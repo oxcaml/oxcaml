@@ -1,0 +1,57 @@
+let $camlInvalid__immstring17 = "lengths" in
+let code check_0 deleted in
+let code bar_1 deleted in
+let $camlInvalid__empty_array41 = Empty_array in
+let code foo_2 deleted in
+let $camlInvalid__Pmakeblock71 =
+  Block 0 ($`*predef*`.caml_exn_Failure, $camlInvalid__immstring17)
+in
+let code inline(never) loopify(never) size(22) newer_version_of(check_0)
+      check_0_1 (t1 : any array, t2 : any array)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Parraylength = %array_length.generic (t2) in
+  let Parraylength_1 = %array_length.generic (t1) in
+  let prim = %phys_ne (Parraylength_1, Parraylength) in
+  switch prim
+    | 0 -> k (0)
+    | 1 -> k1 pop(reraise k1) ($camlInvalid__Pmakeblock71)
+in
+let $camlInvalid__check_3 = closure check_0_1 @check in
+let code inline(always) loopify(never) size(11) newer_version_of(bar_1)
+      bar_1_1 (t1 : any array, t2 : float array)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(check_0_1)
+    ($camlInvalid__check_3 : _ -> imm tagged) (t1, t2) -> k3 * k1
+    where k3 (param : imm tagged) =
+      cont k2
+    where k2 =
+      let prim = %array_load.`float`.mut (t2, 0) in
+      let prim_1 = %float_comp.eq (prim, 0x0p+0) in
+      let float_ordered_and_equal = %tag_imm (prim_1) in
+      cont k (float_ordered_and_equal)
+in
+let $camlInvalid__bar_4 = closure bar_1_1 @bar in
+let code loopify(never) size(11) newer_version_of(foo_2)
+      foo_2_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pmakearray = %array.`float`.mut (0x1p+0) in
+  apply direct(check_0_1) inlining_state(depth(1))
+    ($camlInvalid__check_3 : _ -> imm tagged)
+      (Pmakearray, $camlInvalid__empty_array41)
+      -> k3 * k1
+    where k3 (param_1 : imm tagged) =
+      cont k2
+    where k2 =
+      invalid "(Defining_expr_of_let (bound_pattern prim/110N)\n (defining_expr\n  (((Array_load Naked_floats Naked_floats Mutable) t2/106UV 0)\n   invalid.ml:20,2--23)))"
+in
+let $camlInvalid__foo_5 = closure foo_2_1 @foo in
+let $camlInvalid =
+  Block 0 ($camlInvalid__check_3, $camlInvalid__bar_4, $camlInvalid__foo_5)
+in
+cont done ($camlInvalid)

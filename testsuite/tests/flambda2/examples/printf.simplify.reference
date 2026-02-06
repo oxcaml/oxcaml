@@ -1,0 +1,490 @@
+let code failwith_0 deleted in
+let code invalid_arg_1 deleted in
+let code `@_2` deleted in
+let code `fn[printf.ml:225,4--50]_4` deleted in
+let code kfprintf_3 deleted in
+let code `fn[printf.ml:232,4--50]_6` deleted in
+let code kbprintf_5 deleted in
+let code ikfprintf_7 deleted in
+let code loopify(never) size(1)
+      `fn[printf.ml:239,30--36]_9` (prim : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (0)
+in
+let code fprintf_8 deleted in
+let code loopify(never) size(1)
+      `fn[printf.ml:241,29--35]_11` (prim : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (0)
+in
+let code bprintf_10 deleted in
+let code loopify(never) size(1)
+      `fn[printf.ml:243,32--38]_13` (prim : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (0)
+in
+let code ifprintf_12 deleted in
+let code printf_14 deleted in
+let code eprintf_15 deleted in
+let code k'_17 deleted in
+let code ksprintf_16 deleted in
+let code `fn[printf.ml:257,27--39]_19` deleted in
+let code sprintf_18 deleted in
+let code loopify(never) size(10) newer_version_of(failwith_0)
+      failwith_0_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Failure, s) in
+  cont k1 pop(regular k1) (Pmakeblock)
+in
+let $camlPrintf__failwith_20 = closure failwith_0_1 @failwith in
+let code loopify(never) size(10) newer_version_of(invalid_arg_1)
+      invalid_arg_1_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Invalid_argument, s) in
+  cont k1 pop(regular k1) (Pmakeblock)
+in
+let $camlPrintf__invalid_arg_21 = closure invalid_arg_1_1 @invalid_arg in
+let $`camlPrintf__@_22` =
+  closure `@_2_1` @`@`
+and code rec loopify(never) size(25) newer_version_of(`@_2`)
+      `@_2_1`
+        (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %is_int (l1) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (l2)
+    where k2 =
+      ((let Pfield = %block_load.[`1`] (l1) in
+        apply direct(`@_2_1`)
+          ($`camlPrintf__@_22` ~ depth my_depth -> succ my_depth
+           : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+            (Pfield, l2)
+            -> k2 * k1)
+         where k2 (apply_result : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+           let Pfield = %block_load.[`0`] (l1) in
+           let Pmakeblock = %block.[`0`] (Pfield, apply_result) in
+           cont k (Pmakeblock))
+in
+let code loopify(never) size(13) newer_version_of(`fn[printf.ml:225,4--50]_4`)
+      `fn[printf.ml:225,4--50]_4_1`
+        (acc :
+           [ 0
+           | 0 of [ 0 | 0 of val * val |1 of val * val |2 of val * val
+                  |3 of val * imm tagged |4 of val * val
+                  |5 of val * imm tagged |6 of val * val |7 of val
+                  |8 of val * val ] * val |1 of val * val |2 of val * val
+           |3 of val * imm tagged |4 of val * val |5 of val * imm tagged
+           |6 of val * val |7 of val |8 of val * val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let k = %project_value_slot.[`fn[printf.ml:225,4--50]`].[`k`] (my_closure)
+  in
+  let o = %project_value_slot.[`fn[printf.ml:225,4--50]`].[`o`] (my_closure)
+  in
+  apply direct(output_acc_214)
+    ($CamlinternalFormat.camlCamlinternalFormat__output_acc_367
+     : _ -> imm tagged)
+      (o, acc)
+      -> k3 * k1
+    where k3 (param : imm tagged) =
+      cont k2
+    where k2 =
+      apply k (o) -> k * k1
+in
+let code loopify(never) size(27) newer_version_of(kfprintf_3)
+      kfprintf_3_1
+        (k : val,
+         o : val,
+         param :
+           [ 0 of [ 0 | 0 of val |1 of val |2 of val * val |3 of val * val
+                  |4 of imm tagged * val * val * val
+                  |5 of imm tagged * val * val * val
+                  |6 of imm tagged * val * val * val
+                  |7 of imm tagged * val * val * val
+                  |8 of val * val * val * val |9 of val * val |10 of val
+                  |11 of val * val |12 of imm tagged * val
+                  |13 of val * val * val |14 of val * val * val |15 of val
+                  |16 of val |17 of val * val |18 of val * val |19 of val
+                  |20 of val * val * val |21 of imm tagged * val |22 of val
+                  |23 of val * val |24 of val * val * val ] * val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pfield = %block_load.[`0`] (param) in
+  let `fn[printf.ml:225,4--50]` =
+    closure `fn[printf.ml:225,4--50]_4_1` @`fn[printf.ml:225,4--50]`
+  with { k = k; o = o }
+  in
+  apply direct(make_printf_120)
+    ($CamlinternalFormat.camlCamlinternalFormat__make_printf_354 : _ -> val)
+      (`fn[printf.ml:225,4--50]`, 0, Pfield)
+      -> k * k1
+in
+let $camlPrintf__kfprintf_23 = closure kfprintf_3_1 @kfprintf in
+let code loopify(never) size(13) newer_version_of(`fn[printf.ml:232,4--50]_6`)
+      `fn[printf.ml:232,4--50]_6_1`
+        (acc :
+           [ 0
+           | 0 of [ 0 | 0 of val * val |1 of val * val |2 of val * val
+                  |3 of val * imm tagged |4 of val * val
+                  |5 of val * imm tagged |6 of val * val |7 of val
+                  |8 of val * val ] * val |1 of val * val |2 of val * val
+           |3 of val * imm tagged |4 of val * val |5 of val * imm tagged
+           |6 of val * val |7 of val |8 of val * val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let k =
+    %project_value_slot.[`fn[printf.ml:232,4--50]`].[`k_1`] (my_closure)
+  in
+  let b = %project_value_slot.[`fn[printf.ml:232,4--50]`].[`b`] (my_closure)
+  in
+  apply direct(bufput_acc_215)
+    ($CamlinternalFormat.camlCamlinternalFormat__bufput_acc_368
+     : _ -> imm tagged)
+      (b, acc)
+      -> k3 * k1
+    where k3 (param : imm tagged) =
+      cont k2
+    where k2 =
+      apply k (b) -> k * k1
+in
+let code loopify(never) size(27) newer_version_of(kbprintf_5)
+      kbprintf_5_1
+        (k : val,
+         b : val,
+         param :
+           [ 0 of [ 0 | 0 of val |1 of val |2 of val * val |3 of val * val
+                  |4 of imm tagged * val * val * val
+                  |5 of imm tagged * val * val * val
+                  |6 of imm tagged * val * val * val
+                  |7 of imm tagged * val * val * val
+                  |8 of val * val * val * val |9 of val * val |10 of val
+                  |11 of val * val |12 of imm tagged * val
+                  |13 of val * val * val |14 of val * val * val |15 of val
+                  |16 of val |17 of val * val |18 of val * val |19 of val
+                  |20 of val * val * val |21 of imm tagged * val |22 of val
+                  |23 of val * val |24 of val * val * val ] * val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pfield = %block_load.[`0`] (param) in
+  let `fn[printf.ml:232,4--50]` =
+    closure `fn[printf.ml:232,4--50]_6_1` @`fn[printf.ml:232,4--50]`
+  with { k_1 = k; b = b }
+  in
+  apply direct(make_printf_120)
+    ($CamlinternalFormat.camlCamlinternalFormat__make_printf_354 : _ -> val)
+      (`fn[printf.ml:232,4--50]`, 0, Pfield)
+      -> k * k1
+in
+let $camlPrintf__kbprintf_24 = closure kbprintf_5_1 @kbprintf in
+let code loopify(never) size(5) newer_version_of(ikfprintf_7)
+      ikfprintf_7_1
+        (k : val,
+         oc : val,
+         param :
+           [ 0 of [ 0 | 0 of val |1 of val |2 of val * val |3 of val * val
+                  |4 of imm tagged * val * val * val
+                  |5 of imm tagged * val * val * val
+                  |6 of imm tagged * val * val * val
+                  |7 of imm tagged * val * val * val
+                  |8 of val * val * val * val |9 of val * val |10 of val
+                  |11 of val * val |12 of imm tagged * val
+                  |13 of val * val * val |14 of val * val * val |15 of val
+                  |16 of val |17 of val * val |18 of val * val |19 of val
+                  |20 of val * val * val |21 of imm tagged * val |22 of val
+                  |23 of val * val |24 of val * val * val ] * val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pfield = %block_load.[`0`] (param) in
+  apply direct(make_iprintf_177)
+    ($CamlinternalFormat.camlCamlinternalFormat__make_iprintf_364 : _ -> val)
+      (k, oc, Pfield)
+      -> k * k1
+in
+let $camlPrintf__ikfprintf_25 = closure ikfprintf_7_1 @ikfprintf in
+let $`camlPrintf__fn[printf.ml:239,30--36]_27` =
+  closure `fn[printf.ml:239,30--36]_9` @`fn[printf.ml:239,30--36]`
+in
+let code loopify(never) size(4) newer_version_of(fprintf_8)
+      fprintf_8_1
+        (oc : val,
+         fmt :
+           [ 0 of [ 0 | 0 of val |1 of val |2 of val * val |3 of val * val
+                  |4 of imm tagged * val * val * val
+                  |5 of imm tagged * val * val * val
+                  |6 of imm tagged * val * val * val
+                  |7 of imm tagged * val * val * val
+                  |8 of val * val * val * val |9 of val * val |10 of val
+                  |11 of val * val |12 of imm tagged * val
+                  |13 of val * val * val |14 of val * val * val |15 of val
+                  |16 of val |17 of val * val |18 of val * val |19 of val
+                  |20 of val * val * val |21 of imm tagged * val |22 of val
+                  |23 of val * val |24 of val * val * val ] * val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  apply direct(kfprintf_3_1)
+    ($camlPrintf__kfprintf_23 : _ -> val)
+      ($`camlPrintf__fn[printf.ml:239,30--36]_27`, oc, fmt)
+      -> k * k1
+in
+let $camlPrintf__fprintf_26 = closure fprintf_8_1 @fprintf in
+let $`camlPrintf__fn[printf.ml:241,29--35]_29` =
+  closure `fn[printf.ml:241,29--35]_11` @`fn[printf.ml:241,29--35]`
+in
+let code loopify(never) size(4) newer_version_of(bprintf_10)
+      bprintf_10_1
+        (b : val,
+         fmt :
+           [ 0 of [ 0 | 0 of val |1 of val |2 of val * val |3 of val * val
+                  |4 of imm tagged * val * val * val
+                  |5 of imm tagged * val * val * val
+                  |6 of imm tagged * val * val * val
+                  |7 of imm tagged * val * val * val
+                  |8 of val * val * val * val |9 of val * val |10 of val
+                  |11 of val * val |12 of imm tagged * val
+                  |13 of val * val * val |14 of val * val * val |15 of val
+                  |16 of val |17 of val * val |18 of val * val |19 of val
+                  |20 of val * val * val |21 of imm tagged * val |22 of val
+                  |23 of val * val |24 of val * val * val ] * val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  apply direct(kbprintf_5_1)
+    ($camlPrintf__kbprintf_24 : _ -> val)
+      ($`camlPrintf__fn[printf.ml:241,29--35]_29`, b, fmt)
+      -> k * k1
+in
+let $camlPrintf__bprintf_28 = closure bprintf_10_1 @bprintf in
+let $`camlPrintf__fn[printf.ml:243,32--38]_31` =
+  closure `fn[printf.ml:243,32--38]_13` @`fn[printf.ml:243,32--38]`
+in
+let code loopify(never) size(5) newer_version_of(ifprintf_12)
+      ifprintf_12_1
+        (oc : val,
+         fmt :
+           [ 0 of [ 0 | 0 of val |1 of val |2 of val * val |3 of val * val
+                  |4 of imm tagged * val * val * val
+                  |5 of imm tagged * val * val * val
+                  |6 of imm tagged * val * val * val
+                  |7 of imm tagged * val * val * val
+                  |8 of val * val * val * val |9 of val * val |10 of val
+                  |11 of val * val |12 of imm tagged * val
+                  |13 of val * val * val |14 of val * val * val |15 of val
+                  |16 of val |17 of val * val |18 of val * val |19 of val
+                  |20 of val * val * val |21 of imm tagged * val |22 of val
+                  |23 of val * val |24 of val * val * val ] * val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pfield = %block_load.[`0`] (fmt) in
+  apply direct(make_iprintf_177) inlining_state(depth(10))
+    ($CamlinternalFormat.camlCamlinternalFormat__make_iprintf_364 : _ -> val)
+      ($`camlPrintf__fn[printf.ml:243,32--38]_31`, oc, Pfield)
+      -> k * k1
+in
+let $camlPrintf__ifprintf_30 = closure ifprintf_12_1 @ifprintf in
+let code loopify(never) size(5) newer_version_of(printf_14)
+      printf_14_1
+        (fmt :
+           [ 0 of [ 0 | 0 of val |1 of val |2 of val * val |3 of val * val
+                  |4 of imm tagged * val * val * val
+                  |5 of imm tagged * val * val * val
+                  |6 of imm tagged * val * val * val
+                  |7 of imm tagged * val * val * val
+                  |8 of val * val * val * val |9 of val * val |10 of val
+                  |11 of val * val |12 of imm tagged * val
+                  |13 of val * val * val |14 of val * val * val |15 of val
+                  |16 of val |17 of val * val |18 of val * val |19 of val
+                  |20 of val * val * val |21 of imm tagged * val |22 of val
+                  |23 of val * val |24 of val * val * val ] * val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pfield = %block_load.[`38`] ($Stdlib.camlStdlib) in
+  apply direct(kfprintf_3_1) inlining_state(depth(10))
+    ($camlPrintf__kfprintf_23 : _ -> val)
+      ($`camlPrintf__fn[printf.ml:239,30--36]_27`, Pfield, fmt)
+      -> k * k1
+in
+let $camlPrintf__printf_32 = closure printf_14_1 @printf in
+let code loopify(never) size(5) newer_version_of(eprintf_15)
+      eprintf_15_1
+        (fmt :
+           [ 0 of [ 0 | 0 of val |1 of val |2 of val * val |3 of val * val
+                  |4 of imm tagged * val * val * val
+                  |5 of imm tagged * val * val * val
+                  |6 of imm tagged * val * val * val
+                  |7 of imm tagged * val * val * val
+                  |8 of val * val * val * val |9 of val * val |10 of val
+                  |11 of val * val |12 of imm tagged * val
+                  |13 of val * val * val |14 of val * val * val |15 of val
+                  |16 of val |17 of val * val |18 of val * val |19 of val
+                  |20 of val * val * val |21 of imm tagged * val |22 of val
+                  |23 of val * val |24 of val * val * val ] * val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pfield = %block_load.[`39`] ($Stdlib.camlStdlib) in
+  apply direct(kfprintf_3_1) inlining_state(depth(10))
+    ($camlPrintf__kfprintf_23 : _ -> val)
+      ($`camlPrintf__fn[printf.ml:239,30--36]_27`, Pfield, fmt)
+      -> k * k1
+in
+let $camlPrintf__eprintf_33 = closure eprintf_15_1 @eprintf in
+let code loopify(never) size(88) newer_version_of(k'_17)
+      k'_17_1
+        (acc :
+           [ 0
+           | 0 of [ 0 | 0 of val * val |1 of val * val |2 of val * val
+                  |3 of val * imm tagged |4 of val * val
+                  |5 of val * imm tagged |6 of val * val |7 of val
+                  |8 of val * val ] * val |1 of val * val |2 of val * val
+           |3 of val * imm tagged |4 of val * val |5 of val * imm tagged
+           |6 of val * val |7 of val |8 of val * val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let k = %project_value_slot.[`k'`].[`k_2`] (my_closure) in
+  apply ccall inlining_state(depth(10))
+    ($`*extern*`.caml_create_bytes : val -> val) (64) -> k2 * k1
+    where k2 (s) =
+      let Pmakeblock = %block.[`0`] (s, 64) in
+      let Pmakeblock_1 = %block.mut.[`0`] (Pmakeblock, 0, s) in
+      (apply direct(strput_acc_216)
+         ($CamlinternalFormat.camlCamlinternalFormat__strput_acc_369
+          : _ -> imm tagged)
+           (Pmakeblock_1, acc)
+           -> k3 * k1
+         where k3 (param : imm tagged) =
+           cont k2
+         where k2 =
+           let Pfield = %block_load.mut.[`1`] (Pmakeblock_1) in
+           let Pfield_1 = %block_load.mut.[`0`] (Pmakeblock_1) in
+           let Pfield_2 = %block_load.[`0`] (Pfield_1) in
+           let prim = %int_comp.lt (Pfield, 0) in
+           (switch prim
+              | 0 -> k2
+              | 1 -> k1
+                       pop(reraise k1)
+                       ($Stdlib__Bytes.camlStdlib__Bytes__Pmakeblock3706)
+              where k2 =
+                let prim_1 = %bytes_length (Pfield_2) in
+                let Pbyteslength = %tag_imm (prim_1) in
+                let int_sub = %int_barith.sub (Pbyteslength, Pfield) in
+                let prim_2 = %int_comp.gt (0, int_sub) in
+                (switch prim_2
+                   | 0 -> k2
+                   | 1 -> k1
+                            pop(reraise k1)
+                            ($Stdlib__Bytes.camlStdlib__Bytes__Pmakeblock3706)
+                   where k2 =
+                     (apply ccall inlining_state(depth(30))
+                        ($`*extern*`.caml_create_bytes : val -> val)
+                          (Pfield)
+                          -> k2 * k1
+                        where k2 (r) =
+                          (apply ccall noalloc inlining_state(depth(30))
+                             ($`*extern*`.caml_blit_bytes
+                              : val * val * val * val * val -> val)
+                               (Pfield_2, 0, r, 0, Pfield)
+                               -> k3 * k1
+                             where k3 (param) =
+                               cont k2
+                             where k2 =
+                               apply k (r) -> k * k1)))))
+in
+let code loopify(never) size(101) newer_version_of(ksprintf_16)
+      ksprintf_16_1
+        (k : val,
+         param :
+           [ 0 of [ 0 | 0 of val |1 of val |2 of val * val |3 of val * val
+                  |4 of imm tagged * val * val * val
+                  |5 of imm tagged * val * val * val
+                  |6 of imm tagged * val * val * val
+                  |7 of imm tagged * val * val * val
+                  |8 of val * val * val * val |9 of val * val |10 of val
+                  |11 of val * val |12 of imm tagged * val
+                  |13 of val * val * val |14 of val * val * val |15 of val
+                  |16 of val |17 of val * val |18 of val * val |19 of val
+                  |20 of val * val * val |21 of imm tagged * val |22 of val
+                  |23 of val * val |24 of val * val * val ] * val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let k' = closure k'_17_1 @k' with { k_2 = k } in
+  let Pfield = %block_load.[`0`] (param) in
+  apply direct(make_printf_120)
+    ($CamlinternalFormat.camlCamlinternalFormat__make_printf_354 : _ -> val)
+      (k', 0, Pfield)
+      -> k * k1
+in
+let $camlPrintf__ksprintf_34 = closure ksprintf_16_1 @ksprintf in
+let code loopify(never) size(1) newer_version_of(`fn[printf.ml:257,27--39]_19`)
+      `fn[printf.ml:257,27--39]_19_1` (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  cont k (s)
+in
+let $`camlPrintf__fn[printf.ml:257,27--39]_36` =
+  closure `fn[printf.ml:257,27--39]_19_1` @`fn[printf.ml:257,27--39]`
+in
+let code loopify(never) size(4) newer_version_of(sprintf_18)
+      sprintf_18_1
+        (fmt :
+           [ 0 of [ 0 | 0 of val |1 of val |2 of val * val |3 of val * val
+                  |4 of imm tagged * val * val * val
+                  |5 of imm tagged * val * val * val
+                  |6 of imm tagged * val * val * val
+                  |7 of imm tagged * val * val * val
+                  |8 of val * val * val * val |9 of val * val |10 of val
+                  |11 of val * val |12 of imm tagged * val
+                  |13 of val * val * val |14 of val * val * val |15 of val
+                  |16 of val |17 of val * val |18 of val * val |19 of val
+                  |20 of val * val * val |21 of imm tagged * val |22 of val
+                  |23 of val * val |24 of val * val * val ] * val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  apply direct(ksprintf_16_1)
+    ($camlPrintf__ksprintf_34 : _ -> val)
+      ($`camlPrintf__fn[printf.ml:257,27--39]_36`, fmt)
+      -> k * k1
+in
+let $camlPrintf__sprintf_35 = closure sprintf_18_1 @sprintf in
+let $camlPrintf =
+  Block 0 ($camlPrintf__failwith_20,
+           $camlPrintf__invalid_arg_21,
+           $`camlPrintf__@_22`,
+           $camlPrintf__kfprintf_23,
+           $camlPrintf__kbprintf_24,
+           $camlPrintf__ikfprintf_25,
+           $camlPrintf__fprintf_26,
+           $camlPrintf__bprintf_28,
+           $camlPrintf__ifprintf_30,
+           $camlPrintf__printf_32,
+           $camlPrintf__eprintf_33,
+           $camlPrintf__ksprintf_34,
+           $camlPrintf__sprintf_35,
+           $camlPrintf__ksprintf_34)
+in
+cont done ($camlPrintf)

@@ -1,0 +1,169 @@
+let $camlData_flow_bug__string63 = "index out of bounds" in
+let $camlData_flow_bug__block65 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument,
+           $camlData_flow_bug__string63)
+in
+let $camlData_flow_bug__immstring19 = "" in
+let $camlData_flow_bug__const_block10 = Block 0 (126, 0) in
+let $camlData_flow_bug__const_block12 =
+  Block 0 (63, $camlData_flow_bug__const_block10)
+in
+let $camlData_flow_bug__const_block14 =
+  Block 0 (33, $camlData_flow_bug__const_block12)
+in
+let Popaque = %opaque ($camlData_flow_bug__immstring19) in
+(let Popaque_1 = %opaque (1) in
+ let untagged = %untag_imm (Popaque_1) in
+ let $camlData_flow_bug__Pmakeblock101 = Block 0 (906850200, Popaque) in
+ switch untagged
+   | 0 -> k (-453122489)
+   | 1 -> k ($camlData_flow_bug__Pmakeblock101))
+  where k (fix : val) =
+    ((let prim = %is_int (fix) in
+      switch prim
+        | 0 -> k2
+        | 1 -> k1 (0i)
+        where k2 =
+          let Pfield = %block_load.[`0`] (fix) in
+          let prim_1 = %int_comp.ne (Pfield, -784100624) in
+          switch prim_1
+            | 0 -> k1 (1i)
+            | 1 -> k1 (0i))
+       where k1 (naked_immediate : imm) =
+         (switch naked_immediate
+            | 0 -> k1
+            | 1 -> k
+            where k1 =
+              ((let prim = %is_int (fix) in
+                switch prim
+                  | 0 -> k2
+                  | 1 -> k1 (0i)
+                  where k2 =
+                    let Pfield = %block_load.[`0`] (fix) in
+                    let prim_1 = %int_comp.ne (Pfield, 237833689) in
+                    switch prim_1
+                      | 0 -> k1 (1i)
+                      | 1 -> k1 (0i))
+                 where k1 (naked_immediate_1 : imm) =
+                   (switch naked_immediate_1
+                      | 0 -> k1
+                      | 1 -> k
+                      where k1 =
+                        ((let prim = %is_int (fix) in
+                          switch prim
+                            | 0 -> k2
+                            | 1 -> k1 (0i)
+                            where k2 =
+                              let variant = %block_load.[`0`] (fix) in
+                              let prim_1 = %int_comp.ne (variant, 93260188)
+                              in
+                              (switch prim_1
+                                 | 0 -> k1 (1i)
+                                 | 1 -> k2
+                                 where k2 =
+                                   let prim_2 =
+                                     %int_comp.ne (variant, 906850200)
+                                   in
+                                   switch prim_2
+                                     | 0 -> k1 (1i)
+                                     | 1 -> k1 (0i)))
+                           where k1 (naked_immediate_2 : imm) =
+                             (switch naked_immediate_2
+                                | 0 -> k1
+                                | 1 -> k
+                                where k1 =
+                                  (apply ccall noalloc
+                                     ($`*extern*`.caml_string_notequal
+                                      : val * val -> val)
+                                       (Popaque,
+                                        $camlData_flow_bug__immstring19)
+                                       -> k1 * error
+                                     where k1 (Pccall) =
+                                       ((let untagged = %untag_imm (Pccall)
+                                         in
+                                         switch untagged
+                                           | 0 -> k
+                                           | 1 -> k1)
+                                          where k1 =
+                                            ((let prim =
+                                                %string_length (Popaque)
+                                              in
+                                              let prim_1 =
+                                                %num_conv.[`imm`].[`nativeint`]
+                                                  (prim)
+                                              in
+                                              let prim_2 =
+                                                %int_comp.`nativeint`.unsigned.lt
+                                                  (0n, prim_1)
+                                              in
+                                              switch prim_2
+                                                | 0 -> k1
+                                                | 1 -> k2)
+                                               where k2 =
+                                                 let prim =
+                                                   %string_load.[`8`]
+                                                     (Popaque, 0i)
+                                                 in
+                                                 let Pstringrefs =
+                                                   %tag_imm (prim)
+                                                 in
+                                                 (cont self
+                                                         ($camlData_flow_bug__const_block14)
+                                                    where rec self
+                                                                (param :
+                                                                   [ 0
+                                                                   | 
+                                                                   0 of val *
+                                                                    [ 0
+                                                                    | 
+                                                                    0 of val *
+                                                                    val ] ]) =
+                                                      let prim_1 =
+                                                        %is_int (param)
+                                                      in
+                                                      (switch prim_1
+                                                         | 0 -> k2
+                                                         | 1 -> k
+                                                         where k2 =
+                                                           let Pfield =
+                                                             %block_load.[`0`]
+                                                               (param)
+                                                           in
+                                                           (apply ccall
+                                                                   inlining_state(depth(10))
+                                                              ($`*extern*`.caml_compare
+                                                               : val * val ->
+                                                                 val
+                                                               )
+                                                                (Pfield,
+                                                                 Pstringrefs)
+                                                                -> k2 * error
+                                                              where k2
+                                                                    (Pccall_1) =
+                                                                let prim_2 =
+                                                                  %phys_eq
+                                                                    (
+                                                                    Pccall_1,
+                                                                    0)
+                                                                in
+                                                                (switch prim_2
+                                                                   | 0 -> 
+                                                                   k2
+                                                                   | 1 -> 
+                                                                   k
+                                                                   where 
+                                                                    k2 =
+                                                                    let Pfield_1 =
+                                                                    %block_load.[`1`]
+                                                                    (param)
+                                                                    in
+                                                                    cont 
+                                                                    self
+                                                                    (Pfield_1)))))
+                                               where k1 =
+                                                 cont error
+                                                        pop(regular error)
+                                                        ($camlData_flow_bug__block65)))))))))
+       where k =
+         let $camlData_flow_bug = Block 0 () in
+         cont done ($camlData_flow_bug))

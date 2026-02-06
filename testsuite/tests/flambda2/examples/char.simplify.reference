@@ -1,0 +1,323 @@
+let code failwith_0 deleted in
+let code invalid_arg_1 deleted in
+let code `@_2` deleted in
+let $camlChar__immstring45 = "Char.chr" in
+let code chr_3 deleted in
+let $camlChar__immstring62 = "\\b" in
+let $camlChar__immstring64 = "\\t" in
+let $camlChar__immstring66 = "\\n" in
+let $camlChar__immstring68 = "\\r" in
+let $camlChar__immstring73 = "\\'" in
+let $camlChar__immstring78 = "\\\\" in
+let code escaped_4 deleted in
+let code lowercase_5 deleted in
+let code uppercase_6 deleted in
+let code lowercase_ascii_7 deleted in
+let code uppercase_ascii_8 deleted in
+let code compare_9 deleted in
+let code equal_10 deleted in
+let code loopify(never) size(10) newer_version_of(failwith_0)
+      failwith_0_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Failure, s) in
+  cont k1 pop(regular k1) (Pmakeblock)
+in
+let $camlChar__failwith_11 = closure failwith_0_1 @failwith in
+let code loopify(never) size(10) newer_version_of(invalid_arg_1)
+      invalid_arg_1_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Invalid_argument, s) in
+  cont k1 pop(regular k1) (Pmakeblock)
+in
+let $camlChar__invalid_arg_12 = closure invalid_arg_1_1 @invalid_arg in
+let $`camlChar__@_13` =
+  closure `@_2_1` @`@`
+and code rec loopify(never) size(25) newer_version_of(`@_2`)
+      `@_2_1`
+        (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %is_int (l1) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (l2)
+    where k2 =
+      ((let Pfield = %block_load.[`1`] (l1) in
+        apply direct(`@_2_1`)
+          ($`camlChar__@_13` ~ depth my_depth -> succ my_depth
+           : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+            (Pfield, l2)
+            -> k2 * k1)
+         where k2 (apply_result : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+           let Pfield = %block_load.[`0`] (l1) in
+           let Pmakeblock = %block.[`0`] (Pfield, apply_result) in
+           cont k (Pmakeblock))
+in
+let code loopify(never) size(28) newer_version_of(chr_3)
+      chr_3_1 (n : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let prim = %int_comp.lt (n, 0) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k2
+     where k3 =
+       let prim_1 = %int_comp.gt (n, 255) in
+       switch prim_1
+         | 0 -> k (n)
+         | 1 -> k2)
+    where k2 =
+      apply direct(invalid_arg_1_1)
+        ($camlChar__invalid_arg_12 : _ -> imm tagged)
+          ($camlChar__immstring45)
+          -> never * k1
+in
+let $camlChar__chr_14 = closure chr_3_1 @chr in
+let code loopify(never) size(206) newer_version_of(escaped_4)
+      escaped_4_1 (c : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  (let prim = %int_comp.ge (c, 40) in
+   switch prim
+     | 0 -> k4
+     | 1 -> k5
+     where k5 =
+       let prim_1 = %int_comp.ne (c, 92) in
+       (switch prim_1
+          | 0 -> k ($camlChar__immstring78)
+          | 1 -> k5
+          where k5 =
+            let prim_2 = %int_comp.ge (c, 127) in
+            switch prim_2
+              | 0 -> k2
+              | 1 -> k3)
+     where k4 =
+       let prim_1 = %int_comp.ge (c, 32) in
+       (switch prim_1
+          | 0 -> k4
+          | 1 -> k5
+          where k5 =
+            let prim_2 = %int_comp.ge (c, 39) in
+            switch prim_2
+              | 0 -> k2
+              | 1 -> k ($camlChar__immstring73)
+          where k4 =
+            let prim_2 = %int_comp.ge (c, 14) in
+            (switch prim_2
+               | 0 -> k4
+               | 1 -> k3
+               where k4 =
+                 let untagged = %untag_imm (c) in
+                 switch untagged
+                   | 0 -> k3
+                   | 1 -> k3
+                   | 2 -> k3
+                   | 3 -> k3
+                   | 4 -> k3
+                   | 5 -> k3
+                   | 6 -> k3
+                   | 7 -> k3
+                   | 8 -> k ($camlChar__immstring62)
+                   | 9 -> k ($camlChar__immstring64)
+                   | 10 -> k ($camlChar__immstring66)
+                   | 11 -> k3
+                   | 12 -> k3
+                   | 13 -> k ($camlChar__immstring68))))
+    where k3 =
+      (apply ccall
+         ($`*extern*`.caml_create_bytes : val -> val) (4) -> k3 * k1
+         where k3 (s) =
+           let Pbytessetu = %bytes_or_bigstring_set.bytes.[`8`] (s, 0i, 92i)
+           in
+           let int_div = %int_barith.div (c, 100) in
+           let int_add = %int_barith.add (48, int_div) in
+           let prim = %untag_imm (int_add) in
+           let Pbytessetu_1 =
+             %bytes_or_bigstring_set.bytes.[`8`] (s, 1i, prim)
+           in
+           let int_div_1 = %int_barith.div (c, 10) in
+           let int_mod = %int_barith.mod (int_div_1, 10) in
+           let int_add_1 = %int_barith.add (48, int_mod) in
+           let prim_1 = %untag_imm (int_add_1) in
+           let Pbytessetu_2 =
+             %bytes_or_bigstring_set.bytes.[`8`] (s, 2i, prim_1)
+           in
+           let int_mod_1 = %int_barith.mod (c, 10) in
+           let int_add_2 = %int_barith.add (48, int_mod_1) in
+           let prim_2 = %untag_imm (int_add_2) in
+           let Pbytessetu_3 =
+             %bytes_or_bigstring_set.bytes.[`8`] (s, 3i, prim_2)
+           in
+           cont k (s))
+    where k2 =
+      (apply ccall
+         ($`*extern*`.caml_create_bytes : val -> val) (1) -> k2 * k1
+         where k2 (s) =
+           let prim = %untag_imm (c) in
+           let Pbytessetu = %bytes_or_bigstring_set.bytes.[`8`] (s, 0i, prim)
+           in
+           cont k (s))
+in
+let $camlChar__escaped_15 = closure escaped_4_1 @escaped in
+let code loopify(never) size(75) newer_version_of(lowercase_5)
+      lowercase_5_1 (c : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let prim = %int_comp.ge (c, 65) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k4
+     where k4 =
+       let prim_1 = %int_comp.le (c, 90) in
+       switch prim_1
+         | 0 -> k3
+         | 1 -> k2)
+    where k3 =
+      ((let prim = %int_comp.ge (c, 192) in
+        switch prim
+          | 0 -> k3
+          | 1 -> k4
+          where k4 =
+            let prim_1 = %int_comp.le (c, 214) in
+            switch prim_1
+              | 0 -> k3
+              | 1 -> k2)
+         where k3 =
+           let prim = %int_comp.ge (c, 216) in
+           (switch prim
+              | 0 -> k (c)
+              | 1 -> k3
+              where k3 =
+                let prim_1 = %int_comp.le (c, 222) in
+                switch prim_1
+                  | 0 -> k (c)
+                  | 1 -> k2))
+    where k2 =
+      let int_add = %int_barith.add (c, 32) in
+      cont k (int_add)
+in
+let $camlChar__lowercase_16 = closure lowercase_5_1 @lowercase in
+let code loopify(never) size(75) newer_version_of(uppercase_6)
+      uppercase_6_1 (c : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let prim = %int_comp.ge (c, 97) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k4
+     where k4 =
+       let prim_1 = %int_comp.le (c, 122) in
+       switch prim_1
+         | 0 -> k3
+         | 1 -> k2)
+    where k3 =
+      ((let prim = %int_comp.ge (c, 224) in
+        switch prim
+          | 0 -> k3
+          | 1 -> k4
+          where k4 =
+            let prim_1 = %int_comp.le (c, 246) in
+            switch prim_1
+              | 0 -> k3
+              | 1 -> k2)
+         where k3 =
+           let prim = %int_comp.ge (c, 248) in
+           (switch prim
+              | 0 -> k (c)
+              | 1 -> k3
+              where k3 =
+                let prim_1 = %int_comp.le (c, 254) in
+                switch prim_1
+                  | 0 -> k (c)
+                  | 1 -> k2))
+    where k2 =
+      let int_sub = %int_barith.sub (c, 32) in
+      cont k (int_sub)
+in
+let $camlChar__uppercase_17 = closure uppercase_6_1 @uppercase in
+let code loopify(never) size(27) newer_version_of(lowercase_ascii_7)
+      lowercase_ascii_7_1 (c : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %int_comp.ge (c, 65) in
+  switch prim
+    | 0 -> k (c)
+    | 1 -> k2
+    where k2 =
+      let prim_1 = %int_comp.le (c, 90) in
+      (switch prim_1
+         | 0 -> k (c)
+         | 1 -> k2
+         where k2 =
+           let int_add = %int_barith.add (c, 32) in
+           cont k (int_add))
+in
+let $camlChar__lowercase_ascii_18 =
+  closure lowercase_ascii_7_1 @lowercase_ascii
+in
+let code loopify(never) size(27) newer_version_of(uppercase_ascii_8)
+      uppercase_ascii_8_1 (c : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %int_comp.ge (c, 97) in
+  switch prim
+    | 0 -> k (c)
+    | 1 -> k2
+    where k2 =
+      let prim_1 = %int_comp.le (c, 122) in
+      (switch prim_1
+         | 0 -> k (c)
+         | 1 -> k2
+         where k2 =
+           let int_sub = %int_barith.sub (c, 32) in
+           cont k (int_sub))
+in
+let $camlChar__uppercase_ascii_19 =
+  closure uppercase_ascii_8_1 @uppercase_ascii
+in
+let code loopify(never) size(3) newer_version_of(compare_9)
+      compare_9_1 (c1 : imm tagged, c2 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let int_sub = %int_barith.sub (c1, c2) in
+  cont k (int_sub)
+in
+let $camlChar__compare_20 = closure compare_9_1 @compare in
+let code loopify(never) size(7) newer_version_of(equal_10)
+      equal_10_1 (c1 : imm tagged, c2 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let int_sub = %int_barith.sub (c1, c2) in
+  let prim = %phys_eq (int_sub, 0) in
+  let eq = %tag_imm (prim) in
+  cont k (eq)
+in
+let $camlChar__equal_21 = closure equal_10_1 @equal in
+let $camlChar =
+  Block 0 ($camlChar__failwith_11,
+           $camlChar__invalid_arg_12,
+           $`camlChar__@_13`,
+           $camlChar__chr_14,
+           $camlChar__escaped_15,
+           $camlChar__lowercase_16,
+           $camlChar__uppercase_17,
+           $camlChar__lowercase_ascii_18,
+           $camlChar__uppercase_ascii_19,
+           $camlChar__compare_20,
+           $camlChar__equal_21)
+in
+cont done ($camlChar)

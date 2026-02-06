@@ -1,0 +1,48 @@
+let code escape_string_0 deleted in
+let code loopify(never) size(63) newer_version_of(escape_string_0)
+      escape_string_0_1 (s : val, s' : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %string_length (s) in
+  let for_stop = %tag_imm (prim) in
+  let prim_1 = %int_comp.le (0, for_stop) in
+  switch prim_1
+    | 0 -> k (0)
+    | 1 -> k2
+    where k2 =
+      (cont k2 (0, 0)
+         where rec k2 (i : imm tagged, n_289_unboxed0 : imm tagged) =
+           let prim_2 = %num_conv.[`tagged_imm`].[`imm`] (i) in
+           let prim_3 = %string_load.[`8`] (s, prim_2) in
+           let c = %tag_imm (prim_3) in
+           ((let prim_4 = %int_comp.ne (c, 0) in
+             switch prim_4
+               | 0 -> k4
+               | 1 -> k5
+               where k5 =
+                 let prim_5 =
+                   %num_conv.[`tagged_imm`].[`imm`] (n_289_unboxed0)
+                 in
+                 let Pbytessetu =
+                   %bytes_or_bigstring_set.bytes.[`8`] (s', prim_5, prim_3)
+                 in
+                 cont k3 (n_289_unboxed0)
+               where k4 =
+                 let int_add = %int_barith.add (n_289_unboxed0, 1) in
+                 cont k3 (int_add))
+              where k3 (n_289_unboxed0_1 : imm tagged) =
+                let int_add = %int_barith.add (n_289_unboxed0_1, 1) in
+                let prim_4 = %int_comp.ne (i, for_stop) in
+                (switch prim_4
+                   | 0 -> k (0)
+                   | 1 -> k3
+                   where k3 =
+                     let int_succ = %int_barith.add (i, 1) in
+                     cont k2 (int_succ, int_add))))
+in
+let $camlMutable_vars1__escape_string_1 =
+  closure escape_string_0_1 @escape_string
+in
+let $camlMutable_vars1 = Block 0 ($camlMutable_vars1__escape_string_1) in
+cont done ($camlMutable_vars1)

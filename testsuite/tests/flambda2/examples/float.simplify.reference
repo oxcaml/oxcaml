@@ -1,0 +1,3571 @@
+let code failwith_0 deleted in
+let code invalid_arg_1 deleted in
+let code min_2 deleted in
+let code max_3 deleted in
+let code abs_4 deleted in
+let code lnot_5 deleted in
+let code `^_6` deleted in
+let $camlFloat__immstring142 = "false" in
+let $camlFloat__immstring144 = "true" in
+let code string_of_bool_7 deleted in
+let $camlFloat__immstring158 = "bool_of_string" in
+let code bool_of_string_8 deleted in
+let $camlFloat__const_block168 = Block 0 (0) in
+let $camlFloat__const_block173 = Block 0 (1) in
+let code bool_of_string_opt_9 deleted in
+let $camlFloat__immstring180 = "%d" in
+let code string_of_int_10 deleted in
+let code int_of_string_opt_11 deleted in
+let $camlFloat__immstring7 = "index out of bounds" in
+let $camlFloat__block226 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlFloat__immstring7)
+in
+let $camlFloat__immstring241 = "." in
+let code loop_13 deleted in
+let code valid_float_lexem_12 deleted in
+let $camlFloat__immstring249 = "%.12g" in
+let code string_of_float_14 deleted in
+let code float_of_string_opt_15 deleted in
+let $camlFloat__float291 = 0x0p+0 in
+let code is_finite_16 deleted in
+let $camlFloat__float294 = 0x1p+0 in
+let code is_infinite_17 deleted in
+let code is_nan_18 deleted in
+let code is_integer_19 deleted in
+let code succ_20 deleted in
+let code pred_21 deleted in
+let code equal_22 deleted in
+let code min_23 deleted in
+let code max_24 deleted in
+let code min_max_25 deleted in
+let code min_num_26 deleted in
+let code max_num_27 deleted in
+let code min_max_num_28 deleted in
+let code hash_29 deleted in
+let code unsafe_fill_30 deleted in
+let code unsafe_blit_31 deleted in
+let code check_32 deleted in
+let code make_33 deleted in
+let $camlFloat__immstring664 = "Float.Array.init" in
+let code init_34 deleted in
+let code append_35 deleted in
+let $camlFloat__immstring691 = "Float.Array.concat" in
+let code ensure_ge_36 deleted in
+let code sum_lengths_37 deleted in
+let $camlFloat__immstring742 = "float.ml" in
+let $camlFloat__const_block744 = Block 0 ($camlFloat__immstring742, 645, 14)
+in
+let $camlFloat__Pmakeblock747 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlFloat__const_block744)
+in
+let code loop_39 deleted in
+let code concat_38 deleted in
+let $camlFloat__immstring762 = "Float.Array.sub" in
+let code sub_40 deleted in
+let code copy_41 deleted in
+let $camlFloat__immstring788 = "Float.Array.fill" in
+let code fill_42 deleted in
+let $camlFloat__immstring802 = "Float.array.blit" in
+let code blit_43 deleted in
+let code loopify(never) size(7)
+      `fn[float.ml:675,40--50]_45` (prim : float array, prim_1 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float boxed =
+  let prim_2 = %array_load.`float`.mut (prim, prim_1) in
+  let Parrayrefu = %box_num.`float` (prim_2) in
+  cont k (Parrayrefu)
+in
+let code loopify(never) size(6)
+      `partial_fn[float.ml:675,40--50]_46` (param1 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float boxed =
+  let a =
+    %project_value_slot.[`partial_fn[float.ml:675,40--50]`].[`a`]
+      (my_closure)
+  in
+  let `fn[float.ml:675,40--50]` =
+    %project_value_slot.[`partial_fn[float.ml:675,40--50]`].[`fn[float.ml:675,40--50]`]
+      (my_closure)
+  in
+  apply direct(`fn[float.ml:675,40--50]_45`)
+    (`fn[float.ml:675,40--50]` : _ -> float boxed) (a, param1) -> k * k1
+in
+let code to_list_44 deleted in
+let code fill_48 deleted in
+let code of_list_47 deleted in
+let code iter_49 deleted in
+let $camlFloat__immstring904 =
+  "Float.Array.iter2: arrays must have the same length"
+in
+let code iter2_50 deleted in
+let code map_51 deleted in
+let $camlFloat__immstring965 =
+  "Float.Array.map2: arrays must have the same length"
+in
+let code map2_52 deleted in
+let code iteri_53 deleted in
+let code mapi_54 deleted in
+let code fold_left_55 deleted in
+let code fold_right_56 deleted in
+let code loop_58 deleted in
+let code exists_57 deleted in
+let code loop_60 deleted in
+let code for_all_59 deleted in
+let code loop_62 deleted in
+let code mem_61 deleted in
+let code loop_64 deleted in
+let code mem_ieee_63 deleted in
+let code maxson_66 deleted in
+let code trickledown_67 deleted in
+let code bubbledown_68 deleted in
+let $camlFloat__const_block1341 = Block 0 ($camlFloat__immstring742, 824, 6)
+in
+let $camlFloat__Pmakeblock1344 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlFloat__const_block1341)
+in
+let code trickleup_69 deleted in
+let code sort_65 deleted in
+let code loop_72 deleted in
+let code merge_71 deleted in
+let code isortto_73 deleted in
+let code sortto_74 deleted in
+let code stable_sort_70 deleted in
+let code aux_76 deleted
+and code loopify(never) size(8)
+      partial_aux_77 (param1 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let int_add = %project_value_slot.[`partial_aux`].[`int_add`] (my_closure)
+  in
+  let aux = %project_value_slot.[`partial_aux`].[`my_closure`] (my_closure)
+  in
+  apply
+    (aux : imm tagged * imm tagged -> [ 0 | 0 of val * val ])
+      (int_add, param1)
+      -> k * k1
+in
+let code loopify(never) size(7)
+      partial_aux_78 (param1 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let aux = %project_value_slot.[`partial_aux_1`].[`aux`] (my_closure) in
+  apply
+    (aux : imm tagged * imm tagged -> [ 0 | 0 of val * val ])
+      (0, param1)
+      -> k * k1
+in
+let code to_seq_75 deleted in
+let code aux_80 deleted
+and code loopify(never) size(8)
+      partial_aux_81 (param1 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let aux =
+    %project_value_slot.[`partial_aux_2`].[`my_closure_1`] (my_closure)
+  in
+  let int_add =
+    %project_value_slot.[`partial_aux_2`].[`int_add_1`] (my_closure)
+  in
+  apply
+    (aux : imm tagged * imm tagged -> [ 0 | 0 of val * val ])
+      (int_add, param1)
+      -> k * k1
+in
+let code loopify(never) size(7)
+      partial_aux_82 (param1 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let aux = %project_value_slot.[`partial_aux_3`].[`aux_1`] (my_closure) in
+  apply
+    (aux : imm tagged * imm tagged -> [ 0 | 0 of val * val ])
+      (0, param1)
+      -> k * k1
+in
+let code to_seqi_79 deleted in
+let code fill_84 deleted in
+let code of_rev_list_83 deleted in
+let code of_seq_85 deleted in
+let $camlFloat__empty_array1804 = Empty_array in
+let code map_to_array_87 deleted in
+let code map_from_array_88 deleted in
+let $camlFloat__immstring1176 = "Float.Array.Bottom" in
+let $camlFloat__float339 = 0x1.921fb54442d18p+1 in
+let $camlFloat__float297 = -0x1p+0 in
+let $camlFloat__immstring32 = "Float.Stdlib.Exit" in
+let $camlFloat__immstring10 = "Pervasives.array_bound_error" in
+let $camlFloat__Pmakeblock1909 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlFloat__immstring7)
+in
+apply ccall
+  ($`*extern*`.caml_register_named_value : val * val -> val)
+    ($camlFloat__immstring10, $camlFloat__Pmakeblock1909)
+    -> k1 * error
+  where k1 (param) =
+    cont k
+  where k =
+    let code loopify(never) size(10) newer_version_of(failwith_0)
+          failwith_0_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Failure, s) in
+      cont k1 pop(regular k1) (Pmakeblock)
+    in
+    let $camlFloat__failwith_89 = closure failwith_0_1 @failwith in
+    let code loopify(never) size(10) newer_version_of(invalid_arg_1)
+          invalid_arg_1_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      let Pmakeblock =
+        %block.[`0`] ($`*predef*`.caml_exn_Invalid_argument, s)
+      in
+      cont k1 pop(regular k1) (Pmakeblock)
+    in
+    let $camlFloat__invalid_arg_90 = closure invalid_arg_1_1 @invalid_arg in
+    (apply ccall noalloc
+       ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
+       where k (Pccall) =
+         let $camlFloat__Exit1928 =
+           Block immutable_unique
+           248 ($camlFloat__immstring32, Pccall)
+         in
+         let code loopify(never) size(21) newer_version_of(min_2)
+               min_2_1 (x : val, y : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : val =
+           apply ccall
+             ($`*extern*`.caml_lessequal : val * val -> val)
+               (x, y)
+               -> k2 * k1
+             where k2 (Pccall_1) =
+               let untagged = %untag_imm (Pccall_1) in
+               switch untagged
+                 | 0 -> k (y)
+                 | 1 -> k (x)
+         in
+         let $camlFloat__min_91 = closure min_2_1 @min in
+         let code loopify(never) size(21) newer_version_of(max_3)
+               max_3_1 (x : val, y : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : val =
+           apply ccall
+             ($`*extern*`.caml_greaterequal : val * val -> val)
+               (x, y)
+               -> k2 * k1
+             where k2 (Pccall_1) =
+               let untagged = %untag_imm (Pccall_1) in
+               switch untagged
+                 | 0 -> k (y)
+                 | 1 -> k (x)
+         in
+         let $camlFloat__max_92 = closure max_3_1 @max in
+         let code loopify(never) size(15) newer_version_of(abs_4)
+               abs_4_1 (x : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let prim = %int_comp.ge (x, 0) in
+           switch prim
+             | 0 -> k2
+             | 1 -> k (x)
+             where k2 =
+               let int_neg = %int_barith.sub (0, x) in
+               cont k (int_neg)
+         in
+         let $camlFloat__abs_93 = closure abs_4_1 @abs in
+         let code loopify(never) size(3) newer_version_of(lnot_5)
+               lnot_5_1 (x : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let int_xor = %int_barith.xor (x, -1) in
+           cont k (int_xor)
+         in
+         let $camlFloat__lnot_94 = closure lnot_5_1 @lnot in
+         let $camlFloat__infinity1982 = infinity in
+         let $camlFloat__neg_infinity1986 = -infinity in
+         let $camlFloat__nan1990 = nan in
+         let $camlFloat__max_float1994 = 0x1.fffffffffffffp+1023 in
+         let $camlFloat__min_float1998 = 0x1p-1022 in
+         let $camlFloat__epsilon_float2002 = 0x1p-52 in
+         let code loopify(never) size(36) newer_version_of(`^_6`)
+               `^_6_1` (s1 : val, s2 : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : val =
+           let prim = %string_length (s1) in
+           let l1 = %tag_imm (prim) in
+           let prim_1 = %string_length (s2) in
+           let l2 = %tag_imm (prim_1) in
+           let int_add = %int_barith.add (l1, l2) in
+           apply ccall
+             ($`*extern*`.caml_create_bytes : val -> val)
+               (int_add)
+               -> k2 * k1
+             where k2 (s) =
+               (apply ccall noalloc
+                  ($`*extern*`.caml_blit_string
+                   : val * val * val * val * val -> val)
+                    (s1, 0, s, 0, l1)
+                    -> k3 * k1
+                  where k3 (param) =
+                    cont k2
+                  where k2 =
+                    (apply ccall noalloc
+                       ($`*extern*`.caml_blit_string
+                        : val * val * val * val * val -> val)
+                         (s2, 0, s, l1, l2)
+                         -> k2 * k1
+                       where k2 (param) =
+                         cont k (s)))
+         in
+         let $`camlFloat__^_95` = closure `^_6_1` @`^` in
+         let code loopify(never) size(11) newer_version_of(string_of_bool_7)
+               string_of_bool_7_1 (b : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : val =
+           let untagged = %untag_imm (b) in
+           switch untagged
+             | 0 -> k ($camlFloat__immstring142)
+             | 1 -> k ($camlFloat__immstring144)
+         in
+         let $camlFloat__string_of_bool_96 =
+           closure string_of_bool_7_1 @string_of_bool
+         in
+         let code loopify(never) size(34) newer_version_of(bool_of_string_8)
+               bool_of_string_8_1 (param : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           apply ccall noalloc
+             ($`*extern*`.caml_string_notequal : val * val -> val)
+               (param, $camlFloat__immstring142)
+               -> k2 * k1
+             where k2 (Pccall_1) =
+               ((let untagged = %untag_imm (Pccall_1) in
+                 switch untagged
+                   | 0 -> k (0)
+                   | 1 -> k2)
+                  where k2 =
+                    (apply ccall noalloc
+                       ($`*extern*`.caml_string_notequal : val * val -> val)
+                         (param, $camlFloat__immstring144)
+                         -> k2 * k1
+                       where k2 (Pccall_2) =
+                         ((let untagged = %untag_imm (Pccall_2) in
+                           switch untagged
+                             | 0 -> k (1)
+                             | 1 -> k2)
+                            where k2 =
+                              apply direct(invalid_arg_1_1)
+                                ($camlFloat__invalid_arg_90 : _ -> imm tagged
+                                 )
+                                  ($camlFloat__immstring158)
+                                  -> never * k1)))
+         in
+         let $camlFloat__bool_of_string_97 =
+           closure bool_of_string_8_1 @bool_of_string
+         in
+         let code loopify(never) size(30) newer_version_of(bool_of_string_opt_9)
+               bool_of_string_opt_9_1 (param : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : [ 0 | 0 of val ] =
+           apply ccall noalloc
+             ($`*extern*`.caml_string_notequal : val * val -> val)
+               (param, $camlFloat__immstring142)
+               -> k2 * k1
+             where k2 (Pccall_1) =
+               ((let untagged = %untag_imm (Pccall_1) in
+                 switch untagged
+                   | 0 -> k ($camlFloat__const_block168)
+                   | 1 -> k2)
+                  where k2 =
+                    (apply ccall noalloc
+                       ($`*extern*`.caml_string_notequal : val * val -> val)
+                         (param, $camlFloat__immstring144)
+                         -> k2 * k1
+                       where k2 (Pccall_2) =
+                         let untagged = %untag_imm (Pccall_2) in
+                         switch untagged
+                           | 0 -> k ($camlFloat__const_block173)
+                           | 1 -> k (0)))
+         in
+         let $camlFloat__bool_of_string_opt_98 =
+           closure bool_of_string_opt_9_1 @bool_of_string_opt
+         in
+         let code loopify(never) size(10) newer_version_of(string_of_int_10)
+               string_of_int_10_1 (n : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : val =
+           apply ccall
+             ($`*extern*`.caml_format_int : val * val -> val)
+               ($camlFloat__immstring180, n)
+               -> k * k1
+         in
+         let $camlFloat__string_of_int_99 =
+           closure string_of_int_10_1 @string_of_int
+         in
+         let code loopify(never) size(39) newer_version_of(int_of_string_opt_11)
+               int_of_string_opt_11_1 (s : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : [ 0 | 0 of val ] =
+           let try_region = %begin_try_region () in
+           let try_ghost_region = %begin_try_ghost_region () in
+           cont k3 push(k2)
+             where k3 =
+               (apply ccall
+                  ($`*extern*`.caml_int_of_string : val -> val)
+                    (s)
+                    -> k3 * k2
+                  where k3 (Pccall_1) =
+                    let Pmakeblock = %block.[`0`] (Pccall_1) in
+                    cont k pop(k2) (Pmakeblock))
+             where k2 exn (`exn` : val) =
+               let `unit` = %end_try_region (try_region) in
+               let unit_1 = %end_try_ghost_region (try_ghost_region) in
+               let Pfield = %block_load.[`0`] (`exn`) in
+               let prim = %phys_eq (Pfield, $`*predef*`.caml_exn_Failure) in
+               switch prim
+                 | 0 -> k1 pop(reraise k1) (`exn`)
+                 | 1 -> k (0)
+         in
+         let $camlFloat__int_of_string_opt_100 =
+           closure int_of_string_opt_11_1 @int_of_string_opt
+         in
+         let code rec loopify(done) size(85) newer_version_of(loop_13)
+               loop_13_1 (i : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : val =
+           cont self (i)
+             where rec self (i_1 : imm tagged) =
+               let s = %project_value_slot.[`loop`].[`s`] (my_closure) in
+               let l = %project_value_slot.[`loop`].[`l`] (my_closure) in
+               let prim = %int_comp.ge (i_1, l) in
+               (switch prim
+                  | 0 -> k2
+                  | 1 -> k3
+                  where k3 =
+                    apply direct(`^_6_1`)
+                      ($`camlFloat__^_95` : _ -> val)
+                        (s, $camlFloat__immstring241)
+                        -> k * k1
+                  where k2 =
+                    ((let prim_1 = %string_length (s) in
+                      let prim_2 = %num_conv.[`imm`].[`nativeint`] (prim_1)
+                      in
+                      let prim_3 =
+                        %num_conv.[`tagged_imm`].[`nativeint`] (i_1)
+                      in
+                      let prim_4 =
+                        %int_comp.`nativeint`.unsigned.lt (prim_3, prim_2)
+                      in
+                      switch prim_4
+                        | 0 -> k2
+                        | 1 -> k3)
+                       where k3 =
+                         let prim_1 = %num_conv.[`tagged_imm`].[`imm`] (i_1)
+                         in
+                         let prim_2 = %string_load.[`8`] (s, prim_1) in
+                         let `*match*` = %tag_imm (prim_2) in
+                         ((let prim_3 = %int_comp.ge (`*match*`, 48) in
+                           switch prim_3
+                             | 0 -> k4
+                             | 1 -> k5
+                             where k5 =
+                               let prim_4 = %int_comp.ge (`*match*`, 58) in
+                               switch prim_4
+                                 | 0 -> k3
+                                 | 1 -> k (s)
+                             where k4 =
+                               let prim_4 = %int_comp.ne (`*match*`, 45) in
+                               switch prim_4
+                                 | 0 -> k3
+                                 | 1 -> k (s))
+                            where k3 =
+                              let int_add = %int_barith.add (i_1, 1) in
+                              cont self (int_add))
+                       where k2 =
+                         cont k1 pop(regular k1) ($camlFloat__block226)))
+         in
+         let code loopify(never) size(106) newer_version_of(valid_float_lexem_12)
+               valid_float_lexem_12_1 (s : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : val =
+           let prim = %string_length (s) in
+           let l = %tag_imm (prim) in
+           let loop = closure loop_13_1 @loop
+           with { `^` = $`camlFloat__^_95`; s = s; l = l }
+           in
+           apply direct(loop_13_1) (loop : _ -> val) (0) -> k * k1
+         in
+         let $camlFloat__valid_float_lexem_101 =
+           closure valid_float_lexem_12_1 @valid_float_lexem
+         in
+         let code loopify(never) size(14) newer_version_of(string_of_float_14)
+               string_of_float_14_1 (f : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : val =
+           apply ccall
+             ($`*extern*`.caml_format_float : val * val -> val)
+               ($camlFloat__immstring249, f)
+               -> k2 * k1
+             where k2 (Pccall_1) =
+               apply direct(valid_float_lexem_12_1)
+                 ($camlFloat__valid_float_lexem_101 : _ -> val)
+                   (Pccall_1)
+                   -> k * k1
+         in
+         let $camlFloat__string_of_float_102 =
+           closure string_of_float_14_1 @string_of_float
+         in
+         let code loopify(never) size(39) newer_version_of(float_of_string_opt_15)
+               float_of_string_opt_15_1 (s : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : [ 0 | 0 of val ] =
+           let try_region = %begin_try_region () in
+           let try_ghost_region = %begin_try_ghost_region () in
+           cont k3 push(k2)
+             where k3 =
+               (apply ccall
+                  ($`*extern*`.caml_float_of_string : val -> val)
+                    (s)
+                    -> k3 * k2
+                  where k3 (Pccall_1) =
+                    let Pmakeblock = %block.[`0`] (Pccall_1) in
+                    cont k pop(k2) (Pmakeblock))
+             where k2 exn (`exn` : val) =
+               let `unit` = %end_try_region (try_region) in
+               let unit_1 = %end_try_ghost_region (try_ghost_region) in
+               let Pfield = %block_load.[`0`] (`exn`) in
+               let prim = %phys_eq (Pfield, $`*predef*`.caml_exn_Failure) in
+               switch prim
+                 | 0 -> k1 pop(reraise k1) (`exn`)
+                 | 1 -> k (0)
+         in
+         let $camlFloat__float_of_string_opt_103 =
+           closure float_of_string_opt_15_1 @float_of_string_opt
+         in
+         let $camlFloat__Pmakeblock2148 =
+           Block 0 ($camlFloat__failwith_89,
+                    $camlFloat__invalid_arg_90,
+                    $camlFloat__Exit1928,
+                    $`*predef*`.caml_exn_Match_failure,
+                    $`*predef*`.caml_exn_Assert_failure,
+                    $`*predef*`.caml_exn_Invalid_argument,
+                    $`*predef*`.caml_exn_Failure,
+                    $`*predef*`.caml_exn_Not_found,
+                    $`*predef*`.caml_exn_Out_of_memory,
+                    $`*predef*`.caml_exn_Stack_overflow,
+                    $`*predef*`.caml_exn_Sys_error,
+                    $`*predef*`.caml_exn_End_of_file,
+                    $`*predef*`.caml_exn_Division_by_zero,
+                    $`*predef*`.caml_exn_Sys_blocked_io,
+                    $`*predef*`.caml_exn_Undefined_recursive_module,
+                    $camlFloat__min_91,
+                    $camlFloat__max_92,
+                    $camlFloat__abs_93,
+                    $camlFloat__lnot_94,
+                    4611686018427387903,
+                    -4611686018427387904,
+                    $camlFloat__infinity1982,
+                    $camlFloat__neg_infinity1986,
+                    $camlFloat__nan1990,
+                    $camlFloat__max_float1994,
+                    $camlFloat__min_float1998,
+                    $camlFloat__epsilon_float2002,
+                    $`camlFloat__^_95`,
+                    $camlFloat__string_of_bool_96,
+                    $camlFloat__bool_of_string_97,
+                    $camlFloat__bool_of_string_opt_98,
+                    $camlFloat__string_of_int_99,
+                    $camlFloat__int_of_string_opt_100,
+                    $camlFloat__valid_float_lexem_101,
+                    $camlFloat__string_of_float_102,
+                    $camlFloat__float_of_string_opt_103)
+         in
+         let code loopify(never) size(8) newer_version_of(is_finite_16)
+               is_finite_16_1 (x : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let prim = %unbox_num.`float` (x) in
+           let prim_1 = %bfloat_arith.sub (prim, prim) in
+           let prim_2 = %float_comp.eq (prim_1, 0x0p+0) in
+           let float_ordered_and_equal = %tag_imm (prim_2) in
+           cont k (float_ordered_and_equal)
+         in
+         let $camlFloat__is_finite_104 = closure is_finite_16_1 @is_finite in
+         let code loopify(never) size(8) newer_version_of(is_infinite_17)
+               is_infinite_17_1 (x : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let prim = %unbox_num.`float` (x) in
+           let prim_1 = %bfloat_arith.div (0x1p+0, prim) in
+           let prim_2 = %float_comp.eq (prim_1, 0x0p+0) in
+           let float_ordered_and_equal = %tag_imm (prim_2) in
+           cont k (float_ordered_and_equal)
+         in
+         let $camlFloat__is_infinite_105 =
+           closure is_infinite_17_1 @is_infinite
+         in
+         let code loopify(never) size(7) newer_version_of(is_nan_18)
+               is_nan_18_1 (x : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let prim = %unbox_num.`float` (x) in
+           let prim_1 = %float_comp.eq (prim, prim) in
+           let float_ordered_and_equal = %tag_imm (prim_1) in
+           let float_unordered_or_notequal =
+             %boolean_not (float_ordered_and_equal)
+           in
+           cont k (float_unordered_or_notequal)
+         in
+         let $camlFloat__is_nan_106 = closure is_nan_18_1 @is_nan in
+         let code loopify(never) size(25) newer_version_of(is_integer_19)
+               is_integer_19_1 (x : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           (let unboxed = %unbox_num.`float` (x) in
+            apply ccall noalloc
+              ($`*extern*`.caml_trunc : float -> float) (unboxed) -> k2 * k1)
+             where k2 (Pccall_1 : float) =
+               let prim = %unbox_num.`float` (x) in
+               let prim_1 = %float_comp.eq (prim, Pccall_1) in
+               (switch prim_1
+                  | 0 -> k (0)
+                  | 1 -> k2
+                  where k2 =
+                    let prim_2 = %bfloat_arith.sub (prim, prim) in
+                    let prim_3 = %float_comp.eq (prim_2, 0x0p+0) in
+                    let float_ordered_and_equal = %tag_imm (prim_3) in
+                    cont k (float_ordered_and_equal))
+         in
+         let $camlFloat__is_integer_107 = closure is_integer_19_1 @is_integer
+         in
+         let code loopify(never) size(11) newer_version_of(succ_20)
+               succ_20_1 (x : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : float boxed =
+           (let unboxed = %unbox_num.`float` (x) in
+            apply ccall noalloc
+              ($`*extern*`.caml_nextafter : float * float -> float)
+                (unboxed, infinity)
+                -> k2 * k1)
+             where k2 (Pccall_1 : float) =
+               let Pccall_2 = %box_num.`float` (Pccall_1) in
+               cont k (Pccall_2)
+         in
+         let $camlFloat__succ_108 = closure succ_20_1 @`succ` in
+         let code loopify(never) size(11) newer_version_of(pred_21)
+               pred_21_1 (x : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : float boxed =
+           (let unboxed = %unbox_num.`float` (x) in
+            apply ccall noalloc
+              ($`*extern*`.caml_nextafter : float * float -> float)
+                (unboxed, -infinity)
+                -> k2 * k1)
+             where k2 (Pccall_1 : float) =
+               let Pccall_2 = %box_num.`float` (Pccall_1) in
+               cont k (Pccall_2)
+         in
+         let $camlFloat__pred_109 = closure pred_21_1 @pred in
+         let code loopify(never) size(17) newer_version_of(equal_22)
+               equal_22_1 (x : float boxed, y : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let prim = %unbox_num.`float` (y) in
+           let prim_1 = %unbox_num.`float` (x) in
+           let prim_2 = %float_comp.lt (prim_1, prim) in
+           let float_compare = %tag_imm (prim_2) in
+           let prim_3 = %phys_eq (float_compare, 0) in
+           let eq = %tag_imm (prim_3) in
+           cont k (eq)
+         in
+         let $camlFloat__equal_110 = closure equal_22_1 @equal in
+         let code inline(always) loopify(never) size(78) newer_version_of(min_23)
+               min_23_1 (x : float boxed, y : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : float boxed =
+           (let prim = %unbox_num.`float` (x) in
+            let prim_1 = %unbox_num.`float` (y) in
+            let prim_2 = %float_comp.gt (prim_1, prim) in
+            switch prim_2
+              | 0 -> k4
+              | 1 -> k2
+              where k4 =
+                (apply ccall noalloc
+                   ($`*extern*`.caml_signbit : float -> val)
+                     (prim_1)
+                     -> k4 * k1
+                   where k4 (Pccall_1) =
+                     ((let untagged = %untag_imm (Pccall_1) in
+                       switch untagged
+                         | 0 -> k4
+                         | 1 -> k3)
+                        where k4 =
+                          (apply ccall noalloc
+                             ($`*extern*`.caml_signbit : float -> val)
+                               (prim)
+                               -> k4 * k1
+                             where k4 (Pccall_2) =
+                               let untagged = %untag_imm (Pccall_2) in
+                               switch untagged
+                                 | 0 -> k3
+                                 | 1 -> k2))))
+             where k3 =
+               let prim = %unbox_num.`float` (x) in
+               let prim_1 = %float_comp.eq (prim, prim) in
+               let float_ordered_and_equal = %tag_imm (prim_1) in
+               let float_unordered_or_notequal =
+                 %boolean_not (float_ordered_and_equal)
+               in
+               let untagged = %untag_imm (float_unordered_or_notequal) in
+               switch untagged
+                 | 0 -> k (y)
+                 | 1 -> k (x)
+             where k2 =
+               let prim = %unbox_num.`float` (y) in
+               let prim_1 = %float_comp.eq (prim, prim) in
+               let float_ordered_and_equal = %tag_imm (prim_1) in
+               let float_unordered_or_notequal =
+                 %boolean_not (float_ordered_and_equal)
+               in
+               let untagged = %untag_imm (float_unordered_or_notequal) in
+               switch untagged
+                 | 0 -> k (x)
+                 | 1 -> k (y)
+         in
+         let $camlFloat__min_111 = closure min_23_1 @min_1 in
+         let code inline(always) loopify(never) size(78) newer_version_of(max_24)
+               max_24_1 (x : float boxed, y : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : float boxed =
+           (let prim = %unbox_num.`float` (x) in
+            let prim_1 = %unbox_num.`float` (y) in
+            let prim_2 = %float_comp.gt (prim_1, prim) in
+            switch prim_2
+              | 0 -> k4
+              | 1 -> k2
+              where k4 =
+                (apply ccall noalloc
+                   ($`*extern*`.caml_signbit : float -> val)
+                     (prim_1)
+                     -> k4 * k1
+                   where k4 (Pccall_1) =
+                     ((let untagged = %untag_imm (Pccall_1) in
+                       switch untagged
+                         | 0 -> k4
+                         | 1 -> k3)
+                        where k4 =
+                          (apply ccall noalloc
+                             ($`*extern*`.caml_signbit : float -> val)
+                               (prim)
+                               -> k4 * k1
+                             where k4 (Pccall_2) =
+                               let untagged = %untag_imm (Pccall_2) in
+                               switch untagged
+                                 | 0 -> k3
+                                 | 1 -> k2))))
+             where k3 =
+               let prim = %unbox_num.`float` (y) in
+               let prim_1 = %float_comp.eq (prim, prim) in
+               let float_ordered_and_equal = %tag_imm (prim_1) in
+               let float_unordered_or_notequal =
+                 %boolean_not (float_ordered_and_equal)
+               in
+               let untagged = %untag_imm (float_unordered_or_notequal) in
+               switch untagged
+                 | 0 -> k (x)
+                 | 1 -> k (y)
+             where k2 =
+               let prim = %unbox_num.`float` (x) in
+               let prim_1 = %float_comp.eq (prim, prim) in
+               let float_ordered_and_equal = %tag_imm (prim_1) in
+               let float_unordered_or_notequal =
+                 %boolean_not (float_ordered_and_equal)
+               in
+               let untagged = %untag_imm (float_unordered_or_notequal) in
+               switch untagged
+                 | 0 -> k (y)
+                 | 1 -> k (x)
+         in
+         let $camlFloat__max_112 = closure max_24_1 @max_1 in
+         let $camlFloat__Pmakeblock2388 =
+           Block 0 ($camlFloat__nan1990, $camlFloat__nan1990)
+         in
+         let code inline(always) loopify(never) size(92) newer_version_of(min_max_25)
+               min_max_25_1 (x : float boxed, y : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : [ 0 of float boxed * float boxed ] =
+           let prim = %unbox_num.`float` (x) in
+           let prim_1 = %float_comp.eq (prim, prim) in
+           let float_ordered_and_equal = %tag_imm (prim_1) in
+           let float_unordered_or_notequal =
+             %boolean_not (float_ordered_and_equal)
+           in
+           (let untagged = %untag_imm (float_unordered_or_notequal) in
+            switch untagged
+              | 0 -> k2
+              | 1 -> k ($camlFloat__Pmakeblock2388))
+             where k2 =
+               let prim_2 = %unbox_num.`float` (y) in
+               let prim_3 = %float_comp.eq (prim_2, prim_2) in
+               let float_ordered_and_equal_1 = %tag_imm (prim_3) in
+               let float_unordered_or_notequal_1 =
+                 %boolean_not (float_ordered_and_equal_1)
+               in
+               ((let untagged = %untag_imm (float_unordered_or_notequal_1) in
+                 switch untagged
+                   | 0 -> k2
+                   | 1 -> k ($camlFloat__Pmakeblock2388))
+                  where k2 =
+                    ((let prim_4 = %float_comp.gt (prim_2, prim) in
+                      switch prim_4
+                        | 0 -> k4
+                        | 1 -> k2
+                        where k4 =
+                          (apply ccall noalloc
+                             ($`*extern*`.caml_signbit : float -> val)
+                               (prim_2)
+                               -> k4 * k1
+                             where k4 (Pccall_1) =
+                               ((let untagged = %untag_imm (Pccall_1) in
+                                 switch untagged
+                                   | 0 -> k4
+                                   | 1 -> k3)
+                                  where k4 =
+                                    (apply ccall noalloc
+                                       ($`*extern*`.caml_signbit
+                                        : float -> val)
+                                         (prim)
+                                         -> k4 * k1
+                                       where k4 (Pccall_2) =
+                                         let untagged = %untag_imm (Pccall_2)
+                                         in
+                                         switch untagged
+                                           | 0 -> k3
+                                           | 1 -> k2))))
+                       where k3 =
+                         let Pmakeblock = %block.[`0`] (y, x) in
+                         cont k (Pmakeblock)
+                       where k2 =
+                         let Pmakeblock = %block.[`0`] (x, y) in
+                         cont k (Pmakeblock)))
+         in
+         let $camlFloat__min_max_113 = closure min_max_25_1 @min_max in
+         let code inline(always) loopify(never) size(78) newer_version_of(min_num_26)
+               min_num_26_1 (x : float boxed, y : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : float boxed =
+           (let prim = %unbox_num.`float` (x) in
+            let prim_1 = %unbox_num.`float` (y) in
+            let prim_2 = %float_comp.gt (prim_1, prim) in
+            switch prim_2
+              | 0 -> k4
+              | 1 -> k2
+              where k4 =
+                (apply ccall noalloc
+                   ($`*extern*`.caml_signbit : float -> val)
+                     (prim_1)
+                     -> k4 * k1
+                   where k4 (Pccall_1) =
+                     ((let untagged = %untag_imm (Pccall_1) in
+                       switch untagged
+                         | 0 -> k4
+                         | 1 -> k3)
+                        where k4 =
+                          (apply ccall noalloc
+                             ($`*extern*`.caml_signbit : float -> val)
+                               (prim)
+                               -> k4 * k1
+                             where k4 (Pccall_2) =
+                               let untagged = %untag_imm (Pccall_2) in
+                               switch untagged
+                                 | 0 -> k3
+                                 | 1 -> k2))))
+             where k3 =
+               let prim = %unbox_num.`float` (y) in
+               let prim_1 = %float_comp.eq (prim, prim) in
+               let float_ordered_and_equal = %tag_imm (prim_1) in
+               let float_unordered_or_notequal =
+                 %boolean_not (float_ordered_and_equal)
+               in
+               let untagged = %untag_imm (float_unordered_or_notequal) in
+               switch untagged
+                 | 0 -> k (y)
+                 | 1 -> k (x)
+             where k2 =
+               let prim = %unbox_num.`float` (x) in
+               let prim_1 = %float_comp.eq (prim, prim) in
+               let float_ordered_and_equal = %tag_imm (prim_1) in
+               let float_unordered_or_notequal =
+                 %boolean_not (float_ordered_and_equal)
+               in
+               let untagged = %untag_imm (float_unordered_or_notequal) in
+               switch untagged
+                 | 0 -> k (x)
+                 | 1 -> k (y)
+         in
+         let $camlFloat__min_num_114 = closure min_num_26_1 @min_num in
+         let code inline(always) loopify(never) size(78) newer_version_of(max_num_27)
+               max_num_27_1 (x : float boxed, y : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : float boxed =
+           (let prim = %unbox_num.`float` (x) in
+            let prim_1 = %unbox_num.`float` (y) in
+            let prim_2 = %float_comp.gt (prim_1, prim) in
+            switch prim_2
+              | 0 -> k4
+              | 1 -> k2
+              where k4 =
+                (apply ccall noalloc
+                   ($`*extern*`.caml_signbit : float -> val)
+                     (prim_1)
+                     -> k4 * k1
+                   where k4 (Pccall_1) =
+                     ((let untagged = %untag_imm (Pccall_1) in
+                       switch untagged
+                         | 0 -> k4
+                         | 1 -> k3)
+                        where k4 =
+                          (apply ccall noalloc
+                             ($`*extern*`.caml_signbit : float -> val)
+                               (prim)
+                               -> k4 * k1
+                             where k4 (Pccall_2) =
+                               let untagged = %untag_imm (Pccall_2) in
+                               switch untagged
+                                 | 0 -> k3
+                                 | 1 -> k2))))
+             where k3 =
+               let prim = %unbox_num.`float` (x) in
+               let prim_1 = %float_comp.eq (prim, prim) in
+               let float_ordered_and_equal = %tag_imm (prim_1) in
+               let float_unordered_or_notequal =
+                 %boolean_not (float_ordered_and_equal)
+               in
+               let untagged = %untag_imm (float_unordered_or_notequal) in
+               switch untagged
+                 | 0 -> k (x)
+                 | 1 -> k (y)
+             where k2 =
+               let prim = %unbox_num.`float` (y) in
+               let prim_1 = %float_comp.eq (prim, prim) in
+               let float_ordered_and_equal = %tag_imm (prim_1) in
+               let float_unordered_or_notequal =
+                 %boolean_not (float_ordered_and_equal)
+               in
+               let untagged = %untag_imm (float_unordered_or_notequal) in
+               switch untagged
+                 | 0 -> k (y)
+                 | 1 -> k (x)
+         in
+         let $camlFloat__max_num_115 = closure max_num_27_1 @max_num in
+         let code inline(always) loopify(never) size(108) newer_version_of(min_max_num_28)
+               min_max_num_28_1 (x : float boxed, y : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : [ 0 of float boxed * float boxed ] =
+           let prim = %unbox_num.`float` (x) in
+           let prim_1 = %float_comp.eq (prim, prim) in
+           let float_ordered_and_equal = %tag_imm (prim_1) in
+           let float_unordered_or_notequal =
+             %boolean_not (float_ordered_and_equal)
+           in
+           (let untagged = %untag_imm (float_unordered_or_notequal) in
+            switch untagged
+              | 0 -> k2
+              | 1 -> k3)
+             where k3 =
+               let Pmakeblock = %block.[`0`] (y, y) in
+               cont k (Pmakeblock)
+             where k2 =
+               let prim_2 = %unbox_num.`float` (y) in
+               let prim_3 = %float_comp.eq (prim_2, prim_2) in
+               let float_ordered_and_equal_1 = %tag_imm (prim_3) in
+               let float_unordered_or_notequal_1 =
+                 %boolean_not (float_ordered_and_equal_1)
+               in
+               ((let untagged = %untag_imm (float_unordered_or_notequal_1) in
+                 switch untagged
+                   | 0 -> k2
+                   | 1 -> k3)
+                  where k3 =
+                    let Pmakeblock = %block.[`0`] (x, x) in
+                    cont k (Pmakeblock)
+                  where k2 =
+                    ((let prim_4 = %float_comp.gt (prim_2, prim) in
+                      switch prim_4
+                        | 0 -> k4
+                        | 1 -> k2
+                        where k4 =
+                          (apply ccall noalloc
+                             ($`*extern*`.caml_signbit : float -> val)
+                               (prim_2)
+                               -> k4 * k1
+                             where k4 (Pccall_1) =
+                               ((let untagged = %untag_imm (Pccall_1) in
+                                 switch untagged
+                                   | 0 -> k4
+                                   | 1 -> k3)
+                                  where k4 =
+                                    (apply ccall noalloc
+                                       ($`*extern*`.caml_signbit
+                                        : float -> val)
+                                         (prim)
+                                         -> k4 * k1
+                                       where k4 (Pccall_2) =
+                                         let untagged = %untag_imm (Pccall_2)
+                                         in
+                                         switch untagged
+                                           | 0 -> k3
+                                           | 1 -> k2))))
+                       where k3 =
+                         let Pmakeblock = %block.[`0`] (y, x) in
+                         cont k (Pmakeblock)
+                       where k2 =
+                         let Pmakeblock = %block.[`0`] (x, y) in
+                         cont k (Pmakeblock)))
+         in
+         let $camlFloat__min_max_num_116 =
+           closure min_max_num_28_1 @min_max_num
+         in
+         let code loopify(never) size(4) newer_version_of(hash_29)
+               hash_29_1 (x : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           apply ccall noalloc
+             ($`*extern*`.caml_hash_exn : val * val * val * val -> val)
+               (10, 100, 0, x)
+               -> k * k1
+         in
+         let $camlFloat__hash_117 = closure hash_29_1 @hash in
+         let code loopify(never) size(34) newer_version_of(unsafe_fill_30)
+               unsafe_fill_30_1
+                 (a : float array,
+                  ofs : imm tagged,
+                  len : imm tagged,
+                  v : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let int_add = %int_barith.add (ofs, len) in
+           let for_stop = %int_barith.sub (int_add, 1) in
+           let prim = %int_comp.le (ofs, for_stop) in
+           switch prim
+             | 0 -> k (0)
+             | 1 -> k2
+             where k2 =
+               (cont k2 (ofs)
+                  where rec k2 (i : imm tagged) =
+                    let prim_1 = %unbox_num.`float` (v) in
+                    let Parraysetu = %array_set.`float` (a, i, prim_1) in
+                    let prim_2 = %int_comp.ne (i, for_stop) in
+                    (switch prim_2
+                       | 0 -> k (0)
+                       | 1 -> k3
+                       where k3 =
+                         let int_succ = %int_barith.add (i, 1) in
+                         cont k2 (int_succ)))
+         in
+         let $camlFloat__unsafe_fill_118 =
+           closure unsafe_fill_30_1 @unsafe_fill
+         in
+         let code loopify(never) size(36) newer_version_of(unsafe_blit_31)
+               unsafe_blit_31_1
+                 (src : float array,
+                  sofs : imm tagged,
+                  dst : float array,
+                  dofs : imm tagged,
+                  len : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let for_stop = %int_barith.sub (len, 1) in
+           let prim = %int_comp.le (0, for_stop) in
+           switch prim
+             | 0 -> k (0)
+             | 1 -> k2
+             where k2 =
+               (cont k2 (0)
+                  where rec k2 (i : imm tagged) =
+                    let int_add = %int_barith.add (sofs, i) in
+                    let prim_1 = %array_load.`float`.mut (src, int_add) in
+                    let int_add_1 = %int_barith.add (dofs, i) in
+                    let Parraysetu =
+                      %array_set.`float` (dst, int_add_1, prim_1)
+                    in
+                    let prim_2 = %int_comp.ne (i, for_stop) in
+                    (switch prim_2
+                       | 0 -> k (0)
+                       | 1 -> k3
+                       where k3 =
+                         let int_succ = %int_barith.add (i, 1) in
+                         cont k2 (int_succ)))
+         in
+         let $camlFloat__unsafe_blit_119 =
+           closure unsafe_blit_31_1 @unsafe_blit
+         in
+         let code loopify(never) size(56) newer_version_of(check_32)
+               check_32_1
+                 (a : float array,
+                  ofs : imm tagged,
+                  len : imm tagged,
+                  msg : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           (let prim = %int_comp.lt (ofs, 0) in
+            switch prim
+              | 0 -> k3
+              | 1 -> k2
+              where k3 =
+                let prim_1 = %int_comp.lt (len, 0) in
+                (switch prim_1
+                   | 0 -> k3
+                   | 1 -> k2
+                   where k3 =
+                     let int_add = %int_barith.add (ofs, len) in
+                     let prim_2 = %int_comp.lt (int_add, 0) in
+                     (switch prim_2
+                        | 0 -> k3
+                        | 1 -> k2
+                        where k3 =
+                          let Parraylength = %array_length (a) in
+                          let prim_3 = %int_comp.gt (int_add, Parraylength)
+                          in
+                          switch prim_3
+                            | 0 -> k (0)
+                            | 1 -> k2)))
+             where k2 =
+               apply direct(invalid_arg_1_1)
+                 ($camlFloat__invalid_arg_90 : _ -> imm tagged)
+                   (msg)
+                   -> never * k1
+         in
+         let $camlFloat__check_120 = closure check_32_1 @check in
+         let code loopify(never) size(15) newer_version_of(make_33)
+               make_33_1 (n : imm tagged, v : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : float array =
+           apply ccall
+             ($`*extern*`.caml_floatarray_create : val -> val) (n) -> k2 * k1
+             where k2 (result) =
+               (apply direct(unsafe_fill_30_1)
+                  ($camlFloat__unsafe_fill_118 : _ -> imm tagged)
+                    (result, 0, n, v)
+                    -> k2 * k1
+                  where k2 (param : imm tagged) =
+                    cont k (result))
+         in
+         let $camlFloat__make_121 = closure make_33_1 @make in
+         let code loopify(never) size(64) newer_version_of(init_34)
+               init_34_1 (l : imm tagged, f : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : float array =
+           let prim = %int_comp.lt (l, 0) in
+           switch prim
+             | 0 -> k2
+             | 1 -> k3
+             where k3 =
+               apply direct(invalid_arg_1_1)
+                 ($camlFloat__invalid_arg_90 : _ -> float array)
+                   ($camlFloat__immstring664)
+                   -> never * k1
+             where k2 =
+               (apply ccall
+                  ($`*extern*`.caml_floatarray_create : val -> val)
+                    (l)
+                    -> k2 * k1
+                  where k2 (res) =
+                    let for_stop = %int_barith.sub (l, 1) in
+                    let prim_1 = %int_comp.le (0, for_stop) in
+                    (switch prim_1
+                       | 0 -> k (res)
+                       | 1 -> k2
+                       where k2 =
+                         (cont k2 (0)
+                            where rec k2 (i : imm tagged) =
+                              (apply f (i) -> k3 * k1
+                                 where k3 (apply_result : float boxed) =
+                                   let prim_2 =
+                                     %unbox_num.`float` (apply_result)
+                                   in
+                                   let Parraysetu =
+                                     %array_set.`float` (res, i, prim_2)
+                                   in
+                                   let prim_3 = %int_comp.ne (i, for_stop) in
+                                   (switch prim_3
+                                      | 0 -> k (res)
+                                      | 1 -> k3
+                                      where k3 =
+                                        let int_succ = %int_barith.add (i, 1)
+                                        in
+                                        cont k2 (int_succ))))))
+         in
+         let $camlFloat__init_122 = closure init_34_1 @init in
+         let code loopify(never) size(26) newer_version_of(append_35)
+               append_35_1 (a1 : float array, a2 : float array)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : float array =
+           let l1 = %array_length (a1) in
+           let l2 = %array_length (a2) in
+           let int_add = %int_barith.add (l1, l2) in
+           apply ccall
+             ($`*extern*`.caml_floatarray_create : val -> val)
+               (int_add)
+               -> k2 * k1
+             where k2 (result) =
+               (apply direct(unsafe_blit_31_1)
+                  ($camlFloat__unsafe_blit_119 : _ -> imm tagged)
+                    (a1, 0, result, 0, l1)
+                    -> k3 * k1
+                  where k3 (param : imm tagged) =
+                    cont k2
+                  where k2 =
+                    (apply direct(unsafe_blit_31_1)
+                       ($camlFloat__unsafe_blit_119 : _ -> imm tagged)
+                         (a2, 0, result, l1, l2)
+                         -> k2 * k1
+                       where k2 (param : imm tagged) =
+                         cont k (result)))
+         in
+         let $camlFloat__append_123 = closure append_35_1 @append in
+         let code loopify(never) size(16) newer_version_of(ensure_ge_36)
+               ensure_ge_36_1 (x : imm tagged, y : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let prim = %int_comp.ge (x, y) in
+           switch prim
+             | 0 -> k2
+             | 1 -> k (x)
+             where k2 =
+               apply direct(invalid_arg_1_1)
+                 ($camlFloat__invalid_arg_90 : _ -> imm tagged)
+                   ($camlFloat__immstring691)
+                   -> never * k1
+         in
+         let $camlFloat__ensure_ge_124 = closure ensure_ge_36_1 @ensure_ge in
+         let code rec loopify(done) size(23) newer_version_of(sum_lengths_37)
+               sum_lengths_37_1
+                 (acc : imm tagged,
+                  param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           cont self (acc, param)
+             where rec self
+                         (acc_1 : imm tagged,
+                          param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+               let prim = %is_int (param_1) in
+               (switch prim
+                  | 0 -> k2
+                  | 1 -> k (acc_1)
+                  where k2 =
+                    let Pfield = %block_load.[`1`] (param_1) in
+                    ((let Pfield_1 = %block_load.[`0`] (param_1) in
+                      let Parraylength = %array_length (Pfield_1) in
+                      let int_add = %int_barith.add (Parraylength, acc_1) in
+                      apply direct(ensure_ge_36_1)
+                        ($camlFloat__ensure_ge_124 : _ -> imm tagged)
+                          (int_add, acc_1)
+                          -> k2 * k1)
+                       where k2 (apply_result : imm tagged) =
+                         cont self (apply_result, Pfield)))
+         in
+         let $camlFloat__sum_lengths_125 =
+           closure sum_lengths_37_1 @sum_lengths
+         in
+         let code rec loopify(done) size(38) newer_version_of(loop_39)
+               loop_39_1
+                 (l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                  i : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           cont self (l, i)
+             where rec self
+                         (l_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                          i_1 : imm tagged) =
+               let result =
+                 %project_value_slot.[`loop_1`].[`result`] (my_closure)
+               in
+               let len = %project_value_slot.[`loop_1`].[`len`] (my_closure)
+               in
+               let prim = %is_int (l_1) in
+               (switch prim
+                  | 0 -> k2
+                  | 1 -> k3
+                  where k3 =
+                    let prim_1 = %phys_eq (i_1, len) in
+                    switch prim_1
+                      | 0 -> k1 pop(regular k1) ($camlFloat__Pmakeblock747)
+                      | 1 -> k (0)
+                  where k2 =
+                    let hd = %block_load.[`0`] (l_1) in
+                    let hlen = %array_length (hd) in
+                    (apply direct(unsafe_blit_31_1)
+                       ($camlFloat__unsafe_blit_119 : _ -> imm tagged)
+                         (hd, 0, result, i_1, hlen)
+                         -> k3 * k1
+                       where k3 (param : imm tagged) =
+                         cont k2
+                       where k2 =
+                         let int_add = %int_barith.add (i_1, hlen) in
+                         let Pfield = %block_load.[`1`] (l_1) in
+                         cont self (Pfield, int_add)))
+         in
+         let code loopify(never) size(71) newer_version_of(concat_38)
+               concat_38_1 (l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : float array =
+           let `region` = %begin_region () in
+           apply direct(sum_lengths_37_1)
+             ($camlFloat__sum_lengths_125 : _ -> imm tagged)
+               (0, l)
+               -> k2 * k1
+             where k2 (len : imm tagged) =
+               (apply ccall
+                  ($`*extern*`.caml_floatarray_create : val -> val)
+                    (len)
+                    -> k2 * k1
+                  where k2 (result) =
+                    let loop = closure loop_39_1 @loop_1
+                    with {
+                      unsafe_blit = $camlFloat__unsafe_blit_119;
+                      len = len;
+                      result = result
+                    }
+                    in
+                    (apply direct(loop_39_1)
+                       (loop : _ -> imm tagged) (l, 0) -> k3 * k1
+                       where k3 (param : imm tagged) =
+                         cont k2
+                       where k2 =
+                         let `unit` = %end_region (`region`) in
+                         cont k (result)))
+         in
+         let $camlFloat__concat_126 = closure concat_38_1 @concat in
+         let code loopify(never) size(20) newer_version_of(sub_40)
+               sub_40_1 (a : float array, ofs : imm tagged, len : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : float array =
+           apply direct(check_32_1)
+             ($camlFloat__check_120 : _ -> imm tagged)
+               (a, ofs, len, $camlFloat__immstring762)
+               -> k3 * k1
+             where k3 (param : imm tagged) =
+               cont k2
+             where k2 =
+               (apply ccall
+                  ($`*extern*`.caml_floatarray_create : val -> val)
+                    (len)
+                    -> k2 * k1
+                  where k2 (result) =
+                    (apply direct(unsafe_blit_31_1)
+                       ($camlFloat__unsafe_blit_119 : _ -> imm tagged)
+                         (a, ofs, result, 0, len)
+                         -> k2 * k1
+                       where k2 (param : imm tagged) =
+                         cont k (result)))
+         in
+         let $camlFloat__sub_127 = closure sub_40_1 @sub in
+         let code loopify(never) size(17) newer_version_of(copy_41)
+               copy_41_1 (a : float array)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : float array =
+           let l = %array_length (a) in
+           apply ccall
+             ($`*extern*`.caml_floatarray_create : val -> val) (l) -> k2 * k1
+             where k2 (result) =
+               (apply direct(unsafe_blit_31_1)
+                  ($camlFloat__unsafe_blit_119 : _ -> imm tagged)
+                    (a, 0, result, 0, l)
+                    -> k2 * k1
+                  where k2 (param : imm tagged) =
+                    cont k (result))
+         in
+         let $camlFloat__copy_128 = closure copy_41_1 @copy in
+         let code loopify(never) size(9) newer_version_of(fill_42)
+               fill_42_1
+                 (a : float array,
+                  ofs : imm tagged,
+                  len : imm tagged,
+                  v : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           apply direct(check_32_1)
+             ($camlFloat__check_120 : _ -> imm tagged)
+               (a, ofs, len, $camlFloat__immstring788)
+               -> k3 * k1
+             where k3 (param : imm tagged) =
+               cont k2
+             where k2 =
+               apply direct(unsafe_fill_30_1)
+                 ($camlFloat__unsafe_fill_118 : _ -> imm tagged)
+                   (a, ofs, len, v)
+                   -> k * k1
+         in
+         let $camlFloat__fill_129 = closure fill_42_1 @fill in
+         let code loopify(never) size(14) newer_version_of(blit_43)
+               blit_43_1
+                 (src : float array,
+                  sofs : imm tagged,
+                  dst : float array,
+                  dofs : imm tagged,
+                  len : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           apply direct(check_32_1)
+             ($camlFloat__check_120 : _ -> imm tagged)
+               (src, sofs, len, $camlFloat__immstring802)
+               -> k3 * k1
+             where k3 (param : imm tagged) =
+               cont k2
+             where k2 =
+               (apply direct(check_32_1)
+                  ($camlFloat__check_120 : _ -> imm tagged)
+                    (dst, dofs, len, $camlFloat__immstring802)
+                    -> k3 * k1
+                  where k3 (param : imm tagged) =
+                    cont k2
+                  where k2 =
+                    apply direct(unsafe_blit_31_1)
+                      ($camlFloat__unsafe_blit_119 : _ -> imm tagged)
+                        (src, sofs, dst, dofs, len)
+                        -> k * k1)
+         in
+         let $camlFloat__blit_130 = closure blit_43_1 @blit in
+         let $`camlFloat__fn[float.ml:675,40--50]_132` =
+           closure `fn[float.ml:675,40--50]_45` @`fn[float.ml:675,40--50]`
+         in
+         let code loopify(never) size(35) newer_version_of(to_list_44)
+               to_list_44_1 (a : float array)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+           let `partial_fn[float.ml:675,40--50]` =
+             closure `partial_fn[float.ml:675,40--50]_46`
+               @`partial_fn[float.ml:675,40--50]`
+           with {
+             a = a;
+             `fn[float.ml:675,40--50]` =
+               $`camlFloat__fn[float.ml:675,40--50]_132`
+           }
+           in
+           let Parraylength = %array_length (a) in
+           let prim = %int_comp.lt (Parraylength, 0) in
+           switch prim
+             | 0 -> k2
+             | 1 -> k1
+                      pop(reraise k1)
+                      ($Stdlib__List.camlStdlib__List__Pmakeblock2573)
+             where k2 =
+               let int_sub = %int_barith.sub (Parraylength, 1) in
+               apply direct(init_11) inlining_state(depth(10))
+                 ($Stdlib__List.camlStdlib__List__init_109
+                  : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                   (0, int_sub, `partial_fn[float.ml:675,40--50]`)
+                   -> k * k1
+         in
+         let $camlFloat__to_list_131 = closure to_list_44_1 @to_list in
+         let code rec loopify(done) size(20) newer_version_of(fill_48)
+               fill_48_1
+                 (i : imm tagged,
+                  l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : float array =
+           cont self (i, l)
+             where rec self
+                         (i_1 : imm tagged,
+                          l_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+               let result =
+                 %project_value_slot.[`fill_1`].[`result_1`] (my_closure)
+               in
+               let prim = %is_int (l_1) in
+               (switch prim
+                  | 0 -> k2
+                  | 1 -> k (result)
+                  where k2 =
+                    let Pfield = %block_load.[`0`] (l_1) in
+                    let prim_1 = %unbox_num.`float` (Pfield) in
+                    let Parraysetu = %array_set.`float` (result, i_1, prim_1)
+                    in
+                    let Pfield_1 = %block_load.[`1`] (l_1) in
+                    let int_add = %int_barith.add (i_1, 1) in
+                    cont self (int_add, Pfield_1))
+         in
+         let code loopify(never) size(59) newer_version_of(of_list_47)
+               of_list_47_1 (l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : float array =
+           cont self (0, l)
+             where rec self
+                         (len : imm tagged,
+                          param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+               let prim = %is_int (param) in
+               (switch prim
+                  | 0 -> k3
+                  | 1 -> k2 (len)
+                  where k3 =
+                    let Pfield = %block_load.[`1`] (param) in
+                    let int_add = %int_barith.add (len, 1) in
+                    cont self (int_add, Pfield))
+             where k2 (len) =
+               let apply_result = len in
+               (apply ccall
+                  ($`*extern*`.caml_floatarray_create : val -> val)
+                    (apply_result)
+                    -> k2 * k1
+                  where k2 (result) =
+                    let fill = closure fill_48_1 @fill_1
+                    with { result_1 = result }
+                    in
+                    apply direct(fill_48_1)
+                      (fill : _ -> float array) (0, l) -> k * k1)
+         in
+         let $camlFloat__of_list_133 = closure of_list_47_1 @of_list in
+         let code loopify(never) size(45) newer_version_of(iter_49)
+               iter_49_1 (f : val, a : float array)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let Parraylength = %array_length (a) in
+           let for_stop = %int_barith.sub (Parraylength, 1) in
+           let prim = %int_comp.le (0, for_stop) in
+           switch prim
+             | 0 -> k (0)
+             | 1 -> k2
+             where k2 =
+               (cont k2 (0)
+                  where rec k2 (i : imm tagged) =
+                    ((let prim_1 = %array_load.`float`.mut (a, i) in
+                      let Parrayrefu = %box_num.`float` (prim_1) in
+                      apply f (Parrayrefu) -> k4 * k1
+                        where k4 (param) =
+                          cont k3)
+                       where k3 =
+                         let prim_1 = %int_comp.ne (i, for_stop) in
+                         (switch prim_1
+                            | 0 -> k (0)
+                            | 1 -> k3
+                            where k3 =
+                              let int_succ = %int_barith.add (i, 1) in
+                              cont k2 (int_succ))))
+         in
+         let $camlFloat__iter_134 = closure iter_49_1 @iter in
+         let code loopify(never) size(69) newer_version_of(iter2_50)
+               iter2_50_1 (f : val, a : float array, b : float array)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let Parraylength = %array_length (b) in
+           let Parraylength_1 = %array_length (a) in
+           let prim = %phys_ne (Parraylength_1, Parraylength) in
+           switch prim
+             | 0 -> k2
+             | 1 -> k3
+             where k3 =
+               apply direct(invalid_arg_1_1)
+                 ($camlFloat__invalid_arg_90 : _ -> imm tagged)
+                   ($camlFloat__immstring904)
+                   -> never * k1
+             where k2 =
+               let for_stop = %int_barith.sub (Parraylength_1, 1) in
+               let prim_1 = %int_comp.le (0, for_stop) in
+               (switch prim_1
+                  | 0 -> k (0)
+                  | 1 -> k2
+                  where k2 =
+                    (cont k2 (0)
+                       where rec k2 (i : imm tagged) =
+                         ((let prim_2 = %array_load.`float`.mut (b, i) in
+                           let Parrayrefu = %box_num.`float` (prim_2) in
+                           let prim_3 = %array_load.`float`.mut (a, i) in
+                           let Parrayrefu_1 = %box_num.`float` (prim_3) in
+                           apply f (Parrayrefu_1, Parrayrefu) -> k4 * k1
+                             where k4 (param) =
+                               cont k3)
+                            where k3 =
+                              let prim_2 = %int_comp.ne (i, for_stop) in
+                              (switch prim_2
+                                 | 0 -> k (0)
+                                 | 1 -> k3
+                                 where k3 =
+                                   let int_succ = %int_barith.add (i, 1) in
+                                   cont k2 (int_succ)))))
+         in
+         let $camlFloat__iter2_135 = closure iter2_50_1 @iter2 in
+         let code loopify(never) size(56) newer_version_of(map_51)
+               map_51_1 (f : val, a : float array)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : float array =
+           let l = %array_length (a) in
+           apply ccall
+             ($`*extern*`.caml_floatarray_create : val -> val) (l) -> k2 * k1
+             where k2 (r) =
+               let for_stop = %int_barith.sub (l, 1) in
+               let prim = %int_comp.le (0, for_stop) in
+               (switch prim
+                  | 0 -> k (r)
+                  | 1 -> k2
+                  where k2 =
+                    (cont k2 (0)
+                       where rec k2 (i : imm tagged) =
+                         ((let prim_1 = %array_load.`float`.mut (a, i) in
+                           let Parrayrefu = %box_num.`float` (prim_1) in
+                           apply f (Parrayrefu) -> k3 * k1)
+                            where k3 (apply_result : float boxed) =
+                              let prim_1 = %unbox_num.`float` (apply_result)
+                              in
+                              let Parraysetu =
+                                %array_set.`float` (r, i, prim_1)
+                              in
+                              let prim_2 = %int_comp.ne (i, for_stop) in
+                              (switch prim_2
+                                 | 0 -> k (r)
+                                 | 1 -> k3
+                                 where k3 =
+                                   let int_succ = %int_barith.add (i, 1) in
+                                   cont k2 (int_succ)))))
+         in
+         let $camlFloat__map_136 = closure map_51_1 @map in
+         let code loopify(never) size(80) newer_version_of(map2_52)
+               map2_52_1 (f : val, a : float array, b : float array)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : float array =
+           let la = %array_length (a) in
+           let lb = %array_length (b) in
+           let prim = %phys_ne (la, lb) in
+           switch prim
+             | 0 -> k2
+             | 1 -> k3
+             where k3 =
+               apply direct(invalid_arg_1_1)
+                 ($camlFloat__invalid_arg_90 : _ -> float array)
+                   ($camlFloat__immstring965)
+                   -> never * k1
+             where k2 =
+               (apply ccall
+                  ($`*extern*`.caml_floatarray_create : val -> val)
+                    (la)
+                    -> k2 * k1
+                  where k2 (r) =
+                    let for_stop = %int_barith.sub (la, 1) in
+                    let prim_1 = %int_comp.le (0, for_stop) in
+                    (switch prim_1
+                       | 0 -> k (r)
+                       | 1 -> k2
+                       where k2 =
+                         (cont k2 (0)
+                            where rec k2 (i : imm tagged) =
+                              ((let prim_2 = %array_load.`float`.mut (b, i)
+                                in
+                                let Parrayrefu = %box_num.`float` (prim_2) in
+                                let prim_3 = %array_load.`float`.mut (a, i)
+                                in
+                                let Parrayrefu_1 = %box_num.`float` (prim_3)
+                                in
+                                apply f (Parrayrefu_1, Parrayrefu) -> k3 * k1)
+                                 where k3 (apply_result : float boxed) =
+                                   let prim_2 =
+                                     %unbox_num.`float` (apply_result)
+                                   in
+                                   let Parraysetu =
+                                     %array_set.`float` (r, i, prim_2)
+                                   in
+                                   let prim_3 = %int_comp.ne (i, for_stop) in
+                                   (switch prim_3
+                                      | 0 -> k (r)
+                                      | 1 -> k3
+                                      where k3 =
+                                        let int_succ = %int_barith.add (i, 1)
+                                        in
+                                        cont k2 (int_succ))))))
+         in
+         let $camlFloat__map2_137 = closure map2_52_1 @map2 in
+         let code loopify(never) size(45) newer_version_of(iteri_53)
+               iteri_53_1 (f : val, a : float array)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let Parraylength = %array_length (a) in
+           let for_stop = %int_barith.sub (Parraylength, 1) in
+           let prim = %int_comp.le (0, for_stop) in
+           switch prim
+             | 0 -> k (0)
+             | 1 -> k2
+             where k2 =
+               (cont k2 (0)
+                  where rec k2 (i : imm tagged) =
+                    ((let prim_1 = %array_load.`float`.mut (a, i) in
+                      let Parrayrefu = %box_num.`float` (prim_1) in
+                      apply f (i, Parrayrefu) -> k4 * k1
+                        where k4 (param) =
+                          cont k3)
+                       where k3 =
+                         let prim_1 = %int_comp.ne (i, for_stop) in
+                         (switch prim_1
+                            | 0 -> k (0)
+                            | 1 -> k3
+                            where k3 =
+                              let int_succ = %int_barith.add (i, 1) in
+                              cont k2 (int_succ))))
+         in
+         let $camlFloat__iteri_138 = closure iteri_53_1 @iteri in
+         let code loopify(never) size(56) newer_version_of(mapi_54)
+               mapi_54_1 (f : val, a : float array)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : float array =
+           let l = %array_length (a) in
+           apply ccall
+             ($`*extern*`.caml_floatarray_create : val -> val) (l) -> k2 * k1
+             where k2 (r) =
+               let for_stop = %int_barith.sub (l, 1) in
+               let prim = %int_comp.le (0, for_stop) in
+               (switch prim
+                  | 0 -> k (r)
+                  | 1 -> k2
+                  where k2 =
+                    (cont k2 (0)
+                       where rec k2 (i : imm tagged) =
+                         ((let prim_1 = %array_load.`float`.mut (a, i) in
+                           let Parrayrefu = %box_num.`float` (prim_1) in
+                           apply f (i, Parrayrefu) -> k3 * k1)
+                            where k3 (apply_result : float boxed) =
+                              let prim_1 = %unbox_num.`float` (apply_result)
+                              in
+                              let Parraysetu =
+                                %array_set.`float` (r, i, prim_1)
+                              in
+                              let prim_2 = %int_comp.ne (i, for_stop) in
+                              (switch prim_2
+                                 | 0 -> k (r)
+                                 | 1 -> k3
+                                 where k3 =
+                                   let int_succ = %int_barith.add (i, 1) in
+                                   cont k2 (int_succ)))))
+         in
+         let $camlFloat__mapi_139 = closure mapi_54_1 @mapi in
+         let code loopify(never) size(44) newer_version_of(fold_left_55)
+               fold_left_55_1 (f : val, x : val, a : float array)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : val =
+           let Parraylength = %array_length (a) in
+           let for_stop = %int_barith.sub (Parraylength, 1) in
+           let prim = %int_comp.le (0, for_stop) in
+           switch prim
+             | 0 -> k (x)
+             | 1 -> k2
+             where k2 =
+               (cont k2 (0, x)
+                  where rec k2 (i : imm tagged, r_758_unboxed0 : val) =
+                    let prim_1 = %array_load.`float`.mut (a, i) in
+                    let Parrayrefu = %box_num.`float` (prim_1) in
+                    (apply f (r_758_unboxed0, Parrayrefu) -> k3 * k1
+                       where k3 (return_val0 : val) =
+                         let prim_2 = %int_comp.ne (i, for_stop) in
+                         (switch prim_2
+                            | 0 -> k (return_val0)
+                            | 1 -> k3
+                            where k3 =
+                              let int_succ = %int_barith.add (i, 1) in
+                              cont k2 (int_succ, return_val0))))
+         in
+         let $camlFloat__fold_left_140 = closure fold_left_55_1 @fold_left in
+         let code loopify(never) size(44) newer_version_of(fold_right_56)
+               fold_right_56_1 (f : val, a : float array, x : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : val =
+           let Parraylength = %array_length (a) in
+           let for_start = %int_barith.sub (Parraylength, 1) in
+           let prim = %int_comp.ge (for_start, 0) in
+           switch prim
+             | 0 -> k (x)
+             | 1 -> k2
+             where k2 =
+               (cont k2 (for_start, x)
+                  where rec k2 (i : imm tagged, r_765_unboxed0 : val) =
+                    let prim_1 = %array_load.`float`.mut (a, i) in
+                    let Parrayrefu = %box_num.`float` (prim_1) in
+                    (apply f (Parrayrefu, r_765_unboxed0) -> k3 * k1
+                       where k3 (return_val0 : val) =
+                         let prim_2 = %int_comp.ne (i, 0) in
+                         (switch prim_2
+                            | 0 -> k (return_val0)
+                            | 1 -> k3
+                            where k3 =
+                              let int_pred = %int_barith.sub (i, 1) in
+                              cont k2 (int_pred, return_val0))))
+         in
+         let $camlFloat__fold_right_141 = closure fold_right_56_1 @fold_right
+         in
+         let code rec loopify(done) size(43) newer_version_of(loop_58)
+               loop_58_1 (i : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           cont self (i)
+             where rec self (i_1 : imm tagged) =
+               let a = %project_value_slot.[`loop_2`].[`a_1`] (my_closure) in
+               let p = %project_value_slot.[`loop_2`].[`p`] (my_closure) in
+               let n = %project_value_slot.[`loop_2`].[`n`] (my_closure) in
+               let prim = %phys_eq (i_1, n) in
+               (switch prim
+                  | 0 -> k2
+                  | 1 -> k (0)
+                  where k2 =
+                    ((let prim_1 = %array_load.`float`.mut (a, i_1) in
+                      let Parrayrefu = %box_num.`float` (prim_1) in
+                      apply p (Parrayrefu) -> k3 * k1
+                        where k3 (param : imm tagged) =
+                          let unboxed_field = %untag_imm (param) in
+                          cont k2 (unboxed_field))
+                       where k2 (unboxed_field : imm) =
+                         let naked_immediate = unboxed_field in
+                         (switch naked_immediate
+                            | 0 -> k2
+                            | 1 -> k (1)
+                            where k2 =
+                              let int_add = %int_barith.add (i_1, 1) in
+                              cont self (int_add))))
+         in
+         let code loopify(never) size(59) newer_version_of(exists_57)
+               exists_57_1 (p : val, a : float array)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let n = %array_length (a) in
+           let loop = closure loop_58_1 @loop_2
+           with { p = p; a_1 = a; n = n }
+           in
+           apply direct(loop_58_1) (loop : _ -> imm tagged) (0) -> k * k1
+         in
+         let $camlFloat__exists_142 = closure exists_57_1 @exists in
+         let code rec loopify(done) size(43) newer_version_of(loop_60)
+               loop_60_1 (i : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           cont self (i)
+             where rec self (i_1 : imm tagged) =
+               let p = %project_value_slot.[`loop_3`].[`p_1`] (my_closure) in
+               let a = %project_value_slot.[`loop_3`].[`a_2`] (my_closure) in
+               let n = %project_value_slot.[`loop_3`].[`n_1`] (my_closure) in
+               let prim = %phys_eq (i_1, n) in
+               (switch prim
+                  | 0 -> k2
+                  | 1 -> k (1)
+                  where k2 =
+                    ((let prim_1 = %array_load.`float`.mut (a, i_1) in
+                      let Parrayrefu = %box_num.`float` (prim_1) in
+                      apply p (Parrayrefu) -> k3 * k1
+                        where k3 (param : imm tagged) =
+                          let unboxed_field = %untag_imm (param) in
+                          cont k2 (unboxed_field))
+                       where k2 (unboxed_field : imm) =
+                         let naked_immediate = unboxed_field in
+                         (switch naked_immediate
+                            | 0 -> k (0)
+                            | 1 -> k2
+                            where k2 =
+                              let int_add = %int_barith.add (i_1, 1) in
+                              cont self (int_add))))
+         in
+         let code loopify(never) size(59) newer_version_of(for_all_59)
+               for_all_59_1 (p : val, a : float array)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let n = %array_length (a) in
+           let loop = closure loop_60_1 @loop_3
+           with { p_1 = p; a_2 = a; n_1 = n }
+           in
+           apply direct(loop_60_1) (loop : _ -> imm tagged) (0) -> k * k1
+         in
+         let $camlFloat__for_all_143 = closure for_all_59_1 @for_all in
+         let code rec loopify(done) size(43) newer_version_of(loop_62)
+               loop_62_1 (i : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           cont self (i)
+             where rec self (i_1 : imm tagged) =
+               let n = %project_value_slot.[`loop_4`].[`n_2`] (my_closure) in
+               let a = %project_value_slot.[`loop_4`].[`a_3`] (my_closure) in
+               let x = %project_value_slot.[`loop_4`].[`x`] (my_closure) in
+               let prim = %phys_eq (i_1, n) in
+               (switch prim
+                  | 0 -> k2
+                  | 1 -> k (0)
+                  where k2 =
+                    let prim_1 = %array_load.`float`.mut (a, i_1) in
+                    let prim_2 = %unbox_num.`float` (x) in
+                    let prim_3 = %float_comp.lt (prim_1, prim_2) in
+                    let float_compare = %tag_imm (prim_3) in
+                    let prim_4 = %phys_eq (float_compare, 0) in
+                    (switch prim_4
+                       | 0 -> k2
+                       | 1 -> k (1)
+                       where k2 =
+                         let int_add = %int_barith.add (i_1, 1) in
+                         cont self (int_add)))
+         in
+         let code loopify(never) size(59) newer_version_of(mem_61)
+               mem_61_1 (x : float boxed, a : float array)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let n = %array_length (a) in
+           let loop = closure loop_62_1 @loop_4
+           with { x = x; a_3 = a; n_2 = n }
+           in
+           apply direct(loop_62_1) (loop : _ -> imm tagged) (0) -> k * k1
+         in
+         let $camlFloat__mem_144 = closure mem_61_1 @mem in
+         let code rec loopify(done) size(33) newer_version_of(loop_64)
+               loop_64_1 (i : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           cont self (i)
+             where rec self (i_1 : imm tagged) =
+               let n = %project_value_slot.[`loop_5`].[`n_3`] (my_closure) in
+               let x = %project_value_slot.[`loop_5`].[`x_1`] (my_closure) in
+               let a = %project_value_slot.[`loop_5`].[`a_4`] (my_closure) in
+               let prim = %phys_eq (i_1, n) in
+               (switch prim
+                  | 0 -> k2
+                  | 1 -> k (0)
+                  where k2 =
+                    let prim_1 = %array_load.`float`.mut (a, i_1) in
+                    let prim_2 = %unbox_num.`float` (x) in
+                    let prim_3 = %float_comp.eq (prim_2, prim_1) in
+                    (switch prim_3
+                       | 0 -> k2
+                       | 1 -> k (1)
+                       where k2 =
+                         let int_add = %int_barith.add (i_1, 1) in
+                         cont self (int_add)))
+         in
+         let code loopify(never) size(49) newer_version_of(mem_ieee_63)
+               mem_ieee_63_1 (x : float boxed, a : float array)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let n = %array_length (a) in
+           let loop = closure loop_64_1 @loop_5
+           with { x_1 = x; a_4 = a; n_3 = n }
+           in
+           apply direct(loop_64_1) (loop : _ -> imm tagged) (0) -> k * k1
+         in
+         let $camlFloat__mem_ieee_145 = closure mem_ieee_63_1 @mem_ieee in
+         (apply ccall noalloc
+            ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
+            where k (Pccall_1) =
+              let $camlFloat__Bottom3258 =
+                Block immutable_unique
+                248 ($camlFloat__immstring1176, Pccall_1)
+              in
+              let code rec loopify(done) size(127) newer_version_of(trickleup_69)
+                    trickleup_69_1 (i : imm tagged, e : float boxed)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : imm tagged =
+                (let unboxed_float_1 = %unbox_num.`float` (e) in
+                 cont self (unboxed_float_1, i))
+                  where rec(unboxed_float : float) self (i_1 : imm tagged) =
+                    let e_1 = e in
+                    let unboxed_float_1 = unboxed_float in
+                    let a =
+                      %project_value_slot.[`trickleup`].[`a_5`] (my_closure)
+                    in
+                    let cmp =
+                      %project_value_slot.[`trickleup`].[`cmp`] (my_closure)
+                    in
+                    let int_sub = %int_barith.sub (i_1, 1) in
+                    let father = %int_barith.div (int_sub, 3) in
+                    ((let prim = %phys_ne (i_1, father) in
+                      switch prim
+                        | 0 -> k1
+                                 pop(regular k1)
+                                 ($camlFloat__Pmakeblock1344)
+                        | 1 -> k2)
+                       where k2 =
+                         ((let prim = %array_length (a) in
+                           let prim_1 = %int_comp.unsigned.lt (father, prim)
+                           in
+                           switch prim_1
+                             | 0 -> k3
+                             | 1 -> k4 (prim))
+                            where k4 (prim) =
+                              let cse_param = prim in
+                              let prim_1 = prim in
+                              let prim_2 =
+                                %array_load.`float`.mut (a, father)
+                              in
+                              let Parrayrefs = %box_num.`float` (prim_2) in
+                              (apply cmp (Parrayrefs, e_1) -> k4 * k1
+                                 where k4 (param : imm tagged) =
+                                   cont k2 (param, prim_1))
+                            where k3 =
+                              cont k1 pop(regular k1) ($camlFloat__block226)
+                            where k2 (apply_result : imm tagged, prim) =
+                              let cse_param = prim in
+                              let prim_1 = %int_comp.lt (apply_result, 0) in
+                              (switch prim_1
+                                 | 0 -> k2
+                                 | 1 -> k3
+                                 where k3 =
+                                   let prim_2 =
+                                     %array_load.`float`.mut (a, father)
+                                   in
+                                   ((let prim_3 =
+                                       %int_comp.unsigned.lt (i_1, cse_param)
+                                     in
+                                     switch prim_3
+                                       | 0 -> k3
+                                       | 1 -> k4)
+                                      where k4 =
+                                        let Parraysets =
+                                          %array_set.`float` (a, i_1, prim_2)
+                                        in
+                                        let prim_3 = %int_comp.gt (father, 0)
+                                        in
+                                        (switch prim_3
+                                           | 0 -> k4
+                                           | 1 -> self
+                                                    (unboxed_float, father)
+                                           where k4 =
+                                             ((let prim_4 =
+                                                 %int_comp.unsigned.lt
+                                                   (0, cse_param)
+                                               in
+                                               switch prim_4
+                                                 | 0 -> k4
+                                                 | 1 -> k5)
+                                                where k5 =
+                                                  let Parraysets_1 =
+                                                    %array_set.`float`
+                                                      (a, 0, unboxed_float_1)
+                                                  in
+                                                  cont k (0)
+                                                where k4 =
+                                                  cont k1
+                                                         pop(regular k1)
+                                                         ($camlFloat__block226)))
+                                      where k3 =
+                                        cont k1
+                                               pop(regular k1)
+                                               ($camlFloat__block226))
+                                 where k2 =
+                                   ((let prim_2 =
+                                       %int_comp.unsigned.lt (i_1, cse_param)
+                                     in
+                                     switch prim_2
+                                       | 0 -> k2
+                                       | 1 -> k3)
+                                      where k3 =
+                                        let Parraysets =
+                                          %array_set.`float`
+                                            (a, i_1, unboxed_float_1)
+                                        in
+                                        cont k (0)
+                                      where k2 =
+                                        cont k1
+                                               pop(regular k1)
+                                               ($camlFloat__block226)))))
+              in
+              let code loopify(never) size(246) newer_version_of(maxson_66)
+                    maxson_66_1 (l : imm tagged, i : imm tagged)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : imm tagged =
+                let a = %project_value_slot.[`maxson`].[`a_6`] (my_closure)
+                in
+                let cmp =
+                  %project_value_slot.[`maxson`].[`cmp_1`] (my_closure)
+                in
+                let int_add = %int_barith.add (i, i) in
+                let int_add_1 = %int_barith.add (int_add, i) in
+                let i31 = %int_barith.add (int_add_1, 1) in
+                let int_add_2 = %int_barith.add (i31, 2) in
+                let prim = %int_comp.lt (int_add_2, l) in
+                switch prim
+                  | 0 -> k2
+                  | 1 -> k3
+                  where k3 =
+                    ((let int_add_3 = %int_barith.add (i31, 1) in
+                      (let prim_1 = %array_length (a) in
+                       let prim_2 = %int_comp.unsigned.lt (int_add_3, prim_1)
+                       in
+                       switch prim_2
+                         | 0 -> k4
+                         | 1 -> k5 (prim_1))
+                        where k5 (prim_1) =
+                          let cse_param = prim_1 in
+                          let prim_2 = %array_load.`float`.mut (a, int_add_3)
+                          in
+                          let Parrayrefs = %box_num.`float` (prim_2) in
+                          ((let prim_3 =
+                              %int_comp.unsigned.lt (i31, cse_param)
+                            in
+                            switch prim_3
+                              | 0 -> k5
+                              | 1 -> k6)
+                             where k6 =
+                               let prim_3 = %array_load.`float`.mut (a, i31)
+                               in
+                               let Parrayrefs_1 = %box_num.`float` (prim_3)
+                               in
+                               (apply
+                                  cmp (Parrayrefs_1, Parrayrefs) -> k6 * k1
+                                  where k6 (return_val0 : imm tagged) =
+                                    let prim_4 =
+                                      %int_comp.lt (return_val0, 0)
+                                    in
+                                    switch prim_4
+                                      | 0 -> k3 (i31)
+                                      | 1 -> k3 (int_add_3))
+                             where k5 =
+                               cont k1 pop(regular k1) ($camlFloat__block226))
+                        where k4 =
+                          cont k1 pop(regular k1) ($camlFloat__block226))
+                       where k3 (x_805_unboxed0 : imm tagged) =
+                         ((let prim_1 = %array_length (a) in
+                           let prim_2 =
+                             %int_comp.unsigned.lt (int_add_2, prim_1)
+                           in
+                           switch prim_2
+                             | 0 -> k3
+                             | 1 -> k4 (prim_1))
+                            where k4 (prim_1) =
+                              let cse_param = prim_1 in
+                              let prim_2 =
+                                %array_load.`float`.mut (a, int_add_2)
+                              in
+                              let Parrayrefs = %box_num.`float` (prim_2) in
+                              ((let prim_3 =
+                                  %int_comp.unsigned.lt
+                                    (x_805_unboxed0, cse_param)
+                                in
+                                switch prim_3
+                                  | 0 -> k4
+                                  | 1 -> k5)
+                                 where k5 =
+                                   let prim_3 =
+                                     %array_load.`float`.mut
+                                       (a, x_805_unboxed0)
+                                   in
+                                   let Parrayrefs_1 =
+                                     %box_num.`float` (prim_3)
+                                   in
+                                   (apply
+                                      cmp
+                                        (Parrayrefs_1, Parrayrefs)
+                                        -> k5 * k1
+                                      where k5 (return_val0 : imm tagged) =
+                                        let prim_4 =
+                                          %int_comp.lt (return_val0, 0)
+                                        in
+                                        switch prim_4
+                                          | 0 -> k (x_805_unboxed0)
+                                          | 1 -> k (int_add_2))
+                                 where k4 =
+                                   cont k1
+                                          pop(regular k1)
+                                          ($camlFloat__block226))
+                            where k3 =
+                              cont k1 pop(regular k1) ($camlFloat__block226)))
+                  where k2 =
+                    ((let int_add_3 = %int_barith.add (i31, 1) in
+                      let prim_1 = %int_comp.lt (int_add_3, l) in
+                      switch prim_1
+                        | 0 -> k2
+                        | 1 -> k3
+                        where k3 =
+                          ((let prim_2 = %array_length (a) in
+                            let prim_3 =
+                              %int_comp.unsigned.lt (int_add_3, prim_2)
+                            in
+                            switch prim_3
+                              | 0 -> k3
+                              | 1 -> k4 (prim_2))
+                             where k4 (prim_2) =
+                               let cse_param = prim_2 in
+                               let prim_3 =
+                                 %array_load.`float`.mut (a, int_add_3)
+                               in
+                               let Parrayrefs = %box_num.`float` (prim_3) in
+                               ((let prim_4 =
+                                   %int_comp.unsigned.lt (i31, cse_param)
+                                 in
+                                 switch prim_4
+                                   | 0 -> k4
+                                   | 1 -> k5)
+                                  where k5 =
+                                    let prim_4 =
+                                      %array_load.`float`.mut (a, i31)
+                                    in
+                                    let Parrayrefs_1 =
+                                      %box_num.`float` (prim_4)
+                                    in
+                                    (apply
+                                       cmp
+                                         (Parrayrefs_1, Parrayrefs)
+                                         -> k5 * k1
+                                       where k5 (return_val0 : imm tagged) =
+                                         let prim_5 =
+                                           %int_comp.lt (return_val0, 0)
+                                         in
+                                         switch prim_5
+                                           | 0 -> k2
+                                           | 1 -> k (int_add_3))
+                                  where k4 =
+                                    cont k1
+                                           pop(regular k1)
+                                           ($camlFloat__block226))
+                             where k3 =
+                               cont k1 pop(regular k1) ($camlFloat__block226)))
+                       where k2 =
+                         let prim_1 = %int_comp.lt (i31, l) in
+                         (switch prim_1
+                            | 0 -> k2
+                            | 1 -> k (i31)
+                            where k2 =
+                              let Pmakeblock =
+                                %block.[`0`] ($camlFloat__Bottom3258, i)
+                              in
+                              cont k1 pop(regular k1) (Pmakeblock)))
+              in
+              let code rec loopify(done) size(42) newer_version_of(bubbledown_68)
+                    bubbledown_68_1 (l : imm tagged, i : imm tagged)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1 =
+                cont self (i)
+                  where rec self (i_1 : imm tagged) =
+                    let l_1 = l in
+                    let a =
+                      %project_value_slot.[`bubbledown`].[`a_7`] (my_closure)
+                    in
+                    let maxson =
+                      %project_value_slot.[`bubbledown`].[`maxson`]
+                        (my_closure)
+                    in
+                    (apply direct(maxson_66_1)
+                       (maxson : _ -> imm tagged) (l_1, i_1) -> k2 * k1
+                       where k2 (j : imm tagged) =
+                         ((let prim = %array_length (a) in
+                           let prim_1 = %int_comp.unsigned.lt (j, prim) in
+                           switch prim_1
+                             | 0 -> k2
+                             | 1 -> k3 (prim))
+                            where k3 (prim) =
+                              let cse_param = prim in
+                              let prim_1 = %array_load.`float`.mut (a, j) in
+                              ((let prim_2 =
+                                  %int_comp.unsigned.lt (i_1, cse_param)
+                                in
+                                switch prim_2
+                                  | 0 -> k3
+                                  | 1 -> k4)
+                                 where k4 =
+                                   let Parraysets =
+                                     %array_set.`float` (a, i_1, prim_1)
+                                   in
+                                   cont self (j)
+                                 where k3 =
+                                   cont k1
+                                          pop(regular k1)
+                                          ($camlFloat__block226))
+                            where k2 =
+                              cont k1 pop(regular k1) ($camlFloat__block226)))
+              in
+              let code rec loopify(done) size(86) newer_version_of(trickledown_67)
+                    trickledown_67_1
+                      (l : imm tagged, i : imm tagged, e : float boxed)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : imm tagged =
+                (let unboxed_float_1 = %unbox_num.`float` (e) in
+                 cont self (unboxed_float_1, i))
+                  where rec(unboxed_float : float) self (i_1 : imm tagged) =
+                    let l_1 = l in
+                    let e_1 = e in
+                    let unboxed_float_1 = unboxed_float in
+                    let cmp =
+                      %project_value_slot.[`trickledown`].[`cmp_2`]
+                        (my_closure)
+                    in
+                    let maxson =
+                      %project_value_slot.[`trickledown`].[`maxson_1`]
+                        (my_closure)
+                    in
+                    let a =
+                      %project_value_slot.[`trickledown`].[`a_8`]
+                        (my_closure)
+                    in
+                    (apply direct(maxson_66_1)
+                       (maxson : _ -> imm tagged) (l_1, i_1) -> k2 * k1
+                       where k2 (j : imm tagged) =
+                         ((let prim = %array_length (a) in
+                           let prim_1 = %int_comp.unsigned.lt (j, prim) in
+                           switch prim_1
+                             | 0 -> k3
+                             | 1 -> k4 (prim))
+                            where k4 (prim) =
+                              let cse_param = prim in
+                              let prim_1 = prim in
+                              let prim_2 = %array_load.`float`.mut (a, j) in
+                              let Parrayrefs = %box_num.`float` (prim_2) in
+                              (apply cmp (Parrayrefs, e_1) -> k4 * k1
+                                 where k4 (param : imm tagged) =
+                                   cont k2 (param, prim_1))
+                            where k3 =
+                              cont k1 pop(regular k1) ($camlFloat__block226)
+                            where k2 (apply_result : imm tagged, prim) =
+                              let cse_param = prim in
+                              let prim_1 = %int_comp.gt (apply_result, 0) in
+                              (switch prim_1
+                                 | 0 -> k2
+                                 | 1 -> k3
+                                 where k3 =
+                                   let prim_2 =
+                                     %array_load.`float`.mut (a, j)
+                                   in
+                                   ((let prim_3 =
+                                       %int_comp.unsigned.lt (i_1, cse_param)
+                                     in
+                                     switch prim_3
+                                       | 0 -> k3
+                                       | 1 -> k4)
+                                      where k4 =
+                                        let Parraysets =
+                                          %array_set.`float` (a, i_1, prim_2)
+                                        in
+                                        cont self (unboxed_float, j)
+                                      where k3 =
+                                        cont k1
+                                               pop(regular k1)
+                                               ($camlFloat__block226))
+                                 where k2 =
+                                   ((let prim_2 =
+                                       %int_comp.unsigned.lt (i_1, cse_param)
+                                     in
+                                     switch prim_2
+                                       | 0 -> k2
+                                       | 1 -> k3)
+                                      where k3 =
+                                        let Parraysets =
+                                          %array_set.`float`
+                                            (a, i_1, unboxed_float_1)
+                                        in
+                                        cont k (0)
+                                      where k2 =
+                                        cont k1
+                                               pop(regular k1)
+                                               ($camlFloat__block226)))))
+              in
+              let code loopify(never) size(796) newer_version_of(sort_65)
+                    sort_65_1 (cmp : val, a : float array)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : imm tagged =
+                let `region` = %begin_region () in
+                let ghost_region = %begin_ghost_region () in
+                (let maxson = closure maxson_66_1 @maxson
+                 with {
+                   Bottom = $camlFloat__Bottom3258;
+                   cmp_1 = cmp;
+                   a_6 = a
+                 }
+                 in
+                 let trickledown = closure trickledown_67_1 @trickledown
+                 with { cmp_2 = cmp; a_8 = a; maxson_1 = maxson }
+                 in
+                 let bubbledown = closure bubbledown_68_1 @bubbledown
+                 with { a_7 = a; maxson = maxson }
+                 in
+                 let trickleup = closure trickleup_69_1 @trickleup
+                 with { cmp = cmp; a_5 = a }
+                 in
+                 let l = %array_length (a) in
+                 let int_add = %int_barith.add (l, 1) in
+                 let int_div = %int_barith.div (int_add, 3) in
+                 let for_start = %int_barith.sub (int_div, 1) in
+                 (let prim = %int_comp.ge (for_start, 0) in
+                  switch prim
+                    | 0 -> k3
+                    | 1 -> k4
+                    where k4 =
+                      (cont k4 (for_start)
+                         where rec k4 (i : imm tagged) =
+                           ((let prim_1 = %int_comp.unsigned.lt (i, l) in
+                             switch prim_1
+                               | 0 -> k5
+                               | 1 -> k6)
+                              where k6 =
+                                let prim_1 = %array_load.`float`.mut (a, i)
+                                in
+                                let e = %box_num.`float` (prim_1) in
+                                let try_region = %begin_try_region (`region`)
+                                in
+                                let try_ghost_region =
+                                  %begin_try_ghost_region (ghost_region)
+                                in
+                                (cont k9 push(k7)
+                                   where k9 =
+                                     (apply direct(trickledown_67_1)
+                                        (trickledown : _ -> imm tagged)
+                                          (l, i, e)
+                                          -> k9 * k7
+                                        where k9 (param : imm tagged) =
+                                          cont k8)
+                                   where k8 =
+                                     cont k6 pop(k7)
+                                   where k7 exn (`exn` : val) =
+                                     let `unit` =
+                                       %end_try_region (try_region)
+                                     in
+                                     let unit_1 =
+                                       %end_try_ghost_region
+                                         (try_ghost_region)
+                                     in
+                                     let Pfield = %block_load.[`0`] (`exn`)
+                                     in
+                                     let prim_2 =
+                                       %phys_eq
+                                         (Pfield, $camlFloat__Bottom3258)
+                                     in
+                                     (switch prim_2
+                                        | 0 -> k1 pop(reraise k1) (`exn`)
+                                        | 1 -> k7
+                                        where k7 =
+                                          let Pfield_1 =
+                                            %block_load.[`1`] (`exn`)
+                                          in
+                                          ((let prim_3 =
+                                              %int_comp.unsigned.lt
+                                                (Pfield_1, l)
+                                            in
+                                            switch prim_3
+                                              | 0 -> k7
+                                              | 1 -> k8)
+                                             where k8 =
+                                               let Parraysets =
+                                                 %array_set.`float`
+                                                   (a, Pfield_1, prim_1)
+                                               in
+                                               cont k6
+                                             where k7 =
+                                               cont k1
+                                                      pop(regular k1)
+                                                      ($camlFloat__block226)))
+                                   where k6 =
+                                     let prim_2 = %int_comp.ne (i, 0) in
+                                     (switch prim_2
+                                        | 0 -> k3
+                                        | 1 -> k6
+                                        where k6 =
+                                          let int_pred =
+                                            %int_barith.sub (i, 1)
+                                          in
+                                          cont k4 (int_pred)))
+                              where k5 =
+                                cont k1
+                                       pop(regular k1)
+                                       ($camlFloat__block226))))
+                   where k3 =
+                     let for_start_1 = %int_barith.sub (l, 1) in
+                     ((let prim = %int_comp.ge (for_start_1, 2) in
+                       switch prim
+                         | 0 -> k3
+                         | 1 -> k4
+                         where k4 =
+                           (cont k4 (for_start_1)
+                              where rec k4 (i : imm tagged) =
+                                ((let prim_1 = %int_comp.unsigned.lt (i, l)
+                                  in
+                                  switch prim_1
+                                    | 0 -> k5
+                                    | 1 -> k6)
+                                   where k6 =
+                                     let prim_1 =
+                                       %array_load.`float`.mut (a, i)
+                                     in
+                                     let e = %box_num.`float` (prim_1) in
+                                     ((let prim_2 =
+                                         %int_comp.unsigned.lt (0, l)
+                                       in
+                                       switch prim_2
+                                         | 0 -> k6
+                                         | 1 -> k7)
+                                        where k7 =
+                                          let prim_2 =
+                                            %array_load.`float`.mut (a, 0)
+                                          in
+                                          let Parraysets =
+                                            %array_set.`float` (a, i, prim_2)
+                                          in
+                                          ((let try_region =
+                                              %begin_try_region (`region`)
+                                            in
+                                            let try_ghost_region =
+                                              %begin_try_ghost_region
+                                                (ghost_region)
+                                            in
+                                            cont k9 push(k8)
+                                              where k9 =
+                                                apply direct(bubbledown_68_1)
+                                                  (bubbledown
+                                                   : _ -> imm tagged)
+                                                    (i, 0)
+                                                    -> never * k8
+                                              where k8 exn (`exn` : val) =
+                                                let `unit` =
+                                                  %end_try_region
+                                                    (try_region)
+                                                in
+                                                let unit_1 =
+                                                  %end_try_ghost_region
+                                                    (try_ghost_region)
+                                                in
+                                                let Pfield =
+                                                  %block_load.[`0`] (`exn`)
+                                                in
+                                                let prim_3 =
+                                                  %phys_eq
+                                                    (Pfield,
+                                                     $camlFloat__Bottom3258)
+                                                in
+                                                (switch prim_3
+                                                   | 0 -> k1
+                                                            pop(reraise k1)
+                                                            (`exn`)
+                                                   | 1 -> k8
+                                                   where k8 =
+                                                     let Pfield_1 =
+                                                       %block_load.[`1`]
+                                                         (`exn`)
+                                                     in
+                                                     (apply
+                                                             direct(trickleup_69_1)
+                                                        (trickleup
+                                                         : _ -> imm tagged)
+                                                          (Pfield_1, e)
+                                                          -> k8 * k1
+                                                        where k8
+                                                                (param :
+                                                                   imm tagged) =
+                                                          cont k7)))
+                                             where k7 =
+                                               let prim_3 =
+                                                 %int_comp.ne (i, 2)
+                                               in
+                                               (switch prim_3
+                                                  | 0 -> k3
+                                                  | 1 -> k7
+                                                  where k7 =
+                                                    let int_pred =
+                                                      %int_barith.sub (i, 1)
+                                                    in
+                                                    cont k4 (int_pred)))
+                                        where k6 =
+                                          cont k1
+                                                 pop(regular k1)
+                                                 ($camlFloat__block226))
+                                   where k5 =
+                                     cont k1
+                                            pop(regular k1)
+                                            ($camlFloat__block226))))
+                        where k3 =
+                          let prim = %int_comp.gt (l, 1) in
+                          (switch prim
+                             | 0 -> k2
+                             | 1 -> k3
+                             where k3 =
+                               ((let prim_1 = %int_comp.unsigned.lt (1, l) in
+                                 switch prim_1
+                                   | 0 -> k3
+                                   | 1 -> k4)
+                                  where k4 =
+                                    let prim_1 =
+                                      %array_load.`float`.mut (a, 1)
+                                    in
+                                    ((let prim_2 =
+                                        %int_comp.unsigned.lt (0, l)
+                                      in
+                                      switch prim_2
+                                        | 0 -> k4
+                                        | 1 -> k5)
+                                       where k5 =
+                                         let prim_2 =
+                                           %array_load.`float`.mut (a, 0)
+                                         in
+                                         let Parraysets =
+                                           %array_set.`float` (a, 1, prim_2)
+                                         in
+                                         let Parraysets_1 =
+                                           %array_set.`float` (a, 0, prim_1)
+                                         in
+                                         cont k2
+                                       where k4 =
+                                         cont k1
+                                                pop(regular k1)
+                                                ($camlFloat__block226))
+                                  where k3 =
+                                    cont k1
+                                           pop(regular k1)
+                                           ($camlFloat__block226)))))
+                  where k2 =
+                    let region_return = 0 in
+                    let `unit` = %end_region (`region`) in
+                    let unit_1 = %end_ghost_region (ghost_region) in
+                    cont k (region_return)
+              in
+              let $camlFloat__sort_146 = closure sort_65_1 @sort in
+              let code loopify(never) size(175) newer_version_of(isortto_73)
+                    isortto_73_1
+                      (srcofs : imm tagged,
+                       dst : float array,
+                       dstofs : imm tagged,
+                       len : imm tagged)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : imm tagged =
+                let a = %project_value_slot.[`isortto`].[`a_9`] (my_closure)
+                in
+                let cmp =
+                  %project_value_slot.[`isortto`].[`cmp_3`] (my_closure)
+                in
+                let for_stop = %int_barith.sub (len, 1) in
+                let prim = %int_comp.le (0, for_stop) in
+                switch prim
+                  | 0 -> k (0)
+                  | 1 -> k2
+                  where k2 =
+                    (cont k2 (0)
+                       where rec k2 (i : imm tagged) =
+                         let int_add = %int_barith.add (srcofs, i) in
+                         ((let prim_1 = %array_length (a) in
+                           let prim_2 =
+                             %int_comp.unsigned.lt (int_add, prim_1)
+                           in
+                           switch prim_2
+                             | 0 -> k3
+                             | 1 -> k4)
+                            where k4 =
+                              let prim_1 =
+                                %array_load.`float`.mut (a, int_add)
+                              in
+                              let e = %box_num.`float` (prim_1) in
+                              let int_add_1 = %int_barith.add (dstofs, i) in
+                              let int_sub = %int_barith.sub (int_add_1, 1) in
+                              (cont k5 (int_sub)
+                                 where rec k5 (j_867_unboxed0 : imm tagged) =
+                                   ((let prim_2 =
+                                       %int_comp.ge (j_867_unboxed0, dstofs)
+                                     in
+                                     switch prim_2
+                                       | 0 -> k6 (0i)
+                                       | 1 -> k7
+                                       where k7 =
+                                         ((let prim_3 = %array_length (dst)
+                                           in
+                                           let prim_4 =
+                                             %int_comp.unsigned.lt
+                                               (j_867_unboxed0, prim_3)
+                                           in
+                                           switch prim_4
+                                             | 0 -> k7
+                                             | 1 -> k8)
+                                            where k8 =
+                                              let prim_3 =
+                                                %array_load.`float`.mut
+                                                  (dst, j_867_unboxed0)
+                                              in
+                                              let Parrayrefs =
+                                                %box_num.`float` (prim_3)
+                                              in
+                                              (apply
+                                                 cmp
+                                                   (Parrayrefs, e)
+                                                   -> k8 * k1
+                                                 where k8
+                                                         (return_val0 :
+                                                            imm tagged) =
+                                                   let prim_4 =
+                                                     %int_comp.gt
+                                                       (return_val0, 0)
+                                                   in
+                                                   cont k6 (prim_4))
+                                            where k7 =
+                                              cont k1
+                                                     pop(regular k1)
+                                                     ($camlFloat__block226)))
+                                      where k6 (naked_immediate : imm) =
+                                        let j_867_unboxed0_1 = j_867_unboxed0
+                                        in
+                                        (switch naked_immediate
+                                           | 0 -> k4 (j_867_unboxed0)
+                                           | 1 -> k6
+                                           where k6 =
+                                             ((let prim_2 =
+                                                 %array_length (dst)
+                                               in
+                                               let prim_3 =
+                                                 %int_comp.unsigned.lt
+                                                   (j_867_unboxed0_1, prim_2)
+                                               in
+                                               switch prim_3
+                                                 | 0 -> k6
+                                                 | 1 -> k7 (prim_2))
+                                                where k7 (prim_2) =
+                                                  let cse_param = prim_2 in
+                                                  let prim_3 =
+                                                    %array_load.`float`.mut
+                                                      (dst, j_867_unboxed0_1)
+                                                  in
+                                                  let int_add_2 =
+                                                    %int_barith.add
+                                                      (j_867_unboxed0_1, 1)
+                                                  in
+                                                  ((let prim_4 =
+                                                      %int_comp.unsigned.lt
+                                                        (int_add_2, cse_param)
+                                                    in
+                                                    switch prim_4
+                                                      | 0 -> k7
+                                                      | 1 -> k8)
+                                                     where k8 =
+                                                       let Parraysets =
+                                                         %array_set.`float`
+                                                           (dst,
+                                                            int_add_2,
+                                                            prim_3)
+                                                       in
+                                                       let int_add_3 =
+                                                         %int_barith.add
+                                                           (j_867_unboxed0_1,
+                                                            -1)
+                                                       in
+                                                       cont k5 (int_add_3)
+                                                     where k7 =
+                                                       cont k1
+                                                              pop(regular k1)
+                                                              ($camlFloat__block226))
+                                                where k6 =
+                                                  cont k1
+                                                         pop(regular k1)
+                                                         ($camlFloat__block226))))
+                                 where k4 (j_867_unboxed0) =
+                                   let j_867_unboxed0_1 = j_867_unboxed0 in
+                                   let int_add_2 =
+                                     %int_barith.add (j_867_unboxed0_1, 1)
+                                   in
+                                   ((let prim_2 = %array_length (dst) in
+                                     let prim_3 =
+                                       %int_comp.unsigned.lt
+                                         (int_add_2, prim_2)
+                                     in
+                                     switch prim_3
+                                       | 0 -> k4
+                                       | 1 -> k5)
+                                      where k5 =
+                                        let Parraysets =
+                                          %array_set.`float`
+                                            (dst, int_add_2, prim_1)
+                                        in
+                                        let prim_2 =
+                                          %int_comp.ne (i, for_stop)
+                                        in
+                                        (switch prim_2
+                                           | 0 -> k (0)
+                                           | 1 -> k5
+                                           where k5 =
+                                             let int_succ =
+                                               %int_barith.add (i, 1)
+                                             in
+                                             cont k2 (int_succ))
+                                      where k4 =
+                                        cont k1
+                                               pop(regular k1)
+                                               ($camlFloat__block226)))
+                            where k3 =
+                              cont k1 pop(regular k1) ($camlFloat__block226)))
+              in
+              let code rec loopify(done) size(159) newer_version_of(loop_72)
+                    loop_72_1
+                      (i1 : imm tagged,
+                       s1 : float boxed,
+                       i2 : imm tagged,
+                       s2 : float boxed,
+                       d : imm tagged)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : imm tagged =
+                (let unboxed_float = %unbox_num.`float` (s1) in
+                 let unboxed_float_1 = %unbox_num.`float` (s2) in
+                 cont self
+                        (i1, s1, i2, s2, d, unboxed_float_1, unboxed_float))
+                  where rec self
+                              (i1_1 : imm tagged,
+                               s1_1 : float boxed,
+                               i2_1 : imm tagged,
+                               s2_1 : float boxed,
+                               d_1 : imm tagged,
+                               unboxed_float : float,
+                               unboxed_float_1 : float) =
+                    let src2r =
+                      %project_value_slot.[`loop_6`].[`src2r`] (my_closure)
+                    in
+                    let cmp =
+                      %project_value_slot.[`loop_6`].[`cmp_4`] (my_closure)
+                    in
+                    let a =
+                      %project_value_slot.[`loop_6`].[`a_10`] (my_closure)
+                    in
+                    let src1r =
+                      %project_value_slot.[`loop_6`].[`src1r`] (my_closure)
+                    in
+                    let dst =
+                      %project_value_slot.[`loop_6`].[`dst`] (my_closure)
+                    in
+                    let src2 =
+                      %project_value_slot.[`loop_6`].[`src2`] (my_closure)
+                    in
+                    (apply cmp (s1_1, s2_1) -> k2 * k1
+                       where k2 (apply_result : imm tagged) =
+                         let prim = %int_comp.le (apply_result, 0) in
+                         (switch prim
+                            | 0 -> k2
+                            | 1 -> k3
+                            where k3 =
+                              ((let prim_1 = %array_length (dst) in
+                                let prim_2 =
+                                  %int_comp.unsigned.lt (d_1, prim_1)
+                                in
+                                switch prim_2
+                                  | 0 -> k3
+                                  | 1 -> k4)
+                                 where k4 =
+                                   let Parraysets =
+                                     %array_set.`float`
+                                       (dst, d_1, unboxed_float_1)
+                                   in
+                                   let i1_2 = %int_barith.add (i1_1, 1) in
+                                   let prim_1 = %int_comp.lt (i1_2, src1r) in
+                                   (switch prim_1
+                                      | 0 -> k4
+                                      | 1 -> k5
+                                      where k5 =
+                                        let int_add =
+                                          %int_barith.add (d_1, 1)
+                                        in
+                                        ((let prim_2 = %array_length (a) in
+                                          let prim_3 =
+                                            %int_comp.unsigned.lt
+                                              (i1_2, prim_2)
+                                          in
+                                          switch prim_3
+                                            | 0 -> k5
+                                            | 1 -> k6)
+                                           where k6 =
+                                             let prim_2 =
+                                               %array_load.`float`.mut
+                                                 (a, i1_2)
+                                             in
+                                             let Parrayrefs =
+                                               %box_num.`float` (prim_2)
+                                             in
+                                             cont self
+                                                    (i1_2,
+                                                     Parrayrefs,
+                                                     i2_1,
+                                                     s2_1,
+                                                     int_add,
+                                                     unboxed_float,
+                                                     prim_2)
+                                           where k5 =
+                                             cont k1
+                                                    pop(regular k1)
+                                                    ($camlFloat__block226))
+                                      where k4 =
+                                        let int_sub =
+                                          %int_barith.sub (src2r, i2_1)
+                                        in
+                                        let int_add =
+                                          %int_barith.add (d_1, 1)
+                                        in
+                                        apply direct(blit_43_1)
+                                          ($camlFloat__blit_130
+                                           : _ -> imm tagged)
+                                            (src2,
+                                             i2_1,
+                                             dst,
+                                             int_add,
+                                             int_sub)
+                                            -> k * k1)
+                                 where k3 =
+                                   cont k1
+                                          pop(regular k1)
+                                          ($camlFloat__block226))
+                            where k2 =
+                              ((let prim_1 = %array_length (dst) in
+                                let prim_2 =
+                                  %int_comp.unsigned.lt (d_1, prim_1)
+                                in
+                                switch prim_2
+                                  | 0 -> k2
+                                  | 1 -> k3)
+                                 where k3 =
+                                   let Parraysets =
+                                     %array_set.`float`
+                                       (dst, d_1, unboxed_float)
+                                   in
+                                   let i2_2 = %int_barith.add (i2_1, 1) in
+                                   let prim_1 = %int_comp.lt (i2_2, src2r) in
+                                   (switch prim_1
+                                      | 0 -> k3
+                                      | 1 -> k4
+                                      where k4 =
+                                        let int_add =
+                                          %int_barith.add (d_1, 1)
+                                        in
+                                        ((let prim_2 = %array_length (src2)
+                                          in
+                                          let prim_3 =
+                                            %int_comp.unsigned.lt
+                                              (i2_2, prim_2)
+                                          in
+                                          switch prim_3
+                                            | 0 -> k4
+                                            | 1 -> k5)
+                                           where k5 =
+                                             let prim_2 =
+                                               %array_load.`float`.mut
+                                                 (src2, i2_2)
+                                             in
+                                             let Parrayrefs =
+                                               %box_num.`float` (prim_2)
+                                             in
+                                             cont self
+                                                    (i1_1,
+                                                     s1_1,
+                                                     i2_2,
+                                                     Parrayrefs,
+                                                     int_add,
+                                                     prim_2,
+                                                     unboxed_float_1)
+                                           where k4 =
+                                             cont k1
+                                                    pop(regular k1)
+                                                    ($camlFloat__block226))
+                                      where k3 =
+                                        let int_sub =
+                                          %int_barith.sub (src1r, i1_1)
+                                        in
+                                        let int_add =
+                                          %int_barith.add (d_1, 1)
+                                        in
+                                        apply direct(blit_43_1)
+                                          ($camlFloat__blit_130
+                                           : _ -> imm tagged)
+                                            (a, i1_1, dst, int_add, int_sub)
+                                            -> k * k1)
+                                 where k2 =
+                                   cont k1
+                                          pop(regular k1)
+                                          ($camlFloat__block226))))
+              in
+              let code loopify(never) size(230) newer_version_of(merge_71)
+                    merge_71_1
+                      (src1ofs : imm tagged,
+                       src1len : imm tagged,
+                       src2 : float array,
+                       src2ofs : imm tagged,
+                       src2len : imm tagged,
+                       dst : float array,
+                       dstofs : imm tagged)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : imm tagged =
+                let cmp =
+                  %project_value_slot.[`merge`].[`cmp_5`] (my_closure)
+                in
+                let a = %project_value_slot.[`merge`].[`a_11`] (my_closure)
+                in
+                let src1r = %int_barith.add (src1ofs, src1len) in
+                let src2r = %int_barith.add (src2ofs, src2len) in
+                let loop = closure loop_72_1 @loop_6
+                with {
+                  blit = $camlFloat__blit_130;
+                  cmp_4 = cmp;
+                  a_10 = a;
+                  src2 = src2;
+                  dst = dst;
+                  src1r = src1r;
+                  src2r = src2r
+                }
+                in
+                (let prim = %array_length (src2) in
+                 let prim_1 = %int_comp.unsigned.lt (src2ofs, prim) in
+                 switch prim_1
+                   | 0 -> k2
+                   | 1 -> k3)
+                  where k3 =
+                    let prim = %array_load.`float`.mut (src2, src2ofs) in
+                    let Parrayrefs = %box_num.`float` (prim) in
+                    ((let prim_1 = %array_length (a) in
+                      let prim_2 = %int_comp.unsigned.lt (src1ofs, prim_1) in
+                      switch prim_2
+                        | 0 -> k3
+                        | 1 -> k4)
+                       where k4 =
+                         let prim_1 = %array_load.`float`.mut (a, src1ofs) in
+                         let Parrayrefs_1 = %box_num.`float` (prim_1) in
+                         apply direct(loop_72_1)
+                           (loop : _ -> imm tagged)
+                             (src1ofs,
+                              Parrayrefs_1,
+                              src2ofs,
+                              Parrayrefs,
+                              dstofs)
+                             -> k * k1
+                       where k3 =
+                         cont k1 pop(regular k1) ($camlFloat__block226))
+                  where k2 =
+                    cont k1 pop(regular k1) ($camlFloat__block226)
+              in
+              let code rec loopify(never) size(45) newer_version_of(sortto_74)
+                    sortto_74_1
+                      (srcofs : imm tagged,
+                       dst : float array,
+                       dstofs : imm tagged,
+                       len : imm tagged)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : imm tagged =
+                let merge =
+                  %project_value_slot.[`sortto`].[`merge`] (my_closure)
+                in
+                let a = %project_value_slot.[`sortto`].[`a_12`] (my_closure)
+                in
+                let isortto =
+                  %project_value_slot.[`sortto`].[`isortto`] (my_closure)
+                in
+                let prim = %int_comp.le (len, 5) in
+                switch prim
+                  | 0 -> k2
+                  | 1 -> k3
+                  where k3 =
+                    apply direct(isortto_73_1)
+                      (isortto : _ -> imm tagged)
+                        (srcofs, dst, dstofs, len)
+                        -> k * k1
+                  where k2 =
+                    let l1 = %int_barith.div (len, 2) in
+                    let l2 = %int_barith.sub (len, l1) in
+                    ((let int_add = %int_barith.add (dstofs, l1) in
+                      let int_add_1 = %int_barith.add (srcofs, l1) in
+                      apply direct(sortto_74_1)
+                        (my_closure ~ depth my_depth -> succ my_depth
+                         : _ -> imm tagged)
+                          (int_add_1, dst, int_add, l2)
+                          -> k3 * k1
+                        where k3 (param : imm tagged) =
+                          cont k2 (int_add))
+                       where k2 (int_add) =
+                         let cse_param = int_add in
+                         ((let int_add_1 = %int_barith.add (srcofs, l2) in
+                           apply direct(sortto_74_1)
+                             (my_closure ~ depth my_depth -> succ my_depth
+                              : _ -> imm tagged)
+                               (srcofs, a, int_add_1, l1)
+                               -> k3 * k1
+                             where k3 (param : imm tagged) =
+                               cont k2 (int_add_1))
+                            where k2 (int_add_1) =
+                              let cse_param_1 = int_add_1 in
+                              apply direct(merge_71_1)
+                                (merge : _ -> imm tagged)
+                                  (cse_param_1,
+                                   l1,
+                                   dst,
+                                   cse_param,
+                                   l2,
+                                   dst,
+                                   dstofs)
+                                  -> k * k1))
+              in
+              let code loopify(never) size(533) newer_version_of(stable_sort_70)
+                    stable_sort_70_1 (cmp : val, a : float array)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : imm tagged =
+                let `region` = %begin_region () in
+                let merge = closure merge_71_1 @merge
+                with { blit_1 = $camlFloat__blit_130; cmp_5 = cmp; a_11 = a }
+                in
+                let isortto = closure isortto_73_1 @isortto
+                with { cmp_3 = cmp; a_9 = a }
+                in
+                let sortto = closure sortto_74_1 @sortto
+                with { a_12 = a; merge = merge; isortto = isortto }
+                in
+                let l = %array_length (a) in
+                let prim = %int_comp.le (l, 5) in
+                switch prim
+                  | 0 -> k2
+                  | 1 -> k3
+                  where k3 =
+                    let `unit` = %end_region (`region`) in
+                    apply direct(isortto_73_1)
+                      (isortto : _ -> imm tagged) (0, a, 0, l) -> k * k1
+                  where k2 =
+                    let l1 = %int_barith.div (l, 2) in
+                    let l2 = %int_barith.sub (l, l1) in
+                    (apply ccall
+                       ($`*extern*`.caml_floatarray_create : val -> val)
+                         (l2)
+                         -> k2 * k1
+                       where k2 (t) =
+                         (apply direct(sortto_74_1)
+                            (sortto : _ -> imm tagged)
+                              (l1, t, 0, l2)
+                              -> k3 * k1
+                            where k3 (param : imm tagged) =
+                              cont k2
+                            where k2 =
+                              (apply direct(sortto_74_1)
+                                 (sortto : _ -> imm tagged)
+                                   (0, a, l2, l1)
+                                   -> k3 * k1
+                                 where k3 (param : imm tagged) =
+                                   cont k2
+                                 where k2 =
+                                   let `unit` = %end_region (`region`) in
+                                   apply direct(merge_71_1)
+                                     (merge : _ -> imm tagged)
+                                       (l2, l1, t, 0, l2, a, 0)
+                                       -> k * k1)))
+              in
+              let $camlFloat__stable_sort_147 =
+                closure stable_sort_70_1 @stable_sort
+              in
+              let code rec loopify(never) size(48) newer_version_of(aux_76)
+                    aux_76_1 (i : imm tagged, param : imm tagged)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : [ 0 | 0 of val * val ] =
+                let a = %project_value_slot.[`aux`].[`a_13`] (my_closure) in
+                let Parraylength = %array_length (a) in
+                let prim = %int_comp.lt (i, Parraylength) in
+                switch prim
+                  | 0 -> k (0)
+                  | 1 -> k2
+                  where k2 =
+                    let prim_1 = %array_load.`float`.mut (a, i) in
+                    let x = %box_num.`float` (prim_1) in
+                    let int_add = %int_barith.add (i, 1) in
+                    let partial_aux = closure partial_aux_77 @partial_aux
+                    with {
+                      my_closure =
+                        my_closure ~ depth my_depth -> succ my_depth;
+                      int_add = int_add
+                    }
+                    in
+                    let Pmakeblock = %block.[`0`] (x, partial_aux) in
+                    cont k (Pmakeblock)
+              in
+              let code loopify(never) size(73) newer_version_of(to_seq_75)
+                    to_seq_75_1 (a : float array)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : val =
+                let aux = closure aux_76_1 @aux with { a_13 = a } in
+                let partial_aux = closure partial_aux_78 @partial_aux_1
+                with { aux = aux }
+                in
+                cont k (partial_aux)
+              in
+              let $camlFloat__to_seq_148 = closure to_seq_75_1 @to_seq in
+              let code rec loopify(never) size(55) newer_version_of(aux_80)
+                    aux_80_1 (i : imm tagged, param : imm tagged)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : [ 0 | 0 of val * val ] =
+                let a = %project_value_slot.[`aux_1`].[`a_14`] (my_closure)
+                in
+                let Parraylength = %array_length (a) in
+                let prim = %int_comp.lt (i, Parraylength) in
+                switch prim
+                  | 0 -> k (0)
+                  | 1 -> k2
+                  where k2 =
+                    let prim_1 = %array_load.`float`.mut (a, i) in
+                    let x = %box_num.`float` (prim_1) in
+                    let int_add = %int_barith.add (i, 1) in
+                    let partial_aux = closure partial_aux_81 @partial_aux_2
+                    with {
+                      my_closure_1 =
+                        my_closure ~ depth my_depth -> succ my_depth;
+                      int_add_1 = int_add
+                    }
+                    in
+                    let Pmakeblock = %block.[`0`] (i, x) in
+                    let Pmakeblock_1 = %block.[`0`] (Pmakeblock, partial_aux)
+                    in
+                    cont k (Pmakeblock_1)
+              in
+              let code loopify(never) size(80) newer_version_of(to_seqi_79)
+                    to_seqi_79_1 (a : float array)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : val =
+                let aux = closure aux_80_1 @aux_1 with { a_14 = a } in
+                let partial_aux = closure partial_aux_82 @partial_aux_3
+                with { aux_1 = aux }
+                in
+                cont k (partial_aux)
+              in
+              let $camlFloat__to_seqi_149 = closure to_seqi_79_1 @to_seqi in
+              let code rec loopify(done) size(20) newer_version_of(fill_84)
+                    fill_84_1
+                      (i : imm tagged,
+                       param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : float array =
+                cont self (i, param)
+                  where rec self
+                              (i_1 : imm tagged,
+                               param_1 :
+                                 [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                    let a =
+                      %project_value_slot.[`fill_2`].[`a_15`] (my_closure)
+                    in
+                    let prim = %is_int (param_1) in
+                    (switch prim
+                       | 0 -> k2
+                       | 1 -> k (a)
+                       where k2 =
+                         let Pfield = %block_load.[`0`] (param_1) in
+                         let prim_1 = %unbox_num.`float` (Pfield) in
+                         let Parraysetu = %array_set.`float` (a, i_1, prim_1)
+                         in
+                         let Pfield_1 = %block_load.[`1`] (param_1) in
+                         let int_sub = %int_barith.sub (i_1, 1) in
+                         cont self (int_sub, Pfield_1))
+              in
+              let code loopify(never) size(61) newer_version_of(of_rev_list_83)
+                    of_rev_list_83_1
+                      (l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : float array =
+                cont self (0, l)
+                  where rec self
+                              (len : imm tagged,
+                               param :
+                                 [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                    let prim = %is_int (param) in
+                    (switch prim
+                       | 0 -> k3
+                       | 1 -> k2 (len)
+                       where k3 =
+                         let Pfield = %block_load.[`1`] (param) in
+                         let int_add = %int_barith.add (len, 1) in
+                         cont self (int_add, Pfield))
+                  where k2 (len) =
+                    let len_1 = len in
+                    (apply ccall
+                       ($`*extern*`.caml_floatarray_create : val -> val)
+                         (len_1)
+                         -> k2 * k1
+                       where k2 (a) =
+                         let fill = closure fill_84_1 @fill_2
+                         with { a_15 = a }
+                         in
+                         let int_sub = %int_barith.sub (len_1, 1) in
+                         apply direct(fill_84_1)
+                           (fill : _ -> float array) (int_sub, l) -> k * k1)
+              in
+              let $camlFloat__of_rev_list_150 =
+                closure of_rev_list_83_1 @of_rev_list
+              in
+              let code loopify(never) size(32) newer_version_of(of_seq_85)
+                    of_seq_85_1 (i : val)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : float array =
+                cont self (0, i)
+                  where rec self (acc, seq : val) =
+                    (apply inlining_state(depth(10)) seq (0) -> k3 * k1
+                       where k3 (`*match*` : [ 0 | 0 of val * val ]) =
+                         let prim = %is_int (`*match*`) in
+                         (switch prim
+                            | 0 -> k3
+                            | 1 -> k2 (acc)
+                            where k3 =
+                              let Pfield = %block_load.[`0`] (`*match*`) in
+                              let Pmakeblock = %block.[`0`] (Pfield, acc) in
+                              let Pfield_1 = %block_load.[`1`] (`*match*`) in
+                              cont self (Pmakeblock, Pfield_1)))
+                  where k2 (acc) =
+                    let l = acc in
+                    apply direct(of_rev_list_83_1)
+                      ($camlFloat__of_rev_list_150 : _ -> float array)
+                        (l)
+                        -> k * k1
+              in
+              let $camlFloat__of_seq_151 = closure of_seq_85_1 @of_seq in
+              let code loopify(never) size(100) newer_version_of(map_to_array_87)
+                    map_to_array_87_1 (f : val, a : float array)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : any array =
+                let l = %array_length (a) in
+                let prim = %phys_eq (l, 0) in
+                switch prim
+                  | 0 -> k2
+                  | 1 -> k ($camlFloat__empty_array1804)
+                  where k2 =
+                    ((let prim_1 = %array_load.`float`.mut (a, 0) in
+                      let Parrayrefu = %box_num.`float` (prim_1) in
+                      apply f (Parrayrefu) -> k2 * k1)
+                       where k2 (apply_result) =
+                         (apply ccall
+                            ($`*extern*`.caml_array_make : val * val -> val)
+                              (l, apply_result)
+                              -> k2 * k1
+                            where k2 (r) =
+                              let for_stop = %int_barith.sub (l, 1) in
+                              let prim_1 = %int_comp.le (1, for_stop) in
+                              (switch prim_1
+                                 | 0 -> k (r)
+                                 | 1 -> k2
+                                 where k2 =
+                                   (cont k2 (1)
+                                      where rec k2 (i : imm tagged) =
+                                        ((let prim_2 =
+                                            %array_load.`float`.mut (a, i)
+                                          in
+                                          let Parrayrefu =
+                                            %box_num.`float` (prim_2)
+                                          in
+                                          apply f (Parrayrefu) -> k3 * k1)
+                                           where k3 (apply_result_1) =
+                                             ((let cond_result =
+                                                 %is_flat_float_array (r)
+                                               in
+                                               switch cond_result
+                                                 | 0 -> k5
+                                                 | 1 -> k4)
+                                                where k5 =
+                                                  let ifnot_result =
+                                                    %array_set
+                                                      (r, i, apply_result_1)
+                                                  in
+                                                  cont k3
+                                                where k4 =
+                                                  let prim_2 =
+                                                    %unbox_num.`float`
+                                                      (apply_result_1)
+                                                  in
+                                                  let ifso_result =
+                                                    %array_set.`float`
+                                                      (r, i, prim_2)
+                                                  in
+                                                  cont k3
+                                                where k3 =
+                                                  let prim_2 =
+                                                    %int_comp.ne
+                                                      (i, for_stop)
+                                                  in
+                                                  (switch prim_2
+                                                     | 0 -> k (r)
+                                                     | 1 -> k3
+                                                     where k3 =
+                                                       let int_succ =
+                                                         %int_barith.add
+                                                           (i, 1)
+                                                       in
+                                                       cont k2 (int_succ))))))))
+              in
+              let $camlFloat__map_to_array_153 =
+                closure map_to_array_87_1 @map_to_array
+              in
+              let code loopify(never) size(76) newer_version_of(map_from_array_88)
+                    map_from_array_88_1 (f : val, a : any array)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : float array =
+                let l = %array_length.generic (a) in
+                apply ccall
+                  ($`*extern*`.caml_floatarray_create : val -> val)
+                    (l)
+                    -> k2 * k1
+                  where k2 (r) =
+                    let for_stop = %int_barith.sub (l, 1) in
+                    let prim = %int_comp.le (0, for_stop) in
+                    (switch prim
+                       | 0 -> k (r)
+                       | 1 -> k2
+                       where k2 =
+                         (cont k2 (0)
+                            where rec k2 (i : imm tagged) =
+                              ((let cond_result = %is_flat_float_array (a) in
+                                switch cond_result
+                                  | 0 -> k6
+                                  | 1 -> k5)
+                                 where k6 =
+                                   let ifnot_result = %array_load.mut (a, i)
+                                   in
+                                   cont k4 (ifnot_result)
+                                 where k5 =
+                                   let prim_1 =
+                                     %array_load.`float`.mut (a, i)
+                                   in
+                                   let ifso_result =
+                                     %box_num.`float` (prim_1)
+                                   in
+                                   cont k4 (ifso_result)
+                                 where k4 (if_then_else_result) =
+                                   apply f (if_then_else_result) -> k3 * k1
+                                 where k3 (apply_result : float boxed) =
+                                   let prim_1 =
+                                     %unbox_num.`float` (apply_result)
+                                   in
+                                   let Parraysetu =
+                                     %array_set.`float` (r, i, prim_1)
+                                   in
+                                   let prim_2 = %int_comp.ne (i, for_stop) in
+                                   (switch prim_2
+                                      | 0 -> k (r)
+                                      | 1 -> k3
+                                      where k3 =
+                                        let int_succ = %int_barith.add (i, 1)
+                                        in
+                                        cont k2 (int_succ)))))
+              in
+              let $camlFloat__map_from_array_154 =
+                closure map_from_array_88_1 @map_from_array
+              in
+              let $camlFloat__Pmakeblock4101 =
+                Block 0 ($camlFloat__unsafe_fill_118,
+                         $camlFloat__unsafe_blit_119,
+                         $camlFloat__check_120,
+                         $camlFloat__make_121,
+                         $camlFloat__init_122,
+                         $camlFloat__append_123,
+                         $camlFloat__ensure_ge_124,
+                         $camlFloat__sum_lengths_125,
+                         $camlFloat__concat_126,
+                         $camlFloat__sub_127,
+                         $camlFloat__copy_128,
+                         $camlFloat__fill_129,
+                         $camlFloat__blit_130,
+                         $camlFloat__to_list_131,
+                         $camlFloat__of_list_133,
+                         $camlFloat__iter_134,
+                         $camlFloat__iter2_135,
+                         $camlFloat__map_136,
+                         $camlFloat__map2_137,
+                         $camlFloat__iteri_138,
+                         $camlFloat__mapi_139,
+                         $camlFloat__fold_left_140,
+                         $camlFloat__fold_right_141,
+                         $camlFloat__exists_142,
+                         $camlFloat__for_all_143,
+                         $camlFloat__mem_144,
+                         $camlFloat__mem_ieee_145,
+                         $camlFloat__Bottom3258,
+                         $camlFloat__sort_146,
+                         5,
+                         $camlFloat__stable_sort_147,
+                         $camlFloat__stable_sort_147,
+                         $camlFloat__to_seq_148,
+                         $camlFloat__to_seqi_149,
+                         $camlFloat__of_rev_list_150,
+                         $camlFloat__of_seq_151,
+                         $camlFloat__map_to_array_153,
+                         $camlFloat__map_from_array_154)
+              in
+              let $camlFloat =
+                Block 0 ($camlFloat__Pmakeblock2148,
+                         $camlFloat__float291,
+                         $camlFloat__float294,
+                         $camlFloat__float297,
+                         $camlFloat__infinity1982,
+                         $camlFloat__neg_infinity1986,
+                         $camlFloat__nan1990,
+                         $camlFloat__is_finite_104,
+                         $camlFloat__is_infinite_105,
+                         $camlFloat__is_nan_106,
+                         $camlFloat__float339,
+                         $camlFloat__max_float1994,
+                         $camlFloat__min_float1998,
+                         $camlFloat__epsilon_float2002,
+                         $camlFloat__float_of_string_opt_103,
+                         $camlFloat__string_of_float_102,
+                         $camlFloat__is_integer_107,
+                         $camlFloat__succ_108,
+                         $camlFloat__pred_109,
+                         $camlFloat__equal_110,
+                         $camlFloat__min_111,
+                         $camlFloat__max_112,
+                         $camlFloat__min_max_113,
+                         $camlFloat__min_num_114,
+                         $camlFloat__max_num_115,
+                         $camlFloat__min_max_num_116,
+                         $camlFloat__hash_117,
+                         $camlFloat__Pmakeblock4101)
+              in
+              cont done ($camlFloat)))
