@@ -4396,6 +4396,7 @@ let global_table namelist =
  *     unit_name : char*       -- pointer to null-terminated string
  *     entry_fn : value        -- entry function (OCaml closure)
  *     gc_roots : value *      -- pointer to gc_roots (module block)
+ *     frametable : intnat *   -- pointer to frametable
  *     num_deps : intnat       -- number of dependencies
  *     dep_names : char**      -- pointer to array of dependency name strings
  *     init_state : value      -- Val_int 0 = not init, 1 = initializing,
@@ -4480,6 +4481,9 @@ let unit_deps_table units =
         let gc_roots_sym =
           global_symbol (make_symbol ~compilation_unit:cu "gc_roots")
         in
+        let frametable_sym =
+          global_symbol (make_symbol ~compilation_unit:cu "frametable")
+        in
         let num_deps = List.length deps in
         let deps_sym_item =
           match StringMap.find name dep_array_symbols with
@@ -4489,6 +4493,7 @@ let unit_deps_table units =
         [ Csymbol_address name_sym;
           Csymbol_address entry_sym;
           Csymbol_address gc_roots_sym;
+          Csymbol_address frametable_sym;
           Cint (Nativeint.of_int num_deps);
           deps_sym_item;
           Cint 1n (* initialized flag: Val_false = Val_int(0) = 1 *) ])

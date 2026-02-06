@@ -195,6 +195,7 @@ struct caml_unit_deps_entry {
   const char *unit_name;      /* compilation unit name */
   void *entry_fn;             /* entry function (raw code pointer) */
   value *gc_roots;            /* pointer to gc_roots (module block) */
+  intnat *frametable;         /* pointer to frametable */
   intnat num_deps;            /* number of dependencies */
   const char * const *dep_names;  /* array of dependency names */
   value init_state;           /* one of INIT_STATE_* */
@@ -229,8 +230,9 @@ caml_unit_deps_find(const char *name)
   return NULL;
 }
 
-/* Forward declaration */
+/* Forward declarations */
 void caml_register_dyn_globals(void **globals, int nglobals);
+void caml_register_frametables(void **tables, int ntables);
 
 /* Initialize a module and its dependencies in topological order.
    Uses a recursive depth-first approach.
@@ -268,6 +270,26 @@ static value caml_init_module_rec(struct caml_unit_deps_entry *entry)
     }
   }
 
+  /* CR mshinwell/ntrangez: consider sharing code with natdynlink */
+
+  /* Register gc_roots and frametable before calling the entry function,
+     matching the ordering used by both the normal startup path (where
+     caml_globals[] and caml_frametable[] are statically available before
+     caml_program runs) and natdynlink (which registers both before calling
+     the entry point).
+
+     gc_roots must be registered before the frametables because
+     caml_register_dyn_globals can raise (upon duplicate registration). */
+  if (entry->gc_roots != NULL) {
+    void *globals[1] = { (void *)entry->gc_roots };
+    caml_register_dyn_globals(globals, 1);
+  }
+
+  if (entry->frametable != NULL) {
+    void *tables[1] = { (void *)entry->frametable };
+    caml_register_frametables(tables, 1);
+  }
+
   /* Create a closure wrapper for the entry function.
      The closure has: code pointer at field 0, closinfo at field 1.
      We use arity=0, delta=2 (no environment), is_last=1. */
@@ -279,14 +301,6 @@ static value caml_init_module_rec(struct caml_unit_deps_entry *entry)
   value result = caml_callback_exn(closure, Val_unit);
   if (Is_exception_result(result)) {
     CAMLreturn(result);
-  }
-
-  /* Register the gc_roots with the dynamic globals list.
-     This is the same mechanism used by natdynlink and ensures proper
-     scanning of module blocks including closures. */
-  if (entry->gc_roots != NULL) {
-    void *globals[1] = { (void *)entry->gc_roots };
-    caml_register_dyn_globals(globals, 1);
   }
 
   /* Mark as done */
