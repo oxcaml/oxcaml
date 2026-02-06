@@ -752,12 +752,10 @@ CFI_STARTPROC
            Caml_state->preemption points to a freshly allocated preemption
            continuation. */
         cmpq    $3, Caml_state(preemption)
-        jbe     LBL(preempt_unhandled)
+        jbe     1f
         LEAVE_FUNCTION
         jmp     G(caml_preempt)
-LBL(preempt_unhandled): /* caml_preempt will jump back here if the preemption is
-                           unhandled */
-        /* We're not preempting, so restore registers and return back to the
+1:      /* We're not preempting, so restore registers and return back to the
            user */
         movq    Caml_state(gc_regs), %r15
 LBL(resume_from_preempt):
@@ -1372,7 +1370,7 @@ LBL(112):
        execution. Otherwise, raise Effect.Unhandled. */
         WOSIZE_VAL(%rbx, %rcx)
         cmpq    $3, %rcx
-        je      LBL(preempt_unhandled)
+        je      1f
         ENTER_FUNCTION
 #if defined(WITH_THREAD_SANITIZER)
         /* We must let the TSan runtime know that we switched back to the
@@ -1394,6 +1392,11 @@ LBL(112):
         movq    %rax, C_ARG_1
         LEA_VAR(caml_raise_unhandled_effect, %rax)
         jmp     LBL(caml_c_call)
+1:      /* Preempt unhandled; restore the gc_regs from the continuation to %r15
+           and jump back into the second half of caml_do_call_gc, which will
+           restore the regs and return. */
+        movq   2*8(%rbx), %r15
+        jmp    LBL(resume_from_preempt)
 CFI_ENDPROC
 ENDFUNCTION(G(caml_perform))
 
