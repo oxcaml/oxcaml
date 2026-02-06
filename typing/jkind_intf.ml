@@ -57,7 +57,7 @@ module type Sort = sig
 
     val equal : t -> t -> bool
 
-    val format : Format.formatter -> t -> unit
+    val format : Format_doc.formatter -> t -> unit
 
     val all_void : t -> bool
 
@@ -199,7 +199,7 @@ module type Sort = sig
       if possible *)
   val equate : t -> t -> bool
 
-  val format : Format.formatter -> t -> unit
+  val format : Format_doc.formatter -> t -> unit
 
   (** Checks whether this sort is [void], defaulting to [value] if a sort
       variable is unfilled. *)

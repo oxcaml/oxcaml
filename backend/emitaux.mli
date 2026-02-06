@@ -118,7 +118,7 @@ end
 
 exception Error of error
 
-val report_error : Format.formatter -> error -> unit
+val report_error : Format_doc.formatter -> error -> unit
 
 type preproc_stack_check_result =
   { max_frame_size : int;

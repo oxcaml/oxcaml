@@ -245,7 +245,7 @@ end
 Line 3, characters 27-33:
 3 |   [@@@implicit_kind: ('a : bits64)]
                                ^^^^^^
-Error: The implicit kind for "a" is already defined at Line 2, characters 27-36.
+Error: The implicit kind for "a" is already defined at line 2, characters 27-36.
 |}]
 
 (* No override when variable names don't match. *)
@@ -275,7 +275,7 @@ end
 Line 3, characters 27-36:
 3 |   [@@@implicit_kind: ('b : immediate)]
                                ^^^^^^^^^
-Error: The implicit kind for "b" is already defined at Line 2, characters 44-50.
+Error: The implicit kind for "b" is already defined at line 2, characters 44-50.
 |}]
 
 (* Override in nested modules. *)
@@ -296,7 +296,7 @@ end
 Line 7, characters 29-38:
 7 |     [@@@implicit_kind: ('t : immediate)]
                                  ^^^^^^^^^
-Error: The implicit kind for "t" is already defined at Line 2, characters 27-33.
+Error: The implicit kind for "t" is already defined at line 2, characters 27-33.
 |}]
 
 (* Multiple overrides with different variables. *)
@@ -314,7 +314,7 @@ end
 Line 4, characters 27-31:
 4 |   [@@@implicit_kind: ('a : word) * ('c : immediate)]
                                ^^^^
-Error: The implicit kind for "a" is already defined at Line 2, characters 27-36.
+Error: The implicit kind for "a" is already defined at line 2, characters 27-36.
 |}]
 
 (* Annotations narrowing the jkind fail.*)

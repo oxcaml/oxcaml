@@ -461,7 +461,7 @@ let rec print_path p =
   | Pident id -> Ident.name id
   | Pdot (p, s) -> print_path p ^ "." ^ s
   | Papply (t1, t2) -> "app " ^ print_path t1 ^ " " ^ print_path t2
-  | Pextra_ty _ -> Format.asprintf "%a" Path.print p
+  | Pextra_ty _ -> Format_doc.asprintf "%a" Path.print p
 
 let rec replace_id_in_path path to_rep : Path.t =
   match (path : Path.t) with

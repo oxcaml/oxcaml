@@ -28,12 +28,14 @@ let comparison ppf = function
   | Ugeint -> pp_print_string ppf "ugeint"
 
 let primitive ppf = function
-  | Getglobal c -> fprintf ppf "getglobal %a" Compilation_unit.print c
+  | Getglobal c ->
+    fprintf ppf "getglobal %a" (Format_doc.compat Compilation_unit.print) c
   | Getpredef i -> fprintf ppf "getpredef %a" Ident.print i
   | Boolnot -> pp_print_string ppf "boolnot"
   | Isint -> pp_print_string ppf "isint"
   | Vectlength -> pp_print_string ppf "vectlength"
-  | Setglobal c -> fprintf ppf "setglobal %a" Compilation_unit.print c
+  | Setglobal c ->
+    fprintf ppf "setglobal %a" (Format_doc.compat Compilation_unit.print) c
   | Getfield i -> fprintf ppf "getfield %d" i
   | Getfloatfield i -> fprintf ppf "getfloatfield %d" i
   | Raise Raise_regular -> pp_print_string ppf "raise"

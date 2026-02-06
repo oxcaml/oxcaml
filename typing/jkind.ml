@@ -17,11 +17,11 @@ open Jkind_types
 open Jkind_axis
 open Types
 module Jkind0 = Btype.Jkind0
+module Fmt = Format_doc
 
 [@@@warning "+9"]
 
-let print_type_expr : (Format.formatter -> type_expr -> unit) ref =
-  ref (fun _ _ -> assert false)
+let print_type_expr : type_expr Fmt.printer ref = ref (fun _ _ -> assert false)
 
 let set_print_type_expr p = print_type_expr := p
 
@@ -233,13 +233,12 @@ module Layout = struct
     | Product p -> Product (List.map default_to_value_and_get p)
 
   let format ppf layout =
-    let open Format in
     let rec pp_element ~nested ppf : _ Layout.t -> unit = function
-      | Any -> fprintf ppf "any"
+      | Any -> Fmt.fprintf ppf "any"
       | Sort s -> Sort.format ppf s
       | Product ts ->
-        let pp_sep ppf () = Format.fprintf ppf "@ & " in
-        Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+        let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
+        Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
     in
     pp_element ~nested:false ppf layout
 end
@@ -489,7 +488,7 @@ module With_bounds = struct
     | With_bounds wbs ->
       let type_exprs =
         wbs |> With_bounds_types.to_seq
-        |> Seq.map (fun (ty, _) -> Format.asprintf "%a" !print_type_expr ty)
+        |> Seq.map (fun (ty, _) -> Fmt.asprintf "%a" !print_type_expr ty)
         |> List.of_seq
         (* HACK: we pre-format the types as strings so we so we can sort them
            lexicographically, because otherwise the order of printed [with]s is
@@ -500,7 +499,7 @@ module With_bounds = struct
            deterministic, semantic type comparison *)
         |> List.sort String.compare
       in
-      Format.(
+      Fmt.(
         fprintf ppf "%a"
           (pp_print_list (fun ppf -> fprintf ppf "with@ %s"))
           type_exprs)
@@ -1458,15 +1457,14 @@ module Desc = struct
      [with]-types. See also [Printtyp.out_jkind_of_desc], which uses the same
      algorithm. Internal ticket 5096. *)
   let format_verbose ~verbosity ppf t =
-    let open Format in
     let rec format_desc ~nested ppf (desc : _ t) =
       match desc.layout with
-      | Sort (Var n) -> fprintf ppf "'s%d" (Sort.Var.get_print_number n)
+      | Sort (Var n) -> Fmt.fprintf ppf "'s%d" (Sort.Var.get_print_number n)
       (* Analyze a product before calling [get_const]: the machinery in
          [Const.format] works better for atomic layouts, not products. *)
       | Product lays ->
-        let pp_sep ppf () = fprintf ppf "@ & " in
-        Misc.pp_nested_list ~nested ~pp_element:format_desc ~pp_sep ppf
+        let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
+        Fmt.pp_nested_list ~nested ~pp_element:format_desc ~pp_sep ppf
           (List.map (fun layout -> { desc with layout }) lays)
       | _ -> (
         match get_const desc with
@@ -2008,15 +2006,16 @@ let format_verbose ~verbosity ppf jkind =
 
 let format ppf jkind = format_verbose ~verbosity:Not_verbose ppf jkind
 
-let printtyp_path = ref (fun _ _ -> assert false)
+let printtyp_path : (Fmt.formatter -> Path.t -> unit) ref =
+  ref (fun _ _ -> assert false)
 
 let set_printtyp_path f = printtyp_path := f
 
 module Report_missing_cmi : sig
   (* used both in format_history and in Violation.report_general *)
-  val report_missing_cmi : Format.formatter -> Path.t option -> unit
+  val report_missing_cmi : Fmt.formatter -> Path.t option -> unit
 end = struct
-  open Format
+  open Format_doc
 
   (* CR layouts: Remove this horrible (but useful) heuristic once we have
      transitive dependencies in jenga. *)
@@ -2069,7 +2068,7 @@ module Format_history = struct
   (* CR layouts: all the output in this section is subject to change;
      actually look closely at error messages once this is activated *)
 
-  open Format
+  open Format_doc
 
   let format_with_notify_js ppf str =
     fprintf ppf
@@ -2156,9 +2155,13 @@ module Format_history = struct
     | Implicit_jkind name ->
       fprintf ppf "the implicit kind of type variables named %s" name
     | Type_wildcard loc ->
-      fprintf ppf "the wildcard _ at %a" Location.print_loc_in_lowercase loc
+      fprintf ppf "the wildcard _ at %a"
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
     | Type_of_kind loc ->
-      fprintf ppf "the type at %a" Location.print_loc_in_lowercase loc
+      fprintf ppf "the type at %a"
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
     | With_error_message (_message, context) ->
       (* message gets printed in [format_flattened_history] so we ignore it here *)
       format_annotation_context ppf context
@@ -2353,7 +2356,8 @@ module Format_history = struct
         | None -> ()
       in
       fprintf ppf "of the definition%a at %a" format_id id
-        Location.print_loc_in_lowercase loc
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
     | Abbreviation -> fprintf ppf "it is the expansion of a type abbreviation"
 
   let format_interact_reason ppf : History.interact_reason -> _ = function
@@ -2417,7 +2421,7 @@ let format_history ~intro ppf t =
 (* errors *)
 
 module Violation = struct
-  open Format
+  open Format_doc
   include Jkind0.Violation
 
   let of_ ~context ?missing_cmi violation =
@@ -2512,8 +2516,7 @@ module Violation = struct
                   (fun acc with_bound ->
                     Outcometree.Ojkind_const_with (acc, with_bound, []))
                   (Outcometree.Ojkind_const_mod
-                     ( None,
-                       [Format.asprintf "%a" (Per_axis.print axis) mod_bound] ))
+                     (None, [Fmt.asprintf "%a" (Per_axis.print axis) mod_bound]))
                   with_bounds
               in
               !Oprint.out_jkind_const ppf ojkind
@@ -2964,21 +2967,25 @@ module Debug_printers = struct
   let concrete_legacy_creation_reason ppf :
       History.concrete_legacy_creation_reason -> unit = function
     | Unannotated_type_parameter path ->
-      fprintf ppf "Unannotated_type_parameter %a" !printtyp_path path
+      fprintf ppf "Unannotated_type_parameter %a"
+        (Fmt.compat !printtyp_path)
+        path
     | Wildcard -> fprintf ppf "Wildcard"
     | Unification_var -> fprintf ppf "Unification_var"
 
   let rec annotation_context : type l r.
       _ -> (l * r) History.annotation_context -> unit =
    fun ppf -> function
-    | Type_declaration p -> fprintf ppf "Type_declaration %a" Path.print p
+    | Type_declaration p ->
+      fprintf ppf "Type_declaration %a" (Fmt.compat Path.print) p
     | Type_parameter (p, var) ->
-      fprintf ppf "Type_parameter (%a, %a)" Path.print p
+      fprintf ppf "Type_parameter (%a, %a)" (Fmt.compat Path.print) p
         (Misc.Stdlib.Option.print Misc.Stdlib.String.print)
         var
     | Newtype_declaration name -> fprintf ppf "Newtype_declaration %s" name
     | Constructor_type_parameter (cstr, name) ->
-      fprintf ppf "Constructor_type_parameter (%a, %S)" Path.print cstr name
+      fprintf ppf "Constructor_type_parameter (%a, %S)" (Fmt.compat Path.print)
+        cstr name
     | Existential_unpack name -> fprintf ppf "Existential_unpack %s" name
     | Univar name -> fprintf ppf "Univar %S" name
     | Type_variable name -> fprintf ppf "Type_variable %S" name
@@ -2991,7 +2998,7 @@ module Debug_printers = struct
         context
 
   let any_creation_reason ppf : History.any_creation_reason -> unit = function
-    | Missing_cmi p -> fprintf ppf "Missing_cmi %a" Path.print p
+    | Missing_cmi p -> fprintf ppf "Missing_cmi %a" (Fmt.compat Path.print) p
     | Initial_typedecl_env -> fprintf ppf "Initial_typedecl_env"
     | Dummy_jkind -> fprintf ppf "Dummy_jkind"
     | Wildcard -> fprintf ppf "Wildcard"
@@ -3001,7 +3008,8 @@ module Debug_printers = struct
     | Array_type_argument -> fprintf ppf "Array_type_argument"
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
-        !printtyp_path parent_path
+        (Fmt.compat !printtyp_path)
+        parent_path
     | Overapproximation_of_with_bounds ->
       fprintf ppf "Overapproximation_of_with_bounds"
 
@@ -3029,7 +3037,8 @@ module Debug_printers = struct
     | Let_rec_variable v -> fprintf ppf "Let_rec_variable %a" Ident.print v
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
-        !printtyp_path parent_path
+        (Fmt.compat !printtyp_path)
+        parent_path
     | Recmod_fun_arg -> fprintf ppf "Recmod_fun_arg"
     | Array_comprehension_element -> fprintf ppf "Array_comprehension_element"
     | Array_comprehension_iterator_element ->
@@ -3047,7 +3056,8 @@ module Debug_printers = struct
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
     | Type_argument { parent_path; position; arity } ->
       fprintf ppf "Type_argument (pos %d, arity %d) of %a" position arity
-        !printtyp_path parent_path
+        (Fmt.compat !printtyp_path)
+        parent_path
     | Tuple -> fprintf ppf "Tuple"
     | Row_variable -> fprintf ppf "Row_variable"
     | Polymorphic_variant -> fprintf ppf "Polymorphic_variant"
@@ -3082,7 +3092,8 @@ module Debug_printers = struct
     | Annotated (ctx, loc) ->
       fprintf ppf "Annotated (%a,%a)" annotation_context ctx Location.print_loc
         loc
-    | Missing_cmi p -> fprintf ppf "Missing_cmi %a" !printtyp_path p
+    | Missing_cmi p ->
+      fprintf ppf "Missing_cmi %a" (Fmt.compat !printtyp_path) p
     | Any_creation any -> fprintf ppf "Any_creation %a" any_creation_reason any
     | Immediate_creation immediate ->
       fprintf ppf "Immediate_creation %a" immediate_creation_reason immediate
@@ -3107,7 +3118,9 @@ module Debug_printers = struct
     | Imported -> fprintf ppf "Imported"
     | Imported_type_argument { parent_path; position; arity } ->
       fprintf ppf "Imported_type_argument (pos %d, arity %d) of %a" position
-        arity !printtyp_path parent_path
+        arity
+        (Fmt.compat !printtyp_path)
+        parent_path
     | Generalized (id, loc) ->
       fprintf ppf "Generalized (%s, %a)"
         (match id with Some id -> Ident.unique_name id | None -> "")
@@ -3115,7 +3128,8 @@ module Debug_printers = struct
     | Abbreviation -> fprintf ppf "Abbreviation"
 
   let interact_reason ppf : History.interact_reason -> _ = function
-    | Gadt_equation p -> fprintf ppf "Gadt_equation %a" Path.print p
+    | Gadt_equation p ->
+      fprintf ppf "Gadt_equation %a" (Fmt.compat Path.print) p
     | Tyvar_refinement_intersection ->
       fprintf ppf "Tyvar_refinement_intersection"
     | Subjkind -> fprintf ppf "Subjkind"
@@ -3175,17 +3189,17 @@ let report_error ~loc : Error.t -> _ = function
          When RAE tried this, some types got printed like [t/2], but the
          [/2] shouldn't be there. Investigate and fix. *)
       "@[<v>Unknown layout %a@]"
-      Pprintast.jkind_annotation jkind
+      Pprintast.Doc.jkind_annotation jkind
   | Multiple_jkinds { from_annotation; from_attribute } ->
     Location.errorf ~loc
       "@[<v>A type declaration's layout can be given at most once.@;\
        This declaration has an layout annotation (%a) and a layout attribute \
        ([@@@@%s]).@]"
-      Pprintast.jkind_annotation from_annotation
+      Pprintast.Doc.jkind_annotation from_annotation
       (Builtin_attributes.jkind_attribute_to_string from_attribute.txt)
   | Insufficient_level { jkind; required_layouts_level } -> (
     let hint ppf =
-      Format.fprintf ppf "You must enable -extension %s to use this feature."
+      Fmt.fprintf ppf "You must enable -extension %s to use this feature."
         (Language_extension.to_command_line_string Layouts
            required_layouts_level)
     in
@@ -3201,7 +3215,7 @@ let report_error ~loc : Error.t -> _ = function
         "@[<v>Layout %a is more experimental than allowed by the enabled \
          layouts extension.@;\
          %t@]"
-        Pprintast.jkind_annotation jkind hint)
+        Pprintast.Doc.jkind_annotation jkind hint)
   | Unimplemented_syntax ->
     Location.errorf ~loc "@[<v>Unimplemented kind syntax@]"
   | With_on_right ->

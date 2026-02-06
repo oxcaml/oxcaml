@@ -108,7 +108,7 @@ let dwarf_for_fundecl t fundecl ~fun_end_label ~ppf_dump =
 
 let format_variable_json (variable : DS.Diagnostics.variable_reduction) =
   let layout =
-    Format.asprintf "%a" Jkind_types.Sort.Const.format variable.type_layout
+    Format_doc.asprintf "%a" Jkind_types.Sort.Const.format variable.type_layout
   in
   let type_with_layout = Printf.sprintf "%s @ %s" variable.type_name layout in
   Json.object_

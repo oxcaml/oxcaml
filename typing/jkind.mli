@@ -126,7 +126,7 @@ module With_bounds : sig
     ('l * 'r) Types.with_bounds ->
     ('l * 'r) Types.with_bounds
 
-  val format : Format.formatter -> ('l * 'r) Types.with_bounds -> unit
+  val format : Format_doc.formatter -> ('l * 'r) Types.with_bounds -> unit
 end
 
 (** A [jkind] is a full description of the runtime representation of values of a
@@ -218,25 +218,25 @@ module Violation : sig
   (** Prints a violation and the thing that had an unexpected jkind ([offender],
       which you supply an arbitrary printer for). *)
   val report_with_offender :
-    offender:(Format.formatter -> unit) ->
+    offender:(Format_doc.formatter -> unit) ->
     level:int ->
-    Format.formatter ->
+    Format_doc.formatter ->
     t ->
     unit
 
   (** Like [report_with_offender], but additionally prints that the issue is
       that a representable jkind was expected. *)
   val report_with_offender_sort :
-    offender:(Format.formatter -> unit) ->
+    offender:(Format_doc.formatter -> unit) ->
     level:int ->
-    Format.formatter ->
+    Format_doc.formatter ->
     t ->
     unit
 
   (** Simpler version of [report_with_offender] for when the thing that had an
       unexpected jkind is available as a string. *)
   val report_with_name :
-    name:string -> level:int -> Format.formatter -> t -> unit
+    name:string -> level:int -> Format_doc.formatter -> t -> unit
 end
 
 (******************************)
@@ -483,7 +483,7 @@ module Desc : sig
 
   val get_const : 'd t -> 'd Const.t option
 
-  val format : Format.formatter -> 'd t -> unit
+  val format : Format_doc.formatter -> 'd t -> unit
 end
 
 (** Get a description of a jkind. *)
@@ -611,17 +611,17 @@ val set_outcometree_of_modalities :
 
 (** Provides the [Printtyp.path] formatter back up the dependency chain to this
     module. *)
-val set_printtyp_path : (Format.formatter -> Path.t -> unit) -> unit
+val set_printtyp_path : (Format_doc.formatter -> Path.t -> unit) -> unit
 
 (** Provides the [type_expr] formatter back up the dependency chain to this
     module. *)
-val set_print_type_expr : (Format.formatter -> Types.type_expr -> unit) -> unit
+val set_print_type_expr : Types.type_expr Format_doc.printer -> unit
 
 (** Provides the [raw_type_expr] formatter back up the dependency chain to this
     module. *)
 val set_raw_type_expr : (Format.formatter -> Types.type_expr -> unit) -> unit
 
-val format : Format.formatter -> 'd Types.jkind -> unit
+val format : Format_doc.formatter -> 'd Types.jkind -> unit
 
 module Format_verbosity : sig
   type t =
@@ -635,7 +635,7 @@ end
 (** Similar to [format], but the kind is expanded as much as possible rather
     than written in terms of a kind abbreviation. This is used by Merlin. *)
 val format_verbose :
-  verbosity:Format_verbosity.t -> Format.formatter -> 'd Types.jkind -> unit
+  verbosity:Format_verbosity.t -> Format_doc.formatter -> 'd Types.jkind -> unit
 
 (** Format the history of this jkind: what interactions it has had and why it is
     the jkind that it is. Might be a no-op: see [display_histories] in the
@@ -643,7 +643,10 @@ val format_verbose :
 
     The [intro] is something like "The jkind of t is". *)
 val format_history :
-  intro:(Format.formatter -> unit) -> Format.formatter -> 'd Types.jkind -> unit
+  intro:(Format_doc.formatter -> unit) ->
+  Format_doc.formatter ->
+  'd Types.jkind ->
+  unit
 
 (******************************)
 (* relations *)

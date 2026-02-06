@@ -3006,18 +3006,18 @@ let report_multi_use inner first_is_of_second =
     match second_is_occ, axis with
     | false, Uniqueness ->
       (* second is there, so first is occ - occ is "used as unique" *)
-      Format.dprintf "This value is %s here,@ but %s %s %s as unique at:"
+      Format_doc.dprintf "This value is %s here,@ but %s %s %s as unique at:"
         second_usage first_is_of_second access_order first_usage
     | false, Linearity ->
-      Format.dprintf
+      Format_doc.dprintf
         "This value is %s here,@ but %s is defined as once and %s %s at:"
         second_usage first_is_of_second access_order first_usage
     | true, Uniqueness ->
       (* second is occ (the failing force), so it's "used as unique" *)
-      Format.dprintf "This value is %s here as unique,@ but %s %s %s at:"
+      Format_doc.dprintf "This value is %s here as unique,@ but %s %s %s at:"
         second_usage first_is_of_second access_order first_usage
     | true, Linearity ->
-      Format.dprintf
+      Format_doc.dprintf
         "This value is defined as once and %s here,@ but %s %s %s at:"
         second_usage first_is_of_second access_order first_usage
   in
@@ -3046,11 +3046,11 @@ let report_borrowed_value_used_uniquely cannot_force =
     (* CR-soon zqian: incorperate this into the mode error hint system. *)
     match axis with
     | Uniqueness ->
-      Format.dprintf
+      Format_doc.dprintf
         "This value is %a because it is borrowed,@ but it is expected to be %a."
         Misc.Style.inline_code "aliased" Misc.Style.inline_code "unique"
     | Linearity ->
-      Format.dprintf
+      Format_doc.dprintf
         "The value is %a but expected to be %a because it is to be borrowed."
         Misc.Style.inline_code "once" Misc.Style.inline_code "many"
   in
@@ -3063,10 +3063,12 @@ let report_unique_use_during_borrowing
   let error =
     match axis with
     | Uniqueness ->
-      Format.dprintf "This value is used as %a here,@ but it is being borrowed."
+      Format_doc.dprintf
+        "This value is used as %a here,@ but it is being borrowed."
         Misc.Style.inline_code "unique"
     | Linearity ->
-      Format.dprintf "This value is used as %a here,@ but it is being borrowed."
+      Format_doc.dprintf
+        "This value is used as %a here,@ but it is being borrowed."
         Misc.Style.inline_code "once"
   in
   let sub =
@@ -3079,18 +3081,18 @@ let report_tag_change (err : Overwrites.error) =
   match err with
   | Changed_tag { old_tag; new_tag } ->
     let new_tag_txt =
-      Format.dprintf "%a" Pprintast.longident new_tag.name_for_error.txt
+      Format_doc.dprintf "%a" Pprintast.Doc.longident new_tag.name_for_error.txt
     in
     let old_tag_txt =
       match old_tag with
-      | Old_tag_unknown -> Format.dprintf "is unknown."
+      | Old_tag_unknown -> Format_doc.dprintf "is unknown."
       | Old_tag_was l ->
-        Format.dprintf "is %a." Pprintast.longident l.name_for_error.txt
+        Format_doc.dprintf "is %a." Pprintast.Doc.longident l.name_for_error.txt
       | Old_tag_mutated order -> (
         match order with
-        | Par -> Format.dprintf "is being changed through mutation."
+        | Par -> Format_doc.dprintf "is being changed through mutation."
         | Seq_before | Seq_after ->
-          Format.dprintf "was changed through mutation.")
+          Format_doc.dprintf "was changed through mutation.")
     in
     Location.errorf ~loc:new_tag.name_for_error.loc
       "@[Overwrite may not change the tag to %t.\n\

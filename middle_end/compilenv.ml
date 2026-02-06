@@ -321,21 +321,21 @@ let require_global global_ident =
 
 (* Error report *)
 
-open Format
+open Format_doc
 
 let report_error ppf = function
   | Not_a_unit_info filename ->
       fprintf ppf "%a@ is not a compilation unit description."
-        Location.print_filename filename
+        Location.Doc.quoted_filename filename
   | Corrupted_unit_info filename ->
       fprintf ppf "Corrupted compilation unit description@ %a"
-        Location.print_filename filename
+        Location.Doc.quoted_filename filename
   | Illegal_renaming(name, modname, filename) ->
       fprintf ppf "%a@ contains the description for unit\
                    @ %a when %a was expected"
-        Location.print_filename filename
-        CU.print name
-        CU.print modname
+        Location.Doc.quoted_filename filename
+        CU.print_as_inline_code name
+        CU.print_as_inline_code modname
 
 let () =
   Location.register_error_of_exn

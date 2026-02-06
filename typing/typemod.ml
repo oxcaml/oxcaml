@@ -20,7 +20,7 @@ open Asttypes
 open Parsetree
 open Types
 open Mode
-open Format
+open Format_doc
 
 module Style = Misc.Style
 
@@ -56,8 +56,8 @@ type legacy_module =
   | Toplevel
 
 let print_legacy_module ppf = function
-  | Compilation_unit -> Format.fprintf ppf "compilation unit"
-  | Toplevel -> Format.fprintf ppf "toplevel"
+  | Compilation_unit -> Format_doc.fprintf ppf "compilation unit"
+  | Toplevel -> Format_doc.fprintf ppf "toplevel"
 
 type error =
     Cannot_apply of module_type
@@ -2936,6 +2936,8 @@ let simplify_app_summary app_view = match app_view.arg with
     | false, Some p -> Includemod.Error.Named p, mty, mode
     | false, None   -> Includemod.Error.Anonymous, mty, mode
 
+let not_principal msg = Warnings.Not_principal (Format_doc.Doc.msg msg)
+
 let rec type_module ?alias sttn funct_body anchor env ?expected_mode smod =
   let md, shape =
     type_module_maybe_hold_locks ?alias ~hold_locks:false sttn funct_body anchor
@@ -3101,7 +3103,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
               not (Typecore.generalizable (Btype.generic_level-1) exp.exp_type)
             then
               Location.prerr_warning smod.pmod_loc
-                (Warnings.Not_principal "this module unpacking");
+                (not_principal "this module unpacking");
             modtype_of_package env smod.pmod_loc p fl
         | Tvar _ ->
             raise (Typecore.Error
@@ -3131,7 +3133,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       let lid =
         (* Only used by [untypeast] *)
         let name =
-          Format.asprintf "*instance %a*" Global_module.Name.print glob
+          Format_doc.asprintf "*instance %a*" Global_module.Name.print glob
         in
         Location.(mkloc (Lident name) (ghostify smod.pmod_loc))
       in
@@ -4237,7 +4239,7 @@ let type_implementation target modulename initial_env ast =
         Typecore.optimise_allocations ();
         let shape = Shape_reduce.local_reduce Env.empty shape in
         Printtyp.wrap_printing_env ~error:false initial_env
-          (fun () -> fprintf std_formatter "%a@."
+          Format.(fun () -> fprintf std_formatter "%a@."
               (Printtyp.printed_signature sourcefile)
               simple_sg
           );
@@ -4563,10 +4565,10 @@ let report_error ~loc _env = function
         "@[This module is not a functor; it has type@ %a@]"
         (Style.as_inline_code modtype) mty
   | Not_included errs ->
-      let main = Includemod_errorprinter.err_msgs errs in
+      let main ppf = Includemod_errorprinter.err_msgs ppf errs in
       Location.errorf ~loc "@[<v>Signature mismatch:@ %t@]" main
   | Not_included_functor errs ->
-      let main = Includemod_errorprinter.err_msgs errs in
+      let main ppf = Includemod_errorprinter.err_msgs ppf errs in
       Location.errorf ~loc
         "@[<v>Signature mismatch in included functor's parameter:@ %t@]" main
   | Cannot_eliminate_dependency (dep_type, mty) ->
@@ -4609,26 +4611,25 @@ let report_error ~loc _env = function
         Style.inline_code "with"
         (Style.as_inline_code longident) lid
   | With_mismatch(lid, explanation) ->
-      let main = Includemod_errorprinter.err_msgs explanation in
       Location.errorf ~loc
         "@[<v>\
            @[In this %a constraint, the new definition of %a@ \
              does not match its original definition@ \
              in the constrained signature:@]@ \
-         %t@]"
+         %a@]"
         Style.inline_code "with"
-        (Style.as_inline_code longident) lid main
+        (Style.as_inline_code longident) lid
+        Includemod_errorprinter.err_msgs explanation
   | With_makes_applicative_functor_ill_typed(lid, path, explanation) ->
-      let main = Includemod_errorprinter.err_msgs explanation in
       Location.errorf ~loc
         "@[<v>\
            @[This %a constraint on %a makes the applicative functor @ \
              type %a ill-typed in the constrained signature:@]@ \
-         %t@]"
+         %a@]"
         Style.inline_code "with"
         (Style.as_inline_code longident) lid
         Style.inline_code (Path.name path)
-        main
+        Includemod_errorprinter.err_msgs explanation
   | With_changes_module_alias(lid, id, path) ->
       Location.errorf ~loc
         "@[<v>\
@@ -4648,7 +4649,7 @@ let report_error ~loc _env = function
         [ 12; 7; 3 ]
       in
       let pp_constraint ppf (p,mty) =
-        Format.fprintf ppf "%s := %a" (Path.name p) Printtyp.modtype mty
+        fprintf ppf "%s := %a" (Path.name p) Printtyp.modtype mty
       in
       Location.errorf ~loc
         "This %a constraint@ %a@ makes a packed module ill-formed.@ %a"
@@ -4701,11 +4702,11 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "@[The interface %a@ declares values, not just types.@ \
            An implementation must be provided.@]"
-        Location.print_filename intf_name
+        Location.Doc.quoted_filename intf_name
   | Interface_not_compiled intf_name ->
       Location.errorf ~loc
         "@[Could not find the .cmi file for interface@ %a.@]"
-        Location.print_filename intf_name
+        Location.Doc.quoted_filename intf_name
   | Not_allowed_in_functor_body ->
       Location.errorf ~loc
         "@[This expression creates fresh types.@ %s@]"
@@ -4801,7 +4802,7 @@ let report_error ~loc _env = function
         Style.inline_code (Path.name p)
         Misc.print_see_manual manual_ref
  | Strengthening_mismatch(lid, explanation) ->
-      let main = Includemod_errorprinter.err_msgs explanation in
+      let main ppf = Includemod_errorprinter.err_msgs ppf explanation in
       Location.errorf ~loc
         "@[<v>\
            @[In this strengthened module type, the type of %a@ \
@@ -4823,7 +4824,7 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "@[The interface for %a@ was compiled with -as-parameter.@ \
          It cannot be implemented directly.@]"
-        (Style.as_inline_code Compilation_unit.Name.print) modname
+        Compilation_unit.Name.print_as_inline_code modname
   | Argument_for_non_parameter(param, path) ->
       Location.errorf ~loc
         "Interface %a@ found for module@ %a@ is not flagged as a parameter.@ \
@@ -4834,9 +4835,9 @@ let report_error ~loc _env = function
         { new_arg_type; old_source_file; old_arg_type } ->
       let pp_arg_type ppf arg_type =
         match arg_type with
-        | None -> Format.fprintf ppf "without -as-argument-for"
+        | None -> Format_doc.fprintf ppf "without -as-argument-for"
         | Some arg_type ->
-            Format.fprintf ppf "with -as-argument-for %a"
+            Format_doc.fprintf ppf "with -as-argument-for %a"
               Global_module.Parameter_name.print arg_type
       in
       Location.errorf ~loc
@@ -4857,9 +4858,9 @@ let report_error ~loc _env = function
       let Mode.Value.Error (ax, {left; right}) = Mode.Value.to_simple_error e in
       let d =
         match ax with
-        | Comonadic Areality -> Format.dprintf "a structure"
+        | Comonadic Areality -> Format_doc.dprintf "a structure"
         | _ ->
-            Format.dprintf "a %a structure"
+            Format_doc.dprintf "a %a structure"
               (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
       in
       Location.errorf ~loc
@@ -4882,7 +4883,7 @@ let report_error ~loc _env = function
         print_legacy_module reason
 
 let report_error env ~loc err =
-  Printtyp.wrap_printing_env_error env
+  Printtyp.wrap_printing_env ~error:true env
     (fun () -> report_error env ~loc err)
 
 let () =

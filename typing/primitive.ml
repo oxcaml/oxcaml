@@ -1002,42 +1002,42 @@ module Style = Misc.Style
 let report_error ppf err =
   match err with
   | Old_style_float_with_native_repr_attribute ->
-    Format.fprintf ppf "Cannot use %a in conjunction with %a/%a."
+    Format_doc.fprintf ppf "Cannot use %a in conjunction with %a/%a."
       Style.inline_code "float"
       Style.inline_code "[@unboxed]"
       Style.inline_code  "[@untagged]"
   | Old_style_float_with_non_value ->
-    Format.fprintf ppf "Cannot use %a in conjunction with \
+    Format_doc.fprintf ppf "Cannot use %a in conjunction with \
                         types of non-value layouts."
       Style.inline_code "float"
   | Old_style_noalloc_with_noalloc_attribute ->
-    Format.fprintf ppf "Cannot use %a in conjunction with %a."
+    Format_doc.fprintf ppf "Cannot use %a in conjunction with %a."
       Style.inline_code "noalloc"
       Style.inline_code "[@@noalloc]"
   | No_native_primitive_with_repr_attribute ->
-    Format.fprintf ppf
+    Format_doc.fprintf ppf
       "@[The native code version of the primitive is mandatory@ \
       when attributes %a or %a are present.@]"
       Style.inline_code "[@untagged]"
       Style.inline_code "[@unboxed]"
   | No_native_primitive_with_non_value ->
-    Format.fprintf ppf
+    Format_doc.fprintf ppf
       "@[The native code version of the primitive is mandatory@ \
        for types with non-value layouts.@]"
   | Inconsistent_attributes_for_effects ->
-    Format.fprintf ppf "At most one of %a and %a can be specified."
+    Format_doc.fprintf ppf "At most one of %a and %a can be specified."
       Style.inline_code "[@no_effects]"
       Style.inline_code "[@only_generative_effects]"
   | Inconsistent_noalloc_attributes_for_effects ->
-    Format.fprintf ppf "Cannot use %a in conjunction with %a."
+    Format_doc.fprintf ppf "Cannot use %a in conjunction with %a."
       Style.inline_code "[@@no_generative_effects]"
       Style.inline_code "[@@noalloc]"
   | Invalid_representation_polymorphic_attribute ->
-    Format.fprintf ppf "Attribute %a can only be used \
+    Format_doc.fprintf ppf "Attribute %a can only be used \
                         on built-in primitives."
       Style.inline_code "[@layout_poly]"
   | Invalid_native_repr_for_primitive name ->
-    Format.fprintf ppf
+    Format_doc.fprintf ppf
       "The primitive [%s] is used in an invalid declaration.@ \
        The declaration contains argument/return types with the@ \
        wrong layout."

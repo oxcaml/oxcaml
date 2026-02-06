@@ -3641,7 +3641,7 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
           think (2) hasn't arisen much in practice because for other sorts you
           can add an [@unboxed] annotation to suppress the warning, and because
           in practice people use the layout_poly versions which do work fine. *)
-       let sort = Format.asprintf "%a" Jkind_types.Sort.Const.format c in
+       let sort = Format_doc.asprintf "%a" Jkind_types.Sort.Const.format c in
        Location.prerr_warning core_type.ptyp_loc
          (Warnings.Incompatible_with_upstream
             (Warnings.Non_value_sort sort)));
@@ -4349,7 +4349,7 @@ let check_recmod_typedecl env loc recmod_ids path decl =
 
 (**** Error report ****)
 
-open Format
+open Format_doc
 module Style = Misc.Style
 
 let explain_unbound_gen ppf tv tl typ kwd pr =
@@ -4418,23 +4418,23 @@ module Reaching_path = struct
           List.iter Printtyp.add_type_to_preparation [ty1; ty2]
     ) path
 
+  module Fmt = Format_doc
+
   let pp ppf reaching_path =
     let pp_step ppf = function
       | Expands_to (ty, body) ->
-          Format.fprintf ppf "%a = %a"
+          Fmt.fprintf ppf "%a = %a"
             (Style.as_inline_code Printtyp.prepared_type_expr) ty
             (Style.as_inline_code Printtyp.prepared_type_expr) body
       | Contains (outer, inner) ->
-          Format.fprintf ppf "%a contains %a"
+          Fmt.fprintf ppf "%a contains %a"
             (Style.as_inline_code Printtyp.prepared_type_expr) outer
             (Style.as_inline_code Printtyp.prepared_type_expr) inner
     in
-    let comma ppf () = Format.fprintf ppf ",@ " in
-    Format.(pp_print_list ~pp_sep:comma pp_step) ppf reaching_path
+    Fmt.(pp_print_list ~pp_sep:comma) pp_step ppf reaching_path
 
   let pp_colon ppf path =
-  Format.fprintf ppf ":@;<1 2>@[<v>%a@]"
-    pp path
+    Fmt.fprintf ppf ":@;<1 2>@[<v>%a@]" pp path
 end
 
 let report_jkind_mismatch_due_to_bad_inference ppf ty violation loc =
@@ -4458,6 +4458,7 @@ let report_jkind_mismatch_due_to_bad_inference ppf ty violation loc =
        ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
        ~level:(Ctype.get_current_level ())) violation
 
+let quoted_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty
 let report_error ppf = function
   | Repeated_parameter ->
       fprintf ppf "A type parameter occurs several times"
@@ -4518,17 +4519,17 @@ let report_error ppf = function
         report_jkind_mismatch_due_to_bad_inference ppf ty violation
           Check_constraints
       | None ->
+      let msg = Format_doc.Doc.msg in
       fprintf ppf "@[<v>Constraints are not satisfied in this type.@ ";
       Printtyp.report_unification_error ppf env err
-        (fun ppf -> fprintf ppf "Type")
-        (fun ppf -> fprintf ppf "should be an instance of");
+        (msg "Type")
+        (msg "should be an instance of");
       fprintf ppf "@]"
       end
   | Jkind_mismatch_due_to_bad_inference (ty, violation, loc) ->
       report_jkind_mismatch_due_to_bad_inference ppf ty violation loc
   | Non_regular { definition; used_as; defined_as; reaching_path } ->
       let reaching_path = Reaching_path.simplify reaching_path in
-      let pp_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty in
       Printtyp.prepare_for_printing [used_as; defined_as];
       Reaching_path.add_to_preparation reaching_path;
       Printtyp.Naming_context.reset ();
@@ -4539,8 +4540,8 @@ let report_error ppf = function
          All uses need to match the definition for the recursive type \
          to be regular.@]"
         Style.inline_code (Path.name definition)
-        pp_type (Printtyp.tree_of_typexp Type defined_as)
-        pp_type (Printtyp.tree_of_typexp Type used_as)
+        quoted_type (Printtyp.tree_of_typexp Type defined_as)
+        quoted_type (Printtyp.tree_of_typexp Type used_as)
         (fun pp ->
            let is_expansion = function Expands_to _ -> true | _ -> false in
            if List.exists is_expansion reaching_path then
@@ -4548,17 +4549,17 @@ let report_error ppf = function
              Reaching_path.pp_colon reaching_path
            else fprintf pp ".@ ")
   | Inconsistent_constraint (env, err) ->
+      let msg = Format_doc.Doc.msg in
       fprintf ppf "@[<v>The type constraints are not consistent.@ ";
       Printtyp.report_unification_error ppf env err
-        (fun ppf -> fprintf ppf "Type")
-        (fun ppf -> fprintf ppf "is not compatible with type");
+        (msg "Type")
+        (msg "is not compatible with type");
       fprintf ppf "@]"
   | Type_clash (env, err) ->
+      let msg = Format_doc.Doc.msg in
       Printtyp.report_unification_error ppf env err
-        (function ppf ->
-           fprintf ppf "This type constructor expands to type")
-        (function ppf ->
-           fprintf ppf "but is used here with type")
+        (msg "This type constructor expands to type")
+        (msg "but is used here with type")
   | Null_arity_external ->
       fprintf ppf "External identifiers must be functions"
   | Missing_native_external ->
@@ -4610,12 +4611,11 @@ let report_error ppf = function
            "the type" "this extension" "definition" env)
         err
   | Rebind_wrong_type (lid, env, err) ->
+      let msg = Format_doc.doc_printf in
       Printtyp.report_unification_error ppf env err
-        (function ppf ->
-           fprintf ppf "The constructor %a@ has type"
+        (msg "The constructor %a@ has type"
              (Style.as_inline_code Printtyp.longident) lid)
-        (function ppf ->
-           fprintf ppf "but was expected to be of type")
+        (msg "but was expected to be of type")
   | Rebind_mismatch (lid, p, p') ->
       fprintf ppf
         "@[%s@ %a@ %s@ %a@ %s@ %s@ %a@]"
@@ -4826,7 +4826,7 @@ let report_error ppf = function
             max_value_prefix_len value_prefix_len
       | Insufficient_level { required_layouts_level; mixed_product_kind } -> (
         let hint ppf =
-          Format.fprintf ppf "You must enable -extension %s to use this feature."
+          fprintf ppf "You must enable -extension %s to use this feature."
             (Language_extension.to_command_line_string Layouts
                required_layouts_level)
         in
@@ -4849,7 +4849,7 @@ let report_error ppf = function
             fprintf ppf "an unnamed existential variable"
         | Some str ->
             fprintf ppf "the existential variable %a"
-              (Style.as_inline_code Pprintast.tyvar) str in
+              (Style.as_inline_code Pprintast.Doc.tyvar) str in
       fprintf ppf "@[This type cannot be unboxed because@ \
                    it might contain both float and non-float values,@ \
                    depending on the instantiation of %a.@ \
@@ -4864,7 +4864,7 @@ let report_error ppf = function
         Style.inline_code "nonrec"
   | Invalid_private_row_declaration ty ->
       let pp_private ppf ty = fprintf ppf "private %a" Printtyp.type_expr ty in
-      Format.fprintf ppf
+      fprintf ppf
         "@[<hv>This private row type declaration is invalid.@ \
          The type expression on the right-hand side reduces to@;<1 2>%a@ \
          which does not have a free row type variable.@]@,\

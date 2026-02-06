@@ -1628,10 +1628,11 @@ let transl_type_scheme env styp =
 
 (* Error report *)
 
-open Format
+open Format_doc
 open Printtyp
 module Style = Misc.Style
-let pp_tag ppf t = Format.fprintf ppf "`%s" t
+let pp_tag ppf t = fprintf ppf "`%s" t
+let pp_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty
 
 let report_unbound_variable_reason ppf = function
   | Some Upstream_compatibility ->
@@ -1661,21 +1662,19 @@ let report_error env ppf =
       (Style.as_inline_code longident) lid expected provided
   | Bound_type_variable name ->
       fprintf ppf "Already bound type parameter %a"
-        (Style.as_inline_code Pprintast.tyvar) name
+        (Style.as_inline_code Pprintast.Doc.tyvar) name
   | Recursive_type ->
     fprintf ppf "This type is recursive"
   | Type_mismatch trace ->
+      let msg = Format_doc.Doc.msg in
       Printtyp.report_unification_error ppf Env.empty trace
-        (function ppf ->
-           fprintf ppf "This type")
-        (function ppf ->
-           fprintf ppf "should be an instance of type")
+        (msg "This type")
+        (msg "should be an instance of type")
   | Alias_type_mismatch trace ->
+      let msg = Format_doc.Doc.msg in
       Printtyp.report_unification_error ppf Env.empty trace
-        (function ppf ->
-           fprintf ppf "This alias is bound to type")
-        (function ppf ->
-           fprintf ppf "but is used as an instance of type")
+        (msg "This alias is bound to type")
+        (msg "but is used as an instance of type")
   | Present_has_conjunction l ->
       fprintf ppf "The present constructor %a has a conjunctive type"
         Style.inline_code l
@@ -1692,7 +1691,6 @@ let report_error env ppf =
         Style.inline_code ">"
         (Style.as_inline_code pp_tag) l
   | Constructor_mismatch (ty, ty') ->
-      let pp_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty in
       wrap_printing_env ~error:true env (fun ()  ->
         Printtyp.prepare_for_printing [ty; ty'];
         fprintf ppf "@[<hov>%s %a@ %s@ %a@]"
@@ -1722,7 +1720,7 @@ let report_error env ppf =
   | Cannot_quantify (name, reason) ->
       fprintf ppf
         "@[<hov>The universal type variable %a cannot be generalized:@ "
-        (Style.as_inline_code Pprintast.tyvar) name;
+        (Style.as_inline_code Pprintast.Doc.tyvar) name;
       begin match reason with
       | Unified v ->
         fprintf ppf "it is bound to@ %a"
@@ -1736,7 +1734,7 @@ let report_error env ppf =
   | Bad_univar_jkind { name; jkind_info; inferred_jkind } ->
       fprintf ppf
         "@[<hov>The universal type variable %a was %s to have kind %a.@;%a@]"
-        Pprintast.tyvar name
+        Pprintast.Doc.tyvar name
         (if jkind_info.defaulted then "defaulted" else "declared")
         Jkind.format jkind_info.original_jkind
         (Jkind.format_history ~intro:(
@@ -1754,7 +1752,7 @@ let report_error env ppf =
         "@[<hov>The type variable %a has conflicting kind annotations.@;\
          It has an explicit annotation %a@ \
          but was already implicitly annotated with %a@]"
-        Pprintast.tyvar name
+        Pprintast.Doc.tyvar name
         Jkind.format explicit_jkind
         Jkind.format implicit_jkind
   | Multiple_constraints_on_type s ->

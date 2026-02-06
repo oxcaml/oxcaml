@@ -435,7 +435,7 @@ module Type_decl_shape = struct
             then
               if !Clflags.dwarf_pedantic
               then
-                Misc.fatal_errorf
+                Misc.fatal_errorf_doc
                   "Type_shape: variant constructor with mismatched layout, has \
                    %a but expected %a"
                   Layout.format ly Layout.format ly2
@@ -453,7 +453,7 @@ module Type_decl_shape = struct
               then
                 if !Clflags.dwarf_pedantic
                 then
-                  Misc.fatal_errorf
+                  Misc.fatal_errorf_doc
                     "Type_shape: variant constructor with mismatched layout, \
                      has %a but expected value or void."
                     Layout.format ly
@@ -1138,7 +1138,7 @@ let print_table_all_type_shapes ppf =
         ( Format.asprintf "%a" Uid.print k,
           ( type_name,
             ( Format.asprintf "%a" Shape.print type_shape,
-              Format.asprintf "%a" Layout.format type_layout ) ) ))
+              Format_doc.asprintf "%a" Layout.format type_layout ) ) ))
       entries
   in
   let uids, rest = List.split entries in
