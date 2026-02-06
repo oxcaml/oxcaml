@@ -21,35 +21,109 @@ type t
           many
           stateless
           immutable
-          internal
+          portable
+          contended
           non_null
           non_float
+          local
+          unique
+          static
+          internal
 |}]
 
 type t : immediate
 [%%expect {|
 type t
-  : value mod global many stateless immutable external_ non_null non_float
+  : value
+      mod global
+          many
+          stateless
+          immutable
+          forkable
+          unyielding
+          aliased
+          portable
+          contended
+          external_
+          non_null
+          non_float
+          static
 |}]
 
 type t : float64
 [%%expect {|
-type t : float64 mod external_ non_null non_float
+type t
+  : float64
+      mod external_
+          non_null
+          non_float
+          local
+          unforkable
+          yielding
+          once
+          stateful
+          nonportable
+          unique
+          read_write
+          uncontended
+          static
 |}]
 
 type t : any
 [%%expect {|
-type t : any mod internal maybe_null maybe_separable
+type t
+  : any
+      mod local
+          unforkable
+          yielding
+          once
+          stateful
+          nonportable
+          unique
+          read_write
+          uncontended
+          static
+          internal
+          maybe_null
+          maybe_separable
 |}]
 
 type t : value mod portable
 [%%expect {|
-type t : value mod portable internal non_null separable
+type t
+  : value
+      mod portable
+          non_null
+          separable
+          local
+          unforkable
+          yielding
+          once
+          stateful
+          unique
+          read_write
+          uncontended
+          static
+          internal
 |}]
 
 type t : value mod stateless
 [%%expect {|
-type t : value mod stateless internal non_null separable
+type t
+  : value
+      mod stateless
+          portable
+          non_null
+          separable
+          local
+          unforkable
+          yielding
+          once
+          unique
+          read_write
+          uncontended
+          static
+          internal
 |}]
 
 type 'a t : immutable_data with 'a
@@ -61,8 +135,13 @@ type 'a t
           many
           stateless
           immutable
-          internal
+          portable
+          contended
           non_null
           non_float
+          local
+          unique
+          static
+          internal
       with 'a
 |}]

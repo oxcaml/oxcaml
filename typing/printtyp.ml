@@ -1433,7 +1433,7 @@ let outcome_label : Types.arg_label -> Outcometree.arg_label = function
     accordingly. *)
 let tree_of_modalities mut t =
   t
-  |> Typemode.least_modalities_implying mut
+  |> Typemode.least_modalities ~include_implied:false ~mut
   |> Typemode.sort_dedup_modalities
   |> List.map (fun (Atom (ax, m) : Modality.atom) ->
       Fmt.asprintf "%a" (Modality.Per_axis.print ax) m)
