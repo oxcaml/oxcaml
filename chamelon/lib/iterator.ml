@@ -42,7 +42,7 @@ let minimize_basic (state : 'a) (f : 'a -> pos:int -> 'a minimized_step_result)
     match f state ~pos with
     | New_state nstate -> aux nstate pos true
     | Change_removes_error -> aux state (pos + 1) ever_changed
-    | No_more_changes -> (state, ever_changed)
+    | No_more_changes -> state, ever_changed
   in
   aux state 0 false
 
@@ -53,15 +53,16 @@ let minimize_ranged (state : 'a)
     match f state ~pos ~len with
     | New_state nstate -> loop_increasing nstate pos (2 * len) true
     | Change_removes_error -> loop_decreasing state pos (len / 2) ever_changed
-    | No_more_changes -> (state, ever_changed)
+    | No_more_changes -> state, ever_changed
   and loop_decreasing (state : 'a) (pos : int) (len : int) (ever_changed : bool)
       =
-    if len = 0 then loop_increasing state (pos + 1) 1 ever_changed
+    if len = 0
+    then loop_increasing state (pos + 1) 1 ever_changed
     else
       match f state ~pos ~len with
       | New_state nstate -> loop_decreasing nstate pos (len / 2) true
       | Change_removes_error -> loop_decreasing state pos (len / 2) ever_changed
-      | No_more_changes -> (state, ever_changed)
+      | No_more_changes -> state, ever_changed
   in
   loop_increasing state 0 1 false
 
@@ -74,14 +75,15 @@ let minimize_at minimize cur_file map ~pos ~len =
         pos <= !r && !r < pos + len)
       map cur_file
   in
-  (nmap, pos <= !r)
+  nmap, pos <= !r
 
 let step_minimizer ~check minimize cur_file map ~pos ~len =
   Format.eprintf "Trying %s: pos=%d, len=%d... @?" minimize.minimizer_name pos
     len;
   let map, changed = minimize_at minimize cur_file map ~pos ~len in
   let r =
-    if changed then if check map then New_state map else Change_removes_error
+    if changed
+    then if check map then New_state map else Change_removes_error
     else No_more_changes
   in
   let () =
@@ -94,9 +96,15 @@ let step_minimizer ~check minimize cur_file map ~pos ~len =
 
 let test_minimizer ~check ~pos ~len map cur_file minimize =
   let result, has_changed = minimize_at minimize cur_file map ~pos ~len in
-  if has_changed && check result then (result, true) else (result, false)
+  if has_changed && check result then result, true else result, false
 
-type strategy = Basic | Dichotomy | Test of { pos : int; len : int }
+type strategy =
+  | Basic
+  | Dichotomy
+  | Test of
+      { pos : int;
+        len : int
+      }
 
 let run_strategy strategy ~check map cur_file minimize =
   match strategy with
@@ -105,7 +113,9 @@ let run_strategy strategy ~check map cur_file minimize =
   | Test { pos; len } -> test_minimizer ~check ~pos ~len map cur_file minimize
 
 let basic = Basic
+
 let dichotomy = Dichotomy
+
 let test ~pos ~len = Test { pos; len }
 
 type ('a, 'b) schedule =
@@ -125,19 +135,19 @@ let rec run0 : type a b.
   match schedule with
   | Minimizer minimizer -> run_strategy strategy ~check map cur_file minimizer
   | With_strategy (strategy, schedule) ->
-      run0 ~strategy ~check schedule map cur_file
+    run0 ~strategy ~check schedule map cur_file
   | Sequence schedules ->
-      List.fold_left
-        (fun (map, ever_changed) schedule ->
-          let map', has_changed = run0 ~strategy ~check schedule map cur_file in
-          (map', has_changed || ever_changed))
-        (map, false) schedules
+    List.fold_left
+      (fun (map, ever_changed) schedule ->
+        let map', has_changed = run0 ~strategy ~check schedule map cur_file in
+        map', has_changed || ever_changed)
+      (map, false) schedules
   | Fix schedule ->
-      let rec loop map ever_changed =
-        let map, has_changed = run0 ~strategy ~check schedule map cur_file in
-        if has_changed then loop map true else (map, ever_changed)
-      in
-      loop map false
+    let rec loop map ever_changed =
+      let map, has_changed = run0 ~strategy ~check schedule map cur_file in
+      if has_changed then loop map true else map, ever_changed
+    in
+    loop map false
 
 let run ?(strategy = dichotomy) ~check schedule map cur_file =
   run0 ~strategy ~check schedule map cur_file
@@ -149,14 +159,14 @@ let list schedules =
     (List.concat_map
        (function
          | Sequence schedules -> schedules
-         | (Minimizer _ | Fix _ | With_strategy _) as schedule -> [ schedule ])
+         | (Minimizer _ | Fix _ | With_strategy _) as schedule -> [schedule])
        schedules)
 
 let with_strategy strategy schedules =
   match list schedules with
   | With_strategy (_, _) as schedule -> schedule
   | (Sequence _ | Minimizer _ | Fix _) as schedule ->
-      With_strategy (strategy, schedule)
+    With_strategy (strategy, schedule)
 
 let fix schedules =
   match list schedules with
