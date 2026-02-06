@@ -56,6 +56,28 @@ type always_dynamic =
   | Application
   | Try_with
 
+(* CR-someday zqian: Put [Modality.Const.t] here, once the dependency circle is
+   resolved. To fix that, we can move [Modality.Const] to in front of [Hint],
+   while [Modality] stays in place. *)
+type modality = Modality
+
+type containing =
+  | Tuple
+  | Record of string * modality
+  | Array of modality
+  | Constructor of string * modality
+(* CR-soon zqian: add the relation between structure and items *)
+
+type contains =
+  { containing : containing;
+    contained : pinpoint
+  }
+
+type is_contained_by =
+  { containing : containing;
+    container : Location.t
+  }
+
 type legacy =
   | Compilation_unit
   | Toplevel
