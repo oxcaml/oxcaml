@@ -1,0 +1,28 @@
+let code foo_0 deleted in
+let code loopify(never) size(25) newer_version_of(foo_0)
+      foo_0_1 (b : imm tagged, x : imm tagged, y : float boxed)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let untagged = %untag_imm (b) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k4)
+    where k4 =
+      let prim = %unbox_num.`float` (y) in
+      let prim_1 = %bfloat_arith.add (prim, 0x1p+0) in
+      cont k2 (prim_1)
+    where k3 =
+      let prim = %unbox_num.`float` (y) in
+      let prim_1 = %bfloat_arith.add (prim, 0x1p+0) in
+      cont k2 (prim_1)
+    where k2 (unboxed_float : float) =
+      let unboxed_field_0 = x in
+      let prim = %num_conv.[`float`].[`imm`] (unboxed_float) in
+      let int_of_float = %tag_imm (prim) in
+      let int_add = %int_barith.add (unboxed_field_0, int_of_float) in
+      cont k (int_add)
+in
+let $camlBlock_unboxed__foo_1 = closure foo_0_1 @foo in
+let $camlBlock_unboxed = Block 0 ($camlBlock_unboxed__foo_1) in
+cont done ($camlBlock_unboxed)

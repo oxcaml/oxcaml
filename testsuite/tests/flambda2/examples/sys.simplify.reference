@@ -1,0 +1,165 @@
+let code failwith_0 deleted in
+let code invalid_arg_1 deleted in
+let code getenv_opt_2 deleted in
+let code set_signal_3 deleted in
+let code `fn[sys.ml:375,40--62]_5` deleted in
+let code catch_break_4 deleted in
+let $camlSys__immstring116 = "4.10.0+dev0-2019-04-23" in
+let $camlSys__immstring98 = "Sys.Break" in
+let code loopify(never) size(10) newer_version_of(failwith_0)
+      failwith_0_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Failure, s) in
+  cont k1 pop(regular k1) (Pmakeblock)
+in
+let $camlSys__failwith_6 = closure failwith_0_1 @failwith in
+let code loopify(never) size(10) newer_version_of(invalid_arg_1)
+      invalid_arg_1_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Invalid_argument, s) in
+  cont k1 pop(regular k1) (Pmakeblock)
+in
+let $camlSys__invalid_arg_7 = closure invalid_arg_1_1 @invalid_arg in
+apply ccall
+  ($`*extern*`.caml_sys_executable_name : val -> val) (0) -> k * error
+  where k (executable_name) =
+    (apply ccall
+       ($`*extern*`.caml_sys_get_config : val -> val) (0) -> k * error
+       where k (`*match*`) =
+         let code loopify(never) size(38) newer_version_of(getenv_opt_2)
+               getenv_opt_2_1 (s : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : [ 0 | 0 of val ] =
+           let try_region = %begin_try_region () in
+           let try_ghost_region = %begin_try_ghost_region () in
+           cont k3 push(k2)
+             where k3 =
+               (apply ccall
+                  ($`*extern*`.caml_sys_getenv : val -> val) (s) -> k3 * k2
+                  where k3 (Pccall) =
+                    let Pmakeblock = %block.[`0`] (Pccall) in
+                    cont k pop(k2) (Pmakeblock))
+             where k2 exn (`exn` : val) =
+               let `unit` = %end_try_region (try_region) in
+               let unit_1 = %end_try_ghost_region (try_ghost_region) in
+               let prim = %phys_eq (`exn`, $`*predef*`.caml_exn_Not_found) in
+               switch prim
+                 | 0 -> k1 pop(reraise k1) (`exn`)
+                 | 1 -> k (0)
+         in
+         let $camlSys__getenv_opt_8 = closure getenv_opt_2_1 @getenv_opt in
+         let interactive = %block.mut.[`0`] (0) in
+         let code loopify(never) size(11) newer_version_of(set_signal_3)
+               set_signal_3_1
+                 (sig_num : imm tagged, sig_beh : [ 0 |1 | 0 of val ])
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           apply ccall
+             ($`*extern*`.caml_install_signal_handler : val * val -> val)
+               (sig_num, sig_beh)
+               -> k2 * k1
+             where k2 (param) =
+               cont k (0)
+         in
+         let $camlSys__set_signal_9 = closure set_signal_3_1 @set_signal in
+         (apply ccall noalloc
+            ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
+            where k (Pccall) =
+              let $camlSys__Break224 =
+                Block immutable_unique
+                248 ($camlSys__immstring98, Pccall)
+              in
+              let code loopify(never) size(3) newer_version_of(`fn[sys.ml:375,40--62]_5`)
+                    `fn[sys.ml:375,40--62]_5_1` (param : imm tagged)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : imm tagged =
+                cont k1 pop(regular k1) ($camlSys__Break224)
+              in
+              let $`camlSys__fn[sys.ml:375,40--62]_11` =
+                closure `fn[sys.ml:375,40--62]_5_1` @`fn[sys.ml:375,40--62]`
+              in
+              let $camlSys__Pmakeblock241 =
+                Block 0 ($`camlSys__fn[sys.ml:375,40--62]_11`)
+              in
+              let code loopify(never) size(19) newer_version_of(catch_break_4)
+                    catch_break_4_1 (on : imm tagged)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : imm tagged =
+                (let untagged = %untag_imm (on) in
+                 switch untagged
+                   | 0 -> k2
+                   | 1 -> k3)
+                  where k3 =
+                    apply direct(set_signal_3_1)
+                      ($camlSys__set_signal_9 : _ -> imm tagged)
+                        (-6, $camlSys__Pmakeblock241)
+                        -> k * k1
+                  where k2 =
+                    apply direct(set_signal_3_1)
+                      ($camlSys__set_signal_9 : _ -> imm tagged)
+                        (-6, 0)
+                        -> k * k1
+              in
+              let $camlSys__catch_break_10 =
+                closure catch_break_4_1 @catch_break
+              in
+              let Pfield = %block_load.[`0`] (`*match*`) in
+              let $camlSys =
+                Block 0 ($camlSys__failwith_6,
+                         $camlSys__invalid_arg_7,
+                         executable_name,
+                         Pfield,
+                         0,
+                         0,
+                         64,
+                         63,
+                         1,
+                         0,
+                         0,
+                         70368744177663,
+                         70368744177663,
+                         562949953421303,
+                         $camlSys__getenv_opt_8,
+                         interactive,
+                         $camlSys__set_signal_9,
+                         -1,
+                         -2,
+                         -3,
+                         -4,
+                         -5,
+                         -6,
+                         -7,
+                         -8,
+                         -9,
+                         -10,
+                         -11,
+                         -12,
+                         -13,
+                         -14,
+                         -15,
+                         -16,
+                         -17,
+                         -18,
+                         -19,
+                         -20,
+                         -21,
+                         -22,
+                         -23,
+                         -24,
+                         -25,
+                         -26,
+                         -27,
+                         -28,
+                         $camlSys__Break224,
+                         $camlSys__catch_break_10,
+                         $camlSys__immstring116)
+              in
+              cont done ($camlSys)))

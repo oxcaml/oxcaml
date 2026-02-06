@@ -1,0 +1,266 @@
+let code is_true_1 deleted in
+let code is_false_2 deleted in
+let $camlPhantom__immstring48 = "phantom.ml" in
+let $camlPhantom__const_block50 = Block 0 ($camlPhantom__immstring48, 42, 6)
+in
+let $camlPhantom__Pmakeblock53 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlPhantom__const_block50)
+in
+let code eval_level_3 deleted in
+let code true_at_level0_4 deleted in
+let $camlPhantom__immstring11 = "Phantom.Make(F).UndecidedLit" in
+let code Make_0 deleted in
+let code Make2_5 deleted in
+let code loopify(never) size(77) newer_version_of(true_at_level0_4)
+      true_at_level0_4_1 (st, a : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let UndecidedLit =
+    %project_value_slot.[`true_at_level0`].[`UndecidedLit`] (my_closure)
+  in
+  let try_region = %begin_try_region () in
+  let try_ghost_region = %begin_try_ghost_region () in
+  cont k4 push(k2)
+    where k4 =
+      ((let Pfield = %block_load.[`1`] (a) in
+        let lvl = %block_load.[`3`] (Pfield) in
+        let Pfield_1 = %block_load.mut.[`3`] (a) in
+        (let untagged = %untag_imm (Pfield_1) in
+         switch untagged
+           | 0 -> k5 (lvl)
+           | 1 -> k6 (lvl))
+          where k6 (lvl_1) =
+            let prim = %int_comp.ge (lvl_1, 0) in
+            switch prim
+              | 0 -> k2 pop(regular k2) ($camlPhantom__Pmakeblock53)
+              | 1 -> k4 (lvl_1, 1i)
+          where k5 (lvl_1) =
+            let Pfield_2 = %block_load.[`2`] (a) in
+            let Pfield_3 = %block_load.mut.[`3`] (Pfield_2) in
+            let untagged = %untag_imm (Pfield_3) in
+            switch untagged
+              | 0 -> k2 pop(reraise k2) (UndecidedLit)
+              | 1 -> k4 (lvl_1, 0i))
+         where k4 (lvl, naked_immediate : imm) =
+           let unboxed_field_1 = lvl in
+           (switch naked_immediate
+              | 0 -> k3 (0)
+              | 1 -> k4
+              where k4 =
+                let prim = %phys_eq (unboxed_field_1, 0) in
+                let eq = %tag_imm (prim) in
+                cont k3 (eq)))
+    where k3 (body_result : imm tagged) =
+      cont k pop(k2) (body_result)
+    where k2 exn (`exn` : val) =
+      let `unit` = %end_try_region (try_region) in
+      let unit_1 = %end_try_ghost_region (try_ghost_region) in
+      let prim = %phys_eq (`exn`, UndecidedLit) in
+      switch prim
+        | 0 -> k1 pop(reraise k1) (`exn`)
+        | 1 -> k (0)
+in
+let code inline(always) loopify(never) size(56) newer_version_of(eval_level_3)
+      eval_level_3_1 (_st, a : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of imm tagged * imm tagged ] =
+  let UndecidedLit =
+    %project_value_slot.[`eval_level`].[`UndecidedLit_1`] (my_closure)
+  in
+  let Pfield = %block_load.[`1`] (a) in
+  let lvl = %block_load.[`3`] (Pfield) in
+  let Pfield_1 = %block_load.mut.[`3`] (a) in
+  (let untagged = %untag_imm (Pfield_1) in
+   switch untagged
+     | 0 -> k2
+     | 1 -> k3)
+    where k3 =
+      ((let prim = %int_comp.ge (lvl, 0) in
+        switch prim
+          | 0 -> k1 pop(regular k1) ($camlPhantom__Pmakeblock53)
+          | 1 -> k3)
+         where k3 =
+           let Pmakeblock = %block.[`0`] (1, lvl) in
+           cont k (Pmakeblock))
+    where k2 =
+      let Pfield_2 = %block_load.[`2`] (a) in
+      let Pfield_3 = %block_load.mut.[`3`] (Pfield_2) in
+      ((let untagged = %untag_imm (Pfield_3) in
+        switch untagged
+          | 0 -> k1 pop(reraise k1) (UndecidedLit)
+          | 1 -> k2)
+         where k2 =
+           let Pmakeblock = %block.[`0`] (0, lvl) in
+           cont k (Pmakeblock))
+in
+let code inline(always) loopify(never) size(3) newer_version_of(is_false_2)
+      is_false_2_1 (a : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`2`] (a) in
+  let Pfield_1 = %block_load.mut.[`3`] (Pfield) in
+  cont k (Pfield_1)
+in
+let $camlPhantom__is_false_8 = closure is_false_2_1 @is_false in
+let code inline(always) loopify(never) size(2) newer_version_of(is_true_1)
+      is_true_1_1 (a : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.mut.[`3`] (a) in
+  cont k (Pfield)
+in
+let $camlPhantom__is_true_7 = closure is_true_1_1 @is_true in
+let code inline(always) loopify(never) size(176) newer_version_of(Make_0)
+      Make_0_1 (F : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  apply ccall noalloc
+    ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k2 * k1
+    where k2 (Pccall) =
+      let UndecidedLit =
+        %block.imm_uniq.[`248`] ($camlPhantom__immstring11, Pccall)
+      in
+      let eval_level = closure eval_level_3_1 @eval_level
+      with {
+        UndecidedLit_1 = UndecidedLit;
+        is_true = $camlPhantom__is_true_7;
+        is_false = $camlPhantom__is_false_8
+      }
+      in
+      let true_at_level0 = closure true_at_level0_4_1 @true_at_level0
+      with { UndecidedLit = UndecidedLit; eval_level = eval_level }
+      in
+      let Pmakeblock =
+        %block.[`0`]
+          (UndecidedLit,
+           $camlPhantom__is_true_7,
+           $camlPhantom__is_false_8,
+           eval_level,
+           true_at_level0)
+      in
+      cont k (Pmakeblock)
+in
+let $camlPhantom__Make_6 = closure Make_0_1 @Make in
+let code loopify(never) size(77) newer_version_of(true_at_level0_4_1)
+      true_at_level0_4_2 (st, a : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let UndecidedLit =
+    %project_value_slot.[`true_at_level0`].[`UndecidedLit`] (my_closure)
+  in
+  let try_region = %begin_try_region () in
+  let try_ghost_region = %begin_try_ghost_region () in
+  cont k4 push(k2)
+    where k4 =
+      ((let Pfield = %block_load.[`1`] (a) in
+        let lvl = %block_load.[`3`] (Pfield) in
+        let Pfield_1 = %block_load.mut.[`3`] (a) in
+        (let untagged = %untag_imm (Pfield_1) in
+         switch untagged
+           | 0 -> k5 (lvl)
+           | 1 -> k6 (lvl))
+          where k6 (lvl_1) =
+            let prim = %int_comp.ge (lvl_1, 0) in
+            switch prim
+              | 0 -> k2 pop(regular k2) ($camlPhantom__Pmakeblock53)
+              | 1 -> k4 (1i, lvl_1)
+          where k5 (lvl_1) =
+            let Pfield_2 = %block_load.[`2`] (a) in
+            let Pfield_3 = %block_load.mut.[`3`] (Pfield_2) in
+            let untagged = %untag_imm (Pfield_3) in
+            switch untagged
+              | 0 -> k2 pop(reraise k2) (UndecidedLit)
+              | 1 -> k4 (0i, lvl_1))
+         where k4 (naked_immediate : imm, lvl) =
+           let lvl_1 = lvl in
+           (switch naked_immediate
+              | 0 -> k3 (0)
+              | 1 -> k4
+              where k4 =
+                let prim = %phys_eq (lvl_1, 0) in
+                let eq = %tag_imm (prim) in
+                cont k3 (eq)))
+    where k3 (body_result : imm tagged) =
+      cont k pop(k2) (body_result)
+    where k2 exn (`exn` : val) =
+      let `unit` = %end_try_region (try_region) in
+      let unit_1 = %end_try_ghost_region (try_ghost_region) in
+      let prim = %phys_eq (`exn`, UndecidedLit) in
+      switch prim
+        | 0 -> k1 pop(reraise k1) (`exn`)
+        | 1 -> k (0)
+in
+let code inline(always) loopify(never) size(56) newer_version_of(eval_level_3_1)
+      eval_level_3_2 (_st, a : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of imm tagged * imm tagged ] =
+  let UndecidedLit =
+    %project_value_slot.[`eval_level`].[`UndecidedLit_1`] (my_closure)
+  in
+  let Pfield = %block_load.[`1`] (a) in
+  let lvl = %block_load.[`3`] (Pfield) in
+  let Pfield_1 = %block_load.mut.[`3`] (a) in
+  (let untagged = %untag_imm (Pfield_1) in
+   switch untagged
+     | 0 -> k2
+     | 1 -> k3)
+    where k3 =
+      ((let prim = %int_comp.ge (lvl, 0) in
+        switch prim
+          | 0 -> k1 pop(regular k1) ($camlPhantom__Pmakeblock53)
+          | 1 -> k3)
+         where k3 =
+           let Pmakeblock = %block.[`0`] (1, lvl) in
+           cont k (Pmakeblock))
+    where k2 =
+      let Pfield_2 = %block_load.[`2`] (a) in
+      let Pfield_3 = %block_load.mut.[`3`] (Pfield_2) in
+      ((let untagged = %untag_imm (Pfield_3) in
+        switch untagged
+          | 0 -> k1 pop(reraise k1) (UndecidedLit)
+          | 1 -> k2)
+         where k2 =
+           let Pmakeblock = %block.[`0`] (0, lvl) in
+           cont k (Pmakeblock))
+in
+let code inline(always) loopify(never) size(176) newer_version_of(Make2_5)
+      Make2_5_1 (F : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  apply ccall noalloc inlining_state(depth(1))
+    ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k2 * k1
+    where k2 (Pccall) =
+      let UndecidedLit =
+        %block.imm_uniq.[`248`] ($camlPhantom__immstring11, Pccall)
+      in
+      let eval_level = closure eval_level_3_2 @eval_level
+      with {
+        UndecidedLit_1 = UndecidedLit;
+        is_true = $camlPhantom__is_true_7;
+        is_false = $camlPhantom__is_false_8
+      }
+      in
+      let true_at_level0 = closure true_at_level0_4_2 @true_at_level0
+      with { UndecidedLit = UndecidedLit; eval_level = eval_level }
+      in
+      let Pmakeblock =
+        %block.[`0`]
+          (UndecidedLit,
+           $camlPhantom__is_true_7,
+           $camlPhantom__is_false_8,
+           eval_level,
+           true_at_level0)
+      in
+      cont k (Pmakeblock)
+in
+let $camlPhantom__Make2_9 = closure Make2_5_1 @Make2 in
+let $camlPhantom = Block 0 ($camlPhantom__Make_6, $camlPhantom__Make2_9) in
+cont done ($camlPhantom)

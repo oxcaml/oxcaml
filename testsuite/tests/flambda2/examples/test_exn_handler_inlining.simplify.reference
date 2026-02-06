@@ -1,0 +1,77 @@
+let code id_0 deleted in
+let code p_2 deleted in
+let code g_1 deleted in
+let code f_3 deleted in
+let code loopify(never) size(1) newer_version_of(id_0)
+      id_0_1 (x) my_closure _region _ghost_region my_depth -> k * k1 =
+  cont k (x)
+in
+let $camlTest_exn_handler_inlining__id_4 = closure id_0_1 @`id` in
+let code loopify(never) size(19) newer_version_of(p_2)
+      p_2_1 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      let Popaque = %opaque (0) in
+      cont k (Popaque)
+    where k2 =
+      let Pfield = %block_load.[`1`] (param) in
+      let Popaque = %opaque ($camlTest_exn_handler_inlining__id_4) in
+      apply Popaque (Pfield) -> k * k1
+in
+let $camlTest_exn_handler_inlining__p_6 = closure p_2_1 @p in
+let code loopify(never) size(4) newer_version_of(g_1)
+      g_1_1 (y : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  apply direct(p_2_1)
+    ($camlTest_exn_handler_inlining__p_6
+     : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+      (y)
+      -> k * k1
+in
+let $camlTest_exn_handler_inlining__g_5 = closure g_1_1 @g in
+let code loopify(never) size(18) newer_version_of(f_3)
+      f_3_1 (x : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let try_region = %begin_try_region () in
+  let try_ghost_region = %begin_try_ghost_region () in
+  cont k3 (x)
+    where rec k3 (c_295_unboxed0 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      (cont k6 push(k5)
+         where k6 =
+           (apply direct(p_2_1) inlining_state(depth(10))
+              ($camlTest_exn_handler_inlining__p_6
+               : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                (c_295_unboxed0)
+                -> k6 * k5
+              where k6
+                      (wrapper_return :
+                         [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                cont k4 pop(k5) (wrapper_return))
+         where k5 exn (`exn`) =
+           cont k2 (c_295_unboxed0)
+         where k4 (wrapper_return) =
+           let return_val0 = wrapper_return in
+           cont k3 (return_val0))
+    where k2 (c_295_unboxed0) =
+      let c_295_unboxed0_1 = c_295_unboxed0 in
+      let `unit` = %end_try_region (try_region) in
+      let unit_1 = %end_try_ghost_region (try_ghost_region) in
+      cont k (c_295_unboxed0_1)
+in
+let $camlTest_exn_handler_inlining__f_7 = closure f_3_1 @f in
+let $camlTest_exn_handler_inlining =
+  Block 0 ($camlTest_exn_handler_inlining__id_4,
+           $camlTest_exn_handler_inlining__g_5,
+           $camlTest_exn_handler_inlining__f_7)
+in
+cont done ($camlTest_exn_handler_inlining)

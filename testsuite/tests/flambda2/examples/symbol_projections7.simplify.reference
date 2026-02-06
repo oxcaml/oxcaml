@@ -1,0 +1,22 @@
+let code `fn[symbol_projections7.ml:20,4--18]_1` deleted in
+let y = %opaque (2) in
+let $`camlSymbol_projections7__fn[symbol_projections7.ml:20,4--18]_2` =
+  closure `fn[symbol_projections7.ml:20,4--18]_1_1`
+    @`fn[symbol_projections7.ml:20,4--18]`
+and code loopify(never) size(4) newer_version_of(`fn[symbol_projections7.ml:20,4--18]_1`)
+      `fn[symbol_projections7.ml:20,4--18]_1_1` (x : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let y_1 =
+    %project_value_slot.[`fn[symbol_projections7.ml:20,4--18]`].[`y`]
+      ($`camlSymbol_projections7__fn[symbol_projections7.ml:20,4--18]_2`)
+  in
+  let int_add = %int_barith.add (x, y_1) in
+  cont k (int_add)
+  with { y = y }
+in
+let $camlSymbol_projections7 =
+  Block 0 ($`camlSymbol_projections7__fn[symbol_projections7.ml:20,4--18]_2`)
+in
+cont done ($camlSymbol_projections7)

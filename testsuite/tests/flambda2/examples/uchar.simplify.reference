@@ -1,0 +1,331 @@
+let code failwith_0 deleted in
+let code invalid_arg_1 deleted in
+let code `@_2` deleted in
+let code `^_3` deleted in
+let $camlUchar__immstring62 = "%X" in
+let $camlUchar__immstring66 = " is not an Unicode scalar value" in
+let code err_not_sv_4 deleted in
+let $camlUchar__immstring75 = "%04X" in
+let $camlUchar__immstring79 = " is not a latin1 character" in
+let $camlUchar__immstring81 = "U+" in
+let code err_not_latin1_5 deleted in
+let $camlUchar__immstring53 = "U+10FFFF has no successor" in
+let code succ_6 deleted in
+let $camlUchar__immstring50 = "U+0000 has no predecessor" in
+let code pred_7 deleted in
+let code is_valid_8 deleted in
+let code of_int_9 deleted in
+let code is_char_10 deleted in
+let code of_char_11 deleted in
+let code to_char_12 deleted in
+let code loopify(never) size(1)
+      unsafe_to_char_13 (prim : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (prim)
+in
+let code loopify(never) size(5)
+      equal_14 (prim : imm tagged, prim_1 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim_2 = %phys_eq (prim, prim_1) in
+  let eq = %tag_imm (prim_2) in
+  cont k (eq)
+in
+let code loopify(never) size(7)
+      compare_15 (prim : imm tagged, prim_1 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim_2 = %int_comp.qmark (prim, prim_1) in
+  let int_compare = %tag_imm (prim_2) in
+  cont k (int_compare)
+in
+let code loopify(never) size(1)
+      hash_16 (prim : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (prim)
+in
+let code loopify(never) size(10) newer_version_of(failwith_0)
+      failwith_0_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Failure, s) in
+  cont k1 pop(regular k1) (Pmakeblock)
+in
+let $camlUchar__failwith_17 = closure failwith_0_1 @failwith in
+let code loopify(never) size(10) newer_version_of(invalid_arg_1)
+      invalid_arg_1_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Invalid_argument, s) in
+  cont k1 pop(regular k1) (Pmakeblock)
+in
+let $camlUchar__invalid_arg_18 = closure invalid_arg_1_1 @invalid_arg in
+let $`camlUchar__@_19` =
+  closure `@_2_1` @`@`
+and code rec loopify(never) size(25) newer_version_of(`@_2`)
+      `@_2_1`
+        (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %is_int (l1) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (l2)
+    where k2 =
+      ((let Pfield = %block_load.[`1`] (l1) in
+        apply direct(`@_2_1`)
+          ($`camlUchar__@_19` ~ depth my_depth -> succ my_depth
+           : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+            (Pfield, l2)
+            -> k2 * k1)
+         where k2 (apply_result : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+           let Pfield = %block_load.[`0`] (l1) in
+           let Pmakeblock = %block.[`0`] (Pfield, apply_result) in
+           cont k (Pmakeblock))
+in
+let code loopify(never) size(36) newer_version_of(`^_3`)
+      `^_3_1` (s1 : val, s2 : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let prim = %string_length (s1) in
+  let l1 = %tag_imm (prim) in
+  let prim_1 = %string_length (s2) in
+  let l2 = %tag_imm (prim_1) in
+  let int_add = %int_barith.add (l1, l2) in
+  apply ccall
+    ($`*extern*`.caml_create_bytes : val -> val) (int_add) -> k2 * k1
+    where k2 (s) =
+      (apply ccall noalloc
+         ($`*extern*`.caml_blit_string : val * val * val * val * val -> val)
+           (s1, 0, s, 0, l1)
+           -> k3 * k1
+         where k3 (param) =
+           cont k2
+         where k2 =
+           (apply ccall noalloc
+              ($`*extern*`.caml_blit_string
+               : val * val * val * val * val -> val)
+                (s2, 0, s, l1, l2)
+                -> k2 * k1
+              where k2 (param) =
+                cont k (s)))
+in
+let $`camlUchar__^_20` = closure `^_3_1` @`^` in
+let code loopify(never) size(14) newer_version_of(err_not_sv_4)
+      err_not_sv_4_1 (i : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  apply ccall
+    ($`*extern*`.caml_format_int : val * val -> val)
+      ($camlUchar__immstring62, i)
+      -> k2 * k1
+    where k2 (Pccall) =
+      apply direct(`^_3_1`)
+        ($`camlUchar__^_20` : _ -> val)
+          (Pccall, $camlUchar__immstring66)
+          -> k * k1
+in
+let $camlUchar__err_not_sv_21 = closure err_not_sv_4_1 @err_not_sv in
+let code loopify(never) size(18) newer_version_of(err_not_latin1_5)
+      err_not_latin1_5_1 (u : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  apply ccall
+    ($`*extern*`.caml_format_int : val * val -> val)
+      ($camlUchar__immstring75, u)
+      -> k3 * k1
+    where k3 (Pccall) =
+      apply direct(`^_3_1`)
+        ($`camlUchar__^_20` : _ -> val)
+          (Pccall, $camlUchar__immstring79)
+          -> k2 * k1
+    where k2 (apply_result : val) =
+      apply direct(`^_3_1`)
+        ($`camlUchar__^_20` : _ -> val)
+          ($camlUchar__immstring81, apply_result)
+          -> k * k1
+in
+let $camlUchar__err_not_latin1_22 =
+  closure err_not_latin1_5_1 @err_not_latin1
+in
+let code loopify(never) size(31) newer_version_of(succ_6)
+      succ_6_1 (u : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %phys_eq (u, 55295) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (57344)
+    where k2 =
+      let prim_1 = %phys_eq (u, 1114111) in
+      (switch prim_1
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           apply direct(invalid_arg_1_1)
+             ($camlUchar__invalid_arg_18 : _ -> imm tagged)
+               ($camlUchar__immstring53)
+               -> never * k1
+         where k2 =
+           let int_add = %int_barith.add (u, 1) in
+           cont k (int_add))
+in
+let $camlUchar__succ_23 = closure succ_6_1 @`succ` in
+let code loopify(never) size(31) newer_version_of(pred_7)
+      pred_7_1 (u : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %phys_eq (u, 57344) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (55295)
+    where k2 =
+      let prim_1 = %phys_eq (u, 0) in
+      (switch prim_1
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           apply direct(invalid_arg_1_1)
+             ($camlUchar__invalid_arg_18 : _ -> imm tagged)
+               ($camlUchar__immstring50)
+               -> never * k1
+         where k2 =
+           let int_sub = %int_barith.sub (u, 1) in
+           cont k (int_sub))
+in
+let $camlUchar__pred_24 = closure pred_7_1 @pred in
+let code loopify(never) size(41) newer_version_of(is_valid_8)
+      is_valid_8_1 (i : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let prim = %int_comp.le (0, i) in
+   switch prim
+     | 0 -> k2
+     | 1 -> k3
+     where k3 =
+       let prim_1 = %int_comp.le (i, 55295) in
+       switch prim_1
+         | 0 -> k2
+         | 1 -> k (1))
+    where k2 =
+      let prim = %int_comp.le (57344, i) in
+      (switch prim
+         | 0 -> k (0)
+         | 1 -> k2
+         where k2 =
+           let prim_1 = %int_comp.le (i, 1114111) in
+           let int_lessequal = %tag_imm (prim_1) in
+           cont k (int_lessequal))
+in
+let $camlUchar__is_valid_25 = closure is_valid_8_1 @is_valid in
+let code loopify(never) size(24) newer_version_of(of_int_9)
+      of_int_9_1 (i : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(is_valid_8_1)
+    ($camlUchar__is_valid_25 : _ -> imm tagged) (i) -> k3 * k1
+    where k3 (param : imm tagged) =
+      let unboxed_field = %untag_imm (param) in
+      cont k2 (unboxed_field)
+    where k2 (unboxed_field : imm) =
+      let naked_immediate = unboxed_field in
+      (switch naked_immediate
+         | 0 -> k2
+         | 1 -> k (i)
+         where k2 =
+           (apply direct(err_not_sv_4_1)
+              ($camlUchar__err_not_sv_21 : _ -> val) (i) -> k2 * k1
+              where k2 (apply_result : val) =
+                apply direct(invalid_arg_1_1)
+                  ($camlUchar__invalid_arg_18 : _ -> imm tagged)
+                    (apply_result)
+                    -> never * k1))
+in
+let $camlUchar__of_int_26 = closure of_int_9_1 @of_int in
+let code loopify(never) size(5) newer_version_of(is_char_10)
+      is_char_10_1 (u : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %int_comp.lt (u, 256) in
+  let int_lessthan = %tag_imm (prim) in
+  cont k (int_lessthan)
+in
+let $camlUchar__is_char_27 = closure is_char_10_1 @is_char in
+let code loopify(never) size(1) newer_version_of(of_char_11)
+      of_char_11_1 (c : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (c)
+in
+let $camlUchar__of_char_28 = closure of_char_11_1 @of_char in
+let code loopify(never) size(20) newer_version_of(to_char_12)
+      to_char_12_1 (u : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %int_comp.gt (u, 255) in
+  switch prim
+    | 0 -> k (u)
+    | 1 -> k2
+    where k2 =
+      (apply direct(err_not_latin1_5_1)
+         ($camlUchar__err_not_latin1_22 : _ -> val) (u) -> k2 * k1
+         where k2 (apply_result : val) =
+           apply direct(invalid_arg_1_1)
+             ($camlUchar__invalid_arg_18 : _ -> imm tagged)
+               (apply_result)
+               -> never * k1)
+in
+let $camlUchar__to_char_29 = closure to_char_12_1 @to_char in
+let $camlUchar__unsafe_to_char_30 = closure unsafe_to_char_13 @unsafe_to_char
+in
+let $camlUchar__equal_31 = closure equal_14 @equal in
+let $camlUchar__compare_32 = closure compare_15 @compare in
+let $camlUchar__hash_33 = closure hash_16 @hash in
+let $camlUchar =
+  Block 0 ($camlUchar__failwith_17,
+           $camlUchar__invalid_arg_18,
+           $`camlUchar__@_19`,
+           $`camlUchar__^_20`,
+           $camlUchar__immstring50,
+           $camlUchar__immstring53,
+           $camlUchar__err_not_sv_21,
+           $camlUchar__err_not_latin1_22,
+           0,
+           1114111,
+           55295,
+           57344,
+           65279,
+           65533,
+           $camlUchar__succ_23,
+           $camlUchar__pred_24,
+           $camlUchar__is_valid_25,
+           $camlUchar__of_int_26,
+           $camlUchar__is_char_27,
+           $camlUchar__of_char_28,
+           $camlUchar__to_char_29,
+           $camlUchar__unsafe_to_char_30,
+           $camlUchar__equal_31,
+           $camlUchar__compare_32,
+           $camlUchar__hash_33)
+in
+cont done ($camlUchar)

@@ -1,0 +1,342 @@
+let code empty_0 deleted in
+let code return_1 deleted in
+let code map_2 deleted
+and code loopify(never) size(9)
+      partial_map_3 (param2 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let f = %project_value_slot.[`partial_map`].[`f`] (my_closure) in
+  let Pfield = %project_value_slot.[`partial_map`].[`Pfield`] (my_closure) in
+  let map = %project_value_slot.[`partial_map`].[`my_closure`] (my_closure)
+  in
+  apply
+    (map : val * val * imm tagged -> [ 0 | 0 of val * val ])
+      (f, Pfield, param2)
+      -> k * k1
+in
+let code filter_map_4 deleted
+and code loopify(never) size(9)
+      partial_filter_map_5 (param2 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let filter_map =
+    %project_value_slot.[`partial_filter_map`].[`my_closure_1`] (my_closure)
+  in
+  let f = %project_value_slot.[`partial_filter_map`].[`f_1`] (my_closure) in
+  let next = %project_value_slot.[`partial_filter_map`].[`next`] (my_closure)
+  in
+  apply
+    (filter_map : val * val * imm tagged -> [ 0 | 0 of val * val ])
+      (f, next, param2)
+      -> k * k1
+in
+let code filter_6 deleted
+and code loopify(never) size(9)
+      partial_filter_7 (param2 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let f = %project_value_slot.[`partial_filter`].[`f_2`] (my_closure) in
+  let filter =
+    %project_value_slot.[`partial_filter`].[`my_closure_2`] (my_closure)
+  in
+  let next = %project_value_slot.[`partial_filter`].[`next_1`] (my_closure)
+  in
+  apply
+    (filter : val * val * imm tagged -> [ 0 | 0 of val * val ])
+      (f, next, param2)
+      -> k * k1
+in
+let code flat_map_app_9 deleted
+and code loopify(never) size(10)
+      partial_flat_map_app_10 (param3 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let tail =
+    %project_value_slot.[`partial_flat_map_app`].[`tail`] (my_closure)
+  in
+  let Pfield =
+    %project_value_slot.[`partial_flat_map_app`].[`Pfield_1`] (my_closure)
+  in
+  let flat_map_app =
+    %project_value_slot.[`partial_flat_map_app`].[`my_closure_3`]
+      (my_closure)
+  in
+  let f = %project_value_slot.[`partial_flat_map_app`].[`f_3`] (my_closure)
+  in
+  apply
+    (flat_map_app : val * val * val * imm tagged -> [ 0 | 0 of val * val ])
+      (f, Pfield, tail, param3)
+      -> k * k1
+and code flat_map_8 deleted
+in
+let code aux_12 deleted in
+let code fold_left_11 deleted in
+let code aux_14 deleted in
+let code iter_13 deleted in
+let code loopify(never) size(1) newer_version_of(empty_0)
+      empty_0_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  cont k (0)
+in
+let $camlSeq__empty_15 = closure empty_0_1 @empty in
+let code loopify(never) size(8) newer_version_of(return_1)
+      return_1_1 (x : val, param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let Pmakeblock = %block.[`0`] (x, $camlSeq__empty_15) in
+  cont k (Pmakeblock)
+in
+let $camlSeq__return_16 = closure return_1_1 @return in
+let $camlSeq__map_17 =
+  closure map_2_1 @map
+and code rec loopify(never) size(52) newer_version_of(map_2)
+      map_2_1 (f : val, seq : val, param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  apply seq (0) -> k2 * k1
+    where k2 (`*match*` : [ 0 | 0 of val * val ]) =
+      let prim = %is_int (`*match*`) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let Pfield = %block_load.[`1`] (`*match*`) in
+           let partial_map = closure partial_map_3 @partial_map
+           with {
+             my_closure = $camlSeq__map_17 ~ depth my_depth -> succ my_depth;
+             f = f;
+             Pfield = Pfield
+           }
+           in
+           ((let Pfield_1 = %block_load.[`0`] (`*match*`) in
+             apply f (Pfield_1) -> k2 * k1)
+              where k2 (apply_result : val) =
+                let Pmakeblock = %block.[`0`] (apply_result, partial_map) in
+                cont k (Pmakeblock)))
+in
+let $camlSeq__filter_map_18 =
+  closure filter_map_4_1 @filter_map
+and code rec loopify(never) size(68) newer_version_of(filter_map_4)
+      filter_map_4_1 (f : val, seq : val, param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  apply seq (0) -> k2 * k1
+    where k2 (`*match*` : [ 0 | 0 of val * val ]) =
+      let prim = %is_int (`*match*`) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let next = %block_load.[`1`] (`*match*`) in
+           ((let Pfield = %block_load.[`0`] (`*match*`) in
+             apply f (Pfield) -> k2 * k1)
+              where k2 (`*match*_1` : [ 0 | 0 of val ]) =
+                let prim_1 = %is_int (`*match*_1`) in
+                (switch prim_1
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     apply direct(filter_map_4_1)
+                       ($camlSeq__filter_map_18 ~ depth my_depth -> succ my_depth
+                        : _ -> [ 0 | 0 of val * val ])
+                         (f, next, 0)
+                         -> k * k1
+                   where k2 =
+                     let partial_filter_map =
+                       closure partial_filter_map_5 @partial_filter_map
+                     with {
+                       my_closure_1 =
+                         $camlSeq__filter_map_18 ~ depth my_depth -> succ my_depth;
+                       f_1 = f;
+                       next = next
+                     }
+                     in
+                     let Pfield = %block_load.[`0`] (`*match*_1`) in
+                     let Pmakeblock =
+                       %block.[`0`] (Pfield, partial_filter_map)
+                     in
+                     cont k (Pmakeblock))))
+in
+let $camlSeq__filter_19 =
+  closure filter_6_1 @filter
+and code rec loopify(never) size(68) newer_version_of(filter_6)
+      filter_6_1 (f : val, seq : val, param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  apply seq (0) -> k2 * k1
+    where k2 (`*match*` : [ 0 | 0 of val * val ]) =
+      let prim = %is_int (`*match*`) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let next = %block_load.[`1`] (`*match*`) in
+           let x = %block_load.[`0`] (`*match*`) in
+           (apply f (x) -> k3 * k1
+              where k3 (param_1 : imm tagged) =
+                let unboxed_field = %untag_imm (param_1) in
+                cont k2 (unboxed_field)
+              where k2 (unboxed_field : imm) =
+                let naked_immediate = unboxed_field in
+                (switch naked_immediate
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     let partial_filter =
+                       closure partial_filter_7 @partial_filter
+                     with {
+                       my_closure_2 =
+                         $camlSeq__filter_19 ~ depth my_depth -> succ my_depth;
+                       f_2 = f;
+                       next_1 = next
+                     }
+                     in
+                     let Pmakeblock = %block.[`0`] (x, partial_filter) in
+                     cont k (Pmakeblock)
+                   where k2 =
+                     apply direct(filter_6_1)
+                       ($camlSeq__filter_19 ~ depth my_depth -> succ my_depth
+                        : _ -> [ 0 | 0 of val * val ])
+                         (f, next, 0)
+                         -> k * k1)))
+in
+let $camlSeq__flat_map_20 =
+  closure flat_map_8_1 @flat_map
+and $camlSeq__flat_map_app_21 =
+  closure flat_map_app_9_1 @flat_map_app
+and code rec loopify(never) size(52) newer_version_of(flat_map_app_9)
+      flat_map_app_9_1 (f : val, seq : val, tail : val, param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  apply seq (0) -> k2 * k1
+    where k2 (`*match*` : [ 0 | 0 of val * val ]) =
+      let prim = %is_int (`*match*`) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           apply direct(flat_map_8_1)
+             ($camlSeq__flat_map_20 ~ depth my_depth -> succ my_depth
+              : _ -> [ 0 | 0 of val * val ])
+               (f, tail, 0)
+               -> k * k1
+         where k2 =
+           let Pfield = %block_load.[`1`] (`*match*`) in
+           let partial_flat_map_app =
+             closure partial_flat_map_app_10 @partial_flat_map_app
+           with {
+             my_closure_3 =
+               $camlSeq__flat_map_app_21 ~ depth my_depth -> succ my_depth;
+             f_3 = f;
+             tail = tail;
+             Pfield_1 = Pfield
+           }
+           in
+           let Pfield_1 = %block_load.[`0`] (`*match*`) in
+           let Pmakeblock = %block.[`0`] (Pfield_1, partial_flat_map_app) in
+           cont k (Pmakeblock))
+and code rec loopify(never) size(29) newer_version_of(flat_map_8)
+      flat_map_8_1 (f : val, seq : val, param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  apply seq (0) -> k2 * k1
+    where k2 (`*match*` : [ 0 | 0 of val * val ]) =
+      let prim = %is_int (`*match*`) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let Pfield = %block_load.[`1`] (`*match*`) in
+           ((let Pfield_1 = %block_load.[`0`] (`*match*`) in
+             apply f (Pfield_1) -> k2 * k1)
+              where k2 (apply_result : val) =
+                apply direct(flat_map_app_9_1)
+                  ($camlSeq__flat_map_app_21 ~ depth my_depth -> succ my_depth
+                   : _ -> [ 0 | 0 of val * val ])
+                    (f, apply_result, Pfield, 0)
+                    -> k * k1))
+in
+let code rec loopify(done) size(27) newer_version_of(aux_12)
+      aux_12_1 (f : val, acc, seq : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  cont self (acc, seq)
+    where rec self (acc_1, seq_1 : val) =
+      let f_1 = f in
+      (apply seq_1 (0) -> k2 * k1
+         where k2 (`*match*` : [ 0 | 0 of val * val ]) =
+           let prim = %is_int (`*match*`) in
+           (switch prim
+              | 0 -> k2
+              | 1 -> k (acc_1)
+              where k2 =
+                ((let Pfield = %block_load.[`0`] (`*match*`) in
+                  apply f_1 (acc_1, Pfield) -> k2 * k1)
+                   where k2 (acc_2) =
+                     let Pfield = %block_load.[`1`] (`*match*`) in
+                     cont self (acc_2, Pfield))))
+in
+let $camlSeq__aux_23 = closure aux_12_1 @aux in
+let code loopify(never) size(4) newer_version_of(fold_left_11)
+      fold_left_11_1 (f : val, acc, seq : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  apply direct(aux_12_1) $camlSeq__aux_23 (f, acc, seq) -> k * k1
+in
+let $camlSeq__fold_left_22 = closure fold_left_11_1 @fold_left in
+let code rec loopify(done) size(29) newer_version_of(aux_14)
+      aux_14_1 (seq : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (seq)
+    where rec self (seq_1 : val) =
+      let f = %project_value_slot.[`aux_1`].[`f_4`] (my_closure) in
+      (apply seq_1 (0) -> k2 * k1
+         where k2 (`*match*` : [ 0 | 0 of val * val ]) =
+           let prim = %is_int (`*match*`) in
+           (switch prim
+              | 0 -> k2
+              | 1 -> k (0)
+              where k2 =
+                ((let Pfield = %block_load.[`0`] (`*match*`) in
+                  apply f (Pfield) -> k3 * k1
+                    where k3 (param) =
+                      cont k2)
+                   where k2 =
+                     let Pfield = %block_load.[`1`] (`*match*`) in
+                     cont self (Pfield))))
+in
+let code loopify(never) size(41) newer_version_of(iter_13)
+      iter_13_1 (f : val, seq : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let aux = closure aux_14_1 @aux_1 with { f_4 = f } in
+  apply direct(aux_14_1) (aux : _ -> imm tagged) (seq) -> k * k1
+in
+let $camlSeq__iter_24 = closure iter_13_1 @iter in
+let $camlSeq =
+  Block 0 ($camlSeq__empty_15,
+           $camlSeq__return_16,
+           $camlSeq__map_17,
+           $camlSeq__filter_map_18,
+           $camlSeq__filter_19,
+           $camlSeq__flat_map_20,
+           $camlSeq__flat_map_app_21,
+           $camlSeq__fold_left_22,
+           $camlSeq__iter_24)
+in
+cont done ($camlSeq)

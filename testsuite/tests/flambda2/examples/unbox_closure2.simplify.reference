@@ -1,0 +1,47 @@
+let code bar2_1 deleted in
+let code bar1_2 deleted in
+let code foobar_0 deleted in
+let code inline(always) loopify(never) size(4) newer_version_of(bar1_2)
+      bar1_2_1 (y : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let x = %project_value_slot.[`bar1`].[`x`] (my_closure) in
+  let int_add = %int_barith.add (x, y) in
+  cont k (int_add)
+in
+let code inline(always) loopify(never) size(11) newer_version_of(bar2_1)
+      bar2_1_1 (y : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let x = %project_value_slot.[`bar2`].[`x_1`] (my_closure) in
+  let z = %project_value_slot.[`bar2`].[`z`] (my_closure) in
+  let int_mul = %int_barith.mul (z, x) in
+  let int_mul_1 = %int_barith.mul (int_mul, y) in
+  cont k (int_mul_1)
+in
+let code loopify(never) size(64) newer_version_of(foobar_0)
+      foobar_0_1 (b : imm tagged, x : imm tagged, z : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let untagged = %untag_imm (b) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k4)
+    where k4 =
+      let bar1 = closure bar1_2_1 @bar1 with { x = x } in
+      let Pmakeblock = %block.[`0`] (bar1) in
+      cont k2 (Pmakeblock)
+    where k3 =
+      let bar2 = closure bar2_1_1 @bar2 with { x_1 = x; z = z } in
+      let Pmakeblock = %block.[`1`] (bar2) in
+      cont k2 (Pmakeblock)
+    where k2 (f : [ 0 of val |1 of val ]) =
+      let Pfield = %block_load.[`0`] (f) in
+      apply Pfield (x) -> k * k1
+in
+let $camlUnbox_closure2__foobar_3 = closure foobar_0_1 @foobar in
+let $camlUnbox_closure2 = Block 0 ($camlUnbox_closure2__foobar_3) in
+cont done ($camlUnbox_closure2)

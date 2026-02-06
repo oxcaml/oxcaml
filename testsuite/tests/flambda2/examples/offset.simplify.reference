@@ -1,0 +1,642 @@
+let code f_1 deleted in
+let code g_2 deleted in
+let code h_3 deleted in
+let code inline_0 deleted in
+let code loopify(never) size(16) newer_version_of(f_1)
+      f_1_1 (x : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let a = %project_value_slot.[`f`].[`a`] (my_closure) in
+  let r = %project_value_slot.[`f`].[`r`] (my_closure) in
+  (let untagged = %untag_imm (a) in
+   switch untagged
+     | 0 -> k (0)
+     | 1 -> k2)
+    where k2 =
+      let int_add = %int_barith.add (r, x) in
+      cont k (int_add)
+in
+let code loopify(never) size(20) newer_version_of(g_2)
+      g_2_1 (x : imm tagged, y : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let b = %project_value_slot.[`g`].[`b`] (my_closure) in
+  let s = %project_value_slot.[`g`].[`s`] (my_closure) in
+  (let untagged = %untag_imm (b) in
+   switch untagged
+     | 0 -> k (0)
+     | 1 -> k2)
+    where k2 =
+      let int_mul = %int_barith.mul (x, y) in
+      let int_add = %int_barith.add (s, int_mul) in
+      cont k (int_add)
+in
+let code loopify(never) size(39) newer_version_of(h_3)
+      h_3_1 (x : imm tagged, y : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let a = %project_value_slot.[`h`].[`a`] (my_closure) in
+  let b = %project_value_slot.[`h`].[`b`] (my_closure) in
+  let g = %project_function_slot.[`h`].[`g`] (my_closure) in
+  let f = %project_function_slot.[`h`].[`f`] (my_closure) in
+  (let untagged = %untag_imm (b) in
+   switch untagged
+     | 0 -> k2 (0)
+     | 1 -> k3)
+    where k3 =
+      apply direct(g_2_1)
+        (g ~ depth my_depth -> succ my_depth : _ -> imm tagged)
+          (x, y)
+          -> k2 * k1
+    where k2 (staticcatch_result : imm tagged) =
+      ((let untagged = %untag_imm (a) in
+        switch untagged
+          | 0 -> k2 (0)
+          | 1 -> k3)
+         where k3 =
+           let int_add = %int_barith.add (x, y) in
+           apply direct(f_1_1)
+             (f ~ depth my_depth -> succ my_depth : _ -> imm tagged)
+               (int_add)
+               -> k2 * k1
+         where k2 (staticcatch_result_1 : imm tagged) =
+           let int_add =
+             %int_barith.add (staticcatch_result_1, staticcatch_result)
+           in
+           cont k (int_add))
+in
+let code inline(always) loopify(never) size(305) newer_version_of(inline_0)
+      inline_0_1 (a : imm tagged, b : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  (let tuple_field =
+     %block_load.tag[`0`].`size`[`2`].[`0`]
+       ($Stdlib__Random.camlStdlib__Random__k3684)
+   in
+   cont self
+     where rec self =
+       let st = %dls_get () in
+       let sz = %array_length.generic (st) in
+       let prim = %int_comp.lt (tuple_field, sz) in
+       (switch prim
+          | 0 -> k5
+          | 1 -> k4 (st)
+          where k5 =
+            (apply direct(grow_array_4) inlining_state(depth(3))
+               ($Stdlib__Domain.camlStdlib__Domain__grow_array_86
+                : _ -> any array)
+                 (st, tuple_field, sz)
+                 -> k5 * k1
+               where k5 (new_st : any array) =
+                 (apply ccall noalloc inlining_state(depth(3))
+                    ($`*extern*`.caml_domain_dls_compare_and_set
+                     : val * val -> val)
+                      (st, new_st)
+                      -> k5 * k1
+                    where k5 (Pccall) =
+                      let untagged = %untag_imm (Pccall) in
+                      switch untagged
+                        | 0 -> self
+                        | 1 -> k4 (new_st))))
+     where k4 (st : any array) =
+       ((let cond_result = %is_flat_float_array (st) in
+         switch cond_result
+           | 0 -> k6
+           | 1 -> k5)
+          where k6 =
+            let ifnot_result = %array_load.mut (st, tuple_field) in
+            cont k4 (ifnot_result)
+          where k5 =
+            let prim = %array_load.`float`.mut (st, tuple_field) in
+            let ifso_result = %box_num.`float` (prim) in
+            cont k4 (ifso_result)
+          where k4 (if_then_else_result) =
+            let none =
+              %project_value_slot.[`is_some`].[`none`]
+                ($Stdlib__Domain.camlStdlib__Domain__is_some_84)
+            in
+            let prim = %phys_ne (if_then_else_result, none) in
+            (switch prim
+               | 0 -> k4
+               | 1 -> k5
+               where k5 =
+                 let Pobj_magic = %opaque (if_then_else_result) in
+                 cont k3 (Pobj_magic)
+               where k4 =
+                 apply direct(init_idx_34) inlining_state(depth(2))
+                   ($Stdlib__Domain.camlStdlib__Domain__init_idx_113
+                    : _ -> val)
+                     (tuple_field,
+                      if_then_else_result,
+                      $Stdlib__Random.camlStdlib__Random__mk_default_98)
+                     -> k3 * k1)))
+    where k3 (apply_result : val) =
+      (cont self
+         where rec self =
+           (apply ccall noalloc inlining_state(depth(21))
+              ($`*extern*`.caml_lxm_next_unboxed : val -> int64)
+                (apply_result)
+                -> k3 * k1
+              where k3 (Pccall : int64) =
+                let prim = %num_conv.[`int64`].[`imm`] (Pccall) in
+                let int_of_int64 = %tag_imm (prim) in
+                let r = %int_barith.`and` (int_of_int64, 1073741823) in
+                let v = %int_barith.mod (r, 10) in
+                let int_sub = %int_barith.sub (r, v) in
+                let prim_1 = %int_comp.gt (int_sub, 1073741814) in
+                switch prim_1
+                  | 0 -> k2 (v)
+                  | 1 -> self))
+    where k2 (v) =
+      let r = v in
+      ((let tuple_field =
+          %block_load.tag[`0`].`size`[`2`].[`0`]
+            ($Stdlib__Random.camlStdlib__Random__k3684)
+        in
+        cont self
+          where rec self =
+            let st = %dls_get () in
+            let sz = %array_length.generic (st) in
+            let prim = %int_comp.lt (tuple_field, sz) in
+            (switch prim
+               | 0 -> k5
+               | 1 -> k4 (st)
+               where k5 =
+                 (apply direct(grow_array_4) inlining_state(depth(3))
+                    ($Stdlib__Domain.camlStdlib__Domain__grow_array_86
+                     : _ -> any array)
+                      (st, tuple_field, sz)
+                      -> k5 * k1
+                    where k5 (new_st : any array) =
+                      (apply ccall noalloc inlining_state(depth(3))
+                         ($`*extern*`.caml_domain_dls_compare_and_set
+                          : val * val -> val)
+                           (st, new_st)
+                           -> k5 * k1
+                         where k5 (Pccall) =
+                           let untagged = %untag_imm (Pccall) in
+                           switch untagged
+                             | 0 -> self
+                             | 1 -> k4 (new_st))))
+          where k4 (st : any array) =
+            ((let cond_result = %is_flat_float_array (st) in
+              switch cond_result
+                | 0 -> k6
+                | 1 -> k5)
+               where k6 =
+                 let ifnot_result = %array_load.mut (st, tuple_field) in
+                 cont k4 (ifnot_result)
+               where k5 =
+                 let prim = %array_load.`float`.mut (st, tuple_field) in
+                 let ifso_result = %box_num.`float` (prim) in
+                 cont k4 (ifso_result)
+               where k4 (if_then_else_result) =
+                 let none =
+                   %project_value_slot.[`is_some`].[`none`]
+                     ($Stdlib__Domain.camlStdlib__Domain__is_some_84)
+                 in
+                 let prim = %phys_ne (if_then_else_result, none) in
+                 (switch prim
+                    | 0 -> k4
+                    | 1 -> k5
+                    where k5 =
+                      let Pobj_magic = %opaque (if_then_else_result) in
+                      cont k3 (Pobj_magic)
+                    where k4 =
+                      apply direct(init_idx_34) inlining_state(depth(2))
+                        ($Stdlib__Domain.camlStdlib__Domain__init_idx_113
+                         : _ -> val)
+                          (tuple_field,
+                           if_then_else_result,
+                           $Stdlib__Random.camlStdlib__Random__mk_default_98)
+                          -> k3 * k1)))
+         where k3 (apply_result : val) =
+           (cont self
+              where rec self =
+                (apply ccall noalloc inlining_state(depth(21))
+                   ($`*extern*`.caml_lxm_next_unboxed : val -> int64)
+                     (apply_result)
+                     -> k3 * k1
+                   where k3 (Pccall : int64) =
+                     let prim = %num_conv.[`int64`].[`imm`] (Pccall) in
+                     let int_of_int64 = %tag_imm (prim) in
+                     let r_1 = %int_barith.`and` (int_of_int64, 1073741823)
+                     in
+                     let v_1 = %int_barith.mod (r_1, 10) in
+                     let int_sub = %int_barith.sub (r_1, v_1) in
+                     let prim_1 = %int_comp.gt (int_sub, 1073741814) in
+                     switch prim_1
+                       | 0 -> k2 (v_1)
+                       | 1 -> self))
+         where k2 (v_1) =
+           let s = v_1 in
+           let f = closure f_1_1 @f
+           and g = closure g_2_1 @g
+           and h = closure h_3_1 @h
+           with { a = a; b = b; r = r; s = s }
+           in
+           cont k (h))
+in
+let $camlOffset__inline_4 = closure inline_0_1 @`inline` in
+(let tuple_field =
+   %block_load.tag[`0`].`size`[`2`].[`0`]
+     ($Stdlib__Random.camlStdlib__Random__k3684)
+ in
+ cont self
+   where rec self =
+     let st = %dls_get () in
+     let sz = %array_length.generic (st) in
+     let prim = %int_comp.lt (tuple_field, sz) in
+     (switch prim
+        | 0 -> k3
+        | 1 -> k2 (st)
+        where k3 =
+          (apply direct(grow_array_4) inlining_state(depth(4))
+             ($Stdlib__Domain.camlStdlib__Domain__grow_array_86
+              : _ -> any array)
+               (st, tuple_field, sz)
+               -> k3 * error
+             where k3 (new_st : any array) =
+               (apply ccall noalloc inlining_state(depth(4))
+                  ($`*extern*`.caml_domain_dls_compare_and_set
+                   : val * val -> val)
+                    (st, new_st)
+                    -> k3 * error
+                  where k3 (Pccall) =
+                    let untagged = %untag_imm (Pccall) in
+                    switch untagged
+                      | 0 -> self
+                      | 1 -> k2 (new_st))))
+   where k2 (st : any array) =
+     ((let cond_result = %is_flat_float_array (st) in
+       switch cond_result
+         | 0 -> k4
+         | 1 -> k3)
+        where k4 =
+          let ifnot_result = %array_load.mut (st, tuple_field) in
+          cont k2 (ifnot_result)
+        where k3 =
+          let prim = %array_load.`float`.mut (st, tuple_field) in
+          let ifso_result = %box_num.`float` (prim) in
+          cont k2 (ifso_result)
+        where k2 (if_then_else_result) =
+          let none =
+            %project_value_slot.[`is_some`].[`none`]
+              ($Stdlib__Domain.camlStdlib__Domain__is_some_84)
+          in
+          let prim = %phys_ne (if_then_else_result, none) in
+          (switch prim
+             | 0 -> k2
+             | 1 -> k3
+             where k3 =
+               let Pobj_magic = %opaque (if_then_else_result) in
+               cont k1 (Pobj_magic)
+             where k2 =
+               apply direct(init_idx_34) inlining_state(depth(3))
+                 ($Stdlib__Domain.camlStdlib__Domain__init_idx_113 : 
+                  _ -> val)
+                   (tuple_field,
+                    if_then_else_result,
+                    $Stdlib__Random.camlStdlib__Random__mk_default_98)
+                   -> k1 * error)))
+  where k1 (apply_result : val) =
+    (cont self
+       where rec self =
+         (apply ccall noalloc inlining_state(depth(22))
+            ($`*extern*`.caml_lxm_next_unboxed : val -> int64)
+              (apply_result)
+              -> k1 * error
+            where k1 (Pccall : int64) =
+              let prim = %num_conv.[`int64`].[`imm`] (Pccall) in
+              let int_of_int64 = %tag_imm (prim) in
+              let r = %int_barith.`and` (int_of_int64, 1073741823) in
+              let v = %int_barith.mod (r, 10) in
+              let int_sub = %int_barith.sub (r, v) in
+              let prim_1 = %int_comp.gt (int_sub, 1073741814) in
+              switch prim_1
+                | 0 -> k (v)
+                | 1 -> self))
+  where k (v) =
+    let v_1 = v in
+    ((let tuple_field =
+        %block_load.tag[`0`].`size`[`2`].[`0`]
+          ($Stdlib__Random.camlStdlib__Random__k3684)
+      in
+      cont self
+        where rec self =
+          let st = %dls_get () in
+          let sz = %array_length.generic (st) in
+          let prim = %int_comp.lt (tuple_field, sz) in
+          (switch prim
+             | 0 -> k3
+             | 1 -> k2 (st)
+             where k3 =
+               (apply direct(grow_array_4) inlining_state(depth(4))
+                  ($Stdlib__Domain.camlStdlib__Domain__grow_array_86
+                   : _ -> any array)
+                    (st, tuple_field, sz)
+                    -> k3 * error
+                  where k3 (new_st : any array) =
+                    (apply ccall noalloc inlining_state(depth(4))
+                       ($`*extern*`.caml_domain_dls_compare_and_set
+                        : val * val -> val)
+                         (st, new_st)
+                         -> k3 * error
+                       where k3 (Pccall) =
+                         let untagged = %untag_imm (Pccall) in
+                         switch untagged
+                           | 0 -> self
+                           | 1 -> k2 (new_st))))
+        where k2 (st : any array) =
+          ((let cond_result = %is_flat_float_array (st) in
+            switch cond_result
+              | 0 -> k4
+              | 1 -> k3)
+             where k4 =
+               let ifnot_result = %array_load.mut (st, tuple_field) in
+               cont k2 (ifnot_result)
+             where k3 =
+               let prim = %array_load.`float`.mut (st, tuple_field) in
+               let ifso_result = %box_num.`float` (prim) in
+               cont k2 (ifso_result)
+             where k2 (if_then_else_result) =
+               let none =
+                 %project_value_slot.[`is_some`].[`none`]
+                   ($Stdlib__Domain.camlStdlib__Domain__is_some_84)
+               in
+               let prim = %phys_ne (if_then_else_result, none) in
+               (switch prim
+                  | 0 -> k2
+                  | 1 -> k3
+                  where k3 =
+                    let Pobj_magic = %opaque (if_then_else_result) in
+                    cont k1 (Pobj_magic)
+                  where k2 =
+                    apply direct(init_idx_34) inlining_state(depth(3))
+                      ($Stdlib__Domain.camlStdlib__Domain__init_idx_113
+                       : _ -> val)
+                        (tuple_field,
+                         if_then_else_result,
+                         $Stdlib__Random.camlStdlib__Random__mk_default_98)
+                        -> k1 * error)))
+       where k1 (apply_result : val) =
+         (cont self
+            where rec self =
+              (apply ccall noalloc inlining_state(depth(22))
+                 ($`*extern*`.caml_lxm_next_unboxed : val -> int64)
+                   (apply_result)
+                   -> k1 * error
+                 where k1 (Pccall : int64) =
+                   let prim = %num_conv.[`int64`].[`imm`] (Pccall) in
+                   let int_of_int64 = %tag_imm (prim) in
+                   let r = %int_barith.`and` (int_of_int64, 1073741823) in
+                   let v_2 = %int_barith.mod (r, 10) in
+                   let int_sub = %int_barith.sub (r, v_2) in
+                   let prim_1 = %int_comp.gt (int_sub, 1073741814) in
+                   switch prim_1
+                     | 0 -> k (v_2)
+                     | 1 -> self))
+       where k (v_2) =
+         let v_3 = v_2 in
+         let code loopify(never) size(0) newer_version_of(g_2_1)
+               g_2_2 (x : imm tagged, y : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           cont k (0)
+         in
+         let $camlOffset__f_5 =
+           closure f_1_2 @f
+         and $camlOffset__g_6 =
+           closure g_2_2 @g
+         and $camlOffset__h_7 =
+           closure h_3_2 @h
+         and code loopify(never) size(6) newer_version_of(h_3_1)
+               h_3_2 (x : imm tagged, y : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let int_add = %int_barith.add (x, y) in
+           apply direct(f_1_2) inlining_state(depth(1))
+             ($camlOffset__f_5 ~ depth my_depth -> succ my_depth
+              : _ -> imm tagged)
+               (int_add)
+               -> k * k1
+         and code loopify(never) size(4) newer_version_of(f_1_1)
+               f_1_2 (x : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let r = %project_value_slot.[`f`].[`r`] ($camlOffset__f_5) in
+           let int_add = %int_barith.add (r, x) in
+           cont k (int_add)
+           with { a = 1; b = 0; r = v_1; s = v_3 }
+         in
+         ((let tuple_field =
+             %block_load.tag[`0`].`size`[`2`].[`0`]
+               ($Stdlib__Random.camlStdlib__Random__k3684)
+           in
+           cont self
+             where rec self =
+               let st = %dls_get () in
+               let sz = %array_length.generic (st) in
+               let prim = %int_comp.lt (tuple_field, sz) in
+               (switch prim
+                  | 0 -> k3
+                  | 1 -> k2 (st)
+                  where k3 =
+                    (apply direct(grow_array_4) inlining_state(depth(4))
+                       ($Stdlib__Domain.camlStdlib__Domain__grow_array_86
+                        : _ -> any array)
+                         (st, tuple_field, sz)
+                         -> k3 * error
+                       where k3 (new_st : any array) =
+                         (apply ccall noalloc inlining_state(depth(4))
+                            ($`*extern*`.caml_domain_dls_compare_and_set
+                             : val * val -> val)
+                              (st, new_st)
+                              -> k3 * error
+                            where k3 (Pccall) =
+                              let untagged = %untag_imm (Pccall) in
+                              switch untagged
+                                | 0 -> self
+                                | 1 -> k2 (new_st))))
+             where k2 (st : any array) =
+               ((let cond_result = %is_flat_float_array (st) in
+                 switch cond_result
+                   | 0 -> k4
+                   | 1 -> k3)
+                  where k4 =
+                    let ifnot_result = %array_load.mut (st, tuple_field) in
+                    cont k2 (ifnot_result)
+                  where k3 =
+                    let prim = %array_load.`float`.mut (st, tuple_field) in
+                    let ifso_result = %box_num.`float` (prim) in
+                    cont k2 (ifso_result)
+                  where k2 (if_then_else_result) =
+                    let none =
+                      %project_value_slot.[`is_some`].[`none`]
+                        ($Stdlib__Domain.camlStdlib__Domain__is_some_84)
+                    in
+                    let prim = %phys_ne (if_then_else_result, none) in
+                    (switch prim
+                       | 0 -> k2
+                       | 1 -> k3
+                       where k3 =
+                         let Pobj_magic = %opaque (if_then_else_result) in
+                         cont k1 (Pobj_magic)
+                       where k2 =
+                         apply direct(init_idx_34) inlining_state(depth(3))
+                           ($Stdlib__Domain.camlStdlib__Domain__init_idx_113
+                            : _ -> val)
+                             (tuple_field,
+                              if_then_else_result,
+                              $Stdlib__Random.camlStdlib__Random__mk_default_98)
+                             -> k1 * error)))
+            where k1 (apply_result : val) =
+              (cont self
+                 where rec self =
+                   (apply ccall noalloc inlining_state(depth(22))
+                      ($`*extern*`.caml_lxm_next_unboxed : val -> int64)
+                        (apply_result)
+                        -> k1 * error
+                      where k1 (Pccall : int64) =
+                        let prim = %num_conv.[`int64`].[`imm`] (Pccall) in
+                        let int_of_int64 = %tag_imm (prim) in
+                        let r = %int_barith.`and` (int_of_int64, 1073741823)
+                        in
+                        let v_4 = %int_barith.mod (r, 10) in
+                        let int_sub = %int_barith.sub (r, v_4) in
+                        let prim_1 = %int_comp.gt (int_sub, 1073741814) in
+                        switch prim_1
+                          | 0 -> k (v_4)
+                          | 1 -> self))
+            where k (v_4) =
+              let v_5 = v_4 in
+              ((let tuple_field =
+                  %block_load.tag[`0`].`size`[`2`].[`0`]
+                    ($Stdlib__Random.camlStdlib__Random__k3684)
+                in
+                cont self
+                  where rec self =
+                    let st = %dls_get () in
+                    let sz = %array_length.generic (st) in
+                    let prim = %int_comp.lt (tuple_field, sz) in
+                    (switch prim
+                       | 0 -> k3
+                       | 1 -> k2 (st)
+                       where k3 =
+                         (apply direct(grow_array_4) inlining_state(depth(4))
+                            ($Stdlib__Domain.camlStdlib__Domain__grow_array_86
+                             : _ -> any array)
+                              (st, tuple_field, sz)
+                              -> k3 * error
+                            where k3 (new_st : any array) =
+                              (apply ccall noalloc inlining_state(depth(4))
+                                 ($`*extern*`.caml_domain_dls_compare_and_set
+                                  : val * val -> val)
+                                   (st, new_st)
+                                   -> k3 * error
+                                 where k3 (Pccall) =
+                                   let untagged = %untag_imm (Pccall) in
+                                   switch untagged
+                                     | 0 -> self
+                                     | 1 -> k2 (new_st))))
+                  where k2 (st : any array) =
+                    ((let cond_result = %is_flat_float_array (st) in
+                      switch cond_result
+                        | 0 -> k4
+                        | 1 -> k3)
+                       where k4 =
+                         let ifnot_result = %array_load.mut (st, tuple_field)
+                         in
+                         cont k2 (ifnot_result)
+                       where k3 =
+                         let prim = %array_load.`float`.mut (st, tuple_field)
+                         in
+                         let ifso_result = %box_num.`float` (prim) in
+                         cont k2 (ifso_result)
+                       where k2 (if_then_else_result) =
+                         let none =
+                           %project_value_slot.[`is_some`].[`none`]
+                             ($Stdlib__Domain.camlStdlib__Domain__is_some_84)
+                         in
+                         let prim = %phys_ne (if_then_else_result, none) in
+                         (switch prim
+                            | 0 -> k2
+                            | 1 -> k3
+                            where k3 =
+                              let Pobj_magic = %opaque (if_then_else_result)
+                              in
+                              cont k1 (Pobj_magic)
+                            where k2 =
+                              apply direct(init_idx_34)
+                                     inlining_state(depth(3))
+                                ($Stdlib__Domain.camlStdlib__Domain__init_idx_113
+                                 : _ -> val)
+                                  (tuple_field,
+                                   if_then_else_result,
+                                   $Stdlib__Random.camlStdlib__Random__mk_default_98)
+                                  -> k1 * error)))
+                 where k1 (apply_result : val) =
+                   (cont self
+                      where rec self =
+                        (apply ccall noalloc inlining_state(depth(22))
+                           ($`*extern*`.caml_lxm_next_unboxed : val -> int64)
+                             (apply_result)
+                             -> k1 * error
+                           where k1 (Pccall : int64) =
+                             let prim = %num_conv.[`int64`].[`imm`] (Pccall)
+                             in
+                             let int_of_int64 = %tag_imm (prim) in
+                             let r =
+                               %int_barith.`and` (int_of_int64, 1073741823)
+                             in
+                             let v_6 = %int_barith.mod (r, 10) in
+                             let int_sub = %int_barith.sub (r, v_6) in
+                             let prim_1 = %int_comp.gt (int_sub, 1073741814)
+                             in
+                             switch prim_1
+                               | 0 -> k (v_6)
+                               | 1 -> self))
+                 where k (v_6) =
+                   let v_7 = v_6 in
+                   let code loopify(never) size(0) newer_version_of(f_1_1)
+                         f_1_3 (x : imm tagged)
+                           my_closure _region _ghost_region my_depth
+                           -> k * k1
+                           : imm tagged =
+                     cont k (0)
+                   in
+                   let code loopify(never) size(0) newer_version_of(g_2_1)
+                         g_2_3 (x : imm tagged, y : imm tagged)
+                           my_closure _region _ghost_region my_depth
+                           -> k * k1
+                           : imm tagged =
+                     cont k (0)
+                   in
+                   let code loopify(never) size(0) newer_version_of(h_3_1)
+                         h_3_3 (x : imm tagged, y : imm tagged)
+                           my_closure _region _ghost_region my_depth
+                           -> k * k1
+                           : imm tagged =
+                     cont k (0)
+                   in
+                   let $camlOffset__f_8 =
+                     closure f_1_3 @f
+                   and $camlOffset__g_9 =
+                     closure g_2_3 @g
+                   and $camlOffset__h_10 =
+                     closure h_3_3 @h
+                     with { a = 0; b = 0; r = v_5; s = v_7 }
+                   in
+                   let $camlOffset =
+                     Block 0 ($camlOffset__inline_4,
+                              $camlOffset__h_7,
+                              $camlOffset__h_10)
+                   in
+                   cont done ($camlOffset))))

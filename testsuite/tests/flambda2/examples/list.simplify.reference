@@ -1,0 +1,3631 @@
+let code failwith_0 deleted in
+let code invalid_arg_1 deleted in
+let code `@_2` deleted in
+let code length_aux_3 deleted in
+let code length_4 deleted in
+let code cons_5 deleted in
+let $camlList__immstring67 = "hd" in
+let code hd_6 deleted in
+let $camlList__immstring79 = "tl" in
+let code tl_7 deleted in
+let $camlList__immstring108 = "nth" in
+let code nth_aux_9 deleted in
+let $camlList__immstring110 = "List.nth" in
+let code nth_8 deleted in
+let code nth_aux_11 deleted in
+let code nth_opt_10 deleted in
+let code rev_append_12 deleted in
+let code rev_13 deleted in
+let code init_tailrec_aux_14 deleted in
+let code init_aux_15 deleted in
+let $camlList__immstring202 = "List.init" in
+let code init_16 deleted in
+let code flatten_17 deleted in
+let code map_18 deleted in
+let code mapi_19 deleted in
+let code mapi_20 deleted in
+let code rmap_f_22 deleted in
+let code rev_map_21 deleted in
+let code iter_23 deleted in
+let code iteri_24 deleted in
+let code iteri_25 deleted in
+let code fold_left_26 deleted in
+let code fold_right_27 deleted in
+let $camlList__immstring356 = "List.map2" in
+let code map2_28 deleted in
+let $camlList__immstring390 = "List.rev_map2" in
+let code rmap2_f_30 deleted in
+let code rev_map2_29 deleted in
+let $camlList__immstring414 = "List.iter2" in
+let code iter2_31 deleted in
+let $camlList__immstring439 = "List.fold_left2" in
+let code fold_left2_32 deleted in
+let $camlList__immstring464 = "List.fold_right2" in
+let code fold_right2_33 deleted in
+let code for_all_34 deleted in
+let code exists_35 deleted in
+let $camlList__immstring515 = "List.for_all2" in
+let code for_all2_36 deleted in
+let $camlList__immstring540 = "List.exists2" in
+let code exists2_37 deleted in
+let code mem_38 deleted in
+let code memq_39 deleted in
+let code assoc_40 deleted in
+let code assoc_opt_41 deleted in
+let code assq_42 deleted in
+let code assq_opt_43 deleted in
+let code mem_assoc_44 deleted in
+let code mem_assq_45 deleted in
+let code remove_assoc_46 deleted in
+let code remove_assq_47 deleted in
+let code find_48 deleted in
+let code find_opt_49 deleted in
+let code find_51 deleted in
+let code loopify(never) size(7)
+      partial_find_52 (param1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let find = %project_value_slot.[`partial_find`].[`find`] (my_closure) in
+  apply
+    (find
+     : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] *
+       [ 0 | 0 of val * [ 0 | 0 of val * val ] ] ->
+       [ 0 | 0 of val * [ 0 | 0 of val * val ] ]
+     )
+      (0, param1)
+      -> k * k1
+in
+let code find_all_50 deleted in
+let code aux_54 deleted in
+let code loopify(never) size(7)
+      partial_aux_55 (param1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let aux = %project_value_slot.[`partial_aux`].[`aux`] (my_closure) in
+  apply
+    (aux
+     : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] *
+       [ 0 | 0 of val * [ 0 | 0 of val * val ] ] ->
+       [ 0 | 0 of val * [ 0 | 0 of val * val ] ]
+     )
+      (0, param1)
+      -> k * k1
+in
+let code filter_map_53 deleted in
+let code part_57 deleted in
+let code partition_56 deleted in
+let $camlList__const_block838 = Block 0 (0, 0) in
+let code split_58 deleted in
+let $camlList__immstring873 = "List.combine" in
+let code combine_59 deleted in
+let code merge_60 deleted in
+let $camlList__immstring915 = "list.ml" in
+let $camlList__const_block917 = Block 0 ($camlList__immstring915, 475, 52) in
+let $camlList__Pmakeblock920 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlList__const_block917)
+in
+let code chop_61 deleted in
+let code rev_merge_63 deleted in
+let code rev_merge_rev_64 deleted in
+let code rev_sort_66 deleted and code sort_65 deleted in
+let code stable_sort_62 deleted in
+let code rev_merge_68 deleted in
+let code rev_merge_rev_69 deleted in
+let code rev_sort_71 deleted and code sort_70 deleted in
+let code sort_uniq_67 deleted in
+let code compare_lengths_72 deleted in
+let code compare_length_with_73 deleted in
+let code aux_75 deleted
+and code loopify(never) size(8)
+      partial_aux_76 (param1 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let Pfield = %project_value_slot.[`partial_aux_1`].[`Pfield`] (my_closure)
+  in
+  let aux = %project_value_slot.[`partial_aux_1`].[`my_closure`] (my_closure)
+  in
+  apply
+    (aux
+     : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] * imm tagged ->
+       [ 0 | 0 of val * val ]
+     )
+      (Pfield, param1)
+      -> k * k1
+in
+let code loopify(never) size(8)
+      partial_aux_77 (param1 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let aux = %project_value_slot.[`partial_aux_2`].[`aux_1`] (my_closure) in
+  let l = %project_value_slot.[`partial_aux_2`].[`l`] (my_closure) in
+  apply
+    (aux
+     : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] * imm tagged ->
+       [ 0 | 0 of val * val ]
+     )
+      (l, param1)
+      -> k * k1
+in
+let code to_seq_74 deleted in
+let code direct_79 deleted in
+let code of_seq_78 deleted in
+let code loopify(never) size(10) newer_version_of(failwith_0)
+      failwith_0_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Failure, s) in
+  cont k1 pop(regular k1) (Pmakeblock)
+in
+let $camlList__failwith_81 = closure failwith_0_1 @failwith in
+let code loopify(never) size(10) newer_version_of(invalid_arg_1)
+      invalid_arg_1_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Invalid_argument, s) in
+  cont k1 pop(regular k1) (Pmakeblock)
+in
+let $camlList__invalid_arg_82 = closure invalid_arg_1_1 @invalid_arg in
+let $`camlList__@_83` =
+  closure `@_2_1` @`@`
+and code rec loopify(never) size(25) newer_version_of(`@_2`)
+      `@_2_1`
+        (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %is_int (l1) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (l2)
+    where k2 =
+      ((let Pfield = %block_load.[`1`] (l1) in
+        apply direct(`@_2_1`)
+          ($`camlList__@_83` ~ depth my_depth -> succ my_depth
+           : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+            (Pfield, l2)
+            -> k2 * k1)
+         where k2 (apply_result : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+           let Pfield = %block_load.[`0`] (l1) in
+           let Pmakeblock = %block.[`0`] (Pfield, apply_result) in
+           cont k (Pmakeblock))
+in
+let code rec loopify(done) size(16) newer_version_of(length_aux_3)
+      length_aux_3_1
+        (len : imm tagged, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (len, param)
+    where rec self
+                (len_1 : imm tagged,
+                 param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (len_1)
+         where k2 =
+           let Pfield = %block_load.[`1`] (param_1) in
+           let int_add = %int_barith.add (len_1, 1) in
+           cont self (int_add, Pfield))
+in
+let $camlList__length_aux_84 = closure length_aux_3_1 @length_aux in
+let code loopify(never) size(4) newer_version_of(length_4)
+      length_4_1 (l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(length_aux_3_1)
+    ($camlList__length_aux_84 : _ -> imm tagged) (0, l) -> k * k1
+in
+let $camlList__length_85 = closure length_4_1 @length in
+let code loopify(never) size(8) newer_version_of(cons_5)
+      cons_5_1 (a : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let Pmakeblock = %block.[`0`] (a, l) in
+  cont k (Pmakeblock)
+in
+let $camlList__cons_86 = closure cons_5_1 @cons in
+let code loopify(never) size(17) newer_version_of(hd_6)
+      hd_6_1 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      apply direct(failwith_0_1)
+        ($camlList__failwith_81 : _ -> val)
+          ($camlList__immstring67)
+          -> never * k1
+    where k2 =
+      let Pfield = %block_load.[`0`] (param) in
+      cont k (Pfield)
+in
+let $camlList__hd_87 = closure hd_6_1 @hd in
+let code loopify(never) size(17) newer_version_of(tl_7)
+      tl_7_1 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      apply direct(failwith_0_1)
+        ($camlList__failwith_81
+         : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+          ($camlList__immstring79)
+          -> never * k1
+    where k2 =
+      let Pfield = %block_load.[`1`] (param) in
+      cont k (Pfield)
+in
+let $camlList__tl_88 = closure tl_7_1 @tl in
+let code rec loopify(done) size(34) newer_version_of(nth_aux_9)
+      nth_aux_9_1
+        (l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ], n : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  cont self (l, n)
+    where rec self
+                (l_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 n_1 : imm tagged) =
+      let prim = %is_int (l_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           apply direct(failwith_0_1)
+             ($camlList__failwith_81 : _ -> val)
+               ($camlList__immstring108)
+               -> never * k1
+         where k2 =
+           let prim_1 = %phys_eq (n_1, 0) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k3
+              where k3 =
+                let Pfield = %block_load.[`0`] (l_1) in
+                cont k (Pfield)
+              where k2 =
+                let int_sub = %int_barith.sub (n_1, 1) in
+                let Pfield = %block_load.[`1`] (l_1) in
+                cont self (Pfield, int_sub)))
+in
+let $camlList__nth_aux_90 = closure nth_aux_9_1 @nth_aux in
+let code loopify(never) size(20) newer_version_of(nth_8)
+      nth_8_1 (l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ], n : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let prim = %int_comp.lt (n, 0) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      apply direct(invalid_arg_1_1)
+        ($camlList__invalid_arg_82 : _ -> val)
+          ($camlList__immstring110)
+          -> never * k1
+    where k2 =
+      apply direct(nth_aux_9_1)
+        ($camlList__nth_aux_90 : _ -> val) (l, n) -> k * k1
+in
+let $camlList__nth_89 = closure nth_8_1 @nth in
+let code rec loopify(done) size(36) newer_version_of(nth_aux_11)
+      nth_aux_11_1
+        (l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ], n : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  cont self (l, n)
+    where rec self
+                (l_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 n_1 : imm tagged) =
+      let prim = %is_int (l_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let prim_1 = %phys_eq (n_1, 0) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k3
+              where k3 =
+                let Pfield = %block_load.[`0`] (l_1) in
+                let Pmakeblock = %block.[`0`] (Pfield) in
+                cont k (Pmakeblock)
+              where k2 =
+                let int_sub = %int_barith.sub (n_1, 1) in
+                let Pfield = %block_load.[`1`] (l_1) in
+                cont self (Pfield, int_sub)))
+in
+let $camlList__nth_aux_92 = closure nth_aux_11_1 @nth_aux_1 in
+let code loopify(never) size(20) newer_version_of(nth_opt_10)
+      nth_opt_10_1
+        (l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ], n : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  let prim = %int_comp.lt (n, 0) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      apply direct(invalid_arg_1_1)
+        ($camlList__invalid_arg_82 : _ -> [ 0 | 0 of val ])
+          ($camlList__immstring110)
+          -> never * k1
+    where k2 =
+      apply direct(nth_aux_11_1)
+        ($camlList__nth_aux_92 : _ -> [ 0 | 0 of val ]) (l, n) -> k * k1
+in
+let $camlList__nth_opt_91 = closure nth_opt_10_1 @nth_opt in
+let code rec loopify(done) size(22) newer_version_of(rev_append_12)
+      rev_append_12_1
+        (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  cont self (l1, l2)
+    where rec self
+                (l1_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 l2_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let prim = %is_int (l1_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (l2_1)
+         where k2 =
+           let Pfield = %block_load.[`0`] (l1_1) in
+           let Pmakeblock = %block.[`0`] (Pfield, l2_1) in
+           let Pfield_1 = %block_load.[`1`] (l1_1) in
+           cont self (Pfield_1, Pmakeblock))
+in
+let $camlList__rev_append_93 = closure rev_append_12_1 @rev_append in
+let code loopify(never) size(4) newer_version_of(rev_13)
+      rev_13_1 (l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  apply direct(rev_append_12_1)
+    ($camlList__rev_append_93
+     : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+      (l, 0)
+      -> k * k1
+in
+let $camlList__rev_94 = closure rev_13_1 @rev in
+let code rec loopify(done) size(29) newer_version_of(init_tailrec_aux_14)
+      init_tailrec_aux_14_1
+        (acc : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         i : imm tagged,
+         n : imm tagged,
+         f : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  cont self (acc, i)
+    where rec self
+                (acc_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 i_1 : imm tagged) =
+      let n_1 = n in
+      let f_1 = f in
+      let prim = %int_comp.ge (i_1, n_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (acc_1)
+         where k2 =
+           let int_add = %int_barith.add (i_1, 1) in
+           (apply f_1 (i_1) -> k2 * k1
+              where k2 (apply_result : val) =
+                let Pmakeblock = %block.[`0`] (apply_result, acc_1) in
+                cont self (Pmakeblock, int_add)))
+in
+let $camlList__init_tailrec_aux_95 =
+  closure init_tailrec_aux_14_1 @init_tailrec_aux
+in
+let $camlList__init_aux_96 =
+  closure init_aux_15_1 @init_aux
+and code rec loopify(never) size(32) newer_version_of(init_aux_15)
+      init_aux_15_1 (i : imm tagged, n : imm tagged, f : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %int_comp.ge (i, n) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (0)
+    where k2 =
+      (apply f (i) -> k2 * k1
+         where k2 (r : val) =
+           ((let int_add = %int_barith.add (i, 1) in
+             apply direct(init_aux_15_1)
+               ($camlList__init_aux_96 ~ depth my_depth -> succ my_depth
+                : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                 (int_add, n, f)
+                 -> k2 * k1)
+              where k2
+                      (apply_result :
+                         [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                let Pmakeblock = %block.[`0`] (r, apply_result) in
+                cont k (Pmakeblock)))
+in
+let code loopify(never) size(40) newer_version_of(init_16)
+      init_16_1 (len : imm tagged, f : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %int_comp.lt (len, 0) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      apply direct(invalid_arg_1_1)
+        ($camlList__invalid_arg_82
+         : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+          ($camlList__immstring202)
+          -> never * k1
+    where k2 =
+      let prim_1 = %int_comp.gt (len, 10000) in
+      (switch prim_1
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           (apply direct(init_tailrec_aux_14_1)
+              ($camlList__init_tailrec_aux_95
+               : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                (0, 0, len, f)
+                -> k3 * k1
+              where k3
+                      (apply_result :
+                         [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                apply direct(rev_append_12_1) inlining_state(depth(10))
+                  ($camlList__rev_append_93
+                   : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                    (apply_result, 0)
+                    -> k * k1)
+         where k2 =
+           apply direct(init_aux_15_1)
+             ($camlList__init_aux_96
+              : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+               (0, len, f)
+               -> k * k1)
+in
+let $camlList__init_97 = closure init_16_1 @init in
+let $camlList__flatten_98 =
+  closure flatten_17_1 @flatten
+and code rec loopify(never) size(21) newer_version_of(flatten_17)
+      flatten_17_1 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (0)
+    where k2 =
+      ((let Pfield = %block_load.[`1`] (param) in
+        apply direct(flatten_17_1)
+          ($camlList__flatten_98 ~ depth my_depth -> succ my_depth
+           : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+            (Pfield)
+            -> k2 * k1)
+         where k2 (apply_result : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+           let Pfield = %block_load.[`0`] (param) in
+           apply direct(`@_2_1`)
+             ($`camlList__@_83`
+              : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+               (Pfield, apply_result)
+               -> k * k1)
+in
+let $camlList__map_99 =
+  closure map_18_1 @map
+and code rec loopify(never) size(31) newer_version_of(map_18)
+      map_18_1 (f : val, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (0)
+    where k2 =
+      ((let Pfield = %block_load.[`0`] (param) in
+        apply f (Pfield) -> k2 * k1)
+         where k2 (r : val) =
+           ((let Pfield = %block_load.[`1`] (param) in
+             apply direct(map_18_1)
+               ($camlList__map_99 ~ depth my_depth -> succ my_depth
+                : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                 (f, Pfield)
+                 -> k2 * k1)
+              where k2
+                      (apply_result :
+                         [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                let Pmakeblock = %block.[`0`] (r, apply_result) in
+                cont k (Pmakeblock)))
+in
+let $camlList__mapi_100 =
+  closure mapi_19_1 @mapi
+and code rec loopify(never) size(33) newer_version_of(mapi_19)
+      mapi_19_1
+        (i : imm tagged,
+         f : val,
+         param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (0)
+    where k2 =
+      ((let Pfield = %block_load.[`0`] (param) in
+        apply f (i, Pfield) -> k2 * k1)
+         where k2 (r : val) =
+           ((let Pfield = %block_load.[`1`] (param) in
+             let int_add = %int_barith.add (i, 1) in
+             apply direct(mapi_19_1)
+               ($camlList__mapi_100 ~ depth my_depth -> succ my_depth
+                : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                 (int_add, f, Pfield)
+                 -> k2 * k1)
+              where k2
+                      (apply_result :
+                         [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                let Pmakeblock = %block.[`0`] (r, apply_result) in
+                cont k (Pmakeblock)))
+in
+let code loopify(never) size(4) newer_version_of(mapi_20)
+      mapi_20_1 (f : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  apply direct(mapi_19_1)
+    ($camlList__mapi_100 : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+      (0, f, l)
+      -> k * k1
+in
+let $camlList__mapi_101 = closure mapi_20_1 @mapi_1 in
+let code rec loopify(done) size(29) newer_version_of(rmap_f_22)
+      rmap_f_22_1
+        (accu : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  cont self (accu, param)
+    where rec self
+                (accu_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let f = %project_value_slot.[`rmap_f`].[`f`] (my_closure) in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (accu_1)
+         where k2 =
+           let Pfield = %block_load.[`1`] (param_1) in
+           ((let Pfield_1 = %block_load.[`0`] (param_1) in
+             apply f (Pfield_1) -> k2 * k1)
+              where k2 (apply_result : val) =
+                let Pmakeblock = %block.[`0`] (apply_result, accu_1) in
+                cont self (Pmakeblock, Pfield)))
+in
+let code loopify(never) size(42) newer_version_of(rev_map_21)
+      rev_map_21_1 (f : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let rmap_f = closure rmap_f_22_1 @rmap_f with { f = f } in
+  apply direct(rmap_f_22_1)
+    (rmap_f : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+      (0, l)
+      -> k * k1
+in
+let $camlList__rev_map_102 = closure rev_map_21_1 @rev_map in
+let code rec loopify(done) size(22) newer_version_of(iter_23)
+      iter_23_1 (f : val, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (param)
+    where rec self (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let f_1 = f in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           ((let Pfield = %block_load.[`0`] (param_1) in
+             apply f_1 (Pfield) -> k3 * k1
+               where k3 (param_2) =
+                 cont k2)
+              where k2 =
+                let Pfield = %block_load.[`1`] (param_1) in
+                cont self (Pfield)))
+in
+let $camlList__iter_103 = closure iter_23_1 @iter in
+let code rec loopify(done) size(24) newer_version_of(iteri_24)
+      iteri_24_1
+        (i : imm tagged,
+         f : val,
+         param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (i, param)
+    where rec self
+                (i_1 : imm tagged,
+                 param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let f_1 = f in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           ((let Pfield = %block_load.[`0`] (param_1) in
+             apply f_1 (i_1, Pfield) -> k3 * k1
+               where k3 (param_2) =
+                 cont k2)
+              where k2 =
+                let Pfield = %block_load.[`1`] (param_1) in
+                let int_add = %int_barith.add (i_1, 1) in
+                cont self (int_add, Pfield)))
+in
+let $camlList__iteri_104 = closure iteri_24_1 @iteri in
+let code loopify(never) size(4) newer_version_of(iteri_25)
+      iteri_25_1 (f : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(iteri_24_1)
+    ($camlList__iteri_104 : _ -> imm tagged) (0, f, l) -> k * k1
+in
+let $camlList__iteri_105 = closure iteri_25_1 @iteri_1 in
+let code rec loopify(done) size(21) newer_version_of(fold_left_26)
+      fold_left_26_1
+        (f : val, accu, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  cont self (accu, l)
+    where rec self (accu_1, l_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let f_1 = f in
+      let prim = %is_int (l_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (accu_1)
+         where k2 =
+           let Pfield = %block_load.[`1`] (l_1) in
+           ((let Pfield_1 = %block_load.[`0`] (l_1) in
+             apply f_1 (accu_1, Pfield_1) -> k2 * k1)
+              where k2 (apply_result) =
+                cont self (apply_result, Pfield)))
+in
+let $camlList__fold_left_106 = closure fold_left_26_1 @fold_left in
+let $camlList__fold_right_107 =
+  closure fold_right_27_1 @fold_right
+and code rec loopify(never) size(23) newer_version_of(fold_right_27)
+      fold_right_27_1
+        (f : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ], accu)
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  let prim = %is_int (l) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (accu)
+    where k2 =
+      ((let Pfield = %block_load.[`1`] (l) in
+        apply direct(fold_right_27_1)
+          $camlList__fold_right_107 ~ depth my_depth -> succ my_depth
+            (f, Pfield, accu)
+            -> k2 * k1)
+         where k2 (apply_result) =
+           let Pfield = %block_load.[`0`] (l) in
+           apply f (Pfield, apply_result) -> k * k1)
+in
+let $camlList__map2_108 =
+  closure map2_28_1 @map2
+and code rec loopify(never) size(59) newer_version_of(map2_28)
+      map2_28_1
+        (f : val,
+         l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  (let prim = %is_int (l1) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k4
+     where k4 =
+       let prim_1 = %is_int (l2) in
+       switch prim_1
+         | 0 -> k2
+         | 1 -> k (0)
+     where k3 =
+       let prim_1 = %is_int (l2) in
+       (switch prim_1
+          | 0 -> k3
+          | 1 -> k2
+          where k3 =
+            ((let Pfield = %block_load.[`0`] (l2) in
+              let Pfield_1 = %block_load.[`0`] (l1) in
+              apply f (Pfield_1, Pfield) -> k3 * k1)
+               where k3 (r : val) =
+                 ((let Pfield = %block_load.[`1`] (l2) in
+                   let Pfield_1 = %block_load.[`1`] (l1) in
+                   apply direct(map2_28_1)
+                     ($camlList__map2_108 ~ depth my_depth -> succ my_depth
+                      : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                       (f, Pfield_1, Pfield)
+                       -> k3 * k1)
+                    where k3
+                            (apply_result :
+                               [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                      let Pmakeblock = %block.[`0`] (r, apply_result) in
+                      cont k (Pmakeblock)))))
+    where k2 =
+      apply direct(invalid_arg_1_1)
+        ($camlList__invalid_arg_82
+         : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+          ($camlList__immstring356)
+          -> never * k1
+in
+let code rec loopify(done) size(57) newer_version_of(rmap2_f_30)
+      rmap2_f_30_1
+        (accu : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  cont self (accu, l1, l2)
+    where rec self
+                (accu_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 l1_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 l2_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let f = %project_value_slot.[`rmap2_f`].[`f_1`] (my_closure) in
+      ((let prim = %is_int (l1_1) in
+        switch prim
+          | 0 -> k3
+          | 1 -> k4
+          where k4 =
+            let prim_1 = %is_int (l2_1) in
+            switch prim_1
+              | 0 -> k2
+              | 1 -> k (accu_1)
+          where k3 =
+            let prim_1 = %is_int (l2_1) in
+            (switch prim_1
+               | 0 -> k3
+               | 1 -> k2
+               where k3 =
+                 let Pfield = %block_load.[`1`] (l2_1) in
+                 let Pfield_1 = %block_load.[`1`] (l1_1) in
+                 ((let Pfield_2 = %block_load.[`0`] (l2_1) in
+                   let Pfield_3 = %block_load.[`0`] (l1_1) in
+                   apply f (Pfield_3, Pfield_2) -> k3 * k1)
+                    where k3 (apply_result : val) =
+                      let Pmakeblock = %block.[`0`] (apply_result, accu_1) in
+                      cont self (Pmakeblock, Pfield_1, Pfield))))
+         where k2 =
+           apply direct(invalid_arg_1_1)
+             ($camlList__invalid_arg_82
+              : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+               ($camlList__immstring390)
+               -> never * k1)
+in
+let code loopify(never) size(71) newer_version_of(rev_map2_29)
+      rev_map2_29_1
+        (f : val,
+         l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let rmap2_f = closure rmap2_f_30_1 @rmap2_f
+  with { invalid_arg = $camlList__invalid_arg_82; f_1 = f }
+  in
+  apply direct(rmap2_f_30_1)
+    (rmap2_f : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+      (0, l1, l2)
+      -> k * k1
+in
+let $camlList__rev_map2_109 = closure rev_map2_29_1 @rev_map2 in
+let code rec loopify(done) size(50) newer_version_of(iter2_31)
+      iter2_31_1
+        (f : val,
+         l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (l1, l2)
+    where rec self
+                (l1_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 l2_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let f_1 = f in
+      ((let prim = %is_int (l1_1) in
+        switch prim
+          | 0 -> k3
+          | 1 -> k4
+          where k4 =
+            let prim_1 = %is_int (l2_1) in
+            switch prim_1
+              | 0 -> k2
+              | 1 -> k (0)
+          where k3 =
+            let prim_1 = %is_int (l2_1) in
+            (switch prim_1
+               | 0 -> k3
+               | 1 -> k2
+               where k3 =
+                 ((let Pfield = %block_load.[`0`] (l2_1) in
+                   let Pfield_1 = %block_load.[`0`] (l1_1) in
+                   apply f_1 (Pfield_1, Pfield) -> k4 * k1
+                     where k4 (param) =
+                       cont k3)
+                    where k3 =
+                      let Pfield = %block_load.[`1`] (l2_1) in
+                      let Pfield_1 = %block_load.[`1`] (l1_1) in
+                      cont self (Pfield_1, Pfield))))
+         where k2 =
+           apply direct(invalid_arg_1_1)
+             ($camlList__invalid_arg_82 : _ -> imm tagged)
+               ($camlList__immstring414)
+               -> never * k1)
+in
+let $camlList__iter2_110 = closure iter2_31_1 @iter2 in
+let code rec loopify(done) size(49) newer_version_of(fold_left2_32)
+      fold_left2_32_1
+        (f : val,
+         accu : val,
+         l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  cont self (accu, l1, l2)
+    where rec self
+                (accu_1 : val,
+                 l1_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 l2_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let f_1 = f in
+      ((let prim = %is_int (l1_1) in
+        switch prim
+          | 0 -> k3
+          | 1 -> k4
+          where k4 =
+            let prim_1 = %is_int (l2_1) in
+            switch prim_1
+              | 0 -> k2
+              | 1 -> k (accu_1)
+          where k3 =
+            let prim_1 = %is_int (l2_1) in
+            (switch prim_1
+               | 0 -> k3
+               | 1 -> k2
+               where k3 =
+                 let Pfield = %block_load.[`1`] (l2_1) in
+                 let Pfield_1 = %block_load.[`1`] (l1_1) in
+                 ((let Pfield_2 = %block_load.[`0`] (l2_1) in
+                   let Pfield_3 = %block_load.[`0`] (l1_1) in
+                   apply f_1 (accu_1, Pfield_3, Pfield_2) -> k3 * k1)
+                    where k3 (apply_result : val) =
+                      cont self (apply_result, Pfield_1, Pfield))))
+         where k2 =
+           apply direct(invalid_arg_1_1)
+             ($camlList__invalid_arg_82 : _ -> val)
+               ($camlList__immstring439)
+               -> never * k1)
+in
+let $camlList__fold_left2_111 = closure fold_left2_32_1 @fold_left2 in
+let $camlList__fold_right2_112 =
+  closure fold_right2_33_1 @fold_right2
+and code rec loopify(never) size(51) newer_version_of(fold_right2_33)
+      fold_right2_33_1
+        (f : val,
+         l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         accu : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  (let prim = %is_int (l1) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k4
+     where k4 =
+       let prim_1 = %is_int (l2) in
+       switch prim_1
+         | 0 -> k2
+         | 1 -> k (accu)
+     where k3 =
+       let prim_1 = %is_int (l2) in
+       (switch prim_1
+          | 0 -> k3
+          | 1 -> k2
+          where k3 =
+            ((let Pfield = %block_load.[`1`] (l2) in
+              let Pfield_1 = %block_load.[`1`] (l1) in
+              apply direct(fold_right2_33_1)
+                ($camlList__fold_right2_112 ~ depth my_depth -> succ my_depth
+                 : _ -> val)
+                  (f, Pfield_1, Pfield, accu)
+                  -> k3 * k1)
+               where k3 (apply_result : val) =
+                 let Pfield = %block_load.[`0`] (l2) in
+                 let Pfield_1 = %block_load.[`0`] (l1) in
+                 apply f (Pfield_1, Pfield, apply_result) -> k * k1)))
+    where k2 =
+      apply direct(invalid_arg_1_1)
+        ($camlList__invalid_arg_82 : _ -> val)
+          ($camlList__immstring464)
+          -> never * k1
+in
+let code rec loopify(done) size(33) newer_version_of(for_all_34)
+      for_all_34_1
+        (p : val, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (param)
+    where rec self (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let p_1 = p in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (1)
+         where k2 =
+           ((let Pfield = %block_load.[`0`] (param_1) in
+             apply p_1 (Pfield) -> k3 * k1
+               where k3 (param_2 : imm tagged) =
+                 let unboxed_field = %untag_imm (param_2) in
+                 cont k2 (unboxed_field))
+              where k2 (unboxed_field : imm) =
+                let naked_immediate = unboxed_field in
+                (switch naked_immediate
+                   | 0 -> k (0)
+                   | 1 -> k2
+                   where k2 =
+                     let Pfield = %block_load.[`1`] (param_1) in
+                     cont self (Pfield))))
+in
+let $camlList__for_all_113 = closure for_all_34_1 @for_all in
+let code rec loopify(done) size(33) newer_version_of(exists_35)
+      exists_35_1
+        (p : val, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (param)
+    where rec self (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let p_1 = p in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           ((let Pfield = %block_load.[`0`] (param_1) in
+             apply p_1 (Pfield) -> k3 * k1
+               where k3 (param_2 : imm tagged) =
+                 let unboxed_field = %untag_imm (param_2) in
+                 cont k2 (unboxed_field))
+              where k2 (unboxed_field : imm) =
+                let naked_immediate = unboxed_field in
+                (switch naked_immediate
+                   | 0 -> k2
+                   | 1 -> k (1)
+                   where k2 =
+                     let Pfield = %block_load.[`1`] (param_1) in
+                     cont self (Pfield))))
+in
+let $camlList__exists_114 = closure exists_35_1 @exists in
+let code rec loopify(done) size(61) newer_version_of(for_all2_36)
+      for_all2_36_1
+        (p : val,
+         l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (l1, l2)
+    where rec self
+                (l1_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 l2_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let p_1 = p in
+      ((let prim = %is_int (l1_1) in
+        switch prim
+          | 0 -> k3
+          | 1 -> k4
+          where k4 =
+            let prim_1 = %is_int (l2_1) in
+            switch prim_1
+              | 0 -> k2
+              | 1 -> k (1)
+          where k3 =
+            let prim_1 = %is_int (l2_1) in
+            (switch prim_1
+               | 0 -> k3
+               | 1 -> k2
+               where k3 =
+                 ((let Pfield = %block_load.[`0`] (l2_1) in
+                   let Pfield_1 = %block_load.[`0`] (l1_1) in
+                   apply p_1 (Pfield_1, Pfield) -> k4 * k1
+                     where k4 (param : imm tagged) =
+                       let unboxed_field = %untag_imm (param) in
+                       cont k3 (unboxed_field))
+                    where k3 (unboxed_field : imm) =
+                      let naked_immediate = unboxed_field in
+                      (switch naked_immediate
+                         | 0 -> k (0)
+                         | 1 -> k3
+                         where k3 =
+                           let Pfield = %block_load.[`1`] (l2_1) in
+                           let Pfield_1 = %block_load.[`1`] (l1_1) in
+                           cont self (Pfield_1, Pfield)))))
+         where k2 =
+           apply direct(invalid_arg_1_1)
+             ($camlList__invalid_arg_82 : _ -> imm tagged)
+               ($camlList__immstring515)
+               -> never * k1)
+in
+let $camlList__for_all2_115 = closure for_all2_36_1 @for_all2 in
+let code rec loopify(done) size(61) newer_version_of(exists2_37)
+      exists2_37_1
+        (p : val,
+         l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (l1, l2)
+    where rec self
+                (l1_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 l2_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let p_1 = p in
+      ((let prim = %is_int (l1_1) in
+        switch prim
+          | 0 -> k3
+          | 1 -> k4
+          where k4 =
+            let prim_1 = %is_int (l2_1) in
+            switch prim_1
+              | 0 -> k2
+              | 1 -> k (0)
+          where k3 =
+            let prim_1 = %is_int (l2_1) in
+            (switch prim_1
+               | 0 -> k3
+               | 1 -> k2
+               where k3 =
+                 ((let Pfield = %block_load.[`0`] (l2_1) in
+                   let Pfield_1 = %block_load.[`0`] (l1_1) in
+                   apply p_1 (Pfield_1, Pfield) -> k4 * k1
+                     where k4 (param : imm tagged) =
+                       let unboxed_field = %untag_imm (param) in
+                       cont k3 (unboxed_field))
+                    where k3 (unboxed_field : imm) =
+                      let naked_immediate = unboxed_field in
+                      (switch naked_immediate
+                         | 0 -> k3
+                         | 1 -> k (1)
+                         where k3 =
+                           let Pfield = %block_load.[`1`] (l2_1) in
+                           let Pfield_1 = %block_load.[`1`] (l1_1) in
+                           cont self (Pfield_1, Pfield)))))
+         where k2 =
+           apply direct(invalid_arg_1_1)
+             ($camlList__invalid_arg_82 : _ -> imm tagged)
+               ($camlList__immstring540)
+               -> never * k1)
+in
+let $camlList__exists2_116 = closure exists2_37_1 @exists2 in
+let code rec loopify(done) size(37) newer_version_of(mem_38)
+      mem_38_1 (x : val, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (param)
+    where rec self (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let x_1 = x in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let Pfield = %block_load.[`0`] (param_1) in
+           (apply ccall
+              ($`*extern*`.caml_compare : val * val -> val)
+                (Pfield, x_1)
+                -> k2 * k1
+              where k2 (Pccall) =
+                let prim_1 = %phys_eq (Pccall, 0) in
+                (switch prim_1
+                   | 0 -> k2
+                   | 1 -> k (1)
+                   where k2 =
+                     let Pfield_1 = %block_load.[`1`] (param_1) in
+                     cont self (Pfield_1))))
+in
+let $camlList__mem_117 = closure mem_38_1 @mem in
+let code rec loopify(done) size(27) newer_version_of(memq_39)
+      memq_39_1 (x : val, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (param)
+    where rec self (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let x_1 = x in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let Pfield = %block_load.[`0`] (param_1) in
+           let prim_1 = %phys_eq (Pfield, x_1) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k (1)
+              where k2 =
+                let Pfield_1 = %block_load.[`1`] (param_1) in
+                cont self (Pfield_1)))
+in
+let $camlList__memq_118 = closure memq_39_1 @memq in
+let code rec loopify(done) size(40) newer_version_of(assoc_40)
+      assoc_40_1 (x : val, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  cont self (param)
+    where rec self (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let x_1 = x in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k1 pop(regular k1) ($`*predef*`.caml_exn_Not_found)
+         where k2 =
+           let `*match*` = %block_load.[`0`] (param_1) in
+           let Pfield = %block_load.[`0`] (`*match*`) in
+           (apply ccall
+              ($`*extern*`.caml_compare : val * val -> val)
+                (Pfield, x_1)
+                -> k2 * k1
+              where k2 (Pccall) =
+                let prim_1 = %phys_eq (Pccall, 0) in
+                (switch prim_1
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     let Pfield_1 = %block_load.[`1`] (`*match*`) in
+                     cont k (Pfield_1)
+                   where k2 =
+                     let Pfield_1 = %block_load.[`1`] (param_1) in
+                     cont self (Pfield_1))))
+in
+let $camlList__assoc_119 = closure assoc_40_1 @assoc in
+let code rec loopify(done) size(46) newer_version_of(assoc_opt_41)
+      assoc_opt_41_1
+        (x : val, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  cont self (param)
+    where rec self (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let x_1 = x in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let `*match*` = %block_load.[`0`] (param_1) in
+           let Pfield = %block_load.[`0`] (`*match*`) in
+           (apply ccall
+              ($`*extern*`.caml_compare : val * val -> val)
+                (Pfield, x_1)
+                -> k2 * k1
+              where k2 (Pccall) =
+                let prim_1 = %phys_eq (Pccall, 0) in
+                (switch prim_1
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     let Pfield_1 = %block_load.[`1`] (`*match*`) in
+                     let Pmakeblock = %block.[`0`] (Pfield_1) in
+                     cont k (Pmakeblock)
+                   where k2 =
+                     let Pfield_1 = %block_load.[`1`] (param_1) in
+                     cont self (Pfield_1))))
+in
+let $camlList__assoc_opt_120 = closure assoc_opt_41_1 @assoc_opt in
+let code rec loopify(done) size(30) newer_version_of(assq_42)
+      assq_42_1 (x : val, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  cont self (param)
+    where rec self (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let x_1 = x in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k1 pop(regular k1) ($`*predef*`.caml_exn_Not_found)
+         where k2 =
+           let `*match*` = %block_load.[`0`] (param_1) in
+           let Pfield = %block_load.[`0`] (`*match*`) in
+           let prim_1 = %phys_eq (Pfield, x_1) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k3
+              where k3 =
+                let Pfield_1 = %block_load.[`1`] (`*match*`) in
+                cont k (Pfield_1)
+              where k2 =
+                let Pfield_1 = %block_load.[`1`] (param_1) in
+                cont self (Pfield_1)))
+in
+let $camlList__assq_121 = closure assq_42_1 @assq in
+let code rec loopify(done) size(36) newer_version_of(assq_opt_43)
+      assq_opt_43_1
+        (x : val, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  cont self (param)
+    where rec self (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let x_1 = x in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let `*match*` = %block_load.[`0`] (param_1) in
+           let Pfield = %block_load.[`0`] (`*match*`) in
+           let prim_1 = %phys_eq (Pfield, x_1) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k3
+              where k3 =
+                let Pfield_1 = %block_load.[`1`] (`*match*`) in
+                let Pmakeblock = %block.[`0`] (Pfield_1) in
+                cont k (Pmakeblock)
+              where k2 =
+                let Pfield_1 = %block_load.[`1`] (param_1) in
+                cont self (Pfield_1)))
+in
+let $camlList__assq_opt_122 = closure assq_opt_43_1 @assq_opt in
+let code rec loopify(done) size(38) newer_version_of(mem_assoc_44)
+      mem_assoc_44_1
+        (x : val, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (param)
+    where rec self (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let x_1 = x in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let Pfield = %block_load.[`0`] (param_1) in
+           let Pfield_1 = %block_load.[`0`] (Pfield) in
+           (apply ccall
+              ($`*extern*`.caml_compare : val * val -> val)
+                (Pfield_1, x_1)
+                -> k2 * k1
+              where k2 (Pccall) =
+                let prim_1 = %phys_eq (Pccall, 0) in
+                (switch prim_1
+                   | 0 -> k2
+                   | 1 -> k (1)
+                   where k2 =
+                     let Pfield_2 = %block_load.[`1`] (param_1) in
+                     cont self (Pfield_2))))
+in
+let $camlList__mem_assoc_123 = closure mem_assoc_44_1 @mem_assoc in
+let code rec loopify(done) size(28) newer_version_of(mem_assq_45)
+      mem_assq_45_1
+        (x : val, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (param)
+    where rec self (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let x_1 = x in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let Pfield = %block_load.[`0`] (param_1) in
+           let Pfield_1 = %block_load.[`0`] (Pfield) in
+           let prim_1 = %phys_eq (Pfield_1, x_1) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k (1)
+              where k2 =
+                let Pfield_2 = %block_load.[`1`] (param_1) in
+                cont self (Pfield_2)))
+in
+let $camlList__mem_assq_124 = closure mem_assq_45_1 @mem_assq in
+let $camlList__remove_assoc_125 =
+  closure remove_assoc_46_1 @remove_assoc
+and code rec loopify(never) size(48) newer_version_of(remove_assoc_46)
+      remove_assoc_46_1
+        (x : val, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (0)
+    where k2 =
+      let l = %block_load.[`1`] (param) in
+      let pair = %block_load.[`0`] (param) in
+      let Pfield = %block_load.[`0`] (pair) in
+      (apply ccall
+         ($`*extern*`.caml_compare : val * val -> val) (Pfield, x) -> k2 * k1
+         where k2 (Pccall) =
+           let prim_1 = %phys_eq (Pccall, 0) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k (l)
+              where k2 =
+                (apply direct(remove_assoc_46_1)
+                   ($camlList__remove_assoc_125 ~ depth my_depth -> succ my_depth
+                    : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                     (x, l)
+                     -> k2 * k1
+                   where k2
+                           (apply_result :
+                              [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                     let Pmakeblock = %block.[`0`] (pair, apply_result) in
+                     cont k (Pmakeblock))))
+in
+let $camlList__remove_assq_126 =
+  closure remove_assq_47_1 @remove_assq
+and code rec loopify(never) size(38) newer_version_of(remove_assq_47)
+      remove_assq_47_1
+        (x : val, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (0)
+    where k2 =
+      let l = %block_load.[`1`] (param) in
+      let pair = %block_load.[`0`] (param) in
+      let Pfield = %block_load.[`0`] (pair) in
+      let prim_1 = %phys_eq (Pfield, x) in
+      (switch prim_1
+         | 0 -> k2
+         | 1 -> k (l)
+         where k2 =
+           (apply direct(remove_assq_47_1)
+              ($camlList__remove_assq_126 ~ depth my_depth -> succ my_depth
+               : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                (x, l)
+                -> k2 * k1
+              where k2
+                      (apply_result :
+                         [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                let Pmakeblock = %block.[`0`] (pair, apply_result) in
+                cont k (Pmakeblock)))
+in
+let code rec loopify(done) size(33) newer_version_of(find_48)
+      find_48_1 (p : val, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  cont self (param)
+    where rec self (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let p_1 = p in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k1 pop(regular k1) ($`*predef*`.caml_exn_Not_found)
+         where k2 =
+           let x = %block_load.[`0`] (param_1) in
+           (apply p_1 (x) -> k3 * k1
+              where k3 (param_2 : imm tagged) =
+                let unboxed_field = %untag_imm (param_2) in
+                cont k2 (unboxed_field)
+              where k2 (unboxed_field : imm) =
+                let naked_immediate = unboxed_field in
+                (switch naked_immediate
+                   | 0 -> k2
+                   | 1 -> k (x)
+                   where k2 =
+                     let Pfield = %block_load.[`1`] (param_1) in
+                     cont self (Pfield))))
+in
+let $camlList__find_127 = closure find_48_1 @find in
+let code rec loopify(done) size(40) newer_version_of(find_opt_49)
+      find_opt_49_1
+        (p : val, param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  cont self (param)
+    where rec self (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let p_1 = p in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let x = %block_load.[`0`] (param_1) in
+           (apply p_1 (x) -> k3 * k1
+              where k3 (param_2 : imm tagged) =
+                let unboxed_field = %untag_imm (param_2) in
+                cont k2 (unboxed_field)
+              where k2 (unboxed_field : imm) =
+                let naked_immediate = unboxed_field in
+                (switch naked_immediate
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     let Pmakeblock = %block.[`0`] (x) in
+                     cont k (Pmakeblock)
+                   where k2 =
+                     let Pfield = %block_load.[`1`] (param_1) in
+                     cont self (Pfield))))
+in
+let $camlList__find_opt_128 = closure find_opt_49_1 @find_opt in
+let code rec loopify(done) size(45) newer_version_of(find_51)
+      find_51_1
+        (accu : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  cont self (accu, param)
+    where rec self
+                (accu_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let p = %project_value_slot.[`find_1`].[`p`] (my_closure) in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           apply direct(rev_append_12_1) inlining_state(depth(10))
+             ($camlList__rev_append_93
+              : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+               (accu_1, 0)
+               -> k * k1
+         where k2 =
+           let l = %block_load.[`1`] (param_1) in
+           let x = %block_load.[`0`] (param_1) in
+           (apply p (x) -> k3 * k1
+              where k3 (param_2 : imm tagged) =
+                let unboxed_field = %untag_imm (param_2) in
+                cont k2 (unboxed_field)
+              where k2 (unboxed_field : imm) =
+                let naked_immediate = unboxed_field in
+                (switch naked_immediate
+                   | 0 -> self (accu_1, l)
+                   | 1 -> k2
+                   where k2 =
+                     let Pmakeblock = %block.[`0`] (x, accu_1) in
+                     cont self (Pmakeblock, l))))
+in
+let code loopify(never) size(71) newer_version_of(find_all_50)
+      find_all_50_1 (p : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let find = closure find_51_1 @find_1
+  with { rev = $camlList__rev_94; p = p }
+  in
+  let partial_find = closure partial_find_52 @partial_find
+  with { find = find }
+  in
+  cont k (partial_find)
+in
+let $camlList__find_all_129 = closure find_all_50_1 @find_all in
+let code rec loopify(done) size(45) newer_version_of(aux_54)
+      aux_54_1
+        (accu : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  cont self (accu, param)
+    where rec self
+                (accu_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let f = %project_value_slot.[`aux`].[`f_2`] (my_closure) in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           apply direct(rev_append_12_1) inlining_state(depth(10))
+             ($camlList__rev_append_93
+              : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+               (accu_1, 0)
+               -> k * k1
+         where k2 =
+           let l = %block_load.[`1`] (param_1) in
+           ((let Pfield = %block_load.[`0`] (param_1) in
+             apply f (Pfield) -> k2 * k1)
+              where k2 (`*match*` : [ 0 | 0 of val ]) =
+                let prim_1 = %is_int (`*match*`) in
+                (switch prim_1
+                   | 0 -> k2
+                   | 1 -> self (accu_1, l)
+                   where k2 =
+                     let Pfield = %block_load.[`0`] (`*match*`) in
+                     let Pmakeblock = %block.[`0`] (Pfield, accu_1) in
+                     cont self (Pmakeblock, l))))
+in
+let code loopify(never) size(71) newer_version_of(filter_map_53)
+      filter_map_53_1 (f : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let aux = closure aux_54_1 @aux
+  with { rev_1 = $camlList__rev_94; f_2 = f }
+  in
+  let partial_aux = closure partial_aux_55 @partial_aux with { aux = aux } in
+  cont k (partial_aux)
+in
+let $camlList__filter_map_130 = closure filter_map_53_1 @filter_map in
+let code rec loopify(done) size(65) newer_version_of(part_57)
+      part_57_1
+        (yes : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         no : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of [ 0 | 0 of val * val ] * [ 0 | 0 of val * val ] ] =
+  cont self (yes, no, param)
+    where rec self
+                (yes_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 no_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let p = %project_value_slot.[`part`].[`p_1`] (my_closure) in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           (apply direct(rev_append_12_1) inlining_state(depth(10))
+              ($camlList__rev_append_93
+               : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                (no_1, 0)
+                -> k3 * k1
+              where k3
+                      (apply_result :
+                         [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                (apply direct(rev_append_12_1) inlining_state(depth(10))
+                   ($camlList__rev_append_93
+                    : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                     (yes_1, 0)
+                     -> k3 * k1
+                   where k3
+                           (apply_result_1 :
+                              [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                     let Pmakeblock =
+                       %block.[`0`] (apply_result_1, apply_result)
+                     in
+                     cont k (Pmakeblock)))
+         where k2 =
+           let l = %block_load.[`1`] (param_1) in
+           let x = %block_load.[`0`] (param_1) in
+           (apply p (x) -> k3 * k1
+              where k3 (param_2 : imm tagged) =
+                let unboxed_field = %untag_imm (param_2) in
+                cont k2 (unboxed_field)
+              where k2 (unboxed_field : imm) =
+                let naked_immediate = unboxed_field in
+                (switch naked_immediate
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     let Pmakeblock = %block.[`0`] (x, yes_1) in
+                     cont self (Pmakeblock, no_1, l)
+                   where k2 =
+                     let Pmakeblock = %block.[`0`] (x, no_1) in
+                     cont self (yes_1, Pmakeblock, l))))
+in
+let code loopify(never) size(79) newer_version_of(partition_56)
+      partition_56_1 (p : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of [ 0 | 0 of val * val ] * [ 0 | 0 of val * val ] ] =
+  let part = closure part_57_1 @part
+  with { rev_2 = $camlList__rev_94; p_1 = p }
+  in
+  apply direct(part_57_1)
+    (part : _ -> [ 0 of [ 0 | 0 of val * val ] * [ 0 | 0 of val * val ] ])
+      (0, 0, l)
+      -> k * k1
+in
+let $camlList__partition_131 = closure partition_56_1 @partition in
+let $camlList__split_132 =
+  closure split_58_1 @split
+and code rec loopify(never) size(43) newer_version_of(split_58)
+      split_58_1 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of [ 0 | 0 of val * val ] * [ 0 | 0 of val * val ] ] =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k ($camlList__const_block838)
+    where k2 =
+      let `*match*` = %block_load.[`0`] (param) in
+      ((let Pfield = %block_load.[`1`] (param) in
+        apply direct(split_58_1)
+          ($camlList__split_132 ~ depth my_depth -> succ my_depth
+           : _ -> [ 0 of [ 0 | 0 of val * val ] * [ 0 | 0 of val * val ] ])
+            (Pfield)
+            -> k2 * k1)
+         where k2
+                 (`*match*_1` :
+                    [ 0 of [ 0 | 0 of val * val ] * [ 0 | 0 of val * val ] ]) =
+           let Pfield = %block_load.[`1`] (`*match*_1`) in
+           let Pfield_1 = %block_load.[`1`] (`*match*`) in
+           let Pmakeblock = %block.[`0`] (Pfield_1, Pfield) in
+           let Pfield_2 = %block_load.[`0`] (`*match*_1`) in
+           let Pfield_3 = %block_load.[`0`] (`*match*`) in
+           let Pmakeblock_1 = %block.[`0`] (Pfield_3, Pfield_2) in
+           let Pmakeblock_2 = %block.[`0`] (Pmakeblock_1, Pmakeblock) in
+           cont k (Pmakeblock_2))
+in
+let $camlList__combine_133 =
+  closure combine_59_1 @combine
+and code rec loopify(never) size(60) newer_version_of(combine_59)
+      combine_59_1
+        (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  (let prim = %is_int (l1) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k4
+     where k4 =
+       let prim_1 = %is_int (l2) in
+       switch prim_1
+         | 0 -> k2
+         | 1 -> k (0)
+     where k3 =
+       let prim_1 = %is_int (l2) in
+       (switch prim_1
+          | 0 -> k3
+          | 1 -> k2
+          where k3 =
+            ((let Pfield = %block_load.[`1`] (l2) in
+              let Pfield_1 = %block_load.[`1`] (l1) in
+              apply direct(combine_59_1)
+                ($camlList__combine_133 ~ depth my_depth -> succ my_depth
+                 : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                  (Pfield_1, Pfield)
+                  -> k3 * k1)
+               where k3
+                       (apply_result :
+                          [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                 let Pfield = %block_load.[`0`] (l2) in
+                 let Pfield_1 = %block_load.[`0`] (l1) in
+                 let Pmakeblock = %block.[`0`] (Pfield_1, Pfield) in
+                 let Pmakeblock_1 = %block.[`0`] (Pmakeblock, apply_result)
+                 in
+                 cont k (Pmakeblock_1))))
+    where k2 =
+      apply direct(invalid_arg_1_1)
+        ($camlList__invalid_arg_82
+         : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+          ($camlList__immstring873)
+          -> never * k1
+in
+let $camlList__merge_134 =
+  closure merge_60_1 @merge
+and code rec loopify(never) size(68) newer_version_of(merge_60)
+      merge_60_1
+        (cmp : val,
+         l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %is_int (l1) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (l2)
+    where k2 =
+      let prim_1 = %is_int (l2) in
+      (switch prim_1
+         | 0 -> k2
+         | 1 -> k (l1)
+         where k2 =
+           let h2 = %block_load.[`0`] (l2) in
+           let h1 = %block_load.[`0`] (l1) in
+           (apply cmp (h1, h2) -> k2 * k1
+              where k2 (apply_result : imm tagged) =
+                let prim_2 = %int_comp.le (apply_result, 0) in
+                (switch prim_2
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     ((let Pfield = %block_load.[`1`] (l1) in
+                       apply direct(merge_60_1)
+                         ($camlList__merge_134 ~ depth my_depth -> succ my_depth
+                          : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                           (cmp, Pfield, l2)
+                           -> k3 * k1)
+                        where k3
+                                (apply_result_1 :
+                                   [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                          let Pmakeblock = %block.[`0`] (h1, apply_result_1)
+                          in
+                          cont k (Pmakeblock))
+                   where k2 =
+                     ((let Pfield = %block_load.[`1`] (l2) in
+                       apply direct(merge_60_1)
+                         ($camlList__merge_134 ~ depth my_depth -> succ my_depth
+                          : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                           (cmp, l1, Pfield)
+                           -> k2 * k1)
+                        where k2
+                                (apply_result_1 :
+                                   [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                          let Pmakeblock = %block.[`0`] (h2, apply_result_1)
+                          in
+                          cont k (Pmakeblock)))))
+in
+let code rec loopify(done) size(28) newer_version_of(chop_61)
+      chop_61_1
+        (k : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  cont self (k, l)
+    where rec self
+                (k_1 : imm tagged,
+                 l_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let prim = %phys_eq (k_1, 0) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (l_1)
+         where k2 =
+           let prim_1 = %is_int (l_1) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k1 pop(regular k1) ($camlList__Pmakeblock920)
+              where k2 =
+                let Pfield = %block_load.[`1`] (l_1) in
+                let int_sub = %int_barith.sub (k_1, 1) in
+                cont self (int_sub, Pfield)))
+in
+let $camlList__chop_135 = closure chop_61_1 @chop in
+let code rec loopify(done) size(70) newer_version_of(rev_merge_63)
+      rev_merge_63_1
+        (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         accu : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  cont self (l1, l2, accu)
+    where rec self
+                (l1_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 l2_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 accu_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let cmp = %project_value_slot.[`rev_merge`].[`cmp`] (my_closure) in
+      let prim = %is_int (l1_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           apply direct(rev_append_12_1)
+             ($camlList__rev_append_93
+              : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+               (l2_1, accu_1)
+               -> k * k1
+         where k2 =
+           let prim_1 = %is_int (l2_1) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k3
+              where k3 =
+                apply direct(rev_append_12_1)
+                  ($camlList__rev_append_93
+                   : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                    (l1_1, accu_1)
+                    -> k * k1
+              where k2 =
+                let h2 = %block_load.[`0`] (l2_1) in
+                let h1 = %block_load.[`0`] (l1_1) in
+                (apply cmp (h1, h2) -> k2 * k1
+                   where k2 (apply_result : imm tagged) =
+                     let prim_2 = %int_comp.le (apply_result, 0) in
+                     (switch prim_2
+                        | 0 -> k2
+                        | 1 -> k3
+                        where k3 =
+                          let Pmakeblock = %block.[`0`] (h1, accu_1) in
+                          let Pfield = %block_load.[`1`] (l1_1) in
+                          cont self (Pfield, l2_1, Pmakeblock)
+                        where k2 =
+                          let Pmakeblock = %block.[`0`] (h2, accu_1) in
+                          let Pfield = %block_load.[`1`] (l2_1) in
+                          cont self (l1_1, Pfield, Pmakeblock)))))
+in
+let code rec loopify(done) size(70) newer_version_of(rev_merge_rev_64)
+      rev_merge_rev_64_1
+        (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         accu : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  cont self (l1, l2, accu)
+    where rec self
+                (l1_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 l2_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 accu_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let cmp = %project_value_slot.[`rev_merge_rev`].[`cmp_1`] (my_closure)
+      in
+      let prim = %is_int (l1_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           apply direct(rev_append_12_1)
+             ($camlList__rev_append_93
+              : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+               (l2_1, accu_1)
+               -> k * k1
+         where k2 =
+           let prim_1 = %is_int (l2_1) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k3
+              where k3 =
+                apply direct(rev_append_12_1)
+                  ($camlList__rev_append_93
+                   : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                    (l1_1, accu_1)
+                    -> k * k1
+              where k2 =
+                let h2 = %block_load.[`0`] (l2_1) in
+                let h1 = %block_load.[`0`] (l1_1) in
+                (apply cmp (h1, h2) -> k2 * k1
+                   where k2 (apply_result : imm tagged) =
+                     let prim_2 = %int_comp.gt (apply_result, 0) in
+                     (switch prim_2
+                        | 0 -> k2
+                        | 1 -> k3
+                        where k3 =
+                          let Pmakeblock = %block.[`0`] (h1, accu_1) in
+                          let Pfield = %block_load.[`1`] (l1_1) in
+                          cont self (Pfield, l2_1, Pmakeblock)
+                        where k2 =
+                          let Pmakeblock = %block.[`0`] (h2, accu_1) in
+                          let Pfield = %block_load.[`1`] (l2_1) in
+                          cont self (l1_1, Pfield, Pmakeblock)))))
+in
+let code rec loopify(never) size(380) newer_version_of(rev_sort_66)
+      rev_sort_66_1
+        (n : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let cmp = %project_value_slot.[`rev_sort`].[`cmp_2`] (my_closure) in
+  let rev_merge = %project_value_slot.[`rev_sort`].[`rev_merge`] (my_closure)
+  in
+  let sort = %project_function_slot.[`rev_sort`].[`sort`] (my_closure) in
+  (let prim = %int_comp.ne (n, 2) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k4
+     where k4 =
+       let prim_1 = %int_comp.ne (n, 3) in
+       (switch prim_1
+          | 0 -> k4
+          | 1 -> k2
+          where k4 =
+            let prim_2 = %is_int (l) in
+            (switch prim_2
+               | 0 -> k4
+               | 1 -> k2
+               where k4 =
+                 let `*match*` = %block_load.[`1`] (l) in
+                 let prim_3 = %is_int (`*match*`) in
+                 (switch prim_3
+                    | 0 -> k4
+                    | 1 -> k2
+                    where k4 =
+                      let `*match*_1` = %block_load.[`1`] (`*match*`) in
+                      let prim_4 = %is_int (`*match*_1`) in
+                      (switch prim_4
+                         | 0 -> k4
+                         | 1 -> k2
+                         where k4 =
+                           let x3 = %block_load.[`0`] (`*match*_1`) in
+                           let x2 = %block_load.[`0`] (`*match*`) in
+                           let x1 = %block_load.[`0`] (l) in
+                           (apply cmp (x1, x2) -> k4 * k1
+                              where k4 (apply_result : imm tagged) =
+                                let prim_5 = %int_comp.gt (apply_result, 0)
+                                in
+                                (switch prim_5
+                                   | 0 -> k4
+                                   | 1 -> k5
+                                   where k5 =
+                                     (apply cmp (x2, x3) -> k5 * k1
+                                        where k5
+                                                (apply_result_1 : imm tagged) =
+                                          let prim_6 =
+                                            %int_comp.gt (apply_result_1, 0)
+                                          in
+                                          (switch prim_6
+                                             | 0 -> k5
+                                             | 1 -> k6
+                                             where k6 =
+                                               let Pmakeblock =
+                                                 %block.[`0`] (x3, 0)
+                                               in
+                                               let Pmakeblock_1 =
+                                                 %block.[`0`]
+                                                   (x2, Pmakeblock)
+                                               in
+                                               let Pmakeblock_2 =
+                                                 %block.[`0`]
+                                                   (x1, Pmakeblock_1)
+                                               in
+                                               cont k (Pmakeblock_2)
+                                             where k5 =
+                                               (apply cmp (x1, x3) -> k5 * k1
+                                                  where k5
+                                                          (apply_result_2 :
+                                                             imm tagged) =
+                                                    let prim_7 =
+                                                      %int_comp.gt
+                                                        (apply_result_2, 0)
+                                                    in
+                                                    (switch prim_7
+                                                       | 0 -> k5
+                                                       | 1 -> k6
+                                                       where k6 =
+                                                         let Pmakeblock =
+                                                           %block.[`0`]
+                                                             (x2, 0)
+                                                         in
+                                                         let Pmakeblock_1 =
+                                                           %block.[`0`]
+                                                             (x3, Pmakeblock)
+                                                         in
+                                                         let Pmakeblock_2 =
+                                                           %block.[`0`]
+                                                             (x1,
+                                                              Pmakeblock_1)
+                                                         in
+                                                         cont k
+                                                                (Pmakeblock_2)
+                                                       where k5 =
+                                                         let Pmakeblock =
+                                                           %block.[`0`]
+                                                             (x2, 0)
+                                                         in
+                                                         let Pmakeblock_1 =
+                                                           %block.[`0`]
+                                                             (x1, Pmakeblock)
+                                                         in
+                                                         let Pmakeblock_2 =
+                                                           %block.[`0`]
+                                                             (x3,
+                                                              Pmakeblock_1)
+                                                         in
+                                                         cont k
+                                                                (Pmakeblock_2)))))
+                                   where k4 =
+                                     (apply cmp (x1, x3) -> k4 * k1
+                                        where k4
+                                                (apply_result_1 : imm tagged) =
+                                          let prim_6 =
+                                            %int_comp.gt (apply_result_1, 0)
+                                          in
+                                          (switch prim_6
+                                             | 0 -> k4
+                                             | 1 -> k5
+                                             where k5 =
+                                               let Pmakeblock =
+                                                 %block.[`0`] (x3, 0)
+                                               in
+                                               let Pmakeblock_1 =
+                                                 %block.[`0`]
+                                                   (x1, Pmakeblock)
+                                               in
+                                               let Pmakeblock_2 =
+                                                 %block.[`0`]
+                                                   (x2, Pmakeblock_1)
+                                               in
+                                               cont k (Pmakeblock_2)
+                                             where k4 =
+                                               (apply cmp (x2, x3) -> k4 * k1
+                                                  where k4
+                                                          (apply_result_2 :
+                                                             imm tagged) =
+                                                    let prim_7 =
+                                                      %int_comp.gt
+                                                        (apply_result_2, 0)
+                                                    in
+                                                    (switch prim_7
+                                                       | 0 -> k4
+                                                       | 1 -> k5
+                                                       where k5 =
+                                                         let Pmakeblock =
+                                                           %block.[`0`]
+                                                             (x1, 0)
+                                                         in
+                                                         let Pmakeblock_1 =
+                                                           %block.[`0`]
+                                                             (x3, Pmakeblock)
+                                                         in
+                                                         let Pmakeblock_2 =
+                                                           %block.[`0`]
+                                                             (x2,
+                                                              Pmakeblock_1)
+                                                         in
+                                                         cont k
+                                                                (Pmakeblock_2)
+                                                       where k4 =
+                                                         let Pmakeblock =
+                                                           %block.[`0`]
+                                                             (x1, 0)
+                                                         in
+                                                         let Pmakeblock_1 =
+                                                           %block.[`0`]
+                                                             (x2, Pmakeblock)
+                                                         in
+                                                         let Pmakeblock_2 =
+                                                           %block.[`0`]
+                                                             (x3,
+                                                              Pmakeblock_1)
+                                                         in
+                                                         cont k
+                                                                (Pmakeblock_2)))))))))))
+     where k3 =
+       let prim_1 = %is_int (l) in
+       (switch prim_1
+          | 0 -> k3
+          | 1 -> k2
+          where k3 =
+            let `*match*` = %block_load.[`1`] (l) in
+            let prim_2 = %is_int (`*match*`) in
+            (switch prim_2
+               | 0 -> k3
+               | 1 -> k2
+               where k3 =
+                 let x2 = %block_load.[`0`] (`*match*`) in
+                 let x1 = %block_load.[`0`] (l) in
+                 (apply cmp (x1, x2) -> k3 * k1
+                    where k3 (apply_result : imm tagged) =
+                      let prim_3 = %int_comp.gt (apply_result, 0) in
+                      (switch prim_3
+                         | 0 -> k3
+                         | 1 -> k4
+                         where k4 =
+                           let Pmakeblock = %block.[`0`] (x2, 0) in
+                           let Pmakeblock_1 = %block.[`0`] (x1, Pmakeblock)
+                           in
+                           cont k (Pmakeblock_1)
+                         where k3 =
+                           let Pmakeblock = %block.[`0`] (x1, 0) in
+                           let Pmakeblock_1 = %block.[`0`] (x2, Pmakeblock)
+                           in
+                           cont k (Pmakeblock_1))))))
+    where k2 =
+      let n1 = %int_shift.asr (n, 1i) in
+      let n2 = %int_barith.sub (n, n1) in
+      (apply direct(chop_61_1)
+         ($camlList__chop_135
+          : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+           (n1, l)
+           -> k2 * k1
+         where k2 (l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+           (apply direct(sort_65_1)
+              (sort ~ depth my_depth -> succ my_depth
+               : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                (n1, l)
+                -> k2 * k1
+              where k2 (s1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                (apply direct(sort_65_1)
+                   (sort ~ depth my_depth -> succ my_depth
+                    : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                     (n2, l2)
+                     -> k2 * k1
+                   where k2 (s2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                     apply direct(rev_merge_63_1)
+                       (rev_merge
+                        : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                         (s1, s2, 0)
+                         -> k * k1)))
+and code rec loopify(never) size(380) newer_version_of(sort_65)
+      sort_65_1
+        (n : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let cmp = %project_value_slot.[`sort`].[`cmp_2`] (my_closure) in
+  let rev_merge_rev =
+    %project_value_slot.[`sort`].[`rev_merge_rev`] (my_closure)
+  in
+  let rev_sort = %project_function_slot.[`sort`].[`rev_sort`] (my_closure) in
+  (let prim = %int_comp.ne (n, 2) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k4
+     where k4 =
+       let prim_1 = %int_comp.ne (n, 3) in
+       (switch prim_1
+          | 0 -> k4
+          | 1 -> k2
+          where k4 =
+            let prim_2 = %is_int (l) in
+            (switch prim_2
+               | 0 -> k4
+               | 1 -> k2
+               where k4 =
+                 let `*match*` = %block_load.[`1`] (l) in
+                 let prim_3 = %is_int (`*match*`) in
+                 (switch prim_3
+                    | 0 -> k4
+                    | 1 -> k2
+                    where k4 =
+                      let `*match*_1` = %block_load.[`1`] (`*match*`) in
+                      let prim_4 = %is_int (`*match*_1`) in
+                      (switch prim_4
+                         | 0 -> k4
+                         | 1 -> k2
+                         where k4 =
+                           let x3 = %block_load.[`0`] (`*match*_1`) in
+                           let x2 = %block_load.[`0`] (`*match*`) in
+                           let x1 = %block_load.[`0`] (l) in
+                           (apply cmp (x1, x2) -> k4 * k1
+                              where k4 (apply_result : imm tagged) =
+                                let prim_5 = %int_comp.le (apply_result, 0)
+                                in
+                                (switch prim_5
+                                   | 0 -> k4
+                                   | 1 -> k5
+                                   where k5 =
+                                     (apply cmp (x2, x3) -> k5 * k1
+                                        where k5
+                                                (apply_result_1 : imm tagged) =
+                                          let prim_6 =
+                                            %int_comp.le (apply_result_1, 0)
+                                          in
+                                          (switch prim_6
+                                             | 0 -> k5
+                                             | 1 -> k6
+                                             where k6 =
+                                               let Pmakeblock =
+                                                 %block.[`0`] (x3, 0)
+                                               in
+                                               let Pmakeblock_1 =
+                                                 %block.[`0`]
+                                                   (x2, Pmakeblock)
+                                               in
+                                               let Pmakeblock_2 =
+                                                 %block.[`0`]
+                                                   (x1, Pmakeblock_1)
+                                               in
+                                               cont k (Pmakeblock_2)
+                                             where k5 =
+                                               (apply cmp (x1, x3) -> k5 * k1
+                                                  where k5
+                                                          (apply_result_2 :
+                                                             imm tagged) =
+                                                    let prim_7 =
+                                                      %int_comp.le
+                                                        (apply_result_2, 0)
+                                                    in
+                                                    (switch prim_7
+                                                       | 0 -> k5
+                                                       | 1 -> k6
+                                                       where k6 =
+                                                         let Pmakeblock =
+                                                           %block.[`0`]
+                                                             (x2, 0)
+                                                         in
+                                                         let Pmakeblock_1 =
+                                                           %block.[`0`]
+                                                             (x3, Pmakeblock)
+                                                         in
+                                                         let Pmakeblock_2 =
+                                                           %block.[`0`]
+                                                             (x1,
+                                                              Pmakeblock_1)
+                                                         in
+                                                         cont k
+                                                                (Pmakeblock_2)
+                                                       where k5 =
+                                                         let Pmakeblock =
+                                                           %block.[`0`]
+                                                             (x2, 0)
+                                                         in
+                                                         let Pmakeblock_1 =
+                                                           %block.[`0`]
+                                                             (x1, Pmakeblock)
+                                                         in
+                                                         let Pmakeblock_2 =
+                                                           %block.[`0`]
+                                                             (x3,
+                                                              Pmakeblock_1)
+                                                         in
+                                                         cont k
+                                                                (Pmakeblock_2)))))
+                                   where k4 =
+                                     (apply cmp (x1, x3) -> k4 * k1
+                                        where k4
+                                                (apply_result_1 : imm tagged) =
+                                          let prim_6 =
+                                            %int_comp.le (apply_result_1, 0)
+                                          in
+                                          (switch prim_6
+                                             | 0 -> k4
+                                             | 1 -> k5
+                                             where k5 =
+                                               let Pmakeblock =
+                                                 %block.[`0`] (x3, 0)
+                                               in
+                                               let Pmakeblock_1 =
+                                                 %block.[`0`]
+                                                   (x1, Pmakeblock)
+                                               in
+                                               let Pmakeblock_2 =
+                                                 %block.[`0`]
+                                                   (x2, Pmakeblock_1)
+                                               in
+                                               cont k (Pmakeblock_2)
+                                             where k4 =
+                                               (apply cmp (x2, x3) -> k4 * k1
+                                                  where k4
+                                                          (apply_result_2 :
+                                                             imm tagged) =
+                                                    let prim_7 =
+                                                      %int_comp.le
+                                                        (apply_result_2, 0)
+                                                    in
+                                                    (switch prim_7
+                                                       | 0 -> k4
+                                                       | 1 -> k5
+                                                       where k5 =
+                                                         let Pmakeblock =
+                                                           %block.[`0`]
+                                                             (x1, 0)
+                                                         in
+                                                         let Pmakeblock_1 =
+                                                           %block.[`0`]
+                                                             (x3, Pmakeblock)
+                                                         in
+                                                         let Pmakeblock_2 =
+                                                           %block.[`0`]
+                                                             (x2,
+                                                              Pmakeblock_1)
+                                                         in
+                                                         cont k
+                                                                (Pmakeblock_2)
+                                                       where k4 =
+                                                         let Pmakeblock =
+                                                           %block.[`0`]
+                                                             (x1, 0)
+                                                         in
+                                                         let Pmakeblock_1 =
+                                                           %block.[`0`]
+                                                             (x2, Pmakeblock)
+                                                         in
+                                                         let Pmakeblock_2 =
+                                                           %block.[`0`]
+                                                             (x3,
+                                                              Pmakeblock_1)
+                                                         in
+                                                         cont k
+                                                                (Pmakeblock_2)))))))))))
+     where k3 =
+       let prim_1 = %is_int (l) in
+       (switch prim_1
+          | 0 -> k3
+          | 1 -> k2
+          where k3 =
+            let `*match*` = %block_load.[`1`] (l) in
+            let prim_2 = %is_int (`*match*`) in
+            (switch prim_2
+               | 0 -> k3
+               | 1 -> k2
+               where k3 =
+                 let x2 = %block_load.[`0`] (`*match*`) in
+                 let x1 = %block_load.[`0`] (l) in
+                 (apply cmp (x1, x2) -> k3 * k1
+                    where k3 (apply_result : imm tagged) =
+                      let prim_3 = %int_comp.le (apply_result, 0) in
+                      (switch prim_3
+                         | 0 -> k3
+                         | 1 -> k4
+                         where k4 =
+                           let Pmakeblock = %block.[`0`] (x2, 0) in
+                           let Pmakeblock_1 = %block.[`0`] (x1, Pmakeblock)
+                           in
+                           cont k (Pmakeblock_1)
+                         where k3 =
+                           let Pmakeblock = %block.[`0`] (x1, 0) in
+                           let Pmakeblock_1 = %block.[`0`] (x2, Pmakeblock)
+                           in
+                           cont k (Pmakeblock_1))))))
+    where k2 =
+      let n1 = %int_shift.asr (n, 1i) in
+      let n2 = %int_barith.sub (n, n1) in
+      (apply direct(chop_61_1)
+         ($camlList__chop_135
+          : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+           (n1, l)
+           -> k2 * k1
+         where k2 (l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+           (apply direct(rev_sort_66_1)
+              (rev_sort ~ depth my_depth -> succ my_depth
+               : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                (n1, l)
+                -> k2 * k1
+              where k2 (s1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                (apply direct(rev_sort_66_1)
+                   (rev_sort ~ depth my_depth -> succ my_depth
+                    : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                     (n2, l2)
+                     -> k2 * k1
+                   where k2 (s2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                     apply direct(rev_merge_rev_64_1)
+                       (rev_merge_rev
+                        : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                         (s1, s2, 0)
+                         -> k * k1)))
+in
+let code loopify(never) size(955) newer_version_of(stable_sort_62)
+      stable_sort_62_1
+        (cmp : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let rev_merge = closure rev_merge_63_1 @rev_merge
+  with { rev_append_1 = $camlList__rev_append_93; cmp = cmp }
+  in
+  let rev_merge_rev = closure rev_merge_rev_64_1 @rev_merge_rev
+  with { rev_append = $camlList__rev_append_93; cmp_1 = cmp }
+  in
+  let sort = closure sort_65_1 @sort
+  and rev_sort = closure rev_sort_66_1 @rev_sort
+  with {
+    chop = $camlList__chop_135;
+    cmp_2 = cmp;
+    rev_merge = rev_merge;
+    rev_merge_rev = rev_merge_rev
+  }
+  in
+  apply direct(length_aux_3_1) inlining_state(depth(10))
+    ($camlList__length_aux_84 : _ -> imm tagged) (0, l) -> k2 * k1
+    where k2 (len : imm tagged) =
+      let prim = %int_comp.lt (len, 2) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (l)
+         where k2 =
+           apply direct(sort_65_1)
+             (sort : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+               (len, l)
+               -> k * k1)
+in
+let $camlList__stable_sort_136 = closure stable_sort_62_1 @stable_sort in
+let code rec loopify(done) size(90) newer_version_of(rev_merge_68)
+      rev_merge_68_1
+        (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         accu : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  cont self (l1, l2, accu)
+    where rec self
+                (l1_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 l2_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 accu_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let cmp = %project_value_slot.[`rev_merge_1`].[`cmp_3`] (my_closure) in
+      let prim = %is_int (l1_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           apply direct(rev_append_12_1)
+             ($camlList__rev_append_93
+              : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+               (l2_1, accu_1)
+               -> k * k1
+         where k2 =
+           let prim_1 = %is_int (l2_1) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k3
+              where k3 =
+                apply direct(rev_append_12_1)
+                  ($camlList__rev_append_93
+                   : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                    (l1_1, accu_1)
+                    -> k * k1
+              where k2 =
+                let t2 = %block_load.[`1`] (l2_1) in
+                let h2 = %block_load.[`0`] (l2_1) in
+                let t1 = %block_load.[`1`] (l1_1) in
+                let h1 = %block_load.[`0`] (l1_1) in
+                (apply cmp (h1, h2) -> k2 * k1
+                   where k2 (c : imm tagged) =
+                     let prim_2 = %phys_eq (c, 0) in
+                     (switch prim_2
+                        | 0 -> k2
+                        | 1 -> k3
+                        where k3 =
+                          let Pmakeblock = %block.[`0`] (h1, accu_1) in
+                          cont self (t1, t2, Pmakeblock)
+                        where k2 =
+                          let prim_3 = %int_comp.lt (c, 0) in
+                          (switch prim_3
+                             | 0 -> k2
+                             | 1 -> k3
+                             where k3 =
+                               let Pmakeblock = %block.[`0`] (h1, accu_1) in
+                               cont self (t1, l2_1, Pmakeblock)
+                             where k2 =
+                               let Pmakeblock = %block.[`0`] (h2, accu_1) in
+                               cont self (l1_1, t2, Pmakeblock))))))
+in
+let code rec loopify(done) size(90) newer_version_of(rev_merge_rev_69)
+      rev_merge_rev_69_1
+        (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         accu : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  cont self (l1, l2, accu)
+    where rec self
+                (l1_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 l2_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 accu_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let cmp =
+        %project_value_slot.[`rev_merge_rev_1`].[`cmp_4`] (my_closure)
+      in
+      let prim = %is_int (l1_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           apply direct(rev_append_12_1)
+             ($camlList__rev_append_93
+              : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+               (l2_1, accu_1)
+               -> k * k1
+         where k2 =
+           let prim_1 = %is_int (l2_1) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k3
+              where k3 =
+                apply direct(rev_append_12_1)
+                  ($camlList__rev_append_93
+                   : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                    (l1_1, accu_1)
+                    -> k * k1
+              where k2 =
+                let t2 = %block_load.[`1`] (l2_1) in
+                let h2 = %block_load.[`0`] (l2_1) in
+                let t1 = %block_load.[`1`] (l1_1) in
+                let h1 = %block_load.[`0`] (l1_1) in
+                (apply cmp (h1, h2) -> k2 * k1
+                   where k2 (c : imm tagged) =
+                     let prim_2 = %phys_eq (c, 0) in
+                     (switch prim_2
+                        | 0 -> k2
+                        | 1 -> k3
+                        where k3 =
+                          let Pmakeblock = %block.[`0`] (h1, accu_1) in
+                          cont self (t1, t2, Pmakeblock)
+                        where k2 =
+                          let prim_3 = %int_comp.gt (c, 0) in
+                          (switch prim_3
+                             | 0 -> k2
+                             | 1 -> k3
+                             where k3 =
+                               let Pmakeblock = %block.[`0`] (h1, accu_1) in
+                               cont self (t1, l2_1, Pmakeblock)
+                             where k2 =
+                               let Pmakeblock = %block.[`0`] (h2, accu_1) in
+                               cont self (l1_1, t2, Pmakeblock))))))
+in
+let code rec loopify(never) size(588) newer_version_of(rev_sort_71)
+      rev_sort_71_1
+        (n : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let cmp = %project_value_slot.[`rev_sort_1`].[`cmp_5`] (my_closure) in
+  let rev_merge =
+    %project_value_slot.[`rev_sort_1`].[`rev_merge_1`] (my_closure)
+  in
+  let sort = %project_function_slot.[`rev_sort_1`].[`sort_1`] (my_closure) in
+  (let prim = %int_comp.ne (n, 2) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k4
+     where k4 =
+       let prim_1 = %int_comp.ne (n, 3) in
+       (switch prim_1
+          | 0 -> k4
+          | 1 -> k2
+          where k4 =
+            let prim_2 = %is_int (l) in
+            (switch prim_2
+               | 0 -> k4
+               | 1 -> k2
+               where k4 =
+                 let `*match*` = %block_load.[`1`] (l) in
+                 let prim_3 = %is_int (`*match*`) in
+                 (switch prim_3
+                    | 0 -> k4
+                    | 1 -> k2
+                    where k4 =
+                      let `*match*_1` = %block_load.[`1`] (`*match*`) in
+                      let prim_4 = %is_int (`*match*_1`) in
+                      (switch prim_4
+                         | 0 -> k4
+                         | 1 -> k2
+                         where k4 =
+                           let x3 = %block_load.[`0`] (`*match*_1`) in
+                           let x2 = %block_load.[`0`] (`*match*`) in
+                           let x1 = %block_load.[`0`] (l) in
+                           (apply cmp (x1, x2) -> k4 * k1
+                              where k4 (c : imm tagged) =
+                                let prim_5 = %phys_eq (c, 0) in
+                                (switch prim_5
+                                   | 0 -> k4
+                                   | 1 -> k5
+                                   where k5 =
+                                     (apply cmp (x2, x3) -> k5 * k1
+                                        where k5 (c_1 : imm tagged) =
+                                          let prim_6 = %phys_eq (c_1, 0) in
+                                          (switch prim_6
+                                             | 0 -> k5
+                                             | 1 -> k6
+                                             where k6 =
+                                               let Pmakeblock =
+                                                 %block.[`0`] (x2, 0)
+                                               in
+                                               cont k (Pmakeblock)
+                                             where k5 =
+                                               let prim_7 =
+                                                 %int_comp.gt (c_1, 0)
+                                               in
+                                               (switch prim_7
+                                                  | 0 -> k5
+                                                  | 1 -> k6
+                                                  where k6 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`] (x3, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`]
+                                                        (x2, Pmakeblock)
+                                                    in
+                                                    cont k (Pmakeblock_1)
+                                                  where k5 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`] (x2, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`]
+                                                        (x3, Pmakeblock)
+                                                    in
+                                                    cont k (Pmakeblock_1))))
+                                   where k4 =
+                                     let prim_6 = %int_comp.gt (c, 0) in
+                                     (switch prim_6
+                                        | 0 -> k4
+                                        | 1 -> k5
+                                        where k5 =
+                                          (apply cmp (x2, x3) -> k5 * k1
+                                             where k5 (c_1 : imm tagged) =
+                                               let prim_7 = %phys_eq (c_1, 0)
+                                               in
+                                               (switch prim_7
+                                                  | 0 -> k5
+                                                  | 1 -> k6
+                                                  where k6 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`] (x2, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`]
+                                                        (x1, Pmakeblock)
+                                                    in
+                                                    cont k (Pmakeblock_1)
+                                                  where k5 =
+                                                    let prim_8 =
+                                                      %int_comp.gt (c_1, 0)
+                                                    in
+                                                    (switch prim_8
+                                                       | 0 -> k5
+                                                       | 1 -> k6
+                                                       where k6 =
+                                                         let Pmakeblock =
+                                                           %block.[`0`]
+                                                             (x3, 0)
+                                                         in
+                                                         let Pmakeblock_1 =
+                                                           %block.[`0`]
+                                                             (x2, Pmakeblock)
+                                                         in
+                                                         let Pmakeblock_2 =
+                                                           %block.[`0`]
+                                                             (x1,
+                                                              Pmakeblock_1)
+                                                         in
+                                                         cont k
+                                                                (Pmakeblock_2)
+                                                       where k5 =
+                                                         (apply
+                                                            cmp
+                                                              (x1, x3)
+                                                              -> k5 * k1
+                                                            where k5
+                                                                    (
+                                                                    c_2 :
+                                                                    imm tagged) =
+                                                              let prim_9 =
+                                                                %phys_eq
+                                                                  (c_2, 0)
+                                                              in
+                                                              (switch prim_9
+                                                                 | 0 -> 
+                                                                 k5
+                                                                 | 1 -> 
+                                                                 k6
+                                                                 where 
+                                                                   k6 =
+                                                                   let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x2, 0)
+                                                                   in
+                                                                   let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x1,
+                                                                    Pmakeblock)
+                                                                   in
+                                                                   cont 
+                                                                   k
+                                                                    (Pmakeblock_1)
+                                                                 where 
+                                                                   k5 =
+                                                                   let prim_10 =
+                                                                    %int_comp.gt
+                                                                    (c_2, 0)
+                                                                   in
+                                                                   (switch prim_10
+                                                                    | 0 -> 
+                                                                    k5
+                                                                    | 1 -> 
+                                                                    k6
+                                                                    where 
+                                                                    k6 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x2, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x3,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`]
+                                                                    (x1,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k
+                                                                    (Pmakeblock_2)
+                                                                    where 
+                                                                    k5 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x2, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x1,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`]
+                                                                    (x3,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k
+                                                                    (Pmakeblock_2)))))))
+                                        where k4 =
+                                          (apply cmp (x1, x3) -> k4 * k1
+                                             where k4 (c_1 : imm tagged) =
+                                               let prim_7 = %phys_eq (c_1, 0)
+                                               in
+                                               (switch prim_7
+                                                  | 0 -> k4
+                                                  | 1 -> k5
+                                                  where k5 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`] (x1, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`]
+                                                        (x2, Pmakeblock)
+                                                    in
+                                                    cont k (Pmakeblock_1)
+                                                  where k4 =
+                                                    let prim_8 =
+                                                      %int_comp.gt (c_1, 0)
+                                                    in
+                                                    (switch prim_8
+                                                       | 0 -> k4
+                                                       | 1 -> k5
+                                                       where k5 =
+                                                         let Pmakeblock =
+                                                           %block.[`0`]
+                                                             (x3, 0)
+                                                         in
+                                                         let Pmakeblock_1 =
+                                                           %block.[`0`]
+                                                             (x1, Pmakeblock)
+                                                         in
+                                                         let Pmakeblock_2 =
+                                                           %block.[`0`]
+                                                             (x2,
+                                                              Pmakeblock_1)
+                                                         in
+                                                         cont k
+                                                                (Pmakeblock_2)
+                                                       where k4 =
+                                                         (apply
+                                                            cmp
+                                                              (x2, x3)
+                                                              -> k4 * k1
+                                                            where k4
+                                                                    (
+                                                                    c_2 :
+                                                                    imm tagged) =
+                                                              let prim_9 =
+                                                                %phys_eq
+                                                                  (c_2, 0)
+                                                              in
+                                                              (switch prim_9
+                                                                 | 0 -> 
+                                                                 k4
+                                                                 | 1 -> 
+                                                                 k5
+                                                                 where 
+                                                                   k5 =
+                                                                   let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x1, 0)
+                                                                   in
+                                                                   let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x2,
+                                                                    Pmakeblock)
+                                                                   in
+                                                                   cont 
+                                                                   k
+                                                                    (Pmakeblock_1)
+                                                                 where 
+                                                                   k4 =
+                                                                   let prim_10 =
+                                                                    %int_comp.gt
+                                                                    (c_2, 0)
+                                                                   in
+                                                                   (switch prim_10
+                                                                    | 0 -> 
+                                                                    k4
+                                                                    | 1 -> 
+                                                                    k5
+                                                                    where 
+                                                                    k5 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x1, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x3,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`]
+                                                                    (x2,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k
+                                                                    (Pmakeblock_2)
+                                                                    where 
+                                                                    k4 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x1, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x2,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`]
+                                                                    (x3,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k
+                                                                    (Pmakeblock_2))))))))))))))
+     where k3 =
+       let prim_1 = %is_int (l) in
+       (switch prim_1
+          | 0 -> k3
+          | 1 -> k2
+          where k3 =
+            let `*match*` = %block_load.[`1`] (l) in
+            let prim_2 = %is_int (`*match*`) in
+            (switch prim_2
+               | 0 -> k3
+               | 1 -> k2
+               where k3 =
+                 let x2 = %block_load.[`0`] (`*match*`) in
+                 let x1 = %block_load.[`0`] (l) in
+                 (apply cmp (x1, x2) -> k3 * k1
+                    where k3 (c : imm tagged) =
+                      let prim_3 = %phys_eq (c, 0) in
+                      (switch prim_3
+                         | 0 -> k3
+                         | 1 -> k4
+                         where k4 =
+                           let Pmakeblock = %block.[`0`] (x1, 0) in
+                           cont k (Pmakeblock)
+                         where k3 =
+                           let prim_4 = %int_comp.gt (c, 0) in
+                           (switch prim_4
+                              | 0 -> k3
+                              | 1 -> k4
+                              where k4 =
+                                let Pmakeblock = %block.[`0`] (x2, 0) in
+                                let Pmakeblock_1 =
+                                  %block.[`0`] (x1, Pmakeblock)
+                                in
+                                cont k (Pmakeblock_1)
+                              where k3 =
+                                let Pmakeblock = %block.[`0`] (x1, 0) in
+                                let Pmakeblock_1 =
+                                  %block.[`0`] (x2, Pmakeblock)
+                                in
+                                cont k (Pmakeblock_1)))))))
+    where k2 =
+      let n1 = %int_shift.asr (n, 1i) in
+      let n2 = %int_barith.sub (n, n1) in
+      (apply direct(chop_61_1)
+         ($camlList__chop_135
+          : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+           (n1, l)
+           -> k2 * k1
+         where k2 (l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+           (apply direct(sort_70_1)
+              (sort ~ depth my_depth -> succ my_depth
+               : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                (n1, l)
+                -> k2 * k1
+              where k2 (s1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                (apply direct(sort_70_1)
+                   (sort ~ depth my_depth -> succ my_depth
+                    : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                     (n2, l2)
+                     -> k2 * k1
+                   where k2 (s2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                     apply direct(rev_merge_68_1)
+                       (rev_merge
+                        : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                         (s1, s2, 0)
+                         -> k * k1)))
+and code rec loopify(never) size(588) newer_version_of(sort_70)
+      sort_70_1
+        (n : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let cmp = %project_value_slot.[`sort_1`].[`cmp_5`] (my_closure) in
+  let rev_merge_rev =
+    %project_value_slot.[`sort_1`].[`rev_merge_rev_1`] (my_closure)
+  in
+  let rev_sort =
+    %project_function_slot.[`sort_1`].[`rev_sort_1`] (my_closure)
+  in
+  (let prim = %int_comp.ne (n, 2) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k4
+     where k4 =
+       let prim_1 = %int_comp.ne (n, 3) in
+       (switch prim_1
+          | 0 -> k4
+          | 1 -> k2
+          where k4 =
+            let prim_2 = %is_int (l) in
+            (switch prim_2
+               | 0 -> k4
+               | 1 -> k2
+               where k4 =
+                 let `*match*` = %block_load.[`1`] (l) in
+                 let prim_3 = %is_int (`*match*`) in
+                 (switch prim_3
+                    | 0 -> k4
+                    | 1 -> k2
+                    where k4 =
+                      let `*match*_1` = %block_load.[`1`] (`*match*`) in
+                      let prim_4 = %is_int (`*match*_1`) in
+                      (switch prim_4
+                         | 0 -> k4
+                         | 1 -> k2
+                         where k4 =
+                           let x3 = %block_load.[`0`] (`*match*_1`) in
+                           let x2 = %block_load.[`0`] (`*match*`) in
+                           let x1 = %block_load.[`0`] (l) in
+                           (apply cmp (x1, x2) -> k4 * k1
+                              where k4 (c : imm tagged) =
+                                let prim_5 = %phys_eq (c, 0) in
+                                (switch prim_5
+                                   | 0 -> k4
+                                   | 1 -> k5
+                                   where k5 =
+                                     (apply cmp (x2, x3) -> k5 * k1
+                                        where k5 (c_1 : imm tagged) =
+                                          let prim_6 = %phys_eq (c_1, 0) in
+                                          (switch prim_6
+                                             | 0 -> k5
+                                             | 1 -> k6
+                                             where k6 =
+                                               let Pmakeblock =
+                                                 %block.[`0`] (x2, 0)
+                                               in
+                                               cont k (Pmakeblock)
+                                             where k5 =
+                                               let prim_7 =
+                                                 %int_comp.lt (c_1, 0)
+                                               in
+                                               (switch prim_7
+                                                  | 0 -> k5
+                                                  | 1 -> k6
+                                                  where k6 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`] (x3, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`]
+                                                        (x2, Pmakeblock)
+                                                    in
+                                                    cont k (Pmakeblock_1)
+                                                  where k5 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`] (x2, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`]
+                                                        (x3, Pmakeblock)
+                                                    in
+                                                    cont k (Pmakeblock_1))))
+                                   where k4 =
+                                     let prim_6 = %int_comp.lt (c, 0) in
+                                     (switch prim_6
+                                        | 0 -> k4
+                                        | 1 -> k5
+                                        where k5 =
+                                          (apply cmp (x2, x3) -> k5 * k1
+                                             where k5 (c_1 : imm tagged) =
+                                               let prim_7 = %phys_eq (c_1, 0)
+                                               in
+                                               (switch prim_7
+                                                  | 0 -> k5
+                                                  | 1 -> k6
+                                                  where k6 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`] (x2, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`]
+                                                        (x1, Pmakeblock)
+                                                    in
+                                                    cont k (Pmakeblock_1)
+                                                  where k5 =
+                                                    let prim_8 =
+                                                      %int_comp.lt (c_1, 0)
+                                                    in
+                                                    (switch prim_8
+                                                       | 0 -> k5
+                                                       | 1 -> k6
+                                                       where k6 =
+                                                         let Pmakeblock =
+                                                           %block.[`0`]
+                                                             (x3, 0)
+                                                         in
+                                                         let Pmakeblock_1 =
+                                                           %block.[`0`]
+                                                             (x2, Pmakeblock)
+                                                         in
+                                                         let Pmakeblock_2 =
+                                                           %block.[`0`]
+                                                             (x1,
+                                                              Pmakeblock_1)
+                                                         in
+                                                         cont k
+                                                                (Pmakeblock_2)
+                                                       where k5 =
+                                                         (apply
+                                                            cmp
+                                                              (x1, x3)
+                                                              -> k5 * k1
+                                                            where k5
+                                                                    (
+                                                                    c_2 :
+                                                                    imm tagged) =
+                                                              let prim_9 =
+                                                                %phys_eq
+                                                                  (c_2, 0)
+                                                              in
+                                                              (switch prim_9
+                                                                 | 0 -> 
+                                                                 k5
+                                                                 | 1 -> 
+                                                                 k6
+                                                                 where 
+                                                                   k6 =
+                                                                   let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x2, 0)
+                                                                   in
+                                                                   let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x1,
+                                                                    Pmakeblock)
+                                                                   in
+                                                                   cont 
+                                                                   k
+                                                                    (Pmakeblock_1)
+                                                                 where 
+                                                                   k5 =
+                                                                   let prim_10 =
+                                                                    %int_comp.lt
+                                                                    (c_2, 0)
+                                                                   in
+                                                                   (switch prim_10
+                                                                    | 0 -> 
+                                                                    k5
+                                                                    | 1 -> 
+                                                                    k6
+                                                                    where 
+                                                                    k6 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x2, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x3,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`]
+                                                                    (x1,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k
+                                                                    (Pmakeblock_2)
+                                                                    where 
+                                                                    k5 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x2, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x1,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`]
+                                                                    (x3,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k
+                                                                    (Pmakeblock_2)))))))
+                                        where k4 =
+                                          (apply cmp (x1, x3) -> k4 * k1
+                                             where k4 (c_1 : imm tagged) =
+                                               let prim_7 = %phys_eq (c_1, 0)
+                                               in
+                                               (switch prim_7
+                                                  | 0 -> k4
+                                                  | 1 -> k5
+                                                  where k5 =
+                                                    let Pmakeblock =
+                                                      %block.[`0`] (x1, 0)
+                                                    in
+                                                    let Pmakeblock_1 =
+                                                      %block.[`0`]
+                                                        (x2, Pmakeblock)
+                                                    in
+                                                    cont k (Pmakeblock_1)
+                                                  where k4 =
+                                                    let prim_8 =
+                                                      %int_comp.lt (c_1, 0)
+                                                    in
+                                                    (switch prim_8
+                                                       | 0 -> k4
+                                                       | 1 -> k5
+                                                       where k5 =
+                                                         let Pmakeblock =
+                                                           %block.[`0`]
+                                                             (x3, 0)
+                                                         in
+                                                         let Pmakeblock_1 =
+                                                           %block.[`0`]
+                                                             (x1, Pmakeblock)
+                                                         in
+                                                         let Pmakeblock_2 =
+                                                           %block.[`0`]
+                                                             (x2,
+                                                              Pmakeblock_1)
+                                                         in
+                                                         cont k
+                                                                (Pmakeblock_2)
+                                                       where k4 =
+                                                         (apply
+                                                            cmp
+                                                              (x2, x3)
+                                                              -> k4 * k1
+                                                            where k4
+                                                                    (
+                                                                    c_2 :
+                                                                    imm tagged) =
+                                                              let prim_9 =
+                                                                %phys_eq
+                                                                  (c_2, 0)
+                                                              in
+                                                              (switch prim_9
+                                                                 | 0 -> 
+                                                                 k4
+                                                                 | 1 -> 
+                                                                 k5
+                                                                 where 
+                                                                   k5 =
+                                                                   let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x1, 0)
+                                                                   in
+                                                                   let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x2,
+                                                                    Pmakeblock)
+                                                                   in
+                                                                   cont 
+                                                                   k
+                                                                    (Pmakeblock_1)
+                                                                 where 
+                                                                   k4 =
+                                                                   let prim_10 =
+                                                                    %int_comp.lt
+                                                                    (c_2, 0)
+                                                                   in
+                                                                   (switch prim_10
+                                                                    | 0 -> 
+                                                                    k4
+                                                                    | 1 -> 
+                                                                    k5
+                                                                    where 
+                                                                    k5 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x1, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x3,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`]
+                                                                    (x2,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k
+                                                                    (Pmakeblock_2)
+                                                                    where 
+                                                                    k4 =
+                                                                    let Pmakeblock =
+                                                                    %block.[`0`]
+                                                                    (x1, 0)
+                                                                    in
+                                                                    let Pmakeblock_1 =
+                                                                    %block.[`0`]
+                                                                    (x2,
+                                                                    Pmakeblock)
+                                                                    in
+                                                                    let Pmakeblock_2 =
+                                                                    %block.[`0`]
+                                                                    (x3,
+                                                                    Pmakeblock_1)
+                                                                    in
+                                                                    cont 
+                                                                    k
+                                                                    (Pmakeblock_2))))))))))))))
+     where k3 =
+       let prim_1 = %is_int (l) in
+       (switch prim_1
+          | 0 -> k3
+          | 1 -> k2
+          where k3 =
+            let `*match*` = %block_load.[`1`] (l) in
+            let prim_2 = %is_int (`*match*`) in
+            (switch prim_2
+               | 0 -> k3
+               | 1 -> k2
+               where k3 =
+                 let x2 = %block_load.[`0`] (`*match*`) in
+                 let x1 = %block_load.[`0`] (l) in
+                 (apply cmp (x1, x2) -> k3 * k1
+                    where k3 (c : imm tagged) =
+                      let prim_3 = %phys_eq (c, 0) in
+                      (switch prim_3
+                         | 0 -> k3
+                         | 1 -> k4
+                         where k4 =
+                           let Pmakeblock = %block.[`0`] (x1, 0) in
+                           cont k (Pmakeblock)
+                         where k3 =
+                           let prim_4 = %int_comp.lt (c, 0) in
+                           (switch prim_4
+                              | 0 -> k3
+                              | 1 -> k4
+                              where k4 =
+                                let Pmakeblock = %block.[`0`] (x2, 0) in
+                                let Pmakeblock_1 =
+                                  %block.[`0`] (x1, Pmakeblock)
+                                in
+                                cont k (Pmakeblock_1)
+                              where k3 =
+                                let Pmakeblock = %block.[`0`] (x1, 0) in
+                                let Pmakeblock_1 =
+                                  %block.[`0`] (x2, Pmakeblock)
+                                in
+                                cont k (Pmakeblock_1)))))))
+    where k2 =
+      let n1 = %int_shift.asr (n, 1i) in
+      let n2 = %int_barith.sub (n, n1) in
+      (apply direct(chop_61_1)
+         ($camlList__chop_135
+          : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+           (n1, l)
+           -> k2 * k1
+         where k2 (l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+           (apply direct(rev_sort_71_1)
+              (rev_sort ~ depth my_depth -> succ my_depth
+               : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                (n1, l)
+                -> k2 * k1
+              where k2 (s1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                (apply direct(rev_sort_71_1)
+                   (rev_sort ~ depth my_depth -> succ my_depth
+                    : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                     (n2, l2)
+                     -> k2 * k1
+                   where k2 (s2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                     apply direct(rev_merge_rev_69_1)
+                       (rev_merge_rev
+                        : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                         (s1, s2, 0)
+                         -> k * k1)))
+in
+let code loopify(never) size(1411) newer_version_of(sort_uniq_67)
+      sort_uniq_67_1
+        (cmp : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let rev_merge = closure rev_merge_68_1 @rev_merge_1
+  with { rev_append_3 = $camlList__rev_append_93; cmp_3 = cmp }
+  in
+  let rev_merge_rev = closure rev_merge_rev_69_1 @rev_merge_rev_1
+  with { rev_append_2 = $camlList__rev_append_93; cmp_4 = cmp }
+  in
+  let sort = closure sort_70_1 @sort_1
+  and rev_sort = closure rev_sort_71_1 @rev_sort_1
+  with {
+    chop_1 = $camlList__chop_135;
+    cmp_5 = cmp;
+    rev_merge_1 = rev_merge;
+    rev_merge_rev_1 = rev_merge_rev
+  }
+  in
+  apply direct(length_aux_3_1) inlining_state(depth(10))
+    ($camlList__length_aux_84 : _ -> imm tagged) (0, l) -> k2 * k1
+    where k2 (len : imm tagged) =
+      let prim = %int_comp.lt (len, 2) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (l)
+         where k2 =
+           apply direct(sort_70_1)
+             (sort : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+               (len, l)
+               -> k * k1)
+in
+let $camlList__sort_uniq_137 = closure sort_uniq_67_1 @sort_uniq in
+let code rec loopify(done) size(37) newer_version_of(compare_lengths_72)
+      compare_lengths_72_1
+        (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (l1, l2)
+    where rec self
+                (l1_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 l2_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let prim = %is_int (l1_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           let prim_1 = %is_int (l2_1) in
+           switch prim_1
+             | 0 -> k (-1)
+             | 1 -> k (0)
+         where k2 =
+           let prim_1 = %is_int (l2_1) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k (1)
+              where k2 =
+                let Pfield = %block_load.[`1`] (l2_1) in
+                let Pfield_1 = %block_load.[`1`] (l1_1) in
+                cont self (Pfield_1, Pfield)))
+in
+let $camlList__compare_lengths_138 =
+  closure compare_lengths_72_1 @compare_lengths
+in
+let code rec loopify(done) size(52) newer_version_of(compare_length_with_73)
+      compare_length_with_73_1
+        (l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ], n : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (l, n)
+    where rec self
+                (l_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                 n_1 : imm tagged) =
+      let prim = %is_int (l_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           let prim_1 = %phys_eq (n_1, 0) in
+           (switch prim_1
+              | 0 -> k3
+              | 1 -> k (0)
+              where k3 =
+                let prim_2 = %int_comp.gt (n_1, 0) in
+                switch prim_2
+                  | 0 -> k (1)
+                  | 1 -> k (-1))
+         where k2 =
+           let prim_1 = %int_comp.le (n_1, 0) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k (1)
+              where k2 =
+                let int_sub = %int_barith.sub (n_1, 1) in
+                let Pfield = %block_load.[`1`] (l_1) in
+                cont self (Pfield, int_sub)))
+in
+let $camlList__compare_length_with_139 =
+  closure compare_length_with_73_1 @compare_length_with
+in
+let $camlList__aux_141 =
+  closure aux_75_1 @aux_1
+and code rec loopify(never) size(38) newer_version_of(aux_75)
+      aux_75_1
+        (l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ], param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let prim = %is_int (l) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (0)
+    where k2 =
+      let Pfield = %block_load.[`1`] (l) in
+      let partial_aux = closure partial_aux_76 @partial_aux_1
+      with {
+        my_closure = $camlList__aux_141 ~ depth my_depth -> succ my_depth;
+        Pfield = Pfield
+      }
+      in
+      let Pfield_1 = %block_load.[`0`] (l) in
+      let Pmakeblock = %block.[`0`] (Pfield_1, partial_aux) in
+      cont k (Pmakeblock)
+in
+let code loopify(never) size(18) newer_version_of(to_seq_74)
+      to_seq_74_1 (l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let partial_aux = closure partial_aux_77 @partial_aux_2
+  with { l = l; aux_1 = $camlList__aux_141 }
+  in
+  cont k (partial_aux)
+in
+let $camlList__to_seq_140 = closure to_seq_74_1 @to_seq in
+let $camlList__direct_143 =
+  closure direct_79_1 @`direct`
+and code rec loopify(never) size(77) newer_version_of(direct_79)
+      direct_79_1 (`depth` : imm tagged, seq : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %phys_eq (`depth`, 0) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      (cont self (0, seq)
+         where rec self (acc, seq_1 : val) =
+           (apply inlining_state(depth(10)) seq_1 (0) -> k4 * k1
+              where k4 (`*match*` : [ 0 | 0 of val * val ]) =
+                let prim_1 = %is_int (`*match*`) in
+                (switch prim_1
+                   | 0 -> k4
+                   | 1 -> k3 (acc)
+                   where k4 =
+                     let Pfield = %block_load.[`0`] (`*match*`) in
+                     let Pmakeblock = %block.[`0`] (Pfield, acc) in
+                     let Pfield_1 = %block_load.[`1`] (`*match*`) in
+                     cont self (Pmakeblock, Pfield_1)))
+         where k3 (acc) =
+           let apply_result = acc in
+           apply direct(rev_append_12_1) inlining_state(depth(10))
+             ($camlList__rev_append_93
+              : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+               (apply_result, 0)
+               -> k * k1)
+    where k2 =
+      (apply seq (0) -> k2 * k1
+         where k2 (`*match*` : [ 0 | 0 of val * val ]) =
+           let prim_1 = %is_int (`*match*`) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k (0)
+              where k2 =
+                ((let Pfield = %block_load.[`1`] (`*match*`) in
+                  let int_sub = %int_barith.sub (`depth`, 1) in
+                  apply direct(direct_79_1)
+                    ($camlList__direct_143 ~ depth my_depth -> succ my_depth
+                     : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                      (int_sub, Pfield)
+                      -> k2 * k1)
+                   where k2
+                           (apply_result :
+                              [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                     let Pfield = %block_load.[`0`] (`*match*`) in
+                     let Pmakeblock = %block.[`0`] (Pfield, apply_result) in
+                     cont k (Pmakeblock))))
+in
+let code loopify(never) size(4) newer_version_of(of_seq_78)
+      of_seq_78_1 (seq : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  apply direct(direct_79_1)
+    ($camlList__direct_143 : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+      (500, seq)
+      -> k * k1
+in
+let $camlList__of_seq_142 = closure of_seq_78_1 @of_seq in
+let $camlList =
+  Block 0 ($camlList__failwith_81,
+           $camlList__invalid_arg_82,
+           $`camlList__@_83`,
+           $camlList__length_aux_84,
+           $camlList__length_85,
+           $camlList__cons_86,
+           $camlList__hd_87,
+           $camlList__tl_88,
+           $camlList__nth_89,
+           $camlList__nth_opt_91,
+           $`camlList__@_83`,
+           $camlList__rev_append_93,
+           $camlList__rev_94,
+           $camlList__init_tailrec_aux_95,
+           $camlList__init_aux_96,
+           10000,
+           $camlList__init_97,
+           $camlList__flatten_98,
+           $camlList__flatten_98,
+           $camlList__map_99,
+           $camlList__mapi_101,
+           $camlList__rev_map_102,
+           $camlList__iter_103,
+           $camlList__iteri_105,
+           $camlList__fold_left_106,
+           $camlList__fold_right_107,
+           $camlList__map2_108,
+           $camlList__rev_map2_109,
+           $camlList__iter2_110,
+           $camlList__fold_left2_111,
+           $camlList__fold_right2_112,
+           $camlList__for_all_113,
+           $camlList__exists_114,
+           $camlList__for_all2_115,
+           $camlList__exists2_116,
+           $camlList__mem_117,
+           $camlList__memq_118,
+           $camlList__assoc_119,
+           $camlList__assoc_opt_120,
+           $camlList__assq_121,
+           $camlList__assq_opt_122,
+           $camlList__mem_assoc_123,
+           $camlList__mem_assq_124,
+           $camlList__remove_assoc_125,
+           $camlList__remove_assq_126,
+           $camlList__find_127,
+           $camlList__find_opt_128,
+           $camlList__find_all_129,
+           $camlList__find_all_129,
+           $camlList__filter_map_130,
+           $camlList__partition_131,
+           $camlList__split_132,
+           $camlList__combine_133,
+           $camlList__merge_134,
+           $camlList__chop_135,
+           $camlList__stable_sort_136,
+           $camlList__stable_sort_136,
+           $camlList__stable_sort_136,
+           $camlList__sort_uniq_137,
+           $camlList__compare_lengths_138,
+           $camlList__compare_length_with_139,
+           $camlList__to_seq_140,
+           $camlList__of_seq_142)
+in
+cont done ($camlList)

@@ -1,0 +1,162 @@
+let code out_0 deleted in
+let $camlEmitcode_repro__const_block32 = Block 0 (1, 1) in
+let $camlEmitcode_repro__const_block36 = Block 0 (1, 0) in
+let $camlEmitcode_repro__const_block40 = Block 0 (0, 1) in
+let $camlEmitcode_repro__const_block44 = Block 0 (0, 0) in
+let code emit_instr_1 deleted in
+let $camlEmitcode_repro__const_block70 = Block 0 (2, 2) in
+let $camlEmitcode_repro__const_block90 = Block 0 (2, 1) in
+let code emit_2 deleted in
+let code inline(never) loopify(never) size(1) newer_version_of(out_0)
+      out_0_1 (_x)
+        my_closure my_region my_ghost_region my_depth
+        -> k * k1
+        : imm tagged local =
+  let Popaque = %opaque (0) in
+  cont k (Popaque)
+in
+let $camlEmitcode_repro__out_3 = closure out_0_1 @out in
+let code loopify(never) size(50) newer_version_of(emit_instr_1)
+      emit_instr_1_1 (param : [ 0 |1 | 0 of imm tagged |1 of imm tagged ])
+        my_closure my_region my_ghost_region my_depth
+        -> k * k1
+        : imm tagged local =
+  (let prim = %is_int (param) in
+   switch prim
+     | 0 -> k6
+     | 1 -> k7)
+    where k7 =
+      let untagged = %untag_imm (param) in
+      switch untagged
+        | 0 -> k2
+        | 1 -> k3
+    where k6 =
+      let prim = %get_tag (param) in
+      switch prim
+        | 0 -> k4
+        | 1 -> k5
+    where k5 =
+      apply direct(out_0_1 &my_region &my_ghost_region)
+        ($camlEmitcode_repro__out_3 : _ -> imm tagged)
+          ($camlEmitcode_repro__const_block32)
+          -> k * k1
+    where k4 =
+      apply direct(out_0_1 &my_region &my_ghost_region)
+        ($camlEmitcode_repro__out_3 : _ -> imm tagged)
+          ($camlEmitcode_repro__const_block36)
+          -> k * k1
+    where k3 =
+      apply direct(out_0_1 &my_region &my_ghost_region)
+        ($camlEmitcode_repro__out_3 : _ -> imm tagged)
+          ($camlEmitcode_repro__const_block40)
+          -> k * k1
+    where k2 =
+      apply direct(out_0_1 &my_region &my_ghost_region)
+        ($camlEmitcode_repro__out_3 : _ -> imm tagged)
+          ($camlEmitcode_repro__const_block44)
+          -> k * k1
+in
+let $camlEmitcode_repro__emit_instr_4 = closure emit_instr_1_1 @emit_instr in
+let code rec loopify(done) size(121) newer_version_of(emit_2)
+      emit_2_1 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (param)
+    where rec self (param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let `region` = %begin_region () in
+      let ghost_region = %begin_ghost_region () in
+      ((let prim = %is_int (param_1) in
+        switch prim
+          | 0 -> k3
+          | 1 -> k2
+          where k3 =
+            let instr = %block_load.[`0`] (param_1) in
+            ((let prim_1 = %is_int (instr) in
+              switch prim_1
+                | 0 -> k6
+                | 1 -> k7)
+               where k7 =
+                 let untagged = %untag_imm (instr) in
+                 switch untagged
+                   | 0 -> k4
+                   | 1 -> k3
+               where k6 =
+                 let prim_1 = %get_tag (instr) in
+                 switch prim_1
+                   | 0 -> k3
+                   | 1 -> k5
+               where k5 =
+                 (apply direct(out_0_1 &`region` &ghost_region)
+                    ($camlEmitcode_repro__out_3 : _ -> imm tagged)
+                      ($camlEmitcode_repro__const_block70)
+                      -> k6 * k1
+                    where k6 (param_2 : imm tagged) =
+                      cont k5
+                    where k5 =
+                      let Pfield = %block_load.[`1`] (param_1) in
+                      let `unit` = %end_region (`region`) in
+                      let unit_1 = %end_ghost_region (ghost_region) in
+                      cont self (Pfield))
+               where k4 =
+                 let `*match*` = %block_load.[`1`] (param_1) in
+                 let prim_1 = %is_int (`*match*`) in
+                 (switch prim_1
+                    | 0 -> k4
+                    | 1 -> k3
+                    where k4 =
+                      let Pfield = %block_load.[`0`] (`*match*`) in
+                      ((let prim_2 = %is_int (Pfield) in
+                        switch prim_2
+                          | 0 -> k5
+                          | 1 -> k3)
+                         where k5 =
+                           let prim_2 = %get_tag (Pfield) in
+                           switch prim_2
+                             | 0 -> k4
+                             | 1 -> k3
+                         where k4 =
+                           let Popaque = %opaque (0) in
+                           ((let untagged = %untag_imm (Popaque) in
+                             switch untagged
+                               | 0 -> k3
+                               | 1 -> k4)
+                              where k4 =
+                                (apply
+                                        direct(out_0_1
+                                        &`region` &ghost_region)
+                                   ($camlEmitcode_repro__out_3
+                                    : _ -> imm tagged)
+                                     ($camlEmitcode_repro__const_block90)
+                                     -> k5 * k1
+                                   where k5 (param_2 : imm tagged) =
+                                     cont k4
+                                   where k4 =
+                                     let Pfield_1 =
+                                       %block_load.[`1`] (`*match*`)
+                                     in
+                                     let `unit` = %end_region (`region`) in
+                                     let unit_1 =
+                                       %end_ghost_region (ghost_region)
+                                     in
+                                     cont self (Pfield_1)))))
+               where k3 =
+                 (apply direct(emit_instr_1_1 &`region` &ghost_region)
+                    ($camlEmitcode_repro__emit_instr_4 : _ -> imm tagged)
+                      (instr)
+                      -> k4 * k1
+                    where k4 (param_2 : imm tagged) =
+                      cont k3
+                    where k3 =
+                      let Pfield = %block_load.[`1`] (param_1) in
+                      let `unit` = %end_region (`region`) in
+                      let unit_1 = %end_ghost_region (ghost_region) in
+                      cont self (Pfield))))
+         where k2 =
+           let `unit` = %end_region (`region`) in
+           let unit_1 = %end_ghost_region (ghost_region) in
+           cont k (0))
+in
+let $camlEmitcode_repro__emit_5 = closure emit_2_1 @emit in
+let $camlEmitcode_repro = Block 0 ($camlEmitcode_repro__emit_5) in
+cont done ($camlEmitcode_repro)

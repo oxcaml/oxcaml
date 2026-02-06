@@ -1,0 +1,1975 @@
+let code failwith_0 deleted in
+let code invalid_arg_1 deleted in
+let code min_2 deleted in
+let code max_3 deleted in
+let code abs_4 deleted in
+let code lnot_5 deleted in
+let code `^_6` deleted in
+let $camlM2__immstring147 = "char_of_int" in
+let code char_of_int_7 deleted in
+let $camlM2__immstring155 = "false" in
+let $camlM2__immstring157 = "true" in
+let code string_of_bool_8 deleted in
+let $camlM2__immstring171 = "bool_of_string" in
+let code bool_of_string_9 deleted in
+let $camlM2__const_block181 = Block 0 (0) in
+let $camlM2__const_block186 = Block 0 (1) in
+let code bool_of_string_opt_10 deleted in
+let $camlM2__immstring193 = "%d" in
+let code string_of_int_11 deleted in
+let code int_of_string_opt_12 deleted in
+let $camlM2__immstring6 = "index out of bounds" in
+let $camlM2__block239 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlM2__immstring6)
+in
+let $camlM2__immstring254 = "." in
+let code loop_14 deleted in
+let code valid_float_lexem_13 deleted in
+let $camlM2__immstring262 = "%.12g" in
+let code string_of_float_15 deleted in
+let code float_of_string_opt_16 deleted in
+let code `@_17` deleted in
+let code open_out_gen_18 deleted in
+let $camlM2__const_block323 = Block 0 (7, 0) in
+let $camlM2__const_block325 = Block 0 (4, $camlM2__const_block323) in
+let $camlM2__const_block327 = Block 0 (3, $camlM2__const_block325) in
+let $camlM2__const_block329 = Block 0 (1, $camlM2__const_block327) in
+let code open_out_19 deleted in
+let $camlM2__const_block337 = Block 0 (6, 0) in
+let $camlM2__const_block339 = Block 0 (4, $camlM2__const_block337) in
+let $camlM2__const_block341 = Block 0 (3, $camlM2__const_block339) in
+let $camlM2__const_block343 = Block 0 (1, $camlM2__const_block341) in
+let code open_out_bin_20 deleted in
+let code iter_22 deleted in
+let code flush_all_21 deleted in
+let code output_bytes_23 deleted in
+let code output_string_24 deleted in
+let $camlM2__immstring420 = "output" in
+let code output_25 deleted in
+let $camlM2__immstring445 = "output_substring" in
+let code output_substring_26 deleted in
+let code output_value_27 deleted in
+let code close_out_28 deleted in
+let code close_out_noerr_29 deleted in
+let code open_in_gen_30 deleted in
+let $camlM2__const_block505 = Block 0 (0, $camlM2__const_block323) in
+let code open_in_31 deleted in
+let $camlM2__const_block513 = Block 0 (0, $camlM2__const_block337) in
+let code open_in_bin_32 deleted in
+let $camlM2__immstring538 = "input" in
+let code input_33 deleted in
+let code unsafe_really_input_34 deleted in
+let $camlM2__immstring581 = "really_input" in
+let code really_input_35 deleted in
+let code really_input_string_36 deleted in
+let code build_result_38 deleted in
+let code scan_39 deleted in
+let code input_line_37 deleted in
+let code close_in_noerr_40 deleted in
+let code print_char_41 deleted in
+let code print_string_42 deleted in
+let code print_bytes_43 deleted in
+let code print_int_44 deleted in
+let code print_float_45 deleted in
+let code print_endline_46 deleted in
+let code print_newline_47 deleted in
+let code prerr_char_48 deleted in
+let code prerr_string_49 deleted in
+let code prerr_bytes_50 deleted in
+let code prerr_int_51 deleted in
+let code prerr_float_52 deleted in
+let code prerr_endline_53 deleted in
+let code prerr_newline_54 deleted in
+let code read_line_55 deleted in
+let code read_int_56 deleted in
+let code read_int_opt_57 deleted in
+let code read_float_58 deleted in
+let code read_float_opt_59 deleted in
+let code `fn[m2.ml:680,7--129]_61` deleted in
+let code at_exit_60 deleted in
+let code do_at_exit_62 deleted in
+let code exit_63 deleted in
+let code f_64 deleted in
+let code foo_65 deleted in
+let $camlM2__immstring890 = "Pervasives.do_at_exit" in
+let $camlM2__empty_block849 = Block 0 () in
+let $camlM2__immstring31 = "M2.Exit" in
+let $camlM2__immstring9 = "Pervasives.array_bound_error" in
+let $camlM2__Pmakeblock1023 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlM2__immstring6)
+in
+apply ccall
+  ($`*extern*`.caml_register_named_value : val * val -> val)
+    ($camlM2__immstring9, $camlM2__Pmakeblock1023)
+    -> k1 * error
+  where k1 (param) =
+    cont k
+  where k =
+    let code loopify(never) size(10) newer_version_of(failwith_0)
+          failwith_0_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Failure, s) in
+      cont k1 pop(regular k1) (Pmakeblock)
+    in
+    let $camlM2__failwith_66 = closure failwith_0_1 @failwith in
+    let code loopify(never) size(10) newer_version_of(invalid_arg_1)
+          invalid_arg_1_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      let Pmakeblock =
+        %block.[`0`] ($`*predef*`.caml_exn_Invalid_argument, s)
+      in
+      cont k1 pop(regular k1) (Pmakeblock)
+    in
+    let $camlM2__invalid_arg_67 = closure invalid_arg_1_1 @invalid_arg in
+    (apply ccall noalloc
+       ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
+       where k (Pccall) =
+         let $camlM2__Exit1042 =
+           Block immutable_unique
+           248 ($camlM2__immstring31, Pccall)
+         in
+         let code loopify(never) size(21) newer_version_of(min_2)
+               min_2_1 (x : val, y : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : val =
+           apply ccall
+             ($`*extern*`.caml_lessequal : val * val -> val)
+               (x, y)
+               -> k2 * k1
+             where k2 (Pccall_1) =
+               let untagged = %untag_imm (Pccall_1) in
+               switch untagged
+                 | 0 -> k (y)
+                 | 1 -> k (x)
+         in
+         let $camlM2__min_68 = closure min_2_1 @min in
+         let code loopify(never) size(21) newer_version_of(max_3)
+               max_3_1 (x : val, y : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : val =
+           apply ccall
+             ($`*extern*`.caml_greaterequal : val * val -> val)
+               (x, y)
+               -> k2 * k1
+             where k2 (Pccall_1) =
+               let untagged = %untag_imm (Pccall_1) in
+               switch untagged
+                 | 0 -> k (y)
+                 | 1 -> k (x)
+         in
+         let $camlM2__max_69 = closure max_3_1 @max in
+         let code loopify(never) size(15) newer_version_of(abs_4)
+               abs_4_1 (x : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let prim = %int_comp.ge (x, 0) in
+           switch prim
+             | 0 -> k2
+             | 1 -> k (x)
+             where k2 =
+               let int_neg = %int_barith.sub (0, x) in
+               cont k (int_neg)
+         in
+         let $camlM2__abs_70 = closure abs_4_1 @abs in
+         let code loopify(never) size(3) newer_version_of(lnot_5)
+               lnot_5_1 (x : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           let int_xor = %int_barith.xor (x, -1) in
+           cont k (int_xor)
+         in
+         let $camlM2__lnot_71 = closure lnot_5_1 @lnot in
+         let $camlM2__infinity1096 = infinity in
+         let $camlM2__neg_infinity1100 = -infinity in
+         let $camlM2__nan1104 = nan in
+         let $camlM2__max_float1108 = 0x1.fffffffffffffp+1023 in
+         let $camlM2__min_float1112 = 0x1p-1022 in
+         let $camlM2__epsilon_float1116 = 0x1p-52 in
+         let code loopify(never) size(36) newer_version_of(`^_6`)
+               `^_6_1` (s1 : val, s2 : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : val =
+           let prim = %string_length (s1) in
+           let l1 = %tag_imm (prim) in
+           let prim_1 = %string_length (s2) in
+           let l2 = %tag_imm (prim_1) in
+           let int_add = %int_barith.add (l1, l2) in
+           apply ccall
+             ($`*extern*`.caml_create_bytes : val -> val)
+               (int_add)
+               -> k2 * k1
+             where k2 (s) =
+               (apply ccall noalloc
+                  ($`*extern*`.caml_blit_string
+                   : val * val * val * val * val -> val)
+                    (s1, 0, s, 0, l1)
+                    -> k3 * k1
+                  where k3 (param) =
+                    cont k2
+                  where k2 =
+                    (apply ccall noalloc
+                       ($`*extern*`.caml_blit_string
+                        : val * val * val * val * val -> val)
+                         (s2, 0, s, l1, l2)
+                         -> k2 * k1
+                       where k2 (param) =
+                         cont k (s)))
+         in
+         let $`camlM2__^_72` = closure `^_6_1` @`^` in
+         let code loopify(never) size(28) newer_version_of(char_of_int_7)
+               char_of_int_7_1 (n : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           (let prim = %int_comp.lt (n, 0) in
+            switch prim
+              | 0 -> k3
+              | 1 -> k2
+              where k3 =
+                let prim_1 = %int_comp.gt (n, 255) in
+                switch prim_1
+                  | 0 -> k (n)
+                  | 1 -> k2)
+             where k2 =
+               apply direct(invalid_arg_1_1)
+                 ($camlM2__invalid_arg_67 : _ -> imm tagged)
+                   ($camlM2__immstring147)
+                   -> never * k1
+         in
+         let $camlM2__char_of_int_73 = closure char_of_int_7_1 @char_of_int
+         in
+         let code loopify(never) size(11) newer_version_of(string_of_bool_8)
+               string_of_bool_8_1 (b : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : val =
+           let untagged = %untag_imm (b) in
+           switch untagged
+             | 0 -> k ($camlM2__immstring155)
+             | 1 -> k ($camlM2__immstring157)
+         in
+         let $camlM2__string_of_bool_74 =
+           closure string_of_bool_8_1 @string_of_bool
+         in
+         let code loopify(never) size(34) newer_version_of(bool_of_string_9)
+               bool_of_string_9_1 (param : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : imm tagged =
+           apply ccall noalloc
+             ($`*extern*`.caml_string_notequal : val * val -> val)
+               (param, $camlM2__immstring155)
+               -> k2 * k1
+             where k2 (Pccall_1) =
+               ((let untagged = %untag_imm (Pccall_1) in
+                 switch untagged
+                   | 0 -> k (0)
+                   | 1 -> k2)
+                  where k2 =
+                    (apply ccall noalloc
+                       ($`*extern*`.caml_string_notequal : val * val -> val)
+                         (param, $camlM2__immstring157)
+                         -> k2 * k1
+                       where k2 (Pccall_2) =
+                         ((let untagged = %untag_imm (Pccall_2) in
+                           switch untagged
+                             | 0 -> k (1)
+                             | 1 -> k2)
+                            where k2 =
+                              apply direct(invalid_arg_1_1)
+                                ($camlM2__invalid_arg_67 : _ -> imm tagged)
+                                  ($camlM2__immstring171)
+                                  -> never * k1)))
+         in
+         let $camlM2__bool_of_string_75 =
+           closure bool_of_string_9_1 @bool_of_string
+         in
+         let code loopify(never) size(30) newer_version_of(bool_of_string_opt_10)
+               bool_of_string_opt_10_1 (param : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : [ 0 | 0 of val ] =
+           apply ccall noalloc
+             ($`*extern*`.caml_string_notequal : val * val -> val)
+               (param, $camlM2__immstring155)
+               -> k2 * k1
+             where k2 (Pccall_1) =
+               ((let untagged = %untag_imm (Pccall_1) in
+                 switch untagged
+                   | 0 -> k ($camlM2__const_block181)
+                   | 1 -> k2)
+                  where k2 =
+                    (apply ccall noalloc
+                       ($`*extern*`.caml_string_notequal : val * val -> val)
+                         (param, $camlM2__immstring157)
+                         -> k2 * k1
+                       where k2 (Pccall_2) =
+                         let untagged = %untag_imm (Pccall_2) in
+                         switch untagged
+                           | 0 -> k ($camlM2__const_block186)
+                           | 1 -> k (0)))
+         in
+         let $camlM2__bool_of_string_opt_76 =
+           closure bool_of_string_opt_10_1 @bool_of_string_opt
+         in
+         let code loopify(never) size(10) newer_version_of(string_of_int_11)
+               string_of_int_11_1 (n : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : val =
+           apply ccall
+             ($`*extern*`.caml_format_int : val * val -> val)
+               ($camlM2__immstring193, n)
+               -> k * k1
+         in
+         let $camlM2__string_of_int_77 =
+           closure string_of_int_11_1 @string_of_int
+         in
+         let code loopify(never) size(39) newer_version_of(int_of_string_opt_12)
+               int_of_string_opt_12_1 (s : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : [ 0 | 0 of val ] =
+           let try_region = %begin_try_region () in
+           let try_ghost_region = %begin_try_ghost_region () in
+           cont k3 push(k2)
+             where k3 =
+               (apply ccall
+                  ($`*extern*`.caml_int_of_string : val -> val)
+                    (s)
+                    -> k3 * k2
+                  where k3 (Pccall_1) =
+                    let Pmakeblock = %block.[`0`] (Pccall_1) in
+                    cont k pop(k2) (Pmakeblock))
+             where k2 exn (`exn` : val) =
+               let `unit` = %end_try_region (try_region) in
+               let unit_1 = %end_try_ghost_region (try_ghost_region) in
+               let Pfield = %block_load.[`0`] (`exn`) in
+               let prim = %phys_eq (Pfield, $`*predef*`.caml_exn_Failure) in
+               switch prim
+                 | 0 -> k1 pop(reraise k1) (`exn`)
+                 | 1 -> k (0)
+         in
+         let $camlM2__int_of_string_opt_78 =
+           closure int_of_string_opt_12_1 @int_of_string_opt
+         in
+         let code rec loopify(done) size(85) newer_version_of(loop_14)
+               loop_14_1 (i : imm tagged)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : val =
+           cont self (i)
+             where rec self (i_1 : imm tagged) =
+               let l = %project_value_slot.[`loop`].[`l`] (my_closure) in
+               let s = %project_value_slot.[`loop`].[`s`] (my_closure) in
+               let prim = %int_comp.ge (i_1, l) in
+               (switch prim
+                  | 0 -> k2
+                  | 1 -> k3
+                  where k3 =
+                    apply direct(`^_6_1`)
+                      ($`camlM2__^_72` : _ -> val)
+                        (s, $camlM2__immstring254)
+                        -> k * k1
+                  where k2 =
+                    ((let prim_1 = %string_length (s) in
+                      let prim_2 = %num_conv.[`imm`].[`nativeint`] (prim_1)
+                      in
+                      let prim_3 =
+                        %num_conv.[`tagged_imm`].[`nativeint`] (i_1)
+                      in
+                      let prim_4 =
+                        %int_comp.`nativeint`.unsigned.lt (prim_3, prim_2)
+                      in
+                      switch prim_4
+                        | 0 -> k2
+                        | 1 -> k3)
+                       where k3 =
+                         let prim_1 = %num_conv.[`tagged_imm`].[`imm`] (i_1)
+                         in
+                         let prim_2 = %string_load.[`8`] (s, prim_1) in
+                         let `*match*` = %tag_imm (prim_2) in
+                         ((let prim_3 = %int_comp.ge (`*match*`, 48) in
+                           switch prim_3
+                             | 0 -> k4
+                             | 1 -> k5
+                             where k5 =
+                               let prim_4 = %int_comp.ge (`*match*`, 58) in
+                               switch prim_4
+                                 | 0 -> k3
+                                 | 1 -> k (s)
+                             where k4 =
+                               let prim_4 = %int_comp.ne (`*match*`, 45) in
+                               switch prim_4
+                                 | 0 -> k3
+                                 | 1 -> k (s))
+                            where k3 =
+                              let int_add = %int_barith.add (i_1, 1) in
+                              cont self (int_add))
+                       where k2 =
+                         cont k1 pop(regular k1) ($camlM2__block239)))
+         in
+         let code loopify(never) size(106) newer_version_of(valid_float_lexem_13)
+               valid_float_lexem_13_1 (s : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : val =
+           let prim = %string_length (s) in
+           let l = %tag_imm (prim) in
+           let loop = closure loop_14_1 @loop
+           with { `^` = $`camlM2__^_72`; s = s; l = l }
+           in
+           apply direct(loop_14_1) (loop : _ -> val) (0) -> k * k1
+         in
+         let $camlM2__valid_float_lexem_79 =
+           closure valid_float_lexem_13_1 @valid_float_lexem
+         in
+         let code loopify(never) size(14) newer_version_of(string_of_float_15)
+               string_of_float_15_1 (f : float boxed)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : val =
+           apply ccall
+             ($`*extern*`.caml_format_float : val * val -> val)
+               ($camlM2__immstring262, f)
+               -> k2 * k1
+             where k2 (Pccall_1) =
+               apply direct(valid_float_lexem_13_1)
+                 ($camlM2__valid_float_lexem_79 : _ -> val)
+                   (Pccall_1)
+                   -> k * k1
+         in
+         let $camlM2__string_of_float_80 =
+           closure string_of_float_15_1 @string_of_float
+         in
+         let code loopify(never) size(39) newer_version_of(float_of_string_opt_16)
+               float_of_string_opt_16_1 (s : val)
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : [ 0 | 0 of val ] =
+           let try_region = %begin_try_region () in
+           let try_ghost_region = %begin_try_ghost_region () in
+           cont k3 push(k2)
+             where k3 =
+               (apply ccall
+                  ($`*extern*`.caml_float_of_string : val -> val)
+                    (s)
+                    -> k3 * k2
+                  where k3 (Pccall_1) =
+                    let Pmakeblock = %block.[`0`] (Pccall_1) in
+                    cont k pop(k2) (Pmakeblock))
+             where k2 exn (`exn` : val) =
+               let `unit` = %end_try_region (try_region) in
+               let unit_1 = %end_try_ghost_region (try_ghost_region) in
+               let Pfield = %block_load.[`0`] (`exn`) in
+               let prim = %phys_eq (Pfield, $`*predef*`.caml_exn_Failure) in
+               switch prim
+                 | 0 -> k1 pop(reraise k1) (`exn`)
+                 | 1 -> k (0)
+         in
+         let $camlM2__float_of_string_opt_81 =
+           closure float_of_string_opt_16_1 @float_of_string_opt
+         in
+         let $`camlM2__@_82` =
+           closure `@_17_1` @`@`
+         and code rec loopify(never) size(25) newer_version_of(`@_17`)
+               `@_17_1`
+                 (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                  l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                 my_closure _region _ghost_region my_depth
+                 -> k * k1
+                 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+           let prim = %is_int (l1) in
+           switch prim
+             | 0 -> k2
+             | 1 -> k (l2)
+             where k2 =
+               ((let Pfield = %block_load.[`1`] (l1) in
+                 apply direct(`@_17_1`)
+                   ($`camlM2__@_82` ~ depth my_depth -> succ my_depth
+                    : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                     (Pfield, l2)
+                     -> k2 * k1)
+                  where k2
+                          (apply_result :
+                             [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+                    let Pfield = %block_load.[`0`] (l1) in
+                    let Pmakeblock = %block.[`0`] (Pfield, apply_result) in
+                    cont k (Pmakeblock))
+         in
+         (apply ccall
+            ($`*extern*`.caml_ml_open_descriptor_in : val -> val)
+              (0)
+              -> k * error
+            where k (stdin) =
+              (apply ccall
+                 ($`*extern*`.caml_ml_open_descriptor_out : val -> val)
+                   (1)
+                   -> k * error
+                 where k (stdout) =
+                   (apply ccall
+                      ($`*extern*`.caml_ml_open_descriptor_out : val -> val)
+                        (2)
+                        -> k * error
+                      where k (stderr) =
+                        let code loopify(never) size(31) newer_version_of(open_out_gen_18)
+                              open_out_gen_18_1
+                                (mode :
+                                   [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                                 perm : imm tagged,
+                                 name : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : val =
+                          apply ccall
+                            ($`*extern*`.caml_sys_open
+                             : val * val * val -> val)
+                              (name, mode, perm)
+                              -> k2 * k1
+                            where k2 (Pccall_1) =
+                              (apply ccall
+                                 ($`*extern*`.caml_ml_open_descriptor_out
+                                  : val -> val)
+                                   (Pccall_1)
+                                   -> k2 * k1
+                                 where k2 (c) =
+                                   (apply ccall
+                                      ($`*extern*`.caml_ml_set_channel_name
+                                       : val * val -> val)
+                                        (c, name)
+                                        -> k2 * k1
+                                      where k2 (param) =
+                                        cont k (c)))
+                        in
+                        let $camlM2__open_out_gen_83 =
+                          closure open_out_gen_18_1 @open_out_gen
+                        in
+                        let code loopify(never) size(4) newer_version_of(open_out_19)
+                              open_out_19_1 (name : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : val =
+                          apply direct(open_out_gen_18_1)
+                            ($camlM2__open_out_gen_83 : _ -> val)
+                              ($camlM2__const_block329, 438, name)
+                              -> k * k1
+                        in
+                        let $camlM2__open_out_84 =
+                          closure open_out_19_1 @open_out
+                        in
+                        let code loopify(never) size(4) newer_version_of(open_out_bin_20)
+                              open_out_bin_20_1 (name : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : val =
+                          apply direct(open_out_gen_18_1)
+                            ($camlM2__open_out_gen_83 : _ -> val)
+                              ($camlM2__const_block343, 438, name)
+                              -> k * k1
+                        in
+                        let $camlM2__open_out_bin_85 =
+                          closure open_out_bin_20_1 @open_out_bin
+                        in
+                        let code rec loopify(done) size(49) newer_version_of(iter_22)
+                              iter_22_1
+                                (param :
+                                   [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          cont self (param)
+                            where rec self
+                                        (param_1 :
+                                           [ 0
+                                           | 0 of val *
+                                               [ 0 | 0 of val * val ] ]) =
+                              let prim = %is_int (param_1) in
+                              (switch prim
+                                 | 0 -> k2
+                                 | 1 -> k (0)
+                                 where k2 =
+                                   let try_region = %begin_try_region () in
+                                   let try_ghost_region =
+                                     %begin_try_ghost_region ()
+                                   in
+                                   (cont k5 push(k3)
+                                      where k5 =
+                                        let Pfield =
+                                          %block_load.[`0`] (param_1)
+                                        in
+                                        (apply ccall
+                                           ($`*extern*`.caml_ml_flush
+                                            : val -> val)
+                                             (Pfield)
+                                             -> k5 * k3
+                                           where k5 (param_2) =
+                                             cont k4)
+                                      where k4 =
+                                        cont k2 pop(k3)
+                                      where k3 exn (`exn` : val) =
+                                        let `unit` =
+                                          %end_try_region (try_region)
+                                        in
+                                        let unit_1 =
+                                          %end_try_ghost_region
+                                            (try_ghost_region)
+                                        in
+                                        let Pfield =
+                                          %block_load.[`0`] (`exn`)
+                                        in
+                                        let prim_1 =
+                                          %phys_eq
+                                            (Pfield,
+                                             $`*predef*`.caml_exn_Sys_error)
+                                        in
+                                        switch prim_1
+                                          | 0 -> k1 pop(reraise k1) (`exn`)
+                                          | 1 -> k2
+                                      where k2 =
+                                        let Pfield =
+                                          %block_load.[`1`] (param_1)
+                                        in
+                                        cont self (Pfield)))
+                        in
+                        let $camlM2__iter_87 = closure iter_22_1 @iter in
+                        let code loopify(never) size(14) newer_version_of(flush_all_21)
+                              flush_all_21_1 (param : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          apply ccall
+                            ($`*extern*`.caml_ml_out_channels_list
+                             : val -> val)
+                              (0)
+                              -> k2 * k1
+                            where k2 (Pccall_1) =
+                              apply direct(iter_22_1)
+                                ($camlM2__iter_87 : _ -> imm tagged)
+                                  (Pccall_1)
+                                  -> k * k1
+                        in
+                        let $camlM2__flush_all_86 =
+                          closure flush_all_21_1 @flush_all
+                        in
+                        let code loopify(never) size(17) newer_version_of(output_bytes_23)
+                              output_bytes_23_1 (oc : val, s : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let prim = %bytes_length (s) in
+                          let Pbyteslength = %tag_imm (prim) in
+                          apply ccall
+                            ($`*extern*`.caml_ml_output_bytes
+                             : val * val * val * val -> val)
+                              (oc, s, 0, Pbyteslength)
+                              -> k * k1
+                        in
+                        let $camlM2__output_bytes_88 =
+                          closure output_bytes_23_1 @output_bytes
+                        in
+                        let code loopify(never) size(17) newer_version_of(output_string_24)
+                              output_string_24_1 (oc : val, s : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let prim = %string_length (s) in
+                          let Pstringlength = %tag_imm (prim) in
+                          apply ccall
+                            ($`*extern*`.caml_ml_output
+                             : val * val * val * val -> val)
+                              (oc, s, 0, Pstringlength)
+                              -> k * k1
+                        in
+                        let $camlM2__output_string_89 =
+                          closure output_string_24_1 @output_string
+                        in
+                        let code loopify(never) size(59) newer_version_of(output_25)
+                              output_25_1
+                                (oc : val,
+                                 s : val,
+                                 ofs : imm tagged,
+                                 len : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          (let prim = %int_comp.lt (ofs, 0) in
+                           switch prim
+                             | 0 -> k3
+                             | 1 -> k2
+                             where k3 =
+                               let prim_1 = %int_comp.lt (len, 0) in
+                               (switch prim_1
+                                  | 0 -> k3
+                                  | 1 -> k2
+                                  where k3 =
+                                    let prim_2 = %bytes_length (s) in
+                                    let Pbyteslength = %tag_imm (prim_2) in
+                                    let int_sub =
+                                      %int_barith.sub (Pbyteslength, len)
+                                    in
+                                    let prim_3 = %int_comp.gt (ofs, int_sub)
+                                    in
+                                    (switch prim_3
+                                       | 0 -> k3
+                                       | 1 -> k2
+                                       where k3 =
+                                         apply ccall
+                                           ($`*extern*`.caml_ml_output_bytes
+                                            : val * val * val * val -> val)
+                                             (oc, s, ofs, len)
+                                             -> k * k1)))
+                            where k2 =
+                              apply direct(invalid_arg_1_1)
+                                ($camlM2__invalid_arg_67 : _ -> imm tagged)
+                                  ($camlM2__immstring420)
+                                  -> never * k1
+                        in
+                        let $camlM2__output_90 = closure output_25_1 @output
+                        in
+                        let code loopify(never) size(59) newer_version_of(output_substring_26)
+                              output_substring_26_1
+                                (oc : val,
+                                 s : val,
+                                 ofs : imm tagged,
+                                 len : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          (let prim = %int_comp.lt (ofs, 0) in
+                           switch prim
+                             | 0 -> k3
+                             | 1 -> k2
+                             where k3 =
+                               let prim_1 = %int_comp.lt (len, 0) in
+                               (switch prim_1
+                                  | 0 -> k3
+                                  | 1 -> k2
+                                  where k3 =
+                                    let prim_2 = %string_length (s) in
+                                    let Pstringlength = %tag_imm (prim_2) in
+                                    let int_sub =
+                                      %int_barith.sub (Pstringlength, len)
+                                    in
+                                    let prim_3 = %int_comp.gt (ofs, int_sub)
+                                    in
+                                    (switch prim_3
+                                       | 0 -> k3
+                                       | 1 -> k2
+                                       where k3 =
+                                         apply ccall
+                                           ($`*extern*`.caml_ml_output
+                                            : val * val * val * val -> val)
+                                             (oc, s, ofs, len)
+                                             -> k * k1)))
+                            where k2 =
+                              apply direct(invalid_arg_1_1)
+                                ($camlM2__invalid_arg_67 : _ -> imm tagged)
+                                  ($camlM2__immstring445)
+                                  -> never * k1
+                        in
+                        let $camlM2__output_substring_91 =
+                          closure output_substring_26_1 @output_substring
+                        in
+                        let code loopify(never) size(10) newer_version_of(output_value_27)
+                              output_value_27_1 (chan : val, v : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          apply ccall
+                            ($`*extern*`.caml_output_value
+                             : val * val * val -> val)
+                              (chan, v, 0)
+                              -> k * k1
+                        in
+                        let $camlM2__output_value_92 =
+                          closure output_value_27_1 @output_value
+                        in
+                        let code loopify(never) size(21) newer_version_of(close_out_28)
+                              close_out_28_1 (oc : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          apply ccall
+                            ($`*extern*`.caml_ml_flush : val -> val)
+                              (oc)
+                              -> k3 * k1
+                            where k3 (param) =
+                              cont k2
+                            where k2 =
+                              apply ccall
+                                ($`*extern*`.caml_ml_close_channel
+                                 : val -> val)
+                                  (oc)
+                                  -> k * k1
+                        in
+                        let $camlM2__close_out_93 =
+                          closure close_out_28_1 @close_out
+                        in
+                        let code loopify(never) size(43) newer_version_of(close_out_noerr_29)
+                              close_out_noerr_29_1 (oc : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let try_region = %begin_try_region () in
+                          let try_ghost_region = %begin_try_ghost_region ()
+                          in
+                          cont k5 push(k3)
+                            where k5 =
+                              (apply ccall
+                                 ($`*extern*`.caml_ml_flush : val -> val)
+                                   (oc)
+                                   -> k5 * k3
+                                 where k5 (param) =
+                                   cont k4)
+                            where k4 =
+                              cont k2 pop(k3)
+                            where k3 exn (`exn` : val) =
+                              let `unit` = %end_try_region (try_region) in
+                              let unit_1 =
+                                %end_try_ghost_region (try_ghost_region)
+                              in
+                              cont k2
+                            where k2 =
+                              let try_region_1 = %begin_try_region () in
+                              let try_ghost_region_1 =
+                                %begin_try_ghost_region ()
+                              in
+                              (cont k4 push(k2)
+                                 where k4 =
+                                   apply ccall
+                                     ($`*extern*`.caml_ml_close_channel
+                                      : val -> val)
+                                       (oc)
+                                       -> k3 * k2
+                                 where k3 (body_result : imm tagged) =
+                                   cont k pop(k2) (body_result)
+                                 where k2 exn (`exn` : val) =
+                                   let `unit` =
+                                     %end_try_region (try_region_1)
+                                   in
+                                   let unit_1 =
+                                     %end_try_ghost_region
+                                       (try_ghost_region_1)
+                                   in
+                                   cont k (0))
+                        in
+                        let $camlM2__close_out_noerr_94 =
+                          closure close_out_noerr_29_1 @close_out_noerr
+                        in
+                        let code loopify(never) size(31) newer_version_of(open_in_gen_30)
+                              open_in_gen_30_1
+                                (mode :
+                                   [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                                 perm : imm tagged,
+                                 name : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : val =
+                          apply ccall
+                            ($`*extern*`.caml_sys_open
+                             : val * val * val -> val)
+                              (name, mode, perm)
+                              -> k2 * k1
+                            where k2 (Pccall_1) =
+                              (apply ccall
+                                 ($`*extern*`.caml_ml_open_descriptor_in
+                                  : val -> val)
+                                   (Pccall_1)
+                                   -> k2 * k1
+                                 where k2 (c) =
+                                   (apply ccall
+                                      ($`*extern*`.caml_ml_set_channel_name
+                                       : val * val -> val)
+                                        (c, name)
+                                        -> k2 * k1
+                                      where k2 (param) =
+                                        cont k (c)))
+                        in
+                        let $camlM2__open_in_gen_95 =
+                          closure open_in_gen_30_1 @open_in_gen
+                        in
+                        let code loopify(never) size(4) newer_version_of(open_in_31)
+                              open_in_31_1 (name : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : val =
+                          apply direct(open_in_gen_30_1)
+                            ($camlM2__open_in_gen_95 : _ -> val)
+                              ($camlM2__const_block505, 0, name)
+                              -> k * k1
+                        in
+                        let $camlM2__open_in_96 =
+                          closure open_in_31_1 @open_in
+                        in
+                        let code loopify(never) size(4) newer_version_of(open_in_bin_32)
+                              open_in_bin_32_1 (name : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : val =
+                          apply direct(open_in_gen_30_1)
+                            ($camlM2__open_in_gen_95 : _ -> val)
+                              ($camlM2__const_block513, 0, name)
+                              -> k * k1
+                        in
+                        let $camlM2__open_in_bin_97 =
+                          closure open_in_bin_32_1 @open_in_bin
+                        in
+                        let code loopify(never) size(59) newer_version_of(input_33)
+                              input_33_1
+                                (ic : val,
+                                 s : val,
+                                 ofs : imm tagged,
+                                 len : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          (let prim = %int_comp.lt (ofs, 0) in
+                           switch prim
+                             | 0 -> k3
+                             | 1 -> k2
+                             where k3 =
+                               let prim_1 = %int_comp.lt (len, 0) in
+                               (switch prim_1
+                                  | 0 -> k3
+                                  | 1 -> k2
+                                  where k3 =
+                                    let prim_2 = %bytes_length (s) in
+                                    let Pbyteslength = %tag_imm (prim_2) in
+                                    let int_sub =
+                                      %int_barith.sub (Pbyteslength, len)
+                                    in
+                                    let prim_3 = %int_comp.gt (ofs, int_sub)
+                                    in
+                                    (switch prim_3
+                                       | 0 -> k3
+                                       | 1 -> k2
+                                       where k3 =
+                                         apply ccall
+                                           ($`*extern*`.caml_ml_input
+                                            : val * val * val * val -> val)
+                                             (ic, s, ofs, len)
+                                             -> k * k1)))
+                            where k2 =
+                              apply direct(invalid_arg_1_1)
+                                ($camlM2__invalid_arg_67 : _ -> imm tagged)
+                                  ($camlM2__immstring538)
+                                  -> never * k1
+                        in
+                        let $camlM2__input_98 = closure input_33_1 @input in
+                        let code rec loopify(done) size(40) newer_version_of(unsafe_really_input_34)
+                              unsafe_really_input_34_1
+                                (ic : val,
+                                 s : val,
+                                 ofs : imm tagged,
+                                 len : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          cont self (ofs, len)
+                            where rec self
+                                        (ofs_1 : imm tagged,
+                                         len_1 : imm tagged) =
+                              let ic_1 = ic in
+                              let s_1 = s in
+                              let prim = %int_comp.le (len_1, 0) in
+                              (switch prim
+                                 | 0 -> k2
+                                 | 1 -> k (0)
+                                 where k2 =
+                                   (apply ccall
+                                      ($`*extern*`.caml_ml_input
+                                       : val * val * val * val -> val)
+                                        (ic_1, s_1, ofs_1, len_1)
+                                        -> k2 * k1
+                                      where k2 (r) =
+                                        let prim_1 = %phys_eq (r, 0) in
+                                        (switch prim_1
+                                           | 0 -> k2
+                                           | 1 -> k1
+                                                    pop(regular k1)
+                                                    ($`*predef*`.caml_exn_End_of_file)
+                                           where k2 =
+                                             let int_sub =
+                                               %int_barith.sub (len_1, r)
+                                             in
+                                             let int_add =
+                                               %int_barith.add (ofs_1, r)
+                                             in
+                                             cont self (int_add, int_sub))))
+                        in
+                        let $camlM2__unsafe_really_input_99 =
+                          closure unsafe_really_input_34_1
+                            @unsafe_really_input
+                        in
+                        let code loopify(never) size(53) newer_version_of(really_input_35)
+                              really_input_35_1
+                                (ic : val,
+                                 s : val,
+                                 ofs : imm tagged,
+                                 len : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          (let prim = %int_comp.lt (ofs, 0) in
+                           switch prim
+                             | 0 -> k3
+                             | 1 -> k2
+                             where k3 =
+                               let prim_1 = %int_comp.lt (len, 0) in
+                               (switch prim_1
+                                  | 0 -> k3
+                                  | 1 -> k2
+                                  where k3 =
+                                    let prim_2 = %bytes_length (s) in
+                                    let Pbyteslength = %tag_imm (prim_2) in
+                                    let int_sub =
+                                      %int_barith.sub (Pbyteslength, len)
+                                    in
+                                    let prim_3 = %int_comp.gt (ofs, int_sub)
+                                    in
+                                    (switch prim_3
+                                       | 0 -> k3
+                                       | 1 -> k2
+                                       where k3 =
+                                         apply
+                                                direct(unsafe_really_input_34_1)
+                                           ($camlM2__unsafe_really_input_99
+                                            : _ -> imm tagged)
+                                             (ic, s, ofs, len)
+                                             -> k * k1)))
+                            where k2 =
+                              apply direct(invalid_arg_1_1)
+                                ($camlM2__invalid_arg_67 : _ -> imm tagged)
+                                  ($camlM2__immstring581)
+                                  -> never * k1
+                        in
+                        let $camlM2__really_input_100 =
+                          closure really_input_35_1 @really_input
+                        in
+                        let code loopify(never) size(15) newer_version_of(really_input_string_36)
+                              really_input_string_36_1
+                                (ic : val, len : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : val =
+                          apply ccall
+                            ($`*extern*`.caml_create_bytes : val -> val)
+                              (len)
+                              -> k2 * k1
+                            where k2 (s) =
+                              (apply direct(really_input_35_1)
+                                 ($camlM2__really_input_100 : _ -> imm tagged
+                                  )
+                                   (ic, s, 0, len)
+                                   -> k2 * k1
+                                 where k2 (param : imm tagged) =
+                                   cont k (s))
+                        in
+                        let $camlM2__really_input_string_101 =
+                          closure really_input_string_36_1
+                            @really_input_string
+                        in
+                        let code rec loopify(done) size(29) newer_version_of(build_result_38)
+                              build_result_38_1
+                                (buf : val,
+                                 pos : imm tagged,
+                                 param :
+                                   [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : val =
+                          cont self (pos, param)
+                            where rec self
+                                        (pos_1 : imm tagged,
+                                         param_1 :
+                                           [ 0
+                                           | 0 of val *
+                                               [ 0 | 0 of val * val ] ]) =
+                              let buf_1 = buf in
+                              let prim = %is_int (param_1) in
+                              (switch prim
+                                 | 0 -> k2
+                                 | 1 -> k (buf_1)
+                                 where k2 =
+                                   let hd = %block_load.[`0`] (param_1) in
+                                   let prim_1 = %bytes_length (hd) in
+                                   let len = %tag_imm (prim_1) in
+                                   let int_sub = %int_barith.sub (pos_1, len)
+                                   in
+                                   (apply ccall noalloc
+                                      ($`*extern*`.caml_blit_bytes
+                                       : val * val * val * val * val -> val)
+                                        (hd, 0, buf_1, int_sub, len)
+                                        -> k3 * k1
+                                      where k3 (param_2) =
+                                        cont k2
+                                      where k2 =
+                                        let Pfield =
+                                          %block_load.[`1`] (param_1)
+                                        in
+                                        cont self (int_sub, Pfield)))
+                        in
+                        let $camlM2__build_result_103 =
+                          closure build_result_38_1 @build_result
+                        in
+                        let code rec loopify(done) size(164) newer_version_of(scan_39)
+                              scan_39_1
+                                (accu :
+                                   [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+                                 len : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : val =
+                          cont self (accu, len)
+                            where rec self
+                                        (accu_1 :
+                                           [ 0
+                                           | 0 of val *
+                                               [ 0 | 0 of val * val ] ],
+                                         len_1 : imm tagged) =
+                              let chan =
+                                %project_value_slot.[`scan`].[`chan`]
+                                  (my_closure)
+                              in
+                              (apply ccall
+                                 ($`*extern*`.caml_ml_input_scan_line
+                                  : val -> val)
+                                   (chan)
+                                   -> k2 * k1
+                                 where k2 (n) =
+                                   let prim = %phys_eq (n, 0) in
+                                   (switch prim
+                                      | 0 -> k2
+                                      | 1 -> k3
+                                      where k3 =
+                                        let prim_1 = %is_int (accu_1) in
+                                        (switch prim_1
+                                           | 0 -> k3
+                                           | 1 -> k1
+                                                    pop(regular k1)
+                                                    ($`*predef*`.caml_exn_End_of_file)
+                                           where k3 =
+                                             (apply ccall
+                                                ($`*extern*`.caml_create_bytes
+                                                 : val -> val)
+                                                  (len_1)
+                                                  -> k3 * k1
+                                                where k3 (Pccall_1) =
+                                                  apply
+                                                         direct(build_result_38_1)
+                                                    ($camlM2__build_result_103
+                                                     : _ -> val)
+                                                      (Pccall_1,
+                                                       len_1,
+                                                       accu_1)
+                                                      -> k * k1))
+                                      where k2 =
+                                        let prim_1 = %int_comp.gt (n, 0) in
+                                        (switch prim_1
+                                           | 0 -> k2
+                                           | 1 -> k3
+                                           where k3 =
+                                             let int_sub =
+                                               %int_barith.sub (n, 1)
+                                             in
+                                             (apply ccall
+                                                ($`*extern*`.caml_create_bytes
+                                                 : val -> val)
+                                                  (int_sub)
+                                                  -> k3 * k1
+                                                where k3 (res) =
+                                                  (apply ccall
+                                                     ($`*extern*`.caml_ml_input
+                                                      : val * val * val * val ->
+                                                        val
+                                                      )
+                                                       (chan, res, 0, int_sub)
+                                                       -> k4 * k1
+                                                     where k4 (param) =
+                                                       cont k3
+                                                     where k3 =
+                                                       (apply ccall
+                                                          ($`*extern*`.caml_ml_input_char
+                                                           : val -> val)
+                                                            (chan)
+                                                            -> k4 * k1
+                                                          where k4 (param) =
+                                                            cont k3
+                                                          where k3 =
+                                                            let prim_2 =
+                                                              %is_int
+                                                                (accu_1)
+                                                            in
+                                                            (switch prim_2
+                                                               | 0 -> 
+                                                               k3
+                                                               | 1 -> 
+                                                               k (res)
+                                                               where 
+                                                                 k3 =
+                                                                 let int_add =
+                                                                   %int_barith.add
+                                                                    (len_1, n)
+                                                                 in
+                                                                 let len_2 =
+                                                                   %int_barith.sub
+                                                                    (int_add,
+                                                                    1)
+                                                                 in
+                                                                 let Pmakeblock =
+                                                                   %block.[`0`]
+                                                                    (res,
+                                                                    accu_1)
+                                                                 in
+                                                                 (apply
+                                                                     ccall
+                                                                    ($`*extern*`.caml_create_bytes
+                                                                    : 
+                                                                    val ->
+                                                                    val)
+                                                                    (len_2)
+                                                                    -> k3
+                                                                    * k1
+                                                                    where 
+                                                                    k3
+                                                                    (Pccall_1) =
+                                                                    apply
+                                                                     direct(build_result_38_1)
+                                                                    ($camlM2__build_result_103
+                                                                    : 
+                                                                    _ -> 
+                                                                    val)
+                                                                    (Pccall_1,
+                                                                    len_2,
+                                                                    Pmakeblock)
+                                                                    -> k * k1)))))
+                                           where k2 =
+                                             let int_neg =
+                                               %int_barith.sub (0, n)
+                                             in
+                                             (apply ccall
+                                                ($`*extern*`.caml_create_bytes
+                                                 : val -> val)
+                                                  (int_neg)
+                                                  -> k2 * k1
+                                                where k2 (beg) =
+                                                  (apply ccall
+                                                     ($`*extern*`.caml_ml_input
+                                                      : val * val * val * val ->
+                                                        val
+                                                      )
+                                                       (chan, beg, 0, int_neg)
+                                                       -> k3 * k1
+                                                     where k3 (param) =
+                                                       cont k2
+                                                     where k2 =
+                                                       let int_sub =
+                                                         %int_barith.sub
+                                                           (len_1, n)
+                                                       in
+                                                       let Pmakeblock =
+                                                         %block.[`0`]
+                                                           (beg, accu_1)
+                                                       in
+                                                       cont self
+                                                              (Pmakeblock,
+                                                               int_sub))))))
+                        in
+                        let code loopify(never) size(182) newer_version_of(input_line_37)
+                              input_line_37_1 (chan : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : val =
+                          let `region` = %begin_region () in
+                          (let scan = closure scan_39_1 @scan
+                           with {
+                             End_of_file = $`*predef*`.caml_exn_End_of_file;
+                             chan = chan;
+                             build_result = $camlM2__build_result_103
+                           }
+                           in
+                           apply direct(scan_39_1)
+                             (scan : _ -> val) (0, 0) -> k2 * k1)
+                            where k2 (region_return : val) =
+                              let `unit` = %end_region (`region`) in
+                              cont k (region_return)
+                        in
+                        let $camlM2__input_line_102 =
+                          closure input_line_37_1 @input_line
+                        in
+                        let code loopify(never) size(21) newer_version_of(close_in_noerr_40)
+                              close_in_noerr_40_1 (ic : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let try_region = %begin_try_region () in
+                          let try_ghost_region = %begin_try_ghost_region ()
+                          in
+                          cont k4 push(k2)
+                            where k4 =
+                              apply ccall
+                                ($`*extern*`.caml_ml_close_channel
+                                 : val -> val)
+                                  (ic)
+                                  -> k3 * k2
+                            where k3 (body_result : imm tagged) =
+                              cont k pop(k2) (body_result)
+                            where k2 exn (`exn` : val) =
+                              let `unit` = %end_try_region (try_region) in
+                              let unit_1 =
+                                %end_try_ghost_region (try_ghost_region)
+                              in
+                              cont k (0)
+                        in
+                        let $camlM2__close_in_noerr_104 =
+                          closure close_in_noerr_40_1 @close_in_noerr
+                        in
+                        let $camlM2__print_char_105 =
+                          closure print_char_41_1 @print_char
+                        and code loopify(never) size(11) newer_version_of(print_char_41)
+                              print_char_41_1 (c : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let stdout_1 =
+                            %project_value_slot.[`print_char`].[`stdout`]
+                              ($camlM2__print_char_105)
+                          in
+                          apply ccall
+                            ($`*extern*`.caml_ml_output_char
+                             : val * val -> val)
+                              (stdout_1, c)
+                              -> k * k1
+                          with { stdout = stdout }
+                        in
+                        let $camlM2__print_string_106 =
+                          closure print_string_42_1 @print_string
+                        and code loopify(never) size(5) newer_version_of(print_string_42)
+                              print_string_42_1 (s : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let stdout_1 =
+                            %project_value_slot.[`print_string`].[`stdout_1`]
+                              ($camlM2__print_string_106)
+                          in
+                          apply direct(output_string_24_1)
+                            ($camlM2__output_string_89 : _ -> imm tagged)
+                              (stdout_1, s)
+                              -> k * k1
+                          with { stdout_1 = stdout }
+                        in
+                        let $camlM2__print_bytes_107 =
+                          closure print_bytes_43_1 @print_bytes
+                        and code loopify(never) size(5) newer_version_of(print_bytes_43)
+                              print_bytes_43_1 (s : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let stdout_1 =
+                            %project_value_slot.[`print_bytes`].[`stdout_2`]
+                              ($camlM2__print_bytes_107)
+                          in
+                          apply direct(output_bytes_23_1)
+                            ($camlM2__output_bytes_88 : _ -> imm tagged)
+                              (stdout_1, s)
+                              -> k * k1
+                          with { stdout_2 = stdout }
+                        in
+                        let $camlM2__print_int_108 =
+                          closure print_int_44_1 @print_int
+                        and code loopify(never) size(9) newer_version_of(print_int_44)
+                              print_int_44_1 (i : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let stdout_1 =
+                            %project_value_slot.[`print_int`].[`stdout_3`]
+                              ($camlM2__print_int_108)
+                          in
+                          apply direct(string_of_int_11_1)
+                            ($camlM2__string_of_int_77 : _ -> val)
+                              (i)
+                              -> k2 * k1
+                            where k2 (apply_result : val) =
+                              apply direct(output_string_24_1)
+                                ($camlM2__output_string_89 : _ -> imm tagged)
+                                  (stdout_1, apply_result)
+                                  -> k * k1
+                          with { stdout_3 = stdout }
+                        in
+                        let $camlM2__print_float_109 =
+                          closure print_float_45_1 @print_float
+                        and code loopify(never) size(9) newer_version_of(print_float_45)
+                              print_float_45_1 (f : float boxed)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let stdout_1 =
+                            %project_value_slot.[`print_float`].[`stdout_4`]
+                              ($camlM2__print_float_109)
+                          in
+                          apply direct(string_of_float_15_1)
+                            ($camlM2__string_of_float_80 : _ -> val)
+                              (f)
+                              -> k2 * k1
+                            where k2 (apply_result : val) =
+                              apply direct(output_string_24_1)
+                                ($camlM2__output_string_89 : _ -> imm tagged)
+                                  (stdout_1, apply_result)
+                                  -> k * k1
+                          with { stdout_4 = stdout }
+                        in
+                        let $camlM2__print_endline_110 =
+                          closure print_endline_46_1 @print_endline
+                        and code loopify(never) size(27) newer_version_of(print_endline_46)
+                              print_endline_46_1 (s : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let stdout_1 =
+                            %project_value_slot.[`print_endline`].[`stdout_5`]
+                              ($camlM2__print_endline_110)
+                          in
+                          apply direct(output_string_24_1)
+                            ($camlM2__output_string_89 : _ -> imm tagged)
+                              (stdout_1, s)
+                              -> k3 * k1
+                            where k3 (param : imm tagged) =
+                              cont k2
+                            where k2 =
+                              (apply ccall
+                                 ($`*extern*`.caml_ml_output_char
+                                  : val * val -> val)
+                                   (stdout_1, 10)
+                                   -> k3 * k1
+                                 where k3 (param) =
+                                   cont k2
+                                 where k2 =
+                                   apply ccall
+                                     ($`*extern*`.caml_ml_flush : val -> val)
+                                       (stdout_1)
+                                       -> k * k1)
+                          with { stdout_5 = stdout }
+                        in
+                        let $camlM2__print_newline_111 =
+                          closure print_newline_47_1 @print_newline
+                        and code loopify(never) size(22) newer_version_of(print_newline_47)
+                              print_newline_47_1 (param : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let stdout_1 =
+                            %project_value_slot.[`print_newline`].[`stdout_6`]
+                              ($camlM2__print_newline_111)
+                          in
+                          apply ccall
+                            ($`*extern*`.caml_ml_output_char
+                             : val * val -> val)
+                              (stdout_1, 10)
+                              -> k3 * k1
+                            where k3 (param_1) =
+                              cont k2
+                            where k2 =
+                              apply ccall
+                                ($`*extern*`.caml_ml_flush : val -> val)
+                                  (stdout_1)
+                                  -> k * k1
+                          with { stdout_6 = stdout }
+                        in
+                        let $camlM2__prerr_char_112 =
+                          closure prerr_char_48_1 @prerr_char
+                        and code loopify(never) size(11) newer_version_of(prerr_char_48)
+                              prerr_char_48_1 (c : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let stderr_1 =
+                            %project_value_slot.[`prerr_char`].[`stderr`]
+                              ($camlM2__prerr_char_112)
+                          in
+                          apply ccall
+                            ($`*extern*`.caml_ml_output_char
+                             : val * val -> val)
+                              (stderr_1, c)
+                              -> k * k1
+                          with { stderr = stderr }
+                        in
+                        let $camlM2__prerr_string_113 =
+                          closure prerr_string_49_1 @prerr_string
+                        and code loopify(never) size(5) newer_version_of(prerr_string_49)
+                              prerr_string_49_1 (s : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let stderr_1 =
+                            %project_value_slot.[`prerr_string`].[`stderr_1`]
+                              ($camlM2__prerr_string_113)
+                          in
+                          apply direct(output_string_24_1)
+                            ($camlM2__output_string_89 : _ -> imm tagged)
+                              (stderr_1, s)
+                              -> k * k1
+                          with { stderr_1 = stderr }
+                        in
+                        let $camlM2__prerr_bytes_114 =
+                          closure prerr_bytes_50_1 @prerr_bytes
+                        and code loopify(never) size(5) newer_version_of(prerr_bytes_50)
+                              prerr_bytes_50_1 (s : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let stderr_1 =
+                            %project_value_slot.[`prerr_bytes`].[`stderr_2`]
+                              ($camlM2__prerr_bytes_114)
+                          in
+                          apply direct(output_bytes_23_1)
+                            ($camlM2__output_bytes_88 : _ -> imm tagged)
+                              (stderr_1, s)
+                              -> k * k1
+                          with { stderr_2 = stderr }
+                        in
+                        let $camlM2__prerr_int_115 =
+                          closure prerr_int_51_1 @prerr_int
+                        and code loopify(never) size(9) newer_version_of(prerr_int_51)
+                              prerr_int_51_1 (i : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let stderr_1 =
+                            %project_value_slot.[`prerr_int`].[`stderr_3`]
+                              ($camlM2__prerr_int_115)
+                          in
+                          apply direct(string_of_int_11_1)
+                            ($camlM2__string_of_int_77 : _ -> val)
+                              (i)
+                              -> k2 * k1
+                            where k2 (apply_result : val) =
+                              apply direct(output_string_24_1)
+                                ($camlM2__output_string_89 : _ -> imm tagged)
+                                  (stderr_1, apply_result)
+                                  -> k * k1
+                          with { stderr_3 = stderr }
+                        in
+                        let $camlM2__prerr_float_116 =
+                          closure prerr_float_52_1 @prerr_float
+                        and code loopify(never) size(9) newer_version_of(prerr_float_52)
+                              prerr_float_52_1 (f : float boxed)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let stderr_1 =
+                            %project_value_slot.[`prerr_float`].[`stderr_4`]
+                              ($camlM2__prerr_float_116)
+                          in
+                          apply direct(string_of_float_15_1)
+                            ($camlM2__string_of_float_80 : _ -> val)
+                              (f)
+                              -> k2 * k1
+                            where k2 (apply_result : val) =
+                              apply direct(output_string_24_1)
+                                ($camlM2__output_string_89 : _ -> imm tagged)
+                                  (stderr_1, apply_result)
+                                  -> k * k1
+                          with { stderr_4 = stderr }
+                        in
+                        let $camlM2__prerr_endline_117 =
+                          closure prerr_endline_53_1 @prerr_endline
+                        and code loopify(never) size(27) newer_version_of(prerr_endline_53)
+                              prerr_endline_53_1 (s : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let stderr_1 =
+                            %project_value_slot.[`prerr_endline`].[`stderr_5`]
+                              ($camlM2__prerr_endline_117)
+                          in
+                          apply direct(output_string_24_1)
+                            ($camlM2__output_string_89 : _ -> imm tagged)
+                              (stderr_1, s)
+                              -> k3 * k1
+                            where k3 (param : imm tagged) =
+                              cont k2
+                            where k2 =
+                              (apply ccall
+                                 ($`*extern*`.caml_ml_output_char
+                                  : val * val -> val)
+                                   (stderr_1, 10)
+                                   -> k3 * k1
+                                 where k3 (param) =
+                                   cont k2
+                                 where k2 =
+                                   apply ccall
+                                     ($`*extern*`.caml_ml_flush : val -> val)
+                                       (stderr_1)
+                                       -> k * k1)
+                          with { stderr_5 = stderr }
+                        in
+                        let $camlM2__prerr_newline_118 =
+                          closure prerr_newline_54_1 @prerr_newline
+                        and code loopify(never) size(22) newer_version_of(prerr_newline_54)
+                              prerr_newline_54_1 (param : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let stderr_1 =
+                            %project_value_slot.[`prerr_newline`].[`stderr_6`]
+                              ($camlM2__prerr_newline_118)
+                          in
+                          apply ccall
+                            ($`*extern*`.caml_ml_output_char
+                             : val * val -> val)
+                              (stderr_1, 10)
+                              -> k3 * k1
+                            where k3 (param_1) =
+                              cont k2
+                            where k2 =
+                              apply ccall
+                                ($`*extern*`.caml_ml_flush : val -> val)
+                                  (stderr_1)
+                                  -> k * k1
+                          with { stderr_6 = stderr }
+                        in
+                        let $camlM2__read_line_119 =
+                          closure read_line_55_1 @read_line
+                        and code loopify(never) size(17) newer_version_of(read_line_55)
+                              read_line_55_1 (param : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : val =
+                          let stdout_1 =
+                            %project_value_slot.[`read_line`].[`stdout_7`]
+                              ($camlM2__read_line_119)
+                          in
+                          let stdin_1 =
+                            %project_value_slot.[`read_line`].[`stdin`]
+                              ($camlM2__read_line_119)
+                          in
+                          apply ccall
+                            ($`*extern*`.caml_ml_flush : val -> val)
+                              (stdout_1)
+                              -> k3 * k1
+                            where k3 (param_1) =
+                              cont k2
+                            where k2 =
+                              apply direct(input_line_37_1)
+                                ($camlM2__input_line_102 : _ -> val)
+                                  (stdin_1)
+                                  -> k * k1
+                          with { stdin = stdin; stdout_7 = stdout }
+                        in
+                        let code loopify(never) size(14) newer_version_of(read_int_56)
+                              read_int_56_1 (param : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          apply direct(read_line_55_1)
+                            ($camlM2__read_line_119 : _ -> val)
+                              (0)
+                              -> k2 * k1
+                            where k2 (apply_result : val) =
+                              apply ccall
+                                ($`*extern*`.caml_int_of_string : val -> val)
+                                  (apply_result)
+                                  -> k * k1
+                        in
+                        let $camlM2__read_int_120 =
+                          closure read_int_56_1 @read_int
+                        in
+                        let code loopify(never) size(8) newer_version_of(read_int_opt_57)
+                              read_int_opt_57_1 (param : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : [ 0 | 0 of val ] =
+                          apply direct(read_line_55_1)
+                            ($camlM2__read_line_119 : _ -> val)
+                              (0)
+                              -> k2 * k1
+                            where k2 (apply_result : val) =
+                              apply direct(int_of_string_opt_12_1)
+                                ($camlM2__int_of_string_opt_78
+                                 : _ -> [ 0 | 0 of val ])
+                                  (apply_result)
+                                  -> k * k1
+                        in
+                        let $camlM2__read_int_opt_121 =
+                          closure read_int_opt_57_1 @read_int_opt
+                        in
+                        let code loopify(never) size(14) newer_version_of(read_float_58)
+                              read_float_58_1 (param : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : float boxed =
+                          apply direct(read_line_55_1)
+                            ($camlM2__read_line_119 : _ -> val)
+                              (0)
+                              -> k2 * k1
+                            where k2 (apply_result : val) =
+                              apply ccall
+                                ($`*extern*`.caml_float_of_string
+                                 : val -> val)
+                                  (apply_result)
+                                  -> k * k1
+                        in
+                        let $camlM2__read_float_122 =
+                          closure read_float_58_1 @read_float
+                        in
+                        let code loopify(never) size(8) newer_version_of(read_float_opt_59)
+                              read_float_opt_59_1 (param : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : [ 0 | 0 of val ] =
+                          apply direct(read_line_55_1)
+                            ($camlM2__read_line_119 : _ -> val)
+                              (0)
+                              -> k2 * k1
+                            where k2 (apply_result : val) =
+                              apply direct(float_of_string_opt_16_1)
+                                ($camlM2__float_of_string_opt_81
+                                 : _ -> [ 0 | 0 of val ])
+                                  (apply_result)
+                                  -> k * k1
+                        in
+                        let $camlM2__read_float_opt_123 =
+                          closure read_float_opt_59_1 @read_float_opt
+                        in
+                        let exit_function =
+                          %block.mut.[`0`] ($camlM2__flush_all_86)
+                        in
+                        let code loopify(never) size(32) newer_version_of(`fn[m2.ml:680,7--129]_61`)
+                              `fn[m2.ml:680,7--129]_61_1`
+                                (param : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let g =
+                            %project_value_slot.[`fn[m2.ml:680,7--129]`].[`g`]
+                              (my_closure)
+                          in
+                          let f_already_ran =
+                            %project_value_slot.[`fn[m2.ml:680,7--129]`].[`f_already_ran`]
+                              (my_closure)
+                          in
+                          let f =
+                            %project_value_slot.[`fn[m2.ml:680,7--129]`].[`f`]
+                              (my_closure)
+                          in
+                          (let Pfield = %block_load.mut.[`0`] (f_already_ran)
+                           in
+                           (let untagged = %untag_imm (Pfield) in
+                            switch untagged
+                              | 0 -> k3
+                              | 1 -> k2)
+                             where k3 =
+                               let Psetfield =
+                                 %block_set.`imm`.[`0`] (f_already_ran, 1)
+                               in
+                               (apply f (0) -> k3 * k1
+                                  where k3 (param_1 : imm tagged) =
+                                    cont k2))
+                            where k2 =
+                              apply g (0) -> k * k1
+                        in
+                        let $camlM2__at_exit_124 =
+                          closure at_exit_60_1 @at_exit
+                        and code loopify(never) size(55) newer_version_of(at_exit_60)
+                              at_exit_60_1 (f : val)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let exit_function_1 =
+                            %project_value_slot.[`at_exit`].[`exit_function`]
+                              ($camlM2__at_exit_124)
+                          in
+                          let g = %block_load.mut.[`0`] (exit_function_1) in
+                          let f_already_ran = %block.mut.[`0`] (0) in
+                          let `fn[m2.ml:680,7--129]` =
+                            closure `fn[m2.ml:680,7--129]_61_1`
+                              @`fn[m2.ml:680,7--129]`
+                          with {
+                            f = f;
+                            g = g;
+                            f_already_ran = f_already_ran
+                          }
+                          in
+                          let Psetfield =
+                            %block_set.[`0`]
+                              (exit_function_1, `fn[m2.ml:680,7--129]`)
+                          in
+                          cont k (0)
+                          with { exit_function = exit_function }
+                        in
+                        let $camlM2__do_at_exit_125 =
+                          closure do_at_exit_62_1 @do_at_exit
+                        and code loopify(never) size(8) newer_version_of(do_at_exit_62)
+                              do_at_exit_62_1 (param : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : imm tagged =
+                          let exit_function_1 =
+                            %project_value_slot.[`do_at_exit`].[`exit_function_1`]
+                              ($camlM2__do_at_exit_125)
+                          in
+                          let Pfield =
+                            %block_load.mut.[`0`] (exit_function_1)
+                          in
+                          apply Pfield (0) -> k * k1
+                          with { exit_function_1 = exit_function }
+                        in
+                        let code loopify(never) size(19) newer_version_of(exit_63)
+                              exit_63_1 (retcode : imm tagged)
+                                my_closure _region _ghost_region my_depth
+                                -> k * k1
+                                : val =
+                          (let exit_function_1 =
+                             %project_value_slot.[`do_at_exit`].[`exit_function_1`]
+                               ($camlM2__do_at_exit_125)
+                           in
+                           let Pfield =
+                             %block_load.mut.[`0`] (exit_function_1)
+                           in
+                           apply inlining_state(depth(10))
+                             Pfield (0) -> k3 * k1
+                             where k3 (param : imm tagged) =
+                               cont k2)
+                            where k2 =
+                              apply ccall
+                                ($`*extern*`.caml_sys_exit : val -> val)
+                                  (retcode)
+                                  -> k * k1
+                        in
+                        let $camlM2__exit_126 = closure exit_63_1 @exit in
+                        (apply ccall
+                           ($`*extern*`.caml_register_named_value
+                            : val * val -> val)
+                             ($camlM2__immstring890, $camlM2__do_at_exit_125)
+                             -> k1 * error
+                           where k1 (param) =
+                             cont k
+                           where k =
+                             let code inline(always) loopify(never) size(8) newer_version_of(f_64)
+                                   f_64_1 (a : imm tagged)
+                                     my_closure _region
+                                       _ghost_region my_depth
+                                     -> k * k1
+                                     : imm tagged =
+                               apply direct(string_of_int_11_1)
+                                 ($camlM2__string_of_int_77 : _ -> val)
+                                   (a)
+                                   -> k2 * k1
+                                 where k2 (apply_result : val) =
+                                   apply direct(print_endline_46_1)
+                                     ($camlM2__print_endline_110
+                                      : _ -> imm tagged)
+                                       (apply_result)
+                                       -> k * k1
+                             in
+                             let $camlM2__f_127 = closure f_64_1 @f in
+                             let code loopify(never) size(6) newer_version_of(foo_65)
+                                   foo_65_1 (op : imm tagged, g : val)
+                                     my_closure _region
+                                       _ghost_region my_depth
+                                     -> k * k1
+                                     : imm tagged =
+                               apply g (op) -> k * k1
+                             in
+                             let $camlM2__foo_128 = closure foo_65_1 @foo in
+                             let $camlM2 =
+                               Block 0 ($camlM2__failwith_66,
+                                        $camlM2__invalid_arg_67,
+                                        $camlM2__Exit1042,
+                                        $`*predef*`.caml_exn_Match_failure,
+                                        $`*predef*`.caml_exn_Assert_failure,
+                                        $`*predef*`.caml_exn_Invalid_argument,
+                                        $`*predef*`.caml_exn_Failure,
+                                        $`*predef*`.caml_exn_Not_found,
+                                        $`*predef*`.caml_exn_Out_of_memory,
+                                        $`*predef*`.caml_exn_Stack_overflow,
+                                        $`*predef*`.caml_exn_Sys_error,
+                                        $`*predef*`.caml_exn_End_of_file,
+                                        $`*predef*`.caml_exn_Division_by_zero,
+                                        $`*predef*`.caml_exn_Sys_blocked_io,
+                                        $`*predef*`.caml_exn_Undefined_recursive_module,
+                                        $camlM2__min_68,
+                                        $camlM2__max_69,
+                                        $camlM2__abs_70,
+                                        $camlM2__lnot_71,
+                                        4611686018427387903,
+                                        -4611686018427387904,
+                                        $camlM2__infinity1096,
+                                        $camlM2__neg_infinity1100,
+                                        $camlM2__nan1104,
+                                        $camlM2__max_float1108,
+                                        $camlM2__min_float1112,
+                                        $camlM2__epsilon_float1116,
+                                        $`camlM2__^_72`,
+                                        $camlM2__char_of_int_73,
+                                        $camlM2__string_of_bool_74,
+                                        $camlM2__bool_of_string_75,
+                                        $camlM2__bool_of_string_opt_76,
+                                        $camlM2__string_of_int_77,
+                                        $camlM2__int_of_string_opt_78,
+                                        $camlM2__valid_float_lexem_79,
+                                        $camlM2__string_of_float_80,
+                                        $camlM2__float_of_string_opt_81,
+                                        $`camlM2__@_82`,
+                                        stdin,
+                                        stdout,
+                                        stderr,
+                                        $camlM2__open_out_gen_83,
+                                        $camlM2__open_out_84,
+                                        $camlM2__open_out_bin_85,
+                                        $camlM2__flush_all_86,
+                                        $camlM2__output_bytes_88,
+                                        $camlM2__output_string_89,
+                                        $camlM2__output_90,
+                                        $camlM2__output_substring_91,
+                                        $camlM2__output_value_92,
+                                        $camlM2__close_out_93,
+                                        $camlM2__close_out_noerr_94,
+                                        $camlM2__open_in_gen_95,
+                                        $camlM2__open_in_96,
+                                        $camlM2__open_in_bin_97,
+                                        $camlM2__input_98,
+                                        $camlM2__unsafe_really_input_99,
+                                        $camlM2__really_input_100,
+                                        $camlM2__really_input_string_101,
+                                        $camlM2__input_line_102,
+                                        $camlM2__close_in_noerr_104,
+                                        $camlM2__print_char_105,
+                                        $camlM2__print_string_106,
+                                        $camlM2__print_bytes_107,
+                                        $camlM2__print_int_108,
+                                        $camlM2__print_float_109,
+                                        $camlM2__print_endline_110,
+                                        $camlM2__print_newline_111,
+                                        $camlM2__prerr_char_112,
+                                        $camlM2__prerr_string_113,
+                                        $camlM2__prerr_bytes_114,
+                                        $camlM2__prerr_int_115,
+                                        $camlM2__prerr_float_116,
+                                        $camlM2__prerr_endline_117,
+                                        $camlM2__prerr_newline_118,
+                                        $camlM2__read_line_119,
+                                        $camlM2__read_int_120,
+                                        $camlM2__read_int_opt_121,
+                                        $camlM2__read_float_122,
+                                        $camlM2__read_float_opt_123,
+                                        $camlM2__empty_block849,
+                                        exit_function,
+                                        $camlM2__at_exit_124,
+                                        $camlM2__do_at_exit_125,
+                                        $camlM2__exit_126,
+                                        $camlM2__f_127,
+                                        $camlM2__foo_128)
+                             in
+                             cont done ($camlM2))))))

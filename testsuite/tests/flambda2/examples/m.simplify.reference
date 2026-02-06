@@ -1,0 +1,330 @@
+let code failwith_0 deleted in
+let code invalid_arg_1 deleted in
+let $camlM__immstring35 = "m.ml" in
+let $camlM__const_block37 = Block 0 ($camlM__immstring35, 236, 35) in
+let $camlM__Pmakeblock40 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlM__const_block37)
+in
+let code bal_3 deleted in
+let $camlM__const_block48 = Block 0 ($camlM__immstring35, 238, 41) in
+let $camlM__Pmakeblock51 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlM__const_block48)
+in
+let code min_binding_opt_4 deleted in
+let $camlM__const_block62 = Block 0 ($camlM__immstring35, 240, 36) in
+let $camlM__Pmakeblock65 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlM__const_block62)
+in
+let code join_5 deleted in
+let code min_binding_6 deleted in
+let $camlM__immstring103 = "Map.remove_min_elt" in
+let code remove_min_binding_7 deleted in
+let $camlM__const_block122 = Block 0 ($camlM__immstring35, 259, 6) in
+let $camlM__Pmakeblock125 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlM__const_block122)
+in
+let code concat_8 deleted in
+let $camlM__const_block140 = Block 0 ($camlM__immstring35, 262, 27) in
+let $camlM__Pmakeblock143 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlM__const_block140)
+in
+let code concat_or_join_9 deleted in
+let code Make_2 deleted in
+let code loopify(never) size(10) newer_version_of(failwith_0)
+      failwith_0_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Failure, s) in
+  cont k1 pop(regular k1) (Pmakeblock)
+in
+let $camlM__failwith_10 = closure failwith_0_1 @failwith in
+let code loopify(never) size(10) newer_version_of(invalid_arg_1)
+      invalid_arg_1_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Invalid_argument, s) in
+  cont k1 pop(regular k1) (Pmakeblock)
+in
+let $camlM__invalid_arg_11 = closure invalid_arg_1_1 @invalid_arg in
+let code inline(never) loopify(never) size(3) newer_version_of(bal_3)
+      bal_3_1 (param, param_1, param_2, param_3)
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  cont k1 pop(regular k1) ($camlM__Pmakeblock40)
+in
+let $camlM__bal_13 = closure bal_3_1 @bal in
+let $camlM__remove_min_binding_17 =
+  closure remove_min_binding_7_1 @remove_min_binding
+and code rec loopify(never) size(40) newer_version_of(remove_min_binding_7)
+      remove_min_binding_7_1
+        (param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+              val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+              imm tagged ] =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      apply direct(invalid_arg_1_1)
+        ($camlM__invalid_arg_11
+         : _ ->
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ]
+         )
+          ($camlM__immstring103)
+          -> never * k1
+    where k2 =
+      let l2 = %block_load.[`0`] (param) in
+      let prim_1 = %is_int (l2) in
+      (switch prim_1
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           let Pfield = %block_load.[`3`] (param) in
+           cont k (Pfield)
+         where k2 =
+           let Pfield = %block_load.[`3`] (param) in
+           let Pfield_1 = %block_load.[`2`] (param) in
+           let Pfield_2 = %block_load.[`1`] (param) in
+           (apply direct(remove_min_binding_7_1)
+              ($camlM__remove_min_binding_17 ~ depth my_depth -> succ my_depth
+               : _ ->
+                 [ 0
+                 | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                     val * val *
+                     [ 0 | 0 of val * val * val * val * imm tagged ] *
+                     imm tagged ]
+               )
+                (l2)
+                -> k2 * k1
+              where k2
+                      (apply_result :
+                         [ 0
+                         | 0 of [ 0 | 0 of val * val * val * val * imm tagged
+                                ] * val * val *
+                             [ 0 | 0 of val * val * val * val * imm tagged ] *
+                             imm tagged ]) =
+                apply direct(bal_3_1)
+                  ($camlM__bal_13
+                   : _ ->
+                     [ 0
+                     | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                         val * val *
+                         [ 0 | 0 of val * val * val * val * imm tagged ] *
+                         imm tagged ]
+                   )
+                    (apply_result, Pfield_2, Pfield_1, Pfield)
+                    -> never * k1))
+in
+let code rec loopify(done) size(34) newer_version_of(min_binding_6)
+      min_binding_6_1
+        (param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of val * val ] =
+  cont self (param)
+    where rec self
+                (param_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       imm tagged ]) =
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k1 pop(regular k1) ($`*predef*`.caml_exn_Not_found)
+         where k2 =
+           let l = %block_load.[`0`] (param_1) in
+           let prim_1 = %is_int (l) in
+           (switch prim_1
+              | 0 -> self (l)
+              | 1 -> k2
+              where k2 =
+                let Pfield = %block_load.[`2`] (param_1) in
+                let Pfield_1 = %block_load.[`1`] (param_1) in
+                let Pmakeblock = %block.[`0`] (Pfield_1, Pfield) in
+                cont k (Pmakeblock)))
+in
+let $camlM__min_binding_16 = closure min_binding_6_1 @min_binding in
+let code loopify(never) size(46) newer_version_of(concat_or_join_9)
+      concat_or_join_9_1
+        (t1 :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ],
+         v,
+         d : [ 0 | 0 of val ],
+         t2 :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+              val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+              imm tagged ] =
+  let prim = %is_int (d) in
+  switch prim
+    | 0 -> k1 pop(regular k1) ($camlM__Pmakeblock143)
+    | 1 -> k2
+    where k2 =
+      let prim_1 = %is_int (t1) in
+      (switch prim_1
+         | 0 -> k2
+         | 1 -> k (t2)
+         where k2 =
+           let prim_2 = %is_int (t2) in
+           (switch prim_2
+              | 0 -> k2
+              | 1 -> k (t1)
+              where k2 =
+                (apply direct(min_binding_6_1) inlining_state(depth(1))
+                   ($camlM__min_binding_16 : _ -> [ 0 of val * val ])
+                     (t2)
+                     -> k3 * k1
+                   where k3 (param : [ 0 of val * val ]) =
+                     cont k2
+                   where k2 =
+                     (apply direct(remove_min_binding_7_1)
+                             inlining_state(depth(1))
+                        ($camlM__remove_min_binding_17
+                         : _ ->
+                           [ 0
+                           | 0 of [ 0
+                                  | 0 of val * val * val * val * imm tagged ] *
+                               val * val *
+                               [ 0 | 0 of val * val * val * val * imm tagged
+                               ] * imm tagged ]
+                         )
+                          (t2)
+                          -> k3 * k1
+                        where k3
+                                (param :
+                                   [ 0
+                                   | 0 of [ 0
+                                          | 0 of val * val * val * val *
+                                              imm tagged ] * val * val *
+                                       [ 0
+                                       | 0 of val * val * val * val *
+                                           imm tagged ] * imm tagged ]) =
+                          cont k2
+                        where k2 =
+                          cont k1 pop(regular k1) ($camlM__Pmakeblock125)))))
+in
+let code inline(always) loopify(never) size(35) newer_version_of(concat_8)
+      concat_8_1
+        (t1a :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ],
+         t2b :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+              val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+              imm tagged ] =
+  let prim = %is_int (t1a) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (t2b)
+    where k2 =
+      let prim_1 = %is_int (t2b) in
+      (switch prim_1
+         | 0 -> k2
+         | 1 -> k (t1a)
+         where k2 =
+           (apply direct(min_binding_6_1)
+              ($camlM__min_binding_16 : _ -> [ 0 of val * val ])
+                (t2b)
+                -> k3 * k1
+              where k3 (param : [ 0 of val * val ]) =
+                cont k2
+              where k2 =
+                (apply direct(remove_min_binding_7_1)
+                   ($camlM__remove_min_binding_17
+                    : _ ->
+                      [ 0
+                      | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                          val * val *
+                          [ 0 | 0 of val * val * val * val * imm tagged ] *
+                          imm tagged ]
+                    )
+                     (t2b)
+                     -> k3 * k1
+                   where k3
+                           (param :
+                              [ 0
+                              | 0 of [ 0
+                                     | 0 of val * val * val * val *
+                                         imm tagged ] * val * val *
+                                  [ 0
+                                  | 0 of val * val * val * val * imm tagged ] *
+                                  imm tagged ]) =
+                     cont k2
+                   where k2 =
+                     cont k1 pop(regular k1) ($camlM__Pmakeblock125))))
+in
+let $camlM__concat_18 = closure concat_8_1 @concat in
+let $camlM__concat_or_join_19 = closure concat_or_join_9_1 @concat_or_join in
+let code inline(never) loopify(never) size(3) newer_version_of(join_5)
+      join_5_1 (param, param_1, param_2, param_3)
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  cont k1 pop(regular k1) ($camlM__Pmakeblock65)
+in
+let $camlM__join_15 = closure join_5_1 @join in
+let code inline(never) loopify(never) size(3) newer_version_of(min_binding_opt_4)
+      min_binding_opt_4_1 (param)
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  cont k1 pop(regular k1) ($camlM__Pmakeblock51)
+in
+let $camlM__min_binding_opt_14 = closure min_binding_opt_4_1 @min_binding_opt
+in
+let $camlM__Pmakeblock370 =
+  Block 0 ($camlM__bal_13,
+           $camlM__min_binding_opt_14,
+           $camlM__join_15,
+           $camlM__min_binding_16,
+           $camlM__remove_min_binding_17,
+           $camlM__concat_18,
+           $camlM__concat_or_join_19)
+in
+let code loopify(never) size(1) newer_version_of(Make_2)
+      Make_2_1 (Ord : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  cont k ($camlM__Pmakeblock370)
+in
+let $camlM__Make_12 = closure Make_2_1 @Make in
+let $camlM =
+  Block 0 ($camlM__failwith_10, $camlM__invalid_arg_11, $camlM__Make_12)
+in
+cont done ($camlM)

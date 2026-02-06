@@ -1,0 +1,11 @@
+let $camlO__immstring7 = "O.Stdlib.Exit" in
+apply ccall noalloc
+  ($`*extern*`.caml_fresh_oo_id : val -> val) (0) -> k * error
+  where k (Pccall) =
+    let $camlO__Exit15 =
+      Block immutable_unique
+      248 ($camlO__immstring7, Pccall)
+    in
+    let $camlO__Pmakeblock16 = Block 0 ($camlO__Exit15) in
+    let $camlO = Block 0 ($camlO__Pmakeblock16) in
+    cont done ($camlO)

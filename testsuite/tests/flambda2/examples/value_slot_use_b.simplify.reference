@@ -1,0 +1,22 @@
+(let Popaque = %opaque (1) in
+ (let untagged = %untag_imm (Popaque) in
+  switch untagged
+    | 0 -> k1
+    | 1 -> k2)
+   where k2 =
+     apply direct(f_0) inlined(always)
+       ($Value_slot_use_a.camlValue_slot_use_a__f_2 : _ -> val)
+         (0)
+         -> k * error
+   where k1 =
+     apply direct(f_0) inlined(always)
+       ($Value_slot_use_a.camlValue_slot_use_a__f_2 : _ -> val)
+         (1)
+         -> k * error)
+  where k (g : val) =
+    (apply inlined(never) g (2) -> k1 * error
+       where k1 (param : [ 0 of imm tagged * imm tagged ]) =
+         cont k
+       where k =
+         let $camlValue_slot_use_b = Block 0 () in
+         cont done ($camlValue_slot_use_b))

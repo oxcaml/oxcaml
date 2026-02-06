@@ -1,0 +1,45 @@
+let code aux_1 deleted in
+let code foobar_0 deleted in
+let env = %block.mut.[`0`] (42) in
+let env_1 = env in
+let set_of_closures
+      $camlDeleted_code_printing__foobar_2 =
+      closure foobar_0_1 @foobar
+      with { env = env }
+    end
+and code loopify(never) size(4) newer_version_of(foobar_0)
+      foobar_0_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(aux_1_1)
+    ($camlDeleted_code_printing__aux_3 : _ -> imm tagged) (0) -> k * k1
+and set_of_closures
+      $camlDeleted_code_printing__aux_3 =
+      closure aux_1_1 @aux
+      with { env_1 = env_1 }
+    end
+and code rec loopify(done) size(15) newer_version_of(aux_1)
+      aux_1_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self
+    where rec self =
+      let env_2 =
+        %project_value_slot.[`aux`].[`env_1`]
+          ($camlDeleted_code_printing__aux_3)
+      in
+      let Popaque = %opaque (0) in
+      ((let untagged = %untag_imm (Popaque) in
+        switch untagged
+          | 0 -> self
+          | 1 -> k2)
+         where k2 =
+           let Pfield = %block_load.mut.[`0`] (env_2) in
+           cont k (Pfield))
+in
+let $camlDeleted_code_printing =
+  Block 0 (env, $camlDeleted_code_printing__foobar_2)
+in
+cont done ($camlDeleted_code_printing)

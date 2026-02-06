@@ -1,0 +1,21 @@
+let $camlData_flow_opam_bug__immstring18 = "plop" in
+let $camlData_flow_opam_bug__immstring20 = "plip" in
+let code to_string_0 deleted in
+let code loopify(never) size(11) newer_version_of(to_string_0)
+      to_string_0_1 (context : val, t : [ 0 | 0 of val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  (let prim = %is_int (t) in
+   switch prim
+     | 0 -> k2 ($camlData_flow_opam_bug__immstring20)
+     | 1 -> k2 ($camlData_flow_opam_bug__immstring18))
+    where k2 (f) =
+      let is_int = 0i in
+      cont k (f)
+in
+let $camlData_flow_opam_bug__to_string_1 = closure to_string_0_1 @to_string
+in
+let $camlData_flow_opam_bug = Block 0 ($camlData_flow_opam_bug__to_string_1)
+in
+cont done ($camlData_flow_opam_bug)

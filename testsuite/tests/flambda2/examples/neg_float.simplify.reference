@@ -1,0 +1,31 @@
+let code make_pos_float_0 deleted in
+let code make_neg_float_1 deleted in
+let $camlNeg_float__float4 = -0x1.5p+5 in
+let $camlNeg_float__float_sub44 = 0x1p+1 in
+let code loopify(never) size(1) newer_version_of(make_pos_float_0)
+      make_pos_float_0_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float boxed =
+  cont k ($camlNeg_float__float_sub44)
+in
+let $camlNeg_float__make_pos_float_2 =
+  closure make_pos_float_0_1 @make_pos_float
+in
+let $camlNeg_float__float_sub54 = -0x1p+1 in
+let code loopify(never) size(1) newer_version_of(make_neg_float_1)
+      make_neg_float_1_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float boxed =
+  cont k ($camlNeg_float__float_sub54)
+in
+let $camlNeg_float__make_neg_float_3 =
+  closure make_neg_float_1_1 @make_neg_float
+in
+let $camlNeg_float =
+  Block 0 ($camlNeg_float__float4,
+           $camlNeg_float__make_pos_float_2,
+           $camlNeg_float__make_neg_float_3)
+in
+cont done ($camlNeg_float)

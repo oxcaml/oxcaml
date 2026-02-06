@@ -1,0 +1,26 @@
+let $camlOpt_flags__immstring26 = "foo" in
+(let try_region = %begin_try_region () in
+ let try_ghost_region = %begin_try_ghost_region () in
+ cont k3 push(k2)
+   where k3 =
+     (apply ccall
+        ($`*extern*`.caml_sys_getenv : val -> val)
+          ($camlOpt_flags__immstring26)
+          -> k4 * k2
+        where k4 (param) =
+          cont k3
+        where k3 =
+          cont k1 pop(k2))
+   where k2 exn (`exn` : val) =
+     let `unit` = %end_try_region (try_region) in
+     let unit_1 = %end_try_ghost_region (try_ghost_region) in
+     cont k1)
+  where k1 =
+    let is_int = 0i in
+    switch is_int
+      | 0 -> k (99)
+      | 1 -> k (-1)
+  where k (y : imm tagged) =
+    let $camlOpt_flags__Pmakeblock138 = Block 0 (42, y, 1701) in
+    let $camlOpt_flags = Block 0 ($camlOpt_flags__Pmakeblock138) in
+    cont done ($camlOpt_flags)

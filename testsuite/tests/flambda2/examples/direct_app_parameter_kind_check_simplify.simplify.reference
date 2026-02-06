@@ -1,0 +1,47 @@
+let code send_0 deleted in
+let code create_1 deleted in
+let code loopify(never) size(21) newer_version_of(send_0)
+      send_0_1 (t : val, c : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `*match*` = %block_load.mut.[`0`] (t) in
+  let prim = %is_int (`*match*`) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (0)
+    where k2 =
+      let `*match*_1` = %block_load.[`0`] (`*match*`) in
+      let Pfield = %block_load.[`1`] (`*match*_1`) in
+      let Pfield_1 = %block_load.[`0`] (`*match*_1`) in
+      apply c (Pfield_1, Pfield) -> k * k1
+in
+let $camlDirect_app_parameter_kind_check_simplify__send_3 =
+  closure send_0_1 @send
+in
+let code loopify(never) size(7) newer_version_of(create_1)
+      create_1_1 (_arity : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.mut.[`0`] (0) in
+  cont k (Pmakeblock)
+in
+let $camlDirect_app_parameter_kind_check_simplify__create_4 =
+  closure create_1_1 @create
+in
+(let Pmakeblock72_0 = 0 in
+ let `*match*` = Pmakeblock72_0 in
+ let prim = %is_int (`*match*`) in
+ switch prim
+   | 0 -> k1
+   | 1 -> k
+   where k1 =
+     invalid "(Direct_application_parameter_kind_mismatch\n (params_arity #(\240\157\149\141? \226\168\175 \240\157\149\141?)) (args_arity \240\157\149\141? \226\168\175 \240\157\149\141?) (apply_expr\n  (((Some\n    Direct_app_parameter_kind_check_simplify.camlDirect_app_parameter_kind_check_simplify__fn[direct_app_parameter_kind_check_simplify.ml:26,25--38]_5)\227\128\136k28\227\128\137\227\128\138k2\227\128\139(Pfield/85N\n    Pfield/84N)) (args_arity \240\157\149\141? \226\168\175 \240\157\149\141?) (return_arity \240\157\149\141=tagged_\226\132\149\240\157\149\154)\n   (call_kind\n    (Function\n     (function_call\n      (Direct camlDirect_app_parameter_kind_check_simplify__fn[direct_app_parameter_kind_check_simplify.ml:26,25--38]_2_5_code))))\n   (alloc_mode Heap)\n   (dbg\n    direct_app_parameter_kind_check_simplify.ml:26,9--38;direct_app_parameter_kind_check_simplify.ml:21,32--43)\n   (inline Default_inlined) (inlining_state (depth 10, arguments O3))\n   (probe ()) (position Normal))))")
+  where k =
+    let $camlDirect_app_parameter_kind_check_simplify =
+      Block 0 (0,
+               $camlDirect_app_parameter_kind_check_simplify__send_3,
+               $camlDirect_app_parameter_kind_check_simplify__create_4)
+    in
+    cont done ($camlDirect_app_parameter_kind_check_simplify)

@@ -1,0 +1,15 @@
+let code f_0 deleted in
+let code loopify(never) size(10) newer_version_of(f_0)
+      f_0_1 (x : imm tagged, y : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of imm tagged * imm tagged ] =
+  let a = %int_barith.add (x, y) in
+  let Pmakeblock = %block.[`0`] (a, a) in
+  cont k (Pmakeblock)
+in
+let $camlCse_needing_canonicalisation__f_1 = closure f_0_1 @f in
+let $camlCse_needing_canonicalisation =
+  Block 0 ($camlCse_needing_canonicalisation__f_1)
+in
+cont done ($camlCse_needing_canonicalisation)

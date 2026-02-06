@@ -1,0 +1,43 @@
+let code F1_0 deleted in
+let code F2_1 deleted in
+let code F3_2 deleted in
+let code loopify(never) size(14) newer_version_of(F1_0)
+      F1_0_1 (M : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pfield = %block_load.[`0`] (M) in
+  let x = %block.[`0`] (Pfield) in
+  let Pmakeblock = %block.[`0`] (x) in
+  cont k (Pmakeblock)
+in
+let $camlFunctors2__F1_4 = closure F1_0_1 @F1 in
+let code loopify(never) size(22) newer_version_of(F2_1)
+      F2_1_1 (M1 : val, M2 : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pfield = %block_load.[`0`] (M2) in
+  let Pfield_1 = %block_load.[`0`] (M1) in
+  let x = %block.[`0`] (Pfield_1, Pfield) in
+  let Pmakeblock = %block.[`0`] (x) in
+  let Pmakeblock_1 = %block.[`0`] (Pmakeblock) in
+  cont k (Pmakeblock_1)
+in
+let $camlFunctors2__F2_5 = closure F2_1_1 @F2 in
+let code loopify(never) size(13) newer_version_of(F3_2)
+      F3_2_1 (M1 : val, M2 : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  apply direct(F2_1_1) ($camlFunctors2__F2_5 : _ -> val) (M1, M2) -> k2 * k1
+    where k2 (include : val) =
+      let Pfield = %block_load.[`0`] (include) in
+      let Pmakeblock = %block.[`0`] (Pfield, 0) in
+      cont k (Pmakeblock)
+in
+let $camlFunctors2__F3_6 = closure F3_2_1 @F3 in
+let $camlFunctors2 =
+  Block 0 ($camlFunctors2__F1_4, $camlFunctors2__F2_5, $camlFunctors2__F3_6)
+in
+cont done ($camlFunctors2)

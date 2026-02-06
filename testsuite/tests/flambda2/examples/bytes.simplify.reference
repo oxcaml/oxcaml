@@ -1,0 +1,2748 @@
+let code failwith_22 deleted in
+let code invalid_arg_23 deleted in
+let code `@_24` deleted in
+let code min_25 deleted in
+let code max_26 deleted in
+let code make_27 deleted in
+let code init_28 deleted in
+let code copy_29 deleted in
+let code to_string_30 deleted in
+let code of_string_31 deleted in
+let $camlBytes__immstring852 = "String.sub / Bytes.sub" in
+let code sub_32 deleted in
+let code sub_string_33 deleted in
+let $camlBytes__immstring881 = "Bytes.extend" in
+let code `++_34` deleted in
+let code extend_35 deleted in
+let $camlBytes__immstring940 = "String.fill / Bytes.fill" in
+let code fill_36 deleted in
+let $camlBytes__immstring975 = "Bytes.blit" in
+let code blit_37 deleted in
+let $camlBytes__immstring1010 = "String.blit / Bytes.blit_string" in
+let code blit_string_38 deleted in
+let code iter_39 deleted in
+let code iteri_40 deleted in
+let $camlBytes__immstring1066 = "Bytes.concat" in
+let code ensure_ge_41 deleted in
+let code sum_lengths_42 deleted in
+let code unsafe_blits_43 deleted in
+let code concat_44 deleted in
+let code cat_45 deleted in
+let code is_space_46 deleted in
+let code trim_47 deleted in
+let code escaped_48 deleted in
+let code map_49 deleted in
+let code mapi_50 deleted in
+let code uppercase_ascii_51 deleted in
+let code lowercase_ascii_52 deleted in
+let code apply1_53 deleted in
+let code capitalize_ascii_54 deleted in
+let code uncapitalize_ascii_55 deleted in
+let code index_rec_56 deleted in
+let code index_57 deleted in
+let code index_rec_opt_58 deleted in
+let code index_opt_59 deleted in
+let $camlBytes__immstring1625 = "String.index_from / Bytes.index_from" in
+let code index_from_60 deleted in
+let $camlBytes__immstring1644 =
+  "String.index_from_opt / Bytes.index_from_opt"
+in
+let code index_from_opt_61 deleted in
+let code rindex_rec_62 deleted in
+let code rindex_63 deleted in
+let $camlBytes__immstring1692 = "String.rindex_from / Bytes.rindex_from" in
+let code rindex_from_64 deleted in
+let code rindex_rec_opt_65 deleted in
+let code rindex_opt_66 deleted in
+let $camlBytes__immstring1739 =
+  "String.rindex_from_opt / Bytes.rindex_from_opt"
+in
+let code rindex_from_opt_67 deleted in
+let $camlBytes__immstring1770 = "String.contains_from / Bytes.contains_from"
+in
+let code contains_from_68 deleted in
+let code contains_69 deleted in
+let $camlBytes__immstring1808 =
+  "String.rcontains_from / Bytes.rcontains_from"
+in
+let code rcontains_from_70 deleted in
+let code compare_71 deleted in
+let code uppercase_72 deleted in
+let code lowercase_73 deleted in
+let code capitalize_74 deleted in
+let code uncapitalize_75 deleted in
+let $camlBytes__string1871 = "index out of bounds" in
+let $camlBytes__block1873 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlBytes__string1871)
+in
+let code aux_77 deleted
+and code loopify(never) size(8)
+      partial_aux_78 (param1 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let int_add = %project_value_slot.[`partial_aux`].[`int_add`] (my_closure)
+  in
+  let aux = %project_value_slot.[`partial_aux`].[`my_closure`] (my_closure)
+  in
+  apply
+    (aux : imm tagged * imm tagged -> [ 0 | 0 of val * val ])
+      (int_add, param1)
+      -> k * k1
+in
+let code loopify(never) size(7)
+      partial_aux_79 (param1 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let aux = %project_value_slot.[`partial_aux_1`].[`aux`] (my_closure) in
+  apply
+    (aux : imm tagged * imm tagged -> [ 0 | 0 of val * val ])
+      (0, param1)
+      -> k * k1
+in
+let code to_seq_76 deleted in
+let code aux_81 deleted
+and code loopify(never) size(8)
+      partial_aux_82 (param1 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let aux =
+    %project_value_slot.[`partial_aux_2`].[`my_closure_1`] (my_closure)
+  in
+  let int_add =
+    %project_value_slot.[`partial_aux_2`].[`int_add_1`] (my_closure)
+  in
+  apply
+    (aux : imm tagged * imm tagged -> [ 0 | 0 of val * val ])
+      (int_add, param1)
+      -> k * k1
+in
+let code loopify(never) size(7)
+      partial_aux_83 (param1 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let aux = %project_value_slot.[`partial_aux_3`].[`aux_1`] (my_closure) in
+  apply
+    (aux : imm tagged * imm tagged -> [ 0 | 0 of val * val ])
+      (0, param1)
+      -> k * k1
+in
+let code to_seqi_80 deleted in
+let $camlBytes__immstring1971 = "Bytes.of_seq: cannot grow bytes" in
+let code resize_85 deleted in
+let code `fn[bytes.ml:627,4--90]_86` deleted in
+let code of_seq_84 deleted in
+let code get_int8_87 deleted in
+let code get_uint16_le_88 deleted in
+let code get_uint16_be_89 deleted in
+let code get_int16_ne_90 deleted in
+let code get_int16_le_91 deleted in
+let code get_int16_be_92 deleted in
+let code get_int32_le_93 deleted in
+let code get_int32_be_94 deleted in
+let code get_int64_le_95 deleted in
+let code get_int64_be_96 deleted in
+let code set_int16_le_97 deleted in
+let code set_int16_be_98 deleted in
+let code set_int32_le_99 deleted in
+let code set_int32_be_100 deleted in
+let code set_int64_le_101 deleted in
+let code set_int64_be_102 deleted in
+let code loopify(never) size(27)
+      set_uint8_103 (prim : val, prim_1 : imm tagged, prim_2 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let prim_3 = %bytes_length (prim) in
+   let prim_4 = %num_conv.[`imm`].[`nativeint`] (prim_3) in
+   let prim_5 = %num_conv.[`tagged_imm`].[`nativeint`] (prim_1) in
+   let prim_6 = %int_comp.`nativeint`.unsigned.lt (prim_5, prim_4) in
+   switch prim_6
+     | 0 -> k2
+     | 1 -> k3)
+    where k3 =
+      let prim_3 = %untag_imm (prim_2) in
+      let prim_4 = %num_conv.[`tagged_imm`].[`imm`] (prim_1) in
+      let Pbytessets =
+        %bytes_or_bigstring_set.bytes.[`8`] (prim, prim_4, prim_3)
+      in
+      cont k (0)
+    where k2 =
+      cont k1 pop(regular k1) ($camlBytes__block1873)
+in
+let code loopify(never) size(30)
+      set_uint16_ne_104
+        (prim : val, prim_1 : imm tagged, prim_2 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let prim_3 = %bytes_length (prim) in
+   let prim_4 = %num_conv.[`imm`].[`nativeint`] (prim_3) in
+   let prim_5 = %int_barith.`nativeint`.sub (prim_4, 1n) in
+   let prim_6 = %int_shift.`nativeint`.asr (prim_5, 63i) in
+   let prim_7 = %int_barith.`nativeint`.xor (prim_6, -1n) in
+   let prim_8 = %int_barith.`nativeint`.`and` (prim_7, prim_5) in
+   let prim_9 = %num_conv.[`tagged_imm`].[`nativeint`] (prim_1) in
+   let prim_10 = %int_comp.`nativeint`.unsigned.lt (prim_9, prim_8) in
+   switch prim_10
+     | 0 -> k2
+     | 1 -> k3)
+    where k3 =
+      let prim_3 = %untag_imm (prim_2) in
+      let prim_4 = %num_conv.[`tagged_imm`].[`imm`] (prim_1) in
+      let Pbytes_set_16 =
+        %bytes_or_bigstring_set.bytes.[`16`] (prim, prim_4, prim_3)
+      in
+      cont k (0)
+    where k2 =
+      cont k1 pop(regular k1) ($camlBytes__block1873)
+in
+let code loopify(never) size(10) newer_version_of(failwith_22)
+      failwith_22_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Failure, s) in
+  cont k1 pop(regular k1) (Pmakeblock)
+in
+let $camlBytes__failwith_105 = closure failwith_22_1 @failwith in
+let code loopify(never) size(10) newer_version_of(invalid_arg_23)
+      invalid_arg_23_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Invalid_argument, s) in
+  cont k1 pop(regular k1) (Pmakeblock)
+in
+let $camlBytes__invalid_arg_106 = closure invalid_arg_23_1 @invalid_arg in
+let $`camlBytes__@_107` =
+  closure `@_24_1` @`@`
+and code rec loopify(never) size(25) newer_version_of(`@_24`)
+      `@_24_1`
+        (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %is_int (l1) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (l2)
+    where k2 =
+      ((let Pfield = %block_load.[`1`] (l1) in
+        apply direct(`@_24_1`)
+          ($`camlBytes__@_107` ~ depth my_depth -> succ my_depth
+           : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+            (Pfield, l2)
+            -> k2 * k1)
+         where k2 (apply_result : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+           let Pfield = %block_load.[`0`] (l1) in
+           let Pmakeblock = %block.[`0`] (Pfield, apply_result) in
+           cont k (Pmakeblock))
+in
+let code loopify(never) size(21) newer_version_of(min_25)
+      min_25_1 (x : val, y : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  apply ccall
+    ($`*extern*`.caml_lessequal : val * val -> val) (x, y) -> k2 * k1
+    where k2 (Pccall) =
+      let untagged = %untag_imm (Pccall) in
+      switch untagged
+        | 0 -> k (y)
+        | 1 -> k (x)
+in
+let $camlBytes__min_108 = closure min_25_1 @min in
+let code loopify(never) size(21) newer_version_of(max_26)
+      max_26_1 (x : val, y : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  apply ccall
+    ($`*extern*`.caml_greaterequal : val * val -> val) (x, y) -> k2 * k1
+    where k2 (Pccall) =
+      let untagged = %untag_imm (Pccall) in
+      switch untagged
+        | 0 -> k (y)
+        | 1 -> k (x)
+in
+let $camlBytes__max_109 = closure max_26_1 @max in
+let code loopify(never) size(15) newer_version_of(make_27)
+      make_27_1 (n : imm tagged, c : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  apply ccall ($`*extern*`.caml_create_bytes : val -> val) (n) -> k2 * k1
+    where k2 (s) =
+      (apply ccall noalloc
+         ($`*extern*`.caml_fill_bytes : val * val * val * val -> val)
+           (s, 0, n, c)
+           -> k2 * k1
+         where k2 (param) =
+           cont k (s))
+in
+let $camlBytes__make_110 = closure make_27_1 @make in
+let code loopify(never) size(52) newer_version_of(init_28)
+      init_28_1 (n : imm tagged, f : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  apply ccall ($`*extern*`.caml_create_bytes : val -> val) (n) -> k2 * k1
+    where k2 (s) =
+      let for_stop = %int_barith.sub (n, 1) in
+      let prim = %int_comp.le (0, for_stop) in
+      (switch prim
+         | 0 -> k (s)
+         | 1 -> k2
+         where k2 =
+           (cont k2 (0)
+              where rec k2 (i : imm tagged) =
+                (apply f (i) -> k4 * k1
+                   where k4 (param : imm tagged) =
+                     let unboxed_field = %untag_imm (param) in
+                     cont k3 (unboxed_field)
+                   where k3 (unboxed_field : imm) =
+                     let naked_immediate = unboxed_field in
+                     let prim_1 = %num_conv.[`tagged_imm`].[`imm`] (i) in
+                     let Pbytessetu =
+                       %bytes_or_bigstring_set.bytes.[`8`]
+                         (s, prim_1, naked_immediate)
+                     in
+                     let prim_2 = %int_comp.ne (i, for_stop) in
+                     (switch prim_2
+                        | 0 -> k (s)
+                        | 1 -> k3
+                        where k3 =
+                          let int_succ = %int_barith.add (i, 1) in
+                          cont k2 (int_succ)))))
+in
+let $camlBytes__init_111 = closure init_28_1 @init in
+apply ccall ($`*extern*`.caml_create_bytes : val -> val) (0) -> k * error
+  where k (empty) =
+    let code loopify(never) size(22) newer_version_of(copy_29)
+          copy_29_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      let prim = %bytes_length (s) in
+      let len = %tag_imm (prim) in
+      apply ccall
+        ($`*extern*`.caml_create_bytes : val -> val) (len) -> k2 * k1
+        where k2 (r) =
+          (apply ccall noalloc
+             ($`*extern*`.caml_blit_bytes
+              : val * val * val * val * val -> val)
+               (s, 0, r, 0, len)
+               -> k2 * k1
+             where k2 (param) =
+               cont k (r))
+    in
+    let $camlBytes__copy_112 = closure copy_29_1 @copy in
+    let code loopify(never) size(4) newer_version_of(to_string_30)
+          to_string_30_1 (b : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      apply direct(copy_29_1) ($camlBytes__copy_112 : _ -> val) (b) -> k * k1
+    in
+    let $camlBytes__to_string_113 = closure to_string_30_1 @to_string in
+    let code loopify(never) size(4) newer_version_of(of_string_31)
+          of_string_31_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      apply direct(copy_29_1) ($camlBytes__copy_112 : _ -> val) (s) -> k * k1
+    in
+    let $camlBytes__of_string_114 = closure of_string_31_1 @of_string in
+    let code loopify(never) size(64) newer_version_of(sub_32)
+          sub_32_1 (s : val, ofs : imm tagged, len : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      (let prim = %int_comp.lt (ofs, 0) in
+       switch prim
+         | 0 -> k3
+         | 1 -> k2
+         where k3 =
+           let prim_1 = %int_comp.lt (len, 0) in
+           (switch prim_1
+              | 0 -> k3
+              | 1 -> k2
+              where k3 =
+                let prim_2 = %bytes_length (s) in
+                let Pbyteslength = %tag_imm (prim_2) in
+                let int_sub = %int_barith.sub (Pbyteslength, len) in
+                let prim_3 = %int_comp.gt (ofs, int_sub) in
+                (switch prim_3
+                   | 0 -> k3
+                   | 1 -> k2
+                   where k3 =
+                     (apply ccall
+                        ($`*extern*`.caml_create_bytes : val -> val)
+                          (len)
+                          -> k3 * k1
+                        where k3 (r) =
+                          (apply ccall noalloc
+                             ($`*extern*`.caml_blit_bytes
+                              : val * val * val * val * val -> val)
+                               (s, ofs, r, 0, len)
+                               -> k3 * k1
+                             where k3 (param) =
+                               cont k (r))))))
+        where k2 =
+          apply direct(invalid_arg_23_1)
+            ($camlBytes__invalid_arg_106 : _ -> val)
+              ($camlBytes__immstring852)
+              -> never * k1
+    in
+    let $camlBytes__sub_115 = closure sub_32_1 @sub in
+    let code loopify(never) size(4) newer_version_of(sub_string_33)
+          sub_string_33_1 (b : val, ofs : imm tagged, len : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      apply direct(sub_32_1)
+        ($camlBytes__sub_115 : _ -> val) (b, ofs, len) -> k * k1
+    in
+    let $camlBytes__sub_string_116 = closure sub_string_33_1 @sub_string in
+    let code loopify(never) size(62) newer_version_of(`++_34`)
+          `++_34_1` (a : imm tagged, b : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let c = %int_barith.add (a, b) in
+      let prim = %int_comp.lt (a, 0) in
+      let prim_1 = %int_comp.lt (b, 0) in
+      let prim_2 = %int_comp.lt (c, 0) in
+      switch prim
+        | 0 -> k3
+        | 1 -> k4
+        where k4 =
+          (switch prim_1
+             | 0 -> k (c)
+             | 1 -> k4
+             where k4 =
+               switch prim_2
+                 | 0 -> k2
+                 | 1 -> k (c))
+        where k3 =
+          (switch prim_1
+             | 0 -> k3
+             | 1 -> k (c)
+             where k3 =
+               switch prim_2
+                 | 0 -> k (c)
+                 | 1 -> k2)
+        where k2 =
+          apply direct(invalid_arg_23_1)
+            ($camlBytes__invalid_arg_106 : _ -> imm tagged)
+              ($camlBytes__immstring881)
+              -> never * k1
+    in
+    let $`camlBytes__++_117` = closure `++_34_1` @`++` in
+    let code loopify(never) size(67) newer_version_of(extend_35)
+          extend_35_1 (s : val, left : imm tagged, right : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      (let prim = %bytes_length (s) in
+       let Pbyteslength = %tag_imm (prim) in
+       apply direct(`++_34_1`)
+         ($`camlBytes__++_117` : _ -> imm tagged)
+           (Pbyteslength, left)
+           -> k4 * k1
+         where k4 (param : imm tagged) =
+           cont k3 (param, Pbyteslength))
+        where k3 (apply_result : imm tagged, Pbyteslength) =
+          let cse_param = Pbyteslength in
+          (apply direct(`++_34_1`)
+             ($`camlBytes__++_117` : _ -> imm tagged)
+               (apply_result, right)
+               -> k3 * k1
+             where k3 (param : imm tagged) =
+               cont k2 (param, Pbyteslength))
+        where k2 (len : imm tagged, Pbyteslength) =
+          let cse_param = Pbyteslength in
+          (apply ccall
+             ($`*extern*`.caml_create_bytes : val -> val) (len) -> k2 * k1
+             where k2 (r) =
+               ((let prim = %int_comp.lt (left, 0) in
+                 switch prim
+                   | 0 -> k2 (0, left)
+                   | 1 -> k3
+                   where k3 =
+                     let srcoff = %int_barith.sub (0, left) in
+                     cont k2 (srcoff, 0))
+                  where k2 (srcoff : imm tagged, dstoff : imm tagged) =
+                    ((let int_sub = %int_barith.sub (len, dstoff) in
+                      let int_sub_1 = %int_barith.sub (cse_param, srcoff) in
+                      apply direct(min_25_1)
+                        ($camlBytes__min_108 : _ -> imm tagged)
+                          (int_sub_1, int_sub)
+                          -> k2 * k1)
+                       where k2 (cpylen : imm tagged) =
+                         let prim = %int_comp.gt (cpylen, 0) in
+                         (switch prim
+                            | 0 -> k (r)
+                            | 1 -> k2
+                            where k2 =
+                              (apply ccall noalloc
+                                 ($`*extern*`.caml_blit_bytes
+                                  : val * val * val * val * val -> val)
+                                   (s, srcoff, r, dstoff, cpylen)
+                                   -> k2 * k1
+                                 where k2 (param) =
+                                   cont k (r))))))
+    in
+    let $camlBytes__extend_118 = closure extend_35_1 @extend in
+    let code loopify(never) size(53) newer_version_of(fill_36)
+          fill_36_1
+            (s : val, ofs : imm tagged, len : imm tagged, c : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      (let prim = %int_comp.lt (ofs, 0) in
+       switch prim
+         | 0 -> k3
+         | 1 -> k2
+         where k3 =
+           let prim_1 = %int_comp.lt (len, 0) in
+           (switch prim_1
+              | 0 -> k3
+              | 1 -> k2
+              where k3 =
+                let prim_2 = %bytes_length (s) in
+                let Pbyteslength = %tag_imm (prim_2) in
+                let int_sub = %int_barith.sub (Pbyteslength, len) in
+                let prim_3 = %int_comp.gt (ofs, int_sub) in
+                (switch prim_3
+                   | 0 -> k3
+                   | 1 -> k2
+                   where k3 =
+                     apply ccall noalloc
+                       ($`*extern*`.caml_fill_bytes
+                        : val * val * val * val -> val)
+                         (s, ofs, len, c)
+                         -> k * k1)))
+        where k2 =
+          apply direct(invalid_arg_23_1)
+            ($camlBytes__invalid_arg_106 : _ -> imm tagged)
+              ($camlBytes__immstring940)
+              -> never * k1
+    in
+    let $camlBytes__fill_119 = closure fill_36_1 @fill in
+    let code loopify(never) size(86) newer_version_of(blit_37)
+          blit_37_1
+            (s1 : val,
+             ofs1 : imm tagged,
+             s2 : val,
+             ofs2 : imm tagged,
+             len : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      (let prim = %int_comp.lt (len, 0) in
+       switch prim
+         | 0 -> k3
+         | 1 -> k2
+         where k3 =
+           let prim_1 = %int_comp.lt (ofs1, 0) in
+           (switch prim_1
+              | 0 -> k3
+              | 1 -> k2
+              where k3 =
+                let prim_2 = %bytes_length (s1) in
+                let Pbyteslength = %tag_imm (prim_2) in
+                let int_sub = %int_barith.sub (Pbyteslength, len) in
+                let prim_3 = %int_comp.gt (ofs1, int_sub) in
+                (switch prim_3
+                   | 0 -> k3
+                   | 1 -> k2
+                   where k3 =
+                     let prim_4 = %int_comp.lt (ofs2, 0) in
+                     (switch prim_4
+                        | 0 -> k3
+                        | 1 -> k2
+                        where k3 =
+                          let prim_5 = %bytes_length (s2) in
+                          let Pbyteslength_1 = %tag_imm (prim_5) in
+                          let int_sub_1 =
+                            %int_barith.sub (Pbyteslength_1, len)
+                          in
+                          let prim_6 = %int_comp.gt (ofs2, int_sub_1) in
+                          (switch prim_6
+                             | 0 -> k3
+                             | 1 -> k2
+                             where k3 =
+                               apply ccall noalloc
+                                 ($`*extern*`.caml_blit_bytes
+                                  : val * val * val * val * val -> val)
+                                   (s1, ofs1, s2, ofs2, len)
+                                   -> k * k1)))))
+        where k2 =
+          apply direct(invalid_arg_23_1)
+            ($camlBytes__invalid_arg_106 : _ -> imm tagged)
+              ($camlBytes__immstring975)
+              -> never * k1
+    in
+    let $camlBytes__blit_120 = closure blit_37_1 @blit in
+    let code loopify(never) size(86) newer_version_of(blit_string_38)
+          blit_string_38_1
+            (s1 : val,
+             ofs1 : imm tagged,
+             s2 : val,
+             ofs2 : imm tagged,
+             len : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      (let prim = %int_comp.lt (len, 0) in
+       switch prim
+         | 0 -> k3
+         | 1 -> k2
+         where k3 =
+           let prim_1 = %int_comp.lt (ofs1, 0) in
+           (switch prim_1
+              | 0 -> k3
+              | 1 -> k2
+              where k3 =
+                let prim_2 = %string_length (s1) in
+                let Pstringlength = %tag_imm (prim_2) in
+                let int_sub = %int_barith.sub (Pstringlength, len) in
+                let prim_3 = %int_comp.gt (ofs1, int_sub) in
+                (switch prim_3
+                   | 0 -> k3
+                   | 1 -> k2
+                   where k3 =
+                     let prim_4 = %int_comp.lt (ofs2, 0) in
+                     (switch prim_4
+                        | 0 -> k3
+                        | 1 -> k2
+                        where k3 =
+                          let prim_5 = %bytes_length (s2) in
+                          let Pbyteslength = %tag_imm (prim_5) in
+                          let int_sub_1 = %int_barith.sub (Pbyteslength, len)
+                          in
+                          let prim_6 = %int_comp.gt (ofs2, int_sub_1) in
+                          (switch prim_6
+                             | 0 -> k3
+                             | 1 -> k2
+                             where k3 =
+                               apply ccall noalloc
+                                 ($`*extern*`.caml_blit_string
+                                  : val * val * val * val * val -> val)
+                                   (s1, ofs1, s2, ofs2, len)
+                                   -> k * k1)))))
+        where k2 =
+          apply direct(invalid_arg_23_1)
+            ($camlBytes__invalid_arg_106 : _ -> imm tagged)
+              ($camlBytes__immstring1010)
+              -> never * k1
+    in
+    let $camlBytes__blit_string_121 = closure blit_string_38_1 @blit_string
+    in
+    let code loopify(never) size(50) newer_version_of(iter_39)
+          iter_39_1 (f : val, a : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let prim = %bytes_length (a) in
+      let Pbyteslength = %tag_imm (prim) in
+      let for_stop = %int_barith.sub (Pbyteslength, 1) in
+      let prim_1 = %int_comp.le (0, for_stop) in
+      switch prim_1
+        | 0 -> k (0)
+        | 1 -> k2
+        where k2 =
+          (cont k2 (0)
+             where rec k2 (i : imm tagged) =
+               ((let prim_2 = %num_conv.[`tagged_imm`].[`imm`] (i) in
+                 let prim_3 = %bytes_load.[`8`] (a, prim_2) in
+                 let Pbytesrefu = %tag_imm (prim_3) in
+                 apply f (Pbytesrefu) -> k4 * k1
+                   where k4 (param) =
+                     cont k3)
+                  where k3 =
+                    let prim_2 = %int_comp.ne (i, for_stop) in
+                    (switch prim_2
+                       | 0 -> k (0)
+                       | 1 -> k3
+                       where k3 =
+                         let int_succ = %int_barith.add (i, 1) in
+                         cont k2 (int_succ))))
+    in
+    let $camlBytes__iter_122 = closure iter_39_1 @iter in
+    let code loopify(never) size(50) newer_version_of(iteri_40)
+          iteri_40_1 (f : val, a : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let prim = %bytes_length (a) in
+      let Pbyteslength = %tag_imm (prim) in
+      let for_stop = %int_barith.sub (Pbyteslength, 1) in
+      let prim_1 = %int_comp.le (0, for_stop) in
+      switch prim_1
+        | 0 -> k (0)
+        | 1 -> k2
+        where k2 =
+          (cont k2 (0)
+             where rec k2 (i : imm tagged) =
+               ((let prim_2 = %num_conv.[`tagged_imm`].[`imm`] (i) in
+                 let prim_3 = %bytes_load.[`8`] (a, prim_2) in
+                 let Pbytesrefu = %tag_imm (prim_3) in
+                 apply f (i, Pbytesrefu) -> k4 * k1
+                   where k4 (param) =
+                     cont k3)
+                  where k3 =
+                    let prim_2 = %int_comp.ne (i, for_stop) in
+                    (switch prim_2
+                       | 0 -> k (0)
+                       | 1 -> k3
+                       where k3 =
+                         let int_succ = %int_barith.add (i, 1) in
+                         cont k2 (int_succ))))
+    in
+    let $camlBytes__iteri_123 = closure iteri_40_1 @iteri in
+    let code loopify(never) size(16) newer_version_of(ensure_ge_41)
+          ensure_ge_41_1 (x : imm tagged, y : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let prim = %int_comp.ge (x, y) in
+      switch prim
+        | 0 -> k2
+        | 1 -> k (x)
+        where k2 =
+          apply direct(invalid_arg_23_1)
+            ($camlBytes__invalid_arg_106 : _ -> imm tagged)
+              ($camlBytes__immstring1066)
+              -> never * k1
+    in
+    let $camlBytes__ensure_ge_124 = closure ensure_ge_41_1 @ensure_ge in
+    let code rec loopify(done) size(51) newer_version_of(sum_lengths_42)
+          sum_lengths_42_1
+            (acc : imm tagged,
+             seplen : imm tagged,
+             param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      cont self (acc, param)
+        where rec self
+                    (acc_1 : imm tagged,
+                     param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+          let seplen_1 = seplen in
+          let prim = %is_int (param_1) in
+          (switch prim
+             | 0 -> k2
+             | 1 -> k (acc_1)
+             where k2 =
+               let hd = %block_load.[`0`] (param_1) in
+               let Pfield = %block_load.[`1`] (param_1) in
+               let prim_1 = %is_int (Pfield) in
+               (switch prim_1
+                  | 0 -> k2
+                  | 1 -> k3
+                  where k3 =
+                    let prim_2 = %bytes_length (hd) in
+                    let Pbyteslength = %tag_imm (prim_2) in
+                    let int_add = %int_barith.add (Pbyteslength, acc_1) in
+                    cont k (int_add)
+                  where k2 =
+                    ((let prim_2 = %bytes_length (hd) in
+                      let Pbyteslength = %tag_imm (prim_2) in
+                      let int_add = %int_barith.add (Pbyteslength, seplen_1)
+                      in
+                      let int_add_1 = %int_barith.add (int_add, acc_1) in
+                      apply direct(ensure_ge_41_1)
+                        ($camlBytes__ensure_ge_124 : _ -> imm tagged)
+                          (int_add_1, acc_1)
+                          -> k2 * k1)
+                       where k2 (apply_result : imm tagged) =
+                         cont self (apply_result, Pfield))))
+    in
+    let $camlBytes__sum_lengths_125 = closure sum_lengths_42_1 @sum_lengths
+    in
+    let code rec loopify(done) size(59) newer_version_of(unsafe_blits_43)
+          unsafe_blits_43_1
+            (dst : val,
+             pos : imm tagged,
+             sep : val,
+             seplen : imm tagged,
+             param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      cont self (pos, param)
+        where rec self
+                    (pos_1 : imm tagged,
+                     param_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+          let dst_1 = dst in
+          let sep_1 = sep in
+          let seplen_1 = seplen in
+          let prim = %is_int (param_1) in
+          (switch prim
+             | 0 -> k2
+             | 1 -> k (dst_1)
+             where k2 =
+               let hd = %block_load.[`0`] (param_1) in
+               let Pfield = %block_load.[`1`] (param_1) in
+               let prim_1 = %is_int (Pfield) in
+               (switch prim_1
+                  | 0 -> k2
+                  | 1 -> k3
+                  where k3 =
+                    let prim_2 = %bytes_length (hd) in
+                    let Pbyteslength = %tag_imm (prim_2) in
+                    (apply ccall noalloc
+                       ($`*extern*`.caml_blit_bytes
+                        : val * val * val * val * val -> val)
+                         (hd, 0, dst_1, pos_1, Pbyteslength)
+                         -> k3 * k1
+                       where k3 (param_2) =
+                         cont k (dst_1))
+                  where k2 =
+                    let prim_2 = %bytes_length (hd) in
+                    let Pbyteslength = %tag_imm (prim_2) in
+                    (apply ccall noalloc
+                       ($`*extern*`.caml_blit_bytes
+                        : val * val * val * val * val -> val)
+                         (hd, 0, dst_1, pos_1, Pbyteslength)
+                         -> k3 * k1
+                       where k3 (param_2) =
+                         cont k2
+                       where k2 =
+                         let int_add = %int_barith.add (pos_1, Pbyteslength)
+                         in
+                         (apply ccall noalloc
+                            ($`*extern*`.caml_blit_bytes
+                             : val * val * val * val * val -> val)
+                              (sep_1, 0, dst_1, int_add, seplen_1)
+                              -> k3 * k1
+                            where k3 (param_2) =
+                              cont k2
+                            where k2 =
+                              let int_add_1 =
+                                %int_barith.add (int_add, seplen_1)
+                              in
+                              cont self (int_add_1, Pfield)))))
+    in
+    let $camlBytes__unsafe_blits_126 =
+      closure unsafe_blits_43_1 @unsafe_blits
+    in
+    let $camlBytes__concat_127 =
+      closure concat_44_1 @concat
+    and code loopify(never) size(37) newer_version_of(concat_44)
+          concat_44_1
+            (sep : val, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      let empty_1 =
+        %project_value_slot.[`concat`].[`empty`] ($camlBytes__concat_127)
+      in
+      let prim = %is_int (l) in
+      switch prim
+        | 0 -> k2
+        | 1 -> k (empty_1)
+        where k2 =
+          let prim_1 = %bytes_length (sep) in
+          let seplen = %tag_imm (prim_1) in
+          (apply direct(sum_lengths_42_1)
+             ($camlBytes__sum_lengths_125 : _ -> imm tagged)
+               (0, seplen, l)
+               -> k2 * k1
+             where k2 (apply_result : imm tagged) =
+               (apply ccall
+                  ($`*extern*`.caml_create_bytes : val -> val)
+                    (apply_result)
+                    -> k2 * k1
+                  where k2 (Pccall) =
+                    apply direct(unsafe_blits_43_1)
+                      ($camlBytes__unsafe_blits_126 : _ -> val)
+                        (Pccall, 0, sep, seplen, l)
+                        -> k * k1))
+      with { empty = empty }
+    in
+    let code loopify(never) size(36) newer_version_of(cat_45)
+          cat_45_1 (s1 : val, s2 : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      let prim = %bytes_length (s1) in
+      let l1 = %tag_imm (prim) in
+      let prim_1 = %bytes_length (s2) in
+      let l2 = %tag_imm (prim_1) in
+      let int_add = %int_barith.add (l1, l2) in
+      apply ccall
+        ($`*extern*`.caml_create_bytes : val -> val) (int_add) -> k2 * k1
+        where k2 (r) =
+          (apply ccall noalloc
+             ($`*extern*`.caml_blit_bytes
+              : val * val * val * val * val -> val)
+               (s1, 0, r, 0, l1)
+               -> k3 * k1
+             where k3 (param) =
+               cont k2
+             where k2 =
+               (apply ccall noalloc
+                  ($`*extern*`.caml_blit_bytes
+                   : val * val * val * val * val -> val)
+                    (s2, 0, r, l1, l2)
+                    -> k2 * k1
+                  where k2 (param) =
+                    cont k (r)))
+    in
+    let $camlBytes__cat_128 = closure cat_45_1 @cat in
+    let code loopify(never) size(25) newer_version_of(is_space_46)
+          is_space_46_1 (param : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let switcher = %int_barith.add (param, -9) in
+      let prim = %int_comp.unsigned.lt (4, switcher) in
+      switch prim
+        | 0 -> k2
+        | 1 -> k3
+        where k3 =
+          let prim_1 = %int_comp.ne (switcher, 23) in
+          let tagged_scrutinee = %tag_imm (prim_1) in
+          let not_scrutinee = %boolean_not (tagged_scrutinee) in
+          cont k (not_scrutinee)
+        where k2 =
+          let prim_1 = %int_comp.ne (switcher, 2) in
+          let tagged_scrutinee = %tag_imm (prim_1) in
+          cont k (tagged_scrutinee)
+    in
+    let $camlBytes__is_space_129 = closure is_space_46_1 @is_space in
+    let $camlBytes__trim_130 =
+      closure trim_47_1 @trim
+    and code loopify(never) size(108) newer_version_of(trim_47)
+          trim_47_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      let empty_1 =
+        %project_value_slot.[`trim`].[`empty_1`] ($camlBytes__trim_130)
+      in
+      let prim = %bytes_length (s) in
+      let len = %tag_imm (prim) in
+      cont k3 (0)
+        where rec k3 (i_519_unboxed0 : imm tagged) =
+          ((let prim_1 = %int_comp.lt (i_519_unboxed0, len) in
+            switch prim_1
+              | 0 -> k4 (0i)
+              | 1 -> k5
+              where k5 =
+                let prim_2 =
+                  %num_conv.[`tagged_imm`].[`imm`] (i_519_unboxed0)
+                in
+                let prim_3 = %bytes_load.[`8`] (s, prim_2) in
+                let Pbytesrefu = %tag_imm (prim_3) in
+                (apply direct(is_space_46_1)
+                   ($camlBytes__is_space_129 : _ -> imm tagged)
+                     (Pbytesrefu)
+                     -> k6 * k1
+                   where k6 (param : imm tagged) =
+                     let unboxed_field = %untag_imm (param) in
+                     cont k5 (unboxed_field)
+                   where k5 (unboxed_field : imm) =
+                     let naked_immediate = unboxed_field in
+                     cont k4 (naked_immediate)))
+             where k4 (naked_immediate : imm) =
+               let i_519_unboxed0_1 = i_519_unboxed0 in
+               (switch naked_immediate
+                  | 0 -> k2 (i_519_unboxed0)
+                  | 1 -> k4
+                  where k4 =
+                    let int_add = %int_barith.add (i_519_unboxed0_1, 1) in
+                    cont k3 (int_add)))
+        where k2 (i_519_unboxed0) =
+          let i_519_unboxed0_1 = i_519_unboxed0 in
+          let int_sub = %int_barith.sub (len, 1) in
+          (cont k3 (int_sub)
+             where rec k3 (j_520_unboxed0 : imm tagged) =
+               let i_519_unboxed0_2 = i_519_unboxed0 in
+               ((let prim_1 = %int_comp.ge (j_520_unboxed0, i_519_unboxed0_2)
+                 in
+                 switch prim_1
+                   | 0 -> k4 (0i)
+                   | 1 -> k5
+                   where k5 =
+                     let prim_2 =
+                       %num_conv.[`tagged_imm`].[`imm`] (j_520_unboxed0)
+                     in
+                     let prim_3 = %bytes_load.[`8`] (s, prim_2) in
+                     let Pbytesrefu = %tag_imm (prim_3) in
+                     (apply direct(is_space_46_1)
+                        ($camlBytes__is_space_129 : _ -> imm tagged)
+                          (Pbytesrefu)
+                          -> k6 * k1
+                        where k6 (param : imm tagged) =
+                          let unboxed_field = %untag_imm (param) in
+                          cont k5 (unboxed_field)
+                        where k5 (unboxed_field : imm) =
+                          let naked_immediate = unboxed_field in
+                          cont k4 (naked_immediate)))
+                  where k4 (naked_immediate : imm) =
+                    let i_519_unboxed0_3 = i_519_unboxed0 in
+                    let j_520_unboxed0_1 = j_520_unboxed0 in
+                    (switch naked_immediate
+                       | 0 -> k2 (j_520_unboxed0)
+                       | 1 -> k4
+                       where k4 =
+                         let int_add = %int_barith.add (j_520_unboxed0_1, -1)
+                         in
+                         cont k3 (int_add)))
+             where k2 (j_520_unboxed0) =
+               let i_519_unboxed0_2 = i_519_unboxed0 in
+               let j_520_unboxed0_1 = j_520_unboxed0 in
+               let prim_1 = %int_comp.ge (j_520_unboxed0_1, i_519_unboxed0_2)
+               in
+               (switch prim_1
+                  | 0 -> k (empty_1)
+                  | 1 -> k2
+                  where k2 =
+                    let int_sub_1 =
+                      %int_barith.sub (j_520_unboxed0_1, i_519_unboxed0_2)
+                    in
+                    let int_add = %int_barith.add (int_sub_1, 1) in
+                    apply direct(sub_32_1)
+                      ($camlBytes__sub_115 : _ -> val)
+                        (s, i_519_unboxed0_2, int_add)
+                        -> k * k1))
+      with { empty_1 = empty }
+    in
+    let code loopify(never) size(448) newer_version_of(escaped_48)
+          escaped_48_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      let prim = %bytes_length (s) in
+      let Pbyteslength = %tag_imm (prim) in
+      let for_stop = %int_barith.sub (Pbyteslength, 1) in
+      (let prim_1 = %int_comp.le (0, for_stop) in
+       switch prim_1
+         | 0 -> k2 (0)
+         | 1 -> k3
+         where k3 =
+           (cont k3 (0, 0)
+              where rec k3 (i : imm tagged, n_524_unboxed0 : imm tagged) =
+                let prim_2 = %num_conv.[`tagged_imm`].[`imm`] (i) in
+                let prim_3 = %bytes_load.[`8`] (s, prim_2) in
+                let `*match*` = %tag_imm (prim_3) in
+                ((let prim_4 = %int_comp.ge (`*match*`, 32) in
+                  switch prim_4
+                    | 0 -> k8
+                    | 1 -> k9
+                    where k9 =
+                      let switcher = %int_barith.add (`*match*`, -34) in
+                      let prim_5 = %int_comp.unsigned.lt (58, switcher) in
+                      (switch prim_5
+                         | 0 -> k9
+                         | 1 -> k10
+                         where k10 =
+                           let prim_6 = %int_comp.ge (switcher, 93) in
+                           switch prim_6
+                             | 0 -> k5
+                             | 1 -> k7
+                         where k9 =
+                           let int_add = %int_barith.add (switcher, -1) in
+                           let prim_6 = %int_comp.unsigned.lt (56, int_add)
+                           in
+                           switch prim_6
+                             | 0 -> k5
+                             | 1 -> k6)
+                    where k8 =
+                      let prim_5 = %int_comp.ge (`*match*`, 11) in
+                      (switch prim_5
+                         | 0 -> k8
+                         | 1 -> k9
+                         where k9 =
+                           let prim_6 = %int_comp.ne (`*match*`, 13) in
+                           switch prim_6
+                             | 0 -> k6
+                             | 1 -> k7
+                         where k8 =
+                           let prim_6 = %int_comp.ge (`*match*`, 8) in
+                           switch prim_6
+                             | 0 -> k7
+                             | 1 -> k6))
+                   where k7 =
+                     let n_524_unboxed0_1 = n_524_unboxed0 in
+                     cont k4 (4)
+                   where k6 =
+                     let n_524_unboxed0_1 = n_524_unboxed0 in
+                     cont k4 (2)
+                   where k5 =
+                     let n_524_unboxed0_1 = n_524_unboxed0 in
+                     cont k4 (1)
+                   where k4 (staticcatch_result : imm tagged) =
+                     let n_524_unboxed0_1 = n_524_unboxed0 in
+                     let int_add =
+                       %int_barith.add (n_524_unboxed0_1, staticcatch_result)
+                     in
+                     let prim_4 = %int_comp.ne (i, for_stop) in
+                     (switch prim_4
+                        | 0 -> k2 (int_add)
+                        | 1 -> k4
+                        where k4 =
+                          let int_succ = %int_barith.add (i, 1) in
+                          cont k3 (int_succ, int_add)))))
+        where k2 (n_524_unboxed0 : imm tagged) =
+          let prim_1 = %phys_eq (n_524_unboxed0, Pbyteslength) in
+          (switch prim_1
+             | 0 -> k2
+             | 1 -> k3
+             where k3 =
+               apply direct(copy_29_1)
+                 ($camlBytes__copy_112 : _ -> val) (s) -> k * k1
+             where k2 =
+               (apply ccall
+                  ($`*extern*`.caml_create_bytes : val -> val)
+                    (n_524_unboxed0)
+                    -> k2 * k1
+                  where k2 (s') =
+                    let prim_2 = %int_comp.le (0, for_stop) in
+                    (switch prim_2
+                       | 0 -> k (s')
+                       | 1 -> k2
+                       where k2 =
+                         (cont k2 (0, 0)
+                            where rec k2
+                                        (i : imm tagged,
+                                         n_524_unboxed0_1 : imm tagged) =
+                              let prim_3 =
+                                %num_conv.[`tagged_imm`].[`imm`] (i)
+                              in
+                              let prim_4 = %bytes_load.[`8`] (s, prim_3) in
+                              let c = %tag_imm (prim_4) in
+                              ((let prim_5 = %int_comp.ge (c, 35) in
+                                switch prim_5
+                                  | 0 -> k7
+                                  | 1 -> k8
+                                  where k8 =
+                                    let prim_6 = %int_comp.ne (c, 92) in
+                                    (switch prim_6
+                                       | 0 -> k5
+                                       | 1 -> k8
+                                       where k8 =
+                                         let prim_7 = %int_comp.ge (c, 127)
+                                         in
+                                         switch prim_7
+                                           | 0 -> k4
+                                           | 1 -> k6)
+                                  where k7 =
+                                    let prim_6 = %int_comp.ge (c, 32) in
+                                    (switch prim_6
+                                       | 0 -> k7
+                                       | 1 -> k8
+                                       where k8 =
+                                         let prim_7 = %int_comp.ge (c, 34) in
+                                         switch prim_7
+                                           | 0 -> k4
+                                           | 1 -> k5
+                                       where k7 =
+                                         let prim_7 = %int_comp.ge (c, 14) in
+                                         (switch prim_7
+                                            | 0 -> k7
+                                            | 1 -> k6
+                                            where k7 =
+                                              (switch prim_4
+                                                 | 0 -> k6
+                                                 | 1 -> k6
+                                                 | 2 -> k6
+                                                 | 3 -> k6
+                                                 | 4 -> k6
+                                                 | 5 -> k6
+                                                 | 6 -> k6
+                                                 | 7 -> k6
+                                                 | 8 -> k7
+                                                 | 9 -> k8
+                                                 | 10 -> k9
+                                                 | 11 -> k6
+                                                 | 12 -> k6
+                                                 | 13 -> k10
+                                                 where k10 =
+                                                   let prim_8 =
+                                                     %num_conv.[`tagged_imm`].[`imm`]
+                                                       (n_524_unboxed0_1)
+                                                   in
+                                                   let Pbytessetu =
+                                                     %bytes_or_bigstring_set.bytes.[`8`]
+                                                       (s', prim_8, 92i)
+                                                   in
+                                                   let int_add =
+                                                     %int_barith.add
+                                                       (n_524_unboxed0_1, 1)
+                                                   in
+                                                   let prim_9 =
+                                                     %num_conv.[`tagged_imm`].[`imm`]
+                                                       (int_add)
+                                                   in
+                                                   let Pbytessetu_1 =
+                                                     %bytes_or_bigstring_set.bytes.[`8`]
+                                                       (s', prim_9, 114i)
+                                                   in
+                                                   cont k3 (int_add)
+                                                 where k9 =
+                                                   let prim_8 =
+                                                     %num_conv.[`tagged_imm`].[`imm`]
+                                                       (n_524_unboxed0_1)
+                                                   in
+                                                   let Pbytessetu =
+                                                     %bytes_or_bigstring_set.bytes.[`8`]
+                                                       (s', prim_8, 92i)
+                                                   in
+                                                   let int_add =
+                                                     %int_barith.add
+                                                       (n_524_unboxed0_1, 1)
+                                                   in
+                                                   let prim_9 =
+                                                     %num_conv.[`tagged_imm`].[`imm`]
+                                                       (int_add)
+                                                   in
+                                                   let Pbytessetu_1 =
+                                                     %bytes_or_bigstring_set.bytes.[`8`]
+                                                       (s', prim_9, 110i)
+                                                   in
+                                                   cont k3 (int_add)
+                                                 where k8 =
+                                                   let prim_8 =
+                                                     %num_conv.[`tagged_imm`].[`imm`]
+                                                       (n_524_unboxed0_1)
+                                                   in
+                                                   let Pbytessetu =
+                                                     %bytes_or_bigstring_set.bytes.[`8`]
+                                                       (s', prim_8, 92i)
+                                                   in
+                                                   let int_add =
+                                                     %int_barith.add
+                                                       (n_524_unboxed0_1, 1)
+                                                   in
+                                                   let prim_9 =
+                                                     %num_conv.[`tagged_imm`].[`imm`]
+                                                       (int_add)
+                                                   in
+                                                   let Pbytessetu_1 =
+                                                     %bytes_or_bigstring_set.bytes.[`8`]
+                                                       (s', prim_9, 116i)
+                                                   in
+                                                   cont k3 (int_add)
+                                                 where k7 =
+                                                   let prim_8 =
+                                                     %num_conv.[`tagged_imm`].[`imm`]
+                                                       (n_524_unboxed0_1)
+                                                   in
+                                                   let Pbytessetu =
+                                                     %bytes_or_bigstring_set.bytes.[`8`]
+                                                       (s', prim_8, 92i)
+                                                   in
+                                                   let int_add =
+                                                     %int_barith.add
+                                                       (n_524_unboxed0_1, 1)
+                                                   in
+                                                   let prim_9 =
+                                                     %num_conv.[`tagged_imm`].[`imm`]
+                                                       (int_add)
+                                                   in
+                                                   let Pbytessetu_1 =
+                                                     %bytes_or_bigstring_set.bytes.[`8`]
+                                                       (s', prim_9, 98i)
+                                                   in
+                                                   cont k3 (int_add)))))
+                                 where k6 =
+                                   let n_524_unboxed0_2 = n_524_unboxed0_1 in
+                                   let prim_5 =
+                                     %num_conv.[`tagged_imm`].[`imm`]
+                                       (n_524_unboxed0_2)
+                                   in
+                                   let Pbytessetu =
+                                     %bytes_or_bigstring_set.bytes.[`8`]
+                                       (s', prim_5, 92i)
+                                   in
+                                   let int_add =
+                                     %int_barith.add (n_524_unboxed0_2, 1)
+                                   in
+                                   let int_div = %int_barith.div (c, 100) in
+                                   let int_add_1 =
+                                     %int_barith.add (48, int_div)
+                                   in
+                                   let prim_6 = %untag_imm (int_add_1) in
+                                   let prim_7 =
+                                     %num_conv.[`tagged_imm`].[`imm`]
+                                       (int_add)
+                                   in
+                                   let Pbytessetu_1 =
+                                     %bytes_or_bigstring_set.bytes.[`8`]
+                                       (s', prim_7, prim_6)
+                                   in
+                                   let int_add_2 =
+                                     %int_barith.add (int_add, 1)
+                                   in
+                                   let int_div_1 = %int_barith.div (c, 10) in
+                                   let int_mod =
+                                     %int_barith.mod (int_div_1, 10)
+                                   in
+                                   let int_add_3 =
+                                     %int_barith.add (48, int_mod)
+                                   in
+                                   let prim_8 = %untag_imm (int_add_3) in
+                                   let prim_9 =
+                                     %num_conv.[`tagged_imm`].[`imm`]
+                                       (int_add_2)
+                                   in
+                                   let Pbytessetu_2 =
+                                     %bytes_or_bigstring_set.bytes.[`8`]
+                                       (s', prim_9, prim_8)
+                                   in
+                                   let int_add_4 =
+                                     %int_barith.add (int_add_2, 1)
+                                   in
+                                   let int_mod_1 = %int_barith.mod (c, 10) in
+                                   let int_add_5 =
+                                     %int_barith.add (48, int_mod_1)
+                                   in
+                                   let prim_10 = %untag_imm (int_add_5) in
+                                   let prim_11 =
+                                     %num_conv.[`tagged_imm`].[`imm`]
+                                       (int_add_4)
+                                   in
+                                   let Pbytessetu_3 =
+                                     %bytes_or_bigstring_set.bytes.[`8`]
+                                       (s', prim_11, prim_10)
+                                   in
+                                   cont k3 (int_add_4)
+                                 where k5 =
+                                   let n_524_unboxed0_2 = n_524_unboxed0_1 in
+                                   let prim_5 =
+                                     %num_conv.[`tagged_imm`].[`imm`]
+                                       (n_524_unboxed0_2)
+                                   in
+                                   let Pbytessetu =
+                                     %bytes_or_bigstring_set.bytes.[`8`]
+                                       (s', prim_5, 92i)
+                                   in
+                                   let int_add =
+                                     %int_barith.add (n_524_unboxed0_2, 1)
+                                   in
+                                   let prim_6 =
+                                     %num_conv.[`tagged_imm`].[`imm`]
+                                       (int_add)
+                                   in
+                                   let Pbytessetu_1 =
+                                     %bytes_or_bigstring_set.bytes.[`8`]
+                                       (s', prim_6, prim_4)
+                                   in
+                                   cont k3 (int_add)
+                                 where k4 =
+                                   let n_524_unboxed0_2 = n_524_unboxed0_1 in
+                                   let prim_5 =
+                                     %num_conv.[`tagged_imm`].[`imm`]
+                                       (n_524_unboxed0_2)
+                                   in
+                                   let Pbytessetu =
+                                     %bytes_or_bigstring_set.bytes.[`8`]
+                                       (s', prim_5, prim_4)
+                                   in
+                                   cont k3 (n_524_unboxed0_2)
+                                 where k3 (n_524_unboxed0_2 : imm tagged) =
+                                   let int_add =
+                                     %int_barith.add (n_524_unboxed0_2, 1)
+                                   in
+                                   let prim_5 = %int_comp.ne (i, for_stop) in
+                                   (switch prim_5
+                                      | 0 -> k (s')
+                                      | 1 -> k3
+                                      where k3 =
+                                        let int_succ = %int_barith.add (i, 1)
+                                        in
+                                        cont k2 (int_succ, int_add)))))))
+    in
+    let $camlBytes__escaped_131 = closure escaped_48_1 @escaped in
+    let code loopify(never) size(76) newer_version_of(map_49)
+          map_49_1 (f : val, s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      let prim = %bytes_length (s) in
+      let l = %tag_imm (prim) in
+      let prim_1 = %phys_eq (l, 0) in
+      switch prim_1
+        | 0 -> k2
+        | 1 -> k (s)
+        where k2 =
+          (apply ccall
+             ($`*extern*`.caml_create_bytes : val -> val) (l) -> k2 * k1
+             where k2 (r) =
+               let for_stop = %int_barith.sub (l, 1) in
+               let prim_2 = %int_comp.le (0, for_stop) in
+               (switch prim_2
+                  | 0 -> k (r)
+                  | 1 -> k2
+                  where k2 =
+                    (cont k2 (0)
+                       where rec k2 (i : imm tagged) =
+                         ((let prim_3 = %num_conv.[`tagged_imm`].[`imm`] (i)
+                           in
+                           let prim_4 = %bytes_load.[`8`] (s, prim_3) in
+                           let Pbytesrefu = %tag_imm (prim_4) in
+                           apply f (Pbytesrefu) -> k4 * k1
+                             where k4 (param : imm tagged) =
+                               let unboxed_field = %untag_imm (param) in
+                               cont k3 (unboxed_field, prim_3))
+                            where k3 (unboxed_field : imm, prim_3 : imm) =
+                              let naked_immediate = unboxed_field in
+                              let cse_param = prim_3 in
+                              let Pbytessetu =
+                                %bytes_or_bigstring_set.bytes.[`8`]
+                                  (r, cse_param, naked_immediate)
+                              in
+                              let prim_4 = %int_comp.ne (i, for_stop) in
+                              (switch prim_4
+                                 | 0 -> k (r)
+                                 | 1 -> k3
+                                 where k3 =
+                                   let int_succ = %int_barith.add (i, 1) in
+                                   cont k2 (int_succ))))))
+    in
+    let $camlBytes__map_132 = closure map_49_1 @map in
+    let code loopify(never) size(76) newer_version_of(mapi_50)
+          mapi_50_1 (f : val, s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      let prim = %bytes_length (s) in
+      let l = %tag_imm (prim) in
+      let prim_1 = %phys_eq (l, 0) in
+      switch prim_1
+        | 0 -> k2
+        | 1 -> k (s)
+        where k2 =
+          (apply ccall
+             ($`*extern*`.caml_create_bytes : val -> val) (l) -> k2 * k1
+             where k2 (r) =
+               let for_stop = %int_barith.sub (l, 1) in
+               let prim_2 = %int_comp.le (0, for_stop) in
+               (switch prim_2
+                  | 0 -> k (r)
+                  | 1 -> k2
+                  where k2 =
+                    (cont k2 (0)
+                       where rec k2 (i : imm tagged) =
+                         ((let prim_3 = %num_conv.[`tagged_imm`].[`imm`] (i)
+                           in
+                           let prim_4 = %bytes_load.[`8`] (s, prim_3) in
+                           let Pbytesrefu = %tag_imm (prim_4) in
+                           apply f (i, Pbytesrefu) -> k4 * k1
+                             where k4 (param : imm tagged) =
+                               let unboxed_field = %untag_imm (param) in
+                               cont k3 (prim_3, unboxed_field))
+                            where k3 (prim_3 : imm, unboxed_field : imm) =
+                              let naked_immediate = unboxed_field in
+                              let cse_param = prim_3 in
+                              let Pbytessetu =
+                                %bytes_or_bigstring_set.bytes.[`8`]
+                                  (r, cse_param, naked_immediate)
+                              in
+                              let prim_4 = %int_comp.ne (i, for_stop) in
+                              (switch prim_4
+                                 | 0 -> k (r)
+                                 | 1 -> k3
+                                 where k3 =
+                                   let int_succ = %int_barith.add (i, 1) in
+                                   cont k2 (int_succ))))))
+    in
+    let $camlBytes__mapi_133 = closure mapi_50_1 @mapi in
+    let code loopify(never) size(4) newer_version_of(uppercase_ascii_51)
+          uppercase_ascii_51_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      apply direct(map_49_1)
+        ($camlBytes__map_132 : _ -> val)
+          ($Char.camlChar__uppercase_ascii_19, s)
+          -> k * k1
+    in
+    let $camlBytes__uppercase_ascii_134 =
+      closure uppercase_ascii_51_1 @uppercase_ascii
+    in
+    let code loopify(never) size(4) newer_version_of(lowercase_ascii_52)
+          lowercase_ascii_52_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      apply direct(map_49_1)
+        ($camlBytes__map_132 : _ -> val)
+          ($Char.camlChar__lowercase_ascii_18, s)
+          -> k * k1
+    in
+    let $camlBytes__lowercase_ascii_135 =
+      closure lowercase_ascii_52_1 @lowercase_ascii
+    in
+    let code loopify(never) size(40) newer_version_of(apply1_53)
+          apply1_53_1 (f : val, s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      let prim = %bytes_length (s) in
+      let Pbyteslength = %tag_imm (prim) in
+      let prim_1 = %phys_eq (Pbyteslength, 0) in
+      switch prim_1
+        | 0 -> k2
+        | 1 -> k (s)
+        where k2 =
+          (apply direct(copy_29_1)
+             ($camlBytes__copy_112 : _ -> val) (s) -> k2 * k1
+             where k2 (r : val) =
+               ((let prim_2 = %bytes_load.[`8`] (s, 0i) in
+                 let Pbytesrefu = %tag_imm (prim_2) in
+                 apply f (Pbytesrefu) -> k3 * k1
+                   where k3 (param : imm tagged) =
+                     let unboxed_field = %untag_imm (param) in
+                     cont k2 (unboxed_field))
+                  where k2 (unboxed_field : imm) =
+                    let naked_immediate = unboxed_field in
+                    let Pbytessetu =
+                      %bytes_or_bigstring_set.bytes.[`8`]
+                        (r, 0i, naked_immediate)
+                    in
+                    cont k (r)))
+    in
+    let $camlBytes__apply1_136 = closure apply1_53_1 @apply1 in
+    let code loopify(never) size(4) newer_version_of(capitalize_ascii_54)
+          capitalize_ascii_54_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      apply direct(apply1_53_1)
+        ($camlBytes__apply1_136 : _ -> val)
+          ($Char.camlChar__uppercase_ascii_19, s)
+          -> k * k1
+    in
+    let $camlBytes__capitalize_ascii_137 =
+      closure capitalize_ascii_54_1 @capitalize_ascii
+    in
+    let code loopify(never) size(4) newer_version_of(uncapitalize_ascii_55)
+          uncapitalize_ascii_55_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      apply direct(apply1_53_1)
+        ($camlBytes__apply1_136 : _ -> val)
+          ($Char.camlChar__lowercase_ascii_18, s)
+          -> k * k1
+    in
+    let $camlBytes__uncapitalize_ascii_138 =
+      closure uncapitalize_ascii_55_1 @uncapitalize_ascii
+    in
+    let code rec loopify(done) size(34) newer_version_of(index_rec_56)
+          index_rec_56_1
+            (s : val, lim : imm tagged, i : imm tagged, c : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      cont self (i)
+        where rec self (i_1 : imm tagged) =
+          let s_1 = s in
+          let lim_1 = lim in
+          let c_1 = c in
+          let prim = %int_comp.ge (i_1, lim_1) in
+          (switch prim
+             | 0 -> k2
+             | 1 -> k1 pop(regular k1) ($`*predef*`.caml_exn_Not_found)
+             where k2 =
+               let prim_1 = %num_conv.[`tagged_imm`].[`imm`] (i_1) in
+               let prim_2 = %bytes_load.[`8`] (s_1, prim_1) in
+               let Pbytesrefu = %tag_imm (prim_2) in
+               let prim_3 = %phys_eq (Pbytesrefu, c_1) in
+               (switch prim_3
+                  | 0 -> k2
+                  | 1 -> k (i_1)
+                  where k2 =
+                    let int_add = %int_barith.add (i_1, 1) in
+                    cont self (int_add)))
+    in
+    let $camlBytes__index_rec_139 = closure index_rec_56_1 @index_rec in
+    let code loopify(never) size(11) newer_version_of(index_57)
+          index_57_1 (s : val, c : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let prim = %bytes_length (s) in
+      let Pbyteslength = %tag_imm (prim) in
+      apply direct(index_rec_56_1)
+        ($camlBytes__index_rec_139 : _ -> imm tagged)
+          (s, Pbyteslength, 0, c)
+          -> k * k1
+    in
+    let $camlBytes__index_140 = closure index_57_1 @index in
+    let code rec loopify(done) size(41) newer_version_of(index_rec_opt_58)
+          index_rec_opt_58_1
+            (s : val, lim : imm tagged, i : imm tagged, c : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : [ 0 | 0 of val ] =
+      cont self (i)
+        where rec self (i_1 : imm tagged) =
+          let s_1 = s in
+          let lim_1 = lim in
+          let c_1 = c in
+          let prim = %int_comp.ge (i_1, lim_1) in
+          (switch prim
+             | 0 -> k2
+             | 1 -> k (0)
+             where k2 =
+               let prim_1 = %num_conv.[`tagged_imm`].[`imm`] (i_1) in
+               let prim_2 = %bytes_load.[`8`] (s_1, prim_1) in
+               let Pbytesrefu = %tag_imm (prim_2) in
+               let prim_3 = %phys_eq (Pbytesrefu, c_1) in
+               (switch prim_3
+                  | 0 -> k2
+                  | 1 -> k3
+                  where k3 =
+                    let Pmakeblock = %block.[`0`] (i_1) in
+                    cont k (Pmakeblock)
+                  where k2 =
+                    let int_add = %int_barith.add (i_1, 1) in
+                    cont self (int_add)))
+    in
+    let $camlBytes__index_rec_opt_141 =
+      closure index_rec_opt_58_1 @index_rec_opt
+    in
+    let code loopify(never) size(11) newer_version_of(index_opt_59)
+          index_opt_59_1 (s : val, c : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : [ 0 | 0 of val ] =
+      let prim = %bytes_length (s) in
+      let Pbyteslength = %tag_imm (prim) in
+      apply direct(index_rec_opt_58_1)
+        ($camlBytes__index_rec_opt_141 : _ -> [ 0 | 0 of val ])
+          (s, Pbyteslength, 0, c)
+          -> k * k1
+    in
+    let $camlBytes__index_opt_142 = closure index_opt_59_1 @index_opt in
+    let code loopify(never) size(39) newer_version_of(index_from_60)
+          index_from_60_1 (s : val, i : imm tagged, c : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let prim = %bytes_length (s) in
+      let l = %tag_imm (prim) in
+      (let prim_1 = %int_comp.lt (i, 0) in
+       switch prim_1
+         | 0 -> k3
+         | 1 -> k2
+         where k3 =
+           let prim_2 = %int_comp.gt (i, l) in
+           (switch prim_2
+              | 0 -> k3
+              | 1 -> k2
+              where k3 =
+                apply direct(index_rec_56_1)
+                  ($camlBytes__index_rec_139 : _ -> imm tagged)
+                    (s, l, i, c)
+                    -> k * k1))
+        where k2 =
+          apply direct(invalid_arg_23_1)
+            ($camlBytes__invalid_arg_106 : _ -> imm tagged)
+              ($camlBytes__immstring1625)
+              -> never * k1
+    in
+    let $camlBytes__index_from_143 = closure index_from_60_1 @index_from in
+    let code loopify(never) size(39) newer_version_of(index_from_opt_61)
+          index_from_opt_61_1 (s : val, i : imm tagged, c : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : [ 0 | 0 of val ] =
+      let prim = %bytes_length (s) in
+      let l = %tag_imm (prim) in
+      (let prim_1 = %int_comp.lt (i, 0) in
+       switch prim_1
+         | 0 -> k3
+         | 1 -> k2
+         where k3 =
+           let prim_2 = %int_comp.gt (i, l) in
+           (switch prim_2
+              | 0 -> k3
+              | 1 -> k2
+              where k3 =
+                apply direct(index_rec_opt_58_1)
+                  ($camlBytes__index_rec_opt_141 : _ -> [ 0 | 0 of val ])
+                    (s, l, i, c)
+                    -> k * k1))
+        where k2 =
+          apply direct(invalid_arg_23_1)
+            ($camlBytes__invalid_arg_106 : _ -> [ 0 | 0 of val ])
+              ($camlBytes__immstring1644)
+              -> never * k1
+    in
+    let $camlBytes__index_from_opt_144 =
+      closure index_from_opt_61_1 @index_from_opt
+    in
+    let code rec loopify(done) size(34) newer_version_of(rindex_rec_62)
+          rindex_rec_62_1 (s : val, i : imm tagged, c : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      cont self (i)
+        where rec self (i_1 : imm tagged) =
+          let s_1 = s in
+          let c_1 = c in
+          let prim = %int_comp.lt (i_1, 0) in
+          (switch prim
+             | 0 -> k2
+             | 1 -> k1 pop(regular k1) ($`*predef*`.caml_exn_Not_found)
+             where k2 =
+               let prim_1 = %num_conv.[`tagged_imm`].[`imm`] (i_1) in
+               let prim_2 = %bytes_load.[`8`] (s_1, prim_1) in
+               let Pbytesrefu = %tag_imm (prim_2) in
+               let prim_3 = %phys_eq (Pbytesrefu, c_1) in
+               (switch prim_3
+                  | 0 -> k2
+                  | 1 -> k (i_1)
+                  where k2 =
+                    let int_sub = %int_barith.sub (i_1, 1) in
+                    cont self (int_sub)))
+    in
+    let $camlBytes__rindex_rec_145 = closure rindex_rec_62_1 @rindex_rec in
+    let code loopify(never) size(13) newer_version_of(rindex_63)
+          rindex_63_1 (s : val, c : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let prim = %bytes_length (s) in
+      let Pbyteslength = %tag_imm (prim) in
+      let int_sub = %int_barith.sub (Pbyteslength, 1) in
+      apply direct(rindex_rec_62_1)
+        ($camlBytes__rindex_rec_145 : _ -> imm tagged)
+          (s, int_sub, c)
+          -> k * k1
+    in
+    let $camlBytes__rindex_146 = closure rindex_63_1 @rindex in
+    let code loopify(never) size(39) newer_version_of(rindex_from_64)
+          rindex_from_64_1 (s : val, i : imm tagged, c : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      (let prim = %int_comp.lt (i, -1) in
+       switch prim
+         | 0 -> k3
+         | 1 -> k2
+         where k3 =
+           let prim_1 = %bytes_length (s) in
+           let Pbyteslength = %tag_imm (prim_1) in
+           let prim_2 = %int_comp.ge (i, Pbyteslength) in
+           (switch prim_2
+              | 0 -> k3
+              | 1 -> k2
+              where k3 =
+                apply direct(rindex_rec_62_1)
+                  ($camlBytes__rindex_rec_145 : _ -> imm tagged)
+                    (s, i, c)
+                    -> k * k1))
+        where k2 =
+          apply direct(invalid_arg_23_1)
+            ($camlBytes__invalid_arg_106 : _ -> imm tagged)
+              ($camlBytes__immstring1692)
+              -> never * k1
+    in
+    let $camlBytes__rindex_from_147 = closure rindex_from_64_1 @rindex_from
+    in
+    let code rec loopify(done) size(41) newer_version_of(rindex_rec_opt_65)
+          rindex_rec_opt_65_1 (s : val, i : imm tagged, c : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : [ 0 | 0 of val ] =
+      cont self (i)
+        where rec self (i_1 : imm tagged) =
+          let s_1 = s in
+          let c_1 = c in
+          let prim = %int_comp.lt (i_1, 0) in
+          (switch prim
+             | 0 -> k2
+             | 1 -> k (0)
+             where k2 =
+               let prim_1 = %num_conv.[`tagged_imm`].[`imm`] (i_1) in
+               let prim_2 = %bytes_load.[`8`] (s_1, prim_1) in
+               let Pbytesrefu = %tag_imm (prim_2) in
+               let prim_3 = %phys_eq (Pbytesrefu, c_1) in
+               (switch prim_3
+                  | 0 -> k2
+                  | 1 -> k3
+                  where k3 =
+                    let Pmakeblock = %block.[`0`] (i_1) in
+                    cont k (Pmakeblock)
+                  where k2 =
+                    let int_sub = %int_barith.sub (i_1, 1) in
+                    cont self (int_sub)))
+    in
+    let $camlBytes__rindex_rec_opt_148 =
+      closure rindex_rec_opt_65_1 @rindex_rec_opt
+    in
+    let code loopify(never) size(13) newer_version_of(rindex_opt_66)
+          rindex_opt_66_1 (s : val, c : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : [ 0 | 0 of val ] =
+      let prim = %bytes_length (s) in
+      let Pbyteslength = %tag_imm (prim) in
+      let int_sub = %int_barith.sub (Pbyteslength, 1) in
+      apply direct(rindex_rec_opt_65_1)
+        ($camlBytes__rindex_rec_opt_148 : _ -> [ 0 | 0 of val ])
+          (s, int_sub, c)
+          -> k * k1
+    in
+    let $camlBytes__rindex_opt_149 = closure rindex_opt_66_1 @rindex_opt in
+    let code loopify(never) size(39) newer_version_of(rindex_from_opt_67)
+          rindex_from_opt_67_1 (s : val, i : imm tagged, c : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : [ 0 | 0 of val ] =
+      (let prim = %int_comp.lt (i, -1) in
+       switch prim
+         | 0 -> k3
+         | 1 -> k2
+         where k3 =
+           let prim_1 = %bytes_length (s) in
+           let Pbyteslength = %tag_imm (prim_1) in
+           let prim_2 = %int_comp.ge (i, Pbyteslength) in
+           (switch prim_2
+              | 0 -> k3
+              | 1 -> k2
+              where k3 =
+                apply direct(rindex_rec_opt_65_1)
+                  ($camlBytes__rindex_rec_opt_148 : _ -> [ 0 | 0 of val ])
+                    (s, i, c)
+                    -> k * k1))
+        where k2 =
+          apply direct(invalid_arg_23_1)
+            ($camlBytes__invalid_arg_106 : _ -> [ 0 | 0 of val ])
+              ($camlBytes__immstring1739)
+              -> never * k1
+    in
+    let $camlBytes__rindex_from_opt_150 =
+      closure rindex_from_opt_67_1 @rindex_from_opt
+    in
+    let code loopify(never) size(62) newer_version_of(contains_from_68)
+          contains_from_68_1 (s : val, i : imm tagged, c : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let prim = %bytes_length (s) in
+      let l = %tag_imm (prim) in
+      (let prim_1 = %int_comp.lt (i, 0) in
+       switch prim_1
+         | 0 -> k3
+         | 1 -> k2
+         where k3 =
+           let prim_2 = %int_comp.gt (i, l) in
+           (switch prim_2
+              | 0 -> k3
+              | 1 -> k2
+              where k3 =
+                let try_region = %begin_try_region () in
+                let try_ghost_region = %begin_try_ghost_region () in
+                (cont k4 push(k3)
+                   where k4 =
+                     (apply direct(index_rec_56_1)
+                        ($camlBytes__index_rec_139 : _ -> imm tagged)
+                          (s, l, i, c)
+                          -> k5 * k3
+                        where k5 (param : imm tagged) =
+                          cont k4
+                        where k4 =
+                          cont k pop(k3) (1))
+                   where k3 exn (`exn` : val) =
+                     let `unit` = %end_try_region (try_region) in
+                     let unit_1 = %end_try_ghost_region (try_ghost_region) in
+                     let prim_3 =
+                       %phys_eq (`exn`, $`*predef*`.caml_exn_Not_found)
+                     in
+                     switch prim_3
+                       | 0 -> k1 pop(reraise k1) (`exn`)
+                       | 1 -> k (0))))
+        where k2 =
+          apply direct(invalid_arg_23_1)
+            ($camlBytes__invalid_arg_106 : _ -> imm tagged)
+              ($camlBytes__immstring1770)
+              -> never * k1
+    in
+    let $camlBytes__contains_from_151 =
+      closure contains_from_68_1 @contains_from
+    in
+    let code loopify(never) size(4) newer_version_of(contains_69)
+          contains_69_1 (s : val, c : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      apply direct(contains_from_68_1)
+        ($camlBytes__contains_from_151 : _ -> imm tagged) (s, 0, c) -> k * k1
+    in
+    let $camlBytes__contains_152 = closure contains_69_1 @contains in
+    let code loopify(never) size(62) newer_version_of(rcontains_from_70)
+          rcontains_from_70_1 (s : val, i : imm tagged, c : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      (let prim = %int_comp.lt (i, 0) in
+       switch prim
+         | 0 -> k3
+         | 1 -> k2
+         where k3 =
+           let prim_1 = %bytes_length (s) in
+           let Pbyteslength = %tag_imm (prim_1) in
+           let prim_2 = %int_comp.ge (i, Pbyteslength) in
+           (switch prim_2
+              | 0 -> k3
+              | 1 -> k2
+              where k3 =
+                let try_region = %begin_try_region () in
+                let try_ghost_region = %begin_try_ghost_region () in
+                (cont k4 push(k3)
+                   where k4 =
+                     (apply direct(rindex_rec_62_1)
+                        ($camlBytes__rindex_rec_145 : _ -> imm tagged)
+                          (s, i, c)
+                          -> k5 * k3
+                        where k5 (param : imm tagged) =
+                          cont k4
+                        where k4 =
+                          cont k pop(k3) (1))
+                   where k3 exn (`exn` : val) =
+                     let `unit` = %end_try_region (try_region) in
+                     let unit_1 = %end_try_ghost_region (try_ghost_region) in
+                     let prim_3 =
+                       %phys_eq (`exn`, $`*predef*`.caml_exn_Not_found)
+                     in
+                     switch prim_3
+                       | 0 -> k1 pop(reraise k1) (`exn`)
+                       | 1 -> k (0))))
+        where k2 =
+          apply direct(invalid_arg_23_1)
+            ($camlBytes__invalid_arg_106 : _ -> imm tagged)
+              ($camlBytes__immstring1808)
+              -> never * k1
+    in
+    let $camlBytes__rcontains_from_153 =
+      closure rcontains_from_70_1 @rcontains_from
+    in
+    let code loopify(never) size(4) newer_version_of(compare_71)
+          compare_71_1 (x : val, y : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      apply ccall noalloc
+        ($`*extern*`.caml_bytes_compare : val * val -> val) (x, y) -> k * k1
+    in
+    let $camlBytes__compare_154 = closure compare_71_1 @compare in
+    let code loopify(never) size(4) newer_version_of(uppercase_72)
+          uppercase_72_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      apply direct(map_49_1)
+        ($camlBytes__map_132 : _ -> val)
+          ($Char.camlChar__uppercase_17, s)
+          -> k * k1
+    in
+    let $camlBytes__uppercase_155 = closure uppercase_72_1 @uppercase in
+    let code loopify(never) size(4) newer_version_of(lowercase_73)
+          lowercase_73_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      apply direct(map_49_1)
+        ($camlBytes__map_132 : _ -> val)
+          ($Char.camlChar__lowercase_16, s)
+          -> k * k1
+    in
+    let $camlBytes__lowercase_156 = closure lowercase_73_1 @lowercase in
+    let code loopify(never) size(4) newer_version_of(capitalize_74)
+          capitalize_74_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      apply direct(apply1_53_1)
+        ($camlBytes__apply1_136 : _ -> val)
+          ($Char.camlChar__uppercase_17, s)
+          -> k * k1
+    in
+    let $camlBytes__capitalize_157 = closure capitalize_74_1 @capitalize in
+    let code loopify(never) size(4) newer_version_of(uncapitalize_75)
+          uncapitalize_75_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      apply direct(apply1_53_1)
+        ($camlBytes__apply1_136 : _ -> val)
+          ($Char.camlChar__lowercase_16, s)
+          -> k * k1
+    in
+    let $camlBytes__uncapitalize_158 =
+      closure uncapitalize_75_1 @uncapitalize
+    in
+    let code rec loopify(never) size(69) newer_version_of(aux_77)
+          aux_77_1 (i : imm tagged, param : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : [ 0 | 0 of val * val ] =
+      let s = %project_value_slot.[`aux`].[`s`] (my_closure) in
+      let prim = %bytes_length (s) in
+      let Pbyteslength = %tag_imm (prim) in
+      let prim_1 = %phys_eq (i, Pbyteslength) in
+      switch prim_1
+        | 0 -> k2
+        | 1 -> k (0)
+        where k2 =
+          ((let prim_2 = %num_conv.[`imm`].[`nativeint`] (prim) in
+            let prim_3 = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+            let prim_4 = %int_comp.`nativeint`.unsigned.lt (prim_3, prim_2)
+            in
+            switch prim_4
+              | 0 -> k2
+              | 1 -> k3)
+             where k3 =
+               let prim_2 = %num_conv.[`tagged_imm`].[`imm`] (i) in
+               let prim_3 = %bytes_load.[`8`] (s, prim_2) in
+               let x = %tag_imm (prim_3) in
+               let int_add = %int_barith.add (i, 1) in
+               let partial_aux = closure partial_aux_78 @partial_aux
+               with {
+                 my_closure = my_closure ~ depth my_depth -> succ my_depth;
+                 int_add = int_add
+               }
+               in
+               let Pmakeblock = %block.[`0`] (x, partial_aux) in
+               cont k (Pmakeblock)
+             where k2 =
+               cont k1 pop(regular k1) ($camlBytes__block1873))
+    in
+    let code loopify(never) size(94) newer_version_of(to_seq_76)
+          to_seq_76_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      let aux = closure aux_77_1 @aux with { s = s } in
+      let partial_aux = closure partial_aux_79 @partial_aux_1
+      with { aux = aux }
+      in
+      cont k (partial_aux)
+    in
+    let $camlBytes__to_seq_159 = closure to_seq_76_1 @to_seq in
+    let code rec loopify(never) size(76) newer_version_of(aux_81)
+          aux_81_1 (i : imm tagged, param : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : [ 0 | 0 of val * val ] =
+      let s = %project_value_slot.[`aux_1`].[`s_1`] (my_closure) in
+      let prim = %bytes_length (s) in
+      let Pbyteslength = %tag_imm (prim) in
+      let prim_1 = %phys_eq (i, Pbyteslength) in
+      switch prim_1
+        | 0 -> k2
+        | 1 -> k (0)
+        where k2 =
+          ((let prim_2 = %num_conv.[`imm`].[`nativeint`] (prim) in
+            let prim_3 = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+            let prim_4 = %int_comp.`nativeint`.unsigned.lt (prim_3, prim_2)
+            in
+            switch prim_4
+              | 0 -> k2
+              | 1 -> k3)
+             where k3 =
+               let prim_2 = %num_conv.[`tagged_imm`].[`imm`] (i) in
+               let prim_3 = %bytes_load.[`8`] (s, prim_2) in
+               let x = %tag_imm (prim_3) in
+               let int_add = %int_barith.add (i, 1) in
+               let partial_aux = closure partial_aux_82 @partial_aux_2
+               with {
+                 my_closure_1 = my_closure ~ depth my_depth -> succ my_depth;
+                 int_add_1 = int_add
+               }
+               in
+               let Pmakeblock = %block.[`0`] (i, x) in
+               let Pmakeblock_1 = %block.[`0`] (Pmakeblock, partial_aux) in
+               cont k (Pmakeblock_1)
+             where k2 =
+               cont k1 pop(regular k1) ($camlBytes__block1873))
+    in
+    let code loopify(never) size(101) newer_version_of(to_seqi_80)
+          to_seqi_80_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      let aux = closure aux_81_1 @aux_1 with { s_1 = s } in
+      let partial_aux = closure partial_aux_83 @partial_aux_3
+      with { aux_1 = aux }
+      in
+      cont k (partial_aux)
+    in
+    let $camlBytes__to_seqi_160 = closure to_seqi_80_1 @to_seqi in
+    let code loopify(never) size(58) newer_version_of(resize_85)
+          resize_85_1 (param : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let n = %project_value_slot.[`resize`].[`n`] (my_closure) in
+      let buf = %project_value_slot.[`resize`].[`buf`] (my_closure) in
+      (let Pfield = %block_load.mut.[`0`] (buf) in
+       let prim = %bytes_length (Pfield) in
+       let Pbyteslength = %tag_imm (prim) in
+       let int_mul = %int_barith.mul (2, Pbyteslength) in
+       apply direct(min_25_1)
+         ($camlBytes__min_108 : _ -> imm tagged) (int_mul, 10000) -> k2 * k1)
+        where k2 (new_len : imm tagged) =
+          ((let Pfield = %block_load.mut.[`0`] (buf) in
+            let prim = %bytes_length (Pfield) in
+            let Pbyteslength = %tag_imm (prim) in
+            let prim_1 = %phys_eq (Pbyteslength, new_len) in
+            switch prim_1
+              | 0 -> k2
+              | 1 -> k3
+              where k3 =
+                apply direct(failwith_22_1)
+                  ($camlBytes__failwith_105 : _ -> imm tagged)
+                    ($camlBytes__immstring1971)
+                    -> never * k1)
+             where k2 =
+               (apply direct(make_27_1)
+                  ($camlBytes__make_110 : _ -> val) (new_len, 0) -> k2 * k1
+                  where k2 (new_buf : val) =
+                    ((let Pfield = %block_load.mut.[`0`] (n) in
+                      let Pfield_1 = %block_load.mut.[`0`] (buf) in
+                      apply direct(blit_37_1)
+                        ($camlBytes__blit_120 : _ -> imm tagged)
+                          (Pfield_1, 0, new_buf, 0, Pfield)
+                          -> k3 * k1
+                        where k3 (param_1 : imm tagged) =
+                          cont k2)
+                       where k2 =
+                         let Psetfield = %block_set.[`0`] (buf, new_buf) in
+                         cont k (0))))
+    in
+    let code loopify(never) size(62) newer_version_of(`fn[bytes.ml:627,4--90]_86`)
+          `fn[bytes.ml:627,4--90]_86_1` (c : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let n =
+        %project_value_slot.[`fn[bytes.ml:627,4--90]`].[`n_1`] (my_closure)
+      in
+      let resize =
+        %project_value_slot.[`fn[bytes.ml:627,4--90]`].[`resize`]
+          (my_closure)
+      in
+      let buf =
+        %project_value_slot.[`fn[bytes.ml:627,4--90]`].[`buf_1`] (my_closure)
+      in
+      (let Pfield = %block_load.mut.[`0`] (buf) in
+       let prim = %bytes_length (Pfield) in
+       let Pbyteslength = %tag_imm (prim) in
+       let Pfield_1 = %block_load.mut.[`0`] (n) in
+       let prim_1 = %phys_eq (Pfield_1, Pbyteslength) in
+       switch prim_1
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           (apply direct(resize_85_1)
+              (resize : _ -> imm tagged) (0) -> k3 * k1
+              where k3 (param : imm tagged) =
+                cont k2))
+        where k2 =
+          let Pfield = %block_load.mut.[`0`] (n) in
+          let Pfield_1 = %block_load.mut.[`0`] (buf) in
+          ((let prim = %bytes_length (Pfield_1) in
+            let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
+            let prim_2 = %num_conv.[`tagged_imm`].[`nativeint`] (Pfield) in
+            let prim_3 = %int_comp.`nativeint`.unsigned.lt (prim_2, prim_1)
+            in
+            switch prim_3
+              | 0 -> k2
+              | 1 -> k3)
+             where k3 =
+               let prim = %untag_imm (c) in
+               let prim_1 = %num_conv.[`tagged_imm`].[`imm`] (Pfield) in
+               let Pbytessets =
+                 %bytes_or_bigstring_set.bytes.[`8`] (Pfield_1, prim_1, prim)
+               in
+               let prim_2 =
+                 %block_load.`imm`.tag[`0`].`size`[`1`].mut.[`0`] (n)
+               in
+               let prim_3 = %int_barith.add (1, prim_2) in
+               let Poffsetref =
+                 %block_set.`imm`.tag[`0`].`size`[`1`].lassign.[`0`]
+                   (n, prim_3)
+               in
+               cont k (0)
+             where k2 =
+               cont k1 pop(regular k1) ($camlBytes__block1873))
+    in
+    let code loopify(never) size(191) newer_version_of(of_seq_84)
+          of_seq_84_1 (i : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      let n = %block.mut.[`0`] (0) in
+      apply direct(make_27_1)
+        ($camlBytes__make_110 : _ -> val) (256, 0) -> k2 * k1
+        where k2 (apply_result : val) =
+          let buf = %block.mut.[`0`] (apply_result) in
+          let resize = closure resize_85_1 @resize
+          with {
+            failwith = $camlBytes__failwith_105;
+            min = $camlBytes__min_108;
+            make = $camlBytes__make_110;
+            blit = $camlBytes__blit_120;
+            n = n;
+            buf = buf
+          }
+          in
+          ((let `fn[bytes.ml:627,4--90]` =
+              closure `fn[bytes.ml:627,4--90]_86_1` @`fn[bytes.ml:627,4--90]`
+            with { n_1 = n; buf_1 = buf; resize = resize }
+            in
+            cont self (i)
+              where rec self (seq : val) =
+                (apply inlining_state(depth(10)) seq (0) -> k3 * k1
+                   where k3 (`*match*` : [ 0 | 0 of val * val ]) =
+                     let prim = %is_int (`*match*`) in
+                     (switch prim
+                        | 0 -> k3
+                        | 1 -> k2
+                        where k3 =
+                          let Pfield = %block_load.[`0`] (`*match*`) in
+                          (apply direct(`fn[bytes.ml:627,4--90]_86_1`)
+                                  inlining_state(depth(10))
+                             (`fn[bytes.ml:627,4--90]` : _ -> imm tagged)
+                               (Pfield)
+                               -> k4 * k1
+                             where k4 (param : imm tagged) =
+                               cont k3
+                             where k3 =
+                               let Pfield_1 = %block_load.[`1`] (`*match*`)
+                               in
+                               cont self (Pfield_1)))))
+             where k2 =
+               let Pfield = %block_load.mut.[`0`] (n) in
+               let Pfield_1 = %block_load.mut.[`0`] (buf) in
+               apply direct(sub_32_1)
+                 ($camlBytes__sub_115 : _ -> val)
+                   (Pfield_1, 0, Pfield)
+                   -> k * k1)
+    in
+    let $camlBytes__of_seq_161 = closure of_seq_84_1 @of_seq in
+    let code loopify(never) size(33) newer_version_of(get_int8_87)
+          get_int8_87_1 (b : val, i : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      (let prim = %bytes_length (b) in
+       let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
+       let prim_2 = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+       let prim_3 = %int_comp.`nativeint`.unsigned.lt (prim_2, prim_1) in
+       switch prim_3
+         | 0 -> k2
+         | 1 -> k3)
+        where k3 =
+          let prim = %num_conv.[`tagged_imm`].[`imm`] (i) in
+          let prim_1 = %bytes_load.[`8`] (b, prim) in
+          let Pbytesrefs = %tag_imm (prim_1) in
+          let int_lsl = %int_shift.lsl (Pbytesrefs, 55i) in
+          let int_asr = %int_shift.asr (int_lsl, 55i) in
+          cont k (int_asr)
+        where k2 =
+          cont k1 pop(regular k1) ($camlBytes__block1873)
+    in
+    let $camlBytes__get_int8_162 = closure get_int8_87_1 @get_int8 in
+    let code loopify(never) size(31) newer_version_of(get_uint16_le_88)
+          get_uint16_le_88_1 (b : val, i : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      (let prim = %bytes_length (b) in
+       let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
+       let prim_2 = %int_barith.`nativeint`.sub (prim_1, 1n) in
+       let prim_3 = %int_shift.`nativeint`.asr (prim_2, 63i) in
+       let prim_4 = %int_barith.`nativeint`.xor (prim_3, -1n) in
+       let prim_5 = %int_barith.`nativeint`.`and` (prim_4, prim_2) in
+       let prim_6 = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+       let prim_7 = %int_comp.`nativeint`.unsigned.lt (prim_6, prim_5) in
+       switch prim_7
+         | 0 -> k2
+         | 1 -> k3)
+        where k3 =
+          let prim = %num_conv.[`tagged_imm`].[`imm`] (i) in
+          let prim_1 = %bytes_load.[`16`] (b, prim) in
+          let Pbytes_load_16 = %tag_imm (prim_1) in
+          cont k (Pbytes_load_16)
+        where k2 =
+          cont k1 pop(regular k1) ($camlBytes__block1873)
+    in
+    let $camlBytes__get_uint16_le_163 =
+      closure get_uint16_le_88_1 @get_uint16_le
+    in
+    let code loopify(never) size(38) newer_version_of(get_uint16_be_89)
+          get_uint16_be_89_1 (b : val, i : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      (let prim = %bytes_length (b) in
+       let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
+       let prim_2 = %int_barith.`nativeint`.sub (prim_1, 1n) in
+       let prim_3 = %int_shift.`nativeint`.asr (prim_2, 63i) in
+       let prim_4 = %int_barith.`nativeint`.xor (prim_3, -1n) in
+       let prim_5 = %int_barith.`nativeint`.`and` (prim_4, prim_2) in
+       let prim_6 = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+       let prim_7 = %int_comp.`nativeint`.unsigned.lt (prim_6, prim_5) in
+       switch prim_7
+         | 0 -> k2
+         | 1 -> k3)
+        where k3 =
+          let prim = %num_conv.[`tagged_imm`].[`imm`] (i) in
+          let prim_1 = %bytes_load.[`16`] (b, prim) in
+          let Pbytes_load_16 = %tag_imm (prim_1) in
+          let int_bswap = %int_uarith.bswp (Pbytes_load_16) in
+          cont k (int_bswap)
+        where k2 =
+          cont k1 pop(regular k1) ($camlBytes__block1873)
+    in
+    let $camlBytes__get_uint16_be_164 =
+      closure get_uint16_be_89_1 @get_uint16_be
+    in
+    let code loopify(never) size(36) newer_version_of(get_int16_ne_90)
+          get_int16_ne_90_1 (b : val, i : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      (let prim = %bytes_length (b) in
+       let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
+       let prim_2 = %int_barith.`nativeint`.sub (prim_1, 1n) in
+       let prim_3 = %int_shift.`nativeint`.asr (prim_2, 63i) in
+       let prim_4 = %int_barith.`nativeint`.xor (prim_3, -1n) in
+       let prim_5 = %int_barith.`nativeint`.`and` (prim_4, prim_2) in
+       let prim_6 = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+       let prim_7 = %int_comp.`nativeint`.unsigned.lt (prim_6, prim_5) in
+       switch prim_7
+         | 0 -> k2
+         | 1 -> k3)
+        where k3 =
+          let prim = %num_conv.[`tagged_imm`].[`imm`] (i) in
+          let prim_1 = %bytes_load.[`16`] (b, prim) in
+          let Pbytes_load_16 = %tag_imm (prim_1) in
+          let int_lsl = %int_shift.lsl (Pbytes_load_16, 47i) in
+          let int_asr = %int_shift.asr (int_lsl, 47i) in
+          cont k (int_asr)
+        where k2 =
+          cont k1 pop(regular k1) ($camlBytes__block1873)
+    in
+    let $camlBytes__get_int16_ne_165 =
+      closure get_int16_ne_90_1 @get_int16_ne
+    in
+    let code loopify(never) size(10) newer_version_of(get_int16_le_91)
+          get_int16_le_91_1 (b : val, i : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      apply direct(get_uint16_le_88_1)
+        ($camlBytes__get_uint16_le_163 : _ -> imm tagged) (b, i) -> k2 * k1
+        where k2 (apply_result : imm tagged) =
+          let int_lsl = %int_shift.lsl (apply_result, 47i) in
+          let int_asr = %int_shift.asr (int_lsl, 47i) in
+          cont k (int_asr)
+    in
+    let $camlBytes__get_int16_le_166 =
+      closure get_int16_le_91_1 @get_int16_le
+    in
+    let code loopify(never) size(10) newer_version_of(get_int16_be_92)
+          get_int16_be_92_1 (b : val, i : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      apply direct(get_uint16_be_89_1)
+        ($camlBytes__get_uint16_be_164 : _ -> imm tagged) (b, i) -> k2 * k1
+        where k2 (apply_result : imm tagged) =
+          let int_lsl = %int_shift.lsl (apply_result, 47i) in
+          let int_asr = %int_shift.asr (int_lsl, 47i) in
+          cont k (int_asr)
+    in
+    let $camlBytes__get_int16_be_167 =
+      closure get_int16_be_92_1 @get_int16_be
+    in
+    let code loopify(never) size(35) newer_version_of(get_int32_le_93)
+          get_int32_le_93_1 (b : val, i : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : int32 boxed =
+      (let prim = %bytes_length (b) in
+       let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
+       let prim_2 = %int_barith.`nativeint`.sub (prim_1, 3n) in
+       let prim_3 = %int_shift.`nativeint`.asr (prim_2, 63i) in
+       let prim_4 = %int_barith.`nativeint`.xor (prim_3, -1n) in
+       let prim_5 = %int_barith.`nativeint`.`and` (prim_4, prim_2) in
+       let prim_6 = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+       let prim_7 = %int_comp.`nativeint`.unsigned.lt (prim_6, prim_5) in
+       switch prim_7
+         | 0 -> k2
+         | 1 -> k3)
+        where k3 =
+          let prim = %num_conv.[`tagged_imm`].[`imm`] (i) in
+          let prim_1 = %bytes_load.[`32`] (b, prim) in
+          let Pbytes_load_32 = %box_num.`int32` (prim_1) in
+          cont k (Pbytes_load_32)
+        where k2 =
+          cont k1 pop(regular k1) ($camlBytes__block1873)
+    in
+    let $camlBytes__get_int32_le_168 =
+      closure get_int32_le_93_1 @get_int32_le
+    in
+    let code loopify(never) size(40) newer_version_of(get_int32_be_94)
+          get_int32_be_94_1 (b : val, i : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : int32 boxed =
+      (let prim = %bytes_length (b) in
+       let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
+       let prim_2 = %int_barith.`nativeint`.sub (prim_1, 3n) in
+       let prim_3 = %int_shift.`nativeint`.asr (prim_2, 63i) in
+       let prim_4 = %int_barith.`nativeint`.xor (prim_3, -1n) in
+       let prim_5 = %int_barith.`nativeint`.`and` (prim_4, prim_2) in
+       let prim_6 = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+       let prim_7 = %int_comp.`nativeint`.unsigned.lt (prim_6, prim_5) in
+       switch prim_7
+         | 0 -> k2
+         | 1 -> k3)
+        where k3 =
+          let prim = %num_conv.[`tagged_imm`].[`imm`] (i) in
+          let prim_1 = %bytes_load.[`32`] (b, prim) in
+          let prim_2 = %int_uarith.`int32`.bswp (prim_1) in
+          let int32_bswap = %box_num.`int32` (prim_2) in
+          cont k (int32_bswap)
+        where k2 =
+          cont k1 pop(regular k1) ($camlBytes__block1873)
+    in
+    let $camlBytes__get_int32_be_169 =
+      closure get_int32_be_94_1 @get_int32_be
+    in
+    let code loopify(never) size(34) newer_version_of(get_int64_le_95)
+          get_int64_le_95_1 (b : val, i : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : int64 boxed =
+      (let prim = %bytes_length (b) in
+       let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
+       let prim_2 = %int_barith.`nativeint`.sub (prim_1, 7n) in
+       let prim_3 = %int_shift.`nativeint`.asr (prim_2, 63i) in
+       let prim_4 = %int_barith.`nativeint`.xor (prim_3, -1n) in
+       let prim_5 = %int_barith.`nativeint`.`and` (prim_4, prim_2) in
+       let prim_6 = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+       let prim_7 = %int_comp.`nativeint`.unsigned.lt (prim_6, prim_5) in
+       switch prim_7
+         | 0 -> k2
+         | 1 -> k3)
+        where k3 =
+          let prim = %num_conv.[`tagged_imm`].[`imm`] (i) in
+          let prim_1 = %bytes_load.[`64`] (b, prim) in
+          let Pbytes_load_64 = %box_num.`int64` (prim_1) in
+          cont k (Pbytes_load_64)
+        where k2 =
+          cont k1 pop(regular k1) ($camlBytes__block1873)
+    in
+    let $camlBytes__get_int64_le_170 =
+      closure get_int64_le_95_1 @get_int64_le
+    in
+    let code loopify(never) size(39) newer_version_of(get_int64_be_96)
+          get_int64_be_96_1 (b : val, i : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : int64 boxed =
+      (let prim = %bytes_length (b) in
+       let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
+       let prim_2 = %int_barith.`nativeint`.sub (prim_1, 7n) in
+       let prim_3 = %int_shift.`nativeint`.asr (prim_2, 63i) in
+       let prim_4 = %int_barith.`nativeint`.xor (prim_3, -1n) in
+       let prim_5 = %int_barith.`nativeint`.`and` (prim_4, prim_2) in
+       let prim_6 = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+       let prim_7 = %int_comp.`nativeint`.unsigned.lt (prim_6, prim_5) in
+       switch prim_7
+         | 0 -> k2
+         | 1 -> k3)
+        where k3 =
+          let prim = %num_conv.[`tagged_imm`].[`imm`] (i) in
+          let prim_1 = %bytes_load.[`64`] (b, prim) in
+          let prim_2 = %int_uarith.`int64`.bswp (prim_1) in
+          let int64_bswap = %box_num.`int64` (prim_2) in
+          cont k (int64_bswap)
+        where k2 =
+          cont k1 pop(regular k1) ($camlBytes__block1873)
+    in
+    let $camlBytes__get_int64_be_171 =
+      closure get_int64_be_96_1 @get_int64_be
+    in
+    let code loopify(never) size(30) newer_version_of(set_int16_le_97)
+          set_int16_le_97_1 (b : val, i : imm tagged, x : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      (let prim = %bytes_length (b) in
+       let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
+       let prim_2 = %int_barith.`nativeint`.sub (prim_1, 1n) in
+       let prim_3 = %int_shift.`nativeint`.asr (prim_2, 63i) in
+       let prim_4 = %int_barith.`nativeint`.xor (prim_3, -1n) in
+       let prim_5 = %int_barith.`nativeint`.`and` (prim_4, prim_2) in
+       let prim_6 = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+       let prim_7 = %int_comp.`nativeint`.unsigned.lt (prim_6, prim_5) in
+       switch prim_7
+         | 0 -> k2
+         | 1 -> k3)
+        where k3 =
+          let prim = %untag_imm (x) in
+          let prim_1 = %num_conv.[`tagged_imm`].[`imm`] (i) in
+          let Pbytes_set_16 =
+            %bytes_or_bigstring_set.bytes.[`16`] (b, prim_1, prim)
+          in
+          cont k (0)
+        where k2 =
+          cont k1 pop(regular k1) ($camlBytes__block1873)
+    in
+    let $camlBytes__set_int16_le_172 =
+      closure set_int16_le_97_1 @set_int16_le
+    in
+    let code loopify(never) size(37) newer_version_of(set_int16_be_98)
+          set_int16_be_98_1 (b : val, i : imm tagged, x : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let int_bswap = %int_uarith.bswp (x) in
+      (let prim = %bytes_length (b) in
+       let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
+       let prim_2 = %int_barith.`nativeint`.sub (prim_1, 1n) in
+       let prim_3 = %int_shift.`nativeint`.asr (prim_2, 63i) in
+       let prim_4 = %int_barith.`nativeint`.xor (prim_3, -1n) in
+       let prim_5 = %int_barith.`nativeint`.`and` (prim_4, prim_2) in
+       let prim_6 = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+       let prim_7 = %int_comp.`nativeint`.unsigned.lt (prim_6, prim_5) in
+       switch prim_7
+         | 0 -> k2
+         | 1 -> k3)
+        where k3 =
+          let prim = %untag_imm (int_bswap) in
+          let prim_1 = %num_conv.[`tagged_imm`].[`imm`] (i) in
+          let Pbytes_set_16 =
+            %bytes_or_bigstring_set.bytes.[`16`] (b, prim_1, prim)
+          in
+          cont k (0)
+        where k2 =
+          cont k1 pop(regular k1) ($camlBytes__block1873)
+    in
+    let $camlBytes__set_int16_be_173 =
+      closure set_int16_be_98_1 @set_int16_be
+    in
+    let code loopify(never) size(31) newer_version_of(set_int32_le_99)
+          set_int32_le_99_1 (b : val, i : imm tagged, x : int32 boxed)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      (let prim = %bytes_length (b) in
+       let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
+       let prim_2 = %int_barith.`nativeint`.sub (prim_1, 3n) in
+       let prim_3 = %int_shift.`nativeint`.asr (prim_2, 63i) in
+       let prim_4 = %int_barith.`nativeint`.xor (prim_3, -1n) in
+       let prim_5 = %int_barith.`nativeint`.`and` (prim_4, prim_2) in
+       let prim_6 = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+       let prim_7 = %int_comp.`nativeint`.unsigned.lt (prim_6, prim_5) in
+       switch prim_7
+         | 0 -> k2
+         | 1 -> k3)
+        where k3 =
+          let prim = %unbox_num.`int32` (x) in
+          let prim_1 = %num_conv.[`tagged_imm`].[`imm`] (i) in
+          let Pbytes_set_32 =
+            %bytes_or_bigstring_set.bytes.[`32`] (b, prim_1, prim)
+          in
+          cont k (0)
+        where k2 =
+          cont k1 pop(regular k1) ($camlBytes__block1873)
+    in
+    let $camlBytes__set_int32_le_174 =
+      closure set_int32_le_99_1 @set_int32_le
+    in
+    let code loopify(never) size(36) newer_version_of(set_int32_be_100)
+          set_int32_be_100_1 (b : val, i : imm tagged, x : int32 boxed)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let prim = %unbox_num.`int32` (x) in
+      let prim_1 = %int_uarith.`int32`.bswp (prim) in
+      (let prim_2 = %bytes_length (b) in
+       let prim_3 = %num_conv.[`imm`].[`nativeint`] (prim_2) in
+       let prim_4 = %int_barith.`nativeint`.sub (prim_3, 3n) in
+       let prim_5 = %int_shift.`nativeint`.asr (prim_4, 63i) in
+       let prim_6 = %int_barith.`nativeint`.xor (prim_5, -1n) in
+       let prim_7 = %int_barith.`nativeint`.`and` (prim_6, prim_4) in
+       let prim_8 = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+       let prim_9 = %int_comp.`nativeint`.unsigned.lt (prim_8, prim_7) in
+       switch prim_9
+         | 0 -> k2
+         | 1 -> k3)
+        where k3 =
+          let prim_2 = %num_conv.[`tagged_imm`].[`imm`] (i) in
+          let Pbytes_set_32 =
+            %bytes_or_bigstring_set.bytes.[`32`] (b, prim_2, prim_1)
+          in
+          cont k (0)
+        where k2 =
+          cont k1 pop(regular k1) ($camlBytes__block1873)
+    in
+    let $camlBytes__set_int32_be_175 =
+      closure set_int32_be_100_1 @set_int32_be
+    in
+    let code loopify(never) size(31) newer_version_of(set_int64_le_101)
+          set_int64_le_101_1 (b : val, i : imm tagged, x : int64 boxed)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      (let prim = %bytes_length (b) in
+       let prim_1 = %num_conv.[`imm`].[`nativeint`] (prim) in
+       let prim_2 = %int_barith.`nativeint`.sub (prim_1, 7n) in
+       let prim_3 = %int_shift.`nativeint`.asr (prim_2, 63i) in
+       let prim_4 = %int_barith.`nativeint`.xor (prim_3, -1n) in
+       let prim_5 = %int_barith.`nativeint`.`and` (prim_4, prim_2) in
+       let prim_6 = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+       let prim_7 = %int_comp.`nativeint`.unsigned.lt (prim_6, prim_5) in
+       switch prim_7
+         | 0 -> k2
+         | 1 -> k3)
+        where k3 =
+          let prim = %unbox_num.`int64` (x) in
+          let prim_1 = %num_conv.[`tagged_imm`].[`imm`] (i) in
+          let Pbytes_set_64 =
+            %bytes_or_bigstring_set.bytes.[`64`] (b, prim_1, prim)
+          in
+          cont k (0)
+        where k2 =
+          cont k1 pop(regular k1) ($camlBytes__block1873)
+    in
+    let $camlBytes__set_int64_le_176 =
+      closure set_int64_le_101_1 @set_int64_le
+    in
+    let code loopify(never) size(36) newer_version_of(set_int64_be_102)
+          set_int64_be_102_1 (b : val, i : imm tagged, x : int64 boxed)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let prim = %unbox_num.`int64` (x) in
+      let prim_1 = %int_uarith.`int64`.bswp (prim) in
+      (let prim_2 = %bytes_length (b) in
+       let prim_3 = %num_conv.[`imm`].[`nativeint`] (prim_2) in
+       let prim_4 = %int_barith.`nativeint`.sub (prim_3, 7n) in
+       let prim_5 = %int_shift.`nativeint`.asr (prim_4, 63i) in
+       let prim_6 = %int_barith.`nativeint`.xor (prim_5, -1n) in
+       let prim_7 = %int_barith.`nativeint`.`and` (prim_6, prim_4) in
+       let prim_8 = %num_conv.[`tagged_imm`].[`nativeint`] (i) in
+       let prim_9 = %int_comp.`nativeint`.unsigned.lt (prim_8, prim_7) in
+       switch prim_9
+         | 0 -> k2
+         | 1 -> k3)
+        where k3 =
+          let prim_2 = %num_conv.[`tagged_imm`].[`imm`] (i) in
+          let Pbytes_set_64 =
+            %bytes_or_bigstring_set.bytes.[`64`] (b, prim_2, prim_1)
+          in
+          cont k (0)
+        where k2 =
+          cont k1 pop(regular k1) ($camlBytes__block1873)
+    in
+    let $camlBytes__set_int64_be_177 =
+      closure set_int64_be_102_1 @set_int64_be
+    in
+    let $camlBytes__set_uint8_178 = closure set_uint8_103 @set_uint8 in
+    let $camlBytes__set_uint16_ne_179 =
+      closure set_uint16_ne_104 @set_uint16_ne
+    in
+    let $camlBytes =
+      Block 0 ($camlBytes__failwith_105,
+               $camlBytes__invalid_arg_106,
+               $`camlBytes__@_107`,
+               $camlBytes__min_108,
+               $camlBytes__max_109,
+               $camlBytes__make_110,
+               $camlBytes__init_111,
+               empty,
+               $camlBytes__copy_112,
+               $camlBytes__to_string_113,
+               $camlBytes__of_string_114,
+               $camlBytes__sub_115,
+               $camlBytes__sub_string_116,
+               $`camlBytes__++_117`,
+               $camlBytes__extend_118,
+               $camlBytes__fill_119,
+               $camlBytes__blit_120,
+               $camlBytes__blit_string_121,
+               $camlBytes__iter_122,
+               $camlBytes__iteri_123,
+               $camlBytes__ensure_ge_124,
+               $camlBytes__sum_lengths_125,
+               $camlBytes__unsafe_blits_126,
+               $camlBytes__concat_127,
+               $camlBytes__cat_128,
+               $camlBytes__is_space_129,
+               $camlBytes__trim_130,
+               $camlBytes__escaped_131,
+               $camlBytes__map_132,
+               $camlBytes__mapi_133,
+               $camlBytes__uppercase_ascii_134,
+               $camlBytes__lowercase_ascii_135,
+               $camlBytes__apply1_136,
+               $camlBytes__capitalize_ascii_137,
+               $camlBytes__uncapitalize_ascii_138,
+               $camlBytes__index_rec_139,
+               $camlBytes__index_140,
+               $camlBytes__index_rec_opt_141,
+               $camlBytes__index_opt_142,
+               $camlBytes__index_from_143,
+               $camlBytes__index_from_opt_144,
+               $camlBytes__rindex_rec_145,
+               $camlBytes__rindex_146,
+               $camlBytes__rindex_from_147,
+               $camlBytes__rindex_rec_opt_148,
+               $camlBytes__rindex_opt_149,
+               $camlBytes__rindex_from_opt_150,
+               $camlBytes__contains_from_151,
+               $camlBytes__contains_152,
+               $camlBytes__rcontains_from_153,
+               $camlBytes__compare_154,
+               $camlBytes__uppercase_155,
+               $camlBytes__lowercase_156,
+               $camlBytes__capitalize_157,
+               $camlBytes__uncapitalize_158,
+               $camlBytes__to_seq_159,
+               $camlBytes__to_seqi_160,
+               $camlBytes__of_seq_161,
+               $camlBytes__get_int8_162,
+               $camlBytes__get_uint16_le_163,
+               $camlBytes__get_uint16_be_164,
+               $camlBytes__get_int16_ne_165,
+               $camlBytes__get_int16_le_166,
+               $camlBytes__get_int16_be_167,
+               $camlBytes__get_int32_le_168,
+               $camlBytes__get_int32_be_169,
+               $camlBytes__get_int64_le_170,
+               $camlBytes__get_int64_be_171,
+               $camlBytes__set_int16_le_172,
+               $camlBytes__set_int16_be_173,
+               $camlBytes__set_int32_le_174,
+               $camlBytes__set_int32_be_175,
+               $camlBytes__set_int64_le_176,
+               $camlBytes__set_int64_be_177,
+               $camlBytes__set_uint8_178,
+               $camlBytes__set_uint16_ne_179,
+               $camlBytes__set_int16_be_173,
+               $camlBytes__set_int16_le_172)
+    in
+    cont done ($camlBytes)
