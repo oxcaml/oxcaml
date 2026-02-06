@@ -33,8 +33,14 @@ val transl_modalities :
   Parsetree.modalities ->
   modalities
 
-val least_modalities_implying :
-  Types.mutability -> Mode.Modality.Const.t -> Mode.Modality.atom list
+(** Find the minimum modality annots a user must write to express the given
+    modality. If [include_implied] is [false], modalities implied by other
+    written modalities are included, even if not necessary. *)
+val least_modalities :
+  include_implied:bool ->
+  mut:Types.mutability ->
+  Mode.Modality.Const.t ->
+  Mode.Modality.atom list
 
 val sort_dedup_modalities : Mode.Modality.atom list -> Mode.Modality.atom list
 
