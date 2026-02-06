@@ -3276,114 +3276,128 @@ module Lattices_mono = struct
     let c = min_with dst ax1 (max q_obj) in
     compose_simple dst (Meet_const c) m
 
-  let equal_mode : type a b. a obj -> b obj -> a -> b -> bool =
-   fun a_obj b_obj a b ->
-    match equal_obj a_obj b_obj with
-    | Equal -> Misc.Le_result.equal ~le:(le a_obj) a b
-    | Not_equal -> false
+  let compose_proj_and_with_simple :
+      type a b c p d.
+      c obj -> (p, c, d) simple_morph -> (b, p) Axis.t -> b obj
+      -> (a, b, d) simple_morph -> (a, c, d) morph =
+    fun dst m0 ax0 obj0 m1 ->
+      match m1 with
+      | Id -> Proj_and (m0, ax0, obj0)
+      | Core m1 ->
+        let pm1 = compose_projection_core ax0 m1 in
+        compose_simple_with_proj_core dst m0 pm1
+      | Meet_const c1 ->
+        let c1 = Axis.proj ax0 c1 in
+        Proj_and (compose_simple dst m0 (Meet_const c1), ax0, obj0)
+      | Imply_const c1 ->
+        let c1 = Axis.proj ax0 c1 in
+        Proj_and (compose_simple dst m0 (Imply_const c1), ax0, obj0)
+      | Core_and_meet_const (c1, m1) ->
+        let c1 = Axis.proj ax0 c1 in
+        let pm1 = compose_projection_core ax0 m1 in
+        compose_simple_with_proj_core_and_meet_const dst m0 c1 pm1
+      | Imply_const_and_core (m1, c1) ->
+        let pm1 = compose_projection_core ax0 m1 in
+        compose_simple_with_proj_imply_const_and_core dst m0 c1 pm1
+      | Compose _ -> Compose (Proj_and (m0, ax0, obj0), Simple m1)
+
+  let compose_simple_with_and_max :
+      type a b c q r.
+      c obj -> (b, c, disallowed * r) simple_morph
+      -> (b, q) Axis.t -> (a, q, disallowed * r) simple_morph
+      -> (a, c, disallowed * r) morph =
+    fun dst sm0 ax1 m1 ->
+      let b_obj = src_simple dst sm0 in
+      let a_obj = src b_obj (And_max_with (ax1, m1)) in
+      match sm0 with
+      | Id -> And_max_with (ax1, m1)
+      | Core m0 -> begin
+          match compose_and_max_with_core ax1 m0 with
+          | And_max_core (ax1, m0) ->
+            let obj0 = proj_obj ax1 dst in
+            And_max_with (ax1, compose_simple obj0 (Core m0) m1)
+          | Const_max_core -> Const_max a_obj
+          | And_max_id ax1 -> And_max_with (ax1, m1)
+          | Disallowed -> Compose (Simple sm0, And_max_with (ax1, m1))
+        end
+      | Imply_const c0 ->
+        let c0 = Axis.proj ax1 c0 in
+        let obj0 = proj_obj ax1 dst in
+        And_max_with (ax1, compose_simple obj0 (Imply_const c0) m1)
+      | Imply_const_and_core (m0, c0) -> begin
+        let c0 = Axis.proj ax1 c0 in
+        match compose_and_max_with_core ax1 m0 with
+        | And_max_core (ax1, m0) ->
+          let obj0 = proj_obj ax1 dst in
+          And_max_with (ax1, compose_simple obj0 (Imply_const_and_core (m0,c0)) m1)
+        | Const_max_core -> Const_max a_obj
+        | And_max_id ax1 -> And_max_with (ax1, m1)
+        | Disallowed -> Compose (Simple sm0, And_max_with (ax1, m1))
+        end
+      | Core_and_meet_const _ -> Compose (Simple sm0, And_max_with (ax1, m1))
+      | Meet_const _ -> Compose (Simple sm0, And_max_with (ax1, m1))
+      | Compose _ -> Compose (Simple sm0, And_max_with (ax1, m1))
+
+  let compose_simple_with_and_min :
+      type a b c q l.
+      c obj -> (b, c, l * disallowed) simple_morph
+      -> (b, q) Axis.t -> (a, q, l * disallowed) simple_morph
+      -> (a, c, l * disallowed) morph =
+    fun dst sm0 ax1 m1 ->
+      let b_obj = src_simple dst sm0 in
+      let a_obj = src b_obj (And_min_with (ax1, m1)) in
+      match sm0 with
+      | Id -> And_min_with (ax1, m1)
+      | Core m0 -> begin
+          match compose_and_min_with_core ax1 m0 with
+          | And_min_core (ax1, m0) ->
+            let obj0 = proj_obj ax1 dst in
+            And_min_with (ax1, compose_simple obj0 (Core m0) m1)
+          | Const_min_core -> Const_min a_obj
+          | And_min_id ax1 -> And_min_with (ax1, m1)
+          | Disallowed -> Compose (Simple sm0, And_min_with (ax1, m1))
+        end
+      | Meet_const c0 ->
+        let c0 = Axis.proj ax1 c0 in
+        let obj0 = proj_obj ax1 dst in
+        And_min_with (ax1, compose_simple obj0 (Meet_const c0) m1)
+      | Core_and_meet_const (c0, m0) -> begin
+          match compose_and_min_with_core ax1 m0 with
+          | And_min_core (ax1, m0) ->
+            let obj0 = proj_obj ax1 dst in
+            let c0 = Axis.proj ax1 c0 in
+            And_min_with (ax1, compose_simple obj0 (Core_and_meet_const (c0, m0)) m1)
+          | Const_min_core -> Const_min a_obj
+          | And_min_id ax1 -> And_min_with (ax1, m1)
+          | Disallowed -> Compose (Simple sm0, And_min_with (ax1, m1))
+      end
+      | Imply_const _ -> Compose (Simple sm0, And_min_with (ax1, m1))
+      | Imply_const_and_core _ -> Compose (Simple sm0, And_min_with (ax1, m1))
+      | Compose _ -> Compose (Simple sm0, And_min_with (ax1, m1))
 
   let compose :
       type a b c d.
       c obj -> (b, c, d) morph -> (a, b, d) morph -> (a, c, d) morph =
    fun dst m0 m1 ->
-    let res : (a, c, d) morph = match m0, m1 with
+    match m0, m1 with
     | Simple m0, Simple m1 -> Simple (compose_simple dst m0 m1)
     | Const_max b_obj, _ -> Const_max (src b_obj m1)
     | Const_min b_obj, _ -> Const_min (src b_obj m1)
     | Const (b_obj,c), _ -> Const (src b_obj m1,c)
     | Simple m0, Proj_and(m1, ax1, obj1) ->
       Proj_and (compose_simple dst m0 m1, ax1, obj1)
-    | Proj_and (m0, ax0, obj0) as m0', (Simple m1 as m1') -> begin
-        match m1 with
-        | Id -> m0'
-        | Core m1 ->
-          let pm1 = compose_projection_core ax0 m1 in
-          compose_simple_with_proj_core dst m0 pm1
-        | Meet_const c1 ->
-          let c1 = Axis.proj ax0 c1 in
-          Proj_and (compose_simple dst m0 (Meet_const c1), ax0, obj0)
-        | Imply_const c1 ->
-          let c1 = Axis.proj ax0 c1 in
-          Proj_and (compose_simple dst m0 (Imply_const c1), ax0, obj0)
-        | Core_and_meet_const (c1, m1) ->
-          let c1 = Axis.proj ax0 c1 in
-          let pm1 = compose_projection_core ax0 m1 in
-          compose_simple_with_proj_core_and_meet_const dst m0 c1 pm1
-        | Imply_const_and_core (m1, c1) ->
-          let pm1 = compose_projection_core ax0 m1 in
-          compose_simple_with_proj_imply_const_and_core dst m0 c1 pm1
-        | Compose _ -> Compose (m0',m1')
-      end
+    | Proj_and (m0, ax0, obj0), Simple m1 ->
+      compose_proj_and_with_simple dst m0 ax0 obj0 m1
     | And_max_with (ax0, m0), Simple m1 ->
       let dst = proj_obj ax0 dst in
       And_max_with (ax0, compose_simple dst m0 m1)
-    | Simple m0 as m0', (And_max_with (ax1, m1) as m1') -> begin
-        let b_obj = src_simple dst m0 in
-        let a_obj = src b_obj m1' in
-        match m0 with
-        | Id -> m1'
-        | Core m0 -> begin
-            match compose_and_max_with_core ax1 m0 with
-            | And_max_core (ax1, m0) ->
-              let obj0 = proj_obj ax1 dst in
-              And_max_with (ax1, compose_simple obj0 (Core m0) m1)
-            | Const_max_core -> Const_max a_obj
-            | And_max_id ax1 -> And_max_with (ax1, m1)
-            | Disallowed -> Compose (m0',m1')
-          end
-        | Imply_const c0 ->
-          let c0 = Axis.proj ax1 c0 in
-          let obj0 = proj_obj ax1 dst in
-          And_max_with (ax1, compose_simple obj0 (Imply_const c0) m1)
-        | Imply_const_and_core (m0, c0) -> begin
-          let c0 = Axis.proj ax1 c0 in
-          match compose_and_max_with_core ax1 m0 with
-          | And_max_core (ax1, m0) ->
-            let obj0 = proj_obj ax1 dst in
-            And_max_with (ax1, compose_simple obj0 (Imply_const_and_core (m0,c0)) m1)
-          | Const_max_core -> Const_max a_obj
-          | And_max_id ax1 -> And_max_with (ax1, m1)
-          | Disallowed -> Compose (m0',m1')
-          end
-        | Core_and_meet_const _ -> Compose (m0',m1')
-        | Meet_const _ -> Compose (m0',m1')
-        | Compose _ -> Compose (m0',m1')
-      end
+    | Simple m0, And_max_with (ax1, m1) ->
+      compose_simple_with_and_max dst m0 ax1 m1
     | And_min_with (ax0, m0), Simple m1 ->
       let dst = proj_obj ax0 dst in
       And_min_with (ax0, compose_simple dst m0 m1)
-    | Simple m0 as m0', (And_min_with (ax1, m1) as m1') -> begin
-        let b_obj = src_simple dst m0 in
-        let a_obj = src b_obj m1' in
-        match m0 with
-        | Id -> m1'
-        | Core m0 -> begin
-            match compose_and_min_with_core ax1 m0 with
-            | And_min_core (ax1, m0) ->
-              let obj0 = proj_obj ax1 dst in
-              And_min_with (ax1, compose_simple obj0 (Core m0) m1)
-            | Const_min_core -> Const_min a_obj
-            | And_min_id ax1 -> And_min_with (ax1, m1)
-            | Disallowed -> Compose (m0',m1')
-          end
-        | Meet_const c0 ->
-          let c0 = Axis.proj ax1 c0 in
-          let obj0 = proj_obj ax1 dst in
-          And_min_with (ax1, compose_simple obj0 (Meet_const c0) m1)
-        | Imply_const _ -> Compose (m0',m1')
-        | Core_and_meet_const (c0, m0) -> begin
-            match compose_and_min_with_core ax1 m0 with
-            | And_min_core (ax1, m0) ->
-              let obj0 = proj_obj ax1 dst in
-              let c0 = Axis.proj ax1 c0 in
-              And_min_with (ax1, compose_simple obj0 (Core_and_meet_const (c0, m0)) m1)
-            | Const_min_core -> Const_min a_obj
-            | And_min_id ax1 -> And_min_with (ax1, m1)
-            | Disallowed -> Compose (m0',m1')
-        end
-        | Imply_const_and_core _ -> Compose (m0',m1')
-        | Compose _ -> Compose (m0',m1')
-      end
+    | Simple m0, And_min_with (ax1, m1) ->
+      compose_simple_with_and_min dst m0 ax1 m1
     | Proj_and(m0, ax0, obj1), And_max_with (ax1, m1) -> begin
         match Axis.equal ax0 ax1 with
         | Equal -> Simple (compose_simple dst m0 m1)
@@ -3464,23 +3478,12 @@ module Lattices_mono = struct
     | (_ as m0), Const (obj1,c1) -> Const (obj1,apply dst m0 c1)
     | (_ as m0), Compose (m1, m2) -> Compose (Compose (m0, m1), m2)
     | Compose (m0, m1), (_ as m2) -> Compose (Compose (m0, m1), m2)
-    | Proj_and (_, _ax0, _obj0), Proj_and (_, _ax1, _obj1) -> failwith "should be refuted"
+    | Proj_and (_m0, _ax0, _obj0), Proj_and (_m1, _ax1, _obj1) -> failwith "should be refuted"
     | And_max_with _, And_max_with _ -> failwith "should be refuted"
     | And_max_with _, And_min_with _ -> failwith "should be refuted"
     | And_min_with _, And_max_with _ -> failwith "should be refuted"
     | And_min_with _, And_min_with _ -> failwith "should be refuted"
-    in
 
-    let b_obj = src dst m0 in
-    let a_obj = src b_obj m1 in
-    let c = min a_obj in
-    if not (equal_mode dst dst (apply dst m0 (apply b_obj m1 c)) (apply dst res c)) then begin
-      Format.eprintf "left : %a \n right : %a \n res : %a \n" (print_morph dst) m0 (print_morph b_obj) m1 (print_morph dst) res;
-      Format.eprintf "original(%a) = %a \n res(%a) = %a \n"
-      (print a_obj) c (print dst) (apply dst m0 (apply b_obj m1 c)) (print a_obj) c (print dst) (apply dst res c);
-      assert false
-    end;
-    res
 
   module For_hint = struct
     (** Describes the portion of the input that's responsible for a portion of
