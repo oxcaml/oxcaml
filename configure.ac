@@ -753,7 +753,8 @@ AC_ARG_ENABLE([multidomain],
 AC_ARG_ENABLE([assembler-suitable-for-dissector],
   [AS_HELP_STRING([--enable-assembler-suitable-for-dissector@<:@=PATH@:>@],
     [Use LLVM assembler with large code mode for dissector. If PATH is not
-     specified, llvm-mc must be on PATH.  Overrides any setting of AS])])
+     specified, llvm-mc must be on the PATH.  Overrides any setting of AS,
+     but only when '-dissector' is specified])])
 
 AC_ARG_WITH([flexdll],
   [AS_HELP_STRING([--with-flexdll],
