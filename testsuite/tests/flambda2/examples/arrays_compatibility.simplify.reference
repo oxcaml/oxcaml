@@ -1,0 +1,116 @@
+let code index_0 deleted in
+let $camlArrays_compatibility__string32 = "index out of bounds" in
+let $camlArrays_compatibility__block34 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument,
+           $camlArrays_compatibility__string32)
+in
+let code convert_fast_1 deleted in
+let $camlArrays_compatibility__empty_array5 = Empty_array in
+let code f_2 deleted in
+let code inline(never) loopify(never) size(8) newer_version_of(index_0)
+      index_0_1 (source)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm array =
+  let Pmakearray = %array.`imm`.mut (0, 0) in
+  let Popaque = %opaque (Pmakearray) in
+  cont k (Popaque)
+in
+let $camlArrays_compatibility__index_3 = closure index_0_1 @index in
+let code inline(always) loopify(never) size(60) newer_version_of(convert_fast_1)
+      convert_fast_1_1 (offset : imm tagged, index : imm array)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of imm tagged * imm tagged ] =
+  let line = %opaque (0) in
+  (let prim = %phys_eq (line, 0) in
+   switch prim
+     | 0 -> k4
+     | 1 -> k3
+     where k4 =
+       let prim_1 = %phys_eq (line, 1) in
+       (switch prim_1
+          | 0 -> k4
+          | 1 -> k3
+          where k4 =
+            let int_sub = %int_barith.sub (line, 1) in
+            ((let prim_2 = %array_length (index) in
+              let prim_3 = %int_comp.unsigned.lt (int_sub, prim_2) in
+              switch prim_3
+                | 0 -> k4
+                | 1 -> k5)
+               where k5 =
+                 let Parrayrefs = %array_load.`imm`.mut (index, int_sub) in
+                 let int_sub_1 = %int_barith.sub (offset, Parrayrefs) in
+                 let int_add = %int_barith.add (int_sub_1, 1) in
+                 cont k2 (int_add)
+               where k4 =
+                 cont k1 pop(regular k1) ($camlArrays_compatibility__block34))))
+    where k3 =
+      let int_add = %int_barith.add (offset, 1) in
+      cont k2 (int_add)
+    where k2 (col : imm tagged) =
+      let Pmakeblock = %block.[`0`] (line, col) in
+      cont k (Pmakeblock)
+in
+let $camlArrays_compatibility__convert_fast_4 =
+  closure convert_fast_1_1 @convert_fast
+in
+let $camlArrays_compatibility__Pmakeblock95 =
+  Block 0 ($camlArrays_compatibility__empty_array5,
+           $camlArrays_compatibility__index_3,
+           $camlArrays_compatibility__convert_fast_4)
+in
+let code loopify(never) size(75) newer_version_of(f_2)
+      f_2_1 (fast : imm tagged, source : val, offset : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of imm tagged * imm tagged ] =
+  (let untagged = %untag_imm (fast) in
+   switch untagged
+     | 0 -> k2 ($camlArrays_compatibility__empty_array5)
+     | 1 -> k3)
+    where k3 =
+      apply direct(index_0_1)
+        ($camlArrays_compatibility__index_3 : _ -> val) (source) -> k2 * k1
+    where k2 (index : val) =
+      let line = %opaque (0) in
+      ((let prim = %phys_eq (line, 0) in
+        switch prim
+          | 0 -> k4
+          | 1 -> k3
+          where k4 =
+            let prim_1 = %phys_eq (line, 1) in
+            (switch prim_1
+               | 0 -> k4
+               | 1 -> k3
+               where k4 =
+                 let int_sub = %int_barith.sub (line, 1) in
+                 ((let prim_2 = %array_length (index) in
+                   let prim_3 = %int_comp.unsigned.lt (int_sub, prim_2) in
+                   switch prim_3
+                     | 0 -> k4
+                     | 1 -> k5)
+                    where k5 =
+                      let Parrayrefs = %array_load.`imm`.mut (index, int_sub)
+                      in
+                      let int_sub_1 = %int_barith.sub (offset, Parrayrefs) in
+                      let int_add = %int_barith.add (int_sub_1, 1) in
+                      cont k2 (int_add)
+                    where k4 =
+                      cont k1
+                             pop(regular k1)
+                             ($camlArrays_compatibility__block34))))
+         where k3 =
+           let int_add = %int_barith.add (offset, 1) in
+           cont k2 (int_add)
+         where k2 (col : imm tagged) =
+           let Pmakeblock = %block.[`0`] (line, col) in
+           cont k (Pmakeblock))
+in
+let $camlArrays_compatibility__f_5 = closure f_2_1 @f in
+let $camlArrays_compatibility =
+  Block 0 ($camlArrays_compatibility__Pmakeblock95,
+           $camlArrays_compatibility__f_5)
+in
+cont done ($camlArrays_compatibility)

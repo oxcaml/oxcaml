@@ -1,0 +1,36 @@
+let code x_0 deleted in
+let code id_switch_1 deleted in
+let code not_switch_2 deleted in
+let code inline(always) loopify(never) size(5) newer_version_of(x_0)
+      x_0_1 (xt0 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %int_comp.ne (xt0, 0) in
+  let int_notequal = %tag_imm (prim) in
+  cont k (int_notequal)
+in
+let $camlId_switch__x_3 = closure x_0_1 @x in
+let code loopify(never) size(1) newer_version_of(id_switch_1)
+      id_switch_1_1 (t0 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (t0)
+in
+let $camlId_switch__id_switch_4 = closure id_switch_1_1 @id_switch in
+let code loopify(never) size(2) newer_version_of(not_switch_2)
+      not_switch_2_1 (t2 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pnot = %boolean_not (t2) in
+  cont k (Pnot)
+in
+let $camlId_switch__not_switch_5 = closure not_switch_2_1 @not_switch in
+let $camlId_switch =
+  Block 0 ($camlId_switch__x_3,
+           $camlId_switch__id_switch_4,
+           $camlId_switch__not_switch_5)
+in
+cont done ($camlId_switch)

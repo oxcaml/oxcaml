@@ -1,0 +1,15 @@
+let code f_0 deleted in
+let code loopify(never) size(12) newer_version_of(f_0)
+      f_0_1 (x : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm array =
+  apply ccall
+    ($`*extern*`.caml_array_make : val * val -> val) (42, 0) -> k2 * k1
+    where k2 (a) =
+      let Parraysetu = %array_set.`imm` (a, 0, x) in
+      cont k (a)
+in
+let $camlInt_array_modify__f_1 = closure f_0_1 @f in
+let $camlInt_array_modify = Block 0 ($camlInt_array_modify__f_1) in
+cont done ($camlInt_array_modify)

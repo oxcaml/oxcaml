@@ -1,0 +1,9 @@
+apply ccall ($`*extern*`.rand : val -> val) (0) -> k * error
+  where k (r0) =
+    (apply ccall ($`*extern*`.rand : val -> val) (0) -> k * error
+       where k (r1) =
+         (apply ccall ($`*extern*`.rand : val -> val) (0) -> k * error
+            where k (r2) =
+              let $camlLifting2__t17 = Block 0 (r0, r1, r2) in
+              let $camlLifting2 = Block 0 (r2, $camlLifting2__t17) in
+              cont done ($camlLifting2)))

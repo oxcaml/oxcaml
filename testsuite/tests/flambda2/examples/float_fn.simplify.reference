@@ -1,0 +1,28 @@
+let code g_0 deleted in
+let code f_1 deleted in
+let code inline(never) loopify(never) size(9) newer_version_of(g_0)
+      g_0_1 (x : float boxed)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float boxed =
+  let prim = %unbox_num.`float` (x) in
+  let prim_1 = %bfloat_arith.add (prim, 0x1.5p+5) in
+  let float_add = %box_num.`float` (prim_1) in
+  cont k (float_add)
+in
+let $camlFloat_fn__g_2 = closure g_0_1 @g in
+let code loopify(never) size(13) newer_version_of(f_1)
+      f_1_1 (b, x : float boxed)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float boxed =
+  apply direct(g_0_1) ($camlFloat_fn__g_2 : _ -> float boxed) (x) -> k2 * k1
+    where k2 (y : float boxed) =
+      let prim = %unbox_num.`float` (y) in
+      let prim_1 = %bfloat_arith.add (prim, 0x0p+0) in
+      let float_add = %box_num.`float` (prim_1) in
+      cont k (float_add)
+in
+let $camlFloat_fn__f_3 = closure f_1_1 @f in
+let $camlFloat_fn = Block 0 ($camlFloat_fn__g_2, $camlFloat_fn__f_3) in
+cont done ($camlFloat_fn)

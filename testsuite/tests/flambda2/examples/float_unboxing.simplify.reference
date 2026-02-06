@@ -1,0 +1,40 @@
+let code f_0 deleted in
+let code loopify(never) size(45) newer_version_of(f_0)
+      f_0_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float boxed =
+  cont k3 (1, 0x0p+0, 1i)
+    where rec k3
+                (i : imm tagged, unboxed_float : float, naked_immediate : imm) =
+      let prim = %num_conv.[`imm`].[`float`] (naked_immediate) in
+      ((let int_mod = %int_barith.mod (i, 2) in
+        let prim_1 = %phys_eq (int_mod, 0) in
+        switch prim_1
+          | 0 -> k5
+          | 1 -> k4 (prim)
+          where k5 =
+            let prim_2 = %bfloat_arith.add (prim, 0x1p+0) in
+            cont k4 (prim_2))
+         where k4 (unboxed_float_1 : float) =
+           let unboxed_float_2 = unboxed_float in
+           let prim_1 = %bfloat_arith.add (unboxed_float_2, unboxed_float_1)
+           in
+           let float_add = %box_num.`float` (prim_1) in
+           let prim_2 = %int_comp.ne (i, 1000) in
+           (switch prim_2
+              | 0 -> k2 (float_add)
+              | 1 -> k4
+              where k4 =
+                let int_succ = %int_barith.add (i, 1) in
+                let naked_immediate_1 = %untag_imm (int_succ) in
+                cont k3 (int_succ, prim_1, naked_immediate_1)))
+    where k2 (float_add) =
+      let r_277_unboxed0 = float_add in
+      cont k (r_277_unboxed0)
+in
+let $camlFloat_unboxing__f_1 = closure f_0_1 @f in
+let $camlFloat_unboxing__Pmakeblock112 = Block 0 ($camlFloat_unboxing__f_1)
+in
+let $camlFloat_unboxing = Block 0 ($camlFloat_unboxing__Pmakeblock112) in
+cont done ($camlFloat_unboxing)

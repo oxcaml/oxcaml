@@ -1,0 +1,29 @@
+let code f_0 deleted in
+let code g_1 deleted in
+let b = %block_load.[`4`] ($Stdlib__Sys.camlStdlib__Sys) in
+let code loopify(never) size(3) newer_version_of(f_0)
+      f_0_1 (n : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let int_add = %int_barith.add (n, 42) in
+  cont k (int_add)
+in
+let $camlLet_symbol_var_inlining__f_2 = closure f_0_1 @f in
+let code loopify(never) size(5) newer_version_of(g_1)
+      g_1_1 (m : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let int_mul = %int_barith.mul (m, 42) in
+  cont k (int_mul)
+in
+let $camlLet_symbol_var_inlining__g_3 = closure g_1_1 @g in
+let $camlLet_symbol_var_inlining =
+  Block 0 ($Stdlib__List.camlStdlib__List__length_99,
+           b,
+           $Stdlib__List.camlStdlib__List__map_113,
+           $camlLet_symbol_var_inlining__f_2,
+           $camlLet_symbol_var_inlining__g_3)
+in
+cont done ($camlLet_symbol_var_inlining)

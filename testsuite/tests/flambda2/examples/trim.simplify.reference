@@ -1,0 +1,147 @@
+let code failwith_0 deleted in
+let code invalid_arg_1 deleted in
+let code sub_2 deleted in
+let code is_space_3 deleted in
+let code trim_4 deleted in
+let code loopify(never) size(10) newer_version_of(failwith_0)
+      failwith_0_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Failure, s) in
+  cont k1 pop(regular k1) (Pmakeblock)
+in
+let $camlTrim__failwith_5 = closure failwith_0_1 @failwith in
+let code loopify(never) size(10) newer_version_of(invalid_arg_1)
+      invalid_arg_1_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Invalid_argument, s) in
+  cont k1 pop(regular k1) (Pmakeblock)
+in
+let $camlTrim__invalid_arg_6 = closure invalid_arg_1_1 @invalid_arg in
+apply ccall ($`*extern*`.caml_create_bytes : val -> val) (0) -> k * error
+  where k (empty) =
+    let code inline(never) loopify(never) size(1) newer_version_of(sub_2)
+          sub_2_1 (s, _ofs, _len)
+            my_closure _region _ghost_region my_depth
+            -> k * k1 =
+      cont k (s)
+    in
+    let $camlTrim__sub_7 = closure sub_2_1 @sub in
+    let code inline(never) loopify(never) size(1) newer_version_of(is_space_3)
+          is_space_3_1 (_c)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      cont k (0)
+    in
+    let $camlTrim__is_space_8 = closure is_space_3_1 @is_space in
+    let $camlTrim__trim_9 =
+      closure trim_4_1 @trim
+    and code loopify(never) size(108) newer_version_of(trim_4)
+          trim_4_1 (s : val)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : val =
+      let empty_1 =
+        %project_value_slot.[`trim`].[`empty`] ($camlTrim__trim_9)
+      in
+      let prim = %bytes_length (s) in
+      let len = %tag_imm (prim) in
+      cont k3 (0)
+        where rec k3 (i_403_unboxed0 : imm tagged) =
+          ((let prim_1 = %int_comp.lt (i_403_unboxed0, len) in
+            switch prim_1
+              | 0 -> k4 (0i)
+              | 1 -> k5
+              where k5 =
+                let prim_2 =
+                  %num_conv.[`tagged_imm`].[`imm`] (i_403_unboxed0)
+                in
+                let prim_3 = %bytes_load.[`8`] (s, prim_2) in
+                let Pbytesrefu = %tag_imm (prim_3) in
+                (apply direct(is_space_3_1)
+                   ($camlTrim__is_space_8 : _ -> imm tagged)
+                     (Pbytesrefu)
+                     -> k6 * k1
+                   where k6 (param : imm tagged) =
+                     let unboxed_field = %untag_imm (param) in
+                     cont k5 (unboxed_field)
+                   where k5 (unboxed_field : imm) =
+                     let naked_immediate = unboxed_field in
+                     cont k4 (naked_immediate)))
+             where k4 (naked_immediate : imm) =
+               let i_403_unboxed0_1 = i_403_unboxed0 in
+               (switch naked_immediate
+                  | 0 -> k2 (i_403_unboxed0)
+                  | 1 -> k4
+                  where k4 =
+                    let int_add = %int_barith.add (i_403_unboxed0_1, 1) in
+                    cont k3 (int_add)))
+        where k2 (i_403_unboxed0) =
+          let i_403_unboxed0_1 = i_403_unboxed0 in
+          let int_sub = %int_barith.sub (len, 1) in
+          (cont k3 (int_sub)
+             where rec k3 (j_404_unboxed0 : imm tagged) =
+               let i_403_unboxed0_2 = i_403_unboxed0 in
+               ((let prim_1 = %int_comp.ge (j_404_unboxed0, i_403_unboxed0_2)
+                 in
+                 switch prim_1
+                   | 0 -> k4 (0i)
+                   | 1 -> k5
+                   where k5 =
+                     let prim_2 =
+                       %num_conv.[`tagged_imm`].[`imm`] (j_404_unboxed0)
+                     in
+                     let prim_3 = %bytes_load.[`8`] (s, prim_2) in
+                     let Pbytesrefu = %tag_imm (prim_3) in
+                     (apply direct(is_space_3_1)
+                        ($camlTrim__is_space_8 : _ -> imm tagged)
+                          (Pbytesrefu)
+                          -> k6 * k1
+                        where k6 (param : imm tagged) =
+                          let unboxed_field = %untag_imm (param) in
+                          cont k5 (unboxed_field)
+                        where k5 (unboxed_field : imm) =
+                          let naked_immediate = unboxed_field in
+                          cont k4 (naked_immediate)))
+                  where k4 (naked_immediate : imm) =
+                    let i_403_unboxed0_3 = i_403_unboxed0 in
+                    let j_404_unboxed0_1 = j_404_unboxed0 in
+                    (switch naked_immediate
+                       | 0 -> k2 (j_404_unboxed0)
+                       | 1 -> k4
+                       where k4 =
+                         let int_add = %int_barith.add (j_404_unboxed0_1, -1)
+                         in
+                         cont k3 (int_add)))
+             where k2 (j_404_unboxed0) =
+               let i_403_unboxed0_2 = i_403_unboxed0 in
+               let j_404_unboxed0_1 = j_404_unboxed0 in
+               let prim_1 = %int_comp.ge (j_404_unboxed0_1, i_403_unboxed0_2)
+               in
+               (switch prim_1
+                  | 0 -> k (empty_1)
+                  | 1 -> k2
+                  where k2 =
+                    let int_sub_1 =
+                      %int_barith.sub (j_404_unboxed0_1, i_403_unboxed0_2)
+                    in
+                    let int_add = %int_barith.add (int_sub_1, 1) in
+                    apply direct(sub_2_1)
+                      ($camlTrim__sub_7 : _ -> val)
+                        (s, i_403_unboxed0_2, int_add)
+                        -> k * k1))
+      with { empty = empty }
+    in
+    let $camlTrim =
+      Block 0 ($camlTrim__failwith_5,
+               $camlTrim__invalid_arg_6,
+               empty,
+               $camlTrim__sub_7,
+               $camlTrim__is_space_8,
+               $camlTrim__trim_9)
+    in
+    cont done ($camlTrim)
