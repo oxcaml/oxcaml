@@ -1066,6 +1066,14 @@ module Format_verbosity = struct
     | Not_verbose
     | Expanded
     | Expanded_with_all_mod_bounds
+
+  let default () =
+    match !Clflags.kind_verbosity with
+    | 0 -> Not_verbose
+    | 1 -> Expanded
+    | n ->
+      if n < 0 then failwith "Expected non-negative kind verbosity level";
+      Expanded_with_all_mod_bounds
 end
 
 module Const = struct
@@ -1313,7 +1321,7 @@ module Const = struct
   end
 
   let to_out_jkind_const jkind =
-    To_out_jkind_const.convert ~verbosity:Not_verbose jkind
+    To_out_jkind_const.convert ~verbosity:(Format_verbosity.default ()) jkind
 
   let format ~verbosity ppf jkind =
     To_out_jkind_const.convert ~verbosity jkind |> !Oprint.out_jkind_const ppf
@@ -2004,7 +2012,8 @@ let decompose_product ({ jkind; _ } as jk) =
 let format_verbose ~verbosity ppf jkind =
   Desc.format_verbose ~verbosity ppf (Jkind_desc.get jkind.jkind)
 
-let format ppf jkind = format_verbose ~verbosity:Not_verbose ppf jkind
+let format ppf jkind =
+  format_verbose ~verbosity:(Format_verbosity.default ()) ppf jkind
 
 let printtyp_path : (Fmt.formatter -> Path.t -> unit) ref =
   ref (fun _ _ -> assert false)
