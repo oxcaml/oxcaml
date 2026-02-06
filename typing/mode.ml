@@ -6062,7 +6062,7 @@ module Modality = struct
 
       let apply_right : type l. ?hint:left_only Hint.morph ->
         t -> (l * allowed) Mode.t -> Mode.r =
-        fun ?(hint = Hint.Unknown_non_rigid) t x ->
+        fun ?(hint = Hint.Unknown) t x ->
           match t with
           | Join_const c ->
               Mode.join_const ~hint c (Mode.disallow_left x)
@@ -6220,7 +6220,7 @@ module Modality = struct
       let apply_left : type r.
           ?hint:left_only Hint.morph -> t -> (allowed * r) Mode.t -> Mode.l
           =
-       fun ?(hint = Hint.Unknown_non_rigid) t x ->
+       fun ?(hint = Hint.Unknown) t x ->
         match t with
         | Meet_const c -> Mode.meet_const ~hint c (Mode.disallow_right x)
 
