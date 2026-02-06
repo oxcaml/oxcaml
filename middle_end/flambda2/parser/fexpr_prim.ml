@@ -842,9 +842,8 @@ module OfFlambda = struct
     | Tag_immediate -> tag_immediate env ()
     | Duplicate_block _ | Obj_dup | Get_header | Peek _
     | Reinterpret_boxed_vector ->
-      todo
-        (Format.asprintf "%a" P.Without_args.print (P.Without_args.Unary op))
-        env ()
+      Misc.fatal_errorf "TODO: Unary primitive: %a" P.Without_args.print
+        (P.Without_args.Unary op)
 
   let binop env (op : P.binary_primitive) =
     match op with
@@ -876,18 +875,15 @@ module OfFlambda = struct
     | Bytes_or_bigstring_set (blv, saw) -> bytes_or_bigstring_set env (blv, saw)
     | Bigarray_set (d, k, l) -> bigarray_set env (d, k, l)
     | Write_offset _ ->
-      todo
-        (Format.asprintf "%a" P.Without_args.print (P.Without_args.Ternary op))
-        env ()
+      Misc.fatal_errorf "TODO: Ternary primitive: %a" P.Without_args.print
+        (P.Without_args.Ternary op)
 
   let quaternop env (op : P.quaternary_primitive) =
     match op with
     | Atomic_compare_and_set_field a -> atomic_compare_and_set_field env a
     | Atomic_compare_exchange_field _ ->
-      todo
-        (Format.asprintf "%a" P.Without_args.print
-           (P.Without_args.Quaternary op))
-        env ()
+      Misc.fatal_errorf "TODO: Quaternary primitive: %a" P.Without_args.print
+        (P.Without_args.Quaternary op)
 
   let varop env (op : P.variadic_primitive) =
     match op with
@@ -900,9 +896,8 @@ module OfFlambda = struct
     | Make_array (kind, mutability, alloc) ->
       make_array env (kind, mutability, alloc)
     | Make_block ((Naked_floats | Mixed (_, _)), _, _) ->
-      todo
-        (Format.asprintf "%a" P.Without_args.print (P.Without_args.Variadic op))
-        env ()
+      Misc.fatal_errorf "TODO: Variadic primitive: %a" P.Without_args.print
+        (P.Without_args.Variadic op)
 
   let prim env (p : P.t) : t * Simple.t list =
     match p with
