@@ -1,0 +1,37 @@
+let code of_src_0 deleted in
+let code test_1 deleted in
+let code inline(always) loopify(never) size(5) newer_version_of(of_src_0)
+      of_src_0_1 (param : [ 0 of imm tagged |1 of imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %get_tag (param) in
+  let tagged_scrutinee = %tag_imm (prim) in
+  cont k (tagged_scrutinee)
+in
+let $camlGet_tag_2020_07_21__of_src_2 = closure of_src_0_1 @of_src in
+let code loopify(never) size(29) newer_version_of(test_1)
+      test_1_1 (src : [ 0 of imm tagged |1 of imm tagged ], f : val, g : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  apply f (0) -> k4 * k1
+    where k4 (param : imm tagged) =
+      let unboxed_field = %untag_imm (param) in
+      cont k3 (unboxed_field)
+    where k3 (unboxed_field : imm) =
+      let naked_immediate = unboxed_field in
+      (switch naked_immediate
+         | 0 -> k2 (299)
+         | 1 -> k3
+         where k3 =
+           let prim = %get_tag (src) in
+           let tagged_scrutinee = %tag_imm (prim) in
+           cont k2 (tagged_scrutinee))
+    where k2 (dst : imm tagged) =
+      apply g (dst) -> k * k1
+in
+let $camlGet_tag_2020_07_21__test_3 = closure test_1_1 @test in
+let $camlGet_tag_2020_07_21 =
+  Block 0 ($camlGet_tag_2020_07_21__of_src_2, $camlGet_tag_2020_07_21__test_3)
+in
+cont done ($camlGet_tag_2020_07_21)

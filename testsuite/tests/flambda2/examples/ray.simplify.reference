@@ -1,0 +1,202 @@
+let code min_0 deleted in
+let code max_1 deleted in
+let code aabb_hit_2 deleted in
+let code inline(always) loopify(never) size(14) newer_version_of(min_0)
+      min_0_1 (x : float boxed, y : float boxed)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float boxed =
+  let prim = %unbox_num.`float` (y) in
+  let prim_1 = %unbox_num.`float` (x) in
+  let prim_2 = %float_comp.le (prim_1, prim) in
+  switch prim_2
+    | 0 -> k (y)
+    | 1 -> k (x)
+in
+let $camlRay__min_4 = closure min_0_1 @min in
+let code inline(always) loopify(never) size(14) newer_version_of(max_1)
+      max_1_1 (x : float boxed, y : float boxed)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float boxed =
+  let prim = %unbox_num.`float` (y) in
+  let prim_1 = %unbox_num.`float` (x) in
+  let prim_2 = %float_comp.ge (prim_1, prim) in
+  switch prim_2
+    | 0 -> k (y)
+    | 1 -> k (x)
+in
+let $camlRay__max_5 = closure max_1_1 @max in
+let code loopify(never) size(222) newer_version_of(aabb_hit_2)
+      aabb_hit_2_1
+        (aabb : [ 0 of float ^ 3 * float ^ 3 ],
+         r : [ 0 of float ^ 3 * float ^ 3 ],
+         tmin0 : float boxed,
+         tmax0 : float boxed)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pfield = %block_load.[`1`] (r) in
+  let prim = %block_load.`float`.[`0`] (Pfield) in
+  let Pfield_1 = %block_load.[`0`] (r) in
+  let prim_1 = %block_load.`float`.[`0`] (Pfield_1) in
+  let Pfield_2 = %block_load.[`1`] (aabb) in
+  let prim_2 = %block_load.`float`.[`0`] (Pfield_2) in
+  let Pfield_3 = %block_load.[`0`] (aabb) in
+  let prim_3 = %block_load.`float`.[`0`] (Pfield_3) in
+  let prim_4 = %bfloat_arith.div (0x1p+0, prim) in
+  let prim_5 = %bfloat_arith.sub (prim_3, prim_1) in
+  let prim_6 = %bfloat_arith.mul (prim_5, prim_4) in
+  let prim_7 = %bfloat_arith.sub (prim_2, prim_1) in
+  let prim_8 = %bfloat_arith.mul (prim_7, prim_4) in
+  (let prim_9 = %float_comp.lt (prim_4, 0x0p+0) in
+   switch prim_9
+     | 0 -> k3 (prim_6, prim_6)
+     | 1 -> k3 (prim_8, prim_8))
+    where k3 (unboxed_float : float, unboxed_float_1 : float) =
+      let prim_9 = %unbox_num.`float` (tmin0) in
+      let prim_10 = %float_comp.ge (unboxed_float, prim_9) in
+      switch prim_10
+        | 0 -> k2 (prim_9)
+        | 1 -> k2 (unboxed_float_1)
+    where k2 (unboxed_float : float) =
+      ((let prim_9 = %float_comp.lt (prim_4, 0x0p+0) in
+        switch prim_9
+          | 0 -> k3 (prim_8, prim_8)
+          | 1 -> k3 (prim_6, prim_6))
+         where k3 (unboxed_float_1 : float, unboxed_float_2 : float) =
+           let prim_9 = %unbox_num.`float` (tmax0) in
+           let prim_10 = %float_comp.le (unboxed_float_1, prim_9) in
+           switch prim_10
+             | 0 -> k2 (prim_9)
+             | 1 -> k2 (unboxed_float_2)
+         where k2 (unboxed_float_1 : float) =
+           let prim_9 = %float_comp.le (unboxed_float_1, unboxed_float) in
+           (switch prim_9
+              | 0 -> k2
+              | 1 -> k (0)
+              where k2 =
+                let prim_10 = %block_load.`float`.[`1`] (Pfield) in
+                let prim_11 = %block_load.`float`.[`1`] (Pfield_1) in
+                let prim_12 = %block_load.`float`.[`1`] (Pfield_2) in
+                let prim_13 = %block_load.`float`.[`1`] (Pfield_3) in
+                let prim_14 = %bfloat_arith.div (0x1p+0, prim_10) in
+                let prim_15 = %bfloat_arith.sub (prim_13, prim_11) in
+                let prim_16 = %bfloat_arith.mul (prim_15, prim_14) in
+                let prim_17 = %bfloat_arith.sub (prim_12, prim_11) in
+                let prim_18 = %bfloat_arith.mul (prim_17, prim_14) in
+                ((let prim_19 = %float_comp.lt (prim_14, 0x0p+0) in
+                  switch prim_19
+                    | 0 -> k3 (prim_16, prim_16)
+                    | 1 -> k3 (prim_18, prim_18))
+                   where k3
+                           (unboxed_float_2 : float, unboxed_float_3 : float) =
+                     let prim_19 =
+                       %float_comp.ge (unboxed_float_2, unboxed_float)
+                     in
+                     switch prim_19
+                       | 0 -> k2 (unboxed_float)
+                       | 1 -> k2 (unboxed_float_3)
+                   where k2 (unboxed_float_2 : float) =
+                     ((let prim_19 = %float_comp.lt (prim_14, 0x0p+0) in
+                       switch prim_19
+                         | 0 -> k3 (prim_18, prim_18)
+                         | 1 -> k3 (prim_16, prim_16))
+                        where k3
+                                (unboxed_float_3 : float,
+                                 unboxed_float_4 : float) =
+                          let prim_19 =
+                            %float_comp.le (unboxed_float_3, unboxed_float_1)
+                          in
+                          switch prim_19
+                            | 0 -> k2 (unboxed_float_1)
+                            | 1 -> k2 (unboxed_float_4)
+                        where k2 (unboxed_float_3 : float) =
+                          let prim_19 =
+                            %float_comp.le (unboxed_float_3, unboxed_float_2)
+                          in
+                          (switch prim_19
+                             | 0 -> k2
+                             | 1 -> k (0)
+                             where k2 =
+                               let prim_20 =
+                                 %block_load.`float`.[`2`] (Pfield)
+                               in
+                               let prim_21 =
+                                 %block_load.`float`.[`2`] (Pfield_1)
+                               in
+                               let prim_22 =
+                                 %block_load.`float`.[`2`] (Pfield_2)
+                               in
+                               let prim_23 =
+                                 %block_load.`float`.[`2`] (Pfield_3)
+                               in
+                               let prim_24 =
+                                 %bfloat_arith.div (0x1p+0, prim_20)
+                               in
+                               let prim_25 =
+                                 %bfloat_arith.sub (prim_23, prim_21)
+                               in
+                               let prim_26 =
+                                 %bfloat_arith.mul (prim_25, prim_24)
+                               in
+                               let prim_27 =
+                                 %bfloat_arith.sub (prim_22, prim_21)
+                               in
+                               let prim_28 =
+                                 %bfloat_arith.mul (prim_27, prim_24)
+                               in
+                               ((let prim_29 =
+                                   %float_comp.lt (prim_24, 0x0p+0)
+                                 in
+                                 switch prim_29
+                                   | 0 -> k3 (prim_26, prim_26)
+                                   | 1 -> k3 (prim_28, prim_28))
+                                  where k3
+                                          (unboxed_float_4 : float,
+                                           unboxed_float_5 : float) =
+                                    let prim_29 =
+                                      %float_comp.ge
+                                        (unboxed_float_4, unboxed_float_2)
+                                    in
+                                    switch prim_29
+                                      | 0 -> k2 (unboxed_float_2)
+                                      | 1 -> k2 (unboxed_float_5)
+                                  where k2 (unboxed_float_4 : float) =
+                                    ((let prim_29 =
+                                        %float_comp.lt (prim_24, 0x0p+0)
+                                      in
+                                      switch prim_29
+                                        | 0 -> k3 (prim_28, prim_28)
+                                        | 1 -> k3 (prim_26, prim_26))
+                                       where k3
+                                               (unboxed_float_5 : float,
+                                                unboxed_float_6 : float) =
+                                         let prim_29 =
+                                           %float_comp.le
+                                             (unboxed_float_5,
+                                              unboxed_float_3)
+                                         in
+                                         switch prim_29
+                                           | 0 -> k2 (unboxed_float_3)
+                                           | 1 -> k2 (unboxed_float_6)
+                                       where k2 (unboxed_float_5 : float) =
+                                         let prim_29 =
+                                           %float_comp.le
+                                             (unboxed_float_5,
+                                              unboxed_float_4)
+                                         in
+                                         let float_ordered_and_lessequal =
+                                           %tag_imm (prim_29)
+                                         in
+                                         let Pnot =
+                                           %boolean_not
+                                             (float_ordered_and_lessequal)
+                                         in
+                                         cont k (Pnot))))))))
+in
+let $camlRay__aabb_hit_6 = closure aabb_hit_2_1 @aabb_hit in
+let $camlRay =
+  Block 0 ($camlRay__min_4, $camlRay__max_5, $camlRay__aabb_hit_6)
+in
+cont done ($camlRay)

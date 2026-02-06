@@ -1,0 +1,62 @@
+let $camlData_flow_rec_exn__immstring10 = "data_flow_rec_exn.ml" in
+let $camlData_flow_rec_exn__const_block12 =
+  Block 0 ($camlData_flow_rec_exn__immstring10, 9, 19)
+in
+let $camlData_flow_rec_exn__Pmakeblock15 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure,
+           $camlData_flow_rec_exn__const_block12)
+in
+let code do_stuff_0 deleted in
+let $camlData_flow_rec_exn__const_block49 = Block 0 (12) in
+let code stuff_1 deleted in
+let code loopify(never) size(3) newer_version_of(do_stuff_0)
+      do_stuff_0_1 (env) my_closure _region _ghost_region my_depth -> k * k1 =
+  cont k1 pop(regular k1) ($camlData_flow_rec_exn__Pmakeblock15)
+in
+let $camlData_flow_rec_exn__do_stuff_2 = closure do_stuff_0_1 @do_stuff in
+let code loopify(never) size(37) newer_version_of(stuff_1)
+      stuff_1_1 (env)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  let ghost_region = %begin_ghost_region () in
+  cont k3 (0)
+    where rec k3 (i : imm tagged) =
+      let try_region = %begin_try_region (`region`) in
+      let try_ghost_region = %begin_try_ghost_region (ghost_region) in
+      (cont k6 push(k5)
+         where k6 =
+           let Popaque = %opaque ($camlData_flow_rec_exn__do_stuff_2) in
+           (apply Popaque (env) -> k7 * k5
+              where k7 (param) =
+                cont k6
+              where k6 =
+                let Popaque_1 =
+                  %opaque ($camlData_flow_rec_exn__const_block49)
+                in
+                cont k4 pop(k5))
+         where k5 exn (`exn` : val) =
+           let `unit` = %end_try_region (try_region) in
+           let unit_1 = %end_try_ghost_region (try_ghost_region) in
+           let Popaque = %opaque (0) in
+           cont k4
+         where k4 =
+           let prim = %int_comp.ne (i, 3) in
+           (switch prim
+              | 0 -> k2
+              | 1 -> k4
+              where k4 =
+                let int_succ = %int_barith.add (i, 1) in
+                cont k3 (int_succ)))
+    where k2 =
+      let `unit` = %end_region (`region`) in
+      let unit_1 = %end_ghost_region (ghost_region) in
+      cont k (0)
+in
+let $camlData_flow_rec_exn__stuff_3 = closure stuff_1_1 @stuff in
+let $camlData_flow_rec_exn =
+  Block 0 ($camlData_flow_rec_exn__do_stuff_2,
+           $camlData_flow_rec_exn__stuff_3)
+in
+cont done ($camlData_flow_rec_exn)

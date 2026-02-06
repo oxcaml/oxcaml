@@ -1,0 +1,3818 @@
+let code failwith_0 deleted in
+let code invalid_arg_1 deleted in
+let code `@_2` deleted in
+let code height_4 deleted in
+let code create_5 deleted in
+let code singleton_6 deleted in
+let $camlMap__immstring130 = "Map.bal" in
+let code bal_7 deleted in
+let code is_empty_8 deleted in
+let code add_9 deleted in
+let code find_10 deleted in
+let code find_first_aux_11 deleted in
+let code find_first_12 deleted in
+let code find_first_opt_aux_13 deleted in
+let code find_first_opt_14 deleted in
+let code find_last_aux_15 deleted in
+let code find_last_16 deleted in
+let code find_last_opt_aux_17 deleted in
+let code find_last_opt_18 deleted in
+let code find_opt_19 deleted in
+let code mem_20 deleted in
+let code min_binding_21 deleted in
+let code min_binding_opt_22 deleted in
+let code max_binding_23 deleted in
+let code max_binding_opt_24 deleted in
+let $camlMap__immstring501 = "Map.remove_min_elt" in
+let code remove_min_binding_25 deleted in
+let code add_min_binding_26 deleted in
+let code add_max_binding_27 deleted in
+let code join_28 deleted in
+let code concat_29 deleted in
+let code concat_or_join_30 deleted in
+let $camlMap__const_block619 = Block 0 (0, 0, 0) in
+let code split_31 deleted in
+let $camlMap__immstring696 = "map.ml" in
+let $camlMap__const_block698 = Block 0 ($camlMap__immstring696, 560, 11) in
+let $camlMap__Pmakeblock701 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlMap__const_block698)
+in
+let code merge_32 deleted in
+let code union_33 deleted in
+let code filter_34 deleted in
+let $camlMap__const_block791 = Block 0 (0, 0) in
+let code partition_35 deleted in
+let code cons_enum_36 deleted in
+let code compare_aux_38 deleted in
+let code compare_37 deleted in
+let code equal_aux_40 deleted in
+let code equal_39 deleted in
+let code cardinal_41 deleted in
+let code bindings_aux_42 deleted in
+let code bindings_43 deleted in
+let code add_seq_44 deleted in
+let code of_seq_46 deleted in
+let code seq_of_enum__47 deleted
+and code loopify(never) size(8)
+      partial_seq_of_enum__48 (param1 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let seq_of_enum_ =
+    %project_value_slot.[`partial_seq_of_enum_`].[`my_closure`] (my_closure)
+  in
+  let apply_result =
+    %project_value_slot.[`partial_seq_of_enum_`].[`apply_result`]
+      (my_closure)
+  in
+  apply
+    (seq_of_enum_
+     : [ 0
+       | 0 of val * val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+           [ 0 | 0 of val * val * val * val ] ] *
+       imm tagged -> [ 0 | 0 of val * val ]
+     )
+      (apply_result, param1)
+      -> k * k1
+in
+let code loopify(never) size(8)
+      partial_seq_of_enum__50 (param1 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let apply_result =
+    %project_value_slot.[`partial_seq_of_enum__1`].[`apply_result_1`]
+      (my_closure)
+  in
+  let seq_of_enum_ =
+    %project_value_slot.[`partial_seq_of_enum__1`].[`seq_of_enum_`]
+      (my_closure)
+  in
+  apply
+    (seq_of_enum_
+     : [ 0
+       | 0 of val * val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+           [ 0 | 0 of val * val * val * val ] ] *
+       imm tagged -> [ 0 | 0 of val * val ]
+     )
+      (apply_result, param1)
+      -> k * k1
+in
+let code to_seq_49 deleted in
+let code aux_52 deleted in
+let code loopify(never) size(8)
+      partial_seq_of_enum__53 (param1 : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let apply_result =
+    %project_value_slot.[`partial_seq_of_enum__2`].[`apply_result_2`]
+      (my_closure)
+  in
+  let seq_of_enum_ =
+    %project_value_slot.[`partial_seq_of_enum__2`].[`seq_of_enum__1`]
+      (my_closure)
+  in
+  apply
+    (seq_of_enum_
+     : [ 0
+       | 0 of val * val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+           [ 0 | 0 of val * val * val * val ] ] *
+       imm tagged -> [ 0 | 0 of val * val ]
+     )
+      (apply_result, param1)
+      -> k * k1
+in
+let code to_seq_from_51 deleted in
+let code Make_3 deleted in
+let code loopify(never) size(10) newer_version_of(failwith_0)
+      failwith_0_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Failure, s) in
+  cont k1 pop(regular k1) (Pmakeblock)
+in
+let $camlMap__failwith_54 = closure failwith_0_1 @failwith in
+let code loopify(never) size(10) newer_version_of(invalid_arg_1)
+      invalid_arg_1_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Pmakeblock = %block.[`0`] ($`*predef*`.caml_exn_Invalid_argument, s) in
+  cont k1 pop(regular k1) (Pmakeblock)
+in
+let $camlMap__invalid_arg_55 = closure invalid_arg_1_1 @invalid_arg in
+let $`camlMap__@_56` =
+  closure `@_2_1` @`@`
+and code rec loopify(never) size(25) newer_version_of(`@_2`)
+      `@_2_1`
+        (l1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         l2 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %is_int (l1) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (l2)
+    where k2 =
+      ((let Pfield = %block_load.[`1`] (l1) in
+        apply direct(`@_2_1`)
+          ($`camlMap__@_56` ~ depth my_depth -> succ my_depth
+           : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+            (Pfield, l2)
+            -> k2 * k1)
+         where k2 (apply_result : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+           let Pfield = %block_load.[`0`] (l1) in
+           let Pmakeblock = %block.[`0`] (Pfield, apply_result) in
+           cont k (Pmakeblock))
+in
+let code rec loopify(done) size(68) newer_version_of(aux_52)
+      aux_52_1
+        (low : val,
+         m :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ],
+         c :
+           [ 0
+           | 0 of val * val *
+               [ 0 | 0 of val * val * val * val * imm tagged ] *
+               [ 0 | 0 of val * val * val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of val * val *
+              [ 0 | 0 of val * val * val * val * imm tagged ] *
+              [ 0 | 0 of val * val * val * val ] ] =
+  cont self (m, c)
+    where rec self
+                (m_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       imm tagged ],
+                 c_1 :
+                   [ 0
+                   | 0 of val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       [ 0 | 0 of val * val * val * val ] ]) =
+      let low_1 = low in
+      let Ord = %project_value_slot.[`aux`].[`Ord`] (my_closure) in
+      let prim = %is_int (m_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (c_1)
+         where k2 =
+           let r = %block_load.[`3`] (m_1) in
+           let d = %block_load.[`2`] (m_1) in
+           let v = %block_load.[`1`] (m_1) in
+           ((let Pfield = %block_load.[`0`] (Ord) in
+             apply Pfield (v, low_1) -> k2 * k1)
+              where k2 (n : imm tagged) =
+                let prim_1 = %int_comp.ne (n, 0) in
+                (switch prim_1
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     let prim_2 = %int_comp.lt (n, 0) in
+                     (switch prim_2
+                        | 0 -> k3
+                        | 1 -> self (r, c_1)
+                        where k3 =
+                          let Pmakeblock = %block.[`0`] (v, d, r, c_1) in
+                          let Pfield = %block_load.[`0`] (m_1) in
+                          cont self (Pfield, Pmakeblock))
+                   where k2 =
+                     let Pmakeblock = %block.[`0`] (v, d, r, c_1) in
+                     cont k (Pmakeblock))))
+in
+let code rec loopify(done) size(26) newer_version_of(cons_enum_36)
+      cons_enum_36_1
+        (m :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ],
+         e :
+           [ 0
+           | 0 of val * val *
+               [ 0 | 0 of val * val * val * val * imm tagged ] *
+               [ 0 | 0 of val * val * val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of val * val *
+              [ 0 | 0 of val * val * val * val * imm tagged ] *
+              [ 0 | 0 of val * val * val * val ] ] =
+  cont self (m, e)
+    where rec self
+                (m_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       imm tagged ],
+                 e_1 :
+                   [ 0
+                   | 0 of val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       [ 0 | 0 of val * val * val * val ] ]) =
+      let prim = %is_int (m_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (e_1)
+         where k2 =
+           let Pfield = %block_load.[`3`] (m_1) in
+           let Pfield_1 = %block_load.[`2`] (m_1) in
+           let Pfield_2 = %block_load.[`1`] (m_1) in
+           let Pmakeblock = %block.[`0`] (Pfield_2, Pfield_1, Pfield, e_1) in
+           let Pfield_3 = %block_load.[`0`] (m_1) in
+           cont self (Pfield_3, Pmakeblock))
+in
+let $camlMap__cons_enum_83 = closure cons_enum_36_1 @cons_enum in
+let $camlMap__seq_of_enum__87 =
+  closure seq_of_enum__47_1 @seq_of_enum_
+and code rec loopify(never) size(51) newer_version_of(seq_of_enum__47)
+      seq_of_enum__47_1
+        (c :
+           [ 0
+           | 0 of val * val *
+               [ 0 | 0 of val * val * val * val * imm tagged ] *
+               [ 0 | 0 of val * val * val * val ] ],
+         param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * val ] =
+  let prim = %is_int (c) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (0)
+    where k2 =
+      ((let Pfield = %block_load.[`3`] (c) in
+        let Pfield_1 = %block_load.[`2`] (c) in
+        apply direct(cons_enum_36_1)
+          ($camlMap__cons_enum_83
+           : _ ->
+             [ 0
+             | 0 of val * val *
+                 [ 0 | 0 of val * val * val * val * imm tagged ] *
+                 [ 0 | 0 of val * val * val * val ] ]
+           )
+            (Pfield_1, Pfield)
+            -> k2 * k1)
+         where k2
+                 (apply_result :
+                    [ 0
+                    | 0 of val * val *
+                        [ 0 | 0 of val * val * val * val * imm tagged ] *
+                        [ 0 | 0 of val * val * val * val ] ]) =
+           let partial_seq_of_enum_ =
+             closure partial_seq_of_enum__48 @partial_seq_of_enum_
+           with {
+             my_closure =
+               $camlMap__seq_of_enum__87 ~ depth my_depth -> succ my_depth;
+             apply_result = apply_result
+           }
+           in
+           let Pfield = %block_load.[`1`] (c) in
+           let Pfield_1 = %block_load.[`0`] (c) in
+           let Pmakeblock = %block.[`0`] (Pfield_1, Pfield) in
+           let Pmakeblock_1 = %block.[`0`] (Pmakeblock, partial_seq_of_enum_)
+           in
+           cont k (Pmakeblock_1))
+in
+let code loopify(never) size(102) newer_version_of(to_seq_from_51)
+      to_seq_from_51_1
+        (low : val,
+         m :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let Ord = %project_value_slot.[`to_seq_from`].[`Ord_1`] (my_closure) in
+  let `region` = %begin_region () in
+  let aux = closure aux_52_1 @aux with { Ord = Ord } in
+  apply direct(aux_52_1)
+    (aux
+     : _ ->
+       [ 0
+       | 0 of val * val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+           [ 0 | 0 of val * val * val * val ] ]
+     )
+      (low, m, 0)
+      -> k2 * k1
+    where k2
+            (apply_result :
+               [ 0
+               | 0 of val * val *
+                   [ 0 | 0 of val * val * val * val * imm tagged ] *
+                   [ 0 | 0 of val * val * val * val ] ]) =
+      let `unit` = %end_region (`region`) in
+      let partial_seq_of_enum_ =
+        closure partial_seq_of_enum__53 @partial_seq_of_enum__2
+      with {
+        seq_of_enum__1 = $camlMap__seq_of_enum__87;
+        apply_result_2 = apply_result
+      }
+      in
+      cont k (partial_seq_of_enum_)
+in
+let code loopify(never) size(22) newer_version_of(to_seq_49)
+      to_seq_49_1
+        (m :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  apply direct(cons_enum_36_1)
+    ($camlMap__cons_enum_83
+     : _ ->
+       [ 0
+       | 0 of val * val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+           [ 0 | 0 of val * val * val * val ] ]
+     )
+      (m, 0)
+      -> k2 * k1
+    where k2
+            (apply_result :
+               [ 0
+               | 0 of val * val *
+                   [ 0 | 0 of val * val * val * val * imm tagged ] *
+                   [ 0 | 0 of val * val * val * val ] ]) =
+      let partial_seq_of_enum_ =
+        closure partial_seq_of_enum__50 @partial_seq_of_enum__1
+      with {
+        seq_of_enum_ = $camlMap__seq_of_enum__87;
+        apply_result_1 = apply_result
+      }
+      in
+      cont k (partial_seq_of_enum_)
+in
+let $camlMap__to_seq_88 = closure to_seq_49_1 @to_seq in
+let code loopify(never) size(13) newer_version_of(height_4)
+      height_4_1
+        (param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (0)
+    where k2 =
+      let Pfield = %block_load.[`4`] (param) in
+      cont k (Pfield)
+in
+let $camlMap__height_58 = closure height_4_1 @height in
+let code loopify(never) size(37) newer_version_of(create_5)
+      create_5_1
+        (l :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ],
+         x : val,
+         d : val,
+         r :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+              val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+              imm tagged ] =
+  apply direct(height_4_1)
+    ($camlMap__height_58 : _ -> imm tagged) (l) -> k2 * k1
+    where k2 (hl : imm tagged) =
+      (apply direct(height_4_1)
+         ($camlMap__height_58 : _ -> imm tagged) (r) -> k2 * k1
+         where k2 (hr : imm tagged) =
+           ((let prim = %int_comp.ge (hl, hr) in
+             switch prim
+               | 0 -> k3
+               | 1 -> k4
+               where k4 =
+                 let int_add = %int_barith.add (hl, 1) in
+                 cont k2 (int_add)
+               where k3 =
+                 let int_add = %int_barith.add (hr, 1) in
+                 cont k2 (int_add))
+              where k2 (staticcatch_result : imm tagged) =
+                let Pmakeblock =
+                  %block.[`0`] (l, x, d, r, staticcatch_result)
+                in
+                cont k (Pmakeblock)))
+in
+let $camlMap__create_59 = closure create_5_1 @create in
+let code loopify(never) size(239) newer_version_of(bal_7)
+      bal_7_1
+        (l :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ],
+         x : val,
+         d : val,
+         r :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+              val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+              imm tagged ] =
+  (let prim = %is_int (l) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k2 (0)
+     where k3 =
+       let Pfield = %block_load.[`4`] (l) in
+       cont k2 (Pfield))
+    where k2 (hl : imm tagged) =
+      ((let prim = %is_int (r) in
+        switch prim
+          | 0 -> k3
+          | 1 -> k2 (0)
+          where k3 =
+            let Pfield = %block_load.[`4`] (r) in
+            cont k2 (Pfield))
+         where k2 (hr : imm tagged) =
+           let int_add = %int_barith.add (hr, 2) in
+           let prim = %int_comp.gt (hl, int_add) in
+           (switch prim
+              | 0 -> k2
+              | 1 -> k3
+              where k3 =
+                let prim_1 = %is_int (l) in
+                (switch prim_1
+                   | 0 -> k3
+                   | 1 -> k4
+                   where k4 =
+                     apply direct(invalid_arg_1_1)
+                       ($camlMap__invalid_arg_55
+                        : _ ->
+                          [ 0
+                          | 0 of [ 0
+                                 | 0 of val * val * val * val * imm tagged ] *
+                              val * val *
+                              [ 0 | 0 of val * val * val * val * imm tagged ] *
+                              imm tagged ]
+                        )
+                         ($camlMap__immstring130)
+                         -> never * k1
+                   where k3 =
+                     let lr = %block_load.[`3`] (l) in
+                     let ld = %block_load.[`2`] (l) in
+                     let lv = %block_load.[`1`] (l) in
+                     let ll = %block_load.[`0`] (l) in
+                     (apply direct(height_4_1)
+                        ($camlMap__height_58 : _ -> imm tagged)
+                          (lr)
+                          -> k3 * k1
+                        where k3 (apply_result : imm tagged) =
+                          (apply direct(height_4_1)
+                             ($camlMap__height_58 : _ -> imm tagged)
+                               (ll)
+                               -> k3 * k1
+                             where k3 (apply_result_1 : imm tagged) =
+                               let prim_2 =
+                                 %int_comp.ge (apply_result_1, apply_result)
+                               in
+                               (switch prim_2
+                                  | 0 -> k3
+                                  | 1 -> k4
+                                  where k4 =
+                                    (apply direct(create_5_1)
+                                       ($camlMap__create_59
+                                        : _ ->
+                                          [ 0
+                                          | 0 of [ 0
+                                                 | 0 of val * val * val *
+                                                     val * imm tagged ] *
+                                              val * val *
+                                              [ 0
+                                              | 0 of val * val * val * val *
+                                                  imm tagged ] * imm tagged ]
+                                        )
+                                         (lr, x, d, r)
+                                         -> k4 * k1
+                                       where k4
+                                               (apply_result_2 :
+                                                  [ 0
+                                                  | 0 of [ 0
+                                                         | 0 of val * val *
+                                                             val * val *
+                                                             imm tagged ] *
+                                                      val * val *
+                                                      [ 0
+                                                      | 0 of val * val *
+                                                          val * val *
+                                                          imm tagged ] *
+                                                      imm tagged ]) =
+                                         apply direct(create_5_1)
+                                           ($camlMap__create_59
+                                            : _ ->
+                                              [ 0
+                                              | 0 of [ 0
+                                                     | 0 of val * val * val *
+                                                         val * imm tagged ] *
+                                                  val * val *
+                                                  [ 0
+                                                  | 0 of val * val * val *
+                                                      val * imm tagged ] *
+                                                  imm tagged ]
+                                            )
+                                             (ll, lv, ld, apply_result_2)
+                                             -> k * k1)
+                                  where k3 =
+                                    let prim_3 = %is_int (lr) in
+                                    (switch prim_3
+                                       | 0 -> k3
+                                       | 1 -> k4
+                                       where k4 =
+                                         apply direct(invalid_arg_1_1)
+                                           ($camlMap__invalid_arg_55
+                                            : _ ->
+                                              [ 0
+                                              | 0 of [ 0
+                                                     | 0 of val * val * val *
+                                                         val * imm tagged ] *
+                                                  val * val *
+                                                  [ 0
+                                                  | 0 of val * val * val *
+                                                      val * imm tagged ] *
+                                                  imm tagged ]
+                                            )
+                                             ($camlMap__immstring130)
+                                             -> never * k1
+                                       where k3 =
+                                         ((let Pfield =
+                                             %block_load.[`3`] (lr)
+                                           in
+                                           apply direct(create_5_1)
+                                             ($camlMap__create_59
+                                              : _ ->
+                                                [ 0
+                                                | 0 of [ 0
+                                                       | 0 of val * val *
+                                                           val * val *
+                                                           imm tagged ] *
+                                                    val * val *
+                                                    [ 0
+                                                    | 0 of val * val * val *
+                                                        val * imm tagged ] *
+                                                    imm tagged ]
+                                              )
+                                               (Pfield, x, d, r)
+                                               -> k3 * k1)
+                                            where k3
+                                                    (apply_result_2 :
+                                                       [ 0
+                                                       | 0 of [ 0
+                                                              | 0 of val *
+                                                                  val * val *
+                                                                  val *
+                                                                  imm tagged
+                                                              ] * val * val *
+                                                           [ 0
+                                                           | 0 of val * val *
+                                                               val * val *
+                                                               imm tagged ] *
+                                                           imm tagged ]) =
+                                              let Pfield =
+                                                %block_load.[`2`] (lr)
+                                              in
+                                              let Pfield_1 =
+                                                %block_load.[`1`] (lr)
+                                              in
+                                              ((let Pfield_2 =
+                                                  %block_load.[`0`] (lr)
+                                                in
+                                                apply direct(create_5_1)
+                                                  ($camlMap__create_59
+                                                   : _ ->
+                                                     [ 0
+                                                     | 0 of [ 0
+                                                            | 0 of val *
+                                                                val * val *
+                                                                val *
+                                                                imm tagged ] *
+                                                         val * val *
+                                                         [ 0
+                                                         | 0 of val * val *
+                                                             val * val *
+                                                             imm tagged ] *
+                                                         imm tagged ]
+                                                   )
+                                                    (ll, lv, ld, Pfield_2)
+                                                    -> k3 * k1)
+                                                 where k3
+                                                         (apply_result_3 :
+                                                            [ 0
+                                                            | 0 of [ 0
+                                                                   | 
+                                                                   0 of val *
+                                                                    val *
+                                                                    val *
+                                                                    val *
+                                                                    imm tagged
+                                                                   ] * val *
+                                                                val *
+                                                                [ 0
+                                                                | 0 of val *
+                                                                    val *
+                                                                    val *
+                                                                    val *
+                                                                    imm tagged
+                                                                ] *
+                                                                imm tagged ]) =
+                                                   apply direct(create_5_1)
+                                                     ($camlMap__create_59
+                                                      : _ ->
+                                                        [ 0
+                                                        | 0 of [ 0
+                                                               | 0 of val *
+                                                                   val *
+                                                                   val *
+                                                                   val *
+                                                                   imm tagged
+                                                               ] * val *
+                                                            val *
+                                                            [ 0
+                                                            | 0 of val *
+                                                                val * val *
+                                                                val *
+                                                                imm tagged ] *
+                                                            imm tagged ]
+                                                      )
+                                                       (apply_result_3,
+                                                        Pfield_1,
+                                                        Pfield,
+                                                        apply_result_2)
+                                                       -> k * k1)))))))
+              where k2 =
+                let int_add_1 = %int_barith.add (hl, 2) in
+                let prim_1 = %int_comp.gt (hr, int_add_1) in
+                (switch prim_1
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     let prim_2 = %is_int (r) in
+                     (switch prim_2
+                        | 0 -> k3
+                        | 1 -> k4
+                        where k4 =
+                          apply direct(invalid_arg_1_1)
+                            ($camlMap__invalid_arg_55
+                             : _ ->
+                               [ 0
+                               | 0 of [ 0
+                                      | 0 of val * val * val * val *
+                                          imm tagged ] * val * val *
+                                   [ 0
+                                   | 0 of val * val * val * val * imm tagged
+                                   ] * imm tagged ]
+                             )
+                              ($camlMap__immstring130)
+                              -> never * k1
+                        where k3 =
+                          let rr = %block_load.[`3`] (r) in
+                          let rd = %block_load.[`2`] (r) in
+                          let rv = %block_load.[`1`] (r) in
+                          let rl = %block_load.[`0`] (r) in
+                          (apply direct(height_4_1)
+                             ($camlMap__height_58 : _ -> imm tagged)
+                               (rl)
+                               -> k3 * k1
+                             where k3 (apply_result : imm tagged) =
+                               (apply direct(height_4_1)
+                                  ($camlMap__height_58 : _ -> imm tagged)
+                                    (rr)
+                                    -> k3 * k1
+                                  where k3 (apply_result_1 : imm tagged) =
+                                    let prim_3 =
+                                      %int_comp.ge
+                                        (apply_result_1, apply_result)
+                                    in
+                                    (switch prim_3
+                                       | 0 -> k3
+                                       | 1 -> k4
+                                       where k4 =
+                                         (apply direct(create_5_1)
+                                            ($camlMap__create_59
+                                             : _ ->
+                                               [ 0
+                                               | 0 of [ 0
+                                                      | 0 of val * val *
+                                                          val * val *
+                                                          imm tagged ] *
+                                                   val * val *
+                                                   [ 0
+                                                   | 0 of val * val * val *
+                                                       val * imm tagged ] *
+                                                   imm tagged ]
+                                             )
+                                              (l, x, d, rl)
+                                              -> k4 * k1
+                                            where k4
+                                                    (apply_result_2 :
+                                                       [ 0
+                                                       | 0 of [ 0
+                                                              | 0 of val *
+                                                                  val * val *
+                                                                  val *
+                                                                  imm tagged
+                                                              ] * val * val *
+                                                           [ 0
+                                                           | 0 of val * val *
+                                                               val * val *
+                                                               imm tagged ] *
+                                                           imm tagged ]) =
+                                              apply direct(create_5_1)
+                                                ($camlMap__create_59
+                                                 : _ ->
+                                                   [ 0
+                                                   | 0 of [ 0
+                                                          | 0 of val * val *
+                                                              val * val *
+                                                              imm tagged ] *
+                                                       val * val *
+                                                       [ 0
+                                                       | 0 of val * val *
+                                                           val * val *
+                                                           imm tagged ] *
+                                                       imm tagged ]
+                                                 )
+                                                  (apply_result_2, rv, rd, rr)
+                                                  -> k * k1)
+                                       where k3 =
+                                         let prim_4 = %is_int (rl) in
+                                         (switch prim_4
+                                            | 0 -> k3
+                                            | 1 -> k4
+                                            where k4 =
+                                              apply direct(invalid_arg_1_1)
+                                                ($camlMap__invalid_arg_55
+                                                 : _ ->
+                                                   [ 0
+                                                   | 0 of [ 0
+                                                          | 0 of val * val *
+                                                              val * val *
+                                                              imm tagged ] *
+                                                       val * val *
+                                                       [ 0
+                                                       | 0 of val * val *
+                                                           val * val *
+                                                           imm tagged ] *
+                                                       imm tagged ]
+                                                 )
+                                                  ($camlMap__immstring130)
+                                                  -> never * k1
+                                            where k3 =
+                                              ((let Pfield =
+                                                  %block_load.[`3`] (rl)
+                                                in
+                                                apply direct(create_5_1)
+                                                  ($camlMap__create_59
+                                                   : _ ->
+                                                     [ 0
+                                                     | 0 of [ 0
+                                                            | 0 of val *
+                                                                val * val *
+                                                                val *
+                                                                imm tagged ] *
+                                                         val * val *
+                                                         [ 0
+                                                         | 0 of val * val *
+                                                             val * val *
+                                                             imm tagged ] *
+                                                         imm tagged ]
+                                                   )
+                                                    (Pfield, rv, rd, rr)
+                                                    -> k3 * k1)
+                                                 where k3
+                                                         (apply_result_2 :
+                                                            [ 0
+                                                            | 0 of [ 0
+                                                                   | 
+                                                                   0 of val *
+                                                                    val *
+                                                                    val *
+                                                                    val *
+                                                                    imm tagged
+                                                                   ] * val *
+                                                                val *
+                                                                [ 0
+                                                                | 0 of val *
+                                                                    val *
+                                                                    val *
+                                                                    val *
+                                                                    imm tagged
+                                                                ] *
+                                                                imm tagged ]) =
+                                                   let Pfield =
+                                                     %block_load.[`2`] (rl)
+                                                   in
+                                                   let Pfield_1 =
+                                                     %block_load.[`1`] (rl)
+                                                   in
+                                                   ((let Pfield_2 =
+                                                       %block_load.[`0`] (rl)
+                                                     in
+                                                     apply direct(create_5_1)
+                                                       ($camlMap__create_59
+                                                        : _ ->
+                                                          [ 0
+                                                          | 0 of [ 0
+                                                                 | 0 of val *
+                                                                    val *
+                                                                    val *
+                                                                    val *
+                                                                    imm tagged
+                                                                 ] * val *
+                                                              val *
+                                                              [ 0
+                                                              | 0 of val *
+                                                                  val * val *
+                                                                  val *
+                                                                  imm tagged
+                                                              ] * imm tagged
+                                                          ]
+                                                        )
+                                                         (l, x, d, Pfield_2)
+                                                         -> k3 * k1)
+                                                      where k3
+                                                              (apply_result_3 :
+                                                                 [ 0
+                                                                 | 0 of 
+                                                                    [ 0
+                                                                    | 
+                                                                    0 of val *
+                                                                    val *
+                                                                    val *
+                                                                    val *
+                                                                    imm tagged
+                                                                    ] * val *
+                                                                    val *
+                                                                    [ 0
+                                                                    | 
+                                                                    0 of val *
+                                                                    val *
+                                                                    val *
+                                                                    val *
+                                                                    imm tagged
+                                                                    ] *
+                                                                    imm tagged
+                                                                 ]) =
+                                                        apply
+                                                               direct(create_5_1)
+                                                          ($camlMap__create_59
+                                                           : _ ->
+                                                             [ 0
+                                                             | 0 of [ 0
+                                                                    | 
+                                                                    0 of val *
+                                                                    val *
+                                                                    val *
+                                                                    val *
+                                                                    imm tagged
+                                                                    ] * val *
+                                                                 val *
+                                                                 [ 0
+                                                                 | 0 of val *
+                                                                    val *
+                                                                    val *
+                                                                    val *
+                                                                    imm tagged
+                                                                 ] *
+                                                                 imm tagged ]
+                                                           )
+                                                            (apply_result_3,
+                                                             Pfield_1,
+                                                             Pfield,
+                                                             apply_result_2)
+                                                            -> k * k1)))))))
+                   where k2 =
+                     ((let prim_2 = %int_comp.ge (hl, hr) in
+                       switch prim_2
+                         | 0 -> k3
+                         | 1 -> k4
+                         where k4 =
+                           let int_add_2 = %int_barith.add (hl, 1) in
+                           cont k2 (int_add_2)
+                         where k3 =
+                           let int_add_2 = %int_barith.add (hr, 1) in
+                           cont k2 (int_add_2))
+                        where k2 (staticcatch_result : imm tagged) =
+                          let Pmakeblock =
+                            %block.[`0`] (l, x, d, r, staticcatch_result)
+                          in
+                          cont k (Pmakeblock)))))
+in
+let $camlMap__bal_61 = closure bal_7_1 @bal in
+let code rec loopify(never) size(122) newer_version_of(add_9)
+      add_9_1
+        (x : val,
+         data : val,
+         m :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+              val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+              imm tagged ] =
+  let Ord = %project_value_slot.[`add`].[`Ord_2`] (my_closure) in
+  let prim = %is_int (m) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      let Pmakeblock = %block.[`0`] (0, x, data, 0, 1) in
+      cont k (Pmakeblock)
+    where k2 =
+      let r = %block_load.[`3`] (m) in
+      let d = %block_load.[`2`] (m) in
+      let v = %block_load.[`1`] (m) in
+      let l = %block_load.[`0`] (m) in
+      ((let Pfield = %block_load.[`0`] (Ord) in
+        apply Pfield (x, v) -> k2 * k1)
+         where k2 (c : imm tagged) =
+           let prim_1 = %phys_eq (c, 0) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k3
+              where k3 =
+                let prim_2 = %phys_eq (d, data) in
+                (switch prim_2
+                   | 0 -> k3
+                   | 1 -> k (m)
+                   where k3 =
+                     let Pfield = %block_load.[`4`] (m) in
+                     let Pmakeblock = %block.[`0`] (l, x, data, r, Pfield) in
+                     cont k (Pmakeblock))
+              where k2 =
+                let prim_2 = %int_comp.lt (c, 0) in
+                (switch prim_2
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     (apply direct(add_9_1)
+                        (my_closure ~ depth my_depth -> succ my_depth
+                         : _ ->
+                           [ 0
+                           | 0 of [ 0
+                                  | 0 of val * val * val * val * imm tagged ] *
+                               val * val *
+                               [ 0 | 0 of val * val * val * val * imm tagged
+                               ] * imm tagged ]
+                         )
+                          (x, data, l)
+                          -> k3 * k1
+                        where k3
+                                (ll :
+                                   [ 0
+                                   | 0 of [ 0
+                                          | 0 of val * val * val * val *
+                                              imm tagged ] * val * val *
+                                       [ 0
+                                       | 0 of val * val * val * val *
+                                           imm tagged ] * imm tagged ]) =
+                          let prim_3 = %phys_eq (l, ll) in
+                          (switch prim_3
+                             | 0 -> k3
+                             | 1 -> k (m)
+                             where k3 =
+                               apply direct(bal_7_1)
+                                 ($camlMap__bal_61
+                                  : _ ->
+                                    [ 0
+                                    | 0 of [ 0
+                                           | 0 of val * val * val * val *
+                                               imm tagged ] * val * val *
+                                        [ 0
+                                        | 0 of val * val * val * val *
+                                            imm tagged ] * imm tagged ]
+                                  )
+                                   (ll, v, d, r)
+                                   -> k * k1))
+                   where k2 =
+                     (apply direct(add_9_1)
+                        (my_closure ~ depth my_depth -> succ my_depth
+                         : _ ->
+                           [ 0
+                           | 0 of [ 0
+                                  | 0 of val * val * val * val * imm tagged ] *
+                               val * val *
+                               [ 0 | 0 of val * val * val * val * imm tagged
+                               ] * imm tagged ]
+                         )
+                          (x, data, r)
+                          -> k2 * k1
+                        where k2
+                                (rr :
+                                   [ 0
+                                   | 0 of [ 0
+                                          | 0 of val * val * val * val *
+                                              imm tagged ] * val * val *
+                                       [ 0
+                                       | 0 of val * val * val * val *
+                                           imm tagged ] * imm tagged ]) =
+                          let prim_3 = %phys_eq (r, rr) in
+                          (switch prim_3
+                             | 0 -> k2
+                             | 1 -> k (m)
+                             where k2 =
+                               apply direct(bal_7_1)
+                                 ($camlMap__bal_61
+                                  : _ ->
+                                    [ 0
+                                    | 0 of [ 0
+                                           | 0 of val * val * val * val *
+                                               imm tagged ] * val * val *
+                                        [ 0
+                                        | 0 of val * val * val * val *
+                                            imm tagged ] * imm tagged ]
+                                  )
+                                   (l, v, d, rr)
+                                   -> k * k1)))))
+in
+let code loopify(never) size(28) newer_version_of(add_seq_44)
+      add_seq_44_1
+        (i : val,
+         m :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+              val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+              imm tagged ] =
+  let add = %project_value_slot.[`add_seq`].[`add`] (my_closure) in
+  cont self (m, i)
+    where rec self (acc, seq : val) =
+      (apply inlining_state(depth(10)) seq (0) -> k2 * k1
+         where k2 (`*match*` : [ 0 | 0 of val * val ]) =
+           let prim = %is_int (`*match*`) in
+           (switch prim
+              | 0 -> k2
+              | 1 -> k (acc)
+              where k2 =
+                ((let Pfield = %block_load.[`0`] (`*match*`) in
+                  let Pfield_1 = %block_load.[`1`] (Pfield) in
+                  let Pfield_2 = %block_load.[`0`] (Pfield) in
+                  apply direct(add_9_1) inlining_state(depth(20))
+                    (add
+                     : _ ->
+                       [ 0
+                       | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                           val * val *
+                           [ 0 | 0 of val * val * val * val * imm tagged ] *
+                           imm tagged ]
+                     )
+                      (Pfield_2, Pfield_1, acc)
+                      -> k2 * k1)
+                   where k2 (acc_1) =
+                     let Pfield = %block_load.[`1`] (`*match*`) in
+                     cont self (acc_1, Pfield))))
+in
+let code loopify(never) size(5) newer_version_of(of_seq_46)
+      of_seq_46_1 (i : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+              val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+              imm tagged ] =
+  let add_seq = %project_value_slot.[`of_seq`].[`add_seq`] (my_closure) in
+  apply direct(add_seq_44_1)
+    (add_seq
+     : _ ->
+       [ 0
+       | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val * val *
+           [ 0 | 0 of val * val * val * val * imm tagged ] * imm tagged ]
+     )
+      (i, 0)
+      -> k * k1
+in
+let $camlMap__bindings_aux_85 =
+  closure bindings_aux_42_1 @bindings_aux
+and code rec loopify(never) size(37) newer_version_of(bindings_aux_42)
+      bindings_aux_42_1
+        (accu : [ 0 | 0 of val * [ 0 | 0 of val * val ] ],
+         param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (accu)
+    where k2 =
+      let Pfield = %block_load.[`0`] (param) in
+      ((let Pfield_1 = %block_load.[`3`] (param) in
+        apply direct(bindings_aux_42_1)
+          ($camlMap__bindings_aux_85 ~ depth my_depth -> succ my_depth
+           : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+            (accu, Pfield_1)
+            -> k2 * k1)
+         where k2 (apply_result : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+           let Pfield_1 = %block_load.[`2`] (param) in
+           let Pfield_2 = %block_load.[`1`] (param) in
+           let Pmakeblock = %block.[`0`] (Pfield_2, Pfield_1) in
+           let Pmakeblock_1 = %block.[`0`] (Pmakeblock, apply_result) in
+           apply direct(bindings_aux_42_1)
+             ($camlMap__bindings_aux_85 ~ depth my_depth -> succ my_depth
+              : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+               (Pmakeblock_1, Pfield)
+               -> k * k1)
+in
+let code loopify(never) size(4) newer_version_of(bindings_43)
+      bindings_43_1
+        (s :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  apply direct(bindings_aux_42_1)
+    ($camlMap__bindings_aux_85
+     : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+      (0, s)
+      -> k * k1
+in
+let $camlMap__bindings_86 = closure bindings_43_1 @bindings in
+let $camlMap__cardinal_84 =
+  closure cardinal_41_1 @cardinal
+and code rec loopify(never) size(26) newer_version_of(cardinal_41)
+      cardinal_41_1
+        (param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (0)
+    where k2 =
+      ((let Pfield = %block_load.[`3`] (param) in
+        apply direct(cardinal_41_1)
+          ($camlMap__cardinal_84 ~ depth my_depth -> succ my_depth
+           : _ -> imm tagged)
+            (Pfield)
+            -> k2 * k1)
+         where k2 (apply_result : imm tagged) =
+           ((let Pfield = %block_load.[`0`] (param) in
+             apply direct(cardinal_41_1)
+               ($camlMap__cardinal_84 ~ depth my_depth -> succ my_depth
+                : _ -> imm tagged)
+                 (Pfield)
+                 -> k2 * k1)
+              where k2 (apply_result_1 : imm tagged) =
+                let int_add = %int_barith.add (apply_result_1, 1) in
+                let int_add_1 = %int_barith.add (int_add, apply_result) in
+                cont k (int_add_1)))
+in
+let code rec loopify(done) size(83) newer_version_of(equal_aux_40)
+      equal_aux_40_1
+        (e1 :
+           [ 0
+           | 0 of val * val *
+               [ 0 | 0 of val * val * val * val * imm tagged ] *
+               [ 0 | 0 of val * val * val * val ] ],
+         e2 :
+           [ 0
+           | 0 of val * val *
+               [ 0 | 0 of val * val * val * val * imm tagged ] *
+               [ 0 | 0 of val * val * val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (e1, e2)
+    where rec self
+                (e1_1 :
+                   [ 0
+                   | 0 of val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       [ 0 | 0 of val * val * val * val ] ],
+                 e2_1 :
+                   [ 0
+                   | 0 of val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       [ 0 | 0 of val * val * val * val ] ]) =
+      let cmp = %project_value_slot.[`equal_aux`].[`cmp`] (my_closure) in
+      let Ord = %project_value_slot.[`equal_aux`].[`Ord_3`] (my_closure) in
+      let prim = %is_int (e1_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           let prim_1 = %is_int (e2_1) in
+           let Pisint = %tag_imm (prim_1) in
+           cont k (Pisint)
+         where k2 =
+           let prim_1 = %is_int (e2_1) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k (0)
+              where k2 =
+                ((let Pfield = %block_load.[`0`] (e2_1) in
+                  let Pfield_1 = %block_load.[`0`] (e1_1) in
+                  let Pfield_2 = %block_load.[`0`] (Ord) in
+                  apply Pfield_2 (Pfield_1, Pfield) -> k2 * k1)
+                   where k2 (apply_result : imm tagged) =
+                     let prim_2 = %phys_eq (apply_result, 0) in
+                     (switch prim_2
+                        | 0 -> k (0)
+                        | 1 -> k2
+                        where k2 =
+                          ((let Pfield = %block_load.[`1`] (e2_1) in
+                            let Pfield_1 = %block_load.[`1`] (e1_1) in
+                            apply cmp (Pfield_1, Pfield) -> k3 * k1
+                              where k3 (param : imm tagged) =
+                                let unboxed_field = %untag_imm (param) in
+                                cont k2 (unboxed_field))
+                             where k2 (unboxed_field : imm) =
+                               let naked_immediate = unboxed_field in
+                               (switch naked_immediate
+                                  | 0 -> k (0)
+                                  | 1 -> k2
+                                  where k2 =
+                                    ((let Pfield = %block_load.[`3`] (e2_1)
+                                      in
+                                      let Pfield_1 = %block_load.[`2`] (e2_1)
+                                      in
+                                      apply direct(cons_enum_36_1)
+                                        ($camlMap__cons_enum_83
+                                         : _ ->
+                                           [ 0
+                                           | 0 of val * val *
+                                               [ 0
+                                               | 0 of val * val * val * val *
+                                                   imm tagged ] *
+                                               [ 0
+                                               | 0 of val * val * val * val ]
+                                           ]
+                                         )
+                                          (Pfield_1, Pfield)
+                                          -> k2 * k1)
+                                       where k2
+                                               (apply_result_1 :
+                                                  [ 0
+                                                  | 0 of val * val *
+                                                      [ 0
+                                                      | 0 of val * val *
+                                                          val * val *
+                                                          imm tagged ] *
+                                                      [ 0
+                                                      | 0 of val * val *
+                                                          val * val ] ]) =
+                                         ((let Pfield =
+                                             %block_load.[`3`] (e1_1)
+                                           in
+                                           let Pfield_1 =
+                                             %block_load.[`2`] (e1_1)
+                                           in
+                                           apply direct(cons_enum_36_1)
+                                             ($camlMap__cons_enum_83
+                                              : _ ->
+                                                [ 0
+                                                | 0 of val * val *
+                                                    [ 0
+                                                    | 0 of val * val * val *
+                                                        val * imm tagged ] *
+                                                    [ 0
+                                                    | 0 of val * val * val *
+                                                        val ] ]
+                                              )
+                                               (Pfield_1, Pfield)
+                                               -> k2 * k1)
+                                            where k2
+                                                    (apply_result_2 :
+                                                       [ 0
+                                                       | 0 of val * val *
+                                                           [ 0
+                                                           | 0 of val * val *
+                                                               val * val *
+                                                               imm tagged ] *
+                                                           [ 0
+                                                           | 0 of val * val *
+                                                               val * val ] ]) =
+                                              cont self
+                                                     (apply_result_2,
+                                                      apply_result_1)))))))))
+in
+let code loopify(never) size(107) newer_version_of(equal_39)
+      equal_39_1
+        (cmp : val,
+         m1 :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ],
+         m2 :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Ord = %project_value_slot.[`equal`].[`Ord_4`] (my_closure) in
+  let equal_aux = closure equal_aux_40_1 @equal_aux
+  with { cons_enum = $camlMap__cons_enum_83; cmp = cmp; Ord_3 = Ord }
+  in
+  apply direct(cons_enum_36_1)
+    ($camlMap__cons_enum_83
+     : _ ->
+       [ 0
+       | 0 of val * val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+           [ 0 | 0 of val * val * val * val ] ]
+     )
+      (m2, 0)
+      -> k2 * k1
+    where k2
+            (apply_result :
+               [ 0
+               | 0 of val * val *
+                   [ 0 | 0 of val * val * val * val * imm tagged ] *
+                   [ 0 | 0 of val * val * val * val ] ]) =
+      (apply direct(cons_enum_36_1)
+         ($camlMap__cons_enum_83
+          : _ ->
+            [ 0
+            | 0 of val * val *
+                [ 0 | 0 of val * val * val * val * imm tagged ] *
+                [ 0 | 0 of val * val * val * val ] ]
+          )
+           (m1, 0)
+           -> k2 * k1
+         where k2
+                 (apply_result_1 :
+                    [ 0
+                    | 0 of val * val *
+                        [ 0 | 0 of val * val * val * val * imm tagged ] *
+                        [ 0 | 0 of val * val * val * val ] ]) =
+           apply direct(equal_aux_40_1)
+             (equal_aux : _ -> imm tagged)
+               (apply_result_1, apply_result)
+               -> k * k1)
+in
+let code rec loopify(done) size(90) newer_version_of(compare_aux_38)
+      compare_aux_38_1
+        (e1 :
+           [ 0
+           | 0 of val * val *
+               [ 0 | 0 of val * val * val * val * imm tagged ] *
+               [ 0 | 0 of val * val * val * val ] ],
+         e2 :
+           [ 0
+           | 0 of val * val *
+               [ 0 | 0 of val * val * val * val * imm tagged ] *
+               [ 0 | 0 of val * val * val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (e1, e2)
+    where rec self
+                (e1_1 :
+                   [ 0
+                   | 0 of val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       [ 0 | 0 of val * val * val * val ] ],
+                 e2_1 :
+                   [ 0
+                   | 0 of val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       [ 0 | 0 of val * val * val * val ] ]) =
+      let Ord = %project_value_slot.[`compare_aux`].[`Ord_5`] (my_closure) in
+      let cmp = %project_value_slot.[`compare_aux`].[`cmp_1`] (my_closure) in
+      let prim = %is_int (e1_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           let prim_1 = %is_int (e2_1) in
+           switch prim_1
+             | 0 -> k (-1)
+             | 1 -> k (0)
+         where k2 =
+           let prim_1 = %is_int (e2_1) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k (1)
+              where k2 =
+                ((let Pfield = %block_load.[`0`] (e2_1) in
+                  let Pfield_1 = %block_load.[`0`] (e1_1) in
+                  let Pfield_2 = %block_load.[`0`] (Ord) in
+                  apply Pfield_2 (Pfield_1, Pfield) -> k2 * k1)
+                   where k2 (c : imm tagged) =
+                     let prim_2 = %phys_ne (c, 0) in
+                     (switch prim_2
+                        | 0 -> k2
+                        | 1 -> k (c)
+                        where k2 =
+                          ((let Pfield = %block_load.[`1`] (e2_1) in
+                            let Pfield_1 = %block_load.[`1`] (e1_1) in
+                            apply cmp (Pfield_1, Pfield) -> k2 * k1)
+                             where k2 (c_1 : imm tagged) =
+                               let prim_3 = %phys_ne (c_1, 0) in
+                               (switch prim_3
+                                  | 0 -> k2
+                                  | 1 -> k (c_1)
+                                  where k2 =
+                                    ((let Pfield = %block_load.[`3`] (e2_1)
+                                      in
+                                      let Pfield_1 = %block_load.[`2`] (e2_1)
+                                      in
+                                      apply direct(cons_enum_36_1)
+                                        ($camlMap__cons_enum_83
+                                         : _ ->
+                                           [ 0
+                                           | 0 of val * val *
+                                               [ 0
+                                               | 0 of val * val * val * val *
+                                                   imm tagged ] *
+                                               [ 0
+                                               | 0 of val * val * val * val ]
+                                           ]
+                                         )
+                                          (Pfield_1, Pfield)
+                                          -> k2 * k1)
+                                       where k2
+                                               (apply_result :
+                                                  [ 0
+                                                  | 0 of val * val *
+                                                      [ 0
+                                                      | 0 of val * val *
+                                                          val * val *
+                                                          imm tagged ] *
+                                                      [ 0
+                                                      | 0 of val * val *
+                                                          val * val ] ]) =
+                                         ((let Pfield =
+                                             %block_load.[`3`] (e1_1)
+                                           in
+                                           let Pfield_1 =
+                                             %block_load.[`2`] (e1_1)
+                                           in
+                                           apply direct(cons_enum_36_1)
+                                             ($camlMap__cons_enum_83
+                                              : _ ->
+                                                [ 0
+                                                | 0 of val * val *
+                                                    [ 0
+                                                    | 0 of val * val * val *
+                                                        val * imm tagged ] *
+                                                    [ 0
+                                                    | 0 of val * val * val *
+                                                        val ] ]
+                                              )
+                                               (Pfield_1, Pfield)
+                                               -> k2 * k1)
+                                            where k2
+                                                    (apply_result_1 :
+                                                       [ 0
+                                                       | 0 of val * val *
+                                                           [ 0
+                                                           | 0 of val * val *
+                                                               val * val *
+                                                               imm tagged ] *
+                                                           [ 0
+                                                           | 0 of val * val *
+                                                               val * val ] ]) =
+                                              cont self
+                                                     (apply_result_1,
+                                                      apply_result)))))))))
+in
+let code loopify(never) size(114) newer_version_of(compare_37)
+      compare_37_1
+        (cmp : val,
+         m1 :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ],
+         m2 :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Ord = %project_value_slot.[`compare`].[`Ord_6`] (my_closure) in
+  let compare_aux = closure compare_aux_38_1 @compare_aux
+  with { cons_enum_1 = $camlMap__cons_enum_83; cmp_1 = cmp; Ord_5 = Ord }
+  in
+  apply direct(cons_enum_36_1)
+    ($camlMap__cons_enum_83
+     : _ ->
+       [ 0
+       | 0 of val * val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+           [ 0 | 0 of val * val * val * val ] ]
+     )
+      (m2, 0)
+      -> k2 * k1
+    where k2
+            (apply_result :
+               [ 0
+               | 0 of val * val *
+                   [ 0 | 0 of val * val * val * val * imm tagged ] *
+                   [ 0 | 0 of val * val * val * val ] ]) =
+      (apply direct(cons_enum_36_1)
+         ($camlMap__cons_enum_83
+          : _ ->
+            [ 0
+            | 0 of val * val *
+                [ 0 | 0 of val * val * val * val * imm tagged ] *
+                [ 0 | 0 of val * val * val * val ] ]
+          )
+           (m1, 0)
+           -> k2 * k1
+         where k2
+                 (apply_result_1 :
+                    [ 0
+                    | 0 of val * val *
+                        [ 0 | 0 of val * val * val * val * imm tagged ] *
+                        [ 0 | 0 of val * val * val * val ] ]) =
+           apply direct(compare_aux_38_1)
+             (compare_aux : _ -> imm tagged)
+               (apply_result_1, apply_result)
+               -> k * k1)
+in
+let code loopify(never) size(11) newer_version_of(singleton_6)
+      singleton_6_1 (x : val, d : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+              val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+              imm tagged ] =
+  let Pmakeblock = %block.[`0`] (0, x, d, 0, 1) in
+  cont k (Pmakeblock)
+in
+let $camlMap__singleton_60 = closure singleton_6_1 @singleton in
+let $camlMap__add_max_binding_77 =
+  closure add_max_binding_27_1 @add_max_binding
+and code rec loopify(never) size(27) newer_version_of(add_max_binding_27)
+      add_max_binding_27_1
+        (k : val,
+         x : val,
+         param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+              val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+              imm tagged ] =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      apply direct(singleton_6_1)
+        ($camlMap__singleton_60
+         : _ ->
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ]
+         )
+          (k, x)
+          -> k * k1
+    where k2 =
+      ((let Pfield = %block_load.[`3`] (param) in
+        apply direct(add_max_binding_27_1)
+          ($camlMap__add_max_binding_77 ~ depth my_depth -> succ my_depth
+           : _ ->
+             [ 0
+             | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+                 val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+                 imm tagged ]
+           )
+            (k, x, Pfield)
+            -> k2 * k1)
+         where k2
+                 (apply_result :
+                    [ 0
+                    | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                        val * val *
+                        [ 0 | 0 of val * val * val * val * imm tagged ] *
+                        imm tagged ]) =
+           let Pfield = %block_load.[`2`] (param) in
+           let Pfield_1 = %block_load.[`1`] (param) in
+           let Pfield_2 = %block_load.[`0`] (param) in
+           apply direct(bal_7_1)
+             ($camlMap__bal_61
+              : _ ->
+                [ 0
+                | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                    val * val *
+                    [ 0 | 0 of val * val * val * val * imm tagged ] *
+                    imm tagged ]
+              )
+               (Pfield_2, Pfield_1, Pfield, apply_result)
+               -> k * k1)
+in
+let $camlMap__add_min_binding_76 =
+  closure add_min_binding_26_1 @add_min_binding
+and code rec loopify(never) size(27) newer_version_of(add_min_binding_26)
+      add_min_binding_26_1
+        (k : val,
+         x : val,
+         param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+              val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+              imm tagged ] =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      apply direct(singleton_6_1)
+        ($camlMap__singleton_60
+         : _ ->
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ]
+         )
+          (k, x)
+          -> k * k1
+    where k2 =
+      let Pfield = %block_load.[`3`] (param) in
+      let Pfield_1 = %block_load.[`2`] (param) in
+      let Pfield_2 = %block_load.[`1`] (param) in
+      ((let Pfield_3 = %block_load.[`0`] (param) in
+        apply direct(add_min_binding_26_1)
+          ($camlMap__add_min_binding_76 ~ depth my_depth -> succ my_depth
+           : _ ->
+             [ 0
+             | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+                 val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+                 imm tagged ]
+           )
+            (k, x, Pfield_3)
+            -> k2 * k1)
+         where k2
+                 (apply_result :
+                    [ 0
+                    | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                        val * val *
+                        [ 0 | 0 of val * val * val * val * imm tagged ] *
+                        imm tagged ]) =
+           apply direct(bal_7_1)
+             ($camlMap__bal_61
+              : _ ->
+                [ 0
+                | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                    val * val *
+                    [ 0 | 0 of val * val * val * val * imm tagged ] *
+                    imm tagged ]
+              )
+               (apply_result, Pfield_2, Pfield_1, Pfield)
+               -> k * k1)
+in
+let $camlMap__join_78 =
+  closure join_28_1 @join
+and code rec loopify(never) size(88) newer_version_of(join_28)
+      join_28_1
+        (l :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ],
+         v : val,
+         d : val,
+         r :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+              val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+              imm tagged ] =
+  let prim = %is_int (l) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      apply direct(add_min_binding_26_1)
+        ($camlMap__add_min_binding_76
+         : _ ->
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ]
+         )
+          (v, d, r)
+          -> k * k1
+    where k2 =
+      let prim_1 = %is_int (r) in
+      (switch prim_1
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           apply direct(add_max_binding_27_1)
+             ($camlMap__add_max_binding_77
+              : _ ->
+                [ 0
+                | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                    val * val *
+                    [ 0 | 0 of val * val * val * val * imm tagged ] *
+                    imm tagged ]
+              )
+               (v, d, l)
+               -> k * k1
+         where k2 =
+           let rh = %block_load.[`4`] (r) in
+           let lh = %block_load.[`4`] (l) in
+           let int_add = %int_barith.add (rh, 2) in
+           let prim_2 = %int_comp.gt (lh, int_add) in
+           (switch prim_2
+              | 0 -> k2
+              | 1 -> k3
+              where k3 =
+                ((let Pfield = %block_load.[`3`] (l) in
+                  apply direct(join_28_1)
+                    ($camlMap__join_78 ~ depth my_depth -> succ my_depth
+                     : _ ->
+                       [ 0
+                       | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                           val * val *
+                           [ 0 | 0 of val * val * val * val * imm tagged ] *
+                           imm tagged ]
+                     )
+                      (Pfield, v, d, r)
+                      -> k3 * k1)
+                   where k3
+                           (apply_result :
+                              [ 0
+                              | 0 of [ 0
+                                     | 0 of val * val * val * val *
+                                         imm tagged ] * val * val *
+                                  [ 0
+                                  | 0 of val * val * val * val * imm tagged ] *
+                                  imm tagged ]) =
+                     let Pfield = %block_load.[`2`] (l) in
+                     let Pfield_1 = %block_load.[`1`] (l) in
+                     let Pfield_2 = %block_load.[`0`] (l) in
+                     apply direct(bal_7_1)
+                       ($camlMap__bal_61
+                        : _ ->
+                          [ 0
+                          | 0 of [ 0
+                                 | 0 of val * val * val * val * imm tagged ] *
+                              val * val *
+                              [ 0 | 0 of val * val * val * val * imm tagged ] *
+                              imm tagged ]
+                        )
+                         (Pfield_2, Pfield_1, Pfield, apply_result)
+                         -> k * k1)
+              where k2 =
+                let int_add_1 = %int_barith.add (lh, 2) in
+                let prim_3 = %int_comp.gt (rh, int_add_1) in
+                (switch prim_3
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     let Pfield = %block_load.[`3`] (r) in
+                     let Pfield_1 = %block_load.[`2`] (r) in
+                     let Pfield_2 = %block_load.[`1`] (r) in
+                     ((let Pfield_3 = %block_load.[`0`] (r) in
+                       apply direct(join_28_1)
+                         ($camlMap__join_78 ~ depth my_depth -> succ my_depth
+                          : _ ->
+                            [ 0
+                            | 0 of [ 0
+                                   | 0 of val * val * val * val * imm tagged
+                                   ] * val * val *
+                                [ 0 | 0 of val * val * val * val * imm tagged
+                                ] * imm tagged ]
+                          )
+                           (l, v, d, Pfield_3)
+                           -> k3 * k1)
+                        where k3
+                                (apply_result :
+                                   [ 0
+                                   | 0 of [ 0
+                                          | 0 of val * val * val * val *
+                                              imm tagged ] * val * val *
+                                       [ 0
+                                       | 0 of val * val * val * val *
+                                           imm tagged ] * imm tagged ]) =
+                          apply direct(bal_7_1)
+                            ($camlMap__bal_61
+                             : _ ->
+                               [ 0
+                               | 0 of [ 0
+                                      | 0 of val * val * val * val *
+                                          imm tagged ] * val * val *
+                                   [ 0
+                                   | 0 of val * val * val * val * imm tagged
+                                   ] * imm tagged ]
+                             )
+                              (apply_result, Pfield_2, Pfield_1, Pfield)
+                              -> k * k1)
+                   where k2 =
+                     apply direct(create_5_1)
+                       ($camlMap__create_59
+                        : _ ->
+                          [ 0
+                          | 0 of [ 0
+                                 | 0 of val * val * val * val * imm tagged ] *
+                              val * val *
+                              [ 0 | 0 of val * val * val * val * imm tagged ] *
+                              imm tagged ]
+                        )
+                         (l, v, d, r)
+                         -> k * k1)))
+in
+let $camlMap__remove_min_binding_75 =
+  closure remove_min_binding_25_1 @remove_min_binding
+and code rec loopify(never) size(40) newer_version_of(remove_min_binding_25)
+      remove_min_binding_25_1
+        (param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+              val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+              imm tagged ] =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      apply direct(invalid_arg_1_1)
+        ($camlMap__invalid_arg_55
+         : _ ->
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ]
+         )
+          ($camlMap__immstring501)
+          -> never * k1
+    where k2 =
+      let l = %block_load.[`0`] (param) in
+      let prim_1 = %is_int (l) in
+      (switch prim_1
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           let Pfield = %block_load.[`3`] (param) in
+           cont k (Pfield)
+         where k2 =
+           let Pfield = %block_load.[`3`] (param) in
+           let Pfield_1 = %block_load.[`2`] (param) in
+           let Pfield_2 = %block_load.[`1`] (param) in
+           (apply direct(remove_min_binding_25_1)
+              ($camlMap__remove_min_binding_75 ~ depth my_depth -> succ my_depth
+               : _ ->
+                 [ 0
+                 | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                     val * val *
+                     [ 0 | 0 of val * val * val * val * imm tagged ] *
+                     imm tagged ]
+               )
+                (l)
+                -> k2 * k1
+              where k2
+                      (apply_result :
+                         [ 0
+                         | 0 of [ 0 | 0 of val * val * val * val * imm tagged
+                                ] * val * val *
+                             [ 0 | 0 of val * val * val * val * imm tagged ] *
+                             imm tagged ]) =
+                apply direct(bal_7_1)
+                  ($camlMap__bal_61
+                   : _ ->
+                     [ 0
+                     | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                         val * val *
+                         [ 0 | 0 of val * val * val * val * imm tagged ] *
+                         imm tagged ]
+                   )
+                    (apply_result, Pfield_2, Pfield_1, Pfield)
+                    -> k * k1))
+in
+let code rec loopify(done) size(34) newer_version_of(min_binding_21)
+      min_binding_21_1
+        (param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of val * val ] =
+  cont self (param)
+    where rec self
+                (param_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       imm tagged ]) =
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k1 pop(regular k1) ($`*predef*`.caml_exn_Not_found)
+         where k2 =
+           let l = %block_load.[`0`] (param_1) in
+           let prim_1 = %is_int (l) in
+           (switch prim_1
+              | 0 -> self (l)
+              | 1 -> k2
+              where k2 =
+                let Pfield = %block_load.[`2`] (param_1) in
+                let Pfield_1 = %block_load.[`1`] (param_1) in
+                let Pmakeblock = %block.[`0`] (Pfield_1, Pfield) in
+                cont k (Pmakeblock)))
+in
+let $camlMap__min_binding_71 = closure min_binding_21_1 @min_binding in
+let code loopify(never) size(36) newer_version_of(concat_29)
+      concat_29_1
+        (t1 :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ],
+         t2 :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+              val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+              imm tagged ] =
+  let prim = %is_int (t1) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (t2)
+    where k2 =
+      let prim_1 = %is_int (t2) in
+      (switch prim_1
+         | 0 -> k2
+         | 1 -> k (t1)
+         where k2 =
+           (apply direct(min_binding_21_1)
+              ($camlMap__min_binding_71 : _ -> [ 0 of val * val ])
+                (t2)
+                -> k2 * k1
+              where k2 (`*match*` : [ 0 of val * val ]) =
+                (apply direct(remove_min_binding_25_1)
+                   ($camlMap__remove_min_binding_75
+                    : _ ->
+                      [ 0
+                      | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                          val * val *
+                          [ 0 | 0 of val * val * val * val * imm tagged ] *
+                          imm tagged ]
+                    )
+                     (t2)
+                     -> k2 * k1
+                   where k2
+                           (apply_result :
+                              [ 0
+                              | 0 of [ 0
+                                     | 0 of val * val * val * val *
+                                         imm tagged ] * val * val *
+                                  [ 0
+                                  | 0 of val * val * val * val * imm tagged ] *
+                                  imm tagged ]) =
+                     let Pfield = %block_load.[`1`] (`*match*`) in
+                     let Pfield_1 = %block_load.[`0`] (`*match*`) in
+                     apply direct(join_28_1)
+                       ($camlMap__join_78
+                        : _ ->
+                          [ 0
+                          | 0 of [ 0
+                                 | 0 of val * val * val * val * imm tagged ] *
+                              val * val *
+                              [ 0 | 0 of val * val * val * val * imm tagged ] *
+                              imm tagged ]
+                        )
+                         (t1, Pfield_1, Pfield, apply_result)
+                         -> k * k1)))
+in
+let $camlMap__concat_79 = closure concat_29_1 @concat in
+let $camlMap__partition_82 =
+  closure partition_35_1 @partition
+and code rec loopify(never) size(77) newer_version_of(partition_35)
+      partition_35_1
+        (p : val,
+         param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+              [ 0 | 0 of val * val * val * val * imm tagged ] ] =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k ($camlMap__const_block791)
+    where k2 =
+      let d = %block_load.[`2`] (param) in
+      let v = %block_load.[`1`] (param) in
+      ((let Pfield = %block_load.[`0`] (param) in
+        apply direct(partition_35_1)
+          ($camlMap__partition_82 ~ depth my_depth -> succ my_depth
+           : _ ->
+             [ 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                 [ 0 | 0 of val * val * val * val * imm tagged ] ]
+           )
+            (p, Pfield)
+            -> k2 * k1)
+         where k2
+                 (`*match*` :
+                    [ 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                        [ 0 | 0 of val * val * val * val * imm tagged ] ]) =
+           let lf = %block_load.[`1`] (`*match*`) in
+           let lt = %block_load.[`0`] (`*match*`) in
+           (apply p (v, d) -> k3 * k1
+              where k3 (param_1 : imm tagged) =
+                let unboxed_field = %untag_imm (param_1) in
+                cont k2 (unboxed_field)
+              where k2 (unboxed_field : imm) =
+                let naked_immediate = unboxed_field in
+                ((let Pfield = %block_load.[`3`] (param) in
+                  apply direct(partition_35_1)
+                    ($camlMap__partition_82 ~ depth my_depth -> succ my_depth
+                     : _ ->
+                       [ 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                           [ 0 | 0 of val * val * val * val * imm tagged ] ]
+                     )
+                      (p, Pfield)
+                      -> k2 * k1)
+                   where k2
+                           (`*match*_1` :
+                              [ 0 of [ 0
+                                     | 0 of val * val * val * val *
+                                         imm tagged ] *
+                                  [ 0
+                                  | 0 of val * val * val * val * imm tagged ]
+                              ]) =
+                     let rf = %block_load.[`1`] (`*match*_1`) in
+                     let rt = %block_load.[`0`] (`*match*_1`) in
+                     (switch naked_immediate
+                        | 0 -> k2
+                        | 1 -> k3
+                        where k3 =
+                          (apply direct(concat_29_1)
+                             ($camlMap__concat_79
+                              : _ ->
+                                [ 0
+                                | 0 of [ 0
+                                       | 0 of val * val * val * val *
+                                           imm tagged ] * val * val *
+                                    [ 0
+                                    | 0 of val * val * val * val * imm tagged
+                                    ] * imm tagged ]
+                              )
+                               (lf, rf)
+                               -> k3 * k1
+                             where k3
+                                     (apply_result :
+                                        [ 0
+                                        | 0 of [ 0
+                                               | 0 of val * val * val * val *
+                                                   imm tagged ] * val * val *
+                                            [ 0
+                                            | 0 of val * val * val * val *
+                                                imm tagged ] * imm tagged ]) =
+                               (apply direct(join_28_1)
+                                  ($camlMap__join_78
+                                   : _ ->
+                                     [ 0
+                                     | 0 of [ 0
+                                            | 0 of val * val * val * val *
+                                                imm tagged ] * val * val *
+                                         [ 0
+                                         | 0 of val * val * val * val *
+                                             imm tagged ] * imm tagged ]
+                                   )
+                                    (lt, v, d, rt)
+                                    -> k3 * k1
+                                  where k3
+                                          (apply_result_1 :
+                                             [ 0
+                                             | 0 of [ 0
+                                                    | 0 of val * val * val *
+                                                        val * imm tagged ] *
+                                                 val * val *
+                                                 [ 0
+                                                 | 0 of val * val * val *
+                                                     val * imm tagged ] *
+                                                 imm tagged ]) =
+                                    let Pmakeblock =
+                                      %block.[`0`]
+                                        (apply_result_1, apply_result)
+                                    in
+                                    cont k (Pmakeblock)))
+                        where k2 =
+                          (apply direct(join_28_1)
+                             ($camlMap__join_78
+                              : _ ->
+                                [ 0
+                                | 0 of [ 0
+                                       | 0 of val * val * val * val *
+                                           imm tagged ] * val * val *
+                                    [ 0
+                                    | 0 of val * val * val * val * imm tagged
+                                    ] * imm tagged ]
+                              )
+                               (lf, v, d, rf)
+                               -> k2 * k1
+                             where k2
+                                     (apply_result :
+                                        [ 0
+                                        | 0 of [ 0
+                                               | 0 of val * val * val * val *
+                                                   imm tagged ] * val * val *
+                                            [ 0
+                                            | 0 of val * val * val * val *
+                                                imm tagged ] * imm tagged ]) =
+                               (apply direct(concat_29_1)
+                                  ($camlMap__concat_79
+                                   : _ ->
+                                     [ 0
+                                     | 0 of [ 0
+                                            | 0 of val * val * val * val *
+                                                imm tagged ] * val * val *
+                                         [ 0
+                                         | 0 of val * val * val * val *
+                                             imm tagged ] * imm tagged ]
+                                   )
+                                    (lt, rt)
+                                    -> k2 * k1
+                                  where k2
+                                          (apply_result_1 :
+                                             [ 0
+                                             | 0 of [ 0
+                                                    | 0 of val * val * val *
+                                                        val * imm tagged ] *
+                                                 val * val *
+                                                 [ 0
+                                                 | 0 of val * val * val *
+                                                     val * imm tagged ] *
+                                                 imm tagged ]) =
+                                    let Pmakeblock =
+                                      %block.[`0`]
+                                        (apply_result_1, apply_result)
+                                    in
+                                    cont k (Pmakeblock)))))))
+in
+let $camlMap__filter_81 =
+  closure filter_34_1 @filter
+and code rec loopify(never) size(73) newer_version_of(filter_34)
+      filter_34_1
+        (p : val,
+         m :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+              val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+              imm tagged ] =
+  let prim = %is_int (m) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (0)
+    where k2 =
+      let r = %block_load.[`3`] (m) in
+      let d = %block_load.[`2`] (m) in
+      let v = %block_load.[`1`] (m) in
+      let l = %block_load.[`0`] (m) in
+      (apply direct(filter_34_1)
+         ($camlMap__filter_81 ~ depth my_depth -> succ my_depth
+          : _ ->
+            [ 0
+            | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+                val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+                imm tagged ]
+          )
+           (p, l)
+           -> k2 * k1
+         where k2
+                 (l' :
+                    [ 0
+                    | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                        val * val *
+                        [ 0 | 0 of val * val * val * val * imm tagged ] *
+                        imm tagged ]) =
+           (apply p (v, d) -> k3 * k1
+              where k3 (param : imm tagged) =
+                let unboxed_field = %untag_imm (param) in
+                cont k2 (unboxed_field)
+              where k2 (unboxed_field : imm) =
+                let naked_immediate = unboxed_field in
+                (apply direct(filter_34_1)
+                   ($camlMap__filter_81 ~ depth my_depth -> succ my_depth
+                    : _ ->
+                      [ 0
+                      | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                          val * val *
+                          [ 0 | 0 of val * val * val * val * imm tagged ] *
+                          imm tagged ]
+                    )
+                     (p, r)
+                     -> k2 * k1
+                   where k2
+                           (r' :
+                              [ 0
+                              | 0 of [ 0
+                                     | 0 of val * val * val * val *
+                                         imm tagged ] * val * val *
+                                  [ 0
+                                  | 0 of val * val * val * val * imm tagged ] *
+                                  imm tagged ]) =
+                     (switch naked_immediate
+                        | 0 -> k2
+                        | 1 -> k3
+                        where k3 =
+                          ((let prim_1 = %phys_eq (l, l') in
+                            switch prim_1
+                              | 0 -> k3
+                              | 1 -> k4
+                              where k4 =
+                                let prim_2 = %phys_eq (r, r') in
+                                switch prim_2
+                                  | 0 -> k3
+                                  | 1 -> k (m))
+                             where k3 =
+                               apply direct(join_28_1)
+                                 ($camlMap__join_78
+                                  : _ ->
+                                    [ 0
+                                    | 0 of [ 0
+                                           | 0 of val * val * val * val *
+                                               imm tagged ] * val * val *
+                                        [ 0
+                                        | 0 of val * val * val * val *
+                                            imm tagged ] * imm tagged ]
+                                  )
+                                   (l', v, d, r')
+                                   -> k * k1)
+                        where k2 =
+                          apply direct(concat_29_1)
+                            ($camlMap__concat_79
+                             : _ ->
+                               [ 0
+                               | 0 of [ 0
+                                      | 0 of val * val * val * val *
+                                          imm tagged ] * val * val *
+                                   [ 0
+                                   | 0 of val * val * val * val * imm tagged
+                                   ] * imm tagged ]
+                             )
+                              (l', r')
+                              -> k * k1))))
+in
+let code rec loopify(never) size(102) newer_version_of(split_31)
+      split_31_1
+        (x : val,
+         param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+              [ 0 | 0 of val ] *
+              [ 0 | 0 of val * val * val * val * imm tagged ] ] =
+  let Ord = %project_value_slot.[`split`].[`Ord_7`] (my_closure) in
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k ($camlMap__const_block619)
+    where k2 =
+      let r = %block_load.[`3`] (param) in
+      let d = %block_load.[`2`] (param) in
+      let v = %block_load.[`1`] (param) in
+      let l = %block_load.[`0`] (param) in
+      ((let Pfield = %block_load.[`0`] (Ord) in
+        apply Pfield (x, v) -> k2 * k1)
+         where k2 (c : imm tagged) =
+           let prim_1 = %phys_eq (c, 0) in
+           (switch prim_1
+              | 0 -> k2
+              | 1 -> k3
+              where k3 =
+                let Pmakeblock = %block.[`0`] (d) in
+                let Pmakeblock_1 = %block.[`0`] (l, Pmakeblock, r) in
+                cont k (Pmakeblock_1)
+              where k2 =
+                let prim_2 = %int_comp.lt (c, 0) in
+                (switch prim_2
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     (apply direct(split_31_1)
+                        (my_closure ~ depth my_depth -> succ my_depth
+                         : _ ->
+                           [ 0 of [ 0
+                                  | 0 of val * val * val * val * imm tagged ] *
+                               [ 0 | 0 of val ] *
+                               [ 0 | 0 of val * val * val * val * imm tagged
+                               ] ]
+                         )
+                          (x, l)
+                          -> k3 * k1
+                        where k3
+                                (`*match*` :
+                                   [ 0 of [ 0
+                                          | 0 of val * val * val * val *
+                                              imm tagged ] *
+                                       [ 0 | 0 of val ] *
+                                       [ 0
+                                       | 0 of val * val * val * val *
+                                           imm tagged ] ]) =
+                          ((let Pfield = %block_load.[`2`] (`*match*`) in
+                            apply direct(join_28_1)
+                              ($camlMap__join_78
+                               : _ ->
+                                 [ 0
+                                 | 0 of [ 0
+                                        | 0 of val * val * val * val *
+                                            imm tagged ] * val * val *
+                                     [ 0
+                                     | 0 of val * val * val * val *
+                                         imm tagged ] * imm tagged ]
+                               )
+                                (Pfield, v, d, r)
+                                -> k3 * k1)
+                             where k3
+                                     (apply_result :
+                                        [ 0
+                                        | 0 of [ 0
+                                               | 0 of val * val * val * val *
+                                                   imm tagged ] * val * val *
+                                            [ 0
+                                            | 0 of val * val * val * val *
+                                                imm tagged ] * imm tagged ]) =
+                               let Pfield = %block_load.[`1`] (`*match*`) in
+                               let Pfield_1 = %block_load.[`0`] (`*match*`)
+                               in
+                               let Pmakeblock =
+                                 %block.[`0`]
+                                   (Pfield_1, Pfield, apply_result)
+                               in
+                               cont k (Pmakeblock)))
+                   where k2 =
+                     (apply direct(split_31_1)
+                        (my_closure ~ depth my_depth -> succ my_depth
+                         : _ ->
+                           [ 0 of [ 0
+                                  | 0 of val * val * val * val * imm tagged ] *
+                               [ 0 | 0 of val ] *
+                               [ 0 | 0 of val * val * val * val * imm tagged
+                               ] ]
+                         )
+                          (x, r)
+                          -> k2 * k1
+                        where k2
+                                (`*match*` :
+                                   [ 0 of [ 0
+                                          | 0 of val * val * val * val *
+                                              imm tagged ] *
+                                       [ 0 | 0 of val ] *
+                                       [ 0
+                                       | 0 of val * val * val * val *
+                                           imm tagged ] ]) =
+                          let Pfield = %block_load.[`2`] (`*match*`) in
+                          let Pfield_1 = %block_load.[`1`] (`*match*`) in
+                          ((let Pfield_2 = %block_load.[`0`] (`*match*`) in
+                            apply direct(join_28_1)
+                              ($camlMap__join_78
+                               : _ ->
+                                 [ 0
+                                 | 0 of [ 0
+                                        | 0 of val * val * val * val *
+                                            imm tagged ] * val * val *
+                                     [ 0
+                                     | 0 of val * val * val * val *
+                                         imm tagged ] * imm tagged ]
+                               )
+                                (l, v, d, Pfield_2)
+                                -> k2 * k1)
+                             where k2
+                                     (apply_result :
+                                        [ 0
+                                        | 0 of [ 0
+                                               | 0 of val * val * val * val *
+                                                   imm tagged ] * val * val *
+                                            [ 0
+                                            | 0 of val * val * val * val *
+                                                imm tagged ] * imm tagged ]) =
+                               let Pmakeblock =
+                                 %block.[`0`]
+                                   (apply_result, Pfield_1, Pfield)
+                               in
+                               cont k (Pmakeblock))))))
+in
+let code loopify(never) size(20) newer_version_of(concat_or_join_30)
+      concat_or_join_30_1
+        (t1 :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ],
+         v : val,
+         d : [ 0 | 0 of val ],
+         t2 :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+              val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+              imm tagged ] =
+  let prim = %is_int (d) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      apply direct(concat_29_1)
+        ($camlMap__concat_79
+         : _ ->
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ]
+         )
+          (t1, t2)
+          -> k * k1
+    where k2 =
+      let Pfield = %block_load.[`0`] (d) in
+      apply direct(join_28_1)
+        ($camlMap__join_78
+         : _ ->
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ]
+         )
+          (t1, v, Pfield, t2)
+          -> k * k1
+in
+let $camlMap__concat_or_join_80 = closure concat_or_join_30_1 @concat_or_join
+in
+let code rec loopify(never) size(127) newer_version_of(union_33)
+      union_33_1
+        (f : val,
+         s1 :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ],
+         s2 :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+              val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+              imm tagged ] =
+  let split = %project_value_slot.[`union`].[`split`] (my_closure) in
+  let prim = %is_int (s1) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k (s2)
+    where k2 =
+      let prim_1 = %is_int (s2) in
+      (switch prim_1
+         | 0 -> k2
+         | 1 -> k (s1)
+         where k2 =
+           let d2 = %block_load.[`2`] (s2) in
+           let v2 = %block_load.[`1`] (s2) in
+           let d1 = %block_load.[`2`] (s1) in
+           let v1 = %block_load.[`1`] (s1) in
+           let Pfield = %block_load.[`4`] (s2) in
+           let Pfield_1 = %block_load.[`4`] (s1) in
+           let prim_2 = %int_comp.ge (Pfield_1, Pfield) in
+           (switch prim_2
+              | 0 -> k2
+              | 1 -> k3
+              where k3 =
+                (apply direct(split_31_1)
+                   (split
+                    : _ ->
+                      [ 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                          [ 0 | 0 of val ] *
+                          [ 0 | 0 of val * val * val * val * imm tagged ] ]
+                    )
+                     (v1, s2)
+                     -> k3 * k1
+                   where k3
+                           (`*match*` :
+                              [ 0 of [ 0
+                                     | 0 of val * val * val * val *
+                                         imm tagged ] * [ 0 | 0 of val ] *
+                                  [ 0
+                                  | 0 of val * val * val * val * imm tagged ]
+                              ]) =
+                     let d2_1 = %block_load.[`1`] (`*match*`) in
+                     ((let Pfield_2 = %block_load.[`0`] (`*match*`) in
+                       let Pfield_3 = %block_load.[`0`] (s1) in
+                       apply direct(union_33_1)
+                         (my_closure ~ depth my_depth -> succ my_depth
+                          : _ ->
+                            [ 0
+                            | 0 of [ 0
+                                   | 0 of val * val * val * val * imm tagged
+                                   ] * val * val *
+                                [ 0 | 0 of val * val * val * val * imm tagged
+                                ] * imm tagged ]
+                          )
+                           (f, Pfield_3, Pfield_2)
+                           -> k3 * k1)
+                        where k3
+                                (l :
+                                   [ 0
+                                   | 0 of [ 0
+                                          | 0 of val * val * val * val *
+                                              imm tagged ] * val * val *
+                                       [ 0
+                                       | 0 of val * val * val * val *
+                                           imm tagged ] * imm tagged ]) =
+                          ((let Pfield_2 = %block_load.[`2`] (`*match*`) in
+                            let Pfield_3 = %block_load.[`3`] (s1) in
+                            apply direct(union_33_1)
+                              (my_closure ~ depth my_depth -> succ my_depth
+                               : _ ->
+                                 [ 0
+                                 | 0 of [ 0
+                                        | 0 of val * val * val * val *
+                                            imm tagged ] * val * val *
+                                     [ 0
+                                     | 0 of val * val * val * val *
+                                         imm tagged ] * imm tagged ]
+                               )
+                                (f, Pfield_3, Pfield_2)
+                                -> k3 * k1)
+                             where k3
+                                     (r :
+                                        [ 0
+                                        | 0 of [ 0
+                                               | 0 of val * val * val * val *
+                                                   imm tagged ] * val * val *
+                                            [ 0
+                                            | 0 of val * val * val * val *
+                                                imm tagged ] * imm tagged ]) =
+                               let prim_3 = %is_int (d2_1) in
+                               (switch prim_3
+                                  | 0 -> k3
+                                  | 1 -> k4
+                                  where k4 =
+                                    apply direct(join_28_1)
+                                      ($camlMap__join_78
+                                       : _ ->
+                                         [ 0
+                                         | 0 of [ 0
+                                                | 0 of val * val * val *
+                                                    val * imm tagged ] *
+                                             val * val *
+                                             [ 0
+                                             | 0 of val * val * val * val *
+                                                 imm tagged ] * imm tagged ]
+                                       )
+                                        (l, v1, d1, r)
+                                        -> k * k1
+                                  where k3 =
+                                    ((let Pfield_2 = %block_load.[`0`] (d2_1)
+                                      in
+                                      apply f (v1, d1, Pfield_2) -> k3 * k1)
+                                       where k3
+                                               (apply_result :
+                                                  [ 0 | 0 of val ]) =
+                                         apply direct(concat_or_join_30_1)
+                                           ($camlMap__concat_or_join_80
+                                            : _ ->
+                                              [ 0
+                                              | 0 of [ 0
+                                                     | 0 of val * val * val *
+                                                         val * imm tagged ] *
+                                                  val * val *
+                                                  [ 0
+                                                  | 0 of val * val * val *
+                                                      val * imm tagged ] *
+                                                  imm tagged ]
+                                            )
+                                             (l, v1, apply_result, r)
+                                             -> k * k1)))))
+              where k2 =
+                (apply direct(split_31_1)
+                   (split
+                    : _ ->
+                      [ 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                          [ 0 | 0 of val ] *
+                          [ 0 | 0 of val * val * val * val * imm tagged ] ]
+                    )
+                     (v2, s1)
+                     -> k2 * k1
+                   where k2
+                           (`*match*` :
+                              [ 0 of [ 0
+                                     | 0 of val * val * val * val *
+                                         imm tagged ] * [ 0 | 0 of val ] *
+                                  [ 0
+                                  | 0 of val * val * val * val * imm tagged ]
+                              ]) =
+                     let d1_1 = %block_load.[`1`] (`*match*`) in
+                     ((let Pfield_2 = %block_load.[`0`] (s2) in
+                       let Pfield_3 = %block_load.[`0`] (`*match*`) in
+                       apply direct(union_33_1)
+                         (my_closure ~ depth my_depth -> succ my_depth
+                          : _ ->
+                            [ 0
+                            | 0 of [ 0
+                                   | 0 of val * val * val * val * imm tagged
+                                   ] * val * val *
+                                [ 0 | 0 of val * val * val * val * imm tagged
+                                ] * imm tagged ]
+                          )
+                           (f, Pfield_3, Pfield_2)
+                           -> k2 * k1)
+                        where k2
+                                (l :
+                                   [ 0
+                                   | 0 of [ 0
+                                          | 0 of val * val * val * val *
+                                              imm tagged ] * val * val *
+                                       [ 0
+                                       | 0 of val * val * val * val *
+                                           imm tagged ] * imm tagged ]) =
+                          ((let Pfield_2 = %block_load.[`3`] (s2) in
+                            let Pfield_3 = %block_load.[`2`] (`*match*`) in
+                            apply direct(union_33_1)
+                              (my_closure ~ depth my_depth -> succ my_depth
+                               : _ ->
+                                 [ 0
+                                 | 0 of [ 0
+                                        | 0 of val * val * val * val *
+                                            imm tagged ] * val * val *
+                                     [ 0
+                                     | 0 of val * val * val * val *
+                                         imm tagged ] * imm tagged ]
+                               )
+                                (f, Pfield_3, Pfield_2)
+                                -> k2 * k1)
+                             where k2
+                                     (r :
+                                        [ 0
+                                        | 0 of [ 0
+                                               | 0 of val * val * val * val *
+                                                   imm tagged ] * val * val *
+                                            [ 0
+                                            | 0 of val * val * val * val *
+                                                imm tagged ] * imm tagged ]) =
+                               let prim_3 = %is_int (d1_1) in
+                               (switch prim_3
+                                  | 0 -> k2
+                                  | 1 -> k3
+                                  where k3 =
+                                    apply direct(join_28_1)
+                                      ($camlMap__join_78
+                                       : _ ->
+                                         [ 0
+                                         | 0 of [ 0
+                                                | 0 of val * val * val *
+                                                    val * imm tagged ] *
+                                             val * val *
+                                             [ 0
+                                             | 0 of val * val * val * val *
+                                                 imm tagged ] * imm tagged ]
+                                       )
+                                        (l, v2, d2, r)
+                                        -> k * k1
+                                  where k2 =
+                                    ((let Pfield_2 = %block_load.[`0`] (d1_1)
+                                      in
+                                      apply f (v2, Pfield_2, d2) -> k2 * k1)
+                                       where k2
+                                               (apply_result :
+                                                  [ 0 | 0 of val ]) =
+                                         apply direct(concat_or_join_30_1)
+                                           ($camlMap__concat_or_join_80
+                                            : _ ->
+                                              [ 0
+                                              | 0 of [ 0
+                                                     | 0 of val * val * val *
+                                                         val * imm tagged ] *
+                                                  val * val *
+                                                  [ 0
+                                                  | 0 of val * val * val *
+                                                      val * imm tagged ] *
+                                                  imm tagged ]
+                                            )
+                                             (l, v2, apply_result, r)
+                                             -> k * k1)))))))
+in
+let code rec loopify(never) size(121) newer_version_of(merge_32)
+      merge_32_1
+        (f : val,
+         s1 :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ],
+         s2 :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0
+          | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+              val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+              imm tagged ] =
+  let split = %project_value_slot.[`merge`].[`split_1`] (my_closure) in
+  (let prim = %is_int (s1) in
+   switch prim
+     | 0 -> k3
+     | 1 -> k4
+     where k4 =
+       let prim_1 = %is_int (s2) in
+       switch prim_1
+         | 0 -> k2
+         | 1 -> k (0)
+     where k3 =
+       let v1 = %block_load.[`1`] (s1) in
+       (apply direct(height_4_1)
+          ($camlMap__height_58 : _ -> imm tagged) (s2) -> k3 * k1
+          where k3 (apply_result : imm tagged) =
+            let Pfield = %block_load.[`4`] (s1) in
+            let prim_1 = %int_comp.ge (Pfield, apply_result) in
+            (switch prim_1
+               | 0 -> k2
+               | 1 -> k3
+               where k3 =
+                 (apply direct(split_31_1)
+                    (split
+                     : _ ->
+                       [ 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                           [ 0 | 0 of val ] *
+                           [ 0 | 0 of val * val * val * val * imm tagged ] ]
+                     )
+                      (v1, s2)
+                      -> k3 * k1
+                    where k3
+                            (`*match*` :
+                               [ 0 of [ 0
+                                      | 0 of val * val * val * val *
+                                          imm tagged ] * [ 0 | 0 of val ] *
+                                   [ 0
+                                   | 0 of val * val * val * val * imm tagged
+                                   ] ]) =
+                      ((let Pfield_1 = %block_load.[`2`] (`*match*`) in
+                        let Pfield_2 = %block_load.[`3`] (s1) in
+                        apply direct(merge_32_1)
+                          (my_closure ~ depth my_depth -> succ my_depth
+                           : _ ->
+                             [ 0
+                             | 0 of [ 0
+                                    | 0 of val * val * val * val * imm tagged
+                                    ] * val * val *
+                                 [ 0
+                                 | 0 of val * val * val * val * imm tagged ] *
+                                 imm tagged ]
+                           )
+                            (f, Pfield_2, Pfield_1)
+                            -> k3 * k1)
+                         where k3
+                                 (apply_result_1 :
+                                    [ 0
+                                    | 0 of [ 0
+                                           | 0 of val * val * val * val *
+                                               imm tagged ] * val * val *
+                                        [ 0
+                                        | 0 of val * val * val * val *
+                                            imm tagged ] * imm tagged ]) =
+                           ((let Pfield_1 = %block_load.[`1`] (`*match*`) in
+                             let Pfield_2 = %block_load.[`2`] (s1) in
+                             let Pmakeblock = %block.[`0`] (Pfield_2) in
+                             apply f (v1, Pmakeblock, Pfield_1) -> k3 * k1)
+                              where k3 (apply_result_2 : [ 0 | 0 of val ]) =
+                                ((let Pfield_1 =
+                                    %block_load.[`0`] (`*match*`)
+                                  in
+                                  let Pfield_2 = %block_load.[`0`] (s1) in
+                                  apply direct(merge_32_1)
+                                    (my_closure ~ depth my_depth -> succ my_depth
+                                     : _ ->
+                                       [ 0
+                                       | 0 of [ 0
+                                              | 0 of val * val * val * val *
+                                                  imm tagged ] * val * val *
+                                           [ 0
+                                           | 0 of val * val * val * val *
+                                               imm tagged ] * imm tagged ]
+                                     )
+                                      (f, Pfield_2, Pfield_1)
+                                      -> k3 * k1)
+                                   where k3
+                                           (apply_result_3 :
+                                              [ 0
+                                              | 0 of [ 0
+                                                     | 0 of val * val * val *
+                                                         val * imm tagged ] *
+                                                  val * val *
+                                                  [ 0
+                                                  | 0 of val * val * val *
+                                                      val * imm tagged ] *
+                                                  imm tagged ]) =
+                                     apply direct(concat_or_join_30_1)
+                                       ($camlMap__concat_or_join_80
+                                        : _ ->
+                                          [ 0
+                                          | 0 of [ 0
+                                                 | 0 of val * val * val *
+                                                     val * imm tagged ] *
+                                              val * val *
+                                              [ 0
+                                              | 0 of val * val * val * val *
+                                                  imm tagged ] * imm tagged ]
+                                        )
+                                         (apply_result_3,
+                                          v1,
+                                          apply_result_2,
+                                          apply_result_1)
+                                         -> k * k1)))))))
+    where k2 =
+      let prim = %is_int (s2) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k1 pop(regular k1) ($camlMap__Pmakeblock701)
+         where k2 =
+           let v2 = %block_load.[`1`] (s2) in
+           (apply direct(split_31_1)
+              (split
+               : _ ->
+                 [ 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                     [ 0 | 0 of val ] *
+                     [ 0 | 0 of val * val * val * val * imm tagged ] ]
+               )
+                (v2, s1)
+                -> k2 * k1
+              where k2
+                      (`*match*` :
+                         [ 0 of [ 0 | 0 of val * val * val * val * imm tagged
+                                ] * [ 0 | 0 of val ] *
+                             [ 0 | 0 of val * val * val * val * imm tagged ]
+                         ]) =
+                ((let Pfield = %block_load.[`3`] (s2) in
+                  let Pfield_1 = %block_load.[`2`] (`*match*`) in
+                  apply direct(merge_32_1)
+                    (my_closure ~ depth my_depth -> succ my_depth
+                     : _ ->
+                       [ 0
+                       | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                           val * val *
+                           [ 0 | 0 of val * val * val * val * imm tagged ] *
+                           imm tagged ]
+                     )
+                      (f, Pfield_1, Pfield)
+                      -> k2 * k1)
+                   where k2
+                           (apply_result :
+                              [ 0
+                              | 0 of [ 0
+                                     | 0 of val * val * val * val *
+                                         imm tagged ] * val * val *
+                                  [ 0
+                                  | 0 of val * val * val * val * imm tagged ] *
+                                  imm tagged ]) =
+                     ((let Pfield = %block_load.[`2`] (s2) in
+                       let Pmakeblock = %block.[`0`] (Pfield) in
+                       let Pfield_1 = %block_load.[`1`] (`*match*`) in
+                       apply f (v2, Pfield_1, Pmakeblock) -> k2 * k1)
+                        where k2 (apply_result_1 : [ 0 | 0 of val ]) =
+                          ((let Pfield = %block_load.[`0`] (s2) in
+                            let Pfield_1 = %block_load.[`0`] (`*match*`) in
+                            apply direct(merge_32_1)
+                              (my_closure ~ depth my_depth -> succ my_depth
+                               : _ ->
+                                 [ 0
+                                 | 0 of [ 0
+                                        | 0 of val * val * val * val *
+                                            imm tagged ] * val * val *
+                                     [ 0
+                                     | 0 of val * val * val * val *
+                                         imm tagged ] * imm tagged ]
+                               )
+                                (f, Pfield_1, Pfield)
+                                -> k2 * k1)
+                             where k2
+                                     (apply_result_2 :
+                                        [ 0
+                                        | 0 of [ 0
+                                               | 0 of val * val * val * val *
+                                                   imm tagged ] * val * val *
+                                            [ 0
+                                            | 0 of val * val * val * val *
+                                                imm tagged ] * imm tagged ]) =
+                               apply direct(concat_or_join_30_1)
+                                 ($camlMap__concat_or_join_80
+                                  : _ ->
+                                    [ 0
+                                    | 0 of [ 0
+                                           | 0 of val * val * val * val *
+                                               imm tagged ] * val * val *
+                                        [ 0
+                                        | 0 of val * val * val * val *
+                                            imm tagged ] * imm tagged ]
+                                  )
+                                   (apply_result_2,
+                                    v2,
+                                    apply_result_1,
+                                    apply_result)
+                                   -> k * k1)))))
+in
+let code rec loopify(done) size(40) newer_version_of(max_binding_opt_24)
+      max_binding_opt_24_1
+        (param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  cont self (param)
+    where rec self
+                (param_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       imm tagged ]) =
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let Pfield = %block_load.[`3`] (param_1) in
+           let prim_1 = %is_int (Pfield) in
+           (switch prim_1
+              | 0 -> self (Pfield)
+              | 1 -> k2
+              where k2 =
+                let Pfield_1 = %block_load.[`2`] (param_1) in
+                let Pfield_2 = %block_load.[`1`] (param_1) in
+                let Pmakeblock = %block.[`0`] (Pfield_2, Pfield_1) in
+                let Pmakeblock_1 = %block.[`0`] (Pmakeblock) in
+                cont k (Pmakeblock_1)))
+in
+let $camlMap__max_binding_opt_74 =
+  closure max_binding_opt_24_1 @max_binding_opt
+in
+let code rec loopify(done) size(34) newer_version_of(max_binding_23)
+      max_binding_23_1
+        (param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of val * val ] =
+  cont self (param)
+    where rec self
+                (param_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       imm tagged ]) =
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k1 pop(regular k1) ($`*predef*`.caml_exn_Not_found)
+         where k2 =
+           let Pfield = %block_load.[`3`] (param_1) in
+           let prim_1 = %is_int (Pfield) in
+           (switch prim_1
+              | 0 -> self (Pfield)
+              | 1 -> k2
+              where k2 =
+                let Pfield_1 = %block_load.[`2`] (param_1) in
+                let Pfield_2 = %block_load.[`1`] (param_1) in
+                let Pmakeblock = %block.[`0`] (Pfield_2, Pfield_1) in
+                cont k (Pmakeblock)))
+in
+let $camlMap__max_binding_73 = closure max_binding_23_1 @max_binding in
+let code rec loopify(done) size(40) newer_version_of(min_binding_opt_22)
+      min_binding_opt_22_1
+        (param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  cont self (param)
+    where rec self
+                (param_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       imm tagged ]) =
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let l = %block_load.[`0`] (param_1) in
+           let prim_1 = %is_int (l) in
+           (switch prim_1
+              | 0 -> self (l)
+              | 1 -> k2
+              where k2 =
+                let Pfield = %block_load.[`2`] (param_1) in
+                let Pfield_1 = %block_load.[`1`] (param_1) in
+                let Pmakeblock = %block.[`0`] (Pfield_1, Pfield) in
+                let Pmakeblock_1 = %block.[`0`] (Pmakeblock) in
+                cont k (Pmakeblock_1)))
+in
+let $camlMap__min_binding_opt_72 =
+  closure min_binding_opt_22_1 @min_binding_opt
+in
+let code rec loopify(done) size(49) newer_version_of(mem_20)
+      mem_20_1
+        (x : val,
+         param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (param)
+    where rec self
+                (param_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       imm tagged ]) =
+      let x_1 = x in
+      let Ord = %project_value_slot.[`mem`].[`Ord_8`] (my_closure) in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           ((let Pfield = %block_load.[`1`] (param_1) in
+             let Pfield_1 = %block_load.[`0`] (Ord) in
+             apply Pfield_1 (x_1, Pfield) -> k2 * k1)
+              where k2 (c : imm tagged) =
+                let prim_1 = %phys_eq (c, 0) in
+                (switch prim_1
+                   | 0 -> k2
+                   | 1 -> k (1)
+                   where k2 =
+                     let prim_2 = %int_comp.lt (c, 0) in
+                     (switch prim_2
+                        | 0 -> k2
+                        | 1 -> k3
+                        where k3 =
+                          let Pfield = %block_load.[`0`] (param_1) in
+                          cont self (Pfield)
+                        where k2 =
+                          let Pfield = %block_load.[`3`] (param_1) in
+                          cont self (Pfield)))))
+in
+let code rec loopify(done) size(57) newer_version_of(find_opt_19)
+      find_opt_19_1
+        (x : val,
+         param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  cont self (param)
+    where rec self
+                (param_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       imm tagged ]) =
+      let x_1 = x in
+      let Ord = %project_value_slot.[`find_opt`].[`Ord_9`] (my_closure) in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           ((let Pfield = %block_load.[`1`] (param_1) in
+             let Pfield_1 = %block_load.[`0`] (Ord) in
+             apply Pfield_1 (x_1, Pfield) -> k2 * k1)
+              where k2 (c : imm tagged) =
+                let prim_1 = %phys_eq (c, 0) in
+                (switch prim_1
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     let Pfield = %block_load.[`2`] (param_1) in
+                     let Pmakeblock = %block.[`0`] (Pfield) in
+                     cont k (Pmakeblock)
+                   where k2 =
+                     let prim_2 = %int_comp.lt (c, 0) in
+                     (switch prim_2
+                        | 0 -> k2
+                        | 1 -> k3
+                        where k3 =
+                          let Pfield = %block_load.[`0`] (param_1) in
+                          cont self (Pfield)
+                        where k2 =
+                          let Pfield = %block_load.[`3`] (param_1) in
+                          cont self (Pfield)))))
+in
+let code rec loopify(done) size(50) newer_version_of(find_last_opt_aux_17)
+      find_last_opt_aux_17_1
+        (v0 : val,
+         d0 : val,
+         f : val,
+         param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  cont self (v0, d0, param)
+    where rec self
+                (v0_1 : val,
+                 d0_1 : val,
+                 param_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       imm tagged ]) =
+      let f_1 = f in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           let Pmakeblock = %block.[`0`] (v0_1, d0_1) in
+           let Pmakeblock_1 = %block.[`0`] (Pmakeblock) in
+           cont k (Pmakeblock_1)
+         where k2 =
+           let v = %block_load.[`1`] (param_1) in
+           (apply f_1 (v) -> k3 * k1
+              where k3 (param_2 : imm tagged) =
+                let unboxed_field = %untag_imm (param_2) in
+                cont k2 (unboxed_field)
+              where k2 (unboxed_field : imm) =
+                let naked_immediate = unboxed_field in
+                (switch naked_immediate
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     let Pfield = %block_load.[`3`] (param_1) in
+                     let Pfield_1 = %block_load.[`2`] (param_1) in
+                     cont self (v, Pfield_1, Pfield)
+                   where k2 =
+                     let Pfield = %block_load.[`0`] (param_1) in
+                     cont self (v0_1, d0_1, Pfield))))
+in
+let $camlMap__find_last_opt_aux_69 =
+  closure find_last_opt_aux_17_1 @find_last_opt_aux
+in
+let code rec loopify(done) size(39) newer_version_of(find_last_opt_18)
+      find_last_opt_18_1
+        (f : val,
+         param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  cont self (param)
+    where rec self
+                (param_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       imm tagged ]) =
+      let f_1 = f in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let v = %block_load.[`1`] (param_1) in
+           (apply f_1 (v) -> k3 * k1
+              where k3 (param_2 : imm tagged) =
+                let unboxed_field = %untag_imm (param_2) in
+                cont k2 (unboxed_field)
+              where k2 (unboxed_field : imm) =
+                let naked_immediate = unboxed_field in
+                (switch naked_immediate
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     let Pfield = %block_load.[`3`] (param_1) in
+                     let Pfield_1 = %block_load.[`2`] (param_1) in
+                     apply direct(find_last_opt_aux_17_1)
+                       ($camlMap__find_last_opt_aux_69
+                        : _ -> [ 0 | 0 of val ])
+                         (v, Pfield_1, f_1, Pfield)
+                         -> k * k1
+                   where k2 =
+                     let Pfield = %block_load.[`0`] (param_1) in
+                     cont self (Pfield))))
+in
+let $camlMap__find_last_opt_70 = closure find_last_opt_18_1 @find_last_opt in
+let code rec loopify(done) size(44) newer_version_of(find_last_aux_15)
+      find_last_aux_15_1
+        (v0 : val,
+         d0 : val,
+         f : val,
+         param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of val * val ] =
+  cont self (v0, d0, param)
+    where rec self
+                (v0_1 : val,
+                 d0_1 : val,
+                 param_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       imm tagged ]) =
+      let f_1 = f in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           let Pmakeblock = %block.[`0`] (v0_1, d0_1) in
+           cont k (Pmakeblock)
+         where k2 =
+           let v = %block_load.[`1`] (param_1) in
+           (apply f_1 (v) -> k3 * k1
+              where k3 (param_2 : imm tagged) =
+                let unboxed_field = %untag_imm (param_2) in
+                cont k2 (unboxed_field)
+              where k2 (unboxed_field : imm) =
+                let naked_immediate = unboxed_field in
+                (switch naked_immediate
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     let Pfield = %block_load.[`3`] (param_1) in
+                     let Pfield_1 = %block_load.[`2`] (param_1) in
+                     cont self (v, Pfield_1, Pfield)
+                   where k2 =
+                     let Pfield = %block_load.[`0`] (param_1) in
+                     cont self (v0_1, d0_1, Pfield))))
+in
+let $camlMap__find_last_aux_67 = closure find_last_aux_15_1 @find_last_aux in
+let code rec loopify(done) size(39) newer_version_of(find_last_16)
+      find_last_16_1
+        (f : val,
+         param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of val * val ] =
+  cont self (param)
+    where rec self
+                (param_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       imm tagged ]) =
+      let f_1 = f in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k1 pop(regular k1) ($`*predef*`.caml_exn_Not_found)
+         where k2 =
+           let v = %block_load.[`1`] (param_1) in
+           (apply f_1 (v) -> k3 * k1
+              where k3 (param_2 : imm tagged) =
+                let unboxed_field = %untag_imm (param_2) in
+                cont k2 (unboxed_field)
+              where k2 (unboxed_field : imm) =
+                let naked_immediate = unboxed_field in
+                (switch naked_immediate
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     let Pfield = %block_load.[`3`] (param_1) in
+                     let Pfield_1 = %block_load.[`2`] (param_1) in
+                     apply direct(find_last_aux_15_1)
+                       ($camlMap__find_last_aux_67 : _ -> [ 0 of val * val ])
+                         (v, Pfield_1, f_1, Pfield)
+                         -> k * k1
+                   where k2 =
+                     let Pfield = %block_load.[`0`] (param_1) in
+                     cont self (Pfield))))
+in
+let $camlMap__find_last_68 = closure find_last_16_1 @find_last in
+let code rec loopify(done) size(50) newer_version_of(find_first_opt_aux_13)
+      find_first_opt_aux_13_1
+        (v0 : val,
+         d0 : val,
+         f : val,
+         param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  cont self (v0, d0, param)
+    where rec self
+                (v0_1 : val,
+                 d0_1 : val,
+                 param_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       imm tagged ]) =
+      let f_1 = f in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           let Pmakeblock = %block.[`0`] (v0_1, d0_1) in
+           let Pmakeblock_1 = %block.[`0`] (Pmakeblock) in
+           cont k (Pmakeblock_1)
+         where k2 =
+           let v = %block_load.[`1`] (param_1) in
+           (apply f_1 (v) -> k3 * k1
+              where k3 (param_2 : imm tagged) =
+                let unboxed_field = %untag_imm (param_2) in
+                cont k2 (unboxed_field)
+              where k2 (unboxed_field : imm) =
+                let naked_immediate = unboxed_field in
+                (switch naked_immediate
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     let Pfield = %block_load.[`0`] (param_1) in
+                     let Pfield_1 = %block_load.[`2`] (param_1) in
+                     cont self (v, Pfield_1, Pfield)
+                   where k2 =
+                     let Pfield = %block_load.[`3`] (param_1) in
+                     cont self (v0_1, d0_1, Pfield))))
+in
+let $camlMap__find_first_opt_aux_65 =
+  closure find_first_opt_aux_13_1 @find_first_opt_aux
+in
+let code rec loopify(done) size(39) newer_version_of(find_first_opt_14)
+      find_first_opt_14_1
+        (f : val,
+         param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  cont self (param)
+    where rec self
+                (param_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       imm tagged ]) =
+      let f_1 = f in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (0)
+         where k2 =
+           let v = %block_load.[`1`] (param_1) in
+           (apply f_1 (v) -> k3 * k1
+              where k3 (param_2 : imm tagged) =
+                let unboxed_field = %untag_imm (param_2) in
+                cont k2 (unboxed_field)
+              where k2 (unboxed_field : imm) =
+                let naked_immediate = unboxed_field in
+                (switch naked_immediate
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     let Pfield = %block_load.[`0`] (param_1) in
+                     let Pfield_1 = %block_load.[`2`] (param_1) in
+                     apply direct(find_first_opt_aux_13_1)
+                       ($camlMap__find_first_opt_aux_65
+                        : _ -> [ 0 | 0 of val ])
+                         (v, Pfield_1, f_1, Pfield)
+                         -> k * k1
+                   where k2 =
+                     let Pfield = %block_load.[`3`] (param_1) in
+                     cont self (Pfield))))
+in
+let $camlMap__find_first_opt_66 = closure find_first_opt_14_1 @find_first_opt
+in
+let code rec loopify(done) size(44) newer_version_of(find_first_aux_11)
+      find_first_aux_11_1
+        (v0 : val,
+         d0 : val,
+         f : val,
+         param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of val * val ] =
+  cont self (v0, d0, param)
+    where rec self
+                (v0_1 : val,
+                 d0_1 : val,
+                 param_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       imm tagged ]) =
+      let f_1 = f in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k3
+         where k3 =
+           let Pmakeblock = %block.[`0`] (v0_1, d0_1) in
+           cont k (Pmakeblock)
+         where k2 =
+           let v = %block_load.[`1`] (param_1) in
+           (apply f_1 (v) -> k3 * k1
+              where k3 (param_2 : imm tagged) =
+                let unboxed_field = %untag_imm (param_2) in
+                cont k2 (unboxed_field)
+              where k2 (unboxed_field : imm) =
+                let naked_immediate = unboxed_field in
+                (switch naked_immediate
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     let Pfield = %block_load.[`0`] (param_1) in
+                     let Pfield_1 = %block_load.[`2`] (param_1) in
+                     cont self (v, Pfield_1, Pfield)
+                   where k2 =
+                     let Pfield = %block_load.[`3`] (param_1) in
+                     cont self (v0_1, d0_1, Pfield))))
+in
+let $camlMap__find_first_aux_63 = closure find_first_aux_11_1 @find_first_aux
+in
+let code rec loopify(done) size(39) newer_version_of(find_first_12)
+      find_first_12_1
+        (f : val,
+         param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of val * val ] =
+  cont self (param)
+    where rec self
+                (param_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       imm tagged ]) =
+      let f_1 = f in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k1 pop(regular k1) ($`*predef*`.caml_exn_Not_found)
+         where k2 =
+           let v = %block_load.[`1`] (param_1) in
+           (apply f_1 (v) -> k3 * k1
+              where k3 (param_2 : imm tagged) =
+                let unboxed_field = %untag_imm (param_2) in
+                cont k2 (unboxed_field)
+              where k2 (unboxed_field : imm) =
+                let naked_immediate = unboxed_field in
+                (switch naked_immediate
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     let Pfield = %block_load.[`0`] (param_1) in
+                     let Pfield_1 = %block_load.[`2`] (param_1) in
+                     apply direct(find_first_aux_11_1)
+                       ($camlMap__find_first_aux_63 : _ -> [ 0 of val * val ]
+                        )
+                         (v, Pfield_1, f_1, Pfield)
+                         -> k * k1
+                   where k2 =
+                     let Pfield = %block_load.[`3`] (param_1) in
+                     cont self (Pfield))))
+in
+let $camlMap__find_first_64 = closure find_first_12_1 @find_first in
+let code rec loopify(done) size(51) newer_version_of(find_10)
+      find_10_1
+        (x : val,
+         param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  cont self (param)
+    where rec self
+                (param_1 :
+                   [ 0
+                   | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       val * val *
+                       [ 0 | 0 of val * val * val * val * imm tagged ] *
+                       imm tagged ]) =
+      let x_1 = x in
+      let Ord = %project_value_slot.[`find`].[`Ord_10`] (my_closure) in
+      let prim = %is_int (param_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k1 pop(regular k1) ($`*predef*`.caml_exn_Not_found)
+         where k2 =
+           ((let Pfield = %block_load.[`1`] (param_1) in
+             let Pfield_1 = %block_load.[`0`] (Ord) in
+             apply Pfield_1 (x_1, Pfield) -> k2 * k1)
+              where k2 (c : imm tagged) =
+                let prim_1 = %phys_eq (c, 0) in
+                (switch prim_1
+                   | 0 -> k2
+                   | 1 -> k3
+                   where k3 =
+                     let Pfield = %block_load.[`2`] (param_1) in
+                     cont k (Pfield)
+                   where k2 =
+                     let prim_2 = %int_comp.lt (c, 0) in
+                     (switch prim_2
+                        | 0 -> k2
+                        | 1 -> k3
+                        where k3 =
+                          let Pfield = %block_load.[`0`] (param_1) in
+                          cont self (Pfield)
+                        where k2 =
+                          let Pfield = %block_load.[`3`] (param_1) in
+                          cont self (Pfield)))))
+in
+let code loopify(never) size(4) newer_version_of(is_empty_8)
+      is_empty_8_1
+        (param :
+           [ 0
+           | 0 of [ 0 | 0 of val * val * val * val * imm tagged ] * val *
+               val * [ 0 | 0 of val * val * val * val * imm tagged ] *
+               imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %is_int (param) in
+  let Pisint = %tag_imm (prim) in
+  cont k (Pisint)
+in
+let $camlMap__is_empty_62 = closure is_empty_8_1 @is_empty in
+let code loopify(never) size(1153) newer_version_of(Make_3)
+      Make_3_1 (Ord : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  let add = closure add_9_1 @add
+  with { bal = $camlMap__bal_61; Ord_2 = Ord }
+  in
+  let find = closure find_10_1 @find with { Ord_10 = Ord } in
+  let find_opt = closure find_opt_19_1 @find_opt with { Ord_9 = Ord } in
+  let mem = closure mem_20_1 @mem with { Ord_8 = Ord } in
+  let split = closure split_31_1 @split
+  with { join_1 = $camlMap__join_78; Ord_7 = Ord }
+  in
+  let merge = closure merge_32_1 @merge
+  with {
+    height = $camlMap__height_58;
+    concat_or_join_1 = $camlMap__concat_or_join_80;
+    split_1 = split
+  }
+  in
+  let union = closure union_33_1 @union
+  with {
+    join = $camlMap__join_78;
+    concat_or_join = $camlMap__concat_or_join_80;
+    split = split
+  }
+  in
+  let compare = closure compare_37_1 @compare
+  with { cons_enum_3 = $camlMap__cons_enum_83; Ord_6 = Ord }
+  in
+  let equal = closure equal_39_1 @equal
+  with { cons_enum_2 = $camlMap__cons_enum_83; Ord_4 = Ord }
+  in
+  let add_seq = closure add_seq_44_1 @add_seq with { add = add } in
+  let of_seq = closure of_seq_46_1 @of_seq with { add_seq = add_seq } in
+  let to_seq_from = closure to_seq_from_51_1 @to_seq_from
+  with { seq_of_enum__2 = $camlMap__seq_of_enum__87; Ord_1 = Ord }
+  in
+  let Pmakeblock =
+    %block.[`0`]
+      ($camlMap__height_58,
+       $camlMap__create_59,
+       $camlMap__singleton_60,
+       $camlMap__bal_61,
+       0,
+       $camlMap__is_empty_62,
+       add,
+       find,
+       $camlMap__find_first_aux_63,
+       $camlMap__find_first_64,
+       $camlMap__find_first_opt_aux_65,
+       $camlMap__find_first_opt_66,
+       $camlMap__find_last_aux_67,
+       $camlMap__find_last_68,
+       $camlMap__find_last_opt_aux_69,
+       $camlMap__find_last_opt_70,
+       find_opt,
+       mem,
+       $camlMap__min_binding_71,
+       $camlMap__min_binding_opt_72,
+       $camlMap__max_binding_73,
+       $camlMap__max_binding_opt_74,
+       $camlMap__remove_min_binding_75,
+       $camlMap__add_min_binding_76,
+       $camlMap__add_max_binding_77,
+       $camlMap__join_78,
+       $camlMap__concat_79,
+       $camlMap__concat_or_join_80,
+       split,
+       merge,
+       union,
+       $camlMap__filter_81,
+       $camlMap__partition_82,
+       $camlMap__cons_enum_83,
+       compare,
+       equal,
+       $camlMap__cardinal_84,
+       $camlMap__bindings_aux_85,
+       $camlMap__bindings_86,
+       $camlMap__min_binding_71,
+       $camlMap__min_binding_opt_72,
+       add_seq,
+       of_seq,
+       $camlMap__seq_of_enum__87,
+       $camlMap__to_seq_88,
+       to_seq_from)
+  in
+  cont k (Pmakeblock)
+in
+let $camlMap__Make_57 = closure Make_3_1 @Make in
+let $camlMap =
+  Block 0 ($camlMap__failwith_54,
+           $camlMap__invalid_arg_55,
+           $`camlMap__@_56`,
+           $camlMap__Make_57)
+in
+cont done ($camlMap)

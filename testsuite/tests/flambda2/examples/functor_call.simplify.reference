@@ -1,0 +1,35 @@
+let code test_3 deleted in
+let code inline(always) loopify(never) size(5) newer_version_of(test_3)
+      test_3_1 (x : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %int_comp.gt (x, 0) in
+  let int_greaterthan = %tag_imm (prim) in
+  cont k (int_greaterthan)
+in
+let $camlFunctor_call__test_4 = closure test_3_1 @test in
+let $camlFunctor_call__Pmakeblock129 = Block 0 ($camlFunctor_call__test_4) in
+let code rec loopify(done) size(16) newer_version_of(foo_1_1)
+      foo_1 (x : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (x)
+    where rec self (x_1 : imm tagged) =
+      let prim = %int_comp.gt (x_1, 0) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (x_1)
+         where k2 =
+           let int_add = %int_barith.add (x_1, 1) in
+           cont self (int_add))
+in
+let $camlFunctor_call__foo_6 =
+  closure foo_1 @foo
+  with { X = $camlFunctor_call__Pmakeblock129 }
+in
+let $camlFunctor_call =
+  Block 0 ($camlFunctor_call__Pmakeblock129, $camlFunctor_call__foo_6)
+in
+cont done ($camlFunctor_call)

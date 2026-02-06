@@ -1,0 +1,26 @@
+let try_region = %begin_try_region () in
+let try_ghost_region = %begin_try_ghost_region () in
+(let Popaque = %opaque (1) in
+ let untagged = %untag_imm (Popaque) in
+ switch untagged
+   | 0 -> k
+   | 1 -> k1)
+  where k1 =
+    let `unit` = %end_try_region (try_region) in
+    let unit_1 = %end_try_ghost_region (try_ghost_region) in
+    cont k
+  where k =
+    ((let try_region_1 = %begin_try_region () in
+      let try_ghost_region_1 = %begin_try_ghost_region () in
+      (let Popaque = %opaque (1) in
+       let untagged = %untag_imm (Popaque) in
+       switch untagged
+         | 0 -> k
+         | 1 -> k1)
+        where k1 =
+          let `unit` = %end_try_region (try_region_1) in
+          let unit_1 = %end_try_ghost_region (try_ghost_region_1) in
+          cont k)
+       where k =
+         let $camlTest_try = Block 0 () in
+         cont done ($camlTest_try))
