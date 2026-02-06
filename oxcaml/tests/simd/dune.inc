@@ -1518,10 +1518,7 @@
 (executable
  (name probes)
  (modules probes)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
+ (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta ))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -1529,10 +1526,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
+ (enabled_if (= %{context_name} "main"))
  (action
   (with-outputs-to
    probes.out
@@ -1540,12 +1534,32 @@
 
 (rule
  (alias runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
+ (enabled_if (= %{context_name} "main"))
  (action
    (diff empty.expected probes.out)))
+
+(executable
+ (name probes256)
+ (modules probes256)
+ (enabled_if (= %{context_name} "main"))
+ (ocamlopt_flags
+  (:standard -extension simd_beta ))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   probes256.out
+   (run ./probes256.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff empty.expected probes256.out)))
 
 (executable
  (name arrays256)
@@ -1656,38 +1670,6 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected consts256_u.out)))
-
-(executable
- (name probes256)
- (modules probes256)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (ocamlopt_flags
-  (:standard -extension simd_beta ))
- (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
- (foreign_archives stubs))
-
-(rule
- (alias   runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (action
-  (with-outputs-to
-   probes256.out
-   (run ./probes256.exe))))
-
-(rule
- (alias runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (action
-   (diff empty.expected probes256.out)))
 
 (executable
  (name ops_float32x8)
@@ -3654,20 +3636,14 @@
 
 (rule
  (alias runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
+ (enabled_if (= %{context_name} "main"))
  (action
   (copy probes.ml probes_nodynlink.ml)))
 
 (executable
  (name probes_nodynlink)
  (modules probes_nodynlink)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
+ (enabled_if (= %{context_name} "main"))
  (ocamlopt_flags
   (:standard -extension simd_beta -nodynlink))
  (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
@@ -3675,10 +3651,7 @@
 
 (rule
  (alias   runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
+ (enabled_if (= %{context_name} "main"))
  (action
   (with-outputs-to
    probes_nodynlink.out
@@ -3686,12 +3659,38 @@
 
 (rule
  (alias runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
+ (enabled_if (= %{context_name} "main"))
  (action
    (diff empty.expected probes_nodynlink.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (copy probes256.ml probes256_nodynlink.ml)))
+
+(executable
+ (name probes256_nodynlink)
+ (modules probes256_nodynlink)
+ (enabled_if (= %{context_name} "main"))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -nodynlink))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+  (with-outputs-to
+   probes256_nodynlink.out
+   (run ./probes256_nodynlink.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if (= %{context_name} "main"))
+ (action
+   (diff empty.expected probes256_nodynlink.out)))
 
 (rule
  (alias runtest)
@@ -3832,47 +3831,6 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected consts256_u_nodynlink.out)))
-
-(rule
- (alias runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (action
-  (copy probes256.ml probes256_nodynlink.ml)))
-
-(executable
- (name probes256_nodynlink)
- (modules probes256_nodynlink)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (ocamlopt_flags
-  (:standard -extension simd_beta -nodynlink))
- (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
- (foreign_archives stubs))
-
-(rule
- (alias   runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (action
-  (with-outputs-to
-   probes256_nodynlink.out
-   (run ./probes256_nodynlink.exe))))
-
-(rule
- (alias runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (action
-   (diff empty.expected probes256_nodynlink.out)))
 
 (rule
  (alias runtest)
@@ -6341,6 +6299,47 @@
            (= %{architecture} "amd64")
            (<> %{system} macosx)))
  (action
+  (copy probes256.ml probes256_internal_assembler.ml)))
+
+(executable
+ (name probes256_internal_assembler)
+ (modules probes256_internal_assembler)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (ocamlopt_flags
+  (:standard -extension simd_beta -internal-assembler))
+ (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
+ (foreign_archives stubs))
+
+(rule
+ (alias   runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+  (with-outputs-to
+   probes256_internal_assembler.out
+   (run ./probes256_internal_assembler.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
+   (diff empty.expected probes256_internal_assembler.out)))
+
+(rule
+ (alias runtest)
+ (enabled_if
+      (and (= %{context_name} "main")
+           (= %{architecture} "amd64")
+           (<> %{system} macosx)))
+ (action
   (copy arrays256.ml arrays256_internal_assembler.ml)))
 
 (executable
@@ -6497,47 +6496,6 @@
            (<> %{system} macosx)))
  (action
    (diff empty.expected consts256_u_internal_assembler.out)))
-
-(rule
- (alias runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (action
-  (copy probes256.ml probes256_internal_assembler.ml)))
-
-(executable
- (name probes256_internal_assembler)
- (modules probes256_internal_assembler)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (ocamlopt_flags
-  (:standard -extension simd_beta -internal-assembler))
- (libraries simd_test_builtins stdlib_stable stdlib_upstream_compatible)
- (foreign_archives stubs))
-
-(rule
- (alias   runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (action
-  (with-outputs-to
-   probes256_internal_assembler.out
-   (run ./probes256_internal_assembler.exe))))
-
-(rule
- (alias runtest)
- (enabled_if
-      (and (= %{context_name} "main")
-           (= %{architecture} "amd64")
-           (<> %{system} macosx)))
- (action
-   (diff empty.expected probes256_internal_assembler.out)))
 
 (rule
  (alias runtest)

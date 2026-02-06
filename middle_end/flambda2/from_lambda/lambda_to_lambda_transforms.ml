@@ -716,6 +716,7 @@ let arrayblit env ~src_mutability ~(dst_array_set_kind : L.array_set_kind) args
   | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ->
     arrayblit_expanded env ~src_mutability ~dst_array_set_kind args loc
 
+(* Only used on amd64. *)
 let cast_vec128_to_vec256 =
   Primitive.make ~name:"caml_simd_bytecode_not_supported" ~alloc:false
     ~c_builtin:true ~effects:No_effects ~coeffects:No_coeffects
@@ -724,6 +725,7 @@ let cast_vec128_to_vec256 =
     ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr (Base Vec256))
     ~is_layout_poly:false
 
+(* Only used on amd64. *)
 let cast_vec256_to_vec128 =
   Primitive.make ~name:"caml_simd_bytecode_not_supported" ~alloc:false
     ~c_builtin:true ~effects:No_effects ~coeffects:No_coeffects
@@ -732,6 +734,7 @@ let cast_vec256_to_vec128 =
     ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr (Base Vec128))
     ~is_layout_poly:false
 
+(* Only used on amd64. *)
 let vec256_insert_vec128 =
   Primitive.make ~name:"caml_simd_bytecode_not_supported" ~alloc:false
     ~c_builtin:true ~effects:No_effects ~coeffects:No_coeffects
@@ -743,6 +746,7 @@ let vec256_insert_vec128 =
     ~native_repr_res:(Prim_global, L.Same_as_ocaml_repr (Base Vec256))
     ~is_layout_poly:false
 
+(* Only used on amd64. *)
 let vec256_extract_vec128 =
   Primitive.make ~name:"caml_simd_bytecode_not_supported" ~alloc:false
     ~c_builtin:true ~effects:No_effects ~coeffects:No_coeffects
@@ -780,44 +784,58 @@ let boxed_vec256_field ~loc i arg =
   L.Lprim (Pmixedfield ([i], [| Vec128; Vec128 |], Reads_agree), [arg], loc)
 
 let split_vec256_load ~loc ~mode ~index_kind ~boxed ~arr ~idx ~stride ~load =
+  let arr_id = Ident.create_local "arr" in
+  let arr_duid = Lambda.debug_uid_none in
   let idx_id = Ident.create_local "idx" in
   let idx_duid = Lambda.debug_uid_none in
   let low_id = Ident.create_local "low" in
   let low_duid = Lambda.debug_uid_none in
-  let low = L.Lprim (load true, [arr; Lvar idx_id], loc) in
-  let high =
+  let load_low = L.Lprim (load true, [Lvar arr_id; Lvar idx_id], loc) in
+  let load_high =
     let idx = offset ~loc ~index_kind ~idx:(Lvar idx_id) (16 / stride) in
-    L.Lprim (load false, [arr; idx], loc)
+    L.Lprim (load false, [Lvar arr_id; idx], loc)
   in
   (* Rebind low to do its load first *)
-  let prim =
+  let result =
     if boxed
-    then make_boxed_vec256 ~loc ~mode [Lvar low_id; high]
+    then make_boxed_vec256 ~loc ~mode [Lvar low_id; load_high]
     else
       L.Lprim
         ( Pmake_unboxed_product
             [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128],
-          [Lvar low_id; high],
+          [Lvar low_id; load_high],
           loc )
   in
   Transformed
     (Llet
        ( Strict,
-         L.array_index_to_layout index_kind,
-         idx_id,
-         idx_duid,
-         idx,
+         Pvalue L.generic_value,
+         arr_id,
+         arr_duid,
+         arr,
          Llet
-           (Strict, Punboxed_vector Unboxed_vec128, low_id, low_duid, low, prim)
-       ))
+           ( Strict,
+             L.array_index_to_layout index_kind,
+             idx_id,
+             idx_duid,
+             idx,
+             Llet
+               ( Strict,
+                 Punboxed_vector Unboxed_vec128,
+                 low_id,
+                 low_duid,
+                 load_low,
+                 result ) ) ))
 
 let split_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride ~store =
+  let arr_id = Ident.create_local "arr" in
+  let arr_duid = Lambda.debug_uid_none in
   let idx_id = Ident.create_local "idx" in
   let idx_duid = Lambda.debug_uid_none in
   let value_id = Ident.create_local "value" in
   let value_duid = Lambda.debug_uid_none in
   let value = if boxed then boxed_vec256_to_mixed ~loc value else value in
-  let low, high, value_layout =
+  let value_low, value_high, value_layout =
     if boxed
     then
       ( boxed_vec256_field ~loc 0 (Lvar value_id),
@@ -828,10 +846,12 @@ let split_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride ~store =
         unboxed_vec256_field ~loc 1 (Lvar value_id),
         L.layout_unboxed_tupled_vector Unboxed_vec256 )
   in
-  let low = L.Lprim (store true, [arr; Lvar idx_id; low], loc) in
-  let high =
+  let store_low =
+    L.Lprim (store true, [Lvar arr_id; Lvar idx_id; value_low], loc)
+  in
+  let store_high =
     let idx = offset ~loc ~index_kind ~idx:(Lvar idx_id) (16 / stride) in
-    L.Lprim (store false, [arr; idx; high], loc)
+    L.Lprim (store false, [Lvar arr_id; idx; value_high], loc)
   in
   Transformed
     (Llet
@@ -842,11 +862,17 @@ let split_vec256_store ~loc ~index_kind ~boxed ~arr ~idx ~value ~stride ~store =
          value,
          Llet
            ( Strict,
-             L.array_index_to_layout index_kind,
-             idx_id,
-             idx_duid,
-             idx,
-             Lsequence (low, high) ) ))
+             Pvalue L.generic_value,
+             arr_id,
+             arr_duid,
+             arr,
+             Llet
+               ( Strict,
+                 L.array_index_to_layout index_kind,
+                 idx_id,
+                 idx_duid,
+                 idx,
+                 Lsequence (store_low, store_high) ) ) ))
 
 let ccall_involves_vec256 (desc : L.external_call_description) =
   let repr_vec256 = function[@warning "-4"]
@@ -1169,19 +1195,30 @@ let transform_primitive0 env (prim : L.primitive) args loc =
     if L.split_vectors
     then Transformed arg
     else
-      let low = L.Lprim (Pccall cast_vec256_to_vec128, [arg], loc) in
+      let arg_id = Ident.create_local "arg" in
+      let arg_duid = Lambda.debug_uid_none in
+      let low = L.Lprim (Pccall cast_vec256_to_vec128, [Lvar arg_id], loc) in
       let high =
         L.Lprim
           ( Pccall vec256_extract_vec128,
-            [Lconst (L.const_unboxed_int64 1L); arg],
+            [Lconst (L.const_unboxed_int64 1L); Lvar arg_id],
+            loc )
+      in
+      let product =
+        L.Lprim
+          ( Pmake_unboxed_product
+              [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128],
+            [low; high],
             loc )
       in
       Transformed
-        (Lprim
-           ( Pmake_unboxed_product
-               [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128],
-             [low; high],
-             loc ))
+        (Llet
+           ( Strict,
+             L.layout_unboxed_vector Unboxed_vec256,
+             arg_id,
+             arg_duid,
+             arg,
+             product ))
   | Punbox_vector Boxed_vec256, [arg] when L.split_vectors ->
     (* vec256 -> vec256# as #(vec128# * vec128#) *)
     let arg_id = Ident.create_local "arg" in

@@ -379,7 +379,6 @@ and extern_repr =
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
-  | Unboxed_product of extern_repr list
 
 and external_call_description = extern_repr Primitive.description_gen
 
@@ -1218,15 +1217,7 @@ let layout_unboxed_vector v =
       Punboxed_product
         [Punboxed_vector Unboxed_vec128; Punboxed_vector Unboxed_vec128]
     else Punboxed_vector Unboxed_vec256
-  | Unboxed_vec512 ->
-    if split_vectors
-    then
-      Punboxed_product
-        [ Punboxed_vector Unboxed_vec128;
-          Punboxed_vector Unboxed_vec128;
-          Punboxed_vector Unboxed_vec128;
-          Punboxed_vector Unboxed_vec128 ]
-    else Punboxed_vector Unboxed_vec512
+  | Unboxed_vec512 -> Punboxed_vector Unboxed_vec512
 
 let layout_boxed_vector v =  non_null_value (Pboxedvectorval v)
 
@@ -2294,9 +2285,10 @@ let primitive_may_allocate : primitive -> locality_mode option = function
   | Pobj_magic _ -> None
   | Punbox_vector _ -> None
   | Pbox_vector (_, m) -> Some m
-  | Pjoin_vec256
-  | Psplit_vec256
   | Punbox_unit -> None
+  | Pjoin_vec256 | Psplit_vec256 ->
+    (* Aborts in bytecode, unboxed in native code *)
+    None
   | Pwith_stack | Pwith_stack_bind | Presume | Pperform | Preperform
     (* CR mshinwell: check *)
   | Ppoll ->
@@ -2536,7 +2528,7 @@ let rec layout_of_const_sort (c : Jkind.Sort.Const.t) : layout =
   | Product sorts ->
     layout_unboxed_product (List.map layout_of_const_sort sorts)
 
-let rec layout_of_extern_repr : extern_repr -> _ = function
+let layout_of_extern_repr : extern_repr -> _ = function
   | Unboxed_vector v -> layout_boxed_vector v
   | Unboxed_float bf -> layout_boxed_float bf
   | Unboxed_or_untagged_integer
@@ -2548,14 +2540,11 @@ let rec layout_of_extern_repr : extern_repr -> _ = function
     layout_boxed_int Boxed_int32
   | Unboxed_or_untagged_integer Unboxed_nativeint ->
     layout_boxed_int Boxed_nativeint
-  | Unboxed_product reprs ->
-    Punboxed_product (List.map layout_of_extern_repr reprs)
   | Same_as_ocaml_repr s -> layout_of_const_sort s
 
 let extern_repr_involves_unboxed_products extern_repr =
   match extern_repr with
   | Same_as_ocaml_repr (Product _)
-  | Unboxed_product _ -> true
   | Same_as_ocaml_repr (Base _)
   | Unboxed_vector _ | Unboxed_float _
   | Unboxed_or_untagged_integer _ ->
@@ -2636,7 +2625,9 @@ let rec mixed_block_element_of_layout (layout : layout) :
   | Punboxed_or_untagged_integer Untagged_int8 -> Bits8
   | Punboxed_or_untagged_integer Unboxed_nativeint -> Word
   | Punboxed_vector Unboxed_vec128 -> Vec128
-  | Punboxed_vector Unboxed_vec256 -> Vec256
+  | Punboxed_vector Unboxed_vec256 ->
+    assert (not split_vectors);
+    Vec256
   | Punboxed_vector Unboxed_vec512 -> Vec512
   | Punboxed_or_untagged_integer Untagged_int -> Untagged_immediate
   | Psplicevar id -> Splice_variable id
