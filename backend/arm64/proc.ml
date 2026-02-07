@@ -223,15 +223,7 @@ let ext_loc_float kind divisor last_float make_stack float ofs =
     ofs := !ofs + size; l
   end
 
-let ext_loc_vec128 last_float make_stack float ofs =
-  if !float <= last_float then begin
-    let l = phys_reg Vec128 !float in
-    incr float; l
-  end else begin
-    ofs := Misc.align !ofs size_vec128;
-    let l = stack_slot (make_stack !ofs) Vec128 in
-    ofs := !ofs + size_vec128; l
-  end
+let ext_loc_vec128 = loc_vec128
 
 let external_calling_conventions
     first_int last_int first_float last_float make_stack ty_args =
