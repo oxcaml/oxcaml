@@ -1,0 +1,12 @@
+With -bytecode-hints:
+C_CALL3 caml_ba_set_1 (unsafe uint16 Fortran)
+C_CALL2 caml_ba_get_1 (unsafe complex32 Fortran)
+C_CALL3 caml_ba_get_2 (complex64 Fortran)
+GETGLOBALFIELD compilation unit Hints_link_c, 2
+GETGLOBALFIELD compilation unit Hints_link_c, 1 (immediate)
+C_CALL2 caml_ba_get_1 (sint8 Fortran)
+PUSHGETGLOBALFIELD compilation unit Hints_link_c, 0
+Without -bytecode-hints:
+GETGLOBALFIELD compilation unit Hints_link_c, 2
+GETGLOBALFIELD compilation unit Hints_link_c, 1
+PUSHGETGLOBALFIELD compilation unit Hints_link_c, 0

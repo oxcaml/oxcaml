@@ -29,6 +29,10 @@ type comparison =
   | Ultint
   | Ugeint
 
+type physical_comparison =
+  | CPeq
+  | CPneq
+
 (* Structure of compilation environments *)
 
 type closure_entry = Debug_event.closure_entry =
@@ -93,6 +97,45 @@ and debug_event_repr = Debug_event.debug_event_repr =
   | Event_parent of int ref
   | Event_child of int ref
 
+type closure_hint =
+  { params : Lambda.layout list;
+    return : Lambda.layout;
+    inline : Lambda.inline_attribute;
+    specialise : Lambda.specialise_attribute;
+    is_a_functor : bool }
+
+type ccall_hint =
+  | Hint_unsafe
+    (* Unsafe array, string or bytes access *)
+  | Hint_int of Scalar.any_locality_mode Scalar.Integral.Boxable.Width.t
+    (* Comparison between boxed integers *)
+  | Hint_bigarray of
+      { unsafe : bool;
+        elt_kind : Lambda.bigarray_kind;
+        layout : Lambda.bigarray_layout }
+    (* Bigarray access *)
+  | Hint_primitive of Lambda.external_call_description
+    (* Primitive call *)
+  | Hint_immediate_result
+    (* The value returned by the C function is an immediate *)
+
+type optimization_hint =
+  | Hint_immutable_block
+    (* Allocation of an immutable block *)
+  | Hint_arraylength of Lambda.array_kind
+    (* Array length *)
+  | Hint_closures of closure_hint list
+    (* Closure allocations *)
+  | Hint_ccall of ccall_hint
+    (* C call *)
+  | Hint_int_equality_test
+    (* Equality test between two immediates *)
+  | Hint_immediate
+    (* The value produced by the instruction is an immediate *)
+  | Hint_variant
+    (* The argument of the instruction is a value of a variant type: if it
+       is an immediate, it is a constant constructor *)
+
 (* Abstract machine instructions *)
 
 type label = int                        (* Symbolic code labels *)
@@ -110,27 +153,27 @@ type instruction =
   | Kreturn of int                      (* slot size *)
   | Krestart
   | Kgrab of int                        (* number of arguments *)
-  | Kclosure of label * int
-  | Kclosurerec of label list * int
+  | Kclosure of label * int * closure_hint
+  | Kclosurerec of (label * closure_hint) list * int
   | Koffsetclosure of int
   | Kgetglobal of Compilation_unit.t
   | Ksetglobal of Compilation_unit.t
   | Kgetpredef of Ident.t
   | Kconst of structured_constant
-  | Kmakeblock of int * int             (* size, tag *)
+  | Kmakeblock of int * int * Asttypes.mutable_flag
   | Kmake_faux_mixedblock of int * int  (* size, tag *)
   (* A "faux" mixed block is not actually represented as a mixed block at
      runtime. It just has the top header byte sent to a sentinel value so
      bytecode knows that the block can't be marshaled to native code, where
      mixed records are represented as true mixed blocks.
   *)
-  | Kmakefloatblock of int
-  | Kgetfield of int
+  | Kmakefloatblock of int * Asttypes.mutable_flag
+  | Kgetfield of int * Lambda.immediate_or_pointer
   | Ksetfield of int
   | Kgetfloatfield of int
   | Ksetfloatfield of int
-  | Kvectlength
-  | Kgetvectitem
+  | Kvectlength of Lambda.array_kind
+  | Kgetvectitem of Lambda.immediate_or_pointer
   | Ksetvectitem
   | Kgetstringchar
   | Kgetbyteschar
@@ -146,13 +189,14 @@ type instruction =
   | Kpoptrap
   | Kraise of raise_kind
   | Kcheck_signals
-  | Kccall of string * int
+  | Kccall of string * int * ccall_hint option
   | Knegint | Kaddint | Ksubint | Kmulint | Kdivint | Kmodint
   | Kandint | Korint | Kxorint | Klslint | Klsrint | Kasrint
   | Kintcomp of comparison
+  | Kphyscomp of physical_comparison
   | Koffsetint of int
   | Koffsetref of int
-  | Kisint
+  | Kisint of bool (* the argument is a value of a variant type *)
   | Kgetmethod
   | Kgetpubmet of int
   | Kgetdynmet
