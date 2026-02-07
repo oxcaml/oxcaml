@@ -71,6 +71,10 @@ type comparison = Instruct.comparison =
   | Ultint
   | Ugeint
 
+type physical_comparison = Instruct.physical_comparison =
+  | CPeq
+  | CPneq
+
 type method_kind =
   | Self
   | Public
@@ -81,10 +85,10 @@ type primitive =
   | Getglobal of Compilation_unit.t
   | Getpredef of Ident.t
   | Boolnot
-  | Isint
-  | Vectlength
+  | Isint of { variant_only : bool }
+  | Vectlength of Lambda.array_kind
   | Setglobal of Compilation_unit.t
-  | Getfield of int
+  | Getfield of int * Lambda.immediate_or_pointer
   | Getfloatfield of int
   | Raise of raise_kind
   | Offsetint of int
@@ -102,16 +106,20 @@ type primitive =
   | Lsrint
   | Asrint
   | Intcomp of comparison
+  | Physcomp of physical_comparison
   | Getstringchar
   | Getbyteschar
-  | Getvectitem
+  | Getvectitem of Lambda.immediate_or_pointer
   | Setfield of int
   | Setfloatfield of int
   | Setvectitem
   | Setbyteschar
-  | Ccall of string
-  | Makeblock of { tag : int }
-  | Makefloatblock
+  | Ccall of string * Instruct.ccall_hint option
+  | Makeblock of
+      { tag : int;
+        mut : Asttypes.mutable_flag
+      }
+  | Makefloatblock of Asttypes.mutable_flag
   | Make_faux_mixedblock of
       { total_len : int;
         tag : int
@@ -126,9 +134,10 @@ and rec_binding =
 and bfunction =
   { params : Ident.t list;
     body : blambda;
-    free_variables : Ident.Set.t
+    free_variables : Ident.Set.t;
         (** if we ever intended to do optimizations/transformations on blambda,
             this would be better as a function than a field *)
+    closure_hint : Instruct.closure_hint
   }
 
 and blambda =

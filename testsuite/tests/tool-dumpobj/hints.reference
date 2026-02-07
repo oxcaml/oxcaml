@@ -1,0 +1,85 @@
+       0  BRANCH 72
+       2  RESTART
+       3  GRAB 1
+       5  ACC1
+       6  PUSHACC1
+       7  EQ
+       8  RETURN 2
+      10  RESTART
+      11  GRAB 1
+      13  ACC1
+      14  PUSHACC1
+      15  EQ (int equality test)
+      16  RETURN 2
+      18  ACC0
+      19  GETFIELD0
+      20  RETURN 1
+      22  ACC0
+      23  GETFIELD1
+      24  PUSHACC1
+      25  GETFIELD0 (immediate)
+      26  MAKEBLOCK2 0 (immutable)
+      28  RETURN 1
+      30  ACC0
+      31  GETFIELD1
+      32  PUSHACC1
+      33  GETFIELD0 (immediate)
+      34  MAKEBLOCK2 0 (immutable)
+      36  RETURN 1
+      38  RESTART
+      39  GRAB 1
+      41  ACC1
+      42  PUSHACC1
+      43  C_CALL2 caml_array_get_addr
+      45  RETURN 2
+      47  RESTART
+      48  GRAB 1
+      50  ACC1
+      51  PUSHACC1
+      52  GETVECTITEM (immediate)
+      53  RETURN 2
+      55  RESTART
+      56  GRAB 1
+      58  ACC1
+      59  PUSHACC1
+      60  C_CALL2 caml_array_get_addr (immediate)
+      62  RETURN 2
+      64  ACC0
+      65  GETFIELD1
+      66  RETURN 1
+      68  ACC0
+      69  GETFIELD0 (immediate)
+      70  RETURN 1
+      72  CLOSURE 0, 68 (value<(consts ()) (non_consts ([0: value<int>, *]))> -> value<int>)
+      75  PUSH
+      76  CLOSURE 0, 64 (value<(consts ()) (non_consts ([0: value<int>, *]))> -> *)
+      79  PUSH
+      80  CLOSURE 0, 56 (value<intarray> -> value<int> -> value<int>)
+      83  PUSH
+      84  CLOSURE 0, 48 (value<intarray> -> value<int> -> value<int>)
+      87  PUSH
+      88  CLOSURE 0, 39 (value<addrarray> -> value<int> -> *)
+      91  PUSH
+      92  CLOSURE 0, 30 (value<(consts ()) (non_consts ([0: value<int>, *]))> -> value<(consts ()) (non_consts ([0: value<int>, *]))>)
+      95  PUSH
+      96  CLOSURE 0, 22 (value<(consts ()) (non_consts ([0: value<int>, *]))> -> value<(consts ()) (non_consts ([0: value<int>, *]))>)
+      99  PUSH
+     100  CLOSURE 0, 18 (value<(consts ()) (non_consts ([0: *, value<int>]))> -> *)
+     103  PUSH
+     104  CLOSURE 0, 11 (value<int> -> value<int> -> value<int>)
+     107  PUSH
+     108  CLOSURE 0, 3 (* -> * -> value<int>)
+     111  PUSHACC0
+     112  PUSHACC2
+     113  PUSHACC4
+     114  PUSHACC6
+     115  PUSHACC 8
+     117  PUSHACC 10
+     119  PUSHACC 12
+     121  PUSHACC 14
+     123  PUSHACC 16
+     125  PUSHACC 18
+     127  MAKEBLOCK 10, 0 (immutable)
+     130  POP 10
+     132  SETGLOBAL compilation unit Hints
+     134  STOP
