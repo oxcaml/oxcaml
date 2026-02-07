@@ -244,6 +244,12 @@ let is_store_out_of_range kind ~byte_offset :
     Cfg_selectgen_target_intf.is_store_out_of_range_result =
   if is_offset kind byte_offset then Within_range else Out_of_range
 
+let is_offset_out_of_range byte_offset :
+    Cfg_selectgen_target_intf.is_store_out_of_range_result =
+  if Validated_mem_offset.is_valid ~scale:1 ~offset:byte_offset
+  then Within_range
+  else Out_of_range
+
 let insert_move_extcall_arg (ty_arg : Cmm.exttype) src dst :
     Cfg_selectgen_target_intf.insert_move_extcall_arg_result =
   let ty_arg_is_small_int =

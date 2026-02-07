@@ -622,6 +622,32 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
       assert (Array.length regs_addr = 1);
       ref regs_addr
     in
+    let reset_addressing () =
+      (* Use a temporary to store the address [!base + !byte_offset]. *)
+      let tmp = Reg.createv Cmm.typ_int in
+      (* CR-someday xclerc: Now that this code in the "generic" part, it is
+         maybe a bit unexpected to assume there is no better sequence to emit x
+         += k. That being said, it is a corner case. *)
+      insert_debug env sub_cfg
+        (Op (SU.make_const_int (Nativeint.of_int !byte_offset)))
+        dbg [||] tmp;
+      (* The new base is a pointer into the middle of an ocaml value. *)
+      assert (!byte_offset > 0);
+      let new_base = Reg.createv Cmm.typ_addr in
+      insert_debug env sub_cfg (Op (Operation.Intop Iadd)) dbg
+        (Array.append !base tmp) new_base;
+      (* Use the temporary as the new base address. *)
+      base := new_base;
+      byte_offset := 0;
+      addressing_mode := Arch.identity_addressing
+    in
+    let advance bytes =
+      byte_offset := !byte_offset + bytes;
+      match Target.is_offset_out_of_range !byte_offset with
+      | Within_range ->
+        addressing_mode := Arch.offset_addressing !addressing_mode bytes
+      | Out_of_range -> reset_addressing ()
+    in
     let for_one_arg arg =
       let original_arg = arg in
       let select_store_result =
@@ -656,49 +682,16 @@ module Make (Target : Cfg_selectgen_target_intf.S) = struct
               | Val | Addr | Int -> Word_val
               | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
             in
-            let is_out_of_range :
-                Cfg_selectgen_target_intf.is_store_out_of_range_result =
-              match select_store_result with
-              | Rewritten _ | Use_default -> Within_range
-              | Maybe_out_of_range ->
-                Target.is_store_out_of_range chunk ~byte_offset:!byte_offset
-            in
-            let reset_addressing () =
-              (* Use a temporary to store the address [!base + !byte_offset]. *)
-              let tmp = Reg.createv Cmm.typ_int in
-              (* CR-someday xclerc: Now that this code in the "generic" part, it
-                 is maybe a bit unexpected to assume there is no better sequence
-                 to emit x += k. That being said, it is a corner case. *)
-              insert_debug env sub_cfg
-                (Op (SU.make_const_int (Nativeint.of_int !byte_offset)))
-                dbg [||] tmp;
-              (* The new base is a pointer into the middle of an ocaml value. *)
-              assert (!byte_offset > 0);
-              let new_base = Reg.createv Cmm.typ_addr in
-              insert_debug env sub_cfg (Op (Operation.Intop Iadd)) dbg
-                (Array.append !base tmp) new_base;
-              (* Use the temporary as the new base address. *)
-              base := new_base;
-              byte_offset := 0;
-              addressing_mode := Arch.identity_addressing
-            in
-            (match is_out_of_range with
-            | Within_range -> ()
-            | Out_of_range -> reset_addressing ());
             insert_debug env sub_cfg
               (Op (Store (chunk, !addressing_mode, false)))
               dbg
               (Array.append [| r |] !base)
               [||];
-            let size = SU.size_component r.Reg.typ in
-            addressing_mode := Arch.offset_addressing !addressing_mode size;
-            byte_offset := !byte_offset + size
+            advance (SU.size_component r.Reg.typ)
           done
         | Some op ->
           insert_debug env sub_cfg (Op op) dbg (Array.append regs regs_addr) [||];
-          let size = SU.size_expr env original_arg in
-          addressing_mode := Arch.offset_addressing !addressing_mode size;
-          byte_offset := !byte_offset + size)
+          advance (SU.size_expr env original_arg))
       | Never_returns ->
         Misc.fatal_error
           "emit_expr did not return any registers in [emit_stores]"
