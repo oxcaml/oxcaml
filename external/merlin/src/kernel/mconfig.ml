@@ -446,6 +446,7 @@ let ocaml_ignored_flags =
     "-app-funct";
     "-bin-annot";
     "-bin-annot-cms";
+    "-bytecode-hints";
     "-c";
     "-compact";
     "-compat-32";
