@@ -1356,31 +1356,6 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
   | Lsplice { splice_loc = _;  slambda } ->
       fprintf ppf "$(%a)" slam slambda
-  | Ldelayed delayed ->
-      fprintf ppf "@[<2>(delayed@ %a)@]" ldelayed delayed
-
-and ldelayed ppf = function
-  | Dletrec(bindings, body) ->
-      let pp_rec_kind ppf rec_kind =
-        match (rec_kind : Value_rec_types.recursive_binding_kind) with
-        | Static -> fprintf ppf "static"
-        | Dynamic -> fprintf ppf "dynamic"
-      in
-      let pp_bindings ppf bindings =
-        let spc = ref false in
-        List.iter
-          (fun (id, duid, rec_kind, rhs) ->
-            if !spc then fprintf ppf "@ " else spc := true;
-            fprintf ppf "@[<2>%a%a %a =@ %a@]"
-              Ident.print id
-              debug_uid duid
-              pp_rec_kind rec_kind
-              lam rhs)
-          bindings in
-      fprintf ppf
-        "@[<2>letrec@ (@[<hv 1>%a@])@ %a@]"
-        pp_bindings bindings
-        lam body
 
 and slam ppf = function
   | SLlayout layout -> fprintf ppf "⟪%a⟫" layout_annotation layout

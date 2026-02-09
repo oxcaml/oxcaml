@@ -74,6 +74,10 @@ type field_read_semantics =
   | Reads_agree
   | Reads_vary
 
+type dynamism_mode =
+  | Static
+  | Dynamic
+
 type has_initializer =
   | With_initializer
   | Uninitialized
@@ -130,7 +134,7 @@ type primitive =
   | Pmakefloatblock of mutable_flag * locality_mode
   | Pmakeufloatblock of mutable_flag * locality_mode
   | Pmakelazyblock of lazy_block_tag
-  | Pfield of int * immediate_or_pointer * field_read_semantics
+  | Pfield of int * immediate_or_pointer * field_read_semantics * dynamism_mode
   | Pfield_computed of field_read_semantics
   | Psetfield of int * immediate_or_pointer * initialization_or_assignment
   | Psetfield_computed of immediate_or_pointer * initialization_or_assignment
@@ -851,25 +855,16 @@ type lambda =
      Note that [Lexclave] nesting is currently unsupported. *)
   | Lexclave of lambda
   | Lsplice of lambda_splice
-  | Ldelayed of delayed
-    (** A construct that can only be transformed after slambdaeval (during
-        simplif), use [fail_with_delayed_constructor] to assert that it doesn't
-        exist after that point.  *)
-
-and delayed =
-  | Dletrec of
-    (Ident.t * debug_uid * Value_rec_types.recursive_binding_kind * lambda) list
-    * lambda
+  | Ltemplate of Ident.t list * lambda
+  | Linstantiate of lambda * layout list
 
 and slambda =
   | SLlayout of layout
+  | SLglobal of Compilation_unit.t
   | SLvar of Slambdaident.t
   | SLunit
-  | SLrecord of (string * slambda) array
-    (** Used for representing the static part of modules and records, the strings are the
-        field names which are soley for debug printing. *)
-  | SLfield of Slambdaident.t * int * string
-    (** Field access of records, the string is the field name for debug printing *)
+  | SLrecord of slambda list
+  | SLfield of slambda * int
   | SLhalves of slambda_halves
   | SLproj_comptime of slambda
     (** Project out the compiletime half of a [slambda_halves] *)
@@ -944,6 +939,7 @@ and lambda_apply =
     ap_result_layout : layout;
     ap_region_close : region_close;
     ap_mode : locality_mode;
+    asp_dynamism_mode : dynamism_mode;
     ap_loc : scoped_location;
     ap_tailcall : tailcall_attribute;
     ap_inlined : inlined_attribute; (* [@inlined] attribute in code *)
@@ -971,10 +967,6 @@ and lambda_event_kind =
   | Lev_pseudo
 
 and lambda_splice = { splice_loc : scoped_location; slambda : slambda; }
-
-(** Fails with a fatal error indicating that delayed lambda constructors aren't
-    expected at that point in compilation. *)
-val fail_with_delayed_constructor : delayed -> 'a
 
 (* A description of a parameter to be passed to the runtime representation of a
    parameterised module, namely a function (called the instantiating functor)

@@ -183,8 +183,6 @@ let compute_static_size lam =
       *)
       assert false
     | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
-    | Ldelayed (Dletrec _ as delayed) ->
-      Lambda.fail_with_delayed_constructor delayed
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))
@@ -694,8 +692,6 @@ let rec split_static_function lfun block_var local_idents lam :
       Printlambda.lfunction lfun
       Printlambda.lambda lam
   | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
-  | Ldelayed (Dletrec _ as delayed) ->
-    Lambda.fail_with_delayed_constructor delayed
 and rebuild_arms :
   type a. _ -> _ -> _ -> (a * Lambda.lambda) list ->
   (a * Lambda.lambda) list split_result =

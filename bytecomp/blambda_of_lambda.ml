@@ -219,7 +219,6 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
   in
   match (exp : Lambda.lambda) with
   | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
-  | Ldelayed delayed -> Lambda.fail_with_delayed_constructor delayed
   | Lvar id | Lmutvar id -> Var id
   | Lconst cst -> Const cst
   | Lapply { ap_func; ap_args; ap_region_close } ->

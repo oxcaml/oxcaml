@@ -1,5 +1,7 @@
 assume_info.ml
 assume_info.mli
+lambda_to_slambda.ml
+lambda_to_slambda.mli
 mixed_block_shape.ml
 mixed_block_shape.mli
 mixed_product_bytes.ml

@@ -686,7 +686,6 @@ let rec choice ctx t =
         let+ lam = choice ctx ~tail lam in
         Lexclave lam
     | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
-    | Ldelayed delayed -> Lambda.fail_with_delayed_constructor delayed
 
   and choice_apply ctx ~tail apply =
     let exception No_tmc in

@@ -789,8 +789,6 @@ let free_methods l =
     | Lsplice { splice_loc; _ } ->
       (* CR layout poly: we could definitely do better here. *)
       Lambda.error ~loc:(to_location splice_loc) (Slambda_unsupported "classes")
-    | Ldelayed(Dletrec(bindings, _body)) ->
-        List.iter (fun (id, _, _, _) -> fv := Ident.Set.remove id !fv) bindings
   in free l; !fv
 
 let transl_class ~scopes ids cl_id pub_meths cl vflag =

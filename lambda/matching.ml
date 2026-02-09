@@ -4266,7 +4266,6 @@ let rec map_return f = function
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)
   | Lexclave l -> Lexclave (map_return f l)
-  | Ldelayed (Dletrec (l1, l2)) -> Ldelayed (Dletrec (l1, map_return f l2))
 
 (* The 'opt' reference indicates if the optimization is worthy.
 

@@ -901,15 +901,10 @@ type lambda =
   | Lregion of lambda * layout
   | Lexclave of lambda
   | Lsplice of lambda_splice
-  | Ldelayed of delayed
-
-and delayed =
-  | Dletrec of
-    (Ident.t * debug_uid * Value_rec_types.recursive_binding_kind * lambda) list
-    * lambda
 
 and slambda =
   | SLlayout of layout
+  | SLglobal of Compilation_unit.t
   | SLvar of Slambdaident.t
   | SLunit
   | SLrecord of (string * slambda) array
@@ -1008,14 +1003,6 @@ and lambda_event_kind =
   | Lev_pseudo
 
 and lambda_splice = { splice_loc : scoped_location; slambda : slambda }
-
-let delayed_name = function
-  | Dletrec _ -> "Dletrec"
-
-let fail_with_delayed_constructor delayed =
-  let name = delayed_name delayed in
-  Misc.fatal_errorf
-    "%s in lambda should have been removed by [Simplif.undelay]" name
 
 type runtime_param =
   | Rp_argument_block of Global_module.t
@@ -1284,7 +1271,7 @@ let make_key e =
     | Levent _
     (* CR layout poly: Anything calling this should probably be moved to after
        slambda eval, we could possibly also make slambda keys. *)
-    | Lsplice _  | Ldelayed (Dletrec _) ->
+    | Lsplice _  ->
         raise Not_simple
 
   and tr_recs env es = List.map (tr_rec env) es
@@ -1387,9 +1374,6 @@ let shallow_iter ~tail ~non_tail:f = function
       f e
   | Lexclave e ->
       tail e
-  | Ldelayed (Dletrec (bindings, body)) ->
-      tail body;
-      List.iter (fun (_, _, _, lam) -> f lam) bindings
 
 let iter_head_constructor f l =
   shallow_iter ~tail:f ~non_tail:f l
@@ -1479,13 +1463,6 @@ let rec free_variables = function
   | Lexclave e ->
       free_variables e
   | Lsplice { splice_loc = _; slambda } -> free_variables_slambda slambda
-  | Ldelayed (Dletrec (bindings, body)) ->
-      let set =
-        free_variables_list (free_variables body)
-          (List.map (fun (_, _, _, lam) -> lam) bindings)
-      in
-      Ident.Set.diff set
-        (Ident.Set.of_list (List.map (fun (id, _, _, _) -> id) bindings))
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
@@ -1729,12 +1706,6 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         ({ p with name = name'; debug_uid = duid' } :: params' , l)
       ) params ([], l)
   in
-  let bind_delayed_rec bindings l =
-    List.fold_right (fun (id, duid, rec_kind, rhs) (bindings', l) ->
-        let id', duid', l = bind id duid l in
-        ((id', duid', rec_kind, rhs) :: bindings' , l)
-      ) bindings ([], l)
-  in
   let bind_rec ids l =
     List.fold_right (fun (rb: rec_binding) (ids', l) ->
         let id', duid', l = bind rb.id rb.debug_uid l in
@@ -1860,13 +1831,7 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         Lexclave (subst s l e)
     | Lsplice _ ->
       Misc.fatal_error "Cannot apply substitutions to lambda before slambdaeval"
-    | Ldelayed Dletrec (bindings, body) ->
-        let bindings, l' = bind_delayed_rec bindings l in
-        Ldelayed
-          (Dletrec (List.map (subst_rec_bind s l') bindings, subst s l' body))
   and subst_list s l li = List.map (subst s l) li
-  and subst_rec_bind s l (id, duid, rec_kind, rhs) =
-    (id, duid, rec_kind, subst s l rhs)
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
   and subst_lfun s l lf =
     let params, l' = bind_params lf.params l in
@@ -1983,13 +1948,6 @@ let shallow_map ~tail ~non_tail:f = function
       Lregion (f e, layout)
   | Lexclave e ->
       Lexclave (tail e)
-  | Ldelayed (Dletrec (bindings, body)) ->
-      Ldelayed
-        (Dletrec
-          (List.map
-              (fun (id, duid, rec_kind, value) -> id, duid, rec_kind, f value)
-              bindings,
-            tail body))
 
 let map f =
   let rec g lam = f (shallow_map ~tail:g ~non_tail:g lam) in
@@ -2923,7 +2881,7 @@ let may_allocate_in_region lam =
     | ( Lapply _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
       | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
       | Lifthenelse _ | Lsequence _ | Lassign _ | Lsend _
-      | Levent _ | Lifused _ | Ldelayed (Dletrec _)) as lam ->
+      | Levent _ | Lifused _) as lam ->
        iter_head_constructor loop lam
   in
   if not Config.stack_allocation then false
@@ -2973,11 +2931,9 @@ let rec try_to_find_location lam =
   | Lifused (_, lam)
   | Lregion (lam, _)
   | Lexclave lam
-  | Ltrywith (lam, _, _, _, _)
-  | Ldelayed (Dletrec ((_, _, _, lam) :: _, _)) ->
+  | Ltrywith (lam, _, _, _, _) ->
     try_to_find_location lam
-  | Lvar _ | Lmutvar _ | Lconst _ | Lletrec _ | Lstaticraise (_, [])
-  | Ldelayed (Dletrec _)  ->
+  | Lvar _ | Lmutvar _ | Lconst _ | Lletrec _ | Lstaticraise (_, []) ->
     Debuginfo.Scoped_location.Loc_unknown
 
 let try_to_find_debuginfo lam =
