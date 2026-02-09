@@ -115,10 +115,12 @@ let clz ~arg_is_non_zero bi arg dbg =
       else res)
 
 let ctz ~arg_is_non_zero bi arg dbg =
-  let arg = make_unsigned_int bi arg dbg in
   let bit_count = bit_count bi in
-  if bit_count <> size_int * 8
+  if bit_count = size_int * 8 || arg_is_non_zero
   then
+    let op = Cctz { arg_is_non_zero } in
+    if_operation_supported_bi bi op ~f:(fun () -> Cop (op, [arg], dbg))
+  else
     (* regardless of the value of the argument [arg_is_non_zero], always set the
        corresponding field to [true], because we make it non-zero below by
        setting bit 32/16/8. *)
@@ -127,9 +129,6 @@ let ctz ~arg_is_non_zero bi arg dbg =
         (* Set bit 32/16/8 *)
         let mask = Nativeint.shift_left 1n bit_count in
         Cop (op, [Cop (Cor, [arg; Cconst_natint (mask, dbg)], dbg)], dbg))
-  else
-    let op = Cctz { arg_is_non_zero } in
-    if_operation_supported_bi bi op ~f:(fun () -> Cop (op, [arg], dbg))
 
 let popcnt bi arg dbg =
   if_operation_supported_bi bi Cpopcnt ~f:(fun () ->
