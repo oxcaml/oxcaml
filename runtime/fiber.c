@@ -1071,15 +1071,15 @@ void caml_disable_stack_caches(struct stack_cache* caches)
     struct stack_cache* cache = &caches[i];
 
     // Stop other domains from pushing stacks
-    uintnat len = atomic_fetch_add(&cache->len, MAX_STACK_CACHE_LIMIT);
+    cache->len += MAX_STACK_CACHE_LIMIT;
 
-    while (len > 0) {
+    while (cache->len > MAX_STACK_CACHE_LIMIT) {
       bool freed = false;
       do {
         struct stack_info* top = cache->head;
 
         // len includes domains with pending pushes, so we may reach the end of
-        // the cache before len == 0. If so, spin until the pushes resolve.
+        // the cache. If so, spin until the pushes resolve.
         if(top == NULL) {
           cpu_relax();
           continue;
@@ -1092,8 +1092,6 @@ void caml_disable_stack_caches(struct stack_cache* caches)
           free_stack_memory(top);
         }
       } while(!freed);
-
-      len--;
     }
 
     CAMLassert(cache->head == NULL);
