@@ -36,7 +36,6 @@ CLEAN_FILES = \
   duneconf/ox-extra.inc \
   dune.runtime_selection \
   otherlibs/dune \
-  chamelon/dune \
   natdynlinkops \
   otherlibs/dynlink/natdynlinkops \
   ocamlopt_upstream_flags.sexp \
