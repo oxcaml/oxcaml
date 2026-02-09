@@ -697,15 +697,14 @@ CAMLexport void caml_startup_code(
 
 CAMLexport value caml_init_module_exn(const char *name)
 {
-  caml_fatal_error(
+  return Make_exception_result(caml_failure_exn(
     "caml_init_module: manual module initialization is only supported "
-    "in native code");
-  return Val_unit; /* not reached */
+    "in native code"));
 }
 
 CAMLexport void caml_init_module(const char *name)
 {
-  caml_fatal_error(
+  caml_failwith(
     "caml_init_module: manual module initialization is only supported "
     "in native code");
 }

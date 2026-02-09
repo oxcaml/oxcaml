@@ -235,6 +235,18 @@ caml_unit_deps_find(const char *name)
   return NULL;
 }
 
+/* Returns Make_exception_result(Failure msg) where msg is formatted
+   with the given printf-style format and name argument. */
+static value init_module_failure(const char *fmt, const char *name)
+{
+  size_t len = strlen(fmt) + strlen(name);
+  char *msg = caml_stat_alloc(len);
+  snprintf(msg, len, fmt, name);
+  value exn = caml_failure_exn(msg);
+  caml_stat_free(msg);
+  return Make_exception_result(exn);
+}
+
 /* Initialize a module and its dependencies in topological order.
    Uses a recursive depth-first approach.
    Returns an exception result on failure, Val_unit on success. */
@@ -249,9 +261,9 @@ static value caml_init_module_rec(struct caml_unit_deps_entry *entry)
   }
 
   if (entry->init_state == INIT_STATE_INITIALIZING) {
-    /* Cycle detected - this should never happen */
-    caml_fatal_error("caml_init_module: cycle detected at module %s",
-                     entry->unit_name);
+    CAMLreturn(init_module_failure(
+      "caml_init_module: cycle detected at module %s",
+      entry->unit_name));
   }
 
   /* Mark as initializing before processing dependencies */
@@ -312,7 +324,8 @@ CAMLexport value caml_init_module_exn(const char *name)
 {
   struct caml_unit_deps_entry *entry = caml_unit_deps_find(name);
   if (entry == NULL) {
-    caml_fatal_error("caml_init_module: unit %s not found", name);
+    return init_module_failure(
+      "caml_init_module: unit %s not found", name);
   }
   return caml_init_module_rec(entry);
 }
