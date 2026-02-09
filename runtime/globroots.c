@@ -26,8 +26,6 @@
 #include "caml/stack.h"
 #include "caml/callback.h"
 #include "caml/fail.h"
-#include "caml/alloc.h"
-#include <string.h>
 
 /* This mutex must be locked with [caml_plat_lock_blocking] from the
    mutator, because caml_{register,remove}_{generational_}roots can be

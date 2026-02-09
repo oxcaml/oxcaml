@@ -4408,7 +4408,7 @@ let global_table namelist =
  *)
 let unit_deps_table units =
   let module CU = Compilation_unit in
-  let module StringMap = Map.Make (String) in
+  let module StringMap = Misc.Stdlib.String.Map in
   let unit_name cu = CU.full_path_as_string cu in
   (* Sort units by name for binary search *)
   let sorted_units =
@@ -4498,7 +4498,7 @@ let unit_deps_table units =
           Csymbol_address frametable_sym;
           Cint (Nativeint.of_int num_deps);
           deps_sym_item;
-          Cint 1n (* initialized flag: Val_false = Val_int(0) = 1 *) ])
+          Cint 1n (* init_state: INIT_STATE_NOT_INITIALIZED = Val_int(0) *) ])
       sorted_units
   in
   Cdata (string_data @ dep_arrays @ table_header @ table_entries)

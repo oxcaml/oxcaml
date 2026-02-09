@@ -40,6 +40,8 @@
 #include "caml/stack.h"
 #include "caml/startup_aux.h"
 #include "caml/sys.h"
+#include "caml/globroots.h"
+#include "caml/frame_descriptors.h"
 
 extern int caml_parser_trace;
 extern char caml_system__code_begin, caml_system__code_end;
@@ -186,19 +188,22 @@ void caml_startup_pooled(char_os **argv)
 /* Unit dependency table for manual module initialization.
    This table is emitted by the compiler when -manual-module-init is used. */
 
-/* Initialization states (as OCaml values) */
-#define INIT_STATE_NOT_INITIALIZED Val_int(0)  /* = 1 */
-#define INIT_STATE_INITIALIZING    Val_int(1)  /* = 3 */
-#define INIT_STATE_DONE            Val_int(2)  /* = 5 */
+/* Initialization states.
+   Values are valid OCaml values (Val_int encodings). */
+enum init_state {
+  INIT_STATE_NOT_INITIALIZED = 1,  /* Val_int(0) */
+  INIT_STATE_INITIALIZING    = 3,  /* Val_int(1) */
+  INIT_STATE_DONE            = 5   /* Val_int(2) */
+};
 
 struct caml_unit_deps_entry {
-  const char *unit_name;      /* compilation unit name */
-  void *entry_fn;             /* entry function (raw code pointer) */
-  value *gc_roots;            /* pointer to gc_roots (module block) */
-  intnat *frametable;         /* pointer to frametable */
-  intnat num_deps;            /* number of dependencies */
-  const intnat *dep_indices;  /* array of indices into caml_unit_deps_table */
-  value init_state;           /* one of INIT_STATE_* */
+  const char *unit_name;       /* compilation unit name */
+  void *entry_fn;              /* entry function (raw code pointer) */
+  value *gc_roots;             /* pointer to gc_roots (module block) */
+  intnat *frametable;          /* pointer to frametable */
+  intnat num_deps;             /* number of dependencies */
+  const intnat *dep_indices;   /* array of indices into caml_unit_deps_table */
+  enum init_state init_state;  /* one of INIT_STATE_* */
 };
 
 struct caml_unit_deps_table {
@@ -229,10 +234,6 @@ caml_unit_deps_find(const char *name)
   }
   return NULL;
 }
-
-/* Forward declarations */
-void caml_register_dyn_globals(void **globals, int nglobals);
-void caml_register_frametables(void **tables, int ntables);
 
 /* Initialize a module and its dependencies in topological order.
    Uses a recursive depth-first approach.
@@ -328,9 +329,12 @@ CAMLexport void caml_init_module(const char *name)
 /* OCaml-callable wrapper: Initialize a module by name (string -> unit) */
 CAMLprim value caml_init_module_from_ocaml(value v_name)
 {
-  /* Copy the string to C heap since caml_init_module may trigger GC */
+  /* Copy the string to C heap since caml_init_module_exn may trigger GC */
   char *name = caml_stat_strdup(String_val(v_name));
-  caml_init_module(name);
+  value result = caml_init_module_exn(name);
   caml_stat_free(name);
+  if (Is_exception_result(result)) {
+    caml_raise(Extract_exception(result));
+  }
   return Val_unit;
 }
