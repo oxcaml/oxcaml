@@ -62,12 +62,23 @@ static_assert(sizeof(struct stack_info) == Stack_ctx_words * sizeof(value), "");
 
 static _Atomic int64_t fiber_id = 0;
 
+#define NUM_STACK_SIZE_CLASSES 5
+#define MAX_STACK_CACHE_LIMIT  Max_domains_max
+
 /* Parameters settable with OCAMLRUNPARAM */
 uintnat caml_init_main_stack_wsz = 0;   /* -Xmain_stack_size= */
 uintnat caml_init_thread_stack_wsz = 0; /* -Xthread_stack_size= */
 uintnat caml_init_fiber_stack_wsz = 0;  /* -Xfiber_stack_size= */
 
 uintnat caml_nohugepage_stacks = 1;
+
+uintnat caml_cache_stacks_per_class = /* -Xcache_stacks_per_class */
+#if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
+  1
+#else
+  128
+#endif
+  ;
 
 uintnat caml_get_init_stack_wsize (int context)
 {
@@ -125,37 +136,6 @@ void caml_change_max_stack_size (uintnat new_max_wsize)
                     Bsize_wsize(new_max_wsize) / 1024);
   }
   caml_max_stack_wsize = new_max_wsize;
-}
-
-#define NUM_STACK_SIZE_CLASSES 5
-
-struct stack_info** caml_alloc_stack_cache (void)
-{
-  int i;
-
-  struct stack_info** stack_cache =
-    (struct stack_info**)caml_stat_alloc_noexc(sizeof(struct stack_info*) *
-                                               NUM_STACK_SIZE_CLASSES);
-  if (stack_cache == NULL)
-    return NULL;
-
-  for(i = 0; i < NUM_STACK_SIZE_CLASSES; i++)
-    stack_cache[i] = NULL;
-
-  return stack_cache;
-}
-
-static void free_stack_memory(struct stack_info*);
-void caml_free_stack_cache(struct stack_info** cache)
-{
-  for (int i = 0; i < NUM_STACK_SIZE_CLASSES; i++) {
-    while (cache[i] != NULL) {
-      struct stack_info* stk = cache[i];
-      cache[i] = (struct stack_info*)stk->exception_ptr;
-      free_stack_memory(stk);
-    }
-  }
-  caml_stat_free(cache);
 }
 
 /* Round up to a power of 2 */
@@ -315,18 +295,36 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
                              int64_t id)
 {
   struct stack_info* stack;
-  struct stack_info **cache = Caml_state->stack_cache;
+  struct stack_cache* caches = Caml_state->stack_caches;
 
   static_assert(sizeof(struct stack_info) % sizeof(value) == 0, "");
   static_assert(sizeof(struct stack_handler) % sizeof(value) == 0, "");
 
-  CAMLassert(cache != NULL);
+  CAMLassert(caches != NULL);
 
-  if (cache_bucket != -1 &&
-      cache[cache_bucket] != NULL) {
-    stack = cache[cache_bucket];
-    cache[cache_bucket] =
-      (struct stack_info*)stack->exception_ptr;
+  if (cache_bucket != -1) {
+    struct stack_cache* cache = &caches[cache_bucket];
+    bool alloc = false;
+    do {
+      stack = cache->head;
+      if(stack) {
+        // Other domains may push to the cache, but not pop, so it's safe
+        // to read the exception pointer.
+        struct stack_info* top = (struct stack_info*)stack->exception_ptr;
+        alloc = atomic_compare_exchange_weak(&cache->head, &stack, top);
+        if(alloc) {
+          cache->len -= 1;
+        }
+      } else {
+        stack = alloc_for_stack(wosize, id);
+        if(stack == NULL) {
+          return NULL;
+        }
+        stack->cache_bucket = cache_bucket;
+        alloc = true;
+      }
+    } while(!alloc);
+
     CAMLassert(stack->cache_bucket == stack_cache_bucket(wosize));
   } else {
     /* couldn't get a cached stack, so have to create one */
@@ -346,6 +344,7 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   stack->sp = Stack_high(stack);
   stack->exception_ptr = NULL;
   stack->id = id;
+  stack->domain_idx = Caml_state->id;
   stack->local_arenas = NULL;
   stack->local_sp = 0;
   stack->local_top = NULL;
@@ -1006,38 +1005,137 @@ static void free_stack_memory(struct stack_info* stack)
 #endif
 }
 
-uintnat caml_cache_stacks_per_class =
-#if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
-  1
-#else
-  128
-#endif
-  ;
+struct stack_cache* caml_alloc_stack_caches(void)
+{
+  int i;
+
+  struct stack_cache* stack_caches =
+    (struct stack_cache*)
+    caml_stat_alloc_noexc(sizeof(struct stack_cache) * NUM_STACK_SIZE_CLASSES);
+
+  if (stack_caches == NULL)
+    return NULL;
+
+  for(i = 0; i < NUM_STACK_SIZE_CLASSES; i++) {
+    stack_caches[i].head = NULL;
+    stack_caches[i].len = MAX_STACK_CACHE_LIMIT;
+  }
+
+  return stack_caches;
+}
+
+void caml_free_stack_caches(struct stack_cache* caches)
+{
+  for (int i = 0; i < NUM_STACK_SIZE_CLASSES; i++) {
+    while (caches[i].head != NULL) {
+      struct stack_info* stk = caches[i].head;
+      caches[i].head = (struct stack_info*)stk->exception_ptr;
+      free_stack_memory(stk);
+    }
+  }
+  caml_stat_free(caches);
+}
+
+// Must not be greater than MAX_STACK_CACHE_LIMIT
+static uintnat caml_stack_cache_limit(int domain_idx)
+{
+  // It's common to use the initial domain to distribute fibers to a pool of
+  // worker domains, so we let it cache at least one fiber per running domain.
+  if(domain_idx == 0) {
+    uintnat n = atomic_load_relaxed(&caml_num_domains_running);
+    return n < caml_cache_stacks_per_class ? caml_cache_stacks_per_class : n;
+  }
+  return caml_cache_stacks_per_class;
+}
+
+void caml_enable_stack_caches(struct stack_cache* caches)
+{
+  CAMLassert(caches != NULL);
+
+  for(int i = 0; i < NUM_STACK_SIZE_CLASSES; i++) {
+    struct stack_cache* cache = &caches[i];
+
+    CAMLassert(cache->head == NULL);
+    CAMLassert(cache->len == MAX_STACK_CACHE_LIMIT);
+
+    // Allow other domains to start pushing stacks
+    cache->len -= MAX_STACK_CACHE_LIMIT;
+  }
+}
+
+void caml_disable_stack_caches(struct stack_cache* caches)
+{
+  CAMLassert(caches != NULL);
+
+  for(int i = 0; i < NUM_STACK_SIZE_CLASSES; i++) {
+    struct stack_cache* cache = &caches[i];
+
+    // Stop other domains from pushing stacks
+    uintnat len = atomic_fetch_add(&cache->len, MAX_STACK_CACHE_LIMIT);
+
+    while (len > 0) {
+      bool freed = false;
+      do {
+        struct stack_info* top = cache->head;
+
+        // len includes domains with pending pushes, so we may reach the end of
+        // the cache before len == 0. If so, spin until the pushes resolve.
+        if(top == NULL) {
+          cpu_relax();
+          continue;
+        }
+
+        struct stack_info* next = (struct stack_info*)top->exception_ptr;
+        freed = atomic_compare_exchange_weak(&cache->head, &top, next);
+        if(freed) {
+          cache->len -= 1;
+          free_stack_memory(top);
+        }
+      } while(!freed);
+
+      len--;
+    }
+
+    CAMLassert(cache->head == NULL);
+    CAMLassert(cache->len == MAX_STACK_CACHE_LIMIT);
+  }
+}
 
 void caml_free_stack (struct stack_info* stack)
 {
   CAMLnoalloc;
-  struct stack_info** cache = Caml_state->stack_cache;
+
+  // If this fiber was allocated by a domain at index [domain_idx], the stack
+  // cache at that index has been initialized and will never be freed.
+  struct stack_cache* caches = caml_get_stack_caches(stack->domain_idx);
+  int cache_bucket = stack->cache_bucket;
 
   CAMLassert(stack->magic == 42);
-  CAMLassert(cache != NULL);
+  CAMLassert(caches != NULL);
 
   // Don't need to update local_sp since this is no longer the current stack.
   caml_free_local_arenas(stack->local_arenas);
 
-  if (stack->cache_bucket != -1) {
-    struct stack_info* top = (struct stack_info*)cache[stack->cache_bucket];
-    int64_t count = top ? top->id : 0;
-    if (count < caml_cache_stacks_per_class) {
-      stack->exception_ptr = (void *)top;
-      stack->id = count + 1;
-      cache[stack->cache_bucket] = stack;
+  if (cache_bucket != -1) {
 #if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
-      memset(Stack_base(stack), 0x42,
-             (Stack_high(stack)-Stack_base(stack))*sizeof(value));
+    memset(Stack_base(stack), 0x42,
+          (Stack_high(stack)-Stack_base(stack))*sizeof(value));
 #endif
-    } else {
+    struct stack_cache* cache = &caches[cache_bucket];
+    uintnat limit = caml_stack_cache_limit(stack->domain_idx);
+    uintnat len = atomic_fetch_add(&cache->len, 1);
+    if (len >= limit) {
+      // The cache may have fewer than [len] stacks, but we know other domains
+      // have committed to pushing stacks up to [limit].
+      cache->len -= 1;
       free_stack_memory(stack);
+    } else {
+      bool freed = false;
+      do {
+        struct stack_info* top = cache->head;
+        stack->exception_ptr = (void *)top;
+        freed = atomic_compare_exchange_weak(&cache->head, &top, stack);
+      } while(!freed);
     }
   } else {
     free_stack_memory(stack);
