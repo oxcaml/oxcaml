@@ -327,8 +327,8 @@ let eval_expect_file _fname ~file_contents ~execute_phrase =
   let buf = Buffer.create 1024 in
   let ppf = Format.formatter_of_buffer buf in
   let () = Misc.Style.set_tag_handling ppf in
-  let last_asm = ref None in
   let exec_phrases phrases =
+    let last_asm = ref None in
     let phrases =
       match min_line_number phrases with
       | None -> phrases
@@ -375,7 +375,7 @@ let eval_expect_file _fname ~file_contents ~execute_phrase =
         List.filter_map chunk.expectations ~f:(fun expectation ->
           let output = match expectation.kind with
             | Expect_toplevel -> toplevel_output
-            | Expect_asm -> Option.value asm_output ~default:""
+            | Expect_asm -> Option.value asm_output ~default:"\nNo assembly: compilation failed\n"
           in
           eval_expectation expectation ~output)))
   in
