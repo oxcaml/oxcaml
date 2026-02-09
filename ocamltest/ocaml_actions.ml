@@ -720,21 +720,22 @@ let run_fexpr_check log env =
   let test_source_dir = Actions_helpers.test_source_directory env in
   let test_name = Filename.chop_extension (Actions_helpers.testfile env) in
   List.fold_left (fun (res, env) pass_sfx ->
-      if Result.is_pass res then
-        let pass_dump_file = Filename.make_filename test_name pass_sfx in
-        let pass_ref_file =
-          Filename.(make_filename
-                      (chop_extension pass_dump_file)
-                      "reference")
-        in
-        let dump_file =
-          Filename.make_path [test_build_dir; pass_dump_file]
-        in
-        let ref_file =
-          Filename.make_path [test_source_dir; pass_ref_file]
-        in
+      let pass_dump_file = Filename.make_filename test_name pass_sfx in
+      let pass_ref_file =
+        Filename.(make_filename
+                    (chop_extension pass_dump_file)
+                    "reference")
+      in
+      let dump_file =
+        Filename.make_path [test_build_dir; pass_dump_file]
+      in
+      let ref_file =
+        Filename.make_path [test_source_dir; pass_ref_file]
+      in
+      let nr =
         Actions_helpers.compare_files "fexpr" dump_file ref_file log env
-      else (res, env))
+      in
+      if Result.is_pass res then nr else (res, env))
     (Result.pass, env)
     passes_sfx
 
