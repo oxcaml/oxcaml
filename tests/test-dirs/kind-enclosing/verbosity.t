@@ -14,7 +14,20 @@
   > EOF
   Verbosity 0: immediate
   Verbosity 1: value mod global many stateless immutable external_ non_float
-  Verbosity 2: value mod global many stateless immutable external_ non_null non_float
+  Verbosity 2: value
+    mod global
+        many
+        stateless
+        immutable
+        forkable
+        unyielding
+        aliased
+        portable
+        contended
+        external_
+        non_null
+        non_float
+        static
 
   $ run 1:17 <<EOF
   > type 'a t = 'a option
@@ -27,9 +40,14 @@
         many
         stateless
         immutable
-        internal
+        portable
+        contended
         non_null
         non_float
+        local
+        unique
+        static
+        internal
     with 'a
 
   $ run 2:6 <<EOF
@@ -44,14 +62,78 @@
         many
         stateless
         immutable
-        internal
+        portable
+        contended
         non_null
         non_float
+        local
+        unique
+        static
+        internal
     with int t1
 
   $ run 1:5 <<EOF
   > type t : value mod portable
   > EOF
   Verbosity 0: value mod portable
-  Verbosity 1: value mod portable internal non_null separable
-  Verbosity 2: value mod portable internal non_null separable
+  Verbosity 1: value
+    mod portable
+        non_null
+        separable
+        local
+        unforkable
+        yielding
+        once
+        stateful
+        unique
+        read_write
+        uncontended
+        static
+        internal
+  Verbosity 2: value
+    mod portable
+        non_null
+        separable
+        local
+        unforkable
+        yielding
+        once
+        stateful
+        unique
+        read_write
+        uncontended
+        static
+        internal
+
+  $ run 1:5 <<EOF
+  > type t : value mod stateless
+  > EOF
+  Verbosity 0: value mod stateless
+  Verbosity 1: value
+    mod stateless
+        portable
+        non_null
+        separable
+        local
+        unforkable
+        yielding
+        once
+        unique
+        read_write
+        uncontended
+        static
+        internal
+  Verbosity 2: value
+    mod stateless
+        portable
+        non_null
+        separable
+        local
+        unforkable
+        yielding
+        once
+        unique
+        read_write
+        uncontended
+        static
+        internal
