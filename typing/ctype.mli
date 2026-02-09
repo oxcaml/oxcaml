@@ -76,7 +76,7 @@ val create_scope : unit -> int
 
 val newty: type_desc -> type_expr
 val new_scoped_ty: int -> type_desc -> type_expr
-val newvar: ?name:string -> jkind_lr -> type_expr
+val newvar: ?name:string -> ?evals_to:evals_to -> jkind_lr -> type_expr
 
 val new_rep_var
   : ?name:string
@@ -84,9 +84,9 @@ val new_rep_var
   -> unit
   -> type_expr * Jkind.sort
         (* Return a fresh representable variable, along with its sort *)
-val newvar2: ?name:string -> int -> jkind_lr -> type_expr
+val newvar2: ?name:string -> ?evals_to:evals_to -> int -> jkind_lr -> type_expr
         (* Return a fresh variable *)
-val new_global_var: ?name:string -> jkind_lr -> type_expr
+val new_global_var: ?name:string -> ?evals_to:evals_to -> jkind_lr -> type_expr
         (* Return a fresh variable, bound at toplevel
            (as type variables ['a] in type constraints). *)
 val newobj: type_expr -> type_expr

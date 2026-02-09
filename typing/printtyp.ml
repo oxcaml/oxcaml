@@ -1980,9 +1980,9 @@ let prepare_decl id decl =
       List.iter
         (fun ty ->
           match get_desc ty with
-          | Tvar { name = Some "_"; jkind }
+          | Tvar { name = Some "_"; jkind; evals_to }
               when List.exists (eq_type ty) vars ->
-            set_type_desc ty (Tvar {name = None; jkind})
+            set_type_desc ty (Tvar {name = None; jkind; evals_to})
           | _ -> ())
         params
   | None -> ()

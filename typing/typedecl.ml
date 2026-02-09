@@ -3195,9 +3195,9 @@ let transl_extension_constructor ~scope env type_path type_params
           List.iter
             (fun ty ->
               match get_desc ty with
-              | Tvar { name = Some "_"; jkind }
+              | Tvar { name = Some "_"; jkind; evals_to }
                 when List.exists (eq_type ty) vars ->
-                set_type_desc ty (Tvar { name = None; jkind })
+                set_type_desc ty (Tvar { name = None; jkind; evals_to })
               | _ -> ())
             typext_params
         end;

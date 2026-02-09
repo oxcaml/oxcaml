@@ -251,16 +251,18 @@ let proper_abbrevs tl abbrev =
 let newty desc              = newty2 ~level:!current_level desc
 let new_scoped_ty scope desc = newty3 ~level:!current_level ~scope desc
 
-let newvar ?name jkind =
-  newty2 ~level:!current_level (Tvar { name; jkind })
+let newvar ?name ?evals_to jkind =
+  newty2 ~level:!current_level (Tvar { name; jkind; evals_to })
 let new_rep_var ?name ~why () =
   let jkind, sort = Jkind.of_new_sort_var ~why ~level:!current_level in
   newvar ?name jkind, sort
-let newvar2 ?name level jkind = newty2 ~level (Tvar { name; jkind })
-let new_global_var ?name jkind =
-  newty2 ~level:!global_level (Tvar { name; jkind })
-let newstub ~scope jkind =
-  newty3 ~level:!current_level ~scope (Tvar { name = None; jkind })
+let newvar2 ?name ?evals_to level jkind =
+  newty2 ~level (Tvar { name; jkind; evals_to })
+let new_global_var ?name ?evals_to jkind =
+  newty2 ~level:!global_level (Tvar { name; jkind; evals_to })
+let newstub ?evals_to ~scope jkind =
+  newty3 ~level:!current_level ~scope
+    (Tvar { name = None; jkind; evals_to })
 
 let newobj fields      = newty (Tobject (fields, ref None))
 
@@ -1277,8 +1279,7 @@ let rec copy ?partial ?keep_names copy_scope ty =
     if forget <> generic_level then
       (* Using jkind "any" is ok here: We're forgetting the type because it
          will be unified with the original later. *)
-      newty2 ~level:forget
-        (Tvar { name = None; jkind = Jkind.Builtin.any ~why:Dummy_jkind })
+      newvar2 forget (Jkind.Builtin.any ~why:Dummy_jkind)
     else
     let t = newstub ~scope:(get_scope ty) (Jkind.Builtin.any ~why:Dummy_jkind) in
     For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
@@ -1638,7 +1639,8 @@ let copy_sep ~copy_scope ~fixed ~partial ~bound_univars
             if keep then
               (add_delayed_copy t ty;
                Tvar { name = None;
-                      jkind = Jkind.for_non_float ~why:Polymorphic_variant })
+                      jkind = (Jkind.for_non_float ~why:Polymorphic_variant);
+                      evals_to = None })
             else
             let more' = copy_rec ~may_share:false more in
             let fixed' = fixed && (is_Tvar more || is_Tunivar more) in
@@ -1668,8 +1670,8 @@ let instance_poly' copy_scope
       ~default:
         (fun ty ->
           match get_desc ty with
-            Tunivar { name; jkind } ->
-              if keep_names then newty (Tvar { name; jkind }) else newvar jkind
+            Tunivar { name; jkind; evals_to } ->
+              newvar ?name:(if keep_names then name else None) ?evals_to jkind
           | _ -> assert false)
   in
   let vars = List.map copy_var univars in
@@ -3445,8 +3447,8 @@ let univar_pairs = ref []
 let polyfy env ty vars =
   let subst_univar copy_scope ty =
     match get_desc ty with
-    | Tvar { name; jkind } when get_level ty = generic_level ->
-        let t = newty (Tunivar { name; jkind }) in
+    | Tvar { name; jkind; evals_to } when get_level ty = generic_level ->
+        let t = newty (Tunivar { name; jkind; evals_to }) in
         For_copy.redirect_desc copy_scope ty (Tsubst (t, None));
         Some t
     | _ -> None
@@ -4652,7 +4654,8 @@ and unify_labeled_list env labeled_tl1 labeled_tl2 =
 and make_rowvar level use1 rest1 use2 rest2  =
   let set_name ty name =
     match get_desc ty with
-      Tvar { name = None; jkind } -> set_type_desc ty (Tvar { name; jkind })
+      Tvar { name = None; jkind; evals_to } ->
+        set_type_desc ty (Tvar { name; jkind; evals_to })
     | _ -> ()
   in
   let name =
@@ -4667,7 +4670,7 @@ and make_rowvar level use1 rest1 use2 rest2  =
   in
   if use1 then rest1 else
   if use2 then rest2
-  else newty2 ~level (Tvar { name; jkind = Jkind.Builtin.value ~why:Row_variable })
+  else newvar2 ?name level (Jkind.Builtin.value ~why:Row_variable)
 
 and unify_fields uenv ty1 ty2 =          (* Optimization *)
   let (fields1, rest1) = flatten_fields ty1
@@ -4729,8 +4732,8 @@ and unify_row uenv row1 row2 =
     | Some _, None -> rm1
     | None, Some _ -> rm2
     | None, None ->
-        newty2 ~level:(Int.min (get_level rm1) (get_level rm2))
-          (Tvar { name = None; jkind = Jkind.Builtin.value ~why:Row_variable })
+        newvar2 (Int.min (get_level rm1) (get_level rm2))
+          (Jkind.Builtin.value ~why:Row_variable)
   in
   let fixed = merge_fixed_explanation fixed1 fixed2
   and closed = row1_closed || row2_closed in
@@ -6821,7 +6824,8 @@ let rec build_subtype env (visited : transient_expr list)
           set_type_desc ty
             (Tvar { name = None;
                     jkind = Jkind.Builtin.value
-                               ~why:(Unknown "build subtype 1")});
+                               ~why:(Unknown "build subtype 1");
+                    evals_to = None});
           let t'' = newvar (Jkind.Builtin.value ~why:(Unknown "build subtype 2"))
           in
           let loops = (get_id ty, t'') :: loops in

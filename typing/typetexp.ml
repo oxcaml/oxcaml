@@ -409,8 +409,9 @@ end = struct
       List.fold_left
         (fun acc v ->
            match get_desc v with
-           | Tvar { name; jkind } when get_level v = Btype.generic_level ->
-               set_type_desc v (Tunivar { name; jkind });
+           | Tvar { name; jkind; evals_to }
+             when get_level v = Btype.generic_level ->
+               set_type_desc v (Tunivar { name; jkind; evals_to });
                v :: acc
            | _ -> acc
         )
@@ -433,8 +434,8 @@ end = struct
     begin match get_desc v with
     | Tvar _ when get_level v <> Btype.generic_level ->
         cant_quantify Scope_escape
-    | Tvar { name; jkind } ->
-        set_type_desc v (Tunivar { name; jkind })
+    | Tvar { name; jkind; evals_to } ->
+        set_type_desc v (Tunivar { name; jkind; evals_to })
     | Tunivar _ ->
         cant_quantify Univar
     | _ ->
@@ -465,8 +466,8 @@ end = struct
     let vs = check_poly_univars env loc vars in
     vs |> List.iter (fun v ->
       match get_desc v with
-      | Tunivar { name; jkind } ->
-         set_type_desc v (Tvar { name; jkind })
+      | Tunivar { name; jkind; evals_to } ->
+         set_type_desc v (Tvar { name; jkind; evals_to })
       | _ -> assert false);
     vs
 
@@ -1319,10 +1320,10 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
         let t = instance t in
         let px = Btype.proxy t in
         begin match get_desc px with
-        | Tvar { name = None; jkind } ->
-           set_type_desc px (Tvar { name = Some alias; jkind })
-        | Tunivar { name = None; jkind } ->
-           set_type_desc px (Tunivar {name = Some alias; jkind})
+        | Tvar { name = None; jkind; evals_to } ->
+           set_type_desc px (Tvar { name = Some alias; jkind; evals_to })
+        | Tunivar { name = None; jkind; evals_to } ->
+           set_type_desc px (Tunivar {name = Some alias; jkind; evals_to})
         | _ -> ()
         end;
         { ty with ctyp_type = t }, jkind_annot
