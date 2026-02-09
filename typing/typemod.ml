@@ -1280,7 +1280,7 @@ and apply_modalities_module_type env modalities = function
   | Mty_ident p ->
       let mtd = Env.find_modtype p env in
       begin match mtd.mtd_type with
-      | None -> Mty_ident p, Mode.Modality.Const.id
+      | None -> Mty_ident p, modalities
       | Some mty -> apply_modalities_module_type env modalities mty
       end
   | Mty_strengthen (mty, p, alias) ->
