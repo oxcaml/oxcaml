@@ -1074,24 +1074,20 @@ void caml_disable_stack_caches(struct stack_cache* caches)
     cache->len += MAX_STACK_CACHE_LIMIT;
 
     while (cache->len > MAX_STACK_CACHE_LIMIT) {
-      bool freed = false;
-      do {
-        struct stack_info* top = cache->head;
+      struct stack_info* top = cache->head;
 
-        // len includes domains with pending pushes, so we may reach the end of
-        // the cache. If so, spin until the pushes resolve.
-        if(top == NULL) {
-          cpu_relax();
-          continue;
-        }
+      // len includes domains with pending pushes, so we may reach the end of
+      // the cache. If so, spin until the pushes resolve.
+      if(top == NULL) {
+        cpu_relax();
+        continue;
+      }
 
-        struct stack_info* next = (struct stack_info*)top->exception_ptr;
-        freed = atomic_compare_exchange_weak(&cache->head, &top, next);
-        if(freed) {
-          cache->len -= 1;
-          free_stack_memory(top);
-        }
-      } while(!freed);
+      struct stack_info* next = (struct stack_info*)top->exception_ptr;
+      if(atomic_compare_exchange_weak(&cache->head, &top, next)) {
+        cache->len -= 1;
+        free_stack_memory(top);
+      }
     }
 
     CAMLassert(cache->head == NULL);
