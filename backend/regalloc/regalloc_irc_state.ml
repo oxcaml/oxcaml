@@ -58,7 +58,7 @@ type t =
 
 let[@inline] make ~initial ~stack_slots ~affinity () =
   let num_registers = List.length (Reg.all_relocatable_regs ()) in
-  let graph = Regalloc_interf_graph.make ~num_registers in
+  let graph = Regalloc_interf_graph.make () in
   let reg_work_list = Reg.Tbl.create num_registers in
   let reg_color = Reg.Tbl.create num_registers in
   let reg_alias = Reg.Tbl.create num_registers in
@@ -388,7 +388,11 @@ let[@inline] for_all_adjacent state reg ~f =
   in
   Regalloc_interf_graph.for_all_adjacent_if state.graph reg ~should_visit ~f
 
-let[@inline] adj_set state = Regalloc_interf_graph.adj_set state.graph
+let[@inline] cardinal_edges state =
+  Regalloc_interf_graph.For_debug.cardinal_edges state.graph
+
+let[@inline] iter_edges state ~f =
+  Regalloc_interf_graph.For_debug.iter_edges state.graph ~f
 
 let[@inline] is_empty_node_moves state reg =
   match Reg.Tbl.find_opt state.move_list reg with

@@ -463,14 +463,14 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   if debug
   then (
-    let adj_set = State.adj_set state in
-    log "(%d pairs in adj_set)" (EdgeSet.cardinal adj_set);
+    log "(%d edges in adj_set)" (State.cardinal_edges state);
     (* CR-someday xclerc for xclerc: remove (kept for the moment for debugging,
        but does not deserve to be controlled by a variable) *)
     if false
     then
       (* may produce a *lot* of lines... *)
-      EdgeSet.iter adj_set ~f:(fun p -> log "%s <- adj_set" (Edge.to_string p)));
+      State.iter_edges state ~f:(fun p ->
+          log "%s <- adj_set" (Regalloc_interf_graph.Edge.to_string p)));
   make_work_list state;
   State.invariant state;
   if debug then log_work_list_desc "before loop";

@@ -25,7 +25,27 @@ end
 
 module EdgeTbl = Hashtbl.Make (Edge)
 
-module EdgeSet = struct
+module type S = sig
+  type t
+
+  val make : num_registers:int -> t
+
+  val clear : t -> unit
+
+  val mem : t -> Edge.t -> bool
+
+  val add : t -> Edge.t -> unit
+
+  val capacity : t -> int
+
+  module For_debug : sig
+    val cardinal : t -> int
+
+    val iter : t -> f:(Edge.t -> unit) -> unit
+  end
+end
+
+module EdgeSet : S = struct
   type t = unit EdgeTbl.t
 
   let default_size = 256
@@ -41,9 +61,79 @@ module EdgeSet = struct
 
   let add set x = EdgeTbl.replace set x ()
 
-  let cardinal set = EdgeTbl.length set
+  let capacity _set = max_int
 
-  let iter set ~f = EdgeTbl.iter (fun key () -> f key) set
+  module For_debug = struct
+    let cardinal set = EdgeTbl.length set
+
+    let iter set ~f = EdgeTbl.iter (fun key () -> f key) set
+  end
+end
+
+module BitMatrix : S = struct
+  type t =
+    { bits : bytes;
+      num_registers : int
+    }
+
+  external unsafe_get_uint8 : bytes -> int -> int = "%bytes_unsafe_get"
+  [@@portable]
+
+  external unsafe_set_uint8 : bytes -> int -> int -> unit = "%bytes_unsafe_set"
+  [@@portable]
+
+  let[@inline always] bit_location ((i, j) : Edge.t) num_registers =
+    (* Compute linear bit offset for edge (i,j) in triangular storage. Layout:
+       row i contains edges (i,i), (i,i+1), ..., (i,n-1). Offset = (elements
+       before row i) + (position within row i) = [i*n - i*(i-1)/2] + (j-i) *)
+    let i = Reg.Stamp.to_int i in
+    let j = Reg.Stamp.to_int j in
+    let bit_offset = (i * num_registers) - ((i * (i - 1)) asr 1) + (j - i) in
+    let byte_index = bit_offset lsr 3 in
+    let bit_position = bit_offset land 7 in
+    byte_index, bit_position
+
+  let make ~num_registers =
+    let num_edges = (num_registers * (num_registers + 1)) lsr 1 in
+    let num_bytes = (num_edges + 7) lsr 3 in
+    { bits = Bytes.make num_bytes '\000'; num_registers }
+
+  let clear t = Bytes.fill t.bits 0 (Bytes.length t.bits) '\000'
+
+  let mem t edge =
+    let byte_index, bit_position = bit_location edge t.num_registers in
+    let byte_val = unsafe_get_uint8 t.bits byte_index in
+    byte_val land (1 lsl bit_position) <> 0
+
+  let add t edge =
+    let byte_index, bit_position = bit_location edge t.num_registers in
+    let byte_val = unsafe_get_uint8 t.bits byte_index in
+    unsafe_set_uint8 t.bits byte_index (byte_val lor (1 lsl bit_position))
+
+  let capacity t = t.num_registers
+
+  module For_debug = struct
+    let cardinal t =
+      (* NOTE: This operation is O(n²) where n is the number of registers, as it
+         scans all bytes in the bit matrix. Unlike EdgeSet.cardinal which is
+         O(1), this implementation counts set bits on-demand. *)
+      let count = ref 0 in
+      for byte_index = 0 to Bytes.length t.bits - 1 do
+        let byte_val = unsafe_get_uint8 t.bits byte_index in
+        for bit_position = 0 to 7 do
+          if byte_val land (1 lsl bit_position) <> 0 then incr count
+        done
+      done;
+      !count
+
+    let iter t ~f =
+      for i = 0 to t.num_registers - 1 do
+        for j = i to t.num_registers - 1 do
+          let edge = Reg.Stamp.of_int_unsafe i, Reg.Stamp.of_int_unsafe j in
+          if mem t edge then f edge
+        done
+      done
+  end
 end
 
 module Degree = struct
@@ -56,6 +146,9 @@ module Degree = struct
   let to_float deg = if deg = max_int then Float.infinity else Float.of_int deg
 end
 
+let bit_matrix_threshold : int Lazy.t =
+  Regalloc_utils.int_of_param ~default:0 "BIT_MATRIX_THRESHOLD"
+
 (** Interference graph representation.
 
     Maintains both an edge set and adjacency lists for performance. The edge set
@@ -63,20 +156,36 @@ end
     enable efficient iteration. This duplication is intentional: the IRC
     algorithm requires both fast membership testing (during coalescing) and
     efficient iteration (during simplification and color assignment). *)
+type edge_set =
+  | EdgeSet of EdgeSet.t
+  | BitMatrix of BitMatrix.t
+
 type t =
-  { adj_set : EdgeSet.t;
+  { mutable adj_set : edge_set;
     adj_list : Reg.t list Reg.Tbl.t;
     degree : int Reg.Tbl.t
   }
 
-let[@inline] make ~num_registers =
-  { adj_set = EdgeSet.make ~num_registers;
+let[@inline] make () =
+  let num_registers = Reg.For_testing.get_stamp () in
+  let adj_set =
+    if num_registers < Lazy.force bit_matrix_threshold
+    then BitMatrix (BitMatrix.make ~num_registers)
+    else EdgeSet (EdgeSet.make ~num_registers)
+  in
+  { adj_set;
     adj_list = Reg.Tbl.create num_registers;
     degree = Reg.Tbl.create num_registers
   }
 
 let[@inline] clear graph =
-  EdgeSet.clear graph.adj_set;
+  let num_registers = Reg.For_testing.get_stamp () in
+  (match graph.adj_set with
+  | EdgeSet set -> EdgeSet.clear set
+  | BitMatrix matrix ->
+    if BitMatrix.capacity matrix < num_registers
+    then graph.adj_set <- BitMatrix (BitMatrix.make ~num_registers)
+    else BitMatrix.clear matrix);
   Reg.Tbl.clear graph.adj_list;
   Reg.Tbl.clear graph.degree
 
@@ -87,13 +196,20 @@ let[@inline] add_edge graph u v =
     | Unknown -> true
     | Stack (Local _ | Incoming _ | Outgoing _ | Domainstate _) -> false
   in
-  let pair = Edge.make u.Reg.stamp v.Reg.stamp in
+  let edge = Edge.make u.Reg.stamp v.Reg.stamp in
+  let[@inline] mem_edge () =
+    match graph.adj_set with
+    | EdgeSet set -> EdgeSet.mem set edge
+    | BitMatrix matrix -> BitMatrix.mem matrix edge
+  in
   if
     (not (Reg.same u v))
     && is_interesting_reg u && is_interesting_reg v && same_reg_class u v
-    && not (EdgeSet.mem graph.adj_set pair)
+    && not (mem_edge ())
   then (
-    EdgeSet.add graph.adj_set pair;
+    (match graph.adj_set with
+    | EdgeSet set -> EdgeSet.add set edge
+    | BitMatrix matrix -> BitMatrix.add matrix edge);
     let add_adj_list x y =
       Reg.Tbl.replace graph.adj_list x (y :: Reg.Tbl.find graph.adj_list x)
     in
@@ -115,7 +231,10 @@ let[@inline] add_edge graph u v =
       incr_degree v))
 
 let[@inline] mem_edge graph reg1 reg2 =
-  EdgeSet.mem graph.adj_set (Edge.make reg1.Reg.stamp reg2.Reg.stamp)
+  let edge = Edge.make reg1.Reg.stamp reg2.Reg.stamp in
+  match graph.adj_set with
+  | EdgeSet set -> EdgeSet.mem set edge
+  | BitMatrix matrix -> BitMatrix.mem matrix edge
 
 let[@inline] adj_list graph reg = Reg.Tbl.find graph.adj_list reg
 
@@ -146,10 +265,6 @@ let[@inline] decr_degree graph reg =
   let deg = degree graph reg in
   if deg <> Degree.infinite then Reg.Tbl.replace graph.degree reg (pred deg)
 
-let[@inline] adj_set graph = graph.adj_set
-
-let[@inline] cardinal graph = EdgeSet.cardinal graph.adj_set
-
 let[@inline] init_register graph reg =
   Reg.Tbl.replace graph.adj_list reg [];
   Reg.Tbl.replace graph.degree reg 0
@@ -157,3 +272,15 @@ let[@inline] init_register graph reg =
 let[@inline] init_register_with_infinite_degree graph reg =
   Reg.Tbl.replace graph.adj_list reg [];
   Reg.Tbl.replace graph.degree reg Degree.infinite
+
+module For_debug = struct
+  let cardinal_edges graph =
+    match graph.adj_set with
+    | EdgeSet set -> EdgeSet.For_debug.cardinal set
+    | BitMatrix matrix -> BitMatrix.For_debug.cardinal matrix
+
+  let iter_edges graph ~f =
+    match graph.adj_set with
+    | EdgeSet set -> EdgeSet.For_debug.iter set ~f
+    | BitMatrix matrix -> BitMatrix.For_debug.iter matrix ~f
+end
