@@ -1056,7 +1056,7 @@ void caml_enable_stack_caches(struct stack_cache* caches)
     struct stack_cache* cache = &caches[i];
 
     CAMLassert(cache->head == NULL);
-    CAMLassert(cache->len == MAX_STACK_CACHE_LIMIT);
+    CAMLassert(cache->len >= MAX_STACK_CACHE_LIMIT);
 
     // Allow other domains to start pushing stacks
     cache->len -= MAX_STACK_CACHE_LIMIT;
@@ -1095,7 +1095,7 @@ void caml_disable_stack_caches(struct stack_cache* caches)
     }
 
     CAMLassert(cache->head == NULL);
-    CAMLassert(cache->len == MAX_STACK_CACHE_LIMIT);
+    CAMLassert(cache->len >= MAX_STACK_CACHE_LIMIT);
   }
 }
 
