@@ -4400,12 +4400,17 @@ let global_table namelist =
  *     num_deps : intnat       -- number of dependencies
  *     dep_indices : intnat *  -- pointer to array of indices into entries[]
  *     init_state : value      -- Val_int 0 = not init, 1 = initializing,
- *                                2 = done
+ *                                2 = done, 3 = failed
+ *     raised_exn : value      -- stored exception if failed, Val_unit otherwise
  *   }
  *
  *  Entries are sorted by unit_name for binary search lookup.
  *  Dependencies reference other entries by index, avoiding name lookups.
  *)
+(* CR-someday xclerc: Consider merging the multiple traversals of
+   [sorted_units] (index_map, name_symbols, dep_arrays, table_entries) into
+   fewer passes, and avoiding the duplicate dep filtering between the
+   dep_arrays and table_entries passes. See #5395. *)
 let unit_deps_table units =
   let module CU = Compilation_unit in
   let module StringMap = Misc.Stdlib.String.Map in
@@ -4498,7 +4503,8 @@ let unit_deps_table units =
           Csymbol_address frametable_sym;
           Cint (Nativeint.of_int num_deps);
           deps_sym_item;
-          Cint 1n (* init_state: INIT_STATE_NOT_INITIALIZED = Val_int(0) *) ])
+          Cint 1n (* init_state: INIT_STATE_NOT_INITIALIZED = Val_int(0) *);
+          Cint 1n (* raised_exn: Val_unit (no exception yet) *) ])
       sorted_units
   in
   Cdata (string_data @ dep_arrays @ table_header @ table_entries)

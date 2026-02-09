@@ -193,7 +193,8 @@ void caml_startup_pooled(char_os **argv)
 enum init_state {
   INIT_STATE_NOT_INITIALIZED = 1,  /* Val_int(0) */
   INIT_STATE_INITIALIZING    = 3,  /* Val_int(1) */
-  INIT_STATE_DONE            = 5   /* Val_int(2) */
+  INIT_STATE_DONE            = 5,  /* Val_int(2) */
+  INIT_STATE_FAILED          = 7   /* Val_int(3) */
 };
 
 struct caml_unit_deps_entry {
@@ -204,6 +205,7 @@ struct caml_unit_deps_entry {
   intnat num_deps;             /* number of dependencies */
   const intnat *dep_indices;   /* array of indices into caml_unit_deps_table */
   enum init_state init_state;  /* one of INIT_STATE_* */
+  value raised_exn;            /* stored exception if INIT_STATE_FAILED */
 };
 
 struct caml_unit_deps_table {
@@ -260,6 +262,10 @@ static value caml_init_module_rec(struct caml_unit_deps_entry *entry)
     CAMLreturn(Val_unit);
   }
 
+  if (entry->init_state == INIT_STATE_FAILED) {
+    CAMLreturn(Make_exception_result(entry->raised_exn));
+  }
+
   if (entry->init_state == INIT_STATE_INITIALIZING) {
     CAMLreturn(init_module_failure(
       "caml_init_module: cycle detected at module %s",
@@ -276,6 +282,9 @@ static value caml_init_module_rec(struct caml_unit_deps_entry *entry)
       &caml_unit_deps_table.entries[dep_idx];
     value result = caml_init_module_rec(dep);
     if (Is_exception_result(result)) {
+      entry->init_state = INIT_STATE_FAILED;
+      entry->raised_exn = Extract_exception(result);
+      caml_register_generational_global_root(&entry->raised_exn);
       CAMLreturn(result);
     }
   }
@@ -310,6 +319,9 @@ static value caml_init_module_rec(struct caml_unit_deps_entry *entry)
   /* Call the entry function (takes no arguments, but pass Val_unit) */
   value result = caml_callback_exn(closure, Val_unit);
   if (Is_exception_result(result)) {
+    entry->init_state = INIT_STATE_FAILED;
+    entry->raised_exn = Extract_exception(result);
+    caml_register_generational_global_root(&entry->raised_exn);
     CAMLreturn(result);
   }
 
