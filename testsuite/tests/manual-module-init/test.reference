@@ -97,4 +97,9 @@ Ocaml_init: Base.base_value = 100
 Ocaml_init: initialization complete
 Step 8: done
 
+Step 9: Test module that raises during initialization
+Raises: initializing
+Step 9: caught exception: Failure("Raises: deliberate failure during init")
+Step 9: done
+
 === All tests passed ===

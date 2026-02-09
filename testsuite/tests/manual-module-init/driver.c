@@ -1,9 +1,11 @@
 #define CAML_INTERNALS
 #define NATIVE_CODE
 #include <stdio.h>
+#include <string.h>
 #include <caml/mlvalues.h>
 #include <caml/callback.h>
 #include <caml/memory.h>
+#include <caml/printexc.h>
 #include <caml/startup.h>
 
 int main(int argc, char **argv)
@@ -64,6 +66,24 @@ int main(int argc, char **argv)
   fflush(stdout);
   caml_init_module("Ocaml_init");
   printf("Step 8: done\n\n");
+  fflush(stdout);
+
+  printf("Step 9: Test module that raises during initialization\n");
+  fflush(stdout);
+  {
+    value result = caml_init_module_exn("Raises");
+    if (Is_exception_result(result)) {
+      value exn = Extract_exception(result);
+      char *msg = caml_format_exception(exn);
+      printf("Step 9: caught exception: %s\n", msg);
+      fflush(stdout);
+      caml_stat_free(msg);
+    } else {
+      printf("ERROR: expected exception from Raises module\n");
+      return 1;
+    }
+  }
+  printf("Step 9: done\n\n");
   fflush(stdout);
 
   printf("=== All tests passed ===\n");

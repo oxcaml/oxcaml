@@ -5,8 +5,9 @@ external try_init_self : unit -> int = "try_init_self_stub"
 
 let () = Printf.printf "Cycle_module: calling C stub that will try to init Cycle_module\n%!"
 
-(* This will trigger cycle detection and abort *)
-let result = try_init_self ()
-
-(* Should not reach here *)
-let () = Printf.printf "Cycle_module: ERROR - should have aborted! result=%d\n%!" result
+let () =
+  match try_init_self () with
+  | result ->
+    Printf.printf "Cycle_module: ERROR - should have detected cycle! result=%d\n%!" result
+  | exception Failure msg ->
+    Printf.printf "Cycle_module: caught cycle exception: Failure(\"%s\")\n%!" msg

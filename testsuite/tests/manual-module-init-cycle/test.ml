@@ -24,9 +24,8 @@
    script = "${mkexe} -I${ocamlsrcdir}/${runtime_dir} -o test_driver test_modules.${objext} cycle_stubs.${objext} ${bytecc_libs} driver.c";
    script;
 
-   (* Run the test - expect abort due to cycle detection *)
+   (* Run the test - cycle is detected and caught as an exception *)
    program = "./test_driver";
-   exit_status = "-6";
    run;
    check-program-output;
  }

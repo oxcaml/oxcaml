@@ -17,11 +17,12 @@ int main(int argc, char **argv)
   printf("Step 1: done\n\n");
   fflush(stdout);
 
-  printf("Step 2: Initialize Cycle_module (should detect cycle and abort)\n");
+  printf("Step 2: Initialize Cycle_module (cycle detected and caught in OCaml)\n");
   fflush(stdout);
   caml_init_module("Cycle_module");
+  printf("Step 2: done\n\n");
+  fflush(stdout);
 
-  /* Should not reach here */
-  printf("ERROR: should have aborted due to cycle detection!\n");
-  return 1;
+  printf("=== All tests passed ===\n");
+  return 0;
 }

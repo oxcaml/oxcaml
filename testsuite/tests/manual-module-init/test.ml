@@ -1,5 +1,5 @@
 (* TEST
- readonly_files = "base.ml dep_a.ml dep_b.ml diamond.ml gc_test.ml closures.ml gc_compact_test.ml reentrant_a.ml reentrant_b.ml reentrant_c.ml reentrant_stubs.c ocaml_init.ml driver.c";
+ readonly_files = "base.ml dep_a.ml dep_b.ml diamond.ml gc_test.ml closures.ml gc_compact_test.ml reentrant_a.ml reentrant_b.ml reentrant_c.ml reentrant_stubs.c ocaml_init.ml raises.ml driver.c";
  runtime5;
  {
    setup-ocamlopt.byte-build-env;
@@ -28,6 +28,8 @@
    ocamlopt.byte;
    module = "ocaml_init.ml";
    ocamlopt.byte;
+   module = "raises.ml";
+   ocamlopt.byte;
 
    (* Compile the C stubs *)
    module = "";
@@ -37,7 +39,7 @@
    (* Create complete object with all modules *)
    flags = "-manual-module-init -output-complete-obj";
    program = "test_modules.${objext}";
-   all_modules = "base.cmx dep_a.cmx dep_b.cmx diamond.cmx gc_test.cmx closures.cmx gc_compact_test.cmx reentrant_a.cmx reentrant_c.cmx reentrant_b.cmx ocaml_init.cmx";
+   all_modules = "base.cmx dep_a.cmx dep_b.cmx diamond.cmx gc_test.cmx closures.cmx gc_compact_test.cmx reentrant_a.cmx reentrant_c.cmx reentrant_b.cmx ocaml_init.cmx raises.cmx";
    ocamlopt.byte;
 
    (* Link with C driver and stubs *)
