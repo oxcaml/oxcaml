@@ -53,6 +53,10 @@ module type S = sig
   end
 end
 
+(** Legacy representation for edge sets.
+
+    The implementation is based on a hash table built by applying `Hashtbl.Make`
+    to the `Edge` module above. *)
 module EdgeSet : S
 
 (** Alternative bit matrix representation for edge sets.
@@ -100,7 +104,7 @@ type t
 
 (** Create a new empty interference graph.
 
-    The graph is sized based on the current register stamp
+    The graph size is based on the current register stamp
     (Reg.For_testing.get_stamp). This ensures it can accommodate all registers
     that have been allocated so far. *)
 val make : unit -> t
