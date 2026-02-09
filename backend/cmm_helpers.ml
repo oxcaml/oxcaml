@@ -2597,8 +2597,17 @@ let unbox_int dbg bi =
       | _ -> default cmm)
     | cmm -> default cmm)
 
-let make_unsigned_int bi arg dbg =
-  if bi = Primitive.Unboxed_int32 then zero_extend ~bits:32 arg ~dbg else arg
+let bit_count (bi : Primitive.unboxed_or_untagged_integer) =
+  match bi with
+  | Untagged_int8 -> 8
+  | Untagged_int16 -> 16
+  | Unboxed_int32 -> 32
+  | Unboxed_int64 -> 64
+  | Unboxed_nativeint -> size_int * 8
+  | Untagged_int -> (size_int * 8) - 1
+
+let make_unsigned_int (bi : Primitive.unboxed_or_untagged_integer) arg dbg =
+  zero_extend ~bits:(bit_count bi) arg ~dbg
 
 let unaligned_load_16 ~ptr_out_of_heap ptr idx dbg =
   if Arch.allow_unaligned_access
