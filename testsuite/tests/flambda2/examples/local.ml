@@ -33,14 +33,15 @@ let () =
   assert (length ms = 3)
 
 let rec rev_app (l1 : _ @ local) l2 =
-  match l1 with [] -> l2 | a :: l1 -> rev_app l1 (a :: l2)
+  match l1 with [] -> l2 | a :: l1 -> exclave_ (rev_app l1 (a :: l2))
 
 let rec spans ~break_here l =
   match l with
   | [] -> []
   | _ ->
-    let span, rest = find_span ~break_here l [] in
-    rev_app span [] :: spans ~break_here rest
+    exclave_ (
+      let span, rest = find_span ~break_here l [] in
+      rev_app span [] :: spans ~break_here rest)
 
 and find_span ~break_here l (acc : _ @ local) =
   exclave_
