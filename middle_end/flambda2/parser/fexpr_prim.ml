@@ -159,7 +159,9 @@ let string_accessor_width =
         match i with
         | "f32" -> Single
         | "8" -> Eight
+        | "i8" -> Eight_signed
         | "16" -> Sixteen
+        | "i16" -> Sixteen_signed
         | "32" -> Thirty_two
         | "64" -> Sixty_four
         | "128a" -> One_twenty_eight { aligned = true }
@@ -346,8 +348,8 @@ let probe_is_enabled =
 
 let enter_inlined_apply =
   D.(
-    nullary "%inlined_apply" ~params:(todop "dbginfo") (fun _env dbg ->
-        P.Enter_inlined_apply { dbg }))
+    nullary "%inlined_apply" ~params:param0 (fun _env () ->
+        P.Enter_inlined_apply { dbg = Inlined_debuginfo.none }))
 
 let domain_index =
   D.(nullary "%domain_index" ~params:param0 (fun _env () -> P.Domain_index))
@@ -799,7 +801,7 @@ module OfFlambda = struct
     | Optimised_out kind -> optimised_out env kind
     | Probe_is_enabled { name; enabled_at_init } ->
       probe_is_enabled env (name, enabled_at_init)
-    | Enter_inlined_apply { dbg } -> enter_inlined_apply env dbg
+    | Enter_inlined_apply { dbg = _ } -> enter_inlined_apply env ()
     | Domain_index -> domain_index env ()
     | Dls_get -> dls_get env ()
     | Tls_get -> tls_get env ()
