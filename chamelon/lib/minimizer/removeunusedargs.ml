@@ -254,12 +254,11 @@ let minimize should_remove map cur_name =
   in
   let nmap = Smap.add cur_name nstr map in
   (* Replacing in multifiles *)
-  let name_clr = String.sub cur_name 0 (String.length cur_name - 1) in
   let global_replace str =
     List.fold_left
       (fun nstr (id_fun, depth, arg_list, arg_label) ->
         let id_fun_ext =
-          Path.Pdot (Pident (Ident.create_local name_clr), Ident.name id_fun)
+          Path.Pdot (Pident (Ident.create_local cur_name), Ident.name id_fun)
         in
         let to_replace_mf = fun_wrapper arg_list [] depth id_fun_ext 1 in
         let mapper_mf = replace_mapper id_fun to_replace_mf arg_label in
@@ -270,5 +269,4 @@ let minimize should_remove map cur_name =
   (* Final result *)
   nmap
 
-let minimizer =
-  { minimizer_name = "remove-unused-args"; minimizer_func = minimize }
+let minimizer = multifile_minimizer "remove-unused-args" minimize

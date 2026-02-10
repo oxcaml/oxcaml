@@ -189,91 +189,85 @@ let rec rem_in_pat str pat should_remove =
     pat
   | O (Tpat_var _ | Tpat_alias _ | Tpat_array _ | Tpat_tuple _) -> assert false
 
-let minimize should_remove map cur_name =
-  let cur_str = Smap.find cur_name map in
-  let remove_dead_mapper =
-    { Tast_mapper.default with
-      structure =
-        (fun mapper str ->
-          Tast_mapper.default.structure mapper
-            { str with
-              str_items =
-                List.rev
-                  (List.fold_left
-                     (fun l str_it ->
-                       match str_it.str_desc with
-                       | Tstr_value (r_f, vb_l) ->
-                         let vb_l =
-                           List.rev
-                           @@ List.fold_left
-                                (fun (l : value_binding list) vb ->
-                                  let npat =
-                                    rem_in_pat str vb.vb_pat should_remove
-                                  in
-                                  if var_from_pat npat.pat_desc [] = []
-                                  then l
-                                  else { vb with vb_pat = npat } :: l)
-                                [] vb_l
-                         in
-                         if vb_l = []
-                         then l
-                         else
-                           { str_it with str_desc = Tstr_value (r_f, vb_l) }
-                           :: l
-                       | Tstr_primitive vd ->
-                         let is_used = is_used_var str vd.val_id in
-                         if (not is_used) && should_remove ()
-                         then l
-                         else str_it :: l
-                       | Tstr_exception te ->
-                         let is_used =
-                           is_used_exc str te.tyexn_constructor.ext_name.txt
-                         in
-                         if (not is_used) && should_remove ()
-                         then l
-                         else str_it :: l
-                       | Tstr_type (rf, tdl) ->
-                         let nl =
-                           List.rev
-                             (List.fold_left
-                                (fun l td ->
-                                  let is_used =
-                                    is_used_typ str td.typ_name.txt
-                                  in
-                                  if (not is_used) && should_remove ()
-                                  then l
-                                  else td :: l)
-                                [] tdl)
-                         in
-                         if nl = []
-                         then l
-                         else { str_it with str_desc = Tstr_type (rf, nl) } :: l
-                       | _ -> str_it :: l)
-                     [] str.str_items)
-            });
-      expr =
-        (fun mapper e ->
-          Tast_mapper.default.expr mapper
-            (match e.exp_desc with
-            | Texp_let (rf, vb_l, e1) ->
-              let nvb_l =
-                List.rev
-                  (List.fold_left
-                     (fun (l : value_binding list) vb ->
-                       let npat = rem_in_pat cur_str vb.vb_pat should_remove in
-                       if var_from_pat npat.pat_desc [] = [] && should_remove ()
+let remove_dead_mapper cur_str should_remove =
+  { Tast_mapper.default with
+    structure =
+      (fun mapper str ->
+        Tast_mapper.default.structure mapper
+          { str with
+            str_items =
+              List.rev
+                (List.fold_left
+                   (fun l str_it ->
+                     match str_it.str_desc with
+                     | Tstr_value (r_f, vb_l) ->
+                       let vb_l =
+                         List.rev
+                         @@ List.fold_left
+                              (fun (l : value_binding list) vb ->
+                                let npat =
+                                  rem_in_pat str vb.vb_pat should_remove
+                                in
+                                if var_from_pat npat.pat_desc [] = []
+                                then l
+                                else { vb with vb_pat = npat } :: l)
+                              [] vb_l
+                       in
+                       if vb_l = []
                        then l
-                       else { vb with vb_pat = npat } :: l)
-                     [] vb_l)
-              in
-              if nvb_l = []
-              then e1
-              else { e with exp_desc = Texp_let (rf, nvb_l, e1) }
-            | _ -> e))
-    }
-  in
-  let nstr = remove_dead_mapper.structure remove_dead_mapper cur_str in
-  Smap.add cur_name nstr map
+                       else
+                         { str_it with str_desc = Tstr_value (r_f, vb_l) } :: l
+                     | Tstr_primitive vd ->
+                       let is_used = is_used_var str vd.val_id in
+                       if (not is_used) && should_remove ()
+                       then l
+                       else str_it :: l
+                     | Tstr_exception te ->
+                       let is_used =
+                         is_used_exc str te.tyexn_constructor.ext_name.txt
+                       in
+                       if (not is_used) && should_remove ()
+                       then l
+                       else str_it :: l
+                     | Tstr_type (rf, tdl) ->
+                       let nl =
+                         List.rev
+                           (List.fold_left
+                              (fun l td ->
+                                let is_used = is_used_typ str td.typ_name.txt in
+                                if (not is_used) && should_remove ()
+                                then l
+                                else td :: l)
+                              [] tdl)
+                       in
+                       if nl = []
+                       then l
+                       else { str_it with str_desc = Tstr_type (rf, nl) } :: l
+                     | _ -> str_it :: l)
+                   [] str.str_items)
+          });
+    expr =
+      (fun mapper e ->
+        Tast_mapper.default.expr mapper
+          (match e.exp_desc with
+          | Texp_let (rf, vb_l, e1) ->
+            let nvb_l =
+              List.rev
+                (List.fold_left
+                   (fun (l : value_binding list) vb ->
+                     let npat = rem_in_pat cur_str vb.vb_pat should_remove in
+                     if var_from_pat npat.pat_desc [] = [] && should_remove ()
+                     then l
+                     else { vb with vb_pat = npat } :: l)
+                   [] vb_l)
+            in
+            if nvb_l = []
+            then e1
+            else { e with exp_desc = Texp_let (rf, nvb_l, e1) }
+          | _ -> e))
+  }
 
 let minimizer =
-  { minimizer_name = "remove-dead-code"; minimizer_func = minimize }
+  structure_minimizer "remove-dead-code" (fun should_remove str ->
+      let mapper = remove_dead_mapper str should_remove in
+      mapper.structure mapper str)

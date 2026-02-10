@@ -194,12 +194,11 @@ let minimize should_remove map cur_name =
       nstr !fields_to_remove
   in
   (* Replacing in multifiles *)
-  let name_clr = String.sub cur_name 0 (String.length cur_name - 3) in
   let mapper str =
     List.fold_left
       (fun nstr (i, cons, typ) ->
         let typ_mf =
-          Path.Pdot (Pident (Ident.create_local name_clr), Path.name typ)
+          Path.Pdot (Pident (Ident.create_local cur_name), Path.name typ)
         in
         let mapper_mf = remove_cons_mapper (i, cons, typ_mf) in
         mapper_mf.structure mapper_mf nstr)
@@ -209,5 +208,4 @@ let minimize should_remove map cur_name =
   (* Final result*)
   nmap
 
-let minimizer =
-  { minimizer_name = "remove-cons-fields"; minimizer_func = minimize }
+let minimizer = multifile_minimizer "remove-cons-fields" minimize

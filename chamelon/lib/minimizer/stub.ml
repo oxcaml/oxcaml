@@ -26,7 +26,8 @@
  ******************************************************************************)
 
 (* Minimizer stub: replace value bindings in structures with dummy values,
-   remove top-level expressions.
+   remove top-level expressions, make all types abstract, and remove annotations
+   (except `[@inline]` and `[@local]`).
 
    This minimizer is useful to quickly remove irrelevant definitions without
    breaking signatures.
@@ -68,6 +69,11 @@ let rec is_dummy e =
   | Texp_function ({ body = Function_body body_expr; params }, _id) ->
     List.for_all (fun param -> Option.is_none param.optional_default) params
     && is_dummy body_expr
+  | Texp_function ({ body = Function_cases fc_cases }, _id) -> (
+    match fc_cases.cases with
+    | [{ c_lhs = { pat_desc = Tpat_any; _ }; c_guard = None; c_rhs }] ->
+      is_dummy c_rhs
+    | _ -> false)
   | _ -> false
 
 let rec stub_function_body expr =
@@ -76,57 +82,62 @@ let rec stub_function_body expr =
     let new_body =
       match body with
       | Function_body body_expr -> Function_body (stub_function_body body_expr)
-      | Function_cases _ -> Function_body apply_dummy2
+      | Function_cases fc_cases ->
+        let cases =
+          [{ c_lhs = any_pat; c_guard = None; c_rhs = apply_dummy2 }]
+        in
+        Function_cases { fc_cases with cases }
     in
     let new_params =
-      List.map (fun param -> { param with optional_default = None }) params
+      List.map
+        (fun param ->
+          let pattern = { param.pattern with pat_desc = Tpat_any } in
+          { param with pattern; partial = Total; optional_default = None })
+        params
     in
     let new_func = { params = new_params; body = new_body } in
     { expr with exp_desc = mkTexp_function ~id new_func }
   | _ -> apply_dummy2
 
-let minimize should_remove map cur_name =
-  let mapper =
-    { Tast_mapper.default with
-      structure =
-        (fun sub str ->
-          (* We need to process bindings in reverse order, because stubbing out
-             one binding can make later bindings fail to typecheck due to type
-             inference. *)
-          let new_items =
-            List.filter_map
-              (fun item ->
-                match item.str_desc with
-                | Tstr_value (Recursive, bindings) when should_remove () ->
-                  let bindings =
-                    List.map
-                      (fun vb ->
-                        { vb with vb_expr = stub_function_body vb.vb_expr })
-                      bindings
-                  in
-                  Some
-                    { item with str_desc = Tstr_value (Nonrecursive, bindings) }
-                | Tstr_value (Nonrecursive, bindings) ->
-                  let bindings =
-                    List.map
-                      (fun vb ->
-                        if is_dummy vb.vb_expr
-                        then vb
-                        else if should_remove ()
-                        then { vb with vb_expr = stub_function_body vb.vb_expr }
-                        else sub.value_binding sub vb)
-                      bindings
-                  in
-                  Some
-                    { item with str_desc = Tstr_value (Nonrecursive, bindings) }
-                | Tstr_eval _ when should_remove () -> None
-                | _ -> Some (Tast_mapper.default.structure_item sub item))
-              (List.rev str.str_items)
-          in
+let stub_mapper should_remove =
+  { Tast_mapper.default with
+    structure =
+      (fun sub str ->
+        (* We need to process bindings in reverse order, because stubbing out
+           one binding can make later bindings fail to typecheck due to type
+           inference. *)
+        let new_items =
+          List.filter_map
+            (fun item ->
+              match item.str_desc with
+              | Tstr_value (Recursive, bindings) when should_remove () ->
+                let bindings =
+                  List.map
+                    (fun vb ->
+                      { vb with vb_expr = stub_function_body vb.vb_expr })
+                    bindings
+                in
+                Some
+                  { item with str_desc = Tstr_value (Nonrecursive, bindings) }
+              | Tstr_value (Nonrecursive, bindings) ->
+                let bindings =
+                  List.map
+                    (fun vb ->
+                      if is_dummy vb.vb_expr
+                      then vb
+                      else if should_remove ()
+                      then { vb with vb_expr = stub_function_body vb.vb_expr }
+                      else sub.value_binding sub vb)
+                    bindings
+                in
+                Some
+                  { item with str_desc = Tstr_value (Nonrecursive, bindings) }
+              | Tstr_eval _ when should_remove () -> None
+              | _ -> Some item)
+            (List.rev str.str_items)
+        in
+        Tast_mapper.default.structure sub
           { str with str_items = List.rev new_items })
-    }
-  in
-  let nstr = mapper.structure mapper (Smap.find cur_name map) in
-  Smap.add cur_name nstr map
+  }
 
-let minimizer = { minimizer_name = "stub"; minimizer_func = minimize }
+let minimizer = tast_mapper_minimizer "stub" stub_mapper

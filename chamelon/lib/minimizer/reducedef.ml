@@ -41,19 +41,13 @@ let is_dummy e =
     | _ -> false)
   | _ -> false
 
-let minimize should_remove map cur_name =
-  let reduce_def_mapper =
-    { Tast_mapper.default with
-      value_binding =
-        (fun mapper vb ->
-          if (not (is_dummy vb.vb_expr)) && should_remove ()
-          then { vb with vb_expr = apply_dummy2 }
-          else Tast_mapper.default.value_binding mapper vb)
-    }
-  in
-  let nstr =
-    reduce_def_mapper.structure reduce_def_mapper (Smap.find cur_name map)
-  in
-  Smap.add cur_name nstr map
+let reduce_def_mapper should_remove =
+  { Tast_mapper.default with
+    value_binding =
+      (fun mapper vb ->
+        if (not (is_dummy vb.vb_expr)) && should_remove ()
+        then { vb with vb_expr = apply_dummy2 }
+        else Tast_mapper.default.value_binding mapper vb)
+  }
 
-let minimizer = { minimizer_name = "reduce-def"; minimizer_func = minimize }
+let minimizer = tast_mapper_minimizer "reduce-def" reduce_def_mapper
