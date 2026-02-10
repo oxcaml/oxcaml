@@ -452,13 +452,18 @@ let to_file outchan cu artifact_info ~required_globals ~main_module_block_format
       (p, pos_out outchan - p)
     end else
       (0, 0) in
+  let imports =
+    Env.imports ()
+    |> List.map
+      (fun import -> Import_info.name import, Import_info.Intf.info import)
+  in
   let compunit =
     { cu_name = cu;
       cu_pos = pos_code;
       cu_codesize = !out_position;
       cu_reloc = List.rev !reloc_info;
       cu_arg_descr = arg_descr;
-      cu_imports = Env.imports() |> Array.of_list;
+      cu_imports = Array.of_list imports;
       cu_format = main_module_block_format;
       cu_primitives = List.map Primitive.byte_name
                                !Translmod.primitive_declarations;
