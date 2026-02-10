@@ -2294,18 +2294,19 @@ let check_unused pred casel =
                     Used
                 | _ -> r
               in
-              match r with
-              | Unused ->
+              Builtin_attributes.warning_scope q.pat_attributes (fun () ->
+                match r with
+                | Unused ->
                   Location.prerr_warning
                     q.pat_loc Warnings.Redundant_case
-              | Upartial ps ->
+                | Upartial ps ->
                   List.iter
                     (fun p ->
-                      Location.prerr_warning
-                        p.pat_loc Warnings.Redundant_subpat)
+                       Location.prerr_warning
+                         p.pat_loc Warnings.Redundant_subpat)
                     ps
-              | Used -> ()
-            with Empty | Not_found -> assert false
+                | Used -> ())
+          with Empty | Not_found -> assert false
             end ;
 
           if has_guard then
@@ -2615,7 +2616,7 @@ let all_rhs_idents exp =
   let open Tast_iterator in
   let expr_iter iter exp =
     match exp.exp_desc with
-    | Texp_ident (path, _lid, _descr, _kind, _mode) ->
+    | Texp_ident (path, _lid, _descr, _kind, _mode, _actual_mode) ->
       List.iter (fun id -> ids := Ident.Set.add id !ids) (Path.heads path)
     (* Use default iterator methods for rest of match.*)
     | _ -> Tast_iterator.default_iterator.expr iter exp

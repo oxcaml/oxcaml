@@ -637,6 +637,12 @@ module Sort = struct
     pp_element ~nested:false ppf t
 
   include Static.T
+
+  module Flat = struct
+    type t =
+      | Var of Var.id
+      | Base of base
+  end
 end
 
 module Layout = struct
@@ -650,5 +656,108 @@ module Layout = struct
       | Any
       | Base of Sort.base
       | Product of t list
+
+    let max = Any
+
+    let rec equal c1 c2 =
+      match c1, c2 with
+      | Base b1, Base b2 -> Sort.equal_base b1 b2
+      | Any, Any -> true
+      | Product cs1, Product cs2 -> List.equal equal cs1 cs2
+      | (Base _ | Any | Product _), _ -> false
+
+    let rec get_sort : t -> Sort.Const.t option = function
+      | Any -> None
+      | Base b -> Some (Sort.Const.Base b)
+      | Product ts ->
+        Option.map
+          (fun x -> Sort.Const.Product x)
+          (Misc.Stdlib.List.map_option get_sort ts)
+
+    module Static = struct
+      let value = Base Sort.Value
+
+      let void = Base Sort.Void
+
+      let float64 = Base Sort.Float64
+
+      let float32 = Base Sort.Float32
+
+      let word = Base Sort.Word
+
+      let untagged_immediate = Base Sort.Untagged_immediate
+
+      let bits8 = Base Sort.Bits8
+
+      let bits16 = Base Sort.Bits16
+
+      let bits32 = Base Sort.Bits32
+
+      let bits64 = Base Sort.Bits64
+
+      let vec128 = Base Sort.Vec128
+
+      let vec256 = Base Sort.Vec256
+
+      let vec512 = Base Sort.Vec512
+
+      let of_base : Sort.base -> t = function
+        | Value -> value
+        | Void -> void
+        | Untagged_immediate -> untagged_immediate
+        | Float64 -> float64
+        | Float32 -> float32
+        | Word -> word
+        | Bits8 -> bits8
+        | Bits16 -> bits16
+        | Bits32 -> bits32
+        | Bits64 -> bits64
+        | Vec128 -> vec128
+        | Vec256 -> vec256
+        | Vec512 -> vec512
+    end
+
+    let of_sort s =
+      let rec of_sort : Sort.t -> _ = function
+        | Var _ -> None
+        | Base b -> Some (Static.of_base b)
+        | Product sorts ->
+          Option.map
+            (fun x -> Product x)
+            (* [Sort.get] is deep, so no need to repeat it here *)
+            (Misc.Stdlib.List.map_option of_sort sorts)
+      in
+      of_sort (Sort.get s)
+
+    let of_flat_sort : Sort.Flat.t -> _ = function
+      | Var _ -> None
+      | Base b -> Some (Static.of_base b)
   end
+
+  let rec of_const (const : Const.t) : _ t =
+    match const with
+    | Any -> Any
+    | Base b -> Sort (Sort.of_base b)
+    | Product cs -> Product (List.map of_const cs)
+
+  let product = function
+    | [] -> Misc.fatal_error "Layout.product: empty product"
+    | [lay] -> lay
+    | lays -> Product lays
+
+  let rec get_const of_sort : _ t -> Const.t option = function
+    | Any -> Some Any
+    | Sort s -> of_sort s
+    | Product layouts ->
+      Option.map
+        (fun x -> Const.Product x)
+        (Misc.Stdlib.List.map_option (get_const of_sort) layouts)
+
+  let get_flat_const t = get_const Const.of_flat_sort t
+
+  let get_const t = get_const Const.of_sort t
+
+  let of_new_sort_var ~level =
+    let sort = Sort.new_var ~level in
+    Sort sort, sort
 end

@@ -99,9 +99,10 @@ type node =
   | Module_binding_name of module_binding
   | Module_declaration_name of module_declaration
   | Module_type_declaration_name of module_type_declaration
-  | Mode of Parsetree.mode Location.loc
-  | Modality of Parsetree.modality Location.loc
+  | Mode of Mode.Alloc.atom Location.loc
+  | Modality of Mode.Modality.atom Location.loc
   | Jkind_annotation of Parsetree.jkind_annotation
+  | Mod_bound of Parsetree.mode Location.loc
   | Attribute of attribute
       (** The location of an [Attribute] is considered to be the location of the
           [attr_name], not the overall attribute. This is because in an [Mbrowse.t], an

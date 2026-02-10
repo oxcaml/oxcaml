@@ -40,6 +40,8 @@ type iterator =
     extension_constructor: iterator -> extension_constructor -> unit;
     jkind_annotation: iterator -> Parsetree.jkind_annotation -> unit;
     location: iterator -> Location.t -> unit;
+    modalities: iterator -> modalities -> unit;
+    modes: 'a. iterator -> 'a modes -> unit;
     module_binding: iterator -> module_binding -> unit;
     module_coercion: iterator -> module_coercion -> unit;
     module_declaration: iterator -> module_declaration -> unit;

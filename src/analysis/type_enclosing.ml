@@ -37,7 +37,12 @@ let print_type ~verbosity type_info =
         Format.flush_str_formatter ())
   | Jkind (env, jkind) ->
     wrap_printing_env env (fun () ->
-        Jkind.format_expanded ppf jkind;
+        let verbosity : Jkind.Format_verbosity.t =
+          match Mconfig.Verbosity.to_int ~for_smart:0 verbosity > 0 with
+          | false -> Expanded
+          | true -> Expanded_with_all_mod_bounds
+        in
+        Jkind.format_verbose ~verbosity ppf jkind;
         Format.flush_str_formatter ())
   | String s -> s
 

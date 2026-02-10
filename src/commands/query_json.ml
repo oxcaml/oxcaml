@@ -38,6 +38,11 @@ let dump (type a) : a t -> json =
     | `Logical (line, col) ->
       `Assoc [ ("line", `Int line); ("column", `Int col) ]
   in
+  let mk_verbosity (verbosity : Mconfig.Verbosity.t) =
+    match verbosity with
+    | Lvl n -> `Int n
+    | Smart -> `String "smart"
+  in
   let kinds_to_json kind =
     `List
       (List.map
@@ -78,7 +83,25 @@ let dump (type a) : a t -> json =
           | Some n -> `Int n );
         ("position", mk_position pos)
       ]
+  | Kind_enclosing { position; index; override_verbosity } ->
+    mk "kind-enclosing"
+      ([ ( "index",
+           match index with
+           | None -> `String "all"
+           | Some n -> `Int n );
+         ("position", mk_position position)
+       ]
+      @ (Option.map override_verbosity ~f:(fun v ->
+             ("override-verbosity", mk_verbosity v))
+        |> Option.to_list))
+  | Mode_enclosing { position; override_verbosity } ->
+    mk "mode-enclosing"
+      ([ ("position", mk_position position) ]
+      @ (Option.map override_verbosity ~f:(fun v ->
+             ("override-verbosity", mk_verbosity v))
+        |> Option.to_list))
   | Locate_type pos -> mk "locate-type" [ ("position", mk_position pos) ]
+  | Locate_types pos -> mk "locate-types" [ ("position", mk_position pos) ]
   | Enclosing pos -> mk "enclosing" [ ("position", mk_position pos) ]
   | Complete_prefix (prefix, pos, kind, doc, typ) ->
     mk "complete-prefix"
@@ -258,6 +281,8 @@ let json_of_stack_or_heap (loc, desc) =
         | `Index n -> `Int n )
     ]
 
+let json_of_mode (loc, mode) = with_location loc [ ("mode", `String mode) ]
+
 let json_of_type_loc (loc, desc, tail) =
   with_location loc
     [ ( "type",
@@ -270,6 +295,14 @@ let json_of_type_loc (loc, desc, tail) =
           | `No -> "no"
           | `Tail_position -> "position"
           | `Tail_call -> "call") )
+    ]
+
+let json_of_kind_enclosing_res (loc, desc) =
+  with_location loc
+    [ ( "kind",
+        match desc with
+        | `Kind k -> `String k
+        | `Index n -> `Int n )
     ]
 
 let json_of_error (error : Location.error) =
@@ -381,6 +414,64 @@ let json_of_locate resp =
   | `Found (Some file, pos) ->
     `Assoc [ ("file", `String file); ("pos", Lexing.json_of_position pos) ]
 
+let json_of_locate_types (resp : Locate_types_result.t) =
+  (* This function serializes to json differently than json_of_locate to make it easier
+     to deserialize. *)
+  let json_of_position
+      ({ pos_fname; pos_lnum; pos_bol; pos_cnum } : Lexing.position) =
+    `Assoc
+      [ ("pos_fname", `String pos_fname);
+        ("pos_lnum", `Int pos_lnum);
+        ("pos_bol", `Int pos_bol);
+        ("pos_cnum", `Int pos_cnum)
+      ]
+  in
+  let json_of_option opt ~f =
+    match opt with
+    | None -> `Null
+    | Some x -> f x
+  in
+  let json_of_locate_result result =
+    let variant_name, payload =
+      match result with
+      | `Found (file, pos) ->
+        let file = json_of_option file ~f:(fun file -> `String file) in
+        ("Found", [ file; json_of_position pos ])
+      | `File_not_found msg -> ("File_not_found", [ `String msg ])
+      | `Builtin id -> ("Builtin", [ `String id ])
+      | `Not_found (id, file) ->
+        let file = json_of_option file ~f:(fun file -> `String file) in
+        ("Not_found", [ `String id; file ])
+      | `Not_in_env id -> ("Not_in_env", [ `String id ])
+    in
+    `List (`String variant_name :: payload)
+  in
+  let json_of_node_data : Locate_types_result.Tree.node_data -> _ = function
+    | Arrow -> `List [ `String "Arrow" ]
+    | Tuple -> `List [ `String "Tuple" ]
+    | Unboxed_tuple -> `List [ `String "Unboxed_tuple" ]
+    | Object -> `List [ `String "Object" ]
+    | Poly_variant -> `List [ `String "Poly_variant" ]
+    | Type_ref { type_; result } ->
+      `List
+        [ `String "Type_ref";
+          `Assoc
+            [ ("type", `String type_);
+              ("result", json_of_locate_result result)
+            ]
+        ]
+    | Other type_ -> `List [ `String "Other"; `String type_ ]
+  in
+  let rec json_of_type_tree { Locate_types_result.Tree.data; children } =
+    `Assoc
+      [ ("data", json_of_node_data data);
+        ("children", `List (List.map ~f:json_of_type_tree children))
+      ]
+  in
+  match resp with
+  | Success tree -> json_of_type_tree tree
+  | Invalid_context -> `String "Invalid context"
+
 let json_of_inlay_hints hints =
   let json_of_hint (position, label) =
     `Assoc
@@ -430,7 +521,10 @@ let json_of_response (type a) (query : a t) (response : a) : json =
   | Type_expr _, str -> `String str
   | Stack_or_heap_enclosing _, results ->
     `List (List.map ~f:json_of_stack_or_heap results)
+  | Mode_enclosing _, results -> `List (List.map ~f:json_of_mode results)
   | Type_enclosing _, results -> `List (List.map ~f:json_of_type_loc results)
+  | Kind_enclosing _, results ->
+    `List (List.map ~f:json_of_kind_enclosing_res results)
   | Enclosing _, results ->
     `List (List.map ~f:(fun loc -> with_location loc []) results)
   | Complete_prefix _, compl -> json_of_completions compl
@@ -485,6 +579,7 @@ let json_of_response (type a) (query : a t) (response : a) : json =
     in
     str
   | Locate_type _, resp -> json_of_locate resp
+  | Locate_types _, resp -> json_of_locate_types resp
   | Locate _, resp -> json_of_locate resp
   | Jump _, resp -> begin
     match resp with

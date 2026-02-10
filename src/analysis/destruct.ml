@@ -308,7 +308,7 @@ let rec get_every_pattern loc = function
       (* We are still in the same branch, going up. *)
       get_every_pattern loc parents
     | Expression
-        { exp_desc = Typedtree.Texp_ident (Path.Pident id, _, _, _, _); _ }
+        { exp_desc = Typedtree.Texp_ident (Path.Pident id, _, _, _, _, _); _ }
       when Ident.name id = "*type-error*" -> raise Ill_typed
     | Expression { exp_desc = Typedtree.Texp_function { params; _ }; _ } ->
     begin

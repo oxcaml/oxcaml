@@ -236,7 +236,7 @@ let iter_on_occurrences
 
   expr = (fun sub ({ exp_desc; exp_env; _ } as e) ->
       (match exp_desc with
-      | Texp_ident (path, lid, _, _, _) ->
+      | Texp_ident (path, lid, _, _, _, _) ->
           f ~namespace:Value exp_env path lid
       | Texp_construct (lid, constr_desc, _, _) ->
           add_constructor_description exp_env lid constr_desc
@@ -327,7 +327,7 @@ let iter_on_occurrences
             f ~namespace:Module pat_env path lid
         | Tpat_type (path, lid) ->
             f ~namespace:Type pat_env path lid
-        | Tpat_constraint _ | Tpat_unpack -> ())
+        | Tpat_constraint _ | Tpat_unpack | Tpat_inspected_type _ -> ())
         pat_extra;
       default_iterator.pat sub pat);
 

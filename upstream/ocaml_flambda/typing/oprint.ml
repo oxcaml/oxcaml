@@ -793,8 +793,6 @@ let out_module_type = ref (fun _ -> failwith "Oprint.out_module_type")
 let out_sig_item = ref (fun _ -> failwith "Oprint.out_sig_item")
 let out_signature = ref (fun _ -> failwith "Oprint.out_signature")
 let out_type_extension = ref (fun _ -> failwith "Oprint.out_type_extension")
-let out_functor_parameters =
-  ref (fun _ -> failwith "Oprint.out_functor_parameters")
 
 (* For anonymous functor arguments, the logic to choose between
    the long-form
@@ -816,18 +814,6 @@ let out_functor_parameters =
      S1 -> S2 -> functor (Y : S3) -> S4 -> S5 -> sig end
 *)
 
-(* take a module type that may be a functor type,
-   and return the longest prefix list of arguments
-   that should be printed in long form. *)
-
-let rec collect_functor_args acc = function
-  | Omty_functor (param, mty_res) ->
-      collect_functor_args (param :: acc) mty_res
-  | non_functor -> (acc, non_functor)
-let collect_functor_args mty =
-  let l, rest = collect_functor_args [] mty in
-  List.rev l, rest
-
 let constructor_of_extension_constructor
     (ext : out_extension_constructor) : out_constructor
 =
@@ -837,48 +823,50 @@ let constructor_of_extension_constructor
     ocstr_return_type = ext.oext_ret_type;
   }
 
-let split_anon_functor_arguments params =
-  let rec uncollect_anonymous_suffix acc rest = match acc with
-    | Some (None, mty_arg) :: acc ->
-        uncollect_anonymous_suffix acc
-          (Some (None, mty_arg) :: rest)
-    | _ :: _ | [] ->
-        (acc, rest)
-  in
-  let (acc, rest) = uncollect_anonymous_suffix (List.rev params) [] in
-  (List.rev acc, rest)
+let rec print_out_module_type ppf = function
+  | Omty_functor (param, res, mres) ->
+      fprintf ppf "@[<2>%a@]" print_out_functor (param, res, mres)
+  | _ as mty -> print_simple_out_module_type ppf mty
 
-let rec print_out_module_type ppf mty =
-  print_out_functor ppf mty
+and print_out_module_type_with_modes ppf (mty, mm) =
+  match mm with
+  | [] -> print_out_module_type ppf mty
+  | _ :: _ ->
+      fprintf ppf "%a%a" print_simple_out_module_type mty print_out_modes mm
 
-and print_out_functor_parameters ppf l =
-  let print_nonanon_arg ppf = function
-    | None ->
-        fprintf ppf "()"
-    | Some (param, mty) ->
-        fprintf ppf "(%s : %a)"
-          (Option.value param ~default:"_")
-          print_out_module_type mty
-  in
-  let rec print_args ppf = function
-    | [] -> ()
-    | Some (None, mty_arg) :: l ->
-        fprintf ppf "%a ->@ %a"
-          print_simple_out_module_type mty_arg
-          print_args l
-    | _ :: _ as non_anonymous_functor ->
-        let args, anons = split_anon_functor_arguments non_anonymous_functor in
-        fprintf ppf "@[<2>functor@ %a@]@ ->@ %a"
-          (pp_print_list ~pp_sep:pp_print_space print_nonanon_arg) args
-          print_args anons
-  in
-  print_args ppf l
+(** Prints functor parameter in the context of long form [functor ...]. *)
+and print_out_functor_parameter ppf = function
+  | None -> fprintf ppf "()"
+  | Some (name, mty, mm) -> fprintf ppf "(%s : %a)"
+     (Option.value name ~default:"_")
+     print_out_module_type_with_modes (mty, mm)
 
-and print_out_functor ppf t =
-  let params, non_functor = collect_functor_args t in
-  fprintf ppf "@[<2>%a%a@]"
-    print_out_functor_parameters params
-    print_simple_out_module_type non_functor
+and print_out_functor ppf (param, res, mres) =
+  match param with
+  | Some (None, mty, mm) ->
+      fprintf ppf "%a ->@ %a"
+        print_simple_out_module_type_with_modes (mty, mm)
+        print_out_module_type_with_modes (res, mres)
+  | _ ->
+      fprintf ppf "@[<2>functor@ %a%a"
+        print_out_functor_parameter param
+        print_out_functor_return_with_modes (res, mres)
+
+(** The caller has printed [functor (X : S) ... (Y : T)] and we need to print
+    the functor return. *)
+and print_out_functor_return_with_modes ppf (mty, mm) =
+  let print_as_fresh () =
+    fprintf ppf "@]@ ->@ %a" print_out_module_type_with_modes (mty, mm)
+  in
+  match mty with
+  | Omty_functor (param, res, mres) ->
+      begin match param, mm with
+      | (None | Some (Some _, _, _)), [] ->
+          fprintf ppf "@ %a%a" print_out_functor_parameter param
+            print_out_functor_return_with_modes (res, mres)
+      | _ -> print_as_fresh ()
+      end
+  | _ -> print_as_fresh ()
 and print_simple_out_module_type ppf =
   function
     Omty_abstract -> ()
@@ -897,6 +885,11 @@ and print_simple_out_module_type ppf =
        print_simple_out_module_type mty
        print_ident id
        (if unaliasable then " [@unaliasable]" else "")
+and print_simple_out_module_type_with_modes ppf (mty, mm) =
+  match mm with
+  | [] -> print_simple_out_module_type ppf mty
+  | _ :: _ ->
+      fprintf ppf "%a%a" print_simple_out_module_type mty print_out_modes mm
 and print_out_signature ppf =
   function
     [] -> ()
@@ -1154,7 +1147,6 @@ let _ = out_module_type := print_out_module_type
 let _ = out_signature := print_out_signature
 let _ = out_sig_item := print_out_sig_item
 let _ = out_type_extension := print_out_type_extension
-let _ = out_functor_parameters := print_out_functor_parameters
 
 (* Phrases *)
 

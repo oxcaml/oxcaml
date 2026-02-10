@@ -304,7 +304,7 @@ Convenience function to ensure we haven't made any syntax errors.
   > }
 
 // Modes
-# CR-someday: Add raw modes (and @?) to typedtree so this information can be recovered
+# CR-someday: Provide hint for `@`
 
   $ cat > modes.ml << EOF
   > module type S = sig
@@ -324,7 +324,7 @@ Convenience function to ensure we haven't made any syntax errors.
   $ syn_doc_name modes.ml 2 19
     type t = foo @ local -> bar @ portable
                      ^
-  No documentation found
+  Mode
 
   $ syn_doc_name modes.ml 2 30
     type t = foo @ local -> bar @ portable
@@ -334,7 +334,7 @@ Convenience function to ensure we haven't made any syntax errors.
   $ syn_doc_name modes.ml 2 35
     type t = foo @ local -> bar @ portable
                                      ^
-  No documentation found
+  Mode
 
   $ syn_doc_name modes.ml 4 7
   let (f @ stateless) (x : int @ contended) = (_ : _ @ contended)
@@ -344,7 +344,7 @@ Convenience function to ensure we haven't made any syntax errors.
   $ syn_doc_name modes.ml 4 12
   let (f @ stateless) (x : int @ contended) = (_ : _ @ contended)
               ^
-  No documentation found
+  Mode
 
   $ syn_doc_name modes.ml 4 29
   let (f @ stateless) (x : int @ contended) = (_ : _ @ contended)
@@ -354,7 +354,7 @@ Convenience function to ensure we haven't made any syntax errors.
   $ syn_doc_name modes.ml 4 33
   let (f @ stateless) (x : int @ contended) = (_ : _ @ contended)
                                    ^
-  No documentation found
+  Mode
 
   $ syn_doc_name modes.ml 4 51
   let (f @ stateless) (x : int @ contended) = (_ : _ @ contended)
@@ -364,7 +364,7 @@ Convenience function to ensure we haven't made any syntax errors.
   $ syn_doc_name modes.ml 4 58
   let (f @ stateless) (x : int @ contended) = (_ : _ @ contended)
                                                             ^
-  No documentation found
+  Mode
 
   $ syn_doc_name modes.ml 5 12
   let x : int @ local = 10
@@ -374,15 +374,15 @@ Convenience function to ensure we haven't made any syntax errors.
   $ syn_doc_name modes.ml 5 17
   let x : int @ local = 10
                    ^
-  No documentation found
+  Mode
 
   $ syn_doc_desc modes.ml 5 17
   let x : int @ local = 10
                    ^
-  No documentation found
+  Values with this mode cannot escape the current region
 
 // Modalities
-# CR-someday: Add raw modalities (and @@?) to typedtree so this information can be recovered
+# CR-someday: Provide hint for `@@`
 
   $ cat > modalities.ml << EOF
   > module type S = sig @@ portable
@@ -402,7 +402,7 @@ Convenience function to ensure we haven't made any syntax errors.
   $ syn_doc_name modalities.ml 1 23
   module type S = sig @@ portable
                          ^
-  No documentation found
+  Modality
 
   $ syn_doc_name modalities.ml 2 23
     val foo : int -> int @@ stateless
@@ -412,17 +412,19 @@ Convenience function to ensure we haven't made any syntax errors.
   $ syn_doc_name modalities.ml 2 28
     val foo : int -> int @@ stateless
                               ^
-  No documentation found
+  Modality
 
   $ syn_doc_name modalities.ml 4 24
   external id : 'a -> 'a @@ portable = "%identity"
                           ^
   No documentation found
 
+# CR-someday: Right now the compiler interprets this as a mode rather than a modality. But
+# maybe we should keep up the charade and tell the user that it's a modality.
   $ syn_doc_name modalities.ml 4 28
   external id : 'a -> 'a @@ portable = "%identity"
                               ^
-  No documentation found
+  Mode
 
   $ syn_doc_name modalities.ml 5 22
   type t = { foo : int @@ contended }
@@ -432,14 +434,12 @@ Convenience function to ensure we haven't made any syntax errors.
   $ syn_doc_name modalities.ml 5 28
   type t = { foo : int @@ contended }
                               ^
-  Record Type
+  Modality
 
-# CR-someday: Since modalities aren't yet supported, this is falling through to the record
-# case
   $ syn_doc_desc modalities.ml 5 28
   type t = { foo : int @@ contended }
                               ^
-  Defines variants with a fixed set of fields
+  The annotated value's mode is always at least as weak as `contended`, even if its container's mode is a stronger.
 
 // Kinds
 

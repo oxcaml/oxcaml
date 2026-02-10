@@ -709,6 +709,14 @@ let remove_dir dirname =
   with Sys_error _msg ->
     ()
 
+let remove_dir_contents dirname =
+  try
+    Array.iter
+      (fun entry -> remove_file (Filename.concat dirname entry))
+      (Sys.readdir dirname);
+    remove_dir dirname
+  with Sys_error _ -> ()
+
 (* Expand a -I option: if it starts with +, make it relative to the standard
    library directory *)
 
@@ -1604,12 +1612,14 @@ let is_print_longer_than size p =
   let out_spaces n = count_down n in
   let out_flush _ = () in
   let out_indent _ = () in
+  let out_width = Format.utf_8_scalar_width in
   let out_functions : Format.formatter_out_functions = {
     out_string;
     out_flush;
     out_newline;
     out_spaces;
-    out_indent}
+    out_indent;
+    out_width}
   in
   let ppf = Format.formatter_of_out_functions out_functions in
   try p ppf; false

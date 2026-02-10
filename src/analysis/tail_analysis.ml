@@ -41,6 +41,7 @@ let tail_operator = function
               _
             },
             _,
+            _,
             _ );
       _
     } -> true

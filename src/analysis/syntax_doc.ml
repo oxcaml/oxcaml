@@ -200,13 +200,8 @@ let get_mod_bound_doc mod_bound =
      }
     : syntax_info)
 
-let get_mode_doc mode =
+let get_mode_doc (Atom (axis, mode) : Mode.Alloc.atom) =
   let open Option.Infix in
-  let* (P (axis, mode)) =
-    match Typemode.Mode_axis_pair.of_string mode with
-    | exception Not_found -> None
-    | res -> Some res
-  in
   let* description =
     match (axis, mode) with
     | Comonadic Areality, Local ->
@@ -291,13 +286,7 @@ let get_mode_doc mode =
      { name = "Mode"; description; documentation = doc_url; level = Advanced }
     : syntax_info)
 
-let get_modality_doc modality =
-  let open Option.Infix in
-  let* (P (axis, _)) =
-    match Typemode.Modality_axis_pair.of_string modality with
-    | exception Not_found -> None
-    | res -> Some res
-  in
+let get_modality_doc (Atom (axis, modality) : Mode.Modality.atom) =
   let description =
     (* CR-someday: Detect the context that the modality is within to make this message
        more detailed. Ex: "This field is always stronger than _, even if the record has a
@@ -305,13 +294,15 @@ let get_modality_doc modality =
     match axis with
     | Comonadic _ ->
       Format.asprintf
-        "The annotated value's mode is always at least as strong as `%s`, even \
+        "The annotated value's mode is always at least as strong as `%a`, even \
          if its container's mode is weaker."
+        (Mode.Modality.Per_axis.print axis)
         modality
     | Monadic _ ->
       Format.asprintf
-        "The annotated value's mode is always at least as weak as `%s`, even \
+        "The annotated value's mode is always at least as weak as `%a`, even \
          if its container's mode is a stronger."
+        (Mode.Modality.Per_axis.print axis)
         modality
   in
   (Some
@@ -644,17 +635,15 @@ let get_oxcaml_syntax_doc cursor_loc nodes : syntax_info =
   in
   match nodes with
   (* Modes and modalities *)
-  | Mode { txt = Mode mode; _ } :: ancestors -> (
-    match ancestors with
-    | Jkind_annotation _ :: _ -> get_mod_bound_doc mode
-    | _ -> get_mode_doc mode)
-  | Modality { txt = Modality modality; _ } :: ancestors -> (
+  | Mode { txt = mode; _ } :: _ -> get_mode_doc mode
+  | Modality { txt = modality; _ } :: ancestors -> (
     match ancestors with
     | Jkind_annotation _ :: _ ->
       (* CR-someday: Provide separate documatation for modalities within a jkind *)
       get_modality_doc modality
     | _ -> get_modality_doc modality)
   (* Jkinds *)
+  | Mod_bound { txt = Mode mod_bound; _ } :: _ -> get_mod_bound_doc mod_bound
   | Jkind_annotation { pjkind_desc = Pjk_abbreviation abbrev; _ } :: _ ->
     get_jkind_abbrev_doc abbrev
   | Jkind_annotation { pjkind_desc = Pjk_mod _; _ } :: _ ->
@@ -813,7 +802,8 @@ let get_syntax_doc cursor_loc node : syntax_info =
     :: ( _,
          Module_type_constraint
            (Tmodtype_explicit
-             { mty_desc = Tmty_with (_, [ (_, _, Twith_modtype _) ]); _ }) )
+             ({ mty_desc = Tmty_with (_, [ (_, _, Twith_modtype _) ]); _ }, _))
+       )
     :: _ ->
     Some
       { name = "Module substitution";

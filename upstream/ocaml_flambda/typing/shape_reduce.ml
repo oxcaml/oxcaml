@@ -164,6 +164,8 @@ end) = struct
         { fields : (string * Uid.t option * delayed_nf * Layout.t) list;
           kind : record_kind
         }
+    | NUnknown_type
+    | NAt_layout of nf * Layout.t
 
   (* A type of normal forms for strong call-by-need evaluation.
      The normal form of an abstraction
@@ -271,11 +273,14 @@ end) = struct
           Layout.equal ly1 ly2 &&
           equal_delayed_nf dnf1 dnf2)
         f1 f2
+    | NUnknown_type, NUnknown_type -> true
+    | NAt_layout (nf1, layout1), NAt_layout (nf2, layout2) ->
+      equal_nf nf1 nf2 && Layout.equal layout1 layout2
     | ( ( NVar _ | NLeaf | NApp _ | NAbs _ | NStruct _ | NProj _ | NComp_unit _
         | NAlias _ | NError _ | NConstr _ | NTuple _ | NUnboxed_tuple _
         | NPredef _ | NArrow | NPoly_variant _ | NVariant _
         | NVariant_unboxed _ | NRecord _ | NMutrec _ | NProj_decl _ | NMu _
-        | NRec_var _ ), _ ) -> false
+        | NRec_var _ | NUnknown_type | NAt_layout _ ), _ ) -> false
 
   and equal_nf t1 t2 =
     if not (Option.equal Uid.equal t1.uid t2.uid) then false
@@ -415,7 +420,7 @@ end) = struct
     if MB.is_depleted fuel
     then approx_nf (return (NError "NoFuelLeft"))
     else if MB.is_depleted max_steps_per_variable
-    then return NLeaf
+    then return NUnknown_type
     else (
       MB.decr max_steps_per_variable;
       match t.desc with
@@ -599,6 +604,11 @@ end) = struct
                           (name, uid_opt, delay_reduce env t, ly)) fields
           in
           return (NRecord { fields = dnf_fields; kind })
+      | Unknown_type ->
+          return NUnknown_type
+      | At_layout (shape, layout) ->
+          let nf = reduce env shape in
+          return (NAt_layout (nf, layout))
     )
 
   and read_back env (nf : nf) : t =
@@ -678,6 +688,11 @@ end) = struct
         (name, uid_opt, read_back_force dnf, ly)) fields
       in
       record ?uid kind t_fields
+    | NUnknown_type ->
+      unknown_type ?uid ()
+    | NAt_layout (nf, layout) ->
+      let shape = read_back nf in
+      at_layout ?uid shape layout
 
   (* Sharing the memo tables is safe at the level of a compilation unit since
     idents should be unique *)
@@ -724,7 +739,7 @@ end) = struct
     | NRec_var _ -> false
     | NMutrec _ | NProj_decl _ | NConstr _ | NTuple _ | NUnboxed_tuple _
     | NPredef _ | NArrow | NPoly_variant _ | NVariant _ | NVariant_unboxed _
-    | NRecord _ -> false
+    | NRecord _ | NUnknown_type | NAt_layout _ -> false
 
   let rec reduce_aliases_for_uid env (nf : nf) =
     match nf with

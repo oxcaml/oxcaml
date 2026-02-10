@@ -681,7 +681,12 @@ let ocaml_ignored_flags =
     "-reaper-change-calling-conventions";
     "-no-reaper-change-calling-conventions";
     "-flambda2-expert-cmm-safe-subst";
-    "-no-flambda2-expert-cmm-safe-subst"
+    "-no-flambda2-expert-cmm-safe-subst";
+    "-dissector";
+    "-ddissector";
+    "-ddissector-sizes";
+    "-ddissector-verbose";
+    "-ddissector-partitions"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -779,7 +784,10 @@ let ocaml_ignored_parametrized_flags =
     "-plugin";
     "-dump-into-file";
     "-ddwarf-metrics-output-file";
-    "-reaper-debug-flags"
+    "-reaper-debug-flags";
+    "-dissector-partition-size";
+    "-ddissector-inputs";
+    "-dfexpr-after"
   ]
 
 let ocaml_warnings_spec ~error =

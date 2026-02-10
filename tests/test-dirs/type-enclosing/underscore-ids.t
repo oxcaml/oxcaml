@@ -460,6 +460,8 @@ We try several places in the identifier to check the result stability
           expression (under.ml[2,13+6]..under.ml[5,70+17]) ghost
             Texp_function
             alloc_mode map_comonadic(regional_to_global)(modevar#b[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);id(modevar#c[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            id(modevar#17[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#18[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            []
             [
               Nolabel
               Param_pat
@@ -467,6 +469,8 @@ We try several places in the identifier to check the result stability
                   Tpat_var \"x/278\"
                   sort '_representable_layout_1
                   value_mode map_comonadic(local_to_regional)(modevar#d[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);imply(unique,uncontended,read_write,static)(modevar#e[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                id(modevar#d[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#e[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                []
             ]
             Tfunction_body
               expression (under.ml[2,13+18]..under.ml[5,70+17])

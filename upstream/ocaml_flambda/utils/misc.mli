@@ -137,6 +137,8 @@ module Stdlib : sig
         is returned with the [xs] being the contents of those [Some]s, with
         order preserved.  Otherwise return [None]. *)
 
+    val map : ('a -> 'b) -> 'a t -> 'b t
+
     val map_option : ('a -> 'b option) -> 'a t -> 'b t option
     (** [map_option f l] is [some_if_all_elements_are_some (map f l)], but with
         short circuiting. *)
@@ -438,6 +440,11 @@ val remove_file: string -> unit
 val remove_dir: string -> unit
        (** Delete the given directory if it exists, is a directory, and is
            empty. Never raises an error. *)
+
+val remove_dir_contents: string -> unit
+       (** Delete all files in the given directory, then delete the directory
+           itself. Only handles flat directories (no subdirectories).
+           Never raises an error. *)
 
 val expand_directory: string -> string -> string
        (** [expand_directory alt file] eventually expands a [+] at the

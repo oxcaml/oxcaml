@@ -1,8 +1,8 @@
 (** Language extensions provided by the Jane Street version of the OCaml
-    compiler. These are the parts of [Language_extension] that are required
-    by [Profile_counters_functions]. Forward declaring these allow us to
-    avoid a mutual dependency between files in utils/ and parsing/. Such
-    a dependency prevents Merlin from compiling. *)
+    compiler. These are the parts of [Language_extension] that are required by
+    [Profile_counters_functions]. Forward declaring these allow us to avoid a
+    mutual dependency between files in utils/ and parsing/. Such a dependency
+    prevents Merlin from compiling. *)
 
 (* CR lstevenson: consider moving [Profile_counters_functions] to parsing/ so we
    can get rid of this file. *)
@@ -29,7 +29,6 @@ type _ t =
   | Labeled_tuples : unit t
   | Small_numbers : maturity t
   | Instances : unit t
-  | Separability : unit t
   | Let_mutable : unit t
   | Layout_poly : maturity t
   | Runtime_metaprogramming : unit t

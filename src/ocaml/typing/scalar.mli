@@ -12,18 +12,24 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** This module defines:
-    The scalar types intrinsic to the OCaml compiler, and all of the
-    primitive operations defined on them.
+(** This module defines: The scalar types intrinsic to the OCaml compiler, and
+    all of the primitive operations defined on them.
 
-    Overview: This module provides a comprehensive type system for scalar values in OCaml.
+    Overview: This module provides a comprehensive type system for scalar values
+    in OCaml.
 
     Type Hierarchy:
-    - Scalar.t
-      - Integral: Integer types
-        - Taggable (fits in word_size-1 bits): Int8, Int16, Int
-        - Boxable (requires boxing): Int32, Int64, Nativeint
-      - Floating: Float32, Float64
+    {ul
+     {- Scalar.t
+        {ul
+         {- Integral: Integer types
+            - Taggable (fits in word_size-1 bits): Int8, Int16, Int
+            - Boxable (requires boxing): Int32, Int64, Nativeint
+         }
+         {- Floating: Float32, Float64 }
+        }
+     }
+    }
 
     Representation Forms:
     - Value: Tagged (small integers) or boxed representation
@@ -31,53 +37,62 @@
 
     Operations:
     - Unary: Negation, successor/predecessor, byte swap, static cast
-    - Binary: Arithmetic (add, sub, mul, div), bitwise (and, or, xor),
-             shift (lsl, asr, lsr), comparisons (integer and float)
+    - Binary: Arithmetic (add, sub, mul, div), bitwise (and, or, xor), shift
+      (lsl, asr, lsr), comparisons (integer and float)
 
     The locality parameter tracks where boxed values are allocated.
 
-    A [Scalar.t] represents a particular OCaml type that represents a scalar value. It
-    might be tagged, boxed, or neither. There is also a type parameter for the locality of
-    the scalar value, which represents the location in which that boxed values are
-    allocated.
+    A [Scalar.t] represents a particular OCaml type that represents a scalar
+    value. It might be tagged, boxed, or neither. There is also a type parameter
+    for the locality of the scalar value, which represents the location in which
+    that boxed values are allocated.
 
-    The important consideration is for a [Scalar.t] to represent all of the argument and
-    return types of all the primitives that we want to support. The submodules are
-    organized to make it easy for use different subsets of scalars in different places.
-    Some examples:
+    The important consideration is for a [Scalar.t] to represent all of the
+    argument and return types of all the primitives that we want to support. The
+    submodules are organized to make it easy for use different subsets of
+    scalars in different places. Some examples:
 
-    - Primitive arguments don't depend on the locality of their arguments, but the results
-    do. This is achieved using [ignore_locality : _ t -> any_locality_mode t] to convert
-    arguments to [any_locality_mode] when defining primitives, e.g.:
+    - Primitive arguments don't depend on the locality of their arguments, but
+      the results do. This is achieved using
+      [ignore_locality : _ t -> any_locality_mode t] to convert arguments to
+      [any_locality_mode] when defining primitives, e.g.:
       [Icmp (Scalar.Integral.ignore_locality size, cmp)]
 
-    - Some primitives only take integers, some take only floats, and Three_way_compare
-    takes any scalar type. This is represented using specialized operation types:
-      - [Intrinsic.Binary.Int_op.t] for integer-only ops (Add, Sub, Mul, etc.)
-      - [Intrinsic.Binary.Float_op.t] for float-only ops
-      - [Intrinsic.Binary.Three_way_compare of any_locality_mode t] accepts any scalar
+    {ul
+     {- Some primitives only take integers, some take only floats, and
+        Three_way_compare takes any scalar type. This is represented using
+        specialized operation types:
+        - [Intrinsic.Binary.Int_op.t] for integer-only ops (Add, Sub, Mul, etc.)
+        - [Intrinsic.Binary.Float_op.t] for float-only ops
+        - [Intrinsic.Binary.Three_way_compare of any_locality_mode t] accepts
+          any scalar
+     }
+    }
 
-    - The bytecode compiler wants to easily map unboxed/untagged values to their [value]
-    equivalents. This is supported by [Maybe_naked.t]:
-      - [Value of 'a] represents boxed/tagged values
-      - [Naked of 'b] represents unboxed/untagged values
-      Example: [Scalar.Maybe_naked.Value (Integral.Width.Taggable Int)] vs
-               [Scalar.Maybe_naked.Naked (Integral.Width.Taggable Int)]
+    {ul
+     {- The bytecode compiler wants to easily map unboxed/untagged values to
+        their [value] equivalents. This is supported by [Maybe_naked.t]:
+        - [Value of 'a] represents boxed/tagged values
+        - [Naked of 'b] represents unboxed/untagged values
+     }
+    }
 
-    - The middle-end wants to easily cast between any integral values using only certain
-    primitives. This is enabled by [Intrinsic.Unary.Static_cast]:
-      [Static_cast { src : any_locality_mode t; dst : 'mode t }]
-      which allows casting between different scalar types, e.g., from Int8 to Int32.
-      See jane/doc/scalars.md for documentation on the semantics.
+    Example: [Scalar.Maybe_naked.Value (Integral.Width.Taggable Int)] vs
+    [Scalar.Maybe_naked.Naked (Integral.Width.Taggable Int)]
 
-    In some cases, only the number of bits used in the container (e.g. a
-    machine register or stack slot) is important.  We use [Width] for this.
-    [Width.t] always represents the width of a scalar layout -- it has exactly one
+    - The middle-end wants to easily cast between any integral values using only
+      certain primitives. This is enabled by [Intrinsic.Unary.Static_cast]:
+      [Static_cast { src : any_locality_mode t; dst : 'mode t }] which allows
+      casting between different scalar types, e.g., from Int8 to Int32. See
+      jane/doc/scalars.md for documentation on the semantics.
+
+    In some cases, only the number of bits used in the container (e.g. a machine
+    register or stack slot) is important. We use [Width] for this. [Width.t]
+    always represents the width of a scalar layout -- it has exactly one
     constuctor for each bit-width of the corresponding scalar. The type
     parameter is irrelevant within the [Width] module, that's why it's usually
     fixed to any_locality_mode when the corresponding function is expecting a
-    simple sum type (e.g., [to_string]).
-*)
+    simple sum type (e.g., [to_string]). *)
 
 type any_locality_mode = Any_locality_mode
 
@@ -87,9 +102,9 @@ module Maybe_naked : sig
   type ('a, 'b) t =
     | Value of 'a
     | Naked of 'b
-        (** "Naked" means either untagged or unboxed, depending whether the type fits in
-            31 bits or not. e.g., [Naked Int8] is untagged, but [Naked (Int32
-            Any_locality_mode)] would be unboxed *)
+        (** "Naked" means either untagged or unboxed, depending whether the type
+            fits in 31 bits or not. e.g., [Naked Int8] is untagged, but
+            [Naked (Int32 Any_locality_mode)] would be unboxed *)
 end
 
 val naked : 'a -> (_, 'a) Maybe_naked.t
@@ -215,9 +230,8 @@ module Integer_comparison : sig
 
       Examples with 8-bit integers:
       - Signed: -128 < -1 < 0 < 1 < 127
-      - Unsigned:
-        0 < 1 < 127 < 128 (which is -128 signed) < 255 (which is -1 signed)
-  *)
+      - Unsigned: 0 < 1 < 127 < 128 (which is -128 signed) < 255 (which is -1
+        signed) *)
   type t =
     | Ceq  (** Equal (signed or unsigned - same result) *)
     | Cne  (** Not equal (signed or unsigned - same result) *)
@@ -238,9 +252,9 @@ module Integer_comparison : sig
 
   val negate : t -> t
 
-  (** Creates a comparison operator from the behavior that should happen in
-      each condition, with the given signedness. If every case is the same,
-      returns [Error] of that case *)
+  (** Creates a comparison operator from the behavior that should happen in each
+      condition, with the given signedness. If every case is the same, returns
+      [Error] of that case *)
   val create : Signedness.t -> lt:bool -> eq:bool -> gt:bool -> (t, bool) result
 end
 
@@ -299,13 +313,13 @@ module Operation : sig
             dst : 'mode scalar
           }
           (** [Static_cast] performs a conversion between numeric types, which
-              may include (un)tagging or (un)boxing.  The jane/doc/scalars.md
-              file contains detailed documentation of the semantics.  The
-              middle end expands the static cast operations into finer-grained
-              primitives (for example %int64_as_int, which is represented
-              as a static case, will turn into an unboxing followed by an
-              int64 -> int conversion, the latter of which takes the integer
-              modulo 2^63 (2^31 on 32-bit targets). *)
+              may include (un)tagging or (un)boxing. The jane/doc/scalars.md
+              file contains detailed documentation of the semantics. The middle
+              end expands the static cast operations into finer-grained
+              primitives (for example %int64_as_int, which is represented as a
+              static case, will turn into an unboxing followed by an int64 ->
+              int conversion, the latter of which takes the integer modulo 2^63
+              (2^31 on 32-bit targets). *)
 
     val map : 'a t -> f:('a -> 'b) -> 'b t
 

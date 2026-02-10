@@ -191,11 +191,51 @@ module Locate_context = struct
     ]
 end
 
+module Locate_types_result = struct
+  module Tree = struct
+    type node_data =
+      | Arrow
+      | Tuple
+      | Unboxed_tuple
+      | Object
+      | Poly_variant
+      | Type_ref of
+          { type_ : string;
+            result :
+              [ `Found of string option * Lexing.position
+              | `Builtin of string
+              | `Not_in_env of string
+              | `File_not_found of string
+              | `Not_found of string * string option ]
+          }
+      | Other of string
+
+    type t = { data : node_data; children : t list }
+  end
+
+  type t = Success of Tree.t | Invalid_context
+end
+
 type _ t =
   | Type_expr (* *) : string * Msource.position -> string t
   | Stack_or_heap_enclosing (* *) :
       Msource.position * bool * int option
       -> (Location.t * [ `String of string | `Index of int ]) list t
+  | Kind_enclosing (* *) :
+      { position : Msource.position;
+        index : int option;
+        override_verbosity : Mconfig.Verbosity.t option
+            (** Use a different verbosity for printing kinds than as specified by the
+                Mconfig. *)
+      }
+      -> (Location.t * [ `Kind of string | `Index of int ]) list t
+  | Mode_enclosing (* *) :
+      { position : Msource.position;
+        override_verbosity : Mconfig.Verbosity.t option
+            (** Use a different verbosity for printing modes than as specified by the
+                Mconfig. *)
+      }
+      -> (Location.t * string) list t
   | Type_enclosing (* *) :
       (string * int) option * Msource.position * int option
       -> (Location.t * [ `String of string | `Index of int ] * is_tail_position)
@@ -243,6 +283,7 @@ type _ t =
          | `Not_found of string * string option
          | `At_origin ]
          t
+  | Locate_types : Msource.position -> Locate_types_result.t t
   | Locate (* *) :
       string option
       * [ `ML | `MLI ]
