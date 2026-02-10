@@ -1,7 +1,7 @@
 (* TEST
  compile_only = "true";
  flambda2;
- ocamlopt_flags = "-flambda-cse-depth=2";
+ ocamlopt_flags = "-flambda2-cse-depth=2";
  setup-ocamlopt.byte-build-env;
  ocamlopt.byte with dump-simplify;
  check-fexpr-dump;
@@ -9,7 +9,7 @@
 
 (* The issue with this example is that we want to remove the second array bounds
    check thanks to CSE, but this involves doing two rounds at some point. So
-   this should only work with -flambda-cse-depth of at least 2 (the default is
+   this should only work with -flambda2-cse-depth of at least 2 (the default is
    2) *)
 
 external ( - ) : int -> int -> int = "%subint"
