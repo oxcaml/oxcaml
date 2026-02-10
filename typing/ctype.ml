@@ -2149,10 +2149,13 @@ let rec try_expand_once env ty =
     Tconstr _ -> expand_abbrev env ty
   | Tsplice t ->
       let t = try_expand_once env t in
-      newty2 ~level:(get_level t) (Tsplice t)
+      new_splice_ty t
   | Tquote t ->
       let t = try_expand_once env t in
-      newty2 ~level:(get_level t) (Tquote t)
+      new_quote_ty t
+  | Tquote_eval t ->
+      let t = try_expand_once env t in
+      new_quote_eval_ty t
   | _ -> raise Cannot_expand
 
 (* This one only raises Cannot_expand *)
@@ -2162,31 +2165,149 @@ let try_expand_safe env ty =
   with Escape _ ->
     Btype.backtrack snap; cleanup_abbrev (); raise Cannot_expand
 
-(* Cancel out a head-position pair of $ and <[_]>, or <[_]> and $. *)
-let rec try_quote_splice_cancel_once ty =
-  match get_desc ty with
-  | Tquote t -> begin
-      match get_desc t with
-      | Tsplice t' -> t'
-      | _ ->
-          let t = try_quote_splice_cancel_once t in
-          (* New types are only constructed whenever we expand the subterm *)
-          newty2 ~level:(get_level t) (Tquote t)
-    end
+(* Note [Beta normal form]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Rewriting is used in typing of quotes, splices and evaluations.
+   We use it to normalise types with respect to the set of equations given by:
+   * Quote-splice isomorphism (<[$(t)]> = t and t = $(<[t]>)).
+   * Preservation of concrete types by eval (like [<[int]> eval = int] and
+       [<[s -> t]> eval = <[s]> eval -> <[t]> eval]).
+   To simplify our setting (restraining the expressive power of our system),
+   we restrict the preservation equations to only be at next-stage-kinded types,
+   e.g. <[value]> but not <[<[value]>]>.
+
+   The available rewrites conveniently take the form of beta-reductions.
+   After applying beta-reductions exhaustively, we end up with the normal form
+   described in this note.
+
+   Since quotes and splices are inverses, we will for convenience write
+   [<[ t ]>^-1 = $t] and [$^-1 t = <[t]>].
+
+   It turns out that it is much more natural to beta-reduce [eval] in the form
+   [t qeval = <[t]> eval], hence we use the [Tquote_eval _] type former.
+
+   For any type expression [t] after full head-rewriting, it is of the form
+   [t = <[t' qeval^n]>^m] for natural [n], integer [m] and type expression [t'].
+   If [n > 0], then [t'] is irreducible, and has to be one of the following:
+   * Type variable,
+   * Type constructor that is not top-level,
+   * Quote-kinded type. *)
+
+(* Perform one of the following head-position beta reductions via rewrites:
+   * Reduce a quoted-eval through a concrete (top-level) type constructor.
+   * Cancel a quote-splice pair. *)
+let rec try_reduce_once t =
+  let maybe_reduce_once t =
+    try try_reduce_once t
+    with Cannot_expand -> t
+  in
+  match get_desc t with
+  | Tquote_eval t -> begin
+    match get_desc t with
+    | Tvar _ | Tunivar _ -> raise Cannot_expand
+    (* [<[t1 -> t2]> eval]  ==>  [<[t1]> eval -> <[t2]> eval] *)
+    | Tarrow (a, t1, t2, c) ->
+      (* Distribute across the parameter type's [Tpoly] immediately *)
+      let t1' = new_quote_eval_ty t1 |> maybe_reduce_once in
+      let t2' = new_quote_eval_ty t2 in
+      Tarrow (a, t1', t2', c)
+    (* [<[t1 * t2]> eval]  ==>  [<[t1]> eval * <[t2]> eval] *)
+    | Ttuple tl ->
+      Ttuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
+    (* [<[#(t1 * t2)]> eval]  ==>  [#(<[t1]> eval * <[t2]> eval)] *)
+    | Tunboxed_tuple tl ->
+      Tunboxed_tuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
+    (* [<[(t1, t2) typ]> eval]  ==>  [(<[t1]> eval, <[t2]> eval) typ] *)
+    (* CR-soon jbachurski: [p] might be a path that is only available inside
+       the quote. Thus, we should check if it is top-level here. *)
+    | Tconstr (p, tl, a) ->
+      Tconstr (p, List.map new_quote_eval_ty tl, a)
+    (* [<[ < .. > ]> eval]  ==>  [< <[..]> eval >] *)
+    | Tobject (t, ct) ->
+      Tobject (
+        maybe_reduce_once (new_quote_eval_ty t),
+        ref (
+          Option.map
+            (fun (p, tl) -> p, List.map new_quote_eval_ty tl)
+            !ct))
+    (* [<[ < a: t, .. > ]> eval] ==> [<a : <[t]> eval, <[..]> eval >] *)
+    | Tfield (s, k, t1, t2) ->
+      (* Distribute across the method type's [Tpoly] immediately *)
+      Tfield (
+        s, k, maybe_reduce_once (new_quote_eval_ty t1),
+        maybe_reduce_once (new_quote_eval_ty t2))
+    (* reduce in subterm *)
+    | Tquote _ | Tsplice _ | Tquote_eval _ ->
+      Tquote_eval (try_reduce_once t)
+    (* [<[ < > ]> eval] ==> [< >] *)
+    | Tnil -> Tnil
+    (* [<[ [ `A of t ... ] | ]> eval] ==> [ [ `A of <[t]> eval | ... ] ] *)
+    | Tvariant row ->
+      Tvariant (copy_row new_quote_eval_ty true row false (row_more row))
+    (* [<['a. t]> eval] ==> ['b. (<[{$'b/'a} t]> eval)],
+        where {t/x} is a substitution of t for x. *)
+    | Tpoly (t, tl) ->
+      (* We quantify again, but with the univars [tl'] at an outer stage.
+          This means all instances of univars [tl] have to be replaced
+          by a corresponding instance in [tl'] spliced. *)
+      let copy tv =
+        newty3 ~level:(get_level tv) ~scope:(get_scope tv) (get_desc tv)
+        |> new_splice_ty
+      in
+      let tl', t' =
+        For_copy.with_scope (fun copy_scope ->
+          instance_poly' copy_scope ~keep_names:true
+            ~fixed:false ~copy_var:(Some copy) tl t)
+      in
+      let tl' =
+        List.map (fun t -> match get_desc t with Tsplice uv -> uv | _ -> assert false) tl'
+      in
+      Tpoly (new_quote_eval_ty t', tl')
+    (* [<[(sort 'a). t]> eval] ==> [(sort 'a). <[t]> eval] *)
+    | Trepr (t, sl) ->
+      Trepr (new_quote_eval_ty t, sl)
+    (*     [<[ module S with type typ = t ]> eval]
+        ==> [module S with type typ = <[t]> eval] *)
+    | Tpackage (p, fl) ->
+      Tpackage (p, List.map (fun (n, t) -> n, new_quote_eval_ty t) fl)
+    (* [<[ (of_kind k) ]> eval] ==> [of_kind k]] *)
+    | Tof_kind _ -> get_desc t
+    | Tlink _ | Tsubst _ -> assert false
+    end |> newty2 ~level:(get_level t)
   | Tsplice t -> begin
-      match get_desc t with
-      | Tquote t' -> t'
-      | _ ->
-          let t = try_quote_splice_cancel_once t in
-          newty2 ~level:(get_level t) (Tsplice t)
+    match get_desc t with
+    (* [$<[ t ]>] ==> [t] ]>] *)
+    | Tquote t ->
+      t
+    (* reduce in subterm *)
+    | Tsplice _
+    | Tquote_eval _ ->
+      new_splice_ty (try_reduce_once t)
+    | _ -> raise Cannot_expand
+    end
+  | Tquote t -> begin
+    match get_desc t with
+    (* [<[ $t ]>] ==> [t] ]>] *)
+    | Tsplice t ->
+      t
+    (* reduce in subterm *)
+    | Tquote _
+    | Tquote_eval _ ->
+      new_quote_ty (try_reduce_once t)
+    | _ -> raise Cannot_expand
     end
   | _ -> raise Cannot_expand
 
-(* Cancel out all head-position pairs of $ and <[_]>, or <[_]> and $. *)
-let rec try_quote_splice_cancel ty =
-  let ty' = try_quote_splice_cancel_once ty in
-  try try_quote_splice_cancel ty'
+(* Perform head-position reductions exhaustively til the normal form. *)
+let rec try_reduce ty =
+  let ty' = try_reduce_once ty in
+  try try_reduce ty'
   with Cannot_expand -> ty'
+
+let reduce_head ty =
+  try try_reduce ty
+  with Cannot_expand -> ty
 
 (* Fully expand the head of a type. *)
 let try_expand_head
@@ -2195,11 +2316,11 @@ let try_expand_head
     let ty' = try_once env ty in
     try loop try_once env ty'
     with Cannot_expand ->
-      try try_quote_splice_cancel ty'
+      try try_reduce ty'
       with Cannot_expand -> ty'
   in
   try loop try_once env ty
-  with Cannot_expand -> try_quote_splice_cancel ty
+  with Cannot_expand -> try_reduce ty
 
 (* Unsafe full expansion, may raise [Unify [Escape _]]. *)
 let expand_head_unif env ty =
@@ -2280,6 +2401,9 @@ let rec try_expand_once_opt env ty =
   | Tquote t ->
       let t = try_expand_once_opt env t in
       newty2 ~level:(get_level t) (Tquote t)
+  | Tquote_eval t ->
+      let t = try_expand_once_opt env t in
+      newty2 ~level:(get_level t) (Tquote_eval t)
   | _ -> raise Cannot_expand
 
 let try_expand_safe_opt env ty =

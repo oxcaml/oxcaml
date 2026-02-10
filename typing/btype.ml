@@ -119,10 +119,9 @@ let newgenvar ?name jkind = newgenty (Tvar { name; jkind })
 let newgenstub ~scope jkind =
   newty3 ~level:generic_level ~scope (Tvar { name=None; jkind })
 
-let new_quote_ty t =
-  newty2 ~level:(get_level t) (Tquote t)
-let new_splice_ty t =
-  newty2 ~level:(get_level t) (Tsplice t)
+let new_splice_ty t = newty2 ~level:(get_level t) (Tsplice t)
+let new_quote_ty t = newty2 ~level:(get_level t) (Tquote t)
+let new_quote_eval_ty t = newty2 ~level:(get_level t) (Tquote_eval t)
 
 (**** Check some types ****)
 
