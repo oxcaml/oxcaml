@@ -1,6 +1,7 @@
 #define CAML_INTERNALS
 #define NATIVE_CODE
 #include <caml/mlvalues.h>
+#include <caml/callback.h>
 #include <caml/startup.h>
 
 int main(int argc, char **argv)
