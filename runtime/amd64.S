@@ -538,12 +538,10 @@ G(caml_system__code_begin):
 /* Allocation */
 /******************************************************************************/
 
-/* CR aspsmith: these need to be valid tagged ints for now. probably
-   scan_stack_frames should learn about this instead. */
-#define GC_REGS_NO 1
-#define GC_REGS_XMM 3
-#define GC_REGS_YMM 5
-#define GC_REGS_ZMM 7
+#define GC_REGS_NO 0
+#define GC_REGS_XMM 1
+#define GC_REGS_YMM 2
+#define GC_REGS_ZMM 3
 
 #define Gc_regs_kind 13*8
 
