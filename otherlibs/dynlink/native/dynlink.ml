@@ -34,7 +34,7 @@ type global_map = {
   name : Compilation_unit.t;
   crc_intf : Digest.t option;
   crc_impl : Digest.t option;
-  syms : Symbol.t list;
+  syms : Linkage_name.t list;
 }
 
 module Native = struct
@@ -74,11 +74,7 @@ module Native = struct
       List.map convert_cmx_import (Array.to_list t.dynu_imports_cmx)
 
     let defined_symbols (t : t) =
-      List.map (fun comp_unit ->
-          Symbol.for_compilation_unit comp_unit
-          |> Symbol.linkage_name
-          |> Linkage_name.to_string)
-        t.dynu_defines
+      List.map (fun s -> Config.caml_symbol_prefix ^ s) t.dynu_defines
 
     let unsafe_module _t = false
   end
@@ -94,11 +90,7 @@ module Native = struct
     let rank = ref 0 in
     List.fold_left (fun acc { name; crc_intf; crc_impl; syms; } ->
         let name = Compilation_unit.full_path_as_string name in
-        let syms =
-          List.map
-            (fun sym -> Symbol.linkage_name sym |> Linkage_name.to_string)
-            syms
-        in
+        let syms = List.map Linkage_name.to_string syms in
         rank := !rank + List.length syms;
         let implementation =
           match crc_impl with
