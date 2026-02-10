@@ -752,7 +752,7 @@ and raw_type_desc ppf = function
       fprintf ppf "@[<hov1>Tpackage(@,%a,@,%a)@]" path p
         raw_lid_type_list fl
   | Tof_kind jkind ->
-    fprintf ppf "(type@ :@ %a)" (Jkind.format !printing_env) jkind
+    fprintf ppf "Tof_kind@ %a" (Jkind.format !printing_env) jkind
 and raw_row_fixed ppf = function
 | None -> fprintf ppf "None"
 | Some Types.Fixed_private -> fprintf ppf "Some Fixed_private"
