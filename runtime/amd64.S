@@ -179,6 +179,21 @@
 #define SIZEOF_C_STACK_LINK      40
 #endif
 
+/* Continuation values
+ *
+ * A continuation is a two or three word object:
+ *
+ * - The first field points to a fiber. That fiber will point to
+ *   its parent at Handler_parent(Stack_handler(f))
+ * - The second field points to the last fiber in the linked-list formed by the
+ *   parent pointer
+ * - The third field, if present, points to a [gc_regs] struct for a
+ *   continuation produced by a preemption
+ */
+#define Cont_fiber      0
+#define Cont_last_fiber 8
+#define Cont_gc_regs    16
+
 /******************************************************************************/
 /* OCaml values */
 /******************************************************************************/
@@ -1295,16 +1310,6 @@ ENDFUNCTION(G(caml_callback3_asm))
 
 /******************************************************************************/
 /* Fibers */
-/*
- * A continuation is a two or three word object:
- *
- * - The first field, if present, points to a fiber. That fiber will point to
- *   its parent at Handler_parent(Stack_handler(f))
- * - The second field points to the last fiber in the linked-list formed by the
- *   parent pointer
- * - The third field, if present, points to a [gc_regs] struct for a
- *   continuation produced by a preemption
- */
 /******************************************************************************/
 
 FUNCTION(G(caml_perform))
@@ -1313,7 +1318,7 @@ CFI_STARTPROC
         %rbx: freshly allocated continuation */
         movq    Caml_state(current_stack), %rsi /* %rsi := old stack */
         leaq    1(%rsi), %rdi /* %rdi (last_fiber) := Val_ptr(old stack) */
-        movq    %rdi, 0(%rbx) /* Initialise continuation */
+        movq    %rdi, Cont_fiber(%rbx) /* Initialise continuation */
 LBL(do_perform):
     /*  %rdi: last_fiber
         %rsi: old stack */
@@ -1359,8 +1364,9 @@ LBL(do_perform):
 LBL(112):
     /* Switch back to original performer before raising Effect.Unhandled
        (no-op unless this is a reperform) */
-        movq    0(%rbx), %r10  /* load performer stack from continuation */
-        subq    $1, %r10       /* r10 := Ptr_val(r10) */
+        movq    Cont_fiber(%rbx), %r10  /* load performer stack from
+                                           continuation */
+        subq    $1, %r10                /* r10 := Ptr_val(r10) */
         movq    Caml_state(current_stack), %rsi
         SWITCH_OCAML_STACKS
     /* No parent stack. If this is a preemption effect (wosize of the
@@ -1393,7 +1399,7 @@ LBL(112):
 1:      /* Preempt unhandled; restore the gc_regs from the continuation to %r15
            and jump back into the second half of caml_do_call_gc, which will
            restore the regs and return. */
-        movq   2*8(%rbx), %r15
+        movq   Cont_gc_regs(%rbx), %r15
         jmp    LBL(resume_from_preempt)
 CFI_ENDPROC
 ENDFUNCTION(G(caml_perform))
@@ -1439,10 +1445,10 @@ CFI_STARTPROC
         movq    $1, Caml_state(preemption)
         movq    Caml_state(current_stack), %rsi /* %rsi := old stack */
         leaq    1(%rsi), %rdi   /* %rdi (last_fiber) := Val_ptr(old stack) */
-        movq    %rdi, 0*8(%rbx) /* Store fiber in continuation */
-        movq    $0, 1*8(%rbx)   /* set last fiber of continuation to NULL */
+        movq    %rdi, Cont_fiber(%rbx)    /* Store fiber in continuation */
+        movq    $0, Cont_last_fiber(%rbx) /* set last fiber of continuation to NULL */
         movq    Caml_state(gc_regs), %r12
-        movq    %r12, 2*8(%rbx) /* save gc_regs in continuation */
+        movq    %r12, Cont_gc_regs(%rbx) /* save gc_regs in continuation */
         /* clear gc_regs, as we'll be leaving the runtime after the effect is
            performed */
         movq    $0, Caml_state(gc_regs)
@@ -1454,14 +1460,14 @@ ENDFUNCTION(G(caml_preempt))
 FUNCTION(G(caml_resume))
 CFI_STARTPROC
     /* %rax -> continuation, %rbx -> fun, %rdi -> arg */
-        movq   %rdi, %r12 /* %r12 := arg */
-        movq   8(%rax),  %r13  /* %r13 := last_fiber */
+        movq   %rdi, %r12                    /* %r12 := arg */
+        movq   Cont_last_fiber(%rax),  %r13  /* %r13 := last_fiber */
         WOSIZE_VAL(%rax, %rcx)
-        cmpq   $3, %rcx /* Wosize_hd(%rax) == 3 ? */
+        cmpq   $3, %rcx                      /* Wosize_hd(%rax) == 3 ? */
         je     1f
         pushq  $0; CFI_ADJUST(8) /* no gc_regs, push NULL */
         jmp    2f
-1:      pushq  16(%rax); CFI_ADJUST(8) /* we have a gc_regs, push it */
+1:      pushq  Cont_gc_regs(%rax); CFI_ADJUST(8) /* we have a gc_regs, push it */
 2:      movq   %rax, C_ARG_1
         SWITCH_OCAML_TO_C
         C_call (GCALL(caml_continuation_use_noexc)) /* %rax := stack */
