@@ -103,8 +103,8 @@ Error: Signature mismatch:
        is not compatible with the type
          "<[(string -> unit) * (int -> unit)]> expr"
        Type "(string -> unit) * (string -> unit)" is not compatible with type
-         "(string -> unit) * (int -> unit)" = "(string -> unit) * (int -> unit)"
-       Type "string" = "string" is not compatible with type "int"
+         "(string -> unit) * (int -> unit)"
+       Type "string" is not compatible with type "int"
 |}]
 
 (*  [M4] is analogous to [M3], but featuring an uninhabited type *)
@@ -147,6 +147,6 @@ Error: Signature mismatch:
          val x : <[int * string]> expr
        The type "<[int * int]> expr" is not compatible with the type
          "<[int * string]> expr"
-       Type "int * int" is not compatible with type "int * string" = "int * string"
-       Type "int" = "int" is not compatible with type "string"
+       Type "int * int" is not compatible with type "int * string"
+       Type "int" is not compatible with type "string"
 |}]
