@@ -15,13 +15,12 @@
 
 (* Assign locations and numbers to globals and primitives *)
 
-open! Dynlink_compilerlibs
+open Dynlink_support
 open Cmo_format
 
 module Compunit : sig
   type t = compunit
   val name : t -> string
-  val is_packed : compunit -> bool
 end
 
 module Global : sig

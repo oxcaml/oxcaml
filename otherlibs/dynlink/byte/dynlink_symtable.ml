@@ -15,7 +15,7 @@
 
 (* To assign numbers to globals and primitives *)
 
-open! Dynlink_compilerlibs
+open Dynlink_support
 open Cmo_format
 module Config = Dynlink_config
 
@@ -27,7 +27,6 @@ end
 module Compunit = struct
   type t = compunit
   let name = Compilation_unit.full_path_as_string
-  let is_packed = Compilation_unit.is_packed
 #32 "bytecomp/symtable.ml"
 end
 #42 "bytecomp/symtable.ml"

@@ -15,7 +15,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open! Dynlink_compilerlibs
+open Dynlink_support
+
 module Symtable = Dynlink_symtable
 module Config = Dynlink_config
 open Cmo_format
@@ -185,10 +186,7 @@ module Bytecode = struct
           if compunit.cu_debug = 0 then [| |]
           else begin
             [|
-              (* CR ocaml 5 compressed-marshal:
-              (Compression.input_value ic : Instruct.debug_event list)
-              *)
-              (Marshal.from_channel ic : instruct_debug_event list)
+              (Compression.input_value ic : instruct_debug_event list)
             |]
           end in
         let _, clos = reify_bytecode code events (Some digest) in
