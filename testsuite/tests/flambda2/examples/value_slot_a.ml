@@ -9,7 +9,9 @@
    the simplification of the Project_value_slot primitive will return invalid
    and cause segfaults at runtime). *)
 
+
+
 let f x =
   let () = () in
-  let g y = x, y in
+  let g (y:int) = x, y in
   g
