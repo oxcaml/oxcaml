@@ -391,9 +391,13 @@ let compute_static_size lam =
     | Pobj_magic _
     | Punbox_vector _
     | Pbox_vector (_, _)
+    | Pjoin_vec256
+    | Psplit_vec256
     | Pget_header _
     | Preinterpret_tagged_int63_as_unboxed_int64
-    | Preinterpret_unboxed_int64_as_tagged_int63 ->
+    | Preinterpret_unboxed_int64_as_tagged_int63
+    | Preinterpret_boxed_vector_as_tuple _
+    | Preinterpret_tuple_as_boxed_vector _ ->
         dynamic_size lam
   in
   compute_expression_size Ident.Map.empty lam

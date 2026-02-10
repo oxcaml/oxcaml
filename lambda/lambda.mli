@@ -351,6 +351,10 @@ type primitive =
   | Punbox_unit
   | Punbox_vector of boxed_vector
   | Pbox_vector of boxed_vector * locality_mode
+  | Pjoin_vec256
+  | Psplit_vec256
+  | Preinterpret_boxed_vector_as_tuple of boxed_vector
+  | Preinterpret_tuple_as_boxed_vector of boxed_vector
   | Preinterpret_unboxed_int64_as_tagged_int63
   | Preinterpret_tagged_int63_as_unboxed_int64
     (** At present [Preinterpret_unboxed_int64_as_tagged_int63] and
@@ -1052,11 +1056,15 @@ val make_key: lambda -> lambda option
 
 val const_unit: structured_constant
 val const_int : int -> structured_constant
+val const_unboxed_int64 : int64 -> structured_constant
 
 val tagged_immediate : int -> lambda
 val lambda_unit: lambda
 
 val of_bool : bool -> lambda
+
+(* Whether to translate the vec256 layout to #(vec128 * vec128). *)
+val split_vectors : bool
 
 val layout_unit : layout
 val layout_unboxed_unit : layout
@@ -1075,6 +1083,9 @@ val layout_boxed_float : boxed_float -> layout
 val layout_unboxed_float : unboxed_float -> layout
 val layout_boxed_int : boxed_integer -> layout
 val layout_boxed_vector : boxed_vector -> layout
+val layout_tupled_vector : boxed_vector -> layout
+val layout_unboxed_vector : unboxed_vector -> layout
+val layout_unboxed_tupled_vector : unboxed_vector -> layout
 (* A layout that is Pgenval because it is the field of a tuple *)
 val layout_tuple_element : layout
 (* A layout that is Pgenval because it is the arg of a polymorphic variant *)
@@ -1356,6 +1367,12 @@ val ignorable_product_element_kind_involves_int :
 val array_element_size_in_bytes : array_kind -> int
 
 (** Construction helpers *)
+
+val array_index_to_layout : array_index_kind -> layout
+
+val array_index_to_scalar : array_index_kind -> locality_mode Scalar.Integral.t
+
+val const_scalar : locality_mode Scalar.Integral.t -> int -> lambda
 
 (** A tagged immediate. *)
 val int : _ Scalar.Integral.t

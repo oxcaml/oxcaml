@@ -2042,10 +2042,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
                   List.map unbox_float args ),
               Variadic (Make_array (Values, mutability, mode), args),
               [K.With_subkind.any_value] ) ]))
-  | Pmakearray_dynamic _, _ | Parrayblit _, _ ->
+  | Pmakearray_dynamic _, _
+  | Parrayblit _, _
+  | Pjoin_vec256, _
+  | Psplit_vec256, _ ->
     Misc.fatal_error
-      "Lambda_to_flambda_primitives.convert_lprim: Pmakearray_dynamic and \
-       Parrayblit should have been expanded in [Lambda_to_lambda_transforms]"
+      "Lambda_to_flambda_primitives.convert_lprim: Pmakearray_dynamic, \
+       Parrayblit, Pjoin_vec256, or Psplit_vec256 should have been expanded in \
+       [Lambda_to_lambda_transforms]"
   | Popaque layout, [arg] ->
     opaque ~machine_width layout arg ~middle_end_only:false
   | Pobj_magic layout, [arg] ->
@@ -3049,6 +3053,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
         "Preinterpret_tagged_int63_as_unboxed_int64 can only be used on 64-bit \
          targets";
     [Unary (Reinterpret_64_bit_word Tagged_int63_as_unboxed_int64, i)]
+  | Preinterpret_boxed_vector_as_tuple _, [[arg]]
+  | Preinterpret_tuple_as_boxed_vector _, [[arg]] ->
+    [Unary (Reinterpret_boxed_vector, arg)]
   | Ppeek layout, [[ptr]] ->
     let kind = standard_int_or_float_of_peek_or_poke layout in
     [Unary (Peek kind, ptr)]
@@ -3109,8 +3116,9 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       | Patomic_load_field _ | Pmixedfield _
       | Preinterpret_unboxed_int64_as_tagged_int63
       | Preinterpret_tagged_int63_as_unboxed_int64
-      | Parray_element_size_in_bytes _ | Pmake_idx_array _ | Pidx_deepen _
-      | Ppeek _ | Pmakelazyblock _
+      | Preinterpret_boxed_vector_as_tuple _
+      | Preinterpret_tuple_as_boxed_vector _ | Parray_element_size_in_bytes _
+      | Pmake_idx_array _ | Pidx_deepen _ | Ppeek _ | Pmakelazyblock _
       | Pscalar (Unary _)
       | Pget_ptr _ ),
       ([] | _ :: _ :: _ | [([] | _ :: _ :: _)]) ) ->

@@ -838,7 +838,8 @@ module OfFlambda = struct
     | String_length String -> string_length env ()
     | String_length Bytes -> bytes_length env ()
     | Tag_immediate -> tag_immediate env ()
-    | Duplicate_block _ | Obj_dup | Get_header | Peek _ ->
+    | Duplicate_block _ | Obj_dup | Get_header | Peek _
+    | Reinterpret_boxed_vector ->
       todo
         (Format.asprintf "%a" P.Without_args.print (P.Without_args.Unary op))
         env ()

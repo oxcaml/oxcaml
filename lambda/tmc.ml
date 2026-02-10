@@ -901,6 +901,8 @@ let rec choice ctx t =
     | Pignore
     | Preinterpret_tagged_int63_as_unboxed_int64
     | Preinterpret_unboxed_int64_as_tagged_int63
+    | Preinterpret_boxed_vector_as_tuple _
+    | Preinterpret_tuple_as_boxed_vector _
     | Punbox_unit
 
     (* we don't handle effect or DLS primitives *)
@@ -915,6 +917,7 @@ let rec choice ctx t =
     | Patomic_load_field _ | Patomic_set_field _
     | Pcpu_relax
     | Punbox_vector _ | Pbox_vector (_, _)
+    | Pjoin_vec256 | Psplit_vec256
 
     (* it doesn't seem worth it to support lazy blocks for tmc *)
     | Pmakelazyblock _
