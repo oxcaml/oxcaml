@@ -340,6 +340,19 @@ let list_argument_sort = Jkind.Sort.Const.value
 let list_argument_jkind = Jkind.Builtin.value_or_null ~why:(
   Type_argument {parent_path = path_list; position = 1; arity = 1})
 
+let predef_ikind_context =
+  let unreachable _ = failwith "[predef_ikind_context] We unexpectedly hit a type when computing ikinds for predef types" in
+  {
+    Jkind.jkind_of_type = unreachable;
+    is_abstract = unreachable;
+    lookup_type = unreachable;
+    debug_print_env = unreachable;
+  }
+
+let ikind_of_jkind ~params jkind =
+  Ikind.type_declaration_ikind_of_jkind
+    ~context:predef_ikind_context ~params jkind
+
 let mk_add_type add_type =
   let add_type_with_jkind
       ?manifest type_ident
@@ -354,6 +367,8 @@ let mk_add_type add_type =
         let type_jkind =
           Jkind.of_builtin ~why:(Unboxed_primitive type_ident) unboxed_jkind
         in
+        let type_jkind = Jkind.mark_best type_jkind in
+        let type_ikind = ikind_of_jkind ~params:[] type_jkind in
         let type_kind =
           match kind with
             | Type_abstract Definition -> Type_abstract Definition
@@ -370,7 +385,8 @@ let mk_add_type add_type =
           type_params = [];
           type_arity = 0;
           type_kind;
-          type_jkind = Jkind.mark_best type_jkind;
+          type_jkind;
+          type_ikind;
           type_loc = Location.none;
           type_private = Asttypes.Public;
           type_manifest;
@@ -384,11 +400,14 @@ let mk_add_type add_type =
           type_unboxed_version = None;
         }
     in
+    let type_jkind = Jkind.mark_best jkind in
+    let type_ikind = ikind_of_jkind ~params:[] type_jkind in
     let decl =
       {type_params = [];
       type_arity = 0;
       type_kind = kind;
-      type_jkind = Jkind.mark_best jkind;
+      type_jkind;
+      type_ikind;
       type_loc = Location.none;
       type_private = Asttypes.Public;
       type_manifest = manifest;
@@ -421,11 +440,14 @@ let mk_add_type1 add_type type_ident
       ))
     ~variance ~separability env =
   let param = newgenvar param_jkind in
+  let type_jkind = Jkind.mark_best (jkind param) in
+  let type_ikind = ikind_of_jkind ~params:[param] type_jkind in
   let decl =
     {type_params = [param];
       type_arity = 1;
       type_kind = kind param;
-      type_jkind = Jkind.mark_best (jkind param);
+      type_jkind;
+      type_ikind;
       type_loc = Location.none;
       type_private = Asttypes.Public;
       type_manifest = None;
@@ -445,11 +467,14 @@ let mk_add_type2 add_type type_ident ~jkind ~param1_jkind ~param2_jkind
       ~type_variance ~type_separability env =
   let param1 = newgenvar param1_jkind in
   let param2 = newgenvar param2_jkind in
+  let type_jkind = Jkind.mark_best jkind in
+  let type_ikind = ikind_of_jkind ~params:[param1; param2] type_jkind in
   let decl =
     { type_params = [param1; param2];
       type_arity = 2;
       type_kind = Type_abstract Definition;
-      type_jkind = Jkind.mark_best (jkind);
+      type_jkind;
+      type_ikind;
       type_loc = Location.none;
       type_private = Asttypes.Public;
       type_manifest = None;
@@ -662,16 +687,12 @@ let build_initial_env add_type add_extension empty_env =
            None
          )
        )
-       (* CR layouts v2.8: Possibly remove this -- and simplify [mk_add_type] --
-          when we have a better jkind subsumption check. Internal ticket 5104 *)
+       (* Fields are [int] and [string], so [immutable_data] already captures
+          their direct contribution. Encoding this directly avoids predef-time
+          constructor lookups when deriving ikinds from jkinds. *)
        ~jkind:Jkind.(
          of_builtin Const.Builtin.immutable_data
-           ~why:(Primitive ident_lexing_position) |>
-         add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:type_int |>
-         add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:type_int |>
-         add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:type_int |>
-         add_with_bounds ~modality:Mode.Modality.Const.id
-          ~type_expr:type_string)
+           ~why:(Primitive ident_lexing_position))
   |> add_type1 ident_atomic_loc
        ~variance:Variance.full
        ~separability:Separability.Ind

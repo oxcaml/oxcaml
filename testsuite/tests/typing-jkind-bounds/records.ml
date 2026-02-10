@@ -513,7 +513,7 @@ let foo (t : ('a : immutable_data) t @ nonportable contended once) =
   use_portable t;
   use_uncontended t;
   use_many t
-(* CR layouts v2.8: fix this in the principal case. Internal ticket 5111 *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 type 'a t = { x : 'a; }
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>
@@ -546,7 +546,7 @@ let foo (t : _ t @ nonportable contended once) =
   use_portable t;
   use_uncontended t;
   use_many t
-(* CR layouts v2.8: fix this in the principal case. Internal ticket 5111 *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect {|
 type ('a : immutable_data) t = { x : 'a; }
 val foo : ('a : immutable_data). 'a t @ once contended -> unit = <fun>

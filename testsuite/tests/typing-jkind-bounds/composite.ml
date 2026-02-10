@@ -783,6 +783,15 @@ Line 1, characters 50-51:
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 
+(* Even this is safe because 'a cannot appear in 'a t *)
+let foo (t : (int ref) t @ contended) = use_uncontended t
+[%%expect {|
+Line 1, characters 56-57:
+1 | let foo (t : (int ref) t @ contended) = use_uncontended t
+                                                            ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
 let foo (t : int t @ aliased) = use_unique t
 [%%expect {|
 Line 1, characters 43-44:
@@ -805,6 +814,14 @@ let foo (t : int t @ contended) = use_uncontended t
 Line 1, characters 50-51:
 1 | let foo (t : int t @ contended) = use_uncontended t
                                                       ^
+Error: This value is "contended" but is expected to be "uncontended".
+|}]
+
+let foo (t : (int ref) t @ contended) = use_uncontended t
+[%%expect {|
+Line 1, characters 56-57:
+1 | let foo (t : (int ref) t @ contended) = use_uncontended t
+                                                            ^
 Error: This value is "contended" but is expected to be "uncontended".
 |}]
 

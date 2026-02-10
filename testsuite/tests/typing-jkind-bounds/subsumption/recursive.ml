@@ -111,6 +111,20 @@ module rec My_list : sig type 'a t = Nil | Cons of 'a * 'a My_list.t end
 module My_list : sig type 'a t = 'a My_list.t end
 |}]
 
+type my_int_list : immutable_data = Nil | Cons of int * my_int_list
+type my_int_list2 = Nil | Cons of int * my_int_list2
+[%%expect {|
+type my_int_list = Nil | Cons of int * my_int_list
+type my_int_list2 = Nil | Cons of int * my_int_list2
+|}]
+
+module rec My_int_list : sig
+  type t = Nil | Cons of int * My_int_list.t
+end = My_int_list
+[%%expect {|
+module rec My_int_list : sig type t = Nil | Cons of int * My_int_list.t end
+|}]
+
 module rec My_int_list : sig
   type t : immutable_data = Nil | Cons of int * My_int_list.t
 end = My_int_list

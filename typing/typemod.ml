@@ -867,6 +867,7 @@ module Merge = struct
               type_kind = Type_abstract Definition;
               type_jkind =
                 Jkind.Builtin.value ~why:(Unknown "merge_constraint");
+              type_ikind = Types.ikinds_todo "merge constraint temporary";
               type_private = Private;
               type_manifest = None;
               type_variance =
@@ -1106,7 +1107,13 @@ module Merge = struct
                Internal ticket 5095. *)
             (Ctype.constrain_decl_jkind env tdecl sig_decl.type_jkind);
           check_type_decl sig_env sg_for_env loc id None tdecl sig_decl;
-          let tdecl = { tdecl with type_manifest = None } in
+          let reason = "package constraint removal" in
+          let tdecl =
+            { tdecl with
+              type_manifest = None;
+              type_ikind = Types.ikinds_todo reason
+            }
+          in
           let path = Pident id in
           return ~ghosts ~replace_by:(Some(Sig_type(id, tdecl, rs, priv))) path
       | _ -> None
@@ -2710,7 +2717,17 @@ let rec package_constraints_sig env loc sg constrs =
       | Sig_type (id, ({type_params=[]} as td), rs, priv)
         when List.mem_assoc [Ident.name id] constrs ->
           let ty = List.assoc [Ident.name id] constrs in
-          Sig_type (id, {td with type_manifest = Some ty}, rs, priv)
+          let reason =
+            Format.asprintf "package constraint path=%a" Path.print (Pident id)
+          in
+          Sig_type
+            ( id,
+              { td with
+                type_manifest = Some ty;
+                type_ikind = Types.ikinds_todo reason
+              },
+              rs,
+              priv )
       | Sig_module (id, pres, md, rs, priv) ->
           let rec aux = function
             | (m :: ((_ :: _) as l), t) :: rest when m = Ident.name id ->
@@ -3248,10 +3265,22 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
             with
             | Tcoerce_none -> ()
             | _ ->
+                if !Clflags.ikinds_debug then
+                  Format.eprintf
+                    "[nondep-supertype] unexpected coercion@;original=%a@;\
+                     nondep=%a@."
+                    Printtyp.modtype mty_res
+                    Printtyp.modtype nondep_mty;
                 fatal_error
                   "unexpected coercion from original module type to \
                    nondep_supertype one"
             | exception Includemod.Error _ ->
+                if !Clflags.ikinds_debug then
+                  Format.eprintf
+                    "[nondep-supertype] inclusion failure@;original=%a@;\
+                     nondep=%a@."
+                    Printtyp.modtype mty_res
+                    Printtyp.modtype nondep_mty;
                 fatal_error
                   "nondep_supertype not included in original module type"
             end;
