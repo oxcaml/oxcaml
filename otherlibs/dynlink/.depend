@@ -5,12 +5,9 @@ byte/dynlink.cmo : \
     dynlink_common.cmi \
     dynlink_cmo_format.cmi \
     byte/dynlink.cmi
-<<<<<<< HEAD
 dynlink.cmo : \
     dynlink_types.cmi \
     dynlink.cmi
-||||||| parent of f1c28574ac (Merge pull request #11996 from shindere/emancipate-dynlink-from-compilerlibs)
-=======
 byte/dynlink.cmi :
 byte/dynlink_symtable.cmo : \
     dynlink_config.cmi \
@@ -18,7 +15,6 @@ byte/dynlink_symtable.cmo : \
     byte/dynlink_symtable.cmi
 byte/dynlink_symtable.cmi : \
     dynlink_cmo_format.cmi
->>>>>>> f1c28574ac (Merge pull request #11996 from shindere/emancipate-dynlink-from-compilerlibs)
 dynlink.cmi :
 dynlink_cmo_format.cmi :
 dynlink_cmxs_format.cmi :

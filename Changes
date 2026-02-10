@@ -1029,7 +1029,6 @@ OCaml 5.3.0 (8 January 2025)
 
 ### Other libraries:
 
-<<<<<<< HEAD
 - #11996: release the dependency of dynlink on compilerlibs.
   (Sébastien Hinderer and Stephen Dolan, review by Damien Doligez and
   Hugo Heuzard)
@@ -1037,13 +1036,6 @@ OCaml 5.3.0 (8 January 2025)
 - #13326: Implement Unix.O_APPEND on windows.
   (Romain Beauxis, review by Miod Vallat, Gabriel Scherer and Antonin Décimo)
 
-||||||| parent of f1c28574ac (Merge pull request #11996 from shindere/emancipate-dynlink-from-compilerlibs)
-=======
-- #11996: release the dependency of dynlink on compilerlibs.
-  (Sébastien Hinderer and Stephen Dolan, review by Damien Doligez and
-  Hugo Heuzard)
-
->>>>>>> f1c28574ac (Merge pull request #11996 from shindere/emancipate-dynlink-from-compilerlibs)
 ### Tools:
 
 - #11716: ocamllex: mismatched parentheses and curly brackets are now caught

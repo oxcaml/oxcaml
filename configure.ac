@@ -1110,11 +1110,6 @@ otherlibs="runtime_events"
 optional_libraries="$optional_libraries otherlibs/dynlink/dynlink"
 
 lib_dynlink=true
-dldir=otherlibs/dynlink
-AC_CONFIG_LINKS([
-  $dldir/dynlink_cmo_format.mli:file_formats/cmo_format.mli
-  $dldir/dynlink_cmxs_format.mli:file_formats/cmxs_format.mli
-])
 lib_runtime_events=true
 dldir=otherlibs/dynlink
 AC_CONFIG_LINKS([
