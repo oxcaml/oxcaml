@@ -19,7 +19,7 @@
  (name ocamldebug)
  (modules (:standard \ ocamldebug_entry))
  (modules_without_implementation parser_aux)
- (libraries ocamlcommon ocamltoplevel unix dynlink_internal))
+ (libraries ocamlcommon ocamltoplevel unix dynlink))
 
 (executable
   (name ocamldebug_entry)

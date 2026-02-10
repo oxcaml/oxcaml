@@ -26,3 +26,6 @@ and cma_magic_number = {@QS@|@CMA_MAGIC_NUMBER@|@QS@}
 and cmxs_magic_number = {@QS@|@CMXS_MAGIC_NUMBER@|@QS@}
 
 let caml_symbol_prefix = {@QS@|@caml_symbol_prefix@|@QS@}
+
+let ccomp_type = {@QS@|@ccomptype@|@QS@}
+let runtime5 = "@enable_runtime5@" = "yes"

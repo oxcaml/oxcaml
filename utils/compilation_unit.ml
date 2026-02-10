@@ -231,8 +231,8 @@ module T0 : sig
 
   val compare : t -> t -> int
 end = struct
-  (* As with [Name.t], changing [descr] or [t] requires bumping magic
-     numbers. *)
+  (* As with [Name.t], changing [descr] or [t] requires bumping magic numbers
+     and considerable care in Dynlink_shims. *)
   type descr =
     { name : Name.t;
       for_pack_prefix : Prefix.t;
