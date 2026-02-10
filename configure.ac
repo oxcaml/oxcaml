@@ -1001,7 +1001,11 @@ AS_CASE([$host],
 
 otherlibraries="dynlink"
 lib_dynlink=true
-<<<<<<< HEAD
+dldir=otherlibs/dynlink
+AC_CONFIG_LINKS([
+  $dldir/dynlink_cmo_format.mli:file_formats/cmo_format.mli
+  $dldir/dynlink_cmxs_format.mli:file_formats/cmxs_format.mli
+])
 
 AS_IF(
   [test x"$enable_runtime5" = x"yes"],
@@ -1009,16 +1013,6 @@ AS_IF(
    lib_runtime_events=true],
   [])
 
-||||||| parent of f1c28574ac (Merge pull request #11996 from shindere/emancipate-dynlink-from-compilerlibs)
-lib_runtime_events=true
-=======
-dldir=otherlibs/dynlink
-AC_CONFIG_LINKS([
-  $dldir/dynlink_cmo_format.mli:file_formats/cmo_format.mli
-  $dldir/dynlink_cmxs_format.mli:file_formats/cmxs_format.mli
-])
-lib_runtime_events=true
->>>>>>> f1c28574ac (Merge pull request #11996 from shindere/emancipate-dynlink-from-compilerlibs)
 AS_IF([test x"$enable_unix_lib" != "xno"],
   [enable_unix_lib=yes
   AC_CONFIG_FILES([otherlibs/unix/META])
