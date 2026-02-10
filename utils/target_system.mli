@@ -9,6 +9,8 @@ type architecture =
 
 val architecture : unit -> architecture
 
+val is_arm : unit -> bool
+
 val is_64_bit : unit -> bool
 
 (* CR mshinwell: what happens about these functions for JSIR? *)

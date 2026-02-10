@@ -93,10 +93,8 @@ end = struct
       | Reg.Incoming offset ->
         Incoming { index = byte_offset_to_word_index offset }
       | Reg.Outgoing offset ->
-        (* arm64 macOS requires unaligned stack locations for C calls. *)
-        if
-          String.equal Config.architecture "arm64"
-          && String.equal Config.system "macosx"
+        (* macOS on arm requires unaligned stack locations for C calls. *)
+        if Target_system.is_macos () && Target_system.is_arm ()
         then Outgoing { index = offset / word_size }
         else Outgoing { index = byte_offset_to_word_index offset }
       | Reg.Domainstate offset ->
