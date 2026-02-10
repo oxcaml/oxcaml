@@ -23,9 +23,9 @@ open Cmo_format
 module DC = Dynlink_common
 module DT = Dynlink_types
 
-let convert_cmi_import import =
-  let name = Import_info.name import |> Compilation_unit.Name.to_string in
-  let crc = Import_info.crc import in
+let convert_cmi_import (name, info) =
+  let name = Compilation_unit.Name.to_string name in
+  let crc = Option.map snd info in
   name, crc
 
 module Compression = struct (* Borrowed from utils/compression.ml *)
@@ -96,9 +96,8 @@ module Bytecode = struct
     Compilation_unit.create Compilation_unit.Prefix.empty modname
 
   let fold_initial_units ~init ~f =
-    Array.fold_left (fun acc import ->
-        let modname = Import_info.name import in
-        let crc = Import_info.crc import in
+    Array.fold_left (fun acc (modname, info) ->
+        let crc = Option.map snd info in
         let cu = assume_no_prefix modname in
         let defined =
           Symtable.is_defined_in_global_map !default_global_map

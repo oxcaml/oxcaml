@@ -37,7 +37,7 @@ let expunge_map tbl =
 
 let expunge_crcs tbl =
   Array.to_list tbl
-  |> List.filter (fun import -> keep0 (Import_info.name import))
+  |> List.filter (fun (name, _) -> keep0 name)
   |> Array.of_list
 
 let main () =
@@ -67,7 +67,7 @@ let main () =
           let global_map : Symtable.global_map = input_value ic in
           output_value oc (expunge_map global_map)
       | CRCS ->
-          let crcs : Import_info.t array = input_value ic in
+          let crcs : Cmo_format.crcs = input_value ic in
           output_value oc (expunge_crcs crcs)
       | _ ->
           copy_file_chunk ic oc len
