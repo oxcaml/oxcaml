@@ -236,23 +236,9 @@ caml_unit_deps_find(const char *name)
   return NULL;
 }
 
-static value init_module_failure_(const char *func, const char *fmt,
-                                  const char *name)
-{
-  size_t func_len = strlen(func), fmt_len = strlen(fmt), name_len = strlen(name);
-  /* msg becomes "<func>: <fmt with %s = name>\0"; len overestimates the length
-     by 2 characters, specifically the "%s" inside the fmt string. */
-  size_t len = func_len + 2 + fmt_len + name_len + 1;
-  char *msg = caml_stat_alloc(len);
-  snprintf(msg, func_len + 3, "%s: ", func); /* +3 for ": " and null byte */
-  snprintf(msg + func_len + 2, len - func_len - 2, fmt, name);
-  value exn = caml_failure_exn(msg);
-  caml_stat_free(msg);
-  return Make_exception_result(exn);
-}
-
-#define init_module_failure(fmt, name) \
-  init_module_failure_(__func__, fmt, name)
+#define init_module_failure(fmt, ...) \
+  Make_exception_result( \
+    caml_failure_exn(caml_alloc_sprintf("%s: " fmt, __func__, __VA_ARGS__)))
 
 /* Initialize a module and its dependencies in topological order.
    Uses a recursive depth-first approach.

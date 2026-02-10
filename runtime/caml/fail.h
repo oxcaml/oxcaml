@@ -129,7 +129,7 @@ CAMLnoret CAMLextern void caml_array_align_error (void);
 CAMLnoret CAMLextern void caml_raise_sys_blocked_io (void);
 
 /* Exception constructors */
-CAMLextern value caml_failure_exn (char const *msg);
+CAMLextern value caml_failure_exn (value msg);
 
 #ifdef __cplusplus
 }

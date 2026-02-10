@@ -141,14 +141,6 @@ static value caml_exn_with_arg(value tag, value arg)
   CAMLreturn(bucket);
 }
 
-static value caml_exn_with_string(value tag, char const *msg)
-{
-  CAMLparam1(tag);
-  CAMLlocal1(v_msg);
-  v_msg = caml_copy_string(msg);
-  CAMLreturn(caml_exn_with_arg(tag, v_msg));
-}
-
 /* PR#5115: Built-in exceptions can be triggered by input_value
    while reading the initial value of [caml_global_data].
 
@@ -290,7 +282,8 @@ int caml_is_special_exception(value exn) {
       || exn == Field(f, UNDEFINED_RECURSIVE_MODULE_EXN);
 }
 
-CAMLexport value caml_failure_exn (char const *msg)
+CAMLexport value caml_failure_exn (value msg)
 {
-  return caml_exn_with_string(caml_get_failwith_tag(msg), msg);
+  value tag = caml_get_failwith_tag(String_val(msg));
+  return caml_exn_with_arg(tag, msg);
 }

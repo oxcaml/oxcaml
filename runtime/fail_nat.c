@@ -205,14 +205,6 @@ static value caml_exn_with_arg(value tag, value arg)
   CAMLreturn(bucket);
 }
 
-static value caml_exn_with_string(value tag, char const *msg)
-{
-  CAMLparam1(tag);
-  CAMLlocal1(v_msg);
-  v_msg = caml_copy_string(msg);
-  CAMLreturn(caml_exn_with_arg(tag, v_msg));
-}
-
 void caml_failwith (char const *msg)
 {
   caml_raise_with_string((value) caml_exn_Failure, msg);
@@ -348,7 +340,7 @@ int caml_is_special_exception(value exn) {
     || exn == (value) caml_exn_Undefined_recursive_module;
 }
 
-value caml_failure_exn (char const *msg)
+value caml_failure_exn (value msg)
 {
-  return caml_exn_with_string((value) caml_exn_Failure, msg);
+  return caml_exn_with_arg((value) caml_exn_Failure, msg);
 }
