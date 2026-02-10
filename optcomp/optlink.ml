@@ -80,6 +80,12 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       Library (file_name, infos)
     else raise (Linkenv.Error (Not_an_object_file file_name))
 
+  let dynu_import_cmi_of_ui_import_cmi import =
+    Import_info.name import, Import_info.crc import
+
+  let dynu_import_cmx_of_ui_import_cmx import =
+    Import_info.cu import, Import_info.crc import
+
   let scan_file linkenv ~shared genfns file
       (full_paths, objfiles, tolink, cached_genfns_imports) =
     match read_file file with
@@ -98,8 +104,12 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
             { dynu_name = info.ui_unit;
               dynu_crc = crc;
               dynu_defines = List.map dynu_define_of_cu info.ui_defines;
-              dynu_imports_cmi = info.ui_imports_cmi |> Array.of_list;
-              dynu_imports_cmx = info.ui_imports_cmx |> Array.of_list;
+              dynu_imports_cmi =
+                List.map dynu_import_cmi_of_ui_import_cmi info.ui_imports_cmi
+                |> Array.of_list;
+              dynu_imports_cmx =
+                List.map dynu_import_cmx_of_ui_import_cmx info.ui_imports_cmx
+                |> Array.of_list;
               dynu_quoted_globals = info.ui_quoted_globals |> Array.of_list
             }
       in
@@ -167,13 +177,14 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
               |> Misc.Bitmap.iter (fun i ->
                   let import = infos.lib_imports_cmx.(i) in
                   Linkenv.add_required linkenv req_by import);
-              let imports_list tbl bits =
+              let imports_list f tbl bits =
                 List.init (Array.length tbl) (fun i ->
                     if Misc.Bitmap.get bits i then Some tbl.(i) else None)
-                |> List.filter_map Fun.id
+                |> List.filter_map f
               in
               let quoted_globals =
-                imports_list infos.lib_quoted_globals info.li_quoted_globals
+                imports_list Fun.id infos.lib_quoted_globals
+                  info.li_quoted_globals
               in
               Linkenv.add_quoted_globals linkenv quoted_globals;
               let dynunit : Cmxs_format.dynunit option =
@@ -185,16 +196,20 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                       dynu_crc = info.li_crc;
                       dynu_defines = List.map dynu_define_of_cu info.li_defines;
                       dynu_imports_cmi =
-                        imports_list infos.lib_imports_cmi info.li_imports_cmi
+                        imports_list
+                          (Option.map dynu_import_cmi_of_ui_import_cmi)
+                          infos.lib_imports_cmi info.li_imports_cmi
                         |> Array.of_list;
                       dynu_imports_cmx =
-                        imports_list infos.lib_imports_cmx info.li_imports_cmx
+                        imports_list
+                          (Option.map dynu_import_cmx_of_ui_import_cmx)
+                          infos.lib_imports_cmx info.li_imports_cmx
                         |> Array.of_list;
                       dynu_quoted_globals = quoted_globals |> Array.of_list
                     }
               in
               let imports_cmx =
-                imports_list infos.lib_imports_cmx info.li_imports_cmx
+                imports_list Fun.id infos.lib_imports_cmx info.li_imports_cmx
               in
               let unit =
                 { name = info.li_name;

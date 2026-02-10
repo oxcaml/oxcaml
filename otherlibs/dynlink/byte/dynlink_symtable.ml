@@ -254,7 +254,7 @@ let update_global_table () =
 
 type bytecode_sections =
   { symb: GlobalMap.t;
-    crcs: Import_info.t array;
+    crcs: Cmo_format.crcs;
     prim: string list;
     dlpt: string list }
 
