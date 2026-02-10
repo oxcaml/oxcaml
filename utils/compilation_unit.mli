@@ -153,11 +153,6 @@ val of_complete_global_exn : Global_module.t -> t
     take their names from hidden files.) *)
 val of_string : string -> t
 
-(** Create a global [Ident.t] representing this compilation unit. Only intended
-    for use in bytecode; most uses of [Ident.t]s that are known to be global
-    should simply use [t] instead. *)
-val to_global_ident_for_bytecode : t -> Ident.t
-
 (** Find whether one compilation unit has another as a child. That is, whether
     the other unit has this one as its path prefix. *)
 val is_parent : t -> child:t -> bool

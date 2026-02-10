@@ -26,7 +26,8 @@ module Compunit = struct
   type t = compunit
   let name cu = Compilation_unit.full_path_as_string cu
   let is_packed = Compilation_unit.is_packed
-  let to_ident = Compilation_unit.to_global_ident_for_bytecode
+  let to_ident cu =
+    Ident.create_persistent (Compilation_unit.full_path_as_string cu)
   module Set = Set.Make(struct type nonrec t = t let compare = compare end)
   module Map = Map.Make(struct type nonrec t = t let compare = compare end)
 end
