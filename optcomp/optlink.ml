@@ -29,6 +29,10 @@ module type S = sig
     Linkenv.t -> string -> Cmx_format.unit_infos -> Digest.t -> unit
 end
 
+let dynu_define_of_cu comp_unit =
+  Compilation_unit.mangle_for_linkage_name ~pack_separator:Symbol.pack_separator
+    comp_unit
+
 module Make (Backend : Optcomp_intf.Backend) : S = struct
   open Cmx_format
   open Compilenv
@@ -93,7 +97,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           Some
             { dynu_name = info.ui_unit;
               dynu_crc = crc;
-              dynu_defines = info.ui_defines;
+              dynu_defines = List.map dynu_define_of_cu info.ui_defines;
               dynu_imports_cmi = info.ui_imports_cmi |> Array.of_list;
               dynu_imports_cmx = info.ui_imports_cmx |> Array.of_list;
               dynu_quoted_globals = info.ui_quoted_globals |> Array.of_list
@@ -179,7 +183,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                   Some
                     { dynu_name = info.li_name;
                       dynu_crc = info.li_crc;
-                      dynu_defines = info.li_defines;
+                      dynu_defines = List.map dynu_define_of_cu info.li_defines;
                       dynu_imports_cmi =
                         imports_list infos.lib_imports_cmi info.li_imports_cmi
                         |> Array.of_list;
