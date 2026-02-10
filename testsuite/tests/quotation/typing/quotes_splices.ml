@@ -43,7 +43,7 @@ Line 1, characters 35-41:
 1 | let _ : <[ $(<[$(<[unit]>)]>) ]> = <[()]>
                                        ^^^^^^
 Error: This expression has type "<['a]> expr"
-       but an expression was expected of type "<[unit]>" = "<[unit]>"
+       but an expression was expected of type "<[unit]>"
 |}]
 
 let _ : <[$(<[$unit]>)]> = ()

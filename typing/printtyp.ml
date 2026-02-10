@@ -1534,6 +1534,7 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_ret (Orm_any (tree_of_modes mode), tree)
     | Other _ -> tree
   in
+  let ty = Ctype.reduce_head ty in
   let px = proxy ty in
   if List.memq px !printed_aliases && not (List.memq px !delayed) then
    let non_gen = is_non_gen mode (Transient_expr.type_expr px) in
@@ -1616,11 +1617,8 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_quote (tree_of_typexp mode alloc_mode ty)
     | Tsplice ty ->
         Otyp_splice (tree_of_typexp mode alloc_mode ty)
-    | Tquote_eval ty ->
-        let p', s = best_type_path Predef.path_eval in
-        let tyl = apply_subst s [ty] in
-        Internal_names.add p';
-        Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl)
+    | Tquote_eval _ ->
+        fatal_error "Printtyp.tree_of_typexp: unwrapped Tquote_eval"
     | Tnil | Tfield _ ->
         tree_of_typobject mode ty None
     | Tsubst _ ->
