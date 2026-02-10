@@ -1582,11 +1582,13 @@ let instance_class params cty =
 
 (* [copy_sep] is used to instantiate first-class polymorphic types.
    * It first makes a separate copy of the type as a graph, omitting nodes
-     that have no free univars.
+     that have no free univars (considering only univars in [bound_univars]).
    * In this first pass, [visited] is used as a mapping for previously visited
-     nodes, and must already contain all the free univars in [ty].
+     nodes, and must already contain all the [bound_univars].
    * The remaining (univar-closed) parts of the type are then instantiated
-     with [copy] using a common [copy_scope].
+     with [copy] using a common [copy_scope], unless [partial] is [true]
+     in which case they are kept as-is. Note that the identity of unbound
+     univars is not going to be preserved if [partial] is [false].
    The reason to work in two passes lies in recursive types such as:
      [let h (x : < m : 'a. < n : 'a; p : 'b > > as 'b) = x#m]
    The type of [x#m] should be:
@@ -1594,14 +1596,9 @@ let instance_class params cty =
    I.e., the universal type variable ['a] is both instantiated as a fresh
    type variable ['c] when outside of its binder, and kept as universal
    when under its binder.
-   Assumption: in the first call to [copy_sep], all the free univars should
-   be bound by the same [Tpoly] node. This guarantees that they are only
-   bound when under this [Tpoly] node, which has no free univars, and as
-   such is not part of the separate copy. In turn, this allows the separate
-   copy to keep the sharing of the original type without breaking its
-   binding structure.
  *)
-let copy_sep ~copy_scope ~fixed ~(visited : type_expr TypeHash.t) sch =
+let copy_sep ~copy_scope ~fixed ~partial ~bound_univars
+    ~(visited : type_expr TypeHash.t) sch =
   let free = compute_univars sch in
   let delayed_copies = ref [] in
   let add_delayed_copy t ty =
@@ -1609,10 +1606,16 @@ let copy_sep ~copy_scope ~fixed ~(visited : type_expr TypeHash.t) sch =
       (fun () -> Transient_expr.set_stub_desc t (Tlink (copy copy_scope ty))) ::
       !delayed_copies
   in
-  let rec copy_rec ~may_share (ty : type_expr) =
-    let univars = free ty in
+  let rec copy_rec ~bound_univars ~may_share (ty : type_expr) =
+    let bound_univars =
+      match get_desc ty with
+      | Tpoly (_, tl) -> List.fold_right TypeSet.add tl bound_univars
+      | _ -> bound_univars
+    in
+    let copy_rec = copy_rec ~bound_univars in
+    let univars = TypeSet.inter (free ty) bound_univars in
     if is_Tvar ty || may_share && TypeSet.is_empty univars then
-      if get_level ty <> generic_level then ty else
+      if partial || get_level ty <> generic_level then ty else
       (* jkind not consulted during copy_sep, so Any is safe *)
       let t = newstub ~scope:(get_scope ty) (Jkind.Builtin.any ~why:Dummy_jkind) in
       add_delayed_copy t ty;
@@ -1627,7 +1630,9 @@ let copy_sep ~copy_scope ~fixed ~(visited : type_expr TypeHash.t) sch =
         | Tvariant row ->
             let more = row_more row in
             (* We shall really check the level on the row variable *)
-            let keep = is_Tvar more && get_level more <> generic_level in
+            let keep =
+              partial || is_Tvar more && get_level more <> generic_level
+            in
             (* In that case we should keep the original, but we still
                call copy to correct the levels *)
             if keep then
@@ -1651,11 +1656,12 @@ let copy_sep ~copy_scope ~fixed ~(visited : type_expr TypeHash.t) sch =
       t
     end
   in
-  let ty = copy_rec ~may_share:true sch in
+  let ty = copy_rec ~bound_univars ~may_share:true sch in
   List.iter (fun force -> force ()) !delayed_copies;
   ty
 
-let instance_poly' copy_scope ~keep_names ~fixed ~copy_var univars sch =
+let instance_poly' copy_scope
+    ~keep_names ~fixed ~partial ~copy_var univars sch =
   (* In order to compute univars below, [sch] should not contain [Tsubst] *)
   let copy_var =
     Option.value copy_var
@@ -1669,18 +1675,22 @@ let instance_poly' copy_scope ~keep_names ~fixed ~copy_var univars sch =
   let vars = List.map copy_var univars in
   let visited = TypeHash.create 17 in
   List.iter2 (TypeHash.add visited) univars vars;
-  let ty = copy_sep ~copy_scope ~fixed ~visited sch in
+  let bound_univars = List.fold_right TypeSet.add univars TypeSet.empty in
+  let ty =
+    copy_sep ~copy_scope ~fixed ~partial ~bound_univars ~visited sch
+  in
   vars, ty
 
 let instance_poly_fixed ?(keep_names=false) univars sch =
   For_copy.with_scope (fun copy_scope ->
-    instance_poly' copy_scope ~keep_names ~fixed:true ~copy_var:None univars sch
+    instance_poly' copy_scope
+      ~keep_names ~fixed:true ~partial:false ~copy_var:None univars sch
   )
 
 let instance_poly ?(keep_names=false) univars sch =
   For_copy.with_scope (fun copy_scope ->
-    snd (instance_poly' copy_scope ~keep_names ~fixed:false ~copy_var:None
-          univars sch)
+    snd (instance_poly' copy_scope
+      ~keep_names ~fixed:false ~partial:false ~copy_var:None univars sch)
   )
 
 (** The body of a [Tpoly] will likely have references to the [Tunivar]s bound in
@@ -1721,7 +1731,7 @@ let instance_poly_for_jkind univars sch =
   in
   For_copy.with_scope (fun copy_scope ->
     let _, ty =
-      instance_poly' copy_scope ~keep_names:false ~fixed:false
+      instance_poly' copy_scope ~keep_names:false ~fixed:false ~partial:false
         ~copy_var:(Some copy_var) univars sch
     in
     ty
@@ -1732,8 +1742,8 @@ let instance_label ~fixed lbl =
     let vars, ty_arg =
       match get_desc lbl.lbl_arg with
         Tpoly (ty, tl) ->
-          instance_poly' copy_scope ~keep_names:false ~copy_var:None ~fixed
-            tl ty
+          instance_poly' copy_scope
+            ~keep_names:false ~copy_var:None ~fixed ~partial:false tl ty
       | _ ->
           [], copy copy_scope lbl.lbl_arg
     in
@@ -2271,7 +2281,7 @@ let rec try_reduce_once t =
       let tl', t' =
         For_copy.with_scope (fun copy_scope ->
           instance_poly' copy_scope ~keep_names:true
-            ~fixed:false ~copy_var:(Some copy) tl t)
+            ~fixed:false ~partial:true ~copy_var:(Some copy) tl t)
       in
       let tl' =
         ListLabels.map tl' ~f:(fun t ->

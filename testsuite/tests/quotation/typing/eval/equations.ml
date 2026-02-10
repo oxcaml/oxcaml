@@ -104,21 +104,11 @@ val f :
 let f (x : <[ <a: 'c. 'c -> $('a); b: 'd. 'd -> $('b)> ]> expr)
     : <a: 'c. 'c eval -> 'a eval; b: 'd. 'd eval -> 'b eval> = eval x
 [%%expect {|
-Line 2, characters 63-69:
-2 |     : <a: 'c. 'c eval -> 'a eval; b: 'd. 'd eval -> 'b eval> = eval x
-                                                                   ^^^^^^
-Error: This expression has type
-         "< a : 'c. 'c0 eval -> <['a]> eval; b : 'd. 'd0 eval -> <['b]> eval >"
-           =
-           "< a : 'c. 'c1 eval -> <['a]> eval;
-             b : 'd. 'd1 eval -> <['b]> eval >"
-       but an expression was expected of type
-         "< a : 'c. 'c eval -> <['a]> eval; b : 'd. 'd eval -> <['b]> eval >"
-       Type "'c eval -> <['a]> eval" = "'c2 eval -> <['a]> eval"
-       is not compatible with type "'c3 eval -> <['a]> eval"
-       Type "'c4 eval" is not compatible with type "'c3 eval"
-       The method "a" has type "'c5. 'c6 eval -> <['a]> eval",
-       but the expected method type was "'c3. 'c3 eval -> <['a]> eval"
+val f :
+  ('a : any) ('b : any).
+    <[< a : 'c. 'c -> $('a); b : 'd. 'd -> $('b) >]> expr ->
+    < a : 'c. 'c eval -> 'a eval; b : 'd. 'd eval -> 'b eval > =
+  <fun>
 |}]
 
 (* Quotes *)
@@ -205,116 +195,44 @@ val f :
 let f (x : <[('a. 'a -> 'a) -> int]> expr)
     : ('a. <[ $('a) -> $('a) ]> eval) -> int = eval x
 [%%expect {|
-Line 2, characters 47-53:
-2 |     : ('a. <[ $('a) -> $('a) ]> eval) -> int = eval x
-                                                   ^^^^^^
-Error: This expression has type
-         "('a. 'a0 eval -> 'a eval) -> int" = "('a. 'a1 eval -> 'a eval) -> int"
-       but an expression was expected of type
-         "('a. 'a2 eval -> 'a eval) -> int"
-       Type "'a eval -> 'a3 eval" = "'a4 eval -> 'a3 eval"
-       is not compatible with type
-         "'a5 eval -> 'a6 eval" = "'a7 eval -> 'a6 eval"
-       Type "'a8 eval" is not compatible with type "'a9 eval"
-       Type "'a8" is not compatible with type "'a9"
+val f : <[('a. 'a -> 'a) -> int]> expr -> ('a. 'a eval -> 'a eval) -> int =
+  <fun>
 |}]
 (* fully re-staged *)
 let f (x : <[('a. 'a -> 'a) -> int]> expr)
     : ('a. 'a eval -> 'a eval) -> int = eval x
 [%%expect {|
-Line 2, characters 40-46:
-2 |     : ('a. 'a eval -> 'a eval) -> int = eval x
-                                            ^^^^^^
-Error: This expression has type
-         "('a. 'a0 eval -> 'a eval) -> int" = "('a. 'a1 eval -> 'a eval) -> int"
-       but an expression was expected of type "('a. 'a eval -> 'a eval) -> int"
-       Type "'a eval -> 'a2 eval" = "'a3 eval -> 'a2 eval"
-       is not compatible with type "'a4 eval -> 'a4 eval"
-       Type "'a5 eval" is not compatible with type "'a4 eval"
-       Type "'a5" is not compatible with type "'a4"
+val f : <[('a. 'a -> 'a) -> int]> expr -> ('a. 'a eval -> 'a eval) -> int =
+  <fun>
 |}]
 (* variables from different quantifiers *)
 let f (x : <[('a. 'a -> $('b) -> 'a) -> $('b)]> expr)
     : ('a. <[ $('a) -> $('b) -> $('a) ]> eval) -> 'b eval = eval x
 [%%expect {|
-Line 2, characters 60-66:
-2 |     : ('a. <[ $('a) -> $('b) -> $('a) ]> eval) -> 'b eval = eval x
-                                                                ^^^^^^
-Error: This expression has type
-         "('a. 'a0 eval -> <['b]> eval -> 'a eval) -> <['b]> eval" =
-           "('a. 'a1 eval -> <['b]> eval -> 'a eval) -> <['b]> eval"
-       but an expression was expected of type
-         "('a. 'a2 eval -> <['b]> eval -> 'a eval) -> <['b]> eval"
-       Type
-         "'a eval -> <['b]> eval -> 'a3 eval" =
-           "'a4 eval -> <['b]> eval -> 'a3 eval"
-       is not compatible with type
-         "'a5 eval -> <['b]> eval -> 'a6 eval" =
-           "'a7 eval -> <['b]> eval -> 'a6 eval"
-       Type "'a8 eval" is not compatible with type "'a9 eval"
-       Type "'a8" is not compatible with type "'a9"
+val f :
+  ('b : any).
+    <[('a. 'a -> $('b) -> 'a) -> $('b)]> expr ->
+    ('a. 'a eval -> 'b eval -> 'a eval) -> 'b eval =
+  <fun>
 |}]
 (* nested quantifiers *)
 let f (x : <[('a. ('b. 'a -> 'b) -> 'a) -> unit]> expr)
     : ('a. ('b. 'a eval -> 'b eval) -> 'a eval) -> unit = eval x
 [%%expect {|
-Line 2, characters 58-64:
-2 |     : ('a. ('b. 'a eval -> 'b eval) -> 'a eval) -> unit = eval x
-                                                              ^^^^^^
-Error: This expression has type
-         "('a. ('b. 'a0 eval -> 'b eval) -> 'a eval) -> unit" =
-           "('a. ('b. 'a1 eval -> 'b eval) -> 'a eval) -> unit"
-       but an expression was expected of type
-         "('a. ('b. 'a eval -> 'b eval) -> 'a eval) -> unit"
-       Type
-         "('b. 'a eval -> 'b eval) -> 'a2 eval" =
-           "('b. 'a3 eval -> 'b eval) -> 'a2 eval"
-       is not compatible with type "('b. 'a4 eval -> 'b eval) -> 'a4 eval"
-       Type "'a5 eval -> 'b eval" = "'a6 eval -> 'b eval"
-       is not compatible with type "'a4 eval -> 'b0 eval"
-       Type "'a7 eval" is not compatible with type "'a4 eval"
-       Type "'a7" is not compatible with type "'a4"
+val f :
+  <[('a. ('b. 'a -> 'b) -> 'a) -> unit]> expr ->
+  ('a. ('b. 'a eval -> 'b eval) -> 'a eval) -> unit = <fun>
 |}]
 let f (x : <[('a. ('b. ('c. 'a -> 'b -> 'c) -> 'a -> 'b) -> 'a) -> unit]> expr)
     : ('a. ('b. ('c. 'a eval -> 'b eval -> 'c eval) -> 'a eval -> 'b eval)
             -> 'a eval) -> unit = eval x
 [%%expect {|
-Line 3, characters 34-40:
-3 |             -> 'a eval) -> unit = eval x
-                                      ^^^^^^
-Error: This expression has type
-         "('a.
-            ('b. ('c. 'a0 eval -> 'b0 eval -> 'c eval) -> 'a1 eval -> 'b eval) ->
-            'a eval) ->
-         unit" =
-           "('a.
-              ('b.
-                 ('c. 'a2 eval -> 'b1 eval -> 'c eval) -> 'a3 eval -> 'b eval) ->
-              'a eval) ->
-           unit"
-       but an expression was expected of type
-         "('a.
-            ('b. ('c. 'a eval -> 'b eval -> 'c eval) -> 'a eval -> 'b eval) ->
-            'a eval) ->
-         unit"
-       Type
-         "('b. ('c. 'a eval -> 'b2 eval -> 'c eval) -> 'a4 eval -> 'b eval) ->
-         'a5 eval" =
-           "('b. ('c. 'a6 eval -> 'b3 eval -> 'c eval) -> 'a7 eval -> 'b eval) ->
-           'a5 eval"
-       is not compatible with type
-         "('b. ('c. 'a8 eval -> 'b eval -> 'c eval) -> 'a8 eval -> 'b eval) ->
-         'a8 eval"
-       Type
-         "('c. 'a9 eval -> 'b eval -> 'c eval) -> 'a10 eval -> 'b4 eval" =
-           "('c. 'a11 eval -> 'b5 eval -> 'c eval) -> 'a12 eval -> 'b4 eval"
-       is not compatible with type
-         "('c. 'a8 eval -> 'b6 eval -> 'c eval) -> 'a8 eval -> 'b6 eval"
-       Type
-         "'a13 eval -> 'b7 eval -> 'c eval" = "'a14 eval -> 'b8 eval -> 'c eval"
-       is not compatible with type "'a8 eval -> 'b6 eval -> 'c0 eval"
-       Type "'a15 eval" is not compatible with type "'a8 eval"
-       Type "'a15" is not compatible with type "'a8"
+val f :
+  <[('a. ('b. ('c. 'a -> 'b -> 'c) -> 'a -> 'b) -> 'a) -> unit]> expr ->
+  ('a.
+     ('b. ('c. 'a eval -> 'b eval -> 'c eval) -> 'a eval -> 'b eval) ->
+     'a eval) ->
+  unit = <fun>
 |}]
 
 (* Package types *)
