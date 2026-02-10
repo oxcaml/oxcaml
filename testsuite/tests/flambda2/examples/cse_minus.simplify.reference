@@ -1,16 +1,41 @@
-(* The issue with this example is that we want to remove the second array bounds
-   check thanks to CSE, but this involves doing two rounds at some point. So
-   this should only work with -flambda-cse-depth of at least 2 (the default is
-   2) *)
-
-external ( - ) : int -> int -> int = "%subint"
-
-external ( = ) : 'a -> 'a -> bool = "%equal"
-
-external array_get : 'a array -> int -> 'a = "%array_safe_get"
-
-external array_set : 'a array -> int -> 'a -> unit = "%array_safe_set"
-
-let f table table c min t =
-  assert (array_get table (c - min) = None);
-  array_set table (c - min) (Some t)
+let $camlCse_minus__string17 = "index out of bounds" in
+let $camlCse_minus__block19 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument, $camlCse_minus__string17)
+in
+let $camlCse_minus__immstring26 = "cse_minus.ml" in
+let $camlCse_minus__const_block28 =
+  Block 0 ($camlCse_minus__immstring26, 24, 2)
+in
+let $camlCse_minus__Pmakeblock31 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlCse_minus__const_block28)
+in
+let code f_0 deleted in
+let code loopify(never) size(43) newer_version_of(f_0)
+      f_0_1 (table, table_1 : val array, c : imm tagged, min : imm tagged, t)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let int_sub = %int_barith.sub (c, min) in
+   (let prim = %array_length (table_1) in
+    let prim_1 = %int_comp.unsigned.lt (int_sub, prim) in
+    switch prim_1
+      | 0 -> k3
+      | 1 -> k4 (int_sub))
+     where k4 (int_sub_1) =
+       let int_sub_2 = int_sub_1 in
+       let Parrayrefs = %array_load.mut (table_1, int_sub_2) in
+       let prim = %phys_eq (Parrayrefs, 0) in
+       switch prim
+         | 0 -> k1 pop(regular k1) ($camlCse_minus__Pmakeblock31)
+         | 1 -> k2 (int_sub_2)
+     where k3 =
+       cont k1 pop(regular k1) ($camlCse_minus__block19))
+    where k2 (int_sub) =
+      let cse_param = int_sub in
+      let Pmakeblock = %block.[`0`] (t) in
+      let Parraysets = %array_set (table_1, cse_param, Pmakeblock) in
+      cont k (0)
+in
+let $camlCse_minus__f_1 = closure f_0_1 @f in
+let $camlCse_minus = Block 0 ($camlCse_minus__f_1) in
+cont done ($camlCse_minus)
