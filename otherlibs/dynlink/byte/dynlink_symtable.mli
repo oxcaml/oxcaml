@@ -15,7 +15,8 @@
 
 (* Assign locations and numbers to globals and primitives *)
 
-open Dynlink_cmo_format
+open! Dynlink_compilerlibs
+open Cmo_format
 
 module Compunit : sig
   type t = compunit
@@ -37,7 +38,7 @@ val patch_object:
   (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t ->
   (reloc_info * int) list -> unit
 
-val init_toplevel: unit -> (string * Digest.t option) list
+val init_toplevel: unit -> Import_info.t array
 val update_global_table: unit -> unit
 val get_global_value: Global.t -> Obj.t
 val check_global_initialized: (reloc_info * int) list -> unit
