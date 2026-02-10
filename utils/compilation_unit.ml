@@ -685,9 +685,6 @@ let which_cmx_file desired_comp_unit ~accessed_by : t =
 
 let print_name ppf t = Fmt.fprintf ppf "%a" Name.print (name t)
 
-let to_global_ident_for_bytecode t =
-  Ident.create_persistent (full_path_as_string t)
-
 let print_debug ppf t =
   let name = name t in
   let for_pack_prefix = for_pack_prefix t in
