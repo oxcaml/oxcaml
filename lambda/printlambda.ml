@@ -621,6 +621,14 @@ let primitive ppf = function
   | Pbigarrayset(unsafe, _n, kind, layout) ->
       print_bigarray "set" unsafe kind ppf layout
   | Pbigarraydim(n) -> fprintf ppf "Bigarray.dim_%i" n
+  | Pstring_load_i8 {unsafe; index_kind} ->
+     fprintf ppf "string.%sgeti8[indexed by %a]"
+       (if unsafe then "unsafe_" else "")
+       array_index_kind index_kind
+  | Pstring_load_i16 {unsafe; index_kind} ->
+     fprintf ppf "string.%sgeti16[indexed by %a]"
+       (if unsafe then "unsafe_" else "")
+       array_index_kind index_kind
   | Pstring_load_16 {unsafe; index_kind} ->
      fprintf ppf "string.%sget16[indexed by %a]"
        (if unsafe then "unsafe_" else "")
@@ -642,6 +650,14 @@ let primitive ppf = function
        (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
+  | Pbytes_load_i8 {unsafe; index_kind} ->
+     fprintf ppf "bytes.%sgeti8[indexed by %a]"
+       (if unsafe then "unsafe_" else "")
+       array_index_kind index_kind
+  | Pbytes_load_i16 {unsafe; index_kind} ->
+     fprintf ppf "bytes.%sgeti16[indexed by %a]"
+       (if unsafe then "unsafe_" else "")
+       array_index_kind index_kind
   | Pbytes_load_16 {unsafe; index_kind} ->
      fprintf ppf "bytes.%sget16[indexed by %a]"
        (if unsafe then "unsafe_" else "")
@@ -663,6 +679,10 @@ let primitive ppf = function
        (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
+  | Pbytes_set_8 {unsafe; index_kind} ->
+     fprintf ppf "bytes.%sset8[indexed by %a]"
+       (if unsafe then "unsafe_" else "")
+       array_index_kind index_kind
   | Pbytes_set_16 {unsafe; index_kind} ->
      fprintf ppf "bytes.%sset16[indexed by %a]"
        (if unsafe then "unsafe_" else "")
@@ -683,6 +703,12 @@ let primitive ppf = function
      fprintf ppf "bytes.%sunaligned_set%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#") array_index_kind index_kind
+  | Pbigstring_load_i8 { unsafe; index_kind } ->
+     fprintf ppf "bigarray.array1.%sgeti8[indexed by %a]"
+       (if unsafe then "unsafe_" else "") array_index_kind index_kind
+  | Pbigstring_load_i16 { unsafe; index_kind } ->
+     fprintf ppf "bigarray.array1.%sgeti16[indexed by %a]"
+       (if unsafe then "unsafe_" else "") array_index_kind index_kind
   | Pbigstring_load_16 { unsafe; index_kind } ->
      fprintf ppf "bigarray.array1.%sget16[indexed by %a]"
        (if unsafe then "unsafe_" else "") array_index_kind index_kind
@@ -705,6 +731,9 @@ let primitive ppf = function
        (vector_width size)
        (if boxed then "" else "#") (locality_kind mode)
        array_index_kind index_kind
+  | Pbigstring_set_8 { unsafe; index_kind } ->
+     fprintf ppf "bigarray.array1.%sset8[indexed by %a]"
+       (if unsafe then "unsafe_" else "") array_index_kind index_kind
   | Pbigstring_set_16 { unsafe; index_kind } ->
      fprintf ppf "bigarray.array1.%sset16[indexed by %a]"
        (if unsafe then "unsafe_" else "") array_index_kind index_kind
@@ -746,6 +775,14 @@ let primitive ppf = function
      fprintf ppf "unboxed_float32_array.%sget%s%s%s"
       (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#") (locality_kind mode)
+  | Puntagged_int8_array_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "untagged_int8_array.%sget%s%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#") (locality_kind mode)
+  | Puntagged_int16_array_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "untagged_int16_array.%sget%s%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#") (locality_kind mode)
   | Punboxed_int32_array_load_vec {size; unsafe; mode; boxed} ->
      fprintf ppf "unboxed_int32_array.%sget%s%s%s"
       (if unsafe then "unsafe_" else "") (vector_width size)
@@ -776,6 +813,14 @@ let primitive ppf = function
       (if boxed then "" else "#")
   | Punboxed_float32_array_set_vec {size; unsafe; boxed} ->
      fprintf ppf "unboxed_float32_array.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
+  | Puntagged_int8_array_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "untagged_int8_array.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
+  | Puntagged_int16_array_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "untagged_int16_array.%sset%s%s"
       (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#")
   | Punboxed_int32_array_set_vec {size; unsafe; boxed} ->
@@ -933,26 +978,34 @@ let name_of_primitive = function
   | Pbigarrayref _ -> "Pbigarrayref"
   | Pbigarrayset _ -> "Pbigarrayset"
   | Pbigarraydim _ -> "Pbigarraydim"
+  | Pstring_load_i8 _ -> "Pstring_load_i8"
+  | Pstring_load_i16 _ -> "Pstring_load_i16"
   | Pstring_load_16 _ -> "Pstring_load_16"
   | Pstring_load_32 _ -> "Pstring_load_32"
   | Pstring_load_f32 _ -> "Pstring_load_f32"
   | Pstring_load_64 _ -> "Pstring_load_64"
   | Pstring_load_vec _ -> "Pstring_load_vec"
+  | Pbytes_load_i8 _ -> "Pbytes_load_i8"
+  | Pbytes_load_i16 _ -> "Pbytes_load_i16"
   | Pbytes_load_16 _ -> "Pbytes_load_16"
   | Pbytes_load_32 _ -> "Pbytes_load_32"
   | Pbytes_load_f32 _ -> "Pbytes_load_f32"
   | Pbytes_load_64 _ -> "Pbytes_load_64"
   | Pbytes_load_vec _ -> "Pbytes_load_vec"
+  | Pbytes_set_8 _ -> "Pbytes_set_8"
   | Pbytes_set_16 _ -> "Pbytes_set_16"
   | Pbytes_set_32 _ -> "Pbytes_set_32"
   | Pbytes_set_f32 _ -> "Pbytes_set_f32"
   | Pbytes_set_64 _ -> "Pbytes_set_64"
   | Pbytes_set_vec _ -> "Pbytes_set_vec"
+  | Pbigstring_load_i8 _ -> "Pbigstring_load_i8"
+  | Pbigstring_load_i16 _ -> "Pbigstring_load_i16"
   | Pbigstring_load_16 _ -> "Pbigstring_load_16"
   | Pbigstring_load_32 _ -> "Pbigstring_load_32"
   | Pbigstring_load_f32 _ -> "Pbigstring_load_f32"
   | Pbigstring_load_64 _ -> "Pbigstring_load_64"
   | Pbigstring_load_vec _ -> "Pbigstring_load_vec"
+  | Pbigstring_set_8 _ -> "Pbigstring_set_8"
   | Pbigstring_set_16 _ -> "Pbigstring_set_16"
   | Pbigstring_set_32 _ -> "Pbigstring_set_32"
   | Pbigstring_set_f32 _ -> "Pbigstring_set_f32"
@@ -963,6 +1016,8 @@ let name_of_primitive = function
   | Pint_array_load_vec _ -> "Pint_array_load_vec"
   | Punboxed_float_array_load_vec _ -> "Punboxed_float_array_load_vec"
   | Punboxed_float32_array_load_vec _ -> "Punboxed_float32_array_load_vec"
+  | Puntagged_int8_array_load_vec _ -> "Puntagged_int8_array_load_vec"
+  | Puntagged_int16_array_load_vec _ -> "Puntagged_int16_array_load_vec"
   | Punboxed_int32_array_load_vec _ -> "Punboxed_int32_array_load_vec"
   | Punboxed_int64_array_load_vec _ -> "Punboxed_int64_array_load_vec"
   | Punboxed_nativeint_array_load_vec _ -> "Punboxed_nativeint_array_load_vec"
@@ -971,6 +1026,8 @@ let name_of_primitive = function
   | Pint_array_set_vec _ -> "Pint_array_set_vec"
   | Punboxed_float_array_set_vec _ -> "Punboxed_float_array_set_vec"
   | Punboxed_float32_array_set_vec _ -> "Punboxed_float32_array_set_vec"
+  | Puntagged_int8_array_set_vec _ -> "Puntagged_int8_array_set_vec"
+  | Puntagged_int16_array_set_vec _ -> "Puntagged_int16_array_set_vec"
   | Punboxed_int32_array_set_vec _ -> "Punboxed_int32_array_set_vec"
   | Punboxed_int64_array_set_vec _ -> "Punboxed_int64_array_set_vec"
   | Punboxed_nativeint_array_set_vec _ -> "Punboxed_nativeint_array_set_vec"

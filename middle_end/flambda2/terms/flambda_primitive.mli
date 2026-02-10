@@ -314,15 +314,15 @@ end
 
 type string_accessor_width =
   | Eight
+  | Eight_signed
   | Sixteen
+  | Sixteen_signed
   | Thirty_two
   | Single
   | Sixty_four
   | One_twenty_eight of { aligned : bool }
   | Two_fifty_six of { aligned : bool }
   | Five_twelve of { aligned : bool }
-
-val kind_of_string_accessor_width : string_accessor_width -> Flambda_kind.t
 
 val byte_width_of_string_accessor_width : string_accessor_width -> int
 

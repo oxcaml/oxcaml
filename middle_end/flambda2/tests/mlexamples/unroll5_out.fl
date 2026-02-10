@@ -2,9 +2,11 @@ let code foo_0 deleted in
 let code test1_1 deleted in
 let code test2_2 deleted in
 let code test3_3 deleted in
-let code rec loopify(never) size(80) newer_version_of(foo_0)
+let $camlUnroll5__foo_4 =
+  closure foo_0_1 @foo
+and code rec loopify(never) size(80) newer_version_of(foo_0)
       foo_0_1 (x : imm tagged)
-        my_closure my_region my_ghost_region my_depth
+        my_closure _region _ghost_region my_depth
         -> k * k1 =
   let Popaque = %opaque (1) in
   (let untagged = %untag_imm (Popaque) in
@@ -12,69 +14,67 @@ let code rec loopify(never) size(80) newer_version_of(foo_0)
      | 0 -> k2
      | 1 -> k3)
     where k3 =
-      let Paddint = %int_barith.`add` (x, 1) in
+      let int_add = %int_barith.add (x, 1) in
       let Popaque_1 = %opaque (1) in
       ((let untagged = %untag_imm (Popaque_1) in
         switch untagged
           | 0 -> k3
           | 1 -> k4)
          where k4 =
-           let Paddint_1 = %int_barith.`add` (Paddint, 1) in
+           let int_add_1 = %int_barith.add (int_add, 1) in
            let Popaque_2 = %opaque (1) in
            ((let untagged = %untag_imm (Popaque_2) in
              switch untagged
                | 0 -> k4
                | 1 -> k5)
               where k5 =
-                let Paddint_2 = %int_barith.`add` (Paddint_1, 1) in
+                let int_add_2 = %int_barith.add (int_add_1, 1) in
                 apply direct(foo_0_1) inlining_state(depth(20))
                   $camlUnroll5__foo_4 ~ depth my_depth -> succ (succ (unroll 2 (succ my_depth)))
-                    (Paddint_2)
+                    (int_add_2)
                     -> k * k1
               where k4 =
-                let Psubint = %int_barith.`sub` (Paddint_1, 1) in
+                let int_sub = %int_barith.sub (int_add_1, 1) in
                 apply direct(foo_0_1) inlining_state(depth(20))
                   $camlUnroll5__foo_4 ~ depth my_depth -> succ (succ (unroll 2 (succ my_depth)))
-                    (Psubint)
+                    (int_sub)
                     -> k * k1)
          where k3 =
-           let Psubint = %int_barith.`sub` (Paddint, 1) in
+           let int_sub = %int_barith.sub (int_add, 1) in
            let Popaque_2 = %opaque (1) in
            ((let untagged = %untag_imm (Popaque_2) in
              switch untagged
                | 0 -> k3
                | 1 -> k4)
               where k4 =
-                let Paddint_1 = %int_barith.`add` (Psubint, 1) in
+                let int_add_1 = %int_barith.add (int_sub, 1) in
                 apply direct(foo_0_1) inlining_state(depth(20))
                   $camlUnroll5__foo_4 ~ depth my_depth -> succ (succ (unroll 2 (succ my_depth)))
-                    (Paddint_1)
+                    (int_add_1)
                     -> k * k1
               where k3 =
-                let Psubint_1 = %int_barith.`sub` (Psubint, 1) in
+                let int_sub_1 = %int_barith.sub (int_sub, 1) in
                 apply direct(foo_0_1) inlining_state(depth(20))
                   $camlUnroll5__foo_4 ~ depth my_depth -> succ (succ (unroll 2 (succ my_depth)))
-                    (Psubint_1)
+                    (int_sub_1)
                     -> k * k1))
     where k2 =
-      let Psubint = %int_barith.`sub` (x, 1) in
+      let int_sub = %int_barith.sub (x, 1) in
       apply direct(foo_0_1)
         $camlUnroll5__foo_4 ~ depth my_depth -> succ my_depth
-          (Psubint)
+          (int_sub)
           -> k * k1
-and $camlUnroll5__foo_4 =
-  closure foo_0_1 @foo
 in
 let code loopify(never) size(4) newer_version_of(test1_1)
       test1_1_1 (x : imm tagged)
-        my_closure my_region my_ghost_region my_depth
+        my_closure _region _ghost_region my_depth
         -> k * k1 =
   apply direct(foo_0_1) $camlUnroll5__foo_4 (x) -> k * k1
 in
 let $camlUnroll5__test1_5 = closure test1_1_1 @test1 in
 let code loopify(never) size(80) newer_version_of(test2_2)
       test2_2_1 (x : imm tagged)
-        my_closure my_region my_ghost_region my_depth
+        my_closure _region _ghost_region my_depth
         -> k * k1 =
   let Popaque = %opaque (1) in
   (let untagged = %untag_imm (Popaque) in
@@ -82,61 +82,61 @@ let code loopify(never) size(80) newer_version_of(test2_2)
      | 0 -> k2
      | 1 -> k3)
     where k3 =
-      let Paddint = %int_barith.`add` (x, 1) in
+      let int_add = %int_barith.add (x, 1) in
       let Popaque_1 = %opaque (1) in
       ((let untagged = %untag_imm (Popaque_1) in
         switch untagged
           | 0 -> k3
           | 1 -> k4)
          where k4 =
-           let Paddint_1 = %int_barith.`add` (Paddint, 1) in
+           let int_add_1 = %int_barith.add (int_add, 1) in
            let Popaque_2 = %opaque (1) in
            ((let untagged = %untag_imm (Popaque_2) in
              switch untagged
                | 0 -> k4
                | 1 -> k5)
               where k5 =
-                let Paddint_2 = %int_barith.`add` (Paddint_1, 1) in
+                let int_add_2 = %int_barith.add (int_add_1, 1) in
                 apply direct(foo_0_1) inlining_state(depth(30))
                   $camlUnroll5__foo_4 ~ depth unroll 1 0 -> unroll 0 3
-                    (Paddint_2)
+                    (int_add_2)
                     -> k * k1
               where k4 =
-                let Psubint = %int_barith.`sub` (Paddint_1, 1) in
+                let int_sub = %int_barith.sub (int_add_1, 1) in
                 apply direct(foo_0_1) inlining_state(depth(30))
                   $camlUnroll5__foo_4 ~ depth unroll 1 0 -> unroll 0 3
-                    (Psubint)
+                    (int_sub)
                     -> k * k1)
          where k3 =
-           let Psubint = %int_barith.`sub` (Paddint, 1) in
+           let int_sub = %int_barith.sub (int_add, 1) in
            let Popaque_2 = %opaque (1) in
            ((let untagged = %untag_imm (Popaque_2) in
              switch untagged
                | 0 -> k3
                | 1 -> k4)
               where k4 =
-                let Paddint_1 = %int_barith.`add` (Psubint, 1) in
+                let int_add_1 = %int_barith.add (int_sub, 1) in
                 apply direct(foo_0_1) inlining_state(depth(30))
                   $camlUnroll5__foo_4 ~ depth unroll 1 0 -> unroll 0 3
-                    (Paddint_1)
+                    (int_add_1)
                     -> k * k1
               where k3 =
-                let Psubint_1 = %int_barith.`sub` (Psubint, 1) in
+                let int_sub_1 = %int_barith.sub (int_sub, 1) in
                 apply direct(foo_0_1) inlining_state(depth(30))
                   $camlUnroll5__foo_4 ~ depth unroll 1 0 -> unroll 0 3
-                    (Psubint_1)
+                    (int_sub_1)
                     -> k * k1))
     where k2 =
-      let Psubint = %int_barith.`sub` (x, 1) in
+      let int_sub = %int_barith.sub (x, 1) in
       apply direct(foo_0_1) inlining_state(depth(10))
         $camlUnroll5__foo_4 ~ depth unroll 1 0 -> unroll 0 1
-          (Psubint)
+          (int_sub)
           -> k * k1
 in
 let $camlUnroll5__test2_6 = closure test2_2_1 @test2 in
 let code loopify(never) size(232) newer_version_of(test3_3)
       test3_3_1 (x : imm tagged)
-        my_closure my_region my_ghost_region my_depth
+        my_closure _region _ghost_region my_depth
         -> k * k1 =
   let Popaque = %opaque (1) in
   (let untagged = %untag_imm (Popaque) in
@@ -144,159 +144,159 @@ let code loopify(never) size(232) newer_version_of(test3_3)
      | 0 -> k2
      | 1 -> k3)
     where k3 =
-      let Paddint = %int_barith.`add` (x, 1) in
+      let int_add = %int_barith.add (x, 1) in
       let Popaque_1 = %opaque (1) in
       ((let untagged = %untag_imm (Popaque_1) in
         switch untagged
           | 0 -> k3
           | 1 -> k4)
          where k4 =
-           let Paddint_1 = %int_barith.`add` (Paddint, 1) in
+           let int_add_1 = %int_barith.add (int_add, 1) in
            let Popaque_2 = %opaque (1) in
            ((let untagged = %untag_imm (Popaque_2) in
              switch untagged
                | 0 -> k4
                | 1 -> k5)
               where k5 =
-                let Paddint_2 = %int_barith.`add` (Paddint_1, 1) in
+                let int_add_2 = %int_barith.add (int_add_1, 1) in
                 apply direct(foo_0_1) inlining_state(depth(30))
                   $camlUnroll5__foo_4 ~ depth unroll 3 0 -> unroll 0 3
-                    (Paddint_2)
+                    (int_add_2)
                     -> k * k1
               where k4 =
-                let Psubint = %int_barith.`sub` (Paddint_1, 1) in
+                let int_sub = %int_barith.sub (int_add_1, 1) in
                 apply direct(foo_0_1) inlining_state(depth(30))
                   $camlUnroll5__foo_4 ~ depth unroll 3 0 -> unroll 0 3
-                    (Psubint)
+                    (int_sub)
                     -> k * k1)
          where k3 =
-           let Psubint = %int_barith.`sub` (Paddint, 1) in
+           let int_sub = %int_barith.sub (int_add, 1) in
            let Popaque_2 = %opaque (1) in
            ((let untagged = %untag_imm (Popaque_2) in
              switch untagged
                | 0 -> k3
                | 1 -> k4)
               where k4 =
-                let Paddint_1 = %int_barith.`add` (Psubint, 1) in
+                let int_add_1 = %int_barith.add (int_sub, 1) in
                 apply direct(foo_0_1) inlining_state(depth(30))
                   $camlUnroll5__foo_4 ~ depth unroll 3 0 -> unroll 0 3
-                    (Paddint_1)
+                    (int_add_1)
                     -> k * k1
               where k3 =
-                let Psubint_1 = %int_barith.`sub` (Psubint, 1) in
+                let int_sub_1 = %int_barith.sub (int_sub, 1) in
                 apply direct(foo_0_1) inlining_state(depth(30))
                   $camlUnroll5__foo_4 ~ depth unroll 3 0 -> unroll 0 3
-                    (Psubint_1)
+                    (int_sub_1)
                     -> k * k1))
     where k2 =
-      let Psubint = %int_barith.`sub` (x, 1) in
+      let int_sub = %int_barith.sub (x, 1) in
       let Popaque_1 = %opaque (1) in
       ((let untagged = %untag_imm (Popaque_1) in
         switch untagged
           | 0 -> k2
           | 1 -> k3)
          where k3 =
-           let Paddint = %int_barith.`add` (Psubint, 1) in
+           let int_add = %int_barith.add (int_sub, 1) in
            let Popaque_2 = %opaque (1) in
            ((let untagged = %untag_imm (Popaque_2) in
              switch untagged
                | 0 -> k3
                | 1 -> k4)
               where k4 =
-                let Paddint_1 = %int_barith.`add` (Paddint, 1) in
+                let int_add_1 = %int_barith.add (int_add, 1) in
                 let Popaque_3 = %opaque (1) in
                 ((let untagged = %untag_imm (Popaque_3) in
                   switch untagged
                     | 0 -> k4
                     | 1 -> k5)
                    where k5 =
-                     let Paddint_2 = %int_barith.`add` (Paddint_1, 1) in
+                     let int_add_2 = %int_barith.add (int_add_1, 1) in
                      apply direct(foo_0_1) inlining_state(depth(40))
                        $camlUnroll5__foo_4 ~ depth unroll 2 1 -> unroll 0 4
-                         (Paddint_2)
+                         (int_add_2)
                          -> k * k1
                    where k4 =
-                     let Psubint_1 = %int_barith.`sub` (Paddint_1, 1) in
+                     let int_sub_1 = %int_barith.sub (int_add_1, 1) in
                      apply direct(foo_0_1) inlining_state(depth(40))
                        $camlUnroll5__foo_4 ~ depth unroll 2 1 -> unroll 0 4
-                         (Psubint_1)
+                         (int_sub_1)
                          -> k * k1)
               where k3 =
-                let Psubint_1 = %int_barith.`sub` (Paddint, 1) in
+                let int_sub_1 = %int_barith.sub (int_add, 1) in
                 let Popaque_3 = %opaque (1) in
                 ((let untagged = %untag_imm (Popaque_3) in
                   switch untagged
                     | 0 -> k3
                     | 1 -> k4)
                    where k4 =
-                     let Paddint_1 = %int_barith.`add` (Psubint_1, 1) in
+                     let int_add_1 = %int_barith.add (int_sub_1, 1) in
                      apply direct(foo_0_1) inlining_state(depth(40))
                        $camlUnroll5__foo_4 ~ depth unroll 2 1 -> unroll 0 4
-                         (Paddint_1)
+                         (int_add_1)
                          -> k * k1
                    where k3 =
-                     let Psubint_2 = %int_barith.`sub` (Psubint_1, 1) in
+                     let int_sub_2 = %int_barith.sub (int_sub_1, 1) in
                      apply direct(foo_0_1) inlining_state(depth(40))
                        $camlUnroll5__foo_4 ~ depth unroll 2 1 -> unroll 0 4
-                         (Psubint_2)
+                         (int_sub_2)
                          -> k * k1))
          where k2 =
-           let Psubint_1 = %int_barith.`sub` (Psubint, 1) in
+           let int_sub_1 = %int_barith.sub (int_sub, 1) in
            let Popaque_2 = %opaque (1) in
            ((let untagged = %untag_imm (Popaque_2) in
              switch untagged
                | 0 -> k2
                | 1 -> k3)
               where k3 =
-                let Paddint = %int_barith.`add` (Psubint_1, 1) in
+                let int_add = %int_barith.add (int_sub_1, 1) in
                 let Popaque_3 = %opaque (1) in
                 ((let untagged = %untag_imm (Popaque_3) in
                   switch untagged
                     | 0 -> k3
                     | 1 -> k4)
                    where k4 =
-                     let Paddint_1 = %int_barith.`add` (Paddint, 1) in
+                     let int_add_1 = %int_barith.add (int_add, 1) in
                      let Popaque_4 = %opaque (1) in
                      ((let untagged = %untag_imm (Popaque_4) in
                        switch untagged
                          | 0 -> k4
                          | 1 -> k5)
                         where k5 =
-                          let Paddint_2 = %int_barith.`add` (Paddint_1, 1) in
+                          let int_add_2 = %int_barith.add (int_add_1, 1) in
                           apply direct(foo_0_1) inlining_state(depth(50))
                             $camlUnroll5__foo_4 ~ depth unroll 1 2 -> unroll 0 5
-                              (Paddint_2)
+                              (int_add_2)
                               -> k * k1
                         where k4 =
-                          let Psubint_2 = %int_barith.`sub` (Paddint_1, 1) in
+                          let int_sub_2 = %int_barith.sub (int_add_1, 1) in
                           apply direct(foo_0_1) inlining_state(depth(50))
                             $camlUnroll5__foo_4 ~ depth unroll 1 2 -> unroll 0 5
-                              (Psubint_2)
+                              (int_sub_2)
                               -> k * k1)
                    where k3 =
-                     let Psubint_2 = %int_barith.`sub` (Paddint, 1) in
+                     let int_sub_2 = %int_barith.sub (int_add, 1) in
                      let Popaque_4 = %opaque (1) in
                      ((let untagged = %untag_imm (Popaque_4) in
                        switch untagged
                          | 0 -> k3
                          | 1 -> k4)
                         where k4 =
-                          let Paddint_1 = %int_barith.`add` (Psubint_2, 1) in
+                          let int_add_1 = %int_barith.add (int_sub_2, 1) in
                           apply direct(foo_0_1) inlining_state(depth(50))
                             $camlUnroll5__foo_4 ~ depth unroll 1 2 -> unroll 0 5
-                              (Paddint_1)
+                              (int_add_1)
                               -> k * k1
                         where k3 =
-                          let Psubint_3 = %int_barith.`sub` (Psubint_2, 1) in
+                          let int_sub_3 = %int_barith.sub (int_sub_2, 1) in
                           apply direct(foo_0_1) inlining_state(depth(50))
                             $camlUnroll5__foo_4 ~ depth unroll 1 2 -> unroll 0 5
-                              (Psubint_3)
+                              (int_sub_3)
                               -> k * k1))
               where k2 =
-                let Psubint_2 = %int_barith.`sub` (Psubint_1, 1) in
+                let int_sub_2 = %int_barith.sub (int_sub_1, 1) in
                 apply direct(foo_0_1) inlining_state(depth(30))
                   $camlUnroll5__foo_4 ~ depth unroll 1 2 -> unroll 0 3
-                    (Psubint_2)
+                    (int_sub_2)
                     -> k * k1))
 in
 let $camlUnroll5__test3_7 = closure test3_3_1 @test3 in

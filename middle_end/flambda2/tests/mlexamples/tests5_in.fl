@@ -1,48 +1,52 @@
-let $camlTests5__first_const31 = Block 0 () in
-let code rec size(22)
-      f_0 (x : imm tagged)
-        my_closure my_region my_ghost_region my_depth
-        -> k * k1
-        : imm tagged =
-  let next_depth = rec_info (succ my_depth) in
-  let g = %project_function_slot.[`f`].[`g`] (my_closure) in
-  let prim = %int_comp.`lt` (x, 4) in
-  let Pintcomp = %tag_imm (prim) in
-  (let untagged = %untag_imm (Pintcomp) in
-   switch untagged
-     | 0 -> k (42)
-     | 1 -> k2)
-    where k2 =
-      let Psubint = %int_barith.`sub` (x, 1) in
-      apply direct(g_1)
-        (g ~ depth my_depth -> next_depth : _ -> imm tagged)
-          (Psubint)
-          -> k * k1
-and code rec size(22)
-      g_1 (y : imm tagged)
-        my_closure my_region my_ghost_region my_depth
-        -> k * k1
-        : imm tagged =
-  let next_depth = rec_info (succ my_depth) in
-  let f = %project_function_slot.[`g`].[`f`] (my_closure) in
-  let prim = %int_comp.`gt` (y, 3) in
-  let Pintcomp = %tag_imm (prim) in
-  (let untagged = %untag_imm (Pintcomp) in
-   switch untagged
-     | 0 -> k (7)
-     | 1 -> k2)
-    where k2 =
-      let Psubint = %int_barith.`sub` (y, 1) in
-      apply direct(f_0)
-        (f ~ depth my_depth -> next_depth : _ -> imm tagged)
-          (Psubint)
-          -> k * k1
-in
-(let f = closure f_0 @f and g = closure g_1 @g in
+let $camlTests5__first_const = Block 0 () in
+(let code rec size(23)
+       f_0 (x : imm tagged)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let next_depth = rec_info (succ my_depth) in
+   let g = %project_function_slot.[`f`].[`g`] (my_closure) in
+   (let prim = %int_comp.lt (x, 4) in
+    let int_lessthan = %tag_imm (prim) in
+    (let untagged = %untag_imm (int_lessthan) in
+     switch untagged
+       | 0 -> k1 (42)
+       | 1 -> k4)
+      where k4 =
+        cont k3)
+     where k3 =
+       let int_sub = %int_barith.sub (x, 1) in
+       apply direct(g_1)
+         (g ~ depth my_depth -> next_depth : _ -> imm tagged)
+           (int_sub)
+           -> k1 * k2
+ and code rec size(23)
+       g_1 (y : imm tagged)
+         my_closure _region _ghost_region my_depth
+         -> k1 * k2
+         : imm tagged =
+   let next_depth = rec_info (succ my_depth) in
+   let f = %project_function_slot.[`g`].[`f`] (my_closure) in
+   (let prim = %int_comp.gt (y, 3) in
+    let int_greaterthan = %tag_imm (prim) in
+    (let untagged = %untag_imm (int_greaterthan) in
+     switch untagged
+       | 0 -> k1 (7)
+       | 1 -> k4)
+      where k4 =
+        cont k3)
+     where k3 =
+       let int_sub = %int_barith.sub (y, 1) in
+       apply direct(f_0)
+         (f ~ depth my_depth -> next_depth : _ -> imm tagged)
+           (int_sub)
+           -> k1 * k2
+ in
+ let f = closure f_0 @f and g = closure g_1 @g in
  let Pmakeblock = %block.[`0`] (f, g) in
  cont k (Pmakeblock))
   where k define_root_symbol (module_block) =
-    let field_0 = %block_load.`tag`[`0`].`size`[`2`].[`0`] (module_block) in
-    let field_1 = %block_load.`tag`[`0`].`size`[`2`].[`1`] (module_block) in
+    let field_0 = %block_load.tag[`0`].`size`[`2`].[`0`] (module_block) in
+    let field_1 = %block_load.tag[`0`].`size`[`2`].[`1`] (module_block) in
     let $camlTests5 = Block 0 (field_0, field_1) in
     cont done ($camlTests5)

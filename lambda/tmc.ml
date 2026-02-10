@@ -946,19 +946,26 @@ let rec choice ctx t =
     (* more common cases... *)
     | Pbigarrayref _ | Pbigarrayset _
     | Pbigarraydim _
+    | Pstring_load_i8 _ | Pstring_load_i16 _
     | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_f32 _
     | Pstring_load_64 _ | Pstring_load_vec _
+    | Pbytes_load_i8 _ | Pbytes_load_i16 _
     | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
     | Pbytes_load_64 _ | Pbytes_load_vec _
+    | Pbytes_set_8 _
     | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
     | Pbytes_set_64 _ | Pbytes_set_vec _
+    | Pbigstring_load_i8 _ | Pbigstring_load_i16 _
     | Pbigstring_load_16 _ | Pbigstring_load_32 _ | Pbigstring_load_f32 _
     | Pbigstring_load_64 _ | Pbigstring_load_vec _
+    | Pbigstring_set_8 _
     | Pbigstring_set_16 _ | Pbigstring_set_32 _ | Pbigstring_set_f32 _
     | Pbigstring_set_64 _ | Pbigstring_set_vec _
     | Pfloatarray_load_vec _
     | Pfloat_array_load_vec _
     | Pint_array_load_vec _
+    | Puntagged_int8_array_load_vec _
+    | Puntagged_int16_array_load_vec _
     | Punboxed_float_array_load_vec _
     | Punboxed_float32_array_load_vec _
     | Punboxed_int32_array_load_vec _
@@ -969,6 +976,8 @@ let rec choice ctx t =
     | Pint_array_set_vec _
     | Punboxed_float_array_set_vec _
     | Punboxed_float32_array_set_vec _
+    | Puntagged_int8_array_set_vec _
+    | Puntagged_int16_array_set_vec _
     | Punboxed_int32_array_set_vec _
     | Punboxed_int64_array_set_vec _
     | Punboxed_nativeint_array_set_vec _

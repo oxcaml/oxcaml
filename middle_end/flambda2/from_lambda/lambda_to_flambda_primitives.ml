@@ -598,8 +598,20 @@ let bigarray_dim_bound b dimension =
 let tag_int (arg : H.expr_primitive) : H.expr_primitive =
   Unary (Tag_immediate, Prim arg)
 
+let tag_int8 (arg : H.expr_primitive) : H.expr_primitive =
+  Unary (Num_conv { src = Naked_int8; dst = Tagged_immediate }, Prim arg)
+
+let tag_int16 (arg : H.expr_primitive) : H.expr_primitive =
+  Unary (Num_conv { src = Naked_int16; dst = Tagged_immediate }, Prim arg)
+
 let untag_int (arg : H.simple_or_prim) : H.simple_or_prim =
   Prim (Unary (Untag_immediate, arg))
+
+let untag_int8 (arg : H.simple_or_prim) : H.simple_or_prim =
+  Prim (Unary (Num_conv { src = Tagged_immediate; dst = Naked_int8 }, arg))
+
+let untag_int16 (arg : H.simple_or_prim) : H.simple_or_prim =
+  Prim (Unary (Num_conv { src = Tagged_immediate; dst = Naked_int16 }, arg))
 
 let unbox_float32 (arg : H.simple_or_prim) : H.simple_or_prim =
   Prim (Unary (Unbox_number K.Boxable_number.Naked_float32, arg))
@@ -864,28 +876,34 @@ let checked_bigstring_access ~dbg ~machine_width ~access_len ~align ~primitive
 (* String-like loads *)
 let string_like_load ~dbg ~checks
     ~(access_size : Flambda_primitive.string_accessor_width) ~machine_width
-    (kind : P.string_like_value) mode ~boxed string ~index_kind index
+    (kind : P.string_like_value) mode ~boxed_or_tagged string ~index_kind index
     ~current_region =
   let unsafe_load =
     let index = convert_index_to_untagged_int ~index ~index_kind in
     let wrap =
       match access_size, mode with
       | (Eight | Sixteen), None ->
-        assert (not boxed);
+        assert boxed_or_tagged;
         tag_int
+      | Eight_signed, None -> if boxed_or_tagged then tag_int8 else Fun.id
+      | Sixteen_signed, None -> if boxed_or_tagged then tag_int16 else Fun.id
       | Thirty_two, Some mode ->
-        if boxed then box_bint Boxed_int32 mode ~current_region else Fun.id
+        if boxed_or_tagged
+        then box_bint Boxed_int32 mode ~current_region
+        else Fun.id
       | Single, Some mode ->
-        if boxed then box_float32 mode ~current_region else Fun.id
+        if boxed_or_tagged then box_float32 mode ~current_region else Fun.id
       | Sixty_four, Some mode ->
-        if boxed then box_bint Boxed_int64 mode ~current_region else Fun.id
+        if boxed_or_tagged
+        then box_bint Boxed_int64 mode ~current_region
+        else Fun.id
       | One_twenty_eight _, Some mode ->
-        if boxed then box_vec128 mode ~current_region else Fun.id
+        if boxed_or_tagged then box_vec128 mode ~current_region else Fun.id
       | Two_fifty_six _, Some mode ->
-        if boxed then box_vec256 mode ~current_region else Fun.id
+        if boxed_or_tagged then box_vec256 mode ~current_region else Fun.id
       | Five_twelve _, Some mode ->
-        if boxed then box_vec512 mode ~current_region else Fun.id
-      | (Eight | Sixteen), Some _
+        if boxed_or_tagged then box_vec512 mode ~current_region else Fun.id
+      | (Eight | Eight_signed | Sixteen | Sixteen_signed), Some _
       | ( ( Thirty_two | Single | Sixty_four | One_twenty_eight _
           | Two_fifty_six _ | Five_twelve _ ),
           None ) ->
@@ -912,20 +930,21 @@ let get_header obj mode ~current_region =
 (* Bytes-like set *)
 let bytes_like_set ~dbg ~checks
     ~(access_size : Flambda_primitive.string_accessor_width) ~machine_width
-    (kind : P.bytes_like_value) ~boxed bytes ~index_kind index new_value =
+    (kind : P.bytes_like_value) ~boxed_or_tagged bytes ~index_kind index
+    new_value =
   let unsafe_set =
     let index = convert_index_to_untagged_int ~index ~index_kind in
     let wrap =
       match access_size with
-      | Eight | Sixteen ->
-        assert (not boxed);
-        untag_int
-      | Thirty_two -> if boxed then unbox_bint Boxed_int32 else Fun.id
-      | Single -> if boxed then unbox_float32 else Fun.id
-      | Sixty_four -> if boxed then unbox_bint Boxed_int64 else Fun.id
-      | One_twenty_eight _ -> if boxed then unbox_vec128 else Fun.id
-      | Two_fifty_six _ -> if boxed then unbox_vec256 else Fun.id
-      | Five_twelve _ -> if boxed then unbox_vec512 else Fun.id
+      | Eight | Eight_signed -> if boxed_or_tagged then untag_int8 else Fun.id
+      | Sixteen | Sixteen_signed ->
+        if boxed_or_tagged then untag_int16 else Fun.id
+      | Thirty_two -> if boxed_or_tagged then unbox_bint Boxed_int32 else Fun.id
+      | Single -> if boxed_or_tagged then unbox_float32 else Fun.id
+      | Sixty_four -> if boxed_or_tagged then unbox_bint Boxed_int64 else Fun.id
+      | One_twenty_eight _ -> if boxed_or_tagged then unbox_vec128 else Fun.id
+      | Two_fifty_six _ -> if boxed_or_tagged then unbox_vec256 else Fun.id
+      | Five_twelve _ -> if boxed_or_tagged then unbox_vec512 else Fun.id
     in
     H.Ternary
       (Bytes_or_bigstring_set (kind, access_size), bytes, index, wrap new_value)
@@ -2379,92 +2398,126 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pstringrefu, [[str]; [index]] ->
     let checks = string_or_bytes_checks Eight true in
     [ string_like_load ~checks ~dbg ~machine_width ~access_size:Eight String
-        None ~boxed:false str ~index_kind:Ptagged_int_index index
+        None ~boxed_or_tagged:true str ~index_kind:Ptagged_int_index index
         ~current_region ]
   | Pbytesrefu, [[bytes]; [index]] ->
     let checks = string_or_bytes_checks Eight true in
     [ string_like_load ~checks ~dbg ~machine_width ~access_size:Eight Bytes None
-        ~boxed:false bytes ~index_kind:Ptagged_int_index index ~current_region
-    ]
+        ~boxed_or_tagged:true bytes ~index_kind:Ptagged_int_index index
+        ~current_region ]
   | Pstringrefs, [[str]; [index]] ->
     let checks = string_or_bytes_checks Eight false in
     [ string_like_load ~checks ~dbg ~machine_width ~access_size:Eight String
-        ~boxed:false None str ~index_kind:Ptagged_int_index index
+        ~boxed_or_tagged:true None str ~index_kind:Ptagged_int_index index
         ~current_region ]
   | Pbytesrefs, [[bytes]; [index]] ->
     let checks = string_or_bytes_checks Eight false in
     [ string_like_load ~checks ~dbg ~machine_width ~access_size:Eight Bytes
-        ~boxed:false None bytes ~index_kind:Ptagged_int_index index
+        ~boxed_or_tagged:true None bytes ~index_kind:Ptagged_int_index index
+        ~current_region ]
+  | Pstring_load_i8 { unsafe; index_kind; tagged }, [[str]; [index]] ->
+    let checks = string_or_bytes_checks Eight_signed unsafe in
+    [ string_like_load ~checks ~dbg ~machine_width ~access_size:Eight_signed
+        String ~boxed_or_tagged:tagged None str ~index_kind index
+        ~current_region ]
+  | Pbytes_load_i8 { unsafe; index_kind; tagged }, [[bytes]; [index]] ->
+    let checks = string_or_bytes_checks Eight_signed unsafe in
+    [ string_like_load ~checks ~dbg ~machine_width ~access_size:Eight_signed
+        Bytes ~boxed_or_tagged:tagged None bytes ~index_kind index
+        ~current_region ]
+  | Pstring_load_i16 { unsafe; index_kind; tagged }, [[str]; [index]] ->
+    let checks = string_or_bytes_checks Sixteen_signed unsafe in
+    [ string_like_load ~checks ~dbg ~machine_width ~access_size:Sixteen_signed
+        String ~boxed_or_tagged:tagged None str ~index_kind index
+        ~current_region ]
+  | Pbytes_load_i16 { unsafe; index_kind; tagged }, [[bytes]; [index]] ->
+    let checks = string_or_bytes_checks Sixteen_signed unsafe in
+    [ string_like_load ~checks ~dbg ~machine_width ~access_size:Sixteen_signed
+        Bytes ~boxed_or_tagged:tagged None bytes ~index_kind index
         ~current_region ]
   | Pstring_load_16 { unsafe; index_kind }, [[str]; [index]] ->
     let checks = string_or_bytes_checks Sixteen unsafe in
     [ string_like_load ~checks ~dbg ~machine_width ~access_size:Sixteen String
-        ~boxed:false None str ~index_kind index ~current_region ]
+        ~boxed_or_tagged:true None str ~index_kind index ~current_region ]
   | Pbytes_load_16 { unsafe; index_kind }, [[bytes]; [index]] ->
     let checks = string_or_bytes_checks Sixteen unsafe in
     [ string_like_load ~checks ~dbg ~machine_width ~access_size:Sixteen Bytes
-        ~boxed:false None bytes ~index_kind index ~current_region ]
+        ~boxed_or_tagged:true None bytes ~index_kind index ~current_region ]
   | Pstring_load_32 { unsafe; index_kind; mode; boxed }, [[str]; [index]] ->
     let checks = string_or_bytes_checks Thirty_two unsafe in
     [ string_like_load ~checks ~dbg ~machine_width ~access_size:Thirty_two
-        String ~boxed (Some mode) str ~index_kind index ~current_region ]
+        String ~boxed_or_tagged:boxed (Some mode) str ~index_kind index
+        ~current_region ]
   | Pstring_load_f32 { unsafe; index_kind; mode; boxed }, [[str]; [index]] ->
     let checks = string_or_bytes_checks Single unsafe in
     [ string_like_load ~checks ~dbg ~machine_width ~access_size:Single String
-        ~boxed (Some mode) str ~index_kind index ~current_region ]
+        ~boxed_or_tagged:boxed (Some mode) str ~index_kind index ~current_region
+    ]
   | Pbytes_load_32 { unsafe; index_kind; mode; boxed }, [[bytes]; [index]] ->
     let checks = string_or_bytes_checks Thirty_two unsafe in
     [ string_like_load ~checks ~dbg ~machine_width ~access_size:Thirty_two Bytes
-        ~boxed (Some mode) bytes ~index_kind index ~current_region ]
+        ~boxed_or_tagged:boxed (Some mode) bytes ~index_kind index
+        ~current_region ]
   | Pbytes_load_f32 { unsafe; index_kind; mode; boxed }, [[bytes]; [index]] ->
     let checks = string_or_bytes_checks Single unsafe in
     [ string_like_load ~checks ~dbg ~machine_width ~access_size:Single Bytes
-        ~boxed (Some mode) bytes ~index_kind index ~current_region ]
+        ~boxed_or_tagged:boxed (Some mode) bytes ~index_kind index
+        ~current_region ]
   | Pstring_load_64 { unsafe; index_kind; mode; boxed }, [[str]; [index]] ->
     let checks = string_or_bytes_checks Sixty_four unsafe in
     [ string_like_load ~checks ~dbg ~machine_width ~access_size:Sixty_four
-        String ~boxed (Some mode) str ~index_kind index ~current_region ]
+        String ~boxed_or_tagged:boxed (Some mode) str ~index_kind index
+        ~current_region ]
   | Pbytes_load_64 { unsafe; index_kind; mode; boxed }, [[bytes]; [index]] ->
     let checks = string_or_bytes_checks Sixty_four unsafe in
     [ string_like_load ~checks ~dbg ~machine_width ~access_size:Sixty_four Bytes
-        ~boxed (Some mode) bytes ~index_kind index ~current_region ]
+        ~boxed_or_tagged:boxed (Some mode) bytes ~index_kind index
+        ~current_region ]
   | Pstring_load_vec { size; unsafe; index_kind; mode; boxed }, [[str]; [index]]
     ->
     let access_size = vec_accessor_width ~aligned:false size in
     let checks = string_or_bytes_checks access_size unsafe in
-    [ string_like_load ~checks ~dbg ~machine_width ~access_size String ~boxed
-        (Some mode) str ~index_kind index ~current_region ]
+    [ string_like_load ~checks ~dbg ~machine_width ~access_size String
+        ~boxed_or_tagged:boxed (Some mode) str ~index_kind index ~current_region
+    ]
   | Pbytes_load_vec { size; unsafe; index_kind; mode; boxed }, [[str]; [index]]
     ->
     let access_size = vec_accessor_width ~aligned:false size in
     let checks = string_or_bytes_checks access_size unsafe in
-    [ string_like_load ~checks ~dbg ~machine_width ~access_size Bytes ~boxed
-        (Some mode) str ~index_kind index ~current_region ]
-  | Pbytes_set_16 { unsafe; index_kind }, [[bytes]; [index]; [new_value]] ->
+    [ string_like_load ~checks ~dbg ~machine_width ~access_size Bytes
+        ~boxed_or_tagged:boxed (Some mode) str ~index_kind index ~current_region
+    ]
+  | Pbytes_set_8 { unsafe; index_kind; tagged }, [[bytes]; [index]; [new_value]]
+    ->
+    let checks = string_or_bytes_checks Eight unsafe in
+    [ bytes_like_set ~checks ~dbg ~machine_width ~access_size:Eight Bytes
+        ~boxed_or_tagged:tagged bytes ~index_kind index new_value ]
+  | Pbytes_set_16 { unsafe; index_kind; tagged }, [[bytes]; [index]; [new_value]]
+    ->
     let checks = string_or_bytes_checks Sixteen unsafe in
     [ bytes_like_set ~checks ~dbg ~machine_width ~access_size:Sixteen Bytes
-        ~boxed:false bytes ~index_kind index new_value ]
+        ~boxed_or_tagged:tagged bytes ~index_kind index new_value ]
   | Pbytes_set_32 { unsafe; index_kind; boxed }, [[bytes]; [index]; [new_value]]
     ->
     let checks = string_or_bytes_checks Thirty_two unsafe in
     [ bytes_like_set ~checks ~dbg ~machine_width ~access_size:Thirty_two Bytes
-        ~boxed bytes ~index_kind index new_value ]
+        ~boxed_or_tagged:boxed bytes ~index_kind index new_value ]
   | Pbytes_set_f32 { unsafe; index_kind; boxed }, [[bytes]; [index]; [new_value]]
     ->
     let checks = string_or_bytes_checks Single unsafe in
     [ bytes_like_set ~checks ~dbg ~machine_width ~access_size:Single Bytes
-        ~boxed bytes ~index_kind index new_value ]
+        ~boxed_or_tagged:boxed bytes ~index_kind index new_value ]
   | Pbytes_set_64 { unsafe; index_kind; boxed }, [[bytes]; [index]; [new_value]]
     ->
     let checks = string_or_bytes_checks Sixty_four unsafe in
     [ bytes_like_set ~checks ~dbg ~machine_width ~access_size:Sixty_four Bytes
-        ~boxed bytes ~index_kind index new_value ]
+        ~boxed_or_tagged:boxed bytes ~index_kind index new_value ]
   | ( Pbytes_set_vec { size; unsafe; index_kind; boxed },
       [[bytes]; [index]; [new_value]] ) ->
     let access_size = vec_accessor_width ~aligned:false size in
     let checks = string_or_bytes_checks access_size unsafe in
-    [ bytes_like_set ~checks ~dbg ~machine_width ~access_size Bytes ~boxed bytes
-        ~index_kind index new_value ]
+    [ bytes_like_set ~checks ~dbg ~machine_width ~access_size Bytes
+        ~boxed_or_tagged:boxed bytes ~index_kind index new_value ]
   | Pisint { variant_only }, [[arg]] ->
     [tag_int (Unary (Is_int { variant_only }, arg))]
   | Pisnull, [[arg]] -> [tag_int (Unary (Is_null, arg))]
@@ -2669,11 +2722,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
   | Pbytessetu (* unsafe *), [[bytes]; [index]; [new_value]] ->
     let checks = string_or_bytes_checks Eight true in
     [ bytes_like_set ~checks ~dbg ~machine_width ~access_size:Eight Bytes
-        ~boxed:false bytes ~index_kind:Ptagged_int_index index new_value ]
+        ~boxed_or_tagged:true bytes ~index_kind:Ptagged_int_index index
+        new_value ]
   | Pbytessets, [[bytes]; [index]; [new_value]] ->
     let checks = string_or_bytes_checks Eight false in
     [ bytes_like_set ~checks ~dbg ~machine_width ~access_size:Eight Bytes
-        ~boxed:false bytes ~index_kind:Ptagged_int_index index new_value ]
+        ~boxed_or_tagged:true bytes ~index_kind:Ptagged_int_index index
+        new_value ]
   | Poffsetref n, [[block]] ->
     let block_access : P.Block_access_kind.t =
       Values
@@ -2838,57 +2893,77 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
          with an unknown layout should have been removed by Lambda_to_flambda.")
   | Pbigarraydim dimension, [[arg]] ->
     [tag_int (Unary (Bigarray_length { dimension }, arg))]
+  | Pbigstring_load_i8 { unsafe; index_kind; tagged }, [[big_str]; [index]] ->
+    let checks = string_or_bytes_checks Eight_signed unsafe in
+    [ string_like_load ~checks ~dbg ~machine_width ~access_size:Eight_signed
+        Bigstring ~boxed_or_tagged:tagged None big_str ~index_kind index
+        ~current_region ]
+  | Pbigstring_load_i16 { unsafe; index_kind; tagged }, [[big_str]; [index]] ->
+    let checks = string_or_bytes_checks Sixteen_signed unsafe in
+    [ string_like_load ~checks ~dbg ~machine_width ~access_size:Sixteen_signed
+        Bigstring ~boxed_or_tagged:tagged None big_str ~index_kind index
+        ~current_region ]
   | Pbigstring_load_16 { unsafe; index_kind }, [[big_str]; [index]] ->
     let checks = string_or_bytes_checks Sixteen unsafe in
     [ string_like_load ~checks ~dbg ~machine_width ~access_size:Sixteen
-        Bigstring ~boxed:false None big_str ~index_kind index ~current_region ]
+        Bigstring ~boxed_or_tagged:true None big_str ~index_kind index
+        ~current_region ]
   | Pbigstring_load_32 { unsafe; index_kind; mode; boxed }, [[big_str]; [index]]
     ->
     let checks = string_or_bytes_checks Thirty_two unsafe in
     [ string_like_load ~checks ~dbg ~machine_width ~access_size:Thirty_two
-        Bigstring (Some mode) ~boxed big_str ~index_kind index ~current_region
-    ]
+        Bigstring (Some mode) ~boxed_or_tagged:boxed big_str ~index_kind index
+        ~current_region ]
   | Pbigstring_load_f32 { unsafe; index_kind; mode; boxed }, [[big_str]; [index]]
     ->
     let checks = string_or_bytes_checks Single unsafe in
     [ string_like_load ~checks ~dbg ~machine_width ~access_size:Single Bigstring
-        (Some mode) ~boxed big_str ~index_kind index ~current_region ]
+        (Some mode) ~boxed_or_tagged:boxed big_str ~index_kind index
+        ~current_region ]
   | Pbigstring_load_64 { unsafe; index_kind; mode; boxed }, [[big_str]; [index]]
     ->
     let checks = string_or_bytes_checks Sixty_four unsafe in
     [ string_like_load ~checks ~dbg ~machine_width ~access_size:Sixty_four
-        Bigstring (Some mode) ~boxed big_str ~index_kind index ~current_region
-    ]
+        Bigstring (Some mode) ~boxed_or_tagged:boxed big_str ~index_kind index
+        ~current_region ]
   | ( Pbigstring_load_vec { size; checks; aligned; index_kind; mode; boxed },
       [[big_str]; [index]] ) ->
     let access_size = vec_accessor_width ~aligned size in
     [ string_like_load ~checks ~dbg ~machine_width ~access_size Bigstring
-        (Some mode) ~boxed big_str ~index_kind index ~current_region ]
-  | Pbigstring_set_16 { unsafe; index_kind }, [[bigstring]; [index]; [new_value]]
-    ->
+        (Some mode) ~boxed_or_tagged:boxed big_str ~index_kind index
+        ~current_region ]
+  | ( Pbigstring_set_8 { unsafe; index_kind; tagged },
+      [[bigstring]; [index]; [new_value]] ) ->
+    let checks = string_or_bytes_checks Eight unsafe in
+    [ bytes_like_set ~checks ~dbg ~machine_width ~access_size:Eight Bigstring
+        ~boxed_or_tagged:tagged bigstring ~index_kind index new_value ]
+  | ( Pbigstring_set_16 { unsafe; index_kind; tagged },
+      [[bigstring]; [index]; [new_value]] ) ->
     let checks = string_or_bytes_checks Sixteen unsafe in
     [ bytes_like_set ~checks ~dbg ~machine_width ~access_size:Sixteen Bigstring
-        ~boxed:false bigstring ~index_kind index new_value ]
+        ~boxed_or_tagged:tagged bigstring ~index_kind index new_value ]
   | ( Pbigstring_set_32 { unsafe; index_kind; boxed },
       [[bigstring]; [index]; [new_value]] ) ->
     let checks = string_or_bytes_checks Thirty_two unsafe in
     [ bytes_like_set ~checks ~dbg ~machine_width ~access_size:Thirty_two
-        Bigstring ~boxed bigstring ~index_kind index new_value ]
+        Bigstring ~boxed_or_tagged:boxed bigstring ~index_kind index new_value
+    ]
   | ( Pbigstring_set_f32 { unsafe; index_kind; boxed },
       [[bigstring]; [index]; [new_value]] ) ->
     let checks = string_or_bytes_checks Single unsafe in
     [ bytes_like_set ~checks ~dbg ~machine_width ~access_size:Single Bigstring
-        ~boxed bigstring ~index_kind index new_value ]
+        ~boxed_or_tagged:boxed bigstring ~index_kind index new_value ]
   | ( Pbigstring_set_64 { unsafe; index_kind; boxed },
       [[bigstring]; [index]; [new_value]] ) ->
     let checks = string_or_bytes_checks Sixty_four unsafe in
     [ bytes_like_set ~checks ~dbg ~machine_width ~access_size:Sixty_four
-        Bigstring ~boxed bigstring ~index_kind index new_value ]
+        Bigstring ~boxed_or_tagged:boxed bigstring ~index_kind index new_value
+    ]
   | ( Pbigstring_set_vec { size; checks; aligned; index_kind; boxed },
       [[bigstring]; [index]; [new_value]] ) ->
     let access_size = vec_accessor_width ~aligned size in
-    [ bytes_like_set ~checks ~dbg ~machine_width ~access_size Bigstring ~boxed
-        bigstring ~index_kind index new_value ]
+    [ bytes_like_set ~checks ~dbg ~machine_width ~access_size Bigstring
+        ~boxed_or_tagged:boxed bigstring ~index_kind index new_value ]
   | ( Pfloat_array_load_vec { size; unsafe; index_kind; mode; boxed },
       [[array]; [index]] ) ->
     check_float_array_optimisation_enabled "Pfloat_array_load_vec";
@@ -2931,6 +3006,14 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       [[array]; [index]] ) ->
     [ array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode
         ~boxed ~vec_kind:(vec_kind size) Naked_int32s array ~index_kind index ]
+  | ( Puntagged_int8_array_load_vec { size; unsafe; index_kind; mode; boxed },
+      [[array]; [index]] ) ->
+    [ array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode
+        ~boxed ~vec_kind:(vec_kind size) Naked_int8s array ~index_kind index ]
+  | ( Puntagged_int16_array_load_vec { size; unsafe; index_kind; mode; boxed },
+      [[array]; [index]] ) ->
+    [ array_like_load_vec ~dbg ~machine_width ~current_region ~unsafe ~mode
+        ~boxed ~vec_kind:(vec_kind size) Naked_int16s array ~index_kind index ]
   | ( Pfloat_array_set_vec { size; unsafe; index_kind; boxed },
       [[array]; [index]; [new_value]] ) ->
     check_float_array_optimisation_enabled "Pfloat_array_set_vec";
@@ -2977,6 +3060,16 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
       [[array]; [index]; [new_value]] ) ->
     [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
         ~vec_kind:(vec_kind size) Naked_int32s array ~index_kind index new_value
+    ]
+  | ( Puntagged_int8_array_set_vec { size; unsafe; index_kind; boxed },
+      [[array]; [index]; [new_value]] ) ->
+    [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
+        ~vec_kind:(vec_kind size) Naked_int8s array ~index_kind index new_value
+    ]
+  | ( Puntagged_int16_array_set_vec { size; unsafe; index_kind; boxed },
+      [[array]; [index]; [new_value]] ) ->
+    [ array_like_set_vec ~dbg ~machine_width ~unsafe ~boxed
+        ~vec_kind:(vec_kind size) Naked_int16s array ~index_kind index new_value
     ]
   | Pprobe_is_enabled { name; enabled_at_init }, [] ->
     [tag_int (Nullary (Probe_is_enabled { name; enabled_at_init }))]
@@ -3127,15 +3220,18 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
        %a (%a)"
       Printlambda.primitive prim H.print_list_of_lists_of_simple_or_prim args
   | ( ( Psetfield _ | Pstringrefu | Pbytesrefu | Pstringrefs | Pbytesrefs
-      | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_f32 _
-      | Pstring_load_64 _ | Pstring_load_vec _ | Pbytes_load_16 _
-      | Pbytes_load_32 _ | Pbytes_load_f32 _ | Pbytes_load_64 _
-      | Pbytes_load_vec _ | Pisout | Pfield_computed _ | Psetfloatfield _
-      | Psetufloatfield _ | Psetmixedfield _ | Pbigstring_load_16 _
+      | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
+      | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
+      | Pstring_load_vec _ | Pbytes_load_i8 _ | Pbytes_load_i16 _
+      | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
+      | Pbytes_load_64 _ | Pbytes_load_vec _ | Pisout | Pfield_computed _
+      | Psetfloatfield _ | Psetufloatfield _ | Psetmixedfield _
+      | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
       | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
       | Pbigstring_load_vec _ | Pfloatarray_load_vec _ | Pfloat_array_load_vec _
       | Pint_array_load_vec _ | Punboxed_float_array_load_vec _
-      | Punboxed_float32_array_load_vec _ | Punboxed_int32_array_load_vec _
+      | Punboxed_float32_array_load_vec _ | Puntagged_int8_array_load_vec _
+      | Puntagged_int16_array_load_vec _ | Punboxed_int32_array_load_vec _
       | Punboxed_int64_array_load_vec _ | Punboxed_nativeint_array_load_vec _
       | Parrayrefu
           ( ( Pgenarray_ref _ | Paddrarray_ref | Pgcignorableaddrarray_ref
@@ -3176,11 +3272,13 @@ let convert_lprim ~(machine_width : Target_system.Machine_width.t) ~big_endian
             | Punboxedoruntaggedintarray_set _ | Punboxedvectorarray_set _
             | Pgcscannableproductarray_set _ | Pgcignorableproductarray_set _ ),
             _ )
-      | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _ | Pbytes_set_64 _
-      | Pbytes_set_vec _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
-      | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
-      | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
+      | Pbytes_set_8 _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
+      | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbigstring_set_8 _
+      | Pbigstring_set_16 _ | Pbigstring_set_32 _ | Pbigstring_set_f32 _
+      | Pbigstring_set_64 _ | Pbigstring_set_vec _ | Pfloatarray_set_vec _
+      | Pfloat_array_set_vec _ | Pint_array_set_vec _
       | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
+      | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
       | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
       | Punboxed_nativeint_array_set_vec _ | Patomic_set_field _
       | Patomic_exchange_field _ | Patomic_fetch_add_field | Patomic_add_field
