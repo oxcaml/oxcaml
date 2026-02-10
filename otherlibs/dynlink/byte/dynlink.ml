@@ -52,28 +52,22 @@ module Bytecode = struct
     let implementation_imports (t : t) =
       let required_from_unit =
         t.cu_required_compunits
-        |> List.map Compilation_unit.to_global_ident_for_bytecode
+        |> List.map Compilation_unit.full_path_as_string
       in
       let required =
         required_from_unit
-        @ List.map Compilation_unit.to_global_ident_for_bytecode
+        @ List.map Compilation_unit.full_path_as_string
             (Symtable.required_compunits t.cu_reloc)
       in
       let required =
         List.filter
-          (fun id ->
-             not (Ident.is_predef id)
-             && not (String.contains (Ident.name id) '.'))
+          (fun id -> not (String.contains id '.'))
           required
       in
-      List.map
-        (fun id -> Ident.name id, None)
-        required
+      List.map (fun id -> id, None) required
 
     let defined_symbols (t : t) =
-      List.map (fun cu ->
-          Compilation_unit.to_global_ident_for_bytecode cu
-          |> Ident.name)
+      List.map Compilation_unit.full_path_as_string
         (Symtable.initialized_compunits t.cu_reloc)
 
     let unsafe_module (t : t) = t.cu_primitives <> []
