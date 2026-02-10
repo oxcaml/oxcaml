@@ -63,6 +63,8 @@ let validator_debug = bool_of_param "VALIDATOR_DEBUG"
 
 let block_temporaries = bool_of_param "BLOCK_TEMPORARIES"
 
+let affinity = bool_of_param "AFFINITY"
+
 let verbose : bool Lazy.t = bool_of_param "VERBOSE"
 
 type liveness = Cfg_with_infos.liveness
@@ -116,7 +118,6 @@ module Instruction = struct
       live = Reg.Set.empty;
       stack_offset = -1;
       id = InstructionId.none;
-      irc_work_list = Unknown_list;
       available_before = Reg_availability_set.Unreachable;
       available_across = Reg_availability_set.Unreachable
     }
@@ -157,13 +158,11 @@ let collect_cfg_infos : Cfg_with_layout.t -> cfg_infos =
   Cfg_with_layout.iter_instructions
     cfg_with_layout (* CR xclerc for xclerc: use fold *)
     ~instruction:(fun instr ->
-      (instr : Instruction.t).irc_work_list <- Cfg.Unknown_list;
       add_registers arg instr.arg;
       add_registers res instr.res;
       instr.arg <- Array.copy instr.arg;
       instr.res <- Array.copy instr.res)
     ~terminator:(fun term ->
-      term.irc_work_list <- Cfg.Unknown_list;
       add_registers arg term.arg;
       add_registers res term.res;
       term.arg <- Array.copy term.arg;

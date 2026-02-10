@@ -78,13 +78,17 @@ type regf =
   | YMM of int
   | ZMM of int
 
+type reg_idx =
+  | Scalar of reg64
+  | Vector of regf
+
 type arch = X64 | X86
 
 type addr =
   {
     arch: arch;
     typ: data_type;
-    idx: reg64;
+    idx: reg_idx;
     scale: int;
     base: reg64 option;
     sym: string option;
@@ -154,7 +158,6 @@ type instruction =
   | OR of arg * arg
   | PAUSE
   | POP of arg
-  | POPCNT of arg * arg
   | PREFETCH of bool * prefetch_temporal_locality_hint * arg
   | PUSH of arg
   | RDTSC
@@ -172,8 +175,6 @@ type instruction =
   | TEST of arg * arg
   | XCHG of arg * arg
   | XOR of arg * arg
-  | TZCNT of arg * arg
-  | LZCNT of arg * arg
   | SIMD of Amd64_simd_instrs.instr * arg array
 
 (* ELF specific *)

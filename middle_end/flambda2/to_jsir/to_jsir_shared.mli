@@ -52,6 +52,10 @@ val float32_to_jsir_const :
 
 val float_to_jsir_const : Numeric_types.Float_by_bit_pattern.t -> Jsir.constant
 
+val int8_to_jsir_const : Numeric_types.Int8.t -> Jsir.constant
+
+val int16_to_jsir_const : Numeric_types.Int16.t -> Jsir.constant
+
 val int32_to_jsir_const : Int32.t -> Jsir.constant
 
 val int64_to_jsir_const : Int64.t -> Jsir.constant

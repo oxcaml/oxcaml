@@ -274,8 +274,7 @@ let package_object_files ~ppf_dump files target coercion =
             List.fold_right CU.Set.add cu_required_compunits required_compunits)
       members CU.Set.empty
   in
-  let oc = open_out_bin targetfile in
-  Fun.protect ~finally:(fun () -> close_out oc) (fun () ->
+  Misc.protect_output_to_file targetfile (fun oc ->
     output_string oc Config.cmo_magic_number;
     let pos_depl = pos_out oc in
     output_binary_int oc 0;
@@ -320,7 +319,8 @@ let package_object_files ~ppf_dump files target coercion =
     in
     let format : Lambda.main_module_block_format =
       (* Open modules not supported with packs, so always just a record *)
-      Mb_struct { mb_size = main_module_block_size }
+      Mb_struct
+        { mb_repr = Module_value_only { field_count = main_module_block_size } }
     in
     let compunit =
       { cu_name = packed_compilation_unit;

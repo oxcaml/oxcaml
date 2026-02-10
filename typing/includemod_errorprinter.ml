@@ -98,10 +98,10 @@ module Illegal_permutation = struct
   (** We extract a lone transposition from a full tree of permutations. *)
   let rec transposition_under path (coerc:Typedtree.module_coercion) =
     match coerc with
-    | Tcoerce_structure(c,_) ->
+    | Tcoerce_structure { pos_cc_list; _ } ->
         either
-          (not_fixpoint path 0) c
-          (first_non_id path 0) c
+          (not_fixpoint path 0) pos_cc_list
+          (first_non_id path 0) pos_cc_list
     | Tcoerce_functor(arg,res) ->
         either
           (transposition_under (InArg::path)) arg
@@ -272,12 +272,12 @@ let zap_axis_to_ceil
 
 let print_out_mode
 : type a. ?in_structure:_ -> a Mode.Value.Axis.t -> a -> _
-= fun ?(in_structure=true) ax mode ->
+= fun ?(in_structure=false) ax mode ->
   let print = Mode.Value.Const.print_axis ax in
   if in_structure then
     Format.dprintf " (* in a structure at %a *)" print mode
   else
-    Format.dprintf " (* at %a *)" print mode
+    Format.dprintf " @@ %a" print mode
 
 let maybe_print_mode_l ~is_modal (mode : Mode.Value.l) =
   match is_modal with
@@ -742,7 +742,9 @@ let core env id x =
         (Includecore.report_modality_sub_error "the first" "the second") e
   | Err.Value_descriptions diff ->
       let is_modal = Is_modal.value_mismatch diff.symptom in
-      let mode1, mode2 = maybe_print_modes ~is_modal diff.modes in
+      let mode1, mode2 =
+        maybe_print_modes ~in_structure:true ~is_modal diff.modes
+      in
       Format.dprintf "@[<v>@[<hv>%s:@;<1 2>%a%t@ %s@;<1 2>%a%t@]%a%a%t@]"
         "Values do not match"
         !Oprint.out_sig_item
@@ -820,7 +822,7 @@ let missing_field ppf item =
 
 let module_types {Err.got=mty1; expected=mty2; modes; symptom}=
   let is_modal = Is_modal.module_type_symptom symptom in
-  let mode1, mode2 = maybe_print_modes ~in_structure:false ~is_modal modes in
+  let mode1, mode2 = maybe_print_modes ~is_modal modes in
   Format.dprintf
     "@[<hv 2>Modules do not match:@ \
      %a%t@;<1 -2>is not included in@ %a%t@]"

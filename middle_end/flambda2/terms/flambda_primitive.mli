@@ -52,6 +52,8 @@ end
 module Array_kind : sig
   type t =
     | Immediates  (** An array consisting only of immediate values. *)
+    | Gc_ignorable_values
+        (** An array consisting of [value]-kind elements that the GC may ignore. *)
     | Values
         (** An array consisting of elements of kind [value]. With the float
             array optimisation enabled, such elements must never be [float]s. *)
@@ -59,6 +61,9 @@ module Array_kind : sig
         (** An array consisting of naked floats, represented using
             [Double_array_tag]. *)
     | Naked_float32s
+    | Naked_ints
+    | Naked_int8s
+    | Naked_int16s
     | Naked_int32s
     | Naked_int64s
     | Naked_nativeints
@@ -100,6 +105,8 @@ end
 module Array_load_kind : sig
   type t =
     | Immediates  (** An array consisting only of immediate values. *)
+    | Gc_ignorable_values
+        (** An array consisting of [value]-kind elements that the GC may ignore. *)
     | Values
         (** An array consisting of elements of kind [value]. With the float
             array optimisation enabled, such elements must never be [float]s. *)
@@ -107,6 +114,9 @@ module Array_load_kind : sig
         (** An array consisting of naked floats, represented using
             [Double_array_tag]. *)
     | Naked_float32s
+    | Naked_ints
+    | Naked_int8s
+    | Naked_int16s
     | Naked_int32s
     | Naked_int64s
     | Naked_nativeints
@@ -122,6 +132,8 @@ end
 module Array_set_kind : sig
   type t =
     | Immediates  (** An array consisting only of immediate values. *)
+    | Gc_ignorable_values
+        (** An array of [value]-kind elements that the GC may ignore. *)
     | Values of Init_or_assign.t
         (** An array consisting of elements of kind [value]. With the float
         array optimisation enabled, such elements must never be [float]s. *)
@@ -129,6 +141,9 @@ module Array_set_kind : sig
         (** An array consisting of naked floats, represented using
         [Double_array_tag]. *)
     | Naked_float32s
+    | Naked_ints
+    | Naked_int8s
+    | Naked_int16s
     | Naked_int32s
     | Naked_int64s
     | Naked_nativeints
@@ -165,6 +180,9 @@ module Duplicate_array_kind : sig
     | Values
     | Naked_floats of { length : Target_ocaml_int.t option }
     | Naked_float32s of { length : Target_ocaml_int.t option }
+    | Naked_ints of { length : Target_ocaml_int.t option }
+    | Naked_int8s of { length : Target_ocaml_int.t option }
+    | Naked_int16s of { length : Target_ocaml_int.t option }
     | Naked_int32s of { length : Target_ocaml_int.t option }
     | Naked_int64s of { length : Target_ocaml_int.t option }
     | Naked_nativeints of { length : Target_ocaml_int.t option }

@@ -121,8 +121,16 @@ module Update_kind : sig
   (** Assumes each field is a word; the byte offset is [index * size_addr]. *)
   val naked_int8_fields : t
 
+  (** Tightly packed; the byte offset is [index * 1].  ([index] is as for
+      [make_update], below.) *)
+  val naked_int8s : t
+
   (** Assumes each field is a word; the byte offset is [index * size_addr]. *)
   val naked_int16_fields : t
+
+  (** Tightly packed; the byte offset is [index * 2].  ([index] is as for
+      [make_update], below.) *)
+  val naked_int16s : t
 
   (** Tightly packed; the byte offset is [index * 4].  ([index] is as for
       [make_update], below.) *)

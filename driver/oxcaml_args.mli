@@ -29,6 +29,7 @@ module type Oxcaml_options = sig
   val ddebug_available_regs : unit -> unit
   val ddwarf_types : unit -> unit
   val ddwarf_metrics : unit -> unit
+  val ddwarf_metrics_output_file : string -> unit
   val dcfg : unit -> unit
   val dcfg_invariants : unit -> unit
   val regalloc : Clflags.Register_allocator.t -> unit
@@ -90,6 +91,7 @@ module type Oxcaml_options = sig
   val llvm_flags : string -> unit
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
+  val reaper_debug_flags : string -> unit
   val flambda2_join_points : unit -> unit
   val no_flambda2_join_points : unit -> unit
   val flambda2_result_types_functors_only : unit -> unit
@@ -107,10 +109,18 @@ module type Oxcaml_options = sig
   val flambda2_reaper : unit -> unit
   val no_flambda2_reaper : unit -> unit
   val reaper_preserve_direct_calls : string -> unit
+  val reaper_local_fields : unit -> unit
+  val no_reaper_local_fields : unit -> unit
+  val reaper_unbox : unit -> unit
+  val no_reaper_unbox : unit -> unit
+  val reaper_change_calling_conventions : unit -> unit
+  val no_reaper_change_calling_conventions : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
   val no_flambda2_expert_inline_effects_in_cmm : unit -> unit
+  val flambda2_expert_cmm_safe_subst : unit -> unit
+  val no_flambda2_expert_cmm_safe_subst : unit -> unit
   val flambda2_expert_phantom_lets : unit -> unit
   val no_flambda2_expert_phantom_lets : unit -> unit
   val flambda2_expert_max_block_size_for_projections : int -> unit

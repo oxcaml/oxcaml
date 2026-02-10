@@ -32,3 +32,8 @@ Note that tests whose filename contains `with_uninit` use
 `%makearray_dynamic_uninit` to create arrays, while other tests using this
 infrastructure use `%makearray_dynamic`.
 
+**Important:** When modifying product tests, remember to regenerate the
+corresponding iarray tests in `typing-layouts-iarrays/` using their
+`gen_iarray_test.sh` script. This keeps the test types in sync between mutable
+and immutable array tests.
+

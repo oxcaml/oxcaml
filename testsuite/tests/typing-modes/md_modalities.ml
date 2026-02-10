@@ -137,9 +137,9 @@ Error: Signature mismatch:
          S
        In module "M'":
        Modules do not match:
-         sig val foo : 'a -> 'a end (* at nonportable *)
+         sig val foo : 'a -> 'a end @ nonportable
        is not included in
-         sig val foo : 'a -> 'a @@ portable end (* at nonportable *)
+         sig val foo : 'a -> 'a @@ portable end @ nonportable
        In module "M'":
        Values do not match:
          val foo : 'a -> 'a (* in a structure at nonportable *)

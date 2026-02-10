@@ -29,6 +29,9 @@ let mk_no_flambda2_debug f =
     Arg.Unit f,
     " Disable debug output for the Flambda2 pass" )
 
+let mk_reaper_debug_flags f =
+  ("-reaper-debug-flags", Arg.String f, " Debug flags for the reaper pass")
+
 let mk_no_mach_ir f =
   ( "-no-mach-ir",
     Arg.Unit f,
@@ -365,6 +368,11 @@ let mk_ddwarf_metrics f =
     " Write DWARF metrics to auxiliary JSON file .debug-stats.json, which can \
      then be aggregated with the analyze_debug_stats.py Python script." )
 
+let mk_ddwarf_metrics_output_file f =
+  ( "-ddwarf-metrics-output-file",
+    Arg.String f,
+    "<file>  Set output filename for DWARF metrics data" )
+
 let mk_internal_assembler f =
   ( "-internal-assembler",
     Arg.Unit f,
@@ -527,15 +535,59 @@ let mk_no_flambda2_reaper f =
 
 let mk_reaper_preserve_direct_calls f =
   ( "-reaper-preserve-direct-calls",
-    Arg.Symbol ([ "never"; "always"; "zero-alloc" ], f),
+    Arg.Symbol ([ "never"; "always"; "zero-alloc"; "auto" ], f),
     Printf.sprintf
       " Choose the direct call preservation strategy of the reaper (Flambda2 \
        only)\n\
       \      Valid values are: \n\
       \       \"never\": do not try to preserve direct calls to old functions;\n\
       \       \"always\": always preserve existing direct calls;\n\
-      \       \"zero-alloc\": preserve direct calls only in zero-alloc checked \
-       functions." )
+      \       \"zero-alloc\": preserve direct calls only in zero-alloc checked;\n\
+      \       \"auto\": preserve direct calls only when the reaper is unable \
+       to identify a set of possibly called functions." )
+
+let mk_reaper_local_fields f =
+  ( "-reaper-local-fields",
+    Arg.Unit f,
+    Printf.sprintf " Enable local field handing in the reaper%s (Flambda2 only)"
+      (format_default Flambda2.Default.reaper_local_fields) )
+
+let mk_no_reaper_local_fields f =
+  ( "-no-reaper-local-fields",
+    Arg.Unit f,
+    Printf.sprintf
+      " Disable local field handing in the reaper%s (Flambda2 only)"
+      (format_not_default Flambda2.Default.reaper_local_fields) )
+
+let mk_reaper_unbox f =
+  ( "-reaper-unbox",
+    Arg.Unit f,
+    Printf.sprintf
+      " Enable unboxing in the reaper%s (Flambda2 only, requires \
+       -reaper-change-calling-conventions)"
+      (format_default Flambda2.Default.reaper_unbox) )
+
+let mk_no_reaper_unbox f =
+  ( "-no-reaper-unbox",
+    Arg.Unit f,
+    Printf.sprintf " Disable unboxing in the reaper%s (Flambda2 only)"
+      (format_not_default Flambda2.Default.reaper_unbox) )
+
+let mk_reaper_change_calling_conventions f =
+  ( "-reaper-change-calling-conventions",
+    Arg.Unit f,
+    Printf.sprintf
+      " Allow the reaper to change the calling conventions of functions%s \
+       (Flambda2 only)"
+      (format_default Flambda2.Default.reaper_change_calling_conventions) )
+
+let mk_no_reaper_change_calling_conventions f =
+  ( "-no-reaper-change-calling-conventions",
+    Arg.Unit f,
+    Printf.sprintf
+      " Prevent the reaper from changing the calling conventions of \
+       functions%s (Flambda2 only)"
+      (format_not_default Flambda2.Default.reaper_change_calling_conventions) )
 
 let mk_flambda2_expert_fallback_inlining_heuristic f =
   ( "-flambda2-expert-fallback-inlining-heuristic",
@@ -571,6 +623,21 @@ let mk_no_flambda2_expert_inline_effects_in_cmm f =
       \     expressions in the produced Cmm code into\n\
       \     the arguments of allocation primitives%s (Flambda 2 only)"
       (format_not_default Flambda2.Expert.Default.inline_effects_in_cmm) )
+
+let mk_flambda2_expert_cmm_safe_subst f =
+  ( "-flambda2-expert-cmm-safe-subst",
+    Arg.Unit f,
+    Printf.sprintf
+      " Prevent potentially unsafe substitutions in cmm but may produce less \
+       optimized code%s"
+      (format_default Flambda2.Expert.Default.cmm_safe_subst) )
+
+let mk_no_flambda2_expert_cmm_safe_subst f =
+  ( "-no-flambda2-expert-cmm-safe-subst",
+    Arg.Unit f,
+    Printf.sprintf
+      " Allow more substitutions in cmm, even ones that may be unsafe%s"
+      (format_not_default Flambda2.Expert.Default.cmm_safe_subst) )
 
 let mk_flambda2_expert_phantom_lets f =
   ( "-flambda2-expert-phantom-lets",
@@ -1002,6 +1069,7 @@ module type Oxcaml_options = sig
   val ddebug_available_regs : unit -> unit
   val ddwarf_types : unit -> unit
   val ddwarf_metrics : unit -> unit
+  val ddwarf_metrics_output_file : string -> unit
   val dcfg : unit -> unit
   val dcfg_invariants : unit -> unit
   val regalloc : Clflags.Register_allocator.t -> unit
@@ -1063,6 +1131,7 @@ module type Oxcaml_options = sig
   val llvm_flags : string -> unit
   val flambda2_debug : unit -> unit
   val no_flambda2_debug : unit -> unit
+  val reaper_debug_flags : string -> unit
   val flambda2_join_points : unit -> unit
   val no_flambda2_join_points : unit -> unit
   val flambda2_result_types_functors_only : unit -> unit
@@ -1080,10 +1149,18 @@ module type Oxcaml_options = sig
   val flambda2_reaper : unit -> unit
   val no_flambda2_reaper : unit -> unit
   val reaper_preserve_direct_calls : string -> unit
+  val reaper_local_fields : unit -> unit
+  val no_reaper_local_fields : unit -> unit
+  val reaper_unbox : unit -> unit
+  val no_reaper_unbox : unit -> unit
+  val reaper_change_calling_conventions : unit -> unit
+  val no_reaper_change_calling_conventions : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val no_flambda2_expert_fallback_inlining_heuristic : unit -> unit
   val flambda2_expert_inline_effects_in_cmm : unit -> unit
   val no_flambda2_expert_inline_effects_in_cmm : unit -> unit
+  val flambda2_expert_cmm_safe_subst : unit -> unit
+  val no_flambda2_expert_cmm_safe_subst : unit -> unit
   val flambda2_expert_phantom_lets : unit -> unit
   val no_flambda2_expert_phantom_lets : unit -> unit
   val flambda2_expert_max_block_size_for_projections : int -> unit
@@ -1139,6 +1216,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_ddebug_available_regs F.ddebug_available_regs;
       mk_ddwarf_types F.ddwarf_types;
       mk_ddwarf_metrics F.ddwarf_metrics;
+      mk_ddwarf_metrics_output_file F.ddwarf_metrics_output_file;
       mk_ocamlcfg F.ocamlcfg;
       mk_no_ocamlcfg F.no_ocamlcfg;
       mk_dcfg F.dcfg;
@@ -1204,6 +1282,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_llvm_flags F.llvm_flags;
       mk_flambda2_debug F.flambda2_debug;
       mk_no_flambda2_debug F.no_flambda2_debug;
+      mk_reaper_debug_flags F.reaper_debug_flags;
       mk_flambda2_join_points F.flambda2_join_points;
       mk_no_flambda2_join_points F.no_flambda2_join_points;
       mk_flambda2_result_types_functors_only
@@ -1226,6 +1305,13 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_flambda2_reaper F.flambda2_reaper;
       mk_no_flambda2_reaper F.no_flambda2_reaper;
       mk_reaper_preserve_direct_calls F.reaper_preserve_direct_calls;
+      mk_reaper_local_fields F.reaper_local_fields;
+      mk_no_reaper_local_fields F.no_reaper_local_fields;
+      mk_reaper_unbox F.reaper_unbox;
+      mk_no_reaper_unbox F.no_reaper_unbox;
+      mk_reaper_change_calling_conventions F.reaper_change_calling_conventions;
+      mk_no_reaper_change_calling_conventions
+        F.no_reaper_change_calling_conventions;
       mk_flambda2_expert_fallback_inlining_heuristic
         F.flambda2_expert_fallback_inlining_heuristic;
       mk_no_flambda2_expert_fallback_inlining_heuristic
@@ -1234,6 +1320,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.flambda2_expert_inline_effects_in_cmm;
       mk_no_flambda2_expert_inline_effects_in_cmm
         F.no_flambda2_expert_inline_effects_in_cmm;
+      mk_flambda2_expert_cmm_safe_subst F.flambda2_expert_cmm_safe_subst;
+      mk_no_flambda2_expert_cmm_safe_subst F.no_flambda2_expert_cmm_safe_subst;
       mk_flambda2_expert_phantom_lets F.flambda2_expert_phantom_lets;
       mk_no_flambda2_expert_phantom_lets F.no_flambda2_expert_phantom_lets;
       mk_flambda2_expert_max_block_size_for_projections
@@ -1365,6 +1453,10 @@ module Oxcaml_options_impl = struct
   let ddebug_available_regs = set' Dwarf_flags.ddebug_available_regs
   let ddwarf_types = set' Dwarf_flags.ddwarf_types
   let ddwarf_metrics = set' Dwarf_flags.ddwarf_metrics
+
+  let ddwarf_metrics_output_file s =
+    Dwarf_flags.ddwarf_metrics_output_file := Some s
+
   let heap_reduction_threshold x = Oxcaml_flags.heap_reduction_threshold := x
 
   let zero_alloc_check s =
@@ -1432,6 +1524,11 @@ module Oxcaml_options_impl = struct
   let llvm_flags s = Oxcaml_flags.llvm_flags := s
   let flambda2_debug = set' Oxcaml_flags.Flambda2.debug
   let no_flambda2_debug = clear' Oxcaml_flags.Flambda2.debug
+
+  let reaper_debug_flags s =
+    Oxcaml_flags.Flambda2.reaper_debug_flags :=
+      String.split_on_char ',' s @ !Oxcaml_flags.Flambda2.reaper_debug_flags
+
   let flambda2_join_points = set Flambda2.join_points
   let no_flambda2_join_points = clear Flambda2.join_points
 
@@ -1492,6 +1589,17 @@ module Oxcaml_options_impl = struct
           Oxcaml_flags.Set Oxcaml_flags.Auto
     | _ -> () (* This should not occur as we use Arg.Symbol *)
 
+  let reaper_local_fields = set Flambda2.reaper_local_fields
+  let no_reaper_local_fields = clear Flambda2.reaper_local_fields
+  let reaper_unbox = set Flambda2.reaper_unbox
+  let no_reaper_unbox = clear Flambda2.reaper_unbox
+
+  let reaper_change_calling_conventions =
+    set Flambda2.reaper_change_calling_conventions
+
+  let no_reaper_change_calling_conventions =
+    clear Flambda2.reaper_change_calling_conventions
+
   let flambda2_expert_fallback_inlining_heuristic =
     set Flambda2.Expert.fallback_inlining_heuristic
 
@@ -1504,6 +1612,8 @@ module Oxcaml_options_impl = struct
   let no_flambda2_expert_inline_effects_in_cmm =
     clear Flambda2.Expert.inline_effects_in_cmm
 
+  let flambda2_expert_cmm_safe_subst = set Flambda2.Expert.cmm_safe_subst
+  let no_flambda2_expert_cmm_safe_subst = clear Flambda2.Expert.cmm_safe_subst
   let flambda2_expert_phantom_lets = set Flambda2.Expert.phantom_lets
   let no_flambda2_expert_phantom_lets = clear Flambda2.Expert.phantom_lets
 
@@ -1821,6 +1931,9 @@ module Extra_params = struct
     | "ddebug-available-regs" -> set' Dwarf_flags.ddebug_available_regs
     | "ddwarf-types" -> set' Dwarf_flags.ddwarf_types
     | "ddwarf-metrics" -> set' Dwarf_flags.ddwarf_metrics
+    | "ddwarf-metrics-output-file" ->
+        Dwarf_flags.ddwarf_metrics_output_file := Some v;
+        true
     | "reorder-blocks-random" ->
         set_int_option' Oxcaml_flags.reorder_blocks_random
     | "basic-block-sections" -> set' Oxcaml_flags.basic_block_sections
@@ -1908,6 +2021,10 @@ module Extra_params = struct
     | "keep-llvmir" -> set' Oxcaml_flags.keep_llvmir
     | "llvm-flags" -> set_string Oxcaml_flags.llvm_flags
     | "flambda2-debug" -> set' Oxcaml_flags.Flambda2.debug
+    | "reaper-debug-flags" ->
+        Oxcaml_flags.Flambda2.reaper_debug_flags :=
+          String.split_on_char ',' v @ !Oxcaml_flags.Flambda2.reaper_debug_flags;
+        true
     | "flambda2-join-points" -> set Flambda2.join_points
     | "flambda2-result-types" ->
         (match String.lowercase_ascii v with
@@ -1945,6 +2062,7 @@ module Extra_params = struct
     | "flambda2-join-depth" -> set_int Flambda2.join_depth
     | "flambda2-expert-inline-effects-in-cmm" ->
         set Flambda2.Expert.inline_effects_in_cmm
+    | "flambda2-expert-cmm-safe-subst" -> set Flambda2.Expert.cmm_safe_subst
     | "flambda2-expert-phantom-lets" -> set Flambda2.Expert.phantom_lets
     | "flambda2-expert-max-unboxing-depth" ->
         set_int Flambda2.Expert.max_unboxing_depth
@@ -2049,6 +2167,10 @@ module Extra_params = struct
               "Syntax: reaper-preserve-direct-calls: \
                always|never|zero-alloc|auto");
         true
+    | "reaper-local-fields" -> set Flambda2.reaper_local_fields
+    | "reaper-unbox" -> set Flambda2.reaper_unbox
+    | "reaper-change-calling-conventions" ->
+        set Flambda2.reaper_change_calling_conventions
     | _ -> false
 end
 

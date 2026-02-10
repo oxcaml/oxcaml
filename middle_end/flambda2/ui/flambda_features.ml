@@ -16,6 +16,8 @@ let flambda2_is_enabled () = Clflags.is_flambda2 ()
 
 let debug_flambda2 () = !Oxcaml_flags.Flambda2.debug
 
+let debug_reaper s = List.mem s !Oxcaml_flags.Flambda2.reaper_debug_flags
+
 let with_default (r : 'a Oxcaml_flags.or_default)
     ~(f : Oxcaml_flags.Flambda2.flags -> 'a) =
   match r with
@@ -81,6 +83,18 @@ type reaper_preserve_direct_calls = Oxcaml_flags.reaper_preserve_direct_calls =
 let reaper_preserve_direct_calls () =
   !Oxcaml_flags.Flambda2.reaper_preserve_direct_calls
   |> with_default ~f:(fun d -> d.reaper_preserve_direct_calls)
+
+let reaper_local_fields () =
+  !Oxcaml_flags.Flambda2.reaper_local_fields
+  |> with_default ~f:(fun d -> d.reaper_local_fields)
+
+let reaper_unbox () =
+  !Oxcaml_flags.Flambda2.reaper_unbox
+  |> with_default ~f:(fun d -> d.reaper_unbox)
+
+let reaper_change_calling_conventions () =
+  !Oxcaml_flags.Flambda2.reaper_change_calling_conventions
+  |> with_default ~f:(fun d -> d.reaper_change_calling_conventions)
 
 let flat_float_array () = Config.flat_float_array
 
@@ -257,6 +271,10 @@ module Expert = struct
   let inline_effects_in_cmm () =
     !Oxcaml_flags.Flambda2.Expert.inline_effects_in_cmm
     |> with_default ~f:(fun d -> d.inline_effects_in_cmm)
+
+  let cmm_safe_subst () =
+    !Oxcaml_flags.Flambda2.Expert.cmm_safe_subst
+    |> with_default ~f:(fun d -> d.cmm_safe_subst)
 
   (* CR mshinwell: Remove any uses of this flag, then remove the flag. *)
   let max_block_size_for_projections () =

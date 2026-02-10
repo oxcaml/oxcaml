@@ -13,12 +13,12 @@ module Instruction = struct
     let map_regs arr =
       Array.map
         (fun (r : Reg.t) ->
-          { r with
-            loc =
-              (if remove_locs && not (Reg.is_preassigned r)
-              then Unknown
-              else r.loc)
-          })
+          let loc =
+            if remove_locs && not (Reg.is_preassigned r)
+            then Reg.Unknown
+            else r.loc
+          in
+          Reg.For_testing.with_loc r loc)
         arr
     in
     { desc;
@@ -27,7 +27,6 @@ module Instruction = struct
       id;
       dbg = Debuginfo.none;
       fdo = None;
-      irc_work_list = Unknown_list;
       live = Reg.Set.empty;
       stack_offset = 0;
       available_before = Unreachable;

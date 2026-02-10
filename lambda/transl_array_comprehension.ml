@@ -708,7 +708,7 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
       ( Mutable,
         Lprim (Pmakearray (Pgenarray, Immutable, Lambda.alloc_heap), [], loc) )
     (* Case 2: Fixed size, known array kind *)
-    | Fixed_size, (Pintarray | Paddrarray) ->
+    | Fixed_size, (Pintarray | Paddrarray | Pgcignorableaddrarray) ->
       Immutable StrictOpt, make_vect ~loc ~length:array_size.var ~init:(int 0)
     | Fixed_size, (Pfloatarray | Punboxedfloatarray Unboxed_float64) ->
       (* The representations of these two are the same, it's only
@@ -716,6 +716,12 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
       Immutable StrictOpt, make_float_vect ~loc array_size.var
     | Fixed_size, Punboxedfloatarray Unboxed_float32 ->
       Immutable StrictOpt, make_unboxed_float32_vect ~loc array_size.var
+    | Fixed_size, Punboxedoruntaggedintarray Untagged_int ->
+      Immutable StrictOpt, make_untagged_int_vect ~loc array_size.var
+    | Fixed_size, Punboxedoruntaggedintarray Untagged_int8 ->
+      Immutable StrictOpt, make_untagged_int8_vect ~loc array_size.var
+    | Fixed_size, Punboxedoruntaggedintarray Untagged_int16 ->
+      Immutable StrictOpt, make_untagged_int16_vect ~loc array_size.var
     | Fixed_size, Punboxedoruntaggedintarray Unboxed_int32 ->
       Immutable StrictOpt, make_unboxed_int32_vect ~loc array_size.var
     | Fixed_size, Punboxedoruntaggedintarray Unboxed_int64 ->
@@ -729,7 +735,7 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
     | Fixed_size, Punboxedvectorarray Unboxed_vec512 ->
       Immutable StrictOpt, make_unboxed_vec128_vect ~loc array_size.var
     (* Case 3: Unknown size, known array kind *)
-    | Dynamic_size, (Pintarray | Paddrarray) ->
+    | Dynamic_size, (Pintarray | Paddrarray | Pgcignorableaddrarray) ->
       Mutable, Resizable_array.make ~loc array_kind (int 0)
     | Dynamic_size, Pfloatarray ->
       Mutable, Resizable_array.make ~loc array_kind (float 0.)
@@ -737,6 +743,12 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
       Mutable, Resizable_array.make ~loc array_kind (unboxed_float 0.)
     | Dynamic_size, Punboxedfloatarray Unboxed_float32 ->
       Mutable, Resizable_array.make ~loc array_kind (unboxed_float32 0.)
+    | Dynamic_size, Punboxedoruntaggedintarray Untagged_int ->
+      Mutable, Resizable_array.make ~loc array_kind (untagged_int 0)
+    | Dynamic_size, Punboxedoruntaggedintarray Untagged_int8 ->
+      Mutable, Resizable_array.make ~loc array_kind (untagged_int8 0)
+    | Dynamic_size, Punboxedoruntaggedintarray Untagged_int16 ->
+      Mutable, Resizable_array.make ~loc array_kind (untagged_int16 0)
     | Dynamic_size, Punboxedoruntaggedintarray Unboxed_int32 ->
       Mutable, Resizable_array.make ~loc array_kind (unboxed_int32 0l)
     | Dynamic_size, Punboxedoruntaggedintarray Unboxed_int64 ->
@@ -745,10 +757,6 @@ let initial_array ~loc ~array_kind ~array_size ~array_sizing =
       ( Mutable,
         Resizable_array.make ~loc array_kind (unboxed_nativeint Targetint.zero)
       )
-    | ( _,
-        Punboxedoruntaggedintarray
-          (Untagged_int8 | Untagged_int16 | Untagged_int) ) ->
-      Misc.unboxed_small_int_arrays_are_not_implemented ()
     | Dynamic_size, Punboxedvectorarray Unboxed_vec128
     | Dynamic_size, Punboxedvectorarray Unboxed_vec256
     | Dynamic_size, Punboxedvectorarray Unboxed_vec512 ->
@@ -844,7 +852,7 @@ let body ~loc ~array_kind ~array_size ~array_sizing ~array ~index ~body =
              Lassign (array.id, make_array),
              set_element_in_bounds elt.var,
              layout_unit ))
-    | Pintarray | Paddrarray | Pfloatarray
+    | Pintarray | Paddrarray | Pgcignorableaddrarray | Pfloatarray
     | Punboxedfloatarray (Unboxed_float64 | Unboxed_float32)
     | Punboxedoruntaggedintarray _ | Punboxedvectorarray _ ->
       set_element_in_bounds body
@@ -857,7 +865,8 @@ let body ~loc ~array_kind ~array_size ~array_sizing ~array ~index ~body =
 let comprehension ~transl_exp ~scopes ~loc ~(array_kind : Lambda.array_kind)
     { comp_body; comp_clauses } =
   (match array_kind with
-  | Pgenarray | Paddrarray | Pintarray | Pfloatarray -> ()
+  | Pgenarray | Paddrarray | Pgcignorableaddrarray | Pintarray | Pfloatarray ->
+    ()
   | Punboxedfloatarray _ | Punboxedoruntaggedintarray _ | Punboxedvectorarray _
     ->
     if not !Clflags.native_code

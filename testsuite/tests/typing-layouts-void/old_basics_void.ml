@@ -215,27 +215,19 @@ val magic_D : void_variant =
 - : unit = ()
 |}]
 
-(******************************************)
-(* Test 3: top-level void bindings banned *)
+(***********************************)
+(* Test 3: top-level void bindings *)
 
-let x : t_void = assert false;;
+let x : t_void = t_void ();;
 [%%expect {|
-Line 1, characters 4-5:
-1 | let x : t_void = assert false;;
-        ^
-Error: Types of top-level module bindings must have layout "value", but
-       the type of "x" has layout "void".
+val x : t_void = <abstr>
 |}];;
 
 module M3_1 = struct
-  let x : t_void = assert false;;
+  let x : t_void = t_void ();;
 end;;
 [%%expect {|
-Line 2, characters 6-7:
-2 |   let x : t_void = assert false;;
-          ^
-Error: Types of top-level module bindings must have layout "value", but
-       the type of "x" has layout "void".
+module M3_1 : sig val x : t_void end
 |}];;
 
 module M3_2 = struct
@@ -245,11 +237,7 @@ module M3_2 = struct
     | _ -> assert false
 end;;
 [%%expect {|
-Line 2, characters 6-7:
-2 |   let x =
-          ^
-Error: Types of top-level module bindings must have layout "value", but
-       the type of "x" has layout "void".
+module M3_2 : sig val x : t_void end
 |}];;
 
 module M3_3 = struct
@@ -258,11 +246,7 @@ module M3_3 = struct
   let {z; v} = b'
 end;;
 [%%expect {|
-Line 4, characters 10-11:
-4 |   let {z; v} = b'
-              ^
-Error: Types of top-level module bindings must have layout "value", but
-       the type of "v" has layout "void".
+module M3_3 : sig val x : int val v : void_rec val z : int end
 |}];;
 
 let () = r := []

@@ -186,8 +186,6 @@ module I = struct
 
   let pop x = emit (POP x)
 
-  let popcnt x y = emit (POPCNT (x, y))
-
   let prefetch is_write locality x = emit (PREFETCH (is_write, locality, x))
 
   let push x = emit (PUSH x)
@@ -221,10 +219,6 @@ module I = struct
   let xchg x y = emit (XCHG (x, y))
 
   let xor x y = emit (XOR (x, y))
-
-  let lzcnt x y = emit (LZCNT (x, y))
-
-  let tzcnt x y = emit (TZCNT (x, y))
 
   let simd instr args = emit (SIMD (instr, args))
 end

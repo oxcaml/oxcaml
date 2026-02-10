@@ -652,3 +652,21 @@ Line 3, characters 32-47:
 Error: This expression has type "'a -> unit"
        but an expression was expected of type "'b @ contended -> 'c"
 |}]
+
+let f : unit -> (unit -> string) @ local = fun () -> fun () -> "hello"
+[%%expect{|
+val f : unit -> (unit -> string) @ local = <fun>
+|}]
+
+(* type error should preempt the mode error *)
+let _ : string @ global = f ()
+[%%expect{|
+Line 1, characters 26-30:
+1 | let _ : string @ global = f ()
+                              ^^^^
+Error: This expression has type "unit -> string"
+       but an expression was expected of type "string"
+       Hint: Did you forget to provide "()" as argument?
+  Hint: This function application is partial,
+  maybe some arguments are missing.
+|}]

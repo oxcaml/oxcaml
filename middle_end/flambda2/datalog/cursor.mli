@@ -48,16 +48,31 @@ module Order : sig
 end
 
 module Level : sig
+  type cardinality =
+    | All_values
+    | Any_value
+
   type 'a t
 
   val print : Format.formatter -> 'a t -> unit
 
   (** Returns a reference to the current value at this level.
 
+      The [cardinality] argument can be used to indicate whether all the values
+      of the output are needed ([All_values], the default), or if a single value
+      is enough ([Any_value]). If [Any_value] is provided, the runtime makes no
+      guarantees regarding the value that will actually be returned, and all
+      values can be returned if there is another use with of the level with
+      [All_values] cardinality or the structure of the program prevents early
+      exits. As such, the [Any_value] cardinality should only be used when the
+      value is solely used for debugging purposes, and never when it has a
+      semantic impact on the evaluation.
+
       {b Note}: This reference is set to any new value found prior to executing
       the associated actions, if any, and can thus be used in actions for this
       level or levels of later orders. *)
-  val use_output : 'a t -> 'a option Channel.receiver with_name
+  val use_output :
+    ?cardinality:cardinality -> 'a t -> 'a option Channel.receiver with_name
 
   (** Actions to execute immediately after a value is found at this level. *)
   val actions : 'a t -> actions
@@ -94,8 +109,9 @@ val print : Format.formatter -> 'a t -> unit
 type call
 
 val create_call :
-  ('a Constant.hlist -> unit) ->
+  ('c -> 'a Constant.hlist -> unit) ->
   name:string ->
+  context:'c ->
   'a Option_receiver.hlist with_names ->
   call
 

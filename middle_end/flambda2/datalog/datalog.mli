@@ -35,6 +35,10 @@ end
 
 type bindings
 
+type bindings_ref
+
+val get_bindings : bindings_ref -> bindings
+
 val print_bindings : Format.formatter -> bindings -> unit
 
 (** The type [('p, 'v) program] is the type of programs returning
@@ -85,11 +89,8 @@ val filter :
 
 type callback
 
-val create_callback :
-  ('a Constant.hlist -> unit) -> name:string -> 'a Term.hlist -> callback
-
 val create_callback_with_bindings :
-  (bindings -> 'a Constant.hlist -> unit) ->
+  (bindings_ref -> 'a Constant.hlist -> unit) ->
   name:string ->
   'a Term.hlist ->
   callback

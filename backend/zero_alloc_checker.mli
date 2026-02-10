@@ -49,8 +49,8 @@ module Witness : sig
         { bytes : int;
           dbginfo : Cmm.alloc_dbginfo
         }
-    | Indirect_call
-    | Indirect_tailcall
+    | Indirect_call of { callee : string option }
+    | Indirect_tailcall of { callee : string option }
     | Direct_call of { callee : string }
     | Direct_tailcall of { callee : string }
     | Extcall of { callee : string }

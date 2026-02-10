@@ -505,6 +505,7 @@ val of_const :
   annotation:Parsetree.jkind_annotation option ->
   why:History.creation_reason ->
   quality:'d Types.jkind_quality ->
+  ran_out_of_fuel_during_normalize:bool ->
   'd Const.t ->
   'd Types.jkind
 
@@ -560,9 +561,26 @@ val for_boxed_record : Types.label_declaration list -> Types.jkind_l
 (** Choose an appropriate jkind for an unboxed record type. *)
 val for_unboxed_record : Types.label_declaration list -> Types.jkind_l
 
-(** Choose an appropriate jkind for a boxed variant type. *)
+(** Choose an appropriate jkind for a boxed variant type.
+
+    [decl_params] is the parameters in the head of the type declaration. [type_apply]
+    should be [Ctype.apply] partially applied to an [env].
+
+    [free_vars] is a function that, given a list of [Types.type_expr]s that are used in
+    the boxed variant, returns all type variables that are free within the
+    [Types.type_expr]s. [Ctype.free_variable_set_of_list] is a good candidate for
+    implementing this function. *)
 val for_boxed_variant :
-  loc:Location.t -> Types.constructor_declaration list -> Types.jkind_l
+  loc:Location.t ->
+  decl_params:Types.type_expr list ->
+  type_apply:
+    (Types.type_expr list ->
+    Types.type_expr ->
+    Types.type_expr list ->
+    Types.type_expr) ->
+  free_vars:(Types.type_expr list -> Btype.TypeSet.t) ->
+  Types.constructor_declaration list ->
+  Types.jkind_l
 
 (** Choose an appropriate jkind for a boxed tuple type. *)
 val for_boxed_tuple : (string option * Types.type_expr) list -> Types.jkind_l

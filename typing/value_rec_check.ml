@@ -627,7 +627,7 @@ let array_mode exp elt_sort = match Typeopt.array_kind exp elt_sort with
     (* This is counted as a use, because constructing a generic array
        involves inspecting to decide whether to unbox (PR#6939). *)
     Dereference
-  | Lambda.Paddrarray | Lambda.Pintarray ->
+  | Lambda.Paddrarray | Lambda.Pgcignorableaddrarray | Lambda.Pintarray ->
     (* non-generic, non-float arrays act as constructors *)
     Guard
   | Lambda.Punboxedfloatarray _ | Lambda.Punboxedoruntaggedintarray _

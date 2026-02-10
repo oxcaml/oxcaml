@@ -15,14 +15,6 @@
 
 open Heterogenous_list
 
-(* CR bclement: It's a shame that we can't easily have provenance information as
-   a runtime flag due to the way we evaluate rules before parsing arguments.
-   There might be a better way, but we need to be cautious not to degrade
-   performance when not using provenance. *)
-let use_provenance = ref false
-
-let enable_provenance_for_debug () = use_provenance := true
-
 (** An ['a incremental] represents a value (database or table), paired with
     another copy representing the latest changes to the value. *)
 type 'a incremental =
@@ -126,6 +118,7 @@ type rule =
   | Rule :
       { cursor : 'a Cursor.t;
         binders : binder list;
+        enable_provenance : bool ref;
         provenance_table_ref : provenance FactMap.t ref;
         rule_id : rule_id
       }
@@ -158,17 +151,23 @@ let deduce (atoms : deduction) =
   let rule_id = fresh_rule_id () in
   let binders : (int, binder) Hashtbl.t = Hashtbl.create 17 in
   let provenance_table_ref = ref FactMap.empty in
+  let enable_provenance = ref false in
   let callbacks =
     fold
       (fun (Datalog.Atom (tid, args)) callbacks ->
         let is_trie = Table.Id.is_trie tid in
         let table_ref = find_or_create_ref binders tid in
-        let[@inline] callback_fn ~accept keys =
+        let callback_fn bindings keys =
           let incremental_table = !table_ref in
           match Trie.find_opt is_trie keys incremental_table.current with
           | Some _ -> ()
           | None ->
-            (accept [@inlined hint]) ();
+            if !enable_provenance
+            then
+              provenance_table_ref
+                := add_if_not_exists !provenance_table_ref tid keys
+                     (Rule (rule_id, Datalog.get_bindings bindings)
+                       : provenance);
             table_ref
               := incremental
                    ~current:
@@ -180,21 +179,7 @@ let deduce (atoms : deduction) =
         in
         let name = Table.Id.name tid ^ ".insert" in
         let callback =
-          if !use_provenance
-          then
-            Datalog.create_callback_with_bindings ~name
-              (fun bindings keys ->
-                callback_fn
-                  ~accept:(fun [@inline] () ->
-                    provenance_table_ref
-                      := add_if_not_exists !provenance_table_ref tid keys
-                           (Rule (rule_id, bindings) : provenance))
-                  keys)
-              args
-          else
-            Datalog.create_callback ~name
-              (fun keys -> callback_fn ~accept:(fun [@inline] () -> ()) keys)
-              args
+          Datalog.create_callback_with_bindings ~name callback_fn args
         in
         callback :: callbacks)
       atoms []
@@ -204,10 +189,11 @@ let deduce (atoms : deduction) =
   in
   Datalog.map_program (Datalog.execute callbacks) (fun cursor ->
       let cursor = Cursor.With_parameters.without_parameters cursor in
-      Rule { cursor; binders; provenance_table_ref; rule_id })
+      Rule { cursor; binders; enable_provenance; provenance_table_ref; rule_id })
 
 type stats =
   { timings : (rule_id, rule * float) Hashtbl.t;
+    with_provenance : bool;
     mutable provenance : provenance FactMap.t
   }
 
@@ -228,11 +214,11 @@ let provenance_from_db db =
         (fun args provenance -> add_if_not_exists provenance tid args Input)
         provenance)
 
-let create_stats db =
+let create_stats ?(with_provenance = false) db =
   let provenance =
-    if !use_provenance then provenance_from_db db else FactMap.empty
+    if with_provenance then provenance_from_db db else FactMap.empty
   in
-  { timings = Hashtbl.create 17; provenance }
+  { timings = Hashtbl.create 17; provenance; with_provenance }
 
 let add_timing ~stats (Rule { rule_id; _ } as rule) time =
   Hashtbl.replace stats.timings rule_id
@@ -378,7 +364,7 @@ let print_provenance char_trie rule_defs ppf provenance =
 let print_stats ppf stats =
   let char_trie = { count = 0; trie = CharMap.empty } in
   let char_trie =
-    if !use_provenance
+    if stats.with_provenance
     then
       Hashtbl.fold
         (fun _ (Rule { rule_id; _ }, _time) char_trie ->
@@ -393,7 +379,7 @@ let print_stats ppf stats =
       Hashtbl.replace rule_defs rule_id rule;
       Format.fprintf ppf "@[<v 2>%a@,: %f@]@ " (print_rule char_trie) rule time)
     stats.timings;
-  if !use_provenance
+  if stats.with_provenance
   then (
     Format.fprintf ppf "Provenance@ ==========@ ";
     print_provenance char_trie rule_defs ppf stats.provenance);
@@ -450,6 +436,15 @@ let run_rule_incremental ?stats ~previous ~diff ~current incremental_db
 type t =
   | Saturate of rule list
   | Fixpoint of t list
+
+let rec enable_provenance_for_debug schedule b =
+  match schedule with
+  | Fixpoint schedules ->
+    List.iter (fun schedule -> enable_provenance_for_debug schedule b) schedules
+  | Saturate rules ->
+    List.iter
+      (fun (Rule { enable_provenance; _ }) -> enable_provenance := b)
+      rules
 
 let fixpoint schedule = Fixpoint schedule
 
@@ -541,7 +536,18 @@ let rec run_incremental ?stats schedule ~previous ~diff ~current =
       (List.map (run_incremental ?stats) schedules)
       ~previous ~diff ~current
 
+let maybe_with_provenance stats schedule f =
+  match stats with
+  | None | Some { with_provenance = false; _ } -> f schedule
+  | Some { with_provenance = true; _ } ->
+    Fun.protect
+      ~finally:(fun () -> enable_provenance_for_debug schedule false)
+      (fun () ->
+        enable_provenance_for_debug schedule true;
+        f schedule)
+
 let run ?stats schedule db =
-  (run_incremental ?stats schedule ~previous:Table.Map.empty ~diff:db
-     ~current:db)
-    .current
+  maybe_with_provenance stats schedule (fun schedule ->
+      (run_incremental ?stats schedule ~previous:Table.Map.empty ~diff:db
+         ~current:db)
+        .current)

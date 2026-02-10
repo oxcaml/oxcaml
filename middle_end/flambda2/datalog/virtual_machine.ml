@@ -57,7 +57,8 @@ struct
         -> ('a, 's) instruction
     | Action : 'a * ('a, 's) instruction -> ('a, 's) instruction
     | Call :
-        ('b Constant.hlist -> unit)
+        ('c -> 'b Constant.hlist -> unit)
+        * 'c
         * 'b Option_receiver.hlist
         * ('a, 's) instruction
         * string
@@ -116,7 +117,7 @@ struct
       | Action (a, instr) ->
         Format.fprintf ff "%a@[<v 2>%a@]%a" pp_initiator depth pp_act a
           pp_instruction (instr, depth)
-      | Call (_f, _l, instr, name, names) ->
+      | Call (_f, _c, _l, instr, name, names) ->
         Format.fprintf ff "%a%s (%a)%a" pp_initiator depth name
           (Format.pp_print_list
              ~pp_sep:(fun ff () -> Format.fprintf ff ", ")
@@ -169,8 +170,8 @@ struct
         match (evaluate [@inlined hint]) op with
         | Accept -> execute k stack
         | Skip -> advance stack)
-      | Call (f, rs, k, _name, _names) ->
-        f (Option_receiver.recv rs);
+      | Call (f, ctx, rs, k, _name, _names) ->
+        f ctx (Option_receiver.recv rs);
         execute k stack
     in
     execute instruction
@@ -193,5 +194,5 @@ struct
 
   let action a k = Action (a, k)
 
-  let call f ~name y k = Call (f, y.values, k, name, y.names)
+  let call f ~name ~context y k = Call (f, context, y.values, k, name, y.names)
 end

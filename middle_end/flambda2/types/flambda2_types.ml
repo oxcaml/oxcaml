@@ -132,6 +132,15 @@ include Join_levels
 module Code_age_relation = Code_age_relation
 module Join_analysis = Join_env.Analysis
 
+module Closures_entry = struct
+  include Closures_entry
+
+  let find_function_type t function_slot : _ Or_unknown.t =
+    match find_function_type t ~exact:false function_slot with
+    | Unknown | Bottom -> Unknown
+    | Ok function_type -> Known function_type
+end
+
 let remove_outermost_alias env ty =
   Expand_head.expand_head env ty |> Expand_head.Expanded_type.to_type
 
@@ -143,3 +152,5 @@ module Equal_types_for_debug = struct
     Equal_types_for_debug.equal_env_extension ~meet_type:(Meet.meet_type ()) env
       ext1 ext2
 end
+
+module Rewriter = Traversals

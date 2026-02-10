@@ -187,7 +187,7 @@ let replace_successor_labels t ~normal ~exn block ~f =
       | Switch labels -> Switch (Array.map f labels)
       | Tailcall_self { destination } ->
         Tailcall_self { destination = f destination }
-      | Tailcall_func Indirect
+      | Tailcall_func (Indirect _)
       | Tailcall_func (Direct _)
       | Return | Raise _ | Call_no_return _ ->
         block.terminator.desc
@@ -366,14 +366,16 @@ let dump_terminator' ?(print_reg = Printreg.reg) ?(res = [||]) ?(args = [||])
              }
          })
   | Tailcall_func call ->
+    (* CR ncourant: here and below, maybe the callees should be printed when
+       they are known *)
     dump_linear_call_op ppf
       (match call with
-      | Indirect -> Linear.Ltailcall_ind
+      | Indirect _callees -> Linear.Ltailcall_ind
       | Direct func -> Linear.Ltailcall_imm { func })
   | Call { op = call; label_after } ->
     Format.fprintf ppf "%t%a" print_res dump_linear_call_op
       (match call with
-      | Indirect -> Linear.Lcall_ind
+      | Indirect _callees -> Linear.Lcall_ind
       | Direct func -> Linear.Lcall_imm { func });
     Format.fprintf ppf "%sgoto %a" sep Label.format label_after
   | Prim { op = prim; label_after } ->
@@ -547,17 +549,8 @@ let set_stack_offset_for_block (block : basic_block) stack_offset =
 
 let set_live (instr : _ instruction) live = instr.live <- live
 
-let string_of_irc_work_list = function
-  | Unknown_list -> "unknown_list"
-  | Coalesced -> "coalesced"
-  | Constrained -> "constrained"
-  | Frozen -> "frozen"
-  | Work_list -> "work_list"
-  | Active -> "active"
-
 let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     ?(fdo = Fdo_info.none) ?(live = Reg.Set.empty) ~stack_offset ~id
-    ?(irc_work_list = Unknown_list)
     ?(available_before = Reg_availability_set.Unreachable)
     ?(available_across = Reg_availability_set.Unreachable) () =
   { desc;
@@ -568,13 +561,12 @@ let make_instruction ~desc ?(arg = [||]) ?(res = [||]) ?(dbg = Debuginfo.none)
     live;
     stack_offset;
     id;
-    irc_work_list;
     available_before;
     available_across
   }
 
 let make_instruction_from_copy (copy : _ instruction) ~desc ~id ?(arg = [||])
-    ?(res = [||]) ?(irc_work_list = Unknown_list) () =
+    ?(res = [||]) () =
   { desc;
     arg;
     res;
@@ -583,7 +575,6 @@ let make_instruction_from_copy (copy : _ instruction) ~desc ~id ?(arg = [||])
     live = copy.live;
     stack_offset = copy.stack_offset;
     id;
-    irc_work_list;
     available_before = copy.available_before;
     available_across = copy.available_across
   }
@@ -682,18 +673,6 @@ let basic_block_contains_calls block =
      | Prim { op = External _; _ } -> true
      | Prim { op = Probe _; _ } -> true)
   || DLL.exists block.body ~f:is_alloc_or_poll
-
-let equal_irc_work_list left right =
-  match left, right with
-  | Unknown_list, Unknown_list
-  | Coalesced, Coalesced
-  | Constrained, Constrained
-  | Frozen, Frozen
-  | Work_list, Work_list
-  | Active, Active ->
-    true
-  | (Unknown_list | Coalesced | Constrained | Frozen | Work_list | Active), _ ->
-    false
 
 let remove_trap_instructions t removed_trap_handlers =
   (* Remove Lpushtrap and Lpoptrap instructions that refer to dead labels and

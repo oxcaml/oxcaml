@@ -84,10 +84,10 @@ val ebp : arg
 val esp : arg
 
 val mem32 :
-  data_type -> ?scale:int -> ?base:reg64 -> ?sym:string -> int -> reg64 -> arg
+  data_type -> ?scale:int -> ?base:reg64 -> ?sym:string -> int -> reg_idx -> arg
 
 val mem64 :
-  data_type -> ?scale:int -> ?base:reg64 -> ?sym:string -> int -> reg64 -> arg
+  data_type -> ?scale:int -> ?base:reg64 -> ?sym:string -> int -> reg_idx -> arg
 
 val mem64_rip : data_type -> ?ofs:int -> string -> arg
 
@@ -186,8 +186,6 @@ module I : sig
 
   val pop : arg -> unit
 
-  val popcnt : arg -> arg -> unit
-
   val prefetch : bool -> prefetch_temporal_locality_hint -> arg -> unit
 
   val push : arg -> unit
@@ -221,12 +219,6 @@ module I : sig
   val xchg : arg -> arg -> unit
 
   val xor : arg -> arg -> unit
-
-  (* BMI instructions *)
-
-  val lzcnt : arg -> arg -> unit
-
-  val tzcnt : arg -> arg -> unit
 
   (* SIMD instructions *)
 

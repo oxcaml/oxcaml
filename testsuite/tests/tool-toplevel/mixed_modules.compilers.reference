@@ -1,0 +1,19 @@
+module M :
+  sig
+    val foo : string
+    val unboxed_product : #(#(int * float#) * string * int64#)
+    module N :
+      sig
+        val one : int
+        module K :
+          sig
+            val zero : float#
+            val print_int : Format.formatter -> int -> unit
+          end
+        val two : int
+      end
+    val bar : int64#
+    val baz : string
+  end
+- : int = five
+

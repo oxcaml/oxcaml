@@ -418,6 +418,9 @@ let specialise_array_kind dacc (array_kind : P.Array_kind.t) ~array_ty :
   match array_kind with
   | Naked_floats -> for_naked_number Naked_float
   | Naked_float32s -> for_naked_number Naked_float32
+  | Naked_ints -> for_naked_number Naked_immediate
+  | Naked_int8s -> for_naked_number Naked_int8
+  | Naked_int16s -> for_naked_number Naked_int16
   | Naked_int32s -> for_naked_number Naked_int32
   | Naked_int64s -> for_naked_number Naked_int64
   | Naked_nativeints -> for_naked_number Naked_nativeint
@@ -430,7 +433,7 @@ let specialise_array_kind dacc (array_kind : P.Array_kind.t) ~array_ty :
     match T.meet_is_flat_float_array typing_env array_ty with
     | Known_result false | Need_meet -> Ok array_kind
     | Known_result true | Invalid -> Bottom)
-  | Values -> (
+  | Gc_ignorable_values | Values -> (
     (* Try to specialise to immediates *)
     match T.prove_is_immediates_array typing_env array_ty with
     | Proved () ->

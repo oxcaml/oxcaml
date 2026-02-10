@@ -723,6 +723,15 @@ let global_pat_mode {mode; _}=
   in
   simple_pat_mode mode
 
+let dynamic_pat_mode pat_mode =
+  let mode =
+    Value.join [
+      Value.min_with_monadic Staticity
+        (Staticity.of_const ~hint:Branching Dynamic);
+    pat_mode.mode]
+  in
+  {pat_mode with mode}
+
 let allocations : Alloc.r list ref = Local_store.s_ref []
 
 let reset_allocations () = allocations := []
@@ -1110,6 +1119,11 @@ let check_construct_mutability ~loc ~env mutability ?ty ?modalities block_mode =
       | None -> m0
       in
       submode ~loc ~env m0 block_mode
+
+let check_dynamic pp hint expected_mode =
+  Staticity.submode_err pp
+    (Dynamic |> Staticity.of_const ~hint)
+    (expected_mode |> as_single_mode |> Value.proj_monadic Staticity)
 
 (** Take [m0] which is the parameter to mutable, and the mode of the RHS (the
     content expression), returns the strongest mode the mutable variable can be.
@@ -2089,7 +2103,8 @@ let type_for_loop_index ~loc ~env ~param =
             let pv_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
             let pv =
               { pv_id; pv_uid; pv_mode;
-                pv_kind=Val_reg; pv_type; pv_loc; pv_as_var;
+                pv_kind = Val_reg Jkind.Sort.(of_const Const.for_loop_index);
+                pv_type; pv_loc; pv_as_var;
                 pv_attributes;
                 pv_sort = Jkind.Sort.(of_const Const.for_loop_index)
                 }
@@ -2109,7 +2124,7 @@ let type_comprehension_for_range_iterator_index ~loc ~env ~param tps =
     ~var:(fun ~name ~pv_mode ~pv_type ~pv_loc ~pv_as_var ~pv_attributes ->
           enter_variable
             ~is_as_variable:pv_as_var
-            ~kind:Val_reg
+            ~kind:(Val_reg Jkind.Sort.(of_const Const.for_loop_index))
             tps
             pv_loc
             name
@@ -3009,24 +3024,10 @@ and type_pat_aux
       in
       let mode, kind =
         match mutable_flag with
-        | Immutable -> alloc_mode, Val_reg
+        | Immutable -> alloc_mode, Val_reg sort
         | Mutable ->
             let m0 = Value.Comonadic.newvar () in
             let mode = mutvar_mode ~loc ~env:!!penv m0 alloc_mode in
-            (* Sort information is used when translating a [Texp_mutvar] into an
-               [Lassign]. We calculate [sort] here so we can store and reuse it.
-               However, since we already make sure pattern variables are
-               representable, we are already calculating [sort] elsewhere, but
-               that place is too far removed to easily pass it here. *)
-            let sort =
-              match
-                Ctype.type_sort ~why:Jkind.History.Mutable_var_assignment
-                  ~fixed:false !!penv ty
-              with
-              | Ok sort -> sort
-              | Error err -> raise(Error(loc, !!penv,
-                                          Mutable_var_not_rep(ty, err)))
-            in
             let kind = Val_mut (m0, sort) in
             mode, kind
       in
@@ -3060,7 +3061,7 @@ and type_pat_aux
           let sort = Jkind.Sort.(of_const Const.for_module) in
           let id, uid =
             enter_variable tps loc v alloc_mode.mode t ~is_module:true
-            ~kind:Val_reg sp.ppat_attributes sort
+              ~kind:(Val_reg sort) sp.ppat_attributes sort
           in
           rvp {
             pat_desc = Tpat_var (id, v, uid, sort, alloc_mode.mode);
@@ -3076,7 +3077,8 @@ and type_pat_aux
       let ty_var, mode = solve_Ppat_alias ~mode:alloc_mode.mode !!penv q in
       let mode = cross_left !!penv expected_ty mode in
       let id, uid =
-        enter_variable ~is_as_variable:true ~kind:Val_reg tps name.loc name mode
+        enter_variable ~is_as_variable:true
+          ~kind:(Val_reg sort) tps name.loc name mode
           ty_var sp.ppat_attributes sort
       in
       rvp { pat_desc = Tpat_alias(q, id, name, uid, sort, mode, ty_var);
@@ -3297,7 +3299,8 @@ and type_pat_aux
       let env1, p1, env2, p2 =
         with_local_level begin fun () ->
           let type_pat_rec tps penv sp =
-            type_pat tps category sp expected_ty sort ~penv
+            let alloc_mode = dynamic_pat_mode alloc_mode in
+            type_pat ~alloc_mode tps category sp expected_ty sort ~penv
           in
           let penv1 =
             Pattern_env.copy ~equations_scope:(get_current_level ()) penv in
@@ -3481,7 +3484,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
   in
   let (pv, val_env, met_env) =
     List.fold_right
-      (fun {pv_id; pv_uid; pv_type; pv_loc; pv_as_var; pv_attributes}
+      (fun {pv_id; pv_uid; pv_type; pv_loc; pv_as_var; pv_attributes; pv_sort}
         (pv, val_env, met_env) ->
          let check s =
            if pv_as_var then Warnings.Unused_var { name = s; mutated = false }
@@ -3490,7 +3493,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
          let val_env =
           Env.add_value ~mode:Mode.Value.legacy pv_id
             { val_type = pv_type
-            ; val_kind = Val_reg
+            ; val_kind = Val_reg pv_sort
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
             ; val_modalities = Modality.id
@@ -4844,10 +4847,6 @@ let rec type_approx env sexp ty_expected =
       ignore
         (type_approx_constraint env (Pcoerce (sty1, sty2)) ty_expected ~loc
            : type_expr)
-  | Pexp_apply
-      ({ pexp_desc = Pexp_extension({txt = "extension.escape"}, PStr []) },
-       [Nolabel, e]) ->
-    type_approx env e ty_expected
   | _ -> ()
 
 and type_tuple_approx (env: Env.t) loc ty_expected l =
@@ -6235,15 +6234,6 @@ and type_expect_
       type_n_ary_function ~loc ~env ~expected_mode ~ty_expected ~explanation
         ~attributes:sexp.pexp_attributes (params, body_constraint, body)
   | Pexp_apply
-      ({ pexp_desc = Pexp_extension({txt = "extension.escape"}, PStr []) },
-       [Nolabel, sbody]) ->
-      submode ~loc ~env ~reason:Other Value.legacy expected_mode;
-      let exp =
-        type_expect ~recarg env mode_legacy sbody
-          ty_expected_explained
-      in
-      {exp with exp_loc = loc}
-  | Pexp_apply
       ({ pexp_desc = Pexp_extension({ txt }, PStr []) },
        [Nolabel, sbody]) when is_exclave_extension_node txt ->
       if (txt = "extension.exclave") && not (Language_extension.is_enabled Mode) then
@@ -6280,6 +6270,8 @@ and type_expect_
   | Pexp_apply(sfunct, sargs) ->
       (* See Note [Type-checking applications] *)
       assert (sargs <> []);
+      check_dynamic (loc, Expression) (Always_dynamic Application)
+        expected_mode;
       let pm = position_and_mode env expected_mode sexp in
       let funct_mode =
         match pm.apply_position with
@@ -6353,9 +6345,12 @@ and type_expect_
         | _ ->
             (rt, funct), sargs
       in
-      let (args, ty_res, ap_mode, pm) =
+      let (args, ty_ret, mode_ret, pm) =
         type_application env loc expected_mode pm funct funct_mode sargs rt
       in
+      let mode_ret = Alloc.disallow_right mode_ret in
+      let ap_mode = Alloc.proj_comonadic Areality mode_ret in
+      let mode_ret = cross_left env ty_ret (alloc_as_value mode_ret) in
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
           ~on_application:true
@@ -6363,13 +6358,17 @@ and type_expect_
         |> Builtin_attributes.zero_alloc_attribute_only_assume_allowed
       in
 
-      rue {
+      let exp = rue {
         exp_desc = Texp_apply(funct, args, pm.apply_position, ap_mode,
                               zero_alloc);
         exp_loc = loc; exp_extra = [];
-        exp_type = ty_res;
+        exp_type = ty_ret;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
+      in
+      submode ~loc ~env ~reason:(Application ty_ret) mode_ret expected_mode;
+      check_tail_call_local_returning loc env ap_mode pm;
+      exp
   | Pexp_match(sarg, caselist) ->
       let arg_pat_mode, arg_expected_mode =
         match cases_tuple_arity caselist with
@@ -6407,6 +6406,7 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_try(sbody, caselist) ->
+      check_dynamic (loc, Expression) (Always_dynamic Try_with) expected_mode;
       let body =
         type_expect env (mode_trywith expected_mode)
           sbody ty_expected_explained
@@ -6753,6 +6753,7 @@ and type_expect_
       exp_attributes = sexp.pexp_attributes;
       exp_env = env }
   | Pexp_ifthenelse(scond, sifso, sifnot) ->
+      check_dynamic (loc, Expression) Branching expected_mode;
       let cond =
         type_expect env mode_max scond
           (mk_expected ~explanation:If_conditional Predef.type_bool)
@@ -8884,7 +8885,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       let var_pair ~(mode : Value.lr) name ty sort =
         let id = Ident.create_local name in
         let desc =
-          { val_type = ty; val_kind = Val_reg;
+          { val_type = ty; val_kind = Val_reg sort;
             val_attributes = [];
             val_zero_alloc = Zero_alloc.default;
             val_modalities = Modality.id;
@@ -9091,26 +9092,19 @@ and type_application env app_loc expected_mode position_and_mode
           filter_arrow_mono env (instance funct.exp_type) Nolabel
         ) ~post:(fun {ty_ret; _} -> generalize_structure ty_ret)
       in
-      let ret_mode = Alloc.disallow_right ret_mode in
       let type_sort ~why ty =
         match Ctype.type_sort ~why ~fixed:false env ty with
         | Ok sort -> sort
         | Error err -> raise (Error (app_loc, env, Function_type_not_rep (ty, err)))
       in
       let arg_sort = type_sort ~why:Function_argument ty_arg in
-      let ap_mode = Alloc.proj_comonadic Areality ret_mode in
-      let mode_res =
-        cross_left env ty_ret (alloc_as_value ret_mode)
-      in
-      submode ~loc:app_loc ~env ~reason:Other
-        mode_res expected_mode;
       let arg_mode, _ =
         mode_argument ~funct ~index:0 ~position_and_mode
           ~partial_app:false arg_mode
       in
       let exp = type_expect env arg_mode sarg (mk_expected ty_arg) in
       check_partial_application ~statement:false exp;
-      ([Nolabel, Arg (exp, arg_sort)], ty_ret, ap_mode, position_and_mode)
+      ([Nolabel, Arg (exp, arg_sort)], ty_ret, ret_mode, position_and_mode)
   | _ ->
     (* See Note [Type-checking applications] for an overview *)
       let ty = funct.exp_type in
@@ -9158,16 +9152,7 @@ and type_application env app_loc expected_mode position_and_mode
           ty_ret, mode_ret, args, position_and_mode
         end ~post:(fun (ty_ret, _, _, _) -> generalize_structure ty_ret)
       in
-      let mode_ret = Alloc.disallow_right mode_ret in
-      let ap_mode = Alloc.proj_comonadic Areality mode_ret in
-      let mode_ret =
-        cross_left env ty_ret (alloc_as_value mode_ret)
-      in
-      submode ~loc:app_loc ~env ~reason:(Application ty_ret)
-        mode_ret expected_mode;
-
-      check_tail_call_local_returning app_loc env ap_mode position_and_mode;
-      args, ty_ret, ap_mode, position_and_mode
+      args, ty_ret, mode_ret, position_and_mode
 
 and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
     ~explanation ~attributes sexpl =
@@ -9858,6 +9843,20 @@ and type_cases
   let caselist =
     List.map (fun case -> Parmatch.untyped_case case, case) caselist
   in
+  let n_non_refute =
+    List.fold_left
+      (fun acc ({Parmatch.needs_refute = x; _}, _) ->
+        if x then acc else acc + 1)
+      0 caselist
+  in
+  let pat_mode =
+    if n_non_refute > 1 then begin
+      Staticity.submode_err (loc, Cases_result)
+        (Staticity.of_const ~hint:Branching Dynamic)
+        (expr_mode |> as_single_mode |> Value.proj_monadic Staticity);
+      dynamic_pat_mode pat_mode
+    end else pat_mode
+  in
   (* Most of the work is done by [map_half_typed_cases]. All that's left
      is to typecheck the guards and the cases, and then to check for some
      warnings that can fire in the presence of guards.
@@ -10267,7 +10266,7 @@ and type_let_def_wrap_warnings
                 let mutable_ =
                   (match vd.val_kind with
                    | Val_mut _ -> true
-                   | Val_reg | Val_prim _ | Val_ivar _
+                   | Val_reg _ | Val_prim _ | Val_ivar _
                    | Val_self _ | Val_anc _ -> false)
                 in
                 let mutated = ref false in
@@ -10301,7 +10300,7 @@ and type_let_def_wrap_warnings
                 | Val_mut _->
                   Env.set_value_mutated_callback
                     vd (fun () -> mutated := true)
-                | Val_reg | Val_prim _ | Val_ivar _
+                | Val_reg _ | Val_prim _ | Val_ivar _
                 | Val_self _ | Val_anc _ -> ()
               )
               (Typedtree.pat_bound_idents pat);

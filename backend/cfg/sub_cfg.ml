@@ -40,7 +40,6 @@ let make_instr desc arg res dbg =
     live = Reg.Set.empty;
     stack_offset = Cfg.invalid_stack_offset;
     id = next_instr_id ();
-    irc_work_list = Unknown_list;
     available_before = Unreachable;
     available_across = Unreachable
   }

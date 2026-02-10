@@ -77,7 +77,8 @@ let minimize_at minimize cur_file map ~pos ~len =
   (nmap, pos <= !r)
 
 let step_minimizer c minimize cur_file map ~pos ~len =
-  Format.eprintf "Trying %s: pos=%d, len=%d... " minimize.minimizer_name pos len;
+  Format.eprintf "Trying %s: pos=%d, len=%d... @?" minimize.minimizer_name pos
+    len;
   let map, changed = minimize_at minimize cur_file map ~pos ~len in
   let r =
     if changed then (

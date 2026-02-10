@@ -113,6 +113,8 @@ let tsan = @tsan@
 
 let has_popcnt = "@has_popcnt@" = "yes"
 
+let has_lzcnt = "@has_lzcnt@" = "yes"
+
 let has_pclmul = "@has_pclmul@" = "yes"
 
 let has_sse3 = "@has_sse3@" = "yes"

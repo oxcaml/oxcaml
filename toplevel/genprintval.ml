@@ -285,10 +285,21 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
       let printer_steps = ref max_steps in
 
+      let is_value ty =
+        match
+          Ctype.check_type_jkind env ty (Jkind.Builtin.value_or_null ~why:Probe)
+        with
+        | Ok _ -> true
+        | Error _ -> false
+      in
+
       let nested_values = ObjTbl.create 8 in
       let nest_gen err f depth obj ty =
         let repr = obj in
-        if not (is_real_block repr) then
+        (* We can't store non-values in an [ObjTbl.t] when cycle-checking.
+           As a result, non-values may be printed twice, but cycles will still
+           be detected since every cycle contains at least one value. *)
+        if not (is_value ty) || not (is_real_block repr) then
           f depth obj ty
         else
           if ObjTbl.mem nested_values repr then

@@ -1,5 +1,13 @@
 type t = float
 
+external c_to_int64 : (t[@unboxed]) -> (int64[@unboxed])
+  = "caml_int64_of_float" "caml_int64_of_float_unboxed"
+  [@@noalloc]
+
+external c_of_int64 : (int64[@unboxed]) -> (t[@unboxed])
+  = "caml_int64_to_float" "caml_int64_to_float_unboxed"
+  [@@noalloc]
+
 external c_round : (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float64_round"
   [@@noalloc]

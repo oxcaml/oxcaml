@@ -34,9 +34,23 @@ val transl_type_extension:
     bool -> Env.t -> Location.t -> Parsetree.type_extension ->
     Typedtree.type_extension * Env.t * Shape.t list
 
+type transl_value_decl_modal =
+  | Str_primitive
+  (** A primitive in structure, in which case the modality syntax is treated as
+    modes, and the returned value description will have empty modalities. *)
+  (* CR zqian: avoid the above hack *)
+  | Sig_value of Mode.Value.l * Mode.Modality.Const.t
+  (** A value description in a signature, in which case we require the mode of
+      the structure that the value lives in, as well as the default modalities
+      of the signature. *)
+
+(** Returns a value description and the mode that the VD is based on, and a new
+environment that contains the VD at the mode. *)
 val transl_value_decl:
-    Env.t -> modalities:Mode.Modality.t -> Location.t ->
-    Parsetree.value_description -> Typedtree.value_description * Env.t
+    Env.t -> modal:transl_value_decl_modal ->
+    why:Jkind.History.concrete_creation_reason -> Location.t ->
+    Parsetree.value_description ->
+    Typedtree.value_description * Mode.Value.l * Env.t
 
 (* If the [fixed_row_path] optional argument is provided,
    the [Parsetree.type_declaration] argument should satisfy [is_fixed_type] *)
@@ -91,7 +105,11 @@ module Mixed_product_kind : sig
     | Record
     | Cstr_tuple
     | Cstr_record
+    | Module
 end
+
+val assert_mixed_product_support :
+  Warnings.loc -> Mixed_product_kind.t -> value_prefix_len:int -> unit
 
 type mixed_product_violation =
   | Runtime_support_not_enabled of Mixed_product_kind.t
@@ -156,7 +174,7 @@ type error =
       ; err : Jkind.Violation.t
       }
   | Jkind_empty_record
-  | Non_value_in_sig of Jkind.Violation.t * string * type_expr
+  | Non_representable_in_module of Jkind.Violation.t * type_expr
   | Invalid_jkind_in_block of type_expr * Jkind.Sort.Const.t * jkind_sort_loc
   | Illegal_mixed_product of mixed_product_violation
   | Separability of Typedecl_separability.error

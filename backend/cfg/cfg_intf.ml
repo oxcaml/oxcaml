@@ -33,7 +33,7 @@ open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 
 module S = struct
   type func_call_operation =
-    | Indirect
+    | Indirect of Cmm.symbol list option
     | Direct of Cmm.symbol
 
   type external_call_operation =
@@ -85,14 +85,6 @@ module S = struct
       uo : Label.t  (** if at least one of x or y is NaN *)
     }
 
-  type irc_work_list =
-    | Unknown_list
-    | Coalesced
-    | Constrained
-    | Frozen
-    | Work_list
-    | Active
-
   type 'a instruction =
     { desc : 'a;
       id : InstructionId.t;
@@ -102,7 +94,6 @@ module S = struct
       mutable fdo : Fdo_info.t;
       mutable live : Reg.Set.t;
       mutable stack_offset : int;
-      mutable irc_work_list : irc_work_list;
       mutable available_before : Reg_availability_set.t;
       mutable available_across : Reg_availability_set.t
           (** The availability sets will be set to [Unreachable] prior to the

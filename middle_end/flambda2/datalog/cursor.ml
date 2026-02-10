@@ -103,22 +103,40 @@ end = struct
 end
 
 module Level = struct
+  type cardinality =
+    | All_values
+    | Any_value
+
+  let max_cardinality c1 c2 =
+    match c1, c2 with
+    | All_values, _ | _, All_values -> All_values
+    | Any_value, Any_value -> Any_value
+
   type 'a t =
     { name : string;
       order : Order.t;
       actions : actions;
       mutable iterators : 'a Trie.Iterator.t with_name list;
       mutable output :
-        ('a option Channel.sender * 'a option Channel.receiver) with_name option
+        ('a option Channel.sender * 'a option Channel.receiver) with_name option;
+      mutable output_cardinality : cardinality
     }
 
   let print ppf { name; order; _ } =
     Format.fprintf ppf "%s (with order %a)" name Order.print order
 
   let create ~order name =
-    { name; order; output = None; iterators = []; actions = create_actions () }
+    { name;
+      order;
+      output = None;
+      output_cardinality = Any_value;
+      iterators = [];
+      actions = create_actions ()
+    }
 
-  let use_output level =
+  let use_output ?(cardinality = All_values) level =
+    level.output_cardinality
+      <- max_cardinality level.output_cardinality cardinality;
     match level.output with
     | None ->
       let channel = Channel.create None in
@@ -276,8 +294,9 @@ let rec open_rev_vars :
       | _ :: _ as vars ->
         open_rev_vars vars (VM.open_ iterator cell instruction VM.dispatch)))
 
-(* Optimisation: if we do not use the output from the last variable, we only
-   need the first matching value of that variable.
+(* Optimisation: if the output from the last variable is used with [Any_value]
+   cardinality, we only need the first matching value of that variable and we
+   can skip after the first element.
 
    NB: the variables must be passed in reverse order, i.e. deepest variable
    first. *)
@@ -285,17 +304,20 @@ let rec pop_rev_vars : type s. s Level.hlist -> (vm_action, s) VM.instruction =
   function
   | [] -> VM.advance
   | var :: vars -> (
-    match var.output with None -> VM.up (pop_rev_vars vars) | _ -> VM.advance)
+    match var.output_cardinality with
+    | Any_value -> VM.up (pop_rev_vars vars)
+    | All_values -> VM.advance)
 
 type call =
   | Call :
-      { func : 'a Constant.hlist -> unit;
+      { func : 'c -> 'a Constant.hlist -> unit;
         name : string;
+        context : 'c;
         args : 'a Option_receiver.hlist with_names
       }
       -> call
 
-let create_call func ~name args = Call { func; name; args }
+let create_call func ~name ~context args = Call { func; name; context; args }
 
 let create ?(calls = []) ?output context =
   let { levels; actions; binders; naive_binders } = context in
@@ -306,11 +328,14 @@ let create ?(calls = []) ?output context =
       match output with
       | None -> k
       | Some output ->
-        VM.call (fun args -> !callback args) ~name:"yield" output k
+        VM.call
+          (fun () args -> !callback args)
+          ~name:"yield" ~context:() output k
     in
     (* Make sure to compute calls in the provided order. *)
     List.fold_right
-      (fun (Call { func; name; args }) k -> VM.call func ~name args k)
+      (fun (Call { func; name; context; args }) k ->
+        VM.call func ~name ~context args k)
       calls k
   in
   let instruction : (_, nil) VM.instruction =

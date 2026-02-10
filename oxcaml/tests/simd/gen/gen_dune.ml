@@ -143,6 +143,7 @@ let () =
       "ops_int64x4";
       "ops_int16x16";
       "ops_int8x32";
+      "int_ops";
       "sse_other_ops";
       "avx_test_ops";
       "sse41_test_ops";
@@ -161,6 +162,7 @@ let () =
       "load_store", enabled_if_main_amd64_not_macos;
       "let_mutable", enabled_if_main;
       "let_mutable_u", enabled_if_main;
+      "mixed_modules", enabled_if_main;
       "ops_float32x4", enabled_if_main;
       "ops_float32x4_u", enabled_if_main;
       "ops_float64x2", enabled_if_main;
@@ -177,6 +179,8 @@ let () =
       "ops_u", enabled_if_main;
       "ops256", enabled_if_main_amd64_not_macos;
       "ops256_u", enabled_if_main_amd64_not_macos;
+      "int_ops", enabled_if_main_amd64_not_macos;
+      "int_ops_u", enabled_if_main_amd64_not_macos;
       "sse_other_ops", enabled_if_main_amd64_not_macos;
       "sse_other_ops_u", enabled_if_main_amd64_not_macos;
       "sse41_test_ops", enabled_if_main_amd64_not_macos;

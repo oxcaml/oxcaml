@@ -298,7 +298,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
     | None ->
       ( C.direct_call ~dbg
           (C.Extended_machtype.to_machtype return_ty)
-          pos (C.symbol ~dbg code_sym) args,
+          pos code_sym args,
         free_vars,
         env,
         res,
@@ -328,7 +328,7 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
       env,
       res,
       Ece.all )
-  | Function { function_call = Indirect_known_arity; alloc_mode } ->
+  | Function { function_call = Indirect_known_arity callees; alloc_mode = _ } ->
     fail_if_probe apply;
     let callee =
       match callee with
@@ -338,15 +338,24 @@ let translate_apply0 ~dbg_with_inlined:dbg env res apply =
           "Application expression did not provide callee for indirect call:@ %a"
           Apply.print apply
     in
+    let callees =
+      match callees with
+      | Unknown -> None
+      | Known code_id_set ->
+        Some
+          (List.map
+             (fun code_id ->
+               To_cmm_result.symbol_of_code_id res code_id
+                 ~currently_in_inlined_body:(Env.currently_in_inlined_body env))
+             (Code_id.Set.elements code_id_set))
+    in
     if not (C.check_arity (Apply.args_arity apply) args)
     then
       Misc.fatal_errorf
         "To_cmm expects indirect_known_arity calls to be full applications in \
          order to translate them"
     else
-      ( C.indirect_full_call ~dbg return_ty pos
-          (C.alloc_mode_for_applications_to_cmx alloc_mode)
-          callee args_ty args,
+      ( C.indirect_full_call ~dbg return_ty pos callee ~callees args_ty args,
         free_vars,
         env,
         res,
@@ -537,7 +546,7 @@ let translate_raise ~dbg_with_inlined:dbg env res apply exn_handler args =
       C.simple_list ~dbg env res extra
     in
     let free_vars = Backend_var.Set.union exn_free_vars extra_free_vars in
-    let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
+    let wrap, _, res = Env.flush_delayed_lets ~mode:Flush_everything env res in
     let cmm = C.raise_prim raise_kind exn ~extra_args:extra dbg in
     let cmm, free_vars, symbol_inits =
       wrap cmm free_vars Env.Symbol_inits.empty
@@ -563,7 +572,7 @@ let translate_jump_to_continuation ~dbg_with_inlined:dbg env res apply types
     in
     let args = C.remove_skipped_args args types in
     let args, free_vars, env, res, _ = C.simple_list ~dbg env res args in
-    let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
+    let wrap, _, res = Env.flush_delayed_lets ~mode:Flush_everything env res in
     let cmm, free_vars, symbol_inits =
       wrap (C.cexit cont args trap_actions) free_vars Env.Symbol_inits.empty
     in
@@ -584,7 +593,7 @@ let translate_jump_to_return_continuation ~dbg_with_inlined:dbg env res apply
       C.simple_list ~dbg env res args
     in
     let return_value = C.make_tuple return_values in
-    let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
+    let wrap, _, res = Env.flush_delayed_lets ~mode:Flush_everything env res in
     match Apply_cont.trap_action apply with
     | None ->
       let cmm, free_vars, symbol_inits =
@@ -611,7 +620,7 @@ let translate_jump_to_return_continuation ~dbg_with_inlined:dbg env res apply
 (* Invalid expressions *)
 let invalid env res ~message =
   let wrap, _empty_env, res =
-    Env.flush_delayed_lets ~mode:Branching_point env res
+    Env.flush_delayed_lets ~mode:Flush_everything env res
   in
   let cmm_invalid, res = C.invalid res ~message in
   let cmm, free_vars, symbol_inits =
@@ -988,7 +997,7 @@ and apply_expr env res apply =
   match Apply.continuation apply with
   | Never_returns ->
     (* Case 1 *)
-    let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
+    let wrap, _, res = Env.flush_delayed_lets ~mode:Flush_everything env res in
     let cmm, free_vars, symbol_inits =
       wrap call free_vars Env.Symbol_inits.empty
     in
@@ -1003,7 +1012,7 @@ and apply_expr env res apply =
       if List.compare_lengths apply_result_arity param_types = 0
       then
         let wrap, _, res =
-          Env.flush_delayed_lets ~mode:Branching_point env res
+          Env.flush_delayed_lets ~mode:Flush_everything env res
         in
         let cmm, free_vars, symbol_inits =
           wrap call free_vars Env.Symbol_inits.empty
@@ -1016,7 +1025,9 @@ and apply_expr env res apply =
           param_types Apply.print apply
     | Jump { param_types = _; cont } ->
       (* Case 2 *)
-      let wrap, _, res = Env.flush_delayed_lets ~mode:Branching_point env res in
+      let wrap, _, res =
+        Env.flush_delayed_lets ~mode:Flush_everything env res
+      in
       let cmm, free_vars, symbol_inits =
         wrap (C.cexit cont [call] []) free_vars Env.Symbol_inits.empty
       in

@@ -31,7 +31,6 @@ type error =
   | Unsupported_vector_in_product_array
   | Mixed_product_array of Jkind.Sort.Const.t * type_expr
   | Unsupported_void_in_array
-  | Product_iarrays_unsupported
   | Opaque_array_non_value of
       { array_type: type_expr;
         elt_kinding_failure: (type_expr * Jkind.Violation.t) option }
@@ -121,7 +120,8 @@ let type_sort ~why env loc ty =
    products and in the latter it would be wasteful to compute that information,
    so this type is polymorphic in what it remembers about products. *)
 type 'a classification =
-  | Int   (* any immediate type *)
+  | Immediate
+  | Immediate_or_null
   | Float
   | Void
   | Unboxed_float of unboxed_float
@@ -139,11 +139,10 @@ let classify ~classify_product env ty sort : _ classification =
   let ty = scrape_ty env ty in
   match (sort : Jkind.Sort.Const.t) with
   | Base Value -> begin
-  (* CR or_null: [immediate_or_null] arrays can be intarrays once that is
-     supported by the middle-end *)
   if Ctype.is_always_gc_ignorable env ty
-    && Ctype.check_type_nullability env ty Non_null
-  then Int
+  then
+    if Ctype.check_type_nullability env ty Non_null
+    then Immediate else Immediate_or_null
   else match get_desc ty with
   | Tvar _ | Tunivar _ ->
       Any
@@ -278,7 +277,8 @@ let array_kind_of_elt ~elt_sort env loc ty =
     else Paddrarray
   | Float -> if Config.flat_float_array then Pfloatarray else Paddrarray
   | Addr | Lazy -> Paddrarray
-  | Int -> Pintarray
+  | Immediate -> Pintarray
+  | Immediate_or_null -> Pgcignorableaddrarray
   | Unboxed_float f -> Punboxedfloatarray f
   | Unboxed_int Untagged_int -> Punboxedoruntaggedintarray Untagged_int
   | Unboxed_int Unboxed_int64 -> Punboxedoruntaggedintarray Unboxed_int64
@@ -294,18 +294,9 @@ let array_kind_of_elt ~elt_sort env loc ty =
 
 let array_type_kind ~elt_sort ~elt_ty env loc ty =
   match scrape_poly env ty with
-  | Tconstr(p, [elt_ty], _) when Path.same p Predef.path_array ->
+  | Tconstr(p, [elt_ty], _) when Path.same p Predef.path_array
+                              || Path.same p Predef.path_iarray ->
       array_kind_of_elt ~elt_sort env loc elt_ty
-  | Tconstr(p, [elt_ty], _) when Path.same p Predef.path_iarray ->
-      let kind = array_kind_of_elt ~elt_sort env loc elt_ty in
-      (* CR layouts v7.1: allow iarrays of products. *)
-      begin match kind with
-      | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
-        raise (Error (loc, Product_iarrays_unsupported))
-      | Pgenarray | Paddrarray | Pintarray | Pfloatarray | Punboxedfloatarray _
-      | Punboxedoruntaggedintarray _ | Punboxedvectorarray _  ->
-        kind
-      end
   | Tconstr(p, [], _) when Path.same p Predef.path_floatarray ->
       Pfloatarray
   | _ ->
@@ -1150,7 +1141,7 @@ let lazy_val_requires_forward env loc ty =
   | Unboxed_float _ | Unboxed_int _ | Unboxed_vector _ | Void ->
     Misc.fatal_error "Unboxed value encountered inside lazy expression"
   | Float -> Config.flat_float_array
-  | Addr | Int -> false
+  | Addr | Immediate | Immediate_or_null -> false
   | Product _ -> assert false (* because [classify_product] raises *)
 
 (** The compilation of the expression [lazy e] depends on the form of e:
@@ -1179,32 +1170,6 @@ let classify_lazy_argument : Typedtree.expression ->
        `Identifier `Other
     | _ ->
        `Other
-
-let value_kind_union (k1 : Lambda.value_kind) (k2 : Lambda.value_kind) =
-  if Lambda.equal_value_kind k1 k2 then k1
-    (* CR vlaviron: we could be more precise by comparing nullability and
-       raw kinds separately *)
-  else Lambda.generic_value
-
-let rec layout_union l1 l2 =
-  match l1, l2 with
-  | Pbottom, l
-  | l, Pbottom -> l
-  | Pvalue layout1, Pvalue layout2 ->
-      Pvalue (value_kind_union layout1 layout2)
-  | Punboxed_float f1, Punboxed_float f2 ->
-      if Primitive.equal_unboxed_float f1 f2 then l1 else Ptop
-  | Punboxed_or_untagged_integer bi1, Punboxed_or_untagged_integer bi2 ->
-      if Primitive.equal_unboxed_or_untagged_integer bi1 bi2 then l1 else Ptop
-  | Punboxed_vector vi1, Punboxed_vector vi2 ->
-      if Primitive.equal_unboxed_vector vi1 vi2 then l1 else Ptop
-  | Punboxed_product layouts1, Punboxed_product layouts2 ->
-      if List.compare_lengths layouts1 layouts2 <> 0 then Ptop
-      else Punboxed_product (List.map2 layout_union layouts1 layouts2)
-  | (Ptop | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _ |
-     Punboxed_vector _ | Punboxed_product _),
-    _ ->
-      Ptop
 
 (* Error report *)
 open Format
@@ -1304,9 +1269,6 @@ let report_error ppf = function
          contained abstract types as [mod external] may resolve this error.@]"
         Printtyp.type_expr elt_ty
         Jkind.Sort.Const.format const
-  | Product_iarrays_unsupported ->
-      fprintf ppf
-        "Immutable arrays of unboxed products are not yet supported."
   | Opaque_array_non_value { array_type; elt_kinding_failure }  ->
       begin match elt_kinding_failure with
       | Some (ty, err) ->

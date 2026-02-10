@@ -255,7 +255,7 @@ let emit_call s = I.call (rel_plt s)
 
 let emit_jump s = I.jmp (rel_plt s)
 
-let domain_field f = mem64 QWORD (Domainstate.idx_of_field f * 8) R14
+let domain_field f = mem64 QWORD (Domainstate.idx_of_field f * 8) (Scalar R14)
 
 let emit_cmm_symbol (s : Cmm.symbol) =
   let sym = S.create s.sym_name in
@@ -388,11 +388,11 @@ let reg : Reg.t -> X86_ast.arg =
   | { loc = Reg.Reg r; typ = ty; _ } -> register_name ty r
   | { loc = Stack (Domainstate n); typ = ty; _ } ->
     let ofs = n + (Domainstate.(idx_of_field Domain_extra_params) * 8) in
-    mem64 (x86_data_type_for_stack_slot ty) ofs R14
+    mem64 (x86_data_type_for_stack_slot ty) ofs (Scalar R14)
   | { loc = Stack ((Reg.Local _ | Incoming _ | Outgoing _) as s); typ = ty; _ }
     as r ->
     let ofs = slot_offset s (Stack_class.of_machtype r.typ) in
-    mem64 (x86_data_type_for_stack_slot ty) ofs RSP
+    mem64 (x86_data_type_for_stack_slot ty) ofs (Scalar RSP)
   | { loc = Unknown; _ } -> assert false
 
 let reg64 = function
@@ -414,7 +414,8 @@ let reg_low_32_name = Array.map (fun r -> X86_ast.Reg32 r) int_reg_name
 let emit_subreg tbl typ r =
   match r.loc with
   | Reg.Reg r when r < 13 -> tbl.(r)
-  | Stack s -> mem64 typ (slot_offset s (Stack_class.of_machtype r.Reg.typ)) RSP
+  | Stack s ->
+    mem64 typ (slot_offset s (Stack_class.of_machtype r.Reg.typ)) (Scalar RSP)
   | Reg _ | Unknown -> assert false
 
 let arg8 i n = emit_subreg reg_low_8_name BYTE i.arg.(n)
@@ -438,6 +439,14 @@ let narrow_to_xmm : X86_ast.arg -> X86_ast.arg = function
     | Mem _ | Mem64_RIP _ ) as res ->
     res
 
+let arg_idx i n : X86_ast.reg_idx =
+  match arg i n with
+  | Reg64 reg -> Scalar reg
+  | Regf reg -> Vector reg
+  | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Mem _ | Mem64_RIP _
+    ->
+    assert false
+
 let argX i n = narrow_to_xmm (reg i.arg.(n))
 
 let resX i n = narrow_to_xmm (reg i.res.(n))
@@ -452,12 +461,12 @@ let addressing addr typ i n =
       match sym_global with Global -> Global | Local -> Local
     in
     mem64_rip typ (emit_cmm_symbol_str { sym_name; sym_global }) ~ofs
-  | Iindexed d -> mem64 typ d (arg64 i n)
-  | Iindexed2 d -> mem64 typ ~base:(arg64 i n) d (arg64 i (n + 1))
-  | Iscaled (2, d) -> mem64 typ ~base:(arg64 i n) d (arg64 i n)
-  | Iscaled (scale, d) -> mem64 typ ~scale d (arg64 i n)
+  | Iindexed d -> mem64 typ d (arg_idx i n)
+  | Iindexed2 d -> mem64 typ ~base:(arg64 i n) d (arg_idx i (n + 1))
+  | Iscaled (2, d) -> mem64 typ ~base:(arg64 i n) d (arg_idx i n)
+  | Iscaled (scale, d) -> mem64 typ ~scale d (arg_idx i n)
   | Iindexed2scaled (scale, d) ->
-    mem64 typ ~scale ~base:(arg64 i n) d (arg64 i (n + 1))
+    mem64 typ ~scale ~base:(arg64 i n) d (arg_idx i (n + 1))
 
 (* Record live pointers at call points -- see Emitaux *)
 
@@ -667,7 +676,7 @@ let emit_stack_check ~size_in_bytes ~save_registers ~save_simd =
     (Domainstate.stack_ctx_words * 8) + Stack_check.stack_threshold_size
   in
   if save_registers then I.push r10;
-  I.lea (mem64 NONE (-(size_in_bytes + threshold_offset)) RSP) r10;
+  I.lea (mem64 NONE (-(size_in_bytes + threshold_offset)) (Scalar RSP)) r10;
   I.cmp (domain_field Domainstate.Domain_current_stack) r10;
   if save_registers then I.pop r10;
   I.jb (emit_asm_label_arg overflow);
@@ -1229,18 +1238,20 @@ end = struct
 
   let mov_address ~offset src dest =
     match (src : X86_ast.arg), offset with
+    | Mem { idx = Vector _; _ }, _ ->
+      Misc.fatal_error "Cannot load vectorized address."
     | ( Mem
           { scale = 1;
             base = None;
             sym = None;
             displ = 0;
-            idx;
+            idx = Scalar idx;
             arch = _;
             typ = _
           },
         0 ) ->
       I.mov (Reg64 idx) dest
-    | Mem mem, offset ->
+    | Mem ({ idx = Scalar _; _ } as mem), offset ->
       I.lea (Mem { mem with displ = mem.displ + offset }) dest
     | Mem64_RIP (ty, sym, displ), offset ->
       I.lea (Mem64_RIP (ty, sym, displ + offset)) dest
@@ -1326,11 +1337,14 @@ end = struct
     match arg with
     | Reg8L register' | Reg16 register' | Reg32 register' | Reg64 register' ->
       equal_reg64 register register'
-    | Mem { idx = register'; base = None; scale; _ } ->
+    | Mem { idx = Scalar register'; base = None; scale; _ } ->
       scale <> 0 && equal_reg64 register register'
-    | Mem { idx = register'; base = Some register''; _ } ->
+    | Mem { idx = Scalar register'; base = Some register''; _ } ->
       equal_reg64 register register' || equal_reg64 register register''
-    | Imm _ | Sym _ | Reg8H _ | Regf _ | Mem64_RIP (_, _, _) -> false
+    | Mem { idx = Vector _; _ }
+    | Regf _ | Imm _ | Sym _ | Reg8H _
+    | Mem64_RIP (_, _, _) ->
+      false
 
   (* The C code snippets in the comments throughout this function refer to the
      implementation given in
@@ -1367,7 +1381,7 @@ end = struct
     (* These constants come from
        [https://github.com/google/sanitizers/wiki/AddressSanitizerAlgorithm#64-bit]. *)
     I.shr (int 3) r11;
-    let shadow_address = mem64 BYTE 0x7FFF8000 R11 in
+    let shadow_address = mem64 BYTE 0x7FFF8000 (Scalar R11) in
     let () =
       if not (Memory_chunk_size.is_small memory_chunk_size)
       then (
@@ -1617,54 +1631,63 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
     | First_arg ->
       assert (Reg.same_loc instr.arg.(0) instr.res.(0));
       1
-    | Res { loc; _ } ->
-      assert_loc loc instr.res.(0);
-      1
+    | Res rr ->
+      Array.iteri
+        (fun i ({ loc; _ } : Simd.arg) -> assert_loc loc instr.res.(i))
+        rr;
+      Array.length rr
   in
   assert (res_used = Array.length instr.res)
 
 let to_arg_with_width loc instr i =
   match Simd.loc_register_width loc with
-  | Some Eight -> arg8 instr i
-  | Some Sixteen -> arg16 instr i
-  | Some Thirtytwo -> arg32 instr i
-  | Some (Sixtyfour | Onetwentyeight | Twofiftysix) | None -> arg instr i
+  | Some R8 -> arg8 instr i
+  | Some R16 -> arg16 instr i
+  | Some R32 -> arg32 instr i
+  | Some (R64 | R128 | R256) | None -> arg instr i
 
 let to_res_with_width loc instr i =
   match Simd.loc_register_width loc with
-  | Some Eight -> res8 instr i
-  | Some Sixteen -> res16 instr i
-  | Some Thirtytwo -> res32 instr i
-  | Some (Sixtyfour | Onetwentyeight | Twofiftysix) | None -> res instr i
+  | Some R8 -> res8 instr i
+  | Some R16 -> res16 instr i
+  | Some R32 -> res32 instr i
+  | Some (R64 | R128 | R256) | None -> res instr i
 
 let to_addr_width loc : X86_ast.data_type =
   match Simd.loc_memory_width loc with
-  | Simd.Eight -> BYTE
-  | Sixteen -> WORD
-  | Thirtytwo -> DWORD
-  | Sixtyfour -> QWORD
-  | Onetwentyeight -> VEC128
-  | Twofiftysix -> VEC256
+  | M8 -> BYTE
+  | M16 -> WORD
+  | M32 -> DWORD
+  | M64 -> QWORD
+  | M128 -> VEC128
+  | M256 -> VEC256
+  | M32X | M32Y | M64X | M64Y ->
+    (* Will not be used by the assembler. *)
+    NONE
 
-(* Conservatively assumes unaligned memory. This means ASAN checks are slower
-   than they could be if we were sure the input address is aligned. *)
-let to_memory_chunk loc : Cmm.memory_chunk =
-  match Simd.loc_memory_width loc with
-  | Simd.Eight -> Byte_unsigned
-  | Sixteen -> Sixteen_unsigned
-  | Thirtytwo -> Thirtytwo_unsigned
-  | Sixtyfour -> Word_int
-  | Onetwentyeight -> Onetwentyeight_unaligned
-  | Twofiftysix -> Twofiftysix_unaligned
-
-let emit_simd_sanitize ~address ~instr ~chunk ~kind =
+let emit_simd_sanitize ~address ~instr ~loc ~kind =
   if Config.with_address_sanitizer && !Arch.is_asan_enabled
   then
-    (* May duplicate dependencies, including anything in [address]. *)
-    let arg = Array.init (Array.length instr.arg) (fun i -> arg instr i) in
-    let res = Array.init (Array.length instr.res) (fun i -> res instr i) in
-    let dependencies = Array.append arg res in
-    Address_sanitizer.emit_sanitize ~dependencies ~instr ~address chunk kind
+    let chunk : Cmm.memory_chunk option =
+      match Simd.loc_memory_width loc with
+      | M8 -> Some Byte_unsigned
+      | M16 -> Some Sixteen_unsigned
+      | M32 -> Some Thirtytwo_unsigned
+      | M64 -> Some Word_int
+      (* Conservatively assumes unaligned memory; generates slower checks. *)
+      | M128 -> Some Onetwentyeight_unaligned
+      | M256 -> Some Twofiftysix_unaligned
+      (* We do not sanitize gather/scatter instructions. *)
+      | M32X | M32Y | M64X | M64Y -> None
+    in
+    match chunk with
+    | None -> ()
+    | Some chunk ->
+      (* May duplicate dependencies, including anything in [address]. *)
+      let arg = Array.init (Array.length instr.arg) (fun i -> arg instr i) in
+      let res = Array.init (Array.length instr.res) (fun i -> res instr i) in
+      let dependencies = Array.append arg res in
+      Address_sanitizer.emit_sanitize ~dependencies ~instr ~address chunk kind
   else ()
 
 let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
@@ -1678,10 +1701,9 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
           match Simd.loc_allows_mem arg.loc, mode with
           | true, Some (mode, kind) ->
             let n = num_args_addressing mode in
-            let width = to_addr_width arg.loc in
-            let chunk = to_memory_chunk arg.loc in
-            let address = addressing mode width instr idx in
-            emit_simd_sanitize ~address ~instr ~chunk ~kind;
+            let typ = to_addr_width arg.loc in
+            let address = addressing mode typ instr idx in
+            emit_simd_sanitize ~address ~instr ~loc:arg.loc ~kind;
             idx + n, address :: args
           | _ -> idx + 1, to_arg_with_width arg.loc instr idx :: args)
       (0, []) simd.args
@@ -1689,11 +1711,16 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
   in
   let args =
     match simd.res with
-    | Res_none | First_arg | Res { enc = Implicit | Immediate; _ } -> args
-    | Res { loc; enc = RM_r | RM_rm | Vex_v } -> (
-      match Simd.loc_is_pinned loc with
-      | Some _ -> args
-      | None -> to_res_with_width loc instr 0 :: args)
+    | Res_none | First_arg -> args
+    | Res rr ->
+      Array.fold_left
+        (fun (idx, acc) ({ loc; enc } : Simd.arg) ->
+          match enc with
+          | Implicit | Immediate -> idx, acc
+          | RM_r | RM_rm | Vex_v ->
+            idx + 1, to_res_with_width loc instr idx :: acc)
+        (0, args) rr
+      |> snd
   in
   let args =
     match imm with
@@ -1712,7 +1739,7 @@ let emit_implicit_simd_sanitize (op : Simd.operation) instr =
     match[@warning "-4"] simd.id with
     | Maskmovdqu | Vmaskmovdqu ->
       let address = addressing identity_addressing VEC128 instr 2 in
-      emit_simd_sanitize ~address ~instr ~chunk:Onetwentyeight_unaligned
+      emit_simd_sanitize ~address ~instr ~loc:(Temp [| M128 |])
         ~kind:Store_modify
     | _ ->
       (* Must handle all impure cases in [Simd.class_of_operation] *)
@@ -1894,7 +1921,7 @@ let emit_instr ~first ~fallthrough i =
        && (Config.runtime5 || not (Cmm.equal_stack_align stack_align Align_16))
     then (
       I.mov rsp r13;
-      I.lea (mem64 QWORD stack_ofs RSP) r12;
+      I.lea (mem64 QWORD stack_ofs (Scalar RSP)) r12;
       load_symbol_addr (Cmm.global_symbol func) rax;
       (match stack_align with
       | Align_16 -> emit_call (Cmm.global_symbol "caml_c_call_stack_args")
@@ -2019,7 +2046,7 @@ let emit_instr ~first ~fallthrough i =
       I.jb (emit_asm_label_arg lbl_call_gc);
       let lbl_after_alloc = L.create Text in
       D.define_label lbl_after_alloc;
-      I.lea (mem64 NONE 8 R15) (res i 0);
+      I.lea (mem64 NONE 8 (Scalar R15)) (res i 0);
       call_gc_sites
         := { gc_lbl = lbl_call_gc;
              gc_return_lbl = lbl_after_alloc;
@@ -2047,7 +2074,7 @@ let emit_instr ~first ~fallthrough i =
         | Save_zmm -> emit_call (Cmm.global_symbol "caml_allocN_avx512")));
       let label = record_frame_label i.live (Dbg_alloc dbginfo) in
       D.define_label label;
-      I.lea (mem64 NONE 8 R15) (res i 0))
+      I.lea (mem64 NONE 8 (Scalar R15)) (res i 0))
   | Lop (Alloc { bytes = n; dbginfo = _; mode = Local }) ->
     let r = res i 0 in
     I.mov (domain_field Domainstate.Domain_local_sp) r;
@@ -2119,7 +2146,7 @@ let emit_instr ~first ~fallthrough i =
     instr_for_intop op (arg i 1) (res i 0)
   | Lop (Intop_imm (Iadd, n))
     when not (Reg.equal_location i.arg.(0).loc i.res.(0).loc) ->
-    I.lea (mem64 NONE n (arg64 i 0)) (res i 0)
+    I.lea (mem64 NONE n (arg_idx i 0)) (res i 0)
   | Lop (Intop_imm (Iadd, 1) | Intop_imm (Isub, -1)) -> I.inc (res i 0)
   | Lop (Intop_imm (Iadd, -1) | Intop_imm (Isub, 1)) -> I.dec (res i 0)
   | Lop (Intop_imm (op, n)) ->
@@ -2191,8 +2218,8 @@ let emit_instr ~first ~fallthrough i =
        to do this earlier, based on previous experience with similar things, but
        maybe the change should be left for later. mshinwell: The current
        situation is fine for now. *)
-    if Arch.Extension.enabled BMI
-    then I.lzcnt (arg i 0) (res i 0)
+    if Arch.Extension.enabled LZCNT
+    then I.simd lzcnt_r64_r64m64 [| arg i 0; res i 0 |]
     else if arg_is_non_zero
     then (
       (* No need to handle that bsr is undefined on 0 input. *)
@@ -2212,7 +2239,7 @@ let emit_instr ~first ~fallthrough i =
   | Lop (Intop (Ictz { arg_is_non_zero })) ->
     (* CR-someday gyorsh: can we do it at selection? *)
     if Arch.Extension.enabled BMI
-    then I.tzcnt (arg i 0) (res i 0)
+    then I.simd tzcnt_r64_r64m64 [| arg i 0; res i 0 |]
     else if arg_is_non_zero
     then
       (* No need to handle that bsf is undefined on 0 input. *)
@@ -2223,9 +2250,7 @@ let emit_instr ~first ~fallthrough i =
       I.jne (emit_asm_label_arg lbl_nz);
       I.mov (int 64) (res i 0);
       D.define_label lbl_nz
-  | Lop (Intop Ipopcnt) ->
-    assert (Arch.Extension.enabled POPCNT);
-    I.popcnt (arg i 0) (res i 0)
+  | Lop (Intop Ipopcnt) -> I.simd popcnt_r64_r64m64 [| arg i 0; res i 0 |]
   | Lop (Csel tst) ->
     let len = Array.length i.arg in
     let ifso = i.arg.(len - 2) in
@@ -2378,7 +2403,9 @@ let emit_instr ~first ~fallthrough i =
       else phys_rax, phys_rdx
     in
     I.lea (mem64_rip NONE (L.encode lbl)) (reg tmp1);
-    I.movsxd (mem64 DWORD 0 (arg64 i 0) ~scale:4 ~base:(reg64 tmp1)) (reg tmp2);
+    I.movsxd
+      (mem64 DWORD 0 (arg_idx i 0) ~scale:4 ~base:(reg64 tmp1))
+      (reg tmp2);
     I.add (reg tmp2) (reg tmp1);
     I.jmp (reg tmp1);
     let table = { table_lbl = lbl; elems = jumptbl } in
@@ -2387,7 +2414,7 @@ let emit_instr ~first ~fallthrough i =
     if fp
     then
       let delta = frame_size () - 16 (* retaddr + rbp *) in
-      I.lea (mem64 NONE delta RSP) rbp
+      I.lea (mem64 NONE delta (Scalar RSP)) rbp
   | Ladjust_stack_offset { delta_bytes } ->
     D.cfi_adjust_cfa_offset ~bytes:delta_bytes;
     stack_offset := !stack_offset + delta_bytes

@@ -78,20 +78,23 @@ let instantiate
                { compilation_unit = unit_info.ui_unit;
                  filename = cm_path;
                  base_unit = base_unit_info.ui_unit; })
-    | Some { arg_param; arg_block_idx } ->
-      arg_param, (unit_info.ui_unit, arg_block_idx)
+    | Some { arg_param; arg_block_idx; main_repr } ->
+      arg_param, (unit_info.ui_unit, arg_block_idx, main_repr)
   in
   let arg_infos = List.map arg_info_of_cm_path args in
   let arg_pairs : CU.argument list =
     List.map
-      (fun (param, (value, _)) : CU.argument ->
+      (fun (param, (value, _, _)) : CU.argument ->
          { param = CU.Name.of_parameter_name param; value })
       arg_infos
   in
-  let arg_map : (CU.t * int) Global_module.Parameter_name.Map.t =
+  let arg_map :
+      (CU.t * int * Lambda.module_representation)
+      Global_module.Parameter_name.Map.t
+    =
     match Global_module.Parameter_name.Map.of_list_checked arg_infos with
     | Ok map -> map
-    | Error (Duplicate { key; value1 = (arg1, _); value2 = (arg2, _) }) ->
+    | Error (Duplicate { key; value1 = (arg1, _, _); value2 = (arg2, _, _) }) ->
       error (Repeated_parameter { param = key; arg1; arg2 })
   in
   let compilation_unit = CU.create_instance base_compilation_unit arg_pairs in
@@ -140,14 +143,14 @@ let instantiate
     |> List.map (fun ({ param; value } : Global_module.argument) -> param, value)
     |> Global_module.Parameter_name.Map.of_list
   in
-  let runtime_params, main_module_block_size =
+  let runtime_params, main_module_block_repr =
     match base_unit_info.ui_format with
     | Mb_struct _ ->
       (* Should have raised [Not_parameterised] above *)
       Misc.fatal_errorf "No runtime parameters for %a"
         CU.print base_compilation_unit
-    | Mb_instantiating_functor { mb_runtime_params; mb_returned_size } ->
-      mb_runtime_params, mb_returned_size
+    | Mb_instantiating_functor { mb_runtime_params; mb_returned_repr } ->
+      mb_runtime_params, mb_returned_repr
   in
   let runtime_args =
     runtime_params
@@ -158,8 +161,8 @@ let instantiate
                match
                  Global_module.find_in_parameter_map global arg_map
                with
-               | Some (ra_unit, ra_field_idx) ->
-                 Argument_block { ra_unit; ra_field_idx }
+               | Some (ra_unit, ra_field_idx, ra_main_repr) ->
+                 Argument_block { ra_unit; ra_field_idx; ra_main_repr }
                | None ->
                  (* This should have been caught by
                     [Env.global_of_instance_compilation_unit] earlier *)
@@ -180,7 +183,7 @@ let instantiate
   let arg_descr = base_unit_info.ui_arg_descr in
   compile
     ~source_file:src ~output_prefix ~compilation_unit ~runtime_args
-    ~main_module_block_size ~arg_descr;
+    ~main_module_block_repr ~arg_descr;
   ()
 
 (* Error report *)

@@ -321,7 +321,7 @@ module Env = struct
 
   let find_var_approximation t var =
     try Variable.Map.find var t.value_approximations
-    with Not_found -> Value_approximation.Value_unknown
+    with Not_found -> Value_approximation.Unknown (Variable.kind var)
 
   let set_path_to_root t (path_to_root : Debuginfo.Scoped_location.t) =
     match path_to_root with
@@ -413,12 +413,18 @@ module Acc = struct
               "Closure_conversion: approximation loader returned a Symbol \
                approximation (%a) for symbol %a"
               Symbol.print sym Symbol.print symbol
-          | Value_unknown | Value_const _ | Closure_approximation _
-          | Block_approximation _ ->
+          | Unknown kind ->
+            if not (Flambda_kind.equal kind Flambda_kind.value)
+            then
+              Misc.fatal_errorf
+                "Closure_conversion: approximation loader returned an \
+                 approximation of kind %a for symbol %a"
+                Flambda_kind.print kind Symbol.print symbol
+          | Value_const _ | Closure_approximation _ | Block_approximation _ ->
             ());
         let rec filter_inlinable approx =
           match (approx : Env.value_approximation) with
-          | Value_unknown | Value_symbol _ | Value_const _ -> approx
+          | Unknown _ | Value_symbol _ | Value_const _ -> approx
           | Block_approximation (tag, shape, approxs, alloc_mode) ->
             let approxs = Array.map filter_inlinable approxs in
             Value_approximation.Block_approximation
@@ -457,7 +463,7 @@ module Acc = struct
       approximation_for_external_symbol =
         (if Flambda_features.classic_mode ()
         then approximation_loader cmx_loader
-        else fun _symbol -> Value_approximation.Value_unknown);
+        else fun _symbol -> Value_approximation.Unknown Flambda_kind.value);
       code_in_reverse_order = [];
       code_map = Code_id.Map.empty;
       free_names = Name_occurrences.empty;
@@ -501,25 +507,27 @@ module Acc = struct
             let module VA = Value_approximation in
             Simple.pattern_match'
               (Simple.With_debuginfo.simple simple_with_dbg)
-              ~var:(fun _var ~coercion:_ -> VA.Value_unknown)
+              ~var:(fun var ~coercion:_ -> VA.Unknown (Variable.kind var))
               ~symbol:(fun symbol ~coercion:_ -> VA.Value_symbol symbol)
               ~const:(fun cst -> VA.Value_const cst)
           in
           let fields = List.map approx_of_field fields |> Array.of_list in
           Block_approximation
             (tag, shape, fields, Alloc_mode.For_types.unknown ())
-        else Value_unknown
+        else Unknown Flambda_kind.value
       | Set_of_closures _ | Boxed_float _ | Boxed_float32 _ | Boxed_int32 _
       | Boxed_int64 _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
       | Boxed_nativeint _ | Immutable_float_block _
       (* For immutable float blocks, we can statically allocate them in classic
          mode, but they are not currently provided with approximations. *)
       | Immutable_float_array _ | Immutable_float32_array _
-      | Immutable_value_array _ | Empty_array _ | Immutable_int32_array _
-      | Immutable_int64_array _ | Immutable_nativeint_array _
-      | Immutable_vec128_array _ | Immutable_vec256_array _
-      | Immutable_vec512_array _ | Mutable_string _ | Immutable_string _ ->
-        Value_unknown
+      | Immutable_value_array _ | Empty_array _ | Immutable_int_array _
+      | Immutable_int8_array _ | Immutable_int16_array _
+      | Immutable_int32_array _ | Immutable_int64_array _
+      | Immutable_nativeint_array _ | Immutable_vec128_array _
+      | Immutable_vec256_array _ | Immutable_vec512_array _ | Mutable_string _
+      | Immutable_string _ ->
+        Unknown Flambda_kind.value
     in
     let symbol_approximations =
       Symbol.Map.add symbol approx t.symbol_approximations
@@ -549,7 +557,7 @@ module Acc = struct
          indirection *)
       Misc.fatal_errorf "Symbol %a approximated to symbol %a" Symbol.print
         symbol Symbol.print s
-    | Value_unknown | Closure_approximation _ | Block_approximation _
+    | Unknown _ | Closure_approximation _ | Block_approximation _
     | Value_const _ ->
       (* We need all defined symbols to be present in [symbol_approximations],
          even when their approximation is [Value_unknown] *)
@@ -994,8 +1002,9 @@ module Expr_with_acc = struct
         match Apply.call_kind apply with
         | Function { function_call = Direct _; _ } -> true
         | Function
-            { function_call = Indirect_unknown_arity | Indirect_known_arity; _ }
-          ->
+            { function_call = Indirect_unknown_arity | Indirect_known_arity _;
+              _
+            } ->
           false
         | Method _ | C_call _ | Effect _ -> false)
     in

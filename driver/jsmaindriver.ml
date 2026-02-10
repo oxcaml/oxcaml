@@ -68,10 +68,14 @@ let main argv ppf =
         Warnings.check_fatal ());
       (* Prevents outputting when using make install to dump CSVs for whole compiler.
          Example use case: scripts/profile-compiler-build.sh *)
-      if not !Clflags.dump_into_csv then
-        Compmisc.with_ppf_dump ~stdout:() ~file_prefix:"profile" (fun ppf ->
-            Profile.print ppf !Clflags.profile_columns
-              ~timings_precision:!Clflags.timings_precision);
+      (if not !Clflags.dump_into_csv then
+       let file_prefix =
+         Compmisc.get_profile_file_prefix ~expected_suffix:".dump"
+           ~default_name:"profile"
+       in
+       Compmisc.with_ppf_dump ~stdout:() ~file_prefix (fun ppf ->
+           Profile.print ppf !Clflags.profile_columns
+             ~timings_precision:!Clflags.timings_precision));
       0
   | exception x ->
       Location.report_exception ppf x;

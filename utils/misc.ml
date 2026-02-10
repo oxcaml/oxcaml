@@ -25,8 +25,8 @@ let fatal_errorf fmt =
 
 let fatal_error msg = fatal_errorf "%s" msg
 
-let unboxed_small_int_arrays_are_not_implemented () =
-  fatal_error "unboxed int8/int16 and untagged int arrays are not implemented"
+let splices_should_not_exist_after_eval () =
+  fatal_error "slambda splices should not exist in lambda after slambda eval"
 
 (* Exceptions *)
 
@@ -786,11 +786,19 @@ let output_to_file_via_temporary ?(mode = [Open_text]) filename fn =
   | exception exn ->
       close_out oc; remove_file temp_filename; raise exn
 
-let protect_writing_to_file ~filename ~f =
+let successful_output_files = ref []
+
+let protect_output_to_file filename f =
   let outchan = open_out_bin filename in
   try_finally ~always:(fun () -> close_out outchan)
     ~exceptionally:(fun () -> remove_file filename)
-    (fun () -> f outchan)
+    (fun () ->
+      let a = f outchan in
+      successful_output_files := filename :: !successful_output_files;
+      a)
+
+let remove_successful_output_files () =
+  List.iter remove_file !successful_output_files; successful_output_files := []
 
 let prng = lazy(Random.State.make_self_init ())
 
@@ -2025,6 +2033,12 @@ module Json = struct
   let string value = escape_unicode value
 
   let int value = string_of_int value
+
+  (* Use %.17g instead of string_of_float to avoid invalid JSON output.
+     [string_of_float] can produce "1." for whole numbers, which is not valid
+     JSON. %.17g provides full double precision and produces valid JSON
+     numbers. *)
+  let float value = Printf.sprintf "%.17g" value
 
   let object_ fields =
     let field_strings = String.concat ",\n" fields in

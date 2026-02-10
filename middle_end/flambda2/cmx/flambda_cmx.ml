@@ -63,7 +63,7 @@ let load_symbol_approx loader symbol : Code_or_metadata.t Value_approximation.t
     =
   let comp_unit = Symbol.compilation_unit symbol in
   match load_cmx_file_contents loader comp_unit with
-  | None -> Value_unknown
+  | None -> Unknown Flambda_kind.value
   | Some typing_env ->
     let find_code code_id =
       match Exported_code.find loader.imported_code code_id with

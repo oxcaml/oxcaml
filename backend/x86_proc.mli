@@ -33,6 +33,10 @@ val string_of_reg64 : reg64 -> string
 
 val string_of_regf : regf -> string
 
+val string_of_gpr : arch -> reg64 -> string
+
+val string_of_reg_idx : arch -> reg_idx -> string
+
 val string_of_substring_literal : int -> int -> string -> string
 
 val string_of_string_literal : string -> string

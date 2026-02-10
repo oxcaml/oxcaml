@@ -1,0 +1,30 @@
+
+After simplify:
+let code f_0 deleted in
+let code g_1 deleted in
+let code loopify(never) size(2) newer_version_of(f_0)
+      f_0_1 (b : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let not_scrutinee = %not b in
+  cont k (not_scrutinee)
+in
+let $camlCode_size_of_boolean_not_switch__f_2 = closure f_0_1 @f in
+let code loopify(never) size(4) newer_version_of(g_1)
+      g_1_1 (b : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(f_0_1)
+    ($camlCode_size_of_boolean_not_switch__f_2 : _ -> imm tagged)
+      (b)
+      -> k * k1
+in
+let $camlCode_size_of_boolean_not_switch__g_3 = closure g_1_1 @g in
+let $camlCode_size_of_boolean_not_switch =
+  Block 0 ($camlCode_size_of_boolean_not_switch__f_2,
+           $camlCode_size_of_boolean_not_switch__g_3)
+in
+cont done ($camlCode_size_of_boolean_not_switch)
+

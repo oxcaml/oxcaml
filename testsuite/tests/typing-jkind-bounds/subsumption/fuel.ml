@@ -37,6 +37,24 @@ Error: The kind of type "int list list list list list list list list list list
        as it is very large or deeply recursive.
 |}]
 
+type 'a t : immutable_data with 'a = 'a list list list list list list list list list list list list list
+[%%expect {|
+Line 1, characters 0-104:
+1 | type 'a t : immutable_data with 'a = 'a list list list list list list list list list list list list list
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "'a list list list list list list list list list list
+                        list list list" is
+           immutable_data
+             with 'a list list list list list list list list list list list list
+         because it's a boxed variant type.
+       But the kind of type "'a list list list list list list list list list
+                            list list list list" must be a subkind of
+           immutable_data with 'a
+         because of the definition of t at line 1, characters 0-104.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
+|}]
+
 (* Differences in fuel consumption do not cause errors for module inclusion check
    when both types have manifests *)
 module M : sig

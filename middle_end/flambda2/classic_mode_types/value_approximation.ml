@@ -17,7 +17,7 @@
 (** Approximations used for cross-module inlining in Closure_conversion *)
 
 type 'code t =
-  | Value_unknown
+  | Unknown of Flambda_kind.t
   | Value_symbol of Symbol.t
   | Value_const of Reg_width_const.t
   | Closure_approximation of
@@ -33,7 +33,7 @@ type 'code t =
       * Alloc_mode.For_types.t
 
 let rec print fmt = function
-  | Value_unknown -> Format.fprintf fmt "?"
+  | Unknown _ -> Format.fprintf fmt "?"
   | Value_symbol sym -> Symbol.print fmt sym
   | Value_const i -> Reg_width_const.print fmt i
   | Closure_approximation { code_id; _ } ->
@@ -51,14 +51,14 @@ let rec print fmt = function
       Format.fprintf fmt "}@]")
 
 let is_unknown = function
-  | Value_unknown -> true
+  | Unknown _ -> true
   | Value_symbol _ | Value_const _ | Closure_approximation _
   | Block_approximation _ ->
     false
 
 let rec free_names ~code_free_names approx =
   match approx with
-  | Value_unknown | Value_const _ -> Name_occurrences.empty
+  | Unknown _ | Value_const _ -> Name_occurrences.empty
   | Value_symbol sym -> Name_occurrences.singleton_symbol sym Name_mode.normal
   | Block_approximation (_tag, _shape, approxs, _) ->
     Array.fold_left

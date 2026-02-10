@@ -270,6 +270,14 @@ let string_of_regf = function
   | YMM n -> Printf.sprintf "ymm%d" n
   | ZMM n -> Printf.sprintf "zmm%d" n
 
+let string_of_gpr arch reg =
+  match arch with X86 -> string_of_reg32 reg | X64 -> string_of_reg64 reg
+
+let string_of_reg_idx arch reg_idx =
+  match reg_idx with
+  | Scalar reg -> string_of_gpr arch reg
+  | Vector reg -> string_of_regf reg
+
 let string_of_condition = function
   | E -> "e"
   | AE -> "ae"

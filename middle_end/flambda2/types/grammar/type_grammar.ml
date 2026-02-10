@@ -3287,6 +3287,9 @@ module Closures_entry = struct
     | Unknown -> Unknown
     | Known func_decl -> Ok func_decl
 
+  let function_slot_types { closure_types; _ } =
+    closure_types.function_slot_components_by_index
+
   let value_slot_types { value_slot_types; _ } =
     value_slot_types.value_slot_components_by_index
 end

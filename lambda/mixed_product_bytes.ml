@@ -60,6 +60,8 @@ let rec count (el : _ Lambda.mixed_block_element) : t =
   | Vec512 -> { value = 0; flat = 64 }
   | Product layouts ->
     Array.fold_left (fun cts l -> add cts (count l)) zero layouts
+  | Splice_variable _ ->
+    Misc.fatal_error "Mixed_product_bytes_count: layout poly not supported"
 
 let has_value_and_flat { value; flat } = value > 0 && flat > 0
 
@@ -83,7 +85,10 @@ module Wrt_path = struct
       | Product shape -> count_shape_wrt_path shape i path_rest
       | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
       | Bits64 | Word | Vec128 | Vec256 | Vec512 | Untagged_immediate ->
-        Misc.fatal_error "Mixed_product_bytes_wrt_path: bad mixed block path")
+        Misc.fatal_error "Mixed_product_bytes_wrt_path: bad mixed block path"
+      | Splice_variable _ ->
+        Misc.fatal_error
+          "Mixed_product_bytes_wrt_path: layout poly not supported")
 
   and count_shape_wrt_path (shape : Lambda.mixed_block_shape) pos path =
     let _, totals =

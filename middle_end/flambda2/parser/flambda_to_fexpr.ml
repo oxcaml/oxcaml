@@ -459,7 +459,8 @@ let rec subkind (k : Flambda_kind.With_subkind.Non_null_value_subkind.t) :
   | Value_array -> Value_array
   | Generic_array -> Generic_array
   | Float_block { num_fields } -> Float_block { num_fields }
-  | Unboxed_float32_array | Unboxed_int32_array | Unboxed_int64_array
+  | Unboxed_float32_array | Untagged_int_array | Untagged_int8_array
+  | Untagged_int16_array | Unboxed_int32_array | Unboxed_int64_array
   | Unboxed_nativeint_array | Unboxed_vec128_array | Unboxed_vec256_array
   | Unboxed_vec512_array | Unboxed_product_array ->
     Misc.fatal_error
@@ -637,10 +638,12 @@ let binop env (op : Flambda_primitive.binary_primitive) : Fexpr.binop =
 let fexpr_of_array_kind : Flambda_primitive.Array_kind.t -> Fexpr.array_kind =
   function
   | Immediates -> Immediates
+  | Gc_ignorable_values -> Gc_ignorable_values
   | Naked_floats -> Naked_floats
   | Values -> Values
-  | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-  | Naked_vec128s | Naked_vec256s | Naked_vec512s | Unboxed_product _ ->
+  | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
+  | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
+  | Naked_vec512s | Unboxed_product _ ->
     Misc.fatal_error
       "fexpr support for arrays of unboxed elements not yet implemented"
 
@@ -649,10 +652,12 @@ let fexpr_of_array_set_kind env
     =
   match array_set_kind with
   | Immediates -> Immediates
+  | Gc_ignorable_values -> Gc_ignorable_values
   | Naked_floats -> Naked_floats
   | Values ia -> Values (init_or_assign env ia)
-  | Naked_float32s | Naked_int32s | Naked_int64s | Naked_nativeints
-  | Naked_vec128s | Naked_vec256s | Naked_vec512s ->
+  | Naked_float32s | Naked_ints | Naked_int8s | Naked_int16s | Naked_int32s
+  | Naked_int64s | Naked_nativeints | Naked_vec128s | Naked_vec256s
+  | Naked_vec512s ->
     Misc.fatal_error
       "fexpr support for arrays of unboxed elements not yet implemented"
 
@@ -784,10 +789,10 @@ let static_const env (sc : Static_const.t) : Fexpr.static_data =
     Immutable_float_array (List.map (or_variable float env) elements)
   | Immutable_value_array elements ->
     Immutable_value_array (List.map (field_of_block env) elements)
-  | Immutable_float32_array _ | Immutable_int32_array _
-  | Immutable_int64_array _ | Immutable_nativeint_array _
-  | Immutable_vec128_array _ | Immutable_vec256_array _
-  | Immutable_vec512_array _ ->
+  | Immutable_float32_array _ | Immutable_int_array _ | Immutable_int8_array _
+  | Immutable_int16_array _ | Immutable_int32_array _ | Immutable_int64_array _
+  | Immutable_nativeint_array _ | Immutable_vec128_array _
+  | Immutable_vec256_array _ | Immutable_vec512_array _ ->
     Misc.fatal_error
       "fexpr support for arrays of unboxed elements not yet implemented"
   | Empty_array array_kind -> Empty_array array_kind
@@ -1123,7 +1128,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
       let alloc = alloc_mode_for_applications env alloc_mode in
       Function (Direct { code_id; function_slot; alloc })
     | Function
-        { function_call = Indirect_unknown_arity | Indirect_known_arity;
+        { function_call = Indirect_unknown_arity | Indirect_known_arity _;
           alloc_mode
         } ->
       let alloc = alloc_mode_for_applications env alloc_mode in
@@ -1136,7 +1141,7 @@ and apply_expr env (app : Apply_expr.t) : Fexpr.expr =
   let return_arity = Apply_expr.return_arity app in
   let arities : Fexpr.function_arities option =
     match Apply_expr.call_kind app with
-    | Function { function_call = Indirect_known_arity; alloc_mode = _ } ->
+    | Function { function_call = Indirect_known_arity _; alloc_mode = _ } ->
       let params_arity = Some (complex_arity param_arity) in
       let ret_arity = arity return_arity in
       Some { params_arity; ret_arity }

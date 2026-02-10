@@ -25,12 +25,14 @@ open! Typedtree
    they will simply lead to the resulting external declaration not showing up in
    the extracted list of external declarations. *)
 type unsupported_feature =
-  | MixedRecords
-  | UnboxedProductRecords
-  | ExtensibleVariants
-  | WithNullVariants
+  | Mixed_records
+  | Unboxed_product_records
+  | Extensible_variants
+  | With_null_variants
+  | Unboxed_products
+  | Other of string
 
-exception VicunaUnsupported of unsupported_feature
+exception Vicuna_unsupported of unsupported_feature
 
 (* Helper utility for debugging. *)
 let _pp_type fmt ty =
@@ -138,10 +140,21 @@ let classify env ty : classification =
              Maybe we should emit a warning. *)
           Any)
     | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _ | Tnil | Tvariant _ -> Addr
-    | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _ | Tof_kind _
-    | Tquote _ | Tsplice _ ->
-      (* None of these should occur in the arguments to an external function. *)
-      assert false
+    | Tlink _ ->
+      raise (Vicuna_unsupported (Other "Unexpected type constructor Tlink"))
+    | Tsubst _ ->
+      raise (Vicuna_unsupported (Other "Unexpected type constructor Tsubst"))
+    | Tpoly _ ->
+      raise (Vicuna_unsupported (Other "Unexpected type constructor Tpoly"))
+    | Tfield _ ->
+      raise (Vicuna_unsupported (Other "Unexpected type constructor Tfield"))
+    | Tunboxed_tuple _ -> raise (Vicuna_unsupported Unboxed_products)
+    | Tof_kind _ ->
+      raise (Vicuna_unsupported (Other "Unexpected type constructor Tof_kind"))
+    | Tquote _ ->
+      raise (Vicuna_unsupported (Other "Unexpected type constructor Tquote"))
+    | Tsplice _ ->
+      raise (Vicuna_unsupported (Other "Unexpected type constructor Tsplice"))
 
 type can_be_float_array =
   | YesFloatArray
@@ -162,8 +175,6 @@ let array_type_kind env ty =
     (* This can happen with e.g. Obj.field *)
     MaybeFloatArray
 
-(* Invariant:
-   [value_kind] functions may only be called on types with layout  value. *)
 let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
     value_shape =
   let[@inline] cannot_proceed () =
@@ -224,7 +235,7 @@ let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
           value_kind env subst ~visited ~depth ld_type
         | Type_record_unboxed_product
             (([] | _ :: _ :: _), Record_unboxed_product, _) ->
-          raise (VicunaUnsupported UnboxedProductRecords)
+          raise (Vicuna_unsupported Unboxed_product_records)
         | Type_abstract _ -> Value
         | Type_open ->
           (* open types are variants so should always
@@ -253,26 +264,45 @@ let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
     then Value
     else
       match lookup_subst (get_id ty) subst with None -> Value | Some sh -> sh)
-  | Tpoly _ -> assert false (* handled by [scrape_ty] currently *)
-  | Tfield _ | Tnil | Tlink _ | Tsubst _ | Tof_kind _ | Tunboxed_tuple _
-  | Tquote _ | Tsplice _ ->
-    (* NOTE: we should never encounter those in an external declaration *)
-    assert false
+  | Tpoly _ ->
+    raise
+      (Vicuna_unsupported
+         (Other
+            "Unexpected type constructor Tpoly; should have been handled by \
+             [scrape_ty]"))
+  | Tfield _ ->
+    raise (Vicuna_unsupported (Other "Unexpected type constructor Tfield"))
+  | Tnil ->
+    raise (Vicuna_unsupported (Other "Unexpected type constructor Tnil"))
+  | Tlink _ ->
+    raise (Vicuna_unsupported (Other "Unexpected type constructor Tlink"))
+  | Tsubst _ ->
+    raise (Vicuna_unsupported (Other "Unexpected type constructor Tsubst"))
+  | Tof_kind _ ->
+    raise (Vicuna_unsupported (Other "Unexpected type constructor Tof_kind"))
+  | Tunboxed_tuple _ -> raise (Vicuna_unsupported Unboxed_products)
+  | Tquote _ ->
+    raise (Vicuna_unsupported (Other "Unexpected type constructor Tquote"))
+  | Tsplice _ ->
+    raise (Vicuna_unsupported (Other "Unexpected type constructor Tsplice"))
   | Tpackage _ -> Block None
 
 and value_kind_variant env subst ~visited ~depth
     (cstrs : Types.constructor_declaration list) rep =
   match rep with
-  | Variant_extensible -> raise (VicunaUnsupported ExtensibleVariants)
-  | Variant_with_null -> raise (VicunaUnsupported WithNullVariants)
+  | Variant_extensible -> raise (Vicuna_unsupported Extensible_variants)
+  | Variant_with_null -> raise (Vicuna_unsupported With_null_variants)
   | Variant_unboxed -> (
     match cstrs with
     | [{ cd_args = Cstr_tuple [{ ca_type = ty; _ }]; _ }]
     | [{ cd_args = Cstr_record [{ ld_type = ty; _ }]; _ }] ->
       value_kind env subst ~visited ~depth ty
     | _ ->
-      (* Unboxed records should have only one field. *)
-      assert false)
+      raise
+        (Vicuna_unsupported
+           (Other
+              "Unboxed variant should have exactly one constructor with one \
+               field")))
   | Variant_boxed _layouts ->
     let depth = depth + 1 in
     let for_one_constructor (constructor : Types.constructor_declaration) ~depth
@@ -316,7 +346,11 @@ and value_kind_variant env subst ~visited ~depth
       in
       let sh =
         match non_consts with
-        | [] -> assert false (* See [List.for_all is_constant], above *)
+        | [] ->
+          raise
+            (Vicuna_unsupported
+               (Other "Expected at least one non-constant constructor"))
+          (* See [List.for_all is_constant], above *)
         | sh :: shs ->
           let shapes = List.fold_left (fun a b -> Or (a, b)) sh shs in
           shapes
@@ -327,14 +361,17 @@ and value_kind_record env subst ~visited ~depth
     (labels : Types.label_declaration list) rep =
   match rep with
   | Record_mixed _ ->
-    raise (VicunaUnsupported MixedRecords)
+    raise (Vicuna_unsupported Mixed_records)
     (* TODO: To support these, we'll need to stop calling
        [value_kind] on all fields. *)
-  | Record_inlined (Null, _, _) -> raise (VicunaUnsupported WithNullVariants)
+  | Record_inlined (Null, _, _) -> raise (Vicuna_unsupported With_null_variants)
   | Record_unboxed | Record_inlined (_, _, Variant_unboxed) -> (
     match labels with
     | [{ ld_type; _ }] -> value_kind env subst ~visited ~depth ld_type
-    | [] | _ :: _ :: _ -> assert false)
+    | [] | _ :: _ :: _ ->
+      raise
+        (Vicuna_unsupported
+           (Other "Unboxed record should have exactly one field")))
   | _ ->
     let fields =
       List.map
@@ -349,9 +386,13 @@ and value_kind_record env subst ~visited ~depth
       | Record_float -> FloatArray
       | Record_boxed _ -> Block (Some (0, fields))
       | Record_inlined (Extension _, _, _) -> Block (Some (0, fields))
-      | Record_inlined (Null, _, _) -> assert false
-      | Record_unboxed -> assert false
-      | Record_mixed _ -> assert false
+      | Record_inlined (Null, _, _) ->
+        raise (Vicuna_unsupported With_null_variants)
+      | Record_unboxed ->
+        raise
+          (Vicuna_unsupported
+             (Other "Record_unboxed should have been handled above"))
+      | Record_mixed _ -> raise (Vicuna_unsupported Mixed_records)
       | Record_ufloat -> FloatArray
     in
     non_consts
@@ -441,7 +482,7 @@ let extract_from_typed_tree tt =
     match si.str_desc with
     | Tstr_primitive prim ->
       (try extract_external_declaration outp prim
-       with VicunaUnsupported _ -> ());
+       with Vicuna_unsupported _ -> ());
       it.value_description it prim
     | _ -> default_iterator.structure_item it si
   in

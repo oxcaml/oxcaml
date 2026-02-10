@@ -14,32 +14,30 @@
 (* We only compile for 64 bits. *)
 let bytes_per_word = 8
 
-(* Tag definitions from Cmm_helpers.Unboxed_array_tags *)
+(* Tag definitions from Cmm_helpers.Unboxed_or_untagged_array_tags *)
 let unboxed_product_array_tag = 0
 let unboxed_int64_array_tag = 1
-let unboxed_int32_array_even_tag = 2
-let unboxed_int32_array_odd_tag = 3
-let unboxed_float32_array_even_tag = 4
-let unboxed_float32_array_odd_tag = 5
+let unboxed_int32_array_zero_tag = 2
+let unboxed_int32_array_one_tag = 3
+let unboxed_float32_array_zero_tag = 4
+let unboxed_float32_array_one_tag = 5
 let unboxed_vec128_array_tag = 6
 let unboxed_vec256_array_tag = 7
 let unboxed_vec512_array_tag = 8
 let unboxed_nativeint_array_tag = 9
-
-
-
-(* Tag definitions from Cmm_helpers.Unboxed_array_tags *)
-let unboxed_product_array_tag = 0
-let unboxed_int64_array_tag = 1
-let unboxed_int32_array_even_tag = 2
-let unboxed_int32_array_odd_tag = 3
-let unboxed_float32_array_even_tag = 4
-let unboxed_float32_array_odd_tag = 5
-let unboxed_vec128_array_tag = 6
-let unboxed_vec256_array_tag = 7
-let unboxed_vec512_array_tag = 8
-let unboxed_nativeint_array_tag = 9
-
+let untagged_int_array_tag = 10
+let untagged_int16_array_zero_tag = 12
+let untagged_int16_array_three_tag = 13
+let untagged_int16_array_two_tag = 14
+let untagged_int16_array_one_tag = 15
+let untagged_int8_array_zero_tag = 16
+let untagged_int8_array_seven_tag = 17
+let untagged_int8_array_six_tag = 18
+let untagged_int8_array_five_tag = 19
+let untagged_int8_array_four_tag = 20
+let untagged_int8_array_three_tag = 21
+let untagged_int8_array_two_tag = 22
+let untagged_int8_array_one_tag = 23
 
 
 external[@layout_poly] size_in_bytes : ('a : any mod separable). 'a array -> int
@@ -168,8 +166,8 @@ let check_float32u ~(init : float32#) ~element_size =
       | Native ->
         (* Tag is based on original element count, not padded count *)
         let expected_tag =
-          if n mod 2 = 0 then unboxed_float32_array_even_tag
-          else unboxed_float32_array_odd_tag in
+          if n mod 2 = 0 then unboxed_float32_array_zero_tag
+          else unboxed_float32_array_one_tag in
         assert (tag = expected_tag);
         (* Check mixed block has zero scannable fields *)
         Block_checks.check_mixed_block_scannable_size ~array_type:"float32#" (Obj.repr x) 0
@@ -203,8 +201,8 @@ let check_int32u ~(init : int32#) ~element_size =
       | Native ->
         (* Tag is based on original element count, not padded count *)
         let expected_tag =
-          if n mod 2 = 0 then unboxed_int32_array_even_tag
-          else unboxed_int32_array_odd_tag in
+          if n mod 2 = 0 then unboxed_int32_array_zero_tag
+          else unboxed_int32_array_one_tag in
         assert (tag = expected_tag);
         (* Check mixed block has zero scannable fields *)
         Block_checks.check_mixed_block_scannable_size ~array_type:"int32#" (Obj.repr x) 0
@@ -216,6 +214,123 @@ let check_int32u ~(init : int32#) ~element_size =
 let int32u_array_element_size = size_in_bytes ([||] : int32# array)
 
 let _ = check_int32u ~init:#42l ~element_size:int32u_array_element_size
+
+(* untagged int16s *)
+let check_int16u ~(init : int16#) ~element_size =
+  let check_one n =
+    let x = makearray_dynamic n init in
+    (* These arrays are packed in native code *)
+    let padded_n =
+      match Sys.backend_type with
+      | Native -> (n + 3) / 4 * 4
+      | Bytecode -> n
+      | Other _ -> failwith "Don't know what to do"
+    in
+    assert
+      ((element_size * padded_n / bytes_per_word) = (Obj.size (Obj.repr x)));
+    if n = 0 then
+      Block_checks.check_empty_array_is_uniform
+        ~array_type:"int16#" (Obj.repr x)
+    else begin
+      (* Check tag based on actual array length (n) not padded length *)
+      let tag = Obj.tag (Obj.repr x) in
+      match Sys.backend_type with
+      | Native ->
+        (* Tag is based on original element count, not padded count *)
+        let expected_tag =
+          match n mod 4 with
+          | 0 -> untagged_int16_array_zero_tag
+          | 1 -> untagged_int16_array_one_tag
+          | 2 -> untagged_int16_array_two_tag
+          | 3 -> untagged_int16_array_three_tag
+          | _ -> assert false
+        in
+        assert (tag = expected_tag);
+        (* Check mixed block has zero scannable fields *)
+        Block_checks.check_mixed_block_scannable_size
+          ~array_type:"int16#" (Obj.repr x) 0
+      | Bytecode | Other _ -> ()
+    end
+  in
+  List.iter check_one array_sizes_to_check
+
+let int16u_array_element_size = size_in_bytes ([||] : int16# array)
+
+let _ = check_int16u ~init:#42S ~element_size:int16u_array_element_size
+
+(* untagged int8s *)
+let check_int8u ~(init : int8#) ~element_size =
+  let check_one n =
+    let x = makearray_dynamic n init in
+    (* These arrays are packed in native code *)
+    let padded_n =
+      match Sys.backend_type with
+      | Native -> (n + 7) / 8 * 8
+      | Bytecode -> n
+      | Other _ -> failwith "Don't know what to do"
+    in
+    assert
+      ((element_size * padded_n / bytes_per_word) = (Obj.size (Obj.repr x)));
+    if n = 0 then
+      Block_checks.check_empty_array_is_uniform
+        ~array_type:"int8#" (Obj.repr x)
+    else begin
+      (* Check tag based on actual array length (n) not padded length *)
+      let tag = Obj.tag (Obj.repr x) in
+      match Sys.backend_type with
+      | Native ->
+        (* Tag is based on original element count, not padded count *)
+        let expected_tag =
+          match n mod 8 with
+          | 0 -> untagged_int8_array_zero_tag
+          | 1 -> untagged_int8_array_one_tag
+          | 2 -> untagged_int8_array_two_tag
+          | 3 -> untagged_int8_array_three_tag
+          | 4 -> untagged_int8_array_four_tag
+          | 5 -> untagged_int8_array_five_tag
+          | 6 -> untagged_int8_array_six_tag
+          | 7 -> untagged_int8_array_seven_tag
+          | _ -> assert false
+        in
+        assert (tag = expected_tag);
+        (* Check mixed block has zero scannable fields *)
+        Block_checks.check_mixed_block_scannable_size
+          ~array_type:"int8#" (Obj.repr x) 0
+      | Bytecode | Other _ -> ()
+    end
+  in
+  List.iter check_one array_sizes_to_check
+
+let int8u_array_element_size = size_in_bytes ([||] : int8# array)
+
+let _ = check_int8u ~init:#42s ~element_size:int8u_array_element_size
+
+(* untagged ints *)
+let check_intu ~(init : int#) ~element_size =
+  let check_one n =
+    let x = makearray_dynamic n init in
+    assert
+      ((element_size * n / bytes_per_word) = (Obj.size (Obj.repr x)));
+    if n = 0 then
+      Block_checks.check_empty_array_is_uniform
+        ~array_type:"int#" (Obj.repr x)
+    else begin
+      let tag = Obj.tag (Obj.repr x) in
+      match Sys.backend_type with
+      | Native ->
+        let expected_tag = untagged_int_array_tag in
+        assert (tag = expected_tag);
+        (* Check mixed block has zero scannable fields *)
+        Block_checks.check_mixed_block_scannable_size
+          ~array_type:"int#" (Obj.repr x) 0
+      | Bytecode | Other _ -> ()
+    end
+  in
+  List.iter check_one array_sizes_to_check
+
+let intu_array_element_size = size_in_bytes ([||] : int# array)
+
+let _ = check_intu ~init:#42m ~element_size:intu_array_element_size
 
 (* simple scannable products *)
 let check_scannable_product1 ~(init : #(int * string * int * float array))
@@ -388,4 +503,52 @@ let int32u_pair_array_element_size =
   size_in_bytes ([||] : #(int * t_ignore * bool * t_ignore) array)
 
 let _ = check_int32u_pair ~init:#(#1l, #42l)
+          ~element_size:int32u_pair_array_element_size
+
+(* check lack of int16# packing in unboxed product arrays *)
+let check_int16u_pair ~(init : #(int16# * int16#)) ~element_size =
+  let check_one n =
+    let x = makearray_dynamic n init in
+    (* 2 because there are two components in the unboxed product *)
+    match Sys.backend_type with
+    | Native -> assert (n * 2 = (Obj.size (Obj.repr x)))
+    | Bytecode | Other _ -> assert (n = Obj.size (Obj.repr x));
+    let tag = Obj.tag (Obj.repr x) in
+    (* All unboxed product arrays use tag 0, which matches empty array tag *)
+    assert (tag = unboxed_product_array_tag);
+    (* This product has no scannable fields (only check non-empty arrays) *)
+    if n > 0
+    then Block_checks.check_mixed_block_scannable_size
+           ~array_type:"int16#_pair" (Obj.repr x) 0
+  in
+  List.iter check_one array_sizes_to_check
+
+let int16u_pair_array_element_size =
+  size_in_bytes ([||] : #(int * t_ignore * bool * t_ignore) array)
+
+let _ = check_int16u_pair ~init:#(#1S, #42S)
+          ~element_size:int32u_pair_array_element_size
+
+(* check lack of int8# packing in unboxed product arrays *)
+let check_int8u_pair ~(init : #(int8# * int8#)) ~element_size =
+  let check_one n =
+    let x = makearray_dynamic n init in
+    (* 2 because there are two components in the unboxed product *)
+    match Sys.backend_type with
+    | Native -> assert (n * 2 = (Obj.size (Obj.repr x)))
+    | Bytecode | Other _ -> assert (n = Obj.size (Obj.repr x));
+    let tag = Obj.tag (Obj.repr x) in
+    (* All unboxed product arrays use tag 0, which matches empty array tag *)
+    assert (tag = unboxed_product_array_tag);
+    (* This product has no scannable fields (only check non-empty arrays) *)
+    if n > 0
+    then Block_checks.check_mixed_block_scannable_size
+           ~array_type:"int8#_pair" (Obj.repr x) 0
+  in
+  List.iter check_one array_sizes_to_check
+
+let int8u_pair_array_element_size =
+  size_in_bytes ([||] : #(int * t_ignore * bool * t_ignore) array)
+
+let _ = check_int8u_pair ~init:#(#1s, #42s)
           ~element_size:int32u_pair_array_element_size

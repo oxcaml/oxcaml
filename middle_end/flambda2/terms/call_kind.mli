@@ -22,7 +22,10 @@ module Function_call : sig
         (** The [code_id] uniquely determines the function symbol that
             must be called. *)
     | Indirect_unknown_arity
-    | Indirect_known_arity
+    | Indirect_known_arity of Code_id.Set.t Or_unknown.t
+        (** If a [Code_id.Set.t] is provided, only the provided functions
+             (or a simplified version thereof) can be called, but we don't
+             statically know which. *)
 end
 
 module Method_kind : sig
@@ -111,7 +114,8 @@ val direct_function_call : Code_id.t -> Alloc_mode.For_applications.t -> t
 
 val indirect_function_call_unknown_arity : Alloc_mode.For_applications.t -> t
 
-val indirect_function_call_known_arity : Alloc_mode.For_applications.t -> t
+val indirect_function_call_known_arity :
+  code_ids:Code_id.Set.t Or_unknown.t -> Alloc_mode.For_applications.t -> t
 
 val method_call :
   Method_kind.t -> obj:Simple.t -> Alloc_mode.For_applications.t -> t

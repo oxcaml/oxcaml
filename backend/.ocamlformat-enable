@@ -73,6 +73,8 @@ printreg.ml
 printreg.mli
 probe_emission.ml
 probe_emission.mli
+reg.ml
+reg.mli
 reg_class.mli
 reg_class_utils.ml
 reg_class_utils.mli

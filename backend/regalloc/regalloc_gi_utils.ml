@@ -490,6 +490,24 @@ module Hardware_registers = struct
               }
             -> Interval.overlap itv interval)
 
+  let find_using_affinities (t : t) (affinities : Regalloc_affinity.t)
+      (reg : Reg.t) (interval : Interval.t) : Hardware_register.t option =
+    let reg_class = Reg_class.of_machtype reg.typ in
+    let hardware_regs = Reg_class.Tbl.find t reg_class in
+    let first_available = Reg_class.first_available_register reg_class in
+    let rec find = function
+      | [] -> None
+      | { Regalloc_affinity.priority = _; phys_reg } :: tl ->
+        let reg_index_in_class : int = phys_reg - first_available in
+        let hardware_reg : Hardware_register.t =
+          hardware_regs.(reg_index_in_class)
+        in
+        if not (overlap hardware_reg interval)
+        then Some hardware_reg
+        else find tl
+    in
+    find (Regalloc_affinity.get affinities reg)
+
   let find_first (t : t) (reg : Reg.t) (interval : Interval.t) :
       Hardware_register.t option =
     find_in_class t ~of_reg:reg ~f:(fun hardware_reg ->
@@ -574,28 +592,41 @@ module Hardware_registers = struct
     | None -> Split_or_spill
 
   let find_available :
-      t -> SpillCosts.t Lazy.t -> Reg.t -> Interval.t -> available =
-   fun t costs reg interval ->
+      t ->
+      Regalloc_affinity.t ->
+      SpillCosts.t Lazy.t ->
+      Reg.t ->
+      Interval.t ->
+      available =
+   fun t affinities costs reg interval ->
     let with_no_overlap =
-      let heuristic =
-        match Lazy.force Selection_heuristics.value with
-        | Selection_heuristics.Random_for_testing ->
-          Selection_heuristics.random ()
-        | (First_available | Best_fit | Worst_fit) as heuristic -> heuristic
-      in
-      match heuristic with
-      | Selection_heuristics.Random_for_testing -> assert false
-      | Selection_heuristics.First_available ->
-        if debug
-        then log "trying to find an available register with 'first-available'";
-        find_first t reg interval
-      | Selection_heuristics.Best_fit ->
-        if debug then log "trying to find an available register with 'best-fit'";
-        find_using_length t reg interval ~better:( > )
-      | Selection_heuristics.Worst_fit ->
-        if debug
-        then log "trying to find an available register with 'worst-fit'";
-        find_using_length t reg interval ~better:( < )
+      (* we first use affinity to find an available register, and fall back to
+         heuristics if none is found *)
+      (* CR-someday xclerc for xclerc: we may decide to evict if affinity is
+         very high. *)
+      match find_using_affinities t affinities reg interval with
+      | Some _ as res -> res
+      | None -> (
+        let heuristic =
+          match Lazy.force Selection_heuristics.value with
+          | Selection_heuristics.Random_for_testing ->
+            Selection_heuristics.random ()
+          | (First_available | Best_fit | Worst_fit) as heuristic -> heuristic
+        in
+        match heuristic with
+        | Selection_heuristics.Random_for_testing -> assert false
+        | Selection_heuristics.First_available ->
+          if debug
+          then log "trying to find an available register with 'first-available'";
+          find_first t reg interval
+        | Selection_heuristics.Best_fit ->
+          if debug
+          then log "trying to find an available register with 'best-fit'";
+          find_using_length t reg interval ~better:( > )
+        | Selection_heuristics.Worst_fit ->
+          if debug
+          then log "trying to find an available register with 'worst-fit'";
+          find_using_length t reg interval ~better:( < ))
     in
     match with_no_overlap with
     | Some hardware_reg -> For_assignment { hardware_reg }

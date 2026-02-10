@@ -19,6 +19,8 @@
 module type Common_options = sig
   val _absname : unit -> unit
   val _no_absname : unit -> unit
+  val _locs : unit -> unit
+  val _no_locs : unit -> unit
   val _alert : string -> unit
   val _ikinds : unit -> unit
   val _ikinds_debug : unit -> unit
@@ -153,6 +155,7 @@ module type Compiler_options = sig
   val _dcounters : unit -> unit
   val _dprofile : unit -> unit
   val _dgranularity : string -> unit
+  val _dprofile_output : string -> unit
   val _dump_into_file : unit -> unit
   val _dump_into_csv : unit -> unit
   val _dump_dir : string -> unit

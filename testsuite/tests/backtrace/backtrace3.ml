@@ -44,7 +44,7 @@ let g msg =
           (* this should *not* Re-raise *)
           raise x
 
-let run args =
+let[@inline never] run args =
   try
     ignore (g args.(0)); print_string "No exception\n"
   with exn ->

@@ -313,6 +313,10 @@ let rd_of_reg64 = function
   | R14 -> 14
   | R15 -> 15
 
+let rd_of_reg_idx = function
+  | Scalar reg -> rd_of_reg64 reg
+  | Vector reg -> rd_of_regf reg
+
 let rd_of_reg8 = function
   | Reg8L r -> rd_of_reg64 r
   | Reg8H AH -> 4
@@ -486,7 +490,7 @@ let emit_prefix_modrm b opcodes rm reg ~prefix =
         | Some s -> OImm32 (Some s, displ)
       in
       let idx_reg = idx in
-      let idx = rd_of_reg64 idx in
+      let idx = rd_of_reg_idx idx in
       if scale = 0 then (
         assert (Option.is_none base && (is_x86 arch));
         match offset with
@@ -500,20 +504,20 @@ let emit_prefix_modrm b opcodes rm reg ~prefix =
         match base with
         | None -> (
             match (idx_reg, scale, offset) with
-            | (RSP | R12), 1, OImm8 0L ->
+            | Scalar (RSP | R12), 1, OImm8 0L ->
                 prefix b ~rex:0 ~rexr:(rexr_reg reg)
                          ~rexb:(rexb_base idx) ~rexx:0;
                 buf_opcodes b opcodes;
                 buf_int8 b (mod_rm_reg 0b00 idx reg);
                 buf_int8 b (sib 1 0b100 idx)
-            | (RSP | R12), 1, OImm8 offset8 ->
+            | Scalar (RSP | R12), 1, OImm8 offset8 ->
                 prefix b ~rex:0 ~rexr:(rexr_reg reg)
                          ~rexb:(rexb_base idx) ~rexx:0;
                 buf_opcodes b opcodes;
                 buf_int8 b (mod_rm_reg 0b01 0b100 reg);
                 buf_int8 b (sib 1 0b100 idx);
                 buf_int8L b offset8
-            | (RSP | R12), 1, OImm32 (sym, offset) ->
+            | Scalar (RSP | R12), 1, OImm32 (sym, offset) ->
                 (* to 0x??(%rsp) *)
                 prefix b ~rex:0 ~rexr:(rexr_reg reg)
                          ~rexb:(rexb_base idx) ~rexx:0;
@@ -521,7 +525,7 @@ let emit_prefix_modrm b opcodes rm reg ~prefix =
                 buf_int8 b (mod_rm_reg 0b10 0b100 reg);
                 buf_int8 b (sib 1 0b100 idx);
                 buf_sym b sym offset
-            | (RBP | R13), 1, OImm8 _ -> (
+            | Scalar (RBP | R13), 1, OImm8 _ -> (
                 (* to 0x??(%rbp) *)
                 (* TODO check if offset8 = 0 is enough *)
                 prefix b ~rex:0 ~rexr:(rexr_reg reg)
@@ -531,19 +535,19 @@ let emit_prefix_modrm b opcodes rm reg ~prefix =
                 match offset with
                 | OImm8 offset8 -> buf_int8L b offset8
                 | _ -> assert false)
-            | _, 1, OImm8 0L ->
+            | Scalar _, 1, OImm8 0L ->
                 (* to 0x00(%r??) except %rsp and %rbp *)
                 prefix b ~rex:0 ~rexr:(rexr_reg reg)
                          ~rexb:(rexb_rm idx) ~rexx:0;
                 buf_opcodes b opcodes;
                 buf_int8 b (mod_rm_reg 0b00 idx reg)
-            | _, 1, OImm8 offset8 ->
+            | Scalar _, 1, OImm8 offset8 ->
                 prefix b ~rex:0 ~rexr:(rexr_reg reg)
                          ~rexb:(rexb_rm idx) ~rexx:0;
                 buf_opcodes b opcodes;
                 buf_int8 b (mod_rm_reg 0b01 idx reg);
                 buf_int8L b offset8
-            | _, 1, OImm32 (sym, offset) ->
+            | Scalar _, 1, OImm32 (sym, offset) ->
                 prefix b ~rex:0 ~rexr:(rexr_reg reg)
                          ~rexb:(rexb_rm idx) ~rexx:0;
                 buf_opcodes b opcodes;
@@ -715,9 +719,18 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
   in
   let enc i =
     match instr.res with
-    | Res_none | First_arg | Res { enc = Implicit; _ } -> instr.args.(i).enc
-    | Res { enc; _ } when i = 0 -> enc
-    | Res _ -> instr.args.(i - 1).enc
+    | Res_none | First_arg -> instr.args.(i).enc
+    | Res rr ->
+      let rr = Array.fold_right
+        (fun ({enc; _} : Amd64_simd_defs.arg) acc ->
+          match enc with
+          | Implicit -> acc
+          | _ -> enc :: acc) rr []
+       |> Array.of_list
+      in
+      let n = Array.length rr in
+      if i < n then rr.(i)
+      else instr.args.(i - n).enc
   in
   let rm_only () =
     match args with
@@ -756,6 +769,7 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
       (match enc 2, enc 1, enc 0 with
       | RM_rm, Vex_v, RM_r -> src2, rd_of_reg src1, rd_of_reg dst
       | RM_r, Vex_v, RM_rm -> dst, rd_of_reg src1, rd_of_reg src2
+      | Vex_v, RM_rm, RM_r -> src1, rd_of_reg src2, rd_of_reg dst
       | _ -> failwith instr.mnemonic)
     | _ -> failwith instr.mnemonic
   in
@@ -1228,45 +1242,6 @@ let emit_pop b dst =
   | (Mem _ | Mem64_RIP _) as rm -> emit_mod_rm_reg b no_rex [ 0x8F ] rm 0
   | _ -> assert false
 
-let emit_popcnt b ~dst ~src =
-  match (dst, src) with
-  | (Reg16 reg, ((Reg16 _ | Mem _ | Mem64_RIP _) as rm))
-  | (Reg32 reg, ((Reg32 _ | Mem _ | Mem64_RIP _) as rm)) ->
-    (* POPCNT r16, r/m16 and POPCNT r32, r/m32 *)
-    buf_int8 b 0xF3;
-    emit_mod_rm_reg b no_rex [ 0x0F; 0xB8 ] rm (rd_of_reg64 reg);
-  | (Reg64 reg, ((Reg64 _ | Mem _ | Mem64_RIP _) as rm)) ->
-    (* POPCNT r64, r/m64 *)
-    buf_int8 b 0xF3;
-    emit_mod_rm_reg b rexw [ 0x0F; 0xB8 ] rm (rd_of_reg64 reg);
-  | _ -> assert false
-
-let emit_tzcnt b ~dst ~src =
-  match (dst, src) with
-  | (Reg16 reg, ((Reg16 _ | Mem _ | Mem64_RIP _) as rm))
-  | (Reg32 reg, ((Reg32 _ | Mem _ | Mem64_RIP _) as rm)) ->
-    (* TZCNT r16, r/m16 and TZCNT r32, r/m32 *)
-    buf_int8 b 0xF3;
-    emit_mod_rm_reg b no_rex [ 0x0F; 0xBC ] rm (rd_of_reg64 reg);
-  | (Reg64 reg, ((Reg64 _ | Mem _ | Mem64_RIP _) as rm)) ->
-    (* TZCNT r64, r/m64 *)
-    buf_int8 b 0xF3;
-    emit_mod_rm_reg b rexw [ 0x0F; 0xBC ] rm (rd_of_reg64 reg);
-  | _ -> assert false
-
-let emit_lzcnt b ~dst ~src =
-  match (dst, src) with
-  | (Reg16 reg, ((Reg16 _ | Mem _ | Mem64_RIP _) as rm))
-  | (Reg32 reg, ((Reg32 _ | Mem _ | Mem64_RIP _) as rm)) ->
-    (* LZCNT r16, r/m16 and LZCNT r32, r/m32 *)
-    buf_int8 b 0xF3;
-    emit_mod_rm_reg b no_rex [ 0x0F; 0xBD ] rm (rd_of_reg64 reg);
-  | (Reg64 reg, ((Reg64 _ | Mem _ | Mem64_RIP _) as rm)) ->
-    (* LZCNT r64, r/m64 *)
-    buf_int8 b 0xF3;
-    emit_mod_rm_reg b rexw [ 0x0F; 0xBD ] rm (rd_of_reg64 reg);
-  | _ -> assert false
-
 let rd_of_prefetch_hint = function
   | Nta -> 0
   | T0 -> 1
@@ -1400,7 +1375,6 @@ let assemble_instr b loc = function
   | PAUSE -> emit_pause b
   | PUSH dst -> emit_push b dst
   | POP dst -> emit_pop b dst
-  | POPCNT (src, dst) -> emit_popcnt b ~dst ~src
   | PREFETCH (is_write, hint, rm) -> emit_prefetch b ~is_write ~hint rm
   | RDTSC -> emit_rdtsc b
   | RDPMC -> emit_rdpmc b
@@ -1417,8 +1391,6 @@ let assemble_instr b loc = function
   | TEST (src, dst) -> emit_test b dst src
   | XCHG (src, dst) -> emit_XCHG b dst src
   | XOR (src, dst) -> emit_XOR b dst src
-  | TZCNT (src, dst) -> emit_tzcnt b ~dst ~src
-  | LZCNT (src, dst) -> emit_lzcnt b ~dst ~src
   | SIMD (instr, args) -> emit_simd b instr args
 
 

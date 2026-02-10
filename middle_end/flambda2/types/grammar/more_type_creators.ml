@@ -317,6 +317,28 @@ let exactly_this_closure function_slot ~all_function_slots_in_set:function_types
   in
   TG.create_closures alloc_mode by_function_slot
 
+let at_least_this_closure function_slot
+    ~at_least_these_function_slots:function_types
+    ~at_least_these_closure_types:closure_types
+    ~at_least_these_value_slots:value_slot_types alloc_mode =
+  let closure_types = TG.Product.Function_slot_indexed.create closure_types in
+  let closures_entry =
+    let value_slot_types =
+      TG.Product.Value_slot_indexed.create value_slot_types
+    in
+    TG.Closures_entry.create ~function_types ~closure_types ~value_slot_types
+  in
+  let by_function_slot =
+    let set_of_closures_contents =
+      Set_of_closures_contents.create
+        (Function_slot.Map.keys function_types)
+        (Value_slot.Map.keys value_slot_types)
+    in
+    TG.Row_like_for_closures.create_at_least function_slot
+      set_of_closures_contents closures_entry
+  in
+  TG.create_closures alloc_mode by_function_slot
+
 let static_closure_with_this_code ~this_function_slot ~closure_symbol ~code_id =
   let function_types =
     let function_type =
@@ -508,6 +530,21 @@ let rec unknown_with_subkind ?(alloc_mode = Alloc_mode.For_types.unknown ())
         Ok
           (mutable_array_non_null
              ~element_kind:(Ok Flambda_kind.With_subkind.naked_float32)
+             ~length:any_tagged_immediate alloc_mode)
+      | Untagged_int_array ->
+        Ok
+          (mutable_array_non_null
+             ~element_kind:(Ok Flambda_kind.With_subkind.naked_immediate)
+             ~length:any_tagged_immediate alloc_mode)
+      | Untagged_int8_array ->
+        Ok
+          (mutable_array_non_null
+             ~element_kind:(Ok Flambda_kind.With_subkind.naked_int8)
+             ~length:any_tagged_immediate alloc_mode)
+      | Untagged_int16_array ->
+        Ok
+          (mutable_array_non_null
+             ~element_kind:(Ok Flambda_kind.With_subkind.naked_int16)
              ~length:any_tagged_immediate alloc_mode)
       | Unboxed_int32_array ->
         Ok

@@ -22,7 +22,10 @@ type ext =
   | SSSE3
   | SSE4_1
   | SSE4_2
+  | POPCNT
+  | LZCNT
   | PCLMULQDQ
+  | BMI
   | BMI2
   | AVX
   | AVX2
@@ -52,6 +55,10 @@ type temp =
   | MM
   | XMM
   | YMM
+  | VM32X (* R64 base + i32x4 offset *)
+  | VM32Y (* R64 base + i32x8 offset *)
+  | VM64X (* R64 base + i64x2 offset *)
+  | VM64Y (* R64 base + i64x4 offset *)
 
 (* Possible argument location *)
 type loc =
@@ -74,7 +81,7 @@ type arg =
 type res =
   | Res_none (* No result *)
   | First_arg (* Result is returned in the first argument operand. *)
-  | Res of arg (* Separate operand for result. *)
+  | Res of arg array (* Separate operand(s) for result. *)
 
 type legacy_prefix =
   | Prx_none
@@ -157,10 +164,14 @@ let equal_temp temp0 temp1 =
   | M256, M256
   | MM, MM
   | XMM, XMM
-  | YMM, YMM ->
+  | YMM, YMM
+  | VM32X, VM32X
+  | VM32Y, VM32Y
+  | VM64X, VM64X
+  | VM64Y, VM64Y ->
     true
   | ( ( R8 | R16 | R32 | R64 | M8 | M16 | M32 | M64 | M128 | M256 | MM | XMM
-      | YMM ),
+      | YMM | VM32X | VM32Y | VM64X | VM64Y ),
       _ ) ->
     false
 
@@ -172,7 +183,7 @@ let equal_loc loc0 loc1 =
 
 let temp_is_reg = function
   | R8 | R16 | R32 | R64 | MM | XMM | YMM -> true
-  | M8 | M16 | M32 | M64 | M128 | M256 -> false
+  | M8 | M16 | M32 | M64 | M128 | M256 | VM32X | VM32Y | VM64X | VM64Y -> false
 
 let loc_allows_reg = function
   | Pin _ -> true
@@ -194,7 +205,10 @@ let ext_to_string : ext -> string = function
   | SSSE3 -> "SSSE3"
   | SSE4_1 -> "SSE4_1"
   | SSE4_2 -> "SSE4_2"
+  | POPCNT -> "POPCNT"
+  | LZCNT -> "LZCNT"
   | PCLMULQDQ -> "PCLMULQDQ"
+  | BMI -> "BMI"
   | BMI2 -> "BMI2"
   | AVX -> "AVX"
   | AVX2 -> "AVX2"
@@ -204,13 +218,27 @@ let ext_to_string : ext -> string = function
 let exts_to_string exts =
   Array.map ext_to_string exts |> Array.to_list |> String.concat ", "
 
-type bit_width =
-  | Eight
-  | Sixteen
-  | Thirtytwo
-  | Sixtyfour
-  | Onetwentyeight
-  | Twofiftysix
+module Layout = struct
+  type reg =
+    | R8
+    | R16
+    | R32
+    | R64
+    | R128
+    | R256
+
+  type mem =
+    | M8
+    | M16
+    | M32
+    | M64
+    | M128
+    | M256
+    | M32X
+    | M64X
+    | M32Y
+    | M64Y
+end
 
 let loc_register_width = function
   | Pin _ -> None
@@ -222,13 +250,14 @@ let loc_register_width = function
     in
     Array.iter
       (function
-        | R8 -> set Eight
-        | R16 -> set Sixteen
-        | R32 -> set Thirtytwo
-        | R64 | MM -> set Sixtyfour
-        | XMM -> set Onetwentyeight
-        | YMM -> set Twofiftysix
-        | M8 | M16 | M32 | M64 | M128 | M256 -> ())
+        | R8 -> set Layout.R8
+        | R16 -> set Layout.R16
+        | R32 -> set Layout.R32
+        | R64 | MM -> set Layout.R64
+        | XMM -> set Layout.R128
+        | YMM -> set Layout.R256
+        | M8 | M16 | M32 | M64 | M128 | M256 | VM32X | VM32Y | VM64X | VM64Y ->
+          ())
       temps;
     !width
 
@@ -242,12 +271,16 @@ let loc_memory_width = function
     in
     Array.iter
       (function
-        | M8 -> set Eight
-        | M16 -> set Sixteen
-        | M32 -> set Thirtytwo
-        | M64 -> set Sixtyfour
-        | M128 -> set Onetwentyeight
-        | M256 -> set Twofiftysix
+        | M8 -> set Layout.M8
+        | M16 -> set Layout.M16
+        | M32 -> set Layout.M32
+        | M64 -> set Layout.M64
+        | M128 -> set Layout.M128
+        | M256 -> set Layout.M256
+        | VM32X -> set Layout.M32X
+        | VM32Y -> set Layout.M32Y
+        | VM64X -> set Layout.M64X
+        | VM64Y -> set Layout.M64Y
         | R8 | R16 | R32 | R64 | MM | XMM | YMM -> ())
       temps;
     Option.get !width

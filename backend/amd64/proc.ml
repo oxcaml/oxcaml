@@ -104,13 +104,13 @@ let hard_float_reg =
   v
 
 let hard_vec128_reg =
-  Array.map (fun r -> {r with Reg.typ = Vec128}) hard_float_reg
+  Array.map (Reg.create_alias ~typ:Vec128) hard_float_reg
 let hard_vec256_reg =
-  Array.map (fun r -> {r with Reg.typ = Vec256}) hard_float_reg
+  Array.map (Reg.create_alias ~typ:Vec256) hard_float_reg
 let hard_vec512_reg =
-  Array.map (fun r -> {r with Reg.typ = Vec512}) hard_float_reg
+  Array.map (Reg.create_alias ~typ:Vec512) hard_float_reg
 let hard_float32_reg =
-  Array.map (fun r -> {r with Reg.typ = Float32}) hard_float_reg
+  Array.map (Reg.create_alias ~typ:Float32) hard_float_reg
 
 let add_hard_vec256_regs list ~f =
   if Arch.Extension.enabled_vec256 ()
@@ -133,9 +133,10 @@ let phys_reg ty n =
        for the LLVM backend. However, this breaks an invariant the IRC register
        allocator relies on. It is safe to guard it with this flag since the LLVM
        backend doesn't get that far. *)
+    let r = hard_int_reg.(n) in
     if !Clflags.llvm_backend
-    then { hard_int_reg.(n) with typ = ty }
-    else hard_int_reg.(n)
+    then Reg.create_alias ~typ:ty r
+    else r
   | Float -> hard_float_reg.(n - 100)
   | Float32 -> hard_float32_reg.(n - 100)
   | Vec128 | Valx2 -> hard_vec128_reg.(n - 100)
@@ -521,14 +522,18 @@ let destroyed_by_simd_instr (instr : Simd.instr) =
   | _ ->
     match instr.res with
     | Res_none | First_arg -> [||]
-    | Res { loc; _ } ->
-      match Simd.loc_is_pinned loc with
-      | Some RAX -> [|rax|]
-      | Some RDI -> [|rdi|]
-      | Some RCX -> [|rcx|]
-      | Some RDX -> [|rdx|]
-      | Some XMM0 -> destroy_xmm 0
-      | None -> [||]
+    | Res rr ->
+      Array.fold_left (fun acc ({loc; _} : Simd.arg) ->
+        match Simd.loc_is_pinned loc with
+        | Some RAX -> rax :: acc
+        | Some RDI -> rdi :: acc
+        | Some RCX -> rcx :: acc
+        | Some RDX -> rdx :: acc
+        | Some XMM0 ->
+          let xmm0 = Array.to_list (destroy_xmm 0) in
+          xmm0 @ acc
+        | None -> acc) [] rr
+      |> Array.of_list
 
 let destroyed_by_simd_op (op : Simd.operation) =
   match op.instr with
@@ -647,7 +652,7 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
                           stack_ofs; stack_align = _; effects = _; }; _} ->
     assert (stack_ofs >= 0);
     if alloc || stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
-  | Call {op = Indirect | Direct _; _} -> all_phys_regs
+  | Call {op = Indirect _ | Direct _; _} -> all_phys_regs
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.
    We current return `true` when `destroyed_at_terminator` returns
@@ -670,7 +675,7 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
       true
     else
       if alloc then true else false
-  | Call {op = Indirect | Direct _; _} ->
+  | Call {op = Indirect _ | Direct _; _} ->
     true
 
 (* Layout of the stack frame *)

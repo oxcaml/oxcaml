@@ -242,7 +242,8 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
               original_defining_expr = Some named
             }))
 
-let removed_operations ~(original : Named.t) (result : _ Or_invalid.t) =
+let removed_operations ~min_name_mode ~(original : Named.t) dacc
+    (result : _ Or_invalid.t) =
   let zero = Removed_operations.zero in
   match result with
   | Invalid ->
@@ -271,7 +272,27 @@ let removed_operations ~(original : Named.t) (result : _ Or_invalid.t) =
                      { named = Prim (rewritten_prim, _); _ };
                    _
                  } ->
-               Flambda_primitive.equal original_prim rewritten_prim
+               (* Do not consider the original primitive to have been removed if
+                  there is a rewritten primitive that is equivalent modulo
+                  changes of canonical names.
+
+                  Previously, we simply checked the equality of [original_prim]
+                  and [rewritten_prim], but this meant that a primitive [%prim
+                  param] that gets transformed into [%prim arg] due to inlining
+                  was counted as having been removed. *)
+               let c =
+                 Flambda_primitive.compare_primitive_application
+                   ~compare_simple:(fun original_simple rewritten_simple ->
+                     let _, original_simple =
+                       S.simplify_simple dacc original_simple ~min_name_mode
+                     in
+                     let _, rewritten_simple =
+                       S.simplify_simple dacc rewritten_simple ~min_name_mode
+                     in
+                     Simple.compare original_simple rewritten_simple)
+                   original_prim rewritten_prim
+               in
+               c = 0
              | Keep_binding
                  { simplified_defining_expr =
                      { named = Simple _ | Set_of_closures _ | Rec_info _; _ };
@@ -289,7 +310,9 @@ let simplify_named dacc bound_pattern named ~simplify_function_body :
   match simplify_named0 ~simplify_function_body dacc bound_pattern named with
   | Rewritten f -> Rewritten f
   | Simplified result ->
-    Simplified (result, removed_operations ~original:named result)
+    let min_name_mode = Bound_pattern.name_mode bound_pattern in
+    Simplified
+      (result, removed_operations ~min_name_mode ~original:named dacc result)
   | exception Misc.Fatal_error ->
     let bt = Printexc.get_raw_backtrace () in
     Format.eprintf

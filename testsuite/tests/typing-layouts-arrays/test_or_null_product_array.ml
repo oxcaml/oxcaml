@@ -12,6 +12,14 @@
  {
    native;
  }
+ {
+   flags = "-O3";
+   native;
+ }
+ {
+   flags = "-Oclassic";
+   native;
+ }
 *)
 
 open Gen_product_array_helpers

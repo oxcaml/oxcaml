@@ -141,7 +141,13 @@ type filter =
   | Unless_eq : 'k Value.repr * 'k Term.t * 'k Term.t -> filter
   | User : ('k Constant.hlist -> bool) * 'k Term.hlist -> filter
 
+type bindings_ref =
+  | Bindings_ref : 'a Variable.hlist * 'a Option_receiver.hlist -> bindings_ref
+
 type bindings = Bindings : 'a Variable.hlist * 'a Constant.hlist -> bindings
+
+let get_bindings (Bindings_ref (vars, receivers)) =
+  Bindings (vars, Option_receiver.recv receivers)
 
 let print_bindings ppf (Bindings (vars, values)) =
   let rec loop :
@@ -166,20 +172,12 @@ let print_bindings ppf (Bindings (vars, values)) =
   Format.fprintf ppf "@] }@]"
 
 type callback =
-  | Callback :
-      { func : 'a Constant.hlist -> unit;
-        name : string;
-        args : 'a Term.hlist
-      }
-      -> callback
   | Callback_with_bindings :
-      { func : bindings -> 'a Constant.hlist -> unit;
+      { func : bindings_ref -> 'a Constant.hlist -> unit;
         name : string;
         args : 'a Term.hlist
       }
       -> callback
-
-let create_callback func ~name args = Callback { func; name; args }
 
 let create_callback_with_bindings func ~name args =
   Callback_with_bindings { func; name; args }
@@ -315,7 +313,9 @@ let rec find_last_binding0 : type a. order:_ -> _ -> a Term.hlist -> _ =
 let find_last_binding post_level args =
   find_last_binding0 ~order:Cursor.Order.parameters post_level args
 
-let compile_term : 'a Term.t -> 'a option Channel.receiver with_name = function
+let compile_term :
+    ?cardinality:_ -> 'a Term.t -> 'a option Channel.receiver with_name =
+ fun ?cardinality -> function
   | Constant cte ->
     let _send, recv = Channel.create (Some cte) in
     { value = recv; name = "<constant>" }
@@ -323,16 +323,17 @@ let compile_term : 'a Term.t -> 'a option Channel.receiver with_name = function
     { value = Parameter.get_receiver param; name = param.name }
   | Variable var ->
     let var = Option.get var.level in
-    Cursor.Level.use_output var
+    Cursor.Level.use_output ?cardinality var
 
 let rec compile_terms :
-    type a. a Term.hlist -> a Option_receiver.hlist with_names =
- fun vars ->
+    type a. ?cardinality:_ -> a Term.hlist -> a Option_receiver.hlist with_names
+    =
+ fun ?cardinality vars ->
   match vars with
   | [] -> { values = []; names = [] }
   | term :: terms ->
-    let { value; name } = compile_term term in
-    let { values; names } = compile_terms terms in
+    let { value; name } = compile_term ?cardinality term in
+    let { values; names } = compile_terms ?cardinality terms in
     { values = value :: values; names = name :: names }
 
 let compile_condition context condition =
@@ -360,37 +361,24 @@ let compile_filter context filter =
     let post_level = find_last_binding (Cursor.initial_actions context) args in
     Cursor.add_action post_level (Cursor.filter fn refs)
 
-let rec cursor_call2 :
-    type a b.
-    name:string ->
-    (a Constant.hlist -> b Constant.hlist -> unit) ->
-    a Term.hlist ->
-    b Term.hlist ->
-    Cursor.call =
- fun ~name f xs ys ->
-  match xs with
-  | [] -> Cursor.create_call (f []) ~name (compile_terms ys)
-  | x :: xs ->
-    cursor_call2 ~name (fun xs' (x' :: ys) -> f (x' :: xs') ys) xs (x :: ys)
-
 let rec compile_terminator :
     type p a.
     callbacks:_ -> _ -> _ -> p Parameter.hlist -> (p, a) terminator -> a =
  fun ~callbacks context levels parameters terminator ->
   match terminator with
   | Yield output ->
-    let output = Option.map compile_terms output in
+    let output = Option.map (compile_terms ~cardinality:All_values) output in
     let calls =
       List.map
         (function
-          | Callback { func; name; args } ->
-            Cursor.create_call func ~name (compile_terms args)
           | Callback_with_bindings { func; name; args } ->
             let (Levels vars) = levels in
-            cursor_call2 ~name
-              (fun level_values arg_values ->
-                func (Bindings (vars, level_values)) arg_values)
-              (Term.variables vars) args)
+            let { values = binding_receivers; names = _ } =
+              compile_terms ~cardinality:Any_value (Term.variables vars)
+            in
+            Cursor.create_call ~name
+              ~context:(Bindings_ref (vars, binding_receivers))
+              func (compile_terms args))
         callbacks
     in
     Cursor.With_parameters.create ~calls ?output

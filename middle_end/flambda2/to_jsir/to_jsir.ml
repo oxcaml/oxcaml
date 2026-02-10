@@ -341,7 +341,7 @@ and apply_expr ~env ~res e =
       Misc.fatal_error "Received a nonempty callee for effects"
     | ( None,
         ( Function
-            { function_call = Indirect_unknown_arity | Indirect_known_arity;
+            { function_call = Indirect_unknown_arity | Indirect_known_arity _;
               alloc_mode = _
             }
         | Method _ | C_call _ ) ) ->

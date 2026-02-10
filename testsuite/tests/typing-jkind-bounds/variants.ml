@@ -1025,3 +1025,20 @@ and 'a t2 : immutable_data with 'a = Base of 'a | T1 of 'a t1
 type 'a t1 = Base of 'a | T2 of 'a t2
 and 'a t2 = Base of 'a | T1 of 'a t1
 |}]
+
+type 'a t = Degen of ('a * 'a) t | Leaf
+let f (x : int t) = cross_portable x
+[%%expect {|
+type 'a t = Degen of ('a * 'a) t | Leaf
+Line 2, characters 35-36:
+2 | let f (x : int t) = cross_portable x
+                                       ^
+Error: This expression has type "int t" but an expression was expected of type
+         "('a : value mod portable)"
+       The kind of int t is immutable_data with (int * int) t
+         because of the definition of t at line 1, characters 0-39.
+       But the kind of int t must be a subkind of value mod portable
+         because of the definition of cross_portable at line 10, characters 57-68.
+       Note: I gave up trying to find the simplest kind for the first,
+       as it is very large or deeply recursive.
+|}]
