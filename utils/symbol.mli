@@ -39,6 +39,8 @@ val compilation_unit : t -> Compilation_unit.t
 
 val linkage_name : t -> Linkage_name.t
 
+val pack_separator : unit -> string
+
 (** Linkage names displayed in ocamlobjinfo are formatted differently. *)
 val linkage_name_for_ocamlobjinfo : t -> string
 
