@@ -38,7 +38,7 @@ val patch_object:
   (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t ->
   (reloc_info * int) list -> unit
 
-val init_toplevel: unit -> Import_info.t array
+val init_toplevel: unit -> Cmo_format.crcs
 val update_global_table: unit -> unit
 val get_global_value: Global.t -> Obj.t
 val check_global_initialized: (reloc_info * int) list -> unit

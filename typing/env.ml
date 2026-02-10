@@ -1235,6 +1235,8 @@ let without_cmis f x =
 let imports () = Persistent_env.imports !persistent_env
 
 let import_crcs ~source crcs =
+  let convert (name, nonalias) = Import_info.Intf.create name nonalias in
+  let crcs = Array.map convert crcs in
   Persistent_env.import_crcs !persistent_env ~source crcs
 
 let require_global_for_quote name =

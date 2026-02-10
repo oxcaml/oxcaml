@@ -15,6 +15,9 @@
 
 (* Symbol table information for .cmo and .cma files *)
 
+type modname = Compilation_unit.Name.t
+type crcs = (modname * Import_info.Intf.Nonalias.t option) array
+
 (* Names of compilation units as represented in CMO files *)
 type compunit = Compilation_unit.t
 
@@ -42,7 +45,7 @@ type compilation_unit_descr =
     cu_arg_descr: Lambda.arg_descr option;
                                         (* If this is an argument unit, the
                                            parameter it implements *)
-    cu_imports: Import_info.t array;    (* Names and CRC of intfs imported *)
+    cu_imports: crcs;                   (* Names and CRC of intfs imported *)
     cu_format: Lambda.main_module_block_format;
     cu_required_compunits: Compilation_unit.t list;
                                         (* Compilation units whose
