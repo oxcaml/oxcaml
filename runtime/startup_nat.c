@@ -236,14 +236,17 @@ caml_unit_deps_find(const char *name)
   return NULL;
 }
 
-#define init_module_failure(fmt, ...) \
+/* The result of this macro must not be exposed to the GC. */
+#define init_module_failure_exn(fmt, ...) \
   Make_exception_result( \
     caml_failure_exn(caml_alloc_sprintf("%s: " fmt, __func__, __VA_ARGS__)))
 
 /* Initialize a module and its dependencies in topological order.
    Uses a recursive depth-first approach.
-   Returns an exception result on failure, Val_unit on success. */
-static value caml_init_module_rec(struct caml_unit_deps_entry *entry)
+   Returns an exception result on failure, Val_unit on success.
+   The exception result must not be exposed to the GC.
+   Not portable: must be called from the main thread only. */
+static value caml_init_module_rec_exn(struct caml_unit_deps_entry *entry)
 {
   CAMLparam0();
   CAMLlocal1(closure);
@@ -258,7 +261,7 @@ static value caml_init_module_rec(struct caml_unit_deps_entry *entry)
   }
 
   if (entry->init_state == INIT_STATE_INITIALIZING) {
-    CAMLreturn(init_module_failure(
+    CAMLreturn(init_module_failure_exn(
       "cycle detected at module %s", entry->unit_name));
   }
 
@@ -268,9 +271,18 @@ static value caml_init_module_rec(struct caml_unit_deps_entry *entry)
   /* Initialize all dependencies first */
   for (intnat i = 0; i < entry->num_deps; i++) {
     intnat dep_idx = entry->dep_indices[i];
+    if (dep_idx < 0 || dep_idx >= caml_unit_deps_table.num_units) {
+      value result = init_module_failure_exn(
+        "dependency index %ld out of range for module %s",
+        (long)dep_idx, entry->unit_name);
+      entry->init_state = INIT_STATE_FAILED;
+      entry->raised_exn = Extract_exception(result);
+      caml_register_generational_global_root(&entry->raised_exn);
+      CAMLreturn(result);
+    }
     struct caml_unit_deps_entry *dep =
       &caml_unit_deps_table.entries[dep_idx];
-    value result = caml_init_module_rec(dep);
+    value result = caml_init_module_rec_exn(dep);
     if (Is_exception_result(result)) {
       entry->init_state = INIT_STATE_FAILED;
       entry->raised_exn = Extract_exception(result);
@@ -326,9 +338,9 @@ CAMLexport value caml_init_module_exn(const char *name)
 {
   struct caml_unit_deps_entry *entry = caml_unit_deps_find(name);
   if (entry == NULL) {
-    return init_module_failure("unit %s not found", name);
+    return init_module_failure_exn("unit %s not found", name);
   }
-  return caml_init_module_rec(entry);
+  return caml_init_module_rec_exn(entry);
 }
 
 /* Public API: Initialize a module by name (raises on failure) */
@@ -340,7 +352,9 @@ CAMLexport void caml_init_module(const char *name)
   }
 }
 
-/* OCaml-callable wrapper: Initialize a module by name (string -> unit) */
+/* OCaml-callable wrapper: Initialize a module by name (string -> unit).
+   Must be called from the main thread only; not safe to call from
+   other domains. */
 CAMLprim value caml_init_module_from_ocaml(value v_name)
 {
   /* Copy the string to C heap since caml_init_module_exn may trigger GC */

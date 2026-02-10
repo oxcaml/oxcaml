@@ -6,7 +6,7 @@ Step 2: Initialize Cycle_module (cycle detected and caught in OCaml)
 Cycle_module: initializing
 Cycle_module: calling C stub that will try to init Cycle_module
 C stub: try_init_self_stub called, will try to init Cycle_module
-Cycle_module: caught cycle exception: Failure("caml_init_module_rec: cycle detected at module Cycle_module")
+Cycle_module: caught cycle exception: Failure("caml_init_module_rec_exn: cycle detected at module Cycle_module")
 Step 2: done
 
 === All tests passed ===
