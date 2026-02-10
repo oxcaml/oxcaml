@@ -188,13 +188,12 @@ void caml_startup_pooled(char_os **argv)
 /* Unit dependency table for manual module initialization.
    This table is emitted by the compiler when -manual-module-init is used. */
 
-/* Initialization states.
-   Values are valid OCaml values (Val_int encodings). */
+/* Initialization states. */
 enum init_state {
-  INIT_STATE_NOT_INITIALIZED = 1,  /* Val_int(0) */
-  INIT_STATE_INITIALIZING    = 3,  /* Val_int(1) */
-  INIT_STATE_DONE            = 5,  /* Val_int(2) */
-  INIT_STATE_FAILED          = 7   /* Val_int(3) */
+  INIT_STATE_NOT_INITIALIZED = Val_int(0),
+  INIT_STATE_INITIALIZING    = Val_int(1),
+  INIT_STATE_DONE            = Val_int(2),
+  INIT_STATE_FAILED          = Val_int(3)
 };
 
 struct caml_unit_deps_entry {
@@ -237,17 +236,23 @@ caml_unit_deps_find(const char *name)
   return NULL;
 }
 
-/* Returns Make_exception_result(Failure msg) where msg is formatted
-   with the given printf-style format and name argument. */
-static value init_module_failure(const char *fmt, const char *name)
+static value init_module_failure_(const char *func, const char *fmt,
+                                  const char *name)
 {
-  size_t len = strlen(fmt) + strlen(name);
+  size_t func_len = strlen(func), fmt_len = strlen(fmt), name_len = strlen(name);
+  /* msg becomes "<func>: <fmt with %s = name>\0"; len overestimates the length
+     by 2 characters, specifically the "%s" inside the fmt string. */
+  size_t len = func_len + 2 + fmt_len + name_len + 1;
   char *msg = caml_stat_alloc(len);
-  snprintf(msg, len, fmt, name);
+  snprintf(msg, func_len + 3, "%s: ", func); /* +3 for ": " and null byte */
+  snprintf(msg + func_len + 2, len - func_len - 2, fmt, name);
   value exn = caml_failure_exn(msg);
   caml_stat_free(msg);
   return Make_exception_result(exn);
 }
+
+#define init_module_failure(fmt, name) \
+  init_module_failure_(__func__, fmt, name)
 
 /* Initialize a module and its dependencies in topological order.
    Uses a recursive depth-first approach.
@@ -268,8 +273,7 @@ static value caml_init_module_rec(struct caml_unit_deps_entry *entry)
 
   if (entry->init_state == INIT_STATE_INITIALIZING) {
     CAMLreturn(init_module_failure(
-      "caml_init_module: cycle detected at module %s",
-      entry->unit_name));
+      "cycle detected at module %s", entry->unit_name));
   }
 
   /* Mark as initializing before processing dependencies */
@@ -336,8 +340,7 @@ CAMLexport value caml_init_module_exn(const char *name)
 {
   struct caml_unit_deps_entry *entry = caml_unit_deps_find(name);
   if (entry == NULL) {
-    return init_module_failure(
-      "caml_init_module: unit %s not found", name);
+    return init_module_failure("unit %s not found", name);
   }
   return caml_init_module_rec(entry);
 }

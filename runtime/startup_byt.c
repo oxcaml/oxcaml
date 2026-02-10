@@ -695,24 +695,27 @@ CAMLexport void caml_startup_code(
 /* Manual module initialization is only supported in native code.
    These stubs provide error messages for bytecode. */
 
+static const char init_not_supported_fmt[] =
+  "%s: manual module initialization is only supported in native code";
+
 CAMLexport value caml_init_module_exn(const char *name)
 {
-  return Make_exception_result(caml_failure_exn(
-    "caml_init_module: manual module initialization is only supported "
-    "in native code"));
+  char msg[sizeof(init_not_supported_fmt) + sizeof(__func__)];
+  snprintf(msg, sizeof(msg), init_not_supported_fmt, __func__);
+  return Make_exception_result(caml_failure_exn(msg));
 }
 
 CAMLexport void caml_init_module(const char *name)
 {
-  caml_failwith(
-    "caml_init_module: manual module initialization is only supported "
-    "in native code");
+  char msg[sizeof(init_not_supported_fmt) + sizeof(__func__)];
+  snprintf(msg, sizeof(msg), init_not_supported_fmt, __func__);
+  caml_failwith(msg);
 }
 
 CAMLprim value caml_init_module_from_ocaml(value v_name)
 {
-  caml_failwith(
-    "caml_init_module: manual module initialization is only supported "
-    "in native code");
+  char msg[sizeof(init_not_supported_fmt) + sizeof(__func__)];
+  snprintf(msg, sizeof(msg), init_not_supported_fmt, __func__);
+  caml_failwith(msg);
   return Val_unit; /* not reached */
 }
