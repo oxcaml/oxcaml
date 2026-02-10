@@ -324,9 +324,8 @@ Error: Values do not match:
          val foo7' : <[$('_a) -> $('_a)]> expr
        The type "<[$('_a) -> $('_a)]> expr" is not compatible with the type
          "<[$('_a) -> $('_a)]> expr"
-       Type "$('_a) -> $('_a)" is not compatible with type
-         "$('_a) -> $('_a)" = "$('_a) -> $('_a)"
-       Type "'_a" is not compatible with type "'_a" = "'_a"
+       Type "$('_a) -> $('_a)" is not compatible with type "$('_a) -> $('_a)"
+       Type "'_a" is not compatible with type "'_a"
        The type variable "'a" occurs inside "'a"
 |}];;
 
@@ -457,12 +456,13 @@ mk_pair <[Some 123]>;;
 
 mk_pair <[fun () -> 42]>;;
 [%%expect {|
-- : <[unit -> int * unit -> int]> expr = <[((fun () -> 42), (fun () -> 42))]>
+- : <[(unit -> int) * (unit -> int)]> expr =
+<[((fun () -> 42), (fun () -> 42))]>
 |}];;
 
 mk_pair <[fun x -> x]>;;
 [%%expect {|
-- : <['_weak1 -> '_weak1 * '_weak1 -> '_weak1]> expr =
+- : <[('_weak1 -> '_weak1) * ('_weak1 -> '_weak1)]> expr =
 <[((fun x -> x), (fun x -> x))]>
 |}];;
 
