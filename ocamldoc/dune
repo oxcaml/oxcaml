@@ -70,7 +70,7 @@
     odoc_types
     odoc_value
   )
-  (libraries dynlink_internal ocamlcommon str unix))
+  (libraries dynlink ocamlcommon str unix))
 
 (executable
   (name odoc_byte)
@@ -88,7 +88,7 @@
   (name odoc_native)
   (modes native)
   (modules odoc_native)
-  (libraries odoc_lib dynlink_internal))
+  (libraries odoc_lib dynlink))
 
 (rule
   (targets odoc_native.ml)
