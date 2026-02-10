@@ -768,8 +768,10 @@ CFI_STARTPROC
            continuation. */
         cmpq    $3, Caml_state(preemption)
         jbe     LBL(restore_regs_and_ret)
+        CFI_REMEMBER_STATE
         LEAVE_FUNCTION
         jmp     G(caml_preempt)
+        CFI_RESTORE_STATE
 LBL(restore_regs_and_ret):
         /* We're not preempting, so restore registers and return back to the
            user */
@@ -1406,6 +1408,7 @@ LBL(112):
         WOSIZE_VAL(%rbx, %rcx)
         cmpq    $3, %rcx
         je      1f
+        CFI_REMEMBER_STATE
         ENTER_FUNCTION
 #if defined(WITH_THREAD_SANITIZER)
         /* We must let the TSan runtime know that we switched back to the
@@ -1427,6 +1430,7 @@ LBL(112):
         movq    %rax, C_ARG_1
         LEA_VAR(caml_raise_unhandled_effect, %rax)
         jmp     LBL(caml_c_call)
+        CFI_RESTORE_STATE
 1:      /* Preemption unhandled; jump into the end of caml_resume which will
            handle redoing the interrupted allocation, restoring registers, and
            returning to user code */
@@ -1496,9 +1500,10 @@ CFI_STARTPROC
         WOSIZE_VAL(%rax, %rcx)
         cmpq   $3, %rcx                      /* Wosize_hd(%rax) == 3 ? */
         je     1f
-        pushq  $0; CFI_ADJUST(8) /* no gc_regs, push NULL */
+        pushq  $0                            /* no gc_regs, push NULL */
         jmp    2f
-1:      pushq  Cont_gc_regs(%rax); CFI_ADJUST(8) /* we have a gc_regs, push it */
+1:      pushq  Cont_gc_regs(%rax)            /* we have a gc_regs, push it */
+        CFI_ADJUST(8)                        /* for either push */
 2:      movq   %rax, C_ARG_1
         SWITCH_OCAML_TO_C
         C_call (GCALL(caml_continuation_use_noexc)) /* %rax := stack */
