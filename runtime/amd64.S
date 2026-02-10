@@ -765,13 +765,13 @@ CFI_STARTPROC
            Caml_state->preemption points to a freshly allocated preemption
            continuation. */
         cmpq    $3, Caml_state(preemption)
-        jbe     1f
+        jbe     LBL(restore_regs_and_ret)
         LEAVE_FUNCTION
         jmp     G(caml_preempt)
-1:      /* We're not preempting, so restore registers and return back to the
+LBL(restore_regs_and_ret):
+        /* We're not preempting, so restore registers and return back to the
            user */
         movq    Caml_state(gc_regs), %r15
-LBL(resume_from_preempt):
         /* When preempted continuations resume, they always jump back here, with
            the address for the continuation on the stack */
         movq    Gc_regs_kind(%r15), %r11
@@ -1396,11 +1396,11 @@ LBL(112):
         movq    %rax, C_ARG_1
         LEA_VAR(caml_raise_unhandled_effect, %rax)
         jmp     LBL(caml_c_call)
-1:      /* Preempt unhandled; restore the gc_regs from the continuation to %r15
-           and jump back into the second half of caml_do_call_gc, which will
-           restore the regs and return. */
-        movq   Cont_gc_regs(%rbx), %r15
-        jmp    LBL(resume_from_preempt)
+1:      /* Preemption unhandled; jump into the end of caml_resume which will
+           handle redoing the interrupted allocation, restoring registers, and
+           returning to user code */
+        movq   Cont_gc_regs(%rbx), %rdx
+        jmp    LBL(resume_preemption)
 CFI_ENDPROC
 ENDFUNCTION(G(caml_perform))
 
@@ -1512,9 +1512,10 @@ CFI_STARTPROC
         SWITCH_OCAML_STACKS
         FLUSH_DYNAMIC_CACHE(%r13)
         testq   %rdx, %rdx /* Do we have a gc_regs? */
-        jnz     3f
+        jnz     LBL(resume_preemption)
         jmpq    *(%rbx)    /* no, just jump into the continuation */
-3:      /* This continuation represents a preemption, meaning we have to restore
+LBL(resume_preemption):
+        /* This continuation represents a preemption, meaning we have to restore
            its gc_regs before resuming */
         movq    %rdx, Caml_state(gc_regs)  /* Save gc_regs */
         movq    %r15, Caml_state(young_ptr)
@@ -1523,14 +1524,14 @@ CFI_STARTPROC
            the (possibly new) young heap. */
         ENTER_FUNCTION /* Push frame pointer so that
                           caml_redo_preempted_allocation sees the expected stack
-                          layout, and resume_from_preempt can pop it. */
+                          layout, and restore_regs_and_ret can pop it. */
         SWITCH_OCAML_TO_C
         C_call  (GCALL(caml_redo_preempted_allocation))
         SWITCH_C_TO_OCAML
         movq    Caml_state(gc_regs), %r15  /* Restore gc_regs */
         /* Jump into the second half of caml_do_call_gc, which will restore the
            registers and `ret` to resume */
-        jmp     LBL(resume_from_preempt)
+        jmp     LBL(restore_regs_and_ret)
 LBL(continuation_already_resumed):
         ENTER_FUNCTION
         TSAN_ENTER_FUNCTION(0) /* Necessary to include the caller of caml_resume
