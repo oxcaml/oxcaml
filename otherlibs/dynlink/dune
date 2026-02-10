@@ -12,7 +12,6 @@
 ;*                                                                        *
 ;**************************************************************************
 
-<<<<<<< HEAD
 (rule
  (targets dynlink_internal_byte.ml)
  (deps byte/dynlink.ml)
@@ -73,7 +72,8 @@
    -safe-string
    -strict-formats))
  (ocamlopt_flags
-  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
+  (:standard
+   (:include %{project_root}/ocamlopt_flags.sexp)))
  (modules
   binutils
   local_store
@@ -615,11 +615,18 @@
 ; at the moment, apparently Buenzli is working on this).
 ; We use a workaround for the moment.
 
+(copy_files byte/dynlink_symtable.ml*)
+
 (library
  (name dynlink_internal_common)
  (wrapped false)
  (modes byte native)
- (modules dynlink_common dynlink_types dynlink_platform_intf)
+ (modules
+  dynlink_config
+  dynlink_symtable
+  dynlink_common
+  dynlink_types
+  dynlink_platform_intf)
  (libraries dynlink_compilerlibs))
 
 ; Deps within the compiler tree must be on dynlink_internal not dynlink.
@@ -753,6 +760,8 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Runtimedef.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Symtable.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Opcodes.cmo
+  .dynlink_internal_common.objs/byte/dynlink_config.cmo
+  .dynlink_internal_common.objs/byte/dynlink_symtable.cmo
   .dynlink_internal_common.objs/byte/dynlink_types.cmo
   .dynlink_internal_common.objs/byte/dynlink_platform_intf.cmo
   .dynlink_internal_common.objs/byte/dynlink_common.cmo
@@ -869,6 +878,8 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Runtimedef.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Symtable.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Opcodes.cmx
+  .dynlink_internal_common.objs/native/dynlink_config.cmx
+  .dynlink_internal_common.objs/native/dynlink_symtable.cmx
   .dynlink_internal_common.objs/native/dynlink_types.cmx
   .dynlink_internal_common.objs/native/dynlink_platform_intf.cmx
   .dynlink_internal_common.objs/native/dynlink_common.cmx
@@ -880,6 +891,12 @@
  (files
   (.dynlink_internal.objs/byte/dynlink.cmti as dynlink/dynlink.cmti)
   (.dynlink_internal.objs/byte/dynlink.cmt as dynlink/dynlink.cmt)
+  (.dynlink_internal_common.objs/native/dynlink_config.cmx
+   as
+   dynlink/dynlink_config.cmx)
+  (.dynlink_internal_common.objs/native/dynlink_symtable.cmx
+   as
+   dynlink/dynlink_symtable.cmx)
   (.dynlink_internal_common.objs/native/dynlink_common.cmx
    as
    dynlink/dynlink_common.cmx)
@@ -906,35 +923,3 @@
   (META as dynlink/META))
  (section lib)
  (package ocaml))
-||||||| parent of f1c28574ac (Merge pull request #11996 from shindere/emancipate-dynlink-from-compilerlibs)
-; mshinwell: Disabled: this needs to build in the same way as the
-; Makefile does, with the [Dynlink_compilerlibs] pack.
-;
-; (library
-;   (name dynlink)
-;   (wrapped false)
-;   (modules dynlink dynlink_compilerlibs dynlink_common dynlink_types
-;      dynlink_platform_intf)
-;   ; the -33 is specific to the hackery done with dune.
-;   (flags (:standard -nostdlib -w -33))
-;   (modules_without_implementation dynlink)
-;   (libraries ocamlcommon stdlib))
-;
-; (rule
-;  (targets dynlink_compilerlibs.ml)
-;  (action (write-file %{targets}
-;            "(* empty because we are linking with ocamlcommon *)")))
-=======
-; mshinwell: Disabled: this needs to build in the same way as the
-; Makefile does, with the [Dynlink_compilerlibs] pack.
-;
-; (library
-;   (name dynlink)
-;   (wrapped false)
-;   (modules dynlink dynlink_common dynlink_types
-;      dynlink_platform_intf)
-;   ; the -33 is specific to the hackery done with dune.
-;   (flags (:standard -nostdlib -w -33))
-;   (modules_without_implementation dynlink)
-;   (libraries ocamlcommon stdlib))
->>>>>>> f1c28574ac (Merge pull request #11996 from shindere/emancipate-dynlink-from-compilerlibs)

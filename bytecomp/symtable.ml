@@ -24,9 +24,9 @@ module Style = Misc.Style
 
 module Compunit = struct
   type t = compunit
-  let name (Compunit cu_name) = cu_name
-  let is_packed (Compunit name) = String.contains name '.'
-  let to_ident (Compunit cu_name) = Ident.create_persistent cu_name
+  let name cu = Compilation_unit.full_path_as_string cu
+  let is_packed = Compilation_unit.is_packed
+  let to_ident = Compilation_unit.to_global_ident_for_bytecode
   module Set = Set.Make(struct type nonrec t = t let compare = compare end)
   module Map = Map.Make(struct type nonrec t = t let compare = compare end)
 end
@@ -51,24 +51,12 @@ module Global = struct
 
   let quote s = "`" ^ s ^ "'"
 
-<<<<<<< HEAD
-  let description ppf = function
-    | Glob_compunit cu ->
-        Format_doc.fprintf ppf "compilation unit %a"
-          Compilation_unit.print_as_inline_code cu
-||||||| parent of f1c28574ac (Merge pull request #11996 from shindere/emancipate-dynlink-from-compilerlibs)
-  let description ppf = function
-    | Glob_compunit (Compunit cu) ->
-        Format_doc.fprintf ppf "compilation unit %a"
-          Style.inline_code (quote cu)
-=======
   let description ppf g =
     let open Format_doc in
     match g with
-    | Glob_compunit (Compunit cu) ->
+    | Glob_compunit cu ->
         fprintf ppf "compilation unit %a"
-          Style.inline_code (quote cu)
->>>>>>> f1c28574ac (Merge pull request #11996 from shindere/emancipate-dynlink-from-compilerlibs)
+          Compilation_unit.print_as_inline_code cu
     | Glob_predef (Predef_exn exn) ->
         fprintf ppf "predefined exception %a"
           Style.inline_code (quote exn)
