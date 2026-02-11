@@ -12,6 +12,11 @@ module type S = sig
   val baz : 'a -> 'a @@ portable
 end
 [%%expect{|
+Line 4, characters 24-35:
+4 |   val bar : 'a -> 'a @@ nonportable
+                            ^^^^^^^^^^^
+Warning 217 [redundant-modality]: This nonportable modality is redundant.
+
 module type S =
   sig
     val foo : 'a -> 'a
@@ -36,6 +41,11 @@ module type S' = sig
   include S @@ nonportable
 end
 [%%expect{|
+Line 2, characters 15-26:
+2 |   include S @@ nonportable
+                   ^^^^^^^^^^^
+Warning 217 [redundant-modality]: This nonportable modality is redundant.
+
 module type S' =
   sig
     val foo : 'a -> 'a
@@ -53,6 +63,11 @@ module type S = functor (_ : sig end) -> sig
   val baz : 'a -> 'a @@ portable
 end
 [%%expect{|
+Line 4, characters 24-35:
+4 |   val bar : 'a -> 'a @@ nonportable
+                            ^^^^^^^^^^^
+Warning 217 [redundant-modality]: This nonportable modality is redundant.
+
 module type S =
   sig end ->
     sig
@@ -78,6 +93,11 @@ module type S' = sig
   include functor S @@ nonportable
 end
 [%%expect{|
+Line 2, characters 23-34:
+2 |   include functor S @@ nonportable
+                           ^^^^^^^^^^^
+Warning 217 [redundant-modality]: This nonportable modality is redundant.
+
 module type S' =
   sig
     val foo : 'a -> 'a
@@ -321,6 +341,11 @@ module type S' = sig
 end
 [%%expect{|
 module type S = sig val foo : 'a -> 'a @@ portable end
+Line 6, characters 15-26:
+6 |   include S @@ nonportable contended
+                   ^^^^^^^^^^^
+Warning 217 [redundant-modality]: This nonportable modality is redundant.
+
 module type S' = sig val foo : 'a -> 'a @@ portable contended end
 |}]
 

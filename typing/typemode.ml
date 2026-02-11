@@ -631,7 +631,7 @@ let sort_dedup_modalities ~warn l =
       Location.prerr_warning loc0
         (Warnings.Modal_axis_specified_twice { axis; overriden_by })
   in
-  l |> List.stable_sort compare |> dedup ~on_dup |> List.map (fun x -> x.txt)
+  l |> List.stable_sort compare |> dedup ~on_dup
 
 let transl_modalities_with_default ~maturity ~default annots =
   let modalities_loc =
@@ -641,19 +641,24 @@ let transl_modalities_with_default ~maturity ~default annots =
   in
   let annots = List.map (transl_modality ~maturity) annots in
   (* axes listed in the order of implication. *)
-  let modalities = sort_dedup_modalities ~warn:true annots in
+  let modalities_with_loc = sort_dedup_modalities ~warn:true annots in
   let open Modality in
   (* - default is applied before explicit modalities.
      - explicit modalities can override default.
      - For the same axis, later modalities overrides earlier modalities. *)
   let modalities =
     List.fold_left
-      (fun m (Atom (ax, a) as t) ->
+      (fun m { txt = Atom (ax, a) as t; loc } ->
+        let current_a = Const.proj ax m in
+        (if Per_axis.eq ax a current_a
+         then
+           let modality = Format_doc.asprintf "%a" (Per_axis.print ax) a in
+           Location.prerr_warning loc (Warnings.Redundant_modality modality));
         let m = Const.set ax a m in
         List.fold_left
           (fun m (Atom (ax, a)) -> Const.set ax a m)
           m (implied_modalities t))
-      default modalities
+      default modalities_with_loc
   in
   enforce_forbidden_modalities Modality ~loc:modalities_loc modalities;
   { moda_modalities = modalities; moda_desc = annots }
@@ -676,6 +681,7 @@ let sort_dedup_modalities modalities =
      a none location and disabling warnings. We should find a nicer solution. *)
   List.map (fun x -> { txt = x; loc = Location.none }) modalities
   |> sort_dedup_modalities ~warn:false
+  |> List.map (fun x -> x.txt)
 
 let untransl_modalities t = List.map untransl_modality t.moda_desc
 
