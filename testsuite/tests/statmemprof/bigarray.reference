@@ -1,3 +1,4 @@
+<<<<<<< HEAD
           Allocation: 5000 bytes
                  sub: 5000 bytes
                slice: 5000 bytes
@@ -18,3 +19,26 @@
                  sub: 5000 bytes
                slice: 5000 bytes
                   gc: 0 bytes
+||||||| 23e84b8c4d
+=======
+          Allocation: 5000 custom bytes, 0 mmapped bytes
+                 sub: 5000 custom bytes, 0 mmapped bytes
+               slice: 5000 custom bytes, 0 mmapped bytes
+                  gc: 0 custom bytes, 0 mmapped bytes
+       Unix.map_file: 0 custom bytes, 65536 mmapped bytes
+                 sub: 0 custom bytes, 65536 mmapped bytes
+               slice: 0 custom bytes, 65536 mmapped bytes
+                  gc: 0 custom bytes, 0 mmapped bytes
+    CAML_BA_EXTERNAL: 0 custom bytes, 0 mmapped bytes
+                 sub: 0 custom bytes, 0 mmapped bytes
+               slice: 0 custom bytes, 0 mmapped bytes
+                  gc: 0 custom bytes, 0 mmapped bytes
+       ba_alloc NULL: 5000 custom bytes, 0 mmapped bytes
+                 sub: 5000 custom bytes, 0 mmapped bytes
+               slice: 5000 custom bytes, 0 mmapped bytes
+                  gc: 0 custom bytes, 0 mmapped bytes
+     CAML_BA_MANAGED: 5000 custom bytes, 0 mmapped bytes
+                 sub: 5000 custom bytes, 0 mmapped bytes
+               slice: 5000 custom bytes, 0 mmapped bytes
+                  gc: 0 custom bytes, 0 mmapped bytes
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a

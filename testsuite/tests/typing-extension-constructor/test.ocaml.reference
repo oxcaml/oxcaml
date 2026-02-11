@@ -6,6 +6,18 @@ module M : sig type extension_constructor = int end
 Line 2, characters 1-27:
 2 | ([%extension_constructor A] : extension_constructor);;
      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+<<<<<<< HEAD
 Error: This expression has type "extension_constructor"
        but an expression was expected of type "M.extension_constructor" = "int"
+||||||| 23e84b8c4d
+Error: This expression has type "extension_constructor/2"
+       but an expression was expected of type "M.extension_constructor" = "int"
+       File "_none_", line 1:
+         Definition of type "extension_constructor/2"
+=======
+Error: This expression has type extension_constructor/2
+       but an expression was expected of type M.extension_constructor = int
+       File "_none_", line 1:
+         Definition of type extension_constructor/2
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 

@@ -23,12 +23,22 @@ match None with | Some (Some _) -> () | _ -> ()
 |}];;
 
 run {| let open struct type t = { mutable x : int [@atomic] } end in
+<<<<<<< HEAD
        let _ = fun (v : t) -> v.x in () |};;
 
 [%%expect{|
 let open struct type t = {
                   mutable x: int [@atomic ]} end in
   let _ = fun (v : t) -> v.x in ()
+||||||| 23e84b8c4d
+- : string = "match None with | Some (Some _) -> () | _ -> ()"
+=======
+       let _ = fun (v : t) -> [%atomic.loc v.x] in () |};;
+[%%expect{|
+let open struct type t = {
+                  mutable x: int [@atomic ]} end in
+  let _ = fun (v : t) -> [%ocaml.atomic.loc v.x] in ()
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 - : unit = ()
 |}];;
 
@@ -49,6 +59,7 @@ run {| fun x y z -> (function w -> x y z w) |};;
 [%%expect{|
 fun x y z -> (function | w -> x y z w)
 - : unit = ()
+<<<<<<< HEAD
 |}];;
 
 run {| match None with Some (Some _) -> () | _ -> () |};;
@@ -129,4 +140,47 @@ run {| let foo : 'a -> 'a = fun x -> x in foo |}
 [%%expect{|
 let (foo : 'a -> 'a) = ( (fun x -> x : 'a -> 'a)) in foo
 - : unit = ()
+||||||| 23e84b8c4d
+- : string = "fun x y z -> (function | w -> x y z w)"
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 |}];;
+
+(***********************************)
+(* Untypeast/pprintast correctly handle value binding type annotations. *)
+
+run {| let foo : 'a. 'a -> 'a = fun x -> x in foo |}
+
+[%%expect{|
+let foo : 'a . 'a -> 'a = fun x -> x in foo
+- : unit = ()
+|}];;
+
+run {| let foo : type a . a -> a = fun x -> x in foo |}
+
+[%%expect{|
+let foo : 'a . 'a -> 'a = fun (type a) -> (fun x -> x : a -> a) in foo
+- : unit = ()
+|}]
+
+
+let run s =
+  let pe = Parse.implementation (Lexing.from_string s) in
+  let te,_,_,_,_ = Typemod.type_structure Env.initial pe in
+  let ute = Untypeast.untype_structure te in
+  Format.printf "%a@." Pprintast.structure ute
+;;
+
+[%%expect{|
+val run : string -> unit = <fun>
+|}];;
+
+(* That test would hang before ocaml/ocaml#14105 *)
+run {|type t = (::);; let f (x : t) = match x with (::) -> 4|}
+
+[%%expect{|
+type t =
+  | (::)
+let f (x : t) = match x with | (::) -> 4
+- : unit = ()
+|}]

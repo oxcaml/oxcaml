@@ -1,4 +1,5 @@
 (* TEST
+<<<<<<< HEAD
 {
    runtime4;
    skip;
@@ -15,6 +16,20 @@
 *)
 
 (* CR mslater for nbarnes: this test currently fails on arm64 *)
+||||||| 23e84b8c4d
+=======
+ include runtime_events;
+ include unix;
+ set OCAML_RUNTIME_EVENTS_PRESERVE = "1";
+ hasunix;
+ not-target-windows;
+ {
+   bytecode;
+ }{
+   native;
+ }
+*)
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
   let runtime_begin _ _ _ = ()
   let runtime_end _ _ _ = ()

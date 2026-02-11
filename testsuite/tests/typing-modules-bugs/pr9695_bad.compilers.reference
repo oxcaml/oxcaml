@@ -1,4 +1,10 @@
 File "pr9695_bad.ml", line 10, characters 18-19:
 10 | let () = let open A in x
                        ^
+<<<<<<< HEAD
 Error: The module "A" is an alias for module "MissingModule", which is missing
+||||||| 23e84b8c4d
+Error: This is an alias for module "MissingModule", which is missing
+=======
+Error: This is an alias for module MissingModule, which is missing
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a

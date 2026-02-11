@@ -100,10 +100,50 @@ endif
 .INTERMEDIATE: tmpheader.exe
 tmpheader.exe: $(HEADERPROGRAM).$(O)
 	$(V_MKEXE)$(call MKEXE_VIA_CC,$@,$^)
+<<<<<<< HEAD
 # FIXME This is wrong - mingw could invoke strip; MSVC equivalent?
 ifneq "$(UNIX_OR_WIN32)" "win32"
 	strip $@
 endif
+||||||| 23e84b8c4d
+# FIXME This is wrong - mingw could invoke strip; MSVC equivalent?
+ifneq "$(UNIX_OR_WIN32)" "win32"
+	strip $@
+endif
+
+$(HEADERPROGRAM)%$(O): \
+  OC_CPPFLAGS += -DRUNTIME_NAME="$(HEADER_PATH)ocamlrun$(subst .,,$*)"
+
+$(HEADERPROGRAM)%$(O): $(HEADERPROGRAM).c
+	$(V_CC)$(CC) -c $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS) \
+	  $(OUTPUTOBJ)$@ $^
+
+camlheader_ur: camlheader
+	$(V_GEN)cp camlheader $@
+
+ifeq "$(UNIX_OR_WIN32)" "unix"
+tmptargetcamlheader%exe: $(TARGETHEADERPROGRAM)%$(O)
+	$(V_MKEXE)$(call MKEXE_VIA_CC,$@,$^)
+	strip $@
+
+$(TARGETHEADERPROGRAM)%$(O): $(HEADERPROGRAM).c
+	$(V_CC)$(CC) -c $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS) \
+	      -DRUNTIME_NAME="$(HEADER_TARGET_PATH)ocamlrun$(subst .,,$*)" \
+	      $(OUTPUTOBJ)$@ $^
+
+target_%: tmptarget%.exe
+	$(V_GEN)rm -f $@.exe && \
+	mv $< $@
+else
+target_%: %
+	$(V_GEN)cp $< $@
+endif
+
+endif # ifeq "$(SHEBANGSCRIPTS)" "true"
+
+=======
+	$(STRIP) $@
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 stdlib.cma: $(OBJS)
 	$(V_LINKC)$(CAMLC) -a -o $@ $^

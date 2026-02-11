@@ -39,6 +39,7 @@ open A
 
 let y = A.x + Auxiliaire.z
 
+<<<<<<< HEAD
 let () = print_int y
 
 let a = (module A : AS)
@@ -67,3 +68,40 @@ module type MSB = sig
   include AS with type t := u
   module G := A
 end
+||||||| 23e84b8c4d
+=======
+let () = print_int (Stdlib.(+) y 0)
+
+let a = (module A : AS)
+module _ = (val a)
+
+module F (P : AS) = struct include P end
+module G = F (A)
+type u = F (A).t;; (* FIXME F and A are missing*)
+
+module type MS = sig
+  module type MT
+  module M : AS
+  module X = A
+  type u
+end
+module type MSA = MS with
+  module M = A (* M, MT and u are missing *)
+  and module type MT = AS
+  and type u = B.t
+
+let () = match 4 with
+  | A.(0) | _ -> ()
+
+module type MSB = sig
+  type u
+  include AS with type t := u
+  module G := A
+end
+
+module Out = struct module In = struct let x = () end end
+
+let () = Out.
+  In
+  .x
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a

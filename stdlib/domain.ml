@@ -80,11 +80,41 @@ module Runtime_4 = struct
 
     type 'a key = int * (unit -> 'a) Modes.Portable.t
 
+<<<<<<< HEAD
     let key_counter = Atomic.make 0
+||||||| 23e84b8c4d
+  type dls_state = Obj.t array
+=======
+  module Obj_opt : sig
+    type t
+    val none : t
+    val some : 'a -> t
+    val is_some : t -> bool
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
+<<<<<<< HEAD
     let new_key ?split_from_parent:_ init_orphan =
       let idx = Atomic.fetch_and_add key_counter 1 in
       (idx, { portable = init_orphan })
+||||||| 23e84b8c4d
+  let unique_value = Obj.repr (ref 0)
+=======
+    (** [unsafe_get obj] may only be called safely
+        if [is_some] is true.
+
+        [unsafe_get (some v)] is equivalent to
+        [Obj.obj (Obj.repr v)]. *)
+    val unsafe_get : t -> 'a
+  end = struct
+    type t = Obj.t
+    let none = Obj.repr (ref 0)
+    let some v = Obj.repr v
+    let is_some obj = (obj != none)
+    let unsafe_get obj = Obj.obj obj
+  end
+
+  type dls_state = Obj_opt.t array
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
     (* If necessary, grow the current domain's local state array such that [idx]
     * is a valid index in the array. *)
@@ -112,11 +142,24 @@ module Runtime_4 = struct
       let st = maybe_grow idx in
       Array.unsafe_set st idx (Obj_opt.some x)
 
+<<<<<<< HEAD
     let[@inline never] init_idx (type a) idx old_obj (init : _ -> a) =
       let v : a = init () in
       let new_obj = Obj_opt.some v in
       (* At this point, [st] or [st.(idx)] may have been changed
         by another thread on the same domain.
+||||||| 23e84b8c4d
+  let create_dls () =
+    let st = Array.make 8 unique_value in
+    set_dls_state st
+=======
+  external compare_and_set_dls_state : dls_state -> dls_state -> bool =
+    "caml_domain_dls_compare_and_set" [@@noalloc]
+
+  let create_dls () =
+    let st = Array.make 8 Obj_opt.none in
+    set_dls_state st
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
         If [st] changed, it was resized into a larger value,
         we can just reuse the new value.
@@ -539,22 +582,82 @@ module TLS0 = struct
     k
 
   (* If necessary, grow the current domain's local state array such that [idx]
+<<<<<<< HEAD
     * is a valid index in the array. *)
   let[@inline] maybe_grow idx =
     let st = get_tls_state () in
     let size = Array.length st in
     if idx < size then st
+||||||| 23e84b8c4d
+   * is a valid index in the array. *)
+  let maybe_grow idx =
+    let st = get_dls_state () in
+    let sz = Array.length st in
+    if idx < sz then st
+=======
+   * is a valid index in the array. *)
+  let rec maybe_grow idx =
+    let st = get_dls_state () in
+    let sz = Array.length st in
+    if idx < sz then st
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     else begin
+<<<<<<< HEAD
       let new_st = Obj_opt.grow_array st idx size in
       set_tls_state new_st;
       new_st
+||||||| 23e84b8c4d
+      let rec compute_new_size s =
+        if idx < s then s else compute_new_size (2 * s)
+      in
+      let new_sz = compute_new_size sz in
+      let new_st = Array.make new_sz unique_value in
+      Array.blit st 0 new_st 0 sz;
+      set_dls_state new_st;
+      new_st
+=======
+      let rec compute_new_size s =
+        if idx < s then s else compute_new_size (2 * s)
+      in
+      let new_sz = compute_new_size sz in
+      let new_st = Array.make new_sz Obj_opt.none in
+      Array.blit st 0 new_st 0 sz;
+      (* We want a implementation that is safe with respect to
+         single-domain multi-threading: retry if the DLS state has
+         changed under our feet.
+         Note that the number of retries will be very small in
+         contended scenarios, as the array only grows, with
+         exponential resizing. *)
+      if compare_and_set_dls_state st new_st
+      then new_st
+      else maybe_grow idx
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     end
 
+<<<<<<< HEAD
   let[@inline] set (type a) (idx, _init) (x : a) =
     (* Assures [idx] is in range. *)
+||||||| 23e84b8c4d
+  let set (idx, _init) x =
+=======
+  let set (type a) (idx, _init) (x : a) =
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     let st = maybe_grow idx in
+<<<<<<< HEAD
     Array.unsafe_set st idx (Obj_opt.some x)
+||||||| 23e84b8c4d
+    (* [Sys.opaque_identity] ensures that flambda does not look at the type of
+     * [x], which may be a [float] and conclude that the [st] is a float array.
+     * We do not want OCaml's float array optimisation kicking in here. *)
+    st.(idx) <- Obj.repr (Sys.opaque_identity x)
+=======
+    (* [Sys.opaque_identity] ensures that flambda does not look at the type of
+     * [x], which may be a [float] and conclude that the [st] is a float array.
+     * We do not want OCaml's float array optimisation kicking in here. *)
+    st.(idx) <- Obj_opt.some (Sys.opaque_identity x)
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
+<<<<<<< HEAD
   let[@inline never] init_idx (type a) idx (init : _ -> a) =
     let v : a = init () in
     let new_obj = Obj_opt.some v in
@@ -564,16 +667,84 @@ module TLS0 = struct
 
   let[@inline] get (type a) ((idx, init) : a key) : a =
     (* Assures [idx] is in range. *)
+||||||| 23e84b8c4d
+  let get (idx, init) =
+=======
+
+  let[@inline never] array_compare_and_set a i oldval newval =
+    (* Note: we cannot use [@poll error] due to the
+       allocations on a.(i) in the Double_array case. *)
+    let curval = a.(i) in
+    if curval == oldval then (
+      Array.unsafe_set a i newval;
+      true
+    ) else false
+
+  let get (type a) ((idx, init) : a key) : a =
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     let st = maybe_grow idx in
+<<<<<<< HEAD
     let obj = Array.unsafe_get st idx in
     if Obj_opt.is_some obj
     then (Obj_opt.unsafe_get obj : a)
     else init_idx idx init.portable
+||||||| 23e84b8c4d
+    let v = st.(idx) in
+    if v == unique_value then
+      let v' = Obj.repr (init ()) in
+      st.(idx) <- (Sys.opaque_identity v');
+      Obj.magic v'
+    else Obj.magic v
+=======
+    let obj = st.(idx) in
+    if Obj_opt.is_some obj
+    then (Obj_opt.unsafe_get obj : a)
+    else begin
+      let v : a = init () in
+      let new_obj = Obj_opt.some (Sys.opaque_identity v) in
+      (* At this point, [st] or [st.(idx)] may have been changed
+         by another thread on the same domain.
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
+<<<<<<< HEAD
   type key_value : value mod portable contended =
       KV : 'a key * (unit -> 'a) @@ portable -> key_value
   [@@unsafe_allow_any_mode_crossing "CR with-kinds"]
+||||||| 23e84b8c4d
+  let get_initial_keys () : (int * Obj.t) list =
+    List.map
+      (fun (KI ((idx, _) as k, split)) ->
+           (idx, Obj.repr (split (get k))))
+      (Atomic.get parent_keys)
+=======
+         If [st] changed, it was resized into a larger value,
+         we can just reuse the new value.
 
+         If [st.(idx)] changed, we drop the current value to avoid
+         letting other threads observe a 'revert' that forgets
+         previous modifications. *)
+      let st = get_dls_state () in
+      if array_compare_and_set st idx obj new_obj
+      then v
+      else begin
+        (* if st.(idx) changed, someone must have initialized
+           the key in the meantime. *)
+        let updated_obj = st.(idx) in
+        if Obj_opt.is_some updated_obj
+        then (Obj_opt.unsafe_get updated_obj : a)
+        else assert false
+      end
+    end
+
+  type key_value = KV : 'a key * 'a -> key_value
+
+  let get_initial_keys () : key_value list =
+    List.map
+      (fun (KI (k, split)) -> KV (k, (split (get k))))
+      (Atomic.get parent_keys)
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+
+<<<<<<< HEAD
   module Private = struct
     type keys = key_value list
 
@@ -592,6 +763,17 @@ module TLS0 = struct
     let set_initial_keys (l : key_value list) =
       List.iter (fun (KV (k, v)) -> set k (v ())) l
   end
+||||||| 23e84b8c4d
+  let set_initial_keys (l: (int * Obj.t) list) =
+    List.iter
+      (fun (idx, v) ->
+        let st = maybe_grow idx in st.(idx) <- v)
+      l
+
+=======
+  let set_initial_keys (l: key_value list) =
+    List.iter (fun (KV (k, v)) -> set k v) l
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 end
 
 module Safe = struct
@@ -612,7 +794,16 @@ end
 module TLS = struct
   module Private = TLS0.Private
 
+<<<<<<< HEAD
   type 'a key = 'a TLS0.key
+||||||| 23e84b8c4d
+(******** Callbacks **********)
+=======
+external self_index : unit -> int
+  = "caml_ml_domain_index" [@@noalloc]
+
+(******** Callbacks **********)
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
   let new_key ?split_from_parent f =
     let split_from_parent =

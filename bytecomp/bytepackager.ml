@@ -156,21 +156,33 @@ let process_append_bytecode oc state objfile compunit =
     let events, debug_dirs =
       if !Clflags.debug && compunit.cu_debug > 0 then begin
         seek_in ic compunit.cu_debug;
+<<<<<<< HEAD
         (* CR ocaml 5 compressed-marshal:
         let unit_events = (Compression.input_value ic : debug_event list) in
         *)
         let unit_events = (Marshal.from_channel ic : debug_event list) in
+||||||| 23e84b8c4d
+        let unit_events = (input_value ic : debug_event list) in
+=======
+        let unit_events = (Compression.input_value ic : debug_event list) in
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
         let events =
           rev_append_map
             (relocate_debug state.offset state.subst)
             unit_events
             state.events in
+<<<<<<< HEAD
         let unit_debug_dirs =
           (* CR ocaml 5 compressed-marshal:
           (Compression.input_value ic : string list)
           *)
           (Marshal.from_channel ic : string list)
         in
+||||||| 23e84b8c4d
+        let unit_debug_dirs = (input_value ic : string list) in
+=======
+        let unit_debug_dirs = (Compression.input_value ic : string list) in
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
         let debug_dirs =
           String.Set.union
             state.debug_dirs
@@ -376,21 +388,51 @@ module Style = Misc.Style
 let report_error_doc ppf = function
     Forward_reference(file, compunit) ->
       fprintf ppf "Forward reference to %a in file %a"
+<<<<<<< HEAD
         CU.print_as_inline_code compunit
+||||||| 23e84b8c4d
+        Style.inline_code (Compunit.name compunit)
+        (Style.as_inline_code Location.print_filename) file
+=======
+        Style.inline_code (Compunit.name compunit)
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
         Location.Doc.quoted_filename file
   | Multiple_definition(file, compunit) ->
       fprintf ppf "File %a redefines %a"
         Location.Doc.quoted_filename file
+<<<<<<< HEAD
         CU.print_as_inline_code compunit
+||||||| 23e84b8c4d
+        (Style.as_inline_code Location.print_filename) file
+        Style.inline_code (Compunit.name compunit)
+=======
+        Style.inline_code (Compunit.name compunit)
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   | Not_an_object_file file ->
       fprintf ppf "%a is not a bytecode object file"
         Location.Doc.quoted_filename file
+<<<<<<< HEAD
   | Illegal_renaming(name, file, compunit) ->
+||||||| 23e84b8c4d
+        (Style.as_inline_code Location.print_filename) file
+  | Illegal_renaming(name, file, id) ->
+=======
+  | Illegal_renaming(name, file, id) ->
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
       fprintf ppf "Wrong file naming: %a@ contains the code for\
                    @ %a when %a was expected"
         Location.Doc.quoted_filename file
+<<<<<<< HEAD
         CU.print_as_inline_code name
         CU.print_as_inline_code compunit
+||||||| 23e84b8c4d
+        (Style.as_inline_code Location.print_filename) file
+        Style.inline_code (Compunit.name name)
+        Style.inline_code (Compunit.name id)
+=======
+        Style.inline_code (Compunit.name name)
+        Style.inline_code (Compunit.name id)
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   | File_not_found file ->
       fprintf ppf "File %a not found"
         Style.inline_code file

@@ -25,6 +25,20 @@ MAKE_WARN="$MAKE --warn-undefined-variables"
 
 export PATH=$PREFIX/bin:$PATH
 
+call-configure () {
+  local failed
+  ./configure "$@" || failed=$?
+  if ((failed)); then
+    # Output seems to be a little unpredictable in GitHub Actions: ensure that
+    # the fold is definitely on a new line
+    echo
+    echo "::group::config.log content ($(wc -l config.log) lines)"
+    cat config.log
+    echo '::endgroup::'
+    exit $failed
+  fi
+}
+
 Configure () {
   mkdir -p $PREFIX
   cat<<EOF
@@ -37,23 +51,33 @@ request can be merged.
 ------------------------------------------------------------------------
 EOF
 
-  configure_flags="\
-    --prefix=$PREFIX \
-    --enable-flambda-invariants \
-    --enable-ocamltest \
-    --disable-dependency-generation \
-    $CONFIG_ARG"
-
-  ./configure $configure_flags
+  # $CONFIG_ARG will be intentionally word-split - there is no way to pass
+  # arguments requiring spaces from the workflows.
+  # $CONFIG_ARG also appears last to allow settings specified here to be
+  # overridden by the workflows.
+  call-configure --prefix="$PREFIX" \
+                 --enable-flambda-invariants \
+                 --enable-ocamltest \
+                 --disable-dependency-generation \
+                 $CONFIG_ARG
 }
 
 Build () {
+  local failed
+  export TERM=ansi
   if [ "$(uname)" = 'Darwin' ]; then
-    script -q build.log $MAKE_WARN
+    script -q build.log $MAKE_WARN || failed=$?
+    if ((failed)); then
+      script -q build.log $MAKE_WARN -j1 V=1
+      exit $failed
+    fi
   else
-    script --return --command "$MAKE_WARN" build.log
+    script --return --command "$MAKE_WARN" build.log || failed=$?
+    if ((failed)); then
+      script --return --command "$MAKE_WARN -j1 V=1" build.log
+      exit $failed
+    fi
   fi
-  failed=0
   if grep -Fq ' warning: undefined variable ' build.log; then
     echo Undefined Makefile variables detected:
     grep -F ' warning: undefined variable ' build.log
@@ -65,14 +89,24 @@ Build () {
     failed=1
   fi
   if ((failed)); then
-    exit 1
+    exit $failed
   fi
 }
 
 Test () {
-  echo Running the testsuite
-  $MAKE -C testsuite parallel
-  cd ..
+  if [ "$1" = "sequential" ]; then
+    echo Running the testsuite sequentially
+    $MAKE -C testsuite all
+    cd ..
+  elif [ "$1" = "parallel" ]; then
+    echo Running the testsuite in parallel
+    $MAKE -C testsuite parallel
+    cd ..
+  else
+    echo "Error: unexpected argument '$1' to function Test(). " \
+         "It should be 'sequential' or 'parallel'."
+    exit 1
+  fi
 }
 
 # By default, TestPrefix will attempt to run the tests
@@ -125,7 +159,7 @@ This test checks the global structure of the reference manual
 --------------------------------------------------------------------------
 EOF
   # we need some of the configuration data provided by configure
-  ./configure
+  call-configure
   $MAKE check-stdlib check-case-collision -C manual/tests
 
 }
@@ -151,16 +185,26 @@ ReportBuildStatus () {
 }
 
 BasicCompiler () {
+  local failed
   trap ReportBuildStatus ERR
 
-  ./configure --disable-dependency-generation \
-              --disable-debug-runtime \
-              --disable-instrumented-runtime
+  call-configure --disable-dependency-generation \
+                 --disable-debug-runtime \
+                 --disable-instrumented-runtime \
+                 --enable-ocamltest \
 
   # Need a runtime
-  make -j coldstart
+  make -j coldstart || failed=$?
+  if ((failed)) ; then
+    make -j1 V=1 coldstart
+    exit $failed
+  fi
   # And generated files (ocamllex compiles ocamlyacc)
-  make -j ocamllex
+  make -j ocamllex || failed=$?
+  if ((failed)) ; then
+    make -j1 V=1 ocamllex
+    exit $failed
+  fi
 
   ReportBuildStatus 0
 }
@@ -168,7 +212,8 @@ BasicCompiler () {
 case $1 in
 configure) Configure;;
 build) Build;;
-test) Test;;
+test) Test parallel;;
+test_sequential) Test sequential;;
 test_prefix) TestPrefix $2;;
 api-docs) API_Docs;;
 install) Install;;

@@ -96,13 +96,22 @@ module Error: sig
     (** One side is a functor but the other side is not *)
 
   and functor_params_diff =
+<<<<<<< HEAD
     (Types.functor_parameter list * Types.module_type,
      functor_params_symptom) diff
     (** the return mode of the functor is intentionally omitted, since the diff
         is only about parameters. *)
+||||||| 23e84b8c4d
+    (Types.functor_parameter list * Types.module_type) core_diff
+=======
+    functor_params_info core_diff
+   and functor_params_info =
+     { params: functor_parameter list; res: module_type }
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
   and signature_symptom = {
     env: Env.t;
+    subst: Subst.t;
     missings: Types.signature_item list;
     incompatibles: (Ident.t * sigitem_symptom) list;
   }
@@ -172,9 +181,16 @@ val modes_toplevel : modes
 (* Typechecking *)
 
 val modtypes:
+<<<<<<< HEAD
   loc:Location.t -> Env.t -> mark:bool -> modes:modes ->
+||||||| 23e84b8c4d
+  loc:Location.t -> Env.t -> mark:mark ->
+=======
+  loc:Location.t -> Env.t -> mark:bool ->
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   module_type -> module_type -> module_coercion
 
+<<<<<<< HEAD
 (** [modtypes_constraint ~shape ~loc env ~mark exp_modtype constraint_modtype]
     checks that [exp_modtype] is a subtype of [constraint_modtype], and returns
     the module coercion and the shape of the constrained module.
@@ -189,10 +205,40 @@ val modtypes:
 *)
 val modtypes_constraint:
   shape:Shape.t -> loc:Location.t -> Env.t -> mark:bool -> modes:modes ->
+||||||| 23e84b8c4d
+val modtypes_with_shape:
+  shape:Shape.t -> loc:Location.t -> Env.t -> mark:mark ->
+=======
+val modtypes_consistency:
+  loc:Location.t -> Env.t -> module_type -> module_type -> unit
+
+(** [modtypes_constraint ~shape ~loc env ~mark exp_modtype constraint_modtype]
+    checks that [exp_modtype] is a subtype of [constraint_modtype], and returns
+    the module coercion and the shape of the constrained module.
+
+    It also marks as used paired items in positive position in [exp_modtype],
+    and also paired items in negative position in [constraint_modtype].
+
+    This marking in negative position allows to raise an [unused item] warning
+    whenever an item in a functor parameter in [constraint_modtype] does not
+    exist in [exp_modtypes]. This behaviour differs from the one in
+    {!check_implementation} and {!compunit} which assumes that is not
+    appropriate to raise warning about the interface file while typechecking the
+    implementation file.
+*)
+val modtypes_constraint:
+  shape:Shape.t -> loc:Location.t -> Env.t -> mark:bool ->
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   module_type -> module_type -> module_coercion * Shape.t
 
 val strengthened_module_decl:
+<<<<<<< HEAD
   loc:Location.t -> aliasable:bool -> Env.t -> mark:bool -> mmodes:modes ->
+||||||| 23e84b8c4d
+  loc:Location.t -> aliasable:bool -> Env.t -> mark:mark ->
+=======
+  loc:Location.t -> aliasable:bool -> Env.t -> mark:bool ->
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   module_declaration -> Path.t -> module_declaration -> module_coercion
 
 val check_functor_application :
@@ -205,8 +251,18 @@ val check_functor_application :
 val check_modtype_equiv:
   loc:Location.t -> Env.t -> Ident.t -> module_type -> module_type -> unit
 
+<<<<<<< HEAD
 val signatures: Env.t -> mark:bool -> modes:modes ->
   signature -> signature -> module_coercion
+||||||| 23e84b8c4d
+val signatures: Env.t -> mark:mark ->
+  signature -> signature -> module_coercion
+=======
+val signatures: Env.t -> mark:bool -> signature -> signature -> module_coercion
+
+(** Check an implementation against an interface *)
+val check_implementation: Env.t -> signature -> signature -> unit
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 val include_functor_signatures : Env.t -> mark:bool ->
   signature -> signature -> modes:modes -> (Ident.t * module_coercion) list
@@ -259,7 +315,8 @@ module Functor_inclusion_diff: sig
     type diff = (Types.functor_parameter, unit) Error.functor_param_symptom
     type state
   end
-  val diff: Env.t ->
+  type inclusion_env = { i_env:Env.t; i_subst:Subst.t }
+  val diff: inclusion_env ->
     Types.functor_parameter list * Types.module_type ->
     Types.functor_parameter list * Types.module_type ->
     Diffing.Define(Defs).patch

@@ -30,12 +30,80 @@
 #include "caml/signals.h"
 #include "caml/memprof.h"
 
+<<<<<<< HEAD
 static_assert(sizeof(struct custom_operations) == CUSTOM_OPS_STRUCT_SIZE, "");
 
 uintnat caml_custom_major_ratio = Custom_major_ratio_def;
 uintnat caml_custom_minor_ratio = Custom_minor_ratio_def;
 uintnat caml_custom_minor_max_bsz = Custom_minor_max_bsz_def;
+||||||| 23e84b8c4d
+uintnat caml_custom_major_ratio = Custom_major_ratio_def;
+uintnat caml_custom_minor_ratio = Custom_minor_ratio_def;
+uintnat caml_custom_minor_max_bsz = Custom_minor_max_bsz_def;
+=======
+_Atomic uintnat caml_custom_major_ratio = Custom_major_ratio_def;
+_Atomic uintnat caml_custom_minor_ratio = Custom_minor_ratio_def;
+_Atomic uintnat caml_custom_minor_max_bsz = Custom_minor_max_bsz_def;
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
+<<<<<<< HEAD
+||||||| 23e84b8c4d
+mlsize_t caml_custom_get_max_major (void)
+{
+  /* The major ratio is a percentage relative to the major heap size.
+     A complete GC cycle will be done every time 2/3 of that much
+     memory is allocated for blocks in the major heap.  Assuming
+     constant allocation and deallocation rates, this means there are
+     at most [M/100 * major-heap-size] bytes of floating garbage at
+     any time.  The reason for a factor of 2/3 (or 1.5) is, roughly
+     speaking, because the major GC takes 1.5 cycles (previous cycle +
+     marking phase) before it starts to deallocate dead blocks
+     allocated during the previous cycle.  [heap_size / 150] is really
+     [heap_size * (2/3) / 100] (but faster). */
+  return caml_heap_size(Caml_state->shared_heap) / 150
+         * caml_custom_major_ratio;
+}
+
+/* [mem] is an amount of out-of-heap resources, in the same units as
+   [max_major] and [max_minor]. When the cumulated amount of such
+   resources reaches [max_minor] (for resources held by the minor
+   heap) we do a minor collection; when it reaches [max_major] (for
+   resources held by the major heap), we guarantee that a major cycle
+   is done.
+
+   If [max_major] is 0, then [mem] is a number of bytes and the actual
+   limit is [caml_custom_get_max_major ()] computed at the
+   time when the custom block is promoted to the major heap.
+*/
+=======
+mlsize_t caml_custom_get_max_major (void)
+{
+  /* The major ratio is a percentage relative to the major heap size.
+     A complete GC cycle will be done every time 2/3 of that much
+     memory is allocated for blocks in the major heap.  Assuming
+     constant allocation and deallocation rates, this means there are
+     at most [M/100 * major-heap-size] bytes of floating garbage at
+     any time.  The reason for a factor of 2/3 (or 1.5) is, roughly
+     speaking, because the major GC takes 1.5 cycles (previous cycle +
+     marking phase) before it starts to deallocate dead blocks
+     allocated during the previous cycle.  [heap_size / 150] is really
+     [heap_size * (2/3) / 100] (but faster). */
+  return caml_heap_size(Caml_state->shared_heap) / 150
+         * atomic_load_relaxed(&caml_custom_major_ratio);
+}
+
+/* [mem] is an amount of out-of-heap resources, in the same units as
+   [max_major] and [max_minor]. When the cumulated amount of such
+   resources reaches [max_minor] (for resources held by the minor
+   heap) we do a minor collection; when it reaches [max_major] (for
+   resources held by the major heap), we guarantee that a major cycle
+   is done.
+
+   If [max_major] is 0, then [mem] is a number of bytes and the actual
+   limit is [caml_custom_get_max_major ()] computed at the
+   time when the custom block is promoted to the major heap.
+*/
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 static value alloc_custom_gen (const struct custom_operations * ops,
                                uintnat bsz,
                                bool minor_ok,
@@ -46,12 +114,19 @@ static value alloc_custom_gen (const struct custom_operations * ops,
   CAMLlocal1(result);
 
   wosize = 1 + (bsz + sizeof(value) - 1) / sizeof(value);
+<<<<<<< HEAD
   if (local) {
     CAMLassert(ops->finalize == NULL);
     result = caml_alloc_local(wosize, Custom_tag);
     Custom_ops_val(result) = ops;
   }
   else if (wosize <= Max_young_wosize && minor_ok) {
+||||||| 23e84b8c4d
+  if (wosize <= Max_young_wosize && mem <= caml_custom_minor_max_bsz) {
+=======
+  if (wosize <= Max_young_wosize
+      && mem <= atomic_load_relaxed(&caml_custom_minor_max_bsz)) {
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     result = caml_alloc_small(wosize, Custom_tag);
     Custom_ops_val(result) = ops;
     if (ops->finalize != NULL) {
@@ -68,7 +143,8 @@ static value alloc_custom_gen (const struct custom_operations * ops,
 Caml_inline mlsize_t get_max_minor (void)
 {
   return
-    Bsize_wsize (Caml_state->minor_heap_wsz) / 100 * caml_custom_minor_ratio;
+    Bsize_wsize (Caml_state->minor_heap_wsz) / 100
+                * atomic_load_relaxed(&caml_custom_minor_ratio);
 }
 
 CAMLexport value caml_alloc_custom(const struct custom_operations * ops,
@@ -95,6 +171,7 @@ CAMLexport value caml_alloc_custom_mem(const struct custom_operations * ops,
                                        uintnat bsz,
                                        mlsize_t mem)
 {
+<<<<<<< HEAD
   mlsize_t max_minor = get_max_minor (); /* total allocs before minor GC */
   mlsize_t max_minor_single;      /* largest allowed alloc on minor heap */
   if (caml_custom_minor_max_bsz > 100) {
@@ -126,6 +203,14 @@ CAMLexport value caml_alloc_custom_dep (const struct custom_operations * ops,
   result = caml_alloc_custom_mem(ops, bsz, mem);
   caml_alloc_dependent_memory (result, mem);
   CAMLreturn(result);
+||||||| 23e84b8c4d
+  return alloc_custom_gen (ops, bsz, mem, 0, get_max_minor());
+=======
+  value v = alloc_custom_gen (ops, bsz, mem, 0, get_max_minor());
+  size_t mem_words = (mem + sizeof(value) - 1) / sizeof(value);
+  caml_memprof_sample_block(v, mem_words, mem_words, CAML_MEMPROF_SRC_CUSTOM);
+  return v;
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 }
 
 struct custom_operations_list {
@@ -161,8 +246,9 @@ caml_register_custom_operations(const struct custom_operations * ops)
 
 struct custom_operations * caml_find_custom_operations(const char * ident)
 {
-  struct custom_operations_list * l;
-  for (l = atomic_load(&custom_ops_table); l != NULL; l = l->next)
+  for (struct custom_operations_list *l = atomic_load(&custom_ops_table);
+       l != NULL;
+       l = l->next)
     if (strcmp(l->ops->identifier, ident) == 0)
       return (struct custom_operations*)l->ops;
   return NULL;
@@ -172,9 +258,10 @@ static custom_operations_table custom_ops_final_table = NULL;
 
 struct custom_operations * caml_final_custom_operations(final_fun fn)
 {
-  struct custom_operations_list * l;
   struct custom_operations * ops;
-  for (l = atomic_load(&custom_ops_final_table); l != NULL; l = l->next)
+  for (struct custom_operations_list *l = atomic_load(&custom_ops_final_table);
+       l != NULL;
+       l = l->next)
     if (l->ops->finalize == fn) return (struct custom_operations*)l->ops;
   ops = caml_stat_alloc(sizeof(struct custom_operations));
   ops->identifier = "_final";

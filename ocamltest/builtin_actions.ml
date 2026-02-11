@@ -62,7 +62,7 @@ let cd = make
       try
         Sys.chdir cwd; (Result.pass, env)
       with _ ->
-        let reason = "Could not chidir to \"" ^ cwd ^ "\"" in
+        let reason = "Could not chdir to \"" ^ cwd ^ "\"" in
         let result = Result.fail_with_reason reason in
         (result, env)
     end)
@@ -114,6 +114,13 @@ let hasstr = make
     "str library available"
     "str library not available")
 
+let multicore = make
+  ~name:"multicore"
+  ~description:"Pass if running on multicore"
+  (Actions_helpers.pass_or_skip (Domain.recommended_domain_count () >= 2)
+    "running on multicore"
+    "not running on multicore")
+
 let windows_OS = "Windows_NT"
 
 let get_OS () = Sys.safe_getenv "OS"
@@ -133,6 +140,29 @@ let not_windows = make
   (Actions_helpers.predicate (get_OS () <> windows_OS)
     "not running on Windows"
     "running on Windows")
+
+let not_msvc = make
+  ~name:"not-msvc"
+  ~description:"Pass if not using MSVC / clang-cl"
+  (Actions_helpers.pass_or_skip (Ocamltest_config.ccomp_type <> "msvc")
+    "not using MSVC / clang-cl"
+    "using MSVC / clang-cl")
+
+(* windows _passes_ on Cygwin; target_windows _skips_ for Cygwin *)
+
+let target_windows = make
+  ~name:"target-windows"
+  ~description:"Pass if the compiler does targets native Windows"
+  (Actions_helpers.pass_or_skip (Ocamltest_config.target_os_type = "Win32")
+    "targeting native Windows"
+    "not targeting native Windows")
+
+let not_target_windows = make
+  ~name:"not-target-windows"
+  ~description:"Pass if the compiler does not target native Windows"
+  (Actions_helpers.pass_or_skip (Ocamltest_config.target_os_type <> "Win32")
+    "not targeting native Windows"
+    "targeting native Windows")
 
 let is_bsd_system s =
   match s with
@@ -155,6 +185,15 @@ let not_bsd = make
     "not on a BSD system"
     "on a BSD system")
 
+let linux_system = "linux"
+
+let linux = make
+  ~name:"linux"
+  ~description:"Pass if running on a Linux system"
+  (Actions_helpers.pass_or_skip (Ocamltest_config.system = linux_system)
+     "on a Linux system"
+     "not on a Linux system")
+
 let macos_system = "macosx"
 
 let macos = make
@@ -165,6 +204,7 @@ let macos = make
     "on a MacOS system"
     "not on a MacOS system")
 
+<<<<<<< HEAD
 let not_macos = make
   ~name:"not-macos"
   ~description:"Pass if not running on a MacOS system"
@@ -172,6 +212,18 @@ let not_macos = make
   (Actions_helpers.predicate (not (Ocamltest_config.system = macos_system))
     "not on a MacOS system"
     "on a MacOS system")
+||||||| 23e84b8c4d
+=======
+let not_macos_amd64_tsan = make
+  ~name:"not_macos_amd64_tsan"
+  ~description:"Pass if not running on a MacOS amd64 system with TSan enabled"
+  (Actions_helpers.pass_or_skip
+     (not ((Ocamltest_config.system = macos_system)
+           && (String.equal Ocamltest_config.arch "amd64")
+           && (Ocamltest_config.tsan)))
+     "not on a MacOS amd64 system with TSan enabled"
+     "on a MacOS amd64 system with TSan enabled")
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let arch32 = make
   ~name:"arch32"
@@ -228,6 +280,20 @@ let arch_power = make
   (Actions_helpers.predicate (String.equal Ocamltest_config.arch "power")
     "Target is POWER architecture"
     "Target is not POWER architecture")
+
+let arch_riscv = make
+  ~name:"arch_riscv"
+  ~description:"Pass if target is a RISC-V architecture"
+  (Actions_helpers.pass_or_skip (String.equal Ocamltest_config.arch "riscv")
+     "Target is RISC-V architecture"
+     "Target is not RISC-V architecture")
+
+let arch_s390x = make
+  ~name:"arch_s390x"
+  ~description:"Pass if target is a S390x architecture"
+  (Actions_helpers.pass_or_skip (String.equal Ocamltest_config.arch "s390x")
+     "Target is S390x architecture"
+     "Target is not S390x architecture")
 
 let function_sections = make
   ~name:"function_sections"
@@ -413,14 +479,24 @@ let init () =
     hasunix;
     hassysthreads;
     hasstr;
+    multicore;
     libunix;
     libwin32unix;
     windows;
     not_windows;
+    not_msvc;
+    target_windows;
+    not_target_windows;
     bsd;
     not_bsd;
+    linux;
     macos;
+<<<<<<< HEAD
     not_macos;
+||||||| 23e84b8c4d
+=======
+    not_macos_amd64_tsan;
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     arch32;
     arch64;
     has_symlink;
@@ -434,6 +510,8 @@ let init () =
     arch_amd64;
     arch_i386;
     arch_power;
+    arch_riscv;
+    arch_s390x;
     function_sections;
     frame_pointers;
     no_frame_pointers;

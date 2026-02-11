@@ -88,11 +88,12 @@ module Hashtbl : sig
 
   val create : ?random: (* thwart tools/sync_stdlib_docs *) bool ->
                int -> ('a, 'b) t
-  (** [Hashtbl.create n] creates a new, empty hash table, with
-     initial size [n].  For best results, [n] should be on the
-     order of the expected number of elements that will be in
-     the table.  The table grows as needed, so [n] is just an
-     initial guess.
+  (** [Hashtbl.create n] creates a new, empty hash table, with initial
+     size greater or equal to the suggested size [n].  For best results,
+     [n] should be on the order of the expected number of elements that
+     will be in the table.  The table grows as needed, so [n] is just an
+     initial guess.  If [n] is very small or negative then it is
+     disregarded and a small default size is used.
 
      The optional [~random] parameter (a boolean) controls whether
      the internal organization of the hash table is randomized at each
@@ -760,7 +761,7 @@ module Map : sig
       val add_to_list: key:key -> data:'a -> 'a list t -> 'a list t
       (** [add_to_list ~key ~data m] is [m] with [key] mapped to [l] such
           that [l] is [data :: Map.find key m] if [key] was bound in
-          [m] and [[v]] otherwise.
+          [m] and [[data]] otherwise.
           @since 5.1 *)
 
       val update: key:key -> f:('a option -> 'a option) -> 'a t -> 'a t

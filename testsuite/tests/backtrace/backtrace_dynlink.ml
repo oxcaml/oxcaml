@@ -58,11 +58,30 @@ let () =
  shared-libraries;
  native-dynlink;
  setup-ocamlopt.byte-build-env;
+
+ module = "backtrace_dynlink.ml";
+ flags = "-g";
+ ocamlopt.byte;
+
+ unset module;
+ program = "backtrace_dynlink_plugin.cmxs";
+ flags = "-shared -g";
+ all_modules = "backtrace_dynlink_plugin.ml";
+ ocamlopt.byte;
+
+ program = "${test_build_directory}/main.exe";
+ unset flags;
+ libraries = "dynlink";
+ all_modules = "backtrace_dynlink.cmx";
+ ocamlopt.byte;
+
+ ocamlrunparam += ",b=1";
+ run;
  {
-   module = "backtrace_dynlink.ml";
-   flags = "-g";
-   ocamlopt.byte;
+   no-flambda;
+   check-program-output;
  }{
+<<<<<<< HEAD
    program = "backtrace_dynlink_plugin.cmxs";
    flags = "-shared -g";
    all_modules = "backtrace_dynlink_plugin.ml";
@@ -74,6 +93,30 @@ let () =
    ocamlopt.byte;
    ocamlrunparam += ",b=1";
    run;
+||||||| 23e84b8c4d
+   program = "backtrace_dynlink_plugin.cmxs";
+   flags = "-shared -g";
+   all_modules = "backtrace_dynlink_plugin.ml";
+   ocamlopt.byte;
+ }{
+   program = "${test_build_directory}/main.exe";
+   libraries = "dynlink";
+   all_modules = "backtrace_dynlink.cmx";
+   ocamlopt.byte;
+   ocamlrunparam += ",b=1";
+   run;
+   {
+     no-flambda;
+     check-program-output;
+   }{
+     reference = "${test_source_directory}/backtrace_dynlink.flambda.reference";
+     flambda;
+     check-program-output;
+   }
+=======
+   reference = "${test_source_directory}/backtrace_dynlink.flambda.reference";
+   flambda;
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
    check-program-output;
  }
 *)

@@ -28,6 +28,7 @@
 
 enum { CAML_MEMPROF_SRC_NORMAL = 0,
        CAML_MEMPROF_SRC_MARSHAL = 1, /* interning */
+<<<<<<< HEAD
        CAML_MEMPROF_SRC_CUSTOM = 2 /* custom memory */ };
 
 /* Respond to the allocation of any block. Does not call callbacks.
@@ -41,6 +42,25 @@ enum { CAML_MEMPROF_SRC_NORMAL = 0,
 
 void caml_memprof_sample_block(value block, size_t allocated_words,
                                size_t sampled_words, int source);
+||||||| 23e84b8c4d
+/* Suspend or unsuspend profiling */
+=======
+       CAML_MEMPROF_SRC_CUSTOM = 2, /* custom memory */
+       CAML_MEMPROF_SRC_MAP_FILE = 3, /* mmapped file */
+       CAML_MEMPROF_NUM_SOURCE_KINDS};
+
+/* Respond to the allocation of any block. Does not call callbacks.
+ * `block` is the allocated block, to be tracked by memprof if
+ * sampled. `allocated_words` is the number of words allocated, to be
+ * passed to the allocation callback. `sampled_words` is the number of
+ * words to use when computing the number of samples (this will
+ * normally be one more than `allocated words` due to the header word,
+ * but may not be for out-of-heap memory). `source` is one of the
+ * `CAML_MEMPROF_SRC_* constants above. */
+
+CAMLextern void caml_memprof_sample_block(value block, size_t allocated_words,
+                                          size_t sampled_words, int source);
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 /* Sample a minor heap "Comballoc" (combined allocation). Called when
  * the memprof trigger is hit (before the allocation is actually
@@ -92,7 +112,13 @@ extern void caml_memprof_set_trigger(caml_domain_state *state);
 /* Run any pending callbacks for the current domain (or adopted from a
  * terminated domain). */
 
+<<<<<<< HEAD
 extern value caml_memprof_run_callbacks_exn(void);
+||||||| 23e84b8c4d
+/* Multi-domain support. */
+=======
+extern caml_result caml_memprof_run_callbacks_res(void);
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 
 /*** Multi-domain support. ***/
@@ -137,6 +163,6 @@ CAMLextern void caml_memprof_enter_thread(memprof_thread_t);
 
 CAMLextern void caml_memprof_delete_thread(memprof_thread_t);
 
-#endif
+#endif /* CAML_INTERNALS */
 
 #endif /* CAML_MEMPROF_H */

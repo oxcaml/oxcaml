@@ -87,6 +87,36 @@ let () =
   let a = A.of_list [1; 2; 3] in
   assert (A.fold_right List.cons a [] = [1; 2; 3]);;
 
+(* exists2 *)
+let () =
+  let a = A.of_list [1; 2; 3] in
+  assert (A.exists2 (=) a a);
+  assert (not (A.exists2 (=) (A.of_list []) (A.of_list [])));
+  assert (A.exists2 (=) a (A.of_list [1; 4; 3]));
+  assert (match A.exists2 (=) a (A.of_list [1; 2]) with
+    | exception (Invalid_argument _) -> true
+    | _ -> false
+  );
+  assert (match A.exists2 (=) (A.of_list [1; 2]) a with
+    | exception (Invalid_argument _) -> true
+    | _ -> false
+  );;
+
+(* for_all2 *)
+let () =
+  let a = A.of_list [1; 2; 3] in
+  assert (A.for_all2 (=) a a);
+  assert (A.for_all2 (=) (A.of_list []) (A.of_list []));
+  assert (not (A.for_all2 (=) a (A.of_list [1; 4; 3])));
+  assert (match A.for_all2 (=) a (A.of_list [1; 2]) with
+    | exception (Invalid_argument _) -> true
+    | _ -> false
+  );
+  assert (match A.for_all2 (=) (A.of_list [1; 2]) a with
+    | exception (Invalid_argument _) -> true
+    | _ -> false
+  );;
+
 (** {1:adding Adding elements} *)
 
 (** add_last was tested above *)
@@ -154,6 +184,58 @@ let () =
   assert (0. +. 1. +. 8. +. 10. +. 12. = A.fold_left (+.) 0. a);;
 
 
+(** blit *)
+let () =
+  let () =
+    (* normal blit works ok *)
+    let a = A.of_list [1; 2; 3; 4; 5; 6] in
+    let b = A.of_list [7; 8; 9; 10; 11] in
+    A.blit ~src:b ~src_pos:1 ~dst:a ~dst_pos:2 ~len:3;
+    assert (A.to_list a = [1; 2; 8; 9; 10; 6])
+  in
+  let () =
+    (* source range overflows source array: error *)
+    let a = A.of_list [1; 2] in
+    let b = A.of_list [3; 4] in
+    assert (match
+              A.blit ~src:b ~src_pos:2 ~dst:a ~dst_pos:0 ~len:2
+            with exception _ -> true | _ -> false)
+  in
+  let () =
+    (* target range overflows target array: extend the array *)
+    let a = A.of_list [1; 2] in
+    let b = A.of_list [3; 4; 5] in
+    A.blit ~src:b ~src_pos:0 ~dst:a ~dst_pos:1 ~len:3;
+    assert (A.to_list a = [1; 3; 4; 5]);
+    (* call [fit_capacity] to test the resize logic later on. *)
+    A.fit_capacity a;
+    (* this works even at the end *)
+    A.blit ~src:b ~src_pos:0 ~dst:a ~dst_pos:4 ~len:2;
+    assert (A.to_list a = [1; 3; 4; 5; 3; 4]);
+    (* ... but it fails if the extension would leave a gap *)
+    assert (A.length a = 6);
+    assert (match
+              A.blit ~src:b ~src_pos:0 ~dst:a ~dst_pos:7 ~len:2
+            with exception _ -> true | _ -> false)
+  in
+  let () =
+    (* self-blitting scenarios *)
+    (* src_pos > dst_pos *)
+    let a = A.of_list [1; 2; 3] in
+    A.blit ~src:a ~src_pos:1 ~dst:a ~dst_pos:0 ~len:2;
+    assert (A.to_list a = [2; 3; 3]);
+    A.blit ~src:a ~src_pos:0 ~dst:a ~dst_pos:2 ~len:3;
+    assert (A.to_list a = [2; 3; 2; 3; 3]);
+    let b = A.of_list [1; 2; 3; 4] in
+    (* src_pos = dst_pos *)
+    A.blit ~src:b ~src_pos:1 ~dst:b ~dst_pos:1 ~len:2;
+    assert (A.to_list b = [1; 2; 3; 4]);
+    (* src_pos < dst_pos *)
+    A.blit ~src:b ~src_pos:0 ~dst:b ~dst_pos:2 ~len:2;
+    assert (A.to_list b = [1; 2; 1; 2]);
+  in
+  ()
+
 (** {1:removing Removing elements} *)
 
 
@@ -208,6 +290,45 @@ let () =
   let a = A.mapi (fun i e -> Printf.sprintf "%i %i" i e) a in
   assert (A.to_list a = ["0 1"; "1 2"; "2 3"]);;
 
+(** mem *)
+let () =
+  let a = A.of_list [1;2;3;4;5] in
+  assert (A.mem 1 a = true);
+  assert (A.mem 7 a = false)
+
+(** memq *)
+let () =
+  let five = 5 in
+  let a = A.of_list [five; 6; 7] in
+  assert (A.memq five a = true)
+
+(** find_opt *)
+let () =
+  let a = A.of_list [1;4;9] in
+  assert (A.find_opt (fun x -> x / 2 = 2) a = Some 4);
+  assert (A.find_opt (fun x -> x = 5) a = None)
+
+(** find_index *)
+let () =
+  let a = A.of_list [1;2;3] in
+  assert (A.find_index (fun x -> x = 1) a = Some 0);
+  assert (A.find_index (fun x -> x = 5) a = None)
+
+(** find_map *)
+let () =
+  let a = A.of_list [1;2;3;4;5] in
+  let b = A.of_list [1;2;3] in
+  let go x = if x > 3 then Some x else None in
+  assert (A.find_map go a = Some 4);
+  assert (A.find_map go b = None)
+
+(** find_mapi *)
+let () =
+  let a = A.of_list [1;1;3] in
+  let b = A.of_list [3;2;1] in
+  let go i x = if i = x then Some (i, x) else None in
+  assert (A.find_mapi go a = Some (1,1));
+  assert (A.find_mapi go b = None)
 
 (** Iterator invalidation *)
 
@@ -265,6 +386,38 @@ let () =
     )
   ))
 
+
+(** {1:comparison Comparison functions} *)
+
+let () =
+  let a = A.of_list [1; 2; 3] in
+  A.ensure_capacity a 1000;
+  let b = A.of_list [1; 2; 3] in
+  assert (A.equal (=) a a);
+  assert (A.compare Int.compare a a = 0);
+  assert (A.equal (=) a b);
+  assert (A.compare Int.compare a b = 0);
+  ()
+
+let () =
+  let same eq l1 l2 = A.equal eq (A.of_list l1) (A.of_list l2) in
+  assert (not (same (=) [1; 2; 3] [1; 3; 2]));
+  assert (not (same (=) [1; 2; 3] [1; 2]));
+  assert (not (same (=) [1] [1; 2]));
+  assert (not (same (=) [] [1; 2]));
+  assert (same (fun _ _ -> true) [1; 2] [3; 4]);
+  assert (not (same (fun _ _ -> true) [1; 2] [3]));
+  ()
+
+let () =
+  let compare cmp l1 l2 = A.compare cmp (A.of_list l1) (A.of_list l2) in
+  assert (compare Int.compare [] [] = 0);
+  assert (compare Int.compare [1; 2] [1; 2] = 0);
+  assert (compare Int.compare [min_int] [max_int] < 0);
+  assert (compare Int.compare [10] [0; 1] < 0);
+  assert (compare Int.compare [10] [0] > 0);
+  assert (compare (Fun.flip Int.compare) [10] [0] < 0);
+  ()
 
 (** {1:conversions Conversions to other data structures} *)
 
@@ -374,4 +527,91 @@ let () =
   done;
   A.fit_capacity a;
   assert (A.length a = 201);
-  assert (A.length a = A.capacity a);
+  assert (A.length a = A.capacity a);;
+
+(** unsafe_to_iarray *)
+
+let () =
+  let n = 42 in
+  (* With unchanged capacity *)
+  let a = A.unsafe_to_iarray ~capacity:n (fun t ->
+    for i = 0 to n - 1 do
+      A.add_last t i
+    done)
+  in
+  for i = 0 to n - 1 do
+    assert (Iarray.get a i = i)
+  done;
+  (* With a change in capacity *)
+  let a = A.unsafe_to_iarray ~capacity:n (fun t ->
+    for i = 0 to n + 5 do
+      A.add_last t i
+    done)
+  in
+  for i = 0 to n + 5 do
+    assert (Iarray.get a i = i)
+  done;
+  let a = A.unsafe_to_iarray ~capacity:n (fun t ->
+    for i = 0 to n / 2 do
+      A.add_last t i
+    done;
+    A.fit_capacity t)
+  in
+  for i = 0 to n / 2 do
+    assert (Iarray.get a i = i)
+  done;;
+
+(** unsafe_to_iarray with float *)
+
+let () =
+  let n = 42 in
+  let a = A.unsafe_to_iarray ~capacity:n (fun t ->
+    for i = 0 to n - 1 do
+      A.add_last t (Float.of_int i)
+    done)
+  in
+  for i = 0 to n - 1 do
+    assert (Float.equal (Iarray.get a i) (Float.of_int i))
+  done;;
+
+
+(** check that comparisons and marshalling-with-sharing work as
+    expected. *)
+
+let () =
+  (** Comparison.
+
+      We expect physically-equal dynarrays to be found equal,
+      and structurally-distinct dynarrays to be found distinct.
+  *)
+  let a = A.of_list [42] in
+  let b = A.of_list [21] in
+  assert (Stdlib.compare a a = 0);
+  assert (Stdlib.compare a b <> 0);
+  assert (a = a);
+  assert (a <> b);
+
+  (** On the other hand, we do not specify that comparison is fully
+      structural, it may find structurally-equal values distinct, and
+      in fact it does.
+
+      This is not part of our specification, but we document the
+      current behavior through tests below. *)
+  let a' = A.create () in
+  A.ensure_capacity a' 10000;
+  A.append_list a' [42];
+  assert (A.to_list a = A.to_list a');
+  assert (a <> a');
+  assert (Stdlib.compare a a' <> 0);
+  ();;
+
+let () =
+  (** Marshalling. *)
+  let a = A.of_list [42] in
+  let buf = Marshal.to_string a [] in
+  let c = Marshal.from_string buf 0 in
+  (* Note: currently the equality of dynarrays is *not* stable by
+     marshalling-unmarshalling. *)
+  assert (Stdlib.compare a c <> 0);
+  assert (a <> c);
+  ();;

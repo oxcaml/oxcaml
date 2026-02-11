@@ -136,6 +136,7 @@
  (library_flags -linkall)
  (libraries flambda2_floats)
  (modules_without_implementation
+<<<<<<< HEAD
   annot
   value_rec_types
   asttypes
@@ -147,7 +148,13 @@
   solver_intf
   mode_hint
   mode_intf)
+||||||| 23e84b8c4d
+   annot asttypes cmo_format outcometree parsetree value_rec_types)
+=======
+   annot cmo_format outcometree parsetree value_rec_types)
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
  (modules
+<<<<<<< HEAD
   ;; UTILS
   arrayset
   config
@@ -331,11 +338,26 @@
   ; See note below about camlinternalQuote
   (:include
    %{project_root}/duneconf/camlinternalquote_if_missing_from_stdlib)))
+||||||| 23e84b8c4d
+   ;; UTILS
+   config build_path_prefix_map misc identifiable numbers arg_helper clflags
+   profile terminfo ccomp warnings consistbl strongly_connected_components
+   targetint load_path int_replace_polymorphic_compare binutils local_store
+   lazy_backtrack diffing diffing_with_keys unit_info
+=======
+   ;; UTILS
+   config build_path_prefix_map misc identifiable numbers arg_helper
+   clflags profile terminfo ccomp format_doc warnings consistbl
+   strongly_connected_components targetint load_path
+   int_replace_polymorphic_compare binutils local_store lazy_backtrack diffing
+   diffing_with_keys unit_info compression linkdeps
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 ; Our system compiler doesn't have CamlInternalQuote in its stdlib, so
 ; we need to compile it as an additional target, but only for the first
 ; stage build.  See also duneconf/dune.
 
+<<<<<<< HEAD
 (rule
  (targets camlinternalQuote.ml)
  (enabled_if
@@ -344,7 +366,35 @@
   (copy#
    %{project_root}/stdlib/camlinternalQuote.ml
    %{project_root}/camlinternalQuote.ml)))
+||||||| 23e84b8c4d
+   ;; TYPING
+   ident path primitive shape types btype oprint subst predef datarepr
+   cmi_format persistent_env env type_immediacy errortrace
+   typedtree printtyped ctype printtyp includeclass mtype envaux includecore
+   tast_iterator tast_mapper signature_group cmt_format untypeast
+   includemod includemod_errorprinter
+   typetexp patterns printpat parmatch stypes typeopt typedecl value_rec_check
+   typecore
+   typeclass typemod typedecl_variance typedecl_properties typedecl_immediacy
+   typedecl_unboxed typedecl_separability cmt2annot
+   ; manual update: mli only files
+   annot outcometree value_rec_types
+=======
+   ;; TYPING
+   ident path primitive shape shape_reduce types btype oprint subst predef
+   datarepr cmi_format persistent_env env type_immediacy errortrace
+   typedtree printtyped ctype printtyp rawprinttyp includeclass mtype envaux
+   includecore tast_iterator tast_mapper signature_group cmt_format untypeast
+   includemod includemod_errorprinter errortrace_report
+   typetexp patterns printpat parmatch stypes typeopt typedecl value_rec_check
+   typecore
+   typeclass typemod typedecl_variance typedecl_properties typedecl_immediacy
+   typedecl_unboxed typedecl_separability cmt2annot out_type data_types
+   ; manual update: mli only files
+   annot outcometree value_rec_types
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
+<<<<<<< HEAD
 (rule
  (targets camlinternalQuote.mli)
  (enabled_if
@@ -353,6 +403,38 @@
   (copy#
    %{project_root}/stdlib/camlinternalQuote.mli
    %{project_root}/camlinternalQuote.mli)))
+||||||| 23e84b8c4d
+   ;; lambda/
+   debuginfo lambda matching printlambda runtimedef tmc simplif switch
+   translattribute translclass translcore translmod translobj translprim
+
+   ;; bytecomp/
+   meta opcodes bytesections dll symtable
+
+   ;; some of COMP
+   pparse main_args compenv compmisc makedepend compile_common
+   ; manual update: mli only files
+   cmo_format
+   ; manual update: this is required.
+   instruct
+ ))
+=======
+   ;; lambda/
+   debuginfo lambda matching printlambda runtimedef tmc simplif switch
+   translattribute translclass translcore translmod translobj translprim
+   value_rec_compiler
+
+   ;; bytecomp/
+   meta opcodes bytesections dll symtable
+
+   ;; some of COMP
+   pparse main_args compenv compmisc makedepend compile_common
+   ; manual update: mli only files
+   cmo_format
+   ; manual update: this is required.
+   instruct
+ ))
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 (library
  (name ocamlbytecomp)

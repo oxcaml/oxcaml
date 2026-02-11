@@ -129,8 +129,15 @@ let rec immediate_subtypes : type_expr -> type_expr list = fun ty ->
   | Tarrow(_,ty1,ty2,_) ->
       [ty1; ty2]
   | Ttuple(tys) -> List.map snd tys
+<<<<<<< HEAD
   | Tunboxed_tuple(tys) -> List.map snd tys
   | Tpackage(_, fl) -> (snd (List.split fl))
+||||||| 23e84b8c4d
+  | Ttuple(tys) -> tys
+  | Tpackage(_, fl) -> (snd (List.split fl))
+=======
+  | Tpackage pack -> (snd (List.split pack.pack_cstrs))
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   | Tobject(row,class_ty) ->
       let class_subtys =
         match !class_ty with
@@ -413,10 +420,16 @@ let check_type
     | (Tvariant(_)        , Sep    )
     | (Tobject(_,_)       , Sep    )
     | ((Tnil | Tfield _)  , Sep    )
+<<<<<<< HEAD
     | (Tquote(_)          , Sep    )
     | (Tsplice(_)         , Sep    )
     | (Tpackage(_,_)      , Sep    )
     | (Tof_kind(_)        , Sep    ) -> empty
+||||||| 23e84b8c4d
+    | (Tpackage(_,_)      , Sep    ) -> empty
+=======
+    | (Tpackage _         , Sep    ) -> empty
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     (* "Deeply separable" case for these same constructors. *)
     | (Tarrow _           , Deepsep)
     | (Ttuple _           , Deepsep)
@@ -424,9 +437,15 @@ let check_type
     | (Tvariant(_)        , Deepsep)
     | (Tobject(_,_)       , Deepsep)
     | ((Tnil | Tfield _)  , Deepsep)
+<<<<<<< HEAD
     | (Tquote(_)          , Deepsep)
     | (Tsplice(_)         , Deepsep)
     | (Tpackage(_,_)      , Deepsep) ->
+||||||| 23e84b8c4d
+    | (Tpackage(_,_)      , Deepsep) ->
+=======
+    | (Tpackage _         , Deepsep) ->
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
         let tys = immediate_subtypes ty in
         let on_subtype context ty =
           context ++ check_type (Hyps.guard hyps) ty Deepsep in

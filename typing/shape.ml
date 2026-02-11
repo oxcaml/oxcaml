@@ -60,13 +60,24 @@ module Uid = struct
       | Unit_info.Intf -> Format.pp_print_string fmt "[intf]"
       | Unit_info.Impl -> ()
 
+<<<<<<< HEAD
     let rec print fmt = function
+||||||| 23e84b8c4d
+    let print fmt = function
+=======
+    let print fmt = function
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
       | Internal -> Format.pp_print_string fmt "<internal>"
       | Predef name -> Format.fprintf fmt "<predef:%s>" name
       | Compilation_unit s -> Format.pp_print_string fmt s
       | Item { comp_unit; id; from } ->
           Format.fprintf fmt "%a%s.%d" pp_intf_or_impl from comp_unit id
+<<<<<<< HEAD
       | Unboxed_version t -> Format.fprintf fmt "%a#" print t
+||||||| 23e84b8c4d
+      | Item { comp_unit; id } -> Format.fprintf fmt "%s.%d" comp_unit id
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
     let output oc t =
       let fmt = Format.formatter_of_out_channel oc in
@@ -82,8 +93,13 @@ module Uid = struct
         let open Unit_info in
         match current_unit with
         | None -> "", Impl
+<<<<<<< HEAD
         | Some ui ->
           Compilation_unit.full_path_as_string (modname ui), kind ui
+||||||| 23e84b8c4d
+=======
+        | Some ui -> modname ui, kind ui
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
       in
       incr id;
       Item { comp_unit; id = !id; from }
@@ -146,7 +162,11 @@ module Sig_component_kind = struct
     | Type
     | Constructor
     | Label
+<<<<<<< HEAD
     | Unboxed_label
+||||||| 23e84b8c4d
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     | Module
     | Module_type
     | Extension_constructor
@@ -158,7 +178,11 @@ module Sig_component_kind = struct
     | Type -> "type"
     | Constructor -> "constructor"
     | Label -> "label"
+<<<<<<< HEAD
     | Unboxed_label -> "unboxed label"
+||||||| 23e84b8c4d
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     | Module -> "module"
     | Module_type -> "module type"
     | Extension_constructor -> "extension constructor"
@@ -172,7 +196,11 @@ module Sig_component_kind = struct
     | Type
     | Constructor
     | Label
+<<<<<<< HEAD
     | Unboxed_label
+||||||| 23e84b8c4d
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     | Module
     | Module_type
     | Class
@@ -209,13 +237,20 @@ module Item = struct
     let name (name, _) = name
     let kind (_, kind) = kind
 
+    let name (name, _) = name
+    let kind (_, kind) = kind
+
     let make str ns = str, ns
 
     let value id = Ident.name id, Sig_component_kind.Value
     let type_ id = Ident.name id, Sig_component_kind.Type
     let constr id = Ident.name id, Sig_component_kind.Constructor
     let label id = Ident.name id, Sig_component_kind.Label
+<<<<<<< HEAD
     let unboxed_label id = Ident.name id, Sig_component_kind.Unboxed_label
+||||||| 23e84b8c4d
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     let module_ id = Ident.name id, Sig_component_kind.Module
     let module_type id = Ident.name id, Sig_component_kind.Module_type
     let extension_constructor id =
@@ -502,7 +537,13 @@ module Predef = struct
 end
 
 type var = Ident.t
+<<<<<<< HEAD
 type t = { hash:int; uid: Uid.t option; desc: desc; approximated: bool }
+||||||| 23e84b8c4d
+type t = { uid: Uid.t option; desc: desc }
+=======
+type t = { uid: Uid.t option; desc: desc; approximated: bool }
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 and desc =
   | Var of var
   | Abs of var * t
@@ -514,6 +555,7 @@ and desc =
   | Comp_unit of string
   | Error of string
 
+<<<<<<< HEAD
   (* constructors for types  *)
   | Constr of Ident.t * t list
   | Tuple of t list
@@ -700,6 +742,11 @@ and equal_poly_variant_constructor
   List.equal equal args1 args2
 
 let rec print fmt t =
+||||||| 23e84b8c4d
+let print fmt =
+=======
+let print fmt t =
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   let print_uid_opt =
     Format.pp_print_option (fun fmt -> Format.fprintf fmt "<%a>" Uid.print)
   in
@@ -770,6 +817,7 @@ let rec print fmt t =
         Format.fprintf fmt "Alias@[(@[<v>%a@,%a@])@]" print_uid_opt uid aux t
     | Error s ->
         Format.fprintf fmt "Error %s" s
+<<<<<<< HEAD
     | Constr (id, args) ->
         Format.fprintf fmt "@[%a@ %a@]"
           Ident.print id
@@ -849,12 +897,17 @@ let rec print fmt t =
     Format.fprintf fmt "(%a : %a)" print_nested shape
       (Format_doc.compat Layout.format) layout
 
+||||||| 23e84b8c4d
+        Format.fprintf fmt "{@[<v>%a@,%a@]}" print_uid_opt uid print_map map
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   in
   if t.approximated then
     Format.fprintf fmt "@[(approx)@ %a@]@;" aux t
   else
     Format.fprintf fmt "@[%a@]@;" aux t
 
+<<<<<<< HEAD
 (* We use custom strings as separators instead of pp_print_space, because the
    latter introduces line breaks that can mess up the tables with all shapes. *)
 and print_sep_string str fmt () = Format.pp_print_string fmt str
@@ -927,16 +980,30 @@ let hash_mutrec = 21
 let hash_proj_decl = 22
 let hash_unknown_type = 23
 let hash_at_layout = 24
+||||||| 23e84b8c4d
+  Format.fprintf fmt"@[%a@]@;" aux
+=======
+let rec strip_head_aliases = function
+  | { desc = Alias t; _ } -> strip_head_aliases t
+  | t -> t
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let fresh_var ?(name="shape-var") uid =
   let var = Ident.create_local name in
+<<<<<<< HEAD
   var, { uid = Some uid; desc = Var var;
          hash = Hashtbl.hash (hash_var, uid, var);
          approximated = false }
+||||||| 23e84b8c4d
+  var, { uid = Some uid; desc = Var var }
+=======
+  var, { uid = Some uid; desc = Var var; approximated = false }
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let for_unnamed_functor_param = Ident.create_local "()"
 
 let var uid id =
+<<<<<<< HEAD
   { uid = Some uid; desc = Var id;
     hash = Hashtbl.hash (hash_var, Some uid, id);
     approximated = false }
@@ -946,19 +1013,40 @@ let var' uid id =
   { uid; desc = Var id;
     hash = Hashtbl.hash (hash_var, uid, id);
     approximated = false }
+||||||| 23e84b8c4d
+  { uid = Some uid; desc = Var id }
+=======
+  { uid = Some uid; desc = Var id; approximated = false }
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let abs ?uid var body =
+<<<<<<< HEAD
   { uid; desc = Abs (var, body);
     hash = Hashtbl.hash (hash_abs, uid, body.hash);
     approximated = false }
+||||||| 23e84b8c4d
+  { uid; desc = Abs (var, body) }
+=======
+  { uid; desc = Abs (var, body); approximated = false }
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let str ?uid map =
+<<<<<<< HEAD
   let h = Item.Map.fold (fun key t acc ->
     Hashtbl.hash (acc, Item.hash key, t.hash)) map 0
   in
   { uid; desc = Struct map; hash = Hashtbl.hash (hash_struct, uid, h);
     approximated = false }
+||||||| 23e84b8c4d
+  { uid; desc = Struct map }
+=======
+  { uid; desc = Struct map; approximated = false }
 
+let alias ?uid t =
+  { uid; desc = Alias t; approximated = false}
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+
+<<<<<<< HEAD
 let alias ?uid t =
   { uid; desc = Alias t;
     hash = Hashtbl.hash (hash_alias, uid, t.hash);
@@ -978,6 +1066,15 @@ let leaf uid = leaf' (Some uid)
 let approx t = { t with approximated = true}
 
 let set_approximated ~approximated t = { t with approximated}
+||||||| 23e84b8c4d
+let leaf uid =
+  { uid = Some uid; desc = Leaf }
+=======
+let leaf uid =
+  { uid = Some uid; desc = Leaf; approximated = false }
+
+let approx t = { t with approximated = true}
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let proj ?uid t item =
   match t.desc with
@@ -990,10 +1087,17 @@ let proj ?uid t item =
       with Not_found -> approx t (* ill-typed program *)
       end
   | _ ->
+<<<<<<< HEAD
       { uid; desc = Proj (t, item);
         hash = Hashtbl.hash (hash_proj, t.hash, item); approximated = false }
+||||||| 23e84b8c4d
+      { uid; desc = Proj (t, item) }
+=======
+     { uid; desc = Proj (t, item); approximated = false }
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let app ?uid f ~arg =
+<<<<<<< HEAD
   { uid; desc = App (f, arg);
     hash = Hashtbl.hash (hash_app, f.hash, uid, arg.hash);
     approximated = false }
@@ -1098,17 +1202,37 @@ let at_layout ?uid shape layout =
     hash = Hashtbl.hash (hash_at_layout, uid, shape.hash, layout);
     approximated = false }
 
+||||||| 23e84b8c4d
+      { uid; desc = App (f, arg) }
+=======
+  { uid; desc = App (f, arg); approximated = false }
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let decompose_abs t =
   match t.desc with
   | Abs (x, t) -> Some (x, t)
   | _ -> None
 
+<<<<<<< HEAD
 let dummy_mod = str Item.Map.empty
+||||||| 23e84b8c4d
+module Make_reduce(Params : sig
+  type env
+  val fuel : int
+  val read_unit_shape : unit_name:string -> t option
+  val find_shape : env -> Ident.t -> t
+end) = struct
+  (* We implement a strong call-by-need reduction, following an
+     evaluator from Nathanaelle Courant. *)
+=======
+let dummy_mod =
+  { uid = None; desc = Struct Item.Map.empty; approximated = false }
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let of_path ~find_shape ~namespace path =
   (* We need to handle the following cases:
     Path of constructor:
+<<<<<<< HEAD
       M.t.C
     Path of label:
       M.t.lbl
@@ -1117,6 +1241,247 @@ let of_path ~find_shape ~namespace path =
     Path of label of implicit unboxed record:
       M.t#.lbl
   *)
+||||||| 23e84b8c4d
+  type nf = { uid: Uid.t option; desc: nf_desc }
+  and nf_desc =
+    | NVar of var
+    | NApp of nf * nf
+    | NAbs of local_env * var * t * delayed_nf
+    | NStruct of delayed_nf Item.Map.t
+    | NProj of nf * Item.t
+    | NLeaf
+    | NComp_unit of string
+    | NoFuelLeft of desc
+  (* A type of normal forms for strong call-by-need evaluation.
+     The normal form of an abstraction
+       Abs(x, t)
+     is a closure
+       NAbs(env, x, t, dnf)
+     when [env] is the local environment, and [dnf] is a delayed
+     normal form of [t].
+
+     A "delayed normal form" is morally equivalent to (nf Lazy.t), but
+     we use a different representation that is compatible with
+     memoization (lazy values are not hashable/comparable by default
+     comparison functions): we represent a delayed normal form as
+     just a not-yet-computed pair [local_env * t] of a term in a
+     local environment -- we could also see this as a term under
+     an explicit substitution. This delayed thunked is "forced"
+     by calling the normalization function as usual, but duplicate
+     computations are precisely avoided by memoization.
+   *)
+  and delayed_nf = Thunk of local_env * t
+
+  and local_env = delayed_nf option Ident.Map.t
+  (* When reducing in the body of an abstraction [Abs(x, body)], we
+     bind [x] to [None] in the environment. [Some v] is used for
+     actual substitutions, for example in [App(Abs(x, body), t)], when
+     [v] is a thunk that will evaluate to the normal form of [t]. *)
+
+  let improve_uid uid (nf : nf) =
+    match nf.uid with
+    | Some _ -> nf
+    | None -> { nf with uid }
+
+  let in_memo_table memo_table memo_key f arg =
+    match Hashtbl.find memo_table memo_key with
+    | res -> res
+    | exception Not_found ->
+        let res = f arg in
+        Hashtbl.replace memo_table memo_key res;
+        res
+
+  type env = {
+    fuel: int ref;
+    global_env: Params.env;
+    local_env: local_env;
+    reduce_memo_table: (local_env * t, nf) Hashtbl.t;
+    read_back_memo_table: (nf, t) Hashtbl.t;
+  }
+
+  let bind env var shape =
+    { env with local_env = Ident.Map.add var shape env.local_env }
+
+  let rec reduce_ env t =
+    let memo_key = (env.local_env, t) in
+    in_memo_table env.reduce_memo_table memo_key (reduce__ env) t
+  (* Memoization is absolutely essential for performance on this
+     problem, because the normal forms we build can in some real-world
+     cases contain an exponential amount of redundancy. Memoization
+     can avoid the repeated evaluation of identical subterms,
+     providing a large speedup, but even more importantly it
+     implicitly shares the memory of the repeated results, providing
+     much smaller normal forms (that blow up again if printed back
+     as trees). A functor-heavy file from Irmin has its shape normal
+     form decrease from 100Mio to 2.5Mio when memoization is enabled.
+
+     Note: the local environment is part of the memoization key, while
+     it is defined using a type Ident.Map.t of non-canonical balanced
+     trees: two maps could have exactly the same items, but be
+     balanced differently and therefore hash differently, reducing
+     the effectivenss of memoization.
+     This could in theory happen, say, with the two programs
+       (fun x -> fun y -> ...)
+     and
+       (fun y -> fun x -> ...)
+     having "the same" local environments, with additions done in
+     a different order, giving non-structurally-equal trees. Should we
+     define our own hash functions to provide robust hashing on
+     environments?
+
+     We believe that the answer is "no": this problem does not occur
+     in practice. We can assume that identifiers are unique on valid
+     typedtree fragments (identifier "stamps" distinguish
+     binding positions); in particular the two program fragments above
+     in fact bind *distinct* identifiers x (with different stamps) and
+     different identifiers y, so the environments are distinct. If two
+     environments are structurally the same, they must correspond to
+     the evaluation evnrionments of two sub-terms that are under
+     exactly the same scope of binders. So the two environments were
+     obtained by the same term traversal, adding binders in the same
+     order, giving the same balanced trees: the environments have the
+     same hash.
+*)
+
+  and reduce__ ({fuel; global_env; local_env; _} as env) (t : t) =
+    let reduce env t = reduce_ env t in
+    let delay_reduce env t = Thunk (env.local_env, t) in
+    let force (Thunk (local_env, t)) =
+      reduce { env with local_env } t in
+    let return desc : nf = { uid = t.uid; desc } in
+    if !fuel < 0 then return (NoFuelLeft t.desc)
+    else
+      match t.desc with
+      | Comp_unit unit_name ->
+          begin match Params.read_unit_shape ~unit_name with
+          | Some t -> reduce env t
+          | None -> return (NComp_unit unit_name)
+          end
+      | App(f, arg) ->
+          let f = reduce env f in
+          begin match f.desc with
+          | NAbs(clos_env, var, body, _body_nf) ->
+              let arg = delay_reduce env arg in
+              let env = bind { env with local_env = clos_env } var (Some arg) in
+              reduce env body
+              |> improve_uid t.uid
+          | _ ->
+              let arg = reduce env arg in
+              return (NApp(f, arg))
+          end
+      | Proj(str, item) ->
+          let str = reduce env str in
+          let nored () = return (NProj(str, item)) in
+          begin match str.desc with
+          | NStruct (items) ->
+              begin match Item.Map.find item items with
+              | exception Not_found -> nored ()
+              | nf ->
+                  force nf
+                  |> improve_uid t.uid
+              end
+          | _ ->
+              nored ()
+          end
+      | Abs(var, body) ->
+          let body_nf = delay_reduce (bind env var None) body in
+          return (NAbs(local_env, var, body, body_nf))
+      | Var id ->
+          begin match Ident.Map.find id local_env with
+          (* Note: instead of binding abstraction-bound variables to
+             [None], we could unify it with the [Some v] case by
+             binding the bound variable [x] to [NVar x].
+
+             One reason to distinguish the situations is that we can
+             provide a different [Uid.t] location; for bound
+             variables, we use the [Uid.t] of the bound occurrence
+             (not the binding site), whereas for bound values we use
+             their binding-time [Uid.t]. *)
+          | None -> return (NVar id)
+          | Some def -> force def
+          | exception Not_found ->
+          match Params.find_shape global_env id with
+          | exception Not_found -> return (NVar id)
+          | res when res = t -> return (NVar id)
+          | res ->
+              decr fuel;
+              reduce env res
+          end
+      | Leaf -> return NLeaf
+      | Struct m ->
+          let mnf = Item.Map.map (delay_reduce env) m in
+          return (NStruct mnf)
+
+  let rec read_back env (nf : nf) : t =
+    in_memo_table env.read_back_memo_table nf (read_back_ env) nf
+  (* The [nf] normal form we receive may contain a lot of internal
+     sharing due to the use of memoization in the evaluator. We have
+     to memoize here again, otherwise the sharing is lost by mapping
+     over the term as a tree. *)
+
+  and read_back_ env (nf : nf) : t =
+    { uid = nf.uid; desc = read_back_desc env nf.desc }
+
+  and read_back_desc env desc =
+    let read_back nf = read_back env nf in
+    let read_back_force (Thunk (local_env, t)) =
+      read_back (reduce_ { env with local_env } t) in
+    match desc with
+    | NVar v ->
+        Var v
+    | NApp (nft, nfu) ->
+        App(read_back nft, read_back nfu)
+    | NAbs (_env, x, _t, nf) ->
+        Abs(x, read_back_force nf)
+    | NStruct nstr ->
+        Struct (Item.Map.map read_back_force nstr)
+    | NProj (nf, item) ->
+        Proj (read_back nf, item)
+    | NLeaf -> Leaf
+    | NComp_unit s -> Comp_unit s
+    | NoFuelLeft t -> t
+
+  let reduce global_env t =
+    let fuel = ref Params.fuel in
+    let reduce_memo_table = Hashtbl.create 42 in
+    let read_back_memo_table = Hashtbl.create 42 in
+    let local_env = Ident.Map.empty in
+    let env = {
+      fuel;
+      global_env;
+      reduce_memo_table;
+      read_back_memo_table;
+      local_env;
+    } in
+    reduce_ env t |> read_back env
+end
+
+module Local_reduce =
+  (* Note: this definition with [type env = unit] is only suitable for
+     reduction of toplevel shapes -- shapes of compilation units,
+     where free variables are only Comp_unit names. If we wanted to
+     reduce shapes inside module signatures, we would need to take
+     a typing environment as parameter. *)
+  Make_reduce(struct
+    type env = unit
+    let fuel = 10
+    let read_unit_shape ~unit_name:_ = None
+    let find_shape _env _id = raise Not_found
+  end)
+
+let local_reduce shape =
+  Local_reduce.reduce () shape
+
+let dummy_mod = { uid = None; desc = Struct Item.Map.empty }
+
+let of_path ~find_shape ~namespace =
+=======
+      M.t.C [Pextra_ty("M.t", "C")]
+    Path of label:
+      M.t.lbl [Pextra_ty("M.t", "lbl")]
+    Path of label of inline record:
+      M.t.C.lbl [Pextra_ty(Pextra_ty("M.t", "C"), "lbl")] *)
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   let rec aux : Sig_component_kind.t -> Path.t -> t = fun ns -> function
     | Pident id -> find_shape ns id
     | Pdot (Pextra_ty (path, Punboxed_ty), name) ->
@@ -1135,18 +1500,45 @@ let of_path ~find_shape ~namespace path =
       proj (aux namespace path) (name, ns)
     | Papply (p1, p2) -> app (aux Module p1) ~arg:(aux Module p2)
     | Pextra_ty (path, extra) -> begin
+<<<<<<< HEAD
         match extra with
           Pcstr_ty name -> proj (aux Type path) (name, Constructor)
         | Pext_ty -> aux Extension_constructor path
         | Punboxed_ty -> aux ns path
+||||||| 23e84b8c4d
+        match extra with
+          Pcstr_ty _ -> aux Type path
+        | Pext_ty -> aux Extension_constructor path
+=======
+        match extra, ns, path with
+        | Pcstr_ty name, Label, Pextra_ty _ ->
+            (* Handle the M.t.C.lbl case *)
+            proj (aux Constructor path) (name, ns)
+        | Pcstr_ty name, _, _ -> proj (aux Type path) (name, ns)
+        | Pext_ty, _, _ -> aux Extension_constructor path
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
       end
   in
   aux namespace path
 
 let for_persistent_unit s =
+<<<<<<< HEAD
   comp_unit ~uid:(Compilation_unit s) s
+||||||| 23e84b8c4d
+  { uid = Some (Uid.of_compilation_unit_id (Ident.create_persistent s));
+    desc = Comp_unit s }
+=======
+  { uid = Some (Uid.of_compilation_unit_id (Ident.create_persistent s));
+    desc = Comp_unit s; approximated = false }
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
+<<<<<<< HEAD
 let leaf_for_unpack = leaf' None
+||||||| 23e84b8c4d
+let leaf_for_unpack = { uid = None; desc = Leaf }
+=======
+let leaf_for_unpack = { uid = None; desc = Leaf; approximated = false }
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let set_uid_if_none t uid =
   (* CR sspies: This function clears the approximated field of the shape.
@@ -1211,12 +1603,16 @@ module Map = struct
     let item = Item.label id in
     Item.Map.add item (proj shape item) t
 
+<<<<<<< HEAD
   let add_unboxed_label t id uid =
     Item.Map.add (Item.unboxed_label id) (leaf uid) t
   let add_unboxed_label_proj t id shape =
     let item = Item.unboxed_label id in
     Item.Map.add item (proj shape item) t
 
+||||||| 23e84b8c4d
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   let add_module t id shape = Item.Map.add (Item.module_ id) shape t
   let add_module_proj t id shape =
     let item = Item.module_ id in

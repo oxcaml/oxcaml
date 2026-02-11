@@ -1,4 +1,5 @@
 Indexed shapes:
+<<<<<<< HEAD
 Missing uid : t (File "index_aliases.ml", line 52, characters 9-10)
 Resolved: Index_aliases.26 :
   FArg (File "index_aliases.ml", line 49, characters 5-9)
@@ -35,6 +36,52 @@ Resolved: Index_aliases.5 :
 Resolved: Index_aliases.4 :
   X (File "index_aliases.ml", line 21, characters 32-33)
 Resolved: Index_aliases.1 :
+||||||| 23e84b8c4d
+=======
+Missing uid: t (File "index_aliases.ml", line 52, characters 9-10)
+Resolved: Index_aliases.26:
+  FArg (File "index_aliases.ml", line 49, characters 5-9)
+Resolved: Index_aliases.25:
+  Arg (File "index_aliases.ml", line 48, characters 19-22)
+Resolved: Index_aliases.22:
+  X (File "index_aliases.ml", line 48, characters 14-15)
+Approximated: Index_aliases.22:
+  X.F (File "index_aliases.ml", line 48, characters 14-17)
+Alias: Index_aliases.24 -> Alias: Index_aliases.23 ->
+  Approximated: Index_aliases.22:
+  Z (File "index_aliases.ml", line 45, characters 8-9)
+Missing uid: Z.s (File "index_aliases.ml", line 45, characters 8-11)
+Alias: Index_aliases.23 -> Approximated: Index_aliases.22:
+  Y (File "index_aliases.ml", line 42, characters 11-12)
+Resolved: Index_aliases.22:
+  X (File "index_aliases.ml", line 41, characters 11-12)
+Approximated: Index_aliases.22:
+  X.M (File "index_aliases.ml", line 41, characters 11-14)
+Resolved: Index_aliases.17:
+  x (File "index_aliases.ml", line 40, characters 16-17)
+Resolved: Index_aliases.16:
+  S (File "index_aliases.ml", line 38, characters 8-9)
+Alias: Index_aliases.10 -> Alias: Index_aliases.2 ->
+  Resolved: Index_aliases.1:
+  G (File "index_aliases.ml", line 29, characters 8-9)
+Alias: Index_aliases.2 -> Resolved: Index_aliases.1:
+  B (File "index_aliases.ml", line 28, characters 11-12)
+Resolved: Index_aliases.7:
+  C (File "index_aliases.ml", line 26, characters 11-12)
+Alias: Index_aliases.2 -> Resolved: Index_aliases.1:
+  B (File "index_aliases.ml", line 25, characters 14-15)
+Resolved: Index_aliases.5:
+  F (File "index_aliases.ml", line 25, characters 12-13)
+Resolved: Index_aliases.1:
+  A (File "index_aliases.ml", line 23, characters 14-15)
+Alias: Index_aliases.6 -> Resolved: Index_aliases.5:
+  F' (File "index_aliases.ml", line 23, characters 11-13)
+Resolved: Index_aliases.5:
+  F (File "index_aliases.ml", line 22, characters 12-13)
+Resolved: Index_aliases.4:
+  X (File "index_aliases.ml", line 21, characters 32-33)
+Resolved: Index_aliases.1:
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   A (File "index_aliases.ml", line 19, characters 11-12)
 
 Uid of decls:

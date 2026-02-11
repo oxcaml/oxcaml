@@ -3,6 +3,7 @@
  runtime5;
  multidomain;
  include unix;
+ multicore;
  hasunix;
  {
    bytecode;

@@ -14,8 +14,14 @@
 (**************************************************************************)
 
 open Format
+<<<<<<< HEAD
 let () = Printtyp.Naming_context.enable false
 module Printtyp = Printtyp.Compat
+||||||| 23e84b8c4d
+let () = Printtyp.Naming_context.enable false
+=======
+let () = Out_type.Ident_names.enable false
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let new_fmt () =
   let buf = Buffer.create 512 in

@@ -23,8 +23,11 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include "caml/config.h"
-#ifdef HAS_UNISTD
+#ifndef _WIN32
 #include <unistd.h>
+#endif
+#ifdef _WIN32
+#include <io.h>
 #endif
 #include "caml/alloc.h"
 #include "caml/dynlink.h"
@@ -60,16 +63,15 @@ struct ext_table caml_shared_libs_path;
 
 /* Look up the given primitive name in the built-in primitive table,
    then in the opened shared libraries (shared_libs) */
-static c_primitive lookup_primitive(char * name)
+static c_primitive lookup_primitive(const char * name)
 {
-  int i;
   void * res;
 
-  for (i = 0; caml_names_of_builtin_cprim[i] != NULL; i++) {
+  for (int i = 0; caml_names_of_builtin_cprim[i] != NULL; i++) {
     if (strcmp(name, caml_names_of_builtin_cprim[i]) == 0)
       return caml_builtin_cprim[i];
   }
-  for (i = 0; i < shared_libs.size; i++) {
+  for (int i = 0; i < shared_libs.size; i++) {
     res = caml_dlsym(shared_libs.contents[i], name);
     if (res != NULL) return (c_primitive) res;
   }
@@ -81,9 +83,9 @@ static c_primitive lookup_primitive(char * name)
 
 #define LD_CONF_NAME T("ld.conf")
 
-CAMLexport char_os * caml_get_stdlib_location(void)
+CAMLexport const char_os * caml_get_stdlib_location(void)
 {
-  char_os * stdlib;
+  const char_os * stdlib;
   stdlib = caml_secure_getenv(T("OCAMLLIB"));
   if (stdlib == NULL) stdlib = caml_secure_getenv(T("CAMLLIB"));
   if (stdlib == NULL) stdlib = OCAML_STDLIB_DIR;
@@ -92,7 +94,8 @@ CAMLexport char_os * caml_get_stdlib_location(void)
 
 CAMLexport char_os * caml_parse_ld_conf(void)
 {
-  char_os * stdlib, * ldconfname, * wconfig, * p, * q;
+  const char_os * stdlib;
+  char_os * ldconfname, * wconfig, * p, * q;
   char * config;
 #ifdef _WIN32
   struct _stati64 st;
@@ -168,9 +171,17 @@ void caml_build_primitive_table(char_os * lib_path,
                                 char_os * libs,
                                 char * req_prims)
 {
+<<<<<<< HEAD
   char_os * p;
   char * q;
 
+||||||| 23e84b8c4d
+  char_os * tofree1, * tofree2;
+  char_os * p;
+  char * q;
+
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   /* Initialize the search path for dynamic libraries:
      - directories specified on the command line with the -I option
      - directories specified in the CAML_LD_LIBRARY_PATH
@@ -182,19 +193,38 @@ void caml_build_primitive_table(char_os * lib_path,
   caml_decompose_path(&caml_shared_libs_path,
                       caml_secure_getenv(T("CAML_LD_LIBRARY_PATH")));
   if (lib_path != NULL)
-    for (p = lib_path; *p != 0; p += strlen_os(p) + 1)
+    for (char_os *p = lib_path; *p != 0; p += strlen_os(p) + 1)
       caml_ext_table_add(&caml_shared_libs_path, p);
   caml_parse_ld_conf();
   /* Open the shared libraries */
   caml_ext_table_init(&shared_libs, 8);
   if (libs != NULL)
-    for (p = libs; *p != 0; p += strlen_os(p) + 1)
+    for (char_os *p = libs; *p != 0; p += strlen_os(p) + 1)
       open_shared_lib(p);
   /* Build the primitive table */
   caml_ext_table_init(&caml_prim_table, 0x180);
   caml_ext_table_init(&caml_prim_name_table, 0x180);
   if (req_prims != NULL)
+<<<<<<< HEAD
     for (q = req_prims; *q != 0; q += strlen(q) + 1) {
+||||||| 23e84b8c4d
+#endif
+  for (q = req_prims; *q != 0; q += strlen(q) + 1) {
+    c_primitive prim = lookup_primitive(q);
+    if (prim == NULL)
+          caml_fatal_error("unknown C primitive `%s'", q);
+    caml_ext_table_add(&caml_prim_table, (void *) prim);
+#ifdef DEBUG
+    caml_ext_table_add(&caml_prim_name_table, caml_stat_strdup(q));
+#endif
+  }
+  /* Clean up */
+  caml_stat_free(tofree1);
+  caml_stat_free(tofree2);
+  caml_ext_table_free(&caml_shared_libs_path, 0);
+=======
+    for (char *q = req_prims; *q != 0; q += strlen(q) + 1) {
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
       c_primitive prim = lookup_primitive(q);
       if (prim == NULL)
             caml_fatal_error("unknown C primitive `%s'", q);
@@ -208,9 +238,21 @@ void caml_build_primitive_table(char_os * lib_path,
 
 void caml_build_primitive_table_builtin(void)
 {
+<<<<<<< HEAD
   int i;
   caml_build_primitive_table(NULL, NULL, NULL);
   for (i = 0; caml_builtin_cprim[i] != 0; i++) {
+||||||| 23e84b8c4d
+  int i;
+  caml_ext_table_init(&caml_prim_table, 0x180);
+#ifdef DEBUG
+  caml_ext_table_init(&caml_prim_name_table, 0x180);
+#endif
+  for (i = 0; caml_builtin_cprim[i] != 0; i++) {
+=======
+  caml_build_primitive_table(NULL, NULL, NULL);
+  for (int i = 0; caml_builtin_cprim[i] != 0; i++) {
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     caml_ext_table_add(&caml_prim_table, (void *) caml_builtin_cprim[i]);
     caml_ext_table_add(&caml_prim_name_table,
                        caml_stat_strdup(caml_names_of_builtin_cprim[i]));
@@ -227,6 +269,7 @@ CAMLprim value caml_dynlink_get_bytecode_sections(value unit)
 {
   CAMLparam1(unit);
   CAMLlocal4(ret, tbl, list, str);
+<<<<<<< HEAD
   int i, j;
   ret = caml_alloc(4, 0);
 
@@ -289,6 +332,70 @@ CAMLprim value caml_dynlink_get_bytecode_sections(value unit)
 
   list = Val_emptylist;
   for (i = caml_shared_libs_path.size - 1; i >= 0; i--) {
+||||||| 23e84b8c4d
+=======
+  ret = caml_alloc(4, 0);
+
+  if (caml_params->section_table != NULL) {
+    /* cf. Symtable.bytecode_sections */
+    const char* sec_names[] = {"SYMB", "CRCS"};
+    tbl = caml_input_value_from_block(caml_params->section_table,
+                                      caml_params->section_table_size);
+    for (int i = 0; i < sizeof(sec_names)/sizeof(sec_names[0]); i++) {
+      for (int j = 0; j < Wosize_val(tbl); j++) {
+        value kv = Field(tbl, j);
+        if (!strcmp(sec_names[i], String_val(Field(kv, 0))))
+          Store_field(ret, i, Field(kv, 1));
+      }
+    }
+  } else {
+    struct exec_trailer trail;
+    int fd, err;
+    char *sect;
+    int32_t len;
+
+    fd = open_os(caml_params->exe_name, O_RDONLY | O_BINARY);
+    if (fd < 0)
+      caml_failwith("Dynlink: Failed to re-open bytecode executable");
+
+    err = caml_read_trailer(fd, &trail);
+    if (err != 0)
+      caml_failwith("Dynlink: Failed to re-read bytecode trailer");
+
+    caml_read_section_descriptors(fd, &trail);
+
+    len = caml_seek_optional_section(fd, &trail, "SYMB");
+    sect = caml_stat_alloc(len);
+    if (read(fd, sect, len) != len)
+      caml_failwith("Dynlink: error reading SYMB");
+    Store_field(ret, 0,
+      caml_input_value_from_block(sect, len));
+    caml_stat_free(sect);
+
+    len = caml_seek_optional_section(fd, &trail, "CRCS");
+    if (len > 0) {
+      sect = caml_stat_alloc(len);
+      if (read(fd, sect, len) != len)
+        caml_failwith("Dynlink: error reading CRCS");
+      Store_field(ret, 1,
+        caml_input_value_from_block(sect, len));
+      caml_stat_free(sect);
+    }
+
+    caml_stat_free(trail.section);
+    close(fd);
+  }
+
+  list = Val_emptylist;
+  for (int i = caml_prim_name_table.size - 1; i >= 0; i--) {
+    str = caml_copy_string(caml_prim_name_table.contents[i]);
+    list = caml_alloc_2(Tag_cons, str, list);
+  }
+  Store_field(ret, 2, list);
+
+  list = Val_emptylist;
+  for (int i = caml_shared_libs_path.size - 1; i >= 0; i--) {
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     str = caml_copy_string_of_os(caml_shared_libs_path.contents[i]);
     list = caml_alloc_2(Tag_cons, str, list);
   }
@@ -355,10 +462,9 @@ CAMLprim value caml_dynlink_get_current_libs(value unit)
 {
   CAMLparam0();
   CAMLlocal1(res);
-  int i;
 
   res = caml_alloc_tuple(shared_libs.size);
-  for (i = 0; i < shared_libs.size; i++) {
+  for (int i = 0; i < shared_libs.size; i++) {
     value v = caml_alloc_small(1, Abstract_tag);
     Handle_val(v) = shared_libs.contents[i];
     Store_field(res, i, v);

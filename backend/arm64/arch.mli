@@ -44,9 +44,29 @@ type cmm_label = Label.t
 type bswap_bitwidth = Sixteen | Thirtytwo | Sixtyfour
 
 type specific_operation =
+<<<<<<< HEAD:backend/arm64/arch.mli
   | Ifar_poll
   | Ifar_alloc of { bytes : int; dbginfo : Cmm.alloc_dbginfo }
+||||||| 23e84b8c4d:asmcomp/arm64/arch.mli
+  | Ifar_poll of { return_label: cmm_label option }
+  | Ifar_alloc of { bytes : int; dbginfo : Debuginfo.alloc_dbginfo }
+  | Ifar_intop_checkbound
+  | Ifar_intop_imm_checkbound of { bound : int; }
+=======
+  | Ipoll_far of { return_label: cmm_label option }
+  | Ialloc_far of { bytes : int; dbginfo : Debuginfo.alloc_dbginfo }
+  | Icheckbound_far
+  | Icheckbound_imm_far of { bound : int; }
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a:asmcomp/arm64/arch.mli
   | Ishiftarith of arith_operation * int
+<<<<<<< HEAD:backend/arm64/arch.mli
+||||||| 23e84b8c4d:asmcomp/arm64/arch.mli
+  | Ishiftcheckbound of { shift : int; }
+  | Ifar_shiftcheckbound of { shift : int; }
+=======
+  | Ishiftcheckbound of { shift : int; }
+  | Ishiftcheckbound_far of { shift : int; }
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a:asmcomp/arm64/arch.mli
   | Imuladd       (* multiply and add *)
   | Imulsub       (* multiply and subtract *)
   | Inegmulf      (* floating-point negate and multiply *)
@@ -97,10 +117,16 @@ val identity_addressing : addressing_mode
 
 val offset_addressing : addressing_mode -> int -> addressing_mode
 
+<<<<<<< HEAD:backend/arm64/arch.mli
 val num_args_addressing : addressing_mode -> int
 
 val addressing_displacement_for_llvmize : addressing_mode -> int
 
+||||||| 23e84b8c4d:asmcomp/arm64/arch.mli
+val num_args_addressing : addressing_mode -> int
+
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a:asmcomp/arm64/arch.mli
 (* Printing operations and addressing modes *)
 
 val print_addressing :

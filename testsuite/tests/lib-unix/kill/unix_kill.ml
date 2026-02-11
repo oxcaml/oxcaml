@@ -1,7 +1,20 @@
 (* TEST
  include unix;
+<<<<<<< HEAD
  flags = "-alert -unsafe_multidomain";
  libunix;
+||||||| 23e84b8c4d
+ libunix;
+=======
+ hasunix;
+ not-target-windows;
+ (*
+   Disabled on MacOS amd64 with TSan due to a
+   possible infinite signal loop with TSan under MacOS
+   see https://github.com/llvm/llvm-project/issues/63824
+ *)
+ not_macos_amd64_tsan;
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
  {
    bytecode;
  }{

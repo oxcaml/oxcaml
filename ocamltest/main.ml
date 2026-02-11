@@ -30,7 +30,7 @@ let announce_test_error test_filename error =
   Printf.printf " ... testing '%s' => unexpected error (%s)\n%!"
     (Filename.basename test_filename) error
 
-let print_exn loc e =
+let print_exn loc e bt =
   let open Printf in
   let locstring =
     if loc = Location.none then "" else begin
@@ -42,19 +42,19 @@ let print_exn loc e =
   let msg =
     match e with
     | Variables.Variable_already_registered v ->
-      sprintf "Variable \"%s\" is already in the environment." v
+      sprintf "Variable \"%s\" is already in the environment.\n" v
     | Variables.No_such_variable v ->
-      sprintf "Variable \"%s\" is not in the environment." v
+      sprintf "Variable \"%s\" is not in the environment.\n" v
     | Environments.Modifiers_name_not_found name ->
-      sprintf "Environment modifier \"%s\" does not exist." name
+      sprintf "Environment modifier \"%s\" does not exist.\n" name
     | Tsl_semantics.No_such_test_or_action name ->
-      sprintf "This is not the name of a test or an action: \"%s\"." name
+      sprintf "This is not the name of a test or an action: \"%s\".\n" name
     | Ocaml_actions.Cannot_compile_file_type t ->
-      sprintf "Cannot compile files of type %s." t
+      sprintf "Cannot compile files of type %s.\n" t
     | _ ->
-      sprintf "Unexpected exception: %s" (Printexc.to_string e)
+      sprintf "Unexpected exception: %s\n%s" (Printexc.to_string e) bt
   in
-  eprintf "\n%s%s\n%!" locstring msg
+  eprintf "\n%s%s%!" locstring msg
 
 exception Syntax_error of Lexing.position
 
@@ -84,10 +84,11 @@ let tsl_parse_file_safe test_filename =
 let print_usage () =
   Printf.printf "%s\n%!" Options.usage
 
-let report_error loc e =
-  print_exn loc e;
+let report_error loc e bt =
+  print_exn loc e bt;
   "=> error in test script"
 
+<<<<<<< HEAD
 type result_summary = No_failure | Some_failure | All_skipped
 let join_result summary result =
   let open Result in
@@ -98,7 +99,20 @@ let join_result summary result =
   | Pass, All_skipped -> No_failure
   | Predicate true, All_skipped -> No_failure
   | (Pass | Skip | Predicate _), No_failure -> No_failure
+||||||| 23e84b8c4d
+type result_summary = No_failure | Some_failure | All_skipped
+let join_result summary result =
+  let open Result in
+  match result.status, summary with
+  | Fail, _
+  | _, Some_failure -> Some_failure
+  | Skip, All_skipped -> All_skipped
+  | _ -> No_failure
+=======
+type summary = Result.status = Pass | Skip | Fail
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
+<<<<<<< HEAD
 let join_summaries sa sb =
   match sa, sb with
   | Some_failure, (No_failure | Some_failure | All_skipped)
@@ -106,7 +120,18 @@ let join_summaries sa sb =
   | All_skipped, All_skipped -> All_skipped
   | No_failure, (No_failure | All_skipped)
   | All_skipped, No_failure -> No_failure
+||||||| 23e84b8c4d
+let join_summaries sa sb =
+  match sa, sb with
+  | Some_failure, _
+  | _, Some_failure -> Some_failure
+  | All_skipped, All_skipped -> All_skipped
+  | _ -> No_failure
+=======
+(* The sequential join passes if both tests pass.
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
+<<<<<<< HEAD
 let rec run_test_tree log common_prefix behavior env summ ast
       ~must_do_something =
   match ast with
@@ -151,7 +176,119 @@ let rec run_test_tree log common_prefix behavior env summ ast
           (msg, sub_behavior, newenv, result)
         with e ->
           (report_error name.loc e, Skip_all, env, Result.fail)
+||||||| 23e84b8c4d
+let rec run_test_tree log common_prefix behavior env summ ast =
+  match ast with
+  | Ast (Environment_statement s :: stmts, subs) ->
+    begin match interpret_environment_statement env s with
+    | env ->
+      run_test_tree log common_prefix behavior env summ (Ast (stmts, subs))
+    | exception e ->
+      let line = s.loc.Location.loc_start.Lexing.pos_lnum in
+      Printf.printf "%s line %d %!" common_prefix line;
+      Printf.printf "%s\n%!" (report_error s.loc e);
+      Some_failure
+    end
+  | Ast (Test (_, name, mods) :: stmts, subs) ->
+    let locstr =
+      if name.loc = Location.none then
+        "default"
+      else
+        Printf.sprintf "line %d" name.loc.Location.loc_start.Lexing.pos_lnum
+    in
+    Printf.printf "%s %s (%s) %!" common_prefix locstr name.node;
+    let (msg, children_behavior, newenv, result) =
+      match behavior with
+      | Skip_all -> ("=> n/a", Skip_all, env, Result.skip)
+      | Run ->
+        begin try
+          let testenv = List.fold_left apply_modifiers env mods in
+          let test = lookup_test name in
+          let (result, newenv) = Tests.run log testenv test in
+          let msg = Result.string_of_result result in
+          let sub_behavior = if Result.is_pass result then Run else Skip_all in
+          (msg, sub_behavior, newenv, result)
+        with e -> (report_error name.loc e, Skip_all, env, Result.fail)
+=======
+   This implies that a linear sequence of actions, a path along the
+   test tree, is considered successful if all actions passed. *)
+let join_sequential r1 r2 =
+  match r1, r2 with
+  | Fail, _ | _, Fail -> Fail
+  | Pass, Pass -> Pass
+  | Skip, _ | _, Skip -> Skip
+
+(* The parallel join passes if either test passes.
+
+   This implies that a test formed of several parallel branches is
+   considered successful if at least one of the branches is successful.
+*)
+let join_parallel r1 r2 =
+  match r1, r2 with
+  | Fail, _ | _, Fail -> Fail
+  | Pass, _ | _, Pass -> Pass
+  | Skip, Skip -> Skip
+
+let string_of_summary = function
+  | Pass -> "passed"
+  | Fail -> "failed"
+  | Skip -> "skipped"
+
+let run_test_tree log add_msg behavior env summ ast =
+  let run_statement (behavior, env, summ) = function
+    | Environment_statement s ->
+      begin match interpret_environment_statement env s with
+      | env -> Ok (behavior, env, summ)
+      | exception e ->
+        let bt = Printexc.get_backtrace () in
+        let line = s.loc.Location.loc_start.Lexing.pos_lnum in
+        Printf.ksprintf add_msg "line %d %s" line (report_error s.loc e bt);
+        Error Fail
+      end
+    | Test (_, name, mods) ->
+      let locstr =
+        if name.loc = Location.none then
+          "default"
+        else
+          Printf.sprintf "line %d" name.loc.Location.loc_start.Lexing.pos_lnum
+      in
+      let (msg, behavior, env, result) =
+        match behavior with
+        | Skip_all -> ("=> n/a", Skip_all, env, Result.skip)
+        | Run ->
+          begin try
+            let testenv = List.fold_left apply_modifiers env mods in
+            let test = lookup_test name in
+            let (result, newenv) = Tests.run log testenv test in
+            let msg = Result.string_of_result result in
+            let sub_behavior =
+              if Result.is_pass result then Run else Skip_all in
+            (msg, sub_behavior, newenv, result)
+          with e ->
+            let bt = Printexc.get_backtrace () in
+            (report_error name.loc e bt, Skip_all, env, Result.fail)
+          end
+      in
+      Printf.ksprintf add_msg "%s (%s) %s" locstr name.node msg;
+      let summ = join_sequential summ result.status in
+      Ok (behavior, env, summ)
+  in
+  let rec run_tree behavior env summ (Ast (stmts, subs)) =
+    match List.fold_left_result run_statement (behavior, env, summ) stmts with
+    | Error e -> e
+    | Ok (behavior, env, summ) ->
+        (* If [subs] is empty, there are no further test actions to
+           perform: we are at the end of a test path and can report
+           our current summary. Otherwise we continue with each
+           branch, and parallel-join the result summaries. *)
+        begin match subs with
+        | [] -> summ
+        | _ ->
+            List.fold_left join_parallel Skip
+              (List.map (run_tree behavior env summ) subs)
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
         end
+<<<<<<< HEAD
     in
     if not skip_all then Printf.printf "%s\n%!" msg;
     let newsumm = join_result summ result in
@@ -178,6 +315,18 @@ let rec run_test_tree log common_prefix behavior env summ ast
 
 let run_test_tree log common_prefix behavior env summ ast =
   run_test_tree log common_prefix behavior env summ ast ~must_do_something:true
+||||||| 23e84b8c4d
+    in
+    Printf.printf "%s\n%!" msg;
+    let newsumm = join_result summ result in
+    let newast = Ast (stmts, subs) in
+    run_test_tree log common_prefix children_behavior newenv newsumm newast
+  | Ast ([], subs) ->
+    List.fold_left join_summaries summ
+      (List.map (run_test_tree log common_prefix behavior env All_skipped) subs)
+=======
+  in run_tree behavior env summ ast
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let get_test_source_directory test_dirname =
   if (Filename.is_relative test_dirname) then
@@ -262,6 +411,7 @@ let test_file test_filename =
        let make = try Sys.getenv "MAKE" with Not_found -> "make" in
        let initial_environment = Environments.from_bindings
            [
+             Builtin_variables.dev_null, "/dev/null";
              Builtin_variables.make, make;
              Builtin_variables.test_file, test_basename;
              Builtin_variables.reference, reference_filename;
@@ -271,48 +421,55 @@ let test_file test_filename =
              Builtin_variables.promote, promote;
              Builtin_variables.timeout, default_timeout;
            ] in
-       let common_prefix = " ... testing '" ^ test_basename ^ "' with" in
        let initial_status = if skip_test then Skip_all else Run in
        let rootenv =
          Environments.initialize Environments.Pre log initial_environment
        in
-       let rootenv, initial_status =
+       let msgs = ref [] in
+       let add_msg s = msgs := s :: !msgs in
+       let rootenv, initial_status, initial_summary =
          let rec loop env stmts =
            match stmts with
-           | [] -> (env, initial_status)
+           | [] -> (env, initial_status, Pass)
            | s :: t ->
              begin match interpret_environment_statement env s with
              | env -> loop env t
              | exception e ->
+               let bt = Printexc.get_backtrace () in
                let line = s.loc.Location.loc_start.Lexing.pos_lnum in
-               Printf.printf "%s line %d %!" common_prefix line;
-               Printf.printf "%s\n%!" (report_error s.loc e);
-               (env, Skip_all)
+               Printf.ksprintf add_msg "line %d %s" line
+                 (report_error s.loc e bt);
+               (env, Skip_all, Fail)
              end
          in
          loop rootenv rootenv_statements
        in
        let rootenv = Environments.initialize Environments.Post log rootenv in
        let summary =
-         run_test_tree log common_prefix initial_status rootenv All_skipped
+         run_test_tree log add_msg initial_status rootenv initial_summary
            tsl_ast
        in
+       let common_prefix = " ... testing '" ^ test_basename ^ "'" in
+       Printf.printf "%s => %s%s\n%!" common_prefix (string_of_summary summary)
+         (if Options.show_timings && summary = Pass then
+            let wall_clock_duration = Unix.gettimeofday () -. start in
+            Printf.sprintf " (wall clock: %.02fs)" wall_clock_duration
+          else "");
+       if summary = Fail then
+         List.iter (Printf.printf "%s with %s\n%!" common_prefix)
+           (List.rev !msgs);
        Actions.clear_all_hooks();
        summary
     ) in
   if not Options.log_to_stderr then close_out log;
   begin match summary with
-  | Some_failure ->
+  | Fail ->
       if not Options.log_to_stderr then
         Sys.dump_file stderr ~prefix:"> " log_filename
-  | No_failure | All_skipped ->
+  | Pass | Skip ->
       if not Options.keep_test_dir_on_success then
         clean_test_build_directory ()
-  end;
-  if Options.show_timings && summary = No_failure then
-    let wall_clock_duration = Unix.gettimeofday () -. start in
-    Printf.eprintf "Wall clock: %s took %.02fs\n%!"
-                   test_filename wall_clock_duration
+  end
 
 let is_test filename =
   let input_channel = open_in filename in

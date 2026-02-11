@@ -70,6 +70,7 @@ module type S = sig
   module F:  sig val x : int end -> sig end
 end
 
+<<<<<<< HEAD
 (* Nominal type comparison *)
 
 module Nominal = struct
@@ -97,6 +98,28 @@ end = struct
   module F(X:sig val x:int end) = struct let _ = X.x end
 end
 and Y: sig end = struct end
+||||||| 23e84b8c4d
+=======
+(* from ocaml/ocaml#13955 no warning 32 should be triggered for [test] *)
+
+[@@@warning "-60"]
+module I : sig
+  module F (_ : sig val test : int end) : sig end
+end = struct
+ module F (X: sig val test : int end) = struct let _ = X.test end
+end
+
+(* same for the recursive version *)
+
+module rec X: sig
+  module F(_:sig val x:int end): sig end
+end = struct
+  module F(X:sig val x:int end) = struct let _ = X.x end
+end
+and Y: sig end = struct end
+
+[@@@warning "+60"]
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 (* TEST
  flags = "-w +A";

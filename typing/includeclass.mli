@@ -29,6 +29,14 @@ val class_declarations:
   class_match_failure list
 
 val report_error :
+<<<<<<< HEAD
   Printtyp.type_or_scheme -> class_match_failure list Format_doc.format_printer
 val report_error_doc :
   Printtyp.type_or_scheme -> class_match_failure list Format_doc.printer
+||||||| 23e84b8c4d
+  Printtyp.type_or_scheme -> formatter -> class_match_failure list -> unit
+=======
+  Out_type.type_or_scheme -> class_match_failure list Format_doc.format_printer
+val report_error_doc :
+  Out_type.type_or_scheme -> class_match_failure list Format_doc.printer
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a

@@ -511,12 +511,20 @@ let dump_obj ic =
     List.iter print_reloc cu.cu_reloc;
   if cu.cu_debug > 0 then begin
     seek_in ic cu.cu_debug;
+<<<<<<< HEAD
     (* CR ocaml 5 compressed-marshal:
     let evl = (Compression.input_value ic : debug_event list) in
     ignore (Compression.input_value ic);
     *)
     let evl = (Marshal.from_channel ic : debug_event list) in
     ignore (Marshal.from_channel ic);
+||||||| 23e84b8c4d
+    let evl = (input_value ic : debug_event list) in
+    ignore (input_value ic); (* Skip the list of absolute directory names *)
+=======
+    let evl = (Compression.input_value ic : debug_event list) in
+    ignore (Compression.input_value ic);
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
                 (* Skip the list of absolute directory names *)
     record_events 0 evl
   end;
@@ -544,14 +552,24 @@ let dump_exe ic =
         let num_eventlists = input_binary_int ic in
         for _i = 1 to num_eventlists do
           let orig = input_binary_int ic in
+<<<<<<< HEAD
           (* CR ocaml 5 compressed-marshal:
+||||||| 23e84b8c4d
+          let evl = (input_value ic : debug_event list) in
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
           let evl = (Compression.input_value ic : debug_event list) in
           (* Skip the list of absolute directory names *)
           ignore (Compression.input_value ic);
+<<<<<<< HEAD
           *)
           let evl = (Marshal.from_channel ic : debug_event list) in
           (* Skip the list of absolute directory names *)
           ignore (Marshal.from_channel ic);
+||||||| 23e84b8c4d
+          ignore (input_value ic);
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
           record_events orig evl
         done
   end;

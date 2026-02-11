@@ -140,6 +140,7 @@ module Doc: sig
   val result: ok:'a printer -> error:'e printer -> ('a,'e) result printer
   val either: left:'a printer -> right:'b printer -> ('a,'b) Either.t printer
 
+<<<<<<< HEAD
 end
 
 (** {1 Compatibility API} *)
@@ -287,6 +288,147 @@ val pp_nested_list :
     [~nested] is true, the list is wrapped in parens. The element printer is
     always called with [nested:true], indicating that any inner lists are nested
     and need parens. *)
+||||||| 23e84b8c4d
+=======
+  (** {1 Alignment functions } *)
+
+  (** Align the right side of one ["@{<ralign>...@}"] tag box by inserting
+      spaces at the beginning of boxes. Those function do nothing if the tag box
+      appears after a break hint. *)
+  val align_prefix: (t * int) list -> t list
+  val align_prefix2: (t * int) -> (t * int) -> t * t
+
+end
+
+(** {1 Compatibility API} *)
+
+(** The functions and types below provides source compatibility with format
+printers and conversion function from {!Format_doc} printers to {!Format}
+printers. The reverse direction is implemented using an escape hatch in the
+formatting instruction and should only be used to preserve backward
+compatibility. *)
+
+type doc = Doc.t
+type t = doc
+type formatter
+type 'a printer = formatter -> 'a -> unit
+
+val formatter: doc ref -> formatter
+(** [formatter rdoc] creates a {!formatter} that updates the [rdoc] reference *)
+
+(** Translate a {!Format_doc} printer to a {!Format} one. *)
+type 'a format_printer = Format.formatter -> 'a -> unit
+val compat: 'a printer -> 'a format_printer
+val compat1: ('p1 -> 'a printer) -> ('p1 -> 'a format_printer)
+val compat2: ('p1 -> 'p2 -> 'a printer) -> ('p1 -> 'p2 -> 'a format_printer)
+
+(** If necessary, embbed a {!Format} printer inside a formatting instruction
+    stream. This breaks every guarantees provided by {!Format_doc}. *)
+val deprecated_printer: (Format.formatter -> unit) -> formatter -> unit
+val deprecated: 'a format_printer -> 'a printer
+val deprecated1: ('p1 -> 'a format_printer) -> ('p1 -> 'a printer)
+
+
+(** {2 Format string interpreters }*)
+
+val fprintf : formatter -> ('a, formatter,unit) format -> 'a
+val kfprintf:
+  (formatter -> 'a) -> formatter ->
+  ('b, formatter, unit, 'a) format4 -> 'b
+
+val asprintf :  ('a, formatter, unit, string) format4 -> 'a
+val kasprintf : (string -> 'a) -> ('b, formatter, unit, 'a) format4 -> 'b
+
+
+val dprintf : ('a, formatter, unit, formatter -> unit) format4 -> 'a
+val kdprintf:
+  ((formatter -> unit) -> 'a) ->
+  ('b, formatter, unit, 'a) format4 -> 'b
+
+(** {!doc_printf} and {!kdoc_printf} creates a document directly *)
+val doc_printf: ('a, formatter, unit, doc) format4 -> 'a
+val kdoc_printf: (doc -> 'r) -> ('a, formatter, unit, 'r) format4 -> 'a
+
+(** {2 Compatibility with {!Doc} }*)
+
+val doc_printer: 'a printer -> 'a Doc.printer
+val pp_doc: doc printer
+
+(** {2 Source compatibility with Format}*)
+
+(** {3 String printers } *)
+
+val pp_print_string: string printer
+val pp_print_substring: pos:int -> len:int -> string printer
+val pp_print_text: string printer
+val pp_print_bytes: bytes printer
+
+val pp_print_as: formatter -> int -> string -> unit
+val pp_print_substring_as:
+  pos:int -> len:int -> formatter -> int -> string -> unit
+
+(** {3 Primitive type printers }*)
+
+val pp_print_char: char printer
+val pp_print_int: int printer
+val pp_print_float: float printer
+val pp_print_bool: bool printer
+val pp_print_nothing: unit printer
+
+(** {3 Printer combinators }*)
+
+val pp_print_iter:
+  ?pp_sep:unit printer -> (('a -> unit) -> 'b -> unit) ->
+  'a printer -> 'b printer
+
+val pp_print_list: ?pp_sep:unit printer -> 'a printer -> 'a list printer
+val pp_print_array: ?pp_sep:unit printer -> 'a printer -> 'a array printer
+val pp_print_seq: ?pp_sep:unit printer -> 'a printer -> 'a Seq.t printer
+
+val pp_print_option: ?none:unit printer -> 'a printer -> 'a option printer
+val pp_print_result: ok:'a printer -> error:'e printer -> ('a,'e) result printer
+val pp_print_either:
+  left:'a printer -> right:'b printer -> ('a,'b) Either.t printer
+
+
+(** {3 Boxes and tags }*)
+
+val pp_open_stag: Format.stag printer
+val pp_close_stag: unit printer
+
+val pp_open_box: int printer
+val pp_close_box: unit printer
+
+(** {3 Break hints} *)
+
+val pp_print_space: unit printer
+val pp_print_cut: unit printer
+val pp_print_break: formatter -> int -> int -> unit
+val pp_print_custom_break:
+  formatter -> fits:(string * int * string as 'c) -> breaks:'c -> unit
+
+(** {3 Tabulations }*)
+
+val pp_open_tbox: unit printer
+val pp_close_tbox: unit printer
+val pp_set_tab: unit printer
+val pp_print_tab: unit printer
+val pp_print_tbreak: formatter -> int -> int -> unit
+
+(** {3 Newlines and flushing }*)
+
+val pp_print_if_newline: unit printer
+val pp_force_newline: unit printer
+val pp_print_flush: unit printer
+val pp_print_newline: unit printer
+
+(** {1 Compiler specific functions }*)
+
+(** {2 Separators }*)
+
+val comma: unit printer
+val semicolon: unit printer
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 (** {2 Compiler output} *)
 

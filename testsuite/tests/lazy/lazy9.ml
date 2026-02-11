@@ -34,4 +34,8 @@ let () =
       (* this is what should happen if `todo` is compiled correctly *)
       ()
   end;
+<<<<<<< HEAD
 
+||||||| 23e84b8c4d
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a

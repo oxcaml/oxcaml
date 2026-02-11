@@ -20,7 +20,12 @@ end
 [%%expect{|
 {
  "M"[module] ->
+<<<<<<< HEAD
    {<.39>
+||||||| 23e84b8c4d
+=======
+   {<.37>
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     "Exn"[extension constructor] -> {<.1>
                                      "lbl_exn"[label] -> <.0>;
                                      };

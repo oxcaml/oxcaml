@@ -13,6 +13,7 @@
 /*                                                                        */
 /**************************************************************************/
 
+#define CAML_INTERNALS
 #include <errno.h>
 #include <caml/mlvalues.h>
 #include <caml/memory.h>
@@ -46,7 +47,7 @@ struct socket_option {
 
 /* Table of options, indexed by type */
 
-static struct socket_option sockopt_bool[] = {
+static const struct socket_option sockopt_bool[] = {
   { SOL_SOCKET, SO_DEBUG },
   { SOL_SOCKET, SO_BROADCAST },
   { SOL_SOCKET, SO_REUSEADDR },
@@ -59,7 +60,7 @@ static struct socket_option sockopt_bool[] = {
   { SOL_SOCKET, SO_REUSEPORT }
 };
 
-static struct socket_option sockopt_int[] = {
+static const struct socket_option sockopt_int[] = {
   { SOL_SOCKET, SO_SNDBUF },
   { SOL_SOCKET, SO_RCVBUF },
   { SOL_SOCKET, SO_ERROR },
@@ -67,20 +68,20 @@ static struct socket_option sockopt_int[] = {
   { SOL_SOCKET, SO_RCVLOWAT },
   { SOL_SOCKET, SO_SNDLOWAT } };
 
-static struct socket_option sockopt_linger[] = {
+static const struct socket_option sockopt_linger[] = {
   { SOL_SOCKET, SO_LINGER }
 };
 
-static struct socket_option sockopt_timeval[] = {
+static const struct socket_option sockopt_timeval[] = {
   { SOL_SOCKET, SO_RCVTIMEO },
   { SOL_SOCKET, SO_SNDTIMEO }
 };
 
-static struct socket_option sockopt_unix_error[] = {
+static const struct socket_option sockopt_unix_error[] = {
   { SOL_SOCKET, SO_ERROR }
 };
 
-static struct socket_option * sockopt_table[] = {
+static const struct socket_option * sockopt_table[] = {
   sockopt_bool,
   sockopt_int,
   sockopt_linger,
@@ -88,7 +89,7 @@ static struct socket_option * sockopt_table[] = {
   sockopt_unix_error
 };
 
-static char * getsockopt_fun_name[] = {
+static const char * getsockopt_fun_name[] = {
   "getsockopt",
   "getsockopt_int",
   "getsockopt_optint",
@@ -96,7 +97,7 @@ static char * getsockopt_fun_name[] = {
   "getsockopt_error"
 };
 
-static char * setsockopt_fun_name[] = {
+static const char * setsockopt_fun_name[] = {
   "setsockopt",
   "setsockopt_int",
   "setsockopt_optint",
@@ -110,7 +111,7 @@ union option_value {
   struct timeval tv;
 };
 
-CAMLexport value caml_unix_getsockopt_aux(char * name,
+CAMLexport value caml_unix_getsockopt_aux(const char * name,
                                      enum option_type ty, int level, int option,
                                      value socket)
 {
@@ -152,7 +153,7 @@ CAMLexport value caml_unix_getsockopt_aux(char * name,
     break;
   case TYPE_TIMEVAL:
     res = caml_copy_double((double) optval.tv.tv_sec
-                           + (double) optval.tv.tv_usec / 1e6);
+                           + (double) optval.tv.tv_usec / USEC_PER_SEC);
     break;
   case TYPE_UNIX_ERROR:
     if (optval.i == 0) {
@@ -168,13 +169,12 @@ CAMLexport value caml_unix_getsockopt_aux(char * name,
   CAMLreturn(res);
 }
 
-CAMLexport value caml_unix_setsockopt_aux(char * name,
+CAMLexport value caml_unix_setsockopt_aux(const char * name,
                                      enum option_type ty, int level, int option,
                                      value socket, value val)
 {
   union option_value optval;
   socklen_param_type optsize;
-  double f;
 
   switch (ty) {
   case TYPE_BOOL:
@@ -189,10 +189,8 @@ CAMLexport value caml_unix_setsockopt_aux(char * name,
       optval.lg.l_linger = Int_val(Some_val(val));
     break;
   case TYPE_TIMEVAL:
-    f = Double_val(val);
+    optval.tv = caml_timeval_of_sec(Double_val(val));
     optsize = sizeof(optval.tv);
-    optval.tv.tv_sec = (int) f;
-    optval.tv.tv_usec = (int) (1e6 * (f - optval.tv.tv_sec));
     break;
   case TYPE_UNIX_ERROR:
   default:
@@ -211,7 +209,7 @@ CAMLexport value caml_unix_setsockopt_aux(char * name,
 CAMLprim value caml_unix_getsockopt(value vty, value vsocket, value voption)
 {
   enum option_type ty = Int_val(vty);
-  struct socket_option * opt = &(sockopt_table[ty][Int_val(voption)]);
+  const struct socket_option * opt = &(sockopt_table[ty][Int_val(voption)]);
   return caml_unix_getsockopt_aux(getsockopt_fun_name[ty],
                              ty,
                              opt->level,
@@ -223,7 +221,7 @@ CAMLprim value caml_unix_setsockopt(value vty, value vsocket, value voption,
                                value val)
 {
   enum option_type ty = Int_val(vty);
-  struct socket_option * opt = &(sockopt_table[ty][Int_val(voption)]);
+  const struct socket_option * opt = &(sockopt_table[ty][Int_val(voption)]);
   return caml_unix_setsockopt_aux(setsockopt_fun_name[ty],
                              ty,
                              opt->level,

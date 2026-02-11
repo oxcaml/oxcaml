@@ -1,26 +1,78 @@
 # computation f
+<<<<<<< HEAD
 camlEffects__f_0_6_code
+||||||| 23e84b8c4d
+camlEffects.f
+=======
+camlEffects$f
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 caml_runstack
+<<<<<<< HEAD
 camlEffects__entry
+||||||| 23e84b8c4d
+camlEffects.entry
+=======
+camlEffects$entry
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 caml_program
 # perform effect (E 0)
 # caught effect (E 0). continuing...
+<<<<<<< HEAD
 camlEffects__h_effect_e_2_8_code
 camlEffects__entry
+||||||| 23e84b8c4d
+camlEffects.h_effect_e
+camlEffects.entry
+=======
+camlEffects$h_effect_e
+camlEffects$entry
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 caml_program
 # perform returns 1
+<<<<<<< HEAD
 camlEffects__f_0_6_code
+||||||| 23e84b8c4d
+camlEffects.f
+=======
+camlEffects$f
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 caml_runstack
+<<<<<<< HEAD
 camlEffects__h_effect_e_2_8_code
 camlEffects__entry
+||||||| 23e84b8c4d
+camlEffects.h_effect_e
+camlEffects.entry
+=======
+camlEffects$h_effect_e
+camlEffects$entry
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 caml_program
 # done 2
+<<<<<<< HEAD
 camlEffects__v_retc_4_9_code
 camlEffects__h_effect_e_2_8_code
 camlEffects__entry
+||||||| 23e84b8c4d
+camlEffects.v_retc
+camlEffects.h_effect_e
+camlEffects.entry
+=======
+camlEffects$v_retc
+camlEffects$h_effect_e
+camlEffects$entry
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 caml_program
 # continue returns 3
+<<<<<<< HEAD
 camlEffects__h_effect_e_2_8_code
 camlEffects__entry
+||||||| 23e84b8c4d
+camlEffects.h_effect_e
+camlEffects.entry
+=======
+camlEffects$h_effect_e
+camlEffects$entry
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 caml_program
 # result=4

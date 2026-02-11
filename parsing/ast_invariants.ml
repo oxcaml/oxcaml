@@ -20,11 +20,19 @@ let err = Syntaxerr.ill_formed_ast
 
 let empty_record loc = err loc "Records cannot be empty."
 let invalid_tuple loc = err loc "Tuples must have at least 2 components."
+<<<<<<< HEAD
 let invalid_alias loc = err loc "Alias types must have a name or a jkind."
 let empty_open_tuple_pat loc =
   err loc "Open tuple patterns must have at least one component."
 let short_closed_tuple_pat loc =
   err loc "Closed tuple patterns must have at least 2 components."
+||||||| 23e84b8c4d
+=======
+let empty_open_tuple_pat loc =
+  err loc "Open tuple patterns must have at least one component."
+let short_closed_tuple_pat loc =
+  err loc "Closed tuple patterns must have at least two components."
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 let no_args loc = err loc "Function application with no argument."
 let empty_let loc = err loc "Let with no bindings."
 let mutable_rec_let loc = err loc "Mutable let binding cannot be recursive."
@@ -32,6 +40,8 @@ let multiple_mutable_let loc = err loc "Mutable let must have only one binding."
 let mutable_let_bad_pat loc =
   err loc "Mutable let must have a variable on the left hand side."
 let empty_type loc = err loc "Type declarations cannot be empty."
+let empty_poly_binder loc =
+  err loc "Explicit universal type quantification cannot be empty."
 let complex_id loc = err loc "Functor application not allowed here."
 let module_type_substitution_missing_rhs loc =
   err loc "Module type substitution with no right hand side"
@@ -46,7 +56,7 @@ let empty_constraint loc =
 let simple_longident id =
   let rec is_simple = function
     | Longident.Lident _ -> true
-    | Longident.Ldot (id, _) -> is_simple id
+    | Longident.Ldot (id, _) -> is_simple id.txt
     | Longident.Lapply _ -> false
   in
   if not (is_simple id.txt) then complex_id id.loc
@@ -76,9 +86,18 @@ let iterator =
     let loc = ty.ptyp_loc in
     match ty.ptyp_desc with
     | Ptyp_tuple ([] | [_]) -> invalid_tuple loc
+<<<<<<< HEAD
     | Ptyp_package (_, cstrs) ->
       List.iter (fun (id, _) -> simple_longident id) cstrs
     | Ptyp_alias (_, None, None) -> invalid_alias loc
+||||||| 23e84b8c4d
+    | Ptyp_package (_, cstrs) ->
+      List.iter (fun (id, _) -> simple_longident id) cstrs
+=======
+    | Ptyp_package ptyp ->
+      List.iter (fun (id, _) -> simple_longident id) ptyp.ppt_cstrs
+    | Ptyp_poly([],_) -> empty_poly_binder loc
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     | _ -> ()
   in
   let pat self pat =
@@ -91,6 +110,7 @@ let iterator =
     end;
     let loc = pat.ppat_loc in
     match pat.ppat_desc with
+<<<<<<< HEAD
     | Ppat_tuple (lt, op) -> begin
         match lt, op with
         | ([], Open) -> empty_open_tuple_pat loc
@@ -98,6 +118,12 @@ let iterator =
           short_closed_tuple_pat loc
         | _ -> ()
       end
+||||||| 23e84b8c4d
+    | Ppat_tuple ([] | [_]) -> invalid_tuple loc
+=======
+    | Ppat_tuple (([] | [_]), Closed) -> short_closed_tuple_pat loc
+    | Ppat_tuple ([], Open) -> empty_open_tuple_pat loc
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     | Ppat_record ([], _) -> empty_record loc
     | Ppat_construct (id, _) -> simple_longident id
     | Ppat_record (fields, _) ->
@@ -263,3 +289,88 @@ let iterator =
 
 let structure st = iterator.structure iterator st
 let signature sg = iterator.signature iterator sg
+
+let check_loc_ghost meth v ~source_contents =
+  let equal_modulo_loc =
+    let no_locs =
+      { Ast_mapper.default_mapper
+        with location = (fun _ _ -> Location.none);
+             attributes = (fun _ _ -> []);
+        (* type z = (int [@foo]) create int at location "int" instead of
+           "int [@foo]". I'd rather loosen the check than worsen the location
+           for type errors. *)
+      }
+    in
+    fun meth node1 node2 ->
+      let norm1 = (meth no_locs) no_locs node1 in
+      let norm2 = (meth no_locs) no_locs node2 in
+      Stdlib.(=) norm1 norm2
+  in
+  let super = Ast_iterator.default_iterator in
+  let depth = ref 0 in
+  let limit_quadratic_complexity meth f =
+    fun self v ->
+      if !depth < 1000 then (
+        depth := !depth + 1;
+        (meth super) self v;
+        depth := !depth -1 ;
+        f v;
+    )
+  in
+  let check ?print ?(wrap = Fun.id) meth parse ast1 (loc : Location.t) =
+    let source_fragment =
+      wrap (
+          String.sub source_contents
+            loc.loc_start.pos_cnum
+            (loc.loc_end.pos_cnum - loc.loc_start.pos_cnum)
+        )
+    in
+    let lexbuf = Lexing.from_string source_fragment in
+    let should_be_loc_ghost, error_if_not =
+      match parse lexbuf with
+      | exception Parsing.Parse_error | exception _ ->
+         true, "non-ghost location points to a non parsable range"
+      | ast2 ->
+         if equal_modulo_loc meth ast1 ast2
+         then false, "ghost location should be non-ghost"
+         else true, "non-ghost location points to a range of source \
+                     code that contains the wrong ast"
+    in
+    if loc.loc_ghost <> should_be_loc_ghost
+    then (
+      Format.eprintf "@[<2>%a: %s%t@]@." Location.print_loc loc error_if_not
+        (fun f ->
+          match print with
+          | None -> ()
+          | Some print -> Format.fprintf f "@\n%a" print ast1)
+    )
+  in
+  let self =
+    { super with
+      expr =
+        limit_quadratic_complexity (fun s -> s.expr)
+          (fun v ->
+            check (fun s -> s.expr) Parse.expression v v.pexp_loc
+              (* ~print:(fun f ty -> Printast.expression 0 f ty) *)
+              (* Add parens because in 1 + 2, + gets assigned a non-ghost
+                 location, but + without parens is not a valid expression. *)
+              ~wrap:(fun s -> "( " ^ s ^ " )"))
+    ; pat =
+        limit_quadratic_complexity (fun s -> s.pat)
+          (fun v -> check (fun s -> s.pat) Parse.pattern v v.ppat_loc )
+    ; typ =
+        limit_quadratic_complexity (fun s -> s.typ)
+          (fun v ->
+            check
+              (* ~print:(fun f ty -> Printast.payload 0 f (PTyp ty)) *)
+              (fun s -> s.typ) Parse.core_type v v.ptyp_loc )
+    ; attribute = (fun self attr ->
+      (* Doc comments would probably need some special case to check they are
+         correctly placed. *)
+      if attr.attr_name.txt = "ocaml.doc"
+         || attr.attr_name.txt = "ocaml.text"
+      then ()
+      else super.attribute self attr)
+    }
+  in
+  (meth self) self v

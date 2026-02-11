@@ -34,6 +34,15 @@ exception Incompatible
 
 (* All the following wrapper functions revert to the original level,
    even in case of exception. *)
+val with_local_level_generalize:
+    ?before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
+val with_local_level_generalize_if:
+        bool -> ?before_generalize:('a -> unit) -> (unit -> 'a) -> 'a
+val with_local_level_generalize_structure: (unit -> 'a) -> 'a
+val with_local_level_generalize_structure_if: bool -> (unit -> 'a) -> 'a
+val with_local_level_generalize_structure_if_principal: (unit -> 'a) -> 'a
+val with_local_level_generalize_for_class: (unit -> 'a) -> 'a
+
 val with_local_level: ?post:('a -> unit) -> (unit -> 'a) -> 'a
         (* [with_local_level (fun () -> cmd) ~post] evaluates [cmd] at a
            raised level.
@@ -136,8 +145,6 @@ val merge_row_fields:
 val filter_row_fields:
         bool -> (label * row_field) list -> (label * row_field) list
 
-val generalize: type_expr -> unit
-        (* Generalize in-place the given type *)
 val lower_contravariant: Env.t -> type_expr -> unit
         (* Lower level of type variables inside contravariant branches;
            to be used before generalize for expansive expressions *)
@@ -145,23 +152,16 @@ val lower_variables_only: Env.t -> int -> type_expr -> unit
         (* Lower all variables to the given level *)
 val enforce_current_level: Env.t -> type_expr -> unit
         (* Lower whole type to !current_level *)
-val generalize_structure: type_expr -> unit
-        (* Generalize the structure of a type, lowering variables
-           to !current_level *)
-val generalize_class_type : class_type -> unit
-        (* Generalize the components of a class type *)
-val generalize_class_type_structure : class_type -> unit
-       (* Generalize the structure of the components of a class type *)
-val generalize_class_signature_spine : Env.t -> class_signature -> unit
+val generalize_class_signature_spine: class_signature -> unit
        (* Special function to generalize methods during inference *)
-val correct_levels: type_expr -> type_expr
-        (* Returns a copy with decreasing levels *)
-val limited_generalize: type_expr -> type_expr -> unit
+val limited_generalize: type_expr -> inside:type_expr -> unit
         (* Only generalize some part of the type
            Make the remaining of the type non-generalizable *)
-val limited_generalize_class_type: type_expr -> class_type -> unit
+val limited_generalize_class_type: type_expr -> inside:class_type -> unit
         (* Same, but for class types *)
 
+val duplicate_type: type_expr -> type_expr
+        (* Returns a copy with non-variable nodes at generic level *)
 val fully_generic: type_expr -> bool
 
 val check_scope_escape : Env.t -> int -> type_expr -> unit
@@ -187,10 +187,10 @@ module Pattern_env : sig
     { mutable env : Env.t;
       equations_scope : int;
       (* scope for local type declarations *)
-      allow_recursive_equations : bool;
+      in_counterexample : bool;
       (* true iff checking counter examples *)
     }
-  val make: Env.t -> equations_scope:int -> allow_recursive_equations:bool -> t
+  val make: Env.t -> equations_scope:int -> in_counterexample:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
 end
@@ -199,10 +199,23 @@ type existential_treatment =
   | Keep_existentials_flexible
   | Make_existentials_abstract of Pattern_env.t
 
+<<<<<<< HEAD
 val instance_constructor: existential_treatment ->
         constructor_description ->
         Types.constructor_argument list * type_expr * type_expr list
         (* Same, for a constructor. Also returns existentials. *)
+||||||| 23e84b8c4d
+val instance_constructor: existential_treatment ->
+        constructor_description -> type_expr list * type_expr * type_expr list
+        (* Same, for a constructor. Also returns existentials. *)
+=======
+val instance_constructor:
+  existential_treatment ->
+  Data_types.constructor_description ->
+  type_expr list * type_expr * type_expr list
+(* Same, for a constructor. Also returns existentials. *)
+
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 val instance_parameterized_type:
         ?keep_names:bool ->
         type_expr list -> type_expr -> type_expr list * type_expr
@@ -223,7 +236,9 @@ val instance_poly_fixed:
            checking that an expression matches this scheme. *)
 
 val polyfy: Env.t -> type_expr -> type_expr list -> type_expr * bool
+
 val instance_label:
+<<<<<<< HEAD
         fixed:bool ->
         _ gen_label_description -> type_expr list * type_expr * type_expr
         (* Same, for a label *)
@@ -240,6 +255,16 @@ val instance_prim:
     user-syntax, [curry_mode m0 m1] gives the mode we implicitly interpret b->c
     to have. *)
 val curry_mode : Alloc.Const.t -> Alloc.Const.t -> Alloc.Const.t
+||||||| 23e84b8c4d
+        fixed:bool ->
+        label_description -> type_expr list * type_expr * type_expr
+        (* Same, for a label *)
+=======
+  fixed:bool ->
+  Data_types.label_description ->
+  type_expr list * type_expr * type_expr
+(* Same, for a label *)
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 val apply:
         ?use_current_level:bool ->
@@ -288,13 +313,19 @@ type typedecl_extraction_result =
 val extract_concrete_typedecl:
         Env.t -> type_expr -> typedecl_extraction_result
 
+val get_new_abstract_name : Env.t -> string -> string
+
 val unify: Env.t -> type_expr -> type_expr -> unit
         (* Unify the two types given. Raise [Unify] if not possible. *)
 val unify_gadt:
-        Pattern_env.t -> type_expr -> type_expr -> Btype.TypePairs.t
-        (* Unify the two types given and update the environment with the
-           local constraints. Raise [Unify] if not possible.
-           Returns the pairs of types that have been equated.  *)
+    Pattern_env.t -> pat:type_expr -> expected:type_expr -> Btype.TypePairs.t
+        (* [unify_gadt penv ~pat:ty1 ~expected:ty2] unifies [ty1] and [ty2]
+           in [Pattern] mode, possible adding local constraints to the
+           environment in [penv]. Raises [Unify] if not possible.
+           Returns the pairs of types that have been equated.
+           Type variables in [ty1] are always assumed to be non-leaking
+           (safely reifiable); if [penv.in_counterexample = true]
+           then both [ty1] and [ty2] are assumed to be non-leaking. *)
 val unify_var: Env.t -> type_expr -> type_expr -> unit
         (* Same as [unify], but allow free univars when first type
            is a variable. *)
@@ -334,7 +365,12 @@ val deep_occur_list: type_expr -> type_expr list -> bool
         (* Check whether a type occurs structurally within any type from
            a list of types. *)
 val deep_occur: type_expr -> type_expr -> bool
+<<<<<<< HEAD
         (* Check whether a type occurs structurally within another. *)
+||||||| 23e84b8c4d
+=======
+val deep_occur_list: type_expr -> type_expr list -> bool
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 val moregeneral: Env.t -> bool -> type_expr -> type_expr -> unit
         (* Check if the first type scheme is more general than the second. *)
 val is_moregeneral: Env.t -> bool -> type_expr -> type_expr -> bool
@@ -538,6 +574,7 @@ type closed_class_failure = {
 }
 
 val free_variables: ?env:Env.t -> type_expr -> type_expr list
+<<<<<<< HEAD
         (* If env present, then check for incomplete definitions too;
            returns both normal variables and row variables*)
 val free_non_row_variables_of_list: type_expr list -> type_expr list
@@ -553,6 +590,13 @@ val closed_type_expr: ?env:Env.t -> type_expr -> bool
         (* If env present, expand abbreviations to see if expansion
            eliminates the variable *)
 
+||||||| 23e84b8c4d
+        (* If env present, then check for incomplete definitions too *)
+=======
+val free_variables_list: ?env:Env.t -> type_expr list -> type_expr list
+        (* If env present, then check for incomplete definitions too *)
+val closed_type_expr: ?env:Env.t -> type_expr -> bool
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 val closed_type_decl: type_declaration -> type_expr option
 val closed_extension_constructor: extension_constructor -> type_expr option
 val closed_class:
@@ -569,12 +613,12 @@ val collapse_conj_params: Env.t -> type_expr list -> unit
         (* Collapse conjunctive types in class parameters *)
 
 val get_current_level: unit -> int
-val wrap_trace_gadt_instances: Env.t -> ('a -> 'b) -> 'a -> 'b
+val wrap_trace_gadt_instances: ?force:bool -> Env.t -> ('a -> 'b) -> 'a -> 'b
 
 (* Stubs *)
 val package_subtype :
-    (Env.t -> Path.t -> (Longident.t * type_expr) list ->
-      Path.t -> (Longident.t * type_expr) list -> bool) ref
+    (Env.t -> package -> package ->
+     (unit,Errortrace.first_class_module) Result.t) ref
 
 (* Raises [Incompatible] *)
 val mcomp : Env.t -> type_expr -> type_expr -> unit

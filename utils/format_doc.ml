@@ -251,6 +251,7 @@ module Doc = struct
 
   let msg fmt = kmsg Fun.id fmt
 
+<<<<<<< HEAD
 end
 
 (** Compatibility interface *)
@@ -468,6 +469,291 @@ let pp_nested_list ~nested ~pp_element ~pp_sep ppf arg =
     (pp_parens_if nested
        (pp_print_list ~pp_sep (pp_element ~nested:true)))
     arg
+||||||| 23e84b8c4d
+=======
+
+  let ralign_tag = Format.String_tag "ralign"
+
+  let rec split_on_open_tag tag rbefore = function
+    | [] -> rbefore, []
+    | Open_tag t :: rest when t = tag ->
+       rbefore, rest
+    | elt :: rest ->
+        split_on_open_tag tag (elt::rbefore) rest
+
+  let rec split_on_close opened rbefore = function
+    | [] -> rbefore, []
+    | Open_tag _ as elt :: rest ->
+        split_on_close (opened+1) (elt::rbefore) rest
+    | Close_tag as elt :: rest ->
+        if opened = 0 then rbefore, rest
+        else split_on_close (opened-1) (elt::rbefore) rest
+    | elt :: rest ->
+        split_on_close opened (elt::rbefore) rest
+
+   let rec approx_len acc = function
+     | [] -> Some acc
+     | Text x :: r->
+         let len = Format.utf_8_scalar_width ~pos:0 ~len:(String.length x) x in
+         approx_len (acc + len) r
+     | With_size n :: Text _ :: r -> approx_len (acc + n) r
+     | (Open_box _ | Close_box | Open_tag _ | Close_tag
+        | Open_tbox | Close_tbox | Set_tab | With_size _
+       ) :: r ->
+        approx_len acc r
+    | (Tab_break _ | Break _ | Simple_break _ | Flush _ | Newline | If_newline
+       | Deprecated _ ) :: _ ->
+        None
+
+   type ralign_split = {
+       close_pos:int;
+       before: element list;
+       mid: element list;
+       after: element list;
+     }
+
+   let split_ralign (doc, shift) =
+     let l = to_list doc in
+     let before, rest =
+       split_on_open_tag ralign_tag [] l in
+     let mid, after = split_on_close 0 [] rest in
+     let len = Option.bind (approx_len 0 before) (fun n -> approx_len n mid) in
+     match len with
+     | None -> Error doc
+     | Some len ->
+         Ok { close_pos= shift + len; before; mid; after }
+
+   let align_doc max_pos r =
+     let aligned_before =
+       let before = Open_tag ralign_tag :: r.before in
+       if r.close_pos >= max_pos then before
+       else Text (String.make (max_pos - r.close_pos) ' ') :: before
+     in
+     let mid_to_start = Close_tag :: r.mid @ aligned_before in
+     { rev = List.rev_append r.after mid_to_start }
+
+   let align_prefix l =
+     let l = List.map split_ralign l in
+     let max_pos =
+       List.fold_left (fun mx r ->
+           match r with
+           | Ok r -> max mx r.close_pos
+           | Error _ -> mx
+         ) 0 l
+     in
+     List.map (Result.fold ~ok:(align_doc max_pos) ~error:Fun.id) l
+
+   let align_prefix2 x y = match align_prefix [x;y] with
+     | [x;y] -> x, y
+     | _ -> assert false
+
+end
+
+(** Compatibility interface *)
+
+type doc = Doc.t
+type t = doc
+type formatter = doc ref
+type 'a printer = formatter -> 'a -> unit
+
+let formatter d = d
+
+(** {1 Primitive functions }*)
+
+let pp_print_string ppf s = ppf := Doc.string s !ppf
+
+let pp_print_as ppf size s =
+  ppf := !ppf |> Doc.with_size size |> Doc.string s
+
+let pp_print_substring ~pos ~len ppf s =
+ ppf := Doc.string (String.sub s pos len) !ppf
+
+let pp_print_substring_as ~pos ~len ppf size s =
+  ppf :=
+  !ppf
+  |> Doc.with_size size
+  |> Doc.string (String.sub s pos len)
+
+let pp_print_bytes ppf s = ppf := Doc.string (Bytes.to_string s) !ppf
+let pp_print_text ppf s = ppf := Doc.text s !ppf
+let pp_print_char ppf c = ppf := Doc.char c !ppf
+let pp_print_int ppf c = ppf := Doc.int c !ppf
+let pp_print_float ppf f = ppf := Doc.float f !ppf
+let pp_print_bool ppf b = ppf := Doc.bool b !ppf
+let pp_print_nothing _ _ = ()
+
+let pp_close_box ppf () = ppf := Doc.close_box !ppf
+let pp_close_stag ppf () = ppf := Doc.close_tag !ppf
+
+let pp_print_break ppf spaces indent = ppf := Doc.break ~spaces ~indent !ppf
+
+let pp_print_custom_break ppf ~fits ~breaks =
+  ppf := Doc.custom_break ~fits ~breaks !ppf
+
+let pp_print_space ppf () = pp_print_break ppf 1 0
+let pp_print_cut ppf () = pp_print_break ppf 0 0
+
+let pp_print_flush ppf () = ppf := Doc.flush !ppf
+let pp_force_newline ppf () = ppf := Doc.force_newline !ppf
+let pp_print_newline ppf () = ppf := Doc.force_stop !ppf
+let pp_print_if_newline ppf () =ppf := Doc.if_newline !ppf
+
+let pp_open_stag ppf stag = ppf := !ppf |> Doc.open_tag stag
+
+let pp_open_box_gen ppf indent bxty =
+  let box_type = Doc.box_type bxty in
+   ppf := !ppf |> Doc.open_box box_type indent
+
+let pp_open_box ppf indent = pp_open_box_gen ppf indent Pp_box
+
+
+let pp_open_tbox ppf () = ppf := !ppf |> Doc.open_tbox
+
+let pp_close_tbox ppf () = ppf := !ppf |> Doc.close_tbox
+
+let pp_set_tab ppf () = ppf := !ppf |> Doc.set_tab
+
+let pp_print_tab ppf () = ppf := !ppf |> Doc.tab
+
+let pp_print_tbreak ppf width offset =
+  ppf := !ppf |> Doc.tab_break ~width ~offset
+
+let pp_doc ppf doc = ppf := Doc.append !ppf doc
+
+module Driver = struct
+  (* Interpret a formatting entity on a formatter. *)
+  let output_formatting_lit ppf
+      (fmting_lit:CamlinternalFormatBasics.formatting_lit)
+    = match fmting_lit with
+    | Close_box                 -> pp_close_box ppf ()
+    | Close_tag                 -> pp_close_stag ppf ()
+    | Break (_, width, offset)  -> pp_print_break ppf width offset
+    | FFlush                    -> pp_print_flush ppf ()
+    | Force_newline             -> pp_force_newline ppf ()
+    | Flush_newline             -> pp_print_newline ppf ()
+    | Magic_size (_, _)         -> ()
+    | Escaped_at                -> pp_print_char ppf '@'
+    | Escaped_percent           -> pp_print_char ppf '%'
+    | Scan_indic c              -> pp_print_char ppf '@'; pp_print_char ppf c
+
+
+
+  let compute_tag output tag_acc =
+    let buf = Buffer.create 16 in
+    let buf_fmt = Format.formatter_of_buffer buf in
+    let ppf = ref Doc.empty in
+    output ppf tag_acc;
+    pp_print_flush ppf ();
+    Doc.format buf_fmt !ppf;
+    let len = Buffer.length buf in
+    if len < 2 then Buffer.contents buf
+    else Buffer.sub buf 1 (len - 2)
+
+  (* Recursively output an "accumulator" containing a reversed list of
+     printing entities (string, char, flus, ...) in an output_stream. *)
+  (* Differ from Printf.output_acc by the interpretation of formatting. *)
+  (* Used as a continuation of CamlinternalFormat.make_printf. *)
+  let rec output_acc ppf (acc: _ CamlinternalFormat.acc) =
+    match acc with
+    | Acc_string_literal (Acc_formatting_lit (p, Magic_size (_, size)), s)
+    | Acc_data_string (Acc_formatting_lit (p, Magic_size (_, size)), s) ->
+        output_acc ppf p;
+        pp_print_as ppf size s;
+    | Acc_char_literal (Acc_formatting_lit (p, Magic_size (_, size)), c)
+    | Acc_data_char (Acc_formatting_lit (p, Magic_size (_, size)), c) ->
+        output_acc ppf p;
+        pp_print_as ppf size (String.make 1 c);
+    | Acc_formatting_lit (p, f) ->
+        output_acc ppf p;
+        output_formatting_lit ppf f;
+    | Acc_formatting_gen (p, Acc_open_tag acc') ->
+        output_acc ppf p;
+        pp_open_stag ppf (Format.String_tag (compute_tag output_acc acc'))
+    | Acc_formatting_gen (p, Acc_open_box acc') ->
+        output_acc ppf p;
+        let (indent, bty) =
+          let box_info = compute_tag output_acc acc' in
+          CamlinternalFormat.open_box_of_string box_info
+        in
+        pp_open_box_gen ppf indent bty
+    | Acc_string_literal (p, s)
+    | Acc_data_string (p, s)   -> output_acc ppf p; pp_print_string ppf s;
+    | Acc_char_literal (p, c)
+    | Acc_data_char (p, c)     -> output_acc ppf p; pp_print_char ppf c;
+    | Acc_delay (p, f)         -> output_acc ppf p; f ppf;
+    | Acc_flush p              -> output_acc ppf p; pp_print_flush ppf ();
+    | Acc_invalid_arg (p, msg) -> output_acc ppf p; invalid_arg msg;
+    | End_of_acc               -> ()
+end
+
+let kfprintf k ppf (CamlinternalFormatBasics.Format (fmt, _))  =
+  CamlinternalFormat.make_printf
+    (fun acc -> Driver.output_acc ppf acc; k ppf)
+    End_of_acc fmt
+let fprintf doc fmt = kfprintf ignore doc fmt
+
+
+let kdprintf k (CamlinternalFormatBasics.Format (fmt, _)) =
+  CamlinternalFormat.make_printf
+    (fun acc -> k (fun ppf -> Driver.output_acc ppf acc))
+    End_of_acc fmt
+
+let dprintf fmt = kdprintf (fun i -> i) fmt
+
+let doc_printf fmt =
+  let ppf = ref Doc.empty in
+  kfprintf (fun _ -> let doc = !ppf in ppf := Doc.empty; doc) ppf fmt
+
+let kdoc_printf k fmt =
+  let ppf = ref Doc.empty in
+  kfprintf (fun ppf ->
+      let doc = !ppf in
+      ppf := Doc.empty;
+      k doc
+    )
+    ppf fmt
+
+let doc_printer f x doc =
+  let r = ref doc in
+  f r x;
+  !r
+
+type 'a format_printer = Format.formatter -> 'a -> unit
+
+let format_printer f ppf x =
+  let doc = doc_printer f x Doc.empty in
+  Doc.format ppf doc
+let compat = format_printer
+let compat1 f p1 = compat (f p1)
+let compat2 f p1 p2 = compat (f p1 p2)
+
+let kasprintf k fmt =
+  kdoc_printf (fun doc -> k (Format.asprintf "%a" Doc.format doc)) fmt
+let asprintf fmt = kasprintf Fun.id fmt
+
+let pp_print_iter ?(pp_sep=pp_print_cut) iter elt ppf c =
+      let sep = doc_printer pp_sep () in
+      ppf:= Doc.iter ~sep ~iter (doc_printer elt) c !ppf
+
+let pp_print_list ?(pp_sep=pp_print_cut) elt ppf l =
+  ppf := Doc.list ~sep:(doc_printer pp_sep ()) (doc_printer elt) l !ppf
+
+let pp_print_array ?pp_sep elt ppf a =
+  pp_print_iter ?pp_sep Array.iter elt ppf a
+let pp_print_seq ?pp_sep elt ppf s = pp_print_iter ?pp_sep Seq.iter elt ppf s
+
+let pp_print_option  ?(none=fun _ () -> ()) elt ppf o =
+  ppf := Doc.option ~none:(doc_printer none ()) (doc_printer elt) o !ppf
+
+let pp_print_result  ~ok ~error ppf r =
+   ppf := Doc.result ~ok:(doc_printer ok) ~error:(doc_printer error) r !ppf
+
+let pp_print_either  ~left ~right ppf e =
+  ppf := Doc.either ~left:(doc_printer left) ~right:(doc_printer right) e !ppf
+
+let comma ppf () = fprintf ppf ",@ "
+let semicolon ppf () = fprintf ppf ";@ "
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let pp_two_columns ?(sep = "|") ?max_lines ppf (lines: (string * string) list) =
   let left_column_size =

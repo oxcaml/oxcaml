@@ -140,6 +140,7 @@ CAMLexport void caml_remove_generational_global_root(value *r)
       caml_delete_global_root(&caml_global_roots_old, r);
       /* Fallthrough: the root can be in the young list while actually
          being in the major heap. */
+      fallthrough;
     case YOUNG:
       caml_delete_global_root(&caml_global_roots_young, r);
       break;
@@ -181,6 +182,42 @@ CAMLexport void caml_modify_generational_global_root(value *r, value newval)
 
 #ifdef NATIVE_CODE
 
+<<<<<<< HEAD
+||||||| 23e84b8c4d
+/* Linked-list of natdynlink'd globals */
+
+typedef struct link {
+  void *data;
+  struct link *next;
+} link;
+
+static link *cons(void *data, link *tl) {
+  link *lnk = caml_stat_alloc(sizeof(link));
+  lnk->data = data;
+  lnk->next = tl;
+  return lnk;
+}
+
+#define iter_list(list,lnk) \
+  for (lnk = list; lnk != NULL; lnk = lnk->next)
+
+
+=======
+/* Linked-list of natdynlink'd globals */
+
+typedef struct link {
+  void *data;
+  struct link *next;
+} link;
+
+static link *cons(void *data, link *tl) {
+  link *lnk = caml_stat_alloc(sizeof(link));
+  lnk->data = data;
+  lnk->next = tl;
+  return lnk;
+}
+
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 /* protected by roots_mutex */
 static struct skiplist caml_dyn_globals = SKIPLIST_STATIC_INITIALIZER;
 
@@ -200,10 +237,21 @@ static void caml_register_dyn_global(void *v) {
 }
 
 void caml_register_dyn_globals(void **globals, int nglobals) {
+<<<<<<< HEAD
   int i;
   caml_plat_lock_blocking(&roots_mutex);
   for (i = 0; i < nglobals; i++)
     caml_register_dyn_global(globals[i]);
+||||||| 23e84b8c4d
+  int i;
+  caml_plat_lock(&roots_mutex);
+  for (i = 0; i < nglobals; i++)
+    caml_dyn_globals = cons(globals[i],caml_dyn_globals);
+=======
+  caml_plat_lock_blocking(&roots_mutex);
+  for (int i = 0; i < nglobals; i++)
+    caml_dyn_globals = cons(globals[i],caml_dyn_globals);
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   caml_plat_unlock(&roots_mutex);
 }
 
@@ -247,23 +295,53 @@ static void compute_index_for_global_root_scan(value* glob_block, int* start,
 
 static void scan_native_globals(scanning_action f, void* fdata)
 {
+<<<<<<< HEAD
   int i, j;
   value* glob;
   value glob_block;
   int start, stop;
+||||||| 23e84b8c4d
+  int i, j;
+  static link* dyn_globals;
+  value* glob;
+  link* lnk;
+
+  caml_plat_lock(&roots_mutex);
+  dyn_globals = caml_dyn_globals;
+  caml_plat_unlock(&roots_mutex);
+=======
+  link* dyn_globals;
+
+  caml_plat_lock_blocking(&roots_mutex);
+  dyn_globals = caml_dyn_globals;
+  caml_plat_unlock(&roots_mutex);
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
   /* The global roots */
+<<<<<<< HEAD
   for (i = 0; caml_globals[i] != 0; i++) {
     for(glob = caml_globals[i]; *glob != 0; glob++) {
       glob_block = *glob;
       compute_index_for_global_root_scan(&glob_block, &start, &stop);
       for (j = start; j < stop; j++) {
         f(fdata, Field(glob_block, j), &Field(glob_block, j));
+||||||| 23e84b8c4d
+  for (i = 0; caml_globals[i] != 0; i++) {
+    for(glob = caml_globals[i]; *glob != 0; glob++) {
+      for (j = 0; j < Wosize_val(*glob); j++){
+        f(fdata, Field(*glob, j), &Field(*glob, j));
+=======
+  for (int i = 0; caml_globals[i] != 0; i++) {
+    for (value *glob = caml_globals[i]; *glob != 0; glob++) {
+      for (int j = 0; j < Wosize_val(*glob); j++) {
+        f(fdata, Field(*glob, j), &Field(*glob, j));
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
       }
     }
   }
 
   /* Dynamic (natdynlink) global roots */
+<<<<<<< HEAD
   caml_plat_lock_blocking(&roots_mutex);
   FOREACH_SKIPLIST_ELEMENT(e, &caml_dyn_globals, {
     for(glob = (value *) (e->key); *glob != 0; glob++) {
@@ -271,6 +349,17 @@ static void scan_native_globals(scanning_action f, void* fdata)
       compute_index_for_global_root_scan(&glob_block, &start, &stop);
       for (j = start; j < stop; j++) {
         f(fdata, Field(glob_block, j), &Field(glob_block, j));
+||||||| 23e84b8c4d
+  iter_list(dyn_globals, lnk) {
+    for(glob = (value *) lnk->data; *glob != 0; glob++) {
+      for (j = 0; j < Wosize_val(*glob); j++){
+        f(fdata, Field(*glob, j), &Field(*glob, j));
+=======
+  for (link *lnk = dyn_globals; lnk != NULL; lnk = lnk->next) {
+    for (value *glob = (value *) lnk->data; *glob != 0; glob++) {
+      for (int j = 0; j < Wosize_val(*glob); j++) {
+        f(fdata, Field(*glob, j), &Field(*glob, j));
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
       }
     }
   })
@@ -281,7 +370,8 @@ static void scan_native_globals(scanning_action f, void* fdata)
 
 /* Iterate a GC scanning action over a global root list */
 Caml_inline void caml_iterate_global_roots(scanning_action f,
-                                      struct skiplist * rootlist, void* fdata)
+                                           struct skiplist * rootlist,
+                                           void* fdata)
 {
   CAMLassert(iterating_roots > 0);
   FOREACH_SKIPLIST_ELEMENT(e, rootlist, {

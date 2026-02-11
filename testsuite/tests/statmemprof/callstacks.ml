@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 (* TEST_BELOW
    Blank lines added to preserve locations
 
@@ -11,6 +12,43 @@
 
 
 
+||||||| 23e84b8c4d
+(* TEST
+ flags = "-g -w -5";
+ {
+   reference = "${test_source_directory}/callstacks.flat-float-array.reference";
+   flat-float-array;
+ }{
+   reason = "port stat-mem-prof : https://github.com/ocaml/ocaml/pull/8634";
+   skip;
+   {
+     native;
+   }{
+     bytecode;
+   }
+ }{
+   reference = "${test_source_directory}/callstacks.no-flat-float-array.reference";
+   no-flat-float-array;
+ }{
+   reason = "port stat-mem-prof : https://github.com/ocaml/ocaml/pull/8634";
+   skip;
+   {
+     native;
+   }{
+     bytecode;
+   }
+ }
+=======
+(* TEST
+ flags = "-g";
+ {
+   reference = "${test_source_directory}/callstacks.flat-float-array.reference";
+   flat-float-array;
+ }{
+   reference = "${test_source_directory}/callstacks.no-flat-float-array.reference";
+   no-flat-float-array;
+ }
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 *)
 
 module MP = Gc.Memprof

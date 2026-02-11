@@ -5,8 +5,16 @@
 module type S = sig type t [@@immediate] end;;
 module F (M : S) : S = M;;
 [%%expect{|
+<<<<<<< HEAD
 module type S = sig type t : immediate end
 module F : functor (M : S) -> S
+||||||| 23e84b8c4d
+module type S = sig type t [@@immediate] end
+module F : functor (M : S) -> S
+=======
+module type S = sig type t [@@immediate] end
+module F : (M : S) -> S
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 |}];;
 
 (* VALID DECLARATIONS *)

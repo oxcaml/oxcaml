@@ -27,6 +27,7 @@ type result =
 
 val print_result : Format.formatter -> result -> unit
 
+<<<<<<< HEAD
 module Diagnostics : sig
 
   type t
@@ -96,6 +97,38 @@ end
 (** [local_reduce] will not reduce shapes that require loading external
   compilation units. *)
 val local_reduce :?diagnostics:Diagnostics.t -> Env.t -> Shape.t -> Shape.t
+||||||| 23e84b8c4d
+=======
+(** The [Make] functor is used to generate a reduction function for
+    shapes.
+
+    It is parametrized by:
+    - a function to load the shape of an external compilation unit
+    - some fuel, which is used to bound recursion when dealing with recursive
+      shapes introduced by recursive modules. (FTR: merlin currently uses a
+      fuel of 10, which seems to be enough for most practical examples)
+
+    Usage warning: To ensure good performances, every reduction made with the
+    same instance of that functor share the same ident-based memoization tables.
+    Such an instance should only be used to perform reduction inside a unique
+    compilation unit to prevent conflicting entries in these memoization tables.
+*)
+module Make(_ : sig
+    val fuel : int
+
+    val read_unit_shape : unit_name:string -> Shape.t option
+  end) : sig
+  val reduce : Env.t -> Shape.t -> Shape.t
+
+  (** Perform weak reduction and return the head's uid if any. If reduction was
+    incomplete the partially reduced shape is returned. *)
+  val reduce_for_uid : Env.t -> Shape.t -> result
+end
+
+(** [local_reduce] will not reduce shapes that require loading external
+  compilation units. *)
+val local_reduce : Env.t -> Shape.t -> Shape.t
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 (** [local_reduce_for_uid] will not reduce shapes that require loading external
   compilation units. *)

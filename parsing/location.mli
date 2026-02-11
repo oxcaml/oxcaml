@@ -43,7 +43,31 @@ type t = Warnings.loc = {
   loc_start: Lexing.position;
   loc_end: Lexing.position;
   loc_ghost: bool;
-}
+  }
+(** [t] represents a range of characters in the source code.
+
+    loc_ghost=false whenever the AST described by the location can be parsed
+    from the location. In all other cases, loc_ghost must be true. Most
+    locations produced by the parser have loc_ghost=false.
+    When loc_ghost=true, the location is usually a best effort approximation.
+
+    This info is used by tools like merlin that want to relate source code with
+    parsetrees or later asts. ocamlprof skips instrumentation of ghost nodes.
+
+    Example: in `let f x = x`, we have:
+    - a structure item at location "let f x = x"
+    - a pattern "f" at location "f"
+    - an expression "fun x -> x" at location "x = x" with loc_ghost=true
+    - a pattern "x" at location "x"
+    - an expression "x" at location "x"
+    In this case, every node has loc_ghost=false, except the node "fun x -> x",
+    since [Parser.expression (Lexing.from_string "x = x")] would fail to parse.
+    By contrast, in `let f = fun x -> x`, every node has loc_ghost=false.
+
+    Line directives can modify the filenames and line numbers arbitrarily,
+    which is orthogonal to loc_ghost, which describes the range of characters
+    from loc_start.pos_cnum to loc_end.pos_cnum in the parsed string.
+ *)
 
 (** Note on the use of Lexing.position in this module.
    If [pos_fname = ""], then use [!input_name] instead.
@@ -216,7 +240,12 @@ module Doc: sig
   val separate_new_message: unit Format_doc.printer
   val filename: string Format_doc.printer
   val quoted_filename: string Format_doc.printer
+<<<<<<< HEAD
   val loc: capitalize_first:bool -> t Format_doc.printer
+||||||| 23e84b8c4d
+=======
+  val loc: t Format_doc.printer
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   val locs: t list Format_doc.printer
 end
 
@@ -245,6 +274,7 @@ type report = {
   kind : report_kind;
   main : msg;
   sub : msg list;
+  footnote: Format_doc.t option
 }
 
 type report_printer = {
@@ -366,14 +396,44 @@ val deprecated_script_alert: string -> unit
 type error = report
 (** An [error] is a [report] which [report_kind] must be [Report_error]. *)
 
-val error: ?loc:t -> ?sub:msg list -> string -> error
+type delayed_msg = unit -> Format_doc.t option
 
+<<<<<<< HEAD
 val errorf: ?loc:t -> ?sub:msg list ->
   ('a, Format_doc.formatter, unit, error) format4 -> 'a
+||||||| 23e84b8c4d
+val errorf: ?loc:t -> ?sub:msg list ->
+  ('a, Format.formatter, unit, error) format4 -> 'a
+=======
+val error: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg -> string -> error
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
+<<<<<<< HEAD
 val error_of_printer: ?loc:t -> ?sub:msg list ->
   (Format_doc.formatter -> 'a -> unit) -> 'a -> error
+||||||| 23e84b8c4d
+val error_of_printer: ?loc:t -> ?sub:msg list ->
+  (formatter -> 'a -> unit) -> 'a -> error
+=======
+val errorf: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+  ('a, Format_doc.formatter, unit, error) format4 -> 'a
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
+<<<<<<< HEAD
+||||||| 23e84b8c4d
+val error_of_printer_file: (formatter -> 'a -> unit) -> 'a -> error
+=======
+val aligned_error_hint:
+  ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+  ('a, Format_doc.formatter, unit, Format_doc.t option ->  error) format4 -> 'a
+(** [aligned_error_hint ?loc ?sub ?footnote fmt ... aligned_hint] produces an
+    error report where the potential [aligned_hint] message has been aligned
+    with the main error message before being added to the list of submessages.*)
+
+val error_of_printer: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+  (Format_doc.formatter -> 'a -> unit) -> 'a -> error
+
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 val error_of_printer_file: (Format_doc.formatter -> 'a -> unit) -> 'a -> error
 
 
@@ -397,7 +457,14 @@ exception Already_displayed_error
 (** Raising [Already_displayed_error] signals an error which has already been
    printed. The exception will be caught, but nothing will be printed *)
 
+<<<<<<< HEAD
 val raise_errorf: ?loc:t -> ?sub:msg list ->
+||||||| 23e84b8c4d
+val raise_errorf: ?loc:t -> ?sub:msg list ->
+  ('a, Format.formatter, unit, 'b) format4 -> 'a
+=======
+val raise_errorf: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   ('a, Format_doc.formatter, unit, 'b) format4 -> 'a
 
 val report_exception: formatter -> exn -> unit

@@ -42,6 +42,7 @@ OCAMLTEST_TARGET = @ocamltest_target@
 OCAMLDOC_OPT_TARGET = @ocamldoc_opt_target@
 OCAMLTEST_OPT_TARGET = @ocamltest_opt_target@
 
+build_ocamlobjinfo = @build_ocamlobjinfo@
 build_ocamltest = @build_ocamltest@
 
 build_ocamltex = @build_ocamltex@
@@ -51,6 +52,15 @@ lib_runtime_events = @lib_runtime_events@
 lib_str = @lib_str@
 lib_systhreads = @lib_systhreads@
 lib_unix = @lib_unix@
+
+# The following variable is added to keep track of which other libraries
+# have to be built by the recursive makefiles (not to be confused with
+# the OTHERLIBRARIES variable defined in Makefile.config.in and which
+# lists all the other libraries that get built, no matter how).
+# This variable is expected to disappear once all the makefiles under
+# otherlibs/ have been merged into the root Makefile
+
+OTHERLIBS = @otherlibs@
 
 OPTIONAL_LIBRARIES = @optional_libraries@
 OPTIONAL_BYTECODE_TOOLS = @optional_bytecode_tools@
@@ -63,33 +73,49 @@ INSTALL_OCAMLNAT = @install_ocamlnat@
 DEP_CC=@DEP_CC@ -MM
 COMPUTE_DEPS=@compute_deps@
 
+<<<<<<< HEAD
 # Build-system flags to use to compile C files
 OC_CFLAGS=@oc_cflags@
 OC_CPPFLAGS=-I$(ROOTDIR)/$(RUNTIME_DIR) @oc_cppflags@
+||||||| 23e84b8c4d
+# Build-system flags to use to compile C files
+OC_CFLAGS=@oc_cflags@
+OC_CPPFLAGS=-I$(ROOTDIR)/runtime @oc_cppflags@
+=======
+# Default flags to use to compile C files
+OC_CFLAGS = @oc_cflags@
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
-# The following variable defines flags to be passed to the C preprocessor
-# when compiling C files to be linked with native code. This includes
-# the native runtime itself and can also include the stub code around
-# C libraries when it needs to be different from the one used to
-# link with bytecode.
+# Flags to use when compiling C files to be linked with bytecode
+OC_BYTECODE_CFLAGS = @oc_bytecode_cflags@
 
-# These flags should be passed *in addition* to those in OC_CPPFLAGS, they
-# should not replace them.
+# Flags to use when compiling C files to be linked with native code
+OC_NATIVE_CFLAGS = @oc_native_cflags@
 
-OC_NATIVE_CPPFLAGS=-DNATIVE_CODE @native_cppflags@
+# The submodules should be searched *before* any other external -I paths
+OC_INCLUDES = $(addprefix -I $(ROOTDIR)/, \
+  runtime @flexdll_source_dir@ @winpthreads_source_include_dir@)
+OC_CPPFLAGS = $(OC_INCLUDES) @oc_cppflags@
 
-# Same as above, for CFLAGS
-OC_NATIVE_CFLAGS=@native_cflags@
+OC_BYTECODE_CPPFLAGS = $(OC_INCLUDES) @oc_bytecode_cppflags@
+
+OC_NATIVE_CPPFLAGS = $(OC_INCLUDES) @oc_native_cppflags@
 
 # Additional link-time options
 # To support dynamic loading of shared libraries (they need to look at
 # our own symbols):
 OC_LDFLAGS=@oc_ldflags@
 OC_DLL_LDFLAGS=@oc_dll_ldflags@
-OC_EXE_LDFLAGS=@oc_exe_ldflags@
 
-MKEXE_VIA_CC=\
-  $(CC) $(OC_EXE_LDFLAGS) $(OC_CFLAGS) $(CFLAGS) @mkexe_via_cc_ldflags@
+MKEXE_VIA_CC=$(CC) @mkexe_via_cc_ldflags@ @mkexe_via_cc_extra_cmd@
+
+# How to build sak
+SAK_BUILD=@SAK_BUILD@
+# How to invoke sak
+SAK=@SAK@
+
+# sak command to encode C literals
+ENCODE_C_LITERAL=@encode_C_literal@
 
 # Which tool to use to display differences between files
 DIFF=@DIFF@
@@ -111,10 +137,17 @@ DOCUMENTATION_TOOL_CMD=@documentation_tool_cmd@
 FLEXDLL_SOURCE_DIR=@flexdll_source_dir@
 BOOTSTRAPPING_FLEXDLL=@bootstrapping_flexdll@
 
+# The location of the Winpthreads sources to use (usually provided as the
+# winpthreads Git submodule)
+WINPTHREADS_SOURCE_DIR=@winpthreads_source_dir@
+
 ### Where to install documentation
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
 datarootdir = @datarootdir@
 DOCDIR=@docdir@
+
+### Where to look for the standard library on target
+TARGET_LIBDIR=@TARGET_LIBDIR@
 
 unix_directory = @unix_directory@
 unix_library = @unix_library@
@@ -139,10 +172,9 @@ DEFAULT_BUILD_TARGET = @default_build_target@
 # (other backends may be added in the future).
 #
 # ZZZ is either COMPFLAGS (compile-time flags) or LINKFLAGS (link-time flags).
-# Countrary to the C convention wrt. CFLAGS and LDFLAGS, the flags in the
-# COMPFLAGS category are not passed at link time, so if a flag is needed
-# at both stages, like e.g. -g, it should be added to both
-# XXX_YYY_COMPFLAGS and XXX_YYY_LINKFLAGS.
+# The flags in the COMPFLAGS category are not passed at link time,
+# so if a flag is needed at both stages, like e.g. -g, it should be
+# added to both XXX_YYY_COMPFLAGS and XXX_YYY_LINKFLAGS.
 
 OC_COMMON_COMPFLAGS = -g -strict-sequence -principal -absname \
   -w +a-4-9-40-41-42-44-45-48 -warn-error +a -bin-annot \
@@ -154,6 +186,8 @@ OC_BYTECODE_LINKFLAGS =
 OC_NATIVE_COMPFLAGS = @oc_native_compflags@
 
 OC_NATIVE_LINKFLAGS = -g
+
+BUILD_TRIPLET = @build@
 
 # Platform-dependent command to create symbolic links
 LN = @ln@

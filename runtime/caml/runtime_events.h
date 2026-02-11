@@ -29,7 +29,6 @@
 #define CAML_RUNTIME_EVENTS_H
 
 #include "mlvalues.h"
-#include <stdint.h>
 
 #ifdef CAML_INSTR
 #define CAML_EV_ALLOC(s) caml_ev_alloc(s)
@@ -58,6 +57,8 @@ typedef enum {
 typedef enum {
     EV_GC
 } ev_event_type;
+
+/* See runtime_events.mli for event documentation */
 
 typedef enum {
     EV_RING_START,
@@ -119,8 +120,15 @@ typedef enum {
     EV_COMPACT_EVACUATE,
     EV_COMPACT_FORWARD,
     EV_COMPACT_RELEASE,
+<<<<<<< HEAD
     EV_MINOR_EPHE_CLEAN,
     EV_MINOR_DEPENDENT,
+||||||| 23e84b8c4d
+    EV_COMPACT_RELEASE
+=======
+    EV_EMPTY_MINOR,
+    EV_MINOR_EPHE_CLEAN,
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 } ev_runtime_phase;
 
 typedef enum {
@@ -128,19 +136,23 @@ typedef enum {
     EV_C_FORCE_MINOR_MAKE_VECT,
     EV_C_FORCE_MINOR_SET_MINOR_HEAP_SIZE,
     EV_C_FORCE_MINOR_MEMPROF,
+
     EV_C_MINOR_PROMOTED,
     EV_C_MINOR_ALLOCATED,
+
     EV_C_REQUEST_MAJOR_ALLOC_SHR,
     EV_C_REQUEST_MAJOR_ADJUST_GC_SPEED, /* unused */
     EV_C_REQUEST_MINOR_REALLOC_REF_TABLE,
     EV_C_REQUEST_MINOR_REALLOC_EPHE_REF_TABLE,
     EV_C_REQUEST_MINOR_REALLOC_CUSTOM_TABLE,
+
     EV_C_MAJOR_HEAP_POOL_WORDS,
     EV_C_MAJOR_HEAP_POOL_LIVE_WORDS,
     EV_C_MAJOR_HEAP_LARGE_WORDS,
     EV_C_MAJOR_HEAP_POOL_FRAG_WORDS,
     EV_C_MAJOR_HEAP_POOL_LIVE_BLOCKS,
     EV_C_MAJOR_HEAP_LARGE_BLOCKS,
+<<<<<<< HEAD
     EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE,
     EV_C_MAJOR_SLICE_ALLOC_WORDS,
     EV_C_MAJOR_SLICE_ALLOC_DEPENDENT_WORDS,
@@ -148,6 +160,19 @@ typedef enum {
     EV_C_MAJOR_SLICE_TOTAL_WORK,
     EV_C_MAJOR_SLICE_BUDGET,
     EV_C_MAJOR_SLICE_WORK_DONE,
+||||||| 23e84b8c4d
+=======
+
+    EV_C_MAJOR_HEAP_WORDS,
+    EV_C_MAJOR_ALLOCATED_WORDS,
+    EV_C_MAJOR_ALLOCATED_WORK,
+    EV_C_MAJOR_DEPENDENT_WORK,
+    EV_C_MAJOR_EXTRA_WORK,
+    EV_C_MAJOR_WORK_COUNTER,
+    EV_C_MAJOR_ALLOC_COUNTER,
+    EV_C_MAJOR_SLICE_TARGET,
+    EV_C_MAJOR_SLICE_BUDGET
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 } ev_runtime_counter;
 
 typedef enum {
@@ -170,6 +195,10 @@ typedef enum {
   E_CURSOR_POLL_BUSY = -8,
 } runtime_events_error;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Starts runtime_events. Needs to be called before
    [caml_runtime_events_create_cursor]. Needs the runtime lock held to call and
    will trigger a stop-the-world pause. */
@@ -191,6 +220,14 @@ CAMLextern void caml_runtime_events_resume(void);
    [0] otherwise. */
 CAMLextern int caml_runtime_events_are_active(void);
 
+<<<<<<< HEAD
+||||||| 23e84b8c4d
+=======
+#ifdef __cplusplus
+}
+#endif
+
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 #ifdef CAML_INTERNALS
 
 struct runtime_events_buffer_header {
@@ -333,4 +370,4 @@ CAMLextern value caml_runtime_events_user_resolve(char* event_name,
 
 #endif /* CAML_INTERNALS */
 
-#endif /*CAML_RUNTIME_EVENTS_H*/
+#endif /* CAML_RUNTIME_EVENTS_H */

@@ -42,6 +42,7 @@ let class_declarations env cty1 cty2 =
 
 open Format_doc
 open Ctype
+module Printtyp=Printtyp.Doc
 
 (*
 let rec hide_params = function
@@ -58,7 +59,15 @@ let include_err mode ppf =
       fprintf ppf
         "The classes do not have the same number of type parameters"
   | CM_Type_parameter_mismatch (n, env, err) ->
+<<<<<<< HEAD
       Printtyp.report_equality_error ppf mode env err
+||||||| 23e84b8c4d
+      Printtyp.report_equality_error ppf mode env err
+        (function ppf ->
+           fprintf ppf "The %d%s type parameter has type"
+=======
+     Errortrace_report.equality ppf mode env err
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
         (msg "The %d%s type parameter has type"
              n (Misc.ordinal_suffix n))
         (msg "but is expected to have type")
@@ -70,16 +79,44 @@ let include_err mode ppf =
           "is not matched by the class type"
           Printtyp.class_type cty2)
   | CM_Parameter_mismatch (n, env, err) ->
+<<<<<<< HEAD
       Printtyp.report_moregen_error ppf mode env err
+||||||| 23e84b8c4d
+      Printtyp.report_moregen_error ppf mode env err
+        (function ppf ->
+           fprintf ppf "The %d%s parameter has type"
+=======
+      Errortrace_report.moregen ppf mode env err
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
         (msg "The %d%s parameter has type"
              n (Misc.ordinal_suffix n))
         (msg "but is expected to have type")
   | CM_Val_type_mismatch (lab, env, err) ->
+<<<<<<< HEAD
       Printtyp.report_comparison_error ppf mode env err
+||||||| 23e84b8c4d
+      Printtyp.report_comparison_error ppf mode env err
+        (function ppf ->
+          fprintf ppf "The instance variable %s@ has type" lab)
+        (function ppf ->
+          fprintf ppf "but is expected to have type")
+=======
+      Errortrace_report.comparison ppf mode env err
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
         (msg "The instance variable %s@ has type" lab)
         (msg "but is expected to have type")
   | CM_Meth_type_mismatch (lab, env, err) ->
+<<<<<<< HEAD
       Printtyp.report_comparison_error ppf mode env err
+||||||| 23e84b8c4d
+      Printtyp.report_comparison_error ppf mode env err
+        (function ppf ->
+          fprintf ppf "The method %s@ has type" lab)
+        (function ppf ->
+          fprintf ppf "but is expected to have type")
+=======
+      Errortrace_report.comparison ppf mode env err
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
         (msg "The method %s@ has type" lab)
         (msg "but is expected to have type")
   | CM_Non_mutable_value lab ->

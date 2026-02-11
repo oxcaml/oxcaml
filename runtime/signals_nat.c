@@ -50,7 +50,7 @@ void caml_garbage_collection(void)
 {
   frame_descr* d;
   caml_domain_state * dom_st = Caml_state;
-  caml_frame_descrs fds = caml_get_frame_descrs();
+  caml_frame_descrs * fds = caml_get_frame_descrs();
   struct stack_info* stack = dom_st->current_stack;
 
   char * sp = (char*)stack->sp;
@@ -64,13 +64,23 @@ void caml_garbage_collection(void)
   { /* Find the frame descriptor for the current allocation */
     d = caml_find_frame_descr(fds, retaddr);
     /* Must be an allocation frame */
-    CAMLassert(d && !frame_return_to_C(d) && frame_has_allocs(d));
+    CAMLassert(d);
+    CAMLassert(!frame_return_to_C(d));
+    CAMLassert(frame_has_allocs(d));
   }
 
   { /* Compute the total allocation size at this point,
        including allocations combined by Comballoc */
+<<<<<<< HEAD
     unsigned char* alloc_len = frame_end_of_live_ofs(d);
     int i, nallocs = *alloc_len++;
+||||||| 23e84b8c4d
+    unsigned char* alloc_len = (unsigned char*)(&d->live_ofs[d->num_live]);
+    int i, nallocs = *alloc_len++;
+=======
+    unsigned char* alloc_len = (unsigned char*)(&d->live_ofs[d->num_live]);
+    int nallocs = *alloc_len++;
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     intnat allocsz = 0;
 
     if (nallocs == 0) {
@@ -80,7 +90,7 @@ void caml_garbage_collection(void)
     }
     else
     {
-      for (i = 0; i < nallocs; i++) {
+      for (int i = 0; i < nallocs; i++) {
         allocsz += Whsize_wosize(Wosize_encoded_alloc_len(alloc_len[i]));
       }
       /* We have computed whsize (including header)

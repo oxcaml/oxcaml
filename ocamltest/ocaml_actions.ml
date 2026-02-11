@@ -189,23 +189,26 @@ let is_c_file (_filename, filetype) = filetype=Ocaml_filetypes.C
 
 let cmas_need_dynamic_loading directories libraries =
   let loads_c_code library =
-    let library = Misc.find_in_path directories library in
-    let ic = open_in_bin library in
-    try
-      let len_magic_number = String.length Config.cma_magic_number in
-      let magic_number = really_input_string ic len_magic_number in
-      if magic_number = Config.cma_magic_number then
-        let toc_pos = input_binary_int ic in
-        seek_in ic toc_pos;
-        let toc = (input_value ic : Cmo_format.library) in
-        close_in ic;
-        if toc.Cmo_format.lib_dllibs <> [] then Some (Ok ()) else None
-      else
-        raise End_of_file
-    with End_of_file
-       | Sys_error _ ->
-         begin try close_in ic with Sys_error _ -> () end;
-         Some (Error ("Corrupt or non-CMA file: " ^ library))
+    match Misc.find_in_path directories library with
+    | exception Not_found ->
+      Some (Error ("file not found in include path: " ^ library))
+    | library ->
+      let ic = open_in_bin library in
+      try
+        let len_magic_number = String.length Config.cma_magic_number in
+        let magic_number = really_input_string ic len_magic_number in
+        if magic_number = Config.cma_magic_number then
+          let toc_pos = input_binary_int ic in
+          seek_in ic toc_pos;
+          let toc = (input_value ic : Cmo_format.library) in
+          close_in ic;
+          if toc.Cmo_format.lib_dllibs <> [] then Some (Ok ()) else None
+        else
+          raise End_of_file
+      with End_of_file
+         | Sys_error _ ->
+           begin try close_in ic with Sys_error _ -> () end;
+           Some (Error ("Corrupt or non-CMA file: " ^ library))
   in
   List.find_map loads_c_code (String.words libraries)
 
@@ -218,7 +221,7 @@ let compile_program (compiler : Ocaml_compilers.compiler) log env =
   let output_variable = Compiler.output_variable in
   let prepare = prepare_module output_variable log env in
   let modules =
-    List.concatmap prepare (List.map Ocaml_filetypes.filetype all_modules) in
+    List.concat_map prepare (List.map Ocaml_filetypes.filetype all_modules) in
   let has_c_file = List.exists is_c_file modules in
   let c_headers_flags =
     if has_c_file then Ocaml_flags.c_includes else "" in
@@ -355,7 +358,7 @@ let find_source_modules log env =
       ((plugins env) @ (modules env) @ [(Actions_helpers.testfile env)]) in
   print_module_names log "Specified" specified_modules;
   let source_modules =
-    List.concatmap
+    List.concat_map
       (add_module_interface source_directory)
       specified_modules in
   print_module_names log "Source" source_modules;
@@ -552,6 +555,7 @@ let env_with_lib_unix env =
   in
   Environments.add Ocaml_variables.caml_ld_library_path newlibs env
 
+<<<<<<< HEAD
 let debug log env =
   let program = Environments.safe_lookup Builtin_variables.program env in
   let what = Printf.sprintf "Debugging program %s" program in
@@ -590,6 +594,46 @@ let ocamldebug =
     ~does_something:true
     debug
 
+||||||| 23e84b8c4d
+let debug log env =
+  let program = Environments.safe_lookup Builtin_variables.program env in
+  let what = Printf.sprintf "Debugging program %s" program in
+  Printf.fprintf log "%s\n%!" what;
+  let commandline =
+  [
+    Ocaml_commands.ocamlrun_ocamldebug;
+    Ocaml_flags.ocamldebug_default_flags;
+    program
+  ] in
+  let systemenv =
+    Environments.append_to_system_env
+      default_ocaml_env
+      (env_with_lib_unix env)
+  in
+  let expected_exit_status = 0 in
+  let exit_status =
+    Actions_helpers.run_cmd
+      ~environment:systemenv
+      ~stdin_variable: Ocaml_variables.ocamldebug_script
+      ~stdout_variable:Builtin_variables.output
+      ~stderr_variable:Builtin_variables.output
+      ~append:true
+      log (env_with_lib_unix env) commandline in
+  if exit_status=expected_exit_status
+  then (Result.pass, env)
+  else begin
+    let reason =
+      (Actions_helpers.mkreason
+        what (String.concat " " commandline) exit_status) in
+    (Result.fail_with_reason reason, env)
+  end
+
+let ocamldebug =
+  Actions.make ~name:"ocamldebug" ~description:"Run ocamldebug on the program"
+    debug
+
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 let objinfo log env =
   let tools_directory = Ocaml_directories.tools in
   let program = Environments.safe_lookup Builtin_variables.program env in
@@ -631,8 +675,19 @@ let objinfo log env =
 let ocamlobjinfo =
   Actions.make ~name:"ocamlobjinfo"
     ~description:"Run ocamlobjinfo on the program"
+<<<<<<< HEAD
     ~does_something:true
     objinfo
+||||||| 23e84b8c4d
+    ~description:"Run ocamlobjinfo on the program" objinfo
+=======
+    (fun log env ->
+       if Ocamltest_config.ocamlobjinfo then
+         objinfo log env
+       else
+         Result.skip_with_reason "ocamlobjinfo not available", env
+    )
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let mklib log env =
   let program = Environments.safe_lookup Builtin_variables.program env in
@@ -761,7 +816,7 @@ let run_codegen log env =
     if exit_status=0
     then begin
       let finalise =
-        if Ocamltest_config.ccomptype="msvc"
+        if Ocamltest_config.ccomp_type="msvc"
         then finalise_codegen_msvc
         else finalise_codegen_cc
       in
@@ -784,7 +839,7 @@ let run_cc log env =
   let what = Printf.sprintf "Running C compiler to build %s" program in
   Printf.fprintf log "%s\n%!" what;
   let output_exe =
-    if Ocamltest_config.ccomptype="msvc" then "/Fe" else "-o "
+    if Ocamltest_config.ccomp_type="msvc" then "/Fe" else "-o "
   in
   let commandline =
   [
@@ -1622,7 +1677,6 @@ let init () =
     setup_ocamldoc_build_env;
     run_ocamldoc;
     check_ocamldoc_output;
-    ocamldebug;
     ocamlmklib;
     codegen;
     cc;

@@ -28,11 +28,17 @@ let init_path () = Compmisc.init_path ()
 
 (** Return the initial environment in which compilation proceeds. *)
 let initial_env () =
+<<<<<<< HEAD
   let current =
     match Env.get_unit_name () with
     | Some cu -> Unit_info.modname cu |> Compilation_unit.full_path_as_string
     | None -> ""
   in
+||||||| 23e84b8c4d
+  let current = Env.get_unit_name () in
+=======
+  let current = Env.get_current_unit_name () in
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   let initial = !Odoc_global.initially_opened_module in
   let initially_opened_module =
     if initial = current then
@@ -71,6 +77,7 @@ let no_docstring f x =
   result
 
 let unit_from_source source_file source_kind =
+<<<<<<< HEAD
   let for_pack_prefix =
     (* CR-someday lmaurer: Definitely not right to assume that everything is in
        the same pack and that pack is specified on the command line *)
@@ -79,12 +86,27 @@ let unit_from_source source_file source_kind =
   Unit_info.make ~check_modname:false ~source_file source_kind
     (Filename.remove_extension source_file)
     ~for_pack_prefix
+||||||| 23e84b8c4d
+let unit_from_source source_file =
+    Unit_info.make ~check_modname:false ~source_file
+      (Filename.remove_extension source_file)
+=======
+    Unit_info.make ~check_modname:false ~source_file source_kind
+      (Filename.remove_extension source_file)
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let process_implementation_file sourcefile =
   init_path ();
   let source = unit_from_source sourcefile Unit_info.Impl in
+<<<<<<< HEAD
   let compilation_unit = Unit_info.modname source in
   Env.set_unit_name (Some source);
+||||||| 23e84b8c4d
+  let source = unit_from_source sourcefile in
+  Env.set_unit_name (Unit_info.modname source);
+=======
+  Env.set_current_unit source;
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   let inputfile = preprocess sourcefile in
   let env = initial_env () in
   try
@@ -117,8 +139,16 @@ let process_implementation_file sourcefile =
 let process_interface_file sourcefile =
   init_path ();
   let unit = unit_from_source sourcefile Unit_info.Intf in
+<<<<<<< HEAD
   let compilation_unit = Unit_info.modname unit in
   Env.set_unit_name (Some unit);
+||||||| 23e84b8c4d
+  let unit = unit_from_source sourcefile in
+  let modulename = Unit_info.modname unit in
+  Env.set_unit_name modulename;
+=======
+  Env.set_current_unit unit;
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   let inputfile = preprocess sourcefile in
   let ast =
     Pparse.file ~tool_name inputfile
@@ -223,7 +253,7 @@ let process_file sourcefile =
   | Odoc_global.Text_file file ->
       Location.input_name := file;
       try
-        let mod_name = Unit_info.modname_from_source file in
+        let mod_name = Unit_info.lax_modname_from_source file in
         let txt =
           try Odoc_text.Texter.text_of_string (Odoc_misc.input_file_as_string file)
           with Odoc_text.Text_syntax (l, c, s) ->

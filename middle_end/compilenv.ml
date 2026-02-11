@@ -66,6 +66,7 @@ let current_unit =
     ui_external_symbols = [];
   }
 
+<<<<<<< HEAD
 let reset unit_info =
   let compilation_unit = Unit_info.modname unit_info in
   Infos_table.clear global_infos_table;
@@ -74,6 +75,80 @@ let reset unit_info =
   current_unit.ui_unit <- compilation_unit;
   current_unit.ui_defines <- [compilation_unit];
   current_unit.ui_arg_descr <- None;
+||||||| 23e84b8c4d
+let symbol_separator =
+  match Config.ccomp_type with
+  | "msvc" -> '$' (* MASM does not allow for dots in symbol names *)
+  | _ -> '.'
+
+let concat_symbol unitname id =
+  Printf.sprintf "%s%c%s" unitname symbol_separator id
+
+let symbolname_for_pack pack name =
+  match pack with
+  | None -> name
+  | Some p -> concat_symbol p name
+
+let unit_id_from_name name = Ident.create_persistent name
+
+let make_symbol ?(unitname = current_unit.ui_symbol) idopt =
+  let prefix = "caml" ^ unitname in
+  match idopt with
+  | None -> prefix
+  | Some id -> concat_symbol prefix id
+
+let current_unit_linkage_name () =
+  Linkage_name.create (make_symbol ~unitname:current_unit.ui_symbol None)
+
+let reset ?packname name =
+  Hashtbl.clear global_infos_table;
+  Set_of_closures_id.Tbl.clear imported_sets_of_closures_table;
+  let symbol = symbolname_for_pack packname name in
+  current_unit.ui_name <- name;
+  current_unit.ui_symbol <- symbol;
+  current_unit.ui_defines <- [symbol];
+=======
+let linuxlike_mangling = match Config.system with
+  | "macosx"
+  | "mingw" | "mingw64" | "cygwin" | "win32" | "win64" -> false
+  | _ -> true
+
+let symbol_separator = if linuxlike_mangling then '.' else '$'
+let escape_prefix = if linuxlike_mangling then "$" else "$$"
+
+let concat_symbol unitname id =
+  Printf.sprintf "%s%c%s" unitname symbol_separator id
+
+let symbolname_for_pack pack name =
+  match pack with
+  | None -> name
+  | Some p -> concat_symbol p name
+
+let unit_id_from_name name = Ident.create_persistent name
+
+let make_symbol ?(unitname = current_unit.ui_symbol) idopt =
+  let prefix = "caml" ^ unitname in
+  match idopt with
+  | None -> prefix
+  | Some id -> concat_symbol prefix id
+
+let current_unit_linkage_name () =
+  Linkage_name.create (make_symbol ~unitname:current_unit.ui_symbol None)
+
+let reset ?packname name =
+  let packname =
+    Option.map
+      (Misc.replace_substring ~before:"."
+         ~after:(String.make 1 symbol_separator))
+      packname
+  in
+  Hashtbl.clear global_infos_table;
+  Set_of_closures_id.Tbl.clear imported_sets_of_closures_table;
+  let symbol = symbolname_for_pack packname name in
+  current_unit.ui_name <- name;
+  current_unit.ui_symbol <- symbol;
+  current_unit.ui_defines <- [symbol];
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   current_unit.ui_imports_cmi <- [];
   current_unit.ui_imports_cmx <- [];
   current_unit.ui_quoted_globals <- [];
@@ -95,6 +170,25 @@ let record_external_symbols () =
 let current_unit_infos () =
   current_unit
 
+<<<<<<< HEAD
+||||||| 23e84b8c4d
+let current_unit_name () =
+  current_unit.ui_name
+
+let symbol_in_current_unit name =
+  let prefix = "caml" ^ current_unit.ui_symbol in
+  name = prefix ||
+  (let lp = String.length prefix in
+   String.length name >= 2 + lp
+   && String.sub name 0 lp = prefix
+   && name.[lp] = '_'
+   && name.[lp + 1] = '_')
+
+=======
+let current_unit_name () =
+  current_unit.ui_name
+
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 let read_unit_info filename =
   let ic = open_in_bin filename in
   try
@@ -145,10 +239,24 @@ let read_library_info filename =
 
 (* Read and cache info on global identifiers *)
 
+<<<<<<< HEAD
 let equal_args arg1 arg2 =
   let ({ param = name1; value = value1 } : CU.argument) = arg1 in
   let ({ param = name2; value = value2 } : CU.argument) = arg2 in
   CU.Name.equal name1 name2 && CU.equal value1 value2
+||||||| 23e84b8c4d
+(* Referring to a packed unit is only allowed from a unit that will
+   ultimately end up in the same pack, including through nested packs. *)
+let is_import_from_same_pack ~imported ~current =
+  String.equal imported current
+  || String.starts_with ~prefix:(imported ^ ".") current
+=======
+(* Referring to a packed unit is only allowed from a unit that will
+   ultimately end up in the same pack, including through nested packs. *)
+let is_import_from_same_pack ~imported ~current =
+  String.equal imported current
+  || String.starts_with ~prefix:(concat_symbol imported "") current
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let equal_up_to_pack_prefix cu1 cu2 =
   CU.Name.equal (CU.name cu1) (CU.name cu2)
@@ -322,6 +430,13 @@ let require_global global_ident =
 (* Error report *)
 
 open Format_doc
+<<<<<<< HEAD
+||||||| 23e84b8c4d
+open Format
+module Style = Misc.Style
+=======
+module Style = Misc.Style
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let report_error_doc ppf = function
   | Not_a_unit_info filename ->
@@ -329,13 +444,54 @@ let report_error_doc ppf = function
         Location.Doc.quoted_filename filename
   | Corrupted_unit_info filename ->
       fprintf ppf "Corrupted compilation unit description@ %a"
+<<<<<<< HEAD
         Location.Doc.quoted_filename filename
+||||||| 23e84b8c4d
+        (Style.as_inline_code Location.print_filename) filename
+=======
+       Location.Doc.quoted_filename filename
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   | Illegal_renaming(name, modname, filename) ->
       fprintf ppf "%a@ contains the description for unit\
                    @ %a when %a was expected"
         Location.Doc.quoted_filename filename
+<<<<<<< HEAD
         CU.print_as_inline_code name
         CU.print_as_inline_code modname
+||||||| 23e84b8c4d
+        (Style.as_inline_code Location.print_filename) filename
+        Style.inline_code name
+        Style.inline_code modname
+  | Mismatching_for_pack(filename, pack_1, current_unit, None) ->
+      fprintf ppf "%a@ was built with %a, but the \
+                   @ current unit %a is not"
+        (Style.as_inline_code Location.print_filename) filename
+        Style.inline_code ("-for-pack " ^ pack_1)
+        Style.inline_code current_unit
+  | Mismatching_for_pack(filename, pack_1, current_unit, Some pack_2) ->
+      fprintf ppf "%a@ was built with %a, but the \
+                   @ current unit %a is built with %a"
+        (Style.as_inline_code Location.print_filename) filename
+        Style.inline_code ("-for-pack " ^ pack_1)
+        Style.inline_code current_unit
+        Style.inline_code ("-for-pack " ^ pack_2)
+=======
+        Style.inline_code name
+        Style.inline_code modname
+  | Mismatching_for_pack(filename, pack_1, current_unit, None) ->
+      fprintf ppf "%a@ was built with %a, but the \
+                   @ current unit %a is not"
+        Location.Doc.quoted_filename filename
+        Style.inline_code ("-for-pack " ^ pack_1)
+        Style.inline_code current_unit
+  | Mismatching_for_pack(filename, pack_1, current_unit, Some pack_2) ->
+      fprintf ppf "%a@ was built with %a, but the \
+                   @ current unit %a is built with %a"
+        Location.Doc.quoted_filename filename
+        Style.inline_code ("-for-pack " ^ pack_1)
+        Style.inline_code current_unit
+        Style.inline_code ("-for-pack " ^ pack_2)
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let () =
   Location.register_error_of_exn

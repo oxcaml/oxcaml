@@ -30,13 +30,20 @@ type info = {
   backend : backend;
 }
 
+<<<<<<< HEAD
 type compilation_unit_or_inferred =
   | Exactly of Compilation_unit.t
   | Inferred_from_output_prefix
 
 let with_info ~backend ~tool_name ~source_file ~output_prefix
       ~compilation_unit ~kind ~dump_ext k =
+||||||| 23e84b8c4d
+let with_info ~native ~tool_name ~source_file ~output_prefix ~dump_ext k =
+=======
+let with_info ~native ~tool_name ~dump_ext unit_info k =
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   Compmisc.init_path ();
+<<<<<<< HEAD
   Compmisc.init_parameters ();
   let target =
     match compilation_unit with
@@ -49,12 +56,32 @@ let with_info ~backend ~tool_name ~source_file ~output_prefix
   in
   let compilation_unit = Unit_info.modname target in
   Env.set_unit_name (Some target);
+||||||| 23e84b8c4d
+  let target = Unit_info.make ~source_file output_prefix in
+  Env.set_unit_name (Unit_info.modname target);
+=======
+  Env.set_current_unit unit_info ;
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   let env = Compmisc.initial_env() in
+<<<<<<< HEAD
   let dump_file = String.concat "." [output_prefix; dump_ext] in
   Compmisc.with_ppf_dump ~file_prefix:dump_file (fun ppf_dump ->
+||||||| 23e84b8c4d
+  let dump_file = String.concat "." [output_prefix; dump_ext] in
+  Compmisc.with_ppf_dump ~file_prefix:dump_file @@ fun ppf_dump ->
+=======
+  let dump_file = String.concat "." [Unit_info.prefix unit_info; dump_ext] in
+  Compmisc.with_ppf_dump ~file_prefix:dump_file @@ fun ppf_dump ->
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   k {
+<<<<<<< HEAD
     target;
     module_name = compilation_unit;
+||||||| 23e84b8c4d
+    target;
+=======
+    target = unit_info;
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     env;
     ppf_dump;
     tool_name;
@@ -108,8 +135,14 @@ let typecheck_intf info ast =
           (Printtyp.printed_signature
              (Unit_info.original_source_file info.target))
           sg);
+<<<<<<< HEAD
   ignore (Includemod.signatures info.env ~mark:true
     ~modes:Includemod.modes_unit sg sg);
+||||||| 23e84b8c4d
+  ignore (Includemod.signatures info.env ~mark:Mark_both sg sg);
+=======
+  ignore (Includemod.signatures info.env ~mark:true sg sg);
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   Typecore.force_delayed_checks ();
   Builtin_attributes.warn_unused ();
   Warnings.check_fatal ();
@@ -117,6 +150,7 @@ let typecheck_intf info ast =
 
 let emit_signature info alerts tsg =
   let sg =
+<<<<<<< HEAD
     let kind : Cmi_format.kind =
       if !Clflags.as_parameter then
         Parameter
@@ -128,6 +162,10 @@ let emit_signature info alerts tsg =
         Normal { cmi_impl = info.module_name; cmi_arg_for }
       end
     in
+||||||| 23e84b8c4d
+    let alerts = Builtin_attributes.alerts_of_sig ast in
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     Env.save_signature ~alerts tsg.Typedtree.sig_type
       (Compilation_unit.name info.module_name) kind
       (Unit_info.cmi info.target)
@@ -141,7 +179,12 @@ let interface ~hook_parse_tree ~hook_typed_tree info =
   hook_parse_tree ast;
   if Clflags.(should_stop_after Compiler_pass.Parsing) then () else begin
     let alerts, tsg = typecheck_intf info ast in
+<<<<<<< HEAD
     hook_typed_tree tsg;
+||||||| 23e84b8c4d
+    let tsg = typecheck_intf info ast in
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     if not !Clflags.print_types then begin
       emit_signature info alerts tsg
     end

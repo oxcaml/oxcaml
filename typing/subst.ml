@@ -33,6 +33,7 @@ type type_replacement =
   | Path of Path.t
   | Type_function of { params : type_expr list; body : type_expr }
 
+<<<<<<< HEAD
 type additional_action =
   | Prepare_for_saving of
       { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind;
@@ -49,6 +50,10 @@ type additional_action =
   | Duplicate_variables
   | No_action
 
+||||||| 23e84b8c4d
+type t =
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 type s =
   { types: type_replacement Path.Map.t;
     modules: Path.t Path.Map.t;
@@ -75,6 +80,7 @@ let identity =
     last_compose = None;
   }
 
+<<<<<<< HEAD
 (* Add a replacement for both a path and its unboxed version, even if that
    unboxed version doesn't exist (as we can't tell here whether it exists).
    Asserts we never add an unboxed version directly. *)
@@ -99,15 +105,46 @@ let add_type_replacement types id replacement =
       Path.Map.add
         (Path.unboxed_version id) (Type_function { params; body }) types
     | _ -> types
-
+||||||| 23e84b8c4d
+let add_type_path id p s = { s with types = Path.Map.add id (Path p) s.types }
+let add_type id p s = add_type_path (Pident id) p s
+=======
 let unsafe x = x
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
+<<<<<<< HEAD
+let unsafe x = x
+||||||| 23e84b8c4d
+let add_type_function id ~params ~body s =
+  { s with types = Path.Map.add id (Type_function { params; body }) s.types }
+=======
+let add_type id p s =
+    { s with types = Path.Map.add (Pident id) (Path p) s.types }
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+
+<<<<<<< HEAD
 let add_type id p s =
   let types = add_type_replacement s.types (Pident id) (Path p) in
   { s with types; last_compose = None }
+||||||| 23e84b8c4d
+let add_module_path id p s = { s with modules = Path.Map.add id p s.modules }
+let add_module id p s = add_module_path (Pident id) p s
+=======
+let add_module id p s =
+  { s with modules = Path.Map.add (Pident id) p s.modules }
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
+<<<<<<< HEAD
 let add_module id p s =
   { s with modules = Path.Map.add (Pident id) p s.modules; last_compose = None }
+||||||| 23e84b8c4d
+let add_modtype_path p ty s = { s with modtypes = Path.Map.add p ty s.modtypes }
+let add_modtype id ty s = add_modtype_path (Pident id) ty s
+=======
+let add_modtype_gen p ty s = { s with modtypes = Path.Map.add p ty s.modtypes }
+let add_modtype_path p p' s = add_modtype_gen p (Mty_ident p') s
+let add_modtype id p s = add_modtype_path (Pident id) p s
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let add_modtype_gen p ty s =
   { s with modtypes = Path.Map.add p ty s.modtypes; last_compose = None }
@@ -308,8 +345,15 @@ let rec module_path s path =
 let modtype_path s path =
       match Path.Map.find path s.modtypes with
       | Mty_ident p -> p
+<<<<<<< HEAD
       | Mty_alias _ | Mty_signature _ | Mty_functor _
       | Mty_strengthen _ as mty ->
+||||||| 23e84b8c4d
+      | Mty_alias _ | Mty_signature _ | Mty_functor _ ->
+         fatal_error "Subst.modtype_path"
+=======
+      | Mty_alias _ | Mty_signature _ | Mty_functor _ as mty ->
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
          raise (Module_type_path_substituted_away (path,mty))
       | exception Not_found ->
          match path with
@@ -502,9 +546,22 @@ let rec typexp copy_scope s ty =
          | Type_function { params; body } ->
             Tlink (apply_type_function params args body)
          end
+<<<<<<< HEAD
       | Tpackage(p, fl) ->
           Tpackage(modtype_path s p,
                    List.map (fun (n, ty) -> (n, typexp copy_scope s ty)) fl)
+||||||| 23e84b8c4d
+      | Tpackage(p, fl) ->
+          Tpackage(modtype_path s p,
+                    List.map (fun (n, ty) -> (n, typexp copy_scope s ty)) fl)
+=======
+      | Tpackage {pack_path; pack_cstrs} ->
+          Tpackage {
+            pack_path = modtype_path s pack_path;
+            pack_cstrs =
+              List.map (fun (n, ty) -> (n, typexp copy_scope s ty)) pack_cstrs;
+          }
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
       | Tobject (t1, name) ->
           let t1' = typexp copy_scope s t1 in
           let name' =
@@ -600,9 +657,16 @@ let label_declaration copy_scope s l =
   {
     ld_id = l.ld_id;
     ld_mutable = l.ld_mutable;
+<<<<<<< HEAD
     ld_modalities = l.ld_modalities;
     ld_sort = l.ld_sort;
     ld_type = typexp copy_scope s l.ld_loc l.ld_type;
+||||||| 23e84b8c4d
+    ld_type = typexp copy_scope s l.ld_type;
+=======
+    ld_atomic = l.ld_atomic;
+    ld_type = typexp copy_scope s l.ld_type;
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     ld_loc = loc s l.ld_loc;
     ld_attributes = attrs s l.ld_attributes;
     ld_uid = l.ld_uid;
@@ -885,7 +949,14 @@ let rename_bound_idents scoping s sg =
         let id' = rename id in
         rename_bound_idents
           (add_modtype id (Pident id') s)
+<<<<<<< HEAD
           (Sig_modtype(id', mtd, vis) :: sg)
+||||||| 23e84b8c4d
+          (add_modtype id (Mty_ident(Pident id')) s)
+          (SigL_modtype(id', mtd, vis) :: sg)
+=======
+          (SigL_modtype(id', mtd, vis) :: sg)
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
           rest
     | Sig_class(id, cd, rs, vis) :: rest ->
         (* cheat and pretend they are types cf. PR#6650 *)
@@ -1157,6 +1228,7 @@ module Unsafe = struct
 
   let add_modtype_path = add_modtype_gen
   let add_modtype id mty s = add_modtype_path (Pident id) mty s
+<<<<<<< HEAD
   let add_type_path id p s =
     { s with types = Path.Map.add id (Path p) s.types; last_compose = None }
   let add_type_function id ~params ~body s =
@@ -1200,3 +1272,22 @@ let () =
       | _ ->
           None
     )
+||||||| 23e84b8c4d
+=======
+  let add_type_path id p s = { s with types = Path.Map.add id (Path p) s.types }
+  let add_type_function id ~params ~body s =
+    { s with types = Path.Map.add id (Type_function { params; body }) s.types }
+  let add_module_path id p s = { s with modules = Path.Map.add id p s.modules }
+
+  let wrap f = match f () with
+    | x -> Ok x
+    | exception Module_type_path_substituted_away (p,mty) ->
+        Error (Fcm_type_substituted_away (p,mty))
+
+  let signature_item sc s comp = wrap (fun () -> signature_item sc s comp)
+  let signature sc s comp = wrap (fun () -> signature sc s comp )
+  let compose s1 s2 = wrap (fun () -> compose s1 s2)
+  let type_declaration s t = wrap (fun () -> type_declaration s t)
+
+end
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a

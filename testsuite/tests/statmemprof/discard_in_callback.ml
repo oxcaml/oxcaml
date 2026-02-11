@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 (* TEST
    runtime5;
    { bytecode; }
@@ -18,6 +19,25 @@ module MP = Gc.Memprof
 
 let[@inline never] f33 n =
   ((n, n, (n, n, n, (n,n,n,n,n))), (n, n, (n, n, n, (n,n,n,n,0))))
+||||||| 23e84b8c4d
+=======
+(* TEST *)
+
+(* Tests the effects of stopping and discarding the current profile
+   in an allocation callback, particularly in a combined allocation.
+
+   This test is mainly intended to exercise the handling of tracking
+   entries inside statmemprof around profile discarding. Testing that
+   we count the right number of samples etc is of secondary
+   importance. *)
+
+module MP = Gc.Memprof
+
+(* A combined 7-block 33-word allocation *)
+
+let[@inline never] f33 n =
+  ((n, n, (n, n, n, (n,n,n,n,n))), (n, n, (n, n, n, (n,n,n,n,n))))
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 (* Repeatedly stop sampling and discard the profile in an allocation
    callback. If `restart` is `true, start a fresh profile in the same

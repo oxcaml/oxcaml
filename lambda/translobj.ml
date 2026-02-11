@@ -84,11 +84,23 @@ let int n = Lconst (Const_base (Const_int n))
 
 (* CR layouts v5: To change when we have arrays of other sorts *)
 let prim_makearray =
+<<<<<<< HEAD
   Lambda.simple_prim_on_values ~name:"caml_array_make" ~arity:2 ~alloc:true
+||||||| 23e84b8c4d
+  Primitive.simple ~name:"caml_make_vect" ~arity:2 ~alloc:true
+=======
+  Primitive.simple ~name:"caml_array_make" ~arity:2 ~alloc:true
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 (* Also use it for required globals *)
 let transl_label_init_general f =
+<<<<<<< HEAD
   let expr, repr = f () in
+||||||| 23e84b8c4d
+  let expr, size = f () in
+=======
+  let expr = f () in
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   let expr =
     Hashtbl.fold
       (fun c id expr ->
@@ -110,7 +122,13 @@ let transl_label_init_general f =
   in
   Env.reset_required_globals ();*)
   reset_labels ();
+<<<<<<< HEAD
   expr, repr
+||||||| 23e84b8c4d
+  expr, size
+=======
+  expr
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let transl_label_init_flambda f =
   assert(Config.flambda || Config.flambda2);
@@ -120,7 +138,13 @@ let transl_label_init_flambda f =
   (* Calling f (usually Translmod.transl_struct) requires the
      method_cache variable to be initialised to be able to generate
      method accesses. *)
+<<<<<<< HEAD
   let expr, repr = f () in
+||||||| 23e84b8c4d
+  let expr, size = f () in
+=======
+  let expr = f () in
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   let expr =
     if !method_count = 0 then expr
     else
@@ -131,7 +155,58 @@ let transl_label_init_flambda f =
                Loc_unknown),
         expr)
   in
+<<<<<<< HEAD
   transl_label_init_general (fun () -> expr, repr)
+||||||| 23e84b8c4d
+  transl_label_init_general (fun () -> expr, size)
+
+let transl_store_label_init glob size f arg =
+  assert(not Config.flambda);
+  assert(!Clflags.native_code);
+  method_cache := Lprim(Pfield (size, Pointer, Mutable),
+                        (* XXX KC: conservative *)
+                        [Lprim(Pgetglobal glob, [], Loc_unknown)],
+                        Loc_unknown);
+  let expr = f arg in
+  let (size, expr) =
+    if !method_count = 0 then (size, expr) else
+    (size+1,
+     Lsequence(
+     Lprim(Psetfield(size, Pointer, Root_initialization),
+           [Lprim(Pgetglobal glob, [], Loc_unknown);
+            Lprim (Pccall prim_makearray,
+                   [int !method_count; int 0],
+                   Loc_unknown)],
+           Loc_unknown),
+     expr))
+  in
+  let lam, size = transl_label_init_general (fun () -> (expr, size)) in
+  size, lam
+=======
+  transl_label_init_general (fun () -> expr)
+
+let transl_store_label_init glob size f arg =
+  assert(not Config.flambda);
+  assert(!Clflags.native_code);
+  method_cache := Lprim(Pfield (size, Pointer, Mutable),
+                        (* XXX KC: conservative *)
+                        [Lprim(Pgetglobal glob, [], Loc_unknown)],
+                        Loc_unknown);
+  let expr = f arg in
+  let (size, expr) =
+    if !method_count = 0 then (size, expr) else
+    (size+1,
+     Lsequence(
+     Lprim(Psetfield(size, Pointer, Root_initialization),
+           [Lprim(Pgetglobal glob, [], Loc_unknown);
+            Lprim (Pccall prim_makearray,
+                   [int !method_count; int 0],
+                   Loc_unknown)],
+           Loc_unknown),
+     expr))
+  in
+  size, transl_label_init_general (fun () -> expr)
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let transl_label_init f =
   if !Clflags.native_code || Clflags.is_flambda2 () then

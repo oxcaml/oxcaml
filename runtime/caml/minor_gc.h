@@ -41,6 +41,10 @@
   asize_t reserve;             \
 }
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Count of the total number of minor collections performed by the program */
 CAMLextern atomic_uintnat caml_minor_collections_count;
 
@@ -53,7 +57,12 @@ struct caml_ref_table CAML_TABLE_STRUCT(value *);
 struct caml_ephe_ref_elt {
   value ephe;      /* an ephemeron in major heap */
   mlsize_t offset; /* the offset that points in the minor heap  */
+<<<<<<< HEAD
   value stash;     /* copy of the field if it requires minor-GC cleaning */
+||||||| 23e84b8c4d
+=======
+  value locked;    /* only used during minor GC; see minor_gc.c */
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 };
 struct caml_ephe_ref_table CAML_TABLE_STRUCT(struct caml_ephe_ref_elt);
 
@@ -83,6 +92,10 @@ struct caml_minor_tables {
 #define Is_promoted_hd(hd) ((hd) == Promoted_hd)
 
 CAMLextern void caml_minor_collection (void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #ifdef CAML_INTERNALS
 #include <stdbool.h>
@@ -135,7 +148,12 @@ Caml_inline void add_to_ephe_ref_table (struct caml_ephe_ref_table *tbl,
   ephe_ref = tbl->ptr++;
   ephe_ref->ephe = ar;
   ephe_ref->offset = offset;
+<<<<<<< HEAD
   ephe_ref->stash = caml_ephe_none;
+||||||| 23e84b8c4d
+=======
+  ephe_ref->locked = Val_unit;
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   CAMLassert(ephe_ref->offset < Wosize_val(ephe_ref->ephe));
 }
 

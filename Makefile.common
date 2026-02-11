@@ -141,9 +141,29 @@ ifeq "$(BOOTSTRAPPING_FLEXDLL)" "true"
 ifeq "$(filter $(REAL_ROOT_DIR)/$(BYTE_BINDIR), $(subst :, ,$(PATH)))" ""
   export PATH := \
     $(REAL_ROOT_DIR)/$(OPT_BINDIR):$(REAL_ROOT_DIR)/$(BYTE_BINDIR):$(PATH)
+  # $(BUILD_COMPANY_SYSTEM) is the last two parts of $(BUILD_TRIPLET)
+  BUILD_TRIPLET_FIELDS := $(subst -,$(SPACE),$(BUILD_TRIPLET))
+  BUILD_COMPANY_SYSTEM := $(subst $(SPACE),-,$\
+    $(wordlist 2, $(words $(BUILD_TRIPLET_FIELDS)), $(BUILD_TRIPLET_FIELDS)))
+  # Use the FLEXDIR environment variable to tell flexlink where the support
+  # objects are located. Passing this location using -I would defeat the whole
+  # purpose of the PATH-trick (bootstrapped flexlink is indistinguishable from
+  # an installed flexlink). flexlink also looks for the objects in the same
+  # directory as the executable, but this is slightly irritating as it requires
+  # copying them to both byte/bin/ and opt/bin/ but also doesn't work if
+  # opt/bin/flexlink.exe is a symlink to flexlink.opt.exe, as flexlink can end
+  # up looking in the directory for the target of the symlink, rather than the
+  # symlink itself.
+ifeq "" "$(filter pc-msys pc-cygwin%, $(BUILD_COMPANY_SYSTEM))"
+  export FLEXDIR := $(REAL_ROOT_DIR)
+else
+  export FLEXDIR := $(shell cygpath -w "$(REAL_ROOT_DIR)")
+endif
+  undefine BUILD_TRIPLET_FIELDS
+  undefine BUILD_COMPANY_SYSTEM
 endif
   undefine REAL_ROOT_DIR
-endif
+endif # ifeq "$(BOOTSTRAPPING_FLEXDLL)" "true"
 
 # List of other libraries
 ALL_OTHERLIBS = dynlink str systhreads$(RUNTIME_SUFFIX) unix \
@@ -172,8 +192,8 @@ REQUIRED_HEADERS := $(RUNTIME_HEADERS) $(wildcard *.h)
 endif
 
 %.$(O): %.c $(REQUIRED_HEADERS)
-	$(V_CC)$(CC) -c $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS) \
-	  $(OUTPUTOBJ)$@ $<
+	$(V_CC)$(CC) $(OC_CFLAGS) $(CFLAGS) $(OC_CPPFLAGS) $(CPPFLAGS) \
+	  $(OUTPUTOBJ)$@ -c $<
 
 $(DEPDIR):
 	$(MKDIR) $@
@@ -224,8 +244,14 @@ OCAMLYACCFLAGS ?= --strict -v
 %.ml %.mli: %.mly
 	$(V_OCAMLYACC)$(OCAMLYACC) $(OCAMLYACCFLAGS) $<
 
+<<<<<<< HEAD
 SAK = $(ROOTDIR)/$(RUNTIME_DIR)/sak$(EXE)
 
+||||||| 23e84b8c4d
+SAK = $(ROOTDIR)/runtime/sak$(EXE)
+
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 # Used with the Microsoft toolchain to merge generated manifest files into
 # executables
 if_file_exists = ( test ! -f $(1) || $(2) && rm -f $(1) )
@@ -285,7 +311,7 @@ endef # _OCAML_COMMON_BASE
 # Each program foo is characterised by the foo_LIBRARIES and foo_SOURCES
 # variables. The following macros provide the infrastructure to build foo
 # from the object files whose names are derived from these two
-# varialbes. In particular, the following macros define several
+# variables. In particular, the following macros define several
 # variables whose names are prefixed with foo_ to compute the
 # different lists of files used to build foo.
 
@@ -298,6 +324,8 @@ endef # _OCAML_COMMON_BASE
 
 define _OCAML_PROGRAM_BASE
 $(eval $(call _OCAML_COMMON_BASE,$(1)))
+# To be overridden by the programs needing special link flags
+$(basename $(notdir $(1)))_COMMON_LINKFLAGS =
 endef # _OCAML_PROGRAM_BASE
 
 LINK_BYTECODE_PROGRAM =\
@@ -320,8 +348,17 @@ $(basename $(notdir $(1)))_BCOBJS = \
   $$($(basename $(notdir $(1)))_CMA_FILES) \
   $$($(basename $(notdir $(1)))_BO_FILES) \
   $$($(basename $(notdir $(1)))_CMO_FILES)
+# To be overridden by the programs needing special bytecode link flags
+$(basename $(notdir $(1)))_BYTECODE_LINKFLAGS =
+
+$(basename $(notdir $(1)))_BYTECODE_LINKCMD = \
+$(strip \
+  $$(CAMLC) $$(OC_COMMON_LINKFLAGS) $$(OC_BYTECODE_LINKFLAGS) \
+  $$($(basename $(notdir $(1)))_COMMON_LINKFLAGS) \
+  $$($(basename $(notdir $(1)))_BYTECODE_LINKFLAGS))
+
 $(1)$(EXE): $$$$($(basename $(notdir $(1)))_BCOBJS)
-	$$(V_LINKC)$$(LINK_BYTECODE_PROGRAM) -o $$@ \
+	$$(V_LINKC)$$($(basename $(notdir $(1)))_BYTECODE_LINKCMD) -o $$@ \
 	  $$($(basename $(notdir $(1)))_BCOBJS)
 endef # _OCAML_BYTECODE_PROGRAM
 
@@ -329,9 +366,6 @@ define OCAML_BYTECODE_PROGRAM
 $(eval $(call _OCAML_PROGRAM_BASE,$(1)))
 $(eval $(call _OCAML_BYTECODE_PROGRAM,$(1)))
 endef # OCAML_BYTECODE_PROGRAM
-
-LINK_NATIVE_PROGRAM =\
-  $(CAMLOPT) $(OC_COMMON_LINKFLAGS) $(OC_NATIVE_LINKFLAGS)
 
 define _OCAML_NATIVE_PROGRAM
 $(eval $(call PROGRAM_SYNONYM,$(1)))
@@ -346,8 +380,18 @@ $(basename $(notdir $(1)))_NCOBJS = \
   $$($(basename $(notdir $(1)))_CMXA_FILES) \
   $$($(basename $(notdir $(1)))_NO_FILES) \
   $$($(basename $(notdir $(1)))_CMX_FILES)
+
+# To be overridden by the programs needing special native link flags
+$(basename $(notdir $(1)))_NATIVE_LINKFLAGS =
+
+$(basename $(notdir $(1)))_NATIVE_LINKCMD = \
+$(strip \
+  $$(CAMLOPT) $$(OC_COMMON_LINKFLAGS) $$(OC_NATIVE_LINKFLAGS) \
+  $$($(basename $(notdir $(1)))_COMMON_LINKFLAGS) \
+  $$($(basename $(notdir $(1)))_NATIVE_LINKFLAGS))
+
 $(1)$(EXE): $$$$($(basename $(notdir $(1)))_NCOBJS)
-	$$(V_LINKOPT)$$(LINK_NATIVE_PROGRAM) -o $$@ \
+	$$(V_LINKOPT)$$($(basename $(notdir $(1)))_NATIVE_LINKCMD) -o $$@ \
 	  $$($(basename $(notdir $(1)))_NCOBJS)
 endef # _OCAML_NATIVE_PROGRAM
 
@@ -438,7 +482,7 @@ endef # OCAML_LIBRARY
 
 # Installing a bytecode executable, with debug information removed
 define INSTALL_STRIPPED_BYTE_PROG
-$(OCAMLRUN) $(ROOTDIR)/tools/stripdebug $(1) $(1).tmp \
+$(OCAMLRUN) $(ROOTDIR)/tools/stripdebug$(EXE) $(1) $(1).tmp \
 && $(INSTALL_PROG) $(1).tmp $(2) \
 && rm $(1).tmp
 endef # INSTALL_STRIPPED_BYTE_PROG
@@ -450,3 +494,18 @@ endef # INSTALL_STRIPPED_BYTE_PROG
 # boot/ as part of coldstart. See read_runtime_launch_info in
 # bytecomp/bytelink.ml for further details.
 HEADER_NAME = runtime-launch-info
+<<<<<<< HEAD
+||||||| 23e84b8c4d
+=======
+
+ifeq "$(UNIX_OR_WIN32)" "win32"
+# Ensure that no command can create Cygwin symbolic links by ensuring that
+# symlink(2) will fail if native NTFS symlinks aren't available.
+CYGWIN ?=
+MSYS ?=
+export CYGWIN := $(strip \
+  $(filter-out winsymlinks winsymlinks:%, $(CYGWIN)) winsymlinks:nativestrict)
+export MSYS := $(strip \
+  $(filter-out winsymlinks winsymlinks:%, $(MSYS)) winsymlinks:nativestrict)
+endif
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a

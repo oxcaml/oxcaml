@@ -14,4 +14,11 @@
 (**************************************************************************)
 
 val err_msgs: Includemod.explanation Format_doc.printer
+<<<<<<< HEAD
+||||||| 23e84b8c4d
+val err_msgs: Includemod.explanation -> Format.formatter -> unit
+=======
+val coercion_in_package_subtype:
+  Env.t -> Types.module_type -> Typedtree.module_coercion -> Format_doc.doc
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 val register: unit -> unit

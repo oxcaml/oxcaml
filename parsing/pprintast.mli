@@ -24,6 +24,8 @@
 type space_formatter = (unit, Format.formatter, unit) format
 
 val longident : Format.formatter -> Longident.t -> unit
+val constr : Format.formatter -> Longident.t -> unit
+
 val expression : Format.formatter -> Parsetree.expression -> unit
 val string_of_expression : Parsetree.expression -> string
 
@@ -64,6 +66,7 @@ val tyvar: Format.formatter -> string -> unit
       special treatment required for the single quote character in second
       position, or for keywords by escaping them with \#. No-op on "_". *)
 
+<<<<<<< HEAD
 val jkind_annotation : Format.formatter -> Parsetree.jkind_annotation -> unit
 val mode : Format.formatter -> Parsetree.mode Location.loc -> unit
 
@@ -72,4 +75,16 @@ module Doc:sig
   val longident: Longident.t Format_doc.printer
   val tyvar: string Format_doc.printer
   val jkind_annotation: Parsetree.jkind_annotation Format_doc.printer
+||||||| 23e84b8c4d
+=======
+(** {!Format_doc} functions for error messages *)
+module Doc:sig
+  val longident: Longident.t Format_doc.printer
+  val constr: Longident.t Format_doc.printer
+  val tyvar: string Format_doc.printer
+
+  (** Returns a format document if the expression reads nicely as the subject
+      of a sentence in a error message. *)
+  val nominal_exp : Parsetree.expression -> Format_doc.t option
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 end

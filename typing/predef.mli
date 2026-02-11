@@ -17,6 +17,38 @@
 
 open Types
 
+type abstract_type_constr = [
+  | `Int
+  | `Char
+  | `String
+  | `Bytes
+  | `Float
+  | `Continuation
+  | `Array
+  | `Nativeint
+  | `Int32
+  | `Int64
+  | `Lazy_t
+  | `Extension_constructor
+  | `Floatarray
+  | `Iarray
+  | `Atomic_loc
+]
+type data_type_constr = [
+  | `Bool
+  | `Unit
+  | `Exn
+  | `Eff
+  | `List
+  | `Option
+]
+type type_constr = [
+  | abstract_type_constr
+  | data_type_constr
+]
+
+val find_type_constr : Path.t -> type_constr option
+
 val type_int: type_expr
 val type_char: type_expr
 val type_string: type_expr
@@ -26,6 +58,8 @@ val type_float32: type_expr
 val type_bool: type_expr
 val type_unit: type_expr
 val type_exn: type_expr
+val type_eff: type_expr -> type_expr
+val type_continuation: type_expr -> type_expr -> type_expr
 val type_array: type_expr -> type_expr
 val type_iarray: type_expr -> type_expr
 val type_list: type_expr -> type_expr
@@ -36,6 +70,7 @@ val type_int16: type_expr
 val type_int32: type_expr
 val type_int64: type_expr
 val type_lazy_t: type_expr -> type_expr
+<<<<<<< HEAD
 val type_extension_constructor:type_expr
 val type_floatarray:type_expr
 val type_lexing_position:type_expr
@@ -100,6 +135,14 @@ val type_unboxed_int64x8: type_expr
 val type_unboxed_float16x32: type_expr
 val type_unboxed_float32x16: type_expr
 val type_unboxed_float64x8: type_expr
+||||||| 23e84b8c4d
+val type_extension_constructor:type_expr
+val type_floatarray:type_expr
+=======
+val type_extension_constructor: type_expr
+val type_floatarray: type_expr
+val type_atomic_loc: type_expr -> type_expr
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 val path_int: Path.t
 val path_char: Path.t
@@ -110,6 +153,7 @@ val path_float32: Path.t
 val path_bool: Path.t
 val path_unit: Path.t
 val path_exn: Path.t
+val path_eff: Path.t
 val path_array: Path.t
 val path_iarray: Path.t
 val path_list: Path.t
@@ -122,6 +166,7 @@ val path_int64: Path.t
 val path_lazy_t: Path.t
 val path_extension_constructor: Path.t
 val path_floatarray: Path.t
+<<<<<<< HEAD
 val path_lexing_position: Path.t
 val path_code: Path.t
 
@@ -184,6 +229,10 @@ val path_unboxed_int64x8: Path.t
 val path_unboxed_float16x32: Path.t
 val path_unboxed_float32x16: Path.t
 val path_unboxed_float64x8: Path.t
+||||||| 23e84b8c4d
+=======
+val path_continuation: Path.t
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 val path_match_failure: Path.t
 val path_invalid_argument: Path.t

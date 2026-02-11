@@ -31,7 +31,13 @@
  *
  * - frame_return_to_C(): Whether the return is to C from OCaml, in
  *   which case there is no actual stack frame, GC roots, allocation
+<<<<<<< HEAD
  *   sizes, or debug info.  See caml_system__frametable in the various
+||||||| 23e84b8c4d
+ *   sizes, or debug info.  See caml_system.frametable in the various
+=======
+ *   sizes, or debug info.  See caml_system$frametable in the various
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
  *   architecture-specific OCaml/C interfaces.
  *
  * - frame_size(): The stack frame size, in bytes. All stack frames
@@ -64,7 +70,7 @@ typedef struct {
   int32_t retaddr_rel; /* offset of return address from &retaddr_rel */
   uint16_t frame_data; /* frame size and various flags */
   uint16_t num_live;
-  uint16_t live_ofs[1 /* num_live */];
+  uint16_t live_ofs[/* num_live */]; /* flexible array member */
   /*
     If frame_has_allocs(), alloc lengths follow:
         uint8_t num_allocs;
@@ -148,7 +154,7 @@ Caml_inline bool frame_has_debug(frame_descr *d) {
 /* Used to compute offsets in frame tables.
    ty must have power-of-2 size */
 #define Align_to(p, ty) \
-  (void*)(((uintnat)(p) + sizeof(ty) - 1) & -sizeof(ty))
+  (void*)(((uintnat)(p) + sizeof(ty) - 1) & ~(sizeof(ty) - 1))
 
 #define Hash_retaddr(addr, mask)                          \
   ((((uintnat)(addr) * 52437813) >> 5) & (mask))
@@ -158,7 +164,23 @@ Caml_inline bool frame_has_debug(frame_descr *d) {
    (uintnat)(intnat)((d)->retaddr_rel))
 
 void caml_init_frame_descriptors(void);
+
 void caml_register_frametables(void **tables, int ntables);
+void caml_register_frametable(void *table);
+
+/* Create copies of the frametables and register them in the runtime.
+   It writes back the pointers of the new copies of the frametables.
+   Calling 'caml_unregister_frametable(s)' on these copies is safe
+   and will free the allocated memory. */
+void caml_copy_and_register_frametables(void **table, int *sizes, int ntables);
+void* caml_copy_and_register_frametable(void *table, int size);
+
+/* The unregistered frametables can still be in use after calling
+   this function. Thus, you should not free their memory.
+   Note: it may reorder the content of the array 'tables'.
+   This can be called from a custom block finalizer. */
+void caml_unregister_frametables(void **tables, int ntables);
+void caml_unregister_frametable(void *table);
 
 /* a linked list of frametables */
 typedef struct caml_frametable_list {
@@ -167,44 +189,20 @@ typedef struct caml_frametable_list {
 } caml_frametable_list;
 
 /* a hashtable of frame descriptors */
-typedef struct {
-  int num_descr;
-  int mask;
-  frame_descr** descriptors;
-  caml_frametable_list *frametables;
-} caml_frame_descrs;
-/* Let us call 'capacity' the length of the descriptors array.
+typedef struct caml_frame_descrs caml_frame_descrs;
 
-   We maintain the following invariants:
-     capacity = mask + 1
-     capacity = 0 || Is_power_of_2(capacity)
-     num_desc <= 2 * num_descr <= capacity
-
-   For an extensible array we would maintain
-      num_desc <= capacity,
-    but this is a linear-problem hash table, we need to ensure that
-    free slots are frequent enough, so we use a twice-larger capacity:
-      num_desc * 2 <= capacity
-
-   We keep the list of frametables that was used to build the hashtable.
-   We use it when rebuilding the table after resizing.
-
-   Some frame tables in the list may have been unregistered after the
-   hashtable was built, so in general [num_descrs] is an over-approximation
-   of the true number of frame descriptors in the [list].
-*/
-
-caml_frame_descrs caml_get_frame_descrs(void);
+caml_frame_descrs* caml_get_frame_descrs(void);
 
 /* Find the current table of frame descriptors.
    The resulting structure is only valid until the next GC */
-frame_descr* caml_find_frame_descr(caml_frame_descrs fds, uintnat pc);
+frame_descr* caml_find_frame_descr(caml_frame_descrs *fds, uintnat pc);
 
 
 /* Returns the next frame descriptor (or NULL if none is available),
    and updates *pc and *sp to point to the following one.  */
 frame_descr *caml_next_frame_descriptor
-    (caml_frame_descrs fds, uintnat * pc, char ** sp, struct stack_info* stack);
+    (caml_frame_descrs * fds, uintnat * pc, char ** sp,
+     struct stack_info* stack);
 
 #endif /* CAML_INTERNALS */
 

@@ -21,7 +21,17 @@ val share: structured_constant -> lambda
 val meth: lambda -> string -> lambda * lambda list
 
 val reset_labels: unit -> unit
+<<<<<<< HEAD
 val transl_label_init: (unit -> lambda * 'a) -> lambda * 'a
+||||||| 23e84b8c4d
+val transl_label_init: (unit -> lambda * 'a) -> lambda * 'a
+val transl_store_label_init:
+    Ident.t -> int -> ('a -> lambda) -> 'a -> int * lambda
+=======
+val transl_label_init: (unit -> lambda) -> lambda
+val transl_store_label_init:
+    Ident.t -> int -> ('a -> lambda) -> 'a -> int * lambda
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 val method_ids: Ident.Set.t ref (* reset when starting a new wrapper *)
 

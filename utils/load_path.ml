@@ -418,6 +418,7 @@ let get_paths () =
 let get_visible_path_list () = List.rev_map Dir.path !visible_dirs
 let get_hidden_path_list () = List.rev_map Dir.path !hidden_dirs
 
+<<<<<<< HEAD
 let init_manifests () =
   let manifests_reader = Dune_manifests_reader.create () in
   let load_manifest ~hidden ~basenames manifest_path =
@@ -440,6 +441,42 @@ let init_manifests () =
   List.iter
     (load_manifest ~hidden:true ~basenames:hidden_basenames)
     !Clflags.hidden_include_manifests
+||||||| 23e84b8c4d
+(* Optimized version of [add] below, for use in [init] and [remove_dir]: since
+   we are starting from an empty cache, we can avoid checking whether a unit
+   name already exists in the cache simply by adding entries in reverse
+   order. *)
+let prepend_add dir =
+  List.iter (fun base ->
+      let fn = Filename.concat dir.Dir.path base in
+      let filename = Misc.normalized_unit_filename base in
+      if dir.Dir.hidden then begin
+        STbl.replace !hidden_files base fn;
+        STbl.replace !hidden_files_uncap filename fn
+      end else begin
+        STbl.replace !visible_files base fn;
+        STbl.replace !visible_files_uncap filename fn
+      end
+    ) dir.Dir.files
+=======
+(* Optimized version of [add] below, for use in [init] and [remove_dir]: since
+   we are starting from an empty cache, we can avoid checking whether a unit
+   name already exists in the cache simply by adding entries in reverse
+   order. *)
+let prepend_add dir =
+  List.iter (fun base ->
+      Result.iter (fun filename ->
+          let fn = Filename.concat dir.Dir.path base in
+          if dir.Dir.hidden then begin
+            STbl.replace !hidden_files base fn;
+            STbl.replace !hidden_files_uncap filename fn
+          end else begin
+            STbl.replace !visible_files base fn;
+            STbl.replace !visible_files_uncap filename fn
+          end)
+        (Misc.normalized_unit_filename base)
+    ) dir.Dir.files
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 let init ~auto_include ~visible ~hidden =
   reset ();
@@ -468,8 +505,43 @@ let remove_dir dir =
    left-to-right precedence. *)
 let add (dir : Dir.t) =
   assert (not Config.merlin || Local_store.is_bound ());
+<<<<<<< HEAD
   Path_cache.add dir;
   if (Dir.hidden dir) then
+||||||| 23e84b8c4d
+  let update base fn visible_files hidden_files =
+    if dir.hidden && not (STbl.mem !hidden_files base) then
+      STbl.replace !hidden_files base fn
+    else if not (STbl.mem !visible_files base) then
+      STbl.replace !visible_files base fn
+  in
+  List.iter
+    (fun base ->
+       let fn = Filename.concat dir.Dir.path base in
+       update base fn visible_files hidden_files;
+       let ubase = Misc.normalized_unit_filename base in
+       update ubase fn visible_files_uncap hidden_files_uncap)
+    dir.files;
+  if dir.hidden then
+=======
+  let update base fn visible_files hidden_files =
+    if dir.hidden && not (STbl.mem !hidden_files base) then
+      STbl.replace !hidden_files base fn
+    else if not (STbl.mem !visible_files base) then
+      STbl.replace !visible_files base fn
+  in
+  List.iter
+    (fun base ->
+       Result.iter (fun ubase ->
+           let fn = Filename.concat dir.Dir.path base in
+           update base fn visible_files hidden_files;
+           update ubase fn visible_files_uncap hidden_files_uncap
+         )
+         (Misc.normalized_unit_filename base)
+    )
+    dir.files;
+  if dir.hidden then
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     hidden_dirs := dir :: !hidden_dirs
   else
     visible_dirs := dir :: !visible_dirs
@@ -524,9 +596,20 @@ let find fn =
 
 let find_normalized_with_visibility fn =
   assert (not Config.merlin || Local_store.is_bound ());
+  match Misc.normalized_unit_filename fn with
+  | Error _ -> raise Not_found
+  | Ok fn_uncap ->
   try
     if is_basename fn && not !Sys.interactive then
+<<<<<<< HEAD
       Path_cache.find ~uncap:true fn
+||||||| 23e84b8c4d
+      find_file_in_cache (Misc.normalized_unit_filename fn)
+        visible_files_uncap hidden_files_uncap
+=======
+      find_file_in_cache fn_uncap
+        visible_files_uncap hidden_files_uncap
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     else
       try
         (Misc.find_in_path_normalized (get_visible_path_list ()) fn, Visible)
@@ -534,7 +617,12 @@ let find_normalized_with_visibility fn =
       | Not_found ->
         (Misc.find_in_path_normalized (get_hidden_path_list ()) fn, Hidden)
   with Not_found ->
+<<<<<<< HEAD
     let fn_uncap = String.uncapitalize_ascii fn in
+||||||| 23e84b8c4d
+    let fn_uncap = Misc.normalized_unit_filename fn in
+=======
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     (!auto_include_callback Dir.find_normalized fn_uncap, Visible)
 
 let find_normalized fn = fst (find_normalized_with_visibility fn)

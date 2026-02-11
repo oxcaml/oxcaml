@@ -155,7 +155,7 @@ val uncons : ('a : value_or_null). 'a t -> ('a * 'a t) option
 val length : ('a : value_or_null). 'a t -> int
 (** [length xs] is the length of the sequence [xs].
 
-    The sequence [xs] must be finite.
+    Does not terminate if [xs] is infinite.
 
     @since 4.14 *)
 
@@ -205,15 +205,23 @@ val for_all : ('a : value_or_null). ('a -> bool) -> 'a t -> bool
 (** [for_all p xs] determines whether all elements [x] of the sequence [xs]
     satisfy [p x].
 
-    The sequence [xs] must be finite.
+    May not terminate if [xs] is infinite.
 
     @since 4.14 *)
 
+<<<<<<< HEAD
 val exists : ('a : value_or_null). ('a -> bool) -> 'a t -> bool
 (** [exists xs p] determines whether at least one element [x]
+||||||| 23e84b8c4d
+val exists : ('a -> bool) -> 'a t -> bool
+(** [exists xs p] determines whether at least one element [x]
+=======
+val exists : ('a -> bool) -> 'a t -> bool
+(** [exists p xs] determines whether at least one element [x]
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     of the sequence [xs] satisfies [p x].
 
-    The sequence [xs] must be finite.
+    May not terminate if [xs] is infinite.
 
     @since 4.14 *)
 
@@ -223,7 +231,7 @@ val find : ('a : value_or_null). ('a -> bool) -> 'a t -> 'a option
 
     It returns [None] if there is no such element.
 
-    The sequence [xs] must be finite.
+    May not terminate if [xs] is infinite.
 
     @since 4.14 *)
 
@@ -234,7 +242,7 @@ val find_index : ('a : value_or_null). ('a -> bool) -> 'a t -> int option
 
     It returns [None] if there is no such element.
 
-    The sequence [xs] must be finite.
+    May not terminate if [xs] is infinite.
 
     @since 5.1 *)
 
@@ -246,7 +254,7 @@ val find_map : ('a : value_or_null) ('b : value_or_null)
 
     It returns [None] if there is no such element.
 
-    The sequence [xs] must be finite.
+    May not terminate if [xs] is infinite.
 
     @since 4.14 *)
 
@@ -256,7 +264,7 @@ val find_mapi : ('a : value_or_null) ('b : value_or_null)
    the element as first argument (counting from 0), and the element
    itself as second argument.
 
-   The sequence [xs] must be finite.
+   May not terminate if [xs] is infinite.
 
    @since 5.1 *)
 
@@ -311,7 +319,7 @@ val for_all2 : ('a : value_or_null) ('b : value_or_null)
     [for_all2] and [equal] differ: [equal eq xs ys] can
     be true only if [xs] and [ys] have the same length.
 
-    At least one of the sequences [xs] and [ys] must be finite.
+    May not terminate if both of the sequences [xs] and [ys] are infinite.
 
     [for_all2 p xs ys] is equivalent to [for_all (fun b -> b) (map2 p xs ys)].
 
@@ -326,7 +334,7 @@ val exists2 : ('a : value_or_null) ('b : value_or_null)
     iteration must stop as soon as one sequence is exhausted;
     the excess elements in the other sequence are ignored.
 
-    At least one of the sequences [xs] and [ys] must be finite.
+    May not terminate if both of the sequences [xs] and [ys] are infinite.
 
     [exists2 p xs ys] is equivalent to [exists (fun b -> b) (map2 p xs ys)].
 
@@ -338,7 +346,7 @@ val equal : ('a : value_or_null) ('b : value_or_null)
     [equal eq xs ys] determines whether the sequences [xs] and [ys]
     are pointwise equal.
 
-    At least one of the sequences [xs] and [ys] must be finite.
+    May not terminate if both of the sequences [xs] and [ys] are infinite.
 
     @since 4.14 *)
 
@@ -350,7 +358,7 @@ val compare : ('a : value_or_null) ('b : value_or_null)
 
     For more details on comparison functions, see {!Array.sort}.
 
-    At least one of the sequences [xs] and [ys] must be finite.
+    May not terminate if both of the sequences [xs] and [ys] are infinite.
 
     @since 4.14 *)
 
@@ -378,7 +386,18 @@ val cons : ('a : value_or_null). 'a -> 'a t -> 'a t
 
     @since 4.11 *)
 
+<<<<<<< HEAD
 val init : ('a : value_or_null). int -> (int -> 'a) -> 'a t
+||||||| 23e84b8c4d
+val init : int -> (int -> 'a) -> 'a t
+=======
+val singleton: 'a -> 'a t
+(** [singleton x] returns the one-element sequence containing only [x].
+
+    @since 5.4 *)
+
+val init : int -> (int -> 'a) -> 'a t
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 (** [init n f] is the sequence [f 0; f 1; ...; f (n-1)].
 
     [n] must be nonnegative.
@@ -475,8 +494,22 @@ val filter : ('a : value_or_null). ('a -> bool) -> 'a t -> 'a t
     In other words, [filter p xs] is the sequence [xs],
     deprived of the elements [x] such that [p x] is false. *)
 
+<<<<<<< HEAD
 val filter_map : ('a : value_or_null) ('b : value_or_null)
   . ('a -> 'b option) -> 'a t -> 'b t
+||||||| 23e84b8c4d
+val filter_map : ('a -> 'b option) -> 'a t -> 'b t
+=======
+val filteri : (int -> 'a -> bool) -> 'a t -> 'a t
+(** Same as {!filter}, but the predicate is applied to the index of
+   the element as first argument (counting from 0), and the element
+   itself as second argument.
+
+   @since 5.4
+*)
+
+val filter_map : ('a -> 'b option) -> 'a t -> 'b t
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 (** [filter_map f xs] is the sequence of the elements [y] such that
     [f x = Some y], where [x] ranges over [xs].
 
@@ -525,8 +558,7 @@ val drop : ('a : value_or_null). int -> 'a t -> 'a t
 
     [drop] is lazy: the first [n+1] elements of the sequence [xs]
     are demanded only when the first element of [drop n xs] is
-    demanded. For this reason, [drop 1 xs] is {i not} equivalent
-    to [tail xs], which queries [xs] immediately.
+    demanded.
 
     @raise Invalid_argument if [n] is negative.
 

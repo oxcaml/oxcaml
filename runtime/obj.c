@@ -150,6 +150,7 @@ CAMLprim value caml_obj_with_tag(value new_tag_v, value arg)
 {
   CAMLparam2 (new_tag_v, arg);
   CAMLlocal1 (res);
+<<<<<<< HEAD
   mlsize_t sz, i;
   tag_t tag_for_alloc;
   uintnat infix_offset = 0;
@@ -181,6 +182,13 @@ CAMLprim value caml_obj_with_tag(value new_tag_v, value arg)
   } else {
     tag_for_alloc = new_tag;
   }
+||||||| 23e84b8c4d
+  mlsize_t sz, i;
+  tag_t tg;
+=======
+  mlsize_t sz;
+  tag_t tg;
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
   sz = Wosize_val(arg);
   if (sz == 0) {
@@ -192,10 +200,19 @@ CAMLprim value caml_obj_with_tag(value new_tag_v, value arg)
     res = caml_alloc(sz, tag_for_alloc);
     memcpy(Bp_val(res), Bp_val(arg), sz * sizeof(value));
   } else if (sz <= Max_young_wosize) {
+<<<<<<< HEAD
     reserved_t reserved = Reserved_val(arg);
     res = caml_alloc_small_with_reserved(sz, tag_for_alloc, reserved);
     for (i = 0; i < sz; i++) Field(res, i) = Field(arg, i);
+||||||| 23e84b8c4d
+    res = caml_alloc_small(sz, tg);
+    for (i = 0; i < sz; i++) Field(res, i) = Field(arg, i);
+=======
+    res = caml_alloc_small(sz, tg);
+    for (mlsize_t i = 0; i < sz; i++) Field(res, i) = Field(arg, i);
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
   } else {
+<<<<<<< HEAD
     mlsize_t scannable_sz = Scannable_wosize_val(arg);
     reserved_t reserved = Reserved_val(arg);
 
@@ -235,6 +252,20 @@ CAMLprim value caml_obj_with_tag(value new_tag_v, value arg)
       Field(res, i) = Field(arg, i);
     }
 
+||||||| 23e84b8c4d
+    res = caml_alloc_shr(sz, tg);
+    /* It is safe to use [caml_initialize] even if [tag == Closure_tag]
+       and some of the "values" being copied are actually code pointers.
+       That's because the new "value" does not point to the minor heap. */
+    for (i = 0; i < sz; i++) caml_initialize(&Field(res, i), Field(arg, i));
+=======
+    res = caml_alloc_shr(sz, tg);
+    /* It is safe to use [caml_initialize] even if [tag == Closure_tag]
+       and some of the "values" being copied are actually code pointers.
+       That's because the new "value" does not point to the minor heap. */
+    for (mlsize_t i = 0; i < sz; i++)
+      caml_initialize(&Field(res, i), Field(arg, i));
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
     /* Give gc a chance to run, and run memprof callbacks */
     caml_process_pending_actions();
   }
@@ -392,6 +423,7 @@ struct queue_chunk {
   value entries[ENTRIES_PER_QUEUE_CHUNK];
 };
 
+<<<<<<< HEAD
 /* Return 0 for uniform blocks and 1+n for a mixed block with scannable prefix
    len n.
  */
@@ -411,4 +443,90 @@ CAMLprim value caml_succ_scannable_prefix_len (value v) {
 CAMLprim value caml_is_null(value v)
 {
   return Is_null(v) ? Val_true : Val_false;
+||||||| 23e84b8c4d
+=======
+
+/* For compiling let rec over values */
+
+/* [size] is a [value] representing number of words (fields) */
+CAMLprim value caml_alloc_dummy(value size)
+{
+  mlsize_t wosize = Long_val(size);
+  return caml_alloc (wosize, 0);
+}
+
+/* [size] is a [value] representing number of floats. */
+CAMLprim value caml_alloc_dummy_float (value size)
+{
+  mlsize_t wosize = Long_val(size) * Double_wosize;
+  return caml_alloc (wosize, 0);
+}
+
+/* This is a specialized primitive despite being expressible in terms
+   of [caml_alloc_dummy], because lambda/Value_rec_compiler recognizes
+   calls to this function specifically -- the distinction lets us
+   reconstruct type information that is useful for compilation. */
+CAMLprim value caml_alloc_dummy_lazy (value unit)
+{
+  return caml_alloc(1, 0);
+}
+
+CAMLprim value caml_update_dummy(value dummy, value newval)
+{
+  mlsize_t size;
+  tag_t tag;
+
+  tag = Tag_val (newval);
+
+  if (Wosize_val(dummy) == 0) {
+      /* Size-0 blocks are statically-allocated atoms. We cannot
+         mutate them, but there is no need:
+         - All atoms used in the runtime to represent OCaml values
+           have tag 0 --- including empty flat float arrays, or other
+           types that use a non-0 tag for non-atom blocks.
+         - The dummy was already created with tag 0.
+         So doing nothing suffices. */
+      CAMLassert(Wosize_val(newval) == 0);
+      CAMLassert(Tag_val(dummy) == Tag_val(newval));
+  } else if (tag == Double_array_tag){
+    CAMLassert (Wosize_val(newval) == Wosize_val(dummy));
+    CAMLassert (Tag_val(dummy) != Infix_tag);
+    Unsafe_store_tag_val(dummy, Double_array_tag);
+    size = Wosize_val (newval) / Double_wosize;
+    for (mlsize_t i = 0; i < size; i++) {
+      Store_double_flat_field (dummy, i, Double_flat_field (newval, i));
+    }
+  } else {
+    CAMLassert (tag < No_scan_tag);
+    CAMLassert (Tag_val(dummy) != Infix_tag);
+    Unsafe_store_tag_val(dummy, tag);
+    size = Wosize_val(newval);
+    CAMLassert (size == Wosize_val(dummy));
+    for (mlsize_t i = 0; i < size; i++){
+      caml_modify (&Field(dummy, i), Field(newval, i));
+    }
+  }
+  return Val_unit;
+}
+
+CAMLprim value caml_update_dummy_lazy(value dummy, value newval)
+{
+  // Note: [obj_tag] works on immediates as well
+  int tag = obj_tag (newval);
+  switch (tag) {
+  case Lazy_tag:
+  case Forcing_tag:
+  case Forward_tag:
+    caml_update_dummy(dummy, newval);
+    break;
+  // If the tag of [newval] is not a lazy tag,
+  // it comes from a Forward block that was shortcut.
+  default:
+    CAMLassert (Wosize_val(dummy) == 1);
+    caml_modify(&Field(dummy, 0), newval);
+    Unsafe_store_tag_val(dummy, Forward_tag);
+    break;
+  }
+  return Val_unit;
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 }

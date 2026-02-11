@@ -16,8 +16,15 @@
 #ifndef CAML_CONFIG_H
 #define CAML_CONFIG_H
 
+<<<<<<< HEAD
 /* CR ocaml 5 all-runtime5: remove this and all uses of it */
 #define CAML_RUNTIME_5
+||||||| 23e84b8c4d
+=======
+#include "m.h"
+#include "s.h"
+#include "compatibility.h"
+>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
 
 /* CAML_NAME_SPACE was introduced in OCaml 3.08 to declare compatibility with
    the newly caml_-prefixed names of C runtime functions and to disable the
@@ -27,8 +34,6 @@
 #ifndef CAML_NAME_SPACE
 #define CAML_NAME_SPACE
 #endif
-
-#include "m.h"
 
 /* If supported, tell gcc that we can use 32-bit code addresses for
  * threaded code, unless we are compiled for a shared library (-fPIC option) */
@@ -41,25 +46,18 @@
 /* No longer used in the codebase, but kept because it was exported */
 #define INT64_LITERAL(s) s ## LL
 
-#if defined(_MSC_VER) && !defined(__cplusplus)
-#define Caml_inline static __inline
-#else
 #define Caml_inline static inline
-#endif
-
-#include "s.h"
 
 #ifndef CAML_CONFIG_H_NO_TYPEDEFS
 
 #include <stddef.h>
+#include <limits.h>
 
 #if defined(HAS_LOCALE_H) || defined(HAS_XLOCALE_H)
 #define HAS_LOCALE
 #endif
 
-#ifdef HAS_STDINT_H
 #include <stdint.h>
-#endif
 
 /* Disable the mingw-w64 *printf shims */
 #if defined(CAML_INTERNALS) && defined(__MINGW32__)
@@ -74,7 +72,7 @@
   #define __USE_MINGW_ANSI_STDIO 0
 #endif
 
-#if defined(__MINGW32__) || (defined(_MSC_VER) && _MSC_VER < 1800)
+#if defined(__MINGW32__)
 #define ARCH_SIZET_PRINTF_FORMAT "I"
 #else
 #define ARCH_SIZET_PRINTF_FORMAT "z"
@@ -101,7 +99,7 @@
 #endif
 #endif
 
-#if defined(__MINGW32__) && !__USE_MINGW_ANSI_STDIO
+#if defined(__MINGW32__) && !__USE_MINGW_ANSI_STDIO && !defined(_UCRT)
   #define ARCH_INT64_TYPE long long
   #define ARCH_UINT64_TYPE unsigned long long
   #define ARCH_INT64_PRINTF_FORMAT "I64"
@@ -123,21 +121,6 @@
   #endif
 #endif
 
-#ifndef HAS_STDINT_H
-/* Not a C99 compiler, typically MSVC.  Define the C99 types we use. */
-typedef ARCH_INT32_TYPE int32_t;
-typedef ARCH_UINT32_TYPE uint32_t;
-typedef ARCH_INT64_TYPE int64_t;
-typedef ARCH_UINT64_TYPE uint64_t;
-#if SIZEOF_SHORT == 2
-typedef short int16_t;
-typedef unsigned short uint16_t;
-#else
-#error "No 16-bit integer type available"
-#endif
-typedef unsigned char uint8_t;
-#endif
-
 #if SIZEOF_PTR == SIZEOF_LONG
 /* Standard models: ILP32 or I32LP64 */
 typedef long intnat;
@@ -157,7 +140,10 @@ typedef uint64_t uintnat;
 #error "No integer type available to represent pointers"
 #endif
 
-#define UINTNAT_MAX ((uintnat)-1)
+#define CAML_INTNAT_MIN INTPTR_MIN
+#define CAML_INTNAT_MAX INTPTR_MAX
+#define CAML_UINTNAT_MIN UINTPTR_MIN
+#define CAML_UINTNAT_MAX UINTPTR_MAX
 
 #endif /* CAML_CONFIG_H_NO_TYPEDEFS */
 
@@ -177,11 +163,9 @@ typedef uint64_t uintnat;
 #endif
 
 
-/* We use threaded code interpretation if the compiler provides labels
-   as first-class values (GCC 2.x). */
-
-#if defined(__GNUC__) && __GNUC__ >= 2 && !defined(DEBUG) \
-    && !defined (SHRINKED_GNUC)
+/* We use threaded code interpretation if the C compiler supports the labels as
+   values extension. */
+#if defined(HAVE_LABELS_AS_VALUES) && !defined(DEBUG)
 #define THREADED_CODE
 #endif
 
