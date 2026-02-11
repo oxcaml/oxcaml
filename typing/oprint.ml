@@ -13,7 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Format
+open Format_doc
 open Outcometree
 
 exception Ellipsis
@@ -293,7 +293,8 @@ let print_out_value ppf tree =
     | Oval_unboxed_tuple tree_list ->
         fprintf ppf "@[<1>#(%a)@]" (print_labeled_tree_list print_tree_1 ",")
           tree_list
-    | Oval_code e -> CamlinternalQuote.Code.print ppf e
+    | Oval_code e ->
+        deprecated_printer (fun fmt -> CamlinternalQuote.Code.print fmt e) ppf
     | tree -> fprintf ppf "@[<1>(%a)@]" (cautious print_tree_1) tree
   and print_fields first ppf =
     function
@@ -327,7 +328,7 @@ let print_out_value ppf tree =
   in
   cautious print_tree_1 ppf tree
 
-let out_value = ref print_out_value
+let out_value = ref (compat print_out_value)
 
 (* Types *)
 
@@ -345,7 +346,7 @@ let rec print_list pr sep ppf =
 let pr_present =
   print_list (fun ppf s -> fprintf ppf "`%s" s) (fun ppf -> fprintf ppf "@ ")
 
-let pr_var = Pprintast.tyvar
+let pr_var = Pprintast.Doc.tyvar
 let ty_var ~non_gen ppf s =
   pr_var ppf (if non_gen then "_" ^ s else s)
 
@@ -630,8 +631,8 @@ and print_out_jkind_const ppf ojkind =
       match ojkind with
       | Ojkind_const_with (base, ty, modalities) ->
         let fix_indentation ppf =
-          let { out_newline; out_indent } as out_functions =
-            pp_get_formatter_out_functions ppf ()
+          let ({ Format.out_newline; out_indent; _ } as out_functions) =
+            Format.pp_get_formatter_out_functions ppf ()
           in
           let out_newline () =
             out_newline ();
@@ -639,11 +640,12 @@ and print_out_jkind_const ppf ojkind =
                               here gets included in a larger message, indented
                               by 18 *)
           in
-          pp_set_formatter_out_functions ppf { out_functions with out_newline }
+          Format.pp_set_formatter_out_functions ppf
+             { out_functions with out_newline }
         in
         let base, withs = strip_withs base in
         let with_ =
-          Format.asprintf "%t%a" fix_indentation print_out_type ty
+          Format.asprintf "%t%a" fix_indentation (compat print_out_type) ty
           :: (match modalities with
             | [] -> []
             | modalities -> "@@" :: modalities)
@@ -661,14 +663,14 @@ and print_out_jkind_const ppf ojkind =
         | Some base -> fprintf ppf "%a@ " (pp_element ~nested:true) base
         | None -> ()
       in
-      Misc.pp_parens_if nested (fun ppf (base, modes) ->
+      pp_parens_if nested (fun ppf (base, modes) ->
         fprintf ppf "%amod @[<hv>%a@]" pp_base base
           (pp_print_list ~pp_sep:pp_print_space pp_print_string)
           modes
       ) ppf (base, modes)
     | Ojkind_const_product ts ->
-      let pp_sep ppf () = Format.fprintf ppf "@ & " in
-      Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+      let pp_sep ppf () = fprintf ppf "@ & " in
+      pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
     | Ojkind_const_with _ -> failwith "XXX unreachable (stripped off earlier)"
     | Ojkind_const_kind_of _ ->
       failwith "XXX unimplemented jkind syntax");
@@ -678,7 +680,7 @@ and print_out_jkind_const ppf ojkind =
     | withs ->
       pp_print_list
         (fun ppf ->
-           Format.fprintf ppf "@ with @[<hv 2>%a@]"
+           fprintf ppf "@ with @[<hv 2>%a@]"
              (pp_print_list ~pp_sep:pp_print_space pp_print_string))
         ppf
         withs;
@@ -691,8 +693,8 @@ and print_out_jkind ppf ojkind =
     | Ojkind_var v -> fprintf ppf "%s" v
     | Ojkind_const jkind -> print_out_jkind_const ppf jkind
     | Ojkind_product ts ->
-      let pp_sep ppf () = Format.fprintf ppf "@ & " in
-      Misc.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+      let pp_sep ppf () = fprintf ppf "@ & " in
+      pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
   in
   pp_element ~nested:false ppf ojkind
 
@@ -1162,6 +1164,8 @@ let _ = out_type_extension := print_out_type_extension
 
 (* Phrases *)
 
+open Format
+
 let print_out_exception ppf exn outv =
   match exn with
     Sys.Break -> fprintf ppf "Interrupted.@."
@@ -1196,23 +1200,26 @@ let rec print_items ppf =
           otyext_constructors = exts;
           otyext_private = ext.oext_private }
       in
-        fprintf ppf "@[%a@]" !out_type_extension te;
+        fprintf ppf "@[%a@]" (Format_doc.compat !out_type_extension) te;
         if items <> [] then fprintf ppf "@ %a" print_items items
   | (tree, valopt) :: items ->
       begin match valopt with
         Some v ->
-          fprintf ppf "@[<2>%a =@ %a@]" !out_sig_item tree
+          fprintf ppf "@[<2>%a =@ %a@]" (Format_doc.compat !out_sig_item) tree
             !out_value v
-      | None -> fprintf ppf "@[%a@]" !out_sig_item tree
+      | None -> fprintf ppf "@[%a@]" (Format_doc.compat !out_sig_item) tree
       end;
       if items <> [] then fprintf ppf "@ %a" print_items items
 
 let print_out_phrase ppf =
   function
     Ophr_eval (outv, ty) ->
-      fprintf ppf "@[- : %a@ =@ %a@]@." !out_type ty !out_value outv
+      fprintf ppf "@[- : %a@ =@ %a@]@." (compat !out_type) ty !out_value outv
   | Ophr_signature [] -> ()
   | Ophr_signature items -> fprintf ppf "@[<v>%a@]@." print_items items
   | Ophr_exception (exn, outv) -> print_out_exception ppf exn outv
 
 let out_phrase = ref print_out_phrase
+
+type 'a printer = 'a Format_doc.printer ref
+type 'a toplevel_printer = (Format.formatter -> 'a -> unit) ref

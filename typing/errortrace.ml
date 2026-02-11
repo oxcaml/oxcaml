@@ -16,7 +16,7 @@
 (**************************************************************************)
 
 open Types
-open Format
+open Format_doc
 
 type position = First | Second
 

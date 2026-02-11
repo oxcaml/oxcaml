@@ -497,16 +497,18 @@ module Dwarf_helpers = struct
       Some (Dwarf.dwarf_for_fundecl dwarf fundecl ~fun_end_label ~ppf_dump)
 end
 
-let report_error ppf = function
+let report_error_doc ppf = function
   | Stack_frame_too_large n ->
-    Format.fprintf ppf
+    Format_doc.fprintf ppf
       "stack frame too large (%d bytes). \nUse -long-frames compiler flag." n
   | Stack_frame_way_too_large n ->
-    Format.fprintf ppf "stack frame too large (%d bytes)." n
+    Format_doc.fprintf ppf "stack frame too large (%d bytes)." n
   | Inconsistent_probe_init (name, dbg) ->
-    Format.fprintf ppf
+    Format_doc.fprintf ppf
       "Inconsistent use of ~enabled_at_init in [%%probe %s ..] at %a" name
-      Debuginfo.print_compact dbg
+      Debuginfo.doc_print_compact dbg
+
+let report_error = Format_doc.compat report_error_doc
 
 type preproc_stack_check_result =
   { max_frame_size : int;

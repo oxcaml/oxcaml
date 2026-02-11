@@ -18,7 +18,6 @@ open Asttypes
 open Path
 open Types
 open Typetexp
-open Format
 open Mode
 
 
@@ -48,7 +47,7 @@ type class_type_info = {
 
 type 'a full_class = {
   id : Ident.t;
-  id_loc : tag loc;
+  id_loc : string loc;
   clty: class_declaration;
   ty_id: Ident.t;
   cltydef: class_type_declaration;
@@ -94,7 +93,7 @@ type error =
   | Bad_class_type_parameters of Ident.t * type_expr list * type_expr list
   | Class_match_failure of Ctype.class_match_failure list
   | Unbound_val of string
-  | Unbound_type_var of (formatter -> unit) * Ctype.closed_class_failure
+  | Unbound_type_var of Format_doc.t * Ctype.closed_class_failure
   | Non_generalizable_class of
       { id : Ident.t
       ; clty : Types.class_declaration
@@ -1924,8 +1923,8 @@ let final_decl env define_class
   | Some reason ->
       let printer =
         if define_class
-        then function ppf -> Printtyp.class_declaration id ppf clty
-        else function ppf -> Printtyp.cltype_declaration id ppf cltydef
+        then Format_doc.doc_printf "%a" (Printtyp.class_declaration id) clty
+        else Format_doc.doc_printf "%a" (Printtyp.cltype_declaration id) cltydef
       in
       raise(Error(cl.pci_loc, env, Unbound_type_var(printer, reason)))
   end;
@@ -2176,7 +2175,7 @@ let approx_class_declarations env sdecls =
 
 (* Error report *)
 
-open Format
+open Format_doc
 
 let non_virtual_string_of_kind : kind -> string = function
   | Object -> "object"
@@ -2185,7 +2184,9 @@ let non_virtual_string_of_kind : kind -> string = function
 
 module Style=Misc.Style
 
-let report_error env ppf =
+let out_type ppf t = Style.as_inline_code !Oprint.out_type ppf t
+
+let report_error_doc env ppf =
   let pp_args ppf args =
     let args = List.map (Printtyp.tree_of_typexp Type) args in
     Style.as_inline_code !Oprint.out_type_args ppf args
@@ -2194,17 +2195,17 @@ let report_error env ppf =
   | Repeated_parameter ->
       fprintf ppf "A type parameter occurs several times"
   | Unconsistent_constraint err ->
+      let msg = Format_doc.Doc.msg in
       fprintf ppf "@[<v>The class constraints are not consistent.@ ";
       Printtyp.report_unification_error ppf env err
-        (fun ppf -> fprintf ppf "Type")
-        (fun ppf -> fprintf ppf "is not compatible with type");
+        (msg "Type")
+        (msg "is not compatible with type");
       fprintf ppf "@]"
   | Field_type_mismatch (k, m, err) ->
+      let msg  = Format_doc.doc_printf in
       Printtyp.report_unification_error ppf env err
-        (function ppf ->
-           fprintf ppf "The %s %a@ has type" k Style.inline_code m)
-        (function ppf ->
-           fprintf ppf "but is expected to have type")
+        (msg "The %s %a@ has type" k Style.inline_code m)
+        (msg "but is expected to have type")
   | Unexpected_field (ty, lab) ->
       fprintf ppf
         "@[@[<2>This object is expected to have type :@ %a@]\
@@ -2242,20 +2243,16 @@ let report_error env ppf =
       Printtyp.prepare_for_printing [abbrev; actual; expected];
       fprintf ppf "@[The abbreviation@ %a@ expands to type@ %a@ \
        but is used with type@ %a@]"
-        (Style.as_inline_code !Oprint.out_type)
-        (Printtyp.tree_of_typexp Type abbrev)
-        (Style.as_inline_code !Oprint.out_type)
-        (Printtyp.tree_of_typexp Type actual)
-        (Style.as_inline_code !Oprint.out_type)
-        (Printtyp.tree_of_typexp Type expected)
+        out_type (Printtyp.tree_of_typexp Type abbrev)
+        out_type (Printtyp.tree_of_typexp Type actual)
+        out_type (Printtyp.tree_of_typexp Type expected)
   | Constructor_type_mismatch (c, err) ->
+      let msg = Format_doc.doc_printf in
       Printtyp.report_unification_error ppf env err
-        (function ppf ->
-           fprintf ppf "The expression %a has type"
+        (msg "The expression %a has type"
              Style.inline_code ("new " ^ c)
         )
-        (function ppf ->
-           fprintf ppf "but is used with type")
+        (msg "but is used with type")
   | Virtual_class (kind, mets, vals) ->
       let kind = non_virtual_string_of_kind kind in
       let missings =
@@ -2281,11 +2278,10 @@ let report_error env ppf =
            but is here applied to %i type argument(s)@]"
         (Style.as_inline_code Printtyp.longident) lid expected provided
   | Parameter_mismatch err ->
+      let msg = Format_doc.Doc.msg in
       Printtyp.report_unification_error ppf env err
-        (function ppf ->
-           fprintf ppf "The type parameter")
-        (function ppf ->
-           fprintf ppf "does not meet its constraint: it should be")
+        (msg  "The type parameter")
+        (msg "does not meet its constraint: it should be")
   | Bad_parameters (id, params, cstrs) ->
       Printtyp.prepare_for_printing (params @ cstrs);
       fprintf ppf
@@ -2305,10 +2301,10 @@ let report_error env ppf =
        pp_args params
        pp_args cstrs
   | Class_match_failure error ->
-      Includeclass.report_error Type ppf error
+      Includeclass.report_error_doc Type ppf error
   | Unbound_val lab ->
       fprintf ppf "Unbound instance variable %a" Style.inline_code lab
-  | Unbound_type_var (printer, reason) ->
+  | Unbound_type_var (msg, reason) ->
       let print_reason ppf { Ctype.free_variable; meth; meth_ty; } =
         let (ty0, kind) = free_variable in
         let ty1 =
@@ -2318,17 +2314,16 @@ let report_error env ppf =
         in
         Printtyp.add_type_to_preparation meth_ty;
         Printtyp.add_type_to_preparation ty1;
-        let pp_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty in
         fprintf ppf
           "The method %a@ has type@;<1 2>%a@ where@ %a@ is unbound"
           Style.inline_code meth
-          pp_type (Printtyp.tree_of_typexp Type meth_ty)
-          pp_type (Printtyp.tree_of_typexp Type ty0)
+          out_type (Printtyp.tree_of_typexp Type meth_ty)
+          out_type (Printtyp.tree_of_typexp Type ty0)
       in
       fprintf ppf
-        "@[<v>@[Some type variables are unbound in this type:@;<1 2>%t@]@ \
+        "@[<v>@[Some type variables are unbound in this type:@;<1 2>%a@]@ \
               @[%a@]@]"
-       printer print_reason reason
+       pp_doc msg print_reason reason
   | Non_generalizable_class {id;  clty; nongen_vars } ->
       let[@manual.ref "ss:valuerestriction"] manual_ref = [ 6; 1; 2] in
       Printtyp.prepare_for_printing nongen_vars;
@@ -2348,20 +2343,20 @@ let report_error env ppf =
            Some occurrences are contravariant@]"
         (Style.as_inline_code Printtyp.type_scheme) ty
   | Non_collapsable_conjunction (id, clty, err) ->
+      let msg = Format_doc.Doc.msg in
       fprintf ppf
         "@[The type of this class,@ %a,@ \
            contains non-collapsible conjunctive types in constraints.@ %t@]"
         (Style.as_inline_code @@ Printtyp.class_declaration id) clty
         (fun ppf -> Printtyp.report_unification_error ppf env err
-            (fun ppf -> fprintf ppf "Type")
-            (fun ppf -> fprintf ppf "is not compatible with type")
+            (msg "Type")
+            (msg "is not compatible with type")
         )
   | Self_clash err ->
+      let msg = Format_doc.Doc.msg in
       Printtyp.report_unification_error ppf env err
-        (function ppf ->
-           fprintf ppf "This object is expected to have type")
-        (function ppf ->
-           fprintf ppf "but actually has type")
+        (msg "This object is expected to have type")
+        (msg "but actually has type")
   | Mutability_mismatch (_lab, mut) ->
       let mut1, mut2 =
         match mut with
@@ -2409,17 +2404,19 @@ let report_error env ppf =
       "@[the argument labeled '%s' is a [%%call_pos] argument, filled in @ \
          automatically if ommitted. It cannot be passed with '?'.@]" label
 
-let report_error env ppf err =
+let report_error_doc env ppf err =
   Printtyp.wrap_printing_env ~error:true
-    env (fun () -> report_error env ppf err)
+    env (fun () -> report_error_doc env ppf err)
 
 let () =
   Location.register_error_of_exn
     (function
       | Error (loc, env, err) ->
-        Some (Location.error_of_printer ~loc (report_error env) err)
+        Some (Location.error_of_printer ~loc (report_error_doc env) err)
       | Error_forward err ->
         Some err
       | _ ->
         None
     )
+
+let report_error = Format_doc.compat1 report_error_doc

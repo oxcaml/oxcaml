@@ -42,7 +42,7 @@ let report_error ppf = function
   | Partition_error err -> Partition_object_files.report_error ppf err
   | Partial_link_error err -> Partial_link.report_error ppf err
   | Nodynlink_incompatible ->
-    Format.fprintf ppf
+    Format_doc.fprintf ppf
       "The dissector is incompatible with -nodynlink.@ The -nodynlink flag \
        must not be used when using -dissector."
 

@@ -233,7 +233,14 @@ let debug_info = ref ([] : (int * Instruct.debug_event list * string list) list)
 let link_compunit output_fun currpos_fun inchan file_name compunit =
   check_consistency file_name compunit;
   seek_in inchan compunit.cu_pos;
-  let code_block = LongString.input_bytes inchan compunit.cu_codesize in
+  let code_block =
+    Bigarray.Array1.create Bigarray.Char Bigarray.c_layout compunit.cu_codesize
+  in
+  match
+    In_channel.really_input_bigarray inchan code_block 0 compunit.cu_codesize
+  with
+    | None -> raise End_of_file
+    | Some () -> ();
   Symtable.patch_object code_block compunit.cu_reloc;
   if !Clflags.debug && compunit.cu_debug > 0 then begin
     seek_in inchan compunit.cu_debug;
@@ -256,7 +263,7 @@ let link_compunit output_fun currpos_fun inchan file_name compunit =
       else file_path :: debug_dirs in
     debug_info := (currpos_fun(), debug_event_list, debug_dirs) :: !debug_info
   end;
-  Array.iter output_fun code_block;
+  output_fun code_block;
   if !Clflags.link_everything then
     List.iter Symtable.require_primitive compunit.cu_primitives
 
@@ -525,7 +532,8 @@ let link_bytecode ?final_name tolink exec_name standalone =
          try Dll.open_dlls Dll.For_checking sharedobjs
          with Failure reason -> raise(Error(Cannot_open_dll reason))
        end;
-       let output_fun = output_bytes outchan
+       let output_fun buf =
+         Out_channel.output_bigarray outchan buf 0 (Bigarray.Array1.dim buf)
        and currpos_fun () = pos_out outchan - start_code in
        List.iter (link_file output_fun currpos_fun) tolink;
        if check_dlls then Dll.close_all_dlls();
@@ -571,12 +579,12 @@ let output_code_string_counter = ref 0
 
 let output_code_string outchan code =
   let pos = ref 0 in
-  let len = Bytes.length code in
+  let len = Bigarray.Array1.dim code in
   while !pos < len do
-    let c1 = Char.code(Bytes.get code !pos) in
-    let c2 = Char.code(Bytes.get code (!pos + 1)) in
-    let c3 = Char.code(Bytes.get code (!pos + 2)) in
-    let c4 = Char.code(Bytes.get code (!pos + 3)) in
+    let c1 = Char.code(Bigarray.Array1.get code !pos) in
+    let c2 = Char.code(Bigarray.Array1.get code (!pos + 1)) in
+    let c3 = Char.code(Bigarray.Array1.get code (!pos + 2)) in
+    let c4 = Char.code(Bigarray.Array1.get code (!pos + 3)) in
     pos := !pos + 4;
     Printf.fprintf outchan "0x%02x%02x%02x%02x, " c4 c3 c2 c1;
     incr output_code_string_counter;
@@ -659,7 +667,7 @@ let link_bytecode_as_c tolink outfile with_main =
        let currpos = ref 0 in
        let output_fun code =
          output_code_string outchan code;
-         currpos := !currpos + Bytes.length code
+         currpos := !currpos + (Bigarray.Array1.dim code)
        and currpos_fun () = !currpos in
        List.iter (link_file output_fun currpos_fun) tolink;
        (* The final STOP instruction *)
@@ -915,44 +923,44 @@ let link objfiles output_name =
 
 (* Error report *)
 
-open Format
+open Format_doc
 module Style = Misc.Style
 
-let report_error ppf = function
+let report_error_doc ppf = function
   | File_not_found name ->
       fprintf ppf "Cannot find file %a"
-        (Style.as_inline_code Location.print_filename) name
+        Location.Doc.quoted_filename name
   | Not_an_object_file name ->
       fprintf ppf "The file %a is not a bytecode object file"
-        (Style.as_inline_code Location.print_filename) name
+        Location.Doc.quoted_filename name
   | Wrong_object_name name ->
       fprintf ppf "The output file %a has the wrong name. The extension implies\
                   \ an object file but the link step was requested"
         Style.inline_code name
   | Symbol_error(name, err) ->
       fprintf ppf "Error while linking %a:@ %a"
-        (Style.as_inline_code Location.print_filename) name
-        Symtable.report_error err
+        Location.Doc.quoted_filename name
+        Symtable.report_error_doc err
   | Inconsistent_import(intf, file1, file2) ->
       fprintf ppf
         "@[<hov>Files %a@ and %a@ \
                  make inconsistent assumptions over interface %a@]"
-        (Style.as_inline_code Location.print_filename) file1
-        (Style.as_inline_code Location.print_filename) file2
+        Location.Doc.quoted_filename file1
+        Location.Doc.quoted_filename file2
         Style.inline_code
-        (Format.asprintf "%a" CU.Name.print intf)
+        (Format_doc.asprintf "%a" CU.Name.print intf)
   | Custom_runtime ->
       fprintf ppf "Error while building custom runtime system"
   | File_exists file ->
       fprintf ppf "Cannot overwrite existing file %a"
-        (Style.as_inline_code Location.print_filename) file
+        Location.Doc.quoted_filename file
   | Cannot_open_dll file ->
       fprintf ppf "Error on dynamically loaded library: %a"
-        Location.print_filename file
+        Location.Doc.filename file
   | Required_compunit_unavailable (unavailable, required_by) ->
       fprintf ppf "Module %a is unavailable (required by %a)"
-        (Style.as_inline_code CU.print) unavailable
-        (Style.as_inline_code CU.print) required_by
+        CU.print_as_inline_code unavailable
+        CU.print_as_inline_code required_by
   | Camlheader (msg, header) ->
       fprintf ppf "System error while copying file %a: %a"
         Style.inline_code header
@@ -961,25 +969,26 @@ let report_error ppf = function
       let l = DepSet.elements depset in
       let depends_on ppf (dep, depending) =
         fprintf ppf "%a depends on %a"
-          (Style.as_inline_code CU.print) depending
-          (Style.as_inline_code CU.print) dep
+          CU.print_as_inline_code depending
+          CU.print_as_inline_code dep
       in
       fprintf ppf "@[<hov 2>Wrong link order: %a@]"
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") depends_on) l
   | Multiple_definition(compunit, file1, file2) ->
       fprintf ppf
         "@[<hov>Files %a@ and %a@ both define a module named %a@]"
-        (Style.as_inline_code Location.print_filename) file1
-        (Style.as_inline_code Location.print_filename) file2
-        (Style.as_inline_code CU.print) compunit
-
+        Location.Doc.quoted_filename file1
+        Location.Doc.quoted_filename file2
+        CU.print_as_inline_code compunit
 
 let () =
   Location.register_error_of_exn
     (function
-      | Error err -> Some (Location.error_of_printer_file report_error err)
+      | Error err -> Some (Location.error_of_printer_file report_error_doc err)
       | _ -> None
     )
+
+let report_error = Format_doc.compat report_error_doc
 
 let reset () =
   lib_ccobjs := [];

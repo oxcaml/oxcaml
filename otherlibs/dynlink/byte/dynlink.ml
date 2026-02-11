@@ -1,4 +1,3 @@
-#2 "otherlibs/dynlink/dynlink.ml"
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
@@ -125,13 +124,21 @@ module Bytecode = struct
       Fun.protect f
         ~finally:(fun () -> Mutex.unlock lock)
 
+  let really_input_bigarray ic ar st n =
+    match In_channel.really_input_bigarray ic ar st n with
+      | None -> raise End_of_file
+      | Some () -> ()
+
   let run lock (ic, file_name, file_digest) ~unit_header ~priv =
-    let open Misc in
     let clos = with_lock lock (fun () ->
         let old_state = Symtable.current_state () in
         let compunit : Cmo_format.compilation_unit_descr = unit_header in
         seek_in ic compunit.cu_pos;
-        let code = LongString.input_bytes ic compunit.cu_codesize in
+        let code =
+          Bigarray.Array1.create Bigarray.Char Bigarray.c_layout
+            compunit.cu_codesize
+        in
+        really_input_bigarray ic code 0 compunit.cu_codesize;
         begin try
           Symtable.patch_object code compunit.cu_reloc;
           Symtable.check_global_initialized compunit.cu_reloc;
@@ -140,8 +147,8 @@ module Bytecode = struct
           let new_error : DT.linking_error =
             match error with
             | Symtable.Undefined_global global ->
-              Undefined_global
-                (Format.asprintf "%a" Symtable.Global.description global)
+              let desc = Format_doc.compat Symtable.Global.description in
+              Undefined_global (Format.asprintf "%a" desc global)
             | Symtable.Unavailable_primitive s -> Unavailable_primitive s
             | Symtable.Uninitialized_global global ->
               Uninitialized_global (Symtable.Global.name global)

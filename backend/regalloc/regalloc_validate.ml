@@ -93,7 +93,10 @@ end = struct
       | Reg.Incoming offset ->
         Incoming { index = byte_offset_to_word_index offset }
       | Reg.Outgoing offset ->
-        Outgoing { index = byte_offset_to_word_index offset }
+        (* macOS on arm requires unaligned stack locations for C calls. *)
+        if Target_system.is_macos () && Target_system.is_arm ()
+        then Outgoing { index = offset / word_size }
+        else Outgoing { index = byte_offset_to_word_index offset }
       | Reg.Domainstate offset ->
         Domainstate { index = byte_offset_to_word_index offset }
 
@@ -152,7 +155,7 @@ end
 module Reg_id : sig
   type t =
     | Preassigned of { location : Location.t }
-    | Named of { stamp : int }
+    | Named of { stamp : Reg.Stamp.t }
 
   val compare : t -> t -> int
 
@@ -162,7 +165,7 @@ module Reg_id : sig
 end = struct
   type t =
     | Preassigned of { location : Location.t }
-    | Named of { stamp : int }
+    | Named of { stamp : Reg.Stamp.t }
 
   let of_reg (reg : Reg.t) =
     let loc = Location.of_reg reg in
@@ -213,7 +216,7 @@ end = struct
   module For_print = struct
     type t =
       { name : Reg.Name.t;
-        stamp : int;
+        stamp : Reg.Stamp.t;
         preassigned : bool;
         typ : Cmm.machtype_component
       }

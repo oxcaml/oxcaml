@@ -207,7 +207,12 @@ let classify ~classify_product env ty sort : _ classification =
   | Base Bits32 -> Unboxed_int Unboxed_int32
   | Base Bits64 -> Unboxed_int Unboxed_int64
   | Base Vec128 -> Unboxed_vector Unboxed_vec128
-  | Base Vec256 -> Unboxed_vector Unboxed_vec256
+  | Base Vec256 ->
+    if split_vectors
+    then Product (Pgcignorableproductarray
+                    [ Punboxedvector_ignorable Unboxed_vec128;
+                      Punboxedvector_ignorable Unboxed_vec128 ])
+    else Unboxed_vector Unboxed_vec256
   | Base Vec512 -> Unboxed_vector Unboxed_vec512
   | Base Word -> Unboxed_int Unboxed_nativeint
   | Base Untagged_immediate -> Unboxed_int Untagged_int
@@ -1069,13 +1074,13 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
     Lambda.Punboxed_float Unboxed_float32
   | Base Vec128 when Language_extension.(is_at_least Layouts Stable) &&
                      Language_extension.(is_at_least SIMD Stable) ->
-    Lambda.Punboxed_vector Unboxed_vec128
+    Lambda.layout_unboxed_vector Unboxed_vec128
   | Base Vec256 when Language_extension.(is_at_least Layouts Stable) &&
                      Language_extension.(is_at_least SIMD Stable) ->
-    Lambda.Punboxed_vector Unboxed_vec256
+    Lambda.layout_unboxed_vector Unboxed_vec256
   | Base Vec512 when Language_extension.(is_at_least Layouts Stable) &&
                      Language_extension.(is_at_least SIMD Alpha) ->
-    Lambda.Punboxed_vector Unboxed_vec512
+    Lambda.layout_unboxed_vector Unboxed_vec512
   | Base Void when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_product []
   | Product consts when Language_extension.(is_at_least Layouts Stable) ->
@@ -1142,7 +1147,7 @@ let layout_of_non_void_sort c =
     c
     ~value_kind:(lazy Lambda.generic_value)
     ~error:(fun const ->
-      Misc.fatal_errorf "layout_of_const_sort: %a encountered"
+      Misc.fatal_errorf_doc "layout_of_const_sort: %a encountered"
         Jkind.Sort.Const.format const)
 
 let function_return_layout env loc sort ty =
@@ -1208,7 +1213,7 @@ let classify_lazy_argument : Typedtree.expression ->
        `Other
 
 (* Error report *)
-open Format
+open Format_doc
 
 let report_error ppf = function
   | Non_value_layout (ty, err) ->
@@ -1280,7 +1285,7 @@ let report_error ppf = function
       fprintf ppf "A representable layout is required here.@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) ) err
+           ~level:(Ctype.get_current_level ())) err
   | Unsupported_product_in_lazy const ->
       fprintf ppf
         "Product layout %a detected in [lazy] in [Typeopt.Layout]@ \

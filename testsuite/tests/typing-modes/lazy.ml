@@ -28,7 +28,7 @@ Line 2, characters 18-19:
                       ^
 Error: The value "x" is "local" to the parent region
        but is expected to be "global"
-         because it is used inside the lazy expression at Line 2, characters 4-26
+         because it is used inside the lazy expression at line 2, characters 4-26
          which is expected to be "global"
          because lazy expressions always need to be allocated on the heap.
 |}]
@@ -42,7 +42,7 @@ Line 2, characters 18-19:
                       ^
 Error: The value "x" is "yielding"
        but is expected to be "unyielding"
-         because it is used inside the lazy expression at Line 2, characters 4-26
+         because it is used inside the lazy expression at line 2, characters 4-26
          which is expected to be "unyielding"
          because lazy expressions always need to be allocated on the heap.
 |}]

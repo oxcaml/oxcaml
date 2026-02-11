@@ -1183,7 +1183,8 @@ module Shape_with_layout = struct
        shape once it is more cleaned up. *)
 
     let print fmt { type_shape; type_layout } =
-      Format.fprintf fmt "%a @ %a" Shape.print type_shape Layout.format
+      Format.fprintf fmt "%a @ %a" Shape.print type_shape
+        (Format_doc.compat Layout.format)
         type_layout
 
     let hash { type_shape; type_layout } =

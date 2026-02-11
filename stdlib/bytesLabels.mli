@@ -79,6 +79,9 @@ external create : int -> bytes = "caml_create_bytes"
     sequence is uninitialized and contains arbitrary bytes.
     @raise Invalid_argument if [n < 0] or [n > ]{!Sys.max_string_length}. *)
 
+external create__stack : int -> bytes @ local = "caml_create_local_bytes"
+(** [create__stack n] is like {!create} but returns a stack-allocated bytes. *)
+
 val make : int -> char -> bytes
 (** [make n c] returns a new byte sequence of length [n], filled with
     the byte [c].
@@ -131,8 +134,12 @@ val fill : bytes -> pos:int -> len:int -> char -> unit
     @raise Invalid_argument if [pos] and [len] do not designate a
     valid range of [s]. *)
 
-val blit :
-  src:bytes -> src_pos:int -> dst:bytes -> dst_pos:int -> len:int
+val blit
+  :  src:bytes @ local
+  -> src_pos:int
+  -> dst:bytes @ local
+  -> dst_pos:int
+  -> len:int
   -> unit
 (** [blit ~src ~src_pos ~dst ~dst_pos ~len] copies [len] bytes from byte
     sequence [src], starting at index [src_pos], to byte sequence [dst],
@@ -144,8 +151,12 @@ val blit :
     do not designate a valid range of [dst]. *)
 
 val blit_string :
-  src:string -> src_pos:int -> dst:bytes -> dst_pos:int -> len:int
-  -> unit
+  src:string @ local ->
+  src_pos:int ->
+  dst:bytes @ local ->
+  dst_pos:int ->
+  len:int ->
+  unit
 (** [blit_string ~src ~src_pos ~dst ~dst_pos ~len] copies [len] bytes from
     string [src], starting at index [src_pos], to byte sequence [dst],
     starting at index [dst_pos].

@@ -39,9 +39,9 @@ external unsafe_set : ('a : value_or_null mod separable).
   ('a array[@local_opt]) -> int -> 'a -> unit @@ portable
   = "%array_unsafe_set"
 external make : ('a : value_or_null mod separable).
-  int -> 'a -> 'a array @@ portable = "caml_make_vect"
+  int -> 'a -> 'a array @@ portable = "caml_array_make"
 external create : ('a : value_or_null mod separable).
-  int -> 'a -> 'a array @@ portable = "caml_make_vect"
+  int -> 'a -> 'a array @@ portable = "caml_array_make"
 external unsafe_sub : ('a : value_or_null mod separable).
   'a array -> int -> int -> 'a array @@ portable = "caml_array_sub"
 external append_prim : ('a : value_or_null mod separable).
@@ -53,7 +53,7 @@ external unsafe_blit : ('a : value_or_null mod separable).
 external unsafe_fill : ('a : value_or_null mod separable).
   'a array -> int -> int -> 'a -> unit @@ portable = "caml_array_fill"
 external create_float : ('a : value_or_null mod separable).
-  int -> float array @@ portable = "caml_make_float_vect"
+  int -> float array @@ portable = "caml_array_create_float"
 
 module Floatarray = struct
   external create : int -> floatarray @@ portable = "caml_floatarray_create"

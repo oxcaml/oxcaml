@@ -49,7 +49,7 @@ val empty : unit -> t
 (** Initialize the analysis so that the stack consists of a single toplevel
     continuation. *)
 val init_toplevel :
-  dummy_toplevel_cont:Continuation.t -> Bound_parameters.t -> t -> t
+  dummy_toplevel_cont:Continuation.t -> Bound_parameters.t -> t
 
 (** Add a new continuation on the stack. Used when entering a continuation
     handler. *)

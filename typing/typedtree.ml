@@ -112,9 +112,12 @@ module Unique_barrier = struct
   let print ppf t =
     let open Format in
     let print = function
-      | Enabled u -> fprintf ppf "Enabled(%a)" (Mode.Uniqueness.print ()) u
+      | Enabled u ->
+        fprintf ppf "Enabled(%a)"
+          (Format_doc.compat (Mode.Uniqueness.print ())) u
       | Resolved uc ->
-        fprintf ppf "Resolved(%a)" Mode.Uniqueness.Const.print uc
+        fprintf ppf "Resolved(%a)"
+          (Format_doc.compat Mode.Uniqueness.Const.print) uc
       | Not_computed -> fprintf ppf "Not_computed"
     in
     print !t
@@ -125,8 +128,8 @@ type unique_use = Mode.Uniqueness.r * Mode.Linearity.l
 let print_unique_use ppf (u,l) =
   let open Format in
   fprintf ppf "@[(%a,@ %a)@]"
-    (Mode.Uniqueness.print ()) u
-    (Mode.Linearity.print ()) l
+    (Format_doc.compat (Mode.Uniqueness.print ())) u
+    (Format_doc.compat (Mode.Linearity.print ())) l
 
 type alloc_mode = Mode.Alloc.r
 
@@ -1422,16 +1425,34 @@ let split_pattern pat =
    - Similar to an identifier: words separated by '.' or '#'.
    - Do not contain spaces when printed.
   *)
-let rec exp_is_nominal exp =
-  match exp.exp_desc with
-  | _ when exp.exp_attributes <> [] -> false
-  | Texp_ident _ | Texp_instvar _ | Texp_constant _
-  | Texp_variant (_, None)
-  | Texp_construct (_, _, _, [], _) ->
-      true
-  | Texp_field { record = parent; _ } | Texp_send (parent, _, _) ->
-      exp_is_nominal parent
-  | _ -> false
+let nominal_exp_doc lid t =
+  let open Format_doc.Doc in
+  let longident l = Format_doc.doc_printer lid l.Location.txt in
+  let rec nominal_exp_doc doc exp =
+    match exp.exp_desc with
+    | _ when exp.exp_attributes <> [] -> None
+    | Texp_ident (_,l,_,_,_,_) ->
+        Some (longident l doc)
+    | Texp_instvar (_,_,s) ->
+        Some (string s.Location.txt doc)
+    | Texp_constant _ -> assert false
+    | Texp_variant (lbl, None) ->
+        Some (printf "`%s" lbl doc)
+    | Texp_construct (l, _, _, [], _) -> Some (longident l doc)
+    | Texp_field { record = parent; lid = lbl; _ } ->
+        Option.map
+          (printf ".%t" (longident lbl))
+          (nominal_exp_doc doc parent)
+    | Texp_send (parent, meth, _) ->
+        let name = match meth with
+          | Tmeth_name name -> name
+          | Tmeth_val id | Tmeth_ancestor (id,_) -> Ident.name id in
+        Option.map
+          (printf "#%s" name)
+          (nominal_exp_doc doc parent)
+    | _ -> None
+  in
+  nominal_exp_doc empty t
 
 let loc_of_decl ~uid =
   let of_option { txt; loc } =

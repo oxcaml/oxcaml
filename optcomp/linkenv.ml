@@ -182,7 +182,7 @@ let extract_missing_globals t =
   let mg = ref [] in
   let fmt = function
     | file, None -> file
-    | file, Some part -> Format.asprintf "%s(%a)" file CU.Name.print part
+    | file, Some part -> Format_doc.asprintf "%s(%a)" file CU.Name.print part
   in
   Hashtbl.iter
     (fun md rq -> mg := (md, List.map fmt !rq) :: !mg)
@@ -224,13 +224,13 @@ let lib_ccopts t = t.lib_ccopts
 
 (* Error report *)
 
-open Format
+open Format_doc
 
 let report_error ppf = function
   | File_not_found name -> fprintf ppf "Cannot find file %s" name
   | Not_an_object_file name ->
     fprintf ppf "The file %a is not a compilation unit description"
-      Location.print_filename name
+      Location.Doc.filename name
   | Missing_implementations l ->
     let print_references ppf = function
       | [] -> ()
@@ -240,8 +240,8 @@ let report_error ppf = function
     in
     let print_modules ppf =
       List.iter (fun (md, rq) ->
-          fprintf ppf "@ @[<hov 2>%a referenced from %a@]" CU.print md
-            print_references rq)
+          fprintf ppf "@ @[<hov 2>%a referenced from %a@]"
+            CU.print_as_inline_code md print_references rq)
     in
     fprintf ppf
       "@[<v 2>No implementations provided for the following modules:%a@]"
@@ -250,24 +250,25 @@ let report_error ppf = function
     fprintf ppf
       "@[<hov>Files %a@ and %a@ make inconsistent assumptions over interface \
        %a@]"
-      Location.print_filename file1 Location.print_filename file2 CU.Name.print
-      intf
+      Location.Doc.filename file1 Location.Doc.filename file2
+      CU.Name.print_as_inline_code intf
   | Inconsistent_implementation (intf, file1, file2) ->
     fprintf ppf
       "@[<hov>Files %a@ and %a@ make inconsistent assumptions over \
        implementation %a@]"
-      Location.print_filename file1 Location.print_filename file2 CU.print intf
+      Location.Doc.filename file1 Location.Doc.filename file2
+      CU.print_as_inline_code intf
   | Multiple_definition (modname, file1, file2) ->
     fprintf ppf "@[<hov>Files %a@ and %a@ both define a module named %a@]"
-      Location.print_filename file1 Location.print_filename file2 CU.Name.print
-      modname
+      Location.Doc.filename file1 Location.Doc.filename file2
+      CU.Name.print_as_inline_code modname
   | Missing_cmx (filename, name) ->
     fprintf ppf
       "@[<hov>File %a@ was compiled without access@ to the .cmx file@ for \
        module %a,@ which was produced by `ocamlopt -for-pack'.@ Please \
        recompile %a@ with the correct `-I' option@ so that %a.cmx@ is found.@]"
-      Location.print_filename filename CU.print name Location.print_filename
-      filename CU.print name
+      Location.Doc.filename filename CU.print_as_inline_code name
+      Location.Doc.filename filename CU.print_as_inline_code name
   | Linking_error exitcode ->
     fprintf ppf "Error during linking (exit code %d)" exitcode
   | Archiver_error name ->
@@ -276,7 +277,7 @@ let report_error ppf = function
     fprintf ppf
       "@[<hov>The file %a@ can only be compiled with a backend with support \
        for metaprogramming@]"
-      Location.print_filename filename
+      Location.Doc.filename filename
 
 let () =
   Location.register_error_of_exn (function

@@ -656,6 +656,11 @@ let mk_no_verbose_types f =
   "-no-verbose-types", Arg.Unit f,
   " Omit expert information within types (default)"
 
+let mk_kind_verbosity f =
+  "-kind-verbosity", Arg.Int f,
+  "<n>  Set the verbosity used for printing kinds (0=not verbose, \
+   1=expanded, 2=expanded with all mod bounds)"
+
 let mk_version f =
   "-version", Arg.Unit f, " Print version and exit"
 
@@ -1112,6 +1117,7 @@ module type Common_options = sig
   val _dump_debug_uid_tables : unit -> unit
   val _verbose_types : unit -> unit
   val _no_verbose_types : unit -> unit
+  val _kind_verbosity : int -> unit
   val _version : unit -> unit
   val _vnum : unit -> unit
   val _w : string -> unit
@@ -1494,6 +1500,7 @@ struct
     mk_verbose F._verbose;
     mk_verbose_types F._verbose_types;
     mk_no_verbose_types F._no_verbose_types;
+    mk_kind_verbosity F._kind_verbosity;
     mk_version F._version;
     mk__version F._version;
     mk_vmthread F._vmthread;
@@ -1593,6 +1600,7 @@ struct
     mk_unsafe F._unsafe;
     mk_verbose_types F._verbose_types;
     mk_no_verbose_types F._no_verbose_types;
+    mk_kind_verbosity F._kind_verbosity;
     mk_version F._version;
     mk__version F._version;
     mk_no_version F._no_version;
@@ -1763,6 +1771,7 @@ struct
     mk_verbose F._verbose;
     mk_verbose_types F._verbose_types;
     mk_no_verbose_types F._no_verbose_types;
+    mk_kind_verbosity F._kind_verbosity;
     mk_version F._version;
     mk__version F._version;
     mk_vnum F._vnum;
@@ -1914,6 +1923,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_verbose F._verbose;
     mk_verbose_types F._verbose_types;
     mk_no_verbose_types F._no_verbose_types;
+    mk_kind_verbosity F._kind_verbosity;
     mk_version F._version;
     mk__version F._version;
     mk_no_version F._no_version;
@@ -2049,6 +2059,7 @@ struct
     mk_verbose F._verbose;
     mk_verbose_types F._verbose_types;
     mk_no_verbose_types F._no_verbose_types;
+    mk_kind_verbosity F._kind_verbosity;
     mk_version F._version;
     mk__version F._version;
     mk_vnum F._vnum;
@@ -2166,6 +2177,7 @@ struct
     mk_verbose F._verbose;
     mk_verbose_types F._verbose_types;
     mk_no_verbose_types F._no_verbose_types;
+    mk_kind_verbosity F._kind_verbosity;
     mk_version F._version;
     mk__version F._version;
     mk_vmthread F._vmthread;
@@ -2270,6 +2282,7 @@ module Default = struct
     let _dump_debug_uids = set dump_debug_uids
     let _dump_debug_uid_tables = set dump_debug_uid_tables
     let _verbose_types = set verbose_types
+    let _kind_verbosity n = Clflags.kind_verbosity := n
     let _w s =
       Warnings.parse_options false s |> Option.iter Location.(prerr_alert none)
     let _debug_ocaml = set debug_ocaml

@@ -414,7 +414,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
           | [] -> block
           | _ :: _ ->
             (* for the floatarray hack *)
-            Prim (Ccall "caml_make_array", [block])))
+            Prim (Ccall "caml_array_of_uniform_array", [block])))
     | Presume -> context_switch Resume ~arity:3
     | Pwith_stack -> context_switch With_stack ~arity:5
     | Pwith_stack_bind -> context_switch With_stack_bind ~arity:7
@@ -630,6 +630,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pstringrefu -> binary Getstringchar
     | Pbytesrefu -> binary Getbyteschar
     | Pbytessetu -> ternary Setbyteschar
+    | Pstring_load_i8 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_string_geti8")
+    | Pstring_load_i16 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_string_geti16")
     | Pstring_load_16 { index_kind; _ } ->
       binary (indexing_primitive index_kind "caml_string_get16")
     | Pstring_load_32 { index_kind; _ } ->
@@ -638,6 +642,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       binary (indexing_primitive index_kind "caml_string_getf32")
     | Pstring_load_64 { index_kind; _ } ->
       binary (indexing_primitive index_kind "caml_string_get64")
+    | Pbytes_set_8 { index_kind; _ } ->
+      ternary (indexing_primitive index_kind "caml_bytes_set8")
     | Pbytes_set_16 { index_kind; _ } ->
       ternary (indexing_primitive index_kind "caml_bytes_set16")
     | Pbytes_set_32 { index_kind; _ } ->
@@ -646,6 +652,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       ternary (indexing_primitive index_kind "caml_bytes_setf32")
     | Pbytes_set_64 { index_kind; _ } ->
       ternary (indexing_primitive index_kind "caml_bytes_set64")
+    | Pbytes_load_i8 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_bytes_geti8")
+    | Pbytes_load_i16 { index_kind; _ } ->
+      binary (indexing_primitive index_kind "caml_bytes_geti16")
     | Pbytes_load_16 { index_kind; _ } ->
       binary (indexing_primitive index_kind "caml_bytes_get16")
     | Pbytes_load_32 { index_kind; _ } ->
@@ -761,6 +771,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pbigarrayset (_, n, _, _) ->
       n_ary (Ccall ("caml_ba_set_" ^ Int.to_string n)) ~arity:(n + 2)
     | Pbigarraydim n -> unary (Ccall ("caml_ba_dim_" ^ Int.to_string n))
+    | Pbigstring_load_i8 { unsafe = _; index_kind } ->
+      binary (indexing_primitive index_kind "caml_ba_uint8_geti8")
+    | Pbigstring_load_i16 { unsafe = _; index_kind } ->
+      binary (indexing_primitive index_kind "caml_ba_uint8_geti16")
     | Pbigstring_load_16 { unsafe = _; index_kind } ->
       binary (indexing_primitive index_kind "caml_ba_uint8_get16")
     | Pbigstring_load_32 { unsafe = _; mode = _; index_kind } ->
@@ -769,6 +783,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       binary (indexing_primitive index_kind "caml_ba_uint8_getf32")
     | Pbigstring_load_64 { unsafe = _; mode = _; index_kind } ->
       binary (indexing_primitive index_kind "caml_ba_uint8_get64")
+    | Pbigstring_set_8 { unsafe = _; index_kind } ->
+      ternary (indexing_primitive index_kind "caml_ba_uint8_set8")
     | Pbigstring_set_16 { unsafe = _; index_kind } ->
       ternary (indexing_primitive index_kind "caml_ba_uint8_set16")
     | Pbigstring_set_32 { unsafe = _; index_kind } ->
@@ -807,12 +823,16 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pbigstring_load_vec _ | Pbigstring_set_vec _ | Pfloatarray_load_vec _
     | Pfloat_array_load_vec _ | Pint_array_load_vec _
     | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
+    | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
     | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
     | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
     | Pfloat_array_set_vec _ | Pint_array_set_vec _
     | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
+    | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
     | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
-    | Punboxed_nativeint_array_set_vec _ | Pbox_vector _ | Punbox_vector _ ->
+    | Punboxed_nativeint_array_set_vec _ | Pbox_vector _ | Punbox_vector _
+    | Pjoin_vec256 | Psplit_vec256 | Preinterpret_boxed_vector_as_tuple _
+    | Preinterpret_tuple_as_boxed_vector _ ->
       simd_is_not_supported ()
     | Preinterpret_tagged_int63_as_unboxed_int64 ->
       if Target_system.is_64_bit ()
@@ -844,8 +864,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
       | Punboxedoruntaggedintarray _ | Pfloatarray | Punboxedfloatarray _
       | Pgcscannableproductarray _ | Pgcignorableproductarray _ -> (
         match locality with
-        | Alloc_heap -> binary (Ccall "caml_make_vect")
-        | Alloc_local -> binary (Ccall "caml_make_local_vect")))
+        | Alloc_heap -> binary (Ccall "caml_array_make")
+        | Alloc_local -> binary (Ccall "caml_array_make_local")))
     | Parrayblit { src_mutability = _; dst_array_set_kind } -> (
       match dst_array_set_kind with
       | Punboxedvectorarray_set _ -> simd_is_not_supported ()

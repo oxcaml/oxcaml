@@ -29,6 +29,9 @@ val fatal_errorf: ('a, Format.formatter, unit, 'b) format4 -> 'a
   (** Format the arguments according to the given format string
       and raise [Fatal_error] with the resulting string. *)
 
+val fatal_errorf_doc: ('a, Format_doc.formatter, unit, 'b) format4 -> 'a
+  (** Like [fatal_errorf] but using [Format_doc]. *)
+
 val splices_should_not_exist_after_eval : unit -> _
   (** Raise a [Fatal_error] explaining that a slambda splice shouldn't exist in
       lambda code after slambda eval has happened. *)
@@ -686,23 +689,6 @@ val snd4: 'a * 'b * 'c * 'd -> 'b
 val thd4: 'a * 'b * 'c * 'd -> 'c
 val for4: 'a * 'b * 'c * 'd -> 'd
 
-(** {1 Long strings} *)
-
-(** ``Long strings'' are mutable arrays of characters that are not limited
-    in length to {!Sys.max_string_length}. *)
-
-module LongString :
-  sig
-    type t = bytes array
-    val create : int -> t
-    val length : t -> int
-    val get : t -> int -> char
-    val set : t -> int -> char -> unit
-    val blit : t -> int -> t -> int -> int -> unit
-    val output : out_channel -> t -> int -> int -> unit
-    val input_bytes : in_channel -> int -> t
-  end
-
 (** {1 Spell checking and ``did you mean'' suggestions} *)
 
 val edit_distance : string -> string -> int -> int option
@@ -723,7 +709,8 @@ val spellcheck : string list -> string -> string list
     list of suggestions taken from [env], that are close enough to
     [name] that it may be a typo for one of them. *)
 
-val did_you_mean : Format.formatter -> (unit -> string list) -> unit
+val did_you_mean :
+    Format_doc.formatter -> (unit -> string list) -> unit
 (** [did_you_mean ppf get_choices] hints that the user may have meant
     one of the option returned by calling [get_choices]. It does nothing
     if the returned list is empty.
@@ -783,11 +770,10 @@ module Style : sig
     inline_code: tag_style;
   }
 
-  val as_inline_code: (Format.formatter -> 'a -> unit as 'printer) -> 'printer
-  val inline_code: Format.formatter -> string -> unit
+  val as_inline_code: 'a Format_doc.printer -> 'a Format_doc.printer
+  val inline_code: string Format_doc.printer
 
-  val as_clflag:
-    string -> (Format.formatter -> 'a -> unit as 'printer) -> 'printer
+  val as_clflag: string -> 'a Format_doc.printer -> 'a Format_doc.printer
 
   val default_styles: styles
   val get_styles: unit -> styles
@@ -871,7 +857,7 @@ val pp_nested_list :
     always called with [nested:true], indicating that any inner lists are nested
     and need parens. *)
 
-val print_see_manual : Format.formatter -> int list -> unit
+val print_see_manual : int list Format_doc.printer
 (** See manual section *)
 
 val output_of_print :
@@ -879,6 +865,10 @@ val output_of_print :
 (** [output_of_print print] produces an output function from a pretty printer.
     Note that naively using [Format.formatter_of_out_channel] typechecks but
     doesn't work because it fails to flush the formatter. *)
+
+val output_of_doc_print :
+  (Format_doc.formatter -> 'a -> unit) -> out_channel -> 'a -> unit
+(** Like [output_of_print] but for [Format_doc] printers. *)
 
 val is_print_longer_than: int -> (Format.formatter -> unit) -> bool
 (** Returns [true] if the printed string is longer than the given integer. Stops

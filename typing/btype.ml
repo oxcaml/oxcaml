@@ -1020,10 +1020,10 @@ module Jkind0 = struct
             separability } =
       Format.fprintf ppf "@[{ crossing = %a;@ externality = %a;@ \
         nullability = %a;@ separability = %a }@]"
-        Crossing.print crossing
-        Externality.print externality
-        Nullability.print nullability
-        Separability.print separability
+        (Format_doc.compat Crossing.print) crossing
+        (Format_doc.compat Externality.print) externality
+        (Format_doc.compat Nullability.print) nullability
+        (Format_doc.compat Separability.print) separability
 
     let equal t1 t2 =
       Misc.Le_result.equal ~le:Crossing.le (crossing t1) (crossing t2)

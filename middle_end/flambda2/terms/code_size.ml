@@ -216,8 +216,10 @@ let string_or_bigstring_load ~machine_width kind width =
     (* CR gbury: these should actually depend on Arch.allow_unaligned_access,
        but that would add a dependency on the backend which is probably not
        desirable ? *)
+    | Eight_signed -> 2 (* add, load (allow_unaligned_access) *)
     | Sixteen -> 2 (* add, load (allow_unaligned_access) *)
     (* 7 (not allow_unaligned_access) *)
+    | Sixteen_signed -> 2 (* add, load (allow_unaligned_access) *)
     | Thirty_two | Single -> 2 (* add, load (allow_unaligned_access) *)
     (* 17 (not allow_unaligned_access) *)
     | Sixty_four ->
@@ -422,6 +424,7 @@ let unary_prim_size ~machine_width prim =
   | Float_arith _ -> 2
   | Num_conv { src; dst } -> arith_conversion_size ~machine_width src dst
   | Boolean_not -> 1
+  | Reinterpret_boxed_vector -> 0
   | Reinterpret_64_bit_word reinterpret -> (
     match reinterpret with
     | Tagged_int63_as_unboxed_int64 -> 0

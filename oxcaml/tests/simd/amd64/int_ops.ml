@@ -86,3 +86,21 @@ module Int32 = struct
     eq' (I32.to_int32 low) 0l;
     eq' (I32.to_int32 high) 1l
 end
+
+module Int16 = struct
+  open Builtins.Int16
+  module Int16 = Stdlib_stable.Int16
+
+  let eq' x y =
+    if not (Int16.equal x y)
+    then Printf.printf "%04x <> %04x\n" (Int16.to_int x) (Int16.to_int y)
+
+  let () =
+    eq' (tzcnt 0b1100S) 2S;
+    eq' (tzcnt 0S) 16S;
+    eq' (lzcnt 0b1100S) 12S;
+    eq' (lzcnt 0S) 16S;
+    eq' (popcnt (-1S)) 16S;
+    eq' (popcnt (0b111011S)) 5S;
+    eq' (popcnt 0S) 0S;
+end

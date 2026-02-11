@@ -140,6 +140,7 @@ let select_operation_popcnt ~dbg:_ op args =
   then None
   else
     match op with
+    | "caml_popcnt_int16" -> instr popcnt_r16_r16m16 args
     | "caml_popcnt_int32" -> instr popcnt_r32_r32m32 args
     | "caml_popcnt_int64" -> instr popcnt_r64_r64m64 args
     | _ -> None
@@ -149,6 +150,7 @@ let select_operation_lzcnt ~dbg:_ op args =
   then None
   else
     match op with
+    | "caml_lzcnt_int16" -> instr lzcnt_r16_r16m16 args
     | "caml_lzcnt_int32" -> instr lzcnt_r32_r32m32 args
     | "caml_lzcnt_int64" -> instr lzcnt_r64_r64m64 args
     | _ -> None
@@ -168,6 +170,7 @@ let select_operation_bmi ~dbg:_ op args =
     | "caml_bmi_blsmsk_int64" -> instr blsmsk_r64_r64m64 args
     | "caml_bmi_blsr_int32" -> instr blsr_r32_r32m32 args
     | "caml_bmi_blsr_int64" -> instr blsr_r64_r64m64 args
+    | "caml_bmi_tzcnt_int16" -> instr tzcnt_r16_r16m16 args
     | "caml_bmi_tzcnt_int32" -> instr tzcnt_r32_r32m32 args
     | "caml_bmi_tzcnt_int64" -> instr tzcnt_r64_r64m64 args
     | _ -> None
@@ -1194,7 +1197,7 @@ let pseudoregs_for_mem_operation (op : Simd.Mem.operation) arg res =
 (* Error report *)
 
 let report_error ppf = function
-  | Bad_immediate msg -> Format.pp_print_string ppf msg
+  | Bad_immediate msg -> Format_doc.pp_print_string ppf msg
 
 let () =
   Location.register_error_of_exn (function

@@ -552,7 +552,7 @@ type rcd = { x : int; y : string; }
 Line 1, characters 4-5:
 1 | <[ {x = 42; y = "foo"} ]>;;
         ^
-Error: Label "x" used at Line 1, characters 4-5 cannot be used in this context;
+Error: Label "x" used at line 1, characters 4-5 cannot be used in this context;
        "x" is not defined inside a quotation (<[ ... ]>).
 Hint: Label "x" is defined outside any quotations.
 |}];;
@@ -567,7 +567,7 @@ type rcd_u = #{ xu : int; yu : string; }
 Line 1, characters 15-17:
 1 | <[ fun () -> #{xu = 42; yu = "foo"} ]>;;
                    ^^
-Error: Label "xu" used at Line 1, characters 15-17
+Error: Label "xu" used at line 1, characters 15-17
        cannot be used in this context;
        "xu" is not defined inside a quotation (<[ ... ]>).
 Hint: Label "xu" is defined outside any quotations.
@@ -578,7 +578,7 @@ Hint: Label "xu" is defined outside any quotations.
 Line 1, characters 14-15:
 1 | <[ fun r -> r.x ]>;;
                   ^
-Error: Label "x" used at Line 1, characters 14-15
+Error: Label "x" used at line 1, characters 14-15
        cannot be used in this context;
        "x" is not defined inside a quotation (<[ ... ]>).
 Hint: Label "x" is defined outside any quotations.
@@ -589,7 +589,7 @@ Hint: Label "x" is defined outside any quotations.
 Line 1, characters 8-9:
 1 | <[ fun {x; y} -> x ]>;;
             ^
-Error: Label "x" used at Line 1, characters 8-9 cannot be used in this context;
+Error: Label "x" used at line 1, characters 8-9 cannot be used in this context;
        "x" is not defined inside a quotation (<[ ... ]>).
 Hint: Label "x" is defined outside any quotations.
 |}];;
@@ -728,9 +728,9 @@ module Mod : sig type t = int val mk : 'a -> 'a end
 Line 1, characters 19-20:
 1 | <[ fun (module _ : S) x -> 42 ]>;;
                        ^
-Error: Identifier "S" is used at Line 1, characters 19-20,
+Error: Identifier "S" is used at line 1, characters 19-20,
        inside a quotation (<[ ... ]>);
-       it is introduced at Lines 1-7, characters 0-3, outside any quotations.
+       it is introduced at lines 1-7, characters 0-3, outside any quotations.
 |}];;
 
 <[ let module M = struct type t = int let x = 42 end in M.x ]>;;
@@ -740,7 +740,7 @@ Line 1, characters 18-52:
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Module definition using "struct..end"
        is not supported inside quoted expressions,
-       as seen at Line 1, characters 18-52.
+       as seen at line 1, characters 18-52.
 |}];;
 
 <[ Mod.mk 42 ]>;;
@@ -748,9 +748,9 @@ Error: Module definition using "struct..end"
 Line 1, characters 3-9:
 1 | <[ Mod.mk 42 ]>;;
        ^^^^^^
-Error: Identifier "Mod" is used at Line 1, characters 3-9,
+Error: Identifier "Mod" is used at line 1, characters 3-9,
        inside a quotation (<[ ... ]>);
-       it is introduced at File "_none_", line 1, outside any quotations.
+       it is introduced at file "_none_", line 1, outside any quotations.
 |}];;
 
 let x = 42 in <[ x ]>;;
@@ -758,9 +758,9 @@ let x = 42 in <[ x ]>;;
 Line 1, characters 17-18:
 1 | let x = 42 in <[ x ]>;;
                      ^
-Error: Identifier "x" is used at Line 1, characters 17-18,
+Error: Identifier "x" is used at line 1, characters 17-18,
        inside a quotation (<[ ... ]>);
-       it is introduced at Line 1, characters 4-5, outside any quotations.
+       it is introduced at line 1, characters 4-5, outside any quotations.
 |}];;
 
 let x = <[ 123 ]> in <[ $x ]>;;
@@ -813,7 +813,7 @@ Line 1, characters 11-34:
                ^^^^^^^^^^^^^^^^^^^^^^^
 Error: Object definition using "object..end"
        is not supported inside quoted expressions,
-       as seen at Line 1, characters 11-34.
+       as seen at line 1, characters 11-34.
 |}];;
 
 <[ let open List in map ]>;;
@@ -822,7 +822,7 @@ Line 1, characters 3-23:
 1 | <[ let open List in map ]>;;
        ^^^^^^^^^^^^^^^^^^^^
 Error: Opening modules is not supported inside quoted expressions,
-       as seen at Line 1, characters 3-23.
+       as seen at line 1, characters 3-23.
 |}];;
 
 module M = struct
@@ -836,7 +836,7 @@ Line 5, characters 3-22:
 5 | <[ let open M in M.foo ]>;;
        ^^^^^^^^^^^^^^^^^^^
 Error: Opening modules is not supported inside quoted expressions,
-       as seen at Line 5, characters 3-22.
+       as seen at line 5, characters 3-22.
 |}]
 ;;
 
@@ -847,7 +847,7 @@ Line 1, characters 14-38:
                   ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Adding attributes on fields in object types
        is not supported inside quoted expressions,
-       as seen at Line 1, characters 14-38.
+       as seen at line 1, characters 14-38.
 |}]
 ;;
 
@@ -858,7 +858,7 @@ Line 1, characters 14-41:
                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Adding attributes on tags in polymorphic variant types
        is not supported inside quoted expressions,
-       as seen at Line 1, characters 14-41.
+       as seen at line 1, characters 14-41.
 |}]
 ;;
 
@@ -1011,7 +1011,7 @@ let x = <[ "foo" ]> in <[ let y = (borrow_ x) in (fun (a @ local) -> ()) y ]>
 Line 1, characters 43-44:
 1 | let x = <[ "foo" ]> in <[ let y = (borrow_ x) in (fun (a @ local) -> ()) y ]>
                                                ^
-Error: Identifier "x" is used at Line 1, characters 43-44,
+Error: Identifier "x" is used at line 1, characters 43-44,
        inside a quotation (<[ ... ]>);
-       it is introduced at Line 1, characters 4-5, outside any quotations.
+       it is introduced at line 1, characters 4-5, outside any quotations.
 |}];;

@@ -45,7 +45,7 @@ type error =
 exception Error of error
 
 (** Pretty-print a partial linking error. *)
-val report_error : Format.formatter -> error -> unit
+val report_error : Format_doc.formatter -> error -> unit
 
 (** [link_partitions ~temp_dir partitions] partially links each partition into a
     single relocatable object file.

@@ -145,7 +145,7 @@ Line 5, characters 4-5:
         ^
 Error: This value is "local" because it is borrowed.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
-         because it escapes the borrow region at Lines 4-5, characters 4-5.
+         because it escapes the borrow region at lines 4-5, characters 4-5.
 |}]
 
 (* In the borrow region, you are not allowed to use the original value uniquely *)
@@ -357,7 +357,7 @@ Line 5, characters 4-19:
         ^^^^^^^^^^^^^^^
 Error: This value is "local" because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
-         because it escapes the borrow region at Lines 4-5, characters 4-19.
+         because it escapes the borrow region at lines 4-5, characters 4-19.
 |}]
 
 (* Borrowing in Texp_match/Texp_apply/Texp_let are very similar,
@@ -605,7 +605,7 @@ Line 3, characters 2-29:
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
-         because it escapes the borrow region at Line 3, characters 2-29.
+         because it escapes the borrow region at line 3, characters 2-29.
 |}]
 
 let foo () =
@@ -728,7 +728,7 @@ Line 4, characters 10-50:
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
-         because it escapes the borrow region at Line 4, characters 10-50.
+         because it escapes the borrow region at line 4, characters 10-50.
   Hint: This is a partial application
         Adding 1 more argument will make the value non-local
 |}]
@@ -752,7 +752,7 @@ Line 3, characters 10-24:
               ^^^^^^^^^^^^^^
 Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
-         because it escapes the borrow region at Line 3, characters 10-24.
+         because it escapes the borrow region at line 3, characters 10-24.
 |}]
 
 let foo () =
@@ -767,10 +767,10 @@ Line 4, characters 15-16:
                    ^
 Error: The value "y" is "local" because it is borrowed.
        However, the value "y" highlighted is expected to be "global"
-         because it is used inside the function at Line 4, characters 4-17
+         because it is used inside the function at line 4, characters 4-17
          which is expected to be "global" because it is an allocation
          which is expected to be "local" to the parent region or "global"
-         because it escapes the borrow region at Lines 3-4, characters 4-17.
+         because it escapes the borrow region at lines 3-4, characters 4-17.
 |}]
 
 let foo () =

@@ -452,9 +452,9 @@ let link unix linkenv ml_objfiles output_name ~cached_genfns_imports ~genfns
 
 (* Error report *)
 
-open Format
+open Format_doc
 
-let report_error ppf = function
+let report_error_doc ppf = function
   | Dwarf_fission_objcopy_on_macos ->
     fprintf ppf
       "Error: -gdwarf-fission=objcopy is not supported on macOS systems.@ \
@@ -468,13 +468,15 @@ let report_error ppf = function
     fprintf ppf "Error running objcopy (exit code %d)" exitcode
   | Cm_bundle_error (Missing_intf_for_quote intf) ->
     fprintf ppf "Missing interface for module %a which is required by quote"
-      CU.Name.print intf
+      CU.Name.print_as_inline_code intf
   | Cm_bundle_error (Missing_impl_for_quote impl) ->
     fprintf ppf
       "Missing implementation for module %a which is required by quote"
-      CU.Name.print impl
+      CU.Name.print_as_inline_code impl
+
+let report_error = Format_doc.compat report_error_doc
 
 let () =
   Location.register_error_of_exn (function
-    | Error err -> Some (Location.error_of_printer_file report_error err)
+    | Error err -> Some (Location.error_of_printer_file report_error_doc err)
     | _ -> None)

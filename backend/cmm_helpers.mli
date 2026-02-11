@@ -497,7 +497,10 @@ val box_int_gen :
 val unbox_int :
   Debuginfo.t -> Primitive.boxed_integer -> expression -> expression
 
-(** Used to prepare 32-bit integers on 64-bit platforms for a lsr operation *)
+(** For example, [bit_count Unboxed_int32] is [32] *)
+val bit_count : Primitive.unboxed_or_untagged_integer -> int
+
+(** Used to prepare small integers for a bitwise operations *)
 val make_unsigned_int :
   Primitive.unboxed_or_untagged_integer ->
   expression ->

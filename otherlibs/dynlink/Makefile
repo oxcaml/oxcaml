@@ -81,6 +81,7 @@ COMPILERLIBS_SOURCES=\
   utils/binutils.ml \
   utils/config.ml \
   utils/build_path_prefix_map.ml \
+  utils/format_doc.ml \
   utils/misc.ml \
   utils/target_system.ml \
   utils/identifiable.ml \
@@ -182,6 +183,7 @@ MINI_COMPILERLIBS_SOURCES=\
   utils/binutils.ml \
   utils/config.ml \
   utils/build_path_prefix_map.ml \
+  utils/format_doc.ml \
   utils/misc.ml
 
 # Rules to make a local copy of the .ml and .mli files required.  We also

@@ -111,7 +111,7 @@ let () =
 (let
   (X =? (apply (field_imm 0 (global Toploop!)) "X/376")
    *match* =[value<int>]
-     (let (xs =[value<addrarray>] (caml_make_vect 4 (field_imm 0 X)))
+     (let (xs =[value<addrarray>] (caml_array_make 4 (field_imm 0 X)))
        (seq (array.set[addr indexed by int] xs 1 (field_imm 1 X))
          (array.set[addr indexed by int] xs 2 (field_imm 1 X))
          (if

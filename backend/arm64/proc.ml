@@ -132,16 +132,6 @@ let loc_float = loc_float_gen Float Arch.size_float
 let loc_float32 = loc_float_gen Float32 Arch.size_float
 let loc_vec128 = loc_float_gen Vec128 Arch.size_vec128
 
-let loc_int32 last_int make_stack int ofs =
-  if !int <= last_int then begin
-    let l = phys_reg Int !int in
-    incr int; l
-  end else begin
-    let l = stack_slot (make_stack !ofs) Int in
-    ofs := !ofs + (if macosx then 4 else 8);
-    l
-  end
-
 let calling_conventions
     first_int last_int first_float last_float make_stack first_stack arg =
   let loc = Array.make (Array.length arg) Reg.dummy in
@@ -207,9 +197,33 @@ let loc_results_return res =
      first integer args in r0...r7
      first float args in d0...d7
      remaining args on stack.
-   macOS/iOS peculiarity: int32 arguments passed on stack occupy 4 bytes,
-   while the AAPCS64 says 8 bytes.
+   macOS/iOS peculiarities: scalars passed on stack occupy only their size in
+   bytes, while the AAPCS64 pads them to 8 bytes.
    Return values in r0...r1 or d0. *)
+
+let ext_loc_int divisor last_int make_stack int ofs =
+  if !int <= last_int then begin
+    let l = phys_reg Int !int in
+    incr int; l
+  end else begin
+    let size = if macosx then size_int / divisor else size_int in
+    ofs := Misc.align !ofs size;
+    let l = stack_slot (make_stack !ofs) Int in
+    ofs := !ofs + size; l
+  end
+
+let ext_loc_float kind divisor last_float make_stack float ofs =
+  if !float <= last_float then begin
+    let l = phys_reg kind !float in
+    incr float; l
+  end else begin
+    let size = if macosx then size_float / divisor else size_float in
+    ofs := Misc.align !ofs size;
+    let l = stack_slot (make_stack !ofs) kind in
+    ofs := !ofs + size; l
+  end
+
+let ext_loc_vec128 = loc_vec128
 
 let external_calling_conventions
     first_int last_int first_float last_float make_stack ty_args =
@@ -220,17 +234,21 @@ let external_calling_conventions
   List.iteri (fun i ty_arg ->
     begin match (ty_arg : Cmm.exttype) with
     | XInt | XInt64 ->
-        loc.(i) <- [| loc_int last_int make_stack int ofs |]
-    | XInt32 | XInt16 | XInt8 ->
-        loc.(i) <- [| loc_int32 last_int make_stack int ofs |]
+        loc.(i) <- [| ext_loc_int 1 last_int make_stack int ofs |]
+    | XInt32 ->
+        loc.(i) <- [| ext_loc_int 2 last_int make_stack int ofs |]
+    | XInt16 ->
+        loc.(i) <- [| ext_loc_int 4 last_int make_stack int ofs |]
+    | XInt8 ->
+        loc.(i) <- [| ext_loc_int 8 last_int make_stack int ofs |]
     | XFloat ->
-        loc.(i) <- [| loc_float last_float make_stack float ofs |]
+        loc.(i) <- [| ext_loc_float Float 1 last_float make_stack float ofs |]
+    | XFloat32 ->
+        loc.(i) <- [| ext_loc_float Float32 2 last_float make_stack float ofs |]
     | XVec128 ->
-        loc.(i) <- [| loc_vec128 last_float make_stack float ofs |]
+        loc.(i) <- [| ext_loc_vec128 last_float make_stack float ofs |]
     | XVec256 | XVec512 ->
         Misc.fatal_error "XVec256 and XVec512 not supported on ARM64"
-    | XFloat32 ->
-        loc.(i) <- [| loc_float32 last_float make_stack float ofs |]
     end)
     ty_args;
   (loc, Misc.align !ofs 16, Cmm.Align_16) (* keep stack 16-aligned *)
@@ -400,12 +418,14 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
   | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
   | Tailcall_func _ | Prim {op = Probe _; _} ->
     false
-  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _; stack_ofs = _; _}
-  | Prim {op  = External { func_symbol = _; alloc; ty_res = _; ty_args = _; stack_ofs = _; _}; _} ->
+  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
+                     stack_ofs; _ }
+  | Prim {op  = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
+                           stack_ofs; _ }; _ } ->
     if more_destruction_points then
       true
     else
-    if alloc then true else false
+      if alloc || stack_ofs > 0 then true else false
   | Invalid _ -> more_destruction_points
 
 (* Layout of the stack *)

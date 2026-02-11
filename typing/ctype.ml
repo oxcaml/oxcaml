@@ -120,10 +120,11 @@ let raise_scope_escape_exn ty = raise (scope_escape_exn ty)
 exception Tags of label * label
 
 let () =
+  let open Format_doc in
   Location.register_error_of_exn
     (function
       | Tags (l, l') ->
-          let pp_tag ppf s = Format.fprintf ppf "`%s" s in
+          let pp_tag ppf s = fprintf ppf "`%s" s in
           let inline_tag = Misc.Style.as_inline_code pp_tag in
           Some
             Location.
@@ -2427,7 +2428,7 @@ let mk_is_abstract env p =
   let decl =
     try Env.find_type p env
     with Not_found ->
-      Misc.fatal_errorf "mk_is_abstract: type %a not found in environment"
+      Misc.fatal_errorf_doc "mk_is_abstract: type %a not found in environment"
         Path.print p
   in
   match decl.type_kind with
@@ -2486,7 +2487,8 @@ let rec estimate_type_jkind ~expand_components ~ignore_mod_bounds env ty =
           | Unify_trace _ ->
             (* Shouldn't happen, since [record_params] should just be type
                variables *)
-            Misc.fatal_errorf "failed to unify %a" Path.print p
+            Misc.fatal_errorf "failed to unify %a"
+              (Format_doc.compat Path.print) p
           end;
           let tys = Array.map snd label_params_and_tys |> Array.to_list in
           estimate_unboxed_product_jkind ~expand_components ~ignore_mod_bounds
@@ -3945,7 +3947,7 @@ let add_gadt_equation uenv source destination =
     let jkind = jkind_of_abstract_type_declaration env source in
     let jkind = match Jkind.try_allow_r jkind with
       | None -> Misc.fatal_errorf "Abstract kind with [with]: %a"
-                  Jkind.format
+                  (Format_doc.compat Jkind.format)
                   jkind
       | Some jkind -> jkind
     in
@@ -7855,3 +7857,11 @@ let check_constructor_crossing_destruction
           (Mode.Crossing.apply_right mode_crossing max_bound))
         (fun () -> Ok min_bound))
     env lid tag ~res ~args held_locks
+
+let apply_is_contained_by is_contained_by ?(modalities = Modality.Const.id)
+  mode =
+  let hint =
+    { monadic = Hint.Is_contained_by (Monadic, is_contained_by);
+      comonadic = Hint.Is_contained_by (Comonadic, is_contained_by) }
+  in
+  Modality.Const.apply ~hint modalities mode

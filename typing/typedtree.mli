@@ -1488,9 +1488,11 @@ val pat_bound_idents_full:
 val split_pattern:
   computation general_pattern -> pattern option * pattern option
 
-(** Whether an expression looks nice as the subject of a sentence in a error
-    message. *)
-val exp_is_nominal : expression -> bool
+(** Returns a format document if the expression reads nicely as the subject of a
+    sentence in a error message. *)
+val nominal_exp_doc :
+  Longident.t Format_doc.printer -> expression
+  -> Format_doc.t option
 
 (** Calculates the syntactic arity of a function based on its parameters and body. *)
 val function_arity : function_param list -> function_body -> int

@@ -161,9 +161,19 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
           | Naked_number
               (Naked_immediate | Naked_int64 | Naked_nativeint | Naked_float) ->
             ()
+          | Naked_number (Naked_float32 | Naked_vec128) -> (
+            match Target_system.architecture () with
+            | AArch64 -> ()
+            | X86_64 ->
+              Misc.fatal_errorf
+                "Cannot compile unboxed product return from external C call \
+                 with a component of kind %a"
+                Flambda_kind.With_subkind.print kind
+            | IA32 | ARM | POWER | Z | Riscv ->
+              Misc.fatal_error "Only x86-64 and arm64 are supported")
           | Naked_number
-              ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_vec128
-              | Naked_vec256 | Naked_vec512 | Naked_float32 )
+              ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_vec256
+              | Naked_vec512 )
           | Region | Rec_info ->
             Misc.fatal_errorf
               "Cannot compile unboxed product return from external C call with \
@@ -811,7 +821,12 @@ and let_expr env res let_expr =
 
 and let_cont env res (let_cont : Flambda.Let_cont.t) =
   match let_cont with
-  | Non_recursive { handler; num_free_occurrences; is_applied_with_traps } ->
+  | Non_recursive
+      { handler;
+        num_free_occurrences;
+        is_applied_with_traps;
+        can_be_lifted = _
+      } ->
     Non_recursive_let_cont_handler.pattern_match handler ~f:(fun k ~body ->
         let handler = Non_recursive_let_cont_handler.handler handler in
         match

@@ -14,8 +14,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Format
-
 (* Convert environment summaries to environments. The Boolean [allow_missing_modules]
    controls whether missing modules are allowed. If it set to [true], missing modules
    will not be opened into the environment such that their contents will be missing from
@@ -42,4 +40,5 @@ type error =
 
 exception Error of error
 
-val report_error: formatter -> error -> unit
+val report_error: error Format_doc.format_printer
+val report_error_doc: error Format_doc.printer

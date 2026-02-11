@@ -163,6 +163,7 @@
   priority_queue
   terminfo
   ccomp
+  format_doc
   warnings
   consistbl
   strongly_connected_components
@@ -658,6 +659,7 @@
   regalloc_gi_state
   regalloc_gi_utils
   regalloc_invariants
+  regalloc_interf_graph
   regalloc_irc
   regalloc_irc_state
   regalloc_irc_utils

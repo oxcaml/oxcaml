@@ -29,9 +29,27 @@ module Name = struct
     | Var var -> Var (V.create_local (prefix ^ "-" ^ V.name var))
 end
 
+module Stamp = struct
+  type t = int
+
+  let compare = Int.compare
+
+  let equal = Int.equal
+
+  let hash = Fun.id
+
+  let to_string = string_of_int
+
+  let format fmt s = Format.fprintf fmt "%d" s
+
+  let to_int = Fun.id
+
+  let of_int_unsafe = Fun.id
+end
+
 type t =
   { name : Name.t;
-    stamp : int;
+    stamp : Stamp.t;
     typ : Cmm.machtype_component;
     preassigned : bool;
     mutable loc : location
@@ -47,6 +65,19 @@ and stack_location =
   | Incoming of int
   | Outgoing of int
   | Domainstate of int
+
+let format_stack_location fmt loc =
+  match loc with
+  | Local i -> Format.fprintf fmt "local %d" i
+  | Incoming i -> Format.fprintf fmt "incoming %d" i
+  | Outgoing i -> Format.fprintf fmt "outgoing %d" i
+  | Domainstate i -> Format.fprintf fmt "domainstate %d" i
+
+let format_location fmt loc =
+  match loc with
+  | Unknown -> Format.fprintf fmt "unknown"
+  | Reg i -> Format.fprintf fmt "reg %d" i
+  | Stack s -> Format.fprintf fmt "stack (%a)" format_stack_location s
 
 type reg = t
 

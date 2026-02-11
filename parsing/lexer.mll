@@ -482,7 +482,7 @@ let skip_hash ~maybe_hash =
 
 (* Error report *)
 
-open Format
+open Format_doc
 
 let prepare_error loc = function
   | Illegal_character c ->

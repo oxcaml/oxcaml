@@ -1168,8 +1168,8 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
   | Pgetglobal cu, [] ->
     if Compilation_unit.equal cu (Env.current_unit env)
     then
-      Misc.fatal_errorf "Pgetglobal %a in the same unit" Compilation_unit.print
-        cu;
+      Misc.fatal_errorf_doc "Pgetglobal %a in the same unit"
+        Compilation_unit.print cu;
     let symbol =
       Flambda2_import.Symbol.for_compilation_unit cu |> Symbol.create_wrapped
     in
@@ -1230,35 +1230,41 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
       | Pbytessetu | Pbytesrefs | Pbytessets | Pduparray _ | Parraylength _
       | Parrayrefu _ | Parraysetu _ | Parrayrefs _ | Parraysets _ | Pisint _
       | Pisnull | Pisout | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _
-      | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_f32 _
-      | Pstring_load_64 _ | Pstring_load_vec _ | Pbytes_load_16 _
-      | Pbytes_load_32 _ | Pbytes_load_f32 _ | Pbytes_load_64 _
-      | Pbytes_load_vec _ | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
-      | Pbytes_set_64 _ | Pbytes_set_vec _ | Pbigstring_load_16 _
+      | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
+      | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
+      | Pstring_load_vec _ | Pbytes_load_i8 _ | Pbytes_load_i16 _
+      | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
+      | Pbytes_load_64 _ | Pbytes_load_vec _ | Pbytes_set_8 _ | Pbytes_set_16 _
+      | Pbytes_set_32 _ | Pbytes_set_f32 _ | Pbytes_set_64 _ | Pbytes_set_vec _
+      | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
       | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
-      | Pbigstring_load_vec _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
-      | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
-      | Pfloatarray_load_vec _ | Pfloat_array_load_vec _ | Pint_array_load_vec _
-      | Punboxed_float_array_load_vec _ | Punboxed_float32_array_load_vec _
-      | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
-      | Punboxed_nativeint_array_load_vec _ | Pfloatarray_set_vec _
-      | Pfloat_array_set_vec _ | Pint_array_set_vec _
+      | Pbigstring_load_vec _ | Pbigstring_set_8 _ | Pbigstring_set_16 _
+      | Pbigstring_set_32 _ | Pbigstring_set_f32 _ | Pbigstring_set_64 _
+      | Pbigstring_set_vec _ | Pfloatarray_load_vec _ | Pfloat_array_load_vec _
+      | Pint_array_load_vec _ | Punboxed_float_array_load_vec _
+      | Punboxed_float32_array_load_vec _ | Puntagged_int8_array_load_vec _
+      | Puntagged_int16_array_load_vec _ | Punboxed_int32_array_load_vec _
+      | Punboxed_int64_array_load_vec _ | Punboxed_nativeint_array_load_vec _
+      | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
       | Punboxed_float_array_set_vec _ | Punboxed_float32_array_set_vec _
+      | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
       | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
       | Punboxed_nativeint_array_set_vec _ | Pctconst _ | Pint_as_pointer _
       | Popaque _ | Pprobe_is_enabled _ | Pobj_dup | Pobj_magic _
       | Pmakelazyblock _ | Punbox_vector _ | Punbox_unit
       | Pbox_vector (_, _)
-      | Pmake_unboxed_product _ | Punboxed_product_field _
-      | Parray_element_size_in_bytes _ | Pget_header _ | Pwith_stack
-      | Pwith_stack_bind | Pperform | Presume | Preperform | Pmake_idx_field _
-      | Pmake_idx_mixed_field _ | Pmake_idx_array _ | Pidx_deepen _ | Pget_idx _
-      | Pset_idx _ | Pget_ptr _ | Pset_ptr _ | Patomic_exchange_field _
-      | Patomic_compare_exchange_field _ | Patomic_compare_set_field _
-      | Patomic_fetch_add_field | Patomic_add_field | Patomic_sub_field
-      | Patomic_land_field | Patomic_lor_field | Patomic_lxor_field | Pdls_get
-      | Ptls_get | Pdomain_index | Ppoll | Patomic_load_field _
-      | Patomic_set_field _ | Preinterpret_tagged_int63_as_unboxed_int64
+      | Pjoin_vec256 | Psplit_vec256 | Preinterpret_boxed_vector_as_tuple _
+      | Preinterpret_tuple_as_boxed_vector _ | Pmake_unboxed_product _
+      | Punboxed_product_field _ | Parray_element_size_in_bytes _
+      | Pget_header _ | Pwith_stack | Pwith_stack_bind | Pperform | Presume
+      | Preperform | Pmake_idx_field _ | Pmake_idx_mixed_field _
+      | Pmake_idx_array _ | Pidx_deepen _ | Pget_idx _ | Pset_idx _ | Pget_ptr _
+      | Pset_ptr _ | Patomic_exchange_field _ | Patomic_compare_exchange_field _
+      | Patomic_compare_set_field _ | Patomic_fetch_add_field
+      | Patomic_add_field | Patomic_sub_field | Patomic_land_field
+      | Patomic_lor_field | Patomic_lxor_field | Pdls_get | Ptls_get
+      | Pdomain_index | Ppoll | Patomic_load_field _ | Patomic_set_field _
+      | Preinterpret_tagged_int63_as_unboxed_int64
       | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
       | Pscalar _ | Pphys_equal _ | Pcpu_relax ->
         (* Inconsistent with outer match *)
