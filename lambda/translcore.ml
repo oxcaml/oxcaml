@@ -2087,7 +2087,7 @@ and transl_letmutable ~scopes ~return_layout
 and transl_setinstvar ~scopes loc self var expr =
   let ptr_or_imm, _ = maybe_pointer expr in
   Lprim(Psetfield_computed (ptr_or_imm, Assignment modify_heap),
-    [self; var; transl_exp ~scopes Lambda.layout_any_value expr], loc)
+    [self; var; transl_exp ~scopes Lambda.layout_instance_var expr], loc)
 
 (* CR layouts v5: Invariant - this is only called on values.  Relax that. *)
 and transl_record ~scopes loc env mode fields repres opt_init_expr =

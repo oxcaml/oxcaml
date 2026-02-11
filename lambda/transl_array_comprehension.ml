@@ -923,7 +923,9 @@ let comprehension ~transl_exp ~scopes ~loc ~(array_kind : Lambda.array_kind)
                 ~index
                   (* CR layouts v4: Ensure that the [transl_exp] here can cope
                      with non-values. *)
-                ~body:(transl_exp ~scopes Lambda.layout_any_value comp_body)),
+                ~body:
+                  (transl_exp ~scopes Lambda.layout_array_comprehension_element
+                     comp_body)),
            (* If it was dynamically grown, cut it down to size *)
            match array_sizing with
            | Fixed_size -> array.var
