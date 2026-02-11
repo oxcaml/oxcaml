@@ -583,14 +583,17 @@ let remove_mode_and_jkind_variables ty =
   let rec go ty =
     if TypeSet.mem ty !visited then () else begin
       visited := TypeSet.add ty !visited;
-      match get_desc ty with
-      | Tvar { jkind } -> Jkind.default_to_value jkind
-      | Tunivar { jkind } -> Jkind.default_to_value jkind
-      | Tarrow ((_,marg,mret),targ,tret,_) ->
-         let _ = Alloc.zap_to_legacy marg in
-         let _ = Alloc.zap_to_legacy mret in
-         go targ; go tret
-      | _ -> iter_type_expr go ty
+      begin match get_desc ty with
+      | Tvar { jkind } ->
+        Jkind.default_to_value jkind;
+      | Tunivar { jkind } ->
+        Jkind.default_to_value jkind;
+      | Tarrow ((_,marg,mret),_,_,_) ->
+         Alloc.zap_to_legacy marg |> ignore;
+         Alloc.zap_to_legacy mret |> ignore
+      | _ -> ()
+      end;
+      iter_type_expr go ty
     end
   in go ty
 
@@ -623,7 +626,12 @@ let[@inline] free_vars ~zero ~add_one ?env mark tys =
   let rec fv ~kind acc ty =
     if not (try_mark_node mark ty) then acc
     else match get_desc ty, env with
-      | Tvar { jkind; _ }, _ ->
+      | Tvar { jkind; evals_to }, _ ->
+          let acc =
+            match evals_to with
+            | Some { target } -> fv ~kind acc target
+            | None -> acc
+          in
           add_one ty (Some jkind) kind acc
       | Tconstr (path, tl, _), Some env ->
           let acc =
@@ -825,7 +833,9 @@ let rec generalize stage_offset ty =
     set_level ty generic_level;
     (* recur into abbrev for the speed *)
     begin match get_desc ty with
-    | Tvar name -> update_variable_stage stage_offset ty name.name name.jkind
+    | Tvar name ->
+      update_variable_stage stage_offset ty name.name name.jkind;
+      iter_type_expr (generalize stage_offset) ty
     | Tvariant row ->
         if stage_offset <> 0 && is_Tvar (row_more row) then
           lower_all ty
@@ -853,9 +863,10 @@ let generalize ty =
 let rec generalize_structure ty =
   let level = get_level ty in
   if level <> generic_level then begin
-    if is_Tvar ty && level > !current_level then
-      set_level ty !current_level
-    else if level > !current_level then begin
+    if is_Tvar ty && level > !current_level then begin
+      set_level ty !current_level;
+      iter_type_expr generalize_structure ty
+    end else if level > !current_level then begin
       begin match get_desc ty with
         Tconstr (_, _, abbrev) ->
           abbrev := Mnil
@@ -1061,7 +1072,9 @@ let rec lower_contravariant env var_level visited contra ty =
     Hashtbl.add visited (get_id ty) contra;
     let lower_rec = lower_contravariant env var_level visited in
     match get_desc ty with
-      Tvar _ -> if contra then set_level ty var_level
+      Tvar _ ->
+        if contra then set_level ty var_level;
+        iter_type_expr (lower_rec contra) ty
     | Tconstr (_, [], _) -> ()
     | Tconstr (path, tyl, _abbrev) ->
        let variance, maybe_expand =
@@ -3334,8 +3347,8 @@ let occur_univar ?(inj_only=false) env ty =
   and occur_desc bound ty =
       match get_desc ty with
         Tunivar _ ->
-          if not (TypeSet.mem ty bound) then
-            raise_escape_exn (Univ ty)
+          if not (TypeSet.mem ty bound) then raise_escape_exn (Univ ty);
+          iter_type_expr (occur_rec bound) ty
       | Tpoly (ty, tyl) ->
           let bound = List.fold_right TypeSet.add tyl bound in
           occur_rec bound  ty
@@ -3399,7 +3412,9 @@ let univars_escape env univar_pairs vl ty =
         Tpoly (t, tl) ->
           if List.exists (fun t -> TypeSet.mem t family) tl then ()
           else occur t
-      | Tunivar _ -> if TypeSet.mem t family then raise_escape_exn (Univ t)
+      | Tunivar _ ->
+          if TypeSet.mem t family then raise_escape_exn (Univ t);
+          iter_type_expr occur t
       | Tconstr (_, [], _) -> ()
       | Tconstr (p, tl, _) ->
           begin try
@@ -6015,7 +6030,8 @@ let rec rigidify_rec mark vars ty =
   if try_mark_node mark ty then
     begin match get_desc ty with
     | Tvar { name; jkind } ->
-        vars := TypeMap.add ty (name, jkind) !vars
+        vars := TypeMap.add ty (name, jkind) !vars;
+        iter_type_expr (rigidify_rec mark vars) ty
     | Tvariant row ->
         let Row {more; name; closed} = row_repr row in
         if is_Tvar more && not (has_fixed_explanation row) then begin
@@ -7316,7 +7332,8 @@ let add_nongen_vars_in_schema =
       let visited = TypeSet.add ty visited in
       match get_desc ty with
       | Tvar _ when get_level ty <> generic_level ->
-          visited, TypeSet.add ty weak_set
+          let weak_set = TypeSet.add ty weak_set in
+          fold_type_expr (loop env) (visited, weak_set) ty
       | Tconstr _ ->
           let (_, unexpanded_candidate) as unexpanded_candidate' =
             fold_type_expr

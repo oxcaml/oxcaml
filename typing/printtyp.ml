@@ -1189,6 +1189,7 @@ end = struct
       visited_for_named_vars := px :: !visited_for_named_vars;
       match tty.desc with
       | Tvar _ | Tunivar _ ->
+          iter_type_expr (printer_iter_type_expr add_named_vars) ty;
           add_named_var tty
       | _ ->
           printer_iter_type_expr add_named_vars ty

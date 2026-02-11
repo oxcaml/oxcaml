@@ -29,7 +29,8 @@ let free_vars ?(param=false) ty =
       if try_mark_node mark ty then
         match get_desc ty with
         | Tvar _ ->
-            ret := TypeSet.add ty !ret
+            ret := TypeSet.add ty !ret;
+            iter_type_expr loop ty
         | Tvariant row ->
           iter_row loop row;
           if not (static_row row) then begin
