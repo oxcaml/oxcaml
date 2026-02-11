@@ -183,14 +183,6 @@ let compute_static_size lam =
       *)
       assert false
     | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
-    | Ltemplate (_, free_vars) ->
-      let shape =
-        Ident.Map.data free_vars
-        |> Array.of_list
-        |> Array.map (fun v -> mixed_block_element_of_layout v)
-      in
-      Block (Mixed_record shape)
-    | Linstantiate _ -> dynamic_size lam
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))
@@ -694,9 +686,7 @@ let rec split_static_function lfun block_var local_idents lam :
   | Lassign _
   | Lsend _
   | Lifused _
-  | Lexclave _
-  | Ltemplate _
-  | Linstantiate _ ->
+  | Lexclave _ ->
     Misc.fatal_errorf
       "letrec binding is not a static function:@ lfun=%a@ lam=%a"
       Printlambda.lfunction lfun

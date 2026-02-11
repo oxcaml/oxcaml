@@ -276,7 +276,6 @@
   ;; lambda/
   debuginfo
   lambda
-  lambda_to_slambda
   static_label
   matching
   mixed_block_shape
@@ -287,6 +286,7 @@
   runtimetags
   tmc
   simplif
+  slambda_fracture
   slambda
   slambdaeval
   slambdaident

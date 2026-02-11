@@ -125,13 +125,6 @@ let close_phrase lam =
     Llet(Strict, layout, id, Lambda.debug_uid_none, glob, l)
   ) (free_variables lam) lam
 
-let close_slambda_phrase slam =
-  let lam = match (Slambdaeval.trivial_slambda slam) with
-  | Some lam -> lam
-  | None -> Lambda.error (Slambda_unsupported "the toplevel")
-  in
-  Lambda.SLhalves { sval_comptime = SLunit; sval_runtime = (close_phrase lam) }
-
 (* Return the value referred to by a path *)
 
 (* Like [Obj.field], but handles field reordering in mixed modules.
@@ -329,10 +322,10 @@ let default_load ppf (program : Lambda.program) =
      files) *)
   res
 
-let load_slambda ppf ~compilation_unit program repr =
+let load_tlambda ppf ~compilation_unit program repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
-  if !Clflags.dump_slambda then fprintf ppf "%a@." Printslambda.program program;
-  let program = Slambdaeval.eval program in
+  if !Clflags.dump_tlambda then fprintf ppf "%a@." Printlambda.program program;
+  let program = Slambda.eval (print_if i.ppf_dump Clflags.dump_slambda Printslambda.slambda) program in
   let lam = program.code in
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
   let slam =

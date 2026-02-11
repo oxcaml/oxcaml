@@ -26,8 +26,6 @@ open Translcore
 open Translclass
 open Debuginfo.Scoped_location
 
-module SL = Slambda
-
 let const_int i = Lambda.const_int i
 
 type unsafe_component =
@@ -977,6 +975,40 @@ and transl_include_functor ~generative ~input_repr modl params scopes loc =
 let _ =
   Translcore.transl_module := transl_module
 
+(* Introduce dependencies on modules referenced only by "external". *)
+
+let scan_used_globals lam =
+  let globals = ref Compilation_unit.Set.empty in
+  let rec scan lam =
+    Lambda.iter_head_constructor scan lam;
+    match lam with
+      Lprim ((Pgetglobal cu), _, _) ->
+        globals := Compilation_unit.Set.add cu !globals
+    | _ -> ()
+  in
+  scan lam; !globals
+
+let required_globals ~flambda body =
+  let globals = scan_used_globals body in
+  let add_global comp_unit req =
+    if not flambda && Compilation_unit.Set.mem comp_unit globals then
+      req
+    else
+      Compilation_unit.Set.add comp_unit req
+  in
+  let required =
+    List.fold_left
+      (fun acc cu -> add_global cu acc)
+      (if flambda then globals else Compilation_unit.Set.empty)
+      (Translprim.get_units_with_used_primitives ())
+  in
+  let required =
+    List.fold_right add_global (Env.get_required_globals ()) required
+  in
+  Env.reset_required_globals ();
+  Translprim.clear_used_primitives ();
+  required
+
 let add_arg_block_to_module_representation = function
     (* NB: this assumes [arg_block] has layout value *)
   | Module_value_only { field_count } ->
@@ -1106,10 +1138,11 @@ let transl_implementation compilation_unit impl ~loc =
         in
         body, format
   in
-  { SL.compilation_unit;
+  { compilation_unit;
     main_module_block_format;
     arg_block_idx;
-    code = SLhalves { sval_comptime = SLunit; sval_runtime = body } }
+    required_globals = required_globals ~flambda:true body;
+    code = body }
 
 
 (* Compile a toplevel phrase *)
@@ -1359,6 +1392,11 @@ type runtime_arg =
   | Main_module_block of Compilation_unit.t
   | Unit
 
+let unit_of_runtime_arg arg =
+  match arg with
+  | Argument_block { ra_unit = cu; _ } | Main_module_block cu -> Some cu
+  | Unit -> None
+
 let transl_runtime_arg arg =
   match arg with
   | Argument_block { ra_unit; ra_field_idx; ra_main_repr } ->
@@ -1373,7 +1411,7 @@ let transl_runtime_arg arg =
 let transl_instance_impl
       compilation_unit ~runtime_args ~main_module_block_repr
       ~arg_block_idx
-    : SL.program =
+    : Lambda.program =
   let base_compilation_unit, _args =
     Compilation_unit.split_instance_exn compilation_unit
   in
@@ -1399,7 +1437,10 @@ let transl_instance_impl
       ap_probe = None;
     }
   in
-  let code = Lambda_to_slambda.lambda_to_slambda code in
+  let required_globals =
+    base_compilation_unit :: List.filter_map unit_of_runtime_arg runtime_args
+    |> Compilation_unit.Set.of_list
+  in
   let main_module_block_format =
     Mb_struct { mb_repr = main_module_block_repr }
   in
@@ -1407,6 +1448,7 @@ let transl_instance_impl
     compilation_unit;
     code;
     main_module_block_format;
+    required_globals;
     arg_block_idx;
   }
 

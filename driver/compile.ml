@@ -40,14 +40,14 @@ let make_arg_descr ~param ~arg_block_idx ~main_repr : Lambda.arg_descr option =
   | Some _, None -> Misc.fatal_error "No argument field"
   | None, Some _ -> Misc.fatal_error "Unexpected argument field"
 
-let slambda_to_bytecode i slambda ~as_arg_for =
-  slambda
+let tlambda_to_bytecode i tlambda ~as_arg_for =
+  tlambda
   |> Profile.(record ~accumulate:true generate)
-    (fun slambda ->
+    (fun tlambda ->
        Builtin_attributes.warn_unused ();
-       slambda
-       |> print_if i.ppf_dump Clflags.dump_slambda Printslambda.program
-       |> Slambdaeval.eval
+       tlambda
+       |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.program
+       |> Slambda.eval (print_if i.ppf_dump Clflags.dump_slambda Printslambda.slambda)
        |> fun { Lambda.code = lambda; required_globals;
                 main_module_block_format; arg_block_idx } ->
           lambda
@@ -81,7 +81,7 @@ let to_bytecode i Typedtree.{structure; coercion; argument_interface; _} =
   (structure, coercion, argument_coercion)
   |> Profile.(record transl)
     (Translmod.transl_implementation ~loc i.module_name)
-  |> slambda_to_bytecode i
+  |> tlambda_to_bytecode i
 
 let emit_bytecode i
       (bytecode, required_globals, main_module_block_format, arg_descr) =
@@ -145,7 +145,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
       Translmod.transl_instance info.module_name ~runtime_args
         ~main_module_block_repr ~arg_block_idx
     in
-    let bytecode = slambda_to_bytecode info impl ~as_arg_for in
+    let bytecode = tlambda_to_bytecode info impl ~as_arg_for in
     emit_bytecode info bytecode
 
 let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables =

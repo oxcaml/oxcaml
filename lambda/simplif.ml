@@ -105,7 +105,6 @@ let rec eliminate_ref id = function
   | Lexclave e ->
       Lexclave(eliminate_ref id e)
   | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
-  | Ltemplate _ | Linstantiate _ -> Misc.templates_should_not_exist_after_eval ()
 
 (* Simplification of exits *)
 
@@ -202,7 +201,6 @@ let simplify_exits lam =
   | Lregion (l, _) -> count ~try_depth:(try_depth+1) l
   | Lexclave l -> count ~try_depth:(try_depth-1) l
   | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
-  | Ltemplate _ | Linstantiate _ -> Misc.templates_should_not_exist_after_eval ()
 
   and count_default ~try_depth sw = match sw.sw_failaction with
   | None -> ()
@@ -390,7 +388,6 @@ let simplify_exits lam =
       result_layout ly)
   | Lexclave l -> Lexclave (simplif ~layout ~try_depth:(try_depth - 1) l)
   | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
-  | Ltemplate _ | Linstantiate _ -> Misc.templates_should_not_exist_after_eval ()
   in
   simplif ~layout:None ~try_depth:0 lam
 
@@ -555,7 +552,6 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
       (* Don't move code into an exclave *)
       count Ident.Map.empty l2
   | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
-  | Ltemplate _ | Linstantiate _ -> Misc.templates_should_not_exist_after_eval ()
 
   and count_lfunction fn =
     count Ident.Map.empty fn.body
@@ -725,7 +721,6 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
   | Lregion (l, layout) -> Lregion (simplif l, layout)
   | Lexclave l -> Lexclave (simplif l)
   | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
-  | Ltemplate _ | Linstantiate _ -> Misc.templates_should_not_exist_after_eval ()
   in
   simplif lam
 
@@ -824,7 +819,6 @@ let rec emit_tail_infos is_tail lambda =
   | Lexclave lam ->
       emit_tail_infos is_tail lam
   | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
-  | Ltemplate _ | Linstantiate _ -> Misc.templates_should_not_exist_after_eval ()
 and list_emit_tail_infos_fun f is_tail =
   List.iter (fun x -> emit_tail_infos is_tail (f x))
 and list_emit_tail_infos is_tail =

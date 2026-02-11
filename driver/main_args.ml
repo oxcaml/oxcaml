@@ -865,6 +865,9 @@ let mk_dlocations f =
 let mk_dsource f =
   "-dsource", Arg.Unit f, " (undocumented)"
 
+let mk_dtlambda f =
+  "-dtlambda", Arg.Unit f, " (undocumented)"
+
 let mk_dslambda f =
   "-dslambda", Arg.Unit f, " (undocumented)"
 
@@ -1137,6 +1140,7 @@ module type Core_options = sig
   val _dparsetree : unit -> unit
   val _dtypedtree : unit -> unit
   val _dshape : unit -> unit
+  val _dtlambda : unit -> unit
   val _dslambda : unit -> unit
   val _drawlambda : unit -> unit
   val _dlambda : unit -> unit
@@ -1516,6 +1520,7 @@ struct
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
     mk_drawlambda F._drawlambda;
+    mk_dtlambda F._dtlambda;
     mk_dslambda F._dslambda;
     mk_dlambda F._dlambda;
     mk_dblambda F._dblambda;
@@ -1612,6 +1617,7 @@ struct
     mk_dparsetree F._dparsetree;
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
+    mk_dtlambda F._dtlambda;
     mk_dslambda F._dslambda;
     mk_drawlambda F._drawlambda;
     mk_dlambda F._dlambda;
@@ -1781,6 +1787,7 @@ struct
     mk_dparsetree F._dparsetree;
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
+    mk_dtlambda F._dtlambda;
     mk_dslambda F._dslambda;
     mk_drawlambda F._drawlambda;
     mk_dlambda F._dlambda;
@@ -1929,6 +1936,7 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_dparsetree F._dparsetree;
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
+    mk_dtlambda F._dtlambda;
     mk_dslambda F._dslambda;
     mk_drawlambda F._drawlambda;
     mk_dlambda F._dlambda;
@@ -2067,6 +2075,7 @@ struct
     mk_dparsetree F._dparsetree;
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
+    mk_dtlambda F._dtlambda;
     mk_dslambda F._dslambda;
     mk_drawlambda F._drawlambda;
     mk_dlambda F._dlambda;
@@ -2290,6 +2299,7 @@ module Default = struct
     let _dblambda = set dump_blambda
     let _dletreclambda = set dump_letreclambda
     let _dparsetree = set dump_parsetree
+    let _dtlambda = set dump_tlambda
     let _dslambda = set dump_slambda
     let _drawlambda = set dump_rawlambda
     let _dsource = set dump_source

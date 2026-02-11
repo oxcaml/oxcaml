@@ -850,15 +850,13 @@ type lambda =
   (* [Lexclave] closes the newest region opened.
      Note that [Lexclave] nesting is currently unsupported. *)
   | Lexclave of lambda
-  | Lsplice of lambda_splice
-  | Ltemplate of lfunction * layout Ident.Map.t
-  | Linstantiate of lambda_apply
+  | Lsplice of slambda
 
 and slambda =
   | SLlayout of layout
   | SLglobal of Compilation_unit.t
   | SLvar of Slambdaident.t
-  | SLunit
+  | SLmissing
   | SLrecord of slambda list
   | SLfield of slambda * int
   | SLhalves of slambda_halves
@@ -869,7 +867,6 @@ and slambda =
   | SLtemplate of slambda_function
   | SLinstantiate of slambda_apply
   | SLlet of slambda_let
-  | SLsequence of slambda * slambda
 
 and slambda_halves =
   { sval_comptime: slambda;
@@ -960,8 +957,6 @@ and lambda_event_kind =
   | Lev_after of Types.type_expr
   | Lev_function
   | Lev_pseudo
-
-and lambda_splice = { splice_loc : scoped_location; slambda : slambda; }
 
 (* A description of a parameter to be passed to the runtime representation of a
    parameterised module, namely a function (called the instantiating functor)

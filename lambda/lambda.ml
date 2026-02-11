@@ -900,15 +900,13 @@ type lambda =
   | Lifused of Ident.t * lambda
   | Lregion of lambda * layout
   | Lexclave of lambda
-  | Lsplice of lambda_splice
-  | Ltemplate of lfunction * layout Ident.Map.t
-  | Linstantiate of lambda_apply
+  | Lsplice of slambda
 
 and slambda =
   | SLlayout of layout
   | SLglobal of Compilation_unit.t
   | SLvar of Slambdaident.t
-  | SLunit
+  | SLmissing
   | SLrecord of slambda list
   | SLfield of slambda * int
   | SLhalves of slambda_halves
@@ -917,7 +915,6 @@ and slambda =
   | SLtemplate of slambda_function
   | SLinstantiate of slambda_apply
   | SLlet of slambda_let
-  | SLsequence of slambda * slambda
 
 and slambda_halves =
   { sval_comptime: slambda;
@@ -1003,8 +1000,6 @@ and lambda_event_kind =
   | Lev_after of Types.type_expr
   | Lev_function
   | Lev_pseudo
-
-and lambda_splice = { splice_loc : scoped_location; slambda : slambda }
 
 type runtime_param =
   | Rp_argument_block of Global_module.t
@@ -1225,10 +1220,6 @@ let make_key e =
         Lapply {ap with ap_func = tr_rec env ap.ap_func;
                         ap_args = tr_recs env ap.ap_args;
                         ap_loc = Loc_unknown}
-    | Linstantiate ap ->
-        Linstantiate { ap with ap_func = tr_rec env ap.ap_func;
-                               ap_args = tr_recs env ap.ap_args;
-                               ap_loc = Loc_unknown}
     | Llet (Alias,_k,x,_x_duid,ex,e) -> (* Ignore aliases -> substitute *)
         let ex = tr_rec env ex in
         tr_rec (Ident.add x ex env) e
@@ -1270,7 +1261,7 @@ let make_key e =
     | Lifused (id,e) -> Lifused (id,tr_rec env e)
     | Lregion (e,layout) -> Lregion (tr_rec env e,layout)
     | Lexclave e -> Lexclave (tr_rec env e)
-    | Lletrec _|Lfunction _ | Ltemplate _
+    | Lletrec _|Lfunction _
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
@@ -1380,10 +1371,6 @@ let shallow_iter ~tail ~non_tail:f = function
       f e
   | Lexclave e ->
       tail e
-  | Ltemplate ({body}, _) ->
-      f body
-  | Linstantiate { ap_func = fn; ap_args = args } ->
-      f fn; List.iter f args
 
 let iter_head_constructor f l =
   shallow_iter ~tail:f ~non_tail:f l
@@ -1472,17 +1459,14 @@ let rec free_variables = function
       free_variables e
   | Lexclave e ->
       free_variables e
-  | Lsplice { splice_loc = _; slambda } -> free_variables_slambda slambda
-  | Ltemplate (_, free_vars) -> Ident.Map.keys free_vars
-  | Linstantiate{ap_func = fn; ap_args = args} ->
-      free_variables_list (free_variables fn) args
+  | Lsplice slambda -> free_variables_slambda slambda
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
     set exprs
 
 and free_variables_slambda = function
-  | SLlayout _ | SLglobal _ | SLvar _ | SLunit | SLfield _ -> Ident.Set.empty
+  | SLlayout _ | SLglobal _ | SLvar _ | SLmissing | SLfield _ -> Ident.Set.empty
   | SLrecord fields ->
       List.fold_left
         (fun set field ->
@@ -1508,10 +1492,6 @@ and free_variables_slambda = function
       Ident.Set.union
         (free_variables_slambda slet_value)
         (free_variables_slambda slet_body)
-  | SLsequence (slambda1, slambda2) ->
-      Ident.Set.union
-        (free_variables_slambda slambda1)
-        (free_variables_slambda slambda2)
 
 (* Check if an action has a "when" guard *)
 let static_label_sequence = Static_label.make_sequence ()
@@ -1844,11 +1824,6 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         Lexclave (subst s l e)
     | Lsplice _ ->
         Misc.splices_should_not_exist_after_eval ()
-    | Ltemplate (lfun, free_vars) ->
-        Lfunction (subst_lfun s l lfun)
-    | Linstantiate ap ->
-        Linstantiate{ap with ap_func = subst s l ap.ap_func;
-                      ap_args = subst_list s l ap.ap_args}
   and subst_list s l li = List.map (subst s l) li
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
   and subst_lfun s l lf =
@@ -1966,22 +1941,6 @@ let shallow_map ~tail ~non_tail:f = function
       Lregion (f e, layout)
   | Lexclave e ->
       Lexclave (tail e)
-  | Ltemplate (lfun, free_vars) ->
-      Ltemplate (map_lfunction f lfun, free_vars)
-  | Linstantiate { ap_func; ap_args; ap_result_layout; ap_region_close; ap_mode; ap_loc;
-             ap_tailcall; ap_inlined; ap_specialised; ap_probe } ->
-      Linstantiate {
-        ap_func = f ap_func;
-        ap_args = List.map f ap_args;
-        ap_result_layout;
-        ap_region_close;
-        ap_mode;
-        ap_loc;
-        ap_tailcall;
-        ap_inlined;
-        ap_specialised;
-        ap_probe;
-      }
 
 let map f =
   let rec g lam = f (shallow_map ~tail:g ~non_tail:g lam) in
@@ -2886,12 +2845,11 @@ let may_allocate_in_region lam =
   and loop = function
     | Lvar _ | Lmutvar _ | Lconst _ -> ()
 
-    | Lfunction {mode=Alloc_heap} | Ltemplate ({mode=Alloc_heap},_) -> ()
-    | Lfunction {mode=Alloc_local} | Ltemplate ({mode=Alloc_local},_) -> raise Exit
+    | Lfunction {mode=Alloc_heap} -> ()
+    | Lfunction {mode=Alloc_local} -> raise Exit
 
     | Lapply {ap_mode=Alloc_local}
-    | Lsend (_,_,_,_,_,Alloc_local,_,_)
-    | Linstantiate {ap_mode=Alloc_local} -> raise Exit
+    | Lsend (_,_,_,_,_,Alloc_local,_,_) -> raise Exit
 
     | Lprim (prim, args, _) ->
        begin match primitive_may_allocate prim with
@@ -2910,7 +2868,7 @@ let may_allocate_in_region lam =
     | Lwhile {wh_cond; wh_body} -> loop wh_cond; loop wh_body
     | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
-    | ( Lapply _ | Linstantiate _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
+    | ( Lapply _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
       | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
       | Lifthenelse _ | Lsequence _ | Lassign _ | Lsend _
       | Levent _ | Lifused _) as lam ->
@@ -2949,10 +2907,7 @@ let rec try_to_find_location lam =
   | Lswitch (_, _, loc, _)
   | Lstringswitch (_, _, _, loc, _)
   | Lsend (_, _, _, _, _, _, loc, _)
-  | Levent (_, { lev_loc = loc; _ })
-  | Lsplice { splice_loc = loc; _ }
-  | Ltemplate ({ loc }, _)
-  | Linstantiate { ap_loc = loc; _ } ->
+  | Levent (_, { lev_loc = loc; _ }) ->
     loc
   | Llet (_, _, _, _, lam, _)
   | Lmutlet (_, _, _, lam, _)
@@ -2969,6 +2924,8 @@ let rec try_to_find_location lam =
     try_to_find_location lam
   | Lvar _ | Lmutvar _ | Lconst _ | Lletrec _ | Lstaticraise (_, []) ->
     Debuginfo.Scoped_location.Loc_unknown
+  | Lsplice _ ->
+    Misc.splices_should_not_exist_after_eval ()
 
 let try_to_find_debuginfo lam =
   Debuginfo.from_location (try_to_find_location lam)

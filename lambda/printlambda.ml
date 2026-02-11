@@ -1354,18 +1354,14 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(region@ %a)@]" lam expr
   | Lexclave expr ->
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
-  | Lsplice { splice_loc = _;  slambda } ->
+  | Lsplice slambda ->
       fprintf ppf "$(%a)" slam slambda
-  | Ltemplate (lfun, free_vars) ->
-      lfunction ppf lfun
-  | Linstantiate apply ->
-      fprintf ppf "@[<2>(instantiate)@]"
 
 and slam ppf = function
   | SLlayout layout -> fprintf ppf "⟪%a⟫" layout_annotation layout
   | SLglobal cu -> fprintf ppf "(global %a)" Compilation_unit.print cu
   | SLvar id -> Slambdaident.print ppf id
-  | SLunit -> fprintf ppf "()"
+  | SLmissing -> fprintf ppf "(missing)"
   | SLrecord fields ->
     let print_fields ppf =
       List.iter (fun value -> fprintf ppf "%a;@ " slam value) fields
@@ -1382,8 +1378,6 @@ and slam ppf = function
   | SLlet { slet_name; slet_value; slet_body } ->
     fprintf ppf "@[<hv 2>(let %a =@;<1 2>%a in@ %a)@]"
       Slambdaident.print slet_name slam slet_value slam slet_body
-  | SLsequence(l1, l2) ->
-    fprintf ppf "@[<2>(seq@ %a@ %a)@]" slam l1 slam l2
 
 and slambda_function ppf { sfun_params; sfun_body } =
   let print_params ppf =
