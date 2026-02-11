@@ -14,6 +14,14 @@
 
 external trace : (unit -> 'a) -> 'a = "trace_steps"
 
+let () =
+  (* Ensure uncaught exceptions aren't swallowed by the script (see run_gdb.sh) *)
+  Printexc.set_uncaught_exception_handler (fun exn bt ->
+    print_endline "LOG_BEGIN";
+    print_endline ("Fatal error: exception " ^ Printexc.to_string exn);
+    Printexc.print_raw_backtrace stdout bt;
+    print_endline "LOG_END")
+
 (* The first exception triggers allocation of the backtrace buffer, etc.
    Do that now, to avoid single-stepping through malloc *)
 let () =
@@ -73,4 +81,4 @@ let zz =
 *)
 
 let () =
-  print_endline "LOG_BEGIN\nok\nLOG_END\n"
+  print_string "LOG_BEGIN\nok\nLOG_END\n"

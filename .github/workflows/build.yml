@@ -213,7 +213,7 @@ jobs:
 
       - name: Install gdb (Linux)
         if: runner.os == 'Linux' && contains(matrix.config, '--enable-runtime5')
-        run: sudo apt update && sudo apt install gdb
+        run: sudo apt-get update && sudo apt-get install gdb
 
       - name: Install autoconf and bash and parallel (macOS)
         if: runner.os == 'macOS'
