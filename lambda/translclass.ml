@@ -104,7 +104,7 @@ let transl_meth_list lst =
 let set_inst_var ~scopes obj id expr =
   let ptr_or_imm, _ = Typeopt.maybe_pointer expr in
   Lprim(Psetfield_computed (ptr_or_imm, Assignment modify_heap),
-    [Lvar obj; Lvar id; transl_exp ~scopes Jkind.Sort.Const.for_instance_var expr],
+    [Lvar obj; Lvar id; transl_exp ~scopes Lambda.layout_instance_var expr],
         Loc_unknown)
 
 let transl_val tbl create name =
@@ -380,7 +380,8 @@ let rec build_class_init ~scopes cla cstr super inh_init cl_init msubst top cl =
             | Tcf_method (name, _, Tcfk_concrete (_, exp)) ->
                 let scopes = enter_method_definition ~scopes name.txt in
                 let met_code =
-                  msubst true (transl_scoped_exp ~scopes Jkind.Sort.Const.for_method exp)
+                  msubst true
+                    (transl_scoped_exp ~scopes Lambda.layout_method exp)
                 in
                 let met_code =
                   if !Clflags.native_code && List.length met_code = 1 then
@@ -398,7 +399,8 @@ let rec build_class_init ~scopes cla cstr super inh_init cl_init msubst top cl =
                  Lsequence(mkappl (oo_prim "add_initializer",
                                    Lvar cla :: msubst false
                                                  (transl_exp ~scopes
-                                                    Jkind.Sort.Const.for_initializer exp),
+                                                    Lambda.layout_initializer
+                                                    exp),
                                    layout_unit),
                            cl_init),
                  methods, values)

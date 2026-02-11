@@ -245,56 +245,56 @@ external get : ('a : any mod separable). 'a array -> int -> 'a
 
 let f (a : unit_u array) = length a
 [%%expect{|
-Line 1, characters 27-35:
+Line 1, characters 34-35:
 1 | let f (a : unit_u array) = length a
-                               ^^^^^^^^
+                                      ^
 Error: Types whose layout contains [void] are not yet supported in arrays.
 |}]
 
 let f (a : #(int * unit_u) array) = length a
 [%%expect{|
-Line 1, characters 36-44:
+Line 1, characters 43-44:
 1 | let f (a : #(int * unit_u) array) = length a
-                                        ^^^^^^^^
+                                               ^
 Error: Types whose layout contains [void] are not yet supported in arrays.
 |}]
 
 let f (a : unit_u array) i = get a i
 [%%expect{|
-Line 1, characters 29-36:
+Line 1, characters 33-34:
 1 | let f (a : unit_u array) i = get a i
-                                 ^^^^^^^
+                                     ^
 Error: Types whose layout contains [void] are not yet supported in arrays.
 |}]
 
 let f (a : #(int * unit_u) array) i = get a i
 [%%expect{|
-Line 1, characters 38-45:
+Line 1, characters 42-43:
 1 | let f (a : #(int * unit_u) array) i = get a i
-                                          ^^^^^^^
+                                              ^
 Error: Types whose layout contains [void] are not yet supported in arrays.
 |}]
 
 let f (a : u1 array) i = get a i
 [%%expect{|
-Line 1, characters 25-32:
+Line 1, characters 29-30:
 1 | let f (a : u1 array) i = get a i
-                             ^^^^^^^
+                                 ^
 Error: Types whose layout contains [void] are not yet supported in arrays.
 |}]
 
 let f (a : u2 array) i = get a i
 [%%expect{|
-Line 1, characters 25-32:
+Line 1, characters 29-30:
 1 | let f (a : u2 array) i = get a i
-                             ^^^^^^^
+                                 ^
 Error: Types whose layout contains [void] are not yet supported in arrays.
 |}]
 
 let f (a : u3 array) i = get a i
 [%%expect{|
-Line 1, characters 25-32:
+Line 1, characters 29-30:
 1 | let f (a : u3 array) i = get a i
-                             ^^^^^^^
+                                 ^
 Error: Types whose layout contains [void] are not yet supported in arrays.
 |}]

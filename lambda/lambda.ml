@@ -1078,6 +1078,7 @@ let nullable_value raw_kind =
   Pvalue { raw_kind; nullable = Nullable }
 
 let layout_unit = non_null_value Pintval
+let layout_bool = non_null_value (Pvariant { consts = [0; 1]; non_consts = []})
 let layout_unboxed_unit = Punboxed_product []
 let layout_int = non_null_value Pintval
 let layout_int_or_null = nullable_value Pintval
@@ -1100,6 +1101,7 @@ let layout_variant_arg = nullable_value Pgenval
 let layout_exception = non_null_value Pgenval
 let layout_function = non_null_value Pgenval
 let layout_object = non_null_value Pgenval
+let layout_poly_variant = non_null_value Pgenval
 let layout_class = non_null_value Pgenval
 let layout_module = non_null_value Pgenval
 let layout_functor = non_null_value Pgenval
@@ -1121,7 +1123,14 @@ let layout_lazy = nullable_value Pgenval
 let layout_lazy_contents = nullable_value Pgenval
 let layout_any_value = nullable_value Pgenval
 let layout_letrec = layout_any_value
+let layout_instance_var = nullable_value Pgenval
+let layout_method = nullable_value Pgenval
+let layout_initializer = nullable_value Pgenval
+let layout_array_comprehension_element = nullable_value Pgenval
+let layout_list_element = nullable_value Pgenval
 let layout_probe_arg = nullable_value Pgenval
+let layout_block_idx = layout_unboxed_nativeint
+
 let layout_unboxed_product layouts = Punboxed_product layouts
 
 let unboxed_vector_of_boxed_vector = function

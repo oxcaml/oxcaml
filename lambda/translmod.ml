@@ -630,7 +630,7 @@ and transl_module ~scopes cc rootpath mexp =
       transl_module ~scopes (compose_coercions cc ccarg) rootpath arg
   | Tmod_unpack(arg, _) ->
       apply_coercion loc Strict cc
-        (Translcore.transl_exp ~scopes Jkind.Sort.Const.for_module arg)
+        (Translcore.transl_exp ~scopes Lambda.layout_module arg)
 
 and transl_apply ~scopes ~loc ~cc mod_env funct translated_arg =
   let inlined_attribute =
@@ -736,7 +736,10 @@ and transl_structure ~scopes loc
             transl_structure ~scopes loc fields cc rootpath final_env rem
           in
           let sort = Jkind.Sort.default_for_transl_and_get sort in
-          Lsequence(transl_exp ~scopes sort expr, body), repr
+          let layout =
+            Typeopt.layout_of_sort expr.exp_loc sort
+          in
+          Lsequence(transl_exp ~scopes layout expr, body), repr
       | Tstr_value(rec_flag, pat_expr_list) ->
           (* Translate bindings first *)
           let mk_lam_let =
@@ -1188,12 +1191,14 @@ let transl_toplevel_item ~scopes item =
        unit. *)
     Tstr_eval (expr, sort, _) ->
       let sort = Jkind.Sort.default_for_transl_and_get sort in
-      transl_exp ~scopes sort expr
+      let layout = Typeopt.layout_of_sort expr.exp_loc sort in
+      transl_exp ~scopes layout expr
   | Tstr_value(Nonrecursive,
                [{vb_pat = {pat_desc=Tpat_any}; vb_expr = expr;
                  vb_sort = sort}]) ->
       let sort = Jkind.Sort.default_for_transl_and_get sort in
-      transl_exp ~scopes sort expr
+      let layout = Typeopt.layout_of_sort expr.exp_loc sort in
+      transl_exp ~scopes layout expr
   | Tstr_value(rec_flag, pat_expr_list) ->
       let idents = let_bound_idents pat_expr_list in
       transl_let ~scopes ~return_layout:Lambda.layout_unit ~in_structure:true
