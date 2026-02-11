@@ -71,6 +71,7 @@ void caml_handle_gc_interrupt(void);
 void caml_process_external_interrupt(void);
 void caml_handle_incoming_interrupts(void);
 void caml_domain_setup_preemption(void);
+void caml_domain_reset_preemption(void);
 
 CAMLextern void caml_interrupt_self(void);
 void caml_interrupt_all_signal_safe(void);

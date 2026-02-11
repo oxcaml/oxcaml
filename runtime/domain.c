@@ -1823,6 +1823,12 @@ void caml_domain_setup_preemption(void) {
   CAMLreturn0;
 }
 
+void caml_domain_reset_preemption(void) {
+  if (Is_block(Caml_state->preemption)) {
+    domain_root_set(&Caml_state->preemption, Val_long(1));
+  }
+}
+
 /*  This function is async-signal-safe as [all_domains] and
     [caml_params->max_domains] are set before signal handlers are installed and
     do not change afterwards. */

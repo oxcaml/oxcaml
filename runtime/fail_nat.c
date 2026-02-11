@@ -21,6 +21,7 @@
 #include <signal.h>
 #include "caml/alloc.h"
 #include "caml/callback.h"
+#include "caml/domain.h"
 #include "caml/fail.h"
 #include "caml/fiber.h"
 #include "caml/io.h"
@@ -109,6 +110,7 @@ CAMLno_asan void caml_raise_async(value v)
   char* limit_of_current_c_stack_chunk;
 
   caml_channel_cleanup_on_raise();
+  caml_domain_reset_preemption();
 
   CAMLassert(!Is_exception_result(v));
 
