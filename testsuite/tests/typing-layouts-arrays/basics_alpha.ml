@@ -373,7 +373,7 @@ external makearray_dynamic_uninit : ('a : any mod separable). int -> 'a array
   = "%makearray_dynamic_uninit" [@@layout_poly]
 |}]
 
-type ('a : any) with_i64s = #( int64# * 'a * int64# )
+type ('a : any mod separable) with_i64s = #( int64# * 'a * int64# )
 
 type ok_1 = #(int64# * int32#)
 type ok_2 = float# with_i64s
@@ -386,7 +386,7 @@ type bad_5 = bad_3 with_i64s
 type bad_6 = #(float * #(float * float) * #(float * #(float * float * float)))
 type bad_7 = #{ i : int64# ; bad_4 : bad_4 ; j : int64# }
 [%%expect{|
-type ('a : any) with_i64s = #(int64# * 'a * int64#)
+type ('a : any mod separable) with_i64s = #(int64# * 'a * int64#)
 type ok_1 = #(int64# * int32#)
 type ok_2 = float# with_i64s
 type bad_1 = #(int * int32#)

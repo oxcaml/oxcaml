@@ -139,6 +139,11 @@ type t =
   | Unerasable_position_argument            (* 188 *)
   | Unnecessarily_partial_tuple_pattern     (* 189 *)
   | Probe_name_too_long of string           (* 190 *)
+  | Imprecise_kind_annotation of {
+      name : string;
+      annotated : string;
+      inferred : string;
+    }                                     (* 191 *)
   | Zero_alloc_all_hidden_arrow of string   (* 198 *)
   | Unchecked_zero_alloc_attribute          (* 199 *)
   | Unboxing_impossible                     (* 210 *)

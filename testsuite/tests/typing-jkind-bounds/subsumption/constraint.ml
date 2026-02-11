@@ -72,6 +72,20 @@ end = struct
   type ('a : value mod portable, 'b : value mod contended) t = 'a constraint 'a = 'b
 end
 [%%expect{|
+Line 4, characters 8-31:
+4 |   type ('a : value mod portable, 'b : value mod contended) t = 'a constraint 'a = 'b
+            ^^^^^^^^^^^^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value mod portable'
+but was inferred to have kind `value mod portable contended'.
+
+Line 2, characters 8-31:
+2 |   type ('a : value mod portable, 'b : value mod contended) t : value mod portable contended constraint 'a = 'b
+            ^^^^^^^^^^^^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value mod portable'
+but was inferred to have kind `value mod portable contended'.
+
 module M :
   sig
     type ('b : value mod portable contended, 'a) t
@@ -85,6 +99,20 @@ end = struct
   type ('a : value mod portable, 'b : value mod contended) t = 'a constraint 'a = 'b
 end
 [%%expect{|
+Line 4, characters 8-31:
+4 |   type ('a : value mod portable, 'b : value mod contended) t = 'a constraint 'a = 'b
+            ^^^^^^^^^^^^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value mod portable'
+but was inferred to have kind `value mod portable contended'.
+
+Line 2, characters 8-31:
+2 |   type ('a : value mod portable, 'b : value mod contended) t : value mod many constraint 'a = 'b
+            ^^^^^^^^^^^^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value mod portable'
+but was inferred to have kind `value mod portable contended'.
+
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type ('a : value mod portable, 'b : value mod contended) t = 'a constraint 'a = 'b

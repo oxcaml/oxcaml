@@ -694,6 +694,13 @@ val update_t : t -> unit = <fun>
 
 type ('a : any) t = #{ x : int; y : 'a }
 [%%expect{|
+Line 1, characters 6-14:
+1 | type ('a : any) t = #{ x : int; y : 'a }
+          ^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `any'
+but was inferred to have kind `'_representable_layout_3'.
+
 type ('a : value_or_null) t = #{ x : int; y : 'a; }
 |}]
 

@@ -603,6 +603,13 @@ type ('a : void) void4 = Void4 of 'a
 
 type ('a : any) any4 = Any4 of 'a
 [%%expect{|
+Line 1, characters 6-14:
+1 | type ('a : any) any4 = Any4 of 'a
+          ^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `any'
+but was inferred to have kind `'_representable_layout_6'.
+
 type ('a : value_or_null) any4 = Any4 of 'a
 |}];;
 
@@ -1896,7 +1903,7 @@ Line 1, characters 10-22:
 1 | let () = (assert false : t_any); ()
               ^^^^^^^^^^^^
 Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_6)"
+         "('a : '_representable_layout_7)"
        because it is in the left-hand side of a sequence
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
@@ -1915,7 +1922,7 @@ Line 1, characters 25-37:
 1 | let () = while false do (assert false : t_any); done
                              ^^^^^^^^^^^^
 Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_7)"
+         "('a : '_representable_layout_8)"
        because it is in the body of a while-loop
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.
@@ -1934,7 +1941,7 @@ Line 1, characters 28-40:
 1 | let () = for i = 0 to 0 do (assert false : t_any); done
                                 ^^^^^^^^^^^^
 Error: This expression has type "t_any" but an expression was expected of type
-         "('a : '_representable_layout_8)"
+         "('a : '_representable_layout_9)"
        because it is in the body of a for-loop
        The layout of t_any is any
          because of the definition of t_any at line 5, characters 0-18.

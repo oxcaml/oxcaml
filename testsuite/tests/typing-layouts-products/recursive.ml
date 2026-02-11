@@ -233,6 +233,13 @@ and ('a : any) record_id2 = #{ a : 'a }
 and s = #{ u : u }
 and u = #(int * bad record_id2)
 [%%expect{|
+Line 2, characters 5-13:
+2 | and ('a : any) record_id2 = #{ a : 'a }
+         ^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `any'
+but was inferred to have kind `'_representable_layout_1'.
+
 Line 1, characters 0-21:
 1 | type bad = #( s * s )
     ^^^^^^^^^^^^^^^^^^^^^
@@ -250,6 +257,13 @@ and ('a : any) record_id2 = #{ a : 'a }
 and s = #{ u : u }
 and u = #(int * bad record_id2)
 [%%expect{|
+Line 2, characters 5-13:
+2 | and ('a : any) record_id2 = #{ a : 'a }
+         ^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `any'
+but was inferred to have kind `'_representable_layout_2'.
+
 Line 1, characters 0-21:
 1 | type bad = #( s * s )
     ^^^^^^^^^^^^^^^^^^^^^

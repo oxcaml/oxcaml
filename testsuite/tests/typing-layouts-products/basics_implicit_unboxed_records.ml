@@ -551,6 +551,13 @@ val update_t : t# -> unit = <fun>
 
 type ('a : any) t = { x : int; y : 'a }
 [%%expect{|
+Line 1, characters 6-14:
+1 | type ('a : any) t = { x : int; y : 'a }
+          ^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `any'
+but was inferred to have kind `'_representable_layout_3'.
+
 type ('a : value_or_null) t = { x : int; y : 'a; }
 |}]
 
@@ -615,7 +622,7 @@ Line 2, characters 0-28:
 2 | and b : any & any & any = r#
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The layout of b is '_representable_layout_3 & '_representable_layout_4
+       The layout of b is '_representable_layout_4 & '_representable_layout_5
          because it is an unboxed record.
        But the layout of b must be representable
          because it's the type of a constructor field.
