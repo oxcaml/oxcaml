@@ -645,9 +645,12 @@ type error =
 exception Error of error
 
 
-val report_error: level:int -> error Format_doc.printer
+val report_error: level:int -> error Format_doc.format_printer
+val report_error_doc: level:int -> error Format_doc.printer
 
 val report_lookup_error:
+    level:int -> Location.t -> t -> lookup_error Format_doc.format_printer
+val report_lookup_error_doc:
     level:int -> Location.t -> t -> lookup_error Format_doc.printer
 val in_signature: bool -> t -> t
 
