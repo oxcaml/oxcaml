@@ -317,7 +317,7 @@ let comprehension ~transl_exp ~scopes ~loc { comp_body; comp_clauses } =
     translate_clauses ~transl_exp ~scopes ~loc
       ~comprehension_body:(fun ~accumulator ->
         rev_list_snoc_local ~loc ~init:accumulator
-          ~last:(transl_exp ~scopes Lambda.layout_any_value comp_body))
+          ~last:(transl_exp ~scopes Lambda.layout_list_element comp_body))
       ~accumulator:rev_list_nil comp_clauses
   in
   Lambda_utils.apply ~loc ~mode:alloc_heap
