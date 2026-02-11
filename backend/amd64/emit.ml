@@ -2451,8 +2451,8 @@ let emit_instr ~first ~last ~fallthrough i =
     let call_raise sym =
       emit_call (Cmm.global_symbol sym);
       record_frame Reg.Set.empty (Dbg_raise i.dbg);
-      (* Add a nop if this is the last instruction of this function, so that the return
-         address (used in backtraces) lies in the right function. *)
+      (* Add a nop if this is the last instruction of this function, so that the
+         return address (used in backtraces) lies in the right function. *)
       if last then I.nop ()
     in
     match k with
@@ -2460,7 +2460,8 @@ let emit_instr ~first ~last ~fallthrough i =
       I.mov (int 0) (domain_field Domainstate.Domain_backtrace_pos);
       call_raise "caml_raise_exn"
     | Lambda.Raise_reraise ->
-      call_raise (if Config.runtime5 then "caml_reraise_exn" else "caml_raise_exn");
+      call_raise
+        (if Config.runtime5 then "caml_reraise_exn" else "caml_raise_exn")
     | Lambda.Raise_notrace ->
       I.mov (domain_field Domainstate.Domain_exn_handler) rsp;
       I.pop (domain_field Domainstate.Domain_exn_handler);
@@ -2479,12 +2480,11 @@ let emit_instr ~first ~last ~fallthrough i =
       Printlinear.instr i;
     raise exn
 
-let[@warning "-fragile-match"] is_Lend = function
-  | Lend -> true
-  | _ -> false
+let[@warning "-fragile-match"] is_Lend = function Lend -> true | _ -> false
 
 let rec emit_all ~first ~fallthrough i =
-  if is_Lend i.desc then ()
+  if is_Lend i.desc
+  then ()
   else
     let last = is_Lend i.next.desc in
     (try emit_instr ~first ~last ~fallthrough i with
