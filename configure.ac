@@ -57,11 +57,14 @@ AS_IF([test x"$with_opam_switch" != "x"],
      [AC_MSG_ERROR([Could not determine bin directory for $opam_switch])])
    AC_MSG_NOTICE([Using opam switch: $opam_switch])])
 
-AC_ARG_ENABLE([tool-checks],
-  [AS_HELP_STRING([--disable-tool-checks],
-    [Skip version checks for ocamlopt, dune and menhir])])
+# Not intended for general use: may be useful in the future, e.g. when bisecting
+# if it turns out that some newer versions can actually be used.
+AC_ARG_ENABLE([optional-checks],
+  [AS_HELP_STRING([--disable-optional-checks],
+    [Skip version checks for ocamlopt, dune, menhir, etc.])])
 
-# Check for ocamlopt and its version
+# Check for ocamlopt and its version (AC_CHECK_PROG rather than AC_PATH_PROG
+# since Dune invokes this via a PATH-search too)
 AC_CHECK_PROG([ocamlopt], [ocamlopt], [ocamlopt], [], [$tool_search_path])
 
 AS_IF([test x"$ocamlopt" = 'x'],
@@ -72,15 +75,25 @@ ocamlopt_version=$(PATH="$tool_search_path" "$ocamlopt" -version)
 AS_IF([test x"$ocamlopt_version" = 'x'],
   [AC_MSG_ERROR([unable to execute ocamlopt at $ocamlopt])])
 
-AS_IF([test x"$enable_tool_checks" != 'xno'], [
+# Version checks:
+# - minimum for Dune, from (lang dune ..) in dune-project
+# - exact for menhir (cf. middle_end/flambda2/parser/flambda_parser.ml)
+# - MAJOR.MINOR for OCaml (cf. oxcaml-dev.opam)
+m4_define([DUNE_MINIMUM],
+  m4_esyscmd_s(sed -ne 's/(lang dune \(.*\))/\1.0/p' dune-project))
+m4_define([MENHIR_REQUIRED_VERSION], [20231231])
+m4_define([OCAML_REQUIRED_RELEASE], [5.4])
+
+AS_IF([test x"$enable_optional_checks" != 'xno'], [
   AS_CASE([$ocamlopt_version],
     [*+ox], [AC_MSG_ERROR(m4_normalize(
       [OxCaml ($ocamlopt_version) cannot be used to build OxCaml;
        upstream OCaml is required]))])
 
   # eq2 compares only the first 2 version components (major.minor)
-  AX_COMPARE_VERSION([$ocamlopt_version], [eq2], [5.4], [],
-    [AC_MSG_ERROR([OCaml 5.4.x is required but $ocamlopt_version was found])])
+  AX_COMPARE_VERSION([$ocamlopt_version], [eq2], OCAML_REQUIRED_RELEASE, [],
+    [AC_MSG_ERROR(m4_normalize([OCaml ]OCAML_REQUIRED_RELEASE[.x is required
+                               but $ocamlopt_version was found]))])
 ])
 
 AC_MSG_NOTICE([Using OCaml $ocamlopt_version])
@@ -100,14 +113,17 @@ dune_version=$("$dune" --version)
 AS_IF([test x"$dune_version" = 'x'],
   [AC_MSG_ERROR([unable to execute dune at $dune])])
 
-AS_IF([test x"$enable_tool_checks" != 'xno'], [
-  # Check for upstream Dune
+AS_IF([test x"$enable_optional_checks" != 'xno'], [
+  # Check Dune works
   AS_IF(["$dune" help topics >/dev/null 2>&1], [],
-    [AC_MSG_ERROR([upstream Dune is required])])
+    [AC_MSG_ERROR(m4_normalize([Dune does not work (run eval \$(opam env) or use
+                               --with-opam-switch?)]))])
 
-  AX_COMPARE_VERSION([$dune_version], [ge], [3.20.0], [],
+  # Check version
+  AX_COMPARE_VERSION([$dune_version], [ge], DUNE_MINIMUM, [],
     [AC_MSG_ERROR(m4_normalize(
-      [dune version $dune_version found, but 3.20.0 or later is required]))])
+      [dune version $dune_version found, but ]DUNE_MINIMUM[ or later is
+       required]))])
 ])
 
 AC_MSG_NOTICE([Using dune executable: $dune (version $dune_version)])
@@ -117,16 +133,16 @@ AC_CHECK_PROG([menhir], [menhir], [menhir], [], [$tool_search_path])
 AS_IF([test x"$menhir" = 'x'],
   [AC_MSG_ERROR([menhir not found on PATH])])
 
-# menhir --version outputs "menhir, version YYYYMMDD" - extract the 8-digit date
-menhir_version=$(PATH="$tool_search_path" "$menhir" --version | sed -n 's/.*version \([[0-9]]*\).*/\1/p')
+AS_IF([test x"$enable_optional_checks" != 'xno'], [
+  # menhir --version outputs "menhir, version YYYYMMDD"
+  menhir_version=$(PATH="$tool_search_path" "$menhir" --version | sed -n 's/.*version \([[0-9]]*\).*/\1/p')
 
-AS_IF([test x"$menhir_version" = 'x'],
-  [AC_MSG_ERROR([unable to determine menhir version])])
+  AS_IF([test x"$menhir_version" = 'x'],
+    [AC_MSG_ERROR([unable to determine menhir version])])
 
-AS_IF([test x"$enable_tool_checks" != 'xno'], [
-  AS_IF([test x"$menhir_version" != 'x20231231'],
-    [AC_MSG_ERROR(m4_normalize(
-      [menhir version $menhir_version found, but 20231231 is required]))])
+  AS_IF([test x"$menhir_version" != x']MENHIR_REQUIRED_VERSION['],
+    [AC_MSG_ERROR(m4_normalize([menhir version $menhir_version found,
+                                but ]MENHIR_REQUIRED_VERSION[ is required]))])
 ])
 
 AC_MSG_NOTICE([Using menhir version: $menhir_version])
