@@ -51,7 +51,7 @@ module Mode_info = struct
     in
 
     match modes with
-    | [] -> ""
+    | [] -> "<default>"
     | modes -> "@ " ^ String.concat ~sep:" " modes
 end
 

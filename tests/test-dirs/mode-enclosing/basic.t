@@ -92,4 +92,4 @@ In this test, bar has all legacy modes
   >   counter := !counter + (Stdlib.read_int ())
   > let bar = (foo, !counter)
   > EOF
-  4:4-4:7: 
+  4:4-4:7: <default>
