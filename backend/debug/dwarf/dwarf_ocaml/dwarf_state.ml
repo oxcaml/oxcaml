@@ -53,7 +53,6 @@ end
 type t =
   { compilation_unit_header_label : Asm_label.t;
     compilation_unit_proto_die : Proto_die.t;
-    value_type_proto_die : Proto_die.t;
     code_layout : code_layout;
     debug_loc_table : Debug_loc_table.t;
     debug_ranges_table : Debug_ranges_table.t;
@@ -67,11 +66,10 @@ type t =
   }
 
 let create ~compilation_unit_header_label ~compilation_unit_proto_die
-    ~value_type_proto_die ~code_layout debug_loc_table debug_ranges_table
-    address_table location_list_table ~get_file_num ~sourcefile =
+    ~code_layout debug_loc_table debug_ranges_table address_table
+    location_list_table ~get_file_num ~sourcefile =
   { compilation_unit_header_label;
     compilation_unit_proto_die;
-    value_type_proto_die;
     code_layout;
     debug_loc_table;
     debug_ranges_table;
@@ -87,8 +85,6 @@ let create ~compilation_unit_header_label ~compilation_unit_proto_die
 let compilation_unit_header_label t = t.compilation_unit_header_label
 
 let compilation_unit_proto_die t = t.compilation_unit_proto_die
-
-let value_type_proto_die t = t.value_type_proto_die
 
 let debug_loc_table t = t.debug_loc_table
 

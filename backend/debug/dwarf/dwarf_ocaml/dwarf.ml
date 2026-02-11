@@ -27,6 +27,11 @@ type t =
   { state : DS.t;
     asm_directives : Asm_directives_dwarf.t;
     get_file_id : string -> int;
+    (* [None] when [restrict_to_upstream_dwarf] is set (i.e. only [-g]), since
+       then the CU does not need a fallback type DIE. [Some] when full DWARF is
+       enabled ([-gno-upstream-dwarf]), in which case it is used as the fallback
+       type for variables whose type cannot be determined. *)
+    value_type_proto_die : Proto_die.t option;
     mutable emitted : bool;
     mutable emitted_delayed : bool
   }
@@ -49,12 +54,17 @@ let create ~sourcefile ~unit_name ~asm_directives ~get_file_id ~code_layout =
   in
   let compilation_unit_header_label = Asm_label.create (DWARF Debug_info) in
   let value_type_proto_die =
-    Proto_die.create ~parent:(Some compilation_unit_proto_die) ~tag:Base_type
-      ~attribute_values:
-        [ DAH.create_name "ocaml_value";
-          DAH.create_encoding ~encoding:Encoding_attribute.signed;
-          DAH.create_byte_size_exn ~byte_size:Arch.size_addr ]
-      ()
+    if !Dwarf_flags.restrict_to_upstream_dwarf
+    then None
+    else
+      Some
+        (Proto_die.create ~parent:(Some compilation_unit_proto_die)
+           ~tag:Base_type
+           ~attribute_values:
+             [ DAH.create_name "ocaml_value";
+               DAH.create_encoding ~encoding:Encoding_attribute.signed;
+               DAH.create_byte_size_exn ~byte_size:Arch.size_addr ]
+           ())
   in
   let debug_loc_table = Debug_loc_table.create () in
   let debug_ranges_table = Debug_ranges_table.create () in
@@ -62,13 +72,14 @@ let create ~sourcefile ~unit_name ~asm_directives ~get_file_id ~code_layout =
   let location_list_table = Location_list_table.create () in
   let state =
     DS.create ~compilation_unit_header_label ~compilation_unit_proto_die
-      ~value_type_proto_die ~code_layout debug_loc_table debug_ranges_table
-      address_table location_list_table ~get_file_num:get_file_id ~sourcefile
+      ~code_layout debug_loc_table debug_ranges_table address_table
+      location_list_table ~get_file_num:get_file_id ~sourcefile
     (* CR mshinwell: does get_file_id successfully emit .file directives for
        files we haven't seen before? *)
   in
   { state;
     asm_directives;
+    value_type_proto_die;
     emitted = false;
     emitted_delayed = false;
     get_file_id
@@ -104,8 +115,8 @@ let dwarf_for_fundecl t fundecl ~fun_end_label ~ppf_dump =
         (fun fundecl -> Inlined_frame_ranges.create ~ppf_dump fundecl)
         ~accumulate:true fundecl
     in
-    Dwarf_concrete_instances.for_fundecl ~get_file_id:t.get_file_id t.state
-      fundecl
+    Dwarf_concrete_instances.for_fundecl ~get_file_id:t.get_file_id
+      ~value_type_proto_die:t.value_type_proto_die t.state fundecl
       ~fun_end_label:(Asm_label.create_int Text (fun_end_label |> Label.to_int))
       available_ranges_vars inlined_frame_ranges;
     { fun_end_label; fundecl }
