@@ -151,11 +151,19 @@ jobs:
             cc: clang
 
           - name: runtime5 dwarf-tests (x86_64-linux)
-            config: --enable-runtime5
+            config: --enable-runtime5 --enable-function-sections
             os: warp-ubuntu-latest-x64-8x
             dwarf_tests_only: true
             oxcaml_llvm_tag: oxcaml-lldb-16.0.6-minus1
             oxcaml_llvm_source_branch: lldb
+
+          - name: runtime5 function-sections and dwarf (x86_64-linux)
+            config: --enable-runtime5 --enable-function-sections --enable-oxcaml-dwarf-on-compiler
+            os: warp-ubuntu-latest-x64-8x
+
+          - name: runtime5 function-sections and dwarf (aarch64-linux)
+            config: --enable-runtime5 --enable-function-sections --enable-oxcaml-dwarf-on-compiler
+            os: warp-ubuntu-latest-arm64-8x
 
           - name: runtime5 frame-pointers llvmize-tests (x86_64-linux)
             config: --enable-runtime5 --enable-frame-pointers

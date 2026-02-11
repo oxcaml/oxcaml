@@ -28,9 +28,19 @@ val create :
   unit_name:Ident.t ->
   asm_directives:Asm_directives_dwarf.t ->
   get_file_id:(string -> int) ->
-  code_begin:Asm_symbol.t ->
-  code_end:Asm_symbol.t ->
+  code_layout:Dwarf_state.code_layout ->
   t
+
+(** Record a function's address range. This function can be called
+    unconditionally; it will only record the range when [code_layout] is
+    [Function_sections]. *)
+val record_function_range :
+  t ->
+  function_symbol:Asm_symbol.t ->
+  start_label:Asm_label.t ->
+  end_label:Asm_label.t ->
+  offset_past_end_label:int option ->
+  unit
 
 type fundecl = private
   { fun_end_label : Cmm.label;
@@ -47,8 +57,6 @@ val dwarf_for_fundecl :
 (** Write the DWARF information to the assembly file. This should only be called
     once all (in)constants and function declarations have been passed to the
     above functions. *)
-val emit :
-  t -> basic_block_sections:bool -> binary_backend_available:bool -> unit
+val emit : t -> binary_backend_available:bool -> unit
 
-val emit_delayed :
-  t -> basic_block_sections:bool -> binary_backend_available:bool -> unit
+val emit_delayed : t -> binary_backend_available:bool -> unit

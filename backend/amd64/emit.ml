@@ -2557,7 +2557,12 @@ let fundecl fundecl =
     let n = frame_size () - 8 - if fp then 8 else 0 in
     if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:(-n));
   (match fun_end_label with
-  | Some l -> D.define_label (label_to_asm_label ~section:Text l)
+  | Some l ->
+    let end_label = label_to_asm_label ~section:Text l in
+    D.define_label end_label;
+    let start_label = L.create_label_for_local_symbol Text fundecl_sym in
+    Emitaux.Dwarf_helpers.record_function_range ~function_symbol:fundecl_sym
+      ~start_label ~end_label ~offset_past_end_label:None
   | None -> ());
   D.comment ("LLVM-MCA-END " ^ !function_name);
   D.cfi_endproc ();
