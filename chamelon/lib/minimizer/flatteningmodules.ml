@@ -122,16 +122,20 @@ let rec replace_in_pat : type k. _ -> k general_pattern -> k general_pattern =
                fields)
       | Tpat_array (vl, id) ->
           mkTpat_array ~id (List.map (replace_in_pat mod_name) vl)
-      | O (Tpat_construct (a1, a2, vl, a3)) ->
-          Tpat_construct (a1, a2, List.map (replace_in_pat mod_name) vl, a3)
-      | O (Tpat_record (r, a1)) ->
-          Tpat_record
+      | Tpat_construct (a1, a2, vl, a3, id) ->
+          mkTpat_construct ~id
+            ( a1,
+              a2,
+              List.map (fun (id, pat) -> (id, replace_in_pat mod_name pat)) vl,
+              a3 )
+      | Tpat_record (r, a1, id) ->
+          mkTpat_record ~id
             ( List.map
                 (fun (e1, e2, pat) -> (e1, e2, replace_in_pat mod_name pat))
                 r,
               a1 )
-      | O (Tpat_record_unboxed_product (r, a1)) ->
-          Tpat_record_unboxed_product
+      | Tpat_record_unboxed_product (r, a1, id) ->
+          mkTpat_record_unboxed_product ~id
             ( List.map
                 (fun (e1, e2, pat) -> (e1, e2, replace_in_pat mod_name pat))
                 r,
@@ -147,7 +151,9 @@ let rec replace_in_pat : type k. _ -> k general_pattern -> k general_pattern =
           ( Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
           | Tpat_variant _ | Tpat_exception _ ) ->
           pat.pat_desc
-      | O (Tpat_var _ | Tpat_alias _ | Tpat_array _ | Tpat_tuple _) ->
+      | O
+          ( Tpat_var _ | Tpat_alias _ | Tpat_array _ | Tpat_construct _
+          | Tpat_record _ | Tpat_record_unboxed_product _ | Tpat_tuple _ ) ->
           assert false);
   }
 

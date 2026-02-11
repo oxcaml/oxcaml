@@ -32,7 +32,19 @@ open Mode
 let dummy_jkind = Jkind.Builtin.value ~why:(Unknown "dummy_layout")
 let dummy_value_mode = Value.disallow_right Value.legacy
 let dummy_value_sort = Jkind.Sort.value
+let dummy_const_value_sort = Jkind.Sort.Const.value
 let dummy_alloc_mode = Alloc.disallow_left Alloc.legacy
+let dummy_ctor_repres = Constructor_uniform_value
+
+let dummy_record_repres n =
+  let sorts = Array.init n (fun _ -> dummy_const_value_sort) in
+  Record_boxed sorts
+
+let dummy_record_unboxed_product_repres n =
+  let sorts = Array.init n (fun _ -> dummy_const_value_sort) in
+  Record_unboxed_product sorts
+
+let dummy_record_sorts = Fixed
 let mkTvar name = Tvar { name; jkind = dummy_jkind }
 
 let mkTarrow (label, t1, t2, comm) =
@@ -70,10 +82,21 @@ let mkTexp_tuple ?id exps =
   let exps = List.combine labels exps in
   Texp_tuple (exps, alloc)
 
-type texp_construct_identifier = alloc_mode option
+type texp_construct_identifier = alloc_mode option * constructor_representation
+type texp_construct_arg_identifier = Jkind.Sort.t
 
-let mkTexp_construct ?id:(mode = Some dummy_alloc_mode) (name, desc, args) =
-  Texp_construct (name, desc, args, mode)
+let mkTexp_construct
+    ?id:(mode, repres = (Some dummy_alloc_mode, dummy_ctor_repres))
+    (name, desc, args) =
+  Texp_construct (name, desc, repres, args, mode)
+
+type texp_record_identifier = Types.record_representation * alloc_mode option
+type texp_record_field_identifier = Jkind.Sort.t
+type texp_record_extended_expression_identifier = Jkind.Sort.t
+
+let mkTexp_record ~id:(representation, alloc_mode) (fields, extended_expression)
+    =
+  Texp_record { fields; representation; extended_expression; alloc_mode }
 
 type texp_function_param_identifier = {
   param_sort : Jkind.Sort.t;
@@ -229,8 +252,21 @@ type matched_expression_desc =
   | Texp_construct of
       Longident.t Location.loc
       * constructor_description
-      * expression list
+      * (texp_construct_arg_identifier * expression) list
       * texp_construct_identifier
+  | Texp_record of {
+      fields :
+        (Types.label_description
+        * texp_record_field_identifier
+        * record_label_definition)
+        array;
+      extended_expression :
+        (expression
+        * texp_record_extended_expression_identifier
+        * Unique_barrier.t)
+        option;
+      id : texp_record_identifier;
+    }
   | Texp_tuple of expression list * texp_tuple_identifier
   | Texp_function of texp_function * texp_function_identifier
   | Texp_sequence of expression * expression * texp_sequence_identifier
@@ -250,8 +286,11 @@ let view_texp (e : expression_desc) =
   | Texp_apply (exp, args, pos, mode, za) ->
       let args = List.map (fun (label, x) -> (untype_label label, x)) args in
       Texp_apply (exp, args, (pos, mode, za))
-  | Texp_construct (name, desc, args, mode) ->
-      Texp_construct (name, desc, args, mode)
+  | Texp_construct (name, desc, repres, args, mode) ->
+      Texp_construct (name, desc, args, (mode, repres))
+  | Texp_record { fields; representation; extended_expression; alloc_mode } ->
+      Texp_record
+        { fields; extended_expression; id = (representation, alloc_mode) }
   | Texp_tuple (args, mode) ->
       let labels, args = List.split args in
       Texp_tuple (args, (labels, mode))
@@ -351,6 +390,39 @@ let mkTpat_tuple ?id pats =
   in
   Tpat_tuple (List.combine labels pats)
 
+type tpat_construct_identifier = constructor_representation
+type value_binding_identifier = Jkind.Sort.t
+
+type tpat_construct_type_arg =
+  Ident.t Location.loc * Parsetree.jkind_annotation option
+
+let mkTpat_construct ?id:(repres = dummy_ctor_repres) (id, ctor, args, ty) =
+  Tpat_construct (id, ctor, repres, args, ty)
+
+type tpat_record_identifier =
+  Typedtree.record_sorts * Types.record_representation
+
+let mkTpat_record ?id (args, closed) =
+  let sorts, repres =
+    match id with
+    | Some (sorts, repres) -> (sorts, repres)
+    | None -> (dummy_record_sorts, dummy_record_repres (List.length args))
+  in
+  Tpat_record (args, sorts, repres, closed)
+
+type tpat_record_unboxed_product_identifier =
+  Typedtree.record_sorts * Types.record_unboxed_product_representation
+
+let mkTpat_record_unboxed_product ?id (args, closed) =
+  let sorts, repres =
+    match id with
+    | Some (sorts, repres) -> (sorts, repres)
+    | None ->
+        ( dummy_record_sorts,
+          dummy_record_unboxed_product_repres (List.length args) )
+  in
+  Tpat_record_unboxed_product (args, sorts, repres, closed)
+
 type 'a matched_pattern_desc =
   | Tpat_var :
       Ident.t * string Location.loc * tpat_var_identifier
@@ -367,6 +439,30 @@ type 'a matched_pattern_desc =
   | Tpat_tuple :
       value general_pattern list * tpat_tuple_identifier
       -> value matched_pattern_desc
+  | Tpat_construct :
+      Longident.t Location.loc
+      * Types.constructor_description
+      * (value_binding_identifier * value general_pattern) list
+      * (tpat_construct_type_arg list * core_type) option
+      * tpat_construct_identifier
+      -> value matched_pattern_desc
+  | Tpat_record :
+      (Longident.t Location.loc
+      * Types.label_description
+      * value general_pattern)
+      list
+      * Asttypes.closed_flag
+      * tpat_record_identifier
+      -> value matched_pattern_desc
+  (* CR-soon lmaurer: Consolidate this into [Tpat_record] _absolutely everywhere_ *)
+  | Tpat_record_unboxed_product :
+      (Longident.t Location.loc
+      * Types.unboxed_label_description
+      * value general_pattern)
+      list
+      * Asttypes.closed_flag
+      * tpat_record_unboxed_product_identifier
+      -> value matched_pattern_desc
   | O : 'a pattern_desc -> 'a matched_pattern_desc
 
 let view_tpat (type a) (p : a pattern_desc) : a matched_pattern_desc =
@@ -379,6 +475,12 @@ let view_tpat (type a) (p : a pattern_desc) : a matched_pattern_desc =
   | Tpat_tuple pats ->
       let labels, pats = List.split pats in
       Tpat_tuple (pats, labels)
+  | Tpat_construct (id, ctor, repres, args, ty) ->
+      Tpat_construct (id, ctor, args, ty, repres)
+  | Tpat_record (args, sorts, repres, closed) ->
+      Tpat_record (args, closed, (sorts, repres))
+  | Tpat_record_unboxed_product (args, sorts, repres, closed) ->
+      Tpat_record_unboxed_product (args, closed, (sorts, repres))
   | _ -> O p
 
 type tstr_eval_identifier = Jkind.sort
@@ -412,7 +514,7 @@ let mk_constructor_description cstr_name =
   {
     cstr_name;
     cstr_res = newty2 ~level:0 (mkTvar (Some "a"));
-    cstr_shape = Constructor_uniform_value;
+    cstr_shape = Some Constructor_uniform_value;
     cstr_existentials = [];
     cstr_args = [];
     cstr_arity = 0;
@@ -428,8 +530,6 @@ let mk_constructor_description cstr_name =
     cstr_repr = Variant_boxed [||];
     cstr_constant = true;
   }
-
-type value_binding_identifier = Jkind.Sort.t
 
 let value_binding_identifier_from_texp_match_identifier jkind = jkind
 
