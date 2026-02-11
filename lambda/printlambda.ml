@@ -1356,21 +1356,23 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
   | Lsplice { splice_loc = _;  slambda } ->
       fprintf ppf "$(%a)" slam slambda
+  | Ltemplate (lfun, free_vars) ->
+      lfunction ppf lfun
+  | Linstantiate apply ->
+      fprintf ppf "@[<2>(instantiate)@]"
 
 and slam ppf = function
   | SLlayout layout -> fprintf ppf "⟪%a⟫" layout_annotation layout
+  | SLglobal cu -> fprintf ppf "(global %a)" Compilation_unit.print cu
   | SLvar id -> Slambdaident.print ppf id
   | SLunit -> fprintf ppf "()"
   | SLrecord fields ->
     let print_fields ppf =
-      Array.iter
-        (fun (ident, value) ->
-          fprintf ppf "@[<2>%s =@ %a;@]@ " ident slam value)
-        fields
+      List.iter (fun value -> fprintf ppf "%a;@ " slam value) fields
     in
     fprintf ppf "@[<hv 2>[@ %t]@]" print_fields
-  | SLfield (container, field, field_name) ->
-    fprintf ppf "%a.%i(%s)" Slambdaident.print container field field_name
+  | SLfield (container, field) ->
+    fprintf ppf "%a.%i" slam container field
   | SLhalves { sval_comptime; sval_runtime } ->
     fprintf ppf "@[<hv 2>(%a,@ ⟪ %a ⟫)@]" slam sval_comptime lam sval_runtime
   | SLproj_comptime value -> fprintf ppf "%a.0" slam value

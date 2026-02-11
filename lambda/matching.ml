@@ -4260,12 +4260,11 @@ let rec map_return f = function
           loc, k )
   | (Lstaticraise _ | Lprim (Praise _, _, _)) as l -> l
   | ( Lvar _ | Lmutvar _ | Lconst _ | Lapply _ | Lfunction _ | Lsend _ | Lprim _
-    | Lwhile _ | Lfor _ | Lassign _ | Lifused _ | Lsplice _) as l ->
-      (* CR layout poly: I believe this could inhibit some optimisations in the
-         splice case. We should consider moving this after slambda eval.*)
+    | Lwhile _ | Lfor _ | Lassign _ | Lifused _ | Ltemplate _ | Linstantiate _) as l ->
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)
   | Lexclave l -> Lexclave (map_return f l)
+  | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
 
 (* The 'opt' reference indicates if the optimization is worthy.
 

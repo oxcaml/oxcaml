@@ -901,14 +901,16 @@ type lambda =
   | Lregion of lambda * layout
   | Lexclave of lambda
   | Lsplice of lambda_splice
+  | Ltemplate of lfunction * layout Ident.Map.t
+  | Linstantiate of lambda_apply
 
 and slambda =
   | SLlayout of layout
   | SLglobal of Compilation_unit.t
   | SLvar of Slambdaident.t
   | SLunit
-  | SLrecord of (string * slambda) array
-  | SLfield of Slambdaident.t * int * string
+  | SLrecord of slambda list
+  | SLfield of slambda * int
   | SLhalves of slambda_halves
   | SLproj_comptime of slambda
   | SLproj_runtime of slambda
@@ -1223,6 +1225,10 @@ let make_key e =
         Lapply {ap with ap_func = tr_rec env ap.ap_func;
                         ap_args = tr_recs env ap.ap_args;
                         ap_loc = Loc_unknown}
+    | Linstantiate ap ->
+        Linstantiate { ap with ap_func = tr_rec env ap.ap_func;
+                               ap_args = tr_recs env ap.ap_args;
+                               ap_loc = Loc_unknown}
     | Llet (Alias,_k,x,_x_duid,ex,e) -> (* Ignore aliases -> substitute *)
         let ex = tr_rec env ex in
         tr_rec (Ident.add x ex env) e
@@ -1264,7 +1270,7 @@ let make_key e =
     | Lifused (id,e) -> Lifused (id,tr_rec env e)
     | Lregion (e,layout) -> Lregion (tr_rec env e,layout)
     | Lexclave e -> Lexclave (tr_rec env e)
-    | Lletrec _|Lfunction _
+    | Lletrec _|Lfunction _ | Ltemplate _
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
@@ -1374,6 +1380,10 @@ let shallow_iter ~tail ~non_tail:f = function
       f e
   | Lexclave e ->
       tail e
+  | Ltemplate ({body}, _) ->
+      f body
+  | Linstantiate { ap_func = fn; ap_args = args } ->
+      f fn; List.iter f args
 
 let iter_head_constructor f l =
   shallow_iter ~tail:f ~non_tail:f l
@@ -1463,16 +1473,19 @@ let rec free_variables = function
   | Lexclave e ->
       free_variables e
   | Lsplice { splice_loc = _; slambda } -> free_variables_slambda slambda
+  | Ltemplate (_, free_vars) -> Ident.Map.keys free_vars
+  | Linstantiate{ap_func = fn; ap_args = args} ->
+      free_variables_list (free_variables fn) args
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
     set exprs
 
 and free_variables_slambda = function
-  | SLlayout _ | SLvar _ | SLunit | SLfield _ -> Ident.Set.empty
+  | SLlayout _ | SLglobal _ | SLvar _ | SLunit | SLfield _ -> Ident.Set.empty
   | SLrecord fields ->
-      Array.fold_left
-        (fun set (_, field) ->
+      List.fold_left
+        (fun set field ->
           Ident.Set.union (free_variables_slambda field) set)
         Ident.Set.empty fields
   | SLhalves { sval_comptime; sval_runtime } ->
@@ -1830,7 +1843,12 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
     | Lexclave e ->
         Lexclave (subst s l e)
     | Lsplice _ ->
-      Misc.fatal_error "Cannot apply substitutions to lambda before slambdaeval"
+        Misc.splices_should_not_exist_after_eval ()
+    | Ltemplate (lfun, free_vars) ->
+        Lfunction (subst_lfun s l lfun)
+    | Linstantiate ap ->
+        Linstantiate{ap with ap_func = subst s l ap.ap_func;
+                      ap_args = subst_list s l ap.ap_args}
   and subst_list s l li = List.map (subst s l) li
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
   and subst_lfun s l lf =
@@ -1948,6 +1966,22 @@ let shallow_map ~tail ~non_tail:f = function
       Lregion (f e, layout)
   | Lexclave e ->
       Lexclave (tail e)
+  | Ltemplate (lfun, free_vars) ->
+      Ltemplate (map_lfunction f lfun, free_vars)
+  | Linstantiate { ap_func; ap_args; ap_result_layout; ap_region_close; ap_mode; ap_loc;
+             ap_tailcall; ap_inlined; ap_specialised; ap_probe } ->
+      Linstantiate {
+        ap_func = f ap_func;
+        ap_args = List.map f ap_args;
+        ap_result_layout;
+        ap_region_close;
+        ap_mode;
+        ap_loc;
+        ap_tailcall;
+        ap_inlined;
+        ap_specialised;
+        ap_probe;
+      }
 
 let map f =
   let rec g lam = f (shallow_map ~tail:g ~non_tail:g lam) in
@@ -2852,11 +2886,12 @@ let may_allocate_in_region lam =
   and loop = function
     | Lvar _ | Lmutvar _ | Lconst _ -> ()
 
-    | Lfunction {mode=Alloc_heap} -> ()
-    | Lfunction {mode=Alloc_local} -> raise Exit
+    | Lfunction {mode=Alloc_heap} | Ltemplate ({mode=Alloc_heap},_) -> ()
+    | Lfunction {mode=Alloc_local} | Ltemplate ({mode=Alloc_local},_) -> raise Exit
 
     | Lapply {ap_mode=Alloc_local}
-    | Lsend (_,_,_,_,_,Alloc_local,_,_) -> raise Exit
+    | Lsend (_,_,_,_,_,Alloc_local,_,_)
+    | Linstantiate {ap_mode=Alloc_local} -> raise Exit
 
     | Lprim (prim, args, _) ->
        begin match primitive_may_allocate prim with
@@ -2873,12 +2908,9 @@ let may_allocate_in_region lam =
         rather, it's in the parent region *)
       ()
     | Lwhile {wh_cond; wh_body} -> loop wh_cond; loop wh_body
-    (* CR layout poly: Pessimistically return true, this really should only get
-       called after slambda eval but translcore does some early simplification.
-       We should fix that at some point. *)
-    | Lsplice _ -> raise Exit
+    | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
-    | ( Lapply _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
+    | ( Lapply _ | Linstantiate _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
       | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
       | Lifthenelse _ | Lsequence _ | Lassign _ | Lsend _
       | Levent _ | Lifused _) as lam ->
@@ -2918,7 +2950,9 @@ let rec try_to_find_location lam =
   | Lstringswitch (_, _, _, loc, _)
   | Lsend (_, _, _, _, _, _, loc, _)
   | Levent (_, { lev_loc = loc; _ })
-  | Lsplice { splice_loc = loc; _ }->
+  | Lsplice { splice_loc = loc; _ }
+  | Ltemplate ({ loc }, _)
+  | Linstantiate { ap_loc = loc; _ } ->
     loc
   | Llet (_, _, _, _, lam, _)
   | Lmutlet (_, _, _, lam, _)

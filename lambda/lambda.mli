@@ -74,10 +74,6 @@ type field_read_semantics =
   | Reads_agree
   | Reads_vary
 
-type dynamism_mode =
-  | Static
-  | Dynamic
-
 type has_initializer =
   | With_initializer
   | Uninitialized
@@ -134,7 +130,7 @@ type primitive =
   | Pmakefloatblock of mutable_flag * locality_mode
   | Pmakeufloatblock of mutable_flag * locality_mode
   | Pmakelazyblock of lazy_block_tag
-  | Pfield of int * immediate_or_pointer * field_read_semantics * dynamism_mode
+  | Pfield of int * immediate_or_pointer * field_read_semantics
   | Pfield_computed of field_read_semantics
   | Psetfield of int * immediate_or_pointer * initialization_or_assignment
   | Psetfield_computed of immediate_or_pointer * initialization_or_assignment
@@ -855,8 +851,8 @@ type lambda =
      Note that [Lexclave] nesting is currently unsupported. *)
   | Lexclave of lambda
   | Lsplice of lambda_splice
-  | Ltemplate of Ident.t list * lambda
-  | Linstantiate of lambda * layout list
+  | Ltemplate of lfunction * layout Ident.Map.t
+  | Linstantiate of lambda_apply
 
 and slambda =
   | SLlayout of layout
@@ -939,7 +935,6 @@ and lambda_apply =
     ap_result_layout : layout;
     ap_region_close : region_close;
     ap_mode : locality_mode;
-    asp_dynamism_mode : dynamism_mode;
     ap_loc : scoped_location;
     ap_tailcall : tailcall_attribute;
     ap_inlined : inlined_attribute; (* [@inlined] attribute in code *)

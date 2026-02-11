@@ -33,6 +33,10 @@ val splices_should_not_exist_after_eval : unit -> _
   (** Raise a [Fatal_error] explaining that a slambda splice shouldn't exist in
       lambda code after slambda eval has happened. *)
 
+val templates_should_not_exist_after_eval : unit -> _
+  (** Raise a [Fatal_error] explaining that a template or instantiate node shouldn't exist
+      in lambda code after slambda eval has happened. *)
+
 exception Fatal_error
 
 (** {1 Exceptions and finalization} *)

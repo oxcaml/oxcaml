@@ -594,7 +594,7 @@ let declare_binding ctx (var, def) =
 let rec choice ctx t =
   let rec choice ctx ~tail t =
     match t with
-    | (Lvar _ | Lmutvar _ | Lconst _ | Lfunction _ | Lsend _
+    | (Lvar _ | Lmutvar _ | Lconst _ | Lfunction _ | Ltemplate _ | Lsend _
       | Lassign _ | Lfor _ | Lwhile _) ->
         let t = traverse ctx t in
         Choice.lambda t

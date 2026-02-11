@@ -78,7 +78,7 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Levent _ | Lifused _ -> ()
   | Lregion (_, layout) -> assert_layout_contains_no_splices layout
   | Lexclave _ -> ()
-  | Lsplice _ -> raise Found_a_splice);
+  | Lsplice _ | Ltemplate _ | Linstantiate _ -> raise Found_a_splice);
   Lambda.iter_head_constructor assert_no_splices lam
 
 (* Check that slambda is trivial (a quote and contains no splices) *)

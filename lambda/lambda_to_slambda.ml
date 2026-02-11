@@ -28,7 +28,7 @@ let fracture_prim lambda prim args loc =
       (fun arg_id arg acc ->
         SLlet { slet_name = arg_id; slet_value = arg; slet_body = acc })
       block arg_ids args
-  | Pfield (idx, _, _, Static) ->
+  | Pfield (idx, _, _) ->
     let arg =
       match args with
       | [arg] -> arg
@@ -51,7 +51,6 @@ let fracture_prim lambda prim args loc =
   (* Dynamic output *)
   | Pbytes_to_string | Pbytes_of_string | Pignore | Pgetpredef _
   | Pmakefloatblock _ | Pmakeufloatblock _ | Pmakelazyblock _
-  | Pfield (_, _, _, Dynamic)
   | Pfield_computed _ | Psetfield _ | Psetfield_computed _ | Pfloatfield _
   | Pufloatfield _ | Psetfloatfield _ | Psetufloatfield _ | Psetmixedfield _
   | Pduprecord _ | Parray_element_size_in_bytes _ | Pmake_idx_field _
@@ -160,50 +159,7 @@ let rec lambda_to_slambda env lambda : slambda =
           with_app args_id args
       in
       SLlet { slet_name = func_id; slet_value = func; slet_body = with_args })
-  | Lfunction { params; body; loc; dynamic; _ } ->
-    if dynamic
-    then SLhalves { sval_comptime = SLunit; sval_runtime = lambda }
-    else
-      let free_vars = Lambda.free_variables body |> Ident.Set.to_list in
-      let body_id = Slambdaident.fresh "body" in
-      List.iter (fun param -> Hashtbl.add param.name param.layout) params;
-      let body = slambda_to_lambda env body in
-      List.iter (fun param -> Hashtbl.remove param.name) params;
-      SLhalves
-        { sval_comptime =
-            SLtemplate
-              { sfun_params = params;
-                sfun_body =
-                  SLlet
-                    { slet_name = body_id;
-                      slet_value = body;
-                      slet_body =
-                        SLhalves
-                          { sval_comptime = SLproj_comptime (SLvar body_id);
-                            sval_runtime =
-                              List.fold_left
-                                (fun (id, acc) var ->
-                                  Llet
-                                    ( id + 1,
-                                      Lsplice (SLproj_runtime (SLvar var)) ))
-                                (SLproj_runtime (SLvar body_id)) (0, free_vars)
-                          }
-                    }
-              };
-          sval_runtime =
-            Lprim
-              ( Pmakeblock
-                  ( 0,
-                    Immutable,
-                    Shape
-                      (Array.of_list free_vars
-                      |> Array.map (fun ident ->
-                          Lambda.mixed_block_element_of_layout
-                            (Hashtbl.find env ident))),
-                    alloc_heap ),
-                List.map (fun ident -> Lvar ident) free_vars,
-                loc )
-        }
+  | Lfunction _ -> SLhalves { sval_comptime = SLunit; sval_runtime = lambda }
   | Llet (str, layout, id, duid, def, body) ->
     let body_id = Slambdaident.fresh "body" in
     let body_slambda =
@@ -269,5 +225,45 @@ let rec lambda_to_slambda env lambda : slambda =
   | Lregion (_lam, _layout) -> assert false
   | Lexclave _lam -> assert false
   | Lsplice _splice -> Misc.splices_should_not_exist_after_eval ()
-  | Ltemplate (_params, _body) -> assert false
+  | Ltemplate (_params, _body) ->
+    let free_vars = Lambda.free_variables body |> Ident.Set.to_list in
+      let body_id = Slambdaident.fresh "body" in
+      List.iter (fun param -> Hashtbl.add param.name param.layout) params;
+      let body = slambda_to_lambda env body in
+      List.iter (fun param -> Hashtbl.remove param.name) params;
+      SLhalves
+        { sval_comptime =
+            SLtemplate
+              { sfun_params = params;
+                sfun_body =
+                  SLlet
+                    { slet_name = body_id;
+                      slet_value = body;
+                      slet_body =
+                        SLhalves
+                          { sval_comptime = SLproj_comptime (SLvar body_id);
+                            sval_runtime =
+                              List.fold_left
+                                (fun (id, acc) var ->
+                                  Llet
+                                    ( id + 1,
+                                      Lsplice (SLproj_runtime (SLvar var)) ))
+                                (SLproj_runtime (SLvar body_id)) (0, free_vars)
+                          }
+                    }
+              };
+          sval_runtime =
+            Lprim
+              ( Pmakeblock
+                  ( 0,
+                    Immutable,
+                    Shape
+                      (Array.of_list free_vars
+                      |> Array.map (fun ident ->
+                          Lambda.mixed_block_element_of_layout
+                            (Hashtbl.find env ident))),
+                    alloc_heap ),
+                List.map (fun ident -> Lvar ident) free_vars,
+                loc )
+        }
   | Linstantiate (_func, _args) -> assert false

@@ -785,10 +785,10 @@ let free_methods l =
     | Lvar _ | Lmutvar _ | Lconst _ | Lapply _
     | Lprim _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
     | Lifthenelse _ | Lsequence _ | Lwhile _
-    | Levent _ | Lifused _ | Lregion _ | Lexclave _ -> ()
-    | Lsplice { splice_loc; _ } ->
+    | Levent _ | Lifused _ | Lregion _ | Lexclave _ | Linstantiate _ -> ()
+    | Lsplice { splice_loc = loc; _ } | Ltemplate ({ loc }, _) ->
       (* CR layout poly: we could definitely do better here. *)
-      Lambda.error ~loc:(to_location splice_loc) (Slambda_unsupported "classes")
+      Lambda.error ~loc:(to_location loc) (Slambda_unsupported "classes")
   in free l; !fv
 
 let transl_class ~scopes ids cl_id pub_meths cl vflag =
