@@ -87,13 +87,12 @@ DOMAIN_STATE(uintnat, sweeping_done)
 /* Is sweeping done for the current major cycle. */
 
 DOMAIN_STATE(uintnat, allocated_words)
-<<<<<<< oxcaml
-/* Number of words promoted or allocated directly to the major heap since
-   latest slice. */
+/* Number of words allocated in the major heap (by promotion or
+   direct allocation) since the latest slice. */
 
 DOMAIN_STATE(uintnat, allocated_words_direct)
-/* Number of words allocated directly to the major heap since the latest
-   slice. (subset of allocated_words) */
+/* Subset of [allocated_words] that was allocated directly to the
+   major heap since the latest slice. */
 
 DOMAIN_STATE(uintnat, allocated_dependent_bytes)
 /* Number of external bytes whose pointers were promoted or allocated in
@@ -101,14 +100,6 @@ DOMAIN_STATE(uintnat, allocated_dependent_bytes)
 
 DOMAIN_STATE(uintnat, minor_words_at_last_slice)
 /* Number of minor heap words allocated before the latest slice */
-||||||| upstream-base
-=======
-/* Number of words allocated in the major heap (by promotion or
-   direct allocation) since the latest slice. */
-
-DOMAIN_STATE(uintnat, allocated_words_direct)
-/* Subset of [allocated_words] that was allocated directly to the
-   major heap since the latest slice. */
 
 DOMAIN_STATE(uintnat, allocated_words_suspended)
 /* Subset of [allocated_words] that were allocated in ramp-up
@@ -139,7 +130,6 @@ DOMAIN_STATE(intnat, current_ramp_up_allocated_words_diff)
    this would require additional work to increment this value
    in [caml_update_major_allocated_words].)
 */
->>>>>>> upstream-incoming
 
 DOMAIN_STATE(uintnat, swept_words)
 

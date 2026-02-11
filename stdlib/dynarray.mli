@@ -60,13 +60,7 @@
 
 (** {1:dynarrays Dynamic arrays} *)
 
-<<<<<<< oxcaml
 type !'a t : mutable_data with 'a
-||||||| upstream-base
-type 'a t
-=======
-type !'a t
->>>>>>> upstream-incoming
 (** A dynamic array containing values of type ['a].
 
     A dynamic array [a] provides constant-time [get] and [set]

@@ -1455,6 +1455,8 @@ update_major_slice_work(intnat howmuch,
     dom_st->slice_budget = howmuch;
   }
 
+  /* CR sspies: EV_C_MAJOR_SLICE_ALLOC_WORDS has been renamed to
+     EV_C_MAJOR_ALLOCATED_WORDS to match upstream. */
 <<<<<<< oxcaml
   CAML_GC_MESSAGE(POLICY, "Major slice [%c] work. Policy="
                   "%"ARCH_INTNAT_PRINTF_FORMAT "u. Allocation: "

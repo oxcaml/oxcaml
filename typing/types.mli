@@ -117,7 +117,6 @@ and type_desc =
       Any mix of labeled and unlabeled components also works:
       [Ttuple [Some "l1", t1; None, t2; Some "l3", t3]] ==> [l1:t1 * t2 * l3:t3]
   *)
-<<<<<<< oxcaml
 
   | Tunboxed_tuple of (string option * type_expr) list
   (** [Tunboxed_tuple [None, t1; ...; None, tn]] ==> [#(t1 * ... * tn)]
@@ -128,11 +127,6 @@ and type_desc =
       [Tunboxed_tuple [Some "l1", t1; None, t2; Some "l3", t3]]
            ==> [#(l1:t1 * t2 * l3:t3)]
   *)
-||||||| upstream-base
-  | Ttuple of type_expr list
-  (** [Ttuple [t1;...;tn]] ==> [(t1 * ... * tn)] *)
-=======
->>>>>>> upstream-incoming
 
   | Tconstr of Path.t * type_expr list * abbrev_memo ref
   (** [Tconstr (`A.B.t', [t1;...;tn], _)] ==> [(t1,...,tn) A.B.t]
@@ -193,7 +187,6 @@ and type_desc =
       where 'a1 ... 'an are names given to types in tyl
       and occurrences of those types in ty. *)
 
-<<<<<<< oxcaml
   | Trepr of type_expr * Jkind_types.Sort.univar list
   (** [Trepr (ty, sl)] represents layout polymorphism (from [repr_] syntax).
       [sl] is an ordered list of sort univars that abstract over the layouts of
@@ -209,16 +202,9 @@ and type_desc =
       [Trepr (Tpoly ('a -> 'b, ['a; 'b]), [s1; s2])] where [s1] and [s2] are
       sort univars that appear in the jkinds of ['a] and ['b] respectively. *)
 
-
-  | Tpackage of Path.t * (Longident.t * type_expr) list
-||||||| upstream-base
-  | Tpackage of Path.t * (Longident.t * type_expr) list
-=======
   | Tpackage of package
->>>>>>> upstream-incoming
   (** Type of a first-class module (a.k.a package). *)
 
-<<<<<<< oxcaml
   | Tof_kind of jkind_lr
   (** [Tof_kind jkind] ==> [(type : jkind)]
 
@@ -240,18 +226,13 @@ and arg_label =
 and arrow_desc =
   arg_label * Mode.Alloc.lr * Mode.Alloc.lr
 
-
-
-(** See also documentation for [row_more], which enumerates how these
-    constructors arise. *)
-||||||| upstream-base
-=======
 (** [package] corresponds to the type of a first-class module *)
 and package =
   { pack_path : Path.t;
     pack_cstrs : (string list * type_expr) list }
 
->>>>>>> upstream-incoming
+(** See also documentation for [row_more], which enumerates how these
+    constructors arise. *)
 and fixed_explanation =
   | Univar of type_expr (** The row type was bound to an univar *)
   | Fixed_private (** The row type is private *)
@@ -921,15 +902,10 @@ and constructor_representation =
 and label_declaration =
   {
     ld_id: Ident.t;
-<<<<<<< oxcaml
+    (* CR sspies: upstream has atomicity as a separate [ld_atomic] field
+       rather than folded into [mutability]. *)
     ld_mutable: mutability;
     ld_modalities: Mode.Modality.Const.t;
-||||||| upstream-base
-    ld_mutable: mutable_flag;
-=======
-    ld_mutable: mutable_flag;
-    ld_atomic: atomic_flag;
->>>>>>> upstream-incoming
     ld_type: type_expr;
     ld_sort: Jkind_types.Sort.Const.t;
     ld_loc: Location.t;
@@ -1140,144 +1116,6 @@ include Wrapped with type 'a wrapped = 'a
 
 val item_visibility : signature_item -> visibility
 
-<<<<<<< oxcaml
-(* Constructor and record label descriptions inserted held in typing
-   environments *)
-
-type constructor_description =
-  { cstr_name: string;                  (* Constructor name *)
-    cstr_res: type_expr;                (* Type of the result *)
-    cstr_existentials: type_expr list;  (* list of existentials *)
-    cstr_args: constructor_argument list; (* Type of the arguments *)
-    cstr_arity: int;                    (* Number of arguments *)
-    cstr_tag: tag;                      (* Tag for heap blocks *)
-    cstr_repr: variant_representation;  (* Repr of the outer variant *)
-    cstr_shape: constructor_representation; (* Repr of the constructor itself *)
-    cstr_constant: bool;                (* True if all args are void *)
-    cstr_consts: int;                   (* Number of constant constructors *)
-    cstr_nonconsts: int;                (* Number of non-const constructors *)
-    cstr_generalized: bool;             (* Constrained return type? *)
-    cstr_private: private_flag;         (* Read-only constructor? *)
-    cstr_loc: Location.t;
-    cstr_attributes: Parsetree.attributes;
-    cstr_inlined: type_declaration option;
-      (* [Some decl] here iff the cstr has an inline record (which is decl) *)
-    cstr_uid: Uid.t;
-   }
-
-(* Constructors are the same *)
-val equal_tag :  tag -> tag -> bool
-
-(* Comparison of tags to store them in sets. *)
-val compare_tag :  tag -> tag -> int
-
-(* Constructors may be the same, given potential rebinding *)
-val may_equal_constr :
-    constructor_description ->  constructor_description -> bool
-
-(* Equality *)
-
-val equal_record_representation :
-  record_representation -> record_representation -> bool
-
-val equal_record_unboxed_product_representation :
-  record_unboxed_product_representation -> record_unboxed_product_representation -> bool
-
-val equal_variant_representation :
-  variant_representation -> variant_representation -> bool
-
-type 'a gen_label_description =
-  { lbl_name: string;                   (* Short name *)
-    lbl_res: type_expr;                 (* Type of the result *)
-    lbl_arg: type_expr;                 (* Type of the argument *)
-    lbl_mut: mutability;                (* Is this a mutable field? *)
-    lbl_modalities: Mode.Modality.Const.t;
-                                        (* Modalities on the field *)
-    lbl_sort: Jkind_types.Sort.Const.t; (* Sort of the argument *)
-    lbl_pos: int;                       (* Position in type *)
-    lbl_all: 'a gen_label_description array;   (* All the labels in this type *)
-    lbl_repres: 'a;  (* Representation for outer record *)
-    lbl_private: private_flag;          (* Read-only field? *)
-    lbl_loc: Location.t;
-    lbl_attributes: Parsetree.attributes;
-    lbl_uid: Uid.t;
-  }
-
-type label_description = record_representation gen_label_description
-
-type unboxed_label_description = record_unboxed_product_representation gen_label_description
-
-(** This type tracks the distinction between legacy records ([{ field }]) and unboxed
-    records ([#{ field }]). Note that [Legacy] includes normal boxed records, as well as
-    inlined and [[@@unboxed]] records.
-
-    As a GADT, it also lets us avoid duplicating functions that handle both record forms,
-    such as [Env.find_label_by_name], which has type
-    ['rep record_form -> Longident.t -> Env.t -> 'rep gen_label_description].
-*)
-type _ record_form =
-  | Legacy : record_representation record_form
-  | Unboxed_product : record_unboxed_product_representation record_form
-
-type record_form_packed =
-  | P : _ record_form -> record_form_packed
-
-val record_form_to_string : _ record_form -> string
-
-val mixed_block_element_of_const_sort :
-  Jkind_types.Sort.Const.t -> mixed_block_element
-
-||||||| upstream-base
-(* Constructor and record label descriptions inserted held in typing
-   environments *)
-
-type constructor_description =
-  { cstr_name: string;                  (* Constructor name *)
-    cstr_res: type_expr;                (* Type of the result *)
-    cstr_existentials: type_expr list;  (* list of existentials *)
-    cstr_args: type_expr list;          (* Type of the arguments *)
-    cstr_arity: int;                    (* Number of arguments *)
-    cstr_tag: constructor_tag;          (* Tag for heap blocks *)
-    cstr_consts: int;                   (* Number of constant constructors *)
-    cstr_nonconsts: int;                (* Number of non-const constructors *)
-    cstr_generalized: bool;             (* Constrained return type? *)
-    cstr_private: private_flag;         (* Read-only constructor? *)
-    cstr_loc: Location.t;
-    cstr_attributes: Parsetree.attributes;
-    cstr_inlined: type_declaration option;
-    cstr_uid: Uid.t;
-   }
-
-and constructor_tag =
-    Cstr_constant of int                (* Constant constructor (an int) *)
-  | Cstr_block of int                   (* Regular constructor (a block) *)
-  | Cstr_unboxed                        (* Constructor of an unboxed type *)
-  | Cstr_extension of Path.t * bool     (* Extension constructor
-                                           true if a constant false if a block*)
-
-(* Constructors are the same *)
-val equal_tag :  constructor_tag -> constructor_tag -> bool
-
-(* Constructors may be the same, given potential rebinding *)
-val may_equal_constr :
-    constructor_description ->  constructor_description -> bool
-
-type label_description =
-  { lbl_name: string;                   (* Short name *)
-    lbl_res: type_expr;                 (* Type of the result *)
-    lbl_arg: type_expr;                 (* Type of the argument *)
-    lbl_mut: mutable_flag;              (* Is this a mutable field? *)
-    lbl_pos: int;                       (* Position in block *)
-    lbl_all: label_description array;   (* All the labels in this type *)
-    lbl_repres: record_representation;  (* Representation for this record *)
-    lbl_private: private_flag;          (* Read-only field? *)
-    lbl_loc: Location.t;
-    lbl_attributes: Parsetree.attributes;
-    lbl_uid: Uid.t;
-  }
-
-=======
->>>>>>> upstream-incoming
 (** Extracts the list of "value" identifiers bound by a signature.
     "Value" identifiers are identifiers for signature components that
     correspond to a run-time value: values, extensions, modules, classes.

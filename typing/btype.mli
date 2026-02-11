@@ -63,9 +63,6 @@ val generic_level: int
         (* level of polymorphic variables; = Ident.highest_scope *)
 val lowest_level: int
         (* lowest level for type nodes; = Ident.lowest_scope *)
-<<<<<<< oxcaml
-||||||| upstream-base
-=======
 
 val with_new_pool: level:int -> (unit -> 'a) -> 'a * transient_expr list
         (* [with_new_pool ~level f] executes [f] and returns the nodes
@@ -79,7 +76,6 @@ val newty3: level:int -> scope:int -> type_desc -> type_expr
         (* Create a type with a fresh id *)
 val newty2: level:int -> type_desc -> type_expr
         (* Create a type with a fresh id and no scope *)
->>>>>>> upstream-incoming
 
 val newgenty: type_desc -> type_expr
         (* Create a generic type *)
@@ -94,13 +90,8 @@ val newgenstub: scope:int -> jkind_lr -> type_expr
 val is_Tvar: type_expr -> bool
 val is_Tunivar: type_expr -> bool
 val is_Tconstr: type_expr -> bool
-<<<<<<< oxcaml
 val is_Tpoly: type_expr -> bool
-
-||||||| upstream-base
-=======
 val is_poly_Tpoly: type_expr -> bool
->>>>>>> upstream-incoming
 val dummy_method: label
 val type_kind_is_abstract: type_declaration -> bool
 val type_origin: type_declaration -> type_origin
@@ -331,14 +322,6 @@ val method_type : label -> class_signature -> type_expr
 (* Return the type of an instance variable.
    @raises [Assert_failure] if the class has no such method. *)
 val instance_variable_type : label -> class_signature -> type_expr
-<<<<<<< oxcaml
-
-(**** Forward declarations ****)
-val print_raw: (Format.formatter -> type_expr -> unit) ref
-
-(**** Type information getter ****)
-
-val cstr_type_path : constructor_description -> Path.t
 
 (* These modules exists here to resolve a dependency cycle: [Subst], [Predef],
    [Datarepr], and [Env] must not depend on [Jkind].  The portions intended for
@@ -759,13 +742,13 @@ module Jkind0 : sig
 
   include module type of Jkind
 end
-||||||| upstream-base
+
+(* CR sspies: upstream removed [print_raw] and [cstr_type_path] but oxcaml
+   still uses them. *)
 
 (**** Forward declarations ****)
 val print_raw: (Format.formatter -> type_expr -> unit) ref
 
 (**** Type information getter ****)
 
-val cstr_type_path : constructor_description -> Path.t
-=======
->>>>>>> upstream-incoming
+val cstr_type_path : Data_types.constructor_description -> Path.t

@@ -706,19 +706,6 @@ val spellcheck : string list -> string -> string list
     list of suggestions taken from [env], that are close enough to
     [name] that it may be a typo for one of them. *)
 
-<<<<<<< oxcaml
-val did_you_mean :
-    Format_doc.formatter -> (unit -> string list) -> unit
-(** [did_you_mean ppf get_choices] hints that the user may have meant
-    one of the option returned by calling [get_choices]. It does nothing
-    if the returned list is empty.
-||||||| upstream-base
-val did_you_mean : Format.formatter -> (unit -> string list) -> unit
-(** [did_you_mean ppf get_choices] hints that the user may have meant
-    one of the option returned by calling [get_choices]. It does nothing
-    if the returned list is empty.
-=======
->>>>>>> upstream-incoming
 
 val align_hint:
   prefix:string -> main:Format_doc.t -> hint:Format_doc.t ->
@@ -821,19 +808,11 @@ module Style : sig
     inline_code: tag_style;
   }
 
-<<<<<<< oxcaml
+  val hint: Format_doc.formatter -> unit
   val as_inline_code: 'a Format_doc.printer -> 'a Format_doc.printer
   val inline_code: string Format_doc.printer
 
   val as_clflag: string -> 'a Format_doc.printer -> 'a Format_doc.printer
-||||||| upstream-base
-  val as_inline_code: (Format.formatter -> 'a -> unit as 'printer) -> 'printer
-  val inline_code: Format.formatter -> string -> unit
-=======
-  val hint: Format_doc.formatter -> unit
-  val as_inline_code: 'a Format_doc.printer -> 'a Format_doc.printer
-  val inline_code: string Format_doc.printer
->>>>>>> upstream-incoming
 
   val default_styles: styles
   val get_styles: unit -> styles
@@ -864,33 +843,6 @@ val print_if :
 (** [print_if ppf flag fmt x] prints [x] with [fmt] on [ppf]
     if [flag] is true. *)
 
-<<<<<<< oxcaml
-val pp_two_columns :
-  ?sep:string -> ?max_lines:int ->
-  Format.formatter -> (string * string) list -> unit
-(** [pp_two_columns ?sep ?max_lines ppf l] prints the lines in [l] as two
-   columns separated by [sep] ("|" by default). [max_lines] can be used to
-   indicate a maximum number of lines to print -- an ellipsis gets inserted at
-   the middle if the input has too many lines.
-
-   Example:
-
-    {v pp_two_columns ~max_lines:3 Format.std_formatter [
-      "abc", "hello";
-      "def", "zzz";
-      "a"  , "bllbl";
-      "bb" , "dddddd";
-    ] v}
-
-    prints
-
-    {v
-    abc | hello
-    ...
-    bb  | dddddd
-    v}
-*)
-
 val pp_table : Format.formatter -> (string * string list) list -> unit
 (** [pp_table ppf l] prints the table [l], a list of columns with their
     header. The function fails with a fatal error if the columns have
@@ -918,36 +870,7 @@ val pp_nested_list :
     always called with [nested:true], indicating that any inner lists are nested
     and need parens. *)
 
-||||||| upstream-base
-val pp_two_columns :
-  ?sep:string -> ?max_lines:int ->
-  Format.formatter -> (string * string) list -> unit
-(** [pp_two_columns ?sep ?max_lines ppf l] prints the lines in [l] as two
-   columns separated by [sep] ("|" by default). [max_lines] can be used to
-   indicate a maximum number of lines to print -- an ellipsis gets inserted at
-   the middle if the input has too many lines.
 
-   Example:
-
-    {v pp_two_columns ~max_lines:3 Format.std_formatter [
-      "abc", "hello";
-      "def", "zzz";
-      "a"  , "bllbl";
-      "bb" , "dddddd";
-    ] v}
-
-    prints
-
-    {v
-    abc | hello
-    ...
-    bb  | dddddd
-    v}
-*)
-
-val print_see_manual : Format.formatter -> int list -> unit
-=======
->>>>>>> upstream-incoming
 val print_see_manual : int list Format_doc.printer
 (** See manual section *)
 
@@ -1192,7 +1115,6 @@ module Magic_number : sig
   val all_kinds : kind list
 end
 
-<<<<<<< oxcaml
 (** The result of a less-than-or-equal comparison *)
 module Le_result : sig
   type t =
@@ -1233,8 +1155,8 @@ end
 
 module type T4 = sig
   type ('a, 'b, 'c, 'd) t
-||||||| upstream-base
-=======
+end
+
 (** {1 Minimal support for Unicode characters in identifiers} *)
 
 (** Characters allowed in identifiers are, currently:
@@ -1293,7 +1215,6 @@ module Utf8_lexeme: sig
   (** Checks whether the given normalized string starts with an identifier
       character other than a digit or a single quote.  Subsequent characters
       are not checked. *)
->>>>>>> upstream-incoming
 end
 
 (** {1 Miscellaneous type aliases} *)

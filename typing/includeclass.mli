@@ -29,14 +29,6 @@ val class_declarations:
   class_match_failure list
 
 val report_error :
-<<<<<<< oxcaml
-  Printtyp.type_or_scheme -> class_match_failure list Format_doc.format_printer
-val report_error_doc :
-  Printtyp.type_or_scheme -> class_match_failure list Format_doc.printer
-||||||| upstream-base
-  Printtyp.type_or_scheme -> formatter -> class_match_failure list -> unit
-=======
   Out_type.type_or_scheme -> class_match_failure list Format_doc.format_printer
 val report_error_doc :
   Out_type.type_or_scheme -> class_match_failure list Format_doc.printer
->>>>>>> upstream-incoming

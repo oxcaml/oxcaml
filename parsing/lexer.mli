@@ -20,19 +20,9 @@
 
 *)
 
-<<<<<<< oxcaml
-val init : unit -> unit
-val token : Lexing.lexbuf -> Parser.token
-val skip_hash_bang : Lexing.lexbuf -> unit
-||||||| upstream-base
-val init : unit -> unit
-val token: Lexing.lexbuf -> Parser.token
-val skip_hash_bang: Lexing.lexbuf -> unit
-=======
 val init : ?keyword_edition:((int*int) option * string list) -> unit -> unit
 val token: Lexing.lexbuf -> Parser.token
 val skip_hash_bang: Lexing.lexbuf -> unit
->>>>>>> upstream-incoming
 
 type error =
   | Illegal_character of char

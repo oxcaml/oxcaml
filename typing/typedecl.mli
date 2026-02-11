@@ -59,8 +59,7 @@ val transl_with_constraint:
     Typedtree.type_declaration
 
 val transl_package_constraint:
-<<<<<<< oxcaml
-  loc:Location.t -> type_expr -> Types.type_declaration
+  loc:Location.t -> Env.t -> type_expr -> Types.type_declaration
 
 val abstract_type_decl:
   injective:bool ->
@@ -68,13 +67,6 @@ val abstract_type_decl:
   params:jkind_lr list ->
   type_declaration
 
-||||||| upstream-base
-val abstract_type_decl: injective:bool -> int -> type_declaration
-=======
-  loc:Location.t -> Env.t -> type_expr -> Types.type_declaration
-
-val abstract_type_decl: injective:bool -> int -> type_declaration
->>>>>>> upstream-incoming
 val approx_type_decl:
     Parsetree.type_declaration list -> (Ident.t * type_declaration) list
 val check_recmod_typedecl:
@@ -188,7 +180,6 @@ type error =
   | Boxed_and_unboxed
   | Nonrec_gadt
   | Invalid_private_row_declaration of type_expr
-<<<<<<< oxcaml
   | Local_not_enabled
   | Unexpected_layout_any_in_primitive of string
   | Useless_layout_poly
@@ -208,18 +199,10 @@ type error =
   | Atomic_field_in_mixed_block
   | Non_value_atomic_field
   | Layout_poly_unsupported
-||||||| upstream-base
-=======
-  | Atomic_field_must_be_mutable of string
->>>>>>> upstream-incoming
 
 exception Error of Location.t * error
 
-<<<<<<< oxcaml
-val report_error: error Format_doc.format_printer
-val report_error_doc: error Format_doc.printer
-||||||| upstream-base
-val report_error: formatter -> error -> unit
-=======
+(* CR sspies: upstream changed [report_error] to return [Location.report]. I
+   kept our doc version for now, but this should potentially be revisited. *)
 val report_error: loc:Location.t -> error -> Location.report
->>>>>>> upstream-incoming
+val report_error_doc: error Format_doc.printer

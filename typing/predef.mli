@@ -70,7 +70,6 @@ val type_int16: type_expr
 val type_int32: type_expr
 val type_int64: type_expr
 val type_lazy_t: type_expr -> type_expr
-<<<<<<< oxcaml
 val type_extension_constructor:type_expr
 val type_floatarray:type_expr
 val type_lexing_position:type_expr
@@ -135,14 +134,6 @@ val type_unboxed_int64x8: type_expr
 val type_unboxed_float16x32: type_expr
 val type_unboxed_float32x16: type_expr
 val type_unboxed_float64x8: type_expr
-||||||| upstream-base
-val type_extension_constructor:type_expr
-val type_floatarray:type_expr
-=======
-val type_extension_constructor: type_expr
-val type_floatarray: type_expr
-val type_atomic_loc: type_expr -> type_expr
->>>>>>> upstream-incoming
 
 val path_int: Path.t
 val path_char: Path.t
@@ -166,7 +157,7 @@ val path_int64: Path.t
 val path_lazy_t: Path.t
 val path_extension_constructor: Path.t
 val path_floatarray: Path.t
-<<<<<<< oxcaml
+val path_continuation: Path.t
 val path_lexing_position: Path.t
 val path_code: Path.t
 
@@ -229,10 +220,6 @@ val path_unboxed_int64x8: Path.t
 val path_unboxed_float16x32: Path.t
 val path_unboxed_float32x16: Path.t
 val path_unboxed_float64x8: Path.t
-||||||| upstream-base
-=======
-val path_continuation: Path.t
->>>>>>> upstream-incoming
 
 val path_match_failure: Path.t
 val path_invalid_argument: Path.t

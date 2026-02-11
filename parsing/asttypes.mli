@@ -72,7 +72,6 @@ type injectivity =
   | Injective
   | NoInjectivity
 
-<<<<<<< oxcaml
 type index_kind =
   | Index_int
   | Index_unboxed_int64
@@ -80,7 +79,5 @@ type index_kind =
   | Index_unboxed_int16
   | Index_unboxed_int8
   | Index_unboxed_nativeint
-||||||| upstream-base
-=======
+
 val string_of_label: arg_label -> string
->>>>>>> upstream-incoming

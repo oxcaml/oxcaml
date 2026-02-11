@@ -27,6 +27,7 @@
 
 open Typedtree
 open Types
+open Data_types
 
 val mkTvar : string option -> type_desc
 

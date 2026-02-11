@@ -209,16 +209,8 @@ val for_all : ('a : value_or_null). ('a -> bool) -> 'a t -> bool
 
     @since 4.14 *)
 
-<<<<<<< oxcaml
 val exists : ('a : value_or_null). ('a -> bool) -> 'a t -> bool
-(** [exists xs p] determines whether at least one element [x]
-||||||| upstream-base
-val exists : ('a -> bool) -> 'a t -> bool
-(** [exists xs p] determines whether at least one element [x]
-=======
-val exists : ('a -> bool) -> 'a t -> bool
 (** [exists p xs] determines whether at least one element [x]
->>>>>>> upstream-incoming
     of the sequence [xs] satisfies [p x].
 
     May not terminate if [xs] is infinite.
@@ -386,18 +378,12 @@ val cons : ('a : value_or_null). 'a -> 'a t -> 'a t
 
     @since 4.11 *)
 
-<<<<<<< oxcaml
-val init : ('a : value_or_null). int -> (int -> 'a) -> 'a t
-||||||| upstream-base
-val init : int -> (int -> 'a) -> 'a t
-=======
-val singleton: 'a -> 'a t
+val singleton : ('a : value_or_null). 'a -> 'a t
 (** [singleton x] returns the one-element sequence containing only [x].
 
     @since 5.4 *)
 
-val init : int -> (int -> 'a) -> 'a t
->>>>>>> upstream-incoming
+val init : ('a : value_or_null). int -> (int -> 'a) -> 'a t
 (** [init n f] is the sequence [f 0; f 1; ...; f (n-1)].
 
     [n] must be nonnegative.
@@ -494,13 +480,7 @@ val filter : ('a : value_or_null). ('a -> bool) -> 'a t -> 'a t
     In other words, [filter p xs] is the sequence [xs],
     deprived of the elements [x] such that [p x] is false. *)
 
-<<<<<<< oxcaml
-val filter_map : ('a : value_or_null) ('b : value_or_null)
-  . ('a -> 'b option) -> 'a t -> 'b t
-||||||| upstream-base
-val filter_map : ('a -> 'b option) -> 'a t -> 'b t
-=======
-val filteri : (int -> 'a -> bool) -> 'a t -> 'a t
+val filteri : ('a : value_or_null). (int -> 'a -> bool) -> 'a t -> 'a t
 (** Same as {!filter}, but the predicate is applied to the index of
    the element as first argument (counting from 0), and the element
    itself as second argument.
@@ -508,8 +488,8 @@ val filteri : (int -> 'a -> bool) -> 'a t -> 'a t
    @since 5.4
 *)
 
-val filter_map : ('a -> 'b option) -> 'a t -> 'b t
->>>>>>> upstream-incoming
+val filter_map : ('a : value_or_null) ('b : value_or_null)
+  . ('a -> 'b option) -> 'a t -> 'b t
 (** [filter_map f xs] is the sequence of the elements [y] such that
     [f x = Some y], where [x] ranges over [xs].
 

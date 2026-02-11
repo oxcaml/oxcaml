@@ -75,28 +75,24 @@ val is_right : ('a : value_or_null) ('b : value_or_null)
   . ('a, 'b) t -> bool
 (** [is_right (Left v)] is [false], [is_right (Right v)] is [true]. *)
 
-<<<<<<< oxcaml
-val find_left : ('a : value_or_null) ('b : value_or_null)
-  . ('a, 'b) t -> 'a option
-||||||| upstream-base
-val find_left : ('a, 'b) t -> 'a option
-=======
-val get_left : ('a, 'b) t -> 'a
+val get_left : ('a : value_or_null) ('b : value_or_null)
+  . ('a, 'b) t -> 'a
 (** [get_left e] is [v] if [e] is [Left v] and raise otherwise.
 
     @raise Invalid_argument if [e] is [Right _].
 
     @since 5.4 *)
 
-val get_right : ('a, 'b) t -> 'b
+val get_right : ('a : value_or_null) ('b : value_or_null)
+  . ('a, 'b) t -> 'b
 (** [get_right e] is [v] if [e] is [Right v] and raise otherwise.
 
     @raise Invalid_argument if [e] is [Left _].
 
     @since 5.4 *)
 
-val find_left : ('a, 'b) t -> 'a option
->>>>>>> upstream-incoming
+val find_left : ('a : value_or_null) ('b : value_or_null)
+  . ('a, 'b) t -> 'a option
 (** [find_left (Left v)] is [Some v], [find_left (Right _)] is [None] *)
 
 val find_right : ('a : value_or_null) ('b : value_or_null)
@@ -126,19 +122,13 @@ val fold : ('a : value_or_null) ('b : value_or_null) ('c : value_or_null).
 (** [fold ~left ~right (Left v)] is [left v], and
     [fold ~left ~right (Right v)] is [right v]. *)
 
-<<<<<<< oxcaml
-val iter : ('a : value_or_null) ('b : value_or_null)
-  . left:('a -> unit) -> right:('b -> unit) -> ('a, 'b) t -> unit
-||||||| upstream-base
-val iter : left:('a -> unit) -> right:('b -> unit) -> ('a, 'b) t -> unit
-=======
-val retract : ('a, 'a) t -> 'a
+val retract : ('a : value_or_null) . ('a, 'a) t -> 'a
 (** [retract (Left v)] is [v], and [retract (Right v)] is [v].
 
     @since 5.4 *)
 
-val iter : left:('a -> unit) -> right:('b -> unit) -> ('a, 'b) t -> unit
->>>>>>> upstream-incoming
+val iter : ('a : value_or_null) ('b : value_or_null)
+  . left:('a -> unit) -> right:('b -> unit) -> ('a, 'b) t -> unit
 (** [iter ~left ~right (Left v)] is [left v], and
     [iter ~left ~right (Right v)] is [right v]. *)
 

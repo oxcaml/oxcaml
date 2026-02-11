@@ -41,118 +41,12 @@ val get_unit_export_info
 val set_export_info : Flambda2_cmx.Flambda_cmx_format.t -> unit
         (* Set the export information for the current unit. *)
 
-<<<<<<< oxcaml
 val need_curry_fun:
   Lambda.function_kind -> Cmm.machtype list -> Cmm.machtype -> unit
 val need_apply_fun:
   Cmm.machtype list -> Cmm.machtype -> Cmx_format.alloc_mode -> unit
 val need_send_fun:
   Cmm.machtype list -> Cmm.machtype -> Cmx_format.alloc_mode -> unit
-||||||| upstream-base
-val current_unit_symbol: unit -> Symbol.t
-        (* flambda-only *)
-
-val symbol_separator: char
-        (* Return the module separator used when building symbol names. *)
-
-val make_symbol: ?unitname:string -> string option -> string
-        (* [make_symbol ~unitname:u None] returns the asm symbol that
-           corresponds to the compilation unit [u] (default: the current unit).
-           [make_symbol ~unitname:u (Some id)] returns the asm symbol that
-           corresponds to symbol [id] in the compilation unit [u]
-           (or the current unit). *)
-
-val symbol_in_current_unit: string -> bool
-        (* Return true if the given asm symbol belongs to the
-           current compilation unit, false otherwise. *)
-
-val is_predefined_exception: Symbol.t -> bool
-        (* flambda-only *)
-
-val unit_for_global: Ident.t -> Compilation_unit.t
-        (* flambda-only *)
-
-val symbol_for_global: Ident.t -> string
-        (* Return the asm symbol that refers to the given global identifier
-           flambda-only *)
-val symbol_for_global': Ident.t -> Symbol.t
-        (* flambda-only *)
-val global_approx: Ident.t -> Clambda.value_approximation
-        (* Return the approximation for the given global identifier
-           clambda-only *)
-val set_global_approx: Clambda.value_approximation -> unit
-        (* Record the approximation of the unit being compiled
-           clambda-only *)
-val record_global_approx_toplevel: unit -> unit
-        (* Record the current approximation for the current toplevel phrase
-           clambda-only *)
-
-val set_export_info: Export_info.t -> unit
-        (* Record the information of the unit being compiled
-           flambda-only *)
-val approx_env: unit -> Export_info.t
-        (* Returns all the information loaded from external compilation units
-           flambda-only *)
-val approx_for_global: Compilation_unit.t -> Export_info.t option
-        (* Loads the exported information declaring the compilation_unit
-           flambda-only *)
-
-val need_curry_fun: int -> unit
-val need_apply_fun: int -> unit
-val need_send_fun: int -> unit
-=======
-val current_unit_symbol: unit -> Symbol.t
-        (* flambda-only *)
-
-val symbol_separator: char
-        (* Return the module separator used when building symbol names. *)
-
-val escape_prefix: string
-        (* Return the escape prefix for hexadecimal escape sequences
-           in symbol names. *)
-
-val make_symbol: ?unitname:string -> string option -> string
-        (* [make_symbol ~unitname:u None] returns the asm symbol that
-           corresponds to the compilation unit [u] (default: the current unit).
-           [make_symbol ~unitname:u (Some id)] returns the asm symbol that
-           corresponds to symbol [id] in the compilation unit [u]
-           (or the current unit). *)
-
-val is_predefined_exception: Symbol.t -> bool
-        (* flambda-only *)
-
-val unit_for_global: Ident.t -> Compilation_unit.t
-        (* flambda-only *)
-
-val symbol_for_global: Ident.t -> string
-        (* Return the asm symbol that refers to the given global identifier
-           flambda-only *)
-val symbol_for_global': Ident.t -> Symbol.t
-        (* flambda-only *)
-val global_approx: Ident.t -> Clambda.value_approximation
-        (* Return the approximation for the given global identifier
-           clambda-only *)
-val set_global_approx: Clambda.value_approximation -> unit
-        (* Record the approximation of the unit being compiled
-           clambda-only *)
-val record_global_approx_toplevel: unit -> unit
-        (* Record the current approximation for the current toplevel phrase
-           clambda-only *)
-
-val set_export_info: Export_info.t -> unit
-        (* Record the information of the unit being compiled
-           flambda-only *)
-val approx_env: unit -> Export_info.t
-        (* Returns all the information loaded from external compilation units
-           flambda-only *)
-val approx_for_global: Compilation_unit.t -> Export_info.t option
-        (* Loads the exported information declaring the compilation_unit
-           flambda-only *)
-
-val need_curry_fun: int -> unit
-val need_apply_fun: int -> unit
-val need_send_fun: int -> unit
->>>>>>> upstream-incoming
         (* Record the need of a currying (resp. application,
            message sending) function with the given arity *)
 

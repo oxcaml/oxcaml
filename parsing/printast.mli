@@ -30,7 +30,6 @@ val constant: formatter -> constant -> unit
 
 val pattern: int -> formatter -> pattern -> unit
 val expression: int -> formatter -> expression -> unit
-val pattern: int -> formatter -> pattern -> unit
 val structure: int -> formatter -> structure -> unit
 val payload: int -> formatter -> payload -> unit
 val core_type: int -> formatter -> core_type -> unit

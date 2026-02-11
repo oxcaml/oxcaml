@@ -59,20 +59,11 @@ type out_value =
   | Oval_string of string * int * out_string (* string, size-to-print, kind *)
   | Oval_stuff of string
   | Oval_tuple of (string option * out_value) list
-<<<<<<< oxcaml
   | Oval_unboxed_tuple of (string option * out_value) list
-||||||| upstream-base
-  | Oval_tuple of out_value list
-=======
->>>>>>> upstream-incoming
   | Oval_variant of string * out_value option
   | Oval_lazy of out_value
-<<<<<<< oxcaml
   | Oval_code of CamlinternalQuote.Code.t
-||||||| upstream-base
-=======
   | Oval_floatarray of floatarray
->>>>>>> upstream-incoming
 
 type out_modality = string
 
@@ -141,41 +132,21 @@ and out_type =
   | Otyp_constr of out_ident * out_type list
   | Otyp_manifest of out_type * out_type
   | Otyp_object of { fields: (string * out_type) list; open_row:bool}
-<<<<<<< oxcaml
-  | Otyp_record of (string * out_mutability * out_type * out_modality list) list
-  | Otyp_record_unboxed_product of
-      (string * out_mutability * out_type * out_modality list) list
+  | Otyp_record of out_label list
+  | Otyp_record_unboxed_product of out_label list
   (* INVARIANT: [out_mutability] is included for uniformity with [Otyp_record],
      but it is always [Omm_immutable] *)
-||||||| upstream-base
-  | Otyp_record of (string * bool * out_type) list
-=======
-  | Otyp_record of out_label list
->>>>>>> upstream-incoming
   | Otyp_stuff of string
   | Otyp_sum of out_constructor list
   | Otyp_tuple of (string option * out_type) list
-<<<<<<< oxcaml
   | Otyp_unboxed_tuple of (string option * out_type) list
-||||||| upstream-base
-  | Otyp_tuple of out_type list
-=======
->>>>>>> upstream-incoming
   | Otyp_var of bool * string
   | Otyp_variant of out_variant * bool * (string list) option
-<<<<<<< oxcaml
   | Otyp_quote of out_type
   | Otyp_splice of out_type
   | Otyp_poly of out_vars_jkinds * out_type
   | Otyp_repr of string list * out_type
-  | Otyp_module of out_ident * (string * out_type) list
-||||||| upstream-base
-  | Otyp_poly of string list * out_type
-  | Otyp_module of out_ident * (string * out_type) list
-=======
-  | Otyp_poly of string list * out_type
   | Otyp_module of out_package
->>>>>>> upstream-incoming
   | Otyp_attribute of out_type * out_attribute
   | Otyp_jkind_annot of out_type * out_jkind
       (* Currently only introduced with very explicit code in [Printtyp] and not
@@ -186,9 +157,9 @@ and out_type =
 
 and out_label = {
   olab_name: string;
-  olab_mut: Asttypes.mutable_flag;
-  olab_atomic: Asttypes.atomic_flag;
+  olab_mut: out_mutability;
   olab_type: out_type;
+  olab_modalities: out_modality list;
 }
 
 and out_constructor = {
