@@ -377,13 +377,14 @@ module (F @ portable) () = struct
 end
 [%%expect{|
 val foo : unit -> unit = <fun>
-Line 4, characters 14-17:
+Lines 3-5, characters 22-3:
+3 | ......................() = struct
 4 |     let bar = foo
-                  ^^^
-Error: The value "foo" is "nonportable"
-       but is expected to be "portable"
-         because it is used inside the functor at lines 3-5, characters 22-3
-         which is expected to be "portable".
+5 | end
+Error: The module is "nonportable"
+         because it closes over the value "foo" at line 4, characters 14-17
+         which is "nonportable".
+       However, the module highlighted is expected to be "portable".
 |}]
 
 module (F @ portable) (X : sig val x : int -> int end) = struct

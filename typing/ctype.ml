@@ -7751,3 +7751,11 @@ let check_constructor_crossing_destruction
           (Mode.Crossing.apply_right mode_crossing max_bound))
         (fun () -> Ok min_bound))
     env lid tag ~res ~args held_locks
+
+let apply_is_contained_by is_contained_by ?(modalities = Modality.Const.id)
+  mode =
+  let hint =
+    { monadic = Hint.Is_contained_by (Monadic, is_contained_by);
+      comonadic = Hint.Is_contained_by (Comonadic, is_contained_by) }
+  in
+  Modality.Const.apply ~hint modalities mode

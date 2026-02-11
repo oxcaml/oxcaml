@@ -82,17 +82,25 @@ end
 Line 2, characters 15-16:
 2 |     let local_ x = "hello"
                    ^
-Error: This is "local", but expected to be "global" because it is inside a structure.
+Error: The expression is "local"
+       but is expected to be "global"
+         because it is the value "x" in the structure at line 2, characters 4-26
+         which is expected to be "global"
+         because modules always need to be allocated on the heap.
 |}]
 
 module M @ many = struct
     let (foo @ once) () = ()
 end
 [%%expect{|
-Line 2, characters 9-12:
+Lines 1-3, characters 18-3:
+1 | ..................struct
 2 |     let (foo @ once) () = ()
-             ^^^
-Error: This is "once", but expected to be "many" because it is inside a "many" structure.
+3 | end
+Error: The module is "once"
+         because it contains the value "foo" defined as the expression at line 2, characters 9-12
+         which is "once".
+       However, the module highlighted is expected to be "many".
 |}]
 
 (* Monadic axes don't have such constraint *)
@@ -210,7 +218,7 @@ end
 Line 9, characters 17-18:
 9 |     module M' = (M @ uncontended)
                      ^
-Error: This is "contended", but expected to be "uncontended".
+Error: The module is "contended" but is expected to be "uncontended".
 |}]
 
 module Module_type_nested = struct
@@ -257,7 +265,7 @@ module Module_type_nested :
       sig
         val x : 'a -> 'a @@ stateless
         module N : sig val y : string ref end
-      end @@ contended
+      end @@ stateless contended
   end
 |}]
 
@@ -303,9 +311,6 @@ end
 [%%expect{|
 module Inclusion_fail :
   sig module M : sig val x : string ref end @@ contended end @@ stateless
-|}, Principal{|
-module Inclusion_fail :
-  sig module M : sig val x : string ref end @@ contended end
 |}]
 
 module Inclusion_fail = struct
@@ -404,8 +409,6 @@ end
 [%%expect{|
 module Inclusion_match : sig module M : sig val x : int ref end end @@
   stateless
-|}, Principal{|
-module Inclusion_match : sig module M : sig val x : int ref end end
 |}]
 
 (* [foo] closes over [M.x] instead of [M]. This is better ergonomics. *)
@@ -668,7 +671,7 @@ end = struct
   let foo @ nonportable contended = 42
 end
 [%%expect{|
-module M : sig val foo : int @@ portable end @@ stateless nonportable
+module M : sig val foo : int @@ portable end @@ stateless
 |}]
 
 (* The RHS type (expected type) is used for mode crossing. The following still
@@ -681,7 +684,7 @@ end = struct
   let t @ nonportable contended = 42
 end
 [%%expect{|
-module M : sig type t val t : t @@ portable end @@ stateless nonportable
+module M : sig type t val t : t @@ portable end @@ stateless
 |}]
 
 (* LHS type is a subtype of RHS type, which means more type-level information.
@@ -695,7 +698,6 @@ end = struct
 end
 [%%expect{|
 module M : sig val t : [ `Bar | `Foo ] @@ portable end @@ stateless
-  nonportable
 |}]
 
 module M : sig
@@ -1405,7 +1407,9 @@ Line 2, characters 18-19:
 2 |   let k = (module M : Class) in
                       ^
 Error: The class "M.cla" is "nonportable"
-       but is expected to be "portable"
+         because it contains the class "cla" defined as the class at line 38, characters 2-24
+         which is "nonportable" because classes are always at the legacy modes.
+       However, the class "M.cla" highlighted is expected to be "portable"
          because it is used inside the function at lines 1-3, characters 21-3
          which is expected to be "portable".
 |}]
@@ -1545,10 +1549,14 @@ module M @ portable = struct
   class foo = object end
 end
 [%%expect{|
-Line 2, characters 2-24:
+Lines 1-3, characters 22-3:
+1 | ......................struct
 2 |   class foo = object end
-      ^^^^^^^^^^^^^^^^^^^^^^
-Error: This is "nonportable", but expected to be "portable" because it is inside a "portable" structure.
+3 | end
+Error: The module is "nonportable"
+         because it contains the class "foo" defined as the class at line 2, characters 2-24
+         which is "nonportable" because classes are always at the legacy modes.
+       However, the module highlighted is expected to be "portable".
 |}]
 
 module M @ nonportable = struct class foo = object end end
@@ -1565,7 +1573,9 @@ Error: Signature mismatch:
          sig class foo : object  end end @ portable
        Class declarations foo do not match:
        First is "nonportable"
-       but second is "portable".
+         because it contains the class "foo" defined as the class at line 1, characters 32-54
+         which is "nonportable" because classes are always at the legacy modes.
+       However, second is "portable".
 |}]
 
 module M = struct
