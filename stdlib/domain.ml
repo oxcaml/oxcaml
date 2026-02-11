@@ -485,8 +485,10 @@ module type S = sig
   val max_domain_count : int
   val self_index : unit -> int @@ portable
   val before_first_spawn : (unit -> unit) -> unit @@ nonportable
+    [@@warning "-redundant-modality"]
   val at_exit : (unit -> unit) @ portable -> unit @@ portable
   val do_at_exit : unit -> unit @@ nonportable
+    [@@warning "-redundant-modality"]
 end
 
 let runtime_4_impl = (module Runtime_4 : S)

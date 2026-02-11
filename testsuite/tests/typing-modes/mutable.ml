@@ -28,16 +28,31 @@ val foo : string @ local -> r @ local = <fun>
 
 type r = {mutable s : string @@ global}
 [%%expect{|
+Line 1, characters 32-38:
+1 | type r = {mutable s : string @@ global}
+                                    ^^^^^^
+Warning 217 [redundant-modality]: This global modality is redundant.
+
 type r = { mutable s : string; }
 |}]
 
 type r = {mutable s : string @@ global yielding}
 [%%expect{|
+Line 1, characters 32-38:
+1 | type r = {mutable s : string @@ global yielding}
+                                    ^^^^^^
+Warning 217 [redundant-modality]: This global modality is redundant.
+
 type r = { mutable s : string @@ yielding; }
 |}]
 
 type r = {mutable s : string @@ yielding global}
 [%%expect{|
+Line 1, characters 41-47:
+1 | type r = {mutable s : string @@ yielding global}
+                                             ^^^^^^
+Warning 217 [redundant-modality]: This global modality is redundant.
+
 type r = { mutable s : string @@ yielding; }
 |}]
 
@@ -48,11 +63,21 @@ type r = { mutable s : string @@ yielding; }
 
 type r = {mutable s : string @@ local yielding}
 [%%expect{|
+Line 1, characters 38-46:
+1 | type r = {mutable s : string @@ local yielding}
+                                          ^^^^^^^^
+Warning 217 [redundant-modality]: This yielding modality is redundant.
+
 type r = { mutable s : string @@ local; }
 |}]
 
 type r = {mutable s : string @@ yielding local}
 [%%expect{|
+Line 1, characters 32-40:
+1 | type r = {mutable s : string @@ yielding local}
+                                    ^^^^^^^^
+Warning 217 [redundant-modality]: This yielding modality is redundant.
+
 type r = { mutable s : string @@ local; }
 |}]
 
@@ -108,6 +133,11 @@ val foo : string r @ local -> unit = <fun>
   the same as the mutable-implied ones. *)
 type r' = {mutable s' : string @@ global}
 [%%expect{|
+Line 1, characters 34-40:
+1 | type r' = {mutable s' : string @@ global}
+                                      ^^^^^^
+Warning 217 [redundant-modality]: This global modality is redundant.
+
 type r' = { mutable s' : string; }
 |}]
 
