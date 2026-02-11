@@ -38,7 +38,7 @@ type iterator =
     env: iterator -> Env.t -> unit;
     expr: iterator -> expression -> unit;
     extension_constructor: iterator -> extension_constructor -> unit;
-    jkind_annotation: iterator -> Parsetree.jkind_annotation -> unit;
+    jkind: iterator -> Types.jkind_lr -> unit;
     location: iterator -> Location.t -> unit;
     modalities: iterator -> modalities -> unit;
     modes: 'a. iterator -> 'a modes -> unit;

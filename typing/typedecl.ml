@@ -580,7 +580,17 @@ let transl_constructor_arguments ~new_var_jkind ~unboxed
 let make_constructor
       env loc ~cstr_path ~type_path ~unboxed type_params svars
       sargs sret_type =
-  let tvars = List.map (fun (v, l) -> v.txt, l) svars in
+  let tvars =
+    List.map
+      (fun (v, l) ->
+        v.txt,
+        Option.map
+          (Jkind.of_annotation
+            ~context:(Constructor_type_parameter
+              (cstr_path, v.txt)))
+          l)
+      svars
+  in
   match sret_type with
   | None ->
       let args, targs =
@@ -870,11 +880,13 @@ let transl_declaration env sdecl (id, uid) =
     cty.ctyp_type  (* CR layouts v2.8: Do this more efficiently. Or probably
                       add with-kinds to Typedtree. Internal ticekt 4435. *)
   in
-  let jkind_from_annotation, jkind_annotation =
-    match Jkind.of_type_decl ~context:(Type_declaration path) ~transl_type sdecl with
-    | Some (jkind, annot) ->
-        Some jkind, annot
-    | None -> None, None
+  let jkind_from_annotation =
+    match Jkind.of_type_decl
+            ~context:(Type_declaration path)
+            ~transl_type sdecl
+    with
+    | Some (jkind, _annot) -> Some jkind
+    | None -> None
   in
   let (tman, man) = match sdecl.ptype_manifest with
       None -> None, None
@@ -1123,7 +1135,7 @@ let transl_declaration env sdecl (id, uid) =
         typ_kind = tkind;
         typ_private = sdecl.ptype_private;
         typ_attributes = sdecl.ptype_attributes;
-        typ_jkind_annotation = jkind_annotation
+        typ_jkind = jkind_from_annotation
       }
     in
     decl
@@ -4234,7 +4246,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
     typ_kind = Ttype_abstract;
     typ_private = sdecl.ptype_private;
     typ_attributes = sdecl.ptype_attributes;
-    typ_jkind_annotation = Jkind.get_annotation type_jkind;
+    typ_jkind = Some type_jkind;
   }
   end
   ~post:(fun ttyp -> generalize_decl ttyp.typ_type)

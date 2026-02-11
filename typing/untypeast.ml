@@ -153,7 +153,7 @@ let attributes sub l = List.map (sub.attribute sub) l
 
 let var_jkind ~loc (var, jkind) =
   let add_loc x = mkloc x loc in
-  add_loc var, jkind
+  add_loc var, Option.bind jkind Jkind.get_annotation
 
 let structure sub str =
   List.map (sub.structure_item sub) str.str_items
@@ -244,7 +244,8 @@ let type_declaration sub decl =
     ~priv:decl.typ_private
     ?manifest:(Option.map (sub.typ sub) decl.typ_manifest)
     ~docs:Docstrings.empty_docs
-    ?jkind_annotation:decl.typ_jkind_annotation
+    ?jkind_annotation:(Option.bind decl.typ_jkind
+                         Jkind.get_annotation)
     (map_loc sub decl.typ_name)
 
 let type_kind sub tk = match tk with
@@ -378,7 +379,12 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
             None -> None
           | Some (vl, ty) ->
               let vl =
-                List.map (fun (x, jk) -> {x with txt = Ident.name x.txt}, jk) vl
+                List.map
+                  (fun (x, jkind) ->
+                     {x with txt = Ident.name x.txt},
+                     Option.bind jkind
+                       Jkind.get_annotation)
+                  vl
               in
               Some (vl, sub.typ sub ty)
         in
@@ -426,7 +432,10 @@ let exp_extra sub (extra, loc, attrs) sexp =
         Pexp_constraint (sexp, Some (sub.typ sub cty), [])
     | Texp_poly cto -> Pexp_poly (sexp, Option.map (sub.typ sub) cto)
     | Texp_newtype (_, label_loc, jkind, _) ->
-        Pexp_newtype (label_loc, jkind, sexp)
+        Pexp_newtype
+          (label_loc,
+           Option.bind jkind Jkind.get_annotation,
+           sexp)
     | Texp_stack -> Pexp_stack sexp
     | Texp_mode modes ->
         Pexp_constraint (sexp, None, Typemode.untransl_mode modes)
@@ -592,8 +601,13 @@ let expression sub exp =
                let default_arg = Option.map (sub.expr sub) default_arg in
                let newtypes =
                  List.map
-                   (fun (_, x, annot, _) ->
-                      { pparam_desc = Pparam_newtype (x, annot);
+                   (fun (_, x, jkind, _) ->
+                      let annot =
+                        Option.bind jkind
+                          Jkind.get_annotation
+                      in
+                      { pparam_desc =
+                          Pparam_newtype (x, annot);
                         pparam_loc = x.loc;
                       })
                    fp.fp_newtypes
@@ -1055,8 +1069,11 @@ let core_type sub ct =
   let loc = sub.location sub ct.ctyp_loc in
   let attrs = sub.attributes sub ct.ctyp_attributes in
   let desc = match ct.ctyp_desc with
-    | Ttyp_var (None, jkind) -> Ptyp_any jkind
-    | Ttyp_var (Some s, jkind) -> Ptyp_var (s, jkind)
+    | Ttyp_var (None, jkind) ->
+        Ptyp_any (Option.bind jkind Jkind.get_annotation)
+    | Ttyp_var (Some s, jkind) ->
+        Ptyp_var
+          (s, Option.bind jkind Jkind.get_annotation)
     | Ttyp_arrow (arg_label, ct1, modes1, ct2, modes2) ->
         let modes1 = Typemode.untransl_mode modes1 in
         let modes2 = Typemode.untransl_mode modes2 in
@@ -1078,7 +1095,9 @@ let core_type sub ct =
     | Ttyp_alias (_, None, None) ->
         Misc.fatal_error "anonymous alias without layout annotation in Untypeast"
     | Ttyp_alias (ct, s, jkind) ->
-        Ptyp_alias (sub.typ sub ct, s, jkind)
+        Ptyp_alias
+          (sub.typ sub ct, s,
+           Option.bind jkind Jkind.get_annotation)
     | Ttyp_variant (list, bool, labels) ->
         Ptyp_variant (List.map (sub.row_field sub) list, bool, labels)
     | Ttyp_poly (list, ct) ->
@@ -1091,7 +1110,15 @@ let core_type sub ct =
     | Ttyp_repr (list, ct) ->
         let bound_vars = List.map (fun v -> mkloc v loc) list in
         Ptyp_repr (bound_vars, sub.typ sub ct)
-    | Ttyp_of_kind jkind -> Ptyp_of_kind jkind
+    | Ttyp_of_kind jkind ->
+        let annot =
+          match Jkind.get_annotation jkind with
+          | Some annot -> annot
+          | None ->
+            Misc.fatal_error
+              "untypeast: Ttyp_of_kind without annotation"
+        in
+        Ptyp_of_kind annot
     | Ttyp_call_pos ->
         Ptyp_extension call_pos_extension
   in

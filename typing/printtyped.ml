@@ -206,12 +206,12 @@ let typevar_jkind ~print_quote ppf (v, l) =
     then Pprintast.tyvar
     else fun ppf s -> fprintf ppf "%s" s
   in
-  match l with
+  match Option.bind l Jkind.get_annotation with
   | None -> fprintf ppf " %a" pptv v
-  | Some jkind ->
+  | Some annot ->
       fprintf ppf " (%a : %a)"
         pptv v
-        Pprintast.jkind_annotation jkind
+        Pprintast.jkind_annotation annot
 
 let tuple_component_label i ppf = function
   | None -> line i ppf "Label: None\n"
@@ -273,8 +273,12 @@ let attributes i ppf l =
     Printast.payload (i + 1) ppf a.Parsetree.attr_payload
   ) l
 
-let jkind_annotation i ppf jkind =
-  line i ppf "%a" Pprintast.jkind_annotation jkind
+let jkind i ppf jk =
+  match Jkind.get_annotation jk with
+  | Some annot ->
+    line i ppf "%a" Pprintast.jkind_annotation annot
+  | None ->
+    line i ppf "<no annotation>"
 
 let mode_desc i ppf modes_annot =
   let print_mode_annot i ppf { txt = (Mode.Alloc.Atom (ax, mode)); loc = _ } =
@@ -349,9 +353,9 @@ let rec core_type i ppf x =
   attributes i ppf x.ctyp_attributes;
   let i = i+1 in
   match x.ctyp_desc with
-  | Ttyp_var (s, jkind) ->
+  | Ttyp_var (s, jk) ->
       line i ppf "Ttyp_var %s\n" (Option.value ~default:"_" s);
-      option i jkind_annotation ppf jkind
+      option i jkind ppf jk
   | Ttyp_arrow (l, ct1, m1, ct2, m2) ->
       line i ppf "Ttyp_arrow\n";
       arg_label i ppf l;
@@ -388,13 +392,13 @@ let rec core_type i ppf x =
   | Ttyp_class (li, _, l) ->
       line i ppf "Ttyp_class %a\n" fmt_path li;
       list i core_type ppf l;
-  | Ttyp_alias (ct, s, jkind) ->
+  | Ttyp_alias (ct, s, jk) ->
       line i ppf "Ttyp_alias \"%s\"\n"
         (match s with
          | None -> "_"
          | Some { txt; loc = _ } -> txt);
       core_type i ppf ct;
-      option i jkind_annotation ppf jkind
+      option i jkind ppf jk
   | Ttyp_poly (sl, ct) ->
       line i ppf "Ttyp_poly%a\n"
         (fun ppf -> List.iter (typevar_jkind ~print_quote:true ppf)) sl;
@@ -415,8 +419,8 @@ let rec core_type i ppf x =
       line i ppf "Ttyp_repr%a\n"
         (fun ppf -> List.iter (typevar_no_jkind ~print_quote:true ppf)) lv;
       core_type i ppf ct
-  | Ttyp_of_kind jkind ->
-      line i ppf "Ttyp_of_kind %a\n" (jkind_annotation i) jkind;
+  | Ttyp_of_kind jk ->
+      line i ppf "Ttyp_of_kind %a\n" (jkind i) jk;
   | Ttyp_call_pos -> line i ppf "Ttyp_call_pos\n";
 
 and labeled_core_type i ppf (l, t) =

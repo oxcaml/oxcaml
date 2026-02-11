@@ -2635,7 +2635,7 @@ let rec quote_module_path loc = function
 let type_for_annotation ~env ~loc typ =
   let unwrap_univar ty =
     match get_desc ty with
-    | Tunivar { name = Some name; jkind } -> Some (name, jkind.annotation)
+    | Tunivar { name = Some name; jkind } -> Some (name, Some jkind)
     | Tunivar { name = None; jkind = _ } -> None
     | _ ->
       fatal_errorf
@@ -2649,12 +2649,12 @@ let type_for_annotation ~env ~loc typ =
   let rec go aliased ty =
     let ctyp_desc =
       if aliasable ty && List.memq ty aliased
-      then Ttyp_var (None, (Jkind.Builtin.any ~why:Wildcard).annotation)
+      then Ttyp_var (None, None)
       else
         let go = go (ty :: aliased) in
         match get_desc ty with
         | Tvar { name = _; jkind } | Tof_kind jkind ->
-          Ttyp_var (None, jkind.annotation)
+          Ttyp_var (None, Some jkind)
         | Tunivar _ ->
           let name, jkind_annotation = unwrap_univar ty |> Option.get in
           Ttyp_var (Some name, jkind_annotation)
