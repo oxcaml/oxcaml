@@ -6,8 +6,8 @@
 void marker_trace_start() { }
 void marker_trace_end() { }
 
-static volatile void (*trace_start)(void) = &marker_trace_start;
-static volatile void (*trace_end)(void) = &marker_trace_end;
+static void (*volatile trace_start)(void) = &marker_trace_start;
+static void (*volatile trace_end)(void) = &marker_trace_end;
 
 
 value trace_steps(value f) {
