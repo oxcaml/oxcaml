@@ -869,6 +869,7 @@ module Operand = struct
     | Mem : 'm Addressing_mode.t -> [`Mem of 'm] t
     | Bitmask : Bitmask.t -> [`Bitmask] t
     | Optional : 'a t option -> [`Optional of 'a option] t
+    | Sys_reg : string -> [`Sys_reg] t
     | Unit : unit t
   [@@ocaml.warning "-37"]
 
@@ -897,6 +898,7 @@ module Operand = struct
     | Mem m -> Format.fprintf ppf "%a" Addressing_mode.print m
     | Bitmask b -> Bitmask.print ppf b
     | Optional opt -> ( match opt with Some op -> print ppf op | None -> ())
+    | Sys_reg name -> Format.fprintf ppf "%s" name
     | Unit -> ()
 
   module Wrapped = struct
@@ -1925,6 +1927,13 @@ module Instruction_name = struct
              * [`Reg of [`Neon of [`Vector of 'src_arr * 'src_w]]] )
            t
     | YIELD : (singleton, unit) t
+    | MRS : (pair, [`Reg of [`GP of [`X]]] * [`Sys_reg]) t
+    | CRC32CX :
+        ( triple,
+          [`Reg of [`GP of [`W]]]
+          * [`Reg of [`GP of [`W]]]
+          * [`Reg of [`GP of [`X]]] )
+        t
     | ZIP1 :
         ( triple,
           [ `Reg of
@@ -2095,6 +2104,8 @@ module Instruction_name = struct
         | XTN _ -> "xtn"
         | XTN2 _ -> "xtn2"
         | YIELD -> "yield"
+        | MRS -> "mrs"
+        | CRC32CX -> "crc32cx"
         | ZIP1 -> "zip1"
         | ZIP2 -> "zip2")
   end
@@ -2123,7 +2134,7 @@ module Instruction_name = struct
             failwith "vector_to_lane_operand: not a vector register")
         | Imm _ | Lsl_by_twelve | Shift _ | Lsl_by_multiple_of_16_bits _
         | Shift_by_element_width _ | Cond _ | Float_cond _ | Mem _ | Bitmask _
-        | Optional _ | Unit ->
+        | Optional _ | Unit | Sys_reg _ ->
           failwith "vector_to_lane_operand: not a register operand"
       in
       match instr with
@@ -2619,6 +2630,12 @@ module Instruction_name = struct
         let (Pair (rd, rs)) = ops in
         [| o rd; o rs |]
       | YIELD -> [||]
+      | MRS ->
+        let (Pair (rd, sys_reg)) = ops in
+        [| o rd; o sys_reg |]
+      | CRC32CX ->
+        let (Triple (rd, rn, rm)) = ops in
+        [| o rd; o rn; o rm |]
       | ZIP1 ->
         let (Triple (rd, rs1, rs2)) = ops in
         [| o rd; o rs1; o rs2 |]
@@ -2944,6 +2961,8 @@ module DSL = struct
     Operand.Bitmask n
 
   let cond c = Operand.Cond c
+
+  let sys_reg name : _ Operand.t = Operand.Sys_reg name
 
   (* CR sspies: probably these should be part of the instruction name instead *)
   let float_cond c = Operand.Float_cond c

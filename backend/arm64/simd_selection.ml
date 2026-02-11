@@ -413,6 +413,8 @@ let select_simd_instr op args dbg =
   | "caml_neon_int16x8_dup_lane" ->
     let lane, args = extract_constant args ~max:7 op dbg in
     Some (Dupq_lane_s16 { lane }, args)
+  | "caml_sse42_int64_crc" | "caml_sse42_int_untagged_crc" ->
+    Some (Crc32cx, args)
   | _ -> None
 
 let select_operation_cfg op args dbg =

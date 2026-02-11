@@ -451,6 +451,7 @@ module Operand : sig
     | Mem : 'm Addressing_mode.t -> [`Mem of 'm] t
     | Bitmask : Bitmask.t -> [`Bitmask] t
     | Optional : 'a t option -> [`Optional of 'a option] t
+    | Sys_reg : string -> [`Sys_reg] t
     | Unit : unit t
 
   (** {2 Convenience type aliases for common operand patterns} *)
@@ -1562,6 +1563,13 @@ module Instruction_name : sig
              * [`Reg of [`Neon of [`Vector of 'src_arr * 'src_w]]] )
            t
     | YIELD : (singleton, unit) t
+    | MRS : (pair, [`Reg of [`GP of [`X]]] * [`Sys_reg]) t
+    | CRC32CX :
+        ( triple,
+          [`Reg of [`GP of [`W]]]
+          * [`Reg of [`GP of [`W]]]
+          * [`Reg of [`GP of [`X]]] )
+        t
     | ZIP1 :
         ( triple,
           [ `Reg of
@@ -1758,6 +1766,8 @@ module DSL : sig
     [`Mem of [> `Post_pair]] Operand.t
 
   val cond : Cond.t -> [`Cond] Operand.t
+
+  val sys_reg : string -> [`Sys_reg] Operand.t
 
   val float_cond : Float_cond.t -> [`Float_cond] Operand.t
 

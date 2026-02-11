@@ -551,6 +551,9 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
     let rm = reg_d arg.(1) in
     ins2 FCMP (rn, rm);
     ins4 FCSEL (rd, rn, rm, O.cond Cond.GT)
+  (* CRC32C on 64-bit data *)
+  | Crc32cx ->
+    A.ins3 CRC32CX (H.reg_w res.(0)) (H.reg_w arg.(0)) (H.reg_x arg.(1))
 
 (* Record live pointers at call points *)
 
@@ -948,7 +951,8 @@ let num_call_gc_points instr =
            ( Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
            | Inegmulsubf | Isqrtf | Imove32
            | Ishiftarith (_, _)
-           | Ibswap _ | Isignext _ | Isimd _ ))
+           | Ibswap _ | Isignext _ | Icntvct | Ildbar | Istbar | Imbar | Isimd _
+             ))
     | Lop
         ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
         | Dls_get | Tls_get | Domain_index | Const_int _ | Const_float32 _
@@ -1202,6 +1206,7 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Specific (Ibswap { bitwidth = Thirtytwo | Sixtyfour })) -> 1
     | Lop (Specific Imove32) -> 1
     | Lop (Specific (Isignext _)) -> 1
+    | Lop (Specific (Icntvct | Ildbar | Istbar | Imbar)) -> 1
     | Lop (Name_for_debugger _) -> 0
     | Lcall_op (Lprobe _) ->
       Misc.fatal_error "Optimized probes not supported on arm64."
@@ -1945,6 +1950,11 @@ let emit_instr i =
   | Lop (Specific (Isignext size)) ->
     let rd, rn = H.reg_x i.res.(0), H.reg_x i.arg.(0) in
     A.ins4 SBFM rd rn (O.imm_six 0) (O.imm_six (size - 1))
+  | Lop (Specific Icntvct) ->
+    A.ins2 MRS (H.reg_x i.res.(0)) (O.sys_reg "cntvct_el0")
+  | Lop (Specific Ildbar) -> A.ins0 (DMB ISHLD)
+  | Lop (Specific Istbar) -> A.ins0 (DMB ISHST)
+  | Lop (Specific Imbar) -> A.ins0 (DMB ISH)
   | Lop (Specific (Isimd simd)) -> simd_instr simd i
   | Lop (Name_for_debugger _) -> ()
   | Lcall_op (Lprobe _) ->

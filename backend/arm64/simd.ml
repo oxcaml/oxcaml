@@ -307,6 +307,7 @@ type operation =
   | Mullq_u16
   | Mullq_high_s16
   | Mullq_high_u16
+  | Crc32cx
 
 let print_name op =
   match op with
@@ -493,6 +494,7 @@ let print_name op =
   | Mullq_u16 -> "Mullq_u16"
   | Mullq_high_s16 -> "Mullq_high_s16"
   | Mullq_high_u16 -> "Mullq_high_u16"
+  | Crc32cx -> "Crc32cx"
 
 let print_operation printreg op ppf arg =
   (* CR gyorsh: does not support memory operands (except stack operands). *)
@@ -646,7 +648,8 @@ let equal_operation op1 op2 =
   | Mullq_s16, Mullq_s16
   | Mullq_u16, Mullq_u16
   | Mullq_high_s16, Mullq_high_s16
-  | Mullq_high_u16, Mullq_high_u16 ->
+  | Mullq_high_u16, Mullq_high_u16
+  | Crc32cx, Crc32cx ->
     true
   | Extq_u8 n1, Extq_u8 n2
   | Shrq_n_s32 n1, Shrq_n_s32 n2
@@ -725,7 +728,7 @@ let equal_operation op1 op2 =
       | Qmovn_high_s32 | Qmovn_s32 | Qmovn_high_u32 | Qmovn_u32 | Qmovn_high_s16
       | Qmovn_s16 | Qmovn_high_u16 | Qmovn_u16 | Movn_high_s64 | Movn_s64
       | Movn_high_s32 | Movn_s32 | Movn_high_s16 | Movn_s16 | Mullq_s16
-      | Mullq_u16 | Mullq_high_s16 | Mullq_high_u16 ),
+      | Mullq_u16 | Mullq_high_s16 | Mullq_high_u16 | Crc32cx ),
       _ ) ->
     false
 
@@ -763,7 +766,7 @@ let class_of_operation op =
   | Qmovn_high_u32 | Qmovn_u32 | Qmovn_high_s16 | Qmovn_s16 | Qmovn_high_u16
   | Qmovn_u16 | Movn_high_s64 | Movn_s64 | Movn_high_s32 | Movn_s32
   | Movn_high_s16 | Movn_s16 | Mullq_s16 | Mullq_u16 | Mullq_high_s16
-  | Mullq_high_u16 ->
+  | Mullq_high_u16 | Crc32cx ->
     Pure
 
 let operation_is_pure op = match class_of_operation op with Pure -> true

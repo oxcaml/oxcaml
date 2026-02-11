@@ -79,6 +79,10 @@ type specific_operation =
   | Ibswap of { bitwidth: bswap_bitwidth; } (* endianness conversion *)
   | Imove32       (* 32-bit integer move *)
   | Isignext of int (* sign extension *)
+  | Icntvct         (* read virtual timer count *)
+  | Ildbar          (* load barrier: DMB ISHLD *)
+  | Istbar          (* store barrier: DMB ISHST *)
+  | Imbar           (* full memory barrier: DMB ISH *)
   | Isimd of Simd.operation
   | Illvm_intrinsic of string
 
@@ -227,6 +231,14 @@ let print_specific_operation printreg op ppf arg =
   | Isignext n ->
       fprintf ppf "signext%d %a"
         n printreg arg.(0)
+  | Icntvct ->
+      fprintf ppf "cntvct"
+  | Ildbar ->
+      fprintf ppf "ldbar"
+  | Istbar ->
+      fprintf ppf "stbar"
+  | Imbar ->
+      fprintf ppf "mbar"
   | Isimd op ->
     Simd.print_operation printreg op ppf arg
   | Illvm_intrinsic name ->
@@ -257,6 +269,10 @@ let specific_operation_name : specific_operation -> string = fun op ->
   | Ibswap _ -> "bswap"
   | Imove32 -> "move32"
   | Isignext _ -> "signext"
+  | Icntvct -> "cntvct"
+  | Ildbar -> "ldbar"
+  | Istbar -> "stbar"
+  | Imbar -> "mbar"
   | Isimd _ -> "simd"
   | Illvm_intrinsic _ -> "llvm_intrinsic"
 
@@ -296,11 +312,16 @@ let equal_specific_operation left right =
     Int.equal (int_of_bswap_bitwidth left) (int_of_bswap_bitwidth right)
   | Imove32, Imove32 -> true
   | Isignext left, Isignext right -> Int.equal left right
+  | Icntvct, Icntvct -> true
+  | Ildbar, Ildbar -> true
+  | Istbar, Istbar -> true
+  | Imbar, Imbar -> true
   | Isimd left, Isimd right -> Simd.equal_operation left right
   | Illvm_intrinsic left, Illvm_intrinsic right -> String.equal left right
   | (Ifar_alloc _  | Ifar_poll  | Ishiftarith _
     | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
-    | Inegmulsubf | Isqrtf | Ibswap _ | Imove32 | Isignext _ | Isimd _
+    | Inegmulsubf | Isqrtf | Ibswap _ | Imove32 | Isignext _
+    | Icntvct | Ildbar | Istbar | Imbar | Isimd _
     | Illvm_intrinsic _), _ -> false
 
 let isomorphic_specific_operation op1 op2 =
@@ -310,6 +331,7 @@ let isomorphic_specific_operation op1 op2 =
 
 let operation_is_pure : specific_operation -> bool = function
   | Ifar_alloc _ | Ifar_poll -> false
+  | Icntvct | Ildbar | Istbar | Imbar -> false
   | Ishiftarith _ -> true
   | Imuladd -> true
   | Imulsub -> true
@@ -345,6 +367,7 @@ let operation_allocates = function
   | Ishiftarith (_, _)
   | Isignext _
   | Ibswap _
+  | Icntvct | Ildbar | Istbar | Imbar
   | Isimd _ -> false
   | Illvm_intrinsic _intr ->
       (* Used by the zero_alloc checker that runs before the Llvmize. *)

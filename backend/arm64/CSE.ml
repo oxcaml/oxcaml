@@ -43,6 +43,7 @@ let class_of_operation (op : Operation.t)
       | Ibswap _
       | Imove32
       | Isignext _ -> Op_pure
+      | Icntvct | Ildbar | Istbar | Imbar -> Op_other
       | Isimd op -> of_simd_class (Simd.class_of_operation op)
       | Illvm_intrinsic intr ->
         Misc.fatal_errorf "CSE: Unexpected llvm_intrinsic %s: \

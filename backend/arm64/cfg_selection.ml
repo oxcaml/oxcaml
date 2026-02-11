@@ -217,9 +217,15 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
   | Cextcall { func = "sqrt" | "sqrtf" | "caml_neon_float64_sqrt"; _ } ->
     Rewritten (specific Isqrtf, args)
   | Cextcall { func; builtin = true; _ } -> (
-    match Simd_selection.select_operation_cfg func args dbg with
-    | Some (op, args) -> Rewritten (Basic (Op op), args)
-    | None -> Use_default)
+    match func with
+    | "caml_rdtsc_unboxed" -> Rewritten (specific Icntvct, args)
+    | "caml_load_fence" -> Rewritten (specific Ildbar, args)
+    | "caml_store_fence" -> Rewritten (specific Istbar, args)
+    | "caml_memory_fence" -> Rewritten (specific Imbar, args)
+    | _ -> (
+      match Simd_selection.select_operation_cfg func args dbg with
+      | Some (op, args) -> Rewritten (Basic (Op op), args)
+      | None -> Use_default))
   (* Recognize bswap instructions *)
   | Cbswap { bitwidth } ->
     let bitwidth = select_bitwidth bitwidth in
@@ -272,7 +278,7 @@ let pseudoregs_for_operation op arg res =
       ( Ifar_poll | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf
       | Imulsubf | Inegmulsubf | Isqrtf | Imove32 | Ifar_alloc _
       | Ishiftarith (_, _)
-      | Ibswap _ | Isignext _ )
+      | Ibswap _ | Isignext _ | Icntvct | Ildbar | Istbar | Imbar )
   | Move | Spill | Reload | Opaque | Pause | Begin_region | End_region | Dls_get
   | Tls_get | Domain_index | Poll | Const_int _ | Const_float32 _
   | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _

@@ -1388,6 +1388,19 @@ let encode_instruction : type num operands.
     Simd_helpers.encode_simd_two_reg_misc ~q:1 ~u:0 ~size ~opcode:0b10010 ~rn
       ~rd
   | _, YIELD -> Yield_helpers.encode_yield ()
+  | Pair (Reg { index = rt; _ }, Sys_reg _), MRS ->
+    (* MRS Xt, CNTVCT_EL0: 0xD53BE040 | Rt *)
+    Int32.logor 0xD53BE040l (Int32.of_int rt)
+  | ( Triple
+        (Reg { index = rd; _ }, Reg { index = rn; _ }, Reg { index = rm; _ }),
+      CRC32CX ) ->
+    (* CRC32CX Wd, Wn, Xm: sf=1 S=0 0 11010110 Rm 010 C=1 sz=11 Rn Rd *)
+    let open Int32 in
+    let result = of_int 0x9AC05C00 in
+    let result = logor result (shift_left (of_int rm) 16) in
+    let result = logor result (shift_left (of_int rn) 5) in
+    let result = logor result (of_int rd) in
+    result
   | ( Triple
         ( Reg { reg_name = Neon (Vector vec); index = rd },
           Reg { index = rn; _ },

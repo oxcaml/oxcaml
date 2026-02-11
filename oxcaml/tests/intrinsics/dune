@@ -84,3 +84,17 @@
   (progn
    (diff test_arch.arm64.expected test_arch.out))))
 
+; Compile-only test for intrinsic builtins (fences, rdtsc, crc32c)
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (or
+    (= %{architecture} "amd64")
+    (= %{architecture} "arm64"))))
+ (deps arm64_intrinsics.ml)
+ (action
+  (run %{bin:ocamlopt.opt} %{deps} -c)))
+
