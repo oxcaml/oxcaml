@@ -296,20 +296,29 @@ let float_header = block_header Obj.double_tag (size_float / size_addr)
 let float_local_header =
   local_block_header Obj.double_tag (size_float / size_addr)
 
-let boxedvec128_header = block_header Obj.abstract_tag (size_vec128 / size_addr)
+let boxedvec128_header =
+  block_header 0 (size_vec128 / size_addr)
+    ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
-let boxedvec256_header = block_header Obj.abstract_tag (size_vec256 / size_addr)
+let boxedvec256_header =
+  block_header 0 (size_vec256 / size_addr)
+    ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
-let boxedvec512_header = block_header Obj.abstract_tag (size_vec512 / size_addr)
+let boxedvec512_header =
+  block_header 0 (size_vec512 / size_addr)
+    ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
 let boxedvec128_local_header =
-  local_block_header Obj.abstract_tag (size_vec128 / size_addr)
+  local_block_header 0 (size_vec128 / size_addr)
+    ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
 let boxedvec256_local_header =
-  local_block_header Obj.abstract_tag (size_vec256 / size_addr)
+  local_block_header 0 (size_vec256 / size_addr)
+    ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
 let boxedvec512_local_header =
-  local_block_header Obj.abstract_tag (size_vec512 / size_addr)
+  local_block_header 0 (size_vec512 / size_addr)
+    ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
 let floatarray_header len =
   (* Zero-sized float arrays have tag zero for consistency with
