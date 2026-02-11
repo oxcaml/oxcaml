@@ -830,6 +830,33 @@ let shape_extension_constructor ext =
   | Debugging_shapes ->
     Type_shape.Type_decl_shape.of_extension_constructor_merlin_only ext
 
+let check_imprecise_type_param_annotation path (cty, _) =
+  match cty.ctyp_desc, get_desc cty.ctyp_type with
+  | Ttyp_var (name_opt, Some annot), Tvar { jkind; _ }
+    when not (Jkind.History.has_warned jkind) ->
+    let annotated_jkind =
+      Jkind.of_annotation ~context:(Type_parameter (path, name_opt)) annot
+    in
+    if not (Jkind.equate jkind annotated_jkind) then begin
+      let format_jkind jkind =
+        Format_doc.asprintf "%a" !Oprint.out_jkind
+          (Printtyp.out_jkind_of_jkind jkind)
+      in
+      let name =
+        match name_opt with
+        | Some name -> Pprintast.tyvar_of_name name
+        | None -> "anonymous type parameter"
+      in
+      Location.prerr_warning cty.ctyp_loc
+        (Warnings.Imprecise_kind_annotation {
+          name;
+          annotated = format_jkind annotated_jkind;
+          inferred = format_jkind jkind;
+        });
+      Types.set_var_jkind cty.ctyp_type (Jkind.History.with_warning jkind)
+    end
+  | _ -> ()
+
 let transl_declaration env sdecl (id, uid) =
   (* Bind type parameters *)
   Ctype.with_local_level begin fun () ->
@@ -1098,6 +1125,8 @@ let transl_declaration env sdecl (id, uid) =
         try Ctype.unify env ty ty' with Ctype.Unify err ->
           raise(Error(loc, Inconsistent_constraint (env, err))))
       cstrs;
+  (* Check for imprecise type parameter annotations *)
+    List.iter (check_imprecise_type_param_annotation path) tparams;
   (* Add abstract row *)
     if is_fixed_type sdecl then begin
       let p, _ =
