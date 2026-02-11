@@ -479,12 +479,7 @@ module Dwarf_helpers = struct
 
   let init ~ppf_dump ~disable_dwarf ~sourcefile =
     reset_dwarf ppf_dump;
-    let can_emit_dwarf =
-      !Clflags.debug
-      && ((not !Dwarf_flags.restrict_to_upstream_dwarf)
-         || !Dwarf_flags.dwarf_inlined_frames)
-      && not disable_dwarf
-    in
+    let can_emit_dwarf = !Clflags.debug && not disable_dwarf in
     match
       ( can_emit_dwarf,
         Target_system.architecture (),

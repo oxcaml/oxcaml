@@ -142,8 +142,9 @@ let location_list_entry state ~start_of_code_symbol ~subrange
     Dwarf_5
       (Location_list_entry.create location_list_entry ~start_of_code_symbol)
 
-let dwarf_for_variable state ~function_symbol ~function_proto_die
-    ~proto_dies_for_vars (var : Backend_var.t) ~ident_for_type ~range =
+let dwarf_for_variable state ~value_type_proto_die ~function_symbol
+    ~function_proto_die ~proto_dies_for_vars (var : Backend_var.t)
+    ~ident_for_type ~range =
   let range_info = ARV.Range.info range in
   let provenance = ARV.Range_info.provenance range_info in
   let (parent_proto_die : Proto_die.t), hidden =
@@ -171,12 +172,12 @@ let dwarf_for_variable state ~function_symbol ~function_proto_die
         match provenance with
         | Some provenance ->
           let die_reference =
-            Dwarf_type.variable_to_die state
+            Dwarf_type.variable_to_die state ~value_type_proto_die
               (Backend_var.Provenance.debug_uid provenance)
               ~parent_proto_die
           in
           die_reference
-        | None -> Proto_die.reference (DS.value_type_proto_die state)
+        | None -> Proto_die.reference value_type_proto_die
       in
       let type_attribute =
         [DAH.create_type_from_reference ~proto_die_reference]
@@ -276,7 +277,8 @@ let iterate_over_variable_like_things state ~available_ranges_vars ~f =
       let ident_for_type = Some (Compilation_unit.get_current_exn (), var) in
       f var ~ident_for_type ~range)
 
-let dwarf state ~function_symbol ~function_proto_die available_ranges_vars =
+let dwarf state ~value_type_proto_die ~function_symbol ~function_proto_die
+    available_ranges_vars =
   let proto_dies_for_vars = Backend_var.Tbl.create 42 in
   iterate_over_variable_like_things state ~available_ranges_vars
     ~f:(fun var ~ident_for_type:_ ~range:_ ->
@@ -286,5 +288,5 @@ let dwarf state ~function_symbol ~function_proto_die available_ranges_vars =
       Backend_var.Tbl.add proto_dies_for_vars var { value_die_lvalue; type_die });
   iterate_over_variable_like_things state ~available_ranges_vars
     ~f:
-      (dwarf_for_variable state ~function_symbol ~function_proto_die
-         ~proto_dies_for_vars)
+      (dwarf_for_variable state ~value_type_proto_die ~function_symbol
+         ~function_proto_die ~proto_dies_for_vars)
