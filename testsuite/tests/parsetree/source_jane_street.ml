@@ -569,6 +569,8 @@ val f2 : unit -> unit = <fun>
 |}]
 
 module type S = sig @@ portable contended
+  [@@@warning "-redundant-modality"]
+
   module type S0 = sig @@ portable contended
     val x1 : string -> string @@ local
     val x2 : string -> string @@ portable
@@ -603,7 +605,7 @@ type t =
   | K2 : string @@ global * (float -> float) @@ many * string -> t
 
 type t = { x : string @@ global
-         ; mutable y : float -> float @@ many
+         ; mutable y : float -> float @@ once
          ; global_ z : string @@ many }
 
 type t1 = { mutable x : float
@@ -618,7 +620,7 @@ type t =
   | K2 : string @@ global * (float -> float) @@ many * string -> t
 type t = {
   x : string @@ global;
-  mutable y : float -> float;
+  mutable y : float -> float @@ once;
   z : string @@ global many;
 }
 type t1 = { mutable x : float; mutable f : float -> float; }

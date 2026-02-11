@@ -92,6 +92,11 @@ let with_global_effect : ((string -> unit) @ yielding -> 'a) -> 'a =
 type 'a t1 = Mk1 of 'a @@ global
 type 'a t2 = Mk2 of 'a @@ global yielding
 type 'a t3 = Mk3 of 'a @@ unyielding
+Line 7, characters 26-34:
+7 | type 'a t4 = Mk4 of 'a @@ yielding
+                              ^^^^^^^^
+Warning 217 [redundant-modality]: This yielding modality is redundant.
+
 type 'a t4 = Mk4 of 'a
 val with_global_effect : ((string -> unit) @ yielding -> 'a) -> 'a = <fun>
 |}]
