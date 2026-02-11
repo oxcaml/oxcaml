@@ -114,6 +114,8 @@ val cached_generic_functions_path : string ref
 
 val dissector_assume_lld_without_64_bit_eh_frames : bool ref
 
+val manual_module_init : bool ref
+
 val symbol_visibility_protected : bool ref
 
 val dump_llvmir : bool ref

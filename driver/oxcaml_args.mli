@@ -92,6 +92,8 @@ module type Oxcaml_options = sig
   val ddissector_inputs : string -> unit
   val dissector_assume_lld_without_64_bit_eh_frames : unit -> unit
   val no_dissector_assume_lld_without_64_bit_eh_frames : unit -> unit
+  val manual_module_init : unit -> unit
+  val no_manual_module_init : unit -> unit
   val gc_timings : unit -> unit
   val no_mach_ir : unit -> unit
   val dllvmir : unit -> unit

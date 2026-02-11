@@ -159,6 +159,9 @@ CAMLnoreturn_start
 CAMLextern void caml_raise_sys_blocked_io (void)
 CAMLnoreturn_end;
 
+/* Exception constructors */
+CAMLextern value caml_failure_exn (value msg);
+
 #ifdef __cplusplus
 }
 #endif
