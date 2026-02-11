@@ -120,16 +120,124 @@ let check_tailrec_position t =
            followingsuccessors:@.%a@."
           Label.print tailrec_label Label.Set.print successors
 
-let check_terminator_arity t _label block =
-  match block.Cfg.terminator.desc with
+let check_terminator_arity t label block =
+  let term = block.Cfg.terminator in
+  let args = term.arg in
+  let res = term.res in
+  let check_len kind expected actual desc =
+    if not (Int.equal expected actual)
+    then
+      report t "%a: %s with %d %s(s), expected %d" Label.print label desc actual
+        kind expected
+  in
+  let check_empty kind actual desc = check_len kind 0 actual desc in
+  let count_regs_in_locs locs =
+    Array.fold_left (fun acc r -> acc + Array.length r) 0 locs
+  in
+  (* For calls where we have precise type information (e.g. external calls), we
+     can recompute the calling convention. For OCaml function calls we lack the
+     argument types here, so we only check properties that are type-independent
+     (such as having no results). *)
+  let check_external ~ty_args ~ty_res desc =
+    (* Cmm may omit [ty_args] (empty list) for external calls; selection then
+       fills in a default based on the number of actual arguments (all XInt).
+       Mirror that here to avoid underestimating the arity. *)
+    let ty_args =
+      match ty_args with
+      | [] when Array.length args > 0 ->
+        List.init (Array.length args) (fun _ -> Cmm.XInt)
+      | _ -> ty_args
+    in
+    let locs, _, _ = Proc.loc_external_arguments ty_args in
+    let expected_args = count_regs_in_locs locs in
+    let expected_res = Array.length (Proc.loc_external_results ty_res) in
+    check_len "argument" expected_args (Array.length args) desc;
+    check_len "result" expected_res (Array.length res) desc
+  in
+  match term.desc with
+  | Never ->
+    check_empty "argument" (Array.length args) "Never";
+    check_empty "result" (Array.length res) "Never"
+  | Always _ ->
+    check_empty "argument" (Array.length args) "Always";
+    check_empty "result" (Array.length res) "Always"
+  | Parity_test _ ->
+    check_len "argument" 1 (Array.length args) "Parity_test";
+    check_empty "result" (Array.length res) "Parity_test"
+  | Truth_test _ ->
+    check_len "argument" 1 (Array.length args) "Truth_test";
+    check_empty "result" (Array.length res) "Truth_test"
+  | Float_test _ ->
+    (* Float comparisons are always between two operands. *)
+    check_len "argument" 2 (Array.length args) "Float_test";
+    check_empty "result" (Array.length res) "Float_test"
+  | Int_test { imm; _ } ->
+    (* With an immediate, only one register is passed; otherwise two. *)
+    let expected = if Option.is_some imm then 1 else 2 in
+    check_len "argument" expected (Array.length args) "Int_test";
+    check_empty "result" (Array.length res) "Int_test"
+  | Switch _ ->
+    check_len "argument" 1 (Array.length args) "Switch";
+    check_empty "result" (Array.length res) "Switch"
+  | Return ->
+    (* Return carries the registers holding the function result in calling
+       convention order. Some generated helpers (e.g. curry wrappers) may have a
+       declared return type with more components than they actually return;
+       those are identified by the [caml_curry] prefix and are exempted. *)
+    let expected = Proc.loc_results_return t.cfg.fun_ret_type |> Array.length in
+    let actual = Array.length args in
+    if
+      actual <> expected
+      && not (String.starts_with t.cfg.fun_name ~prefix:"caml_curry")
+    then check_len "argument" expected actual "Return";
+    check_empty "result" (Array.length res) "Return"
   | Raise _ ->
-    let len = Array.length block.Cfg.terminator.arg in
-    if len != 1 then report t "Raise with %d arguments" len
-  | Tailcall_self _ | Call _ | Prim _ | Tailcall_func _ | Never | Always _
-  | Parity_test _ | Truth_test _ | Float_test _ | Int_test _ | Switch _ | Return
-  | Call_no_return _ | Invalid _ ->
-    (* CR-soon xclerc for xclerc: extend check *)
+    check_len "argument" 1 (Array.length args) "Raise";
+    check_empty "result" (Array.length res) "Raise"
+  | Tailcall_self _ ->
+    (* Self tailcalls reuse the current function's parameter passing convention,
+       hence the arity must match [fun_args]. *)
+    check_len "argument"
+      (Array.length t.cfg.fun_args)
+      (Array.length args) "Tailcall_self";
+    check_empty "result" (Array.length res) "Tailcall_self"
+  | Tailcall_func (Indirect _) ->
+    (* The first argument is the callee; we cannot check the rest without the
+       callee's type, but the array must be non-empty and there are no results
+       for tailcalls. *)
+    if Array.length args = 0
+    then report t "%a: Indirect tailcall with no arguments" Label.print label;
+    check_empty "result" (Array.length res) "Tailcall_func"
+  | Tailcall_func (Direct _) ->
+    (* No result registers are produced by a tailcall. *)
+    check_empty "result" (Array.length res) "Tailcall_func"
+  | Call_no_return { ty_args; ty_res; _ } ->
+    (* External calls that do not return still follow the external calling
+       convention for both arguments and (nonexistent) results. *)
+    check_external ~ty_args ~ty_res "Call_no_return"
+  | Prim { op = External { ty_args; ty_res; _ }; _ } ->
+    (* External primitives carry precise type info, so we can recompute both arg
+       and result arities. We must mirror the selection-time defaulting of empty
+       [ty_args] to XInt per argument. *)
+    check_external ~ty_args ~ty_res "Prim(External)"
+  | Prim { op = Probe _; _ } ->
+    (* Probes are typed as [typ_void]; they should therefore not produce result
+       registers. We cannot reliably check their arguments here. *)
+    check_empty "result" (Array.length res) "Prim(Probe)"
+  | Call _ ->
+    (* We lack the callee's signature here. In particular, [caml_program] (the
+       startup thunk) is called for side effects and returns no registers, so we
+       cannot assert any result arity. *)
     ()
+  | Invalid { label_after; _ } ->
+    (* [Invalid] is emitted as a call to [caml_flambda2_invalid]. It always
+       passes the error message symbol as one OCaml-ABI argument; when zero
+       alloc checking is enabled it returns an [int] (so there is a successor
+       and one result register), otherwise it never returns. *)
+    let ty_res =
+      match label_after with None -> Cmm.typ_void | Some _ -> Cmm.typ_int
+    in
+    check_external ~ty_args:[Cmm.XInt] ~ty_res "Invalid"
 
 let check_tailrec t _label block =
   (* check all Tailrec Self agree on the successor label *)
