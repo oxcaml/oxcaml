@@ -44,19 +44,19 @@
 #define Store_vec128_vali(v, x) _mm_storeu_si128((__m128i *)Bp_val(v), x)
 
 Caml_inline value caml_copy_vec128(__m128 v) {
-    value res = caml_alloc_small(Words_per_vec128, Abstract_tag);
+    value res = caml_alloc_small_with_reserved(Words_per_vec128, 0, Reserved_mixed_block_scannable_wosize_native(0));
     Store_vec128_val(res, v);
     return res;
 }
 
 Caml_inline value caml_copy_vec128i(__m128i v) {
-    value res = caml_alloc_small(Words_per_vec128, Abstract_tag);
+    value res = caml_alloc_small_with_reserved(Words_per_vec128, 0, Reserved_mixed_block_scannable_wosize_native(0));
     Store_vec128_vali(res, v);
     return res;
 }
 
 Caml_inline value caml_copy_vec128d(__m128d v) {
-    value res = caml_alloc_small(Words_per_vec128, Abstract_tag);
+    value res = caml_alloc_small_with_reserved(Words_per_vec128, 0, Reserved_mixed_block_scannable_wosize_native(0));
     Store_vec128_vald(res, v);
     return res;
 }
@@ -74,19 +74,19 @@ Caml_inline value caml_copy_vec128d(__m128d v) {
 #define Store_vec256_vali(v, x) _mm256_storeu_si256((__m256i *)Bp_val(v), x)
 
 Caml_inline value caml_copy_vec256(__m256 v) {
-    value res = caml_alloc_small(Words_per_vec256, Abstract_tag);
+    value res = caml_alloc_small_with_reserved(Words_per_vec256, 0, Reserved_mixed_block_scannable_wosize_native(0));
     Store_vec256_val(res, v);
     return res;
 }
 
 Caml_inline value caml_copy_vec256i(__m256i v) {
-    value res = caml_alloc_small(Words_per_vec256, Abstract_tag);
+    value res = caml_alloc_small_with_reserved(Words_per_vec256, 0, Reserved_mixed_block_scannable_wosize_native(0));
     Store_vec256_vali(res, v);
     return res;
 }
 
 Caml_inline value caml_copy_vec256d(__m256d v) {
-    value res = caml_alloc_small(Words_per_vec256, Abstract_tag);
+    value res = caml_alloc_small_with_reserved(Words_per_vec256, 0, Reserved_mixed_block_scannable_wosize_native(0));
     Store_vec256_vald(res, v);
     return res;
 }
@@ -104,19 +104,19 @@ Caml_inline value caml_copy_vec256d(__m256d v) {
 #define Store_vec128_vali(v, x) vstrq_p128((poly128_t *)Bp_val(v), x)
 
 Caml_inline value caml_copy_vec128(float32x4_t v) {
-    value res = caml_alloc_small(Words_per_vec128, Abstract_tag);
+    value res = caml_alloc_small_with_reserved(Words_per_vec128, 0, Reserved_mixed_block_scannable_wosize_native(0));
     Store_vec128_val(res, v);
     return res;
 }
 
 Caml_inline value caml_copy_vec128i(poly128_t v) {
-    value res = caml_alloc_small(Words_per_vec128, Abstract_tag);
+    value res = caml_alloc_small_with_reserved(Words_per_vec128, 0, Reserved_mixed_block_scannable_wosize_native(0));
     Store_vec128_vali(res, v);
     return res;
 }
 
 Caml_inline value caml_copy_vec128d(float64x2_t v) {
-    value res = caml_alloc_small(Words_per_vec128, Abstract_tag);
+    value res = caml_alloc_small_with_reserved(Words_per_vec128, 0, Reserved_mixed_block_scannable_wosize_native(0));
     Store_vec128_vald(res, v);
     return res;
 }
