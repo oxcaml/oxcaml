@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # build-file: Build the .cmi (from .mli) or .cmx (from .ml) for a given file
 #             and all its dependencies.
 # Usage: scripts/build-file <file.ml|file.mli>  (run from repo root)
@@ -28,8 +28,8 @@ case "$file" in
   *)     echo "Expected .ml or .mli file" >&2; exit 1 ;;
 esac
 
-# Try building a dune target. Returns 0 if built, 1 if build error, 2 if
-# target doesn't exist.
+# Try building a dune target. Exits on success or build error.
+# Returns 0 if the target doesn't exist (caller should try next).
 try_target() {
   local target="$1"
   local label="$2"
@@ -37,14 +37,14 @@ try_target() {
   local result
   result=$(RUNTIME_DIR=runtime dune build --root=. --workspace=duneconf/boot.ws "$target" 2>&1) || rc=$?
   if echo "$result" | grep -q "Don't know how to build"; then
-    return 2
+    return 0
   fi
   if [ $rc -eq 0 ]; then
     echo "OK: ${base}.${ext} (${label})"
   else
     echo "$result" >&2
   fi
-  return $rc
+  exit $rc
 }
 
 # 1) Try top-level unwrapped libraries (ocamlcommon, ocamloptcomp, etc.)
@@ -54,16 +54,12 @@ for lib in ocamlcommon ocamloptcomp ocamlbytecomp ocamljcomp oxcaml_common; do
   else
     target=".${lib}.objs/byte/${base}.cmi"
   fi
-  rc=0
-  try_target "$target" "$lib" || rc=$?
-  if [ $rc -le 1 ]; then
-    exit $rc
-  fi
+  try_target "$target" "$lib"
 done
 
 # 2) Try wrapped sub-libraries by walking up from the file's directory.
 #    Wrapped library targets look like: dir/.libname.objs/byte/libname__Module.cmi
-cap_base="$(echo "${base:0:1}" | tr '[:lower:]' '[:upper:]')${base:1}"
+cap_base="${base^}"
 
 dir=$(dirname "$file")
 while [ "$dir" != "." ] && [ "$dir" != "/" ]; do
@@ -77,11 +73,7 @@ while [ "$dir" != "." ] && [ "$dir" != "/" ]; do
       else
         target="${dir}/.${lib}.objs/byte/${lib}__${cap_base}.cmi"
       fi
-      rc=0
-      try_target "$target" "$lib" || rc=$?
-      if [ $rc -le 1 ]; then
-        exit $rc
-      fi
+      try_target "$target" "$lib"
 
       # Try unwrapped naming: module.cmi (for (wrapped false) sub-libraries)
       if [ "$ext" = "cmx" ]; then
@@ -89,11 +81,7 @@ while [ "$dir" != "." ] && [ "$dir" != "/" ]; do
       else
         target="${dir}/.${lib}.objs/byte/${base}.cmi"
       fi
-      rc=0
-      try_target "$target" "$lib" || rc=$?
-      if [ $rc -le 1 ]; then
-        exit $rc
-      fi
+      try_target "$target" "$lib"
     done
   fi
   dir=$(dirname "$dir")
@@ -105,11 +93,7 @@ if [ "$ext" = "cmx" ]; then
 else
   target=".${base}.eobjs/byte/${base}.cmi"
 fi
-rc=0
-try_target "$target" "exe:${base}" || rc=$?
-if [ $rc -le 1 ]; then
-  exit $rc
-fi
+try_target "$target" "exe:${base}"
 
 echo "Module ${base} not found in any library or executable" >&2
 exit 2
