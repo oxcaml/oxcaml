@@ -496,7 +496,7 @@ let operation_supported : Cmm.operation -> bool = function
   | Caddi128 | Csubi128 | Cmuli64 _ ->
     (* CR mslater: restore after the arm DSL is merged *)
     false
-  | Cprefetch _ | Catomic _
+  | Cprefetch _ | Catomic _ -> true
   | Creinterpret_cast (V128_of_vec (Vec256 | Vec512) |
                        V256_of_vec _ | V512_of_vec _)
   | Cstatic_cast (V256_of_scalar _ | Scalar_of_v256 _ |

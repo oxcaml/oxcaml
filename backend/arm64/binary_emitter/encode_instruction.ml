@@ -202,6 +202,8 @@ let encode_instruction : type num operands.
     Branch_helpers.encode_branch_register ~opc:0b0001 ~rn
   | Singleton (Reg rn), BR ->
     Branch_helpers.encode_branch_register ~opc:0b0000 ~rn
+  | Triple (Reg _rs, Reg _rt, Mem (Reg _rn)), CASAL ->
+    Misc.fatal_error "CASAL: binary encoding not yet implemented"
   | Pair (Reg rt, Imm (Sym sym)), CBNZ ->
     let imm19 =
       Branch_helpers.compute_branch_imm19 state ~instr_name:"CBNZ" sym
@@ -827,6 +829,14 @@ let encode_instruction : type num operands.
     Simd_helpers.encode_simd_copy ~q:1 ~op:1 ~imm5 ~imm4 ~rn ~rd
   | Pair (Reg ({ reg_name = GP _; _ } as rd), Mem (Reg rn)), LDAR ->
     Load_store_helpers.encode_load_acquire ~rd ~rn
+  | Triple (Reg _rs, Reg _rt, Mem (Reg _rn)), LDADDAL ->
+    Misc.fatal_error "LDADDAL: binary encoding not yet implemented"
+  | Triple (Reg _rs, Reg _rt, Mem (Reg _rn)), LDCLRAL ->
+    Misc.fatal_error "LDCLRAL: binary encoding not yet implemented"
+  | Triple (Reg _rs, Reg _rt, Mem (Reg _rn)), LDEORAL ->
+    Misc.fatal_error "LDEORAL: binary encoding not yet implemented"
+  | Triple (Reg _rs, Reg _rt, Mem (Reg _rn)), LDSETAL ->
+    Misc.fatal_error "LDSETAL: binary encoding not yet implemented"
   | Triple (Reg rt1, Reg rt2, Mem addressing), LDP _ ->
     Load_store_helpers.encode_load_store_pair_gp ~instr_name:"LDP" ~l:1 ~rt1
       ~rt2 addressing
@@ -943,6 +953,13 @@ let encode_instruction : type num operands.
     Logical_helpers.encode_logical_immediate ~sf:1 ~opc:0b01 ~n ~immr ~imms ~rn
       ~rd
   | ( Quad
+        ( Reg ({ reg_name = GP _; _ } as _rd),
+          Reg ({ reg_name = GP _; _ } as _rn),
+          Reg ({ reg_name = GP _; _ } as _rm),
+          Optional _shift_opt ),
+      ORN_shifted_register ) ->
+    Misc.fatal_error "ORN_shifted_register: binary encoding not yet implemented"
+  | ( Quad
         ( Reg ({ reg_name = GP _; _ } as rd),
           Reg ({ reg_name = GP _; _ } as rn),
           Reg ({ reg_name = GP _; _ } as rm),
@@ -966,6 +983,8 @@ let encode_instruction : type num operands.
     (* ORR: U=0, size=10, opcode=00011 *)
     Simd_helpers.encode_simd_three_same ~q ~u:0 ~size:0b10 ~rm ~opcode:0b00011
       ~rn ~rd
+  | Singleton (Mem _addressing), PRFM _ ->
+    Misc.fatal_error "PRFM: binary encoding not yet implemented"
   | Pair (Reg rd, Reg rn), RBIT ->
     let sf = Reg.gp_sf rd in
     Data_proc_helpers.encode_data_proc_1_source ~sf ~s:0 ~opcode2:0b00000
@@ -1202,6 +1221,8 @@ let encode_instruction : type num operands.
     in
     Add_sub_helpers.encode_add_sub_shifted_reg ~op:1 ~s:1 ~shift ~imm6 ~rd ~rn
       ~rm
+  | Triple (Reg _rs, Reg _rt, Mem (Reg _rn)), SWPAL ->
+    Misc.fatal_error "SWPAL: binary encoding not yet implemented"
   (* TODO: SXTL is an alias; this should be removed from Instruction_name.t and
      handled via a rewrite rule. *)
   | ( Pair

@@ -58,6 +58,11 @@ type specific_operation =
   | Ibswap of { bitwidth: bswap_bitwidth; } (* endianness conversion *)
   | Imove32       (* 32-bit integer move *)
   | Isignext of int (* sign extension *)
+  | Iprefetch of
+    { is_write: bool;
+      locality: Cmm.prefetch_temporal_locality_hint;
+      addr: addressing_mode;
+    }
   | Isimd of Simd.operation
   | Illvm_intrinsic of string
 

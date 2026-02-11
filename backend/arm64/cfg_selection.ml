@@ -224,6 +224,39 @@ let select_operation' ~generic_select_condition:_ (op : Cmm.operation)
   | Cbswap { bitwidth } ->
     let bitwidth = select_bitwidth bitwidth in
     Rewritten (specific (Ibswap { bitwidth }), args)
+  (* Prefetch *)
+  | Cprefetch { is_write; locality } ->
+    let eloc = match args with [arg] -> arg | _ -> assert false in
+    let addr, eloc = select_addressing Word_int eloc in
+    Rewritten
+      (specific (Iprefetch { is_write; locality; addr }), [eloc])
+  (* Atomics: force zero-offset addressing for LSE instructions *)
+  | Catomic { op; size } -> (
+    let chunk : Cmm.memory_chunk =
+      match size with
+      | Word | Sixtyfour -> Word_int
+      | Thirtytwo -> Thirtytwo_signed
+    in
+    let addr = validated_offset chunk 0 in
+    match op with
+    | Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange ->
+      let src, dst =
+        match args with [s; d] -> s, d | _ -> assert false
+      in
+      Rewritten
+        ( Basic
+            (Op (Intop_atomic { op; size; addr })),
+          [src; dst] )
+    | Compare_set | Compare_exchange ->
+      let compare_with, set_to, dst =
+        match args with
+        | [c; s; d] -> c, s, d
+        | _ -> assert false
+      in
+      Rewritten
+        ( Basic
+            (Op (Intop_atomic { op; size; addr })),
+          [compare_with; set_to; dst] ))
   (* Other operations are regular *)
   | _ -> Use_default
 
@@ -268,11 +301,17 @@ let pseudoregs_for_operation op arg res =
   match (op : Operation.t) with
   | Specific (Isimd simd_op) ->
     Simd_selection.pseudoregs_for_operation simd_op arg res
+  | Intop_atomic { op = Compare_exchange; size = _; addr = _ } ->
+    (* CASAL uses the same register for expected input and old-value
+       output: arg.(0) must equal res.(0). *)
+    let arg = Array.copy arg in
+    arg.(0) <- res.(0);
+    arg, res
   | Specific
       ( Ifar_poll | Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf
       | Imulsubf | Inegmulsubf | Isqrtf | Imove32 | Ifar_alloc _
       | Ishiftarith (_, _)
-      | Ibswap _ | Isignext _ )
+      | Ibswap _ | Isignext _ | Iprefetch _ )
   | Move | Spill | Reload | Opaque | Pause | Begin_region | End_region | Dls_get
   | Tls_get | Domain_index | Poll | Const_int _ | Const_float32 _
   | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _

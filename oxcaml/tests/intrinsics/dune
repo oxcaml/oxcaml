@@ -45,6 +45,43 @@
    (diff empty.expected atomics.out))))
 
 
+; Test atomics and prefetch on both amd64 and arm64
+
+(executables
+ (names atomics_and_prefetch)
+ (modules atomics_and_prefetch)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (or
+    (= %{architecture} "amd64")
+    (= %{architecture} "arm64")))))
+
+(rule
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (or
+    (= %{architecture} "amd64")
+    (= %{architecture} "arm64"))))
+ (targets atomics_and_prefetch.out)
+ (deps atomics_and_prefetch.exe)
+ (action
+  (with-outputs-to
+   %{targets}
+   (run ./atomics_and_prefetch.exe))))
+
+(rule
+ (alias runtest)
+ (enabled_if
+  (and
+   (= %{context_name} "main")
+   (or
+    (= %{architecture} "amd64")
+    (= %{architecture} "arm64"))))
+ (action
+  (diff empty.expected atomics_and_prefetch.out)))
+
 ; Test arch_* intrinsics
 
 (executables

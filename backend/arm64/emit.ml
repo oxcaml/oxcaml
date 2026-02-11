@@ -948,7 +948,7 @@ let num_call_gc_points instr =
            ( Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
            | Inegmulsubf | Isqrtf | Imove32
            | Ishiftarith (_, _)
-           | Ibswap _ | Isignext _ | Isimd _ ))
+           | Ibswap _ | Isignext _ | Iprefetch _ | Isimd _ ))
     | Lop
         ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
         | Dls_get | Tls_get | Domain_index | Const_int _ | Const_float32 _
@@ -1077,10 +1077,13 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Const_vec256 _ | Const_vec512 _) ->
       Misc.fatal_error "arm64: got 256/512 bit vector"
     | Lop (Const_symbol _) -> 2
-    | Lop (Intop_atomic _) ->
-      Misc.fatal_errorf
-        "emit_instr: builtins are not yet translated to atomics: %a"
-        Printlinear.instr instr
+    | Lop (Intop_atomic { op; size = _; addr = _ }) -> (
+      match op with
+      | Fetch_and_add | Add | Lor | Lxor | Exchange -> 1
+      | Sub -> 3
+      | Land -> 2
+      | Compare_set -> 4
+      | Compare_exchange -> 1)
     | Lcall_op Lcall_ind -> 1
     | Lcall_op (Lcall_imm _) -> 1
     | Lcall_op Ltailcall_ind -> epilogue_size ()
@@ -1202,6 +1205,8 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Specific (Ibswap { bitwidth = Thirtytwo | Sixtyfour })) -> 1
     | Lop (Specific Imove32) -> 1
     | Lop (Specific (Isignext _)) -> 1
+    | Lop (Specific (Iprefetch { addr; _ })) ->
+      (match addr with Iindexed _ -> 1 | Ibased _ -> 2)
     | Lop (Name_for_debugger _) -> 0
     | Lcall_op (Lprobe _) ->
       Misc.fatal_error "Optimized probes not supported on arm64."
@@ -1525,6 +1530,114 @@ let emit_static_cast (cast : Cmm.static_cast) i =
   | V256_of_scalar _ | Scalar_of_v256 _ | V512_of_scalar _ | Scalar_of_v512 _ ->
     Misc.fatal_error "arm64: got 256/512 bit vector"
 
+let emit_atomic i (op : Cmm.atomic_op) (size : Cmm.atomic_bitwidth) =
+  let addr_base =
+    match op with
+    | Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange ->
+      H.gp_reg_of_reg i.arg.(1)
+    | Compare_set | Compare_exchange ->
+      H.gp_reg_of_reg i.arg.(2)
+  in
+  let addr = O.mem ~base:addr_base in
+  match size with
+  | Thirtytwo ->
+    let src0_w = H.reg_w i.arg.(0) in
+    let tmp_w = H.reg_w reg_tmp1 in
+    (match op with
+    | Fetch_and_add ->
+      A.ins3 LDADDAL src0_w (H.reg_w i.res.(0)) addr
+    | Add ->
+      A.ins3 LDADDAL src0_w O.wzr addr
+    | Sub ->
+      A.ins3 MOVZ reg_x_tmp1 (O.imm_sixteen 0) O.optional_none;
+      A.ins4 SUB_shifted_register tmp_w tmp_w src0_w O.optional_none;
+      A.ins3 LDADDAL tmp_w O.wzr addr
+    | Land ->
+      A.ins4 ORN_shifted_register tmp_w O.wzr src0_w O.optional_none;
+      A.ins3 LDCLRAL tmp_w O.wzr addr
+    | Lor ->
+      A.ins3 LDSETAL src0_w O.wzr addr
+    | Lxor ->
+      A.ins3 LDEORAL src0_w O.wzr addr
+    | Exchange ->
+      A.ins3 SWPAL src0_w (H.reg_w i.res.(0)) addr
+    | Compare_set ->
+      let newval_w = H.reg_w i.arg.(1) in
+      A.ins4 ORR_shifted_register tmp_w O.wzr src0_w O.optional_none;
+      A.ins3 CASAL tmp_w newval_w addr;
+      A.ins_cmp_reg reg_x_tmp1
+        (H.reg_x i.arg.(0)) O.optional_none;
+      A.ins_cset (H.reg_x i.res.(0)) Cond.EQ
+    | Compare_exchange ->
+      assert (Reg.same_loc i.arg.(0) i.res.(0));
+      let newval_w = H.reg_w i.arg.(1) in
+      A.ins3 CASAL (H.reg_w i.res.(0)) newval_w addr)
+  | Sixtyfour | Word ->
+    let src0_x = H.reg_x i.arg.(0) in
+    (match op with
+    | Fetch_and_add ->
+      A.ins3 LDADDAL src0_x (H.reg_x i.res.(0)) addr
+    | Add ->
+      A.ins3 LDADDAL src0_x O.xzr addr
+    | Sub ->
+      A.ins3 MOVZ reg_x_tmp1 (O.imm_sixteen 0) O.optional_none;
+      A.ins4 SUB_shifted_register reg_x_tmp1
+        reg_x_tmp1 src0_x O.optional_none;
+      A.ins3 LDADDAL reg_x_tmp1 O.xzr addr
+    | Land ->
+      A.ins4 ORN_shifted_register reg_x_tmp1
+        O.xzr src0_x O.optional_none;
+      A.ins3 LDCLRAL reg_x_tmp1 O.xzr addr
+    | Lor ->
+      A.ins3 LDSETAL src0_x O.xzr addr
+    | Lxor ->
+      A.ins3 LDEORAL src0_x O.xzr addr
+    | Exchange ->
+      A.ins3 SWPAL src0_x (H.reg_x i.res.(0)) addr
+    | Compare_set ->
+      let newval_x = H.reg_x i.arg.(1) in
+      A.ins4 ORR_shifted_register reg_x_tmp1
+        O.xzr src0_x O.optional_none;
+      A.ins3 CASAL reg_x_tmp1 newval_x addr;
+      A.ins_cmp_reg reg_x_tmp1 src0_x O.optional_none;
+      A.ins_cset (H.reg_x i.res.(0)) Cond.EQ
+    | Compare_exchange ->
+      assert (Reg.same_loc i.arg.(0) i.res.(0));
+      let newval_x = H.reg_x i.arg.(1) in
+      A.ins3 CASAL (H.reg_x i.res.(0)) newval_x addr)
+
+let emit_prefetch i ~is_write ~locality ~addr =
+  let open Ast.Prefetch_operation in
+  let op =
+    match is_write, (locality : Cmm.prefetch_temporal_locality_hint) with
+    | false, High -> PLDL1KEEP
+    | false, Moderate -> PLDL2KEEP
+    | false, Low -> PLDL3KEEP
+    | false, Nonlocal -> PLDL1STRM
+    | true, High -> PSTL1KEEP
+    | true, Moderate -> PSTL2KEEP
+    | true, Low -> PSTL3KEEP
+    | true, Nonlocal -> PSTL1STRM
+  in
+  let base =
+    match addr with
+    | Iindexed _ -> i.arg.(0)
+    | Ibased (s, ofs) ->
+      assert (not !Clflags.dlcode);
+      A.ins2 ADRP reg_x_tmp1
+        (symbol_or_label_for_data ~offset:ofs (Needs_reloc PAGE) s);
+      reg_tmp1
+  in
+  match addr with
+  | Iindexed v ->
+    let base = H.gp_reg_of_reg base in
+    let addressing =
+      Ast.DSL.Validated_mem_offset.to_operand ~base v
+    in
+    A.ins1 (PRFM op) addressing
+  | Ibased _ ->
+    A.ins1 (PRFM op) (O.mem ~base:(H.gp_reg_of_reg base))
+
 (* Output the assembly code for an instruction *)
 
 let emit_instr i =
@@ -1546,10 +1659,8 @@ let emit_instr i =
   | Lepilogue_close ->
     let n = frame_size () in
     if n > 0 then D.cfi_adjust_cfa_offset ~bytes:n
-  | Lop (Intop_atomic _) ->
-    Misc.fatal_errorf
-      "emit_instr: builtins are not yet translated to atomics: %a"
-      Printlinear.instr i
+  | Lop (Intop_atomic { op; size; addr = _ }) ->
+    emit_atomic i op size
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast cast i
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
@@ -1946,6 +2057,8 @@ let emit_instr i =
     let rd, rn = H.reg_x i.res.(0), H.reg_x i.arg.(0) in
     A.ins4 SBFM rd rn (O.imm_six 0) (O.imm_six (size - 1))
   | Lop (Specific (Isimd simd)) -> simd_instr simd i
+  | Lop (Specific (Iprefetch { is_write; locality; addr })) ->
+    emit_prefetch i ~is_write ~locality ~addr
   | Lop (Name_for_debugger _) -> ()
   | Lcall_op (Lprobe _) ->
     Misc.fatal_error "Optimized probes not supported on arm64."

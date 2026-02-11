@@ -497,6 +497,26 @@ module Memory_barrier : sig
     | OSHST  (** waits only for stores and only to the outer shareable domain *)
 end
 
+(** Prefetch operation types for the PRFM instruction.
+    Named as \{PLD|PST\}\{L1|L2|L3\}\{KEEP|STRM\}. *)
+module Prefetch_operation : sig
+  type t =
+    | PLDL1KEEP
+    | PLDL1STRM
+    | PLDL2KEEP
+    | PLDL2STRM
+    | PLDL3KEEP
+    | PLDL3STRM
+    | PSTL1KEEP
+    | PSTL1STRM
+    | PSTL2KEEP
+    | PSTL2STRM
+    | PSTL3KEEP
+    | PSTL3STRM
+
+  val to_string : t -> string
+end
+
 type singleton = [`Singleton]
 
 type pair = [`Pair]
@@ -677,6 +697,12 @@ module Instruction_name : sig
     | B_cond : Branch_cond.t -> (singleton, [`Imm of [`Sym of _]]) t
     | CBNZ : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Imm of [`Sym of _]]) t
     | CBZ : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Imm of [`Sym of _]]) t
+    | CASAL :
+        ( triple,
+          [`Reg of [`GP of [< `X | `W]]]
+          * [`Reg of [`GP of [< `X | `W]]]
+          * [`Mem of [`Base_reg]] )
+        t
     | CLZ :
         (pair, [`Reg of [`GP of ([< `X | `W] as 'w)]] * [`Reg of [`GP of 'w]]) t
     | CM_register :
@@ -1086,6 +1112,30 @@ module Instruction_name : sig
            )
            t
     | LDAR : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Mem of [`Base_reg]]) t
+    | LDADDAL :
+        ( triple,
+          [`Reg of [`GP of [< `X | `W]]]
+          * [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Mem of [`Base_reg]] )
+        t
+    | LDCLRAL :
+        ( triple,
+          [`Reg of [`GP of [< `X | `W]]]
+          * [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Mem of [`Base_reg]] )
+        t
+    | LDEORAL :
+        ( triple,
+          [`Reg of [`GP of [< `X | `W]]]
+          * [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Mem of [`Base_reg]] )
+        t
+    | LDSETAL :
+        ( triple,
+          [`Reg of [`GP of [< `X | `W]]]
+          * [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Mem of [`Base_reg]] )
+        t
     | LDP :
         ('w1, 'w2) LDP_STP_width.t
         -> ( triple,
@@ -1189,6 +1239,14 @@ module Instruction_name : sig
           * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
         t
     | NOP : (singleton, unit) t
+    | ORN_shifted_register :
+        ( quad,
+          [`Reg of [`GP of ([< `X | `W] as 'w)]]
+          * [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Reg of [`GP of 'w]]
+          * [`Optional of
+             [`Shift of [< `Lsl | `Lsr | `Asr] * [`Six]] option] )
+        t
         (** Note: A W-form of ORR_immediate exists but is not modelled here.
             W-form logical immediates use a different bitmask encoding (N=0,
             6-bit immr/imms) than X-form (N can be 0 or 1, different valid
@@ -1215,6 +1273,14 @@ module Instruction_name : sig
           * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
           * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
         t
+    | PRFM :
+        Prefetch_operation.t
+        -> ( singleton,
+             [`Mem of
+              [< `Base_reg
+               | `Offset_twelve_unsigned_scaled
+               | `Offset_nine_signed_unscaled]] )
+           t
     | RBIT :
         (pair, [`Reg of [`GP of ([< `X | `W] as 'w)]] * [`Reg of [`GP of 'w]]) t
     | RET : (singleton, unit) t
@@ -1409,6 +1475,12 @@ module Instruction_name : sig
               [`Vector of ([< any_vector] as 'v) * ([< any_width] as 'w)] ] ]
           * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
           * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
+        t
+    | SWPAL :
+        ( triple,
+          [`Reg of [`GP of [< `X | `W]]]
+          * [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Mem of [`Base_reg]] )
         t
     | SXTL :
         ('src_arr, 'src_w, 'dst_arr, 'dst_w) Widen.t

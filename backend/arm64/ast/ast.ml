@@ -567,6 +567,36 @@ module Memory_barrier = struct
     | OSHST -> "oshst"
 end
 
+module Prefetch_operation = struct
+  type t =
+    | PLDL1KEEP
+    | PLDL1STRM
+    | PLDL2KEEP
+    | PLDL2STRM
+    | PLDL3KEEP
+    | PLDL3STRM
+    | PSTL1KEEP
+    | PSTL1STRM
+    | PSTL2KEEP
+    | PSTL2STRM
+    | PSTL3KEEP
+    | PSTL3STRM
+
+  let to_string = function
+    | PLDL1KEEP -> "pldl1keep"
+    | PLDL1STRM -> "pldl1strm"
+    | PLDL2KEEP -> "pldl2keep"
+    | PLDL2STRM -> "pldl2strm"
+    | PLDL3KEEP -> "pldl3keep"
+    | PLDL3STRM -> "pldl3strm"
+    | PSTL1KEEP -> "pstl1keep"
+    | PSTL1STRM -> "pstl1strm"
+    | PSTL2KEEP -> "pstl2keep"
+    | PSTL2STRM -> "pstl2strm"
+    | PSTL3KEEP -> "pstl3keep"
+    | PSTL3STRM -> "pstl3strm"
+end
+
 module Symbol = struct
   module L = Asm_targets.Asm_label
   module S = Asm_targets.Asm_symbol
@@ -1071,6 +1101,12 @@ module Instruction_name = struct
     | B_cond : Branch_cond.t -> (singleton, [`Imm of [`Sym of _]]) t
     | CBNZ : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Imm of [`Sym of _]]) t
     | CBZ : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Imm of [`Sym of _]]) t
+    | CASAL :
+        ( triple,
+          [`Reg of [`GP of [< `X | `W]]]
+          * [`Reg of [`GP of [< `X | `W]]]
+          * [`Mem of [`Base_reg]] )
+        t
     | CLZ :
         (pair, [`Reg of [`GP of ([< `X | `W] as 'w)]] * [`Reg of [`GP of 'w]]) t
     | CM_register :
@@ -1467,6 +1503,30 @@ module Instruction_name = struct
            )
            t
     | LDAR : (pair, [`Reg of [`GP of [< `X | `W]]] * [`Mem of [`Base_reg]]) t
+    | LDADDAL :
+        ( triple,
+          [`Reg of [`GP of [< `X | `W]]]
+          * [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Mem of [`Base_reg]] )
+        t
+    | LDCLRAL :
+        ( triple,
+          [`Reg of [`GP of [< `X | `W]]]
+          * [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Mem of [`Base_reg]] )
+        t
+    | LDEORAL :
+        ( triple,
+          [`Reg of [`GP of [< `X | `W]]]
+          * [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Mem of [`Base_reg]] )
+        t
+    | LDSETAL :
+        ( triple,
+          [`Reg of [`GP of [< `X | `W]]]
+          * [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Mem of [`Base_reg]] )
+        t
     | LDP :
         ('w1, 'w2) LDP_STP_width.t
         -> ( triple,
@@ -1570,6 +1630,14 @@ module Instruction_name = struct
           * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
         t
     | NOP : (singleton, unit) t
+    | ORN_shifted_register :
+        ( quad,
+          [`Reg of [`GP of ([< `X | `W] as 'w)]]
+          * [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Reg of [`GP of 'w]]
+          * [`Optional of
+             [`Shift of [< `Lsl | `Lsr | `Asr] * [`Six]] option] )
+        t
     | ORR_immediate :
         ( triple,
           [`Reg of [`GP of [< `X]]]
@@ -1592,6 +1660,14 @@ module Instruction_name = struct
           * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
           * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
         t
+    | PRFM :
+        Prefetch_operation.t
+        -> ( singleton,
+             [`Mem of
+              [< `Base_reg
+               | `Offset_twelve_unsigned_scaled
+               | `Offset_nine_signed_unscaled]] )
+           t
     | RBIT :
         (pair, [`Reg of [`GP of ([< `X | `W] as 'w)]] * [`Reg of [`GP of 'w]]) t
     | RET : (singleton, unit) t
@@ -1781,6 +1857,12 @@ module Instruction_name = struct
           * [`Reg of [`Neon of [`Vector of 'v * 'w]]]
           * [`Reg of [`Neon of [`Vector of 'v * 'w]]] )
         t
+    | SWPAL :
+        ( triple,
+          [`Reg of [`GP of [< `X | `W]]]
+          * [`Reg of [`GP of [< `X | `W | `XZR | `WZR]]]
+          * [`Mem of [`Base_reg]] )
+        t
     | SXTL :
         ('src_arr, 'src_w, 'dst_arr, 'dst_w) Widen.t
         -> ( pair,
@@ -1967,6 +2049,7 @@ module Instruction_name = struct
         | BR -> "br"
         | CBNZ -> "cbnz"
         | CBZ -> "cbz"
+        | CASAL -> "casal"
         | CLZ -> "clz"
         | CM_register cond -> "cm" ^ Simd_int_cmp.to_string cond
         | CM_zero cond -> "cm" ^ Simd_int_cmp.to_string cond
@@ -2024,6 +2107,10 @@ module Instruction_name = struct
         | INS _ -> "ins"
         | INS_V _ -> "ins"
         | LDAR -> "ldar"
+        | LDADDAL -> "ldaddal"
+        | LDCLRAL -> "ldclral"
+        | LDEORAL -> "ldeoral"
+        | LDSETAL -> "ldsetal"
         | LDP _ -> "ldp"
         | LDR -> "ldr"
         | LDR_simd_and_fp -> "ldr"
@@ -2044,7 +2131,10 @@ module Instruction_name = struct
         | MVN_vector -> "mvn"
         | NEG_vector -> "neg"
         | NOP -> "nop"
+        | ORN_shifted_register -> "orn"
         | ORR_immediate | ORR_shifted_register | ORR_vector -> "orr"
+        | PRFM op ->
+          "prfm " ^ Prefetch_operation.to_string op
         | RBIT -> "rbit"
         | RET -> "ret"
         | REV -> "rev"
@@ -2073,6 +2163,7 @@ module Instruction_name = struct
         | STRH -> "strh"
         | SUB_immediate | SUB_shifted_register | SUB_vector -> "sub"
         | SUBS_immediate | SUBS_shifted_register -> "subs"
+        | SWPAL -> "swpal"
         | SXTL _ -> "sxtl"
         | TBNZ -> "tbnz"
         | TBZ -> "tbz"
@@ -2195,6 +2286,9 @@ module Instruction_name = struct
       | CBZ ->
         let (Pair (reg, target)) = ops in
         [| o reg; o target |]
+      | CASAL ->
+        let (Triple (rs, rt, addr)) = ops in
+        [| o rs; o rt; o addr |]
       | CLZ ->
         let (Pair (rd, rn)) = ops in
         [| o rd; o rn |]
@@ -2383,6 +2477,18 @@ module Instruction_name = struct
       | LDAR ->
         let (Pair (rt, addr)) = ops in
         [| o rt; o addr |]
+      | LDADDAL ->
+        let (Triple (rs, rt, addr)) = ops in
+        [| o rs; o rt; o addr |]
+      | LDCLRAL ->
+        let (Triple (rs, rt, addr)) = ops in
+        [| o rs; o rt; o addr |]
+      | LDEORAL ->
+        let (Triple (rs, rt, addr)) = ops in
+        [| o rs; o rt; o addr |]
+      | LDSETAL ->
+        let (Triple (rs, rt, addr)) = ops in
+        [| o rs; o rt; o addr |]
       | LDP _ ->
         let (Triple (rt1, rt2, addr)) = ops in
         [| o rt1; o rt2; o addr |]
@@ -2445,6 +2551,11 @@ module Instruction_name = struct
         let (Pair (rd, rs)) = ops in
         [| o rd; o rs |]
       | NOP -> [||]
+      | ORN_shifted_register -> (
+        let (Quad (rd, rn, rm, shift_opt)) = ops in
+        match shift_opt with
+        | Optional None -> [| o rd; o rn; o rm |]
+        | Optional (Some shift) -> [| o rd; o rn; o rm; o shift |])
       | ORR_immediate ->
         let (Triple (rd, rs, bitmask)) = ops in
         [| o rd; o rs; o bitmask |]
@@ -2456,6 +2567,9 @@ module Instruction_name = struct
       | ORR_vector ->
         let (Triple (rd, rs1, rs2)) = ops in
         [| o rd; o rs1; o rs2 |]
+      | PRFM _ ->
+        let (Singleton addr) = ops in
+        [| o addr |]
       | RBIT ->
         let (Pair (rd, rn)) = ops in
         [| o rd; o rn |]
@@ -2555,6 +2669,9 @@ module Instruction_name = struct
       | SUB_vector ->
         let (Triple (rd, rs1, rs2)) = ops in
         [| o rd; o rs1; o rs2 |]
+      | SWPAL ->
+        let (Triple (rs, rt, addr)) = ops in
+        [| o rs; o rt; o addr |]
       | SXTL _ ->
         let (Pair (rd, rs)) = ops in
         [| o rd; o rs |]
