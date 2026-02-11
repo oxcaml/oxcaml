@@ -119,13 +119,13 @@ let module_type_declaration sub x =
   Option.iter (sub.module_type sub) x.mtd_type
 
 let module_declaration sub md =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let {md_loc; md_name; md_type; md_attributes; md_modalities; _} = md in
-||||||| 23e84b8c4d
+||||||| upstream-base
 let module_declaration sub {md_loc; md_name; md_type; md_attributes; _} =
 =======
   let {md_loc; md_name; md_type; md_attributes; _} = md in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   sub.item_declaration sub (Module md);
   sub.location sub md_loc;
   sub.attributes sub md_attributes;
@@ -194,14 +194,14 @@ let value_description sub x =
    | Valmi_sig_value moda -> sub.modalities sub moda
    | Valmi_str_primitive modes -> sub.modes sub modes)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let label_decl sub
     ({ld_loc; ld_name; ld_type; ld_attributes; ld_modalities} as ld) =
-||||||| 23e84b8c4d
+||||||| upstream-base
 let label_decl sub {ld_loc; ld_name; ld_type; ld_attributes; _} =
 =======
 let label_decl sub ({ld_loc; ld_name; ld_type; ld_attributes; _} as ld) =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   sub.item_declaration sub (Label ld);
   sub.location sub ld_loc;
   sub.attributes sub ld_attributes;
@@ -280,18 +280,18 @@ let pat_extra sub (e, loc, attrs) =
   match e with
   | Tpat_type (_, lid) -> iter_loc_lid sub lid
   | Tpat_unpack -> ()
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tpat_open (_, lid, env) -> iter_loc sub lid; sub.env sub env
   | Tpat_constraint (ct, ma) -> sub.typ sub ct; sub.modes sub ma
   | Tpat_inspected_type (Label_disambiguation _) -> ()
   | Tpat_inspected_type (Polymorphic_parameter (Param _)) -> ()
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpat_open (_, lid, env) -> iter_loc sub lid; sub.env sub env
   | Tpat_constraint ct -> sub.typ sub ct
 =======
   | Tpat_open (_, lid, env) -> iter_loc_lid sub lid; sub.env sub env
   | Tpat_constraint ct -> sub.typ sub ct
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let pat
   : type k . iterator -> k general_pattern -> unit
@@ -302,24 +302,24 @@ let pat
   List.iter (pat_extra sub) extra;
   match pat_desc with
   | Tpat_any  -> ()
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tpat_var (_, s, _, _, _) -> iter_loc sub s
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpat_var (_, s) -> iter_loc sub s
 =======
   | Tpat_var (_, s, _) -> iter_loc sub s
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tpat_constant _ -> ()
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tpat_unboxed_unit -> ()
   | Tpat_unboxed_bool _ -> ()
   | Tpat_tuple l -> List.iter (fun (_, p) -> sub.pat sub p) l
   | Tpat_unboxed_tuple l -> List.iter (fun (_, p, _) -> sub.pat sub p) l
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpat_tuple l -> List.iter (sub.pat sub) l
 =======
   | Tpat_tuple l -> List.iter (fun (_, p) -> sub.pat sub p) l
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tpat_construct (lid, _, l, vto) ->
       iter_loc_lid sub lid;
       List.iter (sub.pat sub) l;
@@ -332,13 +332,13 @@ let pat
         sub.typ sub ct) vto
   | Tpat_variant (_, po, _) -> Option.iter (sub.pat sub) po
   | Tpat_record (l, _) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       List.iter (fun (lid, _, i) -> iter_loc sub lid; sub.pat sub i) l
   | Tpat_record_unboxed_product (l, _) ->
       List.iter (fun (lid, _, i) -> iter_loc sub lid; sub.pat sub i) l
   | Tpat_array (_, _, l) -> List.iter (sub.pat sub) l
   | Tpat_alias (p, _, s, _, _, _, _) -> sub.pat sub p; iter_loc sub s
-||||||| 23e84b8c4d
+||||||| upstream-base
       List.iter (fun (lid, _, i) -> iter_loc sub lid; sub.pat sub i) l
   | Tpat_array l -> List.iter (sub.pat sub) l
   | Tpat_alias (p, _, s) -> sub.pat sub p; iter_loc sub s
@@ -346,7 +346,7 @@ let pat
       List.iter (fun (lid, _, i) -> iter_loc_lid sub lid; sub.pat sub i) l
   | Tpat_array (_, l) -> List.iter (sub.pat sub) l
   | Tpat_alias (p, _, s, _, _) -> sub.pat sub p; iter_loc sub s
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tpat_lazy p -> sub.pat sub p
   | Tpat_value p -> sub.pat sub (p :> pattern)
   | Tpat_exception p -> sub.pat sub p
@@ -422,13 +422,13 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
     | Uaccess_unboxed_field (lid, _) -> iter_loc sub lid
   in
   match exp_desc with
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Texp_ident (_, lid, _, _, _, _)  -> iter_loc sub lid
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Texp_ident (_, lid, _)  -> iter_loc sub lid
 =======
   | Texp_ident (_, lid, _)  -> iter_loc_lid sub lid
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Texp_constant _ -> ()
   | Texp_let (rec_flag, list, exp) ->
       sub.value_bindings sub (rec_flag, list);
@@ -443,12 +443,12 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_apply (exp, list, _, _, _) ->
       sub.expr sub exp;
       List.iter (function
-<<<<<<< HEAD
+<<<<<<< oxcaml
         | (_, Arg (exp, _)) -> sub.expr sub exp
         | (_, Omitted _) -> ())
         list
   | Texp_match (exp, _, cases, _) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
       List.iter (fun (_, o) -> Option.iter (sub.expr sub) o) list
   | Texp_match (exp, cases, _) ->
 =======
@@ -456,13 +456,13 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
         | (_, Omitted ()) -> ())
         list
   | Texp_match (exp, cases, effs, _) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       sub.expr sub exp;
       List.iter (sub.case sub) cases;
       List.iter (sub.case sub) effs
   | Texp_try (exp, cases, effs) ->
       sub.expr sub exp;
-<<<<<<< HEAD
+<<<<<<< oxcaml
       List.iter (sub.case sub) cases
   | Texp_unboxed_unit -> ()
   | Texp_unboxed_bool _ -> ()
@@ -470,7 +470,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_unboxed_tuple list -> List.iter (fun (_,e,_) -> sub.expr sub e) list
   | Texp_construct (lid, _, args, _) ->
       iter_loc sub lid;
-||||||| 23e84b8c4d
+||||||| upstream-base
       List.iter (sub.case sub) cases
   | Texp_tuple list -> List.iter (sub.expr sub) list
   | Texp_construct (lid, _, args) ->
@@ -481,12 +481,12 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_tuple list -> List.iter (fun (_, e) -> sub.expr sub e) list
   | Texp_construct (lid, _, args) ->
       iter_loc_lid sub lid;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       List.iter (sub.expr sub) args
   | Texp_variant (_, expo) ->
       Option.iter (fun (expr, _) -> sub.expr sub expr) expo
   | Texp_record { fields; extended_expression; _} ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       iter_fields fields;
       Option.iter (fun (exp, _, _) -> sub.expr sub exp) extended_expression;
   | Texp_record_unboxed_product { fields; extended_expression; _} ->
@@ -494,7 +494,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
       Option.iter (fun (exp, _) -> sub.expr sub exp) extended_expression;
   | Texp_field (exp, _, lid, _, _, _) ->
       iter_loc sub lid;
-||||||| 23e84b8c4d
+||||||| upstream-base
       Array.iter (function
         | _, Kept _ -> ()
         | _, Overridden (lid, exp) -> iter_loc sub lid; sub.expr sub exp)
@@ -510,24 +510,24 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
       Option.iter (sub.expr sub) extended_expression;
   | Texp_field (exp, lid, _) ->
       iter_loc_lid sub lid;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       sub.expr sub exp
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Texp_unboxed_field (exp, _, lid, _, _) ->
       iter_loc sub lid;
       sub.expr sub exp
   | Texp_setfield (exp1, _, lid, _, exp2) ->
       iter_loc sub lid;
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Texp_setfield (exp1, lid, _, exp2) ->
       iter_loc sub lid;
 =======
   | Texp_setfield (exp1, lid, _, exp2) ->
       iter_loc_lid sub lid;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       sub.expr sub exp1;
       sub.expr sub exp2
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Texp_array (_, _, list, _) -> List.iter (sub.expr sub) list
   | Texp_idx (ba, uas) ->
       iter_block_access sub ba;
@@ -555,14 +555,14 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_atomic_loc (exp, _, lid, _, _) ->
       iter_loc sub lid;
       sub.expr sub exp
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Texp_array list -> List.iter (sub.expr sub) list
 =======
   | Texp_atomic_loc (exp, lid, _) ->
       iter_loc sub lid;
       sub.expr sub exp
   | Texp_array (_, list) -> List.iter (sub.expr sub) list
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Texp_ifthenelse (exp1, exp2, expo) ->
       sub.expr sub exp1;
       sub.expr sub exp2;
@@ -579,13 +579,13 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
       sub.expr sub for_body
   | Texp_send (exp, _, _) ->
       sub.expr sub exp
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Texp_new (_, lid, _, _) -> iter_loc sub lid
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Texp_new (_, lid, _) -> iter_loc sub lid
 =======
   | Texp_new (_, lid, _) -> iter_loc_lid sub lid
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Texp_instvar (_, _, s) -> iter_loc sub s
   | Texp_mutvar id -> iter_loc sub id
   | Texp_setinstvar (_, _, s, exp) ->
@@ -785,15 +785,15 @@ let class_expr sub {cl_loc; cl_desc; cl_env; cl_attributes; _} =
   | Tcl_apply (cl, args) ->
       sub.class_expr sub cl;
       List.iter (function
-<<<<<<< HEAD
+<<<<<<< oxcaml
         | (_, Arg (exp, _)) -> sub.expr sub exp
         | (_, Omitted _) -> ())
-||||||| 23e84b8c4d
+||||||| upstream-base
       List.iter (fun (_, e) -> Option.iter (sub.expr sub) e) args
 =======
         | (_, Arg exp) -> sub.expr sub exp
         | (_, Omitted ()) -> ())
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         args
   | Tcl_let (rec_flag, value_bindings, ivars, cl) ->
       sub.value_bindings sub (rec_flag, value_bindings);
@@ -847,19 +847,19 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
       Option.iter (sub.jkind_annotation sub) jkind
   | Ttyp_arrow (_, ct1, ma1, ct2, ma2) ->
       sub.typ sub ct1;
-<<<<<<< HEAD
+<<<<<<< oxcaml
       sub.modes sub ma1;
       sub.typ sub ct2;
       sub.modes sub ma2
   | Ttyp_tuple list -> List.iter (fun (_, t) -> sub.typ sub t) list
   | Ttyp_unboxed_tuple list -> List.iter (fun (_, t) -> sub.typ sub t) list
-||||||| 23e84b8c4d
+||||||| upstream-base
       sub.typ sub ct2
   | Ttyp_tuple list -> List.iter (sub.typ sub) list
 =======
       sub.typ sub ct2
   | Ttyp_tuple list -> List.iter (fun (_, t) -> sub.typ sub t) list
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Ttyp_constr (_, lid, list) ->
       iter_loc_lid sub lid;
       List.iter (sub.typ sub) list
@@ -935,7 +935,7 @@ let value_binding sub ({vb_loc; vb_pat; vb_expr; vb_attributes; _} as vb) =
 
 let env _sub _ = ()
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let jkind_annotation sub l =
   (* iterate over locations contained within parsetree jkind annotation *)
   let ast_iterator =
@@ -951,9 +951,9 @@ let modalities sub x =
 let modes sub x =
   List.iter (iter_loc sub) x.mode_desc
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let item_declaration _sub _ = ()
 
 let default_iterator =

@@ -73,12 +73,12 @@ val set_current_thread_name : string -> unit
     This does nothing if the functionality is not implemented but will
     print a warning on the standard error if enabled.
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 =======
     Likewise, a warning is printed if the operation fails.
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     @since 5.4 *)
 
 exception Exit

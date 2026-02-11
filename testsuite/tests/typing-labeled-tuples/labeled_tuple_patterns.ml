@@ -1,5 +1,5 @@
 (* TEST
-<<<<<<< HEAD
+<<<<<<< oxcaml
  flags = "-extension labeled_tuples";
  expect;
 *)
@@ -633,7 +633,7 @@ let _ =
 
 let _ =
   let (~x:n1, ~y:n2, n3, ~x:n4, ~x:n5, ~y:n6, ~y:n7, n8, n9, ~y:n10, ~x:n11) =
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
    expect;
 *)
@@ -1268,7 +1268,7 @@ let _ =
 let _ =
   let (~x1:n1, ~y2:n2, n3, ~x4:n4, ~x5:n5,
        ~y6:n6, ~y7:n7, n8, n9, ~y10:n10, ~x11:n11) =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     t
   in
   (n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, n11)

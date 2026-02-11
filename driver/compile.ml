@@ -22,7 +22,7 @@ let with_info =
   Compile_common.with_info ~backend:Byte ~tool_name
 
 let interface ~source_file ~output_prefix =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   with_info ~source_file ~output_prefix ~dump_ext:"cmi"
     ~compilation_unit:Inferred_from_output_prefix ~kind:Intf
   @@ fun info ->
@@ -30,14 +30,14 @@ let interface ~source_file ~output_prefix =
     ~hook_parse_tree:(fun _ -> ())
     ~hook_typed_tree:(fun _ -> ())
     info
-||||||| 23e84b8c4d
+||||||| upstream-base
   with_info ~source_file ~output_prefix ~dump_ext:"cmi" @@ fun info ->
   Compile_common.interface info
 =======
   let unit_info = Unit_info.make ~source_file Intf output_prefix in
   with_info ~dump_ext:"cmi" unit_info @@ fun info ->
   Compile_common.interface info
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (** Bytecode compilation backend for .ml files. *)
 
@@ -102,7 +102,7 @@ let emit_bytecode i
             ~main_module_block_format ~arg_descr);
     )
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 type starting_point =
   | Parsing
   | Instantiation of {
@@ -114,7 +114,7 @@ type starting_point =
 let starting_point_of_compiler_pass start_from =
   match (start_from:Clflags.Compiler_pass.t) with
   | Parsing -> Parsing
-||||||| 23e84b8c4d
+||||||| upstream-base
 let implementation ~start_from ~source_file ~output_prefix =
   let backend info typed =
     let bytecode = to_bytecode info typed in
@@ -133,7 +133,7 @@ let implementation ~start_from ~source_file ~output_prefix =
   with_info ~dump_ext:"cmo" unit_info @@ fun info ->
   match (start_from : Clflags.Compiler_pass.t) with
   | Parsing -> Compile_common.implementation info ~backend
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | _ -> Misc.fatal_errorf "Cannot start from %s"
            (Clflags.Compiler_pass.to_string start_from)
 

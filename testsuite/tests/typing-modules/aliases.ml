@@ -15,7 +15,7 @@ module C = Char
 - : char = 'B'
 module C' :
   sig
-<<<<<<< HEAD
+<<<<<<< oxcaml
     external code : char -> int @@ portable = "%identity"
     val chr : int -> char @@ portable
     val escaped : char -> string @@ portable
@@ -27,7 +27,7 @@ module C' :
     val seeded_hash : int -> t -> int @@ portable
     val hash : t -> int @@ portable
     external unsafe_chr : int -> char @@ portable = "%identity"
-||||||| 23e84b8c4d
+||||||| upstream-base
     external code : char -> int = "%identity"
     val chr : int -> char
     val escaped : char -> string
@@ -75,7 +75,7 @@ module C' :
     val seeded_hash : int -> t -> int
     val hash : t -> int
     external unsafe_chr : int -> char = "%identity"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   end
 - : char = 'B'
 module C3 :
@@ -110,7 +110,7 @@ C4.chr 66;;
 module F :
   (X : sig end) ->
     sig
-<<<<<<< HEAD
+<<<<<<< oxcaml
       external code : char -> int @@ portable = "%identity"
       val chr : int -> char @@ portable
       val escaped : char -> string @@ portable
@@ -122,7 +122,7 @@ module F :
       val seeded_hash : int -> t -> int @@ portable
       val hash : t -> int @@ portable
       external unsafe_chr : int -> char @@ portable = "%identity"
-||||||| 23e84b8c4d
+||||||| upstream-base
       external code : char -> int = "%identity"
       val chr : int -> char
       val escaped : char -> string
@@ -147,11 +147,11 @@ module F :
       val seeded_hash : int -> t -> int
       val hash : t -> int
       external unsafe_chr : int -> char = "%identity"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     end
 module C4 :
   sig
-<<<<<<< HEAD
+<<<<<<< oxcaml
     external code : char -> int @@ portable = "%identity"
     val chr : int -> char @@ portable
     val escaped : char -> string @@ portable
@@ -163,7 +163,7 @@ module C4 :
     val seeded_hash : int -> t -> int @@ portable
     val hash : t -> int @@ portable
     external unsafe_chr : int -> char @@ portable = "%identity"
-||||||| 23e84b8c4d
+||||||| upstream-base
     external code : char -> int = "%identity"
     val chr : int -> char
     val escaped : char -> string
@@ -188,7 +188,7 @@ module C4 :
     val seeded_hash : int -> t -> int
     val hash : t -> int
     external unsafe_chr : int -> char = "%identity"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   end
 - : char = 'B'
 |}];;
@@ -615,13 +615,13 @@ module A1 : sig end
 module A2 : sig end
 module L1 : sig module X = A1 end
 module L2 : sig module X = A2 end
-<<<<<<< HEAD
+<<<<<<< oxcaml
 module F : functor (L : sig module X : sig end @@ stateless end) -> sig end
-||||||| 23e84b8c4d
+||||||| upstream-base
 module F : functor (L : sig module X : sig end end) -> sig end
 =======
 module F : (L : sig module X : sig end end) -> sig end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 module F1 : sig end
 module F2 : sig end
 |}];;

@@ -123,12 +123,12 @@ val locs : bool ref
 val directory : string option ref
 val annotations : bool ref
 val binary_annotations : bool ref
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val binary_annotations_cms : bool ref
 val shape_format : shape_format ref
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 val store_occurrences : bool ref
 val use_threads : bool ref
 val noassert : bool ref
@@ -169,12 +169,12 @@ val dump_source : bool ref
 val dump_parsetree : bool ref
 val dump_typedtree : bool ref
 val dump_shape : bool ref
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val dump_slambda : bool ref
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 val dump_matchcomp : bool ref
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 val dump_rawlambda : bool ref
 val dump_lambda : bool ref
 val dump_blambda : bool ref

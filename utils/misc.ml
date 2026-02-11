@@ -653,9 +653,9 @@ module Stdlib = struct
   end
 end
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 module Int = Stdlib.Int
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 let repeated_label l =
   let module Set = Stdlib.String.Set in
@@ -896,7 +896,7 @@ module Utf8_lexeme = struct
     in
     is_lowercase_at (String.length s) s 0
 end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* File functions *)
 
@@ -1403,15 +1403,15 @@ module Style = struct
     pp_close_stag ppf ()
 
   let inline_code ppf s = as_inline_code Format_doc.pp_print_string ppf s
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
   let as_clflag flag printer ppf x =
     Format_doc.fprintf ppf "@{<inline_code>%s %a@}" flag printer x
-||||||| 23e84b8c4d
+||||||| upstream-base
   let inline_code ppf s = as_inline_code Format.pp_print_string ppf s
 =======
   let hint ppf = Format_doc.fprintf ppf "@{<hint>Hint@}"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   (* either prints the tag of [s] or delegates to [or_else] *)
   let mark_open_tag ~or_else s =
@@ -1525,7 +1525,7 @@ let spellcheck env name =
   let env = List.sort_uniq (fun s1 s2 -> String.compare s2 s1) env in
   fst (List.fold_left (compare name) ([], max_int) env)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
 let did_you_mean ppf get_choices =
   let open Format_doc in
@@ -1536,7 +1536,7 @@ let did_you_mean ppf get_choices =
   fprintf ppf "@?";
   match get_choices () with
   | [] -> ()
-||||||| 23e84b8c4d
+||||||| upstream-base
 let did_you_mean ppf get_choices =
   (* flush now to get the error report early, in the (unheard of) case
      where the search in the get_choices function would take a bit of
@@ -1566,15 +1566,15 @@ let did_you_mean ?(pp=Style.inline_code) choices =
   let open Format_doc in
   match choices with
   | [] -> None
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | choices ->
     let rest, last = split_last choices in
-<<<<<<< HEAD
+<<<<<<< oxcaml
      fprintf ppf "@\n@[@{<hint>Hint@}: Did you mean %a%s%a?@]"
        (pp_print_list ~pp_sep:comma Style.inline_code) rest
        (if rest = [] then "" else " or ")
        Style.inline_code last
-||||||| 23e84b8c4d
+||||||| upstream-base
     let comma ppf () = Format.fprintf ppf ", " in
      Format.fprintf ppf "@\n@{<hint>Hint@}: Did you mean %a%s%a?@?"
        (Format.pp_print_list ~pp_sep:comma Style.inline_code) rest
@@ -1587,7 +1587,7 @@ let did_you_mean ?(pp=Style.inline_code) choices =
             (if rest = [] then "" else " or ")
             pp last
       )
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 module Error_style = struct
   type setting =
@@ -1636,7 +1636,7 @@ let delete_eol_spaces src =
   let stop = loop 0 0 in
   Bytes.sub_string dst 0 stop
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let pp_two_columns ?(sep = "|") ?max_lines ppf (lines: (string * string) list) =
   let left_column_size =
     List.fold_left (fun acc (s, _) -> Int.max acc (String.length s)) 0 lines in
@@ -1789,7 +1789,7 @@ let pp_table ppf (columns : (string * string list) list) =
     print_separator ppf table_width
   done
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 let pp_two_columns ?(sep = "|") ?max_lines ppf (lines: (string * string) list) =
   let left_column_size =
     List.fold_left (fun acc (s, _) -> Int.max acc (String.length s)) 0 lines in
@@ -1812,7 +1812,7 @@ let pp_two_columns ?(sep = "|") ?max_lines ppf (lines: (string * string) list) =
   Format.fprintf ppf "@]"
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (* showing configuration and configuration variables *)
 let show_config_and_exit () =
   Config.print_config stdout;
@@ -1879,7 +1879,7 @@ let print_if ppf flag printer arg =
   if !flag then Format.fprintf ppf "%a@." printer arg;
   arg
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let output_of_print print =
   let output out_channel t =
     let ppf = Format.formatter_of_out_channel out_channel in
@@ -1933,9 +1933,9 @@ let to_string_of_print print =
   in
   to_string
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 type filepath = string
 

@@ -120,15 +120,15 @@ typedef enum {
     EV_COMPACT_EVACUATE,
     EV_COMPACT_FORWARD,
     EV_COMPACT_RELEASE,
-<<<<<<< HEAD
+<<<<<<< oxcaml
     EV_MINOR_EPHE_CLEAN,
     EV_MINOR_DEPENDENT,
-||||||| 23e84b8c4d
+||||||| upstream-base
     EV_COMPACT_RELEASE
 =======
     EV_EMPTY_MINOR,
     EV_MINOR_EPHE_CLEAN,
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 } ev_runtime_phase;
 
 typedef enum {
@@ -152,7 +152,7 @@ typedef enum {
     EV_C_MAJOR_HEAP_POOL_FRAG_WORDS,
     EV_C_MAJOR_HEAP_POOL_LIVE_BLOCKS,
     EV_C_MAJOR_HEAP_LARGE_BLOCKS,
-<<<<<<< HEAD
+<<<<<<< oxcaml
     EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE,
     EV_C_MAJOR_SLICE_ALLOC_WORDS,
     EV_C_MAJOR_SLICE_ALLOC_DEPENDENT_WORDS,
@@ -160,7 +160,7 @@ typedef enum {
     EV_C_MAJOR_SLICE_TOTAL_WORK,
     EV_C_MAJOR_SLICE_BUDGET,
     EV_C_MAJOR_SLICE_WORK_DONE,
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 
     EV_C_MAJOR_HEAP_WORDS,
@@ -172,7 +172,7 @@ typedef enum {
     EV_C_MAJOR_ALLOC_COUNTER,
     EV_C_MAJOR_SLICE_TARGET,
     EV_C_MAJOR_SLICE_BUDGET
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 } ev_runtime_counter;
 
 typedef enum {
@@ -220,14 +220,14 @@ CAMLextern void caml_runtime_events_resume(void);
    [0] otherwise. */
 CAMLextern int caml_runtime_events_are_active(void);
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 =======
 #ifdef __cplusplus
 }
 #endif
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #ifdef CAML_INTERNALS
 
 struct runtime_events_buffer_header {

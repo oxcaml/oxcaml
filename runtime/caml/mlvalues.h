@@ -145,7 +145,7 @@ Caml_inline int Is_block(value x) {
 #define Unsigned_long_val(x) ((uintnat)(x) >> 1)
 #define Unsigned_int_val(x)  ((int) Unsigned_long_val(x))
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* The widening conversion in Val_long will do sign extension, because
    the signedness of the thing being casted determines the choice on
    sign extension, not the signedness of the target type. */
@@ -161,7 +161,7 @@ Caml_inline int Is_block(value x) {
 #define Make_exception_result(v) ((v) | 2)
 #define Is_exception_result(v) (((v) & 3) == 2)
 #define Extract_exception(v) ((v) & ~3)
-||||||| 23e84b8c4d
+||||||| upstream-base
 /* Encoded exceptional return values, when functions are suffixed with
    _exn. Encoded exceptions are invalid values and must not be seen
    by the garbage collector. */
@@ -204,7 +204,7 @@ Caml_inline int caml_result_is_exception(struct caml_result_private result)
 
 #define Result_unit Result_value(Val_unit)
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 /* Structure of the header:
 

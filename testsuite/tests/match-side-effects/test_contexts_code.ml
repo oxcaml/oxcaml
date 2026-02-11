@@ -1,13 +1,13 @@
 (* TEST
  readonly_files = "contexts_1.ml contexts_2.ml contexts_3.ml";
-<<<<<<< HEAD
+<<<<<<< oxcaml
  flags = "-dsource -dlambda";
  stack-allocation;
-||||||| 23e84b8c4d
+||||||| upstream-base
  flags = "-dsource -dlambda";
 =======
  flags = "-dsource -dlambda -dcanonical-ids";
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
  expect;
 *)
 
@@ -38,7 +38,7 @@ let example_1 () =
       Result.Error 3
   | { a = true; b = Either.Left y } -> Result.Ok y;;
 (let
-<<<<<<< HEAD
+<<<<<<< oxcaml
   (example_1/305 =
      (function {nlocal = 0} param/329[value<int>]
        : (consts ()) (non_consts ([1: ?] [0: ?]))
@@ -60,7 +60,7 @@ let example_1 () =
                 case tag 1: [1: 2]))
              [1: 1])))))
   (apply (field_imm 1 (global Toploop!)) "example_1" example_1/305))
-||||||| 23e84b8c4d
+||||||| upstream-base
   (example_1/310 =
      (function param/334[int]
        (let (input/312 = (makemutable 0 (int,*) 1 [0: 1]))
@@ -93,7 +93,7 @@ let example_1 () =
               case tag 1: [1: 2]))
            [1: 1]))))
   (apply (field_mut 1 (global Toploop!)) "example_1" example_1/0))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 val example_1 : unit -> (bool, int) Result.t = <fun>
 |}]
 
@@ -122,7 +122,7 @@ let example_2 () =
       Result.Error 3
   | { a = true; b = { mut = Either.Left y } } -> Result.Ok y;;
 (let
-<<<<<<< HEAD
+<<<<<<< oxcaml
   (example_2/344 =
      (function {nlocal = 0} param/348[value<int>]
        : (consts ()) (non_consts ([1: ?] [0: ?]))
@@ -150,7 +150,7 @@ let example_2 () =
                 case tag 1: [1: 2]))
              [1: 1])))))
   (apply (field_imm 1 (global Toploop!)) "example_2" example_2/344))
-||||||| 23e84b8c4d
+||||||| upstream-base
   (example_2/346 =
      (function param/350[int]
        (let (input/348 = (makeblock 0 (int,*) 1 (makemutable 0 [0: 1])))
@@ -185,7 +185,7 @@ let example_2 () =
               case tag 1: [1: 2]))
            [1: 1]))))
   (apply (field_mut 1 (global Toploop!)) "example_2" example_2/0))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 val example_2 : unit -> (bool, int) Result.t = <fun>
 |}]
 
@@ -212,7 +212,7 @@ let example_3 () =
       Result.Error 3
   | { mut = (true, Either.Left y) } -> Result.Ok y;;
 (let
-<<<<<<< HEAD
+<<<<<<< oxcaml
   (example_3/362 =
      (function {nlocal = 0} param/366[value<int>]
        : (consts ()) (non_consts ([1: ?] [0: ?]))
@@ -235,7 +235,7 @@ let example_3 () =
               case tag 1: [1: 2])
              [1: 1])))))
   (apply (field_imm 1 (global Toploop!)) "example_3" example_3/362))
-||||||| 23e84b8c4d
+||||||| upstream-base
   (example_3/363 =
      (function param/367[int]
        (let (input/365 =mut [0: 1 [0: 1]] *match*/368 =o *input/365)
@@ -259,6 +259,6 @@ let example_3 () =
             case tag 1: [1: 2])
            [1: 1]))))
   (apply (field_mut 1 (global Toploop!)) "example_3" example_3/0))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 val example_3 : unit -> (bool, int) Result.t = <fun>
 |}]

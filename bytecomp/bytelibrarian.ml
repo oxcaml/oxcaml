@@ -127,13 +127,13 @@ let report_error_doc ppf = function
   | Not_an_object_file name ->
       fprintf ppf "The file %a is not a bytecode object file"
         Location.Doc.quoted_filename name
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
         (Style.as_inline_code Location.print_filename) name
 =======
   | Link_error e ->
       Linkdeps.report_error_doc ~print_filename:Location.Doc.filename ppf e
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let () =
   Location.register_error_of_exn

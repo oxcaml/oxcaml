@@ -1,6 +1,6 @@
 (* TEST_BELOW *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* CR-someday mslater: this should also work on arm once atomics are builtins *)
 
 (* standard atomics *)
@@ -50,7 +50,7 @@ let set_imm (r : int atomic) v =
     ocamlopt.byte;
     check-ocamlopt.byte-output;
    }
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 (* standard atomics *)
 
@@ -91,5 +91,5 @@ let cas (r : 'a atomic) oldv newv =
    flags = "-c -dcmm -dno-locations -dno-unique-ids";
    ocamlopt.byte;
    check-ocamlopt.byte-output;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 *)

@@ -24,13 +24,13 @@
 #include "caml/osdeps.h"
 #include "caml/platform.h"
 #include "caml/fail.h"
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 #include "caml/lf_skiplist.h"
 =======
 #include "caml/lf_skiplist.h"
 #include "caml/misc.h"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #include "caml/signals.h"
 #ifdef HAS_SYS_MMAN_H
 #include <sys/mman.h>
@@ -106,14 +106,14 @@ void caml_plat_assert_locked(caml_plat_mutex* m)
 #endif
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 CAMLexport CAMLthread_local int caml_lockdepth = 0;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 #ifdef DEBUG
 CAMLexport CAMLthread_local int caml_lockdepth = 0;
 #endif
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 void caml_plat_assert_all_locks_unlocked(void)
 {
@@ -157,9 +157,9 @@ CAMLexport void caml_plat_mutex_reinit(caml_plat_mutex *m)
 /* Condition variables */
 static void caml_plat_cond_init_aux(caml_plat_cond *cond)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   custom_condvar_init(cond);
-||||||| 23e84b8c4d
+||||||| upstream-base
   pthread_condattr_t attr;
   pthread_condattr_init(&attr);
 #if defined(_POSIX_TIMERS) && \
@@ -177,16 +177,16 @@ static void caml_plat_cond_init_aux(caml_plat_cond *cond)
   pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);
 #endif
   pthread_cond_init(cond, &attr);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* Condition variables */
-||||||| 23e84b8c4d
+||||||| upstream-base
 /* Condition variables */
 void caml_plat_cond_init(caml_plat_cond* cond, caml_plat_mutex* m)
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 void caml_plat_cond_init(caml_plat_cond* cond)
 {
   caml_plat_cond_init_aux(cond);
@@ -195,50 +195,50 @@ void caml_plat_cond_init(caml_plat_cond* cond)
 void caml_plat_wait(caml_plat_cond* cond, caml_plat_mutex* mut)
 {
   caml_plat_assert_locked(mut);
-<<<<<<< HEAD
+<<<<<<< oxcaml
   check_err("wait", custom_condvar_wait(cond, mut));
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_plat_assert_locked(cond->mutex);
   check_err("wait", pthread_cond_wait(&cond->cond, cond->mutex));
 =======
   check_err("wait", pthread_cond_wait(cond, mut));
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 void caml_plat_broadcast(caml_plat_cond* cond)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   check_err("cond_broadcast", custom_condvar_broadcast(cond));
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_plat_assert_locked(cond->mutex);
   check_err("cond_broadcast", pthread_cond_broadcast(&cond->cond));
 =======
   check_err("cond_broadcast", pthread_cond_broadcast(cond));
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 void caml_plat_signal(caml_plat_cond* cond)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   check_err("cond_signal", custom_condvar_signal(cond));
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_plat_assert_locked(cond->mutex);
   check_err("cond_signal", pthread_cond_signal(&cond->cond));
 =======
   check_err("cond_signal", pthread_cond_signal(cond));
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 void caml_plat_cond_free(caml_plat_cond* cond)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   check_err("cond_free", custom_condvar_destroy(cond));
-||||||| 23e84b8c4d
+||||||| upstream-base
   check_err("cond_free", pthread_cond_destroy(&cond->cond));
   cond->mutex=0;
 =======
   check_err("cond_free", pthread_cond_destroy(cond));
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 /* Futexes */
@@ -272,7 +272,7 @@ void caml_plat_futex_init(caml_plat_futex* ftx, caml_plat_futex_value value) {
 
 void caml_plat_futex_free(caml_plat_futex* ftx) {
   caml_plat_mutex_free(&ftx->mutex);
-<<<<<<< HEAD
+<<<<<<< oxcaml
   caml_plat_cond_free(&ftx->cond);
 }
 
@@ -373,7 +373,7 @@ void caml_plat_futex_free(caml_plat_futex* ftx) {
 #  elif 0 /* defined(__DragonFly__)
    TODO The following code for DragonFly is untested,
    we currently use the fallback instead. */ */
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   check_err("cond_destroy", pthread_cond_destroy(&ftx->cond));
 }
@@ -475,7 +475,7 @@ void caml_plat_futex_free(caml_plat_futex* ftx) {
 #  elif 0 /* defined(__DragonFly__)
    TODO The following code for DragonFly is untested,
    we currently use the fallback instead. */
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #    define CAML_PLAT_FUTEX_WAIT(ftx, undesired)        \
   umtx_sleep((volatile const int*)ftx, undesired, 0)
 #    define CAML_PLAT_FUTEX_WAKE(ftx)               \
@@ -576,24 +576,24 @@ intnat caml_plat_mmap_alignment = 0;
 
 uintnat caml_mem_round_up_mapping_size(uintnat size)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   if (caml_plat_hugepagesize > caml_plat_pagesize &&
       size > caml_plat_hugepagesize/2)
     return round_up(size, caml_plat_hugepagesize);
   else
     return round_up(size, caml_plat_pagesize);
-||||||| 23e84b8c4d
+||||||| upstream-base
   return round_up(size, caml_plat_pagesize);
 =======
   return caml_round_up(size, caml_plat_pagesize);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 #define Is_page_aligned(size) ((size & (caml_plat_pagesize - 1)) == 0)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 void* caml_mem_map(uintnat size, uintnat flags, const char* name)
-||||||| 23e84b8c4d
+||||||| upstream-base
 #ifdef DEBUG
 static struct lf_skiplist mmap_blocks = {NULL};
 #endif
@@ -611,30 +611,30 @@ static struct lf_skiplist mmap_blocks;
 #endif
 
 void* caml_mem_map(uintnat size, int reserve_only)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 {
   void* mem = caml_plat_mem_map(size, flags, name);
 
   if (mem == 0) {
     CAML_GC_MESSAGE(ADDRSPACE,
-<<<<<<< HEAD
+<<<<<<< oxcaml
                     "mmap %" ARCH_INTNAT_PRINTF_FORMAT "d bytes (%s) failed",
                     size, name);
-||||||| 23e84b8c4d
+||||||| upstream-base
     caml_gc_message(0x1000, "mmap %" ARCH_INTNAT_PRINTF_FORMAT "d bytes failed",
                             size);
 =======
                     "mmap %" ARCH_INTNAT_PRINTF_FORMAT "d bytes failed",
                     size);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     return 0;
   }
 
   CAML_GC_MESSAGE(ADDRSPACE,
                   "mmap %" ARCH_INTNAT_PRINTF_FORMAT "d"
-<<<<<<< HEAD
+<<<<<<< oxcaml
                   " bytes at %p for %s\n", size, mem, name);
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_gc_message(0x1000, "mmap %" ARCH_INTNAT_PRINTF_FORMAT "d"
                           " bytes at %p for heaps\n", size, mem);
 
@@ -647,7 +647,7 @@ void* caml_mem_map(uintnat size, int reserve_only)
 #ifdef DEBUG
   caml_lf_skiplist_insert(&mmap_blocks, (uintnat)mem, size);
 #endif
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   return mem;
 }
@@ -657,17 +657,17 @@ void* caml_mem_commit(void* mem, uintnat size, const char* name)
   CAMLassert(Is_page_aligned(size));
   CAML_GC_MESSAGE(ADDRSPACE,
                   "commit %" ARCH_INTNAT_PRINTF_FORMAT "d"
-<<<<<<< HEAD
+<<<<<<< oxcaml
                   " bytes at %p for %s\n", size, mem, name);
   return caml_plat_mem_commit(mem, size, name);
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_gc_message(0x1000, "commit %" ARCH_INTNAT_PRINTF_FORMAT "d"
                           " bytes at %p for heaps\n", size, mem);
   return caml_plat_mem_commit(mem, size);
 =======
                   " bytes at %p for heaps\n", size, mem);
   return caml_plat_mem_commit(mem, size);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 void caml_mem_decommit(void* mem, uintnat size, const char* name)
@@ -675,27 +675,27 @@ void caml_mem_decommit(void* mem, uintnat size, const char* name)
   if (size) {
     CAML_GC_MESSAGE(ADDRSPACE,
                     "decommit %" ARCH_INTNAT_PRINTF_FORMAT "d"
-<<<<<<< HEAD
+<<<<<<< oxcaml
                     " bytes at %p for %s\n", size, mem, name);
     caml_plat_mem_decommit(mem, size, name);
-||||||| 23e84b8c4d
+||||||| upstream-base
     caml_gc_message(0x1000, "decommit %" ARCH_INTNAT_PRINTF_FORMAT "d"
                             " bytes at %p for heaps\n", size, mem);
     caml_plat_mem_decommit(mem, size);
 =======
                     " bytes at %p for heaps\n", size, mem);
     caml_plat_mem_decommit(mem, size);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   }
 }
 
 void caml_mem_unmap(void* mem, uintnat size)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   CAML_GC_MESSAGE(ADDRSPACE,
                   "munmap %" ARCH_INTNAT_PRINTF_FORMAT "d"
                   " bytes at %p\n", size, mem);
-||||||| 23e84b8c4d
+||||||| upstream-base
 #ifdef DEBUG
   uintnat data;
   CAMLassert(caml_lf_skiplist_find(&mmap_blocks, (uintnat)mem, &data) != 0);
@@ -712,7 +712,7 @@ void caml_mem_unmap(void* mem, uintnat size)
   CAML_GC_MESSAGE(ADDRSPACE,
                   "munmap %" ARCH_INTNAT_PRINTF_FORMAT "d"
                   " bytes at %p for heaps\n", size, mem);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   caml_plat_mem_unmap(mem, size);
 }
 
@@ -734,23 +734,23 @@ void caml_mem_name_map(void* mem, size_t length, const char* format, ...)
 #define Slow_sleep_nsec  (1 * NSEC_PER_MSEC) /*  1 msec */
 #define Max_sleep_nsec   (1 * NSEC_PER_SEC)  /*  1 sec  */
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 unsigned caml_plat_spin_back_off(unsigned sleep_ns,
-||||||| 23e84b8c4d
+||||||| upstream-base
 unsigned caml_plat_spin_wait(unsigned spins,
                              const char* file, int line,
                              const char* function)
 =======
 unsigned caml_plat_spin_back_off(unsigned sleep_nsec,
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                                  const struct caml_plat_srcloc* loc)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   if (sleep_ns < Min_sleep_ns) sleep_ns = Min_sleep_ns;
   if (sleep_ns > Max_sleep_ns) sleep_ns = Max_sleep_ns;
   unsigned next_sleep_ns = sleep_ns + sleep_ns / 4;
   if (sleep_ns < Slow_sleep_ns && Slow_sleep_ns <= next_sleep_ns) {
-||||||| 23e84b8c4d
+||||||| upstream-base
   unsigned next_spins;
   if (spins < Min_sleep_ns) spins = Min_sleep_ns;
   if (spins > Max_sleep_ns) spins = Max_sleep_ns;
@@ -762,35 +762,35 @@ unsigned caml_plat_spin_back_off(unsigned sleep_nsec,
   if (sleep_nsec > Max_sleep_nsec) sleep_nsec = Max_sleep_nsec;
   unsigned next_sleep_nsec = sleep_nsec + sleep_nsec / 4;
   if (sleep_nsec < Slow_sleep_nsec && Slow_sleep_nsec <= next_sleep_nsec) {
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     caml_gc_log("Slow spin-wait loop in %s at %s:%d",
                 loc->function, loc->file, loc->line);
   }
 #ifdef _WIN32
-<<<<<<< HEAD
+<<<<<<< oxcaml
   Sleep(sleep_ns/1000000);
-||||||| 23e84b8c4d
+||||||| upstream-base
   Sleep(spins/1000000);
 =======
   Sleep(sleep_nsec / NSEC_PER_MSEC);
 #elif defined (HAS_NANOSLEEP)
   const struct timespec req = caml_timespec_of_nsec(sleep_nsec);
   nanosleep(&req, NULL);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #else
-<<<<<<< HEAD
+<<<<<<< oxcaml
   usleep(sleep_ns/1000);
-||||||| 23e84b8c4d
+||||||| upstream-base
   usleep(spins/1000);
 =======
   usleep(sleep_nsec / NSEC_PER_USEC);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #endif
-<<<<<<< HEAD
+<<<<<<< oxcaml
   return next_sleep_ns;
-||||||| 23e84b8c4d
+||||||| upstream-base
   return next_spins;
 =======
   return next_sleep_nsec;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }

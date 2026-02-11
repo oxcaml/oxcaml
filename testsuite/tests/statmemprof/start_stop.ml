@@ -1,13 +1,13 @@
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* TEST
    runtime5;
    { bytecode; }
    { native; }
 *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 (* TEST *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Tests various valid and invalid orderings of start/stop/discard
 statmemprof calls. Doesn't test any callbacks or count any allocations,

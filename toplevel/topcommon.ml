@@ -397,13 +397,13 @@ let inline_code = Format_doc.compat Style.inline_code
 let try_run_directive ppf dir_name pdir_arg =
   begin match get_directive dir_name with
   | None ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       fprintf ppf "Unknown directive %a." inline_code dir_name;
       let directives = all_directive_names () in
       Format_doc.compat Misc.did_you_mean ppf
         (fun () -> Misc.spellcheck directives dir_name);
       fprintf ppf "@.";
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf "Unknown directive %a." Style.inline_code dir_name;
       let directives = all_directive_names () in
       Misc.did_you_mean ppf
@@ -418,7 +418,7 @@ let try_run_directive ppf dir_name pdir_arg =
           (Misc.did_you_mean (Misc.spellcheck directives dir_name))
       in
       fprintf ppf "%a@." (Format_doc.compat print) ();
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       false
   | Some d ->
       match d, pdir_arg with
@@ -459,13 +459,13 @@ let try_run_directive ppf dir_name pdir_arg =
           | `String ->
               Format.fprintf ppf "a %a literal" inline_code "string"
           | `Int ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
               Format.fprintf ppf "an %a literal" inline_code "string"
-||||||| 23e84b8c4d
+||||||| upstream-base
               Format.fprintf ppf "an %a literal" Style.inline_code "string"
 =======
               Format.fprintf ppf "an %a literal" inline_code "int"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           | `Ident ->
               Format.fprintf ppf "an identifier"
           | `Bool ->
@@ -480,14 +480,14 @@ let try_run_directive ppf dir_name pdir_arg =
 
 let loading_hint_printer ppf cu =
   let open Format_doc in
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let global = Symtable.Global.Glob_compunit cu in
-||||||| 23e84b8c4d
+||||||| upstream-base
   let global = Symtable.Global.Glob_compunit (Cmo_format.Compunit cu) in
   Symtable.report_error ppf (Symtable.Undefined_global global);
 =======
   let global = Symtable.Global.Glob_compunit (Cmo_format.Compunit cu) in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   Symtable.report_error_doc ppf (Symtable.Undefined_global global);
   let find_with_ext ext =
     let leafname =

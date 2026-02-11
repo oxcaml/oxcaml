@@ -163,11 +163,11 @@ CAMLextern caml_stat_string caml_stat_strdup_noexc(const char *s);
  * obvious equivalents of [caml_stat_strdup] and
  * [caml_stat_strdup_noexc] for wide characters.
  */
-<<<<<<< HEAD
+<<<<<<< oxcaml
 CAMLextern wchar_t* caml_stat_wcsdup(const wchar_t *s);
 CAMLextern wchar_t* caml_stat_wcsdup_noexc(const wchar_t *s);
 #endif
-||||||| 23e84b8c4d
+||||||| upstream-base
 /* [caml_stat_strconcat(nargs, strings)] concatenates NULL-terminated [strings]
    (an array of [char*] of size [nargs]) into a new string, dropping all NULLs,
 =======
@@ -186,7 +186,7 @@ CAMLextern wchar_t* caml_stat_wcsdup_noexc(const wchar_t *s);
 CAMLmalloc(caml_stat_free, 1, 2) CAMLreturns_nonnull()
 CAMLextern caml_stat_string caml_stat_memdup(const char *s, asize_t size,
                                              asize_t *out_size);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 /* [caml_stat_strconcat(nargs, strings)] concatenates null-terminated [strings]
    (an array of [char*] of size [nargs]) into a new string, dropping all NULs,

@@ -110,7 +110,7 @@ and ident_lazy_t = ident_create "lazy_t"
 and ident_string = ident_create "string"
 and ident_extension_constructor = ident_create "extension_constructor"
 and ident_floatarray = ident_create "floatarray"
-<<<<<<< HEAD
+<<<<<<< oxcaml
 and ident_lexing_position = ident_create "lexing_position"
 and ident_atomic_loc = ident_create "atomic_loc"
 (* CR metaprogramming aivaskovic: there is a question about naming;
@@ -142,7 +142,7 @@ and ident_int64x8 = ident_create "int64x8"
 and ident_float16x32 = ident_create "float16x32"
 and ident_float32x16 = ident_create "float32x16"
 and ident_float64x8 = ident_create "float64x8"
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 and ident_iarray = ident_create "iarray"
 and ident_atomic_loc = ident_create "atomic_loc"
@@ -169,7 +169,7 @@ let ident_of_type_constr : type_constr -> Ident.t = function
   | `Floatarray -> ident_floatarray
   | `Iarray -> ident_iarray
   | `Atomic_loc -> ident_atomic_loc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let path_int = Pident ident_int
 and path_char = Pident ident_char
@@ -194,7 +194,7 @@ and path_lazy_t = Pident ident_lazy_t
 and path_string = Pident ident_string
 and path_extension_constructor = Pident ident_extension_constructor
 and path_floatarray = Pident ident_floatarray
-<<<<<<< HEAD
+<<<<<<< oxcaml
 and path_lexing_position = Pident ident_lexing_position
 and path_idx_imm = Pident ident_idx_imm
 and path_idx_mut = Pident ident_idx_mut
@@ -258,13 +258,13 @@ and path_unboxed_int64x8 = Path.unboxed_version path_int64x8
 and path_unboxed_float16x32 = Path.unboxed_version path_float16x32
 and path_unboxed_float32x16 = Path.unboxed_version path_float32x16
 and path_unboxed_float64x8 = Path.unboxed_version path_float64x8
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 and path_iarray = Pident ident_iarray
 and path_atomic_loc = Pident ident_atomic_loc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let type_int = newgenty (Tconstr(path_int, [], ref Mnil))
 and type_int8 = newgenty (Tconstr(path_int8, [], ref Mnil))
 and type_int16 = newgenty (Tconstr(path_int16, [], ref Mnil))
@@ -371,7 +371,7 @@ and type_unboxed_float32x16 =
   newgenty (Tconstr(path_unboxed_float32x16, [], ref Mnil))
 and type_unboxed_float64x8 =
   newgenty (Tconstr(path_unboxed_float64x8, [], ref Mnil))
-||||||| 23e84b8c4d
+||||||| upstream-base
 let type_int = newgenty (Tconstr(path_int, [], ref Mnil))
 and type_char = newgenty (Tconstr(path_char, [], ref Mnil))
 and type_bytes = newgenty (Tconstr(path_bytes, [], ref Mnil))
@@ -424,7 +424,7 @@ let find_type_constr =
     |> Path.Map.of_list
   in
   fun p -> Path.Map.find_opt p all_predef_paths
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let ident_match_failure = ident_create "Match_failure"
 and ident_out_of_memory = ident_create "Out_of_memory"
@@ -472,10 +472,10 @@ and ident_cons = ident_create "::"
 and ident_none = ident_create "None"
 and ident_some = ident_create "Some"
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 and ident_null = ident_create "Null"
 and ident_this = ident_create "This"
-||||||| 23e84b8c4d
+||||||| upstream-base
 let mk_add_type add_type type_ident ?manifest
     ?(immediate=Type_immediacy.Unknown) ?(kind=Type_abstract Definition) env =
   let decl =
@@ -600,9 +600,9 @@ let decl_of_type_constr tconstr =
                  cstr ident_some [tvar]] in
       decl1 ~variance:Variance.covariant ~kind ()
   | `Lazy_t -> decl1 ~variance:Variance.covariant ()
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let option_argument_sort = Jkind_types.Sort.Const.value
 let option_argument_jkind = Jkind.Builtin.value_or_null ~why:(
   Type_argument {parent_path = path_option; position = 1; arity = 1})
@@ -682,7 +682,7 @@ let mk_add_type add_type =
   let add_type ?manifest type_ident ?kind ~jkind ?unboxed_jkind env =
     let jkind = Jkind.of_builtin ~why:(Primitive type_ident) jkind in
     add_type_with_jkind ?manifest type_ident ?kind ~jkind ?unboxed_jkind env
-||||||| 23e84b8c4d
+||||||| upstream-base
 let build_initial_env add_type add_extension empty_env =
   let add_type = mk_add_type add_type
   and add_type1 type_ident
@@ -735,9 +735,9 @@ let build_initial_env add_type add_extension empty_env =
                             (Parsetree.PStr [])];
         ext_uid = Uid.of_predef_id id;
       }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   in
-<<<<<<< HEAD
+<<<<<<< oxcaml
   add_type_with_jkind, add_type
 
 let mk_add_type1 add_type type_ident
@@ -1028,7 +1028,7 @@ let build_initial_env add_type add_extension empty_env =
        ~kind:(variant [cstr ident_void []])
        ~jkind:Jkind.Const.Builtin.immediate
        ~unboxed_jkind:Jkind.Const.Builtin.kind_of_unboxed_unit
-||||||| 23e84b8c4d
+||||||| upstream-base
   let variant constrs = Type_variant (constrs, Variant_regular) in
   empty_env
   (* Predefined types - alphabetical order *)
@@ -1069,17 +1069,17 @@ let build_initial_env add_type add_extension empty_env =
   List.fold_left (fun env tconstr ->
     add_type (ident_of_type_constr tconstr) (decl_of_type_constr tconstr) env
   ) empty_env all_type_constrs
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   (* Predefined exceptions - alphabetical order *)
   |> add_extension ident_assert_failure
-<<<<<<< HEAD
+<<<<<<< oxcaml
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int]),
         Jkind_types.Sort.Const.value]
-||||||| 23e84b8c4d
+||||||| upstream-base
        [newgenty (Ttuple[type_string; type_int; type_int])]
 =======
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int])]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   |> add_extension ident_division_by_zero []
   |> add_extension ident_end_of_file []
   |> add_extension ident_failure [type_string,
@@ -1087,14 +1087,14 @@ let build_initial_env add_type add_extension empty_env =
   |> add_extension ident_invalid_argument [type_string,
        Jkind_types.Sort.Const.value]
   |> add_extension ident_match_failure
-<<<<<<< HEAD
+<<<<<<< oxcaml
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int]),
        Jkind_types.Sort.Const.value]
-||||||| 23e84b8c4d
+||||||| upstream-base
        [newgenty (Ttuple[type_string; type_int; type_int])]
 =======
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int])]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   |> add_extension ident_not_found []
   |> add_extension ident_out_of_memory []
   |> add_extension ident_out_of_fibers []
@@ -1103,7 +1103,7 @@ let build_initial_env add_type add_extension empty_env =
   |> add_extension ident_sys_error [type_string,
        Jkind_types.Sort.Const.value]
   |> add_extension ident_undefined_recursive_module
-<<<<<<< HEAD
+<<<<<<< oxcaml
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int]),
        Jkind_types.Sort.Const.value]
 
@@ -1203,12 +1203,12 @@ let add_or_null add_type env =
   ~kind:or_null_kind
   ~param_jkind:(Jkind.for_or_null_argument ident_or_null)
   ~jkind:or_null_jkind
-||||||| 23e84b8c4d
+||||||| upstream-base
        [newgenty (Ttuple[type_string; type_int; type_int])]
 =======
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int])]
   |> add_extension ident_continuation_already_taken []
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let builtin_values =
   List.map (fun id -> (Ident.name id, id)) all_predef_exns

@@ -96,18 +96,18 @@ module Error: sig
     (** One side is a functor but the other side is not *)
 
   and functor_params_diff =
-<<<<<<< HEAD
+<<<<<<< oxcaml
     (Types.functor_parameter list * Types.module_type,
      functor_params_symptom) diff
     (** the return mode of the functor is intentionally omitted, since the diff
         is only about parameters. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
     (Types.functor_parameter list * Types.module_type) core_diff
 =======
     functor_params_info core_diff
    and functor_params_info =
      { params: functor_parameter list; res: module_type }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   and signature_symptom = {
     env: Env.t;
@@ -181,16 +181,16 @@ val modes_toplevel : modes
 (* Typechecking *)
 
 val modtypes:
-<<<<<<< HEAD
+<<<<<<< oxcaml
   loc:Location.t -> Env.t -> mark:bool -> modes:modes ->
-||||||| 23e84b8c4d
+||||||| upstream-base
   loc:Location.t -> Env.t -> mark:mark ->
 =======
   loc:Location.t -> Env.t -> mark:bool ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   module_type -> module_type -> module_coercion
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (** [modtypes_constraint ~shape ~loc env ~mark exp_modtype constraint_modtype]
     checks that [exp_modtype] is a subtype of [constraint_modtype], and returns
     the module coercion and the shape of the constrained module.
@@ -205,7 +205,7 @@ val modtypes:
 *)
 val modtypes_constraint:
   shape:Shape.t -> loc:Location.t -> Env.t -> mark:bool -> modes:modes ->
-||||||| 23e84b8c4d
+||||||| upstream-base
 val modtypes_with_shape:
   shape:Shape.t -> loc:Location.t -> Env.t -> mark:mark ->
 =======
@@ -228,17 +228,17 @@ val modtypes_consistency:
 *)
 val modtypes_constraint:
   shape:Shape.t -> loc:Location.t -> Env.t -> mark:bool ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   module_type -> module_type -> module_coercion * Shape.t
 
 val strengthened_module_decl:
-<<<<<<< HEAD
+<<<<<<< oxcaml
   loc:Location.t -> aliasable:bool -> Env.t -> mark:bool -> mmodes:modes ->
-||||||| 23e84b8c4d
+||||||| upstream-base
   loc:Location.t -> aliasable:bool -> Env.t -> mark:mark ->
 =======
   loc:Location.t -> aliasable:bool -> Env.t -> mark:bool ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   module_declaration -> Path.t -> module_declaration -> module_coercion
 
 val check_functor_application :
@@ -251,10 +251,10 @@ val check_functor_application :
 val check_modtype_equiv:
   loc:Location.t -> Env.t -> Ident.t -> module_type -> module_type -> unit
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val signatures: Env.t -> mark:bool -> modes:modes ->
   signature -> signature -> module_coercion
-||||||| 23e84b8c4d
+||||||| upstream-base
 val signatures: Env.t -> mark:mark ->
   signature -> signature -> module_coercion
 =======
@@ -262,7 +262,7 @@ val signatures: Env.t -> mark:bool -> signature -> signature -> module_coercion
 
 (** Check an implementation against an interface *)
 val check_implementation: Env.t -> signature -> signature -> unit
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 val include_functor_signatures : Env.t -> mark:bool ->
   signature -> signature -> modes:modes -> (Ident.t * module_coercion) list

@@ -969,8 +969,8 @@ let mk_dcse f =
 let mk_dlinear f =
   "-dlinear", Arg.Unit f, " (undocumented)"
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 let mk_dinterval f =
   "-dinterval", Arg.Unit f, " (undocumented)"
 
@@ -981,7 +981,7 @@ let mk_dinterval f =
 let mk_dparsetree_loc_ghost_invariants f =
   "-dparsetree-loc-ghost-invariants", Arg.Unit f, " (undocumented)"
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let mk_dstartup f =
   "-dstartup", Arg.Unit f, " (undocumented)"
 
@@ -1189,12 +1189,12 @@ module type Core_options = sig
   val _dparsetree_loc_ghost_invariants : unit -> unit
   val _dtypedtree : unit -> unit
   val _dshape : unit -> unit
-<<<<<<< HEAD
+<<<<<<< oxcaml
   val _dslambda : unit -> unit
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   val _dmatchcomp : unit -> unit
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   val _drawlambda : unit -> unit
   val _dlambda : unit -> unit
   val _dblambda : unit -> unit
@@ -1208,12 +1208,12 @@ module type Compiler_options = sig
   val _as_argument_for : string -> unit
   val _as_parameter : unit -> unit
   val _binannot : unit -> unit
-<<<<<<< HEAD
+<<<<<<< oxcaml
   val _binannot_cms : unit -> unit
   val _shape_format : string -> unit
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   val _binannot_occurrences : unit -> unit
   val _c : unit -> unit
   val _cc : string -> unit
@@ -1461,11 +1461,11 @@ struct
     mk_as_argument_for F._as_argument_for;
     mk_as_parameter F._as_parameter;
     mk_binannot F._binannot;
-<<<<<<< HEAD
+<<<<<<< oxcaml
     mk_binannot_cms F._binannot_cms;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     mk_binannot_occurrences F._binannot_occurrences;
     mk_c F._c;
     mk_cc F._cc;
@@ -1691,12 +1691,12 @@ struct
     mk_dparsetree_loc_ghost_invariants F._dparsetree_loc_ghost_invariants;
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
-<<<<<<< HEAD
+<<<<<<< oxcaml
     mk_dslambda F._dslambda;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
     mk_dmatchcomp F._dmatchcomp;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     mk_drawlambda F._drawlambda;
     mk_dlambda F._dlambda;
     mk_dblambda F._dblambda;
@@ -1725,11 +1725,11 @@ struct
     mk_as_argument_for F._as_argument_for;
     mk_as_parameter F._as_parameter;
     mk_binannot F._binannot;
-<<<<<<< HEAD
+<<<<<<< oxcaml
     mk_binannot_cms F._binannot_cms;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     mk_binannot_occurrences F._binannot_occurrences;
     mk_inline_branch_factor F._inline_branch_factor;
     mk_c F._c;
@@ -1875,12 +1875,12 @@ struct
     mk_dparsetree_loc_ghost_invariants F._dparsetree_loc_ghost_invariants;
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
-<<<<<<< HEAD
+<<<<<<< oxcaml
     mk_dslambda F._dslambda;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
     mk_dmatchcomp F._dmatchcomp;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     mk_drawlambda F._drawlambda;
     mk_dlambda F._dlambda;
     mk_dblambda F._dblambda;
@@ -2032,12 +2032,12 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_dparsetree_loc_ghost_invariants F._dparsetree_loc_ghost_invariants;
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
-<<<<<<< HEAD
+<<<<<<< oxcaml
     mk_dslambda F._dslambda;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
     mk_dmatchcomp F._dmatchcomp;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     mk_drawlambda F._drawlambda;
     mk_dlambda F._dlambda;
     mk_dblambda F._dblambda;
@@ -2347,14 +2347,14 @@ module Default = struct
     let _i_variance = set print_variance
     let _labels = clear classic
     let _no_absname = clear Clflags.absname
-<<<<<<< HEAD
+<<<<<<< oxcaml
     let _no_locs = clear Clflags.locs
     let _no_alias_deps = set transparent_modules
-||||||| 23e84b8c4d
+||||||| upstream-base
     let _no_alias_deps = set transparent_modules
 =======
     let _no_alias_deps = set no_alias_deps
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     let _no_app_funct = clear applicative_functors
     let _directory d = Clflags.directory := Some d
     let _no_principal = clear principal
@@ -2410,12 +2410,12 @@ module Default = struct
     let _dblambda = set dump_blambda
     let _dletreclambda = set dump_letreclambda
     let _dparsetree = set dump_parsetree
-<<<<<<< HEAD
+<<<<<<< oxcaml
     let _dslambda = set dump_slambda
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
     let _dparsetree_loc_ghost_invariants = set parsetree_ghost_loc_invariant
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     let _drawlambda = set dump_rawlambda
     let _dsource = set dump_source
     let _dtypedtree = set dump_typedtree
@@ -2536,16 +2536,16 @@ module Default = struct
     let _as_argument_for s = as_argument_for := Some s
     let _as_parameter = set as_parameter
     let _binannot = set binary_annotations
-<<<<<<< HEAD
+<<<<<<< oxcaml
     let _binannot_cms = set binary_annotations_cms
     let _shape_format s =
       match s with
       | "old-merlin" -> shape_format := Old_merlin
       | "debugging-shapes" -> shape_format := Debugging_shapes
       | _ -> ()
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     let _binannot_occurrences = set store_occurrences
     let _c = set compile_only
     let _cc s = c_compiler := (Some s)

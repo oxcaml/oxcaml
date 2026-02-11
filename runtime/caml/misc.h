@@ -27,8 +27,8 @@
 #include <stdarg.h>
 #include <limits.h>
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 #include "camlatomic.h"
 
 =======
@@ -46,7 +46,7 @@
 #define __has_builtin(x) 0
 #endif
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 /* Deprecation warnings */
 
 #if __has_attribute(deprecated) || defined(__GNUC__)
@@ -182,8 +182,8 @@ CAMLdeprecated_typedef(addr, char *);
 #define CAMLthread_local _Thread_local
 #endif
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 /* Prefetching */
 
 #ifdef CAML_INTERNALS
@@ -211,7 +211,7 @@ CAMLdeprecated_typedef(addr, char *);
 #endif
 #endif /* CAML_INTERNALS */
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 /* CAMLunused is preserved for compatibility reasons.
    Instead of the legacy GCC/Clang-only
      CAMLunused foo;
@@ -377,13 +377,13 @@ typedef char char_os;
    from the callsite, making debuggers able to see it. */
 #define CAMLassert(x) \
   (CAMLlikely(x) ? (void) 0 : caml_failed_assert ( #x , __OSFILE__, __LINE__))
-<<<<<<< HEAD
+<<<<<<< oxcaml
 CAMLextern void caml_failed_assert (char *, char_os *, int)
-||||||| 23e84b8c4d
+||||||| upstream-base
 CAMLnoret CAMLextern void caml_failed_assert (char *, char_os *, int);
 =======
 CAMLextern void caml_failed_assert (const char *, const char_os *, int)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #if defined(__has_feature)
   /* However, we do inform clang-analyzer that this function never returns,
      since that improves analysis without breaking debugging */
@@ -473,7 +473,7 @@ CAMLnoret CAMLextern void caml_fatal_error (const char *, ...)
 #endif
 ;
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 CAMLnoreturn_start
 CAMLextern void caml_fatal_out_of_memory (void)
 CAMLnoreturn_end;
@@ -498,7 +498,7 @@ CAMLnoreturn_end;
 #define caml_prefetchw(p)
 #endif
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 /* Detection of available C built-in functions, the Clang way. */
 
 #ifdef __has_builtin
@@ -508,7 +508,7 @@ CAMLnoreturn_end;
 #endif
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 /* Integer arithmetic with overflow detection.
    The functions return 0 if no overflow, 1 if overflow.
    The result of the operation is always stored at [*res].
@@ -604,12 +604,12 @@ extern double caml_log1p(double);
 #define caml_stat_strdup_noexc_to_os caml_stat_strdup_noexc_to_utf16
 #define caml_stat_strdup_of_os caml_stat_strdup_of_utf16
 #define caml_stat_strdup_noexc_of_os caml_stat_strdup_noexc_of_utf16
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 =======
 #define caml_stat_char_array_to_os caml_stat_char_array_to_utf16
 #define caml_stat_char_array_of_os caml_stat_char_array_of_utf16
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #define caml_copy_string_of_os caml_copy_string_of_utf16
 
 #else /* _WIN32 */
@@ -653,12 +653,12 @@ extern double caml_log1p(double);
 #define caml_stat_strdup_noexc_to_os caml_stat_strdup_noexc
 #define caml_stat_strdup_of_os caml_stat_strdup
 #define caml_stat_strdup_noexc_of_os caml_stat_strdup_noexc
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 =======
 #define caml_stat_char_array_to_os caml_stat_memdup
 #define caml_stat_char_array_of_os caml_stat_memdup
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #define caml_copy_string_of_os caml_copy_string
 
 #endif /* _WIN32 */
@@ -709,7 +709,7 @@ CAMLextern int caml_read_directory(char_os * dirname,
 
 extern _Atomic uintnat caml_verb_gc;
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* Bits which may be set in caml_verb_gc. Keep in sync with the OCaml
  * manual, the ocamlrun.1 man page, and gc.mli */
 
@@ -757,7 +757,7 @@ extern _Atomic uintnat caml_verb_gc;
 #define CAML_GC_MSG_VERBOSE (CAML_GC_MSG_MAJOR           | \
                              CAML_GC_MSG_DOMAIN          | \
                              CAML_GC_MSG_COMPACT)
-||||||| 23e84b8c4d
+||||||| upstream-base
 void caml_gc_log (char *, ...)
 #ifdef __GNUC__
   __attribute__ ((format (printf, 1, 2)))
@@ -799,7 +799,7 @@ void caml_gc_log (char *, ...)
                              CAML_GC_MSG_STACKSIZE | \
                              CAML_GC_MSG_COMPACT   | \
                              CAML_GC_MSG_PARAMS)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 /* Use to control messages which should be output at any non-zero verbosity */
 
@@ -913,8 +913,8 @@ CAMLextern int caml_snwprintf(wchar_t * buf,
 #define CAML_GENSYM_2(name, l) CAML_GENSYM_3(name, l)
 #define CAML_GENSYM(name) CAML_GENSYM_2(name, __LINE__)
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 =======
 #define MSEC_PER_SEC  UINT64_C(1000)
 #define USEC_PER_MSEC UINT64_C(1000)
@@ -937,7 +937,7 @@ Caml_inline struct timespec caml_timespec_of_nsec(uint64_t nsec)
         (nsec % NSEC_PER_SEC) };
 }
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #endif /* CAML_INTERNALS */
 
 /* The [backtrace_slot] type represents values stored in
@@ -954,14 +954,14 @@ typedef void * backtrace_slot;
 #define IO_BUFFER_SIZE 65536
 #endif
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 =======
 /* GC policy settings */
 typedef intnat caml_gc_policy;
 #define CAML_GC_RAMP_UP             0x0001
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #ifdef __cplusplus
 }
 #endif

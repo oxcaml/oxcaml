@@ -75,12 +75,12 @@ type pattern_variable =
     pv_loc: Location.t;
     pv_kind: pattern_variable_kind;
     pv_attributes: Typedtree.attributes;
-<<<<<<< HEAD
+<<<<<<< oxcaml
     pv_sort: Jkind.Sort.t;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
     pv_uid : Uid.t;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   }
 
 val mk_expected:
@@ -202,20 +202,20 @@ val escape : loc:Location.t -> env:Env.t -> reason:submode_reason -> (Mode.allow
 
 val self_coercion : (Path.t * Location.t list ref) list ref
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 type unsupported_stack_allocation =
   | Lazy
   | Module
   | Object
   | List_comprehension
   | Array_comprehension
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 type existential_binding =
   | Bind_already_bound
   | Bind_not_in_scope
   | Bind_non_locally_abstract
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 type error =
   | Constructor_arity_mismatch of Longident.t * int * int
@@ -299,7 +299,7 @@ type error =
   | Unrefuted_pattern of Typedtree.pattern
   | Invalid_extension_constructor_payload
   | Not_an_extension_constructor
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Probe_format
   | Probe_name_format of string
   | Probe_name_undefined of string
@@ -310,12 +310,12 @@ type error =
   | Invalid_atomic_loc_payload
   | Label_not_atomic of Longident.t
   | Modalities_on_atomic_field of Longident.t
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   | Invalid_atomic_loc_payload
   | Label_not_atomic of Longident.t
   | Atomic_in_pattern of Longident.t
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Literal_overflow of string
   | Unknown_literal of string * char
   | Float32_literal of string
@@ -333,7 +333,7 @@ type error =
   | Bind_existential of existential_binding * Ident.t * type_expr
   | Missing_type_constraint
   | Wrong_expected_kind of wrong_kind_sort * wrong_kind_context * type_expr
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Wrong_expected_record_boxing of wrong_kind_context * record_form_packed * type_expr
   | Expr_not_a_record_type of record_form_packed * type_expr
   | Expr_record_type_has_wrong_boxing of record_form_packed * type_expr
@@ -370,7 +370,7 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Eval_format
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Expr_not_a_record_type of type_expr
 =======
   | Expr_not_a_record_type of type_expr
@@ -380,7 +380,7 @@ type error =
   | Missing_tuple_label of string option * type_expr
   | Repeated_tuple_exp_label of string
   | Repeated_tuple_pat_label of string
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

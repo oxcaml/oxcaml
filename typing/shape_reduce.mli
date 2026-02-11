@@ -27,7 +27,7 @@ type result =
 
 val print_result : Format.formatter -> result -> unit
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 module Diagnostics : sig
 
   type t
@@ -97,7 +97,7 @@ end
 (** [local_reduce] will not reduce shapes that require loading external
   compilation units. *)
 val local_reduce :?diagnostics:Diagnostics.t -> Env.t -> Shape.t -> Shape.t
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 (** The [Make] functor is used to generate a reduction function for
     shapes.
@@ -128,7 +128,7 @@ end
 (** [local_reduce] will not reduce shapes that require loading external
   compilation units. *)
 val local_reduce : Env.t -> Shape.t -> Shape.t
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (** [local_reduce_for_uid] will not reduce shapes that require loading external
   compilation units. *)

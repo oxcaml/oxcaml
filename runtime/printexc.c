@@ -75,14 +75,14 @@ CAMLexport char * caml_format_exception(value exn)
       start = 1;
     }
     add_char(&buf, '(');
-<<<<<<< HEAD
+<<<<<<< oxcaml
     mlsize_t bucket_size = Wosize_val(bucket);
     for (i = start; i < bucket_size; i++) {
-||||||| 23e84b8c4d
+||||||| upstream-base
     for (i = start; i < Wosize_val(bucket); i++) {
 =======
     for (mlsize_t i = start; i < Wosize_val(bucket); i++) {
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       if (i > start) add_string(&buf, ", ");
       v = Field(bucket, i);
       if (Is_long(v)) {
@@ -131,15 +131,15 @@ static void default_fatal_uncaught_exception(value exn, const char *msg2)
   saved_backtrace_pos = Caml_state->backtrace_pos;
   Caml_state->backtrace_active = 0;
   at_exit = caml_named_value("Pervasives.do_at_exit");
-<<<<<<< HEAD
+<<<<<<< oxcaml
   /* In the event of an asynchronous exception occurring, it will still get
      caught here, because of the semantics of [caml_callback_exn]. */
   if (at_exit != NULL) caml_callback_exn(*at_exit, Val_unit);
-||||||| 23e84b8c4d
+||||||| upstream-base
   if (at_exit != NULL) caml_callback_exn(*at_exit, Val_unit);
 =======
   if (at_exit != NULL) caml_callback_res(*at_exit, Val_unit);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   Caml_state->backtrace_active = saved_backtrace_active;
   Caml_state->backtrace_pos = saved_backtrace_pos;
   /* Display the uncaught exception */

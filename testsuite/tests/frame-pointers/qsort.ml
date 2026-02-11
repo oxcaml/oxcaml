@@ -1,5 +1,5 @@
 (* TEST
-<<<<<<< HEAD
+<<<<<<< oxcaml
  modules = "qsort_.c";
  (* [-D_GNU_SOURCE] is needed when AddressSanitizer support is enabled in order
     for the [dlsym] workaround in [qsort_.c] to work. *)
@@ -10,11 +10,11 @@
  }{
    native;
  }
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
  frame_pointers;
  modules = "qsort_.c";
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 *)
 
 external with_frame : (unit -> 'a) -> 'a = "with_frame"

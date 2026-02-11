@@ -80,9 +80,9 @@ module Runtime_4 = struct
 
     type 'a key = int * (unit -> 'a) Modes.Portable.t
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
     let key_counter = Atomic.make 0
-||||||| 23e84b8c4d
+||||||| upstream-base
   type dls_state = Obj.t array
 =======
   module Obj_opt : sig
@@ -90,13 +90,13 @@ module Runtime_4 = struct
     val none : t
     val some : 'a -> t
     val is_some : t -> bool
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
     let new_key ?split_from_parent:_ init_orphan =
       let idx = Atomic.fetch_and_add key_counter 1 in
       (idx, { portable = init_orphan })
-||||||| 23e84b8c4d
+||||||| upstream-base
   let unique_value = Obj.repr (ref 0)
 =======
     (** [unsafe_get obj] may only be called safely
@@ -114,7 +114,7 @@ module Runtime_4 = struct
   end
 
   type dls_state = Obj_opt.t array
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
     (* If necessary, grow the current domain's local state array such that [idx]
     * is a valid index in the array. *)
@@ -142,13 +142,13 @@ module Runtime_4 = struct
       let st = maybe_grow idx in
       Array.unsafe_set st idx (Obj_opt.some x)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
     let[@inline never] init_idx (type a) idx old_obj (init : _ -> a) =
       let v : a = init () in
       let new_obj = Obj_opt.some v in
       (* At this point, [st] or [st.(idx)] may have been changed
         by another thread on the same domain.
-||||||| 23e84b8c4d
+||||||| upstream-base
   let create_dls () =
     let st = Array.make 8 unique_value in
     set_dls_state st
@@ -159,7 +159,7 @@ module Runtime_4 = struct
   let create_dls () =
     let st = Array.make 8 Obj_opt.none in
     set_dls_state st
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
         If [st] changed, it was resized into a larger value,
         we can just reuse the new value.
@@ -582,13 +582,13 @@ module TLS0 = struct
     k
 
   (* If necessary, grow the current domain's local state array such that [idx]
-<<<<<<< HEAD
+<<<<<<< oxcaml
     * is a valid index in the array. *)
   let[@inline] maybe_grow idx =
     let st = get_tls_state () in
     let size = Array.length st in
     if idx < size then st
-||||||| 23e84b8c4d
+||||||| upstream-base
    * is a valid index in the array. *)
   let maybe_grow idx =
     let st = get_dls_state () in
@@ -600,13 +600,13 @@ module TLS0 = struct
     let st = get_dls_state () in
     let sz = Array.length st in
     if idx < sz then st
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     else begin
-<<<<<<< HEAD
+<<<<<<< oxcaml
       let new_st = Obj_opt.grow_array st idx size in
       set_tls_state new_st;
       new_st
-||||||| 23e84b8c4d
+||||||| upstream-base
       let rec compute_new_size s =
         if idx < s then s else compute_new_size (2 * s)
       in
@@ -631,21 +631,21 @@ module TLS0 = struct
       if compare_and_set_dls_state st new_st
       then new_st
       else maybe_grow idx
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     end
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let[@inline] set (type a) (idx, _init) (x : a) =
     (* Assures [idx] is in range. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
   let set (idx, _init) x =
 =======
   let set (type a) (idx, _init) (x : a) =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     let st = maybe_grow idx in
-<<<<<<< HEAD
+<<<<<<< oxcaml
     Array.unsafe_set st idx (Obj_opt.some x)
-||||||| 23e84b8c4d
+||||||| upstream-base
     (* [Sys.opaque_identity] ensures that flambda does not look at the type of
      * [x], which may be a [float] and conclude that the [st] is a float array.
      * We do not want OCaml's float array optimisation kicking in here. *)
@@ -655,9 +655,9 @@ module TLS0 = struct
      * [x], which may be a [float] and conclude that the [st] is a float array.
      * We do not want OCaml's float array optimisation kicking in here. *)
     st.(idx) <- Obj_opt.some (Sys.opaque_identity x)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let[@inline never] init_idx (type a) idx (init : _ -> a) =
     let v : a = init () in
     let new_obj = Obj_opt.some v in
@@ -667,7 +667,7 @@ module TLS0 = struct
 
   let[@inline] get (type a) ((idx, init) : a key) : a =
     (* Assures [idx] is in range. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
   let get (idx, init) =
 =======
 
@@ -681,14 +681,14 @@ module TLS0 = struct
     ) else false
 
   let get (type a) ((idx, init) : a key) : a =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     let st = maybe_grow idx in
-<<<<<<< HEAD
+<<<<<<< oxcaml
     let obj = Array.unsafe_get st idx in
     if Obj_opt.is_some obj
     then (Obj_opt.unsafe_get obj : a)
     else init_idx idx init.portable
-||||||| 23e84b8c4d
+||||||| upstream-base
     let v = st.(idx) in
     if v == unique_value then
       let v' = Obj.repr (init ()) in
@@ -704,13 +704,13 @@ module TLS0 = struct
       let new_obj = Obj_opt.some (Sys.opaque_identity v) in
       (* At this point, [st] or [st.(idx)] may have been changed
          by another thread on the same domain.
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   type key_value : value mod portable contended =
       KV : 'a key * (unit -> 'a) @@ portable -> key_value
   [@@unsafe_allow_any_mode_crossing "CR with-kinds"]
-||||||| 23e84b8c4d
+||||||| upstream-base
   let get_initial_keys () : (int * Obj.t) list =
     List.map
       (fun (KI ((idx, _) as k, split)) ->
@@ -742,9 +742,9 @@ module TLS0 = struct
     List.map
       (fun (KI (k, split)) -> KV (k, (split (get k))))
       (Atomic.get parent_keys)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   module Private = struct
     type keys = key_value list
 
@@ -763,7 +763,7 @@ module TLS0 = struct
     let set_initial_keys (l : key_value list) =
       List.iter (fun (KV (k, v)) -> set k (v ())) l
   end
-||||||| 23e84b8c4d
+||||||| upstream-base
   let set_initial_keys (l: (int * Obj.t) list) =
     List.iter
       (fun (idx, v) ->
@@ -773,7 +773,7 @@ module TLS0 = struct
 =======
   let set_initial_keys (l: key_value list) =
     List.iter (fun (KV (k, v)) -> set k v) l
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 end
 
 module Safe = struct
@@ -794,16 +794,16 @@ end
 module TLS = struct
   module Private = TLS0.Private
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   type 'a key = 'a TLS0.key
-||||||| 23e84b8c4d
+||||||| upstream-base
 (******** Callbacks **********)
 =======
 external self_index : unit -> int
   = "caml_ml_domain_index" [@@noalloc]
 
 (******** Callbacks **********)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   let new_key ?split_from_parent f =
     let split_from_parent =

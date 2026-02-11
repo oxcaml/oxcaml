@@ -14,11 +14,11 @@
 (**************************************************************************)
 
 val err_msgs: Includemod.explanation Format_doc.printer
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 val err_msgs: Includemod.explanation -> Format.formatter -> unit
 =======
 val coercion_in_package_subtype:
   Env.t -> Types.module_type -> Typedtree.module_coercion -> Format_doc.doc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 val register: unit -> unit

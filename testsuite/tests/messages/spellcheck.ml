@@ -124,13 +124,13 @@ let _ =
 Line 5, characters 22-33:
 5 |     method update n = foobaz <- n
                           ^^^^^^^^^^^
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Error: The value "foobaz" is not an instance variable or mutable variable
-||||||| 23e84b8c4d
+||||||| upstream-base
 Error: The value "foobaz" is not an instance variable
 =======
 Error:   The value "foobaz" is not an instance variable
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 Hint: Did you mean "foobar"?
 |}];;
 

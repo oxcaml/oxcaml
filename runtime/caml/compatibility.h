@@ -2,23 +2,23 @@
 /*                                                                        */
 /*                                 OCaml                                  */
 /*                                                                        */
-<<<<<<<< HEAD:runtime4/caml/hooks.h
+<<<<<<<< oxcaml:runtime4/caml/hooks.h
 /*                    Fabrice Le Fessant, INRIA de Paris                  */
-|||||||| 23e84b8c4d:runtime/caml/atomic_refcount.h
+|||||||| upstream-base:runtime/caml/atomic_refcount.h
 /*      Florian Angeletti, projet Cambium, Inria                          */
 ========
 /*                         Antonin Decimo, Tarides                        */
->>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a:runtime/caml/compatibility.h
+>>>>>>>> upstream-incoming:runtime/caml/compatibility.h
 /*                                                                        */
-<<<<<<<< HEAD:runtime4/caml/hooks.h
+<<<<<<<< oxcaml:runtime4/caml/hooks.h
 /*   Copyright 2016 Institut National de Recherche en Informatique et     */
 /*     en Automatique.                                                    */
-|||||||| 23e84b8c4d:runtime/caml/atomic_refcount.h
+|||||||| upstream-base:runtime/caml/atomic_refcount.h
 /*   Copyright 2022 Institut National de Recherche en Informatique et     */
 /*     en Automatique.                                                    */
 ========
 /*   Copyright 2024 Tarides                                               */
->>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a:runtime/caml/compatibility.h
+>>>>>>>> upstream-incoming:runtime/caml/compatibility.h
 /*                                                                        */
 /*   All rights reserved.  This file is distributed under the terms of    */
 /*   the GNU Lesser General Public License version 2.1, with the          */
@@ -26,7 +26,7 @@
 /*                                                                        */
 /**************************************************************************/
 
-<<<<<<<< HEAD:runtime4/caml/hooks.h
+<<<<<<<< oxcaml:runtime4/caml/hooks.h
 #ifndef CAML_HOOKS_H
 #define CAML_HOOKS_H
 
@@ -36,29 +36,29 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-|||||||| 23e84b8c4d:runtime/caml/atomic_refcount.h
+|||||||| upstream-base:runtime/caml/atomic_refcount.h
 #ifndef CAML_ATOMIC_REFCOUNT_H
 #define CAML_ATOMIC_REFCOUNT_H
 ========
 /* Definitions for compatibility with old identifiers. */
->>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a:runtime/caml/compatibility.h
+>>>>>>>> upstream-incoming:runtime/caml/compatibility.h
 
 #ifndef CAML_COMPATIBILITY_H
 #define CAML_COMPATIBILITY_H
 
-<<<<<<<< HEAD:runtime4/caml/hooks.h
+<<<<<<<< oxcaml:runtime4/caml/hooks.h
 #ifdef NATIVE_CODE
-|||||||| 23e84b8c4d:runtime/caml/atomic_refcount.h
+|||||||| upstream-base:runtime/caml/atomic_refcount.h
 #include "camlatomic.h"
 ========
 #define HAS_STDINT_H 1 /* Deprecated since OCaml 5.3 */
->>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a:runtime/caml/compatibility.h
+>>>>>>>> upstream-incoming:runtime/caml/compatibility.h
 
-<<<<<<<< HEAD:runtime4/caml/hooks.h
+<<<<<<<< oxcaml:runtime4/caml/hooks.h
 /* executed just before calling the entry point of a dynamically
    loaded native code module. */
 CAMLextern void (*caml_natdynlink_hook)(void* handle, const char* unit);
-|||||||| 23e84b8c4d:runtime/caml/atomic_refcount.h
+|||||||| upstream-base:runtime/caml/atomic_refcount.h
 Caml_inline void caml_atomic_refcount_init(atomic_uintnat* refc, uintnat n){
   atomic_store_release(refc, n);
 }
@@ -71,9 +71,9 @@ Caml_inline void caml_atomic_refcount_init(atomic_uintnat* refc, uintnat n){
 #elif defined(HAVE_STRUCT_STAT_ST_ATIMENSEC)
 #  define HAS_NANOSECOND_STAT 3
 #endif
->>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a:runtime/caml/compatibility.h
+>>>>>>>> upstream-incoming:runtime/caml/compatibility.h
 
-<<<<<<<< HEAD:runtime4/caml/hooks.h
+<<<<<<<< oxcaml:runtime4/caml/hooks.h
 #endif /* NATIVE_CODE */
 
 #endif /* CAML_INTERNALS */
@@ -83,7 +83,7 @@ Caml_inline void caml_atomic_refcount_init(atomic_uintnat* refc, uintnat n){
 #endif
 
 #endif /* CAML_HOOKS_H */
-|||||||| 23e84b8c4d:runtime/caml/atomic_refcount.h
+|||||||| upstream-base:runtime/caml/atomic_refcount.h
 Caml_inline uintnat caml_atomic_refcount_decr(atomic_uintnat* refcount){
   return atomic_fetch_add (refcount, -1);
 }
@@ -102,4 +102,4 @@ Caml_inline uintnat caml_atomic_refcount_incr(atomic_uintnat* refcount){
 #endif
 
 #endif  /* CAML_COMPATIBILITY_H */
->>>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a:runtime/caml/compatibility.h
+>>>>>>>> upstream-incoming:runtime/caml/compatibility.h

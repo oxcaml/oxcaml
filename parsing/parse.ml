@@ -169,7 +169,7 @@ let prepare_error err =
       Location.errorf ~loc "Syntax error: invalid package type: %a" invalid ipt
   | Removed_string_set loc ->
       Location.errorf ~loc
-<<<<<<< HEAD
+<<<<<<< oxcaml
         "Syntax error: strings are immutable, there is no assignment \
          syntax for them.\n\
          @{<hint>Hint@}: Mutable sequences of bytes are available in \
@@ -211,7 +211,7 @@ let prepare_error err =
         Style.inline_code ".:" Style.inline_code ".:L" Style.inline_code ".:l"
         Style.inline_code ".:S" Style.inline_code ".:s" Style.inline_code ".:n"
         Style.inline_code ".idx_imm" Style.inline_code ".idx_mut"
-||||||| 23e84b8c4d
+||||||| upstream-base
         "Syntax error: strings are immutable, there is no assignment \
          syntax for them.\n\
          @{<hint>Hint@}: Mutable sequences of bytes are available in \
@@ -230,7 +230,7 @@ let prepare_error err =
             "@{<hint>Hint@}: Did you mean to use %a?"
             Style.inline_code "Bytes.set"
         ]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let () =
   Location.register_error_of_exn

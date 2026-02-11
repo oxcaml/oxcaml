@@ -5,7 +5,7 @@ static char buf[10000];
 value static_bigstring(value unit)
 {
   intnat dim[] = { sizeof(buf) };
-<<<<<<< HEAD
+<<<<<<< oxcaml
   return caml_ba_alloc(CAML_BA_UINT8 | CAML_BA_C_LAYOUT | CAML_BA_EXTERNAL,
                        1, buf, dim);
 }
@@ -22,7 +22,7 @@ value malloc_bigstring(value unit)
   intnat dim[] = { 5000 };
   return caml_ba_alloc(CAML_BA_UINT8 | CAML_BA_C_LAYOUT | CAML_BA_MANAGED,
                        1, malloc(dim[0]), dim);
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 #if defined(_MSC_VER) && !defined(__clang__)
 #pragma warning(push)
@@ -61,5 +61,5 @@ value malloc_bigstring(value unit)
 #if defined(_MSC_VER) && !defined(__clang__)
 #pragma warning(pop)
 #endif
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }

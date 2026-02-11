@@ -1,11 +1,11 @@
 File "pr4791.ml", line 1:
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Warning 63 [erroneous-printed-signature]: The printed interface differs from the inferred interface.
 The inferred interface contained items which could not be printed
 properly due to name collisions between identifiers.
 File "pr4791.ml", line 11, characters 2-12:
   Definition of type t/1
-||||||| 23e84b8c4d
+||||||| upstream-base
 Warning 63 [erroneous-printed-signature]: The printed interface differs from the inferred interface.
 The inferred interface contained items which could not be printed
 properly due to name collisions between identifiers.
@@ -17,7 +17,7 @@ Warning 63 [erroneous-printed-signature]: The printed interface differs from
   not be printed properly due to name collisions between identifiers.
   File "pr4791.ml", line 11, characters 2-12:
   Definition of type t
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 File "pr4791.ml", line 8, characters 0-10:
   Definition of type t/2
   Beware that this warning is purely informational and will not catch all

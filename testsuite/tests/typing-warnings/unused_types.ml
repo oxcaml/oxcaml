@@ -538,7 +538,7 @@ let u (type unused) = ()
 Line 1, characters 12-18:
 1 | let u (type unused) = ()
                 ^^^^^^
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Warning 34 [unused-type-declaration]: unused type unused.
 
 val u : unit = ()
@@ -593,7 +593,7 @@ Line 1, characters 23-29:
 Warning 34 [unused-type-declaration]: unused type unused.
 
 val f : 'used -> 'used = <fun>
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 Warning 34 [unused-type-declaration]: unused type "unused".
 
@@ -751,5 +751,5 @@ type 'a t = [> `A] as 'a
 
 [%%expect{|
 type 'a t = 'a constraint 'a = [> `A ]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 |}]

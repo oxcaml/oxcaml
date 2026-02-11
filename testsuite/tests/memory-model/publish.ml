@@ -1,13 +1,13 @@
 (* TEST
  flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
  modules = "opt.ml barrier.ml hist.ml shared.ml run.ml outcome.ml";
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
  no-tsan; (* tsan detects data races and fails *)
 =======
  multicore;
  no-tsan; (* tsan detects data races and fails *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
  not-bsd;
  no-tsan; (* tsan detects data races and fails *)
  runtime5;

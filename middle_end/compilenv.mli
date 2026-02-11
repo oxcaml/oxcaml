@@ -41,14 +41,14 @@ val get_unit_export_info
 val set_export_info : Flambda2_cmx.Flambda_cmx_format.t -> unit
         (* Set the export information for the current unit. *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val need_curry_fun:
   Lambda.function_kind -> Cmm.machtype list -> Cmm.machtype -> unit
 val need_apply_fun:
   Cmm.machtype list -> Cmm.machtype -> Cmx_format.alloc_mode -> unit
 val need_send_fun:
   Cmm.machtype list -> Cmm.machtype -> Cmx_format.alloc_mode -> unit
-||||||| 23e84b8c4d
+||||||| upstream-base
 val current_unit_symbol: unit -> Symbol.t
         (* flambda-only *)
 
@@ -152,7 +152,7 @@ val approx_for_global: Compilation_unit.t -> Export_info.t option
 val need_curry_fun: int -> unit
 val need_apply_fun: int -> unit
 val need_send_fun: int -> unit
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         (* Record the need of a currying (resp. application,
            message sending) function with the given arity *)
 

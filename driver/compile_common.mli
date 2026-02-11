@@ -37,16 +37,16 @@ type compilation_unit_or_inferred =
 val with_info :
   backend:backend ->
   tool_name:string ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
   source_file:string ->
   output_prefix:string ->
   compilation_unit:compilation_unit_or_inferred ->
   kind:Unit_info.intf_or_impl ->
-||||||| 23e84b8c4d
+||||||| upstream-base
   source_file:string ->
   output_prefix:string ->
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   dump_ext:string ->
   Unit_info.t ->
   (info -> 'a) -> 'a

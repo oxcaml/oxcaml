@@ -251,7 +251,7 @@ module Doc = struct
 
   let msg fmt = kmsg Fun.id fmt
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 end
 
 (** Compatibility interface *)
@@ -469,7 +469,7 @@ let pp_nested_list ~nested ~pp_element ~pp_sep ppf arg =
     (pp_parens_if nested
        (pp_print_list ~pp_sep (pp_element ~nested:true)))
     arg
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 
   let ralign_tag = Format.String_tag "ralign"
@@ -753,7 +753,7 @@ let pp_print_either  ~left ~right ppf e =
 
 let comma ppf () = fprintf ppf ",@ "
 let semicolon ppf () = fprintf ppf ";@ "
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let pp_two_columns ?(sep = "|") ?max_lines ppf (lines: (string * string) list) =
   let left_column_size =

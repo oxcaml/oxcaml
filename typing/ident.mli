@@ -24,12 +24,12 @@ include Identifiable.S with type t := t
    - [compare] compares identifiers by binding location
 *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val print : Format.formatter -> t -> unit
-||||||| 23e84b8c4d
+||||||| upstream-base
 val print_with_scope : Format.formatter -> t -> unit
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 val doc_print: t Format_doc.printer
 val print_with_scope : t Format_doc.printer
         (** Same as {!print} except that it will also add a "[n]" suffix

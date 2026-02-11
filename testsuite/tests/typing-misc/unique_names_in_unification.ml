@@ -14,14 +14,14 @@ val x : t = A
 Line 5, characters 27-28:
 5 |   let f: t -> t = fun B -> x
                                ^
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Error: This expression has type "t/2" but an expression was expected of type
          "t/1"
-||||||| 23e84b8c4d
+||||||| upstream-base
 Error: This expression has type "t/2" but an expression was expected of type "t"
 =======
 Error: The value "x" has type "t/2" but an expression was expected of type "t"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
        Line 4, characters 2-12:
          Definition of type "t/1"
        Line 1, characters 0-10:
@@ -43,15 +43,15 @@ val y : M.t = M.B
 Line 7, characters 34-35:
 7 |   let f : M.t -> M.t = fun M.C -> y
                                       ^
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Error: This expression has type "M/2.t" but an expression was expected of type
          "M/1.t"
-||||||| 23e84b8c4d
+||||||| upstream-base
 Error: This expression has type "M/2.t" but an expression was expected of type
          "M.t"
 =======
 Error: The value "y" has type "M/2.t" but an expression was expected of type "M.t"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
        Lines 4-6, characters 2-5:
          Definition of module "M/1"
        Line 1, characters 0-32:
@@ -67,14 +67,14 @@ type t = D
 Line 2, characters 25-26:
 2 | let f: t -> t = fun D -> x;;
                              ^
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Error: This expression has type "t/2" but an expression was expected of type
          "t/1"
-||||||| 23e84b8c4d
+||||||| upstream-base
 Error: This expression has type "t/2" but an expression was expected of type "t"
 =======
 Error: The value "x" has type "t/2" but an expression was expected of type "t"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
        Line 1, characters 0-10:
          Definition of type "t/1"
        Line 1, characters 0-10:
@@ -97,15 +97,15 @@ type nonrec ttt = X of ttt
 Line 2, characters 32-33:
 2 | let x: ttt = let rec y = A y in y;;
                                     ^
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Error: This expression has type "ttt/2" but an expression was expected of type
          "ttt/1"
-||||||| 23e84b8c4d
+||||||| upstream-base
 Error: This expression has type "ttt/2" but an expression was expected of type
          "ttt"
 =======
 Error: The value "y" has type "ttt/2" but an expression was expected of type "ttt"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
        Line 1, characters 0-26:
          Definition of type "ttt/1"
        Line 2, characters 0-30:

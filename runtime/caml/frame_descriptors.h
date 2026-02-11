@@ -31,13 +31,13 @@
  *
  * - frame_return_to_C(): Whether the return is to C from OCaml, in
  *   which case there is no actual stack frame, GC roots, allocation
-<<<<<<< HEAD
+<<<<<<< oxcaml
  *   sizes, or debug info.  See caml_system__frametable in the various
-||||||| 23e84b8c4d
+||||||| upstream-base
  *   sizes, or debug info.  See caml_system.frametable in the various
 =======
  *   sizes, or debug info.  See caml_system$frametable in the various
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
  *   architecture-specific OCaml/C interfaces.
  *
  * - frame_size(): The stack frame size, in bytes. All stack frames

@@ -81,7 +81,7 @@ let () =
    no-flambda;
    check-program-output;
  }{
-<<<<<<< HEAD
+<<<<<<< oxcaml
    program = "backtrace_dynlink_plugin.cmxs";
    flags = "-shared -g";
    all_modules = "backtrace_dynlink_plugin.ml";
@@ -93,7 +93,7 @@ let () =
    ocamlopt.byte;
    ocamlrunparam += ",b=1";
    run;
-||||||| 23e84b8c4d
+||||||| upstream-base
    program = "backtrace_dynlink_plugin.cmxs";
    flags = "-shared -g";
    all_modules = "backtrace_dynlink_plugin.ml";
@@ -116,7 +116,7 @@ let () =
 =======
    reference = "${test_source_directory}/backtrace_dynlink.flambda.reference";
    flambda;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
    check-program-output;
  }
 *)

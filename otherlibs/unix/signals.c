@@ -41,16 +41,16 @@ static value encode_sigset(sigset_t * set)
 {
   CAMLparam0();
   CAMLlocal1(res);
-<<<<<<< HEAD
+<<<<<<< oxcaml
   res = Val_emptylist;
   for (int i = 1; i < NSIG; i++) {
-||||||| 23e84b8c4d
+||||||| upstream-base
   int i;
 
   for (i = 1; i < NSIG; i++)
 =======
   for (int i = 1; i < NSIG; i++)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     if (sigismember(set, i) > 0) {
       value newcons = caml_alloc_small(2, 0);
       Field(newcons, 0) = Val_int(caml_rev_convert_signal_number(i));
@@ -87,40 +87,40 @@ CAMLprim value caml_unix_sigprocmask(value vaction, value vset)
 CAMLprim value caml_unix_sigpending(value unit)
 {
   sigset_t pending;
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
   int i, j;
   uintnat curr;
 =======
   uintnat curr;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   if (sigpending(&pending) == -1) caml_uerror("sigpending", Nothing);
-<<<<<<< HEAD
+<<<<<<< oxcaml
 #ifdef CAML_RUNTIME_5
   /* Add signals which are "pending" in the runtime */
   for (int i = 0; i < NSIG_WORDS; i++) {
     uintnat curr = atomic_load(&caml_pending_signals[i]);
-||||||| 23e84b8c4d
+||||||| upstream-base
   for (i = 0; i < NSIG_WORDS; i++) {
     curr = atomic_load(&caml_pending_signals[i]);
 =======
   for (int i = 0; i < NSIG_WORDS; i++) {
     curr = atomic_load(&caml_pending_signals[i]);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     if (curr == 0) continue;
     for (int j = 0; j < BITS_PER_WORD; j++) {
-<<<<<<< HEAD
+<<<<<<< oxcaml
       if (curr & ((uintnat)1 << j)) {
         sigaddset(&pending, i * BITS_PER_WORD + j + 1);
       }
-||||||| 23e84b8c4d
+||||||| upstream-base
     for (j = 0; j < BITS_PER_WORD; j++) {
       if (curr & ((uintnat)1 << j))
       sigaddset(&pending, i * BITS_PER_WORD + j + 1);
 =======
       if (curr & ((uintnat)1 << j))
       sigaddset(&pending, i * BITS_PER_WORD + j + 1);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     }
   }
 #else

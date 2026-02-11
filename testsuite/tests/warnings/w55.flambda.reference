@@ -7,11 +7,11 @@ Warning 55 [inlining-impossible]: Cannot inline:
 File "w55.ml", line 31, characters 10-27:
 31 | let i x = (!r [@inlined]) x
                ^^^^^^^^^^^^^^^^^
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Warning 55 [inlining-impossible]: Cannot inline: 
   the optimizer did not know what function was being applied
   (the full inlining stack was: w55.ml:31,10--27)
-||||||| 23e84b8c4d
+||||||| upstream-base
 Warning 55 [inlining-impossible]: Cannot inline: [@inlined] attribute was not used on this function application (the optimizer did not know what function was being applied)
 
 File "w55.ml", line 39, characters 12-30:
@@ -27,4 +27,4 @@ File "w55.ml", line 39, characters 12-30:
                  ^^^^^^^^^^^^^^^^^^
 Warning 55 [inlining-impossible]: Cannot inline:
   [@inlined] attribute was not used on this function application (the optimizer did not know what function was being applied)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

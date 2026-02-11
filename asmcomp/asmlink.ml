@@ -22,13 +22,13 @@ open Compilenv
 module CU = Compilation_unit
 
 type error =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Dwarf_fission_objcopy_on_macos
   | Dwarf_fission_dsymutil_not_macos
   | Dsymutil_error of int
   | Objcopy_error of int
   | Cm_bundle_error of Cm_bundle.error
-||||||| 23e84b8c4d
+||||||| upstream-base
   | File_not_found of filepath
   | Not_an_object_file of filepath
   | Missing_implementations of (modname * string list) list
@@ -47,11 +47,11 @@ type error =
   | Linking_error of int
   | Missing_cmx of filepath * modname
   | Link_error of Linkdeps.error
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 exception Error of error
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 type unit_link_info = Linkenv.unit_link_info =
   { name : Compilation_unit.t;
     defines : Compilation_unit.t list;
@@ -60,7 +60,7 @@ type unit_link_info = Linkenv.unit_link_info =
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
-||||||| 23e84b8c4d
+||||||| upstream-base
 (* Consistency check between interfaces and implementations *)
 
 module Cmi_consistbl = Consistbl.Make (Misc.Stdlib.String)
@@ -208,7 +208,7 @@ let add_ccobjs origin l =
     in
     lib_ccopts := List.map replace_origin l.lib_ccopts @ !lib_ccopts
   end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let runtime_lib () =
   let variant =
@@ -218,12 +218,12 @@ let runtime_lib () =
   in
   let libname = "libasmrun" ^ variant ^ ext_lib in
   try
-<<<<<<< HEAD
+<<<<<<< oxcaml
     if !Clflags.nopervasives || not !Clflags.with_runtime
     then []
     else [Load_path.find libname]
   with Not_found -> raise (Linkenv.Error (File_not_found libname))
-||||||| 23e84b8c4d
+||||||| upstream-base
     if !Clflags.nopervasives || not !Clflags.with_runtime then []
     else [ Load_path.find libname ]
   with Not_found ->
@@ -384,7 +384,7 @@ let scan_file ldeps file tolink = match file with
            end else
            reqd)
         infos.lib_units tolink
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Second pass: generate the startup file and link it with everything else *)
 
@@ -472,10 +472,10 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
 let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units =
   let compile_phrase p = Asmgen.compile_phrase ~ppf_dump p in
   Location.input_name := "caml_startup";
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let shared_startup_comp_unit =
     CU.create CU.Prefix.empty (CU.Name.of_string "_shared_startup")
-||||||| 23e84b8c4d
+||||||| upstream-base
   Compilenv.reset "_shared_startup";
   Emit.begin_assembly ();
   List.iter compile_phrase
@@ -585,7 +585,7 @@ let call_linker file_list startup_file output_name =
   let main_dll = !Clflags.output_c_object
                  && Filename.check_suffix output_name Config.ext_dll
   and main_obj_runtime = !Clflags.output_complete_object
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   in
   let shared_startup_unit_info =
     Unit_info.make_dummy ~input_name:"caml_startup" shared_startup_comp_unit
@@ -811,7 +811,7 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
 
 (* Main entry point *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
     ~genfns ~units_tolink ~uses_eval ~quoted_globals ~ppf_dump : unit =
   if !Oxcaml_flags.internal_assembler
@@ -896,7 +896,7 @@ let link unix linkenv ml_objfiles output_name ~cached_genfns_imports ~genfns
   Profile.record_call "link" (fun () ->
       link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
         ~genfns ~units_tolink ~uses_eval ~quoted_globals ~ppf_dump)
-||||||| 23e84b8c4d
+||||||| upstream-base
 let link ~ppf_dump objfiles output_name =
   Profile.record_call output_name (fun () ->
     let stdlib = "stdlib.cmxa" in
@@ -971,21 +971,21 @@ let link ~ppf_dump objfiles output_name =
            startup_obj output_name)
       ~always:(fun () -> remove_file startup_obj)
   )
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Error report *)
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 open Format
 module Style = Misc.Style
 =======
 module Style = Misc.Style
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 open Format_doc
 
 let report_error_doc ppf = function
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Dwarf_fission_objcopy_on_macos ->
     fprintf ppf
       "Error: -gdwarf-fission=objcopy is not supported on macOS systems.@ \
@@ -1006,7 +1006,7 @@ let report_error_doc ppf = function
       CU.Name.print_as_inline_code impl
 
 let report_error = Format_doc.compat report_error_doc
-||||||| 23e84b8c4d
+||||||| upstream-base
 let report_error ppf = function
   | File_not_found name ->
       fprintf ppf "Cannot find file %a" Style.inline_code name
@@ -1108,14 +1108,14 @@ let report_error ppf = function
         Style.inline_code (name^".cmx")
   | Link_error e ->
       Linkdeps.report_error_doc ~print_filename:Location.Doc.filename ppf e
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let () =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   Location.register_error_of_exn (function
     | Error err -> Some (Location.error_of_printer_file report_error_doc err)
     | _ -> None)
-||||||| 23e84b8c4d
+||||||| upstream-base
   Location.register_error_of_exn
     (function
       | Error err -> Some (Location.error_of_printer_file report_error err)
@@ -1148,4 +1148,4 @@ let reset () =
   implementations := [];
   lib_ccobjs := [];
   lib_ccopts := []
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

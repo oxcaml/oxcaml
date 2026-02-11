@@ -17,7 +17,7 @@
 
 open Shape
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 module MB = Misc.Maybe_bounded
 
 type result =
@@ -791,7 +791,7 @@ module Local_reduce =
     let projection_rules_for_merlin_enabled = true
 
     let read_unit_shape ~diagnostics:_ ~unit_name:_ = None
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 type result =
   | Resolved of Uid.t
@@ -1112,7 +1112,7 @@ module Local_reduce =
   Make(struct
     let fuel = 10
     let read_unit_shape ~unit_name:_ = None
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   end)
 
 let local_reduce = Local_reduce.reduce

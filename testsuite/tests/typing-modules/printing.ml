@@ -50,23 +50,23 @@ module Test : (X : (A -> (B -> C) -> D) -> E -> F) -> sig end
 (* test reprinting of functors *)
 module type LongFunctor1 = functor (X : A) () (_ : B) () -> C -> D -> sig end
 [%%expect {|
-<<<<<<< HEAD
+<<<<<<< oxcaml
 module type LongFunctor1 =
   functor (X : A) () -> B -> functor () -> C -> D -> sig end
-||||||| 23e84b8c4d
+||||||| upstream-base
 module type LongFunctor1 = functor (X : A) () (_ : B) () -> C -> D -> sig end
 =======
 module type LongFunctor1 = (X : A) () (_ : B) () -> C -> D -> sig end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 |}]
 module type LongFunctor2 = functor (_ : A) () (_ : B) () -> C -> D -> sig end
 [%%expect {|
-<<<<<<< HEAD
+<<<<<<< oxcaml
 module type LongFunctor2 =
   A -> functor () -> B -> functor () -> C -> D -> sig end
-||||||| 23e84b8c4d
+||||||| upstream-base
 module type LongFunctor2 = A -> functor () (_ : B) () -> C -> D -> sig end
 =======
 module type LongFunctor2 = A -> () (_ : B) () -> C -> D -> sig end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 |}]

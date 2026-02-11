@@ -30,13 +30,13 @@
 #include "caml/signals.h"
 #include "caml/memprof.h"
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 static_assert(sizeof(struct custom_operations) == CUSTOM_OPS_STRUCT_SIZE, "");
 
 uintnat caml_custom_major_ratio = Custom_major_ratio_def;
 uintnat caml_custom_minor_ratio = Custom_minor_ratio_def;
 uintnat caml_custom_minor_max_bsz = Custom_minor_max_bsz_def;
-||||||| 23e84b8c4d
+||||||| upstream-base
 uintnat caml_custom_major_ratio = Custom_major_ratio_def;
 uintnat caml_custom_minor_ratio = Custom_minor_ratio_def;
 uintnat caml_custom_minor_max_bsz = Custom_minor_max_bsz_def;
@@ -44,10 +44,10 @@ uintnat caml_custom_minor_max_bsz = Custom_minor_max_bsz_def;
 _Atomic uintnat caml_custom_major_ratio = Custom_major_ratio_def;
 _Atomic uintnat caml_custom_minor_ratio = Custom_minor_ratio_def;
 _Atomic uintnat caml_custom_minor_max_bsz = Custom_minor_max_bsz_def;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 mlsize_t caml_custom_get_max_major (void)
 {
   /* The major ratio is a percentage relative to the major heap size.
@@ -103,7 +103,7 @@ mlsize_t caml_custom_get_max_major (void)
    limit is [caml_custom_get_max_major ()] computed at the
    time when the custom block is promoted to the major heap.
 */
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 static value alloc_custom_gen (const struct custom_operations * ops,
                                uintnat bsz,
                                bool minor_ok,
@@ -114,19 +114,19 @@ static value alloc_custom_gen (const struct custom_operations * ops,
   CAMLlocal1(result);
 
   wosize = 1 + (bsz + sizeof(value) - 1) / sizeof(value);
-<<<<<<< HEAD
+<<<<<<< oxcaml
   if (local) {
     CAMLassert(ops->finalize == NULL);
     result = caml_alloc_local(wosize, Custom_tag);
     Custom_ops_val(result) = ops;
   }
   else if (wosize <= Max_young_wosize && minor_ok) {
-||||||| 23e84b8c4d
+||||||| upstream-base
   if (wosize <= Max_young_wosize && mem <= caml_custom_minor_max_bsz) {
 =======
   if (wosize <= Max_young_wosize
       && mem <= atomic_load_relaxed(&caml_custom_minor_max_bsz)) {
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     result = caml_alloc_small(wosize, Custom_tag);
     Custom_ops_val(result) = ops;
     if (ops->finalize != NULL) {
@@ -171,7 +171,7 @@ CAMLexport value caml_alloc_custom_mem(const struct custom_operations * ops,
                                        uintnat bsz,
                                        mlsize_t mem)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   mlsize_t max_minor = get_max_minor (); /* total allocs before minor GC */
   mlsize_t max_minor_single;      /* largest allowed alloc on minor heap */
   if (caml_custom_minor_max_bsz > 100) {
@@ -203,14 +203,14 @@ CAMLexport value caml_alloc_custom_dep (const struct custom_operations * ops,
   result = caml_alloc_custom_mem(ops, bsz, mem);
   caml_alloc_dependent_memory (result, mem);
   CAMLreturn(result);
-||||||| 23e84b8c4d
+||||||| upstream-base
   return alloc_custom_gen (ops, bsz, mem, 0, get_max_minor());
 =======
   value v = alloc_custom_gen (ops, bsz, mem, 0, get_max_minor());
   size_t mem_words = (mem + sizeof(value) - 1) / sizeof(value);
   caml_memprof_sample_block(v, mem_words, mem_words, CAML_MEMPROF_SRC_CUSTOM);
   return v;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 struct custom_operations_list {

@@ -27,14 +27,14 @@ let c_compiler = boot_cannot_call "the C compiler"
 let c_output_obj = ""
 let c_has_debug_prefix_map = false
 let as_has_debug_prefix_map = false
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let as_compress_debug_sections_flag = ""
 let cc_compress_debug_sections_flag = ""
 let ocamlc_cflags = ""
 let ocamlc_cppflags = ""
 let ocamlopt_cflags = ""
 let ocamlopt_cppflags = ""
-||||||| 23e84b8c4d
+||||||| upstream-base
 let ocamlc_cflags = ""
 let ocamlc_cppflags = ""
 let ocamlopt_cflags = ""
@@ -44,7 +44,7 @@ let bytecode_cflags = ""
 let bytecode_cppflags = ""
 let native_cflags = ""
 let native_cppflags = ""
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let bytecomp_c_libraries = ""
 let bytecomp_c_compiler = ""
 let native_c_compiler = c_compiler

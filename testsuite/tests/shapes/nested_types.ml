@@ -20,12 +20,12 @@ end
 [%%expect{|
 {
  "M"[module] ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
    {<.39>
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
    {<.37>
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     "Exn"[extension constructor] -> {<.1>
                                      "lbl_exn"[label] -> <.0>;
                                      };

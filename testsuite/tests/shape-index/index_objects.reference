@@ -1,5 +1,5 @@
 Indexed shapes:
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Resolved: Index_objects.21 :
   ins (File "index_objects.ml", line 48, characters 21-24)
 Resolved: Index_objects.28 :
@@ -21,7 +21,7 @@ Resolved: Index_objects.5 :
 Resolved: Index_objects.5 :
   c (File "index_objects.ml", line 29, characters 8-9)
 Resolved: Index_objects.0 :
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 Resolved: Index_objects.21:
   ins (File "index_objects.ml", line 48, characters 21-24)
@@ -44,7 +44,7 @@ Resolved: Index_objects.5:
 Resolved: Index_objects.5:
   c (File "index_objects.ml", line 29, characters 8-9)
 Resolved: Index_objects.0:
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   o (File "index_objects.ml", line 23, characters 9-10)
 
 Uid of decls:

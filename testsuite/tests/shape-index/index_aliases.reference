@@ -1,5 +1,5 @@
 Indexed shapes:
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Missing uid : t (File "index_aliases.ml", line 52, characters 9-10)
 Resolved: Index_aliases.26 :
   FArg (File "index_aliases.ml", line 49, characters 5-9)
@@ -36,7 +36,7 @@ Resolved: Index_aliases.5 :
 Resolved: Index_aliases.4 :
   X (File "index_aliases.ml", line 21, characters 32-33)
 Resolved: Index_aliases.1 :
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 Missing uid: t (File "index_aliases.ml", line 52, characters 9-10)
 Resolved: Index_aliases.26:
@@ -81,7 +81,7 @@ Resolved: Index_aliases.5:
 Resolved: Index_aliases.4:
   X (File "index_aliases.ml", line 21, characters 32-33)
 Resolved: Index_aliases.1:
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   A (File "index_aliases.ml", line 19, characters 11-12)
 
 Uid of decls:

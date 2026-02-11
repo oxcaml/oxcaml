@@ -12,7 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (** Overview of the compilation scheme
 
     Given a set of recursive definitions, we sort them into four categories:
@@ -41,10 +41,10 @@ val compile_letrec :
    Lambda.debug_uid *
    Value_rec_types.recursive_binding_kind *
    Lambda.lambda) list ->
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 val compile_letrec :
   (Ident.t * Value_rec_types.recursive_binding_kind * Lambda.lambda) list ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   Lambda.lambda ->
   Lambda.lambda

@@ -2,7 +2,7 @@
  expect;
 *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* A bug in typecore leading to extra expansion led this to be rejected. *)
 
 type (_, _) refl = Refl : ('a, 'a) refl
@@ -66,7 +66,7 @@ Error: This expression has type "a" = "unit"
        but an expression was expected of type "'a"
        This instance of "unit" is ambiguous:
        it would escape the scope of its equation
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 type (_, _) refl = Refl : ('a, 'a) refl
 
@@ -117,5 +117,5 @@ Line 2, characters 59-60:
 Warning 16 [unerasable-optional-argument]: this optional argument cannot be erased.
 
 val go : (unit, 'a) refl -> 'a = <fun>
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 |}]

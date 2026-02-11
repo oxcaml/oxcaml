@@ -16,15 +16,15 @@
 #ifndef CAML_CONFIG_H
 #define CAML_CONFIG_H
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* CR ocaml 5 all-runtime5: remove this and all uses of it */
 #define CAML_RUNTIME_5
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 #include "m.h"
 #include "s.h"
 #include "compatibility.h"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 /* CAML_NAME_SPACE was introduced in OCaml 3.08 to declare compatibility with
    the newly caml_-prefixed names of C runtime functions and to disable the

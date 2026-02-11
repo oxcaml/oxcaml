@@ -1,15 +1,15 @@
 (* TEST
    include systhreads;
-<<<<<<< HEAD
+<<<<<<< oxcaml
    flags = "-alert -unsafe_multidomain";
    hassysthreads;
    runtime5;
    { bytecode; }
    { native; }
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
    hassysthreads;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 *)
 
 (* This test creates [nb_keys] DLS keys, each storing an atomic integer.

@@ -1,11 +1,11 @@
-<<<<<<< HEAD
+<<<<<<< oxcaml
 File "bigarray_index_labels.ml", line 14, characters 0-12:
 14 | my_big_array.{(1, ~y:2)} <- 1.5;;
      ^^^^^^^^^^^^
 Error: This expression has type
          "(float, Bigarray.float32_elt, Bigarray.c_layout) Bigarray.Array2.t"
        but an expression was expected of type "('a, 'b, 'c) Bigarray.Array1.t"
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 File "bigarray_index_labels.ml", line 13, characters 0-12:
 13 | my_big_array.{(1, ~y:2)} <- 1.5;;
@@ -13,4 +13,4 @@ File "bigarray_index_labels.ml", line 13, characters 0-12:
 Error: The value my_big_array has type
          (float, Bigarray.float32_elt, Bigarray.c_layout) Bigarray.Array2.t
        but an expression was expected of type ('a, 'b, 'c) Bigarray.Array1.t
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

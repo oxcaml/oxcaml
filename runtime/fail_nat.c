@@ -81,11 +81,11 @@ void caml_raise(value v)
 
   caml_channel_cleanup_on_raise();
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   /* Run callbacks here, so that a signal handler that arrived during
      a blocking call has a chance to interrupt the raising of EINTR */
   v = caml_process_pending_actions_with_root(v);
-||||||| 23e84b8c4d
+||||||| upstream-base
   // avoid calling caml_raise recursively
   v = caml_process_pending_actions_with_root_exn(v);
   if (Is_exception_result(v))
@@ -96,7 +96,7 @@ void caml_raise(value v)
      If the result is an exception, we want to raise it instead of [v].
      The line below does both these things at once. */
   v = result.data;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   limit_of_current_c_stack_chunk = (char*)Caml_state->c_stack;
 
@@ -114,7 +114,7 @@ void caml_raise(value v)
   caml_raise_exception(Caml_state, v);
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* Used by the stack overflow handler -> deactivate ASAN (see
    segv_handler in signals_nat.c). */
 CAMLno_asan void caml_raise_async(value v)
@@ -171,14 +171,14 @@ CAMLno_asan void caml_raise_async(value v)
 
 CAMLno_asan
 void caml_raise_constant(value tag)
-||||||| 23e84b8c4d
+||||||| upstream-base
 /* Used by the stack overflow handler -> deactivate ASAN (see
    segv_handler in signals_nat.c). */
 CAMLno_asan
 void caml_raise_constant(value tag)
 =======
 value caml_exception_failure(char const *msg)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 {
   return caml_exception_with_string((value)caml_exn_Failure, msg);
 }
@@ -200,7 +200,7 @@ value caml_exception_invalid_argument_value(value msg)
 
 value caml_exception_out_of_memory(void)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   caml_raise_with_string((value) caml_exn_Failure, msg);
 }
 
@@ -223,7 +223,7 @@ void caml_raise_out_of_memory(void)
 {
   /* Note that this is not an async exn. */
   caml_raise_constant((value) caml_exn_Out_of_memory);
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_raise_with_string((value) caml_exn_Failure, msg);
 }
 
@@ -247,7 +247,7 @@ void caml_raise_out_of_memory(void)
   caml_raise_constant((value) caml_exn_Out_of_memory);
 =======
   return (value)caml_exn_Out_of_memory;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 void caml_raise_out_of_fibers(void)
@@ -261,13 +261,13 @@ void caml_raise_out_of_fibers(void)
 CAMLno_asan
 value caml_exception_stack_overflow(void)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   caml_raise_async((value) caml_exn_Stack_overflow);
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_raise_constant((value) caml_exn_Stack_overflow);
 =======
   return (value)caml_exn_Stack_overflow;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 value caml_exception_sys_error(value msg)
@@ -292,9 +292,9 @@ value caml_exception_not_found(void)
 
 value caml_exception_sys_blocked_io(void)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   caml_raise_constant((value) caml_exn_Sys_blocked_io);
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_raise_constant((value) caml_exn_Sys_blocked_io);
 }
 
@@ -306,7 +306,7 @@ CAMLexport value caml_raise_if_exception(value res)
 
 =======
   return (value)caml_exn_Sys_blocked_io;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 /* We use a pre-allocated exception because we can't

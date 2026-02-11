@@ -16,13 +16,13 @@ Error: Unbound constructor "A"
 let rec f () = g 42
 and g (x : string) = f ()
 [%%expect{|
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Line 2, characters 6-18:
 2 | and g (x : string) = f ()
           ^^^^^^^^^^^^
 Error: This pattern matches values of type "string"
        but a pattern was expected which matches values of type "int"
-||||||| 23e84b8c4d
+||||||| upstream-base
 Line 1, characters 17-19:
 1 | let rec f () = g 42
                      ^^
@@ -34,7 +34,7 @@ Line 1, characters 17-19:
                      ^^
 Error: The constant "42" has type "int" but an expression was expected of type
          "string"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 |}]
 
 let rec opt_error ?(opt : string) () = f ?opt ()

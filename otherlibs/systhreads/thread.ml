@@ -105,7 +105,7 @@ let select = Unix.select
 
 let wait_pid p = Unix.waitpid [] p
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
 external sigmask : Unix.sigprocmask_command -> int list -> int list @@ portable
    = "caml_thread_sigmask"
@@ -115,7 +115,7 @@ external use_domains : unit -> unit @@ portable = "caml_thread_use_domains"
 
 external set_current_thread_name  : string -> unit @@ portable =
   "caml_set_current_thread_name"
-||||||| 23e84b8c4d
+||||||| upstream-base
 external sigmask : Unix.sigprocmask_command -> int list -> int list
    = "caml_thread_sigmask"
 external wait_signal : int list -> int = "caml_wait_signal"
@@ -125,4 +125,4 @@ let wait_signal = Unix.sigwait
 
 external set_current_thread_name : string -> unit =
         "caml_set_current_thread_name"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

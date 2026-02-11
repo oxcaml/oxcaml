@@ -295,16 +295,16 @@ static void stw_register_frametables(
     caml_domain_state** participating)
 {
   Caml_global_barrier_if_final(participating_count) {
-<<<<<<< HEAD
+<<<<<<< oxcaml
     register_frametables_from_stw_single(frametables);
-||||||| 23e84b8c4d
+||||||| upstream-base
   barrier_status b = caml_global_barrier_begin ();
 
   if (caml_global_barrier_is_final(b)) {
     register_frametables_from_stw_single((frametable_array*) frametables);
 =======
     register_frametables_from_stw_single((caml_frametable_list*) frametables);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   }
 }
 
@@ -398,16 +398,16 @@ frame_descr* caml_find_frame_descr(caml_frame_descrs *fds, uintnat pc)
   while (1) {
     d = fds->descriptors[h];
     if (d == 0) return NULL; /* can happen if some code compiled without -g */
-<<<<<<< HEAD
+<<<<<<< oxcaml
     if (Retaddr_frame(d) == pc) break;
     h = (h+1) & fds.mask;
-||||||| 23e84b8c4d
+||||||| upstream-base
     if (d->retaddr == pc) break;
     h = (h+1) & fds.mask;
 =======
     if (d->retaddr == pc) break;
     h = (h+1) & fds->mask;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   }
   return d;
 }

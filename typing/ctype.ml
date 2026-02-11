@@ -135,8 +135,8 @@ exception Cannot_subst
 
 exception Cannot_unify_universal_variables
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 exception Matches_failure of Env.t * unification_error
 
 =======
@@ -144,7 +144,7 @@ exception Out_of_scope_universal_variable
 
 exception Matches_failure of Env.t * unification_error
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 exception Incompatible
 
 (**** Control tracing of GADT instances *)
@@ -438,14 +438,14 @@ let in_subst_mode = function
   | Expression {in_subst} -> in_subst
   | Pattern _ -> false
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let can_generate_equations = function
   | Expression _ | Pattern { equations_generation = Forbidden } -> false
   | Pattern { equations_generation = Allowed _ } -> true
 
 (* Can only be called when generate_equations is true.  Tracks equations only to
    improve error messages. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 let can_generate_equations = function
   | Expression _ | Pattern { equations_generation = Forbidden } -> false
   | Pattern { equations_generation = Allowed _ } -> true
@@ -453,7 +453,7 @@ let can_generate_equations = function
 (* Can only be called when generate_equations is true *)
 =======
 (* Can only be called when generate_equations is true *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let record_equation uenv t1 t2 =
   match uenv with
   | Expression _ ->
@@ -480,7 +480,7 @@ let without_assume_injective uenv f =
   | Expression _ as uenv -> f uenv
   | Pattern r -> f (Pattern { r with assume_injective = false })
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let without_generating_equations uenv f =
   match uenv with
   | Expression _ as uenv -> f uenv
@@ -509,14 +509,14 @@ let delay_jkind_checks_in f =
   Misc.protect_refs [Misc.R (lmode, Delay_checks r)] f;
   !r
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 let without_generating_equations uenv f =
   match uenv with
   | Expression _ as uenv -> f uenv
   | Pattern r -> f (Pattern { r with equations_generation = Forbidden })
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (*** Checks for type definitions ***)
 
 let rec in_current_module = function
@@ -697,52 +697,52 @@ exception Non_closed of type_expr * variable_kind
    [free_vars] accumulates its answer in a monoid-like structure, with
    an initial element [zero] and a combining function [add_one], passing
    [add_one] information about whether the variable is a normal type variable
-<<<<<<< HEAD
+<<<<<<< oxcaml
    or a row variable. [add_one] also received jkind information about [Tvar]s
    (but not [Tconstr]s that are expanded).
 
    It is marked [@inline] so that calls to [add_one] are not indirect.
-||||||| 23e84b8c4d
+||||||| upstream-base
    [free_vars] returns a [(variable * bool) list], while
    [free_variables] below drops the type/row information
    and only returns a [variable list].
 =======
    or a row variable.
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
  *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let[@inline] free_vars ~zero ~add_one ?env mark tys =
-||||||| 23e84b8c4d
+||||||| upstream-base
 let free_vars ?env ty =
 =======
 let free_vars ~init ~add_one ?env mark ty =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let rec fv ~kind acc ty =
     if not (try_mark_node mark ty) then acc
     else match get_desc ty, env with
-<<<<<<< HEAD
+<<<<<<< oxcaml
       | Tvar { jkind; _ }, _ ->
           add_one ty (Some jkind) kind acc
-||||||| 23e84b8c4d
+||||||| upstream-base
       | Tvar _, _ ->
           (ty, kind) :: acc
 =======
       | Tvar _, _ ->
           add_one ty kind acc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       | Tconstr (path, tl, _), Some env ->
           let acc =
             match Env.find_type_expansion path env with
             | exception Not_found -> acc
             | (_, body, _) ->
                 if get_level body = generic_level then acc
-<<<<<<< HEAD
+<<<<<<< oxcaml
                 else add_one ty None kind acc
-||||||| 23e84b8c4d
+||||||| upstream-base
                 else (ty, kind) :: acc
 =======
                 else add_one ty kind acc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           in
           List.fold_left (fv ~kind:Type_variable) acc tl
       | Tobject (ty, _), _ ->
@@ -758,29 +758,29 @@ let free_vars ~init ~add_one ?env mark ty =
           else fv ~kind:Row_variable acc (row_more row)
       | _    ->
           fold_type_expr (fv ~kind) acc ty
-<<<<<<< HEAD
+<<<<<<< oxcaml
   in
   List.fold_left (fv ~kind:Type_variable) zero tys
-||||||| 23e84b8c4d
+||||||| upstream-base
   in fv ~kind:Type_variable [] ty
 =======
   in fv ~kind:Type_variable init ty
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let free_variables ?env ty =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let add_one ty _jkind _kind acc = ty :: acc in
   with_type_mark (fun mark -> free_vars ~zero:[] ~add_one ?env mark [ty])
-||||||| 23e84b8c4d
+||||||| upstream-base
   let tl = List.map fst (free_vars ?env ty) in
   unmark_type ty;
   tl
 =======
   let add_one ty _kind acc = ty :: acc in
   with_type_mark (fun mark -> free_vars ~init:[] ~add_one ?env mark ty)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let free_non_row_variables_of_list tyl =
   let add_one ty _jkind kind acc =
     match kind with
@@ -822,7 +822,7 @@ let closed_type_expr ?env ty =
 let close_type mark ty =
   remove_mode_and_jkind_variables ty;
   closed_type mark ty
-||||||| 23e84b8c4d
+||||||| upstream-base
 let closed_type ty =
   match free_vars ty with
       []           -> ()
@@ -842,14 +842,14 @@ let closed_type_expr ?env ty =
   with_type_mark (fun mark ->
     try closed_type ?env mark ty; true
     with Non_closed _ -> false)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let closed_parameterized_type params ty =
   with_type_mark begin fun mark ->
     List.iter (mark_type mark) params;
-<<<<<<< HEAD
+<<<<<<< oxcaml
     try close_type mark ty; true with Non_closed _ -> false
-||||||| 23e84b8c4d
+||||||| upstream-base
   List.iter mark_type params;
   let ok =
     try closed_type ty; true with Non_closed _ -> false in
@@ -858,19 +858,19 @@ let closed_parameterized_type params ty =
   ok
 =======
     try closed_type mark ty; true with Non_closed _ -> false
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   end
 
 let closed_type_decl decl =
   with_type_mark begin fun mark -> try
     List.iter (mark_type mark) decl.type_params;
-<<<<<<< HEAD
+<<<<<<< oxcaml
     List.iter remove_mode_and_jkind_variables decl.type_params;
-||||||| 23e84b8c4d
+||||||| upstream-base
   try
     List.iter mark_type decl.type_params;
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     begin match decl.type_kind with
       Type_abstract _ ->
         ()
@@ -878,7 +878,7 @@ let closed_type_decl decl =
         List.iter
           (fun {cd_args; cd_res; _} ->
             match cd_res with
-<<<<<<< HEAD
+<<<<<<< oxcaml
             | Some res_ty ->
                 (* gadts cannot have free type variables, but they might
                    have undefaulted sort variables; these lines default
@@ -891,7 +891,7 @@ let closed_type_decl decl =
                 end;
                 remove_mode_and_jkind_variables res_ty
             | None -> List.iter (close_type mark) (tys_of_constr_args cd_args)
-||||||| 23e84b8c4d
+||||||| upstream-base
             | Some _ -> ()
             | None ->
                 match cd_args with
@@ -904,32 +904,32 @@ let closed_type_decl decl =
                 | Cstr_tuple l ->  List.iter (closed_type mark) l
                 | Cstr_record l ->
                     List.iter (fun l -> closed_type mark l.ld_type) l
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           )
           v
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Type_record(r, _rep, _) ->
         List.iter (fun l -> close_type mark l.ld_type) r
     | Type_record_unboxed_product(r, _rep, _) ->
         List.iter (fun l -> close_type mark l.ld_type) r
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Type_record(r, _rep) ->
         List.iter (fun l -> closed_type l.ld_type) r
 =======
     | Type_record(r, _rep) ->
         List.iter (fun l -> closed_type mark l.ld_type) r
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Type_open -> ()
     end;
     begin match decl.type_manifest with
       None    -> ()
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Some ty -> close_type mark ty
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Some ty -> closed_type ty
 =======
     | Some ty -> closed_type mark ty
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     end;
     None
   with Non_closed (ty, _) ->
@@ -940,7 +940,7 @@ let closed_extension_constructor ext =
   with_type_mark begin fun mark -> try
     List.iter (mark_type mark) ext.ext_type_params;
     begin match ext.ext_ret_type with
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Some res_ty ->
         (* gadts cannot have free type variables, but they might
            have undefaulted sort variables; these lines default
@@ -949,13 +949,13 @@ let closed_extension_constructor ext =
         remove_mode_and_jkind_variables res_ty
     | None ->
         iter_type_expr_cstr_args (close_type mark) ext.ext_args
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Some _ -> ()
     | None -> iter_type_expr_cstr_args closed_type ext.ext_args
 =======
     | Some _ -> ()
     | None -> iter_type_expr_cstr_args (closed_type mark) ext.ext_args
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     end;
     None
   with Non_closed (ty, _) ->
@@ -977,13 +977,13 @@ let closed_class params sign =
     Meths.iter
       (fun lab (priv, _, ty) ->
         if priv = Mpublic then begin
-<<<<<<< HEAD
+<<<<<<< oxcaml
           try close_type mark ty with Non_closed (ty0, variable_kind) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
           try closed_type ty with Non_closed (ty0, variable_kind) ->
 =======
           try closed_type mark ty with Non_closed (ty0, variable_kind) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
             raise (CCFailure {
               free_variable = (ty0, variable_kind);
               meth = lab;
@@ -1014,18 +1014,18 @@ let duplicate_class_type ty =
                          (*  Type level manipulation  *)
                          (*****************************)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let rec lower_all ty =
   if get_level ty > !current_level then begin
     set_level ty !current_level;
     iter_type_expr lower_all ty
   end
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (*
-<<<<<<< HEAD
+<<<<<<< oxcaml
    It would be a bit more efficient to remove abbreviation expansions
    rather than generalizing them: these expansions will usually not be
    used anymore. However, this is not possible in the general case, as
@@ -1052,7 +1052,7 @@ let rec generalize stage_offset ty =
     | _ -> iter_type_expr (generalize stage_offset) ty
     end;
   end
-||||||| 23e84b8c4d
+||||||| upstream-base
    It would be a bit more efficient to remove abbreviation expansions
    rather than generalizing them: these expansions will usually not be
    used anymore. However, this is not possible in the general case, as
@@ -1081,9 +1081,9 @@ let rec generalize ty =
    inferred in the first pass, and can be considered as "known" during the
    second pass.
  *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let generalize ty =
   simple_abbrevs := Mnil;
   generalize 0 ty
@@ -1115,7 +1115,7 @@ let generalize_structure ty =
 let rec generalize_spine ty =
   let level = get_level ty in
   if level < !current_level || level = generic_level then () else
-||||||| 23e84b8c4d
+||||||| upstream-base
 let generalize ty =
   simple_abbrevs := Mnil;
   generalize ty
@@ -1149,9 +1149,9 @@ let rec generalize_spine ty =
   if level < !current_level || level = generic_level then () else
 =======
 let rec copy_spine copy_scope ty =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   match get_desc ty with
-<<<<<<< HEAD
+<<<<<<< oxcaml
     Tarrow (_, ty1, ty2, _) ->
       set_level ty generic_level;
       generalize_spine ty1;
@@ -1173,7 +1173,7 @@ let rec copy_spine copy_scope ty =
       memo := Mnil;
       List.iter generalize_spine tyl
   | _ -> ()
-||||||| 23e84b8c4d
+||||||| upstream-base
     Tarrow (_, ty1, ty2, _) ->
       set_level ty generic_level;
       generalize_spine ty1;
@@ -1226,7 +1226,7 @@ let rec copy_spine copy_scope ty =
 
 let copy_spine ty =
   For_copy.with_scope (fun copy_scope -> copy_spine copy_scope ty)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let forward_try_expand_safe = (* Forward declaration *)
   ref (fun _env _ty -> assert false)
@@ -1269,15 +1269,15 @@ let rec check_scope_escape mark env level ty =
         let p' = normalize_package_path env p in
         if Path.same p p' then raise_escape_exn (Module_type p);
         check_scope_escape mark env level
-<<<<<<< HEAD
+<<<<<<< oxcaml
           (newty2 ~level:orig_level (Tpackage (p', fl)))
-||||||| 23e84b8c4d
+||||||| upstream-base
         check_scope_escape env level
           (newty2 ~level:orig_level (Tpackage (p', fl)))
 =======
           (newty2 ~level:orig_level
             (Tpackage {pack with pack_path = p'}))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | _ ->
         iter_type_expr (check_scope_escape mark env level) ty
     end;
@@ -1759,14 +1759,14 @@ let new_local_type ?(loc = Location.none) ?manifest_and_scope origin jkind =
     type_loc = loc;
     type_attributes = [];
     type_unboxed_default = false;
-<<<<<<< HEAD
+<<<<<<< oxcaml
     type_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
     type_unboxed_version = None;
-||||||| 23e84b8c4d
+||||||| upstream-base
     type_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
 =======
     type_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   }
 
 let existential_name name_counter ty =
@@ -2254,7 +2254,7 @@ let unify_var' = (* Forward declaration *)
 
 let subst env level priv abbrev oty params args body =
   if List.length params <> List.length args then raise Cannot_subst;
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let old_level = !current_level in
   current_level := level;
   let body0 = newvar (Jkind.Builtin.any ~why:Dummy_jkind) in          (* Stub *)
@@ -2282,7 +2282,7 @@ let subst env level priv abbrev oty params args body =
     current_level := old_level;
     undo_abbrev ();
     raise Cannot_subst
-||||||| 23e84b8c4d
+||||||| upstream-base
   let old_level = !current_level in
   current_level := level;
   let body0 = newvar () in          (* Stub *)
@@ -2336,7 +2336,7 @@ let subst env level priv abbrev oty params args body =
       undo_abbrev ();
       raise Cannot_subst
   end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let jkind_subst env level params args jkind =
   (* CR layouts v2.8: This function is used a lot, but there is a better way.
@@ -3497,24 +3497,24 @@ let unify_univar t1 t2 jkind1 jkind2 pairs =
       | _ ->
           raise Cannot_unify_universal_variables
       end
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | [] -> raise Cannot_unify_universal_variables
   in
   inner t1 t2 pairs
-||||||| 23e84b8c4d
+||||||| upstream-base
   | [] -> raise Cannot_unify_universal_variables
 =======
   | [] ->
       raise Out_of_scope_universal_variable
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* The same as [unify_univar], but raises the appropriate exception instead of
    [Cannot_unify_universal_variables] *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let unify_univar_for tr_exn t1 t2 jkind1 jkind2 univar_pairs =
   try unify_univar t1 t2 jkind1 jkind2 univar_pairs
   with Cannot_unify_universal_variables -> raise_unexplained_for tr_exn
-||||||| 23e84b8c4d
+||||||| upstream-base
 let unify_univar_for tr_exn t1 t2 univar_pairs =
   try unify_univar t1 t2 univar_pairs
   with Cannot_unify_universal_variables -> raise_unexplained_for tr_exn
@@ -3529,7 +3529,7 @@ let unify_univar_for (type a) (tr_exn : a trace_exn) t1 t2 univar_pairs =
       match tr_exn with
       | Equality -> raise_unexplained_for tr_exn
       | _ -> fatal_error "Ctype.unify_univar_for: univar not in scope"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Test the occurrence of free univars in a type *)
 (* That's way too expensive. Must do some kind of caching *)
@@ -3640,8 +3640,8 @@ let univars_escape env univar_pairs vl ty =
   in
   occur ty
   end
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 =======
 
 let univar_pairs = ref []
@@ -3651,7 +3651,7 @@ let with_univar_pairs pairs f =
   univar_pairs := pairs;
   Misc.try_finally f
     ~always:(fun () -> univar_pairs := old)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Wrapper checking that no variable escapes and updating univar_pairs *)
 let enter_poly env t1 tl1 t2 tl2 f =
@@ -3759,7 +3759,7 @@ let unexpanded_diff ~got ~expected =
 
 (**** Unification ****)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let rec deep_occur_rec mark t0 ty =
   if get_level ty >= get_level t0 && try_mark_node mark ty then begin
     if eq_type ty t0 then raise Occur;
@@ -3782,7 +3782,7 @@ let deep_occur t0 ty =
       false
     with Occur ->
       true)
-||||||| 23e84b8c4d
+||||||| upstream-base
 (* Return whether [t0] occurs in [ty]. Objects are also traversed. *)
 let deep_occur t0 ty =
   let rec occur_rec ty =
@@ -3802,7 +3802,7 @@ let rec deep_occur_rec mark t0 ty =
     if eq_type ty t0 then raise Occur;
     iter_type_expr (deep_occur_rec mark t0) ty
   end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let deep_occur t0 ty =
   try
@@ -3950,7 +3950,7 @@ let rec expands_to_datatype env ty =
       end
   | _ -> false
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let equivalent_with_nolabels l1 l2 =
   l1 = l2 || (match l1, l2 with
   | (Nolabel | Labelled _), (Nolabel | Labelled _) -> true
@@ -3966,7 +3966,7 @@ let has_jkind_intersection_tk ~level env ty jkind =
    unify.  (This is distinct from [eqtype], which checks if two types *are*
    exactly the same.)  This is used to decide whether GADT cases are
    unreachable.  It is broadly part of unification. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 (* [mcomp] tests if two types are "compatible" -- i.e., if they could ever
    unify.  (This is distinct from [eqtype], which checks if two types *are*
    exactly the same.)  This is used to decide whether GADT cases are
@@ -3985,7 +3985,7 @@ let has_jkind_intersection_tk ~level env ty jkind =
    are sure that there exists no equality witness, but if it does not
    say so, there is no guarantee that such a witness could exist.
  *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* [mcomp type_pairs subst env t1 t2] should not raise an
    exception if it is possible that t1 and t2 are actually
@@ -4014,13 +4014,13 @@ let rec mcomp type_pairs env t1 t2 =
       if eq_type t1' t2' then () else
       if not (TypePairs.mem type_pairs (t1', t2')) then begin
         TypePairs.add type_pairs (t1', t2');
-<<<<<<< HEAD
+<<<<<<< oxcaml
         match (get_desc t1', get_desc t2', t1', t2') with
         | (Tvar { jkind }, _, _, other)
         | (_, Tvar { jkind }, other, _)  -> check_jkinds other jkind
         | (Tarrow ((l1,_,_), t1, u1, _), Tarrow ((l2,_,_), t2, u2, _), _, _)
           when equivalent_with_nolabels l1 l2 ->
-||||||| 23e84b8c4d
+||||||| upstream-base
         match (get_desc t1', get_desc t2') with
         | (Tvar _, _)
         | (_, Tvar _)  ->
@@ -4034,14 +4034,14 @@ let rec mcomp type_pairs env t1 t2 =
             ()
         | (Tarrow (l1, t1, u1, _), Tarrow (l2, t2, u2, _))
           when compatible_labels ~in_pattern_mode:true l1 l2 ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
             mcomp type_pairs env t1 t2;
             mcomp type_pairs env u1 u2;
-<<<<<<< HEAD
+<<<<<<< oxcaml
         | (Ttuple tl1, Ttuple tl2, _, _) ->
             mcomp_labeled_list type_pairs env tl1 tl2
         | (Tconstr (p1, tl1, _), Tconstr (p2, tl2, _), _, _) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
         | (Ttuple tl1, Ttuple tl2) ->
             mcomp_list type_pairs env tl1 tl2
         | (Tconstr (p1, tl1, _), Tconstr (p2, tl2, _)) ->
@@ -4049,15 +4049,15 @@ let rec mcomp type_pairs env t1 t2 =
         | (Ttuple tl1, Ttuple tl2) ->
             mcomp_labeled_list type_pairs env tl1 tl2
         | (Tconstr (p1, tl1, _), Tconstr (p2, tl2, _)) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
             mcomp_type_decl type_pairs env p1 p2 tl1 tl2
-<<<<<<< HEAD
+<<<<<<< oxcaml
         | (Tconstr (_, [], _), _, _, _) when has_injective_univars env t2' ->
             raise_unexplained_for Unify
         | (_, Tconstr (_, [], _), _, _) when has_injective_univars env t1' ->
             raise_unexplained_for Unify
         | (Tconstr (p, _, _), _, _, other) | (_, Tconstr (p, _, _), other, _) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
         | (Tconstr (_, [], _), _) when has_injective_univars env t2' ->
             raise_unexplained_for Unify
         | (_, Tconstr (_, [], _)) when has_injective_univars env t1' ->
@@ -4069,7 +4069,7 @@ let rec mcomp type_pairs env t1 t2 =
         | (_, Tconstr (_, [], _)) when has_injective_univars env t1' ->
             raise Incompatible
         | (Tconstr (p, _, _), _) | (_, Tconstr (p, _, _)) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
             begin try
               let decl = Env.find_type p env in
               if non_aliasable p decl || is_datatype decl ||
@@ -4098,7 +4098,7 @@ let rec mcomp type_pairs env t1 t2 =
                enter_poly env
                  t1 tl1 t2 tl2 (mcomp type_pairs env)
              with Escape _ -> raise Incompatible)
-<<<<<<< HEAD
+<<<<<<< oxcaml
         | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2), _, _) ->
             (* For layout-polymorphic types, establish correspondence between
                sort variables positionally, then compare the bodies. *)
@@ -4123,7 +4123,7 @@ let rec mcomp type_pairs env t1 t2 =
         | (_, Tquote t2, _, _) ->
             mcomp type_pairs env t1' t2
         | (_, _, _, _) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
         | (Tunivar _, Tunivar _) ->
             (try unify_univar t1' t2' !univar_pairs
              with Cannot_unify_universal_variables -> raise Incompatible)
@@ -4135,7 +4135,7 @@ let rec mcomp type_pairs env t1 t2 =
             | Out_of_scope_universal_variable -> ()
             end
         | (_, _) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
             raise Incompatible
       end
 
@@ -4145,12 +4145,12 @@ and mcomp_list type_pairs env tl1 tl2 =
   List.iter2 (mcomp type_pairs env) tl1 tl2
 
 and mcomp_labeled_list type_pairs env labeled_tl1 labeled_tl2 =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   if not (Int.equal (List.length labeled_tl1) (List.length labeled_tl2)) then
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   if 0 <> List.compare_lengths labeled_tl1 labeled_tl2 then
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     raise Incompatible;
   List.iter2
     (fun (label1, ty1) (label2, ty2) ->
@@ -4316,13 +4316,13 @@ and mcomp_record_description type_pairs env =
         mcomp type_pairs env l1.ld_type l2.ld_type;
         if Ident.name l1.ld_id = Ident.name l2.ld_id &&
            l1.ld_mutable = l2.ld_mutable &&
-<<<<<<< HEAD
+<<<<<<< oxcaml
            l1.ld_modalities = l2.ld_modalities
-||||||| 23e84b8c4d
+||||||| upstream-base
            l1.ld_mutable = l2.ld_mutable
 =======
            l1.ld_atomic = l2.ld_atomic
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         then iter xs ys
         else raise Incompatible
     | [], [] -> ()
@@ -4352,7 +4352,7 @@ let find_lowest_level ty =
     in find ty
   end;
   !lowest
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
 let jkind_of_abstract_type_declaration env p =
   try
@@ -4395,7 +4395,7 @@ let add_jkind_equation ~reason uenv destination jkind1 =
         end
       | _ -> ()
     end
-||||||| 23e84b8c4d
+||||||| upstream-base
   let rec find ty =
     if not_marked_node ty then begin
       let level = get_level ty in
@@ -4405,7 +4405,7 @@ let add_jkind_equation ~reason uenv destination jkind1 =
     end
   in find ty; unmark_type ty; !lowest
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* This function can be called only in [Pattern] mode. *)
 let add_gadt_equation uenv source destination =
@@ -4521,7 +4521,7 @@ let compare_package env unify_list lv1 pack1 lv2 pack2 =
   let ntl2 = complete_type_list env pack1.pack_cstrs lv2 pack2
   and ntl1 = complete_type_list env pack2.pack_cstrs lv1 pack1 in
   unify_list (List.map snd ntl1) (List.map snd ntl2);
-<<<<<<< HEAD
+<<<<<<< oxcaml
   if eq_package_path env p1 p2
   || !package_subtype env p1 fl1 p2 fl2
   && !package_subtype env p2 fl2 p1 fl1 then () else raise Not_found
@@ -4530,7 +4530,7 @@ let unify_alloc_mode_for tr_exn a b =
   match Alloc.equate a b with
   | Ok () -> ()
   | Error _ -> raise_unexplained_for tr_exn
-||||||| 23e84b8c4d
+||||||| upstream-base
   if eq_package_path env p1 p2
   || !package_subtype env p1 fl1 p2 fl2
   && !package_subtype env p2 fl2 p1 fl1 then () else raise Not_found
@@ -4540,7 +4540,7 @@ let unify_alloc_mode_for tr_exn a b =
   else Result.bind
       (!package_subtype env pack1 pack2)
       (fun () -> !package_subtype env pack2 pack1)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* force unification in Reither when one side has a non-conjunctive type *)
 (* Code smell: this could also be put in unification_environment.
@@ -4592,7 +4592,7 @@ let unify3_var uenv jkind1 t1' t2 t2' =
       backtrack snap;
       reify uenv t1';
       reify uenv t2';
-<<<<<<< HEAD
+<<<<<<< oxcaml
       if can_generate_equations uenv then begin
         begin match get_desc t2' with
         | Tconstr(path,[],_)
@@ -4611,7 +4611,7 @@ let unify3_var uenv jkind1 t1' t2 t2' =
         end;
         record_equation uenv t1' t2';
       end
-||||||| 23e84b8c4d
+||||||| upstream-base
       if can_generate_equations uenv then begin
         occur_univar ~inj_only:true (get_env uenv) t2';
         record_equation uenv t1' t2';
@@ -4619,7 +4619,7 @@ let unify3_var uenv jkind1 t1' t2 t2' =
 =======
       occur_univar ~inj_only:true (get_env uenv) t2';
       record_equation uenv t1' t2'
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (*
    1. When unifying two non-abbreviated types, one type is made a link
@@ -4774,7 +4774,7 @@ and unify3 uenv t1 t1' t2 t2' =
     end;
     try
       begin match (d1, d2) with
-<<<<<<< HEAD
+<<<<<<< oxcaml
         (Tarrow ((l1,a1,r1), t1, u1, c1),
          Tarrow ((l2,a2,r2), t2, u2, c2))
            when
@@ -4784,7 +4784,7 @@ and unify3 uenv t1 t1' t2 t2' =
           unify_alloc_mode_for Unify a1 a2;
           unify_alloc_mode_for Unify r1 r2;
           unify  uenv t1 t2; unify uenv  u1 u2;
-||||||| 23e84b8c4d
+||||||| upstream-base
         (Tarrow (l1, t1, u1, c1), Tarrow (l2, t2, u2, c2)) when l1 = l2 ||
         (!Clflags.classic || in_pattern_mode uenv) &&
         not (is_optional l1 || is_optional l2) ->
@@ -4793,7 +4793,7 @@ and unify3 uenv t1 t1' t2 t2' =
         (Tarrow (l1, t1, u1, c1), Tarrow (l2, t2, u2, c2)) ->
           eq_labels Unify ~in_pattern_mode:(in_pattern_mode uenv) l1 l2;
           unify uenv t1 t2; unify uenv u1 u2;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           begin match is_commu_ok c1, is_commu_ok c2 with
           | false, true -> set_commu_ok c1
           | true, false -> set_commu_ok c2
@@ -4802,14 +4802,14 @@ and unify3 uenv t1 t1' t2 t2' =
           end
       | (Ttuple labeled_tl1, Ttuple labeled_tl2) ->
           unify_labeled_list uenv labeled_tl1 labeled_tl2
-<<<<<<< HEAD
+<<<<<<< oxcaml
       | (Tunboxed_tuple labeled_tl1, Tunboxed_tuple labeled_tl2) ->
           unify_labeled_list uenv labeled_tl1 labeled_tl2
-||||||| 23e84b8c4d
+||||||| upstream-base
       | (Ttuple tl1, Ttuple tl2) ->
           unify_list uenv tl1 tl2
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       | (Tconstr (p1, tl1, _), Tconstr (p2, tl2, _)) when Path.same p1 p2 ->
           if not (in_pattern_mode uenv) then
             unify_list uenv tl1 tl2
@@ -4834,12 +4834,12 @@ and unify3 uenv t1 t1' t2 t2' =
               inj (List.combine tl1 tl2)
       | (Tconstr (path,[],_),
          Tconstr (path',[],_))
-<<<<<<< HEAD
+<<<<<<< oxcaml
           when let env = get_env uenv in
           is_instantiable env ~for_jkind_eqn:false path
           && is_instantiable env ~for_jkind_eqn:false path'
           && can_generate_equations uenv ->
-||||||| 23e84b8c4d
+||||||| upstream-base
         when let env = get_env uenv in
         is_instantiable env path && is_instantiable env path'
         && can_generate_equations uenv ->
@@ -4847,7 +4847,7 @@ and unify3 uenv t1 t1' t2 t2' =
         when in_pattern_mode uenv &&
         let env = get_env uenv in
         is_instantiable env path && is_instantiable env path' ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           let source, destination =
             if Path.scope path > Path.scope path'
             then  path , t2'
@@ -4856,28 +4856,28 @@ and unify3 uenv t1 t1' t2 t2' =
           record_equation uenv t1' t2';
           add_gadt_equation uenv source destination
       | (Tconstr (path,[],_), _)
-<<<<<<< HEAD
+<<<<<<< oxcaml
         when is_instantiable (get_env uenv) ~for_jkind_eqn:false path
           && can_generate_equations uenv ->
-||||||| 23e84b8c4d
+||||||| upstream-base
         when is_instantiable (get_env uenv) path
         && can_generate_equations uenv ->
 =======
         when in_pattern_mode uenv && is_instantiable (get_env uenv) path ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           reify uenv t2';
           record_equation uenv t1' t2';
           add_gadt_equation uenv path t2'
       | (_, Tconstr (path,[],_))
-<<<<<<< HEAD
+<<<<<<< oxcaml
         when is_instantiable (get_env uenv) ~for_jkind_eqn:false path
           && can_generate_equations uenv ->
-||||||| 23e84b8c4d
+||||||| upstream-base
         when is_instantiable (get_env uenv) path
         && can_generate_equations uenv ->
 =======
         when in_pattern_mode uenv && is_instantiable (get_env uenv) path ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           reify uenv t1';
           record_equation uenv t1' t2';
           add_gadt_equation uenv path t1'
@@ -4931,7 +4931,7 @@ and unify3 uenv t1 t1' t2 t2' =
       | (Tpoly (t1, tl1), Tpoly (t2, tl2)) ->
           enter_poly_for Unify (get_env uenv) t1 tl1 t2 tl2
             (unify uenv)
-<<<<<<< HEAD
+<<<<<<< oxcaml
       | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2)) ->
           (* For layout-polymorphic types, establish correspondence between
              sort variables positionally, then unify the bodies. *)
@@ -4949,7 +4949,7 @@ and unify3 uenv t1 t1' t2 t2' =
             List.iter (fun (_n, ty) -> reify uenv ty) (fl1 @ fl2);
             (* if !generate_equations then List.iter2 (mcomp !env) tl1 tl2 *)
           end
-||||||| 23e84b8c4d
+||||||| upstream-base
       | (Tpackage (p1, fl1), Tpackage (p2, fl2)) ->
           begin try
             unify_package (get_env uenv) (unify_list uenv)
@@ -4962,7 +4962,7 @@ and unify3 uenv t1 t1' t2 t2' =
 =======
       | (Tpackage pack1, Tpackage pack2) ->
           unify_package uenv (get_level t1) pack1 (get_level t2) pack2
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       | (Tnil,  Tconstr _ ) ->
           raise_for Unify (Obj (Abstract_row Second))
       | (Tconstr _,  Tnil ) ->
@@ -5018,7 +5018,7 @@ and unify_list env tl1 tl2 =
   List.iter2 (unify env) tl1 tl2
 
 and unify_labeled_list env labeled_tl1 labeled_tl2 =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   if not (Int.equal (List.length labeled_tl1) (List.length labeled_tl2)) then
     raise_unexplained_for Unify;
   List.iter2
@@ -5027,7 +5027,7 @@ and unify_labeled_list env labeled_tl1 labeled_tl2 =
         raise_unexplained_for Unify;
       unify env ty1 ty2)
     labeled_tl1 labeled_tl2
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   if 0 <> List.compare_lengths labeled_tl1 labeled_tl2 then
     raise_unexplained_for Unify;
@@ -5055,7 +5055,7 @@ and unify_package uenv lvl1 pack1 lvl2 pack2 =
     List.iter (fun (_n, ty) -> reify uenv ty)
         (pack1.pack_cstrs @ pack2.pack_cstrs);
     (* if !generate_equations then List.iter2 (mcomp !env) tl1 tl2 *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Build a fresh row variable for unification *)
 and make_rowvar level use1 rest1 use2 rest2  =
@@ -5340,15 +5340,15 @@ let unify uenv ty1 ty2 =
       undo_compress snap;
       raise (Unify (expand_to_unification_error (get_env uenv) trace))
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let unify_gadt (penv : Pattern_env.t) ty1 ty2 =
   Misc.protect_refs [R (univar_pairs, [])] begin fun () ->
-||||||| 23e84b8c4d
+||||||| upstream-base
 let unify_gadt (penv : Pattern_env.t) ty1 ty2 =
   univar_pairs := [];
 =======
 let unify_gadt (penv : Pattern_env.t) ~pat:ty1 ~expected:ty2 =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let equated_types = TypePairs.create 0 in
   let do_unify_gadt () =
     let uenv = Pattern
@@ -5360,11 +5360,11 @@ let unify_gadt (penv : Pattern_env.t) ~pat:ty1 ~expected:ty2 =
     unify uenv ty1 ty2;
     equated_types
   in
-<<<<<<< HEAD
+<<<<<<< oxcaml
   unify uenv ty1 ty2;
   equated_types
   end
-||||||| 23e84b8c4d
+||||||| upstream-base
   unify uenv ty1 ty2;
   equated_types
 =======
@@ -5380,7 +5380,7 @@ let unify_gadt (penv : Pattern_env.t) ~pat:ty1 ~expected:ty2 =
     (* If it fails, retry in pattern mode *)
     Btype.backtrack snap;
     with_univar_pairs [] do_unify_gadt
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let unify_var uenv t1 t2 =
   if eq_type t1 t2 then () else
@@ -5413,18 +5413,18 @@ let unify_var env ty1 ty2 =
   unify_var (Expression {env; in_subst = false}) ty1 ty2
 
 let unify_pairs env ty1 ty2 pairs =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   Misc.protect_refs [R (univar_pairs, pairs)] begin fun () ->
   univar_pairs := pairs;
   unify (Expression {env; in_subst = false}) ty1 ty2
   end
-||||||| 23e84b8c4d
+||||||| upstream-base
   univar_pairs := pairs;
   unify (Expression {env; in_subst = false}) ty1 ty2
 =======
   with_univar_pairs pairs (fun () ->
     unify (Expression {env; in_subst = false}) ty1 ty2)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let unify env ty1 ty2 =
   unify_pairs env ty1 ty2 []
@@ -5915,7 +5915,7 @@ let close_class_signature env sign =
 
 let generalize_class_signature_spine sign =
   (* Generalize the spine of methods *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let meths = sign.csig_meths in
   Meths.iter (fun _ (_, _, ty) -> generalize_spine ty) meths;
   let new_meths =
@@ -5929,7 +5929,7 @@ let generalize_class_signature_spine sign =
        unify_var env (newvar (Jkind.Builtin.value ~why:Object)) ty)
     meths;
   sign.csig_meths <- new_meths
-||||||| 23e84b8c4d
+||||||| upstream-base
   let meths = sign.csig_meths in
   Meths.iter (fun _ (_, _, ty) -> generalize_spine ty) meths;
   let new_meths =
@@ -5946,7 +5946,7 @@ let generalize_class_signature_spine sign =
   sign.csig_meths <-
     Meths.map (fun (priv, virt, ty) -> priv, virt, copy_spine ty)
       sign.csig_meths
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
                         (***********************************)
                         (*  Matching between type schemes  *)
@@ -5964,9 +5964,9 @@ let moregen_occur env level ty =
     let rec occur ty =
       let lv = get_level ty in
       if lv <= level then () else
-<<<<<<< HEAD
+<<<<<<< oxcaml
       if is_Tvar ty && lv >= generic_level - 1 then raise Occur else
-||||||| 23e84b8c4d
+||||||| upstream-base
   let rec occur ty =
     let lv = get_level ty in
     if lv <= level then () else
@@ -5979,7 +5979,7 @@ let moregen_occur env level ty =
     unmark_type ty; raise_unexplained_for Moregen
 =======
       if is_Tvar ty && lv >= subject_level then raise Occur else
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       if try_mark_node mark ty then iter_type_expr occur ty
     in
     try
@@ -6172,7 +6172,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               instantiating [t2], which we do not wish to do *)
               check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
               link_type t1' t2
-<<<<<<< HEAD
+<<<<<<< oxcaml
           | (Tarrow ((l1,a1,r1), t1, u1, _),
              Tarrow ((l2,a2,r2), t2, u2, _)) when
                (l1 = l2
@@ -6192,7 +6192,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tunboxed_tuple labeled_tl1, Tunboxed_tuple labeled_tl2) ->
               moregen_labeled_list inst_nongen variance type_pairs env
                 labeled_tl1 labeled_tl2
-||||||| 23e84b8c4d
+||||||| upstream-base
           | (Tarrow (l1, t1, u1, _), Tarrow (l2, t2, u2, _)) when l1 = l2
             || !Clflags.classic && not (is_optional l1 || is_optional l2) ->
               moregen inst_nongen type_pairs env t1 t2;
@@ -6206,9 +6206,9 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               moregen inst_nongen type_pairs env u1 u2
           | (Ttuple tl1, Ttuple tl2) ->
               moregen_labeled_list inst_nongen type_pairs env tl1 tl2
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           | (Tconstr (p1, tl1, _), Tconstr (p2, tl2, _))
-<<<<<<< HEAD
+<<<<<<< oxcaml
                 when Path.same p1 p2 -> begin
               match variance with
               | Invariant | Bivariant ->
@@ -6227,7 +6227,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
                   (get_level t1') p1 fl1 (get_level t2') p2 fl2
               with Not_found -> raise_unexplained_for Moregen
               end
-||||||| 23e84b8c4d
+||||||| upstream-base
                 when Path.same p1 p2 ->
               moregen_list inst_nongen type_pairs env tl1 tl2
           | (Tpackage (p1, fl1), Tpackage (p2, fl2)) ->
@@ -6242,7 +6242,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tpackage pack1, Tpackage pack2) ->
               moregen_package inst_nongen type_pairs env (get_level t1') pack1
                 (get_level t2') pack2
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           | (Tnil,  Tconstr _ ) -> raise_for Moregen (Obj (Abstract_row Second))
           | (Tconstr _,  Tnil ) -> raise_for Moregen (Obj (Abstract_row First))
           | (Tvariant row1, Tvariant row2) ->
@@ -6257,7 +6257,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tpoly (t1, []), Tpoly (t2, [])) ->
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tpoly (t1, tl1), Tpoly (t2, tl2)) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
               enter_poly_for Moregen env univar_pairs t1 tl1 t2 tl2
                 (moregen inst_nongen variance type_pairs env)
           | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2)) ->
@@ -6281,7 +6281,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tsplice t1, _) ->
               let t2 = newty2 ~level:(get_level t2) (Tquote t2) in
               moregen inst_nongen variance type_pairs env t1 t2
-||||||| 23e84b8c4d
+||||||| upstream-base
               enter_poly_for Moregen env univar_pairs t1 tl1 t2 tl2
                 (moregen inst_nongen type_pairs env)
           | (Tunivar _, Tunivar _) ->
@@ -6291,7 +6291,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
                 (moregen inst_nongen type_pairs env)
           | (Tunivar _, Tunivar _) ->
               unify_univar_for Moregen t1' t2' !univar_pairs
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           | (_, _) ->
               raise_unexplained_for Moregen
         end
@@ -6304,7 +6304,7 @@ and moregen_list inst_nongen variance type_pairs env tl1 tl2 =
     raise_unexplained_for Moregen;
   List.iter2 (moregen inst_nongen variance type_pairs env) tl1 tl2
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 and moregen_labeled_list inst_nongen variance type_pairs env labeled_tl1
     labeled_tl2 =
   if not (Int.equal (List.length labeled_tl1) (List.length labeled_tl2)) then
@@ -6326,7 +6326,7 @@ and moregen_param_list inst_nongen variance type_pairs env vl tl1 tl2 =
   | _, _, _ -> raise_unexplained_for Moregen
 
 and moregen_fields inst_nongen variance type_pairs env ty1 ty2 =
-||||||| 23e84b8c4d
+||||||| upstream-base
 and moregen_fields inst_nongen type_pairs env ty1 ty2 =
 =======
 and moregen_labeled_list inst_nongen type_pairs env labeled_tl1
@@ -6350,7 +6350,7 @@ and moregen_package inst_nongen type_pairs env lvl1 pack1 lvl2 pack2 =
   | exception Not_found -> raise_unexplained_for Moregen
 
 and moregen_fields inst_nongen type_pairs env ty1 ty2 =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let (fields1, rest1) = flatten_fields ty1
   and (fields2, rest2) = flatten_fields ty2 in
   let (pairs, miss1, miss2) = associate_fields fields1 fields2 in
@@ -6495,8 +6495,8 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
     (* Undo [link_type] if we failed *)
     set_type_desc rm1 md1; raise exn
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 (* Must empty univar_pairs first *)
 let moregen inst_nongen type_pairs env patt subj =
   univar_pairs := [];
@@ -6508,7 +6508,7 @@ let moregen inst_nongen type_pairs env patt subj =
   with_univar_pairs [] (fun () ->
     moregen inst_nongen type_pairs env patt subj)
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (*
    Non-generic variable can be instantiated only if [inst_nongen] is
    true. So, [inst_nongen] should be set to false if the subject might
@@ -6518,7 +6518,7 @@ let moregen inst_nongen type_pairs env patt subj =
    is unimportant.  So, no need to propagate abbreviations.
 *)
 let moregeneral env inst_nongen pat_sch subj_sch =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let old_level = !current_level in
   current_level := generic_level - 1;
   (*
@@ -6552,7 +6552,7 @@ let moregeneral env inst_nongen pat_sch subj_sch =
          generalize subj_inst;
          raise (Moregen (expand_to_moregen_error env trace)))
     ~always:(fun () -> current_level := old_level)
-||||||| 23e84b8c4d
+||||||| upstream-base
   let old_level = !current_level in
   current_level := generic_level - 1;
   (*
@@ -6616,7 +6616,7 @@ let moregeneral env inst_nongen pat_sch subj_sch =
     | Ok () -> ()
     | Error trace -> raise (Moregen (expand_to_moregen_error env trace))
   end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let is_moregeneral env inst_nongen pat_sch subj_sch =
   match moregeneral env inst_nongen pat_sch subj_sch with
@@ -6670,11 +6670,11 @@ let rec rigidify_rec mark vars ty =
         iter_type_expr (rigidify_rec mark vars) ty
     end
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 type var = { name : string option
            ; original_jkind : jkind_lr
            ; ty : type_expr }
-||||||| 23e84b8c4d
+||||||| upstream-base
 let rigidify ty =
   let vars = ref TypeSet.empty in
   rigidify_rec vars ty;
@@ -6685,7 +6685,7 @@ let rigidify ty =
   let vars = ref TypeSet.empty in
   with_type_mark (fun mark -> rigidify_rec mark vars ty);
   TypeSet.elements !vars
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 type t = var list
 
@@ -6783,7 +6783,7 @@ let eqtype_subst type_pairs subst t1 k1 t2 k2 ~do_jkind_check =
     TypePairs.add type_pairs (t1, t2)
   end
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* Curious about [do_jkind_check]? See Note [Contravariance of type parameter
    jkinds] in Includecore. It applies only to the outermost types; the jkinds of
    types further down in the tree are unrelated to the jkinds further out, so we
@@ -6797,7 +6797,7 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
      first ['a] and ['b] would be identified in [eqtype_subst], and then
      the second ['a] and ['a] would be [eq_type]. So we do not call [eq_type]
      here.
-||||||| 23e84b8c4d
+||||||| upstream-base
 let rec eqtype rename type_pairs subst env t1 t2 =
   if eq_type t1 t2 then () else
 =======
@@ -6809,14 +6809,14 @@ let rec eqtype rename type_pairs subst env t1 t2 =
      true would be incorrect: imagine comparing ['a * 'a] with ['b * 'a]. The
      first ['a] and ['b] would be identified in [eqtype_subst], and then the
      second ['a] and ['a] would be [eq_type]. So we do not call [eq_type] here.
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
      On the other hand, when [rename] is false we need to check for phyiscal
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
      On the other hand, when [rename] is false we need to check for physical
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
      equality, as that's the only way variables can be identified.
   *)
   if check_phys_eq t1 t2 then () else
@@ -6837,7 +6837,7 @@ let rec eqtype rename type_pairs subst env t1 t2 =
         if not (TypePairs.mem type_pairs (t1', t2')) then begin
           TypePairs.add type_pairs (t1', t2');
           match (get_desc t1', get_desc t2') with
-<<<<<<< HEAD
+<<<<<<< oxcaml
             (Tvar { jkind = k1 }, Tvar { jkind = k2 }) when rename ->
               eqtype_subst type_pairs subst t1' k1 t2' k2 ~do_jkind_check
           | (Tarrow ((l1,a1,r1), t1, u1, _),
@@ -6854,7 +6854,7 @@ let rec eqtype rename type_pairs subst env t1 t2 =
           | (Tunboxed_tuple labeled_tl1, Tunboxed_tuple labeled_tl2) ->
               eqtype_labeled_list rename type_pairs subst env labeled_tl1
                 labeled_tl2
-||||||| 23e84b8c4d
+||||||| upstream-base
             (Tvar _, Tvar _) when rename ->
               eqtype_subst type_pairs subst t1' t2'
           | (Tarrow (l1, t1, u1, _), Tarrow (l2, t2, u2, _)) when l1 = l2
@@ -6872,11 +6872,11 @@ let rec eqtype rename type_pairs subst env t1 t2 =
               eqtype rename type_pairs subst env u1 u2
           | (Ttuple tl1, Ttuple tl2) ->
               eqtype_labeled_list rename type_pairs subst env tl1 tl2
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           | (Tconstr (p1, tl1, _), Tconstr (p2, tl2, _))
                 when Path.same p1 p2 ->
               eqtype_list_same_length rename type_pairs subst env tl1 tl2
-<<<<<<< HEAD
+<<<<<<< oxcaml
                 ~do_jkind_check:true
           | (Tpackage (p1, fl1), Tpackage (p2, fl2)) ->
               begin try
@@ -6885,7 +6885,7 @@ let rec eqtype rename type_pairs subst env t1 t2 =
                   (get_level t1') p1 fl1 (get_level t2') p2 fl2
               with Not_found -> raise_unexplained_for Equality
               end
-||||||| 23e84b8c4d
+||||||| upstream-base
               eqtype_list rename type_pairs subst env tl1 tl2
           | (Tpackage (p1, fl1), Tpackage (p2, fl2)) ->
               begin try
@@ -6897,7 +6897,7 @@ let rec eqtype rename type_pairs subst env t1 t2 =
           | (Tpackage pack1, Tpackage pack2) ->
               eqtype_package rename type_pairs subst env
                 (get_level t1') pack1 (get_level t2') pack2
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           | (Tnil,  Tconstr _ ) ->
               raise_for Equality (Obj (Abstract_row Second))
           | (Tconstr _,  Tnil ) ->
@@ -6914,7 +6914,7 @@ let rec eqtype rename type_pairs subst env t1 t2 =
           | (Tpoly (t1, []), Tpoly (t2, [])) ->
               eqtype rename type_pairs subst env t1 t2 ~do_jkind_check
           | (Tpoly (t1, tl1), Tpoly (t2, tl2)) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
               enter_poly_for Equality env univar_pairs t1 tl1 t2 tl2
                 (eqtype rename type_pairs subst env ~do_jkind_check)
           | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2)) ->
@@ -6932,7 +6932,7 @@ let rec eqtype rename type_pairs subst env t1 t2 =
               eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (Tsplice t1, Tsplice t2) ->
               eqtype rename type_pairs subst env ~do_jkind_check t1 t2
-||||||| 23e84b8c4d
+||||||| upstream-base
               enter_poly_for Equality env univar_pairs t1 tl1 t2 tl2
                 (eqtype rename type_pairs subst env)
           | (Tunivar _, Tunivar _) ->
@@ -6942,30 +6942,30 @@ let rec eqtype rename type_pairs subst env t1 t2 =
                 (eqtype rename type_pairs subst env)
           | (Tunivar _, Tunivar _) ->
               unify_univar_for Equality t1' t2' !univar_pairs
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           | (_, _) ->
               raise_unexplained_for Equality
         end
   with Equality_trace trace ->
     raise_trace_for Equality (Diff {got = t1; expected = t2} :: trace)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 and eqtype_list_same_length
       rename type_pairs subst env tl1 tl2 ~do_jkind_check =
   List.iter2 (eqtype rename type_pairs subst env ~do_jkind_check) tl1 tl2
 
 and eqtype_list rename type_pairs subst env tl1 tl2 ~do_jkind_check =
-||||||| 23e84b8c4d
+||||||| upstream-base
 and eqtype_list rename type_pairs subst env tl1 tl2 =
 =======
 and eqtype_list_same_length rename type_pairs subst env tl1 tl2 =
   List.iter2 (eqtype rename type_pairs subst env) tl1 tl2
 
 and eqtype_list rename type_pairs subst env tl1 tl2 =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   if List.length tl1 <> List.length tl2 then
     raise_unexplained_for Equality;
-<<<<<<< HEAD
+<<<<<<< oxcaml
   eqtype_list_same_length rename type_pairs subst env tl1 tl2 ~do_jkind_check
 
 and eqtype_labeled_list rename type_pairs subst env labeled_tl1 labeled_tl2 =
@@ -6977,7 +6977,7 @@ and eqtype_labeled_list rename type_pairs subst env labeled_tl1 labeled_tl2 =
         raise_unexplained_for Equality;
       eqtype rename type_pairs subst env ty1 ty2 ~do_jkind_check:true)
     labeled_tl1 labeled_tl2
-||||||| 23e84b8c4d
+||||||| upstream-base
   List.iter2 (eqtype rename type_pairs subst env) tl1 tl2
 =======
   eqtype_list_same_length rename type_pairs subst env tl1 tl2
@@ -7000,7 +7000,7 @@ and eqtype_package rename type_pairs subst env lvl1 pack1 lvl2 pack2 =
   | Ok () -> ()
   | Error fme -> raise_for Equality (First_class_module fme)
   | exception Not_found -> raise_unexplained_for Equality
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 and eqtype_fields rename type_pairs subst env ty1 ty2 =
   let (fields1, rest1) = flatten_fields ty1 in
@@ -7129,7 +7129,7 @@ and eqtype_alloc_mode m1 m2 =
   unify_alloc_mode_for Equality m1 m2
 
 (* Must empty univar_pairs first *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let eqtype_list_same_length
       rename type_pairs subst env tl1 tl2 ~do_jkind_check =
   Misc.protect_refs [R (univar_pairs, [])] begin fun () ->
@@ -7139,7 +7139,7 @@ let eqtype_list_same_length
     (fun () -> eqtype_list_same_length rename type_pairs subst env
          tl1 tl2 ~do_jkind_check)
   end
-||||||| 23e84b8c4d
+||||||| upstream-base
 let eqtype_list rename type_pairs subst env tl1 tl2 =
   univar_pairs := [];
   let snap = Btype.snapshot () in
@@ -7153,37 +7153,37 @@ let eqtype_list_same_length rename type_pairs subst env tl1 tl2 =
     Misc.try_finally
       ~always:(fun () -> backtrack snap)
       (fun () -> eqtype_list_same_length rename type_pairs subst env tl1 tl2))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let eqtype rename type_pairs subst env t1 t2 =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   eqtype_list ~do_jkind_check:true rename type_pairs subst env [t1] [t2]
-||||||| 23e84b8c4d
+||||||| upstream-base
   eqtype_list rename type_pairs subst env [t1] [t2]
 =======
   eqtype_list_same_length rename type_pairs subst env [t1] [t2]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Two modes: with or without renaming of variables *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let equal ?(do_jkind_check = true) env rename tyl1 tyl2 =
-||||||| 23e84b8c4d
+||||||| upstream-base
 let equal env rename tyl1 tyl2 =
 =======
 let equal env rename tyl1 tyl2 =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   if List.length tyl1 <> List.length tyl2 then
     raise_unexplained_for Equality;
   if List.for_all2 eq_type tyl1 tyl2 then () else
   let subst = ref [] in
-<<<<<<< HEAD
+<<<<<<< oxcaml
   try eqtype_list_same_length ~do_jkind_check rename (TypePairs.create 11)
         subst env tyl1 tyl2
-||||||| 23e84b8c4d
+||||||| upstream-base
   try eqtype_list rename (TypePairs.create 11) subst env tyl1 tyl2
 =======
   try eqtype_list_same_length rename (TypePairs.create 11) subst env tyl1 tyl2
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   with Equality_trace trace ->
     raise (Equality (expand_to_equality_error env trace !subst))
 
@@ -7348,7 +7348,7 @@ let match_class_types ?(trace=true) env pat_sch subj_sch =
   let errors = match_class_sig_shape ~strict:false sign1 sign2 in
   match errors with
   | [] ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       let old_level = !current_level in
       current_level := generic_level - 1;
       (*
@@ -7391,7 +7391,7 @@ let match_class_types ?(trace=true) env pat_sch subj_sch =
       in
       current_level := old_level;
       res
-||||||| 23e84b8c4d
+||||||| upstream-base
       let old_level = !current_level in
       current_level := generic_level - 1;
       (*
@@ -7477,7 +7477,7 @@ let match_class_types ?(trace=true) env pat_sch subj_sch =
           with Failure res -> res
         end
       end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | errors ->
       CM_Class_type_mismatch (env, pat_sch, subj_sch) :: errors
 
@@ -7646,7 +7646,7 @@ let rec build_subtype env (visited : transient_expr list)
       let visited = tt :: visited in
       let (t1', c1) = build_subtype env visited loops (not posi) level t1 in
       let (t2', c2) = build_subtype env visited loops posi level t2 in
-<<<<<<< HEAD
+<<<<<<< oxcaml
       let (a', c3) =
         if level > 2 then begin
           (* If posi, then t1' >= t1, and we pick t1; otherwise we pick t1'. In
@@ -7663,7 +7663,7 @@ let rec build_subtype env (visited : transient_expr list)
             build_submode_neg a
           end
         end else a, Unchanged
-||||||| 23e84b8c4d
+||||||| upstream-base
       let c = max_change c1 c2 in
       if c > Unchanged
       then (newty (Tarrow(l, t1', t2', commu_ok)), c)
@@ -7686,23 +7686,23 @@ let rec build_subtype env (visited : transient_expr list)
       let labels, tlist = List.split labeled_tlist in
       let tlist' =
         List.map (build_subtype env visited loops posi level) tlist
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       in
-<<<<<<< HEAD
+<<<<<<< oxcaml
       let (r', c4) =
         if level > 2 then build_submode posi r else r, Unchanged
       in
       let c = max_change c1 (max_change c2 (max_change c3 c4)) in
       if c > Unchanged
       then (newty (Tarrow((l,a',r'), t1', t2', commu_ok)), c)
-||||||| 23e84b8c4d
+||||||| upstream-base
       let c = collect tlist' in
       if c > Unchanged then (newty (Ttuple (List.map fst tlist')), c)
 =======
       let c = collect tlist' in
       if c > Unchanged then
         (newty (Ttuple (List.combine labels (List.map fst tlist'))), c)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       else (t, Unchanged)
   | Ttuple labeled_tlist ->
       build_subtype_tuple env visited loops posi level t labeled_tlist
@@ -7733,21 +7733,21 @@ let rec build_subtype env (visited : transient_expr list)
              as this occurrence might break the occur check.
              XXX not clear whether this correct anyway... *)
           if deep_occur_list ty tl1 then raise Not_found;
-<<<<<<< HEAD
+<<<<<<< oxcaml
           set_type_desc ty
             (Tvar { name = None;
                     jkind = Jkind.Builtin.value
                                ~why:(Unknown "build subtype 1")});
           let t'' = newvar (Jkind.Builtin.value ~why:(Unknown "build subtype 2"))
           in
-||||||| 23e84b8c4d
+||||||| upstream-base
           if List.exists (deep_occur ty) tl1 then raise Not_found;
           set_type_desc ty (Tvar None);
           let t'' = newvar () in
 =======
           set_type_desc ty (Tvar None);
           let t'' = newvar () in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           let loops = (get_id ty, t'') :: loops in
           (* May discard [visited] as level is going down *)
           let (ty1', c) =
@@ -7932,17 +7932,17 @@ let rec subtype_rec env trace t1 t2 cstrs =
     match (get_desc t1, get_desc t2) with
       (Tvar _, _) | (_, Tvar _) ->
         (trace, t1, t2, !univar_pairs)::cstrs
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | (Tarrow((l1,a1,r1), t1, u1, _),
        Tarrow((l2,a2,r2), t2, u2, _)) when l1 = l2
       || !Clflags.classic && equivalent_with_nolabels l1 l2 ->
-||||||| 23e84b8c4d
+||||||| upstream-base
     | (Tarrow(l1, t1, u1, _), Tarrow(l2, t2, u2, _)) when l1 = l2
       || !Clflags.classic && not (is_optional l1 || is_optional l2) ->
 =======
     | (Tarrow(l1, t1, u1, _), Tarrow(l2, t2, u2, _))
       when compatible_labels ~in_pattern_mode:false l1 l2 ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         let cstrs =
           subtype_rec
             env
@@ -7962,13 +7962,13 @@ let rec subtype_rec env trace t1 t2 cstrs =
           cstrs
     | (Ttuple tl1, Ttuple tl2) ->
         subtype_labeled_list env trace tl1 tl2 cstrs
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | (Tunboxed_tuple tl1, Tunboxed_tuple tl2) ->
         subtype_labeled_list env trace tl1 tl2 cstrs
-||||||| 23e84b8c4d
+||||||| upstream-base
         subtype_list env trace tl1 tl2 cstrs
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | (Tconstr(p1, [], _), Tconstr(p2, [], _)) when Path.same p1 p2 ->
         cstrs
     | (Tconstr(p1, _tl1, _abbrev1), _)
@@ -7986,15 +7986,15 @@ let rec subtype_rec env trace t1 t2 cstrs =
               if co then
                 if cn then
                   (trace, newty2 ~level:(get_level t1) (Ttuple[None, t1]),
-<<<<<<< HEAD
+<<<<<<< oxcaml
                    newty2 ~level:(get_level t2) (Ttuple[None, t2]), !univar_pairs)
-||||||| 23e84b8c4d
+||||||| upstream-base
                   (trace, newty2 ~level:(get_level t1) (Ttuple[t1]),
                    newty2 ~level:(get_level t2) (Ttuple[t2]), !univar_pairs)
 =======
                    newty2 ~level:(get_level t2) (Ttuple[None, t2]),
                    !univar_pairs)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                   :: cstrs
                 else
                   subtype_rec
@@ -8044,7 +8044,7 @@ let rec subtype_rec env trace t1 t2 cstrs =
         with Escape _ ->
           (trace, t1, t2, !univar_pairs)::cstrs
         end
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | (Trepr (u1, sort_vars1), Trepr (u2, sort_vars2)) ->
         (* For layout-polymorphic types, establish correspondence between
            sort variables positionally, then check subtype on the bodies. *)
@@ -8082,7 +8082,7 @@ let rec subtype_rec env trace t1 t2 cstrs =
          subtype_rec env trace t1 t2 cstrs
     | (Tsplice t1, Tsplice t2) ->
          subtype_rec env trace t1 t2 cstrs
-||||||| 23e84b8c4d
+||||||| upstream-base
     | (Tpackage (p1, fl1), Tpackage (p2, fl2)) ->
         begin try
           let ntl1 =
@@ -8112,20 +8112,20 @@ let rec subtype_rec env trace t1 t2 cstrs =
     | (Tpackage pack1, Tpackage pack2) ->
         subtype_package env trace (get_level t1) pack1
           (get_level t2) pack2 cstrs
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | (_, _) ->
         (trace, t1, t2, !univar_pairs)::cstrs
   end
 
 and subtype_labeled_list env trace labeled_tl1 labeled_tl2 cstrs =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   if not (Int.equal (List.length labeled_tl1) (List.length labeled_tl2)) then
-||||||| 23e84b8c4d
+||||||| upstream-base
 and subtype_list env trace tl1 tl2 cstrs =
   if List.length tl1 <> List.length tl2 then
 =======
   if 0 <> List.compare_lengths labeled_tl1 labeled_tl2 then
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     subtype_error ~env ~trace ~unification_trace:[];
   List.fold_left2
     (fun cstrs (label1, ty1) (label2, ty2) ->
@@ -8137,8 +8137,8 @@ and subtype_list env trace tl1 tl2 cstrs =
         ty1 ty2
         cstrs)
     cstrs labeled_tl1 labeled_tl2
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
     (fun cstrs t1 t2 ->
        subtype_rec
          env
@@ -8172,7 +8172,7 @@ and subtype_package env trace lvl1 pack1 lvl2 pack2 cstrs =
   with Not_found ->
     (trace, newty (Tpackage pack1), newty (Tpackage pack2), !univar_pairs)
       ::cstrs
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 and subtype_fields env trace ty1 ty2 cstrs =
   (* Assume that either rest1 or rest2 is not Tvar *)
@@ -8280,7 +8280,7 @@ and subtype_row env trace row1 row2 cstrs =
 
 let subtype env ty1 ty2 =
   TypePairs.clear subtypes;
-<<<<<<< HEAD
+<<<<<<< oxcaml
   Misc.protect_refs [R (univar_pairs, [])] begin fun () ->
   (* Build constraint set. *)
   let cstrs =
@@ -8295,7 +8295,7 @@ let subtype env ty1 ty2 =
            subtype_error ~env ~trace:trace0 ~unification_trace:(List.tl trace))
       (List.rev cstrs)
   end
-||||||| 23e84b8c4d
+||||||| upstream-base
   univar_pairs := [];
   (* Build constraint set. *)
   let cstrs =
@@ -8326,7 +8326,7 @@ let subtype env ty1 ty2 =
              ~trace:trace0
              ~unification_trace:(List.tl trace))
         (List.rev cstrs))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
                               (*******************)
                               (*  Miscellaneous  *)
@@ -8517,14 +8517,14 @@ let rec normalize_type_rec mark ty =
         begin match !nm with
         | None -> ()
         | Some (n, v :: l) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
             if deep_occur_list ty l then
-||||||| 23e84b8c4d
+||||||| upstream-base
             if deep_occur ty (newgenty (Ttuple l)) then
 =======
             if deep_occur_list ty l
             then
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
               (* The abbreviation may be hiding something, so remove it *)
               set_name nm None
             else

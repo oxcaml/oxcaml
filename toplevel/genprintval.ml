@@ -186,14 +186,14 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
     let exn_printer path ppf exn =
       Format_doc.fprintf ppf "<printer %a raised an exception: %s>"
-<<<<<<< HEAD
+<<<<<<< oxcaml
         Printtyp.path path
-||||||| 23e84b8c4d
+||||||| upstream-base
     let exn_printer ppf path exn =
       fprintf ppf "<printer %a raised an exception: %s>" Printtyp.path path
 =======
         Printtyp.Doc.path path
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         (Printexc.to_string exn)
 
     let out_exn path exn =
@@ -306,16 +306,16 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
     and tree_of_label =
       tree_of_qualified
-<<<<<<< HEAD
+<<<<<<< oxcaml
         (fun lid env ->
           (Env.find_label_by_name Legacy lid env).lbl_res)
-||||||| 23e84b8c4d
+||||||| upstream-base
         (fun lid env ->
           (Env.find_label_by_name lid env).lbl_res)
 =======
         (Env.lookup_all_labels ~use:false ~loc:Location.none Env.Construct)
         Data_types.lbl_res_type_path
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
     (* An abstract type *)
 
@@ -359,16 +359,16 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       let nested_values = ObjTbl.create 8 in
       let nest_gen err f depth obj ty =
         let repr = obj in
-<<<<<<< HEAD
+<<<<<<< oxcaml
         (* We can't store non-values in an [ObjTbl.t] when cycle-checking.
            As a result, non-values may be printed twice, but cycles will still
            be detected since every cycle contains at least one value. *)
         if not (is_value ty) || not (is_real_block repr) then
-||||||| 23e84b8c4d
+||||||| upstream-base
         if not (O.is_block repr) then
 =======
         if not (O.is_block repr) || (O.tag repr >= Obj.no_scan_tag) then
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           f depth obj ty
         else
           if ObjTbl.mem nested_values repr then
@@ -397,7 +397,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               Oval_stuff "<fun>"
           | Ttuple(labeled_tys) ->
               Oval_tuple (tree_of_labeled_val_list 0 depth obj labeled_tys)
-<<<<<<< HEAD
+<<<<<<< oxcaml
           | Tunboxed_tuple(labeled_tys) ->
               Oval_unboxed_tuple
                 (tree_of_labeled_val_list 0 depth obj labeled_tys)
@@ -501,7 +501,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
             when Path.same path Predef.path_code ->
             Oval_code (O.obj obj : CamlinternalQuote.Code.t)
 
-||||||| 23e84b8c4d
+||||||| upstream-base
           | Ttuple(ty_list) ->
               Oval_tuple (tree_of_val_list 0 depth obj ty_list)
           | Tconstr(path, [ty_arg], _)
@@ -614,7 +614,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                  Oval_lazy v
                end
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           | Tconstr(path, ty_list, _) -> begin
               match get_desc (Ctype.expand_head env ty) with
               | Tconstr(path, [ty_arg], _)
@@ -654,7 +654,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 | {type_kind = Type_abstract _; type_manifest = Some body;
                    type_params} ->
                     tree_of_val depth obj
-<<<<<<< HEAD
+<<<<<<< oxcaml
                       (instantiate_type env decl.type_params ty_list body)
                 | {type_kind = Type_variant (constr_list, rep, _)} ->
                   (* Here we work backwards from the actual runtime value to
@@ -792,7 +792,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                           env path decl.type_params ty_list
                           lbl_list pos obj
                     end
-||||||| 23e84b8c4d
+||||||| upstream-base
                       (instantiate_type env decl.type_params ty_list body)
                 | {type_kind = Type_variant (constr_list,rep)} ->
                     let unbx = (rep = Variant_unboxed) in
@@ -854,7 +854,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 | {type_kind = Type_record(lbl_list, rep); type_params} ->
                     tree_of_record depth path type_params ty_list obj
                       lbl_list rep
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                 | {type_kind = Type_open} ->
                     tree_of_extension path ty_list depth obj
             end
@@ -1084,16 +1084,16 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               (* PR#5722: print full module path only
                  for first record field *)
               let lid =
-<<<<<<< HEAD
+<<<<<<< oxcaml
                 if first then tree_of_label env path (Out_name.create name)
                 else Oide_ident (Out_name.create name)
-||||||| 23e84b8c4d
+||||||| upstream-base
                 if pos = 0 then tree_of_label env path (Out_name.create name)
                 else Oide_ident (Out_name.create name)
 =======
                 if pos = 0 then tree_of_label env path name
                 else tree_of_name name
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
               and v =
                 match print_sort ld_sort with
                 | Print_as msg -> Oval_stuff msg
@@ -1108,7 +1108,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         in
         Oval_record_unboxed_product (tree_of_fields (pos = 0) pos lbl_list)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
       and tree_of_labeled_val_list start depth obj labeled_tys =
         let rec tree_list i = function
           | [] -> []
@@ -1120,7 +1120,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       (* CR layouts v4: When we allow other jkinds in tuples, this should be
          generalized to take a list or array of jkinds, rather than just
          pairing each type with a bool indicating whether it is void *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
       and tree_of_polyvariant depth obj row =
         if O.is_block obj then
@@ -1156,7 +1156,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               (label, tree) :: tree_list (i + 1) labeled_tys in
       tree_list start labeled_tys
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       and tree_of_val_list start depth obj ty_list =
         let rec tree_list i = function
           | [] -> []
@@ -1291,14 +1291,14 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
             let printer ppf =
               Format_doc.fprintf ppf
                 "<internal error: incorrect arity for '%a'>"
-<<<<<<< HEAD
+<<<<<<< oxcaml
                 Printtyp.path path in
-||||||| 23e84b8c4d
+||||||| upstream-base
               fprintf ppf "<internal error: incorrect arity for '%a'>"
                 Printtyp.path path in
 =======
                 Printtyp.Doc.path path in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
             Oval_printer printer)
 
 

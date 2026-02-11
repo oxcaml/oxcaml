@@ -68,12 +68,12 @@ type cmt_infos = {
   cmt_uid_to_decl : item_declaration Shape.Uid.Tbl.t;
   cmt_impl_shape : Shape.t option; (* None for mli *)
   cmt_ident_occurrences :
-<<<<<<< HEAD
+<<<<<<< oxcaml
     (Longident.t Location.loc * Shape_reduce.result) array
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
     (Longident.t Location.loc * Shape_reduce.result) list
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 type error =
@@ -116,7 +116,7 @@ val get_saved_types : unit -> binary_part list
 val set_saved_types : binary_part list -> unit
 
 val record_declaration_dependency: dependency_kind * Uid.t * Uid.t -> unit
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
 val index_occurrences :
   binary_annots -> (Longident.t Location.loc * Shape_reduce.result) array
@@ -129,12 +129,12 @@ val iter_declarations
 (** Whether only the summary of the environment should be stored. This is based on
     whether the environment variable OCAML_BINANNOT_WITHENV is set *)
 val need_to_clear_env : bool
-||||||| 23e84b8c4d
+||||||| upstream-base
 val record_value_dependency:
   Types.value_description -> Types.value_description -> unit
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (*
 

@@ -38,12 +38,12 @@ module Global : sig
     | Glob_predef of predef
   val name: t -> string
   val description: t Format_doc.printer
-<<<<<<< HEAD
+<<<<<<< oxcaml
   val of_compilation_unit: Compilation_unit.t -> t
-||||||| 23e84b8c4d
+||||||| upstream-base
   val description: Format.formatter -> t -> unit
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   val of_ident: Ident.t -> t option
   module Set : Set.S with type elt = t
   module Map : Map.S with type key = t

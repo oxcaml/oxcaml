@@ -10,9 +10,9 @@ on:
     tags:
       - '*'
   pull_request:
-<<<<<<< HEAD
+<<<<<<< oxcaml
   merge_group:
-||||||| 23e84b8c4d
+||||||| upstream-base
 
 # Restrict the GITHUB_TOKEN
 permissions: {}
@@ -56,11 +56,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'pull_request' || github.sha }}
   cancel-in-progress: true
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 jobs:
   build:
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
     runs-on: 'ubuntu-latest'
     outputs:
       manual_changed: ${{ steps.manual.outputs.manual_changed }}
@@ -337,7 +337,7 @@ jobs:
             return skip_testsuite;
 
   others:
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     name: ${{ matrix.name }}
     needs: config
     runs-on: ${{ matrix.os }}
@@ -345,7 +345,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-<<<<<<< HEAD
+<<<<<<< oxcaml
         include:
           - name: runtime5 (x86_64-linux)
             config: --enable-runtime5
@@ -518,7 +518,7 @@ jobs:
       J: "8"
       run_testsuite: "true"
 
-||||||| 23e84b8c4d
+||||||| upstream-base
         include:
           - name: linux-O0
             os: ubuntu-latest
@@ -528,9 +528,9 @@ jobs:
 =======
         include: ${{ fromJSON(needs.config.outputs.jobs) }}
       fail-fast: true
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     steps:
-<<<<<<< HEAD
+<<<<<<< oxcaml
       - name: Checkout the OxCaml repo
         uses: actions/checkout@master
 
@@ -562,15 +562,15 @@ jobs:
 
       - name: Set up Opam
         uses: ocaml/setup-ocaml@v3
-||||||| 23e84b8c4d
+||||||| upstream-base
       - name: Checkout
         uses: actions/checkout@v3
 =======
       - name: Checkout
         uses: actions/checkout@v5
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         with:
-<<<<<<< HEAD
+<<<<<<< oxcaml
           ocaml-compiler: oxcaml-ci-deps.5.2.0-with-ocaml.5.4.0
           opam-repositories: |
             local: file://${{ github.workspace }}/tools/ci/local-opam
@@ -580,7 +580,7 @@ jobs:
 
       - name: Set up Opam environment
         # this command adds the opam environment to the PATH.
-||||||| 23e84b8c4d
+||||||| upstream-base
           persist-credentials: false
       - name: OS Dependencies
         if: runner.os == 'MacOS'
@@ -601,21 +601,21 @@ jobs:
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           lldb --version
       - name: configure tree
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         run: |
-<<<<<<< HEAD
+<<<<<<< oxcaml
           opam env --set-root --set-switch --shell=cmd | sed -n 's/^set //p' | tee -a "$GITHUB_ENV"
 
       - name: Disable any testcases
-||||||| 23e84b8c4d
+||||||| upstream-base
           CONFIG_ARG='${{ matrix.config_arg }}' MAKE_ARG=-j bash -xe tools/ci/actions/runner.sh configure
       - name: Build
 =======
           CONFIG_ARG='--enable-codegen-invariants ${{ matrix.config_arg }}' MAKE_ARG=-j bash -xe tools/ci/actions/runner.sh configure
       - name: Build
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         run: |
-<<<<<<< HEAD
+<<<<<<< oxcaml
           disable_testcases="${{matrix.disable_testcases}}"
           if [ -n "$disable_testcases" ]; then
             rm -fv $disable_testcases
@@ -623,7 +623,7 @@ jobs:
 
       - name: Install custom OxCaml LLVM
         if: matrix.oxcaml_llvm_tag != '' && runner.os == 'Linux'
-||||||| 23e84b8c4d
+||||||| upstream-base
           MAKE_ARG=-j bash -xe tools/ci/actions/runner.sh build
       - name: Run the testsuite
         if: ${{ matrix.name != 'linux-O0' }}
@@ -631,9 +631,9 @@ jobs:
           MAKE_ARG=-j bash -xe tools/ci/actions/runner.sh build
       - name: Run the testsuite
         if: ${{ matrix.name != 'linux-O0' && needs.config.outputs.skip-testsuite != 'true' }}
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         run: |
-<<<<<<< HEAD
+<<<<<<< oxcaml
           # Determine architecture
           if [[ "${{ runner.arch }}" == "X64" ]]; then
             ARCH="x86_64"
@@ -715,7 +715,7 @@ jobs:
             OCAMLPARAM="$ORIG_OCAMLPARAM"
             make install
           fi
-||||||| 23e84b8c4d
+||||||| upstream-base
           bash -c 'SHOW_TIMINGS=1 tools/ci/actions/runner.sh test'
       - name: Run the testsuite (linux-O0)
         if: ${{ matrix.name == 'linux-O0' }}
@@ -723,7 +723,7 @@ jobs:
           bash -c 'SHOW_TIMINGS=1 tools/ci/actions/runner.sh test'
       - name: Run the testsuite (linux-O0)
         if: ${{ matrix.name == 'linux-O0' && needs.config.outputs.skip-testsuite != 'true' }}
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         env:
           BUILD_OCAMLPARAM: ${{ matrix.build_ocamlparam }}
           OCAMLPARAM: ${{ matrix.ocamlparam }}
@@ -847,13 +847,13 @@ jobs:
               -validate -param AFFINITY:on -regalloc $allocator || exit 1; \
           done
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
       - name: Collect and push metrics
         if: matrix.collect_metrics == true && github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.METRICS_REPO_TOKEN }}
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-||||||| 23e84b8c4d
+||||||| upstream-base
   i386:
     runs-on: ubuntu-latest
     container:
@@ -870,9 +870,9 @@ jobs:
       options: --platform linux/i386 --user root
     steps:
       - name: OS Dependencies
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         run: |
-<<<<<<< HEAD
+<<<<<<< oxcaml
           # Checkout metrics repository
           gh repo clone oxcaml/oxcaml-metrics metrics-repo
 
@@ -935,7 +935,7 @@ jobs:
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
-||||||| 23e84b8c4d
+||||||| upstream-base
           apt-get update
           apt-get install -y git gcc make parallel
       - name: Checkout
@@ -968,4 +968,4 @@ concurrency:
         if: ${{ needs.config.outputs.skip-testsuite != 'true' }}
         run: |
           su ocaml -c "bash -xe tools/ci/actions/runner.sh test"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

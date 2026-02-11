@@ -23,9 +23,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-<<<<<<< HEAD
+<<<<<<< oxcaml
 extern value caml_ephe_none, caml_ephe_locked;
-||||||| 23e84b8c4d
+||||||| upstream-base
 extern value caml_ephe_none;
 =======
 
@@ -34,7 +34,7 @@ extern value caml_ephe_none, caml_ephe_locked;
 #ifdef __cplusplus
 }
 #endif
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 #ifdef CAML_INTERNALS
 
@@ -84,12 +84,12 @@ struct caml_ephe_info {
 
 value caml_ephe_await_key(value ephe, uintnat i);
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Caml_inline value ephe_key(value ephe, uintnat i)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 Caml_inline value Ephe_key(value ephe, uintnat i)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 {
   value v = atomic_load_acquire(Op_atomic_val(ephe) + i);
   if (v == caml_ephe_locked)

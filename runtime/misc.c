@@ -41,12 +41,12 @@ void caml_print_loc(const char_os *file_os, int line) {
   fprintf(stderr, "[%02d] file %s; line %d ### ",
           (Caml_state_opt != NULL) ? Caml_state_opt->id : -1, file, line);
   caml_stat_free(file);
-<<<<<<< HEAD
+<<<<<<< oxcaml
 #if Caml_has_builtin(__builtin_trap) || defined(__GNUC__)
   __builtin_trap();
 #endif
   abort();
-||||||| 23e84b8c4d
+||||||| upstream-base
   abort();
 =======
 }
@@ -64,7 +64,7 @@ CAMLnoret void caml_debug_abort(const char_os * file_os, int line) {
   fprintf(stderr, "Abort\n");
   fflush(stderr);
   caml_abort();
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 #endif
 
@@ -89,15 +89,15 @@ void caml_alloc_point_here(void)
 
 atomic_uintnat caml_verb_gc = 0;
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 static void print_log(const char* msg, int newline, va_list ap)
-||||||| 23e84b8c4d
+||||||| upstream-base
 void caml_gc_log (char *msg, ...)
 =======
 void caml_gc_log (const char *msg, ...)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   char buf[GC_LOG_LENGTH];
   int pos = 0;
   if (!(atomic_load_relaxed(&caml_verb_gc) & CAML_GC_MSG_NO_TIMESTAMP)) {
@@ -121,7 +121,7 @@ void caml_gc_log (const char *msg, ...)
     va_start (ap, msg);
     print_log(msg, 1, ap);
     va_end (ap);
-||||||| 23e84b8c4d
+||||||| upstream-base
   if ((atomic_load_relaxed(&caml_verb_gc) & 0x800) != 0) {
     char fmtbuf[GC_LOG_LENGTH];
     va_list args;
@@ -141,7 +141,7 @@ void caml_gc_log (const char *msg, ...)
     vfprintf(stderr, fmtbuf, args);
     va_end (args);
     fflush(stderr);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   }
 }
 

@@ -54,7 +54,7 @@ Caml_inline void st_msleep(st_timeout *timeout)
 #endif
 
 #include "st_pthreads.h"
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
 /* Signal handling */
 
@@ -120,7 +120,7 @@ value caml_wait_signal(value sigs)
   sync_check_error(retcode, "Thread.wait_signal");
   return Val_int(caml_rev_convert_signal_number(signo));
 }
-||||||| 23e84b8c4d
+||||||| upstream-base
 
 /* Signal handling */
 
@@ -190,4 +190,4 @@ value caml_wait_signal(value sigs)
 #endif
 }
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

@@ -78,12 +78,12 @@ module BLAKE2 (X: sig val hash_length : int end) : sig @@ portable include S end
 
   type state
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   external create_gen: int -> string -> state @@ portable = "caml_blake2_create"
   external update: state -> string -> int -> int -> unit @@ portable = "caml_blake2_update"
   external final: state -> int -> t @@ portable = "caml_blake2_final"
   external unsafe_string: int -> string -> string -> int -> int -> t @@ portable
-||||||| 23e84b8c4d
+||||||| upstream-base
   external create_gen: int -> string -> state = "caml_blake2_create"
   external update: state -> string -> int -> int -> unit = "caml_blake2_update"
   external final: state -> int -> t = "caml_blake2_final"
@@ -93,7 +93,7 @@ module BLAKE2 (X: sig val hash_length : int end) : sig @@ portable include S end
   external update: state -> bytes -> int -> int -> unit = "caml_blake2_update"
   external final: state -> int -> t = "caml_blake2_final"
   external unsafe_string: int -> string -> string -> int -> int -> t
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                         = "caml_blake2_string"
   external unsafe_bytes: int -> string -> bytes -> int -> int -> t
                         = "caml_blake2_bytes"
@@ -173,17 +173,17 @@ module MD5 = struct
   let compare = String.compare
   let equal = String.equal
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   external unsafe_string: string -> int -> int -> t @@ portable = "caml_md5_string"
   external channel: in_channel -> int -> t @@ portable = "caml_md5_chan"
-||||||| 23e84b8c4d
+||||||| upstream-base
   external unsafe_string: string -> int -> int -> t = "caml_md5_string"
   external channel: in_channel -> int -> t = "caml_md5_chan"
 =======
   external unsafe_string: string -> int -> int -> t = "caml_md5_string"
   external unsafe_bytes: bytes -> int -> int -> t = "caml_md5_bytes"
   external channel: in_channel -> int -> t = "caml_md5_chan"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   let string str =
     unsafe_string str 0 (String.length str)

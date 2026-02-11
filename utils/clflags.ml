@@ -128,13 +128,13 @@ let locs = ref true                     (* -locs *)
 let directory = ref None                (* -directory *)
 let annotations = ref false             (* -annot *)
 let binary_annotations = ref false      (* -bin-annot *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let binary_annotations_cms = ref false  (* -bin-annot-cms *)
 let shape_format =                      (* -shape-format *)
   ref (if Config.oxcaml_dwarf then Debugging_shapes else Old_merlin)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let store_occurrences = ref false       (* -bin-annot-occurrences *)
 and use_threads = ref false             (* -thread *)
 and noassert = ref false                (* -noassert *)
@@ -175,12 +175,12 @@ let dump_source = ref false             (* -dsource *)
 let dump_parsetree = ref false          (* -dparsetree *)
 and dump_typedtree = ref false          (* -dtypedtree *)
 and dump_shape = ref false              (* -dshape *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
 and dump_slambda = ref false            (* -dslambda *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 and dump_matchcomp = ref false          (* -dmatchcomp *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 and dump_rawlambda = ref false          (* -drawlambda *)
 and dump_lambda = ref false             (* -dlambda *)
 and dump_blambda = ref false             (* -dblambda *)
@@ -202,16 +202,16 @@ let optimize_for_speed = ref true       (* -compact *)
 and opaque = ref false                  (* -opaque *)
 
 and dump_cmm = ref false                (* -dcmm *)
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 let dump_selection = ref false          (* -dsel *)
 =======
 let dump_selection = ref false          (* -dsel *)
 let dump_combine = ref false            (* -dcombine *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let dump_cse = ref false                (* -dcse *)
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 let dump_live = ref false               (* -dlive *)
 let dump_spill = ref false              (* -dspill *)
 let dump_split = ref false              (* -dsplit *)
@@ -230,10 +230,10 @@ let dump_interval = ref false           (* -dinterval *)
 let dump_regalloc = ref false           (* -dalloc *)
 let dump_reload = ref false             (* -dreload *)
 let dump_scheduling = ref false         (* -dscheduling *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let dump_linear = ref false             (* -dlinear *)
 let keep_startup_file = ref false       (* -dstartup *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let debug_ocaml = ref false             (* -debug-ocaml *)
 let llvm_backend = ref false            (* -llvm-backend *)
 let default_timings_precision  = 3
@@ -254,12 +254,12 @@ let set_profile_granularity v =
   match List.assoc_opt v profile_granularity_level_mapping with
   | Some granularity -> profile_granularity := granularity
   | None -> raise (Invalid_argument (Format.sprintf "profile granularity: %s" v))
-||||||| 23e84b8c4d
+||||||| upstream-base
 let dump_combine = ref false            (* -dcombine *)
 let profile_columns : Profile.column list ref = ref [] (* -dprofile/-dtimings *)
 =======
 let profile_columns : Profile.column list ref = ref [] (* -dprofile/-dtimings *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let native_code = ref false             (* set to true under ocamlopt *)
 let jsir = ref false                    (* set to true under ocamlj *)

@@ -171,17 +171,17 @@ void caml_build_primitive_table(char_os * lib_path,
                                 char_os * libs,
                                 char * req_prims)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   char_os * p;
   char * q;
 
-||||||| 23e84b8c4d
+||||||| upstream-base
   char_os * tofree1, * tofree2;
   char_os * p;
   char * q;
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   /* Initialize the search path for dynamic libraries:
      - directories specified on the command line with the -I option
      - directories specified in the CAML_LD_LIBRARY_PATH
@@ -205,9 +205,9 @@ void caml_build_primitive_table(char_os * lib_path,
   caml_ext_table_init(&caml_prim_table, 0x180);
   caml_ext_table_init(&caml_prim_name_table, 0x180);
   if (req_prims != NULL)
-<<<<<<< HEAD
+<<<<<<< oxcaml
     for (q = req_prims; *q != 0; q += strlen(q) + 1) {
-||||||| 23e84b8c4d
+||||||| upstream-base
 #endif
   for (q = req_prims; *q != 0; q += strlen(q) + 1) {
     c_primitive prim = lookup_primitive(q);
@@ -224,7 +224,7 @@ void caml_build_primitive_table(char_os * lib_path,
   caml_ext_table_free(&caml_shared_libs_path, 0);
 =======
     for (char *q = req_prims; *q != 0; q += strlen(q) + 1) {
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       c_primitive prim = lookup_primitive(q);
       if (prim == NULL)
             caml_fatal_error("unknown C primitive `%s'", q);
@@ -238,11 +238,11 @@ void caml_build_primitive_table(char_os * lib_path,
 
 void caml_build_primitive_table_builtin(void)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   int i;
   caml_build_primitive_table(NULL, NULL, NULL);
   for (i = 0; caml_builtin_cprim[i] != 0; i++) {
-||||||| 23e84b8c4d
+||||||| upstream-base
   int i;
   caml_ext_table_init(&caml_prim_table, 0x180);
 #ifdef DEBUG
@@ -252,7 +252,7 @@ void caml_build_primitive_table_builtin(void)
 =======
   caml_build_primitive_table(NULL, NULL, NULL);
   for (int i = 0; caml_builtin_cprim[i] != 0; i++) {
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     caml_ext_table_add(&caml_prim_table, (void *) caml_builtin_cprim[i]);
     caml_ext_table_add(&caml_prim_name_table,
                        caml_stat_strdup(caml_names_of_builtin_cprim[i]));
@@ -269,7 +269,7 @@ CAMLprim value caml_dynlink_get_bytecode_sections(value unit)
 {
   CAMLparam1(unit);
   CAMLlocal4(ret, tbl, list, str);
-<<<<<<< HEAD
+<<<<<<< oxcaml
   int i, j;
   ret = caml_alloc(4, 0);
 
@@ -332,7 +332,7 @@ CAMLprim value caml_dynlink_get_bytecode_sections(value unit)
 
   list = Val_emptylist;
   for (i = caml_shared_libs_path.size - 1; i >= 0; i--) {
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   ret = caml_alloc(4, 0);
 
@@ -395,7 +395,7 @@ CAMLprim value caml_dynlink_get_bytecode_sections(value unit)
 
   list = Val_emptylist;
   for (int i = caml_shared_libs_path.size - 1; i >= 0; i--) {
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     str = caml_copy_string_of_os(caml_shared_libs_path.contents[i]);
     list = caml_alloc_2(Tag_cons, str, list);
   }

@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* TEST
    runtime5;
    { bytecode; }
@@ -33,7 +33,7 @@ module AllocSet = Set.Make(Int3Tuples)
 
 let[@inline never] f33 n =
   ((n, n, (n, n, n, (n,n,n,n,n))), (n, n, (n, n, n, (n,n,n,n,0))))
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 (* TEST *)
 
@@ -65,7 +65,7 @@ module AllocSet = Set.Make(Int3Tuples)
 
 let[@inline never] f33 n =
   ((n, n, (n, n, n, (n,n,n,n,n))), (n, n, (n, n, n, (n,n,n,n,n))))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Repeatedly stop sampling from an allocation callback. If `restart`
    is `true, start a fresh profile in the same callback. Otherwise,

@@ -28,7 +28,7 @@
 
 enum { CAML_MEMPROF_SRC_NORMAL = 0,
        CAML_MEMPROF_SRC_MARSHAL = 1, /* interning */
-<<<<<<< HEAD
+<<<<<<< oxcaml
        CAML_MEMPROF_SRC_CUSTOM = 2 /* custom memory */ };
 
 /* Respond to the allocation of any block. Does not call callbacks.
@@ -42,7 +42,7 @@ enum { CAML_MEMPROF_SRC_NORMAL = 0,
 
 void caml_memprof_sample_block(value block, size_t allocated_words,
                                size_t sampled_words, int source);
-||||||| 23e84b8c4d
+||||||| upstream-base
 /* Suspend or unsuspend profiling */
 =======
        CAML_MEMPROF_SRC_CUSTOM = 2, /* custom memory */
@@ -60,7 +60,7 @@ void caml_memprof_sample_block(value block, size_t allocated_words,
 
 CAMLextern void caml_memprof_sample_block(value block, size_t allocated_words,
                                           size_t sampled_words, int source);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 /* Sample a minor heap "Comballoc" (combined allocation). Called when
  * the memprof trigger is hit (before the allocation is actually
@@ -112,13 +112,13 @@ extern void caml_memprof_set_trigger(caml_domain_state *state);
 /* Run any pending callbacks for the current domain (or adopted from a
  * terminated domain). */
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 extern value caml_memprof_run_callbacks_exn(void);
-||||||| 23e84b8c4d
+||||||| upstream-base
 /* Multi-domain support. */
 =======
 extern caml_result caml_memprof_run_callbacks_res(void);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 
 /*** Multi-domain support. ***/

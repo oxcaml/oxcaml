@@ -13,7 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* Printing functions *)
 
 open Misc
@@ -441,7 +441,7 @@ let reset_naming_context = Naming_context.reset
 
 let ident ppf id = pp_print_string ppf
     (Out_name.print (Naming_context.ident_name_simple None id))
-||||||| 23e84b8c4d
+||||||| upstream-base
 (* Printing functions *)
 
 open Misc
@@ -759,7 +759,7 @@ let ident ppf id = pp_print_string ppf
 =======
 open Out_type
 module Fmt = Format_doc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let namespaced_ident namespace  id =
   Out_name.print (ident_name (Some namespace) id)
@@ -798,7 +798,7 @@ let instance_name global =
   let typexp mode ppf ty =
     !Oprint.out_type ppf (tree_of_typexp mode ty)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let non_shadowed_pervasive = function
   | Pdot(Pident id, s) as path ->
       Ident.same id ident_stdlib &&
@@ -806,7 +806,7 @@ let non_shadowed_pervasive = function
        | (path', _) -> Path.same path path'
        | exception Not_found -> true)
   | _ -> false
-||||||| 23e84b8c4d
+||||||| upstream-base
 let non_shadowed_stdlib namespace = function
   | Pdot(Pident id, s) as path ->
       Ident.same id ident_stdlib &&
@@ -817,7 +817,7 @@ let non_shadowed_stdlib namespace = function
 =======
   let type_expansion k ppf e =
     pp_type_expansion ppf (trees_of_type_expansion k e)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   let type_declaration id ppf decl =
     !Oprint.out_sig_item ppf (tree_of_type_declaration id decl Trec_first)
@@ -828,7 +828,7 @@ let non_shadowed_stdlib namespace = function
     prepare_for_printing [ty];
     prepared_type_expr ppf ty
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let expand_longident_head name =
   match find_double_underscore name with
   | None -> None
@@ -851,7 +851,7 @@ let rec rewrite_double_underscore_paths env p =
   | Pextra_ty (p, extra) ->
     Pextra_ty (rewrite_double_underscore_paths env p, extra)
   | Pident id ->
-||||||| 23e84b8c4d
+||||||| upstream-base
 (* Simple heuristic to print Foo__bar.* as Foo.Bar.* when Foo.Bar is an alias
    for Foo__bar. This pattern is used by the stdlib. *)
 let rec rewrite_double_underscore_paths env p =
@@ -922,9 +922,9 @@ let rec rewrite_double_underscore_paths env p =
     reset_except_conflicts ();
     prepare_type_constructor_arguments ext.ext_args;
     Option.iter add_type_to_preparation ext.ext_ret_type;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     let name = Ident.name id in
-<<<<<<< HEAD
+<<<<<<< oxcaml
     match expand_longident_head name with
     | None -> p
     | Some better_lid ->
@@ -1514,7 +1514,7 @@ end = struct
                   String.Map.add constr (tree_of_path None p :: prev) acc
               | Definition | Rec_check_regularity -> acc)
         !names String.Map.empty
-||||||| 23e84b8c4d
+||||||| upstream-base
     match find_double_underscore name with
     | None -> p
     | Some i ->
@@ -2011,9 +2011,9 @@ end = struct
       extension_constructor_args_and_ret_type_subtree
         ext.ext_args
         ext.ext_ret_type
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     in
-<<<<<<< HEAD
+<<<<<<< oxcaml
     String.Map.iter
       (fun constr out_idents ->
         match out_idents with
@@ -3258,7 +3258,7 @@ let extension_only_constructor id ppf ext =
   Fmt.fprintf ppf "@[<hv>%a@]"
     !Oprint.out_constr {
       ocstr_name = name;
-||||||| 23e84b8c4d
+||||||| upstream-base
     String.Map.iter
       (fun constr out_idents ->
         match out_idents with
@@ -4093,14 +4093,14 @@ let extension_only_constructor id ppf ext =
     Fmt.fprintf ppf "@[<hv>%a@]"
       !Oprint.out_constr {
       Outcometree.ocstr_name = name;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       ocstr_args = args;
       ocstr_return_type = ret;
     }
 
   (* Print a signature body (used by -i when compiling a .ml) *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let tree_of_value_description id decl =
   (* Format.eprintf "@[%a@]@." raw_type_expr decl.val_type; *)
   let id = Ident.name id in
@@ -4164,7 +4164,7 @@ let tree_of_value_description id decl =
     | _ -> vd
   in
   Osig_value vd)
-||||||| 23e84b8c4d
+||||||| upstream-base
 let tree_of_value_description id decl =
   (* Format.eprintf "@[%a@]@." raw_type_expr decl.val_type; *)
   let id = Ident.name id in
@@ -4184,7 +4184,7 @@ let tree_of_value_description id decl =
 =======
   let print_signature ppf tree =
     Fmt.fprintf ppf "@[<v>%a@]" !Oprint.out_signature tree
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   let signature ppf sg =
     Fmt.fprintf ppf "%a" print_signature (tree_of_signature sg)
@@ -4206,7 +4206,7 @@ let type_expr = Fmt.compat type_expr
 let type_scheme = Fmt.compat type_scheme
 let shared_type_scheme = Fmt.compat shared_type_scheme
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let tree_of_method mode (lab, priv, virt, ty) =
   let (ty, tyl) = method_type priv ty in
   let tty = tree_of_typexp mode ty in
@@ -4217,7 +4217,7 @@ let tree_of_method mode (lab, priv, virt, ty) =
   let priv = priv <> Mpublic in
   let virt = virt = Virtual in
   Ocsg_method (lab, priv, virt, Otyp_poly(qtvs, tty))
-||||||| 23e84b8c4d
+||||||| upstream-base
 let tree_of_method mode (lab, priv, virt, ty) =
   let (ty, tyl) = method_type priv ty in
   let tty = tree_of_typexp mode ty in
@@ -4234,9 +4234,9 @@ let constructor = Fmt.compat constructor
 let constructor_arguments = Fmt.compat constructor_arguments
 let extension_constructor = Fmt.compat1 extension_constructor
 let extension_only_constructor = Fmt.compat1 extension_only_constructor
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let rec prepare_class_type params = function
   | Cty_constr (_p, tyl, cty) ->
       let row = Btype.self_type_row cty in
@@ -4255,7 +4255,7 @@ let rec prepare_class_type params = function
   | Cty_arrow (_, ty, cty) ->
       prepare_type ty;
       prepare_class_type params cty
-||||||| 23e84b8c4d
+||||||| upstream-base
 let rec prepare_class_type params = function
   | Cty_constr (_p, tyl, cty) ->
       let row = Btype.self_type_row cty in
@@ -4278,9 +4278,9 @@ let rec prepare_class_type params = function
 let modtype = Fmt.compat modtype
 let modtype_declaration = Fmt.compat1 modtype_declaration
 let signature = Fmt.compat signature
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let rec tree_of_class_type mode params =
   function
   | Cty_constr (p', tyl, cty) ->
@@ -4343,7 +4343,7 @@ let rec tree_of_class_type mode params =
          | _ -> Otyp_stuff "<hidden>"
        else tree_of_typexp mode ty in
       Octy_arrow (lab, tr, tree_of_class_type mode params cty)
-||||||| 23e84b8c4d
+||||||| upstream-base
 let rec tree_of_class_type mode params =
   function
   | Cty_constr (p', tyl, cty) ->
@@ -4409,9 +4409,9 @@ let rec tree_of_class_type mode params =
 let class_declaration = Fmt.compat1 class_declaration
 let class_type = Fmt.compat class_type
 let cltype_declaration = Fmt.compat1 cltype_declaration
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let class_type ppf cty =
   reset ();
   prepare_class_type [] cty;
@@ -4809,7 +4809,7 @@ let print_signature ppf tree =
 
 let signature ppf sg =
   fprintf ppf "%a" print_signature (tree_of_signature sg)
-||||||| 23e84b8c4d
+||||||| upstream-base
 let class_type ppf cty =
   reset ();
   prepare_class_type [] cty;
@@ -5092,21 +5092,21 @@ let print_signature ppf tree =
 let signature ppf sg =
   fprintf ppf "%a" print_signature (tree_of_signature sg)
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Print a signature body (used by -i when compiling a .ml) *)
 let printed_signature sourcefile ppf sg =
   (* we are tracking any collision event for warning 63 *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   Conflicts.reset ();
   reset_naming_context ();
-||||||| 23e84b8c4d
+||||||| upstream-base
   Conflicts.reset ();
 =======
   Ident_conflicts.reset ();
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let t = tree_of_signature sg in
-<<<<<<< HEAD
+<<<<<<< oxcaml
   if Warnings.(is_active @@ Erroneous_printed_signature "")
   && Conflicts.exists ()
   then begin
@@ -5806,7 +5806,7 @@ module Compat = struct
     in
     string_of_label lbl
 end
-||||||| 23e84b8c4d
+||||||| upstream-base
   if Warnings.(is_active @@ Erroneous_printed_signature "")
   && Conflicts.exists ()
   then begin
@@ -6417,4 +6417,4 @@ let tree_of_type_declaration ident td rs =
         Warnings.check_fatal ()
     end;
   Fmt.compat print_signature ppf t
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

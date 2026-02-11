@@ -66,10 +66,10 @@ Caml_inline void cpu_relax(void) {
 }
 
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* If we're using glibc, use a custom condition variable implementation to
    avoid this bug: https://sourceware.org/bugzilla/show_bug.cgi?id=25847
-||||||| 23e84b8c4d
+||||||| upstream-base
 #define atomic_load_acquire(p)                    \
   atomic_load_explicit((p), memory_order_acquire)
 #define atomic_load_relaxed(p)                    \
@@ -80,9 +80,9 @@ Caml_inline void cpu_relax(void) {
   atomic_store_explicit((p), (v), memory_order_relaxed)
 =======
 /* Warning: blocking functions.
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
    For now we only have this on linux because it directly uses the linux futex
    syscalls. */
 #if defined(__linux__) && defined(__GNU_LIBRARY__) && defined(__GLIBC__) && defined(__GLIBC_MINOR__)
@@ -94,28 +94,28 @@ typedef struct {
 typedef pthread_cond_t custom_condvar;
 #define CUSTOM_COND_INITIALIZER PTHREAD_COND_INITIALIZER
 #endif
-||||||| 23e84b8c4d
+||||||| upstream-base
 /* Spin-wait loops */
 =======
    Blocking functions are for use in the runtime outside of the
    mutator, or when the domain lock is not held.
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* Warning: blocking functions.
-||||||| 23e84b8c4d
+||||||| upstream-base
 #define Max_spins 1000
 =======
    In order to use them inside the mutator and while holding the
    domain lock, one must make sure that the wait is very short, and
    that no deadlock can arise from the interaction with the domain
    locks and the stop-the-world sections.
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
    Blocking functions are for use in the runtime outside of the
    mutator, or when the domain lock is not held.
-||||||| 23e84b8c4d
+||||||| upstream-base
 CAMLextern unsigned caml_plat_spin_wait(unsigned spins,
                                         const char* file, int line,
                                         const char* function);
@@ -128,14 +128,14 @@ CAMLextern unsigned caml_plat_spin_wait(unsigned spins,
     - if the same lock is acquired at any point using [Mutex.lock] or
       [caml_plat_lock_non_blocking] on the same domain (circular
       deadlock with the domain lock).
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
    In order to use them inside the mutator and while holding the
    domain lock, one must make sure that the wait is very short, and
    that no deadlock can arise from the interaction with the domain
    locks and the stop-the-world sections.
-||||||| 23e84b8c4d
+||||||| upstream-base
 #define GENSYM_3(name, l) name##l
 #define GENSYM_2(name, l) GENSYM_3(name, l)
 #define GENSYM(name) GENSYM_2(name, __LINE__)
@@ -144,9 +144,9 @@ CAMLextern unsigned caml_plat_spin_wait(unsigned spins,
    lock a mutex when inside the mutator and holding the domain lock.
    The domain lock must be held in order to call
    [caml_plat_lock_non_blocking].
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
    In particular one must not call [caml_plat_lock_blocking] on a
    mutex while the domain lock is held:
     - if any critical section of the mutex crosses an allocation, a
@@ -161,7 +161,7 @@ CAMLextern unsigned caml_plat_spin_wait(unsigned spins,
    The domain lock must be held in order to call
    [caml_plat_lock_non_blocking].
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 #define SPIN_WAIT                                                       \
   unsigned GENSYM(caml__spins) = 0;                                     \
   for (; 1; cpu_relax(),                                                \
@@ -186,7 +186,7 @@ Caml_inline uintnat atomic_fetch_add_verify_ge0(atomic_uintnat* p, uintnat v) {
   return result;
 }
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
    It is possible to combine calls to [caml_plat_lock_non_blocking] on
    a mutex from the mutator holding the domain lock with calls to
    [caml_plat_lock_blocking] on another mutator that has released
@@ -208,10 +208,10 @@ void caml_plat_assert_locked(caml_plat_mutex*);
 void caml_plat_assert_all_locks_unlocked(void);
 Caml_inline void caml_plat_unlock(caml_plat_mutex*);
 void caml_plat_mutex_free(caml_plat_mutex*);
-<<<<<<< HEAD
+<<<<<<< oxcaml
 typedef custom_condvar caml_plat_cond;
 #define CAML_PLAT_COND_INITIALIZER CUSTOM_COND_INITIALIZER
-||||||| 23e84b8c4d
+||||||| upstream-base
 typedef struct { pthread_cond_t cond; caml_plat_mutex* mutex; } caml_plat_cond;
 #define CAML_PLAT_COND_INITIALIZER(m) { PTHREAD_COND_INITIALIZER, m }
 void caml_plat_cond_init(caml_plat_cond*, caml_plat_mutex*);
@@ -222,7 +222,7 @@ void caml_plat_wait(caml_plat_cond*);
 CAMLextern void caml_plat_mutex_reinit(caml_plat_mutex*);
 typedef pthread_cond_t caml_plat_cond;
 #define CAML_PLAT_COND_INITIALIZER PTHREAD_COND_INITIALIZER
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 void caml_plat_cond_init(caml_plat_cond*);
 void caml_plat_wait(caml_plat_cond*, caml_plat_mutex*); /* blocking */
 void caml_plat_broadcast(caml_plat_cond*);
@@ -407,12 +407,12 @@ typedef uintnat barrier_status;
    the last arrival. */
 Caml_inline barrier_status caml_plat_barrier_arrive(caml_plat_barrier* barrier)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   return caml_atomic_counter_incr(&barrier->arrived);
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   return 1 + atomic_fetch_add(&barrier->arrived, 1);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 /* -- Single-sense --

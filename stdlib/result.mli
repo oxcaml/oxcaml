@@ -44,9 +44,9 @@ val get_ok : ('a : value_or_null) ('e : value_or_null). ('a, 'e) result -> 'a
 
     @raise Invalid_argument if [r] is [Error _]. *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val get_error : ('a : value_or_null) ('e : value_or_null). ('a, 'e) result -> 'e
-||||||| 23e84b8c4d
+||||||| upstream-base
 val get_error : ('a, 'e) result -> 'e
 =======
 val get_ok' : ('a, string) result -> 'a
@@ -56,15 +56,15 @@ val get_ok' : ('a, string) result -> 'a
     @since 5.4 *)
 
 val get_error : ('a, 'e) result -> 'e
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** [get_error r] is [e] if [r] is [Error e] and raise otherwise.
 
     @raise Invalid_argument if [r] is [Ok _]. *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val bind : ('a : value_or_null) ('b : value_or_null) ('e : value_or_null).
   ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
-||||||| 23e84b8c4d
+||||||| upstream-base
 val bind : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
 =======
 val error_to_failure : ('a, string) result -> 'a
@@ -74,7 +74,7 @@ val error_to_failure : ('a, string) result -> 'a
     @since 5.4 *)
 
 val bind : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** [bind r f] is [f v] if [r] is [Ok v] and [r] if [r] is [Error _]. *)
 
 val join : ('a : value_or_null) ('e : value_or_null)
@@ -85,10 +85,10 @@ val map : ('a : value_or_null) ('b : value_or_null) ('e : value_or_null).
   ('a -> 'b) -> ('a, 'e) result -> ('b, 'e) result
 (** [map f r] is [Ok (f v)] if [r] is [Ok v] and [r] if [r] is [Error _]. *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val map_error : ('a : value_or_null) ('e : value_or_null) ('f : value_or_null).
   ('e -> 'f) -> ('a, 'e) result -> ('a, 'f) result
-||||||| 23e84b8c4d
+||||||| upstream-base
 val map_error : ('e -> 'f) -> ('a, 'e) result -> ('a, 'f) result
 =======
 val product : ('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e) result
@@ -98,7 +98,7 @@ val product : ('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e) result
     @since 5.4 *)
 
 val map_error : ('e -> 'f) -> ('a, 'e) result -> ('a, 'f) result
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** [map_error f r] is [Error (f e)] if [r] is [Error e] and [r] if
     [r] is [Ok _]. *)
 
@@ -107,10 +107,10 @@ val fold : ('a : value_or_null) ('c : value_or_null) ('e : value_or_null).
 (** [fold ~ok ~error r] is [ok v] if [r] is [Ok v] and [error e] if [r]
     is [Error e]. *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val iter : ('a : value_or_null) ('e : value_or_null)
   . ('a -> unit) -> ('a, 'e) result -> unit
-||||||| 23e84b8c4d
+||||||| upstream-base
 val iter : ('a -> unit) -> ('a, 'e) result -> unit
 =======
 val retract : ('a, 'a) result -> 'a
@@ -119,7 +119,7 @@ val retract : ('a, 'a) result -> 'a
     @since 5.4 *)
 
 val iter : ('a -> unit) -> ('a, 'e) result -> unit
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** [iter f r] is [f v] if [r] is [Ok v] and [()] otherwise. *)
 
 val iter_error : ('a : value_or_null) ('e : value_or_null)

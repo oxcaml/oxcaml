@@ -46,12 +46,12 @@ CAMLexport value caml_alloc_with_reserved (mlsize_t wosize, tag_t tag,
       result = Atom (tag);
     }else{
       Caml_check_caml_state();
-<<<<<<< HEAD
+<<<<<<< oxcaml
       Alloc_small_with_reserved (result, wosize, tag, Alloc_small_enter_GC,
                                  reserved);
       if (Scannable_tag(tag)) {
         for (i = 0; i < scannable_wosize; i++) Field (result, i) = Val_unit;
-||||||| 23e84b8c4d
+||||||| upstream-base
       Alloc_small (result, wosize, tag, Alloc_small_enter_GC);
       if (tag < No_scan_tag){
         for (i = 0; i < wosize; i++) Field (result, i) = Val_unit;
@@ -59,15 +59,15 @@ CAMLexport value caml_alloc_with_reserved (mlsize_t wosize, tag_t tag,
       Alloc_small (result, wosize, tag, Alloc_small_enter_GC);
       if (tag < No_scan_tag){
         for (mlsize_t i = 0; i < wosize; i++) Field (result, i) = Val_unit;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       }
     }
   } else {
-<<<<<<< HEAD
+<<<<<<< oxcaml
     result = caml_alloc_shr_reserved (wosize, tag, reserved);
     if (Scannable_tag(tag)) {
       for (i = 0; i < scannable_wosize; i++) Field (result, i) = Val_unit;
-||||||| 23e84b8c4d
+||||||| upstream-base
     result = caml_alloc_shr (wosize, tag);
     if (tag < No_scan_tag) {
       for (i = 0; i < wosize; i++) Field (result, i) = Val_unit;
@@ -75,7 +75,7 @@ CAMLexport value caml_alloc_with_reserved (mlsize_t wosize, tag_t tag,
     result = caml_alloc_shr (wosize, tag);
     if (tag < No_scan_tag) {
       for (mlsize_t i = 0; i < wosize; i++) Field (result, i) = Val_unit;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     }
     result = caml_check_urgent_gc (result);
   }
@@ -350,7 +350,7 @@ CAMLexport int caml_convert_flag_list(value list, const int *flags)
   return res;
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* For compiling let rec over values */
 
 /* [size] is a [value] representing number of words (fields) */
@@ -470,7 +470,7 @@ CAMLprim value caml_update_dummy(value dummy, value newval)
   return Val_unit;
 }
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 /* For compiling let rec over values */
 
 /* [size] is a [value] representing number of words (fields) */
@@ -567,7 +567,7 @@ CAMLprim value caml_update_dummy(value dummy, value newval)
 }
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 CAMLexport value caml_alloc_some(value v)
 {
   CAMLparam1(v);

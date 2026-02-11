@@ -2,7 +2,7 @@
  flags = "-dshape";
  expect;
 *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
 module M = struct end (* uid 0 *)
 module F(X : sig end) = M
 module App = F(List)
@@ -107,7 +107,7 @@ module O = N.M
                              });
  }
 module F : functor (X : sig end) -> sig module M : sig end end
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 
 module M = struct end (* uid 0 *)
@@ -214,7 +214,7 @@ module O = N.M
                              });
  }
 module F : (X : sig end) -> sig module M : sig end end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 {
  "N"[module] -> {<.22>
                  "M"[module] -> {<.19>};

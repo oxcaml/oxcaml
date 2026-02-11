@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* TEST
    flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
    runtime5;
@@ -25,7 +25,7 @@ let go () =
       assert (String.hash s1 mod len = h)
     end;
     Weak.set table h (Some (s,s))
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 (* TEST *)
 
@@ -45,7 +45,7 @@ let go () =
     | Some s' -> assert (String.hash s' mod len = h)
     end;
     Weak.set table h (Some s)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   done
 
 let () =

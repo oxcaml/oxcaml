@@ -264,14 +264,14 @@ static void generic_final_minor_update
       CAMLassert (Is_block (final->table[i].val));
       CAMLassert (Tag_val (final->table[i].val) != Forward_tag);
       if (Is_young(final->table[i].val) &&
-<<<<<<< HEAD
+<<<<<<< oxcaml
           !Is_promoted_hd(Hd_val(final->table[i].val))) {
-||||||| 23e84b8c4d
+||||||| upstream-base
       if (Is_young(final->table[j].val) &&
           caml_get_header_val(final->table[i].val) != 0) {
 =======
           caml_get_header_val(final->table[i].val) != 0) {
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         /** dead */
         fi->todo_tail->item[k] = final->table[i];
         /* The finalisation function is called with unit not with the value */

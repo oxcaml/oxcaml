@@ -74,14 +74,14 @@ end
 [%%expect{|
 Line 2, characters 11-14:
 2 |   type t = X.F(Parsing).t
-<<<<<<< HEAD
+<<<<<<< oxcaml
                ^^^^^^^^^^^^^^
 Error: The module "X.F" is of abstract type "S", it cannot be applied
-||||||| 23e84b8c4d
+||||||| upstream-base
                ^^^^^^^^^^^^^^
 Error: The module "X.F" is abstract, it cannot be applied
 =======
                ^^^
 Error: The module "X.F" is abstract, it cannot be applied
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 |}]

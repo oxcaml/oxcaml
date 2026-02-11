@@ -47,7 +47,7 @@ val c_has_debug_prefix_map : bool
 val as_has_debug_prefix_map : bool
 (** Whether the assembler supports --debug-prefix-map *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val as_compress_debug_sections_flag : string
 (** The flag to use for assembler debug section compression ("" if none) *)
 
@@ -62,11 +62,11 @@ val objcopy : string
     [Clflags.dwarf_fission]. *)
 
 val ocamlc_cflags : string
-||||||| 23e84b8c4d
+||||||| upstream-base
 val ocamlc_cflags : string
 =======
 val bytecode_cflags : string
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** The flags ocamlc should pass to the C compiler *)
 
 val bytecode_cppflags : string

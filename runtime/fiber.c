@@ -20,15 +20,15 @@
 
 #include "caml/config.h"
 #include <string.h>
-<<<<<<< HEAD
+<<<<<<< oxcaml
 #include <stdbool.h>
 #include <stdio.h>
 #ifdef HAS_UNISTD
-||||||| 23e84b8c4d
+||||||| upstream-base
 #ifdef HAS_UNISTD
 =======
 #ifndef _WIN32
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #include <unistd.h>
 #endif
 #include <assert.h>
@@ -147,10 +147,10 @@ void caml_change_max_stack_size (uintnat new_max_wsize)
 /* Round up to a power of 2 */
 static uintnat round_up_p2(uintnat x, uintnat p2)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   CAMLassert (Is_power_of_2(p2));
   return (x + p2 - 1) & ~(p2 - 1);
-||||||| 23e84b8c4d
+||||||| upstream-base
   int i;
 
   struct stack_info** stack_cache =
@@ -174,7 +174,7 @@ static uintnat round_up_p2(uintnat x, uintnat p2)
     stack_cache[i] = NULL;
 
   return stack_cache;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 /* Allocate a stack with at least the specified number of words.
@@ -182,7 +182,7 @@ static uintnat round_up_p2(uintnat x, uintnat p2)
    well-defined), but other fields are uninitialised */
 Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize, int64_t id)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   /* Ensure 16-byte alignment of the [struct stack_handler*]. */
   const int stack_alignment = 16;
 
@@ -194,7 +194,7 @@ Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize, int64_t id)
                sizeof(value) * wosize +
                8 + /* For 16-byte aligning handler */
                sizeof(struct stack_handler);
-||||||| 23e84b8c4d
+||||||| upstream-base
   size_t len = sizeof(struct stack_info) +
                sizeof(value) * wosize +
                8 /* for alignment to 16-bytes, needed for arm64 */ +
@@ -223,7 +223,7 @@ Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize, int64_t id)
 #endif
 
 #ifdef USE_MMAP_MAP_STACK
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   struct stack_info* si;
   si = mmap(NULL, len, PROT_WRITE | PROT_READ,
              MAP_ANONYMOUS | MAP_PRIVATE | MAP_STACK, -1, 0);
@@ -397,8 +397,8 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
     }
 
     stack->cache_bucket = cache_bucket;
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 
     /* Ensure 16-byte alignment because some architectures require it */
     hand = (struct stack_handler*)
@@ -413,7 +413,7 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
     hand = (struct stack_handler*)caml_round_up(
       (uintnat)stack + sizeof(struct stack_info) + sizeof(value) * wosize, 16);
     stack->handler = hand;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   }
 
   struct stack_handler* hand = stack->handler;
@@ -657,15 +657,15 @@ Caml_inline void scan_stack_frames(
   value * regs;
   frame_descr * d;
   value *root;
-<<<<<<< HEAD
+<<<<<<< oxcaml
   caml_frame_descrs fds = caml_get_frame_descrs();
   /* does not change during marking */
   struct global_heap_state colors = caml_global_heap_state;
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_frame_descrs fds = caml_get_frame_descrs();
 =======
   caml_frame_descrs * fds = caml_get_frame_descrs();
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   sp = (char*)stack->sp;
   regs = gc_regs;
@@ -961,11 +961,11 @@ int caml_try_realloc_stack(asize_t required_space)
   stack_used = Stack_high(old_stack) - (value*)old_stack->sp;
   wsize = Stack_high(old_stack) - Stack_base(old_stack);
   uintnat max_stack_wsize = caml_max_stack_wsize;
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 =======
   wsize = wsize & (~1); // zero alignment bit
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   do {
     if (wsize >= max_stack_wsize) return 0;
     wsize *= 2;
@@ -1015,17 +1015,17 @@ int caml_try_realloc_stack(asize_t required_space)
      frame is also a normal exception trap frame.  However
      Caml_state->async_exn_handler itself must be updated. */
   caml_rewrite_exception_stack(old_stack, (value**)&Caml_state->exn_handler,
-<<<<<<< HEAD
+<<<<<<< oxcaml
                                (value**) &Caml_state->async_exn_handler,
                                new_stack);
-||||||| 23e84b8c4d
+||||||| upstream-base
                               new_stack);
 #ifdef WITH_FRAME_POINTERS
   rewrite_frame_pointers(old_stack, new_stack);
 #endif
 =======
                               new_stack);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #endif
 
   /* Update stack pointers in Caml_state->c_stack. It is possible to have
@@ -1059,7 +1059,7 @@ int caml_try_realloc_stack(asize_t required_space)
 #endif
         link->stack = new_stack;
         link->sp = (char*)link->sp + delta;
-<<<<<<< HEAD
+<<<<<<< oxcaml
       }
       if (link->async_exn_handler >= (char*) Stack_base(old_stack)
           && link->async_exn_handler < (char*) Stack_high(old_stack)) {
@@ -1074,11 +1074,11 @@ int caml_try_realloc_stack(asize_t required_space)
       } else {
         fiber_debug_log("Not touching link->async_exn_handler %p",
           link->async_exn_handler);
-||||||| 23e84b8c4d
+||||||| upstream-base
         link->sp = (void*)((char*)Stack_high(new_stack) -
                            ((char*)Stack_high(old_stack) - (char*)link->sp));
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       }
     }
   }

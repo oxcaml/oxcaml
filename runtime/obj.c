@@ -150,7 +150,7 @@ CAMLprim value caml_obj_with_tag(value new_tag_v, value arg)
 {
   CAMLparam2 (new_tag_v, arg);
   CAMLlocal1 (res);
-<<<<<<< HEAD
+<<<<<<< oxcaml
   mlsize_t sz, i;
   tag_t tag_for_alloc;
   uintnat infix_offset = 0;
@@ -182,13 +182,13 @@ CAMLprim value caml_obj_with_tag(value new_tag_v, value arg)
   } else {
     tag_for_alloc = new_tag;
   }
-||||||| 23e84b8c4d
+||||||| upstream-base
   mlsize_t sz, i;
   tag_t tg;
 =======
   mlsize_t sz;
   tag_t tg;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   sz = Wosize_val(arg);
   if (sz == 0) {
@@ -200,19 +200,19 @@ CAMLprim value caml_obj_with_tag(value new_tag_v, value arg)
     res = caml_alloc(sz, tag_for_alloc);
     memcpy(Bp_val(res), Bp_val(arg), sz * sizeof(value));
   } else if (sz <= Max_young_wosize) {
-<<<<<<< HEAD
+<<<<<<< oxcaml
     reserved_t reserved = Reserved_val(arg);
     res = caml_alloc_small_with_reserved(sz, tag_for_alloc, reserved);
     for (i = 0; i < sz; i++) Field(res, i) = Field(arg, i);
-||||||| 23e84b8c4d
+||||||| upstream-base
     res = caml_alloc_small(sz, tg);
     for (i = 0; i < sz; i++) Field(res, i) = Field(arg, i);
 =======
     res = caml_alloc_small(sz, tg);
     for (mlsize_t i = 0; i < sz; i++) Field(res, i) = Field(arg, i);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   } else {
-<<<<<<< HEAD
+<<<<<<< oxcaml
     mlsize_t scannable_sz = Scannable_wosize_val(arg);
     reserved_t reserved = Reserved_val(arg);
 
@@ -252,7 +252,7 @@ CAMLprim value caml_obj_with_tag(value new_tag_v, value arg)
       Field(res, i) = Field(arg, i);
     }
 
-||||||| 23e84b8c4d
+||||||| upstream-base
     res = caml_alloc_shr(sz, tg);
     /* It is safe to use [caml_initialize] even if [tag == Closure_tag]
        and some of the "values" being copied are actually code pointers.
@@ -265,7 +265,7 @@ CAMLprim value caml_obj_with_tag(value new_tag_v, value arg)
        That's because the new "value" does not point to the minor heap. */
     for (mlsize_t i = 0; i < sz; i++)
       caml_initialize(&Field(res, i), Field(arg, i));
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     /* Give gc a chance to run, and run memprof callbacks */
     caml_process_pending_actions();
   }
@@ -423,7 +423,7 @@ struct queue_chunk {
   value entries[ENTRIES_PER_QUEUE_CHUNK];
 };
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* Return 0 for uniform blocks and 1+n for a mixed block with scannable prefix
    len n.
  */
@@ -443,7 +443,7 @@ CAMLprim value caml_succ_scannable_prefix_len (value v) {
 CAMLprim value caml_is_null(value v)
 {
   return Is_null(v) ? Val_true : Val_false;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 
 /* For compiling let rec over values */
@@ -528,5 +528,5 @@ CAMLprim value caml_update_dummy_lazy(value dummy, value newval)
     break;
   }
   return Val_unit;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }

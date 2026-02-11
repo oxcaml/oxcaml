@@ -133,19 +133,19 @@ let map_elt (type variety) f : ('a, variety) elt -> ('b, variety) elt = function
       Escape { kind = Equation (f x); context }
   | Escape {kind = (Univ _ | Self | Constructor _ | Module_type _ | Constraint);
             _}
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Variant _ | Obj _ | Incompatible_fields _ | Rec_occur (_, _) as x -> x
   | Bad_jkind _ as x -> x
   | Bad_jkind_sort _ as x -> x
   | Unequal_var_jkinds _ as x -> x
   | Unequal_tof_kind_jkinds _ as x -> x
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Variant _ | Obj _ | Incompatible_fields _ | Rec_occur (_, _) as x -> x
 =======
   | Variant _ | Obj _ | Function_label_mismatch _ | Tuple_label_mismatch _
   | Incompatible_fields _
   | Rec_occur (_, _) | First_class_module _  as x -> x
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let map f t = List.map (map_elt f) t
 

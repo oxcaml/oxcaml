@@ -28,7 +28,7 @@ open Types
    Indeed, non-variable node of a type are duplicated, with their
    levels set to generic level.  That way, the resulting type is
    well-formed (decreasing levels), even if the original one was not.
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
    In the presence of local substitutions for module types, a substitution for a
    type expression may fail to produce a well-formed type. In order to confine
@@ -69,18 +69,18 @@ type additional_action_config =
    See the documentation on [additional_action_config].
 *)
 val with_additional_action: additional_action_config -> t -> t
-||||||| 23e84b8c4d
+||||||| upstream-base
 *)
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* Any of the additional actions involve copying type variables. Calling
    [reset_additional_action_type_id] resets the id counter used when the copying
    of type variables needs to mint new type variable ids.
 *)
 val reset_additional_action_type_id: unit -> unit
-||||||| 23e84b8c4d
+||||||| upstream-base
 val identity: t
 =======
    In the presence of local substitutions for module types, a substitution for a
@@ -88,10 +88,10 @@ val identity: t
    this issue to local substitutions, the type of substitutions is split into a
    safe and unsafe variant. Only unsafe substitutions may expand a module type
    path into a generic module type. *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 val add_type: Ident.t -> Path.t -> t -> t
 val add_type_path: Path.t -> Path.t -> t -> t
 val add_type_function:
@@ -123,7 +123,7 @@ val add_modtype: Ident.t -> Path.t -> 'k subst -> 'k subst
 
 val for_saving: t -> t
 val reset_for_saving: unit -> unit
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 val change_locs: 'k subst -> Location.t -> 'k subst
 
 val module_path: t -> Path.t -> Path.t

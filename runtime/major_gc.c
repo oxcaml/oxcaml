@@ -42,7 +42,7 @@
 #include "caml/custom.h"
 #include "caml/minor_gc.h"
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* NB the MARK_STACK_INIT_SIZE must be larger than the number of objects
    that can be in a pool, see POOL_WSIZE */
 #define MARK_STACK_INIT_SIZE (1 << 12)
@@ -91,7 +91,7 @@ uintnat caml_gc_pacing_policy = GC_PACING_2025;
 
    (0 = disabled, 50 = theoretically optimal space/time tradeoff) */
 uintnat caml_gc_overhead_adjustment = 0;
-||||||| 23e84b8c4d
+||||||| upstream-base
 /* NB the MARK_STACK_INIT_SIZE must be larger than the number of objects
    that can be in a pool, see POOL_WSIZE */
 #define MARK_STACK_INIT_SIZE (1 << 12)
@@ -128,7 +128,7 @@ uintnat caml_percent_free = Percent_free_def;
 =======
 /* Default speed setting for the major GC. */
 _Atomic uintnat caml_percent_free = Percent_free_def;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 /* This variable is only written with the world stopped, so it need not be
    atomic */
@@ -200,7 +200,7 @@ static atomic_uintnat num_domains_to_final_update_last;
    (finalise first) finalisers are processed. */
 static atomic_uintnat num_domains_orphaning_finalisers = 0;
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* The GC uses separate units to count marking work and sweeping work, which are
    converted with these functions (following the Dest_source convention).
    In general, sweep units are the default, with conversions to/from mark units
@@ -236,7 +236,7 @@ static intnat Sweepwork_markwork(intnat mark_work)
 */
 static atomic_uintnat total_work_incurred;
 static atomic_uintnat total_work_completed;
-||||||| 23e84b8c4d
+||||||| upstream-base
 /* These two counters keep track of how much work the GC is supposed to
    do in order to keep up with allocation. Both are in GC work units.
    `alloc_counter` increases when we allocate: the number of words allocated
@@ -262,7 +262,7 @@ enum global_roots_status{
   WORK_STARTED
 };
 static atomic_uintnat domain_global_roots_started;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 gc_phase_t caml_gc_phase;
 
@@ -301,7 +301,7 @@ Caml_inline char caml_gc_phase_char(int may_access_gc_phase) {
   }
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* True when some domain wants to enter Phase_sweep_and_mark_main */
 atomic_uintnat caml_gc_mark_phase_requested;
 
@@ -324,7 +324,7 @@ static struct ephe_cycle_info_t {
  * ephe_lock or in the global barrier. However, the fields may be read without
  * the lock. */
 static caml_plat_mutex ephe_lock = CAML_PLAT_MUTEX_INITIALIZER;
-||||||| 23e84b8c4d
+||||||| upstream-base
 extern value caml_ephe_none; /* See weak.c */
 
 static struct ephe_cycle_info_t {
@@ -348,7 +348,7 @@ static caml_plat_mutex ephe_lock = CAML_PLAT_MUTEX_INITIALIZER;
 /*******************************************************************************
  * Prefetching
  ******************************************************************************/
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 #define PREFETCH_BUFFER_SIZE  (1 << 8)
 #define PREFETCH_BUFFER_MIN   64 /* keep pb at least this full */
@@ -458,11 +458,11 @@ static void ephe_next_cycle (void)
   caml_plat_lock_blocking(&ephe_lock);
 
   (void)caml_atomic_counter_incr(&ephe_cycle_info.ephe_cycle);
-<<<<<<< HEAD
+<<<<<<< oxcaml
   CAMLassert(atomic_load_acquire(&ephe_cycle_info.num_domains_done) <=
              atomic_load_acquire(&ephe_cycle_info.num_domains_todo));
   (void)caml_atomic_counter_init(&ephe_cycle_info.num_domains_done, 0);
-||||||| 23e84b8c4d
+||||||| upstream-base
   atomic_fetch_add(&ephe_cycle_info.ephe_cycle, +1);
   CAMLassert(atomic_load_acquire(&ephe_cycle_info.num_domains_done) <=
              atomic_load_acquire(&ephe_cycle_info.num_domains_todo));
@@ -471,21 +471,21 @@ static void ephe_next_cycle (void)
   CAMLassert(caml_atomic_counter_value(&ephe_cycle_info.num_domains_done) <=
              caml_atomic_counter_value(&ephe_cycle_info.num_domains_todo));
   caml_atomic_counter_init(&ephe_cycle_info.num_domains_done, 0);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   caml_plat_unlock(&ephe_lock);
 }
 
 static void ephe_todo_list_emptied (void)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   /* If we haven't started marking, the todo list can grow (during ephemeron
      allocation), so we should not yet announce that it has emptied */
   CAMLassert (caml_marking_started());
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_plat_lock(&ephe_lock);
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   caml_plat_lock_blocking(&ephe_lock);
 
   /* Force next ephemeron marking cycle in order to avoid reasoning about
@@ -497,17 +497,17 @@ static void ephe_todo_list_emptied (void)
   /* Since the todo list is empty, this domain does not need to participate in
    * further ephemeron cycles. */
   (void)caml_atomic_counter_decr(&ephe_cycle_info.num_domains_todo);
-<<<<<<< HEAD
+<<<<<<< oxcaml
   CAMLassert(atomic_load_acquire(&ephe_cycle_info.num_domains_done) <=
              atomic_load_acquire(&ephe_cycle_info.num_domains_todo));
-||||||| 23e84b8c4d
+||||||| upstream-base
   atomic_fetch_add(&ephe_cycle_info.num_domains_todo, -1);
   CAMLassert(atomic_load_acquire(&ephe_cycle_info.num_domains_done) <=
              atomic_load_acquire(&ephe_cycle_info.num_domains_todo));
 =======
   CAMLassert(caml_atomic_counter_value(&ephe_cycle_info.num_domains_done) <=
              caml_atomic_counter_value(&ephe_cycle_info.num_domains_todo));
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   caml_plat_unlock(&ephe_lock);
 }
@@ -536,27 +536,27 @@ static void record_ephe_marking_done (uintnat ephe_cycle)
     return;
 
   caml_plat_lock_blocking(&ephe_lock);
-<<<<<<< HEAD
+<<<<<<< oxcaml
   if (ephe_cycle == atomic_load(&ephe_cycle_info.ephe_cycle)) {
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_plat_lock(&ephe_lock);
   if (ephe_cycle == atomic_load(&ephe_cycle_info.ephe_cycle)) {
 =======
   if (ephe_cycle == caml_atomic_counter_value(&ephe_cycle_info.ephe_cycle)) {
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     Caml_state->ephe_info->cycle = ephe_cycle;
     (void)caml_atomic_counter_incr(&ephe_cycle_info.num_domains_done);
-<<<<<<< HEAD
+<<<<<<< oxcaml
     CAMLassert(atomic_load_acquire(&ephe_cycle_info.num_domains_done) <=
                atomic_load_acquire(&ephe_cycle_info.num_domains_todo));
-||||||| 23e84b8c4d
+||||||| upstream-base
     atomic_fetch_add(&ephe_cycle_info.num_domains_done, +1);
     CAMLassert(atomic_load_acquire(&ephe_cycle_info.num_domains_done) <=
                atomic_load_acquire(&ephe_cycle_info.num_domains_todo));
 =======
     CAMLassert(caml_atomic_counter_value(&ephe_cycle_info.num_domains_done) <=
                caml_atomic_counter_value(&ephe_cycle_info.num_domains_todo));
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   }
   caml_plat_unlock(&ephe_lock);
 }
@@ -898,8 +898,8 @@ static void adopt_orphaned_work (int expected_status)
   }
 }
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 /******************************************************************************/
 
 #define BUFFER_SIZE 64
@@ -966,7 +966,7 @@ double caml_mean_space_overhead (void)
 static atomic_uintnat alloc_counter;
 static atomic_uintnat work_counter;
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 static inline intnat max2 (intnat a, intnat b)
 {
   if (a > b){
@@ -997,7 +997,7 @@ static inline intnat diffmod (uintnat x1, uintnat x2)
 
 /* Reset the work and alloc counters to be equal to each other, by
  * setting them both equal to the "larger" (in the wrapping-around
-<<<<<<< HEAD
+<<<<<<< oxcaml
  * sense we are using here for total_work_completed/incurred).
  *
  * For use at times when we have disturbed the major GC from its usual
@@ -1176,7 +1176,7 @@ static uintnat gc_slice_work(uintnat heap_words,
 static void update_major_slice_work(intnat howmuch,
                                     int may_access_gc_phase,
                                     bool log_events)
-||||||| 23e84b8c4d
+||||||| upstream-base
 static void update_major_slice_work(intnat howmuch,
                                     int may_access_gc_phase)
 =======
@@ -1214,10 +1214,10 @@ static void
 update_major_slice_work(intnat howmuch,
                         int may_access_gc_phase,
                         int log_events /* log events to the ring? */)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 {
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
   double heap_words;
   intnat alloc_work, dependent_work, extra_work, new_work;
   intnat my_alloc_count, my_dependent_count;
@@ -1227,17 +1227,17 @@ update_major_slice_work(intnat howmuch,
   intnat my_alloc_count, my_alloc_direct_count, my_dependent_count;
   intnat my_alloc_suspended_count, my_alloc_resumed_count;
   double my_extra_count;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   caml_domain_state *dom_st = Caml_state;
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
   uintnat heap_size, heap_sweep_words, total_cycle_work;
 =======
   uintnat heap_words, heap_size, heap_sweep_words, total_cycle_work;
   uintnat percent_free;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   uintnat work_done_between_slices =
     Sweepwork_markwork(mark_work_done_between_slices()) +
     sweep_work_done_between_slices();
@@ -1250,7 +1250,7 @@ update_major_slice_work(intnat howmuch,
   uintnat last_minor_words = dom_st->minor_words_at_last_slice;
   uintnat curr_minor_words = caml_minor_words_allocated();
   uintnat my_minor_count = curr_minor_words - last_minor_words;
-||||||| 23e84b8c4d
+||||||| upstream-base
   my_alloc_count = dom_st->allocated_words;
   my_dependent_count = dom_st->dependent_allocated;
   my_extra_count = dom_st->extra_heap_resources;
@@ -1262,22 +1262,22 @@ update_major_slice_work(intnat howmuch,
   my_dependent_count = dom_st->dependent_allocated;
   my_extra_count = dom_st->extra_heap_resources;
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   dom_st->stat_major_words += dom_st->allocated_words;
-<<<<<<< HEAD
+<<<<<<< oxcaml
   dom_st->stat_major_dependent_bytes += dom_st->allocated_dependent_bytes;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   dom_st->current_ramp_up_allocated_words_diff +=
     dom_st->allocated_words_suspended;
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   dom_st->allocated_words = 0;
   dom_st->allocated_words_direct = 0;
-<<<<<<< HEAD
+<<<<<<< oxcaml
   dom_st->allocated_dependent_bytes = 0;
   dom_st->minor_words_at_last_slice = curr_minor_words;
-||||||| 23e84b8c4d
+||||||| upstream-base
   dom_st->dependent_allocated = 0;
   dom_st->extra_heap_resources = 0.0;
   /*
@@ -1294,7 +1294,7 @@ update_major_slice_work(intnat howmuch,
      Free memory at the start of the GC cycle (garbage + free list) (assumed):
                  FM = heap_words * caml_percent_free
                       / (100 + caml_percent_free)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   uintnat heap_words = Wsize_bsize(caml_heap_size(dom_st->shared_heap));
 
@@ -1307,8 +1307,8 @@ update_major_slice_work(intnat howmuch,
 
   atomic_fetch_add (&total_work_incurred, new_work);
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
      Since we must do TW amount of work in TT time, the amount of work done
      for this slice is:
                  S = P * TW
@@ -1443,7 +1443,7 @@ update_major_slice_work(intnat howmuch,
   atomic_fetch_add (&work_counter, dom_st->major_work_done_between_slices);
   dom_st->major_work_done_between_slices = 0;
   atomic_fetch_add (&alloc_counter, new_work);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   if (howmuch == AUTO_TRIGGERED_MAJOR_SLICE ||
       howmuch == GC_CALCULATE_MAJOR_SLICE) {
     dom_st->slice_target = atomic_load (&total_work_incurred);
@@ -1455,7 +1455,7 @@ update_major_slice_work(intnat howmuch,
     dom_st->slice_budget = howmuch;
   }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   CAML_GC_MESSAGE(POLICY, "Major slice [%c] work. Policy="
                   "%"ARCH_INTNAT_PRINTF_FORMAT "u. Allocation: "
                   "%"ARCH_INTNAT_PRINTF_FORMAT "u words, "
@@ -1490,7 +1490,7 @@ update_major_slice_work(intnat howmuch,
                                      atomic_load(&total_work_completed)));
     CAML_EV_COUNTER(EV_C_MAJOR_SLICE_BUDGET,
                     dom_st->slice_budget);
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_gc_log("Updated major work: [%c] "
               " %"ARCH_INTNAT_PRINTF_FORMAT "u heap_words, "
               " %"ARCH_INTNAT_PRINTF_FORMAT "u allocated, "
@@ -1549,7 +1549,7 @@ update_major_slice_work(intnat howmuch,
     CAML_EV_COUNTER(EV_C_MAJOR_ALLOC_COUNTER, atomic_load (&alloc_counter));
     CAML_EV_COUNTER(EV_C_MAJOR_SLICE_TARGET, dom_st->slice_target);
     CAML_EV_COUNTER(EV_C_MAJOR_SLICE_BUDGET, dom_st->slice_budget);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   }
 }
 
@@ -1588,7 +1588,7 @@ static void commit_major_slice_sweepwork(intnat words_done) {
   }
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 static intnat get_major_slice_markwork(collection_slice_mode mode)
 {
   intnat budget = get_major_slice_sweepwork(mode);
@@ -1601,7 +1601,7 @@ static void commit_major_slice_markwork(intnat words_done)
 }
 
 static void mark_stack_prune(struct mark_stack* stk);
-||||||| 23e84b8c4d
+||||||| upstream-base
 static void mark_stack_prune(struct mark_stack* stk);
 =======
 /*******************************************************************************
@@ -1639,7 +1639,7 @@ struct mark_stack {
   struct addrmap compressed_stack;
   addrmap_iterator compressed_stack_iter;
 };
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 #ifdef DEBUG
 #define Is_markable(v) \
@@ -1936,7 +1936,7 @@ static void mark_slice_darken(struct mark_stack* stk, value child,
   }
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 static CAMLno_tsan
 #if defined(WITH_THREAD_SANITIZER)
 Caml_noinline
@@ -1945,12 +1945,12 @@ value volatile_load_uninstrumented(volatile value* p) {
   return *p;
 }
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 CAMLno_tsan /* Loads from locations in the OCaml heap can cause false alarms in
                TSan when these locations are concurrently written to by
                caml_modify (see comment inside the function). */
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 Caml_noinline static intnat do_some_marking(struct mark_stack* stk,
                                             intnat budget)
 {
@@ -2062,19 +2062,19 @@ again:
     for (; me.start < scan_end; me.start++) {
       CAMLassert(budget >= 0);
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
       /* This load may race with a concurrent caml_modify. It does not
          constitute a data race as this is a volatile load. However, TSan will
          wrongly see a race here (see section 3.2 of comment in tsan.c). We
          therefore make sure it is never TSan-instrumented. */
-||||||| 23e84b8c4d
+||||||| upstream-base
       /* This load may race with a concurrent caml_modify. It does not
          constitute a data race as this is a volatile load. However, TSan will
          wrongly see a race here (see section 3.2 of comment in tsan.c). Hence
          the TSan-silencing of the present function. */
       value child = *me.start;
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       value child = volatile_load_uninstrumented(me.start);
 
       budget--;
@@ -2213,7 +2213,7 @@ static void cycle_major_heap_from_stw_single(
   caml_domain_state* domain,
   uintnat num_domains_in_stw)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   value v, data, key, f, todo;
   value* prev_linkp;
   header_t hd;
@@ -2221,7 +2221,7 @@ static void cycle_major_heap_from_stw_single(
   caml_domain_state* domain_state = Caml_state;
   int alive_data;
   uintnat examined = 0, trivial_data = 0, marked_data = 0;
-||||||| 23e84b8c4d
+||||||| upstream-base
   value v, data, key, f, todo;
   value* prev_linkp;
   header_t hd;
@@ -2236,9 +2236,9 @@ static void cycle_major_heap_from_stw_single(
   caml_cycle_heap_from_stw_single();
   caml_gc_log("GC cycle %lu completed (heap cycled)",
               (long unsigned int)caml_major_cycles_completed);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   CAMLassert(caml_marking_started());
   if (domain_state->ephe_info->cursor.cycle == for_cycle &&
       !force_alive) {
@@ -2255,7 +2255,7 @@ static void cycle_major_heap_from_stw_single(
     hd = Hd_val(v);
     data = Ephe_data(v);
     alive_data = 1;
-||||||| 23e84b8c4d
+||||||| upstream-base
   if (domain_state->ephe_info->cursor.cycle == for_cycle &&
       !force_alive) {
     prev_linkp = domain_state->ephe_info->cursor.todop;
@@ -2274,7 +2274,7 @@ static void cycle_major_heap_from_stw_single(
 =======
   caml_major_cycles_completed++;
   CAML_GC_MESSAGE(SLICESIZE, "Starting major GC cycle\n");
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   if (atomic_load_relaxed(&caml_verb_gc) & CAML_GC_MSG_STATS) {
     struct gc_stats s;
@@ -2290,7 +2290,7 @@ static void cycle_major_heap_from_stw_single(
                  "swept_words %"ARCH_INTNAT_PRINTF_FORMAT"d",
                  heap_words, not_garbage_words, swept_words);
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
     size = Wosize_hd(hd);
     for (i = CAML_EPHE_FIRST_KEY; alive_data && i < size; i++) {
       key = ephe_key(v, i);
@@ -2314,7 +2314,7 @@ static void cycle_major_heap_from_stw_single(
             alive_data = 0;
         }
       }
-||||||| 23e84b8c4d
+||||||| upstream-base
     size = Wosize_hd(hd);
     for (i = CAML_EPHE_FIRST_KEY; alive_data && i < size; i++) {
       key = Field(v, i);
@@ -2362,9 +2362,9 @@ static void cycle_major_heap_from_stw_single(
                                                - live_words) / live_words;
 
       caml_gc_log("Previous cycle's space_overhead: %lf", space_overhead);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     }
-<<<<<<< HEAD
+<<<<<<< oxcaml
     budget -= Whsize_wosize(i);
 
     bool keep;
@@ -2393,7 +2393,7 @@ static void cycle_major_heap_from_stw_single(
       *prev_linkp = todo;
     }
     ++ examined;
-||||||| 23e84b8c4d
+||||||| upstream-base
     budget -= Whsize_wosize(i);
 
     if (force_alive || alive_data) {
@@ -2412,17 +2412,17 @@ static void cycle_major_heap_from_stw_single(
 =======
     last_cycle.heap_words = heap_words;
     last_cycle.not_garbage_words = not_garbage_words;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 #define F_U "%"ARCH_INTNAT_PRINTF_FORMAT"u"
   CAML_GC_MESSAGE(SLICE, "Marked ephemerons: %s. Ephemeron cycle "F_U
                   " examined "F_U" trivial data "F_U" marked data "F_U"\n",
                   domain_state->ephe_info->cursor.cycle == for_cycle ?
                   "Continued from cursor" : "Discarded cursor",
                   for_cycle, examined, trivial_data, marked_data);
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_gc_log
   ("Mark Ephemeron: %s. Ephemeron cycle=%"ARCH_INTNAT_PRINTF_FORMAT"d "
    "examined=%"ARCH_INTNAT_PRINTF_FORMAT"d "
@@ -2432,7 +2432,7 @@ static void cycle_major_heap_from_stw_single(
    for_cycle, marked, made_live);
 =======
   domain->swept_words = 0;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   caml_atomic_counter_init(&num_domains_to_sweep, num_domains_in_stw);
   caml_atomic_counter_init(&num_domains_to_mark, num_domains_in_stw);
@@ -2452,7 +2452,7 @@ static void cycle_major_heap_from_stw_single(
   caml_atomic_counter_init(&num_domains_to_final_update_last,
                            num_domains_in_stw);
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
     if (is_unmarked(v)) {
       /* The whole array is dead, drop this ephemeron */
     } else {
@@ -2463,7 +2463,7 @@ static void cycle_major_heap_from_stw_single(
     }
   }
   return budget;
-||||||| 23e84b8c4d
+||||||| upstream-base
     if (is_unmarked(v)) {
       /* The whole array is dead, drop this ephemeron */
       budget -= 1;
@@ -2479,7 +2479,7 @@ static void cycle_major_heap_from_stw_single(
   atomic_store(&domain_global_roots_started, WORK_UNSTARTED);
 
   caml_code_fragment_cleanup_from_stw_single();
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 static void request_mark_phase (void)
@@ -2733,13 +2733,13 @@ static void stw_cycle_all_domains(
                         (domain, (void*)0, participating_count, participating);
 
   CAML_EV_BEGIN(EV_MAJOR_GC_STW);
-<<<<<<< HEAD
+<<<<<<< oxcaml
   static bool compacting = false;
   Caml_global_barrier_if_final(participating_count) {
     cycle_major_heap_from_stw_single(domain, (uintnat) participating_count);
     /* Do compaction decision for all domains here */
     compacting = should_compact_from_stw_single(params.compaction_mode);
-||||||| 23e84b8c4d
+||||||| upstream-base
 
   {
     /* Cycle major heap */
@@ -2836,7 +2836,7 @@ static void stw_cycle_all_domains(
 =======
   Caml_global_barrier_if_final(participating_count) {
     cycle_major_heap_from_stw_single(domain, (uintnat) participating_count);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   }
 
   /* If the heap is to be verified, do it before the domains continue
@@ -2880,8 +2880,8 @@ static void stw_cycle_all_domains(
   domain->sweeping_done = 0;
   domain->marking_done = 0;
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
   CAML_EV_BEGIN(EV_MAJOR_MARK_ROOTS);
   caml_do_roots (&caml_darken, darken_scanning_flags, domain, domain, 0);
   {
@@ -2962,7 +2962,7 @@ static void stw_cycle_all_domains(
   if (domain->ephe_info->todo == (value) NULL)
     ephe_todo_list_emptied();
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   /* Finalisers */
   domain->final_info->updated_first = 0;
   domain->final_info->updated_last = 0;
@@ -3057,27 +3057,27 @@ static void stw_try_complete_gc_phase(
   CAML_EV_END(EV_MAJOR_GC_PHASE_CHANGE);
 }
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 intnat caml_opportunistic_major_work_available (void)
 =======
 /*******************************************************************************
  * Major GC slices
  ******************************************************************************/
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 intnat caml_opportunistic_major_work_available (caml_domain_state* domain_state)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   return
     !domain_state->sweeping_done ||
     (caml_marking_started() && !domain_state->marking_done);
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_domain_state* domain_state = Caml_state;
   return !domain_state->sweeping_done || !domain_state->marking_done;
 =======
   return !domain_state->sweeping_done || !domain_state->marking_done;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 static char collection_slice_mode_char(collection_slice_mode mode)
@@ -3110,29 +3110,29 @@ static void major_collection_slice(intnat howmuch,
   /* Opportunistic slices may run concurrently with gc phase updates. */
   int may_access_gc_phase = (mode != Slice_opportunistic);
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   CAML_GC_MESSAGE(SLICE, "Major slice start [%c%c%c]\n",
                   collection_slice_mode_char(mode),
                   !caml_incoming_interrupts_queued() ? '.' : '*',
                   caml_gc_phase_char(may_access_gc_phase));
-||||||| 23e84b8c4d
+||||||| upstream-base
   int log_events = mode != Slice_opportunistic ||
                    (atomic_load_relaxed(&caml_verb_gc) & 0x40);
 =======
   int log_events = mode != Slice_opportunistic ||
                    (atomic_load_relaxed(&caml_verb_gc) &
                     CAML_GC_MSG_SLICESIZE);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   bool log_events = mode != Slice_opportunistic ||
                     (atomic_load_relaxed(&caml_verb_gc) &
                      CAML_GC_MSG_SLICE);
 
-||||||| 23e84b8c4d
+||||||| upstream-base
   update_major_slice_work(howmuch, may_access_gc_phase);
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   update_major_slice_work(howmuch, may_access_gc_phase, log_events);
 
   /* When a full slice of major GC work is done,
@@ -3143,14 +3143,14 @@ static void major_collection_slice(intnat howmuch,
    * NB: needed particularly to avoid caml_ev spam when polling */
   if (mode == Slice_opportunistic &&
       !caml_opportunistic_major_work_available(domain_state)) {
-<<<<<<< HEAD
+<<<<<<< oxcaml
     commit_major_slice_sweepwork (0);
-||||||| 23e84b8c4d
+||||||| upstream-base
       !caml_opportunistic_major_work_available()) {
     commit_major_slice_work (0);
 =======
     commit_major_slice_work (0);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     return;
   }
 
@@ -3246,17 +3246,17 @@ mark_again:
 
     /* Ephemerons */
     if (caml_gc_phase != Phase_sweep_ephe) {
-<<<<<<< HEAD
+<<<<<<< oxcaml
       /* Ephemeron Marking
          This work is accounted as marking work */
       saved_ephe_cycle = atomic_load_acquire(&ephe_cycle_info.ephe_cycle);
-||||||| 23e84b8c4d
+||||||| upstream-base
       /* Ephemeron Marking */
       saved_ephe_cycle = atomic_load_acquire(&ephe_cycle_info.ephe_cycle);
 =======
       /* Ephemeron Marking */
       saved_ephe_cycle = caml_atomic_counter_value(&ephe_cycle_info.ephe_cycle);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       if (domain_state->ephe_info->todo != (value) NULL &&
           saved_ephe_cycle > domain_state->ephe_info->cycle &&
           get_major_slice_markwork(mode) > 0) {
@@ -3523,24 +3523,24 @@ void caml_finish_marking (void)
     empty_mark_stack();
     shrink_mark_stack();
     Caml_state->stat_major_words += Caml_state->allocated_words;
-<<<<<<< HEAD
+<<<<<<< oxcaml
     Caml_state->stat_major_dependent_bytes +=
       Caml_state->allocated_dependent_bytes;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
     Caml_state->current_ramp_up_allocated_words_diff +=
       Caml_state->allocated_words_suspended;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     Caml_state->allocated_words = 0;
     Caml_state->allocated_words_direct = 0;
-<<<<<<< HEAD
+<<<<<<< oxcaml
     Caml_state->allocated_dependent_bytes = 0;
     CAMLassert(Caml_state->marking_done);
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
     Caml_state->allocated_words_suspended = 0;
     Caml_state->allocated_words_resumed = 0;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     CAML_EV_END(EV_MAJOR_FINISH_MARKING);
   }
 }
@@ -3562,7 +3562,7 @@ void caml_finish_sweeping (void)
   CAML_EV_END(EV_MAJOR_FINISH_SWEEPING);
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Caml_inline int add_addr(struct addrmap* amap, value_ptr ptr) {
   uintnat chunk = ptr_to_chunk(ptr);
   uintnat offset = ptr_to_chunk_offset(ptr);
@@ -3641,7 +3641,7 @@ static void mark_stack_prune(struct mark_stack* stk)
   stk->compressed_stack_iter = caml_addrmap_iterator(&stk->compressed_stack);
 }
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 Caml_inline int add_addr(struct addrmap* amap, value_ptr ptr) {
   uintnat chunk = ptr_to_chunk(ptr);
   uintnat offset = ptr_to_chunk_offset(ptr);
@@ -3719,7 +3719,7 @@ static void mark_stack_prune(struct mark_stack* stk)
 }
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 int caml_init_major_gc(caml_domain_state* d) {
   d->mark_stack = caml_stat_alloc_noexc(sizeof(struct mark_stack));
   if(d->mark_stack == NULL) {
@@ -3781,14 +3781,14 @@ void caml_teardown_major_gc(void) {
   /* Account for latest allocations, but do not write to the event ring since
      we are out of the STW participant set; the ring may be torn down
      concurrently. */
-<<<<<<< HEAD
+<<<<<<< oxcaml
   update_major_slice_work (0, may_access_gc_phase, false);
-||||||| 23e84b8c4d
+||||||| upstream-base
   /* account for latest allocations */
   update_major_slice_work (0, may_access_gc_phase);
 =======
   update_major_slice_work (0, may_access_gc_phase, 0);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   CAMLassert(!caml_addrmap_iter_ok(&d->mark_stack->compressed_stack,
                                    d->mark_stack->compressed_stack_iter));
   caml_addrmap_clear(&d->mark_stack->compressed_stack);

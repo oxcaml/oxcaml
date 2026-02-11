@@ -140,7 +140,7 @@ module Doc: sig
   val result: ok:'a printer -> error:'e printer -> ('a,'e) result printer
   val either: left:'a printer -> right:'b printer -> ('a,'b) Either.t printer
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 end
 
 (** {1 Compatibility API} *)
@@ -288,7 +288,7 @@ val pp_nested_list :
     [~nested] is true, the list is wrapped in parens. The element printer is
     always called with [nested:true], indicating that any inner lists are nested
     and need parens. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   (** {1 Alignment functions } *)
 
@@ -428,7 +428,7 @@ val pp_print_newline: unit printer
 
 val comma: unit printer
 val semicolon: unit printer
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (** {2 Compiler output} *)
 

@@ -87,7 +87,7 @@ DOMAIN_STATE(uintnat, sweeping_done)
 /* Is sweeping done for the current major cycle. */
 
 DOMAIN_STATE(uintnat, allocated_words)
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* Number of words promoted or allocated directly to the major heap since
    latest slice. */
 
@@ -101,7 +101,7 @@ DOMAIN_STATE(uintnat, allocated_dependent_bytes)
 
 DOMAIN_STATE(uintnat, minor_words_at_last_slice)
 /* Number of minor heap words allocated before the latest slice */
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 /* Number of words allocated in the major heap (by promotion or
    direct allocation) since the latest slice. */
@@ -139,7 +139,7 @@ DOMAIN_STATE(intnat, current_ramp_up_allocated_words_diff)
    this would require additional work to increment this value
    in [caml_update_major_allocated_words].)
 */
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 DOMAIN_STATE(uintnat, swept_words)
 

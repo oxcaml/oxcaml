@@ -43,7 +43,7 @@
 
 open Lambda
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (** {1. Sizing} *)
 
 (* Simple blocks *)
@@ -958,7 +958,7 @@ let compile_letrec input_bindings body =
                  no_loc)
         in
         Llet(Strict, Lambda.layout_letrec, id, duid, alloc, body))
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 (** Allocation and backpatching primitives *)
 
@@ -1805,7 +1805,7 @@ let compile_letrec input_bindings body =
     List.fold_left (fun body (id, size, _lam) ->
         let alloc = compile_alloc size in
         Llet(Strict, Pgenval, id, alloc, body))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       body_with_dynamic_values all_bindings_rev.static
   in
   body_with_pre_allocations

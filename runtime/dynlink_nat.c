@@ -39,10 +39,10 @@ CAMLexport void (*caml_natdynlink_hook)(void* handle, const char* unit) = NULL;
 #include <string.h>
 #include <limits.h>
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* This should match the value of Symbol.separator () */
 #define CAML_SYM_SEPARATOR "__"
-||||||| 23e84b8c4d
+||||||| upstream-base
 /* This should match the value of Compilenv.symbol_separator */
 #ifdef _MSC_VER
 #define CAML_SYM_SEPARATOR "$"
@@ -55,7 +55,7 @@ CAMLexport void (*caml_natdynlink_hook)(void* handle, const char* unit) = NULL;
 #else
  #define CAML_SYM_SEPARATOR "."
 #endif
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 #define Handle_val(v) (*((void **) Data_abstract_val(v)))
 static value Val_handle(void* handle) {
@@ -130,8 +130,8 @@ CAMLprim value caml_natdynlink_register(value handle_v, value symbols) {
 
   for (int i = 0; i < nsymbols; i++) {
     const char* unit = String_val(Field(symbols, i));
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
     table[i] = getsym(handle, unit, "frametable");
     if (table[i] == NULL) {
       caml_stat_free(table);
@@ -155,7 +155,7 @@ CAMLprim value caml_natdynlink_register(value handle_v, value symbols) {
 
   for (int i = 0; i < nsymbols; i++) {
     const char* unit = String_val(Field(symbols, i));
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     table[i] = getsym(handle, unit, "gc_roots");
     if (table[i] == NULL) {
       caml_stat_free(table);

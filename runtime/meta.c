@@ -139,13 +139,13 @@ CAMLprim value caml_realloc_global(value size)
   actual_size = Wosize_val(old_global_data);
   if (requested_size >= actual_size) {
     requested_size = (requested_size + 0x100) & 0xFFFFFF00;
-<<<<<<< HEAD
+<<<<<<< oxcaml
     CAML_GC_MESSAGE(TABLES, "Growing global data to %"
-||||||| 23e84b8c4d
+||||||| upstream-base
     caml_gc_message (0x08, "Growing global data to %"
 =======
     CAML_GC_MESSAGE(STACKSIZE, "Growing global data to %"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                      ARCH_INTNAT_PRINTF_FORMAT "u entries\n",
                      requested_size);
     new_global_data = caml_alloc_shr(requested_size, 0);

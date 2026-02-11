@@ -1,27 +1,27 @@
-<<<<<<< HEAD
+<<<<<<< oxcaml
 camlStack_realloc2__callback_3_14_code
-||||||| 23e84b8c4d
+||||||| upstream-base
 camlStack_realloc2.callback
 =======
 camlStack_realloc2$callback
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 caml_start_program
 caml_callback
 c_fun
 caml_c_call
-<<<<<<< HEAD
+<<<<<<< oxcaml
 camlStack_realloc2__f_comp_5_16_code
-||||||| 23e84b8c4d
+||||||| upstream-base
 camlStack_realloc2.f_comp
 =======
 camlStack_realloc2$f_comp
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 caml_runstack
-<<<<<<< HEAD
+<<<<<<< oxcaml
 camlStack_realloc2__entry
-||||||| 23e84b8c4d
+||||||| upstream-base
 camlStack_realloc2.entry
 =======
 camlStack_realloc2$entry
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 caml_program

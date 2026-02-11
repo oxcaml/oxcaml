@@ -2,7 +2,7 @@
  expect;
 *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* A type with kind value, used for the below tests *)
 type t_value
 [%%expect {|
@@ -339,7 +339,7 @@ Error: This type "t_value" should be an instance of type "('a : immediate)"
        But the kind of t_value must be a subkind of immediate
          because of the definition of t at line 5, characters 0-39.
 |}];;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 (* You may constrain abstract types in packages. *)
 module type S = sig
@@ -589,4 +589,4 @@ end
 [%%expect {|
 module X : sig type t end
 |}]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

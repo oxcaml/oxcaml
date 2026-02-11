@@ -39,23 +39,23 @@ type error =
   | Custom_runtime
   | File_exists of filepath
   | Cannot_open_dll of filepath
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Required_compunit_unavailable of CU.t * CU.t
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Required_compunit_unavailable of (compunit * compunit)
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Camlheader of string * filepath
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Wrong_link_order of DepSet.t
   | Multiple_definition of CU.t * filepath * filepath
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Wrong_link_order of DepSet.t
   | Multiple_definition of compunit * filepath * filepath
 =======
   | Link_error of Linkdeps.error
   | Needs_custom_runtime of string
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 exception Error of error
 
@@ -113,11 +113,11 @@ let add_ccobjs obj_name origin l =
 
 (* First pass: determine which units are needed *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let missing_compunits = ref CU.Map.empty
 let provided_compunits = ref CU.Set.empty
 let badly_ordered_dependencies : DepSet.t ref = ref DepSet.empty
-||||||| 23e84b8c4d
+||||||| upstream-base
 let missing_compunits = ref Compunit.Map.empty
 let provided_compunits = ref Compunit.Set.empty
 let badly_ordered_dependencies : DepSet.t ref = ref DepSet.empty
@@ -126,15 +126,15 @@ let required compunit =
   (Symtable.required_compunits compunit.cu_reloc
    @ compunit.cu_required_compunits)
   |> List.map (fun (Compunit i) -> i)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let record_badly_ordered_dependency cu1 cu2 =
   badly_ordered_dependencies
     := DepSet.add (cu1, cu2) !badly_ordered_dependencies
 
 let is_required (rel, _pos) =
-||||||| 23e84b8c4d
+||||||| upstream-base
 let record_badly_ordered_dependency dep =
   badly_ordered_dependencies := DepSet.add dep !badly_ordered_dependencies
 
@@ -142,22 +142,22 @@ let is_required (rel, _pos) =
 =======
 let provided compunit =
   List.filter_map (fun (rel, _pos) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   match rel with
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Reloc_setcompunit cu ->
       CU.Map.mem cu !missing_compunits
     | _ -> false
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Reloc_setcompunit cu ->
       Compunit.Map.mem cu !missing_compunits
     | _ -> false
 =======
     | Reloc_setcompunit (Compunit id) -> Some id
     | _ -> None) compunit.cu_reloc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let add_required compunit =
   let add cu =
     if CU.Set.mem cu !provided_compunits then
@@ -166,7 +166,7 @@ let add_required compunit =
   in
   List.iter add (Symtable.required_compunits compunit.cu_reloc);
   List.iter add compunit.cu_required_compunits
-||||||| 23e84b8c4d
+||||||| upstream-base
 let add_required compunit =
   let add cu =
     if Compunit.Set.mem cu !provided_compunits then
@@ -183,9 +183,9 @@ let linkdeps_unit ldeps ~filename compunit =
   let provides = provided compunit in
   let Compunit compunit = compunit.cu_name in
   Linkdeps.add ldeps ~filename ~compunit ~requires ~provides
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let remove_required (rel, _pos) =
   match rel with
     Reloc_setcompunit cu ->
@@ -194,7 +194,7 @@ let remove_required (rel, _pos) =
   | _ -> ()
 
 let scan_file obj_name tolink =
-||||||| 23e84b8c4d
+||||||| upstream-base
 let remove_required (rel, _pos) =
   match rel with
     Reloc_setcompunit cu ->
@@ -205,7 +205,7 @@ let remove_required (rel, _pos) =
 let scan_file obj_name tolink =
 =======
 let scan_file ldeps obj_name tolink =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let file_name =
     try
       Load_path.find obj_name
@@ -260,18 +260,18 @@ let scan_file ldeps obj_name tolink =
 module Consistbl = Consistbl.Make (CU.Name) (Import_info.Intf.Nonalias.Kind)
 
 let crc_interfaces = Consistbl.create ()
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let interfaces = ref ([] : CU.Name.t list)
 let implementations_defined = ref ([] : (CU.t * string) list)
-||||||| 23e84b8c4d
+||||||| upstream-base
 let interfaces = ref ([] : string list)
 let implementations_defined = ref ([] : (compunit * string) list)
 =======
 let interfaces = ref ([] : string list)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let check_consistency file_name cu =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   begin try
     let source = List.assoc cu.cu_name !implementations_defined in
     raise (Error (Multiple_definition(cu.cu_name, file_name, source)));
@@ -282,7 +282,7 @@ let check_consistency file_name cu =
       (fun import ->
         let name = Import_info.name import in
         let info = Import_info.Intf.info import in
-||||||| 23e84b8c4d
+||||||| upstream-base
   begin try
     let source = List.assoc cu.cu_name !implementations_defined in
     raise (Error (Multiple_definition(cu.cu_name, file_name, source)));
@@ -295,7 +295,7 @@ let check_consistency file_name cu =
   try
     List.iter
       (fun (name, crco) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         interfaces := name :: !interfaces;
         match info with
           None -> ()
@@ -339,7 +339,7 @@ let link_compunit output_fun currpos_fun inchan file_name compunit =
   if !Clflags.debug && compunit.cu_debug > 0 then begin
     seek_in inchan compunit.cu_debug;
     let debug_event_list : Instruct.debug_event list =
-<<<<<<< HEAD
+<<<<<<< oxcaml
       (* CR ocaml 5 compressed-marshal:
       Compression.input_value inchan
       *)
@@ -351,14 +351,14 @@ let link_compunit output_fun currpos_fun inchan file_name compunit =
       *)
       Marshal.from_channel inchan
     in
-||||||| 23e84b8c4d
+||||||| upstream-base
     let debug_event_list : Instruct.debug_event list = input_value inchan in
     let debug_dirs : string list = input_value inchan in
 =======
       Compression.input_value inchan in
     let debug_dirs : string list =
       Compression.input_value inchan in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     let file_path = Filename.dirname (Location.absolute_path file_name) in
     let debug_dirs =
       if List.mem file_path debug_dirs
@@ -781,9 +781,9 @@ static char caml_data[] = {
          [| Bytesections.Name.to_string SYMB,
             Symtable.data_global_map();
             Bytesections.Name.to_string CRCS,
-<<<<<<< HEAD
+<<<<<<< oxcaml
             Obj.repr(extract_crc_interfaces() |> Array.of_list) |]
-||||||| 23e84b8c4d
+||||||| upstream-base
        let sections : (string * Obj.t) list =
          [ Bytesections.Name.to_string SYMB,
            Symtable.data_global_map();
@@ -793,7 +793,7 @@ static char caml_data[] = {
            Obj.repr(extract_crc_interfaces()) ]
 =======
             Obj.repr(extract_crc_interfaces()) |]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
        in
        output_string outchan {|
 static char caml_sections[] = {
@@ -921,7 +921,7 @@ let link objfiles output_name =
     | false, true, false -> "stdlib.cma" :: objfiles
     | _                  -> "stdlib.cma" :: objfiles @ ["std_exit.cmo"]
   in
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let tolink = List.fold_right scan_file objfiles [] in
   begin
     match CU.Map.bindings !missing_compunits with
@@ -933,7 +933,7 @@ let link objfiles output_name =
         else
             raise (Error (Wrong_link_order !badly_ordered_dependencies))
   end;
-||||||| 23e84b8c4d
+||||||| upstream-base
   let tolink = List.fold_right scan_file objfiles [] in
   begin
     match Compunit.Map.bindings !missing_compunits with
@@ -951,7 +951,7 @@ let link objfiles output_name =
   (match Linkdeps.check ldeps with
    | None -> ()
    | Some e -> raise (Error (Link_error e)));
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   Clflags.ccobjs := !Clflags.ccobjs @ !lib_ccobjs; (* put user's libs last *)
   Clflags.all_ccopts := !lib_ccopts @ !Clflags.all_ccopts;
                                                    (* put user's opts first *)
@@ -1081,16 +1081,16 @@ let report_error_doc ppf = function
                  make inconsistent assumptions over interface %a@]"
         Location.Doc.quoted_filename file1
         Location.Doc.quoted_filename file2
-<<<<<<< HEAD
+<<<<<<< oxcaml
         Style.inline_code
         (Format_doc.asprintf "%a" CU.Name.print intf)
-||||||| 23e84b8c4d
+||||||| upstream-base
         (Style.as_inline_code Location.print_filename) file1
         (Style.as_inline_code Location.print_filename) file2
         Style.inline_code intf
 =======
         Style.inline_code intf
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Custom_runtime ->
       fprintf ppf "Error while building custom runtime system"
   | File_exists file ->
@@ -1099,12 +1099,12 @@ let report_error_doc ppf = function
   | Cannot_open_dll file ->
       fprintf ppf "Error on dynamically loaded library: %a"
         Location.Doc.filename file
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Required_compunit_unavailable (unavailable, required_by) ->
       fprintf ppf "Module %a is unavailable (required by %a)"
         CU.print_as_inline_code unavailable
         CU.print_as_inline_code required_by
-||||||| 23e84b8c4d
+||||||| upstream-base
         Location.print_filename file
   | Required_compunit_unavailable
     (Compunit unavailable, Compunit required_by) ->
@@ -1112,12 +1112,12 @@ let report_error_doc ppf = function
         Style.inline_code unavailable
         Style.inline_code required_by
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Camlheader (msg, header) ->
       fprintf ppf "System error while copying file %a: %a"
         Style.inline_code header
         Style.inline_code msg
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Wrong_link_order depset ->
       let l = DepSet.elements depset in
       let depends_on ppf (dep, depending) =
@@ -1133,7 +1133,7 @@ let report_error_doc ppf = function
         Location.Doc.quoted_filename file1
         Location.Doc.quoted_filename file2
         CU.print_as_inline_code compunit
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Wrong_link_order depset ->
       let l = DepSet.elements depset in
       let depends_on ppf (dep, depending) =
@@ -1156,7 +1156,7 @@ let report_error_doc ppf = function
   | Needs_custom_runtime obj_name ->
       fprintf ppf "%s links with C code, so cannot be linked with -use-prims \
                    or -use-runtime unless -noautolink is specified" obj_name
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let () =
   Location.register_error_of_exn
@@ -1171,12 +1171,12 @@ let reset () =
   lib_ccobjs := [];
   lib_ccopts := [];
   lib_dllibs := [];
-<<<<<<< HEAD
+<<<<<<< oxcaml
   missing_compunits := CU.Map.empty;
-||||||| 23e84b8c4d
+||||||| upstream-base
   missing_compunits := Compunit.Map.empty;
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   Consistbl.clear crc_interfaces;
   debug_info := [];
   output_code_string_counter := 0

@@ -1,11 +1,11 @@
 (* TEST
-<<<<<<< HEAD
+<<<<<<< oxcaml
    runtime5;
    frame_pointers;
    readonly_files = "fp_backtrace.c stack_realloc_.c";
    all_modules = "${readonly_files} stack_realloc2.ml";
    native;
-||||||| 23e84b8c4d
+||||||| upstream-base
  frame_pointers;
  readonly_files = "fp_backtrace.c stack_realloc_.c";
  all_modules = "${readonly_files} stack_realloc2.ml";
@@ -25,7 +25,7 @@
    arch_amd64;
    native;
  }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 *)
 
 open Effect

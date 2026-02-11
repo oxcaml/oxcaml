@@ -1,5 +1,5 @@
 Indexed shapes:
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Resolved: Index_constrs.1 :
   M.F (File "index_constrs.ml", line 32, characters 32-35)
 Resolved: Index_constrs.0 :
@@ -15,7 +15,7 @@ Unresolved: CU Stdlib . "raise"[value]  :
 Resolved: Index_constrs.4 :
   E (File "index_constrs.ml", line 25, characters 9-10)
 Resolved: Index_constrs.0 :
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 Resolved: Index_constrs.2:
   M (File "index_constrs.ml", line 32, characters 32-33)
@@ -34,7 +34,7 @@ Unresolved: CU Stdlib . "raise"[value] :
 Resolved: Index_constrs.4:
   E (File "index_constrs.ml", line 25, characters 9-10)
 Resolved: Index_constrs.0:
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   E (File "index_constrs.ml", line 20, characters 16-17)
 
 Uid of decls:

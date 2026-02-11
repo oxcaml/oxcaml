@@ -25,13 +25,13 @@ type t = {
   original_source_file: filename;
   raw_source_file: filename;
   prefix: file_prefix;
-<<<<<<< HEAD
+<<<<<<< oxcaml
   modname: Compilation_unit.t;
-||||||| 23e84b8c4d
+||||||| upstream-base
   modname: modname;
 =======
   modname: modname;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   kind: intf_or_impl;
 }
 
@@ -64,7 +64,7 @@ let modulize s = match Misc.Utf8_lexeme.capitalize s with Ok x | Error x -> x
 let normalize x = match Misc.normalized_unit_filename x with
   | Ok x | Error x -> x
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let compilation_unit_from_source ~for_pack_prefix source_file =
   let modname =
     modname_from_source source_file |> Compilation_unit.Name.of_string
@@ -74,14 +74,14 @@ let compilation_unit_from_source ~for_pack_prefix source_file =
 let start_char = function
   | 'A' .. 'Z' -> true
   | _ -> false
-||||||| 23e84b8c4d
+||||||| upstream-base
 let start_char = function
   | 'A' .. 'Z' -> true
   | _ -> false
 =======
 let stem source_file =
   source_file |> Filename.basename |> basename_chop_extensions
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let strict_modname_from_source source_file =
   source_file |> stem |> strict_modulize
@@ -98,7 +98,7 @@ let check_unit_name file =
     Location.prerr_warning (Location.in_file (original_source_file file))
       (Warnings.Bad_module_name name)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let make ?(check_modname=true) ~source_file ~for_pack_prefix kind prefix =
   let modname = compilation_unit_from_source ~for_pack_prefix prefix in
   let p =
@@ -110,7 +110,7 @@ let make ?(check_modname=true) ~source_file ~for_pack_prefix kind prefix =
       kind
     }
   in
-||||||| 23e84b8c4d
+||||||| upstream-base
 let make ?(check_modname=true) ~source_file prefix =
   let modname = modname_from_source prefix in
   let p = { modname; prefix; source_file } in
@@ -118,7 +118,7 @@ let make ?(check_modname=true) ~source_file prefix =
 let make ?(check_modname=true) ~source_file kind prefix =
   let modname = strict_modname_from_source prefix in
   let p = { modname; prefix; source_file; kind } in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   if check_modname then check_unit_name p;
   p
 
@@ -154,12 +154,12 @@ module Artifact = struct
   let modname x = x.modname
   let prefix x = Filename.remove_extension (filename x)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let from_filename ~for_pack_prefix filename =
     let modname = compilation_unit_from_source ~for_pack_prefix filename in
 
     { modname; filename; original_source_file = None; raw_source_file = None }
-||||||| 23e84b8c4d
+||||||| upstream-base
   let from_filename filename =
     let modname = modname_from_source filename in
     { modname; filename; source_file = None }
@@ -167,7 +167,7 @@ module Artifact = struct
   let from_filename filename =
     let modname = lax_modname_from_source filename in
     { modname; filename; source_file = None }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 end
 
@@ -231,14 +231,14 @@ let is_cmi f = Filename.check_suffix (Artifact.filename f) ".cmi"
 let find_normalized_cmi f =
   let filename = (modname f |> Compilation_unit.name_as_string) ^ ".cmi" in
   let filename = Load_path.find_normalized filename in
-<<<<<<< HEAD
+<<<<<<< oxcaml
   {
     Artifact.filename;
     modname = modname f;
     original_source_file = Some f.original_source_file;
     raw_source_file = Some f.raw_source_file;
   }
-||||||| 23e84b8c4d
+||||||| upstream-base
   { Artifact.filename; modname = modname f; source_file = Some f.source_file  }
 =======
   { Artifact.filename; modname = modname f; source_file = Some f.source_file  }
@@ -253,4 +253,4 @@ let () =
       | Error err -> Some (report_error err)
       | _ -> None
     )
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

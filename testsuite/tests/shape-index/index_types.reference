@@ -1,5 +1,5 @@
 Indexed shapes:
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Resolved: Index_types.9 :
   t (File "index_types.ml", line 41, characters 12-13)
 Resolved: Index_types.10 :
@@ -11,7 +11,7 @@ Resolved: Index_types.3 :
 Resolved: Index_types.0 : t (File "index_types.ml", line 25, characters 9-10)
 Resolved: Index_types.0 : t (File "index_types.ml", line 20, characters 8-9)
 Resolved: Index_types.0 : t (File "index_types.ml", line 20, characters 8-9)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 Resolved: Index_types.9: t (File "index_types.ml", line 41, characters 12-13)
 Resolved: Index_types.10: N (File "index_types.ml", line 41, characters 9-10)
@@ -22,7 +22,7 @@ Resolved: Index_types.3:
 Resolved: Index_types.0: t (File "index_types.ml", line 25, characters 9-10)
 Resolved: Index_types.0: t (File "index_types.ml", line 20, characters 8-9)
 Resolved: Index_types.0: t (File "index_types.ml", line 20, characters 8-9)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 Uid of decls:
 Index_types.0: t (File "index_types.ml", line 18, characters 5-6)

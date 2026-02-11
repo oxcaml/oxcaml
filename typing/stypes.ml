@@ -149,14 +149,14 @@ let print_info pp prev_loc ti =
       Format.pp_print_string Format.str_formatter "  ";
       Printtyp.wrap_printing_env ~error:false env
         (fun () ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
            Format_doc.compat Printtyp.shared_type_scheme Format.str_formatter
              typ
-||||||| 23e84b8c4d
+||||||| upstream-base
         (fun () -> Printtyp.shared_type_scheme Format.str_formatter typ);
 =======
            Printtyp.shared_type_scheme Format.str_formatter typ
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         );
       Format.pp_print_newline Format.str_formatter ();
       let s = Format.flush_str_formatter () in

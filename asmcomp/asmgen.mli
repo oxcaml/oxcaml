@@ -78,13 +78,13 @@ type error =
   | Asm_generation of string * Emitaux.error
 
 exception Error of error
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 val report_error: Format.formatter -> error -> unit
 =======
 val report_error: error Format_doc.format_printer
 val report_error_doc: error Format_doc.printer
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 val report_error : error Format_doc.format_printer
 

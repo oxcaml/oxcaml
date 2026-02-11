@@ -38,9 +38,9 @@ CAMLexport void caml_raise(value v)
 
   caml_channel_cleanup_on_raise();
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   v = caml_process_pending_actions_with_root(v);
-||||||| 23e84b8c4d
+||||||| upstream-base
   // avoid calling caml_raise recursively
   v = caml_process_pending_actions_with_root_exn(v);
   if (Is_exception_result(v))
@@ -51,7 +51,7 @@ CAMLexport void caml_raise(value v)
      If the result is an exception, we want to raise it instead of [v].
      The line below does both these things at once. */
   v = result.data;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   if (Caml_state->external_raise == NULL) {
     caml_terminate_signals();
@@ -64,7 +64,7 @@ CAMLexport void caml_raise(value v)
   siglongjmp(Caml_state->external_raise->jmp->buf, 1);
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 CAMLexport void caml_raise_async(value v)
 {
   Caml_check_caml_state();
@@ -145,7 +145,7 @@ CAMLexport void caml_raise_with_string(value tag, char const *msg)
   CAMLnoreturn;
 }
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 CAMLexport void caml_raise_constant(value tag)
 {
   caml_raise(tag);
@@ -187,7 +187,7 @@ CAMLexport void caml_raise_with_string(value tag, char const *msg)
 }
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 /* PR#5115: Built-in exceptions can be triggered by input_value
    while reading the initial value of [caml_global_data].
 
@@ -256,24 +256,24 @@ CAMLexport value caml_exception_array_bound_error(void)
   return caml_exception_invalid_argument("index out of bounds");
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 CAMLexport void caml_array_align_error(void)
 {
   caml_invalid_argument("address was misaligned");
 }
 
 CAMLexport void caml_raise_out_of_memory(void)
-||||||| 23e84b8c4d
+||||||| upstream-base
 CAMLexport void caml_raise_out_of_memory(void)
 =======
 CAMLexport value caml_exception_out_of_memory(void)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 {
   check_global_data("Out_of_memory");
   return Field(caml_global_data, OUT_OF_MEMORY_EXN);
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 CAMLexport void caml_raise_out_of_fibers(void)
 {
   check_global_data("Out_of_fibers");
@@ -281,20 +281,20 @@ CAMLexport void caml_raise_out_of_fibers(void)
 }
 
 CAMLexport void caml_raise_stack_overflow(void)
-||||||| 23e84b8c4d
+||||||| upstream-base
 CAMLexport void caml_raise_stack_overflow(void)
 =======
 CAMLexport value caml_exception_stack_overflow(void)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 {
   check_global_data("Stack_overflow");
-<<<<<<< HEAD
+<<<<<<< oxcaml
   caml_raise_async(Field(caml_global_data, STACK_OVERFLOW_EXN));
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_raise_constant(Field(caml_global_data, STACK_OVERFLOW_EXN));
 =======
   return Field(caml_global_data, STACK_OVERFLOW_EXN);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 CAMLexport value caml_exception_sys_error(value msg)
@@ -324,9 +324,9 @@ CAMLexport value caml_exception_not_found(void)
 CAMLexport value caml_exception_sys_blocked_io(void)
 {
   check_global_data("Sys_blocked_io");
-<<<<<<< HEAD
+<<<<<<< oxcaml
   caml_raise_constant(Field(caml_global_data, SYS_BLOCKED_IO));
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_raise_constant(Field(caml_global_data, SYS_BLOCKED_IO));
 }
 
@@ -338,7 +338,7 @@ CAMLexport value caml_raise_if_exception(value res)
 
 =======
   return Field(caml_global_data, SYS_BLOCKED_IO);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 int caml_is_special_exception(value exn) {

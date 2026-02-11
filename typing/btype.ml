@@ -106,22 +106,22 @@ module TypePairs = struct
         f (type_expr t1, type_expr t2))
 end
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 (**** Forward declarations ****)
 
 let print_raw =
   ref (fun _ -> assert false : Format.formatter -> type_expr -> unit)
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (**** Type level management ****)
 
 let generic_level = Ident.highest_scope
 let lowest_level = Ident.lowest_scope
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 let pivot_level = 2 * lowest_level - 1
     (* pivot_level - lowest_level < lowest_level *)
 =======
@@ -171,16 +171,16 @@ let add_to_pool ~level ty =
   if level >= generic_level || level <= lowest_level then () else
   let pool = pool_of_level level !pool_stack in
   pool.pool <- ty :: pool.pool
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (**** Some type creators ****)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let newgenty desc = newty2 ~level:generic_level desc
 let newgenvar ?name jkind = newgenty (Tvar { name; jkind })
 let newgenstub ~scope jkind =
   newty3 ~level:generic_level ~scope (Tvar { name=None; jkind })
-||||||| 23e84b8c4d
+||||||| upstream-base
 let newgenty desc      = newty2 ~level:generic_level desc
 let newgenvar ?name () = newgenty (Tvar name)
 let newgenstub ~scope  = newty3 ~level:generic_level ~scope (Tvar None)
@@ -205,20 +205,20 @@ let newty2 ~level desc =
 let newgenty desc      = newty2 ~level:generic_level desc
 let newgenvar ?name () = newgenty (Tvar name)
 let newgenstub ~scope  = newty3 ~level:generic_level ~scope (Tvar None)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (**** Check some types ****)
 
 let is_Tvar ty = match get_desc ty with Tvar _ -> true | _ -> false
 let is_Tunivar ty = match get_desc ty with Tunivar _ -> true | _ -> false
 let is_Tconstr ty = match get_desc ty with Tconstr _ -> true | _ -> false
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let is_Tpoly ty = match get_desc ty with Tpoly _ -> true | _ -> false
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 let is_poly_Tpoly ty =
   match get_desc ty with Tpoly (_, _ :: _) -> true | _ -> false
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let type_kind_is_abstract decl =
   match decl.type_kind with Type_abstract _ -> true | _ -> false
 let type_origin decl =
@@ -383,14 +383,14 @@ let fold_type_expr f init ty =
   | Tarrow (_, ty1, ty2, _) ->
       let result = f init ty1 in
       f result ty2
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Ttuple l            -> List.fold_left f init (List.map snd l)
   | Tunboxed_tuple l    -> List.fold_left f init (List.map snd l)
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Ttuple l            -> List.fold_left f init l
 =======
   | Ttuple l            -> List.fold_left (fun acc (_, t) -> f acc t) init l
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tconstr (_, l, _)   -> List.fold_left f init l
   | Tobject(ty, {contents = Some (_, p)}) ->
       let result = f init ty in
@@ -411,19 +411,19 @@ let fold_type_expr f init ty =
   | Tpoly (ty, tyl)     ->
     let result = f init ty in
     List.fold_left f result tyl
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Trepr (ty, _sort_vars) ->
     f init ty
   | Tpackage (_, fl)  ->
     List.fold_left (fun result (_n, ty) -> f result ty) init fl
   | Tof_kind _ -> init
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpackage (_, fl)  ->
     List.fold_left (fun result (_n, ty) -> f result ty) init fl
 =======
   | Tpackage pack ->
     List.fold_left (fun result (_n, ty) -> f result ty) init pack.pack_cstrs
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let iter_type_expr f ty =
   fold_type_expr (fun () v -> f v) () ty
@@ -615,13 +615,13 @@ let rec copy_type_desc ?(keep_names=false) f = function
      if keep_names then tv else Tvar { name=None; jkind }
   | Tarrow (p, ty1, ty2, c)-> Tarrow (p, f ty1, f ty2, copy_commu c)
   | Ttuple l            -> Ttuple (List.map (fun (label, t) -> label, f t) l)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tunboxed_tuple l    ->
     Tunboxed_tuple (List.map (fun (label, t) -> label, f t) l)
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Ttuple l            -> Ttuple (List.map f l)
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tconstr (p, l, _)   -> Tconstr (p, List.map f l, ref Mnil)
   | Tobject(ty, {contents = Some (p, tl)})
                         -> Tobject (f ty, ref (Some(p, List.map f tl)))
@@ -639,12 +639,12 @@ let rec copy_type_desc ?(keep_names=false) f = function
   | Tpoly (ty, tyl)     ->
       let tyl = List.map f tyl in
       Tpoly (f ty, tyl)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Trepr (ty, sort_vars) ->
       Trepr (f ty, sort_vars)
   | Tpackage (p, fl)  -> Tpackage (p, List.map (fun (n, ty) -> (n, f ty)) fl)
   | Tof_kind jk -> Tof_kind jk
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpackage (p, fl)  -> Tpackage (p, List.map (fun (n, ty) -> (n, f ty)) fl)
 
 (* Utilities for copying *)
@@ -653,7 +653,7 @@ let rec copy_type_desc ?(keep_names=false) f = function
   | Tpackage pack       ->
       Tpackage {pack with
         pack_cstrs = List.map (fun (n, ty) -> (n, f ty)) pack.pack_cstrs}
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* TODO: rename to [module Copy_scope] *)
 module For_copy : sig
@@ -909,7 +909,7 @@ let instance_variable_type label sign =
   match Vars.find label sign.csig_vars with
   | (_, _, ty) -> ty
   | exception Not_found -> assert false
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
                   (********************************)
                   (*  Utilities for poly types    *)
@@ -2634,7 +2634,7 @@ module Jkind0 = struct
 
   include Jkind
 end
-||||||| 23e84b8c4d
+||||||| upstream-base
 
                   (**********************************)
                   (*  Utilities for level-marking   *)
@@ -2704,4 +2704,4 @@ let cstr_type_path cstr =
   | Tconstr (p, _, _) -> p
   | _ -> assert false
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

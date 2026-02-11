@@ -51,14 +51,14 @@ static void compare_free_stack(struct compare_stack* stk)
 /* Same, then raise Out_of_memory */
 CAMLnoret static void compare_stack_overflow(struct compare_stack* stk)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   CAML_GC_MESSAGE(DEBUG,
                   "Stack overflow in structural comparison.\n");
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_gc_message (0x04, "Stack overflow in structural comparison\n");
 =======
   CAML_GC_MESSAGE(HEAPSIZE, "Stack overflow in structural comparison\n");
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   compare_free_stack(stk);
   caml_raise_out_of_memory();
 }

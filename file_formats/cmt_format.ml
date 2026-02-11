@@ -63,12 +63,12 @@ type cmt_infos = {
   cmt_uid_to_decl : item_declaration Shape.Uid.Tbl.t;
   cmt_impl_shape : Shape.t option; (* None for mli *)
   cmt_ident_occurrences :
-<<<<<<< HEAD
+<<<<<<< oxcaml
     (Longident.t Location.loc * Shape_reduce.result) array
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
     (Longident.t Location.loc * Shape_reduce.result) list
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 type error =
@@ -96,12 +96,12 @@ let iter_on_declaration f decl =
   | Value vd -> f vd.val_val.val_uid decl;
   | Value_binding vb ->
       let bound_idents = let_bound_idents_full [vb] in
-<<<<<<< HEAD
+<<<<<<< oxcaml
       List.iter (fun (_, _, _, _, uid) -> f uid decl) bound_idents
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
       List.iter (fun (_, _, _, uid) -> f uid decl) bound_idents
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Type td ->
       if not (Btype.is_row_name (Ident.name td.typ_id)) then
         f td.typ_type.type_uid (Type td)
@@ -163,7 +163,7 @@ let iter_on_occurrences
   let path_in_type typ name =
     match Types.get_desc typ with
     | Tconstr (type_path, _, _) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       Some (Path.Pdot (type_path,  name))
     | _ -> None
   in
@@ -426,7 +426,7 @@ let index_occurrences binary_annots =
   in
   iter_on_annots (iter_on_occurrences ~f) binary_annots;
   Array.of_list !index
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
       Some (Path.Pextra_ty(type_path, Pcstr_ty name))
     | _ -> None
@@ -671,25 +671,25 @@ let index_occurrences binary_annots =
   in
   iter_on_annots (iter_on_occurrences ~f) binary_annots;
   !index
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 exception Error of error
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let input_cmt ic : cmt_infos =
   (* CR ocaml 5 compressed-marshal mshinwell:
      (Compression.input_value ic : cmt_infos)
   *)
   Marshal.from_channel ic
-||||||| 23e84b8c4d
+||||||| upstream-base
 let input_cmt ic = (input_value ic : cmt_infos)
 =======
 let input_cmt ic = (Compression.input_value ic : cmt_infos)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let output_cmt oc cmt =
   output_string oc Config.cmt_magic_number;
-<<<<<<< HEAD
+<<<<<<< oxcaml
   (* BACKPORT BEGIN *)
   (* CR ocaml 5 compressed-marshal mshinwell:
      upstream uses [Compression] here:
@@ -697,11 +697,11 @@ let output_cmt oc cmt =
   *)
   Marshal.(to_channel oc (cmt : cmt_infos) [])
   (* BACKPORT END *)
-||||||| 23e84b8c4d
+||||||| upstream-base
   Marshal.(to_channel oc (cmt : cmt_infos) [Compression])
 =======
   Compression.output_value oc (cmt : cmt_infos)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let read filename =
 (*  Printf.fprintf stderr "Cmt_format.read %s\n%!" filename; *)
@@ -766,7 +766,7 @@ let save_cmt target cu binary_annots initial_env cmi shape =
            | None -> None
            | Some cmi -> Some (output_cmi temp_file_name oc cmi)
          in
-<<<<<<< HEAD
+<<<<<<< oxcaml
          (* We use the raw_source_file because the original_source_file may not
             exist (or may have changed), so computing the digest may fail or
             produce inconsistent results. Merlin expects the cms_sourcefile to
@@ -778,7 +778,7 @@ let save_cmt target cu binary_annots initial_env cmi shape =
             index_occurrences binary_annots
           else
             [| |]
-||||||| 23e84b8c4d
+||||||| upstream-base
          let sourcefile = Unit_info.Artifact.source_file target in
 =======
          let sourcefile = Unit_info.Artifact.source_file target in
@@ -787,12 +787,12 @@ let save_cmt target cu binary_annots initial_env cmi shape =
             index_occurrences binary_annots
           else
             []
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
          in
          let cmt_annots = clear_env binary_annots in
          let cmt_uid_to_decl = index_declarations cmt_annots in
          let source_digest = Option.map Digest.file sourcefile in
-<<<<<<< HEAD
+<<<<<<< oxcaml
          let compare_imports import1 import2 =
            let modname1 = Import_info.name import1 in
            let modname2 = Import_info.name import2 in
@@ -803,23 +803,23 @@ let save_cmt target cu binary_annots initial_env cmi shape =
            Array.sort compare_imports imports;
            imports
          in
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
          let cmt_args =
            let cmt_args = Array.copy Sys.argv in
            cmt_args.(0) <- Location.rewrite_absolute_path Sys.argv.(0);
            cmt_args in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
          let cmt = {
-<<<<<<< HEAD
+<<<<<<< oxcaml
            cmt_modname = cu;
-||||||| 23e84b8c4d
+||||||| upstream-base
            cmt_modname = Unit_info.Artifact.modname target;
            cmt_annots = clear_env binary_annots;
            cmt_value_dependencies = !value_deps;
 =======
            cmt_modname = Unit_info.Artifact.modname target;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
            cmt_annots;
            cmt_declaration_dependencies = !uids_deps;
            cmt_comments = Lexer.comments ();

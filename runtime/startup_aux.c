@@ -104,15 +104,15 @@ static void init_startup_params(void)
   params.use_hugetlb_pages = 0;
 
 #ifdef DEBUG
-<<<<<<< HEAD
+<<<<<<< oxcaml
   // Silenced in oxcaml to make it easier to run tests that
   // check program output.
   // atomic_store_relaxed(&caml_verb_gc, CAML_GC_MSG_VERBOSE | CAML_GC_MSG_MINOR);
-||||||| 23e84b8c4d
+||||||| upstream-base
   atomic_store_relaxed(&caml_verb_gc, 0x3F);
 =======
   atomic_store_relaxed(&caml_verb_gc, CAML_GC_MSG_VERBOSE | CAML_GC_MSG_MINOR);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #endif
 #ifndef NATIVE_CODE
   cds_file = caml_secure_getenv(T("CAML_DEBUG_FILE"));
@@ -143,7 +143,7 @@ static void scanmult (char_os *opt, uintnat *var)
 
 static void parse_gc_tweak(char_os** opt_p)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   char_os *opt = *opt_p;
   char_os *name = opt;
   while (*opt != '\0') {
@@ -169,12 +169,12 @@ static void parse_gc_tweak(char_os** opt_p)
   }
   *opt_p = opt;
 }
-||||||| 23e84b8c4d
+||||||| upstream-base
   init_startup_params();
 =======
   init_startup_params();
   uintnat val;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 
 static void parse_ocamlrunparam(char_os* opt)

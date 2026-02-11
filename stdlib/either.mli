@@ -75,10 +75,10 @@ val is_right : ('a : value_or_null) ('b : value_or_null)
   . ('a, 'b) t -> bool
 (** [is_right (Left v)] is [false], [is_right (Right v)] is [true]. *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val find_left : ('a : value_or_null) ('b : value_or_null)
   . ('a, 'b) t -> 'a option
-||||||| 23e84b8c4d
+||||||| upstream-base
 val find_left : ('a, 'b) t -> 'a option
 =======
 val get_left : ('a, 'b) t -> 'a
@@ -96,7 +96,7 @@ val get_right : ('a, 'b) t -> 'b
     @since 5.4 *)
 
 val find_left : ('a, 'b) t -> 'a option
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** [find_left (Left v)] is [Some v], [find_left (Right _)] is [None] *)
 
 val find_right : ('a : value_or_null) ('b : value_or_null)
@@ -126,10 +126,10 @@ val fold : ('a : value_or_null) ('b : value_or_null) ('c : value_or_null).
 (** [fold ~left ~right (Left v)] is [left v], and
     [fold ~left ~right (Right v)] is [right v]. *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val iter : ('a : value_or_null) ('b : value_or_null)
   . left:('a -> unit) -> right:('b -> unit) -> ('a, 'b) t -> unit
-||||||| 23e84b8c4d
+||||||| upstream-base
 val iter : left:('a -> unit) -> right:('b -> unit) -> ('a, 'b) t -> unit
 =======
 val retract : ('a, 'a) t -> 'a
@@ -138,7 +138,7 @@ val retract : ('a, 'a) t -> 'a
     @since 5.4 *)
 
 val iter : left:('a -> unit) -> right:('b -> unit) -> ('a, 'b) t -> unit
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** [iter ~left ~right (Left v)] is [left v], and
     [iter ~left ~right (Right v)] is [right v]. *)
 

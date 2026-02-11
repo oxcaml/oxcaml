@@ -42,7 +42,7 @@ exception Error of error * Location.t
 
 (* The table of keywords *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let keyword_table =
   create_hashtable 149 [
     "and", AND;
@@ -88,7 +88,7 @@ let keyword_table =
     "open", OPEN;
     "or", OR;
     "overwrite_", OVERWRITE;
-||||||| 23e84b8c4d
+||||||| upstream-base
 let keyword_table =
   create_hashtable 149 [
     "and", AND;
@@ -170,9 +170,9 @@ let all_keywords =
     "of", OF, always;
     "open", OPEN, always;
     "or", OR, always;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (*  "parser", PARSER; *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
     "private", PRIVATE;
     "rec", REC;
     "repr_", REPR;
@@ -191,7 +191,7 @@ let all_keywords =
     "when", WHEN;
     "while", WHILE;
     "with", WITH;
-||||||| 23e84b8c4d
+||||||| upstream-base
     "private", PRIVATE;
     "rec", REC;
     "sig", SIG;
@@ -221,16 +221,16 @@ let all_keywords =
     "when", WHEN, always;
     "while", WHILE, always;
     "with", WITH, always;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
     "lor", INFIXOP3("lor"); (* Should be INFIXOP2 *)
     "lxor", INFIXOP3("lxor"); (* Should be INFIXOP2 *)
     "land", INFIXOP3("land");
     "lsl", INFIXOP4("lsl");
     "lsr", INFIXOP4("lsr");
     "asr", INFIXOP4("asr")
-||||||| 23e84b8c4d
+||||||| upstream-base
     "lor", INFIXOP3("lor"); (* Should be INFIXOP2 *)
     "lxor", INFIXOP3("lxor"); (* Should be INFIXOP2 *)
     "mod", INFIXOP3("mod");
@@ -246,16 +246,16 @@ let all_keywords =
     "lsl", INFIXOP4("lsl"), always;
     "lsr", INFIXOP4("lsr"), always;
     "asr", INFIXOP4("asr"), always
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 ]
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let lookup_keyword name =
   match Hashtbl.find keyword_table name with
   | kw -> kw
   | exception Not_found ->
      LIDENT name
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 
 let keyword_table = Hashtbl.create 149
@@ -278,7 +278,7 @@ let populate_keywords (version,keywords) =
     | exception Not_found -> Hashtbl.replace tbl name None
     ) keywords
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* To buffer string literals *)
 
@@ -568,19 +568,19 @@ let uchar_for_uchar_escape lexbuf =
       illegal_escape lexbuf
         (Printf.sprintf "%X is not a Unicode scalar value" cp)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let is_keyword name =
   match lookup_keyword name with
   | LIDENT _ -> false
   | _ -> true
-||||||| 23e84b8c4d
+||||||| upstream-base
 let is_keyword name = Hashtbl.mem keyword_table name
 =======
 let validate_encoding lexbuf raw_name =
   match Utf8_lexeme.normalize raw_name with
   | Error _ -> error lexbuf (Invalid_encoding raw_name)
   | Ok name -> name
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let ident_for_extended lexbuf raw_name =
   let name = validate_encoding lexbuf raw_name in
@@ -847,7 +847,7 @@ rule token = parse
   | "?" (lowercase identchar * as name) ':'
       { check_label_name lexbuf name;
         OPTLABEL name }
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | "?" (lowercase_latin1 identchar_latin1 * as name) ':'
       { warn_latin1 lexbuf;
         OPTLABEL name }
@@ -864,7 +864,7 @@ rule token = parse
         lookup_keyword name }
   | raw_ident_escape (lowercase identchar * as name)
       { LIDENT name }
-||||||| 23e84b8c4d
+||||||| upstream-base
   | "?" (lowercase_latin1 identchar_latin1 * as name) ':'
       { warn_latin1 lexbuf;
         OPTLABEL name }
@@ -876,9 +876,9 @@ rule token = parse
         check_label_name ~raw_escape:(escape<>"") lexbuf name;
         OPTLABEL name
       }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | lowercase identchar * as name
-<<<<<<< HEAD
+<<<<<<< oxcaml
       { lookup_keyword name }
   (* Lowercase latin1 identifiers are split into 3 cases, and the order matters
      (longest to shortest).
@@ -896,17 +896,17 @@ rule token = parse
         LIDENT name }
   | lowercase_latin1 identchar_latin1 * as name
       { warn_latin1 lexbuf; LIDENT name }
-||||||| 23e84b8c4d
+||||||| upstream-base
       { try Hashtbl.find keyword_table name
         with Not_found -> LIDENT name }
   | lowercase_latin1 identchar_latin1 * as name
       { warn_latin1 lexbuf; LIDENT name }
 =======
       { find_keyword lexbuf name }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | uppercase identchar * as name
       { UIDENT name } (* No capitalized keywords *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | uppercase_latin1 identchar_latin1 * as name
       { warn_latin1 lexbuf; UIDENT name }
   (* This matches either an integer literal or a directive. If the text "#2"
@@ -931,7 +931,7 @@ rule token = parse
     (float_literal | hex_float_literal as lit) (literal_modifier as modif)
       { float ~maybe_hash lit (Some modif) }
   | '#'? (float_literal | hex_float_literal | int_literal) identchar+ as invalid
-||||||| 23e84b8c4d
+||||||| upstream-base
   | uppercase_latin1 identchar_latin1 * as name
       { warn_latin1 lexbuf; UIDENT name }
   | int_literal as lit { INT (lit, None) }
@@ -962,7 +962,7 @@ rule token = parse
   | (float_literal | hex_float_literal as lit) (literal_modifier as modif)
       { FLOAT (lit, Some modif) }
   | (float_literal | hex_float_literal | int_literal) identchar+ as invalid
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       { error lexbuf (Invalid_literal invalid) }
   | "\""
       { let s, loc = wrap_string_lexer string lexbuf in

@@ -120,15 +120,15 @@ let is_ref : Types.value_description -> bool = function
 (* See the note on abstracted arguments in the documentation for
     Typedtree.Texp_apply *)
 let is_abstracted_arg : arg_label * apply_arg -> bool = function
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | (_, Omitted _) -> true
-||||||| 23e84b8c4d
+||||||| upstream-base
 let is_abstracted_arg : arg_label * expression option -> bool = function
   | (_, None) -> true
   | (_, Some _) -> false
 =======
   | (_, Omitted ()) -> true
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | (_, Arg _) -> false
 
 let classify_expression : Typedtree.expression -> sd =
@@ -158,7 +158,7 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_let (rec_flag, vb, e) ->
         let env = classify_value_bindings rec_flag env vb in
         classify_expression env e
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Texp_letmutable (vb, e) ->
         let env = classify_value_bindings Nonrecursive env [vb] in
         classify_expression env e
@@ -172,7 +172,7 @@ let classify_expression : Typedtree.expression -> sd =
         let env = Ident.add mid size env in
         classify_expression env e
     | Texp_ident (path, _, _, _, _, _) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Texp_ident (path, _, _) ->
 =======
     | Texp_letmodule (Some mid, _, _, mexp, e) ->
@@ -185,24 +185,24 @@ let classify_expression : Typedtree.expression -> sd =
         let env = Ident.add mid size env in
         classify_expression env e
     | Texp_ident (path, _, _) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         classify_path env path
 
     (* non-binding cases *)
     | Texp_open (_, e)
     | Texp_letmodule (None, _, _, _, e)
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Texp_sequence (_, _, e)
     | Texp_letexception (_, e)
     | Texp_exclave e ->
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Texp_letmodule (_, _, _, _, e)
     | Texp_sequence (_, e)
     | Texp_letexception (_, e) ->
 =======
     | Texp_sequence (_, e)
     | Texp_letexception (_, e) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         classify_expression env e
 
     | Texp_construct (_, {cstr_repr = Variant_unboxed}, [e], _) ->
@@ -210,9 +210,9 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_construct _ ->
         Static
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Texp_record { representation = Record_unboxed;
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Texp_construct (_, _, exprs) ->
         if List.for_all is_constant exprs then Constant else Static
 
@@ -224,14 +224,14 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_record { representation = Record_unboxed _;
 =======
     | Texp_record { representation = Record_unboxed _;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                     fields = [| _, Overridden (_,e) |] } ->
         classify_expression env e
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Texp_record { representation = Record_ufloat; _ } ->
         Dynamic
     | Texp_record _ ->
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Texp_record { fields; _ } ->
         (* We ignore the [extended_expression] field.
            As long as all fields are Overridden rather than Kept, the value
@@ -263,7 +263,7 @@ let classify_expression : Typedtree.expression -> sd =
         Static
 
     | Texp_unreachable ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         Static
 
     | Texp_record_unboxed_product { representation = Record_unboxed_product;
@@ -342,11 +342,11 @@ let classify_expression : Typedtree.expression -> sd =
           (* other cases compile to a lazy block holding a function *)
           Static
       end
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Texp_eval _ ->
       (* CR metaprogramming mshinwell: Make sure this is correct *)
       Static
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Texp_extension_constructor _ ->
         Static
 
@@ -363,7 +363,7 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_unreachable ->
         Constant
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
     | Texp_new _
     | Texp_instvar _
@@ -378,17 +378,17 @@ let classify_expression : Typedtree.expression -> sd =
     | Texp_assert _
     | Texp_try _
     | Texp_override _
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Texp_letop _
     (* CR metaprogramming aivaskovic: verify for quotations and splices *)
     | Texp_quotation _
     | Texp_antiquotation _ ->
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Texp_letop _ ->
         Not_recursive
 =======
     | Texp_letop _ ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         Dynamic
   and classify_value_bindings rec_flag env bindings =
     (* We use a non-recursive classification, classifying each
@@ -406,13 +406,13 @@ let classify_expression : Typedtree.expression -> sd =
     let old_env = env in
     let add_value_binding env vb =
       match vb.vb_pat.pat_desc with
-<<<<<<< HEAD
+<<<<<<< oxcaml
       | Tpat_var (id, _loc, _uid, _sort, _mode) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
       | Tpat_var (id, _loc) ->
 =======
       | Tpat_var (id, _loc, _uid) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           let size = classify_expression old_env vb.vb_expr in
           Ident.add id size env
       | _ ->
@@ -777,16 +777,16 @@ let rec expression : Typedtree.expression -> term_judg =
       value_bindings Nonrecursive [binding] >> expression body
     | Texp_letmodule (x, _, _, mexp, e) ->
       module_binding (x, mexp) >> expression e
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Texp_match (e, _, cases, _) ->
       (*
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Texp_match (e, cases, _) ->
       (*
 =======
     | Texp_match (e, cases, eff_cases, _) ->
       (* TODO: update comment below for eff_cases
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
          (Gi; mi |- pi -> ei : m)^i
          G |- e : sum(mi)^i
          ----------------------------------------------
@@ -796,10 +796,10 @@ let rec expression : Typedtree.expression -> term_judg =
         let pat_envs, pat_modes =
           List.split (List.map (fun c -> case c mode) cases) in
         let env_e = expression e (List.fold_left Mode.join Ignore pat_modes) in
-<<<<<<< HEAD
+<<<<<<< oxcaml
         Env.join_list (env_e :: pat_envs))
     | Texp_for tf ->
-||||||| 23e84b8c4d
+||||||| upstream-base
         Env.join_list (env_e :: pat_envs))
     | Texp_for (_, _, low, high, _, body) ->
 =======
@@ -809,7 +809,7 @@ let rec expression : Typedtree.expression -> term_judg =
         Env.join_list
           ((Env.join_list (env_e :: pat_envs)) :: (eff_e :: eff_envs)))
     | Texp_for (_, _, low, high, _, body) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       (*
         G1 |- low: m[Dereference]
         G2 |- high: m[Dereference]
@@ -837,17 +837,17 @@ let rec expression : Typedtree.expression -> term_judg =
       path pth << Dereference
     | Texp_instvar (self_path, pth, _inst_var) ->
         join [path self_path << Dereference; path pth]
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Texp_mutvar id ->
         single id.txt << Dereference
     | Texp_apply
         ({exp_desc = Texp_ident (_, _, vd, Id_prim _, _, _)}, [_, Arg (arg, _)],
          _, _, _)
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Texp_apply ({exp_desc = Texp_ident (_, _, vd)}, [_, Some arg])
 =======
     | Texp_apply ({exp_desc = Texp_ident (_, _, vd)}, [_, Arg arg])
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       when is_ref vd ->
       (*
         G |- e: m[Guard]
@@ -867,16 +867,16 @@ let rec expression : Typedtree.expression -> term_judg =
            function is stored in the closure without being called. *)
         let rec split_args ~has_omitted_arg = function
           | [] -> [], []
-<<<<<<< HEAD
+<<<<<<< oxcaml
           | (_, Omitted _) :: rest -> split_args ~has_omitted_arg:true rest
           | (_, Arg (arg, _)) :: rest ->
-||||||| 23e84b8c4d
+||||||| upstream-base
           | (_, None) :: rest -> split_args ~has_omitted_arg:true rest
           | (_, Some arg) :: rest ->
 =======
           | (_, Omitted ()) :: rest -> split_args ~has_omitted_arg:true rest
           | (_, Arg arg) :: rest ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
             let applied, delayed = split_args ~has_omitted_arg rest in
             if has_omitted_arg
             then applied, arg :: delayed
@@ -891,7 +891,7 @@ let rec expression : Typedtree.expression -> term_judg =
         join [expression e << function_mode;
               list expression applied << Dereference;
               list expression delayed << Guard]
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Texp_tuple (exprs, _) ->
       list expression (List.map snd exprs) << Guard
     | Texp_unboxed_tuple exprs ->
@@ -914,7 +914,7 @@ let rec expression : Typedtree.expression -> term_judg =
           expression index << Dereference
         | Baccess_block (_, idx) ->
           expression idx << Dereference
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Texp_tuple exprs ->
       list expression exprs << Guard
     | Texp_array exprs ->
@@ -946,7 +946,7 @@ let rec expression : Typedtree.expression -> term_judg =
         | Lambda.Paddrarray | Lambda.Pintarray ->
             (* non-generic, non-float arrays act as constructors *)
             Guard
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       in
       (* All unboxed accesses are nonrecursive, but we include the below match
          in case we add new unboxed access types *)
@@ -1553,15 +1553,15 @@ and class_expr : Typedtree.class_expr -> term_judg =
     | Tcl_apply (ce, args) ->
         let arg (_, arg) =
           match arg with
-<<<<<<< HEAD
+<<<<<<< oxcaml
           | Omitted _ -> empty
           | Arg (e, _) -> expression e
-||||||| 23e84b8c4d
+||||||| upstream-base
         let arg (_label, eo) = option expression eo in
 =======
           | Omitted () -> empty
           | Arg e -> expression e
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         in
         join [
           class_expr ce << Dereference;
@@ -1717,16 +1717,16 @@ and pattern : type k . k general_pattern -> Env.t -> mode = fun pat env ->
 and is_destructuring_pattern : type k . k general_pattern -> bool =
   fun pat -> match pat.pat_desc with
     | Tpat_any -> false
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Tpat_var (_, _, _, _, _) -> false
     | Tpat_alias (pat, _, _, _, _, _, _) -> is_destructuring_pattern pat
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Tpat_var (_, _) -> false
     | Tpat_alias (pat, _, _) -> is_destructuring_pattern pat
 =======
     | Tpat_var (_, _, _) -> false
     | Tpat_alias (pat, _, _, _, _) -> is_destructuring_pattern pat
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Tpat_constant _ -> true
     | Tpat_unboxed_unit -> true
     | Tpat_unboxed_bool _ -> true

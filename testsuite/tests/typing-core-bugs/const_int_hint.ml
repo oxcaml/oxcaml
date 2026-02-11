@@ -188,13 +188,13 @@ Hint: Did you mean "0b1000_1101l"?
 |}]
 type t1 = {mutable f1: int32};; let _ = fun x -> x.f1 <- 1_000n;;
 [%%expect{|
-<<<<<<< HEAD
+<<<<<<< oxcaml
 type t1 = { mutable f1 : int32; }
 Line 1, characters 57-63:
 1 | type t1 = {mutable f1: int32};; let _ = fun x -> x.f1 <- 1_000n;;
                                                              ^^^^^^
 Error: This expression has type "nativeint"
-||||||| 23e84b8c4d
+||||||| upstream-base
 type t1 = { f1 : int32; }
 Line 1, characters 49-55:
 1 | type t1 = {f1: int32};; let _ = fun x -> x.f1 <- 1_000n;;
@@ -206,7 +206,7 @@ Line 1, characters 49-55:
 1 | type t1 = {f1: int32};; let _ = fun x -> x.f1 <- 1_000n;;
                                                      ^^^^^^
 Error: The constant "1_000n" has type "nativeint"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
        but an expression was expected of type "int32"
 Hint: Did you mean "1_000l"?
 |}]

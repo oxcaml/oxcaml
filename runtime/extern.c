@@ -402,14 +402,14 @@ static void close_extern_output(struct caml_extern_state* s)
 
 static void free_extern_output(struct caml_extern_state* s)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   struct caml_output_block * blk, * nextblk;
 
-||||||| 23e84b8c4d
+||||||| upstream-base
   struct output_block * blk, * nextblk;
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   if (s->extern_userprovided_output == NULL) {
     for (struct caml_output_block *blk = s->extern_output_first, *nextblk;
          blk != NULL;
@@ -483,13 +483,13 @@ static void extern_failwith(struct caml_extern_state* s, const char *msg)
 
 static void extern_stack_overflow(struct caml_extern_state* s)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   CAML_GC_MESSAGE(DEBUG,
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_gc_message (0x04, "Stack overflow in marshaling value\n");
 =======
   CAML_GC_MESSAGE(HEAPSIZE,
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                   "Stack overflow in marshaling value\n");
   free_extern_output(s);
   caml_raise_out_of_memory();
@@ -1178,12 +1178,12 @@ CAMLexport void caml_output_value_to_malloc(value v, value flags,
   int header_len;
   intnat data_len;
   char * res;
-<<<<<<< HEAD
+<<<<<<< oxcaml
   struct caml_output_block * blk, * nextblk;
-||||||| 23e84b8c4d
+||||||| upstream-base
   struct output_block * blk, * nextblk;
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   struct caml_extern_state* s = init_extern_state ();
 
   init_extern_output(s);

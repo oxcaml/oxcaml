@@ -94,13 +94,13 @@ let dummy_parameter_list typ =
     | Types.Ttuple l ->
         if label = Types.Nolabel then
           Odoc_parameter.Tuple
-<<<<<<< HEAD
+<<<<<<< oxcaml
             (List.map (fun t2 -> iter (Types.Nolabel, t2)) (List.map snd l), t)
-||||||| 23e84b8c4d
+||||||| upstream-base
             (List.map (fun t2 -> iter (Nolabel, t2)) l, t)
 =======
             (List.map (fun t2 -> iter (Nolabel, t2)) (List.map snd l), t)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         else
           (* if there is a label, then we don't want to decompose the tuple *)
           Odoc_parameter.Simple_name

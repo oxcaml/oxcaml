@@ -53,24 +53,24 @@ let scrape_ty env ty =
   in
   match get_desc ty with
   | Tconstr _ ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       let ty = Ctype.correct_levels ty in
       let ty' = Ctype.expand_head_opt env ty in
       begin match get_desc ty' with
-||||||| 23e84b8c4d
+||||||| upstream-base
       let ty = Ctype.expand_head_opt env (Ctype.correct_levels ty) in
       begin match get_desc ty with
 =======
       let ty = Ctype.expand_head_opt env ty in
       begin match get_desc ty with
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       | Tconstr (p, _, _) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
           begin match find_unboxed_type (Env.find_type p env) with
           | Some _ -> (Ctype.get_unboxed_type_approximation env ty').ty
           | None -> ty'
           | exception Not_found -> ty (* missing cmi file *)
-||||||| 23e84b8c4d
+||||||| upstream-base
           begin match Env.find_type p env with
           | {type_kind = ( Type_variant (_, Variant_unboxed)
           | Type_record (_, Record_unboxed _) ); _} -> begin
@@ -87,16 +87,16 @@ let scrape_ty env ty =
             Typedecl_unboxed.get_unboxed_type_representation env ty
           | _ -> Some ty
           | exception Not_found -> None
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           end
       | _ ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
           ty'
-||||||| 23e84b8c4d
+||||||| upstream-base
           ty
 =======
           Some ty
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       end
   | _ -> Some ty
 
@@ -123,7 +123,7 @@ let is_base_type env ty base_ty_path =
   | _ -> false
 
 let maybe_pointer_type env ty =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let ty = scrape_ty env ty in
   let immediate_or_pointer =
     match Ctype.is_always_gc_ignorable env ty with
@@ -136,7 +136,7 @@ let maybe_pointer_type env ty =
     | false -> Nullable
   in
   immediate_or_pointer, nullable
-||||||| 23e84b8c4d
+||||||| upstream-base
   let ty = scrape_ty env ty in
   if is_immediate (Ctype.immediacy env ty) then Immediate
   else Pointer
@@ -146,7 +146,7 @@ let maybe_pointer_type env ty =
     if is_immediate (Ctype.immediacy env ty) then Immediate
     else Pointer
   | None -> Pointer
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
 
@@ -162,7 +162,7 @@ let type_sort ~why env loc ty =
   | Ok sort -> sort
   | Error err -> raise (Error (loc, Not_a_sort (ty, err)))
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* [classification]s are used for two things: things in arrays, and things in
    lazys. In the former case, we need detailed information about unboxed
    products and in the latter it would be wasteful to compute that information,
@@ -191,7 +191,7 @@ let classify ~classify_product env ty sort : _ classification =
   then
     if Ctype.check_type_nullability env ty Non_null
     then Immediate else Immediate_or_null
-||||||| 23e84b8c4d
+||||||| upstream-base
 let classify env ty =
   let ty = scrape_ty env ty in
   if maybe_pointer_type env ty = Immediate then Int
@@ -201,12 +201,12 @@ let classify env ty : classification =
   | None -> Any
   | Some ty ->
   if maybe_pointer_type env ty = Immediate then Int
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   else match get_desc ty with
   | Tvar _ | Tunivar _ ->
       Any
   | Tconstr (p, _args, _abbrev) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       if Path.same p Predef.path_float then Float
       else if Path.same p Predef.path_lazy_t then Lazy
       else if Path.same p Predef.path_string
@@ -240,7 +240,7 @@ let classify env ty : classification =
            || Path.same p Predef.path_float64x8
            then Addr
       else begin
-||||||| 23e84b8c4d
+||||||| upstream-base
       if Path.same p Predef.path_float then Float
       else if Path.same p Predef.path_lazy_t then Lazy
       else if Path.same p Predef.path_string
@@ -262,7 +262,7 @@ let classify env ty : classification =
              | `Atomic_loc)
         -> Addr
       | Some #Predef.data_type_constr | None ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         try
           match (Env.find_type p env).type_kind with
           | Type_abstract _ ->
@@ -396,12 +396,12 @@ let array_kind_of_elt ~elt_sort env loc ty =
 
 let array_type_kind ~elt_sort ~elt_ty env loc ty =
   match scrape_poly env ty with
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tconstr(p, [elt_ty], _) when Path.same p Predef.path_array
                               || Path.same p Predef.path_iarray ->
       array_kind_of_elt ~elt_sort env loc elt_ty
   | Tconstr(p, [], _) when Path.same p Predef.path_floatarray ->
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tconstr(p, [elt_ty], _) when Path.same p Predef.path_array ->
       begin match classify env elt_ty with
       | Any -> if Config.flat_float_array then Pgenarray else Paddrarray
@@ -420,7 +420,7 @@ let array_type_kind ~elt_sort ~elt_ty env loc ty =
       | Int -> Pintarray
       end
   | Some (Tconstr(p, [], _)) when Path.same p Predef.path_floatarray ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       Pfloatarray
   | _ ->
     begin match elt_ty with
@@ -500,7 +500,7 @@ let layout_table =
 
 let bigarray_specialize_kind_and_layout env ~kind ~layout typ =
   match scrape env typ with
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tconstr(_p, [_caml_type; elt_type; layout_type], _abbrev) ->
       let kind =
         match kind with
@@ -515,7 +515,7 @@ let bigarray_specialize_kind_and_layout env ~kind ~layout typ =
         | _ -> layout
       in
       (kind, layout)
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tconstr(_p, [_caml_type; elt_type; layout_type], _abbrev) ->
       (bigarray_decode_type env elt_type kind_table Pbigarray_unknown,
        bigarray_decode_type env layout_type layout_table
@@ -525,11 +525,11 @@ let bigarray_specialize_kind_and_layout env ~kind ~layout typ =
       (bigarray_decode_type env elt_type kind_table Pbigarray_unknown,
        bigarray_decode_type env layout_type layout_table
                             Pbigarray_unknown_layout)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | _ ->
       (kind, layout)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let value_kind_of_value_jkind env jkind =
   let layout = Jkind.get_layout_defaulting_to_value jkind in
   (* In other places, we use [Ctype.type_jkind_purely_if_principal]. Here, we omit
@@ -1264,7 +1264,7 @@ let function_arg_layout env loc sort ty =
   match is_function_type env ty with
   | Some (arg_type, _) -> layout env loc sort arg_type
   | None -> Misc.fatal_error "function_arg_layout called on non-function type"
-||||||| 23e84b8c4d
+||||||| upstream-base
 let value_kind env ty =
   let ty = scrape_ty env ty in
   if is_immediate (Ctype.immediacy env ty) then Pintval
@@ -1300,7 +1300,7 @@ let value_kind env ty =
     | _ ->
         Pgenval
   end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (** Whether a forward block is needed for a lazy thunk on a value, i.e.
     if the value can be represented as a float/forward/lazy *)

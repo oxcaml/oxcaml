@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* TEST
    runtime5;
    { bytecode; }
@@ -19,7 +19,7 @@ module MP = Gc.Memprof
 
 let[@inline never] f33 n =
   ((n, n, (n, n, n, (n,n,n,n,n))), (n, n, (n, n, n, (n,n,n,n,0))))
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 (* TEST *)
 
@@ -37,7 +37,7 @@ module MP = Gc.Memprof
 
 let[@inline never] f33 n =
   ((n, n, (n, n, n, (n,n,n,n,n))), (n, n, (n, n, n, (n,n,n,n,n))))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Repeatedly stop sampling and discard the profile in an allocation
    callback. If `restart` is `true, start a fresh profile in the same

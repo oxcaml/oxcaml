@@ -175,13 +175,13 @@ G(name):
      Version 1.0
      https://github.com/hjl-tools/x86-psABI/wiki/x86-64-psABI-1.0.pdf */
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 #define DW_CFA_def_cfa_expression 0x0f
-||||||| 23e84b8c4d
+||||||| upstream-base
 #define DW_CFA_def_cfa_expression 0x0f
 #define DW_REG_rbx                3
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #define DW_REG_rbp                6
 #define DW_REG_rsp                7
 #define DW_REG_r13                13
@@ -233,15 +233,15 @@ X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(27) X(
 
    If a C function is called which might call back into OCaml,
    then nothing may be pushed to the C stack between SWITCH_OCAML_TO_C
-<<<<<<< HEAD
+<<<<<<< oxcaml
    and the next call on the C stack. (This is to ensure frame pointers
    are correctly maintained if the stack is reallocated) */
-||||||| 23e84b8c4d
+||||||| upstream-base
 /* Switch from OCaml to C stack. Clobbers %r10, %r11. */
 =======
    and the next C call. (This is to ensure frame pointers are correctly
    maintained if the stack is reallocated) */
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #ifdef ASM_CFI_SUPPORTED
 #define SWITCH_OCAML_TO_C_CFI                                   \
         CFI_REMEMBER_STATE;                                     \
@@ -484,13 +484,13 @@ X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(27) X(
         .text
 
 #if defined(FUNCTION_SECTIONS)
-<<<<<<< HEAD
+<<<<<<< oxcaml
         TEXT_SECTION(caml_hot.code_begin)
         .globl  G(caml_hot.code_begin)
         .globl  G(caml_hot__code_begin)
 G(caml_hot.code_begin):
 G(caml_hot__code_begin):
-||||||| 23e84b8c4d
+||||||| upstream-base
         TEXT_SECTION(caml_hot.code_begin)
         .globl  G(caml_hot.code_begin)
 G(caml_hot.code_begin):
@@ -498,15 +498,15 @@ G(caml_hot.code_begin):
         TEXT_SECTION(CAMLSEP(hot,code_begin))
         .globl  G(CAMLSEP(hot,code_begin))
 G(CAMLSEP(hot,code_begin)):
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
         TEXT_SECTION(caml_hot.code_end)
         .globl  G(caml_hot.code_end)
         .globl  G(caml_hot__code_end)
 G(caml_hot.code_end):
 G(caml_hot__code_end):
-||||||| 23e84b8c4d
+||||||| upstream-base
         TEXT_SECTION(caml_hot.code_end)
         .globl  G(caml_hot.code_end)
 G(caml_hot.code_end):
@@ -514,7 +514,7 @@ G(caml_hot.code_end):
         TEXT_SECTION(CAMLSEP(hot,code_end))
         .globl  G(CAMLSEP(hot,code_end))
 G(CAMLSEP(hot,code_end)):
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #endif
 
 /******************************************************************************/
@@ -676,7 +676,7 @@ G(caml_system__code_begin):
 #define TSAN_RESTORE_CALLER_REGS
 #endif
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 #define Make_call_realloc_stack(suffix, simd)        \
     FUNCTION(G(caml_call_realloc_stack ## suffix))   \
     CFI_STARTPROC                                  ; \
@@ -734,11 +734,11 @@ Make_call_gc(_avx, YMM)
 Make_call_gc(_avx512, ZMM)
 
 FUNCTION(G(caml_raise_stack_overflow_nat))
-||||||| 23e84b8c4d
+||||||| upstream-base
 FUNCTION(G(caml_call_realloc_stack))
 =======
 FUNCTION(caml_call_realloc_stack)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 CFI_STARTPROC
         CFI_SIGNAL_FRAME
         /* We assume that we are always on the OCaml stack at this point.
@@ -750,21 +750,21 @@ CFI_STARTPROC
         SWITCH_OCAML_TO_C
         CHECK_STACK_ALIGNMENT; jmp GCALL(caml_raise_stack_overflow)
 CFI_ENDPROC
-<<<<<<< HEAD
+<<<<<<< oxcaml
 ENDFUNCTION(G(caml_raise_stack_overflow_nat))
-||||||| 23e84b8c4d
+||||||| upstream-base
 ENDFUNCTION(G(caml_call_realloc_stack))
 =======
 END_FUNCTION(caml_call_realloc_stack)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 #define r15_sub_words(n) subq $8+8*n, %r15
 #define r15_sub_1        r15_sub_words(1)
 #define r15_sub_2        r15_sub_words(2)
 #define r15_sub_3        r15_sub_words(3)
 #define r15_sub_N        /* do nothing */
-||||||| 23e84b8c4d
+||||||| upstream-base
 FUNCTION(G(caml_call_gc))
 CFI_STARTPROC
         CFI_SIGNAL_FRAME
@@ -800,9 +800,9 @@ LBL(caml_call_gc):
         ret
 CFI_ENDPROC
 END_FUNCTION(caml_call_gc)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 #define Make_alloc_fun(base_name, words, simd) \
 FUNCTION(G(base_name ## simd))                 \
 CFI_STARTPROC;                                 \
@@ -814,7 +814,7 @@ CFI_STARTPROC;                                 \
         ret;                                   \
 CFI_ENDPROC ;                                  \
 ENDFUNCTION(G(base_name ## simd)) ;
-||||||| 23e84b8c4d
+||||||| upstream-base
 FUNCTION(G(caml_alloc1))
 CFI_STARTPROC
         ENTER_FUNCTION
@@ -836,15 +836,15 @@ CFI_STARTPROC
         ret
 CFI_ENDPROC
 END_FUNCTION(caml_alloc1)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 #define Make_alloc_funs(words) \
 Make_alloc_fun(caml_alloc ## words, words,) \
 Make_alloc_fun(caml_alloc ## words, words, _sse) \
 Make_alloc_fun(caml_alloc ## words, words, _avx) \
 Make_alloc_fun(caml_alloc ## words, words, _avx512)
-||||||| 23e84b8c4d
+||||||| upstream-base
 FUNCTION(G(caml_alloc2))
 CFI_STARTPROC
         ENTER_FUNCTION
@@ -866,14 +866,14 @@ CFI_STARTPROC
         ret
 CFI_ENDPROC
 END_FUNCTION(caml_alloc2)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Make_alloc_funs(1) /* caml_alloc1* */
 Make_alloc_funs(2) /* caml_alloc2* */
 Make_alloc_funs(3) /* caml_alloc3* */
 Make_alloc_funs(N) /* caml_allocN* */
-||||||| 23e84b8c4d
+||||||| upstream-base
 FUNCTION(G(caml_alloc3))
 CFI_STARTPROC
         ENTER_FUNCTION
@@ -895,9 +895,9 @@ CFI_STARTPROC
         ret
 CFI_ENDPROC
 END_FUNCTION(caml_alloc3)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 #define Make_call_local_realloc(suffix, simd)        \
     FUNCTION(G(caml_call_local_realloc ## suffix)) ; \
     CFI_STARTPROC               ;                    \
@@ -917,7 +917,7 @@ Make_call_local_realloc(, NO)
 Make_call_local_realloc(_sse, XMM)
 Make_call_local_realloc(_avx, YMM)
 Make_call_local_realloc(_avx512, ZMM)
-||||||| 23e84b8c4d
+||||||| upstream-base
 FUNCTION(G(caml_allocN))
 CFI_STARTPROC
         ENTER_FUNCTION
@@ -937,7 +937,7 @@ CFI_STARTPROC
         ret
 CFI_ENDPROC
 END_FUNCTION(caml_allocN)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 /******************************************************************************/
 /* Call a C function from OCaml */
@@ -1006,7 +1006,7 @@ LBL(caml_c_call):
 CFI_ENDPROC
 END_FUNCTION(caml_c_call)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 #if defined(SYS_mingw64) || defined (SYS_cygwin)
 /* Allocate the shadow store on Windows (the c_stack_link store was used \
    in calling caml_c_call_copy_stack_args) */
@@ -1084,7 +1084,7 @@ END_FUNCTION(caml_c_call)
 Make_c_call_stack_args()
 Make_c_call_stack_args(_avx)
 Make_c_call_stack_args(_avx512)
-||||||| 23e84b8c4d
+||||||| upstream-base
 FUNCTION(G(caml_c_call_stack_args))
 CFI_STARTPROC
         CFI_SIGNAL_FRAME
@@ -1191,7 +1191,7 @@ LBL(106):
         ret
 CFI_ENDPROC
 END_FUNCTION(caml_c_call_copy_stack_args)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 /******************************************************************************/
 /* Start the OCaml program */
@@ -1796,7 +1796,7 @@ CFI_STARTPROC
 CFI_ENDPROC
 END_FUNCTION(caml_ml_array_bound_error)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 FUNCTION(G(caml_ml_array_align_error))
 CFI_STARTPROC
         ENTER_FUNCTION
@@ -1806,11 +1806,11 @@ CFI_ENDPROC
 ENDFUNCTION(G(caml_ml_array_align_error))
 
 FUNCTION(G(caml_assert_stack_invariants))
-||||||| 23e84b8c4d
+||||||| upstream-base
 FUNCTION(G(caml_assert_stack_invariants))
 =======
 FUNCTION(caml_assert_stack_invariants)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 CFI_STARTPROC
         movq    Caml_state(current_stack), %r11
         movq    %rsp, %r10
@@ -1830,7 +1830,7 @@ G(caml_system__code_end):
 /* Frametable - GC roots for callback */
 /* Uses the same naming convention as ocamlopt generated modules. */
         .data
-<<<<<<< HEAD
+<<<<<<< oxcaml
         .globl  G(caml_system__frametable)
         .align  EIGHT_ALIGN
 G(caml_system__frametable):
@@ -1838,7 +1838,7 @@ G(caml_system__frametable):
         .4byte  LBL(108) - . /* return address into callback */
         .value  -1           /* negative frame size => use callback link */
         .value  0            /* no roots here */
-||||||| 23e84b8c4d
+||||||| upstream-base
         .globl  G(caml_system.frametable)
         .align  EIGHT_ALIGN
 G(caml_system.frametable):
@@ -1852,13 +1852,13 @@ OBJECT(CAMLSEP(system,frametable))
         .quad   LBL(108)    /* return address into callback */
         .value  -1          /* negative frame size => use callback link */
         .value  0           /* no roots here */
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         .align  EIGHT_ALIGN
-<<<<<<< HEAD
+<<<<<<< oxcaml
         .4byte  LBL(frame_runstack) - . /* return address into fiber_val_handler */
         .value  -1                      /* negative frame size => use callback link */
         .value  0                       /* no roots here */
-||||||| 23e84b8c4d
+||||||| upstream-base
         .quad   LBL(frame_runstack) /* return address into fiber_val_handler */
         .value  -1          /* negative frame size => use callback link */
         .value  0           /* no roots here */
@@ -1867,7 +1867,7 @@ OBJECT(CAMLSEP(system,frametable))
         .value  -1          /* negative frame size => use callback link */
         .value  0           /* no roots here */
 END_OBJECT(CAMLSEP(system,frametable))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 #if defined(SYS_macosx)
         .literal16

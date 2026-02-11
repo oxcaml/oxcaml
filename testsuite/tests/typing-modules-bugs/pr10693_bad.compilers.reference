@@ -35,16 +35,16 @@ Error: Signature mismatch:
        In module M.M:
        Modules do not match:
          sig
-<<<<<<< HEAD
+<<<<<<< oxcaml
            val x : X/2.t option
            module M : functor (Y : Dep) -> sig val x : X/2.t option end
-||||||| 23e84b8c4d
+||||||| upstream-base
            val x : X.t option
            module M : functor (Y : Dep) -> sig val x : X.t option end
 =======
            val x : X.t option
            module M : (Y : Dep) -> sig val x : X.t option end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
          end
        is not included in
          sig val x : X.t option end
@@ -53,24 +53,24 @@ Error: Signature mismatch:
          val x : X/1.t option
        is not included in
          val x : X/2.t option
-<<<<<<< HEAD
+<<<<<<< oxcaml
        The type "X/1.t option" is not compatible with the type "X/2.t option"
        Type "X/1.t" is not compatible with type "X/2.t"
-||||||| 23e84b8c4d
+||||||| upstream-base
        The type "X.t option" is not compatible with the type "X/2.t option"
        Type "X.t" is not compatible with type "X/2.t"
 =======
        The type X.t option is not compatible with the type X/2.t option
        Type X.t is not compatible with type X/2.t
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
        File "_none_", line 1:
-<<<<<<< HEAD
+<<<<<<< oxcaml
          Definition of module "X/1"
-||||||| 23e84b8c4d
+||||||| upstream-base
          Definition of module "X"
 =======
          Definition of module X
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
        File "_none_", line 1:
          Definition of module X/2
        File "pr10693_bad.ml", line 17, characters 6-24: Expected declaration

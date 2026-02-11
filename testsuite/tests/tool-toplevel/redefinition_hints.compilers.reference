@@ -14,13 +14,13 @@ val y : (u * v * (module S)) M.t = M.X (A, B, <module>)
 Line 2, characters 4-5:
 2 | x = y;;
         ^
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Error: This expression has type "(u/1 * v/1 * (module S/1)) M/1.t"
-||||||| 23e84b8c4d
+||||||| upstream-base
 Error: This expression has type "(u * v * (module S)) M.t"
 =======
 Error: The value y has type (u * v * (module S)) M.t
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
        but an expression was expected of type
          (u/2 * v/2 * (module S/2)) M/2.t
        Hint: The types v and u have been defined multiple times in this
@@ -48,32 +48,32 @@ Error: The value b has type a/2 but an expression was expected of type a/3
 Line 1, characters 4-5:
 1 | a = c;;
         ^
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Error: This expression has type "a/1" but an expression was expected of type
          "a/2"
        Hint: The type "a" has been defined multiple times in this toplevel
-||||||| 23e84b8c4d
+||||||| upstream-base
 Error: This expression has type "a" but an expression was expected of type "a/3"
        Hint: The type "a" has been defined multiple times in this toplevel
 =======
 Error: The value c has type a but an expression was expected of type a/3
        Hint: The type a has been defined multiple times in this toplevel
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
          session. Some toplevel values still refer to old versions of this
          type. Did you try to redefine them?
 Line 1, characters 4-5:
 1 | b = c;;
         ^
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Error: This expression has type "a/1" but an expression was expected of type
          "a/2"
        Hint: The type "a" has been defined multiple times in this toplevel
-||||||| 23e84b8c4d
+||||||| upstream-base
 Error: This expression has type "a" but an expression was expected of type "a/2"
        Hint: The type "a" has been defined multiple times in this toplevel
 =======
 Error: The value c has type a but an expression was expected of type a/2
        Hint: The type a has been defined multiple times in this toplevel
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
          session. Some toplevel values still refer to old versions of this
          type. Did you try to redefine them?

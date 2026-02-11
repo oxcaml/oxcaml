@@ -13,9 +13,9 @@
 (*                                                                        *)
 (**************************************************************************)
 
-<<<<<<< HEAD:toplevel/native/topstart.ml
+<<<<<<< oxcaml:toplevel/native/topstart.ml
 let _ = Stdlib.exit (Topmain.main())
-||||||| 23e84b8c4d:asmcomp/asmpackager.mli
+||||||| upstream-base:asmcomp/asmpackager.mli
 (* "Package" a set of .cmx/.o files into one .cmx/.o file having the
    original compilation units as sub-modules. *)
 
@@ -62,4 +62,4 @@ exception Error of error
 
 val report_error: error Format_doc.format_printer
 val report_error_doc: error Format_doc.printer
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a:asmcomp/asmpackager.mli
+>>>>>>> upstream-incoming:asmcomp/asmpackager.mli

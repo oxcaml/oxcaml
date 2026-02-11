@@ -143,7 +143,7 @@ module T = struct
     sub.location sub loc;
     sub.attributes sub attrs;
     match desc with
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Ptyp_any jkind
     | Ptyp_var (_, jkind) -> Option.iter (sub.jkind_annotation sub) jkind
     | Ptyp_arrow (_lab, t1, t2, m1, m2) ->
@@ -151,7 +151,7 @@ module T = struct
         sub.modes sub m1; sub.modes sub m2
     | Ptyp_tuple tyl -> iter_labeled_tuple sub tyl
     | Ptyp_unboxed_tuple tyl -> iter_labeled_tuple sub tyl
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Ptyp_any
     | Ptyp_var _ -> ()
     | Ptyp_arrow (_lab, t1, t2) ->
@@ -163,34 +163,34 @@ module T = struct
     | Ptyp_arrow (_lab, t1, t2) ->
         sub.typ sub t1; sub.typ sub t2
     | Ptyp_tuple tyl -> List.iter (fun (_, e) -> sub.typ sub e) tyl
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Ptyp_constr (lid, tl) ->
         iter_loc_lid sub lid; List.iter (sub.typ sub) tl
     | Ptyp_object (ol, _o) ->
         List.iter (object_field sub) ol
     | Ptyp_class (lid, tl) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
         iter_loc sub lid; List.iter (sub.typ sub) tl
     | Ptyp_alias (t, _, jkind) ->
         sub.typ sub t;
         Option.iter (sub.jkind_annotation sub) jkind
-||||||| 23e84b8c4d
+||||||| upstream-base
         iter_loc sub lid; List.iter (sub.typ sub) tl
     | Ptyp_alias (t, _) -> sub.typ sub t
 =======
         iter_loc_lid sub lid; List.iter (sub.typ sub) tl
     | Ptyp_alias (t, _) -> sub.typ sub t
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Ptyp_variant (rl, _b, _ll) ->
         List.iter (row_field sub) rl
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Ptyp_poly (bound_vars, t) ->
         List.iter (bound_var sub) bound_vars;
         sub.typ sub t;
     | Ptyp_package (lid, l) ->
         iter_loc sub lid;
         List.iter (iter_tuple (iter_loc sub) (sub.typ sub)) l
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Ptyp_poly (_, t) -> sub.typ sub t
     | Ptyp_package (lid, l) ->
         iter_loc sub lid;
@@ -199,7 +199,7 @@ module T = struct
     | Ptyp_poly (_, t) -> sub.typ sub t
     | Ptyp_package ptyp ->
         sub.package_type sub ptyp
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Ptyp_open (mod_ident, t) ->
         iter_loc_lid sub mod_ident;
         sub.typ sub t
@@ -541,43 +541,43 @@ module E = struct
     | Pexp_match (e, pel) ->
         sub.expr sub e; sub.cases sub pel
     | Pexp_try (e, pel) -> sub.expr sub e; sub.cases sub pel
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Pexp_unboxed_unit -> ()
     | Pexp_unboxed_bool _ -> ()
     | Pexp_tuple el -> iter_labeled_tuple sub el
     | Pexp_unboxed_tuple el -> iter_labeled_tuple sub el
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Pexp_tuple el -> List.iter (sub.expr sub) el
 =======
     | Pexp_tuple el -> List.iter (fun (_, e) -> sub.expr sub e) el
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Pexp_construct (lid, arg) ->
         iter_loc_lid sub lid; iter_opt (sub.expr sub) arg
     | Pexp_variant (_lab, eo) ->
         iter_opt (sub.expr sub) eo
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Pexp_record (l, eo)
     | Pexp_record_unboxed_product (l, eo) ->
         List.iter (iter_tuple (iter_loc sub) (sub.expr sub)) l;
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Pexp_record (l, eo) ->
         List.iter (iter_tuple (iter_loc sub) (sub.expr sub)) l;
 =======
     | Pexp_record (l, eo) ->
         List.iter (iter_tuple (iter_loc_lid sub) (sub.expr sub)) l;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         iter_opt (sub.expr sub) eo
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Pexp_field (e, lid)
     | Pexp_unboxed_field (e, lid) ->
         sub.expr sub e; iter_loc sub lid
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Pexp_field (e, lid) ->
         sub.expr sub e; iter_loc sub lid
 =======
     | Pexp_field (e, lid) ->
         sub.expr sub e; iter_loc_lid sub lid
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Pexp_setfield (e1, lid, e2) ->
         sub.expr sub e1; iter_loc_lid sub lid;
         sub.expr sub e2
@@ -603,16 +603,16 @@ module E = struct
       Option.iter (sub.typ sub) t;
       sub.modes sub m
     | Pexp_send (e, _s) -> sub.expr sub e
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Pexp_new lid -> iter_loc sub lid
     | Pexp_setvar (s, e) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Pexp_new lid -> iter_loc sub lid
     | Pexp_setinstvar (s, e) ->
 =======
     | Pexp_new lid -> iter_loc_lid sub lid
     | Pexp_setinstvar (s, e) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         iter_loc sub s; sub.expr sub e
     | Pexp_override sel ->
         List.iter (iter_tuple (iter_loc sub) (sub.expr sub)) sel
@@ -627,13 +627,13 @@ module E = struct
     | Pexp_poly (e, t) ->
         sub.expr sub e; iter_opt (sub.typ sub) t
     | Pexp_object cls -> sub.class_structure sub cls
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Pexp_newtype (s, jkind, e) ->
         iter_loc sub s;
         Option.iter (sub.jkind_annotation sub) jkind;
         sub.expr sub e
     | Pexp_pack me -> sub.module_expr sub me
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Pexp_newtype (_s, e) -> sub.expr sub e
     | Pexp_pack me -> sub.module_expr sub me
 =======
@@ -641,7 +641,7 @@ module E = struct
     | Pexp_pack (me, optyp) ->
         sub.module_expr sub me;
         Option.iter (sub.package_type sub) optyp
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Pexp_open (o, e) ->
         sub.open_declaration sub o; sub.expr sub e
     | Pexp_letop {let_; ands; body} ->
@@ -680,16 +680,16 @@ module P = struct
     | Ppat_alias (p, s) -> sub.pat sub p; iter_loc sub s
     | Ppat_constant _ -> ()
     | Ppat_interval _ -> ()
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Ppat_unboxed_unit -> ()
     | Ppat_unboxed_bool _ -> ()
     | Ppat_tuple (pl, _) -> iter_labeled_tuple sub pl
     | Ppat_unboxed_tuple (pl, _) -> iter_labeled_tuple sub pl
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Ppat_tuple pl -> List.iter (sub.pat sub) pl
 =======
     | Ppat_tuple (pl, _) -> List.iter (fun (_, p) -> sub.pat sub p) pl
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Ppat_construct (l, p) ->
         iter_loc_lid sub l;
         iter_opt
@@ -702,12 +702,12 @@ module P = struct
              sub.pat sub p)
           p
     | Ppat_variant (_l, p) -> iter_opt (sub.pat sub) p
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Ppat_record (lpl, _cf)
     | Ppat_record_unboxed_product (lpl, _cf) ->
         List.iter (iter_tuple (iter_loc sub) (sub.pat sub)) lpl
     | Ppat_array (_mut, pl) -> List.iter (sub.pat sub) pl
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Ppat_record (lpl, _cf) ->
         List.iter (iter_tuple (iter_loc sub) (sub.pat sub)) lpl
     | Ppat_array pl -> List.iter (sub.pat sub) pl
@@ -715,13 +715,13 @@ module P = struct
     | Ppat_record (lpl, _cf) ->
         List.iter (iter_tuple (iter_loc_lid sub) (sub.pat sub)) lpl
     | Ppat_array pl -> List.iter (sub.pat sub) pl
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Ppat_or (p1, p2) -> sub.pat sub p1; sub.pat sub p2
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Ppat_constraint (p, t, m) ->
         sub.pat sub p; Option.iter (sub.typ sub) t; sub.modes sub m;
     | Ppat_type s -> iter_loc sub s
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Ppat_constraint (p, t) ->
         sub.pat sub p; sub.typ sub t
     | Ppat_type s -> iter_loc sub s
@@ -729,7 +729,7 @@ module P = struct
     | Ppat_constraint (p, t) ->
         sub.pat sub p; sub.typ sub t
     | Ppat_type s -> iter_loc_lid sub s
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Ppat_lazy p -> sub.pat sub p
     | Ppat_unpack s -> iter_loc sub s
     | Ppat_effect (p1,p2) -> sub.pat sub p1; sub.pat sub p2

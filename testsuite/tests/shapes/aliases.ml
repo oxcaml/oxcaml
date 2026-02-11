@@ -2,7 +2,7 @@
  flags = "-dshape";
  expect;
 *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
 module A = struct type t end
 module B = A
 [%%expect{|
@@ -88,7 +88,7 @@ module G (X : sig type t end) = struct include X end
                              });
  }
 module G : functor (X : sig type t end) -> sig type t = X.t end
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 
 module A = struct type t end
@@ -176,7 +176,7 @@ module G (X : sig type t end) = struct include X end
                              });
  }
 module G : (X : sig type t end) -> sig type t = X.t end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 |}]
 
 module E = G(B)

@@ -209,16 +209,16 @@ val for_all : ('a : value_or_null). ('a -> bool) -> 'a t -> bool
 
     @since 4.14 *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val exists : ('a : value_or_null). ('a -> bool) -> 'a t -> bool
 (** [exists xs p] determines whether at least one element [x]
-||||||| 23e84b8c4d
+||||||| upstream-base
 val exists : ('a -> bool) -> 'a t -> bool
 (** [exists xs p] determines whether at least one element [x]
 =======
 val exists : ('a -> bool) -> 'a t -> bool
 (** [exists p xs] determines whether at least one element [x]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     of the sequence [xs] satisfies [p x].
 
     May not terminate if [xs] is infinite.
@@ -386,9 +386,9 @@ val cons : ('a : value_or_null). 'a -> 'a t -> 'a t
 
     @since 4.11 *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val init : ('a : value_or_null). int -> (int -> 'a) -> 'a t
-||||||| 23e84b8c4d
+||||||| upstream-base
 val init : int -> (int -> 'a) -> 'a t
 =======
 val singleton: 'a -> 'a t
@@ -397,7 +397,7 @@ val singleton: 'a -> 'a t
     @since 5.4 *)
 
 val init : int -> (int -> 'a) -> 'a t
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** [init n f] is the sequence [f 0; f 1; ...; f (n-1)].
 
     [n] must be nonnegative.
@@ -494,10 +494,10 @@ val filter : ('a : value_or_null). ('a -> bool) -> 'a t -> 'a t
     In other words, [filter p xs] is the sequence [xs],
     deprived of the elements [x] such that [p x] is false. *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val filter_map : ('a : value_or_null) ('b : value_or_null)
   . ('a -> 'b option) -> 'a t -> 'b t
-||||||| 23e84b8c4d
+||||||| upstream-base
 val filter_map : ('a -> 'b option) -> 'a t -> 'b t
 =======
 val filteri : (int -> 'a -> bool) -> 'a t -> 'a t
@@ -509,7 +509,7 @@ val filteri : (int -> 'a -> bool) -> 'a t -> 'a t
 *)
 
 val filter_map : ('a -> 'b option) -> 'a t -> 'b t
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** [filter_map f xs] is the sequence of the elements [y] such that
     [f x = Some y], where [x] ranges over [xs].
 

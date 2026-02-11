@@ -11,16 +11,16 @@
           [
             structure_item (shortcut_ext_attr.ml[10,179+2]..[30,721+31]) ghost
               Pstr_eval
-<<<<<<< HEAD
+<<<<<<< oxcaml
               expression (shortcut_ext_attr.ml[10,179+2]..[30,721+31])
                 Pexp_let Immutable Nonrec
-||||||| 23e84b8c4d
+||||||| upstream-base
               expression (shortcut_ext_attr.ml[10,179+2]..[30,721+31])
                 Pexp_let Nonrec
 =======
               expression (shortcut_ext_attr.ml[10,179+2]..[30,721+31]) ghost
                 Pexp_let Nonrec
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                 [
                   <def>
                       attribute "foo"
@@ -536,19 +536,19 @@
               core_type (shortcut_ext_attr.ml[61,1304+2]..[61,1304+22]) ghost
                 attribute "foo"
                   []
-<<<<<<< HEAD
+<<<<<<< oxcaml
                 Ptyp_package "M" (shortcut_ext_attr.ml[61,1304+20]..[61,1304+21])
                 []
         ptype_jkind_annotation =
           None
-||||||| 23e84b8c4d
+||||||| upstream-base
                 Ptyp_package "M" (shortcut_ext_attr.ml[61,1304+20]..[61,1304+21])
                 []
 =======
                 Ptyp_package
                   package_type "M" (shortcut_ext_attr.ml[61,1304+20]..[61,1304+21])
                   []
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     ]
   structure_item (shortcut_ext_attr.ml[64,1353+0]..[67,1409+22])
     Pstr_module
@@ -801,17 +801,17 @@
   structure_item (shortcut_ext_attr.ml[93,1885+0]..[93,1885+19])
     Pstr_extension "foo"
     [
-<<<<<<< HEAD
+<<<<<<< oxcaml
       structure_item (shortcut_ext_attr.ml[93,1885+0]..[93,1885+19])
         Pstr_include        Structure
           attribute "foo"
-||||||| 23e84b8c4d
+||||||| upstream-base
       structure_item (shortcut_ext_attr.ml[93,1885+0]..[93,1885+19])
         Pstr_include          attribute "foo"
 =======
       structure_item (shortcut_ext_attr.ml[93,1885+0]..[93,1885+19]) ghost
         Pstr_include          attribute "foo"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
             []
         module_expr (shortcut_ext_attr.ml[93,1885+18]..[93,1885+19])
           Pmod_ident "M" (shortcut_ext_attr.ml[93,1885+18]..[93,1885+19])

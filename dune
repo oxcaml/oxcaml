@@ -136,7 +136,7 @@
  (library_flags -linkall)
  (libraries flambda2_floats)
  (modules_without_implementation
-<<<<<<< HEAD
+<<<<<<< oxcaml
   annot
   value_rec_types
   asttypes
@@ -148,13 +148,13 @@
   solver_intf
   mode_hint
   mode_intf)
-||||||| 23e84b8c4d
+||||||| upstream-base
    annot asttypes cmo_format outcometree parsetree value_rec_types)
 =======
    annot cmo_format outcometree parsetree value_rec_types)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
  (modules
-<<<<<<< HEAD
+<<<<<<< oxcaml
   ;; UTILS
   arrayset
   config
@@ -338,7 +338,7 @@
   ; See note below about camlinternalQuote
   (:include
    %{project_root}/duneconf/camlinternalquote_if_missing_from_stdlib)))
-||||||| 23e84b8c4d
+||||||| upstream-base
    ;; UTILS
    config build_path_prefix_map misc identifiable numbers arg_helper clflags
    profile terminfo ccomp warnings consistbl strongly_connected_components
@@ -351,13 +351,13 @@
    strongly_connected_components targetint load_path
    int_replace_polymorphic_compare binutils local_store lazy_backtrack diffing
    diffing_with_keys unit_info compression linkdeps
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 ; Our system compiler doesn't have CamlInternalQuote in its stdlib, so
 ; we need to compile it as an additional target, but only for the first
 ; stage build.  See also duneconf/dune.
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (rule
  (targets camlinternalQuote.ml)
  (enabled_if
@@ -366,7 +366,7 @@
   (copy#
    %{project_root}/stdlib/camlinternalQuote.ml
    %{project_root}/camlinternalQuote.ml)))
-||||||| 23e84b8c4d
+||||||| upstream-base
    ;; TYPING
    ident path primitive shape types btype oprint subst predef datarepr
    cmi_format persistent_env env type_immediacy errortrace
@@ -392,9 +392,9 @@
    typedecl_unboxed typedecl_separability cmt2annot out_type data_types
    ; manual update: mli only files
    annot outcometree value_rec_types
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (rule
  (targets camlinternalQuote.mli)
  (enabled_if
@@ -403,7 +403,7 @@
   (copy#
    %{project_root}/stdlib/camlinternalQuote.mli
    %{project_root}/camlinternalQuote.mli)))
-||||||| 23e84b8c4d
+||||||| upstream-base
    ;; lambda/
    debuginfo lambda matching printlambda runtimedef tmc simplif switch
    translattribute translclass translcore translmod translobj translprim
@@ -434,7 +434,7 @@
    ; manual update: this is required.
    instruct
  ))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (library
  (name ocamlbytecomp)

@@ -281,7 +281,7 @@ module Doc = struct
 
   let filename ppf file =
     Fmt.pp_print_string ppf (show_filename file)
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
   let linenum ppf line =
     if !Clflags.locs
@@ -292,11 +292,11 @@ module Doc = struct
     if !Clflags.locs
     then Fmt.fprintf ppf "%i" char
     else Fmt.fprintf ppf "_"
-||||||| 23e84b8c4d
+||||||| upstream-base
 let print_filename ppf file =
   Format.pp_print_string ppf (show_filename file)
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Best-effort printing of the text describing a location, of the form
    'File "foo.ml", line 3, characters 10-12'.
@@ -304,9 +304,9 @@ let print_filename ppf file =
    Some of the information (filename, line number or characters numbers) in the
    location might be invalid; in which case we do not print it.
  *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let loc ~capitalize_first ppf loc =
-||||||| 23e84b8c4d
+||||||| upstream-base
 let print_loc ppf loc =
   setup_tags ();
   let file_valid = function
@@ -321,7 +321,7 @@ let print_loc ppf loc =
   let chars_valid ~startchar ~endchar = startchar <> -1 && endchar <> -1 in
 =======
   let loc ppf loc =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     setup_tags ();
     let file_valid = function
       | "_none_" ->
@@ -347,10 +347,10 @@ let print_loc ppf loc =
 
     let first = ref true in
     let capitalize s =
-<<<<<<< HEAD
+<<<<<<< oxcaml
       if !first then (first := false;
                       if capitalize_first then String.capitalize_ascii s else s)
-||||||| 23e84b8c4d
+||||||| upstream-base
   let first = ref true in
   let capitalize s =
     if !first then (first := false; String.capitalize_ascii s)
@@ -359,7 +359,7 @@ let print_loc ppf loc =
     if !first then () else Format.fprintf ppf ", " in
 =======
       if !first then (first := false; String.capitalize_ascii s)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       else s in
     let comma () =
       if !first then () else Fmt.fprintf ppf ", " in
@@ -375,8 +375,8 @@ let print_loc ppf loc =
     comma ();
     let startline = if line_valid startline then startline else 1 in
     let endline = if line_valid endline then endline else startline in
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
     Format.fprintf ppf "%s %i-%i" (capitalize "characters") startchar endchar
   );
 =======
@@ -385,9 +385,9 @@ let print_loc ppf loc =
       else
         Fmt.fprintf ppf "%s %i-%i" (capitalize "lines") startline endline
     end;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
     begin if startline = endline then
         Fmt.fprintf ppf "%s %a"
           (capitalize "line") linenum startline
@@ -395,16 +395,16 @@ let print_loc ppf loc =
         Fmt.fprintf ppf "%s %a-%a"
           (capitalize "lines") linenum startline linenum endline
     end;
-||||||| 23e84b8c4d
+||||||| upstream-base
   Format.fprintf ppf "@}"
 =======
     if chars_valid ~startchar ~endchar then (
       comma ();
       Fmt.fprintf ppf "%s %i-%i" (capitalize "characters") startchar endchar
     );
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
     if chars_valid ~startchar ~endchar then (
       comma ();
       Fmt.fprintf ppf "%s %a-%a"
@@ -424,7 +424,7 @@ end
 let print_filename = Fmt.compat Doc.filename
 let print_loc_in_lowercase = Fmt.compat (Doc.loc ~capitalize_first:false)
 let print_loc = Fmt.compat (Doc.loc ~capitalize_first:true)
-||||||| 23e84b8c4d
+||||||| upstream-base
 (* Print a comma-separated list of locations *)
 let print_locs ppf locs =
   Format.pp_print_list ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
@@ -442,7 +442,7 @@ end
 
 let print_filename = Fmt.compat Doc.filename
 let print_loc = Fmt.compat Doc.loc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let print_locs = Fmt.compat Doc.locs
 let separate_new_message ppf = Fmt.compat Doc.separate_new_message ppf ()
 
@@ -935,16 +935,16 @@ let batch_mode_printer : report_printer =
       | Misc.Error_style.Short ->
           ()
     in
-<<<<<<< HEAD
+<<<<<<< oxcaml
     Format.fprintf ppf "@[<v>%a:@ %a@]" print_loc loc
-||||||| 23e84b8c4d
+||||||| upstream-base
     Format.fprintf ppf "@[<v>%a:@ %a@]" print_loc loc highlight loc
 =======
     Format.fprintf ppf "%a:@ %a" print_loc loc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       (Fmt.compat highlight) loc
   in
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let pp_txt ppf txt = Format.fprintf ppf "@[%a@]" Fmt.Doc.format txt in
   let pp self ppf report =
     setup_tags ();
@@ -955,7 +955,7 @@ let batch_mode_printer : report_printer =
     *)
     print_updating_num_loc_lines ppf (fun ppf () ->
       Format.fprintf ppf "@[<v>%a%a%a: %a%a%a%a@]@."
-||||||| 23e84b8c4d
+||||||| upstream-base
   let pp_txt ppf txt = Format.fprintf ppf "@[%t@]" txt in
   let pp self ppf report =
     setup_tags ();
@@ -973,7 +973,7 @@ let batch_mode_printer : report_printer =
   in
   let error_format self ppf report =
     Format.fprintf ppf "@[<v>%a%a%a: %a@[%a@]%a%a%a@]@."
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       Format.pp_open_tbox ()
       (self.pp_main_loc self report) report.main.loc
       (self.pp_report_kind self report) report.kind
@@ -1096,21 +1096,21 @@ let report_error ppf err =
 let mkerror loc sub footnote txt =
   { kind = Report_error; main = { loc; txt }; sub; footnote=footnote () }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let errorf ?(loc = none) ?(sub = []) =
   Fmt.kdoc_printf (mkerror loc sub)
-||||||| 23e84b8c4d
+||||||| upstream-base
 let errorf ?(loc = none) ?(sub = []) =
   Format.kdprintf (mkerror loc sub)
 =======
 let errorf ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) =
   Fmt.kdoc_printf (mkerror loc sub footnote)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let error ?(loc = none) ?(sub = []) msg_str =
   mkerror loc sub (Fmt.Doc.string msg_str Fmt.Doc.empty)
-||||||| 23e84b8c4d
+||||||| upstream-base
 let error ?(loc = none) ?(sub = []) msg_str =
   mkerror loc sub (fun ppf -> Format.pp_print_string ppf msg_str)
 =======
@@ -1123,12 +1123,12 @@ let aligned_error_hint
           let main, hint = Misc.align_error_hint ~main ~hint in
           mkerror loc (mknoloc hint :: sub) footnote main
   ) fmt
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let error_of_printer ?(loc = none) ?(sub = []) pp x =
   mkerror loc sub (Fmt.doc_printf "%a" pp x)
-||||||| 23e84b8c4d
+||||||| upstream-base
 let error_of_printer ?(loc = none) ?(sub = []) pp x =
   mkerror loc sub (fun ppf -> pp ppf x)
 =======
@@ -1137,7 +1137,7 @@ let error ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) msg_str =
 
 let error_of_printer ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) pp x =
   mkerror loc sub footnote (Fmt.doc_printf "%a" pp x)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let error_of_printer_file print x =
   error_of_printer ~loc:(in_file !input_name) print x
@@ -1150,12 +1150,12 @@ let default_warning_alert_reporter report mk (loc: t) w : report option =
   match report w with
   | `Inactive -> None
   | `Active { Warnings.id; message; is_error; sub_locs } ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       let msg_of_str str = Format_doc.Doc.(empty |> string str) in
-||||||| 23e84b8c4d
+||||||| upstream-base
       let msg_of_str str = fun ppf -> Format.pp_print_string ppf str in
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       let kind = mk is_error id in
       let main = { loc; txt = message } in
       let sub = List.map (fun (loc, sub_message) ->
@@ -1296,17 +1296,17 @@ let () =
       | _ -> None
     )
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let raise_errorf ?(loc = none) ?(sub = []) =
   Fmt.kdoc_printf (fun txt -> raise (Error (mkerror loc sub txt)))
 
 let todo_overwrite_not_implemented ?(kind = "") t =
   alert ~kind t "Overwrite not implemented.";
   assert false
-||||||| 23e84b8c4d
+||||||| upstream-base
 let raise_errorf ?(loc = none) ?(sub = []) =
   Format.kdprintf (fun txt -> raise (Error (mkerror loc sub txt)))
 =======
 let raise_errorf ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) =
   Fmt.kdoc_printf (fun txt -> raise (Error (mkerror loc sub footnote txt)))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

@@ -70,7 +70,7 @@ module type S = sig
   module F:  sig val x : int end -> sig end
 end
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* Nominal type comparison *)
 
 module Nominal = struct
@@ -98,7 +98,7 @@ end = struct
   module F(X:sig val x:int end) = struct let _ = X.x end
 end
 and Y: sig end = struct end
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 (* from ocaml/ocaml#13955 no warning 32 should be triggered for [test] *)
 
@@ -119,7 +119,7 @@ end
 and Y: sig end = struct end
 
 [@@@warning "+60"]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* TEST
  flags = "-w +A";

@@ -47,7 +47,7 @@ using std::memory_order_seq_cst;
 #define atomic_store_relaxed(p, v)                      \
   atomic_store_explicit((p), (v), memory_order_relaxed)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Caml_inline void caml_atomic_counter_init(atomic_uintnat* counter, uintnat n)
 {
   atomic_store_release(counter, n);
@@ -68,7 +68,7 @@ Caml_inline uintnat caml_atomic_counter_incr(atomic_uintnat* counter)
 {
   uintnat old = atomic_fetch_add(counter, 1);
   CAMLassert(old+1 != 0);
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 /* Atomic counters, abstracted here for use across the runtime. */
 
@@ -101,7 +101,7 @@ Caml_inline uintnat caml_atomic_counter_incr(atomic_uintnat* counter)
 {
   uintnat old = atomic_fetch_add(counter, 1);
   CAMLassert (old+1 != 0);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   return old+1;
 }
 

@@ -1,5 +1,5 @@
 Indexed shapes:
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Resolved: Index_modules.0 :
   A.x (File "index_modules.ml", line 22, characters 17-20)
 Resolved: Index_modules.0 :
@@ -9,7 +9,7 @@ Unresolved: CU Stdlib . "+"[value]  :
 Unresolved: CU Stdlib . "print_int"[value]  :
   print_int (File "index_modules.ml", line 22, characters 2-11)
 Resolved: Index_modules.1 :
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 Resolved: Index_modules.1:
   A (File "index_modules.ml", line 22, characters 17-18)
@@ -22,7 +22,7 @@ Unresolved: CU Stdlib . "+"[value] :
 Unresolved: CU Stdlib . "print_int"[value] :
   print_int (File "index_modules.ml", line 22, characters 2-11)
 Resolved: Index_modules.1:
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   A (File "index_modules.ml", line 21, characters 11-12)
 
 Uid of decls:

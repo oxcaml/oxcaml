@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* TEST
  include stdlib_stable;
 *)
@@ -269,7 +269,7 @@ let () =
   (* The below tests immutable arrays of *mutable* arrays because physical
      equality is only guaranteed to be distinct for mutable values *)
   assert (not (Iarray.memq [|1;2;3|] [:[|1;2;3|];[|2;3;4|];[|0|]:]));
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 (* TEST *)
 
@@ -536,7 +536,7 @@ let () =
   (* The below tests immutable arrays of *mutable* arrays because physical
      equality is only guaranteed to be distinct for mutable values *)
   assert (not (Iarray.memq [|1;2;3|] [|[|1;2;3|];[|2;3;4|];[|0|]|]));
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   assert (Iarray.memq 1 (make 100 1));
   assert (not (Iarray.memq (ref 1) (make 100 (ref 1))));
 ;;

@@ -64,11 +64,11 @@ type label_mismatch =
   | Type of Errortrace.equality_error
   | Mutability of position
   | Atomicity of position
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Modality of Mode.Modality.equate_error
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 type record_change =
   (Types.label_declaration as 'ld, 'ld, label_mismatch) Diffing_with_keys.change
@@ -217,17 +217,17 @@ val report_type_mismatch :
   string -> string -> string ->
   Env.t ->
   type_mismatch Format_doc.printer
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
 val report_modality_sub_error :
   string -> string -> Format_doc.formatter -> Mode.Modality.error -> unit
 
 val report_mode_sub_error :
   string -> string -> Format_doc.formatter -> Mode.Value.error -> unit
-||||||| 23e84b8c4d
+||||||| upstream-base
   Format.formatter -> type_mismatch -> unit
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 val report_extension_constructor_mismatch :
   string -> string -> string ->

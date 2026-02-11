@@ -76,9 +76,9 @@ val cons : ('a : value_or_null). 'a -> 'a list -> 'a list
     @since 4.03 (4.05 in ListLabels)
  *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val hd : ('a : value_or_null). 'a list -> 'a
-||||||| 23e84b8c4d
+||||||| upstream-base
 val hd : 'a list -> 'a
 =======
 val singleton: 'a -> 'a list
@@ -87,7 +87,7 @@ val singleton: 'a -> 'a list
     @since 5.4 *)
 
 val hd : 'a list -> 'a
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** Return the first element of the given list.
    @raise Failure if the list is empty.
  *)
@@ -397,10 +397,10 @@ val filteri : ('a : value_or_null). f:(int -> 'a -> bool) -> 'a list -> 'a list
    @since 4.11
 *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val partition : ('a : value_or_null).
   f:('a -> bool) -> 'a list -> 'a list * 'a list
-||||||| 23e84b8c4d
+||||||| upstream-base
 val partition : f:('a -> bool) -> 'a list -> 'a list * 'a list
 =======
 
@@ -443,7 +443,7 @@ val drop_while : f:('a -> bool) -> 'a list -> 'a list
 *)
 
 val partition : f:('a -> bool) -> 'a list -> 'a list * 'a list
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** [partition ~f l] returns a pair of lists [(l1, l2)], where
    [l1] is the list of all the elements of [l] that
    satisfy the predicate [f], and [l2] is the list of all the
@@ -586,11 +586,11 @@ val fast_sort : ('a : value_or_null).
     faster on typical input.
  *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val sort_uniq : ('a : value_or_null).
   cmp:('a -> 'a -> int) -> 'a list -> 'a list
 (** Same as {!sort}, but also remove duplicates.
-||||||| 23e84b8c4d
+||||||| upstream-base
 val sort_uniq : cmp:('a -> 'a -> int) -> 'a list -> 'a list
 (** Same as {!sort}, but also remove duplicates.
 =======
@@ -598,7 +598,7 @@ val sort_uniq : cmp:('a -> 'a -> int) -> 'a list -> 'a list
 (** Same as {!sort}, but also remove duplicates: if multiple elements
     compare equal, keep only the first.
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     @since 4.02 (4.03 in ListLabels)
 
     @before 5.4 the element kept was not necessarily the first one.

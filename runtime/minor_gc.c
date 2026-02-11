@@ -203,12 +203,12 @@ struct oldify_state {
   uintnat allocated_words;
 };
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* In-progress headers are zeros except for the lowest color bit set
    to 1. */
 #define In_progress_hd (Make_header(0, 0, 0x100))
 #define Is_update_in_progress(hd) ((hd) == In_progress_hd)
-||||||| 23e84b8c4d
+||||||| upstream-base
 static value alloc_shared(caml_domain_state* d,
                           mlsize_t wosize, tag_t tag, reserved_t reserved)
 {
@@ -233,11 +233,11 @@ static value alloc_shared(caml_domain_state* d,
   }
   return Val_hp(mem);
 }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 static header_t spin_on_header(value v) {
-||||||| 23e84b8c4d
+||||||| upstream-base
 /* in progress updates are zeros except for the lowest color bit set to 1
    that is a header with: wosize == 0 && color == 1 && tag == 0 */
 #define In_progress_update_val ((header_t)0x100)
@@ -251,7 +251,7 @@ static void spin_on_header(value v) {
 #define Is_update_in_progress(hd) ((hd) == In_progress_update_val)
 
 static void spin_on_header(value v) {
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   SPIN_WAIT {
     header_t h = atomic_load(Hp_atomic_val(v));
     if (Is_promoted_hd(h))
@@ -365,9 +365,9 @@ static scanning_action_flags oldify_scanning_flags =
 
 static void oldify_one (void* st_v, value v, volatile value *p)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
 tail_call:
-||||||| 23e84b8c4d
+||||||| upstream-base
   struct oldify_state* st = st_v;
   value result;
   header_t hd;
@@ -385,7 +385,7 @@ tail_call:
   tag_t tag;
 
   tail_call:
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   if (!(Is_block(v) && Is_young(v))) {
     /* not a minor block */
     *p = v;
@@ -414,11 +414,11 @@ tail_call:
     }
   } while (tag == Infix_tag);
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   mlsize_t sz = Wosize_hd (hd);
   value field0 = Field(v, 0); /* will be overwritten by try_promote */
   if (tag == Forward_tag) {
-||||||| 23e84b8c4d
+||||||| upstream-base
   if (tag == Cont_tag) {
     value stack_value = Field(v, 0);
     CAMLassert(Wosize_hd(hd) == 2 && infix_offset == 0);
@@ -542,13 +542,13 @@ tail_call:
     for (mlsize_t i = 0; i < sz; i++) {
       Field(result, i) = Field(v, i);
     }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     CAMLassert (infix_offset == 0);
-<<<<<<< HEAD
+<<<<<<< oxcaml
     CAMLassert (sz == 1);
     value f = field0;
     tag_t ft = 0;
-||||||| 23e84b8c4d
+||||||| upstream-base
     if( !try_update_object_header(v, p, result, 0) ) {
       /* Conflict */
       *Hp_val(result) = Make_header(sz, No_scan_tag,
@@ -588,7 +588,7 @@ tail_call:
     f = Forward_val (v);
     ft = 0;
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     if (Is_block (f)) {
       ft = Tag_val (Is_promoted_hd(get_header_val(f)) ? Field(f, 0) : f);
     }
@@ -662,35 +662,35 @@ tail_call:
   }
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 typedef struct mopup_result_s {
   bool locked_ephemerons;
 } mopup_result_s, *mopup_result_t;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 typedef struct {
   bool locked_ephemerons;
 } promote_result;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 /* Finish the work that was put off by [oldify_one].
    Note that [oldify_one] itself is called by oldify_mopup, so we
    have to be careful to remove the first entry from the list before
    oldifying its fields. */
 CAMLno_tsan_for_perf
-<<<<<<< HEAD
+<<<<<<< oxcaml
 static mopup_result_s oldify_mopup (struct oldify_state* st, int do_ephemerons)
-||||||| 23e84b8c4d
+||||||| upstream-base
 CAMLno_tsan /* Disable TSan instrumentation for performance. */
 static void oldify_mopup (struct oldify_state* st, int do_ephemerons)
 =======
 static promote_result oldify_mopup (struct oldify_state* st, int do_ephemerons)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   mopup_result_s result = { .locked_ephemerons = false, };
   bool redo;
-||||||| 23e84b8c4d
+||||||| upstream-base
   value v, new_v, f;
   mlsize_t i;
   caml_domain_state* domain_state = st->domain;
@@ -706,7 +706,7 @@ static promote_result oldify_mopup (struct oldify_state* st, int do_ephemerons)
   struct caml_ephe_ref_elt *re;
   int redo;
   promote_result result = { .locked_ephemerons = false };
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   do {
     redo = false;
@@ -721,7 +721,7 @@ static promote_result oldify_mopup (struct oldify_state* st, int do_ephemerons)
 
       mlsize_t scannable_wosize = Scannable_wosize_val(new_v);
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
       /* [v] was only added to the [todo_list] if its [scannable_wosize > 1].
          - It needs to be greater than 0 because we oldify the first field.
          - It needs to be greater than 1 so the below loop runs at least once,
@@ -731,7 +731,7 @@ static promote_result oldify_mopup (struct oldify_state* st, int do_ephemerons)
       CAMLassert (scannable_wosize > 1);
 
       value f = Field(new_v, 0);
-||||||| 23e84b8c4d
+||||||| upstream-base
     f = Field(new_v, 0);
     CAMLassert (!Is_debug_tag(f));
     if (Is_block (f) && Is_young(f)) {
@@ -747,13 +747,13 @@ static promote_result oldify_mopup (struct oldify_state* st, int do_ephemerons)
     }
     for (mlsize_t i = 1; i < Wosize_val (new_v); i++){
       f = Field(v, i);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       CAMLassert (!Is_debug_tag(f));
       if (Is_block (f) && Is_young(f)) {
         oldify_one (st, f, Op_val (new_v));
       }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
       mlsize_t i = 1;
       if(Tag_val(new_v) == Closure_tag) {
         /* non-scannable prefix already copied in oldify_one */
@@ -827,7 +827,7 @@ static promote_result oldify_mopup (struct oldify_state* st, int do_ephemerons)
             atomic_compare_exchange_strong(data, &v, new_v);
             redo = true; /* may have found new oldify_todo_list */
           }
-||||||| 23e84b8c4d
+||||||| upstream-base
   /* Oldify the key and data in the minor heap of all ephemerons touched in this
      cycle. We are doing this to avoid introducing a barrier for the end of all
      domains promoting reachable objects and having to handle the complexity
@@ -894,13 +894,13 @@ static promote_result oldify_mopup (struct oldify_state* st, int do_ephemerons)
              (We don't care who wins the race, so result not checked) */
           atomic_compare_exchange_strong(data, &v, new_v);
           redo = 1; /* may have found new oldify_todo_list */
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         }
       }
     }
-<<<<<<< HEAD
+<<<<<<< oxcaml
   } while (redo);
-||||||| 23e84b8c4d
+||||||| upstream-base
   }
 
   if (redo) goto again;
@@ -908,7 +908,7 @@ static promote_result oldify_mopup (struct oldify_state* st, int do_ephemerons)
   }
 
   if (redo) goto again;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   return result;
 }
 
@@ -943,19 +943,19 @@ int caml_do_opportunistic_major_slice
 static void minor_gc_leave_barrier
   (caml_domain_state* domain, int participating_count);
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 typedef struct promote_result_s {
   bool locked_ephemerons;
 } promote_result_s, *promote_result_t;
 
 static promote_result_s
-||||||| 23e84b8c4d
+||||||| upstream-base
 void caml_empty_minor_heap_promote(caml_domain_state* domain,
                                    int participating_count,
                                    caml_domain_state** participating)
 =======
 static promote_result
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 caml_empty_minor_heap_promote(caml_domain_state* domain,
                               int participating_count,
                               caml_domain_state** participating)
@@ -1091,39 +1091,39 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
                           domain, false);
   CAML_EV_END(EV_MINOR_MEMPROF_ROOTS);
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   CAML_GC_MESSAGE(MINOR, "roots complete (%d roots). Mopping up.\n",
                   remembered_roots);
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   CAML_EV_BEGIN(EV_MINOR_REMEMBERED_SET_PROMOTE);
-<<<<<<< HEAD
+<<<<<<< oxcaml
   mopup_result_s mopup_result = oldify_mopup (&st, 1); /* ephemerons promoted here */
   result.locked_ephemerons = mopup_result.locked_ephemerons;
-||||||| 23e84b8c4d
+||||||| upstream-base
   oldify_mopup (&st, 1); /* ephemerons promoted here */
 =======
   promote_result result = oldify_mopup (&st, 1); /* ephemerons promoted here */
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   CAML_EV_END(EV_MINOR_REMEMBERED_SET_PROMOTE);
   CAML_EV_END(EV_MINOR_REMEMBERED_SET);
   CAML_GC_MESSAGE(MINOR, "Promoted %"ARCH_INTNAT_PRINTF_FORMAT"u bytes.\n",
                   st.live_bytes);
 #ifdef DEBUG
   caml_global_barrier(participating_count);
-<<<<<<< HEAD
+<<<<<<< oxcaml
   CAML_GC_MESSAGE(DEBUG, "major ref table [%p, %p).\n",
                   self_minor_tables->major_ref.base,
                   self_minor_tables->major_ref.ptr);
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_global_barrier();
   caml_gc_log("ref_base: %p, ref_ptr: %p",
     self_minor_tables->major_ref.base, self_minor_tables->major_ref.ptr);
 =======
   caml_gc_log("ref_base: %p, ref_ptr: %p",
     self_minor_tables->major_ref.base, self_minor_tables->major_ref.ptr);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   for (r = self_minor_tables->major_ref.base;
        r < self_minor_tables->major_ref.ptr; r++) {
     value vnew = **r;
@@ -1210,8 +1210,8 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
   CAML_EV_COUNTER(EV_C_MINOR_ALLOCATED, minor_allocated_bytes);
 
   CAML_EV_END(EV_MINOR);
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
   caml_gc_log ("Minor collection of domain %d completed: %2.0f%% of %u KB live",
                domain->id,
                100.0 * (double)st.live_bytes / (double)minor_allocated_bytes,
@@ -1227,7 +1227,7 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
                  domain->id,
                  100.0 * (double)st.live_bytes / (double)minor_allocated_bytes,
                  (unsigned)(minor_allocated_bytes + 512)/1024);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   /* leave the barrier */
   if( participating_count > 1 ) {
@@ -1240,7 +1240,7 @@ caml_empty_minor_heap_promote(caml_domain_state* domain,
 
 static void ephe_clean_minor (caml_domain_state* domain)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   struct caml_ephe_ref_table table = domain->minor_tables->ephe_ref;
   for (struct caml_ephe_ref_elt* re = table.base; re < table.ptr; re++) {
     value v = re->stash;
@@ -1257,7 +1257,7 @@ static void ephe_clean_minor (caml_domain_state* domain)
     }
     CAMLassert(Tag_hd(hd) != Infix_tag);
     if (Is_promoted_hd(hd)) {
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   struct caml_ephe_ref_table table =
     domain->minor_tables->ephe_ref;
@@ -1276,7 +1276,7 @@ static void ephe_clean_minor (caml_domain_state* domain)
     }
     CAMLassert(Tag_hd(hd) != Infix_tag);
     if (hd == 0) {
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       /* promoted */
       v = Field(v, 0) + infix_offset;
     } else {
@@ -1308,9 +1308,9 @@ static void custom_finalize_minor (caml_domain_state * domain)
   }
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 static void dependent_accounting_minor (caml_domain_state *domain)
-||||||| 23e84b8c4d
+||||||| upstream-base
 void caml_do_opportunistic_major_slice
   (caml_domain_state* domain_unused, void* unused)
 =======
@@ -1322,9 +1322,9 @@ static void nonatomic_increment_counter(atomic_uintnat* counter) {
 
 static void minor_gc_leave_barrier
   (caml_domain_state* domain, int participating_count)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   struct caml_dependent_elt *elt;
   for (elt = domain->minor_tables->dependent.base;
        elt < domain->minor_tables->dependent.ptr; elt++) {
@@ -1386,7 +1386,7 @@ int caml_do_opportunistic_major_slice
     /* NB: need to put guard around the ev logs to prevent spam when we poll */
     uintnat log_events =
         atomic_load_relaxed(&caml_verb_gc) & CAML_GC_MSG_SLICE;
-||||||| 23e84b8c4d
+||||||| upstream-base
   /* NB: need to put guard around the ev logs to prevent
     spam when we poll */
   if (caml_opportunistic_major_work_available()) {
@@ -1425,7 +1425,7 @@ int caml_do_opportunistic_major_slice
     /* NB: need to put guard around the ev logs to prevent spam when we poll */
     uintnat log_events =
         atomic_load_relaxed(&caml_verb_gc) & CAML_GC_MSG_SLICESIZE;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     if (log_events) CAML_EV_BEGIN(EV_MAJOR_MARK_OPPORTUNISTIC);
     caml_opportunistic_major_collection_slice(Major_slice_work_min);
     if (log_events) CAML_EV_END(EV_MAJOR_MARK_OPPORTUNISTIC);
@@ -1441,7 +1441,7 @@ int caml_do_opportunistic_major_slice
    agree on whether the roots should be marked, this variable is sampled
    only once, instead of having domains check it individually.
 */
-<<<<<<< HEAD
+<<<<<<< oxcaml
 void caml_empty_minor_heap_setup(caml_domain_state* domain_unused,
                                  void* mark_requested) {
   /* Check whether the mark phase has been requested */
@@ -1449,12 +1449,12 @@ void caml_empty_minor_heap_setup(caml_domain_state* domain_unused,
     atomic_load_relaxed(&caml_gc_mark_phase_requested)
     ? atomic_exchange(&caml_gc_mark_phase_requested, 0)
     : 0;
-||||||| 23e84b8c4d
+||||||| upstream-base
 void caml_empty_minor_heap_setup(caml_domain_state* domain_unused) {
   atomic_store_release(&domains_finished_minor_gc, 0);
 =======
 void caml_empty_minor_heap_setup(caml_domain_state* domain_unused) {
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   /* Increment the total number of minor collections done in the program */
   nonatomic_increment_counter (&caml_minor_collections_count);
   caml_plat_barrier_reset(&minor_gc_end_barrier);
@@ -1475,20 +1475,20 @@ caml_stw_empty_minor_heap_no_major_slice(caml_domain_state* domain,
     caml_fatal_error("Minor GC triggered recursively");
   Caml_state->in_minor_collection = 1;
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   /* mark_requested_ptr must be read before minor GC barrier */
   uintnat mark_requested = *(uintnat*)mark_requested_ptr;
 
-||||||| 23e84b8c4d
+||||||| upstream-base
   if( participating[0] == Caml_state ) {
     atomic_fetch_add(&caml_minor_cycles_started, 1);
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   if( participating[0] == domain ) {
     nonatomic_increment_counter(&caml_minor_cycles_started);
   }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   promote_result_s prom =
     caml_empty_minor_heap_promote(domain, participating_count, participating);
 
@@ -1507,7 +1507,7 @@ caml_stw_empty_minor_heap_no_major_slice(caml_domain_state* domain,
   /* while the minor heap is empty, allow the major GC to mark roots */
   if (mark_requested)
     caml_mark_roots_stw(participating_count, participating);
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_gc_log("running stw empty_minor_heap_promote");
   caml_empty_minor_heap_promote(domain, participating_count, participating);
 =======
@@ -1526,7 +1526,7 @@ caml_stw_empty_minor_heap_no_major_slice(caml_domain_state* domain,
   caml_gc_log("updating memprof");
   caml_memprof_after_minor_gc(domain);
   CAML_EV_END(EV_MINOR_MEMPROF_CLEAN);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   CAML_EV_BEGIN(EV_MINOR_FINALIZED);
   CAML_GC_MESSAGE(MINOR, "Finalizing dead minor custom blocks.\n");
@@ -1577,18 +1577,18 @@ void caml_empty_minor_heap_no_major_slice_from_stw(
   int participating_count,
   caml_domain_state** participating)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   static uintnat mark_requested; /* written by only one domain */
   Caml_global_barrier_if_final(participating_count) {
     caml_empty_minor_heap_setup(domain, &mark_requested);
-||||||| 23e84b8c4d
+||||||| upstream-base
   barrier_status b = caml_global_barrier_begin();
   if( caml_global_barrier_is_final(b) ) {
     caml_empty_minor_heap_setup(domain);
 =======
   Caml_global_barrier_if_final(participating_count) {
     caml_empty_minor_heap_setup(domain);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   }
 
   /* if we are entering from within a major GC STW section then
@@ -1633,13 +1633,13 @@ void caml_empty_minor_heaps_once (void)
     caml_try_empty_minor_heap_on_all_domains();
   } while (saved_minor_cycle ==
            atomic_load_relaxed(&caml_minor_cycles_started));
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
   } while (saved_minor_cycle == atomic_load(&caml_minor_cycles_started));
 =======
 
   CAML_EV_END(EV_EMPTY_MINOR);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 /* Called by minor allocations when [Caml_state->young_ptr] reaches
@@ -1660,14 +1660,14 @@ void caml_alloc_small_dispatch (caml_domain_state * dom_st,
     if (flags & CAML_FROM_CAML)
       /* In the case of allocations performed from OCaml, execute
          asynchronous callbacks. */
-<<<<<<< HEAD
+<<<<<<< oxcaml
       (void) caml_raise_async_if_exception(caml_do_pending_actions_exn(),
         "minor GC");
-||||||| 23e84b8c4d
+||||||| upstream-base
       caml_raise_if_exception(caml_do_pending_actions_exn());
 =======
       caml_get_value_or_raise(caml_do_pending_actions_res());
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     else {
       /* In the case of allocations performed from C, only perform
          non-delayable actions. */
@@ -1741,13 +1741,13 @@ static void realloc_generic_table
                          element_size);
   }else if (tbl->limit == tbl->threshold){
     CAML_EV_COUNTER (ev_counter_name, 1);
-<<<<<<< HEAD
+<<<<<<< oxcaml
     CAML_GC_MESSAGE(TABLES, msg_threshold, 0);
-||||||| 23e84b8c4d
+||||||| upstream-base
     caml_gc_message (0x08, msg_threshold, 0);
 =======
     CAML_GC_MESSAGE(STACKSIZE, msg_threshold, 0);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     tbl->limit = tbl->end;
     caml_request_minor_gc ();
   }else{
@@ -1756,13 +1756,13 @@ static void realloc_generic_table
 
     tbl->size *= 2;
     sz = (tbl->size + tbl->reserve) * element_size;
-<<<<<<< HEAD
+<<<<<<< oxcaml
     CAML_GC_MESSAGE(TABLES, msg_growing, (intnat) sz/1024);
-||||||| 23e84b8c4d
+||||||| upstream-base
     caml_gc_message (0x08, msg_growing, (intnat) sz/1024);
 =======
     CAML_GC_MESSAGE(STACKSIZE, msg_growing, (intnat) sz/1024);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     tbl->base = caml_stat_resize_noexc (tbl->base, sz);
     if (tbl->base == NULL){
       caml_fatal_error ("%s", msg_error);

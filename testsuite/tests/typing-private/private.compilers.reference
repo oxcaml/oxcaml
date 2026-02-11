@@ -122,16 +122,16 @@ Error: Type declarations do not match:
          type !'a t = private < x : int; .. > constraint 'a = 'a t
        is not included in
          type 'a t
-<<<<<<< HEAD
+<<<<<<< oxcaml
        Their parameters differ:
        The type "'b t as 'b" is not equal to the type "'a"
-||||||| 23e84b8c4d
+||||||| upstream-base
        Their parameters differ
        The type "'b t as 'b" is not equal to the type "'a"
 =======
        Their parameters differ
        The type 'b t as 'b is not equal to the type 'a
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 type 'a t = private 'a constraint 'a = < x : int; .. >
 type t = [ `Closed ]
 type nonrec t = private [> t ]

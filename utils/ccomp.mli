@@ -35,7 +35,7 @@ type link_mode =
   | MainDll
   | Partial
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* If the ~native_toplevel flag is true, we don't pass any `-L` flags to gcc.
    In some cases we observed so many flags being passed that gcc would crash,
    but they should all be unnecessary as we're compiling with `-shared` in that
@@ -46,10 +46,10 @@ val call_linker:
   ?native_toplevel:bool -> link_mode -> string -> string list -> string -> int
 
 val linker_is_flexlink : bool
-||||||| 23e84b8c4d
+||||||| upstream-base
 val call_linker: link_mode -> string -> string list -> string -> int
 
 val linker_is_flexlink : bool
 =======
 val call_linker: link_mode -> string -> string list -> string -> int
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

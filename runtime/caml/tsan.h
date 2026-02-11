@@ -21,10 +21,10 @@ extern "C" {
 
 /* Macro used to deactivate thread sanitizer on some functions. */
 #define CAMLno_tsan
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* __has_feature is Clang-specific, but GCC defines __SANITIZE_ADDRESS__ and
  * __SANITIZE_THREAD__. */
-||||||| 23e84b8c4d
+||||||| upstream-base
 #define CAMLreally_no_tsan
 /* __has_feature is Clang-specific, but GCC defines __SANITIZE_ADDRESS__ and
  * __SANITIZE_THREAD__. */
@@ -36,7 +36,7 @@ extern "C" {
    entirely, so we need to use the stronger, Clang-specific attribute
    `disable_sanitizer_instrumentation`.
    This should select the right attribute in all circumstances. */
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #if defined(__has_feature)
 #  if __has_feature(thread_sanitizer)
 #    undef CAMLno_tsan
@@ -75,7 +75,7 @@ extern "C" {
 
 extern void AnnotateHappensBefore(const char *f, int l, void *addr);
 extern void AnnotateHappensAfter(const char *f, int l, void *addr);
-<<<<<<< HEAD
+<<<<<<< oxcaml
 #endif
 
 /* Macro used to un-instrument some functions of the runtime for performance
@@ -84,11 +84,11 @@ extern void AnnotateHappensAfter(const char *f, int l, void *addr);
 #  define CAMLno_tsan_for_perf
 #else
 #  define CAMLno_tsan_for_perf CAMLno_tsan
-||||||| 23e84b8c4d
+||||||| upstream-base
 #  undef CAMLno_tsan
 #  define CAMLno_tsan CAMLreally_no_tsan
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #endif
 
 /* Macro used to un-instrument some functions of the runtime for performance

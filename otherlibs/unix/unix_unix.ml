@@ -504,14 +504,14 @@ type lock_command =
 external lockf : file_descr -> lock_command -> int -> unit @@ portable = "caml_unix_lockf"
 external kill : int -> int -> unit @@ portable = "caml_unix_kill"
 type sigprocmask_command = SIG_SETMASK | SIG_BLOCK | SIG_UNBLOCK
-<<<<<<< HEAD
+<<<<<<< oxcaml
 external sigprocmask:
   sigprocmask_command -> int list @ local -> int list @@ portable
   = "caml_unix_sigprocmask"
 external sigpending: unit -> int list @@ portable = "caml_unix_sigpending"
 external sigsuspend:
   int list @ local -> unit @@ portable = "caml_unix_sigsuspend"
-||||||| 23e84b8c4d
+||||||| upstream-base
 external sigprocmask: sigprocmask_command -> int list -> int list
         = "caml_unix_sigprocmask"
 external sigpending: unit -> int list = "caml_unix_sigpending"
@@ -522,7 +522,7 @@ external sigprocmask: sigprocmask_command -> int list -> int list
 external sigpending: unit -> int list = "caml_unix_sigpending"
 external sigsuspend: int list -> unit = "caml_unix_sigsuspend"
 external sigwait: int list -> int = "caml_unix_sigwait"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let pause() =
   let sigs = sigprocmask SIG_BLOCK [] in sigsuspend sigs

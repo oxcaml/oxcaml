@@ -1,10 +1,10 @@
 (* TEST
-<<<<<<< HEAD
+<<<<<<< oxcaml
  expect;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   expect;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 *)
 
 module M = struct type t = T end

@@ -88,7 +88,7 @@ let report_error loc e bt =
   print_exn loc e bt;
   "=> error in test script"
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 type result_summary = No_failure | Some_failure | All_skipped
 let join_result summary result =
   let open Result in
@@ -99,7 +99,7 @@ let join_result summary result =
   | Pass, All_skipped -> No_failure
   | Predicate true, All_skipped -> No_failure
   | (Pass | Skip | Predicate _), No_failure -> No_failure
-||||||| 23e84b8c4d
+||||||| upstream-base
 type result_summary = No_failure | Some_failure | All_skipped
 let join_result summary result =
   let open Result in
@@ -110,9 +110,9 @@ let join_result summary result =
   | _ -> No_failure
 =======
 type summary = Result.status = Pass | Skip | Fail
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let join_summaries sa sb =
   match sa, sb with
   | Some_failure, (No_failure | Some_failure | All_skipped)
@@ -120,7 +120,7 @@ let join_summaries sa sb =
   | All_skipped, All_skipped -> All_skipped
   | No_failure, (No_failure | All_skipped)
   | All_skipped, No_failure -> No_failure
-||||||| 23e84b8c4d
+||||||| upstream-base
 let join_summaries sa sb =
   match sa, sb with
   | Some_failure, _
@@ -129,9 +129,9 @@ let join_summaries sa sb =
   | _ -> No_failure
 =======
 (* The sequential join passes if both tests pass.
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let rec run_test_tree log common_prefix behavior env summ ast
       ~must_do_something =
   match ast with
@@ -176,7 +176,7 @@ let rec run_test_tree log common_prefix behavior env summ ast
           (msg, sub_behavior, newenv, result)
         with e ->
           (report_error name.loc e, Skip_all, env, Result.fail)
-||||||| 23e84b8c4d
+||||||| upstream-base
 let rec run_test_tree log common_prefix behavior env summ ast =
   match ast with
   | Ast (Environment_statement s :: stmts, subs) ->
@@ -286,9 +286,9 @@ let run_test_tree log add_msg behavior env summ ast =
         | _ ->
             List.fold_left join_parallel Skip
               (List.map (run_tree behavior env summ) subs)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         end
-<<<<<<< HEAD
+<<<<<<< oxcaml
     in
     if not skip_all then Printf.printf "%s\n%!" msg;
     let newsumm = join_result summ result in
@@ -315,7 +315,7 @@ let run_test_tree log add_msg behavior env summ ast =
 
 let run_test_tree log common_prefix behavior env summ ast =
   run_test_tree log common_prefix behavior env summ ast ~must_do_something:true
-||||||| 23e84b8c4d
+||||||| upstream-base
     in
     Printf.printf "%s\n%!" msg;
     let newsumm = join_result summ result in
@@ -326,7 +326,7 @@ let run_test_tree log common_prefix behavior env summ ast =
       (List.map (run_test_tree log common_prefix behavior env All_skipped) subs)
 =======
   in run_tree behavior env summ ast
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let get_test_source_directory test_dirname =
   if (Filename.is_relative test_dirname) then

@@ -46,15 +46,15 @@
     very short running programs.
 *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (** The type for counter events emitted by the runtime. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 (** The type for counter events emitted by the runtime *)
 =======
 (** The type for counter events emitted by the runtime. Counter events are used
   to measure a quantity at a point in time or record the occurence of an event.
   In the latter case their value will be one. *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 type runtime_counter =
 | EV_C_FORCE_MINOR_ALLOC_SMALL
 (**
@@ -140,7 +140,7 @@ Live blocks of a Domain's major heap pools.
 (**
 Live blocks of a Domain's major heap large allocations.
 @since 5.1 *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
 | EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE
 (**
    Reallocation of the table of dependent memory from minor heap
@@ -169,7 +169,7 @@ Work budget for this domain in the current slice
 (**
 Total work done by this domain in a slice
 @since 5.4 *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 | EV_C_MAJOR_HEAP_WORDS
 (**
@@ -225,7 +225,7 @@ end of the major slice (see EV_C_MAJOR_SLICE_COUNTER).
 The budget in 'work' that a domain has to do during the major slice.
 @since 5.3
 *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (** The type for span events emitted by the runtime. *)
 type runtime_phase =
@@ -270,9 +270,9 @@ Event spanning the sweeping work of a major GC.
 @since 5.0
 *)
 | EV_MAJOR_MARK_ROOTS
-<<<<<<< HEAD
+<<<<<<< oxcaml
 | EV_MAJOR_MEMPROF_ROOTS
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 (**
 Event spanning the marking of roots in a major GC.
@@ -283,7 +283,7 @@ Event spanning the marking of roots in a major GC.
 Event spanning the marking of memprof roots in a major GC.
 @since 5.3
 *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 | EV_MAJOR_MARK
 (**
 Event spanning the marking of the heap in a major GC.
@@ -295,10 +295,10 @@ Event spanning any minor GC work.
 @since 5.0
 *)
 | EV_MINOR_LOCAL_ROOTS
-<<<<<<< HEAD
+<<<<<<< oxcaml
 | EV_MINOR_MEMPROF_ROOTS
 | EV_MINOR_MEMPROF_CLEAN
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 (**
 Event spanning the scanning and major allocation of local roots during a minor
@@ -316,7 +316,7 @@ Event spanning cleaning and updating of memprof structures at the end of a
 minor GC.
 @since 5.3
 *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 | EV_MINOR_FINALIZED
 (**
 Event spanning the running of finalisers for dead custom blocks at the end of a
@@ -434,9 +434,9 @@ Event spanning the time spent as the leader of a stop-the-world.
 @since 5.0
 *)
 | EV_MAJOR_FINISH_SWEEPING
-<<<<<<< HEAD
+<<<<<<< oxcaml
 | EV_MAJOR_MEMPROF_CLEAN
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 (**
 Event spanning the time spent finishing sweeping when forced to as part of
@@ -449,7 +449,7 @@ Event spanning the time spent cleaning memprof structures at the end of a major
 GC.
 @since 5.3
 *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 | EV_MINOR_FINALIZERS_ADMIN
 (**
 Event spanning finalisers book-keeping at the end of a minor GC.
@@ -500,10 +500,10 @@ evacuation during a compaction.
 @since 5.2
 *)
 | EV_COMPACT_RELEASE
-<<<<<<< HEAD
+<<<<<<< oxcaml
 | EV_MINOR_EPHE_CLEAN
 | EV_MINOR_DEPENDENT
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 (**
 Event spanning releasing the evacuated pools at the end of a compaction.
@@ -515,15 +515,15 @@ Event spanning a domain needing to empty its minor heap for a new allocation.
 This includes time spent trying to become stop-the-world leader.
 @since 5.4
 *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (** Lifecycle events for the ring itself. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 (** Lifecycle events for the ring itself *)
 =======
 (** Lifecycle events for Runtime_events and domains. *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 type lifecycle =
   EV_RING_START
 (**

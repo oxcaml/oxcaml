@@ -7,10 +7,10 @@ ${program}
 
 # now check the assembly file produced during compilation
 asm=${test_build_directory}/func_sections.s
-<<<<<<< HEAD
+<<<<<<< oxcaml
 grep -E "\.section \.text\.caml\.(camlFunc_sections__|_ZN13Func_sections)" "$asm" | wc -l | tr -d ' ' | sed '/^$/d'
-||||||| 23e84b8c4d
+||||||| upstream-base
 grep "\.section \.text\.caml\.camlFunc_sections\." "$asm" | wc -l | tr -d ' ' | sed '/^$/d'
 =======
 grep "\.section \.text\.caml\.camlFunc_sections[.$]" "$asm" | wc -l | tr -d ' ' | sed '/^$/d'
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

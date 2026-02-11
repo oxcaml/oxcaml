@@ -139,16 +139,16 @@ let tyvar_of_name s =
   else
     "'" ^ s
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* Unlike upstream, we call this module [Doc_internal] and define [Doc] at the
    end of the file to include [jkind_annotation]. *)
 module Doc_internal = struct
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 module Doc = struct
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (* Turn an arbitrary variable name into a valid OCaml identifier by adding \#
-<<<<<<< HEAD
+<<<<<<< oxcaml
   in case it is a keyword, or parenthesis when it is an infix or prefix
   operator. *)
   let ident_of_name ppf txt =
@@ -158,7 +158,7 @@ module Doc = struct
       else if needs_spaces txt then "(@;%s@;)"
       else "(%s)"
     in Format_doc.fprintf ppf format txt
-||||||| 23e84b8c4d
+||||||| upstream-base
   in case it is a keyword, or parenthesis when it is an infix or prefix
   operator. *)
 let ident_of_name ppf txt =
@@ -262,7 +262,7 @@ let ident_of_name ppf i =
   Format_doc.compat (Doc.ident_of_name ~kind:Other) ppf i
 
 let constr ppf l = Format_doc.compat Doc.constr ppf l
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   let protect_longident ppf print_longident longprefix txt =
     if not (needs_parens txt) then
@@ -274,7 +274,7 @@ let constr ppf l = Format_doc.compat Doc.constr ppf l
     else
       Format_doc.fprintf ppf "%a.(%s)" print_longident longprefix txt
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let rec longident f = function
     | Lident s -> ident_of_name f s
     | Ldot(y,s) -> protect_longident f longident y s
@@ -300,7 +300,7 @@ let split_out_curry_attr attrs =
   in
   is_curry, non_curry
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 let protect_longident ppf print_longident longprefix txt =
   let format : (_, _, _) format =
     if not (needs_parens txt) then "%a.%s"
@@ -309,7 +309,7 @@ let protect_longident ppf print_longident longprefix txt =
   fprintf ppf format print_longident longprefix txt
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 type space_formatter = (unit, Format.formatter, unit) format
 
 let override = function
@@ -350,13 +350,13 @@ let view_expr x =
               (List.rev acc,true)
           | {pexp_desc=
              Pexp_construct ({txt=Lident "::";_},
-<<<<<<< HEAD
+<<<<<<< oxcaml
                              Some ({pexp_desc= Pexp_tuple([None, e1;None, e2]);
-||||||| 23e84b8c4d
+||||||| upstream-base
                              Some ({pexp_desc= Pexp_tuple([e1;e2]);
 =======
                              Some ({pexp_desc= Pexp_tuple([None, e1; None, e2]);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                                     pexp_attributes = []}));
              pexp_attributes = []}
             ->
@@ -427,11 +427,11 @@ let paren: 'a . ?first:space_formatter -> ?last:space_formatter ->
     if b then (pp f "("; pp f first; fu f x; pp f last; pp f ")")
     else fu f x
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let longident_loc f x = pp f "%a" longident x.txt
 
 let constant f = function
-||||||| 23e84b8c4d
+||||||| upstream-base
 let rec longident f = function
   | Lident s -> ident_of_name f s
   | Ldot(y,s) -> protect_longident f longident y s
@@ -446,7 +446,7 @@ let with_loc pr ppf x = pr ppf x.txt
 let value_longident_loc = with_loc value_longident
 
 let constant_desc f = function
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Pconst_char i ->
       pp f "%C"  i
   | Pconst_untagged_char i ->
@@ -506,14 +506,14 @@ let iter_loc f ctxt {txt; loc = _} = f ctxt txt
 let constant_string f s = pp f "%S" s
 
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 let tyvar ppf s =
   Format.fprintf ppf "%s" (tyvar_of_name s)
 =======
 
 let tyvar ppf v = Format_doc.compat Doc.tyvar ppf v
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let tyvar ppf v = Format_doc.compat Doc_internal.tyvar ppf v
 
@@ -757,7 +757,7 @@ and tuple_type_component ctxt f (label, ty) =
 
 and core_type1 ctxt f x =
   if x.ptyp_attributes <> [] then core_type ctxt f x
-<<<<<<< HEAD
+<<<<<<< oxcaml
   else
     match x.ptyp_desc with
     | Ptyp_any jkind -> tyvar_loc_option_jkind f (None, jkind)
@@ -766,7 +766,7 @@ and core_type1 ctxt f x =
         pp f "(%a)" (list (labeled_core_type1 ctxt) ~sep:"@;*@;") tl
     | Ptyp_unboxed_tuple l ->
       core_type1_labeled_tuple ctxt f ~unboxed:true l
-||||||| 23e84b8c4d
+||||||| upstream-base
   else match x.ptyp_desc with
     | Ptyp_any -> pp f "_";
     | Ptyp_var s -> tyvar f  s;
@@ -777,7 +777,7 @@ and core_type1 ctxt f x =
     | Ptyp_var s -> tyvar f  s;
     | Ptyp_tuple l ->
         pp f "(%a)" (list (tuple_type_component ctxt) ~sep:"@;*@;") l
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Ptyp_constr (li, l) ->
         pp f (* "%a%a@;" *) "%a%a"
           (fun f l -> match l with
@@ -838,7 +838,7 @@ and core_type1 ctxt f x =
     | Ptyp_class (li, l) ->   (*FIXME*)
         pp f "@[<hov2>%a@;#%a@]"
           (list (core_type ctxt) ~sep:"," ~first:"(" ~last:")") l
-<<<<<<< HEAD
+<<<<<<< oxcaml
           longident_loc li
     | Ptyp_package (lid, cstrs) ->
         let aux f (s, ct) =
@@ -854,7 +854,7 @@ and core_type1 ctxt f x =
         pp f "@[<hov2><[%a]>@]" (core_type ctxt) t
     | Ptyp_splice t ->
         pp f "@[<hov2>$(%a)@]" (core_type ctxt) t
-||||||| 23e84b8c4d
+||||||| upstream-base
           longident_loc li
     | Ptyp_package (lid, cstrs) ->
         let aux f (s, ct) =
@@ -870,9 +870,9 @@ and core_type1 ctxt f x =
         pp f "@[<hov2>(module@ %a)@]" (package_type ctxt) pck_ty
     | Ptyp_open(li, ct) ->
        pp f "@[<hov2>%a.(%a)@]" value_longident_loc li (core_type ctxt) ct
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Ptyp_extension e -> extension ctxt f e
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _ | Ptyp_repr _
       | Ptyp_of_kind _) ->
        paren true (core_type ctxt) f x
@@ -920,7 +920,7 @@ and core_type_with_optional_modes  ctxt f (ty, modes) =
   match modes with
   | [] -> core_type ctxt f ty
   | _ :: _ -> pp f "%a%a" (core_type2 ctxt) ty optional_at_modes modes
-||||||| 23e84b8c4d
+||||||| upstream-base
     | _ -> paren true (core_type ctxt) f x
 =======
     | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _) ->
@@ -936,7 +936,7 @@ and package_type ctxt f ptyp =
     pp f "%a@ with@ %a"
       (with_loc type_longident) ptyp.ppt_path
       (list aux ~sep:"@ and@ ") ptyp.ppt_cstrs
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (********************pattern********************)
 (* be cautious when use [pattern], [pattern1] is preferred *)
@@ -963,7 +963,7 @@ and pattern_or ctxt f x =
       pp f "@[<hov0>%a@]" (list ~sep:"@ | " (pattern1 ctxt)) orpats
 
 and pattern1 ctxt (f:Format.formatter) (x:pattern) : unit =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let rec pattern_list_helper f p = match p with
     | {ppat_desc =
          Ppat_construct
@@ -977,7 +977,7 @@ and pattern1 ctxt (f:Format.formatter) (x:pattern) : unit =
       end
     | _ -> pattern1 ctxt f p
   in
-||||||| 23e84b8c4d
+||||||| upstream-base
   let rec pattern_list_helper f = function
     | {ppat_desc =
          Ppat_construct
@@ -990,7 +990,7 @@ and pattern1 ctxt (f:Format.formatter) (x:pattern) : unit =
     | p -> pattern1 ctxt f p
   in
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   if x.ppat_attributes <> [] then pattern ctxt f x
   else match x.ppat_desc with
     | Ppat_variant (l, Some p) ->
@@ -1003,7 +1003,7 @@ and pattern1 ctxt (f:Format.formatter) (x:pattern) : unit =
         pp f "%a::%a" (simple_pattern ctxt) pat1 (pattern1 ctxt) pat2
     | Ppat_construct (li, po) ->
         (* FIXME The third field always false *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
         if txt = Lident "::" then
           pp f "%a" pattern_list_helper x
         else
@@ -1015,7 +1015,7 @@ and pattern1 ctxt (f:Format.formatter) (x:pattern) : unit =
                  (list ~sep:"@ " name_loc_jkind) vl
                  (simple_pattern ctxt) x
            | None -> pp f "%a" longident_loc li)
-||||||| 23e84b8c4d
+||||||| upstream-base
         if txt = Lident "::" then
           pp f "%a" pattern_list_helper x
         else
@@ -1037,10 +1037,10 @@ and pattern1 ctxt (f:Format.formatter) (x:pattern) : unit =
                 (list ~sep:"@ " ident_of_name_loc) vl
                 (simple_pattern ctxt) x
           | None -> pp f "%a" value_longident_loc li)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | _ -> simple_pattern ctxt f x
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 and labeled_pattern1 ctxt (f:Format.formatter) (label, x) : unit =
   let simple_name = match x with
     | {ppat_desc = Ppat_var { txt=s; _ }; ppat_attributes = []; _} -> Some s
@@ -1054,7 +1054,7 @@ and labeled_pattern1 ctxt (f:Format.formatter) (label, x) : unit =
   | Some lbl, _ ->
     pp f "~%s:" lbl;
     pattern1 ctxt f x
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 and tuple_pattern_component ctxt (f:Format.formatter) (label, x) : unit =
   let simple_name = match x with
@@ -1078,7 +1078,7 @@ and tuple_pattern ctxt f l closed =
   pp f "@[<1>(%a%a)@]"
     (list ~sep:",@;" (tuple_pattern_component ctxt)) l
     closed_flag closed
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
   if x.ppat_attributes <> [] then pattern ctxt f x
@@ -1104,7 +1104,7 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
     | Ppat_type li ->
         pp f "#%a" (with_loc type_longident) li
     | Ppat_record (l, closed) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
         record_pattern ctxt f ~unboxed:false l closed
     | Ppat_record_unboxed_product (l, closed) ->
         record_pattern ctxt f ~unboxed:true l closed
@@ -1114,7 +1114,7 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
         labeled_tuple_pattern ctxt f ~unboxed:false l closed
     | Ppat_unboxed_tuple (l, closed) ->
         labeled_tuple_pattern ctxt f ~unboxed:true l closed
-||||||| 23e84b8c4d
+||||||| upstream-base
         let longident_x_pattern f (li, p) =
           match (li,p) with
           | ({txt=Lident s;_ },
@@ -1151,7 +1151,7 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
             pp f "@[<2>{@;%a;_}@]" (list longident_x_pattern ~sep:";@;") l
         end
     | Ppat_tuple (l,c) -> tuple_pattern ctxt f l c
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Ppat_constant (c) -> pp f "%a" constant c
     | Ppat_interval (c1, c2) -> pp f "%a..%a" constant c1 constant c2
     | Ppat_variant (l,None) ->  pp f "`%a" ident_of_name l
@@ -1303,16 +1303,16 @@ and sugar_expr ctxt f e =
           | Ldot ({txt=Lident "Bigarray";_}, {txt="Array3";_}),
                   i1 :: i2 :: i3 :: rest ->
             print ".{" "," "}" (simple_expr ctxt) [i1; i2; i3] rest
-<<<<<<< HEAD
+<<<<<<< oxcaml
           | Ldot (Lident "Bigarray", "Genarray"),
             {pexp_desc = Pexp_array (_, indexes); pexp_attributes = []} :: rest ->
-||||||| 23e84b8c4d
+||||||| upstream-base
           | Ldot (Lident "Bigarray", "Genarray"),
             {pexp_desc = Pexp_array indexes; pexp_attributes = []} :: rest ->
 =======
           | Ldot ({txt=Lident "Bigarray";_}, {txt="Genarray";_}),
             {pexp_desc = Pexp_array indexes; pexp_attributes = []} :: rest ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
               print ".{" "," "}" (simple_expr ctxt) indexes rest
           | _ -> false
         end
@@ -1348,8 +1348,8 @@ and sugar_expr ctxt f e =
     end
   | _ -> false
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 and function_param ctxt f param =
   match param.pparam_desc with
   | Pparam_val (a, b, c) -> label_exp ctxt f (a, b, c)
@@ -1409,7 +1409,7 @@ and function_params_then_body ctxt f params constraint_ body ~delimiter =
     delimiter
     (function_body (under_functionrhs ctxt)) body
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 and expression ctxt f x =
   if x.pexp_attributes <> [] then
     pp f "((%a)@,%a)" (expression ctxt) {x with pexp_attributes=[]}
@@ -1546,16 +1546,16 @@ and expression ctxt f x =
         pp f "@[<hv>%a@]"
           (list (expression (under_semi ctxt)) ~sep:";@;") lst
     | Pexp_new (li) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
         pp f "@[<hov2>new@ %a@]" longident_loc li;
     | Pexp_setvar (s, e) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
         pp f "@[<hov2>new@ %a@]" longident_loc li;
     | Pexp_setinstvar (s, e) ->
 =======
         pp f "@[<hov2>new@ %a@]" (with_loc type_longident) li;
     | Pexp_setinstvar (s, e) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         pp f "@[<hov2>%a@ <-@ %a@]" ident_of_name s.txt (expression ctxt) e
     | Pexp_override l -> (* FIXME *)
         let string_x_expression f (s, e) =
@@ -1619,15 +1619,15 @@ and expression2 ctxt f x =
   if x.pexp_attributes <> [] then expression ctxt f x
   else match x.pexp_desc with
     | Pexp_field (e, li) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
         pp f "@[<hov2>%a.%a@]" (simple_expr ctxt) e longident_loc li
     | Pexp_unboxed_field (e, li) ->
         pp f "@[<hov2>%a.#%a@]" (simple_expr ctxt) e longident_loc li
-||||||| 23e84b8c4d
+||||||| upstream-base
         pp f "@[<hov2>%a.%a@]" (simple_expr ctxt) e longident_loc li
 =======
         pp f "@[<hov2>%a.%a@]" (simple_expr ctxt) e value_longident_loc li
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Pexp_send (e, s) ->
         pp f "@[<hov2>%a#%a@]" (simple_expr ctxt) e ident_of_name s.txt
 
@@ -1653,12 +1653,12 @@ and simple_expr ctxt f x =
     (* |`Normal -> longident_loc f li *)
     (* | `Prefix _ | `Infix _ -> pp f "( %a )" longident_loc li) *)
     | Pexp_constant c -> constant f c;
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Pexp_pack me ->
         pp f "(module@;%a)" (module_expr ctxt) me
     | Pexp_unboxed_unit -> pp f "#()"
     | Pexp_unboxed_bool b -> pp f "#%a" bool b
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Pexp_pack me ->
         pp f "(module@;%a)" (module_expr ctxt) me
 =======
@@ -1666,9 +1666,9 @@ and simple_expr ctxt f x =
         pp f "(module@;%a" (module_expr ctxt) me;
         Option.iter (pp f " :@ %a" (package_type ctxt)) opty;
         pp f ")"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Pexp_tuple l ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
         labeled_tuple_expr ctxt f ~unboxed:false l
     | Pexp_unboxed_tuple l ->
         labeled_tuple_expr ctxt f ~unboxed:true l
@@ -1683,7 +1683,7 @@ and simple_expr ctxt f x =
           (expression ctxt) e
           (core_type_with_optional_modes ctxt) (ct, m)
       end
-||||||| 23e84b8c4d
+||||||| upstream-base
         pp f "@[<hov2>(%a)@]" (list (simple_expr ctxt) ~sep:",@;") l
     | Pexp_constraint (e, ct) ->
         pp f "(%a : %a)" (expression ctxt) e (core_type ctxt) ct
@@ -1691,14 +1691,14 @@ and simple_expr ctxt f x =
         pp f "@[<hov2>(%a)@]" (list (tuple_expr_component ctxt) ~sep:",@;") l
     | Pexp_constraint (e, ct) ->
         pp f "(%a : %a)" (expression ctxt) e (core_type ctxt) ct
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Pexp_coerce (e, cto1, ct) ->
         pp f "(%a%a :> %a)" (expression ctxt) e
           (option (core_type ctxt) ~first:" : " ~last:" ") cto1 (* no sep hint*)
           (core_type ctxt) ct
     | Pexp_variant (l, None) -> pp f "`%a" ident_of_name l
     | Pexp_record (l, eo) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
         record_expr ctxt f ~unboxed:false l eo
     | Pexp_record_unboxed_product (l, eo) ->
         record_expr ctxt f ~unboxed:true l eo
@@ -1706,7 +1706,7 @@ and simple_expr ctxt f x =
         let punct = match mut with
           | Immutable -> ':'
           | Mutable -> '|'
-||||||| 23e84b8c4d
+||||||| upstream-base
         let longident_x_expression f ( li, e) =
           match e with
           |  {pexp_desc=Pexp_ident {txt;_};
@@ -1724,7 +1724,7 @@ and simple_expr ctxt f x =
               pp f "@[<hov2>%a@;=@;%a@]"
                 value_longident_loc li
                 (simple_expr ctxt) e
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         in
         pp f "@[<0>@[<2>[%c%a%c]@]@]"
           punct
@@ -2009,17 +2009,17 @@ and module_type ctxt f x =
               (module_type1_with_optional_modes ctxt) (mt1, mm1)
               (module_type_with_optional_modes ctxt) (mt2, mm2)
         | Some name ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
             pp f "@[<hov2>functor@ (%s@ :@ %a)@ ->@ %a@]" name
               (module_type_with_optional_modes ctxt) (mt1, mm1)
               (module_type_with_optional_modes ctxt) (mt2, mm2)
-||||||| 23e84b8c4d
+||||||| upstream-base
             pp f "@[<hov2>functor@ (%s@ :@ %a)@ ->@ %a@]" name
               (module_type ctxt) mt1 (module_type ctxt) mt2
 =======
             pp f "@[<hov2>(%s@ :@ %a)@ ->@ %a@]" name
               (module_type ctxt) mt1 (module_type ctxt) mt2
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         end
     | Pmty_with (mt, []) -> module_type ctxt f mt
     | Pmty_with (mt, l) ->
@@ -2035,16 +2035,16 @@ and module_type ctxt f x =
 and with_constraint ctxt f = function
   | Pwith_type (li, ({ptype_params= ls ;_} as td)) ->
       pp f "type@ %a %a =@ %a"
-<<<<<<< HEAD
+<<<<<<< oxcaml
         type_params ls
         longident_loc li (type_declaration ctxt) td
-||||||| 23e84b8c4d
+||||||| upstream-base
         (type_params ctxt) ls
         longident_loc li (type_declaration ctxt) td
 =======
         (type_params ctxt) ls
         (with_loc type_longident) li (type_declaration ctxt) td
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Pwith_module (li, li2) ->
       pp f "module %a =@ %a" value_longident_loc li value_longident_loc li2;
   | Pwith_modtype (li, mty) ->
@@ -2053,16 +2053,16 @@ and with_constraint ctxt f = function
         (module_type ctxt) mty;
   | Pwith_typesubst (li, ({ptype_params=ls;_} as td)) ->
       pp f "type@ %a %a :=@ %a"
-<<<<<<< HEAD
+<<<<<<< oxcaml
         type_params ls
         longident_loc li
-||||||| 23e84b8c4d
+||||||| upstream-base
         (type_params ctxt) ls
         longident_loc li
 =======
         (type_params ctxt) ls
         (with_loc type_longident) li
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         (type_declaration ctxt) td
   | Pwith_modsubst (li, li2) ->
       pp f "module %a :=@ %a" value_longident_loc li value_longident_loc li2
@@ -2078,13 +2078,13 @@ and module_type1 ctxt f x =
     | Pmty_ident li ->
         pp f "%a" (with_loc type_longident) li;
     | Pmty_alias li ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
         pp f "(module %a)" longident_loc li;
     | Pmty_signature {psg_items; psg_modalities} ->
         pp f "@[<hv0>@[<hv2>sig%a@ %a@]@ end@]" (* "@[<hov>sig@ %a@ end@]" *)
           optional_space_atat_modalities psg_modalities
           (list (signature_item ctxt)) psg_items (* FIXME wrong indentation*)
-||||||| 23e84b8c4d
+||||||| upstream-base
         pp f "(module %a)" longident_loc li;
     | Pmty_signature (s) ->
         pp f "@[<hv0>@[<hv2>sig@ %a@]@ end@]" (* "@[<hov>sig@ %a@ end@]" *)
@@ -2094,7 +2094,7 @@ and module_type1 ctxt f x =
     | Pmty_signature (s) ->
         pp f "@[<hv0>@[<hv2>sig@ %a@]@ end@]" (* "@[<hov>sig@ %a@ end@]" *)
           (list (signature_item ctxt)) s (* FIXME wrong indentation*)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Pmty_typeof me ->
         pp f "@[<hov2>module@ type@ of@ %a@]" (module_expr ctxt) me
     | Pmty_extension e -> extension ctxt f e
@@ -2147,14 +2147,14 @@ and signature_item ctxt f x : unit =
                             pmty_attributes=[]; _}; _} as pmd) ->
       pp f "@[<hov>module@ %s@ =@ %a%a@]%a"
         (Option.value pmd.pmd_name.txt ~default:"_")
-<<<<<<< HEAD
+<<<<<<< oxcaml
         longident_loc alias
         optional_space_atat_modalities pmd.pmd_modalities
-||||||| 23e84b8c4d
+||||||| upstream-base
         longident_loc alias
 =======
         value_longident_loc alias
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         (item_attributes ctxt) pmd.pmd_attributes
   | Psig_module pmd ->
       pp f "@[<hov>module@ %s@ :@ %a%a@]%a"
@@ -2315,13 +2315,13 @@ and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct; pvb_modes = mode
         (core_type_with_optional_modes ctxt) (typ, modes)
         (expression ctxt) x
   | Some (Pvc_constraint { locally_abstract_univars = vars; typ }) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       pp f "%a@;: %a@;=@;%a"
         (simple_pattern ctxt) p
         (poly_type_with_optional_modes ctxt)
         (List.map (fun x -> (x, None)) vars, typ, modes)
         (expression ctxt) x
-||||||| 23e84b8c4d
+||||||| upstream-base
       pp f "%a@;: type@;%a.@;%a@;=@;%a"
         (simple_pattern ctxt) p (list pp_print_string ~sep:"@;")
         (List.map (fun x -> x.txt) vars)
@@ -2331,7 +2331,7 @@ and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct; pvb_modes = mode
         (simple_pattern ctxt) p (list ident_of_name ~sep:"@;")
         (List.map (fun x -> x.txt) vars)
         (core_type ctxt) typ (expression ctxt) x
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Some (Pvc_coercion {ground=None; coercion }) ->
       pp f "%a@;:>@;%a@;=@;%a"
         (simple_pattern ctxt) p
@@ -2720,10 +2720,10 @@ and type_extension ctxt f x =
     pp f "@\n|@;%a" (extension_constructor ctxt) x
   in
   pp f "@[<2>type %a%a += %a@ %a@]%a"
-<<<<<<< HEAD
+<<<<<<< oxcaml
     type_params x.ptyext_params
     longident_loc x.ptyext_path
-||||||| 23e84b8c4d
+||||||| upstream-base
     (fun f -> function
        | [] -> ()
        | l ->
@@ -2737,7 +2737,7 @@ and type_extension ctxt f x =
            pp f "%a@;" (list (type_param ctxt) ~first:"(" ~last:")" ~sep:",") l)
     x.ptyext_params
     (with_loc type_longident) x.ptyext_path
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     private_flag x.ptyext_private (* Cf: #7200 *)
     (list ~sep:"" extension_constructor)
     x.ptyext_constructors
@@ -2817,7 +2817,7 @@ and label_x_expression_param ctxt f (l,e) =
       else
         pp f "~%a:%a" ident_of_name lbl (simple_expr ctxt) e
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 and tuple_component ctxt f (l,e) =
   let simple_name = match e with
     | {pexp_desc=Pexp_ident {txt=Lident l;_};
@@ -2830,7 +2830,7 @@ and tuple_component ctxt f (l,e) =
   | _, Some lbl -> pp f "~%s:%a" lbl (simple_expr ctxt) e
   (* Unlabeled component *)
   | _, None  -> expression2 ctxt f e (* level 2*)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 and tuple_expr_component ctxt f (l,e) =
   let simple_name = match e with
@@ -2844,7 +2844,7 @@ and tuple_expr_component ctxt f (l,e) =
   | _, Some lbl -> pp f "~%s:%a" lbl (simple_expr ctxt) e
   (* Unlabeled component *)
   | _, None  -> expression2 ctxt f e
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 and directive_argument f x =
   match x.pdira_desc with
@@ -3051,7 +3051,7 @@ let top_phrase f x =
   pp f ";;";
   pp_print_newline f ()
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let longident = print_with_maximal_extensions longident
 let core_type = print_reset_with_maximal_extensions core_type
 let pattern = print_reset_with_maximal_extensions pattern
@@ -3076,7 +3076,7 @@ module Doc = struct
   let jkind_annotation ppf jkind =
     Format_doc.deprecated_printer (fun fmt -> jkind_annotation fmt jkind) ppf
 end
-||||||| 23e84b8c4d
+||||||| upstream-base
 let core_type = core_type reset_ctxt
 let pattern = pattern reset_ctxt
 let signature = signature reset_ctxt
@@ -3107,4 +3107,4 @@ let signature_item = signature_item reset_ctxt
 let binding = binding reset_ctxt
 let payload = payload reset_ctxt
 let longident = value_longident
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

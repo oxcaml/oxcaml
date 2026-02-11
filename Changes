@@ -1610,13 +1610,13 @@ OCaml 5.2.0 (13 May 2024)
   (Guillaume Munch-Maccagnoni, bug reports and suggestion by Mark
    Shinwell, review by Nick Barnes and Stephen Dolan)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 - #12876: Port ThreadSanitizer support to Linux on POWER
   (Miod Vallat, review by Tim McGilchrist)
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 - #12408: `Domain.spawn` no longer leaks its functional argument for
   the whole duration of the children domain lifetime.
   (Guillaume Munch-Maccagnoni, review by Gabriel Scherer)
@@ -1691,11 +1691,11 @@ OCaml 5.2.0 (13 May 2024)
   (David Allsopp, Antonin Décimo, and Samuel Hym, review by Nicolás Ojeda Bär)
 
 - #11911, #12382, #12383: Restore statmemprof functionality in part
-<<<<<<< HEAD
+<<<<<<< oxcaml
   (backtrace buffers, per-thread and per-domain data structures).
   (Nick Barnes, review by Gabriel Scherer, Fabrice Buoro, Sadiq
    Jaffer, and Guillaume Munch-Maccagnoni).
-||||||| 23e84b8c4d
+||||||| upstream-base
   (backtrace buffers, per-thread and per-domain data
   structures). (Nick Barnes, review by Gabriel Scherer, Fabrice Buoro,
   Sadiq Jaffer, and Guillaume Munch-Maccagnoni).
@@ -1704,7 +1704,7 @@ OCaml 5.2.0 (13 May 2024)
   GC/allocation interface). (Nick Barnes, review by Gabriel Scherer,
   Fabrice Buoro, Sadiq Jaffer, Guillaume Munch-Maccagnoni, and
   Jacques-Henri Jourdan).
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 - #12735: Store both ends of the stack chain in continuations
   (Leo White, review by Miod Vallat and KC Sivaramakrishnan)
@@ -1734,13 +1734,13 @@ OCaml 5.2.0 (13 May 2024)
    Hari Hara Naveen S, reviewed by Fabrice Buoro, Gabriel Scherer and
    Miod Vallat)
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 =======
 - #12876: Port ThreadSanitizer support to Linux on POWER
   (Miod Vallat, review by Tim McGilchrist)
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 - #12886: Reinitialize IO mutexes after fork
   (Max Slater, review by Guillaume Munch-Maccagnoni and Xavier Leroy)
 
@@ -2154,7 +2154,7 @@ OCaml 5.2.0 (13 May 2024)
   usages index
   (Ulysse Gérard, review by Gabriel Scherer and Nathanaëlle Courant)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 - #13286: Distinguish unique identifiers `Shape.Uid.t` according to their
   provenance: either an implementation or an interface.
   (Ulysse Gérard, review by Florian Angeletti and Leo White)
@@ -2164,9 +2164,9 @@ OCaml 5.2.0 (13 May 2024)
   (Ulysse Gérard, Florian Angeletti, review by Florian Angeletti and Gabriel
   Scherer)
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 ### Build system:
 
 - #12198, #12321, #12586, #12616, #12706, #13048: continue the merge of the
@@ -3916,14 +3916,14 @@ OCaml 4.14 maintenance version
   (emitted for Linux in #8805)
   (Hannes Mehnert, review by Nicolás Ojeda Bär)
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 =======
 - #13448, #13449: fix a code-generation bug on unsafe array accesses
   at type int32, int64, nativeint, which has been introduced in OCaml 4.04.
   (Gabriel Scherer, review by Nicolás Ojeda Bär and Vincent Laviron,
    report by Raphaël Bocquet and Simon Cruanes)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 OCaml 4.14.1 (20 December 2022)
 ------------------------------
@@ -3984,17 +3984,17 @@ OCaml 4.14.1 (20 December 2022)
   mismatch error involving recursive types.
   (Florian Angeletti, review by Gabriel Scherer)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 - #11732: Ensure that types from packed modules are always generalised
   (Stephen Dolan and Leo White, review by Jacques Garrigue)
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 - #11662, #11673: fix a memory leak when using Dynlink,
   the bug was only present in development version of OCaml 5.
   (Stephen Dolan, report by Andre Maroneze, review by Gabriel Scherer)
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 - #11732: Ensure that types from packed modules are always generalised
   (Stephen Dolan and Leo White, review by Jacques Garrigue)
 

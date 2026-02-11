@@ -142,13 +142,13 @@ val io_buffer_size: int
     @since 5.4
 *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val interactive : bool ref @@ nonportable
-||||||| 23e84b8c4d
+||||||| upstream-base
 val interactive : bool ref
 =======
 val interactive : bool ref
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 [@@alert unsynchronized_access
     "The interactive status is a mutable global state."
 ]
@@ -272,14 +272,14 @@ external runtime_parameters : unit -> string = "caml_runtime_parameters"
 
 external poll_actions : unit -> unit = "%poll"
 (** Run any pending runtime actions, such as minor collections, major
-<<<<<<< HEAD
+<<<<<<< oxcaml
     GC slices, signal handlers, finalizers, or memprof callbacks. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
     GC slices, signal handlers, finalizers, or memprof callbacks.
     @since 5.3 *)
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (** {1 Signal handling} *)
 
@@ -305,25 +305,25 @@ type signal_behavior =
    number as an argument. *)
 
 external signal :
-<<<<<<< HEAD
+<<<<<<< oxcaml
   int -> signal_behavior -> signal_behavior @@ nonportable = "caml_install_signal_handler"
 [@@alert unsafe_multidomain "Use [Sys.Safe.signal]."]
-||||||| 23e84b8c4d
+||||||| upstream-base
   int -> signal_behavior -> signal_behavior = "caml_install_signal_handler"
 =======
   signal -> signal_behavior -> signal_behavior = "caml_install_signal_handler"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** Set the behavior of the system on receipt of a given signal.  The
    first argument is the signal number.  Return the behavior
    previously associated with the signal. If the signal number is
    invalid (or not available on your system), an [Invalid_argument]
    exception is raised.
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val set_signal : int -> signal_behavior -> unit @@ nonportable
 [@@alert unsafe_multidomain "Use [Sys.Safe.set_signal]."]
 (** Same as {!Sys.signal} but return value is ignored. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 val set_signal : int -> signal_behavior -> unit
 (** Same as {!Sys.signal} but return value is ignored. *)
 =======
@@ -331,7 +331,7 @@ val set_signal : int -> signal_behavior -> unit
    to a platform-independent signal using {!signal_of_int} before
    calling the handler.
 *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 val set_signal : signal -> signal_behavior -> unit
 (** Same as {!Sys.signal} but the return value is ignored. *)

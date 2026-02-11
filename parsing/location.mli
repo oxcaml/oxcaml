@@ -240,12 +240,12 @@ module Doc: sig
   val separate_new_message: unit Format_doc.printer
   val filename: string Format_doc.printer
   val quoted_filename: string Format_doc.printer
-<<<<<<< HEAD
+<<<<<<< oxcaml
   val loc: capitalize_first:bool -> t Format_doc.printer
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   val loc: t Format_doc.printer
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   val locs: t list Format_doc.printer
 end
 
@@ -398,29 +398,29 @@ type error = report
 
 type delayed_msg = unit -> Format_doc.t option
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val errorf: ?loc:t -> ?sub:msg list ->
   ('a, Format_doc.formatter, unit, error) format4 -> 'a
-||||||| 23e84b8c4d
+||||||| upstream-base
 val errorf: ?loc:t -> ?sub:msg list ->
   ('a, Format.formatter, unit, error) format4 -> 'a
 =======
 val error: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg -> string -> error
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val error_of_printer: ?loc:t -> ?sub:msg list ->
   (Format_doc.formatter -> 'a -> unit) -> 'a -> error
-||||||| 23e84b8c4d
+||||||| upstream-base
 val error_of_printer: ?loc:t -> ?sub:msg list ->
   (formatter -> 'a -> unit) -> 'a -> error
 =======
 val errorf: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
   ('a, Format_doc.formatter, unit, error) format4 -> 'a
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 val error_of_printer_file: (formatter -> 'a -> unit) -> 'a -> error
 =======
 val aligned_error_hint:
@@ -433,7 +433,7 @@ val aligned_error_hint:
 val error_of_printer: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
   (Format_doc.formatter -> 'a -> unit) -> 'a -> error
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 val error_of_printer_file: (Format_doc.formatter -> 'a -> unit) -> 'a -> error
 
 
@@ -457,14 +457,14 @@ exception Already_displayed_error
 (** Raising [Already_displayed_error] signals an error which has already been
    printed. The exception will be caught, but nothing will be printed *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val raise_errorf: ?loc:t -> ?sub:msg list ->
-||||||| 23e84b8c4d
+||||||| upstream-base
 val raise_errorf: ?loc:t -> ?sub:msg list ->
   ('a, Format.formatter, unit, 'b) format4 -> 'a
 =======
 val raise_errorf: ?loc:t -> ?sub:msg list -> ?footnote:delayed_msg ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   ('a, Format_doc.formatter, unit, 'b) format4 -> 'a
 
 val report_exception: formatter -> exn -> unit

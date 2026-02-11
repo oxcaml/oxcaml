@@ -74,13 +74,13 @@ let compute_variance env visited vari ty =
         compute_same ty2
     | Ttuple tl ->
         List.iter (fun (_,t) -> compute_same t) tl
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Tunboxed_tuple tl ->
         List.iter (fun (_,t) -> compute_same t) tl
-||||||| 23e84b8c4d
+||||||| upstream-base
         List.iter compute_same tl
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Tconstr (path, tl, _) ->
         let open Variance in
         if tl = [] then () else begin
@@ -117,16 +117,16 @@ let compute_variance env visited vari ty =
         compute_same (row_more row)
     | Tpoly (ty, _) | Trepr (ty, _) ->
         compute_same ty
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Tvar _ | Tnil | Tlink _ | Tunivar _ | Tof_kind _ -> ()
     | Tpackage (_, fl) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Tvar _ | Tnil | Tlink _ | Tunivar _ -> ()
     | Tpackage (_, fl) ->
 =======
     | Tvar _ | Tnil | Tlink _ | Tunivar _ -> ()
     | Tpackage pack ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         let v = Variance.(compose vari full) in
         List.iter (fun (_, ty) -> compute_variance_rec v ty) pack.pack_cstrs
   in
@@ -204,15 +204,15 @@ let compute_variance_type env ~check (required, loc) decl tyl =
                                                         (c,n,i)))))
       params required;
     (* Check propagation from constrained parameters *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
     let args = Btype.newgenty (Ttuple (List.map (fun t -> None, t) params)) in
     let fvl = Ctype.free_variables args in
-||||||| 23e84b8c4d
+||||||| upstream-base
     let args = Btype.newgenty (Ttuple params) in
     let fvl = Ctype.free_variables args in
 =======
     let fvl = Ctype.free_variables_list params in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     let fvl =
       List.filter (fun v -> not (List.exists (eq_type v) params)) fvl in
     (* If there are no extra variables there is nothing to do *)

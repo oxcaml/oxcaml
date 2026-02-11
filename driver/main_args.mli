@@ -90,12 +90,12 @@ module type Core_options = sig
   val _dparsetree_loc_ghost_invariants : unit -> unit
   val _dtypedtree : unit -> unit
   val _dshape : unit -> unit
-<<<<<<< HEAD
+<<<<<<< oxcaml
   val _dslambda : unit -> unit
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   val _dmatchcomp : unit -> unit
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   val _drawlambda : unit -> unit
   val _dlambda : unit -> unit
   val _dblambda : unit -> unit
@@ -109,12 +109,12 @@ module type Compiler_options = sig
   val _as_argument_for : string -> unit
   val _as_parameter : unit -> unit
   val _binannot : unit -> unit
-<<<<<<< HEAD
+<<<<<<< oxcaml
   val _binannot_cms : unit -> unit
   val _shape_format : string -> unit
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   val _binannot_occurrences : unit -> unit
   val _c : unit -> unit
   val _cc : string -> unit

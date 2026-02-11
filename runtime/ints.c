@@ -675,7 +675,7 @@ CAMLprim int64_t caml_int64_of_string_unboxed(value s)
       if (res >  (uint64_t)1 << 63) caml_failwith(INT64_ERRMSG);
     }
   }
-<<<<<<< HEAD
+<<<<<<< oxcaml
   if (sign < 0) res = - res;
   return res;
 }
@@ -683,13 +683,13 @@ CAMLprim int64_t caml_int64_of_string_unboxed(value s)
 CAMLprim value caml_int64_of_string(value s)
 {
   return caml_copy_int64(caml_int64_of_string_unboxed(s));
-||||||| 23e84b8c4d
+||||||| upstream-base
   if (sign < 0) res = - res;
   return caml_copy_int64(res);
 =======
   if (sign < 0) res = -(int64_t)res;
   return caml_copy_int64(res);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 int64_t caml_int64_bits_of_float_unboxed(double d)

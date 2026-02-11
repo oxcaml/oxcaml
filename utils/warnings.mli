@@ -39,7 +39,7 @@ type constructor_usage_warning =
   | Not_constructed
   | Only_exported_private
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 type upstream_compat_warning =
   | Immediate_erasure of string
   | Non_value_sort of string
@@ -50,12 +50,12 @@ type upstream_compat_warning =
 type name_out_of_scope_warning =
   | Name of string
   | Fields of { record_form : string ; fields : string list }
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 type type_declaration_usage_warning =
   | Declaration
   | Alias
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 type t =
   | Comment_start                           (*  1 *)
@@ -65,16 +65,16 @@ type t =
   | Ignored_partial_application             (*  5 *)
   | Labels_omitted of string list           (*  6 *)
   | Method_override of string list          (*  7 *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Partial_match of string                 (*  8 *)
   | Missing_record_field_pattern of { form : string ; unbound : string } (* 9 *)
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Partial_match of string                 (*  8 *)
   | Missing_record_field_pattern of string  (*  9 *)
 =======
   | Partial_match of Format_doc.t           (*  8 *)
   | Missing_record_field_pattern of string  (*  9 *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Non_unit_statement                      (* 10 *)
   | Redundant_case                          (* 11 *)
   | Redundant_subpat                        (* 12 *)
@@ -148,7 +148,7 @@ type t =
   | Unused_tmc_attribute                    (* 71 *)
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* Oxcaml specific warnings: numbers should go down from 199 *)
   | Unmutated_mutable of string             (* 186 *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
@@ -166,11 +166,11 @@ type t =
   | Atomic_float_record_boxed               (* 214 *)
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
   | Use_during_borrowing                    (* 216 *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   | Degraded_to_partial_match               (* 74 *)
   | Unnecessarily_partial_tuple_pattern     (* 75 *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 

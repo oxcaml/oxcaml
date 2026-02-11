@@ -17,14 +17,14 @@
 
 open Asttypes
 open Typedtree
-<<<<<<< HEAD
+<<<<<<< oxcaml
 open Types
-||||||| 23e84b8c4d
+||||||| upstream-base
 open Types
 open Format
 =======
 open Data_types
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 open Format_doc
 
 let is_cons = function
@@ -101,25 +101,25 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
   in
   match v.pat_desc with
   | Tpat_any -> fprintf ppf "_"
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tpat_var (x,_,_,_,_) -> fprintf ppf "%s" (Ident.name x)
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpat_var (x,_) -> fprintf ppf "%s" (Ident.name x)
 =======
   | Tpat_var (x,_,_) -> fprintf ppf "%s" (Ident.name x)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tpat_constant c -> fprintf ppf "%s" (pretty_const c)
   | Tpat_unboxed_unit -> fprintf ppf "#()"
   | Tpat_unboxed_bool b -> fprintf ppf "#%a" bool b
   | Tpat_tuple vs ->
       fprintf ppf "@[(%a)@]" (pretty_list pretty_labeled_val ",") vs
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tpat_unboxed_tuple vs ->
       fprintf ppf "@[#(%a)@]" (pretty_list pretty_labeled_val_sort ",") vs
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf "@[(%a)@]" (pretty_vals ",") vs
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tpat_construct (_, cstr, [], _) ->
       fprintf ppf "%s" cstr.cstr_name
   | Tpat_construct (_, cstr, [w], None) ->
@@ -142,13 +142,13 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
       fprintf ppf "`%s" l
   | Tpat_variant (l, Some w, _) ->
       fprintf ppf "@[<2>`%s@ %a@]" l pretty_arg w
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tpat_record (lvs,_) -> pretty_record ~unboxed:false lvs
   | Tpat_record_unboxed_product (lvs,_) -> pretty_record ~unboxed:true lvs
   | Tpat_array (am, _arg_sort, vs) ->
       let punct = if Types.is_mutable am then '|' else ':' in
       fprintf ppf "@[[%c %a %c]@]" punct (pretty_vals " ;") vs punct
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpat_record (lvs,_) ->
       let filtered_lvs = List.filter
           (function
@@ -186,17 +186,17 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
       end
   | Tpat_array (_, vs) ->
       fprintf ppf "@[[| %a |]@]" (pretty_vals " ;") vs
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tpat_lazy v ->
       fprintf ppf "@[<2>lazy@ %a@]" pretty_arg v
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tpat_alias (v, x, _, _, _, _, _) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpat_alias (v, x,_) ->
       fprintf ppf "@[(%a@ as %a)@]" pretty_val v Ident.print x
 =======
   | Tpat_alias (v, x,_,_,_) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       fprintf ppf "@[(%a@ as %a)@]" pretty_val v Ident.doc_print x
   | Tpat_value v ->
       fprintf ppf "%a" pretty_val (v :> pattern)
@@ -235,8 +235,8 @@ and pretty_list : type k . (_ -> k -> _) -> _ -> _ -> k list -> _ =
     | [v] -> print_val ppf v
     | v::vs ->
         fprintf ppf "%a%s@ %a" print_val v sep (pretty_list print_val sep) vs
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 and pretty_vals sep ppf = function
   | [] -> ()
   | [v] -> pretty_val ppf v
@@ -252,7 +252,7 @@ and pretty_labeled_val ppf (l, p) =
   | None -> ()
   end;
   pretty_val ppf p
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 and pretty_vals sep = pretty_list pretty_val sep
 

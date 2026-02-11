@@ -133,8 +133,8 @@ void caml_init_gc_stats (uintnat max_domains)
   if (sampled_gc_stats == NULL)
     caml_fatal_error("Failed to allocate sampled_gc_stats");
 }
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 static struct gc_stats sampled_gc_stats[Max_domains];
 =======
 
@@ -144,7 +144,7 @@ void caml_free_gc_stats(void)
     caml_stat_free(sampled_gc_stats);
   sampled_gc_stats = NULL;
 }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 /* Update the sampled stats for the given domain during a STW section. */
 void caml_collect_gc_stats_sample_stw(caml_domain_state* domain)
@@ -190,13 +190,13 @@ void caml_compute_gc_stats(struct gc_stats* buf)
   pool_max = buf->heap_stats.pool_max_words;
   large_max = buf->heap_stats.large_max_words;
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   for (i=0; i<caml_params->max_domains; i++) {
-||||||| 23e84b8c4d
+||||||| upstream-base
   for (i=0; i<Max_domains; i++) {
 =======
   for (int i = 0; i < caml_params->max_domains; i++) {
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     /* For allocation stats, we use the live stats of the current domain
        and the sampled stats of other domains.
 

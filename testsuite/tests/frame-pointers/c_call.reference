@@ -1,37 +1,37 @@
 fp_backtrace_many_args
 caml_c_call_copy_stack_args
 caml_c_call_stack_args
-<<<<<<< HEAD
+<<<<<<< oxcaml
 camlC_call__f_0_1_code
 camlC_call__entry
-||||||| 23e84b8c4d
+||||||| upstream-base
 camlC_call.f
 camlC_call.entry
 =======
 camlC_call$f
 camlC_call$entry
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 caml_program
 caml_c_call
-<<<<<<< HEAD
+<<<<<<< oxcaml
 camlC_call__f_0_1_code
 camlC_call__entry
-||||||| 23e84b8c4d
+||||||| upstream-base
 camlC_call.f
 camlC_call.entry
 =======
 camlC_call$f
 camlC_call$entry
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 caml_program
-<<<<<<< HEAD
+<<<<<<< oxcaml
 camlC_call__f_0_1_code
 camlC_call__entry
-||||||| 23e84b8c4d
+||||||| upstream-base
 camlC_call.f
 camlC_call.entry
 =======
 camlC_call$f
 camlC_call$entry
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 caml_program

@@ -40,9 +40,9 @@ val link_shared :
   ppf_dump:Format.formatter ->
   unit
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val call_linker_shared : ?native_toplevel:bool -> string list -> string -> unit
-||||||| 23e84b8c4d
+||||||| upstream-base
 val call_linker_shared: string list -> string -> unit
 
 val reset : unit -> unit
@@ -86,4 +86,4 @@ exception Error of error
 
 val report_error: error Format_doc.format_printer
 val report_error_doc: error Format_doc.printer
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

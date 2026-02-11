@@ -12,7 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 type (!'a : value_or_null) t : sync_data with 'a =
   { mutable contents : 'a [@atomic] }
 
@@ -21,7 +21,7 @@ external make
   'a -> ('a t[@local_opt])
   @@ portable
   = "%makemutable"
-||||||| 23e84b8c4d
+||||||| upstream-base
 type !'a t
 
 external make : 'a -> 'a t = "%makemutable"
@@ -33,9 +33,9 @@ external fetch_and_add : int t -> int -> int = "%atomic_fetch_add"
 external ignore : 'a -> unit = "%ignore"
 =======
 external ignore : 'a -> unit = "%ignore"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 external make_contended
   : ('a : value_or_null).
   'a -> ('a t[@local_opt])
@@ -161,7 +161,7 @@ module Loc = struct
   external get_contended : ('a : value_or_null).
     'a t @ contended local -> 'a @ contended @@ portable = "%atomic_load_loc"
 end
-||||||| 23e84b8c4d
+||||||| upstream-base
 let set r x = ignore (exchange r x)
 let incr r = ignore (fetch_and_add r 1)
 let decr r = ignore (fetch_and_add r (-1))
@@ -206,4 +206,4 @@ let incr t =
   Loc.incr [%atomic.loc t.contents]
 let decr t =
   Loc.decr [%atomic.loc t.contents]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

@@ -117,7 +117,7 @@ and type_desc =
       Any mix of labeled and unlabeled components also works:
       [Ttuple [Some "l1", t1; None, t2; Some "l3", t3]] ==> [l1:t1 * t2 * l3:t3]
   *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
   | Tunboxed_tuple of (string option * type_expr) list
   (** [Tunboxed_tuple [None, t1; ...; None, tn]] ==> [#(t1 * ... * tn)]
@@ -128,11 +128,11 @@ and type_desc =
       [Tunboxed_tuple [Some "l1", t1; None, t2; Some "l3", t3]]
            ==> [#(l1:t1 * t2 * l3:t3)]
   *)
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Ttuple of type_expr list
   (** [Ttuple [t1;...;tn]] ==> [(t1 * ... * tn)] *)
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   | Tconstr of Path.t * type_expr list * abbrev_memo ref
   (** [Tconstr (`A.B.t', [t1;...;tn], _)] ==> [(t1,...,tn) A.B.t]
@@ -193,7 +193,7 @@ and type_desc =
       where 'a1 ... 'an are names given to types in tyl
       and occurrences of those types in ty. *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Trepr of type_expr * Jkind_types.Sort.univar list
   (** [Trepr (ty, sl)] represents layout polymorphism (from [repr_] syntax).
       [sl] is an ordered list of sort univars that abstract over the layouts of
@@ -211,14 +211,14 @@ and type_desc =
 
 
   | Tpackage of Path.t * (Longident.t * type_expr) list
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpackage of Path.t * (Longident.t * type_expr) list
 =======
   | Tpackage of package
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   (** Type of a first-class module (a.k.a package). *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tof_kind of jkind_lr
   (** [Tof_kind jkind] ==> [(type : jkind)]
 
@@ -244,14 +244,14 @@ and arrow_desc =
 
 (** See also documentation for [row_more], which enumerates how these
     constructors arise. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 (** [package] corresponds to the type of a first-class module *)
 and package =
   { pack_path : Path.t;
     pack_cstrs : (string list * type_expr) list }
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 and fixed_explanation =
   | Univar of type_expr (** The row type was bound to an univar *)
   | Fixed_private (** The row type is private *)
@@ -921,15 +921,15 @@ and constructor_representation =
 and label_declaration =
   {
     ld_id: Ident.t;
-<<<<<<< HEAD
+<<<<<<< oxcaml
     ld_mutable: mutability;
     ld_modalities: Mode.Modality.Const.t;
-||||||| 23e84b8c4d
+||||||| upstream-base
     ld_mutable: mutable_flag;
 =======
     ld_mutable: mutable_flag;
     ld_atomic: atomic_flag;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     ld_type: type_expr;
     ld_sort: Jkind_types.Sort.Const.t;
     ld_loc: Location.t;
@@ -1140,7 +1140,7 @@ include Wrapped with type 'a wrapped = 'a
 
 val item_visibility : signature_item -> visibility
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* Constructor and record label descriptions inserted held in typing
    environments *)
 
@@ -1227,7 +1227,7 @@ val record_form_to_string : _ record_form -> string
 val mixed_block_element_of_const_sort :
   Jkind_types.Sort.Const.t -> mixed_block_element
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 (* Constructor and record label descriptions inserted held in typing
    environments *)
 
@@ -1277,7 +1277,7 @@ type label_description =
   }
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** Extracts the list of "value" identifiers bound by a signature.
     "Value" identifiers are identifiers for signature components that
     correspond to a run-time value: values, extensions, modules, classes.

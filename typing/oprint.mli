@@ -18,7 +18,7 @@ open Outcometree
 type 'a printer = 'a Format_doc.printer ref
 type 'a toplevel_printer = (Format.formatter -> 'a -> unit) ref
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val out_ident : out_ident printer
 val out_value : out_value toplevel_printer
 val out_label : (string * out_mutability * out_type * out_modality list) printer
@@ -34,7 +34,7 @@ val out_class_type : out_class_type printer
 val out_module_type : out_module_type printer
 val out_sig_item : out_sig_item printer
 val out_signature : out_sig_item list printer
-||||||| 23e84b8c4d
+||||||| upstream-base
 val out_ident : (formatter -> out_ident -> unit) ref
 val out_value : (formatter -> out_value -> unit) ref
 val out_label : (formatter -> string * bool * out_type -> unit) ref
@@ -64,7 +64,7 @@ val out_sig_item : out_sig_item printer
 val out_signature :out_sig_item list printer
 val out_functor_parameters :
   (string option * Outcometree.out_module_type) option list printer
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 val out_type_extension : out_type_extension printer
 val out_phrase : out_phrase toplevel_printer
 

@@ -2,14 +2,14 @@
 flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
 hassysthreads;
 include systhreads;
-<<<<<<< HEAD
+<<<<<<< oxcaml
 not-windows;
 poll-insertion;
-||||||| 23e84b8c4d
+||||||| upstream-base
 not-windows;
 =======
 not-target-windows;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 no-tsan;
 runtime5;
 multidomain;

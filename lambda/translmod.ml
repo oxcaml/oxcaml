@@ -506,15 +506,15 @@ let transl_class_bindings ~scopes cl_list =
    List.map
      (fun ({ci_id_class=id; ci_expr=cl; ci_virt=vf}, meths) ->
        let def, rkind = transl_class ~scopes ids id meths cl vf in
-<<<<<<< HEAD
+<<<<<<< oxcaml
        (* CR sspies: Can we find a better [debug_uid] here? *)
        (id, Lambda.debug_uid_none, rkind, def))
-||||||| 23e84b8c4d
+||||||| upstream-base
        let def = transl_class ~scopes ids id meths cl vf in
        { id; rkind = Class; def})
 =======
        (id, rkind, def))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
      cl_list)
 
 (* Compile one or more functors, merging curried functors to produce
@@ -623,14 +623,14 @@ and transl_module ~scopes cc rootpath mexp =
       apply_coercion loc Strict cc
         (transl_module_path loc mexp.mod_env path)
   | Tmod_structure str ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       let lam, _repr = transl_struct ~scopes loc [] cc rootpath str in
       lam
-||||||| 23e84b8c4d
+||||||| upstream-base
       fst (transl_struct ~scopes loc [] cc rootpath str)
 =======
       transl_struct ~scopes loc [] cc rootpath str
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tmod_functor _ ->
       oo_wrap mexp.mod_env true (fun () ->
         compile_functor ~scopes mexp cc rootpath loc) ()
@@ -674,16 +674,16 @@ and transl_structure ~scopes loc
   (fields : (Ident.t * Jkind.Sort.t) list) cc rootpath final_env =
   function
     [] ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       let body, repr =
-||||||| 23e84b8c4d
+||||||| upstream-base
       let body, size =
 =======
       let body =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         match cc with
           Tcoerce_none ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
             let ids, sorts = List.split (List.rev fields) in
             let repr = transl_module_representation (Array.of_list sorts) in
             Lprim(block_of_module_representation ~loc:(to_location loc) repr,
@@ -691,7 +691,7 @@ and transl_structure ~scopes loc
               repr
         | Tcoerce_structure
           { input_repr = _; output_repr; pos_cc_list; id_pos_list; } ->
-||||||| 23e84b8c4d
+||||||| upstream-base
             Lprim(Pmakeblock(0, Immutable, None),
                   List.map (fun id -> Lvar id) (List.rev fields), loc),
               List.length fields
@@ -700,7 +700,7 @@ and transl_structure ~scopes loc
             Lprim(Pmakeblock(0, Immutable, None),
                   List.map (fun id -> Lvar id) (List.rev fields), loc)
         | Tcoerce_structure(pos_cc_list, id_pos_list) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                 (* Do not ignore id_pos_list ! *)
             (*Format.eprintf "%a@.@[" Includemod.print_coercion cc;
             List.iter (fun l -> Format.eprintf "%a@ " Ident.print l)
@@ -742,22 +742,22 @@ and transl_structure ~scopes loc
               List.filter (fun (id,_,_) -> not (Ident.Set.mem id ids))
                 id_pos_list
             in
-<<<<<<< HEAD
+<<<<<<< oxcaml
             ( wrap_id_pos_list loc id_pos_list get_field get_layout lam,
               output_repr )
-||||||| 23e84b8c4d
+||||||| upstream-base
             wrap_id_pos_list loc id_pos_list get_field lam,
               List.length pos_cc_list
 =======
             wrap_id_pos_list loc id_pos_list get_field lam
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         | _ ->
             fatal_error "Translmod.transl_structure"
       in
       (* This debugging event provides information regarding the structure
          items. It is ignored by the OCaml debugger but is used by
          Js_of_ocaml to preserve variable names. *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
       (if !Clflags.debug && not !Clflags.native_code then
          Levent(body,
                 {lev_loc = loc;
@@ -767,7 +767,7 @@ and transl_structure ~scopes loc
        else
          body),
       repr
-||||||| 23e84b8c4d
+||||||| upstream-base
       (if !Clflags.debug && not !Clflags.native_code then
          Levent(body,
                 {lev_loc = loc;
@@ -786,29 +786,29 @@ and transl_structure ~scopes loc
                 lev_env = final_env})
       else
         body
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | item :: rem ->
       match item.str_desc with
-<<<<<<< HEAD
+<<<<<<< oxcaml
       | Tstr_eval (expr, sort, _) ->
           let body, repr =
-||||||| 23e84b8c4d
+||||||| upstream-base
       | Tstr_eval (expr, _) ->
           let body, size =
 =======
       | Tstr_eval (expr, _) ->
           let body =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
             transl_structure ~scopes loc fields cc rootpath final_env rem
           in
-<<<<<<< HEAD
+<<<<<<< oxcaml
           let sort = Jkind.Sort.default_for_transl_and_get sort in
           Lsequence(transl_exp ~scopes sort expr, body), repr
-||||||| 23e84b8c4d
+||||||| upstream-base
           Lsequence(transl_exp ~scopes expr, body), size
 =======
           Lsequence(transl_exp ~scopes expr, body)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       | Tstr_value(rec_flag, pat_expr_list) ->
           (* Translate bindings first *)
           let mk_lam_let =
@@ -821,29 +821,29 @@ and transl_structure ~scopes loc
               fields
           in
           (* Then, translate remainder of struct *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
           let body, repr =
-||||||| 23e84b8c4d
+||||||| upstream-base
           let body, size =
 =======
           let body =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
             transl_structure ~scopes loc ext_fields cc rootpath final_env rem
           in
-<<<<<<< HEAD
+<<<<<<< oxcaml
           mk_lam_let body, repr
-||||||| 23e84b8c4d
+||||||| upstream-base
           mk_lam_let body, size
 =======
           mk_lam_let body
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       | Tstr_primitive descr ->
           record_primitive descr.val_val;
           transl_structure ~scopes loc fields cc rootpath final_env rem
       | Tstr_type _ ->
           transl_structure ~scopes loc fields cc rootpath final_env rem
       | Tstr_typext(tyext) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
           let newfields =
             List.map
               (fun ext ->
@@ -852,7 +852,7 @@ and transl_structure ~scopes loc
           in
           let body, repr =
             transl_structure ~scopes loc (List.rev_append newfields fields)
-||||||| 23e84b8c4d
+||||||| upstream-base
           let ids = List.map (fun ext -> ext.ext_id) tyext.tyext_constructors in
           let body, size =
             transl_structure ~scopes loc (List.rev_append ids fields)
@@ -860,47 +860,47 @@ and transl_structure ~scopes loc
           let ids = List.map (fun ext -> ext.ext_id) tyext.tyext_constructors in
           let body =
             transl_structure ~scopes loc (List.rev_append ids fields)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
               cc rootpath final_env rem
           in
-<<<<<<< HEAD
+<<<<<<< oxcaml
           transl_type_extension ~scopes item.str_env rootpath tyext body, repr
-||||||| 23e84b8c4d
+||||||| upstream-base
           transl_type_extension ~scopes item.str_env rootpath tyext body, size
 =======
           transl_type_extension ~scopes item.str_env rootpath tyext body
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       | Tstr_exception ext ->
           let id = ext.tyexn_constructor.ext_id in
           let id_duid = Lambda.debug_uid_none in
           (* CR sspies: Can we find a better [debug_uid] here? *)
           let path = field_path rootpath id in
-<<<<<<< HEAD
+<<<<<<< oxcaml
           let body, repr =
             transl_structure ~scopes loc
               ((id, Jkind.Sort.(of_const Const.for_exception)) :: fields)
               cc rootpath final_env rem
-||||||| 23e84b8c4d
+||||||| upstream-base
           let body, size =
             transl_structure ~scopes loc (id::fields) cc rootpath final_env rem
 =======
           let body =
             transl_structure ~scopes loc (id::fields) cc rootpath final_env rem
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           in
           Llet(Strict, Lambda.layout_block, id, id_duid,
                transl_extension_constructor ~scopes
                                             item.str_env
                                             path
-<<<<<<< HEAD
+<<<<<<< oxcaml
                                             ext.tyexn_constructor, body),
           repr
-||||||| 23e84b8c4d
+||||||| upstream-base
                                             ext.tyexn_constructor, body),
           size
 =======
                                             ext.tyexn_constructor, body)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       | Tstr_module ({mb_presence=Mp_present} as mb) ->
           let id = mb.mb_id in
           let field =
@@ -920,39 +920,39 @@ and transl_structure ~scopes loc
                                                  mb.mb_attributes
           in
           (* Translate remainder second *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
           let body, repr =
             transl_structure ~scopes loc (cons_opt field fields)
-||||||| 23e84b8c4d
+||||||| upstream-base
           let body, size =
             transl_structure ~scopes loc (cons_opt id fields)
 =======
           let body =
             transl_structure ~scopes loc (cons_opt id fields)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
               cc rootpath final_env rem
           in
           begin match id with
           | None ->
               Lsequence (Lprim(Pignore, [module_body],
-<<<<<<< HEAD
+<<<<<<< oxcaml
                                of_location ~scopes mb.mb_name.loc), body),
               repr
-||||||| 23e84b8c4d
+||||||| upstream-base
                                of_location ~scopes mb.mb_name.loc), body),
               size
 =======
                                of_location ~scopes mb.mb_name.loc), body)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           | Some id ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
               Llet(pure_module mb.mb_expr, Lambda.layout_module, id,
               id_duid, module_body, body), repr
-||||||| 23e84b8c4d
+||||||| upstream-base
               Llet(pure_module mb.mb_expr, Pgenval, id, module_body, body), size
 =======
               Llet(pure_module mb.mb_expr, Pgenval, id, module_body, body)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           end
       | Tstr_module ({mb_presence=Mp_absent}) ->
           transl_structure ~scopes loc fields cc rootpath final_env rem
@@ -963,17 +963,17 @@ and transl_structure ~scopes loc
                 (fun id -> id, Jkind.Sort.(of_const Const.for_module)) mb.mb_id)
               bindings
           in
-<<<<<<< HEAD
+<<<<<<< oxcaml
           let body, repr =
             transl_structure ~scopes loc (List.rev_append newfields fields)
               cc rootpath final_env rem
-||||||| 23e84b8c4d
+||||||| upstream-base
           let body, size =
             transl_structure ~scopes loc ext_fields cc rootpath final_env rem
 =======
           let body =
             transl_structure ~scopes loc ext_fields cc rootpath final_env rem
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           in
           let lam =
             compile_recmodule ~scopes (fun id modl ->
@@ -985,37 +985,37 @@ and transl_structure ~scopes loc
                     Tcoerce_none (field_path rootpath id) modl
             ) bindings body
           in
-<<<<<<< HEAD
+<<<<<<< oxcaml
           lam, repr
-||||||| 23e84b8c4d
+||||||| upstream-base
           lam, size
 =======
           lam
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       | Tstr_class cl_list ->
           let (ids, class_bindings) = transl_class_bindings ~scopes cl_list in
-<<<<<<< HEAD
+<<<<<<< oxcaml
           let newfields =
             List.map (fun id -> id, Jkind.Sort.(of_const Const.for_class)) ids
           in
           let body, repr =
             transl_structure ~scopes loc (List.rev_append newfields fields)
-||||||| 23e84b8c4d
+||||||| upstream-base
           let body, size =
             transl_structure ~scopes loc (List.rev_append ids fields)
 =======
           let body =
             transl_structure ~scopes loc (List.rev_append ids fields)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
               cc rootpath final_env rem
           in
-<<<<<<< HEAD
+<<<<<<< oxcaml
           Value_rec_compiler.compile_letrec class_bindings body, repr
-||||||| 23e84b8c4d
+||||||| upstream-base
           Lletrec(class_bindings, body), size
 =======
           Value_rec_compiler.compile_letrec class_bindings body
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       | Tstr_include incl ->
           let ids_with_sorts =
             bound_value_identifiers_and_sorts incl.incl_type
@@ -1027,12 +1027,12 @@ and transl_structure ~scopes loc
           let rec rebind_idents pos newfields = function
               [] ->
                 transl_structure ~scopes loc newfields cc rootpath final_env rem
-<<<<<<< HEAD
+<<<<<<< oxcaml
             | (id, sort) :: ids_with_sorts ->
                 let const_sort = Jkind.Sort.default_for_transl_and_get sort in
                 let lambda_layout =
                   Typeopt.layout_of_sort (to_location loc) const_sort
-||||||| 23e84b8c4d
+||||||| upstream-base
             | id :: ids ->
                 let body, size =
                   rebind_idents (pos + 1) (id :: newfields) ids
@@ -1040,9 +1040,9 @@ and transl_structure ~scopes loc
             | id :: ids ->
                 let body =
                   rebind_idents (pos + 1) (id :: newfields) ids
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                 in
-<<<<<<< HEAD
+<<<<<<< oxcaml
                 let body, repr =
                   rebind_idents (pos + 1) ((id, sort) :: newfields)
                     ids_with_sorts
@@ -1054,7 +1054,7 @@ and transl_structure ~scopes loc
                            [Lvar mid],
                            of_location ~scopes incl.incl_loc), body),
                 repr
-||||||| 23e84b8c4d
+||||||| upstream-base
                 Llet(Alias, Pgenval, id,
                      Lprim(Pfield (pos, Pointer, Mutable),
                         [Lvar mid], of_location ~scopes incl.incl_loc), body),
@@ -1063,9 +1063,9 @@ and transl_structure ~scopes loc
                 Llet(Alias, Pgenval, id,
                      Lprim(Pfield (pos, Pointer, Mutable),
                         [Lvar mid], of_location ~scopes incl.incl_loc), body)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           in
-<<<<<<< HEAD
+<<<<<<< oxcaml
           let body, repr =
             rebind_idents 0 fields ids_with_sorts
           in
@@ -1083,7 +1083,7 @@ and transl_structure ~scopes loc
           in
           Llet(let_kind, Lambda.layout_module, mid, mid_duid, modl, body),
           repr
-||||||| 23e84b8c4d
+||||||| upstream-base
           let body, size = rebind_idents 0 fields ids in
           Llet(pure_module modl, Pgenval, mid,
                transl_module ~scopes Tcoerce_none None modl, body),
@@ -1092,7 +1092,7 @@ and transl_structure ~scopes loc
           let body = rebind_idents 0 fields ids in
           Llet(pure_module modl, Pgenval, mid,
                transl_module ~scopes Tcoerce_none None modl, body)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
       | Tstr_open od ->
           let pure = pure_module od.open_expr in
@@ -1113,12 +1113,12 @@ and transl_structure ~scopes loc
               let rec rebind_idents pos newfields = function
                   [] -> transl_structure
                           ~scopes loc newfields cc rootpath final_env rem
-<<<<<<< HEAD
+<<<<<<< oxcaml
                 | (id, sort) :: ids_with_sorts ->
                   let const_sort = Jkind.Sort.default_for_transl_and_get sort in
                   let lambda_layout =
                     Typeopt.layout_of_sort (to_location loc) const_sort
-||||||| 23e84b8c4d
+||||||| upstream-base
                 | id :: ids ->
                   let body, size =
                     rebind_idents (pos + 1) (id :: newfields) ids
@@ -1126,9 +1126,9 @@ and transl_structure ~scopes loc
                 | id :: ids ->
                   let body =
                     rebind_idents (pos + 1) (id :: newfields) ids
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                   in
-<<<<<<< HEAD
+<<<<<<< oxcaml
                   let body, repr =
                     rebind_idents (pos + 1) ((id, sort) :: newfields)
                       ids_with_sorts
@@ -1139,7 +1139,7 @@ and transl_structure ~scopes loc
                       Lprim(mod_field pos open_repr, [Lvar mid],
                             of_location ~scopes od.open_loc), body),
                   repr
-||||||| 23e84b8c4d
+||||||| upstream-base
                   Llet(Alias, Pgenval, id,
                       Lprim(Pfield (pos, Pointer, Mutable), [Lvar mid],
                             of_location ~scopes od.open_loc), body),
@@ -1148,16 +1148,16 @@ and transl_structure ~scopes loc
                   Llet(Alias, Pgenval, id,
                       Lprim(Pfield (pos, Pointer, Mutable), [Lvar mid],
                             of_location ~scopes od.open_loc), body)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
               in
-<<<<<<< HEAD
+<<<<<<< oxcaml
               let body, repr =
                 rebind_idents 0 fields ids_with_sorts
               in
               Llet(pure, Lambda.layout_module, mid, mid_duid,
                    transl_module ~scopes Tcoerce_none None od.open_expr, body),
               repr
-||||||| 23e84b8c4d
+||||||| upstream-base
               let body, size = rebind_idents 0 fields ids in
               Llet(pure, Pgenval, mid,
                    transl_module ~scopes Tcoerce_none None od.open_expr, body),
@@ -1166,7 +1166,7 @@ and transl_structure ~scopes loc
               let body = rebind_idents 0 fields ids in
               Llet(pure, Pgenval, mid,
                    transl_module ~scopes Tcoerce_none None od.open_expr, body)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           end
       | Tstr_modtype _
       | Tstr_class_type _
@@ -1285,12 +1285,12 @@ let wrap_toplevel_functor_in_struct code =
 
 (* Compile an implementation *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let has_parameters () =
   Env.parameters () <> []
 
 let transl_implementation compilation_unit impl ~loc =
-||||||| 23e84b8c4d
+||||||| upstream-base
 let transl_implementation_flambda module_name (str, cc) =
 =======
 let module_block_size component_names coercion =
@@ -1302,11 +1302,11 @@ let module_block_size component_names coercion =
   | Tcoerce_alias _ -> assert false
 
 let transl_implementation_flambda module_name (str, cc) =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   reset_labels ();
   primitive_declarations := [];
   Translprim.clear_used_primitives ();
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let scopes = enter_compilation_unit ~scopes:empty_scopes compilation_unit in
   let body, (repr, arg_block_idx) =
     Translobj.transl_label_init (fun () ->
@@ -1315,7 +1315,7 @@ let transl_implementation_flambda module_name (str, cc) =
           impl
       in
       body, (repr, arg_block_idx))
-||||||| 23e84b8c4d
+||||||| upstream-base
   let module_id = Ident.create_persistent module_name in
   let scopes = enter_module_definition ~scopes:empty_scopes module_id in
   let body, size =
@@ -1329,9 +1329,9 @@ let transl_implementation_flambda module_name (str, cc) =
     Translobj.transl_label_init
       (fun () -> transl_struct ~scopes Loc_unknown [] cc
                    (global_path module_id) str)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   in
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let body, main_module_block_format =
     match has_parameters () with
     | false ->
@@ -1339,7 +1339,7 @@ let transl_implementation_flambda module_name (str, cc) =
     | true ->
         let mb_runtime_params, runtime_param_idents =
           match Env.runtime_parameter_bindings () with
-||||||| 23e84b8c4d
+||||||| upstream-base
   { module_ident = module_id;
     main_module_block_size = size;
     required_globals = required_globals ~flambda:true body;
@@ -2404,7 +2404,7 @@ let build_ident_map restr idlist more_ids =
         (* ignore _id_pos_list as the ids are already bound *)
         let idarray = Array.of_list idlist in
         let rec export_map pos map prims aliases undef = function
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           | [] ->
               (* We didn't end up using any of the parameters, but this is still a
                  parameterised module, so it must still be implemented as a function that
@@ -2499,17 +2499,17 @@ let toploop_setvalue id lam =
 
 let toploop_setvalue_id id = toploop_setvalue id (Lvar id)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let close_toplevel_term (lam, ()) =
   Ident.Set.fold (fun id l -> Llet(Strict, Lambda.layout_any_value, id,
                                   Lambda.debug_uid_none,
-||||||| 23e84b8c4d
+||||||| upstream-base
 let close_toplevel_term (lam, ()) =
   Ident.Set.fold (fun id l -> Llet(Strict, Pgenval, id,
 =======
 let close_toplevel_term lam =
   Ident.Set.fold (fun id l -> Llet(Strict, Pgenval, id,
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                                   toploop_getvalue id, l))
                 (free_variables lam) lam
 
@@ -2573,15 +2573,15 @@ let transl_toplevel_item ~scopes item =
          be a value named identically *)
       let (ids, class_bindings) = transl_class_bindings ~scopes cl_list in
       List.iter set_toplevel_unique_name ids;
-<<<<<<< HEAD
+<<<<<<< oxcaml
       let body = make_sequence toploop_setvalue_id ids in
       Value_rec_compiler.compile_letrec class_bindings body
-||||||| 23e84b8c4d
+||||||| upstream-base
       Lletrec(class_bindings, make_sequence toploop_setvalue_id ids)
 =======
       Value_rec_compiler.compile_letrec class_bindings
         (make_sequence toploop_setvalue_id ids)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tstr_include incl ->
       let ids = bound_value_identifiers incl.incl_type in
       let loc = of_location ~scopes incl.incl_loc in
@@ -2648,16 +2648,16 @@ let transl_toplevel_item ~scopes item =
 
 let transl_toplevel_item_and_close ~scopes itm =
   close_toplevel_term
-<<<<<<< HEAD
+<<<<<<< oxcaml
     (transl_label_init
        (fun () ->
           let expr = transl_toplevel_item ~scopes itm
           in expr, ()))
-||||||| 23e84b8c4d
+||||||| upstream-base
     (transl_label_init (fun () -> transl_toplevel_item ~scopes itm, ()))
 =======
     (transl_label_init (fun () -> transl_toplevel_item ~scopes itm))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let transl_toplevel_definition str =
   reset_labels ();
@@ -2672,7 +2672,7 @@ let get_component = function
     None -> Lconst const_unit
   | Some id -> Lprim(Pgetglobal id, [], Loc_unknown)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let () =
   match Jkind.Sort.Const.for_module with
   | Base Value -> ()
@@ -2690,7 +2690,7 @@ let transl_package component_names coercion =
     | Tcoerce_alias _ -> assert false
   in
   field_count,
-||||||| 23e84b8c4d
+||||||| upstream-base
 let transl_package_flambda component_names coercion =
   let size =
     match coercion with
@@ -2704,7 +2704,7 @@ let transl_package_flambda component_names coercion =
 =======
 let transl_package_flambda component_names coercion =
   module_block_size component_names coercion,
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   apply_coercion Loc_unknown Strict coercion
     (Lprim(block_of_module_representation ~loc:Location.none
              (Module_value_only { field_count }),

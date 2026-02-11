@@ -23,9 +23,9 @@
 
     @since 5.0 *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 type !'a t : value mod portable contended with 'a
-||||||| 23e84b8c4d
+||||||| upstream-base
 type !'a t
 =======
 [@@@alert unstable
@@ -33,7 +33,7 @@ type !'a t
 ]
 
 type !'a t
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** A domain of type ['a t] runs independently, eventually producing a
     result of type 'a, or an exception *)
 
@@ -116,8 +116,8 @@ let temp_file_key = Domain.DLS.new_key (fun _ ->
     to close it, thus guaranteeing the descriptor is not leaked in
     case the current domain exits. *)
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 val cpu_relax : unit -> unit
 (** If busy-waiting, calling cpu_relax () between iterations
     will improve performance on some CPU architectures *)
@@ -159,7 +159,7 @@ val self_index : unit -> int
 *)
 
 module DLS : sig
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** Domain-local Storage *)
 module DLS : sig
 

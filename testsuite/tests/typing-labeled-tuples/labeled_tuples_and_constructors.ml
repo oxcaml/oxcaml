@@ -1,5 +1,5 @@
 (* TEST
-<<<<<<< HEAD
+<<<<<<< oxcaml
  flags = "-extension labeled_tuples";
  expect;
 *)
@@ -84,7 +84,7 @@ Error: This expression has type "'a * y:'b"
        but an expression was expected of type "x:int * int"
 |}]
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
    expect;
 *)
@@ -173,4 +173,4 @@ Error: This expression has type "'a * y:'b"
        but an expression was expected of type "x:int * int"
        A label "x" was expected
 |}]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

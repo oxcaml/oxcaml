@@ -154,16 +154,16 @@ void caml_ephe_clean (value v) {
 
   hd = Hd_val(v);
   size = Wosize_hd (hd);
-<<<<<<< HEAD
+<<<<<<< oxcaml
   for (i = CAML_EPHE_FIRST_KEY; i < size; i++) {
     child = ephe_key(v, i);
-||||||| 23e84b8c4d
+||||||| upstream-base
   for (i = CAML_EPHE_FIRST_KEY; i < size; i++) {
     child = Field(v, i);
 =======
   for (mlsize_t i = CAML_EPHE_FIRST_KEY; i < size; i++) {
     child = Ephe_key(v, i);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   ephemeron_again:
     if (child != caml_ephe_none && Is_block(child)) {
       if (Tag_val (child) == Forward_tag) {
@@ -213,9 +213,9 @@ static void clean_field (value e, mlsize_t offset)
     do_check_key_clean(e, offset);
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 static void do_set (value e, mlsize_t offset, value v)
-||||||| 23e84b8c4d
+||||||| upstream-base
 CAMLreally_no_tsan /* This function performs volatile writes, which we consider
                       to be non-racy, but TSan reports data races, so we never
                       instrument it with TSan. */
@@ -227,13 +227,13 @@ Caml_noinline /* Unfortunately, Clang disregards the no_tsan attribute on
 static void do_set (value e, mlsize_t offset, value v)
 =======
 Caml_inline void ephe_write_barrier (value e, mlsize_t offset, value v)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   if (Is_block(v) && Is_young(v)) {
     value old = Field(e, offset);
     if (!(Is_block(old) && Is_young(old)))
-||||||| 23e84b8c4d
+||||||| upstream-base
   if (Is_block(v) && Is_young(v)) {
     value old = Field(e, offset);
     Field(e, offset) = v;
@@ -242,16 +242,16 @@ Caml_inline void ephe_write_barrier (value e, mlsize_t offset, value v)
   if (Is_block (v) && Is_young (v)){
     value old = Field (e, offset);
     if (!(Is_block (old) && Is_young (old))){
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       add_to_ephe_ref_table (&Caml_state->minor_tables->ephe_ref,
                              e, offset);
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
   } else {
     Field(e, offset) = v;
 =======
     }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   }
 
   /* See Note [MM] in memory.c */
@@ -532,13 +532,13 @@ static value ephe_blit_keys (value es, mlsize_t offset_s,
                              value ed, mlsize_t offset_d, mlsize_t length)
 {
   CAMLparam2(es,ed);
-<<<<<<< HEAD
+<<<<<<< oxcaml
   long i;
-||||||| 23e84b8c4d
+||||||| upstream-base
   CAMLlocal1(ar);
   long i;
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   if (length == 0) CAMLreturn(Val_unit);
 
@@ -549,32 +549,32 @@ static value ephe_blit_keys (value es, mlsize_t offset_s,
   caml_ephe_clean(ed);
 
   if (offset_d < offset_s) {
-<<<<<<< HEAD
+<<<<<<< oxcaml
     for (i = 0; i < length; i++) {
       caml_ephe_await_key(ed, offset_d + i);
       do_set(ed, offset_d + i, ephe_key(es, offset_s + i));
-||||||| 23e84b8c4d
+||||||| upstream-base
     for (i = 0; i < length; i++) {
       do_set(ed, offset_d + i, Field(es, (offset_s + i)));
 =======
     for (long i = 0; i < length; i++) {
       caml_ephe_await_key(ed, offset_d + i);
       ephe_modify(ed, offset_d + i, Ephe_key(es, offset_s + i));
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     }
   } else {
-<<<<<<< HEAD
+<<<<<<< oxcaml
     for (i = length - 1; i >= 0; i--) {
       caml_ephe_await_key(ed, offset_d + i);
       do_set(ed, offset_d + i, ephe_key(es, offset_s + i));
-||||||| 23e84b8c4d
+||||||| upstream-base
     for (i = length - 1; i >= 0; i--) {
       do_set(ed, offset_d + i, Field(es, (offset_s + i)));
 =======
     for (long i = length - 1; i >= 0; i--) {
       caml_ephe_await_key(ed, offset_d + i);
       ephe_modify(ed, offset_d + i, Ephe_key(es, offset_s + i));
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     }
   }
   CAMLreturn(Val_unit);
@@ -605,17 +605,17 @@ CAMLprim value caml_ephe_blit_data (value es, value ed)
   caml_ephe_clean(ed);
 
   value v = Ephe_data(es);
-<<<<<<< HEAD
+<<<<<<< oxcaml
   do_set(ed, CAML_EPHE_DATA_OFFSET, v);
   if (caml_marking_started())
     caml_darken(Caml_state, v, 0);
-||||||| 23e84b8c4d
+||||||| upstream-base
   ephe_blit_field (es, CAML_EPHE_DATA_OFFSET, ed, CAML_EPHE_DATA_OFFSET, 1);
   caml_darken(0, Field(ed, CAML_EPHE_DATA_OFFSET), 0);
 =======
   ephe_modify(ed, CAML_EPHE_DATA_OFFSET, v);
   caml_darken(Caml_state, v, 0);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   /* [ed] may be in [Caml_state->ephe_info->live] list. The data value may be
      unmarked. The ephemerons on the live list are not scanned during ephemeron
      marking. Hence, unconditionally darken the data value. */

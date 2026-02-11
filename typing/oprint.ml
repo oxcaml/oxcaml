@@ -124,7 +124,7 @@ let escape_string s =
     Bytes.to_string s'
   end
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let rec print_typlist print_elem sep ppf =
   function
     [] -> ()
@@ -166,7 +166,7 @@ let rec print_labeled_typlist print_elem sep ppf =
       pp_print_string ppf sep;
       pp_print_space ppf ();
       print_labeled_typlist print_elem sep ppf tyl
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 let print_label_type ppf =
   function
@@ -182,7 +182,7 @@ let print_label ppf =
     pp_print_string ppf s;
     pp_print_string ppf ":";
   | None -> ()
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let print_out_string ppf s =
   let not_escaped =
@@ -274,7 +274,7 @@ let print_out_value ppf tree =
         end
     | Oval_list tl ->
         fprintf ppf "@[<1>[%a]@]" (print_tree_list print_tree_1 ";") tl
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Oval_array (tl, am) ->
         let sigil = match am with
           | Mutable   -> '|'
@@ -282,13 +282,13 @@ let print_out_value ppf tree =
         in
         fprintf ppf "@[<2>[%c%a%c]@]"
           sigil (print_tree_list print_tree_1 ";") tl sigil
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Oval_array tl ->
         fprintf ppf "@[<2>[|%a|]@]" (print_tree_list print_tree_1 ";") tl
 =======
     | Oval_array (tl, _mutability) ->
         fprintf ppf "@[<2>[|%a|]@]" (print_tree_list print_tree_1 ";") tl
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Oval_constr (name, []) -> print_constr ppf name
     | Oval_variant (name, None) -> fprintf ppf "`%a" print_lident name
     | Oval_stuff s -> pp_print_string ppf s
@@ -299,14 +299,14 @@ let print_out_value ppf tree =
     | Oval_ellipsis -> raise Ellipsis
     | Oval_printer f -> f ppf
     | Oval_tuple tree_list ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
         fprintf ppf "@[<1>(%a)@]" (print_labeled_tree_list print_tree_1 ",") tree_list
     | Oval_unboxed_tuple tree_list ->
         fprintf ppf "@[<1>#(%a)@]" (print_labeled_tree_list print_tree_1 ",")
           tree_list
     | Oval_code e ->
         deprecated_printer (fun fmt -> CamlinternalQuote.Code.print fmt e) ppf
-||||||| 23e84b8c4d
+||||||| upstream-base
         fprintf ppf "@[<1>(%a)@]" (print_tree_list print_tree_1 ",") tree_list
 =======
         let print_elem ppf (lbl, item) =
@@ -317,7 +317,7 @@ let print_out_value ppf tree =
        fprintf ppf "@[<2>[|%a|]@]"
          (pp_print_seq ~pp_sep:semicolon pp_print_float)
          (Float.Array.to_seq arr)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | tree -> fprintf ppf "@[<1>(%a)@]" (cautious print_tree_1) tree
   and print_fields first ppf =
     function
@@ -468,20 +468,20 @@ and print_out_type_1 ppf =
   function
   | Otyp_arrow (lab, am, ty1, ty2) ->
       pp_open_box ppf 0;
-<<<<<<< HEAD
+<<<<<<< oxcaml
       print_arg_label_and_out_type ppf lab ty1 ~print_type:(print_out_arg am);
-||||||| 23e84b8c4d
+||||||| upstream-base
       print_arg_label ppf lab;
       print_out_type_2 ppf ty1;
 =======
       print_arg_label ppf lab;
       print_out_type_2 ~arg:true ppf ty1;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       pp_print_string ppf " ->";
       pp_print_space ppf ();
       print_out_ret ppf ty2;
       pp_close_box ppf ()
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | ty -> print_out_type_2 ppf ty
 
 and print_out_arg am ppf ty =
@@ -503,21 +503,21 @@ and print_out_ret ppf =
   | _ -> assert false
 
 and print_out_type_2 ppf =
-||||||| 23e84b8c4d
+||||||| upstream-base
   | ty -> print_out_type_2 ppf ty
 and print_out_type_2 ppf =
 =======
   | ty -> print_out_type_2 ~arg:false ppf ty
 and print_out_type_2 ~arg ppf =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   function
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Otyp_tuple tyl ->
       fprintf
         ppf "@[<0>%a@]" (print_labeled_typlist print_simple_out_type " *") tyl
   | ty -> print_out_type_3 ppf ty
 and print_out_type_3 ppf =
-||||||| 23e84b8c4d
+||||||| upstream-base
     Otyp_tuple tyl ->
       fprintf ppf "@[<0>%a@]" (print_typlist print_simple_out_type " *") tyl
   | ty -> print_simple_out_type ppf ty
@@ -542,7 +542,7 @@ and print_simple_out_type ppf =
       if parens then pp_print_char ppf ')'
   | ty -> print_simple_out_type ppf ty
 and print_simple_out_type ppf =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   function
     Otyp_class (id, tyl) ->
       fprintf ppf "@[%a#%a@]" print_typargs tyl print_ident id
@@ -592,7 +592,7 @@ and print_simple_out_type ppf =
       pp_close_box ppf ()
   | Otyp_abstract | Otyp_open
   | Otyp_sum _ | Otyp_manifest (_, _) -> ()
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Otyp_record lbls -> print_record_decl ~unboxed:false ppf lbls
   | Otyp_record_unboxed_product lbls -> print_record_decl ~unboxed:true ppf lbls
   | Otyp_module (p, fl) ->
@@ -605,7 +605,7 @@ and print_simple_out_type ppf =
         )
         fl;
       fprintf ppf ")@]"
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Otyp_record lbls -> print_record_decl ppf lbls
   | Otyp_module (p, fl) ->
       fprintf ppf "@[<1>(module %a" print_ident p;
@@ -621,9 +621,9 @@ and print_simple_out_type ppf =
   | Otyp_record lbls -> print_record_decl ppf lbls
   | Otyp_module pack ->
       fprintf ppf "@[<1>(module %a)@]" print_package pack
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Otyp_attribute (t, attr) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       fprintf ppf "@[<1>(%a [@@%s])@]"
         print_out_type_0 t attr.oattr_name
   | Otyp_jkind_annot (t, jk) ->
@@ -655,7 +655,7 @@ and print_record_decl ~unboxed ppf lbls =
   let hash = if unboxed then "#" else "" in
   fprintf ppf "%s{%a@;<1 -2>}"
     hash (print_list_init print_out_label (fun ppf -> fprintf ppf "@ ")) lbls
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf "@[<1>(%a [@@%s])@]" print_out_type t attr.oattr_name
 and print_record_decl ppf lbls =
   fprintf ppf "{%a@;<1 -2>}"
@@ -674,7 +674,7 @@ and print_package ppf pack =
 and print_record_decl ppf lbls =
   fprintf ppf "{%a@;<1 -2>}"
     (print_list_init print_out_label (fun ppf -> fprintf ppf "@ ")) lbls
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 and print_fields open_row ppf =
   function
     [] ->
@@ -694,8 +694,8 @@ and print_row_field ppf (l, opt_amp, tyl) =
   fprintf ppf "@[<hv 2>`%a%t%a@]" print_lident l pr_of
     (print_typlist print_out_type " &")
     tyl
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 and print_typlist print_elem sep ppf =
   function
     [] -> ()
@@ -716,7 +716,7 @@ and print_typlist : 'a . (_ -> 'a -> _) -> _ -> _ -> 'a list -> _ =
       pp_print_string ppf sep;
       pp_print_space ppf ();
       print_typlist print_elem sep ppf tyl
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 and print_typargs ppf =
   function
     [] -> ()
@@ -728,7 +728,7 @@ and print_typargs ppf =
       pp_print_char ppf ')';
       pp_close_box ppf ();
       pp_print_space ppf ()
-<<<<<<< HEAD
+<<<<<<< oxcaml
 and print_out_label ppf (name, mut, arg, gbl) =
   (* See the notes [NON-LEGACY MODES] *)
   let mut, atomic =
@@ -845,7 +845,7 @@ and pr_var_repr ppf v =
 
 and pr_var_reprs vs =
   print_list pr_var_repr (fun ppf -> fprintf ppf "@ ") vs
-||||||| 23e84b8c4d
+||||||| upstream-base
 and print_out_label ppf (name, mut, arg) =
   fprintf ppf "@[<2>%s%a :@ %a@];" (if mut then "mutable " else "")
     print_lident name
@@ -859,7 +859,7 @@ and print_out_label ppf {olab_name; olab_mut; olab_atomic; olab_type} =
     print_lident olab_name
     print_out_type olab_type
     (match olab_atomic with Atomic -> " [@atomic]" | Nonatomic -> "")
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let out_label = ref print_out_label
 
@@ -885,7 +885,7 @@ let type_parameter ~in_parens ppf
      ot_jkind=lay; }
   =
   let open Asttypes in
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let format_string : _ format = "%s%s%a%a" in
   let format_string : _ format = match lay with
     | Some _ when not in_parens -> "(" ^^ format_string ^^ ")"
@@ -893,7 +893,7 @@ let type_parameter ~in_parens ppf
   in
   fprintf ppf format_string
     (match var with Covariant -> "+" | Contravariant -> "-" | NoVariance ->  "")
-||||||| 23e84b8c4d
+||||||| upstream-base
   fprintf ppf "%s%s%a"
     (match var with Covariant -> "+" | Contravariant -> "-" | NoVariance ->  "")
 =======
@@ -903,7 +903,7 @@ let type_parameter ~in_parens ppf
     | Contravariant -> "-"
     | NoVariance ->  ""
     | Bivariant -> "+-")
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     (match inj with Injective -> "!" | NoInjectivity -> "")
     (print_type_parameter ~non_gen) ty
     print_out_jkind_annot lay
@@ -928,18 +928,18 @@ let rec print_out_class_type ppf =
       in
       fprintf ppf "@[%a%a@]" pr_tyl tyl print_ident id
   | Octy_arrow (lab, ty, cty) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       let print_type = print_out_type_2 in
       fprintf ppf "@[%t ->@ %a@]"
         (fun ppf -> print_arg_label_and_out_type ppf lab ty ~print_type)
         print_out_class_type cty
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf "@[%a%a ->@ %a@]" print_arg_label lab
         print_out_type_2 ty print_out_class_type cty
 =======
       fprintf ppf "@[%a%a ->@ %a@]" print_arg_label lab
         (print_out_type_2 ~arg:true) ty print_out_class_type cty
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Octy_signature (self_ty, csil) ->
       let pr_param ppf =
         function
@@ -1013,14 +1013,14 @@ and print_out_module_type_with_modes ppf (mty, mm) =
   | _ :: _ ->
       fprintf ppf "%a%a" print_simple_out_module_type mty print_out_modes mm
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (** Prints functor parameter in the context of long form [functor ...]. *)
 and print_out_functor_parameter ppf = function
   | None -> fprintf ppf "()"
   | Some (name, mty, mm) -> fprintf ppf "(%s : %a)"
      (Option.value name ~default:"_")
      print_out_module_type_with_modes (mty, mm)
-||||||| 23e84b8c4d
+||||||| upstream-base
 and print_out_functor_parameters ppf l =
   let print_nonanon_arg ppf = function
     | None ->
@@ -1066,7 +1066,7 @@ and print_out_functor_parameters ppf l =
           print_args anons
   in
   print_args ppf l
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 and print_out_functor ppf (param, res, mres) =
   match param with

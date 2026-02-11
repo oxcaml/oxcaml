@@ -47,15 +47,15 @@ type stat =
 
     heap_chunks : int;
     (** Number of contiguous pieces of memory that make up the major heap.
-<<<<<<< HEAD
+<<<<<<< oxcaml
         For runtime 5, these are the chunks used for small block allocation. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
         This metrics is currently not available in OCaml 5: the field value is
         always [0]. *)
 =======
         This metric is currently not available in OCaml 5: the field value is
         always [0]. *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
     live_words : int;
     (** Number of words of live data in the major heap, including the header
@@ -136,19 +136,19 @@ type control =
         number is less than or equal to 1000, it is a percentage of
         the current heap size (i.e. setting it to 100 will double the heap
         size at each increase). If it is more than 1000, it is a fixed
-<<<<<<< HEAD
+<<<<<<< oxcaml
         number of words that will be added to the heap. Default: 15.
 
         In runtime5, the "current heap size" metric does not include those
         allocations of more than 128 words. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
         number of words that will be added to the heap. Default: 15. *)
 =======
         number of words that will be added to the heap.
 
         This field is currently not available in OCaml 5: the field value is
         always [0]. *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
     space_overhead : int;
     (** The major GC speed is computed from this parameter.
@@ -166,7 +166,7 @@ type control =
     (** This value controls the GC messages on standard error output.
        It is a sum of some of the following flags, to print messages
        on the corresponding events:
-<<<<<<< HEAD
+<<<<<<< oxcaml
         - [0x00001]    Main events of each major GC cycle
         - [0x00002]    Minor collection events
         - [0x00004]    Per-slice events
@@ -203,7 +203,7 @@ type control =
        - [0x0800] GC debugging messages.
        - [0x1000] Include domain ID in log messages.
        - [0x2000] Include timestamp in log messages.
-||||||| 23e84b8c4d
+||||||| upstream-base
        - [0x001] Start and end of major GC cycle.
        - [0x002] Minor collection and major GC slice.
        - [0x004] Growing and shrinking of the heap.
@@ -229,7 +229,7 @@ type control =
        - [0x0400] Output GC statistics at program exit.
        - [0x0800] GC debugging messages.
        - [0x1000] Address space reservation changes.
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
        Default: 0. *)
 
     max_overhead : int;
@@ -239,17 +239,17 @@ type control =
        compaction is triggered at the end of each major GC cycle
        (this setting is intended for testing purposes only).
        If [max_overhead >= 1000000], compaction is never triggered.
-<<<<<<< HEAD
+<<<<<<< oxcaml
        On runtime4, if compaction is permanently disabled, it is strongly
        suggested to set [allocation_policy] to 2.
         Default: 500. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
        Default: 500. *)
 =======
 
        This field is currently not available in OCaml 5: the field value is
        always [0]. *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
     stack_limit : int;
     (** The maximum size of the fiber stacks (in words).
@@ -258,14 +258,14 @@ type control =
     allocation_policy : int;
     (** The policy used for allocating in the major heap.
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
         This option is ignored when using runtime5.
-||||||| 23e84b8c4d
+||||||| upstream-base
         This option is ignored in OCaml 5.x.
 =======
         This field is currently not available in OCaml 5: the field value is
         always [0].
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
         Prior to runtime5, possible values were 0, 1 and 2.
 
@@ -320,12 +320,12 @@ type control =
     (** The size of the window used by the major GC for smoothing
         out variations in its workload. This is an integer between
         1 and 50.
-<<<<<<< HEAD
+<<<<<<< oxcaml
         Default: 1.
         This metric is currently not available in OCaml 5: the field value is
         always [0].
         @since 4.03 *)
-||||||| 23e84b8c4d
+||||||| upstream-base
         Default: 1.
         @since 4.03 *)
 =======
@@ -333,7 +333,7 @@ type control =
 
         This field is currently not available in OCaml 5: the field value is
         always [0]. *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
     custom_major_ratio : int;
     (** Target ratio of floating garbage to major heap size for
@@ -397,12 +397,12 @@ type control =
 
 external stat : unit -> stat = "caml_gc_stat"
 (** Return the current values of the memory management counters in a
-<<<<<<< HEAD
+<<<<<<< oxcaml
     [stat] record that represent the program's total memory stats.
 
     This is expensive: in runtime 4, it traverses all of memory to gather
     statistics, while in runtime 5, it causes a full major collection. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
    [stat] record that represent the program's total memory stats.
    This function causes a full major collection. *)
 =======
@@ -411,10 +411,10 @@ external stat : unit -> stat = "caml_gc_stat"
     are currently not available in OCaml 5: their returned field values are
     therefore [0].
     This function causes a full major collection. *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 external quick_stat : unit -> stat = "caml_gc_quick_stat"
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (** Same as [stat] except much cheaper.
 
     In runtime 4, the heap is not traversed, and [live_words], [live_blocks],
@@ -426,7 +426,7 @@ external quick_stat : unit -> stat = "caml_gc_quick_stat"
     last major collection cycle (and as for [stat], the values [free_blocks],
     [largest_free], and [stack_size] are set to 0).
     *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 (** Same as [stat] except that [live_words], [live_blocks], [free_words],
     [free_blocks], [largest_free], and [fragments] are set to 0. Due to
     per-domain buffers it may only represent the state of the program's
@@ -440,7 +440,7 @@ external quick_stat : unit -> stat = "caml_gc_quick_stat"
     counters sampled at the last minor collection or at the end of the last
     major collection cycle (whichever is the latest). Hence, the memory stats
     returned by [quick_stat] are not instantaneously accurate. *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 external counters : unit -> float * float * float = "caml_gc_counters"
 (** Return [(minor_words, promoted_words, major_words)] for the current
@@ -774,13 +774,13 @@ module (Memprof @@ nonportable) :
        the sampling rate in samples per word (including headers).
        Usually, with cheap callbacks, a rate of 1e-4 has no visible
        effect on performance, and 1e-3 causes the program to run a few
-<<<<<<< HEAD
+<<<<<<< oxcaml
        percent slower.  0.0 <= sampling_rate <= 1.0
-||||||| 23e84b8c4d
+||||||| upstream-base
        percent slower.
 =======
        percent slower. 0.0 <= sampling_rate <= 1.0.
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
        The parameter [callstack_size] is the length of the callstack
        recorded at every sample. Its default is [max_int].

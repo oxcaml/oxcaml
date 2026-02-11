@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* CR ocaml 5 compressed-marshal: re-enable this test
 
 (* TEST
@@ -171,7 +171,7 @@ let main () =
 let _ = main ()
 
 *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 (* TEST
    include ocamlcommon;
@@ -341,4 +341,4 @@ let main () =
   Sys.remove "intext.data"
 
 let _ = main ()
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

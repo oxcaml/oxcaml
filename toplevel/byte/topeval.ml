@@ -121,7 +121,7 @@ let execute_phrase print_outcome ppf phr =
   match phr with
   | Ptop_def sstr ->
       let oldenv = !toplevel_env in
-<<<<<<< HEAD
+<<<<<<< oxcaml
       let oldsig = !toplevel_sig in
       Typecore.reset_delayed_checks ();
       let (str, sg, sn, shape, newenv) =
@@ -134,7 +134,7 @@ let execute_phrase print_outcome ppf phr =
       Typecore.force_delayed_checks ();
       let shape = Shape_reduce.local_reduce Env.empty shape in
       if !Clflags.dump_shape then Shape.print ppf shape;
-||||||| 23e84b8c4d
+||||||| upstream-base
       Typecore.reset_delayed_checks ();
       let (str, sg, sn, shape, newenv) =
         Typemod.type_toplevel_phrase oldenv sstr
@@ -147,7 +147,7 @@ let execute_phrase print_outcome ppf phr =
       if !Clflags.dump_shape then Shape.print ppf shape;
 =======
       let (str, sg', newenv) = typecheck_phrase ppf oldenv sstr in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       let lam = Translmod.transl_toplevel_definition str in
       Warnings.check_fatal ();
       begin try

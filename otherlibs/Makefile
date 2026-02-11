@@ -20,17 +20,17 @@ include $(ROOTDIR)/Makefile.common
 # its following conditional definition needs to be kept because,
 # at the moment, the clean targets depend on this variable but
 # when they are invoked ../Makefile.config is not included, so that
-<<<<<<< HEAD
+<<<<<<< oxcaml
 # OTHERLIBRARIES would be empty and the clean targets would thus not work.
 OTHERLIBRARIES ?= dynlink str systhreads$(RUNTIME_SUFFIX) unix \
   runtime_events eval
-||||||| 23e84b8c4d
+||||||| upstream-base
 # OTHERLIBRARIES would be empty and the clean targets would thus not work.
 OTHERLIBRARIES ?= dynlink str systhreads unix runtime_events
 =======
 # OTHERLIBS would be empty and the clean target would thus not work.
 OTHERLIBS ?= str systhreads unix runtime_events
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 # $1: target name to dispatch to all otherlibs/*/Makefile
 define dispatch_

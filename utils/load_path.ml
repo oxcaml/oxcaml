@@ -418,7 +418,7 @@ let get_paths () =
 let get_visible_path_list () = List.rev_map Dir.path !visible_dirs
 let get_hidden_path_list () = List.rev_map Dir.path !hidden_dirs
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let init_manifests () =
   let manifests_reader = Dune_manifests_reader.create () in
   let load_manifest ~hidden ~basenames manifest_path =
@@ -441,7 +441,7 @@ let init_manifests () =
   List.iter
     (load_manifest ~hidden:true ~basenames:hidden_basenames)
     !Clflags.hidden_include_manifests
-||||||| 23e84b8c4d
+||||||| upstream-base
 (* Optimized version of [add] below, for use in [init] and [remove_dir]: since
    we are starting from an empty cache, we can avoid checking whether a unit
    name already exists in the cache simply by adding entries in reverse
@@ -476,7 +476,7 @@ let prepend_add dir =
           end)
         (Misc.normalized_unit_filename base)
     ) dir.Dir.files
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let init ~auto_include ~visible ~hidden =
   reset ();
@@ -505,10 +505,10 @@ let remove_dir dir =
    left-to-right precedence. *)
 let add (dir : Dir.t) =
   assert (not Config.merlin || Local_store.is_bound ());
-<<<<<<< HEAD
+<<<<<<< oxcaml
   Path_cache.add dir;
   if (Dir.hidden dir) then
-||||||| 23e84b8c4d
+||||||| upstream-base
   let update base fn visible_files hidden_files =
     if dir.hidden && not (STbl.mem !hidden_files base) then
       STbl.replace !hidden_files base fn
@@ -541,7 +541,7 @@ let add (dir : Dir.t) =
     )
     dir.files;
   if dir.hidden then
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     hidden_dirs := dir :: !hidden_dirs
   else
     visible_dirs := dir :: !visible_dirs
@@ -601,15 +601,15 @@ let find_normalized_with_visibility fn =
   | Ok fn_uncap ->
   try
     if is_basename fn && not !Sys.interactive then
-<<<<<<< HEAD
+<<<<<<< oxcaml
       Path_cache.find ~uncap:true fn
-||||||| 23e84b8c4d
+||||||| upstream-base
       find_file_in_cache (Misc.normalized_unit_filename fn)
         visible_files_uncap hidden_files_uncap
 =======
       find_file_in_cache fn_uncap
         visible_files_uncap hidden_files_uncap
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     else
       try
         (Misc.find_in_path_normalized (get_visible_path_list ()) fn, Visible)
@@ -617,12 +617,12 @@ let find_normalized_with_visibility fn =
       | Not_found ->
         (Misc.find_in_path_normalized (get_hidden_path_list ()) fn, Hidden)
   with Not_found ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
     let fn_uncap = String.uncapitalize_ascii fn in
-||||||| 23e84b8c4d
+||||||| upstream-base
     let fn_uncap = Misc.normalized_unit_filename fn in
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     (!auto_include_callback Dir.find_normalized fn_uncap, Visible)
 
 let find_normalized fn = fst (find_normalized_with_visibility fn)

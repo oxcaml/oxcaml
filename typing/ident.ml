@@ -162,7 +162,7 @@ let is_predef = function
   | Predef _ -> true
   | _ -> false
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let is_instance = function
   | Global_with_args _ -> true
   | _ -> false
@@ -171,7 +171,7 @@ let to_global = function
   | Global head -> Some (Global_module.Name.create_no_args head)
   | Global_with_args g -> Some g
   | _ -> None
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 let canonical_stamps = s_table Hashtbl.create 0
 let next_canonical_stamp = s_table Hashtbl.create 0
@@ -200,12 +200,12 @@ let pp_stamped ppf (name, stamp) =
     in
     fprintf ppf "%s/%i" name stamp
   end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let print ~with_scope ppf =
   let open Format_doc in
   function
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Global name -> fprintf ppf "%s!" name
   | Predef { name; stamp = n } ->
       fprintf ppf "%s%s!" name
@@ -219,7 +219,7 @@ let print ~with_scope ppf =
         (if with_scope then asprintf "[%i]" scope else "")
   | Global_with_args g ->
       fprintf ppf "%a!" Global_module.Name.print g
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Global name -> fprintf ppf "%s!" name
   | Predef { name; stamp = n } ->
       fprintf ppf "%s%s!" name
@@ -244,24 +244,24 @@ let print ~with_scope ppf =
       fprintf ppf "%a%s"
         pp_stamped (name, stamp)
         (if with_scope then asprintf "[%i]" scope else "")
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let print_with_scope ppf id = print ~with_scope:true ppf id
 
 let doc_print ppf id = print ~with_scope:false ppf id
 let print ppf id = Format_doc.compat doc_print ppf id
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
 let to_global_exn id =
   match to_global id with
   | Some global -> global
   | None -> Misc.fatal_errorf "Not global: %a" print id
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 let print ppf id = print ~with_scope:false ppf id
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (* For the documentation of ['a Ident.tbl], see ident.mli.
 
    The implementation is a copy-paste specialization of

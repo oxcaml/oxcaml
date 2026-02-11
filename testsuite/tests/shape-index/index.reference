@@ -1,5 +1,5 @@
 Indexed shapes:
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Resolved: Index.5 : A (File "index.ml", line 68, characters 14-15)
 Resolved: Index.25 : u (File "index.ml", line 67, characters 28-29)
 Resolved: Index.2 : AS (File "index.ml", line 67, characters 10-12)
@@ -62,7 +62,7 @@ Index.25: u (File "index.ml", line 66, characters 7-8)
 Index.26: t (File "index.ml", line 67, characters 23-24)
 Index.27: G (File "index.ml", line 68, characters 9-10)
 Index.28: MSB (File "index.ml", line 65, characters 12-15)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 Resolved: Index.31: Out (File "index.ml", line 73, characters 9-12)
 Resolved: Index.30: Out.In (File "index.ml", lines 73-74, characters 9-4)
@@ -142,4 +142,4 @@ Index.28: MSB (File "index.ml", line 65, characters 12-15)
 Index.29: x (File "index.ml", line 71, characters 43-44)
 Index.30: In (File "index.ml", line 71, characters 27-29)
 Index.31: Out (File "index.ml", line 71, characters 7-10)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

@@ -57,7 +57,7 @@ let fmt_char_option f = function
   | None -> fprintf f "None"
   | Some c -> fprintf f "Some %c" c
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let fmt_constant f x =
   match x with
   | Pconst_integer (i,m) -> fprintf f "PConst_int (%s,%a)" i fmt_char_option m
@@ -79,7 +79,7 @@ let fmt_bool f x =
   | true -> fprintf f "true";
 ;;
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 let fmt_constant f x =
   match x with
   | Pconst_integer (i,m) -> fprintf f "PConst_int (%s,%a)" i fmt_char_option m
@@ -91,7 +91,7 @@ let fmt_constant f x =
   | Pconst_float (s,m) -> fprintf f "PConst_float (%s,%a)" s fmt_char_option m
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let fmt_mutable_flag f x =
   match x with
   | Immutable -> fprintf f "Immutable"
@@ -222,14 +222,14 @@ let rec core_type i ppf x =
   | Ptyp_tuple l ->
       line i ppf "Ptyp_tuple\n";
       list i (labeled_tuple_element core_type) ppf l;
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Ptyp_unboxed_tuple l ->
       line i ppf "Ptyp_unboxed_tuple\n";
       list i (labeled_tuple_element core_type) ppf l
-||||||| 23e84b8c4d
+||||||| upstream-base
       list i core_type ppf l;
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Ptyp_constr (li, l) ->
       line i ppf "Ptyp_constr %a\n" fmt_longident_loc li;
       list i core_type ppf l;
@@ -287,21 +287,21 @@ let rec core_type i ppf x =
       line i ppf "Ptyp_extension \"%s\"\n" s.txt;
       payload i ppf arg
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 and typevar i ppf (s, jkind) =
   line i ppf "var: %s\n" s.txt;
   jkind_annotation_opt (i+1) ppf jkind
 
 and reprvar i ppf s =
   line i ppf "reprvar: %s\n" s.txt
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 and package_type i ppf ptyp =
   let i = i + 1 in
   line i ppf "package_type %a\n" fmt_longident_loc ptyp.ppt_path;
   list i package_with ppf ptyp.ppt_cstrs;
   attributes i ppf ptyp.ppt_attrs
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 and package_with i ppf (s, t) =
   line i ppf "with type %a\n" fmt_longident_loc s;
@@ -321,7 +321,7 @@ and pattern i ppf x =
       line i ppf "Ppat_constant\n";
       fmt_constant i ppf c;
   | Ppat_interval (c1, c2) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       line i ppf "Ppat_interval %a..%a\n" fmt_constant c1 fmt_constant c2;
   | Ppat_unboxed_unit -> line i ppf "Ppat_unboxed_unit\n";
   | Ppat_unboxed_bool b -> line i ppf "Ppat_unboxed_bool %a\n" fmt_bool b;
@@ -331,7 +331,7 @@ and pattern i ppf x =
   | Ppat_unboxed_tuple (l, c) ->
       line i ppf "Ppat_unboxed_tuple %a\n" fmt_closed_flag c;
       list i (labeled_tuple_element pattern) ppf l
-||||||| 23e84b8c4d
+||||||| upstream-base
       line i ppf "Ppat_interval %a..%a\n" fmt_constant c1 fmt_constant c2;
   | Ppat_tuple (l) ->
       line i ppf "Ppat_tuple\n";
@@ -343,7 +343,7 @@ and pattern i ppf x =
   | Ppat_tuple (l, c) ->
       line i ppf "Ppat_tuple\n %a\n" fmt_closed_flag c;
       list i (labeled_tuple_element pattern) ppf l;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Ppat_construct (li, po) ->
       line i ppf "Ppat_construct %a\n" fmt_longident_loc li;
       option i
@@ -404,11 +404,11 @@ and expression i ppf x =
   let i = i+1 in
   match x.pexp_desc with
   | Pexp_ident (li) -> line i ppf "Pexp_ident %a\n" fmt_longident_loc li;
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Pexp_constant (c) -> line i ppf "Pexp_constant %a\n" fmt_constant c;
   | Pexp_let (mf, rf, l, e) ->
       line i ppf "Pexp_let %a %a\n" fmt_mutable_flag mf fmt_rec_flag rf;
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Pexp_constant (c) -> line i ppf "Pexp_constant %a\n" fmt_constant c;
   | Pexp_let (rf, l, e) ->
       line i ppf "Pexp_let %a\n" fmt_rec_flag rf;
@@ -418,7 +418,7 @@ and expression i ppf x =
       fmt_constant i ppf c;
   | Pexp_let (rf, l, e) ->
       line i ppf "Pexp_let %a\n" fmt_rec_flag rf;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       list i value_binding ppf l;
       expression i ppf e;
   | Pexp_function (params, c, body) ->
@@ -443,14 +443,14 @@ and expression i ppf x =
   | Pexp_tuple (l) ->
       line i ppf "Pexp_tuple\n";
       list i (labeled_tuple_element expression) ppf l;
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Pexp_unboxed_tuple (l) ->
       line i ppf "Pexp_unboxed_tuple\n";
       list i (labeled_tuple_element expression) ppf l;
-||||||| 23e84b8c4d
+||||||| upstream-base
       list i expression ppf l;
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Pexp_construct (li, eo) ->
       line i ppf "Pexp_construct %a\n" fmt_longident_loc li;
       option i expression ppf eo;

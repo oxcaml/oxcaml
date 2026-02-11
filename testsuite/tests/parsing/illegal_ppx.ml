@@ -42,7 +42,7 @@ let functor_id loc = Location.mkloc (Longident.(
 let complex_record loc =
   H.Pat.record ~loc [functor_id loc, H.Pat.any ~loc () ] Asttypes.Closed
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let alias_with_too_many_nones loc =
   H.Typ.alias ~loc (H.Typ.constr ~loc { txt = Lident "unit"; loc } []) None None
 
@@ -64,7 +64,7 @@ let lt_empty_open_pat loc =
   H.Pat.tuple ~loc [] Open
 
 let lt_short_closed_pat loc =
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 
 let empty_open_tuple_pat loc =
@@ -72,7 +72,7 @@ let empty_open_tuple_pat loc =
   H.Pat.tuple ~loc [] Open
 
 let short_closed_tuple_pat loc =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let pat = H.Pat.mk Ppat_any in
   H.Pat.tuple ~loc [Some "baz", pat] Closed
 
@@ -101,20 +101,20 @@ let pat mapper p =
   match p.ppat_desc with
   | Ppat_extension ({txt="record_with_functor_fields";loc},_) ->
       complex_record loc
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Ppat_extension ({txt="lt_empty_open_pat";loc},_) ->
       lt_empty_open_pat loc
   | Ppat_extension ({txt="lt_short_closed_pat";loc},_) ->
       lt_short_closed_pat loc
   | Ppat_extension ({txt="nested_pat_constraint";loc},_) ->
       nested_pat_constraint loc
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   | Ppat_extension ({txt="empty_open_tuple_pat";loc},_) ->
       empty_open_tuple_pat loc
   | Ppat_extension ({txt="short_closed_tuple_pat";loc},_) ->
       short_closed_tuple_pat loc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | _ -> super.M.pat mapper p
 
 let typ mapper ty =
@@ -135,11 +135,11 @@ let signature_item mapper stri = match stri.psig_desc with
 
 
 let () = M.register "illegal ppx" (fun _ ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
     { super with typ; expr; pat; structure_item; signature_item }
-||||||| 23e84b8c4d
+||||||| upstream-base
     { super with expr; pat; structure_item; signature_item }
 =======
     { super with expr; pat; structure_item; signature_item; typ }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   )

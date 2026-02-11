@@ -501,10 +501,10 @@ Error: Signature mismatch:
                    module B :
                      sig
                        module C :
-<<<<<<< HEAD
+<<<<<<< oxcaml
                          functor (X : sig end) (Y : sig end)
                            (Z : sig ... end) -> sig end
-||||||| 23e84b8c4d
+||||||| upstream-base
                          functor (X : sig end) (Y : sig end)
                            (Z : sig
                                   module D :
@@ -540,7 +540,7 @@ Error: Signature mismatch:
                                   end
                               end)
                            -> sig end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                      end
                  end
              end
@@ -554,10 +554,10 @@ Error: Signature mismatch:
                    module B :
                      sig
                        module C :
-<<<<<<< HEAD
+<<<<<<< oxcaml
                          functor (X : sig end) (Y : sig end)
                            (Z : sig ... end) -> sig end
-||||||| 23e84b8c4d
+||||||| upstream-base
                          functor (X : sig end) (Y : sig end)
                            (Z : sig
                                   module D :
@@ -593,7 +593,7 @@ Error: Signature mismatch:
                                   end
                               end)
                            -> sig end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                      end
                  end
              end
@@ -606,10 +606,10 @@ Error: Signature mismatch:
                  module B :
                    sig
                      module C :
-<<<<<<< HEAD
+<<<<<<< oxcaml
                        functor (X : sig end) (Y : sig end)
                          (Z : sig module D : sig ... end end) -> sig end
-||||||| 23e84b8c4d
+||||||| upstream-base
                        functor (X : sig end) (Y : sig end)
                          (Z : sig
                                 module D :
@@ -645,7 +645,7 @@ Error: Signature mismatch:
                                 end
                             end)
                          -> sig end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                    end
                end
            end
@@ -657,10 +657,10 @@ Error: Signature mismatch:
                  module B :
                    sig
                      module C :
-<<<<<<< HEAD
+<<<<<<< oxcaml
                        functor (X : sig end) (Y : sig end)
                          (Z : sig module D : sig ... end end) -> sig end
-||||||| 23e84b8c4d
+||||||| upstream-base
                        functor (X : sig end) (Y : sig end)
                          (Z : sig
                                 module D :
@@ -696,7 +696,7 @@ Error: Signature mismatch:
                                 end
                             end)
                          -> sig end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                    end
                end
            end

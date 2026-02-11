@@ -556,7 +556,7 @@ let pop_last (Pack a) =
   if length = 0 then raise Not_found;
   let last = length - 1 in
   (* We know [length > 0] so [last >= 0]. *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   match Array.unsafe_get arr last with
   | Empty ->
       Error.missing_element ~i:last ~length
@@ -564,7 +564,7 @@ let pop_last (Pack a) =
       Array.unsafe_set arr last Empty;
       a.length <- last;
       s.v
-||||||| 23e84b8c4d
+||||||| upstream-base
   match Array.unsafe_get arr last with
   (* At this point we know that [last] is a valid index in [arr]. *)
   | Empty ->
@@ -578,7 +578,7 @@ let pop_last (Pack a) =
   Array.unsafe_set arr last (Dummy.of_dummy dummy);
   a.length <- last;
   v
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let pop_last_opt a =
   match pop_last a with

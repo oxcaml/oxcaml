@@ -51,12 +51,12 @@ module Global = struct
 
   let quote s = "`" ^ s ^ "'"
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let description ppf = function
     | Glob_compunit cu ->
         Format_doc.fprintf ppf "compilation unit %a"
           Compilation_unit.print_as_inline_code cu
-||||||| 23e84b8c4d
+||||||| upstream-base
   let description ppf = function
     | Glob_compunit (Compunit cu) ->
         Format.fprintf ppf "compilation unit %a" Style.inline_code (quote cu)
@@ -67,15 +67,15 @@ module Global = struct
     | Glob_compunit (Compunit cu) ->
         fprintf ppf "compilation unit %a"
           Style.inline_code (quote cu)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Glob_predef (Predef_exn exn) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
         Format_doc.fprintf ppf "predefined exception %a"
-||||||| 23e84b8c4d
+||||||| upstream-base
         Format.fprintf ppf "predefined exception %a"
 =======
         fprintf ppf "predefined exception %a"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           Style.inline_code (quote exn)
 
   let of_compilation_unit cu = Glob_compunit cu
@@ -391,11 +391,11 @@ let update_global_table () =
 
 type bytecode_sections =
   { symb: GlobalMap.t;
-<<<<<<< HEAD
+<<<<<<< oxcaml
     crcs: Import_info.t array;
     prim: string list;
     dlpt: string list }
-||||||| 23e84b8c4d
+||||||| upstream-base
 (* Recover data for toplevel initialization.  Data can come either from
    executable file (normal case) or from linked-in data (-output-obj). *)
 
@@ -432,15 +432,15 @@ let read_sections () =
 
 external get_bytecode_sections : unit -> bytecode_sections =
   "caml_dynlink_get_bytecode_sections"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Initialize the linker for toplevel use *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* In oxcaml, [get_bytecode_sections] is passed in, because it is
    absent from the 4.x runtime as used by the current system compiler. *)
 let init_toplevel ~get_bytecode_sections =
-||||||| 23e84b8c4d
+||||||| upstream-base
 let init_toplevel () =
   try
     let sect = read_sections () in
@@ -470,7 +470,7 @@ let init_toplevel () =
     fatal_error "Toplevel bytecode executable is corrupted"
 =======
 let init_toplevel () =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let sect = get_bytecode_sections () in
   global_table := sect.symb;
   c_prim_table := PrimMap.empty;

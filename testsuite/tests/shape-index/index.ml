@@ -39,7 +39,7 @@ open A
 
 let y = A.x + Auxiliaire.z
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let () = print_int y
 
 let a = (module A : AS)
@@ -68,7 +68,7 @@ module type MSB = sig
   include AS with type t := u
   module G := A
 end
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 let () = print_int (Stdlib.(+) y 0)
 
@@ -104,4 +104,4 @@ module Out = struct module In = struct let x = () end end
 let () = Out.
   In
   .x
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

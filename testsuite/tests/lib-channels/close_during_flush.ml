@@ -2,7 +2,7 @@
  not-windows;
  include unix;
  hasunix;
-<<<<<<< HEAD
+<<<<<<< oxcaml
  runtime5;
  native;
 *)
@@ -31,7 +31,7 @@ let () =
     close_out ch
   in
   Sys.Safe.signal Sys.sigalrm (Signal_handle alarm_handler) |> ignore;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
  native;
 *)
@@ -60,7 +60,7 @@ let () =
     close_out ch
   in
   Sys.signal Sys.sigalrm (Signal_handle alarm_handler) |> ignore;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   Unix.alarm 1 |> ignore;
   flush ch;
   print_endline "ok"

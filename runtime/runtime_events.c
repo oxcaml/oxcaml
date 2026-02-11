@@ -483,7 +483,7 @@ CAMLprim value caml_ml_runtime_events_resume(value vunit) {
   caml_runtime_events_resume(); return Val_unit;
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 CAMLprim value caml_ml_runtime_events_path(value vunit)
 {
   CAMLparam0();
@@ -502,7 +502,7 @@ CAMLprim value caml_ml_runtime_events_path(value vunit)
     caml_stat_free(current_ring_loc_str);
   } else {
     res = Val_none;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 CAMLprim value caml_ml_runtime_events_path(value vunit) {
   CAMLparam0();
@@ -515,7 +515,7 @@ CAMLprim value caml_ml_runtime_events_path(value vunit) {
     str = caml_copy_string_of_os(current_ring_loc_str);
     caml_stat_free(current_ring_loc_str);
     res = caml_alloc_some(str);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   }
 
   CAMLreturn(res);
@@ -740,13 +740,13 @@ CAMLprim value caml_runtime_events_user_register(value event_name,
 
 
   /* Pre-allocate to avoid STW while holding [user_events_lock]. */
-<<<<<<< HEAD
+<<<<<<< oxcaml
   list_item = caml_alloc(2, 0);
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_plat_lock(&user_events_lock);
 =======
   list_item = caml_alloc_small(2, 0);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   /* [user_events_lock] can be acquired during STW, so we must use
      caml_plat_lock_blocking and be careful to avoid triggering any
@@ -761,17 +761,17 @@ CAMLprim value caml_runtime_events_user_register(value event_name,
   }
 
   // event is added to the list of known events
-<<<<<<< HEAD
+<<<<<<< oxcaml
   Store_field(list_item, 0, event);
   Store_field(list_item, 1, user_events);
-||||||| 23e84b8c4d
+||||||| upstream-base
   list_item = caml_alloc_small(2, 0);
   Field(list_item, 0) = event;
   Field(list_item, 1) = user_events;
 =======
   Field(list_item, 0) = event;
   Field(list_item, 1) = user_events;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   caml_modify_generational_global_root(&user_events, list_item);
   // end critical section
   caml_plat_unlock(&user_events_lock);
@@ -813,14 +813,14 @@ CAMLprim value caml_runtime_events_user_write(
     value record = Field(event_type, 0);
     value serializer = Field(record, 0);
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
     res = caml_callback2_exn(serializer, write_buffer, event_content);
 
     if (Is_exception_result(res)) {
       res = Extract_exception(res);
       caml_raise(res);
     }
-||||||| 23e84b8c4d
+||||||| upstream-base
     caml_plat_lock(&write_buffer_lock);
 
     if (write_buffer == Val_none) {
@@ -843,7 +843,7 @@ CAMLprim value caml_runtime_events_user_write(
      * potentially have been destroyed during the callback. */
     if ( !ring_is_active() )
       CAMLreturn(Val_unit);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
     /* Need to check whether the ring is active again as the ring might
      * potentially have been destroyed during the callback. */

@@ -66,7 +66,7 @@ let current_unit =
     ui_external_symbols = [];
   }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let reset unit_info =
   let compilation_unit = Unit_info.modname unit_info in
   Infos_table.clear global_infos_table;
@@ -75,7 +75,7 @@ let reset unit_info =
   current_unit.ui_unit <- compilation_unit;
   current_unit.ui_defines <- [compilation_unit];
   current_unit.ui_arg_descr <- None;
-||||||| 23e84b8c4d
+||||||| upstream-base
 let symbol_separator =
   match Config.ccomp_type with
   | "msvc" -> '$' (* MASM does not allow for dots in symbol names *)
@@ -148,7 +148,7 @@ let reset ?packname name =
   current_unit.ui_name <- name;
   current_unit.ui_symbol <- symbol;
   current_unit.ui_defines <- [symbol];
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   current_unit.ui_imports_cmi <- [];
   current_unit.ui_imports_cmx <- [];
   current_unit.ui_quoted_globals <- [];
@@ -170,8 +170,8 @@ let record_external_symbols () =
 let current_unit_infos () =
   current_unit
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 let current_unit_name () =
   current_unit.ui_name
 
@@ -188,7 +188,7 @@ let symbol_in_current_unit name =
 let current_unit_name () =
   current_unit.ui_name
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let read_unit_info filename =
   let ic = open_in_bin filename in
   try
@@ -239,12 +239,12 @@ let read_library_info filename =
 
 (* Read and cache info on global identifiers *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let equal_args arg1 arg2 =
   let ({ param = name1; value = value1 } : CU.argument) = arg1 in
   let ({ param = name2; value = value2 } : CU.argument) = arg2 in
   CU.Name.equal name1 name2 && CU.equal value1 value2
-||||||| 23e84b8c4d
+||||||| upstream-base
 (* Referring to a packed unit is only allowed from a unit that will
    ultimately end up in the same pack, including through nested packs. *)
 let is_import_from_same_pack ~imported ~current =
@@ -256,7 +256,7 @@ let is_import_from_same_pack ~imported ~current =
 let is_import_from_same_pack ~imported ~current =
   String.equal imported current
   || String.starts_with ~prefix:(concat_symbol imported "") current
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let equal_up_to_pack_prefix cu1 cu2 =
   CU.Name.equal (CU.name cu1) (CU.name cu2)
@@ -430,13 +430,13 @@ let require_global global_ident =
 (* Error report *)
 
 open Format_doc
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 open Format
 module Style = Misc.Style
 =======
 module Style = Misc.Style
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let report_error_doc ppf = function
   | Not_a_unit_info filename ->
@@ -444,21 +444,21 @@ let report_error_doc ppf = function
         Location.Doc.quoted_filename filename
   | Corrupted_unit_info filename ->
       fprintf ppf "Corrupted compilation unit description@ %a"
-<<<<<<< HEAD
+<<<<<<< oxcaml
         Location.Doc.quoted_filename filename
-||||||| 23e84b8c4d
+||||||| upstream-base
         (Style.as_inline_code Location.print_filename) filename
 =======
        Location.Doc.quoted_filename filename
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Illegal_renaming(name, modname, filename) ->
       fprintf ppf "%a@ contains the description for unit\
                    @ %a when %a was expected"
         Location.Doc.quoted_filename filename
-<<<<<<< HEAD
+<<<<<<< oxcaml
         CU.print_as_inline_code name
         CU.print_as_inline_code modname
-||||||| 23e84b8c4d
+||||||| upstream-base
         (Style.as_inline_code Location.print_filename) filename
         Style.inline_code name
         Style.inline_code modname
@@ -491,7 +491,7 @@ let report_error_doc ppf = function
         Style.inline_code ("-for-pack " ^ pack_1)
         Style.inline_code current_unit
         Style.inline_code ("-for-pack " ^ pack_2)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let () =
   Location.register_error_of_exn

@@ -19,12 +19,12 @@ open Path
 open Asttypes
 open Parsetree
 open Types
-<<<<<<< HEAD
+<<<<<<< oxcaml
 open Mode
-||||||| 23e84b8c4d
+||||||| upstream-base
 open Format
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 open Format_doc
 
 module Style = Misc.Style
@@ -94,7 +94,7 @@ type error =
   | Invalid_type_subst_rhs
   | Non_packable_local_modtype_subst of Path.t
   | With_cannot_remove_packed_modtype of Path.t * module_type
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Strengthening_mismatch of Longident.t * Includemod.explanation
   | Cannot_pack_parameter
   | Compiling_as_parameterised_parameter
@@ -108,10 +108,10 @@ type error =
       old_source_file : Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   | Cannot_alias of Path.t
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -484,7 +484,7 @@ let path_is_strict_prefix =
        Ident.same ident1 ident2
        && list_is_strict_prefix l1 ~prefix:l2
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let rec instance_name ~loc env syntax =
   let { pmod_instance_head = head; pmod_instance_args = args } = syntax in
   let args =
@@ -499,10 +499,10 @@ let rec instance_name ~loc env syntax =
   | Error (Duplicate { name; value1 = _; value2 = _ }) ->
     raise (Error (loc, env, Duplicate_parameter_name name))
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 let iterator_with_env env =
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let iterator_with_env super env =
   let env = ref (lazy env) in
   env, { super with
@@ -634,15 +634,15 @@ let check_well_formed_module env loc context mty =
           check_signature env rem
     in
     let env, super =
-<<<<<<< HEAD
+<<<<<<< oxcaml
       iterator_with_env (Btype.type_iterators mark) env in
-||||||| 23e84b8c4d
+||||||| upstream-base
     let env, super = iterator_with_env env in
 =======
       iterator_with_env Btype.type_iterators_without_type_expr env in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     { super with
-<<<<<<< HEAD
+<<<<<<< oxcaml
       it_type_expr = (fun self ty ->
         (* Check that an unboxed path is valid because substitutions can
            remove an unboxed version of a type.
@@ -669,10 +669,10 @@ let check_well_formed_module env loc context mty =
         Option.iter (self.it_type_expr self) td.type_manifest;
         self.it_type_kind self td.type_kind
       );
-||||||| 23e84b8c4d
+||||||| upstream-base
       it_type_expr = (fun _self _ty -> ());
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       it_signature = (fun self sg ->
         let env_before = !env in
         let env = lazy (Env.add_signature sg (Lazy.force env_before)) in
@@ -722,7 +722,7 @@ let params_are_constrained =
   in
   loop
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let rec remove_modality_and_zero_alloc_variables_sg env ~zap_modality sg =
   let sg_item = function
     | Sig_value (id, desc, vis) ->
@@ -745,7 +745,7 @@ let rec remove_modality_and_zero_alloc_variables_sg env ~zap_modality sg =
         let md = {md with md_type; md_modalities} in
         Sig_module (id, pres, md, re, vis)
     | item -> item
-||||||| 23e84b8c4d
+||||||| upstream-base
 type with_info =
   | With_type of Parsetree.type_declaration
   | With_typesubst of Parsetree.type_declaration
@@ -810,9 +810,9 @@ let merge_constraint_aux initial_env loc sg lid constr : merge_result =
     match constr with
     | Approx_with_modtype _ | Approx_with_modtypesubst _ -> true
     | _ -> false
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   in
-<<<<<<< HEAD
+<<<<<<< oxcaml
   List.map sg_item sg
 
 and remove_modality_and_zero_alloc_variables_mty env ~zap_modality mty =
@@ -901,12 +901,12 @@ module Merge = struct
 
   let return = return_payload ~late_typedtree:()
 
-||||||| 23e84b8c4d
+||||||| upstream-base
   let real_ids = ref [] in
   let unpackable_modtype = ref None in
 =======
   let real_ids = ref [] in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let split_row_id s ghosts =
     let srow = s ^ "#row" in
     let rec split before = function
@@ -916,7 +916,7 @@ module Merge = struct
       | [] -> before, None, []
     in
     split [] ghosts
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
   let unsafe_signature_subst initial_env loc sg sub =
     (* This signature will not be used directly, it will always be freshened
@@ -933,7 +933,7 @@ module Merge = struct
      destructive substitution and checks wellformedness of the resulting
      signature *)
   let post_process ~approx ~destructive loc lid env paths sg replace =
-||||||| 23e84b8c4d
+||||||| upstream-base
   in
   let rec patch_item constr namelist outer_sig_env sg_for_env ~ghosts item =
     let return ?(ghosts=ghosts) ~replace_by info =
@@ -1323,9 +1323,9 @@ module Merge = struct
     let (path, merge_info, sg) = merge_signature initial_env sg names in
     if destructive_substitution then
       check_usage_after_substitution ~loc ~lid initial_env !real_ids sg;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     let sg =
-<<<<<<< HEAD
+<<<<<<< oxcaml
       if destructive then
         (* Check that the substitution will not make the signature ill-formed *)
         let () = if not approx then
@@ -1504,7 +1504,7 @@ module Merge = struct
         match type_decl_is_alias sdecl with
         | Some lid ->
             (* if the type is an alias of [lid], replace by the definition *)
-||||||| 23e84b8c4d
+||||||| upstream-base
     match tcstr with
     | (_, _, Twith_typesubst tdecl) ->
        let how_to_extend_subst =
@@ -1526,31 +1526,31 @@ module Merge = struct
          in
          match type_decl_is_alias sdecl with
          | Some lid ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
             let replacement, _ =
               try Env.find_type_by_name lid.txt env
               with Not_found -> assert false
             in
             fun s path -> Subst.Unsafe.add_type_path path replacement s
-<<<<<<< HEAD
+<<<<<<< oxcaml
         | None ->
             (* if the type is not an alias, try to inline it *)
-||||||| 23e84b8c4d
+||||||| upstream-base
             fun s path -> Subst.add_type_path path replacement s
          | None ->
 =======
          | None ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
             let body = Option.get tdecl.typ_type.type_manifest in
             let params = tdecl.typ_type.type_params in
-<<<<<<< HEAD
+<<<<<<< oxcaml
             if params_are_constrained params then
               raise(Error(loc, env, With_cannot_remove_constrained_type));
             fun s path ->
               Subst.Unsafe.add_type_function path ~params ~body s
       else
         fun s _ -> s
-||||||| 23e84b8c4d
+||||||| upstream-base
             if params_are_constrained params
             then raise(Error(loc, initial_env,
                              With_cannot_remove_constrained_type));
@@ -1606,9 +1606,9 @@ module Merge = struct
         unsafe_signature_subst sub sg
     | _ ->
        sg
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     in
-<<<<<<< HEAD
+<<<<<<< oxcaml
     let sg =
       post_process ~approx:false ~destructive loc lid env paths sg replace in
     (tdecl, (path, lid, sg))
@@ -1795,7 +1795,7 @@ module Merge = struct
       | Pwith_modtype _ -> false
 
 end
-||||||| 23e84b8c4d
+||||||| upstream-base
     check_well_formed_module initial_env loc "this instantiated signature"
       (Mty_signature sg);
     (tcstr, sg)
@@ -1807,7 +1807,7 @@ end
     (path, merge_info, sg)
   with Includemod.Error explanation ->
     raise(Error(loc, initial_env, With_mismatch(lid.txt, explanation)))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Normal merge function - build the typed tree *)
 let merge_constraint env loc sg lid cty =
@@ -2346,13 +2346,13 @@ end = struct
     let open Sig_component_kind in
     match component with
     | Value -> names.values
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Type | Label | Unboxed_label | Constructor -> names.types
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Type -> names.types
 =======
     | Type | Label | Constructor -> names.types
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Module -> names.modules
     | Module_type -> names.modtypes
     | Extension_constructor -> names.typexts
@@ -2697,25 +2697,25 @@ and transl_with ~loc env remove_aliases (rev_tcstrs, sg) constr =
         (constr, Merge.merge_modtype ~destructive env loc sg l tmty.mty_type)
 
   in
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
   let (tcstr, sg) = merge_constraint env loc sg lid with_info in
   (tcstr :: rev_tcstrs, sg)
 =======
   let (path, lid, constr, sg) = merge_constraint env loc sg lid with_info in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   ((path, lid, constr) :: rev_tcstrs, sg)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 and transl_signature env {psg_items; psg_modalities; psg_loc} =
-||||||| 23e84b8c4d
+||||||| upstream-base
 
 
 and transl_signature ?(toplevel = false) env sg =
 =======
 
 and transl_signature env sg =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let names = Signature_names.create () in
 
   (* We assume the structure (described by the signature) to be at legacy mode,
@@ -2831,7 +2831,7 @@ and transl_signature env sg =
                 ~body:(Option.get td.typ_type.type_manifest)
                 Subst.identity
             in
-<<<<<<< HEAD
+<<<<<<< oxcaml
             Some (`Substituted_away subst)
           in
           Signature_names.check_type ?info names td.typ_loc td.typ_id
@@ -2895,7 +2895,7 @@ and transl_signature env sg =
             let id, newenv =
               Env.enter_module_declaration ~scope name pres md
                 ~mode:md_mode env
-||||||| 23e84b8c4d
+||||||| upstream-base
             Signature_names.check_value names tdesc.val_loc tdesc.val_id;
             Env.register_uid tdesc.val_val.val_uid tdesc.val_loc;
             let (trem,rem, final_env) = transl_sig newenv srem in
@@ -2914,9 +2914,9 @@ and transl_signature env sg =
         | Psig_type (rec_flag, sdecls) ->
             let (decls, newenv, _) =
               Typedecl.transl_type_decl env rec_flag sdecls
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
             in
-<<<<<<< HEAD
+<<<<<<< oxcaml
             Signature_names.check_module names pmd.pmd_name.loc id;
             Some id, newenv
         in
@@ -2950,7 +2950,7 @@ and transl_signature env sg =
               md_attributes = pms.pms_attributes;
               md_loc = pms.pms_loc;
               md_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
-||||||| 23e84b8c4d
+||||||| upstream-base
             List.iter (fun td ->
               Signature_names.check_type names td.typ_loc td.typ_id;
               if not (Btype.is_row_name (Ident.name td.typ_id)) then
@@ -3128,7 +3128,7 @@ and transl_signature env sg =
               md_attributes=pmd.pmd_attributes;
               md_loc=pmd.pmd_loc;
               md_uid = Uid.mk ~current_unit:(Env.get_current_unit ());
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
             }
         in
         let pres =
@@ -3269,7 +3269,7 @@ and transl_signature env sg =
             let context =
               Jkind.History.Implicit_jkind var_name
             in
-<<<<<<< HEAD
+<<<<<<< oxcaml
             Env.add_implicit_jkind
               ~loc:jkind_annot.pjkind_loc var_name
               (Jkind.of_annotation ~context jkind_annot) env
@@ -3291,7 +3291,7 @@ and transl_signature env sg =
         (new_item :: sig_items)
         (List.rev_append new_types sig_type)
         srem
-||||||| 23e84b8c4d
+||||||| upstream-base
             let id, newenv =
               match pmd.pmd_name.txt with
               | None -> None, env
@@ -3697,7 +3697,7 @@ and transl_signature env sg =
             mksig (Tsig_attribute x) env loc :: trem, rem, final_env
         | Psig_extension (ext, _attrs) ->
             raise (Error_forward (Builtin_attributes.error_of_extension ext))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   in
   let previous_saved_types = Cmt_format.get_saved_types () in
   Builtin_attributes.warning_scope []
@@ -3801,7 +3801,7 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
   in
   let init =
     List.map2
-<<<<<<< HEAD
+<<<<<<< oxcaml
       (fun id (pmd, smmode) ->
          let md_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
          let md_type, md_modalities =
@@ -3810,23 +3810,23 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
               pmd.pmd_modalities
          in
          let md_modalities = Modality.of_const md_modalities.moda_modalities in
-||||||| 23e84b8c4d
+||||||| upstream-base
       (fun id pmd ->
          let md_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
 =======
       (fun id pmd ->
          let md_uid = Uid.mk ~current_unit:(Env.get_current_unit ()) in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
          let md =
-<<<<<<< HEAD
+<<<<<<< oxcaml
            { md_type;
              md_modalities;
-||||||| 23e84b8c4d
+||||||| upstream-base
            { md_type = approx_modtype approx_env pmd.pmd_type;
 =======
            { md_type =
                approx_modtype (approx_env pmd.pmd_name.txt) pmd.pmd_type;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
              md_loc = pmd.pmd_loc;
              md_attributes = pmd.pmd_attributes;
              md_uid }
@@ -3871,23 +3871,23 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
     List.map2 (fun (pmd, _) (id_shape, id_loc, md, mmode, md_modalities, mty) ->
       let tmd =
         {md_id=Option.map fst id_shape; md_name=id_loc; md_type=mty;
-<<<<<<< HEAD
+<<<<<<< oxcaml
          md_modalities;
-||||||| 23e84b8c4d
+||||||| upstream-base
          md_presence=Mp_present;
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
          md_uid=md.Types.md_uid; md_presence=Mp_present;
          md_loc=pmd.pmd_loc;
          md_attributes=pmd.pmd_attributes}
       in
-<<<<<<< HEAD
+<<<<<<< oxcaml
       tmd, mmode, md.Types.md_uid, Option.map snd id_shape
-||||||| 23e84b8c4d
+||||||| upstream-base
       tmd, md.md_uid, Option.map snd id_shape
 =======
       tmd, md.Types.md_uid, Option.map snd id_shape
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     ) sdecls dcl2
   in
   (dcl2, env2)
@@ -4108,15 +4108,15 @@ let check_recmodule_inclusion env bindings =
           try
             Includemod.modtypes_constraint ~shape
               ~loc:modl.mod_loc ~mark:true
-<<<<<<< HEAD
+<<<<<<< oxcaml
               env ~modes mty_actual' mty_decl'
-||||||| 23e84b8c4d
+||||||| upstream-base
             Includemod.modtypes_with_shape ~shape
               ~loc:modl.mod_loc ~mark:Mark_both
               env mty_actual' mty_decl'
 =======
               env mty_actual' mty_decl'
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           with Includemod.Error msg ->
             raise(Error(modl.mod_loc, env, Not_included msg)) in
         let modl' =
@@ -4197,40 +4197,40 @@ let modtype_of_package env loc pack =
   in
   Subst.modtype Keep Subst.identity mty
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* CR zqian: [package_subtype] should take [modes], but piping this through
   [ctype] is too much. Instead, we take the conservative approach. *)
 let package_subtype env p1 fl1 p2 fl2 =
   let mkmty p fl =
-||||||| 23e84b8c4d
+||||||| upstream-base
 let package_subtype env p1 fl1 p2 fl2 =
   let mkmty p fl =
 =======
 let package_subtype env pack1 pack2 =
   let mkmty pack =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     let fl =
-<<<<<<< HEAD
+<<<<<<< oxcaml
       List.filter (fun (_n,t) -> Ctype.closed_type_expr t) fl in
     modtype_of_package env Location.none p fl
-||||||| 23e84b8c4d
+||||||| upstream-base
       List.filter (fun (_n,t) -> Ctype.free_variables t = []) fl in
     modtype_of_package env Location.none p fl
 =======
       List.filter (fun (_n,t) -> Ctype.closed_type_expr t) pack.pack_cstrs in
     modtype_of_package env Location.none {pack with pack_cstrs = fl}
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   in
   match mkmty pack1, mkmty pack2 with
   | exception Error(_, _, Cannot_scrape_package_type r) ->
       Result.Error (Errortrace.Package_cannot_scrape r)
   | mty1, mty2 ->
     let loc = Location.none in
-<<<<<<< HEAD
+<<<<<<< oxcaml
     match Includemod.modtypes ~loc ~mark:true env ~modes:All mty1 mty2 with
     | Tcoerce_none -> true
     | _ | exception Includemod.Error _ -> false
-||||||| 23e84b8c4d
+||||||| upstream-base
     match Includemod.modtypes ~loc ~mark:Mark_both env mty1 mty2 with
     | Tcoerce_none -> true
     | _ | exception Includemod.Error _ -> false
@@ -4245,18 +4245,18 @@ let package_subtype env pack1 pack2 =
     | exception Includemod.Error e ->
         let msg = doc_printf "%a" Includemod_errorprinter.err_msgs e in
         Result.Error (Errortrace.Package_inclusion msg)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let () = Ctype.package_subtype := package_subtype
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let wrap_constraint_package env mark arg mty mode explicit =
-||||||| 23e84b8c4d
+||||||| upstream-base
 let wrap_constraint_package env mark arg mty explicit =
   let mark = if mark then Includemod.Mark_both else Includemod.Mark_neither in
 =======
 let wrap_constraint_package env mark arg mty explicit =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let mty1 = Subst.modtype Keep Subst.identity arg.mod_type in
   let mty2 = Subst.modtype Keep Subst.identity mty in
   let modes : Includemod.modes = Specific (arg.mod_mode, mode) in
@@ -4274,23 +4274,23 @@ let wrap_constraint_package env mark arg mty explicit =
 
 let wrap_constraint_with_shape env mark arg mty mode
   shape explicit =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let modes : Includemod.modes = Specific (arg.mod_mode, mode) in
-||||||| 23e84b8c4d
+||||||| upstream-base
   let mark = if mark then Includemod.Mark_both else Includemod.Mark_neither in
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let coercion, shape =
     try
       Includemod.modtypes_constraint ~shape ~loc:arg.mod_loc env ~mark
-<<<<<<< HEAD
+<<<<<<< oxcaml
         ~modes arg.mod_type mty
-||||||| 23e84b8c4d
+||||||| upstream-base
       Includemod.modtypes_with_shape ~shape ~loc:arg.mod_loc env ~mark
         arg.mod_type mty
 =======
         arg.mod_type mty
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     with Includemod.Error msg ->
       raise(Error(arg.mod_loc, env, Not_included msg)) in
   { mod_desc = Tmod_constraint(arg, mty, explicit, coercion);
@@ -4329,7 +4329,7 @@ let simplify_app_summary app_view = match app_view.arg with
     | false, Some p -> Includemod.Error.Named p, mty, mode
     | false, None   -> Includemod.Error.Anonymous, mty, mode
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let not_principal msg = Warnings.Not_principal (Format_doc.Doc.msg msg)
 
 let rec type_module ?alias sttn funct_body anchor env smod =
@@ -4344,7 +4344,7 @@ and  type_module_maybe_hold_locks ?(alias=false) ~hold_locks sttn funct_body
   Builtin_attributes.warning_scope smod.pmod_attributes
     (fun () -> type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       smod)
-||||||| 23e84b8c4d
+||||||| upstream-base
 let rec type_module ?(alias=false) sttn funct_body anchor env smod =
   Builtin_attributes.warning_scope smod.pmod_attributes
     (fun () -> type_module_aux ~alias sttn funct_body anchor env smod)
@@ -4353,9 +4353,9 @@ let check_package_closed ~loc ~env ~typ fl =
   if List.exists (fun (_n, t) -> not (Ctype.closed_type_expr t)) fl
   then
     raise (Error (loc, env, Incomplete_packed_module typ))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
   (* If the module is an identifier, there might be locks between the
   declaration site and the use site.
@@ -4363,7 +4363,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
   - If [hold_locks] is [false], the locks are walked.
 
   If the module is not an identifier, [hold_locks] has no effect. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 and type_module_aux ~alias sttn funct_body anchor env smod =
 =======
 let not_principal msg = Warnings.Not_principal (Format_doc.Doc.msg msg)
@@ -4373,16 +4373,16 @@ let rec type_module ?(alias=false) ~strengthen ~funct_body anchor env smod =
     (fun () -> type_module_aux ~alias ~strengthen ~funct_body anchor env smod)
 
 and type_module_aux ~alias ~strengthen ~funct_body anchor env smod =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   match smod.pmod_desc with
     Pmod_ident lid ->
       let path, mode_with_locks =
         Env.lookup_module_path ~load:(not alias) ~loc:smod.pmod_loc lid.txt env
       in
-<<<<<<< HEAD
+<<<<<<< oxcaml
       type_module_path_aux ~alias ~hold_locks sttn env path mode_with_locks lid
         smod
-||||||| 23e84b8c4d
+||||||| upstream-base
       let md = { mod_desc = Tmod_ident (path, lid);
                  mod_type = Mty_alias path;
                  mod_env = env;
@@ -4453,19 +4453,19 @@ and type_module_aux ~alias ~strengthen ~funct_body anchor env smod =
         end
       in
       md, shape
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Pmod_structure sstr ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       Env.check_no_open_quotations smod.pmod_loc env Env.Struct_qt;
       let (str, sg, mode, names, shape, _finalenv) =
         type_structure funct_body anchor env sstr in
-||||||| 23e84b8c4d
+||||||| upstream-base
       let (str, sg, names, shape, _finalenv) =
         type_structure funct_body anchor env sstr in
 =======
       let (str, sg, names, shape, _finalenv) =
         type_structure ~funct_body anchor env sstr in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       let md =
         { mod_desc = Tmod_structure str;
           mod_type = Mty_signature sg;
@@ -4520,7 +4520,7 @@ and type_module_aux ~alias ~strengthen ~funct_body anchor env smod =
           Named (id, param, mty, tmode), Types.Named (id, mty.mty_type, mode),
           newenv, var, true
       in
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
       let body, body_shape = type_module true funct_body None newenv sbody in
       let body_mode = mode_without_locks_exn body.mod_mode in
@@ -4536,13 +4536,13 @@ and type_module_aux ~alias ~strengthen ~funct_body anchor env smod =
             Alloc.submode_exn (Alloc.close_over param_mode) ret_mode);
          Alloc.submode_exn (Alloc.partial_apply alloc_mode) ret_mode
        | _ -> ());
-||||||| 23e84b8c4d
+||||||| upstream-base
       let body, body_shape = type_module true funct_body None newenv sbody in
 =======
       let body, body_shape =
         type_module ~strengthen:true ~funct_body None newenv sbody
       in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       { mod_desc = Tmod_functor(t_arg, body);
         mod_type = Mty_functor(ty_arg, body.mod_type, ret_mode);
         mod_mode = Value.disallow_right mode, None;
@@ -4551,7 +4551,7 @@ and type_module_aux ~alias ~strengthen ~funct_body anchor env smod =
         mod_loc = smod.pmod_loc },
       Shape.abs funct_shape_param body_shape
   | Pmod_apply _ | Pmod_apply_unit _ ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       type_application smod.pmod_loc sttn funct_body env smod
   | Pmod_constraint(sarg, smty, smode) ->
       (* Only hold locks if coercion *)
@@ -4564,7 +4564,7 @@ and type_module_aux ~alias ~strengthen ~funct_body anchor env smod =
         type_module_maybe_hold_locks ~alias ~hold_locks true funct_body
           anchor env sarg
       in
-||||||| 23e84b8c4d
+||||||| upstream-base
       type_application smod.pmod_loc sttn funct_body env smod
   | Pmod_constraint(sarg, smty) ->
       let arg, arg_shape = type_module ~alias true funct_body anchor env sarg in
@@ -4576,7 +4576,7 @@ and type_module_aux ~alias ~strengthen ~funct_body anchor env smod =
         type_module ~alias ~strengthen:true ~funct_body anchor env sarg
       in
       let mty = transl_modtype env smty in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       let md, final_shape =
         match smty with
         | None ->
@@ -4598,29 +4598,29 @@ and type_module_aux ~alias ~strengthen ~funct_body anchor env smod =
   | Pmod_unpack sexp ->
       let mode = Value.newvar () in
       let exp =
-<<<<<<< HEAD
+<<<<<<< oxcaml
         Ctype.with_local_level_if_principal
           (fun () -> Typecore.type_exp env sexp
             ~mode:(Value.disallow_left mode))
           ~post:Typecore.generalize_structure_exp
-||||||| 23e84b8c4d
+||||||| upstream-base
         Ctype.with_local_level_if_principal
           (fun () -> Typecore.type_exp env sexp)
           ~post:Typecore.generalize_structure_exp
 =======
         Ctype.with_local_level_generalize_structure_if_principal
           (fun () -> Typecore.type_exp env sexp)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       in
       let mty =
         match get_desc (Ctype.expand_head env exp.exp_type) with
-<<<<<<< HEAD
+<<<<<<< oxcaml
           Tpackage (p, fl) ->
             if List.exists (fun (_n, t) -> not (Ctype.closed_type_expr t)) fl
             then
               raise (Error (smod.pmod_loc, env,
                             Incomplete_packed_module exp.exp_type));
-||||||| 23e84b8c4d
+||||||| upstream-base
           Tpackage (p, fl) ->
             if List.exists (fun (_n, t) -> Ctype.free_variables t <> []) fl then
               raise (Error (smod.pmod_loc, env,
@@ -4629,20 +4629,20 @@ and type_module_aux ~alias ~strengthen ~funct_body anchor env smod =
           Tpackage pack ->
             check_package_closed ~loc:smod.pmod_loc ~env ~typ:exp.exp_type
               pack.pack_cstrs;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
             if !Clflags.principal &&
               not (Typecore.generalizable (Btype.generic_level-1) exp.exp_type)
             then
               Location.prerr_warning smod.pmod_loc
                 (not_principal "this module unpacking");
-<<<<<<< HEAD
+<<<<<<< oxcaml
             modtype_of_package env smod.pmod_loc p fl
-||||||| 23e84b8c4d
+||||||| upstream-base
                 (Warnings.Not_principal "this module unpacking");
             modtype_of_package env smod.pmod_loc p fl
 =======
             modtype_of_package env smod.pmod_loc pack
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         | Tvar _ ->
             raise (Typecore.Error
                      (smod.pmod_loc, env, Typecore.Cannot_infer_signature))
@@ -4725,19 +4725,19 @@ and type_module_path_aux ~alias ~hold_locks sttn env path
 and type_application loc ~strengthen ~funct_body env smod =
   let rec extract_application ~funct_body env sargs smod =
     match smod.pmod_desc with
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Pmod_apply(f, sarg) ->
         let arg, shape =
           type_module_maybe_hold_locks ~hold_locks:true true funct_body None env
             sarg
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Pmod_apply (f, sarg) ->
         let arg, shape = type_module true funct_body None env sarg in
 =======
     | Pmod_apply (f, sarg) ->
         let arg, shape =
           type_module ~strengthen:true ~funct_body None env sarg
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         in
         let summary = {
           loc = smod.pmod_loc;
@@ -4842,17 +4842,17 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
       | { loc = app_loc; attributes = app_attributes;
           arg = Some { shape = arg_shape; path = arg_path; arg } } ->
       let coercion =
-<<<<<<< HEAD
+<<<<<<< oxcaml
         try Includemod.modtypes
               ~loc:arg.mod_loc ~mark:true env arg.mod_type mty_param
               ~modes:(Specific (arg.mod_mode, mm_param))
-||||||| 23e84b8c4d
+||||||| upstream-base
         try Includemod.modtypes
               ~loc:arg.mod_loc ~mark:Mark_both env arg.mod_type mty_param
 =======
         try Includemod.modtypes ~loc:arg.mod_loc ~mark:true env
               arg.mod_type mty_param
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         with Includemod.Error _ -> apply_error ()
       in
       let mty_appl =
@@ -4882,17 +4882,17 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
                     raise (Error(app_loc, env, error))
             in
             begin match
-<<<<<<< HEAD
+<<<<<<< oxcaml
               Includemod.modtypes
                 ~loc:app_loc ~mark:false env mty_res nondep_mty
                 ~modes:(Specific ((mm_res, None), mm_res))
-||||||| 23e84b8c4d
+||||||| upstream-base
               Includemod.modtypes
                 ~loc:app_loc ~mark:Mark_neither env mty_res nondep_mty
 =======
               Includemod.modtypes ~loc:app_loc ~mark:false env
                 mty_res nondep_mty
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
             with
             | Tcoerce_none -> ()
             | _ ->
@@ -4960,16 +4960,16 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
     } in
     open_descr, Mode.Value.(max |> disallow_right), [], newenv
   | _ ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
     let md, mod_shape = type_module true funct_body None env od.popen_expr in
     let mode = mode_without_locks_exn md.mod_mode in
-||||||| 23e84b8c4d
+||||||| upstream-base
     let md, mod_shape = type_module true funct_body None env od.popen_expr in
 =======
     let md, mod_shape =
       type_module ~strengthen:true ~funct_body None env od.popen_expr
     in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     let scope = Ctype.create_scope () in
     let sg, newenv =
       Env.enter_signature ~scope ~mod_shape
@@ -5006,15 +5006,15 @@ and type_open_decl_aux ?used_slot ?toplevel ~funct_body names env od =
     } in
     open_descr, mode, sg, newenv
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 and type_structure ?(toplevel = None) funct_body anchor env sstr =
   (* CR implicit-types: implement implicit variable jkinds in structures. *)
   let env = Env.clear_implicit_jkinds env in
-||||||| 23e84b8c4d
+||||||| upstream-base
 and type_structure ?(toplevel = false) funct_body anchor env sstr =
 =======
 and type_structure ?(toplevel = false) ~funct_body anchor env sstr =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let names = Signature_names.create () in
   let _, md_mode = register_allocation () in
   let loc_md = location_of_structure sstr in
@@ -5093,7 +5093,7 @@ and type_structure ?(toplevel = false) ~funct_body anchor env sstr =
            will be marked as being used during the signature inclusion test. *)
         let items, shape_map =
           List.fold_left
-<<<<<<< HEAD
+<<<<<<< oxcaml
             (fun (acc, shape_map) (id, id_info, zero_alloc) ->
               let zero_alloc =
                 (* We only allow "Check" attributes in signatures.  Here we
@@ -5123,7 +5123,7 @@ and type_structure ?(toplevel = false) ~funct_body anchor env sstr =
                   val_zero_alloc = zero_alloc;
                   val_modalities = modalities }
               in
-||||||| 23e84b8c4d
+||||||| upstream-base
             (fun (acc, shape_map) (id, { Asttypes.loc; _ }, _typ)->
               Signature_names.check_value names loc id;
               let vd =  Env.find_value (Pident id) newenv in
@@ -5132,7 +5132,7 @@ and type_structure ?(toplevel = false) ~funct_body anchor env sstr =
             (fun (acc, shape_map) (id, { Asttypes.loc; _ }, _typ, _uid)->
               Signature_names.check_value names loc id;
               let vd =  Env.find_value (Pident id) newenv in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
               Sig_value(id, vd, Exported) :: acc,
               Shape.Map.add_value shape_map id vd.val_uid
             )
@@ -5229,14 +5229,14 @@ and type_structure ?(toplevel = false) ~funct_body anchor env sstr =
           | Mty_alias _ -> Mp_absent
           | _ -> Mp_present
         in
-<<<<<<< HEAD
+<<<<<<< oxcaml
         let md_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
         let mode = mode_without_locks_exn modl.mod_mode in
-||||||| 23e84b8c4d
+||||||| upstream-base
         let md_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
 =======
         let md_uid = Uid.mk ~current_unit:(Env.get_current_unit ()) in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         let md =
           { md_type = enrich_module_type anchor name.txt modl.mod_type env;
             md_modalities = Modality.undefined;
@@ -5321,16 +5321,16 @@ and type_structure ?(toplevel = false) ~funct_body anchor env sstr =
                let mty' =
                  enrich_module_type anchor name.txt modl.mod_type newenv
                in
-<<<<<<< HEAD
+<<<<<<< oxcaml
                (id, name, mty, modl, mty', Option.get mode, attrs, loc, shape,
                 uid))
-||||||| 23e84b8c4d
+||||||| upstream-base
                (id, name, mty, modl, mty', attrs, loc, shape, uid))
 =======
                Includemod.modtypes_consistency ~loc:modl.mod_loc newenv
                 mty' mty.mty_type;
                (id, name, mty, modl, mty', attrs, loc, shape, uid))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
             decls sbind in
         let newenv = (* allow aliasing recursive modules from outside *)
           List.fold_left
@@ -5389,17 +5389,17 @@ and type_structure ?(toplevel = false) ~funct_body anchor env sstr =
         let map = Shape.Map.add_module_type shape_map id decl.mtd_uid in
         Tstr_modtype mtd, [Sig_modtype (id, decl, Exported)], map, newenv
     | Pstr_open sod ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
         let toplevel = Option.is_some toplevel in
         let (od, mode, sg, newenv) =
           type_open_decl ~toplevel funct_body names env sod
-||||||| 23e84b8c4d
+||||||| upstream-base
         let (od, sg, newenv) =
           type_open_decl ~toplevel funct_body names env sod
 =======
         let (od, sg, newenv) =
           type_open_decl ~toplevel ~funct_body names env sod
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         in
         let sg =
           rebase_modalities_sg ~loc:sod.popen_expr.pmod_loc ~loc_md
@@ -5474,9 +5474,9 @@ and type_structure ?(toplevel = false) ~funct_body anchor env sstr =
         shape_map,
         new_env
     | Pstr_include sincl ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
         type_str_include ~loc env shape_map sincl sig_acc
-||||||| 23e84b8c4d
+||||||| upstream-base
         let smodl = sincl.pincl_mod in
         let modl, modl_shape =
           Builtin_attributes.warning_scope sincl.pincl_attributes
@@ -5518,22 +5518,22 @@ and type_structure ?(toplevel = false) ~funct_body anchor env sstr =
           }
         in
         Tstr_include incl, sg, shape, new_env
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Pstr_extension (ext, _attrs) ->
         raise (Error_forward (Builtin_attributes.error_of_extension ext))
     | Pstr_attribute x ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
         Builtin_attributes.parse_standard_implementation_attributes x;
         if Option.is_some toplevel
         || not (Warnings.is_active (Misplaced_attribute "")) then
           Builtin_attributes.mark_alert_used x;
-||||||| 23e84b8c4d
+||||||| upstream-base
         Builtin_attributes.warning_attribute x;
         if toplevel || not (Warnings.is_active (Misplaced_attribute "")) then
           Builtin_attributes.mark_alert_used x;
 =======
         Builtin_attributes.warning_attribute x;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         Tstr_attribute x, [], shape_map, env
     | Pstr_kind_abbrev _ ->
         Misc.fatal_error "kind_abbrev not supported!"
@@ -5569,7 +5569,7 @@ and type_structure ?(toplevel = false) ~funct_body anchor env sstr =
   if Option.is_some toplevel then run ()
   else Builtin_attributes.warning_scope [] run
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* The toplevel will print some types not present in the signature *)
 let remove_mode_and_jkind_variables_for_toplevel str =
   match str.str_items with
@@ -5598,7 +5598,7 @@ let type_toplevel_phrase env sig_acc s =
 let type_module_alias env smod =
   type_module_maybe_hold_locks ~alias:true ~hold_locks:true true false
     None env smod
-||||||| 23e84b8c4d
+||||||| upstream-base
 let type_toplevel_phrase env s =
   Env.reset_required_globals ();
   type_structure ~toplevel:true false None env s
@@ -5606,13 +5606,13 @@ let type_toplevel_phrase env s =
 let type_toplevel_phrase env s =
   Env.reset_required_globals ();
   type_structure ~toplevel:true ~funct_body:false None env s
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let type_module = type_module true false None
 let type_module_maybe_hold_locks = type_module_maybe_hold_locks true false None
 let type_structure = type_structure false None
-||||||| 23e84b8c4d
+||||||| upstream-base
 let type_module_alias = type_module ~alias:true true false None
 let type_module = type_module true false None
 let type_structure = type_structure false None
@@ -5623,7 +5623,7 @@ let type_module =
   type_module ~strengthen:true ~funct_body:false None
 let type_structure =
   type_structure ~funct_body:false None
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Normalize types in a signature *)
 
@@ -5777,36 +5777,36 @@ let type_package env m pack =
         let lid = Longident.unflatten n |> Option.get in
         raise (Error(modl.mod_loc, env, Scoping_pack (lid,ty))))
     fl';
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let _, mode = register_allocation () in
   let modl =
     wrap_constraint_package env true modl mty mode Tmodtype_implicit
   in
   modl, fl'
-||||||| 23e84b8c4d
+||||||| upstream-base
   let modl = wrap_constraint_package env true modl mty Tmodtype_implicit in
   modl, fl'
 =======
   let modl = wrap_constraint_package env true modl mty Tmodtype_implicit in
   modl, {pack with pack_cstrs = fl'}
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Fill in the forward declarations *)
 
 let type_open_decl ?used_slot env od =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let od, _, _, env =
     type_open_decl ?used_slot ?toplevel:None false (Signature_names.create ())
       env od
   in
   od, env
-||||||| 23e84b8c4d
+||||||| upstream-base
   type_open_decl ?used_slot ?toplevel:None false (Signature_names.create ()) env
     od
 =======
   type_open_decl ?used_slot ?toplevel:None ~funct_body:false
     (Signature_names.create ()) env od
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let type_open_descr ?used_slot env od =
   type_open_descr ?used_slot ?toplevel:None env od
@@ -5945,24 +5945,24 @@ let type_implementation target modulename initial_env ast =
             simple_sg
         in
         Typecore.force_delayed_checks ();
-<<<<<<< HEAD
+<<<<<<< oxcaml
         Mode.erase_hints ();
         Typecore.optimise_allocations ();
-||||||| 23e84b8c4d
+||||||| upstream-base
         let shape = Shape.local_reduce shape in
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         let shape = Shape_reduce.local_reduce Env.empty shape in
         Printtyp.wrap_printing_env ~error:false initial_env
           Format.(fun () -> fprintf std_formatter "%a@."
-<<<<<<< HEAD
+<<<<<<< oxcaml
               (Printtyp.printed_signature sourcefile)
-||||||| 23e84b8c4d
+||||||| upstream-base
           (fun () -> fprintf std_formatter "%a@."
               (Printtyp.printed_signature @@ Unit_info.source_file target)
 =======
               (Printtyp.printed_signature @@ Unit_info.source_file target)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
               simple_sg
           );
         gen_annot target (Cmt_format.Implementation str);
@@ -6015,7 +6015,7 @@ let type_implementation target modulename initial_env ast =
                      { new_arg_type = arg_type; old_source_file = source_intf;
                        old_arg_type = arg_type_from_cmi });
           let coercion, shape =
-<<<<<<< HEAD
+<<<<<<< oxcaml
             Profile.record_call "check_sig" (fun () ->
               Includemod.compunit initial_env ~mark:true
                 sourcefile sg compiled_intf_file_name dclsig shape)
@@ -6031,7 +6031,7 @@ let type_implementation target modulename initial_env ast =
              ([Tcoerce_primitive] is a pain in particular). *)
           let argument_interface =
             check_argument_type_if_given initial_env source_intf dclsig arg_type
-||||||| 23e84b8c4d
+||||||| upstream-base
             Includemod.compunit initial_env ~mark:Mark_positive
               sourcefile sg source_intf
               dclsig shape
@@ -6039,7 +6039,7 @@ let type_implementation target modulename initial_env ast =
             Includemod.compunit initial_env ~mark:true
               sourcefile sg source_intf
               dclsig shape
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           in
           Typecore.force_delayed_checks ();
           Mode.erase_hints ();
@@ -6047,12 +6047,12 @@ let type_implementation target modulename initial_env ast =
           (* It is important to run these checks after the inclusion test above,
              so that value declarations which are not used internally but
              exported are not reported as being unused. *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
           Profile.record_call "save_cmt" (fun () ->
             let shape = Shape_reduce.local_reduce Env.empty shape in
             let annots = Cmt_format.Implementation str in
             save_cmt_and_cms target annots initial_env None (Some shape));
-||||||| 23e84b8c4d
+||||||| upstream-base
           let shape = Shape.local_reduce shape in
           let annots = Cmt_format.Implementation str in
           save_cmt target annots initial_env None (Some shape);
@@ -6060,7 +6060,7 @@ let type_implementation target modulename initial_env ast =
           let shape = Shape_reduce.local_reduce Env.empty shape in
           let annots = Cmt_format.Implementation str in
           save_cmt target annots initial_env None (Some shape);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           { structure = str;
             coercion;
             shape;
@@ -6072,17 +6072,17 @@ let type_implementation target modulename initial_env ast =
             (Location.in_file sourcefile)
             Warnings.Missing_mli;
           let coercion, shape =
-<<<<<<< HEAD
+<<<<<<< oxcaml
             Profile.record_call "check_sig" (fun () ->
               Includemod.compunit initial_env ~mark:true
                 sourcefile sg "(inferred signature)" simple_sg shape)
-||||||| 23e84b8c4d
+||||||| upstream-base
             Includemod.compunit initial_env ~mark:Mark_positive
               sourcefile sg "(inferred signature)" simple_sg shape
 =======
             Includemod.compunit initial_env ~mark:true
               sourcefile sg "(inferred signature)" simple_sg shape
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           in
           check_nongen_signature finalenv simple_sg;
           let zap_modality =
@@ -6109,18 +6109,18 @@ let type_implementation target modulename initial_env ast =
           let shape = Shape_reduce.local_reduce Env.empty shape in
           let alerts = Builtin_attributes.alerts_of_str ~mark:true ast in
           if not !Clflags.dont_write_files then begin
-<<<<<<< HEAD
+<<<<<<< oxcaml
             let name = Compilation_unit.name modulename in
             let kind =
               Cmi_format.Normal { cmi_impl = modulename; cmi_arg_for = arg_type }
-||||||| 23e84b8c4d
+||||||| upstream-base
             let alerts = Builtin_attributes.alerts_of_str ast in
             let cmi =
               Env.save_signature ~alerts simple_sg (Unit_info.cmi target)
 =======
             let cmi =
               Env.save_signature ~alerts simple_sg (Unit_info.cmi target)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
             in
             let cmi =
               Profile.record_call "save_cmi" (fun () ->
@@ -6159,7 +6159,7 @@ let save_signature target modname tsg initial_env cmi =
   Cms_format.save_cms  (Unit_info.cmsi target) modname
     (Cmt_format.Interface tsg) initial_env None decl_deps
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let cms_register_toplevel_signature_attributes ~sourcefile ~uid ast =
   cms_register_toplevel_attributes ~sourcefile ~uid ast.psg_items
     ~f:(function
@@ -6188,7 +6188,7 @@ let type_interface ~sourcefile modulename env ast =
   ignore (check_argument_type_if_given env sourcefile sg.sig_type arg_type
           : Typedtree.argument_interface option);
   sg
-||||||| 23e84b8c4d
+||||||| upstream-base
 let type_interface env ast =
   transl_signature ~toplevel:true env ast
 
@@ -6197,7 +6197,7 @@ let transl_signature env ast =
 =======
 let type_interface env ast =
   transl_signature env ast
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* "Packaging" of several compilation units into one unit
    having them as sub-modules.  *)
@@ -6333,7 +6333,7 @@ let report_error ~loc _env = function
         "@[This module is not a functor; it has type@ %a@]"
         (Style.as_inline_code modtype) mty
   | Not_included errs ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       let main ppf = Includemod_errorprinter.err_msgs ppf errs in
       Location.errorf ~loc "@[<v>Signature mismatch:@ %t@]" main
   | Not_included_functor errs ->
@@ -6347,7 +6347,7 @@ let report_error ~loc _env = function
         | Functor_included -> "This functor can't be included directly; please \
                                apply it to an explicit argument"
       in
-||||||| 23e84b8c4d
+||||||| upstream-base
       let main = Includemod_errorprinter.err_msgs errs in
       Location.errorf ~loc "@[<v>Signature mismatch:@ %t@]" main
   | Cannot_eliminate_dependency mty ->
@@ -6356,7 +6356,7 @@ let report_error ~loc _env = function
         "@[<v>Signature mismatch:@ %a@]"
         Includemod_errorprinter.err_msgs errs
   | Cannot_eliminate_dependency mty ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       Location.errorf ~loc
         "@[This functor has type@ %a@ \
            The parameter cannot be eliminated in the result type.@ \
@@ -6390,14 +6390,14 @@ let report_error ~loc _env = function
         Style.inline_code "with"
         (Style.as_inline_code longident) lid
   | With_mismatch(lid, explanation) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       Location.errorf ~loc
-||||||| 23e84b8c4d
+||||||| upstream-base
       let main = Includemod_errorprinter.err_msgs explanation in
       Location.errorf ~loc
 =======
       Location.errorf ~loc ~footnote:Out_type.Ident_conflicts.err_msg
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         "@[<v>\
            @[In this %a constraint, the new definition of %a@ \
              does not match its original definition@ \
@@ -6407,14 +6407,14 @@ let report_error ~loc _env = function
         (Style.as_inline_code longident) lid
         Includemod_errorprinter.err_msgs explanation
   | With_makes_applicative_functor_ill_typed(lid, path, explanation) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       Location.errorf ~loc
-||||||| 23e84b8c4d
+||||||| upstream-base
       let main = Includemod_errorprinter.err_msgs explanation in
       Location.errorf ~loc
 =======
       Location.errorf ~loc ~footnote:Out_type.Ident_conflicts.err_msg
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         "@[<v>\
            @[This %a constraint on %a makes the applicative functor @ \
              type %a ill-typed in the constrained signature:@]@ \
@@ -6442,15 +6442,15 @@ let report_error ~loc _env = function
         [ 12; 7; 3 ]
       in
       let pp_constraint ppf (p,mty) =
-<<<<<<< HEAD
+<<<<<<< oxcaml
         fprintf ppf "%s := %a" (Path.name p) Printtyp.modtype mty
-||||||| 23e84b8c4d
+||||||| upstream-base
       let pp_constraint ppf () =
         Format.fprintf ppf "%s := %a"
           (Path.name p) Printtyp.modtype mty
 =======
         fprintf ppf "%s := %a" (Path.name p) modtype mty
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       in
       Location.errorf ~loc
         "This %a constraint@ %a@ makes a packed module ill-formed.@ %a"
@@ -6462,12 +6462,12 @@ let report_error ~loc _env = function
         "In the constrained signature, type %a is defined to be %a.@ \
          Package %a constraints may only be used on abstract types."
         (Style.as_inline_code longident) lid
-<<<<<<< HEAD
+<<<<<<< oxcaml
         (Style.as_inline_code Printtyp.type_expr) ty
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
         (Style.as_inline_code type_expr) ty
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         Style.inline_code "with"
   | Repeated_name(kind, name) ->
       Location.errorf ~loc
@@ -6552,11 +6552,11 @@ let report_error ~loc _env = function
         "The type of this packed module refers to %a, which is missing"
         (Style.as_inline_code path) p
   | Badly_formed_signature (context, err) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       Location.errorf ~loc "@[In %s:@ %a@]"
         context
         Typedecl.report_error_doc err
-||||||| 23e84b8c4d
+||||||| upstream-base
       Location.errorf ~loc "@[In %s:@ %a@]" context Typedecl.report_error err
 =======
      let report = Typedecl.report_error ~loc err in
@@ -6566,7 +6566,7 @@ let report_error ~loc _env = function
          Format_doc.pp_doc report.main.txt
      in
      { report with main = { report.main with txt} }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Cannot_hide_id Illegal_shadowing
       { shadowed_item_kind; shadowed_item_id; shadowed_item_loc;
         shadower_id; user_id; user_kind; user_loc } ->

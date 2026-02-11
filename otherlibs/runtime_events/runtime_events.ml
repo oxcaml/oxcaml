@@ -33,7 +33,7 @@ type runtime_counter =
 | EV_C_MAJOR_HEAP_POOL_FRAG_WORDS
 | EV_C_MAJOR_HEAP_POOL_LIVE_BLOCKS
 | EV_C_MAJOR_HEAP_LARGE_BLOCKS
-<<<<<<< HEAD
+<<<<<<< oxcaml
 | EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE
 | EV_C_MAJOR_SLICE_ALLOC_WORDS
 | EV_C_MAJOR_SLICE_ALLOC_DEPENDENT_WORDS
@@ -41,7 +41,7 @@ type runtime_counter =
 | EV_C_MAJOR_SLICE_TOTAL_WORK
 | EV_C_MAJOR_SLICE_BUDGET
 | EV_C_MAJOR_SLICE_WORK_DONE
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 | EV_C_MAJOR_HEAP_WORDS
 | EV_C_MAJOR_ALLOCATED_WORDS
@@ -52,7 +52,7 @@ type runtime_counter =
 | EV_C_MAJOR_ALLOC_COUNTER
 | EV_C_MAJOR_SLICE_TARGET
 | EV_C_MAJOR_SLICE_BUDGET
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 type runtime_phase =
 | EV_EXPLICIT_GC_SET
@@ -103,13 +103,13 @@ type runtime_phase =
 | EV_COMPACT_EVACUATE
 | EV_COMPACT_FORWARD
 | EV_COMPACT_RELEASE
-<<<<<<< HEAD
+<<<<<<< oxcaml
 | EV_MINOR_EPHE_CLEAN
 | EV_MINOR_DEPENDENT
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 | EV_EMPTY_MINOR
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 type lifecycle =
   EV_RING_START
@@ -148,7 +148,7 @@ let runtime_counter_name counter =
       "major_heap_pool_live_blocks"
   | EV_C_MAJOR_HEAP_LARGE_BLOCKS ->
       "major_heap_large_blocks"
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE ->
       "request_minor_realloc_dependent_table"
   | EV_C_MAJOR_SLICE_ALLOC_WORDS ->
@@ -163,7 +163,7 @@ let runtime_counter_name counter =
     "major_slice_budget"
   | EV_C_MAJOR_SLICE_WORK_DONE ->
     "major_slice_work_done"
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   | EV_C_MAJOR_HEAP_WORDS ->
       "major_heap_words"
@@ -184,7 +184,7 @@ let runtime_counter_name counter =
   | EV_C_MAJOR_SLICE_BUDGET ->
       "major_slice_budget"
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let runtime_phase_name phase =
   match phase with
@@ -236,13 +236,13 @@ let runtime_phase_name phase =
   | EV_COMPACT_EVACUATE -> "compaction_evacuate"
   | EV_COMPACT_FORWARD -> "compaction_forward"
   | EV_COMPACT_RELEASE -> "compaction_release"
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | EV_MINOR_EPHE_CLEAN -> "minor_ephe_clean"
   | EV_MINOR_DEPENDENT -> "minor_dependent"
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   | EV_EMPTY_MINOR -> "empty_minor"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let lifecycle_name lifecycle =
   match lifecycle with
@@ -336,7 +336,7 @@ module User = struct
        the write buffer across calls.
 
        To be safe for multi-domain programs, we use domain-local
-<<<<<<< HEAD
+<<<<<<< oxcaml
        storage for the write buffer. To accomodate for multi-threaded
        programs (without depending on the Thread module), we store
        a list of caches for each domain. This might leak a bit of
@@ -374,7 +374,7 @@ module User = struct
              thread could have popped [buf]. *)
           let buf = Obj.magic_uncontended buf.Modes.Contended.contended in
           consumer buf)
-||||||| 23e84b8c4d
+||||||| upstream-base
   let write event value = user_write event value
 =======
        storage for the write buffer. To accommodate for multi-threaded
@@ -415,7 +415,7 @@ module User = struct
       let buf = pop_or_create buffers in
       Fun.protect ~finally:(fun () -> push buffers buf)
         (fun () -> consumer buf)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   let write (type a) (event : a t) (value : a) =
     if runtime_events_are_active () then

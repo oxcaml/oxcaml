@@ -60,24 +60,24 @@ module Uid = struct
       | Unit_info.Intf -> Format.pp_print_string fmt "[intf]"
       | Unit_info.Impl -> ()
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
     let rec print fmt = function
-||||||| 23e84b8c4d
+||||||| upstream-base
     let print fmt = function
 =======
     let print fmt = function
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       | Internal -> Format.pp_print_string fmt "<internal>"
       | Predef name -> Format.fprintf fmt "<predef:%s>" name
       | Compilation_unit s -> Format.pp_print_string fmt s
       | Item { comp_unit; id; from } ->
           Format.fprintf fmt "%a%s.%d" pp_intf_or_impl from comp_unit id
-<<<<<<< HEAD
+<<<<<<< oxcaml
       | Unboxed_version t -> Format.fprintf fmt "%a#" print t
-||||||| 23e84b8c4d
+||||||| upstream-base
       | Item { comp_unit; id } -> Format.fprintf fmt "%s.%d" comp_unit id
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
     let output oc t =
       let fmt = Format.formatter_of_out_channel oc in
@@ -93,13 +93,13 @@ module Uid = struct
         let open Unit_info in
         match current_unit with
         | None -> "", Impl
-<<<<<<< HEAD
+<<<<<<< oxcaml
         | Some ui ->
           Compilation_unit.full_path_as_string (modname ui), kind ui
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
         | Some ui -> modname ui, kind ui
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       in
       incr id;
       Item { comp_unit; id = !id; from }
@@ -162,11 +162,11 @@ module Sig_component_kind = struct
     | Type
     | Constructor
     | Label
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Unboxed_label
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Module
     | Module_type
     | Extension_constructor
@@ -178,11 +178,11 @@ module Sig_component_kind = struct
     | Type -> "type"
     | Constructor -> "constructor"
     | Label -> "label"
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Unboxed_label -> "unboxed label"
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Module -> "module"
     | Module_type -> "module type"
     | Extension_constructor -> "extension constructor"
@@ -196,11 +196,11 @@ module Sig_component_kind = struct
     | Type
     | Constructor
     | Label
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Unboxed_label
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Module
     | Module_type
     | Class
@@ -246,11 +246,11 @@ module Item = struct
     let type_ id = Ident.name id, Sig_component_kind.Type
     let constr id = Ident.name id, Sig_component_kind.Constructor
     let label id = Ident.name id, Sig_component_kind.Label
-<<<<<<< HEAD
+<<<<<<< oxcaml
     let unboxed_label id = Ident.name id, Sig_component_kind.Unboxed_label
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     let module_ id = Ident.name id, Sig_component_kind.Module
     let module_type id = Ident.name id, Sig_component_kind.Module_type
     let extension_constructor id =
@@ -537,13 +537,13 @@ module Predef = struct
 end
 
 type var = Ident.t
-<<<<<<< HEAD
+<<<<<<< oxcaml
 type t = { hash:int; uid: Uid.t option; desc: desc; approximated: bool }
-||||||| 23e84b8c4d
+||||||| upstream-base
 type t = { uid: Uid.t option; desc: desc }
 =======
 type t = { uid: Uid.t option; desc: desc; approximated: bool }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 and desc =
   | Var of var
   | Abs of var * t
@@ -555,7 +555,7 @@ and desc =
   | Comp_unit of string
   | Error of string
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   (* constructors for types  *)
   | Constr of Ident.t * t list
   | Tuple of t list
@@ -742,11 +742,11 @@ and equal_poly_variant_constructor
   List.equal equal args1 args2
 
 let rec print fmt t =
-||||||| 23e84b8c4d
+||||||| upstream-base
 let print fmt =
 =======
 let print fmt t =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let print_uid_opt =
     Format.pp_print_option (fun fmt -> Format.fprintf fmt "<%a>" Uid.print)
   in
@@ -817,7 +817,7 @@ let print fmt t =
         Format.fprintf fmt "Alias@[(@[<v>%a@,%a@])@]" print_uid_opt uid aux t
     | Error s ->
         Format.fprintf fmt "Error %s" s
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Constr (id, args) ->
         Format.fprintf fmt "@[%a@ %a@]"
           Ident.print id
@@ -897,17 +897,17 @@ let print fmt t =
     Format.fprintf fmt "(%a : %a)" print_nested shape
       (Format_doc.compat Layout.format) layout
 
-||||||| 23e84b8c4d
+||||||| upstream-base
         Format.fprintf fmt "{@[<v>%a@,%a@]}" print_uid_opt uid print_map map
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   in
   if t.approximated then
     Format.fprintf fmt "@[(approx)@ %a@]@;" aux t
   else
     Format.fprintf fmt "@[%a@]@;" aux t
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* We use custom strings as separators instead of pp_print_space, because the
    latter introduces line breaks that can mess up the tables with all shapes. *)
 and print_sep_string str fmt () = Format.pp_print_string fmt str
@@ -980,30 +980,30 @@ let hash_mutrec = 21
 let hash_proj_decl = 22
 let hash_unknown_type = 23
 let hash_at_layout = 24
-||||||| 23e84b8c4d
+||||||| upstream-base
   Format.fprintf fmt"@[%a@]@;" aux
 =======
 let rec strip_head_aliases = function
   | { desc = Alias t; _ } -> strip_head_aliases t
   | t -> t
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let fresh_var ?(name="shape-var") uid =
   let var = Ident.create_local name in
-<<<<<<< HEAD
+<<<<<<< oxcaml
   var, { uid = Some uid; desc = Var var;
          hash = Hashtbl.hash (hash_var, uid, var);
          approximated = false }
-||||||| 23e84b8c4d
+||||||| upstream-base
   var, { uid = Some uid; desc = Var var }
 =======
   var, { uid = Some uid; desc = Var var; approximated = false }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let for_unnamed_functor_param = Ident.create_local "()"
 
 let var uid id =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   { uid = Some uid; desc = Var id;
     hash = Hashtbl.hash (hash_var, Some uid, id);
     approximated = false }
@@ -1013,40 +1013,40 @@ let var' uid id =
   { uid; desc = Var id;
     hash = Hashtbl.hash (hash_var, uid, id);
     approximated = false }
-||||||| 23e84b8c4d
+||||||| upstream-base
   { uid = Some uid; desc = Var id }
 =======
   { uid = Some uid; desc = Var id; approximated = false }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let abs ?uid var body =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   { uid; desc = Abs (var, body);
     hash = Hashtbl.hash (hash_abs, uid, body.hash);
     approximated = false }
-||||||| 23e84b8c4d
+||||||| upstream-base
   { uid; desc = Abs (var, body) }
 =======
   { uid; desc = Abs (var, body); approximated = false }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let str ?uid map =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let h = Item.Map.fold (fun key t acc ->
     Hashtbl.hash (acc, Item.hash key, t.hash)) map 0
   in
   { uid; desc = Struct map; hash = Hashtbl.hash (hash_struct, uid, h);
     approximated = false }
-||||||| 23e84b8c4d
+||||||| upstream-base
   { uid; desc = Struct map }
 =======
   { uid; desc = Struct map; approximated = false }
 
 let alias ?uid t =
   { uid; desc = Alias t; approximated = false}
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let alias ?uid t =
   { uid; desc = Alias t;
     hash = Hashtbl.hash (hash_alias, uid, t.hash);
@@ -1066,7 +1066,7 @@ let leaf uid = leaf' (Some uid)
 let approx t = { t with approximated = true}
 
 let set_approximated ~approximated t = { t with approximated}
-||||||| 23e84b8c4d
+||||||| upstream-base
 let leaf uid =
   { uid = Some uid; desc = Leaf }
 =======
@@ -1074,7 +1074,7 @@ let leaf uid =
   { uid = Some uid; desc = Leaf; approximated = false }
 
 let approx t = { t with approximated = true}
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let proj ?uid t item =
   match t.desc with
@@ -1087,17 +1087,17 @@ let proj ?uid t item =
       with Not_found -> approx t (* ill-typed program *)
       end
   | _ ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       { uid; desc = Proj (t, item);
         hash = Hashtbl.hash (hash_proj, t.hash, item); approximated = false }
-||||||| 23e84b8c4d
+||||||| upstream-base
       { uid; desc = Proj (t, item) }
 =======
      { uid; desc = Proj (t, item); approximated = false }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let app ?uid f ~arg =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   { uid; desc = App (f, arg);
     hash = Hashtbl.hash (hash_app, f.hash, uid, arg.hash);
     approximated = false }
@@ -1202,20 +1202,20 @@ let at_layout ?uid shape layout =
     hash = Hashtbl.hash (hash_at_layout, uid, shape.hash, layout);
     approximated = false }
 
-||||||| 23e84b8c4d
+||||||| upstream-base
       { uid; desc = App (f, arg) }
 =======
   { uid; desc = App (f, arg); approximated = false }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let decompose_abs t =
   match t.desc with
   | Abs (x, t) -> Some (x, t)
   | _ -> None
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let dummy_mod = str Item.Map.empty
-||||||| 23e84b8c4d
+||||||| upstream-base
 module Make_reduce(Params : sig
   type env
   val fuel : int
@@ -1227,12 +1227,12 @@ end) = struct
 =======
 let dummy_mod =
   { uid = None; desc = Struct Item.Map.empty; approximated = false }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let of_path ~find_shape ~namespace path =
   (* We need to handle the following cases:
     Path of constructor:
-<<<<<<< HEAD
+<<<<<<< oxcaml
       M.t.C
     Path of label:
       M.t.lbl
@@ -1241,7 +1241,7 @@ let of_path ~find_shape ~namespace path =
     Path of label of implicit unboxed record:
       M.t#.lbl
   *)
-||||||| 23e84b8c4d
+||||||| upstream-base
   type nf = { uid: Uid.t option; desc: nf_desc }
   and nf_desc =
     | NVar of var
@@ -1481,7 +1481,7 @@ let of_path ~find_shape ~namespace =
       M.t.lbl [Pextra_ty("M.t", "lbl")]
     Path of label of inline record:
       M.t.C.lbl [Pextra_ty(Pextra_ty("M.t", "C"), "lbl")] *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let rec aux : Sig_component_kind.t -> Path.t -> t = fun ns -> function
     | Pident id -> find_shape ns id
     | Pdot (Pextra_ty (path, Punboxed_ty), name) ->
@@ -1500,12 +1500,12 @@ let of_path ~find_shape ~namespace =
       proj (aux namespace path) (name, ns)
     | Papply (p1, p2) -> app (aux Module p1) ~arg:(aux Module p2)
     | Pextra_ty (path, extra) -> begin
-<<<<<<< HEAD
+<<<<<<< oxcaml
         match extra with
           Pcstr_ty name -> proj (aux Type path) (name, Constructor)
         | Pext_ty -> aux Extension_constructor path
         | Punboxed_ty -> aux ns path
-||||||| 23e84b8c4d
+||||||| upstream-base
         match extra with
           Pcstr_ty _ -> aux Type path
         | Pext_ty -> aux Extension_constructor path
@@ -1516,29 +1516,29 @@ let of_path ~find_shape ~namespace =
             proj (aux Constructor path) (name, ns)
         | Pcstr_ty name, _, _ -> proj (aux Type path) (name, ns)
         | Pext_ty, _, _ -> aux Extension_constructor path
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       end
   in
   aux namespace path
 
 let for_persistent_unit s =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   comp_unit ~uid:(Compilation_unit s) s
-||||||| 23e84b8c4d
+||||||| upstream-base
   { uid = Some (Uid.of_compilation_unit_id (Ident.create_persistent s));
     desc = Comp_unit s }
 =======
   { uid = Some (Uid.of_compilation_unit_id (Ident.create_persistent s));
     desc = Comp_unit s; approximated = false }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let leaf_for_unpack = leaf' None
-||||||| 23e84b8c4d
+||||||| upstream-base
 let leaf_for_unpack = { uid = None; desc = Leaf }
 =======
 let leaf_for_unpack = { uid = None; desc = Leaf; approximated = false }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let set_uid_if_none t uid =
   (* CR sspies: This function clears the approximated field of the shape.
@@ -1603,16 +1603,16 @@ module Map = struct
     let item = Item.label id in
     Item.Map.add item (proj shape item) t
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let add_unboxed_label t id uid =
     Item.Map.add (Item.unboxed_label id) (leaf uid) t
   let add_unboxed_label_proj t id shape =
     let item = Item.unboxed_label id in
     Item.Map.add item (proj shape item) t
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let add_module t id shape = Item.Map.add (Item.module_ id) shape t
   let add_module_proj t id shape =
     let item = Item.module_ id in

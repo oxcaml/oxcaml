@@ -100,12 +100,12 @@ endif
 .INTERMEDIATE: tmpheader.exe
 tmpheader.exe: $(HEADERPROGRAM).$(O)
 	$(V_MKEXE)$(call MKEXE_VIA_CC,$@,$^)
-<<<<<<< HEAD
+<<<<<<< oxcaml
 # FIXME This is wrong - mingw could invoke strip; MSVC equivalent?
 ifneq "$(UNIX_OR_WIN32)" "win32"
 	strip $@
 endif
-||||||| 23e84b8c4d
+||||||| upstream-base
 # FIXME This is wrong - mingw could invoke strip; MSVC equivalent?
 ifneq "$(UNIX_OR_WIN32)" "win32"
 	strip $@
@@ -143,7 +143,7 @@ endif # ifeq "$(SHEBANGSCRIPTS)" "true"
 
 =======
 	$(STRIP) $@
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 stdlib.cma: $(OBJS)
 	$(V_LINKC)$(CAMLC) -a -o $@ $^

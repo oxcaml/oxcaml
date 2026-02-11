@@ -43,18 +43,18 @@ value caml_gc_major(value);
 void caml_heap_check (void);
 #endif
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 void caml_init_gc_tweaks(void);
 uintnat* caml_lookup_gc_tweak(const char* name, uintnat len);
 void caml_print_gc_tweaks(void);
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 /* See the documentation of [Gc.ramp_up] in the standard library. */
 caml_result caml_gc_ramp_up(value callback, uintnat *out_suspended_work);
 
 /* See the documentation of [Gc.ramp_down] in the standard library. */
 void caml_gc_ramp_down(uintnat suspended_ramp_up_words);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 #endif /* CAML_INTERNALS */
 

@@ -293,13 +293,13 @@ CAMLexport void caml_ba_finalize(value v)
       free(b->data);
       caml_free_dependent_memory(v, caml_ba_byte_size(b));
     } else {
-<<<<<<< HEAD
+<<<<<<< oxcaml
       if (!caml_atomic_counter_decr(&b->proxy->refcount)) {
-||||||| 23e84b8c4d
+||||||| upstream-base
       if (caml_atomic_refcount_decr(&b->proxy->refcount) == 1) {
 =======
       if (caml_atomic_counter_decr(&b->proxy->refcount) == 0) {
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         free(b->proxy->data);
         caml_free_dependent_memory(v, b->proxy->size);
         free(b->proxy);

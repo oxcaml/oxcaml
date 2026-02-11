@@ -77,18 +77,18 @@ struct caml_exception_context {
 
 int caml_is_special_exception(value exn);
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 CAMLextern value caml_raise_async_if_exception(value res, const char* where);
 
 CAMLnoreturn_start
 CAMLextern void caml_raise_async(value res)
 CAMLnoreturn_end;
-||||||| 23e84b8c4d
+||||||| upstream-base
 CAMLextern value caml_raise_if_exception(value res);
 =======
 /* from runtime/sync.c */
 CAMLextern void caml_check_error(int err, char const * msg);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 #endif /* CAML_INTERNALS */
 
@@ -114,28 +114,28 @@ CAMLnoret CAMLextern void caml_failwith_value (value msg);
 CAMLnoret CAMLextern void caml_invalid_argument (char const *msg);
 CAMLnoret CAMLextern void caml_invalid_argument_value (value msg);
 CAMLnoret CAMLextern void caml_raise_out_of_memory (void);
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
 CAMLnoret CAMLextern void caml_raise_out_of_fibers (void);
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 CAMLnoret CAMLextern void caml_raise_stack_overflow (void);
 CAMLnoret CAMLextern void caml_raise_sys_error (value);
 CAMLnoret CAMLextern void caml_raise_end_of_file (void);
 CAMLnoret CAMLextern void caml_raise_zero_divide (void);
 CAMLnoret CAMLextern void caml_raise_not_found (void);
 CAMLnoret CAMLextern void caml_array_bound_error (void);
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
 CAMLnoret CAMLextern void caml_array_align_error (void);
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 CAMLnoret CAMLextern void caml_raise_sys_blocked_io (void);
 
 /* Non-raising variants of the above functions. The exception is

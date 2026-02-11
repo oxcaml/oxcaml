@@ -70,18 +70,18 @@ Caml_inline void restore_stack_parent(caml_domain_state* domain_state,
 {
   CAMLassert(Stack_parent(domain_state->current_stack) == NULL);
   if (Is_block(cont)) {
-<<<<<<< HEAD
+<<<<<<< oxcaml
     struct stack_info* parent_stack = Ptr_val(caml_continuation_use(cont));
-||||||| 23e84b8c4d
+||||||| upstream-base
   Stack_parent(domain_state->current_stack) = parent_stack;
 =======
     struct stack_info* parent_stack = Ptr_val(Op_val(cont)[0]);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     Stack_parent(domain_state->current_stack) = parent_stack;
   }
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 static value raise_if_exception(value res)
 {
   if (Is_exception_result(res)) {
@@ -95,10 +95,10 @@ static value raise_if_exception(value res)
   return res;
 }
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #ifndef NATIVE_CODE
 
 /* Bytecode callbacks */
@@ -486,47 +486,47 @@ static value encoded_value_or_raise(value res)
 
 CAMLexport value caml_callback (value closure, value arg)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   return raise_if_exception(callback(closure, arg));
-||||||| 23e84b8c4d
+||||||| upstream-base
   return caml_raise_if_exception(caml_callback_exn(closure, arg));
 =======
   return encoded_value_or_raise(caml_callback_exn(closure, arg));
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 CAMLexport value caml_callback2 (value closure, value arg1, value arg2)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   return raise_if_exception(callback2_global(closure, arg1, arg2));
-||||||| 23e84b8c4d
+||||||| upstream-base
   return caml_raise_if_exception(caml_callback2_exn(closure, arg1, arg2));
 =======
   return encoded_value_or_raise(caml_callback2_exn(closure, arg1, arg2));
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 CAMLexport value caml_callback3 (value closure, value arg1, value arg2,
                                  value arg3)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   return raise_if_exception(callback3_global(closure, arg1, arg2, arg3));
-||||||| 23e84b8c4d
+||||||| upstream-base
   return caml_raise_if_exception(caml_callback3_exn(closure, arg1, arg2, arg3));
 =======
   return encoded_value_or_raise(caml_callback3_exn(closure, arg1, arg2, arg3));
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 CAMLexport value caml_callbackN (value closure, int narg, value args[])
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   return raise_if_exception(callbackN_global(closure, narg, args));
-||||||| 23e84b8c4d
+||||||| upstream-base
   return caml_raise_if_exception(caml_callbackN_exn(closure, narg, args));
 =======
   return encoded_value_or_raise(caml_callbackN_exn(closure, narg, args));
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 #endif
@@ -571,10 +571,10 @@ CAMLprim value caml_register_named_value(value vname, value val)
     }
   }
   if (!found) {
-<<<<<<< HEAD
+<<<<<<< oxcaml
     struct named_value *nv = (struct named_value *)
       caml_stat_alloc(sizeof(struct named_value) + namelen);
-||||||| 23e84b8c4d
+||||||| upstream-base
     nv = (struct named_value *)
       caml_stat_alloc(sizeof(struct named_value) + namelen);
     memcpy(nv->name, name, namelen + 1);
@@ -582,7 +582,7 @@ CAMLprim value caml_register_named_value(value vname, value val)
     size_t namelen = strlen(String_val(vname));
     struct named_value * nv =
       caml_stat_alloc(sizeof(struct named_value) + namelen + 1);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     memcpy(nv->name, String_val(vname), namelen + 1);
     nv->val = val;
     nv->next = named_value_table[h];

@@ -1181,13 +1181,13 @@ type sigprocmask_command = Unix.sigprocmask_command =
   | SIG_BLOCK
   | SIG_UNBLOCK
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val sigprocmask : mode:sigprocmask_command -> int list @ local -> int list
-||||||| 23e84b8c4d
+||||||| upstream-base
 val sigprocmask : mode:sigprocmask_command -> int list -> int list
 =======
 val sigprocmask : mode:sigprocmask_command -> Sys.signal list -> Sys.signal list
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** [sigprocmask ~mode sigs] changes the set of blocked signals.
    If [mode] is [SIG_SETMASK], blocked signals are set to those in
    the list [sigs].
@@ -1210,13 +1210,13 @@ val sigpending : unit -> Sys.signal list
    @raise Invalid_argument on Windows (no inter-process
    signals on Windows) *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val sigsuspend : int list @ local -> unit
-||||||| 23e84b8c4d
+||||||| upstream-base
 val sigsuspend : int list -> unit
 =======
 val sigsuspend : Sys.signal list -> unit
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** [sigsuspend sigs] atomically sets the blocked signals to [sigs]
    and waits for a non-ignored, non-blocked signal to be delivered.
    On return, the blocked signals are reset to their initial value.

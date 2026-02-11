@@ -16,9 +16,9 @@
 (*  bytegen.ml : translation of lambda terms to lists of instructions. *)
 
 open Misc
-<<<<<<< HEAD
+<<<<<<< oxcaml
 open Blambda
-||||||| 23e84b8c4d
+||||||| upstream-base
 open Asttypes
 open Primitive
 open Types
@@ -29,7 +29,7 @@ open Asttypes
 open Primitive
 open Lambda
 open Switch
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 open Instruct
 open Debuginfo.Scoped_location
 
@@ -141,8 +141,8 @@ let rec discard_dead_code = function
   | (Klabel _ | Krestart | Ksetglobal _) :: _ as cont -> cont
   | _ :: cont -> discard_dead_code cont
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 (* Check if we're in tailcall position *)
 
 let rec is_tailcall = function
@@ -222,7 +222,7 @@ let preserve_tailcall_for_prim = function
   | Pdls_get ->
       false
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (* Add a Kpop N instruction in front of a continuation *)
 
 let rec add_pop n cont =
@@ -242,12 +242,12 @@ let add_const const = function
 
 let add_const_unit = add_const Lambda.const_unit
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let rec push_dummies n k =
   match n with
   | 0 -> k
   | _ -> Kconst Lambda.const_unit :: Kpush :: push_dummies (n - 1) k
-||||||| 23e84b8c4d
+||||||| upstream-base
 let rec push_dummies n k = match n with
 | 0 -> k
 | _ -> Kconst const_unit::Kpush::push_dummies (n-1) k
@@ -393,7 +393,7 @@ let rec push_dummies n k = match n with
 | 0 -> k
 | _ -> Kconst const_unit::Kpush::push_dummies (n-1) k
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (**** Merging consecutive events ****)
 
@@ -518,7 +518,7 @@ let check_stack stack_info sz =
 (** Translate a primitive to a bytecode instruction *)
 let comp_primitive stack_info p sz args =
   check_stack stack_info sz;
-<<<<<<< HEAD
+<<<<<<< oxcaml
   match (p : Blambda.primitive) with
   | Getglobal cu -> Kgetglobal cu
   | Setglobal cu -> Ksetglobal cu
@@ -557,7 +557,7 @@ let comp_primitive stack_info p sz args =
   | Raise kind -> Kraise kind
   | Make_faux_mixedblock { total_len; tag } ->
     Kmake_faux_mixedblock (total_len, tag)
-||||||| 23e84b8c4d
+||||||| upstream-base
   match p with
     Pgetglobal id -> Kgetglobal id
   | Psetglobal id -> Ksetglobal id
@@ -864,7 +864,7 @@ module Storer =
     (struct type t = lambda type key = lambda
       let compare_key = Stdlib.compare
       let make_key = Lambda.make_key end)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Compile an expression.
    The value of the expression is left in the accumulator.
@@ -1128,7 +1128,7 @@ and comp_expr stack_info env exp sz cont =
           (comp_expr stack_info env body (sz + nvars)
              (add_pop nvars (branch1 :: cont2)))
       else
-<<<<<<< HEAD
+<<<<<<< oxcaml
         (* small optimization for nvars = 1 *)
         let var = match vars with [var] -> var | _ -> assert false in
         let lbl_handler, cont2 =
@@ -1149,7 +1149,7 @@ and comp_expr stack_info env exp sz cont =
     let rec loop sz tbb =
       if tb == tbb
       then add_pop (sz - size) cont
-||||||| 23e84b8c4d
+||||||| upstream-base
         if nargs < 4 then
           comp_args stack_info env args' sz
             (getmethod :: Kapply nargs :: cont)
@@ -1513,11 +1513,11 @@ and comp_expr stack_info env exp sz cont =
       if is_tailcall cont then
         comp_args stack_info env args sz
           (Kreperformterm(sz + nargs) :: discard_dead_code cont)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       else
-<<<<<<< HEAD
+<<<<<<< oxcaml
         match tbb with
-||||||| 23e84b8c4d
+||||||| upstream-base
         fatal_error "Reperform used in non-tail position"
   | Lprim (Pduparray (kind, mutability),
            [Lprim (Pmakearray (kind',_),args,_)], loc) ->
@@ -1687,7 +1687,7 @@ and comp_expr stack_info env exp sz cont =
       let rec loop sz tbb =
         if tb == tbb then add_pop (sz-size) cont
         else match tbb with
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         | [] -> assert false
         | try_sz :: tbb ->
           add_pop (sz - try_sz - 4) (Kpoptrap :: loop try_sz tbb)

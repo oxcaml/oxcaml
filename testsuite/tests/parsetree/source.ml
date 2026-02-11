@@ -7490,7 +7490,7 @@ let x = new M.\#begin
 
 let f = fun x (type \#begin) (type \#end) -> 1
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* check pretty-printing of local module open in core_type *)
 type t = String.( t )
 
@@ -7498,7 +7498,7 @@ type t = String.( t )
 
 let x: [`A] :> [> `A | `B ] = `A
 let x :> [> `A | `B ] = `A
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 let f: type \#if. \#if -> \#if = fun x -> x
 
@@ -7535,4 +7535,4 @@ type t = String.( t )
 
 (* Utf8 identifier *)
 let là = function ça -> ça
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

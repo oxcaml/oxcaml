@@ -1245,10 +1245,10 @@ let formatter_of_symbolic_output_buffer sob =
 
 *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let[@inline] apply1 f v = f (DLS.get std_formatter_key) v
 let[@inline] apply2 f v w = f (DLS.get std_formatter_key) v w
-||||||| 23e84b8c4d
+||||||| upstream-base
 let open_hbox v = pp_open_hbox (DLS.get std_formatter_key) v
 and open_vbox v = pp_open_vbox (DLS.get std_formatter_key) v
 and open_hvbox v = pp_open_hvbox (DLS.get std_formatter_key) v
@@ -1298,7 +1298,7 @@ and force_newline v = pp_force_newline (DLS.get std_formatter_key) v
 and print_flush v = pp_print_flush (DLS.get std_formatter_key) v
 and print_newline v = pp_print_newline (DLS.get std_formatter_key) v
 and print_if_newline v = pp_print_if_newline (DLS.get std_formatter_key) v
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let open_hbox = apply1 pp_open_hbox
 and open_vbox = apply1 pp_open_vbox
@@ -1402,13 +1402,13 @@ let pp_print_text ppf s =
   let left = ref 0 in
   let right = ref 0 in
   let flush () =
-<<<<<<< HEAD
+<<<<<<< oxcaml
     pp_print_substring ppf s ~pos:!left ~len:(!right - !left);
-||||||| 23e84b8c4d
+||||||| upstream-base
     pp_print_string ppf (String.sub s !left (!right - !left));
 =======
     pp_print_substring ~pos:!left ~len:(!right - !left) ppf s;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     incr right; left := !right;
   in
   while (!right <> len) do

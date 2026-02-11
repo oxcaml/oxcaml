@@ -204,7 +204,7 @@ let macos = make
     "on a MacOS system"
     "not on a MacOS system")
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let not_macos = make
   ~name:"not-macos"
   ~description:"Pass if not running on a MacOS system"
@@ -212,7 +212,7 @@ let not_macos = make
   (Actions_helpers.predicate (not (Ocamltest_config.system = macos_system))
     "not on a MacOS system"
     "on a MacOS system")
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 let not_macos_amd64_tsan = make
   ~name:"not_macos_amd64_tsan"
@@ -223,7 +223,7 @@ let not_macos_amd64_tsan = make
            && (Ocamltest_config.tsan)))
      "not on a MacOS amd64 system with TSan enabled"
      "on a MacOS amd64 system with TSan enabled")
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let arch32 = make
   ~name:"arch32"
@@ -491,12 +491,12 @@ let init () =
     not_bsd;
     linux;
     macos;
-<<<<<<< HEAD
+<<<<<<< oxcaml
     not_macos;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
     not_macos_amd64_tsan;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     arch32;
     arch64;
     has_symlink;

@@ -46,8 +46,8 @@ void caml_do_roots (
   caml_final_do_roots(f, fflags, fdata, d, do_final_val);
 
 }
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 
 CAMLexport void caml_do_local_roots (
   scanning_action f, scanning_action_flags fflags, void* fdata,
@@ -91,4 +91,4 @@ CAMLexport void caml_do_local_roots (
   }
   caml_scan_stack(f, fflags, fdata, current_stack, v_gc_regs);
 }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

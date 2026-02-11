@@ -3,7 +3,7 @@
    expect;
 *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 module Atomic = struct
   module Loc = struct
     type ('a : value_or_null) t = 'a atomic_loc
@@ -579,7 +579,7 @@ Line 3, characters 4-31:
 3 |     mutable field : u [@atomic]
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Atomic record fields must have layout value.
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 (* Basic usage: redefine atomics. *)
 
@@ -846,5 +846,5 @@ module Pattern_matching_wildcard :
     val warning : t -> int
     val allowed : t -> int
   end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 |}]

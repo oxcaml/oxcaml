@@ -561,13 +561,13 @@ Error: Signature mismatch:
          val f : (module s/2) -> unit
        The type "(module s/1) -> unit" is not compatible with the type
          "(module s/2) -> unit"
-<<<<<<< HEAD
+<<<<<<< oxcaml
        Type "(module s/1)" is not compatible with type "(module s/2)"
-||||||| 23e84b8c4d
+||||||| upstream-base
        Type "(module s)" is not compatible with type "(module s/2)"
 =======
        Modules do not match: s is not included in s/2
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
        Line 6, characters 4-17:
          Definition of module type "s/1"
        Line 2, characters 2-15:
@@ -1862,8 +1862,8 @@ Error: Signature mismatch:
        The value "x" is required but not provided
        The value "y" is required but not provided
 |}];;
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 =======
 
 
@@ -2048,4 +2048,4 @@ Error: Signature mismatch:
        The type "'a -> unit" is not compatible with the type "?x:int -> unit"
        A label "?x" was expected
 |}]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

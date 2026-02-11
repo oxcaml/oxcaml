@@ -20,19 +20,19 @@ let err = Syntaxerr.ill_formed_ast
 
 let empty_record loc = err loc "Records cannot be empty."
 let invalid_tuple loc = err loc "Tuples must have at least 2 components."
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let invalid_alias loc = err loc "Alias types must have a name or a jkind."
 let empty_open_tuple_pat loc =
   err loc "Open tuple patterns must have at least one component."
 let short_closed_tuple_pat loc =
   err loc "Closed tuple patterns must have at least 2 components."
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 let empty_open_tuple_pat loc =
   err loc "Open tuple patterns must have at least one component."
 let short_closed_tuple_pat loc =
   err loc "Closed tuple patterns must have at least two components."
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let no_args loc = err loc "Function application with no argument."
 let empty_let loc = err loc "Let with no bindings."
 let mutable_rec_let loc = err loc "Mutable let binding cannot be recursive."
@@ -86,18 +86,18 @@ let iterator =
     let loc = ty.ptyp_loc in
     match ty.ptyp_desc with
     | Ptyp_tuple ([] | [_]) -> invalid_tuple loc
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Ptyp_package (_, cstrs) ->
       List.iter (fun (id, _) -> simple_longident id) cstrs
     | Ptyp_alias (_, None, None) -> invalid_alias loc
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Ptyp_package (_, cstrs) ->
       List.iter (fun (id, _) -> simple_longident id) cstrs
 =======
     | Ptyp_package ptyp ->
       List.iter (fun (id, _) -> simple_longident id) ptyp.ppt_cstrs
     | Ptyp_poly([],_) -> empty_poly_binder loc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | _ -> ()
   in
   let pat self pat =
@@ -110,7 +110,7 @@ let iterator =
     end;
     let loc = pat.ppat_loc in
     match pat.ppat_desc with
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Ppat_tuple (lt, op) -> begin
         match lt, op with
         | ([], Open) -> empty_open_tuple_pat loc
@@ -118,12 +118,12 @@ let iterator =
           short_closed_tuple_pat loc
         | _ -> ()
       end
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Ppat_tuple ([] | [_]) -> invalid_tuple loc
 =======
     | Ppat_tuple (([] | [_]), Closed) -> short_closed_tuple_pat loc
     | Ppat_tuple ([], Open) -> empty_open_tuple_pat loc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Ppat_record ([], _) -> empty_record loc
     | Ppat_construct (id, _) -> simple_longident id
     | Ppat_record (fields, _) ->

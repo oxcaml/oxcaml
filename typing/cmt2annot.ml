@@ -23,13 +23,13 @@ let variables_iterator scope =
   let super = default_iterator in
   let pat sub (type k) (p : k general_pattern) =
     begin match p.pat_desc with
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Tpat_var (id, _, _, _, _) | Tpat_alias (_, id, _, _, _, _, _) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Tpat_var (id, _) | Tpat_alias (_, id, _) ->
 =======
     | Tpat_var (id, _, _) | Tpat_alias (_, id, _, _, _) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         Stypes.record (Stypes.An_ident (p.pat_loc,
                                         Ident.name id,
                                         Annot.Idef scope))
@@ -106,13 +106,13 @@ let rec iterator ~scope rebuild_env =
         bind_bindings exp.exp_loc bindings
     | Texp_let (Nonrecursive, bindings, body) ->
         bind_bindings body.exp_loc bindings
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Texp_match (_, _, f1, _) ->
         bind_cases f1
     | Texp_try (_, f) ->
         bind_cases f
     | Texp_function { params; _ } ->
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Texp_match (_, f1, _) ->
         bind_cases f1
     | Texp_try (_, f) ->
@@ -126,7 +126,7 @@ let rec iterator ~scope rebuild_env =
         bind_cases f1;
         bind_cases f2
     | Texp_function (params, _) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         List.iter (bind_function_param exp.exp_loc) params
     | Texp_letmodule (_, modname, _, _, body ) ->
         Stypes.record (Stypes.An_ident

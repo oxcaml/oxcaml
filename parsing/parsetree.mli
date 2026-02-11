@@ -126,7 +126,7 @@ and core_type_desc =
          *)
   | Ptyp_tuple of (string option * core_type) list
       (** [Ptyp_tuple(tl)] represents a product type:
-<<<<<<< HEAD
+<<<<<<< oxcaml
           - [T1 * ... * Tn]       when [tl] is [(None,T1);...;(None,Tn)]
           - [L1:T1 * ... * Ln:Tn] when [tl] is [(Some L1,T1);...;(Some Ln,Tn)]
           - A mix, e.g. [L1:T1 * T2] when [tl] is [(Some L1,T1);(None,T2)]
@@ -137,7 +137,7 @@ and core_type_desc =
       (** Unboxed tuple types: [Ptyp_unboxed_tuple([(Some l1,P1);...;(Some l2,Pn)]]
           represents a product type [#(l1:T1 * ... * l2:Tn)], and the labels
           are optional.
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Ptyp_tuple of core_type list
       (** [Ptyp_tuple([T1 ; ... ; Tn])]
           represents a product type [T1 * ... * Tn].
@@ -148,7 +148,7 @@ and core_type_desc =
               when [tl] is [(Some L1, T1); ...; (Some Ln, Tn)]
           - A mix, e.g., [L1:T1 * T2]
               when [tl] is [(Some L1, T1); (None, T2)]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
            Invariant: [n >= 2].
         *)
@@ -231,14 +231,14 @@ and core_type_desc =
   | Ptyp_repr of string loc list * core_type
   | Ptyp_extension of extension  (** [[%id]]. *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 and arg_label = Asttypes.arg_label =
     Nolabel
   | Labelled of string
   | Optional of string
 
 and package_type = Longident.t loc * (Longident.t loc * core_type) list
-||||||| 23e84b8c4d
+||||||| upstream-base
 and package_type = Longident.t loc * (Longident.t loc * core_type) list
 =======
 and package_type =
@@ -248,7 +248,7 @@ and package_type =
      ppt_loc: Location.t;
      ppt_attrs: attributes;
     }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** As {!package_type} typed values:
          - [{ppt_path: S; ppt_cstrs: []}] represents [(module S)],
          - [{ppt_path: S; ppt_cstrs: [(t1, T1) ; ... ; (tn, Tn)]}]
@@ -308,7 +308,7 @@ and pattern_desc =
 
            Other forms of interval are recognized by the parser
            but rejected by the type-checker. *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Ppat_unboxed_unit (** [#()] *)
   | Ppat_unboxed_bool of bool (** [#false] or [#true] *)
   | Ppat_tuple of (string option * pattern) list * Asttypes.closed_flag
@@ -318,7 +318,7 @@ and pattern_desc =
             [(Some L1, P1);...;(Some Ln, Pn)]
           - A mix, e.g. [(~L1:P1, P2)] when [pl] is [(Some L1, P1);(None, P2)]
           - If pattern is open, then it also ends in a [..]
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Ppat_tuple of pattern list
       (** Patterns [(P1, ..., Pn)].
 =======
@@ -330,9 +330,9 @@ and pattern_desc =
               when [pl] is [(Some L1, P1); ...; (Some Ln, Pn)]
           - A mix, e.g. [(~L1:P1, P2)]
               when [pl] is [(Some L1, P1); (None, P2)]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
           Invariant:
           - If Closed, [n >= 2].
           - If Open, [n >= 1].
@@ -349,7 +349,7 @@ and pattern_desc =
   | Ppat_construct of
       Longident.t loc
       * ((string loc * jkind_annotation option) list * pattern) option
-||||||| 23e84b8c4d
+||||||| upstream-base
            Invariant: [n >= 2]
         *)
   | Ppat_construct of Longident.t loc * (string loc list * pattern) option
@@ -362,7 +362,7 @@ and pattern_desc =
           - If Open, [n >= 1].
       *)
   | Ppat_construct of Longident.t loc * (string loc list * pattern) option
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       (** [Ppat_construct(C, args)] represents:
             - [C]               when [args] is [None],
             - [C P]             when [args] is [Some ([], P)]
@@ -477,7 +477,7 @@ and expression_desc =
       (** [match E0 with P1 -> E1 | ... | Pn -> En] *)
   | Pexp_try of expression * case list
       (** [try E0 with P1 -> E1 | ... | Pn -> En] *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Pexp_unboxed_unit (** [#()] *)
   | Pexp_unboxed_bool of bool (** [#false] or [#true] *)
   | Pexp_tuple of (string option * expression) list
@@ -488,7 +488,7 @@ and expression_desc =
             when [el] is [(Some L1, E1);...;(Some Ln, En)]
           - A mix, e.g.:
             [(~L1:E1, E2)] when [el] is [(Some L1, E1); (None, E2)]
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Pexp_tuple of expression list
       (** Expressions [(E1, ..., En)]
 =======
@@ -500,7 +500,7 @@ and expression_desc =
               when [el] is [(Some L1, E1); ...; (Some Ln, En)]
           - A mix, e.g., [(~L1:E1, E2)]
               when [el] is [(Some L1, E1); (None, E2)]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
            Invariant: [n >= 2]
         *)
@@ -588,7 +588,7 @@ and expression_desc =
            {{!class_field_kind.Cfk_concrete}[Cfk_concrete]} for methods (not
            values). *)
   | Pexp_object of class_structure  (** [object ... end] *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Pexp_newtype of string loc * jkind_annotation option * expression
       (** [fun (type t) -> E] or [fun (type t : k) -> E] *)
   | Pexp_pack of module_expr
@@ -596,7 +596,7 @@ and expression_desc =
 
            [(module ME : S)] is represented as
            [Pexp_constraint(Pexp_pack ME, Ptyp_package S)] *)
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Pexp_newtype of string loc * expression  (** [fun (type t) -> E] *)
   | Pexp_pack of module_expr
       (** [(module ME)].
@@ -607,7 +607,7 @@ and expression_desc =
   | Pexp_newtype of string loc * expression  (** [fun (type t) -> E] *)
   | Pexp_pack of module_expr * package_type option
       (** [(module ME)] or [(module ME : S)]. *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Pexp_open of open_declaration * expression
       (** - [M.(E)]
             - [let open M in E]

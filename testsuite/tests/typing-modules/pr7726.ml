@@ -61,13 +61,13 @@ module M :
   end
 module type S =
   sig
-<<<<<<< HEAD
+<<<<<<< oxcaml
     module F : functor (X : T) -> T @@ stateless
-||||||| 23e84b8c4d
+||||||| upstream-base
     module F : functor (X : T) -> T
 =======
     module F : (X : T) -> T
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     module rec Fixed : sig type t = F(Fixed).t end
   end
 module Id : (X : T) -> sig type t = X.t end
@@ -126,17 +126,17 @@ module Foo (F : T -> T) = struct
 module M = Foo(Id);;
 M.f 5;;
 [%%expect{|
-<<<<<<< HEAD
+<<<<<<< oxcaml
 module Foo :
   functor (F : T -> T) -> sig val f : Fix(F).Fixed.t -> Fix(F).Fixed.t end
-||||||| 23e84b8c4d
+||||||| upstream-base
 module Foo :
   functor (F : T -> T) -> sig val f : Fix(F).Fixed.t -> Fix(F).Fixed.t end
 module M : sig val f : Fix(Id).Fixed.t -> Fix(Id).Fixed.t end
 =======
 module Foo : (F : T -> T) -> sig val f : Fix(F).Fixed.t -> Fix(F).Fixed.t end
 module M : sig val f : Fix(Id).Fixed.t -> Fix(Id).Fixed.t end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 Line 1:
 Error: In the signature of Fix(Id):
        The definition of "Fixed.t" contains a cycle:

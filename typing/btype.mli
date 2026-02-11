@@ -63,8 +63,8 @@ val generic_level: int
         (* level of polymorphic variables; = Ident.highest_scope *)
 val lowest_level: int
         (* lowest level for type nodes; = Ident.lowest_scope *)
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 =======
 
 val with_new_pool: level:int -> (unit -> 'a) -> 'a * transient_expr list
@@ -79,7 +79,7 @@ val newty3: level:int -> scope:int -> type_desc -> type_expr
         (* Create a type with a fresh id *)
 val newty2: level:int -> type_desc -> type_expr
         (* Create a type with a fresh id and no scope *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 val newgenty: type_desc -> type_expr
         (* Create a generic type *)
@@ -94,13 +94,13 @@ val newgenstub: scope:int -> jkind_lr -> type_expr
 val is_Tvar: type_expr -> bool
 val is_Tunivar: type_expr -> bool
 val is_Tconstr: type_expr -> bool
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val is_Tpoly: type_expr -> bool
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 val is_poly_Tpoly: type_expr -> bool
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 val dummy_method: label
 val type_kind_is_abstract: type_declaration -> bool
 val type_origin: type_declaration -> type_origin
@@ -331,7 +331,7 @@ val method_type : label -> class_signature -> type_expr
 (* Return the type of an instance variable.
    @raises [Assert_failure] if the class has no such method. *)
 val instance_variable_type : label -> class_signature -> type_expr
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
 (**** Forward declarations ****)
 val print_raw: (Format.formatter -> type_expr -> unit) ref
@@ -759,7 +759,7 @@ module Jkind0 : sig
 
   include module type of Jkind
 end
-||||||| 23e84b8c4d
+||||||| upstream-base
 
 (**** Forward declarations ****)
 val print_raw: (Format.formatter -> type_expr -> unit) ref
@@ -768,4 +768,4 @@ val print_raw: (Format.formatter -> type_expr -> unit) ref
 
 val cstr_type_path : constructor_description -> Path.t
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

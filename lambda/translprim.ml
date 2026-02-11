@@ -104,7 +104,7 @@ type loc_kind =
 type atomic_kind =
   | Ref   (* operation on an atomic reference (takes only a pointer) *)
   | Field (* operation on an atomic field (takes a pointer and an offset) *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Loc (* operation on a first-class field (takes a (pointer, offset) pair *)
 
 type atomic_op =
@@ -120,7 +120,7 @@ type atomic_op =
   | Lor
   | Lxor
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   | Loc   (* operation on a first-class field (takes a (pointer, offset) pair *)
 
@@ -129,7 +129,7 @@ type atomic_op =
   | Exchange
   | Cas
   | Faa
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 type prim =
   | Primitive of Lambda.primitive * int
@@ -145,7 +145,7 @@ type prim =
   | Send_cache of Lambda.region_close * Lambda.layout
   | Frame_pointers
   | Identity
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Apply of Lambda.region_close * Lambda.layout
   | Revapply of Lambda.region_close * Lambda.layout
   | Atomic of atomic_op * atomic_kind * Lambda.immediate_or_pointer
@@ -154,14 +154,14 @@ type prim =
     (* For [Peek] and [Poke] the [option] is [None] until the primitive
        specialization code (below) has been run. *)
   | Unsupported of Lambda.primitive
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Apply
   | Revapply
 =======
   | Apply
   | Revapply
   | Atomic of atomic_op * atomic_kind
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let units_with_used_primitives = Hashtbl.create 7
 let add_used_primitive loc env path =
@@ -192,7 +192,7 @@ let gen_array_set_kind mode =
 let prim_sys_argv =
   Lambda.simple_prim_on_values ~name:"caml_sys_argv" ~arity:1 ~alloc:true
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let to_locality ~poly = function
   | Prim_global, _ -> alloc_heap
   | Prim_local, _ -> alloc_local
@@ -200,7 +200,7 @@ let to_locality ~poly = function
     match poly with
     | None -> assert false
     | Some locality -> transl_locality_mode_l locality
-||||||| 23e84b8c4d
+||||||| upstream-base
 let primitives_table =
   create_hashtable 57 [
     "%identity", Identity;
@@ -741,7 +741,7 @@ let primitives_table =
     "%dls_get", Primitive (Pdls_get, 1);
     "%poll", Primitive (Ppoll, 1);
   ]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let to_modify_mode ~poly = function
   | Prim_global, _ -> modify_heap
@@ -2565,7 +2565,7 @@ let lambda_of_loc kind sloc =
   | Loc_FILE -> Lconst (Const_immstring file)
   | Loc_MODULE ->
     let filename = Filename.basename file in
-<<<<<<< HEAD
+<<<<<<< oxcaml
     let name = Compilation_unit.get_current () in
     let module_name =
       match name with
@@ -2573,13 +2573,13 @@ let lambda_of_loc kind sloc =
       | Some comp_unit ->
         Compilation_unit.name_as_string comp_unit
     in
-||||||| 23e84b8c4d
+||||||| upstream-base
     let name = Env.get_unit_name () in
     let module_name = if name = "" then "//"^filename^"//" else name in
 =======
     let name = Env.get_current_unit_name () in
     let module_name = if name = "" then "//"^filename^"//" else name in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     Lconst (Const_immstring module_name)
   | Loc_LOC ->
     let loc = Printf.sprintf "File %S, line %d, characters %d-%d"
@@ -2595,7 +2595,7 @@ let atomic_arity op (kind : atomic_kind) =
   let arity_of_op =
     match op with
     | Load -> 1
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Set -> 2
     | Exchange -> 2
     | Compare_exchange -> 3
@@ -2680,7 +2680,7 @@ let lambda_of_atomic prim_name loc op (kind : atomic_kind)
           Llet (
             Strict, Pvalue { raw_kind = Pgenval; nullable = Non_nullable},
             varg, Lambda.debug_uid_none, loc_arg, Lprim (prim, args, loc))
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
     | Exchange -> 2
     | Cas -> 3
@@ -2750,7 +2750,7 @@ let lambda_of_atomic prim_name loc op (kind : atomic_kind) args =
           in
           let args = ptr :: ofs :: rest in
           Llet (Strict, Pgenval, varg, loc_arg, Lprim (prim, args, loc))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let caml_restore_raw_backtrace =
   Lambda.simple_prim_on_values ~name:"caml_restore_raw_backtrace" ~arity:2
@@ -2842,7 +2842,7 @@ let lambda_of_prim prim_name prim loc args arg_exps =
         ap_region_close = pos;
         ap_mode = alloc_heap;
       }
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Peek None, _ | Poke None, _ ->
       raise(Error(to_location loc, Wrong_layout_for_peek_or_poke prim_name))
   | Peek (Some layout), [ptr] ->
@@ -2866,17 +2866,17 @@ let lambda_of_prim prim_name prim loc args arg_exps =
         loc)
   | Atomic (op, kind, imm_or_ptr), args ->
       lambda_of_atomic prim_name loc op kind imm_or_ptr args
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   | Atomic (op, kind), args ->
       lambda_of_atomic prim_name loc op kind args
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | (Raise _ | Raise_with_backtrace
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Lazy_force _ | Loc _ | Primitive _ | Sys_argv | Comparison _
     | Send _ | Send_self _ | Send_cache _ | Frame_pointers | Identity
     | Apply _ | Revapply _ | Peek _ | Poke _), _ ->
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Lazy_force | Loc _ | Primitive _ | Comparison _
     | Send | Send_self | Send_cache | Frame_pointers | Identity
     | Apply | Revapply), _ ->
@@ -2885,7 +2885,7 @@ let lambda_of_prim prim_name prim loc args arg_exps =
     | Send | Send_self | Send_cache | Frame_pointers | Identity
     | Apply | Revapply
     ), _ ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       raise(Error(to_location loc, Wrong_arity_builtin_primitive prim_name))
 
 let check_primitive_arity loc p =
@@ -2917,19 +2917,19 @@ let check_primitive_arity loc p =
     | Send _ | Send_self _ -> p.prim_arity = 2
     | Send_cache _ -> p.prim_arity = 4
     | Frame_pointers -> p.prim_arity = 0
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Identity | Peek _ -> p.prim_arity = 1
     | Apply _ | Revapply _ | Poke _ -> p.prim_arity = 2
     | Atomic (op, kind, _) -> p.prim_arity = atomic_arity op kind
     | Unsupported _ -> true
-||||||| 23e84b8c4d
+||||||| upstream-base
     | Identity -> p.prim_arity = 1
     | Apply | Revapply -> p.prim_arity = 2
 =======
     | Identity -> p.prim_arity = 1
     | Apply | Revapply -> p.prim_arity = 2
     | Atomic (op, kind) -> p.prim_arity = atomic_arity op kind
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   in
   if not ok then raise(Error(loc, Wrong_arity_builtin_primitive p.prim_name))
 
@@ -3051,7 +3051,7 @@ let lambda_primitive_needs_event_after = function
      an exception or allocate (this is approximated conservatively). These are
      places where we may
      collect the call stack. *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Pscalar op ->
     let { can_raise; result } : _  Scalar.Operation.info =
       Scalar.Operation.info op
@@ -3105,7 +3105,7 @@ let lambda_primitive_needs_event_after = function
   (* [Preinterpret_tagged_int63_as_unboxed_int64] has to allocate in
      bytecode, because int64# is actually represented as a boxed value. *)
   | Preinterpret_tagged_int63_as_unboxed_int64 -> true
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Pduprecord _ | Pccall _ | Pfloatofint | Pnegfloat | Pabsfloat
   | Paddfloat | Psubfloat | Pmulfloat | Pdivfloat | Pstringrefs | Pbytesrefs
   | Pbytessets | Pmakearray (Pgenarray, _) | Pduparray _
@@ -3137,7 +3137,7 @@ let lambda_primitive_needs_event_after = function
   | Pbigstring_set_16 _ | Pbigstring_set_32 _ | Pbigstring_set_64 _
   | Prunstack | Pperform | Preperform | Presume
   | Pbbswap _ | Ppoll -> true
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   | Pphys_equal _
   | Pbytes_to_string | Pbytes_of_string
@@ -3152,7 +3152,7 @@ let lambda_primitive_needs_event_after = function
 
   | Pfield _ | Pfield_computed _ | Psetfield _
   | Psetfield_computed _ | Pfloatfield _ | Psetfloatfield _ | Praise _
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Pufloatfield _ | Psetufloatfield _ | Pmixedfield _ | Psetmixedfield _
   | Poffsetref _
   | Psequor | Psequand | Pnot
@@ -3185,7 +3185,7 @@ let lambda_primitive_needs_event_after = function
   | Pbox_vector (_, _)
   | Punbox_unit
     -> false
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Psequor | Psequand | Pnot | Pnegint | Paddint | Psubint | Pmulint
   | Pdivint _ | Pmodint _ | Pandint | Porint | Pxorint | Plslint | Plsrint
   | Pasrint | Pintcomp _ | Poffsetint _ | Poffsetref _ | Pintoffloat
@@ -3208,7 +3208,7 @@ let lambda_primitive_needs_event_after = function
   | Pintofbint _ | Pctconst _ | Pbswap16 | Pint_as_pointer | Popaque | Pdls_get
   | Pmakelazyblock _
       -> false
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Determine if a primitive should be surrounded by an "after" debug event *)
 let primitive_needs_event_after = function
@@ -3216,12 +3216,12 @@ let primitive_needs_event_after = function
   | External _ | Sys_argv -> true
   | Comparison(comp, knd) ->
       lambda_primitive_needs_event_after (comparison_primitive comp knd)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Lazy_force _ | Send _ | Send_self _ | Send_cache _
   | Apply _ | Revapply _ -> true
   | Raise _ | Raise_with_backtrace | Loc _ | Frame_pointers | Identity
   | Peek _ | Poke _ | Atomic _ | Unsupported _ -> false
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Lazy_force | Send | Send_self | Send_cache
   | Apply | Revapply -> true
   | Raise _ | Raise_with_backtrace | Loc _ | Frame_pointers | Identity -> false
@@ -3233,7 +3233,7 @@ let primitive_needs_event_after = function
   | Frame_pointers | Identity
   | Atomic (_, _)
     -> false
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
     path exp args arg_exps pos =

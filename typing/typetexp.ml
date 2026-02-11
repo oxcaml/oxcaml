@@ -88,7 +88,7 @@ type error =
   | Method_mismatch of string * type_expr * type_expr
   | Opened_object of Path.t option
   | Not_an_object of type_expr
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Unsupported_extension : _ Language_extension.t -> error
   | Polymorphic_optional_param
   | Non_value of
@@ -104,10 +104,10 @@ type error =
        usage_stage : Env.stage}
   | Mismatched_jkind_annotation of
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   | Repeated_tuple_label of string
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -163,17 +163,17 @@ module TyVarEnv : sig
 
   val is_in_scope : string -> bool
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   val add : string -> type_expr -> jkind_lr -> Env.stage -> unit
   (* add a global type variable to the environment, with the given jkind.
      Precondition: the [type_expr] must be a [Tvar] with the given jkind. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
   val add : string -> type_expr -> unit
   (* add a global type variable to the environment *)
 =======
   val add : ?unused:bool ref -> string -> type_expr -> unit
   (* add a global type variable to the environment *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   val with_local_scope : (unit -> 'a) -> 'a
   (* see mli file *)
@@ -239,7 +239,7 @@ module TyVarEnv : sig
     row_context:type_expr option ref list -> string -> type_expr * Env.stage
     (* look up a local type variable; throws Not_found if it isn't in scope *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   val lookup_global_jkind : string -> jkind_lr
     (* look up a global type variable, returning the jkind it was originally
        assigned. Throws [Not_found] if the variable isn't in scope. See
@@ -251,14 +251,14 @@ module TyVarEnv : sig
     (* Remember that a given name is bound to a given type.
 
        If [rigid] is set, also remember that it's fixed at the given jkind. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
   val remember_used : string -> type_expr -> Location.t -> unit
     (* remember that a given name is bound to a given type *)
 =======
   val remember_used :
     ?check:Location.t -> string -> type_expr -> Location.t -> unit
     (* remember that a given name is bound to a given type *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   val globalize_used_variables : policy -> Env.t -> unit -> unit
   (* after finishing with a type signature, used variables are unified to the
@@ -281,30 +281,30 @@ end = struct
   (* These are the "global" type variables: they were in scope before
      we started processing the current type. See Note [Global type variables].
   *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let type_variables =
     ref (TyVarMap.empty : (type_expr * jkind_lr * Env.stage) TyVarMap.t)
-||||||| 23e84b8c4d
+||||||| upstream-base
   let type_variables = ref (TyVarMap.empty : type_expr TyVarMap.t)
 =======
   let type_variables = ref (TyVarMap.empty : (type_expr * bool ref) TyVarMap.t)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   (* These are variables that have been used in the currently-being-checked
      type, possibly including the variables in [type_variables].
   *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   type used_info = {
     ty : type_expr;
     loc : Location.t;
     (* Rigid variables are set at a given jkind.
-||||||| 23e84b8c4d
+||||||| upstream-base
   let used_variables =
     ref (TyVarMap.empty : (type_expr * Location.t) TyVarMap.t)
 =======
   let used_variables =
     ref (TyVarMap.empty : (type_expr * Location.t * bool ref) TyVarMap.t)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
        Note that a rigid variable can still be unified; if it's unified
        with a non-variable type expression like [int], it stays valid as long as
@@ -330,21 +330,21 @@ end = struct
   let is_in_scope name =
     TyVarMap.mem name !type_variables
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let add name v jkind stage =
-||||||| 23e84b8c4d
+||||||| upstream-base
   let add name v =
 =======
   let add ?(unused = ref false) name v =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     assert (not_generic v);
-<<<<<<< HEAD
+<<<<<<< oxcaml
     type_variables := TyVarMap.add name (v, jkind, stage) !type_variables
-||||||| 23e84b8c4d
+||||||| upstream-base
     type_variables := TyVarMap.add name v !type_variables
 =======
     type_variables := TyVarMap.add name (v, unused) !type_variables
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   let narrow () =
     (increase_global_level (), !type_variables)
@@ -360,14 +360,14 @@ end = struct
      ~finally:(fun () -> widen context)
 
   (* throws Not_found if the variable is not in scope *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let lookup_global name =
     let (type_expr, _, stage) = TyVarMap.find name !type_variables in
     (type_expr, stage)
 
   let lookup_global_jkind name =
     snd3 (TyVarMap.find name !type_variables)
-||||||| 23e84b8c4d
+||||||| upstream-base
   let lookup_global_type_variable name =
     TyVarMap.find name !type_variables
 =======
@@ -375,7 +375,7 @@ end = struct
     let (v, unused) = TyVarMap.find name !type_variables in
     unused := false;
     v
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   let get_in_scope_names () =
     let add_name name _ l =
@@ -516,12 +516,12 @@ end = struct
     v
 
   let check_poly_univars env loc vars =
-<<<<<<< HEAD
+<<<<<<< oxcaml
     vars |> List.iter (fun (_, p, _) -> generalize p.univar);
-||||||| 23e84b8c4d
+||||||| upstream-base
     vars |> List.iter (fun (_, p) -> generalize p.univar);
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     let univars =
       vars |> List.map (fun (name, {univar=ty1; jkind_info; _ }, _) ->
         let v = Btype.proxy ty1 in
@@ -565,29 +565,29 @@ end = struct
       associate row_context p;
       p.univar, s
     with Not_found ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       let info = TyVarMap.find name !used_variables in
       instance info.ty, info.stage
-||||||| 23e84b8c4d
+||||||| upstream-base
       instance (fst (TyVarMap.find name !used_variables))
 =======
       let (v, _, unused) = TyVarMap.find name !used_variables in
       unused := false;
       instance v
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       (* This call to instance might be redundant; all variables
          inserted into [used_variables] are non-generic, but some
          might get generalized. *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let remember_used ~rigid name v loc stage =
-||||||| 23e84b8c4d
+||||||| upstream-base
   let remember_used name v loc =
 =======
   let remember_used ?check name v loc =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     assert (not_generic v);
-<<<<<<< HEAD
+<<<<<<< oxcaml
     let rigid =
       match TyVarMap.find name !used_variables with
       | info -> info.rigid
@@ -595,7 +595,7 @@ end = struct
     in
     let info = { ty = v; loc; rigid; stage } in
     used_variables := TyVarMap.add name info !used_variables
-||||||| 23e84b8c4d
+||||||| upstream-base
     used_variables := TyVarMap.add name (v, loc) !used_variables
 =======
     let unused = match check with
@@ -612,7 +612,7 @@ end = struct
       | _ -> ref false
     in
     used_variables := TyVarMap.add name (v, loc, unused) !used_variables
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 
   type flavor = Unification | Universal
@@ -674,21 +674,21 @@ end = struct
       { flavor; unbound_variable_policy; _ } env =
     let r = ref [] in
     TyVarMap.iter
-<<<<<<< HEAD
+<<<<<<< oxcaml
       (fun name { ty; rigid; loc; stage = s } ->
         (match rigid with
         | Some original_jkind ->
           check_jkind env loc name ty { original_jkind; defaulted = false }
         |  None -> ());
-||||||| 23e84b8c4d
+||||||| upstream-base
       (fun name (ty, loc) ->
 =======
       (fun name (ty, loc, unused) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         if flavor = Unification || is_in_scope name then
           let v = new_global_var (Jkind.Builtin.any ~why:Dummy_jkind) in
           let snap = Btype.snapshot () in
-<<<<<<< HEAD
+<<<<<<< oxcaml
           if try unify env v ty; true with _ -> Btype.backtrack snap; false
           then try
               let (type_expr, stage) = lookup_global name in
@@ -716,7 +716,7 @@ end = struct
                           Unbound_type_variable (Pprintast.tyvar_of_name name,
                                                  get_in_scope_names (),
                                                  Some Upstream_compatibility))))
-||||||| 23e84b8c4d
+||||||| upstream-base
           if try unify env v ty; true with _ -> Btype.backtrack snap; false
           then try
             r := (loc, v, lookup_global_type_variable name) :: !r
@@ -746,7 +746,7 @@ end = struct
               let v2 = new_global_var () in
               r := (loc, v, v2) :: !r;
               add ~unused name v2)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       !used_variables;
     used_variables := TyVarMap.empty;
     fun () ->
@@ -788,7 +788,7 @@ let newvar ?name jkind =
 let valid_tyvar_name name =
   name <> "" && name.[0] <> '_'
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let transl_type_param_var env loc attrs name_opt
       (jkind : jkind_lr) jkind_annot =
   let tvar = Ttyp_var (name_opt, jkind_annot) in
@@ -808,7 +808,7 @@ let transl_type_param_var env loc attrs name_opt
     ctyp_loc = loc; ctyp_attributes = attrs }
 
 let transl_type_param env path jkind_default styp =
-||||||| 23e84b8c4d
+||||||| upstream-base
 let transl_type_param env styp =
 =======
 let check_tyvar_name env loc name =
@@ -816,7 +816,7 @@ let check_tyvar_name env loc name =
     raise (Error (loc, env, Invalid_variable_name ("'" ^ name)))
 
 let transl_type_param env styp =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let loc = styp.ptyp_loc in
   let transl_jkind_and_annot_opt jkind_annot name =
     let implicit =
@@ -848,7 +848,7 @@ let transl_type_param env styp =
   in
   let attrs = styp.ptyp_attributes in
   match styp.ptyp_desc with
-<<<<<<< HEAD
+<<<<<<< oxcaml
     Ptyp_any jkind ->
       let name = None in
       let jkind, jkind_annot = transl_jkind_and_annot_opt jkind name in
@@ -857,7 +857,7 @@ let transl_type_param env styp =
       let name = Some name in
       let jkind, jkind_annot = transl_jkind_and_annot_opt jkind name in
       transl_type_param_var env loc attrs name jkind jkind_annot
-||||||| 23e84b8c4d
+||||||| upstream-base
     Ptyp_any ->
       let ty = new_global_var ~name:"_" () in
         { ctyp_desc = Ttyp_any; ctyp_type = ty; ctyp_env = env;
@@ -890,7 +890,7 @@ let transl_type_param env styp =
       in
         { ctyp_desc = Ttyp_var name; ctyp_type = ty; ctyp_env = env;
           ctyp_loc = loc; ctyp_attributes = styp.ptyp_attributes; }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | _ -> assert false
 
 let transl_type_param env path jkind_default styp =
@@ -1012,7 +1012,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       ctyp_loc = loc; ctyp_attributes = styp.ptyp_attributes }
   in
   match styp.ptyp_desc with
-<<<<<<< HEAD
+<<<<<<< oxcaml
     Ptyp_any jkind ->
       let tjkind, tjkind_annot =
         match jkind with
@@ -1077,7 +1077,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
         | [] -> transl_type env ~policy ~row_context ret_mode.mode_modes ret
       in
       loop mode args
-||||||| 23e84b8c4d
+||||||| upstream-base
     Ptyp_any ->
       let ty = TyVarEnv.new_any_var styp.ptyp_loc env policy in
       ctyp Ttyp_any ty
@@ -1130,9 +1130,9 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       else ty1 in
     let ty = newty (Tarrow(l, ty1, cty2.ctyp_type, commu_ok)) in
     ctyp (Ttyp_arrow (l, cty1, cty2)) ty
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Ptyp_tuple stl ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
     let desc, typ =
       transl_type_aux_tuple env ~loc ~policy ~row_context stl
     in
@@ -1150,7 +1150,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
                (List.map (fun (label, ctyp) -> label, ctyp.ctyp_type) tl))
     in
     ctyp (Ttyp_unboxed_tuple tl) ctyp_type
-||||||| 23e84b8c4d
+||||||| upstream-base
     assert (List.length stl >= 2);
     let ctys = List.map (transl_type env ~policy ~row_context) stl in
     let ty = newty (Ttuple (List.map (fun ctyp -> ctyp.ctyp_type) ctys)) in
@@ -1166,7 +1166,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       newty (Ttuple (List.map (fun (l, ctyp) -> l, ctyp.ctyp_type) ctys))
     in
     ctyp (Ttyp_tuple ctys) ty
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Ptyp_constr(lid, stl) ->
       let (path, decl) = Env.lookup_type ~loc:lid.loc lid.txt env in
       let stl =
@@ -1263,14 +1263,14 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             assert false
       in
       ctyp (Ttyp_class (path, lid, args)) ty
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Ptyp_alias(st, alias, jkind) ->
     let desc, typ =
       transl_type_alias env ~policy ~row_context
         mode styp.ptyp_attributes loc st alias jkind
     in
     ctyp desc typ
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Ptyp_alias(st, alias) ->
       let cty =
         try
@@ -1342,7 +1342,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           { ty with ctyp_type = t }
       in
       ctyp (Ttyp_alias (cty, alias)) cty.ctyp_type
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Ptyp_variant(fields, closed, present) ->
       let name = ref None in
       let mkfield l f =
@@ -1469,11 +1469,11 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let ty = newty (Tvariant (make_row more)) in
       ctyp (Ttyp_variant (tfields, closed, present)) ty
   | Ptyp_poly(vars, st) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       let desc, typ =
         transl_type_poly env ~policy ~row_context mode styp.ptyp_loc
           vars st
-||||||| 23e84b8c4d
+||||||| upstream-base
       let vars = List.map (fun v -> v.txt) vars in
       let new_univars, cty =
         with_local_level begin fun () ->
@@ -1494,9 +1494,9 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           end in
           (new_univars, cty)
         end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       in
-<<<<<<< HEAD
+<<<<<<< oxcaml
       ctyp desc typ
   | Ptyp_repr(vars, st) ->
       Language_extension.assert_enabled ~loc Layout_poly
@@ -1534,7 +1534,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let path = !transl_modtype_longident loc env p.txt in
       let ty = newty (Tpackage (path,
                        List.map (fun (s, cty) -> (s.txt, cty.ctyp_type)) ptys))
-||||||| 23e84b8c4d
+||||||| upstream-base
       let ty = cty.ctyp_type in
       let ty_list = TyVarEnv.check_poly_univars env styp.ptyp_loc new_univars in
       let ty_list = List.filter (fun v -> deep_occur v ty) ty_list in
@@ -1566,15 +1566,15 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           pack_path = path;
           pack_cstrs = List.map (fun (s, cty) ->
                          (Longident.flatten s.txt, cty.ctyp_type)) ptys})
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       in
       ctyp (Ttyp_package {
-<<<<<<< HEAD
+<<<<<<< oxcaml
             pack_path = path;
             pack_type = mty;
             pack_fields = ptys;
             pack_txt = p;
-||||||| 23e84b8c4d
+||||||| upstream-base
             pack_path = path;
             pack_type = mty.mty_type;
             pack_fields = ptys;
@@ -1584,7 +1584,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             tpt_type = mty;
             tpt_cstrs = ptys;
             tpt_txt = ptyp.ppt_path;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
            }) ty
   | Ptyp_open (mod_ident, t) ->
       let path, new_env =
@@ -1892,8 +1892,8 @@ and transl_fields env ~policy ~row_context o fields =
       newty (Tfield (s, field_public, ty', ty))) ty_init fields in
   ty, object_fields
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 
 =======
 and transl_package env ~policy ~row_context ptyp =
@@ -1912,7 +1912,7 @@ and transl_package env ~policy ~row_context ptyp =
   let path = !transl_modtype_longident loc env ptyp.ppt_path.txt in
   path, mty, ptys
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (* Make the rows "fixed" in this type, to make universal check easier *)
 let rec make_fixed_univars mark ty =
   if try_mark_node mark ty then
@@ -1940,12 +1940,12 @@ let rec make_fixed_univars mark ty =
 let make_fixed_univars ty =
   with_type_mark (fun mark -> make_fixed_univars mark ty)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let transl_type env policy mode styp =
   transl_type env ~policy ~row_context:[] mode styp
 
 let transl_simple_type_impl env ~new_var_jkind ?univars ~policy mode styp =
-||||||| 23e84b8c4d
+||||||| upstream-base
 let transl_type env policy styp =
   transl_type env ~policy ~row_context:[] styp
 
@@ -1959,7 +1959,7 @@ let transl_type env policy styp =
   transl_type env ~policy ~row_context:[] styp
 
 let transl_simple_type env ?univars ~closed styp =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   TyVarEnv.reset_locals ?univars ();
   let policy = TyVarEnv.make_policy policy new_var_jkind in
   let typ = transl_type env policy mode styp in
@@ -1989,11 +1989,11 @@ let transl_simple_type_univars env styp =
 let transl_simple_type_delayed env mode styp =
   TyVarEnv.reset_locals ();
   let typ, force =
-<<<<<<< HEAD
+<<<<<<< oxcaml
     with_local_level begin fun () ->
       let policy = TyVarEnv.make_policy Open Any in
       let typ = transl_type env policy mode styp in
-||||||| 23e84b8c4d
+||||||| upstream-base
     with_local_level begin fun () ->
       let policy = TyVarEnv.extensible_policy in
       let typ = transl_type env policy styp in
@@ -2001,7 +2001,7 @@ let transl_simple_type_delayed env mode styp =
     with_local_level_generalize begin fun () ->
       let policy = TyVarEnv.extensible_policy in
       let typ = transl_type env policy styp in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       make_fixed_univars typ.ctyp_type;
       (* This brings the used variables to the global level, but doesn't link
          them to their other occurrences just yet. This will be done when
@@ -2058,10 +2058,10 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
 let transl_type_scheme env styp =
   match styp.ptyp_desc with
   | Ptyp_poly (vars, st) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
     transl_type_scheme_poly env styp.ptyp_attributes
       styp.ptyp_loc vars st
-||||||| 23e84b8c4d
+||||||| upstream-base
      let vars = List.map (fun v -> v.txt) vars in
      let univars, typ =
        with_local_level begin fun () ->
@@ -2094,11 +2094,11 @@ let transl_type_scheme env styp =
        ctyp_env = env;
        ctyp_loc = styp.ptyp_loc;
        ctyp_attributes = styp.ptyp_attributes }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | _ ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
     transl_type_scheme_mono env styp
-||||||| 23e84b8c4d
+||||||| upstream-base
       with_local_level
         (fun () -> TyVarEnv.reset (); transl_simple_type env ~closed:false styp)
         ~post:generalize_ctyp
@@ -2107,31 +2107,31 @@ let transl_type_scheme env styp =
       with_local_level_generalize
         (fun () -> TyVarEnv.reset (); transl_simple_type env ~closed:false styp)
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Error report *)
 
 open Format_doc
-<<<<<<< HEAD
+<<<<<<< oxcaml
 open Printtyp
-||||||| 23e84b8c4d
+||||||| upstream-base
 open Format
 open Printtyp
 =======
 open Printtyp.Doc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 module Style = Misc.Style
 let pp_tag ppf t = fprintf ppf "`%s" t
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let pp_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty
-||||||| 23e84b8c4d
+||||||| upstream-base
 let pp_tag ppf t = Format.fprintf ppf "`%s" t
 =======
 let pp_out_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty
 let pp_type ppf ty = Style.as_inline_code Printtyp.Doc.type_expr ppf ty
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let report_unbound_variable_reason ppf = function
   | Some Upstream_compatibility ->
       fprintf ppf "@.Hint: Explicit quantification requires quantifying all \
@@ -2150,7 +2150,7 @@ let report_error_doc env ppf =
       fprintf ppf "A type wildcard %a is not allowed in this type declaration."
         Style.inline_code "_";
       report_unbound_variable_reason ppf reason
-||||||| 23e84b8c4d
+||||||| upstream-base
 
 let report_error env ppf = function
   | Unbound_type_variable (name, in_scope_names) ->
@@ -2171,7 +2171,7 @@ let report_error_doc loc env = function
       Location.errorf ~loc
         "A type wildcard %a is not allowed in this type declaration."
         Style.inline_code "_"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Undefined_type_constructor p ->
       Location.errorf ~loc
         "The type constructor@ %a@ is not yet completely defined"
@@ -2182,24 +2182,24 @@ let report_error_doc loc env = function
          but is here applied to %i argument(s)"
         (Style.as_inline_code longident) lid expected provided
   | Bound_type_variable name ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       fprintf ppf "Already bound type parameter %a"
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf "Already bound type parameter %a"
         (Style.as_inline_code Pprintast.tyvar) name
 =======
       Location.errorf ~loc "Already bound type parameter %a"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         (Style.as_inline_code Pprintast.Doc.tyvar) name
   | Recursive_type ->
       Location.errorf ~loc "This type is recursive"
   | Type_mismatch trace ->
       let msg = Format_doc.Doc.msg in
-<<<<<<< HEAD
+<<<<<<< oxcaml
       Printtyp.report_unification_error ppf Env.empty trace
         (msg "This type")
         (msg "should be an instance of type")
-||||||| 23e84b8c4d
+||||||| upstream-base
       Printtyp.report_unification_error ppf Env.empty trace
         (function ppf ->
            fprintf ppf "This type")
@@ -2210,14 +2210,14 @@ let report_error_doc loc env = function
         Errortrace_report.unification ppf Env.empty trace
           (msg "This type")
           (msg "should be an instance of type")
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Alias_type_mismatch trace ->
       let msg = Format_doc.Doc.msg in
-<<<<<<< HEAD
+<<<<<<< oxcaml
       Printtyp.report_unification_error ppf Env.empty trace
         (msg "This alias is bound to type")
         (msg "but is used as an instance of type")
-||||||| 23e84b8c4d
+||||||| upstream-base
       Printtyp.report_unification_error ppf Env.empty trace
         (function ppf ->
            fprintf ppf "This alias is bound to type")
@@ -2228,7 +2228,7 @@ let report_error_doc loc env = function
         Errortrace_report.unification ppf Env.empty trace
           (msg "This alias is bound to type")
           (msg "but is used as an instance of type")
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Present_has_conjunction l ->
       Location.errorf ~loc "The present constructor %a has a conjunctive type"
         Style.inline_code l
@@ -2257,13 +2257,13 @@ let report_error_doc loc env = function
           pp_out_type (Out_type.tree_of_typexp Type ty')
         )
   | Not_a_variant ty ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       fprintf ppf
         "@[The type %a@ does not expand to a polymorphic variant type@]"
         (Style.as_inline_code Printtyp.type_expr) ty;
       begin match get_desc ty with
         | Tvar { name = Some s } ->
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf
         "@[The type %a@ does not expand to a polymorphic variant type@]"
         (Style.as_inline_code Printtyp.type_expr) ty;
@@ -2275,7 +2275,7 @@ let report_error_doc loc env = function
         pp_type ty
         begin match get_desc ty with
         | Tvar (Some s) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
            (* PR#7012: help the user that wrote 'Foo instead of `Foo *)
            Misc.did_you_mean  ["`" ^ s]
         | _ -> None
@@ -2290,7 +2290,7 @@ let report_error_doc loc env = function
       Location.errorf ~loc
         "The type variable name %a is not allowed in programs"
         Style.inline_code name
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Cannot_quantify (name, reason) ->
       fprintf ppf
         "@[<hov>The universal type variable %a cannot be generalized:@ "
@@ -2329,7 +2329,7 @@ let report_error_doc loc env = function
         Pprintast.Doc.tyvar name
         Jkind.format explicit_jkind
         Jkind.format implicit_jkind
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Cannot_quantify (name, v) ->
       fprintf ppf
         "@[<hov>The universal type variable %a cannot be generalized:@ "
@@ -2356,7 +2356,7 @@ let report_error_doc loc env = function
         "The universal type variable %a cannot be generalized:@ %a"
         (Style.as_inline_code Pprintast.Doc.tyvar) name
         explanation v
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Multiple_constraints_on_type s ->
       Location.errorf ~loc "Multiple constraints for type %a"
         (Style.as_inline_code longident) s
@@ -2373,7 +2373,7 @@ let report_error_doc loc env = function
              Some p -> fprintf ppf "@ %a" (Style.as_inline_code path) p
            | None -> fprintf ppf "") nm
   | Not_an_object ty ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       fprintf ppf "@[The type %a@ is not an object type@]"
         (Style.as_inline_code Printtyp.type_expr) ty
   | Unsupported_extension ext ->
@@ -2431,7 +2431,7 @@ let report_error_doc loc env = function
       Env.print_stage usage_stage
       Env.print_stage intro_stage
       Env.print_with_quote_promote (name, intro_stage, usage_stage)
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf "@[The type %a@ is not an object type@]"
         (Style.as_inline_code Printtyp.type_expr) ty
 =======
@@ -2440,19 +2440,19 @@ let report_error_doc loc env = function
   | Repeated_tuple_label l ->
       Location.errorf ~loc "@[This tuple type has two labels named %a@]"
         Style.inline_code l
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let () =
   Location.register_error_of_exn
     (function
       | Error (loc, env, err) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
         Some (Location.error_of_printer ~loc (report_error_doc env) err)
-||||||| 23e84b8c4d
+||||||| upstream-base
         Some (Location.error_of_printer ~loc (report_error env) err)
 =======
         Some (report_error_doc loc env err)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       | Error_forward err ->
         Some err
       | _ ->

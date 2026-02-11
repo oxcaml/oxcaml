@@ -17,11 +17,11 @@
 
 #include <math.h>
 #include <stdbool.h>
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 =======
 #include <assert.h>
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #include "caml/alloc.h"
 #include "caml/backtrace.h"
 #include "caml/backtrace_prim.h"
@@ -336,14 +336,14 @@
  * Some callbacks are run at allocation time, for allocations from
  * Caml (see under "Sampling" above). Other allocation callbacks, and
  * all post-allocation callbacks, are run during
-<<<<<<< HEAD
+<<<<<<< oxcaml
  * `caml_memprof_run_callbacks_exn()`, which is called by the
  * runtime's general pending-action mechanism at poll points.
  *
  * We set the domain's action-pending flag when we notice we have
  * pending callbacks. Caml drops into the runtime at a poll point, and
  * calls `caml_memprof_run_callbacks_exn()`, whenever the
-||||||| 23e84b8c4d
+||||||| upstream-base
 /* type aliases for the hierarchy of structures for managing memprof status. */
 =======
  * `caml_memprof_run_callbacks_res()`, which is called by the
@@ -352,7 +352,7 @@
  * We set the domain's action-pending flag when we notice we have
  * pending callbacks. Caml drops into the runtime at a poll point, and
  * calls `caml_memprof_run_callbacks_res()`, whenever the
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
  * action-pending flag is set, whether or not memprof set it. So
  * memprof maintains its own per-domain `pending` flag, to avoid
  * suspending/unsuspending sampling, and checking all the entries
@@ -463,7 +463,7 @@ typedef struct memprof_orphan_table_s memprof_orphan_table_s,
 /* the mask for a given callback index */
 #define CB_MASK(cb) (1 << ((cb) - 1))
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* Structure for each tracked allocation. Six words (with many spare
  * bits in the final word). */
 
@@ -492,7 +492,7 @@ struct entry_s {
   /* The source of the allocation: normal allocations, interning,
    * or custom_mem (CAML_MEMPROF_SRC_*). */
   unsigned int source : 2;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 /* How many bits required for an allocation source */
 #define SRC_TYPE_BITS    2
@@ -526,7 +526,7 @@ struct entry_s {
   /* The source of the allocation: normal allocations, interning,
    * or custom_mem (CAML_MEMPROF_SRC_*). */
   unsigned int source : SRC_TYPE_BITS;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   /* Is `block` actually an offset? */
   bool offset : 1;
@@ -670,8 +670,8 @@ struct memprof_domain_s {
 struct memprof_orphan_table_s {
   /* An orphaned entries table */
   entries_s entries;
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 /**** Create and destroy thread state structures ****/
 =======
 
@@ -1271,9 +1271,9 @@ static uintnat rand_binom(memprof_domain_t domain, uintnat len)
 }
 
 /**** Create and destroy thread state structures ****/
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   /* next orphaned table in a linked list. */
   memprof_orphan_table_t next;
 };
@@ -1290,20 +1290,20 @@ static atomic_uintnat orphans_present;
 /**** Initializing and clearing entries tables ****/
 
 static void entries_init(entries_t es, size_t min_capacity, value config)
-||||||| 23e84b8c4d
+||||||| upstream-base
 static memprof_thread_t thread_create(memprof_domain_t domain)
 =======
 /* Create a thread state structure attached to `domain`. */
 
 static memprof_thread_t thread_create(memprof_domain_t domain)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   es->t = NULL;
   es->min_capacity = min_capacity;
   es->capacity = es->size = es->young = es->evict = es->active = 0;
   es->config = config;
-||||||| 23e84b8c4d
+||||||| upstream-base
   memprof_thread_t thread = caml_stat_alloc(sizeof(memprof_thread_s));
   if (!thread) {
     return NULL;
@@ -1333,12 +1333,12 @@ static memprof_thread_t thread_create(memprof_domain_t domain)
   domain->threads = thread;
 
   return thread;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 static void entries_clear(entries_t es)
-||||||| 23e84b8c4d
+||||||| upstream-base
 static void thread_destroy(memprof_thread_t thread)
 =======
 /* Destroy a thread state structure.  If the thread's entries table is
@@ -1346,13 +1346,13 @@ static void thread_destroy(memprof_thread_t thread)
  * domain) then its entries will be lost. */
 
 static void thread_destroy(memprof_thread_t thread)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   if (es->t) {
     caml_stat_free(es->t);
     es->t = NULL;
-||||||| 23e84b8c4d
+||||||| upstream-base
   memprof_domain_t domain = thread->domain;
 
   if (domain->current == thread) {
@@ -1373,9 +1373,9 @@ static void thread_destroy(memprof_thread_t thread)
 
   if (domain->current == thread) {
     domain->current = NULL;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   }
-<<<<<<< HEAD
+<<<<<<< oxcaml
   es->capacity = es->size = es->young = es->evict = es->active = 0;
   es->config = CONFIG_NONE;
 }
@@ -1711,7 +1711,7 @@ static void orphans_adopt(memprof_domain_t domain)
   /* Find the end of the domain's orphans list */
   memprof_orphan_table_t *p = &domain->orphans;
   while(*p) {
-||||||| 23e84b8c4d
+||||||| upstream-base
   /* remove thread from the per-domain list. Could go faster if we
    * used a doubly-linked list, but that's premature optimisation
    * at this point. */
@@ -1724,17 +1724,17 @@ static void orphans_adopt(memprof_domain_t domain)
   memprof_thread_t *p = &domain->threads;
   while (*p != thread) {
     CAMLassert(*p); /* checks that thread is on the list */
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     p = &(*p)->next;
   }
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
   caml_plat_lock_blocking(&orphans_lock);
   if (orphans) {
     *p = orphans;
     orphans = NULL;
     atomic_store_release(&orphans_present, 0);
-||||||| 23e84b8c4d
+||||||| upstream-base
 
   *p = thread->next;
 
@@ -1777,11 +1777,11 @@ static void domain_destroy(memprof_domain_t domain)
     memprof_thread_t next = thread->next;
     thread_destroy(thread);
     thread = next;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   }
-<<<<<<< HEAD
+<<<<<<< oxcaml
   caml_plat_unlock(&orphans_lock);
-||||||| 23e84b8c4d
+||||||| upstream-base
 
   caml_stat_free(domain);
 =======
@@ -1789,20 +1789,20 @@ static void domain_destroy(memprof_domain_t domain)
   entries_clear(&domain->entries); /* In case allocation failed */
   caml_stat_free(domain->callstack_buffer);
   caml_stat_free(domain);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* Destroy an orphan table. */
 
 static void orphans_destroy(memprof_orphan_table_t ot)
-||||||| 23e84b8c4d
+||||||| upstream-base
 static memprof_domain_t domain_create(caml_domain_state *caml_state)
 =======
 /* Create a domain state structure */
 
 static memprof_domain_t domain_create(caml_domain_state *caml_state)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 {
   entries_clear(&ot->entries);
   caml_stat_free(ot);
@@ -1832,9 +1832,9 @@ static void orphans_update_pending(memprof_domain_t domain)
       p = &ot->next;
     }
   }
-<<<<<<< HEAD
+<<<<<<< oxcaml
   domain->orphans_pending = pending;
-||||||| 23e84b8c4d
+||||||| upstream-base
 
   domain->caml_state = caml_state;
   domain->threads = NULL;
@@ -1871,10 +1871,10 @@ static void orphans_update_pending(memprof_domain_t domain)
     domain = NULL;
   }
   return domain;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /**** Statistical sampling ****/
 
 /* We use a low-quality SplitMix64 PRNG to initialize state vectors
@@ -3064,7 +3064,7 @@ static void set_config(memprof_domain_t domain, value config)
     thread = thread->next;
   }
 }
-||||||| 23e84b8c4d
+||||||| upstream-base
 /**** Interface to domain module ***/
 
 void caml_memprof_new_domain(caml_domain_state *parent,
@@ -5047,7 +5047,7 @@ CAMLexport void caml_memprof_enter_thread(memprof_thread_t thread)
 }
 
 /**** Interface to OCaml ****/
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
 {
@@ -5098,7 +5098,7 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
     caml_initialize(&Field(config, i), Field(tracker,
                                              i - CONFIG_FIELD_FIRST_CALLBACK));
   }
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
 
   set_config(domain, config);
@@ -5149,7 +5149,7 @@ CAMLprim value caml_memprof_participate(value config)
   set_action_pending_as_needed(domain);
 
   CAMLreturn(Val_unit);
-||||||| 23e84b8c4d
+||||||| upstream-base
   caml_memprof_renew_minor_sample();
 
   callstack_size = sz;
@@ -5189,7 +5189,7 @@ static void empty_entry_array(struct entry_array *ea) {
   set_action_pending_as_needed(domain);
 
   CAMLreturn(config);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }
 
 CAMLprim value caml_memprof_stop(value unit)
@@ -5200,7 +5200,7 @@ CAMLprim value caml_memprof_stop(value unit)
   CAMLassert(thread);
 
   /* Final attempt to run allocation callbacks; don't use
-<<<<<<< HEAD
+<<<<<<< oxcaml
    * caml_memprof_run_callbacks_exn as we only really need allocation
    * callbacks now. */
   if (!thread->suspended) {
@@ -5208,7 +5208,7 @@ CAMLprim value caml_memprof_stop(value unit)
     value res = entries_run_callbacks_exn(thread, &thread->entries);
     update_suspended(domain, false);
     (void) caml_raise_async_if_exception(res, "memprof callback");
-||||||| 23e84b8c4d
+||||||| upstream-base
   /* Discard the tracked blocks in the global entries array. */
   empty_entry_array(&entries_global);
 =======
@@ -5219,7 +5219,7 @@ CAMLprim value caml_memprof_stop(value unit)
     caml_result res = entries_run_callbacks_res(thread, &thread->entries);
     update_suspended(domain, false);
     (void) caml_get_value_or_raise(res);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   }
 
   value config = thread_config(thread);
@@ -5236,7 +5236,7 @@ CAMLprim value caml_memprof_stop(value unit)
 
 CAMLprim value caml_memprof_discard(value config)
 {
-<<<<<<< HEAD
+<<<<<<< oxcaml
   CAMLparam1(config);
   uintnat status = Status(config);
   CAMLassert((status == CONFIG_STATUS_STOPPED) ||
@@ -5255,7 +5255,7 @@ CAMLprim value caml_memprof_discard(value config)
   Set_status(config, CONFIG_STATUS_DISCARDED);
 
   CAMLreturn(Val_unit);
-||||||| 23e84b8c4d
+||||||| upstream-base
 #endif
 =======
   uintnat status = Status(config);
@@ -5275,5 +5275,5 @@ CAMLprim value caml_memprof_discard(value config)
   Set_status(config, CONFIG_STATUS_DISCARDED);
 
   return Val_unit;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }

@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+<<<<<<< oxcaml
 #define CAML_NAME_SPACE
 #include <caml/config.h>
 #ifdef WITH_ADDRESS_SANITIZER
@@ -106,7 +106,7 @@ value sort2(value cmp_clos, value a, value b)
   Field(ret,0) = *vs[0];
   Field(ret,1) = *vs[1];
   CAMLreturn (ret);
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 #include <caml/mlvalues.h>
 #include <caml/alloc.h>
@@ -187,5 +187,5 @@ value sort2(value cmp_clos, value a, value b)
   qsort(vs, 2, sizeof(value*), &cmp_callback);
   cmp_fn = NULL;
   CAMLreturn (caml_alloc_2(0, *vs[0], *vs[1]));
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 }

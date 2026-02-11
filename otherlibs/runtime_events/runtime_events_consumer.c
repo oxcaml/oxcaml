@@ -103,7 +103,7 @@ static int format_runtime_ring_file(
     }
   } else {
     /* Attaching to a process by directory and PID */
-<<<<<<< HEAD
+<<<<<<< oxcaml
     ring_file = caml_stat_alloc_noexc(RING_FILE_NAME_MAX_LEN);
     if (ring_file == NULL) {
       ret = E_ALLOC_FAIL;
@@ -111,7 +111,7 @@ static int format_runtime_ring_file(
     }
 
     int err;
-||||||| 23e84b8c4d
+||||||| upstream-base
   /* In this case we are reading the ring for a different process */
     if (runtime_events_path) {
       char* path_u8 = caml_stat_strdup_of_os(runtime_events_path);
@@ -126,7 +126,7 @@ static int format_runtime_ring_file(
       goto fail_alloc_file;
     }
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     if (input_path) {
       err = snprintf_os(ring_file, RING_FILE_NAME_MAX_LEN,
                         T("%s/%d.events"), input_path, input_pid);
@@ -1351,8 +1351,8 @@ CAMLprim value caml_ml_runtime_events_read_poll(value wrapper,
 
   CAMLreturn(Val_int(events_consumed));
 }
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 };
 =======
 
@@ -1363,4 +1363,4 @@ CAMLprim uint64_t caml_ml_runtime_current_timestamp_unboxed(value unit) {
 CAMLprim value caml_ml_runtime_current_timestamp(value unit) {
   return caml_copy_int64(caml_time_counter());
 }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

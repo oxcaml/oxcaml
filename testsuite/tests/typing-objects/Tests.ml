@@ -730,16 +730,16 @@ Error: Multiple definition of the type name "t".
 
 fun x -> (x :> < m : 'a -> 'a > as 'a);;
 [%%expect{|
-<<<<<<< HEAD
+<<<<<<< oxcaml
 - : < m : (< m : 'a -> 'a > as 'a) -> 'a; .. > -> 'a = <fun>
-||||||| 23e84b8c4d
+||||||| upstream-base
 - : < m : (< m : 'a > as 'b) -> 'b as 'a; .. > -> 'b = <fun>
 =======
 - : < m : (< m : 'a > as 'b) -> 'b as 'a; .. > -> 'b = <fun>
 |}, Principal{|
 - : < m : < m : 'a > -> < m : 'a > as 'a; .. > -> (< m : 'b -> 'b > as 'b) =
 <fun>
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 |}];;
 
 fun x -> (x : int -> bool :> 'a -> 'a);;

@@ -23,7 +23,7 @@ type ('a : any mod separable) t = 'a array
 
 (* Array operations *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 external length : ('a : value_or_null mod separable).
   ('a array[@local_opt]) @ immutable -> int @@ stateless
   = "%array_length"
@@ -55,7 +55,7 @@ external unsafe_fill : ('a : value_or_null mod separable).
   'a array -> int -> int -> 'a -> unit @@ portable = "caml_array_fill"
 external create_float : ('a : value_or_null mod separable).
   int -> float array @@ portable = "caml_array_create_float"
-||||||| 23e84b8c4d
+||||||| upstream-base
 external length : 'a array -> int = "%array_length"
 external get: 'a array -> int -> 'a = "%array_safe_get"
 external set: 'a array -> int -> 'a -> unit = "%array_safe_set"
@@ -87,7 +87,7 @@ external unsafe_blit :
 external unsafe_fill :
   'a array -> int -> int -> 'a -> unit = "caml_array_fill"
 external create_float: int -> float array = "caml_array_create_float"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 module Floatarray = struct
   external create : int -> floatarray @@ portable = "caml_floatarray_create"

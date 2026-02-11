@@ -723,38 +723,38 @@ let compile_implementation_linear unix output_prefix ~progname ~ppf_dump =
       linear_gen_implementation ~ppf_dump unix progname)
 
 (* Error report *)
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 module Style = Misc.Style
 =======
 module Style = Misc.Style
 let fprintf, dprintf = Format_doc.fprintf, Format_doc.dprintf
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let fprintf = Format_doc.fprintf
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 let report_error ppf = function
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let report_error_doc ppf = function
   | Assembler_error file ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
     fprintf ppf "Assembler error, input left in file %a"
       Location.Doc.quoted_filename file
   | Binary_emitter_mismatch file ->
     fprintf ppf "Binary emitter verification failed for %a"
       Location.Doc.quoted_filename file
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf "Assembler error, input left in file %a"
         Location.print_filename file
 =======
       fprintf ppf "Assembler error, input left in file %a"
         Location.Doc.quoted_filename file
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Mismatched_for_pack saved ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
     let msg prefix =
       if Compilation_unit.Prefix.is_empty prefix
       then "without -for-pack"
@@ -766,7 +766,7 @@ let report_error_doc ppf = function
   | Asm_generation (fn, err) ->
     fprintf ppf "Error producing assembly code for %s: %a" fn
       Emitaux.report_error_doc err
-||||||| 23e84b8c4d
+||||||| upstream-base
     let msg = function
        | None -> Format.dprintf "without %a" Style.inline_code "-for-pack"
        | Some s -> Format.dprintf "with %a" Style.inline_code ("-for-pack " ^ s)
@@ -790,14 +790,14 @@ let report_error_doc ppf = function
      fprintf ppf
        "Error producing assembly code for function %a: %a"
        Style.inline_code fn Emitaux.report_error_doc err
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let () =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   Location.register_error_of_exn (function
     | Error err -> Some (Location.error_of_printer_file report_error_doc err)
     | _ -> None)
-||||||| 23e84b8c4d
+||||||| upstream-base
   Location.register_error_of_exn
     (function
       | Error err -> Some (Location.error_of_printer_file report_error err)
@@ -809,6 +809,6 @@ let () =
       | Error err -> Some (Location.error_of_printer_file report_error_doc err)
       | _ -> None
     )
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let report_error = Format_doc.compat report_error_doc

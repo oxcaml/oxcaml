@@ -184,7 +184,7 @@ let _ = add_directive "mod_use" (Directive_string (with_error_fmt dir_mod_use))
 
 (* Install, remove a printer *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 module Printer = struct
   type kind =
     | Old of Types.type_expr
@@ -312,7 +312,7 @@ let find_printer lid =
       in Error report
     | Some kind -> Ok (path, kind)
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 module Printer = struct
   type kind =
     | Old of Types.type_expr
@@ -431,7 +431,7 @@ let find_printer lid =
     | Some kind -> Ok (path, kind)
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let install_printer_by_kind path kind =
   let v = eval_value_path !toplevel_env path in
   match kind with
@@ -454,13 +454,13 @@ let install_printer_by_kind path kind =
 let remove_installed_printer path =
   match remove_printer path with
   | () -> Ok ()
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | exception Not_found ->
     let report ppf =
       fprintf ppf "The printer named %a is not installed.@."
         Printtyp.Compat.path path
     in Error report
-||||||| 23e84b8c4d
+||||||| upstream-base
   | exception Not_found ->
     let report ppf =
       fprintf ppf "The printer named %a is not installed.@."
@@ -468,7 +468,7 @@ let remove_installed_printer path =
     in Error report
 =======
   | exception Not_found -> Error (`No_active_printer path)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let dir_install_printer ppf lid =
   match Topprinters.find_printer !toplevel_env lid with

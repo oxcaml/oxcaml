@@ -84,9 +84,9 @@ let parse_id_payload txt loc options ~default ~empty payload =
   | Ok a -> a
   | Error () -> default
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let parse_inline_attribute attr : inline_attribute =
-||||||| 23e84b8c4d
+||||||| upstream-base
 let get_optional_payload get_from_exp =
   let open Parsetree in
   function
@@ -205,7 +205,7 @@ let parse_id_payload txt loc ~default ~empty cases payload =
       | None -> warn ()
 
 let parse_inline_attribute attr =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   match attr with
   | None -> Default_inline
   | Some ({Parsetree.attr_name = {txt;loc}; attr_payload = payload} as attr) ->

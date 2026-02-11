@@ -106,7 +106,7 @@ module Typ = struct
         | Ptyp_var (x, jkind) ->
             let jkind = Option.map loop_jkind jkind in
             check_variable var_names t.ptyp_loc x;
-<<<<<<< HEAD
+<<<<<<< oxcaml
             Ptyp_var (x, jkind)
         | Ptyp_arrow (label,core_type,core_type',modes,modes') ->
             Ptyp_arrow(label, loop core_type, loop core_type', modes, modes')
@@ -114,7 +114,7 @@ module Typ = struct
             Ptyp_tuple (List.map (fun (l, t) -> l, loop t) lst)
         | Ptyp_unboxed_tuple lst ->
           Ptyp_unboxed_tuple (List.map (fun (l, t) -> l, loop t) lst)
-||||||| 23e84b8c4d
+||||||| upstream-base
             Ptyp_var x
         | Ptyp_arrow (label,core_type,core_type') ->
             Ptyp_arrow(label, loop core_type, loop core_type')
@@ -125,7 +125,7 @@ module Typ = struct
             Ptyp_arrow(label, loop core_type, loop core_type')
         | Ptyp_tuple lst ->
             Ptyp_tuple (List.map (fun (l, t) -> l, loop t) lst)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         | Ptyp_constr( { txt = Longident.Lident s }, [])
           when List.mem s var_names ->
             Ptyp_var (s, None)
@@ -142,7 +142,7 @@ module Typ = struct
         | Ptyp_variant(row_field_list, flag, lbl_lst_option) ->
             Ptyp_variant(List.map loop_row_field row_field_list,
                          flag, lbl_lst_option)
-<<<<<<< HEAD
+<<<<<<< oxcaml
         | Ptyp_poly(var_lst, core_type) ->
           let var_lst =
             List.map (fun (v, jkind) ->
@@ -153,7 +153,7 @@ module Typ = struct
             Ptyp_poly(var_lst, loop core_type)
         | Ptyp_package(longident,lst) ->
             Ptyp_package(longident,List.map (fun (n,typ) -> (n,loop typ) ) lst)
-||||||| 23e84b8c4d
+||||||| upstream-base
         | Ptyp_poly(string_lst, core_type) ->
           List.iter (fun v ->
             check_variable var_names t.ptyp_loc v.txt) string_lst;
@@ -167,7 +167,7 @@ module Typ = struct
             Ptyp_poly(string_lst, loop core_type)
         | Ptyp_package ptyp ->
             Ptyp_package (loop_package_type ptyp)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         | Ptyp_open (mod_ident, core_type) ->
             Ptyp_open (mod_ident, loop core_type)
         | Ptyp_quote core_type ->
@@ -236,16 +236,16 @@ module Pat = struct
   let alias ?loc ?attrs a b = mk ?loc ?attrs (Ppat_alias (a, b))
   let constant ?loc ?attrs a = mk ?loc ?attrs (Ppat_constant a)
   let interval ?loc ?attrs a b = mk ?loc ?attrs (Ppat_interval (a, b))
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let unboxed_unit ?loc ?attrs () = mk ?loc ?attrs Ppat_unboxed_unit
   let unboxed_bool ?loc ?attrs b = mk ?loc ?attrs (Ppat_unboxed_bool b)
   let tuple ?loc ?attrs a b = mk ?loc ?attrs (Ppat_tuple (a, b))
   let unboxed_tuple ?loc ?attrs a b = mk ?loc ?attrs (Ppat_unboxed_tuple (a, b))
-||||||| 23e84b8c4d
+||||||| upstream-base
   let tuple ?loc ?attrs a = mk ?loc ?attrs (Ppat_tuple a)
 =======
   let tuple ?loc ?attrs a b = mk ?loc ?attrs (Ppat_tuple (a, b))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let construct ?loc ?attrs a b = mk ?loc ?attrs (Ppat_construct (a, b))
   let variant ?loc ?attrs a b = mk ?loc ?attrs (Ppat_variant (a, b))
   let record ?loc ?attrs a b = mk ?loc ?attrs (Ppat_record (a, b))
@@ -308,16 +308,16 @@ module Exp = struct
   let lazy_ ?loc ?attrs a = mk ?loc ?attrs (Pexp_lazy a)
   let poly ?loc ?attrs a b = mk ?loc ?attrs (Pexp_poly (a, b))
   let object_ ?loc ?attrs a = mk ?loc ?attrs (Pexp_object a)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let newtype ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_newtype (a, b, c))
   let pack ?loc ?attrs a = mk ?loc ?attrs (Pexp_pack a)
-||||||| 23e84b8c4d
+||||||| upstream-base
   let newtype ?loc ?attrs a b = mk ?loc ?attrs (Pexp_newtype (a, b))
   let pack ?loc ?attrs a = mk ?loc ?attrs (Pexp_pack a)
 =======
   let newtype ?loc ?attrs a b = mk ?loc ?attrs (Pexp_newtype (a, b))
   let pack ?loc ?attrs a b = mk ?loc ?attrs (Pexp_pack (a, b))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let open_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_open (a, b))
   let letop ?loc ?attrs let_ ands body =
     mk ?loc ?attrs (Pexp_letop {let_; ands; body})

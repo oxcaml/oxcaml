@@ -26,13 +26,13 @@ type modname = string
 type filename = string
 type file_prefix = string
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* CR lmaurer: These overlap with functionality in [Compilation_unit] **)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 type error = Invalid_encoding of filename
 exception Error of error
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (** [modulize s] capitalizes the first letter of [s]. *)
 val modulize: string -> modname
@@ -106,11 +106,11 @@ val kind: t -> intf_or_impl
     by {!is_unit_name}[ ~strict:true]. *)
 val check_unit_name : t -> unit
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (** [make ~check ~source_file ~for_pack_prefix kind prefix] associates both the
     [source_file] and the module name {!modname_from_source}[ target_prefix] to
     the prefix filesystem path [prefix].
-||||||| 23e84b8c4d
+||||||| upstream-base
 (** [make ~check ~source_file prefix] associates both the
     [source_file] and the module name {!modname_from_source}[ target_prefix] to
     the prefix filesystem path [prefix].
@@ -118,14 +118,14 @@ val check_unit_name : t -> unit
 (** [make ~check ~source_file kind prefix] associates both the
     [source_file] and the module name {!lax_modname_from_source}[ target_prefix]
     to the prefix filesystem path [prefix].
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
    If [check_modname=true], this function emits a warning if the derived module
    name is not valid according to {!check_unit_name}.
 *)
 val make:
     ?check_modname:bool -> source_file:filename ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
     for_pack_prefix:Compilation_unit.Prefix.t ->
     intf_or_impl -> file_prefix -> t
 
@@ -144,11 +144,11 @@ val make_with_known_compilation_unit:
 val make_dummy: input_name:string -> Compilation_unit.t -> t
 
 val set_original_source_file_name : t -> filename -> t
-||||||| 23e84b8c4d
+||||||| upstream-base
 val make: ?check_modname:bool -> source_file:filename -> file_prefix -> t
 =======
     intf_or_impl -> file_prefix -> t
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (** {1:artifact_function Build artifacts }*)
 module Artifact: sig
@@ -180,12 +180,12 @@ module Artifact: sig
    (** [modname a] is the module name of the compilation artifact.*)
    val modname: t -> Compilation_unit.t
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
    (** [from_filename ~for_pack_prefix filename] reconstructs the module name
        [modname_from_source filename] associated to the artifact [filename],
        assuming the pack prefix is [for_pack_prefix]. *)
    val from_filename: for_pack_prefix:Compilation_unit.Prefix.t -> filename -> t
-||||||| 23e84b8c4d
+||||||| upstream-base
    (** [from_filename filename] reconstructs the module name
        [modname_from_source filename] associated to the artifact [filename]. *)
    val from_filename: filename -> t
@@ -194,7 +194,7 @@ module Artifact: sig
        [lax_modname_from_source filename] associated to the artifact
        [filename]. *)
    val from_filename: filename -> t
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 end
 

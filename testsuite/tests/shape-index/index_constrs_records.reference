@@ -1,5 +1,5 @@
 Indexed shapes:
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Resolved: Index_constrs_records.38 :
   l_exn (File "index_constrs_records.ml", line 43, characters 21-26)
 Resolved: Index_constrs_records.34 :
@@ -92,7 +92,7 @@ Index_constrs_records.35:
   Exn (File "index_constrs_records.ml", line 39, characters 10-13)
 Index_constrs_records.37:
   e (File "index_constrs_records.ml", line 41, characters 4-5)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 Resolved: Index_constrs_records.47:
   r (File "index_constrs_records.ml", line 52, characters 22-23)
@@ -218,4 +218,4 @@ Index_constrs_records.39:
   A (File "index_constrs_records.ml", line 47, characters 11-12)
 Index_constrs_records.45:
   Mod (File "index_constrs_records.ml", line 46, characters 7-10)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

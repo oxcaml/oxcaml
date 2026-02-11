@@ -4,7 +4,7 @@
    combined allocation, causes already-run allocation callbacks to
    be reflected by deallocation callbacks. *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 module MP = Gc.Memprof
 
 external runtime5 : unit -> bool = "%runtime5"
@@ -163,7 +163,7 @@ let raise_in_alloc () =
   assert (alloc_size = dealloc_size +
                        (6 + 5 + 4 + 6 + 5 + 4 + 3 + 3));
   end;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 exception MyExc of string
 
@@ -313,7 +313,7 @@ let raise_in_alloc () =
 
   assert (alloc_size = dealloc_size +
                        (6 + 5 + 4 + 6 + 5 + 4 + 3 + 3));
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   arr
 
 

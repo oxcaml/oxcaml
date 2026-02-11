@@ -56,14 +56,14 @@ Error: Signature mismatch:
          "A of t/1"
        is not the same as:
          "A of t/2"
-<<<<<<< HEAD
+<<<<<<< oxcaml
        The type "t/1" is not equal to the type "t/2"
-||||||| 23e84b8c4d
+||||||| upstream-base
          "A of t"
        The type "t" is not equal to the type "t/2"
 =======
        The type "t" is not equal to the type "t/2"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
        Line 4, characters 9-19:
          Definition of type "t/1"
        Line 2, characters 2-11:
@@ -92,15 +92,15 @@ Error: Signature mismatch:
          sig module A : (X : s) -> sig end end
        In module "A":
        Modules do not match:
-<<<<<<< HEAD
+<<<<<<< oxcaml
          functor (X : s/1) -> ...
-||||||| 23e84b8c4d
+||||||| upstream-base
          functor (X : s) -> ...
 =======
          (X : s) -> ...
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
        is not included in
-<<<<<<< HEAD
+<<<<<<< oxcaml
          functor (X : s/2) -> ...
        Module types do not match:
          s/1
@@ -110,7 +110,7 @@ Error: Signature mismatch:
          Definition of module type "s/1"
        Line 2, characters 2-15:
          Definition of module type "s/2"
-||||||| 23e84b8c4d
+||||||| upstream-base
          functor (X : s/2) -> ...
        Module types do not match:
          s
@@ -127,7 +127,7 @@ Line 5, characters 6-19:
   Definition of module type "s"
 Line 2, characters 2-15:
   Definition of module type "s/2"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 |}]
 
 module L = struct
@@ -157,14 +157,14 @@ Error: Signature mismatch:
          "A of T/1.t"
        is not the same as:
          "A of T/2.t"
-<<<<<<< HEAD
+<<<<<<< oxcaml
        The type "T/1.t" is not equal to the type "T/2.t"
-||||||| 23e84b8c4d
+||||||| upstream-base
          "A of T.t"
        The type "T.t" is not equal to the type "T/2.t"
 =======
        The type "T.t" is not equal to the type "T/2.t"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
        Line 5, characters 6-34:
          Definition of module "T/1"
        Line 2, characters 2-30:
@@ -193,13 +193,13 @@ Error: Signature mismatch:
          val f : (module s/2) -> t/2 -> t/2
        The type "(module s/1) -> t/2 -> t/1" is not compatible with the type
          "(module s/2) -> t/2 -> t/2"
-<<<<<<< HEAD
+<<<<<<< oxcaml
        Type "(module s/1)" is not compatible with type "(module s/2)"
-||||||| 23e84b8c4d
+||||||| upstream-base
        Type "(module s)" is not compatible with type "(module s/2)"
 =======
        Modules do not match: s is not included in s/2
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
        Line 5, characters 23-33:
          Definition of type "t/1"
        Line 3, characters 2-12:
@@ -266,12 +266,12 @@ Error: Signature mismatch:
          class b : a/2
        The public method c cannot be hidden
        The first class type has no method m
-<<<<<<< HEAD
+<<<<<<< oxcaml
        Line 5, characters 4-74:
          Definition of class type "a/1"
        Line 2, characters 2-36:
          Definition of class type "a/2"
-||||||| 23e84b8c4d
+||||||| upstream-base
        Line 5, characters 4-74:
          Definition of class type "a"
        Line 2, characters 2-36:
@@ -281,7 +281,7 @@ Line 5, characters 4-74:
   Definition of class type "a"
 Line 2, characters 2-36:
   Definition of class type "a/2"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 |}]
 
 module R = struct
@@ -309,12 +309,12 @@ Error: Signature mismatch:
        does not match
          class type b = a/2
        The first class type has no method m
-<<<<<<< HEAD
+<<<<<<< oxcaml
        Line 5, characters 4-29:
          Definition of class type "a/1"
        Line 2, characters 2-42:
          Definition of class type "a/2"
-||||||| 23e84b8c4d
+||||||| upstream-base
        Line 5, characters 4-29:
          Definition of class type "a"
        Line 2, characters 2-42:
@@ -324,7 +324,7 @@ Line 5, characters 4-29:
   Definition of class type "a"
 Line 2, characters 2-42:
   Definition of class type "a/2"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 |}]
 
 module S = struct

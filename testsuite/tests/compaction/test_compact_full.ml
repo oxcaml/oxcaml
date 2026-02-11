@@ -1,6 +1,6 @@
 (* TEST
 *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
 external runtime5 : unit -> bool = "%runtime5"
 
@@ -13,7 +13,7 @@ let () =
   (* assert that we have done an additional three major collections *)
   if runtime5 () then
     assert (heap_stats_after.major_collections == heap_stats_before.major_collections+3);
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 let () =
   Gc.full_major (); (* do a major before compaction so there isn't any pending major
@@ -23,6 +23,6 @@ let () =
   let heap_stats_after = Gc.quick_stat () in
   (* assert that we have done an additional three major collections *)
   assert (heap_stats_after.major_collections == heap_stats_before.major_collections+3);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   (* also a compaction! *)
   assert (heap_stats_after.compactions == heap_stats_before.compactions+1)

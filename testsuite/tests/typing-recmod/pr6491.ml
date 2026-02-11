@@ -8,7 +8,7 @@ and Baz : sig class type c = object inherit Bar.c end end = Baz;;
 [%%expect {|
 Line 2, characters 44-47:
 2 | and Bar : sig class type c = object inherit Foo.c end end = Bar
-<<<<<<< HEAD
+<<<<<<< oxcaml
                                                 ^^^^^
 Error: This class type is recursive. This use of the class type "Foo.c"
        from the recursive module "Foo" within the definition of
@@ -23,7 +23,7 @@ module rec Foo : sig class type c = object inherit Foo.c end end = Foo;;
 Line 1, characters 51-56:
 1 | module rec Foo : sig class type c = object inherit Foo.c end end = Foo;;
                                                        ^^^^^
-||||||| 23e84b8c4d
+||||||| upstream-base
                                                 ^^^^^
 Error: Illegal recursive module reference
 =======
@@ -41,7 +41,7 @@ module rec Foo : sig class type c = object inherit Foo.c end end = Foo;;
 Line 1, characters 51-54:
 1 | module rec Foo : sig class type c = object inherit Foo.c end end = Foo;;
                                                        ^^^
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 Error: This class type is recursive. This use of the class type "Foo.c"
        from the recursive module "Foo" within the definition of
        the class type "c" in the recursive module "Foo"
@@ -60,14 +60,14 @@ let baz (x : Baz.c) = x#x;;
 [%%expect{|
 Line 2, characters 29-32:
 2 | and Bar : sig class type c = Foo.c end = Bar
-<<<<<<< HEAD
+<<<<<<< oxcaml
                                  ^^^^^
-||||||| 23e84b8c4d
+||||||| upstream-base
                                  ^^^^^
 Error: Illegal recursive module reference
 =======
                                  ^^^
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 Error: This class type is recursive. This use of the class type "Foo.c"
        from the recursive module "Foo" within the definition of
        the class type "c" in the recursive module "Bar"

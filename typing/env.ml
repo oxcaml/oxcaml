@@ -42,11 +42,11 @@ let value_declarations  : unit usage_tbl ref = s_table Types.Uid.Tbl.create 16
 let type_declarations   : unit usage_tbl ref = s_table Types.Uid.Tbl.create 16
 let module_declarations : unit usage_tbl ref = s_table Types.Uid.Tbl.create 16
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let mutated_mutable_values : unit usage_tbl ref =
   s_table Types.Uid.Tbl.create 16
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 let uid_to_loc : Location.t Types.Uid.Tbl.t ref =
   s_table Types.Uid.Tbl.create 16
 
@@ -55,7 +55,7 @@ let register_uid uid loc = Types.Uid.Tbl.add !uid_to_loc uid loc
 let get_uid_to_loc_tbl () = !uid_to_loc
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 type constructor_usage = Positive | Pattern | Exported_private | Exported
 type constructor_usages =
   {
@@ -155,7 +155,7 @@ type value_unbound_reason =
 type module_unbound_reason =
   | Mod_unbound_illegal_recursion of
       { container : string option; unbound : string }
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
 type stage_lock =
   | Quotation_lock
@@ -179,10 +179,10 @@ let partition_locks locks =
     locks
 
 type locks = lock list
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Mod_unbound_illegal_recursion
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 type summary =
     Env_empty
@@ -1088,7 +1088,7 @@ let rec print_address ppf = function
   | Alocal id -> Format.fprintf ppf "%s" (Ident.name id)
   | Adot(a, _, pos) -> Format.fprintf ppf "%a.[%i]" print_address a pos
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 type address_head =
   | AHunit of Compilation_unit.t
   | AHlocal of Ident.t
@@ -1105,7 +1105,7 @@ module Current_unit_name : sig
   val is : string -> bool
   val is_ident : Ident.t -> bool
   val is_path : Path.t -> bool
-||||||| 23e84b8c4d
+||||||| upstream-base
 (* The name of the compilation unit currently compiled.
    "" if outside a compilation unit. *)
 module Current_unit_name : sig
@@ -1128,13 +1128,13 @@ module Current_unit : sig
     val is_ident : Ident.t -> bool
     val is_path : Path.t -> bool
   end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 end = struct
   let current_unit : Unit_info.t option ref =
     ref None
   let get () =
     !current_unit
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let set unit_info =
     current_unit := unit_info
   let get_cu () =
@@ -1151,7 +1151,7 @@ end = struct
   let is_path = function
   | Pident id -> is_ident id
   | Pdot _ | Papply _ | Pextra_ty _ -> false
-||||||| 23e84b8c4d
+||||||| upstream-base
   let set name =
     current_unit := name
   let is name =
@@ -1180,7 +1180,7 @@ end = struct
     | Pident id -> is_ident id
     | Pdot _ | Papply _ | Pextra_ty _ -> false
   end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 end
 
 let set_current_unit = Current_unit.set
@@ -1191,21 +1191,21 @@ let find_same_module id tbl =
   match IdTbl.find_same_without_locks id tbl with
   | x -> x
   | exception Not_found
-<<<<<<< HEAD
+<<<<<<< oxcaml
     when Ident.is_global id && not (Current_unit_name.is_ident id) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
     when Ident.persistent id && not (Current_unit_name.is_ident id) ->
 =======
     when Ident.persistent id && not (Current_unit.Name.is_ident id) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       Mod_persistent
 
 let find_name_module ~mark name tbl =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   match IdTbl.find_name_and_locks wrap_module ~mark name tbl with
   | Ok x -> x
   | Error locks when not (Current_unit_name.is name) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
   match IdTbl.find_name wrap_module ~mark name tbl with
   | x -> x
   | exception Not_found when not (Current_unit_name.is name) ->
@@ -1213,23 +1213,23 @@ let find_name_module ~mark name tbl =
   match IdTbl.find_name wrap_module ~mark name tbl with
   | x -> x
   | exception Not_found when not (Current_unit.Name.is name) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       let path = Pident(Ident.create_persistent name) in
       path, locks, Mod_persistent
   | _ ->
     raise Not_found
 
 let add_persistent_structure id env =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   if not (Ident.is_global id) then invalid_arg "Env.add_persistent_structure";
   if Current_unit_name.is_ident id then env
-||||||| 23e84b8c4d
+||||||| upstream-base
   if not (Ident.persistent id) then invalid_arg "Env.add_persistent_structure";
   if Current_unit_name.is_ident id then env
 =======
   if not (Ident.persistent id) then invalid_arg "Env.add_persistent_structure";
   if Current_unit.Name.is_ident id then env
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   else begin
     let material =
       (* This addition only observably changes the environment if it shadows a
@@ -1384,12 +1384,12 @@ let reset_declaration_caches () =
   Types.Uid.Tbl.clear !used_labels;
   ()
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let reset_cache ~preserve_persistent_env =
   Current_unit_name.set None;
   if not preserve_persistent_env then
     Persistent_env.clear !persistent_env;
-||||||| 23e84b8c4d
+||||||| upstream-base
 let reset_cache () =
   Current_unit_name.set "";
   Persistent_env.clear !persistent_env;
@@ -1397,7 +1397,7 @@ let reset_cache () =
 let reset_cache () =
   Current_unit.unset ();
   Persistent_env.clear !persistent_env;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   reset_declaration_caches ();
   ()
 
@@ -1845,7 +1845,7 @@ let has_probe name = String.Set.mem name !probes
 let find_shape env (ns : Shape.Sig_component_kind.t) id =
   match ns with
   | Type ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       let ty = IdTbl.find_same_without_locks id env.types in
       ty.tda_shape
   | Constructor ->
@@ -1854,7 +1854,7 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
       Shape.leaf ((TycompTbl.find_same id env.labels).lbl_uid)
   | Unboxed_label ->
       Shape.leaf ((TycompTbl.find_same id env.unboxed_labels).lbl_uid)
-||||||| 23e84b8c4d
+||||||| upstream-base
       (IdTbl.find_same id env.types).tda_shape
 =======
       (IdTbl.find_same id env.types).tda_shape
@@ -1862,7 +1862,7 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
       Shape.leaf ((TycompTbl.find_same id env.constrs).cda_description.cstr_uid)
   | Label ->
       Shape.leaf ((TycompTbl.find_same id env.labels).lbl_uid)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Extension_constructor ->
       (TycompTbl.find_same id env.constrs).cda_shape
   | Value ->
@@ -1881,13 +1881,13 @@ let find_shape env (ns : Shape.Sig_component_kind.t) id =
              properly populated. *)
           assert false
       | exception Not_found
-<<<<<<< HEAD
+<<<<<<< oxcaml
         when Ident.is_global id && not (Current_unit_name.is_ident id) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
         when Ident.persistent id && not (Current_unit_name.is_ident id) ->
 =======
         when Ident.persistent id && not (Current_unit.Name.is_ident id) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           Shape.for_persistent_unit (Ident.name id)
       end
   | Module_type ->
@@ -1918,7 +1918,7 @@ let shape_or_leaf uid = function
 let required_globals = s_ref []
 let reset_required_globals () = required_globals := []
 let get_required_globals () = !required_globals
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let add_required_unit cu =
   if not (List.exists (Compilation_unit.equal cu) !required_globals)
   then required_globals := cu :: !required_globals
@@ -1930,7 +1930,7 @@ let add_required_ident id env =
     | AHunit cu -> add_required_unit cu
 let add_required_global path env =
   add_required_ident (Path.head path) env
-||||||| 23e84b8c4d
+||||||| upstream-base
 let add_required_global id =
   if Ident.global id && not !Clflags.transparent_modules
   && not (List.exists (Ident.same id) !required_globals)
@@ -1940,7 +1940,7 @@ let add_required_global id =
   if Ident.global id && not !Clflags.no_alias_deps
   && not (List.exists (Ident.same id) !required_globals)
   then required_globals := id :: !required_globals
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let rec normalize_module_path lax env = function
   | Pident id as path when lax && Ident.is_global id ->
@@ -1962,13 +1962,13 @@ and expand_module_path lax env path =
   try match find_module_lazy ~alias:true path env with
     {md_type=Mty_alias path1} ->
       let path' = normalize_module_path lax env path1 in
-<<<<<<< HEAD
+<<<<<<< oxcaml
       if not (lax || !Clflags.transparent_modules) then begin
         let id = Path.head path in
         if Ident.is_global_or_predef id && not (Ident.same id (Path.head path'))
         then add_required_global (Pident id) env
       end;
-||||||| 23e84b8c4d
+||||||| upstream-base
       if lax || !Clflags.transparent_modules then path' else
       let id = Path.head path in
       if Ident.global id && not (Ident.same id (Path.head path'))
@@ -1978,7 +1978,7 @@ and expand_module_path lax env path =
       let id = Path.head path in
       if Ident.global id && not (Ident.same id (Path.head path'))
       then add_required_global id;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       path'
   | _ -> path
   with Not_found when lax
@@ -2301,14 +2301,14 @@ let prefix_idents root prefixing_sub sg =
     | Sig_modtype(id, mtd, vis) :: rem ->
       let p = Pdot(root, Ident.name id) in
       prefix_idents root
-<<<<<<< HEAD
+<<<<<<< oxcaml
         ((Sig_modtype(id, mtd, vis), p) :: items_and_paths)
-||||||| 23e84b8c4d
+||||||| upstream-base
         ((SigL_modtype(id, mtd, vis), p) :: items_and_paths)
         (Subst.add_modtype id (Mty_ident p) prefixing_sub)
 =======
         ((SigL_modtype(id, mtd, vis), p) :: items_and_paths)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         (Subst.add_modtype id p prefixing_sub)
         rem
     | Sig_class(id, cd, rs, vis) :: rem ->
@@ -3221,17 +3221,17 @@ let enter_signature ?mod_shape ~scope sg ?mode env =
 let enter_signature_and_shape ~scope ~parent_shape mod_shape sg ?mode env =
   enter_signature_and_shape ~scope ~parent_shape (Some mod_shape) sg ?mode env
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let add_value_lazy = add_value_lazy ?shape:None
 let add_value ?check ~mode id vd =
   add_value_lazy ?check ~mode id (Subst.Lazy.of_value_description vd)
-||||||| 23e84b8c4d
+||||||| upstream-base
 let add_value = add_value ?shape:None
 let add_type = add_type ?shape:None
 let add_extension = add_extension ?shape:None
 =======
 let add_value = add_value ?shape:None
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let add_class = add_class ?shape:None
 let add_cltype = add_cltype ?shape:None
 let add_modtype_lazy = add_modtype_lazy ?shape:None
@@ -4288,9 +4288,9 @@ let open_signature
     in
     open_signature ~errors:true ~loc:lid.loc (Some slot) lid.txt env
   end
-<<<<<<< HEAD
+<<<<<<< oxcaml
   else open_signature ~errors:true ~loc:lid.loc None lid.txt env
-||||||| 23e84b8c4d
+||||||| upstream-base
   else open_signature None root env
 
 (* Read a signature from a file *)
@@ -5365,26 +5365,26 @@ let lookup_all_dot_constructors ~errors ~use ~loc usage l s env =
                let use_fun () = use_constructor ~use ~loc usage env cda in
                (cda.cda_description, use_fun))
             cstrs
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* General forms of the lookup functions *)
 
 let lookup_module_path ~errors ~use ~loc ~load lid env =
   match lid with
   | Lident s ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       if !Clflags.transparent_modules && not load then
         let path, mode_with_locks, () =
           lookup_ident_module Don't_load ~errors ~use ~loc s env
         in
         path, mode_with_locks
-||||||| 23e84b8c4d
+||||||| upstream-base
       if !Clflags.transparent_modules && not load then
         fst (lookup_ident_module Don't_load ~errors ~use ~loc s env)
 =======
       if !Clflags.no_alias_deps && not load then
         fst (lookup_ident_module Don't_load ~errors ~use ~loc s env)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       else
         let path, mode_with_locks, _ =
           lookup_ident_module Load ~errors ~use ~loc s env
@@ -5733,12 +5733,12 @@ let lookup_settable_variable ?(use=true) ~loc name env =
 (* Checking if a name is bound *)
 
 let bound_module name env =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   match IdTbl.find_name_and_locks wrap_module ~mark:false name env.modules with
   | Ok _ -> true
   | Error _ ->
       if Current_unit_name.is name then false
-||||||| 23e84b8c4d
+||||||| upstream-base
   match IdTbl.find_name wrap_module ~mark:false name env.modules with
   | _ -> true
   | exception Not_found ->
@@ -5748,7 +5748,7 @@ let bound_module name env =
   | _ -> true
   | exception Not_found ->
       if Current_unit.Name.is name then false
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       else begin
         match
           find_pers_mod ~allow_hidden:false ~allow_excess_args:false
@@ -5989,17 +5989,17 @@ open Format_doc
 
 (* Forward declarations *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let print_longident : Longident.t printer ref = ref (fun _ _ -> assert false)
-||||||| 23e84b8c4d
+||||||| upstream-base
 let print_longident =
   ref ((fun _ _ -> assert false) : formatter -> Longident.t -> unit)
 =======
 let print_path: Path.t printer ref = ref (fun _ _ -> assert false)
 let pp_path ppf l = !print_path ppf l
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let pp_longident ppf l = !print_longident ppf l
 
 let print_path: Path.t printer ref = ref (fun _ _ -> assert false)
@@ -6011,12 +6011,12 @@ let report_jkind_violation_with_offender =
   ref ((fun ~offender:_ ~level:_ _ _ -> assert false)
        : offender:(Format_doc.formatter -> unit) ->
          level:int -> Format_doc.formatter -> Jkind.Violation.t -> unit)
-||||||| 23e84b8c4d
+||||||| upstream-base
 let print_path =
   ref ((fun _ _ -> assert false) : formatter -> Path.t -> unit)
 =======
 module Style = Misc.Style
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let quoted_longident = Style.as_inline_code Pprintast.Doc.longident
 let quoted_constr = Style.as_inline_code Pprintast.Doc.constr
@@ -6059,7 +6059,7 @@ let extract_settable_variables env =
        | Val_ivar _ | Val_mut _ -> name :: acc
        | _ -> acc) None env []
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let print_lock_item ppf (item, lid) =
   match (item : Mode.Hint.lock_item) with
   | Module ->
@@ -6137,7 +6137,7 @@ let report_lookup_error_doc ~level _loc env ppf = function
             Style.inline_code "rec"
             line
     end
-||||||| 23e84b8c4d
+||||||| upstream-base
 module Style = Misc.Style
 
 let report_lookup_error _loc env ppf = function
@@ -6177,13 +6177,13 @@ let report_lookup_error_doc loc env = function
                 line
              ]
         )
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Unbound_type lid ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       fprintf ppf "Unbound type constructor %a"
          quoted_longident lid;
       spellcheck ppf extract_types env lid;
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf "Unbound type constructor %a"
         (Style.as_inline_code !print_longident) lid;
       spellcheck ppf extract_types env lid;
@@ -6192,14 +6192,14 @@ let report_lookup_error_doc loc env = function
        "@{<ralign>Unbound type constructor @}%a"
        quoted_longident lid
        (spellcheck extract_types env lid)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Unbound_module lid -> begin
-<<<<<<< HEAD
+<<<<<<< oxcaml
       fprintf ppf "Unbound module %a"
         quoted_longident lid;
        match find_modtype_by_name_lazy lid env with
       | exception Not_found -> spellcheck ppf extract_modules env lid;
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf "Unbound module %a"
         (Style.as_inline_code !print_longident) lid;
        match find_modtype_by_name lid env with
@@ -6211,14 +6211,14 @@ let report_lookup_error_doc loc env = function
       | exception Not_found ->
          Location.aligned_error_hint ~loc "%t" main
            (spellcheck extract_modules env lid)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       | _ ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
          fprintf ppf
            "@.@[@{<hint>Hint@}: There is a module type named %a, %s@]"
            quoted_longident lid
            "but module types are not modules"
-||||||| 23e84b8c4d
+||||||| upstream-base
          fprintf ppf
            "@.@[@{<hint>Hint@}: There is a module type named %a, %s@]"
            (Style.as_inline_code !print_longident) lid
@@ -6230,10 +6230,10 @@ let report_lookup_error_doc loc env = function
                     but module types are not modules"
                    quoted_longident lid
            ]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     end
   | Unbound_constructor lid ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       fprintf ppf "Unbound constructor %a"
         quoted_longident lid;
       spellcheck ppf extract_constructors env lid;
@@ -6276,7 +6276,7 @@ let report_lookup_error_doc loc env = function
         | _ -> ());
         fprintf ppf "@]"
       | None -> ());
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf "Unbound constructor %a"
         (Style.as_inline_code !print_longident) lid;
       spellcheck ppf extract_constructors env lid;
@@ -6294,30 +6294,30 @@ let report_lookup_error_doc loc env = function
        "@{<ralign>Unbound record field @}%a"
        quoted_longident lid
        (spellcheck extract_labels env lid)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Unbound_class lid -> begin
-<<<<<<< HEAD
+<<<<<<< oxcaml
       fprintf ppf "Unbound class %a"
         quoted_longident lid;
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf "Unbound class %a"
         (Style.as_inline_code !print_longident) lid;
 =======
       let main ppf =
         fprintf ppf "@{<ralign>Unbound class @}%a" quoted_longident lid
       in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       match find_cltype_by_name lid env with
       | exception Not_found ->
          Location.aligned_error_hint ~loc "%t" main
            (spellcheck extract_classes env lid)
       | _ ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
          fprintf ppf
            "@.@[@{<hint>Hint@}: There is a class type named %a, %s@]"
            quoted_longident lid
            "but classes are not class types"
-||||||| 23e84b8c4d
+||||||| upstream-base
          fprintf ppf
            "@.@[@{<hint>Hint@}: There is a class type named %a, %s@]"
            (Style.as_inline_code !print_longident) lid
@@ -6330,15 +6330,15 @@ let report_lookup_error_doc loc env = function
               but classes are not class types."
              quoted_longident lid
          ]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     end
   | Unbound_modtype lid -> begin
-<<<<<<< HEAD
+<<<<<<< oxcaml
       fprintf ppf "Unbound module type %a"
         quoted_longident lid;
       match find_module_by_name_lazy lid env with
       | exception Not_found -> spellcheck ppf extract_modtypes env lid;
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf "Unbound module type %a"
         (Style.as_inline_code !print_longident) lid;
       match find_module_by_name lid env with
@@ -6351,15 +6351,15 @@ let report_lookup_error_doc loc env = function
       | exception Not_found ->
          Location.aligned_error_hint ~loc "%t" main
            (spellcheck extract_modtypes env lid)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       | _ ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
          fprintf ppf
            "@.@[@{<hint>Hint@}: There is a module named %a, %s@]"
            quoted_longident lid
            "but modules are not module types"
     end
-||||||| 23e84b8c4d
+||||||| upstream-base
          fprintf ppf
            "@.@[@{<hint>Hint@}: There is a module named %a, %s@]"
            (Style.as_inline_code !print_longident) lid
@@ -6374,9 +6374,9 @@ let report_lookup_error_doc loc env = function
                quoted_longident lid
            ]
       end
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Unbound_cltype lid ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       fprintf ppf "Unbound class type %a"
         quoted_longident lid;
       spellcheck ppf extract_cltypes env lid
@@ -6388,7 +6388,7 @@ let report_lookup_error_doc loc env = function
       fprintf ppf "The value %a is not an instance variable or mutable variable"
         Style.inline_code s;
       spellcheck_name ppf extract_settable_variables env s
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf "Unbound class type %a"
         (Style.as_inline_code !print_longident) lid;
       spellcheck ppf extract_cltypes env lid;
@@ -6413,13 +6413,13 @@ let report_lookup_error_doc loc env = function
         "@{<ralign>The value @}%a is not an instance variable"
         Style.inline_code s
         (spellcheck_name extract_instance_variables env s)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Masked_instance_variable lid ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       fprintf ppf
         "The instance variable %a@ \
          cannot be accessed from the definition of another instance variable"
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf
         "The instance variable %a@ \
          cannot be accessed from the definition of another instance variable"
@@ -6428,14 +6428,14 @@ let report_lookup_error_doc loc env = function
       Location.errorf ~loc
         "The instance variable %a@ cannot@ be@ accessed@ from@ the@ \
          definition@ of@ another instance variable"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         quoted_longident lid
   | Masked_self_variable lid ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       fprintf ppf
         "The self variable %a@ \
          cannot be accessed from the definition of an instance variable"
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf
         "The self variable %a@ \
          cannot be accessed from the definition of an instance variable"
@@ -6444,10 +6444,10 @@ let report_lookup_error_doc loc env = function
       Location.errorf ~loc
         "The self variable %a@ cannot@ be@ accessed@ \
          from@ the@ definition of an instance variable"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         quoted_longident lid
   | Masked_ancestor_variable lid ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       fprintf ppf
         "The ancestor variable %a@ \
          cannot be accessed from the definition of an instance variable"
@@ -6480,7 +6480,7 @@ let report_lookup_error_doc loc env = function
         else dprintf "the module type of %a" Style.inline_code unbound
       in
       fprintf ppf
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf
         "The ancestor variable %a@ \
          cannot be accessed from the definition of an instance variable"
@@ -6520,7 +6520,7 @@ let report_lookup_error_doc loc env = function
         else dprintf "the module type of %a" Style.inline_code unbound
       in
       Location.errorf ~loc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         "@[<hov>This class type is recursive.@ This use of the class type %a@ \
          from the recursive module %a@ within the definition of@ \
          the class type %a@ in the recursive module %a@ \
@@ -6534,7 +6534,7 @@ let report_lookup_error_doc loc env = function
         Style.inline_code container
         self_or_unbound
   | Structure_used_as_functor lid ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       fprintf ppf "@[The module %a is a structure, it cannot be applied@]"
         quoted_longident lid
   | Abstract_used_as_functor (lid, p) ->
@@ -6552,7 +6552,7 @@ let report_lookup_error_doc loc env = function
         quoted_longident lid
         (Style.as_inline_code !print_path) p
         print_structure_components_reason reason
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf "@[The module %a is a structure, it cannot be applied@]"
         (Style.as_inline_code !print_longident) lid
   | Abstract_used_as_functor lid ->
@@ -6581,12 +6581,12 @@ let report_lookup_error_doc loc env = function
      Location.errorf ~loc
        "The module %a is abstract, it cannot have any components"
        quoted_longident lid
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Generative_used_as_applicative lid ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       fprintf ppf "@[The functor %a is generative,@ it@ cannot@ be@ \
                    applied@ in@ type@ expressions@]"
-||||||| 23e84b8c4d
+||||||| upstream-base
       fprintf ppf "@[The functor %a is generative,@ it@ cannot@ be@ \
                    applied@ in@ type@ expressions@]"
         (Style.as_inline_code !print_longident) lid
@@ -6594,7 +6594,7 @@ let report_lookup_error_doc loc env = function
      Location.errorf ~loc
        "The functor %a is generative,@ it@ cannot@ be@ \
         applied@ in@ type@ expressions"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         quoted_longident lid
   | Cannot_scrape_alias(lid, p) ->
       let cause =
@@ -6604,7 +6604,7 @@ let report_lookup_error_doc loc env = function
       Location.errorf ~loc
         "The module %a is an alias for module %a, which %s"
         quoted_longident lid
-<<<<<<< HEAD
+<<<<<<< oxcaml
         (Style.as_inline_code !print_path) p cause
   | Local_value_used_in_exclave (item, lid) ->
       fprintf ppf "@[%a local, so it cannot be used \
@@ -6665,18 +6665,18 @@ let report_lookup_error_doc loc env = function
         print_unbound_in_quotation context
         quoted_longident lid
         print_stage avail_stage
-||||||| 23e84b8c4d
+||||||| upstream-base
         (Style.as_inline_code !print_longident) lid
         (Style.as_inline_code !print_path) p cause
 =======
         (Style.as_inline_code pp_path) p cause
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let report_error_doc ~level ppf = function
   | Missing_module(_, path1, path2) ->
       fprintf ppf "@[@[<hov>";
-||||||| 23e84b8c4d
+||||||| upstream-base
 let report_error ppf = function
   | Missing_module(_, path1, path2) ->
       fprintf ppf "@[@[<hov>";
@@ -6684,7 +6684,7 @@ let report_error ppf = function
 let report_error_doc = function
   | Missing_module(loc, path1, path2) ->
      let pp_path path1 path2 ppf =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       if Path.same path1 path2 then
         fprintf ppf "Internal path@ %a@ is dangling."
           Style.inline_code (Path.name path1)
@@ -6700,7 +6700,7 @@ let report_error_doc = function
   | Illegal_value_name(loc, name) ->
       Location.errorf ~loc "%a is not a valid value identifier."
        Style.inline_code name
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Implicit_jkind_already_defined { name; defined_at; loc = _ } ->
       fprintf ppf
         "@[<hov>The implicit kind for %a is already defined at %a.@]"
@@ -6723,16 +6723,16 @@ let report_error_doc = function
          as seen at %a.@]"
         print_unsupported_quotation context
         (Location.Doc.loc ~capitalize_first:false) loc
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Lookup_error(loc, t, err) -> report_lookup_error loc t ppf err
 =======
   | Lookup_error(loc, t, err) -> report_lookup_error_doc loc t err
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let () =
   Location.register_error_of_exn
     (function
-<<<<<<< HEAD
+<<<<<<< oxcaml
       | Error err ->
           let loc =
             match err with
@@ -6752,7 +6752,7 @@ let () =
           Some
             (error_of_printer
                (report_error_doc ~level:Btype.generic_level) err)
-||||||| 23e84b8c4d
+||||||| upstream-base
       | Error err ->
           let loc =
             match err with
@@ -6768,7 +6768,7 @@ let () =
           Some (error_of_printer report_error err)
 =======
       | Error err ->  Some (report_error_doc err)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       | _ ->
           None
     )

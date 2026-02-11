@@ -90,7 +90,7 @@ let eval_value_path env path =
 
 (* Install, remove a printer (as in toplevel/topdirs) *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let match_printer_type desc make_printer_type =
   Ctype.with_local_level ~post:Ctype.generalize begin fun () ->
     let ty_arg = Ctype.newvar (Jkind.Builtin.value ~why:Debug_printer_argument) in
@@ -128,7 +128,7 @@ let install_printer ppf lid =
     else
       (fun formatter repr -> Obj.obj v formatter (Obj.obj repr)) in
   Printval.install_printer path ty_arg ppf print_function
-||||||| 23e84b8c4d
+||||||| upstream-base
 let match_printer_type desc make_printer_type =
   Ctype.with_local_level ~post:Ctype.generalize begin fun () ->
     let ty_arg = Ctype.newvar() in
@@ -197,7 +197,7 @@ let install_printer ppf lid =
           Printval.install_printer path ty_arg print_function
       | Topprinters.Generic _ ->
           raise (Error (`Wrong_type lid))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let remove_printer lid =
   match Topprinters.find_printer Env.empty lid with
@@ -213,12 +213,12 @@ let remove_printer lid =
 open Format
 module Style = Misc.Style
 let quoted_longident =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   Format_doc.compat @@ Style.as_inline_code Printtyp.longident
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   Format_doc.compat @@ Style.as_inline_code Printtyp.Doc.longident
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let report_error ppf = function
   | `Load_failure e ->
@@ -227,42 +227,42 @@ let report_error ppf = function
   | `Unbound_identifier lid ->
       fprintf ppf "@[Unbound identifier %a@]@."
         quoted_longident lid
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Unavailable_module(md, lid) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
       (Style.as_inline_code Printtyp.longident) lid
   | Unavailable_module(md, lid) ->
 =======
   | `Unavailable_module(md, lid) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       fprintf ppf
         "@[The debugger does not contain the code for@ %a.@ \
          Please load an implementation of %s first.@]@."
         quoted_longident lid md
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Wrong_type lid ->
-||||||| 23e84b8c4d
+||||||| upstream-base
            Please load an implementation of %s first.@]@."
         (Style.as_inline_code Printtyp.longident) lid md
   | Wrong_type lid ->
 =======
   | `Wrong_type lid ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       fprintf ppf "@[%a has the wrong type for a printing function.@]@."
         quoted_longident lid
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | No_active_printer lid ->
-||||||| 23e84b8c4d
+||||||| upstream-base
       (Style.as_inline_code Printtyp.longident) lid
   | No_active_printer lid ->
 =======
   | `No_active_printer path ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       fprintf ppf "@[%a is not currently active as a printing function.@]@."
-<<<<<<< HEAD
+<<<<<<< oxcaml
         quoted_longident lid
-||||||| 23e84b8c4d
+||||||| upstream-base
       (Style.as_inline_code Printtyp.longident) lid
 =======
         Printtyp.path path
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

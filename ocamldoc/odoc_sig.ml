@@ -448,14 +448,14 @@ module Analyser =
       let comment_opt = analyze_alerts comment_opt ld_attributes in
       {
         rf_name = field_name ;
-<<<<<<< HEAD
+<<<<<<< oxcaml
         rf_mutable = Types.is_mutable mutable_flag;
-||||||| 23e84b8c4d
+||||||| upstream-base
         rf_mutable = mutable_flag = Mutable ;
 =======
         rf_mutable = mutable_flag = Mutable ;
         rf_atomic = atomic_flag = Atomic ;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         rf_type = Odoc_env.subst_type env type_expr ;
         rf_text = comment_opt
       }
@@ -509,15 +509,15 @@ module Analyser =
       let record comments
           { Typedtree.ld_id; ld_mutable; ld_atomic; ld_type; ld_loc; ld_attributes } =
         get_field env comments @@
-<<<<<<< HEAD
+<<<<<<< oxcaml
         {Types.ld_id; ld_mutable; ld_modalities = Mode.Modality.Const.id;
          ld_sort=Jkind.Sort.Const.void (* ignored *);
          ld_type=ld_type.Typedtree.ctyp_type;
-||||||| 23e84b8c4d
+||||||| upstream-base
         {Types.ld_id; ld_mutable; ld_type=ld_type.Typedtree.ctyp_type;
 =======
         {Types.ld_id; ld_mutable; ld_atomic; ld_type=ld_type.Typedtree.ctyp_type;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
          ld_loc; ld_attributes; ld_uid=Types.Uid.internal_not_actually_unique} in
       let open Typedtree in
       function

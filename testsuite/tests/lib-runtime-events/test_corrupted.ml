@@ -1,5 +1,5 @@
 (* TEST
-<<<<<<< HEAD
+<<<<<<< oxcaml
 {
    runtime4;
    skip;
@@ -16,7 +16,7 @@
 *)
 
 (* CR mslater for nbarnes: this test currently fails on arm64 *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
  include runtime_events;
  include unix;
@@ -29,7 +29,7 @@
    native;
  }
 *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   let runtime_begin _ _ _ = ()
   let runtime_end _ _ _ = ()

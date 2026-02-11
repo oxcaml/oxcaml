@@ -173,12 +173,12 @@ git clean -q -f -d -x
 ./configure \
   CC="$CC" \
   --enable-tsan \
-<<<<<<< HEAD
+<<<<<<< oxcaml
   CFLAGS="-DTSAN_INSTRUMENT_ALL" \
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   CPPFLAGS="-DTSAN_INSTRUMENT_ALL" \
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   --disable-stdlib-manpages --enable-dependency-generation
 
 # Build the system

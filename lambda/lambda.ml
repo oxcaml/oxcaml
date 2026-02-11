@@ -152,14 +152,14 @@ type primitive =
   | Pgetglobal of Compilation_unit.t
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
   | Pmakefloatblock of mutable_flag * locality_mode
   | Pmakeufloatblock of mutable_flag * locality_mode
   | Pmakelazyblock of lazy_block_tag
   | Pfield of int * immediate_or_pointer * field_read_semantics
   | Pfield_computed of field_read_semantics
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Pmakeblock of int * mutable_flag * block_shape
   | Pfield of int * immediate_or_pointer * mutable_flag
   | Pfield_computed
@@ -168,7 +168,7 @@ type primitive =
   | Pmakelazyblock of lazy_block_tag
   | Pfield of int * immediate_or_pointer * mutable_flag
   | Pfield_computed
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Psetfield of int * immediate_or_pointer * initialization_or_assignment
   | Psetfield_computed of immediate_or_pointer * initialization_or_assignment
   | Pfloatfield of int * field_read_semantics * locality_mode
@@ -379,7 +379,7 @@ type primitive =
   (* Integer to external pointer *)
   | Pint_as_pointer of locality_mode
   (* Atomic operations *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Patomic_load_field of {immediate_or_pointer : immediate_or_pointer}
   | Patomic_set_field of {immediate_or_pointer : immediate_or_pointer}
   | Patomic_exchange_field of {immediate_or_pointer : immediate_or_pointer}
@@ -392,14 +392,14 @@ type primitive =
   | Patomic_land_field
   | Patomic_lor_field
   | Patomic_lxor_field
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Patomic_load of {immediate_or_pointer : immediate_or_pointer}
   | Patomic_exchange
   | Patomic_cas
   | Patomic_fetch_add
 =======
   | Patomic_load
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   (* Inhibition of optimisation *)
   | Popaque of layout
   (* Statically-defined probes *)
@@ -424,7 +424,7 @@ type primitive =
   | Ppoke of peek_or_poke
   (* Fetching domain-local state *)
   | Pdls_get
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Ptls_get
   | Pdomain_index
   (* Poll for runtime actions *)
@@ -434,11 +434,11 @@ type primitive =
   | Pset_idx of layout * modify_mode
   | Pget_ptr of layout * Asttypes.mutable_flag
   | Pset_ptr of layout * modify_mode
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   (* Poll for runtime actions *)
   | Ppoll
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 and extern_repr =
   | Same_as_ocaml_repr of Jkind.Sort.Const.t
@@ -991,13 +991,13 @@ and slambda = lambda SL.t0
 
 and rec_binding = {
   id : Ident.t;
-<<<<<<< HEAD
+<<<<<<< oxcaml
   debug_uid : debug_uid;
-||||||| 23e84b8c4d
+||||||| upstream-base
   rkind : Value_rec_types.recursive_binding_kind;
   def : lambda;
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   def : lfunction;
 }
 
@@ -1147,7 +1147,7 @@ let unboxed_nativeint =
 
 let const_unit = const_int 0
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let dummy_constant = tagged_immediate (0xBBBB / 2)
 
 let array_index_to_layout = function
@@ -1190,26 +1190,26 @@ let const_scalar (kind : locality_mode Scalar.Integral.t) n =
     | Naked (Boxable (Int64 _)) -> const_unboxed_int64 (Int64.of_int n)
     | Naked (Boxable (Nativeint _)) ->
       const_unboxed_nativeint (Nativeint.of_int n))
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 let dummy_constant = Lconst (const_int (0xBBBB / 2))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let max_arity () =
   if !Clflags.native_code then 126 else max_int
   (* 126 = 127 (the maximal number of parameters supported in C--)
            - 1 (the hidden parameter containing the environment) *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode =
   assert (List.length params > 0);
-||||||| 23e84b8c4d
+||||||| upstream-base
 let lfunction ~kind ~params ~return ~body ~attr ~loc =
 =======
 let lfunction' ~kind ~params ~return ~body ~attr ~loc =
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   assert (List.length params <= max_arity ());
-<<<<<<< HEAD
+<<<<<<< oxcaml
   (* A curried function type with n parameters has n arrows. Of these,
      the first [n-nlocal] have return mode Heap, while the remainder
      have return mode Local, except possibly the final one.
@@ -1235,14 +1235,14 @@ let lfunction' ~kind ~params ~return ~body ~attr ~loc =
 
 let lfunction ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode =
   Lfunction (lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode)
-||||||| 23e84b8c4d
+||||||| upstream-base
   Lfunction { kind; params; return; body; attr; loc }
 =======
   { kind; params; return; body; attr; loc }
 
 let lfunction ~kind ~params ~return ~body ~attr ~loc =
   Lfunction (lfunction' ~kind ~params ~return ~body ~attr ~loc)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let lambda_unit = Lconst const_unit
 
@@ -1813,7 +1813,7 @@ let transl_extension_path loc env path =
 let transl_class_path loc env path =
   transl_path Env.find_class_address loc env path
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let transl_prim mod_name name =
   let pers = Ident.create_persistent mod_name in
   let env = Env.add_persistent_structure pers Env.empty in
@@ -1822,7 +1822,7 @@ let transl_prim mod_name name =
   | path, _ -> transl_value_path Loc_unknown env path
   | exception Not_found ->
       fatal_error ("Primitive " ^ name ^ " not found.")
-||||||| 23e84b8c4d
+||||||| upstream-base
 let transl_prim mod_name name =
   let pers = Ident.create_persistent mod_name in
   let env = Env.add_persistent_structure pers Env.empty in
@@ -1844,7 +1844,7 @@ let transl_prim modname field =
           fatal_errorf "Primitive %s.%s not found." modname field
       | path, _ -> transl_value_path Loc_unknown env path
     )
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let block_of_module_representation ~loc = function
   | Module_value_only _ -> Pmakeblock(0, Immutable, All_value, alloc_heap)
@@ -1940,14 +1940,14 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
                       ap_args = subst_list s l ap.ap_args}
     | Lfunction lf ->
         Lfunction (subst_lfun s l lf)
-<<<<<<< HEAD
+<<<<<<< oxcaml
     | Llet(str, k, id, duid, arg, body) ->
         let id, duid, l' = bind id duid l in
         Llet(str, k, id, duid, subst s l arg, subst s l' body)
     | Lmutlet(k, id, duid, arg, body) ->
         let id, duid, l' = bind id duid l in
         Lmutlet(k, id, duid, subst s l arg, subst s l' body)
-||||||| 23e84b8c4d
+||||||| upstream-base
         let params, l' = bind_many lf.params l in
         Lfunction {lf with params; body = subst s l' lf.body}
     | Llet(str, k, id, arg, body) ->
@@ -1963,7 +1963,7 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
     | Lmutlet(k, id, arg, body) ->
         let id, l' = bind id l in
         Lmutlet(k, id, subst s l arg, subst s l' body)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | Lletrec(decl, body) ->
         let decl, l' = bind_rec decl l in
         Lletrec(List.map (subst_decl s l') decl, subst s l' body)
@@ -2055,13 +2055,13 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
   and subst_list s l li = List.map (subst s l) li
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
   and subst_lfun s l lf =
-<<<<<<< HEAD
+<<<<<<< oxcaml
     let params, l' = bind_params lf.params l in
-||||||| 23e84b8c4d
+||||||| upstream-base
   and subst_decl s l decl = { decl with def = subst s l decl.def }
 =======
     let params, l' = bind_many lf.params l in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     { lf with params; body = subst s l' lf.body }
   and subst_case s l (key, case) = (key, subst s l case)
   and subst_strcase s l (key, case) = (key, subst s l case)
@@ -2089,8 +2089,8 @@ let duplicate_function =
      (fun _ _ env -> env)
      ~freshen_bound_variables:true
      Ident.Map.empty).subst_lfunction
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 let duplicate lam =
   subst
     (fun _ _ env -> env)
@@ -2102,7 +2102,7 @@ let duplicate lam =
 let map_lfunction f { kind; params; return; body; attr; loc } =
   let body = f body in
   { kind; params; return; body; attr; loc }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let map_lfunction f { kind; params; return; body; attr; loc;
                       mode; ret_mode } =
@@ -2130,12 +2130,12 @@ let shallow_map ~tail ~non_tail:f = function
       }
   | Lfunction lfun ->
       Lfunction (map_lfunction f lfun)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Llet (str, layout, v, v_duid, e1, e2) ->
       Llet (str, layout, v, v_duid, f e1, tail e2)
   | Lmutlet (layout, v, v_duid, e1, e2) ->
       Lmutlet (layout, v, v_duid, f e1, tail e2)
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Lfunction { kind; params; return; body; attr; loc; } ->
       Lfunction { kind; params; return; body = f body; attr; loc; }
   | Llet (str, k, v, e1, e2) ->
@@ -2147,22 +2147,22 @@ let shallow_map ~tail ~non_tail:f = function
       Llet (str, k, v, f e1, f e2)
   | Lmutlet (k, v, e1, e2) ->
       Lmutlet (k, v, f e1, f e2)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Lletrec (idel, e2) ->
       Lletrec
         (List.map (fun rb ->
              { rb with def = map_lfunction f rb.def })
             idel,
-<<<<<<< HEAD
+<<<<<<< oxcaml
          tail e2)
   | Lprim (Psequand as p, [l1; l2], loc)
   | Lprim (Psequor as p, [l1; l2], loc) ->
       Lprim(p, [f l1; tail l2], loc)
-||||||| 23e84b8c4d
+||||||| upstream-base
       Lletrec (List.map (fun rb -> { rb with def = f rb.def }) idel, f e2)
 =======
          f e2)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Lprim (p, el, loc) ->
       Lprim (p, List.map f el, loc)
   | Lswitch (e, sw, loc, layout) ->

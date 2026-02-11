@@ -73,18 +73,18 @@ INSTALL_OCAMLNAT = @install_ocamlnat@
 DEP_CC=@DEP_CC@ -MM
 COMPUTE_DEPS=@compute_deps@
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 # Build-system flags to use to compile C files
 OC_CFLAGS=@oc_cflags@
 OC_CPPFLAGS=-I$(ROOTDIR)/$(RUNTIME_DIR) @oc_cppflags@
-||||||| 23e84b8c4d
+||||||| upstream-base
 # Build-system flags to use to compile C files
 OC_CFLAGS=@oc_cflags@
 OC_CPPFLAGS=-I$(ROOTDIR)/runtime @oc_cppflags@
 =======
 # Default flags to use to compile C files
 OC_CFLAGS = @oc_cflags@
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 # Flags to use when compiling C files to be linked with bytecode
 OC_BYTECODE_CFLAGS = @oc_bytecode_cflags@

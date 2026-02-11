@@ -77,9 +77,9 @@ val peek_opt : ('a : value_or_null) . 'a t @ local -> 'a option
 val top : ('a : value_or_null) . 'a t @ local -> 'a
 (** [top] is a synonym for [peek]. *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val clear : ('a : value_or_null) . 'a t @ local -> unit
-||||||| 23e84b8c4d
+||||||| upstream-base
 val clear : 'a t -> unit
 =======
 val drop : 'a t -> unit
@@ -88,7 +88,7 @@ val drop : 'a t -> unit
    @since 5.3 *)
 
 val clear : 'a t -> unit
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 (** Discard all elements from a queue. *)
 
 val copy : ('a : value_or_null) . 'a t @ local -> 'a t

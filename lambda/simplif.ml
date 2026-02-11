@@ -25,12 +25,12 @@ exception Real_reference
 
 let check_function_escape id lfun =
   (* Check that the identifier is not one of the parameters *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let param_is_id { name; _ } = Ident.same id name in
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   let param_is_id (param, _) = Ident.same id param in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   assert (not (List.exists param_is_id lfun.params));
   if Ident.Set.mem id (Lambda.free_variables lfun.body) then
     raise Real_reference
@@ -45,12 +45,12 @@ let rec eliminate_ref id = function
   | Lfunction lfun as lam ->
       check_function_escape id lfun;
       lam
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Llet(str, kind, v, duid, e1, e2) ->
       Llet(str, kind, v, duid, eliminate_ref id e1, eliminate_ref id e2)
   | Lmutlet(kind, v, duid, e1, e2) ->
       Lmutlet(kind, v, duid, eliminate_ref id e1, eliminate_ref id e2)
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Lfunction _ as lam ->
       if Ident.Set.mem id (free_variables lam)
       then raise Real_reference
@@ -64,7 +64,7 @@ let rec eliminate_ref id = function
       Llet(str, kind, v, eliminate_ref id e1, eliminate_ref id e2)
   | Lmutlet(kind, v, e1, e2) ->
       Lmutlet(kind, v, eliminate_ref id e1, eliminate_ref id e2)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Lletrec(idel, e2) ->
       List.iter (fun rb -> check_function_escape id rb.def) idel;
       Lletrec(idel, eliminate_ref id e2)
@@ -265,7 +265,7 @@ let simplify_exits lam =
     match l with
   | Lvar _| Lmutvar _ | Lconst _ -> l
   | Lapply ap ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       Lapply{ap with ap_func = simplif ~layout:None ~try_depth ap.ap_func;
                      ap_args = List.map (simplif ~layout:None ~try_depth) ap.ap_args}
   | Lfunction lfun ->
@@ -276,7 +276,7 @@ let simplify_exits lam =
   | Lmutlet(kind, v, duid, l1, l2) ->
       Lmutlet(kind, v, duid, simplif ~layout:None ~try_depth l1,
               simplif ~layout ~try_depth l2)
-||||||| 23e84b8c4d
+||||||| upstream-base
       Lapply{ap with ap_func = simplif ~try_depth ap.ap_func;
                      ap_args = List.map (simplif ~try_depth) ap.ap_args}
   | Lfunction{kind; params; return; body = l; attr; loc} ->
@@ -294,17 +294,17 @@ let simplify_exits lam =
       Llet(str, kind, v, simplif ~try_depth l1, simplif ~try_depth l2)
   | Lmutlet(kind, v, l1, l2) ->
       Lmutlet(kind, v, simplif ~try_depth l1, simplif ~try_depth l2)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Lletrec(bindings, body) ->
       let bindings =
-<<<<<<< HEAD
+<<<<<<< oxcaml
         List.map (fun ({ def = {kind; params; return; body = l; attr; loc;
                                 mode; ret_mode } }
                        as rb) ->
                    let def =
                      lfunction' ~kind ~params ~return ~mode ~ret_mode
                        ~body:(simplif ~layout:None ~try_depth l) ~attr ~loc
-||||||| 23e84b8c4d
+||||||| upstream-base
         List.map (fun rb -> { rb with def = simplif ~try_depth rb.def })
 =======
         List.map (fun ({ def = {kind; params; return; body = l; attr; loc} }
@@ -312,7 +312,7 @@ let simplify_exits lam =
                    let def =
                      lfunction' ~kind ~params ~return
                        ~body:(simplif ~try_depth l) ~attr ~loc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                    in
                    { rb with def })
           bindings
@@ -555,13 +555,13 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
      count bv l1;
      count bv l2
   | Lletrec(bindings, body) ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       List.iter (fun { def } -> count_lfunction def) bindings;
-||||||| 23e84b8c4d
+||||||| upstream-base
       List.iter (fun { def } -> count bv def) bindings;
 =======
       List.iter (fun { def } -> count bv def.body) bindings;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       count bv body
   | Lprim(_p, ll, _) -> List.iter (count bv) ll
   | Lswitch(l, sw, _loc, _kind) ->
@@ -810,10 +810,10 @@ let rec emit_tail_infos is_tail lambda =
       list_emit_tail_infos false ap.ap_args
   | Lfunction lfun ->
       emit_tail_infos_lfunction is_tail lfun
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Llet (_, _k, _, _, lam, body)
   | Lmutlet (_k, _, _, lam, body) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Lfunction {body = lam} ->
       emit_tail_infos true lam
   | Llet (_, _k, _, lam, body)
@@ -821,7 +821,7 @@ let rec emit_tail_infos is_tail lambda =
 =======
   | Llet (_, _k, _, lam, body)
   | Lmutlet (_k, _, lam, body) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       emit_tail_infos false lam;
       emit_tail_infos is_tail body
   | Lletrec (bindings, body) ->
@@ -984,11 +984,11 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
         let body = Lambda.rename subst body in
         let body = if add_region then Lregion (body, return) else body in
         let inner_fun =
-<<<<<<< HEAD
+<<<<<<< oxcaml
           lfunction' ~kind:(Curried {nlocal=0})
             ~params:new_ids
             ~return ~body ~attr ~loc ~mode ~ret_mode
-||||||| 23e84b8c4d
+||||||| upstream-base
           lfunction ~kind:Curried
             ~params:(List.map (fun id -> id, Pgenval) new_ids)
             ~return ~body ~attr ~loc
@@ -996,19 +996,19 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
           lfunction' ~kind:Curried
             ~params:(List.map (fun id -> id, Pgenval) new_ids)
             ~return ~body ~attr ~loc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         in
         (wrapper_body, { id = inner_id;
-<<<<<<< HEAD
+<<<<<<< oxcaml
                          debug_uid = inner_id_duid;
-||||||| 23e84b8c4d
+||||||| upstream-base
         (wrapper_body, { id = inner_id; rkind = Static; def = inner_fun })
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
                          def = inner_fun })
   in
   try
-<<<<<<< HEAD
+<<<<<<< oxcaml
     (* TODO: enable this optimisation even in the presence of local returns *)
     begin match kind, ret_mode with
     | Curried {nlocal}, _ when nlocal > 0 -> raise Exit
@@ -1022,7 +1022,7 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
        debug_uid = fun_duid;
        def = lfunction' ~kind ~params ~return ~body ~attr ~loc
            ~mode ~ret_mode };
-||||||| 23e84b8c4d
+||||||| upstream-base
     let body, inner = aux [] body in
     let attr = default_stub_attribute in
     [{ id = fun_id; rkind = Static;
@@ -1032,20 +1032,20 @@ let split_default_wrapper ~id:fun_id ~debug_uid:fun_duid ~kind ~params ~return
     let attr = default_stub_attribute in
     [{ id = fun_id;
        def = lfunction' ~kind ~params ~return ~body ~attr ~loc };
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
      inner]
   with Exit ->
     [{ id = fun_id;
-<<<<<<< HEAD
+<<<<<<< oxcaml
        debug_uid = fun_duid;
        def = lfunction' ~kind ~params ~return ~body ~attr ~loc
            ~mode ~ret_mode  }]
-||||||| 23e84b8c4d
+||||||| upstream-base
     [{ id = fun_id; rkind = Static;
        def = lfunction ~kind ~params ~return ~body ~attr ~loc }]
 =======
        def = lfunction' ~kind ~params ~return ~body ~attr ~loc }]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Simplify local let-bound functions: if all occurrences are
    fully-applied function calls in the same "tail scope", replace the

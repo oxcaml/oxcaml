@@ -82,10 +82,10 @@ let warn_unused () =
 (* These are the attributes that are tracked in the builtin_attrs table for
    misplaced attribute warnings. *)
 let builtin_attrs =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   [ "inline"
   ; "atomic"
-||||||| 23e84b8c4d
+||||||| upstream-base
   [ "alert"
   ; "boxed"
   ; "deprecated"
@@ -104,7 +104,7 @@ let builtin_attrs =
   ; "immediate"
   ; "immediate64"
   ; "inline"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   ; "inlined"
   ; "specialise"
   ; "specialised"
@@ -181,19 +181,19 @@ let register_attr current_phase name =
     if is_builtin_attr name.txt then
       Attribute_table.replace unused_attrs name ()
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let ident_of_payload = function
   | PStr[{pstr_desc=Pstr_eval({pexp_desc=Pexp_ident {txt=Lident id}},_)}] ->
      Some id
   | _ -> None
 
 let string_of_cst = function
-||||||| 23e84b8c4d
+||||||| upstream-base
 let string_of_cst = function
 =======
 let string_of_cst const =
   match const.pconst_desc with
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Pconst_string(s, _, _) -> Some s
   | _ -> None
 
@@ -378,15 +378,15 @@ let rec attrs_of_sig_items = function
   | _ ->
       []
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let alerts_of_sig ~mark {psg_items; _} =
   let a = attrs_of_sig_items psg_items in
-||||||| 23e84b8c4d
+||||||| upstream-base
 let alerts_of_sig sg = alerts_of_attrs (attrs_of_sig sg)
 =======
 let alerts_of_sig ~mark sg =
   let a = attrs_of_sig sg in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   if mark then mark_alerts_used a;
   alerts_of_attrs a
 
@@ -560,7 +560,7 @@ let has_unboxed attrs = has_attribute "unboxed" attrs
 
 let has_boxed attrs = has_attribute "boxed" attrs
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let has_unsafe_allow_any_mode_crossing attrs =
   has_attribute "unsafe_allow_any_mode_crossing" attrs
 
@@ -1215,7 +1215,7 @@ let get_eval_payload payload =
   | PTyp typ -> Ok typ
   | _ -> Error ()
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let has_atomic attrs = has_attribute "atomic" attrs

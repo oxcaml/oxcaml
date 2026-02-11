@@ -61,14 +61,14 @@ let invoke_traced_function codeptr env arg =
   Meta.invoke_traced_function codeptr env arg
 
 let print_label ppf l =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   if l <> Nolabel then fprintf ppf "%s:" (Printtyp.string_of_label l)
-||||||| 23e84b8c4d
+||||||| upstream-base
   if l <> Asttypes.Nolabel then fprintf ppf "%s:" (Printtyp.string_of_label l)
 =======
   if l <> Asttypes.Nolabel then fprintf ppf "%s:"
   (Asttypes.string_of_label l)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* If a function returns a functional value, wrap it into a trace code *)
 

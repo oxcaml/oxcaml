@@ -1,7 +1,7 @@
 File "w53_without_cmi.ml", line 6, characters 4-9:
 6 | [@@@alert xyz "xyz"] (* rejected *)
         ^^^^^
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Warning 53 [misplaced-attribute]: the "alert" attribute cannot appear in this context
 
 File "w53_without_cmi.ml", line 9, characters 6-11:
@@ -28,7 +28,7 @@ File "w53_with_cmi.ml", line 6, characters 4-9:
 6 | [@@@alert xyz "xyz"] (* rejected *)
         ^^^^^
 Warning 53 [misplaced-attribute]: the "alert" attribute cannot appear in this context
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 Warning 53 [misplaced-attribute]: the alert attribute cannot appear in this context
 
@@ -56,7 +56,7 @@ File "w53_with_cmi.ml", line 6, characters 4-9:
 6 | [@@@alert xyz "xyz"] (* rejected *)
         ^^^^^
 Warning 53 [misplaced-attribute]: the alert attribute cannot appear in this context
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 File "w53_across_cmi.ml", line 17, characters 5-20:
 17 | open W53_without_cmi
           ^^^^^^^^^^^^^^^

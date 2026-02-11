@@ -31,7 +31,7 @@
 #endif
 #endif
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 static
 #ifdef _MSC_VER
 __forceinline
@@ -39,7 +39,7 @@ __forceinline
 __inline
 #endif
 unsigned long read_size(const char * const ptr)
-||||||| 23e84b8c4d
+||||||| upstream-base
 /* Two macros are required so that QUOTE(foo) stringizes the _expansion_ of foo
    rather than foo itself. cf. the Stringizing chapter in the cpp manual
    (https://gcc.gnu.org/onlinedocs/gcc-13.1.0/cpp/Stringizing.html). */
@@ -57,7 +57,7 @@ __inline
 unsigned long read_size(const char * const ptr)
 =======
 Caml_inline unsigned long read_size(const char * const ptr)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 {
   const unsigned char * const p = (const unsigned char * const) ptr;
   return ((unsigned long) p[0] << 24) | ((unsigned long) p[1] << 16) |

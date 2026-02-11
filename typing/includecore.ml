@@ -143,8 +143,8 @@ let primitive_descriptions pd1 pd2 =
   else
     native_repr_args pd1.prim_native_repr_args pd2.prim_native_repr_args
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 type value_mismatch =
   | Primitive_mismatch of primitive_mismatch
   | Not_a_primitive
@@ -180,7 +180,7 @@ let value_descriptions_consistency env vd1 vd2 =
   | (_, Val_prim _) -> raise (Dont_match Not_a_primitive)
   | (_, _) -> Tcoerce_none
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let value_descriptions ~loc env name
     ~mmodes
     (vd1 : Types.value_description)
@@ -191,7 +191,7 @@ let value_descriptions ~loc env name
     loc
     vd1.val_attributes vd2.val_attributes
     name;
-<<<<<<< HEAD
+<<<<<<< oxcaml
   begin match Zero_alloc.sub vd1.val_zero_alloc vd2.val_zero_alloc with
   | Ok () -> ()
   | Error e -> raise (Dont_match (Zero_alloc e))
@@ -256,7 +256,7 @@ let value_descriptions ~loc env name
          | Val_prim _ -> raise (Dont_match Not_a_primitive)
          | _ -> Tcoerce_none
      end
-||||||| 23e84b8c4d
+||||||| upstream-base
   match Ctype.moregeneral env true vd1.val_type vd2.val_type with
   | exception Ctype.Moregen err -> raise (Dont_match (Type err))
   | () -> begin
@@ -279,7 +279,7 @@ let value_descriptions ~loc env name
   match Ctype.moregeneral env true vd1.val_type vd2.val_type with
   | exception Ctype.Moregen err -> raise (Dont_match (Type err))
   | () -> value_descriptions_consistency env vd1 vd2
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Inclusion between manifest types (particularly for private row types) *)
 
@@ -337,11 +337,11 @@ type label_mismatch =
   | Type of Errortrace.equality_error
   | Mutability of position
   | Atomicity of position
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Modality of Modality.equate_error
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 type record_change =
   (Types.label_declaration, Types.label_declaration, label_mismatch)
@@ -442,11 +442,11 @@ let report_modality_equate_error first second ppf
 
 module Style = Misc.Style
 module Fmt = Format_doc
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 =======
 module Printtyp = Printtyp.Doc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let report_primitive_mismatch first second ppf err =
   let pr fmt = Fmt.fprintf ppf fmt in
@@ -487,7 +487,7 @@ let report_value_mismatch first second env ppf err =
       pr "The implementation is not a primitive."
   | Type trace ->
       let msg = Fmt.Doc.msg in
-<<<<<<< HEAD
+<<<<<<< oxcaml
       Printtyp.report_moregen_error ppf Type_scheme env trace
         (msg "The type")
         (msg "is not compatible with the type")
@@ -497,7 +497,7 @@ let report_value_mismatch first second env ppf err =
       let got = first ^ " is" in
       let expected = second ^ " is" in
       report_mode_sub_error got expected ppf e
-||||||| 23e84b8c4d
+||||||| upstream-base
       Printtyp.report_moregen_error ppf Type_scheme env trace
         (fun ppf -> Format.fprintf ppf "The type")
         (fun ppf -> Format.fprintf ppf "is not compatible with the type")
@@ -505,19 +505,19 @@ let report_value_mismatch first second env ppf err =
       Errortrace_report.moregen ppf Type_scheme env trace
         (msg "The type")
         (msg "is not compatible with the type")
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let report_type_inequality env ppf err =
   let msg = Fmt.Doc.msg in
-<<<<<<< HEAD
+<<<<<<< oxcaml
   Printtyp.report_equality_error ppf Type_scheme env err
-||||||| 23e84b8c4d
+||||||| upstream-base
   Printtyp.report_equality_error ppf Type_scheme env err
     (fun ppf -> Format.fprintf ppf "The type")
     (fun ppf -> Format.fprintf ppf "is not equal to the type")
 =======
   Errortrace_report.equality ppf Type_scheme env err
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     (msg "The type")
     (msg "is not equal to the type")
 
@@ -540,15 +540,15 @@ let report_label_mismatch first second env ppf err =
       report_type_inequality env ppf err
   | Mutability ord ->
       Format_doc.fprintf ppf "%s is mutable and %s is not."
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
       Format.fprintf ppf "%s is mutable and %s is not."
 =======
         (String.capitalize_ascii (choose ord first second))
         (choose_other ord first second)
   | Atomicity ord ->
       Format_doc.fprintf ppf "%s is atomic and %s is not."
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         (String.capitalize_ascii (choose ord first second))
         (choose_other ord first second)
   | Atomicity ord ->
@@ -765,13 +765,13 @@ let report_unsafe_mode_crossing_mismatch first second ppf e =
 
 let report_type_mismatch first second decl env ppf err =
   let pr fmt = Fmt.fprintf ppf fmt in
-<<<<<<< HEAD
+<<<<<<< oxcaml
   pr "@ ";
-||||||| 23e84b8c4d
+||||||| upstream-base
   let pr fmt = Format.fprintf ppf fmt in
   pr "@ ";
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   match err with
   | Arity ->
       pr "They have different arities."
@@ -845,7 +845,7 @@ let compare_unsafe_mode_crossing ~env umc1 umc2 =
 module Record_diffing = struct
 
   let compare_labels env params1 params2
-<<<<<<< HEAD
+<<<<<<< oxcaml
         (ld1 : Types.label_declaration)
         (ld2 : Types.label_declaration) =
         let err =
@@ -882,7 +882,7 @@ module Record_diffing = struct
             end
           | Error e -> Some (Modality e : label_mismatch)
         end
-||||||| 23e84b8c4d
+||||||| upstream-base
       (ld1 : Types.label_declaration)
       (ld2 : Types.label_declaration) =
     if ld1.ld_mutable <> ld2.ld_mutable
@@ -918,7 +918,7 @@ module Record_diffing = struct
     | exception Ctype.Equality err ->
         Some (Type err : label_mismatch)
     | () -> None
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
   let rec equal ~loc env params1 params2
       (labels1 : Types.label_declaration list)
@@ -1441,7 +1441,7 @@ let type_manifest env ty1 ty2 priv2 kind2 =
       | () -> None
     end
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* Note [Contravariance of type parameter jkinds]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1528,7 +1528,7 @@ let type_manifest env ty1 ty2 priv2 kind2 =
    *)
 
 (* See Note [Contravariance of type parameter jkinds]. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 (* A type declarations [td1] is consistent with the type declaration [td2] if
    there is a context E such E |- td1 <: td2 for the ordinary subtyping. For
@@ -1541,7 +1541,7 @@ let type_declarations_consistency env decl1 decl2 =
     | Some err -> Some (Privacy err)
     | None -> None
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let type_declarations ?(equality = false) ~loc env ~mark name
       decl1 path decl2 =
   Builtin_attributes.check_alerts_inclusion
@@ -1550,7 +1550,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
     loc
     decl1.type_attributes decl2.type_attributes
     name;
-<<<<<<< HEAD
+<<<<<<< oxcaml
   if decl1.type_arity <> decl2.type_arity then Some Arity else
   (* Step 1 from the Note *)
   let err =
@@ -1594,7 +1594,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
     | Some err -> Some (Privacy err)
     | None -> None
   in
-||||||| 23e84b8c4d
+||||||| upstream-base
   if decl1.type_arity <> decl2.type_arity then Some Arity else
   let err =
     match privacy_mismatch env decl1 decl2 with
@@ -1603,7 +1603,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
   in
 =======
   let err = type_declarations_consistency env decl1 decl2 in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   if err <> None then err else
   let err = match (decl1.type_manifest, decl2.type_manifest) with
       (_, None) -> None
@@ -1666,7 +1666,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
           mark usage cstrs1;
           if equality then mark Env.Exported cstrs2
         end;
-<<<<<<< HEAD
+<<<<<<< oxcaml
         Misc.Stdlib.Option.first_some
           (Variant_diffing.compare_with_representation ~loc env
               decl1.type_params
@@ -1688,7 +1688,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
           (mark_and_compare_records Unboxed_product labels1 rep1 labels2 rep2)
           (fun () -> compare_unsafe_mode_crossing ~env umc1 umc2)
       end
-||||||| 23e84b8c4d
+||||||| upstream-base
         Variant_diffing.compare_with_representation ~loc env
           decl1.type_params
           decl2.type_params
@@ -1738,7 +1738,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
           decl1.type_params decl2.type_params
           labels1 labels2
           rep1 rep2
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     | (Type_open, Type_open) -> None
     | (_, _) -> Some (Kind (of_kind decl1.type_kind, of_kind decl2.type_kind))
   in
@@ -1761,8 +1761,8 @@ let type_declarations ?(equality = false) ~loc env ~mark name
                                      []))))
   | All_good ->
   let abstr = Btype.type_kind_is_abstract decl2 && decl2.type_manifest = None in
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
   (* If attempt to assign a non-immediate type (e.g. string) to a type that
    * must be immediate, then we error *)
   let err =
@@ -1802,7 +1802,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
      * when the internal type is open, as we do not allow changing the
        variance in that case  *)
   let abstr' = abstr || decl2.type_private = Private in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let need_variance =
     abstr' || decl1.type_private = Private || decl1.type_kind = Type_open in
   if not need_variance then None else

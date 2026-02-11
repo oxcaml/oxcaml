@@ -72,7 +72,7 @@ type injectivity =
   | Injective
   | NoInjectivity
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 type index_kind =
   | Index_int
   | Index_unboxed_int64
@@ -80,7 +80,7 @@ type index_kind =
   | Index_unboxed_int16
   | Index_unboxed_int8
   | Index_unboxed_nativeint
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 val string_of_label: arg_label -> string
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

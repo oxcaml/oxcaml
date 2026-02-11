@@ -198,7 +198,7 @@ val explicit_arity: Parsetree.attributes -> bool
 val has_unboxed: Parsetree.attributes -> bool
 val has_boxed: Parsetree.attributes -> bool
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val has_unsafe_allow_any_mode_crossing : Parsetree.attributes -> bool
 
 val parse_standard_interface_attributes : Parsetree.attribute -> unit
@@ -362,7 +362,7 @@ val get_tracing_probe_payload :
 val get_eval_payload :
   Parsetree.payload -> (Parsetree.core_type, unit) result
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 val has_atomic: Parsetree.attributes -> bool

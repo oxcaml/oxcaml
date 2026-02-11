@@ -57,7 +57,7 @@ ENDM
 SAVE_ALL_REGS MACRO
     ; Save young_ptr
         mov     Caml_state(young_ptr), r15
-<<<<<<< HEAD
+<<<<<<< oxcaml
     ; Build array of registers, save it into Caml_state(gc_regs)
         push    rbp
         push    r11
@@ -127,7 +127,7 @@ SAVE_ALL_REGS MACRO
         pop     r11
         pop     rbp
     ; Restore Caml_state(young_ptr)
-||||||| 23e84b8c4d
+||||||| upstream-base
     ; Build array of registers, save it into Caml_state(gc_regs)
         push    rbp
         push    r11
@@ -270,7 +270,7 @@ RESTORE_ALL_REGS MACRO
         movsd   xmm13, mmword ptr [r15 + (13+13)*8]
         movsd   xmm14, mmword ptr [r15 + (14+13)*8]
         movsd   xmm15, mmword ptr [r15 + (15+13)*8]
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         mov     r15, Caml_state(young_ptr)
 ENDM
 
@@ -811,13 +811,13 @@ caml_ml_array_bound_error:
         lea     rax, caml_array_bound_error_asm
         jmp     caml_c_call
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
         PUBLIC  caml_ml_array_align_error
         ALIGN   16
 caml_ml_array_align_error:
         lea     rax, caml_array_align_error_asm
         jmp     caml_c_call
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
         PUBLIC  caml_assert_stack_invariants
         ALIGN   4
@@ -830,7 +830,7 @@ caml_assert_stack_invariants:
         int     3
 L310:
         ret
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
         PUBLIC caml_system__code_end
 caml_system__code_end:
@@ -838,14 +838,14 @@ caml_system__code_end:
 ; Frametable - GC roots for callback
 ; Uses the same naming convention as ocamlopt generated modules.
         .DATA
-<<<<<<< HEAD
+<<<<<<< oxcaml
         PUBLIC  caml_system__frametable
 caml_system__frametable LABEL QWORD
         QWORD   1                ; one descriptor
         DWORD   L107 - THIS BYTE ; return address into callback
         WORD    -1               ; negative frame size => use callback link
         WORD    0                ; no roots here
-||||||| 23e84b8c4d
+||||||| upstream-base
         PUBLIC  caml_system__frametable
 caml_system__frametable LABEL QWORD
         QWORD   1           ; one descriptor
@@ -859,7 +859,7 @@ caml_system$frametable LABEL QWORD
         QWORD   L107        ; return address into callback
         WORD    -1          ; negative frame size => use callback link
         WORD    0           ; no roots here
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         ALIGN   8
         QWORD   frame_runstack
         WORD    -1

@@ -26,18 +26,18 @@
 #include "mlvalues.h"
 #include "domain_state.h"
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 #ifdef MULTIDOMAIN
-||||||| 23e84b8c4d
+||||||| upstream-base
 /* The runtime currently has a hard limit on the number of domains.
    This hard limit may go away in the future. */
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #ifdef ARCH_SIXTYFOUR
 #define Max_domains_def 128
 #else
 #define Max_domains_def 16
-<<<<<<< HEAD
+<<<<<<< oxcaml
 #endif
 /* Upper limit for the number of domains. Chosen to be arbitrarily large. Used
  * for sanity checking [max_domains] value in OCAMLRUNPARAM. */
@@ -45,10 +45,10 @@
 #else
 #define Max_domains_def 1
 #define Max_domains_max 1
-||||||| 23e84b8c4d
+||||||| upstream-base
 #define Max_domains 16
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #endif
 
 /* Upper limit for the number of domains. Chosen to be arbitrarily large. Used
@@ -153,24 +153,24 @@ int caml_domain_is_in_stw(void);
 
 int caml_domain_terminating(caml_domain_state *);
 int caml_domain_is_terminating(void);
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 =======
 void caml_domain_terminate(bool last);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 int caml_try_run_on_all_domains_with_spin_work(
   int sync,
   void (*handler)(caml_domain_state*, void*, int, caml_domain_state**),
   void* data,
-<<<<<<< HEAD
+<<<<<<< oxcaml
   void (*leader_setup)(caml_domain_state*, void*),
-||||||| 23e84b8c4d
+||||||| upstream-base
   void (*leader_setup)(caml_domain_state*),
   void (*enter_spin_callback)(caml_domain_state*, void*),
 =======
   void (*leader_setup)(caml_domain_state*),
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   /* return nonzero if there may still be useful work to do while spinning */
   int (*enter_spin_callback)(caml_domain_state*, void*),
   void* enter_spin_data);
@@ -281,8 +281,8 @@ void caml_global_barrier_release_as_final(barrier_status status);
          ((CAML_GENSYM(alone) ? (void)0 :                               \
            caml_global_barrier_release_as_final(CAML_GENSYM(b))),       \
           CAML_GENSYM(continue) = 0))
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 int caml_domain_terminating(caml_domain_state *);
 int caml_domain_is_terminating(void);
 =======
@@ -297,7 +297,7 @@ void caml_stop_all_domains(void);
 /* Try and release all synchronisation resources set up by
    caml_init_domains(). Returns whether all resources could be released. */
 bool caml_free_domains(void);
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 #endif /* CAML_INTERNALS */
 

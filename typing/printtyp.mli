@@ -16,21 +16,21 @@
 (** Printing functions *)
 
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 open Format_doc
-||||||| 23e84b8c4d
+||||||| upstream-base
 open Format
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 open Types
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val longident: Longident.t printer
 val ident: Ident.t printer
 val namespaced_ident: Shape.Sig_component_kind.t -> Ident.t -> string
 val tree_of_path: Path.t -> out_ident
 val path: Path.t printer
-||||||| 23e84b8c4d
+||||||| upstream-base
 val longident: formatter -> Longident.t -> unit
 val ident: formatter -> Ident.t -> unit
 val namespaced_ident: Shape.Sig_component_kind.t -> Ident.t -> string
@@ -40,9 +40,9 @@ val path: formatter -> Path.t -> unit
 type namespace := Shape.Sig_component_kind.t
 
 val namespaced_ident: namespace -> Ident.t -> string
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 val string_of_path: Path.t -> string
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
 val type_path: Path.t printer
 (** Print a type path taking account of [-short-paths].
@@ -55,7 +55,7 @@ end
 
 type namespace := Shape.Sig_component_kind.t option
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 
 val type_path: formatter -> Path.t -> unit
 (** Print a type path taking account of [-short-paths].
@@ -69,9 +69,9 @@ end
 type namespace := Shape.Sig_component_kind.t option
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 val strings_of_paths: namespace -> Path.t list -> string list
-<<<<<<< HEAD
+<<<<<<< oxcaml
     (** Print a list of paths, using the same naming context to
         avoid name collisions *)
 
@@ -319,7 +319,7 @@ val tree_of_typvariant_repr : row_desc -> typvariant_repr
 (* Simple heuristic to rewrite Foo__bar.* as Foo.Bar.* when Foo.Bar is an alias
    for Foo__bar. This pattern is used by the stdlib. *)
 val rewrite_double_underscore_paths: Env.t -> Path.t -> Path.t
-||||||| 23e84b8c4d
+||||||| upstream-base
     (** Print a list of paths, using the same naming context to
         avoid name collisions *)
 
@@ -528,15 +528,15 @@ val rewrite_double_underscore_paths: Env.t -> Path.t -> Path.t
 =======
 (** Print a list of paths, using the same naming context to
     avoid name collisions *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 val rewrite_double_underscore_longidents: Env.t -> Longident.t -> Longident.t
 
 (** [printed_signature sourcefile ppf sg] print the signature [sg] of
-<<<<<<< HEAD
+<<<<<<< oxcaml
     [sourcefile] with potential warnings for name collisions *)
 val printed_signature: string -> Format.formatter -> signature -> unit
-||||||| 23e84b8c4d
+||||||| upstream-base
     [sourcefile] with potential warnings for name collisions *)
 val printed_signature: string -> formatter -> signature -> unit
 =======
@@ -614,4 +614,4 @@ module Doc : Printers with type 'a printer := 'a Format_doc.printer
 
 (** For compatibility with Format printers *)
 include Printers with type 'a printer := 'a Format_doc.format_printer
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

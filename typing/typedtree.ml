@@ -17,7 +17,7 @@
 
 open Asttypes
 open Types
-<<<<<<< HEAD
+<<<<<<< oxcaml
 open Mode
 
 type constant =
@@ -52,12 +52,12 @@ type modalities = Typemode.modalities =
   { moda_modalities : Mode.Modality.Const.t;
     moda_desc : Mode.Modality.atom Location.loc list
   }
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 open Data_types
 
 module Uid = Shape.Uid
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Value expressions for the core language *)
 
@@ -184,39 +184,39 @@ and pat_extra =
 and 'k pattern_desc =
   (* value patterns *)
   | Tpat_any : value pattern_desc
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tpat_var :
     Ident.t * string loc * Uid.t * Jkind_types.Sort.t * Mode.Value.l ->
     value pattern_desc
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpat_var : Ident.t * string loc -> value pattern_desc
 =======
   | Tpat_var : Ident.t * string loc * Uid.t -> value pattern_desc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tpat_alias :
-<<<<<<< HEAD
+<<<<<<< oxcaml
       value general_pattern * Ident.t * string loc * Uid.t * Jkind_types.Sort.t
       * Mode.Value.l * Types.type_expr -> value pattern_desc
-||||||| 23e84b8c4d
+||||||| upstream-base
       value general_pattern * Ident.t * string loc -> value pattern_desc
 =======
       value general_pattern * Ident.t * string loc * Uid.t * type_expr ->
       value pattern_desc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tpat_constant : constant -> value pattern_desc
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tpat_unboxed_unit : value pattern_desc
   | Tpat_unboxed_bool : bool -> value pattern_desc
   | Tpat_tuple : (string option * value general_pattern) list -> value pattern_desc
   | Tpat_unboxed_tuple :
       (string option * value general_pattern * Jkind.sort) list ->
       value pattern_desc
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpat_tuple : value general_pattern list -> value pattern_desc
 =======
   | Tpat_tuple :
       (string option * value general_pattern) list -> value pattern_desc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tpat_construct :
       Longident.t loc * Types.constructor_description *
         value general_pattern list *
@@ -230,19 +230,19 @@ and 'k pattern_desc =
       (Longident.t loc * label_description * value general_pattern) list *
         closed_flag ->
       value pattern_desc
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tpat_record_unboxed_product :
       (Longident.t loc * unboxed_label_description * value general_pattern) list
       * closed_flag ->
       value pattern_desc
   | Tpat_array :
       mutability * Jkind.sort * value general_pattern list -> value pattern_desc
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpat_array : value general_pattern list -> value pattern_desc
 =======
   | Tpat_array :
       mutable_flag * value general_pattern list -> value pattern_desc
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tpat_lazy : value general_pattern -> value pattern_desc
   (* computation patterns *)
   | Tpat_value : tpat_value_argument -> computation pattern_desc
@@ -287,7 +287,7 @@ and expression_desc =
         unique_use * Mode.Value.l
   | Texp_constant of constant
   | Texp_let of rec_flag * value_binding list * expression
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Texp_letmutable of value_binding * expression
   | Texp_function of
       { params : function_param list;
@@ -306,7 +306,7 @@ and expression_desc =
   | Texp_unboxed_bool of bool
   | Texp_tuple of (string option * expression) list * alloc_mode
   | Texp_unboxed_tuple of (string option * expression * Jkind.sort) list
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Texp_function of function_param list * function_body
   | Texp_apply of expression * (arg_label * expression option) list
   | Texp_match of expression * computation case list * partial
@@ -318,7 +318,7 @@ and expression_desc =
   | Texp_match of expression * computation case list * value case list * partial
   | Texp_try of expression * value case list * value case list
   | Texp_tuple of (string option * expression) list
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Texp_construct of
       Longident.t loc * constructor_description * expression list * alloc_mode option
   | Texp_variant of label * (expression * alloc_mode) option
@@ -328,7 +328,7 @@ and expression_desc =
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
       alloc_mode : alloc_mode option
     }
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Texp_record_unboxed_product of {
       fields :
         ( Types.unboxed_label_description * record_label_definition ) array;
@@ -344,26 +344,26 @@ and expression_desc =
   | Texp_unboxed_field of
       expression * Jkind.sort * Longident.t loc * unboxed_label_description *
         unique_use
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Texp_field of expression * Longident.t loc * label_description
 =======
   | Texp_atomic_loc of expression * Longident.t loc * label_description
   | Texp_field of expression * Longident.t loc * label_description
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Texp_setfield of
-<<<<<<< HEAD
+<<<<<<< oxcaml
       expression * Mode.Locality.l * Longident.t loc * label_description * expression
   | Texp_array of mutability * Jkind.Sort.t * expression list * alloc_mode
   | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
   | Texp_array_comprehension of mutability * Jkind.sort * comprehension
-||||||| 23e84b8c4d
+||||||| upstream-base
       expression * Longident.t loc * label_description * expression
   | Texp_array of expression list
 =======
       expression * Longident.t loc * label_description * expression
   | Texp_array of mutable_flag * expression list
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Texp_ifthenelse of expression * expression * expression option
   | Texp_sequence of expression * Jkind.sort * expression
   | Texp_while of {
@@ -541,7 +541,7 @@ and ('a, 'b) arg_or_omitted =
   | Arg of 'a
   | Omitted of 'b
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 and omitted_parameter =
   { mode_closure : Mode.Alloc.r;
     mode_arg : Mode.Alloc.l;
@@ -555,10 +555,10 @@ and apply_position =
   | Tail
   | Nontail
   | Default
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 and apply_arg = (expression, unit) arg_or_omitted
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* Value expressions for the class language *)
 
@@ -860,13 +860,13 @@ and core_type =
    }
 
 and core_type_desc =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Ttyp_var of string option * Parsetree.jkind_annotation option
   | Ttyp_arrow of arg_label * core_type * Mode.Alloc.Const.t modes *
                   core_type * Mode.Alloc.Const.t modes
   | Ttyp_tuple of (string option * core_type) list
   | Ttyp_unboxed_tuple of (string option * core_type) list
-||||||| 23e84b8c4d
+||||||| upstream-base
     Ttyp_any
   | Ttyp_var of string
   | Ttyp_arrow of arg_label * core_type * core_type
@@ -876,7 +876,7 @@ and core_type_desc =
   | Ttyp_var of string
   | Ttyp_arrow of arg_label * core_type * core_type
   | Ttyp_tuple of (string option * core_type) list
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Ttyp_constr of Path.t * Longident.t loc * core_type list
   | Ttyp_object of object_field list * closed_flag
   | Ttyp_class of Path.t * Longident.t loc * core_type list
@@ -960,15 +960,15 @@ and label_declaration =
      ld_id: Ident.t;
      ld_name: string loc;
      ld_uid: Uid.t;
-<<<<<<< HEAD
+<<<<<<< oxcaml
      ld_mutable: mutability;
      ld_modalities: modalities;
-||||||| 23e84b8c4d
+||||||| upstream-base
      ld_mutable: mutable_flag;
 =======
      ld_mutable: mutable_flag;
      ld_atomic: atomic_flag;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
      ld_type: core_type;
      ld_loc: Location.t;
      ld_attributes: attribute list;
@@ -979,13 +979,13 @@ and constructor_declaration =
      cd_id: Ident.t;
      cd_name: string loc;
      cd_uid: Uid.t;
-<<<<<<< HEAD
+<<<<<<< oxcaml
      cd_vars: (string * Parsetree.jkind_annotation option) list;
-||||||| 23e84b8c4d
+||||||| upstream-base
      cd_vars: string loc list;
 =======
      cd_vars: string loc list;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
      cd_args: constructor_arguments;
      cd_res: core_type option;
      cd_loc: Location.t;
@@ -1176,30 +1176,30 @@ type pattern_action =
 let shallow_iter_pattern_desc
   : type k . pattern_action -> k pattern_desc -> unit
   = fun f -> function
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tpat_alias(p, _, _, _, _, _, _) -> f.f p
   | Tpat_tuple patl -> List.iter (fun (_, p) -> f.f p) patl
   | Tpat_unboxed_tuple patl -> List.iter (fun (_, p, _) -> f.f p) patl
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpat_alias(p, _, _) -> f.f p
   | Tpat_tuple patl -> List.iter f.f patl
 =======
   | Tpat_alias(p, _, _, _, _) -> f.f p
   | Tpat_tuple patl -> List.iter (fun (_, p) -> f.f p) patl
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tpat_construct(_, _, patl, _) -> List.iter f.f patl
   | Tpat_variant(_, pat, _) -> Option.iter f.f pat
   | Tpat_record (lbl_pat_list, _) ->
       List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tpat_record_unboxed_product (lbl_pat_list, _) ->
       List.iter (fun (_, _, pat) -> f.f pat) lbl_pat_list
   | Tpat_array (_, _, patl) -> List.iter f.f patl
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpat_array patl -> List.iter f.f patl
 =======
   | Tpat_array (_, patl) -> List.iter f.f patl
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tpat_lazy p -> f.f p
   | Tpat_any
   | Tpat_var _
@@ -1215,26 +1215,26 @@ type pattern_transformation =
 let shallow_map_pattern_desc
   : type k . pattern_transformation -> k pattern_desc -> k pattern_desc
   = fun f d -> match d with
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tpat_alias (p1, id, s, uid, sort, m, ty) ->
       Tpat_alias (f.f p1, id, s, uid, sort, m, ty)
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpat_alias (p1, id, s) ->
       Tpat_alias (f.f p1, id, s)
 =======
   | Tpat_alias (p1, id, s, uid, ty) ->
       Tpat_alias (f.f p1, id, s, uid, ty)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tpat_tuple pats ->
       Tpat_tuple (List.map (fun (label, pat) -> label, f.f pat) pats)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tpat_unboxed_tuple pats ->
       Tpat_unboxed_tuple
         (List.map (fun (label, pat, sort) -> label, f.f pat, sort) pats)
-||||||| 23e84b8c4d
+||||||| upstream-base
       Tpat_tuple (List.map f.f pats)
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tpat_record (lpats, closed) ->
       Tpat_record (List.map (fun (lid, l,p) -> lid, l, f.f p) lpats, closed)
   | Tpat_record_unboxed_product (lpats, closed) ->
@@ -1242,16 +1242,16 @@ let shallow_map_pattern_desc
         (List.map (fun (lid, l,p) -> lid, l, f.f p) lpats, closed)
   | Tpat_construct (lid, c, pats, ty) ->
       Tpat_construct (lid, c, List.map f.f pats, ty)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tpat_array (am, arg_sort, pats) ->
       Tpat_array (am, arg_sort, List.map f.f pats)
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpat_array pats ->
       Tpat_array (List.map f.f pats)
 =======
   | Tpat_array (am, pats) ->
       Tpat_array (am, List.map f.f pats)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tpat_lazy p1 -> Tpat_lazy (f.f p1)
   | Tpat_variant (x1, Some p1, x2) ->
       Tpat_variant (x1, Some (f.f p1), x2)
@@ -1306,11 +1306,11 @@ let rec iter_bound_idents
   : type k . _ -> k general_pattern -> _
   = fun f pat ->
   match pat.pat_desc with
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tpat_var (id, s, uid, sort, _mode) ->
       f (id, s, pat.pat_type, sort, uid)
   | Tpat_alias(p, id, s, uid, sort, _mode, ty) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpat_var (id,s) ->
      f (id,s,pat.pat_type)
   | Tpat_alias(p, id, s) ->
@@ -1318,15 +1318,15 @@ let rec iter_bound_idents
   | Tpat_var (id, s, uid) ->
      f (id,s,pat.pat_type, uid)
   | Tpat_alias(p, id, s, uid, ty) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       iter_bound_idents f p;
-<<<<<<< HEAD
+<<<<<<< oxcaml
       f (id, s, ty, sort, uid)
-||||||| 23e84b8c4d
+||||||| upstream-base
       f (id,s,pat.pat_type)
 =======
       f (id, s, ty, uid)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tpat_or(p1, _, _) ->
       (* Invariant : both arguments bind the same variables *)
       iter_bound_idents f p1
@@ -1398,13 +1398,13 @@ let rev_pat_bound_idents_full ~of_sort ~of_const_sort pat =
   !idents_full
 
 let rev_only_idents idents_full =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   List.rev_map (fun (id,_,_,_,_) -> id) idents_full
-||||||| 23e84b8c4d
+||||||| upstream-base
   List.rev_map (fun (id,_,_) -> id) idents_full
 =======
   List.rev_map (fun (id,_,_,_) -> id) idents_full
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let pat_bound_idents_full pat =
   List.rev (for_transl rev_pat_bound_idents_full pat)
@@ -1486,39 +1486,39 @@ let alpha_var env id = List.assoc id env
 let rec alpha_pat
   : type k . _ -> k general_pattern -> k general_pattern
   = fun env p -> match p.pat_desc with
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tpat_var (id, s, uid, sort, mode) -> (* note the ``Not_found'' case *)
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpat_var (id, s) -> (* note the ``Not_found'' case *)
 =======
   | Tpat_var (id, s, uid) -> (* note the ``Not_found'' case *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       {p with pat_desc =
-<<<<<<< HEAD
+<<<<<<< oxcaml
        try Tpat_var (alpha_var env id, s, uid, sort, mode) with
-||||||| 23e84b8c4d
+||||||| upstream-base
        try Tpat_var (alpha_var env id, s) with
 =======
        try Tpat_var (alpha_var env id, s, uid) with
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
        | Not_found -> Tpat_any}
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tpat_alias (p1, id, s, uid, sort, mode, ty) ->
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpat_alias (p1, id, s) ->
 =======
   | Tpat_alias (p1, id, s, uid, ty) ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       let new_p =  alpha_pat env p1 in
       begin try
-<<<<<<< HEAD
+<<<<<<< oxcaml
         {p with pat_desc =
            Tpat_alias (new_p, alpha_var env id, s, uid, sort, mode, ty)}
-||||||| 23e84b8c4d
+||||||| upstream-base
         {p with pat_desc = Tpat_alias (new_p, alpha_var env id, s)}
 =======
         {p with pat_desc = Tpat_alias (new_p, alpha_var env id, s, uid, ty)}
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
       with
       | Not_found -> new_p
       end
@@ -1560,7 +1560,7 @@ let split_pattern pat =
   in
   split_pattern pat
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* Expressions are considered nominal if they can be used as the subject of a
    sentence or action. In practice, we consider that an expression is nominal
    if they satisfy one of:
@@ -1801,7 +1801,7 @@ and fold_antiquote_comprehension_clauses f acc ccs =
 
 and fold_antiquote_binding_op f acc op =
   fold_antiquote_exp f acc op.bop_exp
-||||||| 23e84b8c4d
+||||||| upstream-base
 (* Expressions are considered nominal if they can be used as the subject of a
    sentence or action. In practice, we consider that an expression is nominal
    if they satisfy one of:
@@ -1821,4 +1821,4 @@ let rec exp_is_nominal exp =
 let map_apply_arg f = function
   | Arg arg -> Arg (f arg)
   | Omitted _ as arg -> arg
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

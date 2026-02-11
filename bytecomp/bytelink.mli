@@ -24,15 +24,15 @@ module DepSet : Set.S with type elt = Dep.t
 val link : filepath list -> filepath -> unit
 val reset : unit -> unit
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val check_consistency: filepath -> Cmo_format.compilation_unit_descr -> unit
-||||||| 23e84b8c4d
+||||||| upstream-base
 val check_consistency: filepath -> Cmo_format.compilation_unit -> unit
 =======
 val check_consistency: filepath -> Cmo_format.compilation_unit -> unit
 val linkdeps_unit :
   Linkdeps.t -> filename:string -> Cmo_format.compilation_unit -> unit
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 val extract_crc_interfaces: unit -> Import_info.t list
 
@@ -45,23 +45,23 @@ type error =
   | Custom_runtime
   | File_exists of filepath
   | Cannot_open_dll of filepath
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Required_compunit_unavailable of Compilation_unit.t * Compilation_unit.t
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Required_compunit_unavailable of (Cmo_format.compunit * Cmo_format.compunit)
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Camlheader of string * filepath
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Wrong_link_order of DepSet.t
   | Multiple_definition of Compilation_unit.t * filepath * filepath
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Wrong_link_order of DepSet.t
   | Multiple_definition of Cmo_format.compunit * filepath * filepath
 =======
   | Link_error of Linkdeps.error
   | Needs_custom_runtime of filepath
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 exception Error of error
 

@@ -244,14 +244,14 @@ OCAMLYACCFLAGS ?= --strict -v
 %.ml %.mli: %.mly
 	$(V_OCAMLYACC)$(OCAMLYACC) $(OCAMLYACCFLAGS) $<
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 SAK = $(ROOTDIR)/$(RUNTIME_DIR)/sak$(EXE)
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 SAK = $(ROOTDIR)/runtime/sak$(EXE)
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 # Used with the Microsoft toolchain to merge generated manifest files into
 # executables
 if_file_exists = ( test ! -f $(1) || $(2) && rm -f $(1) )
@@ -494,8 +494,8 @@ endef # INSTALL_STRIPPED_BYTE_PROG
 # boot/ as part of coldstart. See read_runtime_launch_info in
 # bytecomp/bytelink.ml for further details.
 HEADER_NAME = runtime-launch-info
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 =======
 
 ifeq "$(UNIX_OR_WIN32)" "win32"
@@ -508,4 +508,4 @@ export CYGWIN := $(strip \
 export MSYS := $(strip \
   $(filter-out winsymlinks winsymlinks:%, $(MSYS)) winsymlinks:nativestrict)
 endif
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

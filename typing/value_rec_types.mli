@@ -21,10 +21,10 @@ type recursive_binding_kind =
 | Static
   (** Bindings for which some kind of pre-allocation scheme is possible.
       The expression is allowed to be recursive, as long as its definition does
-<<<<<<< HEAD
+<<<<<<< oxcaml
       not inspect recursively defined values.
       See [Value_rec_compiler] for more details on the compilation scheme. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
   (** The expression evaluates to a function or block of a
       statically known size.
       It will be pre-allocated and back-patched later.
@@ -48,7 +48,7 @@ type recursive_binding_kind =
       we simply identify this special case with a dedicated constructor. *)
 =======
       not inspect recursively defined values. *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 | Dynamic
   (** Bindings for which pre-allocation is not possible.
       The expression is not allowed to refer to any recursive variable. *)

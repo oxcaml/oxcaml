@@ -1,11 +1,11 @@
 File "pr7402.ml", line 1:
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Warning 63 [erroneous-printed-signature]: The printed interface differs from the inferred interface.
 The inferred interface contained items which could not be printed
 properly due to name collisions between identifiers.
 File "pr7402.ml", lines 14-16, characters 0-5:
   Definition of module M/1
-||||||| 23e84b8c4d
+||||||| upstream-base
 Warning 63 [erroneous-printed-signature]: The printed interface differs from the inferred interface.
 The inferred interface contained items which could not be printed
 properly due to name collisions between identifiers.
@@ -17,7 +17,7 @@ Warning 63 [erroneous-printed-signature]: The printed interface differs from
   not be printed properly due to name collisions between identifiers.
   File "pr7402.ml", lines 14-16, characters 0-5:
   Definition of module M
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 File "pr7402.ml", lines 8-11, characters 0-3:
   Definition of module M/2
   Beware that this warning is purely informational and will not catch all

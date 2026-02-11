@@ -34,7 +34,7 @@ type constructor_usage_warning =
   | Not_constructed
   | Only_exported_private
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 type upstream_compat_warning =
   | Immediate_erasure of string (* example: annotation in
       [type ('a : immediate) t = int] can't be erased. *)
@@ -52,12 +52,12 @@ type upstream_compat_warning =
 type name_out_of_scope_warning =
   | Name of string
   | Fields of { record_form : string ; fields : string list }
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 type type_declaration_usage_warning =
   | Declaration
   | Alias
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 type t =
   | Comment_start                           (*  1 *)
@@ -67,16 +67,16 @@ type t =
   | Ignored_partial_application             (*  5 *)
   | Labels_omitted of string list           (*  6 *)
   | Method_override of string list          (*  7 *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Partial_match of string                 (*  8 *)
   | Missing_record_field_pattern of { form : string ; unbound : string } (* 9 *)
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Partial_match of string                 (*  8 *)
   | Missing_record_field_pattern of string  (*  9 *)
 =======
   | Partial_match of Format_doc.t           (*  8 *)
   | Missing_record_field_pattern of string  (*  9 *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Non_unit_statement                      (* 10 *)
   | Redundant_case                          (* 11 *)
   | Redundant_subpat                        (* 12 *)
@@ -145,7 +145,7 @@ type t =
   | Unused_tmc_attribute                    (* 71 *)
   | Tmc_breaks_tailcall                     (* 72 *)
   | Generative_application_expects_unit     (* 73 *)
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Unmutated_mutable of string             (* 186 *)
   | Incompatible_with_upstream of upstream_compat_warning (* 187 *)
   | Unerasable_position_argument            (* 188 *)
@@ -163,11 +163,11 @@ type t =
   | Atomic_float_record_boxed               (* 214 *)
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
   | Use_during_borrowing                    (* 216 *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   | Degraded_to_partial_match               (* 74 *)
   | Unnecessarily_partial_tuple_pattern     (* 75 *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -249,7 +249,7 @@ let number = function
   | Unused_tmc_attribute -> 71
   | Tmc_breaks_tailcall -> 72
   | Generative_application_expects_unit -> 73
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Unmutated_mutable _ -> 186
   | Incompatible_with_upstream _ -> 187
   | Unerasable_position_argument -> 188
@@ -263,24 +263,24 @@ let number = function
   | Atomic_float_record_boxed -> 214
   | Implied_attribute _ -> 215
   | Use_during_borrowing -> 216
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   | Degraded_to_partial_match -> 74
   | Unnecessarily_partial_tuple_pattern -> 75
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
    the  definition of the number function above ends *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let last_warning_number = 250
 ;;
-||||||| 23e84b8c4d
+||||||| upstream-base
 let last_warning_number = 73
 =======
 let last_warning_number = 75
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 type description =
   { number : int;
@@ -619,7 +619,7 @@ let descriptions = [
     description = "A generative functor is applied to an empty structure \
                    (struct end) rather than to ().";
     since = since 5 1 };
-<<<<<<< HEAD
+<<<<<<< oxcaml
   { number = 186;
     names = ["unmutated-mutable"];
     description =
@@ -674,7 +674,7 @@ let descriptions = [
     names = ["use-during-borrowing"];
     description = "Use of a value during an active borrow.";
     since = since 5 3 };
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
   { number = 74;
     names = ["degraded-to-partial-match"];
@@ -686,7 +686,7 @@ let descriptions = [
     description = "A tuple pattern ends in .. but fully matches its expected \
                    type.";
     since = since 5 4 };
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 ]
 
 let name_to_number =
@@ -1072,7 +1072,7 @@ let message = function
         Style.inline_code cname
         space_inline_list slist
   | Method_override [] -> assert false
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Partial_match "" -> "this pattern-matching is not exhaustive."
   | Partial_match s ->
       "this pattern-matching is not exhaustive.\n\
@@ -1081,7 +1081,7 @@ let message = function
       "the following labels are not bound in this " ^ form ^ " pattern:\n" ^
       unbound ^
       "\nEither bind these labels explicitly or add '; _' to the pattern."
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Partial_match "" -> "this pattern-matching is not exhaustive."
   | Partial_match s ->
       "this pattern-matching is not exhaustive.\n\
@@ -1103,7 +1103,7 @@ let message = function
            @[Either bind these labels explicitly or add %a to the pattern.@]"
         Style.inline_code s
         Style.inline_code "; _"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Non_unit_statement ->
       msg "this expression should have type unit."
   | Redundant_case -> msg "this match case is unused."
@@ -1129,7 +1129,7 @@ let message = function
         Style.inline_code {|\r|}
         Style.inline_code {|\\|}
   | Implicit_public_methods l ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       "the following private methods were made public implicitly:\n "
       ^ String.concat " " l ^ "."
   | Unerasable_optional_argument -> "this optional argument cannot be erased."
@@ -1139,7 +1139,7 @@ let message = function
         Format_doc.pp_doc msg
   | Non_principal_labels s -> s^" without principality."
   | Ignored_extra_argument -> "this argument will not be used by the function."
-||||||| 23e84b8c4d
+||||||| upstream-base
       "the following private methods were made public implicitly:\n "
       ^ String.concat " " l ^ "."
   | Unerasable_optional_argument -> "this optional argument cannot be erased."
@@ -1162,15 +1162,15 @@ let message = function
   | Non_principal_labels s -> msg "%s without principality." s
   | Ignored_extra_argument ->
       msg "this argument will not be used by the function."
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Nonreturning_statement ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       "this statement never returns (or has an unsound type.)"
   | Preprocessor s -> s
   | Useless_record_with s ->
       "all the fields are explicitly listed in this " ^ s ^ ":\n\
        the 'with' clause is useless."
-||||||| 23e84b8c4d
+||||||| upstream-base
       "this statement never returns (or has an unsound type.)"
   | Preprocessor s -> s
   | Useless_record_with ->
@@ -1183,12 +1183,12 @@ let message = function
       msg "all the fields are explicitly listed in this record:@ \
            the %a clause is useless."
         Style.inline_code "with"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Bad_module_name (modname) ->
       msg "bad source file name: %a is not a valid module name."
         Style.inline_code modname
   | All_clauses_guarded ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       "this pattern-matching is not exhaustive.\n\
        All clauses in this pattern-matching are guarded."
   | Unused_var { name = v; mutated = false }
@@ -1197,7 +1197,7 @@ let message = function
   | Unused_var { name = v; mutated = true }
   | Unused_var_strict { name = v; mutated = true } ->
     "variable " ^ v ^ " was mutated but never used."
-||||||| 23e84b8c4d
+||||||| upstream-base
       "this pattern-matching is not exhaustive.\n\
        All clauses in this pattern-matching are guarded."
   | Unused_var v | Unused_var_strict v -> "unused variable " ^ v ^ "."
@@ -1207,7 +1207,7 @@ let message = function
   | Unused_var v | Unused_var_strict v ->
       msg "unused variable %a."
         Style.inline_code v
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Wildcard_arg_to_constant_constr ->
       msg "wildcard pattern given as argument to a constant constructor"
   | Eol_in_string ->
@@ -1256,7 +1256,7 @@ let message = function
             kind Style.inline_code s
       end
   | Unused_rec_flag ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       "unused rec flag."
   | Name_out_of_scope (ty, Name nm) ->
       nm ^ " was selected from type " ^ ty ^
@@ -1267,7 +1267,7 @@ let message = function
        not visible in the current scope: "
       ^ String.concat " " fields ^ ".\n\
        They will not be selected if the type becomes unknown."
-||||||| 23e84b8c4d
+||||||| upstream-base
       "unused rec flag."
   | Name_out_of_scope (ty, [nm], false) ->
       nm ^ " was selected from type " ^ ty ^
@@ -1294,7 +1294,7 @@ let message = function
            @[They will not be selected@ if the type@ becomes@ unknown.@]"
         Style.inline_code ty
         space_inline_list slist
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Ambiguous_name ([s], tl, false, expansion) ->
       msg "%a belongs to several types:@;<1 2>%a.@ \
            The first one was selected.@ \
@@ -1353,13 +1353,13 @@ let message = function
         (if b then "tailcall" else "non-tailcall")
   | Fragile_literal_pattern ->
       let[@manual.ref "ss:warn52"] ref_manual = [ 13; 5; 3 ] in
-<<<<<<< HEAD
+<<<<<<< oxcaml
       Format.asprintf
         "Code should not depend on the actual values of\n\
          this constructor's arguments. They are only for information\n\
          and may change in future versions. %a"
         (Format_doc.compat Misc.print_see_manual) ref_manual
-||||||| 23e84b8c4d
+||||||| upstream-base
       Format.asprintf
         "Code should not depend on the actual values of\n\
          this constructor's arguments. They are only for information\n\
@@ -1371,7 +1371,7 @@ let message = function
          this@ constructor's arguments.@ @[They are only for@ information@ \
          and@ may@ change@ in@ future versions.@ %a@]"
         Misc.print_see_manual ref_manual
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Unreachable_case ->
       msg "this match case is unreachable.@ \
            Consider replacing it with a refutation case %a"
@@ -1402,7 +1402,7 @@ let message = function
                different@ or-pattern@ alternatives."
               comma_inline_list vars
       in
-<<<<<<< HEAD
+<<<<<<< oxcaml
       Format.asprintf
         "Ambiguous or-pattern variables under guard;\n\
          %s.\n\
@@ -1414,7 +1414,7 @@ let message = function
         "no %s file was found in path for module %s, \
          and its interface was not compiled with -opaque"
         missing_extension module_name
-||||||| 23e84b8c4d
+||||||| upstream-base
       Format.asprintf
         "Ambiguous or-pattern variables under guard;\n\
          %s.\n\
@@ -1439,7 +1439,7 @@ let message = function
          and@ its@ interface@ was@ not@ compiled@ with %a"
         Style.inline_code name
         Style.inline_code "-opaque"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Flambda_assignment_to_non_mutable_value ->
       msg
         "A potential@ assignment@ to@ a@ non-mutable@ value@ was@ detected@ \
@@ -1487,7 +1487,7 @@ let message = function
   | Unused_functor_parameter s ->
       msg "unused functor parameter %a." Style.inline_code s
   | Match_on_mutable_state_prevent_uncurry ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
     "This pattern depends on mutable state.\n\
      It prevents the remaining arguments from being uncurried, which will \
      cause additional closure allocations."
@@ -1500,7 +1500,7 @@ let message = function
   | Unused_field { form; field; complaint = Not_mutated } ->
       "mutable " ^ form ^ " field " ^ field ^
       " is never mutated."
-||||||| 23e84b8c4d
+||||||| upstream-base
     "This pattern depends on mutable state.\n\
      It prevents the remaining arguments from being uncurried, which will \
      cause additional closure allocations."
@@ -1526,7 +1526,7 @@ let message = function
   | Unused_field (s, Not_mutated) ->
       msg "mutable record field %a is never mutated."
         Style.inline_code s
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Missing_mli ->
       msg "Cannot find interface file."
   | Unused_tmc_attribute ->
@@ -1544,7 +1544,7 @@ let message = function
         Style.inline_code "[@tail_mod_cons]"
         Style.inline_code "[@tailcall false]"
   | Generative_application_expects_unit ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
   | Unmutated_mutable v -> "mutable variable " ^ v ^ " was never mutated."
@@ -1620,7 +1620,7 @@ let message = function
       implied implying
   | Use_during_borrowing ->
       "This value is used while being borrowed."
-||||||| 23e84b8c4d
+||||||| upstream-base
       "A generative functor\n\
        should be applied to '()'; using '(struct end)' is deprecated."
 =======
@@ -1641,7 +1641,7 @@ let message = function
         "This tuple pattern@ unnecessarily@ ends in %a,@ as@ it@ explicitly@ \
          matches@ all@ components@ of@ its@ expected@ type."
         Style.inline_code ".."
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 ;;
 
 let nerrors = ref 0

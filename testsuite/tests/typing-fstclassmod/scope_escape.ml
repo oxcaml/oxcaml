@@ -99,10 +99,10 @@ module type S = sig type t val x : t end
 Line 15, characters 8-10:
 15 |   unify ()
              ^^
-<<<<<<< HEAD
+<<<<<<< oxcaml
 Error: This expression has type "unit" but an expression was expected of type
          "M.t"
-||||||| 23e84b8c4d
+||||||| upstream-base
 Error: This expression has type "unit" but an expression was expected of type
          "M.t"
 |}, Principal{|
@@ -123,5 +123,5 @@ Error: This expression has type "unit" but an expression was expected of type
 =======
 Error: The constructor "()" has type "unit"
        but an expression was expected of type "M.t"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 |}];;

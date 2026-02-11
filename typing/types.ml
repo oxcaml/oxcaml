@@ -74,12 +74,12 @@ and scope_field = int
 and type_expr = transient_expr
 
 and type_desc =
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Tvar of { name : string option; jkind : jkind_lr }
   | Tarrow of arrow_desc * type_expr * type_expr * commutable
   | Ttuple of (string option * type_expr) list
   | Tunboxed_tuple of (string option * type_expr) list
-||||||| 23e84b8c4d
+||||||| upstream-base
     Tvar of string option
   | Tarrow of arg_label * type_expr * type_expr * commutable
   | Ttuple of type_expr list
@@ -87,7 +87,7 @@ and type_desc =
     Tvar of string option
   | Tarrow of arg_label * type_expr * type_expr * commutable
   | Ttuple of (string option * type_expr) list
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Tconstr of Path.t * type_expr list * abbrev_memo ref
   | Tobject of type_expr * (Path.t * type_expr list) option ref
   | Tfield of string * field_kind * type_expr * type_expr
@@ -99,7 +99,7 @@ and type_desc =
   | Tvariant of row_desc
   | Tunivar of { name : string option; jkind : jkind_lr }
   | Tpoly of type_expr * type_expr list
-<<<<<<< HEAD
+<<<<<<< oxcaml
   | Trepr of type_expr * Jkind_types.Sort.univar list
   | Tpackage of Path.t * (Longident.t * type_expr) list
   | Tof_kind of jkind_lr
@@ -112,7 +112,7 @@ and arg_label =
 
 and arrow_desc =
   arg_label * Mode.Alloc.lr * Mode.Alloc.lr
-||||||| 23e84b8c4d
+||||||| upstream-base
   | Tpackage of Path.t * (Longident.t * type_expr) list
 =======
   | Tpackage of package
@@ -120,7 +120,7 @@ and arrow_desc =
 and package =
     { pack_path : Path.t;
       pack_cstrs : (string list * type_expr) list }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 and row_desc =
     { row_fields: (label * row_field) list;
@@ -461,15 +461,15 @@ and constructor_representation =
 and label_declaration =
   {
     ld_id: Ident.t;
-<<<<<<< HEAD
+<<<<<<< oxcaml
     ld_mutable: mutability;
     ld_modalities: Mode.Modality.Const.t;
-||||||| 23e84b8c4d
+||||||| upstream-base
     ld_mutable: mutable_flag;
 =======
     ld_mutable: mutable_flag;
     ld_atomic: atomic_flag;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     ld_type: type_expr;
     ld_sort: Jkind_types.Sort.Const.t;
     ld_loc: Location.t;
@@ -647,7 +647,7 @@ module Make_wrapped(Wrap : Wrap) = struct
   module rec M : Wrapped with type 'a wrapped = 'a Wrap.t = M
   include M
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let sort_of_signature_item = function
     | Sig_value(_, decl, _) ->
       begin match decl.val_kind with
@@ -974,7 +974,7 @@ let find_unboxed_type decl =
   | Type_abstract _ | Type_open ->
     None
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 
 (* Constructor and record label descriptions inserted held in typing
    environments *)
@@ -1022,7 +1022,7 @@ let may_equal_constr c1 c2 =
          equal_tag tag1 tag2)
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let item_visibility = function
   | Sig_value (_, _, vis)
   | Sig_type (_, _, _, vis)
@@ -1252,16 +1252,16 @@ module Transient_expr = struct
     | _ -> assert false);
     ty.desc <- d
   let set_level ty lv = ty.level <- lv
-<<<<<<< HEAD
+<<<<<<< oxcaml
   let set_var_jkind ty jkind' =
     match ty.desc with
     | Tvar { name; _ } ->
       set_desc ty (Tvar { name; jkind = jkind' })
     | _ -> Misc.fatal_error "set_var_jkind called on non-var"
-||||||| 23e84b8c4d
+||||||| upstream-base
   let set_scope ty sc = ty.scope <- sc
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   let get_scope ty = ty.scope land scope_mask
   let get_marks ty = ty.scope lsr 27
   let set_scope ty sc =
@@ -1686,15 +1686,15 @@ let set_scope ty scope =
     if ty.id <= !last_snapshot then log_change (Cscope (ty, prev_scope));
     Transient_expr.set_scope ty scope
   end
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let set_var_jkind ty jkind =
   let ty = repr ty in
   log_type ty;
   Transient_expr.set_var_jkind ty jkind
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let set_univar rty ty =
   log_change (Cuniv (rty, !rty)); rty := Some ty
 let set_name nm v =

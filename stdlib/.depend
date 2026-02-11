@@ -295,13 +295,13 @@ stdlib__Domain.cmx : domain.ml \
     stdlib__Array.cmx \
     stdlib__Domain.cmi
 stdlib__Domain.cmi : domain.mli
-<<<<<<< HEAD
+<<<<<<< oxcaml
 effect.cmo : \
     effect.cmi
 effect.cmx : \
     effect.cmi
 effect.cmi :
-||||||| 23e84b8c4d
+||||||| upstream-base
 stdlib__Dynarray.cmo : dynarray.ml \
     stdlib__Sys.cmi \
     stdlib__Seq.cmi \
@@ -367,7 +367,7 @@ stdlib__Effect.cmx : effect.ml \
     stdlib__Effect.cmi
 stdlib__Effect.cmi : effect.mli \
     stdlib__Printexc.cmi
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 stdlib__Either.cmo : either.ml \
     stdlib__Either.cmi
 stdlib__Either.cmx : either.ml \
@@ -606,26 +606,26 @@ stdlib__Lazy.cmi : lazy.mli \
     camlinternalLazy.cmi
 stdlib__Lexing.cmo : lexing.ml \
     stdlib__Sys.cmi \
-<<<<<<< HEAD
+<<<<<<< oxcaml
     stdlib__String.cmi \
     stdlib.cmi \
-||||||| 23e84b8c4d
+||||||| upstream-base
     stdlib__String.cmi \
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     stdlib__Int.cmi \
     stdlib__Bytes.cmi \
     stdlib__Array.cmi \
     stdlib__Lexing.cmi
 stdlib__Lexing.cmx : lexing.ml \
     stdlib__Sys.cmx \
-<<<<<<< HEAD
+<<<<<<< oxcaml
     stdlib__String.cmx \
     stdlib.cmx \
-||||||| 23e84b8c4d
+||||||| upstream-base
     stdlib__String.cmx \
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     stdlib__Int.cmx \
     stdlib__Bytes.cmx \
     stdlib__Array.cmx \
@@ -672,23 +672,23 @@ stdlib__Map.cmi : map.mli \
     stdlib.cmi \
     stdlib__Seq.cmi
 stdlib__Marshal.cmo : marshal.ml \
-<<<<<<< HEAD
+<<<<<<< oxcaml
     stdlib__String.cmi \
     stdlib.cmi \
-||||||| 23e84b8c4d
+||||||| upstream-base
     stdlib__String.cmi \
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     stdlib__Bytes.cmi \
     stdlib__Marshal.cmi
 stdlib__Marshal.cmx : marshal.ml \
-<<<<<<< HEAD
+<<<<<<< oxcaml
     stdlib__String.cmx \
     stdlib.cmx \
-||||||| 23e84b8c4d
+||||||| upstream-base
     stdlib__String.cmx \
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     stdlib__Bytes.cmx \
     stdlib__Marshal.cmi
 stdlib__Marshal.cmi : marshal.mli \
@@ -772,9 +772,9 @@ stdlib__Out_channel.cmx : out_channel.ml \
     stdlib__Fun.cmx \
     stdlib__Out_channel.cmi
 stdlib__Out_channel.cmi : out_channel.mli \
-<<<<<<< HEAD
+<<<<<<< oxcaml
     stdlib.cmi
-||||||| 23e84b8c4d
+||||||| upstream-base
     stdlib.cmi \
     stdlib__Bigarray.cmi
 =======
@@ -785,7 +785,7 @@ stdlib__Pair.cmo : pair.ml \
 stdlib__Pair.cmx : pair.ml \
     stdlib__Pair.cmi
 stdlib__Pair.cmi : pair.mli
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 stdlib__Parsing.cmo : parsing.ml \
     stdlib.cmi \
     stdlib__Obj.cmi \
@@ -1074,12 +1074,12 @@ stdlib__Unit.cmi : unit.mli \
     stdlib.cmi
 stdlib__Weak.cmo : weak.ml \
     stdlib__Sys.cmi \
-<<<<<<< HEAD
+<<<<<<< oxcaml
     stdlib.cmi \
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
     stdlib__Option.cmi \
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     stdlib__Obj.cmi \
     stdlib__Int.cmi \
     stdlib__Hashtbl.cmi \
@@ -1087,12 +1087,12 @@ stdlib__Weak.cmo : weak.ml \
     stdlib__Weak.cmi
 stdlib__Weak.cmx : weak.ml \
     stdlib__Sys.cmx \
-<<<<<<< HEAD
+<<<<<<< oxcaml
     stdlib.cmx \
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
     stdlib__Option.cmx \
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     stdlib__Obj.cmx \
     stdlib__Int.cmx \
     stdlib__Hashtbl.cmx \

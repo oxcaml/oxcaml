@@ -1,6 +1,6 @@
 File "main.ml", line 1, characters 8-11:
 1 | let _ = A.a = B.b
-<<<<<<< HEAD
+<<<<<<< oxcaml
             ^^^
 Error: This expression has type "M.a" but an expression was expected of type
          "('a : value_or_null)"
@@ -9,7 +9,7 @@ Error: This expression has type "M.a" but an expression was expected of type
        But the layout of M.a must be a sublayout of value.
        No .cmi file found containing M.a.
        Hint: Adding "m" to your dependencies might help.
-||||||| 23e84b8c4d
+||||||| upstream-base
                   ^^^
 Error: This expression has type "M.b" but an expression was expected of type
          "M.a"
@@ -24,4 +24,4 @@ Error: The value B.b has type M.b but an expression was expected of type M.a
        in path.
        Type M.a is abstract because no corresponding cmi file was found
        in path.
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming

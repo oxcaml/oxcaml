@@ -51,16 +51,16 @@ struct custom_operations {
 extern "C" {
 #endif
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
 CAMLextern uintnat caml_custom_major_ratio;
 CAMLextern uintnat caml_custom_minor_ratio;
-||||||| 23e84b8c4d
+||||||| upstream-base
 
 CAMLextern uintnat caml_custom_major_ratio;
 =======
 CAMLextern atomic_uintnat caml_custom_major_ratio;
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 CAMLextern value caml_alloc_custom(const struct custom_operations * ops,
                                    uintnat size, /*size in bytes*/

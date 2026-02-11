@@ -1,8 +1,8 @@
-<<<<<<< HEAD
+<<<<<<< oxcaml
 camlException_handler__handler_2_7_code
 camlException_handler__bare_4_9_code
 camlException_handler__entry
-||||||| 23e84b8c4d
+||||||| upstream-base
 camlException_handler.handler
 camlException_handler.bare
 camlException_handler.entry
@@ -10,13 +10,13 @@ camlException_handler.entry
 camlException_handler$handler
 camlException_handler$bare
 camlException_handler$entry
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 caml_program
-<<<<<<< HEAD
+<<<<<<< oxcaml
 camlException_handler__handler_2_7_code
 camlException_handler__bare_4_9_code
 camlException_handler__entry
-||||||| 23e84b8c4d
+||||||| upstream-base
 camlException_handler.handler
 camlException_handler.bare
 camlException_handler.entry
@@ -24,13 +24,13 @@ camlException_handler.entry
 camlException_handler$handler
 camlException_handler$bare
 camlException_handler$entry
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 caml_program
-<<<<<<< HEAD
+<<<<<<< oxcaml
 camlException_handler__handler_2_7_code
 camlException_handler__nested_3_8_code
 camlException_handler__entry
-||||||| 23e84b8c4d
+||||||| upstream-base
 camlException_handler.handler
 camlException_handler.nested
 camlException_handler.entry
@@ -38,13 +38,13 @@ camlException_handler.entry
 camlException_handler$handler
 camlException_handler$nested
 camlException_handler$entry
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 caml_program
-<<<<<<< HEAD
+<<<<<<< oxcaml
 camlException_handler__handler_2_7_code
 camlException_handler__nested_3_8_code
 camlException_handler__entry
-||||||| 23e84b8c4d
+||||||| upstream-base
 camlException_handler.handler
 camlException_handler.nested
 camlException_handler.entry
@@ -52,5 +52,5 @@ camlException_handler.entry
 camlException_handler$handler
 camlException_handler$nested
 camlException_handler$entry
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 caml_program

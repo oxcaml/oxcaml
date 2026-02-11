@@ -25,7 +25,7 @@
 
 #include "caml/sync.h"
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 #ifdef __linux__
 #include <features.h>
 #include <unistd.h>
@@ -34,9 +34,9 @@
 #include <limits.h>
 #endif
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 typedef int sync_retcode;
 
 /* Mutexes */
@@ -202,7 +202,7 @@ Caml_inline int sync_condvar_wait(sync_condvar c, sync_mutex m)
   return custom_condvar_wait(c, m);
 }
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 /* Reporting errors */
 
 Caml_inline void sync_check_error(int retcode, char * msg)
@@ -224,7 +224,7 @@ Caml_inline void sync_check_error(int retcode, char * msg)
   caml_raise_sys_error(str);
 }
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 /* Reporting errors */
 
 static void sync_check_error(int retcode, char * msg)
@@ -247,5 +247,5 @@ static void sync_check_error(int retcode, char * msg)
 }
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 #endif /* CAML_SYNC_POSIX_H */

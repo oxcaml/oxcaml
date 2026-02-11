@@ -16,15 +16,15 @@
 (** The functions to get a string from different kinds of elements (types, modules, ...). *)
 
 module Name = Odoc_name
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let () = Printtyp.Naming_context.enable false
 module Printtyp_main = Printtyp
 module Printtyp = Printtyp.Compat
-||||||| 23e84b8c4d
+||||||| upstream-base
 let () = Printtyp.Naming_context.enable false
 =======
 let () = Out_type.Ident_names.enable false
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let string_of_variance t v =
   if ( t.Odoc_type.ty_kind = Odoc_type.Type_abstract ||
@@ -148,16 +148,16 @@ let string_of_class_params c =
         Printf.bprintf b "%s%s%s%s -> "
           (
            match label with
-<<<<<<< HEAD
+<<<<<<< oxcaml
              Types.Nolabel -> ""
            | s -> Printtyp_main.string_of_label s ^":"
-||||||| 23e84b8c4d
+||||||| upstream-base
              Asttypes.Nolabel -> ""
            | s -> Printtyp.string_of_label s ^":"
 =======
              Asttypes.Nolabel -> ""
            | s -> Asttypes.string_of_label s ^":"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           )
           (if parent then "(" else "")
           (Odoc_print.string_of_type_expr

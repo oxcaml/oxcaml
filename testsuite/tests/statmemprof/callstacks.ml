@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+<<<<<<< oxcaml
 (* TEST_BELOW
    Blank lines added to preserve locations
 
@@ -12,7 +12,7 @@
 
 
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 (* TEST
  flags = "-g -w -5";
  {
@@ -48,7 +48,7 @@
    reference = "${test_source_directory}/callstacks.no-flat-float-array.reference";
    no-flat-float-array;
  }
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 *)
 
 module MP = Gc.Memprof

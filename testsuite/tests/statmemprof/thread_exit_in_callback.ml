@@ -1,10 +1,10 @@
 (* TEST
-<<<<<<< HEAD
+<<<<<<< oxcaml
  reason = "Thread.exit from a Memprof callback is a fatal error under oxcaml";
  skip;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
  include systhreads;
  hassysthreads;
  {

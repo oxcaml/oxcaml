@@ -555,7 +555,7 @@ let env_with_lib_unix env =
   in
   Environments.add Ocaml_variables.caml_ld_library_path newlibs env
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 let debug log env =
   let program = Environments.safe_lookup Builtin_variables.program env in
   let what = Printf.sprintf "Debugging program %s" program in
@@ -594,7 +594,7 @@ let ocamldebug =
     ~does_something:true
     debug
 
-||||||| 23e84b8c4d
+||||||| upstream-base
 let debug log env =
   let program = Environments.safe_lookup Builtin_variables.program env in
   let what = Printf.sprintf "Debugging program %s" program in
@@ -633,7 +633,7 @@ let ocamldebug =
     debug
 
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 let objinfo log env =
   let tools_directory = Ocaml_directories.tools in
   let program = Environments.safe_lookup Builtin_variables.program env in
@@ -675,10 +675,10 @@ let objinfo log env =
 let ocamlobjinfo =
   Actions.make ~name:"ocamlobjinfo"
     ~description:"Run ocamlobjinfo on the program"
-<<<<<<< HEAD
+<<<<<<< oxcaml
     ~does_something:true
     objinfo
-||||||| 23e84b8c4d
+||||||| upstream-base
     ~description:"Run ocamlobjinfo on the program" objinfo
 =======
     (fun log env ->
@@ -687,7 +687,7 @@ let ocamlobjinfo =
        else
          Result.skip_with_reason "ocamlobjinfo not available", env
     )
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 let mklib log env =
   let program = Environments.safe_lookup Builtin_variables.program env in

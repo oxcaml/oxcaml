@@ -20,13 +20,13 @@ open Types
 open Data_types
 
 val extension_descr:
-<<<<<<< HEAD
+<<<<<<< oxcaml
   current_unit:Unit_info.t option -> Path.t -> extension_constructor ->
-||||||| 23e84b8c4d
+||||||| upstream-base
   current_unit:string -> Path.t -> extension_constructor ->
 =======
   current_unit:(Unit_info.t option) -> Path.t -> extension_constructor ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   constructor_description
 
 val labels_of_type:
@@ -36,13 +36,13 @@ val unboxed_labels_of_type:
   Path.t -> type_declaration ->
   (Ident.t * unboxed_label_description) list
 val constructors_of_type:
-<<<<<<< HEAD
+<<<<<<< oxcaml
   current_unit:Unit_info.t option -> Path.t -> type_declaration ->
-||||||| 23e84b8c4d
+||||||| upstream-base
   current_unit:string -> Path.t -> type_declaration ->
 =======
   current_unit:(Unit_info.t option) -> Path.t -> type_declaration ->
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   (Ident.t * constructor_description) list
 
 

@@ -1,13 +1,13 @@
 (* TEST
-<<<<<<< HEAD
+<<<<<<< oxcaml
  flags += "-alert -do_not_spawn_domains -alert -unsafe_multidomain";
  ocamlrunparam += ",d=129";
  runtime5;
  multidomain;
-||||||| 23e84b8c4d
+||||||| upstream-base
 =======
  ocamlrunparam += ",d=129";
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
  { native; }
 *)
 

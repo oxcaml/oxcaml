@@ -889,14 +889,14 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
   | Cmi_format.Error err ->
       let msg = Format.asprintf "%a"
           Cmi_format.report_error err in
-<<<<<<< HEAD
+<<<<<<< oxcaml
       let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
-||||||| 23e84b8c4d
+||||||| upstream-base
       let msg = Format.asprintf "%a" Cmi_format.report_error err in
       let warn = Warnings.No_cmi_file(name, Some msg) in
 =======
       let warn = Warnings.No_cmi_file(name, Some msg) in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         Location.prerr_warning loc warn
   | Error err ->
       let msg =
@@ -906,13 +906,13 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
               " %a@ contains the compiled interface for @ \
                %a when %a was expected"
               Location.Doc.quoted_filename filename
-<<<<<<< HEAD
+<<<<<<< oxcaml
               CU.Name.print_as_inline_code ps_name
               CU.Name.print_as_inline_code name
         | Inconsistent_import _ ->
             (* Can't be raised by [find_pers_struct ~check:false] *)
             assert false
-||||||| 23e84b8c4d
+||||||| upstream-base
               (Style.as_inline_code Location.print_filename) filename
               Style.inline_code ps_name
               Style.inline_code name
@@ -921,7 +921,7 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
               Style.inline_code ps_name
               Style.inline_code name
         | Inconsistent_import _ -> assert false
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         | Need_recursive_types name ->
             Format_doc.doc_printf
               "%a uses recursive types"
@@ -962,13 +962,13 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
               (Style.as_inline_code Global_module.Name.print) value
       in
       let msg = Format_doc.(asprintf "%a" pp_doc) msg in
-<<<<<<< HEAD
+<<<<<<< oxcaml
       let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
-||||||| 23e84b8c4d
+||||||| upstream-base
       let warn = Warnings.No_cmi_file(name, Some msg) in
 =======
       let warn = Warnings.No_cmi_file(name, Some msg) in
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
         Location.prerr_warning loc warn
 
 let read penv modname a =
@@ -1139,31 +1139,31 @@ let report_error_doc ppf =
       "Wrong file naming: %a@ contains the compiled interface for@ \
        %a when %a was expected"
       Location.Doc.quoted_filename filename
-<<<<<<< HEAD
+<<<<<<< oxcaml
       CU.Name.print_as_inline_code ps_name
       CU.Name.print_as_inline_code modname
-||||||| 23e84b8c4d
+||||||| upstream-base
       (Style.as_inline_code Location.print_filename) filename
       Style.inline_code ps_name
       Style.inline_code modname
 =======
       Style.inline_code ps_name
       Style.inline_code modname
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Inconsistent_import(name, source1, source2) -> fprintf ppf
       "@[<hov>The files %a@ and %a@ \
               make inconsistent assumptions@ over interface %a@]"
       Location.Doc.quoted_filename source1
       Location.Doc.quoted_filename source2
-<<<<<<< HEAD
+<<<<<<< oxcaml
       CU.Name.print_as_inline_code name
-||||||| 23e84b8c4d
+||||||| upstream-base
       (Style.as_inline_code Location.print_filename) source1
       (Style.as_inline_code Location.print_filename) source2
       Style.inline_code name
 =======
       Style.inline_code name
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
   | Need_recursive_types(import) ->
       fprintf ppf
         "@[<hov>Invalid import of %a, which uses recursive types.@ \
@@ -1272,16 +1272,16 @@ let () =
   Location.register_error_of_exn
     (function
       | Error err ->
-<<<<<<< HEAD
+<<<<<<< oxcaml
           (* Note that this module don't have location info in its errors, since
              (unlike [Env]) it doesn't take [Location.t]s as arguments. However,
              [Env] is often able to add location info to our errors by
              re-raising them with the [Env.Error_from_persistent_env]
              constructor. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
           Some (Location.error_of_printer_file report_error err)
 =======
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
           Some (Location.error_of_printer_file report_error_doc err)
       | _ -> None
     )

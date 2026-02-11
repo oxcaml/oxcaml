@@ -14,12 +14,12 @@ boot_ocamlobjinfo = tools/objinfo.exe
 ocamldir = .
 toplevels_installed = top opttop
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 CLEAN_DUNE_WORKSPACES = \
   duneconf/boot.ws \
   duneconf/runtime_stdlib.ws \
   duneconf/main.ws
-||||||| 23e84b8c4d
+||||||| upstream-base
 CAMLC = $(BOOT_OCAMLC) $(BOOT_STDLIBFLAGS) -use-prims runtime/primitives
 CAMLOPT=$(OCAMLRUN) ./ocamlopt$(EXE) $(STDLIBFLAGS) -I otherlibs/dynlink
 ARCHES=amd64 arm64 power s390x riscv
@@ -36,7 +36,7 @@ VPATH = utils parsing typing bytecomp file_formats lambda middle_end \
   asmcomp driver toplevel tools runtime \
   $(addprefix otherlibs/, $(ALL_OTHERLIBS))
 INCLUDES = $(addprefix -I ,$(VPATH))
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 # These are getting rm -rf'd, so be careful with this.
 
@@ -112,8 +112,8 @@ else
   CLEAN_DUNE_BIN := $(shell command -v dune 2>/dev/null)
 endif
 
-<<<<<<< HEAD
-||||||| 23e84b8c4d
+<<<<<<< oxcaml
+||||||| upstream-base
 OC_OCAMLDEPDIRS = $(VPATH)
 
 # This list is passed to expunge, which accepts both uncapitalized and
@@ -1852,9 +1852,9 @@ tests:
 
 # Make clean in the test suite
 
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 .PHONY: clean
-<<<<<<< HEAD
+<<<<<<< oxcaml
 clean:
 	$(if $(filter 1,$(V)),,@)set -eu; \
 	  dirs="$(CLEAN_DIRS)"; \
@@ -1874,7 +1874,7 @@ clean:
 	  fi; \
 	  rm -rf -- $$dirs; \
 	  rm -f -- $(CLEAN_FILES)
-||||||| 23e84b8c4d
+||||||| upstream-base
 clean::
 	$(MAKE) -C testsuite clean
 
@@ -5065,11 +5065,11 @@ DEP_FILES = $(addsuffix .depend, $(DEP_DIRS))
 depend: $(DEP_FILES) | beforedepend
 	$(V_GEN)cat $^ > .$@
 	@rm -f $(DYNLINK_DEPEND_DUMMY_FILES)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 .PHONY: distclean
 distclean: clean
-<<<<<<< HEAD
+<<<<<<< oxcaml
 	$(if $(filter 1,$(V)),,@)set -eu; \
 	  dirs="$(DISTCLEAN_DIRS)"; \
 	  if [ -z "$$dirs" ]; then echo "Refusing to distclean empty directory list" >&2; exit 1; fi; \
@@ -5078,7 +5078,7 @@ distclean: clean
 	  done; \
 	  rm -rf -- $$dirs; \
 	  rm -f -- $(DISTCLEAN_FILES)
-||||||| 23e84b8c4d
+||||||| upstream-base
 	if [ -f flexdll/Makefile ]; then $(MAKE) -C flexdll distclean MSVC_DETECT=0; fi
 	$(MAKE) -C manual distclean
 	rm -f ocamldoc/META
@@ -5121,9 +5121,9 @@ endif
 	rm -rf autom4te.cache winpthreads-sources flexdll-sources \
          $(BYTE_BUILD_TREE) $(OPT_BUILD_TREE)
 	rm -f config.log config.status libtool
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 $(ocamldir)/duneconf/ox-extra.inc:
 	echo > $@
 
@@ -5132,7 +5132,7 @@ include Makefile.common-ox
 .PHONY: ci
 ifeq ($(coverage),yes)
 ci: ci-coverage
-||||||| 23e84b8c4d
+||||||| upstream-base
 # Installation
 .PHONY: install
 install:
@@ -5212,7 +5212,7 @@ ifeq "$(INSTALL_BYTECODE_PROGRAMS)" "true"
 	    (cd "$(INSTALL_BINDIR)" && $(LN) "$$i.byte$(EXE)" "$$i$(EXE)"); \
 	  fi; \
 	done
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 else
 ci: ci-no-coverage
 endif
@@ -5260,7 +5260,7 @@ check_all_arches: _build/_bootinstall
 	for arch in $(ARCHES); do \
 	  ARCH=$$arch RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build $(ws_boot) ocamloptcomp.cma; \
 	done
-<<<<<<< HEAD
+<<<<<<< oxcaml
 
 # Compare the OxCaml installation tree against the upstream one.
 
@@ -5276,7 +5276,7 @@ compare: _compare/config.status _install
 	    $(MAKE) world.opt && \
 	    $(MAKE) ocamlnat && \
 	    $(MAKE) install); \
-||||||| 23e84b8c4d
+||||||| upstream-base
 endif
 	for i in $(TOOLS_TO_INSTALL_BYT); \
 	do \
@@ -5449,12 +5449,12 @@ ifeq "$(build_libraries_manpages)" "true"
 endif
 	if test -n "$(WITH_DEBUGGER)"; then \
 	  $(INSTALL_PROG) debugger/ocamldebug$(EXE) "$(INSTALL_BINDIR)"; \
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 	fi
-<<<<<<< HEAD
+<<<<<<< oxcaml
 	./scripts/compare.sh $$(pwd)/_compare/_install $$(pwd)/_install \
 	  _install/bin/ocamlobjinfo.opt
-||||||| 23e84b8c4d
+||||||| upstream-base
 ifeq "$(BOOTSTRAPPING_FLEXDLL)" "true"
 ifeq "$(TOOLCHAIN)" "msvc"
 	$(INSTALL_DATA) $(FLEXDLL_SOURCE_DIR)/$(FLEXDLL_MANIFEST) \
@@ -5507,16 +5507,16 @@ ifeq "$(INSTALL_BYTECODE_PROGRAMS)" "true"
 else
 	if test -f ocamlopt$(EXE); then $(MAKE) installopt; fi
 endif
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 _compare/config.status: ocaml/config.status
 	set -eu; rm -rf _compare
 	mkdir _compare
 	rsync -a --filter=':- $$(pwd)/ocaml/.gitignore' \
 	  $$(pwd)/ocaml/ $$(pwd)/_compare
 	(cd _compare && ./configure $(CONFIGURE_ARGS) --prefix=$$(pwd)/_install)
-||||||| 23e84b8c4d
+||||||| upstream-base
 # Installation of the native-code compiler
 .PHONY: installopt
 installopt:
@@ -5698,7 +5698,7 @@ endif
 	$(INSTALL_DATA) \
           tools/profiling.cmx tools/profiling.$(O) \
 	  "$(INSTALL_LIBDIR_PROFILING)"
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 .PHONY: promote
 promote:
@@ -5709,11 +5709,11 @@ fmt: $(dune_config_targets)
 	$(if $(filter 1,$(V)),,@)bash scripts/fmt.sh
 
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 .PHONY: check-fmt
 check-fmt: $(dune_config_targets)
 	$(if $(filter 1,$(V)),,@)bash tools/ci/actions/check-fmt.sh
-||||||| 23e84b8c4d
+||||||| upstream-base
 Makefile.config Makefile.build_config: config.status
 config.status:
 	@echo "Please refer to the installation instructions:"
@@ -5744,7 +5744,7 @@ config.status:
 	@echo "  make install"
 	@echo "should work."
 	@false
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
 .PHONY: regen-flambda2-parser
 regen-flambda2-parser: $(dune_config_targets)

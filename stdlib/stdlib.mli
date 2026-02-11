@@ -125,7 +125,7 @@ exception Undefined_recursive_module of (string * int * int)
 
 (** {1 Comparisons} *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 external ( = ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%equal"
 (** [e1 = e2] tests for structural equality of [e1] and [e2].
    Mutable structures (e.g. references and arrays) are equal
@@ -134,7 +134,7 @@ external ( = ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> 
    Equality between functional values raises [Invalid_argument].
    Equality between cyclic data structures may not terminate.
    Left-associative operator, see {!Ocaml_operators} for more information. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 external ( = ) : 'a -> 'a -> bool = "%equal"
 (** [e1 = e2] tests for structural equality of [e1] and [e2].
    Mutable structures (e.g. references and arrays) are equal
@@ -148,18 +148,18 @@ external ( = ) : 'a -> 'a -> bool = "%equal"
 (** Alias of {!Repr.equal}
     Left-associative operator, see {!Ocaml_operators} for more information.
 *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 external ( <> ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%notequal"
 (** Negation of {!Stdlib.( = )}.
-||||||| 23e84b8c4d
+||||||| upstream-base
 external ( <> ) : 'a -> 'a -> bool = "%notequal"
 (** Negation of {!Stdlib.( = )}.
 =======
 external ( <> ) : 'a -> 'a -> bool = "%notequal"
 (** Negation of {!Repr.equal}.
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     Left-associative operator, see {!Ocaml_operators} for more information.
 *)
 
@@ -190,7 +190,7 @@ external ( >= ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) ->
    Left-associative operator, see {!Ocaml_operators} for more information.
 *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 external compare : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> int = "%compare"
 (** [compare x y] returns [0] if [x] is equal to [y],
    a negative integer if [x] is less than [y], and a positive integer
@@ -209,7 +209,7 @@ external compare : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -
    The [compare] function can be used as the comparison function
    required by the {!Set.Make} and {!Map.Make} functors, as well as
    the {!List.sort} and {!Array.sort} functions. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 external compare : 'a -> 'a -> int = "%compare"
 (** [compare x y] returns [0] if [x] is equal to [y],
    a negative integer if [x] is less than [y], and a positive integer
@@ -231,14 +231,14 @@ external compare : 'a -> 'a -> int = "%compare"
 =======
 external compare : 'a -> 'a -> int = "%compare"
 (** Alias of {!Repr.compare}. *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val min : ('a : value_or_null) . 'a -> 'a -> 'a
 (** Return the smaller of the two arguments.
     The result is unspecified if one of the arguments contains
     the float value [nan]. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 val min : 'a -> 'a -> 'a
 (** Return the smaller of the two arguments.
     The result is unspecified if one of the arguments contains
@@ -246,14 +246,14 @@ val min : 'a -> 'a -> 'a
 =======
 val min : 'a -> 'a -> 'a
 (** Alias of {!Repr.min}. *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 val max : ('a : value_or_null) . 'a -> 'a -> 'a
 (** Return the greater of the two arguments.
     The result is unspecified if one of the arguments contains
     the float value [nan]. *)
-||||||| 23e84b8c4d
+||||||| upstream-base
 val max : 'a -> 'a -> 'a
 (** Return the greater of the two arguments.
     The result is unspecified if one of the arguments contains
@@ -261,9 +261,9 @@ val max : 'a -> 'a -> 'a
 =======
 val max : 'a -> 'a -> 'a
 (** Alias of {!Repr.max}. *)
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 external ( == ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%eq"
 (** [e1 == e2] tests for physical equality of [e1] and [e2].
    On mutable types such as references, arrays, byte sequences, records with
@@ -274,7 +274,7 @@ external ( == ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) ->
    implementation-dependent; however, it is guaranteed that
    [e1 == e2] implies [compare e1 e2 = 0].
    Left-associative operator,  see {!Ocaml_operators} for more information.
-||||||| 23e84b8c4d
+||||||| upstream-base
 external ( == ) : 'a -> 'a -> bool = "%eq"
 (** [e1 == e2] tests for physical equality of [e1] and [e2].
    On mutable types such as references, arrays, byte sequences, records with
@@ -289,19 +289,19 @@ external ( == ) : 'a -> 'a -> bool = "%eq"
 external ( == ) : 'a -> 'a -> bool = "%eq"
 (** Alias of {!Repr.phys_equal}.
     Left-associative operator,  see {!Ocaml_operators} for more information.
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
 *)
 
-<<<<<<< HEAD
+<<<<<<< oxcaml
 external ( != ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%noteq"
 (** Negation of {!Stdlib.( == )}.
-||||||| 23e84b8c4d
+||||||| upstream-base
 external ( != ) : 'a -> 'a -> bool = "%noteq"
 (** Negation of {!Stdlib.( == )}.
 =======
 external ( != ) : 'a -> 'a -> bool = "%noteq"
 (** Negation of {!Repr.phys_equal}.
->>>>>>> d505d53be15ca18a648496b70604a7b4db15db2a
+>>>>>>> upstream-incoming
     Left-associative operator,  see {!Ocaml_operators} for more information.
 *)
 
