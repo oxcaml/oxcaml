@@ -787,7 +787,8 @@ and unsafe_mode_crossing =
 
 and ('lbl, 'lbl_flat, 'cstr) type_kind =
     Type_abstract of type_origin
-  | Type_record of 'lbl list * record_representation option * unsafe_mode_crossing option
+  | Type_record of
+      'lbl list * record_representation option * unsafe_mode_crossing option
   | Type_record_unboxed_product of
       'lbl_flat list *
       record_unboxed_product_representation option *
@@ -1119,7 +1120,8 @@ type constructor_description =
     cstr_arity: int;                    (* Number of arguments *)
     cstr_tag: tag;                      (* Tag for heap blocks *)
     cstr_repr: variant_representation;  (* Repr of the outer variant *)
-    cstr_shape: constructor_representation option; (* Repr of the constructor itself *)
+    cstr_shape: constructor_representation option;
+                                        (* Repr of the constructor itself *)
     cstr_constant: bool;                (* True if all args are void *)
     cstr_consts: int;                   (* Number of constant constructors *)
     cstr_nonconsts: int;                (* Number of non-const constructors *)

@@ -5062,7 +5062,8 @@ let report_lookup_error_doc ~level _loc env ppf = function
           fprintf ppf
             "@.@[@{<hint>Hint@}: \
              [%@%@unboxed] records don't get unboxed versions.@]"
-      | Type_record (_, Some (Record_float | Record_ufloat | Record_mixed _), _) ->
+      | Type_record (_, Some (Record_float | Record_ufloat | Record_mixed _),
+                     _) ->
           fprintf ppf
             "@.@[@{<hint>Hint@}: Float records don't get unboxed versions.@]";
       | Type_record_unboxed_product _ ->

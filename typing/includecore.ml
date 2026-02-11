@@ -931,7 +931,9 @@ module Record_diffing = struct
              Some (Record_mismatch (Ufloat_representation Second))
 
           | Record_mixed m1, Record_mixed m2 ->
-              begin match find_mismatch_in_mixed_record_representations m1 m2 with
+              begin match
+                find_mismatch_in_mixed_record_representations m1 m2
+              with
               | None -> None
               | Some mismatch -> Some (Record_mismatch mismatch)
               end
@@ -946,7 +948,8 @@ module Record_diffing = struct
       | Unboxed_product ->
         begin match rep1, rep2 with
         | None, None
-        | Some (Record_unboxed_product _), Some (Record_unboxed_product _) -> None
+        | Some (Record_unboxed_product _), Some (Record_unboxed_product _) ->
+            None
         | Some _, None -> Some (Fixed_representation First)
         | None, Some _ -> Some (Fixed_representation Second)
         end

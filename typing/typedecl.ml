@@ -1681,7 +1681,8 @@ let update_constructor_arguments_sorts env loc cd_args =
     List.for_all
       (fun { ca_sort } -> all_void_sort_option ca_sort) args,
     jkinds,
-    (Misc.Stdlib.List.map_option (fun arg -> arg.ca_sort) args) |> Option.map Array.of_list
+    (Misc.Stdlib.List.map_option (fun arg -> arg.ca_sort) args)
+      |> Option.map Array.of_list
   | Types.Cstr_record lbls ->
     let lbls, jkinds =
       update_label_sorts_in_place env loc lbls ~form:Legacy
@@ -2081,7 +2082,8 @@ let update_record_kind (type rep) env loc (form : rep record_form)
                 | { floats = true; voids = true; atomic_fields = false }
                 | { float64s = true; voids = true; atomic_fields = false }
                 | { values = true; float64s = true; atomic_fields = false }
-                | { non_float64_unboxed_fields = true; atomic_fields = false } ) ->
+                | { non_float64_unboxed_fields = true;
+                    atomic_fields = false } ) ->
           let shape =
             Element_repr.mixed_product_shape loc reprs Record
           in
@@ -2199,10 +2201,10 @@ let update_record_representation env loc form lbls_and_types rep =
    It is called after the circularity checks and the delayed jkind checks
    have happened, so we can fully compute jkinds of types.
 
-   This function does not do any /checks/ on the jkind after performing the update; the
-   annotation, for example, is checked in the caller, [update_decls_jkind], so that
-   mutually recursive type decls see each others' best kinds during normalization and
-   subsumption
+   This function does not do any /checks/ on the jkind after performing the
+   update; the annotation, for example, is checked in the caller,
+   [update_decls_jkind], so that mutually recursive type decls see each others'
+   best kinds during normalization and subsumption
 *)
 let rec update_decl_jkind env dpath decl =
   let type_unboxed_version =
@@ -2323,14 +2325,15 @@ let rec update_decl_jkind env dpath decl =
            should be factored out *)
         let sorts, rep, type_jkind =
           let lbls = List.map (fun lbl -> lbl, lbl.Types.ld_type) lbls in
-          update_record_kind env decl.type_loc Unboxed_product lbls rep ~warn:true
+          update_record_kind env decl.type_loc Unboxed_product lbls rep
+            ~warn:true
         in
         let lbls =
           List.map2 (fun lbl ld_sort -> { lbl with ld_sort }) lbls sorts
         in
         let rep = Result.to_option rep in
-        (* See Note [Quality of jkinds during inference] for more information about when we
-           mark jkinds as best *)
+        (* See Note [Quality of jkinds during inference] for more information
+           about when we mark jkinds as best *)
         let type_jkind = Jkind.mark_best type_jkind in
         { decl with type_kind = Type_record_unboxed_product (lbls, rep, umc);
                     type_jkind }

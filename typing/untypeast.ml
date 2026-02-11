@@ -387,7 +387,8 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
             []    -> None
           | [(_, arg)] -> Some (sub.pat sub arg)
           | args  ->
-              Some (Pat.tuple ~loc (List.map (fun (_, p) -> None, sub.pat sub p) args)
+              Some (Pat.tuple ~loc
+                      (List.map (fun (_, p) -> None, sub.pat sub p) args)
                       Closed)
         in
         Ppat_construct (map_loc sub lid,

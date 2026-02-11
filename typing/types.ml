@@ -368,12 +368,14 @@ and unsafe_mode_crossing =
 
 and ('lbl, 'lbl_flat, 'cstr) type_kind =
     Type_abstract of type_origin
-  | Type_record of 'lbl list * record_representation option * unsafe_mode_crossing option
+  | Type_record of
+      'lbl list * record_representation option * unsafe_mode_crossing option
   | Type_record_unboxed_product of
       'lbl_flat list *
       record_unboxed_product_representation option *
       unsafe_mode_crossing option
-  | Type_variant of 'cstr list * variant_representation * unsafe_mode_crossing option
+  | Type_variant of
+      'cstr list * variant_representation * unsafe_mode_crossing option
   | Type_open
 
 and tag = Ordinary of {src_index: int;     (* Unique name (per type) *)
@@ -719,7 +721,8 @@ type constructor_description =
     cstr_arity: int;                    (* Number of arguments *)
     cstr_tag: tag;                      (* Tag for heap blocks *)
     cstr_repr: variant_representation;  (* Repr of the outer variant *)
-    cstr_shape: constructor_representation option; (* Repr of the constructor itself *)
+    cstr_shape: constructor_representation option;
+                                        (* Repr of the constructor itself *)
     cstr_constant: bool;                (* True if all args are void *)
     (* True if it's the constructor of a non-[@@unboxed] variant with 0 bits of
        payload. (Or equivalently, if it's represented as either a tagged int or
@@ -822,7 +825,8 @@ let equal_variant_representation r1 r2 = r1 == r2 || match r1, r2 with
   | Variant_unboxed, Variant_unboxed ->
       true
   | Variant_boxed cstrs_and_sorts1, Variant_boxed cstrs_and_sorts2 ->
-      Misc.Stdlib.Array.equal (Option.equal (fun (cstr1, sorts1) (cstr2, sorts2) ->
+      Misc.Stdlib.Array.equal
+        (Option.equal (fun (cstr1, sorts1) (cstr2, sorts2) ->
           equal_constructor_representation cstr1 cstr2
           && Misc.Stdlib.Array.equal Jkind_types.Sort.Const.equal
                sorts1 sorts2))
@@ -940,11 +944,14 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
 
 let find_unboxed_type decl =
   match decl.type_kind with
-    Type_record ([{ld_type = arg; ld_modalities = ms; _}], Some Record_unboxed, _)
+    Type_record
+      ([{ld_type = arg; ld_modalities = ms; _}], Some Record_unboxed, _)
   | Type_record
-      ([{ld_type = arg; ld_modalities = ms; _ }], Some (Record_inlined (_, _, Variant_unboxed)), _)
+      ([{ld_type = arg; ld_modalities = ms; _ }],
+       Some (Record_inlined (_, _, Variant_unboxed)), _)
   | Type_record_unboxed_product
-      ([{ld_type = arg; ld_modalities = ms; _ }], Some (Record_unboxed_product _), _)
+      ([{ld_type = arg; ld_modalities = ms; _ }],
+       Some (Record_unboxed_product _), _)
   | Type_variant ([{cd_args = Cstr_tuple [{ca_type = arg; ca_modalities = ms; _}]; _}], Variant_unboxed, _)
   | Type_variant ([{cd_args = Cstr_record [{ld_type = arg; ld_modalities = ms; _}]; _}], Variant_unboxed, _) ->
     Some (arg, ms)

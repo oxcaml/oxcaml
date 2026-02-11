@@ -1476,7 +1476,8 @@ let instance_constructor' copy_scope existential_treatment cstr =
   let ty_ex = List.map copy_existential cstr.cstr_existentials in
   let ty_res = copy copy_scope cstr.cstr_res in
   let ty_args =
-    List.map (fun ca -> {ca with ca_type = copy copy_scope ca.ca_type}) cstr.cstr_args
+    List.map (fun ca -> {ca with ca_type = copy copy_scope ca.ca_type})
+      cstr.cstr_args
   in
   (ty_args, ty_res, ty_ex)
 

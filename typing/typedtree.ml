@@ -284,14 +284,17 @@ and expression_desc =
       (Jkind.sort * expression) list * alloc_mode option
   | Texp_variant of label * (expression * alloc_mode) option
   | Texp_record of {
-      fields : ( Types.label_description * Jkind.sort * record_label_definition ) array;
+      fields :
+        ( Types.label_description * Jkind.sort * record_label_definition )
+          array;
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
       alloc_mode : alloc_mode option
     }
   | Texp_record_unboxed_product of {
       fields :
-        ( Types.unboxed_label_description * Jkind.sort * record_label_definition ) array;
+        ( Types.unboxed_label_description * Jkind.sort *
+          record_label_definition ) array;
       representation : Types.record_unboxed_product_representation;
       extended_expression : (expression * Jkind.sort) option;
     }

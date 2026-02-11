@@ -141,7 +141,8 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
          users to write their own null constructors. *)
       (* CR layouts v3.3: generalize to [any]. *)
       [| Some (Constructor_uniform_value, [| |])
-       ; Some (Constructor_uniform_value, [| Jkind_types.Sort.Const.value |]) |],
+       ; Some (Constructor_uniform_value,
+               [| Jkind_types.Sort.Const.value |]) |],
       false
   in
   let num_consts = ref 0 and num_nonconsts = ref 0 in

@@ -509,7 +509,9 @@ and expression_desc =
             in which case it does not need allocation.
           *)
   | Texp_record of {
-      fields : ( Types.label_description * Jkind.sort * record_label_definition ) array;
+      fields :
+        ( Types.label_description * Jkind.sort * record_label_definition )
+          array;
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
       alloc_mode : alloc_mode option

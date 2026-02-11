@@ -3399,7 +3399,8 @@ and type_pat_aux
         representation_for_tuple_constructor !!penv constr args ~loc ~jkinds
           ~containing_type:expected_ty
       in
-      rvp { pat_desc=Tpat_construct(lid, constr, repr, ctor_args, existential_ctyp);
+      rvp { pat_desc =
+              Tpat_construct(lid, constr, repr, ctor_args, existential_ctyp);
             pat_loc = loc;
             pat_extra = [
               Tpat_inspected_type (Label_disambiguation ambiguity), loc, []];
@@ -6041,7 +6042,8 @@ and type_expect_
           | Some (Record_inlined (_, _, (Variant_unboxed | Variant_with_null)))
             -> false
           | Some (Record_boxed _ | Record_float | Record_ufloat | Record_mixed _
-                 | Record_inlined (_, _, (Variant_boxed _ | Variant_extensible)))
+                 | Record_inlined (_, _, (Variant_boxed _
+                                         | Variant_extensible)))
           | None
             -> true
         end

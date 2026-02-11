@@ -923,11 +923,13 @@ and value_kind_variant env ~loc ~visited ~depth ~num_nodes_visited
                 in
                 if is_mutable then None
                 else match fields with
-                | Constructor_uniform xs when List.compare_length_with xs 0 = 0 ->
+                | Constructor_uniform xs
+                    when List.compare_length_with xs 0 = 0 ->
                   let consts = next_const :: consts in
                   Some (num_nodes_visited,
                         next_const + 1, consts, next_tag, non_consts)
-                | Constructor_mixed shape when mixed_block_shape_is_empty shape ->
+                | Constructor_mixed shape
+                    when mixed_block_shape_is_empty shape ->
                   let consts = next_const :: consts in
                   Some (num_nodes_visited,
                         next_const + 1, consts, next_tag, non_consts)
