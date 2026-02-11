@@ -92,15 +92,13 @@ module rec My_list : sig
 end = My_list
 (* CR layouts v2.8: fix this. Internal ticket 5127 *)
 [%%expect {|
-Line 2, characters 43-70:
+Line 2, characters 2-70:
 2 |   type 'a t : immutable_data with 'a = Nil | Cons of 'a * 'a My_list.t
-                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Constructor argument types must have a representable layout.
-       The layout of 'a My_list.t is any
-         because the compiler failed to deduce its exact kind
-         due to with-bound checking limitations.
-       But the layout of 'a My_list.t must be representable
-         because it's the type of a constructor field.
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is immutable_data with 'a with 'a My_list.t
+         because it's a boxed variant type.
+       But the kind of type "t" must be a subkind of immutable_data with 'a
+         because of the annotation on the declaration of the type t.
 |}]
 
 module rec My_list : sig
