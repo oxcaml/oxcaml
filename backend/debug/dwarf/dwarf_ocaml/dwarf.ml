@@ -34,14 +34,18 @@ type t =
 (* CR mshinwell: On OS X 10.11 (El Capitan), dwarfdump doesn't seem to be able
    to read our 64-bit DWARF output. *)
 
-let create ~sourcefile ~unit_name ~asm_directives ~get_file_id ~code_begin
-    ~code_end =
+let create ~sourcefile ~unit_name ~asm_directives ~get_file_id ~code_layout =
   (match !Dwarf_flags.gdwarf_format with
   | Thirty_two -> Dwarf_format.set Thirty_two
   | Sixty_four -> Dwarf_format.set Sixty_four);
   let compilation_unit_proto_die =
-    Dwarf_compilation_unit.compile_unit_proto_die ~sourcefile ~unit_name
-      ~code_begin ~code_end
+    Dwarf_compilation_unit.compile_unit_proto_die_without_code_ranges
+      ~sourcefile ~unit_name
+    (* The compilation unit die does not include any code range attributes at
+       this point (e.g., no range list of the code sections). The ranges are
+       added later when we emit the DWARF, because at that point we have emitted
+       all the functions and have collected all of the relevant symbols (see
+       [emit] below). *)
   in
   let compilation_unit_header_label = Asm_label.create (DWARF Debug_info) in
   let value_type_proto_die =
@@ -52,18 +56,14 @@ let create ~sourcefile ~unit_name ~asm_directives ~get_file_id ~code_begin
           DAH.create_byte_size_exn ~byte_size:Arch.size_addr ]
       ()
   in
-  let start_of_code_symbol =
-    Cmm_helpers.make_symbol "code_begin" |> Asm_symbol.create_global
-  in
   let debug_loc_table = Debug_loc_table.create () in
   let debug_ranges_table = Debug_ranges_table.create () in
   let address_table = Address_table.create () in
   let location_list_table = Location_list_table.create () in
   let state =
     DS.create ~compilation_unit_header_label ~compilation_unit_proto_die
-      ~value_type_proto_die ~start_of_code_symbol debug_loc_table
-      debug_ranges_table address_table location_list_table
-      ~get_file_num:get_file_id ~sourcefile
+      ~value_type_proto_die ~code_layout debug_loc_table debug_ranges_table
+      address_table location_list_table ~get_file_num:get_file_id ~sourcefile
     (* CR mshinwell: does get_file_id successfully emit .file directives for
        files we haven't seen before? *)
   in
@@ -73,6 +73,11 @@ let create ~sourcefile ~unit_name ~asm_directives ~get_file_id ~code_begin
     emitted_delayed = false;
     get_file_id
   }
+
+let record_function_range t ~function_symbol ~start_label ~end_label
+    ~offset_past_end_label =
+  DS.record_function_range t.state ~function_symbol ~start_label ~end_label
+    ~offset_past_end_label
 
 type fundecl =
   { fun_end_label : Cmm.label;
@@ -172,13 +177,18 @@ let emit_stats_file t =
   Printf.fprintf oc "%s\n" main_object;
   close_out oc
 
-let emit t ~basic_block_sections ~binary_backend_available =
+let emit t ~binary_backend_available =
   if t.emitted
   then
     Misc.fatal_error
       "Cannot call [Dwarf.emit] more than once on a given value of type \
        [Dwarf.t]";
   t.emitted <- true;
+  Dwarf_compilation_unit.add_code_ranges_to_compile_unit_proto_die
+    (DS.compilation_unit_proto_die t.state)
+    ~code_layout:(DS.code_layout t.state)
+    ~ranges:(DS.function_ranges t.state)
+    ~debug_ranges_table:(DS.debug_ranges_table t.state);
   Dwarf_world.emit ~asm_directives:t.asm_directives
     ~compilation_unit_proto_die:(DS.compilation_unit_proto_die t.state)
     ~compilation_unit_header_label:(DS.compilation_unit_header_label t.state)
@@ -186,15 +196,13 @@ let emit t ~basic_block_sections ~binary_backend_available =
     ~debug_ranges_table:(DS.debug_ranges_table t.state)
     ~address_table:(DS.address_table t.state)
     ~location_list_table:(DS.location_list_table t.state)
-    ~basic_block_sections ~binary_backend_available;
+    ~binary_backend_available;
   if !Dwarf_flags.ddwarf_metrics then emit_stats_file t
 
-let emit t ~basic_block_sections ~binary_backend_available =
-  Profile.record "emit_dwarf"
-    (emit ~basic_block_sections ~binary_backend_available)
-    t
+let emit t ~binary_backend_available =
+  Profile.record "emit_dwarf" (emit ~binary_backend_available) t
 
-let emit_delayed t ~basic_block_sections ~binary_backend_available =
+let emit_delayed t ~binary_backend_available =
   if t.emitted_delayed
   then
     Misc.fatal_error
@@ -202,9 +210,7 @@ let emit_delayed t ~basic_block_sections ~binary_backend_available =
        type [Dwarf.t]";
   t.emitted_delayed <- true;
   Dwarf_world.emit_delayed ~asm_directives:t.asm_directives
-    ~basic_block_sections ~binary_backend_available
+    ~binary_backend_available
 
-let emit_delayed t ~basic_block_sections ~binary_backend_available =
-  Profile.record "emit_delayed_dwarf"
-    (emit_delayed ~basic_block_sections ~binary_backend_available)
-    t
+let emit_delayed t ~binary_backend_available =
+  Profile.record "emit_delayed_dwarf" (emit_delayed ~binary_backend_available) t
