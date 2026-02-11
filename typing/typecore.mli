@@ -68,19 +68,14 @@ type pattern_variable_kind =
 type pattern_variable =
   {
     pv_id: Ident.t;
-    pv_uid: Uid.t;
     pv_mode: Mode.Value.l;
     pv_kind: value_kind;
     pv_type: type_expr;
     pv_loc: Location.t;
     pv_kind: pattern_variable_kind;
     pv_attributes: Typedtree.attributes;
-<<<<<<< oxcaml
     pv_sort: Jkind.Sort.t;
-||||||| upstream-base
-=======
-    pv_uid : Uid.t;
->>>>>>> upstream-incoming
+    pv_uid: Uid.t;
   }
 
 val mk_expected:
@@ -202,28 +197,25 @@ val escape : loc:Location.t -> env:Env.t -> reason:submode_reason -> (Mode.allow
 
 val self_coercion : (Path.t * Location.t list ref) list ref
 
-<<<<<<< oxcaml
 type unsupported_stack_allocation =
   | Lazy
   | Module
   | Object
   | List_comprehension
   | Array_comprehension
-||||||| upstream-base
-=======
+
 type existential_binding =
   | Bind_already_bound
   | Bind_not_in_scope
   | Bind_non_locally_abstract
->>>>>>> upstream-incoming
 
+(* CR sspies: This error type seems to mix upstream with non-upstream
+   constructors quite a bit. I tried to be careful during conflict resolution,
+   but it would be good to sort them into upstream first then our additions.
+   This should make future merges easier. *)
 type error =
   | Constructor_arity_mismatch of Longident.t * int * int
-  | Constructor_labeled_arg
-  | Partial_tuple_pattern_bad_type
-  | Extra_tuple_label of string option * type_expr
-  | Missing_tuple_label of string option * type_expr
-  | Label_mismatch of record_form_packed * Longident.t * Errortrace.unification_error
+  | Label_mismatch of Data_types.record_form_packed * Longident.t * Errortrace.unification_error
   | Pattern_type_clash :
       Errortrace.unification_error * Parsetree.pattern_desc option
       -> error
@@ -247,7 +239,7 @@ type error =
     }
   | Apply_wrong_label of arg_label * type_expr * bool
   | Label_multiply_defined of string
-  | Label_missing of record_form_packed * Ident.t list
+  | Label_missing of Data_types.record_form_packed * Ident.t list
   | Label_not_mutable of Longident.t
   | Wrong_name of string * type_expected * wrong_name
   | Name_type_mismatch of
@@ -299,23 +291,16 @@ type error =
   | Unrefuted_pattern of Typedtree.pattern
   | Invalid_extension_constructor_payload
   | Not_an_extension_constructor
-<<<<<<< oxcaml
   | Probe_format
   | Probe_name_format of string
   | Probe_name_undefined of string
   (* CR-soon mshinwell: Use an inlined record *)
   | Probe_is_enabled_format
   | Extension_not_enabled : _ Language_extension.t -> error
-  | Atomic_in_pattern of Longident.t
   | Invalid_atomic_loc_payload
   | Label_not_atomic of Longident.t
+  | Atomic_in_pattern of Longident.t
   | Modalities_on_atomic_field of Longident.t
-||||||| upstream-base
-=======
-  | Invalid_atomic_loc_payload
-  | Label_not_atomic of Longident.t
-  | Atomic_in_pattern of Longident.t
->>>>>>> upstream-incoming
   | Literal_overflow of string
   | Unknown_literal of string * char
   | Float32_literal of string
@@ -333,10 +318,15 @@ type error =
   | Bind_existential of existential_binding * Ident.t * type_expr
   | Missing_type_constraint
   | Wrong_expected_kind of wrong_kind_sort * wrong_kind_context * type_expr
-<<<<<<< oxcaml
-  | Wrong_expected_record_boxing of wrong_kind_context * record_form_packed * type_expr
-  | Expr_not_a_record_type of record_form_packed * type_expr
-  | Expr_record_type_has_wrong_boxing of record_form_packed * type_expr
+  | Wrong_expected_record_boxing of wrong_kind_context * Data_types.record_form_packed * type_expr
+  | Expr_not_a_record_type of Data_types.record_form_packed * type_expr
+  | Constructor_labeled_arg
+  | Partial_tuple_pattern_bad_type
+  | Extra_tuple_label of string option * type_expr
+  | Missing_tuple_label of string option * type_expr
+  | Repeated_tuple_exp_label of string
+  | Repeated_tuple_pat_label of string
+  | Expr_record_type_has_wrong_boxing of Data_types.record_form_packed * type_expr
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
   | Block_access_record_unboxed
@@ -370,17 +360,6 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Eval_format
-||||||| upstream-base
-  | Expr_not_a_record_type of type_expr
-=======
-  | Expr_not_a_record_type of type_expr
-  | Constructor_labeled_arg
-  | Partial_tuple_pattern_bad_type
-  | Extra_tuple_label of string option * type_expr
-  | Missing_tuple_label of string option * type_expr
-  | Repeated_tuple_exp_label of string
-  | Repeated_tuple_pat_label of string
->>>>>>> upstream-incoming
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

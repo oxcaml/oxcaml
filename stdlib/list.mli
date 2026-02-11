@@ -74,18 +74,12 @@ val cons : ('a : value_or_null). 'a -> 'a list -> 'a list
     @since 4.03 (4.05 in ListLabels)
  *)
 
-<<<<<<< oxcaml
-val hd : ('a : value_or_null). 'a list -> 'a
-||||||| upstream-base
-val hd : 'a list -> 'a
-=======
-val singleton: 'a -> 'a list
+val singleton : ('a : value_or_null). 'a -> 'a list
 (** [singleton x] returns the one-element list [[x]].
 
     @since 5.4 *)
 
-val hd : 'a list -> 'a
->>>>>>> upstream-incoming
+val hd : ('a : value_or_null). 'a list -> 'a
 (** Return the first element of the given list.
    @raise Failure if the list is empty.
  *)
@@ -395,17 +389,11 @@ val filteri : ('a : value_or_null). (int -> 'a -> bool) -> 'a list -> 'a list
    @since 4.11
 *)
 
-<<<<<<< oxcaml
-val partition : ('a : value_or_null).
-  ('a -> bool) -> 'a list -> 'a list * 'a list
-||||||| upstream-base
-val partition : ('a -> bool) -> 'a list -> 'a list * 'a list
-=======
 
 (** {1 List manipulation} *)
 
 
-val take : int -> 'a list -> 'a list
+val take : ('a : value_or_null). int -> 'a list -> 'a list
 (** [take n l] returns the prefix of [l] of length [n],
     or a copy of [l] if [n > length l]. This is the empty
     list if [n] is negative.
@@ -416,7 +404,7 @@ val take : int -> 'a list -> 'a list
     @since 5.3
 *)
 
-val drop : int -> 'a list -> 'a list
+val drop : ('a : value_or_null). int -> 'a list -> 'a list
 (** [drop n l] returns the suffix of [l] after [n] elements,
     or [[]] if [n > length l]. This is [l] if [n] is negative.
 
@@ -426,22 +414,22 @@ val drop : int -> 'a list -> 'a list
     @since 5.3
 *)
 
-val take_while : ('a -> bool) -> 'a list -> 'a list
+val take_while : ('a : value_or_null). ('a -> bool) -> 'a list -> 'a list
 (** [take_while p l] is the longest (possibly empty) prefix of [l]
     containing only elements that satisfy [p].
 
     @since 5.3
 *)
 
-val drop_while : ('a -> bool) -> 'a list -> 'a list
+val drop_while : ('a : value_or_null). ('a -> bool) -> 'a list -> 'a list
 (** [drop_while p l] is the longest (possibly empty) suffix of [l]
     starting at the first element that does not satisfy [p].
 
     @since 5.3
 *)
 
-val partition : ('a -> bool) -> 'a list -> 'a list * 'a list
->>>>>>> upstream-incoming
+val partition : ('a : value_or_null).
+  ('a -> bool) -> 'a list -> 'a list * 'a list
 (** [partition f l] returns a pair of lists [(l1, l2)], where
    [l1] is the list of all the elements of [l] that
    satisfy the predicate [f], and [l2] is the list of all the
@@ -582,18 +570,10 @@ val fast_sort : ('a : value_or_null). ('a -> 'a -> int) -> 'a list -> 'a list
     faster on typical input.
  *)
 
-<<<<<<< oxcaml
 val sort_uniq : ('a : value_or_null). ('a -> 'a -> int) -> 'a list -> 'a list
-(** Same as {!sort}, but also remove duplicates.
-||||||| upstream-base
-val sort_uniq : ('a -> 'a -> int) -> 'a list -> 'a list
-(** Same as {!sort}, but also remove duplicates.
-=======
-val sort_uniq : ('a -> 'a -> int) -> 'a list -> 'a list
 (** Same as {!sort}, but also remove duplicates: if multiple elements
     compare equal, keep only the first.
 
->>>>>>> upstream-incoming
     @since 4.02 (4.03 in ListLabels)
 
     @before 5.4 the element kept was not necessarily the first one.

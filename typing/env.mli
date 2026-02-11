@@ -18,16 +18,7 @@
 open Types
 open Data_types
 open Misc
-<<<<<<< oxcaml
 module Jkind = Btype.Jkind0
-||||||| upstream-base
-
-val register_uid : Uid.t -> Location.t -> unit
-
-val get_uid_to_loc_tbl : unit -> Location.t Types.Uid.Tbl.t
-
-=======
->>>>>>> upstream-incoming
 
 type value_unbound_reason =
   | Val_unbound_instance_variable
@@ -38,13 +29,8 @@ type value_unbound_reason =
 type module_unbound_reason =
   | Mod_unbound_illegal_recursion of
       { container : string option; unbound: string }
-<<<<<<< oxcaml
 
 type locks
-||||||| upstream-base
-  | Mod_unbound_illegal_recursion
-=======
->>>>>>> upstream-incoming
 
 type summary =
     Env_empty
@@ -424,28 +410,14 @@ val add_value_lazy:
     ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
     Ident.t -> Subst.Lazy.value_description -> t -> t
 val add_value:
-<<<<<<< oxcaml
     ?check:(string -> Warnings.t) -> mode:(Mode.allowed * 'r) Mode.Value.t ->
     Ident.t -> Types.value_description -> t -> t
 val add_type:
-    check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
-||||||| upstream-base
-    ?check:(string -> Warnings.t) -> Ident.t -> value_description -> t -> t
-val add_type: check:bool -> Ident.t -> type_declaration -> t -> t
-=======
-    ?check:(string -> Warnings.t) -> Ident.t -> value_description -> t -> t
-val add_type:
   check:bool -> ?shape:Shape.t -> Ident.t -> type_declaration -> t -> t
->>>>>>> upstream-incoming
 val add_extension:
   check:bool -> ?shape:Shape.t -> rebind:bool -> Ident.t ->
   extension_constructor -> t -> t
-<<<<<<< oxcaml
 (* Modules can be added without modes, which defaults to the max mode *)
-||||||| upstream-base
-  check:bool -> rebind:bool -> Ident.t -> extension_constructor -> t -> t
-=======
->>>>>>> upstream-incoming
 val add_module: ?arg:bool -> ?shape:Shape.t ->
   Ident.t -> module_presence -> module_type -> ?mode:Mode.Value.l -> t -> t
 val add_module_lazy: update_summary:bool ->
@@ -574,20 +546,10 @@ val reset_cache: preserve_persistent_env:bool -> unit
 (* To be called before each toplevel phrase. *)
 val reset_cache_toplevel: unit -> unit
 
-<<<<<<< oxcaml
-(* Remember the name of the current compilation unit. *)
-val set_unit_name: Unit_info.t option -> unit
-val get_unit_name: unit -> Unit_info.t option
-||||||| upstream-base
-(* Remember the name of the current compilation unit. *)
-val set_unit_name: string -> unit
-val get_unit_name: unit -> string
-=======
 (* Remember the current compilation unit. *)
-val set_current_unit: Unit_info.t -> unit
+val set_current_unit: Unit_info.t option -> unit
 val get_current_unit : unit -> Unit_info.t option
 val get_current_unit_name: unit -> string
->>>>>>> upstream-incoming
 
 (* Read, save a signature to/from a file. *)
 val read_signature:
@@ -684,7 +646,6 @@ type error =
 
 exception Error of error
 
-<<<<<<< oxcaml
 
 val report_error: level:int -> error Format_doc.format_printer
 val report_error_doc: level:int -> error Format_doc.printer
@@ -693,15 +654,7 @@ val report_lookup_error:
     level:int -> Location.t -> t -> lookup_error Format_doc.format_printer
 val report_lookup_error_doc:
     level:int -> Location.t -> t -> lookup_error Format_doc.printer
-||||||| upstream-base
-open Format
 
-val report_error: formatter -> error -> unit
-
-val report_lookup_error: Location.t -> t -> formatter -> lookup_error -> unit
-
-=======
->>>>>>> upstream-incoming
 val in_signature: bool -> t -> t
 
 val is_in_signature: t -> bool
@@ -735,7 +688,6 @@ val same_constr: (t -> type_expr -> type_expr -> bool) ref
 val constrain_type_jkind:
   (t -> type_expr -> jkind_r -> (unit, Jkind.Violation.t) result) ref
 (* Forward declaration to break mutual recursion with Printtyp. *)
-<<<<<<< oxcaml
 val print_longident: Longident.t Format_doc.printer ref
 (* Forward declaration to break mutual recursion with Printtyp. *)
 val print_path: Path.t Format_doc.printer ref
@@ -745,13 +697,6 @@ val print_type_expr: Types.type_expr Format_doc.printer ref
 val report_jkind_violation_with_offender:
   (offender:(Format_doc.formatter -> unit) ->
    level:int -> Format_doc.formatter -> Jkind.Violation.t -> unit) ref
-||||||| upstream-base
-val print_longident: (Format.formatter -> Longident.t -> unit) ref
-(* Forward declaration to break mutual recursion with Printtyp. *)
-val print_path: (Format.formatter -> Path.t -> unit) ref
-=======
-val print_path: Path.t Format_doc.printer ref
->>>>>>> upstream-incoming
 
 
 (** Folds *)
