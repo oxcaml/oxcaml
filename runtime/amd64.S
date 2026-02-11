@@ -200,6 +200,7 @@
 #define DW_REG_rbp                6
 #define DW_REG_rsp                7
 #define DW_REG_r13                13
+#define DW_REG_r14                14
 #define DW_OP_breg                0x70
 #define DW_OP_deref               0x06
 #define DW_OP_plus_uconst         0x23
@@ -303,6 +304,7 @@ X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(27) X(
    Clobbers %r10 and %r11. */
 #define RESTORE_EXN_HANDLER_OCAML              \
         movq    Caml_state(exn_handler), %rsp; \
+        CFI_DEF_CFA_REGISTER(DW_REG_rsp);      \
         CFI_DEF_CFA_OFFSET(16);                \
         POP_EXN_HANDLER
 
@@ -1005,6 +1007,12 @@ LBL(caml_start_program):
     /* Switch stacks and call the OCaml code */
         movq    %r10, %rsp
 #ifdef ASM_CFI_SUPPORTED
+        /* Use some tricky DWARF to find the parent C stack frame, by
+           reading the C_STACK_SP slot from the top of the OCaml frame.
+
+           Note that we can't use Caml_state->c_stack, since that always
+           points to the innermost C frame, and the debugger needs to be
+           able to unwind nested alternating C/OCaml stacks. */
         CFI_REMEMBER_STATE
         .cfi_escape DW_CFA_def_cfa_expression, 3 + 2,                 \
             /* %rsp points to the exn handler on the OCaml stack */   \
@@ -1022,6 +1030,32 @@ LBL(108):
         movq    0(%rsp), %r11
         movq    %r11, Caml_state(exn_handler)
         leaq    16(%rsp), %r10
+        jmp     1f
+#ifdef ASM_CFI_SUPPORTED
+        /* Switch to some different tricky DWARF to find the parent C frame,
+           this time by using Caml_state->c_stack.
+
+           We can no longer reliably read C_STACK_SP from the OCaml frame,
+           since if we got here via an exception that may have been clobbered.
+           However, we now know we're the innermost frame (since we're running),
+           so we can get the right stack pointer from Caml_state->c_stack. */
+        .ifge 8*domain_field_caml_c_stack - 128
+        .error "Caml_state(c_stack) out of range for LEB128 encoding"
+        .endif
+        .cfi_escape DW_CFA_def_cfa_expression, 4 + 2,                 \
+            /* load Caml_state(c_stack) */                            \
+          DW_OP_breg + DW_REG_r14, 0x80 + 8*domain_field_caml_c_stack, 0, DW_OP_deref, \
+          DW_OP_plus_uconst,                                          \
+             SIZEOF_C_STACK_LINK  /* struct c_stack_link */ +         \
+             6*8 /* callee save regs */ +                             \
+             8   /* ret addr */
+#endif
+LBL(109):
+    /* Exception handler*/
+    /* Mark the bucket as an exception result and return it */
+        orq     $2, %rax
+        /* exn handler already popped here */
+        movq    %rsp, %r10
 1:  /* restore GC regs */
         movq    8(%r10), %r11
         movq    %r11, Caml_state(gc_regs)
@@ -1058,13 +1092,6 @@ LBL(108):
         POP_CALLEE_SAVE_REGS
     /* Return to caller. */
         ret
-LBL(109):
-    /* Exception handler*/
-    /* Mark the bucket as an exception result and return it */
-        orq     $2, %rax
-        /* exn handler already popped here */
-        movq    %rsp, %r10
-        jmp     1b
 CFI_ENDPROC
 ENDFUNCTION(G(caml_start_program))
 
@@ -1076,16 +1103,20 @@ ENDFUNCTION(G(caml_start_program))
 
 FUNCTION(G(caml_raise_exn))
 CFI_STARTPROC
+        CFI_SIGNAL_FRAME
         ENTER_FUNCTION
 LBL(caml_raise_exn):
         testq   $1, Caml_state(backtrace_active)
         jne   LBL(116)
+        CFI_REMEMBER_STATE
         RESTORE_EXN_HANDLER_OCAML
         ret
+        CFI_RESTORE_STATE
 LBL(116):
         movq    $0, Caml_state(backtrace_pos)
 LBL(117):
         movq    %rsp, %r13        /* Save OCaml stack pointer */
+        CFI_DEF_CFA_REGISTER(DW_REG_r13)
         movq    %rax, %r12        /* Save exception bucket */
         movq    Caml_state(c_stack), %rsp
         movq    %rax, C_ARG_1     /* arg 1: exception bucket */
