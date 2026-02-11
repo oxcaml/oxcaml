@@ -1799,7 +1799,7 @@ let solve_constructor_annotation
         let (id, new_env) =
           Env.enter_type ~scope:expansion_scope name.txt decl !!penv in
         Pattern_env.set_env penv new_env;
-        {name with txt = id}, Some jkind)
+        {name with txt = id}, jkind)
       name_list
   in
   let cty, ty, force =

@@ -281,7 +281,7 @@ let pat
         List.iter
           (fun (v, jkind) ->
              iter_loc sub v;
-             Option.iter (sub.jkind sub) jkind)
+             sub.jkind sub jkind)
           vs;
         sub.typ sub ct) vto
   | Tpat_variant (_, po, _) -> Option.iter (sub.pat sub) po
@@ -730,9 +730,7 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
       Option.iter (sub.jkind sub) jkind
   | Ttyp_variant (list, _, _) -> List.iter (sub.row_field sub) list
   | Ttyp_poly (vars, ct) ->
-      List.iter
-        (fun (_, l) -> Option.iter (sub.jkind sub) l)
-        vars;
+      List.iter (fun (_, l) -> sub.jkind sub l) vars;
       sub.typ sub ct
   | Ttyp_package pack -> sub.package_type sub pack
   | Ttyp_open (_, mod_ident, t) ->

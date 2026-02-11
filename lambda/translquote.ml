@@ -2635,7 +2635,7 @@ let rec quote_module_path loc = function
 let type_for_annotation ~env ~loc typ =
   let unwrap_univar ty =
     match get_desc ty with
-    | Tunivar { name = Some name; jkind } -> Some (name, Some jkind)
+    | Tunivar { name = Some name; jkind } -> Some (name, jkind)
     | Tunivar { name = None; jkind = _ } -> None
     | _ ->
       fatal_errorf
@@ -2656,8 +2656,8 @@ let type_for_annotation ~env ~loc typ =
         | Tvar { name = _; jkind } | Tof_kind jkind ->
           Ttyp_var (None, Some jkind)
         | Tunivar _ ->
-          let name, jkind_annotation = unwrap_univar ty |> Option.get in
-          Ttyp_var (Some name, jkind_annotation)
+          let name, jkind = unwrap_univar ty |> Option.get in
+          Ttyp_var (Some name, Some jkind)
         | Tarrow ((arg_label, _, _), ty, ty', _) ->
           Ttyp_arrow
             ( arg_label,

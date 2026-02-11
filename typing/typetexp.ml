@@ -176,7 +176,7 @@ module TyVarEnv : sig
   (* evaluate with a locally extended set of univars *)
 
   val ttyp_poly_arg :
-    poly_univars -> (string * Types.jkind_lr option) list
+    poly_univars -> (string * Types.jkind_lr) list
   (* something suitable as an argument to [Ttyp_poly] *)
 
   val make_poly_univars :
@@ -369,7 +369,7 @@ end = struct
 
   let ttyp_poly_arg (poly_univars : poly_univars) = List.map
       (fun (name, pending_univar, _stage) ->
-        name, Some pending_univar.jkind_info.original_jkind)
+        name, pending_univar.jkind_info.original_jkind)
       poly_univars
 
   let mk_pending_univar name jkind jkind_info =

@@ -382,8 +382,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
                 List.map
                   (fun (x, jkind) ->
                      {x with txt = Ident.name x.txt},
-                     Option.bind jkind
-                       Jkind.get_annotation)
+                     Jkind.get_annotation jkind)
                   vl
               in
               Some (vl, sub.typ sub ty)
@@ -1101,7 +1100,13 @@ let core_type sub ct =
     | Ttyp_variant (list, bool, labels) ->
         Ptyp_variant (List.map (sub.row_field sub) list, bool, labels)
     | Ttyp_poly (list, ct) ->
-        let bound_vars = List.map (var_jkind ~loc) list in
+        let bound_vars =
+          List.map
+            (fun (var, jkind) ->
+               mkloc var loc,
+               Jkind.get_annotation jkind)
+            list
+        in
         Ptyp_poly (bound_vars, sub.typ sub ct)
     | Ttyp_package pack -> Ptyp_package (sub.package_type sub pack)
     | Ttyp_open (_path, mod_ident, t) -> Ptyp_open (mod_ident, sub.typ sub t)

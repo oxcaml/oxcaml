@@ -334,8 +334,7 @@ let pat
         let vto = Option.map (fun (vl,cty) ->
           List.map
             (fun (v, jk) ->
-               map_loc sub v,
-               Option.map (sub.jkind sub) jk)
+               map_loc sub v, sub.jkind sub jk)
             vl, sub.typ sub cty) vto in
         Tpat_construct (map_loc sub loc, cd,
           List.map (sub.pat sub) l, vto)
@@ -1010,7 +1009,8 @@ let typ sub x =
     | Ttyp_variant (list, closed, labels) ->
         Ttyp_variant (List.map (sub.row_field sub) list, closed, labels)
     | Ttyp_poly (vars, ct) ->
-        Ttyp_poly (List.map (var_jkind sub) vars, sub.typ sub ct)
+        Ttyp_poly (List.map (fun (v, l) -> v, sub.jkind sub l) vars,
+                   sub.typ sub ct)
     | Ttyp_package pack ->
         Ttyp_package (sub.package_type sub pack)
     | Ttyp_open (path, mod_ident, t) ->
