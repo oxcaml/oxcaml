@@ -661,7 +661,7 @@ let mklb first ~loc (p, e, typ, modes, is_pun, poly) attrs =
     lb_expression = e;
     lb_constraint=typ;
     lb_is_pun = is_pun;
-    lb_poly = poly;
+    lb_is_poly = poly;
     lb_modes = modes;
     lb_attributes = attrs;
     lb_docs = symbol_docs_lazy loc;
@@ -688,7 +688,7 @@ let val_of_let_bindings ~loc lbs =
     List.map
       (fun lb ->
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
-           ~poly:lb.lb_poly
+           ~poly:lb.lb_is_poly
            ~modes:lb.lb_modes
            ~docs:(Lazy.force lb.lb_docs)
            ~text:(Lazy.force lb.lb_text)
