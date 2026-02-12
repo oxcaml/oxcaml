@@ -80,69 +80,6 @@ let run_parser_on_file ~start_symbol filename =
 let parse_fexpr filename =
   run_parser_on_file ~start_symbol:Parser.Incremental.flambda_unit filename
 
-let parse_expect_test_spec filename =
-  run_parser_on_file ~start_symbol:Parser.Incremental.expect_test_spec filename
-
-let text_of_reversed_lines rev_lines =
-  let rev_lines = "" :: rev_lines in
-  (* Add terminating newline to last line *)
-  String.concat "\n" (List.rev rev_lines)
-
-let after_line ~length (pos : Lexing.position) =
-  let pos_bol = pos.pos_bol + length in
-  (* include the newline *)
-  { pos with pos_lnum = pos.pos_lnum + 1; pos_bol; pos_cnum = pos_bol }
-
-let read_lines ~until ~pos ic =
-  let rec loop pos rev_lines =
-    match input_line ic with
-    | line ->
-      let pos = after_line pos ~length:(String.length line) in
-      if String.equal line until
-      then true, pos, text_of_reversed_lines rev_lines
-      else loop pos (line :: rev_lines)
-    | exception End_of_file -> false, pos, text_of_reversed_lines rev_lines
-  in
-  loop pos []
-
-let parse_markdown_doc filename =
-  let ic = open_in filename in
-  Misc.try_finally
-    ~always:(fun () -> close_in ic)
-    (fun () ->
-      let rec read_text pos rev_nodes =
-        let matched_block_start, pos, text =
-          read_lines ic ~until:"```flexpect" ~pos
-        in
-        let rev_nodes =
-          match text with
-          | "" -> rev_nodes
-          | _ -> (Text text : Fexpr.markdown_node) :: rev_nodes
-        in
-        if matched_block_start
-        then read_block pos rev_nodes
-        else Ok (List.rev rev_nodes)
-      and read_block pos rev_nodes =
-        let matched_block_end, end_pos, text =
-          read_lines ic ~until:"```" ~pos
-        in
-        if not matched_block_end
-        then
-          let loc = make_loc (end_pos, end_pos) in
-          Error (Parsing_error ("Unexpected EOF", loc))
-        else
-          Result.bind
-            (run_parser ~start_symbol:Parser.Incremental.expect_test_spec
-               ~start_pos:pos (Lexing.from_string text))
-            (fun test_spec ->
-              let rev_nodes : Fexpr.markdown_node list =
-                Expect test_spec :: rev_nodes
-              in
-              read_text end_pos rev_nodes)
-      in
-      let pos = initial_pos filename in
-      read_text pos [])
-
 let make_unit_info ~filename =
   Unit_info.make ~source_file:filename
     ~for_pack_prefix:Compilation_unit.Prefix.empty Impl filename

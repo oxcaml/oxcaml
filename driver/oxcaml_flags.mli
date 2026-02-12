@@ -190,11 +190,10 @@ module Flambda2 : sig
   module Dump : sig
     type target = Nowhere | Main_dump_stream | File of Misc.filepath
     type pass = Last_pass | This_pass of string
-    
+
     val rawfexpr : target ref
     val fexpr : target ref
     val fexpr_after : pass ref
-    val flexpect : target ref
     val fexpr_annot : bool ref
     val fexpr_annot_after : string list ref
     val slot_offsets : bool ref
