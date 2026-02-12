@@ -330,4 +330,7 @@ let hide_additions (st : global_map) =
 let is_defined_in_global_map (gmap : global_map) global =
   Global.Map.mem global gmap.tbl
 
+let fold_global_map f (gmap : global_map) init =
+  Global.Map.fold f gmap.tbl init
+
 let empty_global_map = GlobalMap.empty
