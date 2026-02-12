@@ -73,18 +73,8 @@ INSTALL_OCAMLNAT = @install_ocamlnat@
 DEP_CC=@DEP_CC@ -MM
 COMPUTE_DEPS=@compute_deps@
 
-<<<<<<< oxcaml
-# Build-system flags to use to compile C files
-OC_CFLAGS=@oc_cflags@
-OC_CPPFLAGS=-I$(ROOTDIR)/$(RUNTIME_DIR) @oc_cppflags@
-||||||| upstream-base
-# Build-system flags to use to compile C files
-OC_CFLAGS=@oc_cflags@
-OC_CPPFLAGS=-I$(ROOTDIR)/runtime @oc_cppflags@
-=======
 # Default flags to use to compile C files
 OC_CFLAGS = @oc_cflags@
->>>>>>> upstream-incoming
 
 # Flags to use when compiling C files to be linked with bytecode
 OC_BYTECODE_CFLAGS = @oc_bytecode_cflags@
@@ -94,7 +84,7 @@ OC_NATIVE_CFLAGS = @oc_native_cflags@
 
 # The submodules should be searched *before* any other external -I paths
 OC_INCLUDES = $(addprefix -I $(ROOTDIR)/, \
-  runtime @flexdll_source_dir@ @winpthreads_source_include_dir@)
+  $(RUNTIME_DIR) @flexdll_source_dir@ @winpthreads_source_include_dir@)
 OC_CPPFLAGS = $(OC_INCLUDES) @oc_cppflags@
 
 OC_BYTECODE_CPPFLAGS = $(OC_INCLUDES) @oc_bytecode_cppflags@

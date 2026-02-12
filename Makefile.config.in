@@ -163,21 +163,10 @@ CFLAGS=@CFLAGS@
 CPPFLAGS=@CPPFLAGS@
 BYTECODE_CFLAGS=@bytecode_cflags@
 
-<<<<<<< oxcaml
-OCAMLC_CPPFLAGS=@ocamlc_cppflags@
-ZSTD_LIBS=@zstd_libs@
-BYTECCLIBS=@zstd_libs@ @cclibs@
-EXE=@exeext@
-||||||| upstream-base
-OCAMLC_CPPFLAGS=@ocamlc_cppflags@
-BYTECCLIBS=@cclibs@
-EXE=@exeext@
-=======
 BYTECODE_CPPFLAGS=@bytecode_cppflags@
 ZSTD_LIBS=@zstd_libs@
 BYTECCLIBS=@zstd_libs@ @cclibs@
 EXE=@EXEEXT@
->>>>>>> upstream-incoming
 OUTPUTEXE=@outputexe@$(EMPTY)
 SUPPORTS_SHARED_LIBRARIES=@supports_shared_libraries@
 MKSHAREDLIBRPATH=@mksharedlibrpath@
