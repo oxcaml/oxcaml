@@ -389,24 +389,26 @@ let print_arg_label_and_out_type ppf (lbl : arg_label) ty ~print_type =
   | Position l -> fprintf ppf "%a:[%%call_pos]" print_lident l
   | Optional l -> fprintf ppf "?%a:%a" print_lident l print_type ty
 
+let pp_arg_zero_alloc ppf (zero_alloc : Zero_alloc.check option) =
+  match zero_alloc with
+  | None -> ()
+  | Some check ->
+    fprintf ppf "@ [@zero_alloc%s]" (Zero_alloc.check_payload_to_string check)
+
 let rec print_out_type_0 ppf =
   function
   | Otyp_alias {non_gen; aliased; alias } ->
     fprintf ppf "@[%a@ as %a@]"
       print_out_type_0 aliased
       (ty_var ~non_gen) alias
-  | Otyp_poly ([], ty) ->
-      print_out_type_0 ppf ty  (* no "." if there are no vars *)
   | Otyp_newlayout ([], ty) ->
       print_out_type_0 ppf ty  (* no "." if there are no vars *)
-  | Otyp_poly (sl, ty) ->
-      fprintf ppf "@[<hov 2>%a.@ %a@]"
-        pr_var_jkinds sl
-        print_out_type_0 ty
   | Otyp_newlayout (sl, ty) ->
       fprintf ppf "@[<hov 2>layout_ %a.@ %a@]"
         pr_sort_univars sl
         print_out_type_0 ty
+  | Otyp_poly _ as ty ->
+      print_poly_body ppf ty
   | Otyp_repr ([], ty) ->
       print_out_type_0 ppf ty  (* no "." if there are no vars *)
   | Otyp_repr (sl, ty) ->
@@ -420,13 +422,33 @@ let rec print_out_type_0 ppf =
    - It is an argument to a function ([~arg])
    - Or, there is at least one mode to print.
  *)
+and print_poly_body ppf = function
+  | Otyp_poly ([], ty, _) -> print_out_type_0 ppf ty
+  | Otyp_poly (sl, ty, _) ->
+      fprintf ppf "@[<hov 2>%a.@ %a@]"
+        pr_var_jkinds sl
+        print_out_type_0 ty
+  | _ -> assert false
+
 and print_out_type_mode ~arg mode ppf ty =
-  let parens =
-    is_initially_labeled_tuple ty && arg
+  let zero_alloc = match ty with
+    | Otyp_poly (_, _, za) -> za
+    | _ -> None
   in
+  let has_zero_alloc = Option.is_some zero_alloc in
+  let parens = (is_initially_labeled_tuple ty || has_zero_alloc) && arg in
   if parens then
     pp_print_char ppf '(';
-  print_out_type_2 ppf ty;
+  (match ty with
+   | Otyp_poly ([], inner, _) ->
+     (* Peel the empty-vars Otyp_poly so that print_out_type_2 can decide
+        whether the inner type needs its own parens (e.g. arrows get them,
+        simple constrs do not), rather than unconditionally wrapping
+        the whole Otyp_poly node in parens. *)
+     print_out_type_2 ppf inner
+   | _ -> print_out_type_2 ppf ty);
+  if has_zero_alloc then
+    pp_arg_zero_alloc ppf zero_alloc;
   if parens then
     pp_print_char ppf ')';
   print_out_modes ppf mode
@@ -435,7 +457,8 @@ and print_out_type_1 ppf =
   function
   | Otyp_arrow (lab, am, ty1, ty2) ->
       pp_open_box ppf 0;
-      print_arg_label_and_out_type ppf lab ty1 ~print_type:(print_out_arg am);
+      print_arg_label_and_out_type ppf lab ty1
+        ~print_type:(print_out_arg am);
       pp_print_string ppf " ->";
       pp_print_space ppf ();
       print_out_ret ppf ty2;
@@ -457,7 +480,8 @@ and print_out_ret ppf =
       pp_print_char ppf ')';
       print_out_modes ppf rm
     end
-  | Otyp_ret (Orm_any rm, ty) -> print_out_type_mode ~arg:false rm ppf ty
+  | Otyp_ret (Orm_any rm, ty) ->
+    print_out_type_mode ~arg:false rm ppf ty
   | _ -> assert false
 
 and print_out_type_2 ppf =

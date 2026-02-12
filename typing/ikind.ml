@@ -443,7 +443,7 @@ module Solver = struct
       | Types.Tlink _ -> failwith "Tlink shouldn't appear in kind"
       | Types.Tsubst _ -> failwith "Tsubst shouldn't appear in kind"
       | Types.Trepr (ty, _sort_vars) -> kind ~use_tables:true ctx ty
-      | Types.Tpoly (ty, univars) ->
+      | Types.Tpoly (ty, univars, _zero_alloc) ->
         (* CR ikinds: this is sound but not fully precise.
           Internal ticket 5746. *)
         let ty = !instance_poly_for_jkind' univars ty in

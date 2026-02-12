@@ -69,7 +69,7 @@ let rec batch_add_subst args vals subst =
    links, and [@@unboxed] types. The returned type will therefore be none
    of these cases (except in case of missing cmis). *)
 let scrape_ty env ty =
-  let ty = match get_desc ty with Tpoly (ty, _) -> ty | _ -> ty in
+  let ty = match get_desc ty with Tpoly (ty, _, _) -> ty | _ -> ty in
   match get_desc ty with
   | Tconstr _ -> (
     let ty = Ctype.correct_levels ty in
@@ -85,7 +85,7 @@ let scrape_ty env ty =
 
 let scrape_poly env ty =
   let ty = scrape_ty env ty in
-  match get_desc ty with Tpoly (ty, _) -> get_desc ty | d -> d
+  match get_desc ty with Tpoly (ty, _, _) -> get_desc ty | d -> d
 
 type classification =
   | Int (* any immediate type *)

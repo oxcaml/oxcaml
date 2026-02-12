@@ -2806,7 +2806,7 @@ let type_for_annotation ~env ~loc typ =
               Typemode.transl_alloc_mode [],
               go ty',
               Typemode.transl_alloc_mode [] )
-        | Tpoly (ty, tyl) -> (
+        | Tpoly (ty, tyl, _za) -> (
           let cty = go ty in
           match List.filter_map unwrap_univar tyl with
           | [] -> cty.ctyp_desc

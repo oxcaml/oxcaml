@@ -228,7 +228,8 @@ let rec add_native_repr_attributes ty attrs =
   match ty, attrs with
     (* Otyp_poly and Otyp_newlayout case might have been added in e.g.
        tree_of_value_description *)
-  | Otyp_poly (vars, ty), _ -> Otyp_poly (vars, add_native_repr_attributes ty attrs)
+  | Otyp_poly (vars, ty, zero_alloc), _ ->
+    Otyp_poly (vars, add_native_repr_attributes ty attrs, zero_alloc)
   | Otyp_newlayout (vars, ty), _ ->
     Otyp_newlayout (vars, add_native_repr_attributes ty attrs)
   | Otyp_arrow (label, am, a, Otyp_ret (rm, r)), attr_l :: rest ->

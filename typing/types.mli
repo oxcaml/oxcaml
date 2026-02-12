@@ -242,10 +242,13 @@ and type_desc =
   (** Occurrence of a type variable introduced by a
       forall quantifier / [Tpoly]. *)
 
-  | Tpoly of type_expr * type_expr list
-  (** [Tpoly (ty,tyl)] ==> ['a1... 'an. ty],
+  | Tpoly of type_expr * type_expr list * Zero_alloc.check option
+  (** [Tpoly (ty,tyl,za)] ==> ['a1... 'an. ty],
       where 'a1 ... 'an are names given to types in tyl
-      and occurrences of those types in ty. *)
+      and occurrences of those types in ty;
+      za is relevant when placed on a function parameter, where it states
+      zero_alloc assumption when used in the function body and expectations
+      on the actual parameter *)
 
   | Trepr of type_expr * Jkind_types.Sort.univar list
   (** [Trepr (ty, sl)] represents layout polymorphism (from [repr_] syntax).

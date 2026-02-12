@@ -734,7 +734,7 @@ and raw_type_desc ppf = function
   | Tunivar { name; jkind } ->
       fprintf ppf "Tunivar (@,%a,@,%a)"
         print_name name (Jkind.format !printing_env) jkind
-  | Tpoly (t, tl) ->
+  | Tpoly (t, tl, _za) ->
       fprintf ppf "@[<hov1>Tpoly(@,%a,@,%a)@]"
         raw_type t
         raw_type_list tl
@@ -1355,7 +1355,7 @@ let rec mark_loops_rec visited ty =
             visited_objects := px :: !visited_objects;
           printer_iter_type_expr (mark_loops_rec visited) ty
         end
-    | Tpoly(ty, tyl) ->
+    | Tpoly(ty, tyl, _) ->
         List.iter add_alias tyl;
         mark_loops_rec visited ty
     | _ ->
@@ -1662,9 +1662,11 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_stuff "<Tsubst>"
     | Tlink _ ->
         fatal_error "Printtyp.tree_of_typexp"
-    | Tpoly (ty, []) | Trepr (ty, []) ->
+    | Tpoly (ty, [], None) ->
         tree_of_typexp mode alloc_mode ty
-    | Tpoly (ty, tyl) ->
+    | Tpoly (ty, [], za) ->
+        Otyp_poly ([], tree_of_typexp mode alloc_mode ty, za)
+    | Tpoly (ty, tyl, za) ->
         (*let print_names () =
           List.iter (fun (_, name) -> prerr_string (name ^ " ")) !names;
           prerr_string "; " in *)
@@ -1674,15 +1676,19 @@ let rec tree_of_modal_typexp mode modal ty =
            printed once when used as proxy *)
         List.iter add_delayed tyl;
         let tl = tree_of_qtvs tyl in
-        let tr = Otyp_poly (tl, tree_of_typexp mode alloc_mode ty) in
+        let tr =
+          Otyp_poly (tl, tree_of_typexp mode alloc_mode ty, za)
+        in
         (* Forget names when we leave scope *)
         Names.remove_names tyl;
         delayed := old_delayed; tr
+    | Trepr (ty, []) ->
+        tree_of_typexp mode alloc_mode ty
     | Trepr (ty, sort_vars) ->
         (* Trepr wraps a Tpoly that contains the type variables
            corresponding to the sort variables. Extract them and print. *)
         (match get_desc ty with
-         | Tpoly (inner_ty, (_ :: _ as tyl))  ->
+         | Tpoly (inner_ty, (_ :: _ as tyl), _za)  ->
              (* Check that the sort_vars match the jkinds of tyl *)
              let sorts_match =
                match
@@ -2413,8 +2419,32 @@ let extension_only_constructor id ppf ext =
       ocstr_return_type = ret;
     }
 
-(* Print a value declaration *)
+(* Print zero alloc information, if any *)
+let tree_of_zero_alloc zero_alloc apparent_arity =
+  let open Zero_alloc in
+  match zero_alloc with
+  | Default_zero_alloc | Ignore_assert_all -> None
+  | Check ({ custom_error_msg; _ } as check) ->
+    Some { oattr_name =
+         String.concat ""
+           ["zero_alloc";
+            Zero_alloc.check_payload_to_string ~apparent_arity check;
+            match custom_error_msg with
+            | None -> ""
+            | Some msg -> Printf.sprintf " custom_error_message %S" msg
+           ] }
+  | Assume { strict; never_returns_normally; arity; _ } ->
+    Some { oattr_name =
+         String.concat ""
+           ["zero_alloc assume";
+            if strict then " strict" else "";
+            if never_returns_normally then " never_returns_normally" else "";
+            if arity = apparent_arity then "" else
+              Printf.sprintf " arity %d" arity;
+           ]
+     }
 
+(* Print a value declaration *)
 let tree_of_value_description id decl =
   (* Format.eprintf "@[%a@]@." raw_type_expr decl.val_type; *)
   let id = Ident.name id in
@@ -2445,34 +2475,12 @@ let tree_of_value_description id decl =
     count 0 decl.val_type
   in
   let attrs =
-    match Zero_alloc.get decl.val_zero_alloc with
-    | Default_zero_alloc | Ignore_assert_all -> []
-    | Check { strict; opt; arity; custom_error_msg; loc = _; } ->
-      [{ oattr_name =
-           String.concat ""
-             ["zero_alloc";
-              if strict then " strict" else "";
-              if opt then " opt" else "";
-              if arity = apparent_arity then "" else
-                Printf.sprintf " arity %d" arity;
-              match custom_error_msg with
-              | None -> ""
-              | Some msg -> Printf.sprintf " custom_error_message %S" msg
-             ] }]
-    | Assume { strict; never_returns_normally; arity; _ } ->
-      [{ oattr_name =
-           String.concat ""
-             ["zero_alloc assume";
-              if strict then " strict" else "";
-              if never_returns_normally then " never_returns_normally" else "";
-              if arity = apparent_arity then "" else
-                Printf.sprintf " arity %d" arity;
-             ]
-       }]
+    Option.to_list
+      (tree_of_zero_alloc (Zero_alloc.get decl.val_zero_alloc) apparent_arity)
   in
   let vd =
     { oval_name = id;
-      oval_type = Otyp_newlayout(qsvs, Otyp_poly(qtvs, ty));
+      oval_type = Otyp_newlayout(qsvs, Otyp_poly(qtvs, ty, None));
       oval_modalities = tree_of_modalities Immutable moda;
       oval_prims = [];
       oval_attributes = attrs
@@ -2492,7 +2500,7 @@ let value_description id ppf decl =
 
 let method_type priv ty =
   match priv, get_desc ty with
-  | Mpublic, Tpoly(ty, tyl) -> (ty, tyl)
+  | Mpublic, Tpoly(ty, tyl, _) -> (ty, tyl)
   | _ , _ -> (ty, [])
 
 let prepare_method _lab (priv, _virt, ty) =
@@ -2508,7 +2516,7 @@ let tree_of_method mode (lab, priv, virt, ty) =
   Names.remove_names tyl;
   let priv = priv <> Mpublic in
   let virt = virt = Virtual in
-  Ocsg_method (lab, priv, virt, Otyp_poly(qtvs, tty))
+  Ocsg_method (lab, priv, virt, Otyp_poly(qtvs, tty, None))
 
 let rec prepare_class_type params = function
   | Cty_constr (_p, tyl, cty) ->
@@ -3220,7 +3228,7 @@ let print_tags ppf tags  =
   Fmt.(pp_print_list ~pp_sep:comma) print_tag ppf tags
 
 let is_unit_arg env ty =
-  let ty, vars = tpoly_get_poly ty in
+  let ty, vars, _ = tpoly_get_poly ty in
   if vars <> [] then false
   else begin
     match get_desc (Ctype.expand_head env ty) with
@@ -3444,6 +3452,8 @@ let explanation (type variety) intro prev env
       Some (doc_printf "@ because their kinds are different.\
                      @ @[<v>%t@;%t@]"
               (fmt_history "the first" k1) (fmt_history "the second" k2))
+  | Errortrace.Incompatible_zero_alloc e ->
+      Some(doc_printf "@,@[%a@]" Zero_alloc.print_error e)
 
 let mismatch intro env trace =
   Errortrace.explain trace (fun ~prev h -> explanation intro prev env h)
@@ -3506,7 +3516,7 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
            | Unequal_tof_kind_jkinds _) ->
         true
     | Some (Diff _ | Escape _ | Variant _ | Obj _ | Incompatible_fields _
-           | Rec_occur _)
+           | Rec_occur _ | Incompatible_zero_alloc _)
     | None ->
         false
   in

@@ -4750,7 +4750,7 @@ optional_atat_modalities_expr:
   | expr { $1 }
   | stack(expr) { $1 }
 
-%inline param_type:
+poly_param_type:
   | mktyp(
     LPAREN bound_vars = typevar_list DOT inner_type = core_type RPAREN
       { Ptyp_poly (bound_vars, inner_type) }
@@ -4766,8 +4766,13 @@ optional_atat_modalities_expr:
       { Ptyp_newlayout (bound_vars, inner_type) }
     )
     { $1 }
-  | ty = tuple_type
-    { ty }
+  | ty = poly_param_type attr = attribute
+    { Typ.attr ty attr }
+;
+
+%inline param_type:
+  | poly_param_type { $1 }
+  | ty = tuple_type { ty }
 ;
 
 (* Tuple types include:

@@ -195,6 +195,11 @@ type error =
   | Mismatched_jkind_annotation of
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Lpoly_unsupported
+  | Must_provide_zero_alloc_arity
+  | Invalid_payload_arg_zero_alloc
+  | Zero_alloc_on_optional_param
+  | Zero_alloc_attr_non_function
+  | Zero_alloc_arity_mismatch of int * int
 
 exception Error of Location.t * Env.t * error
 

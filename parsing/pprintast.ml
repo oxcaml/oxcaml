@@ -1349,10 +1349,10 @@ and class_field ctxt f x =
         (override ovf)
         private_flag pf
         (fun f -> function
-           | {pexp_desc=Pexp_poly (e, Some ct); pexp_attributes=[]; _} ->
+           | {pexp_desc=Pexp_poly (e, Some ct); _} ->
                pp f "%a :@;%a=@;%a"
                  ident_of_name s.txt (core_type ctxt) ct (expression ctxt) e
-           | {pexp_desc=Pexp_poly (e, None); pexp_attributes=[]; _} ->
+           | {pexp_desc=Pexp_poly (e, None); _} ->
                bind e
            | _ -> bind e) e
         (item_attributes ctxt) x.pcf_attributes
