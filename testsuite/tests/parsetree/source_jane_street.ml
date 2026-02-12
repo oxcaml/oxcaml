@@ -1743,3 +1743,32 @@ Line 1, characters 0-39:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The "let poly_" annotation is not yet implemented.
 |}]
+
+(* Mixed poly and non-poly in mutually recursive bindings *)
+let poly_ f : 'a. 'a -> 'a = fun x -> x
+and g = fun x -> x
+[%%expect{|
+Line 1, characters 0-39:
+1 | let poly_ f : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "let poly_" annotation is not yet implemented.
+|}]
+
+let h = fun x -> x
+and poly_ k : 'a. 'a -> 'a = fun x -> x
+[%%expect{|
+Line 2, characters 0-39:
+2 | and poly_ k : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "let poly_" annotation is not yet implemented.
+|}]
+
+let m = fun x -> x
+and poly_ n : 'a. 'a -> 'a = fun x -> x
+and p = fun x -> x
+[%%expect{|
+Line 2, characters 0-39:
+2 | and poly_ n : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "let poly_" annotation is not yet implemented.
+|}]
