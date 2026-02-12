@@ -250,12 +250,12 @@ let modes_toplevel =
 
 (* Inclusion between value descriptions *)
 
-let value_descriptions ~loc env ~direction subst id ~mmodes vd1 vd2 =
+let value_descriptions ~loc env ~direction subst id ~on_function_argument ~mmodes vd1 vd2 =
   if Directionality.mark_as_used direction then
     Env.mark_value_used vd1.val_uid;
   let vd2 = Subst.value_description subst vd2 in
   try
-    Ok (Includecore.value_descriptions ~loc env (Ident.name id) ~mmodes vd1 vd2)
+    Ok (Includecore.value_descriptions ~loc env (Ident.name id) ~on_function_argument ~mmodes vd1 vd2)
   with Includecore.Dont_match err ->
     Error Error.(Core (Value_descriptions (mdiff vd1 vd2 mmodes err)))
 
@@ -950,7 +950,7 @@ and signature_components :
         match sigi1, sigi2 with
         | Sig_value(id1, valdecl1, _) ,Sig_value(_id2, valdecl2, _) ->
             let item =
-              value_descriptions ~loc ~direction env subst id1 ~mmodes
+              value_descriptions ~loc ~direction env subst id1 ~on_function_argument:false ~mmodes
                 (Subst.Lazy.force_value_description valdecl1)
                 (Subst.Lazy.force_value_description valdecl2)
             in

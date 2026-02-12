@@ -48,7 +48,7 @@ exception Error of Location.t * error
 let scrape_ty env ty =
   let ty =
     match get_desc ty with
-    | Tpoly(ty, _) -> ty
+    | Tpoly(ty, _, _) -> ty
     | _ -> ty
   in
   match get_desc ty with
@@ -74,7 +74,7 @@ let scrape env ty =
 let scrape_poly env ty =
   let ty = scrape_ty env ty in
   match get_desc ty with
-  | Tpoly (ty, _) -> get_desc ty
+  | Tpoly (ty, _, _) -> get_desc ty
   | d -> d
 
 let is_function_type env ty =

@@ -984,7 +984,7 @@ let parse_zero_alloc_payload ~loc ~arity ~custom_error_message
     | None -> warn ();  Default_zero_alloc
     | Some ca -> ca arity loc custom_error_message
 
-let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr =
+let parse_zero_alloc_attribute ~in_signature ~on_application ~on_function_argument ~default_arity attr =
   match attr with
   | None -> Default_zero_alloc
   | Some {Parsetree.attr_name = {txt; loc}; attr_payload = payload} ->
@@ -1031,12 +1031,12 @@ let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr
         match filter_arity payload with
         | None -> default_arity, payload
         | Some (user_arity, payload) ->
-          if in_signature then
+          if in_signature || on_function_argument then
             user_arity, payload
           else
             (warn_payload loc txt
                "The \"arity\" field is only supported on \"zero_alloc\" in \
-                signatures";
+                signatures or on function arguments";
              default_arity, payload)
       in
       let _, payload = List.split payload in
@@ -1077,11 +1077,11 @@ let parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity attr
             Default_zero_alloc)
 
 
-let get_zero_alloc_attribute ~in_signature ~on_application ~default_arity l =
+let get_zero_alloc_attribute ~in_signature ~on_application ~on_function_argument ~default_arity l =
   let attr = select_attribute is_zero_alloc_attribute l in
   let res =
-      parse_zero_alloc_attribute ~in_signature ~on_application ~default_arity
-        attr
+      parse_zero_alloc_attribute ~in_signature ~on_application ~on_function_argument
+        ~default_arity attr
   in
   (match attr, res with
    | None, Default_zero_alloc -> ()

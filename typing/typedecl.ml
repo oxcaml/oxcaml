@@ -517,7 +517,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
     List.map
       (fun ld ->
          let ty = ld.ld_type.ctyp_type in
-         let ty = match get_desc ty with Tpoly(t,[]) -> t | _ -> ty in
+         let ty = match get_desc ty with Tpoly(t,[],_) -> t | _ -> ty in
          check_representable ~why:(Label_declaration ld.ld_id)
            env ld.ld_loc kloc ty;
          {Types.ld_id = ld.ld_id;
@@ -1356,7 +1356,7 @@ let rec check_constraints_rec env loc visited ty =
         | All_good -> ()
       end;
       List.iter (check_constraints_rec env loc visited) args
-  | Tpoly (ty, tl) ->
+  | Tpoly (ty, tl, _za) ->
       let ty = Ctype.instance_poly tl ty in
       check_constraints_rec env loc visited ty
   | _ ->
@@ -2705,7 +2705,7 @@ let check_regularity ~abs_env env loc path decl to_check =
             with Not_found -> ()
           end;
           List.iter (check_subtype cpath args prev_exp trace ty) args'
-      | Tpoly (ty, tl) ->
+      | Tpoly (ty, tl, _) ->
           let ty = Ctype.instance_poly ~keep_names:true tl ty in
           check_regular cpath args prev_exp trace ty
       | _ ->
@@ -3724,7 +3724,7 @@ let rec parse_native_repr_attributes env core_type ty rmode
     raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type kind))
   | Ptyp_arrow (_, ct1, ct2, _, _), Tarrow ((_,marg,mret), t1, t2, _), _
     when not (Builtin_attributes.has_curry core_type.ptyp_attributes) ->
-    let t1, _ = Btype.tpoly_get_poly t1 in
+    let t1, _, _ = Btype.tpoly_get_poly t1 in
     let repr_arg =
       make_native_repr
         env ct1 t1 ~global_repr
@@ -3765,7 +3765,7 @@ let check_unboxable env loc ty =
         if tydecl.type_unboxed_default then
           Path.Set.add p acc
         else acc
-      | Tpoly (ty, []) -> check_type acc ty
+      | Tpoly (ty, [], _za) -> check_type acc ty
       | _ -> acc
     with Not_found -> acc
   in
@@ -3942,6 +3942,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
       let zero_alloc =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:true
           ~on_application:false
+          ~on_function_argument:false
           ~default_arity valdecl.pval_attributes
       in
       let zero_alloc =

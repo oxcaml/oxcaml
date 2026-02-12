@@ -90,6 +90,8 @@ type 'variety variant =
   (* Equality & Moregen *)
   | Presence_not_guaranteed_for : position * string -> comparison variant
   | Openness : position (* Always [Second] for Moregen *) -> comparison variant
+  (* Zero alloc *)
+  | Incompatible_zero_alloc : _ variant
 
 type 'variety obj =
   (* Common *)

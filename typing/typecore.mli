@@ -71,6 +71,7 @@ type pattern_variable =
     pv_as_var: bool;
     pv_attributes: Typedtree.attributes;
     pv_sort: Jkind.Sort.t;
+    pv_zero_alloc: Zero_alloc.t;
   }
 
 val mk_expected:
@@ -343,6 +344,8 @@ type error =
   | Unexpected_hole
   | Eval_format
   | Let_poly_not_yet_implemented
+  | Wrong_arg_zero_alloc of Zero_alloc.error
+  | Unsupported_arg_zero_alloc
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

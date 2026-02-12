@@ -91,7 +91,7 @@ val new_global_var: ?name:string -> jkind_lr -> type_expr
            (as type variables ['a] in type constraints). *)
 val newobj: type_expr -> type_expr
 val newconstr: Path.t -> type_expr list -> type_expr
-val newmono : type_expr -> type_expr
+val newmono : zero_alloc:Zero_alloc.t -> type_expr -> type_expr
 val none: type_expr
         (* A dummy type expression *)
 
@@ -313,7 +313,8 @@ type filtered_arrow =
     ret_mode : Mode.Alloc.lr
   }
 
-val filter_arrow: Env.t -> type_expr -> arg_label -> force_tpoly:bool ->
+val filter_arrow: Env.t -> type_expr -> arg_label ->
+                  force_tpoly:bool -> zero_alloc:Zero_alloc.t ->
                   filtered_arrow
         (* A special case of unification (with l:'a -> 'b). If
            [force_poly] is false then the usual invariant that the

@@ -732,7 +732,7 @@ and raw_type_desc ppf = function
   | Tunivar { name; jkind } ->
       fprintf ppf "Tunivar (@,%a,@,%a)"
         print_name name (Jkind.format !printing_env) jkind
-  | Tpoly (t, tl) ->
+  | Tpoly (t, tl, _za) ->
       fprintf ppf "@[<hov1>Tpoly(@,%a,@,%a)@]"
         raw_type t
         raw_type_list tl
@@ -1352,7 +1352,7 @@ let rec mark_loops_rec visited ty =
             visited_objects := px :: !visited_objects;
           printer_iter_type_expr (mark_loops_rec visited) ty
         end
-    | Tpoly(ty, tyl) ->
+    | Tpoly(ty, tyl, _) ->
         List.iter add_alias tyl;
         mark_loops_rec visited ty
     | _ ->
@@ -1535,7 +1535,7 @@ type typvariant_repr = {
   tags : string list option
 }
 
-let rec tree_of_modal_typexp mode modal ty =
+let rec tree_of_modal_typexp ?(zero_alloc=Zero_alloc.Default_zero_alloc) mode modal ty =
   let not_arrow tree =
     match modal with
     | Arrow_return {mode; _} ->
@@ -1581,7 +1581,7 @@ let rec tree_of_modal_typexp mode modal ty =
         let acc_mode = curry_mode alloc_mode arg_mode in
         let modal = Arrow_return {acc = acc_mode; mode = mret} in
         let t2 = tree_of_modal_typexp mode modal ty2 in
-        Otyp_arrow (lab, tree_of_modes arg_mode, t1, t2)
+        Otyp_arrow (lab, zero_alloc, tree_of_modes arg_mode, t1, t2)
     | Ttuple labeled_tyl ->
         Otyp_tuple (tree_of_labeled_typlist mode labeled_tyl)
     | Tunboxed_tuple labeled_tyl ->
@@ -1632,27 +1632,31 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_stuff "<Tsubst>"
     | Tlink _ ->
         fatal_error "Printtyp.tree_of_typexp"
-    | Tpoly (ty, []) | Trepr (ty, []) ->
-        tree_of_typexp mode alloc_mode ty
-    | Tpoly (ty, tyl) ->
+    | Tpoly (ty, [], zero_alloc) ->
+        let zero_alloc = Zero_alloc.get zero_alloc in
+        tree_of_typexp ~zero_alloc mode alloc_mode ty
+    | Tpoly (ty, tyl, zero_alloc) ->
         (*let print_names () =
           List.iter (fun (_, name) -> prerr_string (name ^ " ")) !names;
           prerr_string "; " in *)
+        let zero_alloc = Zero_alloc.get zero_alloc in
         let tyl = List.map Transient_expr.repr tyl in
         let old_delayed = !delayed in
         (* Make the names delayed, so that the real type is
            printed once when used as proxy *)
         List.iter add_delayed tyl;
         let tl = tree_of_qtvs tyl in
-        let tr = Otyp_poly (tl, tree_of_typexp mode alloc_mode ty) in
+        let tr = Otyp_poly (tl, tree_of_typexp ~zero_alloc mode alloc_mode ty) in
         (* Forget names when we leave scope *)
         Names.remove_names tyl;
         delayed := old_delayed; tr
+    | Trepr (ty, []) ->
+        tree_of_typexp mode alloc_mode ty
     | Trepr (ty, sort_vars) ->
         (* Trepr wraps a Tpoly that contains the type variables
            corresponding to the sort variables. Extract them and print. *)
         (match get_desc ty with
-         | Tpoly (inner_ty, (_ :: _ as tyl))  ->
+         | Tpoly (inner_ty, (_ :: _ as tyl), _za)  ->
              (* Check that the sort_vars match the jkinds of tyl *)
              let sorts_match =
                match
@@ -1723,8 +1727,8 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_ret (rm, ty)
     | Other m -> pr_typ m
 
-and tree_of_typexp mode alloc_mode ty =
-  tree_of_modal_typexp mode (Other alloc_mode) ty
+and tree_of_typexp ?(zero_alloc=Zero_alloc.Default_zero_alloc) mode alloc_mode ty =
+  tree_of_modal_typexp mode (Other alloc_mode) ~zero_alloc ty
 
 (* qtvs = quantified type variables *)
 (* this silently drops any arguments that are not generic Tvar or Tunivar *)
@@ -2369,8 +2373,35 @@ let extension_only_constructor id ppf ext =
       ocstr_return_type = ret;
     }
 
-(* Print a value declaration *)
+(* Print zero alloc information, if any *)
+let tree_of_zero_alloc zero_alloc apparent_arity =
+  let open Zero_alloc in
+  match zero_alloc with
+  | Default_zero_alloc | Ignore_assert_all -> None
+  | Check { strict; opt; arity; custom_error_msg; loc = _; } ->
+    Some { oattr_name =
+         String.concat ""
+           ["zero_alloc";
+            if strict then " strict" else "";
+            if opt then " opt" else "";
+            if arity = apparent_arity then "" else
+              Printf.sprintf " arity %d" arity;
+            match custom_error_msg with
+            | None -> ""
+            | Some msg -> Printf.sprintf " custom_error_message %S" msg
+           ] }
+  | Assume { strict; never_returns_normally; arity; _ } ->
+    Some { oattr_name =
+         String.concat ""
+           ["zero_alloc assume";
+            if strict then " strict" else "";
+            if never_returns_normally then " never_returns_normally" else "";
+            if arity = apparent_arity then "" else
+              Printf.sprintf " arity %d" arity;
+           ]
+     }
 
+(* Print a value declaration *)
 let tree_of_value_description id decl =
   (* Format.eprintf "@[%a@]@." raw_type_expr decl.val_type; *)
   let id = Ident.name id in
@@ -2395,30 +2426,8 @@ let tree_of_value_description id decl =
     count 0 decl.val_type
   in
   let attrs =
-    match Zero_alloc.get decl.val_zero_alloc with
-    | Default_zero_alloc | Ignore_assert_all -> []
-    | Check { strict; opt; arity; custom_error_msg; loc = _; } ->
-      [{ oattr_name =
-           String.concat ""
-             ["zero_alloc";
-              if strict then " strict" else "";
-              if opt then " opt" else "";
-              if arity = apparent_arity then "" else
-                Printf.sprintf " arity %d" arity;
-              match custom_error_msg with
-              | None -> ""
-              | Some msg -> Printf.sprintf " custom_error_message %S" msg
-             ] }]
-    | Assume { strict; never_returns_normally; arity; _ } ->
-      [{ oattr_name =
-           String.concat ""
-             ["zero_alloc assume";
-              if strict then " strict" else "";
-              if never_returns_normally then " never_returns_normally" else "";
-              if arity = apparent_arity then "" else
-                Printf.sprintf " arity %d" arity;
-             ]
-       }]
+    Option.to_list
+      (tree_of_zero_alloc (Zero_alloc.get decl.val_zero_alloc) apparent_arity)
   in
   let vd =
     { oval_name = id;
@@ -2442,7 +2451,7 @@ let value_description id ppf decl =
 
 let method_type priv ty =
   match priv, get_desc ty with
-  | Mpublic, Tpoly(ty, tyl) -> (ty, tyl)
+  | Mpublic, Tpoly(ty, tyl, _) -> (ty, tyl)
   | _ , _ -> (ty, [])
 
 let prepare_method _lab (priv, _virt, ty) =
@@ -3167,7 +3176,7 @@ let print_tags ppf tags  =
   Fmt.(pp_print_list ~pp_sep:comma) print_tag ppf tags
 
 let is_unit_arg env ty =
-  let ty, vars = tpoly_get_poly ty in
+  let ty, vars, _ = tpoly_get_poly ty in
   if vars <> [] then false
   else begin
     match get_desc (Ctype.expand_head env ty) with
@@ -3265,6 +3274,9 @@ let explain_variant (type variety) : variety Errortrace.variant -> _ = function
       Some(doc_printf "@,The %a variant type is open and the %a is not"
              Errortrace.print_pos pos
              Errortrace.print_pos (Errortrace.swap_position pos))
+  (* Zero alloc *)
+  | Errortrace.Incompatible_zero_alloc ->
+      Some(doc_printf "@,@[Zero-alloc attributes are incompatible@]")
 
 let explain_escape pre = function
   | Errortrace.Univ u ->
