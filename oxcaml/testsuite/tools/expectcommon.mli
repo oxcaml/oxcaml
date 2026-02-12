@@ -41,8 +41,7 @@ module type Toplevel = sig
 end
 
 (** Hook to capture assembly output for [%%expect_asm]. This function should be
-    set by expectnat.ml. It takes a thunk that executes the phrase and returns
-    the filtered assembly string. *)
+    set by expectnat.ml. *)
 val register_assembly_callback : ((string -> unit) -> unit) option ref
 
 val read_anonymous_arg : object_extensions:string list -> string -> unit

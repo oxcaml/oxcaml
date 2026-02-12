@@ -69,7 +69,7 @@ let match_expect_extension (ext : Parsetree.extension) =
     | Some kind ->
     let invalid_payload
         ?(loc=extid_loc)
-        ?(msg = "invalid [%%expect payload]")
+        ?(msg = (Printf.sprintf "invalid [%%%%%s payload]" txt))
         () =
       Location.raise_errorf ~loc "%s" msg
     in
@@ -186,26 +186,22 @@ let split_chunks phrases =
         (List.rev acc, None)
       else
         (List.rev acc, Some (List.rev code_acc))
+    | Ptop_def [] :: phrases -> loop phrases code_acc expect_acc acc
     | phrase :: phrases ->
-      match phrase with
-      | Ptop_def [] -> loop phrases code_acc expect_acc acc
-      | Ptop_def [{pstr_desc = Pstr_extension(ext, [])}] -> begin
-          match match_expect_extension ext with
-          | None -> loop phrases (phrase :: code_acc) expect_acc acc
-          | Some expectation ->
-            loop phrases code_acc (expectation :: expect_acc) acc
-        end
-      | _ -> begin
-        match expect_acc with
-        | [] -> loop phrases (phrase :: code_acc) [] acc
-        | _ ->
-          let chunk =
-            { phrases = List.rev code_acc
-            ; expectations = List.rev expect_acc
-            }
-          in
-          loop phrases [phrase] [] (chunk :: acc)
-      end
+      let expectation = match phrase with
+        | Ptop_def [{pstr_desc = Pstr_extension(ext, [])}] -> match_expect_extension ext
+        | _ -> None
+      in match expectation with
+        | Some expectation -> loop phrases code_acc (expectation :: expect_acc) acc
+        | None -> match expect_acc with
+          | [] -> loop phrases (phrase :: code_acc) [] acc
+          | _ ->
+            let chunk =
+              { phrases = List.rev code_acc
+              ; expectations = List.rev expect_acc
+              }
+            in
+            loop phrases [phrase] [] (chunk :: acc)
   in
   loop phrases [] [] []
 
