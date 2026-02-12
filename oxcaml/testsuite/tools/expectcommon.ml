@@ -35,7 +35,7 @@ type expectation =
 
 (* A list of phrases with the expected toplevel output *)
 type chunk =
-  { phrases     : Parsetree.toplevel_phrase list
+  { phrases      : Parsetree.toplevel_phrase list
   ; expectations : expectation list
   }
 

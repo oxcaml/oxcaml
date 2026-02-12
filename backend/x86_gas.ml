@@ -257,9 +257,16 @@ let format_asm_for_expect_asm ~name ~body =
   bprintf buf "%s:\n" name;
   List.iter
     (fun line ->
-      let line_buf = Buffer.create 128 in
-      print_line line_buf line;
-      Buffer.add_string buf (tabs_to_spaces (Buffer.contents line_buf));
-      Buffer.add_char buf '\n')
+      let should_output =
+        match[@warning "-4"] line with
+        | Ins _ | Directive (New_label _) -> true
+        | Directive _ -> false
+      in
+      if should_output
+      then (
+        let line_buf = Buffer.create 128 in
+        print_line line_buf line;
+        Buffer.add_string buf (tabs_to_spaces (Buffer.contents line_buf));
+        Buffer.add_char buf '\n'))
     body;
   Buffer.contents buf

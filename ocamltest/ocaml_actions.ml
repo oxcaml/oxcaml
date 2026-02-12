@@ -1410,9 +1410,8 @@ let runtime5 = Actions.make
   (Actions_helpers.predicate Config.runtime5
     "5.x runtime being used"
     "4.x runtime being used")
-let ocamldoc = Ocaml_tools.ocamldoc
-module Ocamldoc = (val ocamldoc)
 
+(* CR ttebbi: We should also protect against non-default register allocation options. *)
 let only_default_codegen = Actions.make
   ~name:"only-default-codegen"
   ~description:"Passes if all the codegen options are at the current default, \
@@ -1426,6 +1425,8 @@ let only_default_codegen = Actions.make
     "default codegen"
     "non-default codegen")
 
+let ocamldoc = Ocaml_tools.ocamldoc
+module Ocamldoc = (val ocamldoc)
 
 let ocamldoc_output_file env prefix =
   let backend =

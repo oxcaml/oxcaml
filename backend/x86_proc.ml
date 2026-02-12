@@ -443,13 +443,7 @@ let current_output_pos () = DLL.last_cell asm_code
 let output_from pos =
   match pos with
   | None -> DLL.to_list asm_code
-  | Some start_excl ->
-    let rec loop pos acc =
-      match pos with
-      | None -> List.rev acc
-      | Some cell -> loop (DLL.next cell) (DLL.value cell :: acc)
-    in
-    loop (DLL.next start_excl) []
+  | Some start_excl -> DLL.suffix start_excl
 
 let generate_code asm =
   (match asm with
