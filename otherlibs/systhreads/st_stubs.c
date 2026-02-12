@@ -671,7 +671,7 @@ void caml_thread_tick_hook(void)
      on the next go around. */
   uintnat ticks_per_preemption =
       ceil((float)Thread_timeout_usec /
-           (float)(atomic_load_relaxed(&Caml_state->tick_thread_interval_usec)));
+           (float)(caml_effective_tick_interval_usec()));
 
   if (++Ticks_elapsed >= ticks_per_preemption) {
     Ticks_elapsed = 0;
@@ -747,7 +747,7 @@ CAMLprim value caml_thread_initialize(value unit)
 
 CAMLprim value caml_thread_cleanup(value unit)
 {
-  caml_domain_stop_tick_thread();
+  caml_stop_tick_thread();
   return Val_unit;
 }
 
@@ -832,7 +832,7 @@ CAMLprim value caml_thread_new(value clos)
   /* Create the tick thread if not already done.
      Because of PR#4666, we start the tick thread late, only when we create
      the first additional thread in the current process */
-  st_retcode err = caml_domain_start_tick_thread();
+  st_retcode err = caml_start_tick_thread();
   sync_check_error(err, "Thread.create");
 
   /* Create a thread info block */
@@ -875,7 +875,7 @@ CAMLexport int caml_c_thread_register(void)
   caml_acquire_domain_lock();
 
   /* Create tick thread if not already done */
-  st_retcode err = caml_domain_start_tick_thread();
+  st_retcode err = caml_start_tick_thread();
   if (err != 0) goto out_err;
 
   /* Set a thread info block */

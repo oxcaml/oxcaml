@@ -89,10 +89,11 @@ CAMLextern void caml_release_domain_lock(void);
 
 /* Start the tick thread unless it is disabled. Returns nonzero in the case of
    an error. */
-CAMLextern int caml_domain_start_tick_thread(void);
+CAMLextern int caml_start_tick_thread(void);
 
 /* Stop the tick thread */
-CAMLextern void caml_domain_stop_tick_thread(void);
+CAMLextern void caml_stop_tick_thread(void);
+CAMLextern uintnat caml_effective_tick_interval_usec(void);
 
 /* These hooks are not modified after other domains are spawned. */
 CAMLextern void (*caml_atfork_hook)(void);
