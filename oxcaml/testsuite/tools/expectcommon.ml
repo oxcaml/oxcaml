@@ -375,8 +375,8 @@ let eval_expect_file _fname ~file_contents ~execute_phrase =
         List.filter_map chunk.expectations ~f:(fun expectation ->
           let output = match expectation.kind with
             | Expect_toplevel -> toplevel_output
-            | Expect_asm ->
-              Option.value asm_output ~default:"\nNo assembly: compilation failed\n"
+            | Expect_asm -> Option.value asm_output
+                              ~default:"\nNo assembly: compilation failed\n"
           in
           eval_expectation expectation ~output)))
   in
