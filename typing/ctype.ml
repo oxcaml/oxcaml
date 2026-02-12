@@ -4975,6 +4975,11 @@ let rec filter_method_row env name priv ty =
   | _ ->
       raise Filter_method_row_failed
 
+let generic_instance_declaration_with_params env params decl =
+  let decl = generic_instance_declaration decl in
+  List.iter2 (unify_var env) decl.type_params params;
+  decl
+
 (* Operations on class signatures *)
 
 let new_class_signature () =
