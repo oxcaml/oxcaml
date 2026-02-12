@@ -1800,7 +1800,7 @@ let solve_constructor_annotation
         let (id, new_env) =
           Env.enter_type ~scope:expansion_scope name.txt decl !!penv in
         Pattern_env.set_env penv new_env;
-        {name with txt = id}, jkind_annot_opt)
+        {name with txt = id}, jkind)
       name_list
   in
   let cty, ty, force =
@@ -5646,7 +5646,7 @@ type type_function_result =
       type_expr * type_function_result_param list * function_body;
     (* The uninterrupted prefix of newtypes of the parameter suffix. *)
     newtypes: (Ident.t * string loc *
-               Parsetree.jkind_annotation option * Uid.t) list;
+               Types.jkind_lr option * Uid.t) list;
     (* Whether any of the value parameters contains a GADT pattern. *)
     params_contain_gadt: contains_gadt;
     (* The alloc mode of the "rest of the function". None only for recursive
@@ -8232,25 +8232,30 @@ and type_function
   match params_suffix with
   | { pparam_desc = Pparam_newtype (newtype_var, jkind_annot) } :: rest ->
       (* Check everything else in the scope of (type a). *)
-      let (params, body, newtypes, contains_gadt, fun_alloc_mode, ret_info),
-          exp_type, id, uid =
-        type_newtype env newtype_var jkind_annot (fun env ->
+      let (params, body, newtypes, contains_gadt,
+           fun_alloc_mode, ret_info),
+          exp_type, id, jkind_opt, uid =
+        type_newtype env newtype_var jkind_annot
+          (fun env ->
           let { function_ = exp_type, params, body;
-                newtypes; params_contain_gadt = contains_gadt;
+                newtypes;
+                params_contain_gadt = contains_gadt;
                 fun_alloc_mode; ret_info;
               }
             =
-            (* mimic the typing of Pexp_newtype by minting a new type var,
-                like [type_exp].
-            *)
             type_function env expected_mode
-              (newvar (Jkind.Builtin.any ~why:Dummy_jkind))
-              rest body_constraint body ~in_function ~first
+              (newvar
+                (Jkind.Builtin.any ~why:Dummy_jkind))
+              rest body_constraint body
+              ~in_function ~first
           in
-          (params, body, newtypes, contains_gadt, fun_alloc_mode, ret_info),
+          (params, body, newtypes, contains_gadt,
+           fun_alloc_mode, ret_info),
           exp_type)
       in
-      let newtype = id, newtype_var, jkind_annot, uid in
+      let newtype =
+        id, newtype_var, jkind_opt, uid
+      in
       with_explanation ty_fun.explanation (fun () ->
           unify_exp_types loc env exp_type (instance ty_expected));
       { function_ = exp_type, params, body;
@@ -10012,12 +10017,15 @@ and map_half_typed_cases
 *)
 and type_newtype
   : type a. _ -> _ -> _ -> (Env.t -> a * type_expr)
-    -> a * type_expr * Ident.t * Uid.t =
+    -> a * type_expr * Ident.t * Types.jkind_lr option
+       * Uid.t =
   fun env name jkind_annot_opt type_body  ->
   let { txt = name; loc = name_loc } : _ Location.loc = name in
   let jkind =
-    Jkind.of_annotation_option_default ~context:(Newtype_declaration name)
-      ~default:(Jkind.Builtin.value ~why:Univar) jkind_annot_opt
+    Jkind.of_annotation_option_default
+      ~context:(Newtype_declaration name)
+      ~default:(Jkind.Builtin.value ~why:Univar)
+      jkind_annot_opt
   in
   let ty =
     if Typetexp.valid_tyvar_name name then
@@ -10028,42 +10036,51 @@ and type_newtype
   (* Use [with_local_level] just for scoping *)
   with_local_level begin fun () ->
     (* Create a fake abstract type declaration for name. *)
-    let decl = new_local_type ~loc:name_loc Definition jkind in
+    let decl =
+      new_local_type ~loc:name_loc Definition jkind
+    in
     let scope = create_scope () in
-    let (id, new_env) = Env.enter_type ~scope name decl env in
+    let (id, new_env) =
+      Env.enter_type ~scope name decl env
+    in
 
     let result, exp_type = type_body new_env in
-    (* Replace every instance of this type constructor in the resulting
-       type. *)
+    (* Replace every instance of this type constructor
+       in the resulting type. *)
     let seen = Hashtbl.create 8 in
     let rec replace t =
       if Hashtbl.mem seen (get_id t) then ()
       else begin
         Hashtbl.add seen (get_id t) ();
-        match get_desc t with
-        | Tconstr (Path.Pident id', _, _) when id == id' -> link_type t ty
-        | _ -> Btype.iter_type_expr replace t
+        (match get_desc t with
+        | Tconstr (Path.Pident id', _, _)
+          when id == id' ->
+          link_type t ty
+        | _ -> Btype.iter_type_expr replace t)
       end
     in
     let ety = Subst.type_expr Subst.identity exp_type in
     replace ety;
     let uid = decl.type_uid in
-    (result, ety, id, uid)
+    let jkind_opt =
+      Option.map (fun _ -> jkind) jkind_annot_opt
+    in
+    (result, ety, id, jkind_opt, uid)
   end
 
 (** [type_newtype] where the "body" is just an expression. *)
 and type_newtype_expr
     ~loc ~env ~expected_mode ~rue ~attributes name jkind_annot_opt sbody =
-  let body, ety, id, uid =
+  let body, ety, id, jkind_opt, uid =
     type_newtype env name jkind_annot_opt (fun env ->
       let expr = type_exp env expected_mode sbody in
       expr, expr.exp_type)
   in
-  (* non-expansive if the body is non-expansive, so we don't introduce
-     any new extra node in the typed AST. *)
+  (* non-expansive if the body is non-expansive, so we don't
+     introduce any new extra node in the typed AST. *)
   rue { body with exp_loc = loc; exp_type = ety;
         exp_extra =
-        (Texp_newtype (id, name, jkind_annot_opt, uid),
+        (Texp_newtype (id, name, jkind_opt, uid),
          loc, attributes) :: body.exp_extra }
 
 (* Typing of match cases *)

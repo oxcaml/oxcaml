@@ -38,8 +38,7 @@ type mapper =
     expr: mapper -> expression -> expression;
     extension_constructor: mapper -> extension_constructor ->
       extension_constructor;
-    jkind_annotation:
-      mapper -> Parsetree.jkind_annotation -> Parsetree.jkind_annotation;
+    jkind: mapper -> Types.jkind_lr -> Types.jkind_lr;
     location: mapper -> Location.t -> Location.t;
     modalities: mapper -> modalities -> modalities;
     modes: 'a. mapper -> 'a modes -> 'a modes;

@@ -39,8 +39,7 @@ type mapper =
     expr: mapper -> expression -> expression;
     extension_constructor: mapper -> extension_constructor ->
       extension_constructor;
-    jkind_annotation:
-      mapper -> Parsetree.jkind_annotation -> Parsetree.jkind_annotation;
+    jkind: mapper -> Types.jkind_lr -> Types.jkind_lr;
     location: mapper -> Location.t -> Location.t;
     modalities: mapper -> modalities -> modalities;
     (* CR-someday lstevenson: If we ever want to inspect the [mode_modes] field,
@@ -281,7 +280,8 @@ let type_exception sub x =
   let tyexn_attributes = sub.attributes sub x.tyexn_attributes in
   {tyexn_loc; tyexn_constructor; tyexn_attributes}
 
-let var_jkind sub (v, l) = v, Option.map (sub.jkind_annotation sub) l
+let var_jkind sub (v, l) =
+  v, Option.map (sub.jkind sub) l
 
 let extension_constructor sub x =
   let ext_loc = sub.location sub x.ext_loc in
@@ -334,10 +334,10 @@ let pat
         let vto = Option.map (fun (vl,cty) ->
           List.map
             (fun (v, jk) ->
-               (map_loc sub v,
-                Option.map (sub.jkind_annotation sub) jk))
+               map_loc sub v, sub.jkind sub jk)
             vl, sub.typ sub cty) vto in
-        Tpat_construct (map_loc sub loc, cd, List.map (sub.pat sub) l, vto)
+        Tpat_construct (map_loc sub loc, cd,
+          List.map (sub.pat sub) l, vto)
     | Tpat_variant (l, po, rd) ->
         Tpat_variant (l, Option.map (sub.pat sub) po, rd)
     | Tpat_record (l, closed) ->
@@ -383,8 +383,9 @@ let function_param sub
   in
   let fp_newtypes =
     List.map
-      (fun (id, var, annot, uid) ->
-         id, map_loc sub var, Option.map (sub.jkind_annotation sub) annot, uid)
+      (fun (id, var, jkind, uid) ->
+         id, map_loc sub var,
+         Option.map (sub.jkind sub) jkind, uid)
       fp_newtypes
   in
   let fp_mode = sub.modes sub fp_mode in
@@ -981,9 +982,9 @@ let typ sub x =
   let ctyp_env = sub.env sub x.ctyp_env in
   let ctyp_desc =
     match x.ctyp_desc with
-    | (Ttyp_var (_,None) | Ttyp_call_pos) as d -> d
-    | Ttyp_var (s, Some jkind) ->
-        Ttyp_var (s, Some (sub.jkind_annotation sub jkind))
+    | Ttyp_var (s, jk) ->
+        Ttyp_var (s, Option.map (sub.jkind sub) jk)
+    | Ttyp_call_pos as d -> d
     | Ttyp_arrow (label, ct1, ma1, ct2, ma2) ->
         Ttyp_arrow (label, sub.typ sub ct1, sub.modes sub ma1,
                     sub.typ sub ct2, sub.modes sub ma2)
@@ -1002,20 +1003,21 @@ let typ sub x =
            map_loc sub lid,
            List.map (sub.typ sub) list
           )
-    | Ttyp_alias (ct, s, jkind) ->
+    | Ttyp_alias (ct, s, jk) ->
         Ttyp_alias (sub.typ sub ct, s,
-                    Option.map (sub.jkind_annotation sub) jkind)
+                    Option.map (sub.jkind sub) jk)
     | Ttyp_variant (list, closed, labels) ->
         Ttyp_variant (List.map (sub.row_field sub) list, closed, labels)
     | Ttyp_poly (vars, ct) ->
-        Ttyp_poly (List.map (var_jkind sub) vars, sub.typ sub ct)
+        Ttyp_poly (List.map (fun (v, l) -> v, sub.jkind sub l) vars,
+                   sub.typ sub ct)
     | Ttyp_package pack ->
         Ttyp_package (sub.package_type sub pack)
     | Ttyp_open (path, mod_ident, t) ->
         Ttyp_open (path, map_loc sub mod_ident, sub.typ sub t)
     | Ttyp_repr (vars, ct) -> Ttyp_repr (vars, sub.typ sub ct)
-    | Ttyp_of_kind jkind ->
-        Ttyp_of_kind (sub.jkind_annotation sub jkind)
+    | Ttyp_of_kind jk ->
+        Ttyp_of_kind (sub.jkind sub jk)
     | Ttyp_quote t -> Ttyp_quote (sub.typ sub t)
     | Ttyp_splice t -> Ttyp_splice (sub.typ sub t)
   in
@@ -1096,14 +1098,7 @@ let value_binding sub x =
 
 let env _sub x = x
 
-let jkind_annotation sub annot =
-  (* map over locations contained within parsetree jkind annotation *)
-  let ast_mapper =
-    { Ast_mapper.default_mapper
-      with location = (fun _this loc -> sub.location sub loc)
-    }
-  in
-  ast_mapper.jkind_annotation ast_mapper annot
+let jkind _sub jk = jk
 
 let modalities sub x =
   let moda_desc = List.map (map_loc sub) x.moda_desc in
@@ -1131,7 +1126,7 @@ let default =
     env;
     expr;
     extension_constructor;
-    jkind_annotation;
+    jkind;
     location;
     modalities;
     modes;

@@ -84,11 +84,7 @@ type texp_function_param_identifier =
     param_mode : Alloc.l;
     param_curry : function_curry;
     param_newtypes :
-      (Ident.t
-      * string Location.loc
-      * Parsetree.jkind_annotation option
-      * Uid.t)
-      list
+      (Ident.t * string Location.loc * Types.jkind_lr option * Uid.t) list
   }
 
 type texp_function_param =

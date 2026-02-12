@@ -243,7 +243,7 @@ and 'k pattern_desc =
   | Tpat_construct :
       Longident.t loc * Types.constructor_description *
         value general_pattern list *
-        ((Ident.t loc * Parsetree.jkind_annotation option) list * core_type)
+        ((Ident.t loc * Types.jkind_lr) list * core_type)
           option ->
       value pattern_desc
         (** C                             ([], None)
@@ -336,7 +336,7 @@ and exp_extra =
   | Texp_poly of core_type option
         (** Used for method bodies. *)
   | Texp_newtype of Ident.t * string loc *
-                    Parsetree.jkind_annotation option * Uid.t
+                    Types.jkind_lr option * Uid.t
         (** fun (type t : immediate) ->
 
         The [Ident.t] and [Uid.t] fields are unused by the compiler, but Merlin needs
@@ -632,7 +632,7 @@ and function_param =
     fp_mode: Mode.Alloc.l modes;
     fp_curry: function_curry;
     fp_newtypes: (Ident.t * string loc *
-                  Parsetree.jkind_annotation option * Uid.t) list;
+                  Types.jkind_lr option * Uid.t) list;
     (** [fp_newtypes] are the new type declarations that come *after* that
         parameter. The newtypes that come before the first parameter are
         placed as exp_extras on the Texp_function node. This is just used in
@@ -1120,7 +1120,7 @@ and core_type =
    }
 
 and core_type_desc =
-  | Ttyp_var of string option * Parsetree.jkind_annotation option
+  | Ttyp_var of string option * Types.jkind_lr option
   | Ttyp_arrow of arg_label * core_type * Mode.Alloc.Const.t modes *
                   core_type * Mode.Alloc.Const.t modes
   | Ttyp_tuple of (string option * core_type) list
@@ -1129,15 +1129,15 @@ and core_type_desc =
   | Ttyp_object of object_field list * closed_flag
   | Ttyp_class of Path.t * Longident.t loc * core_type list
   | Ttyp_alias of core_type * string loc option *
-                  Parsetree.jkind_annotation option
+                  Types.jkind_lr option
   | Ttyp_variant of row_field list * closed_flag * label list option
-  | Ttyp_poly of (string * Parsetree.jkind_annotation option) list * core_type
+  | Ttyp_poly of (string * Types.jkind_lr) list * core_type
   | Ttyp_package of package_type
   | Ttyp_open of Path.t * Longident.t loc * core_type
   | Ttyp_quote of core_type
   | Ttyp_splice of core_type
   | Ttyp_repr of string list * core_type
-  | Ttyp_of_kind of Parsetree.jkind_annotation
+  | Ttyp_of_kind of Types.jkind_lr
   | Ttyp_call_pos
       (** [Ttyp_call_pos] represents the type of the value of a Position
           argument ([lbl:[%call_pos] -> ...]). *)
@@ -1199,7 +1199,7 @@ and type_declaration =
     typ_manifest: core_type option;
     typ_loc: Location.t;
     typ_attributes: attributes;
-    typ_jkind_annotation: Parsetree.jkind_annotation option;
+    typ_jkind: Types.jkind_l option;
    }
 
 and type_kind =
@@ -1226,7 +1226,7 @@ and constructor_declaration =
      cd_id: Ident.t;
      cd_name: string loc;
      cd_uid: Uid.t;
-     cd_vars: (string * Parsetree.jkind_annotation option) list;
+     cd_vars: (string * Types.jkind_lr option) list;
      cd_args: constructor_arguments;
      cd_res: core_type option;
      cd_loc: Location.t;
@@ -1273,7 +1273,7 @@ and extension_constructor =
   }
 
 and extension_constructor_kind =
-    Text_decl of (string * Parsetree.jkind_annotation option) list *
+    Text_decl of (string * Types.jkind_lr option) list *
                  constructor_arguments *
                  core_type option
   | Text_rebind of Path.t * Longident.t loc

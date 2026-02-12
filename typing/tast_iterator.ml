@@ -34,7 +34,7 @@ type iterator =
     env: iterator -> Env.t -> unit;
     expr: iterator -> expression -> unit;
     extension_constructor: iterator -> extension_constructor -> unit;
-    jkind_annotation: iterator -> Parsetree.jkind_annotation -> unit;
+    jkind: iterator -> Types.jkind_lr -> unit;
     location: iterator -> Location.t -> unit;
     modalities: iterator -> modalities -> unit;
     (* CR-someday lstevenson: If we ever want to inspect the [mode_modes] field,
@@ -279,9 +279,9 @@ let pat
       List.iter (sub.pat sub) l;
       Option.iter (fun (vs, ct) ->
         List.iter
-          (fun (v, jk) ->
+          (fun (v, jkind) ->
              iter_loc sub v;
-             Option.iter (sub.jkind_annotation sub) jk)
+             sub.jkind sub jkind)
           vs;
         sub.typ sub ct) vto
   | Tpat_variant (_, po, _) -> Option.iter (sub.pat sub) po
@@ -316,9 +316,9 @@ let extra sub = function
 let function_param sub { fp_loc; fp_kind; fp_newtypes; fp_mode; _ } =
   sub.location sub fp_loc;
   List.iter
-    (fun (_, var, annot, _) ->
+    (fun (_, var, jkind, _) ->
        iter_loc sub var;
-       Option.iter (sub.jkind_annotation sub) annot)
+       Option.iter (sub.jkind sub) jkind)
     fp_newtypes;
   sub.modes sub fp_mode;
   match fp_kind with
@@ -710,7 +710,7 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
   sub.env sub ctyp_env;
   match ctyp_desc with
   | Ttyp_var (_, jkind) ->
-      Option.iter (sub.jkind_annotation sub) jkind
+      Option.iter (sub.jkind sub) jkind
   | Ttyp_arrow (_, ct1, ma1, ct2, ma2) ->
       sub.typ sub ct1;
       sub.modes sub ma1;
@@ -727,10 +727,10 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
       List.iter (sub.typ sub) list
   | Ttyp_alias (ct, _, jkind) ->
       sub.typ sub ct;
-      Option.iter (sub.jkind_annotation sub) jkind
+      Option.iter (sub.jkind sub) jkind
   | Ttyp_variant (list, _, _) -> List.iter (sub.row_field sub) list
   | Ttyp_poly (vars, ct) ->
-      List.iter (fun (_, l) -> Option.iter (sub.jkind_annotation sub) l) vars;
+      List.iter (fun (_, l) -> sub.jkind sub l) vars;
       sub.typ sub ct
   | Ttyp_package pack -> sub.package_type sub pack
   | Ttyp_open (_, mod_ident, t) ->
@@ -739,7 +739,7 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
   | Ttyp_quote t -> sub.typ sub t
   | Ttyp_splice t -> sub.typ sub t
   | Ttyp_repr (_, ct) -> sub.typ sub ct
-  | Ttyp_of_kind jkind -> sub.jkind_annotation sub jkind
+  | Ttyp_of_kind jkind -> sub.jkind sub jkind
   | Ttyp_call_pos -> ()
 
 let class_structure sub {cstr_self; cstr_fields; _} =
@@ -793,14 +793,7 @@ let value_binding sub ({vb_loc; vb_pat; vb_expr; vb_attributes; _} as vb) =
 
 let env _sub _ = ()
 
-let jkind_annotation sub l =
-  (* iterate over locations contained within parsetree jkind annotation *)
-  let ast_iterator =
-    { Ast_iterator.default_iterator
-      with location = (fun _this loc -> sub.location sub loc)
-    }
-  in
-  ast_iterator.jkind_annotation ast_iterator l
+let jkind _sub _l = ()
 
 let modalities sub x =
   List.iter (iter_loc sub) x.moda_desc
@@ -828,7 +821,7 @@ let default_iterator =
     env;
     expr;
     extension_constructor;
-    jkind_annotation;
+    jkind;
     location;
     modalities;
     modes;
