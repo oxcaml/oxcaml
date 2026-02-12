@@ -96,25 +96,42 @@ module Bytecode = struct
     Compilation_unit.create Compilation_unit.Prefix.empty modname
 
   let fold_initial_units ~init ~f =
-    Array.fold_left (fun acc (modname, info) ->
-        let crc = Option.map snd info in
-        let cu = assume_no_prefix modname in
-        let defined =
-          Symtable.is_defined_in_global_map !default_global_map
-            (Glob_compunit cu)
-        in
-        let implementation =
-          if defined then Some (None, DT.Loaded)
-          else None
-        in
-        let compunit = modname |> Compilation_unit.Name.to_string in
-        let defined_symbols =
-          if defined then [compunit]
-          else []
-        in
-        f acc ~compunit ~interface:crc ~implementation ~defined_symbols)
-      init
-      !default_crcs
+    let acc =
+      Array.fold_left (fun acc (modname, info) ->
+          let crc = Option.map snd info in
+          let cu = assume_no_prefix modname in
+          let defined =
+            Symtable.is_defined_in_global_map !default_global_map
+              (Glob_compunit cu)
+          in
+          let implementation =
+            if defined then Some (None, DT.Loaded)
+            else None
+          in
+          let compunit = modname |> Compilation_unit.Name.to_string in
+          let defined_symbols =
+            if defined then [compunit]
+            else []
+          in
+          f acc ~compunit ~interface:crc ~implementation ~defined_symbols)
+        init
+        !default_crcs
+    in
+    (* Bytecode doesn't track the CRCs of implementations, which means that
+       while the symbols of parameterized modules will appear in the initial
+       units list, the symbols for the instantiations will not. Pick these up by
+       iterating over the global map. *)
+    Symtable.fold_global_map
+      (fun global _slot acc ->
+        match global with
+        | Glob_compunit cu when Compilation_unit.is_instance cu ->
+          let compunit = Compilation_unit.full_path_as_string cu in
+          f acc ~compunit ~interface:None
+            ~implementation:(Some (None, DT.Loaded))
+            ~defined_symbols:[compunit]
+        | Glob_compunit _ | Glob_predef _ -> acc)
+      !default_global_map
+      acc
 
   let run_shared_startup _ = ()
 

@@ -51,6 +51,8 @@ val empty_global_map: global_map
 val current_state: unit -> global_map
 val hide_additions: global_map -> unit
 val is_defined_in_global_map: global_map -> Global.t -> bool
+val fold_global_map :
+  (Global.t -> int -> 'a -> 'a) -> global_map -> 'a -> 'a
 
 (* Error report *)
 
