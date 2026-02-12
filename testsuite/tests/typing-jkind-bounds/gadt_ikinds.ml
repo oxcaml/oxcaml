@@ -110,12 +110,8 @@ type t = Foo : ('a : immutable_data). 'a -> t
 |}]
 
 let foo (t : t @ contended) = use_uncontended t
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect {|
-Line 1, characters 46-47:
-1 | let foo (t : t @ contended) = use_uncontended t
-                                                  ^
-Error: This value is "contended" but is expected to be "uncontended".
+val foo : t @ contended -> unit = <fun>
 |}]
 
 let foo (t : t @ local) = use_global t [@nontail]
@@ -134,12 +130,8 @@ type 'a t = Foo : 'a -> 'a t
 |}]
 
 let foo (t : int t @ once) = use_many t
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect {|
-Line 1, characters 38-39:
-1 | let foo (t : int t @ once) = use_many t
-                                          ^
-Error: This value is "once" but is expected to be "many".
+val foo : int t @ once -> unit = <fun>
 |}]
 
 let foo (t : int t @ aliased) = use_unique t
@@ -161,7 +153,7 @@ Lines 1-3, characters 0-61:
 1 | type 'a t : value mod contended portable =
 2 |   | Shared : ('b : value mod contended portable). 'b  -> 'b t
 3 |   | Unshared : (unit -> 'c) @@ portable               -> 'c t
-Error: The kind of type "t" is value mod non_float
+Error: The kind of type "t" is value mod portable immutable non_float with 'a
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of
            value mod portable contended
@@ -233,16 +225,8 @@ type ('a, 'b) t = { inner : 'a; }
 type 'a u : immutable_data with 'a =
 | P1 : ('a1, 'b) t -> 'a1 u
 | P2 : ('a2, 'b) t -> 'a2 u
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
-Lines 1-3, characters 0-27:
-1 | type 'a u : immutable_data with 'a =
-2 | | P1 : ('a1, 'b) t -> 'a1 u
-3 | | P2 : ('a2, 'b) t -> 'a2 u
-Error: The kind of type "u" is value mod non_float
-         because it's a boxed variant type.
-       But the kind of type "u" must be a subkind of immutable_data with 'a
-         because of the annotation on the declaration of the type u.
+type 'a u = P1 : ('a1, 'b) t -> 'a1 u | P2 : ('a2, 'b) t -> 'a2 u
 |}]
 
 (* Any existentials in the with-bounds turn into [(type : kind)] then get normalized away.
@@ -278,15 +262,7 @@ type ('x, 'y) t : immutable_data with 'x with 'y =
   | T : 'a -> ('a, 'a) t
   | U : 'c -> ('b,  'c) t
 [%%expect{|
-Lines 1-3, characters 0-25:
-1 | type ('x, 'y) t : immutable_data with 'x with 'y =
-2 |   | T : 'a -> ('a, 'a) t
-3 |   | U : 'c -> ('b,  'c) t
-Error: The kind of type "t" is value mod non_float
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of
-           immutable_data with 'x with 'y
-         because of the annotation on the declaration of the type t.
+type ('x, 'y) t = T : 'a -> ('a, 'a) t | U : 'c -> ('b, 'c) t
 |}]
 
 type 'a t : immediate =
@@ -303,15 +279,8 @@ Error: The kind of type "t" is value mod non_float
 
 type 'a t : immutable_data =
   | A : ('b : immutable_data). 'b -> 'b option t
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
-Lines 1-2, characters 0-48:
-1 | type 'a t : immutable_data =
-2 |   | A : ('b : immutable_data). 'b -> 'b option t
-Error: The kind of type "t" is value mod non_float
-         because it's a boxed variant type.
-       But the kind of type "t" must be a subkind of immutable_data
-         because of the annotation on the declaration of the type t.
+type 'a t = A : ('b : immutable_data). 'b -> 'b option t
 |}]
 
 type 'a t : immediate =
@@ -320,7 +289,7 @@ type 'a t : immediate =
 Lines 1-2, characters 0-48:
 1 | type 'a t : immediate =
 2 |   | A : ('b : immutable_data). 'b -> 'b option t
-Error: The kind of type "t" is value mod non_float
+Error: The kind of type "t" is immutable_data
          because it's a boxed variant type.
        But the kind of type "t" must be a subkind of immediate
          because of the annotation on the declaration of the type t.
@@ -329,61 +298,37 @@ Error: The kind of type "t" is value mod non_float
 type 'a cell : mutable_data with 'a =
   | Nil : 'a cell
   | Cons of { value : 'a; mutable next: 'a cell }
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
-Lines 1-3, characters 0-49:
-1 | type 'a cell : mutable_data with 'a =
-2 |   | Nil : 'a cell
-3 |   | Cons of { value : 'a; mutable next: 'a cell }
-Error: The kind of type "cell" is value mod non_float
-         because it's a boxed variant type.
-       But the kind of type "cell" must be a subkind of mutable_data with 'a
-         because of the annotation on the declaration of the type cell.
+type 'a cell =
+    Nil : 'a cell
+  | Cons of { value : 'a; mutable next : 'a cell; }
 |}]
 
 type 'a cell : mutable_data with 'a =
   | Nil
   | Cons : { value : 'b; mutable next: 'b cell } -> 'b cell
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
-Lines 1-3, characters 0-59:
-1 | type 'a cell : mutable_data with 'a =
-2 |   | Nil
-3 |   | Cons : { value : 'b; mutable next: 'b cell } -> 'b cell
-Error: The kind of type "cell" is value mod non_float
-         because it's a boxed variant type.
-       But the kind of type "cell" must be a subkind of mutable_data with 'a
-         because of the annotation on the declaration of the type cell.
+type 'a cell =
+    Nil
+  | Cons : { value : 'b; mutable next : 'b cell; } -> 'b cell
 |}]
 
 type 'a cell : sync_data with 'a =
   | Nil : 'a cell
   | Cons of { value : 'a; mutable next: 'a cell [@atomic] }
-(* CR layouts v2.8: This should be accepted *)
 [%%expect{|
-Lines 1-3, characters 0-59:
-1 | type 'a cell : sync_data with 'a =
-2 |   | Nil : 'a cell
-3 |   | Cons of { value : 'a; mutable next: 'a cell [@atomic] }
-Error: The kind of type "cell" is value mod non_float
-         because it's a boxed variant type.
-       But the kind of type "cell" must be a subkind of sync_data with 'a
-         because of the annotation on the declaration of the type cell.
+type 'a cell =
+    Nil : 'a cell
+  | Cons of { value : 'a; mutable next : 'a cell [@atomic]; }
 |}]
 
 type 'a cell : sync_data with 'a =
   | Nil
   | Cons : { value : 'b; mutable next: 'b cell [@atomic] } -> 'b cell
-(* CR layouts v2.8: This should be accepted *)
 [%%expect{|
-Lines 1-3, characters 0-69:
-1 | type 'a cell : sync_data with 'a =
-2 |   | Nil
-3 |   | Cons : { value : 'b; mutable next: 'b cell [@atomic] } -> 'b cell
-Error: The kind of type "cell" is value mod non_float
-         because it's a boxed variant type.
-       But the kind of type "cell" must be a subkind of sync_data with 'a
-         because of the annotation on the declaration of the type cell.
+type 'a cell =
+    Nil
+  | Cons : { value : 'b; mutable next : 'b cell [@atomic]; } -> 'b cell
 |}]
 
 (* Existentials that are the type arguments to abstract types should end up as [type :
@@ -399,7 +344,8 @@ type 'a abstract : value mod portable
 Lines 2-3, characters 0-70:
 2 | type existential_abstract : immediate =
 3 |   | P : ('a : value mod portable). 'a abstract -> existential_abstract
-Error: The kind of type "existential_abstract" is value mod non_float
+Error: The kind of type "existential_abstract" is
+           immutable_data with (type : value mod portable) abstract
          because it's a boxed variant type.
        But the kind of type "existential_abstract" must be a subkind of
            immediate
@@ -408,30 +354,16 @@ Error: The kind of type "existential_abstract" is value mod non_float
 
 type existential_abstract : immutable_data with (type : value mod portable) abstract =
   | P : ('a : value mod portable). 'a abstract -> existential_abstract
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
-Lines 1-2, characters 0-70:
-1 | type existential_abstract : immutable_data with (type : value mod portable) abstract =
-2 |   | P : ('a : value mod portable). 'a abstract -> existential_abstract
-Error: The kind of type "existential_abstract" is value mod non_float
-         because it's a boxed variant type.
-       But the kind of type "existential_abstract" must be a subkind of
-           immutable_data with (type : value mod portable) abstract
-         because of the annotation on the declaration of the type existential_abstract.
+type existential_abstract =
+    P : ('a : value mod portable). 'a abstract -> existential_abstract
 |}]
 
 type existential_abstract : value mod portable =
   | P : ('a : value mod portable). 'a abstract -> existential_abstract
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
-Lines 1-2, characters 0-70:
-1 | type existential_abstract : value mod portable =
-2 |   | P : ('a : value mod portable). 'a abstract -> existential_abstract
-Error: The kind of type "existential_abstract" is value mod non_float
-         because it's a boxed variant type.
-       But the kind of type "existential_abstract" must be a subkind of
-           value mod portable
-         because of the annotation on the declaration of the type existential_abstract.
+type existential_abstract =
+    P : ('a : value mod portable). 'a abstract -> existential_abstract
 |}]
 
 let foo (x : existential_abstract @ nonportable) =
@@ -442,12 +374,10 @@ module M : sig
 end = struct
   type t = P : ('a : value mod portable). 'a abstract -> t
 end
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
-Line 1, characters 13-33:
-1 | let foo (x : existential_abstract @ nonportable) =
-                 ^^^^^^^^^^^^^^^^^^^^
-Error: Unbound type constructor "existential_abstract"
+val foo : existential_abstract -> unit = <fun>
+module M :
+  sig type t : immutable_data with (type : value mod portable) abstract end
 |}]
 
 module M : sig
@@ -460,24 +390,7 @@ end
    Tconstrs, checking to see if corresponding arguments are in a sub-kind relationship --
    but only if at least the argument on the right is best. Subtle. *)
 [%%expect{|
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = P : ('a : immediate). 'a abstract -> t
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t = P : ('a : immediate). 'a abstract -> t end
-       is not included in
-         sig type t : immutable_data with (type : value) abstract end
-       Type declarations do not match:
-         type t = P : ('a : immediate). 'a abstract -> t
-       is not included in
-         type t : immutable_data with (type : value) abstract
-       The kind of the first is value mod non_float
-         because of the definition of t at line 4, characters 2-49.
-       But the kind of the first must be a subkind of
-           immutable_data with (type : value) abstract
-         because of the definition of t at line 2, characters 2-54.
+module M : sig type t : immutable_data with (type : value) abstract end
 |}]
 
 (* Some hard recursive types with existentials *)
@@ -485,16 +398,13 @@ type existential_abstract : value mod portable with (type : value mod portable) 
   | P : ('a : value mod portable). 'a abstract t2 -> existential_abstract
 and 'a t2 = P : { contents : 'a; other : ('b : value mod portable) option } -> 'a t2
 and 'a abstract : value mod portable
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
-Lines 1-2, characters 0-73:
-1 | type existential_abstract : value mod portable with (type : value mod portable) abstract =
-2 |   | P : ('a : value mod portable). 'a abstract t2 -> existential_abstract
-Error: The kind of type "existential_abstract" is value mod non_float
-         because it's a boxed variant type.
-       But the kind of type "existential_abstract" must be a subkind of
-           value mod portable with (type : value mod portable) abstract/2
-         because of the annotation on the declaration of the type existential_abstract.
+type existential_abstract =
+    P : ('a : value mod portable). 'a abstract t2 -> existential_abstract
+and 'a t2 =
+    P : 'a ('b : value mod portable). { contents : 'a; other : 'b option;
+    } -> 'a t2
+and 'a abstract : value mod portable
 |}]
 
 (* Actually mode crossing for [type : kind] *)
@@ -523,30 +433,33 @@ module F2(M : S with type 'a b = int) = struct
   let foo1 (x : M.t @ nonportable) = use_portable x
   let foo2 (x : M.t @ contended) = use_uncontended x
 end
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
-Line 2, characters 2-31:
-2 |   type t : immutable_data = M.t
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "M.t" is value mod non_float
-         because of the definition of t at line 3, characters 2-47.
-       But the kind of type "M.t" must be a subkind of immutable_data
-         because of the definition of t at line 2, characters 2-31.
+module F2 :
+  functor
+    (M : sig
+           type 'a b = int
+           type t = P : ('a : value mod portable). 'a b -> t
+         end)
+    ->
+    sig
+      type t = M.t
+      val foo1 : M.t -> unit
+      val foo2 : M.t @ contended -> unit
+    end
 |}]
 
 module F3(M : S with type 'a b = 'a) = struct
   type t : value mod portable = M.t
   let foo (x : t @ nonportable) = use_portable x
 end
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
-Line 2, characters 2-35:
-2 |   type t : value mod portable = M.t
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "M/2.t" is value mod non_float
-         because of the definition of t at line 3, characters 2-47.
-       But the kind of type "M/2.t" must be a subkind of value mod portable
-         because of the definition of t at line 2, characters 2-35.
+module F3 :
+  functor
+    (M : sig
+           type 'a b = 'a
+           type t = P : ('a : value mod portable). 'a b -> t
+         end)
+    -> sig type t = M.t val foo : t -> unit end
 |}]
 
 module F4(M : S with type 'a b = 'a) = struct
@@ -572,12 +485,8 @@ type _ box = Box : 'a -> 'a box
 |}]
 
 let foo (x : int box @ contended) = use_uncontended x
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
-Line 1, characters 52-53:
-1 | let foo (x : int box @ contended) = use_uncontended x
-                                                        ^
-Error: This value is "contended" but is expected to be "uncontended".
+val foo : int box @ contended -> unit = <fun>
 |}]
 
 let should_reject (x : int ref box @ contended) = use_uncontended x
@@ -595,12 +504,8 @@ type (_, _) box2 = Box2 : 'a -> ('a, 'a) box2
 |}]
 
 let foo (x : (int, int) box2 @ contended) = use_uncontended x
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
-Line 1, characters 60-61:
-1 | let foo (x : (int, int) box2 @ contended) = use_uncontended x
-                                                                ^
-Error: This value is "contended" but is expected to be "uncontended".
+val foo : (int, int) box2 @ contended -> unit = <fun>
 |}]
 
 let should_reject (x : (int ref, int ref) box2 @ contended) = use_uncontended x
@@ -616,7 +521,7 @@ type show_me_the_kind : immediate = (int ref, int ref) box2
 Line 1, characters 0-59:
 1 | type show_me_the_kind : immediate = (int ref, int ref) box2
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "(int ref, int ref) box2" is value mod non_float
+Error: The kind of type "(int ref, int ref) box2" is mutable_data
          because of the definition of box2 at line 1, characters 0-45.
        But the kind of type "(int ref, int ref) box2" must be a subkind of
            immediate
@@ -630,7 +535,7 @@ type _ box : immediate = Box : 'a -> 'a box
 Line 1, characters 0-43:
 1 | type _ box : immediate = Box : 'a -> 'a box
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "box" is value mod non_float
+Error: The kind of type "box" is immutable_data with _
          because it's a boxed variant type.
        But the kind of type "box" must be a subkind of immediate
          because of the annotation on the declaration of the type box.
@@ -639,12 +544,8 @@ Error: The kind of type "box" is value mod non_float
 (* Only the first type parameter matters *)
 
 let crosses (x : (int, int ref) box2 @ contended) = use_uncontended x
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
-Line 1, characters 68-69:
-1 | let crosses (x : (int, int ref) box2 @ contended) = use_uncontended x
-                                                                        ^
-Error: This value is "contended" but is expected to be "uncontended".
+val crosses : (int, int ref) box2 @ contended -> unit = <fun>
 |}]
 
 let doesn't_cross (x : (int ref, int) box2 @ contended) = use_uncontended x
@@ -662,17 +563,9 @@ Error: This value is "contended" but is expected to be "uncontended".
 type 'a t constraint 'a = 'b option
 type 'c t2 : immutable_data with (type : value) option t =
   | K : 'd t -> 'd t2
-(* CR layouts v2.8: This should be accepted. Internal ticket 4973. *)
 [%%expect{|
 type 'a t constraint 'a = 'b option
-Lines 2-3, characters 0-21:
-2 | type 'c t2 : immutable_data with (type : value) option t =
-3 |   | K : 'd t -> 'd t2
-Error: The kind of type "t2" is value mod non_float
-         because it's a boxed variant type.
-       But the kind of type "t2" must be a subkind of
-           immutable_data with (type : value) option t
-         because of the annotation on the declaration of the type t2.
+type 'c t2 = K : 'a option t -> 'a option t2
 |}]
 
 type 'a t constraint 'a = 'b option
@@ -683,7 +576,7 @@ type 'a t constraint 'a = 'b option
 Lines 2-3, characters 0-21:
 2 | type 'c t2 : immediate =
 3 |   | K : 'd t -> 'd t2
-Error: The kind of type "t2" is value mod non_float
+Error: The kind of type "t2" is immutable_data with (type : value) option t
          because it's a boxed variant type.
        But the kind of type "t2" must be a subkind of immediate
          because of the annotation on the declaration of the type t2.
@@ -701,7 +594,8 @@ type show_me_the_kind : immediate = exist_row1
 Line 1, characters 0-46:
 1 | type show_me_the_kind : immediate = exist_row1
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "exist_row1" is value mod non_float
+Error: The kind of type "exist_row1" is
+           immutable_data with [< `A | `B of int ref ]
          because of the definition of exist_row1 at line 1, characters 0-67.
        But the kind of type "exist_row1" must be a subkind of immediate
          because of the definition of show_me_the_kind at line 1, characters 0-46.
@@ -734,7 +628,8 @@ type show_me_the_kind : immediate = exist_row2
 Line 1, characters 0-46:
 1 | type show_me_the_kind : immediate = exist_row2
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "exist_row2" is value mod non_float
+Error: The kind of type "exist_row2" is
+           immutable_data with [> `A | `B of int ref ]
          because of the definition of exist_row2 at line 1, characters 0-67.
        But the kind of type "exist_row2" must be a subkind of immediate
          because of the definition of show_me_the_kind at line 1, characters 0-46.
@@ -767,7 +662,8 @@ type 'a show_me_the_kind : immediate = 'a option exist_row3
 Line 1, characters 0-59:
 1 | type 'a show_me_the_kind : immediate = 'a option exist_row3
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "'a option exist_row3" is value mod non_float
+Error: The kind of type "'a option exist_row3" is
+           immutable_data with [> `A | `B of int ref ]
          because of the definition of exist_row3 at line 1, characters 0-80.
        But the kind of type "'a option exist_row3" must be a subkind of
            immediate

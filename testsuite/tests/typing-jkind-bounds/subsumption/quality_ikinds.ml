@@ -388,13 +388,7 @@ end = struct
 end
 [%%expect {|
 type gadt = Foo : int -> gadt
-Line 3, characters 2-39:
-3 |   type t : value mod portable with gadt
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value
-         because of the annotation on the declaration of the type t.
-       But the kind of type "t" must be a subkind of value
-         because of the annotation on the declaration of the type t.
+module M : sig type t : value mod portable end
 |}]
 
 type gadt = Foo : int -> gadt
@@ -405,13 +399,24 @@ end = struct
 end
 [%%expect {|
 type gadt = Foo : int -> gadt
-Line 3, characters 2-37:
-3 |   type t : value mod global with gadt
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value
-         because of the annotation on the declaration of the type t.
-       But the kind of type "t" must be a subkind of value
-         because of the annotation on the declaration of the type t.
+Lines 4-6, characters 6-3:
+4 | ......struct
+5 |   type t
+6 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t end
+       is not included in
+         sig type t : value mod forkable unyielding end
+       Type declarations do not match:
+         type t
+       is not included in
+         type t : value mod forkable unyielding
+       The kind of the first is value
+         because of the definition of t at line 5, characters 2-8.
+       But the kind of the first must be a subkind of
+           value mod forkable unyielding
+         because of the definition of t at line 3, characters 2-37.
 |}]
 
 type gadt = Foo : int -> gadt [@@unboxed]
@@ -492,6 +497,8 @@ end = struct
   type a = { foo : ('a : value). 'a }
   type t
 end
+(* CR layouts v2.8: If we ever give univars min mod-bounds, this should get
+   rejected. Internal ticket 5746. *)
 [%%expect {|
 Line 3, characters 2-37:
 3 |   type t : value mod contended with a
@@ -509,6 +516,8 @@ end = struct
   type a = { foo : ('a : value). 'a } [@@unboxed]
   type t
 end
+(* CR layouts v2.8: If we ever give univars min mod-bounds, this should get
+   rejected. Internal ticket 5746. *)
 [%%expect {|
 Line 3, characters 2-37:
 3 |   type t : value mod contended with a

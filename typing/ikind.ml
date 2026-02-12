@@ -392,6 +392,9 @@ module Solver = struct
     Ldd.solve_pending ();
     kind_poly
 
+  let node_of_name (ctx : ctx) (name : Ldd.Name.t) : Ldd.node =
+    rigid_name ctx name
+
   (* Materialize a solved polynomial for storing in
      [Types.constructor_ikind]. *)
   let constr_kind_poly (ctx : ctx) (c : Path.t)
@@ -435,6 +438,142 @@ let shallow_axes_are_relevant_for_rep = function
     `Relevant
   | `Variant Types.Variant_unboxed -> `Relevant
   | `Record _ | `Variant _ -> `Irrelevant
+
+(* Build an id-set for quick membership checks on type expressions. *)
+let type_id_set (tys : Types.type_expr list) =
+  let ids = Hashtbl.create (List.length tys) in
+  List.iter
+    (fun ty -> Hashtbl.replace ids (Types.get_id ty) ())
+    tys;
+  ids
+
+(* Gather unique local vars from [tys], skipping declaration parameters. *)
+let collect_type_vars_excluding ~(excluded_ids : ('a, unit) Hashtbl.t)
+    (tys : Types.type_expr list) : Types.type_expr list =
+  let seen = Hashtbl.create 16 in
+  let vars = ref [] in
+  let rec collect ty =
+    match Types.get_desc ty with
+    | Types.Tvar _ | Types.Tunivar _ ->
+      let id = Types.get_id ty in
+      if
+        not (Hashtbl.mem excluded_ids id)
+        && not (Hashtbl.mem seen id)
+      then (
+        Hashtbl.replace seen id ();
+        vars := ty :: !vars)
+    | _ -> Btype.iter_type_expr collect ty
+  in
+  List.iter collect tys;
+  List.rev !vars
+
+(* Use each local variable's declared jkind as its fallback bound. *)
+let local_var_bounds (ctx : Solver.ctx) (local_vars : Types.type_expr list) =
+  let bounds = Hashtbl.create (List.length local_vars) in
+  List.iter
+    (fun ty ->
+      let bound =
+        match Types.get_desc ty with
+        | Types.Tvar { jkind; _ } | Types.Tunivar { jkind; _ } ->
+          Solver.ckind_of_jkind ctx jkind
+        | _ -> Ldd.const Axis_lattice.top
+      in
+      Hashtbl.replace bounds (Types.get_id ty) bound)
+    local_vars;
+  bounds
+
+(* For a plain-variable result argument, map it directly to [lhs_kind]. *)
+let add_plain_var_projection ~(local_var_ids : ('a, unit) Hashtbl.t)
+    ~(local_subst : ('a, Ldd.node) Hashtbl.t) ~(lhs_kind : Ldd.node)
+    (res_arg : Types.type_expr) : unit =
+  match Types.get_desc res_arg with
+  | Types.Tvar _ | Types.Tunivar _ ->
+    let id = Types.get_id res_arg in
+    if
+      Hashtbl.mem local_var_ids id
+      && not (Hashtbl.mem local_subst id)
+    then Hashtbl.add local_subst id lhs_kind
+  | _ -> ()
+
+let make_gadt_payload_projector
+    ~(decl_params : Types.type_expr list) (ctx : Solver.ctx) :
+    Types.constructor_declaration -> Types.type_expr -> Ldd.node =
+  (* For a GADT constructor, compute payload kinds under a projection from
+     constructor-local vars (existentials/equated vars) to declaration
+     parameters. This keeps payload ikinds comparable to the type's declared
+     parameters while remaining conservative for unmapped locals.
+
+     Examples:
+     - type 'a t = C : 'b -> 'b t
+       Here result arg is plain var ['b], aligned with param ['a], so we map
+       ['b -> kind('a)] when computing payload kind of ['b].
+
+     - type ('a, 'b) u = C : 'x * 'y -> ('x, int) u
+       We map ['x -> kind('a)] from the first result arg. The second result
+       arg is [int], so ['y] gets no projection and falls back to its declared
+       local bound.
+
+     - type ('a, 'b) same = C : 'x -> ('x, 'x) same
+       First hit wins: ['x] is mapped from the first result arg to kind('a);
+       the second occurrence does not overwrite it. *)
+  let decl_param_ids = type_id_set decl_params in
+  let fallback ty = Solver.kind ctx ty in
+  fun (c : Types.constructor_declaration) ->
+    match c.cd_res with
+    | None -> fallback
+    | Some res -> (
+      match Types.get_desc res with
+      | Types.Tconstr (_, res_args, _) ->
+        let payload_tys = Types.tys_of_constr_args c.cd_args in
+        (* Step 1: collect constructor-local vars seen in payload/result. *)
+        let local_vars =
+          collect_type_vars_excluding
+            ~excluded_ids:decl_param_ids
+            (payload_tys @ res_args)
+        in
+        if local_vars = []
+        then fallback
+        else
+          let local_var_ids = type_id_set local_vars in
+          let local_var_bounds = local_var_bounds ctx local_vars in
+          (* Step 2: build a partial substitution local_var -> projected kind
+             from the constructor result arguments. Earlier mappings win. *)
+          let local_subst = Hashtbl.create (List.length local_vars) in
+          if List.length res_args = List.length decl_params
+          then
+            List.iter2
+              (fun decl_param res_arg ->
+                add_plain_var_projection
+                  ~local_var_ids
+                  ~local_subst
+                  ~lhs_kind:(Solver.kind ctx decl_param)
+                  res_arg)
+              decl_params res_args;
+          (* Step 3: apply the substitution to payload kinds:
+             - mapped locals use their projected kinds
+             - unmapped locals fall back to their declared bounds
+             - non-local names are left unchanged. *)
+          (* Rewrite projected local vars in payload kinds; unmapped locals
+             fall back to their declared bounds. *)
+          let map_name (name : Ldd.Name.t) =
+            match name with
+            | Ldd.Name.Param id -> (
+              match Hashtbl.find_opt local_subst id with
+              | Some projected -> projected
+              | None ->
+                if Hashtbl.mem local_var_ids id
+                then
+                  (match Hashtbl.find_opt local_var_bounds id with
+                  | Some bound -> bound
+                  | None -> Ldd.const Axis_lattice.top)
+                else Solver.node_of_name ctx name)
+            | Ldd.Name.Unknown _ | Ldd.Name.Atom _ ->
+              Solver.node_of_name ctx name
+          in
+          fun ty ->
+            let raw_kind = Solver.kind ctx ty in
+            Ldd.map_rigid map_name raw_kind
+      | _ -> fallback)
 
 (* Lookup function supplied to the solver.
    We prefer a stored ikind (when present) and otherwise recompute from the
@@ -562,16 +701,6 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
              properties rather than modal axes. *)
           use_decl_jkind ~treat_as_abstract:false
         | Types.Type_variant (cstrs, rep, _umc_opt) ->
-          (* GADTs introduce existential type variables via [cd_res] and can
-             install local equations. For ikinds, we conservatively round up
-             when we see GADT constructors to avoid leaking existentials into
-             stored polynomials. *)
-          let has_gadt_constructor =
-            List.exists
-              (fun (c : Types.constructor_declaration) ->
-                Option.is_some c.cd_res)
-              cstrs
-          in
           (* Choose base: immediate for void-only variants; sync if any record
              field is atomic; mutable if any non-atomic mutable field appears;
              otherwise immutable. *)
@@ -596,17 +725,26 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
           in
           let kind : Solver.ckind =
            fun (ctx : Solver.ctx) ->
-            let ctx =
-              if has_gadt_constructor
-              then Solver.reset_for_mode ctx ~mode:Solver.Round_up
-              else ctx
-            in
             let base_lat0 =
               if all_args_void
               then Axis_lattice.immediate
               else Axis_lattice.immutable_data
             in
+            let payload_kind_of_constructor =
+              if
+                List.exists
+                  (fun (c : Types.constructor_declaration) ->
+                    Option.is_some c.cd_res)
+                  cstrs
+              then
+                make_gadt_payload_projector
+                  ~decl_params:type_decl.type_params ctx
+              else
+                fun (_c : Types.constructor_declaration) ty ->
+                  Solver.kind ctx ty
+            in
             let constructor_contrib (c : Types.constructor_declaration) =
+              let payload_kind = payload_kind_of_constructor c in
               match c.cd_args with
               | Types.Cstr_tuple args ->
                 Ldd.sum args
@@ -618,7 +756,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
                     in
                     Ldd.meet
                       (Ldd.const mask)
-                      (Solver.kind ctx arg.ca_type))
+                      (payload_kind arg.ca_type))
               | Types.Cstr_record lbls ->
                 Ldd.sum lbls
                   ~base:Ldd.bot
@@ -631,7 +769,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
                       (label_mutability_contribution lbl)
                       (Ldd.meet
                          (Ldd.const mask)
-                         (Solver.kind ctx lbl.ld_type)))
+                         (payload_kind lbl.ld_type)))
             in
             Ldd.sum cstrs
               ~base:(Ldd.const base_lat0)
