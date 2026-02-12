@@ -808,13 +808,14 @@ let default_mapper =
     type_exception = T.map_type_exception;
     extension_constructor = T.map_extension_constructor;
     value_description =
-      (fun this {pval_name; pval_type; pval_modalities; pval_prim; pval_loc;
-                 pval_attributes} ->
+      (fun this {pval_name; pval_type; pval_modalities; pval_prim; pval_poly;
+                 pval_loc; pval_attributes} ->
         Val.mk
           (map_loc this pval_name)
           (this.typ this pval_type)
           ~attrs:(this.attributes this pval_attributes)
           ~loc:(this.location this pval_loc)
+          ~poly:pval_poly
           ~modalities:(this.modalities this pval_modalities)
           ~prim:pval_prim
       );
@@ -891,7 +892,8 @@ let default_mapper =
 
 
     value_binding =
-      (fun this {pvb_pat; pvb_expr; pvb_constraint; pvb_modes; pvb_attributes; pvb_loc} ->
+      (fun this {pvb_pat; pvb_expr; pvb_constraint; pvb_is_poly; pvb_modes;
+                 pvb_attributes; pvb_loc} ->
          let map_ct (ct:Parsetree.value_constraint) = match ct with
            | Pvc_constraint {locally_abstract_univars=vars; typ} ->
                Pvc_constraint
@@ -908,6 +910,7 @@ let default_mapper =
            (this.pat this pvb_pat)
            (this.expr this pvb_expr)
            ?value_constraint:(Option.map map_ct pvb_constraint)
+           ~poly:pvb_is_poly
            ~loc:(this.location this pvb_loc)
            ~modes:(this.modes this pvb_modes)
            ~attrs:(this.attributes this pvb_attributes)

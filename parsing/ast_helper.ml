@@ -473,8 +473,9 @@ end
 
 module Val = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-        ?(prim = []) ?(modalities=[]) name typ =
+        ?(prim = []) ?(poly = false) ?(modalities=[]) name typ =
     {
+     pval_poly = poly;
      pval_name = name;
      pval_type = typ;
      pval_attributes = add_docs_attrs docs attrs;
@@ -558,8 +559,9 @@ end
 
 module Vb = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-        ?(text = []) ?value_constraint ?(modes = []) pat expr =
+        ?(text = []) ?value_constraint ?(poly = false) ?(modes = []) pat expr =
     {
+     pvb_is_poly = poly;
      pvb_pat = pat;
      pvb_expr = expr;
      pvb_constraint=value_constraint;

@@ -126,6 +126,7 @@ type error =
   | Illegal_mixed_product of mixed_product_violation
   | Separability of Typedecl_separability.error
   | Bad_unboxed_attribute of string
+  | Poly_not_yet_implemented
   | Boxed_and_unboxed
   | Nonrec_gadt
   | Invalid_private_row_declaration of type_expr
@@ -3868,6 +3869,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
   let mode, val_modalities, val_modal_info =
     match modal with
     | Str_primitive ->
+        assert (not valdecl.pval_poly);
         let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
         let modes = List.map modality_to_mode valdecl.pval_modalities in
         let modes = Typemode.transl_mode_annots modes in
@@ -3880,6 +3882,11 @@ let transl_value_decl env loc ~modal ~why valdecl =
         in
         mode, Mode.Modality.undefined, Valmi_str_primitive modes
     | Sig_value (md_mode, sig_modalities) ->
+        if valdecl.pval_poly then begin
+          Language_extension.assert_enabled ~loc Layout_poly
+            Language_extension.Alpha;
+          raise (Error (loc, Poly_not_yet_implemented))
+        end;
         let raw_modalities =
           Typemode.transl_modalities_with_default
             ~maturity:Stable ~default:sig_modalities valdecl.pval_modalities
@@ -3955,6 +3962,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
   | [] ->
       raise (Error(valdecl.pval_loc, Val_in_structure))
   | _ ->
+      (* external declarations do not support poly_ *)
+      assert (not valdecl.pval_poly);
       let global_repr =
         match
           get_native_repr_attribute valdecl.pval_attributes ~global_repr:None
@@ -4843,6 +4852,9 @@ let report_error_doc ppf = function
     end
   | Bad_unboxed_attribute msg ->
       fprintf ppf "@[This type cannot be unboxed because@ %s.@]" msg
+  | Poly_not_yet_implemented ->
+      fprintf ppf "@[The %a annotation is not yet implemented.@]"
+        Style.inline_code "val poly_"
   | Separability (Typedecl_separability.Non_separable_evar evar) ->
       let pp_evar ppf = function
         | None ->

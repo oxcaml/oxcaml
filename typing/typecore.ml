@@ -297,6 +297,7 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Eval_format
+  | Let_poly_not_yet_implemented
 
 
 let not_principal fmt =
@@ -5721,7 +5722,13 @@ let vb_exp_constraint {pvb_expr=expr; pvb_pat=pat; pvb_constraint=ct; pvb_modes=
       List.fold_right mk_newtype locally_abstract_univars expr
 
 let vb_pat_constraint
-      ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; _ } as vb) =
+      ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; pvb_is_poly;
+        pvb_loc; _ } as vb) =
+  if pvb_is_poly then begin
+    Language_extension.assert_enabled ~loc:pvb_loc Layout_poly
+      Language_extension.Alpha;
+    raise (Error (pvb_loc, Env.empty, Let_poly_not_yet_implemented))
+  end;
   let spat =
     let open Ast_helper in
     let loc =
@@ -12297,6 +12304,10 @@ let report_error ~loc env =
         "The eval extension takes a single type as its argument, for \
          example %a."
         Style.inline_code "[%eval: int]"
+  | Let_poly_not_yet_implemented ->
+      Location.errorf ~loc
+        "The %a annotation is not yet implemented."
+        Style.inline_code "let poly_"
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

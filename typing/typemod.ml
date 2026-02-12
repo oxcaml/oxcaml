@@ -3563,6 +3563,8 @@ and type_structure ?(toplevel = None) funct_body anchor env sstr =
         shape_map,
         newenv
     | Pstr_primitive sdesc ->
+        (* external declarations do not support poly_ *)
+        assert (not sdesc.pval_poly);
         let (desc, mode, newenv) =
           Typedecl.transl_value_decl env ~modal:Str_primitive
             ~why:Structure_item loc sdesc
