@@ -698,17 +698,3 @@ and code_binding ppf
 
 let flambda_unit ppf ({ body } : flambda_unit) =
   Format.fprintf ppf "@[<v>@[%a@]@ @]" (expr Outer) body
-
-let expect_test_spec ppf ({ before; after } : expect_test_spec) =
-  Format.fprintf ppf "@[<v>%a===>@ %a@]" flambda_unit before flambda_unit after
-
-let markdown_doc ppf nodes =
-  Format.fprintf ppf "@[<v>";
-  List.iter
-    (fun (node : markdown_node) ->
-      match node with
-      | Text text -> Format.pp_print_string ppf text
-      | Expect spec ->
-        Format.fprintf ppf "```flexpect@ %a@ ```@ " expect_test_spec spec)
-    nodes;
-  Format.fprintf ppf "@]"

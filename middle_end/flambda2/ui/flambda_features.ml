@@ -164,8 +164,6 @@ let dump_fexpr pass =
     !Oxcaml_flags.Flambda2.Dump.fexpr
   | (Last_pass | This_pass _), _ -> Nowhere
 
-let dump_flexpect () = !Oxcaml_flags.Flambda2.Dump.flexpect
-
 let dump_slot_offsets () = !Oxcaml_flags.Flambda2.Dump.slot_offsets
 
 let dump_flow () = !Oxcaml_flags.Flambda2.Dump.flow

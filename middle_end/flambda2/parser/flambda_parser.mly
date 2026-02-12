@@ -60,7 +60,6 @@ let make_boxed_const_int (i, m) : static_data =
 
 %token AMP   [@symbol "&"]
 %token AT    [@symbol "@"]
-%token BIGARROW [@symbol "===>"]
 %token BLANK [@symbol "_"]
 %token CARET [@symbol "^"]
 %token COLON  [@symbol ":"]
@@ -165,13 +164,12 @@ let make_boxed_const_int (i, m) : static_data =
 %token STATIC_CONST_FLOAT_BLOCK [@symbol "Float_block"]
 %token STATIC_CONST_EMPTY_ARRAY [@symbol "Empty_array"]
 
-%start flambda_unit expect_test_spec
+%start flambda_unit
 %type <Fexpr.alloc_mode_for_allocations> alloc_mode_for_allocations_opt
 %type <Fexpr.alloc_mode_for_applications> alloc_mode_for_applications_opt
 %type <Fexpr.empty_array_kind> empty_array_kind
 %type <Fexpr.const> const
 %type <Fexpr.continuation> continuation
-%type <Fexpr.expect_test_spec> expect_test_spec
 %type <Fexpr.field_of_block> field_of_block
 %type <Fexpr.flambda_unit> flambda_unit
 %type <Fexpr.continuation_sort option> continuation_sort
@@ -202,11 +200,6 @@ flambda_unit:
   | body = module_
     EOF
     { body }
-;
-
-expect_test_spec:
-  | before = module_; BIGARROW; after = module_; EOF
-    { { before; after } }
 ;
 
 (* XCR lwhite: Probably easier to just use some default names for these

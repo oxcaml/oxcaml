@@ -102,7 +102,6 @@ type token =
   | COLON
   | CARET
   | BLANK
-  | BIGARROW
   | AT
   | AMP
 
@@ -113,8 +112,6 @@ exception Error
 (* The monolithic API. *)
 
 val flambda_unit: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (Fexpr.flambda_unit)
-
-val expect_test_spec: (Lexing.lexbuf -> token) -> Lexing.lexbuf -> (Fexpr.expect_test_spec)
 
 module MenhirInterpreter : sig
   
@@ -130,7 +127,5 @@ end
 module Incremental : sig
   
   val flambda_unit: Lexing.position -> (Fexpr.flambda_unit) MenhirInterpreter.checkpoint
-  
-  val expect_test_spec: Lexing.position -> (Fexpr.expect_test_spec) MenhirInterpreter.checkpoint
   
 end

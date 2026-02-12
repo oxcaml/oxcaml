@@ -6,7 +6,7 @@ flambda_unit: KWD_APPLY SYMBOL LPAREN RPAREN KWD_WITH
 ##
 ## Ends in an error in state: 398.
 ##
-## apply_expr -> call_kind option(inlined) option(inlining_state) simple simple_args . MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) simple simple_args . MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## call_kind option(inlined) option(inlining_state) simple simple_args
@@ -20,7 +20,7 @@ flambda_unit: KWD_APPLY SYMBOL MINUSGREATER IDENT KWD_WITH
 ##
 ## Ends in an error in state: 400.
 ##
-## apply_expr -> call_kind option(inlined) option(inlining_state) simple simple_args MINUSGREATER result_continuation . exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) simple simple_args MINUSGREATER result_continuation . exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## call_kind option(inlined) option(inlining_state) simple simple_args MINUSGREATER result_continuation
@@ -34,7 +34,7 @@ flambda_unit: KWD_APPLY SYMBOL MINUSGREATER KWD_WITH
 ##
 ## Ends in an error in state: 399.
 ##
-## apply_expr -> call_kind option(inlined) option(inlining_state) simple simple_args MINUSGREATER . result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) simple simple_args MINUSGREATER . result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## call_kind option(inlined) option(inlining_state) simple simple_args MINUSGREATER
@@ -48,7 +48,7 @@ flambda_unit: KWD_APPLY SYMBOL KWD_WITH
 ##
 ## Ends in an error in state: 397.
 ##
-## apply_expr -> call_kind option(inlined) option(inlining_state) simple . simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) simple . simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ## simple -> simple . TILDE coercion [ TILDE MINUSGREATER LPAREN ]
 ##
 ## The known suffix of the stack is as follows:
@@ -65,7 +65,7 @@ flambda_unit: KWD_APPLY KWD_WITH
 ##
 ## Ends in an error in state: 327.
 ##
-## atomic_expr -> KWD_APPLY . apply_expr [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## atomic_expr -> KWD_APPLY . apply_expr [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_APPLY
@@ -94,7 +94,7 @@ flambda_unit: KWD_CONT IDENT LPAREN KWD_WITH
 ##
 ## Ends in an error in state: 60.
 ##
-## simple_args -> LPAREN . loption(separated_nonempty_list(COMMA,simple)) RPAREN [ RPAREN PIPE MINUSGREATER KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## simple_args -> LPAREN . loption(separated_nonempty_list(COMMA,simple)) RPAREN [ RPAREN PIPE MINUSGREATER KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAREN
@@ -111,7 +111,7 @@ flambda_unit: KWD_CONT IDENT KWD_VAL
 ##
 ## Ends in an error in state: 44.
 ##
-## apply_cont_expr -> continuation . option(trap_action) simple_args [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_cont_expr -> continuation . option(trap_action) simple_args [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## continuation
@@ -127,7 +127,7 @@ flambda_unit: KWD_CONT KWD_WITH
 ##
 ## Ends in an error in state: 325.
 ##
-## atomic_expr -> KWD_CONT . apply_cont_expr [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## atomic_expr -> KWD_CONT . apply_cont_expr [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_CONT
@@ -240,7 +240,7 @@ flambda_unit: KWD_LET SYMBOL EQUAL KWD_CLOSURE IDENT KWD_IN KWD_WITH
 ##
 ## Ends in an error in state: 447.
 ##
-## let_symbol(expr) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN . expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF BIGARROW ]
+## let_symbol(expr) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN . expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN
@@ -298,8 +298,8 @@ flambda_unit: KWD_LET KWD_WITH
 ##
 ## Ends in an error in state: 75.
 ##
-## let_expr(expr) -> KWD_LET . let_(expr) [ RPAREN KWD_WITH KWD_IN KWD_AND EOF BIGARROW ]
-## let_symbol(expr) -> KWD_LET . separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF BIGARROW ]
+## let_expr(expr) -> KWD_LET . let_(expr) [ RPAREN KWD_WITH KWD_IN KWD_AND EOF ]
+## let_symbol(expr) -> KWD_LET . separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_LET
@@ -313,7 +313,7 @@ Examples of let expressions:
 
 flambda_unit: KWD_SWITCH SYMBOL KWD_WITH
 ##
-## Ends in an error in state: 463.
+## Ends in an error in state: 456.
 ##
 ## flambda_unit -> module_ . EOF [ # ]
 ##
@@ -330,7 +330,7 @@ flambda_unit: KWD_SWITCH SYMBOL KWD_WITH
 ## In state 34, spurious reduction of production atomic_expr -> KWD_SWITCH simple switch
 ## In state 444, spurious reduction of production inner_expr -> atomic_expr
 ## In state 409, spurious reduction of production expr -> inner_expr
-## In state 460, spurious reduction of production module_ -> expr
+## In state 459, spurious reduction of production module_ -> expr
 ##
 
 Expected one or more switch cases, separated by semicolons, surrounded by {}.
@@ -339,7 +339,7 @@ Example:
 
 flambda_unit: KWD_WITH
 ##
-## Ends in an error in state: 462.
+## Ends in an error in state: 0.
 ##
 ## flambda_unit' -> . flambda_unit [ # ]
 ##
@@ -349,23 +349,223 @@ flambda_unit: KWD_WITH
 
 Expected an expression.
 
-expect_test_spec: TILDE
-##
-## Ends in an error in state: 0.
-##
-## expect_test_spec' -> . expect_test_spec [ # ]
-##
-## The known suffix of the stack is as follows:
-##
-##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: LPAREN TILDE
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+flambda_unit: LPAREN TILDE
 ##
 ## Ends in an error in state: 1.
 ##
-## atomic_expr -> LPAREN . expr RPAREN [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## atomic_expr -> LPAREN . expr RPAREN [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAREN
@@ -373,11 +573,11 @@ expect_test_spec: LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_SWITCH TILDE
+flambda_unit: KWD_SWITCH TILDE
 ##
 ## Ends in an error in state: 3.
 ##
-## atomic_expr -> KWD_SWITCH . simple switch [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## atomic_expr -> KWD_SWITCH . simple switch [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_SWITCH
@@ -385,12 +585,12 @@ expect_test_spec: KWD_SWITCH TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_SWITCH FLOAT SYMBOL
+flambda_unit: KWD_SWITCH FLOAT SYMBOL
 ##
 ## Ends in an error in state: 11.
 ##
-## atomic_expr -> KWD_SWITCH simple . switch [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
-## simple -> simple . TILDE coercion [ TILDE RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND INT EOF BIGARROW ]
+## atomic_expr -> KWD_SWITCH simple . switch [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
+## simple -> simple . TILDE coercion [ TILDE RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND INT EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_SWITCH simple
@@ -398,11 +598,11 @@ expect_test_spec: KWD_SWITCH FLOAT SYMBOL
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_SWITCH FLOAT TILDE TILDE
+flambda_unit: KWD_SWITCH FLOAT TILDE TILDE
 ##
 ## Ends in an error in state: 12.
 ##
-## simple -> simple TILDE . coercion [ TILDE SEMICOLON RPAREN RBRACE PIPE MINUSGREATER LPAREN LBRACK KWD_WITH KWD_WHERE KWD_VAL KWD_REGION KWD_REC_INFO KWD_NATIVEINT KWD_INT64 KWD_INT32 KWD_IN KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY KWD_ANDWHERE KWD_AND INT EOF COMMA COLON BIGARROW ]
+## simple -> simple TILDE . coercion [ TILDE SEMICOLON RPAREN RBRACE PIPE MINUSGREATER LPAREN LBRACK KWD_WITH KWD_WHERE KWD_VAL KWD_REGION KWD_REC_INFO KWD_NATIVEINT KWD_INT64 KWD_INT32 KWD_IN KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY KWD_ANDWHERE KWD_AND INT EOF COMMA COLON ]
 ##
 ## The known suffix of the stack is as follows:
 ## simple TILDE
@@ -410,11 +610,11 @@ expect_test_spec: KWD_SWITCH FLOAT TILDE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_SWITCH FLOAT TILDE KWD_DEPTH TILDE
+flambda_unit: KWD_SWITCH FLOAT TILDE KWD_DEPTH TILDE
 ##
 ## Ends in an error in state: 14.
 ##
-## coercion -> KWD_DEPTH . rec_info MINUSGREATER rec_info [ TILDE SEMICOLON RPAREN RBRACE PIPE MINUSGREATER LPAREN LBRACK KWD_WITH KWD_WHERE KWD_VAL KWD_REGION KWD_REC_INFO KWD_NATIVEINT KWD_INT64 KWD_INT32 KWD_IN KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY KWD_ANDWHERE KWD_AND INT EOF COMMA COLON BIGARROW ]
+## coercion -> KWD_DEPTH . rec_info MINUSGREATER rec_info [ TILDE SEMICOLON RPAREN RBRACE PIPE MINUSGREATER LPAREN LBRACK KWD_WITH KWD_WHERE KWD_VAL KWD_REGION KWD_REC_INFO KWD_NATIVEINT KWD_INT64 KWD_INT32 KWD_IN KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY KWD_ANDWHERE KWD_AND INT EOF COMMA COLON ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_DEPTH
@@ -422,11 +622,11 @@ expect_test_spec: KWD_SWITCH FLOAT TILDE KWD_DEPTH TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL KWD_REC_INFO LPAREN TILDE
+flambda_unit: KWD_LET IDENT EQUAL KWD_REC_INFO LPAREN TILDE
 ##
 ## Ends in an error in state: 15.
 ##
-## rec_info_atom -> LPAREN . rec_info RPAREN [ TILDE SEMICOLON RPAREN RBRACE PIPE MINUSGREATER LPAREN LBRACK KWD_WITH KWD_WHERE KWD_VAL KWD_REGION KWD_REC_INFO KWD_NATIVEINT KWD_INT64 KWD_INT32 KWD_IN KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY KWD_ANDWHERE KWD_AND INT EOF COMMA COLON BIGARROW ]
+## rec_info_atom -> LPAREN . rec_info RPAREN [ TILDE SEMICOLON RPAREN RBRACE PIPE MINUSGREATER LPAREN LBRACK KWD_WITH KWD_WHERE KWD_VAL KWD_REGION KWD_REC_INFO KWD_NATIVEINT KWD_INT64 KWD_INT32 KWD_IN KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY KWD_ANDWHERE KWD_AND INT EOF COMMA COLON ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAREN
@@ -434,11 +634,11 @@ expect_test_spec: KWD_LET IDENT EQUAL KWD_REC_INFO LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_SWITCH FLOAT TILDE KWD_DEPTH KWD_UNROLL TILDE
+flambda_unit: KWD_SWITCH FLOAT TILDE KWD_DEPTH KWD_UNROLL TILDE
 ##
 ## Ends in an error in state: 16.
 ##
-## rec_info -> KWD_UNROLL . plain_int rec_info_atom [ TILDE SEMICOLON RPAREN RBRACE PIPE MINUSGREATER LPAREN LBRACK KWD_WITH KWD_WHERE KWD_VAL KWD_REGION KWD_REC_INFO KWD_NATIVEINT KWD_INT64 KWD_INT32 KWD_IN KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY KWD_ANDWHERE KWD_AND INT EOF COMMA COLON BIGARROW ]
+## rec_info -> KWD_UNROLL . plain_int rec_info_atom [ TILDE SEMICOLON RPAREN RBRACE PIPE MINUSGREATER LPAREN LBRACK KWD_WITH KWD_WHERE KWD_VAL KWD_REGION KWD_REC_INFO KWD_NATIVEINT KWD_INT64 KWD_INT32 KWD_IN KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY KWD_ANDWHERE KWD_AND INT EOF COMMA COLON ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_UNROLL
@@ -446,11 +646,11 @@ expect_test_spec: KWD_SWITCH FLOAT TILDE KWD_DEPTH KWD_UNROLL TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_SWITCH FLOAT TILDE KWD_DEPTH KWD_UNROLL INT TILDE
+flambda_unit: KWD_SWITCH FLOAT TILDE KWD_DEPTH KWD_UNROLL INT TILDE
 ##
 ## Ends in an error in state: 18.
 ##
-## rec_info -> KWD_UNROLL plain_int . rec_info_atom [ TILDE SEMICOLON RPAREN RBRACE PIPE MINUSGREATER LPAREN LBRACK KWD_WITH KWD_WHERE KWD_VAL KWD_REGION KWD_REC_INFO KWD_NATIVEINT KWD_INT64 KWD_INT32 KWD_IN KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY KWD_ANDWHERE KWD_AND INT EOF COMMA COLON BIGARROW ]
+## rec_info -> KWD_UNROLL plain_int . rec_info_atom [ TILDE SEMICOLON RPAREN RBRACE PIPE MINUSGREATER LPAREN LBRACK KWD_WITH KWD_WHERE KWD_VAL KWD_REGION KWD_REC_INFO KWD_NATIVEINT KWD_INT64 KWD_INT32 KWD_IN KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY KWD_ANDWHERE KWD_AND INT EOF COMMA COLON ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_UNROLL plain_int
@@ -458,11 +658,11 @@ expect_test_spec: KWD_SWITCH FLOAT TILDE KWD_DEPTH KWD_UNROLL INT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_SWITCH FLOAT TILDE KWD_DEPTH KWD_SUCC TILDE
+flambda_unit: KWD_SWITCH FLOAT TILDE KWD_DEPTH KWD_SUCC TILDE
 ##
 ## Ends in an error in state: 24.
 ##
-## rec_info -> KWD_SUCC . rec_info_atom [ TILDE SEMICOLON RPAREN RBRACE PIPE MINUSGREATER LPAREN LBRACK KWD_WITH KWD_WHERE KWD_VAL KWD_REGION KWD_REC_INFO KWD_NATIVEINT KWD_INT64 KWD_INT32 KWD_IN KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY KWD_ANDWHERE KWD_AND INT EOF COMMA COLON BIGARROW ]
+## rec_info -> KWD_SUCC . rec_info_atom [ TILDE SEMICOLON RPAREN RBRACE PIPE MINUSGREATER LPAREN LBRACK KWD_WITH KWD_WHERE KWD_VAL KWD_REGION KWD_REC_INFO KWD_NATIVEINT KWD_INT64 KWD_INT32 KWD_IN KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY KWD_ANDWHERE KWD_AND INT EOF COMMA COLON ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_SUCC
@@ -470,11 +670,11 @@ expect_test_spec: KWD_SWITCH FLOAT TILDE KWD_DEPTH KWD_SUCC TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL KWD_REC_INFO LPAREN INT TILDE
+flambda_unit: KWD_LET IDENT EQUAL KWD_REC_INFO LPAREN INT TILDE
 ##
 ## Ends in an error in state: 27.
 ##
-## rec_info_atom -> LPAREN rec_info . RPAREN [ TILDE SEMICOLON RPAREN RBRACE PIPE MINUSGREATER LPAREN LBRACK KWD_WITH KWD_WHERE KWD_VAL KWD_REGION KWD_REC_INFO KWD_NATIVEINT KWD_INT64 KWD_INT32 KWD_IN KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY KWD_ANDWHERE KWD_AND INT EOF COMMA COLON BIGARROW ]
+## rec_info_atom -> LPAREN rec_info . RPAREN [ TILDE SEMICOLON RPAREN RBRACE PIPE MINUSGREATER LPAREN LBRACK KWD_WITH KWD_WHERE KWD_VAL KWD_REGION KWD_REC_INFO KWD_NATIVEINT KWD_INT64 KWD_INT32 KWD_IN KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY KWD_ANDWHERE KWD_AND INT EOF COMMA COLON ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAREN rec_info
@@ -482,11 +682,11 @@ expect_test_spec: KWD_LET IDENT EQUAL KWD_REC_INFO LPAREN INT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_SWITCH FLOAT TILDE KWD_DEPTH INT TILDE
+flambda_unit: KWD_SWITCH FLOAT TILDE KWD_DEPTH INT TILDE
 ##
 ## Ends in an error in state: 29.
 ##
-## coercion -> KWD_DEPTH rec_info . MINUSGREATER rec_info [ TILDE SEMICOLON RPAREN RBRACE PIPE MINUSGREATER LPAREN LBRACK KWD_WITH KWD_WHERE KWD_VAL KWD_REGION KWD_REC_INFO KWD_NATIVEINT KWD_INT64 KWD_INT32 KWD_IN KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY KWD_ANDWHERE KWD_AND INT EOF COMMA COLON BIGARROW ]
+## coercion -> KWD_DEPTH rec_info . MINUSGREATER rec_info [ TILDE SEMICOLON RPAREN RBRACE PIPE MINUSGREATER LPAREN LBRACK KWD_WITH KWD_WHERE KWD_VAL KWD_REGION KWD_REC_INFO KWD_NATIVEINT KWD_INT64 KWD_INT32 KWD_IN KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY KWD_ANDWHERE KWD_AND INT EOF COMMA COLON ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_DEPTH rec_info
@@ -494,11 +694,11 @@ expect_test_spec: KWD_SWITCH FLOAT TILDE KWD_DEPTH INT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_SWITCH FLOAT TILDE KWD_DEPTH INT MINUSGREATER TILDE
+flambda_unit: KWD_SWITCH FLOAT TILDE KWD_DEPTH INT MINUSGREATER TILDE
 ##
 ## Ends in an error in state: 30.
 ##
-## coercion -> KWD_DEPTH rec_info MINUSGREATER . rec_info [ TILDE SEMICOLON RPAREN RBRACE PIPE MINUSGREATER LPAREN LBRACK KWD_WITH KWD_WHERE KWD_VAL KWD_REGION KWD_REC_INFO KWD_NATIVEINT KWD_INT64 KWD_INT32 KWD_IN KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY KWD_ANDWHERE KWD_AND INT EOF COMMA COLON BIGARROW ]
+## coercion -> KWD_DEPTH rec_info MINUSGREATER . rec_info [ TILDE SEMICOLON RPAREN RBRACE PIPE MINUSGREATER LPAREN LBRACK KWD_WITH KWD_WHERE KWD_VAL KWD_REGION KWD_REC_INFO KWD_NATIVEINT KWD_INT64 KWD_INT32 KWD_IN KWD_IMM KWD_FLOAT32 KWD_FLOAT KWD_ANY KWD_ANDWHERE KWD_AND INT EOF COMMA COLON ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_DEPTH rec_info MINUSGREATER
@@ -506,11 +706,11 @@ expect_test_spec: KWD_SWITCH FLOAT TILDE KWD_DEPTH INT MINUSGREATER TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_SWITCH FLOAT PIPE TILDE
+flambda_unit: KWD_SWITCH FLOAT PIPE TILDE
 ##
 ## Ends in an error in state: 35.
 ##
-## switch -> option(PIPE) . loption(separated_nonempty_list(PIPE,switch_case)) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## switch -> option(PIPE) . loption(separated_nonempty_list(PIPE,switch_case)) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## option(PIPE)
@@ -518,11 +718,11 @@ expect_test_spec: KWD_SWITCH FLOAT PIPE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_SWITCH FLOAT INT TILDE
+flambda_unit: KWD_SWITCH FLOAT INT TILDE
 ##
 ## Ends in an error in state: 37.
 ##
-## switch_case -> tag . MINUSGREATER apply_cont_expr [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## switch_case -> tag . MINUSGREATER apply_cont_expr [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## tag
@@ -530,11 +730,11 @@ expect_test_spec: KWD_SWITCH FLOAT INT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_SWITCH FLOAT INT MINUSGREATER TILDE
+flambda_unit: KWD_SWITCH FLOAT INT MINUSGREATER TILDE
 ##
 ## Ends in an error in state: 38.
 ##
-## switch_case -> tag MINUSGREATER . apply_cont_expr [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## switch_case -> tag MINUSGREATER . apply_cont_expr [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## tag MINUSGREATER
@@ -542,11 +742,11 @@ expect_test_spec: KWD_SWITCH FLOAT INT MINUSGREATER TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_CONT IDENT KWD_PUSH TILDE
+flambda_unit: KWD_CONT IDENT KWD_PUSH TILDE
 ##
 ## Ends in an error in state: 45.
 ##
-## trap_action -> KWD_PUSH . LPAREN continuation RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## trap_action -> KWD_PUSH . LPAREN continuation RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_PUSH
@@ -554,11 +754,11 @@ expect_test_spec: KWD_CONT IDENT KWD_PUSH TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_CONT IDENT KWD_PUSH LPAREN TILDE
+flambda_unit: KWD_CONT IDENT KWD_PUSH LPAREN TILDE
 ##
 ## Ends in an error in state: 46.
 ##
-## trap_action -> KWD_PUSH LPAREN . continuation RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## trap_action -> KWD_PUSH LPAREN . continuation RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_PUSH LPAREN
@@ -566,11 +766,11 @@ expect_test_spec: KWD_CONT IDENT KWD_PUSH LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_CONT IDENT KWD_PUSH LPAREN IDENT TILDE
+flambda_unit: KWD_CONT IDENT KWD_PUSH LPAREN IDENT TILDE
 ##
 ## Ends in an error in state: 47.
 ##
-## trap_action -> KWD_PUSH LPAREN continuation . RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## trap_action -> KWD_PUSH LPAREN continuation . RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_PUSH LPAREN continuation
@@ -578,11 +778,11 @@ expect_test_spec: KWD_CONT IDENT KWD_PUSH LPAREN IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_CONT IDENT KWD_POP TILDE
+flambda_unit: KWD_CONT IDENT KWD_POP TILDE
 ##
 ## Ends in an error in state: 49.
 ##
-## trap_action -> KWD_POP . LPAREN option(raise_kind) continuation RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## trap_action -> KWD_POP . LPAREN option(raise_kind) continuation RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_POP
@@ -590,11 +790,11 @@ expect_test_spec: KWD_CONT IDENT KWD_POP TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_CONT IDENT KWD_POP LPAREN TILDE
+flambda_unit: KWD_CONT IDENT KWD_POP LPAREN TILDE
 ##
 ## Ends in an error in state: 50.
 ##
-## trap_action -> KWD_POP LPAREN . option(raise_kind) continuation RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## trap_action -> KWD_POP LPAREN . option(raise_kind) continuation RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_POP LPAREN
@@ -602,11 +802,11 @@ expect_test_spec: KWD_CONT IDENT KWD_POP LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_CONT IDENT KWD_POP LPAREN KWD_NOTRACE TILDE
+flambda_unit: KWD_CONT IDENT KWD_POP LPAREN KWD_NOTRACE TILDE
 ##
 ## Ends in an error in state: 55.
 ##
-## trap_action -> KWD_POP LPAREN option(raise_kind) . continuation RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## trap_action -> KWD_POP LPAREN option(raise_kind) . continuation RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_POP LPAREN option(raise_kind)
@@ -614,11 +814,11 @@ expect_test_spec: KWD_CONT IDENT KWD_POP LPAREN KWD_NOTRACE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_CONT IDENT KWD_POP LPAREN IDENT TILDE
+flambda_unit: KWD_CONT IDENT KWD_POP LPAREN IDENT TILDE
 ##
 ## Ends in an error in state: 56.
 ##
-## trap_action -> KWD_POP LPAREN option(raise_kind) continuation . RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## trap_action -> KWD_POP LPAREN option(raise_kind) continuation . RPAREN [ RPAREN PIPE LPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_POP LPAREN option(raise_kind) continuation
@@ -626,11 +826,11 @@ expect_test_spec: KWD_CONT IDENT KWD_POP LPAREN IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_CONT IDENT KWD_POP LPAREN IDENT RPAREN TILDE
+flambda_unit: KWD_CONT IDENT KWD_POP LPAREN IDENT RPAREN TILDE
 ##
 ## Ends in an error in state: 59.
 ##
-## apply_cont_expr -> continuation option(trap_action) . simple_args [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_cont_expr -> continuation option(trap_action) . simple_args [ RPAREN PIPE KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## continuation option(trap_action)
@@ -638,7 +838,7 @@ expect_test_spec: KWD_CONT IDENT KWD_POP LPAREN IDENT RPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COMMA TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COMMA TILDE
 ##
 ## Ends in an error in state: 62.
 ##
@@ -650,12 +850,12 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COMMA TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_SWITCH FLOAT INT MINUSGREATER IDENT LPAREN RPAREN TILDE
+flambda_unit: KWD_SWITCH FLOAT INT MINUSGREATER IDENT LPAREN RPAREN TILDE
 ##
 ## Ends in an error in state: 70.
 ##
-## separated_nonempty_list(PIPE,switch_case) -> switch_case . [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
-## separated_nonempty_list(PIPE,switch_case) -> switch_case . PIPE separated_nonempty_list(PIPE,switch_case) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## separated_nonempty_list(PIPE,switch_case) -> switch_case . [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
+## separated_nonempty_list(PIPE,switch_case) -> switch_case . PIPE separated_nonempty_list(PIPE,switch_case) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## switch_case
@@ -663,11 +863,11 @@ expect_test_spec: KWD_SWITCH FLOAT INT MINUSGREATER IDENT LPAREN RPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_SWITCH FLOAT INT MINUSGREATER IDENT PIPE TILDE
+flambda_unit: KWD_SWITCH FLOAT INT MINUSGREATER IDENT PIPE TILDE
 ##
 ## Ends in an error in state: 71.
 ##
-## separated_nonempty_list(PIPE,switch_case) -> switch_case PIPE . separated_nonempty_list(PIPE,switch_case) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## separated_nonempty_list(PIPE,switch_case) -> switch_case PIPE . separated_nonempty_list(PIPE,switch_case) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## switch_case PIPE
@@ -675,7 +875,7 @@ expect_test_spec: KWD_SWITCH FLOAT INT MINUSGREATER IDENT PIPE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_SET_OF_CLOSURES TILDE
+flambda_unit: KWD_LET KWD_SET_OF_CLOSURES TILDE
 ##
 ## Ends in an error in state: 76.
 ##
@@ -687,7 +887,7 @@ expect_test_spec: KWD_LET KWD_SET_OF_CLOSURES TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_SET_OF_CLOSURES SYMBOL TILDE
+flambda_unit: KWD_LET KWD_SET_OF_CLOSURES SYMBOL TILDE
 ##
 ## Ends in an error in state: 77.
 ##
@@ -699,7 +899,7 @@ expect_test_spec: KWD_LET KWD_SET_OF_CLOSURES SYMBOL TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL TILDE
+flambda_unit: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL TILDE
 ##
 ## Ends in an error in state: 78.
 ##
@@ -711,7 +911,7 @@ expect_test_spec: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL KWD_CLOSURE TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL KWD_CLOSURE TILDE
 ##
 ## Ends in an error in state: 79.
 ##
@@ -723,7 +923,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL KWD_CLOSURE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_DIRECT LPAREN IDENT AT TILDE
+flambda_unit: KWD_APPLY KWD_DIRECT LPAREN IDENT AT TILDE
 ##
 ## Ends in an error in state: 82.
 ##
@@ -735,7 +935,7 @@ expect_test_spec: KWD_APPLY KWD_DIRECT LPAREN IDENT AT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL KWD_CLOSURE IDENT AT IDENT TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL KWD_CLOSURE IDENT AT IDENT TILDE
 ##
 ## Ends in an error in state: 85.
 ##
@@ -747,7 +947,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL KWD_CLOSURE IDENT AT IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL KWD_CLOSURE IDENT AMP TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL KWD_CLOSURE IDENT AMP TILDE
 ##
 ## Ends in an error in state: 86.
 ##
@@ -759,7 +959,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL KWD_CLOSURE IDENT AMP TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL KWD_CLOSURE IDENT KWD_IN
+flambda_unit: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL KWD_CLOSURE IDENT KWD_IN
 ##
 ## Ends in an error in state: 92.
 ##
@@ -781,7 +981,7 @@ expect_test_spec: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL KWD_CLOSURE IDENT KWD
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL KWD_CLOSURE IDENT KWD_AND TILDE
+flambda_unit: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL KWD_CLOSURE IDENT KWD_AND TILDE
 ##
 ## Ends in an error in state: 93.
 ##
@@ -793,7 +993,7 @@ expect_test_spec: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL KWD_CLOSURE IDENT KWD
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL PRIM KWD_WITH TILDE
+flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH TILDE
 ##
 ## Ends in an error in state: 96.
 ##
@@ -805,7 +1005,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM KWD_WITH TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE TILDE
+flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE TILDE
 ##
 ## Ends in an error in state: 97.
 ##
@@ -817,7 +1017,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT TILDE
+flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT TILDE
 ##
 ## Ends in an error in state: 99.
 ##
@@ -829,7 +1029,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT EQUAL TILDE
+flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT EQUAL TILDE
 ##
 ## Ends in an error in state: 100.
 ##
@@ -841,7 +1041,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT EQUAL TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT EQUAL FLOAT SYMBOL
+flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT EQUAL FLOAT SYMBOL
 ##
 ## Ends in an error in state: 101.
 ##
@@ -854,7 +1054,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT EQUAL FLOAT SYM
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT EQUAL FLOAT SEMICOLON TILDE
+flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT EQUAL FLOAT SEMICOLON TILDE
 ##
 ## Ends in an error in state: 103.
 ##
@@ -866,7 +1066,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE IDENT EQUAL FLOAT SEM
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL KWD_CLOSURE IDENT KWD_WITH LBRACE RBRACE TILDE
+flambda_unit: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL KWD_CLOSURE IDENT KWD_WITH LBRACE RBRACE TILDE
 ##
 ## Ends in an error in state: 108.
 ##
@@ -878,7 +1078,7 @@ expect_test_spec: KWD_LET KWD_SET_OF_CLOSURES SYMBOL EQUAL KWD_CLOSURE IDENT KWD
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_UNROLL TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_UNROLL TILDE
 ##
 ## Ends in an error in state: 113.
 ##
@@ -890,7 +1090,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_UNROLL TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_UNROLL LPAREN TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_UNROLL LPAREN TILDE
 ##
 ## Ends in an error in state: 114.
 ##
@@ -902,7 +1102,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_UNROLL LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_UNROLL LPAREN INT TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_UNROLL LPAREN INT TILDE
 ##
 ## Ends in an error in state: 115.
 ##
@@ -914,7 +1114,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_UNROLL LPAREN INT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_INLINE TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_INLINE TILDE
 ##
 ## Ends in an error in state: 117.
 ##
@@ -929,7 +1129,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_INLINE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_INLINE LPAREN TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_INLINE LPAREN TILDE
 ##
 ## Ends in an error in state: 118.
 ##
@@ -944,7 +1144,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_INLINE LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_NEVER TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_NEVER TILDE
 ##
 ## Ends in an error in state: 119.
 ##
@@ -956,7 +1156,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_NEVER TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_DEFAULT TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_DEFAULT TILDE
 ##
 ## Ends in an error in state: 121.
 ##
@@ -968,7 +1168,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_DEFAULT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_AVAILABLE TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_AVAILABLE TILDE
 ##
 ## Ends in an error in state: 123.
 ##
@@ -980,7 +1180,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_AVAILABLE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_ALWAYS TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_ALWAYS TILDE
 ##
 ## Ends in an error in state: 125.
 ##
@@ -992,7 +1192,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_ALWAYS TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_ALWAYS RPAREN TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_ALWAYS RPAREN TILDE
 ##
 ## Ends in an error in state: 127.
 ##
@@ -1004,7 +1204,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_INLINE LPAREN KWD_ALWAYS RPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_LOOPIFY TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_LOOPIFY TILDE
 ##
 ## Ends in an error in state: 128.
 ##
@@ -1016,7 +1216,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_LOOPIFY TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN TILDE
 ##
 ## Ends in an error in state: 129.
 ##
@@ -1028,7 +1228,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN KWD_DEFAULT TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN KWD_DEFAULT TILDE
 ##
 ## Ends in an error in state: 132.
 ##
@@ -1041,7 +1241,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN KWD_DEFAULT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN KWD_ALWAYS TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN KWD_ALWAYS TILDE
 ##
 ## Ends in an error in state: 135.
 ##
@@ -1053,7 +1253,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN KWD_ALWAYS TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN KWD_ALWAYS RPAREN TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN KWD_ALWAYS RPAREN TILDE
 ##
 ## Ends in an error in state: 137.
 ##
@@ -1065,7 +1265,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_LOOPIFY LPAREN KWD_ALWAYS RPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE TILDE
 ##
 ## Ends in an error in state: 138.
 ##
@@ -1077,7 +1277,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN TILDE
 ##
 ## Ends in an error in state: 139.
 ##
@@ -1089,7 +1289,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT TILDE
 ##
 ## Ends in an error in state: 141.
 ##
@@ -1101,7 +1301,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN TILDE
 ##
 ## Ends in an error in state: 142.
 ##
@@ -1113,7 +1313,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_OF TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_OF TILDE
 ##
 ## Ends in an error in state: 143.
 ##
@@ -1125,7 +1325,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_OF LPAREN TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_OF LPAREN TILDE
 ##
 ## Ends in an error in state: 144.
 ##
@@ -1137,7 +1337,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_OF LPAREN IDENT TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_OF LPAREN IDENT TILDE
 ##
 ## Ends in an error in state: 145.
 ##
@@ -1149,7 +1349,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_OF LPAREN IDENT RPAREN TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_OF LPAREN IDENT RPAREN TILDE
 ##
 ## Ends in an error in state: 147.
 ##
@@ -1161,7 +1361,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_NEWER_VERSION_
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_TUPLED TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_TUPLED TILDE
 ##
 ## Ends in an error in state: 149.
 ##
@@ -1173,7 +1373,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN KWD_TUPLED TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT TILDE
+flambda_unit: KWD_LET IDENT TILDE
 ##
 ## Ends in an error in state: 155.
 ##
@@ -1185,7 +1385,7 @@ expect_test_spec: KWD_LET IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL TILDE
+flambda_unit: KWD_LET IDENT EQUAL TILDE
 ##
 ## Ends in an error in state: 156.
 ##
@@ -1197,7 +1397,7 @@ expect_test_spec: KWD_LET IDENT EQUAL TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL PRIM TILDE
+flambda_unit: KWD_LET IDENT EQUAL PRIM TILDE
 ##
 ## Ends in an error in state: 157.
 ##
@@ -1209,7 +1409,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL PRIM DOT TILDE
+flambda_unit: KWD_LET IDENT EQUAL PRIM DOT TILDE
 ##
 ## Ends in an error in state: 158.
 ##
@@ -1223,7 +1423,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM DOT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL PRIM DOT LBRACK TILDE
+flambda_unit: KWD_LET IDENT EQUAL PRIM DOT LBRACK TILDE
 ##
 ## Ends in an error in state: 159.
 ##
@@ -1235,7 +1435,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM DOT LBRACK TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL PRIM DOT LBRACK IDENT TILDE
+flambda_unit: KWD_LET IDENT EQUAL PRIM DOT LBRACK IDENT TILDE
 ##
 ## Ends in an error in state: 162.
 ##
@@ -1247,7 +1447,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM DOT LBRACK IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL PRIM DOT IDENT TILDE
+flambda_unit: KWD_LET IDENT EQUAL PRIM DOT IDENT TILDE
 ##
 ## Ends in an error in state: 164.
 ##
@@ -1260,7 +1460,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM DOT IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL PRIM DOT IDENT LBRACK TILDE
+flambda_unit: KWD_LET IDENT EQUAL PRIM DOT IDENT LBRACK TILDE
 ##
 ## Ends in an error in state: 165.
 ##
@@ -1272,7 +1472,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM DOT IDENT LBRACK TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL PRIM DOT IDENT LBRACK IDENT TILDE
+flambda_unit: KWD_LET IDENT EQUAL PRIM DOT IDENT LBRACK IDENT TILDE
 ##
 ## Ends in an error in state: 166.
 ##
@@ -1284,7 +1484,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM DOT IDENT LBRACK IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL PRIM DOT LBRACK IDENT RBRACK TILDE
+flambda_unit: KWD_LET IDENT EQUAL PRIM DOT LBRACK IDENT RBRACK TILDE
 ##
 ## Ends in an error in state: 168.
 ##
@@ -1296,7 +1496,7 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM DOT LBRACK IDENT RBRACK TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL KWD_REC_INFO TILDE
+flambda_unit: KWD_LET IDENT EQUAL KWD_REC_INFO TILDE
 ##
 ## Ends in an error in state: 171.
 ##
@@ -1308,7 +1508,7 @@ expect_test_spec: KWD_LET IDENT EQUAL KWD_REC_INFO TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL FLOAT SYMBOL
+flambda_unit: KWD_LET IDENT EQUAL FLOAT SYMBOL
 ##
 ## Ends in an error in state: 173.
 ##
@@ -1321,7 +1521,7 @@ expect_test_spec: KWD_LET IDENT EQUAL FLOAT SYMBOL
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY TILDE
 ##
 ## Ends in an error in state: 183.
 ##
@@ -1333,7 +1533,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY LBRACKPIPE TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY LBRACKPIPE TILDE
 ##
 ## Ends in an error in state: 184.
 ##
@@ -1345,7 +1545,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY LBRACKPIPE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY LBRACKPIPE SYMBOL TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY LBRACKPIPE SYMBOL TILDE
 ##
 ## Ends in an error in state: 191.
 ##
@@ -1358,7 +1558,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY LBRACKPIPE SYMBO
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY LBRACKPIPE SYMBOL SEMICOLON TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY LBRACKPIPE SYMBOL SEMICOLON TILDE
 ##
 ## Ends in an error in state: 192.
 ##
@@ -1370,7 +1570,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_VALUE_ARRAY LBRACKPIPE SYMBO
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK TILDE
 ##
 ## Ends in an error in state: 194.
 ##
@@ -1382,7 +1582,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK LPAREN TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK LPAREN TILDE
 ##
 ## Ends in an error in state: 195.
 ##
@@ -1394,7 +1594,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK LPAREN IDENT TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK LPAREN IDENT TILDE
 ##
 ## Ends in an error in state: 201.
 ##
@@ -1407,7 +1607,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK LPAREN IDENT TIL
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK LPAREN IDENT COMMA TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK LPAREN IDENT COMMA TILDE
 ##
 ## Ends in an error in state: 202.
 ##
@@ -1419,7 +1619,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_BLOCK LPAREN IDENT COM
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_ARRAY TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_ARRAY TILDE
 ##
 ## Ends in an error in state: 204.
 ##
@@ -1431,7 +1631,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_ARRAY TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_ARRAY LBRACKPIPE TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_ARRAY LBRACKPIPE TILDE
 ##
 ## Ends in an error in state: 205.
 ##
@@ -1443,7 +1643,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_ARRAY LBRACKPIPE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_ARRAY LBRACKPIPE IDENT TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_ARRAY LBRACKPIPE IDENT TILDE
 ##
 ## Ends in an error in state: 209.
 ##
@@ -1456,7 +1656,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_ARRAY LBRACKPIPE IDENT
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_ARRAY LBRACKPIPE IDENT SEMICOLON TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_ARRAY LBRACKPIPE IDENT SEMICOLON TILDE
 ##
 ## Ends in an error in state: 210.
 ##
@@ -1468,7 +1668,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_FLOAT_ARRAY LBRACKPIPE IDENT
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK TILDE
 ##
 ## Ends in an error in state: 214.
 ##
@@ -1480,7 +1680,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK KWD_IMMUTABLE_UNIQUE TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK KWD_IMMUTABLE_UNIQUE TILDE
 ##
 ## Ends in an error in state: 217.
 ##
@@ -1492,7 +1692,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK KWD_IMMUTABLE_UNIQUE T
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT TILDE
 ##
 ## Ends in an error in state: 218.
 ##
@@ -1504,7 +1704,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT LPAREN TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT LPAREN TILDE
 ##
 ## Ends in an error in state: 219.
 ##
@@ -1516,7 +1716,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT LPAREN SYMBOL TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT LPAREN SYMBOL TILDE
 ##
 ## Ends in an error in state: 223.
 ##
@@ -1529,7 +1729,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT LPAREN SYMBOL TILD
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT LPAREN SYMBOL COMMA TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT LPAREN SYMBOL COMMA TILDE
 ##
 ## Ends in an error in state: 224.
 ##
@@ -1541,7 +1741,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL STATIC_CONST_BLOCK INT LPAREN SYMBOL COMM
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL KWD_MUTABLE TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL KWD_MUTABLE TILDE
 ##
 ## Ends in an error in state: 226.
 ##
@@ -1553,7 +1753,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL KWD_MUTABLE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL IDENT TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL IDENT TILDE
 ##
 ## Ends in an error in state: 230.
 ##
@@ -1565,7 +1765,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL IDENT COLON TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON TILDE
 ##
 ## Ends in an error in state: 231.
 ##
@@ -1577,7 +1777,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL IDENT COLON TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL IDENT COLON KWD_NATIVEINT TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_NATIVEINT TILDE
 ##
 ## Ends in an error in state: 232.
 ##
@@ -1589,7 +1789,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL IDENT COLON KWD_NATIVEINT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL IDENT COLON KWD_INT64 TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_INT64 TILDE
 ##
 ## Ends in an error in state: 234.
 ##
@@ -1601,7 +1801,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL IDENT COLON KWD_INT64 TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL IDENT COLON KWD_INT32 TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_INT32 TILDE
 ##
 ## Ends in an error in state: 236.
 ##
@@ -1613,7 +1813,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL IDENT COLON KWD_INT32 TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL IDENT COLON KWD_FLOAT32 TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_FLOAT32 TILDE
 ##
 ## Ends in an error in state: 238.
 ##
@@ -1625,7 +1825,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL IDENT COLON KWD_FLOAT32 TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET SYMBOL EQUAL IDENT COLON KWD_FLOAT TILDE
+flambda_unit: KWD_LET SYMBOL EQUAL IDENT COLON KWD_FLOAT TILDE
 ##
 ## Ends in an error in state: 240.
 ##
@@ -1637,7 +1837,7 @@ expect_test_spec: KWD_LET SYMBOL EQUAL IDENT COLON KWD_FLOAT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT TILDE
 ##
 ## Ends in an error in state: 249.
 ##
@@ -1649,11 +1849,11 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN TILDE
+flambda_unit: KWD_HCF KWD_WHERE KWD_REC LPAREN TILDE
 ##
 ## Ends in an error in state: 250.
 ##
-## kinded_args -> LPAREN . separated_nonempty_list(COMMA,kinded_variable) RPAREN [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND IDENT EQUAL EOF BIGARROW ]
+## kinded_args -> LPAREN . separated_nonempty_list(COMMA,kinded_variable) RPAREN [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND IDENT EQUAL EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAREN
@@ -1661,7 +1861,7 @@ expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT TILDE
+flambda_unit: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT TILDE
 ##
 ## Ends in an error in state: 251.
 ##
@@ -1673,7 +1873,7 @@ expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COLON TILDE
+flambda_unit: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COLON TILDE
 ##
 ## Ends in an error in state: 252.
 ##
@@ -1685,7 +1885,7 @@ expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COLON TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON LBRACK TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON LBRACK TILDE
 ##
 ## Ends in an error in state: 253.
 ##
@@ -1697,7 +1897,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON LBRACK TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON LBRACK INT TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON LBRACK INT TILDE
 ##
 ## Ends in an error in state: 254.
 ##
@@ -1710,7 +1910,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON LBRACK INT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON LBRACK INT PIPE TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON LBRACK INT PIPE TILDE
 ##
 ## Ends in an error in state: 256.
 ##
@@ -1722,7 +1922,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON LBRACK INT PIPE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON LBRACK INT KWD_OF KWD_FLOAT PIPE INT TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON LBRACK INT KWD_OF KWD_FLOAT PIPE INT TILDE
 ##
 ## Ends in an error in state: 257.
 ##
@@ -1734,7 +1934,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON LBRACK INT KWD_OF KWD_FLOAT PIPE 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON LBRACK INT KWD_OF TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON LBRACK INT KWD_OF TILDE
 ##
 ## Ends in an error in state: 258.
 ##
@@ -1746,7 +1946,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON LBRACK INT KWD_OF TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_VAL TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_VAL TILDE
 ##
 ## Ends in an error in state: 259.
 ##
@@ -1759,7 +1959,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_VAL TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_NATIVEINT TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_NATIVEINT TILDE
 ##
 ## Ends in an error in state: 263.
 ##
@@ -1772,7 +1972,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_NATIVEINT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_INT64 TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_INT64 TILDE
 ##
 ## Ends in an error in state: 265.
 ##
@@ -1785,7 +1985,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_INT64 TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_INT32 TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_INT32 TILDE
 ##
 ## Ends in an error in state: 267.
 ##
@@ -1798,7 +1998,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_INT32 TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_IMM TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_IMM TILDE
 ##
 ## Ends in an error in state: 269.
 ##
@@ -1812,7 +2012,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_IMM TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT32 TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT32 TILDE
 ##
 ## Ends in an error in state: 272.
 ##
@@ -1825,7 +2025,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT32 TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT TILDE
 ##
 ## Ends in an error in state: 274.
 ##
@@ -1840,7 +2040,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT CARET TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT CARET TILDE
 ##
 ## Ends in an error in state: 277.
 ##
@@ -1852,7 +2052,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT CARET TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_ANY TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_ANY TILDE
 ##
 ## Ends in an error in state: 279.
 ##
@@ -1864,7 +2064,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_ANY TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_REC_INFO TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_REC_INFO TILDE
 ##
 ## Ends in an error in state: 285.
 ##
@@ -1877,7 +2077,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_REC_INFO TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT STAR TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT STAR TILDE
 ##
 ## Ends in an error in state: 286.
 ##
@@ -1889,7 +2089,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT STAR TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON LBRACK INT KWD_OF KWD_FLOAT RPAREN
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON LBRACK INT KWD_OF KWD_FLOAT RPAREN
 ##
 ## Ends in an error in state: 290.
 ##
@@ -1912,7 +2112,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON LBRACK INT KWD_OF KWD_FLOAT RPARE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON LBRACK INT KWD_OF KWD_FLOAT PIPE TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON LBRACK INT KWD_OF KWD_FLOAT PIPE TILDE
 ##
 ## Ends in an error in state: 291.
 ##
@@ -1924,7 +2124,7 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON LBRACK INT KWD_OF KWD_FLOAT PIPE 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COLON KWD_REC_INFO TILDE
+flambda_unit: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COLON KWD_REC_INFO TILDE
 ##
 ## Ends in an error in state: 301.
 ##
@@ -1937,7 +2137,7 @@ expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COLON KWD_REC_INFO TILD
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COMMA TILDE
+flambda_unit: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COMMA TILDE
 ##
 ## Ends in an error in state: 302.
 ##
@@ -1949,7 +2149,7 @@ expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT COMMA TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT LPAREN IDENT RPAREN TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT LPAREN IDENT RPAREN TILDE
 ##
 ## Ends in an error in state: 304.
 ##
@@ -1961,7 +2161,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT LPAREN IDENT
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT TILDE
 ##
 ## Ends in an error in state: 305.
 ##
@@ -1973,7 +2173,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT TILDE
 ##
 ## Ends in an error in state: 306.
 ##
@@ -1985,7 +2185,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT TILDE
 ##
 ## Ends in an error in state: 307.
 ##
@@ -1997,7 +2197,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT TILDE
 ##
 ## Ends in an error in state: 308.
 ##
@@ -2009,7 +2209,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER TILDE
 ##
 ## Ends in an error in state: 309.
 ##
@@ -2021,7 +2221,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT TILDE
 ##
 ## Ends in an error in state: 310.
 ##
@@ -2033,7 +2233,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT STAR TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT STAR TILDE
 ##
 ## Ends in an error in state: 311.
 ##
@@ -2045,7 +2245,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT STAR IDENT TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT STAR IDENT TILDE
 ##
 ## Ends in an error in state: 313.
 ##
@@ -2057,7 +2257,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT STAR IDENT COLON TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT STAR IDENT COLON TILDE
 ##
 ## Ends in an error in state: 314.
 ##
@@ -2069,7 +2269,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT STAR IDENT COLON KWD_UNIT TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT STAR IDENT COLON KWD_UNIT TILDE
 ##
 ## Ends in an error in state: 318.
 ##
@@ -2081,7 +2281,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT STAR IDENT KWD_LOCAL TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT STAR IDENT KWD_LOCAL TILDE
 ##
 ## Ends in an error in state: 320.
 ##
@@ -2093,7 +2293,7 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT STAR IDENT EQUAL TILDE
+flambda_unit: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT IDENT IDENT MINUSGREATER IDENT STAR IDENT EQUAL TILDE
 ##
 ## Ends in an error in state: 321.
 ##
@@ -2105,11 +2305,11 @@ expect_test_spec: KWD_LET KWD_CODE KWD_SIZE LPAREN INT RPAREN IDENT IDENT IDENT 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_INVALID TILDE
+flambda_unit: KWD_INVALID TILDE
 ##
 ## Ends in an error in state: 322.
 ##
-## atomic_expr -> KWD_INVALID . STRING [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## atomic_expr -> KWD_INVALID . STRING [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_INVALID
@@ -2117,7 +2317,7 @@ expect_test_spec: KWD_INVALID TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_DIRECT TILDE
+flambda_unit: KWD_APPLY KWD_DIRECT TILDE
 ##
 ## Ends in an error in state: 328.
 ##
@@ -2129,7 +2329,7 @@ expect_test_spec: KWD_APPLY KWD_DIRECT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_DIRECT LPAREN TILDE
+flambda_unit: KWD_APPLY KWD_DIRECT LPAREN TILDE
 ##
 ## Ends in an error in state: 329.
 ##
@@ -2141,7 +2341,7 @@ expect_test_spec: KWD_APPLY KWD_DIRECT LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_DIRECT LPAREN IDENT TILDE
+flambda_unit: KWD_APPLY KWD_DIRECT LPAREN IDENT TILDE
 ##
 ## Ends in an error in state: 330.
 ##
@@ -2153,7 +2353,7 @@ expect_test_spec: KWD_APPLY KWD_DIRECT LPAREN IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_DIRECT LPAREN IDENT AT IDENT TILDE
+flambda_unit: KWD_APPLY KWD_DIRECT LPAREN IDENT AT IDENT TILDE
 ##
 ## Ends in an error in state: 331.
 ##
@@ -2165,7 +2365,7 @@ expect_test_spec: KWD_APPLY KWD_DIRECT LPAREN IDENT AT IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY AMP TILDE
+flambda_unit: KWD_APPLY AMP TILDE
 ##
 ## Ends in an error in state: 332.
 ##
@@ -2177,7 +2377,7 @@ expect_test_spec: KWD_APPLY AMP TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY AMP IDENT TILDE
+flambda_unit: KWD_APPLY AMP IDENT TILDE
 ##
 ## Ends in an error in state: 333.
 ##
@@ -2189,7 +2389,7 @@ expect_test_spec: KWD_APPLY AMP IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY AMP IDENT AMP TILDE
+flambda_unit: KWD_APPLY AMP IDENT AMP TILDE
 ##
 ## Ends in an error in state: 334.
 ##
@@ -2201,7 +2401,7 @@ expect_test_spec: KWD_APPLY AMP IDENT AMP TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_DIRECT LPAREN IDENT AMP IDENT AMP IDENT TILDE
+flambda_unit: KWD_APPLY KWD_DIRECT LPAREN IDENT AMP IDENT AMP IDENT TILDE
 ##
 ## Ends in an error in state: 336.
 ##
@@ -2213,7 +2413,7 @@ expect_test_spec: KWD_APPLY KWD_DIRECT LPAREN IDENT AMP IDENT AMP IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_CCALL TILDE
+flambda_unit: KWD_APPLY KWD_CCALL TILDE
 ##
 ## Ends in an error in state: 338.
 ##
@@ -2225,13 +2425,13 @@ expect_test_spec: KWD_APPLY KWD_CCALL TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_CCALL KWD_NOALLOC TILDE
+flambda_unit: KWD_APPLY KWD_CCALL KWD_NOALLOC TILDE
 ##
 ## Ends in an error in state: 341.
 ##
-## apply_expr -> call_kind . option(inlined) option(inlining_state) simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
-## apply_expr -> call_kind . option(inlined) option(inlining_state) simple simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
-## apply_expr -> call_kind . option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind . option(inlined) option(inlining_state) simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
+## apply_expr -> call_kind . option(inlined) option(inlining_state) simple simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
+## apply_expr -> call_kind . option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## call_kind
@@ -2239,7 +2439,7 @@ expect_test_spec: KWD_APPLY KWD_CCALL KWD_NOALLOC TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_UNROLL TILDE
+flambda_unit: KWD_APPLY KWD_UNROLL TILDE
 ##
 ## Ends in an error in state: 342.
 ##
@@ -2251,7 +2451,7 @@ expect_test_spec: KWD_APPLY KWD_UNROLL TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_UNROLL LPAREN TILDE
+flambda_unit: KWD_APPLY KWD_UNROLL LPAREN TILDE
 ##
 ## Ends in an error in state: 343.
 ##
@@ -2263,7 +2463,7 @@ expect_test_spec: KWD_APPLY KWD_UNROLL LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_UNROLL LPAREN INT TILDE
+flambda_unit: KWD_APPLY KWD_UNROLL LPAREN INT TILDE
 ##
 ## Ends in an error in state: 344.
 ##
@@ -2275,7 +2475,7 @@ expect_test_spec: KWD_APPLY KWD_UNROLL LPAREN INT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_INLINED TILDE
+flambda_unit: KWD_APPLY KWD_INLINED TILDE
 ##
 ## Ends in an error in state: 346.
 ##
@@ -2290,7 +2490,7 @@ expect_test_spec: KWD_APPLY KWD_INLINED TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_INLINED LPAREN TILDE
+flambda_unit: KWD_APPLY KWD_INLINED LPAREN TILDE
 ##
 ## Ends in an error in state: 347.
 ##
@@ -2305,7 +2505,7 @@ expect_test_spec: KWD_APPLY KWD_INLINED LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_INLINED LPAREN KWD_NEVER TILDE
+flambda_unit: KWD_APPLY KWD_INLINED LPAREN KWD_NEVER TILDE
 ##
 ## Ends in an error in state: 348.
 ##
@@ -2317,7 +2517,7 @@ expect_test_spec: KWD_APPLY KWD_INLINED LPAREN KWD_NEVER TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_INLINED LPAREN KWD_HINT TILDE
+flambda_unit: KWD_APPLY KWD_INLINED LPAREN KWD_HINT TILDE
 ##
 ## Ends in an error in state: 350.
 ##
@@ -2329,7 +2529,7 @@ expect_test_spec: KWD_APPLY KWD_INLINED LPAREN KWD_HINT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_INLINED LPAREN KWD_DEFAULT TILDE
+flambda_unit: KWD_APPLY KWD_INLINED LPAREN KWD_DEFAULT TILDE
 ##
 ## Ends in an error in state: 352.
 ##
@@ -2341,7 +2541,7 @@ expect_test_spec: KWD_APPLY KWD_INLINED LPAREN KWD_DEFAULT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_INLINED LPAREN KWD_ALWAYS TILDE
+flambda_unit: KWD_APPLY KWD_INLINED LPAREN KWD_ALWAYS TILDE
 ##
 ## Ends in an error in state: 354.
 ##
@@ -2353,13 +2553,13 @@ expect_test_spec: KWD_APPLY KWD_INLINED LPAREN KWD_ALWAYS TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_INLINED LPAREN KWD_ALWAYS RPAREN TILDE
+flambda_unit: KWD_APPLY KWD_INLINED LPAREN KWD_ALWAYS RPAREN TILDE
 ##
 ## Ends in an error in state: 356.
 ##
-## apply_expr -> call_kind option(inlined) . option(inlining_state) simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
-## apply_expr -> call_kind option(inlined) . option(inlining_state) simple simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
-## apply_expr -> call_kind option(inlined) . option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) . option(inlining_state) simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
+## apply_expr -> call_kind option(inlined) . option(inlining_state) simple simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
+## apply_expr -> call_kind option(inlined) . option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## call_kind option(inlined)
@@ -2367,7 +2567,7 @@ expect_test_spec: KWD_APPLY KWD_INLINED LPAREN KWD_ALWAYS RPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_INLINING_STATE TILDE
+flambda_unit: KWD_APPLY KWD_INLINING_STATE TILDE
 ##
 ## Ends in an error in state: 357.
 ##
@@ -2379,7 +2579,7 @@ expect_test_spec: KWD_APPLY KWD_INLINING_STATE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_INLINING_STATE LPAREN TILDE
+flambda_unit: KWD_APPLY KWD_INLINING_STATE LPAREN TILDE
 ##
 ## Ends in an error in state: 358.
 ##
@@ -2391,7 +2591,7 @@ expect_test_spec: KWD_APPLY KWD_INLINING_STATE LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH TILDE
+flambda_unit: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH TILDE
 ##
 ## Ends in an error in state: 359.
 ##
@@ -2403,7 +2603,7 @@ expect_test_spec: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN TILDE
+flambda_unit: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN TILDE
 ##
 ## Ends in an error in state: 360.
 ##
@@ -2415,7 +2615,7 @@ expect_test_spec: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN INT TILDE
+flambda_unit: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN INT TILDE
 ##
 ## Ends in an error in state: 361.
 ##
@@ -2427,7 +2627,7 @@ expect_test_spec: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN INT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN INT RPAREN TILDE
+flambda_unit: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN INT RPAREN TILDE
 ##
 ## Ends in an error in state: 363.
 ##
@@ -2439,13 +2639,13 @@ expect_test_spec: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN INT RPARE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN INT RPAREN RPAREN TILDE
+flambda_unit: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN INT RPAREN RPAREN TILDE
 ##
 ## Ends in an error in state: 365.
 ##
-## apply_expr -> call_kind option(inlined) option(inlining_state) . simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
-## apply_expr -> call_kind option(inlined) option(inlining_state) . simple simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
-## apply_expr -> call_kind option(inlined) option(inlining_state) . LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) . simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) . simple simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) . LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## call_kind option(inlined) option(inlining_state)
@@ -2453,11 +2653,11 @@ expect_test_spec: KWD_APPLY KWD_INLINING_STATE LPAREN KWD_DEPTH LPAREN INT RPARE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN TILDE
+flambda_unit: KWD_APPLY LPAREN TILDE
 ##
 ## Ends in an error in state: 366.
 ##
-## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN . simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN . simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ## simple_args -> LPAREN . loption(separated_nonempty_list(COMMA,simple)) RPAREN [ MINUSGREATER ]
 ##
 ## The known suffix of the stack is as follows:
@@ -2466,11 +2666,11 @@ expect_test_spec: KWD_APPLY LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT SYMBOL
+flambda_unit: KWD_APPLY LPAREN FLOAT SYMBOL
 ##
 ## Ends in an error in state: 367.
 ##
-## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple . COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple . COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ## separated_nonempty_list(COMMA,simple) -> simple . [ RPAREN ]
 ## separated_nonempty_list(COMMA,simple) -> simple . COMMA separated_nonempty_list(COMMA,simple) [ RPAREN ]
 ## simple -> simple . TILDE coercion [ TILDE RPAREN COMMA COLON ]
@@ -2481,11 +2681,11 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT SYMBOL
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON TILDE
 ##
 ## Ends in an error in state: 368.
 ##
-## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON . blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON . blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## call_kind option(inlined) option(inlining_state) LPAREN simple COLON
@@ -2493,11 +2693,11 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_UNIT TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_UNIT TILDE
 ##
 ## Ends in an error in state: 371.
 ##
-## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) . MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) . MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds)
@@ -2505,11 +2705,11 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_UNIT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER TILDE
 ##
 ## Ends in an error in state: 372.
 ##
-## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER . kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER . kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER
@@ -2517,11 +2717,11 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_UNIT TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_UNIT TILDE
 ##
 ## Ends in an error in state: 373.
 ##
-## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds . RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds . RPAREN simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds
@@ -2529,11 +2729,11 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_UNIT T
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAREN TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAREN TILDE
 ##
 ## Ends in an error in state: 374.
 ##
-## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN . simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN . simple_args MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN
@@ -2541,11 +2741,11 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAREN LPAREN RPAREN TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAREN LPAREN RPAREN TILDE
 ##
 ## Ends in an error in state: 375.
 ##
-## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args . MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args . MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args
@@ -2553,11 +2753,11 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAREN MINUSGREATER TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAREN MINUSGREATER TILDE
 ##
 ## Ends in an error in state: 376.
 ##
-## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER . result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER . result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER
@@ -2565,11 +2765,11 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAREN MINUSGREATER IDENT TILDE
+flambda_unit: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT RPAREN MINUSGREATER IDENT TILDE
 ##
 ## Ends in an error in state: 378.
 ##
-## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation . exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation . exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## call_kind option(inlined) option(inlining_state) LPAREN simple COLON blank_or(kinds_with_subkinds) MINUSGREATER kinds_with_subkinds RPAREN simple_args MINUSGREATER result_continuation
@@ -2577,11 +2777,11 @@ expect_test_spec: KWD_APPLY LPAREN FLOAT COLON KWD_FLOAT MINUSGREATER KWD_FLOAT 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY MINUSGREATER IDENT STAR TILDE
+flambda_unit: KWD_APPLY MINUSGREATER IDENT STAR TILDE
 ##
 ## Ends in an error in state: 379.
 ##
-## exn_continuation -> STAR . continuation loption(exn_extra_args) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## exn_continuation -> STAR . continuation loption(exn_extra_args) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## STAR
@@ -2589,11 +2789,11 @@ expect_test_spec: KWD_APPLY MINUSGREATER IDENT STAR TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY MINUSGREATER IDENT STAR IDENT TILDE
+flambda_unit: KWD_APPLY MINUSGREATER IDENT STAR IDENT TILDE
 ##
 ## Ends in an error in state: 380.
 ##
-## exn_continuation -> STAR continuation . loption(exn_extra_args) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## exn_continuation -> STAR continuation . loption(exn_extra_args) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## STAR continuation
@@ -2601,11 +2801,11 @@ expect_test_spec: KWD_APPLY MINUSGREATER IDENT STAR IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN TILDE
+flambda_unit: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN TILDE
 ##
 ## Ends in an error in state: 381.
 ##
-## exn_extra_args -> LPAREN . separated_nonempty_list(COMMA,exn_extra_arg) RPAREN [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## exn_extra_args -> LPAREN . separated_nonempty_list(COMMA,exn_extra_arg) RPAREN [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAREN
@@ -2613,7 +2813,7 @@ expect_test_spec: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN FLOAT SYMBOL
+flambda_unit: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN FLOAT SYMBOL
 ##
 ## Ends in an error in state: 382.
 ##
@@ -2626,7 +2826,7 @@ expect_test_spec: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN FLOAT SYMBOL
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN FLOAT KWD_REC_INFO TILDE
+flambda_unit: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN FLOAT KWD_REC_INFO TILDE
 ##
 ## Ends in an error in state: 386.
 ##
@@ -2639,7 +2839,7 @@ expect_test_spec: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN FLOAT KWD_REC_I
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN FLOAT KWD_FLOAT COMMA TILDE
+flambda_unit: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN FLOAT KWD_FLOAT COMMA TILDE
 ##
 ## Ends in an error in state: 387.
 ##
@@ -2651,11 +2851,11 @@ expect_test_spec: KWD_APPLY MINUSGREATER IDENT STAR IDENT LPAREN FLOAT KWD_FLOAT
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY LPAREN RPAREN TILDE
+flambda_unit: KWD_APPLY LPAREN RPAREN TILDE
 ##
 ## Ends in an error in state: 393.
 ##
-## apply_expr -> call_kind option(inlined) option(inlining_state) simple_args . MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) simple_args . MINUSGREATER result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## call_kind option(inlined) option(inlining_state) simple_args
@@ -2663,11 +2863,11 @@ expect_test_spec: KWD_APPLY LPAREN RPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY MINUSGREATER TILDE
+flambda_unit: KWD_APPLY MINUSGREATER TILDE
 ##
 ## Ends in an error in state: 394.
 ##
-## apply_expr -> call_kind option(inlined) option(inlining_state) simple_args MINUSGREATER . result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) simple_args MINUSGREATER . result_continuation exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## call_kind option(inlined) option(inlining_state) simple_args MINUSGREATER
@@ -2675,11 +2875,11 @@ expect_test_spec: KWD_APPLY MINUSGREATER TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_APPLY MINUSGREATER IDENT TILDE
+flambda_unit: KWD_APPLY MINUSGREATER IDENT TILDE
 ##
 ## Ends in an error in state: 395.
 ##
-## apply_expr -> call_kind option(inlined) option(inlining_state) simple_args MINUSGREATER result_continuation . exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## apply_expr -> call_kind option(inlined) option(inlining_state) simple_args MINUSGREATER result_continuation . exn_continuation [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## call_kind option(inlined) option(inlining_state) simple_args MINUSGREATER result_continuation
@@ -2687,12 +2887,12 @@ expect_test_spec: KWD_APPLY MINUSGREATER IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF TILDE
+flambda_unit: KWD_HCF TILDE
 ##
 ## Ends in an error in state: 409.
 ##
-## expr -> inner_expr . [ RPAREN KWD_WITH KWD_IN KWD_AND EOF BIGARROW ]
-## where_expr -> inner_expr . KWD_WHERE cont_recursive loption(separated_nonempty_list(KWD_ANDWHERE,continuation_binding)) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF BIGARROW ]
+## expr -> inner_expr . [ RPAREN KWD_WITH KWD_IN KWD_AND EOF ]
+## where_expr -> inner_expr . KWD_WHERE cont_recursive loption(separated_nonempty_list(KWD_ANDWHERE,continuation_binding)) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## inner_expr
@@ -2700,11 +2900,11 @@ expect_test_spec: KWD_HCF TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE TILDE
+flambda_unit: KWD_HCF KWD_WHERE TILDE
 ##
 ## Ends in an error in state: 410.
 ##
-## where_expr -> inner_expr KWD_WHERE . cont_recursive loption(separated_nonempty_list(KWD_ANDWHERE,continuation_binding)) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF BIGARROW ]
+## where_expr -> inner_expr KWD_WHERE . cont_recursive loption(separated_nonempty_list(KWD_ANDWHERE,continuation_binding)) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## inner_expr KWD_WHERE
@@ -2712,11 +2912,11 @@ expect_test_spec: KWD_HCF KWD_WHERE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE KWD_REC TILDE
+flambda_unit: KWD_HCF KWD_WHERE KWD_REC TILDE
 ##
 ## Ends in an error in state: 411.
 ##
-## cont_recursive -> KWD_REC . kinded_args [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND IDENT EOF BIGARROW ]
+## cont_recursive -> KWD_REC . kinded_args [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND IDENT EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_REC
@@ -2724,11 +2924,11 @@ expect_test_spec: KWD_HCF KWD_WHERE KWD_REC TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT RPAREN TILDE
+flambda_unit: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT RPAREN TILDE
 ##
 ## Ends in an error in state: 413.
 ##
-## where_expr -> inner_expr KWD_WHERE cont_recursive . loption(separated_nonempty_list(KWD_ANDWHERE,continuation_binding)) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF BIGARROW ]
+## where_expr -> inner_expr KWD_WHERE cont_recursive . loption(separated_nonempty_list(KWD_ANDWHERE,continuation_binding)) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## inner_expr KWD_WHERE cont_recursive
@@ -2736,11 +2936,11 @@ expect_test_spec: KWD_HCF KWD_WHERE KWD_REC LPAREN IDENT RPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE IDENT TILDE
+flambda_unit: KWD_HCF KWD_WHERE IDENT TILDE
 ##
 ## Ends in an error in state: 416.
 ##
-## continuation_binding -> continuation_id . continuation_sort kinded_args EQUAL continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## continuation_binding -> continuation_id . continuation_sort kinded_args EQUAL continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## continuation_id
@@ -2748,11 +2948,11 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE IDENT KWD_DEFINE_ROOT_SYMBOL TILDE
+flambda_unit: KWD_HCF KWD_WHERE IDENT KWD_DEFINE_ROOT_SYMBOL TILDE
 ##
 ## Ends in an error in state: 419.
 ##
-## continuation_binding -> continuation_id continuation_sort . kinded_args EQUAL continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## continuation_binding -> continuation_id continuation_sort . kinded_args EQUAL continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## continuation_id continuation_sort
@@ -2760,11 +2960,11 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT KWD_DEFINE_ROOT_SYMBOL TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE IDENT LPAREN IDENT RPAREN TILDE
+flambda_unit: KWD_HCF KWD_WHERE IDENT LPAREN IDENT RPAREN TILDE
 ##
 ## Ends in an error in state: 420.
 ##
-## continuation_binding -> continuation_id continuation_sort kinded_args . EQUAL continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## continuation_binding -> continuation_id continuation_sort kinded_args . EQUAL continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## continuation_id continuation_sort kinded_args
@@ -2772,11 +2972,11 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT LPAREN IDENT RPAREN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL TILDE
+flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL TILDE
 ##
 ## Ends in an error in state: 421.
 ##
-## continuation_binding -> continuation_id continuation_sort kinded_args EQUAL . continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## continuation_binding -> continuation_id continuation_sort kinded_args EQUAL . continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## continuation_id continuation_sort kinded_args EQUAL
@@ -2784,12 +2984,12 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET TILDE
+flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET TILDE
 ##
 ## Ends in an error in state: 422.
 ##
-## let_expr(continuation_body) -> KWD_LET . let_(continuation_body) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
-## let_symbol(continuation_body) -> KWD_LET . separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## let_expr(continuation_body) -> KWD_LET . let_(continuation_body) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
+## let_symbol(continuation_body) -> KWD_LET . separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_LET
@@ -2797,11 +2997,11 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET KWD_CODE IDENT KWD_DELETED KWD_WITH LBRACE RBRACE TILDE
+flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET KWD_CODE IDENT KWD_DELETED KWD_WITH LBRACE RBRACE TILDE
 ##
 ## Ends in an error in state: 424.
 ##
-## let_symbol(continuation_body) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt . KWD_IN continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## let_symbol(continuation_body) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt . KWD_IN continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt
@@ -2809,11 +3009,11 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET KWD_CODE IDENT KWD_DELET
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET KWD_CODE IDENT KWD_DELETED KWD_IN TILDE
+flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET KWD_CODE IDENT KWD_DELETED KWD_IN TILDE
 ##
 ## Ends in an error in state: 425.
 ##
-## let_symbol(continuation_body) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN . continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## let_symbol(continuation_body) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN . continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt KWD_IN
@@ -2821,11 +3021,11 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET KWD_CODE IDENT KWD_DELET
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE RBRACE TILDE
+flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE RBRACE TILDE
 ##
 ## Ends in an error in state: 431.
 ##
-## let_(continuation_body) -> separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt . KWD_IN continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## let_(continuation_body) -> separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt . KWD_IN continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt
@@ -2833,11 +3033,11 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET IDENT EQUAL PRIM KWD_WIT
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET IDENT EQUAL PRIM KWD_IN TILDE
+flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET IDENT EQUAL PRIM KWD_IN TILDE
 ##
 ## Ends in an error in state: 432.
 ##
-## let_(continuation_body) -> separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt KWD_IN . continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## let_(continuation_body) -> separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt KWD_IN . continuation_body [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt KWD_IN
@@ -2845,7 +3045,7 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_LET IDENT EQUAL PRIM KWD_IN 
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL KWD_REC_INFO INT TILDE
+flambda_unit: KWD_LET IDENT EQUAL KWD_REC_INFO INT TILDE
 ##
 ## Ends in an error in state: 434.
 ##
@@ -2858,7 +3058,7 @@ expect_test_spec: KWD_LET IDENT EQUAL KWD_REC_INFO INT TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL PRIM KWD_AND TILDE
+flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_AND TILDE
 ##
 ## Ends in an error in state: 435.
 ##
@@ -2870,12 +3070,12 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM KWD_AND TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_HCF TILDE
+flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_HCF TILDE
 ##
 ## Ends in an error in state: 440.
 ##
-## separated_nonempty_list(KWD_ANDWHERE,continuation_binding) -> continuation_binding . [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF BIGARROW ]
-## separated_nonempty_list(KWD_ANDWHERE,continuation_binding) -> continuation_binding . KWD_ANDWHERE separated_nonempty_list(KWD_ANDWHERE,continuation_binding) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF BIGARROW ]
+## separated_nonempty_list(KWD_ANDWHERE,continuation_binding) -> continuation_binding . [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF ]
+## separated_nonempty_list(KWD_ANDWHERE,continuation_binding) -> continuation_binding . KWD_ANDWHERE separated_nonempty_list(KWD_ANDWHERE,continuation_binding) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## continuation_binding
@@ -2883,11 +3083,11 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_HCF TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_HCF KWD_ANDWHERE TILDE
+flambda_unit: KWD_HCF KWD_WHERE IDENT EQUAL KWD_HCF KWD_ANDWHERE TILDE
 ##
 ## Ends in an error in state: 441.
 ##
-## separated_nonempty_list(KWD_ANDWHERE,continuation_binding) -> continuation_binding KWD_ANDWHERE . separated_nonempty_list(KWD_ANDWHERE,continuation_binding) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF BIGARROW ]
+## separated_nonempty_list(KWD_ANDWHERE,continuation_binding) -> continuation_binding KWD_ANDWHERE . separated_nonempty_list(KWD_ANDWHERE,continuation_binding) [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## continuation_binding KWD_ANDWHERE
@@ -2895,11 +3095,11 @@ expect_test_spec: KWD_HCF KWD_WHERE IDENT EQUAL KWD_HCF KWD_ANDWHERE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET KWD_CODE IDENT KWD_DELETED KWD_WITH LBRACE RBRACE TILDE
+flambda_unit: KWD_LET KWD_CODE IDENT KWD_DELETED KWD_WITH LBRACE RBRACE TILDE
 ##
 ## Ends in an error in state: 446.
 ##
-## let_symbol(expr) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt . KWD_IN expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF BIGARROW ]
+## let_symbol(expr) -> KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt . KWD_IN expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## KWD_LET separated_nonempty_list(KWD_AND,symbol_binding) with_value_slots_opt
@@ -2907,11 +3107,11 @@ expect_test_spec: KWD_LET KWD_CODE IDENT KWD_DELETED KWD_WITH LBRACE RBRACE TILD
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE RBRACE TILDE
+flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE RBRACE TILDE
 ##
 ## Ends in an error in state: 450.
 ##
-## let_(expr) -> separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt . KWD_IN expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF BIGARROW ]
+## let_(expr) -> separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt . KWD_IN expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt
@@ -2919,11 +3119,11 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM KWD_WITH LBRACE RBRACE TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: KWD_LET IDENT EQUAL PRIM KWD_IN TILDE
+flambda_unit: KWD_LET IDENT EQUAL PRIM KWD_IN TILDE
 ##
 ## Ends in an error in state: 451.
 ##
-## let_(expr) -> separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt KWD_IN . expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF BIGARROW ]
+## let_(expr) -> separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt KWD_IN . expr [ RPAREN KWD_WITH KWD_IN KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## separated_nonempty_list(KWD_AND,let_binding) with_value_slots_opt KWD_IN
@@ -2931,11 +3131,11 @@ expect_test_spec: KWD_LET IDENT EQUAL PRIM KWD_IN TILDE
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
 
-expect_test_spec: LPAREN KWD_HCF KWD_WITH
+flambda_unit: LPAREN KWD_HCF KWD_WITH
 ##
 ## Ends in an error in state: 454.
 ##
-## atomic_expr -> LPAREN expr . RPAREN [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF BIGARROW ]
+## atomic_expr -> LPAREN expr . RPAREN [ RPAREN KWD_WITH KWD_WHERE KWD_IN KWD_ANDWHERE KWD_AND EOF ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAREN expr
@@ -2945,56 +3145,6 @@ expect_test_spec: LPAREN KWD_HCF KWD_WITH
 ## accurate view of the past (what has been recognized so far), they
 ## may provide an INCOMPLETE view of the future (what was expected next).
 ## In state 409, spurious reduction of production expr -> inner_expr
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-expect_test_spec: KWD_HCF RPAREN
-##
-## Ends in an error in state: 456.
-##
-## expect_test_spec -> module_ . BIGARROW module_ EOF [ # ]
-##
-## The known suffix of the stack is as follows:
-## module_
-##
-## WARNING: This example involves spurious reductions.
-## This implies that, although the LR(1) items shown above provide an
-## accurate view of the past (what has been recognized so far), they
-## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 409, spurious reduction of production expr -> inner_expr
-## In state 460, spurious reduction of production module_ -> expr
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-expect_test_spec: KWD_HCF BIGARROW TILDE
-##
-## Ends in an error in state: 457.
-##
-## expect_test_spec -> module_ BIGARROW . module_ EOF [ # ]
-##
-## The known suffix of the stack is as follows:
-## module_ BIGARROW
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-expect_test_spec: KWD_HCF BIGARROW KWD_HCF RPAREN
-##
-## Ends in an error in state: 458.
-##
-## expect_test_spec -> module_ BIGARROW module_ . EOF [ # ]
-##
-## The known suffix of the stack is as follows:
-## module_ BIGARROW module_
-##
-## WARNING: This example involves spurious reductions.
-## This implies that, although the LR(1) items shown above provide an
-## accurate view of the past (what has been recognized so far), they
-## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 409, spurious reduction of production expr -> inner_expr
-## In state 460, spurious reduction of production module_ -> expr
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
