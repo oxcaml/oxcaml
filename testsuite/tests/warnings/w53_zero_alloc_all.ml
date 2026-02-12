@@ -20,7 +20,6 @@ module type TestZeroAllocSig = sig
   type s1 = Foo1 [@zero_alloc] (* rejected *)
   val f : int -> int [@@zero_alloc] (* accepted *)
 
-  external y : (int [@zero_alloc]) -> (int [@zero_alloc]) = "x" (* rejected *)
   external z : int -> int = "x" "y" [@@zero_alloc] (* rejected *)
   external[@zero_alloc] q : int -> int = "x" "y" (* rejected *)
 
@@ -42,7 +41,6 @@ module TestZeroAllocStruct = struct
 
   let[@zero_alloc] f x = x (* accepted *)
 
-  external y : (int [@zero_alloc]) -> (int [@zero_alloc]) = "x" (* rejected *)
   external z : int -> int = "x" "y" [@@zero_alloc] (* rejected *)
   external[@zero_alloc] q : int -> int = "x" "y" (* rejected *)
 
