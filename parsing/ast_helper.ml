@@ -561,7 +561,7 @@ module Vb = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
         ?(text = []) ?value_constraint ?(poly = false) ?(modes = []) pat expr =
     {
-     pvb_poly = poly;
+     pvb_is_poly = poly;
      pvb_pat = pat;
      pvb_expr = expr;
      pvb_constraint=value_constraint;

@@ -1397,7 +1397,7 @@ and class_field ctxt f x =
               ppat_attributes=[]};
            pvb_expr=e;
            pvb_constraint=None;
-           pvb_poly=false;
+           pvb_is_poly=false;
            pvb_attributes=[];
            pvb_modes=[];
            pvb_loc=Location.none;
@@ -1769,7 +1769,7 @@ and poly_type_with_optional_modes ctxt f (vars, typ, modes) =
 
 (* transform [f = fun g h -> ..] to [f g h = ... ] could be improved *)
 and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct;
-                    pvb_modes = modes; pvb_poly=_; _} =
+                    pvb_modes = modes; pvb_is_poly=_; _} =
   (* .pvb_attributes have already been printed by the caller, #bindings *)
   match ct with
   | Some (Pvc_constraint { locally_abstract_univars = []; typ }) ->
@@ -1867,7 +1867,7 @@ and bindings ctxt f (mf,rf,l) =
       else
         [], x
     in
-    let poly_str = if x.pvb_poly then "poly_ " else "" in
+    let poly_str = if x.pvb_is_poly then "poly_ " else "" in
     pp f "@[<2>%s %a%s%a%a%a@]%a" kwd mutable_flag mf poly_str rec_flag rf
       optional_legacy_modes legacy
       (binding ctxt) x

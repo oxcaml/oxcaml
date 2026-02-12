@@ -792,7 +792,7 @@ let default_iterator =
 
     value_binding =
       (fun this {pvb_pat; pvb_expr; pvb_attributes; pvb_loc; pvb_constraint;
-                 pvb_poly=_; pvb_modes} ->
+                 pvb_is_poly=_; pvb_modes} ->
          this.modes this pvb_modes;
          this.pat this pvb_pat;
          this.expr this pvb_expr;

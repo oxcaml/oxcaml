@@ -5730,8 +5730,8 @@ let vb_exp_constraint {pvb_expr=expr; pvb_pat=pat; pvb_constraint=ct; pvb_modes=
       List.fold_right mk_newtype locally_abstract_univars expr
 
 let vb_pat_constraint
-      ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; pvb_poly; _ } as vb) =
-  if pvb_poly then
+      ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; pvb_is_poly; _ } as vb) =
+  if pvb_is_poly then
     raise (Error (pat.ppat_loc, Env.empty, Let_poly_not_yet_implemented));
   let spat =
     let open Ast_helper in

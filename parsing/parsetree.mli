@@ -1331,7 +1331,7 @@ and value_constraint =
 
 and value_binding =
   {
-    pvb_poly: bool; (** [let poly_ ] *)
+    pvb_is_poly: bool; (** [let poly_ ] *)
     pvb_pat: pattern;
     pvb_expr: expression;
     pvb_constraint: value_constraint option;

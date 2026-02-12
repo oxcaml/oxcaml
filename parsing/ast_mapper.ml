@@ -892,7 +892,7 @@ let default_mapper =
 
 
     value_binding =
-      (fun this {pvb_pat; pvb_expr; pvb_constraint; pvb_poly; pvb_modes;
+      (fun this {pvb_pat; pvb_expr; pvb_constraint; pvb_is_poly; pvb_modes;
                  pvb_attributes; pvb_loc} ->
          let map_ct (ct:Parsetree.value_constraint) = match ct with
            | Pvc_constraint {locally_abstract_univars=vars; typ} ->
@@ -910,7 +910,7 @@ let default_mapper =
            (this.pat this pvb_pat)
            (this.expr this pvb_expr)
            ?value_constraint:(Option.map map_ct pvb_constraint)
-           ~poly:pvb_poly
+           ~poly:pvb_is_poly
            ~loc:(this.location this pvb_loc)
            ~modes:(this.modes this pvb_modes)
            ~attrs:(this.attributes this pvb_attributes)
