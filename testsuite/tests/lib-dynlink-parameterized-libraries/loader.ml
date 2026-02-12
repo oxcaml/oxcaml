@@ -49,9 +49,6 @@
    program = "plugin.cma";
    module = "";
    all_modules = "\
-     int_elem.cmo \
-     printer.cmo \
-     printer-Int_elem.cmo \
      runner.cmo \
      runner-Int_elem.cmo \
      plugin.cmo \
@@ -63,7 +60,7 @@
    flags = "-linkall";
    include ocamlcommon;
    libraries += "dynlink";
-   all_modules = "loader.ml";
+   all_modules = "int_elem.cmo printer.cmo printer-Int_elem.cmo loader.ml";
    ocamlc.byte;
 
    arguments = "plugin.cma";
@@ -112,9 +109,6 @@
    flags = "-shared";
    module = "";
    all_modules = "\
-     int_elem.cmx \
-     printer.cmx \
-     printer-Int_elem.cmx \
      runner.cmx \
      runner-Int_elem.cmx \
      plugin.cmx \
@@ -125,7 +119,7 @@
    flags = "-linkall";
    include ocamlcommon;
    libraries += "dynlink";
-   all_modules = "loader.ml";
+   all_modules = "int_elem.cmx printer.cmx printer-Int_elem.cmx loader.ml";
    ocamlopt.byte;
 
    arguments = "plugin.cmxs";
