@@ -1710,17 +1710,17 @@ val f : ((repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) -> unit = <fun>
 
 let poly_ id : 'a. 'a -> 'a = fun x -> x
 [%%expect{|
-Line 1, characters 10-12:
+Line 1, characters 0-40:
 1 | let poly_ id : 'a. 'a -> 'a = fun x -> x
-              ^^
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The "let poly_" annotation is not yet implemented.
 |}]
 
 let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
 [%%expect{|
-Line 1, characters 10-15:
+Line 1, characters 0-54:
 1 | let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
-              ^^^^^
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The "let poly_" annotation is not yet implemented.
 |}]
 
@@ -1738,8 +1738,8 @@ Error: The "val poly_" annotation is not yet implemented.
 let poly_ f : 'a. 'a -> 'a = fun x -> x
 and poly_ g : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
 [%%expect{|
-Line 1, characters 10-11:
+Line 1, characters 0-39:
 1 | let poly_ f : 'a. 'a -> 'a = fun x -> x
-              ^
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The "let poly_" annotation is not yet implemented.
 |}]

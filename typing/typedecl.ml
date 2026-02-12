@@ -3896,8 +3896,11 @@ let transl_value_decl env loc ~modal ~why valdecl =
         in
         mode, Mode.Modality.undefined, Valmi_str_primitive modes
     | Sig_value (md_mode, sig_modalities) ->
-        if valdecl.pval_poly then
-          raise (Error (loc, Poly_not_yet_implemented));
+        if valdecl.pval_poly then begin
+          Language_extension.assert_enabled ~loc Layout_poly
+            Language_extension.Alpha;
+          raise (Error (loc, Poly_not_yet_implemented))
+        end;
         let raw_modalities =
           Typemode.transl_modalities_with_default
             ~maturity:Stable ~default:sig_modalities valdecl.pval_modalities
