@@ -97,13 +97,22 @@ let check_layout t layout =
         report t "Node not found for label %a in layout" Label.print label)
     layout
 
+let check_arity t label ctor_print ctor kind expected actual_array =
+  let actual = Array.length actual_array in
+  let report expected =
+    report t "%a: %a with %d %s(s), expected %s@." Label.print label ctor_print
+      ctor actual kind expected
+  in
+  match expected with
+  | [] -> ()
+  | [expected] ->
+    if not (Int.equal expected actual) then report (Int.to_string expected)
+  | expected ->
+    if not (List.exists (Int.equal actual) expected)
+    then report (expected |> List.map Int.to_string |> String.concat ", ")
+
 let count_regs_in_locs locs =
   Array.fold_left (fun acc r -> acc + Array.length r) 0 locs
-
-let check_len_with ~report kind expected actual =
-  if not (Int.equal expected actual) then report kind expected actual
-
-let check_empty_with ~report kind actual = check_len_with ~report kind 0 actual
 
 let check_tailrec_position t =
   (* tailrec entry point is either the entry block or the only successor of the
@@ -132,21 +141,16 @@ let check_terminator_arity t label block =
   let term = block.Cfg.terminator in
   let args = term.arg in
   let res = term.res in
-  let report_error desc kind expected actual =
-    report t "%a: %s with %d %s(s), expected %d" Label.print label desc actual
-      kind expected
-  in
-  let check_len kind expected actual desc =
-    check_len_with ~report:(report_error desc) kind expected actual
-  in
-  let check_empty kind actual desc =
-    check_empty_with ~report:(report_error desc) kind actual
+  let check ~expected_args ~expected_res =
+    let print_desc = Cfg.dump_terminator ~sep:"; " in
+    check_arity t label print_desc term.desc "argument" expected_args args;
+    check_arity t label print_desc term.desc "result" expected_res res
   in
   (* For calls where we have precise type information (e.g. external calls), we
      can recompute the calling convention. For OCaml function calls we lack the
      argument types here, so we only check properties that are type-independent
      (such as having no results). *)
-  let check_external ~ty_args ~ty_res desc =
+  let check_external ~ty_args ~ty_res =
     (* Cmm may omit [ty_args] (empty list) for external calls; selection then
        fills in a default based on the number of actual arguments (all XInt).
        Mirror that here to avoid underestimating the arity. *)
@@ -157,81 +161,62 @@ let check_terminator_arity t label block =
       | _ -> ty_args
     in
     let locs, _, _ = Proc.loc_external_arguments ty_args in
-    let expected_args = count_regs_in_locs locs in
-    let expected_res = Array.length (Proc.loc_external_results ty_res) in
-    check_len "argument" expected_args (Array.length args) desc;
-    check_len "result" expected_res (Array.length res) desc
+    let expected_args = [count_regs_in_locs locs] in
+    let expected_res = [Array.length (Proc.loc_external_results ty_res)] in
+    check ~expected_args ~expected_res
   in
   match term.desc with
-  | Never ->
-    check_empty "argument" (Array.length args) "Never";
-    check_empty "result" (Array.length res) "Never"
-  | Always _ ->
-    check_empty "argument" (Array.length args) "Always";
-    check_empty "result" (Array.length res) "Always"
-  | Parity_test _ ->
-    check_len "argument" 1 (Array.length args) "Parity_test";
-    check_empty "result" (Array.length res) "Parity_test"
-  | Truth_test _ ->
-    check_len "argument" 1 (Array.length args) "Truth_test";
-    check_empty "result" (Array.length res) "Truth_test"
+  | Never -> check ~expected_args:[0] ~expected_res:[0]
+  | Always _ -> check ~expected_args:[0] ~expected_res:[0]
+  | Parity_test _ -> check ~expected_args:[1] ~expected_res:[0]
+  | Truth_test _ -> check ~expected_args:[1] ~expected_res:[0]
   | Float_test _ ->
     (* Float comparisons are always between two operands. *)
-    check_len "argument" 2 (Array.length args) "Float_test";
-    check_empty "result" (Array.length res) "Float_test"
+    check ~expected_args:[2] ~expected_res:[0]
   | Int_test { imm; _ } ->
     (* With an immediate, only one register is passed; otherwise two. *)
-    let expected = if Option.is_some imm then 1 else 2 in
-    check_len "argument" expected (Array.length args) "Int_test";
-    check_empty "result" (Array.length res) "Int_test"
-  | Switch _ ->
-    check_len "argument" 1 (Array.length args) "Switch";
-    check_empty "result" (Array.length res) "Switch"
+    let expected_args = if Option.is_some imm then [1] else [2] in
+    check ~expected_args ~expected_res:[0]
+  | Switch _ -> check ~expected_args:[1] ~expected_res:[0]
   | Return ->
     (* Return carries the registers holding the function result in calling
        convention order. Some generated helpers (e.g. curry wrappers) may have a
        declared return type with more components than they actually return;
        those are identified by the [caml_curry] prefix and are exempted. *)
-    let expected = Proc.loc_results_return t.cfg.fun_ret_type |> Array.length in
-    let actual = Array.length args in
-    if
-      actual <> expected
-      && not (String.starts_with t.cfg.fun_name ~prefix:"caml_curry")
-    then check_len "argument" expected actual "Return";
-    check_empty "result" (Array.length res) "Return"
-  | Raise _ ->
-    check_len "argument" 1 (Array.length args) "Raise";
-    check_empty "result" (Array.length res) "Raise"
+    let expected_args =
+      if String.starts_with t.cfg.fun_name ~prefix:"caml_curry"
+      then []
+      else [Proc.loc_results_return t.cfg.fun_ret_type |> Array.length]
+    in
+    check ~expected_args ~expected_res:[0]
+  | Raise _ -> check ~expected_args:[1] ~expected_res:[0]
   | Tailcall_self _ ->
     (* Self tailcalls reuse the current function's parameter passing convention,
        hence the arity must match [fun_args]. *)
-    check_len "argument"
-      (Array.length t.cfg.fun_args)
-      (Array.length args) "Tailcall_self";
-    check_empty "result" (Array.length res) "Tailcall_self"
+    check ~expected_args:[Array.length t.cfg.fun_args] ~expected_res:[0]
   | Tailcall_func (Indirect _) ->
     (* The first argument is the callee; we cannot check the rest without the
        callee's type, but the array must be non-empty and there are no results
        for tailcalls. *)
     if Array.length args = 0
     then report t "%a: Indirect tailcall with no arguments" Label.print label;
-    check_empty "result" (Array.length res) "Tailcall_func"
+    check ~expected_args:[] ~expected_res:[0]
   | Tailcall_func (Direct _) ->
     (* No result registers are produced by a tailcall. *)
-    check_empty "result" (Array.length res) "Tailcall_func"
+    check ~expected_args:[] ~expected_res:[0]
   | Call_no_return { ty_args; ty_res; _ } ->
     (* External calls that do not return still follow the external calling
        convention for both arguments and (nonexistent) results. *)
-    check_external ~ty_args ~ty_res "Call_no_return"
+    check_external ~ty_args ~ty_res
   | Prim { op = External { ty_args; ty_res; _ }; _ } ->
     (* External primitives carry precise type info, so we can recompute both arg
        and result arities. We must mirror the selection-time defaulting of empty
        [ty_args] to XInt per argument. *)
-    check_external ~ty_args ~ty_res "Prim(External)"
+    check_external ~ty_args ~ty_res
   | Prim { op = Probe _; _ } ->
     (* Probes are typed as [typ_void]; they should therefore not produce result
        registers. We cannot reliably check their arguments here. *)
-    check_empty "result" (Array.length res) "Prim(Probe)"
+    check ~expected_args:[] ~expected_res:[0]
   | Call _ ->
     (* We lack the callee's signature here. In particular, [caml_program] (the
        startup thunk) is called for side effects and returns no registers, so we
@@ -245,38 +230,27 @@ let check_terminator_arity t label block =
     let ty_res =
       match label_after with None -> Cmm.typ_void | Some _ -> Cmm.typ_int
     in
-    check_external ~ty_args:[Cmm.XInt] ~ty_res "Invalid"
+    check_external ~ty_args:[Cmm.XInt] ~ty_res
 
 let check_basic_arity t label (instr : Cfg.basic Cfg.instruction) =
   let args = instr.arg in
   let res = instr.res in
   let desc = Format.asprintf "%a" Cfg.dump_basic instr.desc in
-  let report_error kind expected actual =
-    report t "%a (instr %a): %s with %d %s(s), expected %d" Label.print label
-      InstructionId.print instr.id desc actual kind expected
-  in
-  let check_len kind expected actual =
-    check_len_with ~report:report_error kind expected actual
-  in
-  let check_empty kind actual =
-    check_empty_with ~report:report_error kind actual
+  let check ~expected_args ~expected_res =
+    check_arity t label Cfg.dump_basic instr.desc "argument" expected_args args;
+    check_arity t label Cfg.dump_basic instr.desc "result" expected_res res
   in
   match instr.desc with
-  | Reloadretaddr ->
-    check_empty "argument" (Array.length args);
-    check_empty "result" (Array.length res)
+  | Reloadretaddr -> check ~expected_args:[0] ~expected_res:[0]
   | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _ ->
-    check_empty "argument" (Array.length args);
-    check_empty "result" (Array.length res)
+    check ~expected_args:[0] ~expected_res:[0]
   | Op op -> (
-    let len_args = Array.length args in
-    let len_res = Array.length res in
     match op with
     | Move | Spill | Reload ->
-      check_len "argument" 1 len_args;
-      check_len "result" 1 len_res;
+      check ~expected_args:[1] ~expected_res:[1];
       if
-        len_args = 1 && len_res = 1
+        Array.length args = 1
+        && Array.length res = 1
         && not (Proc.types_are_compatible args.(0) res.(0))
       then
         report t "%a (instr %a): %s uses incompatible registers %a -> %a"
@@ -284,32 +258,25 @@ let check_basic_arity t label (instr : Cfg.basic Cfg.instruction) =
           args.(0) Printreg.reg res.(0)
     | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
     | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ ->
-      check_empty "argument" len_args;
-      check_len "result" 1 len_res
-    | Stackoffset _ ->
-      check_empty "argument" len_args;
-      check_empty "result" len_res
+      check ~expected_args:[0] ~expected_res:[1]
+    | Stackoffset _ -> check ~expected_args:[0] ~expected_res:[0]
     | Load { addressing_mode; _ } ->
-      check_len "argument" (Arch.num_args_addressing addressing_mode) len_args;
-      check_len "result" 1 len_res
+      check
+        ~expected_args:[Arch.num_args_addressing addressing_mode]
+        ~expected_res:[1]
     | Store (_, addr, _) ->
-      check_len "argument" (1 + Arch.num_args_addressing addr) len_args;
-      check_empty "result" len_res
+      check ~expected_args:[1 + Arch.num_args_addressing addr] ~expected_res:[0]
     | Intop op ->
       let expected_args =
-        if Operation.is_unary_integer_operation op then 1 else 2
+        if Operation.is_unary_integer_operation op then [1] else [2]
       in
-      check_len "argument" expected_args len_args;
-      check_len "result" 1 len_res
+      check ~expected_args ~expected_res:[1]
     | Int128op op ->
       let expected_args, expected_res =
-        match op with Iadd128 | Isub128 -> 4, 2 | Imul64 _ -> 2, 2
+        match op with Iadd128 | Isub128 -> [4], [2] | Imul64 _ -> [2], [2]
       in
-      check_len "argument" expected_args len_args;
-      check_len "result" expected_res len_res
-    | Intop_imm _ ->
-      check_len "argument" 1 len_args;
-      check_len "result" 1 len_res
+      check ~expected_args ~expected_res
+    | Intop_imm _ -> check ~expected_args:[1] ~expected_res:[1]
     | Intop_atomic { op; addr; _ } ->
       let addr_args = Arch.num_args_addressing addr in
       let data_args =
@@ -317,53 +284,42 @@ let check_basic_arity t label (instr : Cfg.basic Cfg.instruction) =
         | Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange -> 1
         | Compare_set | Compare_exchange -> 2
       in
-      check_len "argument" (addr_args + data_args) len_args;
       let expected_res =
         match op with
-        | Add | Sub | Land | Lor | Lxor -> 0
-        | Fetch_and_add | Exchange | Compare_set | Compare_exchange -> 1
+        | Add | Sub | Land | Lor | Lxor -> [0]
+        | Fetch_and_add | Exchange | Compare_set | Compare_exchange -> [1]
       in
-      check_len "result" expected_res len_res
-    | Floatop (_, (Inegf | Iabsf)) ->
-      check_len "argument" 1 len_args;
-      check_len "result" 1 len_res
+      check ~expected_args:[addr_args + data_args] ~expected_res
+    | Floatop (_, (Inegf | Iabsf)) -> check ~expected_args:[1] ~expected_res:[1]
     | Floatop (_, (Iaddf | Isubf | Imulf | Idivf)) ->
-      check_len "argument" 2 len_args;
-      check_len "result" 1 len_res
-    | Floatop (_, Icompf _) -> (
-      check_len "argument" 2 len_args;
-      match len_res with
-      | 1 | 2 -> ()
-      | _ ->
-        report t "%a (instr %a): %s with %d result(s), expected 1 or 2"
-          Label.print label InstructionId.print instr.id desc len_res)
+      check ~expected_args:[2] ~expected_res:[1]
+    | Floatop (_, Icompf _) -> check ~expected_args:[2] ~expected_res:[1; 2]
     | Csel _ ->
+      let len_args = Array.length args in
       if len_args < 3
       then
         report t "%a (instr %a): %s with %d argument(s), expected at least 3"
-          Label.print label InstructionId.print instr.id desc len_args
-      else (
-        check_len "result" 1 len_res;
-        if len_res = 1
+          Label.print label InstructionId.print instr.id desc len_args;
+      check ~expected_args:[] ~expected_res:[1];
+      if Array.length res = 1
+      then
+        let ifso = args.(len_args - 2) in
+        let ifnot = args.(len_args - 1) in
+        let res0 = res.(0) in
+        if
+          (not (Proc.types_are_compatible res0 ifso))
+          || not (Proc.types_are_compatible res0 ifnot)
         then
-          let ifso = args.(len_args - 2) in
-          let ifnot = args.(len_args - 1) in
-          let res0 = res.(0) in
-          if
-            (not (Proc.types_are_compatible res0 ifso))
-            || not (Proc.types_are_compatible res0 ifnot)
-          then
-            report t
-              "%a (instr %a): %s result type mismatches selected values %a/%a"
-              Label.print label InstructionId.print instr.id desc Printreg.reg
-              ifso Printreg.reg ifnot)
+          report t
+            "%a (instr %a): %s result type mismatches selected values %a/%a"
+            Label.print label InstructionId.print instr.id desc Printreg.reg
+            ifso Printreg.reg ifnot
     | Reinterpret_cast _ | Static_cast _ ->
-      check_len "argument" 1 len_args;
-      check_len "result" 1 len_res
-    | Probe_is_enabled _ ->
-      check_empty "argument" len_args;
-      check_len "result" 1 len_res
+      check ~expected_args:[1] ~expected_res:[1]
+    | Probe_is_enabled _ -> check ~expected_args:[0] ~expected_res:[1]
     | Opaque ->
+      let len_args = Array.length args in
+      let len_res = Array.length res in
       if len_args = 0 || len_res = 0
       then
         report t "%a (instr %a): %s expected non-empty args/results" Label.print
@@ -380,29 +336,15 @@ let check_basic_arity t label (instr : Cfg.basic Cfg.instruction) =
               Label.print label InstructionId.print instr.id desc Printreg.reg
               args.(i) Printreg.reg res.(i)
         done
-    | Begin_region ->
-      check_empty "argument" len_args;
-      check_len "result" 1 len_res
-    | End_region ->
-      check_len "argument" 1 len_args;
-      check_empty "result" len_res
+    | Begin_region -> check ~expected_args:[0] ~expected_res:[1]
+    | End_region -> check ~expected_args:[1] ~expected_res:[0]
     | Specific _ -> ()
     | Name_for_debugger { regs; _ } ->
-      if len_args <> 0 && len_args <> Array.length regs
-      then
-        report t "%a (instr %a): %s with %d argument(s), expected 0 or %d"
-          Label.print label InstructionId.print instr.id desc len_args
-          (Array.length regs);
-      check_empty "result" len_res
+      check ~expected_args:[0; Array.length regs] ~expected_res:[0]
     | Dls_get | Tls_get | Domain_index ->
-      check_empty "argument" len_args;
-      check_len "result" 1 len_res
-    | Poll | Pause ->
-      check_empty "argument" len_args;
-      check_empty "result" len_res
-    | Alloc _ ->
-      check_empty "argument" len_args;
-      check_len "result" 1 len_res)
+      check ~expected_args:[0] ~expected_res:[1]
+    | Poll | Pause -> check ~expected_args:[0] ~expected_res:[0]
+    | Alloc _ -> check ~expected_args:[0] ~expected_res:[1])
 
 let check_tailrec t _label block =
   (* check all Tailrec Self agree on the successor label *)
