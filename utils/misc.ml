@@ -1526,7 +1526,7 @@ let get_build_path_prefix_map =
     !map_cache
 
 let debug_prefix_map_flags () =
-  if not Config.as_has_debug_prefix_map then
+  if String.equal Config.as_debug_prefix_map_flag "" then
     []
   else begin
     match get_build_path_prefix_map () with
@@ -1537,7 +1537,8 @@ let debug_prefix_map_flags () =
            match map_elem with
            | None -> acc
            | Some { Build_path_prefix_map.target; source; } ->
-             (Printf.sprintf "--debug-prefix-map %s=%s"
+             (Printf.sprintf "%s %s=%s"
+                Config.as_debug_prefix_map_flag
                 (Filename.quote source)
                 (Filename.quote target)) :: acc)
         map
