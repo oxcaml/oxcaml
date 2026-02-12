@@ -82,9 +82,7 @@ Depending on the initial changes, it might be necessary to do this multiple time
 
 To rebuild after making changes, you can just type `make`. You need to
 have a working OCaml 5.4.0 compiler on your PATH before doing so,
-e.g. installed via OPAM. You also need to have dune and menhir.
-
-`menhir` should be pinned to a specific version: `opam pin add menhir 20231231`.
+e.g. installed via OPAM. You also need to have dune and menhir, which must be at specific versions.
 
 There is a special target `make hacking` which starts Dune in polling mode.  The rebuild
 performed here is equivalent to `make ocamlopt` in the upstream distribution: it rebuilds the
