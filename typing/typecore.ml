@@ -5730,7 +5730,8 @@ let vb_exp_constraint {pvb_expr=expr; pvb_pat=pat; pvb_constraint=ct; pvb_modes=
       List.fold_right mk_newtype locally_abstract_univars expr
 
 let vb_pat_constraint
-      ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; pvb_is_poly; pvb_loc; _ } as vb) =
+      ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; pvb_is_poly;
+        pvb_loc; _ } as vb) =
   if pvb_is_poly then begin
     Language_extension.assert_enabled ~loc:pvb_loc Layout_poly
       Language_extension.Alpha;
