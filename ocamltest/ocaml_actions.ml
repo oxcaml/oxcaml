@@ -1411,7 +1411,8 @@ let runtime5 = Actions.make
     "5.x runtime being used"
     "4.x runtime being used")
 
-(* CR ttebbi: We should also protect against non-default register allocation options. *)
+(* CR ttebbi: We should also protect against non-default register allocation
+    options. *)
 let only_default_codegen = Actions.make
   ~name:"only-default-codegen"
   ~description:"Passes if all the codegen options are at the current default, \
