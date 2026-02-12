@@ -155,7 +155,7 @@ val with_only_names : t -> t
     - names, as per the input
 
     - code IDs, containing *both* the code IDs and the "newer version of" code
-    IDs from the input.
+      IDs from the input.
 
     The "newer version of" code IDs field in the returned value will always be
     empty. *)

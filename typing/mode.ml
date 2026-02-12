@@ -19,6 +19,7 @@ open Allowance
 open Solver
 open Mode_intf
 module Hint = Mode_hint
+module Fmt = Format_doc
 
 module Hint_for_solver (* : Solver_intf.Hint *) = struct
   module Pinpoint = struct
@@ -34,8 +35,7 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
 
     let id : _ t = Skip
 
-    let left_adjoint :
-        type l.
+    let left_adjoint : type l.
         Hint.pinpoint ->
         (l * allowed) t ->
         Hint.pinpoint * (allowed * disallowed) t =
@@ -47,23 +47,18 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Captured_by_partial_application ->
         (Location.none, Expression), Adj_captured_by_partial_application
       | Crossing -> pp, Crossing
-      | Unknown_non_rigid -> (Location.none, Unknown), Unknown_non_rigid
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_r loc -> pp, Allocation_l loc
       | Contains_r (Comonadic, { containing; contained }) ->
-        ( contained,
-          Is_contained_by (Comonadic, { containing; container = fst pp }) )
+        contained, Is_contained_by (Comonadic, { containing; container = pp })
       | Contains_l (Monadic, { containing; contained }) ->
-        contained, Is_contained_by (Monadic, { containing; container = fst pp })
+        contained, Is_contained_by (Monadic, { containing; container = pp })
       | Is_contained_by (Comonadic, { containing; container }) ->
-        ( (container, Expression),
-          Contains_l (Comonadic, { containing; contained = pp }) )
+        container, Contains_l (Comonadic, { containing; contained = pp })
       | Is_contained_by (Monadic, { containing; container }) ->
-        ( (container, Expression),
-          Contains_r (Monadic, { containing; contained = pp }) )
+        container, Contains_r (Monadic, { containing; contained = pp })
 
-    let right_adjoint :
-        type r.
+    let right_adjoint : type r.
         Hint.pinpoint ->
         (allowed * r) t ->
         Hint.pinpoint * (disallowed * allowed) t =
@@ -75,102 +70,94 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       | Adj_captured_by_partial_application ->
         (Location.none, Expression), Captured_by_partial_application
       | Crossing -> pp, Crossing
-      | Unknown_non_rigid -> (Location.none, Unknown), Unknown_non_rigid
       | Unknown -> (Location.none, Unknown), Unknown
       | Allocation_l loc -> pp, Allocation_r loc
       | Contains_l (Comonadic, { containing; contained }) ->
-        ( contained,
-          Is_contained_by (Comonadic, { containing; container = fst pp }) )
+        contained, Is_contained_by (Comonadic, { containing; container = pp })
       | Contains_r (Monadic, { containing; contained }) ->
-        contained, Is_contained_by (Monadic, { containing; container = fst pp })
+        contained, Is_contained_by (Monadic, { containing; container = pp })
       | Is_contained_by (Comonadic, { containing; container }) ->
-        ( (container, Expression),
-          Contains_r (Comonadic, { containing; contained = pp }) )
+        container, Contains_r (Comonadic, { containing; contained = pp })
       | Is_contained_by (Monadic, { containing; container }) ->
-        ( (container, Expression),
-          Contains_l (Monadic, { containing; contained = pp }) )
+        container, Contains_l (Monadic, { containing; contained = pp })
 
     include Magic_allow_disallow (struct
       type (_, _, 'd) sided = 'd t constraint 'd = 'l * 'r
 
       let allow_left : type l r. (allowed * r) t -> (l * r) t =
-        fun (type l r) (h : (allowed * r) t) : (l * r) t ->
-         match h with
-         | Skip -> Skip
-         | Unknown -> Unknown
-         | Close_over (Monadic, x) -> Close_over (Monadic, x)
-         | Close_over (Comonadic, x) -> Close_over (Comonadic, x)
-         | Adj_captured_by_partial_application ->
-           Adj_captured_by_partial_application
-         | Crossing -> Crossing
-         | Unknown_non_rigid -> Unknown_non_rigid
-         | Allocation_l loc -> Allocation_l loc
-         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
-         | Contains_r (Monadic, x) -> Contains_r (Monadic, x)
-         | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
-         | Is_contained_by (Monadic, x) -> Is_contained_by (Monadic, x)
+       fun (type l r) (h : (allowed * r) t) : (l * r) t ->
+        match h with
+        | Skip -> Skip
+        | Unknown -> Unknown
+        | Close_over (Monadic, x) -> Close_over (Monadic, x)
+        | Close_over (Comonadic, x) -> Close_over (Comonadic, x)
+        | Adj_captured_by_partial_application ->
+          Adj_captured_by_partial_application
+        | Crossing -> Crossing
+        | Allocation_l loc -> Allocation_l loc
+        | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
+        | Contains_r (Monadic, x) -> Contains_r (Monadic, x)
+        | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
+        | Is_contained_by (Monadic, x) -> Is_contained_by (Monadic, x)
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
-        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
-         match h with
-         | Skip -> Skip
-         | Unknown -> Unknown
-         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
-         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
-         | Captured_by_partial_application -> Captured_by_partial_application
-         | Crossing -> Crossing
-         | Unknown_non_rigid -> Unknown_non_rigid
-         | Allocation_r loc -> Allocation_r loc
-         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
-         | Contains_l (Monadic, x) -> Contains_l (Monadic, x)
-         | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
-         | Is_contained_by (Monadic, x) -> Is_contained_by (Monadic, x)
+       fun (type l r) (h : (l * allowed) t) : (l * r) t ->
+        match h with
+        | Skip -> Skip
+        | Unknown -> Unknown
+        | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
+        | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
+        | Captured_by_partial_application -> Captured_by_partial_application
+        | Crossing -> Crossing
+        | Allocation_r loc -> Allocation_r loc
+        | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
+        | Contains_l (Monadic, x) -> Contains_l (Monadic, x)
+        | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
+        | Is_contained_by (Monadic, x) -> Is_contained_by (Monadic, x)
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
-        fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
-         match h with
-         | Skip -> Skip
-         | Unknown -> Unknown
-         | Close_over (Monadic, x) -> Close_over (Monadic, x)
-         | Close_over (Comonadic, x) -> Close_over (Comonadic, x)
-         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
-         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
-         | Captured_by_partial_application -> Captured_by_partial_application
-         | Adj_captured_by_partial_application ->
-           Adj_captured_by_partial_application
-         | Crossing -> Crossing
-         | Unknown_non_rigid -> Unknown_non_rigid
-         | Allocation_r loc -> Allocation_r loc
-         | Allocation_l loc -> Allocation_l loc
-         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
-         | Contains_l (Monadic, x) -> Contains_l (Monadic, x)
-         | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
-         | Is_contained_by (Monadic, x) -> Is_contained_by (Monadic, x)
-         | Contains_r (Monadic, x) -> Contains_r (Monadic, x)
-         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
+       fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
+        match h with
+        | Skip -> Skip
+        | Unknown -> Unknown
+        | Close_over (Monadic, x) -> Close_over (Monadic, x)
+        | Close_over (Comonadic, x) -> Close_over (Comonadic, x)
+        | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
+        | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
+        | Captured_by_partial_application -> Captured_by_partial_application
+        | Adj_captured_by_partial_application ->
+          Adj_captured_by_partial_application
+        | Crossing -> Crossing
+        | Allocation_r loc -> Allocation_r loc
+        | Allocation_l loc -> Allocation_l loc
+        | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
+        | Contains_l (Monadic, x) -> Contains_l (Monadic, x)
+        | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
+        | Is_contained_by (Monadic, x) -> Is_contained_by (Monadic, x)
+        | Contains_r (Monadic, x) -> Contains_r (Monadic, x)
+        | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
-        fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
-         match h with
-         | Skip -> Skip
-         | Unknown -> Unknown
-         | Close_over (Monadic, x) -> Close_over (Monadic, x)
-         | Close_over (Comonadic, x) -> Close_over (Comonadic, x)
-         | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
-         | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
-         | Captured_by_partial_application -> Captured_by_partial_application
-         | Adj_captured_by_partial_application ->
-           Adj_captured_by_partial_application
-         | Crossing -> Crossing
-         | Unknown_non_rigid -> Unknown_non_rigid
-         | Allocation_l loc -> Allocation_l loc
-         | Allocation_r loc -> Allocation_r loc
-         | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
-         | Contains_r (Monadic, x) -> Contains_r (Monadic, x)
-         | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
-         | Is_contained_by (Monadic, x) -> Is_contained_by (Monadic, x)
-         | Contains_l (Monadic, x) -> Contains_l (Monadic, x)
-         | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
+       fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
+        match h with
+        | Skip -> Skip
+        | Unknown -> Unknown
+        | Close_over (Monadic, x) -> Close_over (Monadic, x)
+        | Close_over (Comonadic, x) -> Close_over (Comonadic, x)
+        | Is_closed_by (Monadic, x) -> Is_closed_by (Monadic, x)
+        | Is_closed_by (Comonadic, x) -> Is_closed_by (Comonadic, x)
+        | Captured_by_partial_application -> Captured_by_partial_application
+        | Adj_captured_by_partial_application ->
+          Adj_captured_by_partial_application
+        | Crossing -> Crossing
+        | Allocation_l loc -> Allocation_l loc
+        | Allocation_r loc -> Allocation_r loc
+        | Contains_l (Comonadic, x) -> Contains_l (Comonadic, x)
+        | Contains_r (Monadic, x) -> Contains_r (Monadic, x)
+        | Is_contained_by (Comonadic, x) -> Is_contained_by (Comonadic, x)
+        | Is_contained_by (Monadic, x) -> Is_contained_by (Monadic, x)
+        | Contains_l (Monadic, x) -> Contains_l (Monadic, x)
+        | Contains_r (Comonadic, x) -> Contains_r (Comonadic, x)
     end)
   end
 
@@ -187,66 +174,75 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
       type (_, _, 'd) sided = 'd t constraint 'd = 'l * 'r
 
       let allow_left : type l r. (allowed * r) t -> (l * r) t =
-        fun (type l r) (h : (allowed * r) t) : (l * r) t ->
-         match h with
-         | Unknown -> Unknown
-         | Class_legacy_comonadic -> Class_legacy_comonadic
-         | Stack_expression -> Stack_expression
-         | Mutable_read m -> Mutable_read m
-         | Mutable_write m -> Mutable_write m
-         | Lazy_forced -> Lazy_forced
+       fun (type l r) (h : (allowed * r) t) : (l * r) t ->
+        match h with
+        | Unknown -> Unknown
+        | Legacy x -> Legacy x
+        | Stack_expression -> Stack_expression
+        | Mutable_read m -> Mutable_read m
+        | Mutable_write m -> Mutable_write m
+        | Lazy_forced -> Lazy_forced
+        | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
+        | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
 
       let allow_right : type l r. (l * allowed) t -> (l * r) t =
-        fun (type l r) (h : (l * allowed) t) : (l * r) t ->
-         match h with
-         | Unknown -> Unknown
-         | Class_legacy_monadic -> Class_legacy_monadic
-         | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
-         | Tailcall_function -> Tailcall_function
-         | Tailcall_argument -> Tailcall_argument
-         | Function_return -> Function_return
-         | Module_allocated_on_heap -> Module_allocated_on_heap
-         | Is_used_in pp -> Is_used_in pp
-         | Always_dynamic x -> Always_dynamic x
-         | Branching -> Branching
+       fun (type l r) (h : (l * allowed) t) : (l * r) t ->
+        match h with
+        | Unknown -> Unknown
+        | Legacy x -> Legacy x
+        | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
+        | Tailcall_function -> Tailcall_function
+        | Tailcall_argument -> Tailcall_argument
+        | Function_return -> Function_return
+        | Module_allocated_on_heap -> Module_allocated_on_heap
+        | Is_used_in pp -> Is_used_in pp
+        | Always_dynamic x -> Always_dynamic x
+        | Branching -> Branching
+        | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
+        | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
+        | Escape_region x -> Escape_region x
 
       let disallow_left : type l r. (l * r) t -> (disallowed * r) t =
-        fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
-         match h with
-         | Unknown -> Unknown
-         | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
-         | Class_legacy_comonadic -> Class_legacy_comonadic
-         | Class_legacy_monadic -> Class_legacy_monadic
-         | Tailcall_function -> Tailcall_function
-         | Tailcall_argument -> Tailcall_argument
-         | Mutable_read m -> Mutable_read m
-         | Mutable_write m -> Mutable_write m
-         | Lazy_forced -> Lazy_forced
-         | Function_return -> Function_return
-         | Stack_expression -> Stack_expression
-         | Module_allocated_on_heap -> Module_allocated_on_heap
-         | Is_used_in pp -> Is_used_in pp
-         | Always_dynamic x -> Always_dynamic x
-         | Branching -> Branching
+       fun (type l r) (h : (l * r) t) : (disallowed * r) t ->
+        match h with
+        | Unknown -> Unknown
+        | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
+        | Legacy x -> Legacy x
+        | Tailcall_function -> Tailcall_function
+        | Tailcall_argument -> Tailcall_argument
+        | Mutable_read m -> Mutable_read m
+        | Mutable_write m -> Mutable_write m
+        | Lazy_forced -> Lazy_forced
+        | Function_return -> Function_return
+        | Stack_expression -> Stack_expression
+        | Module_allocated_on_heap -> Module_allocated_on_heap
+        | Is_used_in pp -> Is_used_in pp
+        | Always_dynamic x -> Always_dynamic x
+        | Branching -> Branching
+        | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
+        | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
+        | Escape_region x -> Escape_region x
 
       let disallow_right : type l r. (l * r) t -> (l * disallowed) t =
-        fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
-         match h with
-         | Unknown -> Unknown
-         | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
-         | Class_legacy_comonadic -> Class_legacy_comonadic
-         | Class_legacy_monadic -> Class_legacy_monadic
-         | Tailcall_function -> Tailcall_function
-         | Tailcall_argument -> Tailcall_argument
-         | Mutable_read m -> Mutable_read m
-         | Mutable_write m -> Mutable_write m
-         | Lazy_forced -> Lazy_forced
-         | Function_return -> Function_return
-         | Stack_expression -> Stack_expression
-         | Module_allocated_on_heap -> Module_allocated_on_heap
-         | Is_used_in pp -> Is_used_in pp
-         | Always_dynamic x -> Always_dynamic x
-         | Branching -> Branching
+       fun (type l r) (h : (l * r) t) : (l * disallowed) t ->
+        match h with
+        | Unknown -> Unknown
+        | Lazy_allocated_on_heap -> Lazy_allocated_on_heap
+        | Legacy x -> Legacy x
+        | Tailcall_function -> Tailcall_function
+        | Tailcall_argument -> Tailcall_argument
+        | Mutable_read m -> Mutable_read m
+        | Mutable_write m -> Mutable_write m
+        | Lazy_forced -> Lazy_forced
+        | Function_return -> Function_return
+        | Stack_expression -> Stack_expression
+        | Module_allocated_on_heap -> Module_allocated_on_heap
+        | Is_used_in pp -> Is_used_in pp
+        | Always_dynamic x -> Always_dynamic x
+        | Branching -> Branching
+        | Borrowed (loc, Monadic) -> Borrowed (loc, Monadic)
+        | Borrowed (loc, Comonadic) -> Borrowed (loc, Comonadic)
+        | Escape_region x -> Escape_region x
     end)
   end
 end
@@ -272,8 +268,8 @@ module type CoHeyting = sig
 
   include Lattice
 
-  (** [subtract _ c] is the left adjoint of [join c]. That is, for any [a] and [b],
-      [subtract a c <= b] iff [a <= join c b] *)
+  (** [subtract _ c] is the left adjoint of [join c]. That is, for any [a] and
+      [b], [subtract a c <= b] iff [a <= join c b] *)
   val subtract : t -> t -> t
 end
 
@@ -283,8 +279,8 @@ module Lattices = struct
   module type Total = sig
     (** A lattice is total order, if for any [a] [b], [a <= b] or [b <= a].
 
-      If it's also finite, then the ordering can be represented as a monotone
-      injection [ord] into [int], where [a <= b] iff [ord a <= ord b]. *)
+        If it's also finite, then the ordering can be represented as a monotone
+        injection [ord] into [int], where [a <= b] iff [ord a <= ord b]. *)
 
     type t
 
@@ -357,8 +353,8 @@ module Lattices = struct
     let legacy = Global
 
     let print ppf = function
-      | Global -> Format.fprintf ppf "global"
-      | Local -> Format.fprintf ppf "local"
+      | Global -> Fmt.fprintf ppf "global"
+      | Local -> Fmt.fprintf ppf "local"
 
     let _is_areality = ()
   end
@@ -382,9 +378,9 @@ module Lattices = struct
     let legacy = Global
 
     let print ppf = function
-      | Global -> Format.fprintf ppf "global"
-      | Regional -> Format.fprintf ppf "regional"
-      | Local -> Format.fprintf ppf "local"
+      | Global -> Fmt.fprintf ppf "global"
+      | Regional -> Fmt.fprintf ppf "regional"
+      | Local -> Fmt.fprintf ppf "local"
 
     let _is_areality = ()
   end
@@ -407,8 +403,8 @@ module Lattices = struct
     let legacy = Aliased
 
     let print ppf = function
-      | Aliased -> Format.fprintf ppf "aliased"
-      | Unique -> Format.fprintf ppf "unique"
+      | Aliased -> Fmt.fprintf ppf "aliased"
+      | Unique -> Fmt.fprintf ppf "unique"
   end
 
   module Linearity = struct
@@ -429,8 +425,8 @@ module Lattices = struct
     let legacy = Many
 
     let print ppf = function
-      | Once -> Format.fprintf ppf "once"
-      | Many -> Format.fprintf ppf "many"
+      | Once -> Fmt.fprintf ppf "once"
+      | Many -> Fmt.fprintf ppf "many"
   end
 
   module Portability = struct
@@ -452,9 +448,9 @@ module Lattices = struct
     let legacy = Nonportable
 
     let print ppf = function
-      | Portable -> Format.fprintf ppf "portable"
-      | Shareable -> Format.fprintf ppf "shareable"
-      | Nonportable -> Format.fprintf ppf "nonportable"
+      | Portable -> Fmt.fprintf ppf "portable"
+      | Shareable -> Fmt.fprintf ppf "shareable"
+      | Nonportable -> Fmt.fprintf ppf "nonportable"
   end
 
   module Contention = struct
@@ -476,9 +472,9 @@ module Lattices = struct
     let legacy = Uncontended
 
     let print ppf = function
-      | Contended -> Format.fprintf ppf "contended"
-      | Shared -> Format.fprintf ppf "shared"
-      | Uncontended -> Format.fprintf ppf "uncontended"
+      | Contended -> Fmt.fprintf ppf "contended"
+      | Shared -> Fmt.fprintf ppf "shared"
+      | Uncontended -> Fmt.fprintf ppf "uncontended"
   end
 
   module Forkable = struct
@@ -499,8 +495,8 @@ module Lattices = struct
     let legacy = Forkable
 
     let print ppf = function
-      | Unforkable -> Format.fprintf ppf "unforkable"
-      | Forkable -> Format.fprintf ppf "forkable"
+      | Unforkable -> Fmt.fprintf ppf "unforkable"
+      | Forkable -> Fmt.fprintf ppf "forkable"
   end
 
   module Yielding = struct
@@ -521,8 +517,8 @@ module Lattices = struct
     let legacy = Unyielding
 
     let print ppf = function
-      | Yielding -> Format.fprintf ppf "yielding"
-      | Unyielding -> Format.fprintf ppf "unyielding"
+      | Yielding -> Fmt.fprintf ppf "yielding"
+      | Unyielding -> Fmt.fprintf ppf "unyielding"
   end
 
   module Statefulness = struct
@@ -544,9 +540,9 @@ module Lattices = struct
     let legacy = Stateful
 
     let print ppf = function
-      | Stateless -> Format.fprintf ppf "stateless"
-      | Observing -> Format.fprintf ppf "observing"
-      | Stateful -> Format.fprintf ppf "stateful"
+      | Stateless -> Fmt.fprintf ppf "stateless"
+      | Observing -> Fmt.fprintf ppf "observing"
+      | Stateful -> Fmt.fprintf ppf "stateful"
   end
 
   module Visibility = struct
@@ -568,9 +564,9 @@ module Lattices = struct
     let legacy = Read_write
 
     let print ppf = function
-      | Immutable -> Format.fprintf ppf "immutable"
-      | Read -> Format.fprintf ppf "read"
-      | Read_write -> Format.fprintf ppf "read_write"
+      | Immutable -> Fmt.fprintf ppf "immutable"
+      | Read -> Fmt.fprintf ppf "read"
+      | Read_write -> Fmt.fprintf ppf "read_write"
   end
 
   module Staticity = struct
@@ -591,8 +587,8 @@ module Lattices = struct
     let legacy = Dynamic
 
     let print ppf = function
-      | Dynamic -> Format.fprintf ppf "dynamic"
-      | Static -> Format.fprintf ppf "static"
+      | Dynamic -> Fmt.fprintf ppf "dynamic"
+      | Static -> Fmt.fprintf ppf "static"
   end
 
   type monadic =
@@ -688,7 +684,7 @@ module Lattices = struct
       { uniqueness; contention; visibility; staticity }
 
     let print ppf m =
-      Format.fprintf ppf "%a,%a,%a,%a" Uniqueness.print m.uniqueness
+      Fmt.fprintf ppf "%a,%a,%a,%a" Uniqueness.print m.uniqueness
         Contention.print m.contention Visibility.print m.visibility
         Staticity.print m.staticity
   end
@@ -812,7 +808,7 @@ module Lattices = struct
       { areality; linearity; portability; forkable; yielding; statefulness }
 
     let print ppf m =
-      Format.fprintf ppf "%a,%a,%a,%a,%a,%a" Areality.print m.areality
+      Fmt.fprintf ppf "%a,%a,%a,%a,%a,%a" Areality.print m.areality
         Linearity.print m.linearity Portability.print m.portability
         Forkable.print m.forkable Yielding.print m.yielding Statefulness.print
         m.statefulness
@@ -899,21 +895,20 @@ module Lattices = struct
 
   let print_obj : type a. _ -> a obj -> unit =
    fun ppf -> function
-    | Locality -> Format.fprintf ppf "Locality"
-    | Regionality -> Format.fprintf ppf "Regionality"
-    | Uniqueness_op -> Format.fprintf ppf "Uniqueness_op"
-    | Linearity -> Format.fprintf ppf "Linearity"
-    | Portability -> Format.fprintf ppf "Portability"
-    | Forkable -> Format.fprintf ppf "Forkable"
-    | Yielding -> Format.fprintf ppf "Yielding"
-    | Statefulness -> Format.fprintf ppf "Statefulness"
-    | Contention_op -> Format.fprintf ppf "Contention_op"
-    | Visibility_op -> Format.fprintf ppf "Visibility_op"
-    | Staticity_op -> Format.fprintf ppf "Staticity_op"
-    | Monadic_op -> Format.fprintf ppf "Monadic_op"
-    | Comonadic_with_locality -> Format.fprintf ppf "Comonadic_with_locality"
-    | Comonadic_with_regionality ->
-      Format.fprintf ppf "Comonadic_with_regionality"
+    | Locality -> Fmt.fprintf ppf "Locality"
+    | Regionality -> Fmt.fprintf ppf "Regionality"
+    | Uniqueness_op -> Fmt.fprintf ppf "Uniqueness_op"
+    | Linearity -> Fmt.fprintf ppf "Linearity"
+    | Portability -> Fmt.fprintf ppf "Portability"
+    | Forkable -> Fmt.fprintf ppf "Forkable"
+    | Yielding -> Fmt.fprintf ppf "Yielding"
+    | Statefulness -> Fmt.fprintf ppf "Statefulness"
+    | Contention_op -> Fmt.fprintf ppf "Contention_op"
+    | Visibility_op -> Fmt.fprintf ppf "Visibility_op"
+    | Staticity_op -> Fmt.fprintf ppf "Staticity_op"
+    | Monadic_op -> Fmt.fprintf ppf "Monadic_op"
+    | Comonadic_with_locality -> Fmt.fprintf ppf "Comonadic_with_locality"
+    | Comonadic_with_regionality -> Fmt.fprintf ppf "Comonadic_with_regionality"
 
   let min : type a. a obj -> a = function
     | Locality -> Locality.min
@@ -1101,16 +1096,16 @@ module Lattices_mono = struct
 
     let print : type p r. _ -> (p, r) t -> unit =
      fun ppf -> function
-      | Areality -> Format.fprintf ppf "locality"
-      | Linearity -> Format.fprintf ppf "linearity"
-      | Portability -> Format.fprintf ppf "portability"
-      | Uniqueness -> Format.fprintf ppf "uniqueness"
-      | Contention -> Format.fprintf ppf "contention"
-      | Forkable -> Format.fprintf ppf "forkable"
-      | Yielding -> Format.fprintf ppf "yielding"
-      | Statefulness -> Format.fprintf ppf "statefulness"
-      | Visibility -> Format.fprintf ppf "visibility"
-      | Staticity -> Format.fprintf ppf "staticity"
+      | Areality -> Fmt.fprintf ppf "locality"
+      | Linearity -> Fmt.fprintf ppf "linearity"
+      | Portability -> Fmt.fprintf ppf "portability"
+      | Uniqueness -> Fmt.fprintf ppf "uniqueness"
+      | Contention -> Fmt.fprintf ppf "contention"
+      | Forkable -> Fmt.fprintf ppf "forkable"
+      | Yielding -> Fmt.fprintf ppf "yielding"
+      | Statefulness -> Fmt.fprintf ppf "statefulness"
+      | Visibility -> Fmt.fprintf ppf "visibility"
+      | Staticity -> Fmt.fprintf ppf "staticity"
 
     let eq : type p r0 r1. (p, r0) t -> (p, r1) t -> (r0, r1) Misc.eq option =
      fun ax0 ax1 ->
@@ -1174,21 +1169,26 @@ module Lattices_mono = struct
     | Map_comonadic :
         ('a0, 'a1, 'l * 'r) morph
         -> ('a0 comonadic_with, 'a1 comonadic_with, 'l * 'r) morph
-        (** Lift an morphism on areality to a morphism on the comonadic fragment   *)
-    | Monadic_to_comonadic_min
-        : (Monadic_op.t, 'a comonadic_with, 'l * disallowed) morph
-        (** Dualize the monadic fragment to the comonadic fragment. The areality is set to min. *)
+        (** Lift an morphism on areality to a morphism on the comonadic fragment
+        *)
+    | Monadic_to_comonadic_min :
+        (Monadic_op.t, 'a comonadic_with, 'l * disallowed) morph
+        (** Dualize the monadic fragment to the comonadic fragment. The areality
+            is set to min. *)
     | Comonadic_to_monadic_min :
         'a comonadic_with obj
         -> ('a comonadic_with, Monadic_op.t, 'l * disallowed) morph
-        (** Dualize the comonadic fragment to the monadic fragment. The staticity_op is set to min. *)
-    | Monadic_to_comonadic_max
-        : (Monadic_op.t, 'a comonadic_with, disallowed * 'r) morph
-        (** Dualize the monadic fragment to the comonadic fragment. The areality is set to max. *)
+        (** Dualize the comonadic fragment to the monadic fragment. The
+            staticity_op is set to min. *)
+    | Monadic_to_comonadic_max :
+        (Monadic_op.t, 'a comonadic_with, disallowed * 'r) morph
+        (** Dualize the monadic fragment to the comonadic fragment. The areality
+            is set to max. *)
     | Comonadic_to_monadic_max :
         'a comonadic_with obj
         -> ('a comonadic_with, Monadic_op.t, disallowed * 'r) morph
-        (** Dualize the comonadic fragment to the monadic fragment. The staticity_op is set to max. *)
+        (** Dualize the comonadic fragment to the monadic fragment. The
+            staticity_op is set to max. *)
     (* Following is a chain of adjunction (complete and cannot extend in
        either direction) *)
     | Local_to_regional : (Locality.t, Regionality.t, 'l * disallowed) morph
@@ -1196,7 +1196,7 @@ module Lattices_mono = struct
     | Regional_to_local : (Regionality.t, Locality.t, 'l * 'r) morph
         (** Maps regional to local, identity otherwise *)
     | Locality_as_regionality : (Locality.t, Regionality.t, 'l * 'r) morph
-        (** Inject locality into regionality  *)
+        (** Inject locality into regionality *)
     | Regional_to_global : (Regionality.t, Locality.t, 'l * 'r) morph
         (** Maps regional to global, identity otherwise *)
     | Global_to_regional : (Locality.t, Regionality.t, disallowed * 'r) morph
@@ -1210,9 +1210,8 @@ module Lattices_mono = struct
   include Magic_allow_disallow (struct
     type ('a, 'b, 'd) sided = ('a, 'b, 'd) morph constraint 'd = 'l * 'r
 
-    let rec allow_left :
-        type a b l r. (a, b, allowed * r) morph -> (a, b, l * r) morph =
-      function
+    let rec allow_left : type a b l r.
+        (a, b, allowed * r) morph -> (a, b, l * r) morph = function
       | Id -> Id
       | Proj (src, ax) -> Proj (src, ax)
       | Min_with ax -> Min_with ax
@@ -1231,9 +1230,8 @@ module Lattices_mono = struct
         let f = allow_left f in
         Map_comonadic f
 
-    let rec allow_right :
-        type a b l r. (a, b, l * allowed) morph -> (a, b, l * r) morph =
-      function
+    let rec allow_right : type a b l r.
+        (a, b, l * allowed) morph -> (a, b, l * r) morph = function
       | Id -> Id
       | Proj (src, ax) -> Proj (src, ax)
       | Max_with ax -> Max_with ax
@@ -1253,9 +1251,8 @@ module Lattices_mono = struct
         let f = allow_right f in
         Map_comonadic f
 
-    let rec disallow_left :
-        type a b l r. (a, b, l * r) morph -> (a, b, disallowed * r) morph =
-      function
+    let rec disallow_left : type a b l r.
+        (a, b, l * r) morph -> (a, b, disallowed * r) morph = function
       | Id -> Id
       | Proj (src, ax) -> Proj (src, ax)
       | Min_with ax -> Min_with ax
@@ -1279,9 +1276,8 @@ module Lattices_mono = struct
         let f = disallow_left f in
         Map_comonadic f
 
-    let rec disallow_right :
-        type a b l r. (a, b, l * r) morph -> (a, b, l * disallowed) morph =
-      function
+    let rec disallow_right : type a b l r.
+        (a, b, l * r) morph -> (a, b, l * disallowed) morph = function
       | Id -> Id
       | Proj (src, ax) -> Proj (src, ax)
       | Min_with ax -> Min_with ax
@@ -1368,8 +1364,7 @@ module Lattices_mono = struct
   module Equal_morph = Magic_equal (struct
     type ('a, 'b, 'd) t = ('a, 'b, 'd) morph constraint 'd = 'l * 'r
 
-    let rec equal :
-        type a0 l0 r0 a1 b l1 r1.
+    let rec equal : type a0 l0 r0 a1 b l1 r1.
         (a0, b, l0 * r0) morph ->
         (a1, b, l1 * r1) morph ->
         (a0, a1) Misc.eq option =
@@ -1425,32 +1420,30 @@ module Lattices_mono = struct
 
   let eq_morph = Equal_morph.equal
 
-  let rec print_morph :
-      type a b l r. b obj -> Format.formatter -> (a, b, l * r) morph -> unit =
+  let rec print_morph : type a b l r.
+      b obj -> Fmt.formatter -> (a, b, l * r) morph -> unit =
    fun dst ppf -> function
-    | Id -> Format.fprintf ppf "id"
-    | Meet_with c -> Format.fprintf ppf "meet(%a)" (print dst) c
-    | Imply c -> Format.fprintf ppf "imply(%a)" (print dst) c
-    | Proj (_, ax) -> Format.fprintf ppf "proj_%a" Axis.print ax
-    | Max_with ax -> Format.fprintf ppf "max_with_%a" Axis.print ax
-    | Min_with ax -> Format.fprintf ppf "min_with_%a" Axis.print ax
+    | Id -> Fmt.fprintf ppf "id"
+    | Meet_with c -> Fmt.fprintf ppf "meet(%a)" (print dst) c
+    | Imply c -> Fmt.fprintf ppf "imply(%a)" (print dst) c
+    | Proj (_, ax) -> Fmt.fprintf ppf "proj_%a" Axis.print ax
+    | Max_with ax -> Fmt.fprintf ppf "max_with_%a" Axis.print ax
+    | Min_with ax -> Fmt.fprintf ppf "min_with_%a" Axis.print ax
     | Map_comonadic f ->
       let dst0 = proj_obj Areality dst in
-      Format.fprintf ppf "map_comonadic(%a)" (print_morph dst0) f
-    | Monadic_to_comonadic_min -> Format.fprintf ppf "monadic_to_comonadic_min"
-    | Comonadic_to_monadic_min _ ->
-      Format.fprintf ppf "comonadic_to_monadic_min"
-    | Comonadic_to_monadic_max _ ->
-      Format.fprintf ppf "comonadic_to_monadic_max"
-    | Monadic_to_comonadic_max -> Format.fprintf ppf "monadic_to_comonadic_max"
-    | Local_to_regional -> Format.fprintf ppf "local_to_regional"
-    | Regional_to_local -> Format.fprintf ppf "regional_to_local"
-    | Locality_as_regionality -> Format.fprintf ppf "locality_as_regionality"
-    | Regional_to_global -> Format.fprintf ppf "regional_to_global"
-    | Global_to_regional -> Format.fprintf ppf "global_to_regional"
+      Fmt.fprintf ppf "map_comonadic(%a)" (print_morph dst0) f
+    | Monadic_to_comonadic_min -> Fmt.fprintf ppf "monadic_to_comonadic_min"
+    | Comonadic_to_monadic_min _ -> Fmt.fprintf ppf "comonadic_to_monadic_min"
+    | Comonadic_to_monadic_max _ -> Fmt.fprintf ppf "comonadic_to_monadic_max"
+    | Monadic_to_comonadic_max -> Fmt.fprintf ppf "monadic_to_comonadic_max"
+    | Local_to_regional -> Fmt.fprintf ppf "local_to_regional"
+    | Regional_to_local -> Fmt.fprintf ppf "regional_to_local"
+    | Locality_as_regionality -> Fmt.fprintf ppf "locality_as_regionality"
+    | Regional_to_global -> Fmt.fprintf ppf "regional_to_global"
+    | Global_to_regional -> Fmt.fprintf ppf "global_to_regional"
     | Compose (f0, f1) ->
       let mid = src dst f0 in
-      Format.fprintf ppf "%a ∘ %a" (print_morph dst) f0 (print_morph mid) f1
+      Fmt.fprintf ppf "%a ∘ %a" (print_morph dst) f0 (print_morph mid) f1
 
   let id = Id
 
@@ -1508,8 +1501,8 @@ module Lattices_mono = struct
 
   let max_with dst ax a = Axis.set ax a (max dst)
 
-  let monadic_to_comonadic_min :
-      type a. a comonadic_with obj -> Monadic_op.t -> a comonadic_with =
+  let monadic_to_comonadic_min : type a.
+      a comonadic_with obj -> Monadic_op.t -> a comonadic_with =
    fun obj m ->
     let areality : a =
       match obj with
@@ -1523,8 +1516,8 @@ module Lattices_mono = struct
     let statefulness = visibility_to_statefulness m.visibility in
     { areality; linearity; portability; forkable; yielding; statefulness }
 
-  let comonadic_to_monadic_min :
-      type a. a comonadic_with obj -> a comonadic_with -> Monadic_op.t =
+  let comonadic_to_monadic_min : type a.
+      a comonadic_with obj -> a comonadic_with -> Monadic_op.t =
    fun _ m ->
     let uniqueness = linear_to_unique m.linearity in
     let contention = portable_to_contended m.portability in
@@ -1532,8 +1525,8 @@ module Lattices_mono = struct
     let staticity = Staticity.min in
     { uniqueness; contention; visibility; staticity }
 
-  let comonadic_to_monadic_max :
-      type a. a comonadic_with obj -> a comonadic_with -> Monadic_op.t =
+  let comonadic_to_monadic_max : type a.
+      a comonadic_with obj -> a comonadic_with -> Monadic_op.t =
    fun _ m ->
     let uniqueness = linear_to_unique m.linearity in
     let contention = portable_to_contended m.portability in
@@ -1541,8 +1534,8 @@ module Lattices_mono = struct
     let staticity = Staticity.max in
     { uniqueness; contention; visibility; staticity }
 
-  let monadic_to_comonadic_max :
-      type a. a comonadic_with obj -> Monadic_op.t -> a comonadic_with =
+  let monadic_to_comonadic_max : type a.
+      a comonadic_with obj -> Monadic_op.t -> a comonadic_with =
    fun obj m ->
     let areality : a =
       match obj with
@@ -1585,16 +1578,18 @@ module Lattices_mono = struct
       set_areality (apply dst0 f a0) a
 
   module For_hint = struct
-    (** Describes the portion of the input that's responsible for a portion of the output
-        of a morphism *)
+    (** Describes the portion of the input that's responsible for a portion of
+        the output of a morphism *)
     type 'a responsible_axis =
       | NoneResponsible : 'a responsible_axis
-          (** The input is not responsible for the output; instead, the morphism is solely
-          responsible for the output. *)
+          (** The input is not responsible for the output; instead, the morphism
+              is solely responsible for the output. *)
       | SourceIsSingle : 'a responsible_axis
-          (** The input of the morphism is single axis, and is responsible for the output. *)
+          (** The input of the morphism is single axis, and is responsible for
+              the output. *)
       | Axis : ('a, 'a_x) Axis.t -> 'a responsible_axis
-          (** The specified axis of the input object is responsible for the output. *)
+          (** The specified axis of the input object is responsible for the
+              output. *)
 
     (* CR zqian: the following functions are hard to write, and are redundant since all
        the information are already in [apply]. A general and simpler apporach would work
@@ -1606,11 +1601,11 @@ module Lattices_mono = struct
        no axis of [a] being responsible, in which case the morphism is solely
        respoonsible. *)
 
-    (** Given a morphism either from a single axis to a single axis, or from a product
-     object to a single axis, return the portion of the input that's responsible for the
-     output. *)
-    let rec find_responsible_axis_single :
-        type a b l r. (a, b, l * r) morph -> a responsible_axis = function
+    (** Given a morphism either from a single axis to a single axis, or from a
+        product object to a single axis, return the portion of the input that's
+        responsible for the output. *)
+    let rec find_responsible_axis_single : type a b l r.
+        (a, b, l * r) morph -> a responsible_axis = function
       | Proj (_a_obj, ax) -> Axis ax
       | Compose (g, f) -> (
         match find_responsible_axis_single g with
@@ -1626,11 +1621,10 @@ module Lattices_mono = struct
       | Regional_to_global | Global_to_regional ->
         SourceIsSingle
 
-    (** Given a morphism either from a single axis to a product, or from a product to a
-     product, return the portion of the input that's responsible for the specified axis of
-     the output. *)
-    and find_responsible_axis_prod :
-        type a b b_ax l r.
+    (** Given a morphism either from a single axis to a product, or from a
+        product to a product, return the portion of the input that's responsible
+        for the specified axis of the output. *)
+    and find_responsible_axis_prod : type a b b_ax l r.
         (a, b, l * r) morph -> (b, b_ax) Axis.t -> a responsible_axis =
      fun m ax ->
       let handle_monadic_to_comonadic (type x y)
@@ -1690,9 +1684,8 @@ module Lattices_mono = struct
   end
 
   (** Compose m0 after m1. Returns [Some f] if the composition can be
-    represented by [f] instead of [Compose m0 m1]. [None] otherwise. *)
-  let rec maybe_compose :
-      type a b c l r.
+      represented by [f] instead of [Compose m0 m1]. [None] otherwise. *)
+  let rec maybe_compose : type a b c l r.
       c obj ->
       (b, c, l * r) morph ->
       (a, b, l * r) morph ->
@@ -1809,15 +1802,13 @@ module Lattices_mono = struct
         Max_with _ ) ->
       .
 
-  and compose :
-      type a b c l r.
+  and compose : type a b c l r.
       c obj -> (b, c, l * r) morph -> (a, b, l * r) morph -> (a, c, l * r) morph
       =
    fun dst f g ->
     match maybe_compose dst f g with Some m -> m | None -> Compose (f, g)
 
-  let rec left_adjoint :
-      type a b l.
+  let rec left_adjoint : type a b l.
       b obj -> (a, b, l * allowed) morph -> (b, a, allowed * disallowed) morph =
    fun dst f ->
     match f with
@@ -1845,8 +1836,7 @@ module Lattices_mono = struct
       let f' = left_adjoint dst0 f in
       Map_comonadic f'
 
-  and right_adjoint :
-      type a b r.
+  and right_adjoint : type a b r.
       b obj -> (a, b, allowed * r) morph -> (b, a, disallowed * allowed) morph =
    fun dst f ->
     match f with
@@ -1898,21 +1888,22 @@ module Axis = C.Axis
 type nonrec 'a simple_error = 'a simple_error
 
 let print_longident =
-  ref (fun _ _ -> assert false : Format.formatter -> Longident.t -> unit)
+  ref (fun _ _ -> assert false : Fmt.formatter -> Longident.t -> unit)
 
 module Report = struct
   open Hint
 
   (** Human-readable mode error hints. Compared to [S.error]:
-  - This doesn't contain branch, and thus forms a chain.
-  - Each node on the chain talks about a single axis, instead of potentially on a product
-  lattice. *)
+      - This doesn't contain branch, and thus forms a chain.
+      - Each node on the chain talks about a single axis, instead of potentially
+        on a product lattice. *)
   type 'd hint =
     | Apply : 'd morph * 'b C.obj * ('b, 'd) ahint -> 'd hint
     | Const : 'd const -> 'd hint
     | Irrelevant : ('l * 'r) hint
-        (** The current mode is not responsible for the error (that is, the surrounding
-          morphism is solely responsible), and should not be printed. *)
+        (** The current mode is not responsible for the error (that is, the
+            surrounding morphism is solely responsible), and should not be
+            printed. *)
     constraint 'd = 'l * 'r
   [@@ocaml.warning "-62"]
 
@@ -1926,10 +1917,9 @@ module Report = struct
 
   (** Convert Solver error to report. *)
   module Of_solver = struct
-    (** Given a branch of two constant bounds on a single axis, choose the the one that's
-        responsible for the branch. *)
-    let choose_branch_axis :
-        type a l r.
+    (** Given a branch of two constant bounds on a single axis, choose the the
+        one that's responsible for the branch. *)
+    let choose_branch_axis : type a l r.
         (l * r) Solver_intf.branch -> a C.obj -> a -> a -> [`First | `Second] =
      fun b a_obj x y ->
       (* CR-someday zqian: in the case where [x = y], we currently arbitrarily choose from
@@ -1950,10 +1940,9 @@ module Report = struct
         then `Second
         else Misc.fatal_error "A single axis should be a total ordering."
 
-    (** Given a solver hint on a product lattice, and an axis in that product that we are
-    interested in, returns a human-readible hint.*)
-    let rec hint_apply :
-        type a b l r.
+    (** Given a solver hint on a product lattice, and an axis in that product
+        that we are interested in, returns a human-readible hint.*)
+    let rec hint_apply : type a b l r.
         a C.obj ->
         (l * r) morph ->
         (b, a, l * r) C.morph ->
@@ -1972,8 +1961,7 @@ module Report = struct
         let obj = C.proj_obj ax obj in
         Apply (morph_hint, obj, ahint)
 
-    and hint_prod :
-        type t a l r.
+    and hint_prod : type t a l r.
         t C.obj -> (t, a) Axis.t -> (t, l * r) S.hint -> (l * r) hint =
      fun obj ax -> function
       | Apply (morph_hint, morph, ahint) ->
@@ -1991,15 +1979,15 @@ module Report = struct
         in
         hint_prod obj ax chosen_hint
 
-    and ahint_prod :
-        type t a l r.
+    and ahint_prod : type t a l r.
         t C.obj -> (t, a) Axis.t -> (t, l * r) S.ahint -> (a, l * r) ahint =
      fun obj ax (t, hint) ->
       let a = Axis.proj ax t in
       let hint = hint_prod obj ax hint in
       a, hint
 
-    (** Given a solver hint on a single axis lattice, returns a human-readible hint. *)
+    (** Given a solver hint on a single axis lattice, returns a human-readible
+        hint. *)
     and hint_axis : type a l r. a C.obj -> (a, l * r) S.hint -> (l * r) hint =
      fun obj -> function
       | Apply (morph_hint, morph, ahint) ->
@@ -2014,8 +2002,7 @@ module Report = struct
         in
         hint_axis obj chosen_hint
 
-    and ahint_axis :
-        type a l r.
+    and ahint_axis : type a l r.
         a Lattices_mono.obj -> (a, l * r) S.ahint -> (a, l * r) ahint =
      fun obj (a, hint) -> a, hint_axis obj hint
 
@@ -2034,8 +2021,6 @@ module Report = struct
 
   [@@@warning "-4"]
 
-  open Format
-
   type sound =
     | Consonant
     | Vowel
@@ -2050,7 +2035,7 @@ module Report = struct
     let article =
       if capitalize then String.capitalize_ascii article else article
     in
-    dprintf "%s %s" article s
+    Fmt.dprintf "%s %s" article s
 
   let print_lock_item : lock_item -> _ = function
     | Module -> print_article_noun Consonant "module"
@@ -2058,12 +2043,18 @@ module Report = struct
     | Value -> print_article_noun Consonant "value"
     | Constructor -> print_article_noun Consonant "constructor"
 
+  let print_structure_item : structure_item -> _ =
+   fun (category, id) ~capitalize ->
+    Fmt.dprintf "%t %a"
+      (print_lock_item ~definite:true ~capitalize category)
+      Misc.Style.inline_code (Ident.name id)
+
   let print_pinpoint_desc : pinpoint_desc -> _ = function
     | Unknown -> None
     | Ident { category; lid } ->
       Some
         (fun ~definite ~capitalize ->
-          dprintf "%t %a"
+          Fmt.dprintf "%t %a"
             (print_lock_item ~definite ~capitalize category)
             (Misc.Style.as_inline_code !print_longident)
             lid)
@@ -2079,217 +2070,308 @@ module Report = struct
     | Cases_result ->
       Some
         (fun ~definite ~capitalize ->
-          dprintf "%t of %t"
+          Fmt.dprintf "%t of %t"
             (print_article_noun ~definite:true ~capitalize Consonant "result")
             (print_article_noun ~definite ~capitalize:false Consonant "cases"))
+    | Pattern -> Some (print_article_noun Consonant "pattern")
+    | Module -> Some (print_article_noun Consonant "module")
+    | Structure -> Some (print_article_noun Consonant "structure")
+    | Structure_item x ->
+      Some
+        (fun ~definite:_ ~capitalize ->
+          Fmt.dprintf "%t in the structure" (print_structure_item ~capitalize x))
 
   let print_pinpoint : pinpoint -> _ =
    fun (loc, desc) ->
     print_pinpoint_desc desc
     |> Option.map (fun print_desc ~definite ~capitalize ppf ->
-           match Location.is_none loc, definite with
-           | true, _ -> print_desc ~definite:false ~capitalize ppf
-           | false, true ->
-             fprintf ppf "%t at %a"
-               (print_desc ~definite ~capitalize)
-               Location.print_loc loc
-           | false, false ->
-             fprintf ppf "%t (at %a)"
-               (print_desc ~definite ~capitalize)
-               Location.print_loc loc)
+        match Location.is_none loc, definite with
+        | true, _ -> print_desc ~definite:false ~capitalize ppf
+        | false, true ->
+          Fmt.fprintf ppf "%t at %a"
+            (print_desc ~definite ~capitalize)
+            (Location.Doc.loc ~capitalize_first:false)
+            loc
+        | false, false ->
+          Fmt.fprintf ppf "%t (at %a)"
+            (print_desc ~definite ~capitalize)
+            (Location.Doc.loc ~capitalize_first:false)
+            loc)
+
+  let is_known_pinpoint : pinpoint -> bool = function
+    | _, Unknown -> false
+    | _ -> true
 
   let print_mutable_part ppf = function
-    | Record_field s -> fprintf ppf "mutable field %a" Misc.Style.inline_code s
-    | Array_elements -> fprintf ppf "array elements"
+    | Record_field s ->
+      Fmt.fprintf ppf "mutable field %a" Misc.Style.inline_code s
+    | Array_elements -> Fmt.fprintf ppf "array elements"
 
   let print_always_dynamic = function
-    | Application -> dprintf "function applications"
-    | Try_with -> dprintf "try-with clauses"
+    | Application -> Fmt.dprintf "function applications"
+    | Try_with -> Fmt.dprintf "try-with clauses"
+
+  let print_legacy = function
+    | Toplevel -> print_article_noun Consonant "top-level clause"
+    | Compilation_unit -> print_article_noun Consonant "compilation unit"
+    | Class -> print_article_noun Consonant "class"
+
+  let print_region_desc : region_desc -> _ = function
+    | Borrow -> print_article_noun Consonant "borrow region"
+
+  let print_region : capitalize:_ -> region -> _ =
+   fun ~capitalize (loc, desc) ->
+    Fmt.dprintf "%t at %a"
+      (print_region_desc desc ~definite:true ~capitalize)
+      (Location.Doc.loc ~capitalize_first:false)
+      loc
 
   (** Given a pinpoint and a const, where the pinpoint has been expressed,
-  prints the const to explain the mode on the pinpoint. *)
-  let print_const (type l r) (_, pp_desc) ppf : (l * r) const -> unit = function
+      prints the const to explain the mode on the pinpoint. *)
+  let print_const (type l r) ((_, pp_desc) : pinpoint) ppf :
+      (l * r) const -> unit = function
     | Unknown -> Misc.fatal_error "Unknown hint should not be printed"
     | Lazy_allocated_on_heap ->
       (match pp_desc with
       | Lazy ->
         (* if we already said it's a lazy, we don't need to emphasize it again. *)
-        pp_print_string ppf "lazy expressions always need"
-      | _ -> pp_print_string ppf "it is a lazy expression and thus needs");
-      pp_print_string ppf " to be allocated on the heap"
-    | Class_legacy_monadic | Class_legacy_comonadic ->
-      (match pp_desc with
-      | Ident { category = Class; _ } ->
+        Fmt.pp_print_string ppf "lazy expressions always need"
+      | _ -> Fmt.pp_print_string ppf "it is a lazy expression and thus needs");
+      Fmt.pp_print_string ppf " to be allocated on the heap"
+    | Legacy m ->
+      (match pp_desc, m with
+      | ( (Ident { category = Class; _ } | Class | Structure_item (Class, _)),
+          Class ) ->
         (* if we already said it's a class, we don't need to emphasize it again. *)
-        pp_print_string ppf "classes are always"
-      | _ -> pp_print_string ppf "it is a class and thus");
-      pp_print_string ppf " at the legacy modes"
+        Fmt.pp_print_string ppf "classes are always"
+      | _ ->
+        Fmt.fprintf ppf "it is %t and thus always"
+          (print_legacy m ~definite:false ~capitalize:false));
+      Fmt.pp_print_string ppf " at the legacy modes"
     | Tailcall_function ->
-      pp_print_string ppf "it is the function in a tail call"
+      Fmt.pp_print_string ppf "it is the function in a tail call"
     | Tailcall_argument ->
-      pp_print_string ppf "it is an argument in a tail call"
-    | Mutable_read m -> fprintf ppf "its %a is being read" print_mutable_part m
+      Fmt.pp_print_string ppf "it is an argument in a tail call"
+    | Mutable_read m ->
+      Fmt.fprintf ppf "its %a is being read" print_mutable_part m
     | Mutable_write m ->
-      fprintf ppf "its %a is being written" print_mutable_part m
+      Fmt.fprintf ppf "its %a is being written" print_mutable_part m
     | Lazy_forced -> (
       match pp_desc with
       | Lazy ->
         (* if we already said it's a lazy, we don't need to emphasize it again. *)
-        pp_print_string ppf "it is being forced"
-      | _ -> pp_print_string ppf "it is a lazy value being forced")
+        Fmt.pp_print_string ppf "it is being forced"
+      | _ -> Fmt.pp_print_string ppf "it is a lazy value being forced")
     | Function_return ->
-      fprintf ppf
-        "it is a function return value.@\n\
-         Hint: Use exclave_ to return a local value"
+      Fmt.fprintf ppf
+        "it is a function return value.@ Hint: Use exclave_ to return a local \
+         value"
     | Stack_expression ->
-      fprintf ppf "it is %a-allocated" Misc.Style.inline_code "stack_"
+      Fmt.fprintf ppf "it is %a-allocated" Misc.Style.inline_code "stack_"
     | Module_allocated_on_heap ->
       (match pp_desc with
-      | Ident { category = Module; _ } | Functor ->
+      | Ident { category = Module; _ }
+      | Functor | Module | Structure
+      | Structure_item (Module, _) ->
         (* if we already said it's a module, we don't need to emphasize it again. *)
-        pp_print_string ppf "modules always need"
-      | _ -> pp_print_string ppf "it is a module and thus needs");
-      pp_print_string ppf " to be allocated on the heap"
+        Fmt.pp_print_string ppf "modules always need"
+      | _ -> Fmt.pp_print_string ppf "it is a module and thus needs");
+      Fmt.pp_print_string ppf " to be allocated on the heap"
     | Is_used_in pp ->
       let print_pp = print_pinpoint pp |> Option.get in
-      fprintf ppf "it is used in %t"
+      Fmt.fprintf ppf "it is used in %t"
         (print_pp ~definite:false ~capitalize:false)
     | Always_dynamic x ->
-      fprintf ppf "%t are always dynamic" (print_always_dynamic x)
-    | Branching -> fprintf ppf "it has branches"
+      Fmt.fprintf ppf "%t are always dynamic" (print_always_dynamic x)
+    | Branching -> Fmt.fprintf ppf "it has branches"
+    | Borrowed _ -> Fmt.fprintf ppf "it is borrowed"
+    | Escape_region reg ->
+      Fmt.fprintf ppf "it escapes %t" (print_region ~capitalize:false reg)
 
-  let print_allocation_l : allocation -> formatter -> unit =
+  let print_allocation_l : allocation -> Fmt.formatter -> unit =
    fun { txt; loc } ->
     match txt with
     | Unknown ->
-      dprintf "is allocated at %a containing data" Location.print_loc loc
+      Fmt.dprintf "is allocated at %a containing data"
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
     | Optional_argument ->
-      dprintf
+      Fmt.dprintf
         "is an optional argument wrapper (and thus allocated) of the value at \
          %a"
-        Location.print_loc loc
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
     | Function_coercion ->
-      dprintf
+      Fmt.dprintf
         "is a partial application of the function at %a on omittable parameters"
-        Location.print_loc loc
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
     | Float_projection ->
-      dprintf "is projected (at %a) from a float record (and thus allocated)"
-        Location.print_loc loc
+      Fmt.dprintf
+        "is projected (at %a) from a float record (and thus allocated)"
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
 
-  let print_allocation_r : allocation -> formatter -> unit =
+  let print_allocation_r : allocation -> Fmt.formatter -> unit =
    fun { txt; _ } ->
     match txt with
-    | Unknown -> dprintf "is an allocation"
+    | Unknown -> Fmt.dprintf "is an allocation"
     | Optional_argument ->
-      dprintf
+      Fmt.dprintf
         "is to be put in an optional argument wrapper (and thus an allocation)"
     | Function_coercion ->
-      dprintf
+      Fmt.dprintf
         "is to omit some parameters by partial application (and thus an \
          allocation)"
     | Float_projection ->
-      dprintf "is a float-record projection (and thus an allocation)"
+      Fmt.dprintf "is a float-record projection (and thus an allocation)"
 
-  let print_contains : contains -> ((formatter -> unit) * pinpoint) option =
-   fun { containing; contained } ->
+  let modality_if_relevant ~fixpoint pp =
+    if
+      fixpoint
+      (* if the modality doesn't change the bound, we omit the modality and
+          print the remaining chain. *)
+    then (fun _ppf Modality -> ()), pp
+    else
+      (* if the modality change the bound, we signal that. Moreover, since each
+         axis is total ordering, the modality is solely responsible for the
+         bound, and we omit the remaining chain. *)
+      (* CR-someday zqian: print the modality on the offending axis. *)
+      ( (fun ppf Modality -> Fmt.fprintf ppf " (with some modality)"),
+        (Location.none, Unknown : pinpoint) )
+
+  let print_contains :
+      fixpoint:bool -> contains -> ((Fmt.formatter -> unit) * pinpoint) option =
+   fun ~fixpoint { containing; contained } ->
     print_pinpoint contained
     |> Option.map (fun print_pp ->
-           let print_pp = print_pp ~definite:true ~capitalize:false in
-           let pr =
-             match containing with
-             | Tuple -> dprintf "is a tuple that contains %t" print_pp
-             | Record s ->
-               dprintf "is a record whose field %a is %t" Misc.Style.inline_code
-                 s print_pp
-             | Array -> dprintf "is an array that contains %t" print_pp
-             | Constructor s ->
-               dprintf "contains (via constructor %a) %t" Misc.Style.inline_code
-                 s print_pp
-           in
-           pr, contained)
+        let print_pp = print_pp ~definite:true ~capitalize:false in
+        let maybe_modality, contained =
+          modality_if_relevant ~fixpoint contained
+        in
+        let pr =
+          match containing with
+          | Tuple -> Fmt.dprintf "is a tuple that contains %t" print_pp
+          | Record (s, moda) ->
+            Fmt.dprintf "is a record whose field %a%a is %t"
+              Misc.Style.inline_code s maybe_modality moda print_pp
+          | Array moda ->
+            Fmt.dprintf "is an array that contains%a %t" maybe_modality moda
+              print_pp
+          | Constructor (s, moda) ->
+            Fmt.dprintf "contains (via constructor %a)%a %t"
+              Misc.Style.inline_code s maybe_modality moda print_pp
+          | Structure (x, moda) ->
+            Fmt.dprintf "contains %t%a defined as %t"
+              (print_structure_item ~capitalize:false x)
+              maybe_modality moda print_pp
+        in
+        pr, contained)
 
-  let print_is_contained_by : is_contained_by -> (formatter -> unit) * pinpoint
-      =
-   fun { containing; container } ->
+  let print_is_contained_by :
+      fixpoint:bool -> is_contained_by -> (Fmt.formatter -> unit) * pinpoint =
+   fun ~fixpoint { containing; container } ->
+    let maybe_modality, pp = modality_if_relevant ~fixpoint container in
+    (* CR-someday zqian: Use the full [container] to improve the printing below.
+       E.g., insted of printing "the tuple at XXX", we can print "the tuple
+       pattern at XXX" or "the tuple expression at XXX". *)
+    let container = fst container in
     let pr =
       match containing with
       | Tuple ->
-        dprintf "is an element of the tuple at %a" Location.print_loc container
-      | Record s ->
-        dprintf "is the field %a of the record at %a" Misc.Style.inline_code s
-          Location.print_loc container
-      | Array ->
-        dprintf "is an element of the array at %a" Location.print_loc container
-      | Constructor s ->
-        dprintf "is contained (via constructor %a) in the value at %a"
-          Misc.Style.inline_code s Location.print_loc container
+        Fmt.dprintf "is an element of the tuple at %a"
+          (Location.Doc.loc ~capitalize_first:false)
+          container
+      | Record (s, moda) ->
+        Fmt.dprintf "is the field %a%a of the record at %a"
+          Misc.Style.inline_code s maybe_modality moda
+          (Location.Doc.loc ~capitalize_first:false)
+          container
+      | Array moda ->
+        Fmt.dprintf "is an element%a of the array at %a" maybe_modality moda
+          (Location.Doc.loc ~capitalize_first:false)
+          container
+      | Constructor (s, moda) ->
+        Fmt.dprintf "is contained (via constructor %a)%a in the value at %a"
+          Misc.Style.inline_code s maybe_modality moda
+          (Location.Doc.loc ~capitalize_first:false)
+          container
+      | Structure (x, moda) ->
+        Fmt.dprintf "is %t%a in the structure at %a"
+          (print_structure_item ~capitalize:false x)
+          maybe_modality moda
+          (Location.Doc.loc ~capitalize_first:false)
+          container
     in
-    let pp = container, Expression in
     pr, pp
 
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the
-      morph and have been expressed already, print the morph and gives the source pinpoint. *)
-  let print_morph :
-      type l r.
-      pinpoint -> (l * r) morph -> ((formatter -> unit) * pinpoint) option =
-   fun pp -> function
+      morph and have been expressed already, print the morph and return the
+      source pinpoint. The source pinpoint could be [Unknown], in which case the
+      rest of the chain will not be printed. *)
+  let print_morph : type l r.
+      fixpoint:bool ->
+      pinpoint ->
+      (l * r) morph ->
+      ((Fmt.formatter -> unit) * pinpoint) option =
+   fun ~fixpoint pp -> function
     | Skip -> Misc.fatal_error "Skip hint should not be printed"
-    | Unknown | Unknown_non_rigid -> None
+    | Unknown -> None
     | Close_over (Comonadic, { closed = pp; _ }) ->
       print_pinpoint pp
       |> Option.map (fun print_pp ->
-             ( dprintf "closes over %t"
-                 (print_pp ~definite:true ~capitalize:false),
-               pp ))
+          ( Fmt.dprintf "closes over %t"
+              (print_pp ~definite:true ~capitalize:false),
+            pp ))
     | Close_over (Monadic, { closed = pp; _ }) ->
       print_pinpoint pp
       |> Option.map (fun print_pp ->
-             ( dprintf "contains a usage (of %t)"
-                 (print_pp ~definite:true ~capitalize:false),
-               pp ))
+          ( Fmt.dprintf "contains a usage (of %t)"
+              (print_pp ~definite:true ~capitalize:false),
+            pp ))
     | Is_closed_by (_, { closure = pp; _ }) ->
       print_pinpoint pp
       |> Option.map (fun print_pp ->
-             ( dprintf "is used inside %t"
-                 (print_pp ~definite:true ~capitalize:false),
-               pp ))
+          ( Fmt.dprintf "is used inside %t"
+              (print_pp ~definite:true ~capitalize:false),
+            pp ))
     | Captured_by_partial_application ->
       Some
-        ( dprintf "is captured by a partial application",
+        ( Fmt.dprintf "is captured by a partial application",
           (Location.none, Expression) )
     | Adj_captured_by_partial_application ->
       Some
-        ( dprintf "has a partial application capturing a value",
+        ( Fmt.dprintf "has a partial application capturing a value",
           (Location.none, Expression) )
-    | Crossing -> Some (dprintf "crosses with something", pp)
+    | Crossing -> Some (Fmt.dprintf "crosses with something", pp)
     | Allocation_r alloc -> Some (print_allocation_r alloc, pp)
     | Allocation_l alloc -> Some (print_allocation_l alloc, pp)
-    | Contains_l (_, contains) -> print_contains contains
-    | Contains_r (_, contains) -> print_contains contains
+    | Contains_l (_, contains) -> print_contains ~fixpoint contains
+    | Contains_r (_, contains) -> print_contains ~fixpoint contains
     | Is_contained_by (_, is_contained_by) ->
-      Some (print_is_contained_by is_contained_by)
+      Some (print_is_contained_by ~fixpoint is_contained_by)
 
-  let print_mode :
-      type a. [`Actual | `Expected] -> a C.obj -> formatter -> a -> unit =
+  let print_mode : type a.
+      [`Actual | `Expected] -> a C.obj -> Fmt.formatter -> a -> unit =
    fun side obj ppf x ->
     let mode_printer = Misc.Style.as_inline_code (C.print obj) in
     match side, obj, x with
     | `Actual, Regionality, Regional ->
-      fprintf ppf "%a to the parent region" mode_printer C.Regionality.Local
+      Fmt.fprintf ppf "%a to the parent region" mode_printer C.Regionality.Local
       (* CR-someday zqian: treat the following cases generally. *)
     | `Expected, Contention_op, Shared ->
       (* When "shared" is expected, we tell the user that either shared or
          uncontended is expected. *)
-      fprintf ppf "%a or %a" mode_printer C.Contention.Shared mode_printer
+      Fmt.fprintf ppf "%a or %a" mode_printer C.Contention.Shared mode_printer
         C.Contention.Uncontended
     | `Expected, Visibility_op, Read ->
-      fprintf ppf "%a or %a" mode_printer C.Visibility.Read mode_printer
+      Fmt.fprintf ppf "%a or %a" mode_printer C.Visibility.Read mode_printer
         C.Visibility.Read_write
     | `Expected, Regionality, Regional ->
-      fprintf ppf "%a to the parent region or %a" mode_printer
+      Fmt.fprintf ppf "%a to the parent region or %a" mode_printer
         C.Regionality.Local mode_printer C.Regionality.Global
     | _ -> mode_printer ppf x
-   [@@ocaml.warning "-4"]
+  [@@ocaml.warning "-4"]
 
   let adjust_side : type a. a C.obj -> [`Left | `Right] -> [`Actual | `Expected]
       =
@@ -2300,29 +2382,27 @@ module Report = struct
     | false, `Left -> `Actual
     | false, `Right -> `Expected
 
-  let print_mode_with_side :
-      type a.
-      sub:bool -> [`Left | `Right] -> a C.obj -> Format.formatter -> a -> unit =
+  let print_mode_with_side : type a.
+      sub:bool -> [`Left | `Right] -> a C.obj -> Fmt.formatter -> a -> unit =
    fun ~sub side obj ppf a ->
     let side = adjust_side obj side in
     if sub
     then (
-      Format.pp_print_string ppf "which ";
+      Fmt.fprintf ppf "@ which ";
       match side with
-      | `Actual -> pp_print_string ppf "is "
-      | `Expected -> pp_print_string ppf "is expected to be ");
+      | `Actual -> Fmt.pp_print_string ppf "is "
+      | `Expected -> Fmt.pp_print_string ppf "is expected to be ");
     print_mode side obj ppf a
 
-  (** Some morph hints are said to be "non-rigid", because they should be printed only
-      when they change modes. *)
+  (** Some morph hints are said to be "non-rigid", because they should be
+      printed only when they change modes. *)
   let is_rigid : type l r. (l * r) morph -> bool = function
     | Unknown -> true
     | Close_over _ | Is_closed_by _ | Captured_by_partial_application
     | Contains_l _ | Contains_r _ | Is_contained_by _
     | Adj_captured_by_partial_application ->
       true
-    | Allocation_r _ | Allocation_l _ | Skip | Crossing | Unknown_non_rigid ->
-      false
+    | Allocation_r _ | Allocation_l _ | Skip | Crossing -> false
 
   let eq_mode : type a b. a C.obj -> b C.obj -> a -> b -> bool =
    fun a_obj b_obj a b ->
@@ -2330,28 +2410,29 @@ module Report = struct
     | Some Refl -> Misc.Le_result.equal ~le:(C.le a_obj) a b
     | None -> false
 
-  let rec print_ahint :
-      type a l r.
+  let rec print_ahint : type a l r.
       ?sub:bool ->
       [`Left | `Right] ->
       pinpoint ->
       a C.obj ->
-      Format.formatter ->
+      Fmt.formatter ->
       (a, l * r) ahint ->
       print_error_result option =
    fun ?(sub = false) side pp (obj : a C.obj) ppf (a, hint) ->
     match hint with
-    | Apply (morph_hint, src, ahint)
-      when (not (is_rigid morph_hint)) && eq_mode obj src a (fst ahint) ->
-      print_ahint ~sub side pp src ppf ahint
-    | Apply (morph_hint, src, ahint) -> (
-      print_mode_with_side ~sub side obj ppf a;
-      match print_morph pp morph_hint with
-      | None -> Some Mode
-      | Some (t, pp) ->
-        fprintf ppf "@ because it %t@ " t;
-        ignore (print_ahint ~sub:true side pp src ppf ahint);
-        Some Mode_with_hint)
+    | Apply (morph_hint, src, ahint) ->
+      let fixpoint = eq_mode obj src a (fst ahint) in
+      if (not (is_rigid morph_hint)) && fixpoint
+      then print_ahint ~sub side pp src ppf ahint
+      else (
+        print_mode_with_side ~sub side obj ppf a;
+        match print_morph ~fixpoint pp morph_hint with
+        | None -> Some Mode
+        | Some (t, pp) ->
+          Fmt.fprintf ppf "@ because it %t" t;
+          if is_known_pinpoint pp
+          then ignore (print_ahint ~sub:true side pp src ppf ahint);
+          Some Mode_with_hint)
     | Const Unknown ->
       print_mode_with_side ~sub side obj ppf a;
       Some Mode
@@ -2363,21 +2444,20 @@ module Report = struct
            inside a responsible morphism";
       None
     | Const c ->
-      fprintf ppf "%a@ because %a"
+      Fmt.fprintf ppf "%a@ because %a"
         (print_mode_with_side ~sub side obj)
         a (print_const pp) c;
       Some Mode_with_hint
-   [@@ocaml.warning "-4"]
+  [@@ocaml.warning "-4"]
 
   type 'a ahint_sided =
     | Left of ('a, left_only) ahint
     | Right of ('a, right_only) ahint
 
-  let print_ahint_sided :
-      type a.
+  let print_ahint_sided : type a.
       pinpoint ->
       a C.obj ->
-      Format.formatter ->
+      Fmt.formatter ->
       a ahint_sided ->
       print_error_result option =
    fun pp obj ppf ahint_sided ->
@@ -2417,9 +2497,8 @@ module Error = struct
     | Product : 'r C.obj * ('r, 'a) Axis.t * 'r t -> packed
     | Axis : 'a C.obj * 'a t -> packed
 
-  let print_product :
-      type r a. Hint.pinpoint -> r C.obj -> (r, a) Axis.t -> r t -> print_error
-      =
+  let print_product : type r a.
+      Hint.pinpoint -> r C.obj -> (r, a) Axis.t -> r t -> print_error =
    fun pp obj ax err ->
     let err = S.populate_error obj err in
     let err = Report.Of_solver.error_prod obj ax err in
@@ -2439,30 +2518,32 @@ module Error = struct
 
   let print_packed_simple_context : Hint.pinpoint -> packed -> Location.error =
    fun pp packed ->
-    let open Format in
+    let open Format_doc in
     let loc, desc = pp in
     let print ppf () =
+      let open_box = Fmt.dprintf "@[<hov 2>" in
+      let reopen_box = Fmt.dprintf "@]@ %t" open_box in
       let print_desc = Report.print_pinpoint_desc desc in
       (let print_desc =
          match print_desc with
-         | None -> dprintf "This"
+         | None -> Fmt.dprintf "This"
          | Some print_desc -> print_desc ~definite:true ~capitalize:true
        in
-       fprintf ppf "%t is " print_desc);
+       fprintf ppf "%t%t is " open_box print_desc);
       let ({ left; right } : print_error) = print_packed pp packed in
       (match left ppf with
       | Mode_with_hint ->
         let print_desc =
           match print_desc with
-          | None -> dprintf "the highlighted"
+          | None -> Fmt.dprintf "the highlighted"
           | Some print_desc ->
-            dprintf "%t highlighted"
+            Fmt.dprintf "%t highlighted"
               (print_desc ~definite:true ~capitalize:false)
         in
-        fprintf ppf ".@\nHowever, %t is expected to be " print_desc
-      | Mode -> fprintf ppf "@ but is expected to be ");
+        fprintf ppf ".%tHowever, %t is expected to be " reopen_box print_desc
+      | Mode -> fprintf ppf "%tbut is expected to be " reopen_box);
       ignore (right ppf);
-      pp_print_string ppf "."
+      fprintf ppf ".@]"
     in
     Location.error_of_printer ~loc print ()
 end
@@ -2512,7 +2593,7 @@ let try_with_log op =
   | Error _ as x ->
     S.undo_changes !log';
     x
-  [@@inline]
+[@@inline]
 
 let with_log op =
   let log' = ref S.empty_changes in
@@ -2520,7 +2601,7 @@ let with_log op =
   let r = op ~log in
   !append_changes log';
   r
-  [@@inline]
+[@@inline]
 
 let equate_from_submode submode_log m0 m1 ~log =
   match submode_log m0 m1 ~log with
@@ -2529,7 +2610,7 @@ let equate_from_submode submode_log m0 m1 ~log =
     match submode_log m1 m0 ~log with
     | Error e -> Error (Right_le_left, e)
     | Ok () -> Ok ())
-  [@@inline]
+[@@inline]
 
 let equate_from_submode' submode m0 m1 =
   match submode m0 m1 with
@@ -2538,7 +2619,7 @@ let equate_from_submode' submode m0 m1 =
     match submode m1 m0 with
     | Error e -> Error (Right_le_left, e)
     | Ok () -> Ok ())
-  [@@inline]
+[@@inline]
 
 module Comonadic_gen (Obj : Obj) = struct
   open Obj
@@ -3379,7 +3460,7 @@ module Value_with (Areality : Areality) = struct
     }
 
   let print ?verbose () ppf { monadic; comonadic } =
-    Format.fprintf ppf "%a;%a"
+    Fmt.fprintf ppf "%a;%a"
       (Comonadic.print ?verbose ())
       comonadic
       (Monadic.print ?verbose ())
@@ -3448,7 +3529,7 @@ module Value_with (Areality : Areality) = struct
 
     let print ppf m =
       let { monadic; comonadic } = split m in
-      Format.fprintf ppf "%a,%a" Comonadic.print comonadic Monadic.print monadic
+      Fmt.fprintf ppf "%a,%a" Comonadic.print comonadic Monadic.print monadic
 
     let legacy =
       merge { comonadic = Comonadic.legacy; monadic = Monadic.legacy }
@@ -3576,10 +3657,10 @@ module Value_with (Areality : Areality) = struct
             staticity
           } =
         let option_print print ppf = function
-          | None -> Format.fprintf ppf "None"
-          | Some a -> Format.fprintf ppf "Some %a" print a
+          | None -> Fmt.fprintf ppf "None"
+          | Some a -> Fmt.fprintf ppf "Some %a" print a
         in
-        Format.fprintf ppf "%a,%a,%a,%a,%a,%a,%a,%a,%a,%a"
+        Fmt.fprintf ppf "%a,%a,%a,%a,%a,%a,%a,%a,%a,%a"
           (option_print Areality.Const.print)
           areality
           (option_print Linearity.Const.print)
@@ -3643,7 +3724,7 @@ module Value_with (Areality : Areality) = struct
       let { comonadic; _ } = split m in
       comonadic
 
-    let print_axis : type a. a Axis.t -> _ -> a -> unit =
+    let print_axis : type a. a Axis.t -> Fmt.formatter -> a -> unit =
      fun ax ppf a ->
       let obj = proj_obj ax in
       C.print obj ppf a
@@ -3715,6 +3796,8 @@ module Value_with (Areality : Areality) = struct
     let comonadic, b0 = Comonadic.newvar_below comonadic in
     let monadic, b1 = Monadic.newvar_below monadic in
     { monadic; comonadic }, b0 || b1
+
+  type atom = Atom : 'a Axis.t * 'a -> atom
 
   type error =
     | Monadic of Monadic.error
@@ -3854,9 +3937,9 @@ module Value_with (Areality : Areality) = struct
     let comonadic = Comonadic.zap_to_legacy comonadic in
     merge { monadic; comonadic }
 
-  (** This is about partially applying [A -> B -> C] to [A] and getting [B ->
-    C]. [comonadic] and [monadic] constutute the mode of [A], and we need to
-    give the lower bound mode of [B -> C]. *)
+  (** This is about partially applying [A -> B -> C] to [A] and getting
+      [B -> C]. [comonadic] and [monadic] constutute the mode of [A], and we
+      need to give the lower bound mode of [B -> C]. *)
   let close_over { comonadic; monadic } =
     let comonadic = Comonadic.disallow_right comonadic in
     (* The comonadic of the returned function is constrained by the monadic of the closed argument via the dualizing morphism. *)
@@ -4101,10 +4184,11 @@ module Modality = struct
         match then_, t with
         | Join_const c0, Join_const c1 -> Join_const (Mode.Const.join c0 c1)
 
-      let apply : type l r. t -> (l * r) Mode.t -> (l * r) Mode.t =
-       fun t x ->
-        match t with
-        | Join_const c -> Mode.join_const ~hint:Unknown_non_rigid c x
+      let apply : type l r.
+          ?hint:(l * r) neg Hint.morph -> t -> (l * r) Mode.t -> (l * r) Mode.t
+          =
+       fun ?(hint = Hint.Unknown) t x ->
+        match t with Join_const c -> Mode.join_const ~hint c x
 
       let proj ax (Join_const c) : _ Atom.t = Join_with (Axis.proj ax c)
 
@@ -4112,7 +4196,7 @@ module Modality = struct
         Join_const (Axis.set ax a c)
 
       let print ppf = function
-        | Join_const c -> Format.fprintf ppf "join_const(%a)" Mode.Const.print c
+        | Join_const c -> Fmt.fprintf ppf "join_const(%a)" Mode.Const.print c
     end
 
     type t =
@@ -4149,20 +4233,22 @@ module Modality = struct
       | Undefined, _ | _, Undefined ->
         Misc.fatal_error "modality Undefined should not be in sub."
 
-    let id = Const Const.id
-
-    let apply : type r. t -> (allowed * r) Mode.t -> Mode.l =
-     fun t x ->
+    let apply : type r.
+        ?hint:(allowed * r) neg Hint.morph ->
+        t ->
+        (allowed * r) Mode.t ->
+        Mode.l =
+     fun ?hint t x ->
       match t with
-      | Const c -> Const.apply c x |> Mode.disallow_right
+      | Const c -> Const.apply ?hint c x |> Mode.disallow_right
       | Undefined ->
         Misc.fatal_error "modality Undefined should not be applied."
       | Diff (_, m) -> Mode.join [Mode.allow_right m; x]
 
     let print ppf = function
       | Const c -> Const.print ppf c
-      | Undefined -> Format.fprintf ppf "undefined"
-      | Diff _ -> Format.fprintf ppf "diff"
+      | Undefined -> Fmt.fprintf ppf "undefined"
+      | Diff _ -> Fmt.fprintf ppf "diff"
 
     (* All zapping functions mutate [mm] and [m] to the degree that's sufficient
        to fix [subtract_mm m], and return it. [subtract] is antitone for [mm]
@@ -4193,7 +4279,11 @@ module Modality = struct
 
     let zap_to_id = zap_to_floor
 
-    let to_const_opt = function Const c -> Some c | Undefined | Diff _ -> None
+    let to_const_opt = function
+      | Const c -> Some c
+      | Undefined ->
+        Misc.fatal_error "modality Undefined should not be looked at"
+      | Diff _ -> None
 
     let of_const c = Const c
 
@@ -4240,10 +4330,11 @@ module Modality = struct
         match then_, t with
         | Meet_const c0, Meet_const c1 -> Meet_const (Mode.Const.meet c0 c1)
 
-      let apply : type l r. t -> (l * r) Mode.t -> (l * r) Mode.t =
-       fun t x ->
-        match t with
-        | Meet_const c -> Mode.meet_const ~hint:Unknown_non_rigid c x
+      let apply : type l r.
+          ?hint:(l * r) pos Hint.morph -> t -> (l * r) Mode.t -> (l * r) Mode.t
+          =
+       fun ?(hint = Hint.Unknown) t x ->
+        match t with Meet_const c -> Mode.meet_const ~hint c x
 
       let proj ax (Meet_const c) : _ Atom.t = Meet_with (Axis.proj ax c)
 
@@ -4251,7 +4342,7 @@ module Modality = struct
         Meet_const (Axis.set ax a c)
 
       let print ppf = function
-        | Meet_const c -> Format.fprintf ppf "meet_const(%a)" Mode.Const.print c
+        | Meet_const c -> Fmt.fprintf ppf "meet_const(%a)" Mode.Const.print c
     end
 
     type t =
@@ -4291,12 +4382,14 @@ module Modality = struct
       | Undefined, _ | _, Undefined ->
         Misc.fatal_error "modality Undefined should not be in sub."
 
-    let id = Const Const.id
-
-    let apply : type r. t -> (allowed * r) Mode.t -> Mode.l =
-     fun t x ->
+    let apply : type r.
+        ?hint:(allowed * r) pos Hint.morph ->
+        t ->
+        (allowed * r) Mode.t ->
+        Mode.l =
+     fun ?hint t x ->
       match t with
-      | Const c -> Const.apply c x |> Mode.disallow_right
+      | Const c -> Const.apply ?hint c x |> Mode.disallow_right
       | Undefined ->
         Misc.fatal_error "modality Undefined should not be applied."
       | Exactly (_mm, m) ->
@@ -4308,8 +4401,8 @@ module Modality = struct
 
     let print ppf = function
       | Const c -> Const.print ppf c
-      | Undefined -> Format.fprintf ppf "undefined"
-      | Exactly _ -> Format.fprintf ppf "exactly"
+      | Undefined -> Fmt.fprintf ppf "undefined"
+      | Exactly _ -> Fmt.fprintf ppf "exactly"
 
     let infer ~md_mode ~mode = Exactly (md_mode, mode)
 
@@ -4360,7 +4453,9 @@ module Modality = struct
 
     let to_const_opt = function
       | Const c -> Some c
-      | Undefined | Exactly _ -> None
+      | Undefined ->
+        Misc.fatal_error "modality Undefined should not be looked at"
+      | Exactly _ -> None
 
     let of_const c = Const c
   end
@@ -4396,6 +4491,12 @@ module Modality = struct
     let is_constant : type a. a Axis.t -> a -> bool = function
       | Monadic ax -> Monadic.is_constant ax
       | Comonadic ax -> Comonadic.is_constant ax
+
+    let print (type a) (ax : a Axis.t) ppf (t : a) =
+      match ax, t with
+      | Comonadic ax, Meet_with t ->
+        Value.Comonadic.Const.Per_axis.print ax ppf t
+      | Monadic ax, Join_with t -> Value.Monadic.Const.Per_axis.print ax ppf t
   end
 
   type error = Error : 'a Axis.t * 'a simple_error -> error
@@ -4423,9 +4524,17 @@ module Modality = struct
 
     let equate = equate_from_submode' sub
 
-    let apply t { monadic; comonadic } =
-      let monadic = Monadic.apply t.monadic monadic in
-      let comonadic = Comonadic.apply t.comonadic comonadic in
+    let apply ?hint t { monadic; comonadic } =
+      let monadic =
+        Monadic.apply
+          ?hint:(Option.map (fun { monadic; _ } -> monadic) hint)
+          t.monadic monadic
+      in
+      let comonadic =
+        Comonadic.apply
+          ?hint:(Option.map (fun { comonadic; _ } -> comonadic) hint)
+          t.comonadic comonadic
+      in
       { monadic; comonadic }
 
     let concat ~then_ t =
@@ -4453,18 +4562,29 @@ module Modality = struct
         Value.Axis.all
 
     let print ppf { monadic; comonadic } =
-      Format.fprintf ppf "%a;%a" Monadic.print monadic Comonadic.print comonadic
+      Fmt.fprintf ppf "%a;%a" Monadic.print monadic Comonadic.print comonadic
   end
 
   type t = (Monadic.t, Comonadic.t) monadic_comonadic
 
-  let id : t = { monadic = Monadic.id; comonadic = Comonadic.id }
+  let undefined : t = { monadic = Undefined; comonadic = Undefined }
 
-  let undefined : t = { monadic = Undefined; comonadic = Comonadic.Undefined }
+  let is_undefined : t -> bool = function
+    | { monadic = Undefined; comonadic = Undefined } -> true
+    | _ -> false
+  [@@ocaml.warning "-4"]
 
-  let apply t { monadic; comonadic } =
-    let monadic = Monadic.apply t.monadic monadic in
-    let comonadic = Comonadic.apply t.comonadic comonadic in
+  let apply ?hint t { monadic; comonadic } =
+    let monadic =
+      Monadic.apply
+        ?hint:(Option.map (fun { monadic; _ } -> monadic) hint)
+        t.monadic monadic
+    in
+    let comonadic =
+      Comonadic.apply
+        ?hint:(Option.map (fun { comonadic; _ } -> comonadic) hint)
+        t.comonadic comonadic
+    in
     { monadic; comonadic }
 
   let sub_log t0 t1 ~log : (unit, error) Result.t =
@@ -4480,7 +4600,7 @@ module Modality = struct
   let equate m0 m1 = try_with_log (equate_from_submode sub_log m0 m1)
 
   let print ppf ({ monadic; comonadic } : t) =
-    Format.fprintf ppf "%a;%a" Monadic.print monadic Comonadic.print comonadic
+    Fmt.fprintf ppf "%a;%a" Monadic.print monadic Comonadic.print comonadic
 
   let infer ~md_mode ~mode : t =
     let comonadic =
@@ -4636,7 +4756,7 @@ module Crossing = struct
       Modality (Join_const (Mode.Const.join c0 c1))
 
     let print ppf (Modality m) =
-      Format.fprintf ppf "Modality %a" Modality.Const.print m
+      Fmt.fprintf ppf "Modality %a" Modality.Const.print m
   end
 
   module Comonadic = struct
@@ -4723,7 +4843,7 @@ module Crossing = struct
       Modality (Meet_const (Mode.Const.meet c0 c1))
 
     let print ppf (Modality m) =
-      Format.fprintf ppf "Modality %a" Modality.Const.print m
+      Fmt.fprintf ppf "Modality %a" Modality.Const.print m
   end
 
   module Axis = struct
@@ -4751,7 +4871,7 @@ module Crossing = struct
       | Monadic _, Comonadic _ -> None
       | Comonadic _, Monadic _ -> None
 
-    let print : type a. Format.formatter -> a t -> unit =
+    let print : type a. Fmt.formatter -> a t -> unit =
      fun ppf -> function
       | Monadic ax -> Axis.print ppf ax
       | Comonadic ax -> Axis.print ppf ax
@@ -4761,7 +4881,7 @@ module Crossing = struct
     open Axis
 
     let le : type a. a t -> a -> a -> bool =
-     fun [@inline available] ax a b ->
+     fun[@inline available] ax a b ->
       match ax with
       | Monadic ax -> (Monadic.Atom.le [@inlined hint]) ax a b
       | Comonadic ax -> (Comonadic.Atom.le [@inlined hint]) ax a b
@@ -4775,18 +4895,18 @@ module Crossing = struct
       | Comonadic ax -> (Comonadic.Atom.max [@inlined hint]) ax
 
     let meet : type a. a t -> a -> a -> a =
-     fun [@inline available] ax a b ->
+     fun[@inline available] ax a b ->
       match ax with
       | Monadic ax -> (Monadic.Atom.meet [@inlined hint]) ax a b
       | Comonadic ax -> (Comonadic.Atom.meet [@inlined hint]) ax a b
 
     let join : type a. a t -> a -> a -> a =
-     fun [@inline available] ax a b ->
+     fun[@inline available] ax a b ->
       match ax with
       | Monadic ax -> (Monadic.Atom.join [@inlined hint]) ax a b
       | Comonadic ax -> (Comonadic.Atom.join [@inlined hint]) ax a b
 
-    let print : type a. a t -> Format.formatter -> a -> unit = function
+    let print : type a. a t -> Fmt.formatter -> a -> unit = function
       | Monadic ax -> Monadic.Atom.print ax
       | Comonadic ax -> Comonadic.Atom.print ax
 
@@ -4808,7 +4928,7 @@ module Crossing = struct
     { monadic; comonadic }
 
   let apply_left t m =
-    m |> Value.unhint |> apply_left_unhint t
+    m |> Value.disallow_right |> Value.unhint |> apply_left_unhint t
     |> Value.hint ~monadic:Crossing ~comonadic:Crossing
 
   let apply_right_unhint t { monadic; comonadic } =
@@ -4817,7 +4937,7 @@ module Crossing = struct
     { monadic; comonadic }
 
   let apply_right t m =
-    m |> Value.unhint |> apply_right_unhint t
+    m |> Value.disallow_left |> Value.unhint |> apply_right_unhint t
     |> Value.hint ~monadic:Crossing ~comonadic:Crossing
 
   (* Our mode crossing is for [Value] modes, but can be extended to [Alloc]
@@ -4922,10 +5042,10 @@ module Crossing = struct
           let a = proj ax t in
           if Per_axis.(le ax (max ax) a)
           then None
-          else Some (Format.asprintf "%a" (Per_axis.print ax) a))
+          else Some (Fmt.asprintf "%a" (Per_axis.print ax) a))
         Value.Axis.all
     in
-    Format.(pp_print_list ~pp_sep:pp_print_space pp_print_string ppf l)
+    Fmt.(pp_print_list ~pp_sep:pp_print_space pp_print_string ppf l)
 
   let to_modality
       { monadic = Monadic.Modality monadic;

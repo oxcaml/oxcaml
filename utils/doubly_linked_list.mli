@@ -89,6 +89,8 @@ val for_alli : 'a t -> f:(int -> 'a -> bool) -> bool
 
 val to_list : 'a t -> 'a list
 
+val to_array : 'a t -> 'a array
+
 (* Adds all of the elements of `from` to `to_`, and clears `from`. *)
 val transfer : to_:'a t -> from:'a t -> unit -> unit
 

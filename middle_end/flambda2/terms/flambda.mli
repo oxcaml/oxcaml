@@ -18,24 +18,24 @@
 
     The language is in double-barrelled continuation-passing style (CPS).
     Continuations, used for normal and exceptional control flow, are second
-    class.  Unlike some CPS-based representations there is a conventional
-    "let"-binding construct; this is structured in A-normal form (ANF).  Terms
+    class. Unlike some CPS-based representations there is a conventional
+    "let"-binding construct; this is structured in A-normal form (ANF). Terms
     are represented up to alpha-conversion of bound variables and continuations.
 
     The basic structure of the language ensures that:
 
     - every intermediate value (and in particular every potential value that we
-    may want to statically allocate) has a name;
+      may want to statically allocate) has a name;
 
     - every point to which we might wish to jump has a name;
 
     - there are no nested "let"s or subexpressions;
 
     - no re-normalisation of terms is required when substituting an application
-    for an inlined body (unlike in conventional ANF forms). *)
+      for an inlined body (unlike in conventional ANF forms). *)
 
 (** Modules may be found further down the file giving operations on the abstract
-    types that follow.  The types for some parts of terms (e.g. Apply_expr) are
+    types that follow. The types for some parts of terms (e.g. Apply_expr) are
     defined in their own files. *)
 
 type expr
@@ -53,8 +53,8 @@ type static_const_group
 type expr_descr = private
   | Let of let_expr
       (** Bind variable(s), symbol(s) and/or code ID(s). The defining expression
-          (the part after the "=", as in "let x = defining_expr in body")
-          never has any effect on control flow. *)
+          (the part after the "=", as in "let x = defining_expr in body") never
+          has any effect on control flow. *)
   | Let_cont of let_cont_expr  (** Define one or more continuations. *)
   | Apply of Apply_expr.t
       (** Call an OCaml function, external function or method. *)
@@ -89,9 +89,12 @@ and let_cont_expr = private
             (** [num_free_occurrences] can be used, for example, to decide
                 whether to inline out a linearly-used continuation. It will
                 always be strictly greater than zero. *)
-        is_applied_with_traps : bool
+        is_applied_with_traps : bool;
             (** [is_applied_with_traps] is used to prevent inlining of
                 continuations that are applied with a trap action *)
+        can_be_lifted : bool
+            (** [can_be_lifted] is used to prevent some continuations from being
+                lifted during continuation specialization. *)
       }
   | Recursive of recursive_let_cont_handlers
 
@@ -188,8 +191,9 @@ module Named : sig
   val dummy_value :
     machine_width:Target_system.Machine_width.t -> Flambda_kind.t -> t
 
-  (** Return the kind of the expression. Must only be used on expressions
-      bound to a singleton pattern (everything except sets of closures and static consts). *)
+  (** Return the kind of the expression. Must only be used on expressions bound
+      to a singleton pattern (everything except sets of closures and static
+      consts). *)
   val kind : t -> Flambda_kind.t
 
   (** Returns [true] iff the given expression is a set of closures that will be
@@ -218,10 +222,9 @@ module Let_expr : sig
       expressions that bind symbols and code IDs (which are not treated up to
       alpha equivalence).
 
-      Variables have normal syntactic scoping.  Symbols and code IDs are
-      treated as in scope in all parts of the term dominated by the
-      corresponding [Let]-binding.
-  *)
+      Variables have normal syntactic scoping. Symbols and code IDs are treated
+      as in scope in all parts of the term dominated by the corresponding
+      [Let]-binding. *)
 
   type t = let_expr
 
@@ -237,8 +240,8 @@ module Let_expr : sig
   (** The defining expression of the [Let]. *)
   val defining_expr : t -> named
 
-  (** Look inside the [Let] by choosing a member of the alpha-equivalence
-      class. *)
+  (** Look inside the [Let] by choosing a member of the alpha-equivalence class.
+  *)
   val pattern_match : t -> f:(Bound_pattern.t -> body:expr -> 'a) -> 'a
 
   val pattern_match' :
@@ -369,8 +372,8 @@ module Let_cont_expr : sig
 
       [body] where [name] [args] = [handler]
 
-      (In the -drawflambda / -dflambda output, "where" is omitted, in
-      favour of a simple label syntax e.g. "k42:")
+      (In the -drawflambda / -dflambda output, "where" is omitted, in favour of
+      a simple label syntax e.g. "k42:")
 
       - Continuations are second-class.
 
@@ -407,6 +410,15 @@ module Let_cont_expr : sig
     body:expr ->
     num_free_occurrences_of_cont_in_body:Num_occurrences.t Or_unknown.t ->
     is_applied_with_traps:bool ->
+    expr
+
+  (** Same as [create_non_recursive] but marks the continuation as a wrapper.
+      Wrapper continuations are not lifted during specialization *)
+  val create_non_liftable :
+    Continuation.t ->
+    Continuation_handler.t ->
+    body:expr ->
+    free_names_of_body:Name_occurrences.t Or_unknown.t ->
     expr
 
   (** Create a definition of a set of possibly-recursive continuations. *)
@@ -456,7 +468,8 @@ module Recursive_let_cont_handlers : sig
       'a) ->
     'a
 
-  (** Deconstruct two continuation bindings using the same bound continuations. *)
+  (** Deconstruct two continuation bindings using the same bound continuations.
+  *)
   val pattern_match_pair :
     t ->
     t ->
@@ -504,8 +517,8 @@ module Function_params_and_body : sig
     t
 
   (** Choose a member of the alpha-equivalence class to enable examination of
-      the parameters, relations thereon and the body over which they are
-      scoped. *)
+      the parameters, relations thereon and the body over which they are scoped.
+  *)
   val pattern_match :
     t ->
     f:

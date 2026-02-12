@@ -204,7 +204,7 @@ let sort_of_native_repr ~poly_sort repr =
   match extern_repr_of_native_repr ~poly_sort repr with
   | Same_as_ocaml_repr s -> s
   | (Unboxed_float _ | Unboxed_or_untagged_integer _ |
-      Unboxed_vector _) ->
+     Unboxed_vector _) ->
     Jkind.Sort.Const.Base Value
 
 let to_lambda_prim prim ~poly_sort =
@@ -228,13 +228,32 @@ let to_lambda_prim prim ~poly_sort =
     ~native_repr_res
     ~is_layout_poly:prim.prim_is_layout_poly
 
+let bigstring_checks ~unsafe ~aligned size =
+  if unsafe
+  then None
+  else
+    let len =
+      match size with
+      | Boxed_vec128 -> 16
+      | Boxed_vec256 -> 32
+      | Boxed_vec512 -> 64
+    in
+    let align = if aligned then len else 0 in
+    Some (~len, ~align)
+
 let indexing_primitives =
   let types_and_widths =
     [
+      ( Printf.sprintf "%%caml_bigstring_geti8%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbigstring_load_i8 { unsafe; index_kind; tagged } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_bigstring_get16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
           Pbigstring_load_16 { unsafe; index_kind } );
+      ( Printf.sprintf "%%caml_bigstring_geti16%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbigstring_load_i16 { unsafe; index_kind; tagged } );
       ( Printf.sprintf "%%caml_bigstring_get32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pbigstring_load_32 { unsafe; index_kind; mode; boxed } );
@@ -246,18 +265,26 @@ let indexing_primitives =
           Pbigstring_load_64 { unsafe; index_kind; mode; boxed } );
       ( Printf.sprintf "%%caml_bigstring_getu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec128 in
           Pbigstring_load_vec
-            { size = Boxed_vec128; aligned = false; unsafe;
-              index_kind; mode; boxed } );
+            { size = Boxed_vec128; checks; index_kind; mode;
+              aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_geta128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec128 in
           Pbigstring_load_vec
-            { size = Boxed_vec128; aligned = true; unsafe;
-              index_kind; mode; boxed } );
+            { size = Boxed_vec128; checks; index_kind; mode;
+              aligned = true; boxed } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_bigstring_set16%s%s" unsafe index_kind),
-        fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
-          Pbigstring_set_16 { unsafe; index_kind } );
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbigstring_set_16 { unsafe; index_kind; tagged } );
+      ( Printf.sprintf "%%caml_bigstring_set8%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbigstring_set_8 { unsafe; index_kind; tagged } );
+      ( Printf.sprintf "%%caml_bigstring_set16%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbigstring_set_16 { unsafe; index_kind; tagged } );
       ( Printf.sprintf "%%caml_bigstring_set32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
           Pbigstring_set_32 { unsafe; index_kind; boxed } );
@@ -269,52 +296,74 @@ let indexing_primitives =
           Pbigstring_set_64 { unsafe; index_kind; boxed } );
       ( Printf.sprintf "%%caml_bigstring_setu128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec128; aligned = false;
-                               unsafe; index_kind; boxed } );
+          let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec128 in
+          Pbigstring_set_vec
+            { size = Boxed_vec128; checks; index_kind;
+              aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_seta128%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec128; aligned = true;
-                               unsafe; index_kind; boxed } );
+          let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec128 in
+          Pbigstring_set_vec
+            { size = Boxed_vec128; checks; index_kind;
+              aligned = true; boxed } );
       ( Printf.sprintf "%%caml_bigstring_getu256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec256 in
           Pbigstring_load_vec
-            { size = Boxed_vec256; aligned = false; unsafe;
-              index_kind; mode; boxed } );
+            { size = Boxed_vec256; checks; index_kind; mode;
+              aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_geta256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec256 in
           Pbigstring_load_vec
-            { size = Boxed_vec256; aligned = true; unsafe;
-              index_kind; mode; boxed } );
+            { size = Boxed_vec256; checks; index_kind; mode;
+              aligned = true; boxed } );
       ( Printf.sprintf "%%caml_bigstring_setu256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec256; aligned = false;
-                               unsafe; index_kind; boxed } );
+          let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec256 in
+          Pbigstring_set_vec
+            { size = Boxed_vec256; checks; index_kind;
+              aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_seta256%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec256; aligned = true;
-                               unsafe; index_kind; boxed } );
+          let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec256 in
+          Pbigstring_set_vec
+            { size = Boxed_vec256; checks; index_kind;
+              aligned = true; boxed } );
       ( Printf.sprintf "%%caml_bigstring_getu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec512 in
           Pbigstring_load_vec
-            { size = Boxed_vec512; aligned = false; unsafe;
-              index_kind; mode; boxed } );
+            { size = Boxed_vec512; checks; index_kind; mode;
+              aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_geta512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
+          let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec512 in
           Pbigstring_load_vec
-            { size = Boxed_vec512; aligned = true; unsafe;
-              index_kind; mode; boxed } );
+            { size = Boxed_vec512; checks; index_kind; mode;
+              aligned = true; boxed } );
       ( Printf.sprintf "%%caml_bigstring_setu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec512; aligned = false;
-                               unsafe; index_kind; boxed } );
+          let checks = bigstring_checks ~unsafe ~aligned:false Boxed_vec512 in
+          Pbigstring_set_vec
+            { size = Boxed_vec512; checks; index_kind;
+              aligned = false; boxed } );
       ( Printf.sprintf "%%caml_bigstring_seta512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
-          Pbigstring_set_vec { size = Boxed_vec512; aligned = true;
-                               unsafe; index_kind; boxed } );
+          let checks = bigstring_checks ~unsafe ~aligned:true Boxed_vec512 in
+          Pbigstring_set_vec
+            { size = Boxed_vec512; checks; index_kind;
+              aligned = true; boxed } );
+      ( Printf.sprintf "%%caml_bytes_geti8%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbytes_load_i8 { unsafe; index_kind; tagged } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_bytes_get16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
           Pbytes_load_16 { unsafe; index_kind } );
+      ( Printf.sprintf "%%caml_bytes_geti16%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbytes_load_i16 { unsafe; index_kind; tagged } );
       ( Printf.sprintf "%%caml_bytes_get32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pbytes_load_32 { unsafe; index_kind; mode; boxed } );
@@ -328,10 +377,12 @@ let indexing_primitives =
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pbytes_load_vec { size = Boxed_vec128; unsafe;
                             index_kind; mode; boxed } );
-      ( (fun unsafe _boxed index_kind ->
-          Printf.sprintf "%%caml_bytes_set16%s%s" unsafe index_kind),
-        fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
-          Pbytes_set_16 { unsafe; index_kind } );
+      ( Printf.sprintf "%%caml_bytes_set8%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbytes_set_8 { unsafe; index_kind; tagged } );
+      ( Printf.sprintf "%%caml_bytes_set16%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pbytes_set_16 { unsafe; index_kind; tagged } );
       ( Printf.sprintf "%%caml_bytes_set32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
           Pbytes_set_32 { unsafe; index_kind; boxed } );
@@ -358,10 +409,16 @@ let indexing_primitives =
       ( Printf.sprintf "%%caml_bytes_setu512%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode:_ ->
           Pbytes_set_vec { size = Boxed_vec512; unsafe; index_kind; boxed } );
+      ( Printf.sprintf "%%caml_string_geti8%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pstring_load_i8 { unsafe; index_kind; tagged } );
       ( (fun unsafe _boxed index_kind ->
           Printf.sprintf "%%caml_string_get16%s%s" unsafe index_kind),
         fun ~unsafe ~boxed:_ ~index_kind ~mode:_ ->
           Pstring_load_16 { unsafe; index_kind } );
+      ( Printf.sprintf "%%caml_string_geti16%s%s%s",
+        fun ~unsafe ~boxed:tagged ~index_kind ~mode:_ ->
+          Pstring_load_i16 { unsafe; index_kind; tagged } );
       ( Printf.sprintf "%%caml_string_get32%s%s%s",
         fun ~unsafe ~boxed ~index_kind ~mode ->
           Pstring_load_32 { unsafe; index_kind; mode; boxed } );
@@ -389,7 +446,8 @@ let indexing_primitives =
       ( (fun unsafe _boxed _index_kind ->
           Printf.sprintf "%%caml_string_set16%s" unsafe),
         fun ~unsafe ~boxed:_ ~index_kind:_ ~mode:_ ->
-          Pbytes_set_16 { unsafe; index_kind = Ptagged_int_index } );
+          Pbytes_set_16
+            { unsafe; index_kind = Ptagged_int_index; tagged = true } );
       ( (fun unsafe _boxed _index_kind ->
           Printf.sprintf "%%caml_string_set32%s" unsafe ),
         fun ~unsafe ~boxed:_ ~index_kind:_ ~mode:_ ->
@@ -407,6 +465,8 @@ let indexing_primitives =
       (Ptagged_int_index, "");
       (Punboxed_or_untagged_integer_index Unboxed_nativeint,
        "_indexed_by_nativeint#");
+      (Punboxed_or_untagged_integer_index Untagged_int8, "_indexed_by_int8#");
+      (Punboxed_or_untagged_integer_index Untagged_int16, "_indexed_by_int16#");
       (Punboxed_or_untagged_integer_index Unboxed_int32, "_indexed_by_int32#");
       (Punboxed_or_untagged_integer_index Unboxed_int64, "_indexed_by_int64#");
     ]
@@ -465,6 +525,18 @@ let array_vec_primitives =
                                          mode; boxed }),
        (fun ~size ~unsafe ~index_kind ~boxed ->
          Punboxed_int32_array_set_vec { size; unsafe; index_kind; boxed }));
+      ("untagged_int16_array",
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Puntagged_int16_array_load_vec { size; unsafe; index_kind;
+                                          mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Puntagged_int16_array_set_vec { size; unsafe; index_kind; boxed }));
+      ("untagged_int8_array",
+       (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
+         Puntagged_int8_array_load_vec { size; unsafe; index_kind;
+                                         mode; boxed }),
+       (fun ~size ~unsafe ~index_kind ~boxed ->
+         Puntagged_int8_array_set_vec { size; unsafe; index_kind; boxed }));
       ("unboxed_nativeint_array",
        (fun ~size ~unsafe ~index_kind ~mode ~boxed ->
          Punboxed_nativeint_array_load_vec { size; unsafe; index_kind;
@@ -483,6 +555,8 @@ let array_vec_primitives =
       (Ptagged_int_index, "");
       (Punboxed_or_untagged_integer_index Unboxed_nativeint,
        "_indexed_by_nativeint#");
+      (Punboxed_or_untagged_integer_index Untagged_int8, "_indexed_by_int8#");
+      (Punboxed_or_untagged_integer_index Untagged_int16, "_indexed_by_int16#");
       (Punboxed_or_untagged_integer_index Unboxed_int32, "_indexed_by_int32#");
       (Punboxed_or_untagged_integer_index Unboxed_int64, "_indexed_by_int64#");
     ]
@@ -589,8 +663,10 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%setfield1" ->
        let mode = get_first_arg_mode () in
        Primitive ((Psetfield(1, Pointer, Assignment mode)), 2);
-    | "%makeblock" -> Primitive ((Pmakeblock(0, Immutable, None, mode)), 1)
-    | "%makemutable" -> Primitive ((Pmakeblock(0, Mutable, None, mode)), 1)
+    | "%makeblock" ->
+       Primitive ((Pmakeblock(0, Immutable, All_value, mode)), 1)
+    | "%makemutable" ->
+       Primitive ((Pmakeblock(0, Mutable, All_value, mode)), 1)
     | "%raise" -> Raise Raise_regular
     | "%reraise" -> Raise Raise_reraise
     | "%raise_notrace" -> Raise Raise_notrace
@@ -1007,6 +1083,8 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%box_vec128" -> Primitive(Pbox_vector (Boxed_vec128, mode), 1)
     | "%unbox_vec256" -> Primitive(Punbox_vector Boxed_vec256, 1)
     | "%box_vec256" -> Primitive(Pbox_vector (Boxed_vec256, mode), 1)
+    | "%join_vec256" -> Primitive(Pjoin_vec256, 2)
+    | "%split_vec256" -> Primitive(Psplit_vec256, 1)
     | "%unbox_vec512" -> Primitive(Punbox_vector Boxed_vec512, 1)
     | "%box_vec512" -> Primitive(Pbox_vector (Boxed_vec512, mode), 1)
     | "%get_header" -> Primitive (Pget_header mode, 1)
@@ -1045,16 +1123,20 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | "%atomic_lxor_field" -> Atomic(Lxor, Field, Immediate)
     | "%atomic_lxor_loc" -> Atomic(Lxor, Loc, Immediate)
     | "%cpu_relax" -> Primitive (Pcpu_relax, 1)
-    | "%runstack" ->
-      if runtime5 then Primitive (Prunstack, 3) else Unsupported Prunstack
+    | "%with_stack" ->
+      if runtime5 then Primitive (Pwith_stack, 5) else Unsupported Pwith_stack
+    | "%with_stack_bind" ->
+      if runtime5 then Primitive (Pwith_stack_bind, 7)
+      else Unsupported Pwith_stack_bind
     | "%reperform" ->
       if runtime5 then Primitive (Preperform, 3) else Unsupported Preperform
     | "%perform" ->
       if runtime5 then Primitive (Pperform, 1) else Unsupported Pperform
     | "%resume" ->
-      if runtime5 then Primitive (Presume, 4) else Unsupported Presume
+      if runtime5 then Primitive (Presume, 3) else Unsupported Presume
     | "%dls_get" -> Primitive (Pdls_get, 1)
     | "%tls_get" -> Primitive (Ptls_get, 1)
+    | "%domain_index" -> Primitive (Pdomain_index, 1)
     | "%poll" -> Primitive (Ppoll, 1)
     | "%unbox_nativeint" ->
       static_cast ~src:(i nativeint) ~dst:(naked (i nativeint))
@@ -1665,7 +1747,8 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       | Pbigarray_unknown, Pbigarray_unknown_layout -> None
       | _, _ -> Some (Primitive (Pbigarrayset(unsafe, n, k, l), arity))
     end
-  | Primitive (Pmakeblock(tag, mut, None, mode), arity), fields -> begin
+  | Primitive (Pmakeblock(tag, mut, All_value, mode), arity), fields ->
+    begin
       let shape =
         List.map (fun typ ->
           Lambda.must_be_value (Typeopt.layout env (to_location loc)
@@ -1674,7 +1757,9 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       in
       let useful = List.exists (fun knd -> knd <> Lambda.generic_value) shape in
       if useful then
-        Some (Primitive (Pmakeblock(tag, mut, Some shape, mode),arity))
+        Some (Primitive (Pmakeblock(tag, mut,
+                           Lambda.block_shape_of_value_kinds (Some shape),
+                           mode), arity))
       else None
     end
   | Comparison(comp, Compare_generic), p1 :: _ ->
@@ -2083,7 +2168,8 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       lambda_of_loc kind loc
   | Loc kind, [arg] ->
       let lam = lambda_of_loc kind loc in
-      Lprim(Pmakeblock(0, Immutable, None, alloc_heap), [lam; arg], loc)
+      Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
+            [lam; arg], loc)
   | Send (pos, layout), [obj; meth] ->
       Lsend(Public, meth, obj, [], pos, alloc_heap, loc, layout)
   | Send_self (pos, layout), [obj; meth] ->
@@ -2131,7 +2217,7 @@ let lambda_of_prim prim_name prim loc args arg_exps =
       Lprim (
         Praise Raise_regular,
         [Lprim (
-          Pmakeblock (0, Immutable, None, alloc_heap),
+          Pmakeblock (0, Immutable, All_value, alloc_heap),
           [exn; Lconst (Const_immstring msg)],
           loc)],
         loc)
@@ -2231,8 +2317,8 @@ let transl_primitive loc p env ty ~poly_mode ~poly_sort path =
   | [] -> lambda_of_prim p.prim_name prim loc args None
   | _ ->
      let loc =
-       Debuginfo.Scoped_location.map_scopes (fun ~scopes ->
-         Debuginfo.Scoped_location.enter_partial_or_eta_wrapper ~scopes)
+       Debuginfo.Scoped_location.map_scopes
+         Debuginfo.Scoped_location.enter_partial_or_eta_wrapper
          loc
      in
      let body = lambda_of_prim p.prim_name prim loc args None in
@@ -2317,26 +2403,35 @@ let lambda_primitive_needs_event_after = function
   | Pmakearray_dynamic (Pgenarray, _, _)
   | Parrayrefu ((Pgenarray_ref _ | Pfloatarray_ref _), _, _)
   | Parrayrefs _ | Parraysets _
-  | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _ | Pstring_load_16 _
+  | Pbigarrayref _ | Pbigarrayset _ | Pbigarraydim _
+  | Pstring_load_i8 _ | Pstring_load_i16 _ | Pstring_load_16 _
   | Pstring_load_32 _ | Pstring_load_f32 _ | Pstring_load_64 _
-  | Pstring_load_vec _ | Pbytes_load_16 _ | Pbytes_load_32 _
-  | Pbytes_load_f32 _ | Pbytes_load_64 _ | Pbytes_load_vec _ | Pbytes_set_16 _
+  | Pstring_load_vec _
+  | Pbytes_load_i8 _ | Pbytes_load_i16 _ | Pbytes_load_16 _ | Pbytes_load_32 _
+  | Pbytes_load_f32 _ | Pbytes_load_64 _ | Pbytes_load_vec _
+  | Pbytes_set_8 _ | Pbytes_set_16 _
   | Pbytes_set_32 _  | Pbytes_set_f32 _ | Pbytes_set_64 _ | Pbytes_set_vec _
-  | Pbigstring_load_16 _
+  | Pbigstring_load_i8 _ | Pbigstring_load_i16 _ | Pbigstring_load_16 _
   | Pbigstring_load_32 _ | Pbigstring_load_f32 _ | Pbigstring_load_64 _
-  | Pbigstring_load_vec _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
+  | Pbigstring_load_vec _
+  | Pbigstring_set_8 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
   | Pbigstring_set_f32 _ | Pbigstring_set_64 _ | Pbigstring_set_vec _
   | Pfloatarray_load_vec _ | Pfloat_array_load_vec _ | Pint_array_load_vec _
   | Punboxed_float_array_load_vec _| Punboxed_float32_array_load_vec _
+  | Puntagged_int8_array_load_vec _ | Puntagged_int16_array_load_vec _
   | Punboxed_int32_array_load_vec _ | Punboxed_int64_array_load_vec _
   | Punboxed_nativeint_array_load_vec _
   | Pfloatarray_set_vec _ | Pfloat_array_set_vec _ | Pint_array_set_vec _
   | Punboxed_float_array_set_vec _| Punboxed_float32_array_set_vec _
+  | Puntagged_int8_array_set_vec _ | Puntagged_int16_array_set_vec _
   | Punboxed_int32_array_set_vec _ | Punboxed_int64_array_set_vec _
   | Punboxed_nativeint_array_set_vec _
+  | Pjoin_vec256 | Psplit_vec256
+  | Preinterpret_boxed_vector_as_tuple _
+  | Preinterpret_tuple_as_boxed_vector _
   | Pget_idx _ | Pset_idx _
   | Pget_ptr _ | Pset_ptr _
-  | Prunstack | Pperform | Preperform | Presume
+  | Pwith_stack | Pwith_stack_bind | Pperform | Preperform | Presume
   | Ppoll | Pobj_dup | Pget_header _ -> true
   (* [Preinterpret_tagged_int63_as_unboxed_int64] has to allocate in
      bytecode, because int64# is actually represented as a boxed value. *)
@@ -2347,7 +2442,7 @@ let lambda_primitive_needs_event_after = function
   | Parray_to_iarray | Parray_of_iarray
   | Pignore
   | Pgetglobal _ | Pgetpredef _ | Pmakeblock _ | Pmakefloatblock _
-  | Pmakeufloatblock _ | Pmakemixedblock _ | Pmakelazyblock _
+  | Pmakeufloatblock _ | Pmakelazyblock _
   | Pmake_unboxed_product _ | Punboxed_product_field _
   | Parray_element_size_in_bytes _
   | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pmake_idx_array _
@@ -2380,6 +2475,7 @@ let lambda_primitive_needs_event_after = function
   | Pcpu_relax | Pctconst _ | Pint_as_pointer _ | Popaque _
   | Pdls_get
   | Ptls_get
+  | Pdomain_index
   | Pobj_magic _ | Punbox_vector _
   | Preinterpret_unboxed_int64_as_tagged_int63 | Ppeek _ | Ppoke _
   (* These don't allocate in bytecode; they're just identity functions: *)
@@ -2457,10 +2553,10 @@ let transl_primitive_application loc p env ty ~poly_mode ~stack ~poly_sort
 
 (* Error report *)
 
-open Format
+open Format_doc
 module Style = Misc.Style
 
-let report_error ppf = function
+let report_error_doc ppf = function
   | Unknown_builtin_primitive prim_name ->
       fprintf ppf "Unknown builtin primitive %a" Style.inline_code prim_name
   | Wrong_arity_builtin_primitive prim_name ->
@@ -2496,7 +2592,9 @@ let () =
   Location.register_error_of_exn
     (function
       | Error (loc, err) ->
-          Some (Location.error_of_printer ~loc report_error err)
+          Some (Location.error_of_printer ~loc report_error_doc err)
       | _ ->
         None
     )
+
+let report_error = Format_doc.compat report_error_doc

@@ -147,6 +147,7 @@ type error =
   | Constructor_submode_failed of Mode.Value.error
   | Atomic_field_in_mixed_block
   | Non_value_atomic_field
+  | Layout_poly_unsupported
 
 open Typedtree
 
@@ -268,24 +269,10 @@ let enter_type ?abstract_abbrevs rec_flag env sdecl (id, uid) =
      are checked and then unified with the real manifest and checked against the
      kind. *)
   let type_jkind =
-    Jkind.of_type_decl_default
+    Jkind.of_type_decl_overapproximate_unknown
       ~context:(Type_declaration path)
-      (* CR layouts v2.8: This next line is truly terrible. But I think it's OK
-         for now: it will mean that any [with] constraints get interpreted to
-         mean that the thing does not cross that mode. That's OK: the jkind
-         produced here can be an overapproximation of the correct jkind (note
-         that [any] is the default).  Indeed the only reason (I think) we need a
-         non-[any] jkind here is to produce better error messages.
-
-         Doing better here will be annoying, because a type is in scope in its
-         own jkind... and yet we don't have an env that we can use at this
-         point. I think probably the solution will be to have
-         [Jkind.of_type_decl_default] just return [max] every time it sees a
-         [with]-kind... which basically just does this [type_exn] trick but much
-         more sanely. Internal ticket 5116. *)
-      ~transl_type:(fun _ -> Predef.type_exn)
-      ~default:(Jkind.disallow_right any)
       sdecl
+    |> Option.value ~default:(Jkind.disallow_right any)
   in
   let abstract_source, type_manifest, unboxed_type_manifest =
     match sdecl.ptype_manifest, abstract_abbrevs with
@@ -477,6 +464,11 @@ let check_representable ~why env loc kloc typ =
   | Ok _ -> ()
   | Error err -> raise (Error (loc,Jkind_sort {kloc; typ; err}))
 
+let check_no_repr cty =
+  match cty.ptyp_desc with
+  | Ptyp_repr _ -> raise (Error (cty.ptyp_loc, Layout_poly_unsupported))
+  | _ -> ()
+
 let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
       env univars closed lbls kloc =
   assert (lbls <> []);
@@ -508,6 +500,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
          let modalities =
           Typemode.transl_modalities ~maturity:Stable mut modalities
          in
+         check_no_repr arg;
          let arg = Ast_helper.Typ.force_poly arg in
          let cty = transl_simple_type ~new_var_jkind env ?univars ~closed Mode.Alloc.Const.legacy arg in
          {ld_id = Ident.create_local name.txt;
@@ -528,7 +521,7 @@ let transl_labels (type rep) ~(record_form : rep record_form) ~new_var_jkind
            env ld.ld_loc kloc ty;
          {Types.ld_id = ld.ld_id;
           ld_mutable = ld.ld_mutable;
-          ld_modalities = ld.ld_modalities;
+          ld_modalities = ld.ld_modalities.moda_modalities;
           ld_sort = Jkind.Sort.Const.void;
             (* Updated by [update_label_sorts] *)
           ld_type = ty;
@@ -556,7 +549,7 @@ let transl_types_gf ~new_var_jkind env loc univars closed cal kloc =
     check_representable ~why:(Constructor_declaration idx)
       env loc kloc ca.ca_type.ctyp_type;
     {
-      Types.ca_modalities = ca.ca_modalities;
+      Types.ca_modalities = ca.ca_modalities.moda_modalities;
       ca_loc = ca.ca_loc;
       ca_type = ca.ca_type.ctyp_type;
       ca_sort = Jkind.Sort.Const.void;
@@ -611,7 +604,7 @@ let make_constructor
         Ctype.with_local_level_if closed begin fun () ->
           TyVarEnv.reset ();
           let univar_list =
-            TyVarEnv.make_poly_univars_jkinds
+            TyVarEnv.make_poly_univars_jkinds env
               ~context:(fun v -> Constructor_type_parameter (cstr_path, v))
               (List.map (fun (v, l) -> (v, l, Env.stage env)) svars)
           in
@@ -1778,6 +1771,7 @@ module Element_repr = struct
       | Base Void -> Void
       | Product l ->
         Unboxed_element (Product (Array.of_list (List.map sort_to_t l)))
+      | Univar _ -> Misc.fatal_error "sort_to_t: unexpected univar"
       in
       sort_to_t sort
 
@@ -1892,7 +1886,19 @@ let rec update_decl_jkind env dpath decl =
          mutable voids : bool;
       }
   end in
-
+  (* The compiler does not like matching on records with mutable fields, so we
+     create an immutable copy for the match below. *)
+  let module Imm_element_rep = struct
+    type element_repr_summary =
+      {  values : bool;
+         floats: bool;
+         atomic_floats : bool;
+         atomic_fields : bool;
+         float64s : bool;
+         non_float64_unboxed_fields : bool;
+         voids : bool;
+    }
+  end in
   (* returns updated labels, updated rep, and updated jkind *)
   let update_record_kind loc lbls rep =
     match lbls, rep with
@@ -1945,7 +1951,14 @@ let rec update_decl_jkind env dpath decl =
         reprs lbls;
       let rep =
         (* CR layouts: improve the readability of this match *)
-        match repr_summary with
+        let { values; floats; atomic_floats; float64s;
+               non_float64_unboxed_fields; atomic_fields; voids} = repr_summary
+        in
+        let summary : Imm_element_rep.element_repr_summary =
+          { values; floats; atomic_floats; float64s;
+            non_float64_unboxed_fields; atomic_fields; voids }
+        in
+        match summary with
         (* We store floats flatly in mixed records if all fields are
            float/float64/void. *)
         | { values = false; floats = true; atomic_floats = false;
@@ -2601,6 +2614,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
       | Any -> true
       | Base _ -> false
       | Product l -> List.exists has_any l
+      | Univar _ -> Misc.fatal_error "Unboxed_recursion: univar"
     in
     if has_any layout then tyl else []
   in
@@ -3538,6 +3552,7 @@ let native_repr_of_type env kind ty sort_or_poly =
       | Poly -> false
       | Sort (Base Value) -> true
       | Sort (Base _ | Product _) -> false
+      | Sort (Univar _) -> Misc.fatal_error "typedecl: Univar in native repr"
     in
     if is_immediate && is_non_nullable && is_value
     then Some (Unboxed_or_untagged_integer Untagged_int)
@@ -3663,6 +3678,8 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
     Repr_poly
   | Native_repr_attr_absent, Sort (Base (Value | Void) as base) ->
     Same_as_ocaml_repr base
+  | Native_repr_attr_absent, Sort (Univar _) ->
+    Misc.fatal_error "typedecl: Univar in concrete type"
   | Native_repr_attr_absent, (Sort (Base sort as c)) ->
     (if Language_extension.erasable_extensions_only ()
     then
@@ -3683,7 +3700,7 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
           think (2) hasn't arisen much in practice because for other sorts you
           can add an [@unboxed] annotation to suppress the warning, and because
           in practice people use the layout_poly versions which do work fine. *)
-       let sort = Format.asprintf "%a" Jkind_types.Sort.Const.format c in
+       let sort = Format_doc.asprintf "%a" Jkind_types.Sort.Const.format c in
        Location.prerr_warning core_type.ptyp_loc
          (Warnings.Incompatible_with_upstream
             (Warnings.Non_value_sort sort)));
@@ -3695,6 +3712,8 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
       raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type kind))
     | Some repr -> repr
     end
+  | Native_repr_attr_present Unboxed, Sort (Univar _) ->
+    Misc.fatal_error "typedecl: Univar in concrete type"
   | Native_repr_attr_present Unboxed, (Sort (Product _ | Base Void)) ->
     raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unboxed))
   | Native_repr_attr_present Unboxed, (Sort (Base sort as c)) ->
@@ -3905,28 +3924,29 @@ type transl_value_decl_modal =
 
 (* Translate a value declaration *)
 let transl_value_decl env loc ~modal ~why valdecl =
-  let mode, val_modalities =
+  let mode, val_modalities, val_modal_info =
     match modal with
     | Str_primitive ->
         let modality_to_mode {txt = Modality m; loc} = {txt = Mode m; loc} in
         let modes = List.map modality_to_mode valdecl.pval_modalities in
+        let modes = Typemode.transl_mode_annots modes in
         let mode =
-          modes
-          |> Typemode.transl_mode_annots
+          modes.mode_modes
           |> Mode.Alloc.Const.(
               Option.value ~default:{legacy with staticity = Static})
           |> Mode.Alloc.of_const
           |> Mode.alloc_as_value
         in
-        mode, Mode.Modality.id
+        mode, Mode.Modality.undefined, Valmi_str_primitive modes
     | Sig_value (md_mode, sig_modalities) ->
-        let modalities =
-          match valdecl.pval_modalities with
-          | [] -> sig_modalities
-          | l -> Typemode.transl_modalities ~maturity:Stable Immutable l
+        let raw_modalities =
+          Typemode.transl_modalities_with_default
+            ~maturity:Stable ~default:sig_modalities valdecl.pval_modalities
         in
-        let modalities = Mode.Modality.of_const modalities in
-        md_mode, modalities
+        let modalities =
+          Mode.Modality.of_const raw_modalities.moda_modalities
+        in
+        md_mode, modalities, Valmi_sig_value raw_modalities
   in
   let cty = Typetexp.transl_type_scheme env valdecl.pval_type in
   let sort =
@@ -4024,6 +4044,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
       if !Clflags.native_code
       && prim.prim_arity > 5
       && prim.prim_native_name = ""
+      && not (String.starts_with ~prefix:"%" prim.prim_name)
       then raise(Error(valdecl.pval_type.ptyp_loc, Missing_native_external));
       check_unboxable env loc ty;
       { val_type = ty; val_kind = Val_prim prim; Types.val_loc = loc;
@@ -4042,6 +4063,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
      val_id = id;
      val_name = valdecl.pval_name;
      val_desc = cty; val_val = v;
+     val_modal_info;
      val_prim = valdecl.pval_prim;
      val_loc = valdecl.pval_loc;
      val_attributes = valdecl.pval_attributes;
@@ -4364,19 +4386,11 @@ let approx_type_decl sdecl_list =
        let id = Ident.create_scoped ~scope sdecl.ptype_name.txt in
        let path = Path.Pident id in
        let injective = sdecl.ptype_kind <> Ptype_abstract in
-       let transl_type sty =
-         Misc.fatal_errorf
-           "@[I do not yet know how to deal with [with]-types (such as %a)@ in \
-            recursive modules. Please contact the Jane Street OCaml Language@ \
-            team for help if you see this."
-           Pprintast.core_type sty
-       in
        let jkind =
-         Jkind.of_type_decl_default
+         Jkind.of_type_decl_overapproximate_unknown
            ~context:(Type_declaration path)
-           ~transl_type
-           ~default:(Jkind.Builtin.value ~why:Default_type_jkind)
            sdecl
+         |> Option.value ~default:(Jkind.Builtin.value ~why:Default_type_jkind)
        in
        let params =
          List.map (fun (param, _) -> get_type_param_jkind path param)
@@ -4410,7 +4424,7 @@ let check_recmod_typedecl env loc recmod_ids path decl =
 
 (**** Error report ****)
 
-open Format
+open Format_doc
 module Style = Misc.Style
 
 let explain_unbound_gen ppf tv tl typ kwd pr =
@@ -4479,23 +4493,23 @@ module Reaching_path = struct
           List.iter Printtyp.add_type_to_preparation [ty1; ty2]
     ) path
 
+  module Fmt = Format_doc
+
   let pp ppf reaching_path =
     let pp_step ppf = function
       | Expands_to (ty, body) ->
-          Format.fprintf ppf "%a = %a"
+          Fmt.fprintf ppf "%a = %a"
             (Style.as_inline_code Printtyp.prepared_type_expr) ty
             (Style.as_inline_code Printtyp.prepared_type_expr) body
       | Contains (outer, inner) ->
-          Format.fprintf ppf "%a contains %a"
+          Fmt.fprintf ppf "%a contains %a"
             (Style.as_inline_code Printtyp.prepared_type_expr) outer
             (Style.as_inline_code Printtyp.prepared_type_expr) inner
     in
-    let comma ppf () = Format.fprintf ppf ",@ " in
-    Format.(pp_print_list ~pp_sep:comma pp_step) ppf reaching_path
+    Fmt.(pp_print_list ~pp_sep:comma) pp_step ppf reaching_path
 
   let pp_colon ppf path =
-  Format.fprintf ppf ":@;<1 2>@[<v>%a@]"
-    pp path
+    Fmt.fprintf ppf ":@;<1 2>@[<v>%a@]" pp path
 end
 
 let report_jkind_mismatch_due_to_bad_inference ppf ty violation loc =
@@ -4519,7 +4533,8 @@ let report_jkind_mismatch_due_to_bad_inference ppf ty violation loc =
        ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
        ~level:(Ctype.get_current_level ())) violation
 
-let report_error ppf = function
+let quoted_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty
+let report_error_doc ppf = function
   | Repeated_parameter ->
       fprintf ppf "A type parameter occurs several times"
   | Duplicate_constructor s ->
@@ -4579,17 +4594,17 @@ let report_error ppf = function
         report_jkind_mismatch_due_to_bad_inference ppf ty violation
           Check_constraints
       | None ->
+      let msg = Format_doc.Doc.msg in
       fprintf ppf "@[<v>Constraints are not satisfied in this type.@ ";
       Printtyp.report_unification_error ppf env err
-        (fun ppf -> fprintf ppf "Type")
-        (fun ppf -> fprintf ppf "should be an instance of");
+        (msg "Type")
+        (msg "should be an instance of");
       fprintf ppf "@]"
       end
   | Jkind_mismatch_due_to_bad_inference (ty, violation, loc) ->
       report_jkind_mismatch_due_to_bad_inference ppf ty violation loc
   | Non_regular { definition; used_as; defined_as; reaching_path } ->
       let reaching_path = Reaching_path.simplify reaching_path in
-      let pp_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty in
       Printtyp.prepare_for_printing [used_as; defined_as];
       Reaching_path.add_to_preparation reaching_path;
       Printtyp.Naming_context.reset ();
@@ -4600,8 +4615,8 @@ let report_error ppf = function
          All uses need to match the definition for the recursive type \
          to be regular.@]"
         Style.inline_code (Path.name definition)
-        pp_type (Printtyp.tree_of_typexp Type defined_as)
-        pp_type (Printtyp.tree_of_typexp Type used_as)
+        quoted_type (Printtyp.tree_of_typexp Type defined_as)
+        quoted_type (Printtyp.tree_of_typexp Type used_as)
         (fun pp ->
            let is_expansion = function Expands_to _ -> true | _ -> false in
            if List.exists is_expansion reaching_path then
@@ -4609,17 +4624,17 @@ let report_error ppf = function
              Reaching_path.pp_colon reaching_path
            else fprintf pp ".@ ")
   | Inconsistent_constraint (env, err) ->
+      let msg = Format_doc.Doc.msg in
       fprintf ppf "@[<v>The type constraints are not consistent.@ ";
       Printtyp.report_unification_error ppf env err
-        (fun ppf -> fprintf ppf "Type")
-        (fun ppf -> fprintf ppf "is not compatible with type");
+        (msg "Type")
+        (msg "is not compatible with type");
       fprintf ppf "@]"
   | Type_clash (env, err) ->
+      let msg = Format_doc.Doc.msg in
       Printtyp.report_unification_error ppf env err
-        (function ppf ->
-           fprintf ppf "This type constructor expands to type")
-        (function ppf ->
-           fprintf ppf "but is used here with type")
+        (msg "This type constructor expands to type")
+        (msg "but is used here with type")
   | Null_arity_external ->
       fprintf ppf "External identifiers must be functions"
   | Missing_native_external ->
@@ -4671,12 +4686,11 @@ let report_error ppf = function
            "the type" "this extension" "definition" env)
         err
   | Rebind_wrong_type (lid, env, err) ->
+      let msg = Format_doc.doc_printf in
       Printtyp.report_unification_error ppf env err
-        (function ppf ->
-           fprintf ppf "The constructor %a@ has type"
+        (msg "The constructor %a@ has type"
              (Style.as_inline_code Printtyp.longident) lid)
-        (function ppf ->
-           fprintf ppf "but was expected to be of type")
+        (msg "but was expected to be of type")
   | Rebind_mismatch (lid, p, p') ->
       fprintf ppf
         "@[%s@ %a@ %s@ %a@ %s@ %s@ %a@]"
@@ -4887,7 +4901,7 @@ let report_error ppf = function
             max_value_prefix_len value_prefix_len
       | Insufficient_level { required_layouts_level; mixed_product_kind } -> (
         let hint ppf =
-          Format.fprintf ppf "You must enable -extension %s to use this feature."
+          fprintf ppf "You must enable -extension %s to use this feature."
             (Language_extension.to_command_line_string Layouts
                required_layouts_level)
         in
@@ -4910,7 +4924,7 @@ let report_error ppf = function
             fprintf ppf "an unnamed existential variable"
         | Some str ->
             fprintf ppf "the existential variable %a"
-              (Style.as_inline_code Pprintast.tyvar) str in
+              (Style.as_inline_code Pprintast.Doc.tyvar) str in
       fprintf ppf "@[This type cannot be unboxed because@ \
                    it might contain both float and non-float values,@ \
                    depending on the instantiation of %a.@ \
@@ -4925,7 +4939,7 @@ let report_error ppf = function
         Style.inline_code "nonrec"
   | Invalid_private_row_declaration ty ->
       let pp_private ppf ty = fprintf ppf "private %a" Printtyp.type_expr ty in
-      Format.fprintf ppf
+      fprintf ppf
         "@[<hv>This private row type declaration is invalid.@ \
          The type expression on the right-hand side reduces to@;<1 2>%a@ \
          which does not have a free row type variable.@]@,\
@@ -5008,13 +5022,18 @@ let report_error ppf = function
   | Non_value_atomic_field ->
     fprintf ppf
       "@[Atomic record fields must have layout value.@]"
+  | Layout_poly_unsupported ->
+    fprintf ppf
+      "@[Layout polymorphism is unsupported in this context.@]"
 
 
 let () =
   Location.register_error_of_exn
     (function
       | Error (loc, err) ->
-        Some (Location.error_of_printer ~loc report_error err)
+        Some (Location.error_of_printer ~loc report_error_doc err)
       | _ ->
         None
     )
+
+let report_error = Format_doc.compat report_error_doc

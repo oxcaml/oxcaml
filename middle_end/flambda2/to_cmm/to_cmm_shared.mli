@@ -121,18 +121,18 @@ module Update_kind : sig
   (** Assumes each field is a word; the byte offset is [index * size_addr]. *)
   val naked_int8_fields : t
 
-  (** Tightly packed; the byte offset is [index * 1].  ([index] is as for
+  (** Tightly packed; the byte offset is [index * 1]. ([index] is as for
       [make_update], below.) *)
   val naked_int8s : t
 
   (** Assumes each field is a word; the byte offset is [index * size_addr]. *)
   val naked_int16_fields : t
 
-  (** Tightly packed; the byte offset is [index * 2].  ([index] is as for
+  (** Tightly packed; the byte offset is [index * 2]. ([index] is as for
       [make_update], below.) *)
   val naked_int16s : t
 
-  (** Tightly packed; the byte offset is [index * 4].  ([index] is as for
+  (** Tightly packed; the byte offset is [index * 4]. ([index] is as for
       [make_update], below.) *)
   val naked_int32s : t
 
@@ -160,16 +160,16 @@ module Update_kind : sig
   (** Tightly packed (eight words each); the byte offset is [index * 64]. *)
   val naked_vec512s : t
 
-  (** Assumes each field is a word; the byte offset is [index * size_addr].
-      Note that in this case the index is still based on word-width fields! *)
+  (** Assumes each field is a word; the byte offset is [index * size_addr]. Note
+      that in this case the index is still based on word-width fields! *)
   val naked_vec128_fields : t
 
-  (** Assumes each field is a word; the byte offset is [index * size_addr].
-      Note that in this case the index is still based on word-width fields! *)
+  (** Assumes each field is a word; the byte offset is [index * size_addr]. Note
+      that in this case the index is still based on word-width fields! *)
   val naked_vec256_fields : t
 
-  (** Assumes each field is a word; the byte offset is [index * size_addr].
-      Note that in this case the index is still based on word-width fields! *)
+  (** Assumes each field is a word; the byte offset is [index * size_addr]. Note
+      that in this case the index is still based on word-width fields! *)
   val naked_vec512_fields : t
 end
 

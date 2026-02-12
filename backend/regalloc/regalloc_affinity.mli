@@ -6,8 +6,8 @@
     physical register with high affinity.
 
     This could be extended to the phi moves introduced during splitting, but
-    this basic version already seems useful, in particular for the linscan
-    and greedy allocators. *)
+    this basic version already seems useful, in particular for the linscan and
+    greedy allocators. *)
 
 type phys_reg = int
 
@@ -22,7 +22,7 @@ type t
     number of times it moves from/to a given physical register. *)
 val compute : Cfg_with_infos.t -> t
 
-(** Returns the affinities for the passed temporary in descending order
-    (i.e. from the highest to the lowest affinity), returning an empty list
-    if the temporary has no affinity with any physical register. *)
+(** Returns the affinities for the passed temporary in descending order (i.e.
+    from the highest to the lowest affinity), returning an empty list if the
+    temporary has no affinity with any physical register. *)
 val get : t -> Reg.t -> affinity list

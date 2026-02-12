@@ -375,12 +375,14 @@ module Forward (D : Domain_S) (T : Forward_transfer with type domain = D.t) :
       handlers_are_entry_points:bool ->
       context ->
       (domain Label.Tbl.t, unit) result =
-   fun cfg ?(max_iteration = max_int) ~init ~handlers_are_entry_points context ->
+   fun cfg ?(max_iteration = max_int) ~init ~handlers_are_entry_points
+       context ->
     let work_state =
       Dataflow_impl.create cfg
         ~init:(fun block ->
-          if Label.equal block.start cfg.entry_label
-             || (handlers_are_entry_points && block.is_trap_handler)
+          if
+            Label.equal block.start cfg.entry_label
+            || (handlers_are_entry_points && block.is_trap_handler)
           then Some init
           else None)
         ~store_instr:false
@@ -534,8 +536,7 @@ module Backward (D : Domain_S) (T : Backward_transfer with type domain = D.t) :
     | Instr : domain InstructionId.Tbl.t map
     | Both : (domain InstructionId.Tbl.t * domain Label.Tbl.t) map
 
-  let run :
-      type a.
+  let run : type a.
       Cfg.t ->
       ?max_iteration:int ->
       ?exnescape:domain ->

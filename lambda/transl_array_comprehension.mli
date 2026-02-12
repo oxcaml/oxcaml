@@ -5,11 +5,11 @@ open Debuginfo.Scoped_location
 (** Translate array comprehensions; see the .ml file for more details *)
 
 (** Translate an array comprehension ([Typedtree.comprehension], when it's the
-    body of a [Typedtree.Texp_array_comprehension]) into Lambda.  This generates
+    body of a [Typedtree.Texp_array_comprehension]) into Lambda. This generates
     more efficient code in the case where the array has a known fixed size, by
     preallocating the generated array; otherwise, it dynamically resizes the
-    generated array, cutting it back down to size at the end.  The [array_kind]
-    of the resulting array must be provided.  We do not need to pass in whether
+    generated array, cutting it back down to size at the end. The [array_kind]
+    of the resulting array must be provided. We do not need to pass in whether
     the resulting array should be mutable or immutable; both sorts of arrays
     will be constructed mutably, and the type checker has already enforced that
     only mutable arrays are actually used mutably.

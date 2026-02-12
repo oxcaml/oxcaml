@@ -44,7 +44,7 @@
 #   like all other .depend files. It should be used when the dependencies
 #   (of the OCaml code in the grammar semantic actions) change.
 
-MENHIR ?= menhir
+MENHIR ?= $(opam_exec) menhir
 
 ## Unused tokens
 

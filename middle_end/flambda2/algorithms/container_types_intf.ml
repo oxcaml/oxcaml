@@ -55,8 +55,8 @@ module type Set = sig
       with [s1]. *)
   val union_sharing : t -> t -> t
 
-  (** [union_shared s1 s2] is [union_sharing s1 s2], with a fast path for
-      shared subsets of [s1] and [s2]. *)
+  (** [union_shared s1 s2] is [union_sharing s1 s2], with a fast path for shared
+      subsets of [s1] and [s2]. *)
   val union_shared : t -> t -> t
 
   val inter : t -> t -> t
@@ -66,11 +66,11 @@ module type Set = sig
   val diff : t -> t -> t
 
   (** [diff_sharing s1 s2] is [diff s1 s2], with maximal sharing of the result
-        with [s1]. *)
+      with [s1]. *)
   val diff_sharing : t -> t -> t
 
   (** [diff_shared s1 s2] is [diff_sharing s1 s2], with a fast path for shared
-        subsets of [s1] and [s2]. *)
+      subsets of [s1] and [s2]. *)
   val diff_shared : t -> t -> t
 
   val compare : t -> t -> int
@@ -259,9 +259,9 @@ module type Map = sig
       sharing of the result with [m1]. *)
   val diff_sharing : (key -> 'a -> 'b -> 'a option) -> 'a t -> 'b t -> 'a t
 
-  (** [diff_shared f m1 m2] is a version of [diff_sharing f m1 m2] that
-      further exploits sharing of [m1] and [m2] to avoid calling [f] when
-      possible, assuming that [f x x] always returns [None]. *)
+  (** [diff_shared f m1 m2] is a version of [diff_sharing f m1 m2] that further
+      exploits sharing of [m1] and [m2] to avoid calling [f] when possible,
+      assuming that [f x x] always returns [None]. *)
   val diff_shared : (key -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
 
   val inter_domain_is_non_empty : 'a t -> 'a t -> bool
@@ -316,12 +316,12 @@ module type Map_plus_iterator = sig
       order. *)
   type 'a iterator
 
-  (** [iterator t] returns an iterator for all the bindings in [t],
-      initially positioned on [min_binding t]. *)
+  (** [iterator t] returns an iterator for all the bindings in [t], initially
+      positioned on [min_binding t]. *)
   val iterator : 'a t -> 'a iterator
 
-  (** [current iterator] returns the key-value pair at the current
-      position, or [None] if the iterator is exhausted. *)
+  (** [current iterator] returns the key-value pair at the current position, or
+      [None] if the iterator is exhausted. *)
   val current : 'a iterator -> (key * 'a) option
 
   (** [advance iterator] position the [iterator] on the next key. *)

@@ -109,7 +109,10 @@ let compare_structured_constants c1 c2 =
   | Const_int64 x1, Const_int64 x2 -> Int64.compare x1 x2
   | Const_nativeint x1, Const_nativeint x2 -> Nativeint.compare x1 x2
   | Const_block (t1, l1), Const_block (t2, l2) ->
-    let c = t1 - t2 (* no overflow possible here *) in
+    let c =
+      t1 - t2
+      (* no overflow possible here *)
+    in
     if c <> 0 then c else compare_constant_lists l1 l2
   | Const_float_array l1, Const_float_array l2 -> compare_float_lists l1 l2
   | Const_string s1, Const_string s2 -> String.compare s1 s2

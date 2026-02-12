@@ -22,10 +22,10 @@ let open_out_text = open_out
 
 module Deprecated : sig
   val open_in : string -> in_channel
-    [@@deprecated "use open_int_text/open_int_bin"]
+  [@@deprecated "use open_int_text/open_int_bin"]
 
   val open_out : string -> out_channel
-    [@@deprecated "use open_out_text/open_out_bin"]
+  [@@deprecated "use open_out_text/open_out_bin"]
 end = struct
   let open_in = open_in
 
@@ -154,16 +154,16 @@ module List = struct
       f1 :: f2 :: f3 :: f4 :: f5
       ::
       (if ctr > max_non_tailcall
-      then slow_map ~f tl
-      else count_map ~f tl (ctr + 1))
-    [@@if ocaml_version < (4, 14, 0)]
+       then slow_map ~f tl
+       else count_map ~f tl (ctr + 1))
+  [@@if ocaml_version < (4, 14, 0)]
 
   (* CR selee: hacky commenting just to get things working. Clean up later *)
   (* let map l ~f = count_map ~f l 0 [@@if ocaml_version < (4, 14, 0)] *)
 
   let[@tail_mod_cons] rec map l ~f =
     match l with [] -> [] | x :: tl -> f x :: (map [@tailcall]) tl ~f
-    [@@if ocaml_version >= (4, 14, 0)]
+  [@@if ocaml_version >= (4, 14, 0)]
 
   let rec take' acc n l =
     if n = 0
@@ -177,10 +177,10 @@ module List = struct
   let rec last = function [] -> None | [x] -> Some x | _ :: xs -> last xs
 
   let is_empty = function [] -> true | _ -> false
-    [@@if ocaml_version < (5, 1, 0)]
+  [@@if ocaml_version < (5, 1, 0)]
 
   let tail_append l1 l2 = rev_append (rev l1) l2
-    [@@if ocaml_version < (5, 1, 0)]
+  [@@if ocaml_version < (5, 1, 0)]
 
   let rec count_append l1 l2 count =
     match l2 with
@@ -196,9 +196,9 @@ module List = struct
         x1 :: x2 :: x3 :: x4 :: x5
         ::
         (if count > max_non_tailcall
-        then tail_append tl l2
-        else count_append tl l2 (count + 1)))
-    [@@if ocaml_version < (5, 1, 0)]
+         then tail_append tl l2
+         else count_append tl l2 (count + 1)))
+  [@@if ocaml_version < (5, 1, 0)]
 
   let append l1 l2 = count_append l1 l2 0 [@@if ocaml_version < (5, 1, 0)]
 
@@ -380,42 +380,42 @@ module Uchar = struct
   include Uchar
 
   module Utf_decode : sig
-    (** The type for UTF decode results. Values of this type represent
-    the result of a Unicode Transformation Format decoding attempt. *)
+    (** The type for UTF decode results. Values of this type represent the
+        result of a Unicode Transformation Format decoding attempt. *)
     type utf_decode [@@immediate]
 
     (** [utf_decode_is_valid d] is [true] if and only if [d] holds a valid
-    decode. *)
+        decode. *)
     val utf_decode_is_valid : utf_decode -> bool
 
     (** [utf_decode_uchar d] is the Unicode character decoded by [d] if
-    [utf_decode_is_valid d] is [true] and {!Uchar.rep} otherwise. *)
+        [utf_decode_is_valid d] is [true] and {!Uchar.rep} otherwise. *)
     val utf_decode_uchar : utf_decode -> t
 
-    (** [utf_decode_length d] is the number of elements from the source
-    that were consumed by the decode [d]. This is always strictly
-    positive and smaller or equal to [4]. The kind of source elements
-    depends on the actual decoder; for the decoders of the standard
-    library this function always returns a length in bytes. *)
+    (** [utf_decode_length d] is the number of elements from the source that
+        were consumed by the decode [d]. This is always strictly positive and
+        smaller or equal to [4]. The kind of source elements depends on the
+        actual decoder; for the decoders of the standard library this function
+        always returns a length in bytes. *)
     val utf_decode_length : utf_decode -> int
 
     (** [utf_decode n u] is a valid UTF decode for [u] that consumed [n]
-    elements from the source for decoding. [n] must be positive and
-    smaller or equal to [4] (this is not checked by the module). *)
+        elements from the source for decoding. [n] must be positive and smaller
+        or equal to [4] (this is not checked by the module). *)
     val utf_decode : int -> t -> utf_decode
 
     (** [utf_decode_invalid n] is an invalid UTF decode that consumed [n]
-    elements from the source to error. [n] must be positive and
-    smaller or equal to [4] (this is not checked by the module). The
-    resulting decode has {!rep} as the decoded Unicode character. *)
+        elements from the source to error. [n] must be positive and smaller or
+        equal to [4] (this is not checked by the module). The resulting decode
+        has {!rep} as the decoded Unicode character. *)
     val utf_decode_invalid : int -> utf_decode
 
-    (** [utf_8_byte_length u] is the number of bytes needed to encode
-    [u] in UTF-8. *)
+    (** [utf_8_byte_length u] is the number of bytes needed to encode [u] in
+        UTF-8. *)
     val utf_8_byte_length : t -> int
 
-    (** [utf_16_byte_length u] is the number of bytes needed to encode
-    [u] in UTF-16. *)
+    (** [utf_16_byte_length u] is the number of bytes needed to encode [u] in
+        UTF-16. *)
     val utf_16_byte_length : t -> int
   end = struct
     (* UTF codecs tools *)
@@ -739,47 +739,53 @@ module String = struct
           else loop max b (last + 1)
         | '\xE0' ->
           let last = i + 2 in
-          if last > max
-             || not_in_xA0_to_xBF (get b (i + 1))
-             || not_in_x80_to_xBF (get b last)
+          if
+            last > max
+            || not_in_xA0_to_xBF (get b (i + 1))
+            || not_in_x80_to_xBF (get b last)
           then false
           else loop max b (last + 1)
         | '\xE1' .. '\xEC' | '\xEE' .. '\xEF' ->
           let last = i + 2 in
-          if last > max
-             || not_in_x80_to_xBF (get b (i + 1))
-             || not_in_x80_to_xBF (get b last)
+          if
+            last > max
+            || not_in_x80_to_xBF (get b (i + 1))
+            || not_in_x80_to_xBF (get b last)
           then false
           else loop max b (last + 1)
         | '\xED' ->
           let last = i + 2 in
-          if last > max
-             || not_in_x80_to_x9F (get b (i + 1))
-             || not_in_x80_to_xBF (get b last)
+          if
+            last > max
+            || not_in_x80_to_x9F (get b (i + 1))
+            || not_in_x80_to_xBF (get b last)
           then false
           else loop max b (last + 1)
         | '\xF0' ->
           let last = i + 3 in
-          if last > max
-             || not_in_x90_to_xBF (get b (i + 1))
-             || not_in_x80_to_xBF (get b (i + 2))
-             || not_in_x80_to_xBF (get b last)
+          if
+            last > max
+            || not_in_x90_to_xBF (get b (i + 1))
+            || not_in_x80_to_xBF (get b (i + 2))
+            || not_in_x80_to_xBF (get b last)
           then false
           else loop max b (last + 1)
         | '\xF1' .. '\xF3' ->
           let last = i + 3 in
-          if last > max
-             || not_in_x80_to_xBF (get b (i + 1))
-             || not_in_x80_to_xBF (get b (i + 2))
-             || not_in_x80_to_xBF (get b last)
+          if
+            last > max
+            || not_in_x80_to_xBF (get b (i + 1))
+            || not_in_x80_to_xBF (get b (i + 2))
+            || not_in_x80_to_xBF (get b last)
           then false
           else loop max b (last + 1)
         | '\xF4' ->
           let last = i + 3 in
-          if last > max
-             || not_in_x80_to_x8F (get b (i + 1))
-             || not_in_x80_to_xBF (get b (i + 2))
-             || not_in_x80_to_xBF (get b last)
+          if
+            last > max
+            || not_in_x80_to_x8F (get b (i + 1))
+            || not_in_x80_to_xBF (get b (i + 2))
+            || not_in_x80_to_xBF (get b last)
           then false
           else loop max b (last + 1)
         | _ -> false
@@ -1098,7 +1104,7 @@ module In_channel = struct
     match stdlib_input_line ic with
     | line -> line :: input_lines ic
     | exception End_of_file -> []
-    [@@if ocaml_version < (5, 1, 0)]
+  [@@if ocaml_version < (5, 1, 0)]
 
   let input_line_exn = stdlib_input_line
 end
@@ -1163,12 +1169,12 @@ module Hashtbl = struct
   include Hashtbl
 
   let (create
-      [@deprecated "Use Int.Hashtbl, String.Hashtbl, Var.Hashtbl, Addr.Hashtbl"])
-      =
+       [@deprecated
+         "Use Int.Hashtbl, String.Hashtbl, Var.Hashtbl, Addr.Hashtbl"]) =
     Hashtbl.create
 
   let (of_seq
-      [@deprecated "Use Int.Hashtbl, String.Hashtbl, Var.Hashtbl, Addr.Hashtbl"])
-      =
+       [@deprecated
+         "Use Int.Hashtbl, String.Hashtbl, Var.Hashtbl, Addr.Hashtbl"]) =
     Hashtbl.of_seq
 end

@@ -122,6 +122,8 @@ module Mixed_block_shape : sig
   val equal : t -> t -> bool
 
   val compare : t -> t -> int
+
+  val print : Format.formatter -> t -> unit
 end
 
 module Scannable_block_shape : sig
@@ -130,8 +132,8 @@ module Scannable_block_shape : sig
     | Mixed_record of Mixed_block_shape.t
 
   (** For now if two block shapes do not compare as equal they will be
-      incompatible. If that changes, a [compatible] function will be
-      introduced. *)
+      incompatible. If that changes, a [compatible] function will be introduced.
+  *)
   val equal : t -> t -> bool
 
   val compare : t -> t -> int

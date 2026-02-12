@@ -152,9 +152,9 @@ let bind_no_simplification are_rebuilding ~bindings ~body ~cost_metrics_of_body
   ListLabels.fold_left (List.rev bindings)
     ~init:(body, cost_metrics_of_body, free_names_of_body)
     ~f:(fun
-         (expr, cost_metrics, free_names)
-         (var, size_of_defining_expr, defining_expr)
-       ->
+        (expr, cost_metrics, free_names)
+        (var, size_of_defining_expr, defining_expr)
+      ->
       let expr =
         create_let are_rebuilding
           (Bound_pattern.singleton var)

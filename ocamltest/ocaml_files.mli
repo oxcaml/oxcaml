@@ -40,6 +40,8 @@ val cmpbyt : string
 
 val expect : string
 
+val expectnat : string
+
 val ocamllex : string
 
 val ocamlyacc : string

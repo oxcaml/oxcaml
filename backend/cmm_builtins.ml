@@ -54,8 +54,9 @@ let if_operation_supported op ~f =
   match Proc.operation_supported op with true -> Some (f ()) | false -> None
 
 let if_operation_supported_bi bi op ~f =
-  if Primitive.equal_unboxed_or_untagged_integer bi Primitive.Unboxed_int64
-     && size_int = 4
+  if
+    Primitive.equal_unboxed_or_untagged_integer bi Primitive.Unboxed_int64
+    && size_int = 4
   then None
   else if_operation_supported op ~f
 
@@ -90,7 +91,8 @@ let shift32 make_op arg count dbg =
     | Cifthenelse (_, _, _, _, _, _)
     | Cswitch (_, _, _, _)
     | Ccatch (_, _, _)
-    | Cexit (_, _, _) ->
+    | Cexit (_, _, _)
+    | Cinvalid _ ->
       Cop (Cand, [count; Cconst_int (mask, dbg)], dbg)
   in
   Some (make_op arg count dbg)
@@ -107,27 +109,26 @@ let clz ~arg_is_non_zero bi arg dbg =
   let op = Cclz { arg_is_non_zero } in
   if_operation_supported_bi bi op ~f:(fun () ->
       let res = Cop (op, [make_unsigned_int bi arg dbg], dbg) in
-      if Primitive.equal_unboxed_or_untagged_integer bi Primitive.Unboxed_int32
-         && size_int = 8
-      then Cop (Caddi, [res; Cconst_int (-32, dbg)], dbg)
+      let extra_bits = (size_int * 8) - bit_count bi in
+      if extra_bits <> 0
+      then Cop (Caddi, [res; Cconst_int (-extra_bits, dbg)], dbg)
       else res)
 
 let ctz ~arg_is_non_zero bi arg dbg =
-  let arg = make_unsigned_int bi arg dbg in
-  if Primitive.equal_unboxed_or_untagged_integer bi Primitive.Unboxed_int32
-     && size_int = 8
+  let bit_count = bit_count bi in
+  if bit_count = size_int * 8 || arg_is_non_zero
   then
-    (* regardless of the value of the argument [arg_is_non_zero], always set the
-       corresponding field to [true], because we make it non-zero below by
-       setting bit 32. *)
-    let op = Cctz { arg_is_non_zero = true } in
-    if_operation_supported_bi bi op ~f:(fun () ->
-        (* Set bit 32 *)
-        let mask = Nativeint.shift_left 1n 32 in
-        Cop (op, [Cop (Cor, [arg; Cconst_natint (mask, dbg)], dbg)], dbg))
-  else
     let op = Cctz { arg_is_non_zero } in
     if_operation_supported_bi bi op ~f:(fun () -> Cop (op, [arg], dbg))
+  else
+    (* regardless of the value of the argument [arg_is_non_zero], always set the
+       corresponding field to [true], because we make it non-zero below by
+       setting bit 32/16/8. *)
+    let op = Cctz { arg_is_non_zero = true } in
+    if_operation_supported_bi bi op ~f:(fun () ->
+        (* Set bit 32/16/8 *)
+        let mask = Nativeint.shift_left 1n bit_count in
+        Cop (op, [Cop (Cor, [arg; Cconst_natint (mask, dbg)], dbg)], dbg))
 
 let popcnt bi arg dbg =
   if_operation_supported_bi bi Cpopcnt ~f:(fun () ->
@@ -827,15 +828,15 @@ let transl_vec_builtin name args dbg _typ_res =
   | _ -> None
 
 (** [transl_builtin prim args dbg] returns None if the built-in [prim] is not
-  supported, otherwise it constructs and returns the corresponding Cmm
-  expression.
+    supported, otherwise it constructs and returns the corresponding Cmm
+    expression.
 
-  The names of builtins below correspond to the native code names associated
-  with "external" declarations in the stand-alone library [ocaml_intrinsics].
+    The names of builtins below correspond to the native code names associated
+    with "external" declarations in the stand-alone library [ocaml_intrinsics].
 
-  For situations such as where the Cmm code below returns e.g. an untagged
-  integer, we exploit the generic mechanism on "external" to deal with the
-  tagging before the result is returned to the user. *)
+    For situations such as where the Cmm code below returns e.g. an untagged
+    integer, we exploit the generic mechanism on "external" to deal with the
+    tagging before the result is returned to the user. *)
 let transl_builtin name args dbg typ_res =
   match name with
   | "caml_int128_add" ->
@@ -881,12 +882,20 @@ let transl_builtin name args dbg typ_res =
     clz ~arg_is_non_zero:false Unboxed_int64 (one_arg name args) dbg
   | "caml_int32_clz_unboxed_to_untagged" ->
     clz ~arg_is_non_zero:false Unboxed_int32 (one_arg name args) dbg
+  | "caml_int16_clz_untagged_to_untagged" ->
+    clz ~arg_is_non_zero:false Untagged_int16 (one_arg name args) dbg
+  | "caml_int8_clz_untagged_to_untagged" ->
+    clz ~arg_is_non_zero:false Untagged_int8 (one_arg name args) dbg
   | "caml_nativeint_clz_unboxed_to_untagged" ->
     clz ~arg_is_non_zero:false Unboxed_nativeint (one_arg name args) dbg
   | "caml_int64_clz_nonzero_unboxed_to_untagged" ->
     clz ~arg_is_non_zero:true Unboxed_int64 (one_arg name args) dbg
   | "caml_int32_clz_nonzero_unboxed_to_untagged" ->
     clz ~arg_is_non_zero:true Unboxed_int32 (one_arg name args) dbg
+  | "caml_int16_clz_nonzero_untagged_to_untagged" ->
+    clz ~arg_is_non_zero:true Untagged_int16 (one_arg name args) dbg
+  | "caml_int8_clz_nonzero_untagged_to_untagged" ->
+    clz ~arg_is_non_zero:true Untagged_int8 (one_arg name args) dbg
   | "caml_nativeint_clz_nonzero_unboxed_to_untagged" ->
     clz ~arg_is_non_zero:true Unboxed_nativeint (one_arg name args) dbg
   | "caml_int_popcnt_tagged_to_untagged" ->
@@ -904,6 +913,10 @@ let transl_builtin name args dbg typ_res =
     popcnt Unboxed_int64 (one_arg name args) dbg
   | "caml_int32_popcnt_unboxed_to_untagged" ->
     popcnt Unboxed_int32 (one_arg name args) dbg
+  | "caml_int16_popcnt_untagged_to_untagged" ->
+    popcnt Untagged_int16 (one_arg name args) dbg
+  | "caml_int8_popcnt_untagged_to_untagged" ->
+    popcnt Untagged_int8 (one_arg name args) dbg
   | "caml_nativeint_popcnt_unboxed_to_untagged" ->
     popcnt Unboxed_nativeint (one_arg name args) dbg
   | "caml_int_ctz_untagged_to_untagged" ->
@@ -934,12 +947,20 @@ let transl_builtin name args dbg typ_res =
               dbg )
         in
         Cop (op, [Cop (Cor, [one_arg name args; c], dbg)], dbg))
+  | "caml_int8_ctz_untagged_to_untagged" ->
+    ctz ~arg_is_non_zero:false Untagged_int8 (one_arg name args) dbg
+  | "caml_int16_ctz_untagged_to_untagged" ->
+    ctz ~arg_is_non_zero:false Untagged_int16 (one_arg name args) dbg
   | "caml_int32_ctz_unboxed_to_untagged" ->
     ctz ~arg_is_non_zero:false Unboxed_int32 (one_arg name args) dbg
   | "caml_int64_ctz_unboxed_to_untagged" ->
     ctz ~arg_is_non_zero:false Unboxed_int64 (one_arg name args) dbg
   | "caml_nativeint_ctz_unboxed_to_untagged" ->
     ctz ~arg_is_non_zero:false Unboxed_nativeint (one_arg name args) dbg
+  | "caml_int8_ctz_nonzero_untagged_to_untagged" ->
+    ctz ~arg_is_non_zero:true Untagged_int8 (one_arg name args) dbg
+  | "caml_int16_ctz_nonzero_untagged_to_untagged" ->
+    ctz ~arg_is_non_zero:true Untagged_int16 (one_arg name args) dbg
   | "caml_int32_ctz_nonzero_unboxed_to_untagged" ->
     ctz ~arg_is_non_zero:true Unboxed_int32 (one_arg name args) dbg
   | "caml_int64_ctz_nonzero_unboxed_to_untagged" ->
@@ -984,7 +1005,8 @@ let transl_builtin name args dbg typ_res =
         | Cifthenelse (_, _, _, _, _, _)
         | Cswitch (_, _, _, _)
         | Ccatch (_, _, _)
-        | Cexit (_, _, _) ->
+        | Cexit (_, _, _)
+        | Cinvalid _ ->
           Cop (op, [cond; ifso; ifnot], dbg))
   | "caml_int32_shift_left_by_int32_unboxed" ->
     let arg, count = two_args name args in
@@ -1270,7 +1292,7 @@ let extcall ~dbg ~returns ~alloc ~is_c_builtin ~effects ~coeffects ~ty_args name
   else default
 
 let report_error ppf = function
-  | Bad_immediate msg -> Format.pp_print_string ppf msg
+  | Bad_immediate msg -> Format_doc.pp_print_string ppf msg
 
 let () =
   Location.register_error_of_exn (function

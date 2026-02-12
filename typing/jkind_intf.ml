@@ -20,13 +20,21 @@ module type Sort = sig
       calling convention of values of a given type. *)
   type t
 
+  (** Rigid sort variables similiar to [Tunivar] for types. They can be
+      specified to be equal by [enter_repr] but cannot be equated/unified. *)
+  type univar = { name : string option }
+
+  (** [enter_repr pairs f] establishes correspondence between sort univars (for
+      Trepr) using the given list of pairs, then calls [f]. *)
+  val enter_repr : (univar * univar) list -> (unit -> 'a) -> 'a
+
   (** These are the constant sorts -- fully determined and without variables *)
   type base =
     | Void  (** No run time representation at all *)
     | Value  (** Standard ocaml value representation *)
     | Untagged_immediate
-        (** Untagged 31- or 63-bit immediates, but without the tag bit, so they must
-        never be visible to the GC *)
+        (** Untagged 31- or 63-bit immediates, but without the tag bit, so they
+            must never be visible to the GC *)
     | Float64  (** Unboxed 64-bit floats *)
     | Float32  (** Unboxed 32-bit floats *)
     | Word  (** Unboxed native-size integers *)
@@ -45,10 +53,11 @@ module type Sort = sig
     type t =
       | Base of base
       | Product of t list
+      | Univar of univar
 
     val equal : t -> t -> bool
 
-    val format : Format.formatter -> t -> unit
+    val format : Format_doc.formatter -> t -> unit
 
     val all_void : t -> bool
 
@@ -110,7 +119,7 @@ module type Sort = sig
     val for_list_element : t
 
     (** These are sorts for the types of ocaml expressions that we expect will
-        always be "value".  These names are used in the translation to lambda to
+        always be "value". These names are used in the translation to lambda to
         make the code clearer. *)
     val for_function : t
 
@@ -149,17 +158,17 @@ module type Sort = sig
     type id = private int
     (* the [private int] allows the debugger to print it *)
 
-    (** Extract the unique id for a [var]; this should be used only
-        for debugging or printing, not for decision making *)
+    (** Extract the unique id for a [var]; this should be used only for
+        debugging or printing, not for decision making *)
     val get_id : var -> id
 
-    (** Get the number of an [id], useful for printing. These numbers
-        get allocated only when an [id] gets printed, and so they are
-        less brittle than just printing the [id] itself. *)
+    (** Get the number of an [id], useful for printing. These numbers get
+        allocated only when an [id] gets printed, and so they are less brittle
+        than just printing the [id] itself. *)
     val get_print_number : id -> int
 
     (** These names are generated lazily and only when this function is called,
-      and are not guaranteed to be efficient to create *)
+        and are not guaranteed to be efficient to create *)
     val name : var -> string
   end
 
@@ -186,28 +195,29 @@ module type Sort = sig
 
   val of_var : var -> t
 
-  (** This checks for equality, and sets any variables to make two sorts
-      equal, if possible *)
+  (** This checks for equality, and sets any variables to make two sorts equal,
+      if possible *)
   val equate : t -> t -> bool
 
-  val format : Format.formatter -> t -> unit
+  val format : Format_doc.formatter -> t -> unit
 
   (** Checks whether this sort is [void], defaulting to [value] if a sort
       variable is unfilled. *)
   val is_void_defaulting : t -> bool
 
-  (** [default_to_value_and_get] extracts the sort as a `const`.  If it's a variable,
-      it is set to [value] first. *)
+  (** [default_to_value_and_get] extracts the sort as a `const`. If it's a
+      variable, it is set to [value] first. *)
   val default_to_value_and_get : t -> Const.t
 
   (* CR layouts v12: Default this to void. *)
 
-  (** [default_for_transl_and_get] extracts the sort as a `const`.  If it's a variable,
-      it is set to [value] first. After we have support for [void], this will default to
-      [void] instead. *)
+  (** [default_for_transl_and_get] extracts the sort as a `const`. If it's a
+      variable, it is set to [value] first. After we have support for [void],
+      this will default to [void] instead. *)
   val default_for_transl_and_get : t -> Const.t
 
-  (** To record changes to sorts, for use with `Types.{snapshot, backtrack}` *)
+  (** To record changes to sorts, for use with [Types.snapshot] and
+      [Types.backtrack]. *)
   type change
 
   val undo_change : change -> unit
@@ -246,6 +256,7 @@ module History = struct
     | Idx_element
     | Structure_item
     | Signature_item
+    | Layout_poly
 
   (* For sort variables that are in the "legacy" position
      on the jkind lattice, defaulting exactly to [value]. *)
@@ -268,6 +279,7 @@ module History = struct
     | Existential_unpack : string -> (allowed * allowed) annotation_context
     | Univar : string -> (allowed * allowed) annotation_context
     | Type_variable : string -> (allowed * allowed) annotation_context
+    | Implicit_jkind : string -> (allowed * allowed) annotation_context
     | Type_wildcard : Location.t -> (allowed * allowed) annotation_context
     | Type_of_kind : Location.t -> (allowed * allowed) annotation_context
     | With_error_message :
@@ -296,6 +308,9 @@ module History = struct
           position : int;
           arity : int
         }
+    | Recmod_fun_arg
+    | Array_comprehension_element
+    | Array_comprehension_iterator_element
 
   type value_creation_reason =
     | Class_let_binding
@@ -325,19 +340,16 @@ module History = struct
     | Default_type_jkind
     | Existential_type_variable
     | Idx_base
-    | Array_comprehension_element
     | List_comprehension_iterator_element
-    | Array_comprehension_iterator_element
     | Lazy_expression
     | Class_type_argument
     | Class_term_argument
     | Debug_printer_argument
-    | Recmod_fun_arg
+    | Array_type_kind
     | Quotation_result
     | Antiquotation_result
     | Tquote
     | Tsplice
-    | Array_type_kind
     | Unknown of string (* CR layouts: get rid of these *)
 
   type immediate_creation_reason =
@@ -368,6 +380,7 @@ module History = struct
           position : int;
           arity : int
         }
+    | Overapproximation_of_with_bounds
 
   type product_creation_reason =
     | Unboxed_tuple

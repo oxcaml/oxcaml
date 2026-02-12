@@ -47,8 +47,7 @@ type stat =
 
     heap_chunks : int;
     (** Number of contiguous pieces of memory that make up the major heap.
-        This metric is currently not available in OCaml 5: the field value is
-        always [0]. *)
+        For runtime 5, these are the chunks used for small block allocation. *)
 
     live_words : int;
     (** Number of words of live data in the major heap, including the header
@@ -328,16 +327,23 @@ type control =
 
 external stat : unit -> stat = "caml_gc_stat"
 (** Return the current values of the memory management counters in a
-   [stat] record that represent the program's total memory stats.
-   This function causes a full major collection. *)
+    [stat] record that represent the program's total memory stats.
+
+    This is expensive: in runtime 4, it traverses all of memory to gather
+    statistics, while in runtime 5, it causes a full major collection. *)
 
 external quick_stat : unit -> stat = "caml_gc_quick_stat"
-(** Same as [stat] except that [live_words], [live_blocks], [free_words],
-    [free_blocks], [largest_free], and [fragments] are set to 0. Due to
-    per-domain buffers it may only represent the state of the program's
-    total memory usage since the last minor collection or major cycle.
-    This function is much faster than [stat] because it does not need to
-    trigger a full major collection. *)
+(** Same as [stat] except much cheaper.
+
+    In runtime 4, the heap is not traversed, and [live_words], [live_blocks],
+    [free_words], [free_blocks], [largest_free], and [fragments] are all set
+    to 0.
+
+    In runtime 5, no major collection is triggered, and the values returned
+    (except [minor_collections]) represent the state of memory at the end of
+    last major collection cycle (and as for [stat], the values [free_blocks],
+    [largest_free], and [stack_size] are set to 0).
+    *)
 
 external counters : unit -> float * float * float = "caml_gc_counters"
 (** Return [(minor_words, promoted_words, major_words)] for the current

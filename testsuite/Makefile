@@ -126,6 +126,11 @@ endif
 export OCAMLRUNPARAM?=v=0
 endif
 
+# Remove these from the environment to prevent text unexpectedly wrapping with
+# -d options.
+unexport ROWS
+unexport COLUMNS
+
 .PHONY: default
 default:
 	@echo "Available targets:"

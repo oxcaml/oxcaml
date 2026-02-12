@@ -22,6 +22,15 @@ open Cmo_format
 module String = Misc.Stdlib.String
 module Style = Misc.Style
 
+module Compunit = struct
+  type t = compunit
+  let name (Compunit cu_name) = cu_name
+  let is_packed (Compunit name) = String.contains name '.'
+  let to_ident (Compunit cu_name) = Ident.create_persistent cu_name
+  module Set = Set.Make(struct type nonrec t = t let compare = compare end)
+  module Map = Map.Make(struct type nonrec t = t let compare = compare end)
+end
+
 let builtin_values = Predef.builtin_values
 
 module Predef = struct
@@ -44,10 +53,10 @@ module Global = struct
 
   let description ppf = function
     | Glob_compunit cu ->
-        Format.fprintf ppf "compilation unit %a"
-          (Style.as_inline_code Compilation_unit.print) cu
+        Format_doc.fprintf ppf "compilation unit %a"
+          Compilation_unit.print_as_inline_code cu
     | Glob_predef (Predef_exn exn) ->
-        Format.fprintf ppf "predefined exception %a"
+        Format_doc.fprintf ppf "predefined exception %a"
           Style.inline_code (quote exn)
 
   let of_compilation_unit cu = Glob_compunit cu
@@ -101,7 +110,7 @@ module PrimMap = Num_tbl(Misc.Stdlib.String.Map)
 (* Global variables *)
 
 let global_table = ref GlobalMap.empty
-and literal_table = ref([] : (int * structured_constant) list)
+and literal_table = ref([] : (int * Obj.t) list)
 
 let is_global_defined global =
   Global.Map.mem global (!global_table).tbl
@@ -186,6 +195,63 @@ let output_primitive_table outchan =
   done;
   fprintf outchan "  0 };\n"
 
+(* Translate structured constants *)
+
+(* We cannot use [float32] or [or_null] types in the compiler. *)
+external is_boot_compiler : unit -> bool = "caml_is_boot_compiler"
+external float32_of_string : string -> Obj.t = "caml_float32_of_string"
+
+external int_as_pointer : int -> Obj.t = "%int_as_pointer"
+
+let rec transl_const = function
+    Const_base(Const_int i)
+  | Const_base(Const_untagged_int i) -> Obj.repr i
+  | Const_base(Const_char c)
+  | Const_base(Const_untagged_char c) -> Obj.repr c
+  | Const_base(Const_string (s, _, _)) -> Obj.repr s
+  | Const_base(Const_float32 f)
+  | Const_base(Const_unboxed_float32 f) ->
+      if is_boot_compiler ()
+      then Misc.fatal_error
+             "The boot bytecode compiler should not produce float32 constants."
+      else Obj.repr (float32_of_string f)
+  | Const_base(Const_float f)
+  | Const_base(Const_unboxed_float f) -> Obj.repr (float_of_string f)
+  | Const_base(Const_int8 i)
+  | Const_base(Const_untagged_int8 i) -> Obj.repr i
+  | Const_base(Const_int16 i)
+  | Const_base(Const_untagged_int16 i) -> Obj.repr i
+  | Const_base(Const_int32 i)
+  | Const_base(Const_unboxed_int32 i) -> Obj.repr i
+  | Const_base(Const_int64 i)
+  | Const_base(Const_unboxed_int64 i) -> Obj.repr i
+  | Const_base(Const_nativeint i)
+  | Const_base(Const_unboxed_nativeint i) -> Obj.repr i
+  | Const_immstring s -> Obj.repr s
+  | Const_block(tag, fields) ->
+      let block = Obj.new_block tag (List.length fields) in
+      let transl_field pos cst =
+        Obj.set_field block pos (transl_const cst)
+      in
+      List.iteri transl_field fields;
+      block
+  | Const_mixed_block _ ->
+      (* CR layouts v5.9: Support constant mixed blocks in bytecode, either by
+        dynamically allocating them once at top-level, or by supporting
+        marshaling into the cmo format for mixed blocks in bytecode.
+      *)
+      Misc.fatal_error "[Const_mixed_block] not supported in bytecode."
+  | Const_float_block fields | Const_float_array fields ->
+      let res = Array.Floatarray.create (List.length fields) in
+      List.iteri (fun i f -> Array.Floatarray.set res i (float_of_string f))
+        fields;
+      Obj.repr res
+  | Const_null ->
+    if is_boot_compiler ()
+    then Misc.fatal_error
+           "The boot bytecode compiler should not produce null constants."
+    else int_as_pointer 0
+
 (* Initialization for batch linking *)
 
 let init () =
@@ -202,7 +268,7 @@ let init () =
             Const_base(Const_int (-i-1))
            ])
       in
-      literal_table := (c, cst) :: !literal_table)
+      literal_table := (c, transl_const cst) :: !literal_table)
     Runtimedef.builtin_exceptions;
   (* Initialize the known C primitives *)
   let set_prim_table_from_file primfile =
@@ -243,10 +309,11 @@ let init () =
 (* Relocate a block of object bytecode *)
 
 let patch_int buff pos n =
-  LongString.set buff pos (Char.unsafe_chr n);
-  LongString.set buff (pos + 1) (Char.unsafe_chr (n asr 8));
-  LongString.set buff (pos + 2) (Char.unsafe_chr (n asr 16));
-  LongString.set buff (pos + 3) (Char.unsafe_chr (n asr 24))
+  let open Bigarray.Array1 in
+  set buff pos (Char.unsafe_chr n);
+  set buff (pos + 1) (Char.unsafe_chr (n asr 8));
+  set buff (pos + 2) (Char.unsafe_chr (n asr 16));
+  set buff (pos + 3) (Char.unsafe_chr (n asr 24))
 
 let patch_object buff patchlist =
   List.iter
@@ -266,67 +333,12 @@ let patch_object buff patchlist =
           patch_int buff pos (of_prim name))
     patchlist
 
-(* Translate structured constants *)
-
-(* We cannot use [float32] or [or_null] types in the compiler. *)
-external is_boot_compiler : unit -> bool = "caml_is_boot_compiler"
-external float32_of_string : string -> Obj.t = "caml_float32_of_string"
-
-external int_as_pointer : int -> Obj.t = "%int_as_pointer"
-
-let rec transl_const = function
-    Const_base(Const_int i)
-  | Const_base(Const_untagged_int i) -> Obj.repr i
-  | Const_base(Const_char c)
-  | Const_base(Const_untagged_char c) -> Obj.repr c
-  | Const_base(Const_string (s, _, _)) -> Obj.repr s
-  | Const_base(Const_float32 f)
-  | Const_base(Const_unboxed_float32 f) ->
-      if is_boot_compiler ()
-      then Misc.fatal_error "The boot bytecode compiler should not produce float32 constants."
-      else Obj.repr (float32_of_string f)
-  | Const_base(Const_float f)
-  | Const_base(Const_unboxed_float f) -> Obj.repr (float_of_string f)
-  | Const_base(Const_int8 i)
-  | Const_base(Const_untagged_int8 i) -> Obj.repr i
-  | Const_base(Const_int16 i)
-  | Const_base(Const_untagged_int16 i) -> Obj.repr i
-  | Const_base(Const_int32 i)
-  | Const_base(Const_unboxed_int32 i) -> Obj.repr i
-  | Const_base(Const_int64 i)
-  | Const_base(Const_unboxed_int64 i) -> Obj.repr i
-  | Const_base(Const_nativeint i)
-  | Const_base(Const_unboxed_nativeint i) -> Obj.repr i
-  | Const_immstring s -> Obj.repr s
-  | Const_block(tag, fields) ->
-      let block = Obj.new_block tag (List.length fields) in
-      let transl_field pos cst =
-        Obj.set_field block pos (transl_const cst)
-      in
-      List.iteri transl_field fields;
-      block
-  | Const_mixed_block _ ->
-      (* CR layouts v5.9: Support constant mixed blocks in bytecode, either by
-        dynamically allocating them once at top-level, or by supporting
-        marshaling into the cmo format for mixed blocks in bytecode.
-      *)
-      Misc.fatal_error "[Const_mixed_block] not supported in bytecode."
-  | Const_float_block fields | Const_float_array fields ->
-      let res = Array.Floatarray.create (List.length fields) in
-      List.iteri (fun i f -> Array.Floatarray.set res i (float_of_string f))
-        fields;
-      Obj.repr res
-  | Const_null ->
-    if is_boot_compiler ()
-    then Misc.fatal_error "The boot bytecode compiler should not produce null constants."
-    else int_as_pointer 0
-
 (* Build the initial table of globals *)
 
 let initial_global_table () =
   let glob = Array.make !global_table.cnt (Obj.repr 0) in
   List.iter
-    (fun (slot, cst) -> glob.(slot) <- transl_const cst)
+    (fun (slot, cst) -> glob.(slot) <- cst)
     !literal_table;
   literal_table := [];
   glob
@@ -348,7 +360,7 @@ let update_global_table () =
   if ng > Array.length(Meta.global_data()) then Meta.realloc_global_data ng;
   let glob = Meta.global_data() in
   List.iter
-    (fun (slot, cst) -> glob.(slot) <- transl_const cst)
+    (fun (slot, cst) -> glob.(slot) <- cst)
     !literal_table;
   literal_table := []
 
@@ -451,9 +463,9 @@ let empty_global_map = GlobalMap.empty
 
 (* Error report *)
 
-open Format
+open Format_doc
 
-let report_error ppf = function
+let report_error_doc ppf = function
   | Undefined_global global ->
       fprintf ppf "Reference to undefined %a" Global.description global
   | Unavailable_primitive s ->
@@ -469,9 +481,11 @@ let report_error ppf = function
 let () =
   Location.register_error_of_exn
     (function
-      | Error err -> Some (Location.error_of_printer_file report_error err)
+      | Error err -> Some (Location.error_of_printer_file report_error_doc err)
       | _ -> None
     )
+
+let report_error = Format_doc.compat report_error_doc
 
 let reset () =
   global_table := GlobalMap.empty;

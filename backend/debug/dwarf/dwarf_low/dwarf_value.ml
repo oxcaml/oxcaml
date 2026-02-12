@@ -275,6 +275,9 @@ let append_to_comment { value; comment } to_append =
   in
   { value; comment }
 
+(* CR mshinwell/xclerc: The following two functions are similar to some in
+   [Asm_directives]. *)
+
 (* DWARF-4 standard section 7.6. *)
 let uleb128_size i =
   let rec uleb128_size i =

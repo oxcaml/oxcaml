@@ -89,7 +89,8 @@ and let_cont_expr =
   | Non_recursive of
       { handler : non_recursive_let_cont_handler;
         num_free_occurrences : Num_occurrences.t Or_unknown.t;
-        is_applied_with_traps : bool
+        is_applied_with_traps : bool;
+        can_be_lifted : bool
       }
   | Recursive of recursive_let_cont_handlers
 
@@ -213,7 +214,8 @@ and apply_renaming_let_expr ({ let_abst; defining_expr } as t) renaming =
 
 and apply_renaming_let_cont_expr let_cont renaming =
   match let_cont with
-  | Non_recursive { handler; num_free_occurrences; is_applied_with_traps } ->
+  | Non_recursive
+      { handler; num_free_occurrences; is_applied_with_traps; can_be_lifted } ->
     let handler' =
       apply_renaming_non_recursive_let_cont_handler handler renaming
     in
@@ -221,7 +223,11 @@ and apply_renaming_let_cont_expr let_cont renaming =
     then let_cont
     else
       Non_recursive
-        { handler = handler'; num_free_occurrences; is_applied_with_traps }
+        { handler = handler';
+          num_free_occurrences;
+          is_applied_with_traps;
+          can_be_lifted
+        }
   | Recursive handlers ->
     let handlers' =
       apply_renaming_recursive_let_cont_handlers handlers renaming
@@ -392,7 +398,11 @@ and ids_for_export_named t =
 and ids_for_export_let_cont_expr t =
   match t with
   | Non_recursive
-      { handler; num_free_occurrences = _; is_applied_with_traps = _ } ->
+      { handler;
+        num_free_occurrences = _;
+        is_applied_with_traps = _;
+        can_be_lifted = _
+      } ->
     ids_for_export_non_recursive_let_cont_handler handler
   | Recursive handlers -> ids_for_export_recursive_let_cont_handlers handlers
 
@@ -459,17 +469,15 @@ let rec named_must_be_static_consts (named : named) =
       named
 
 and match_against_bound_static_pattern_static_const_or_code :
-      'a.
-      static_const_or_code ->
-      Bound_static.Pattern.t ->
-      code:(Code_id.t -> function_params_and_body Code0.t -> 'a) ->
-      deleted_code:(Code_id.t -> 'a) ->
-      set_of_closures:
-        (closure_symbols:Symbol.t Function_slot.Lmap.t ->
-        Set_of_closures.t ->
-        'a) ->
-      block_like:(Symbol.t -> Static_const.t -> 'a) ->
-      'a =
+    'a.
+    static_const_or_code ->
+    Bound_static.Pattern.t ->
+    code:(Code_id.t -> function_params_and_body Code0.t -> 'a) ->
+    deleted_code:(Code_id.t -> 'a) ->
+    set_of_closures:
+      (closure_symbols:Symbol.t Function_slot.Lmap.t -> Set_of_closures.t -> 'a) ->
+    block_like:(Symbol.t -> Static_const.t -> 'a) ->
+    'a =
  fun static_const_or_code (pat : Bound_static.Pattern.t) ~code:code_callback
      ~deleted_code:deleted_code_callback ~set_of_closures ~block_like ->
   match static_const_or_code, pat with
@@ -491,22 +499,23 @@ and match_against_bound_static_pattern_static_const_or_code :
       static_const_or_code
 
 and match_against_bound_static__static_const_group :
-      'a.
-      static_const_group ->
-      Bound_static.t ->
-      init:'a ->
-      code:('a -> Code_id.t -> function_params_and_body Code0.t -> 'a) ->
-      deleted_code:('a -> Code_id.t -> 'a) ->
-      set_of_closures:
-        ('a ->
-        closure_symbols:Symbol.t Function_slot.Lmap.t ->
-        Set_of_closures.t ->
-        'a) ->
-      block_like:('a -> Symbol.t -> Static_const.t -> 'a) ->
-      'a =
+    'a.
+    static_const_group ->
+    Bound_static.t ->
+    init:'a ->
+    code:('a -> Code_id.t -> function_params_and_body Code0.t -> 'a) ->
+    deleted_code:('a -> Code_id.t -> 'a) ->
+    set_of_closures:
+      ('a ->
+      closure_symbols:Symbol.t Function_slot.Lmap.t ->
+      Set_of_closures.t ->
+      'a) ->
+    block_like:('a -> Symbol.t -> Static_const.t -> 'a) ->
+    'a =
  fun t bound_static ~init ~code:code_callback
      ~deleted_code:deleted_code_callback
-     ~set_of_closures:set_of_closures_callback ~block_like:block_like_callback ->
+     ~set_of_closures:set_of_closures_callback
+     ~block_like:block_like_callback ->
   let bound_static_pats = Bound_static.to_list bound_static in
   if List.compare_lengths t bound_static_pats <> 0
   then
@@ -618,8 +627,12 @@ and print_function_params_and_body ppf t =
 and print_let_cont_expr ppf t =
   let rec gather_let_conts let_conts let_cont =
     match let_cont with
-    | Non_recursive { handler; num_free_occurrences; is_applied_with_traps = _ }
-      ->
+    | Non_recursive
+        { handler;
+          num_free_occurrences;
+          is_applied_with_traps = _;
+          can_be_lifted = _
+        } ->
       let print k ~body =
         let let_conts, body =
           match descr body with
@@ -701,9 +714,11 @@ and flatten_for_printing0 bound_static defining_exprs =
         }
       in
       flattened_acc @ [flattened], true)
-    ~set_of_closures:
-      (fun (flattened_acc, second_or_later_rec_binding) ~closure_symbols
-           set_of_closures ->
+    ~set_of_closures:(fun
+        (flattened_acc, second_or_later_rec_binding)
+        ~closure_symbols
+        set_of_closures
+      ->
       let flattened =
         if Set_of_closures.is_empty set_of_closures
         then []
@@ -715,8 +730,8 @@ and flatten_for_printing0 bound_static defining_exprs =
             } ]
       in
       flattened_acc @ flattened, true)
-    ~block_like:
-      (fun (flattened_acc, second_or_later_rec_binding) symbol defining_expr ->
+    ~block_like:(fun
+        (flattened_acc, second_or_later_rec_binding) symbol defining_expr ->
       let flattened =
         { second_or_later_binding_within_one_set = false;
           second_or_later_rec_binding;
@@ -952,10 +967,10 @@ module Continuation_handler = struct
             then
               A.pattern_match_pair t1.cont_handler_abst t2.cont_handler_abst
                 ~f:(fun
-                     params
-                     ({ handler = handler1; _ } : T0.t)
-                     ({ handler = handler2; _ } : T0.t)
-                   -> Ok (f params ~handler1 ~handler2))
+                    params
+                    ({ handler = handler1; _ } : T0.t)
+                    ({ handler = handler2; _ } : T0.t)
+                  -> Ok (f params ~handler1 ~handler2))
             else
               Error
                 Pattern_match_pair_error.Parameter_lists_have_different_lengths))
@@ -1028,10 +1043,10 @@ module Function_params_and_body = struct
   let pattern_match_pair t1 t2 ~f =
     A.pattern_match_pair t1.abst t2.abst
       ~f:(fun
-           bound_for_function
-           { expr = body1; free_names = _ }
-           { expr = body2; free_names = _ }
-         ->
+          bound_for_function
+          { expr = body1; free_names = _ }
+          { expr = body2; free_names = _ }
+        ->
         f
           ~return_continuation:
             (Bound_for_function.return_continuation bound_for_function)
@@ -1239,10 +1254,10 @@ module Recursive_let_cont_handlers = struct
   let pattern_match_pair t1 t2 ~f =
     A1.pattern_match_pair t1 t2
       ~f:(fun
-           _
-           (handlers0_1 : recursive_let_cont_handlers_t0)
-           (handlers0_2 : recursive_let_cont_handlers_t0)
-         ->
+          _
+          (handlers0_1 : recursive_let_cont_handlers_t0)
+          (handlers0_2 : recursive_let_cont_handlers_t0)
+        ->
         let body1 = handlers0_1.body in
         let body2 = handlers0_2.body in
         A0.pattern_match_pair handlers0_1.handlers handlers0_2.handlers
@@ -1601,14 +1616,21 @@ module Let_cont_expr = struct
 
   let print = print_let_cont_expr
 
-  let create_non_recursive' ~cont handler ~body
+  let create0 ~can_be_lifted ~cont handler ~body
       ~num_free_occurrences_of_cont_in_body:num_free_occurrences
       ~is_applied_with_traps =
     let handler = Non_recursive_let_cont_handler.create cont handler ~body in
     Expr.create_let_cont
-      (Non_recursive { handler; num_free_occurrences; is_applied_with_traps })
+      (Non_recursive
+         { handler; num_free_occurrences; is_applied_with_traps; can_be_lifted })
 
-  let create_non_recursive cont handler ~body ~free_names_of_body =
+  let create_non_recursive' ~cont handler ~body
+      ~num_free_occurrences_of_cont_in_body ~is_applied_with_traps =
+    create0 ~can_be_lifted:true ~cont handler ~body
+      ~num_free_occurrences_of_cont_in_body ~is_applied_with_traps
+
+  let create_non_recursive0 ~can_be_lifted cont handler ~body
+      ~free_names_of_body =
     let num_free_occurrences_of_cont_in_body, is_applied_with_traps =
       (* Only the continuations of [free_names_of_body] are used.
          [Closure_conversion_aux] relies on this property. *)
@@ -1620,8 +1642,12 @@ module Let_cont_expr = struct
           Name_occurrences.continuation_is_applied_with_traps free_names_of_body
             cont )
     in
-    create_non_recursive' ~cont handler ~body
+    create0 ~can_be_lifted ~cont handler ~body
       ~num_free_occurrences_of_cont_in_body ~is_applied_with_traps
+
+  let create_non_recursive = create_non_recursive0 ~can_be_lifted:true
+
+  let create_non_liftable = create_non_recursive0 ~can_be_lifted:false
 
   let create_recursive ~invariant_params handlers ~body =
     if Continuation_handlers.contains_exn_handler handlers

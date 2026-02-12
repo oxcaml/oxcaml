@@ -28,8 +28,8 @@
 
 open! Jsoo_imports.Import
 
-(** Bind a fresh JSIR variable to [expr], and map [fvar] to this new variable in the
-    environment. *)
+(** Bind a fresh JSIR variable to [expr], and map [fvar] to this new variable in
+    the environment. *)
 val bind_expr_to_var :
   env:To_jsir_env.t ->
   res:To_jsir_result.t ->
@@ -79,8 +79,8 @@ val simples :
   Simple.t list ->
   Jsir.Var.t list * To_jsir_result.t
 
-(** Take in [Bound_parameters.t] and bind each parameter to fresh JSIR variables in the
-    environment, and return the variables in order *)
+(** Take in [Bound_parameters.t] and bind each parameter to fresh JSIR variables
+    in the environment, and return the variables in order *)
 val bound_parameters :
   env:To_jsir_env.t -> Bound_parameters.t -> Jsir.Var.t list * To_jsir_env.t
 

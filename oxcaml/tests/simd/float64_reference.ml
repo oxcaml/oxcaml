@@ -2,43 +2,43 @@ type t = float
 
 external c_to_int64 : (t[@unboxed]) -> (int64[@unboxed])
   = "caml_int64_of_float" "caml_int64_of_float_unboxed"
-  [@@noalloc]
+[@@noalloc]
 
 external c_of_int64 : (int64[@unboxed]) -> (t[@unboxed])
   = "caml_int64_to_float" "caml_int64_to_float_unboxed"
-  [@@noalloc]
+[@@noalloc]
 
 external c_round : (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float64_round"
-  [@@noalloc]
+[@@noalloc]
 
 external c_min : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float64_min"
-  [@@noalloc]
+[@@noalloc]
 
 external c_max : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float64_max"
-  [@@noalloc]
+[@@noalloc]
 
 external c_min_match_sse : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float64_min_match_sse"
-  [@@noalloc]
+[@@noalloc]
 
 external c_max_match_sse : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float64_max_match_sse"
-  [@@noalloc]
+[@@noalloc]
 
 external c_sqrt : (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float64_sqrt"
-  [@@noalloc]
+[@@noalloc]
 
 external cvtt_i32 : (t[@unboxed]) -> (int32[@unboxed])
   = "caml_vec128_unreachable" "float64_cvtt_i32"
-  [@@noalloc]
+[@@noalloc]
 
 external float32x4_of_int64s : int64 -> int64 -> float32x4
   = "caml_vec128_unreachable" "vec128_of_int64s"
-  [@@noalloc] [@@unboxed]
+[@@noalloc] [@@unboxed]
 
 let check_floats f =
   let open Float in
@@ -73,9 +73,9 @@ let check_floats f =
     let f1 = Random.int64 Int64.max_int in
     f
       (if Random.bool ()
-      then Int64.float_of_bits f0
-      else Int64.(neg f0 |> float_of_bits))
+       then Int64.float_of_bits f0
+       else Int64.(neg f0 |> float_of_bits))
       (if Random.bool ()
-      then Int64.float_of_bits f1
-      else Int64.(neg f1 |> float_of_bits))
+       then Int64.float_of_bits f1
+       else Int64.(neg f1 |> float_of_bits))
   done

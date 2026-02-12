@@ -13,7 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open Format
+open Format_doc
 
 type error =
   | CannotRun of string
@@ -236,7 +236,7 @@ let file ~tool_name inputfile parse_fun ast_kind =
   in
   ast
 
-let report_error ppf = function
+let report_error_doc ppf = function
   | CannotRun cmd ->
       fprintf ppf "Error while running external preprocessor@.\
                    Command line: %s@." cmd
@@ -247,9 +247,11 @@ let report_error ppf = function
 let () =
   Location.register_error_of_exn
     (function
-      | Error err -> Some (Location.error_of_printer_file report_error err)
+      | Error err -> Some (Location.error_of_printer_file report_error_doc err)
       | _ -> None
     )
+
+let report_error = Format_doc.compat report_error_doc
 
 let parse_file ~tool_name invariant_fun parse kind source_file =
   Location.input_name := source_file;

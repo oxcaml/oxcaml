@@ -5,6 +5,161 @@
 
 #syntax quotations on
 
+type t_int = <[int]>;;
+[%%expect {|
+type t_int = <[int]>
+|}];;
+
+type t_char = <[char]>;;
+[%%expect {|
+type t_char = <[char]>
+|}];;
+
+type t_string = <[string]>;;
+[%%expect {|
+type t_string = <[string]>
+|}];;
+
+type t_bytes = <[bytes]>;;
+[%%expect {|
+type t_bytes = <[bytes]>
+|}];;
+
+type t_float = <[float]>;;
+[%%expect {|
+type t_float = <[float]>
+|}];;
+
+type t_float32 = <[float32]>;;
+[%%expect {|
+type t_float32 = <[float32]>
+|}];;
+
+type t_bool = <[bool]>;;
+[%%expect {|
+type t_bool = <[bool]>
+|}];;
+
+type t_unit = <[unit]>;;
+[%%expect {|
+type t_unit = <[unit]>
+|}];;
+
+type t_exn = <[exn]>;;
+[%%expect {|
+type t_exn = <[exn]>
+|}];;
+
+type t_array = <[int array]>;;
+[%%expect {|
+type t_array = <[int array]>
+|}];;
+
+type t_iarray = <[int iarray]>;;
+[%%expect {|
+type t_iarray = <[int iarray]>
+|}];;
+
+type t_list = <[int list]>;;
+[%%expect {|
+type t_list = <[int list]>
+|}];;
+
+type t_option = <[int option]>;;
+[%%expect {|
+type t_option = <[int option]>
+|}];;
+
+type t_nativeint = <[nativeint]>;;
+[%%expect {|
+type t_nativeint = <[nativeint]>
+|}];;
+
+type t_int32 = <[int32]>;;
+[%%expect {|
+type t_int32 = <[int32]>
+|}];;
+
+type t_int64 = <[int64]>;;
+[%%expect {|
+type t_int64 = <[int64]>
+|}];;
+
+type t_lazy_t = <[int lazy_t]>;;
+[%%expect {|
+type t_lazy_t = <[int lazy_t]>
+|}];;
+
+type t_extension_constructor = <[extension_constructor]>;;
+[%%expect {|
+type t_extension_constructor = <[extension_constructor]>
+|}];;
+
+type t_floatarray = <[floatarray]>;;
+[%%expect {|
+type t_floatarray = <[floatarray]>
+|}];;
+
+type t_lexing_position = <[lexing_position]>;;
+[%%expect {|
+type t_lexing_position = <[lexing_position]>
+|}];;
+
+type t_expr = <[<[int]> expr]>;;
+[%%expect {|
+type t_expr = <[<[int]> expr]>
+|}];;
+
+type t_unboxed_float = <[float#]>;;
+[%%expect {|
+type t_unboxed_float = <[float#]>
+|}];;
+
+type t_unboxed_nativeint = <[nativeint#]>;;
+[%%expect {|
+type t_unboxed_nativeint = <[nativeint#]>
+|}];;
+
+type t_unboxed_int32 = <[int32#]>;;
+[%%expect {|
+type t_unboxed_int32 = <[int32#]>
+|}];;
+
+type t_unboxed_int64 = <[int64#]>;;
+[%%expect {|
+type t_unboxed_int64 = <[int64#]>
+|}];;
+
+type t_int8x16 = <[int8x16]>;;
+[%%expect {|
+type t_int8x16 = <[int8x16]>
+|}];;
+
+type t_int16x8 = <[int16x8]>;;
+[%%expect {|
+type t_int16x8 = <[int16x8]>
+|}];;
+
+type t_int32x4 = <[int32x4]>;;
+[%%expect {|
+type t_int32x4 = <[int32x4]>
+|}];;
+
+type t_int64x2 = <[int64x2]>;;
+[%%expect {|
+type t_int64x2 = <[int64x2]>
+|}];;
+
+type t_float32x4 = <[float32x4]>;;
+[%%expect {|
+type t_float32x4 = <[float32x4]>
+|}];;
+
+type t_float64x2 = <[float64x2]>;;
+[%%expect {|
+type t_float64x2 = <[float64x2]>
+|}];;
+
 type s0 = <[int]>;;
 [%%expect {|
 type s0 = <[int]>
@@ -51,7 +206,7 @@ Line 1, characters 10-23:
 1 | type s7 = $(int -> int);;
               ^^^^^^^^^^^^^
 Error: Splices ($) are not allowed in the initial stage,
-       as encountered at Line 1, characters 10-23.
+       as encountered at line 1, characters 10-23.
        Did you forget to insert a quotation?
 |}];;
 
@@ -76,7 +231,7 @@ Line 1, characters 13-16:
 1 | type 'a t3 = $'a -> $'a -> 'a expr;;
                  ^^^
 Error: Splices ($) are not allowed in the initial stage,
-       as encountered at Line 1, characters 13-16.
+       as encountered at line 1, characters 13-16.
        Did you forget to insert a quotation?
 |}];;
 
@@ -86,7 +241,7 @@ Line 1, characters 13-16:
 1 | type 'a t4 = $'a -> $'a;;
                  ^^^
 Error: Splices ($) are not allowed in the initial stage,
-       as encountered at Line 1, characters 13-16.
+       as encountered at line 1, characters 13-16.
        Did you forget to insert a quotation?
 |}];;
 
@@ -95,9 +250,9 @@ let p x = <[x]>;;
 Line 1, characters 12-13:
 1 | let p x = <[x]>;;
                 ^
-Error: Identifier "x" is used at Line 1, characters 12-13,
+Error: Identifier "x" is used at line 1, characters 12-13,
        inside a quotation (<[ ... ]>);
-       it is introduced at Line 1, characters 6-7, outside any quotations.
+       it is introduced at line 1, characters 6-7, outside any quotations.
 |}];;
 
 let f (x : $'a) = x
@@ -106,7 +261,7 @@ Line 1, characters 11-14:
 1 | let f (x : $'a) = x
                ^^^
 Error: Splices ($) are not allowed in the initial stage,
-       as encountered at Line 1, characters 11-14.
+       as encountered at line 1, characters 11-14.
        Did you forget to insert a quotation?
 |}];;
 
@@ -150,9 +305,9 @@ let foo6 (type a) (type b) x = <[fun (y : a) -> y]>;;
 Line 1, characters 42-43:
 1 | let foo6 (type a) (type b) x = <[fun (y : a) -> y]>;;
                                               ^
-Error: Identifier "a" is used at Line 1, characters 42-43,
+Error: Identifier "a" is used at line 1, characters 42-43,
        inside a quotation (<[ ... ]>);
-       it is introduced at Line 1, characters 15-16, outside any quotations.
+       it is introduced at line 1, characters 15-16, outside any quotations.
 |}];;
 
 let foo7 (type a) (type b) x = <[fun (y : $a) -> y]>;;
@@ -198,9 +353,23 @@ type t4 = A | B
 Line 3, characters 2-3:
 3 | <[A]>;;
       ^
-Error: Constructor "A" used at Line 3, characters 2-3
+Error: Constructor "A" used at line 3, characters 2-3
        cannot be used in this context;
        "A" is not defined inside a quotation (<[ ... ]>).
+Hint: Constructor "A" is defined outside any quotations.
+|}];;
+
+type t5 = int;;
+
+type s = <[t5#]>;;
+[%%expect {|
+type t5 = int
+Line 3, characters 11-14:
+3 | type s = <[t5#]>;;
+               ^^^
+Error: Identifier "t5" is used at line 3, characters 11-14,
+       inside a quotation (<[ ... ]>);
+       it is introduced at line 1, characters 0-13, outside any quotations.
 |}];;
 
 <[fun (x : 'a) (y : 'b) -> (x, y)]>;;

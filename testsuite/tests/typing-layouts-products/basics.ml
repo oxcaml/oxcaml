@@ -1084,8 +1084,8 @@ let f_external_kind_annot_mode_crosses_local_2
   : local_ t -> t = fun x -> x
 [%%expect{|
 type t
-  : value mod global non_float
-    & (float64 mod global & value mod global non_float)
+  : value mod global external_ non_float
+    & (float64 mod global & value mod global external_ non_float)
 val f_external_kind_annot_mode_crosses_local_2 : t @ local -> t = <fun>
 |}]
 
@@ -1585,7 +1585,8 @@ Line 1, characters 31-37:
 1 | let _ = Array.init 3 (fun _ -> #(1,2))
                                    ^^^^^^
 Error: This expression has type "#('a * 'b)"
-       but an expression was expected of type "('c : value)"
+       but an expression was expected of type
+         "('c : value_or_null mod separable)"
        The layout of #('a * 'b) is
            '_representable_layout_13 & '_representable_layout_14
          because it is an unboxed tuple.
@@ -1593,23 +1594,23 @@ Error: This expression has type "#('a * 'b)"
 |}]
 
 external make : ('a : value & value) . int -> 'a -> 'a array =
-  "caml_make_vect" "caml_make_vect"
+  "caml_array_make" "caml_array_make"
 [%%expect{|
 Line 1, characters 16-60:
 1 | external make : ('a : value & value) . int -> 'a -> 'a array =
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The primitive [caml_make_vect] is used in an invalid declaration.
+Error: The primitive [caml_array_make] is used in an invalid declaration.
        The declaration contains argument/return types with the wrong layout.
 |}]
 
 external[@layout_poly] make : ('a : any mod separable) . int -> 'a -> 'a array =
-  "caml_make_vect"
+  "caml_array_make"
 
 let _ = make 3 #(1,2)
 [%%expect{|
-Lines 1-2, characters 0-18:
+Lines 1-2, characters 0-19:
 1 | external[@layout_poly] make : ('a : any mod separable) . int -> 'a -> 'a array =
-2 |   "caml_make_vect"
+2 |   "caml_array_make"
 Error: Attribute "[@layout_poly]" can only be used on built-in primitives.
 |}]
 
@@ -1669,7 +1670,8 @@ Line 2, characters 31-50:
 2 | let _ = Array.init 3 (fun _ -> #{ i1 = 1; i2 = 2 })
                                    ^^^^^^^^^^^^^^^^^^^
 Error: This expression has type "array_init_record"
-       but an expression was expected of type "('a : value)"
+       but an expression was expected of type
+         "('a : value_or_null mod separable)"
        The layout of array_init_record is value & value
          because of the definition of array_init_record at line 1, characters 0-48.
        But the layout of array_init_record must be a sublayout of value.

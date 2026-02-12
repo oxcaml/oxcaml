@@ -816,12 +816,17 @@ let cc =
     ~does_something:true
     run_cc
 
-let run_expect_once input_file principal log env =
+let run_expect_once input_file principal log env ~backend =
   let expect_flags = Sys.safe_getenv "EXPECT_FLAGS" in
   let principal_flag = if principal then "-principal" else "" in
+  let command =
+    match (backend : Ocaml_backends.t) with
+    | Bytecode -> Ocaml_commands.expect
+    | Native -> Ocaml_commands.expectnat
+  in
   let commandline =
   [
-    Ocaml_commands.expect;
+    command;
     expect_flags;
     Ocaml_flags.toplevel_default_flags;
     Ocaml_flags.stdlib;
@@ -829,8 +834,8 @@ let run_expect_once input_file principal log env =
     Ocaml_flags.include_toplevel_directory;
     flags env;
     principal_flag;
-    libraries Bytecode env;
-    binary_modules Bytecode env;
+    libraries backend env;
+    binary_modules backend env;
     input_file
   ]
   in
@@ -844,13 +849,13 @@ let run_expect_once input_file principal log env =
     (Result.fail_with_reason reason, env)
   end
 
-let run_expect_twice input_file log env =
+let run_expect_twice input_file log env ~backend =
   let corrected filename = Filename.make_filename filename "corrected" in
-  let (result1, env1) = run_expect_once input_file false log env in
+  let (result1, env1) = run_expect_once input_file false log env ~backend in
   if Result.is_pass result1 then begin
     let intermediate_file = corrected input_file in
     let (result2, env2) =
-      run_expect_once intermediate_file true log env1 in
+      run_expect_once intermediate_file true log env1 ~backend in
     if Result.is_pass result2 then begin
       let output_file = corrected intermediate_file in
       let output_env = Environments.add_bindings
@@ -862,14 +867,20 @@ let run_expect_twice input_file log env =
     end else (result2, env2)
   end else (result1, env1)
 
-let run_expect log env =
+let run_expect_with ~backend log env =
   let input_file = Actions_helpers.testfile env in
-  run_expect_twice input_file log env
+  run_expect_twice input_file log env ~backend
 
 let run_expect =
   Actions.make ~name:"run-expect" ~description:"Run expect test"
     ~does_something:true
-    run_expect
+    (run_expect_with ~backend:Bytecode)
+
+let run_expectnat =
+  Actions.make ~name:"run-expectnat"
+    ~description:"Run expect test (native code)"
+    ~does_something:true
+    (run_expect_with ~backend:Native)
 
 let make_check_tool_output name tool = Actions.make
   ~name
@@ -1579,6 +1590,7 @@ let init () =
     ocamlopt_opt;
     check_ocamlopt_opt_output;
     run_expect;
+    run_expectnat;
     compare_bytecode_programs;
     compare_binary_files;
     setup_ocaml_build_env;

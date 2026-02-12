@@ -1,0 +1,47 @@
+; Tests for Binary_emitter_verify module
+; Currently ARM64-only; x86 tests can be added in verify/x86/ later
+
+; Build the test executable
+(executable
+ (name test_verify)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "arm64")))
+ (modules test_verify)
+ (libraries ocamloptcomp unix))
+
+; Assemble ARM64 test files
+(rule
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "arm64")))
+ (targets reference.o match.o mismatch_text_content.o mismatch_text_size.o
+          mismatch_text_reloc.o mismatch_data_reloc.o mismatch_data_content.o
+          mismatch_data_size.o text_only.o data_only.o)
+ (deps arm64/reference.s arm64/match.s arm64/mismatch_text_content.s
+       arm64/mismatch_text_size.s arm64/mismatch_text_reloc.s
+       arm64/mismatch_data_reloc.s arm64/mismatch_data_content.s
+       arm64/mismatch_data_size.s arm64/text_only.s arm64/data_only.s)
+ (action
+  (progn
+   (run as -o reference.o arm64/reference.s)
+   (run as -o match.o arm64/match.s)
+   (run as -o mismatch_text_content.o arm64/mismatch_text_content.s)
+   (run as -o mismatch_text_size.o arm64/mismatch_text_size.s)
+   (run as -o mismatch_text_reloc.o arm64/mismatch_text_reloc.s)
+   (run as -o mismatch_data_reloc.o arm64/mismatch_data_reloc.s)
+   (run as -o mismatch_data_content.o arm64/mismatch_data_content.s)
+   (run as -o mismatch_data_size.o arm64/mismatch_data_size.s)
+   (run as -o text_only.o arm64/text_only.s)
+   (run as -o data_only.o arm64/data_only.s))))
+
+; Run the test
+(rule
+ (alias runtest)
+ (enabled_if
+  (and (= %{context_name} "main")
+       (= %{architecture} "arm64")))
+ (deps test_verify.exe reference.o match.o mismatch_text_content.o
+       mismatch_text_size.o mismatch_text_reloc.o mismatch_data_reloc.o
+       mismatch_data_content.o mismatch_data_size.o text_only.o data_only.o)
+ (action (run ./test_verify.exe)))

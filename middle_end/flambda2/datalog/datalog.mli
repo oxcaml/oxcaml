@@ -18,8 +18,7 @@ open Heterogenous_list
 (** {2 Query language} *)
 
 (** Fact retrieval is supported through a query expressed using (typed) Datalog
-    queries.
-*)
+    queries. *)
 
 module Term : sig
   include Heterogenous_list.S
@@ -41,12 +40,11 @@ val get_bindings : bindings_ref -> bindings
 
 val print_bindings : Format.formatter -> bindings -> unit
 
-(** The type [('p, 'v) program] is the type of programs returning
-      values of type ['v] with parameters ['p].
+(** The type [('p, 'v) program] is the type of programs returning values of type
+    ['v] with parameters ['p].
 
-      The output of programs is either queries or rules; the use of a shared
-      types allows writing combinators that work in both cases.
-  *)
+    The output of programs is either queries or rules; the use of a shared types
+    allows writing combinators that work in both cases. *)
 type ('p, 'a) program
 
 val map_program : ('p, 'a) program -> ('a -> 'b) -> ('p, 'b) program

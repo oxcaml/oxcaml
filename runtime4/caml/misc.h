@@ -537,6 +537,10 @@ extern int caml_snwprintf(wchar_t * buf,
  */
 typedef void * backtrace_slot;
 
+#ifndef IO_BUFFER_SIZE
+#define IO_BUFFER_SIZE 65536
+#endif
+
 #ifdef __cplusplus
 }
 #endif

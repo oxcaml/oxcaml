@@ -182,16 +182,24 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 (fun x -> Oval_int64 (O.obj x : int64)) ))
     ] : (Path.t * printer) list)
 
-    let exn_printer ppf path exn =
-      fprintf ppf "<printer %a raised an exception: %s>" Printtyp.path path
+    let exn_printer path ppf exn =
+      Format_doc.fprintf ppf "<printer %a raised an exception: %s>"
+        Printtyp.path path
         (Printexc.to_string exn)
 
     let out_exn path exn =
-      Oval_printer (fun ppf -> exn_printer ppf path exn)
+      Oval_printer (fun ppf -> exn_printer path ppf exn)
+
+    let user_printer path f ppf x =
+      Format_doc.deprecated_printer
+        (fun ppf ->
+           try f ppf x with
+           | exn -> Format_doc.compat1 exn_printer path ppf exn
+        )
+        ppf
 
     let install_printer path ty fn =
-      let print_val ppf obj =
-        try fn ppf obj with exn -> exn_printer ppf path exn in
+      let print_val ppf obj = user_printer path fn ppf obj in
       let printer obj = Oval_printer (fun ppf -> print_val ppf obj) in
       printers := (path, Simple (ty, printer)) :: !printers
 
@@ -203,8 +211,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         match gp with
         | Zero fn ->
             let out_printer obj =
-              let printer ppf =
-                try fn ppf obj with exn -> exn_printer ppf function_path exn in
+              let printer ppf = user_printer function_path fn ppf obj in
               Oval_printer printer in
             Zero out_printer
         | Succ fn ->
@@ -280,6 +287,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               Vec128 | Vec256 | Vec512 | Word | Untagged_immediate) ->
         Print_as "<abstr>"
       | Product _ -> Print_as "<unboxed product>"
+      | Univar _ -> Print_as "<univar>"
 
     let outval_of_value max_steps max_depth check_depth env obj ty =
 
@@ -616,6 +624,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               fatal_error "Printval.outval_of_value"
           | Tpoly (ty, _) ->
               tree_of_val (depth - 1) obj ty
+          | Trepr (ty, _) ->
+              tree_of_val (depth - 1) obj ty
           | Tpackage _ ->
               Oval_stuff "<module>"
         end
@@ -836,7 +846,8 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | _ ->
           (fun _obj ->
             let printer ppf =
-              fprintf ppf "<internal error: incorrect arity for '%a'>"
+              Format_doc.fprintf ppf
+                "<internal error: incorrect arity for '%a'>"
                 Printtyp.path path in
             Oval_printer printer)
 

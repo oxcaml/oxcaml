@@ -296,20 +296,29 @@ let float_header = block_header Obj.double_tag (size_float / size_addr)
 let float_local_header =
   local_block_header Obj.double_tag (size_float / size_addr)
 
-let boxedvec128_header = block_header Obj.abstract_tag (size_vec128 / size_addr)
+let boxedvec128_header =
+  block_header 0 (size_vec128 / size_addr)
+    ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
-let boxedvec256_header = block_header Obj.abstract_tag (size_vec256 / size_addr)
+let boxedvec256_header =
+  block_header 0 (size_vec256 / size_addr)
+    ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
-let boxedvec512_header = block_header Obj.abstract_tag (size_vec512 / size_addr)
+let boxedvec512_header =
+  block_header 0 (size_vec512 / size_addr)
+    ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
 let boxedvec128_local_header =
-  local_block_header Obj.abstract_tag (size_vec128 / size_addr)
+  local_block_header 0 (size_vec128 / size_addr)
+    ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
 let boxedvec256_local_header =
-  local_block_header Obj.abstract_tag (size_vec256 / size_addr)
+  local_block_header 0 (size_vec256 / size_addr)
+    ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
 let boxedvec512_local_header =
-  local_block_header Obj.abstract_tag (size_vec512 / size_addr)
+  local_block_header 0 (size_vec512 / size_addr)
+    ~block_kind:(Mixed_block { scannable_prefix = 0 })
 
 let floatarray_header len =
   (* Zero-sized float arrays have tag zero for consistency with
@@ -477,7 +486,7 @@ let rec map_tail1 e ~f =
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _ | Cconst_symbol _
   | Cvar _ | Ctuple _ | Cop _ | Cifthenelse _ | Cexit _ | Ccatch _ | Cswitch _
-    ->
+  | Cinvalid _ ->
     f e
 
 let map_tail2 x y ~f = map_tail1 y ~f:(fun y -> map_tail1 x ~f:(fun x -> f x y))
@@ -623,9 +632,9 @@ let add_int_ptr ~ptr_out_of_heap c1 c2 dbg =
 
 let neg_int c dbg = sub_int (Cconst_int (0, dbg)) c dbg
 
-(** This function conservatively approximates the number of significant bits in its signed
-    argument. That is, it computes the number of bits required to represent the absolute
-    value of its argument. *)
+(** This function conservatively approximates the number of significant bits in
+    its signed argument. That is, it computes the number of bits required to
+    represent the absolute value of its argument. *)
 let rec max_signed_bit_length e =
   match prefer_or e with
   | Cop ((Ccmpi _ | Ccmpf _), _, _) ->
@@ -957,9 +966,9 @@ let get_const_bitmask = function
     Some (x, Nativeint.of_int mask)
   | _ -> None
 
-(** [low_bits ~bits x] is a (potentially simplified) value which agrees with x on at least
-    the low [bits] bits. E.g., [low_bits ~bits x & mask = x & mask], where [mask] is a
-    bitmask of the low [bits] bits . *)
+(** [low_bits ~bits x] is a (potentially simplified) value which agrees with x
+    on at least the low [bits] bits. E.g., [low_bits ~bits x & mask = x & mask],
+    where [mask] is a bitmask of the low [bits] bits . *)
 let rec low_bits ~bits ~dbg x =
   assert (bits > 0);
   if bits >= arch_bits
@@ -1125,7 +1134,7 @@ let divimm_parameters d =
   in
   loop (size - 1) (udivmod min_int anc) (udivmod min_int ad)
 
-(* For d > 1, the result [(m, p)] of [divimm_parameters d] satisfies the following
+(*= For d > 1, the result [(m, p)] of [divimm_parameters d] satisfies the following
    inequality:
 
    2^(wordsize + p) < m * d <= 2^(wordsize + p) + 2^(p + 1) (i)
@@ -1140,40 +1149,41 @@ let divimm_parameters d =
    exhaustively tested for values of d from 2 to 10^9 in the wordsize = 64
    case.
 
- * let add2 (xh, xl) (yh, yl) =
- *   let zl = add xl yl and zh = add xh yh in
- *   (if unsigned_compare zl xl < 0 then succ zh else zh), zl
- *
- * let shl2 (xh, xl) n =
- *   assert (0 < n && n < size + size);
- *   if n < size
- *   then
- *     logor (shift_left xh n) (shift_right_logical xl (size - n)),
- *       shift_left xl n
- *   else shift_left xl (n - size), 0n
- *
- * let mul2 x y =
- *   let halfsize = size / 2 in
- *   let halfmask = pred (shift_left 1n halfsize) in
- *   let xl = logand x halfmask and xh = shift_right_logical x halfsize in
- *   let yl = logand y halfmask and yh = shift_right_logical y halfsize in
- *   add2
- *     (mul xh yh, 0n)
- *     (add2
- *        (shl2 (0n, mul xl yh) halfsize)
- *        (add2 (shl2 (0n, mul xh yl) halfsize) (0n, mul xl yl)))
- *
- * let unsigned_compare2 (xh, xl) (yh, yl) =
- *   let c = unsigned_compare xh yh in
- *   if c = 0 then unsigned_compare xl yl else c
- *
- * let validate d m p =
- *   let md = mul2 m d in
- *   let one2 = 0n, 1n in
- *   let twoszp = shl2 one2 (size + p) in
- *   let twop1 = shl2 one2 (p + 1) in
- *   unsigned_compare2 twoszp md < 0 && unsigned_compare2 md (add2 twoszp twop1) <= 0
- *)
+   let add2 (xh, xl) (yh, yl) =
+     let zl = add xl yl and zh = add xh yh in
+     (if unsigned_compare zl xl < 0 then succ zh else zh), zl
+
+   let shl2 (xh, xl) n =
+     assert (0 < n && n < size + size);
+     if n < size
+     then
+       logor (shift_left xh n) (shift_right_logical xl (size - n)),
+         shift_left xl n
+     else shift_left xl (n - size), 0n
+
+   let mul2 x y =
+     let halfsize = size / 2 in
+     let halfmask = pred (shift_left 1n halfsize) in
+     let xl = logand x halfmask and xh = shift_right_logical x halfsize in
+     let yl = logand y halfmask and yh = shift_right_logical y halfsize in
+     add2
+       (mul xh yh, 0n)
+       (add2
+          (shl2 (0n, mul xl yh) halfsize)
+          (add2 (shl2 (0n, mul xh yl) halfsize) (0n, mul xl yl)))
+
+   let unsigned_compare2 (xh, xl) (yh, yl) =
+     let c = unsigned_compare xh yh in
+     if c = 0 then unsigned_compare xl yl else c
+
+   let validate d m p =
+     let md = mul2 m d in
+     let one2 = 0n, 1n in
+     let twoszp = shl2 one2 (size + p) in
+     let twop1 = shl2 one2 (p + 1) in
+     unsigned_compare2 twoszp md < 0
+     && unsigned_compare2 md (add2 twoszp twop1) <= 0
+*)
 
 let raise_symbol dbg symb =
   Cop
@@ -1184,12 +1194,12 @@ let[@inline] get_const = function
   | Cconst_natint (i, _) -> Some i
   | _ -> None
 
-(** Division or modulo on registers. The overflow case min_int / -1 can
-    occur, in which case we force x / -1 = -x and x mod -1 = 0. (PR#5513).
-    In typical cases, [operator] is used to compute the result.
+(** Division or modulo on registers. The overflow case min_int / -1 can occur,
+    in which case we force x / -1 = -x and x mod -1 = 0. (PR#5513). In typical
+    cases, [operator] is used to compute the result.
 
-    However, if division crashes on overflow, we will insert a runtime check for a divisor
-    of -1, and fall back to [if_divisor_is_minus_one]. *)
+    However, if division crashes on overflow, we will insert a runtime check for
+    a divisor of -1, and fall back to [if_divisor_is_minus_one]. *)
 let make_safe_divmod operator ~if_divisor_is_negative_one
     ?(dividend_cannot_be_min_int = false) c1 c2 ~dbg =
   if dividend_cannot_be_min_int || not Arch.division_crashes_on_overflow
@@ -1453,7 +1463,7 @@ let unbox_vec512 =
       match Cmmgen_state.structured_constant_of_sym symbol with
       | Some
           (Const_vec512
-            { word0; word1; word2; word3; word4; word5; word6; word7 }) ->
+             { word0; word1; word2; word3; word4; word5; word6; word7 }) ->
         Some
           (Cconst_vec512
              ({ word0; word1; word2; word3; word4; word5; word6; word7 }, dbg))
@@ -1579,8 +1589,8 @@ let get_tag ptr dbg =
     (* Same comment as [get_header] above *)
     Cop
       ( (if Config.runtime5
-        then mk_load_immut Byte_unsigned
-        else mk_load_mut Byte_unsigned),
+         then mk_load_immut Byte_unsigned
+         else mk_load_mut Byte_unsigned),
         [Cop (Cadda, [ptr; Cconst_int (tag_offset, dbg)], dbg)],
         dbg )
 
@@ -1810,8 +1820,8 @@ let addr_array_initialize arr ofs newval dbg =
       [array_indexing log2_size_addr arr ofs dbg; newval],
       dbg )
 
-(** [zero_extend ~bits dbg e] returns [e] with the most significant [arch_bits - bits]
-    bits set to 0 *)
+(** [zero_extend ~bits dbg e] returns [e] with the most significant
+    [arch_bits - bits] bits set to 0 *)
 let zero_extend ~bits ~dbg e =
   assert (0 < bits && bits <= arch_bits);
   let mask = Nativeint.pred (Nativeint.shift_left 1n bits) in
@@ -2596,8 +2606,17 @@ let unbox_int dbg bi =
       | _ -> default cmm)
     | cmm -> default cmm)
 
-let make_unsigned_int bi arg dbg =
-  if bi = Primitive.Unboxed_int32 then zero_extend ~bits:32 arg ~dbg else arg
+let bit_count (bi : Primitive.unboxed_or_untagged_integer) =
+  match bi with
+  | Untagged_int8 -> 8
+  | Untagged_int16 -> 16
+  | Unboxed_int32 -> 32
+  | Unboxed_int64 -> 64
+  | Unboxed_nativeint -> size_int * 8
+  | Untagged_int -> (size_int * 8) - 1
+
+let make_unsigned_int (bi : Primitive.unboxed_or_untagged_integer) arg dbg =
+  zero_extend ~bits:(bit_count bi) arg ~dbg
 
 let unaligned_load_16 ~ptr_out_of_heap ptr idx dbg =
   if Arch.allow_unaligned_access
@@ -3017,11 +3036,10 @@ let make_switch arg cases actions dbg =
   let extract_uconstant = function
     (* Constant integers loaded from a table should end in 1, so that Cload
        never produces untagged integers *)
-    | Cconst_int (n, _), _dbg when n land 1 = 1 ->
-      Some (Cint (Nativeint.of_int n))
-    | Cconst_natint (n, _), _dbg when Nativeint.(to_int (logand n one) = 1) ->
+    | Cconst_int (n, _) when n land 1 = 1 -> Some (Cint (Nativeint.of_int n))
+    | Cconst_natint (n, _) when Nativeint.(to_int (logand n one) = 1) ->
       Some (Cint n)
-    | Cconst_symbol (s, _), _dbg -> Some (Csymbol_address s)
+    | Cconst_symbol (s, _) -> Some (Csymbol_address s)
     | _ -> None
   in
   let extract_affine ~cases ~const_actions =
@@ -3035,9 +3053,10 @@ let make_switch arg cases actions dbg =
           | Cint v -> v = Nativeint.(add (mul (of_int i) slope) v0)
           | _ -> false
         in
-        if Misc.Stdlib.Array.for_alli
-             (fun i idx -> check i const_actions.(idx))
-             cases
+        if
+          Misc.Stdlib.Array.for_alli
+            (fun i idx -> check i const_actions.(idx))
+            cases
         then Some (v0, slope)
         else None
       | _, _ -> None
@@ -3060,12 +3079,58 @@ let make_switch arg cases actions dbg =
       (natint_const_untagged dbg offset)
       dbg
   in
-  match Misc.Stdlib.Array.all_somes (Array.map extract_uconstant actions) with
-  | None -> Cswitch (arg, cases, actions, dbg)
-  | Some const_actions -> (
+  let module Classify = struct
+    type elt =
+      | Not_constant
+      | Constant of Cmm.data_item
+      | Jump of Cmm.exit_label * Cmm.data_item
+
+    type array =
+      | Init
+      | Not_constant
+      | Constant_rev of Cmm.data_item list
+      | Jump_rev of Cmm.exit_label * Cmm.data_item list
+  end in
+  let classify (action, _dbg) : Classify.elt =
+    match action with
+    | Cexit (lbl, [arg], []) -> (
+      match extract_uconstant arg with
+      | None -> Not_constant
+      | Some uconst -> Jump (lbl, uconst))
+    | _ -> (
+      match extract_uconstant action with
+      | None -> Not_constant
+      | Some uconst -> Constant uconst)
+  in
+  let join (prev : Classify.array) (elt : Classify.elt) : Classify.array =
+    match prev, elt with
+    | Init, Not_constant -> Not_constant
+    | Init, Constant item -> Constant_rev [item]
+    | Init, Jump (lbl, item) -> Jump_rev (lbl, [item])
+    | Not_constant, _ | _, Not_constant -> Not_constant
+    | Constant_rev items, Constant item -> Constant_rev (item :: items)
+    | Jump_rev (lbl, items), Jump (lbl', item) ->
+      if Cmm.equal_exit_label lbl lbl'
+      then Jump_rev (lbl, item :: items)
+      else Not_constant
+    | Constant_rev _, Jump _ | Jump_rev _, Constant _ -> Not_constant
+  in
+  let transl_constant_switch ~items_rev =
+    let const_actions = Array.of_list (List.rev items_rev) in
     match extract_affine ~cases ~const_actions with
     | Some (offset, slope) -> make_affine_computation ~offset ~slope arg dbg
-    | None -> make_table_lookup ~cases ~const_actions arg dbg)
+    | None -> make_table_lookup ~cases ~const_actions arg dbg
+  in
+  match
+    Array.fold_left
+      (fun acc elt -> join acc (classify elt))
+      Classify.Init actions
+  with
+  | Init -> Misc.fatal_error "Empty switch"
+  | Not_constant -> Cswitch (arg, cases, actions, dbg)
+  | Constant_rev items_rev -> transl_constant_switch ~items_rev
+  | Jump_rev (lbl, items_rev) ->
+    Cexit (lbl, [transl_constant_switch ~items_rev], [])
 
 module SArgBlocks = struct
   type primitive = operation
@@ -3897,12 +3962,12 @@ let intermediate_curry_functions ~nlocal ~arity result =
                         ~is_last:true,
                       dbg () ) ]
                 @ (if has_nary
-                  then
-                    [ Cconst_symbol
-                        ( global_symbol
-                            (name1 ^ "_" ^ Int.to_string (num + 1) ^ "_app"),
-                          dbg () ) ]
-                  else [])
+                   then
+                     [ Cconst_symbol
+                         ( global_symbol
+                             (name1 ^ "_" ^ Int.to_string (num + 1) ^ "_app"),
+                           dbg () ) ]
+                   else [])
                 @ value_slot_given_machtype args
                 @ [Cvar clos],
                 dbg () );
@@ -3913,39 +3978,39 @@ let intermediate_curry_functions ~nlocal ~arity result =
         }
       ::
       (if has_nary
-      then
-        let direct_args =
-          List.mapi
-            (fun i ty ->
-              V.create_local (Printf.sprintf "arg%d" (i + num + 2)), ty)
-            remaining_args
-        in
-        let fun_args =
-          List.map
-            (fun (arg, ty) -> VP.create arg, ty)
-            (direct_args @ [clos, typ_val])
-        in
-        let fun_name =
-          global_symbol (name1 ^ "_" ^ Int.to_string (num + 1) ^ "_app")
-        in
-        let fun_dbg = placeholder_fun_dbg ~human_name:fun_name in
-        let cf =
-          Cfunction
-            { fun_name;
-              fun_args;
-              fun_body =
-                make_curry_apply result narity
-                  (arg_type :: accumulated_args)
-                  (List.map (fun (arg, _) -> Cvar arg) direct_args)
-                  clos (num + 1);
-              fun_codegen_options = [];
-              fun_dbg;
-              fun_poll = Default_poll;
-              fun_ret_type = result
-            }
-        in
-        [cf]
-      else [])
+       then
+         let direct_args =
+           List.mapi
+             (fun i ty ->
+               V.create_local (Printf.sprintf "arg%d" (i + num + 2)), ty)
+             remaining_args
+         in
+         let fun_args =
+           List.map
+             (fun (arg, ty) -> VP.create arg, ty)
+             (direct_args @ [clos, typ_val])
+         in
+         let fun_name =
+           global_symbol (name1 ^ "_" ^ Int.to_string (num + 1) ^ "_app")
+         in
+         let fun_dbg = placeholder_fun_dbg ~human_name:fun_name in
+         let cf =
+           Cfunction
+             { fun_name;
+               fun_args;
+               fun_body =
+                 make_curry_apply result narity
+                   (arg_type :: accumulated_args)
+                   (List.map (fun (arg, _) -> Cvar arg) direct_args)
+                   clos (num + 1);
+               fun_codegen_options = [];
+               fun_dbg;
+               fun_poll = Default_poll;
+               fun_ret_type = result
+             }
+         in
+         [cf]
+       else [])
       @ loop (arg_type :: accumulated_args) remaining_args (num + 1)
   in
   loop [] arity 0
@@ -3980,12 +4045,13 @@ let addr_array_length arg dbg =
 
 let bbswap (bitwidth : Cmm.bswap_bitwidth) arg dbg =
   let op = Cbswap { bitwidth } in
-  if Proc.operation_supported op
-     && not
-          ((match bitwidth with
-           | Sixtyfour -> true
-           | Sixteen | Thirtytwo -> false)
-          && size_int < 8)
+  if
+    Proc.operation_supported op
+    && not
+         ((match bitwidth with
+            | Sixtyfour -> true
+            | Sixteen | Thirtytwo -> false)
+         && size_int < 8)
   then Cop (op, [arg], dbg)
   else
     let func, tyarg =
@@ -4206,21 +4272,7 @@ let fail_if_called_indirectly_function () =
     { sym_name = "caml_fail_if_called_indirectly_message"; sym_global = Local }
   in
   let string_data = emit_string_constant message_symbol message [] in
-  let fun_body =
-    Cop
-      ( Cextcall
-          { func = Cmm.caml_flambda2_invalid;
-            ty = Cmm.typ_void;
-            alloc = false;
-            ty_args = [XInt];
-            returns = false;
-            builtin = false;
-            effects = Arbitrary_effects;
-            coeffects = Has_coeffects
-          },
-        [Cconst_symbol (message_symbol, Debuginfo.none)],
-        Debuginfo.none )
-  in
+  let fun_body = Cinvalid { message; symbol = message_symbol } in
   let fn : Cmm.fundecl =
     { fun_name = fail_if_called_indirectly_sym;
       fun_args = [];
@@ -4461,7 +4513,7 @@ let letin v ~defining_expr ~body =
   | Cvar _ | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_symbol _ | Cconst_vec128 _ | Cconst_vec256 _ | Cconst_vec512 _
   | Clet _ | Cphantom_let _ | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _
-  | Cswitch _ | Ccatch _ | Cexit _ ->
+  | Cswitch _ | Ccatch _ | Cexit _ | Cinvalid _ ->
     Clet (v, defining_expr, body)
 
 let sequence x y =
@@ -4818,7 +4870,7 @@ let cmm_arith_size (e : Cmm.expression) =
     Some 0
   | Cop _ -> Some (cmm_arith_size0 e)
   | Clet _ | Cphantom_let _ | Ctuple _ | Csequence _ | Cifthenelse _ | Cswitch _
-  | Ccatch _ | Cexit _ ->
+  | Ccatch _ | Cexit _ | Cinvalid _ ->
     None
 
 (* Atomics *)
@@ -5165,6 +5217,8 @@ let dls_get ~dbg = Cop (Cdls_get, [], dbg)
 
 let tls_get ~dbg = Cop (Ctls_get, [], dbg)
 
+let domain_index ~dbg = Cop (Cdomain_index, [], dbg)
+
 let perform ~dbg eff =
   let cont =
     make_alloc dbg ~tag:Runtimetags.cont_tag
@@ -5179,24 +5233,58 @@ let perform ~dbg eff =
       [Cconst_symbol (sym, dbg); eff; cont],
       dbg )
 
-let run_stack ~dbg ~stack ~f ~arg =
-  (* Rc_normal would be fine here, but this is unlikely to ever be a tail call
-     (usages of this primitive shouldn't be generated in tail position), so we
-     use Rc_nontail for clarity. *)
+let with_stack ~dbg ~valuec ~exnc ~effc ~f ~arg =
   let sym = Cmm.global_symbol "caml_runstack" in
   Cop
-    ( Capply { result_type = typ_val; region = Rc_nontail; callees = Some [sym] },
-      [Cconst_symbol (sym, dbg); stack; f; arg],
+    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
+        Cop
+          ( Cextcall
+              { func = "caml_alloc_stack";
+                ty = typ_val;
+                alloc = true;
+                builtin = false;
+                returns = true;
+                effects = Arbitrary_effects;
+                coeffects = Has_coeffects;
+                ty_args = [XInt; XInt; XInt]
+              },
+            [valuec; exnc; effc],
+            dbg );
+        f;
+        arg ],
       dbg )
 
-let resume ~dbg ~stack ~f ~arg ~last_fiber =
+let with_stack_bind ~dbg ~valuec ~exnc ~effc ~dyn ~bind ~f ~arg =
+  let sym = Cmm.global_symbol "caml_runstack" in
+  Cop
+    ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
+      [ Cconst_symbol (Cmm.global_symbol "caml_runstack", dbg);
+        Cop
+          ( Cextcall
+              { func = "caml_alloc_stack_bind";
+                ty = typ_val;
+                alloc = true;
+                builtin = false;
+                returns = true;
+                effects = Arbitrary_effects;
+                coeffects = Has_coeffects;
+                ty_args = [XInt; XInt; XInt; XInt; XInt]
+              },
+            [valuec; exnc; effc; dyn; bind],
+            dbg );
+        f;
+        arg ],
+      dbg )
+
+let resume ~dbg ~cont ~f ~arg =
   (* Rc_normal is required here, because there are some uses of effects with
      repeated resumes, and these should consume O(1) stack space by tail-calling
      caml_resume. *)
   let sym = Cmm.global_symbol "caml_resume" in
   Cop
     ( Capply { result_type = typ_val; region = Rc_normal; callees = Some [sym] },
-      [Cconst_symbol (sym, dbg); stack; f; arg; last_fiber],
+      [Cconst_symbol (sym, dbg); cont; f; arg],
       dbg )
 
 let reperform ~dbg ~eff ~cont ~last_fiber =
@@ -5242,10 +5330,11 @@ module Scalar_type = struct
   end
 
   module Bit_width_and_signedness : sig
-    (** An integer with signedness [signedness t] that fits into a general-purpose
-        register. It is canonically stored in twos-complement representation, in the lower
-        [bits] bits of its container (whether that be memory or a register), and is sign-
-        or zero-extended to fill the entire container. *)
+    (** An integer with signedness [signedness t] that fits into a
+        general-purpose register. It is canonically stored in twos-complement
+        representation, in the lower [bits] bits of its container (whether that
+        be memory or a register), and is sign- or zero-extended to fill the
+        entire container. *)
     type t [@@immediate]
 
     val create_exn : bit_width:int -> signedness:Signedness.t -> t
@@ -5297,7 +5386,8 @@ module Scalar_type = struct
 
     let[@inline] unsigned t = with_signedness t ~signedness:Unsigned
 
-    (** Determines whether [dst] can represent every value of [src], preserving sign *)
+    (** Determines whether [dst] can represent every value of [src], preserving
+        sign *)
     let[@inline] can_cast_without_losing_information ~src ~dst =
       match signedness src, signedness dst with
       | Signed, Signed | Unsigned, Unsigned -> bit_width src <= bit_width dst
@@ -5332,8 +5422,9 @@ module Scalar_type = struct
     let nativeint = create_exn ~bit_width:arch_bits ~signedness:Signed
   end
 
-  (** An {!Integer.t} but with the additional stipulation that its container must
-      reserve its lowest bit to be 1. The [bit_width] field includes this bit. *)
+  (** An {!Integer.t} but with the additional stipulation that its container
+      must reserve its lowest bit to be 1. The [bit_width] field includes this
+      bit. *)
   module Tagged_integer = struct
     include Integral_type
 
@@ -5434,9 +5525,10 @@ module Scalar_type = struct
     | Float src, Float dst -> Float_width.static_cast ~dbg ~src ~dst exp
     | Integral src, Float dst ->
       let float_of_int_arg = Integral.nativeint in
-      if not
-           (Integral.can_cast_without_losing_information ~src
-              ~dst:float_of_int_arg)
+      if
+        not
+          (Integral.can_cast_without_losing_information ~src
+             ~dst:float_of_int_arg)
       then
         Misc.fatal_errorf "static_cast: casting %a to float is not implemented"
           Integral.print src

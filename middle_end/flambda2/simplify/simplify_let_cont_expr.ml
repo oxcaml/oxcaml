@@ -164,7 +164,7 @@ type rebuild_let_cont_data =
 
 (* Helpers *)
 
-let split_non_recursive_let_cont handler =
+let split_non_recursive_let_cont ~can_be_lifted handler =
   let cont, body =
     Non_recursive_let_cont_handler.pattern_match handler ~f:(fun cont ~body ->
         cont, body)
@@ -177,7 +177,8 @@ let split_non_recursive_let_cont handler =
   in
   ( body,
     Non_recursive_handler.create ~cont ~params ~handler
-      ~lifted_params:Lifted_cont_params.empty ~is_exn_handler ~is_cold )
+      ~lifted_params:Lifted_cont_params.empty ~is_exn_handler ~can_be_lifted
+      ~is_cold )
 
 let split_recursive_let_cont handlers =
   let invariant_params, body, rec_handlers =
@@ -277,19 +278,22 @@ let decide_param_usage_non_recursive ~free_names ~required_names
     Misc.fatal_errorf
       "The data_flow analysis marked the param %a@ as not required, but the \
        free_names indicate it is actually used:@ \n\
-       free_names = %a" BP.print param NO.print free_names;
+       free_names = %a"
+      BP.print param NO.print free_names;
   if is_used && Variable.Set.mem param_var removed_aliased
   then
     Misc.fatal_errorf
       "The alias analysis marked the param %a@ as removed, but the free_names \
        indicate it is actually used:@ \n\
-       free_names = %a" BP.print param NO.print free_names;
+       free_names = %a"
+      BP.print param NO.print free_names;
   if is_used then Used else Unused
 
 let decide_param_usage_recursive ~required_names ~invariant_set ~removed_aliased
     param : Apply_cont_rewrite.used =
-  if Name.Set.mem (BP.name param) required_names
-     && not (Variable.Set.mem (BP.var param) removed_aliased)
+  if
+    Name.Set.mem (BP.name param) required_names
+    && not (Variable.Set.mem (BP.var param) removed_aliased)
   then
     if Bound_parameter.Set.mem param invariant_set
     then Used_as_invariant
@@ -457,9 +461,9 @@ let rebuild_let_cont (data : rebuild_let_cont_data) ~after_rebuild body uacc =
           let remove_let_cont_leaving_handler =
             match RE.to_apply_cont body with
             | Some apply_cont -> (
-              if not
-                   (Continuation.equal cont
-                      (Apply_cont.continuation apply_cont))
+              if
+                not
+                  (Continuation.equal cont (Apply_cont.continuation apply_cont))
               then false
               else
                 match Apply_cont.args apply_cont with
@@ -708,12 +712,13 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
       (* TODO move to its own function *)
       let uenv =
         (* CR : factor this out in a separate function ? *)
-        if (* We must make the final decision now as to whether to inline this
-              continuation or not; we can't wait until
-              [Simplify_apply_cont.rebuild_apply_cont] because we need to decide
-              sooner than that whether to keep the [Let_cont] (in order to keep
-              free name sets correct). *)
-           is_single_inlinable_use
+        if
+          (* We must make the final decision now as to whether to inline this
+             continuation or not; we can't wait until
+             [Simplify_apply_cont.rebuild_apply_cont] because we need to decide
+             sooner than that whether to keep the [Let_cont] (in order to keep
+             free name sets correct). *)
+          is_single_inlinable_use
         then (
           (* Note that [Continuation_uses] won't set [is_single_inlinable_use]
              if [cont] is an exception handler. *)
@@ -739,8 +744,9 @@ let rebuild_single_non_recursive_handler ~at_unit_toplevel
                   let args = Apply_cont.args apply_cont in
                   Shortcut_to (Apply_cont.continuation apply_cont, args))
               | None ->
-                if RE.can_be_removed_as_invalid handler
-                     (UA.are_rebuilding_terms uacc)
+                if
+                  RE.can_be_removed_as_invalid handler
+                    (UA.are_rebuilding_terms uacc)
                 then Invalid
                 else Unknown
           in
@@ -869,9 +875,10 @@ let rec rebuild_continuation_handlers_loop ~rebuild_body
               match invariant_params with
               | None -> Some cont_invariant_params
               | Some invariant_params ->
-                if not
-                     (Bound_parameters.equal invariant_params
-                        cont_invariant_params)
+                if
+                  not
+                    (Bound_parameters.equal invariant_params
+                       cont_invariant_params)
                 then
                   Misc.fatal_errorf
                     "Inconsistent invariant params: invariant_params=%a@ \
@@ -1538,8 +1545,14 @@ and simplify_handlers ~simplify_expr ~down_to_up ~denv_for_join ~rebuild_body
   let previous_are_lifting_conts = DA.are_lifting_conts dacc in
   match data.handlers with
   | Non_recursive
-      ({ cont; params; lifted_params; handler; is_exn_handler; is_cold } as
-      original) -> (
+      ({ cont;
+         params;
+         lifted_params;
+         handler;
+         is_exn_handler;
+         is_cold;
+         can_be_lifted = _
+       } as original) -> (
     match
       Continuation_uses_env.get_continuation_uses body_continuation_uses_env
         cont
@@ -1703,22 +1716,29 @@ and after_downwards_traversal_of_body ~simplify_expr ~down_to_up
   let denv_for_join = data.denv_for_join in
   match DA.are_lifting_conts dacc with
   | Lifting_out_of { continuation = _ } ->
-    (* In this case, we have decided to lift the continuation being bound out of
-       its defining handler. Therefore we save the non-simplified version of the
-       continuation in the dacc, so that we can simplify during the `down_to_up`
-       later. *)
-    let params_to_lift =
-      DE.variables_defined_in_current_continuation denv_for_join
-    in
-    let handlers =
-      Original_handlers.add_params_to_lift data.handlers params_to_lift
-    in
-    let dacc = DA.add_lifted_continuation data.denv_for_join handlers dacc in
-    (* Restore lifted constants in dacc *)
-    let dacc =
-      DA.add_to_lifted_constant_accumulator dacc data.prior_lifted_constants
-    in
-    down_to_up dacc ~rebuild:rebuild_body
+    if not (Original_handlers.can_be_lifted data.handlers)
+    then
+      (* wrapper continuations are not lifted, and will be duplicated and
+         re-simplified for each specialized continuation, so we can just not
+         simplify their handler *)
+      down_to_up dacc ~rebuild:rebuild_body
+    else
+      (* In this case, we have decided to lift the continuation being bound out
+         of its defining handler. Therefore we save the non-simplified version
+         of the continuation in the dacc, so that we can simplify during the
+         `down_to_up` later. *)
+      let params_to_lift =
+        DE.variables_defined_in_current_continuation denv_for_join
+      in
+      let handlers =
+        Original_handlers.add_params_to_lift data.handlers params_to_lift
+      in
+      let dacc = DA.add_lifted_continuation data.denv_for_join handlers dacc in
+      (* Restore lifted constants in dacc *)
+      let dacc =
+        DA.add_to_lifted_constant_accumulator dacc data.prior_lifted_constants
+      in
+      down_to_up dacc ~rebuild:rebuild_body
   | Not_lifting | Analyzing _ ->
     simplify_handlers data dacc ~simplify_expr ~down_to_up ~denv_for_join
       ~rebuild_body
@@ -1783,7 +1803,8 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
       Original_handlers.bound_continuations data.handlers
     in
     DE.add_lifting_cost lifting_cost
-      (DE.define_continuations denv_for_body bound_continuations)
+      (DE.define_continuations denv_for_body bound_continuations
+         ~can_be_lifted:(Original_handlers.can_be_lifted data.handlers))
   in
   (* During specialization, we must take care of correctly handling let-bound
      continuations that have been lifted during the first downwards pass, and
@@ -1798,24 +1819,37 @@ let simplify_let_cont0 ~(simplify_expr : _ Simplify_common.expr_simplifier) dacc
     | Replayed continuation_mapping -> (
       match data.handlers with
       | Non_recursive non_rec_handler ->
-        let lifted_cont =
-          Continuation.Map.find non_rec_handler.cont continuation_mapping
-        in
-        let new_handler =
-          let args =
-            List.map
-              (fun bp -> Simple.var (Bound_parameter.var bp))
-              (Bound_parameters.to_list non_rec_handler.params)
+        if not non_rec_handler.can_be_lifted
+        then
+          (* wrapper continuations (such as the ones introduced for
+             over-applications), are not lifted, and are duplicated.
+
+             CR gbury: this might end up duplicating a fair bit of code, e.g. if
+             an application in a wrapper continuation (such as the ones
+             introduced for over-application wrapper continuations) is inlined.
+             The "correct" way to solve this is to either better handle symbols
+             introduced while simplifying downwards, or partially rebuild the
+             generic handler to use as base for the specialized handlers. *)
+          data.handlers
+        else
+          let lifted_cont =
+            Continuation.Map.find non_rec_handler.cont continuation_mapping
           in
-          let apply_cont =
-            Apply_cont.create lifted_cont ~dbg:Debuginfo.none ~args
+          let new_handler =
+            let args =
+              List.map
+                (fun bp -> Simple.var (Bound_parameter.var bp))
+                (Bound_parameters.to_list non_rec_handler.params)
+            in
+            let apply_cont =
+              Apply_cont.create lifted_cont ~dbg:Debuginfo.none ~args
+            in
+            Flambda.Expr.create_apply_cont apply_cont
           in
-          Flambda.Expr.create_apply_cont apply_cont
-        in
-        let new_non_rec_handler =
-          Non_recursive_handler.with_handler new_handler non_rec_handler
-        in
-        Original_handlers.create_non_recursive new_non_rec_handler
+          let new_non_rec_handler =
+            Non_recursive_handler.with_handler new_handler non_rec_handler
+          in
+          Original_handlers.create_non_recursive new_non_rec_handler
       | Recursive { invariant_params; lifted_params; continuation_handlers } ->
         assert (Lifted_cont_params.is_empty lifted_params);
         let continuation_handlers =
@@ -1861,8 +1895,10 @@ let simplify_let_cont ~simplify_expr dacc let_cont ~down_to_up =
      call [simplify_let_cont_stage1]. *)
   let body, handlers =
     match (let_cont : Let_cont.t) with
-    | Non_recursive { handler; _ } ->
-      let body, non_rec_handler = split_non_recursive_let_cont handler in
+    | Non_recursive { handler; can_be_lifted; _ } ->
+      let body, non_rec_handler =
+        split_non_recursive_let_cont ~can_be_lifted handler
+      in
       let original_handlers =
         Original_handlers.create_non_recursive non_rec_handler
       in

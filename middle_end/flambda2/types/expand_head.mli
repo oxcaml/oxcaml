@@ -62,6 +62,8 @@ module Expanded_type : sig
 
   val is_unknown : t -> bool
 
+  val is_unknown_maybe_null : t -> bool
+
   val to_type : t -> Type_grammar.t
 
   type descr = private
@@ -122,6 +124,8 @@ val expand_head0 :
 val is_bottom : Typing_env.t -> Type_grammar.t -> bool
 
 val is_unknown : Typing_env.t -> Type_grammar.t -> bool
+
+val is_unknown_maybe_null : Typing_env.t -> Type_grammar.t -> bool
 
 val is_alias_to_a_symbol : Type_grammar.t -> bool
 

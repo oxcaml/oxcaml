@@ -81,8 +81,8 @@ val gdwarf_may_alter_codegen_experimental : bool ref
 
 (** Setting this to [true] will emit sufficient DWARF to get inlined frame
     information, but won't emit information e.g. about local variables (unless
-    [restrict_to_upstream_dwarf] is set to [false], although that implies
-    this variable being set to [true]). *)
+    [restrict_to_upstream_dwarf] is set to [false], although that implies this
+    variable being set to [true]). *)
 val dwarf_inlined_frames : bool ref
 
 val default_gdwarf_compression : string
@@ -93,25 +93,23 @@ val ddwarf_metrics : bool ref
 
 val ddwarf_metrics_output_file : string option ref
 
-(** Get the DWARF compression flag to pass to the C toolchain.
-    Returns a flag of the form " -gz=<compression>" (note the leading space).
-    Returns an empty string if compression is not enabled.
-    Note: The -gz= option is common between GCC and Clang, unlike
-    --compress-debug-sections.
-    See: https://maskray.me/blog/2022-01-23-compressed-debug-sections *)
+(** Get the DWARF compression flag to pass to the C toolchain. Returns a flag of
+    the form " -gz=<compression>" (note the leading space). Returns an empty
+    string if compression is not enabled. Note: The -gz= option is common
+    between GCC and Clang, unlike --compress-debug-sections. See:
+    https://maskray.me/blog/2022-01-23-compressed-debug-sections *)
 val get_dwarf_c_toolchain_flag : unit -> string
 
-(** Get the DWARF compression flag to pass to the assembler.
-    Similar to get_dwarf_c_toolchain_flag but uses the assembler-specific flag.
-    Returns a string with a leading space if not empty. *)
+(** Get the DWARF compression flag to pass to the assembler. Similar to
+    get_dwarf_c_toolchain_flag but uses the assembler-specific flag. Returns a
+    string with a leading space if not empty. *)
 val get_dwarf_as_toolchain_flag : unit -> string
 
-(** Get the DWARF compression format to use.
-    Returns Some compression if compression is enabled and not "none" or empty.
-    Returns None otherwise. *)
+(** Get the DWARF compression format to use. Returns Some compression if
+    compression is enabled and not "none" or empty. Returns None otherwise. *)
 val get_dwarf_compression_format : unit -> string option
 
-(** Get the DWARF compression format to use with objcopy.
-    Returns Some compression only if compression is enabled and objcopy supports it.
-    Returns None otherwise. *)
+(** Get the DWARF compression format to use with objcopy. Returns Some
+    compression only if compression is enabled and objcopy supports it. Returns
+    None otherwise. *)
 val get_dwarf_objcopy_compression_format : unit -> string option

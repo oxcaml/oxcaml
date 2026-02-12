@@ -45,7 +45,7 @@ end
 
 module Default_jit = struct
   let jit_load ~phrase_name fmt prog : _ Result.t =
-    match Jit.jit_load ~phrase_name fmt prog with
+    match Jit.jit_load_program ~phrase_name fmt prog with
     | Result obj -> Ok obj
     | Exception exn -> Error exn
 
@@ -199,17 +199,17 @@ let eval code =
       !cmxs
   in
   (if not !use_existing_compilerlibs_state_for_artifacts
-  then
-    Persistent_env.Persistent_signature.load
-      := fun ~allow_hidden:_ ~unit_name ->
-           Option.map
-             (fun cmi ->
-               { Persistent_env.Persistent_signature.filename =
-                   Compilation_unit.Name.to_string unit_name;
-                 cmi;
-                 visibility = Visible
-               })
-             (Compilation_unit.Name.Map.find_opt unit_name !cmis));
+   then
+     Persistent_env.Persistent_signature.load
+       := fun ~allow_hidden:_ ~unit_name ->
+            Option.map
+              (fun cmi ->
+                { Persistent_env.Persistent_signature.filename =
+                    Compilation_unit.Name.to_string unit_name;
+                  cmi;
+                  visibility = Visible
+                })
+              (Compilation_unit.Name.Map.find_opt unit_name !cmis));
   let env = Compmisc.initial_env () in
   let typed_impl =
     Typemod.type_implementation unit_info compilation_unit env ast

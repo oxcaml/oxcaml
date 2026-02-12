@@ -148,3 +148,201 @@ Error: Signature mismatch:
        The left-hand side is "nonportable"
        but the right-hand side is "portable".
 |}]
+
+(* nested default modalities on different axes *)
+module type S = sig @@ portable
+    val bar : 'a -> 'a
+    module M : sig @@ contended
+        val foo : 'a -> 'a
+    end
+end
+[%%expect{|
+module type S =
+  sig
+    val bar : 'a -> 'a @@ portable
+    module M : sig val foo : 'a -> 'a @@ portable contended end
+  end
+|}]
+
+(* nested default modalities on the same axis *)
+module type S = sig @@ portable
+    val bar : 'a -> 'a
+    module M : sig @@ nonportable
+        val foo : 'a -> 'a
+    end
+end
+[%%expect{|
+module type S =
+  sig
+    val bar : 'a -> 'a @@ portable
+    module M : sig val foo : 'a -> 'a @@ portable end
+  end
+|}]
+
+(* CR modes: fix nested signatures overriding. Internal ticket 6301. *)
+(* two nested signatures with defaults + val overriding outer default *)
+module type S = sig @@ portable
+    val outer : 'a -> 'a
+    module M : sig @@ contended
+        val inner : 'a -> 'a
+        val inner_override : 'a -> 'a @@ nonportable
+    end
+end
+[%%expect{|
+module type S =
+  sig
+    val outer : 'a -> 'a @@ portable
+    module M :
+      sig
+        val inner : 'a -> 'a @@ portable contended
+        val inner_override : 'a -> 'a @@ portable contended
+      end
+  end
+|}]
+
+(* two nested signatures with defaults + val overriding inner default *)
+module type S = sig @@ portable
+    val outer : 'a -> 'a
+    module M : sig @@ contended
+        val inner : 'a -> 'a
+        val inner_override : 'a -> 'a @@ uncontended
+    end
+end
+[%%expect{|
+module type S =
+  sig
+    val outer : 'a -> 'a @@ portable
+    module M :
+      sig
+        val inner : 'a -> 'a @@ portable contended
+        val inner_override : 'a -> 'a @@ portable
+      end
+  end
+|}]
+
+(* default modality on one axis + explicit modality on val on another axis *)
+module type S = sig @@ portable
+    val foo : 'a -> 'a @@ contended
+    val bar : 'a -> 'a
+end
+[%%expect{|
+module type S =
+  sig
+    val foo : 'a -> 'a @@ portable contended
+    val bar : 'a -> 'a @@ portable
+  end
+|}]
+
+(* default modality on one axis + explicit modality on val on the same axis *)
+module type S = sig @@ portable
+    val foo : 'a -> 'a @@ nonportable
+    val bar : 'a -> 'a
+end
+[%%expect{|
+module type S = sig val foo : 'a -> 'a val bar : 'a -> 'a @@ portable end
+|}]
+
+(* Testing implications. *)
+
+(* default global, val local *)
+module type S = sig @@ global
+    val foo : 'a -> 'a @@ local
+    val bar : 'a -> 'a
+end
+[%%expect{|
+module type S =
+  sig val foo : 'a -> 'a @@ aliased val bar : 'a -> 'a @@ global end
+|}]
+
+(* default global, val unforkable *)
+module type S = sig @@ global
+    val foo : 'a -> 'a @@ unforkable
+    val bar : 'a -> 'a
+end
+[%%expect{|
+module type S =
+  sig
+    val foo : 'a -> 'a @@ global unforkable
+    val bar : 'a -> 'a @@ global
+  end
+|}]
+
+(* default global unforkable, val global *)
+module type S = sig @@ global unforkable
+    val foo : 'a -> 'a @@ global
+    val bar : 'a -> 'a
+end
+[%%expect{|
+module type S =
+  sig
+    val foo : 'a -> 'a @@ global
+    val bar : 'a -> 'a @@ global unforkable
+  end
+|}]
+
+(* default global unforkable, val local *)
+module type S = sig @@ global unforkable
+    val foo : 'a -> 'a @@ local
+    val bar : 'a -> 'a
+end
+[%%expect{|
+module type S =
+  sig
+    val foo : 'a -> 'a @@ aliased
+    val bar : 'a -> 'a @@ global unforkable
+  end
+|}]
+
+(* default global unforkable, val forkable *)
+module type S = sig @@ global unforkable
+    val foo : 'a -> 'a @@ forkable
+    val bar : 'a -> 'a
+end
+[%%expect{|
+module type S =
+  sig
+    val foo : 'a -> 'a @@ global
+    val bar : 'a -> 'a @@ global unforkable
+  end
+|}]
+
+(* default local, val global *)
+module type S = sig @@ local
+    val foo : 'a -> 'a @@ global
+    val bar : 'a -> 'a
+end
+[%%expect{|
+module type S = sig val foo : 'a -> 'a @@ global val bar : 'a -> 'a end
+|}]
+
+(* default unforkable, val global *)
+module type S = sig @@ unforkable
+    val foo : 'a -> 'a @@ global
+    val bar : 'a -> 'a
+end
+[%%expect{|
+module type S = sig val foo : 'a -> 'a @@ global val bar : 'a -> 'a end
+|}]
+
+(* default forkable, val global *)
+module type S = sig @@ forkable
+    val foo : 'a -> 'a @@ global
+    val bar : 'a -> 'a
+end
+[%%expect{|
+module type S =
+  sig val foo : 'a -> 'a @@ global val bar : 'a -> 'a @@ forkable end
+|}]
+
+(* default forkable, val global unforkable *)
+module type S = sig @@ forkable
+    val foo : 'a -> 'a @@ global unforkable
+    val bar : 'a -> 'a
+end
+[%%expect{|
+module type S =
+  sig
+    val foo : 'a -> 'a @@ global unforkable
+    val bar : 'a -> 'a @@ forkable
+  end
+|}]

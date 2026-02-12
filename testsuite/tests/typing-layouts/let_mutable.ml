@@ -1,29 +1,21 @@
 (* TEST
- reference = "${test_source_directory}/let_mutable.reference";
  include stdlib_upstream_compatible;
  include stdlib_stable;
  flambda2;
  {
    flags = "-extension let_mutable";
-   native;
- }{
-   flags = "-extension let_mutable";
-   bytecode;
+   { expect; expect.opt; }
  }{
    flags = "-extension layouts_alpha -extension let_mutable";
-   native;
- }{
-   flags = "-extension layouts_alpha -extension let_mutable";
-   bytecode;
+   { expect; expect.opt; }
  }{
    flags = "-extension layouts_beta -extension let_mutable";
-   native;
- }{
-   flags = "-extension layouts_beta -extension let_mutable";
-   bytecode;
+   { expect; expect.opt; }
  }*)
 
-open Stdlib_upstream_compatible
+module Int64_u = Stdlib_upstream_compatible.Int64_u
+module Int32_u = Stdlib_upstream_compatible.Int32_u
+module Float_u = Stdlib_upstream_compatible.Float_u
 module Float32_u = Stdlib_stable.Float32_u
 
 let triangle_f64 n =
@@ -33,8 +25,15 @@ let triangle_f64 n =
   done;
   sum
 
-let () = Printf.printf "%.2f\n" (triangle_f64 10 |> Float_u.to_float)
-
+let _ = triangle_f64 10 |> Float_u.to_float
+[%%expect{|
+module Int64_u = Stdlib_upstream_compatible.Int64_u
+module Int32_u = Stdlib_upstream_compatible.Int32_u
+module Float_u = Stdlib_upstream_compatible.Float_u
+module Float32_u = Stdlib_stable.Float32_u
+val triangle_f64 : int -> Float_u.t = <fun>
+- : float = 55.
+|}]
 
 let triangle_f32 n =
   let mutable sum = #0.0s in
@@ -43,10 +42,11 @@ let triangle_f32 n =
   done;
   sum
 
-let () =
-  Printf.printf "%.2f\n"
-    (triangle_f32 10 |> Float32_u.to_float |> Float_u.to_float)
-
+let _ = triangle_f32 10 |> Float32_u.to_float |> Float_u.to_float
+[%%expect{|
+val triangle_f32 : int -> Float32_u.t = <fun>
+- : float = 55.
+|}]
 
 let triangle_i64 n =
   let mutable sum = #0L in
@@ -55,8 +55,11 @@ let triangle_i64 n =
   done;
   sum
 
-let () = Printf.printf "%d\n" (triangle_i64 10 |> Int64_u.to_int)
-
+let _ = triangle_i64 10 |> Int64_u.to_int
+[%%expect{|
+val triangle_i64 : int -> Int64_u.t = <fun>
+- : int = 55
+|}]
 
 let triangle_i32 n =
   let mutable sum = #0l in
@@ -65,7 +68,11 @@ let triangle_i32 n =
   done;
   sum
 
-let () = Printf.printf "%d\n" (triangle_i32 10 |> Int32_u.to_int)
+let _ = triangle_i32 10 |> Int32_u.to_int
+[%%expect{|
+val triangle_i32 : int -> Int32_u.t = <fun>
+- : int = 55
+|}]
 
 let triangle_i64_i32_f64 n =
   let mutable sum = #(#0L, #(#0l, #0.)) in
@@ -77,8 +84,11 @@ let triangle_i64_i32_f64 n =
   done;
   sum
 
-let () =
+let _ =
   let #(a, #(b, c)) = triangle_i64_i32_f64 10 in
-  Printf.printf "%d %d %.2f\n" (Int64_u.to_int a)
-                               (Int32_u.to_int b)
-                               (Float_u.to_float c)
+  (Int64_u.to_int a, Int32_u.to_int b, Float_u.to_float c)
+[%%expect{|
+val triangle_i64_i32_f64 : int -> #(Int64_u.t * #(Int32_u.t * Float_u.t)) =
+  <fun>
+- : int * int * float = (55, 55, 55.)
+|}]

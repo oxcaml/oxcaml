@@ -42,41 +42,37 @@ let make_arg_descr ~param ~arg_block_idx ~main_repr : Lambda.arg_descr option =
 let slambda_to_jsir i slambda ~as_arg_for =
   slambda
   |> Profile.(record ~accumulate:true generate) (fun (program : SL.program) ->
-         Builtin_attributes.warn_unused ();
-         program
-         |> print_if i.ppf_dump Clflags.dump_slambda Printslambda.program
-         |> Slambdaeval.eval
-         |> fun (program : Lambda.program) ->
-         program.code
-         |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
-         |> Simplif.simplify_lambda ~restrict_to_upstream_dwarf:true
-              ~gdwarf_may_alter_codegen:false
-         |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
-         |> fun lambda ->
-         let arg_descr =
-           make_arg_descr ~param:as_arg_for ~arg_block_idx:program.arg_block_idx
-             ~main_repr:
-               (Lambda.main_module_representation
-                  program.main_module_block_format)
-         in
-         lambda |> fun code ->
-         Flambda2.lambda_to_flambda ~machine_width:Thirty_two_no_gc_tag_bit
-           ~ppf_dump:i.ppf_dump
-           ~prefixname:(Unit_info.prefix i.target)
-           { program with code }
-         |> fun (flambda_result : Flambda2.flambda_result) ->
-         let jsir =
-           Flambda2_to_jsir.To_jsir.unit ~offsets:flambda_result.offsets
-             ~all_code:flambda_result.all_code
-             ~reachable_names:flambda_result.reachable_names
-             flambda_result.flambda
-           |> print_if i.ppf_dump Clflags.dump_jsir
-                (fun ppf (jsir : Flambda2_to_jsir.To_jsir_result.program) ->
-                  Jsoo_imports.Code.Print.program ppf
-                    (fun _ _ -> "")
-                    jsir.program)
-         in
-         (jsir, program.main_module_block_format, arg_descr))
+      Builtin_attributes.warn_unused ();
+      program
+      |> print_if i.ppf_dump Clflags.dump_slambda Printslambda.program
+      |> Slambdaeval.eval
+      |> fun (program : Lambda.program) ->
+      program.code
+      |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
+      |> Simplif.simplify_lambda ~restrict_to_upstream_dwarf:true
+           ~gdwarf_may_alter_codegen:false
+      |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
+      |> fun lambda ->
+      let arg_descr =
+        make_arg_descr ~param:as_arg_for ~arg_block_idx:program.arg_block_idx
+          ~main_repr:
+            (Lambda.main_module_representation program.main_module_block_format)
+      in
+      lambda |> fun code ->
+      Flambda2.lambda_to_flambda ~machine_width:Thirty_two_no_gc_tag_bit
+        ~ppf_dump:i.ppf_dump
+        ~prefixname:(Unit_info.prefix i.target)
+        { program with code }
+      |> fun (flambda_result : Flambda2.flambda_result) ->
+      let jsir =
+        Flambda2_to_jsir.To_jsir.unit ~offsets:flambda_result.offsets
+          ~all_code:flambda_result.all_code
+          ~reachable_names:flambda_result.reachable_names flambda_result.flambda
+        |> print_if i.ppf_dump Clflags.dump_jsir
+             (fun ppf (jsir : Flambda2_to_jsir.To_jsir_result.program) ->
+               Jsoo_imports.Code.Print.program ppf (fun _ _ -> "") jsir.program)
+      in
+      (jsir, program.main_module_block_format, arg_descr))
 
 let emit_jsir i
     ({ program; imported_compilation_units } :

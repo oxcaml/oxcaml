@@ -39,8 +39,12 @@ let instruction ppf = function
       List.iter (fun lbl -> fprintf ppf " %i" lbl) lbls;
       fprintf ppf ", %i" n
   | Koffsetclosure n -> fprintf ppf "\toffsetclosure %i" n
-  | Kgetglobal cu -> fprintf ppf "\tgetglobal %a" Compilation_unit.print cu
-  | Ksetglobal cu -> fprintf ppf "\tsetglobal %a" Compilation_unit.print cu
+  | Kgetglobal cu ->
+      fprintf ppf "\tgetglobal %a"
+        (Format_doc.compat Compilation_unit.print) cu
+  | Ksetglobal cu ->
+      fprintf ppf "\tsetglobal %a"
+        (Format_doc.compat Compilation_unit.print) cu
   | Kgetpredef id -> fprintf ppf "\tgetpredef %a" Ident.print id
   | Kconst cst ->
       fprintf ppf "@[<10>\tconst@ %a@]" Printlambda.structured_constant cst
@@ -107,6 +111,8 @@ let instruction ppf = function
   | Kresume -> fprintf ppf "\tresume"
   | Kresumeterm n -> fprintf ppf "\tresumeterm %i" n
   | Kreperformterm n -> fprintf ppf "\treperformterm %i" n
+  | Kwith_stack -> fprintf ppf "\twith_stack"
+  | Kwith_stack_bind -> fprintf ppf "\twith_stack_bind"
   | Kstop -> fprintf ppf "\tstop"
   | Kevent ev -> fprintf ppf "\tevent \"%s\" %i-%i"
                          ev.ev_loc.Location.loc_start.Lexing.pos_fname

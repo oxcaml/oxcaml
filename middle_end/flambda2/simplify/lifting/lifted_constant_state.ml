@@ -218,33 +218,33 @@ let sort0 t =
     |> SCC_lifted_constants
        .stable_connected_components_sorted_from_roots_to_leaf
     |> ArrayLabels.map ~f:(fun (group : SCC_lifted_constants.component) ->
-           let code_id_or_symbols =
-             match group with
-             | No_loop code_id_or_symbol -> [code_id_or_symbol]
-             | Has_loop code_id_or_symbols -> code_id_or_symbols
-           in
-           let _, lifted_constants =
-             ListLabels.fold_left code_id_or_symbols ~init:(CIS.Set.empty, [])
-               ~f:(fun ((already_seen, definitions) as acc) code_id_or_symbol ->
-                 if CIS.Set.mem code_id_or_symbol already_seen
-                 then acc
-                 else
-                   let lifted_constant =
-                     CIS.Map.find code_id_or_symbol code_id_or_symbol_to_const
-                   in
-                   let already_seen =
-                     (* We may encounter the same defining expression more than
-                        once, in the case of sets of closures, which may bind
-                        more than one symbol. We must avoid duplicates in the
-                        resulting [LC.t]. *)
-                     let bound_static = LC.bound_static lifted_constant in
-                     CIS.Set.union
-                       (Bound_static.everything_being_defined bound_static)
-                       already_seen
-                   in
-                   already_seen, lifted_constant :: definitions)
-           in
-           LC.concat lifted_constants)
+        let code_id_or_symbols =
+          match group with
+          | No_loop code_id_or_symbol -> [code_id_or_symbol]
+          | Has_loop code_id_or_symbols -> code_id_or_symbols
+        in
+        let _, lifted_constants =
+          ListLabels.fold_left code_id_or_symbols ~init:(CIS.Set.empty, [])
+            ~f:(fun ((already_seen, definitions) as acc) code_id_or_symbol ->
+              if CIS.Set.mem code_id_or_symbol already_seen
+              then acc
+              else
+                let lifted_constant =
+                  CIS.Map.find code_id_or_symbol code_id_or_symbol_to_const
+                in
+                let already_seen =
+                  (* We may encounter the same defining expression more than
+                     once, in the case of sets of closures, which may bind more
+                     than one symbol. We must avoid duplicates in the resulting
+                     [LC.t]. *)
+                  let bound_static = LC.bound_static lifted_constant in
+                  CIS.Set.union
+                    (Bound_static.everything_being_defined bound_static)
+                    already_seen
+                in
+                already_seen, lifted_constant :: definitions)
+        in
+        LC.concat lifted_constants)
   in
   { innermost_first }
 

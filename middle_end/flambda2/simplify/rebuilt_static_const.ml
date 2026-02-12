@@ -305,9 +305,10 @@ let make_code_deleted t ~if_code_id_is_member_of =
       else t)
   | Block_not_rebuilt _ | Set_of_closures_not_rebuilt _ -> t
   | Code_not_rebuilt code ->
-    if Code_id.Set.mem
-         (Non_constructed_code.code_id code)
-         if_code_id_is_member_of
+    if
+      Code_id.Set.mem
+        (Non_constructed_code.code_id code)
+        if_code_id_is_member_of
     then deleted_code
     else t
 

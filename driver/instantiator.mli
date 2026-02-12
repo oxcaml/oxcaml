@@ -79,4 +79,4 @@ type error =
 
 exception Error of error
 
-val report_error: Format.formatter -> error -> unit
+val report_error: Format_doc.formatter -> error -> unit

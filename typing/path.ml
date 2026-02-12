@@ -136,12 +136,12 @@ let rec name ?(paren=kfalse) = function
 let rec print ppf = function
   | Pident id -> Ident.print_with_scope ppf id
   | Pdot(p, s) | Pextra_ty (p, Pcstr_ty s) ->
-      Format.fprintf ppf "%a.%s" print p s
-  | Papply(p1, p2) -> Format.fprintf ppf "%a(%a)" print p1 print p2
+      Format_doc.fprintf ppf "%a.%s" print p s
+  | Papply(p1, p2) -> Format_doc.fprintf ppf "%a(%a)" print p1 print p2
   | Pextra_ty (p, Pext_ty) -> print ppf p
   | Pextra_ty (p, Punboxed_ty) ->
     match p with
-    | Pident id -> Format.fprintf ppf "%a#" Ident.print_with_scope id
+    | Pident id -> Format_doc.fprintf ppf "%a#" Ident.print_with_scope id
     | Pdot (p, s) -> print ppf (Pdot (p, s ^ "#"))
     | Papply _ | Pextra_ty _ ->
       Misc.fatal_error "Path.print"

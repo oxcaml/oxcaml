@@ -29,13 +29,13 @@ let empty = []
 
 let create params =
   (if Flambda_features.check_invariants ()
-  then
-    let params_set = BP.Set.of_list params in
-    if List.length params <> BP.Set.cardinal params_set
-    then
-      Misc.fatal_errorf
-        "Names provided to [Bound_parameters.create] must be disjoint:@ %a"
-        print params);
+   then
+     let params_set = BP.Set.of_list params in
+     if List.length params <> BP.Set.cardinal params_set
+     then
+       Misc.fatal_errorf
+         "Names provided to [Bound_parameters.create] must be disjoint:@ %a"
+         print params);
   params
 
 let cons param t = create (param :: t)

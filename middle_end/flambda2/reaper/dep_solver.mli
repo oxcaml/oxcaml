@@ -29,6 +29,12 @@ val print_unboxed_fields :
   'a unboxed_fields ->
   unit
 
+val fold_unboxed_with_kind :
+  (Flambda_kind.t -> 'a -> 'b -> 'b) ->
+  'a unboxed_fields Field.Map.t ->
+  'b ->
+  'b
+
 type unboxed = Variable.t unboxed_fields Field.Map.t
 
 type changed_representation =
@@ -53,16 +59,14 @@ val has_source : result -> Code_id_or_name.t -> bool
 
 val field_used : result -> Code_id_or_name.t -> Field.t -> bool
 
-val cofield_has_use : result -> Code_id_or_name.t -> Cofield.t -> bool
-
 val not_local_field_has_source : result -> Code_id_or_name.t -> Field.t -> bool
 
 (** Color of node when producing the graph as a .dot *)
 val print_color : result -> Code_id_or_name.t -> string
 
-(** [rewrite_kind_with_subkind result var kind_with_subkind]
-    For [kind_with_subkind] the kind associated to variable [var],
-    removes the subkinds on the parts that are not used in [result]. *)
+(** [rewrite_kind_with_subkind result var kind_with_subkind] For
+    [kind_with_subkind] the kind associated to variable [var], removes the
+    subkinds on the parts that are not used in [result]. *)
 val rewrite_kind_with_subkind :
   result -> Name.t -> Flambda_kind.With_subkind.t -> Flambda_kind.With_subkind.t
 (* CR pchambart: rename to remove_unused_part_of_subkind or something like
@@ -76,10 +80,21 @@ val code_id_actually_directly_called :
 val rewrite_typing_env :
   result -> unit_symbol:Symbol.t -> typing_env -> typing_env
 
+type keep_or_delete =
+  | Keep
+  | Delete
+
 val rewrite_result_types :
   result ->
   old_typing_env:typing_env ->
-  Variable.t list ->
-  Variable.t list ->
+  my_closure:Variable.t ->
+  params:(Variable.t * keep_or_delete) list ->
+  results:(Variable.t * keep_or_delete) list ->
   Result_types.t ->
   Result_types.t
+
+val arguments_used_by_known_arity_call :
+  result -> Code_id_or_name.t -> 'a list -> ('a * keep_or_delete) list
+
+val arguments_used_by_unknown_arity_call :
+  result -> Code_id_or_name.t -> 'a list list -> ('a * keep_or_delete) list list

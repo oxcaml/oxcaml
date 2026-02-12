@@ -434,7 +434,11 @@ let int_regs_destroyed_at_c_call_win64 =
   if Config.runtime5 then [|0;1;4;5;6;7;10;11;12|] else [|0;4;5;6;7;10;11|]
 
 let int_regs_destroyed_at_c_call =
-  if Config.runtime5 then [|0;1;2;3;4;5;6;7;10;11|] else [|0;2;3;4;5;6;7;10;11|]
+  if Config.runtime5 && not Config.no_stack_checks then
+    (* Clobbers r13 (9) to hold stack pointer. See emit.ml *)
+    [|0;2;3;4;5;6;7;9;10;11|]
+  else
+    [|0;2;3;4;5;6;7;10;11|]
 
 let destroyed_at_c_call_win64 =
   (* Win64: rbx, rbp, rsi, rdi, r12-r15, xmm6-xmm15 preserved *)
@@ -626,7 +630,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
        | Specific (Ilea _ | Ioffset_loc _ | Ibswap _
                   | Isextend32 | Izextend32
                   | Ilfence | Isfence | Imfence)
-       | Name_for_debugger _ | Dls_get | Tls_get | Pause)
+       | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Pause)
   | Poptrap _ | Prologue | Epilogue ->
     if fp then [| rbp |] else [||]
   | Stack_check _ ->
@@ -652,6 +656,9 @@ let destroyed_at_terminator (terminator : Cfg_intf.S.terminator) =
                           stack_ofs; stack_align = _; effects = _; }; _} ->
     assert (stack_ofs >= 0);
     if alloc || stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
+  | Invalid { message = _; stack_ofs; stack_align = _; label_after = _ } ->
+    assert (stack_ofs >= 0);
+    if stack_ofs > 0 then all_phys_regs else destroyed_at_c_call
   | Call {op = Indirect _ | Direct _; _} -> all_phys_regs
 
 (* CR-soon xclerc for xclerc: consider having more destruction points.
@@ -669,12 +676,15 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
     false
   | Switch _ ->
     false
-  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _; _ }
-  | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _; _ }; _} ->
+  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
+                     stack_ofs; stack_align = _; effects = _; }
+  | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
+                          stack_ofs; stack_align = _; effects = _; }; _} ->
     if more_destruction_points then
       true
     else
-      if alloc then true else false
+      if alloc || stack_ofs > 0 then true else false
+  | Invalid _ -> more_destruction_points
   | Call {op = Indirect _ | Direct _; _} ->
     true
 
@@ -768,6 +778,7 @@ let operation_supported = function
   | Ctuple_field _
   | Cdls_get
   | Ctls_get
+  | Cdomain_index
   | Cpoll
   | Cpause
   | Creinterpret_cast (Int_of_value | Value_of_int |
@@ -785,7 +796,7 @@ let expression_supported = function
   | Cconst_int _ | Cconst_natint _ | Cconst_float32 _ | Cconst_float _
   | Cconst_vec128 _ | Cconst_symbol _  | Cvar _ | Clet _ | Cphantom_let _
   | Ctuple _ | Cop _ | Csequence _ | Cifthenelse _ | Cswitch _ | Ccatch _
-  | Cexit _ -> true
+  | Cexit _ | Cinvalid _ -> true
   | Cconst_vec256 _ -> Arch.Extension.enabled_vec256 ()
   | Cconst_vec512 _ -> Arch.Extension.enabled_vec512 ()
 

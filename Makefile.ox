@@ -7,7 +7,7 @@ ifeq ($(shell test -x '$(DUNE)' || echo fail), fail)
   $(error Dune not found. Run ./configure --with-dune=/path/to/dune.exe (See HACKING.ox))
 endif
 
-dune = $(DUNE)
+dune = $(opam_exec) $(DUNE)
 
 ifeq ($(shell which ocamlopt >& /dev/null || echo fail), fail)
   $(error ocamlopt not found. See HACKING.ox)

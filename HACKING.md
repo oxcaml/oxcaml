@@ -56,17 +56,18 @@ In the event that one needs to rebase a patch over formatting changes, here is a
 Assuming a specific formatting commit:
 ```shell
 # main formatting commit for flambda2/ in the repository
-format_commit=331c16734636a218261d4835fb77b38c5788f50a
+format_commit=first-ocamlformat.0.28.1
+previous_commit=last-ocamlformat.0.24.1 # or $format_commit~1
 ```
 
 Rebase as usual until its parent:
 ```shell
-git rebase $format_commit~1
+git rebase $previous_commit
 ```
 
 Then rebase once more on the commit itself:
 ```shell
-git rebase $format_commit -Xtheirs --exec 'make fmt && git commit -a --amend --no-edit'
+git rebase $format_commit -Xtheirs --exec 'make fmt || git commit -a --amend --no-edit'
 ```
 Each commit will be amended with formatting. Any conflict appearing can be resolved automatically by choosing our side (hence, `theirs` on a rebase, surprisingly enough). This is correct assuming the commit contains no semantic changes.
 
@@ -80,7 +81,7 @@ Depending on the initial changes, it might be necessary to do this multiple time
 ## Rebuilding during dev work
 
 To rebuild after making changes, you can just type `make`. You need to
-have a working OCaml 4.14 or 4.14.1 compiler on your PATH before doing so,
+have a working OCaml 5.4.0 compiler on your PATH before doing so,
 e.g. installed via OPAM. You also need to have dune and menhir.
 
 `menhir` should be pinned to a specific version: `opam pin add menhir 20231231`.
@@ -302,8 +303,8 @@ for the first stage.
 This is still under development, but should work!
 ```shell
 opam repo add oxcaml git+https://github.com/chambart/opam-repository-js.git#with-extensions
-opam switch create 5.2.0+flambda2 --repos oxcaml,default
-eval $(opam env --switch=5.2.0+flambda2)
+opam switch create 5.2.0+oxcaml --repos oxcaml,default
+eval $(opam env --switch=5.2.0+oxcaml)
 ```
 
 ## Testing the compiler built locally with OPAM (old method)
@@ -327,7 +328,7 @@ thoroughly (e.g. `git clean -dfX`) before reconfiguring with a different prefix.
 
 Then build the compiler with the command `make _install` (this is the default
 target plus some setup in preparation for installation). As usual when building,
-a 4.14 compiler (and dune and menhir) need to be in the path. See the warning above
+a 5.4.0 compiler (and dune and menhir) need to be in the path. See the warning above
 about the version of menhir to use.
 
 Now the build part is done, we don't need to stay in the build environment
@@ -347,12 +348,12 @@ opam switch create oxcaml --empty --repositories=flambda2=git+https://github.com
 Then we can install the compiler. The recommended way is to use the `opam-custom-install`
 plugin. See [here](https://gitlab.ocamlpro.com/louis/opam-custom-install)
 for instructions. The plugin can be installed in any existing OPAM switch,
-for example a 4.14 switch used for building. Once installed, the plugin will be
+for example a 5.4.0 switch used for building. Once installed, the plugin will be
 available whatever the current active switch is.
 Once the plugin is installed, we can use it to install the compiler:
 
 ```shell
-opam custom-install ocaml-variants.4.14.0+flambda2 -- make -C ${oxcaml-root-dir} install_for_opam
+opam custom-install ocaml-variants.5.2.0+oxcaml -- make -C ${oxcaml-root-dir} install_for_opam
 ```
 The `-C ${oxcaml-dir}` part can be omitted if we're still in the build directory.
 
@@ -361,7 +362,7 @@ it is recommended to run the command `opam reinstall --forget-pending` after
 every use of `opam custom-install`, otherwise any subsequent `opam` command
 tries to rebuild the compiler from scratch.
 
-To finish the installation, `opam install ocaml.4.14.0` will install the remaining
+To finish the installation, `opam install ocaml.5.2.0` will install the remaining
 auxiliary packages necessary for a regular switch. After that, normal opam
 packages can be installed the usual way.
 
@@ -374,7 +375,7 @@ As `opam-custom-install` is still experimental, it can sometimes be hard to inst
 In this case, it is possible to use the more fragile `opam install --fake` command:
 
 ```shell
-opam install --fake ocaml-variants.4.14.0+flambda2
+opam install --fake ocaml-variants.5.2.0+oxcaml
 make -C ${oxcaml-root-dir} install_for_opam
 ```
 

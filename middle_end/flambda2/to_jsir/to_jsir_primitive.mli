@@ -28,7 +28,8 @@
 
 open! Jsoo_imports.Import
 
-(** Translate a flambda primitive call to a JSIR variable containing the result. *)
+(** Translate a flambda primitive call to a JSIR variable containing the result.
+*)
 val primitive :
   env:To_jsir_env.t ->
   res:To_jsir_result.t ->

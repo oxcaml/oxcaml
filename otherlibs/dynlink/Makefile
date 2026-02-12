@@ -81,6 +81,7 @@ COMPILERLIBS_SOURCES=\
   utils/binutils.ml \
   utils/config.ml \
   utils/build_path_prefix_map.ml \
+  utils/format_doc.ml \
   utils/misc.ml \
   utils/target_system.ml \
   utils/identifiable.ml \
@@ -140,8 +141,13 @@ COMPILERLIBS_SOURCES=\
   typing/zero_alloc.ml \
   typing/types.ml \
   typing/oprint.ml \
+<<<<<<< HEAD
   typing/typemode.ml \
   typing/jkind.ml \
+||||||| 73bc7b39d5
+  typing/jkind.ml \
+=======
+>>>>>>> origin/main
   typing/typedtree.ml \
   typing/global_counters.ml \
   typing/ldd_intf.ml \
@@ -158,6 +164,7 @@ COMPILERLIBS_SOURCES=\
   file_formats/cmi_format.ml \
   typing/persistent_env.ml \
   typing/env.ml \
+  typing/jkind.ml \
   typing/errortrace.ml \
   typing/signature_group.ml \
   typing/ctype.ml \
@@ -195,6 +202,7 @@ MINI_COMPILERLIBS_SOURCES=\
   utils/binutils.ml \
   utils/config.ml \
   utils/build_path_prefix_map.ml \
+  utils/format_doc.ml \
   utils/misc.ml
 
 # Rules to make a local copy of the .ml and .mli files required.  We also

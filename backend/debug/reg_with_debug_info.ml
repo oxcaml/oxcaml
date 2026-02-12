@@ -197,9 +197,8 @@ module Set = struct
      (filter (fun t -> Reg.same_loc_fatal_on_unknown ~fatal_message t.reg reg)
      t) with | [] -> raise Not_found | reg :: _ -> reg *)
 
-  (**
-   let print ppf t = Format.pp_print_list ~pp_sep:(fun ppf () -> Format.fprintf
-   ppf ", ") print_el ppf (elements t) *)
+  (** let print ppf t = Format.pp_print_list ~pp_sep:(fun ppf () ->
+      Format.fprintf ppf ", ") print_el ppf (elements t) *)
   let print_el ppf t =
     let print_reg = Printreg.reg in
     match t.debug_info with

@@ -19,6 +19,9 @@ open Lexing
 open Location
 open Typedtree
 
+let fmt_sort = Format_doc.compat Jkind.Sort.format
+let fmt_const_sort = Format_doc.compat Jkind.Sort.Const.format
+
 let fmt_position f l =
   if l.pos_lnum = -1
   then fprintf f "%s[%d]" l.pos_fname l.pos_cnum
@@ -90,6 +93,11 @@ let fmt_constant f x =
   | Const_unboxed_int64 (i) -> fprintf f "Const_unboxed_int64 %Ld" i
   | Const_unboxed_nativeint (i) -> fprintf f "Const_unboxed_nativeint %nd" i
 
+let fmt_bool f x =
+  match x with
+  | false -> fprintf f "false"
+  | true -> fprintf f "true"
+
 let fmt_mutable_flag f x =
   match x with
   | Immutable -> fprintf f "Immutable"
@@ -99,9 +107,11 @@ let fmt_mutable_mode_flag f (x : Types.mutability) =
   match x with
   | Immutable -> fprintf f "Immutable"
   | Mutable { mode; atomic = Nonatomic } ->
-    fprintf f "Mutable(%a)" (Mode.Value.Comonadic.print ()) mode
+    fprintf f "Mutable(%a)"
+      (Format_doc.compat (Mode.Value.Comonadic.print ())) mode
   | Mutable { mode; atomic = Atomic } ->
-    fprintf f "Atomic(%a)" (Mode.Value.Comonadic.print ()) mode
+    fprintf f "Atomic(%a)"
+      (Format_doc.compat (Mode.Value.Comonadic.print ())) mode
 
 let fmt_virtual_flag f x =
   match x with
@@ -182,6 +192,14 @@ let arg_label i ppf = function
   | Labelled s -> line i ppf "Labelled \"%s\"\n" s
   | Position s -> line i ppf "Position \"%s\"\n" s
 
+let typevar_no_jkind ~print_quote ppf v =
+  let pptv =
+    if print_quote
+    then Pprintast.tyvar
+    else fun ppf s -> fprintf ppf "%s" s
+  in
+  fprintf ppf " %a" pptv v
+
 let typevar_jkind ~print_quote ppf (v, l) =
   let pptv =
     if print_quote
@@ -204,7 +222,7 @@ let typevars ppf vs =
   List.iter (typevar_jkind ~print_quote:true ppf) vs
 
 let sort_array i ppf sorts =
-  array (i+1) (fun _ ppf l -> fprintf ppf "%a;@ " Jkind.Sort.Const.format l)
+  array (i+1) (fun _ ppf l -> fprintf ppf "%a;@ " fmt_const_sort l)
     ppf sorts
 
 let tag ppf = let open Types in function
@@ -258,6 +276,66 @@ let attributes i ppf l =
 let jkind_annotation i ppf jkind =
   line i ppf "%a" Pprintast.jkind_annotation jkind
 
+let mode_desc i ppf modes_annot =
+  let print_mode_annot i ppf { txt = (Mode.Alloc.Atom (ax, mode)); loc = _ } =
+    line i ppf "%a: %a\n"
+      (Format_doc.compat Mode.Alloc.Axis.print) ax
+      (Format_doc.compat (Mode.Alloc.Const.print_axis ax)) mode
+  in
+  list i print_mode_annot ppf modes_annot
+
+let modes ~pr i ppf { mode_modes = mm; mode_desc = md } =
+  pr i ppf mm;
+  mode_desc i ppf md
+
+let alloc_modes i ppf ms =
+  let print_alloc_modes i ppf m =
+    line i ppf "%a\n" (Format_doc.compat Mode.Alloc.Const.print) m
+  in
+  modes ~pr:print_alloc_modes i ppf ms
+
+let alloc_modes_opt i ppf ms =
+  let print_alloc_modes_opt i ppf m =
+    line i ppf "%a\n" (Format_doc.compat Mode.Alloc.Const.Option.print) m
+  in
+  modes ~pr:print_alloc_modes_opt i ppf ms
+
+let alloc_modes_var i ppf ms =
+  let print_alloc_modes_var i ppf m =
+    line i ppf "%a\n" (Format_doc.compat (Mode.Alloc.print ())) m
+  in
+  modes ~pr:print_alloc_modes_var i ppf ms
+
+let value_modes_var i ppf ms =
+  let print_value_modes_var i ppf m =
+    line i ppf "%a\n" (Format_doc.compat (Mode.Value.print ())) m
+  in
+  modes ~pr:print_value_modes_var i ppf ms
+
+let moda_desc i ppf modalities_annot =
+  let modality_as_mode (Mode.Modality.Atom (ax, modality)) : Mode.Value.atom =
+    match ax, modality with
+    | Comonadic ax, Meet_with mode -> Atom (Comonadic ax, mode)
+    | Monadic ax, Join_with mode -> Atom (Monadic ax, mode)
+  in
+  let as_modes_annot =
+    List.map (Location.map modality_as_mode) modalities_annot
+  in
+  let print_mode_annot i ppf { txt = (Mode.Value.Atom (ax, mode)); loc = _ } =
+    line i ppf "%a: %a\n"
+      (Format_doc.compat Mode.Value.Axis.print) ax
+      (Format_doc.compat (Mode.Value.Const.print_axis ax)) mode
+  in
+  list i print_mode_annot ppf as_modes_annot
+
+let modalities i ppf { moda_modalities = mm; moda_desc = md } =
+  line i ppf "%a\n" (Format_doc.compat Mode.Modality.Const.print) mm;
+  moda_desc i ppf md
+
+let val_description_modal_info i ppf = function
+  | Valmi_sig_value ms -> modalities i ppf ms
+  | Valmi_str_primitive ms -> alloc_modes_opt i ppf ms
+
 let zero_alloc_assume i ppf : Zero_alloc.assume -> unit = function
     { strict; never_returns_normally; never_raises; arity; loc = _ } ->
     line i ppf "assume_zero_alloc arity=%d%s%s%s\n"
@@ -274,11 +352,13 @@ let rec core_type i ppf x =
   | Ttyp_var (s, jkind) ->
       line i ppf "Ttyp_var %s\n" (Option.value ~default:"_" s);
       option i jkind_annotation ppf jkind
-  | Ttyp_arrow (l, ct1, ct2) ->
+  | Ttyp_arrow (l, ct1, m1, ct2, m2) ->
       line i ppf "Ttyp_arrow\n";
       arg_label i ppf l;
       core_type i ppf ct1;
+      alloc_modes i ppf m1;
       core_type i ppf ct2;
+      alloc_modes i ppf m2;
   | Ttyp_tuple l ->
       line i ppf "Ttyp_tuple\n";
       list i labeled_core_type ppf l;
@@ -331,6 +411,10 @@ let rec core_type i ppf x =
   | Ttyp_splice t ->
       line i ppf "Ttyp_splice\n";
       core_type i ppf t
+  | Ttyp_repr (lv, ct) ->
+      line i ppf "Ttyp_repr%a\n"
+        (fun ppf -> List.iter (typevar_no_jkind ~print_quote:true ppf)) lv;
+      core_type i ppf ct
   | Ttyp_of_kind jkind ->
       line i ppf "Ttyp_of_kind %a\n" (jkind_annotation i) jkind;
   | Ttyp_call_pos -> line i ppf "Ttyp_call_pos\n";
@@ -342,6 +426,36 @@ and labeled_core_type i ppf (l, t) =
 and package_with i ppf (s, t) =
   line i ppf "with type %a\n" fmt_longident s;
   core_type i ppf t
+
+and label_ambiguity i ppf = function
+  | Ambiguous { path; arity } ->
+    line i ppf "Ambiguous %a %d\n" fmt_path path arity
+  | Unambiguous ->
+    line i ppf "Unambiguous\n"
+
+and poly_param : type a. _ -> _ -> a poly_param -> unit =
+  fun i ppf -> function
+  | Param ty ->
+    line i ppf "Param %a\n" (Format_doc.compat Printtyp.raw_type_expr) ty
+  | Arrow args ->
+    line i ppf "Arrow\n";
+    list (i+1) (fun i ppf (label, ty) ->
+        arg_label i ppf label;
+        option i (fun i f ->
+          line i f "%a" (Format_doc.compat Printtyp.raw_type_expr)) ppf ty)
+      ppf args
+  | Method ({txt}, ty) ->
+    fprintf ppf "Method %s %a\n" txt
+      (Format_doc.compat Printtyp.raw_type_expr) ty
+
+and type_inspection : type a. _ -> _ -> a type_inspection -> unit =
+  fun i ppf -> function
+  | Label_disambiguation amb ->
+    line i ppf "Label_disambiguation\n";
+    label_ambiguity (i+1) ppf amb;
+  | Polymorphic_parameter param ->
+    line i ppf "Polymorphic_parameter\n";
+    poly_param (i+1) ppf param;
 
 and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   line i ppf "pattern %a\n" fmt_location x.pat_loc;
@@ -357,14 +471,16 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   | Tpat_any -> line i ppf "Tpat_any\n";
   | Tpat_var (s,_,_,sort,m) ->
       line i ppf "Tpat_var \"%a\"\n" fmt_ident s;
-      line i ppf "sort %a\n" Jkind.Sort.format sort;
+      line i ppf "sort %a\n" fmt_sort sort;
       value_mode i ppf m
   | Tpat_alias (p, s,_,_,sort,m,_) ->
       line i ppf "Tpat_alias \"%a\"\n" fmt_ident s;
-      line i ppf "sort %a\n" Jkind.Sort.format sort;
+      line i ppf "sort %a\n" fmt_sort sort;
       value_mode i ppf m;
       pattern i ppf p;
   | Tpat_constant (c) -> line i ppf "Tpat_constant %a\n" fmt_constant c;
+  | Tpat_unboxed_unit -> line i ppf "Tpat_unboxed_unit\n";
+  | Tpat_unboxed_bool b -> line i ppf "Tpat_unboxed_bool %a\n" fmt_bool b;
   | Tpat_tuple (l) ->
       line i ppf "Tpat_tuple\n";
       list i labeled_pattern ppf l;
@@ -394,7 +510,7 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       list i longident_x_pattern ppf l;
   | Tpat_array (am, arg_sort, l) ->
       line i ppf "Tpat_array %a\n" fmt_mutable_mode_flag am;
-      line i ppf "%a\n" Jkind.Sort.format arg_sort;
+      line i ppf "%a\n" fmt_sort arg_sort;
       list i pattern ppf l;
   | Tpat_lazy p ->
       line i ppf "Tpat_lazy\n";
@@ -420,23 +536,28 @@ and labeled_pattern_with_sorts :
   fun i ppf (label, x, sort) ->
     tuple_component_label i ppf label;
     pattern i ppf x;
-    line i ppf "%a\n" Jkind.Sort.format sort
+    line i ppf "%a\n" fmt_sort sort
 
 and pattern_extra i ppf (extra_pat, _, attrs) =
   match extra_pat with
   | Tpat_unpack ->
      line i ppf "Tpat_extra_unpack\n";
      attributes i ppf attrs;
-  | Tpat_constraint cty ->
+  | Tpat_constraint (cty, m) ->
      line i ppf "Tpat_extra_constraint\n";
      attributes i ppf attrs;
      core_type i ppf cty;
+     alloc_modes i ppf m;
   | Tpat_type (id, _) ->
      line i ppf "Tpat_extra_type %a\n" fmt_path id;
      attributes i ppf attrs;
   | Tpat_open (id,_,_) ->
      line i ppf "Tpat_extra_open %a\n" fmt_path id;
      attributes i ppf attrs;
+  | Tpat_inspected_type ti ->
+     line i ppf "Tpat_inspected_type\n";
+     attributes i ppf attrs;
+     type_inspection (i+1) ppf ti
 
 and function_body i ppf (body : function_body) =
   match[@warning "+9"] body with
@@ -452,9 +573,9 @@ and function_body i ppf (body : function_body) =
         fmt_partiality fc_partial
         fmt_location fc_loc;
       alloc_mode_raw i ppf fc_arg_mode;
-      line i ppf "%a\n" Jkind.Sort.format fc_arg_sort;
+      line i ppf "%a\n" fmt_sort fc_arg_sort;
       attributes (i+1) ppf fc_attributes;
-      Option.iter (fun e -> expression_extra (i+1) ppf e []) fc_exp_extra;
+      List.iter (fun e -> expression_extra (i+1) ppf e []) fc_exp_extra;
       list (i+1) case ppf fc_cases
 
 and expression_extra i ppf x attrs =
@@ -475,16 +596,26 @@ and expression_extra i ppf x attrs =
   | Texp_newtype (_, s, k, _) ->
       line i ppf "Texp_newtype %a\n" (typevar_jkind ~print_quote:false) (s.txt, k);
       attributes i ppf attrs;
+  | Texp_borrowed ->
+      line i ppf "Texp_borrowed\n"
+  | Texp_ghost_region ->
+      line i ppf "Texp_ghost_region\n"
   | Texp_stack ->
       line i ppf "Texp_stack\n";
       attributes i ppf attrs
   | Texp_mode m ->
       line i ppf "Texp_mode\n";
       attributes i ppf attrs;
-      alloc_const_option_mode i ppf m
+      alloc_const_option_mode i ppf m.mode_modes;
+      alloc_modes_opt i ppf m;
+  | Texp_inspected_type ti ->
+      line i ppf "Texp_inspected_type\n";
+      attributes i ppf attrs;
+      type_inspection (i+1) ppf ti
 
 and alloc_mode_raw: type l r. _ -> _ -> (l * r) Mode.Alloc.t -> _
-  = fun i ppf m -> line i ppf "alloc_mode %a\n" (Mode.Alloc.print ()) m
+  = fun i ppf m ->
+    line i ppf "alloc_mode %a\n" (Format_doc.compat (Mode.Alloc.print ())) m
 
 and alloc_mode i ppf (m : alloc_mode) = alloc_mode_raw i ppf m
 
@@ -492,13 +623,14 @@ and alloc_mode_option i ppf m = Option.iter (alloc_mode i ppf) m
 
 and locality_mode i ppf m =
   line i ppf "locality_mode %a\n"
-    (Mode.Locality.print ()) m
+    (Format_doc.compat (Mode.Locality.print ())) m
 
 and value_mode i ppf m =
-  line i ppf "value_mode %a\n" (Mode.Value.print ()) m
+  line i ppf "value_mode %a\n" (Format_doc.compat (Mode.Value.print ())) m
 
 and alloc_const_option_mode i ppf m =
-  line i ppf "alloc_const_option_mode %a\n" Mode.Alloc.Const.Option.print m
+  line i ppf "alloc_const_option_mode %a\n"
+    (Format_doc.compat Mode.Alloc.Const.Option.print) m
 
 and expression_alloc_mode i ppf (expr, am) =
   alloc_mode i ppf am;
@@ -515,7 +647,7 @@ and expression i ppf x =
     List.iter (fun (x, _, attrs) -> expression_extra (i+1) ppf x attrs) extra;
   end;
   match x.exp_desc with
-  | Texp_ident (li,_,_,_,_) -> line i ppf "Texp_ident %a\n" fmt_path li;
+  | Texp_ident (li,_,_,_,_,_) -> line i ppf "Texp_ident %a\n" fmt_path li;
   | Texp_instvar (_, li,_) -> line i ppf "Texp_instvar %a\n" fmt_path li;
   | Texp_mutvar id -> line i ppf "Texp_mutvar %a\n" fmt_ident id.txt;
   | Texp_constant (c) -> line i ppf "Texp_constant %a\n" fmt_constant c;
@@ -527,9 +659,10 @@ and expression i ppf x =
       line i ppf "Texp_letmutable\n";
       value_binding Nonrecursive i ppf vb;
       expression i ppf e
-  | Texp_function { params; body; alloc_mode = am } ->
+  | Texp_function { params; body; alloc_mode = am; ret_mode } ->
       line i ppf "Texp_function\n";
       alloc_mode i ppf am;
+      alloc_modes_var i ppf ret_mode;
       list i function_param ppf params;
       function_body i ppf body;
   | Texp_apply (e, l, m, am, za) ->
@@ -547,12 +680,14 @@ and expression i ppf x =
       line i ppf "Texp_match%a\n"
         fmt_partiality partial;
       expression i ppf e;
-      line i ppf "%a\n" Jkind.Sort.format sort;
+      line i ppf "%a\n" fmt_sort sort;
       list i case ppf l;
   | Texp_try (e, l) ->
       line i ppf "Texp_try\n";
       expression i ppf e;
       list i case ppf l;
+  | Texp_unboxed_unit -> line i ppf "Texp_unboxed_unit\n";
+  | Texp_unboxed_bool b -> line i ppf "Texp_unboxed_bool %a\n" fmt_bool b;
   | Texp_tuple (l, am) ->
       line i ppf "Texp_tuple\n";
       alloc_mode i ppf am;
@@ -603,7 +738,7 @@ and expression i ppf x =
       expression i ppf e2;
   | Texp_array (amut, sort, l, amode) ->
       line i ppf "Texp_array %a\n" fmt_mutable_mode_flag amut;
-      line i ppf "%a\n" Jkind.Sort.format sort;
+      line i ppf "%a\n" fmt_sort sort;
       alloc_mode i ppf amode;
       list i expression ppf l;
   | Texp_idx (ba, uas) ->
@@ -613,7 +748,7 @@ and expression i ppf x =
   | Texp_atomic_loc (e, sort, li, _, amode) ->
       line i ppf "Texp_atomic_loc\n";
       expression i ppf e;
-      line i ppf "%a\n" Jkind.Sort.format sort;
+      line i ppf "%a\n" fmt_sort sort;
       longident i ppf li;
       alloc_mode i ppf amode
   | Texp_list_comprehension comp ->
@@ -621,7 +756,7 @@ and expression i ppf x =
       comprehension i ppf comp
   | Texp_array_comprehension (amut, sort, comp) ->
       line i ppf "Texp_array_comprehension %a\n" fmt_mutable_mode_flag amut;
-      line i ppf "%a\n" Jkind.Sort.format sort;
+      line i ppf "%a\n" fmt_sort sort;
       comprehension i ppf comp
   | Texp_ifthenelse (e1, e2, eo) ->
       line i ppf "Texp_ifthenelse\n";
@@ -631,7 +766,7 @@ and expression i ppf x =
   | Texp_sequence (e1, s, e2) ->
       line i ppf "Texp_sequence\n";
       expression i ppf e1;
-      line i ppf "%a\n" Jkind.Sort.format s;
+      line i ppf "%a\n" fmt_sort s;
       expression i ppf e2;
   | Texp_while {wh_cond; wh_body} ->
       line i ppf "Texp_while\n";
@@ -730,6 +865,7 @@ and value_description i ppf x =
   attributes i ppf x.val_attributes;
   core_type (i+1) ppf x.val_desc;
   list (i+1) string ppf x.val_prim;
+  val_description_modal_info (i+1) ppf x.val_modal_info
 
 and binding_op i ppf x =
   line i ppf "binding_op %a %a\n" fmt_path x.bop_op_path
@@ -739,7 +875,7 @@ and binding_op i ppf x =
 and function_param i ppf x =
   let p = x.fp_arg_label in
   arg_label i ppf p;
-  match x.fp_kind with
+  (match x.fp_kind with
   | Tparam_pat pat ->
       line i ppf "Param_pat%a\n"
         fmt_partiality x.fp_partial;
@@ -747,9 +883,10 @@ and function_param i ppf x =
   | Tparam_optional_default (pat, expr, sort) ->
       line i ppf "Param_optional_default%a\n"
         fmt_partiality x.fp_partial;
-      line i ppf "%a\n" Jkind.Sort.format sort;
+      line i ppf "%a\n" fmt_sort sort;
       pattern (i+1) ppf pat;
-      expression (i+1) ppf expr
+      expression (i+1) ppf expr);
+  alloc_modes_var (i+1) ppf x.fp_mode
 
 and type_parameter i ppf (x, _variance) = core_type i ppf x
 
@@ -987,13 +1124,16 @@ and module_type i ppf x =
   | Tmty_signature (s) ->
       line i ppf "Tmty_signature\n";
       signature i ppf s;
-  | Tmty_functor (Unit, mt2) ->
+  | Tmty_functor (Unit, mt2, ma2) ->
       line i ppf "Tmty_functor ()\n";
       module_type i ppf mt2;
-  | Tmty_functor (Named (s, _, mt1), mt2) ->
+      alloc_modes i ppf ma2;
+  | Tmty_functor (Named (s, _, mt1, ma1), mt2, ma2) ->
       line i ppf "Tmty_functor \"%a\"\n" fmt_modname s;
       module_type i ppf mt1;
+      alloc_modes i ppf ma1;
       module_type i ppf mt2;
+      alloc_modes i ppf ma2;
   | Tmty_with (mt, l) ->
       line i ppf "Tmty_with\n";
       module_type i ppf mt;
@@ -1006,7 +1146,9 @@ and module_type i ppf x =
     module_type i ppf mt;
     line i ppf "%a\n" fmt_path li;
 
-and signature i ppf x = list i signature_item ppf x.sig_items
+and signature i ppf x =
+  list i signature_item ppf x.sig_items;
+  modalities i ppf x.sig_modalities
 
 and signature_item i ppf x =
   line i ppf "signature_item %a\n" fmt_location x.sig_loc;
@@ -1051,10 +1193,11 @@ and signature_item i ppf x =
         fmt_override_flag od.open_override
         fmt_path (fst od.open_expr);
       attributes i ppf od.open_attributes
-  | Tsig_include (incl, _) ->
+  | Tsig_include (incl, moda) ->
       line i ppf "Tsig_include\n";
       attributes i ppf incl.incl_attributes;
-      module_type i ppf incl.incl_mod
+      module_type i ppf incl.incl_mod;
+      modalities i ppf moda;
   | Tsig_class (l) ->
       line i ppf "Tsig_class\n";
       list i class_description ppf l;
@@ -1107,10 +1250,11 @@ and module_expr i ppf x =
   | Tmod_functor (Unit, me) ->
       line i ppf "Tmod_functor ()\n";
       module_expr i ppf me;
-  | Tmod_functor (Named (s, _, mt), me) ->
+  | Tmod_functor (Named (s, _, mt, ma), me) ->
       line i ppf "Tmod_functor \"%a\"\n" fmt_modname s;
       module_type i ppf mt;
       module_expr i ppf me;
+      alloc_modes i ppf ma;
   | Tmod_apply (me1, me2, _) ->
       line i ppf "Tmod_apply\n";
       module_expr i ppf me1;
@@ -1118,10 +1262,11 @@ and module_expr i ppf x =
   | Tmod_apply_unit me1 ->
       line i ppf "Tmod_apply_unit\n";
       module_expr i ppf me1;
-  | Tmod_constraint (me, _, Tmodtype_explicit mt, _) ->
+  | Tmod_constraint (me, _, Tmodtype_explicit (mt, modes), _) ->
       line i ppf "Tmod_constraint\n";
       module_expr i ppf me;
       module_type i ppf mt;
+      value_modes_var i ppf modes;
   | Tmod_constraint (me, _, Tmodtype_implicit, _) -> module_expr i ppf me
   | Tmod_unpack (e, _) ->
       line i ppf "Tmod_unpack\n";
@@ -1136,7 +1281,7 @@ and structure_item i ppf x =
   | Tstr_eval (e, l, attrs) ->
       line i ppf "Tstr_eval\n";
       attributes i ppf attrs;
-      line i ppf "%a\n" Jkind.Sort.format l;
+      line i ppf "%a\n" fmt_sort l;
       expression i ppf e;
   | Tstr_value (rf, l) ->
       line i ppf "Tstr_value %a\n" fmt_rec_flag rf;
@@ -1204,15 +1349,17 @@ and constructor_arguments i ppf = function
   | Cstr_record l -> list i label_decl ppf l
 
 and label_decl i ppf {ld_id; ld_name = _; ld_mutable; ld_type; ld_loc;
-                      ld_attributes} =
+                      ld_attributes; ld_modalities} =
   line i ppf "%a\n" fmt_location ld_loc;
   attributes i ppf ld_attributes;
   line (i+1) ppf "%a\n" fmt_mutable_mode_flag ld_mutable;
   line (i+1) ppf "%a" fmt_ident ld_id;
-  core_type (i+1) ppf ld_type
+  core_type (i+1) ppf ld_type;
+  modalities (i+1) ppf ld_modalities
 
-and field_decl i ppf {ca_type=ty; ca_loc=_; ca_modalities=_} =
-  core_type (i+1) ppf ty
+and field_decl i ppf {ca_type=ty; ca_loc=_; ca_modalities} =
+  core_type (i+1) ppf ty;
+  modalities (i+1) ppf ca_modalities
 
 and longident_x_pattern : 'a. _ -> _ -> _ * 'a * _ -> _ =
   fun i ppf (li, _, p) ->
@@ -1226,7 +1373,7 @@ and block_access i ppf = function
         { mut; index_kind; index; base_ty = _; elt_ty = _; elt_sort } ->
       line i ppf "Baccess_array %a %a %a\n"
         fmt_mutable_flag mut fmt_index_kind index_kind
-        Jkind.Sort.format elt_sort;
+        fmt_sort elt_sort;
       expression i ppf index
   | Baccess_block (mut, index) ->
       line i ppf "Baccess_block %a\n"
@@ -1315,7 +1462,7 @@ and labeled_expression i ppf (l, e) =
 and labeled_sorted_expression i ppf (l, e, s) =
   tuple_component_label i ppf l;
   expression (i+1) ppf e;
-  line i ppf "%a\n" Jkind.Sort.format s;
+  line i ppf "%a\n" fmt_sort s;
 
 and ident_x_expression_def i ppf (l, e) =
   line i ppf "<def> \"%a\"\n" fmt_ident l;

@@ -19,6 +19,7 @@ type ('a : value_or_null) elem =
 val int_elem : int elem
 val int32_elem : int32 elem
 val int64_elem : int64 elem
+val int64x2_elem : int64x2 elem
 val nativeint_elem : nativeint elem
 
 val float_elem : float elem

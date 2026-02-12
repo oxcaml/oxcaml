@@ -313,7 +313,7 @@ let init_shape id modl =
             Tarrow(_,ty_arg,_,_) -> begin
               (* CR layouts: We should allow any representable layout here. It
                  will require reworking [camlinternalMod.init_mod]. *)
-              let jkind = Jkind.Builtin.value ~why:Recmod_fun_arg in
+              let jkind = Jkind.Builtin.value_or_null ~why:Recmod_fun_arg in
               let ty_arg = Ctype.correct_levels ty_arg in
               match Ctype.check_type_jkind env ty_arg jkind with
               | Ok _ -> const_int 0 (* camlinternalMod.Function *)
@@ -540,10 +540,10 @@ let merge_functors ~scopes mexp coercion root_path =
       let path, param =
         match param with
         | Unit -> None, Ident.create_local "*"
-        | Named (None, _, _) ->
+        | Named (None, _, _, _) ->
           let id = Ident.create_local "_" in
           functor_path path id, id
-        | Named (Some id, _, _) -> functor_path path id, id
+        | Named (Some id, _, _, _) -> functor_path path id, id
       in
       let inline_attribute =
         merge_inline_attributes inline_attribute inline_attribute' loc
@@ -1050,7 +1050,7 @@ let transl_implementation_module ~loc ~scopes module_id (str, cc, cc2) =
     add_arg_block_to_module_block ~loc lam repr cc2
 
 let wrap_toplevel_functor_in_struct code =
-  Lprim(Pmakeblock(0, Immutable, None, Lambda.alloc_heap),
+  Lprim(Pmakeblock(0, Immutable, All_value, Lambda.alloc_heap),
         [ code ],
         Loc_unknown)
 
@@ -1420,14 +1420,14 @@ let transl_instance instance_unit ~runtime_args ~main_module_block_repr
 
 (* Error report *)
 
-open Format
+open Format_doc
 module Style = Misc.Style
 
 let print_cycle ppf cycle =
-  let print_ident ppf (x,_) = Format.pp_print_string ppf (Ident.name x) in
+  let print_ident ppf (x,_) = pp_print_string ppf (Ident.name x) in
   let pp_sep ppf () = fprintf ppf "@ -> " in
-  Format.fprintf ppf "%a%a%s"
-    (Format.pp_print_list ~pp_sep print_ident) cycle
+  fprintf ppf "%a%a%s"
+    (pp_print_list ~pp_sep print_ident) cycle
     pp_sep ()
     (Ident.name @@ fst @@ List.hd cycle)
 (* we repeat the first element to make the cycle more apparent *)
@@ -1437,7 +1437,7 @@ let explanation_submsg (id, unsafe_info) =
   | Unnamed -> assert false (* can't be part of a cycle. *)
   | Unsafe {reason;loc;subid} ->
       let print fmt =
-        let printer = Format.dprintf fmt
+        let printer = doc_printf fmt
             Style.inline_code (Ident.name id)
             Style.inline_code (Ident.name subid) in
         Location.mkloc printer loc in
@@ -1467,7 +1467,7 @@ let report_error loc = function
       Location.errorf ~loc
         "Cannot instantiate using the packed module %a@ \
          as either the instantiated module or an argument"
-      Compilation_unit.print comp_unit
+        Compilation_unit.print_as_inline_code comp_unit
 
 let () =
   Location.register_error_of_exn

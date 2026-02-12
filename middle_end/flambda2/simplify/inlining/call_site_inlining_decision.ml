@@ -63,9 +63,9 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
     Continuation.create ~name:"speculative_inlining_toplevel_continuation" ()
   in
   let dacc =
-    DA.map_flow_acc dacc ~f:(fun _ ->
-        Flow.Acc.init_toplevel ~dummy_toplevel_cont Bound_parameters.empty
-          (Flow.Acc.empty ()))
+    DA.with_flow_acc
+      (Flow.Acc.init_toplevel ~dummy_toplevel_cont Bound_parameters.empty)
+      dacc
   in
   let _, uacc =
     simplify_expr dacc expr ~down_to_up:(fun dacc ~rebuild ->
@@ -126,9 +126,10 @@ let speculative_inlining dacc ~apply ~function_type ~simplify_expr ~return_arity
   UA.cost_metrics uacc
 
 let argument_types_useful dacc apply =
-  if not
-       (Flambda_features.Inlining.speculative_inlining_only_if_arguments_useful
-          ())
+  if
+    not
+      (Flambda_features.Inlining.speculative_inlining_only_if_arguments_useful
+         ())
   then true
   else
     let typing_env = DE.typing_env (DA.denv dacc) in
@@ -137,7 +138,7 @@ let argument_types_useful dacc apply =
         Simple.pattern_match simple
           ~name:(fun name ~coercion:_ ->
             let ty = TE.find typing_env name None in
-            not (T.is_unknown typing_env ty))
+            not (T.is_unknown_maybe_null typing_env ty))
           ~const:(fun _ -> true))
       (Apply.args apply)
 
@@ -329,8 +330,9 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
               Flambda_features.Inlining.max_rec_depth
                 (Round (DE.round (DA.denv dacc)))
             in
-            if Simplify_rec_info_expr.depth_may_exceed dacc rec_info
-                 max_rec_depth
+            if
+              Simplify_rec_info_expr.depth_may_exceed dacc rec_info
+                max_rec_depth
             then (
               fail_if_must_inline ();
               Recursion_depth_exceeded)

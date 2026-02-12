@@ -111,10 +111,10 @@ let env_of_only_summary ?(allow_missing_modules = false) env =
 
 (* Error report *)
 
-open Format
+open Format_doc
 module Style = Misc.Style
 
-let report_error ppf = function
+let report_error_doc ppf = function
   | Module_not_found p ->
       fprintf ppf "@[Cannot find module %a@].@."
         (Style.as_inline_code Printtyp.path) p
@@ -122,6 +122,8 @@ let report_error ppf = function
 let () =
   Location.register_error_of_exn
     (function
-      | Error err -> Some (Location.error_of_printer_file report_error err)
+      | Error err -> Some (Location.error_of_printer_file report_error_doc err)
       | _ -> None
     )
+
+let report_error = Format_doc.compat report_error_doc

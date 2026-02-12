@@ -26,9 +26,9 @@ val patricia_tree_of_trie :
 
 (** Existential witness for tries of given key and value types.
 
-   {b Note}: This type is currently unused by the [Trie] module, but is provided
-   as a convenience for users that need to create existentially quantified
-   tries. *)
+    {b Note}: This type is currently unused by the [Trie] module, but is
+    provided as a convenience for users that need to create existentially
+    quantified tries. *)
 type ('k, 'v) is_any_trie =
   | Is_trie : ('t, 'k, 'v) is_trie -> ('k, 'v) is_any_trie
 
@@ -67,8 +67,7 @@ module Iterator : sig
       is called.
 
       The [output] reference is set to the corresponding value when [accept] is
-      called on the last iterator.
-  *)
+      called on the last iterator. *)
   val create :
     ('m, 'k, 'v) is_trie -> 'm Channel.receiver -> 'v Channel.sender -> 'k hlist
 end

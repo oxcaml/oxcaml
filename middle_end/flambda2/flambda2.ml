@@ -26,9 +26,10 @@ let get_module_info comp_unit =
     Misc.fatal_error
       "get_global_info is not for use with predefined exception compilation \
        units";
-  if Compilation_unit.Name.equal cmx_name
-       (Flambda2_identifiers.Symbol.external_symbols_compilation_unit ()
-       |> Compilation_unit.name)
+  if
+    Compilation_unit.Name.equal cmx_name
+      (Flambda2_identifiers.Symbol.external_symbols_compilation_unit ()
+      |> Compilation_unit.name)
   then None
   else Compilenv.get_unit_export_info comp_unit
 
@@ -52,6 +53,16 @@ let dump_if_enabled ppf enabled ~header ~f a =
 
 let pp_flambda_as_fexpr ppf unit =
   Print_fexpr.flambda_unit ppf (unit |> Flambda_to_fexpr.conv)
+
+let dump_fexpr_annot ~prefixname suffix unit =
+  if Flambda_features.dump_fexpr_annot ()
+  then
+    Misc.protect_output_to_file
+      (prefixname ^ "." ^ suffix ^ ".fl")
+      (fun out ->
+        let ppf = Format.formatter_of_out_channel out in
+        pp_flambda_as_fexpr ppf unit;
+        Format.pp_print_flush ppf ())
 
 let print_rawflambda ppf unit =
   dump_if_enabled ppf
@@ -161,8 +172,9 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
      to be computed differently according to the array kind, in the case where
      the width of a float is not equal to the machine word width (at present,
      this happens only on 32-bit targets). *)
-  if Cmm_helpers.wordsize_shift <> Cmm_helpers.numfloat_shift
-     && Flambda_features.flat_float_array ()
+  if
+    Cmm_helpers.wordsize_shift <> Cmm_helpers.numfloat_shift
+    && Flambda_features.flat_float_array ()
   then
     Misc.fatal_error
       "Cannot compile on targets where floats are not word-width when the \
@@ -180,16 +192,17 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
   in
   Compiler_hooks.execute Raw_flambda2 raw_flambda;
   print_rawflambda ppf raw_flambda;
+  dump_fexpr_annot ~prefixname "raw" raw_flambda;
   let flambda, offsets, reachable_names, cmx, all_code =
     match mode, close_program_metadata with
     | Classic, Classic (code, reachable_names, cmx, offsets) ->
       (if Flambda_features.inlining_report ()
-      then
-        let output_prefix = prefixname ^ ".cps_conv" in
-        let inlining_tree =
-          Inlining_report.output_then_forget_decisions ~output_prefix
-        in
-        Compiler_hooks.execute Inlining_tree inlining_tree);
+       then
+         let output_prefix = prefixname ^ ".cps_conv" in
+         let inlining_tree =
+           Inlining_report.output_then_forget_decisions ~output_prefix
+         in
+         Compiler_hooks.execute Inlining_tree inlining_tree);
       raw_flambda, offsets, reachable_names, cmx, code
     | Normal, Normal ->
       let round = 0 in
@@ -204,18 +217,22 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
               raw_flambda)
       in
       (if Flambda_features.inlining_report ()
-      then
-        let output_prefix = Printf.sprintf "%s.%d" prefixname round in
-        let inlining_tree =
-          Inlining_report.output_then_forget_decisions ~output_prefix
-        in
-        Compiler_hooks.execute Inlining_tree inlining_tree);
+       then
+         let output_prefix = Printf.sprintf "%s.%d" prefixname round in
+         let inlining_tree =
+           Inlining_report.output_then_forget_decisions ~output_prefix
+         in
+         Compiler_hooks.execute Inlining_tree inlining_tree);
       Compiler_hooks.execute Flambda2 flambda;
       let last_pass_name = "simplify" in
       print_flambda last_pass_name
         (Flambda_features.dump_simplify ())
         ppf flambda;
+      print_fexpr "simplify"
+        (Flambda_features.dump_fexpr (This_pass "simplify"))
+        ppf flambda;
       print_flexpect "simplify" ppf ~raw_flambda flambda;
+      dump_fexpr_annot ~prefixname "simplify" flambda;
       let ( flambda,
             free_names,
             all_code,
@@ -229,7 +246,11 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
                 Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader ~all_code
                   ~final_typing_env flambda)
           in
+          print_fexpr "reaper"
+            (Flambda_features.dump_fexpr (This_pass "reaper"))
+            ppf flambda;
           print_flexpect "reaper" ppf ~raw_flambda flambda;
+          dump_fexpr_annot ~prefixname "reaper" flambda;
           ( flambda,
             free_names,
             all_code,
@@ -247,7 +268,9 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
       print_flambda last_pass_name
         (Flambda_features.dump_flambda ())
         ppf flambda;
-      print_fexpr last_pass_name (Flambda_features.dump_fexpr ()) ppf flambda;
+      print_fexpr last_pass_name
+        (Flambda_features.dump_fexpr Last_pass)
+        ppf flambda;
       let { unit = flambda; exported_offsets; cmx; all_code; reachable_names } =
         build_run_result flambda ~free_names ~final_typing_env ~all_code
           slot_offsets

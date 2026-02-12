@@ -11,7 +11,7 @@ val create : unit -> t
     example:
 
     [check ~arbitrary_impls:Arbitrary.[int; int] ~f:(fun i j -> i + j = j + i)
-    ~name:"+ comm"]
+     ~name:"+ comm"]
 
     If [f] returns [false], testing stops and the failing arguments are printed
     on standard error. If [f] returns true for all [n] cases, a success message

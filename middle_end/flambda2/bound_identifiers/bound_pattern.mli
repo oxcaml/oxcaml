@@ -12,9 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** Things that a [Let]-expression binds.
-    If a [Let]-expression binds more than one name, all of those names have
-    the same kind. *)
+(** Things that a [Let]-expression binds. If a [Let]-expression binds more than
+    one name, all of those names have the same kind. *)
 
 type t = private
   | Singleton of Bound_var.t

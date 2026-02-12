@@ -79,6 +79,7 @@ let rec ignorable_product_element_kinds kinds =
 and ignorable_product_element_kind = function
   | Pint_ignorable -> "int"
   | Punboxedfloat_ignorable f -> unboxed_float f
+  | Punboxedvector_ignorable v -> unboxed_vector v
   | Punboxedoruntaggedint_ignorable i -> unboxed_integer i
   | Pproduct_ignorable kinds -> ignorable_product_element_kinds kinds
 
@@ -284,8 +285,6 @@ let return_kind ppf (mode, kind) =
   | Pbottom -> fprintf ppf ": bottom@ "
   | Psplicevar id -> fprintf ppf ": $%a@ " Ident.print id
 
-let field_kind = value_kind
-
 let locality_kind = function
   | Alloc_heap -> ""
   | Alloc_local -> "[L]"
@@ -321,18 +320,6 @@ let record_rep ppf r = match r with
   | Record_float -> fprintf ppf "float"
   | Record_ufloat -> fprintf ppf "ufloat"
   | Record_mixed _ -> fprintf ppf "mixed"
-
-let block_shape ppf shape = match shape with
-  | None | Some [] -> ()
-  | Some l when List.for_all ((=) Lambda.generic_value) l -> ()
-  | Some [elt] ->
-      Format.fprintf ppf " (%a)" field_kind elt
-  | Some (h :: t) ->
-      Format.fprintf ppf " (%a" field_kind h;
-      List.iter (fun elt ->
-          Format.fprintf ppf ",%a" field_kind elt)
-        t;
-      Format.fprintf ppf ")"
 
 let rec mixed_block_element
   : 'a. (_ -> 'a -> _) -> _ -> 'a mixed_block_element -> _ =
@@ -371,6 +358,12 @@ and mixed_block_shape
     fprintf ppf ")"
   end
 
+let block_shape ppf shape = match shape with
+  | All_value -> ()
+  | Shape arr ->
+      if Array.for_all ((=) (Lambda.Value Lambda.generic_value)) arr then ()
+      else mixed_block_shape (fun _ () -> ()) ppf arr
+
 let field_read_semantics ppf sem =
   match sem with
   | Reads_agree -> ()
@@ -403,7 +396,8 @@ let primitive ppf = function
   | Pbytes_to_string -> fprintf ppf "bytes_to_string"
   | Pbytes_of_string -> fprintf ppf "bytes_of_string"
   | Pignore -> fprintf ppf "ignore"
-  | Pgetglobal cu -> fprintf ppf "global %a!" Compilation_unit.print cu
+  | Pgetglobal cu ->
+      fprintf ppf "global %a!" (Format_doc.compat Compilation_unit.print) cu
   | Pgetpredef id -> fprintf ppf "getpredef %a!" Ident.print id
   | Pmakeblock(tag, Immutable, shape, mode) ->
       fprintf ppf "make%sblock %i%a"
@@ -432,15 +426,6 @@ let primitive ppf = function
   | Pmakeufloatblock (Mutable, mode) ->
      fprintf ppf "make%sufloatblock Mutable"
         (locality_mode_if_local mode)
-  | Pmakemixedblock (tag, Immutable, abs, mode) ->
-      fprintf ppf "make%amixedblock %i Immutable%a"
-        locality_mode mode tag (mixed_block_shape (fun _ _ -> ())) abs
-  | Pmakemixedblock (tag, Immutable_unique, abs, mode) ->
-     fprintf ppf "make%amixedblock %i Immutable_unique%a"
-        locality_mode mode tag (mixed_block_shape (fun _ _ -> ())) abs
-  | Pmakemixedblock (tag, Mutable, abs, mode) ->
-     fprintf ppf "make%amixedblock %i Mutable%a"
-        locality_mode mode tag (mixed_block_shape (fun _ _ -> ())) abs
   | Pmakelazyblock Lazy_tag ->
       fprintf ppf "makelazyblock"
   | Pmakelazyblock Forward_tag ->
@@ -527,7 +512,8 @@ let primitive ppf = function
         (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",") pp_print_int) n
         (mixed_block_shape (fun _ _ -> ())) shape
   | Pduprecord (rep, size) -> fprintf ppf "duprecord %a %i" record_rep rep size
-  | Prunstack -> fprintf ppf "runstack"
+  | Pwith_stack -> fprintf ppf "with_stack"
+  | Pwith_stack_bind -> fprintf ppf "with_stack_bind"
   | Pperform -> fprintf ppf "perform"
   | Presume -> fprintf ppf "resume"
   | Preperform -> fprintf ppf "reperform"
@@ -635,6 +621,14 @@ let primitive ppf = function
   | Pbigarrayset(unsafe, _n, kind, layout) ->
       print_bigarray "set" unsafe kind ppf layout
   | Pbigarraydim(n) -> fprintf ppf "Bigarray.dim_%i" n
+  | Pstring_load_i8 {unsafe; index_kind} ->
+     fprintf ppf "string.%sgeti8[indexed by %a]"
+       (if unsafe then "unsafe_" else "")
+       array_index_kind index_kind
+  | Pstring_load_i16 {unsafe; index_kind} ->
+     fprintf ppf "string.%sgeti16[indexed by %a]"
+       (if unsafe then "unsafe_" else "")
+       array_index_kind index_kind
   | Pstring_load_16 {unsafe; index_kind} ->
      fprintf ppf "string.%sget16[indexed by %a]"
        (if unsafe then "unsafe_" else "")
@@ -656,6 +650,14 @@ let primitive ppf = function
        (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
+  | Pbytes_load_i8 {unsafe; index_kind} ->
+     fprintf ppf "bytes.%sgeti8[indexed by %a]"
+       (if unsafe then "unsafe_" else "")
+       array_index_kind index_kind
+  | Pbytes_load_i16 {unsafe; index_kind} ->
+     fprintf ppf "bytes.%sgeti16[indexed by %a]"
+       (if unsafe then "unsafe_" else "")
+       array_index_kind index_kind
   | Pbytes_load_16 {unsafe; index_kind} ->
      fprintf ppf "bytes.%sget16[indexed by %a]"
        (if unsafe then "unsafe_" else "")
@@ -677,6 +679,10 @@ let primitive ppf = function
        (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
+  | Pbytes_set_8 {unsafe; index_kind} ->
+     fprintf ppf "bytes.%sset8[indexed by %a]"
+       (if unsafe then "unsafe_" else "")
+       array_index_kind index_kind
   | Pbytes_set_16 {unsafe; index_kind} ->
      fprintf ppf "bytes.%sset16[indexed by %a]"
        (if unsafe then "unsafe_" else "")
@@ -697,6 +703,12 @@ let primitive ppf = function
      fprintf ppf "bytes.%sunaligned_set%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (vector_width size)
        (if boxed then "" else "#") array_index_kind index_kind
+  | Pbigstring_load_i8 { unsafe; index_kind } ->
+     fprintf ppf "bigarray.array1.%sgeti8[indexed by %a]"
+       (if unsafe then "unsafe_" else "") array_index_kind index_kind
+  | Pbigstring_load_i16 { unsafe; index_kind } ->
+     fprintf ppf "bigarray.array1.%sgeti16[indexed by %a]"
+       (if unsafe then "unsafe_" else "") array_index_kind index_kind
   | Pbigstring_load_16 { unsafe; index_kind } ->
      fprintf ppf "bigarray.array1.%sget16[indexed by %a]"
        (if unsafe then "unsafe_" else "") array_index_kind index_kind
@@ -712,13 +724,16 @@ let primitive ppf = function
      fprintf ppf "bigarray.array1.%sget64%s%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        (locality_kind mode) array_index_kind index_kind
-  | Pbigstring_load_vec { size; unsafe; aligned; mode; boxed; index_kind } ->
+  | Pbigstring_load_vec { size; checks; aligned; mode; boxed; index_kind } ->
      fprintf ppf "bigarray.array1.%s%sget%s%s%s[indexed by %a]"
-       (if unsafe then "unsafe_" else "")
+       (if Option.is_none checks then "unsafe_" else "")
        (if aligned then "aligned_" else "unaligned_")
        (vector_width size)
        (if boxed then "" else "#") (locality_kind mode)
        array_index_kind index_kind
+  | Pbigstring_set_8 { unsafe; index_kind } ->
+     fprintf ppf "bigarray.array1.%sset8[indexed by %a]"
+       (if unsafe then "unsafe_" else "") array_index_kind index_kind
   | Pbigstring_set_16 { unsafe; index_kind } ->
      fprintf ppf "bigarray.array1.%sset16[indexed by %a]"
        (if unsafe then "unsafe_" else "") array_index_kind index_kind
@@ -734,9 +749,9 @@ let primitive ppf = function
      fprintf ppf "bigarray.array1.%sset64%s[indexed by %a]"
        (if unsafe then "unsafe_" else "") (if boxed then "" else "#")
        array_index_kind index_kind
-  | Pbigstring_set_vec { size; unsafe; aligned; boxed; index_kind } ->
+  | Pbigstring_set_vec { size; checks; aligned; boxed; index_kind } ->
      fprintf ppf "bigarray.array1.%s%sset%s%s[indexed by %a]"
-       (if unsafe then "unsafe_" else "")
+       (if Option.is_none checks then "unsafe_" else "")
        (if aligned then "aligned_" else "unaligned_")
        (vector_width size)
        (if boxed then "" else "#") array_index_kind index_kind
@@ -758,6 +773,14 @@ let primitive ppf = function
       (if boxed then "" else "#") (locality_kind mode)
   | Punboxed_float32_array_load_vec {size; unsafe; mode; boxed} ->
      fprintf ppf "unboxed_float32_array.%sget%s%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#") (locality_kind mode)
+  | Puntagged_int8_array_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "untagged_int8_array.%sget%s%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#") (locality_kind mode)
+  | Puntagged_int16_array_load_vec {size; unsafe; mode; boxed} ->
+     fprintf ppf "untagged_int16_array.%sget%s%s%s"
       (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#") (locality_kind mode)
   | Punboxed_int32_array_load_vec {size; unsafe; mode; boxed} ->
@@ -790,6 +813,14 @@ let primitive ppf = function
       (if boxed then "" else "#")
   | Punboxed_float32_array_set_vec {size; unsafe; boxed} ->
      fprintf ppf "unboxed_float32_array.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
+  | Puntagged_int8_array_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "untagged_int8_array.%sset%s%s"
+      (if unsafe then "unsafe_" else "") (vector_width size)
+      (if boxed then "" else "#")
+  | Puntagged_int16_array_set_vec {size; unsafe; boxed} ->
+     fprintf ppf "untagged_int16_array.%sset%s%s"
       (if unsafe then "unsafe_" else "") (vector_width size)
       (if boxed then "" else "#")
   | Punboxed_int32_array_set_vec {size; unsafe; boxed} ->
@@ -834,6 +865,7 @@ let primitive ppf = function
   | Popaque _ -> fprintf ppf "opaque"
   | Pdls_get -> fprintf ppf "dls_get"
   | Ptls_get -> fprintf ppf "tls_get"
+  | Pdomain_index -> fprintf ppf "domain_index"
   | Ppoll -> fprintf ppf "poll"
   | Pcpu_relax -> fprintf ppf "cpu_relax"
   | Pprobe_is_enabled {name} -> fprintf ppf "probe_is_enabled[%s]" name
@@ -843,6 +875,8 @@ let primitive ppf = function
   | Punbox_vector bi -> fprintf ppf "unbox_%s" (boxed_vector bi)
   | Pbox_vector (bi, m) ->
       fprintf ppf "box_%s%s" (boxed_vector bi) (locality_kind m)
+  | Pjoin_vec256 -> fprintf ppf "join_vec256"
+  | Psplit_vec256 -> fprintf ppf "split_vec256"
   | Parray_to_iarray -> fprintf ppf "array_to_iarray"
   | Parray_of_iarray -> fprintf ppf "array_of_iarray"
   | Pget_header m -> fprintf ppf "get_header%s" (locality_kind m)
@@ -850,6 +884,10 @@ let primitive ppf = function
       fprintf ppf "reinterpret_tagged_int63_as_unboxed_int64"
   | Preinterpret_unboxed_int64_as_tagged_int63 ->
       fprintf ppf "reinterpret_unboxed_int64_as_tagged_int63"
+  | Preinterpret_boxed_vector_as_tuple v ->
+      fprintf ppf "reinterpret_boxed_%s_as_tuple" (boxed_vector v)
+  | Preinterpret_tuple_as_boxed_vector v ->
+      fprintf ppf "reinterpret_tuple_as_boxed_%s" (boxed_vector v)
   | Ppeek layout ->
       fprintf ppf "(peek@ %a)"
         peek_or_poke layout
@@ -891,7 +929,6 @@ let name_of_primitive = function
   | Pmakeblock _ -> "Pmakeblock"
   | Pmakefloatblock _ -> "Pmakefloatblock"
   | Pmakeufloatblock _ -> "Pmakeufloatblock"
-  | Pmakemixedblock _ -> "Pmakemixedblock"
   | Pmakelazyblock _ -> "Pmakelazyblock"
   | Pfield _ -> "Pfield"
   | Pfield_computed _ -> "Pfield_computed"
@@ -941,26 +978,34 @@ let name_of_primitive = function
   | Pbigarrayref _ -> "Pbigarrayref"
   | Pbigarrayset _ -> "Pbigarrayset"
   | Pbigarraydim _ -> "Pbigarraydim"
+  | Pstring_load_i8 _ -> "Pstring_load_i8"
+  | Pstring_load_i16 _ -> "Pstring_load_i16"
   | Pstring_load_16 _ -> "Pstring_load_16"
   | Pstring_load_32 _ -> "Pstring_load_32"
   | Pstring_load_f32 _ -> "Pstring_load_f32"
   | Pstring_load_64 _ -> "Pstring_load_64"
   | Pstring_load_vec _ -> "Pstring_load_vec"
+  | Pbytes_load_i8 _ -> "Pbytes_load_i8"
+  | Pbytes_load_i16 _ -> "Pbytes_load_i16"
   | Pbytes_load_16 _ -> "Pbytes_load_16"
   | Pbytes_load_32 _ -> "Pbytes_load_32"
   | Pbytes_load_f32 _ -> "Pbytes_load_f32"
   | Pbytes_load_64 _ -> "Pbytes_load_64"
   | Pbytes_load_vec _ -> "Pbytes_load_vec"
+  | Pbytes_set_8 _ -> "Pbytes_set_8"
   | Pbytes_set_16 _ -> "Pbytes_set_16"
   | Pbytes_set_32 _ -> "Pbytes_set_32"
   | Pbytes_set_f32 _ -> "Pbytes_set_f32"
   | Pbytes_set_64 _ -> "Pbytes_set_64"
   | Pbytes_set_vec _ -> "Pbytes_set_vec"
+  | Pbigstring_load_i8 _ -> "Pbigstring_load_i8"
+  | Pbigstring_load_i16 _ -> "Pbigstring_load_i16"
   | Pbigstring_load_16 _ -> "Pbigstring_load_16"
   | Pbigstring_load_32 _ -> "Pbigstring_load_32"
   | Pbigstring_load_f32 _ -> "Pbigstring_load_f32"
   | Pbigstring_load_64 _ -> "Pbigstring_load_64"
   | Pbigstring_load_vec _ -> "Pbigstring_load_vec"
+  | Pbigstring_set_8 _ -> "Pbigstring_set_8"
   | Pbigstring_set_16 _ -> "Pbigstring_set_16"
   | Pbigstring_set_32 _ -> "Pbigstring_set_32"
   | Pbigstring_set_f32 _ -> "Pbigstring_set_f32"
@@ -971,6 +1016,8 @@ let name_of_primitive = function
   | Pint_array_load_vec _ -> "Pint_array_load_vec"
   | Punboxed_float_array_load_vec _ -> "Punboxed_float_array_load_vec"
   | Punboxed_float32_array_load_vec _ -> "Punboxed_float32_array_load_vec"
+  | Puntagged_int8_array_load_vec _ -> "Puntagged_int8_array_load_vec"
+  | Puntagged_int16_array_load_vec _ -> "Puntagged_int16_array_load_vec"
   | Punboxed_int32_array_load_vec _ -> "Punboxed_int32_array_load_vec"
   | Punboxed_int64_array_load_vec _ -> "Punboxed_int64_array_load_vec"
   | Punboxed_nativeint_array_load_vec _ -> "Punboxed_nativeint_array_load_vec"
@@ -979,6 +1026,8 @@ let name_of_primitive = function
   | Pint_array_set_vec _ -> "Pint_array_set_vec"
   | Punboxed_float_array_set_vec _ -> "Punboxed_float_array_set_vec"
   | Punboxed_float32_array_set_vec _ -> "Punboxed_float32_array_set_vec"
+  | Puntagged_int8_array_set_vec _ -> "Puntagged_int8_array_set_vec"
+  | Puntagged_int16_array_set_vec _ -> "Puntagged_int16_array_set_vec"
   | Punboxed_int32_array_set_vec _ -> "Punboxed_int32_array_set_vec"
   | Punboxed_int64_array_set_vec _ -> "Punboxed_int64_array_set_vec"
   | Punboxed_nativeint_array_set_vec _ -> "Punboxed_nativeint_array_set_vec"
@@ -1011,12 +1060,14 @@ let name_of_primitive = function
   | Patomic_lxor_field -> "Patomic_lxor_field"
   | Pcpu_relax -> "Pcpu_relax"
   | Popaque _ -> "Popaque"
-  | Prunstack -> "Prunstack"
+  | Pwith_stack -> "Pwith_stack"
+  | Pwith_stack_bind -> "Pwith_stack_bind"
   | Presume -> "Presume"
   | Pperform -> "Pperform"
   | Preperform -> "Preperform"
   | Pdls_get -> "Pdls_get"
   | Ptls_get -> "Ptls_get"
+  | Pdomain_index -> "Pdomain_index"
   | Ppoll -> "Ppoll"
   | Pprobe_is_enabled _ -> "Pprobe_is_enabled"
   | Pobj_dup -> "Pobj_dup"
@@ -1024,6 +1075,8 @@ let name_of_primitive = function
   | Punbox_unit -> "Punbox_unit"
   | Punbox_vector _ -> "Punbox_vector"
   | Pbox_vector _ -> "Pbox_vector"
+  | Pjoin_vec256 -> "Pjoin_vec256"
+  | Psplit_vec256 -> "Psplit_vec256"
   | Parray_of_iarray -> "Parray_of_iarray"
   | Parray_to_iarray -> "Parray_to_iarray"
   | Pget_header _ -> "Pget_header"
@@ -1031,6 +1084,10 @@ let name_of_primitive = function
       "Preinterpret_tagged_int63_as_unboxed_int64"
   | Preinterpret_unboxed_int64_as_tagged_int63 ->
       "Preinterpret_unboxed_int64_as_tagged_int63"
+  | Preinterpret_boxed_vector_as_tuple _ ->
+      "Preinterpret_boxed_vector_as_tuple"
+  | Preinterpret_tuple_as_boxed_vector _ ->
+      "Preinterpret_tuple_as_boxed_vector"
   | Ppeek _ -> "Ppeek"
   | Ppoke _ -> "Ppoke"
   | Pget_idx _ -> "Pget_idx"

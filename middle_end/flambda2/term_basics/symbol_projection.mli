@@ -14,13 +14,17 @@
 
 module Projection : sig
   type t = private
-    | Block_load of { index : Target_ocaml_int.t }
+    | Block_load of
+        { index : Target_ocaml_int.t;
+          block_shape : Flambda_kind.Block_shape.t
+        }
     | Project_value_slot of
         { project_from : Function_slot.t;
           value_slot : Value_slot.t
         }
 
-  val block_load : index:Target_ocaml_int.t -> t
+  val block_load :
+    index:Target_ocaml_int.t -> block_shape:Flambda_kind.Block_shape.t -> t
 
   val project_value_slot : Function_slot.t -> Value_slot.t -> t
 end

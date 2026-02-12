@@ -18,7 +18,8 @@
     (1) https://github.com/janestreet/splittable_random
 
     (2)
-    http://2014.splashcon.org/event/oopsla2014-fast-splittable-pseudorandom-number-generators *)
+    http://2014.splashcon.org/event/oopsla2014-fast-splittable-pseudorandom-number-generators
+*)
 
 type t
 

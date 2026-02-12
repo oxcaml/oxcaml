@@ -28,12 +28,14 @@ let comparison ppf = function
   | Ugeint -> pp_print_string ppf "ugeint"
 
 let primitive ppf = function
-  | Getglobal c -> fprintf ppf "getglobal %a" Compilation_unit.print c
+  | Getglobal c ->
+    fprintf ppf "getglobal %a" (Format_doc.compat Compilation_unit.print) c
   | Getpredef i -> fprintf ppf "getpredef %a" Ident.print i
   | Boolnot -> pp_print_string ppf "boolnot"
   | Isint -> pp_print_string ppf "isint"
   | Vectlength -> pp_print_string ppf "vectlength"
-  | Setglobal c -> fprintf ppf "setglobal %a" Compilation_unit.print c
+  | Setglobal c ->
+    fprintf ppf "setglobal %a" (Format_doc.compat Compilation_unit.print) c
   | Getfield i -> fprintf ppf "getfield %d" i
   | Getfloatfield i -> fprintf ppf "getfloatfield %d" i
   | Raise Raise_regular -> pp_print_string ppf "raise"
@@ -118,7 +120,7 @@ let rec blambda ppf = function
     let matching_cases cases i =
       ListLabels.mapi cases ~f:(fun n j -> n, j)
       |> ListLabels.filter_map ~f:(fun (n, j) ->
-             if i <> j then None else Some n)
+          if i <> j then None else Some n)
     in
     let or_pattern ppf = function
       | [] -> ()
@@ -210,7 +212,8 @@ let rec blambda ppf = function
       match op with
       | Perform -> "perform"
       | Reperform -> "reperform"
-      | Runstack -> "runstack"
+      | With_stack -> "with_stack"
+      | With_stack_bind -> "with_stack_bind"
       | Resume -> "resume"
     in
     fprintf ppf "@[<2>(%s@ %a)@]" op

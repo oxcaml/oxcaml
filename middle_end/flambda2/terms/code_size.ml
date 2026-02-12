@@ -216,8 +216,10 @@ let string_or_bigstring_load ~machine_width kind width =
     (* CR gbury: these should actually depend on Arch.allow_unaligned_access,
        but that would add a dependency on the backend which is probably not
        desirable ? *)
+    | Eight_signed -> 2 (* add, load (allow_unaligned_access) *)
     | Sixteen -> 2 (* add, load (allow_unaligned_access) *)
     (* 7 (not allow_unaligned_access) *)
+    | Sixteen_signed -> 2 (* add, load (allow_unaligned_access) *)
     | Thirty_two | Single -> 2 (* add, load (allow_unaligned_access) *)
     (* 17 (not allow_unaligned_access) *)
     | Sixty_four ->
@@ -243,12 +245,12 @@ let divmod_bi_check ~machine_width else_branch_size
     (bi : Flambda_kind.Standard_int.t) =
   (* CR gbury: we should allow check Arch.division_crashed_on_overflow, but
      that's likely a dependency we want to avoid ? *)
-  if Target_system.Machine_width.is_32_bit machine_width
-     ||
-     match bi with
-     | Naked_int8 | Naked_int16 | Naked_int32 -> false
-     | Naked_int64 | Naked_nativeint | Naked_immediate | Tagged_immediate ->
-       true
+  if
+    Target_system.Machine_width.is_32_bit machine_width
+    ||
+    match bi with
+    | Naked_int8 | Naked_int16 | Naked_int32 -> false
+    | Naked_int64 | Naked_nativeint | Naked_immediate | Tagged_immediate -> true
   then 2 + else_branch_size
   else 0
 
@@ -391,6 +393,7 @@ let nullary_prim_size prim =
   | Enter_inlined_apply _ -> 0
   | Dls_get -> 1
   | Tls_get -> 1
+  | Domain_index -> 1
   | Poll | Cpu_relax -> alloc_size
 
 let unary_prim_size ~machine_width prim =
@@ -421,6 +424,7 @@ let unary_prim_size ~machine_width prim =
   | Float_arith _ -> 2
   | Num_conv { src; dst } -> arith_conversion_size ~machine_width src dst
   | Boolean_not -> 1
+  | Reinterpret_boxed_vector -> 0
   | Reinterpret_64_bit_word reinterpret -> (
     match reinterpret with
     | Tagged_int63_as_unboxed_int64 -> 0
@@ -525,10 +529,8 @@ let apply apply =
   match Apply_expr.call_kind apply with
   | Function { function_call = Direct _; _ } -> direct_call_size
   (* CR mshinwell: Check / fix these numbers *)
-  | Function { function_call = Indirect_unknown_arity; alloc_mode = _ } ->
-    indirect_call_size
-  | Function { function_call = Indirect_known_arity _; alloc_mode = _ } ->
-    indirect_call_size
+  | Function { function_call = Indirect_unknown_arity } -> indirect_call_size
+  | Function { function_call = Indirect_known_arity _ } -> indirect_call_size
   | C_call { needs_caml_c_call = true; _ } -> needs_caml_c_call_extcall_size
   | C_call { needs_caml_c_call = false; _ } ->
     does_not_need_caml_c_call_extcall_size

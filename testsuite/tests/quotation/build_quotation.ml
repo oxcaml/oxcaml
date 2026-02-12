@@ -1,5 +1,5 @@
 (* TEST
- flags = "-extension runtime_metaprogramming";
+ flags = "-extension runtime_metaprogramming -extension comprehensions";
  expect;
 *)
 
@@ -72,9 +72,20 @@
 - : <[bool]> expr = <[false]>
 |}];;
 
+<[ function #false -> #true | #true -> #false ]>;;
+[%%expect {|
+- : <[bool# -> bool#]> expr = <[function | #false -> #true | #true -> #false
+]>
+|}];;
+
 <[ () ]>;;
 [%%expect {|
 - : <[unit]> expr = <[()]>
+|}];;
+
+<[ fun #() -> #() ]>;;
+[%%expect {|
+- : <[unit# -> unit#]> expr = <[fun #() -> #()]>
 |}];;
 
 <[ (1, 2) ]>;;
@@ -538,7 +549,12 @@ type rcd = { x : int; y : string; }
 
 <[ {x = 42; y = "foo"} ]>;;
 [%%expect {|
-- : <[rcd]> expr = <[{ x = 42; y = "foo"; }]>
+Line 1, characters 4-5:
+1 | <[ {x = 42; y = "foo"} ]>;;
+        ^
+Error: Label "x" used at line 1, characters 4-5 cannot be used in this context;
+       "x" is not defined inside a quotation (<[ ... ]>).
+Hint: Label "x" is defined outside any quotations.
 |}];;
 
 type rcd_u = #{xu: int; yu: string};;
@@ -548,17 +564,34 @@ type rcd_u = #{ xu : int; yu : string; }
 
 <[ fun () -> #{xu = 42; yu = "foo"} ]>;;
 [%%expect {|
-- : <[unit -> rcd_u]> expr = <[fun () -> { xu = 42; yu = "foo"; }]>
+Line 1, characters 15-17:
+1 | <[ fun () -> #{xu = 42; yu = "foo"} ]>;;
+                   ^^
+Error: Label "xu" used at line 1, characters 15-17
+       cannot be used in this context;
+       "xu" is not defined inside a quotation (<[ ... ]>).
+Hint: Label "xu" is defined outside any quotations.
 |}];;
 
 <[ fun r -> r.x ]>;;
 [%%expect {|
-- : <[rcd -> int]> expr = <[fun r -> r.x]>
+Line 1, characters 14-15:
+1 | <[ fun r -> r.x ]>;;
+                  ^
+Error: Label "x" used at line 1, characters 14-15
+       cannot be used in this context;
+       "x" is not defined inside a quotation (<[ ... ]>).
+Hint: Label "x" is defined outside any quotations.
 |}];;
 
 <[ fun {x; y} -> x ]>;;
 [%%expect {|
-- : <[rcd -> int]> expr = <[fun {x=x; y=y; } -> x]>
+Line 1, characters 8-9:
+1 | <[ fun {x; y} -> x ]>;;
+            ^
+Error: Label "x" used at line 1, characters 8-9 cannot be used in this context;
+       "x" is not defined inside a quotation (<[ ... ]>).
+Hint: Label "x" is defined outside any quotations.
 |}];;
 
 <[ raise (Match_failure ("foo", 42, 100)) ]>;;
@@ -654,6 +687,16 @@ type rcd_u = #{ xu : int; yu : string; }
 <[fun () -> exclave_ stack_ (Some 42)]>
 |}];;
 
+<[ let x = borrow_ 42 in x + 1 ]>;;
+[%%expect {|
+- : <[int]> expr = <[let x = (borrow_ 42) in x + 1]>
+|}];;
+
+<[ fun x -> let y = borrow_ x in y + 1 ]>;;
+[%%expect {|
+- : <[int -> int]> expr = <[fun x -> let y = (borrow_ x) in y + 1]>
+|}];;
+
 module type S = sig
   type t
   type t2
@@ -674,14 +717,20 @@ end;;
 module Mod : sig type t = int val mk : 'a -> 'a end
 |}];;
 
+<[fun (module M : Hashtbl.S) x -> M.clear (M.create x)]>;;
+[%%expect {|
+- : <[(module Hashtbl.S) -> int -> unit]> expr =
+<[fun (module M : Stdlib.Hashtbl.S) x -> M.clear (M.create x)]>
+|}];;
+
 <[ fun (module _ : S) x -> 42 ]>;;
 [%%expect {|
 Line 1, characters 19-20:
 1 | <[ fun (module _ : S) x -> 42 ]>;;
                        ^
-Error: Identifier "S" is used at Line 1, characters 19-20,
+Error: Identifier "S" is used at line 1, characters 19-20,
        inside a quotation (<[ ... ]>);
-       it is introduced at Lines 1-7, characters 0-3, outside any quotations.
+       it is introduced at lines 1-7, characters 0-3, outside any quotations.
 |}];;
 
 <[ let module M = struct type t = int let x = 42 end in M.x ]>;;
@@ -691,7 +740,7 @@ Line 1, characters 18-52:
                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Module definition using "struct..end"
        is not supported inside quoted expressions,
-       as seen at Line 1, characters 18-52.
+       as seen at line 1, characters 18-52.
 |}];;
 
 <[ Mod.mk 42 ]>;;
@@ -699,9 +748,9 @@ Error: Module definition using "struct..end"
 Line 1, characters 3-9:
 1 | <[ Mod.mk 42 ]>;;
        ^^^^^^
-Error: Identifier "Mod" is used at Line 1, characters 3-9,
+Error: Identifier "Mod" is used at line 1, characters 3-9,
        inside a quotation (<[ ... ]>);
-       it is introduced at File "_none_", line 1, outside any quotations.
+       it is introduced at file "_none_", line 1, outside any quotations.
 |}];;
 
 let x = 42 in <[ x ]>;;
@@ -709,14 +758,52 @@ let x = 42 in <[ x ]>;;
 Line 1, characters 17-18:
 1 | let x = 42 in <[ x ]>;;
                      ^
-Error: Identifier "x" is used at Line 1, characters 17-18,
+Error: Identifier "x" is used at line 1, characters 17-18,
        inside a quotation (<[ ... ]>);
-       it is introduced at Line 1, characters 4-5, outside any quotations.
+       it is introduced at line 1, characters 4-5, outside any quotations.
 |}];;
 
 let x = <[ 123 ]> in <[ $x ]>;;
 [%%expect {|
 - : <[int]> expr = <[123]>
+|}];;
+
+let _ = <[ [ a * b for a = 1 to 10 for b = a to 10 ] ]>;;
+[%%expect {|
+- : <[int list]> expr = <[[ a * b for a = 1 to 10 for b = a to 10 ]]>
+|}];;
+
+let _ = <[ [ a * b for a = 1 to 10 and b = 1 to 10 ] ]>;;
+[%%expect {|
+- : <[int list]> expr = <[[ a * b for a = 1 to 10 and b = 1 to 10 ]]>
+|}];;
+
+let _ = <[ [ a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 ] ]>;;
+[%%expect {|
+- : <[int list]> expr =
+<[[ a * b for a = 1 to 10 for b = a to 10 when (a + (b mod 2)) = 0 ]]>
+|}];;
+
+let _ = <[ [| a * b for a = 1 to 10 for b = a to 10 when a + b mod 2 = 0 |] ]>;;
+[%%expect {|
+- : <[int array]> expr =
+<[[| a * b for a = 1 to 10 for b = a to 10 when (a + (b mod 2)) = 0 |]]>
+|}];;
+
+let _ = <[ [| a ^ "!" for a in [|"foo"; "bar"|] |] ]>;;
+[%%expect {|
+- : <[string array]> expr = <[[| a ^ "!" for a in [|"foo"; "bar"|] |]]>
+|}];;
+
+let _ = <[ [: a ^ "!" for a in [:"foo"; "bar":] :] ]>;;
+[%%expect {|
+- : <[string iarray]> expr = <[[: a ^ "!" for a in [|"foo"; "bar"|] :]]>
+|}];;
+
+let _ = <[ [ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ] ]>;;
+[%%expect {|
+- : <[string list]> expr =
+<[[ a ^ b for a in ["foo"; "bar"] and b in ["!"; "?"; "!?"] ]]>
 |}];;
 
 <[ let o = object method f = 1 end in o#f ]>;;
@@ -726,7 +813,7 @@ Line 1, characters 11-34:
                ^^^^^^^^^^^^^^^^^^^^^^^
 Error: Object definition using "object..end"
        is not supported inside quoted expressions,
-       as seen at Line 1, characters 11-34.
+       as seen at line 1, characters 11-34.
 |}];;
 
 <[ let open List in map ]>;;
@@ -735,8 +822,45 @@ Line 1, characters 3-23:
 1 | <[ let open List in map ]>;;
        ^^^^^^^^^^^^^^^^^^^^
 Error: Opening modules is not supported inside quoted expressions,
-       as seen at Line 1, characters 3-23.
+       as seen at line 1, characters 3-23.
 |}];;
+
+module M = struct
+  let foo = 42
+end;;
+
+<[ let open M in M.foo ]>;;
+[%%expect {|
+module M : sig val foo : int end
+Line 5, characters 3-22:
+5 | <[ let open M in M.foo ]>;;
+       ^^^^^^^^^^^^^^^^^^^
+Error: Opening modules is not supported inside quoted expressions,
+       as seen at line 5, characters 3-22.
+|}]
+;;
+
+<[ fun (x : < foo: int[@warning "-26"] >) -> x ]>;;
+[%%expect {|
+Line 1, characters 14-38:
+1 | <[ fun (x : < foo: int[@warning "-26"] >) -> x ]>;;
+                  ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Adding attributes on fields in object types
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 14-38.
+|}]
+;;
+
+<[ fun (x : [ `Foo of int[@warning "-26"] ]) -> x ]>;;
+[%%expect {|
+Line 1, characters 14-41:
+1 | <[ fun (x : [ `Foo of int[@warning "-26"] ]) -> x ]>;;
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Adding attributes on tags in polymorphic variant types
+       is not supported inside quoted expressions,
+       as seen at line 1, characters 14-41.
+|}]
+;;
 
 <[ fun x -> $ (<[ x ]>) ]>;;
 [%%expect {|
@@ -798,8 +922,96 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 = <[fun (f : x:'a -> ?y:'b -> 'c -> unit) x y z -> f ~x:x ?y:None z]>
 |}];;
 
+<[ let rec add : int * int -> int = fun (x, y) -> x + y in add ]>
+[%%expect {|
+- : <[int * int -> int]> expr =
+<[
+  let rec add : (int) * (int) -> int =
+  (fun (x, y) -> x + y : (int) * (int) -> int) in add
+]>
+|}];;
+
+<[ let rec id : 'a. 'a -> 'a = fun x -> x in id ]>
+[%%expect {|
+- : <[$('a) -> $('a)]> expr =
+<[let rec id : 'a. 'a -> 'a = (fun x -> x) in id]>
+|}];;
+
+<[ let rec foo : int -> int = fun x -> if x < 0 then bar x else 0
+   and bar : int -> int = fun x -> if x > 0 then foo x else 0
+   in foo, bar ]>
+[%%expect {|
+- : <[(int -> int) * (int -> int)]> expr =
+<[
+  let rec foo : int -> int =
+  (fun x -> if (x < 0) then (bar x) else 0 : int -> int)
+  and bar : int -> int =
+  (fun x__1 -> if (x__1 > 0) then (foo x__1) else 0 : int -> int) in
+  (foo, bar)
+]>
+|}];;
+
+<[ let rec foo (x : int) : int = if x < 0 then bar x else 0
+   and bar (x : int) : int = if x > 0 then foo x else 0
+   in foo, bar ]>
+[%%expect {|
+- : <[(int -> int) * (int -> int)]> expr =
+<[
+  let rec foo = (fun (x : int) -> (if (x < 0) then (bar x) else 0 : int))
+  and bar =
+  (fun (x__1 : int) -> (if (x__1 > 0) then (foo x__1) else 0 : int)) in
+  (foo, bar)
+]>
+|}];;
+
 <[ fun x -> function None -> 0 | Some x -> x ]>
 [%%expect {|
 - : <[$('a) -> int option -> int]> expr =
 <[fun x -> function | None -> 0 | Some (x__1) -> x__1]>
+|}];;
+
+<[ fun f x -> (f [@inlined]) x [@nontail] ]>
+[%%expect {|
+- : <[($('a) -> $('b)) -> $('a) -> $('b)]> expr =
+<[fun f x -> ((f [@inlined]) x [@nontail])]>
+|}];;
+
+<[ fun x -> [ x ; x + 1 ] ]>
+[%%expect {|
+- : <[int -> int list]> expr = <[fun x -> [x; x + 1]]>
+|}];;
+
+(* Constraints must be parenthesised in tuple and list elements *)
+
+<[ fun x -> ((x : int), (x + 1 : int)) ]>
+[%%expect {|
+- : <[int -> int * int]> expr = <[fun x -> ((x : int), (x + 1 : int))]>
+|}];;
+
+<[ fun x -> [(x : int); (x + 1 : int)] ]>
+[%%expect {|
+- : <[int -> int list]> expr = <[fun x -> [(x : int); (x + 1 : int)]]>
+|}];;
+
+<[ (fun f -> (f 42, f "abc") : ('a. 'a -> 'a) -> (int * string)) ]>
+[%%expect {|
+- : <[('a. 'a -> 'a) -> int * string]> expr =
+<[(fun (f : 'a. 'a -> 'a) -> ((f 42), (f "abc")) : ('a__1. 'a__1 -> 'a__1) ->
+  (int) * (string))
+]>
+|}];;
+
+let x = <[ "foo" ]> in <[ let y = (borrow_ $x) in (fun (a @ local) -> ()) y ]>
+[%%expect{|
+- : <[unit]> expr = <[let y = (borrow_ "foo") in (fun a -> ()) y]>
+|}];;
+
+let x = <[ "foo" ]> in <[ let y = (borrow_ x) in (fun (a @ local) -> ()) y ]>
+[%%expect{|
+Line 1, characters 43-44:
+1 | let x = <[ "foo" ]> in <[ let y = (borrow_ x) in (fun (a @ local) -> ()) y ]>
+                                               ^
+Error: Identifier "x" is used at line 1, characters 43-44,
+       inside a quotation (<[ ... ]>);
+       it is introduced at line 1, characters 4-5, outside any quotations.
 |}];;

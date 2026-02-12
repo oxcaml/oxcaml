@@ -89,10 +89,11 @@ let clean_for_export t ~reachable_names =
   let names_to_types =
     Name.Map.filter_map
       (fun name (ty, binding_time_and_mode) ->
-        if Name_occurrences.mem_name reachable_names name
-           && Compilation_unit.equal
-                (Name.compilation_unit name)
-                current_compilation_unit
+        if
+          Name_occurrences.mem_name reachable_names name
+          && Compilation_unit.equal
+               (Name.compilation_unit name)
+               current_compilation_unit
         then (
           let binding_time_and_mode =
             if Name.is_var name

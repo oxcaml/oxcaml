@@ -63,9 +63,10 @@ let invariant_header_map dominators header_map =
       List.iter loops ~f:(fun loop ->
           Label.Set.iter
             (fun loop_label ->
-              if not
-                   (Cfg_dominators.is_dominating dominators header_label
-                      loop_label)
+              if
+                not
+                  (Cfg_dominators.is_dominating dominators header_label
+                     loop_label)
               then
                 fatal
                   "Cfg_loop_infos.invariant_header_map: block %a is not \

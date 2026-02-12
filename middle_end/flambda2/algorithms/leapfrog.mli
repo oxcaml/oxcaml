@@ -17,8 +17,7 @@
     Triejoin: A Simple, Worst-Case Optimal Join Algorithm" by Todd L. Veldhuizen
     (1).
 
-  (1) https://arxiv.org/pdf/1210.0481
-*)
+    (1) https://arxiv.org/pdf/1210.0481 *)
 
 (** {2 Iterators} *)
 
@@ -42,24 +41,23 @@ module type Iterator = sig
         iterator at depth [d + 1] for iteration on the trie currently pointed to
         by the iterator at depth [d].
 
-      - [init] is called on the iterator at depth [d] to start a new
-        iteration at depth [d]. Each call to [init] on the iterator at depth [d]
-        will iterate on the same set of keys until [accept] is called again on
-        the iterator at depth [d - 1].
+      - [init] is called on the iterator at depth [d] to start a new iteration
+        at depth [d]. Each call to [init] on the iterator at depth [d] will
+        iterate on the same set of keys until [accept] is called again on the
+        iterator at depth [d - 1].
 
       There are two special cases:
 
-       - When [accept] on the iterator at depth [d] and [d] is the last depth,
-         there is no iterator at depth [d + 1]. Instead, the value associated
-         with the current tuple is stored in another hidden reference -- the way
-         to access this hidden reference depends on the concrete implementation
-         of the [Iterator] signature.
+      - When [accept] on the iterator at depth [d] and [d] is the last depth,
+        there is no iterator at depth [d + 1]. Instead, the value associated
+        with the current tuple is stored in another hidden reference -- the way
+        to access this hidden reference depends on the concrete implementation
+        of the [Iterator] signature.
 
-       - There is no iterator at depth [-1], and so there is no way from this
-         signature to set a value to iterate on at depth [0]. This is again done
-         through explicit setting of yet another hidden reference whose location
-         depends on the concrete implementation of the [Iterator] signature.
-  *)
+      - There is no iterator at depth [-1], and so there is no way from this
+        signature to set a value to iterate on at depth [0]. This is again done
+        through explicit setting of yet another hidden reference whose location
+        depends on the concrete implementation of the [Iterator] signature. *)
 
   (** ['a t] is the type of iterators with keys of type ['a]. The type of values
       is hidden. *)
@@ -74,9 +72,9 @@ module type Iterator = sig
       [advance] is a no-op on an exhausted iterator. *)
   val advance : 'a t -> unit
 
-  (** [seek it x] moves the iterator to the least upper bound for [x],
-      i.e. the least key [y] such that [y >= x], exhausting the iterator if no
-      such key exists.
+  (** [seek it x] moves the iterator to the least upper bound for [x], i.e. the
+      least key [y] such that [y >= x], exhausting the iterator if no such key
+      exists.
 
       {b Note}: Only keys greater than the current position are considered:
       [seek] does nothing if [x] is smaller than the current key. *)
@@ -104,11 +102,11 @@ module Map (T : Container_types.S_plus_iterator) : sig
   (** [create cell handler] returns a new imperative iterator that iterates over
       the keys of the map in [cell].
 
-       - When calling [init], the iterator is initialised with the lowest key of
-         the map currently in the [cell] reference.
+      - When calling [init], the iterator is initialised with the lowest key of
+        the map currently in the [cell] reference.
 
-       - Calling [accept] will set the [handler] reference to the current value
-         of the iterator. *)
+      - Calling [accept] will set the [handler] reference to the current value
+        of the iterator. *)
   val create : 'a T.Map.t Channel.receiver -> 'a Channel.sender -> T.t t
 end
 
@@ -123,7 +121,6 @@ module Join (Iterator : Iterator) : sig
       The trie navigation operations [init] and [accept] are delegated to the
       underlying iterators.
 
-      @raise Invalid_argument if [iterators] is empty.
-  *)
+      @raise Invalid_argument if [iterators] is empty. *)
   val create : 'a Iterator.t list -> 'a t
 end

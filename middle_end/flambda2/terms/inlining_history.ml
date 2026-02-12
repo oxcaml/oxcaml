@@ -58,8 +58,9 @@ module Absolute = struct
     aux ppf t
 
   and print ppf (compilation_unit, t) =
-    Format.fprintf ppf "%a::%a" Compilation_unit.print_name compilation_unit
-      print_path t
+    Format.fprintf ppf "%a::%a"
+      (Format_doc.compat Compilation_unit.print_name)
+      compilation_unit print_path t
 
   let tag_path (path : path) =
     match path with

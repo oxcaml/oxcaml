@@ -333,6 +333,7 @@ let operation d = function
   | Ctuple_field (field, _ty) -> to_string "tuple_field %i" field
   | Cdls_get -> "dls_get"
   | Ctls_get -> "tls_get"
+  | Cdomain_index -> "domain_index"
   | Cpoll -> "poll"
   | Cpause -> "pause"
 
@@ -458,6 +459,8 @@ let rec expr ppf = function
     fprintf ppf "@[<2>(exit%a %a" trap_action_list traps exit_label i;
     List.iter (fun e -> fprintf ppf "@ %a" expr e) el;
     fprintf ppf ")@]"
+  | Cinvalid { message; symbol = sym } ->
+    fprintf ppf "@[<2>(invalid@ %S@ %a)@]" message symbol sym
 
 and sequence ppf = function[@warning "-4"]
   | Csequence (e1, e2) -> fprintf ppf "%a@ %a" sequence e1 sequence e2

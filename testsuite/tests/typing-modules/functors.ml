@@ -943,8 +943,9 @@ Error: Signature mismatch:
                    module E :
                      sig
                        module F :
-                         sig ... end -> sig ... end -> sig ... end ->
-                           sig ... end -> sig end
+                         sig ... end ->
+                           sig ... end ->
+                             sig ... end -> sig ... end -> sig end
                      end
                  end
              end
@@ -959,8 +960,9 @@ Error: Signature mismatch:
                module E :
                  sig
                    module F :
-                     sig type x end -> sig type y end -> sig type z end ->
-                       sig type w end -> sig end
+                     sig type x end ->
+                       sig type y end ->
+                         sig type z end -> sig type w end -> sig end
                  end
              end
          end
@@ -972,8 +974,9 @@ Error: Signature mismatch:
            module E :
              sig
                module F :
-                 sig type x end -> sig type y end -> sig type z end ->
-                   sig type w end -> sig end
+                 sig type x end ->
+                   sig type y end ->
+                     sig type z end -> sig type w end -> sig end
              end
          end
        In module "B.C.D.E":
@@ -982,8 +985,8 @@ Error: Signature mismatch:
        is not included in
          sig
            module F :
-             sig type x end -> sig type y end -> sig type z end ->
-               sig type w end -> sig end
+             sig type x end ->
+               sig type y end -> sig type z end -> sig type w end -> sig end
          end
        In module "B.C.D.E.F":
        Modules do not match:
@@ -1483,9 +1486,8 @@ Error: Signature mismatch:
          sig
            module F :
              sig type wrong end ->
-               functor (X : sig module type T end) (Res : X.T) (Res :
-                 X.T) (Res : X.T)
-               -> (X.T with Res)
+               functor (X : sig module type T end) (Res : X.T) (Res : X.T)
+                 (Res : X.T) -> (X.T with Res)
          end
        is not included in
          sig
@@ -1497,20 +1499,20 @@ Error: Signature mismatch:
                         module type inner =
                           sig module type t module M : t end
                         module F :
-                          functor (X : inner) -> (T -> T -> T) ->
-                            sig module type res = X.t end
+                          functor (X : inner) ->
+                            (T -> T -> T) -> sig module type res = X.t end
                         module Y :
                           sig
                             module type t = T -> T -> T
                             module M : functor (X : T) (Y : T) -> T
                           end
                       end)
-               -> X.F(X.Y)(X.Y.M).res
+                 -> X.F(X.Y)(X.Y.M).res
          end
        In module "F":
        Modules do not match:
-         functor (Arg : $S1) (X : $S2) (Res : X.T) (Res : X.T) (Res :
-         X.T) -> ...
+         functor (Arg : $S1) (X : $S2) (Res : X.T) (Res : X.T) (Res : X.T)
+         -> ...
        is not included in
          functor (sig end) (X : $T2) X.T X.T -> ...
        1. Module types do not match:

@@ -1,4 +1,4 @@
-File "fail26.ml", line 38, characters 5-15:
+File "fail26.ml", line 38, characters 3-13:
 Error: Annotation check for zero_alloc failed on function Fail26.raise_invalid_index_FAIL (camlFail26.raise_invalid_index_FAIL_HIDE_STAMP).
 
 File "fail26.ml", line 41, characters 5-15:

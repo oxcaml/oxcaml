@@ -328,7 +328,8 @@ and compute_extra_args_for_closure ~pass rewrite_id ~typing_env_at_use
     U.decision =
   let vars_within_closure =
     Value_slot.Map.mapi
-      (fun var ({ epa; decision; kind } : U.field_decision) : U.field_decision ->
+      (fun var ({ epa; decision; kind } : U.field_decision) : U.field_decision
+         ->
         let unboxer =
           Unboxers.Closure_field.unboxer machine_width function_slot var
         in
@@ -414,8 +415,9 @@ and compute_extra_args_for_variant ~pass rewrite_id ~typing_env_at_use
                   (Target_ocaml_int.to_int field_nth)
               in
               let new_extra_arg, new_arg_being_unboxed =
-                if are_there_non_const_ctors_at_use
-                   && Tag.Scannable.equal tag_at_use_site tag_decision
+                if
+                  are_there_non_const_ctors_at_use
+                  && Tag.Scannable.equal tag_at_use_site tag_decision
                 then
                   let unboxer =
                     Unboxers.Field.unboxer ~poison_const bak ~index:field_nth
@@ -454,7 +456,8 @@ let add_extra_params_and_args extra_params_and_args ~invalids decision =
     | Do_not_unbox _ -> extra_params_and_args
     | Unbox (Unique_tag_and_size { tag = _; shape = _; fields }) ->
       List.fold_left
-        (fun extra_params_and_args ({ epa; decision; kind } : U.field_decision) ->
+        (fun extra_params_and_args ({ epa; decision; kind } : U.field_decision)
+           ->
           let extra_param = BP.create epa.param kind epa.param_debug_uid in
           let extra_params_and_args =
             EPA.add extra_params_and_args ~invalids ~extra_param

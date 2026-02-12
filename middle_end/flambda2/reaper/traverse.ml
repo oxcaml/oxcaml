@@ -399,7 +399,11 @@ and traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
 and traverse_let_cont denv acc (let_cont : Let_cont.t) : rev_expr =
   match let_cont with
   | Non_recursive
-      { handler; num_free_occurrences = _; is_applied_with_traps = _ } ->
+      { handler;
+        num_free_occurrences = _;
+        is_applied_with_traps = _;
+        can_be_lifted = _
+      } ->
     Non_recursive_let_cont_handler.pattern_match handler ~f:(fun cont ~body ->
         traverse_let_cont_non_recursive denv acc cont ~body handler)
   | Recursive handlers ->
@@ -410,18 +414,24 @@ and traverse_let_cont denv acc (let_cont : Let_cont.t) : rev_expr =
 and traverse_let_cont_non_recursive denv acc cont ~body handler =
   let cont_handler = Non_recursive_let_cont_handler.handler handler in
   let traverse handler acc =
+    let is_exn_handler = Continuation_handler.is_exn_handler cont_handler in
+    let params = Bound_parameters.vars handler.bound_parameters in
     Acc.continuation_info acc cont
-      { params = Bound_parameters.vars handler.bound_parameters;
+      { params;
         arity =
           Flambda_arity.unarize
             (Bound_parameters.arity handler.bound_parameters);
-        is_exn_handler = Continuation_handler.is_exn_handler cont_handler
+        is_exn_handler
       };
-    let conts =
-      Continuation.Map.add cont
-        (Normal (Bound_parameters.vars handler.bound_parameters))
-        denv.conts
-    in
+    if is_exn_handler
+    then
+      (* The exception parameter of any exception handler is assumed to have any
+         possible source. This makes sure that we do not unbox the exception
+         parameter of exception handlers, which is incorrect when used in
+         functions (for instance, if they raise async exceptions), and would
+         also probably put incorrect backtrace information. *)
+      Acc.add_any_source acc (Code_id_or_name.var (List.hd params));
+    let conts = Continuation.Map.add cont (Normal params) denv.conts in
     let denv =
       { parent = Let_cont { cont; handler; parent = denv.parent };
         conts;
@@ -507,8 +517,7 @@ and traverse_let_cont_recursive denv acc ~invariant_params ~body handlers =
   in
   traverse denv acc body
 
-and traverse_cont_handler :
-    type a.
+and traverse_cont_handler : type a.
     denv -> acc -> Continuation_handler.t -> (cont_handler -> acc -> a) -> a =
  fun denv acc cont_handler k ->
   let is_exn_handler = Continuation_handler.is_exn_handler cont_handler in
@@ -561,23 +570,31 @@ and traverse_apply denv acc apply : rev_expr =
       return_args;
     match Apply.call_kind apply with
     | Function _ -> ()
-    | Method { obj; kind = _; alloc_mode = _ } ->
-      Acc.add_cond_any_usage acc ~denv obj
+    | Method { obj; kind = _ } -> Acc.add_cond_any_usage acc ~denv obj
     | C_call _ -> ()
     | Effect (Perform { eff }) -> Acc.add_cond_any_usage acc ~denv eff
     | Effect (Reperform { eff; cont; last_fiber }) ->
       Acc.add_cond_any_usage acc ~denv eff;
       Acc.add_cond_any_usage acc ~denv cont;
       Acc.add_cond_any_usage acc ~denv last_fiber
-    | Effect (Run_stack { stack; f; arg }) ->
-      Acc.add_cond_any_usage acc ~denv stack;
+    | Effect (With_stack { valuec; exnc; effc; f; arg }) ->
+      Acc.add_cond_any_usage acc ~denv valuec;
+      Acc.add_cond_any_usage acc ~denv exnc;
+      Acc.add_cond_any_usage acc ~denv effc;
       Acc.add_cond_any_usage acc ~denv f;
       Acc.add_cond_any_usage acc ~denv arg
-    | Effect (Resume { stack; f; arg; last_fiber }) ->
-      Acc.add_cond_any_usage acc ~denv stack;
+    | Effect (With_stack_bind { valuec; exnc; effc; dyn; bind; f; arg }) ->
+      Acc.add_cond_any_usage acc ~denv valuec;
+      Acc.add_cond_any_usage acc ~denv exnc;
+      Acc.add_cond_any_usage acc ~denv effc;
+      Acc.add_cond_any_usage acc ~denv dyn;
+      Acc.add_cond_any_usage acc ~denv bind;
       Acc.add_cond_any_usage acc ~denv f;
-      Acc.add_cond_any_usage acc ~denv arg;
-      Acc.add_cond_any_usage acc ~denv last_fiber
+      Acc.add_cond_any_usage acc ~denv arg
+    | Effect (Resume { cont; f; arg }) ->
+      Acc.add_cond_any_usage acc ~denv cont;
+      Acc.add_cond_any_usage acc ~denv f;
+      Acc.add_cond_any_usage acc ~denv arg
   in
   traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc;
   let expr = Apply apply in
@@ -694,17 +711,17 @@ and traverse_code (acc : acc) (code_id : Code_id.t) (code : Code.t)
   let params_and_body = Code.params_and_body code in
   Function_params_and_body.pattern_match params_and_body
     ~f:(fun
-         ~return_continuation
-         ~exn_continuation
-         params
-         ~body
-         ~my_closure
-         ~is_my_closure_used:_
-         ~my_region
-         ~my_ghost_region
-         ~my_depth
-         ~free_names_of_body:_
-       ->
+        ~return_continuation
+        ~exn_continuation
+        params
+        ~body
+        ~my_closure
+        ~is_my_closure_used:_
+        ~my_region
+        ~my_ghost_region
+        ~my_depth
+        ~free_names_of_body:_
+      ->
       traverse_function_params_and_body acc code_id code ~return_continuation
         ~exn_continuation params ~body ~my_closure ~my_region ~my_ghost_region
         ~my_depth ~le_monde_exterieur ~all_constants)

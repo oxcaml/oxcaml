@@ -57,8 +57,8 @@ type extra_info =
           expression. This allows to obtain the Cmm expression as it was before
           untagging. *)
 
-(** Record of all primitive translation functions, to avoid a cyclic
-    dependency. *)
+(** Record of all primitive translation functions, to avoid a cyclic dependency.
+*)
 type prim_res = extra_info option * To_cmm_result.t * Cmm.expression
 
 type ('env, 'prim, 'arity) prim_helper =
@@ -119,12 +119,12 @@ val enter_function_body :
 
 (** {2 Debuginfo} *)
 
-(** Add the inlined debuginfo from the env to the debuginfo provided,
-    in order to get the correct debuginfo to attach. *)
+(** Add the inlined debuginfo from the env to the debuginfo provided, in order
+    to get the correct debuginfo to attach. *)
 val add_inlined_debuginfo : t -> Debuginfo.t -> Debuginfo.t
 
-(** Adjust the inlined debuginfo in the env to represent the fact
-    that we entered the inlined body of a function. *)
+(** Adjust the inlined debuginfo in the env to represent the fact that we
+    entered the inlined body of a function. *)
 val enter_inlined_apply : t -> Inlined_debuginfo.t -> t
 
 (** Set the inlined debuginfo. *)
@@ -179,7 +179,7 @@ val create_bound_parameters :
     according to the effects and coeffects of their defining expressions:
 
     - bindings whose defining expressions are _pure_, that is to say have
-    neither effects nor coeffects;
+      neither effects nor coeffects;
 
     - bindings that have effects and/or coeffects.
 
@@ -325,8 +325,8 @@ val extra_info : t -> Simple.t -> extra_info option
 
 (** {2 Continuation bindings} *)
 
-(** Param types: some parameters might be skipped: for instance parameters
-    of kind [Rec_info] are meant to be removed during to_cmm translation. *)
+(** Param types: some parameters might be skipped: for instance parameters of
+    kind [Rec_info] are meant to be removed during to_cmm translation. *)
 type 'a param_type =
   | Param of 'a
   | Skip_param

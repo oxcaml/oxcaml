@@ -18,6 +18,7 @@
 #include <unistd.h>
 #define __USE_GNU
 #if !defined(__OpenBSD__)
+#define _GNU_SOURCE
 #include <sys/ucontext.h>
 #endif
 

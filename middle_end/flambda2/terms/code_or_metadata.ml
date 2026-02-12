@@ -178,8 +178,9 @@ let apply_renaming t renaming =
     let delayed_renaming' =
       Renaming.compose ~second:renaming ~first:not_loaded.delayed_renaming
     in
-    if metadata' == not_loaded.metadata
-       && delayed_renaming' == not_loaded.delayed_renaming
+    if
+      metadata' == not_loaded.metadata
+      && delayed_renaming' == not_loaded.delayed_renaming
     then t
     else
       Code_present

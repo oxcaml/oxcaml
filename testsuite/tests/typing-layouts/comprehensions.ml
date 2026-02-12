@@ -17,7 +17,7 @@ Line 6, characters 23-41:
 6 | let unbox_array x = [| Float_u.of_float a for a in x |]
                            ^^^^^^^^^^^^^^^^^^
 Error: This expression has type "Stdlib_upstream_compatible.Float_u.t" = "float#"
-       but an expression was expected of type "('a : value)"
+       but an expression was expected of type "('a : value_or_null)"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.
        But the layout of Stdlib_upstream_compatible.Float_u.t must be a sublayout of
          value
@@ -29,7 +29,7 @@ let box_array x = [| Float_u.to_float a for a in x |]
 Line 1, characters 38-39:
 1 | let box_array x = [| Float_u.to_float a for a in x |]
                                           ^
-Error: This expression has type "('a : value)"
+Error: This expression has type "('a : value_or_null)"
        but an expression was expected of type
          "Stdlib_upstream_compatible.Float_u.t" = "float#"
        The layout of Stdlib_upstream_compatible.Float_u.t is float64.

@@ -50,7 +50,8 @@ let simplify_switch (block : C.basic_block) labels =
   match labels_with_counts with
   | [(l, _)] ->
     (* All labels are the same and equal to l *)
-    block.terminator <- { block.terminator with desc = Always l }
+    block.terminator
+      <- { block.terminator with desc = Always l; arg = [||]; res = [||] }
   | [(l0, n); (ln, k)] ->
     assert (Label.equal labels.(0) l0);
     assert (Label.equal labels.(n) ln);
@@ -122,7 +123,7 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
           | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
           | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
           | Begin_region | End_region | Specific _ | Name_for_debugger _
-          | Dls_get | Poll | Pause | Alloc _ | Tls_get )
+          | Dls_get | Poll | Pause | Alloc _ | Tls_get | Domain_index )
       | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
       | Stack_check _ ->
         Array.iter
@@ -152,8 +153,7 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
       Misc.fatal_errorf "invalid argument index (%d) for instruction %a" arg_idx
         InstructionId.format term.id
   in
-  let[@inline] apply_constructor :
-      type a b.
+  let[@inline] apply_constructor : type a b.
       known_value option ->
       extract:(known_value -> a option) ->
       f:(a -> b option) ->
@@ -162,8 +162,7 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
     let res = Option.map f (Option.bind value extract) in
     Option.join res
   in
-  let[@inline] apply_constructors :
-      type a b.
+  let[@inline] apply_constructors : type a b.
       known_value option ->
       known_value option ->
       extract:(known_value -> a option) ->
@@ -218,8 +217,7 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
         in
         if result < 0 then Some lt else if result > 0 then Some gt else Some eq)
   | Float_test { width; lt : Label.t; eq : Label.t; gt : Label.t; uo } -> (
-    let apply_float_constructors :
-        type a.
+    let apply_float_constructors : type a.
         known_value option ->
         known_value option ->
         extract:(known_value -> a option) ->
@@ -263,18 +261,21 @@ let evaluate_terminator (known_values : known_value Reg.UsingLocEquality.Tbl.t)
         else None)
   | Never -> assert false
   | Always _ | Return | Raise _ | Tailcall_self _ | Tailcall_func _
-  | Call_no_return _ | Call _ | Prim _ ->
+  | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
     None
 
-let block_known_values (block : C.basic_block) ~(is_after_regalloc : bool) :
-    bool =
-  if !Oxcaml_flags.cfg_value_propagation && is_after_regalloc
+let block_known_values (block : C.basic_block) ~(is_after_regalloc : bool)
+    ~(allowed_to_be_irreducible : bool) : bool =
+  if
+    !Oxcaml_flags.cfg_value_propagation
+    && is_after_regalloc && allowed_to_be_irreducible
   then (
     let known_values = collect_known_values block.body in
     match evaluate_terminator known_values block.terminator with
     | None -> false
     | Some succ ->
-      block.terminator <- { block.terminator with desc = Always succ };
+      block.terminator
+        <- { block.terminator with desc = Always succ; arg = [||]; res = [||] };
       true)
   else false
 
@@ -304,7 +305,14 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
          `block_known_values`, except for the guard and whether one or two
          blocks are involved. *)
       let new_successor =
-        if is_after_regalloc
+        (* The graph may become irreducible if the successor block is the header
+           block of a loop. Indeed, if we shortcircuit that block, it means we
+           are jumping "inside" the loop directly, which in turn means the loop
+           is no longer natural. This is acceptable if we are past the last use
+           of the loop information. *)
+        if
+          !Oxcaml_flags.cfg_value_propagation
+          && is_after_regalloc && cfg.allowed_to_be_irreducible
         then
           let known_values = collect_known_values block.body in
           evaluate_terminator known_values successor_block.terminator
@@ -312,11 +320,17 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
       in
       match new_successor with
       | Some succ ->
-        block.terminator <- { block.terminator with desc = Always succ };
+        block.terminator
+          <- { block.terminator with
+               desc = Always succ;
+               arg = [||];
+               res = [||]
+             };
         true
       | None -> (
-        if Label.equal block.start cfg.entry_label
-           || not cfg.allowed_to_be_irreducible
+        if
+          Label.equal block.start cfg.entry_label
+          || not cfg.allowed_to_be_irreducible
         then false
         else
           (* If we jump to a block that is empty, we can copy the terminator
@@ -336,7 +350,7 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
                  };
             true
           | Never | Always _ | Switch _ | Raise _ | Tailcall_self _
-          | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ ->
+          | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ->
             false)
     else false
   | Never ->
@@ -347,18 +361,24 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
     if Label.Set.cardinal labels = 1
     then (
       let l = Label.Set.min_elt labels in
-      block.terminator <- { block.terminator with desc = Always l };
+      block.terminator
+        <- { block.terminator with desc = Always l; arg = [||]; res = [||] };
       false)
-    else block_known_values block ~is_after_regalloc
+    else
+      block_known_values block ~is_after_regalloc
+        ~allowed_to_be_irreducible:cfg.allowed_to_be_irreducible
   | Switch labels ->
-    let shortcircuit = block_known_values block ~is_after_regalloc in
+    let shortcircuit =
+      block_known_values block ~is_after_regalloc
+        ~allowed_to_be_irreducible:cfg.allowed_to_be_irreducible
+    in
     if shortcircuit
     then true
     else (
       simplify_switch block labels;
       false)
   | Raise _ | Return | Tailcall_self _ | Tailcall_func _ | Call_no_return _
-  | Call _ | Prim _ ->
+  | Call _ | Prim _ | Invalid _ ->
     false
 
 let run cfg =

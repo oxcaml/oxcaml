@@ -43,7 +43,7 @@ val reset : unit -> unit
 
 val to_int : t -> int
 
-(** [of_int_unsafe] is used for testing and ocamlfdo.  *)
+(** [of_int_unsafe] is used for testing and ocamlfdo. *)
 val of_int_unsafe : int -> t
 
 val equal : t -> t -> bool

@@ -6,35 +6,35 @@ let of_float f = Int32.bits_of_float f
 let to_float i = Int32.float_of_bits i
 
 external zero : unit -> (t[@unboxed]) = "caml_vec128_unreachable" "float32_zero"
-  [@@noalloc]
+[@@noalloc]
 
 external neg_zero : unit -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_neg_zero"
-  [@@noalloc]
+[@@noalloc]
 
 external one : unit -> (t[@unboxed]) = "caml_vec128_unreachable" "float32_one"
-  [@@noalloc]
+[@@noalloc]
 
 external neg_one : unit -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_neg_one"
-  [@@noalloc]
+[@@noalloc]
 
 external nan : unit -> (t[@unboxed]) = "caml_vec128_unreachable" "float32_nan"
-  [@@noalloc]
+[@@noalloc]
 
 external neg_infinity : unit -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_neg_infinity"
-  [@@noalloc]
+[@@noalloc]
 
 external infinity : unit -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_infinity"
-  [@@noalloc]
+[@@noalloc]
 
 external maxv : unit -> (t[@unboxed]) = "caml_vec128_unreachable" "float32_maxv"
-  [@@noalloc]
+[@@noalloc]
 
 external minv : unit -> (t[@unboxed]) = "caml_vec128_unreachable" "float32_minv"
-  [@@noalloc]
+[@@noalloc]
 
 let zero = zero ()
 
@@ -56,91 +56,91 @@ let minv = minv ()
 
 external cvt_i32 : (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_cvt_i32"
-  [@@noalloc]
+[@@noalloc]
 
 external cvtt_i32 : (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_cvtt_i32"
-  [@@noalloc]
+[@@noalloc]
 
 external round : (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_round"
-  [@@noalloc]
+[@@noalloc]
 
 external eq : (t[@unboxed]) -> (t[@unboxed]) -> bool
   = "caml_vec128_unreachable" "float32_eq"
-  [@@noalloc]
+[@@noalloc]
 
 external lt : (t[@unboxed]) -> (t[@unboxed]) -> bool
   = "caml_vec128_unreachable" "float32_lt"
-  [@@noalloc]
+[@@noalloc]
 
 external le : (t[@unboxed]) -> (t[@unboxed]) -> bool
   = "caml_vec128_unreachable" "float32_le"
-  [@@noalloc]
+[@@noalloc]
 
 external neq : (t[@unboxed]) -> (t[@unboxed]) -> bool
   = "caml_vec128_unreachable" "float32_ne"
-  [@@noalloc]
+[@@noalloc]
 
 external nle : (t[@unboxed]) -> (t[@unboxed]) -> bool
   = "caml_vec128_unreachable" "float32_nle"
-  [@@noalloc]
+[@@noalloc]
 
 external nlt : (t[@unboxed]) -> (t[@unboxed]) -> bool
   = "caml_vec128_unreachable" "float32_nlt"
-  [@@noalloc]
+[@@noalloc]
 
 external ord : (t[@unboxed]) -> (t[@unboxed]) -> bool
   = "caml_vec128_unreachable" "float32_ord"
-  [@@noalloc]
+[@@noalloc]
 
 external uord : (t[@unboxed]) -> (t[@unboxed]) -> bool
   = "caml_vec128_unreachable" "float32_uord"
-  [@@noalloc]
+[@@noalloc]
 
 external add : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_add"
-  [@@noalloc]
+[@@noalloc]
 
 external sub : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_sub"
-  [@@noalloc]
+[@@noalloc]
 
 external mul : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_mul"
-  [@@noalloc]
+[@@noalloc]
 
 external div : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_div"
-  [@@noalloc]
+[@@noalloc]
 
 external c_min : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_min"
-  [@@noalloc]
+[@@noalloc]
 
 external c_max : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_max"
-  [@@noalloc]
+[@@noalloc]
 
 external min_match_sse : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_min_match_sse"
-  [@@noalloc]
+[@@noalloc]
 
 external max_match_sse : (t[@unboxed]) -> (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_max_match_sse"
-  [@@noalloc]
+[@@noalloc]
 
 external rcp : (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_rcp"
-  [@@noalloc]
+[@@noalloc]
 
 external sqrt : (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_sqrt"
-  [@@noalloc]
+[@@noalloc]
 
 external rsqrt : (t[@unboxed]) -> (t[@unboxed])
   = "caml_vec128_unreachable" "float32_rsqrt"
-  [@@noalloc]
+[@@noalloc]
 
 let check_floats f =
   Random.set_state (Random.State.make [| 1234567890 |]);

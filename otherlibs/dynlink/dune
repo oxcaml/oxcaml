@@ -72,13 +72,14 @@
    -safe-string
    -strict-formats))
  (ocamlopt_flags
-  (:include %{project_root}/ocamlopt_flags.sexp))
+  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (modules
   binutils
   local_store
   config
   build_path_prefix_map
   misc
+  format_doc
   target_system
   identifiable
   numbers
@@ -128,6 +129,7 @@
   zero_alloc
   types
   oprint
+<<<<<<< HEAD
   typemode
   jkind
   ;; IKINDS
@@ -136,7 +138,15 @@
   axis_lattice
   ikind
   value_rec_types
+||||||| 73bc7b39d5
+  typemode
+  jkind
+  value_rec_types
+=======
+>>>>>>> origin/main
   btype
+  typemode
+  value_rec_types
   lazy_backtrack
   type_shape
   zero_alloc_utils
@@ -150,6 +160,7 @@
   cmi_format
   persistent_env
   env
+  jkind
   errortrace
   ctype
   signature_group
@@ -218,6 +229,8 @@
 (copy_files ../../utils/build_path_prefix_map.ml)
 
 (copy_files ../../utils/misc.ml)
+
+(copy_files ../../utils/format_doc.ml)
 
 (copy_files ../../utils/target_system.ml)
 
@@ -325,13 +338,13 @@
 
 (copy_files ../../typing/mode.ml)
 
+(copy_files ../../typing/btype.ml)
+
 (copy_files ../../typing/typemode.ml)
 
 (copy_files ../../typing/zero_alloc.ml)
 
 (copy_files ../../typing/types.ml)
-
-(copy_files ../../typing/btype.ml)
 
 (copy_files ../../typing/errortrace.ml)
 
@@ -413,6 +426,8 @@
 (copy_files ../../utils/build_path_prefix_map.mli)
 
 (copy_files ../../utils/misc.mli)
+
+(copy_files ../../utils/format_doc.mli)
 
 (copy_files ../../utils/identifiable.mli)
 
@@ -516,13 +531,13 @@
 
 (copy_files ../../typing/mode.mli)
 
+(copy_files ../../typing/btype.mli)
+
 (copy_files ../../typing/typemode.mli)
 
 (copy_files ../../typing/zero_alloc.mli)
 
 (copy_files ../../typing/types.mli)
-
-(copy_files ../../typing/btype.mli)
 
 (copy_files ../../typing/errortrace.mli)
 
@@ -666,6 +681,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Local_store.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Build_path_prefix_map.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Config.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Format_doc.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Misc.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Target_system.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Arg_helper.cmo
@@ -719,10 +735,15 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Scalar.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Primitive.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Oprint.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typemode.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Btype.cmo
+<<<<<<< HEAD
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ikind.cmo
+||||||| 73bc7b39d5
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind.cmo
+=======
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typemode.cmo
+>>>>>>> origin/main
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Subst.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Signature_with_global_bindings.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Bytesections.cmo
@@ -737,6 +758,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Predef.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Type_shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Env.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Errortrace.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ctype.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Signature_group.cmo
@@ -785,6 +807,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Local_store.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Build_path_prefix_map.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Config.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Format_doc.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Misc.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Target_system.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Arg_helper.cmx
@@ -838,10 +861,15 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Scalar.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Primitive.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Oprint.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typemode.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Btype.cmx
+<<<<<<< HEAD
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ikind.cmx
+||||||| 73bc7b39d5
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind.cmx
+=======
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typemode.cmx
+>>>>>>> origin/main
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Subst.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Signature_with_global_bindings.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Bytesections.cmx
@@ -856,6 +884,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Predef.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Type_shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Env.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Errortrace.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ctype.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Signature_group.cmx

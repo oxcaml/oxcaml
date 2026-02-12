@@ -64,12 +64,12 @@ let instantiate ~src ~args targetcmo =
 
 (* Error report *)
 
-open Format
+open Format_doc
 
 let report_error ppf = function
   | Not_an_object_file file ->
     fprintf ppf "%a is not a bytecode object file"
-      Location.print_filename file
+      Location.Doc.filename file
 
 let () =
   Location.register_error_of_exn

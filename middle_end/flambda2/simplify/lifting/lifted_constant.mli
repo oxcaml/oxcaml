@@ -74,8 +74,8 @@ type t
 
 val print : Format.formatter -> t -> unit
 
-(** The creation functions take the types of symbols to avoid re-inferring
-    them. *)
+(** The creation functions take the types of symbols to avoid re-inferring them.
+*)
 val create_block_like :
   Symbol.t ->
   symbol_projections:Symbol_projection.t Variable.Map.t ->

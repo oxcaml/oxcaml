@@ -864,8 +864,9 @@ let remove_symbol t ~symbol =
     { t with names }
 
 let remove_code_id t ~code_id =
-  if For_code_ids.is_empty t.code_ids
-     && For_code_ids.is_empty t.newer_version_of_code_ids
+  if
+    For_code_ids.is_empty t.code_ids
+    && For_code_ids.is_empty t.newer_version_of_code_ids
   then t
   else
     let code_ids = For_code_ids.remove t.code_ids code_id in
@@ -880,8 +881,9 @@ let remove_code_id_or_symbol t ~(code_id_or_symbol : Code_id_or_symbol.t) =
     ~symbol:(fun symbol -> remove_symbol t ~symbol)
 
 let remove_continuation t ~continuation =
-  if For_continuations.is_empty t.continuations
-     && For_continuations.is_empty t.continuations_in_trap_actions
+  if
+    For_continuations.is_empty t.continuations
+    && For_continuations.is_empty t.continuations_in_trap_actions
   then t
   else
     let continuations = For_continuations.remove t.continuations continuation in

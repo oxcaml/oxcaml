@@ -2,6 +2,19 @@
  expect;
 *)
 
+(* unit# can be ignored with [;] *)
+
+external unbox_unit : unit -> unit# = "%unbox_unit"
+[%%expect{|
+external unbox_unit : unit -> unit# = "%unbox_unit"
+|}]
+
+let () =
+  unbox_unit ();
+  ()
+[%%expect{|
+|}]
+
 type unit_u : void mod everything
 [%%expect{|
 type unit_u : void mod everything
@@ -96,10 +109,10 @@ Error: The kind of type "bad" is immediate with unit_u with v1 with v2
          because of the annotation on the declaration of the type bad.
 |}]
 
-type vme : void mod external_
+type vme : void_internal mod external_
 type t : value mod external_ = A of vme
 [%%expect{|
-type vme : void mod external_
+type vme : void
 type t = A of vme
 |}]
 

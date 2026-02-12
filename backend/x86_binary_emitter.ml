@@ -24,6 +24,8 @@ module String = Misc.Stdlib.String
 
 module D = Asm_targets.Asm_directives.Directive
 module C = D.Constant
+module Asm_label = Asm_targets.Asm_label
+module Asm_symbol = Asm_targets.Asm_symbol
 
 
 type section = {
@@ -200,7 +202,9 @@ let eval_const b current_pos cst =
     | C.Signed_int n -> Rint n
     | C.Unsigned_int n -> Rint (Numbers.Uint64.to_int64 n)
     | C.This -> Rabs ("", 0L)
-    | C.Named_thing lbl -> Rabs (lbl, 0L)
+    | C.Label lbl -> Rabs (Asm_label.encode lbl, 0L)
+    | C.Symbol sym -> Rabs (Asm_symbol.encode sym, 0L)
+    | C.Variable name -> Rabs (name, 0L)
     | C.Sub (c1, c2) -> (
         let c1 = eval c1 and c2 = eval c2 in
         match (c1, c2) with
@@ -705,7 +709,7 @@ let emit_vex_rm_reg b ops rm reg ~vex_m ~vex_w ~vex_v ~vex_l ~vex_p =
 
 let rd_of_reg = function
   | Regf reg -> rd_of_regf reg
-  | Reg32 reg | Reg64 reg -> rd_of_reg64 reg
+  | Reg16 reg | Reg32 reg | Reg64 reg -> rd_of_reg64 reg
   | _ -> assert false
 
 let emit_simd b (instr : Amd64_simd_instrs.instr) args =
@@ -773,11 +777,15 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
       | _ -> failwith instr.mnemonic)
     | _ -> failwith instr.mnemonic
   in
-  let emit_legacy_prefix = function
-    | Prx_none -> ()
+  let emit_legacy_prefix ~operand_size_override prefix =
+    let emit_operand_size_overide () =
+      if operand_size_override then buf_int8 b 0x66
+    in
+    match prefix with
+    | Prx_none -> emit_operand_size_overide ()
     | Prx_66 -> buf_int8 b 0x66
-    | Prx_F3 -> buf_int8 b 0xF3
-    | Prx_F2 -> buf_int8 b 0xF2
+    | Prx_F3 -> buf_int8 b 0xF3; emit_operand_size_overide ()
+    | Prx_F2 -> buf_int8 b 0xF2; emit_operand_size_overide ()
   in
   let legacy_escape = function
     | Esc_none -> [instr.enc.opcode]
@@ -802,13 +810,13 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
     | Prx_F2 -> 3
   in
   (match instr.enc.rm_reg, instr.enc.prefix with
-  | Spec rmod, Legacy { prefix; rex; escape } ->
+  | Spec rmod, Legacy { prefix; rex; escape; operand_size_override } ->
     let rm = rm_only () in
-    emit_legacy_prefix prefix;
+    emit_legacy_prefix prefix ~operand_size_override;
     emit_mod_rm_reg b (mk_rex rex) (legacy_escape escape) rm rmod
-  | Reg, Legacy { prefix; rex; escape } ->
+  | Reg, Legacy { prefix; rex; escape; operand_size_override } ->
     let rm, reg = rm_reg () in
-    emit_legacy_prefix prefix;
+    emit_legacy_prefix prefix ~operand_size_override;
     emit_mod_rm_reg b (mk_rex rex) (legacy_escape escape) rm reg
   | Reg, Vex { vex_m; vex_w; vex_l; vex_p } ->
     let rm, vex_v, reg = rm_vexv_reg () in
@@ -1007,7 +1015,7 @@ let emit_shift reg b dst src =
       assert (is_imm8L n);
       emit_mod_rm_reg b rexw [ 0xC1 ] rm reg;
       buf_int8L b n
-  | ((Reg64 _ | Reg32 _) as rm), Reg8L RCX ->
+  | ((Reg64 _ | Reg32 _ | Mem _) as rm), Reg8L RCX ->
       emit_mod_rm_reg b rexw [ 0xD3 ] rm reg
   | _ ->
       Format.eprintf "emit_shift: src=%a dst=%a@." print_old_arg src
@@ -1395,8 +1403,8 @@ let assemble_instr b loc = function
 
 
 let[@warning "+4"] constant b cst
-      (width: D.Constant_with_width.width_in_bytes) =
-  let open D.Constant_with_width in
+      (width : D.Constant_with_width.Width_in_bytes.t) =
+  let open D.Constant_with_width.Width_in_bytes in
   match cst, width with
   | C.Signed_int n, Eight -> buf_int8L b n
   | C.Signed_int n, Sixteen -> buf_int16L b n
@@ -1406,16 +1414,20 @@ let[@warning "+4"] constant b cst
   | C.Unsigned_int n, Sixteen -> buf_int16L b (Numbers.Uint64.to_int64 n)
   | C.Unsigned_int n, Thirty_two -> buf_int32L b (Numbers.Uint64.to_int64 n)
   | C.Unsigned_int n, Sixty_four -> buf_int64L b (Numbers.Uint64.to_int64 n)
-  | (C.This | C.Named_thing _ | C.Add _ | C.Sub _), Eight ->
+  | ( (C.This | C.Label _ | C.Symbol _ | C.Variable _ | C.Add _ | C.Sub _),
+      Eight ) ->
     record_local_reloc b (RelocConstant (cst, B8));
     buf_int8L b 0L
-  | (C.This | C.Named_thing _ | C.Add _ | C.Sub _), Sixteen ->
+  | ( (C.This | C.Label _ | C.Symbol _ | C.Variable _ | C.Add _ | C.Sub _),
+      Sixteen ) ->
     record_local_reloc b (RelocConstant (cst, B16));
     buf_int16L b 0L
-  | (C.This | C.Named_thing _ | C.Add _ | C.Sub _), Thirty_two ->
+  | ( (C.This | C.Label _ | C.Symbol _ | C.Variable _ | C.Add _ | C.Sub _),
+      Thirty_two ) ->
     record_local_reloc b (RelocConstant (cst, B32));
     buf_int32L b 0L
-  | (C.This | C.Named_thing _ | C.Add _ | C.Sub _), Sixty_four ->
+  | ( (C.This | C.Label _ | C.Symbol _ | C.Variable _ | C.Add _ | C.Sub _),
+      Sixty_four ) ->
     record_local_reloc b (RelocConstant (cst, B64));
     buf_int64L b 0L
 
@@ -1426,14 +1438,20 @@ let assemble_line b loc ins =
         assemble_instr b loc instr;
         incr loc
     | Directive (D.Comment _ )-> ()
-    | Directive (D.Global sym) -> (get_symbol b sym).sy_binding <- Sy_global
-    | Directive (D.Weak sym) -> (get_symbol b sym).sy_binding <- Sy_weak
-    | Directive (D.Protected sym) -> (get_symbol b sym).sy_protected <- true
+    | Directive (D.Global sym) ->
+      (get_symbol b (Asm_symbol.encode sym)).sy_binding <- Sy_global
+    | Directive (D.Weak sym) ->
+      (get_symbol b (Asm_symbol.encode sym)).sy_binding <- Sy_weak
+    | Directive (D.Protected sym) ->
+      (get_symbol b (Asm_symbol.encode sym)).sy_protected <- true
     | Directive (D.Const {constant = c; comment = _ }) ->
       constant b
               (D.Constant_with_width.constant c)
               (D.Constant_with_width.width_in_bytes c)
-    | Directive (D.New_label (s, _)) -> declare_label b s
+    | Directive (D.New_label (D.Label lbl, _)) ->
+      declare_label b (Asm_label.encode lbl)
+    | Directive (D.New_label (D.Symbol sym, _)) ->
+      declare_label b (Asm_symbol.encode sym)
     | Directive (D.Bytes { str; comment = _ }) -> Buffer.add_string b.buf str
     | Directive (D.External _) -> ()
     | Directive (D.Direct_assignment _) -> assert false
@@ -1450,12 +1468,17 @@ let assemble_line b loc ins =
     | Directive (D.Loc _) -> ()
     | Directive (D.Private_extern _) -> assert false
     | Directive (D.Indirect_symbol _) -> assert false
-    | Directive (D.Type (lbl, kind)) -> (get_symbol b lbl).sy_type <- Some kind
-    | Directive (D.Size (lbl, cst)) -> (
+    | Directive (D.Type (D.Label lbl, kind)) ->
+      (get_symbol b (Asm_label.encode lbl)).sy_type <- Some kind
+    | Directive (D.Type (D.Symbol sym, kind)) ->
+      (get_symbol b (Asm_symbol.encode sym)).sy_type <- Some kind
+    | Directive (D.Size (sym, cst)) -> (
         match eval_const b (Buffer.length b.buf) cst with
-        | Rint n -> (get_symbol b lbl).sy_size <- Some (Int64.to_int n)
+        | Rint n ->
+            (get_symbol b (Asm_symbol.encode sym)).sy_size
+              <- Some (Int64.to_int n)
         | _ -> assert false)
-    | Directive (D.Align { fill_x86_bin_emitter=data; bytes = n}) -> (
+    | Directive (D.Align { fill=data; bytes = n}) -> (
         (* TODO: Buffer.length = 0 => set section align *)
         let pos = Buffer.length b.buf in
         let current = pos mod n in
@@ -1492,15 +1515,21 @@ let assemble_line b loc ins =
           buf_int8 b 0
         done
     | Directive (D.Hidden _) | Directive D.New_line -> ()
-    | Directive (D.Reloc { name = D.R_X86_64_PLT32;
-              expr = C.Sub (C.Named_thing wrap_label, C.Signed_int 4L);
-              offset = C.Sub (C.This, C.Signed_int 4L);
-            })  when String.Tbl.mem local_labels wrap_label ->
-      record_local_reloc b ~offset:(-4) (RelocCall wrap_label)
+    | Directive
+        (D.Reloc
+          { name = D.R_X86_64_PLT32;
+            target_symbol;
+            addend = 4L;
+            offset = C.Sub (C.This, C.Signed_int 4L)
+          })
+      when String.Tbl.mem local_labels (Asm_symbol.encode target_symbol) ->
+      let sym = Asm_symbol.encode target_symbol in
+      record_local_reloc b ~offset:(-4) (RelocCall sym)
     | Directive (D.Reloc _)
     | Directive (D.Sleb128 _)
     | Directive (D.Uleb128 _) ->
-      X86_gas.generate_asm Out_channel.stderr [ins];
+      let dll = Oxcaml_utils.Doubly_linked_list.make_single ins in
+      X86_gas.generate_asm Out_channel.stderr dll;
       Misc.fatal_errorf "x86_binary_emitter: unsupported instruction"
   with e ->
     Printf.eprintf "Exception %s:\n%!" (Printexc.to_string e);
@@ -1521,8 +1550,10 @@ let assemble_section arch section =
 
   let icount = ref 0 in
   ArrayLabels.iter section.sec_instrs ~f:(function
-    | Directive (D.New_label (lbl, _)) ->
-        String.Tbl.add local_labels lbl !icount
+    | Directive (D.New_label (D.Label lbl, _)) ->
+        String.Tbl.add local_labels (Asm_label.encode lbl) !icount
+    | Directive (D.New_label (D.Symbol sym, _)) ->
+        String.Tbl.add local_labels (Asm_symbol.encode sym) !icount
     | Ins _ -> incr icount
     | _ -> ());
 
@@ -1617,3 +1648,192 @@ let contents b =
 let relocations b = b.relocations
 
 let labels b = b.labels
+
+(* For_jit module implementing Binary_emitter_intf.S *)
+module For_jit = struct
+  (* Alias parent Relocation before shadowing it *)
+  module Reloc = Relocation
+  module Kind = Relocation.Kind
+
+  module Relocation = struct
+    type t = Reloc.t
+
+    let offset_from_section_beginning (r : Reloc.t) =
+      r.Reloc.offset_from_section_beginning
+
+    let size (r : Reloc.t) : Binary_emitter_intf.data_size =
+      match r.Reloc.kind with
+      | Kind.REL32 _ | Kind.DIR32 _ -> Binary_emitter_intf.B32
+      | Kind.DIR64 _ -> Binary_emitter_intf.B64
+
+    let parse_label label =
+      match String.split_on_char '@' label with
+      | [sym] -> sym, None
+      | [sym; suffix] -> sym, Some suffix
+      | _ -> label, None
+
+    let string_to_target name : Binary_emitter_intf.target =
+      Binary_emitter_intf.Symbol (Asm_symbol.create_global name)
+
+    let target_symbol (r : Reloc.t) : Binary_emitter_intf.target =
+      let label =
+        match r.Reloc.kind with
+        | Kind.REL32 (label, _)
+        | Kind.DIR32 (label, _)
+        | Kind.DIR64 (label, _) ->
+          label
+      in
+      let sym, _ = parse_label label in
+      string_to_target sym
+
+    (* x86 doesn't have paired relocations, so this just returns a singleton *)
+    let target_symbols r = [target_symbol r]
+
+    (* x86 doesn't have paired relocations, so this just returns a singleton
+       with the addend from the relocation *)
+    let target_symbols_with_addends (r : Reloc.t) =
+      let label, addend =
+        match r.Reloc.kind with
+        | Kind.REL32 (label, addend)
+        | Kind.DIR32 (label, addend)
+        | Kind.DIR64 (label, addend) ->
+          label, addend
+      in
+      let sym, _ = parse_label label in
+      [string_to_target sym, Int64.to_int addend]
+
+    let is_got_reloc (r : Reloc.t) =
+      let label =
+        match r.Reloc.kind with
+        | Kind.REL32 (label, _)
+        | Kind.DIR32 (label, _)
+        | Kind.DIR64 (label, _) ->
+          label
+      in
+      let _, suffix = parse_label label in
+      match suffix with Some "GOTPCREL" -> true | _ -> false
+
+    let is_plt_reloc (r : Reloc.t) =
+      let label =
+        match r.Reloc.kind with
+        | Kind.REL32 (label, _)
+        | Kind.DIR32 (label, _)
+        | Kind.DIR64 (label, _) ->
+          label
+      in
+      let _, suffix = parse_label label in
+      match suffix with Some "PLT" -> true | _ -> false
+
+    let print_target ppf (target : Binary_emitter_intf.target) =
+      match target with
+      | Binary_emitter_intf.Symbol sym -> Asm_symbol.print ppf sym
+      | Binary_emitter_intf.Label lbl -> Asm_label.print ppf lbl
+
+    let compute_value (r : Reloc.t) ~place_address ~lookup_target
+        ~read_instruction:_ =
+      let label, addend =
+        match r.Reloc.kind with
+        | Kind.REL32 (label, addend)
+        | Kind.DIR32 (label, addend)
+        | Kind.DIR64 (label, addend) ->
+          label, addend
+      in
+      let sym, _ = parse_label label in
+      let target = string_to_target sym in
+      match lookup_target target with
+      | None ->
+        Error (Format.asprintf "Symbol not found: %a" print_target target)
+      | Some target_addr ->
+        let target_addr = Int64.add target_addr addend in
+        (match r.Reloc.kind with
+        | Kind.REL32 _ ->
+          (* Relative: compute offset from place to target *)
+          let rel_size = 4L in
+          (* REL32 is 4 bytes *)
+          let src_addr = Int64.add place_address rel_size in
+          Ok (Int64.sub target_addr src_addr)
+        | Kind.DIR32 _ | Kind.DIR64 _ ->
+          (* Absolute: just use the target address *)
+          Ok target_addr)
+  end
+
+  module Assembled_section = struct
+    type t = buffer
+
+    type relocation = Reloc.t
+
+    let size b = Buffer.length b.buf
+
+    let contents b = Bytes.to_string (contents_mut b)
+
+    let contents_mut = contents_mut
+
+    let relocations b = b.relocations
+
+    let find_symbol_offset b (sym : Asm_symbol.t) =
+      match String.Tbl.find_opt b.labels (Asm_symbol.encode sym) with
+      | Some s -> s.sy_pos
+      | None -> None
+
+    let find_label_offset b (lbl : Asm_label.t) =
+      match String.Tbl.find_opt b.labels (Asm_label.encode lbl) with
+      | Some s -> s.sy_pos
+      | None -> None
+
+    let iter_labels_and_symbols b ~f =
+      String.Tbl.iter
+        (fun name sym ->
+          match sym.sy_pos with
+          | Some offset ->
+            (* x86 uses strings internally; wrap as Symbol *)
+            let target = Relocation.string_to_target name in
+            f target ~offset
+          | None -> ())
+        b.labels
+
+    let add_patch b ~offset ~size:(sz : Binary_emitter_intf.data_size) ~data =
+      let sz =
+        match sz with
+        | Binary_emitter_intf.B8 -> B8
+        | Binary_emitter_intf.B16 -> B16
+        | Binary_emitter_intf.B32 -> B32
+        | Binary_emitter_intf.B64 -> B64
+      in
+      add_patch ~offset ~size:sz ~data b
+  end
+
+  module Plt = struct
+    (* x86-64 PLT entry: movabs r10, <address> ; 49 ba <8 bytes> jmp *r10 ; 41
+       ff e2 Total: 10 bytes *)
+    let movabs_r10_opcode = "\x49\xba"
+
+    let jmp_r10_instr = "\x41\xff\xe2"
+
+    let entry_size =
+      String.length movabs_r10_opcode + 8 + String.length jmp_r10_instr
+
+    let write_entry buf address =
+      Buffer.add_string buf movabs_r10_opcode;
+      for i = 0 to 7 do
+        let byte =
+          Int64.(to_int (logand (shift_right_logical address (i * 8)) 0xFFL))
+        in
+        Buffer.add_char buf (Char.chr byte)
+      done;
+      Buffer.add_string buf jmp_r10_instr
+  end
+
+  module Internal_assembler = struct
+    type assembled_section = Assembled_section.t
+
+    type hook = (string * assembled_section) list -> string -> unit
+
+    let current_hook : hook option ref = ref None
+
+    let register h = current_hook := Some h
+
+    let unregister () = current_hook := None
+
+    let get () = !current_hook
+  end
+end

@@ -864,7 +864,8 @@ let rec choice ctx t =
   and choice_prim ctx ~tail prim primargs loc =
     match prim with
     (* The important case is the construction case *)
-    | Pmakeblock (tag, flag, shape, mode) ->
+    | Pmakeblock (tag, flag, shape, mode)
+      when Lambda.is_uniform_block_shape shape ->
         choice_makeblock ctx ~tail (tag, flag, shape, mode) primargs loc
 
     (* Some primitives have arguments in tail-position *)
@@ -900,10 +901,13 @@ let rec choice ctx t =
     | Pignore
     | Preinterpret_tagged_int63_as_unboxed_int64
     | Preinterpret_unboxed_int64_as_tagged_int63
+    | Preinterpret_boxed_vector_as_tuple _
+    | Preinterpret_tuple_as_boxed_vector _
     | Punbox_unit
 
     (* we don't handle effect or DLS primitives *)
-    | Prunstack | Pperform | Presume | Preperform | Pdls_get | Ptls_get
+    | Pwith_stack | Pwith_stack_bind | Pperform | Presume | Preperform
+    | Pdls_get | Ptls_get | Pdomain_index
 
     (* we don't handle atomic primitives *)
     | Patomic_exchange_field _ | Patomic_compare_exchange_field _
@@ -913,6 +917,7 @@ let rec choice ctx t =
     | Patomic_load_field _ | Patomic_set_field _
     | Pcpu_relax
     | Punbox_vector _ | Pbox_vector (_, _)
+    | Pjoin_vec256 | Psplit_vec256
 
     (* it doesn't seem worth it to support lazy blocks for tmc *)
     | Pmakelazyblock _
@@ -923,12 +928,12 @@ let rec choice ctx t =
     (* we don't handle { foo with x = ...; y = recursive-call } *)
     | Pduprecord _
 
-    (* we don't handle all-float records or mixed blocks. If we
+    (* we don't handle all-float records or mixed-blocks. If we
        did, we'd need to remove references to Lambda.layout_tmc_field
     *)
     | Pmakefloatblock _
     | Pmakeufloatblock _
-    | Pmakemixedblock _
+    | Pmakeblock _
 
     (* nor unboxed products *)
     | Pmake_unboxed_product _ | Punboxed_product_field _
@@ -941,19 +946,26 @@ let rec choice ctx t =
     (* more common cases... *)
     | Pbigarrayref _ | Pbigarrayset _
     | Pbigarraydim _
+    | Pstring_load_i8 _ | Pstring_load_i16 _
     | Pstring_load_16 _ | Pstring_load_32 _ | Pstring_load_f32 _
     | Pstring_load_64 _ | Pstring_load_vec _
+    | Pbytes_load_i8 _ | Pbytes_load_i16 _
     | Pbytes_load_16 _ | Pbytes_load_32 _ | Pbytes_load_f32 _
     | Pbytes_load_64 _ | Pbytes_load_vec _
+    | Pbytes_set_8 _
     | Pbytes_set_16 _ | Pbytes_set_32 _ | Pbytes_set_f32 _
     | Pbytes_set_64 _ | Pbytes_set_vec _
+    | Pbigstring_load_i8 _ | Pbigstring_load_i16 _
     | Pbigstring_load_16 _ | Pbigstring_load_32 _ | Pbigstring_load_f32 _
     | Pbigstring_load_64 _ | Pbigstring_load_vec _
+    | Pbigstring_set_8 _
     | Pbigstring_set_16 _ | Pbigstring_set_32 _ | Pbigstring_set_f32 _
     | Pbigstring_set_64 _ | Pbigstring_set_vec _
     | Pfloatarray_load_vec _
     | Pfloat_array_load_vec _
     | Pint_array_load_vec _
+    | Puntagged_int8_array_load_vec _
+    | Puntagged_int16_array_load_vec _
     | Punboxed_float_array_load_vec _
     | Punboxed_float32_array_load_vec _
     | Punboxed_int32_array_load_vec _
@@ -964,6 +976,8 @@ let rec choice ctx t =
     | Pint_array_set_vec _
     | Punboxed_float_array_set_vec _
     | Punboxed_float32_array_set_vec _
+    | Puntagged_int8_array_set_vec _
+    | Puntagged_int16_array_set_vec _
     | Punboxed_int32_array_set_vec _
     | Punboxed_int64_array_set_vec _
     | Punboxed_nativeint_array_set_vec _
@@ -1099,7 +1113,7 @@ let () =
                Ambiguous_constructor_arguments
                  { explicit = false; arguments }) ->
           let print_msg ppf =
-            Format.fprintf ppf
+            Format_doc.fprintf ppf
               "%a:@ this@ constructor@ application@ may@ be@ \
                TMC-transformed@ in@ several@ different@ ways.@ \
                Please@ disambiguate@ by@ adding@ an@ explicit@ %a \
@@ -1124,7 +1138,7 @@ let () =
                Ambiguous_constructor_arguments
                  { explicit = true; arguments }) ->
           let print_msg ppf =
-            Format.fprintf ppf
+            Format_doc.fprintf ppf
               "%a:@ this@ constructor@ application@ may@ be@ \
                TMC-transformed@ in@ several@ different@ ways.@ Only@ one@ of@ \
                the@ arguments@ may@ become@ a@ TMC@ call,@ but@ several@ \

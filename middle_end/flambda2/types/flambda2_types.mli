@@ -637,6 +637,12 @@ val is_bottom : Typing_env.t -> t -> bool
 
 val is_unknown : Typing_env.t -> t -> bool
 
+(** Whether the given type contains no information, except about nullability
+    (i.e. returns `true` for both `value` and `value_or_null`, whereas
+    `is_unknown` returns `false` for `value` because we know something -- it
+    can't be `null`). *)
+val is_unknown_maybe_null : Typing_env.t -> t -> bool
+
 val is_alias_to_a_symbol : t -> bool
 
 val type_for_const : Reg_width_const.t -> t
@@ -952,6 +958,10 @@ module Rewriter : sig
     val block_field :
       Target_ocaml_int.t -> Flambda_kind.t -> 'a t -> 'a block_field
 
+    val is_int : 'a t -> 'a block_field
+
+    val get_tag : 'a t -> 'a block_field
+
     val block : ?tag:Tag.t -> 'a block_field list -> 'a t
 
     type 'a array_field
@@ -1033,6 +1043,8 @@ module Rewriter : sig
 
     module Map : Container_types.Map with type key = t
 
+    val in_coercion : t -> t
+
     val rewrite : t -> typing_env -> flambda_type -> t Rule.t
 
     (** [block_slot t ofs env ty] returns the abstraction of a field at offset
@@ -1043,9 +1055,9 @@ module Rewriter : sig
     val block_slot :
       ?tag:Tag.t -> t -> Target_ocaml_int.t -> typing_env -> flambda_type -> t
 
-    (** [array_slot t ofs env ty] returns the abstraction of an array field
-        at offset [ofs] of an array with abstraction [t]. [ty] is the type of
-        the field. *)
+    (** [array_slot t ofs env ty] returns the abstraction of an array field at
+        offset [ofs] of an array with abstraction [t]. [ty] is the type of the
+        field. *)
     val array_slot : t -> Target_ocaml_int.t -> typing_env -> flambda_type -> t
 
     type set_of_closures

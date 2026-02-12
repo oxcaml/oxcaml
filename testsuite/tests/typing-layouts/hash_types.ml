@@ -18,14 +18,26 @@ type float_u : float64 = float#
 type float_u = float#
 |}]
 
+type unit_u : void mod everything = unit#
+
 (* Unboxed versions are accessible through aliases... *)
 module Float = struct
   type t = float
 end
 type t = Float.t#
 [%%expect{|
+type unit_u = unit#
 module Float : sig type t = float end
 type t = Float.t#
+|}]
+
+module Unit = struct
+  type t = unit
+end
+type t = Unit.t#
+[%%expect{|
+module Unit : sig type t = unit end
+type t = Unit.t#
 |}]
 
 (* ...but not if the alias is abstract. *)
@@ -45,12 +57,28 @@ Line 1, characters 11-19:
 Error: The type "Float.t" has no unboxed version.
 |}]
 
+module Unit : sig
+  type t
+end = struct
+  type t = unit
+end
+[%%expect{|
+module Unit : sig type t end
+|}]
+
 (* The alias can also have type parameters. *)
 type f : float64 = unit ff#
 and 'a ff = float
 [%%expect{|
 type f = unit ff#
 and 'a ff = float
+|}]
+
+type u : void = string uu#
+and 'a uu = unit
+[%%expect{|
+type u = string uu#
+and 'a uu = unit
 |}]
 
 (* If a type with an unboxed version is shadowed by another, [#]

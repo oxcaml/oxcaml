@@ -28,6 +28,8 @@ exception Error of error
 
 let output_channel = ref stdout
 
+let output_prefix = ref ""
+
 let emit_string s = output_string !output_channel s
 
 let emit_buffer b = Buffer.output_buffer !output_channel b
@@ -55,8 +57,9 @@ let get_flags debuginfo =
   match debuginfo with
   | Dbg_other d | Dbg_raise d -> if is_none_dbg d then 0 else 1
   | Dbg_alloc dbgs ->
-    if !Clflags.debug
-       && List.exists (fun d -> not (is_none_dbg d.Cmm.alloc_dbg)) dbgs
+    if
+      !Clflags.debug
+      && List.exists (fun d -> not (is_none_dbg d.Cmm.alloc_dbg)) dbgs
     then 3
     else 2
 
@@ -443,8 +446,8 @@ module Dwarf_helpers = struct
         Symbol.for_current_unit () |> Symbol.linkage_name
         |> Linkage_name.to_string |> Ident.create_persistent
       in
-      let code_begin = Asm_targets.Asm_symbol.create code_begin in
-      let code_end = Asm_targets.Asm_symbol.create code_end in
+      let code_begin = Asm_targets.Asm_symbol.create_global code_begin in
+      let code_end = Asm_targets.Asm_symbol.create_global code_end in
       dwarf
         := Some
              (Dwarf.create ~sourcefile ~unit_name ~asm_directives
@@ -494,16 +497,18 @@ module Dwarf_helpers = struct
       Some (Dwarf.dwarf_for_fundecl dwarf fundecl ~fun_end_label ~ppf_dump)
 end
 
-let report_error ppf = function
+let report_error_doc ppf = function
   | Stack_frame_too_large n ->
-    Format.fprintf ppf
+    Format_doc.fprintf ppf
       "stack frame too large (%d bytes). \nUse -long-frames compiler flag." n
   | Stack_frame_way_too_large n ->
-    Format.fprintf ppf "stack frame too large (%d bytes)." n
+    Format_doc.fprintf ppf "stack frame too large (%d bytes)." n
   | Inconsistent_probe_init (name, dbg) ->
-    Format.fprintf ppf
+    Format_doc.fprintf ppf
       "Inconsistent use of ~enabled_at_init in [%%probe %s ..] at %a" name
-      Debuginfo.print_compact dbg
+      Debuginfo.doc_print_compact dbg
+
+let report_error = Format_doc.compat report_error_doc
 
 type preproc_stack_check_result =
   { max_frame_size : int;
@@ -528,9 +533,9 @@ let preproc_stack_check ~fun_body ~frame_size ~trap_size =
     | Lprologue | Lepilogue_open | Lepilogue_close
     | Lop
         ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-        | Tls_get | Poll | Pause | Const_int _ | Const_float32 _ | Const_float _
-        | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-        | Load _
+        | Tls_get | Domain_index | Poll | Pause | Const_int _ | Const_float32 _
+        | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+        | Const_vec512 _ | Load _
         | Store (_, _, _)
         | Intop _ | Int128op _
         | Intop_imm (_, _)
@@ -602,7 +607,7 @@ let emit_elf_note ~section ~owner ~typ ~emit_desc =
   let module D = Asm_targets.Asm_directives in
   let module L = Asm_targets.Asm_label in
   let bytes = if Target_system.is_macos () then 8 else 4 in
-  D.align ~fill_x86_bin_emitter:Zero ~bytes;
+  D.align ~fill:Zero ~bytes;
   let a = L.create section in
   let b = L.create section in
   let c = L.create section in
@@ -613,11 +618,11 @@ let emit_elf_note ~section ~owner ~typ ~emit_desc =
   D.define_label a;
   D.string (owner ^ "\000");
   D.define_label b;
-  D.align ~fill_x86_bin_emitter:Zero ~bytes;
+  D.align ~fill:Zero ~bytes;
   D.define_label c;
   emit_desc ();
   D.define_label d;
-  D.align ~fill_x86_bin_emitter:Zero ~bytes
+  D.align ~fill:Zero ~bytes
 
 let reset () =
   reset_debug_info ();

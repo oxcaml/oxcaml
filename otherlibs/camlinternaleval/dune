@@ -31,9 +31,6 @@
  (name camlinternaleval)
  (modes byte native)
  (libraries jit ocamlcommon)
- ; CR mshinwell: Enable metaprogramming on arm64.  Needs the binary emitter
- (enabled_if
-  (= %{architecture} "amd64"))
  (flags
   (:standard
    -strict-sequence
@@ -42,7 +39,7 @@
    -safe-string
    -strict-formats))
  (ocamlopt_flags
-  (:include %{project_root}/ocamlopt_flags.sexp))
+  (:standard (:include %{project_root}/ocamlopt_flags.sexp)))
  (library_flags
   (:standard -linkall -ccopt %{read:../../natdynlinkops}))
  (foreign_stubs
@@ -50,8 +47,6 @@
   (names eval_stubs)))
 
 (install
- (enabled_if
-  (= %{architecture} "amd64"))
  (files
   (.camlinternaleval.objs/native/camlinternaleval.cmx
    as

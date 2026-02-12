@@ -109,7 +109,8 @@ type prefix =
   | Legacy of
       { prefix : legacy_prefix;
         rex : legacy_rex;
-        escape : legacy_escape
+        escape : legacy_escape;
+        operand_size_override : bool
       }
   | Vex of
       { vex_m : vex_map;

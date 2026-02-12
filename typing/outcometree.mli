@@ -53,7 +53,7 @@ type out_value =
   | Oval_int64 of int64
   | Oval_nativeint of nativeint
   | Oval_list of out_value list
-  | Oval_printer of (Format.formatter -> unit)
+  | Oval_printer of (Format_doc.formatter -> unit)
   | Oval_record of (out_ident * out_value) list
   | Oval_record_unboxed_product of (out_ident * out_value) list
   | Oval_string of string * int * out_string (* string, size-to-print, kind *)
@@ -145,6 +145,7 @@ and out_type =
   | Otyp_quote of out_type
   | Otyp_splice of out_type
   | Otyp_poly of out_vars_jkinds * out_type
+  | Otyp_repr of string list * out_type
   | Otyp_module of out_ident * (string * out_type) list
   | Otyp_attribute of out_type * out_attribute
   | Otyp_jkind_annot of out_type * out_jkind
@@ -175,7 +176,9 @@ and out_class_sig_item =
 
 type out_module_type =
   | Omty_abstract
-  | Omty_functor of (string option * out_module_type) option * out_module_type
+  | Omty_functor of
+      (string option * out_module_type * out_mode list) option *
+        out_module_type * out_mode list
   | Omty_ident of out_ident
   | Omty_signature of out_sig_item list
   | Omty_alias of out_ident

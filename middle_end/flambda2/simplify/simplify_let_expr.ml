@@ -84,7 +84,7 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
         | Delete_binding _ -> binding
         | Keep_binding
             ({ let_bound; simplified_defining_expr; original_defining_expr = _ }
-            as kept_binding) -> (
+             as kept_binding) -> (
           match simplified_defining_expr.named with
           | Prim (prim, _dbg) -> (
             match Bound_pattern.must_be_singleton_opt let_bound with
@@ -524,13 +524,3 @@ let simplify_let ~simplify_expr ~simplify_function_body dacc let_expr
     ~f:
       (simplify_let0 ~simplify_expr ~simplify_function_body dacc let_expr
          ~down_to_up)
-
-let simplify_let_with_bound_pattern ~simplify_expr_with_bound_pattern
-    ~simplify_function_body dacc let_expr ~down_to_up =
-  let module L = Flambda.Let in
-  L.pattern_match let_expr ~f:(fun bound_pattern ->
-      simplify_let0
-        ~simplify_expr:(fun dacc body ~down_to_up ->
-          simplify_expr_with_bound_pattern dacc (bound_pattern, body)
-            ~down_to_up)
-        ~simplify_function_body dacc let_expr ~down_to_up bound_pattern)

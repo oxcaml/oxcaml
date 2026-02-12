@@ -263,6 +263,8 @@ let afl_inst_ratio = ref 100           (* -afl-inst-ratio *)
 let function_sections = ref false      (* -function-sections *)
 let probes = ref Config.probes         (* -probes *)
 
+let kind_verbosity = ref 0             (* -kind-verbosity *)
+
 let supports_optimized_probes =
   Config.probes
   && match Target_system.architecture () with
@@ -897,6 +899,15 @@ let zero_alloc_check = ref Zero_alloc_annotations.Check.Check_default  (* -zero-
 let zero_alloc_assert = ref Zero_alloc_annotations.Assert.Assert_default (* -zero-alloc-assert all *)
 
 let no_auto_include_otherlibs = ref false      (* -no-auto-include-otherlibs *)
+
+let dissector = ref false                      (* -dissector *)
+let dissector_partition_size_default = 1.0     (* Default size in GiB *)
+let dissector_partition_size = ref None        (* -dissector-partition-size *)
+let ddissector = ref false                     (* -ddissector *)
+let ddissector_sizes = ref false               (* -ddissector-sizes *)
+let ddissector_verbose = ref false             (* -ddissector-verbose *)
+let ddissector_partitions = ref false          (* -ddissector-partitions *)
+let ddissector_inputs = ref None               (* -ddissector-inputs <file> *)
 
 let prepend_directory file_name =
   match !directory with

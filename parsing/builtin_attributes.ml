@@ -126,6 +126,7 @@ let builtin_attrs =
   ; "cold"
   ; "regalloc"
   ; "regalloc_param"
+  ; "implicit_kind"
   ]
 
 let builtin_attrs =
@@ -179,6 +180,7 @@ let string_of_opt_payload p =
   | Some s -> s
   | None -> ""
 
+module Style = Misc.Style
 let error_of_extension ext =
   let submessage_from main_loc main_txt = function
     | {pstr_desc=Pstr_extension
@@ -187,19 +189,18 @@ let error_of_extension ext =
         | PStr([{pstr_desc=Pstr_eval
                      ({pexp_desc=Pexp_constant(Pconst_string(msg,_,_))}, _)}
                ]) ->
-            { Location.loc; txt = fun ppf -> Format.pp_print_text ppf msg }
+            Location.msg ~loc "%a" Format_doc.pp_print_text msg
         | _ ->
-            { Location.loc; txt = fun ppf ->
-                Format.fprintf ppf
-                  "Invalid syntax for sub-message of extension '%s'." main_txt }
+            Location.msg ~loc "Invalid syntax for sub-message of extension %a."
+              Style.inline_code main_txt
         end
     | {pstr_desc=Pstr_extension (({txt; loc}, _), _)} ->
-        { Location.loc; txt = fun ppf ->
-            Format.fprintf ppf "Uninterpreted extension '%s'." txt }
+        Location.msg ~loc "Uninterpreted extension '%a'."
+          Style.inline_code txt
     | _ ->
-        { Location.loc = main_loc; txt = fun ppf ->
-            Format.fprintf ppf
-              "Invalid syntax for sub-message of extension '%s'." main_txt }
+        Location.msg ~loc:main_loc
+          "Invalid syntax for sub-message of extension %a."
+          Style.inline_code main_txt
   in
   match ext with
   | ({txt = ("ocaml.error"|"error") as txt; loc}, p) ->
@@ -209,7 +210,7 @@ let error_of_extension ext =
                   ({pexp_desc=Pexp_constant(Pconst_string(msg,_,_))}, _)}::
              inner) ->
           let sub = List.map (submessage_from loc txt) inner in
-          Location.error_of_printer ~loc ~sub Format.pp_print_text msg
+          Location.error_of_printer ~loc ~sub Format_doc.pp_print_text msg
       | _ ->
           Location.errorf ~loc "Invalid syntax for extension '%s'." txt
       end
@@ -716,6 +717,44 @@ let error_message_attr l =
       end
     | _ -> None in
   List.find_map inner l
+
+let get_implicit_jkind_attr x =
+  let extract_var_and_jkind typ =
+    match typ.ptyp_desc with
+    | Ptyp_var (var_name, Some jkind_annot) ->
+        var_name, jkind_annot
+    | _ -> raise Exit
+  in
+  let parse_implicit_jkind_payload = function
+    | PTyp typ ->
+        begin match typ.ptyp_desc with
+        | Ptyp_var (_, Some _) ->
+            (* Single variable: ('a : immediate) *)
+            [extract_var_and_jkind typ]
+        | Ptyp_tuple typs ->
+            (* Multiple variables: ('a : immediate) * ('b : int) *)
+            List.map (fun (label_opt, typ) ->
+              match label_opt with
+              | None -> extract_var_and_jkind typ
+              | Some _ -> raise Exit
+            ) typs
+        | _ -> raise Exit
+        end
+    | _ -> raise Exit
+  in
+  match x.attr_name.txt with
+  | "ocaml.implicit_kind" | "implicit_kind" ->
+    begin match parse_implicit_jkind_payload x.attr_payload with
+    | pairs ->
+      mark_used x.attr_name;
+      pairs
+    | exception Exit ->
+      warn_payload x.attr_loc x.attr_name.txt
+        "implicit_kind attribute expects: \
+        ('var1 : jkind1) * ('var2 : jkind2) ...";
+      []
+    end
+  | _ -> []
 
 type zero_alloc_check =
   { strict: bool;

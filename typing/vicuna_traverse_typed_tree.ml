@@ -35,13 +35,13 @@ type unsupported_feature =
 exception Vicuna_unsupported of unsupported_feature
 
 (* Helper utility for debugging. *)
-let _pp_type fmt ty =
+let _pp_type ppf ty =
   match get_desc ty with
-  | Tconstr (p, _, _) -> Format.fprintf fmt "constr(%a)" Path.print p
-  | Tvariant _ -> Format.fprintf fmt "variant"
-  | Tvar { name = None; _ } -> Format.fprintf fmt "var(_)"
-  | Tvar { name = Some v; _ } -> Format.fprintf fmt "var(%s)" v
-  | _ -> Format.fprintf fmt "other type"
+  | Tconstr (p, _, _) -> Format_doc.fprintf ppf "constr(%a)" Path.print p
+  | Tvariant _ -> Format_doc.fprintf ppf "variant"
+  | Tvar { name = None; _ } -> Format_doc.fprintf ppf "var(_)"
+  | Tvar { name = Some v; _ } -> Format_doc.fprintf ppf "var(%s)" v
+  | _ -> Format_doc.fprintf ppf "other type"
 
 module Subst = Map.Make (struct
   type t = Int.t
@@ -120,13 +120,14 @@ let classify env ty : classification =
       then Float
       else if Path.same p Predef.path_lazy_t
       then Lazy
-      else if Path.same p Predef.path_string
-              || Path.same p Predef.path_bytes
-              || Path.same p Predef.path_array
-              || Path.same p Predef.path_iarray
-              || Path.same p Predef.path_nativeint
-              || Path.same p Predef.path_int32
-              || Path.same p Predef.path_int64
+      else if
+        Path.same p Predef.path_string
+        || Path.same p Predef.path_bytes
+        || Path.same p Predef.path_array
+        || Path.same p Predef.path_iarray
+        || Path.same p Predef.path_nativeint
+        || Path.same p Predef.path_int32
+        || Path.same p Predef.path_int64
       then Addr
       else
         try
@@ -155,6 +156,8 @@ let classify env ty : classification =
       raise (Vicuna_unsupported (Other "Unexpected type constructor Tquote"))
     | Tsplice _ ->
       raise (Vicuna_unsupported (Other "Unexpected type constructor Tsplice"))
+    | Trepr _ ->
+      raise (Vicuna_unsupported (Other "Unexpected type constructor Trepr"))
 
 type can_be_float_array =
   | YesFloatArray
@@ -285,6 +288,8 @@ let rec value_kind env (subst : value_shape Subst.t) ~visited ~depth ty :
     raise (Vicuna_unsupported (Other "Unexpected type constructor Tquote"))
   | Tsplice _ ->
     raise (Vicuna_unsupported (Other "Unexpected type constructor Tsplice"))
+  | Trepr _ ->
+    raise (Vicuna_unsupported (Other "Unexpected type constructor Trepr"))
   | Tpackage _ -> Block None
 
 and value_kind_variant env subst ~visited ~depth
@@ -412,7 +417,7 @@ let rec split_external_type (ct : core_type) :
     (core_type * bool) list * core_type =
   match ct.ctyp_desc with
   | Ttyp_poly (_, ct) -> split_external_type ct
-  | Ttyp_arrow (lab, arg, cont) -> (
+  | Ttyp_arrow (lab, arg, _, cont, _) -> (
     let args, ret = split_external_type cont in
     match lab with
     | Nolabel | Labelled _ -> (arg, false) :: args, ret
@@ -460,10 +465,10 @@ let extract_external_declaration outp (v : value_description) =
     | tail ->
       (* The compiler should reject providing additional names in external
          declarations. *)
-      Misc.fatal_errorf "Unexpected names at %s:%d, found %a"
+      Misc.fatal_errorf_doc "Unexpected names at %s:%d, found %a"
         v.val_loc.loc_start.pos_fname v.val_loc.loc_start.pos_lnum
-        (Format.pp_print_list ~pp_sep:Format.pp_print_space
-           Format.pp_print_string)
+        (Format_doc.pp_print_list ~pp_sep:Format_doc.pp_print_space
+           Format_doc.pp_print_string)
         tail);
     (* TODO: Add support for extracting/checking the native code name. *)
     let args, ret = split_external_type v.val_desc in

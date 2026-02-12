@@ -130,7 +130,7 @@ let make_bundled_cm_file unix ~ppf_dump ~quoted_globals ~output_name
     Some (if named_startup_file then bundled_cm else ".bundled_cm")
   in
   let bundled_cm_obj = Filename.temp_file "bundled_cm" ".cmx" in
-  Asmgen.compile_unit ~output_prefix:output_name ~asm_filename:bundled_cm
+  Asmgen.compile_unit unix ~output_prefix:output_name ~asm_filename:bundled_cm
     ~keep_asm:true (* TODO *)
     ~obj_filename:bundled_cm_obj ~may_reduce_heap:true ~ppf_dump (fun () ->
       Location.input_name := "caml_bundled_cm";

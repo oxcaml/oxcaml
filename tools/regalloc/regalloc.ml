@@ -35,7 +35,7 @@ type strategy =
 let stategies =
   ["default", Default; "custom", Custom]
   @ List.map register_allocators ~f:(fun ra ->
-        string_of_register_allocator ra, Allocator ra)
+      string_of_register_allocator ra, Allocator ra)
 
 type config =
   { strategy : strategy;
@@ -150,10 +150,10 @@ let collect_in_stats (cfg_with_infos : Cfg_with_infos.t)
   let num_instrs, num_destruction_points, num_high_pressure_points =
     Cfg.fold_blocks (Cfg_with_layout.cfg cfg_with_layout) ~init:(0, 0, 0)
       ~f:(fun
-           _label
-           block
-           (num_instrs, num_destruction_points, num_high_pressure_points)
-         ->
+          _label
+          block
+          (num_instrs, num_destruction_points, num_high_pressure_points)
+        ->
         let num_instrs = num_instrs + DLL.length block.body + 1 in
         let is_destruction_point =
           Proc.is_destruction_point
@@ -170,8 +170,9 @@ let collect_in_stats (cfg_with_infos : Cfg_with_infos.t)
           num_high_pressure_points + count_high_pressure_points block.body
         in
         let num_high_pressure_points =
-          if (not is_destruction_point)
-             && is_high_pressure_point block.terminator
+          if
+            (not is_destruction_point)
+            && is_high_pressure_point block.terminator
           then succ num_high_pressure_points
           else num_high_pressure_points
         in
@@ -309,17 +310,16 @@ let process_file (file : string) (config : config) =
   incr num_processed_files;
   let unit_info, _digest = Cfg_format.restore file in
   List.iter unit_info.items ~f:(fun (item : Cfg_format.cfg_item_info) ->
-      begin
-        match item with
-        | Cfg _ -> ()
-        | Data _ -> ()
-        | Cfg_before_regalloc
-            { cfg_with_layout_and_relocatable_regs; cmm_label; reg_stamp } ->
-          let cfg_with_layout, relocatable_regs =
-            cfg_with_layout_and_relocatable_regs
-          in
-          process_function config cfg_with_layout cmm_label reg_stamp
-            relocatable_regs
+      begin match item with
+      | Cfg _ -> ()
+      | Data _ -> ()
+      | Cfg_before_regalloc
+          { cfg_with_layout_and_relocatable_regs; cmm_label; reg_stamp } ->
+        let cfg_with_layout, relocatable_regs =
+          cfg_with_layout_and_relocatable_regs
+        in
+        process_function config cfg_with_layout cmm_label reg_stamp
+          relocatable_regs
       end)
 
 let is_regalloc_file (file : string) =

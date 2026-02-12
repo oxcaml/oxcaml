@@ -49,6 +49,7 @@ struct heap_stats {
 struct global_heap_stats {
   uintnat chunk_words;       /* total words in "chunks", including free pools */
   uintnat max_chunk_words;   /* maximum of chunk_words over time */
+  uintnat chunks;            /* count of pool chunks. */
 };
 
 /* Note: accumulating stats then removing them is not a no-op, as

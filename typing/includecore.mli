@@ -132,7 +132,10 @@ type type_mismatch =
 type mmodes =
   | All
   (** Check module inclusion [M1 : MT1 @ m <= MT2 @ m] for all [m]. *)
-  | Specific of Mode.Value.l * Mode.Value.r * Typedtree.held_locks option
+  | Specific:
+      ((Mode.allowed * 'r) Mode.Value.t * Typedtree.held_locks option) *
+      ('l * Mode.allowed) Mode.Value.t ->
+      mmodes
   (** Check module inclusion [M1 : MT1 @ m1 <= MT2 @ m2].
 
     No prior constraint between [m1] and [m2] is given. In particular, it's
@@ -189,20 +192,20 @@ val class_types:
 val report_value_mismatch :
   string -> string ->
   Env.t ->
-  Format.formatter -> value_mismatch -> unit
+  value_mismatch Format_doc.printer
 
 val report_type_mismatch :
   string -> string -> string ->
   Env.t ->
-  Format.formatter -> type_mismatch -> unit
+  type_mismatch Format_doc.printer
 
 val report_modality_sub_error :
-  string -> string -> Format.formatter -> Mode.Modality.error -> unit
+  string -> string -> Format_doc.formatter -> Mode.Modality.error -> unit
 
 val report_mode_sub_error :
-  string -> string -> Format.formatter -> Mode.Value.error -> unit
+  string -> string -> Format_doc.formatter -> Mode.Value.error -> unit
 
 val report_extension_constructor_mismatch :
   string -> string -> string ->
   Env.t ->
-  Format.formatter -> extension_constructor_mismatch -> unit
+  extension_constructor_mismatch Format_doc.printer

@@ -3,11 +3,11 @@ include Builtins.Int8x32
 
 external low_of : (int[@untagged]) -> (t[@unboxed])
   = "caml_vec256_unreachable" "caml_int8x32_low_of_int8"
-  [@@noalloc] [@@builtin]
+[@@noalloc] [@@builtin]
 
 external low_to : (t[@unboxed]) -> (int[@untagged])
   = "caml_vec256_unreachable" "caml_int8x32_low_to_int8"
-  [@@noalloc] [@@builtin]
+[@@noalloc] [@@builtin]
 
 let () =
   let v1 = low_of 1 in

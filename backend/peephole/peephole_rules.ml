@@ -16,10 +16,10 @@ let delete_fst_if_redundant ~fst ~snd ~(fst_val : Cfg.basic Cfg.instruction)
   else None
 
 (** Logical condition for simplifying the following case:
-    {|
+    {v
     mov ..., x
     mov ..., x
-    |}
+    v}
 
     In this case, the first instruction should be removed *)
 
@@ -47,10 +47,10 @@ let remove_overwritten_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
   | _ -> None
 
 (** Logical condition for simplifying the following case:
-    {|
+    {v
     mov x, y
     mov y, x
-    |}
+    v}
 
     In this case, the second instruction should be removed *)
 
@@ -75,22 +75,21 @@ let remove_useless_mov (cell : Cfg.basic Cfg.instruction DLL.cell) =
   | _ -> None
 
 (** Logical condition for simplifying the following case:
-  {|
+    {v
     <op1> const1, r
     <op2> const2, r
-  |}
+    v}
 
-  to:
-  {|
+    to:
+    {v
     <op1> (const1 <op2> const2), r
-  |}
+    v}
 
-    where
-    const1 and const2 are immediate values, and
-    <op1> and <op2> are associative binary operators such
-    that either <op1> is the same as <op2>, or <op1> is the inverse of <op2>,
-    or there exists const3 such that <op1 const1> can be expressed as <op2 const3>
-    or <op2 const2> can be expressed as <op1 const3> *)
+    where const1 and const2 are immediate values, and <op1> and <op2> are
+    associative binary operators such that either <op1> is the same as <op2>, or
+    <op1> is the inverse of <op2>, or there exists const3 such that <op1 const1>
+    can be expressed as <op2 const3> or <op2 const2> can be expressed as <op1
+    const3> *)
 
 let are_compatible op1 op2 imm1 imm2 :
     (Operation.integer_operation * int) option =
@@ -166,19 +165,20 @@ let fold_intop_imm (cell : Cfg.basic Cfg.instruction DLL.cell) =
        use the same source register; 2. Ensures that both instructions output
        the result to the source register. This is currently redundant for amd64
        since there are no instructions that invalidate this condition. *)
-    if Array.length fst_val.arg = 1
-       && Array.length snd_val.arg = 1
-       && Array.length fst_val.res = 1
-       && Array.length snd_val.res = 1
-       && U.are_equal_regs
-            (Array.unsafe_get fst_val.arg 0)
-            (Array.unsafe_get snd_val.arg 0)
-       && U.are_equal_regs
-            (Array.unsafe_get fst_val.arg 0)
-            (Array.unsafe_get fst_val.res 0)
-       && U.are_equal_regs
-            (Array.unsafe_get snd_val.arg 0)
-            (Array.unsafe_get snd_val.res 0)
+    if
+      Array.length fst_val.arg = 1
+      && Array.length snd_val.arg = 1
+      && Array.length fst_val.res = 1
+      && Array.length snd_val.res = 1
+      && U.are_equal_regs
+           (Array.unsafe_get fst_val.arg 0)
+           (Array.unsafe_get snd_val.arg 0)
+      && U.are_equal_regs
+           (Array.unsafe_get fst_val.arg 0)
+           (Array.unsafe_get fst_val.res 0)
+      && U.are_equal_regs
+           (Array.unsafe_get snd_val.arg 0)
+           (Array.unsafe_get snd_val.res 0)
     then
       match fst_val.desc, snd_val.desc with
       | Op (Intop_imm (op1, imm1)), Op (Intop_imm (op2, imm2)) -> (

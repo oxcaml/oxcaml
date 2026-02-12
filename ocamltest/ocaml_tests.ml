@@ -131,6 +131,21 @@ let expect =
   ]
 }
 
+let natexpect =
+{
+  test_name = "expect.opt";
+  test_run_by_default = false;
+  test_description =
+    "Run expect tests in the program in the OCaml native toplevel and check \
+     their output";
+  test_actions =
+  [
+    setup_simple_build_env;
+    run_expectnat;
+    check_program_output
+  ]
+}
+
 let ocamldoc =
 {
   test_name = "ocamldoc";
@@ -185,6 +200,7 @@ let init () =
     toplevel;
     nattoplevel;
     expect;
+    natexpect;
     ocamldoc;
     asmgen;
   ]

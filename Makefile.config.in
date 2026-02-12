@@ -232,6 +232,9 @@ INTEL_JCC_BUG_CFLAGS=@intel_jcc_bug_cflags@
 STACK_ALLOCATION=@stack_allocation@
 POLL_INSERTION=@poll_insertion@
 DUNE=@dune@
+OPAM=@opam@
+OPAM_SWITCH=@opam_switch@
+OPAM_EXEC=@opam_exec@
 
 # Selection of OCaml 4.x or 5.x runtime
 RUNTIME_SUFFIX=@runtime_suffix@
@@ -263,3 +266,6 @@ middle_end = @middle_end@
 coverage = @coverage@
 legacy_layout = @legacy_layout@
 main_build_profile = @main_build_profile@
+opam = @opam@
+opam_switch = @opam_switch@
+opam_exec = @opam_exec@

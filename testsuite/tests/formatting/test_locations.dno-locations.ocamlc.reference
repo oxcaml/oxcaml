@@ -94,6 +94,8 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
         expression 
           Texp_function
           alloc_mode global,many,portable,forkable,unyielding,stateful;id(modevar#9[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+          global,many,nonportable,forkable,unyielding,stateful;aliased,uncontended,read_write,dynamic
+          []
           []
           Tfunction_cases 
           alloc_mode global,many,nonportable,forkable,unyielding,stateful;aliased,uncontended,read_write,dynamic

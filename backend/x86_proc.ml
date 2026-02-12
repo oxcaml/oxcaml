@@ -17,6 +17,7 @@
 
 open! Int_replace_polymorphic_compare
 open X86_ast
+module DLL = Oxcaml_utils.Doubly_linked_list
 
 module Section_name = struct
   module S = struct
@@ -131,9 +132,10 @@ let string_of_substring_literal k n s =
       if !last_was_escape
       then Printf.bprintf b "\\%o" (Char.code c)
       else Buffer.add_char b c
-    else if between c ' ' '~'
-            && (not (Char.equal c '"'))
-            (* '"' *) && not (Char.equal c '\\')
+    else if
+      between c ' ' '~'
+      && (not (Char.equal c '"'))
+      (* '"' *) && not (Char.equal c '\\')
     then (
       Buffer.add_char b c;
       last_was_escape := false)
@@ -397,9 +399,9 @@ let assemble_file infile outfile =
     binary_content := None;
     0
 
-let asm_code = ref []
+let asm_code = DLL.make_empty ()
 
-let asm_code_current_section = ref (ref [])
+let asm_code_current_section = ref (DLL.make_empty ())
 
 let asm_code_by_section = Section_name.Tbl.create 100
 
@@ -409,36 +411,40 @@ let delayed_sections = Section_name.Tbl.create 100
 let create_asm_file = ref true
 
 let directive dir =
-  if !create_asm_file then asm_code := dir :: !asm_code;
+  if !create_asm_file then DLL.add_end asm_code dir;
   match[@warning "-4"] dir with
   | Directive
-      (Asm_targets.Asm_directives.Directive.Section
-        { names = name; flags; args; is_delayed }) -> (
-    let name = Section_name.make name flags args in
-    let where = if is_delayed then delayed_sections else asm_code_by_section in
+      (Asm_targets.Asm_directives.Directive.Section (section, first_occurrence))
+    -> (
+    let details = Asm_targets.Asm_section.details section first_occurrence in
+    let name = Section_name.make details.names details.flags details.args in
+    let where =
+      if details.is_delayed then delayed_sections else asm_code_by_section
+    in
     match Section_name.Tbl.find_opt where name with
     | Some x -> asm_code_current_section := x
     | None ->
-      asm_code_current_section := ref [];
-      Section_name.Tbl.add where name !asm_code_current_section)
-  | dir -> !asm_code_current_section := dir :: !(!asm_code_current_section)
+      let new_section = DLL.make_empty () in
+      asm_code_current_section := new_section;
+      Section_name.Tbl.add where name new_section)
+  | dir -> DLL.add_end !asm_code_current_section dir
 
 let emit ins = directive (Ins ins)
 
 let reset_asm_code () =
-  asm_code := [];
-  asm_code_current_section := ref [];
+  DLL.clear asm_code;
+  asm_code_current_section := DLL.make_empty ();
   Section_name.Tbl.clear asm_code_by_section
 
 let generate_code asm =
   (match asm with
-  | Some f -> Profile.record ~accumulate:true "write_asm" f (List.rev !asm_code)
+  | Some f -> Profile.record ~accumulate:true "write_asm" f asm_code
   | None -> ());
   match !internal_assembler with
   | Some f ->
     let get sections =
       Section_name.Tbl.fold
-        (fun name instrs acc -> (name, List.rev !instrs) :: acc)
+        (fun name instrs acc -> (name, instrs) :: acc)
         sections []
     in
     let instrs = get asm_code_by_section in

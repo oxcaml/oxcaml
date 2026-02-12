@@ -150,8 +150,7 @@ let get_bindings (Bindings_ref (vars, receivers)) =
   Bindings (vars, Option_receiver.recv receivers)
 
 let print_bindings ppf (Bindings (vars, values)) =
-  let rec loop :
-      type a.
+  let rec loop : type a.
       first:bool ->
       Format.formatter ->
       a Variable.hlist ->
@@ -240,8 +239,7 @@ let execute callbacks =
     levels = Levels []
   }
 
-let foreach :
-    type a p b.
+let foreach : type a p b.
     a String.hlist -> (a Term.hlist -> (p, b) program) -> (p, b) program =
  fun names f ->
   let vars = Variable.list names in
@@ -251,8 +249,7 @@ let foreach :
 let bind_iterator actions var iterator =
   Cursor.add_action actions (Cursor.bind_iterator var iterator)
 
-let rec bind_atom :
-    type a.
+let rec bind_atom : type a.
     order:_ -> _ -> a Term.hlist -> a Trie.Iterator.hlist -> string list -> unit
     =
  fun ~order post_level args iterators iterator_names ->
@@ -325,9 +322,8 @@ let compile_term :
     let var = Option.get var.level in
     Cursor.Level.use_output ?cardinality var
 
-let rec compile_terms :
-    type a. ?cardinality:_ -> a Term.hlist -> a Option_receiver.hlist with_names
-    =
+let rec compile_terms : type a.
+    ?cardinality:_ -> a Term.hlist -> a Option_receiver.hlist with_names =
  fun ?cardinality vars ->
   match vars with
   | [] -> { values = []; names = [] }
@@ -361,8 +357,7 @@ let compile_filter context filter =
     let post_level = find_last_binding (Cursor.initial_actions context) args in
     Cursor.add_action post_level (Cursor.filter fn refs)
 
-let rec compile_terminator :
-    type p a.
+let rec compile_terminator : type p a.
     callbacks:_ -> _ -> _ -> p Parameter.hlist -> (p, a) terminator -> a =
  fun ~callbacks context levels parameters terminator ->
   match terminator with

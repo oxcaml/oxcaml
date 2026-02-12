@@ -57,6 +57,7 @@ struct stack_info {
    * Stacks may be unpooled if either the stack size is not 2**N multiple of
    * [caml_fiber_wsz] or the stack is bigger than pooled sizes. */
   int cache_bucket;
+  int domain_idx; /* the index of the domain that allocated this fiber */
   size_t size; /* only used when USE_MMAP_MAP_STACK is defined */
   uintnat magic;
   int64_t id;
@@ -194,10 +195,10 @@ struct c_stack_link {
  *  Native code
  *  -----------
  *
- * In native compilation the stack switching primitives Prunstack,
- * Pperform, Preperform and Presume make use of corresponding functions
- * implemented in the assembly files for an architecture (such as
- * runtime/amd64.S).
+ * In native compilation the stack switching primitives
+ * Pwith_stack/Pwith_stack_bind, Pperform, Preperform and Presume make use of
+ * corresponding functions implemented in the assembly files for an architecture
+ * (such as runtime/amd64.S).
  *
  * A continuation object represents a suspended OCaml stack. It contains
  * the stack pointer tagged as an integer to avoid being followed by the GC.
@@ -210,6 +211,8 @@ struct c_stack_link {
  *  stack and installs an exception handler. On return the new OCaml stack
  *  is freed, the stack is restored to the parent OCaml stack and the
  *  handle_value/handle_exn function is executed on the parent OCaml stack.
+ *  The Pwith_stack primitive is compiled to caml_runstack, with the first
+ *  argument being the result of caml_alloc_stack.
  *
  * caml_perform effect continuation
  *  caml_perform captures the current OCaml stack in the continuation object
@@ -223,11 +226,11 @@ struct c_stack_link {
  *  by setting up the required registers then jumping into caml_perform which
  *  does the switch to the parent and execution of the handle_effect function.
  *
- * caml_resume new_fiber function argument
- *  caml_resume resumes execution on new_fiber by making the current stack
+ * caml_resume continuation function argument
+ *  caml_resume resumes execution of continuation by making the current stack
  *  the parent of the new_fiber and then switching to the stack for new_fiber.
  *  The function with argument is then executed on the new stack. Care is taken
- *  to check if the new_fiber argument has already been resumed and so is null.
+ *  to check if the continuation has already been resumed and so its stack null.
  *
  *
  *  Bytecode
@@ -237,12 +240,21 @@ struct c_stack_link {
  * some changes are made to the bytecode interpreter on every function return
  * and exception raise. In particular:
  *
- *  Presume | Prunstack -> RESUME (& RESUMETERM if a tail call)
- *   RESUME checks that the stack is valid (a NULL stack indicates a
- *   continuation that has already been resumed). The stacks are then switched
- *   with the old stack becoming the parent of the new stack. Care is taken
- *   to setup the exception handler for the new stack. Execution continues
- *   on the new OCaml stack with the passed function and argument.
+ *  Pwith_stack -> WITH_STACK
+ *   WITH_STACK allocates a new stack (with provided effect, return, and
+ *   exception handlers) and calls a provided function with a provided argument
+ *   as the first function on that stack.
+ *
+ *  Pwith_stack_bind -> WITH_STACK_BIND
+ *   As per WITH_STACK, except it also binds a single dynamic variable within
+ *   the scope of the stack.
+ *
+ *  Presume -> RESUME (& RESUMETERM if a tail call)
+ *   RESUME checks that the continuation has not already been resumed. The
+ *   stacks are then switched with the old stack becoming the parent of the new
+ *   stack. Care is taken to setup the exception handler for the new stack.
+ *   Execution continues on the new OCaml stack with the passed function and
+ *   argument.
  *
  *  Pperform -> PERFORM
  *   PERFORM captures the current stack in a continuation object it allocates.
@@ -277,14 +289,25 @@ extern value caml_global_data;
 #define Trap_pc(tp) (((code_t *)(tp))[0])
 #define Trap_link(tp) ((tp)[1])
 
-struct stack_info** caml_alloc_stack_cache (void);
-void caml_free_stack_cache(struct stack_info**);
+struct stack_cache {
+  _Atomic(struct stack_info*) head;
+  _Atomic(uintnat) len;
+};
+
+struct stack_cache* caml_alloc_stack_caches(void);
+void caml_enable_stack_caches(struct stack_cache*);
+void caml_disable_stack_caches(struct stack_cache*);
+void caml_free_stack_caches(struct stack_cache*);
+
 CAMLextern struct stack_info* caml_alloc_main_stack (uintnat init_wsize);
 
 void caml_scan_stack(
   scanning_action f, scanning_action_flags fflags, void* fdata,
   struct stack_info* stack, value* v_gc_regs);
 
+value caml_alloc_stack(value hval, value hexn, value heff);
+value caml_alloc_stack_bind(value hval, value hexn, value heff, value dyn,
+                            value bind);
 struct stack_info* caml_alloc_stack_noexc(mlsize_t wosize, value hval,
                                           value hexn, value heff,
                                           value dyn, value bind,
@@ -321,6 +344,7 @@ caml_rewrite_exception_stack(struct stack_info *old_stack,
                              struct stack_info *new_stack);
 #endif
 
+value caml_continuation_use_noexc (value cont);
 value caml_continuation_use (value cont);
 
 /* Replace the stack of a continuation that was previously removed

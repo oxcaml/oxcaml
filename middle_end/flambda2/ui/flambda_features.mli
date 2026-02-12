@@ -101,7 +101,13 @@ val dump_flambda : unit -> bool
 
 val dump_rawfexpr : unit -> dump_target
 
-val dump_fexpr : unit -> dump_target
+val dump_fexpr_annot : unit -> bool
+
+type pass = Oxcaml_flags.Flambda2.Dump.pass =
+  | Last_pass
+  | This_pass of string
+
+val dump_fexpr : pass -> dump_target
 
 val dump_flexpect : unit -> dump_target
 
@@ -122,7 +128,8 @@ module Inlining : sig
 
   val depth_scaling_factor : int
 
-  (** [max_depth] returns the user's value multipled by [depth_scaling_factor]. *)
+  (** [max_depth] returns the user's value multipled by [depth_scaling_factor].
+  *)
   val max_depth : round_or_default -> int
 
   val max_rec_depth : round_or_default -> int

@@ -30,6 +30,7 @@ val setup_ocamlopt_opt_build_env : Actions.t
 val ocamlopt_opt : Actions.t
 val check_ocamlopt_opt_output : Actions.t
 val run_expect : Actions.t
+val run_expectnat : Actions.t
 val compare_bytecode_programs : Actions.t
 val compare_binary_files : Actions.t
 val setup_ocaml_build_env : Actions.t

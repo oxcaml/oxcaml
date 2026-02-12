@@ -97,8 +97,9 @@ let lift dacc ty ~bound_to static_const : _ Or_invalid.t * DA.t =
     in
     match existing_symbol with
     | Some symbol ->
-      if Flambda_features.check_invariants ()
-         && not (DE.mem_symbol (DA.denv dacc) symbol)
+      if
+        Flambda_features.check_invariants ()
+        && not (DE.mem_symbol (DA.denv dacc) symbol)
       then
         Misc.fatal_errorf
           "Constant with symbol %a is shareable but not in the environment:@ %a"

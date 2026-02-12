@@ -13,8 +13,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(** A continuation shortcut is an anonymous continuation whose body is a
-    single [Apply_cont] expression to another continuation. *)
+(** A continuation shortcut is an anonymous continuation whose body is a single
+    [Apply_cont] expression to another continuation. *)
 
 type t
 

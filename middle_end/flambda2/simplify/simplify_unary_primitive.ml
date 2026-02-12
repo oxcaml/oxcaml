@@ -451,8 +451,8 @@ let simplify_boolean_not dacc ~original_term ~arg:_ ~arg_ty ~result_var =
         (fun imm ->
           if Target_ocaml_int.equal imm (Target_ocaml_int.zero machine_width)
           then Some (Target_ocaml_int.one machine_width)
-          else if Target_ocaml_int.equal imm
-                    (Target_ocaml_int.one machine_width)
+          else if
+            Target_ocaml_int.equal imm (Target_ocaml_int.one machine_width)
           then Some (Target_ocaml_int.zero machine_width)
           else None)
         imms
@@ -681,6 +681,10 @@ let simplify_is_flat_float_array dacc ~original_term ~arg:_ ~arg_ty ~result_var
 let simplify_opaque_identity dacc ~kind ~original_term ~arg:_ ~arg_ty:_
     ~result_var =
   SPR.create_unknown dacc ~result_var kind ~original_term
+
+let simplify_reinterpret_boxed_vector dacc ~original_term ~arg:_ ~arg_ty:_
+    ~result_var =
+  SPR.create_unknown dacc ~result_var Flambda_kind.value ~original_term
 
 let simplify_end_region dacc ~original_term ~arg:_ ~arg_ty:_ ~result_var =
   let denv = DA.denv dacc in
@@ -934,8 +938,14 @@ let simplify_immutable_block_load access_kind ~field ~min_name_mode dacc
   in
   SPR.map_dacc result (fun dacc ->
       let kind = P.Block_access_kind.element_subkind_for_load access_kind in
+      let block_shape : Flambda_kind.Block_shape.t =
+        match (access_kind : P.Block_access_kind.t) with
+        | Values _ -> Scannable Value_only
+        | Naked_floats _ -> Float_record
+        | Mixed { shape; _ } -> Scannable (Mixed_record shape)
+      in
       Simplify_common.add_symbol_projection dacc ~projected_from:arg
-        (Symbol_projection.Projection.block_load ~index:field)
+        (Symbol_projection.Projection.block_load ~index:field ~block_shape)
         ~projection_bound_to:result_var ~kind)
 
 let simplify_mutable_block_load _access_kind ~field:_ ~original_prim dacc
@@ -1015,6 +1025,7 @@ let simplify_unary_primitive dacc original_prim (prim : P.unary_primitive) ~arg
     | Boolean_not -> simplify_boolean_not
     | Reinterpret_64_bit_word reinterpret ->
       simplify_reinterpret_64_bit_word reinterpret
+    | Reinterpret_boxed_vector -> simplify_reinterpret_boxed_vector
     | Is_boxed_float -> simplify_is_boxed_float
     | Is_flat_float_array -> simplify_is_flat_float_array
     | Int_as_pointer mode -> simplify_int_as_pointer ~mode

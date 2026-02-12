@@ -243,7 +243,7 @@ module Variable_data = struct
         @[<hov 1>(kind@ %a)@]@ \
         @[<hov 1>(user_visible@ %b)@]\
         )@]"
-      Compilation_unit.print_debug compilation_unit
+      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
       name
       name_stamp
       Flambda_kind.print kind
@@ -294,7 +294,7 @@ module Symbol_data = struct
         @[<hov 1>(compilation_unit@ %a)@]@ \
         @[<hov 1>(linkage_name@ %a)@]\
         )@]"
-      Compilation_unit.print_debug compilation_unit
+      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
       Linkage_name.print linkage_name
 end
 
@@ -302,28 +302,38 @@ module Code_id_data = struct
   type t =
     { compilation_unit : Compilation_unit.t;
       name : string;
+      debug_info : Debuginfo.t;
       linkage_name : Linkage_name.t
     }
 
   let flags = code_id_flags
 
-  let [@ocamlformat "disable"] print ppf { compilation_unit; name; linkage_name; } =
+  let [@ocamlformat "disable"] print ppf { compilation_unit; name; debug_info = _; linkage_name; } =
     Format.fprintf ppf "@[<hov 1>(\
         @[<hov 1>(compilation_unit@ %a)@]@ \
         @[<hov 1>(name@ %s)@]@ \
         @[<hov 1>(linkage_name@ %a)@]@ \
         )@]"
-      Compilation_unit.print_debug compilation_unit
+      (Format_doc.compat Compilation_unit.print_debug) compilation_unit
       name
       Linkage_name.print linkage_name
 
-  let hash { compilation_unit = _; name = _; linkage_name } =
-    (* As per comment above, just looking at the linkage name suffices (same
-       below), rather than the compilation unit as well. *)
+  let hash { compilation_unit = _; name = _; debug_info = _; linkage_name } =
+    (* Linkage names are unique across a whole project, so there's no need to
+       hash the other fields. *)
     Linkage_name.hash linkage_name
 
-  let equal { compilation_unit = _; name = _; linkage_name = linkage_name1 }
-      { compilation_unit = _; name = _; linkage_name = linkage_name2 } =
+  let equal
+      { compilation_unit = _;
+        name = _;
+        debug_info = _;
+        linkage_name = linkage_name1
+      }
+      { compilation_unit = _;
+        name = _;
+        debug_info = _;
+        linkage_name = linkage_name2
+      } =
     Linkage_name.equal linkage_name1 linkage_name2
 end
 
@@ -484,8 +494,9 @@ module Variable = struct
         Format.fprintf ppf "%s/%d%s" (name t) (name_stamp t)
           (if user_visible t then "UV" else "N")
       else
-        Format.fprintf ppf "%a.%s/%d%s" Compilation_unit.print cu (name t)
-          (name_stamp t)
+        Format.fprintf ppf "%a.%s/%d%s"
+          (Format_doc.compat Compilation_unit.print)
+          cu (name t) (name_stamp t)
           (if user_visible t then "UV" else "N")
   end
 
@@ -561,7 +572,7 @@ module Symbol = struct
 
     let print ppf t =
       Format.fprintf ppf "%t" Flambda_colours.symbol;
-      Compilation_unit.print ppf (compilation_unit t);
+      (Format_doc.compat Compilation_unit.print) ppf (compilation_unit t);
       Format.pp_print_string ppf ".";
       Linkage_name.print ppf (linkage_name t);
       Format.fprintf ppf "%t" Flambda_colours.pop
@@ -811,9 +822,11 @@ module Code_id = struct
 
   let name t = (find_data t).name
 
+  let debug t = (find_data t).debug_info
+
   let previous_name_stamp = ref (-1)
 
-  let create ~name compilation_unit =
+  let create ~name ~(debug : Debuginfo.t) compilation_unit =
     let name_stamp =
       if !previous_name_stamp = max_int
       then Misc.fatal_error "Have run out of name stamps";
@@ -828,10 +841,13 @@ module Code_id = struct
       in
       Symbol0.for_name compilation_unit name |> Symbol0.linkage_name
     in
-    let data : Code_id_data.t = { compilation_unit; name; linkage_name } in
+    let data : Code_id_data.t =
+      { compilation_unit; name; debug_info = debug; linkage_name }
+    in
     Table.add !grand_table_of_code_ids data
 
-  let rename t = create ~name:(name t) (Compilation_unit.get_current_exn ())
+  let rename t =
+    create ~name:(name t) ~debug:(debug t) (Compilation_unit.get_current_exn ())
 
   let in_compilation_unit t comp_unit =
     Compilation_unit.equal (get_compilation_unit t) comp_unit

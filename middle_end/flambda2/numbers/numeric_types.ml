@@ -74,8 +74,9 @@ struct
       else Int64.to_int i
 
     let unsigned_of_int64_exn i =
-      if Int64.compare i unsigned_min_int64 < 0
-         || Int64.compare i unsigned_max_int64 > 0
+      if
+        Int64.compare i unsigned_min_int64 < 0
+        || Int64.compare i unsigned_max_int64 > 0
       then Misc.fatal_errorf "Int%d: %Ld is out of range" num_bits i
       else Int64.to_int i
 

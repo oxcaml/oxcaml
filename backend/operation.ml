@@ -325,6 +325,7 @@ type t =
       }
   | Dls_get
   | Tls_get
+  | Domain_index
   | Poll
   | Pause
   | Alloc of
@@ -370,6 +371,7 @@ let is_pure = function
   | Name_for_debugger _ -> false
   | Dls_get -> true
   | Tls_get -> true
+  | Domain_index -> true
   | Poll -> false
   | Pause -> false
   | Alloc _ -> false
@@ -464,6 +466,7 @@ let dump ppf op =
   | Name_for_debugger _ -> Format.fprintf ppf "name_for_debugger"
   | Dls_get -> Format.fprintf ppf "dls_get"
   | Tls_get -> Format.fprintf ppf "tls_get"
+  | Domain_index -> Format.fprintf ppf "domain_index"
   | Poll -> Format.fprintf ppf "poll"
   | Pause -> Format.fprintf ppf "pause"
   | Alloc { bytes; dbginfo = _; mode = Heap } ->

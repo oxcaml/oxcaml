@@ -19,10 +19,17 @@ set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
+# Use configured opam switch from Makefile.config
+if [ -f Makefile.config ]; then
+  opam_exec=$(grep '^opam_exec = ' Makefile.config 2>/dev/null \
+    | cut -d= -f2- | sed 's/^ *//')
+fi
+opam_exec=${opam_exec:-}
+
 # needed for the root dune file to parse
 touch dune.runtime_selection duneconf/dirs-to-ignore.inc duneconf/ox-extra.inc
 
 exit_code=0
-dune build @fmt || exit_code=1
+$opam_exec dune build @fmt || exit_code=1
 scripts/80ch.sh || exit_code=1
 exit $exit_code

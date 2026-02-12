@@ -111,19 +111,14 @@ let mutable_mode m0 : _ Mode.Value.t =
 
 (* Type expressions for the core language *)
 
-module Jkind_mod_bounds = struct
-  module Crossing = Mode.Crossing
-  module Externality = Jkind_axis.Externality
-  module Nullability = Jkind_axis.Nullability
-  module Separability = Jkind_axis.Separability
-
-  type t = {
-    crossing : Crossing.t;
-    externality: Externality.t;
-    nullability: Nullability.t;
-    separability: Separability.t;
+type mod_bounds =
+  { crossing : Mode.Crossing.t;
+    externality: Jkind_axis.Externality.t;
+    nullability: Jkind_axis.Nullability.t;
+    separability: Jkind_axis.Separability.t;
   }
 
+<<<<<<< HEAD
   let crossing t = t.crossing
 
   let[@inline] modal ax t = t |> crossing |> (Crossing.proj [@inlined hint]) ax
@@ -418,8 +413,191 @@ module Jkind_mod_bounds = struct
 end
 
 
+||||||| 73bc7b39d5
+  let crossing t = t.crossing
+
+  let[@inline] modal ax t = t |> crossing |> (Crossing.proj [@inlined hint]) ax
+  let areality = Crossing.Axis.Comonadic Areality
+  let linearity = Crossing.Axis.Comonadic Linearity
+  let uniqueness = Crossing.Axis.Monadic Uniqueness
+  let portability = Crossing.Axis.Comonadic Portability
+  let contention = Crossing.Axis.Monadic Contention
+  let forkable = Crossing.Axis.Comonadic Forkable
+  let yielding = Crossing.Axis.Comonadic Yielding
+  let statefulness = Crossing.Axis.Comonadic Statefulness
+  let visibility = Crossing.Axis.Monadic Visibility
+  let staticity = Crossing.Axis.Monadic Staticity
+  let[@inline] externality t = t.externality
+  let[@inline] nullability t = t.nullability
+  let[@inline] separability t = t.separability
+
+  let[@inline] create
+      crossing
+      ~externality
+      ~nullability
+      ~separability =
+    {
+      crossing;
+      externality;
+      nullability;
+      separability;
+    }
+
+  let[@inline] set_crossing crossing t = { t with crossing }
+  let[@inline] set_externality externality t = { t with externality }
+  let[@inline] set_nullability nullability t = { t with nullability }
+  let[@inline] set_separability separability t = { t with separability }
+
+  let[@inline] set_max_in_set t max_axes =
+    let open Jkind_axis.Axis_set in
+    let[@inline] modal ax =
+      if mem max_axes (Modal ax)
+      then (Crossing.Per_axis.max [@inlined hint]) ax
+      else modal ax t
+    in
+    (* a little optimization *)
+    if is_empty max_axes then t else
+    let regionality = modal areality in
+    let linearity = modal linearity in
+    let uniqueness = modal uniqueness in
+    let portability = modal portability in
+    let contention = modal contention in
+    let forkable = modal forkable in
+    let yielding = modal yielding in
+    let statefulness = modal statefulness in
+    let visibility = modal visibility in
+    let staticity = modal staticity in
+    let externality =
+      if mem max_axes (Nonmodal Externality)
+      then Externality.max
+      else t.externality
+    in
+    let nullability =
+      if mem max_axes (Nonmodal Nullability)
+      then Nullability.max
+      else t.nullability
+    in
+    let separability =
+      if mem max_axes (Nonmodal Separability)
+      then Separability.max
+      else t.separability
+    in
+    let monadic =
+      Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
+    in
+    let comonadic =
+      Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
+        ~forkable ~statefulness
+    in
+    let crossing : Mode.Crossing.t = { monadic; comonadic } in
+    {
+      crossing;
+      externality;
+      nullability;
+      separability;
+    }
+
+  let[@inline] set_min_in_set t min_axes =
+    let open Jkind_axis.Axis_set in
+    let modal ax =
+      if mem min_axes (Modal ax)
+      then (Crossing.Per_axis.min [@inlined hint]) ax
+      else modal ax t
+    in
+    (* a little optimization *)
+    if is_empty min_axes then t else
+    let regionality = modal areality in
+    let linearity = modal linearity in
+    let uniqueness = modal uniqueness in
+    let portability = modal portability in
+    let contention = modal contention in
+    let forkable = modal forkable in
+    let yielding = modal yielding in
+    let statefulness = modal statefulness in
+    let visibility = modal visibility in
+    let staticity = modal staticity in
+    let externality =
+      if mem min_axes (Nonmodal Externality)
+      then Externality.min
+      else t.externality
+    in
+    let nullability =
+      if mem min_axes (Nonmodal Nullability)
+      then Nullability.min
+      else t.nullability
+    in
+    let separability =
+      if mem min_axes (Nonmodal Separability)
+      then Separability.min
+      else t.separability
+    in
+    let monadic =
+      Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
+    in
+    let comonadic =
+      Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
+        ~forkable ~statefulness
+    in
+    let crossing : Mode.Crossing.t = { monadic; comonadic } in
+    {
+      crossing;
+      externality;
+      nullability;
+      separability;
+    }
+
+  let[@inline] is_max_within_set t axes =
+    let open Jkind_axis.Axis_set in
+    let modal ax =
+      not (mem axes (Modal ax)) ||
+      Crossing.Per_axis.((le [@inlined hint]) ax ((max [@inlined hint]) ax)
+        (modal ax t))
+    in
+    modal areality &&
+    modal linearity &&
+    modal uniqueness &&
+    modal portability &&
+    modal contention &&
+    modal forkable &&
+    modal yielding &&
+    modal statefulness &&
+    modal visibility &&
+    modal staticity &&
+    (not (mem axes (Nonmodal Externality)) ||
+     Externality.(le max (externality t))) &&
+    (not (mem axes (Nonmodal Nullability)) ||
+     Nullability.(le max (nullability t))) &&
+    (not (mem axes (Nonmodal Separability)) ||
+     Separability.(le max (separability t)))
+
+  let max =
+    { crossing = Mode.Crossing.max;
+      externality = Externality.max;
+      nullability = Nullability.max;
+      separability = Separability.max }
+
+  let[@inline] is_max m = m = max
+  let debug_print ppf
+        { crossing;
+          externality;
+          nullability;
+          separability } =
+    Format.fprintf ppf "@[{ crossing = %a;@ externality = %a;@ \
+      nullability = %a;@ separability = %a }@]"
+      Crossing.print crossing
+      Externality.print externality
+      Nullability.print nullability
+      Separability.print separability
+end
+
+
+=======
+>>>>>>> origin/main
 module With_bounds_type_info = struct
   type t = {relevant_axes : Jkind_axis.Axis_set.t } [@@unboxed]
+
+  let join { relevant_axes = axes1 } { relevant_axes = axes2 } =
+    { relevant_axes = Jkind_axis.Axis_set.union axes1 axes2 }
 end
 
 type transient_expr =
@@ -450,6 +628,7 @@ and type_desc =
   | Tvariant of row_desc
   | Tunivar of { name : string option; jkind : jkind_lr }
   | Tpoly of type_expr * type_expr list
+  | Trepr of type_expr * Jkind_types.Sort.univar list
   | Tpackage of Path.t * (Longident.t * type_expr) list
   | Tof_kind of jkind_lr
 
@@ -525,7 +704,7 @@ and 'd with_bounds =
 
 and ('layout, 'd) layout_and_axes =
   { layout : 'layout;
-    mod_bounds : Jkind_mod_bounds.t;
+    mod_bounds : mod_bounds;
     with_bounds : 'd with_bounds
   }
   constraint 'd = 'l * 'r
@@ -925,14 +1104,14 @@ module type Wrapped = sig
   type module_type =
     Mty_ident of Path.t
   | Mty_signature of signature
-  | Mty_functor of functor_parameter * module_type
+  | Mty_functor of functor_parameter * module_type * Mode.Alloc.lr
   | Mty_alias of Path.t
   | Mty_strengthen of module_type * Path.t * Aliasability.t
       (* See comments about the aliasability of strengthening in mtype.ml *)
 
   and functor_parameter =
   | Unit
-  | Named of Ident.t option * module_type
+  | Named of Ident.t option * module_type * Mode.Alloc.lr
 
   and signature = signature_item list wrapped
 
@@ -1010,15 +1189,15 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
   let rec module_type m = function
     | Mty_ident p -> To.Mty_ident p
     | Mty_alias p -> To.Mty_alias p
-    | Mty_functor (parm,mty) ->
-        To.Mty_functor (functor_parameter m parm, module_type m mty)
+    | Mty_functor (parm,mty,mm) ->
+        To.Mty_functor (functor_parameter m parm, module_type m mty, mm)
     | Mty_signature sg -> To.Mty_signature (signature m sg)
     | Mty_strengthen (mty,p,aliasable) ->
         To.Mty_strengthen (module_type m mty, p, aliasable)
 
   and functor_parameter m = function
       | Unit -> To.Unit
-      | Named (id,mty) -> To.Named (id, module_type m mty)
+      | Named (id,mty,mm) -> To.Named (id, module_type m mty,mm)
 
   let value_description m {val_type; val_modalities; val_kind; val_zero_alloc;
                            val_attributes; val_loc; val_uid} =
@@ -1277,6 +1456,7 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Product sorts ->
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
   | Base Void -> Void
+  | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
 
 let find_unboxed_type decl =
   match decl.type_kind with
@@ -1617,6 +1797,7 @@ let best_effort_compare_type_expr te1 te2 =
         | Tconstr (_, _, _) -> 5
         | Tpoly (_, _) -> 6
         | Tof_kind _ -> 7
+        | Trepr (_, _) -> 8
         (* Types we should never see *)
         | Tlink _ -> Misc.fatal_error "Tlink encountered in With_bounds_types"
       in
@@ -1639,6 +1820,14 @@ let best_effort_compare_type_expr te1 te2 =
         (* NOTE: this is mostly broken according to the semantics of type_expr, but probably
            fine for the particular "best-effort" comparison we want. *)
         List.compare (aux (depth + 1)) (t1 :: ts1) (t2 :: ts2)
+      | Trepr (t1, sort_vars1), Trepr (t2, sort_vars2) ->
+        (* Compare by establishing correspondence between univars and comparing
+           the inner types with that correspondence. *)
+        (match List.combine sort_vars1 sort_vars2 with
+         | exception Invalid_argument _ ->
+           Int.compare (List.length sort_vars1) (List.length sort_vars2)
+         | pairs ->
+           Jkind_types.Sort.enter_repr pairs (fun () -> aux (depth + 1) t1 t2))
       | _, _ -> rank te1 - rank te2
   in
   aux 0 te1 te2
@@ -2053,5 +2242,10 @@ let undo_compress (changes, _old) =
         | _ -> ())
         log
 
-let functor_param_mode = Mode.Alloc.legacy
-let functor_res_mode = Mode.Alloc.legacy
+let class_mode =
+  let hint : _ Mode.Hint.const = Legacy Class in
+  Mode.Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)
+
+let toplevel_mode =
+  let hint : _ Mode.Hint.const = Legacy Toplevel in
+  Mode.Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)

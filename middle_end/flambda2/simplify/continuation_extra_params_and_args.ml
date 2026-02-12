@@ -106,8 +106,8 @@ let add t ~invalids ~extra_param ~extra_args =
                new param: %a\n\
                new args: %a\n\
                new invalids: %a\n\
-               existing epa: %a" Apply_cont_rewrite_id.print id
-              Bound_parameter.print extra_param
+               existing epa: %a"
+              Apply_cont_rewrite_id.print id Bound_parameter.print extra_param
               (Apply_cont_rewrite_id.Map.print Extra_arg.print)
               extra_args Apply_cont_rewrite_id.Set.print invalids print t
           | Some _, None ->
@@ -120,8 +120,8 @@ let add t ~invalids ~extra_param ~extra_args =
                  new param: %a\n\
                  new args: %a\n\
                  new invalids: %a\n\
-                 existing epa: %a" Apply_cont_rewrite_id.print id
-                Bound_parameter.print extra_param
+                 existing epa: %a"
+                Apply_cont_rewrite_id.print id Bound_parameter.print extra_param
                 (Apply_cont_rewrite_id.Map.print Extra_arg.print)
                 extra_args Apply_cont_rewrite_id.Set.print invalids print t
           | Some Or_invalid.Invalid, Some _ -> Some Or_invalid.Invalid
@@ -181,9 +181,10 @@ let add_args_for_all_params t apply_cont_rewrite_id new_args =
   match t with
   | Empty -> ( match new_args with [] -> t | _ :: _ -> error ())
   | Non_empty { extra_params; extra_args } ->
-    if not
-         (List.compare_lengths new_args (Bound_parameters.to_list extra_params)
-         = 0)
+    if
+      not
+        (List.compare_lengths new_args (Bound_parameters.to_list extra_params)
+        = 0)
     then error ()
     else
       let extra_args =

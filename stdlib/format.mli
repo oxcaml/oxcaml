@@ -242,6 +242,14 @@ val pp_print_string : formatter -> string -> unit
 val print_string : string -> unit
 (** [pp_print_string ppf s] prints [s] in the current pretty-printing box. *)
 
+val pp_print_substring : pos:int -> len:int -> formatter -> string -> unit
+val print_substring : pos:int -> len:int -> string -> unit
+(** [pp_print_substring ~pos ~len ppf s] prints the substring of [s] that starts
+    at position [pos] and stops at position [pos+len] in the current
+    pretty-printing box.
+  @since 5.3
+*)
+
 val pp_print_bytes : formatter -> bytes -> unit
 val print_bytes : bytes -> unit
 (** [pp_print_bytes ppf b] prints [b] in the current pretty-printing box.
@@ -252,6 +260,15 @@ val pp_print_as : formatter -> int -> string -> unit
 val print_as : int -> string -> unit
 (** [pp_print_as ppf len s] prints [s] in the current pretty-printing box.
   The pretty-printer formats [s] as if it were of length [len].
+*)
+
+val pp_print_substring_as :
+  pos:int -> len:int -> formatter -> int -> string -> unit
+val print_substring_as : pos:int -> len:int -> int -> string -> unit
+(** [pp_print_substring_as ~first ~len ppf len_as s] prints the substring of [s]
+  that starts at position [pos] and stop at position [pos+len] in the current
+  pretty-printing box as if it were of length [len_as].
+  @since 5.1
 *)
 
 val pp_print_int : formatter -> int -> unit
@@ -851,6 +868,7 @@ val get_formatter_output_functions :
 
 type formatter_out_functions = {
   out_string : string -> int -> int -> unit;
+  out_width : string -> pos:int -> len:int -> int; (** @since 5.4 *)
   out_flush : unit -> unit;
   out_newline : unit -> unit;
   out_spaces : int -> unit;
@@ -861,6 +879,13 @@ type formatter_out_functions = {
   It is called with a string [s], a start position [p], and a number of
   characters [n]; it is supposed to output characters [p] to [p + n - 1] of
   [s].
+- the [out_width] function informs the formatting engine of the width of the
+  substring as rendered on the output device. Explicit width information as
+  provided by [@<n>], {!pp_print_as} or {!pp_print_substring_as} takes priority
+  over this function. Moreover, the formatting engine evaluates the width of the
+  string arguments of {!pp_print_string} and substring arguments of
+  {!pp_print_substring} as a whole. Consequently, [out_width] can be used to
+  compute an approximative width for unicode substrings.
 - the [out_flush] function flushes the pretty-printer output device.
 - [out_newline] is called to open a new line when the pretty-printer splits
   the line.
@@ -875,6 +900,8 @@ type formatter_out_functions = {
   (e.g. {!Stdlib.output_string} and {!Stdlib.flush} for a
    {!Stdlib.out_channel} device, or [Buffer.add_substring] and
    {!Stdlib.ignore} for a [Buffer.t] output device),
+- field [out_width] is the number of unicode scalar values
+  (see {!utf_8_scalar_width}) in the substring.
 - field [out_newline] is equivalent to [out_string "\n" 0 1];
 - fields [out_spaces] and [out_indent] are equivalent to
   [out_string (String.make n ' ') 0 n].
@@ -893,9 +920,9 @@ val set_formatter_out_functions : formatter_out_functions -> unit @@ nonportable
   lines opening (which can be connected to any other action needed by the
   application at hand).
 
-  Reasonable defaults for functions [out_spaces] and [out_newline] are
-  respectively [out_funs.out_string (String.make n ' ') 0 n] and
-  [out_funs.out_string "\n" 0 1].
+  Reasonable defaults for functions [out_spaces], [out_newline], and [out_width]
+  are respectively [out_funs.out_string (String.make n ' ') 0 n],
+  [out_funs.out_string "\n" 0 1] and {!utf_8_scalar_width}.
   @since 4.01
 *)
 
@@ -907,6 +934,18 @@ val get_formatter_out_functions : unit -> formatter_out_functions @@ nonportable
   current setting and restore it afterwards.
   @since 4.01
 *)
+
+val utf_8_scalar_width: string -> pos:int -> len:int -> int
+(** [utf_8_scalar_width s ~pos ~len] is the number of unicode scalar values in
+    the substring [String.sub s pos len]. Invalid byte sequences are implicitly
+    replaced by [U+FFFD] since this yields a better width approximation for
+    other ascii-based encoding scheme like ISO-8859-15. This is the default
+    [out_width] function since OCaml 5.4.
+    @since 5.4 *)
+
+val ascii_width: string -> pos:int -> len:int -> int
+(** [ascii_width s ~pos ~len] is [len].
+    @since 5.4 *)
 
 (** {1:tagsmeaning Redefining semantic tag operations} *)
 

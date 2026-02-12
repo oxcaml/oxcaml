@@ -16,7 +16,7 @@
 
 (rule
   (targets sak)
-  (deps ../Makefile.upstream ../.depend ../Makefile.menhir ../Makefile.best_binaries
+  (deps ../Makefile.upstream ../Makefile.menhir ../Makefile.best_binaries
     ../stdlib/StdlibModules ../.depend.menhir ../config.status
     ../Makefile.common ../Makefile.config_if_required
     ../Makefile.build_config ../Makefile.config sak.c
@@ -55,7 +55,7 @@
    simd.c
    blake2.c
    misc.c
-   build_config.h sync_posix.h caml/jumptbl.h)
+   build_config.h sync_posix.h caml/jumptbl.h caml/domain_state.tbl)
  (action
    (progn
      (run %{dep:gen_primitives.sh} primitives %{deps})
@@ -72,7 +72,6 @@
    ../Makefile.config_if_required
    ../Makefile.common ../Makefile.upstream
    ../Makefile.menhir
-   ../.depend
    ../.depend.menhir
    ../config.status
    ../stdlib/StdlibModules
@@ -88,12 +87,10 @@
  (action
  (no-infer
    (progn
-     (bash "touch .depend") ; hack.
-     (bash "rm -f sak build_config.h") ; hack
+     (bash "rm -f sak build_config.h")
      (bash "cd .. && make V=1 -j8 -f Makefile.upstream runtime/libasmrun.a runtime/libasmrund.a runtime/libasmruni.a runtime/libasmrun_pic.a \
     runtime/libasmrun_shared.so runtime/libcamlrun.a runtime/libcamlrund.a runtime/libcamlruni.a runtime/libcamlrun_pic.a \
-    runtime/libcamlrun_shared.so runtime/ocamlrun runtime/ocamlrund runtime/ocamlruni runtime/ld.conf COMPUTE_DEPS=false")
-     (bash "rm .depend")))))
+    runtime/libcamlrun_shared.so runtime/ocamlrun runtime/ocamlrund runtime/ocamlruni runtime/ld.conf COMPUTE_DEPS=false")))))
 
 (install
   (files

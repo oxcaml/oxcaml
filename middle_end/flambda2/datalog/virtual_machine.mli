@@ -40,15 +40,15 @@ end) : sig
 
       Each iterator in the stack is associated with:
 
-        - A reference, where the current value of the iterator is stored (this
-          reference is the only way for users to access the current value of the
-          iterator)
-        - An instruction, to be executed for each value of the iterator
+      - A reference, where the current value of the iterator is stored (this
+        reference is the only way for users to access the current value of the
+        iterator)
+      - An instruction, to be executed for each value of the iterator
 
-      The [iterator] function is provided as a convenience when a list of
-      column iterators needs to be iterated at once; for more advanced usage
-      (e.g. filtering the values dynamically), an [instruction] must be
-      constructed manually. *)
+      The [iterator] function is provided as a convenience when a list of column
+      iterators needs to be iterated at once; for more advanced usage (e.g.
+      filtering the values dynamically), an [instruction] must be constructed
+      manually. *)
 
   (** The type [('a, 'y, 's) instruction] represents instructions of the virtual
       machine. The type parameters are interpreted as follows:
@@ -57,7 +57,7 @@ end) : sig
         (introduced with [action])
 
       - The ['y] type parameter represents the type of values yielded by the
-      virtual machine (in [fold] or [iter]).
+        virtual machine (in [fold] or [iter]).
 
       - The ['s] type parameter represents the stack of the virtual machine. *)
   type ('a, 's) instruction
@@ -90,16 +90,15 @@ end) : sig
     ('b, 's) instruction ->
     ('b, 's) instruction
 
-  (** [up k] moves back to the previous level in the stack, then executes
-      [k] at that level. *)
+  (** [up k] moves back to the previous level in the stack, then executes [k] at
+      that level. *)
   val up : ('a, 's) instruction -> ('a, _ -> 's) instruction
 
   (** [open iterator cell each_value k] initializes a new level.
 
       The [iterator] is [init]ialized, and pushed onto the stack with associated
       reference [cell] and instruction [each_value]. Then, execute instruction
-      [k].
-  *)
+      [k]. *)
   val open_ :
     'i Iterator.t with_name ->
     'i option Channel.sender with_name ->
@@ -113,12 +112,13 @@ end) : sig
       [create]. *)
   val action : 'a -> ('a, 's) instruction -> ('a, 's) instruction
 
-  (** [call f ~name rs k] calls [f] with the values of the references in [rs] as a
-      heterogeneous list of values, then executes the instruction [k]. [name] is used when printing.
+  (** [call f ~name rs k] calls [f] with the values of the references in [rs] as
+      a heterogeneous list of values, then executes the instruction [k]. [name]
+      is used when printing.
 
       {b Note}: The references in [rs] are intended to be the references
-      associated with levels in the stack at the point the [call] instruction
-      is executed, and {b must not} be [None] at that point. *)
+      associated with levels in the stack at the point the [call] instruction is
+      executed, and {b must not} be [None] at that point. *)
   val call :
     ('c -> 'a Constant.hlist -> unit) ->
     name:string ->

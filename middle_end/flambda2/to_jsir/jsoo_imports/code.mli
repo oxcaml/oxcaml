@@ -158,8 +158,9 @@ type constant =
 module Constant : sig
   type t = constant
 
-  (** Guaranteed equality in terms of OCaml [(=)]: if [constant_equal a b =
-    Some v], then [Poly.equal a b = v]. This is used for optimization purposes. *)
+  (** Guaranteed equality in terms of OCaml [(=)]: if
+      [constant_equal a b = Some v], then [Poly.equal a b = v]. This is used for
+      optimization purposes. *)
   val ocaml_equal : t -> t -> bool option
 end
 
@@ -232,12 +233,12 @@ type program =
 type cmj_body =
   { program : program;
     last_var : Addr.t;
-        (** Highest used variable in the translation, since it is kept track by a
-        mutable state (in [Var]), and the [ocamlj] compiler and [js_of_ocaml]
-        need to have these in sync *)
+        (** Highest used variable in the translation, since it is kept track by
+            a mutable state (in [Var]), and the [ocamlj] compiler and
+            [js_of_ocaml] need to have these in sync *)
     imported_compilation_units : Compilation_unit.t list;
-        (** Compilation units fetched from JSOO's global data table. Needed to fill in
-        [Unit_info.t] in JSOO*)
+        (** Compilation units fetched from JSOO's global data table. Needed to
+            fill in [Unit_info.t] in JSOO*)
     exported_compilation_unit : Compilation_unit.t
         (** Current compilation unit. Needed to fill in [Unit_info.t] in JSOO *)
   }
@@ -276,32 +277,31 @@ type 'c fold_blocs =
 type fold_blocs_poly = { fold : 'a. 'a fold_blocs } [@@unboxed]
 
 (** [fold_closures p f init] folds [f] over all closures in the program [p],
-    starting from the initial value [init]. For each closure, [f] is called
-    with the following arguments: the closure name (enclosed in
-    {!Stdlib.Some}), its parameter list, the address and parameter instantiation
-    of its first block, the optional closure location and the current accumulator.
-    In addition, [f] is called on the initial block [p.start], with
-    [None] as the closure name.  All closures in all blocks of [p] are
-    included in the fold, not only the ones reachable from
-    [p.start]. *)
+    starting from the initial value [init]. For each closure, [f] is called with
+    the following arguments: the closure name (enclosed in {!Stdlib.Some}), its
+    parameter list, the address and parameter instantiation of its first block,
+    the optional closure location and the current accumulator. In addition, [f]
+    is called on the initial block [p.start], with [None] as the closure name.
+    All closures in all blocks of [p] are included in the fold, not only the
+    ones reachable from [p.start]. *)
 val fold_closures :
   program ->
   (Var.t option -> Var.t list -> cont -> Parse_info.t option -> 'd -> 'd) ->
   'd ->
   'd
 
-(** Similar to {!fold_closures}, but applies the fold function to the
-    innermost closures first. Unlike with {!fold_closures}, only the closures
-    reachable from [p.start] are considered. *)
+(** Similar to {!fold_closures}, but applies the fold function to the innermost
+    closures first. Unlike with {!fold_closures}, only the closures reachable
+    from [p.start] are considered. *)
 val fold_closures_innermost_first :
   program ->
   (Var.t option -> Var.t list -> cont -> Parse_info.t option -> 'd -> 'd) ->
   'd ->
   'd
 
-(** Similar to {!fold_closures}, but applies the fold function to the
-    outermost closures first. Unlike with {!fold_closures}, only the closures
-    reachable from [p.start] are considered. *)
+(** Similar to {!fold_closures}, but applies the fold function to the outermost
+    closures first. Unlike with {!fold_closures}, only the closures reachable
+    from [p.start] are considered. *)
 val fold_closures_outermost_first :
   program ->
   (Var.t option -> Var.t list -> cont -> Parse_info.t option -> 'd -> 'd) ->

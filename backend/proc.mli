@@ -115,14 +115,13 @@ val domainstate_ptr_dwarf_register_number : int
 (* Calling the assembler *)
 val assemble_file : string -> string -> int
 
-(** [operation_supported op] returns true when [op]
-    can be implemented directly with a hardware instruction.
-    Used in Cmmgen when converting [@@builtin] external calls
-    to primitive operations. *)
+(** [operation_supported op] returns true when [op] can be implemented directly
+    with a hardware instruction. Used in Cmmgen when converting [@@builtin]
+    external calls to primitive operations. *)
 val operation_supported : Cmm.operation -> bool
 
-(** [expression_supported exp] returns true when [exp] is a
-    cmm expression supported by this architecture. *)
+(** [expression_supported exp] returns true when [exp] is a cmm expression
+    supported by this architecture. *)
 val expression_supported : Cmm.expression -> bool
 
 (** The number of bytes each trap occupies on the stack. *)
