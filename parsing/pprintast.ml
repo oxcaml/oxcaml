@@ -1768,8 +1768,7 @@ and poly_type_with_optional_modes ctxt f (vars, typ, modes) =
       optional_at_modes modes
 
 (* transform [f = fun g h -> ..] to [f g h = ... ] could be improved *)
-and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct;
-                    pvb_modes = modes; _} =
+and binding ctxt f {pvb_pat=p; pvb_expr=x; pvb_constraint = ct; pvb_modes = modes; _} =
   (* .pvb_attributes have already been printed by the caller, #bindings *)
   match ct with
   | Some (Pvc_constraint { locally_abstract_univars = []; typ }) ->
