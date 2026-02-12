@@ -189,10 +189,12 @@ let split_chunks phrases =
     | Ptop_def [] :: phrases -> loop phrases code_acc expect_acc acc
     | phrase :: phrases ->
       let expectation = match phrase with
-        | Ptop_def [{pstr_desc = Pstr_extension(ext, [])}] -> match_expect_extension ext
+        | Ptop_def [{pstr_desc = Pstr_extension(ext, [])}] ->
+          match_expect_extension ext
         | _ -> None
       in match expectation with
-        | Some expectation -> loop phrases code_acc (expectation :: expect_acc) acc
+        | Some expectation ->
+          loop phrases code_acc (expectation :: expect_acc) acc
         | None -> match expect_acc with
           | [] -> loop phrases (phrase :: code_acc) [] acc
           | _ ->
