@@ -79,7 +79,7 @@ LIBFILES=stdlib.cma std_exit.cmo *.cmi $(HEADER_NAME)
 - Runtime dependency list updated to include shared libraries
 - `FLEXDLL_MANIFEST` pattern changed: `default_$(ARCH).manifest` -> `default$(filter-out _i386,_$(ARCH)).manifest`
 
-**Status**: Windows-specific, likely not relevant for OxCaml.
+**Status**: Windows-specific, not relevant yet for OxCaml.
 
 ## Runtime Changes
 

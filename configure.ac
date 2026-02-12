@@ -18,7 +18,7 @@
 # Require Autoconf 2.71 for repeatability in CI
 AC_PREREQ([2.71])
 AC_INIT([OxCaml],
-        5.4.1+ox,
+        5.4.0+ox,
         [opensource@janestreet.com],
         [oxcaml],
         [http://github.com/oxcaml/oxcaml])
@@ -1026,7 +1026,6 @@ otherlibraries="dynlink"
 otherlibs=""
 optional_libraries="$optional_libraries otherlibs/dynlink/dynlink"
 
-dnl CR sspies: These dynlink changes need looking at.
 lib_dynlink=true
 dldir=otherlibs/dynlink
 AC_CONFIG_LINKS([
