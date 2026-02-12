@@ -3,8 +3,8 @@
  ocamlopt_flags = "-flambda2-inline-small-function-size 26 -flambda2-inline-threshold 26.99 -flambda2-inline-large-function-size 100";
  flambda2;
  setup-ocamlopt.byte-build-env;
- ocamlopt.byte with check_simplify;
- check_fexpr_dump;
+ ocamlopt.byte with dump-simplify;
+ check-fexpr-dump;
 *)
 
 

@@ -3,8 +3,8 @@
  flambda2;
  ocamlopt_flags = "-flambda2-inline-small-function-size 1 -flambda2-inline-large-function-size 1";
  setup-ocamlopt.byte-build-env;
- ocamlopt.byte with check_simplify;
- check_fexpr_dump;
+ ocamlopt.byte with dump-simplify;
+ check-fexpr-dump;
 *)
 
 let f b =

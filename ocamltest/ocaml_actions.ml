@@ -733,7 +733,10 @@ let run_fexpr_check log env =
         Filename.make_path [test_source_dir; pass_ref_file]
       in
       let nr =
-        Actions_helpers.compare_files "fexpr" dump_file ref_file log env
+        if Sys.file_exists dump_file && Sys.file_exists ref_file then
+          Actions_helpers.compare_files "fexpr" dump_file ref_file log env
+        else
+          (Result.fail_with_reason ("Expected a pass output "^pass_sfx), env)
       in
       if Result.is_pass res then nr else (res, env))
     (Result.pass, env)
@@ -741,7 +744,7 @@ let run_fexpr_check log env =
 
 let check_fexpr_dump =
   native_action @@
-  Actions.make ~name:"check_fexpr_dump"
+  Actions.make ~name:"check-fexpr-dump"
     ~description:"Compare passes fexpr dumps to reference"
     ~does_something:true run_fexpr_check
 

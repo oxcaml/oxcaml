@@ -196,7 +196,7 @@ module Flambda2 : sig
     val fexpr_after : pass ref
     val flexpect : target ref
     val fexpr_annot : bool ref
-    val fexpr_annot_pass : string list ref
+    val fexpr_annot_after : string list ref
     val slot_offsets : bool ref
     val freshen : bool ref
     val flow : bool ref

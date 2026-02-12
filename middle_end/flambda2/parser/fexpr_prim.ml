@@ -159,9 +159,9 @@ let string_accessor_width =
         match i with
         | "f32" -> Single
         | "8" -> Eight
-        | "i8" -> Eight_signed
+        | "8s" -> Eight_signed
         | "16" -> Sixteen
-        | "i16" -> Sixteen_signed
+        | "16s" -> Sixteen_signed
         | "32" -> Thirty_two
         | "64" -> Sixty_four
         | "128a" -> One_twenty_eight { aligned = true }
@@ -176,9 +176,9 @@ let string_accessor_width =
         let s =
           match (saw : P.string_accessor_width) with
           | Eight -> "8"
-          | Eight_signed -> "i8"
+          | Eight_signed -> "8s"
           | Sixteen -> "16"
-          | Sixteen_signed -> "i16"
+          | Sixteen_signed -> "16s"
           | Thirty_two -> "32"
           | Single -> "f32"
           | Sixty_four -> "64"

@@ -58,7 +58,7 @@ let dump_fexpr_annot ~prefixname suffix unit =
   let dump =
     Flambda_features.dump_fexpr_annot ()
     || List.exists (String.equal suffix)
-         (Flambda_features.dump_fexpr_annot_pass ())
+         (Flambda_features.dump_fexpr_annot_after ())
   in
   if dump
   then
