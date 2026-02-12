@@ -131,7 +131,6 @@ DOMAIN_STATE(uintnat, requested_global_major_slice)
 
 DOMAIN_STATE(uintnat, requested_minor_gc)
 
-DOMAIN_STATE(atomic_uintnat, tick_thread_interval_usec)
 DOMAIN_STATE(atomic_bool, requested_tick)
 
 DOMAIN_STATE(int, parser_trace)
