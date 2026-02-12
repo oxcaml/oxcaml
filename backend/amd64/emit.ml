@@ -77,6 +77,8 @@ let record_for_expect_asm ~name ~debug_info ~asm_start =
     let name =
       match Debuginfo.to_items debug_info with
       | item :: _ ->
+        (* CR-someday ttebbi: We could assign disambiguating names for multiple
+           anonymous functions *)
         Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
           item.dinfo_scopes
         (* Remove the module name introduced by the toplevel eval loop. *)
