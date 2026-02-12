@@ -558,8 +558,9 @@ Error: Signature mismatch:
        is not included in
          val f : int -> int -> int [@@zero_alloc]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the syntactic arity of
-       the implementation must match the function type in the interface.
+       When using "zero_alloc" in a signature, the
+       syntactic arity of the implementation must match the function type in
+       the interface.
        Here the former is 1 and the latter is 2.
 |}]
 
@@ -607,8 +608,9 @@ Error: Signature mismatch:
        is not included in
          val f : t_two_args [@@zero_alloc arity 2]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the syntactic arity of
-       the implementation must match the function type in the interface.
+       When using "zero_alloc" in a signature, the
+       syntactic arity of the implementation must match the function type in
+       the interface.
        Here the former is 1 and the latter is 2.
 |}]
 
@@ -636,8 +638,9 @@ Error: Signature mismatch:
        is not included in
          val f : t_two_args [@@zero_alloc arity 1]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the syntactic arity of
-       the implementation must match the function type in the interface.
+       When using "zero_alloc" in a signature, the
+       syntactic arity of the implementation must match the function type in
+       the interface.
        Here the former is 2 and the latter is 1.
 |}]
 
@@ -693,8 +696,9 @@ Error: Signature mismatch:
        is not included in
          val f : int -> t [@@zero_alloc]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the syntactic arity of
-       the implementation must match the function type in the interface.
+       When using "zero_alloc" in a signature, the
+       syntactic arity of the implementation must match the function type in
+       the interface.
        Here the former is 2 and the latter is 1.
 |}]
 
@@ -737,8 +741,9 @@ Error: Signature mismatch:
        is not included in
          val f : int -> int -> int -> int * int [@@zero_alloc arity 2]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the syntactic arity of
-       the implementation must match the function type in the interface.
+       When using "zero_alloc" in a signature, the
+       syntactic arity of the implementation must match the function type in
+       the interface.
        Here the former is 3 and the latter is 2.
 |}]
 
@@ -795,7 +800,7 @@ Line 2, characters 7-17:
 2 |   let[@zero_alloc arity 2] f x y = x + y
            ^^^^^^^^^^
 Warning 47 [attribute-payload]: illegal payload for attribute 'zero_alloc'.
-The "arity" field is only supported on "zero_alloc" in signatures
+The "arity" field is only supported on "zero_alloc" in signatures or on function arguments
 
 module M_struct_arity_let_1 :
   sig val f : int -> int -> int [@@zero_alloc] end
@@ -809,7 +814,7 @@ Line 2, characters 7-17:
 2 |   let[@zero_alloc arity 2] f = fun x y -> x + y
            ^^^^^^^^^^
 Warning 47 [attribute-payload]: illegal payload for attribute 'zero_alloc'.
-The "arity" field is only supported on "zero_alloc" in signatures
+The "arity" field is only supported on "zero_alloc" in signatures or on function arguments
 
 module M_struct_arity_let_2 :
   sig val f : int -> int -> int [@@zero_alloc] end
@@ -823,7 +828,7 @@ Line 2, characters 15-25:
 2 |   let f = fun[@zero_alloc arity 2]  x y -> x + y
                    ^^^^^^^^^^
 Warning 47 [attribute-payload]: illegal payload for attribute 'zero_alloc'.
-The "arity" field is only supported on "zero_alloc" in signatures
+The "arity" field is only supported on "zero_alloc" in signatures or on function arguments
 
 module M_struct_arity_let_fun_1 :
   sig val f : int -> int -> int [@@zero_alloc] end
@@ -841,7 +846,7 @@ Line 4, characters 11-21:
 4 |       fun[@zero_alloc arity 1] y -> y
                ^^^^^^^^^^
 Warning 47 [attribute-payload]: illegal payload for attribute 'zero_alloc'.
-The "arity" field is only supported on "zero_alloc" in signatures
+The "arity" field is only supported on "zero_alloc" in signatures or on function arguments
 
 module M_struct_arity_let_fun_2 : sig val f : int -> int -> int end
 |}]
@@ -1084,8 +1089,9 @@ Error: Signature mismatch:
        is not included in
          val f : int -> t [@@zero_alloc]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the syntactic arity of
-       the implementation must match the function type in the interface.
+       When using "zero_alloc" in a signature, the
+       syntactic arity of the implementation must match the function type in
+       the interface.
        Here the former is 2 and the latter is 1.
 |}]
 
@@ -1111,8 +1117,9 @@ Error: Signature mismatch:
        is not included in
          val f : int -> int -> int [@@zero_alloc]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the syntactic arity of
-       the implementation must match the function type in the interface.
+       When using "zero_alloc" in a signature, the
+       syntactic arity of the implementation must match the function type in
+       the interface.
        Here the former is 1 and the latter is 2.
 |}]
 
