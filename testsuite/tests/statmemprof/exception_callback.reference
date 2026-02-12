@@ -1,2 +1,8 @@
 Run without exception.
+<<<<<<< oxcaml
 Exception from memprof.
+||||||| upstream-base
+Fatal error: exception Failure("callback failed")
+=======
+Exception from major allocation callback.
+>>>>>>> upstream-incoming

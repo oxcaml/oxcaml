@@ -86,7 +86,13 @@ end);;
 Line 2, characters 0-9:
 2 | open List
     ^^^^^^^^^
+<<<<<<< oxcaml
 Error (warning 33 [unused-open]): unused open List.
+||||||| upstream-base
+Error (warning 33 [unused-open]): unused open Stdlib.List.
+=======
+Error (warning 33 [unused-open]): unused open "Stdlib.List".
+>>>>>>> upstream-incoming
 |}];;
 
 type unknown += Foo;;

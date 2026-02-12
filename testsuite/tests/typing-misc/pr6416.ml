@@ -56,7 +56,14 @@ Error: Signature mismatch:
          "A of t/1"
        is not the same as:
          "A of t/2"
+<<<<<<< oxcaml
        The type "t/1" is not equal to the type "t/2"
+||||||| upstream-base
+         "A of t"
+       The type "t" is not equal to the type "t/2"
+=======
+       The type "t" is not equal to the type "t/2"
+>>>>>>> upstream-incoming
        Line 4, characters 9-19:
          Definition of type "t/1"
        Line 2, characters 2-11:
@@ -80,13 +87,20 @@ Lines 4-7, characters 4-7:
 7 |     end
 Error: Signature mismatch:
        Modules do not match:
-         sig module type s module A : functor (X : s) -> sig end end
+         sig module type s module A : (X : s) -> sig end end
        is not included in
-         sig module A : functor (X : s) -> sig end end
+         sig module A : (X : s) -> sig end end
        In module "A":
        Modules do not match:
+<<<<<<< oxcaml
          functor (X : s/1) -> ...
+||||||| upstream-base
+         functor (X : s) -> ...
+=======
+         (X : s) -> ...
+>>>>>>> upstream-incoming
        is not included in
+<<<<<<< oxcaml
          functor (X : s/2) -> ...
        Module types do not match:
          s/1
@@ -96,6 +110,24 @@ Error: Signature mismatch:
          Definition of module type "s/1"
        Line 2, characters 2-15:
          Definition of module type "s/2"
+||||||| upstream-base
+         functor (X : s/2) -> ...
+       Module types do not match:
+         s
+       does not include
+         s/2
+       Line 5, characters 6-19:
+         Definition of module type "s"
+       Line 2, characters 2-15:
+         Definition of module type "s/2"
+=======
+         (X : s/2) -> ...
+       Module types do not match: s does not include s/2
+Line 5, characters 6-19:
+  Definition of module type "s"
+Line 2, characters 2-15:
+  Definition of module type "s/2"
+>>>>>>> upstream-incoming
 |}]
 
 module L = struct
@@ -125,7 +157,14 @@ Error: Signature mismatch:
          "A of T/1.t"
        is not the same as:
          "A of T/2.t"
+<<<<<<< oxcaml
        The type "T/1.t" is not equal to the type "T/2.t"
+||||||| upstream-base
+         "A of T.t"
+       The type "T.t" is not equal to the type "T/2.t"
+=======
+       The type "T.t" is not equal to the type "T/2.t"
+>>>>>>> upstream-incoming
        Line 5, characters 6-34:
          Definition of module "T/1"
        Line 2, characters 2-30:
@@ -154,7 +193,13 @@ Error: Signature mismatch:
          val f : (module s/2) -> t/2 -> t/2
        The type "(module s/1) -> t/2 -> t/1" is not compatible with the type
          "(module s/2) -> t/2 -> t/2"
+<<<<<<< oxcaml
        Type "(module s/1)" is not compatible with type "(module s/2)"
+||||||| upstream-base
+       Type "(module s)" is not compatible with type "(module s/2)"
+=======
+       Modules do not match: s is not included in s/2
+>>>>>>> upstream-incoming
        Line 5, characters 23-33:
          Definition of type "t/1"
        Line 3, characters 2-12:
@@ -221,10 +266,22 @@ Error: Signature mismatch:
          class b : a/2
        The public method c cannot be hidden
        The first class type has no method m
+<<<<<<< oxcaml
        Line 5, characters 4-74:
          Definition of class type "a/1"
        Line 2, characters 2-36:
          Definition of class type "a/2"
+||||||| upstream-base
+       Line 5, characters 4-74:
+         Definition of class type "a"
+       Line 2, characters 2-36:
+         Definition of class type "a/2"
+=======
+Line 5, characters 4-74:
+  Definition of class type "a"
+Line 2, characters 2-36:
+  Definition of class type "a/2"
+>>>>>>> upstream-incoming
 |}]
 
 module R = struct
@@ -252,10 +309,22 @@ Error: Signature mismatch:
        does not match
          class type b = a/2
        The first class type has no method m
+<<<<<<< oxcaml
        Line 5, characters 4-29:
          Definition of class type "a/1"
        Line 2, characters 2-42:
          Definition of class type "a/2"
+||||||| upstream-base
+       Line 5, characters 4-29:
+         Definition of class type "a"
+       Line 2, characters 2-42:
+         Definition of class type "a/2"
+=======
+Line 5, characters 4-29:
+  Definition of class type "a"
+Line 2, characters 2-42:
+  Definition of class type "a/2"
+>>>>>>> upstream-incoming
 |}]
 
 module S = struct
@@ -399,9 +468,9 @@ module Foo : sig type info = { doc : unit; } type t = { info : info; } end
 Line 5, characters 38-41:
 5 | let add_extra_info arg = arg.Foo.info.doc
                                           ^^^
-Warning 40 [name-out-of-scope]: doc was selected from type Foo.info.
-It is not visible in the current scope, and will not
-be selected if the type becomes unknown.
+Warning 40 [name-out-of-scope]: "doc" was selected from type "Foo.info".
+  It is not visible in the current scope, and will not be selected
+  if the type becomes unknown.
 
 val add_extra_info : Foo.t -> unit = <fun>
 |}]
@@ -422,9 +491,9 @@ module Bar : sig end
 Line 8, characters 38-41:
 8 | let add_extra_info arg = arg.Foo.info.doc
                                           ^^^
-Warning 40 [name-out-of-scope]: doc was selected from type Bar/2.info.
-It is not visible in the current scope, and will not
-be selected if the type becomes unknown.
+Warning 40 [name-out-of-scope]: "doc" was selected from type "Bar/2.info".
+  It is not visible in the current scope, and will not be selected
+  if the type becomes unknown.
 
 val add_extra_info : Foo.t -> unit = <fun>
 |}]

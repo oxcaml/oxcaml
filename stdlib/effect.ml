@@ -12,7 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-type 'a t = ..
+type 'a t = 'a eff = ..
 external perform : 'a t -> 'a = "%perform"
 exception Out_of_fibers = Out_of_fibers
 type exn += Unhandled: 'a t -> exn
@@ -81,10 +81,38 @@ let with_handler cont valuec exnc (effc : 'a. ('a, _, _) effc) f x =
 
 module Deep = struct
 
+<<<<<<< oxcaml
   type ('a,'b) continuation =
     | Cont : ('a,'x,'b) cont -> ('a, 'b) continuation [@@unboxed]
+||||||| upstream-base
+  type ('a,'b) continuation
+=======
+  type nonrec ('a,'b) continuation = ('a,'b) continuation
+>>>>>>> upstream-incoming
 
+<<<<<<< oxcaml
   let continue (Cont k) v = resume k (fun x-> x) v
+||||||| upstream-base
+  external take_cont_noexc : ('a, 'b) continuation -> ('a, 'b) stack =
+    "caml_continuation_use_noexc" [@@noalloc]
+  external alloc_stack :
+    ('a -> 'b) ->
+    (exn -> 'b) ->
+    ('c t -> ('c, 'b) continuation -> last_fiber -> 'b) ->
+    ('a, 'b) stack = "caml_alloc_stack"
+  external cont_last_fiber : ('a, 'b) continuation -> last_fiber = "%field1"
+  external cont_set_last_fiber :
+    ('a, 'b) continuation -> last_fiber -> unit = "%setfield1"
+=======
+  external take_cont_noexc : ('a, 'b) continuation -> ('a, 'b) stack =
+    "caml_continuation_use_noexc" [@@noalloc]
+  external alloc_stack :
+    ('a -> 'b) ->
+    (exn -> 'b) ->
+    ('c t -> ('c, 'b) continuation -> last_fiber -> 'b) ->
+    ('a, 'b) stack = "caml_alloc_stack"
+  external cont_last_fiber : ('a, 'b) continuation -> last_fiber = "%field1"
+>>>>>>> upstream-incoming
 
   let discontinue (Cont k) e = resume k (fun e -> raise e) e
 
@@ -102,9 +130,17 @@ module Deep = struct
   let match_with comp arg handler =
     let effc eff k last_fiber =
       match handler.effc eff with
+<<<<<<< oxcaml
       | Some f ->
           cont_set_last_fiber k last_fiber;
           f (Cont k)
+||||||| upstream-base
+      | Some f ->
+          cont_set_last_fiber k last_fiber;
+          f k
+=======
+      | Some f -> f k
+>>>>>>> upstream-incoming
       | None -> reperform eff k last_fiber
     in
     with_stack handler.retc handler.exnc effc comp arg
@@ -115,9 +151,17 @@ module Deep = struct
   let try_with comp arg handler =
     let effc' eff k last_fiber =
       match handler.effc eff with
+<<<<<<< oxcaml
       | Some f ->
           cont_set_last_fiber k last_fiber;
           f (Cont k)
+||||||| upstream-base
+      | Some f ->
+          cont_set_last_fiber k last_fiber;
+          f k
+=======
+      | Some f -> f k
+>>>>>>> upstream-incoming
       | None -> reperform eff k last_fiber
     in
     with_stack (fun x -> x) (fun e -> raise e) effc' comp arg
@@ -129,19 +173,57 @@ end
 
 module Shallow = struct
 
+<<<<<<< oxcaml
   type ('a,'b) continuation =
     | Cont : ('a,'b,'x) cont -> ('a,'b) continuation [@@unboxed]
+||||||| upstream-base
+  type ('a,'b) continuation
+
+  external alloc_stack :
+    ('a -> 'b) ->
+    (exn -> 'b) ->
+    ('c t -> ('c, 'b) continuation -> last_fiber -> 'b) ->
+    ('a, 'b) stack = "caml_alloc_stack"
+
+  external cont_last_fiber : ('a, 'b) continuation -> last_fiber = "%field1"
+  external cont_set_last_fiber :
+    ('a, 'b) continuation -> last_fiber -> unit = "%setfield1"
+=======
+  type ('a,'b) continuation
+
+  external alloc_stack :
+    ('a -> 'b) ->
+    (exn -> 'b) ->
+    ('c t -> ('c, 'b) continuation -> last_fiber -> 'b) ->
+    ('a, 'b) stack = "caml_alloc_stack"
+
+  external cont_last_fiber : ('a, 'b) continuation -> last_fiber = "%field1"
+>>>>>>> upstream-incoming
 
   let fiber : type a b. (a -> b) -> (a, b) continuation = fun f ->
     let module M = struct type _ t += Initial_setup__ : a t end in
     let exception E of (a,b) continuation in
     let f' () = f (perform M.Initial_setup__) in
     let error _ = failwith "impossible" in
+<<<<<<< oxcaml
     let effc (type a2) (eff : a2 t) (k : (a2,b,_) cont) last_fiber =
+||||||| upstream-base
+    let effc eff k last_fiber =
+=======
+    let effc eff k _last_fiber =
+>>>>>>> upstream-incoming
       match eff with
+<<<<<<< oxcaml
       | M.Initial_setup__ ->
           cont_set_last_fiber k last_fiber;
           raise_notrace (E (Cont k))
+||||||| upstream-base
+      | M.Initial_setup__ ->
+          cont_set_last_fiber k last_fiber;
+          raise_notrace (E k)
+=======
+      | M.Initial_setup__ -> raise_notrace (E k)
+>>>>>>> upstream-incoming
       | _ -> error ()
     in
     match with_stack error error effc f' () with
@@ -159,9 +241,17 @@ module Shallow = struct
   let continue_gen (Cont k) resume_fun v handler =
     let effc eff k last_fiber =
       match handler.effc eff with
+<<<<<<< oxcaml
       | Some f ->
           cont_set_last_fiber k last_fiber;
           f (Cont k)
+||||||| upstream-base
+      | Some f ->
+          cont_set_last_fiber k last_fiber;
+          f k
+=======
+      | Some f -> f k
+>>>>>>> upstream-incoming
       | None -> reperform eff k last_fiber
     in
     with_handler k handler.retc handler.exnc effc resume_fun v

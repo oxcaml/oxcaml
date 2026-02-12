@@ -156,21 +156,33 @@ let process_append_bytecode oc state objfile compunit =
     let events, debug_dirs =
       if !Clflags.debug && compunit.cu_debug > 0 then begin
         seek_in ic compunit.cu_debug;
+<<<<<<< oxcaml
         (* CR ocaml 5 compressed-marshal:
         let unit_events = (Compression.input_value ic : debug_event list) in
         *)
         let unit_events = (Marshal.from_channel ic : debug_event list) in
+||||||| upstream-base
+        let unit_events = (input_value ic : debug_event list) in
+=======
+        let unit_events = (Compression.input_value ic : debug_event list) in
+>>>>>>> upstream-incoming
         let events =
           rev_append_map
             (relocate_debug state.offset state.subst)
             unit_events
             state.events in
+<<<<<<< oxcaml
         let unit_debug_dirs =
           (* CR ocaml 5 compressed-marshal:
           (Compression.input_value ic : string list)
           *)
           (Marshal.from_channel ic : string list)
         in
+||||||| upstream-base
+        let unit_debug_dirs = (input_value ic : string list) in
+=======
+        let unit_debug_dirs = (Compression.input_value ic : string list) in
+>>>>>>> upstream-incoming
         let debug_dirs =
           String.Set.union
             state.debug_dirs
@@ -376,21 +388,51 @@ module Style = Misc.Style
 let report_error_doc ppf = function
     Forward_reference(file, compunit) ->
       fprintf ppf "Forward reference to %a in file %a"
+<<<<<<< oxcaml
         CU.print_as_inline_code compunit
+||||||| upstream-base
+        Style.inline_code (Compunit.name compunit)
+        (Style.as_inline_code Location.print_filename) file
+=======
+        Style.inline_code (Compunit.name compunit)
+>>>>>>> upstream-incoming
         Location.Doc.quoted_filename file
   | Multiple_definition(file, compunit) ->
       fprintf ppf "File %a redefines %a"
         Location.Doc.quoted_filename file
+<<<<<<< oxcaml
         CU.print_as_inline_code compunit
+||||||| upstream-base
+        (Style.as_inline_code Location.print_filename) file
+        Style.inline_code (Compunit.name compunit)
+=======
+        Style.inline_code (Compunit.name compunit)
+>>>>>>> upstream-incoming
   | Not_an_object_file file ->
       fprintf ppf "%a is not a bytecode object file"
         Location.Doc.quoted_filename file
+<<<<<<< oxcaml
   | Illegal_renaming(name, file, compunit) ->
+||||||| upstream-base
+        (Style.as_inline_code Location.print_filename) file
+  | Illegal_renaming(name, file, id) ->
+=======
+  | Illegal_renaming(name, file, id) ->
+>>>>>>> upstream-incoming
       fprintf ppf "Wrong file naming: %a@ contains the code for\
                    @ %a when %a was expected"
         Location.Doc.quoted_filename file
+<<<<<<< oxcaml
         CU.print_as_inline_code name
         CU.print_as_inline_code compunit
+||||||| upstream-base
+        (Style.as_inline_code Location.print_filename) file
+        Style.inline_code (Compunit.name name)
+        Style.inline_code (Compunit.name id)
+=======
+        Style.inline_code (Compunit.name name)
+        Style.inline_code (Compunit.name id)
+>>>>>>> upstream-incoming
   | File_not_found file ->
       fprintf ppf "File %a not found"
         Style.inline_code file

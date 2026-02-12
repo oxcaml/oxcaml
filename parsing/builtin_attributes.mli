@@ -188,7 +188,7 @@ val select_attributes :
 (** [attr_equals_builtin attr s] is true if the name of the attribute is [s] or
     ["ocaml." ^ s].  This is useful for manually inspecting attribute names, but
     note that doing so will not result in marking the attribute used for the
-    purpose of warning 53, so it is usually preferrable to use [has_attribute]
+    purpose of warning 53, so it is usually preferable to use [has_attribute]
     or [select_attributes]. *)
 val attr_equals_builtin : Parsetree.attribute -> string -> bool
 
@@ -198,6 +198,7 @@ val explicit_arity: Parsetree.attributes -> bool
 val has_unboxed: Parsetree.attributes -> bool
 val has_boxed: Parsetree.attributes -> bool
 
+<<<<<<< oxcaml
 val has_unsafe_allow_any_mode_crossing : Parsetree.attributes -> bool
 
 val parse_standard_interface_attributes : Parsetree.attribute -> unit
@@ -361,4 +362,7 @@ val get_tracing_probe_payload :
 val get_eval_payload :
   Parsetree.payload -> (Parsetree.core_type, unit) result
 
+||||||| upstream-base
+=======
+>>>>>>> upstream-incoming
 val has_atomic: Parsetree.attributes -> bool

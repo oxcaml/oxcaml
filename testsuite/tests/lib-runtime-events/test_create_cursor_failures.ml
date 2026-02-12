@@ -1,4 +1,5 @@
 (* TEST
+<<<<<<< oxcaml
 {
    runtime4;
    skip;
@@ -9,6 +10,16 @@
    libunix;
    { bytecode; }
    { native; }
+||||||| upstream-base
+=======
+ include unix;
+ include runtime_events;
+ hasunix;
+ {
+   bytecode;
+ }{
+   native;
+>>>>>>> upstream-incoming
  }
 *)
 

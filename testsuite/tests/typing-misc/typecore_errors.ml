@@ -13,10 +13,18 @@
 
 let x = function 0. .. 1. -> ()
 [%%expect {|
-Line 8, characters 17-25:
+Line 8, characters 17-19:
 8 | let x = function 0. .. 1. -> ()
+<<<<<<< oxcaml
                      ^^^^^^^^
 Error: Only character intervals and untagged character intervals are supported in patterns.
+||||||| upstream-base
+                     ^^^^^^^^
+Error: Only character intervals are supported in patterns.
+=======
+                     ^^
+Error: Only character intervals are supported in patterns.
+>>>>>>> upstream-incoming
 |}]
 
 (** Constructor arity mismatch *)

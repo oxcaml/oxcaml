@@ -723,17 +723,38 @@ let compile_implementation_linear unix output_prefix ~progname ~ppf_dump =
       linear_gen_implementation ~ppf_dump unix progname)
 
 (* Error report *)
+<<<<<<< oxcaml
+||||||| upstream-base
+module Style = Misc.Style
+=======
+module Style = Misc.Style
+let fprintf, dprintf = Format_doc.fprintf, Format_doc.dprintf
+>>>>>>> upstream-incoming
 
+<<<<<<< oxcaml
 let fprintf = Format_doc.fprintf
 
+||||||| upstream-base
+let report_error ppf = function
+=======
+>>>>>>> upstream-incoming
 let report_error_doc ppf = function
   | Assembler_error file ->
+<<<<<<< oxcaml
     fprintf ppf "Assembler error, input left in file %a"
       Location.Doc.quoted_filename file
   | Binary_emitter_mismatch file ->
     fprintf ppf "Binary emitter verification failed for %a"
       Location.Doc.quoted_filename file
+||||||| upstream-base
+      fprintf ppf "Assembler error, input left in file %a"
+        Location.print_filename file
+=======
+      fprintf ppf "Assembler error, input left in file %a"
+        Location.Doc.quoted_filename file
+>>>>>>> upstream-incoming
   | Mismatched_for_pack saved ->
+<<<<<<< oxcaml
     let msg prefix =
       if Compilation_unit.Prefix.is_empty prefix
       then "without -for-pack"
@@ -745,10 +766,49 @@ let report_error_doc ppf = function
   | Asm_generation (fn, err) ->
     fprintf ppf "Error producing assembly code for %s: %a" fn
       Emitaux.report_error_doc err
+||||||| upstream-base
+    let msg = function
+       | None -> Format.dprintf "without %a" Style.inline_code "-for-pack"
+       | Some s -> Format.dprintf "with %a" Style.inline_code ("-for-pack " ^ s)
+     in
+     fprintf ppf
+       "This input file cannot be compiled %t: it was generated %t."
+       (msg !Clflags.for_package) (msg saved)
+  | Asm_generation(fn, err) ->
+     fprintf ppf
+       "Error producing assembly code for function %a: %a"
+       Style.inline_code fn Emitaux.report_error err
+=======
+    let msg = function
+       | None -> dprintf "without %a" Style.inline_code "-for-pack"
+       | Some s -> dprintf "with %a" Style.inline_code ("-for-pack " ^ s)
+     in
+     fprintf ppf
+       "This input file cannot be compiled %t: it was generated %t."
+       (msg !Clflags.for_package) (msg saved)
+  | Asm_generation(fn, err) ->
+     fprintf ppf
+       "Error producing assembly code for function %a: %a"
+       Style.inline_code fn Emitaux.report_error_doc err
+>>>>>>> upstream-incoming
 
 let () =
+<<<<<<< oxcaml
   Location.register_error_of_exn (function
     | Error err -> Some (Location.error_of_printer_file report_error_doc err)
     | _ -> None)
+||||||| upstream-base
+  Location.register_error_of_exn
+    (function
+      | Error err -> Some (Location.error_of_printer_file report_error err)
+      | _ -> None
+    )
+=======
+  Location.register_error_of_exn
+    (function
+      | Error err -> Some (Location.error_of_printer_file report_error_doc err)
+      | _ -> None
+    )
+>>>>>>> upstream-incoming
 
 let report_error = Format_doc.compat report_error_doc

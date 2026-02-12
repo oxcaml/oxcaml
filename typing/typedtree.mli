@@ -23,6 +23,7 @@
 
 open Asttypes
 module Uid = Shape.Uid
+<<<<<<< oxcaml
 
 (* We define a new constant type that can represent unboxed values.
    This is currently used only in [Typedtree], but the long term goal
@@ -49,6 +50,9 @@ type constant =
   | Const_unboxed_int32 of int32
   | Const_unboxed_int64 of int64
   | Const_unboxed_nativeint of nativeint
+||||||| upstream-base
+=======
+>>>>>>> upstream-incoming
 
 (* Value expressions for the core language *)
 
@@ -209,17 +213,31 @@ and 'k pattern_desc =
   (* value patterns *)
   | Tpat_any : value pattern_desc
         (** _ *)
+<<<<<<< oxcaml
   | Tpat_var :
       Ident.t * string loc * Uid.t * Jkind_types.Sort.t * Mode.Value.l ->
       value pattern_desc
+||||||| upstream-base
+  | Tpat_var : Ident.t * string loc -> value pattern_desc
+=======
+  | Tpat_var : Ident.t * string loc * Uid.t -> value pattern_desc
+>>>>>>> upstream-incoming
         (** x *)
   | Tpat_alias :
+<<<<<<< oxcaml
       value general_pattern * Ident.t * string loc * Uid.t * Jkind_types.Sort.t
       * Mode.Value.l * Types.type_expr
         -> value pattern_desc
+||||||| upstream-base
+      value general_pattern * Ident.t * string loc -> value pattern_desc
+=======
+      value general_pattern * Ident.t * string loc * Uid.t * Types.type_expr ->
+      value pattern_desc
+>>>>>>> upstream-incoming
         (** P as a *)
   | Tpat_constant : constant -> value pattern_desc
         (** 1, 'a', "true", 1.0, 1l, 1L, 1n *)
+<<<<<<< oxcaml
   | Tpat_unboxed_unit : value pattern_desc
         (** #() *)
   | Tpat_unboxed_bool : bool -> value pattern_desc
@@ -237,14 +255,32 @@ and 'k pattern_desc =
         (** #(P1, ..., Pn)              [(None,P1,s1); ...; (None,Pn,sn)])
             #(L1:P1, ... Ln:Pn)         [(Some L1,P1,s1); ...; (Some Ln,Pn,sn)])
             Any mix, e.g. #(L1:P1, P2)  [(Some L1,P1,s1); ...; (None,P2,s2)])
+||||||| upstream-base
+  | Tpat_tuple : value general_pattern list -> value pattern_desc
+        (** (P1, ..., Pn)
+=======
+  | Tpat_tuple :
+      (string option * value general_pattern) list -> value pattern_desc
+        (** (P1, ..., Pn)                  [(None,P1); ...; (None,Pn)])
+            (L1:P1, ... Ln:Pn)             [(Some L1,P1); ...; (Some Ln,Pn)])
+            Any mix, e.g. (L1:P1, P2)      [(Some L1,P1); ...; (None,P2)])
+>>>>>>> upstream-incoming
 
             Invariant: n >= 2
          *)
   | Tpat_construct :
+<<<<<<< oxcaml
       Longident.t loc * Types.constructor_description *
         value general_pattern list *
         ((Ident.t loc * Parsetree.jkind_annotation option) list * core_type)
           option ->
+||||||| upstream-base
+      Longident.t loc * Types.constructor_description *
+        value general_pattern list * (Ident.t loc list * core_type) option ->
+=======
+      Longident.t loc * Data_types.constructor_description *
+        value general_pattern list * (Ident.t loc list * core_type) option ->
+>>>>>>> upstream-incoming
       value pattern_desc
         (** C                             ([], None)
             C P                           ([P], None)
@@ -265,14 +301,18 @@ and 'k pattern_desc =
             See {!Types.row_desc} for an explanation of the last parameter.
          *)
   | Tpat_record :
-      (Longident.t loc * Types.label_description * value general_pattern) list *
-        closed_flag ->
-      value pattern_desc
+      (Longident.t loc
+       * Data_types.label_description
+       * value general_pattern
+      ) list
+      * closed_flag
+      -> value pattern_desc
         (** { l1=P1; ...; ln=Pn }     (flag = Closed)
             { l1=P1; ...; ln=Pn; _}   (flag = Open)
 
             Invariant: n > 0
          *)
+<<<<<<< oxcaml
   | Tpat_record_unboxed_product :
       (Longident.t loc * Types.unboxed_label_description * value general_pattern) list *
         closed_flag ->
@@ -286,6 +326,13 @@ and 'k pattern_desc =
       Types.mutability * Jkind.sort * value general_pattern list -> value pattern_desc
         (** [| P1; ...; Pn |]    (flag = Mutable)
             [: P1; ...; Pn :]    (flag = Immutable) *)
+||||||| upstream-base
+  | Tpat_array : value general_pattern list -> value pattern_desc
+        (** [| P1; ...; Pn |] *)
+=======
+  | Tpat_array : mutable_flag * value general_pattern list -> value pattern_desc
+        (** [| P1; ...; Pn |] *)
+>>>>>>> upstream-incoming
   | Tpat_lazy : value general_pattern -> value pattern_desc
         (** lazy P *)
   (* computation patterns *)
@@ -401,6 +448,7 @@ and expression_desc =
         (** let P1 = E1 and ... and Pn = EN in E       (flag = Nonrecursive)
             let rec P1 = E1 and ... and Pn = EN in E   (flag = Recursive)
          *)
+<<<<<<< oxcaml
   | Texp_letmutable of value_binding * expression
         (** let mutable P = E in E' *)
   | Texp_function of
@@ -427,6 +475,33 @@ and expression_desc =
   | Texp_apply of
       expression * (arg_label * apply_arg) list * apply_position *
         Mode.Locality.l * Zero_alloc.assume option
+||||||| upstream-base
+  | Texp_function of function_param list * function_body
+    (** fun P0 P1 -> function p1 -> e1 | p2 -> e2  (body = Tfunction_cases _)
+        fun P0 P1 -> E                             (body = Tfunction_body _)
+
+        This construct has the same arity as the originating
+        {{!Parsetree.expression_desc.Pexp_function}[Pexp_function]}.
+        Arity determines when side-effects for effectful parameters are run
+        (e.g. optional argument defaults, matching against lazy patterns).
+        Parameters' effects are run left-to-right when an n-ary function is
+        saturated with n arguments.
+    *)
+  | Texp_apply of expression * (arg_label * expression option) list
+=======
+  | Texp_function of function_param list * function_body
+    (** fun P0 P1 -> function p1 -> e1 | p2 -> e2  (body = Tfunction_cases _)
+        fun P0 P1 -> E                             (body = Tfunction_body _)
+
+        This construct has the same arity as the originating
+        {{!Parsetree.expression_desc.Pexp_function}[Pexp_function]}.
+        Arity determines when side-effects for effectful parameters are run
+        (e.g. optional argument defaults, matching against lazy patterns).
+        Parameters' effects are run left-to-right when an n-ary function is
+        saturated with n arguments.
+    *)
+  | Texp_apply of expression * (arg_label * apply_arg) list
+>>>>>>> upstream-incoming
         (** E0 ~l1:E1 ... ~ln:En
 
             The expression can be Omitted if the expression is abstracted over
@@ -438,21 +513,47 @@ and expression_desc =
 
             The resulting typedtree for the application is:
             Texp_apply (Texp_ident "f/1037",
+<<<<<<< oxcaml
                         [(Nolabel, Omitted _);
                          (Labelled "y", Some (Texp_constant Const_int 3))
+||||||| upstream-base
+                        [(Nolabel, None);
+                         (Labelled "y", Some (Texp_constant Const_int 3))
+=======
+                        [(Nolabel, Omitted ());
+                         (Labelled "y", Arg (Texp_constant Const_int 3))
+>>>>>>> upstream-incoming
                         ])
+<<<<<<< oxcaml
 
             The [Zero_alloc.assume option] records the optional [@zero_alloc
             assume] attribute that may appear on applications. *)
   | Texp_match of expression * Jkind.sort * computation case list * partial
+||||||| upstream-base
+         *)
+  | Texp_match of expression * computation case list * partial
+=======
+         *)
+  | Texp_match of expression * computation case list * value case list * partial
+>>>>>>> upstream-incoming
         (** match E0 with
             | P1 -> E1
             | P2 | exception P3 -> E2
             | exception P4 -> E3
+            | effect P4 k -> E4
 
+<<<<<<< oxcaml
             [Texp_match (E0, sort_of_E0, [(P1, E1); (P2 | exception P3, E2);
                               (exception P4, E3)], _)]
+||||||| upstream-base
+            [Texp_match (E0, [(P1, E1); (P2 | exception P3, E2);
+                              (exception P4, E3)], _)]
+=======
+            [Texp_match (E0, [(P1, E1); (P2 | exception P3, E2);
+                              (exception P4, E3)], [(P4, E4)],  _)]
+>>>>>>> upstream-incoming
          *)
+<<<<<<< oxcaml
   | Texp_try of expression * value case list
         (** try E with P1 -> E1 | ... | PN -> EN *)
   | Texp_unboxed_unit
@@ -476,10 +577,37 @@ and expression_desc =
                 when [el] is [(Some L1, E1, s1);...;(Some Ln, En, sn)],
             - Any mix, e.g. [#(L1: E1, E2)]
                 when [el] is [(Some L1, E1, s1); (None, E2, s2)]
+||||||| upstream-base
+  | Texp_try of expression * value case list
+        (** try E with P1 -> E1 | ... | PN -> EN *)
+  | Texp_tuple of expression list
+        (** (E1, ..., EN) *)
+=======
+  | Texp_try of expression * value case list * value case list
+         (** try E with
+            | P1 -> E1
+            | effect P2 k -> E2
+            [Texp_try (E, [(P1, E1)], [(P2, E2)])]
+          *)
+  | Texp_tuple of (string option * expression) list
+        (** [Texp_tuple(el)] represents
+            - [(E1, ..., En)]
+                 when [el] is [(None, E1);...;(None, En)],
+            - [(L1:E1, ..., Ln:En)]
+                 when [el] is [(Some L1, E1);...;(Some Ln, En)],
+            - Any mix, e.g. [(L1: E1, E2)]
+                 when [el] is [(Some L1, E1); (None, E2)]
+>>>>>>> upstream-incoming
           *)
   | Texp_construct of
+<<<<<<< oxcaml
       Longident.t loc * Types.constructor_description *
       expression list * alloc_mode option
+||||||| upstream-base
+      Longident.t loc * Types.constructor_description * expression list
+=======
+      Longident.t loc * Data_types.constructor_description * expression list
+>>>>>>> upstream-incoming
         (** C                []
             C E              [E]
             C (E1, ..., En)  [E1;...;En]
@@ -494,7 +622,7 @@ and expression_desc =
             in which case it does not need allocation.
           *)
   | Texp_record of {
-      fields : ( Types.label_description * record_label_definition ) array;
+      fields : ( Data_types.label_description * record_label_definition ) array;
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
       alloc_mode : alloc_mode option
@@ -509,6 +637,7 @@ and expression_desc =
             Texp_record
               { fields = [| l1, Kept t1; l2 Override P2 |]; representation;
                 extended_expression = Some E0 }
+<<<<<<< oxcaml
             [alloc_mode] is the allocation mode of the record,
             or [None] if it is [Record_unboxed],
             in which case it does not need allocation.
@@ -541,7 +670,18 @@ and expression_desc =
   | Texp_unboxed_field of
       expression * Jkind.sort * Longident.t loc * Types.unboxed_label_description *
         unique_use
+||||||| upstream-base
+        *)
+  | Texp_field of expression * Longident.t loc * Types.label_description
+=======
+        *)
+  | Texp_atomic_loc of
+      expression * Longident.t loc * Data_types.label_description
+  | Texp_field of
+      expression * Longident.t loc * Data_types.label_description
+>>>>>>> upstream-incoming
   | Texp_setfield of
+<<<<<<< oxcaml
       expression * Mode.Locality.l * Longident.t loc *
       Types.label_description * expression
     (** [alloc_mode] translates to the [modify_mode] of the record *)
@@ -549,6 +689,13 @@ and expression_desc =
   | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
   | Texp_array_comprehension of Types.mutability * Jkind.sort * comprehension
+||||||| upstream-base
+      expression * Longident.t loc * Types.label_description * expression
+  | Texp_array of expression list
+=======
+      expression * Longident.t loc * Data_types.label_description * expression
+  | Texp_array of mutable_flag * expression list
+>>>>>>> upstream-incoming
   | Texp_ifthenelse of expression * expression * expression option
   | Texp_sequence of expression * Jkind.sort * expression
   | Texp_while of {
@@ -609,9 +756,36 @@ and expression_desc =
   | Texp_antiquotation of expression
   | Texp_eval of core_type * Jkind.sort
 
+<<<<<<< oxcaml
 and function_curry =
   | More_args of { partial_mode : Mode.Alloc.l }
   | Final_arg
+||||||| upstream-base
+and meth =
+    Tmeth_name of string
+  | Tmeth_val of Ident.t
+  | Tmeth_ancestor of Ident.t * Path.t
+
+and 'k case =
+    {
+     c_lhs: 'k general_pattern;
+     c_guard: expression option;
+     c_rhs: expression;
+    }
+=======
+and meth =
+    Tmeth_name of string
+  | Tmeth_val of Ident.t
+  | Tmeth_ancestor of Ident.t * Path.t
+
+and 'k case =
+    {
+     c_lhs: 'k general_pattern;
+     c_cont: Ident.t option;
+     c_guard: expression option;
+     c_rhs: expression;
+    }
+>>>>>>> upstream-incoming
 
 and function_param =
   {
@@ -767,6 +941,7 @@ and binding_op =
     bop_loc : Location.t;
   }
 
+<<<<<<< oxcaml
 (* See Note [Type-checking applications] in Typecore *)
 and ('a, 'b) arg_or_omitted =
   | Arg of 'a (* an argument actually passed to a function *)
@@ -785,6 +960,14 @@ and apply_position =
   | Tail          (* must be tail-call optimised *)
   | Nontail       (* must not be tail-call optimised *)
   | Default       (* tail-call optimised if in tail position *)
+||||||| upstream-base
+=======
+and ('a, 'b) arg_or_omitted =
+  | Arg of 'a
+  | Omitted of 'b
+
+and apply_arg = (expression, unit) arg_or_omitted
+>>>>>>> upstream-incoming
 
 (* Value expressions for the class language *)
 
@@ -1120,11 +1303,23 @@ and core_type =
    }
 
 and core_type_desc =
+<<<<<<< oxcaml
   | Ttyp_var of string option * Parsetree.jkind_annotation option
   | Ttyp_arrow of arg_label * core_type * Mode.Alloc.Const.t modes *
                   core_type * Mode.Alloc.Const.t modes
   | Ttyp_tuple of (string option * core_type) list
   | Ttyp_unboxed_tuple of (string option * core_type) list
+||||||| upstream-base
+    Ttyp_any
+  | Ttyp_var of string
+  | Ttyp_arrow of arg_label * core_type * core_type
+  | Ttyp_tuple of core_type list
+=======
+    Ttyp_any
+  | Ttyp_var of string
+  | Ttyp_arrow of arg_label * core_type * core_type
+  | Ttyp_tuple of (string option * core_type) list
+>>>>>>> upstream-incoming
   | Ttyp_constr of Path.t * Longident.t loc * core_type list
   | Ttyp_object of object_field list * closed_flag
   | Ttyp_class of Path.t * Longident.t loc * core_type list
@@ -1143,10 +1338,10 @@ and core_type_desc =
           argument ([lbl:[%call_pos] -> ...]). *)
 
 and package_type = {
-  pack_path : Path.t;
-  pack_fields : (Longident.t loc * core_type) list;
-  pack_type : Types.module_type;
-  pack_txt : Longident.t loc;
+  tpt_path : Path.t;
+  tpt_cstrs : (Longident.t loc * core_type) list;
+  tpt_type : Types.module_type;
+  tpt_txt : Longident.t loc;
 }
 
 and row_field = {
@@ -1214,8 +1409,15 @@ and label_declaration =
      ld_id: Ident.t;
      ld_name: string loc;
      ld_uid: Uid.t;
+<<<<<<< oxcaml
      ld_mutable: Types.mutability;
      ld_modalities: modalities;
+||||||| upstream-base
+     ld_mutable: mutable_flag;
+=======
+     ld_mutable: mutable_flag;
+     ld_atomic: atomic_flag;
+>>>>>>> upstream-incoming
      ld_type: core_type;
      ld_loc: Location.t;
      ld_attributes: attributes;
@@ -1226,7 +1428,13 @@ and constructor_declaration =
      cd_id: Ident.t;
      cd_name: string loc;
      cd_uid: Uid.t;
+<<<<<<< oxcaml
      cd_vars: (string * Parsetree.jkind_annotation option) list;
+||||||| upstream-base
+     cd_vars: string loc list;
+=======
+     cd_vars: string loc list;
+>>>>>>> upstream-incoming
      cd_args: constructor_arguments;
      cd_res: core_type option;
      cd_loc: Location.t;
@@ -1415,6 +1623,7 @@ val let_bound_idents_with_sorts:
     value_binding list -> (Ident.t * Jkind.Sort.t) list
 val let_bound_idents_full:
     value_binding list ->
+<<<<<<< oxcaml
     (Ident.t * string loc * Types.type_expr * Jkind.Sort.t * Uid.t) list
 
 (* [let_bound_idents_with_modes_sorts_and_checks] finds all the idents in the
@@ -1433,6 +1642,11 @@ val let_bound_idents_with_modes_sorts_and_checks:
   value_binding list
   -> (Ident.t * (Location.t * Mode.Value.l * Jkind.sort) list
               * Zero_alloc.t) list
+||||||| upstream-base
+    value_binding list -> (Ident.t * string loc * Types.type_expr) list
+=======
+    (Ident.t * string loc * Types.type_expr * Types.Uid.t) list
+>>>>>>> upstream-incoming
 
 (** Alpha conversion of patterns *)
 val alpha_pat:
@@ -1443,13 +1657,21 @@ val mkloc: 'a -> Location.t -> 'a Asttypes.loc
 
 val pat_bound_idents: 'k general_pattern -> Ident.t list
 val pat_bound_idents_full:
+<<<<<<< oxcaml
   'k general_pattern
   -> (Ident.t * string loc * Types.type_expr * Types.Uid.t * Jkind.Sort.Const.t) list
+||||||| upstream-base
+  'k general_pattern -> (Ident.t * string loc * Types.type_expr) list
+=======
+  'k general_pattern ->
+  (Ident.t * string loc * Types.type_expr * Types.Uid.t) list
+>>>>>>> upstream-incoming
 
 (** Splits an or pattern into its value (left) and exception (right) parts. *)
 val split_pattern:
   computation general_pattern -> pattern option * pattern option
 
+<<<<<<< oxcaml
 (** Returns a format document if the expression reads nicely as the subject of a
     sentence in a error message. *)
 val nominal_exp_doc :
@@ -1472,3 +1694,11 @@ val mode_without_locks_exn : mode_with_locks -> Mode.Value.l
 (** Fold over the antiquotations in an expression. This function defines the
     evaluation order of antiquotations. *)
 val fold_antiquote_exp : ('a -> expression -> 'a) -> 'a -> expression -> 'a
+||||||| upstream-base
+(** Whether an expression looks nice as the subject of a sentence in a error
+    message. *)
+val exp_is_nominal : expression -> bool
+=======
+val map_apply_arg:
+  ('a -> ' b) -> ('a, 'omitted) arg_or_omitted ->  ('b, 'omitted) arg_or_omitted
+>>>>>>> upstream-incoming

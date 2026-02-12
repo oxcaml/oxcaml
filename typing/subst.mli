@@ -28,6 +28,7 @@ open Types
    Indeed, non-variable node of a type are duplicated, with their
    levels set to generic level.  That way, the resulting type is
    well-formed (decreasing levels), even if the original one was not.
+<<<<<<< oxcaml
 
    In the presence of local substitutions for module types, a substitution for a
    type expression may fail to produce a well-formed type. In order to confine
@@ -68,13 +69,61 @@ type additional_action_config =
    See the documentation on [additional_action_config].
 *)
 val with_additional_action: additional_action_config -> t -> t
+||||||| upstream-base
+*)
+=======
+>>>>>>> upstream-incoming
 
+<<<<<<< oxcaml
 (* Any of the additional actions involve copying type variables. Calling
    [reset_additional_action_type_id] resets the id counter used when the copying
    of type variables needs to mint new type variable ids.
 *)
 val reset_additional_action_type_id: unit -> unit
+||||||| upstream-base
+val identity: t
+=======
+   In the presence of local substitutions for module types, a substitution for a
+   type expression may fail to produce a well-formed type. In order to confine
+   this issue to local substitutions, the type of substitutions is split into a
+   safe and unsafe variant. Only unsafe substitutions may expand a module type
+   path into a generic module type. *)
+>>>>>>> upstream-incoming
 
+<<<<<<< oxcaml
+||||||| upstream-base
+val add_type: Ident.t -> Path.t -> t -> t
+val add_type_path: Path.t -> Path.t -> t -> t
+val add_type_function:
+  Path.t -> params:type_expr list -> body:type_expr -> t -> t
+val add_module: Ident.t -> Path.t -> t -> t
+val add_module_path: Path.t -> Path.t -> t -> t
+val add_modtype: Ident.t -> module_type -> t -> t
+val add_modtype_path: Path.t -> module_type -> t -> t
+
+val for_saving: t -> t
+val reset_for_saving: unit -> unit
+val change_locs: t -> Location.t -> t
+=======
+(** Type familly for substitutions *)
+type +'k subst
+
+type safe = [`Safe]
+type unsafe = [`Unsafe]
+
+type t = safe subst
+(** Standard substitution*)
+
+val identity: 'a subst
+val unsafe: t -> unsafe subst
+
+val add_type: Ident.t -> Path.t -> 'k subst -> 'k subst
+val add_module: Ident.t -> Path.t -> 'k subst -> 'k subst
+val add_modtype: Ident.t -> Path.t -> 'k subst -> 'k subst
+
+val for_saving: t -> t
+val reset_for_saving: unit -> unit
+>>>>>>> upstream-incoming
 val change_locs: 'k subst -> Location.t -> 'k subst
 
 val module_path: t -> Path.t -> Path.t

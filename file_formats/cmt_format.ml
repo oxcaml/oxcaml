@@ -63,7 +63,12 @@ type cmt_infos = {
   cmt_uid_to_decl : item_declaration Shape.Uid.Tbl.t;
   cmt_impl_shape : Shape.t option; (* None for mli *)
   cmt_ident_occurrences :
+<<<<<<< oxcaml
     (Longident.t Location.loc * Shape_reduce.result) array
+||||||| upstream-base
+=======
+    (Longident.t Location.loc * Shape_reduce.result) list
+>>>>>>> upstream-incoming
 }
 
 type error =
@@ -91,7 +96,12 @@ let iter_on_declaration f decl =
   | Value vd -> f vd.val_val.val_uid decl;
   | Value_binding vb ->
       let bound_idents = let_bound_idents_full [vb] in
+<<<<<<< oxcaml
       List.iter (fun (_, _, _, _, uid) -> f uid decl) bound_idents
+||||||| upstream-base
+=======
+      List.iter (fun (_, _, _, uid) -> f uid decl) bound_idents
+>>>>>>> upstream-incoming
   | Type td ->
       if not (Btype.is_row_name (Ident.name td.typ_id)) then
         f td.typ_type.type_uid (Type td)
@@ -153,6 +163,7 @@ let iter_on_occurrences
   let path_in_type typ name =
     match Types.get_desc typ with
     | Tconstr (type_path, _, _) ->
+<<<<<<< oxcaml
       Some (Path.Pdot (type_path,  name))
     | _ -> None
   in
@@ -415,17 +426,270 @@ let index_occurrences binary_annots =
   in
   iter_on_annots (iter_on_occurrences ~f) binary_annots;
   Array.of_list !index
+||||||| upstream-base
+=======
+      Some (Path.Pextra_ty(type_path, Pcstr_ty name))
+    | _ -> None
+  in
+  let add_constructor_description env lid =
+    function
+    | { Data_types.cstr_tag = Cstr_extension (path, _); _ } ->
+        f ~namespace:Extension_constructor env path lid
+    | { Data_types.cstr_uid = Predef name; _} ->
+        let id = List.assoc name Predef.builtin_idents in
+        f ~namespace:Constructor env (Pident id) lid
+    | { Data_types.cstr_res; cstr_name; _ } ->
+        let path = path_in_type cstr_res cstr_name in
+        Option.iter (fun path -> f ~namespace:Constructor env path lid) path
+  in
+  let add_label env lid { Data_types.lbl_name; lbl_res; _ } =
+    let path = path_in_type lbl_res lbl_name in
+    Option.iter (fun path -> f ~namespace:Label env path lid) path
+  in
+  let with_constraint ~env (_path, _lid, with_constraint) =
+    match with_constraint with
+    | Twith_module (path', lid') | Twith_modsubst (path', lid') ->
+        f ~namespace:Module env path' lid'
+    | _ -> ()
+  in
+  Tast_iterator.{ default_iterator with
+
+  expr = (fun sub ({ exp_desc; exp_env; _ } as e) ->
+      (match exp_desc with
+      | Texp_ident (path, lid, _) ->
+          f ~namespace:Value exp_env path lid
+      | Texp_construct (lid, constr_desc, _) ->
+          add_constructor_description exp_env lid constr_desc
+      | Texp_field (_, lid, label_desc)
+      | Texp_setfield (_, lid, label_desc, _)
+      | Texp_atomic_loc (_, lid, label_desc) ->
+          add_label exp_env lid label_desc
+      | Texp_new (path, lid, _) ->
+          f ~namespace:Class exp_env path lid
+      | Texp_record { fields; _ } ->
+        Array.iter (fun (label_descr, record_label_definition) ->
+          match record_label_definition with
+          | Overridden (
+              { Location.txt; loc},
+              {exp_loc; _})
+              when not exp_loc.loc_ghost
+                && loc.loc_start = exp_loc.loc_start
+                && loc.loc_end = exp_loc.loc_end ->
+            (* In the presence of punning we want to index the label
+                even if it is ghosted *)
+            let lid = { Location.txt; loc = {loc with loc_ghost = false} } in
+            add_label exp_env lid label_descr
+          | Overridden (lid, _) -> add_label exp_env lid label_descr
+          | Kept _ -> ()) fields
+      | Texp_instvar  (_self_path, path, name) ->
+          let lid = { name with txt = Longident.Lident name.txt } in
+          f ~namespace:Value exp_env path lid
+      | Texp_setinstvar  (_self_path, path, name, _) ->
+          let lid = { name with txt = Longident.Lident name.txt } in
+          f ~namespace:Value exp_env path lid
+      | Texp_override (_self_path, modifs) ->
+          List.iter (fun (id, (name : string Location.loc), _exp) ->
+            let lid = { name with txt = Longident.Lident name.txt } in
+            f ~namespace:Value exp_env (Path.Pident id) lid)
+            modifs
+      | Texp_extension_constructor (lid, path) ->
+          f ~namespace:Extension_constructor exp_env path lid
+      | Texp_constant _ | Texp_let _ | Texp_function _ | Texp_apply _
+      | Texp_match _ | Texp_try _ | Texp_tuple _ | Texp_variant _ | Texp_array _
+      | Texp_ifthenelse _ | Texp_sequence _ | Texp_while _ | Texp_for _
+      | Texp_send _
+      | Texp_letmodule _ | Texp_letexception _ | Texp_assert _ | Texp_lazy _
+      | Texp_object _ | Texp_pack _ | Texp_letop _ | Texp_unreachable
+      | Texp_open _ -> ());
+      default_iterator.expr sub e);
+
+  (* Remark: some types get iterated over twice due to how constraints are
+      encoded in the typedtree. For example, in [let x : t = 42], [t] is
+      present in both a [Tpat_constraint] and a [Texp_constraint] node) *)
+  typ =
+    (fun sub ({ ctyp_desc; ctyp_env; _ } as ct) ->
+      (match ctyp_desc with
+      | Ttyp_constr (path, lid, _ctyps) ->
+          f ~namespace:Type ctyp_env path lid
+      | Ttyp_package {tpt_path; tpt_txt} ->
+          f ~namespace:Module_type ctyp_env tpt_path tpt_txt
+      | Ttyp_class (path, lid, _typs) ->
+          (* Deprecated syntax to extend a polymorphic variant *)
+          f ~namespace:Type ctyp_env path lid
+      |  Ttyp_open (path, lid, _ct) ->
+          f ~namespace:Module ctyp_env path lid
+      | Ttyp_any | Ttyp_var _ | Ttyp_arrow _ | Ttyp_tuple _ | Ttyp_object _
+      | Ttyp_alias _ | Ttyp_variant _ | Ttyp_poly _ -> ());
+      default_iterator.typ sub ct);
+
+  pat =
+    (fun (type a) sub
+      ({ pat_desc; pat_extra; pat_env; _ } as pat : a general_pattern) ->
+      (match pat_desc with
+      | Tpat_construct (lid, constr_desc, _, _) ->
+          add_constructor_description pat_env lid constr_desc
+      | Tpat_record (fields, _) ->
+        List.iter (fun (lid, label_descr, pat) ->
+          let lid =
+            let open Location in
+            (* In the presence of punning we want to index the label
+               even if it is ghosted *)
+            if (not pat.pat_loc.loc_ghost
+              && lid.loc.loc_start = pat.pat_loc.loc_start
+              && lid.loc.loc_end = pat.pat_loc.loc_end)
+            then {lid with loc = {lid.loc with loc_ghost = false}}
+            else lid
+          in
+          add_label pat_env lid label_descr)
+        fields
+      | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ | Tpat_tuple _
+      | Tpat_variant _ | Tpat_array _ | Tpat_lazy _ | Tpat_value _
+      | Tpat_exception _ | Tpat_or _ -> ());
+      List.iter  (fun (pat_extra, _, _) ->
+        match pat_extra with
+        | Tpat_open (path, lid, _) ->
+            f ~namespace:Module pat_env path lid
+        | Tpat_type (path, lid) ->
+            f ~namespace:Type pat_env path lid
+        | Tpat_constraint _ | Tpat_unpack -> ())
+        pat_extra;
+      default_iterator.pat sub pat);
+
+  binding_op = (fun sub ({bop_op_path; bop_op_name; bop_exp; _} as bop) ->
+    let lid = { bop_op_name with txt = Longident.Lident bop_op_name.txt } in
+    f ~namespace:Value bop_exp.exp_env bop_op_path lid;
+    default_iterator.binding_op sub bop);
+
+  module_expr =
+    (fun sub ({ mod_desc; mod_env; _ } as me) ->
+      (match mod_desc with
+      | Tmod_ident (path, lid) -> f ~namespace:Module mod_env path lid
+      | Tmod_structure _ | Tmod_functor _ | Tmod_apply _ | Tmod_apply_unit _
+      | Tmod_constraint _ | Tmod_unpack _ -> ());
+      default_iterator.module_expr sub me);
+
+  open_description =
+    (fun sub ({ open_expr = (path, lid); open_env; _ } as od)  ->
+      f ~namespace:Module open_env path lid;
+      default_iterator.open_description sub od);
+
+  module_type =
+    (fun sub ({ mty_desc; mty_env; _ } as mty)  ->
+      (match mty_desc with
+      | Tmty_ident (path, lid) ->
+          f ~namespace:Module_type mty_env path lid
+      | Tmty_with (_mty, l) ->
+          List.iter (with_constraint ~env:mty_env) l
+      | Tmty_alias (path, lid) ->
+          f ~namespace:Module mty_env path lid
+      | Tmty_signature _ | Tmty_functor _ | Tmty_typeof _ -> ());
+      default_iterator.module_type sub mty);
+
+  class_expr =
+    (fun sub ({ cl_desc; cl_env; _} as ce) ->
+      (match cl_desc with
+      | Tcl_ident (path, lid, _) -> f ~namespace:Class cl_env path lid
+      | Tcl_structure _ | Tcl_fun _ | Tcl_apply _ | Tcl_let _
+      | Tcl_constraint _ | Tcl_open _ -> ());
+      default_iterator.class_expr sub ce);
+
+  class_type =
+    (fun sub ({ cltyp_desc; cltyp_env; _} as ct) ->
+      (match cltyp_desc with
+      | Tcty_constr (path, lid, _) -> f ~namespace:Class_type cltyp_env path lid
+      | Tcty_signature _ | Tcty_arrow _ | Tcty_open _ -> ());
+      default_iterator.class_type sub ct);
+
+  signature_item =
+    (fun sub ({ sig_desc; sig_env; _ } as sig_item) ->
+      (match sig_desc with
+      | Tsig_exception {
+          tyexn_constructor = { ext_kind = Text_rebind (path, lid)}} ->
+          f ~namespace:Extension_constructor sig_env path lid
+      | Tsig_modsubst { ms_manifest; ms_txt } ->
+          f ~namespace:Module sig_env ms_manifest ms_txt
+      | Tsig_typext { tyext_path; tyext_txt } ->
+          f ~namespace:Type sig_env tyext_path tyext_txt
+      | Tsig_value _ | Tsig_type _ | Tsig_typesubst _ | Tsig_exception _
+      | Tsig_module _ | Tsig_recmodule _ | Tsig_modtype _ | Tsig_modtypesubst _
+      | Tsig_open _ | Tsig_include _ | Tsig_class _ | Tsig_class_type _
+      | Tsig_attribute _ -> ());
+      default_iterator.signature_item sub sig_item);
+
+  structure_item =
+    (fun sub ({ str_desc; str_env; _ } as str_item) ->
+      (match str_desc with
+      | Tstr_exception {
+          tyexn_constructor = { ext_kind = Text_rebind (path, lid)}} ->
+          f ~namespace:Extension_constructor str_env path lid
+      | Tstr_typext { tyext_path; tyext_txt } ->
+          f ~namespace:Type str_env tyext_path tyext_txt
+      | Tstr_eval _ | Tstr_value _ | Tstr_primitive _ | Tstr_type _
+      | Tstr_exception _ | Tstr_module _ | Tstr_recmodule _
+      | Tstr_modtype _ | Tstr_open _ | Tstr_class _ | Tstr_class_type _
+      | Tstr_include _ | Tstr_attribute _ -> ());
+      default_iterator.structure_item sub str_item)
+}
+
+let index_declarations binary_annots =
+  let index : item_declaration Types.Uid.Tbl.t = Types.Uid.Tbl.create 16 in
+  let f uid fragment = Types.Uid.Tbl.add index uid fragment in
+  iter_on_annots (iter_on_declarations ~f) binary_annots;
+  index
+
+let index_occurrences binary_annots =
+  let index : (Longident.t Location.loc * Shape_reduce.result) list ref =
+    ref []
+  in
+  let f ~namespace env path lid =
+    let not_ghost { Location.loc = { loc_ghost; _ }; _ } = not loc_ghost in
+    let reduce_and_store ~namespace lid path = if not_ghost lid then
+      match Env.shape_of_path ~namespace env path with
+      | exception Not_found -> ()
+      | { uid = Some (Predef _); _ } -> ()
+      | path_shape ->
+        let result = Shape_reduce.local_reduce_for_uid env path_shape in
+        index := (lid, result) :: !index
+    in
+    (* Shape reduction can be expensive, but the persistent memoization tables
+       should make these successive reductions fast. *)
+    let rec index_components namespace lid path  =
+      let module_ = Shape.Sig_component_kind.Module in
+      let scraped_path = Path.scrape_extra_ty path in
+      match lid.Location.txt, scraped_path with
+      | Longident.Ldot (lid', _), Path.Pdot (path', _) ->
+        reduce_and_store ~namespace lid path;
+        index_components module_ lid' path'
+      | Longident.Lapply (lid', lid''), Path.Papply (path', path'') ->
+        index_components module_ lid'' path'';
+        index_components module_ lid' path'
+      | Longident.Lident _, _ ->
+        reduce_and_store ~namespace lid path;
+      | _, _ -> ()
+    in
+    index_components namespace lid path
+  in
+  iter_on_annots (iter_on_occurrences ~f) binary_annots;
+  !index
+>>>>>>> upstream-incoming
 
 exception Error of error
 
+<<<<<<< oxcaml
 let input_cmt ic : cmt_infos =
   (* CR ocaml 5 compressed-marshal mshinwell:
      (Compression.input_value ic : cmt_infos)
   *)
   Marshal.from_channel ic
+||||||| upstream-base
+let input_cmt ic = (input_value ic : cmt_infos)
+=======
+let input_cmt ic = (Compression.input_value ic : cmt_infos)
+>>>>>>> upstream-incoming
 
 let output_cmt oc cmt =
   output_string oc Config.cmt_magic_number;
+<<<<<<< oxcaml
   (* BACKPORT BEGIN *)
   (* CR ocaml 5 compressed-marshal mshinwell:
      upstream uses [Compression] here:
@@ -433,6 +697,11 @@ let output_cmt oc cmt =
   *)
   Marshal.(to_channel oc (cmt : cmt_infos) [])
   (* BACKPORT END *)
+||||||| upstream-base
+  Marshal.(to_channel oc (cmt : cmt_infos) [Compression])
+=======
+  Compression.output_value oc (cmt : cmt_infos)
+>>>>>>> upstream-incoming
 
 let read filename =
 (*  Printf.fprintf stderr "Cmt_format.read %s\n%!" filename; *)
@@ -497,6 +766,7 @@ let save_cmt target cu binary_annots initial_env cmi shape =
            | None -> None
            | Some cmi -> Some (output_cmi temp_file_name oc cmi)
          in
+<<<<<<< oxcaml
          (* We use the raw_source_file because the original_source_file may not
             exist (or may have changed), so computing the digest may fail or
             produce inconsistent results. Merlin expects the cms_sourcefile to
@@ -508,10 +778,21 @@ let save_cmt target cu binary_annots initial_env cmi shape =
             index_occurrences binary_annots
           else
             [| |]
+||||||| upstream-base
+         let sourcefile = Unit_info.Artifact.source_file target in
+=======
+         let sourcefile = Unit_info.Artifact.source_file target in
+         let cmt_ident_occurrences =
+          if !Clflags.store_occurrences then
+            index_occurrences binary_annots
+          else
+            []
+>>>>>>> upstream-incoming
          in
          let cmt_annots = clear_env binary_annots in
          let cmt_uid_to_decl = index_declarations cmt_annots in
          let source_digest = Option.map Digest.file sourcefile in
+<<<<<<< oxcaml
          let compare_imports import1 import2 =
            let modname1 = Import_info.name import1 in
            let modname2 = Import_info.name import2 in
@@ -522,12 +803,27 @@ let save_cmt target cu binary_annots initial_env cmi shape =
            Array.sort compare_imports imports;
            imports
          in
+||||||| upstream-base
+=======
+         let cmt_args =
+           let cmt_args = Array.copy Sys.argv in
+           cmt_args.(0) <- Location.rewrite_absolute_path Sys.argv.(0);
+           cmt_args in
+>>>>>>> upstream-incoming
          let cmt = {
+<<<<<<< oxcaml
            cmt_modname = cu;
+||||||| upstream-base
+           cmt_modname = Unit_info.Artifact.modname target;
+           cmt_annots = clear_env binary_annots;
+           cmt_value_dependencies = !value_deps;
+=======
+           cmt_modname = Unit_info.Artifact.modname target;
+>>>>>>> upstream-incoming
            cmt_annots;
            cmt_declaration_dependencies = !uids_deps;
            cmt_comments = Lexer.comments ();
-           cmt_args = Sys.argv;
+           cmt_args;
            cmt_sourcefile = sourcefile;
            cmt_builddir = Location.rewrite_absolute_path (Sys.getcwd ());
            cmt_loadpath = Load_path.get_paths ();

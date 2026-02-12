@@ -401,7 +401,7 @@ let format_pp_token state size = function
     end
 
   | Pp_if_newline ->
-    if state.pp_current_indent != state.pp_margin - state.pp_space_left
+    if state.pp_current_indent <> state.pp_margin - state.pp_space_left
     then pp_skip_token state
 
   | Pp_break { fits; breaks } ->
@@ -453,11 +453,15 @@ let rec advance_left state =
   | Some { size; token; length } ->
     let pending_count = state.pp_right_total - state.pp_left_total in
     if Size.is_known size || pending_count >= state.pp_space_left then begin
-      Queue.take state.pp_queue |> ignore; (* Not empty: we peek into it *)
-      let size = if Size.is_known size then Size.to_int size else pp_infinity in
-      format_pp_token state size token;
-      state.pp_left_total <- length + state.pp_left_total;
-      (advance_left [@tailcall]) state
+      match Queue.take_opt state.pp_queue with
+      | None -> invalid_arg "Format: Unsynchronized access to formatter"
+      | Some _ ->  (* Not empty: we peek into it *)
+        let size =
+          if Size.is_known size then Size.to_int size else pp_infinity
+        in
+        format_pp_token state size token;
+        state.pp_left_total <- length + state.pp_left_total;
+        (advance_left [@tailcall]) state
     end
 
 
@@ -1241,8 +1245,60 @@ let formatter_of_symbolic_output_buffer sob =
 
 *)
 
+<<<<<<< oxcaml
 let[@inline] apply1 f v = f (DLS.get std_formatter_key) v
 let[@inline] apply2 f v w = f (DLS.get std_formatter_key) v w
+||||||| upstream-base
+let open_hbox v = pp_open_hbox (DLS.get std_formatter_key) v
+and open_vbox v = pp_open_vbox (DLS.get std_formatter_key) v
+and open_hvbox v = pp_open_hvbox (DLS.get std_formatter_key) v
+and open_hovbox v = pp_open_hovbox (DLS.get std_formatter_key) v
+and open_box v = pp_open_box (DLS.get std_formatter_key) v
+and close_box v = pp_close_box (DLS.get std_formatter_key) v
+and open_stag v = pp_open_stag (DLS.get std_formatter_key) v
+and close_stag v = pp_close_stag (DLS.get std_formatter_key) v
+and print_as v w = pp_print_as (DLS.get std_formatter_key) v w
+and print_string v = pp_print_string (DLS.get std_formatter_key) v
+and print_bytes v = pp_print_bytes (DLS.get std_formatter_key) v
+and print_int v = pp_print_int (DLS.get std_formatter_key) v
+and print_float v = pp_print_float (DLS.get std_formatter_key) v
+and print_char v = pp_print_char (DLS.get std_formatter_key) v
+and print_bool v = pp_print_bool (DLS.get std_formatter_key) v
+and print_break v w = pp_print_break (DLS.get std_formatter_key) v w
+and print_cut v = pp_print_cut (DLS.get std_formatter_key) v
+and print_space v = pp_print_space (DLS.get std_formatter_key) v
+and force_newline v = pp_force_newline (DLS.get std_formatter_key) v
+and print_flush v = pp_print_flush (DLS.get std_formatter_key) v
+and print_newline v = pp_print_newline (DLS.get std_formatter_key) v
+and print_if_newline v = pp_print_if_newline (DLS.get std_formatter_key) v
+=======
+let open_hbox v = pp_open_hbox (DLS.get std_formatter_key) v
+and open_vbox v = pp_open_vbox (DLS.get std_formatter_key) v
+and open_hvbox v = pp_open_hvbox (DLS.get std_formatter_key) v
+and open_hovbox v = pp_open_hovbox (DLS.get std_formatter_key) v
+and open_box v = pp_open_box (DLS.get std_formatter_key) v
+and close_box v = pp_close_box (DLS.get std_formatter_key) v
+and open_stag v = pp_open_stag (DLS.get std_formatter_key) v
+and close_stag v = pp_close_stag (DLS.get std_formatter_key) v
+and print_as v w = pp_print_as (DLS.get std_formatter_key) v w
+and print_string v = pp_print_string (DLS.get std_formatter_key) v
+and print_substring ~pos ~len v =
+  pp_print_substring  ~pos ~len (DLS.get std_formatter_key) v
+and print_substring_as ~pos ~len as_len v =
+  pp_print_substring_as ~pos ~len (DLS.get std_formatter_key) as_len v
+and print_bytes v = pp_print_bytes (DLS.get std_formatter_key) v
+and print_int v = pp_print_int (DLS.get std_formatter_key) v
+and print_float v = pp_print_float (DLS.get std_formatter_key) v
+and print_char v = pp_print_char (DLS.get std_formatter_key) v
+and print_bool v = pp_print_bool (DLS.get std_formatter_key) v
+and print_break v w = pp_print_break (DLS.get std_formatter_key) v w
+and print_cut v = pp_print_cut (DLS.get std_formatter_key) v
+and print_space v = pp_print_space (DLS.get std_formatter_key) v
+and force_newline v = pp_force_newline (DLS.get std_formatter_key) v
+and print_flush v = pp_print_flush (DLS.get std_formatter_key) v
+and print_newline v = pp_print_newline (DLS.get std_formatter_key) v
+and print_if_newline v = pp_print_if_newline (DLS.get std_formatter_key) v
+>>>>>>> upstream-incoming
 
 let open_hbox = apply1 pp_open_hbox
 and open_vbox = apply1 pp_open_vbox
@@ -1346,7 +1402,13 @@ let pp_print_text ppf s =
   let left = ref 0 in
   let right = ref 0 in
   let flush () =
+<<<<<<< oxcaml
     pp_print_substring ppf s ~pos:!left ~len:(!right - !left);
+||||||| upstream-base
+    pp_print_string ppf (String.sub s !left (!right - !left));
+=======
+    pp_print_substring ~pos:!left ~len:(!right - !left) ppf s;
+>>>>>>> upstream-incoming
     incr right; left := !right;
   in
   while (!right <> len) do
@@ -1361,6 +1423,53 @@ let pp_print_text ppf s =
       | _ -> incr right
   done;
   if !left <> len then flush ()
+
+(* To format free-flowing text *)
+let format_text fmt6 =
+  let open CamlinternalFormatBasics in
+  let Format(fmt,_) = fmt6 in
+  let cons_space ~spaces fmt = Formatting_lit (Break("",spaces,0), fmt) in
+  let rec skip_and_count_whites spaces newlines len s pos =
+    if pos >= len then pos, spaces, newlines else
+    match s.[pos] with
+    | ' ' -> skip_and_count_whites (1+spaces) newlines len s (1+pos)
+    | '\n' -> skip_and_count_whites spaces (1+newlines) len s (1+pos)
+    | _ -> pos, spaces, newlines
+  in
+  let[@tail_mod_cons] rec split len s pos fmt =
+    if pos >= len then fmt
+    else
+      let space = String.index_from_opt s pos ' ' in
+      let newline = String.index_from_opt s pos '\n' in
+      let first = match space, newline with
+        | Some x, Some y -> Some (min x y)
+        | None, x | x, None -> x
+      in
+      match first with
+      | None ->
+          String_literal(String.sub s pos (len-pos), fmt)
+      | Some sep ->
+          let before = String.sub s pos (sep-pos) in
+          let pos, spaces, newlines = skip_and_count_whites 0 0 len s sep in
+          let repeat, break =
+            match newlines, spaces with
+            | (0|1), spaces -> 1, Break("", max spaces 1, 0)
+            | bl, _ -> bl, Force_newline
+          in
+          String_literal(before, cons ~repeat break len s pos fmt)
+  and[@tail_mod_cons] cons ~repeat break len s pos fmt =
+    if repeat = 0 then
+      split len s pos fmt
+    else
+      Formatting_lit (break, cons ~repeat:(repeat-1) break len s pos fmt)
+  in
+  let concat s fmt = match s with
+    | `Char (' '|'\n') -> cons_space ~spaces:1 fmt
+    | `Char c -> Char_literal(c,fmt)
+    | `String s -> split (String.length s) s 0 fmt in
+  let fmt = string_concat_map {f=concat} fmt in
+  Format(fmt, CamlinternalFormat.string_of_fmt fmt)
+
 
 let pp_print_option ?(none = fun _ () -> ()) pp_v ppf = function
 | None -> none ppf ()

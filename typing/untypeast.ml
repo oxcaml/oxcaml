@@ -88,16 +88,14 @@ Some notes:
 
 (** Utility functions. *)
 
-let string_is_prefix sub str =
-  let sublen = String.length sub in
-  String.length str >= sublen && String.sub str 0 sublen = sub
-
-let rec lident_of_path = function
+let rec lident_of_path =
+  let noloc_lident_of_path p = mknoloc (lident_of_path p) in
+  function
   | Path.Pident id -> Longident.Lident (Ident.name id)
   | Path.Papply (p1, p2) ->
-      Longident.Lapply (lident_of_path p1, lident_of_path p2)
+      Longident.Lapply (noloc_lident_of_path p1, noloc_lident_of_path p2)
   | Path.Pdot (p, s) | Path.Pextra_ty (p, Pcstr_ty s) ->
-      Longident.Ldot (lident_of_path p, s)
+      Longident.Ldot (noloc_lident_of_path p, mknoloc s)
   | Path.Pextra_ty (p, _) -> lident_of_path p
 
 let map_loc sub {loc; txt} = {loc = sub.location sub loc; txt}
@@ -123,6 +121,7 @@ let rec extract_letop_patterns n pat =
 (** Mapping functions. *)
 
 let constant = function
+<<<<<<< oxcaml
   | Const_char c -> Pconst_char c
   | Const_untagged_char c -> Pconst_untagged_char c
   | Const_string (s,loc,d) -> Pconst_string (s,loc,d)
@@ -142,6 +141,23 @@ let constant = function
   | Const_unboxed_int32 i -> Pconst_unboxed_integer (Int32.to_string i, 'l')
   | Const_unboxed_int64 i -> Pconst_unboxed_integer (Int64.to_string i, 'L')
   | Const_unboxed_nativeint i -> Pconst_unboxed_integer (Nativeint.to_string i, 'n')
+||||||| upstream-base
+  | Const_char c -> Pconst_char c
+  | Const_string (s,loc,d) -> Pconst_string (s,loc,d)
+  | Const_int i -> Pconst_integer (Int.to_string i, None)
+  | Const_int32 i -> Pconst_integer (Int32.to_string i, Some 'l')
+  | Const_int64 i -> Pconst_integer (Int64.to_string i, Some 'L')
+  | Const_nativeint i -> Pconst_integer (Nativeint.to_string i, Some 'n')
+  | Const_float f -> Pconst_float (f,None)
+=======
+  | Const_char c -> Const.char c
+  | Const_string (s,loc,d) -> Const.string ?quotation_delimiter:d ~loc s
+  | Const_int i -> Const.integer (Int.to_string i)
+  | Const_int32 i -> Const.integer ~suffix:'l' (Int32.to_string i)
+  | Const_int64 i -> Const.integer ~suffix:'L' (Int64.to_string i)
+  | Const_nativeint i -> Const.integer ~suffix:'n' (Nativeint.to_string i)
+  | Const_float f -> Const.float f
+>>>>>>> upstream-incoming
 
 let attribute sub a = {
     attr_name = map_loc sub a.attr_name;
@@ -328,7 +344,13 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
       { pat_extra=[Tpat_unpack, loc, _attrs]; pat_desc = Tpat_any; _ } ->
         Ppat_unpack { txt = None; loc  }
     | { pat_extra=[Tpat_unpack, _, _attrs];
+<<<<<<< oxcaml
         pat_desc = Tpat_var (_,name, _, _, _); _ } ->
+||||||| upstream-base
+    | { pat_extra=[Tpat_unpack, _, _attrs]; pat_desc = Tpat_var (_,name); _ } ->
+=======
+        pat_desc = Tpat_var (_,name, _); _ } ->
+>>>>>>> upstream-incoming
         Ppat_unpack { name with txt = Some name.txt }
     | { pat_extra=[Tpat_type (_path, lid), _, _attrs]; _ } ->
         Ppat_type (map_loc sub lid)
@@ -341,7 +363,13 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | _ ->
     match pat.pat_desc with
       Tpat_any -> Ppat_any
+<<<<<<< oxcaml
     | Tpat_var (id, name,_,_,_) ->
+||||||| upstream-base
+    | Tpat_var (id, name) ->
+=======
+    | Tpat_var (id, name, _) ->
+>>>>>>> upstream-incoming
         begin
           match (Ident.name id).[0] with
             'A'..'Z' ->
@@ -354,24 +382,42 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
        The compiler transforms (x:t) into (_ as x : t).
        This avoids transforming a warning 27 into a 26.
      *)
+<<<<<<< oxcaml
     | Tpat_alias
       ({pat_desc = Tpat_any; pat_loc}, _id, name, _uid, _sort, _mode, _ty)
+||||||| upstream-base
+    | Tpat_alias ({pat_desc = Tpat_any; pat_loc}, _id, name)
+=======
+    | Tpat_alias ({pat_desc = Tpat_any; pat_loc}, _id, name, _, _ty)
+>>>>>>> upstream-incoming
          when pat_loc = pat.pat_loc ->
        Ppat_var name
 
+<<<<<<< oxcaml
     | Tpat_alias (pat, _id, name, _uid, _sort, _mode, _ty) ->
+||||||| upstream-base
+    | Tpat_alias (pat, _id, name) ->
+=======
+    | Tpat_alias (pat, _id, name, _, _ty) ->
+>>>>>>> upstream-incoming
         Ppat_alias (sub.pat sub pat, name)
     | Tpat_constant cst -> Ppat_constant (constant cst)
     | Tpat_unboxed_unit -> Ppat_unboxed_unit
     | Tpat_unboxed_bool b -> Ppat_unboxed_bool b
     | Tpat_tuple list ->
         Ppat_tuple
+<<<<<<< oxcaml
           ( List.map (fun (label, p) -> label, sub.pat sub p) list
           , Closed)
     | Tpat_unboxed_tuple list ->
         Ppat_unboxed_tuple
           (List.map (fun (label, p, _) -> label, sub.pat sub p) list,
            Closed)
+||||||| upstream-base
+        Ppat_tuple (List.map (sub.pat sub) list)
+=======
+          (List.map (fun (label, p) -> label, sub.pat sub p) list, Closed)
+>>>>>>> upstream-incoming
     | Tpat_construct (lid, _, args, vto) ->
         let tyo =
           match vto with
@@ -386,7 +432,16 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
           match args with
             []    -> None
           | [arg] -> Some (sub.pat sub arg)
+<<<<<<< oxcaml
           | args  -> Some (Pat.tuple ~loc (List.map (fun p -> None, sub.pat sub p) args) Closed)
+||||||| upstream-base
+          | args  -> Some (Pat.tuple ~loc (List.map (sub.pat sub) args))
+=======
+          | args  ->
+              Some (Pat.tuple ~loc
+                      (List.map (fun p -> None, sub.pat sub p) args)
+                      Closed)
+>>>>>>> upstream-incoming
         in
         Ppat_construct (map_loc sub lid,
           match tyo, arg with
@@ -400,11 +455,17 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | Tpat_record (list, closed) ->
         Ppat_record (List.map (fun (lid, _, pat) ->
             map_loc sub lid, sub.pat sub pat) list, closed)
+<<<<<<< oxcaml
     | Tpat_record_unboxed_product (list, closed) ->
         Ppat_record_unboxed_product (List.map (fun (lid, _, pat) ->
             map_loc sub lid, sub.pat sub pat) list, closed)
     | Tpat_array (am, _, list) ->
         Ppat_array (mutable_ am, List.map (sub.pat sub) list)
+||||||| upstream-base
+    | Tpat_array list -> Ppat_array (List.map (sub.pat sub) list)
+=======
+    | Tpat_array (_mut, list) -> Ppat_array (List.map (sub.pat sub) list)
+>>>>>>> upstream-incoming
     | Tpat_lazy p -> Ppat_lazy (sub.pat sub p)
 
     | Tpat_exception p -> Ppat_exception (sub.pat sub p)
@@ -450,6 +511,7 @@ let value_binding sub vb =
   let loc = sub.location sub vb.vb_loc in
   let attrs = sub.attributes sub vb.vb_attributes in
   let pat = sub.pat sub vb.vb_pat in
+<<<<<<< oxcaml
   let pat, value_constraint, modes =
     match pat.ppat_desc with
     | Ppat_constraint (pat, Some ({ ptyp_desc = Ptyp_poly _; _ } as cty),
@@ -511,6 +573,22 @@ let label : Types.arg_label -> Parsetree.arg_label = function
   | Nolabel -> Nolabel
 
 let call_pos_extension = Location.mknoloc "call_pos_extension", PStr []
+||||||| upstream-base
+  Vb.mk ~loc ~attrs
+    (sub.pat sub vb.vb_pat)
+    (sub.expr sub vb.vb_expr)
+=======
+  let pat, value_constraint =
+    match pat.ppat_desc with
+    | Ppat_constraint (pat, ({ ptyp_desc = Ptyp_poly _; _ } as cty)) ->
+      let constr =
+        Pvc_constraint { locally_abstract_univars = []; typ = cty }
+      in
+      pat, Some constr
+    | _ -> pat, None
+  in
+  Vb.mk ~loc ~attrs ?value_constraint pat (sub.expr sub vb.vb_expr)
+>>>>>>> upstream-incoming
 
 let expression sub exp =
   let loc = sub.location sub exp.exp_loc in
@@ -611,9 +689,20 @@ let expression sub exp =
         Pexp_apply (sub.expr sub exp,
           List.fold_right (fun (label, arg) list ->
               match arg with
+<<<<<<< oxcaml
               | Omitted _ -> list
               | Arg (exp, _) -> (label, sub.expr sub exp) :: list
+||||||| upstream-base
+          List.fold_right (fun (label, expo) list ->
+              match expo with
+                None -> list
+              | Some exp -> (label, sub.expr sub exp) :: list
+=======
+              | Omitted () -> list
+              | Arg exp -> (label, sub.expr sub exp) :: list
+>>>>>>> upstream-incoming
           ) list [])
+<<<<<<< oxcaml
     | Texp_match (exp, _, cases, _) ->
       Pexp_match (sub.expr sub exp, List.map (sub.case sub) cases)
     | Texp_try (exp, cases) ->
@@ -626,6 +715,45 @@ let expression sub exp =
         Pexp_unboxed_tuple
           (List.map (fun (lbl, e, _) -> lbl, sub.expr sub e) list)
     | Texp_construct (lid, _, args, _) ->
+||||||| upstream-base
+    | Texp_match (exp, cases, _) ->
+      Pexp_match (sub.expr sub exp, List.map (sub.case sub) cases)
+    | Texp_try (exp, cases) ->
+        Pexp_try (sub.expr sub exp, List.map (sub.case sub) cases)
+    | Texp_tuple list ->
+        Pexp_tuple (List.map (sub.expr sub) list)
+    | Texp_construct (lid, _, args) ->
+=======
+    | Texp_match (exp, cases, eff_cases, _) ->
+      let merged_cases = List.map (sub.case sub) cases
+        @ List.map
+          (fun c ->
+            let uc = sub.case sub c in
+            let pat = { uc.pc_lhs
+                        (* XXX KC: The 2nd argument of Ppat_effect is wrong *)
+                        with ppat_desc = Ppat_effect (uc.pc_lhs, uc.pc_lhs) }
+            in
+            { uc with pc_lhs = pat })
+          eff_cases
+      in
+      Pexp_match (sub.expr sub exp, merged_cases)
+    | Texp_try (exp, exn_cases, eff_cases) ->
+        let merged_cases = List.map (sub.case sub) exn_cases
+        @ List.map
+          (fun c ->
+            let uc = sub.case sub c in
+            let pat = { uc.pc_lhs
+                        (* XXX KC: The 2nd argument of Ppat_effect is wrong *)
+                        with ppat_desc = Ppat_effect (uc.pc_lhs, uc.pc_lhs) }
+            in
+            { uc with pc_lhs = pat })
+          eff_cases
+        in
+        Pexp_try (sub.expr sub exp, merged_cases)
+    | Texp_tuple list ->
+        Pexp_tuple (List.map (fun (lbl, e) -> lbl, sub.expr sub e) list)
+    | Texp_construct (lid, _, args) ->
+>>>>>>> upstream-incoming
         Pexp_construct (map_loc sub lid,
           (match args with
               [] -> None
@@ -642,6 +770,7 @@ let expression sub exp =
             | _, Overridden (lid, exp) -> (lid, sub.expr sub exp) :: l)
             [] fields
         in
+<<<<<<< oxcaml
         Pexp_record (list, Option.map (fun (exp, _, _) -> sub.expr sub exp)
                              extended_expression)
     | Texp_record_unboxed_product { fields; extended_expression; _ } ->
@@ -661,12 +790,27 @@ let expression sub exp =
                                     (map_loc sub lid))
                              ])
     | Texp_field (exp, _sort, lid, _label, _, _) ->
+||||||| upstream-base
+        Pexp_record (list, Option.map (sub.expr sub) extended_expression)
+    | Texp_field (exp, lid, _label) ->
+=======
+        Pexp_record (list, Option.map (sub.expr sub) extended_expression)
+    | Texp_atomic_loc (exp, lid, _label) ->
+        Pexp_extension ({ txt = "ocaml.atomic.loc"; loc },
+                        PStr [ Str.eval ~loc
+                                 (Exp.field ~loc
+                                    (sub.expr sub exp)
+                                    (map_loc sub lid))
+                             ])
+    | Texp_field (exp, lid, _label) ->
+>>>>>>> upstream-incoming
         Pexp_field (sub.expr sub exp, map_loc sub lid)
     | Texp_unboxed_field (exp, _, lid, _label, _) ->
         Pexp_unboxed_field (sub.expr sub exp, map_loc sub lid)
     | Texp_setfield (exp1, _, lid, _label, exp2) ->
         Pexp_setfield (sub.expr sub exp1, map_loc sub lid,
           sub.expr sub exp2)
+<<<<<<< oxcaml
     | Texp_array (amut, _, list, _) ->
         Pexp_array (mutable_ amut, List.map (sub.expr sub) list)
     | Texp_idx (ba, uas) ->
@@ -677,6 +821,13 @@ let expression sub exp =
     | Texp_array_comprehension (amut, _, comp) ->
         Pexp_comprehension
           (Pcomp_array_comprehension (mutable_ amut, comprehension sub comp))
+||||||| upstream-base
+    | Texp_array list ->
+        Pexp_array (List.map (sub.expr sub) list)
+=======
+    | Texp_array (_mut, list) ->
+        Pexp_array (List.map (sub.expr sub) list)
+>>>>>>> upstream-incoming
     | Texp_ifthenelse (exp1, exp2, expo) ->
         Pexp_ifthenelse (sub.expr sub exp1,
           sub.expr sub exp2,
@@ -721,7 +872,7 @@ let expression sub exp =
     | Texp_object (cl, _) ->
         Pexp_object (sub.class_structure sub cl)
     | Texp_pack (mexpr) ->
-        Pexp_pack (sub.module_expr sub mexpr)
+        Pexp_pack (sub.module_expr sub mexpr, None)
     | Texp_letop {let_; ands; body; _} ->
         let pat, and_pats =
           extract_letop_patterns (List.length ands) body.c_lhs
@@ -805,9 +956,10 @@ let binding_op sub bop pat =
   {pbop_op; pbop_pat; pbop_exp; pbop_loc}
 
 let package_type sub pack =
-  (map_loc sub pack.pack_txt,
-    List.map (fun (s, ct) ->
-        (s, sub.typ sub ct)) pack.pack_fields)
+  { ppt_path = map_loc sub pack.tpt_txt;
+    ppt_cstrs = List.map (fun (s, ct) -> (s, sub.typ sub ct)) pack.tpt_cstrs;
+    ppt_attrs = [];
+    ppt_loc = sub.location sub pack.tpt_txt.loc }
 
 let module_type_declaration sub mtd =
   let loc = sub.location sub mtd.mtd_loc in
@@ -996,8 +1148,16 @@ let class_expr sub cexpr =
         Pcl_apply (sub.class_expr sub cl,
           List.fold_right (fun (label, expo) list ->
               match expo with
+<<<<<<< oxcaml
               | Omitted _ -> list
               | Arg (exp, _) -> (label, sub.expr sub exp) :: list
+||||||| upstream-base
+                None -> list
+              | Some exp -> (label, sub.expr sub exp) :: list
+=======
+              | Omitted () -> list
+              | Arg exp -> (label, sub.expr sub exp) :: list
+>>>>>>> upstream-incoming
           ) args [])
 
     | Tcl_let (rec_flat, bindings, _ivars, cl) ->
@@ -1055,6 +1215,7 @@ let core_type sub ct =
   let loc = sub.location sub ct.ctyp_loc in
   let attrs = sub.attributes sub ct.ctyp_attributes in
   let desc = match ct.ctyp_desc with
+<<<<<<< oxcaml
     | Ttyp_var (None, jkind) -> Ptyp_any jkind
     | Ttyp_var (Some s, jkind) -> Ptyp_var (s, jkind)
     | Ttyp_arrow (arg_label, ct1, modes1, ct2, modes2) ->
@@ -1067,6 +1228,20 @@ let core_type sub ct =
     | Ttyp_unboxed_tuple list ->
         Ptyp_unboxed_tuple
           (List.map (fun (lbl, t) -> lbl, sub.typ sub t) list)
+||||||| upstream-base
+      Ttyp_any -> Ptyp_any
+    | Ttyp_var s -> Ptyp_var s
+    | Ttyp_arrow (label, ct1, ct2) ->
+        Ptyp_arrow (label, sub.typ sub ct1, sub.typ sub ct2)
+    | Ttyp_tuple list -> Ptyp_tuple (List.map (sub.typ sub) list)
+=======
+      Ttyp_any -> Ptyp_any
+    | Ttyp_var s -> Ptyp_var s
+    | Ttyp_arrow (label, ct1, ct2) ->
+        Ptyp_arrow (label, sub.typ sub ct1, sub.typ sub ct2)
+    | Ttyp_tuple list ->
+        Ptyp_tuple (List.map (fun (l, typ) -> l, sub.typ sub typ) list)
+>>>>>>> upstream-incoming
     | Ttyp_constr (_path, lid, list) ->
         Ptyp_constr (map_loc sub lid,
           List.map (sub.typ sub) list)
@@ -1099,8 +1274,16 @@ let core_type sub ct =
 
 let class_structure sub cs =
   let rec remove_self = function
+<<<<<<< oxcaml
     | { pat_desc = Tpat_alias (p, id, _s, _uid, _sort, _mode, _ty) }
       when string_is_prefix "selfpat-" (Ident.name id) ->
+||||||| upstream-base
+    | { pat_desc = Tpat_alias (p, id, _s) }
+      when string_is_prefix "selfpat-" (Ident.name id) ->
+=======
+    | { pat_desc = Tpat_alias (p, id, _s, _, _ty) }
+      when String.starts_with ~prefix:"selfpat-" (Ident.name id) ->
+>>>>>>> upstream-incoming
         remove_self p
     | p -> p
   in
@@ -1129,8 +1312,16 @@ let object_field sub {of_loc; of_desc; of_attributes;} =
   Of.mk ~loc ~attrs desc
 
 and is_self_pat = function
+<<<<<<< oxcaml
   | { pat_desc = Tpat_alias(_pat, id, _, _uid, _sort, _mode, _ty) } ->
       string_is_prefix "self-" (Ident.name id)
+||||||| upstream-base
+  | { pat_desc = Tpat_alias(_pat, id, _) } ->
+      string_is_prefix "self-" (Ident.name id)
+=======
+  | { pat_desc = Tpat_alias(_pat, id, _, _, _ty) } ->
+      String.starts_with ~prefix:"self-" (Ident.name id)
+>>>>>>> upstream-incoming
   | _ -> false
 
 (* [Typeclass] adds a [self] parameter to initializers and methods that isn't

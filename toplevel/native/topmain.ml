@@ -13,6 +13,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+<<<<<<< oxcaml
 open Compenv
 
 let usage =
@@ -20,6 +21,11 @@ let usage =
 
 let preload_objects = ref []
 
+||||||| upstream-base
+let preload_objects = ref []
+
+=======
+>>>>>>> upstream-incoming
 (* Position of the first non expanded argument *)
 let first_nonexpanded_pos = ref 0
 
@@ -38,6 +44,7 @@ let expand_position pos len =
     (* New last position *)
     first_nonexpanded_pos := pos + len + 2
 
+<<<<<<< oxcaml
 
 let prepare ppf =
   Opttoploop.set_paths ();
@@ -54,11 +61,45 @@ let prepare ppf =
       false
 
 let file_argument name =
+||||||| upstream-base
+
+let prepare ppf =
+  Topcommon.set_paths ();
+  try
+    let res =
+      List.for_all (Topeval.load_file false ppf) (List.rev !preload_objects)
+    in
+    Topcommon.run_hooks Topcommon.Startup;
+    res
+  with x ->
+    try Location.report_exception ppf x; false
+    with x ->
+      Format.fprintf ppf "Uncaught exception: %s\n" (Printexc.to_string x);
+      false
+
+let input_argument name =
+  let filename = Toploop.filename_of_input name in
+=======
+let input_argument name =
+  let filename = Toploop.filename_of_input name in
+>>>>>>> upstream-incoming
   let ppf = Format.err_formatter in
+<<<<<<< oxcaml
   if Filename.check_suffix name ".cmxs"
     || Filename.check_suffix name ".cmx"
     || Filename.check_suffix name ".cmxa"
   then preload_objects := name :: !preload_objects
+||||||| upstream-base
+  if Filename.check_suffix filename ".cmxs"
+    || Filename.check_suffix filename ".cmx"
+    || Filename.check_suffix filename ".cmxa"
+  then preload_objects := filename :: !preload_objects
+=======
+  if Filename.check_suffix filename ".cmxs"
+    || Filename.check_suffix filename ".cmx"
+    || Filename.check_suffix filename ".cmxa"
+  then Toploop.preload_objects := filename :: !Toploop.preload_objects
+>>>>>>> upstream-incoming
   else if is_expanded !current then begin
     (* Script files are not allowed in expand options because otherwise the
        check in override arguments may fail since the new argv can be larger
@@ -73,9 +114,20 @@ let file_argument name =
                               (Array.length !argv - !Arg.current)
       in
       Compmisc.read_clflags_from_env ();
+<<<<<<< oxcaml
       if prepare ppf && Opttoploop.run_script ppf name newargs
       then raise (Exit_with_status 0)
       else raise (Exit_with_status 2)
+||||||| upstream-base
+      if prepare ppf && Toploop.run_script ppf name newargs
+      then raise (Compenv.Exit_with_status 0)
+      else raise (Compenv.Exit_with_status 2)
+=======
+      if Toploop.prepare ppf ~input:name () &&
+         Toploop.run_script ppf name newargs
+      then raise (Compenv.Exit_with_status 0)
+      else raise (Compenv.Exit_with_status 2)
+>>>>>>> upstream-incoming
     end
 
 let wrap_expand f s =
@@ -114,7 +166,13 @@ let main () =
                       raise (Exit_with_status 0)
   end;
   Compmisc.read_clflags_from_env ();
+<<<<<<< oxcaml
   if not (prepare Format.err_formatter) then raise (Exit_with_status 2);
+||||||| upstream-base
+  if not (prepare Format.err_formatter) then raise (Compenv.Exit_with_status 2);
+=======
+  if not (Toploop.prepare ppf ()) then raise (Compenv.Exit_with_status 2);
+>>>>>>> upstream-incoming
   Compmisc.init_path ();
   Opttoploop.loop Format.std_formatter
 

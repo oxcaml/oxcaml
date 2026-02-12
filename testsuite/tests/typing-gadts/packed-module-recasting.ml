@@ -230,7 +230,7 @@ let cast_functor_argument_under_equality (type t)
   (module F (M))
 [%%expect {|
 module type S = sig type t end
-module type F = functor (M : S) -> sig type t = M.t end
+module type F = (M : S) -> sig type t = M.t end
 module type S' = sig type _ t_aux type t val eq : (t, unit t_aux) eq end
 val cast_functor_argument_under_equality :
   (module S' with type t = 't) -> (module F) -> (module S with type t = 't) =
@@ -261,8 +261,7 @@ let cast_functor_argument_signature_under_equality (type t)
   (module M : F(M).S)
 [%%expect {|
 module type S = sig type t end
-module type F =
-  functor (M : S) -> sig module type S = sig type t = M.t end end
+module type F = (M : S) -> sig module type S = sig type t = M.t end end
 module type S' = sig type _ t_aux type t val eq : (t, unit t_aux) eq end
 val cast_functor_argument_signature_under_equality :
   (module S' with type t = 't) -> (module F) -> (module S with type t = 't) =
@@ -483,7 +482,7 @@ val f : ('a, 'b -> 'b) eq -> ('a, int -> int) eq -> 'a -> 'b = <fun>
 Line 4, characters 2-7:
 4 |   M.res;;
       ^^^^^
-Error: This expression has type "b" = "int"
+Error: The value "M.res" has type "b" = "int"
        but an expression was expected of type "'a"
        This instance of "int" is ambiguous:
        it would escape the scope of its equation
@@ -498,7 +497,7 @@ val f : ('a, 'b -> 'b) eq -> ('a, int -> int) eq -> 'a -> int = <fun>
 Line 4, characters 3-8:
 4 |    M.res;;
        ^^^^^
-Error: This expression has type "int" but an expression was expected of type "'a"
+Error: The value "M.res" has type "int" but an expression was expected of type "'a"
        This instance of "int" is ambiguous:
        it would escape the scope of its equation
 |}]

@@ -19,8 +19,7 @@ type t = ..
 type t += Alpha | Aleph
 module M : sig type w = .. type w += Alpha | Beta type t += Beth end
 module F :
-  functor (X : sig end) ->
-    sig type u = .. type t += Gamma type u += Gamme end
+  (X : sig end) -> sig type u = .. type t += Gamma type u += Gamme end
 module X : sig end
 |}]
 
@@ -31,7 +30,7 @@ Line 1, characters 11-15:
                ^^^^
 Error: This variant expression is expected to have type "t"
        There is no constructor "Alph" within type "t"
-Hint: Did you mean "Aleph" or "Alpha"?
+Hint:             Did you mean "Aleph" or "Alpha"?
 |}]
 
 open M;;
@@ -42,7 +41,7 @@ Line 2, characters 12-16:
                 ^^^^
 Error: This variant expression is expected to have type "M.w"
        There is no constructor "Alha" within type "M.w"
-Hint: Did you mean "Alpha"?
+Hint:             Did you mean "Alpha"?
 |}]
 
 let z: t = Bet;;
@@ -52,7 +51,7 @@ Line 1, characters 11-14:
                ^^^
 Error: This variant expression is expected to have type "t"
        There is no constructor "Bet" within type "t"
-Hint: Did you mean "Beth"?
+Hint:             Did you mean "Beth"?
 |}]
 
 
@@ -66,7 +65,7 @@ Line 3, characters 9-13:
              ^^^^
 Error: This variant expression is expected to have type "t"
        There is no constructor "Gamm" within type "t"
-Hint: Did you mean "Gamma"?
+Hint:             Did you mean "Gamma"?
 |}];;
 
 raise Not_Found;;
@@ -76,7 +75,7 @@ Line 1, characters 6-15:
           ^^^^^^^^^
 Error: This variant expression is expected to have type "exn"
        There is no constructor "Not_Found" within type "exn"
-Hint: Did you mean "Not_found"?
+Hint:             Did you mean "Not_found"?
 |}]
 
 (** Aliasing *)
@@ -134,7 +133,7 @@ module FX = F(X) open FX
 type exn += Beth;;
 let x : X.t = Beth;;
 [%%expect {|
-module F : functor (X : sig type t = .. end) -> sig type X.t += Beth end
+module F : (X : sig type t = .. end) -> sig type X.t += Beth end
 module X : sig type t = .. end
 module FX : sig type X.t += Beth end
 type exn += Beth
@@ -157,7 +156,7 @@ Line 7, characters 13-17:
                  ^^^^
 Error: This variant expression is expected to have type "P.p"
        There is no constructor "Alha" within type "x"
-Hint: Did you mean "Alpha"?
+Hint:             Did you mean "Alpha"?
 |}]
 
 module M = struct type t = .. type t += T end
@@ -198,7 +197,7 @@ Line 3, characters 8-12:
             ^^^^
 Error: This variant expression is expected to have type "exn"
        There is no constructor "Locl" within type "exn"
-Hint: Did you mean "Local"?
+Hint:             Did you mean "Local"?
 |}]
 
 let x =
@@ -242,8 +241,8 @@ type b = Unique
 Line 7, characters 8-14:
 7 | let x = Unique;;
             ^^^^^^
-Warning 41 [ambiguous-name]: Unique belongs to several types: b M.s t a
-The first one was selected. Please disambiguate if this is wrong.
+Warning 41 [ambiguous-name]: "Unique" belongs to several types: "b" "M.s" "t" "a".
+  The first one was selected. Please disambiguate if this is wrong.
 
 val x : b = Unique
 |}]

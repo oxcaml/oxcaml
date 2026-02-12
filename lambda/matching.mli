@@ -30,6 +30,10 @@ val for_trywith:
         scopes:scopes -> return_layout:layout -> Location.t ->
         lambda -> (pattern * lambda) list ->
         lambda
+val for_handler:
+        scopes:scopes -> Location.t ->
+        lambda -> lambda -> lambda -> (pattern * lambda) list ->
+        lambda
 val for_let:
         scopes:scopes -> arg_sort:Jkind.Sort.Const.t -> return_layout:layout ->
         Location.t -> lambda -> Asttypes.mutable_flag -> pattern -> lambda ->

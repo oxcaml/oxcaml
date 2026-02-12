@@ -16,7 +16,14 @@
 
 
 val pretty_const
+<<<<<<< oxcaml
   : Typedtree.constant -> string
+||||||| upstream-base
+  : Asttypes.constant -> string
+val pretty_val : Format.formatter -> 'k Typedtree.general_pattern -> unit
+=======
+  : Asttypes.constant -> string
+>>>>>>> upstream-incoming
 
 val top_pretty: 'k Typedtree.general_pattern Format_doc.printer
 

@@ -44,9 +44,13 @@ type variance_error =
        variable : type_expr
      }
 
+type anonymous_variance_error =
+  | Variable_constrained of type_expr
+  | Variable_instantiated of type_expr
+
 type error =
   | Bad_variance of variance_error * surface_variance * surface_variance
-  | Varying_anonymous
+  | Varying_anonymous of int * anonymous_variance_error
 
 
 exception Error of Location.t * error
@@ -70,8 +74,13 @@ let compute_variance env visited vari ty =
         compute_same ty2
     | Ttuple tl ->
         List.iter (fun (_,t) -> compute_same t) tl
+<<<<<<< oxcaml
     | Tunboxed_tuple tl ->
         List.iter (fun (_,t) -> compute_same t) tl
+||||||| upstream-base
+        List.iter compute_same tl
+=======
+>>>>>>> upstream-incoming
     | Tconstr (path, tl, _) ->
         let open Variance in
         if tl = [] then () else begin
@@ -108,10 +117,18 @@ let compute_variance env visited vari ty =
         compute_same (row_more row)
     | Tpoly (ty, _) | Trepr (ty, _) ->
         compute_same ty
+<<<<<<< oxcaml
     | Tvar _ | Tnil | Tlink _ | Tunivar _ | Tof_kind _ -> ()
     | Tpackage (_, fl) ->
+||||||| upstream-base
+    | Tvar _ | Tnil | Tlink _ | Tunivar _ -> ()
+    | Tpackage (_, fl) ->
+=======
+    | Tvar _ | Tnil | Tlink _ | Tunivar _ -> ()
+    | Tpackage pack ->
+>>>>>>> upstream-incoming
         let v = Variance.(compose vari full) in
-        List.iter (fun (_, ty) -> compute_variance_rec v ty) fl
+        List.iter (fun (_, ty) -> compute_variance_rec v ty) pack.pack_cstrs
   in
   compute_variance_rec vari ty
 
@@ -128,7 +145,10 @@ let compute_variance_type env ~check (required, loc) decl tyl =
     List.map
       (fun (c,n,i) ->
         let i = if check_injectivity then i else false in
-        if c || n then (c,n,i) else (true,true,i))
+        (* c and n reflects respectively + and - in the syntax,
+           and maps respectively to `not May_neg` and `not May_pos`
+           in the {!Types.Variance.f} fields *)
+        not n, not c, i)
       required
   in
   (* Prepare *)
@@ -184,8 +204,15 @@ let compute_variance_type env ~check (required, loc) decl tyl =
                                                         (c,n,i)))))
       params required;
     (* Check propagation from constrained parameters *)
+<<<<<<< oxcaml
     let args = Btype.newgenty (Ttuple (List.map (fun t -> None, t) params)) in
     let fvl = Ctype.free_variables args in
+||||||| upstream-base
+    let args = Btype.newgenty (Ttuple params) in
+    let fvl = Ctype.free_variables args in
+=======
+    let fvl = Ctype.free_variables_list params in
+>>>>>>> upstream-incoming
     let fvl =
       List.filter (fun v -> not (List.exists (eq_type v) params)) fvl in
     (* If there are no extra variables there is nothing to do *)
@@ -259,8 +286,12 @@ let add_false = List.map (fun ty -> false, ty)
    or it is a variable appearing in another parameter *)
 let constrained vars ty =
   match get_desc ty with
-  | Tvar _ -> List.exists (List.exists (eq_type ty)) vars
-  | _ -> true
+  | Tvar _ ->
+      begin match List.find_map (List.find_opt (eq_type ty)) vars with
+      | Some var -> Some (Variable_constrained var)
+      | None -> None
+      end
+  | _ -> Some (Variable_instantiated ty)
 
 let for_constr = function
   | Types.Cstr_tuple l -> List.map (fun {ca_type; _} -> false, ca_type) l
@@ -270,8 +301,8 @@ let for_constr = function
           (Types.is_mutable ld_mutable, ld_type))
         l
 
-let compute_variance_gadt env ~check (required, loc as rloc) decl
-    (tl, ret_type_opt) =
+let compute_variance_gadt env ~check (required, _ as rloc) decl
+    (cloc, tl, ret_type_opt) =
   match ret_type_opt with
   | None ->
       compute_variance_type env ~check rloc {decl with type_private = Private}
@@ -283,14 +314,20 @@ let compute_variance_gadt env ~check (required, loc as rloc) decl
           let fvl = List.map (Ctype.free_variables ?env:None) tyl in
           let _ =
             List.fold_left2
-              (fun (fv1,fv2) ty (c,n,_) ->
+              (fun (index, fv1,fv2) ty (c,n,_) ->
                 match fv2 with [] -> assert false
                 | fv :: fv2 ->
                     (* fv1 @ fv2 = free_variables of other parameters *)
-                    if (c||n) && constrained (fv1 @ fv2) ty then
-                      raise (Error(loc, Varying_anonymous));
-                    (fv :: fv1, fv2))
-              ([], fvl) tyl required
+                    if (c || n)
+                    then begin
+                      match constrained (fv1 @ fv2) ty with
+                      | None -> ()
+                      | Some reason ->
+                          raise (Error(cloc,
+                                       Varying_anonymous (index, reason)))
+                    end;
+                    (succ index, fv :: fv1, fv2))
+              (1, [], fvl) tyl required
           in
           compute_variance_type env ~check rloc
             {decl with type_params = tyl; type_private = Private}
@@ -304,7 +341,7 @@ let compute_variance_extension env decl ext rloc =
   let ext = ext.Typedtree.ext_type in
   compute_variance_gadt env ~check rloc
     {decl with type_params = ext.ext_type_params}
-    (ext.ext_args, ext.ext_ret_type)
+    (ext.ext_loc, ext.ext_args, ext.ext_ret_type)
 
 let compute_variance_gadt_constructor env ~check rloc decl tl =
   let check =
@@ -313,7 +350,7 @@ let compute_variance_gadt_constructor env ~check rloc decl tl =
     | None -> None
   in
   compute_variance_gadt env ~check rloc decl
-    (tl.Types.cd_args, tl.Types.cd_res)
+    (tl.Types.cd_loc, tl.Types.cd_args, tl.Types.cd_res)
 
 let compute_variance_decl env ~check decl (required, _ as rloc) =
   let check =
@@ -323,11 +360,13 @@ let compute_variance_decl env ~check decl (required, _ as rloc) =
       check
   in
   let abstract = Btype.type_kind_is_abstract decl in
-  if (abstract || decl.type_kind = Type_open) && decl.type_manifest = None then
+  match decl with
+  | {type_kind = Type_abstract _ | Type_open; type_manifest = None} ->
     List.map
       (fun (c, n, i) -> make (not n) (not c) (not abstract || i))
       required
-  else begin
+  | { type_kind = _; type_manifest = Some _ }
+  | { type_kind = Type_record _ | Type_variant _; type_manifest = _ } ->
     let mn =
       match decl.type_manifest with
         None -> []
@@ -374,7 +413,6 @@ let compute_variance_decl env ~check decl (required, _ as rloc) =
     if mn = [] || not abstract then
       List.map Variance.strengthen vari
     else vari
-  end
 
 let is_hash id =
   let s = Ident.name id in
@@ -427,6 +465,7 @@ let transl_variance (v, i) =
     | Covariant -> (true, false)
     | Contravariant -> (false, true)
     | NoVariance -> (false, false)
+    | Bivariant -> (true, true)
   in
   (co, cn, match i with Injective -> true | NoInjectivity -> false)
 

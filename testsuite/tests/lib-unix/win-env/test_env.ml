@@ -4,7 +4,8 @@
  include unix;
  flags += "-strict-sequence -w +A-70 -warn-error +A";
  modules = "stubs.c";
- libwin32unix;
+ hasunix;
+ target-windows;
  {
    bytecode;
  }{

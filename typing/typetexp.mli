@@ -174,6 +174,7 @@ type error =
   | Method_mismatch of string * type_expr * type_expr
   | Opened_object of Path.t option
   | Not_an_object of type_expr
+<<<<<<< oxcaml
   | Unsupported_extension : _ Language_extension.t -> error
   | Polymorphic_optional_param
   | Non_value of
@@ -189,12 +190,22 @@ type error =
        usage_stage : Env.stage}
   | Mismatched_jkind_annotation of
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
+||||||| upstream-base
+=======
+  | Repeated_tuple_label of string
+>>>>>>> upstream-incoming
 
 exception Error of Location.t * Env.t * error
 
+<<<<<<< oxcaml
 val report_error: Env.t -> error Format_doc.format_printer
 val report_error_doc: Env.t -> error Format_doc.printer
 
+||||||| upstream-base
+val report_error: Env.t -> Format.formatter -> error -> unit
+
+=======
+>>>>>>> upstream-incoming
 (* Support for first-class modules. *)
 val transl_modtype_longident:  (* from Typemod *)
     (Location.t -> Env.t -> Longident.t -> Path.t) ref

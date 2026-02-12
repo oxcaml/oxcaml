@@ -318,6 +318,7 @@ CAMLprim value caml_bytes_set64(value str, value index, value newval)
 CAMLno_tsan_for_perf /* This attribute needs to stay on its own line for this
                         function to be detected as a primitive by the build
                         system. */
+<<<<<<< oxcaml
 
 CAMLprim value caml_string_geti8_indexed_by_int64(value, value);
 CAMLprim value caml_string_geti8_indexed_by_int32(value, value);
@@ -458,6 +459,10 @@ String_and_bytes_access_index_by(64, nativeint, intnat, Nativeint_val)
 #define int8 caml_ba_int8
 #define int16 caml_ba_int16
 
+||||||| upstream-base
+CAMLno_tsan /* Disable TSan instrumentation for performance. */
+=======
+>>>>>>> upstream-incoming
 CAMLprim value caml_string_equal(value s1, value s2)
 {
   mlsize_t sz1, sz2;

@@ -129,8 +129,15 @@ let rec immediate_subtypes : type_expr -> type_expr list = fun ty ->
   | Tarrow(_,ty1,ty2,_) ->
       [ty1; ty2]
   | Ttuple(tys) -> List.map snd tys
+<<<<<<< oxcaml
   | Tunboxed_tuple(tys) -> List.map snd tys
   | Tpackage(_, fl) -> (snd (List.split fl))
+||||||| upstream-base
+  | Ttuple(tys) -> tys
+  | Tpackage(_, fl) -> (snd (List.split fl))
+=======
+  | Tpackage pack -> (snd (List.split pack.pack_cstrs))
+>>>>>>> upstream-incoming
   | Tobject(row,class_ty) ->
       let class_subtys =
         match !class_ty with
@@ -413,10 +420,16 @@ let check_type
     | (Tvariant(_)        , Sep    )
     | (Tobject(_,_)       , Sep    )
     | ((Tnil | Tfield _)  , Sep    )
+<<<<<<< oxcaml
     | (Tquote(_)          , Sep    )
     | (Tsplice(_)         , Sep    )
     | (Tpackage(_,_)      , Sep    )
     | (Tof_kind(_)        , Sep    ) -> empty
+||||||| upstream-base
+    | (Tpackage(_,_)      , Sep    ) -> empty
+=======
+    | (Tpackage _         , Sep    ) -> empty
+>>>>>>> upstream-incoming
     (* "Deeply separable" case for these same constructors. *)
     | (Tarrow _           , Deepsep)
     | (Ttuple _           , Deepsep)
@@ -424,9 +437,15 @@ let check_type
     | (Tvariant(_)        , Deepsep)
     | (Tobject(_,_)       , Deepsep)
     | ((Tnil | Tfield _)  , Deepsep)
+<<<<<<< oxcaml
     | (Tquote(_)          , Deepsep)
     | (Tsplice(_)         , Deepsep)
     | (Tpackage(_,_)      , Deepsep) ->
+||||||| upstream-base
+    | (Tpackage(_,_)      , Deepsep) ->
+=======
+    | (Tpackage _         , Deepsep) ->
+>>>>>>> upstream-incoming
         let tys = immediate_subtypes ty in
         let on_subtype context ty =
           context ++ check_type (Hyps.guard hyps) ty Deepsep in

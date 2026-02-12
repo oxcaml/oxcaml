@@ -123,8 +123,12 @@ val locs : bool ref
 val directory : string option ref
 val annotations : bool ref
 val binary_annotations : bool ref
+<<<<<<< oxcaml
 val binary_annotations_cms : bool ref
 val shape_format : shape_format ref
+||||||| upstream-base
+=======
+>>>>>>> upstream-incoming
 val store_occurrences : bool ref
 val use_threads : bool ref
 val noassert : bool ref
@@ -139,6 +143,7 @@ val use_prims : string ref
 val use_runtime : string ref
 val plugin : bool ref
 val principal : bool ref
+val print_variance : bool ref
 val real_paths : bool ref
 val recursive_types : bool ref
 val strict_sequence : bool ref
@@ -152,8 +157,9 @@ val make_package : bool ref
 val for_package : string option ref
 val error_size : int ref
 val float_const_prop : bool ref
-val transparent_modules : bool ref
+val no_alias_deps : bool ref
 val unique_ids : bool ref
+val canonical_ids : bool ref
 val locations : bool ref
 val parameters : string list ref
 val as_parameter : bool ref
@@ -163,7 +169,12 @@ val dump_source : bool ref
 val dump_parsetree : bool ref
 val dump_typedtree : bool ref
 val dump_shape : bool ref
+<<<<<<< oxcaml
 val dump_slambda : bool ref
+||||||| upstream-base
+=======
+val dump_matchcomp : bool ref
+>>>>>>> upstream-incoming
 val dump_rawlambda : bool ref
 val dump_lambda : bool ref
 val dump_blambda : bool ref
@@ -236,6 +247,7 @@ val unbox_free_vars_of_closures : bool ref
 val unbox_specialised_args : bool ref
 val clambda_checks : bool ref
 val cmm_invariants : bool ref
+val parsetree_ghost_loc_invariant : bool ref
 val default_inline_max_depth : int
 val inline_max_depth : Int_arg_helper.parsed ref
 val remove_unused_arguments : bool ref
@@ -259,6 +271,9 @@ val set_dumped_pass : string -> bool -> unit
 val dump_into_file : bool ref
 val dump_into_csv : bool ref
 val dump_dir : string option ref
+
+val keyword_edition: string option ref
+val parse_keyword_edition: string -> (int*int) option * string list
 
 (* Support for flags that can also be set from an environment variable *)
 type 'a env_reader = {
@@ -321,6 +336,7 @@ module Compiler_pass : sig
   val to_output_filename: t -> prefix:string -> string
   val of_input_filename: string -> t option
 end
+
 val stop_after : Compiler_pass.t option ref
 val should_stop_after : Compiler_pass.t -> bool
 val set_save_ir_after : Compiler_pass.t -> bool -> unit
@@ -342,6 +358,45 @@ module Register_allocator : sig
 end
 
 val is_flambda2 : unit -> bool
+
+module Dump_option : sig
+  type t =
+    | Source
+    | Parsetree
+    | Typedtree
+    | Shape
+    | Match_comp
+    | Raw_lambda
+    | Lambda
+    | Instr
+    | Raw_clambda
+    | Clambda
+    | Raw_flambda
+    | Flambda
+      (* Note: no support for [-dflambda-let <stamp>] for now. *)
+    | Cmm
+    | Selection
+    | Combine
+    | CSE
+    | Live
+    | Spill
+    | Split
+    | Interf
+    | Prefer
+    | Regalloc
+    | Scheduling
+    | Linear
+    | Interval
+
+  val compare : t -> t -> int
+
+  val of_string : string -> t option
+  val to_string : t -> string
+
+  val flag : t -> bool ref
+
+  val available : t -> (unit, string) Result.t
+end
 
 val arg_spec : (string * Arg.spec * string) list ref
 

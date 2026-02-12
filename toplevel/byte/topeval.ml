@@ -107,7 +107,7 @@ let load_lambda ppf lam =
 (* Print the outcome of an evaluation *)
 
 let pr_item =
-  Printtyp.print_items
+  Out_type.print_items
     (fun env -> function
       | Sig_value(id, {val_kind = Val_reg _; val_type}, _) ->
           Some (outval_of_value env (getvalue (Translmod.toplevel_name id))
@@ -121,6 +121,7 @@ let execute_phrase print_outcome ppf phr =
   match phr with
   | Ptop_def sstr ->
       let oldenv = !toplevel_env in
+<<<<<<< oxcaml
       let oldsig = !toplevel_sig in
       Typecore.reset_delayed_checks ();
       let (str, sg, sn, shape, newenv) =
@@ -133,6 +134,20 @@ let execute_phrase print_outcome ppf phr =
       Typecore.force_delayed_checks ();
       let shape = Shape_reduce.local_reduce Env.empty shape in
       if !Clflags.dump_shape then Shape.print ppf shape;
+||||||| upstream-base
+      Typecore.reset_delayed_checks ();
+      let (str, sg, sn, shape, newenv) =
+        Typemod.type_toplevel_phrase oldenv sstr
+      in
+      if !Clflags.dump_typedtree then Printtyped.implementation ppf str;
+      let sg' = Typemod.Signature_names.simplify newenv sn sg in
+      ignore (Includemod.signatures ~mark:Mark_positive oldenv sg sg');
+      Typecore.force_delayed_checks ();
+      let shape = Shape.local_reduce shape in
+      if !Clflags.dump_shape then Shape.print ppf shape;
+=======
+      let (str, sg', newenv) = typecheck_phrase ppf oldenv sstr in
+>>>>>>> upstream-incoming
       let lam = Translmod.transl_toplevel_definition str in
       Warnings.check_fatal ();
       begin try
@@ -150,7 +165,10 @@ let execute_phrase print_outcome ppf phr =
                       match find_eval_phrase str with
                       | Some (exp, _, _, _) ->
                         let outv = outval_of_value newenv v exp.exp_type in
-                        let ty = Printtyp.tree_of_type_scheme exp.exp_type in
+                        let ty =
+                          Out_type.prepare_for_printing [exp.exp_type];
+                          Out_type.tree_of_typexp Type_scheme exp.exp_type
+                        in
                         Ophr_eval (outv, ty)
                       | None -> Ophr_signature (pr_item oldenv sg'))
               else Ophr_signature []

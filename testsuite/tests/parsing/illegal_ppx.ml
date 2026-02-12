@@ -36,11 +36,13 @@ let missing_rhs loc =
 
 let empty_let loc = H.Str.value ~loc Asttypes.Nonrecursive []
 let empty_type loc = H.Str.type_ ~loc Asttypes.Nonrecursive []
-let functor_id loc = Location.mkloc
-    (Longident.( Lapply (Lident "F", Lident "X"))) loc
+let empty_poly_binder loc = H.Typ.(poly ~loc [] (any ~loc ()))
+let functor_id loc = Location.mkloc (Longident.(
+  Lapply (Location.mknoloc (Lident "F"),  Location.mknoloc (Lident "X")))) loc
 let complex_record loc =
   H.Pat.record ~loc [functor_id loc, H.Pat.any ~loc () ] Asttypes.Closed
 
+<<<<<<< oxcaml
 let alias_with_too_many_nones loc =
   H.Typ.alias ~loc (H.Typ.constr ~loc { txt = Lident "unit"; loc } []) None None
 
@@ -62,6 +64,15 @@ let lt_empty_open_pat loc =
   H.Pat.tuple ~loc [] Open
 
 let lt_short_closed_pat loc =
+||||||| upstream-base
+=======
+
+let empty_open_tuple_pat loc =
+  let pat = H.Pat.mk Ppat_any in
+  H.Pat.tuple ~loc [] Open
+
+let short_closed_tuple_pat loc =
+>>>>>>> upstream-incoming
   let pat = H.Pat.mk Ppat_any in
   H.Pat.tuple ~loc [Some "baz", pat] Closed
 
@@ -90,13 +101,28 @@ let pat mapper p =
   match p.ppat_desc with
   | Ppat_extension ({txt="record_with_functor_fields";loc},_) ->
       complex_record loc
+<<<<<<< oxcaml
   | Ppat_extension ({txt="lt_empty_open_pat";loc},_) ->
       lt_empty_open_pat loc
   | Ppat_extension ({txt="lt_short_closed_pat";loc},_) ->
       lt_short_closed_pat loc
   | Ppat_extension ({txt="nested_pat_constraint";loc},_) ->
       nested_pat_constraint loc
+||||||| upstream-base
+=======
+  | Ppat_extension ({txt="empty_open_tuple_pat";loc},_) ->
+      empty_open_tuple_pat loc
+  | Ppat_extension ({txt="short_closed_tuple_pat";loc},_) ->
+      short_closed_tuple_pat loc
+>>>>>>> upstream-incoming
   | _ -> super.M.pat mapper p
+
+let typ mapper ty =
+  match ty.ptyp_desc with
+  | Ptyp_extension ({txt="empty_poly_binder";loc},_) ->
+      empty_poly_binder loc
+  | _ -> super.M.typ mapper ty
+
 
 let structure_item mapper stri = match stri.pstr_desc with
   | Pstr_extension (({Location.txt="empty_let";loc},_),_) -> empty_let loc
@@ -109,5 +135,11 @@ let signature_item mapper stri = match stri.psig_desc with
 
 
 let () = M.register "illegal ppx" (fun _ ->
+<<<<<<< oxcaml
     { super with typ; expr; pat; structure_item; signature_item }
+||||||| upstream-base
+    { super with expr; pat; structure_item; signature_item }
+=======
+    { super with expr; pat; structure_item; signature_item; typ }
+>>>>>>> upstream-incoming
   )

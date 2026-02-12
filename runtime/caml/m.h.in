@@ -53,22 +53,6 @@
    SIZEOF_LONGLONG to the sizes in bytes of the C types "int", "long",
    "char *", "short" and "long long" respectively. */
 
-#undef ARCH_INT64_TYPE
-#undef ARCH_UINT64_TYPE
-
-/* Define ARCH_INT64_TYPE and ARCH_UINT64_TYPE to 64-bit integer types,
-   typically "long long" and "unsigned long long" on 32-bit platforms,
-   and "long" and "unsigned long" on 64-bit platforms.
-   If the C compiler doesn't support any 64-bit integer type,
-   leave both ARCH_INT64_TYPE and ARCH_UINT64_TYPE undefined. */
-
-#undef ARCH_INT64_PRINTF_FORMAT
-
-/* Define ARCH_INT64_PRINTF_FORMAT to the printf format used for formatting
-   values of type ARCH_INT64_TYPE.  This is usually "ll" on 32-bit
-   platforms and "l" on 64-bit platforms.
-   Leave undefined if ARCH_INT64_TYPE is undefined.  */
-
 #undef ARCH_ALIGN_INT64
 
 /* Define ARCH_ALIGN_INT64 if the processor requires 64-bit integers to be
@@ -81,6 +65,11 @@
 #undef CUSTOM_OPS_STRUCT_SIZE
 
 #undef ASM_CFI_SUPPORTED
+
+#undef ASM_SIZE_TYPE_DIRECTIVES
+
+/* Define ASM_SIZE_TYPE_DIRECTIVES when the ".size" and ".type" assembler
+   directives can be used */
 
 #undef WITH_FRAME_POINTERS
 
@@ -102,6 +91,7 @@
 
 #undef USE_MMAP_MAP_STACK
 
+<<<<<<< oxcaml
 #undef STACK_ALLOCATION
 
 #undef STACK_CHECKS_ENABLED
@@ -129,3 +119,10 @@
 #undef HAS_AVX
 
 #undef HAS_AVX2
+||||||| upstream-base
+=======
+#undef WITH_NONEXECSTACK_NOTE
+
+/* Define WITH_NONEXECSTACK_NOTE when an explicit ".note.GNU-stack" section
+   is to be added to indicate the stack should not be executable */
+>>>>>>> upstream-incoming

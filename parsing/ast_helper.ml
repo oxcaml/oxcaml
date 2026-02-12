@@ -33,15 +33,20 @@ let with_default_loc l f =
   Misc.protect_refs [Misc.R (default_loc, l)] f
 
 module Const = struct
-  let integer ?suffix i = Pconst_integer (i, suffix)
-  let int ?suffix i = integer ?suffix (Int.to_string i)
-  let int32 ?(suffix='l') i = integer ~suffix (Int32.to_string i)
-  let int64 ?(suffix='L') i = integer ~suffix (Int64.to_string i)
-  let nativeint ?(suffix='n') i = integer ~suffix (Nativeint.to_string i)
-  let float ?suffix f = Pconst_float (f, suffix)
-  let char c = Pconst_char c
+  let mk ?(loc = !default_loc) d =
+    {pconst_desc = d;
+     pconst_loc = loc}
+
+  let integer ?loc ?suffix i = mk ?loc (Pconst_integer (i, suffix))
+  let int ?loc ?suffix i = integer ?loc ?suffix (Int.to_string i)
+  let int32 ?loc ?(suffix='l') i = integer ?loc ~suffix (Int32.to_string i)
+  let int64 ?loc ?(suffix='L') i = integer ?loc ~suffix (Int64.to_string i)
+  let nativeint ?loc ?(suffix='n') i =
+    integer ?loc ~suffix (Nativeint.to_string i)
+  let float ?loc ?suffix f = mk ?loc (Pconst_float (f, suffix))
+  let char ?loc c = mk ?loc (Pconst_char c)
   let string ?quotation_delimiter ?(loc= !default_loc) s =
-    Pconst_string (s, loc, quotation_delimiter)
+    mk ~loc (Pconst_string (s, loc, quotation_delimiter))
 end
 
 module Attr = struct
@@ -71,7 +76,7 @@ module Typ = struct
   let alias ?loc ?attrs a b c = mk ?loc ?attrs (Ptyp_alias (a, b, c))
   let variant ?loc ?attrs a b c = mk ?loc ?attrs (Ptyp_variant (a, b, c))
   let poly ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_poly (a, b))
-  let package ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_package (a, b))
+  let package ?loc ?attrs a = mk ?loc ?attrs (Ptyp_package a)
   let extension ?loc ?attrs a = mk ?loc ?attrs (Ptyp_extension a)
   let open_ ?loc ?attrs mod_ident t = mk ?loc ?attrs (Ptyp_open (mod_ident, t))
   let quote ?loc ?attrs t = mk ?loc ?attrs (Ptyp_quote t)
@@ -101,6 +106,7 @@ module Typ = struct
         | Ptyp_var (x, jkind) ->
             let jkind = Option.map loop_jkind jkind in
             check_variable var_names t.ptyp_loc x;
+<<<<<<< oxcaml
             Ptyp_var (x, jkind)
         | Ptyp_arrow (label,core_type,core_type',modes,modes') ->
             Ptyp_arrow(label, loop core_type, loop core_type', modes, modes')
@@ -108,6 +114,18 @@ module Typ = struct
             Ptyp_tuple (List.map (fun (l, t) -> l, loop t) lst)
         | Ptyp_unboxed_tuple lst ->
           Ptyp_unboxed_tuple (List.map (fun (l, t) -> l, loop t) lst)
+||||||| upstream-base
+            Ptyp_var x
+        | Ptyp_arrow (label,core_type,core_type') ->
+            Ptyp_arrow(label, loop core_type, loop core_type')
+        | Ptyp_tuple lst -> Ptyp_tuple (List.map loop lst)
+=======
+            Ptyp_var x
+        | Ptyp_arrow (label,core_type,core_type') ->
+            Ptyp_arrow(label, loop core_type, loop core_type')
+        | Ptyp_tuple lst ->
+            Ptyp_tuple (List.map (fun (l, t) -> l, loop t) lst)
+>>>>>>> upstream-incoming
         | Ptyp_constr( { txt = Longident.Lident s }, [])
           when List.mem s var_names ->
             Ptyp_var (s, None)
@@ -124,6 +142,7 @@ module Typ = struct
         | Ptyp_variant(row_field_list, flag, lbl_lst_option) ->
             Ptyp_variant(List.map loop_row_field row_field_list,
                          flag, lbl_lst_option)
+<<<<<<< oxcaml
         | Ptyp_poly(var_lst, core_type) ->
           let var_lst =
             List.map (fun (v, jkind) ->
@@ -134,6 +153,21 @@ module Typ = struct
             Ptyp_poly(var_lst, loop core_type)
         | Ptyp_package(longident,lst) ->
             Ptyp_package(longident,List.map (fun (n,typ) -> (n,loop typ) ) lst)
+||||||| upstream-base
+        | Ptyp_poly(string_lst, core_type) ->
+          List.iter (fun v ->
+            check_variable var_names t.ptyp_loc v.txt) string_lst;
+            Ptyp_poly(string_lst, loop core_type)
+        | Ptyp_package(longident,lst) ->
+            Ptyp_package(longident,List.map (fun (n,typ) -> (n,loop typ) ) lst)
+=======
+        | Ptyp_poly(string_lst, core_type) ->
+          List.iter (fun v ->
+            check_variable var_names t.ptyp_loc v.txt) string_lst;
+            Ptyp_poly(string_lst, loop core_type)
+        | Ptyp_package ptyp ->
+            Ptyp_package (loop_package_type ptyp)
+>>>>>>> upstream-incoming
         | Ptyp_open (mod_ident, core_type) ->
             Ptyp_open (mod_ident, loop core_type)
         | Ptyp_quote core_type ->
@@ -176,9 +210,17 @@ module Typ = struct
             Oinherit (loop t)
       in
       { field with pof_desc; }
+    and loop_package_type ptyp =
+      { ptyp with
+        ppt_cstrs = List.map (fun (n,typ) -> (n,loop typ) ) ptyp.ppt_cstrs }
     in
     loop t
 
+  let package_type ?(loc = !default_loc) ?(attrs = []) p c =
+    {ppt_loc = loc;
+     ppt_path = p;
+     ppt_cstrs = c;
+     ppt_attrs = attrs}
 end
 
 module Pat = struct
@@ -194,10 +236,16 @@ module Pat = struct
   let alias ?loc ?attrs a b = mk ?loc ?attrs (Ppat_alias (a, b))
   let constant ?loc ?attrs a = mk ?loc ?attrs (Ppat_constant a)
   let interval ?loc ?attrs a b = mk ?loc ?attrs (Ppat_interval (a, b))
+<<<<<<< oxcaml
   let unboxed_unit ?loc ?attrs () = mk ?loc ?attrs Ppat_unboxed_unit
   let unboxed_bool ?loc ?attrs b = mk ?loc ?attrs (Ppat_unboxed_bool b)
   let tuple ?loc ?attrs a b = mk ?loc ?attrs (Ppat_tuple (a, b))
   let unboxed_tuple ?loc ?attrs a b = mk ?loc ?attrs (Ppat_unboxed_tuple (a, b))
+||||||| upstream-base
+  let tuple ?loc ?attrs a = mk ?loc ?attrs (Ppat_tuple a)
+=======
+  let tuple ?loc ?attrs a b = mk ?loc ?attrs (Ppat_tuple (a, b))
+>>>>>>> upstream-incoming
   let construct ?loc ?attrs a b = mk ?loc ?attrs (Ppat_construct (a, b))
   let variant ?loc ?attrs a b = mk ?loc ?attrs (Ppat_variant (a, b))
   let record ?loc ?attrs a b = mk ?loc ?attrs (Ppat_record (a, b))
@@ -211,6 +259,7 @@ module Pat = struct
   let unpack ?loc ?attrs a = mk ?loc ?attrs (Ppat_unpack a)
   let open_ ?loc ?attrs a b = mk ?loc ?attrs (Ppat_open (a, b))
   let exception_ ?loc ?attrs a = mk ?loc ?attrs (Ppat_exception a)
+  let effect_ ?loc ?attrs a b = mk ?loc ?attrs (Ppat_effect(a, b))
   let extension ?loc ?attrs a = mk ?loc ?attrs (Ppat_extension a)
 end
 
@@ -259,8 +308,16 @@ module Exp = struct
   let lazy_ ?loc ?attrs a = mk ?loc ?attrs (Pexp_lazy a)
   let poly ?loc ?attrs a b = mk ?loc ?attrs (Pexp_poly (a, b))
   let object_ ?loc ?attrs a = mk ?loc ?attrs (Pexp_object a)
+<<<<<<< oxcaml
   let newtype ?loc ?attrs a b c = mk ?loc ?attrs (Pexp_newtype (a, b, c))
   let pack ?loc ?attrs a = mk ?loc ?attrs (Pexp_pack a)
+||||||| upstream-base
+  let newtype ?loc ?attrs a b = mk ?loc ?attrs (Pexp_newtype (a, b))
+  let pack ?loc ?attrs a = mk ?loc ?attrs (Pexp_pack a)
+=======
+  let newtype ?loc ?attrs a b = mk ?loc ?attrs (Pexp_newtype (a, b))
+  let pack ?loc ?attrs a b = mk ?loc ?attrs (Pexp_pack (a, b))
+>>>>>>> upstream-incoming
   let open_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_open (a, b))
   let letop ?loc ?attrs let_ ands body =
     mk ?loc ?attrs (Pexp_letop {let_; ands; body})
@@ -685,7 +742,6 @@ module Te = struct
      pext_loc = loc;
      pext_attributes = add_docs_attrs docs (add_info_attrs info attrs);
     }
-
 end
 
 module Csig = struct

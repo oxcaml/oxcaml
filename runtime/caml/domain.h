@@ -17,22 +17,27 @@
 #ifndef CAML_DOMAIN_H
 #define CAML_DOMAIN_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #ifdef CAML_INTERNALS
+
+#include <stdbool.h>
 
 #include "camlatomic.h"
 #include "config.h"
 #include "mlvalues.h"
 #include "domain_state.h"
 
+<<<<<<< oxcaml
 #ifdef MULTIDOMAIN
+||||||| upstream-base
+/* The runtime currently has a hard limit on the number of domains.
+   This hard limit may go away in the future. */
+=======
+>>>>>>> upstream-incoming
 #ifdef ARCH_SIXTYFOUR
 #define Max_domains_def 128
 #else
 #define Max_domains_def 16
+<<<<<<< oxcaml
 #endif
 /* Upper limit for the number of domains. Chosen to be arbitrarily large. Used
  * for sanity checking [max_domains] value in OCAMLRUNPARAM. */
@@ -40,7 +45,15 @@ extern "C" {
 #else
 #define Max_domains_def 1
 #define Max_domains_max 1
+||||||| upstream-base
+#define Max_domains 16
+=======
+>>>>>>> upstream-incoming
 #endif
+
+/* Upper limit for the number of domains. Chosen to be arbitrarily large. Used
+ * for sanity checking [max_domains] value in OCAMLRUNPARAM. */
+#define Max_domains_max 4096
 
 /* is the minor heap full or an external interrupt has been triggered */
 Caml_inline int caml_check_gc_interrupt(caml_domain_state * dom_st)
@@ -103,9 +116,35 @@ CAMLextern uintnat caml_minor_heap_max_wsz;
 
 CAMLextern atomic_uintnat caml_num_domains_running;
 
+/* When [caml_domain_alone()] is true, there is a single domain
+   running. In particular, if the test passes while holding the domain
+   lock, then we know that no other domain is running concurrently,
+   and we can use fast paths with fewer synchronization operations.
+
+      // if you hold the domain lock:
+      if (caml_domain_alone()) {
+        // sequential fast path
+        ...
+      } else {
+        // slower concurrent version
+        ...
+      }
+*/
 Caml_inline intnat caml_domain_alone(void)
 {
   return atomic_load_acquire(&caml_num_domains_running) == 1;
+}
+
+/* The index of the current domain. It is an integer unique among
+   currently-running domains, in the interval [0; N-1] where N is the
+   peak number of domains running simultaneously so far. The index of
+   a terminated domain may be reused for a new domain.
+
+   This function requires the domain lock to be held.
+*/
+Caml_inline int caml_domain_index(void)
+{
+  return Caml_state->id;
 }
 
 #ifdef DEBUG
@@ -114,12 +153,24 @@ int caml_domain_is_in_stw(void);
 
 int caml_domain_terminating(caml_domain_state *);
 int caml_domain_is_terminating(void);
+<<<<<<< oxcaml
+||||||| upstream-base
+=======
+void caml_domain_terminate(bool last);
+>>>>>>> upstream-incoming
 
 int caml_try_run_on_all_domains_with_spin_work(
   int sync,
   void (*handler)(caml_domain_state*, void*, int, caml_domain_state**),
   void* data,
+<<<<<<< oxcaml
   void (*leader_setup)(caml_domain_state*, void*),
+||||||| upstream-base
+  void (*leader_setup)(caml_domain_state*),
+  void (*enter_spin_callback)(caml_domain_state*, void*),
+=======
+  void (*leader_setup)(caml_domain_state*),
+>>>>>>> upstream-incoming
   /* return nonzero if there may still be useful work to do while spinning */
   int (*enter_spin_callback)(caml_domain_state*, void*),
   void* enter_spin_data);
@@ -134,7 +185,7 @@ int caml_try_run_on_all_domains(
    [caml_try_run_on_all_domains*] runners, it will
    run on all participant domains in parallel.
 
-   The "STW critical section" is the runtime interval betweeen the
+   The "STW critical section" is the runtime interval between the
    start of the execution of the STW callback and the last barrier in
    the callback. During this interval, mutator code from registered
    participants cannot be running in parallel.
@@ -230,11 +281,24 @@ void caml_global_barrier_release_as_final(barrier_status status);
          ((CAML_GENSYM(alone) ? (void)0 :                               \
            caml_global_barrier_release_as_final(CAML_GENSYM(b))),       \
           CAML_GENSYM(continue) = 0))
+<<<<<<< oxcaml
+||||||| upstream-base
+int caml_domain_terminating(caml_domain_state *);
+int caml_domain_is_terminating(void);
+=======
+
+/*
+ * Termination helpers.
+ */
+
+/* Force all other domains to stop their operation. */
+void caml_stop_all_domains(void);
+
+/* Try and release all synchronisation resources set up by
+   caml_init_domains(). Returns whether all resources could be released. */
+bool caml_free_domains(void);
+>>>>>>> upstream-incoming
 
 #endif /* CAML_INTERNALS */
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* CAML_DOMAIN_H */

@@ -109,7 +109,15 @@ void caml_lf_skiplist_init(struct lf_skiplist *sk) {
                                    NUM_LEVELS * sizeof(struct lf_skipcell *));
   if (sk->tail == NULL)
     caml_fatal_error("caml_lf_skiplist_init: out of memory");
+<<<<<<< oxcaml
   sk->tail->key = UINTNAT_MAX;
+||||||| upstream-base
+  sk->tail = caml_stat_alloc(SIZEOF_LF_SKIPCELL +
+                             NUM_LEVELS * sizeof(struct lf_skipcell *));
+  sk->tail->key = UINTNAT_MAX;
+=======
+  sk->tail->key = CAML_UINTNAT_MAX;
+>>>>>>> upstream-incoming
   sk->tail->data = 0;
   sk->tail->garbage_next = NULL;
   sk->tail->top_level = NUM_LEVELS - 1;
@@ -292,7 +300,7 @@ static struct lf_skipcell *lf_skiplist_lookup(struct lf_skiplist *sk,
 /* Search a skip list */
 
 int caml_lf_skiplist_find(struct lf_skiplist *sk, uintnat key, uintnat *data) {
-  struct lf_skipcell *found_cell = lf_skiplist_lookup(sk, key, NULL);
+  const struct lf_skipcell *found_cell = lf_skiplist_lookup(sk, key, NULL);
 
   if (found_cell->key == key) {
     if (data) {
@@ -308,7 +316,7 @@ int caml_lf_skiplist_find_below(struct lf_skiplist *sk, uintnat k, uintnat *key,
                                 uintnat *data) {
   struct lf_skipcell *pred;
   struct lf_skipcell *curr = lf_skiplist_lookup(sk, k, &pred);
-  struct lf_skipcell *found_cell;
+  const struct lf_skipcell *found_cell;
 
   if (curr->key == k) {
     found_cell = curr;
@@ -333,7 +341,8 @@ int caml_lf_skiplist_insert(struct lf_skiplist *sk, uintnat key, uintnat data) {
   struct lf_skipcell *preds[NUM_LEVELS];
   struct lf_skipcell *succs[NUM_LEVELS];
 
-  CAMLassert(key > 0 && key < UINTNAT_MAX);
+  CAMLassert(0 < key);
+  CAMLassert(key < CAML_UINTNAT_MAX);
 
   while (1) {
     /* We first try to find a node with [key] in the skip list. If it exists
@@ -374,7 +383,7 @@ int caml_lf_skiplist_insert(struct lf_skiplist *sk, uintnat key, uintnat data) {
          must end up at this level and so as long as the node is present, it
          will be found - regardless of whether it has been added to the level
          above. Consider the staircasing referred to in [skiplist_find] earlier,
-         the final step in finding a node is following the reference from it's
+         the final step in finding a node is following the reference from its
          predecessor at the bottom level. */
       pred = preds[0];
       succ = succs[0];
@@ -488,7 +497,7 @@ int caml_lf_skiplist_remove(struct lf_skiplist *sk, uintnat key) {
 void caml_lf_skiplist_free_garbage(struct lf_skiplist *sk) {
   struct lf_skipcell *curr = atomic_load_acquire(&sk->garbage_head);
 
-  struct lf_skipcell *head = sk->head;
+  const struct lf_skipcell *head = sk->head;
   while (curr != head) {
     struct lf_skipcell *next = atomic_load_relaxed(&curr->garbage_next);
     // acquire not useful, if executed in STW

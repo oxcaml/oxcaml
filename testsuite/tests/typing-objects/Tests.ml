@@ -77,7 +77,7 @@ class ['a] c = object
 end
 [%%expect {|
 module F :
-  functor (X : sig type t end) ->
+  (X : sig type t end) ->
     sig class type ['a] c = object method m : 'a -> X.t end end
 class ['a] c : object constraint 'a = < m : 'a -> Int.t; .. > end
 |}]
@@ -416,8 +416,8 @@ class c () = object val x = - true val y = -. () end;;
 Line 1, characters 30-34:
 1 | class c () = object val x = - true val y = -. () end;;
                                   ^^^^
-Error: This expression has type "bool" but an expression was expected of type
-         "int"
+Error: The constructor "true" has type "bool"
+       but an expression was expected of type "int"
 |}];;
 
 class c () = object method f = 1 method g = 1 method h = 1 end;;
@@ -483,24 +483,24 @@ end;;
 Line 3, characters 2-13:
 3 |   inherit c 5
       ^^^^^^^^^^^
-Warning 13 [instance-variable-override]: the following instance variables are overridden by the class c :
-  x
+Warning 13 [instance-variable-override]: the following instance variables
+  are overridden by the class "c": "x"
 
 Line 4, characters 6-7:
 4 |   val y = 3
           ^
-Warning 13 [instance-variable-override]: the instance variable y is overridden.
+Warning 13 [instance-variable-override]: the instance variable "y" is overridden.
 
 Line 6, characters 2-13:
 6 |   inherit d 7
       ^^^^^^^^^^^
-Warning 13 [instance-variable-override]: the following instance variables are overridden by the class d :
-  t z
+Warning 13 [instance-variable-override]: the following instance variables
+  are overridden by the class "d": "t" "z"
 
 Line 7, characters 6-7:
 7 |   val u = 3
           ^
-Warning 13 [instance-variable-override]: the instance variable u is overridden.
+Warning 13 [instance-variable-override]: the instance variable "u" is overridden.
 
 class e :
   unit ->
@@ -730,7 +730,16 @@ Error: Multiple definition of the type name "t".
 
 fun x -> (x :> < m : 'a -> 'a > as 'a);;
 [%%expect{|
+<<<<<<< oxcaml
 - : < m : (< m : 'a -> 'a > as 'a) -> 'a; .. > -> 'a = <fun>
+||||||| upstream-base
+- : < m : (< m : 'a > as 'b) -> 'b as 'a; .. > -> 'b = <fun>
+=======
+- : < m : (< m : 'a > as 'b) -> 'b as 'a; .. > -> 'b = <fun>
+|}, Principal{|
+- : < m : < m : 'a > -> < m : 'a > as 'a; .. > -> (< m : 'b -> 'b > as 'b) =
+<fun>
+>>>>>>> upstream-incoming
 |}];;
 
 fun x -> (x : int -> bool :> 'a -> 'a);;
@@ -765,7 +774,7 @@ val x : '_weak2 list ref = {contents = []}
 module F(X : sig end) =
   struct type t = int let _ = (x : < m : t> list ref) end;;
 [%%expect{|
-module F : functor (X : sig end) -> sig type t = int end
+module F : (X : sig end) -> sig type t = int end
 |}];;
 x;;
 [%%expect{|
@@ -789,8 +798,7 @@ fun (x : 'a t) -> (x : 'a); ();;
 Line 1, characters 19-20:
 1 | fun (x : 'a t) -> (x : 'a); ();;
                        ^
-Error: This expression has type "'a t" but an expression was expected of type
-         "'a"
+Error: The value "x" has type "'a t" but an expression was expected of type "'a"
        The type variable "'a" occurs inside "'a t"
 |}];;
 fun ((x : 'a) | (x : 'a t)) -> ();;
@@ -944,8 +952,8 @@ class a = object val x = 3 val y = x + 2 end;;
 Line 1, characters 35-36:
 1 | class a = object val x = 3 val y = x + 2 end;;
                                        ^
-Error: The instance variable "x"
-       cannot be accessed from the definition of another instance variable
+Error: The instance variable "x" cannot be accessed from the definition of
+       another instance variable
 |}];;
 
 class a = object (self) val x = self#m method m = 3 end;;
@@ -953,8 +961,8 @@ class a = object (self) val x = self#m method m = 3 end;;
 Line 1, characters 32-36:
 1 | class a = object (self) val x = self#m method m = 3 end;;
                                     ^^^^
-Error: The self variable "self"
-       cannot be accessed from the definition of an instance variable
+Error: The self variable "self" cannot be accessed from the
+       definition of an instance variable
 |}];;
 
 class a = object method m = 3 end
@@ -964,8 +972,8 @@ class a : object method m : int end
 Line 2, characters 44-49:
 2 | class b = object inherit a as super val x = super#m end;;
                                                 ^^^^^
-Error: The ancestor variable "super"
-       cannot be accessed from the definition of an instance variable
+Error: The ancestor variable "super" cannot be accessed from
+       the definition of an instance variable
 |}];;
 
 (* Some more tests of class idiosyncrasies *)
@@ -999,7 +1007,7 @@ class c = object
 Line 4, characters 17-23:
 4 |       method n = self#m
                      ^^^^^^
-Warning 17 [undeclared-virtual-method]: the virtual method m is not declared.
+Warning 17 [undeclared-virtual-method]: the virtual method "m" is not declared.
 
 class c : object method m : int method n : int end
 |}];;
@@ -1151,7 +1159,7 @@ val is_empty : <  > -> unit = <fun>
 Line 2, characters 54-58:
 2 | class c = object (self) method private foo = is_empty self end;;
                                                           ^^^^
-Error: This expression has type "< .. >" but an expression was expected of type
+Error: The value "self" has type "< .. >" but an expression was expected of type
          "<  >"
        Self type cannot be unified with a closed object type
 |}];;
@@ -1165,8 +1173,8 @@ val has_foo : < foo : 'a; .. > -> unit = <fun>
 Line 3, characters 10-75:
 3 | class c = object (self) method private foo = 5 initializer has_foo self end;;
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Warning 15 [implicit-public-methods]: the following private methods were made public implicitly:
- foo.
+Warning 15 [implicit-public-methods]: the following private methods were made
+  public implicitly: "foo".
 
 class c : object method foo : int end
 |}];;
@@ -1245,7 +1253,7 @@ let o = object(self) initializer has_foo self end;;
 Line 1, characters 41-45:
 1 | let o = object(self) initializer has_foo self end;;
                                              ^^^^
-Error: This expression has type "<  >" but an expression was expected of type
+Error: The value "self" has type "<  >" but an expression was expected of type
          "< foo : int; .. >"
        The first object type has no method "foo"
 |}];;

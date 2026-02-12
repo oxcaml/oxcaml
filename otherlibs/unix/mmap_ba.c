@@ -34,7 +34,7 @@ static void caml_ba_mapped_finalize(value v)
   if (b->proxy == NULL) {
     caml_ba_unmap_file(b->data, caml_ba_byte_size(b));
   } else {
-    if (-- b->proxy->refcount == 0) {
+    if (caml_atomic_counter_decr(&b->proxy->refcount) == 0) {
       caml_ba_unmap_file(b->proxy->data, b->proxy->size);
       free(b->proxy);
     }
@@ -61,18 +61,32 @@ static struct custom_operations caml_ba_mapped_ops = {
 CAMLexport value
 caml_unix_mapped_alloc(int flags, int num_dims, void * data, intnat * dim)
 {
+<<<<<<< oxcaml
   uintnat asize, num_elts = 1, mem_bytes, mem_words;
   int i;
+||||||| upstream-base
+  uintnat asize;
+  int i;
+=======
+  uintnat asize, mem_words;
+>>>>>>> upstream-incoming
   value res;
   struct caml_ba_array * b;
   intnat dimcopy[CAML_BA_MAX_NUM_DIMS];
 
-  CAMLassert(num_dims >= 0 && num_dims <= CAML_BA_MAX_NUM_DIMS);
+  CAMLassert(0 <= num_dims);
+  CAMLassert(num_dims <= CAML_BA_MAX_NUM_DIMS);
   CAMLassert((flags & CAML_BA_KIND_MASK) < CAML_BA_FIRST_UNIMPLEMENTED_KIND);
+<<<<<<< oxcaml
   for (i = 0; i < num_dims; i++) {
     num_elts *= dim[i];
     dimcopy[i] = dim[i];
   }
+||||||| upstream-base
+  for (i = 0; i < num_dims; i++) dimcopy[i] = dim[i];
+=======
+  for (int i = 0; i < num_dims; i++) dimcopy[i] = dim[i];
+>>>>>>> upstream-incoming
   asize = SIZEOF_BA_ARRAY + num_dims * sizeof(intnat);
   res = caml_alloc_custom(&caml_ba_mapped_ops, asize, 0, 1);
   mem_bytes = num_elts * caml_ba_element_size[flags & CAML_BA_KIND_MASK];
@@ -88,6 +102,9 @@ caml_unix_mapped_alloc(int flags, int num_dims, void * data, intnat * dim)
   b->num_dims = num_dims;
   b->flags = flags | CAML_BA_MAPPED_FILE;
   b->proxy = NULL;
-  for (i = 0; i < num_dims; i++) b->dim[i] = dimcopy[i];
+  for (int i = 0; i < num_dims; i++) b->dim[i] = dimcopy[i];
+  mem_words = (caml_ba_byte_size(b) + sizeof(value) - 1) / sizeof(value);
+  caml_memprof_sample_block(
+    res, mem_words, mem_words, CAML_MEMPROF_SRC_MAP_FILE);
   return res;
 }

@@ -29,11 +29,17 @@ val transl_apply: scopes:scopes
                   -> ?tailcall:tailcall_attribute
                   -> ?inlined:inlined_attribute
                   -> ?specialised:specialise_attribute
+<<<<<<< oxcaml
                   -> ?position:region_close
                   -> ?mode:locality_mode
                   -> result_layout:Lambda.layout
                   -> lambda
                   -> (arg_label * apply_arg) list
+||||||| upstream-base
+                  -> lambda -> (arg_label * expression option) list
+=======
+                  -> lambda -> (arg_label * apply_arg) list
+>>>>>>> upstream-incoming
                   -> scoped_location -> lambda
 val transl_let: scopes:scopes -> return_layout:layout -> ?in_structure:bool
                   -> rec_flag -> value_binding list -> lambda -> lambda

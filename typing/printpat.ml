@@ -17,7 +17,14 @@
 
 open Asttypes
 open Typedtree
+<<<<<<< oxcaml
 open Types
+||||||| upstream-base
+open Types
+open Format
+=======
+open Data_types
+>>>>>>> upstream-incoming
 open Format_doc
 
 let is_cons = function
@@ -94,14 +101,25 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
   in
   match v.pat_desc with
   | Tpat_any -> fprintf ppf "_"
+<<<<<<< oxcaml
   | Tpat_var (x,_,_,_,_) -> fprintf ppf "%s" (Ident.name x)
+||||||| upstream-base
+  | Tpat_var (x,_) -> fprintf ppf "%s" (Ident.name x)
+=======
+  | Tpat_var (x,_,_) -> fprintf ppf "%s" (Ident.name x)
+>>>>>>> upstream-incoming
   | Tpat_constant c -> fprintf ppf "%s" (pretty_const c)
   | Tpat_unboxed_unit -> fprintf ppf "#()"
   | Tpat_unboxed_bool b -> fprintf ppf "#%a" bool b
   | Tpat_tuple vs ->
       fprintf ppf "@[(%a)@]" (pretty_list pretty_labeled_val ",") vs
+<<<<<<< oxcaml
   | Tpat_unboxed_tuple vs ->
       fprintf ppf "@[#(%a)@]" (pretty_list pretty_labeled_val_sort ",") vs
+||||||| upstream-base
+      fprintf ppf "@[(%a)@]" (pretty_vals ",") vs
+=======
+>>>>>>> upstream-incoming
   | Tpat_construct (_, cstr, [], _) ->
       fprintf ppf "%s" cstr.cstr_name
   | Tpat_construct (_, cstr, [w], None) ->
@@ -124,14 +142,61 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
       fprintf ppf "`%s" l
   | Tpat_variant (l, Some w, _) ->
       fprintf ppf "@[<2>`%s@ %a@]" l pretty_arg w
+<<<<<<< oxcaml
   | Tpat_record (lvs,_) -> pretty_record ~unboxed:false lvs
   | Tpat_record_unboxed_product (lvs,_) -> pretty_record ~unboxed:true lvs
   | Tpat_array (am, _arg_sort, vs) ->
       let punct = if Types.is_mutable am then '|' else ':' in
       fprintf ppf "@[[%c %a %c]@]" punct (pretty_vals " ;") vs punct
+||||||| upstream-base
+  | Tpat_record (lvs,_) ->
+      let filtered_lvs = List.filter
+          (function
+            | (_,_,{pat_desc=Tpat_any}) -> false (* do not show lbl=_ *)
+            | _ -> true) lvs in
+      begin match filtered_lvs with
+      | [] -> fprintf ppf "{ _ }"
+      | (_, lbl, _) :: q ->
+          let elision_mark ppf =
+            (* we assume that there is no label repetitions here *)
+             if Array.length lbl.lbl_all > 1 + List.length q then
+               fprintf ppf ";@ _@ "
+             else () in
+          fprintf ppf "@[{%a%t}@]"
+            pretty_lvals filtered_lvs elision_mark
+      end
+  | Tpat_array vs ->
+      fprintf ppf "@[[| %a |]@]" (pretty_vals " ;") vs
+=======
+  | Tpat_record (lvs,_) ->
+      let filtered_lvs = List.filter
+          (function
+            | (_,_,{pat_desc=Tpat_any}) -> false (* do not show lbl=_ *)
+            | _ -> true) lvs in
+      begin match filtered_lvs with
+      | [] -> fprintf ppf "{ _ }"
+      | (_, lbl, _) :: q ->
+          let elision_mark ppf =
+            (* we assume that there is no label repetitions here *)
+             if Array.length lbl.lbl_all > 1 + List.length q then
+               fprintf ppf ";@ _@ "
+             else () in
+          fprintf ppf "@[{%a%t}@]"
+            pretty_lvals filtered_lvs elision_mark
+      end
+  | Tpat_array (_, vs) ->
+      fprintf ppf "@[[| %a |]@]" (pretty_vals " ;") vs
+>>>>>>> upstream-incoming
   | Tpat_lazy v ->
       fprintf ppf "@[<2>lazy@ %a@]" pretty_arg v
+<<<<<<< oxcaml
   | Tpat_alias (v, x, _, _, _, _, _) ->
+||||||| upstream-base
+  | Tpat_alias (v, x,_) ->
+      fprintf ppf "@[(%a@ as %a)@]" pretty_val v Ident.print x
+=======
+  | Tpat_alias (v, x,_,_,_) ->
+>>>>>>> upstream-incoming
       fprintf ppf "@[(%a@ as %a)@]" pretty_val v Ident.doc_print x
   | Tpat_value v ->
       fprintf ppf "%a" pretty_val (v :> pattern)
@@ -170,6 +235,24 @@ and pretty_list : type k . (_ -> k -> _) -> _ -> _ -> k list -> _ =
     | [v] -> print_val ppf v
     | v::vs ->
         fprintf ppf "%a%s@ %a" print_val v sep (pretty_list print_val sep) vs
+<<<<<<< oxcaml
+||||||| upstream-base
+and pretty_vals sep ppf = function
+  | [] -> ()
+  | [v] -> pretty_val ppf v
+  | v::vs ->
+      fprintf ppf "%a%s@ %a" pretty_val v sep (pretty_vals sep) vs
+=======
+
+and pretty_vals sep = pretty_list pretty_val sep
+
+and pretty_labeled_val ppf (l, p) =
+  begin match l with
+  | Some s -> fprintf ppf "~%s:" s
+  | None -> ()
+  end;
+  pretty_val ppf p
+>>>>>>> upstream-incoming
 
 and pretty_vals sep = pretty_list pretty_val sep
 

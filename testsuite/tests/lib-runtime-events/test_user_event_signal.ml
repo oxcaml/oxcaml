@@ -1,10 +1,18 @@
 (* TEST
+<<<<<<< oxcaml
  runtime5;
  flags = "-alert -unsafe_multidomain";
  include runtime_events;
  include unix;
  hasunix;
  not-windows;
+||||||| upstream-base
+=======
+ include runtime_events;
+ include unix;
+ hasunix;
+ not-target-windows;
+>>>>>>> upstream-incoming
  {
    bytecode;
  }

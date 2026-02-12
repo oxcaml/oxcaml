@@ -1,5 +1,10 @@
 (* TEST
+<<<<<<< oxcaml
  expect;
+||||||| upstream-base
+=======
+  expect;
+>>>>>>> upstream-incoming
 *)
 
 module M = struct type t = T end

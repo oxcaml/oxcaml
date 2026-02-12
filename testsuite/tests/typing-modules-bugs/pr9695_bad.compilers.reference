@@ -1,4 +1,10 @@
 File "pr9695_bad.ml", line 10, characters 18-19:
 10 | let () = let open A in x
                        ^
+<<<<<<< oxcaml
 Error: The module "A" is an alias for module "MissingModule", which is missing
+||||||| upstream-base
+Error: This is an alias for module "MissingModule", which is missing
+=======
+Error: This is an alias for module MissingModule, which is missing
+>>>>>>> upstream-incoming

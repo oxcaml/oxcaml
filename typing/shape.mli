@@ -49,9 +49,13 @@
     a talk about the reduction strategy
 *)
 
+<<<<<<< oxcaml
 module Layout = Jkind_types.Sort.Const
 type base_layout = Jkind_types.Sort.base
 
+||||||| upstream-base
+=======
+>>>>>>> upstream-incoming
 (** A [Uid.t] is associated to every declaration in signatures and
     implementations. They uniquely identify bindings in the program. When
     associated with these bindings' locations they are useful to external tools
@@ -60,19 +64,33 @@ type base_layout = Jkind_types.Sort.base
 module Uid : sig
   type t = private
     | Compilation_unit of string
+<<<<<<< oxcaml
     | Item of {
         comp_unit: string;
         id: int;
         from: Unit_info.intf_or_impl }
+||||||| upstream-base
+    | Item of { comp_unit: string; id: int }
+=======
+    | Item of { comp_unit: string; id: int; from: Unit_info.intf_or_impl }
+>>>>>>> upstream-incoming
     | Internal
     | Predef of string
     | Unboxed_version of t
 
   val reinit : unit -> unit
 
+<<<<<<< oxcaml
   val mk : current_unit:Unit_info.t option -> t
   val of_compilation_unit_id : Compilation_unit.t -> t
   val of_compilation_unit_name : Compilation_unit.Name.t -> t
+||||||| upstream-base
+  val mk : current_unit:string -> t
+  val of_compilation_unit_id : Ident.t -> t
+=======
+  val mk : current_unit:(Unit_info.t option) -> t
+  val of_compilation_unit_id : Ident.t -> t
+>>>>>>> upstream-incoming
   val of_predef_id : Ident.t -> t
   val internal_not_actually_unique : t
   val unboxed_version : t -> t
@@ -107,7 +125,11 @@ module Sig_component_kind : sig
     | Type
     | Constructor
     | Label
+<<<<<<< oxcaml
     | Unboxed_label
+||||||| upstream-base
+=======
+>>>>>>> upstream-incoming
     | Module
     | Module_type
     | Extension_constructor
@@ -135,7 +157,11 @@ module Item : sig
   val type_ : Ident.t -> t
   val constr : Ident.t -> t
   val label : Ident.t -> t
+<<<<<<< oxcaml
   val unboxed_label : Ident.t -> t
+||||||| upstream-base
+=======
+>>>>>>> upstream-incoming
   val module_ : Ident.t -> t
   val module_type : Ident.t -> t
   val extension_constructor : Ident.t -> t
@@ -144,12 +170,16 @@ module Item : sig
 
   val print : Format.formatter -> t -> unit
 
+<<<<<<< oxcaml
   val compare : t -> t -> int
 
   val is_constructor : t -> bool
   val is_label : t -> bool
   val is_unboxed_label : t -> bool
 
+||||||| upstream-base
+=======
+>>>>>>> upstream-incoming
   module Map : Map.S with type key = t
 end
 
@@ -228,7 +258,13 @@ module Predef : sig
 end
 
 type var = Ident.t
+<<<<<<< oxcaml
 type t = private { hash: int; uid: Uid.t option; desc: desc; approximated: bool }
+||||||| upstream-base
+type t = { uid: Uid.t option; desc: desc }
+=======
+type t = { uid: Uid.t option; desc: desc; approximated: bool }
+>>>>>>> upstream-incoming
 and desc =
   | Var of var
   | Abs of var * t
@@ -239,6 +275,7 @@ and desc =
   | Proj of t * Item.t
   | Comp_unit of string
   | Error of string
+<<<<<<< oxcaml
 
   (* constructors for types *)
   | Constr of Ident.t * t list
@@ -334,11 +371,15 @@ and constructor_representation = mixed_product_shape
 and mixed_product_shape = Layout.t array
 
 
+||||||| upstream-base
+=======
+>>>>>>> upstream-incoming
 
 val print : Format.formatter -> t -> unit
 
 val strip_head_aliases : t -> t
 
+<<<<<<< oxcaml
 val equal : t -> t -> bool
 
 val equal_record_kind : record_kind -> record_kind -> bool
@@ -346,6 +387,9 @@ val equal_record_kind : record_kind -> record_kind -> bool
 val equal_complex_constructor :
   ('a -> 'a -> bool) -> 'a complex_constructor -> 'a complex_constructor -> bool
 
+||||||| upstream-base
+=======
+>>>>>>> upstream-incoming
 (* Smart constructors *)
 
 val for_unnamed_functor_param : var
@@ -357,7 +401,11 @@ val abs : ?uid:Uid.t -> var -> t -> t
 val app : ?uid:Uid.t -> t -> arg:t -> t
 val str : ?uid:Uid.t -> t Item.Map.t -> t
 val alias : ?uid:Uid.t -> t -> t
+<<<<<<< oxcaml
 val error : ?uid:Uid.t -> string -> t
+||||||| upstream-base
+=======
+>>>>>>> upstream-incoming
 val proj : ?uid:Uid.t -> t -> Item.t -> t
 val leaf : Uid.t -> t
 val leaf' : Uid.t option -> t
@@ -427,9 +475,13 @@ module Map : sig
   val add_label : t -> Ident.t -> Uid.t -> t
   val add_label_proj : t -> Ident.t -> shape -> t
 
+<<<<<<< oxcaml
   val add_unboxed_label : t -> Ident.t -> Uid.t -> t
   val add_unboxed_label_proj : t -> Ident.t -> shape -> t
 
+||||||| upstream-base
+=======
+>>>>>>> upstream-incoming
   val add_module : t -> Ident.t -> shape -> t
   val add_module_proj : t -> Ident.t -> shape -> t
 
@@ -457,6 +509,7 @@ val of_path :
   namespace:Sig_component_kind.t -> Path.t -> t
 
 val set_uid_if_none : t -> Uid.t -> t
+<<<<<<< oxcaml
 
 module Cache : Hashtbl.S with type key = t
 
@@ -472,3 +525,30 @@ module DeBruijn_env : sig
 
   val get_opt : 'a t -> de_bruijn_index:DeBruijn_index.t -> 'a option
 end
+||||||| upstream-base
+
+(** The [Make_reduce] functor is used to generate a reduction function for
+    shapes.
+
+    It is parametrized by:
+    - an environment and a function to find shapes by path in that environment
+    - a function to load the shape of an external compilation unit
+    - some fuel, which is used to bound recursion when dealing with recursive
+      shapes introduced by recursive modules. (FTR: merlin currently uses a
+      fuel of 10, which seems to be enough for most practical examples)
+*)
+module Make_reduce(Context : sig
+    type env
+
+    val fuel : int
+
+    val read_unit_shape : unit_name:string -> t option
+
+    val find_shape : env -> Ident.t -> t
+  end) : sig
+  val reduce : Context.env -> t -> t
+end
+
+val local_reduce : t -> t
+=======
+>>>>>>> upstream-incoming

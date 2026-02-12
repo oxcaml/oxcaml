@@ -39,13 +39,18 @@
 #include "caml/startup_aux.h"
 #include "caml/sys.h"
 
-extern int caml_parser_trace;
 extern char caml_system__code_begin, caml_system__code_end;
 /* The two symbols above are defined in runtime/$ARCH.S.
    They use the old `__` separator convention because the new convention
+<<<<<<< oxcaml
    gives `caml_system__code_begin`, which is not a valid C identifier. */
 
 extern uintnat caml_prelinking_in_use;
+||||||| upstream-base
+   gives `caml_system.code_begin`, which is not a valid C identifier. */
+=======
+   gives `caml_system$code_begin`, which is not a valid C identifier. */
+>>>>>>> upstream-incoming
 
 /* Initialize the static data and code area limits. */
 
@@ -55,8 +60,8 @@ static void init_segments(void)
 {
   extern struct segment caml_code_segments[];
   char * caml_code_area_start, * caml_code_area_end;
-  int i;
 
+<<<<<<< oxcaml
   if (caml_prelinking_in_use) {
     /* Register each segment as a separate code fragment */
     for (i = 0; caml_code_segments[i].begin != 0; i++) {
@@ -77,6 +82,23 @@ static void init_segments(void)
     caml_register_code_fragment(caml_code_area_start,
                                 caml_code_area_end,
                                 DIGEST_LATER, NULL);
+||||||| upstream-base
+  caml_code_area_start = caml_code_segments[0].begin;
+  caml_code_area_end = caml_code_segments[0].end;
+  for (i = 1; caml_code_segments[i].begin != 0; i++) {
+    if (caml_code_segments[i].begin < caml_code_area_start)
+      caml_code_area_start = caml_code_segments[i].begin;
+    if (caml_code_segments[i].end > caml_code_area_end)
+      caml_code_area_end = caml_code_segments[i].end;
+=======
+  caml_code_area_start = caml_code_segments[0].begin;
+  caml_code_area_end = caml_code_segments[0].end;
+  for (int i = 1; caml_code_segments[i].begin != 0; i++) {
+    if (caml_code_segments[i].begin < caml_code_area_start)
+      caml_code_area_start = caml_code_segments[i].begin;
+    if (caml_code_segments[i].end > caml_code_area_end)
+      caml_code_area_end = caml_code_segments[i].end;
+>>>>>>> upstream-incoming
   }
   /* Also register the glue code written in assembly */
   caml_register_code_fragment(&caml_system__code_begin,
@@ -98,7 +120,7 @@ extern void caml_install_invalid_parameter_handler(void);
 
 value caml_startup_common(char_os **argv, int pooling)
 {
-  char_os * exe_name, * proc_self_exe;
+  const char_os * exe_name, * proc_self_exe;
   value res;
 
   caml_init_os_params();
@@ -106,11 +128,18 @@ value caml_startup_common(char_os **argv, int pooling)
   /* Determine options */
   caml_parse_ocamlrunparam();
 
+<<<<<<< oxcaml
 #ifdef DEBUG
   // Silenced in oxcaml to make it easier to run tests that
   // check program output.
   // CAML_GC_MESSAGE (ANY, "### OCaml runtime: debug mode ###\n");
 #endif
+||||||| upstream-base
+#ifdef DEBUG
+  caml_gc_message (-1, "### OCaml runtime: debug mode ###\n");
+#endif
+=======
+>>>>>>> upstream-incoming
   if (caml_params->cleanup_on_exit)
     pooling = 1;
   if (!caml_startup_aux(pooling))

@@ -20,6 +20,7 @@ open Misc
 open Asttypes
 open Primitive
 open Types
+open Data_types
 open Typedtree
 open Typeopt
 open Lambda
@@ -43,6 +44,7 @@ type error =
 exception Error of Location.t * error
 
 let use_dup_for_constant_mutable_arrays_bigger_than = 4
+<<<<<<< oxcaml
 
 let layout_exp sort e = layout e.exp_env e.exp_loc sort e.exp_type
 let layout_pat sort p = layout p.pat_env p.pat_loc sort p.pat_type
@@ -69,6 +71,10 @@ let field_offset_for_label lbl =
   | Record_inlined (_, Constructor_mixed _, Variant_with_null)
   | Record_mixed _ ->
       lbl.lbl_pos
+||||||| upstream-base
+let use_dup_for_constant_arrays_bigger_than = 4
+=======
+>>>>>>> upstream-incoming
 
 (* Forward declaration -- to be filled in by Translmod.transl_module *)
 let transl_module =
@@ -89,7 +95,13 @@ let prim_fresh_oo_id =
 let transl_extension_constructor ~scopes env path ext =
   let path =
     Printtyp.wrap_printing_env env ~error:true (fun () ->
+<<<<<<< oxcaml
       Option.map (Printtyp.rewrite_double_underscore_longidents env) path)
+||||||| upstream-base
+      Option.map (Printtyp.rewrite_double_underscore_paths env) path)
+=======
+      Option.map (Out_type.rewrite_double_underscore_paths env) path)
+>>>>>>> upstream-incoming
   in
   let name =
     match path with
@@ -299,8 +311,16 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
 
 let rec iter_exn_names f pat =
   match pat.pat_desc with
+<<<<<<< oxcaml
   | Tpat_var (id, _, _, _, _) -> f id
   | Tpat_alias (p, id, _, _, _, _, _) ->
+||||||| upstream-base
+  | Tpat_var (id, _) -> f id
+  | Tpat_alias (p, id, _) ->
+=======
+  | Tpat_var (id, _, _) -> f id
+  | Tpat_alias (p, id, _, _, _) ->
+>>>>>>> upstream-incoming
       f id;
       iter_exn_names f p
   | _ -> ()
@@ -315,6 +335,7 @@ let transl_ident loc env ty path desc kind =
       transl_value_path loc env path
   |  _ -> fatal_error "Translcore.transl_exp: bad Texp_ident"
 
+<<<<<<< oxcaml
 let can_apply_primitive p pmode pos args =
   let is_omitted = function
     | Arg _ -> false
@@ -366,6 +387,17 @@ let zero_alloc_of_application
 
 let rec transl_exp ~scopes sort e =
   transl_exp1 ~scopes ~in_new_scope:false sort e
+||||||| upstream-base
+let rec transl_exp ~scopes e =
+  transl_exp1 ~scopes ~in_new_scope:false e
+=======
+let is_omitted = function
+  | Arg _ -> false
+  | Omitted () -> true
+
+let rec transl_exp ~scopes e =
+  transl_exp1 ~scopes ~in_new_scope:false e
+>>>>>>> upstream-incoming
 
 (* ~in_new_scope tracks whether we just opened a new scope.
 
@@ -391,6 +423,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         e.exp_env e.exp_type path desc kind
   | Texp_constant cst -> Lconst (Const_base cst)
   | Texp_let(rec_flag, pat_expr_list, body) ->
+<<<<<<< oxcaml
       let return_layout = layout_exp sort body in
       transl_let ~scopes ~return_layout rec_flag pat_expr_list
         (event_before ~scopes body (transl_exp ~scopes sort body))
@@ -419,6 +452,39 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
           in
           (x, arg_sort) :: arg_exps, extra_args
         | _, ((_, Omitted _) :: _) -> assert false
+||||||| upstream-base
+      transl_let ~scopes rec_flag pat_expr_list
+        (event_before ~scopes body (transl_exp ~scopes body))
+  | Texp_function (params, body) ->
+      let scopes =
+        if in_new_scope then scopes
+        else enter_anonymous_function ~scopes
+      in
+      transl_function ~scopes e params body
+  | Texp_apply({ exp_desc = Texp_ident(path, _, {val_kind = Val_prim p});
+                exp_type = prim_type } as funct, oargs)
+    when List.length oargs >= p.prim_arity
+    && List.for_all (fun (_, arg) -> arg <> None) oargs ->
+      let argl, extra_args = cut p.prim_arity oargs in
+      let arg_exps =
+         List.map (function _, Some x -> x | _ -> assert false) argl
+=======
+      transl_let ~scopes rec_flag pat_expr_list
+        (event_before ~scopes body (transl_exp ~scopes body))
+  | Texp_function (params, body) ->
+      let scopes =
+        if in_new_scope then scopes
+        else enter_anonymous_function ~scopes
+      in
+      transl_function ~scopes e params body
+  | Texp_apply({ exp_desc = Texp_ident(path, _, {val_kind = Val_prim p});
+                exp_type = prim_type } as funct, oargs)
+    when List.length oargs >= p.prim_arity
+    && List.for_all (fun (_, arg) -> not (is_omitted arg)) oargs ->
+      let argl, extra_args = cut p.prim_arity oargs in
+      let arg_exps =
+         List.map (function _, Arg x -> x | _, Omitted () -> assert false) argl
+>>>>>>> upstream-incoming
       in
       let arg_exps, extra_args = cut_args p.prim_native_repr_args oargs in
       let args = transl_list ~scopes arg_exps in
@@ -474,6 +540,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       in
       event_after ~scopes e
         (transl_apply ~scopes ~tailcall ~inlined ~specialised
+<<<<<<< oxcaml
            ~assume_zero_alloc
            ~result_layout
            ~position ~mode (transl_exp ~scopes Jkind.Sort.Const.for_function funct)
@@ -498,6 +565,53 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         transl_value_list_with_shape ~scopes
           (List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) el)
       in
+||||||| upstream-base
+           (transl_exp ~scopes funct) oargs (of_location ~scopes e.exp_loc))
+  | Texp_match(arg, pat_expr_list, partial) ->
+      transl_match ~scopes e arg pat_expr_list partial
+  | Texp_try(body, pat_expr_list) ->
+      let id = Typecore.name_cases "exn" pat_expr_list in
+      Ltrywith(transl_exp ~scopes body, id,
+               Matching.for_trywith ~scopes e.exp_loc (Lvar id)
+                 (transl_cases_try ~scopes pat_expr_list))
+  | Texp_tuple el ->
+      let ll, shape = transl_list_with_shape ~scopes el in
+=======
+           (transl_exp ~scopes funct) oargs (of_location ~scopes e.exp_loc))
+  | Texp_match(arg, pat_expr_list, [], partial) ->
+      transl_match ~scopes e arg pat_expr_list partial
+  | Texp_match(arg, pat_expr_list, eff_pat_expr_list, partial) ->
+  (* need to separate the values from exceptions for transl_handler *)
+      let split_case (val_cases, exn_cases as acc)
+            ({ c_lhs; c_rhs } as case) =
+        if c_rhs.exp_desc = Texp_unreachable then acc else
+        let val_pat, exn_pat = split_pattern c_lhs in
+        match val_pat, exn_pat with
+        | None, None -> assert false
+        | Some pv, None ->
+            { case with c_lhs = pv } :: val_cases, exn_cases
+        | None, Some pe ->
+            val_cases, { case with c_lhs = pe } :: exn_cases
+        | Some pv, Some pe ->
+            { case with c_lhs = pv } :: val_cases,
+            { case with c_lhs = pe } :: exn_cases
+      in
+      let pat_expr_list, exn_pat_expr_list =
+        let x, y = List.fold_left split_case ([], []) pat_expr_list in
+        List.rev x, List.rev y
+      in
+      transl_handler ~scopes e arg (Some (pat_expr_list, partial))
+        exn_pat_expr_list eff_pat_expr_list
+  | Texp_try(body, pat_expr_list, []) ->
+      let id = Typecore.name_cases "exn" pat_expr_list in
+      Ltrywith(transl_exp ~scopes body, id,
+               Matching.for_trywith ~scopes e.exp_loc (Lvar id)
+                 (transl_cases_try ~scopes pat_expr_list))
+  | Texp_try(body, exn_pat_expr_list, eff_pat_expr_list) ->
+      transl_handler ~scopes e body None exn_pat_expr_list eff_pat_expr_list
+  | Texp_tuple el ->
+      let ll, shape = transl_list_with_shape ~scopes (List.map snd el) in
+>>>>>>> upstream-incoming
       begin try
         Lconst(Const_block(0, List.map extract_constant ll))
       with Not_constant ->
@@ -653,6 +767,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       transl_record ~scopes e.exp_loc e.exp_env
         (Option.map transl_alloc_mode alloc_mode)
         fields representation extended_expression
+<<<<<<< oxcaml
   | Texp_record_unboxed_product
         {fields; representation; extended_expression } ->
       transl_record_unboxed_product ~scopes e.exp_loc e.exp_env
@@ -845,13 +960,114 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let imm_array = makearray Immutable in
       let lambda_arr_mut : Lambda.mutable_flag =
         if Types.is_mutable amut then Mutable else Immutable
+||||||| upstream-base
+  | Texp_field(arg, _, lbl) ->
+      let targ = transl_exp ~scopes arg in
+      begin match lbl.lbl_repres with
+          Record_regular | Record_inlined _ ->
+          Lprim (Pfield (lbl.lbl_pos, maybe_pointer e, lbl.lbl_mut), [targ],
+                 of_location ~scopes e.exp_loc)
+        | Record_unboxed _ -> targ
+        | Record_float ->
+          Lprim (Pfloatfield lbl.lbl_pos, [targ],
+                 of_location ~scopes e.exp_loc)
+        | Record_extension _ ->
+          Lprim (Pfield (lbl.lbl_pos + 1, maybe_pointer e, lbl.lbl_mut), [targ],
+                 of_location ~scopes e.exp_loc)
+      end
+  | Texp_setfield(arg, _, lbl, newval) ->
+      let access =
+        match lbl.lbl_repres with
+          Record_regular
+        | Record_inlined _ ->
+          Psetfield(lbl.lbl_pos, maybe_pointer newval, Assignment)
+        | Record_unboxed _ -> assert false
+        | Record_float -> Psetfloatfield (lbl.lbl_pos, Assignment)
+        | Record_extension _ ->
+          Psetfield (lbl.lbl_pos + 1, maybe_pointer newval, Assignment)
+=======
+  | Texp_atomic_loc (arg, _, lbl) ->
+      let shape = Some [Typeopt.value_kind arg.exp_env arg.exp_type; Pintval] in
+      let (arg, lbl) = transl_atomic_loc ~scopes arg lbl in
+      let loc = of_location ~scopes e.exp_loc in
+      Lprim (Pmakeblock (0, Immutable, shape), [arg; lbl], loc)
+  | Texp_field (arg, _, ({ lbl_atomic = Atomic; _ } as lbl)) ->
+      let arg, lbl = transl_atomic_loc ~scopes arg lbl in
+      let loc = of_location ~scopes e.exp_loc in
+      Lprim (Patomic_load, [arg; lbl], loc)
+  | Texp_field (arg, _, lbl) ->
+      let targ = transl_exp ~scopes arg in
+      begin match lbl.lbl_repres with
+          Record_regular | Record_inlined _ ->
+          Lprim (Pfield (lbl.lbl_pos, maybe_pointer e, lbl.lbl_mut), [targ],
+                 of_location ~scopes e.exp_loc)
+        | Record_unboxed _ -> targ
+        | Record_float ->
+          Lprim (Pfloatfield lbl.lbl_pos, [targ],
+                 of_location ~scopes e.exp_loc)
+        | Record_extension _ ->
+          Lprim (Pfield (lbl.lbl_pos + 1, maybe_pointer e, lbl.lbl_mut), [targ],
+                 of_location ~scopes e.exp_loc)
+      end
+  | Texp_setfield (arg, _, ({ lbl_atomic = Atomic; _ } as lbl), newval) ->
+      let prim =
+        Primitive.simple
+          ~name:"caml_atomic_exchange_field" ~arity:3 ~alloc:false
       in
+      let arg, lbl = transl_atomic_loc ~scopes arg lbl in
+      let newval = transl_exp ~scopes newval in
+      let loc = of_location ~scopes e.exp_loc in
+      Lprim (
+        Pignore,
+        [Lprim (Pccall prim, [arg; lbl; newval], loc)],
+        loc
+      )
+  | Texp_setfield(arg, _, lbl, newval) ->
+      let access =
+        match lbl.lbl_repres with
+          Record_regular
+        | Record_inlined _ ->
+          Psetfield(lbl.lbl_pos, maybe_pointer newval, Assignment)
+        | Record_unboxed _ -> assert false
+        | Record_float -> Psetfloatfield (lbl.lbl_pos, Assignment)
+        | Record_extension _ ->
+          Psetfield (lbl.lbl_pos + 1, maybe_pointer newval, Assignment)
+>>>>>>> upstream-incoming
+      in
+<<<<<<< oxcaml
+||||||| upstream-base
+      Lprim(access, [transl_exp ~scopes arg; transl_exp ~scopes newval],
+            of_location ~scopes e.exp_loc)
+  | Texp_array expr_list ->
+      let kind = array_kind e in
+      let ll = transl_list ~scopes expr_list in
+=======
+      Lprim(access, [transl_exp ~scopes arg; transl_exp ~scopes newval],
+            of_location ~scopes e.exp_loc)
+  | Texp_array (amut, expr_list) ->
+      let kind = array_kind e in
+      let ll = transl_list ~scopes expr_list in
+      let loc = of_location ~scopes e.exp_loc in
+      let makearray mutability =
+        Lprim (Pmakearray (kind, mutability), ll, loc)
+      in
+      let duparray_to_mutable array =
+        Lprim (Pduparray (kind, Mutable), [array], loc)
+      in
+      let imm_array = makearray Immutable in
+>>>>>>> upstream-incoming
       begin try
         (* For native code the decision as to which compilation strategy to
            use is made later.  This enables the Flambda passes to lift certain
            kinds of array definitions to symbols. *)
         (* Deactivate constant optimization if array is small enough *)
+<<<<<<< oxcaml
         if Types.is_mutable amut &&
+||||||| upstream-base
+        if List.length ll <= use_dup_for_constant_arrays_bigger_than
+=======
+        if amut = Asttypes.Mutable &&
+>>>>>>> upstream-incoming
            List.length ll <= use_dup_for_constant_mutable_arrays_bigger_than
         then begin
           raise Not_constant
@@ -860,7 +1076,23 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         if is_local_mode mode then raise Not_constant;
         begin match List.map extract_constant ll with
         | exception Not_constant
+<<<<<<< oxcaml
           when kind = Pfloatarray && Types.is_mutable amut ->
+||||||| upstream-base
+        | exception Not_constant when kind = Pfloatarray ->
+            (* We cannot currently lift [Pintarray] arrays safely in Flambda
+               because [caml_modify] might be called upon them (e.g. from
+               code operating on polymorphic arrays, or functions such as
+               [caml_array_blit].
+               To avoid having different Lambda code for
+               bytecode/Closure vs.  Flambda, we always generate
+               [Pduparray] here, and deal with it in [Bytegen] (or in
+               the case of Closure, in [Cmmgen], which already has to
+               handle [Pduparray Pmakearray Pfloatarray] in the case
+               where the array turned out to be inconstant).
+=======
+          when kind = Pfloatarray && amut = Asttypes.Mutable ->
+>>>>>>> upstream-incoming
             (* We cannot currently lift mutable [Pintarray] arrays safely in
                Flambda because [caml_modify] might be called upon them
                (e.g. from code operating on polymorphic arrays, or functions
@@ -876,11 +1108,20 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             duparray_to_mutable imm_array
         | cl ->
             let const =
+<<<<<<< oxcaml
               if Config.flambda2 then
                 imm_array
               else
                 match kind with
                 | Paddrarray | Pgcignorableaddrarray | Pintarray ->
+||||||| upstream-base
+            let imm_array =
+              match kind with
+              | Paddrarray | Pintarray ->
+=======
+              match kind with
+              | Paddrarray | Pintarray ->
+>>>>>>> upstream-incoming
                   Lconst(Const_block(0, cl))
                 | Pfloatarray ->
                   Lconst(Const_float_array(List.map extract_float cl))
@@ -891,10 +1132,26 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                 | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
                   Misc.fatal_error "Use flambda2 for unboxed arrays"
             in
+<<<<<<< oxcaml
             if Types.is_mutable amut then duparray_to_mutable const else const
+||||||| upstream-base
+            Lprim (Pduparray (kind, Mutable), [imm_array],
+                   of_location ~scopes e.exp_loc)
+=======
+            match amut with
+            | Mutable   -> duparray_to_mutable const
+            | Immutable -> const
+>>>>>>> upstream-incoming
         end
       with Not_constant ->
+<<<<<<< oxcaml
         makearray lambda_arr_mut
+||||||| upstream-base
+        Lprim(Pmakearray (kind, Mutable), ll,
+              of_location ~scopes e.exp_loc)
+=======
+        makearray amut
+>>>>>>> upstream-incoming
       end
   | Texp_idx (ba, uas) ->
     transl_idx ~scopes e.exp_loc e.exp_env ba uas
@@ -1082,6 +1339,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       | `Constant_or_function ->
         (* A constant expr (of type <> float if [Config.flat_float_array] is
            true) gets compiled as itself. *)
+<<<<<<< oxcaml
          transl_exp ~scopes Jkind.Sort.Const.for_lazy_body e
       | `Float_that_cannot_be_shortcut ->
           (* We don't need to wrap with Popaque: this forward
@@ -1090,7 +1348,20 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
          Lprim(Pmakelazyblock Forward_tag,
                 [transl_exp ~scopes Jkind.Sort.Const.for_lazy_body e],
                of_location ~scopes e.exp_loc)
+||||||| upstream-base
+         transl_exp ~scopes e
+      | `Float_that_cannot_be_shortcut ->
+          (* We don't need to wrap with Popaque: this forward
+             block will never be shortcutted since it points to a float
+             and Config.flat_float_array is true. *)
+          Lprim(Pmakeblock(Obj.forward_tag, Immutable, None),
+                [transl_exp ~scopes e], of_location ~scopes e.exp_loc)
+=======
+         transl_exp ~scopes e
+      | `Float_that_cannot_be_shortcut
+>>>>>>> upstream-incoming
       | `Identifier `Forward_value ->
+<<<<<<< oxcaml
          (* CR-someday mshinwell: Consider adding a new primitive
             that expresses the construction of forward_tag blocks.
             We need to use [Popaque] here to prevent unsound
@@ -1099,6 +1370,21 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             value may subsequently turn into an immediate... *)
          Lprim(Pmakelazyblock Forward_tag,
                 [transl_exp ~scopes Jkind.Sort.Const.for_lazy_body e],
+||||||| upstream-base
+         (* CR-someday mshinwell: Consider adding a new primitive
+            that expresses the construction of forward_tag blocks.
+            We need to use [Popaque] here to prevent unsound
+            optimisation in Flambda, but the concept of a mutable
+            block doesn't really match what is going on here.  This
+            value may subsequently turn into an immediate... *)
+         Lprim (Popaque,
+                [Lprim(Pmakeblock(Obj.forward_tag, Immutable, None),
+                       [transl_exp ~scopes e],
+                       of_location ~scopes e.exp_loc)],
+=======
+         Lprim (Pmakelazyblock Forward_tag,
+                [transl_exp ~scopes e],
+>>>>>>> upstream-incoming
                 of_location ~scopes e.exp_loc)
       | `Identifier `Other ->
          transl_exp ~scopes Jkind.Sort.Const.for_lazy_body e
@@ -1119,12 +1405,19 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                             *)
                             ~attr:function_attribute_disallowing_arity_fusion
                             ~loc:(of_location ~scopes e.exp_loc)
+<<<<<<< oxcaml
                             ~mode:alloc_heap
                             ~ret_mode:alloc_heap
                             ~body:(maybe_region_layout
                                      Lambda.layout_lazy_contents
                                      (transl_exp ~scopes Jkind.Sort.Const.for_lazy_body e))
          in
+||||||| upstream-base
+                            ~body:(transl_exp ~scopes e) in
+          Lprim(Pmakeblock(Config.lazy_tag, Mutable, None), [fn],
+=======
+                            ~body:(transl_exp ~scopes e) in
+>>>>>>> upstream-incoming
           Lprim(Pmakelazyblock Lazy_tag, [fn],
                 of_location ~scopes e.exp_loc)
       end
@@ -1390,13 +1683,40 @@ and transl_guard ~scopes guard rhs_sort rhs =
         (Lifthenelse(transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
                      expr, staticfail, layout))
 
+<<<<<<< oxcaml
 and transl_case ~scopes rhs_sort {c_lhs; c_guard; c_rhs} =
   (c_lhs, transl_guard ~scopes c_guard rhs_sort c_rhs)
+||||||| upstream-base
+and transl_case ~scopes {c_lhs; c_guard; c_rhs} =
+  (c_lhs, transl_guard ~scopes c_guard c_rhs)
+=======
+and transl_cont cont c_cont body =
+  match cont, c_cont with
+  | Some id1, Some id2 -> Llet(Alias, Pgenval, id2, Lvar id1, body)
+  | None, None
+  | Some _, None -> body
+  | None, Some _ -> assert false
+>>>>>>> upstream-incoming
 
+<<<<<<< oxcaml
 and transl_cases ~scopes rhs_sort cases =
+||||||| upstream-base
+and transl_cases ~scopes cases =
+=======
+and transl_case ~scopes ?cont {c_lhs; c_cont; c_guard; c_rhs} =
+  (c_lhs, transl_cont cont c_cont (transl_guard ~scopes c_guard c_rhs))
+
+and transl_cases ~scopes ?cont cases =
+>>>>>>> upstream-incoming
   let cases =
     List.filter (fun c -> c.c_rhs.exp_desc <> Texp_unreachable) cases in
+<<<<<<< oxcaml
   List.map (transl_case ~scopes rhs_sort) cases
+||||||| upstream-base
+  List.map (transl_case ~scopes) cases
+=======
+  List.map (transl_case ~scopes ?cont) cases
+>>>>>>> upstream-incoming
 
 and transl_case_try ~scopes rhs_sort {c_lhs; c_guard; c_rhs} =
   iter_exn_names Translprim.add_exception_ident c_lhs;
@@ -1487,8 +1807,16 @@ and transl_apply ~scopes
        will occur exactly when all the arguments up to this parameter
        have been received.
   *)
+<<<<<<< oxcaml
   let rec build_apply lam args loc pos ap_mode result_layout = function
     | Omitted { mode_closure; mode_arg; mode_ret; sort_arg; sort_ret } :: l ->
+||||||| upstream-base
+  let rec build_apply lam args = function
+      (None, optional) :: l ->
+=======
+  let rec build_apply lam args = function
+      (Omitted (), optional) :: l ->
+>>>>>>> upstream-incoming
         (* Out-of-order partial application; we will need to build a closure *)
         assert (pos = Rc_normal);
         let defs = ref [] in
@@ -1512,10 +1840,16 @@ and transl_apply ~scopes
            if we already passed here this is a no-op. *)
         let l =
           List.map
+<<<<<<< oxcaml
             (fun arg ->
                match arg with
                | Omitted _ -> arg
                | Arg arg -> Arg (protect "arg" arg))
+||||||| upstream-base
+          List.map (fun (arg, opt) -> Option.map (protect "arg") arg, opt) l
+=======
+            (fun (arg, opt) -> Typedtree.map_apply_arg (protect "arg") arg, opt)
+>>>>>>> upstream-incoming
             l
         in
         let id_arg = Ident.create_local "param" in
@@ -1556,10 +1890,23 @@ and transl_apply ~scopes
           (fun (id, layout, lam) body ->
           Llet(Strict, layout, id, Lambda.debug_uid_none, lam, body))
           !defs body
+<<<<<<< oxcaml
     | Arg (arg, _) :: l ->
       build_apply lam (arg :: args) loc pos ap_mode result_layout l
     | [] -> lapply lam (List.rev args) loc pos ap_mode result_layout
+||||||| upstream-base
+    | (Some arg, optional) :: l ->
+        build_apply lam ((arg, optional) :: args) l
+    | [] ->
+        lapply lam (List.rev_map fst args)
+=======
+    | (Arg arg, optional) :: l ->
+        build_apply lam ((arg, optional) :: args) l
+    | [] ->
+        lapply lam (List.rev_map fst args)
+>>>>>>> upstream-incoming
   in
+<<<<<<< oxcaml
   let args =
     List.map
       (fun (_, arg) ->
@@ -1571,6 +1918,20 @@ and transl_apply ~scopes
       sargs
   in
   build_apply lam [] loc position mode result_layout args
+||||||| upstream-base
+  (build_apply lam [] (List.map (fun (l, x) ->
+                                   Option.map (transl_exp ~scopes) x,
+                                   Btype.is_optional l)
+                                sargs)
+     : Lambda.lambda)
+=======
+  let transl_arg arg = Typedtree.map_apply_arg (transl_exp ~scopes) arg in
+  (build_apply lam [] (List.map (fun (l, arg) ->
+                                   transl_arg arg,
+                                   Btype.is_optional l)
+                                sargs)
+     : Lambda.lambda)
+>>>>>>> upstream-incoming
 
 (* There are two cases in function translation:
     - [Tupled]. It takes a tupled argument, and we can flatten it.
@@ -1605,6 +1966,7 @@ and transl_tupled_function
   =
   let eligible_cases =
     match params, body with
+<<<<<<< oxcaml
     | [],
       Tfunction_cases
         { fc_cases = { c_lhs; _ } :: _ as cases;
@@ -1616,6 +1978,21 @@ and transl_tupled_function
         let fp_sort = Jkind.Sort.default_for_transl_and_get fp_sort in
         let case = { c_lhs = pat; c_guard = None; c_rhs = body } in
         Some ([ case ], fp_partial, pat, fp_mode.mode_modes, fp_sort)
+||||||| upstream-base
+    | [], Tfunction_cases { cases; partial } ->
+        Some (cases, partial)
+    | [ { fp_kind = Tparam_pat pat; fp_partial } ], Tfunction_body body ->
+        let case = { c_lhs = pat; c_guard = None; c_rhs = body } in
+        Some ([ case ], fp_partial)
+=======
+    | [], Tfunction_cases { cases; partial } ->
+        Some (cases, partial)
+    | [ { fp_kind = Tparam_pat pat; fp_partial } ], Tfunction_body body ->
+        let case =
+          { c_lhs = pat; c_cont = None; c_guard = None; c_rhs = body }
+        in
+        Some ([ case ], fp_partial)
+>>>>>>> upstream-incoming
     | _ -> None
   in
   (* Cases can be eligible for flattening if they belong to the only param
@@ -2033,7 +2410,15 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
       let idlist =
         List.map
           (fun {vb_pat=pat} -> match pat.pat_desc with
+<<<<<<< oxcaml
               Tpat_var (id,_,uid,_,_) -> id, uid
+||||||| upstream-base
+              Tpat_var (id,_) -> id
+            | Tpat_alias ({pat_desc=Tpat_any}, id,_) -> id
+=======
+              Tpat_var (id,_,_) -> id
+            | Tpat_alias ({pat_desc=Tpat_any}, id,_,_,_) -> id
+>>>>>>> upstream-incoming
             | _ -> assert false)
         pat_expr_list in
       let transl_case
@@ -2043,12 +2428,19 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
         let def =
           transl_bound_exp ~scopes ~in_structure vb_pat vb_sort expr vb_loc vb_attributes
         in
+<<<<<<< oxcaml
         let def =
           if add_regions then maybe_region_exp vb_sort expr def else def
         in
         ( id, id_duid, rkind, def ) in
+||||||| upstream-base
+        { id; rkind; def } in
+=======
+        ( id, rkind, def ) in
+>>>>>>> upstream-incoming
       let lam_bds = List.map2 transl_case pat_expr_list idlist in
       fun body -> Value_rec_compiler.compile_letrec lam_bds body
+<<<<<<< oxcaml
 
 and transl_letmutable ~scopes ~return_layout
       {vb_pat=pat; vb_expr=expr; vb_attributes=attr; vb_loc; vb_sort} body =
@@ -2058,6 +2450,10 @@ and transl_letmutable ~scopes ~return_layout
   in
   Matching.for_let ~scopes ~return_layout ~arg_sort pat.pat_loc lam Mutable
     pat body
+||||||| upstream-base
+      fun body -> Lletrec(lam_bds, body)
+=======
+>>>>>>> upstream-incoming
 
 and transl_setinstvar ~scopes loc self var expr =
   let ptr_or_imm, _ = maybe_pointer expr in
@@ -2459,8 +2855,31 @@ and transl_idx ~scopes loc env ba uas =
            (of_location ~scopes loc))
   end
 
+<<<<<<< oxcaml
 and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
   let return_layout = layout_exp return_sort e in
+||||||| upstream-base
+and transl_match ~scopes e arg pat_expr_list partial =
+=======
+and transl_atomic_loc ~scopes arg lbl =
+  let arg = transl_exp ~scopes arg in
+  let offset =
+    match lbl.lbl_repres with
+    | Record_regular
+    | Record_inlined _ -> 0
+    | Record_float ->
+        fatal_error
+          "Translcore.transl_atomic_loc: atomic field in float record"
+    | Record_unboxed _ ->
+        fatal_error
+          "Translcore.transl_atomic_loc: atomic field in unboxed record"
+    | Record_extension _ -> 1
+  in
+  let lbl = Lconst (Const_base (Const_int (lbl.lbl_pos + offset))) in
+  (arg, lbl)
+
+and transl_match ~scopes e arg pat_expr_list partial =
+>>>>>>> upstream-incoming
   let rewrite_case (val_cases, exn_cases, static_handlers as acc)
         ({ c_lhs; c_guard; c_rhs } as case) =
     if c_rhs.exp_desc = Texp_unreachable then acc else
@@ -2486,10 +2905,22 @@ and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
         (* Simplif doesn't like it if binders are not uniq, so we make sure to
            use different names in the value and the exception branches. *)
         let ids_full = Typedtree.pat_bound_idents_full pv in
+<<<<<<< oxcaml
         let ids = List.map (fun (id, _, _, _, _) -> id) ids_full in
+||||||| upstream-base
+        let ids = List.map (fun (id, _, _) -> id) ids_full in
+=======
+        let ids = List.map (fun (id, _, _, _) -> id) ids_full in
+>>>>>>> upstream-incoming
         let ids_kinds =
+<<<<<<< oxcaml
           List.map (fun (id, {Location.loc; _}, ty, duid, s) ->
             id, duid, Typeopt.layout pv.pat_env loc s ty)
+||||||| upstream-base
+          List.map (fun (id, _, ty) -> id, Typeopt.value_kind pv.pat_env ty)
+=======
+          List.map (fun (id, _, ty, _) -> id, Typeopt.value_kind pv.pat_env ty)
+>>>>>>> upstream-incoming
             ids_full
         in
         let vids = List.map Ident.rename ids in
@@ -2549,6 +2980,7 @@ and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
          bytecode means unboxed tuple are slightly worse than normal tuples
          there. Consider adding it for unboxed tuples. *)
       assert (static_handlers = []);
+<<<<<<< oxcaml
       let mode = transl_alloc_mode alloc_mode in
       let argl =
         List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) argl
@@ -2558,6 +2990,30 @@ and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
     | {exp_desc = Texp_tuple (argl, alloc_mode)}, _ :: _ ->
         let argl =
           List.map (fun (_, a) -> (a, Jkind.Sort.Const.for_tuple_element)) argl
+||||||| upstream-base
+      Matching.for_multiple_match ~scopes e.exp_loc
+        (transl_list ~scopes argl) val_cases partial
+    | {exp_desc = Texp_tuple argl}, _ :: _ ->
+        let val_ids =
+          List.map
+            (fun arg ->
+               Typecore.name_pattern "val" [],
+               Typeopt.value_kind arg.exp_env arg.exp_type
+            )
+            argl
+=======
+      Matching.for_multiple_match ~scopes e.exp_loc
+        (transl_list ~scopes (List.map snd argl)) val_cases partial
+    | {exp_desc = Texp_tuple argl}, _ :: _ ->
+        let argl = List.map snd argl in
+        let val_ids =
+          List.map
+            (fun arg ->
+               Typecore.name_pattern "val" [],
+               Typeopt.value_kind arg.exp_env arg.exp_type
+            )
+            argl
+>>>>>>> upstream-incoming
         in
         let val_ids, lvars =
           List.map
@@ -2594,9 +3050,76 @@ and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
        handler, Same_region, return_layout)
   ) classic static_handlers
 
+<<<<<<< oxcaml
 and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
       case_sort partial =
   let rec loop prev_layout prev_lam = function
+||||||| upstream-base
+and transl_letop ~scopes loc env let_ ands param case partial =
+  let rec loop prev_lam = function
+=======
+and prim_alloc_stack =
+  Pccall (Primitive.simple ~name:"caml_alloc_stack" ~arity:3 ~alloc:true)
+
+and transl_handler ~scopes e body val_caselist exn_caselist eff_caselist =
+  let val_fun =
+    match val_caselist with
+    | None ->
+        let param = Ident.create_local "param" in
+        lfunction ~kind:Curried ~params:[param, Pgenval]
+         ~return:Pgenval ~body:(Lvar param)
+         ~attr:default_function_attribute ~loc:Loc_unknown
+    | Some (val_caselist, partial) ->
+        let val_cases = transl_cases ~scopes val_caselist in
+        let param = Typecore.name_cases "param" val_caselist in
+        let body =
+          Matching.for_function ~scopes e.exp_loc None (Lvar param) val_cases
+            partial
+        in
+        lfunction ~kind:Curried ~params:[param, Pgenval]
+          ~return:Pgenval ~attr:default_function_attribute
+          ~loc:Loc_unknown ~body
+  in
+  let exn_fun =
+    let exn_cases = transl_cases ~scopes exn_caselist in
+    let param = Typecore.name_cases "exn" exn_caselist in
+    let body = Matching.for_trywith ~scopes e.exp_loc (Lvar param) exn_cases in
+    lfunction ~kind:Curried ~params:[param, Pgenval] ~return:Pgenval
+      ~attr:default_function_attribute ~loc:Loc_unknown ~body
+  in
+  let eff_fun =
+    let param = Typecore.name_cases "eff" eff_caselist in
+    let cont = Ident.create_local "k" in
+    let cont_tail = Ident.create_local "ktail" in
+    let eff_cases = transl_cases ~scopes ~cont eff_caselist in
+    let body =
+      Matching.for_handler ~scopes e.exp_loc (Lvar param) (Lvar cont)
+        (Lvar cont_tail) eff_cases
+    in
+    lfunction ~kind:Curried
+      ~params:[(param, Pgenval); (cont, Pgenval); (cont_tail, Pgenval)]
+      ~return:Pgenval ~attr:default_function_attribute ~loc:Loc_unknown ~body
+  in
+  let (body_fun, arg) =
+    match transl_exp ~scopes body with
+    | Lapply { ap_func = fn; ap_args = [arg]; _ }
+        when is_evaluated fn && is_evaluated arg -> (fn, arg)
+    | body ->
+       let param = Ident.create_local "param" in
+       (lfunction ~kind:Curried ~params:[param, Pgenval] ~return:Pgenval
+                  ~attr:default_function_attribute ~loc:Loc_unknown
+                  ~body,
+        Lconst(Const_base(Const_int 0)))
+  in
+  let alloc_stack =
+    Lprim(prim_alloc_stack, [val_fun; exn_fun; eff_fun], Loc_unknown)
+  in
+  Lprim(Prunstack, [alloc_stack; body_fun; arg],
+        of_location ~scopes e.exp_loc)
+
+and transl_letop ~scopes loc env let_ ands param case partial =
+  let rec loop prev_lam = function
+>>>>>>> upstream-incoming
     | [] -> prev_lam
     | and_ :: rest ->
         let left_id = Ident.create_local "left" in

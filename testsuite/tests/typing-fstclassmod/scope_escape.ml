@@ -99,6 +99,29 @@ module type S = sig type t val x : t end
 Line 15, characters 8-10:
 15 |   unify ()
              ^^
+<<<<<<< oxcaml
 Error: This expression has type "unit" but an expression was expected of type
          "M.t"
+||||||| upstream-base
+Error: This expression has type "unit" but an expression was expected of type
+         "M.t"
+|}, Principal{|
+module type S = sig type t val x : t end
+Lines 8-12, characters 4-8:
+ 8 | ....(module struct
+ 9 |       type t = unit
+10 |
+11 |       let x = ()
+12 |     end)
+Warning 18 [not-principal]: this module packing is not principal.
+
+Line 15, characters 8-10:
+15 |   unify ()
+             ^^
+Error: This expression has type "unit" but an expression was expected of type
+         "M.t"
+=======
+Error: The constructor "()" has type "unit"
+       but an expression was expected of type "M.t"
+>>>>>>> upstream-incoming
 |}];;

@@ -1,6 +1,10 @@
 (* TEST
  include systhreads;
+<<<<<<< oxcaml
  flags = "-alert -unsafe_multidomain";
+||||||| upstream-base
+=======
+>>>>>>> upstream-incoming
  hassysthreads;
  {
    bytecode;
@@ -28,7 +32,13 @@ let set a =
 
 (* no-alloc printing to stdout *)
 let say msg =
+<<<<<<< oxcaml
   Unix.write Unix.stdout (Bytes.unsafe_of_string msg) 0 (String.length msg)
+||||||| upstream-base
+  Unix.write Unix.stdout (Bytes.unsafe_of_string msg) 0 (String.length msg) |> ignore
+=======
+  Unix.write_substring Unix.stdout msg 0 (String.length msg)
+>>>>>>> upstream-incoming
   |> ignore
 
 (*
@@ -105,9 +115,20 @@ let () =
   let th = Thread.create thread_fn () in
   let _:Gc.Memprof.t = Gc.Memprof.(start ~sampling_rate:1.
     { null_tracker with
+<<<<<<< oxcaml
       alloc_minor = (fun info -> if info.size = 1 then
                                      (say "    minor alloc\n"; Some ())
                                  else None);
+||||||| upstream-base
+      alloc_minor = (fun _ ->
+        say "    minor alloc\n";
+        Some ());
+      alloc_major = (fun _ ->
+        say "    major alloc\n";
+        Some "major block\n");
+=======
+      alloc_minor = (fun info -> say "    minor alloc\n"; Some ());
+>>>>>>> upstream-incoming
       alloc_major = (fun _ -> say "    major alloc\n"; Some "major block\n");
       promote = (fun () ->
         say "    promoting...\n";

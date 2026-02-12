@@ -23,6 +23,7 @@ type ('a : any mod separable) t = 'a array
 
 (* Array operations *)
 
+<<<<<<< oxcaml
 external length : ('a : value_or_null mod separable).
   ('a array[@local_opt]) @ immutable -> int @@ stateless
   = "%array_length"
@@ -54,6 +55,39 @@ external unsafe_fill : ('a : value_or_null mod separable).
   'a array -> int -> int -> 'a -> unit @@ portable = "caml_array_fill"
 external create_float : ('a : value_or_null mod separable).
   int -> float array @@ portable = "caml_array_create_float"
+||||||| upstream-base
+external length : 'a array -> int = "%array_length"
+external get: 'a array -> int -> 'a = "%array_safe_get"
+external set: 'a array -> int -> 'a -> unit = "%array_safe_set"
+external unsafe_get: 'a array -> int -> 'a = "%array_unsafe_get"
+external unsafe_set: 'a array -> int -> 'a -> unit = "%array_unsafe_set"
+external make: int -> 'a -> 'a array = "caml_make_vect"
+external create: int -> 'a -> 'a array = "caml_make_vect"
+external unsafe_sub : 'a array -> int -> int -> 'a array = "caml_array_sub"
+external append_prim : 'a array -> 'a array -> 'a array = "caml_array_append"
+external concat : 'a array list -> 'a array = "caml_array_concat"
+external unsafe_blit :
+  'a array -> int -> 'a array -> int -> int -> unit = "caml_array_blit"
+external unsafe_fill :
+  'a array -> int -> int -> 'a -> unit = "caml_array_fill"
+external create_float: int -> float array = "caml_make_float_vect"
+=======
+external length : 'a array -> int = "%array_length"
+external get: 'a array -> int -> 'a = "%array_safe_get"
+external set: 'a array -> int -> 'a -> unit = "%array_safe_set"
+external unsafe_get: 'a array -> int -> 'a = "%array_unsafe_get"
+external unsafe_set: 'a array -> int -> 'a -> unit = "%array_unsafe_set"
+external make: int -> 'a -> 'a array = "caml_array_make"
+external create: int -> 'a -> 'a array = "caml_array_make"
+external unsafe_sub : 'a array -> int -> int -> 'a array = "caml_array_sub"
+external append_prim : 'a array -> 'a array -> 'a array = "caml_array_append"
+external concat : 'a array list -> 'a array = "caml_array_concat"
+external unsafe_blit :
+  'a array -> int -> 'a array -> int -> int -> unit = "caml_array_blit"
+external unsafe_fill :
+  'a array -> int -> int -> 'a -> unit = "caml_array_fill"
+external create_float: int -> float array = "caml_array_create_float"
+>>>>>>> upstream-incoming
 
 module Floatarray = struct
   external create : int -> floatarray @@ portable = "caml_floatarray_create"
@@ -216,6 +250,23 @@ let of_list = function
         | hd::tl -> unsafe_set a i hd; fill (i+1) tl in
       fill 1 tl
 
+let equal eq a b =
+  if length a <> length b then false else
+  let i = ref 0 in
+  let len = length a in
+  while !i < len && eq (unsafe_get a !i) (unsafe_get b !i) do incr i done;
+  !i = len
+
+let stdlib_compare = compare
+let compare cmp a b =
+  let len_a = length a and len_b = length b in
+  let diff = len_a - len_b in
+  if diff <> 0 then (if diff < 0 then -1 else 1) else
+  let i = ref 0 and c = ref 0 in
+  while !i < len_a && !c = 0
+  do c := cmp (unsafe_get a !i) (unsafe_get b !i); incr i done;
+  !c
+
 let fold_left f x a =
   let r = ref x in
   for i = 0 to length a - 1 do
@@ -284,7 +335,7 @@ let mem x a =
   let n = length a in
   let rec loop i =
     if i = n then false
-    else if compare (unsafe_get a i) x = 0 then true
+    else if stdlib_compare (unsafe_get a i) x = 0 then true
     else loop (succ i) in
   loop 0
 
@@ -470,11 +521,19 @@ let stable_sort cmp a =
 
 let fast_sort = stable_sort
 
+let shuffle_contract_violation i j =
+  let int = string_of_int in
+  invalid_arg
+    ("Array.shuffle: 'rand " ^ int (i + 1) ^
+     "' returned " ^ int j ^
+     ", out of expected range [0; " ^ int i ^ "]")
+
 let shuffle ~rand a = (* Fisher-Yates *)
   for i = length a - 1 downto 1 do
     let j = rand (i + 1) in
+    if not (0 <= j && j <= i) then shuffle_contract_violation i j;
     let v = unsafe_get a i in
-    unsafe_set a i (get a j);
+    unsafe_set a i (unsafe_get a j);
     unsafe_set a j v
   done
 

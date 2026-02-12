@@ -28,11 +28,12 @@
 #include <sys/stat.h>
 #ifdef _WIN32
 #include <direct.h> /* for _wchdir and _wgetcwd */
+#include <io.h> /* for _wopen and close */
 #else
 #include <sys/wait.h>
 #endif
 #include "caml/config.h"
-#ifdef HAS_UNISTD
+#ifndef _WIN32
 #include <unistd.h>
 #endif
 #ifdef HAS_TIMES
@@ -45,8 +46,8 @@
 #ifdef HAS_GETTIMEOFDAY
 #include <sys/time.h>
 #endif
-#ifdef __APPLE__
-#include <sys/random.h> /* for getentropy */
+#if defined(HAS_GETENTROPY) && defined(__APPLE__)
+#include <sys/random.h>
 #endif
 #include "caml/alloc.h"
 #include "caml/debugger.h"
@@ -181,6 +182,7 @@ CAMLexport void caml_do_exit(int retcode)
           "forced_major_collections: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
           (intnat)s.alloc_stats.forced_major_collections);
       CAML_GC_MESSAGE(STATS,
+<<<<<<< oxcaml
           "compactions: %"ARCH_INTNAT_PRINTF_FORMAT"u\n",
           atomic_load(&caml_compactions_count));
       CAML_GC_MESSAGE(STATS,
@@ -194,6 +196,20 @@ CAMLexport void caml_do_exit(int retcode)
                       s.global_stats.chunk_words);
       CAML_GC_MESSAGE(STATS, "max chunk_words: %"ARCH_INTNAT_PRINTF_FORMAT"u\n",
                       s.global_stats.max_chunk_words);
+||||||| upstream-base
+      caml_gc_message(0x400, "heap_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+                    heap_words);
+      caml_gc_message(0x400, "top_heap_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+                      top_heap_words);
+      caml_gc_message(0x400, "mean_space_overhead: %lf\n",
+                      caml_mean_space_overhead());
+=======
+          "heap_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+          heap_words);
+      CAML_GC_MESSAGE(STATS,
+          "top_heap_words: %"ARCH_INTNAT_PRINTF_FORMAT"d\n",
+          top_heap_words);
+>>>>>>> upstream-incoming
     }
   }
 
@@ -515,7 +531,7 @@ CAMLprim value caml_sys_executable_name(value unit)
   return caml_copy_string_of_os(caml_params->exe_name);
 }
 
-void caml_sys_init(char_os * exe_name, char_os **argv)
+void caml_sys_init(const char_os * exe_name, char_os **argv)
 {
 #ifdef _WIN32
   /* Initialises the caml_win32_* globals on Windows with the version of
@@ -576,19 +592,19 @@ double caml_sys_time_include_children_unboxed(value include_children)
 {
 #ifdef HAS_GETRUSAGE
   struct rusage ru;
-  double acc = 0.;
+  double sec = 0.;
 
   getrusage (RUSAGE_SELF, &ru);
-  acc += ru.ru_utime.tv_sec + ru.ru_utime.tv_usec / 1e6
-    + ru.ru_stime.tv_sec + ru.ru_stime.tv_usec / 1e6;
+  sec += ru.ru_utime.tv_sec + (double) ru.ru_utime.tv_usec / USEC_PER_SEC
+      +  ru.ru_stime.tv_sec + (double) ru.ru_stime.tv_usec / USEC_PER_SEC;
 
   if (Bool_val(include_children)) {
     getrusage (RUSAGE_CHILDREN, &ru);
-    acc += ru.ru_utime.tv_sec + ru.ru_utime.tv_usec / 1e6
-      + ru.ru_stime.tv_sec + ru.ru_stime.tv_usec / 1e6;
+    sec += ru.ru_utime.tv_sec + (double) ru.ru_utime.tv_usec / USEC_PER_SEC
+        +  ru.ru_stime.tv_sec + (double) ru.ru_stime.tv_usec / USEC_PER_SEC;
   }
 
-  return acc;
+  return sec;
 #else
   #ifdef HAS_TIMES
     #ifndef CLK_TCK
@@ -630,55 +646,51 @@ CAMLprim value caml_sys_time(value unit)
 }
 
 #ifdef _WIN32
-extern int caml_win32_random_seed (intnat data[16]);
+extern int caml_win32_random_seed(intnat data[16]);
 #else
 int caml_unix_random_seed(intnat data[16])
 {
-  int n = 0;
+  unsigned n = 0;
   unsigned char buffer[12];
   int nread = 0;
 
   /* Try kernel entropy first */
-#if defined(HAS_GETENTROPY) || defined(__APPLE__)
-  if (getentropy(buffer, 12) != -1) {
-    nread = 12;
+#ifdef HAS_GETENTROPY
+  if (getentropy(buffer, sizeof(buffer)) != -1) {
+    nread = sizeof(buffer);
   } else
 #endif
   { int fd = open("/dev/urandom", O_RDONLY, 0);
     if (fd != -1) {
-      nread = read(fd, buffer, 12);
+      nread = read(fd, buffer, sizeof(buffer));
       close(fd);
     }
   }
   while (nread > 0) data[n++] = buffer[--nread];
   /* If the kernel provided enough entropy, we now have 96 bits
      of good random data and can stop here. */
-  if (n >= 12) return n;
+  if (n >= sizeof(buffer)) return n;
 
   /* Otherwise, complement whatever we got (probably nothing)
      with some not-very-random data. */
-  {
 #ifdef HAS_GETTIMEOFDAY
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    if (n < 16) data[n++] = tv.tv_usec;
-    if (n < 16) data[n++] = tv.tv_sec;
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  if (n < 16) data[n++] = tv.tv_usec;
+  if (n < 16) data[n++] = tv.tv_sec;
 #else
-    if (n < 16) data[n++] = time(NULL);
+  if (n < 16) data[n++] = time(NULL);
 #endif
-#ifdef HAS_UNISTD
-    if (n < 16) data[n++] = getpid();
-    if (n < 16) data[n++] = getppid();
-#endif
-    return n;
-  }
+  if (n < 16) data[n++] = getpid();
+  if (n < 16) data[n++] = getppid();
+  return n;
 }
 #endif
 
-CAMLprim value caml_sys_random_seed (value unit)
+CAMLprim value caml_sys_random_seed(value unit)
 {
   intnat data[16];
-  int n, i;
+  int n;
   value res;
 #ifdef _WIN32
   n = caml_win32_random_seed(data);
@@ -687,7 +699,7 @@ CAMLprim value caml_sys_random_seed (value unit)
 #endif
   /* Convert to an OCaml array of ints */
   res = caml_alloc_small(n, 0);
-  for (i = 0; i < n; i++) Field(res, i) = Val_long(data[i]);
+  for (int i = 0; i < n; i++) Field(res, i) = Val_long(data[i]);
   return res;
 }
 
@@ -839,5 +851,17 @@ CAMLprim value caml_xdg_defaults(value unit)
   return caml_win32_xdg_defaults();
 #else
   return Val_emptylist;
+#endif
+}
+
+/* On Windows, returns the path to a directory suitable for storing
+   temporary files. On Unix, this path is more easily computed in
+   OCaml, so the string returned by the primitive is empty. */
+CAMLprim value caml_sys_temp_dir_name(value unit)
+{
+#ifdef _WIN32
+  return caml_win32_get_temp_path();
+#else
+  return caml_copy_string("");
 #endif
 }

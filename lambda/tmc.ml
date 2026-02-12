@@ -666,8 +666,20 @@ let rec choice ctx t =
            we need to remove the exception handler) *)
         let+ l1 = choice ctx ~tail:false l1
         and+ l2 = choice ctx ~tail l2 in
+<<<<<<< oxcaml
         Ltrywith (l1, id, id_duid, l2, kind)
     | Lstaticcatch (l1, ids, l2, r, kind) ->
+||||||| upstream-base
+           we need to remove the exception handler),
+           so it is not transformed here *)
+        let l1 = traverse ctx l1 in
+        let+ l2 = choice ctx ~tail l2 in
+        Ltrywith (l1, id, l2)
+    | Lstaticcatch (l1, ids, l2) ->
+=======
+        Ltrywith (l1, id, l2)
+    | Lstaticcatch (l1, ids, l2) ->
+>>>>>>> upstream-incoming
         (* In [static-catch l1 with ids -> l2],
            the term [l1] is in fact in tail-position *)
         let+ l1 = choice ctx ~tail l1
@@ -874,7 +886,20 @@ let rec choice ctx t =
           |  [l1] -> l1
           | _ -> invalid_arg "choice_prim" in
         let+ l1 = choice ctx ~tail l1 in
+<<<<<<< oxcaml
         Lprim (Popaque layout, [l1], loc)
+||||||| upstream-base
+        Lprim (Popaque, [l1], loc)
+    | (Psequand | Psequor) as shortcutop ->
+        let l1, l2 = match primargs with
+          |  [l1; l2] -> l1, l2
+          | _ -> invalid_arg "choice_prim" in
+        let l1 = traverse ctx l1 in
+        let+ l2 = choice ctx ~tail l2 in
+        Lprim (shortcutop, [l1; l2], loc)
+=======
+        Lprim (Popaque, [l1], loc)
+>>>>>>> upstream-incoming
 
     (* in common cases we just return *)
     | Pphys_equal _
@@ -910,6 +935,7 @@ let rec choice ctx t =
     | Pdls_get | Ptls_get | Pdomain_index
 
     (* we don't handle atomic primitives *)
+<<<<<<< oxcaml
     | Patomic_exchange_field _ | Patomic_compare_exchange_field _
     | Patomic_compare_set_field _ | Patomic_fetch_add_field
     | Patomic_add_field | Patomic_sub_field | Patomic_land_field
@@ -921,6 +947,11 @@ let rec choice ctx t =
 
     (* it doesn't seem worth it to support lazy blocks for tmc *)
     | Pmakelazyblock _
+||||||| upstream-base
+    | Patomic_exchange | Patomic_cas | Patomic_fetch_add | Patomic_load _
+=======
+    | Patomic_load
+>>>>>>> upstream-incoming
 
     (* we don't handle array indices as destinations yet *)
     | (Pmakearray _ | Pduparray _ | Pmakearray_dynamic _)
@@ -942,6 +973,13 @@ let rec choice ctx t =
     | Pobj_dup
     | Pobj_magic _
     | Pprobe_is_enabled _
+
+    (* Lazy blocks should never contain a recursive call directly:
+       either it's a closure (Lazy_tag), or a variable (Forward_tag).
+       The case 'let foo = recursive_call in lazy foo' could be translated to
+       use tmc in the cases where 'foo' might be of type lazy or float, but
+       given the fragility of such a transformation we choose not to. *)
+    | Pmakelazyblock _
 
     (* more common cases... *)
     | Pbigarrayref _ | Pbigarrayset _
@@ -983,6 +1021,7 @@ let rec choice ctx t =
     | Punboxed_nativeint_array_set_vec _
     | Pget_header _
     | Pctconst _
+<<<<<<< oxcaml
     | Pint_as_pointer _
     | Psequand | Psequor
     | Ppoll
@@ -990,6 +1029,19 @@ let rec choice ctx t =
     | Pmake_idx_field _ | Pmake_idx_mixed_field _ | Pidx_deepen _
     | Pmake_idx_array _
     | Pget_idx _ | Pset_idx _ | Pget_ptr _ | Pset_ptr _ ->
+||||||| upstream-base
+    | Pbswap16
+    | Pbbswap _
+    | Pint_as_pointer
+      ->
+=======
+    | Pbswap16
+    | Pbbswap _
+    | Pint_as_pointer
+    | Psequand | Psequor
+    | Ppoll
+      ->
+>>>>>>> upstream-incoming
         let primargs = traverse_list ctx primargs in
         Choice.lambda (Lprim (prim, primargs, loc))
 
@@ -1016,10 +1068,22 @@ and traverse ctx = function
 and traverse_lfunction ctx lfun =
   map_lfunction (traverse ctx) lfun
 
+<<<<<<< oxcaml
 and traverse_let outer_ctx var var_duid def =
+||||||| upstream-base
+and traverse_let outer_ctx var def =
+=======
+and traverse_let outer_ctx var def =
+>>>>>>> upstream-incoming
   let inner_ctx = declare_binding outer_ctx (var, def) in
   let bindings =
+<<<<<<< oxcaml
     traverse_let_binding outer_ctx inner_ctx var var_duid def
+||||||| upstream-base
+    traverse_binding Non_recursive outer_ctx inner_ctx (var, def)
+=======
+    traverse_let_binding outer_ctx inner_ctx var def
+>>>>>>> upstream-incoming
   in
   inner_ctx, bindings
 
@@ -1034,10 +1098,40 @@ and traverse_letrec ctx bindings =
   in
   ctx, bindings
 
+<<<<<<< oxcaml
 and traverse_let_binding outer_ctx inner_ctx var var_duid def =
+||||||| upstream-base
+and traverse_binding :
+  type a. a binding_kind -> context -> context -> a -> a list =
+  fun binding_kind outer_ctx inner_ctx binding ->
+  let (var, def) : Ident.t * lambda =
+    match binding_kind, binding with
+    | Recursive, { id; rkind=_; def } -> id, def
+    | Non_recursive, (var, def) -> var, def
+  in
+  let mk_same_binding (var : Ident.t) (def : lambda) : a =
+    match binding_kind, binding with
+    | Recursive, { id=_; rkind; def=_ } -> { id = var; rkind; def }
+    | Non_recursive, _ -> var, def
+  in
+  let mk_static_binding (var : Ident.t) (def : lambda) : a =
+    match binding_kind, binding with
+    | Recursive, _ -> { id = var; rkind = Static; def }
+    | Non_recursive, _ -> var, def
+  in
+=======
+and traverse_let_binding outer_ctx inner_ctx var def =
+>>>>>>> upstream-incoming
   match find_candidate def with
+<<<<<<< oxcaml
   | None -> [ var, var_duid, traverse outer_ctx def ]
+||||||| upstream-base
+  | None -> [mk_same_binding var (traverse outer_ctx def)]
+=======
+  | None -> [ var, traverse outer_ctx def ]
+>>>>>>> upstream-incoming
   | Some lfun ->
+<<<<<<< oxcaml
       let functions = make_dps_variant var var_duid inner_ctx outer_ctx lfun in
       List.map
         (fun (var, var_duid, lfun) -> var, var_duid, Lfunction lfun) functions
@@ -1053,6 +1147,21 @@ and traverse_letrec_binding ctx { id; debug_uid; def } =
     [ { id; debug_uid = debug_uid; def = traverse_lfunction ctx def } ]
 
 and make_dps_variant var var_duid inner_ctx outer_ctx (lfun : lfunction) =
+||||||| upstream-base
+=======
+      let functions = make_dps_variant var inner_ctx outer_ctx lfun in
+      List.map (fun (var, lfun) -> var, Lfunction lfun) functions
+
+and traverse_letrec_binding ctx { id; def } =
+  if def.attr.tmc_candidate
+  then
+    let functions = make_dps_variant id ctx ctx def in
+    List.map (fun (id, def) -> { id; def }) functions
+  else
+    [ { id; def = traverse_lfunction ctx def } ]
+
+and make_dps_variant var inner_ctx outer_ctx (lfun : lfunction) =
+>>>>>>> upstream-incoming
   let special = Ident.Map.find var inner_ctx.specialized in
   let fun_choice = choice outer_ctx ~tail:true lfun.body in
   if fun_choice.Choice.tmc_calls = [] then
@@ -1062,7 +1171,13 @@ and make_dps_variant var var_duid inner_ctx outer_ctx (lfun : lfunction) =
   let direct =
     let { kind; params; return; body = _; attr; loc; mode; ret_mode } = lfun in
     let body = Choice.direct fun_choice in
+<<<<<<< oxcaml
     lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode in
+||||||| upstream-base
+    lfunction ~kind ~params ~return ~body ~attr ~loc in
+=======
+    lfunction' ~kind ~params ~return ~body ~attr ~loc in
+>>>>>>> upstream-incoming
   let dps =
     let dst_param = {
       var = Ident.create_local "dst";
@@ -1070,6 +1185,7 @@ and make_dps_variant var var_duid inner_ctx outer_ctx (lfun : lfunction) =
       loc = lfun.loc;
     } in
     let dst = { dst_param with offset = Offset (Lvar dst_param.offset) } in
+<<<<<<< oxcaml
     let params = add_dst_params dst_param lfun.params in
     let kind =
       match lfun.mode, lfun.kind with
@@ -1085,6 +1201,19 @@ and make_dps_variant var var_duid inner_ctx outer_ctx (lfun : lfunction) =
     Lambda.duplicate_function @@ lfunction'
       ~kind
       ~params
+||||||| upstream-base
+    Lambda.duplicate @@ lfunction
+      ~kind:
+        (* Support of Tupled function: see [choice_apply]. *)
+        Curried
+      ~params:(add_dst_params dst_param lfun.params)
+=======
+    Lambda.duplicate_function @@ lfunction'
+      ~kind:
+        (* Support of Tupled function: see [choice_apply]. *)
+        Curried
+      ~params:(add_dst_params dst_param lfun.params)
+>>>>>>> upstream-incoming
       ~return:lfun.return
       ~body:(Choice.dps ~tail:true ~dst:dst fun_choice)
       ~attr:lfun.attr
@@ -1093,9 +1222,15 @@ and make_dps_variant var var_duid inner_ctx outer_ctx (lfun : lfunction) =
       ~ret_mode:lfun.ret_mode
   in
   let dps_var = special.dps_id in
+<<<<<<< oxcaml
   let dps_var_duid = Lambda.debug_uid_none in
   [var, var_duid, direct;
    dps_var, dps_var_duid, dps]
+||||||| upstream-base
+  [mk_static_binding var direct; mk_static_binding dps_var dps]
+=======
+  [var, direct; dps_var, dps]
+>>>>>>> upstream-incoming
 
 and traverse_list ctx terms =
   List.map (traverse ctx) terms

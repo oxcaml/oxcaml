@@ -21,7 +21,17 @@ val share: structured_constant -> lambda
 val meth: lambda -> string -> lambda * lambda list
 
 val reset_labels: unit -> unit
+<<<<<<< oxcaml
 val transl_label_init: (unit -> lambda * 'a) -> lambda * 'a
+||||||| upstream-base
+val transl_label_init: (unit -> lambda * 'a) -> lambda * 'a
+val transl_store_label_init:
+    Ident.t -> int -> ('a -> lambda) -> 'a -> int * lambda
+=======
+val transl_label_init: (unit -> lambda) -> lambda
+val transl_store_label_init:
+    Ident.t -> int -> ('a -> lambda) -> 'a -> int * lambda
+>>>>>>> upstream-incoming
 
 val method_ids: Ident.Set.t ref (* reset when starting a new wrapper *)
 

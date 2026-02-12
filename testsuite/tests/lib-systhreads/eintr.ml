@@ -2,7 +2,7 @@
  include systhreads;
  flags = "-alert -unsafe_multidomain";
  hassysthreads;
- not-windows;
+ not-target-windows;
  {
    bytecode;
  }{

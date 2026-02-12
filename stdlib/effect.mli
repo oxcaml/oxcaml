@@ -12,17 +12,17 @@
 (*                                                                        *)
 (**************************************************************************)
 
-[@@@alert unstable
-    "The Effect interface may change in incompatible ways in the future."
-]
-
 (** Effects.
 
     See 'Language extensions/Effect handlers' section in the manual.
 
     @since 5.0 *)
 
-type _ t = ..
+[@@@alert unstable
+    "The Effect interface may change in incompatible ways in the future."
+]
+
+type 'a t = 'a eff = ..
 (** The type of effects. *)
 
 exception Unhandled : 'a t -> exn
@@ -45,7 +45,7 @@ external perform : 'a t -> 'a = "%perform"
 module Deep : sig
   (** Deep handlers *)
 
-  type ('a,'b) continuation
+  type nonrec ('a,'b) continuation = ('a,'b) continuation
   (** [('a,'b) continuation] is a delimited continuation that expects a ['a]
       value and returns a ['b] value. *)
 

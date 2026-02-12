@@ -1,3 +1,4 @@
+<<<<<<< oxcaml
 (* TEST
    runtime5;
    { bytecode; }
@@ -32,6 +33,39 @@ module AllocSet = Set.Make(Int3Tuples)
 
 let[@inline never] f33 n =
   ((n, n, (n, n, n, (n,n,n,n,n))), (n, n, (n, n, n, (n,n,n,n,0))))
+||||||| upstream-base
+=======
+(* TEST *)
+
+(* Tests the effects of stopping and starting profiles in allocation
+   callbacks, particularly in combined allocations.
+
+   This also tests that promotion and deallocation callbacks from old
+   profiles get called correctly even after the profile has stopped
+   sampling. *)
+
+module MP = Gc.Memprof
+
+(* We need sets of 3-tuples of integers *)
+
+module Int3Tuples =
+struct
+  type t = int * int * int
+  let compare (x0,y0,z0) (x1,y1,z1) =
+    match Stdlib.compare x0 x1 with
+    | 0 -> (match Stdlib.compare y0 y1 with
+            | 0 -> Stdlib.compare z0 z1
+            | c -> c)
+    | c -> c
+end
+
+module AllocSet = Set.Make(Int3Tuples)
+
+(* A combined 7-block 33-word allocation *)
+
+let[@inline never] f33 n =
+  ((n, n, (n, n, n, (n,n,n,n,n))), (n, n, (n, n, n, (n,n,n,n,n))))
+>>>>>>> upstream-incoming
 
 (* Repeatedly stop sampling from an allocation callback. If `restart`
    is `true, start a fresh profile in the same callback. Otherwise,

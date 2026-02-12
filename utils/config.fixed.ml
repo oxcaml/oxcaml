@@ -27,17 +27,31 @@ let c_compiler = boot_cannot_call "the C compiler"
 let c_output_obj = ""
 let c_has_debug_prefix_map = false
 let as_has_debug_prefix_map = false
+<<<<<<< oxcaml
 let as_compress_debug_sections_flag = ""
 let cc_compress_debug_sections_flag = ""
 let ocamlc_cflags = ""
 let ocamlc_cppflags = ""
 let ocamlopt_cflags = ""
 let ocamlopt_cppflags = ""
+||||||| upstream-base
+let ocamlc_cflags = ""
+let ocamlc_cppflags = ""
+let ocamlopt_cflags = ""
+let ocamlopt_cppflags = ""
+=======
+let bytecode_cflags = ""
+let bytecode_cppflags = ""
+let native_cflags = ""
+let native_cppflags = ""
+>>>>>>> upstream-incoming
 let bytecomp_c_libraries = ""
 let bytecomp_c_compiler = ""
 let native_c_compiler = c_compiler
 let native_c_libraries = ""
+let compression_c_libraries = ""
 let native_ldflags = ""
+let with_nonexecstack_note = false
 let native_pack_linker = boot_cannot_call "the linker"
 let default_rpath = ""
 let mksharedlibrpath = ""
@@ -55,8 +69,11 @@ let probes = false
 let poll_insertion = false
 let with_flambda_invariants = false
 let with_cmm_invariants = false
+let with_codegen_invariants = false
 let windows_unicode = false
 let flat_float_array = true
+let align_double = true
+let align_int64 = true
 let function_sections = false
 let afl_instrument = false
 let native_compiler = false
@@ -64,8 +81,11 @@ let tsan = false
 let architecture = "none"
 let model = "default"
 let system = "unknown"
+let target_os_type =
+  "The boot compiler should not be using Config.target_os_type"
 let asm = boot_cannot_call "the assembler"
 let asm_cfi_supported = false
+let asm_size_type_directives = false
 let with_frame_pointers = false
 let with_address_sanitizer = false
 let reserved_header_bits = 0

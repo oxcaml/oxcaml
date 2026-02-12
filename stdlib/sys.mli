@@ -142,7 +142,13 @@ val io_buffer_size: int
     @since 5.4
 *)
 
+<<<<<<< oxcaml
 val interactive : bool ref @@ nonportable
+||||||| upstream-base
+val interactive : bool ref
+=======
+val interactive : bool ref
+>>>>>>> upstream-incoming
 [@@alert unsynchronized_access
     "The interactive status is a mutable global state."
 ]
@@ -266,134 +272,201 @@ external runtime_parameters : unit -> string = "caml_runtime_parameters"
 
 external poll_actions : unit -> unit = "%poll"
 (** Run any pending runtime actions, such as minor collections, major
+<<<<<<< oxcaml
     GC slices, signal handlers, finalizers, or memprof callbacks. *)
+||||||| upstream-base
+=======
+    GC slices, signal handlers, finalizers, or memprof callbacks.
+    @since 5.3 *)
+
+>>>>>>> upstream-incoming
 
 (** {1 Signal handling} *)
 
+type signal = int
+(** The type for signal numbers.
+
+  Negative numbers are used by OCaml to provide a platform-independent
+  number for signals recognised by OCaml. Positive numbers are always the
+  platform-dependent value for a given signal.
+  The function {!signal_of_int} converts known platform-dependent numbers
+  to independent ones, and {!signal_to_int} does the reverse.
+  @since 5.4 *)
 
 type signal_behavior =
     Signal_default
   | Signal_ignore
-  | Signal_handle of (int -> unit)   (** *)
+  | Signal_handle of (signal -> unit)   (** *)
 (** What to do when receiving a signal:
    - [Signal_default]: take the default behavior
      (usually: abort the program)
    - [Signal_ignore]: ignore the signal
    - [Signal_handle f]: call function [f], giving it the signal
-   number as argument. *)
+   number as an argument. *)
 
 external signal :
+<<<<<<< oxcaml
   int -> signal_behavior -> signal_behavior @@ nonportable = "caml_install_signal_handler"
 [@@alert unsafe_multidomain "Use [Sys.Safe.signal]."]
+||||||| upstream-base
+  int -> signal_behavior -> signal_behavior = "caml_install_signal_handler"
+=======
+  signal -> signal_behavior -> signal_behavior = "caml_install_signal_handler"
+>>>>>>> upstream-incoming
 (** Set the behavior of the system on receipt of a given signal.  The
    first argument is the signal number.  Return the behavior
    previously associated with the signal. If the signal number is
    invalid (or not available on your system), an [Invalid_argument]
-   exception is raised. *)
+   exception is raised.
 
+<<<<<<< oxcaml
 val set_signal : int -> signal_behavior -> unit @@ nonportable
 [@@alert unsafe_multidomain "Use [Sys.Safe.set_signal]."]
 (** Same as {!Sys.signal} but return value is ignored. *)
+||||||| upstream-base
+val set_signal : int -> signal_behavior -> unit
+(** Same as {!Sys.signal} but return value is ignored. *)
+=======
+   If a platform-dependent signal number is used, it will be converted
+   to a platform-independent signal using {!signal_of_int} before
+   calling the handler.
+*)
+>>>>>>> upstream-incoming
 
+val set_signal : signal -> signal_behavior -> unit
+(** Same as {!Sys.signal} but the return value is ignored. *)
 
 (** {2 Signal numbers for the standard POSIX signals.} *)
 
-val sigabrt : int
+val sigabrt : signal
 (** Abnormal termination *)
 
-val sigalrm : int
+val sigalrm : signal
 (** Timeout *)
 
-val sigfpe : int
+val sigfpe : signal
 (** Arithmetic exception *)
 
-val sighup : int
+val sighup : signal
 (** Hangup on controlling terminal *)
 
-val sigill : int
+val sigill : signal
 (** Invalid hardware instruction *)
 
-val sigint : int
+val sigint : signal
 (** Interactive interrupt (ctrl-C) *)
 
-val sigkill : int
+val sigkill : signal
 (** Termination (cannot be ignored) *)
 
-val sigpipe : int
+val sigpipe : signal
 (** Broken pipe *)
 
-val sigquit : int
+val sigquit : signal
 (** Interactive termination *)
 
-val sigsegv : int
+val sigsegv : signal
 (** Invalid memory reference *)
 
-val sigterm : int
+val sigterm : signal
 (** Termination *)
 
-val sigusr1 : int
+val sigusr1 : signal
 (** Application-defined signal 1 *)
 
-val sigusr2 : int
+val sigusr2 : signal
 (** Application-defined signal 2 *)
 
-val sigchld : int
+val sigchld : signal
 (** Child process terminated *)
 
-val sigcont : int
+val sigcont : signal
 (** Continue *)
 
-val sigstop : int
-(** Stop *)
+val sigstop : signal
+(** Stop (cannot be caught or ignored) *)
 
-val sigtstp : int
+val sigtstp : signal
 (** Interactive stop *)
 
-val sigttin : int
+val sigttin : signal
 (** Terminal read from background process *)
 
-val sigttou : int
+val sigttou : signal
 (** Terminal write from background process *)
 
-val sigvtalrm : int
+val sigvtalrm : signal
 (** Timeout in virtual time *)
 
-val sigprof : int
+val sigprof : signal
 (** Profiling interrupt *)
 
-val sigbus : int
+val sigbus : signal
 (** Bus error
     @since 4.03 *)
 
-val sigpoll : int
+val sigpoll : signal
 (** Pollable event
     @since 4.03 *)
 
-val sigsys : int
+val sigsys : signal
 (** Bad argument to routine
     @since 4.03 *)
 
-val sigtrap : int
+val sigtrap : signal
 (** Trace/breakpoint trap
     @since 4.03 *)
 
-val sigurg : int
+val sigurg : signal
 (** Urgent condition on socket
     @since 4.03 *)
 
-val sigxcpu : int
+val sigxcpu : signal
 (** Timeout in cpu time
     @since 4.03 *)
 
-val sigxfsz : int
+val sigxfsz : signal
 (** File size limit exceeded
     @since 4.03 *)
 
+val sigio : signal
+(** I/O is possible on a descriptor
+    @since 5.4 *)
+
+val sigwinch : signal
+(** Window size change
+    @since 5.4 *)
+
+val signal_to_string : signal -> string
+(** [signal_to_string] formats an OCaml [signal] as a C POSIX
+    {{:http://pubs.opengroup.org/onlinepubs/9799919799/basedefs/signal.h.html}
+    constant} or ["SIG(%d)"] for platform-dependent signal numbers.
+
+    @raise Invalid_argument for unrecognised negative numbers.
+    @since 5.4 *)
+
+val signal_of_int : int -> signal
+(** [signal_of_int n] converts a platform-dependent signal number [n] to
+    an OCaml signal number.
+
+    For positive [n] this is [n] itself if OCaml does not have a
+    platform-independent signal number for [n].
+
+    @raise Invalid_argument if [n] is negative.
+    @since 5.4 *)
+
+val signal_to_int : signal -> int
+(** [signal_to_int n] converts an OCaml signal number [n] to
+    a platform-dependent signal number.
+
+    For positive [n] this is [n] itself.
+
+    @raise Invalid_argument for unrecognised negative numbers.
+    @since 5.4 *)
 
 exception Break
 (** Exception raised on interactive interrupt if {!Sys.catch_break}
    is enabled. *)
-
 
 val catch_break : bool -> unit
 (** [catch_break] governs whether interactive interrupt (ctrl-C)
@@ -483,7 +556,9 @@ external[@layout_poly] opaque_identity :
 (** For the purposes of optimization, [opaque_identity] behaves like an
     unknown (and thus possibly side-effecting) function.
 
-    At runtime, [opaque_identity] disappears altogether.
+    At runtime, [opaque_identity] disappears altogether.  However, it does
+    prevent the argument from being garbage collected until the location
+    where the call would have occurred.
 
     A typical use of this function is to prevent pure computations from being
     optimized away in benchmarking loops.  For example:

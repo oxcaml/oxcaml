@@ -439,6 +439,7 @@ let to_file outchan cu artifact_info ~required_globals ~main_module_block_format
           (Filename.dirname (Location.absolute_path filename))
         !debug_dirs;
       let p = pos_out outchan in
+<<<<<<< oxcaml
       (* CR ocaml 5 compressed-marshal mshinwell:
          Compression not supported in the OCaml 4 runtime
       Compression.output_value outchan !events;
@@ -449,6 +450,14 @@ let to_file outchan cu artifact_info ~required_globals ~main_module_block_format
       Marshal.(to_channel outchan (String.Set.elements !debug_dirs)
                           []);
 (* BACKPORT END *)
+||||||| upstream-base
+      Marshal.(to_channel outchan !events [Compression]);
+      Marshal.(to_channel outchan (String.Set.elements !debug_dirs)
+                          [Compression]);
+=======
+      Compression.output_value outchan !events;
+      Compression.output_value outchan (String.Set.elements !debug_dirs);
+>>>>>>> upstream-incoming
       (p, pos_out outchan - p)
     end else
       (0, 0) in

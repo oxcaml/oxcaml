@@ -1,17 +1,55 @@
 # resumed...
+<<<<<<< oxcaml
 camlReperform__foo_0_8_code
 camlReperform__foo_0_8_code
 camlReperform__foo_0_8_code
 camlReperform__foo_0_8_code
 camlReperform__foo_0_8_code
 camlReperform__foo_0_8_code
+||||||| upstream-base
+camlReperform.foo
+camlReperform.foo
+camlReperform.foo
+camlReperform.foo
+camlReperform.foo
+camlReperform.foo
+=======
+camlReperform$foo
+camlReperform$foo
+camlReperform$foo
+camlReperform$foo
+camlReperform$foo
+camlReperform$foo
+>>>>>>> upstream-incoming
 caml_runstack
+<<<<<<< oxcaml
 camlReperform__bar_1_9_code
 camlReperform__bar_1_9_code
 camlReperform__bar_1_9_code
 camlReperform__bar_1_9_code
 camlReperform__bar_1_9_code
 camlReperform__bar_1_9_code
+||||||| upstream-base
+camlReperform.bar
+camlReperform.bar
+camlReperform.bar
+camlReperform.bar
+camlReperform.bar
+camlReperform.bar
+=======
+camlReperform$bar
+camlReperform$bar
+camlReperform$bar
+camlReperform$bar
+camlReperform$bar
+camlReperform$bar
+>>>>>>> upstream-incoming
 caml_runstack
+<<<<<<< oxcaml
 camlReperform__entry
+||||||| upstream-base
+camlReperform.entry
+=======
+camlReperform$entry
+>>>>>>> upstream-incoming
 caml_program

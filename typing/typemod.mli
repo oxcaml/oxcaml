@@ -47,8 +47,16 @@ val type_implementation:
   Unit_info.t -> Compilation_unit.t -> Env.t ->
   Parsetree.structure -> Typedtree.implementation
 val type_interface:
+<<<<<<< oxcaml
   sourcefile:string -> Compilation_unit.t -> Env.t ->
   Parsetree.signature -> Typedtree.signature
+||||||| upstream-base
+        Env.t -> Parsetree.signature -> Typedtree.signature
+val transl_signature:
+        Env.t -> Parsetree.signature -> Typedtree.signature
+=======
+        Env.t -> Parsetree.signature -> Typedtree.signature
+>>>>>>> upstream-incoming
 val check_nongen_signature:
         Env.t -> Types.signature -> unit
         (*
@@ -58,8 +66,7 @@ val type_open_:
         Env.t -> Location.t -> Longident.t Asttypes.loc -> Path.t * Env.t
         *)
 val modtype_of_package:
-        Env.t -> Location.t ->
-        Path.t -> (Longident.t * type_expr) list -> module_type
+        Env.t -> Location.t -> package -> module_type
 
 val path_of_module : Typedtree.module_expr -> Path.t option
 
@@ -83,7 +90,11 @@ module Sig_component_kind : sig
     | Type
     | Constructor
     | Label
+<<<<<<< oxcaml
     | Unboxed_label
+||||||| upstream-base
+=======
+>>>>>>> upstream-incoming
     | Module
     | Module_type
     | Extension_constructor
@@ -153,6 +164,7 @@ type error =
   | Invalid_type_subst_rhs
   | Non_packable_local_modtype_subst of Path.t
   | With_cannot_remove_packed_modtype of Path.t * module_type
+<<<<<<< oxcaml
   | Strengthening_mismatch of Longident.t * Includemod.explanation
   | Cannot_pack_parameter
   | Compiling_as_parameterised_parameter
@@ -166,6 +178,10 @@ type error =
       old_source_file: Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
+||||||| upstream-base
+=======
+  | Cannot_alias of Path.t
+>>>>>>> upstream-incoming
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

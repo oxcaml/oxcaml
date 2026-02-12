@@ -51,9 +51,16 @@ struct custom_operations {
 extern "C" {
 #endif
 
+<<<<<<< oxcaml
 
 CAMLextern uintnat caml_custom_major_ratio;
 CAMLextern uintnat caml_custom_minor_ratio;
+||||||| upstream-base
+
+CAMLextern uintnat caml_custom_major_ratio;
+=======
+CAMLextern atomic_uintnat caml_custom_major_ratio;
+>>>>>>> upstream-incoming
 
 CAMLextern value caml_alloc_custom(const struct custom_operations * ops,
                                    uintnat size, /*size in bytes*/
@@ -92,6 +99,10 @@ CAMLextern void
 /* Global variable moved to Caml_state in 4.10 */
 #define caml_compare_unordered (Caml_state_field(compare_unordered))
 
+#ifdef __cplusplus
+}
+#endif
+
 #ifdef CAML_INTERNALS
 extern struct custom_operations *
           caml_find_custom_operations(const char * ident);
@@ -106,9 +117,5 @@ extern const struct custom_operations caml_int64_ops;
 extern const struct custom_operations caml_ba_ops;
 extern const struct custom_operations caml_float32_ops;
 #endif /* CAML_INTERNALS */
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* CAML_CUSTOM_H */

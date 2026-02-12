@@ -46,3 +46,49 @@ void caml_do_roots (
   caml_final_do_roots(f, fflags, fdata, d, do_final_val);
 
 }
+<<<<<<< oxcaml
+||||||| upstream-base
+
+CAMLexport void caml_do_local_roots (
+  scanning_action f, scanning_action_flags fflags, void* fdata,
+  struct caml__roots_block *local_roots,
+  struct stack_info *current_stack,
+  value * v_gc_regs)
+{
+  struct caml__roots_block *lr;
+  int i, j;
+  value* sp;
+
+  for (lr = local_roots; lr != NULL; lr = lr->next) {
+    for (i = 0; i < lr->ntables; i++){
+      for (j = 0; j < lr->nitems; j++){
+        sp = &(lr->tables[i][j]);
+        if (*sp != 0) {
+          f (fdata, *sp, sp);
+        }
+      }
+    }
+  }
+  caml_scan_stack(f, fflags, fdata, current_stack, v_gc_regs);
+}
+=======
+
+CAMLexport void caml_do_local_roots (
+  scanning_action f, scanning_action_flags fflags, void* fdata,
+  struct caml__roots_block *local_roots,
+  struct stack_info *current_stack,
+  value * v_gc_regs)
+{
+  for (struct caml__roots_block *lr = local_roots; lr != NULL; lr = lr->next) {
+    for (int i = 0; i < lr->ntables; i++) {
+      for (int j = 0; j < lr->nitems; j++) {
+        value* sp = &(lr->tables[i][j]);
+        if (*sp != 0) {
+          f (fdata, *sp, sp);
+        }
+      }
+    }
+  }
+  caml_scan_stack(f, fflags, fdata, current_stack, v_gc_regs);
+}
+>>>>>>> upstream-incoming

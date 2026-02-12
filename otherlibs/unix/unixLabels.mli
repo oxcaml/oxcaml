@@ -193,15 +193,14 @@ type process_status = Unix.process_status =
     WEXITED of int
         (** The process terminated normally by [exit];
            the argument is the return code. *)
-  | WSIGNALED of int
+  | WSIGNALED of Sys.signal
         (** The process was killed by a signal;
            the argument is the signal number. *)
-  | WSTOPPED of int
+  | WSTOPPED of Sys.signal
         (** The process was stopped by a signal; the argument is the
            signal number. *)
-(** The termination status of a process.  See module {!Sys} for the
-    definitions of the standard signal numbers.  Note that they are
-    not the numbers used by the OS.
+(** The termination status of a process. See {!Sys.signal} for the
+    definitions of the standard signal numbers.
 
     On Windows: only [WEXITED] is used (as there are no inter-process signals)
     but with specific return codes to indicate special termination causes.
@@ -1116,7 +1115,11 @@ external select :
    The result is composed of three sets of descriptors: those ready
    for reading (first component), ready for writing (second component),
    and over which an exceptional condition is pending (third
-   component). *)
+   component).
+
+   On Windows, if one of descriptor lists exceeds [FD_SETSIZE] elements
+   (64 by default), or if at least one non-socket file descriptor is
+   used, the maximal timeout is capped to 2{^32} milliseconds. *)
 
 (** {1 Locking} *)
 
@@ -1167,7 +1170,7 @@ val lockf : file_descr -> mode:lock_command -> len:int -> unit
    the functions {!Sys.signal} and {!Sys.set_signal}.
 *)
 
-val kill : pid:int -> signal:int -> unit
+val kill : pid:int -> signal:Sys.signal -> unit
 (** [kill ~pid ~signal] sends signal number [signal] to the process
    with id [pid].
 
@@ -1178,7 +1181,13 @@ type sigprocmask_command = Unix.sigprocmask_command =
   | SIG_BLOCK
   | SIG_UNBLOCK
 
+<<<<<<< oxcaml
 val sigprocmask : mode:sigprocmask_command -> int list @ local -> int list
+||||||| upstream-base
+val sigprocmask : mode:sigprocmask_command -> int list -> int list
+=======
+val sigprocmask : mode:sigprocmask_command -> Sys.signal list -> Sys.signal list
+>>>>>>> upstream-incoming
 (** [sigprocmask ~mode sigs] changes the set of blocked signals.
    If [mode] is [SIG_SETMASK], blocked signals are set to those in
    the list [sigs].
@@ -1188,20 +1197,26 @@ val sigprocmask : mode:sigprocmask_command -> int list @ local -> int list
    from the set of blocked signals.
    [sigprocmask] returns the set of previously blocked signals.
 
-   When the systhreads version of the [Thread] module is loaded, this
-   function redirects to [Thread.sigmask]. I.e., [sigprocmask] only
-   changes the mask of the current thread.
+   Each domain, and each thread when the [Thread] module is loaded,
+   has its own signal mask.  [sigprocmask] only changes the mask
+   of the current domain or current thread.
 
    @raise Invalid_argument on Windows (no inter-process signals on
    Windows) *)
 
-val sigpending : unit -> int list
+val sigpending : unit -> Sys.signal list
 (** Return the set of blocked signals that are currently pending.
 
    @raise Invalid_argument on Windows (no inter-process
    signals on Windows) *)
 
+<<<<<<< oxcaml
 val sigsuspend : int list @ local -> unit
+||||||| upstream-base
+val sigsuspend : int list -> unit
+=======
+val sigsuspend : Sys.signal list -> unit
+>>>>>>> upstream-incoming
 (** [sigsuspend sigs] atomically sets the blocked signals to [sigs]
    and waits for a non-ignored, non-blocked signal to be delivered.
    On return, the blocked signals are reset to their initial value.
@@ -1215,6 +1230,17 @@ val pause : unit -> unit
    @raise Invalid_argument on Windows (no inter-process signals on
    Windows) *)
 
+val sigwait : Sys.signal list -> Sys.signal
+(** [sigwait sigs] waits until one of the signals in the list [sigs]
+   becomes pending.  It then removes this signal from the set of pending
+   signals, and returns the number of this signal.
+   Signal handlers attached to the signals in [sigs] will not be
+   invoked.  The signals [sigs] are expected to be blocked before
+   calling [sigwait].
+
+   @since 5.4
+   @raise Invalid_argument on Windows (no inter-process signals on
+   Windows) *)
 
 (** {1 Time functions} *)
 

@@ -154,6 +154,7 @@ let print_cma_infos (lib : Cmo_format.library) =
   printf "\n";
   List.iter print_cmo_infos lib.lib_units
 
+<<<<<<< oxcaml
 let print_cmi_infos name crcs kind params global_name_bindings =
   if not !quiet then begin
     let open Cmi_format in
@@ -178,14 +179,49 @@ let print_cmi_infos name crcs kind params global_name_bindings =
     Array.iter print_intf_import crcs;
     printf "Globals in scope:\n";
     Array.iter print_global_name_binding global_name_bindings
+||||||| upstream-base
+let print_cmi_infos name crcs =
+  printf "Unit name: %s\n" name;
+  printf "Interfaces imported:\n";
+  List.iter print_name_crc crcs
+=======
+let print_cmi_infos name crcs =
+  if not !quiet then begin
+    printf "Unit name: %s\n" name;
+    printf "Interfaces imported:\n";
+    List.iter print_name_crc crcs
+>>>>>>> upstream-incoming
   end
 
 let print_cmt_infos cmt =
   let open Cmt_format in
   if not !quiet then begin
+<<<<<<< oxcaml
     printf "Cmt unit name: %a\n" Compilation_unit.output cmt.cmt_modname;
     print_string "Cmt interfaces imported:\n";
     Array.iter print_intf_import cmt.cmt_imports;
+||||||| upstream-base
+  printf "Cmt unit name: %s\n" cmt.cmt_modname;
+  print_string "Cmt interfaces imported:\n";
+  List.iter print_name_crc cmt.cmt_imports;
+  printf "Source file: %s\n"
+         (match cmt.cmt_sourcefile with None -> "(none)" | Some f -> f);
+  printf "Compilation flags:";
+  Array.iter print_spaced_string cmt.cmt_args;
+  printf "\nLoad path:\n  Visible:";
+  List.iter print_spaced_string cmt.cmt_loadpath.visible;
+  printf "\n  Hidden:";
+  List.iter print_spaced_string cmt.cmt_loadpath.hidden;
+  printf "\n";
+  printf "cmt interface digest: %s\n"
+    (match cmt.cmt_interface_digest with
+     | None -> ""
+     | Some crc -> string_of_crc crc);
+=======
+    printf "Cmt unit name: %s\n" cmt.cmt_modname;
+    print_string "Cmt interfaces imported:\n";
+    List.iter print_name_crc cmt.cmt_imports;
+>>>>>>> upstream-incoming
     printf "Source file: %s\n"
           (match cmt.cmt_sourcefile with None -> "(none)" | Some f -> f);
     printf "Compilation flags:";
@@ -208,6 +244,7 @@ let print_cmt_infos cmt =
   end;
   if !index then begin
     printf "Indexed shapes:\n";
+<<<<<<< oxcaml
     Array.iter (fun (loc, item) ->
       let pp_loc fmt { Location.txt; loc } =
         Format.fprintf fmt "%a (%a)"
@@ -248,6 +285,49 @@ let print_cmt_infos cmt =
         | Value vd -> vd.val_name
         | Value_binding vb ->
           let (_, name, _, _, _) =
+||||||| upstream-base
+=======
+    List.iter (fun (loc, item) ->
+      let pp_loc fmt { Location.txt; loc } =
+        Format.fprintf fmt "%a (%a)"
+          Pprintast.longident txt Location.print_loc loc
+      in
+      Format.printf "@[<hov 2>%a:@ %a@]@;"
+        Shape_reduce.print_result item pp_loc loc)
+      cmt.cmt_ident_occurrences;
+    Format.print_flush ()
+  end;
+  if !uid_deps then begin
+    printf "\nUid dependencies:\n";
+    let arr = Array.of_list cmt.cmt_declaration_dependencies in
+    let () =
+      Array.sort (fun (_tr, u1, u2) (_tr', u1', u2') ->
+                    match Shape.Uid.compare u1 u1' with
+                    | 0 -> Shape.Uid.compare u2 u2'
+                    | n -> n) arr
+    in
+    Format.printf "@[<v>";
+    Array.iter (fun (rk, u1, u2) ->
+      let rk = match rk with
+        | Definition_to_declaration -> "<-"
+        | Declaration_to_declaration -> "<->"
+      in
+      Format.printf "@[<h>%a %s %a@]@;"
+        Shape.Uid.print u1
+        rk
+        Shape.Uid.print u2) arr;
+    Format.printf "@]";
+  end;
+  if !decls then begin
+    printf "\nUid of decls:\n";
+    let decls = Array.of_list (Shape.Uid.Tbl.to_list cmt.cmt_uid_to_decl) in
+    Array.sort (fun (uid, _) (uid', _) -> Shape.Uid.compare uid uid') decls;
+    Array.iter (fun (uid, item) ->
+      let loc = match (item : Typedtree.item_declaration) with
+        | Value vd -> vd.val_name
+        | Value_binding vb ->
+          let (_, name, _, _) =
+>>>>>>> upstream-incoming
             List.hd (Typedtree.let_bound_idents_full [vb])
           in
           name
@@ -302,7 +382,21 @@ let print_general_infos print_name name crc defines arg_descr mbf
 
 let print_global_table table =
   printf "Globals defined:\n";
+<<<<<<< oxcaml
   Symtable.iter_global_map (fun id _ -> print_line (Symtable.Global.name id))
+||||||| upstream-base
+  Symtable.iter_global_map
+    (fun global _ ->
+       print_line
+         (Format.asprintf "%a" Symtable.Global.description global)
+    )
+=======
+  Symtable.iter_global_map
+    (fun global _ ->
+       let desc = Format_doc.compat Symtable.Global.description in
+       print_line (Format.asprintf "%a" desc global)
+    )
+>>>>>>> upstream-incoming
     table
 
 open Cmx_format
@@ -592,9 +686,22 @@ let dump_obj filename =
   then dump_cmxs ic
   else exit_magic_error ~expected_kind:None (Parse_error head_error)
 
+let print_version () =
+  Format.printf "ocamlobjinfo, version %s@." Sys.ocaml_version;
+  exit 0
+
+let print_version_num () =
+  Format.printf "%s@." Sys.ocaml_version;
+  exit 0
+
 let arg_list = [
   "-quiet", Arg.Set quiet,
+<<<<<<< oxcaml
     " Only print explicitely required information";
+||||||| upstream-base
+=======
+    " Only print explicitly required information";
+>>>>>>> upstream-incoming
   "-no-approx", Arg.Set no_approx,
     " Do not print module approximation information";
   "-no-code", Arg.Set no_code,
@@ -608,6 +715,8 @@ let arg_list = [
   "-uid-deps", Arg.Set uid_deps,
     " Print the declarations' uids dependencies of the module";
   "-null-crc", Arg.Set no_crc, " Print a null CRC for imported interfaces";
+  "-version", Arg.Unit print_version, " Print version and exit";
+  "-vnum", Arg.Unit print_version_num, " Print version number and exit";
   "-args", Arg.Expand Arg.read_arg,
      "<file> Read additional newline separated command line arguments \n\
      \      from <file>";

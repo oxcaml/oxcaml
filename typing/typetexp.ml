@@ -18,7 +18,6 @@
 (* Typechecking of type expressions for the core language *)
 
 open Asttypes
-open Misc
 open Parsetree
 open Typedtree
 open Types
@@ -89,6 +88,7 @@ type error =
   | Method_mismatch of string * type_expr * type_expr
   | Opened_object of Path.t option
   | Not_an_object of type_expr
+<<<<<<< oxcaml
   | Unsupported_extension : _ Language_extension.t -> error
   | Polymorphic_optional_param
   | Non_value of
@@ -104,6 +104,10 @@ type error =
        usage_stage : Env.stage}
   | Mismatched_jkind_annotation of
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
+||||||| upstream-base
+=======
+  | Repeated_tuple_label of string
+>>>>>>> upstream-incoming
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -159,9 +163,17 @@ module TyVarEnv : sig
 
   val is_in_scope : string -> bool
 
+<<<<<<< oxcaml
   val add : string -> type_expr -> jkind_lr -> Env.stage -> unit
   (* add a global type variable to the environment, with the given jkind.
      Precondition: the [type_expr] must be a [Tvar] with the given jkind. *)
+||||||| upstream-base
+  val add : string -> type_expr -> unit
+  (* add a global type variable to the environment *)
+=======
+  val add : ?unused:bool ref -> string -> type_expr -> unit
+  (* add a global type variable to the environment *)
+>>>>>>> upstream-incoming
 
   val with_local_scope : (unit -> 'a) -> 'a
   (* see mli file *)
@@ -227,6 +239,7 @@ module TyVarEnv : sig
     row_context:type_expr option ref list -> string -> type_expr * Env.stage
     (* look up a local type variable; throws Not_found if it isn't in scope *)
 
+<<<<<<< oxcaml
   val lookup_global_jkind : string -> jkind_lr
     (* look up a global type variable, returning the jkind it was originally
        assigned. Throws [Not_found] if the variable isn't in scope. See
@@ -238,6 +251,14 @@ module TyVarEnv : sig
     (* Remember that a given name is bound to a given type.
 
        If [rigid] is set, also remember that it's fixed at the given jkind. *)
+||||||| upstream-base
+  val remember_used : string -> type_expr -> Location.t -> unit
+    (* remember that a given name is bound to a given type *)
+=======
+  val remember_used :
+    ?check:Location.t -> string -> type_expr -> Location.t -> unit
+    (* remember that a given name is bound to a given type *)
+>>>>>>> upstream-incoming
 
   val globalize_used_variables : policy -> Env.t -> unit -> unit
   (* after finishing with a type signature, used variables are unified to the
@@ -260,16 +281,30 @@ end = struct
   (* These are the "global" type variables: they were in scope before
      we started processing the current type. See Note [Global type variables].
   *)
+<<<<<<< oxcaml
   let type_variables =
     ref (TyVarMap.empty : (type_expr * jkind_lr * Env.stage) TyVarMap.t)
+||||||| upstream-base
+  let type_variables = ref (TyVarMap.empty : type_expr TyVarMap.t)
+=======
+  let type_variables = ref (TyVarMap.empty : (type_expr * bool ref) TyVarMap.t)
+>>>>>>> upstream-incoming
 
   (* These are variables that have been used in the currently-being-checked
      type, possibly including the variables in [type_variables].
   *)
+<<<<<<< oxcaml
   type used_info = {
     ty : type_expr;
     loc : Location.t;
     (* Rigid variables are set at a given jkind.
+||||||| upstream-base
+  let used_variables =
+    ref (TyVarMap.empty : (type_expr * Location.t) TyVarMap.t)
+=======
+  let used_variables =
+    ref (TyVarMap.empty : (type_expr * Location.t * bool ref) TyVarMap.t)
+>>>>>>> upstream-incoming
 
        Note that a rigid variable can still be unified; if it's unified
        with a non-variable type expression like [int], it stays valid as long as
@@ -295,9 +330,21 @@ end = struct
   let is_in_scope name =
     TyVarMap.mem name !type_variables
 
+<<<<<<< oxcaml
   let add name v jkind stage =
+||||||| upstream-base
+  let add name v =
+=======
+  let add ?(unused = ref false) name v =
+>>>>>>> upstream-incoming
     assert (not_generic v);
+<<<<<<< oxcaml
     type_variables := TyVarMap.add name (v, jkind, stage) !type_variables
+||||||| upstream-base
+    type_variables := TyVarMap.add name v !type_variables
+=======
+    type_variables := TyVarMap.add name (v, unused) !type_variables
+>>>>>>> upstream-incoming
 
   let narrow () =
     (increase_global_level (), !type_variables)
@@ -313,12 +360,22 @@ end = struct
      ~finally:(fun () -> widen context)
 
   (* throws Not_found if the variable is not in scope *)
+<<<<<<< oxcaml
   let lookup_global name =
     let (type_expr, _, stage) = TyVarMap.find name !type_variables in
     (type_expr, stage)
 
   let lookup_global_jkind name =
     snd3 (TyVarMap.find name !type_variables)
+||||||| upstream-base
+  let lookup_global_type_variable name =
+    TyVarMap.find name !type_variables
+=======
+  let lookup_global_type_variable name =
+    let (v, unused) = TyVarMap.find name !type_variables in
+    unused := false;
+    v
+>>>>>>> upstream-incoming
 
   let get_in_scope_names () =
     let add_name name _ l =
@@ -459,7 +516,12 @@ end = struct
     v
 
   let check_poly_univars env loc vars =
+<<<<<<< oxcaml
     vars |> List.iter (fun (_, p, _) -> generalize p.univar);
+||||||| upstream-base
+    vars |> List.iter (fun (_, p) -> generalize p.univar);
+=======
+>>>>>>> upstream-incoming
     let univars =
       vars |> List.map (fun (name, {univar=ty1; jkind_info; _ }, _) ->
         let v = Btype.proxy ty1 in
@@ -503,14 +565,29 @@ end = struct
       associate row_context p;
       p.univar, s
     with Not_found ->
+<<<<<<< oxcaml
       let info = TyVarMap.find name !used_variables in
       instance info.ty, info.stage
+||||||| upstream-base
+      instance (fst (TyVarMap.find name !used_variables))
+=======
+      let (v, _, unused) = TyVarMap.find name !used_variables in
+      unused := false;
+      instance v
+>>>>>>> upstream-incoming
       (* This call to instance might be redundant; all variables
          inserted into [used_variables] are non-generic, but some
          might get generalized. *)
 
+<<<<<<< oxcaml
   let remember_used ~rigid name v loc stage =
+||||||| upstream-base
+  let remember_used name v loc =
+=======
+  let remember_used ?check name v loc =
+>>>>>>> upstream-incoming
     assert (not_generic v);
+<<<<<<< oxcaml
     let rigid =
       match TyVarMap.find name !used_variables with
       | info -> info.rigid
@@ -518,6 +595,24 @@ end = struct
     in
     let info = { ty = v; loc; rigid; stage } in
     used_variables := TyVarMap.add name info !used_variables
+||||||| upstream-base
+    used_variables := TyVarMap.add name (v, loc) !used_variables
+=======
+    let unused = match check with
+      | Some check_loc
+          when Warnings.(is_active (Unused_type_declaration ("", Alias))) ->
+        let unused = ref true in
+        !Env.add_delayed_check_forward begin fun () ->
+            let warn = Warnings.(Unused_type_declaration ("'" ^ name, Alias))
+            in
+            if !unused && Warnings.is_active warn
+            then Location.prerr_warning check_loc warn
+          end;
+        unused
+      | _ -> ref false
+    in
+    used_variables := TyVarMap.add name (v, loc, unused) !used_variables
+>>>>>>> upstream-incoming
 
 
   type flavor = Unification | Universal
@@ -579,14 +674,21 @@ end = struct
       { flavor; unbound_variable_policy; _ } env =
     let r = ref [] in
     TyVarMap.iter
+<<<<<<< oxcaml
       (fun name { ty; rigid; loc; stage = s } ->
         (match rigid with
         | Some original_jkind ->
           check_jkind env loc name ty { original_jkind; defaulted = false }
         |  None -> ());
+||||||| upstream-base
+      (fun name (ty, loc) ->
+=======
+      (fun name (ty, loc, unused) ->
+>>>>>>> upstream-incoming
         if flavor = Unification || is_in_scope name then
           let v = new_global_var (Jkind.Builtin.any ~why:Dummy_jkind) in
           let snap = Btype.snapshot () in
+<<<<<<< oxcaml
           if try unify env v ty; true with _ -> Btype.backtrack snap; false
           then try
               let (type_expr, stage) = lookup_global name in
@@ -614,6 +716,37 @@ end = struct
                           Unbound_type_variable (Pprintast.tyvar_of_name name,
                                                  get_in_scope_names (),
                                                  Some Upstream_compatibility))))
+||||||| upstream-base
+          if try unify env v ty; true with _ -> Btype.backtrack snap; false
+          then try
+            r := (loc, v, lookup_global_type_variable name) :: !r
+          with Not_found ->
+            if extensibility = Fixed && Btype.is_Tvar ty then
+              raise(Error(loc, env,
+                          Unbound_type_variable (Pprintast.tyvar_of_name name,
+                                                 get_in_scope_names ())));
+            let v2 = new_global_var () in
+            r := (loc, v, v2) :: !r;
+            add name v2)
+=======
+          if try unify env v ty; true
+            with
+                Unify err when is_in_scope name ->
+                  raise (Error(loc, env, Type_mismatch err))
+              | _ -> Btype.backtrack snap; false
+          then match lookup_global_type_variable name with
+            | global_var ->
+              r := (loc, v, global_var) :: !r;
+              unused := false
+            | exception Not_found ->
+              if extensibility = Fixed && Btype.is_Tvar ty then
+                raise(Error(loc, env,
+                            Unbound_type_variable (Pprintast.tyvar_of_name name,
+                                                  get_in_scope_names ())));
+              let v2 = new_global_var () in
+              r := (loc, v, v2) :: !r;
+              add ~unused name v2)
+>>>>>>> upstream-incoming
       !used_variables;
     used_variables := TyVarMap.empty;
     fun () ->
@@ -633,14 +766,12 @@ let check_package_with_type_constraints = ref (fun _ -> assert false)
 let sort_constraints_no_duplicates loc env l =
   List.sort
     (fun (s1, _t1) (s2, _t2) ->
-       if s1.txt = s2.txt then
+       if Longident.same s1.txt s2.txt then
          raise (Error (loc, env, Multiple_constraints_on_type s1.txt));
        compare s1.txt s2.txt)
     l
 
 (* Translation of type expressions *)
-
-let generalize_ctyp typ = generalize typ.ctyp_type
 
 let strict_ident c = (c = '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z')
 
@@ -657,6 +788,7 @@ let newvar ?name jkind =
 let valid_tyvar_name name =
   name <> "" && name.[0] <> '_'
 
+<<<<<<< oxcaml
 let transl_type_param_var env loc attrs name_opt
       (jkind : jkind_lr) jkind_annot =
   let tvar = Ttyp_var (name_opt, jkind_annot) in
@@ -676,6 +808,15 @@ let transl_type_param_var env loc attrs name_opt
     ctyp_loc = loc; ctyp_attributes = attrs }
 
 let transl_type_param env path jkind_default styp =
+||||||| upstream-base
+let transl_type_param env styp =
+=======
+let check_tyvar_name env loc name =
+  if not (valid_tyvar_name name) then
+    raise (Error (loc, env, Invalid_variable_name ("'" ^ name)))
+
+let transl_type_param env styp =
+>>>>>>> upstream-incoming
   let loc = styp.ptyp_loc in
   let transl_jkind_and_annot_opt jkind_annot name =
     let implicit =
@@ -707,6 +848,7 @@ let transl_type_param env path jkind_default styp =
   in
   let attrs = styp.ptyp_attributes in
   match styp.ptyp_desc with
+<<<<<<< oxcaml
     Ptyp_any jkind ->
       let name = None in
       let jkind, jkind_annot = transl_jkind_and_annot_opt jkind name in
@@ -715,6 +857,40 @@ let transl_type_param env path jkind_default styp =
       let name = Some name in
       let jkind, jkind_annot = transl_jkind_and_annot_opt jkind name in
       transl_type_param_var env loc attrs name jkind jkind_annot
+||||||| upstream-base
+    Ptyp_any ->
+      let ty = new_global_var ~name:"_" () in
+        { ctyp_desc = Ttyp_any; ctyp_type = ty; ctyp_env = env;
+          ctyp_loc = loc; ctyp_attributes = styp.ptyp_attributes; }
+  | Ptyp_var name ->
+      let ty =
+          if not (valid_tyvar_name name) then
+            raise (Error (loc, Env.empty, Invalid_variable_name ("'" ^ name)));
+          if TyVarEnv.is_in_scope name then
+            raise Already_bound;
+          let v = new_global_var ~name () in
+          TyVarEnv.add name v;
+          v
+      in
+        { ctyp_desc = Ttyp_var name; ctyp_type = ty; ctyp_env = env;
+          ctyp_loc = loc; ctyp_attributes = styp.ptyp_attributes; }
+=======
+    Ptyp_any ->
+      let ty = new_global_var ~name:"_" () in
+        { ctyp_desc = Ttyp_any; ctyp_type = ty; ctyp_env = env;
+          ctyp_loc = loc; ctyp_attributes = styp.ptyp_attributes; }
+  | Ptyp_var name ->
+      let ty =
+          check_tyvar_name Env.empty loc name;
+          if TyVarEnv.is_in_scope name then
+            raise Already_bound;
+          let v = new_global_var ~name () in
+          TyVarEnv.add name v;
+          v
+      in
+        { ctyp_desc = Ttyp_var name; ctyp_type = ty; ctyp_env = env;
+          ctyp_loc = loc; ctyp_attributes = styp.ptyp_attributes; }
+>>>>>>> upstream-incoming
   | _ -> assert false
 
 let transl_type_param env path jkind_default styp =
@@ -836,6 +1012,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       ctyp_loc = loc; ctyp_attributes = styp.ptyp_attributes }
   in
   match styp.ptyp_desc with
+<<<<<<< oxcaml
     Ptyp_any jkind ->
       let tjkind, tjkind_annot =
         match jkind with
@@ -900,7 +1077,62 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
         | [] -> transl_type env ~policy ~row_context ret_mode.mode_modes ret
       in
       loop mode args
+||||||| upstream-base
+    Ptyp_any ->
+      let ty = TyVarEnv.new_any_var styp.ptyp_loc env policy in
+      ctyp Ttyp_any ty
+  | Ptyp_var name ->
+    let ty =
+      if not (valid_tyvar_name name) then
+        raise (Error (styp.ptyp_loc, env, Invalid_variable_name ("'" ^ name)));
+      begin try
+        TyVarEnv.lookup_local ~row_context:row_context name
+      with Not_found ->
+        let v = TyVarEnv.new_var ~name policy in
+        TyVarEnv.remember_used name v styp.ptyp_loc;
+        v
+      end
+    in
+    ctyp (Ttyp_var name) ty
+  | Ptyp_arrow(l, st1, st2) ->
+    let cty1 = transl_type env ~policy ~row_context st1 in
+    let cty2 = transl_type env ~policy ~row_context st2 in
+    let ty1 = cty1.ctyp_type in
+    let ty1 =
+      if Btype.is_optional l
+      then newty (Tconstr(Predef.path_option,[ty1], ref Mnil))
+      else ty1 in
+    let ty = newty (Tarrow(l, ty1, cty2.ctyp_type, commu_ok)) in
+    ctyp (Ttyp_arrow (l, cty1, cty2)) ty
+=======
+    Ptyp_any ->
+      let ty = TyVarEnv.new_any_var styp.ptyp_loc env policy in
+      ctyp Ttyp_any ty
+  | Ptyp_var name ->
+    let ty =
+      check_tyvar_name env styp.ptyp_loc name;
+      begin try
+        TyVarEnv.lookup_local ~row_context:row_context name
+      with Not_found ->
+        let v = TyVarEnv.new_var ~name policy in
+        TyVarEnv.remember_used name v styp.ptyp_loc;
+        v
+      end
+    in
+    ctyp (Ttyp_var name) ty
+  | Ptyp_arrow(l, st1, st2) ->
+    let cty1 = transl_type env ~policy ~row_context st1 in
+    let cty2 = transl_type env ~policy ~row_context st2 in
+    let ty1 = cty1.ctyp_type in
+    let ty1 =
+      if Btype.is_optional l
+      then newty (Tconstr(Predef.path_option,[ty1], ref Mnil))
+      else ty1 in
+    let ty = newty (Tarrow(l, ty1, cty2.ctyp_type, commu_ok)) in
+    ctyp (Ttyp_arrow (l, cty1, cty2)) ty
+>>>>>>> upstream-incoming
   | Ptyp_tuple stl ->
+<<<<<<< oxcaml
     let desc, typ =
       transl_type_aux_tuple env ~loc ~policy ~row_context stl
     in
@@ -918,6 +1150,23 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
                (List.map (fun (label, ctyp) -> label, ctyp.ctyp_type) tl))
     in
     ctyp (Ttyp_unboxed_tuple tl) ctyp_type
+||||||| upstream-base
+    assert (List.length stl >= 2);
+    let ctys = List.map (transl_type env ~policy ~row_context) stl in
+    let ty = newty (Ttuple (List.map (fun ctyp -> ctyp.ctyp_type) ctys)) in
+    ctyp (Ttyp_tuple ctys) ty
+=======
+    assert (List.length stl >= 2);
+    Option.iter (fun l -> raise (Error (loc, env, Repeated_tuple_label l)))
+      (Misc.repeated_label stl);
+    let ctys =
+      List.map (fun (l, t) -> l, transl_type env ~policy ~row_context t) stl
+    in
+    let ty =
+      newty (Ttuple (List.map (fun (l, ctyp) -> l, ctyp.ctyp_type) ctys))
+    in
+    ctyp (Ttyp_tuple ctys) ty
+>>>>>>> upstream-incoming
   | Ptyp_constr(lid, stl) ->
       let (path, decl) = Env.lookup_type ~loc:lid.loc lid.txt env in
       let stl =
@@ -1014,12 +1263,86 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             assert false
       in
       ctyp (Ttyp_class (path, lid, args)) ty
+<<<<<<< oxcaml
   | Ptyp_alias(st, alias, jkind) ->
     let desc, typ =
       transl_type_alias env ~policy ~row_context
         mode styp.ptyp_attributes loc st alias jkind
     in
     ctyp desc typ
+||||||| upstream-base
+  | Ptyp_alias(st, alias) ->
+      let cty =
+        try
+          let t = TyVarEnv.lookup_local ~row_context alias.txt in
+          let ty = transl_type env ~policy ~aliased:true ~row_context st in
+          begin try unify_var env t ty.ctyp_type with Unify err ->
+            let err = Errortrace.swap_unification_error err in
+            raise(Error(alias.loc, env, Alias_type_mismatch err))
+          end;
+          ty
+        with Not_found ->
+          let t, ty =
+            with_local_level_if_principal begin fun () ->
+              let t = newvar () in
+              (* Use the whole location, which is used by [Type_mismatch]. *)
+              TyVarEnv.remember_used alias.txt t styp.ptyp_loc;
+              let ty = transl_type env ~policy ~row_context st in
+              begin try unify_var env t ty.ctyp_type with Unify err ->
+                let err = Errortrace.swap_unification_error err in
+                raise(Error(alias.loc, env, Alias_type_mismatch err))
+              end;
+              (t, ty)
+            end
+            ~post: (fun (t, _) -> generalize_structure t)
+          in
+          let t = instance t in
+          let px = Btype.proxy t in
+          begin match get_desc px with
+          | Tvar None -> set_type_desc px (Tvar (Some alias.txt))
+          | Tunivar None -> set_type_desc px (Tunivar (Some alias.txt))
+          | _ -> ()
+          end;
+          { ty with ctyp_type = t }
+      in
+      ctyp (Ttyp_alias (cty, alias)) cty.ctyp_type
+=======
+  | Ptyp_alias(st, alias) ->
+      let cty =
+        try
+          check_tyvar_name env alias.loc alias.txt;
+          let t = TyVarEnv.lookup_local ~row_context alias.txt in
+          let ty = transl_type env ~policy ~aliased:true ~row_context st in
+          begin try unify_var env t ty.ctyp_type with Unify err ->
+            let err = Errortrace.swap_unification_error err in
+            raise(Error(alias.loc, env, Alias_type_mismatch err))
+          end;
+          ty
+        with Not_found ->
+          let t, ty =
+            with_local_level_generalize_structure_if_principal begin fun () ->
+              let t = newvar () in
+              (* Use the whole location, which is used by [Type_mismatch]. *)
+              TyVarEnv.remember_used ~check:alias.loc alias.txt t styp.ptyp_loc;
+              let ty = transl_type env ~policy ~row_context st in
+              begin try unify_var env t ty.ctyp_type with Unify err ->
+                let err = Errortrace.swap_unification_error err in
+                raise(Error(alias.loc, env, Alias_type_mismatch err))
+              end;
+              (t, ty)
+            end
+          in
+          let t = instance t in
+          let px = Btype.proxy t in
+          begin match get_desc px with
+          | Tvar None -> set_type_desc px (Tvar (Some alias.txt))
+          | Tunivar None -> set_type_desc px (Tunivar (Some alias.txt))
+          | _ -> ()
+          end;
+          { ty with ctyp_type = t }
+      in
+      ctyp (Ttyp_alias (cty, alias)) cty.ctyp_type
+>>>>>>> upstream-incoming
   | Ptyp_variant(fields, closed, present) ->
       let name = ref None in
       let mkfield l f =
@@ -1146,10 +1469,34 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let ty = newty (Tvariant (make_row more)) in
       ctyp (Ttyp_variant (tfields, closed, present)) ty
   | Ptyp_poly(vars, st) ->
+<<<<<<< oxcaml
       let desc, typ =
         transl_type_poly env ~policy ~row_context mode styp.ptyp_loc
           vars st
+||||||| upstream-base
+      let vars = List.map (fun v -> v.txt) vars in
+      let new_univars, cty =
+        with_local_level begin fun () ->
+          let new_univars = TyVarEnv.make_poly_univars vars in
+          let cty = TyVarEnv.with_univars new_univars begin fun () ->
+            transl_type env ~policy ~row_context st
+          end in
+          (new_univars, cty)
+        end
+        ~post:(fun (_,cty) -> generalize_ctyp cty)
+=======
+      let vars = List.map (fun v -> v.txt) vars in
+      let new_univars, cty =
+        with_local_level_generalize begin fun () ->
+          let new_univars = TyVarEnv.make_poly_univars vars in
+          let cty = TyVarEnv.with_univars new_univars begin fun () ->
+            transl_type env ~policy ~row_context st
+          end in
+          (new_univars, cty)
+        end
+>>>>>>> upstream-incoming
       in
+<<<<<<< oxcaml
       ctyp desc typ
   | Ptyp_repr(vars, st) ->
       Language_extension.assert_enabled ~loc Layout_poly
@@ -1187,12 +1534,57 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let path = !transl_modtype_longident loc env p.txt in
       let ty = newty (Tpackage (path,
                        List.map (fun (s, cty) -> (s.txt, cty.ctyp_type)) ptys))
+||||||| upstream-base
+      let ty = cty.ctyp_type in
+      let ty_list = TyVarEnv.check_poly_univars env styp.ptyp_loc new_univars in
+      let ty_list = List.filter (fun v -> deep_occur v ty) ty_list in
+      let ty' = Btype.newgenty (Tpoly(ty, ty_list)) in
+      unify_var env (newvar()) ty';
+      ctyp (Ttyp_poly (vars, cty)) ty'
+  | Ptyp_package (p, l) ->
+      let loc = styp.ptyp_loc in
+      let l = sort_constraints_no_duplicates loc env l in
+      let mty = create_package_mty loc p l in
+      let mty =
+        TyVarEnv.with_local_scope (fun () -> !transl_modtype env mty) in
+      let ptys = List.map (fun (s, pty) ->
+                             s, transl_type env ~policy ~row_context pty
+                          ) l in
+      let path = !transl_modtype_longident loc env p.txt in
+      let ty = newty (Tpackage (path,
+                       List.map (fun (s, cty) -> (s.txt, cty.ctyp_type)) ptys))
+=======
+      let ty = cty.ctyp_type in
+      let ty_list = TyVarEnv.check_poly_univars env styp.ptyp_loc new_univars in
+      let ty_list = List.filter (fun v -> deep_occur v ty) ty_list in
+      let ty' = Btype.newgenty (Tpoly(ty, ty_list)) in
+      unify_var env (newvar()) ty';
+      ctyp (Ttyp_poly (vars, cty)) ty'
+  | Ptyp_package ptyp ->
+      let path, mty, ptys = transl_package env ~policy ~row_context ptyp in
+      let ty = newty (Tpackage {
+          pack_path = path;
+          pack_cstrs = List.map (fun (s, cty) ->
+                         (Longident.flatten s.txt, cty.ctyp_type)) ptys})
+>>>>>>> upstream-incoming
       in
       ctyp (Ttyp_package {
+<<<<<<< oxcaml
             pack_path = path;
             pack_type = mty;
             pack_fields = ptys;
             pack_txt = p;
+||||||| upstream-base
+            pack_path = path;
+            pack_type = mty.mty_type;
+            pack_fields = ptys;
+            pack_txt = p;
+=======
+            tpt_path = path;
+            tpt_type = mty;
+            tpt_cstrs = ptys;
+            tpt_txt = ptyp.ppt_path;
+>>>>>>> upstream-incoming
            }) ty
   | Ptyp_open (mod_ident, t) ->
       let path, new_env =
@@ -1500,6 +1892,27 @@ and transl_fields env ~policy ~row_context o fields =
       newty (Tfield (s, field_public, ty', ty))) ty_init fields in
   ty, object_fields
 
+<<<<<<< oxcaml
+||||||| upstream-base
+
+=======
+and transl_package env ~policy ~row_context ptyp =
+  let loc = ptyp.ppt_loc in
+  let l = sort_constraints_no_duplicates loc env ptyp.ppt_cstrs in
+  let mty = Ast_helper.Mty.mk ~loc (Pmty_ident ptyp.ppt_path) in
+  let mty = TyVarEnv.with_local_scope (fun () -> !transl_modtype env mty) in
+  let ptys =
+    List.map (fun (s, pty) -> s, transl_type env ~policy ~row_context pty) l
+  in
+  let mty =
+    if ptys <> [] then
+      !check_package_with_type_constraints loc env mty.mty_type ptys
+    else mty.mty_type
+  in
+  let path = !transl_modtype_longident loc env ptyp.ppt_path.txt in
+  path, mty, ptys
+
+>>>>>>> upstream-incoming
 (* Make the rows "fixed" in this type, to make universal check easier *)
 let rec make_fixed_univars mark ty =
   if try_mark_node mark ty then
@@ -1527,10 +1940,26 @@ let rec make_fixed_univars mark ty =
 let make_fixed_univars ty =
   with_type_mark (fun mark -> make_fixed_univars mark ty)
 
+<<<<<<< oxcaml
 let transl_type env policy mode styp =
   transl_type env ~policy ~row_context:[] mode styp
 
 let transl_simple_type_impl env ~new_var_jkind ?univars ~policy mode styp =
+||||||| upstream-base
+let transl_type env policy styp =
+  transl_type env ~policy ~row_context:[] styp
+
+let make_fixed_univars ty =
+  make_fixed_univars ty;
+  Btype.unmark_type ty
+
+let transl_simple_type env ?univars ~closed styp =
+=======
+let transl_type env policy styp =
+  transl_type env ~policy ~row_context:[] styp
+
+let transl_simple_type env ?univars ~closed styp =
+>>>>>>> upstream-incoming
   TyVarEnv.reset_locals ?univars ();
   let policy = TyVarEnv.make_policy policy new_var_jkind in
   let typ = transl_type env policy mode styp in
@@ -1546,7 +1975,7 @@ let transl_simple_type_univars env styp =
   TyVarEnv.reset_locals ();
   let typ, univs =
     TyVarEnv.collect_univars begin fun () ->
-      with_local_level ~post:generalize_ctyp begin fun () ->
+      with_local_level_generalize begin fun () ->
         let policy = TyVarEnv.univars_policy in
         let typ = transl_type env policy Alloc.Const.legacy styp in
         TyVarEnv.globalize_used_variables policy env ();
@@ -1560,9 +1989,19 @@ let transl_simple_type_univars env styp =
 let transl_simple_type_delayed env mode styp =
   TyVarEnv.reset_locals ();
   let typ, force =
+<<<<<<< oxcaml
     with_local_level begin fun () ->
       let policy = TyVarEnv.make_policy Open Any in
       let typ = transl_type env policy mode styp in
+||||||| upstream-base
+    with_local_level begin fun () ->
+      let policy = TyVarEnv.extensible_policy in
+      let typ = transl_type env policy styp in
+=======
+    with_local_level_generalize begin fun () ->
+      let policy = TyVarEnv.extensible_policy in
+      let typ = transl_type env policy styp in
+>>>>>>> upstream-incoming
       make_fixed_univars typ.ctyp_type;
       (* This brings the used variables to the global level, but doesn't link
          them to their other occurrences just yet. This will be done when
@@ -1570,8 +2009,6 @@ let transl_simple_type_delayed env mode styp =
       let force = TyVarEnv.globalize_used_variables policy env in
       (typ, force)
     end
-    (* Generalize everything except the variables that were just globalized. *)
-    ~post:(fun (typ,_) -> generalize_ctyp typ)
   in
   (typ, instance typ.ctyp_type, force)
 
@@ -1621,19 +2058,80 @@ let transl_type_scheme_poly env attrs loc vars inner_type =
 let transl_type_scheme env styp =
   match styp.ptyp_desc with
   | Ptyp_poly (vars, st) ->
+<<<<<<< oxcaml
     transl_type_scheme_poly env styp.ptyp_attributes
       styp.ptyp_loc vars st
+||||||| upstream-base
+     let vars = List.map (fun v -> v.txt) vars in
+     let univars, typ =
+       with_local_level begin fun () ->
+         TyVarEnv.reset ();
+         let univars = TyVarEnv.make_poly_univars vars in
+         let typ = transl_simple_type env ~univars ~closed:true st in
+         (univars, typ)
+       end
+       ~post:(fun (_,typ) -> generalize_ctyp typ)
+     in
+     let _ = TyVarEnv.instance_poly_univars env styp.ptyp_loc univars in
+     { ctyp_desc = Ttyp_poly (vars, typ);
+       ctyp_type = typ.ctyp_type;
+       ctyp_env = env;
+       ctyp_loc = styp.ptyp_loc;
+       ctyp_attributes = styp.ptyp_attributes }
+=======
+     let vars = List.map (fun v -> v.txt) vars in
+     let univars, typ =
+       with_local_level_generalize begin fun () ->
+         TyVarEnv.reset ();
+         let univars = TyVarEnv.make_poly_univars vars in
+         let typ = transl_simple_type env ~univars ~closed:true st in
+         (univars, typ)
+       end
+     in
+     let _ = TyVarEnv.instance_poly_univars env styp.ptyp_loc univars in
+     { ctyp_desc = Ttyp_poly (vars, typ);
+       ctyp_type = typ.ctyp_type;
+       ctyp_env = env;
+       ctyp_loc = styp.ptyp_loc;
+       ctyp_attributes = styp.ptyp_attributes }
+>>>>>>> upstream-incoming
   | _ ->
+<<<<<<< oxcaml
     transl_type_scheme_mono env styp
+||||||| upstream-base
+      with_local_level
+        (fun () -> TyVarEnv.reset (); transl_simple_type env ~closed:false styp)
+        ~post:generalize_ctyp
+
+=======
+      with_local_level_generalize
+        (fun () -> TyVarEnv.reset (); transl_simple_type env ~closed:false styp)
+
+>>>>>>> upstream-incoming
 
 (* Error report *)
 
 open Format_doc
+<<<<<<< oxcaml
 open Printtyp
+||||||| upstream-base
+open Format
+open Printtyp
+=======
+open Printtyp.Doc
+>>>>>>> upstream-incoming
 module Style = Misc.Style
 let pp_tag ppf t = fprintf ppf "`%s" t
+<<<<<<< oxcaml
 let pp_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty
+||||||| upstream-base
+let pp_tag ppf t = Format.fprintf ppf "`%s" t
+=======
+let pp_out_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty
+let pp_type ppf ty = Style.as_inline_code Printtyp.Doc.type_expr ppf ty
+>>>>>>> upstream-incoming
 
+<<<<<<< oxcaml
 let report_unbound_variable_reason ppf = function
   | Some Upstream_compatibility ->
       fprintf ppf "@.Hint: Explicit quantification requires quantifying all \
@@ -1652,71 +2150,147 @@ let report_error_doc env ppf =
       fprintf ppf "A type wildcard %a is not allowed in this type declaration."
         Style.inline_code "_";
       report_unbound_variable_reason ppf reason
+||||||| upstream-base
+
+let report_error env ppf = function
+  | Unbound_type_variable (name, in_scope_names) ->
+    fprintf ppf "The type variable %a is unbound in this type declaration.@ %a"
+      Style.inline_code name
+      did_you_mean (fun () -> Misc.spellcheck in_scope_names name )
+  | No_type_wildcards ->
+      fprintf ppf "A type wildcard %a is not allowed in this type declaration."
+        Style.inline_code "_"
+=======
+let report_error_doc loc env = function
+  | Unbound_type_variable (name, in_scope_names) ->
+    Location.aligned_error_hint ~loc
+      "@{<ralign>The type variable @}%a is unbound in this type declaration."
+        Style.inline_code name
+        (Misc.did_you_mean (Misc.spellcheck in_scope_names name))
+  | No_type_wildcards ->
+      Location.errorf ~loc
+        "A type wildcard %a is not allowed in this type declaration."
+        Style.inline_code "_"
+>>>>>>> upstream-incoming
   | Undefined_type_constructor p ->
-    fprintf ppf "The type constructor@ %a@ is not yet completely defined"
-      (Style.as_inline_code path) p
+      Location.errorf ~loc
+        "The type constructor@ %a@ is not yet completely defined"
+        (Style.as_inline_code path) p
   | Type_arity_mismatch(lid, expected, provided) ->
-    fprintf ppf
-      "@[The type constructor %a@ expects %i argument(s),@ \
-        but is here applied to %i argument(s)@]"
-      (Style.as_inline_code longident) lid expected provided
+      Location.errorf ~loc
+        "The type constructor %a@ expects %i argument(s),@ \
+         but is here applied to %i argument(s)"
+        (Style.as_inline_code longident) lid expected provided
   | Bound_type_variable name ->
+<<<<<<< oxcaml
       fprintf ppf "Already bound type parameter %a"
+||||||| upstream-base
+      fprintf ppf "Already bound type parameter %a"
+        (Style.as_inline_code Pprintast.tyvar) name
+=======
+      Location.errorf ~loc "Already bound type parameter %a"
+>>>>>>> upstream-incoming
         (Style.as_inline_code Pprintast.Doc.tyvar) name
   | Recursive_type ->
-    fprintf ppf "This type is recursive"
+      Location.errorf ~loc "This type is recursive"
   | Type_mismatch trace ->
       let msg = Format_doc.Doc.msg in
+<<<<<<< oxcaml
       Printtyp.report_unification_error ppf Env.empty trace
         (msg "This type")
         (msg "should be an instance of type")
+||||||| upstream-base
+      Printtyp.report_unification_error ppf Env.empty trace
+        (function ppf ->
+           fprintf ppf "This type")
+        (function ppf ->
+           fprintf ppf "should be an instance of type")
+=======
+      Location.errorf ~loc "%t" @@ fun ppf ->
+        Errortrace_report.unification ppf Env.empty trace
+          (msg "This type")
+          (msg "should be an instance of type")
+>>>>>>> upstream-incoming
   | Alias_type_mismatch trace ->
       let msg = Format_doc.Doc.msg in
+<<<<<<< oxcaml
       Printtyp.report_unification_error ppf Env.empty trace
         (msg "This alias is bound to type")
         (msg "but is used as an instance of type")
+||||||| upstream-base
+      Printtyp.report_unification_error ppf Env.empty trace
+        (function ppf ->
+           fprintf ppf "This alias is bound to type")
+        (function ppf ->
+           fprintf ppf "but is used as an instance of type")
+=======
+      Location.errorf ~loc "%t" @@ fun ppf ->
+        Errortrace_report.unification ppf Env.empty trace
+          (msg "This alias is bound to type")
+          (msg "but is used as an instance of type")
+>>>>>>> upstream-incoming
   | Present_has_conjunction l ->
-      fprintf ppf "The present constructor %a has a conjunctive type"
+      Location.errorf ~loc "The present constructor %a has a conjunctive type"
         Style.inline_code l
   | Present_has_no_type l ->
-      fprintf ppf
-        "@[<v>@[The constructor %a is missing from the upper bound@ \
+      Location.errorf ~loc
+        "The constructor %a is missing from the upper bound@ \
          (between %a@ and %a)@ of this polymorphic variant@ \
-         but is present in@ its lower bound (after %a).@]@,\
-         @[@{<hint>Hint@}: Either add %a in the upper bound,@ \
-         or remove it@ from the lower bound.@]@]"
+         but is present in@ its lower bound (after %a)."
         (Style.as_inline_code pp_tag) l
         Style.inline_code "<"
         Style.inline_code ">"
         Style.inline_code ">"
-        (Style.as_inline_code pp_tag) l
+        ~sub:[
+          Location.msg
+            "@{<hint>Hint@}: Either add %a in the upper bound,@ \
+             or@ remove@ it@ from the lower bound."
+            (Style.as_inline_code pp_tag) l
+        ]
   | Constructor_mismatch (ty, ty') ->
       wrap_printing_env ~error:true env (fun ()  ->
-        Printtyp.prepare_for_printing [ty; ty'];
-        fprintf ppf "@[<hov>%s %a@ %s@ %a@]"
-          "This variant type contains a constructor"
-          pp_type (tree_of_typexp Type ty)
-          "which should be"
-          pp_type (tree_of_typexp Type ty'))
+        Out_type.prepare_for_printing [ty; ty'];
+        Location.errorf ~loc
+          "This variant type contains a constructor %a@ \
+           which should be@ %a"
+          pp_out_type (Out_type.tree_of_typexp Type ty)
+          pp_out_type (Out_type.tree_of_typexp Type ty')
+        )
   | Not_a_variant ty ->
+<<<<<<< oxcaml
       fprintf ppf
         "@[The type %a@ does not expand to a polymorphic variant type@]"
         (Style.as_inline_code Printtyp.type_expr) ty;
       begin match get_desc ty with
         | Tvar { name = Some s } ->
-           (* PR#7012: help the user that wrote 'Foo instead of `Foo *)
-           Misc.did_you_mean ppf (fun () -> ["`" ^ s])
-        | _ -> ()
-      end
-  | Variant_tags (lab1, lab2) ->
+||||||| upstream-base
       fprintf ppf
-        "@[Variant tags %a@ and %a have the same hash value.@ %s@]"
+        "@[The type %a@ does not expand to a polymorphic variant type@]"
+        (Style.as_inline_code Printtyp.type_expr) ty;
+      begin match get_desc ty with
+        | Tvar (Some s) ->
+=======
+      Location.aligned_error_hint ~loc
+        "@{<ralign>The type @}%a@ does not expand to a polymorphic variant type"
+        pp_type ty
+        begin match get_desc ty with
+        | Tvar (Some s) ->
+>>>>>>> upstream-incoming
+           (* PR#7012: help the user that wrote 'Foo instead of `Foo *)
+           Misc.did_you_mean  ["`" ^ s]
+        | _ -> None
+        end
+  | Variant_tags (lab1, lab2) ->
+      Location.errorf ~loc
+        "Variant tags %a@ and %a have the same hash value.@ \
+         Change one of them."
         (Style.as_inline_code pp_tag) lab1
         (Style.as_inline_code pp_tag) lab2
-        "Change one of them."
   | Invalid_variable_name name ->
-      fprintf ppf "The type variable name %a is not allowed in programs"
+      Location.errorf ~loc
+        "The type variable name %a is not allowed in programs"
         Style.inline_code name
+<<<<<<< oxcaml
   | Cannot_quantify (name, reason) ->
       fprintf ppf
         "@[<hov>The universal type variable %a cannot be generalized:@ "
@@ -1755,22 +2329,51 @@ let report_error_doc env ppf =
         Pprintast.Doc.tyvar name
         Jkind.format explicit_jkind
         Jkind.format implicit_jkind
+||||||| upstream-base
+  | Cannot_quantify (name, v) ->
+      fprintf ppf
+        "@[<hov>The universal type variable %a cannot be generalized:@ "
+        (Style.as_inline_code Pprintast.tyvar) name;
+      if Btype.is_Tvar v then
+        fprintf ppf "it escapes its scope"
+      else if Btype.is_Tunivar v then
+        fprintf ppf "it is already bound to another variable"
+      else
+        fprintf ppf "it is bound to@ %a"
+          (Style.as_inline_code Printtyp.type_expr) v;
+      fprintf ppf ".@]";
+=======
+  | Cannot_quantify (name, v) ->
+      let explanation ppf v =
+        if Btype.is_Tvar v then
+          fprintf ppf "it escapes its scope."
+        else if Btype.is_Tunivar v then
+          fprintf ppf "it is already bound to another variable."
+        else
+          fprintf ppf "it is bound to@ %a." pp_type v
+      in
+      Location.errorf ~loc
+        "The universal type variable %a cannot be generalized:@ %a"
+        (Style.as_inline_code Pprintast.Doc.tyvar) name
+        explanation v
+>>>>>>> upstream-incoming
   | Multiple_constraints_on_type s ->
-      fprintf ppf "Multiple constraints for type %a"
+      Location.errorf ~loc "Multiple constraints for type %a"
         (Style.as_inline_code longident) s
   | Method_mismatch (l, ty, ty') ->
       wrap_printing_env ~error:true env (fun ()  ->
-        fprintf ppf "@[<hov>Method %a has type %a,@ which should be %a@]"
+        Location.errorf ~loc "Method %a has type %a,@ which should be %a"
           Style.inline_code l
-          (Style.as_inline_code Printtyp.type_expr) ty
-          (Style.as_inline_code Printtyp.type_expr) ty')
+          pp_type ty
+          pp_type ty')
   | Opened_object nm ->
-      fprintf ppf
+      Location.errorf ~loc
         "Illegal open object type%a"
         (fun ppf -> function
              Some p -> fprintf ppf "@ %a" (Style.as_inline_code path) p
            | None -> fprintf ppf "") nm
   | Not_an_object ty ->
+<<<<<<< oxcaml
       fprintf ppf "@[The type %a@ is not an object type@]"
         (Style.as_inline_code Printtyp.type_expr) ty
   | Unsupported_extension ext ->
@@ -1828,12 +2431,28 @@ let report_error_doc env ppf =
       Env.print_stage usage_stage
       Env.print_stage intro_stage
       Env.print_with_quote_promote (name, intro_stage, usage_stage)
+||||||| upstream-base
+      fprintf ppf "@[The type %a@ is not an object type@]"
+        (Style.as_inline_code Printtyp.type_expr) ty
+=======
+      Location.errorf ~loc "@[The type %a@ is not an object type@]"
+        pp_type ty
+  | Repeated_tuple_label l ->
+      Location.errorf ~loc "@[This tuple type has two labels named %a@]"
+        Style.inline_code l
+>>>>>>> upstream-incoming
 
 let () =
   Location.register_error_of_exn
     (function
       | Error (loc, env, err) ->
+<<<<<<< oxcaml
         Some (Location.error_of_printer ~loc (report_error_doc env) err)
+||||||| upstream-base
+        Some (Location.error_of_printer ~loc (report_error env) err)
+=======
+        Some (report_error_doc loc env err)
+>>>>>>> upstream-incoming
       | Error_forward err ->
         Some err
       | _ ->

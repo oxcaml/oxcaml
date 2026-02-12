@@ -46,7 +46,7 @@ BINDIR=@bindir@
 
 datarootdir=@datarootdir@
 
-### Where to install the standard library
+### Where to install the standard library on host
 LIBDIR=@libdir@
 
 ### Where to install the stub code for the standard library
@@ -161,12 +161,23 @@ INSTALL_SOURCE_ARTIFACTS=@install_source_artifacts@
 
 CFLAGS=@CFLAGS@
 CPPFLAGS=@CPPFLAGS@
-OCAMLC_CFLAGS=@ocamlc_cflags@
+BYTECODE_CFLAGS=@bytecode_cflags@
 
+<<<<<<< oxcaml
 OCAMLC_CPPFLAGS=@ocamlc_cppflags@
 ZSTD_LIBS=@zstd_libs@
 BYTECCLIBS=@zstd_libs@ @cclibs@
 EXE=@exeext@
+||||||| upstream-base
+OCAMLC_CPPFLAGS=@ocamlc_cppflags@
+BYTECCLIBS=@cclibs@
+EXE=@exeext@
+=======
+BYTECODE_CPPFLAGS=@bytecode_cppflags@
+ZSTD_LIBS=@zstd_libs@
+BYTECCLIBS=@zstd_libs@ @cclibs@
+EXE=@EXEEXT@
+>>>>>>> upstream-incoming
 OUTPUTEXE=@outputexe@$(EMPTY)
 SUPPORTS_SHARED_LIBRARIES=@supports_shared_libraries@
 MKSHAREDLIBRPATH=@mksharedlibrpath@
@@ -175,14 +186,18 @@ NATDYNLINK=@natdynlink@
 NATDYNLINKOPTS=@natdynlinkopts@
 SYSLIB=@syslib@
 MKLIB=@mklib@
-# #7678: ocamlopt uses these only to compile .c files, and the behaviour for the
-#        two drivers should be identical.
-OCAMLOPT_CFLAGS=@ocamlc_cflags@
-OCAMLOPT_CPPFLAGS=@ocamlc_cppflags@
+
+# The following variable defines flags to be passed to the C preprocessor
+# when compiling C files to be linked with native code. This includes
+# the native runtime itself and can also include the stub code around
+# C libraries when it needs to be different from the one used to
+# link with bytecode.
+
 NATIVECCLIBS=@cclibs@
 SYSTHREAD_SUPPORT=@systhread_support@
+STRIP=@STRIP@
 PACKLD=@PACKLD@$(EMPTY)
-CCOMPTYPE=@ccomptype@
+CCOMPTYPE=@ccomp_type@
 TOOLCHAIN=@toolchain@
 CMXS=@cmxs@
 
@@ -216,6 +231,7 @@ FLAMBDA=@flambda@
 FLAMBDA2=@flambda2@
 WITH_FLAMBDA_INVARIANTS=@flambda_invariants@
 WITH_CMM_INVARIANTS=@cmm_invariants@
+WITH_CODEGEN_INVARIANTS=@codegen_invariants@
 FORCE_SAFE_STRING=true
 DEFAULT_SAFE_STRING=true
 WINDOWS_UNICODE=@windows_unicode@
@@ -241,6 +257,13 @@ RUNTIME_SUFFIX=@runtime_suffix@
 RUNTIME_DIR=runtime$(RUNTIME_SUFFIX)
 
 # Deprecated variables
+
+## Variables deprecated since OCaml 5.3
+
+OCAMLC_CFLAGS=@bytecode_cflags@
+OCAMLOPT_CFLAGS=@native_cflags@
+OCAMLC_CPPFLAGS=@bytecode_cppflags@
+OCAMLOPT_CPPFLAGS=@native_cppflags@
 
 ## Variables deprecated since OCaml 5.2
 

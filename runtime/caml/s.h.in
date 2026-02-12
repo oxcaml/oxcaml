@@ -78,8 +78,6 @@
 
 #undef HAS_ISSETUGID
 
-#undef HAS_STDATOMIC_H
-
 #undef HAS_SYS_MMAN_H
 
 #undef HAS_LINUX_FUTEX_H
@@ -108,11 +106,10 @@
 
 #undef HAS_IPV6
 
-#undef HAS_STDINT_H
-
 #undef HAS_PTHREAD_NP_H
 
 #undef HAS_PRCTL
+<<<<<<< oxcaml
 
 #undef HAS_PTHREAD_SETNAME_NP
 
@@ -123,8 +120,18 @@
 #undef HAS_DECL_SETTHREADDESCRIPTION
 
 #undef HAS_UNISTD
+||||||| upstream-base
+#undef HAS_UNISTD
+=======
+>>>>>>> upstream-incoming
 
-/* Define HAS_UNISTD if you have /usr/include/unistd.h. */
+#undef HAS_PTHREAD_SETNAME_NP
+
+#undef HAS_PTHREAD_SET_NAME_NP
+
+#undef HAS_SETTHREADDESCRIPTION
+
+#undef HAS_DECL_SETTHREADDESCRIPTION
 
 #undef HAS_DIRENT
 
@@ -271,7 +278,15 @@
 
 #undef HAS_PWRITE
 
-#undef HAS_NANOSECOND_STAT
+#undef HAVE_STRUCT_STAT_ST_ATIM_TV_NSEC
+#undef HAVE_STRUCT_STAT_ST_ATIMESPEC_TV_NSEC
+#undef HAVE_STRUCT_STAT_ST_ATIMENSEC
+
+/* Define either HAVE_STRUCT_STAT_ST_ATIM_TV_NSEC,
+   HAVE_STRUCT_STAT_ST_ATIMESPEC_TV_NSEC, or HAVE_STRUCT_STAT_ST_ATIMENSEC if
+   (respectively) the field struct stat.st_atim.tv_nsec,
+   struct stat.st_atimespec.tv_nsec, or struct stat.st_atimensec is available.
+*/
 
 #undef HAS_GETHOSTBYNAME_R
 
@@ -280,9 +295,9 @@
    gethostbyname_r(): either 5 or 6 depending on prototype.
    (5 is the Solaris version, 6 is the Linux version). */
 
-#undef HAS_GETHOSTBYADDR_R 8
+#undef HAS_GETHOSTBYADDR_R
 
-/* Define HAS_GETHOSTBYADDR_R if gethostbyname_r() is available.
+/* Define HAS_GETHOSTBYADDR_R if gethostbyaddr_r() is available.
    The value of this symbol is the number of arguments of
    gethostbyaddr_r(): either 7 or 8 depending on prototype.
    (7 is the Solaris version, 8 is the Linux version). */
@@ -337,8 +352,6 @@
 
 #undef HAS_BROKEN_PRINTF
 
-#undef HAS_STRERROR
-
 #undef HAS_POSIX_MONOTONIC_CLOCK
 
 #undef HAS_CLOCK_GETTIME_NSEC_NP
@@ -347,3 +360,11 @@
 #undef HAS_BSD_GETAFFINITY_NP
 
 #undef HAS_ZSTD
+
+#undef HAVE_MAX_ALIGN_T
+
+/* 3. Language extensions. */
+
+#undef HAVE_LABELS_AS_VALUES
+
+/* Define if the C compiler supports the labels as values extension. */

@@ -33,6 +33,7 @@ type type_replacement =
   | Path of Path.t
   | Type_function of { params : type_expr list; body : type_expr }
 
+<<<<<<< oxcaml
 type additional_action =
   | Prepare_for_saving of
       { prepare_jkind : 'l 'r. Location.t -> ('l * 'r) jkind -> ('l * 'r) jkind;
@@ -49,6 +50,10 @@ type additional_action =
   | Duplicate_variables
   | No_action
 
+||||||| upstream-base
+type t =
+=======
+>>>>>>> upstream-incoming
 type s =
   { types: type_replacement Path.Map.t;
     modules: Path.t Path.Map.t;
@@ -75,6 +80,7 @@ let identity =
     last_compose = None;
   }
 
+<<<<<<< oxcaml
 (* Add a replacement for both a path and its unboxed version, even if that
    unboxed version doesn't exist (as we can't tell here whether it exists).
    Asserts we never add an unboxed version directly. *)
@@ -99,15 +105,46 @@ let add_type_replacement types id replacement =
       Path.Map.add
         (Path.unboxed_version id) (Type_function { params; body }) types
     | _ -> types
-
+||||||| upstream-base
+let add_type_path id p s = { s with types = Path.Map.add id (Path p) s.types }
+let add_type id p s = add_type_path (Pident id) p s
+=======
 let unsafe x = x
+>>>>>>> upstream-incoming
 
+<<<<<<< oxcaml
+let unsafe x = x
+||||||| upstream-base
+let add_type_function id ~params ~body s =
+  { s with types = Path.Map.add id (Type_function { params; body }) s.types }
+=======
+let add_type id p s =
+    { s with types = Path.Map.add (Pident id) (Path p) s.types }
+>>>>>>> upstream-incoming
+
+<<<<<<< oxcaml
 let add_type id p s =
   let types = add_type_replacement s.types (Pident id) (Path p) in
   { s with types; last_compose = None }
+||||||| upstream-base
+let add_module_path id p s = { s with modules = Path.Map.add id p s.modules }
+let add_module id p s = add_module_path (Pident id) p s
+=======
+let add_module id p s =
+  { s with modules = Path.Map.add (Pident id) p s.modules }
+>>>>>>> upstream-incoming
 
+<<<<<<< oxcaml
 let add_module id p s =
   { s with modules = Path.Map.add (Pident id) p s.modules; last_compose = None }
+||||||| upstream-base
+let add_modtype_path p ty s = { s with modtypes = Path.Map.add p ty s.modtypes }
+let add_modtype id ty s = add_modtype_path (Pident id) ty s
+=======
+let add_modtype_gen p ty s = { s with modtypes = Path.Map.add p ty s.modtypes }
+let add_modtype_path p p' s = add_modtype_gen p (Mty_ident p') s
+let add_modtype id p s = add_modtype_path (Pident id) p s
+>>>>>>> upstream-incoming
 
 let add_modtype_gen p ty s =
   { s with modtypes = Path.Map.add p ty s.modtypes; last_compose = None }
@@ -308,8 +345,15 @@ let rec module_path s path =
 let modtype_path s path =
       match Path.Map.find path s.modtypes with
       | Mty_ident p -> p
+<<<<<<< oxcaml
       | Mty_alias _ | Mty_signature _ | Mty_functor _
       | Mty_strengthen _ as mty ->
+||||||| upstream-base
+      | Mty_alias _ | Mty_signature _ | Mty_functor _ ->
+         fatal_error "Subst.modtype_path"
+=======
+      | Mty_alias _ | Mty_signature _ | Mty_functor _ as mty ->
+>>>>>>> upstream-incoming
          raise (Module_type_path_substituted_away (path,mty))
       | exception Not_found ->
          match path with
@@ -502,9 +546,22 @@ let rec typexp copy_scope s ty =
          | Type_function { params; body } ->
             Tlink (apply_type_function params args body)
          end
+<<<<<<< oxcaml
       | Tpackage(p, fl) ->
           Tpackage(modtype_path s p,
                    List.map (fun (n, ty) -> (n, typexp copy_scope s ty)) fl)
+||||||| upstream-base
+      | Tpackage(p, fl) ->
+          Tpackage(modtype_path s p,
+                    List.map (fun (n, ty) -> (n, typexp copy_scope s ty)) fl)
+=======
+      | Tpackage {pack_path; pack_cstrs} ->
+          Tpackage {
+            pack_path = modtype_path s pack_path;
+            pack_cstrs =
+              List.map (fun (n, ty) -> (n, typexp copy_scope s ty)) pack_cstrs;
+          }
+>>>>>>> upstream-incoming
       | Tobject (t1, name) ->
           let t1' = typexp copy_scope s t1 in
           let name' =
@@ -600,9 +657,16 @@ let label_declaration copy_scope s l =
   {
     ld_id = l.ld_id;
     ld_mutable = l.ld_mutable;
+<<<<<<< oxcaml
     ld_modalities = l.ld_modalities;
     ld_sort = l.ld_sort;
     ld_type = typexp copy_scope s l.ld_loc l.ld_type;
+||||||| upstream-base
+    ld_type = typexp copy_scope s l.ld_type;
+=======
+    ld_atomic = l.ld_atomic;
+    ld_type = typexp copy_scope s l.ld_type;
+>>>>>>> upstream-incoming
     ld_loc = loc s l.ld_loc;
     ld_attributes = attrs s l.ld_attributes;
     ld_uid = l.ld_uid;
@@ -885,7 +949,14 @@ let rename_bound_idents scoping s sg =
         let id' = rename id in
         rename_bound_idents
           (add_modtype id (Pident id') s)
+<<<<<<< oxcaml
           (Sig_modtype(id', mtd, vis) :: sg)
+||||||| upstream-base
+          (add_modtype id (Mty_ident(Pident id')) s)
+          (SigL_modtype(id', mtd, vis) :: sg)
+=======
+          (SigL_modtype(id', mtd, vis) :: sg)
+>>>>>>> upstream-incoming
           rest
     | Sig_class(id, cd, rs, vis) :: rest ->
         (* cheat and pretend they are types cf. PR#6650 *)
@@ -1157,6 +1228,7 @@ module Unsafe = struct
 
   let add_modtype_path = add_modtype_gen
   let add_modtype id mty s = add_modtype_path (Pident id) mty s
+<<<<<<< oxcaml
   let add_type_path id p s =
     { s with types = Path.Map.add id (Path p) s.types; last_compose = None }
   let add_type_function id ~params ~body s =
@@ -1200,3 +1272,22 @@ let () =
       | _ ->
           None
     )
+||||||| upstream-base
+=======
+  let add_type_path id p s = { s with types = Path.Map.add id (Path p) s.types }
+  let add_type_function id ~params ~body s =
+    { s with types = Path.Map.add id (Type_function { params; body }) s.types }
+  let add_module_path id p s = { s with modules = Path.Map.add id p s.modules }
+
+  let wrap f = match f () with
+    | x -> Ok x
+    | exception Module_type_path_substituted_away (p,mty) ->
+        Error (Fcm_type_substituted_away (p,mty))
+
+  let signature_item sc s comp = wrap (fun () -> signature_item sc s comp)
+  let signature sc s comp = wrap (fun () -> signature sc s comp )
+  let compose s1 s2 = wrap (fun () -> compose s1 s2)
+  let type_declaration s t = wrap (fun () -> type_declaration s t)
+
+end
+>>>>>>> upstream-incoming

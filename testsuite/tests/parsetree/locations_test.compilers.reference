@@ -76,7 +76,9 @@ Ptop_def
               expression (//toplevel//[2,1+9]..[2,1+16])
                 Pexp_ident "payload" (//toplevel//[2,1+9]..[2,1+16])
           ]
-        Pexp_constant PConst_int (3,None)
+        Pexp_constant
+        constant (//toplevel//[2,1+0]..[2,1+1])
+          PConst_int (3,None)
   ]
 
 - : int = 3
@@ -120,7 +122,7 @@ Ptop_def
               []
   ]
 
-module type F = functor (A : S) (B : S) -> sig end
+module type F = (A : S) (B : S) -> sig end
 Ptop_def
   [
     structure_item (//toplevel//[2,1+0]..[2,1+48])
@@ -139,7 +141,7 @@ Ptop_def
               []
   ]
 
-module F : functor (A : S) (B : S) -> sig end
+module F : (A : S) (B : S) -> sig end
 Ptop_def
   [
     structure_item (//toplevel//[4,18+0]..[4,18+31])
@@ -237,7 +239,9 @@ Ptop_def
             Ptyp_constr "int" (//toplevel//[4,29+8]..[4,29+11])
             []
           expression (//toplevel//[4,29+14]..[4,29+15])
-            Pexp_constant PConst_int (3,None)
+            Pexp_constant
+            constant (//toplevel//[4,29+14]..[4,29+15])
+              PConst_int (3,None)
       ]
   ]
 
@@ -404,7 +408,9 @@ Ptop_def
                 expression (//toplevel//[2,1+19]..[2,1+28])
                   Pexp_constraint
                   expression (//toplevel//[2,1+27]..[2,1+28])
-                    Pexp_constant PConst_int (3,None)
+                    Pexp_constant
+                    constant (//toplevel//[2,1+27]..[2,1+28])
+                      PConst_int (3,None)
                   core_type (//toplevel//[2,1+21]..[2,1+24])
                     Ptyp_constr "int" (//toplevel//[2,1+21]..[2,1+24])
                     []
@@ -566,7 +572,9 @@ Ptop_def
                     "foo" (//toplevel//[3,9+13]..[3,9+16])
                     Concrete Fresh
                     expression (//toplevel//[3,9+19]..[3,9+21])
-                      Pexp_constant PConst_int (12,None)
+                      Pexp_constant
+                      constant (//toplevel//[3,9+19]..[3,9+21])
+                        PConst_int (12,None)
                 class_field (//toplevel//[3,9+22]..[3,9+46])
                   Pcf_method Public
                     "x" (//toplevel//[3,9+29]..[3,9+30])
@@ -614,7 +622,9 @@ Ptop_def
               [
                 "contents" (//toplevel//[4,19+12]..[4,19+20])
                   expression (//toplevel//[4,19+23]..[4,19+24])
-                    Pexp_constant PConst_int (3,None)
+                    Pexp_constant
+                    constant (//toplevel//[4,19+23]..[4,19+24])
+                      PConst_int (3,None)
               ]
               None
       ]
@@ -641,7 +651,15 @@ Ptop_def
                   [
                     None
                     expression (//toplevel//[2,1+12]..[2,1+13])
+<<<<<<< oxcaml
                       Pexp_constant PConst_int (3,None)
+||||||| upstream-base
+                      Pexp_constant PConst_int (3,None)
+=======
+                      Pexp_constant
+                      constant (//toplevel//[2,1+12]..[2,1+13])
+                        PConst_int (3,None)
+>>>>>>> upstream-incoming
                     None
                     expression (//toplevel//[2,1+15]..[2,1+18]) ghost
                       Pexp_construct "::" (//toplevel//[2,1+15]..[2,1+18]) ghost
@@ -651,7 +669,15 @@ Ptop_def
                           [
                             None
                             expression (//toplevel//[2,1+15]..[2,1+16])
+<<<<<<< oxcaml
                               Pexp_constant PConst_int (4,None)
+||||||| upstream-base
+                              Pexp_constant PConst_int (4,None)
+=======
+                              Pexp_constant
+                              constant (//toplevel//[2,1+15]..[2,1+16])
+                                PConst_int (4,None)
+>>>>>>> upstream-incoming
                             None
                             expression (//toplevel//[2,1+17]..[2,1+18]) ghost
                               Pexp_construct "[]" (//toplevel//[2,1+17]..[2,1+18]) ghost
@@ -677,9 +703,13 @@ Ptop_def
             expression (//toplevel//[2,1+12]..[2,1+16])
               Pexp_sequence
               expression (//toplevel//[2,1+12]..[2,1+13])
-                Pexp_constant PConst_int (3,None)
+                Pexp_constant
+                constant (//toplevel//[2,1+12]..[2,1+13])
+                  PConst_int (3,None)
               expression (//toplevel//[2,1+15]..[2,1+16])
-                Pexp_constant PConst_int (4,None)
+                Pexp_constant
+                constant (//toplevel//[2,1+15]..[2,1+16])
+                  PConst_int (4,None)
       ]
   ]
 
@@ -988,7 +1018,9 @@ Ptop_def
           <arg>
           Nolabel
             expression (//toplevel//[4,27+4]..[4,27+5])
-              Pexp_constant PConst_int (4,None)
+              Pexp_constant
+              constant (//toplevel//[4,27+4]..[4,27+5])
+                PConst_int (4,None)
         ]
   ]
 
@@ -1009,11 +1041,15 @@ Ptop_def
           <arg>
           Nolabel
             expression (//toplevel//[1,0+4]..[1,0+5])
-              Pexp_constant PConst_int (4,None)
+              Pexp_constant
+              constant (//toplevel//[1,0+4]..[1,0+5])
+                PConst_int (4,None)
           <arg>
           Nolabel
             expression (//toplevel//[1,0+10]..[1,0+11])
-              Pexp_constant PConst_int (4,None)
+              Pexp_constant
+              constant (//toplevel//[1,0+10]..[1,0+11])
+                PConst_int (4,None)
         ]
   ]
 
@@ -1034,7 +1070,9 @@ Ptop_def
           <arg>
           Nolabel
             expression (//toplevel//[2,1+5]..[2,1+6])
-              Pexp_constant PConst_int (4,None)
+              Pexp_constant
+              constant (//toplevel//[2,1+5]..[2,1+6])
+                PConst_int (4,None)
         ]
   ]
 
@@ -1055,11 +1093,15 @@ Ptop_def
           <arg>
           Nolabel
             expression (//toplevel//[1,0+5]..[1,0+6])
-              Pexp_constant PConst_int (4,None)
+              Pexp_constant
+              constant (//toplevel//[1,0+5]..[1,0+6])
+                PConst_int (4,None)
           <arg>
           Nolabel
             expression (//toplevel//[1,0+11]..[1,0+12])
-              Pexp_constant PConst_int (4,None)
+              Pexp_constant
+              constant (//toplevel//[1,0+11]..[1,0+12])
+                PConst_int (4,None)
         ]
   ]
 
@@ -1080,7 +1122,9 @@ Ptop_def
           <arg>
           Nolabel
             expression (//toplevel//[2,1+5]..[2,1+6])
-              Pexp_constant PConst_int (4,None)
+              Pexp_constant
+              constant (//toplevel//[2,1+5]..[2,1+6])
+                PConst_int (4,None)
         ]
   ]
 
@@ -1101,11 +1145,15 @@ Ptop_def
           <arg>
           Nolabel
             expression (//toplevel//[1,0+5]..[1,0+6])
-              Pexp_constant PConst_int (4,None)
+              Pexp_constant
+              constant (//toplevel//[1,0+5]..[1,0+6])
+                PConst_int (4,None)
           <arg>
           Nolabel
             expression (//toplevel//[1,0+11]..[1,0+12])
-              Pexp_constant PConst_int (4,None)
+              Pexp_constant
+              constant (//toplevel//[1,0+11]..[1,0+12])
+                PConst_int (4,None)
         ]
   ]
 
@@ -1130,8 +1178,9 @@ Ptop_def
                     pattern (//toplevel//[4,28+25]..[4,28+26])
                       Ppat_unpack "M" (//toplevel//[4,28+25]..[4,28+26])
                     core_type (//toplevel//[4,28+29]..[4,28+30])
-                      Ptyp_package "S" (//toplevel//[4,28+29]..[4,28+30])
-                      []
+                      Ptyp_package
+                        package_type "S" (//toplevel//[4,28+29]..[4,28+30])
+                        []
                   expression (//toplevel//[4,28+35]..[4,28+37])
                     Pexp_construct "()" (//toplevel//[4,28+35]..[4,28+37])
                     None
@@ -1179,7 +1228,7 @@ Ptop_def
               class_type (//toplevel//[4,33+2]..[4,33+12])
                 Pcty_signature
                 class_signature
-                  core_type (//toplevel//[4,33+8]..[4,33+8])
+                  core_type (//toplevel//[4,33+8]..[4,33+8]) ghost
                     Ptyp_any
                   []
       ]
@@ -1197,19 +1246,25 @@ Ptop_def
                 structure_item (//toplevel//[4,19+0]..[4,19+36])
                   Pstr_eval
                   expression (//toplevel//[4,19+0]..[4,19+36])
-                    Pexp_constant PConst_string(" Some docstring attached to x. ",(//toplevel//[4,19+0]..[4,19+36]),None)
+                    Pexp_constant
+                    constant (//toplevel//[4,19+0]..[4,19+36])
+                      PConst_string(" Some docstring attached to x. ",(//toplevel//[4,19+0]..[4,19+36]),None)
               ]
             attribute "ocaml.doc"
               [
                 structure_item (//toplevel//[7,69+0]..[7,69+39])
                   Pstr_eval
                   expression (//toplevel//[7,69+0]..[7,69+39])
-                    Pexp_constant PConst_string(" Another docstring attached to x. ",(//toplevel//[7,69+0]..[7,69+39]),None)
+                    Pexp_constant
+                    constant (//toplevel//[7,69+0]..[7,69+39])
+                      PConst_string(" Another docstring attached to x. ",(//toplevel//[7,69+0]..[7,69+39]),None)
               ]
           pattern (//toplevel//[5,56+4]..[5,56+5])
             Ppat_var "x" (//toplevel//[5,56+4]..[5,56+5])
           expression (//toplevel//[6,64+2]..[6,64+4])
-            Pexp_constant PConst_int (42,None)
+            Pexp_constant
+            constant (//toplevel//[6,64+2]..[6,64+4])
+              PConst_int (42,None)
       ]
   ]
 
@@ -1235,7 +1290,9 @@ Ptop_def
                     expression (//toplevel//[3,56+26]..[3,56+27]) ghost
                       Pexp_poly
                       expression (//toplevel//[3,56+26]..[3,56+27])
-                        Pexp_constant PConst_int (1,None)
+                        Pexp_constant
+                        constant (//toplevel//[3,56+26]..[3,56+27])
+                          PConst_int (1,None)
                       None
               ]
       ]
@@ -1265,7 +1322,9 @@ Ptop_def
                       expression (//toplevel//[1,0+26]..[1,0+27]) ghost
                         Pexp_poly
                         expression (//toplevel//[1,0+26]..[1,0+27])
-                          Pexp_constant PConst_int (1,None)
+                          Pexp_constant
+                          constant (//toplevel//[1,0+26]..[1,0+27])
+                            PConst_int (1,None)
                         None
                 ]
       ]
@@ -1296,7 +1355,9 @@ Ptop_def
                         expression (//toplevel//[1,0+31]..[1,0+32]) ghost
                           Pexp_poly
                           expression (//toplevel//[1,0+31]..[1,0+32])
-                            Pexp_constant PConst_int (1,None)
+                            Pexp_constant
+                            constant (//toplevel//[1,0+31]..[1,0+32])
+                              PConst_int (1,None)
                           None
                   ]
       ]
@@ -1329,7 +1390,9 @@ Ptop_def
                           expression (//toplevel//[1,0+31]..[1,0+32]) ghost
                             Pexp_poly
                             expression (//toplevel//[1,0+31]..[1,0+32])
-                              Pexp_constant PConst_int (1,None)
+                              Pexp_constant
+                              constant (//toplevel//[1,0+31]..[1,0+32])
+                                PConst_int (1,None)
                             None
                     ]
       ]
@@ -1390,7 +1453,9 @@ Ptop_def
                         expression (//toplevel//[3,20+20]..[3,20+21]) ghost
                           Pexp_poly
                           expression (//toplevel//[3,20+20]..[3,20+21])
-                            Pexp_constant PConst_int (1,None)
+                            Pexp_constant
+                            constant (//toplevel//[3,20+20]..[3,20+21])
+                              PConst_int (1,None)
                           None
                   ]
             <arg>
@@ -1410,7 +1475,9 @@ Ptop_def
                           expression (//toplevel//[4,46+20]..[4,46+21]) ghost
                             Pexp_poly
                             expression (//toplevel//[4,46+20]..[4,46+21])
-                              Pexp_constant PConst_int (1,None)
+                              Pexp_constant
+                              constant (//toplevel//[4,46+20]..[4,46+21])
+                                PConst_int (1,None)
                             None
                     ]
             <arg>
@@ -1473,7 +1540,9 @@ Ptop_def
                             <arg>
                             Nolabel
                               expression (//toplevel//[4,76+17]..[4,76+18])
-                                Pexp_constant PConst_int (1,None)
+                                Pexp_constant
+                                constant (//toplevel//[4,76+17]..[4,76+18])
+                                  PConst_int (1,None)
                           ]
                 ]
                 expression (//toplevel//[5,98+2]..[5,98+12])

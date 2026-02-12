@@ -44,13 +44,37 @@ val get_ok : ('a : value_or_null) ('e : value_or_null). ('a, 'e) result -> 'a
 
     @raise Invalid_argument if [r] is [Error _]. *)
 
+<<<<<<< oxcaml
 val get_error : ('a : value_or_null) ('e : value_or_null). ('a, 'e) result -> 'e
+||||||| upstream-base
+val get_error : ('a, 'e) result -> 'e
+=======
+val get_ok' : ('a, string) result -> 'a
+(** [get_ok'] is like {!get_ok} but in case of error uses the
+    error message for raising [Invalid_argument].
+
+    @since 5.4 *)
+
+val get_error : ('a, 'e) result -> 'e
+>>>>>>> upstream-incoming
 (** [get_error r] is [e] if [r] is [Error e] and raise otherwise.
 
     @raise Invalid_argument if [r] is [Ok _]. *)
 
+<<<<<<< oxcaml
 val bind : ('a : value_or_null) ('b : value_or_null) ('e : value_or_null).
   ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
+||||||| upstream-base
+val bind : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
+=======
+val error_to_failure : ('a, string) result -> 'a
+(** [error_to_failure r] is [v] if [r] is [Ok v] and raises [Failure e]
+    if [r] is [Error e].
+
+    @since 5.4 *)
+
+val bind : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
+>>>>>>> upstream-incoming
 (** [bind r f] is [f v] if [r] is [Ok v] and [r] if [r] is [Error _]. *)
 
 val join : ('a : value_or_null) ('e : value_or_null)
@@ -61,8 +85,20 @@ val map : ('a : value_or_null) ('b : value_or_null) ('e : value_or_null).
   ('a -> 'b) -> ('a, 'e) result -> ('b, 'e) result
 (** [map f r] is [Ok (f v)] if [r] is [Ok v] and [r] if [r] is [Error _]. *)
 
+<<<<<<< oxcaml
 val map_error : ('a : value_or_null) ('e : value_or_null) ('f : value_or_null).
   ('e -> 'f) -> ('a, 'e) result -> ('a, 'f) result
+||||||| upstream-base
+val map_error : ('e -> 'f) -> ('a, 'e) result -> ('a, 'f) result
+=======
+val product : ('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e) result
+(** [product r0 r1] is [Ok (v0, v1)] if [r0] is [Ok v0] and [r1] is [Ok v2]
+    and otherwise returns the error of [r0], if any, or the error of [r1].
+
+    @since 5.4 *)
+
+val map_error : ('e -> 'f) -> ('a, 'e) result -> ('a, 'f) result
+>>>>>>> upstream-incoming
 (** [map_error f r] is [Error (f e)] if [r] is [Error e] and [r] if
     [r] is [Ok _]. *)
 
@@ -71,8 +107,19 @@ val fold : ('a : value_or_null) ('c : value_or_null) ('e : value_or_null).
 (** [fold ~ok ~error r] is [ok v] if [r] is [Ok v] and [error e] if [r]
     is [Error e]. *)
 
+<<<<<<< oxcaml
 val iter : ('a : value_or_null) ('e : value_or_null)
   . ('a -> unit) -> ('a, 'e) result -> unit
+||||||| upstream-base
+val iter : ('a -> unit) -> ('a, 'e) result -> unit
+=======
+val retract : ('a, 'a) result -> 'a
+(** [retract r] is [v] if [r] is [Ok v] or [Error v].
+
+    @since 5.4 *)
+
+val iter : ('a -> unit) -> ('a, 'e) result -> unit
+>>>>>>> upstream-incoming
 (** [iter f r] is [f v] if [r] is [Ok v] and [()] otherwise. *)
 
 val iter_error : ('a : value_or_null) ('e : value_or_null)
@@ -120,3 +167,23 @@ val to_seq : ('a : value_or_null) ('e : value_or_null)
   . ('a, 'e) result -> 'a Seq.t
 (** [to_seq r] is [r] as a sequence. [Ok v] is the singleton sequence
     containing [v] and [Error _] is the empty sequence. *)
+
+(** {1:syntax Syntax} *)
+
+(** Binding operators.
+
+    @since 5.4 *)
+module Syntax : sig
+
+  val ( let* ) : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
+  (** [( let* )] is {!Result.bind}. *)
+
+  val ( and* ) : ('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e) result
+  (** [( and* )] is {!Result.product}. *)
+
+  val ( let+ ) : ('a, 'e) result -> ('a -> 'b) -> ('b, 'e) result
+  (** [( let+ )] is {!Result.map}. *)
+
+  val ( and+ ) : ('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e) result
+  (** [( and+ )] is {!Result.product}. *)
+end

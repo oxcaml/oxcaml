@@ -18,6 +18,7 @@
 
 open Asttypes
 open Types
+open Data_types
 open Btype
 module Jkind = Btype.Jkind0
 
@@ -31,6 +32,7 @@ let free_vars ?(param=false) ty =
         | Tvar _ ->
             ret := TypeSet.add ty !ret
         | Tvariant row ->
+<<<<<<< oxcaml
           iter_row loop row;
           if not (static_row row) then begin
             match get_desc (row_more row) with
@@ -38,6 +40,34 @@ let free_vars ?(param=false) ty =
             | _ -> loop (row_more row)
           end
         (* XXX: What about Tobject ? *)
+||||||| upstream-base
+  let rec loop ty =
+    if try_mark_node ty then
+      match get_desc ty with
+      | Tvar _ ->
+          ret := TypeSet.add ty !ret
+      | Tvariant row ->
+          iter_row loop row;
+          if not (static_row row) then begin
+            match get_desc (row_more row) with
+            | Tvar _ when param -> ret := TypeSet.add ty !ret
+            | _ -> loop (row_more row)
+          end
+      (* XXX: What about Tobject ? *)
+      | _ ->
+          iter_type_expr loop ty
+  in
+  loop ty;
+  unmark_type ty;
+=======
+            iter_row loop row;
+            if not (static_row row) then begin
+              match get_desc (row_more row) with
+              | Tvar _ when param -> ret := TypeSet.add ty !ret
+              | _ -> loop (row_more row)
+            end
+                (* XXX: What about Tobject ? *)
+>>>>>>> upstream-incoming
         | _ ->
             iter_type_expr loop ty
     in
@@ -238,6 +268,7 @@ let none =
   create_expr (Ttuple []) ~level:(-1) ~scope:Btype.generic_level ~id:(-1)
     (* Clearly ill-formed type *)
 
+<<<<<<< oxcaml
 let dummy_label (type rep) (record_form : rep record_form)
     : rep gen_label_description =
   let repres : rep = match record_form with
@@ -249,6 +280,16 @@ let dummy_label (type rep) (record_form : rep record_form)
     lbl_sort = Jkind_types.Sort.Const.void;
     lbl_pos = -1; lbl_all = [||];
     lbl_repres = repres;
+||||||| upstream-base
+let dummy_label =
+  { lbl_name = ""; lbl_res = none; lbl_arg = none; lbl_mut = Immutable;
+    lbl_pos = (-1); lbl_all = [||]; lbl_repres = Record_regular;
+=======
+let dummy_label =
+  { lbl_name = ""; lbl_res = none; lbl_arg = none;
+    lbl_mut = Immutable; lbl_atomic = Nonatomic;
+    lbl_pos = (-1); lbl_all = [||]; lbl_repres = Record_regular;
+>>>>>>> upstream-incoming
     lbl_private = Public;
     lbl_loc = Location.none;
     lbl_attributes = [];
@@ -265,9 +306,16 @@ let label_descrs record_form ty_res lbls repres priv =
             lbl_res = ty_res;
             lbl_arg = l.ld_type;
             lbl_mut = l.ld_mutable;
+<<<<<<< oxcaml
             lbl_modalities = l.ld_modalities;
             lbl_sort = l.ld_sort;
             lbl_pos = pos;
+||||||| upstream-base
+            lbl_pos = num;
+=======
+            lbl_atomic = l.ld_atomic;
+            lbl_pos = num;
+>>>>>>> upstream-incoming
             lbl_all = all_labels;
             lbl_repres = repres;
             lbl_private = priv;
