@@ -2,10 +2,10 @@
 (*                                                                        *)
 (*                                 OCaml                                  *)
 (*                                                                        *)
-(*             Xavier Leroy, projet Gallium, INRIA Rocquencourt           *)
+(*                     Sebastien Hinderer, Tarides                        *)
 (*                                                                        *)
-(*   Copyright 2010 Institut National de Recherche en Informatique et     *)
-(*     en Automatique                                                     *)
+(*   Copyright 2024 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
 (*   the GNU Lesser General Public License version 2.1, with the          *)
@@ -13,25 +13,16 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Format of .cmxs files *)
+(* Configuration values needed by the dynlink library *)
 
-type modname = Compilation_unit.Name.t
-type crcs = (modname * Digest.t option) array
+val magic_length : int
 
-(* Each .cmxs dynamically-loaded plugin contains a symbol
-   "caml_plugin_header" containing the following info
-   (as an externed record) *)
+val ext_dll: string
+val cmo_magic_number: string
+val cma_magic_number: string
+val cmxs_magic_number: string
 
-type dynunit = {
-  dynu_name: Compilation_unit.t;
-  dynu_crc: Digest.t;
-  dynu_imports_cmi: crcs;
-  dynu_imports_cmx: (Compilation_unit.t * Digest.t option) array;
-  dynu_quoted_globals: Compilation_unit.Name.t array;
-  dynu_defines: string list;
-}
+val caml_symbol_prefix: string
 
-type dynheader = {
-  dynu_magic: string;
-  dynu_units: dynunit list;
-}
+val ccomp_type: string
+val runtime5: bool

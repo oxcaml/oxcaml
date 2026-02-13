@@ -58,7 +58,7 @@ let print_cu_without_prefix oc cu =
   in
   Compilation_unit.output oc cu_without_prefix
 
-let print_with_crc ~print_name name crco =
+let print_with_crc ~print_name (name, crco) =
   let crc =
     match crco with
       None -> dummy_crc
@@ -75,12 +75,7 @@ let print_cu_crc = print_with_crc ~print_name:print_cu_without_prefix
 let print_intf_import import =
   let name = Import_info.name import in
   let crco = Import_info.crc import in
-  print_name_crc name crco
-
-let print_impl_import import =
-  let name = Import_info.cu import in
-  let crco = Import_info.crc import in
-  print_cu_crc name crco
+  print_name_crc (name, crco)
 
 let print_quoted_global global =
   printf "\t%a\n" Compilation_unit.Name.output global
@@ -125,7 +120,8 @@ let print_cmo_infos cu =
   printf "Unit name: %a\n" Compilation_unit.output cu.cu_name;
   Option.iter print_arg_descr cu.cu_arg_descr;
   print_string "Interfaces imported:\n";
-  Array.iter print_intf_import cu.cu_imports;
+  Array.iter (fun (name, crc) ->
+    print_name_crc (name, Option.map snd crc)) cu.cu_imports;
   print_main_module_block_format cu.cu_format;
   print_string "Required globals:\n";
   List.iter print_required_compunit cu.cu_required_compunits;
@@ -180,12 +176,18 @@ let print_cmi_infos name crcs kind params global_name_bindings =
     Array.iter print_global_name_binding global_name_bindings
   end
 
+let intf_from_import f import =
+  f (Import_info.name import, Import_info.crc import)
+
+let impl_from_import f import =
+  f (Import_info.cu import, Import_info.crc import)
+
 let print_cmt_infos cmt =
   let open Cmt_format in
   if not !quiet then begin
     printf "Cmt unit name: %a\n" Compilation_unit.output cmt.cmt_modname;
     print_string "Cmt interfaces imported:\n";
-    Array.iter print_intf_import cmt.cmt_imports;
+    Array.iter (intf_from_import print_name_crc) cmt.cmt_imports;
     printf "Source file: %s\n"
           (match cmt.cmt_sourcefile with None -> "(none)" | Some f -> f);
     printf "Compilation flags:";
@@ -285,17 +287,17 @@ let print_cms_infos cms =
   printf "Source file: %s\n"
     (match cms.cms_sourcefile with None -> "(none)" | Some f -> f)
 
-let print_general_infos print_name name crc defines arg_descr mbf
+let print_general_infos print_name name crc print_define defines arg_descr mbf
     iter_cmi iter_cmx iter_qglobals =
   printf "Name: %a\n" print_name name;
   printf "CRC of implementation: %s\n" (string_of_crc crc);
   printf "Globals defined:\n";
-  List.iter print_name_line defines;
+  List.iter print_define defines;
   Option.iter print_arg_descr arg_descr;
   printf "Interfaces imported:\n";
-  iter_cmi print_intf_import;
+  iter_cmi print_name_crc;
   printf "Implementations imported:\n";
-  iter_cmx print_impl_import;
+  iter_cmx print_cu_crc;
   printf "Globals used in quotations:\n";
   iter_qglobals print_quoted_global;
   Option.iter print_main_module_block_format mbf
@@ -343,10 +345,13 @@ let print_generic_fns gfns =
   printf "Send functions:%a\n" pr_afuns gfns.send_fun
 
 let print_cmx_infos (uir, sections, crc) =
-  print_general_infos Compilation_unit.output uir.uir_unit crc uir.uir_defines
+  print_general_infos Compilation_unit.output
+    uir.uir_unit
+    crc
+    print_name_line uir.uir_defines
     uir.uir_arg_descr (Some uir.uir_format)
-    (fun f -> Array.iter f uir.uir_imports_cmi)
-    (fun f -> Array.iter f uir.uir_imports_cmx)
+    (fun f -> Array.iter (intf_from_import f) uir.uir_imports_cmi)
+    (fun f -> Array.iter (impl_from_import f) uir.uir_imports_cmx)
     (fun f -> Array.iter f uir.uir_quoted_globals);
   begin
     match uir.uir_export_info with
@@ -380,11 +385,13 @@ let print_cmxa_infos (lib : Cmx_format.library_infos) =
   lib.lib_units
   |> List.iter (fun u ->
         print_general_infos Compilation_unit.output u.li_name u.li_crc
-          u.li_defines None None
+          print_name_line u.li_defines None None
           (fun f ->
-            B.iter (fun i -> f lib.lib_imports_cmi.(i)) u.li_imports_cmi)
+            B.iter (fun i ->
+              (intf_from_import f) lib.lib_imports_cmi.(i)) u.li_imports_cmi)
           (fun f ->
-            B.iter (fun i -> f lib.lib_imports_cmx.(i)) u.li_imports_cmx)
+            B.iter (fun i ->
+              (impl_from_import f) lib.lib_imports_cmx.(i)) u.li_imports_cmx)
           (fun f ->
             B.iter(fun i -> f lib.lib_quoted_globals.(i)) u.li_quoted_globals);
         printf "Force link: %s\n" (if u.li_force_link then "YES" else "no"))
@@ -392,15 +399,15 @@ let print_cmxa_infos (lib : Cmx_format.library_infos) =
 let print_cmxs_infos header =
   List.iter
     (fun ui ->
-       print_general_infos
-         Compilation_unit.output ui.dynu_name
-         ui.dynu_crc
-         ui.dynu_defines
-         None
-         None
-         (fun f -> Array.iter f ui.dynu_imports_cmi)
-         (fun f -> Array.iter f ui.dynu_imports_cmx)
-         (fun f -> Array.iter f ui.dynu_quoted_globals);)
+      print_general_infos
+        Compilation_unit.output ui.dynu_name
+        ui.dynu_crc
+        print_line ui.dynu_defines
+        None
+        None
+        (fun f -> Array.iter f ui.dynu_imports_cmi)
+        (fun f -> Array.iter f ui.dynu_imports_cmx)
+        (fun f -> Array.iter f ui.dynu_quoted_globals);)
     header.dynu_units
 
 let p_title title = printf "%s:\n" title

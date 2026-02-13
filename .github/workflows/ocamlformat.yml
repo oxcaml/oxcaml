@@ -43,5 +43,12 @@ jobs:
         if: ${{ contains( github.event.pull_request.labels.*.name, 'skip 80ch') }}
         run: echo SKIP_80CH=y >> "$GITHUB_ENV"
 
+      # These would be set-up by configure, but we don't have a compiler
+      - name: Configure tree
+        run: |
+          touch otherlibs/dynlink/dynlink_config.ml
+          touch otherlibs/dynlink/dynlink_cmo_format.mli
+          touch otherlibs/dynlink/dynlink_cmxs_format.mli
+
       - name: Check OCaml Formatting
         run: opam exec -- bash tools/ci/actions/check-fmt.sh

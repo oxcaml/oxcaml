@@ -209,7 +209,11 @@ let make_globals_map t units_list =
         let name = CU.name unit.name in
         let intf_crc = find_crc name in
         CU.Name.Tbl.remove interfaces name;
-        let syms = List.map Symbol.for_compilation_unit unit.defines in
+        let syms =
+          List.map
+            (fun cu -> Symbol.linkage_name (Symbol.for_compilation_unit cu))
+            unit.defines
+        in
         unit.name, intf_crc, Some unit.crc, syms)
       units_list
   in

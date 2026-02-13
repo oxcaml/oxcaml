@@ -231,8 +231,8 @@ module T0 : sig
 
   val compare : t -> t -> int
 end = struct
-  (* As with [Name.t], changing [descr] or [t] requires bumping magic
-     numbers. *)
+  (* As with [Name.t], changing [descr] or [t] requires bumping magic numbers
+     and considerable care in Dynlink_shims. *)
   type descr =
     { name : Name.t;
       for_pack_prefix : Prefix.t;
@@ -684,9 +684,6 @@ let which_cmx_file desired_comp_unit ~accessed_by : t =
     create (ListLabels.rev prefix_rev |> Prefix.of_list) name
 
 let print_name ppf t = Fmt.fprintf ppf "%a" Name.print (name t)
-
-let to_global_ident_for_bytecode t =
-  Ident.create_persistent (full_path_as_string t)
 
 let print_debug ppf t =
   let name = name t in

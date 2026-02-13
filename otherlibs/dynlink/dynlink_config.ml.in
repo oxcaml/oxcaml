@@ -1,11 +1,13 @@
+(* @configure_input@ *)
+#3 "otherlibs/dynlink/dynlink_config.ml.in"
 (**************************************************************************)
 (*                                                                        *)
 (*                                 OCaml                                  *)
 (*                                                                        *)
-(*             Xavier Leroy, projet Gallium, INRIA Rocquencourt           *)
+(*                     Sebastien Hinderer, Tarides                        *)
 (*                                                                        *)
-(*   Copyright 2010 Institut National de Recherche en Informatique et     *)
-(*     en Automatique                                                     *)
+(*   Copyright 2024 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
 (*                                                                        *)
 (*   All rights reserved.  This file is distributed under the terms of    *)
 (*   the GNU Lesser General Public License version 2.1, with the          *)
@@ -13,25 +15,17 @@
 (*                                                                        *)
 (**************************************************************************)
 
-(* Format of .cmxs files *)
+(* Configuration values needed by the dynlink library *)
 
-type modname = Compilation_unit.Name.t
-type crcs = (modname * Digest.t option) array
+(* Length of magic numbers *)
+let magic_length = @MAGIC_LENGTH@
 
-(* Each .cmxs dynamically-loaded plugin contains a symbol
-   "caml_plugin_header" containing the following info
-   (as an externed record) *)
+let ext_dll = "." ^ {@QS@|@SO@|@QS@}
+and cmo_magic_number = {@QS@|@CMO_MAGIC_NUMBER@|@QS@}
+and cma_magic_number = {@QS@|@CMA_MAGIC_NUMBER@|@QS@}
+and cmxs_magic_number = {@QS@|@CMXS_MAGIC_NUMBER@|@QS@}
 
-type dynunit = {
-  dynu_name: Compilation_unit.t;
-  dynu_crc: Digest.t;
-  dynu_imports_cmi: crcs;
-  dynu_imports_cmx: (Compilation_unit.t * Digest.t option) array;
-  dynu_quoted_globals: Compilation_unit.Name.t array;
-  dynu_defines: string list;
-}
+let caml_symbol_prefix = {@QS@|@caml_symbol_prefix@|@QS@}
 
-type dynheader = {
-  dynu_magic: string;
-  dynu_units: dynunit list;
-}
+let ccomp_type = {@QS@|@ccomptype@|@QS@}
+let runtime5 = "@enable_runtime5@" = "yes"

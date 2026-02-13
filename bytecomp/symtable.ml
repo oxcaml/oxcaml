@@ -24,9 +24,10 @@ module Style = Misc.Style
 
 module Compunit = struct
   type t = compunit
-  let name (Compunit cu_name) = cu_name
-  let is_packed (Compunit name) = String.contains name '.'
-  let to_ident (Compunit cu_name) = Ident.create_persistent cu_name
+  let name cu = Compilation_unit.full_path_as_string cu
+  let is_packed = Compilation_unit.is_packed
+  let to_ident cu =
+    Ident.create_persistent (Compilation_unit.full_path_as_string cu)
   module Set = Set.Make(struct type nonrec t = t let compare = compare end)
   module Map = Map.Make(struct type nonrec t = t let compare = compare end)
 end
@@ -51,12 +52,14 @@ module Global = struct
 
   let quote s = "`" ^ s ^ "'"
 
-  let description ppf = function
+  let description ppf g =
+    let open Format_doc in
+    match g with
     | Glob_compunit cu ->
-        Format_doc.fprintf ppf "compilation unit %a"
+        fprintf ppf "compilation unit %a"
           Compilation_unit.print_as_inline_code cu
     | Glob_predef (Predef_exn exn) ->
-        Format_doc.fprintf ppf "predefined exception %a"
+        fprintf ppf "predefined exception %a"
           Style.inline_code (quote exn)
 
   let of_compilation_unit cu = Glob_compunit cu
@@ -366,7 +369,7 @@ let update_global_table () =
 
 type bytecode_sections =
   { symb: GlobalMap.t;
-    crcs: Import_info.t array;
+    crcs: Cmo_format.crcs;
     prim: string list;
     dlpt: string list }
 
