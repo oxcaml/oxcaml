@@ -679,7 +679,7 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   domain_state->young_limit = 0;
   domain_state->unique_id = d->unique_id;
-  atomic_store_release(&domain_state->requested_tick, false);
+  atomic_store_relaxed(&domain_state->requested_tick, false);
 
   /* Synchronized with [caml_interrupt_all_signal_safe], so that the
      initializing writes of young_limit and [requested_tick] happen before any
