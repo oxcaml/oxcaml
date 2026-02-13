@@ -284,6 +284,6 @@ typedef uint64_t uintnat;
 #define Allocation_policy_def caml_policy_best_fit
 
 /* Default tick thread interval, in microseconds */
-#define Default_tick_interval_usec 10000
+#define Default_tick_interval_usec 50000
 
 #endif /* CAML_CONFIG_H */
