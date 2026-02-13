@@ -669,10 +669,12 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   domain_state->young_limit = 0;
   domain_state->unique_id = d->unique_id;
+  domain_state->requested_external_interrupt = 0;
 
   /* Synchronized with [caml_interrupt_all_signal_safe], so that the
-     initializing write of young_limit happens before any
-     interrupt. */
+     initializing writes of young_limit and requested_external_interrupt happen
+     before any interrupt.
+  */
   atomic_store_explicit(&d->interrupt_word, &domain_state->young_limit,
                         memory_order_release);
 
@@ -780,7 +782,6 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->requested_major_slice = 0;
   domain_state->requested_minor_gc = 0;
   domain_state->major_slice_epoch = 0;
-  domain_state->requested_external_interrupt = 0;
 
   domain_state->parser_trace = 0;
 
