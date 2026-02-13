@@ -135,8 +135,6 @@ let[@inline never] [@local never][@specialize never] copy_array_index_from_start
   copy (pos+3);
   ()
 
-(* Can't vectorize because of an unnecessary sign extension. The heuristics in the
-   vectorizer can be extended to handle this case. *)
 let[@inline never] [@local never][@specialize never] add_array_from_start (a : Int32_u.t array) (b : Int32_u.t array) =
   let[@inline always] add pos =
     let x = Int32_u.Array.unsafe_get a pos in
@@ -151,6 +149,8 @@ let[@inline never] [@local never][@specialize never] add_array_from_start (a : I
   ()
 
 (*
+CR jrayman: how do I regenerate this code?
+
 camlTest7__add_array_from_start_7_22_code(R:I/0[%rax] R:I/1[%rbx]) {test7.ml:112,74-379}
   a:V/61 := R:I/0[%rax]
   b:V/62 := R:I/1[%rbx]

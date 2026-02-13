@@ -1542,6 +1542,7 @@ val poll : dbg:Debuginfo.t -> expression
 (** This module defines the various kinds of scalars usable in Cmm. It also
     provides ways to generate expressions to cast between them. *)
 module Scalar_type : sig
+  (* CR jrayman *)
   (** A static_cast from a larger integral type to a smaller one logically
       truncates the upper bits. Note that values are stored in registers sign-
       or zero- extended according to their signdness, so the result may be

@@ -225,6 +225,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
     let extern_name = with_float_suffix ~bitwidth op_name in
     use_prim' (Extern extern_name)
   | Num_conv { src; dst } -> (
+    (* CR jrayman: Do [caml_*] C/JS primitives need to change? *)
     let caml_of src dst =
       use_prim' (Extern (Format.sprintf "caml_%s_of_%s" src dst))
     in

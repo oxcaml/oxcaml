@@ -1578,6 +1578,7 @@ let opaque ~machine_width layout arg ~middle_end_only : H.expr_primitive list =
       Unary (Opaque_identity { middle_end_only; kind }, arg_component))
     arg kinds
 
+(* CR jrayman: Is extn assumed here? * translates to [Num_conv] *)
 let rec static_cast0 ~(src : L.any_locality_mode Scalar.t)
     ~(dst : L.locality_mode Scalar.t) (arg : H.simple_or_prim) ~current_region :
     H.simple_or_prim =
