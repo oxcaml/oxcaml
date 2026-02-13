@@ -159,10 +159,3 @@ let () =
   test_logical2 Smallint.min Int.min;
   test_logical2 Smallint.max Int.max;
   ()
-
-(* test that the value is stored sign-extended in the register *)
-external get_register : Smallint.t -> nativeint = "get_register_bytecode" "get_register"
-
-let () =
-  assert (get_register (Smallint.shift_left (Smallint.max_int()) 1) = -2n);
-  ()

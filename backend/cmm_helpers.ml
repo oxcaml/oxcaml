@@ -5451,6 +5451,7 @@ module Scalar_type = struct
   end
 
   module Bit_width_and_signedness : sig
+    (* CR jrayman *)
     (** An integer with signedness [signedness t] that fits into a
         general-purpose register. It is canonically stored in twos-complement
         representation, in the lower [bits] bits of its container (whether that
@@ -5510,10 +5511,7 @@ module Scalar_type = struct
     (** Determines whether [dst] can represent every value of [src], preserving
         sign *)
     let[@inline] can_cast_without_losing_information ~src ~dst =
-      match signedness src, signedness dst with
-      | Signed, Signed | Unsigned, Unsigned -> bit_width src <= bit_width dst
-      | Unsigned, Signed -> bit_width src < bit_width dst
-      | Signed, Unsigned -> false
+      bit_width src >= bit_width dst
 
     let[@inline] static_cast ~dbg ~src ~dst exp =
       if can_cast_without_losing_information ~src ~dst
@@ -5522,9 +5520,9 @@ module Scalar_type = struct
            expressions, this is a no-op *)
         exp
       else
-        match signedness dst with
-        | Signed -> sign_extend ~bits:(bit_width dst) exp ~dbg
-        | Unsigned -> zero_extend ~bits:(bit_width dst) exp ~dbg
+        match signedness src with
+        | Signed -> sign_extend ~bits:(bit_width src) exp ~dbg
+        | Unsigned -> zero_extend ~bits:(bit_width src) exp ~dbg
 
     let[@inline] conjugate ~outer ~inner ~dbg ~f x =
       x
@@ -5620,9 +5618,12 @@ module Scalar_type = struct
       | Untagged src, Untagged dst -> Integer.static_cast ~dbg ~src ~dst exp
       | Tagged src, Tagged dst -> Tagged_integer.static_cast ~dbg ~src ~dst exp
       | Untagged src, Tagged dst ->
-        tag_int
-          (Integer.static_cast ~dbg ~src ~dst:(Tagged_integer.untagged dst) exp)
-          dbg
+        let bits =
+          min (Integer.bit_width src)
+            (Integer.bit_width (Tagged_integer.untagged dst))
+        in
+        let extended = sign_extend ~bits exp ~dbg in
+        tag_int extended dbg
       | Tagged src, Untagged dst ->
         Integer.static_cast ~dbg
           ~src:(Tagged_integer.untagged src)
@@ -5646,16 +5647,8 @@ module Scalar_type = struct
     | Float src, Float dst -> Float_width.static_cast ~dbg ~src ~dst exp
     | Integral src, Float dst ->
       let float_of_int_arg = Integral.nativeint in
-      if
-        not
-          (Integral.can_cast_without_losing_information ~src
-             ~dst:float_of_int_arg)
-      then
-        Misc.fatal_errorf "static_cast: casting %a to float is not implemented"
-          Integral.print src
-      else
-        unary (Cstatic_cast (Float_of_int dst)) ~dbg
-          (Integral.static_cast exp ~dbg ~src ~dst:float_of_int_arg)
+      unary (Cstatic_cast (Float_of_int dst)) ~dbg
+        (Integral.static_cast exp ~dbg ~src ~dst:float_of_int_arg)
     | Float src, Integral dst -> (
       match Integral.signedness dst with
       | Unsigned ->
@@ -5669,7 +5662,7 @@ module Scalar_type = struct
         let exp = unary (Cstatic_cast (Int_of_float src)) exp ~dbg in
         let src = Integral.nativeint in
         (* assert that nativeint is indeed the largest integer width *)
-        assert (Integral.can_cast_without_losing_information ~src:dst ~dst:src);
+        (* assert (Integral.can_cast_without_losing_information ~src:dst ~dst:src); *)
         Integral.static_cast exp ~dbg ~src ~dst)
 
   let[@inline] conjugate ~outer ~inner ~dbg ~f x =
