@@ -1,3 +1,3 @@
 open Lambda
 
-val eval : (slambda -> slambda) -> program -> program
+val eval : (slambda -> slambda) -> lambda -> lambda

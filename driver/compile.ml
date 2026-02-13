@@ -43,14 +43,13 @@ let make_arg_descr ~param ~arg_block_idx ~main_repr : Lambda.arg_descr option =
 let tlambda_to_bytecode i tlambda ~as_arg_for =
   tlambda
   |> Profile.(record ~accumulate:true generate)
-    (fun tlambda ->
+    (fun { Lambda.code = tlambda; required_globals; main_module_block_format;
+           arg_block_idx }  ->
        Builtin_attributes.warn_unused ();
        tlambda
-       |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.program
-       |> Slambda.eval (print_if i.ppf_dump Clflags.dump_slambda Printslambda.slambda)
-       |> fun { Lambda.code = lambda; required_globals;
-                main_module_block_format; arg_block_idx } ->
-          lambda
+       |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
+       |> Slambda.eval
+            (print_if i.ppf_dump Clflags.dump_slambda Printslambda.slambda)
        |> print_if i.ppf_dump Clflags.dump_debug_uid_tables
           (fun ppf _ -> Type_shape.print_debug_uid_tables ppf)
        |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda

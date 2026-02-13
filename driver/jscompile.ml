@@ -43,11 +43,10 @@ let tlambda_to_jsir i tlambda ~as_arg_for =
   |> Profile.(record ~accumulate:true generate)
        (fun (program : Lambda.program) ->
          Builtin_attributes.warn_unused ();
-         program
-         |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.program
+         program.code
+         |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
          |> Slambda.eval
               (print_if i.ppf_dump Clflags.dump_slambda Printslambda.slambda)
-         |> (fun (program : Lambda.program) -> program.code)
          |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
          |> Simplif.simplify_lambda ~restrict_to_upstream_dwarf:true
               ~gdwarf_may_alter_codegen:false

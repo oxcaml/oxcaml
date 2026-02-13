@@ -92,10 +92,12 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     tlambda
     |> Profile.(record generate) (fun (program : Lambda.program) ->
         Builtin_attributes.warn_unused ();
-        program
-        |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.program
+        program.code
+        |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
         |> Slambda.eval
              (print_if i.ppf_dump Clflags.dump_slambda Printslambda.slambda)
+        |> fun lambda ->
+        { program with Lambda.code = lambda }
         |> print_if i.ppf_dump Clflags.dump_debug_uid_tables (fun ppf _ ->
             Type_shape.print_debug_uid_tables ppf)
         |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program

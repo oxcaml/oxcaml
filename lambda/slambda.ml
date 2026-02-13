@@ -81,9 +81,9 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Lsplice _ -> raise Found_a_splice);
   Lambda.iter_head_constructor assert_no_splices lam
 
-let eval inspect_slambda (program : Lambda.program) : Lambda.program =
+let eval inspect_slambda (template_lam : Lambda.lambda) : Lambda.lambda =
   let raw_lam =
-    Slambda_fracture.fracture program.code
+    Slambda_fracture.fracture template_lam
     |> inspect_slambda |> Slambdaeval.eval
   in
   (try assert_no_splices raw_lam
@@ -91,8 +91,8 @@ let eval inspect_slambda (program : Lambda.program) : Lambda.program =
      Misc.fatal_error "Encountered a splice in the program after slambda eval");
   if
     (not Language_extension.(is_enabled Layout_poly))
-    && not (Repr.phys_equal program.code raw_lam)
+    && not (template_lam == raw_lam)
   then
     Misc.fatal_error
       "Slambda eval did something non-trivial but layout poly is disabled.";
-  { program with code = raw_lam }
+  raw_lam
