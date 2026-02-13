@@ -24,6 +24,7 @@ type t =
   | C_minus_minus
   | Lexer
   | Grammar
+  | Flambda
   | Binary_interface
   | Obj
   | Backend_specific of Ocaml_backends.t * backend_specific

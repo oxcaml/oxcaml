@@ -729,13 +729,13 @@ const:
   | KWD_NULL { Null }
 ;
 
-func_name_with_optional_arities:
-  | s = simple { s, None }
+%inline func_name_with_optional_arities:
+  | s = ioption(simple) { s, None }
   | LPAREN;
       s = simple; COLON; params_arity = blank_or(kinds_with_subkinds);
       MINUSGREATER; ret_arity = kinds_with_subkinds;
     RPAREN
-    { s, Some ({ params_arity; ret_arity } : function_arities) }
+    { Some s, Some ({ params_arity; ret_arity } : function_arities) }
 ;
 
 blank_or(a):

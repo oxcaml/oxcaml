@@ -1,10 +1,10 @@
 (* TEST
  compile_only = "true";
  flambda2;
- ocamlopt_flags = "-flambda2-inline-small-function-size 0 -flambda2-inline-large-function-size 0 -dfexpr-after simplify";
+ ocamlopt_flags = "-flambda2-inline-small-function-size 0 -flambda2-inline-large-function-size 0";
  setup-ocamlopt.byte-build-env;
- ocamlopt.byte;
- check-ocamlopt.byte-output;
+ ocamlopt.byte with dump-simplify;
+ check-fexpr-dump;
 *)
 
 (* Need at least 3 cases in a match to be considered a

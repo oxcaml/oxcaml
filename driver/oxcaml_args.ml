@@ -973,7 +973,14 @@ let mk_dfexpr f =
 let mk_dfexpr_annot f =
   ( "-dfexpr-annot",
     Arg.Unit f,
-    " Dump fexpr alongside each compilation unit\n     (Flambda 2 only)" )
+    " Dump fexpr of all passes alongside each compilation unit\n\
+    \     (Flambda 2 only)" )
+
+let mk_dfexpr_annot_after f =
+  ( "-dfexpr-annot-after",
+    Arg.String f,
+    " Dump fexpr of given pass alongside each compilation unit\n\
+    \     (Flambda 2 only)" )
 
 let mk_dfexpr_after f =
   let passes = [ "simplify"; "reaper" ] in
@@ -1288,6 +1295,7 @@ module type Oxcaml_options = sig
   val dfexpr_after : string -> unit
   val dflexpect_to : string -> unit
   val dfexpr_annot : unit -> unit
+  val dfexpr_annot_after : string -> unit
   val dslot_offsets : unit -> unit
   val dfreshen : unit -> unit
   val dflow : unit -> unit
@@ -1480,6 +1488,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dfexpr_after F.dfexpr_after;
       mk_dflexpect_to F.dflexpect_to;
       mk_dfexpr_annot F.dfexpr_annot;
+      mk_dfexpr_annot_after F.dfexpr_annot_after;
       mk_dslot_offsets F.dslot_offsets;
       mk_dfreshen F.dfreshen;
       mk_dflow F.dflow;
@@ -1870,6 +1879,10 @@ module Oxcaml_options_impl = struct
   let dfexpr_to file = Flambda2.Dump.fexpr := Flambda2.Dump.File file
   let dflexpect_to file = Flambda2.Dump.flexpect := Flambda2.Dump.File file
   let dfexpr_annot () = Flambda2.Dump.fexpr_annot := true
+
+  let dfexpr_annot_after pass =
+    Flambda2.Dump.fexpr_annot_after := pass :: !Flambda2.Dump.fexpr_annot_after
+
   let dslot_offsets = set' Flambda2.Dump.slot_offsets
   let dfreshen = set' Flambda2.Dump.freshen
   let dflow = set' Flambda2.Dump.flow
