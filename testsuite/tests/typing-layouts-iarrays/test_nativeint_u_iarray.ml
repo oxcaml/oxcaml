@@ -22,11 +22,11 @@ open Stdlib_upstream_compatible
 
 module Nativeint_u_array0 :
   Gen_u_iarray.S0 with type element_t = nativeint#
-                   and type ('a : any) array_t = 'a iarray 
+                   and type ('a : any mod separable) array_t = 'a iarray 
                    and type mutable_t = nativeint# array = struct
   type element_t = nativeint#
 
-  type ('a : any) array_t = 'a iarray
+  type ('a : any mod separable) array_t = 'a iarray
   type mutable_t = nativeint# array
 
   type element_arg = unit -> element_t

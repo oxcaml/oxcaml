@@ -135,6 +135,11 @@ type t =
   | Unerasable_position_argument            (* 188 *)
   | Unnecessarily_partial_tuple_pattern     (* 189 *)
   | Probe_name_too_long of string           (* 190 *)
+  | Imprecise_kind_annotation of {
+      name : string;
+      annotated : string;
+      inferred : string;
+    }                                       (* 191 *)
   | Zero_alloc_all_hidden_arrow of string   (* 198 *)
   | Unchecked_zero_alloc_attribute          (* 199 *)
   | Unboxing_impossible                     (* 210 *)
@@ -233,6 +238,7 @@ let number = function
   | Unerasable_position_argument -> 188
   | Unnecessarily_partial_tuple_pattern -> 189
   | Probe_name_too_long _ -> 190
+  | Imprecise_kind_annotation _ -> 191
   | Zero_alloc_all_hidden_arrow _ -> 198
   | Unchecked_zero_alloc_attribute -> 199
   | Unboxing_impossible -> 210
@@ -609,6 +615,10 @@ let descriptions = [
     names = ["probe-name-too-long"];
     description = "Probe name must be at most 100 characters long.";
     since = since 4 14 };
+  { number = 191;
+    names = ["imprecise-kind-annotation"];
+    description = "A kind annotation is less precise than the inferred kind.";
+    since = since 5 2 };
   { number = 198;
     names = ["zero-alloc-all-hidden-arrow"];
     description = "A declaration whose type is an alias of a function type \
@@ -1291,6 +1301,12 @@ let message = function
       Printf.sprintf
         "This probe name is too long: `%s'. \
          Probe names must be at most 100 characters long." name
+  | Imprecise_kind_annotation { name; annotated; inferred } ->
+      Printf.sprintf
+        "The type variable `%s'\n\
+         was annotated with kind `%s'\n\
+         but was inferred to have kind `%s'."
+        name annotated inferred
   | Zero_alloc_all_hidden_arrow s ->
       Printf.sprintf
       "The type of this item is an\n\

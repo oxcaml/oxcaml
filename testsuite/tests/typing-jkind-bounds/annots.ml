@@ -454,8 +454,29 @@ let f : ('a : value) t2_imm -> ('a : value) t2_imm = fun x -> x
 let f : ('a : value) t2_global -> ('a : value) t2_global = fun x -> x
 let f : ('a : word) t2_complex -> ('a : word) t2_complex = fun x -> x
 [%%expect {|
+Line 1, characters 8-20:
+1 | let f : ('a : value) t2_imm -> ('a : value) t2_imm = fun x -> x
+            ^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value'
+but was inferred to have kind `immediate'.
+
 val f : ('a : immediate). 'a t2_imm -> 'a t2_imm = <fun>
+Line 2, characters 8-20:
+2 | let f : ('a : value) t2_global -> ('a : value) t2_global = fun x -> x
+            ^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value'
+but was inferred to have kind `value mod global'.
+
 val f : ('a : value mod global). 'a t2_global -> 'a t2_global = <fun>
+Line 3, characters 8-19:
+3 | let f : ('a : word) t2_complex -> ('a : word) t2_complex = fun x -> x
+            ^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `word'
+but was inferred to have kind `word mod many aliased'.
+
 val f : ('a : word mod many aliased). 'a t2_complex -> 'a t2_complex = <fun>
 |}]
 
@@ -511,8 +532,29 @@ type ('a : value) t = 'a t2_imm
 type ('a : value) t = 'a t2_global
 type ('a : word) t = 'a t2_complex
 [%%expect {|
+Line 1, characters 6-16:
+1 | type ('a : value) t = 'a t2_imm
+          ^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value'
+but was inferred to have kind `immediate'.
+
 type ('a : immediate) t = 'a t2_imm
+Line 2, characters 6-16:
+2 | type ('a : value) t = 'a t2_global
+          ^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value'
+but was inferred to have kind `value mod global'.
+
 type ('a : value mod global) t = 'a t2_global
+Line 3, characters 6-15:
+3 | type ('a : word) t = 'a t2_complex
+          ^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `word'
+but was inferred to have kind `word mod many aliased'.
+
 type ('a : word mod many aliased) t = 'a t2_complex
 |}]
 

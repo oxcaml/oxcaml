@@ -234,10 +234,12 @@ module TyVarEnv : sig
 
   val remember_used :
     rigid:jkind_lr option
+    -> annotation:Parsetree.jkind_annotation option
     -> string -> type_expr -> Location.t -> Env.stage -> unit
     (* Remember that a given name is bound to a given type.
 
-       If [rigid] is set, also remember that it's fixed at the given jkind. *)
+       If [rigid] is set, also remember that it's fixed at the given jkind.
+       [annotation] is the original jkind annotation, if any. *)
 
   val globalize_used_variables : policy -> Env.t -> unit -> unit
   (* after finishing with a type signature, used variables are unified to the
@@ -276,11 +278,15 @@ end = struct
        the final expression checks against the rigid jkind.
     *)
     rigid : jkind_lr option;
-    stage : Env.stage
+    stage : Env.stage;
+    annotation : Parsetree.jkind_annotation option;
   }
 
   let used_variables =
     ref (TyVarMap.empty : used_info TyVarMap.t)
+
+  module LocSet = Set.Make(Location)
+  let warned_imprecise_locs = ref LocSet.empty
 
   (* These are variables that will become univars when we're done with the
      current type. Used to force free variables in method types to become
@@ -290,7 +296,8 @@ end = struct
 
   let reset () =
     reset_global_level ();
-    type_variables := TyVarMap.empty
+    type_variables := TyVarMap.empty;
+    warned_imprecise_locs := LocSet.empty
 
   let is_in_scope name =
     TyVarMap.mem name !type_variables
@@ -509,14 +516,14 @@ end = struct
          inserted into [used_variables] are non-generic, but some
          might get generalized. *)
 
-  let remember_used ~rigid name v loc stage =
+  let remember_used ~rigid ~annotation name v loc stage =
     assert (not_generic v);
-    let rigid =
+    let rigid, annotation =
       match TyVarMap.find name !used_variables with
-      | info -> info.rigid
-      | exception Not_found -> rigid
+      | info -> info.rigid, info.annotation
+      | exception Not_found -> rigid, annotation
     in
-    let info = { ty = v; loc; rigid; stage } in
+    let info = { ty = v; loc; rigid; stage; annotation } in
     used_variables := TyVarMap.add name info !used_variables
 
 
@@ -575,11 +582,40 @@ end = struct
       raise(Error(loc, env, No_type_wildcards (Some Upstream_compatibility)))
     | policy -> new_var jkind policy
 
+  let check_imprecise_annotation loc name ty annotation =
+    match annotation, get_desc ty with
+    | Some annot, Tvar { jkind; _ }
+      (* This can be called multiple times (with different variable ids
+         for different levels) for the same location (see internal ticket
+         6461). Therefore, we track the locations instead of using
+         [Jkind.History.has_warned]. *)
+      when not (LocSet.mem loc !warned_imprecise_locs) ->
+      let annotated_jkind =
+        Jkind.of_annotation
+          ~context:(Type_variable (Pprintast.tyvar_of_name name))
+          annot
+      in
+      if not (Jkind.equate jkind annotated_jkind) then begin
+        warned_imprecise_locs := LocSet.add loc !warned_imprecise_locs;
+        let format_jkind jkind =
+          Format_doc.asprintf "%a" !Oprint.out_jkind
+            (Printtyp.out_jkind_of_jkind jkind)
+        in
+        Location.prerr_warning loc
+          (Warnings.Imprecise_kind_annotation {
+            name = Pprintast.tyvar_of_name name;
+            annotated = format_jkind annotated_jkind;
+            inferred = format_jkind jkind;
+          })
+      end
+    | _ -> ()
+
   let globalize_used_variables
       { flavor; unbound_variable_policy; _ } env =
     let r = ref [] in
     TyVarMap.iter
-      (fun name { ty; rigid; loc; stage = s } ->
+      (fun name { ty; rigid; loc; stage = s; annotation } ->
+        check_imprecise_annotation loc name ty annotation;
         (match rigid with
         | Some original_jkind ->
           check_jkind env loc name ty { original_jkind; defaulted = false }
@@ -1238,7 +1274,8 @@ and transl_type_var env ~policy ~row_context attrs loc name jkind_annot_opt =
           | None -> TyVarEnv.new_jkind ~is_named:true policy, None
       in
       let ty = TyVarEnv.new_var ~name jkind policy in
-      TyVarEnv.remember_used ~rigid name ty loc (Env.stage env);
+      TyVarEnv.remember_used ~rigid ~annotation:jkind_annot_opt
+        name ty loc (Env.stage env);
       ty, Env.stage env
   in
   if Env.stage env <> stage then
@@ -1350,7 +1387,8 @@ and transl_type_alias env ~row_context ~policy mode attrs styp_loc styp name_opt
             in
             let t = newvar jkind in
             (* Use the whole location, which is used by [Type_mismatch]. *)
-            TyVarEnv.remember_used ~rigid alias t styp_loc (Env.stage env);
+            TyVarEnv.remember_used ~rigid ~annotation:jkind_annot_opt
+              alias t styp_loc (Env.stage env);
             let ty = transl_type env ~policy ~row_context mode styp in
             begin try unify_var env t ty.ctyp_type with Unify err ->
               let err = Errortrace.swap_unification_error err in

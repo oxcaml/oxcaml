@@ -436,6 +436,13 @@ type should_work = t_value t1
 
 [%%expect{|
 type (_, _) two
+Line 3, characters 6-14:
+3 | type ('a : any) t1 = ('a id_any_mod_separable, 'a id_value_or_null) two
+          ^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `any'
+but was inferred to have kind `value'.
+
 type 'a t1 = ('a id_any_mod_separable, 'a id_value_or_null) two
 type should_work = t_value t1
 |}]

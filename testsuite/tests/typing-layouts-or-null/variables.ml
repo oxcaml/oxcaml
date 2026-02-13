@@ -292,6 +292,13 @@ end = struct
 end
 
 [%%expect{|
+Line 2, characters 10-30:
+2 |   val f : ('a : value_or_null) -> 'a
+              ^^^^^^^^^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value_or_null'
+but was inferred to have kind `value'.
+
 module M : sig val f : 'a -> 'a end
 |}]
 
@@ -311,6 +318,13 @@ type t = Packed : 'a dummy -> t
    set ['a : value_or_null]. *)
 type t = Packed : ('a : value_or_null) dummy -> t
 [%%expect{|
+Line 1, characters 18-38:
+1 | type t = Packed : ('a : value_or_null) dummy -> t
+                      ^^^^^^^^^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value_or_null'
+but was inferred to have kind `value'.
+
 type t = Packed : 'a dummy -> t
 |}]
 
@@ -365,6 +379,13 @@ type ('c : value_or_null) constrained' = bool
   constraint 'c = ('a : value_or_null) dummy
 
 [%%expect{|
+Line 2, characters 18-38:
+2 |   constraint 'c = ('a : value_or_null) dummy
+                      ^^^^^^^^^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value_or_null'
+but was inferred to have kind `value'.
+
 type 'b constrained' = bool constraint 'b = 'a dummy
 |}]
 

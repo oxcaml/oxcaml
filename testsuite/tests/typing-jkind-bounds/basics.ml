@@ -1274,12 +1274,68 @@ type ('a : value) t = ('a : any)
 type ('a : value) t = ('a : value)
 type ('a : bits32 mod aliased) t = ('a : any mod global)
 [%%expect {|
+Line 1, characters 6-28:
+1 | type ('a : value mod aliased) t = ('a : value mod global)
+          ^^^^^^^^^^^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value mod aliased'
+but was inferred to have kind `value mod global'.
+
 type ('a : value mod global) t = 'a
+Line 2, characters 26-38:
+2 | type ('a : immediate) t = ('a : value)
+                              ^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value'
+but was inferred to have kind `immediate'.
+
 type ('a : immediate) t = 'a
+Line 3, characters 6-16:
+3 | type ('a : value) t = ('a : immediate)
+          ^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value'
+but was inferred to have kind `immediate'.
+
 type ('a : immediate) t = 'a
+Line 4, characters 72-113:
+4 | type ('a : value mod external_ stateless many unyielding non_float) t = ('a : value mod immutable global aliased)
+                                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value mod global immutable'
+but was inferred to have kind `immediate'.
+
+Line 4, characters 6-66:
+4 | type ('a : value mod external_ stateless many unyielding non_float) t = ('a : value mod immutable global aliased)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value mod unyielding many stateless external_ non_float'
+but was inferred to have kind `immediate'.
+
 type ('a : immediate) t = 'a
+Line 5, characters 22-32:
+5 | type ('a : value) t = ('a : any)
+                          ^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `any'
+but was inferred to have kind `value'.
+
 type 'a t = 'a
 type 'a t = 'a
+Line 7, characters 35-56:
+7 | type ('a : bits32 mod aliased) t = ('a : any mod global)
+                                       ^^^^^^^^^^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `any mod global'
+but was inferred to have kind `bits32 mod global'.
+
+Line 7, characters 6-29:
+7 | type ('a : bits32 mod aliased) t = ('a : any mod global)
+          ^^^^^^^^^^^^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `bits32 mod aliased'
+but was inferred to have kind `bits32 mod global'.
+
 type ('a : bits32 mod global) t = 'a
 |}]
 
@@ -1299,8 +1355,29 @@ let f : ('a : any mod global aliased) -> ('a: any mod contended) = fun x -> x
 let f : ('a : value mod external64) -> ('a: any mod external_) = fun x -> x
 let f : ('a : value) -> ('a: immediate) = fun x -> x
 [%%expect {|
+Line 1, characters 8-37:
+1 | let f : ('a : any mod global aliased) -> ('a: any mod contended) = fun x -> x
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `any mod global'
+but was inferred to have kind `any mod global contended'.
+
 val f : ('a : value_or_null mod global contended). 'a -> 'a = <fun>
+Line 2, characters 8-35:
+2 | let f : ('a : value mod external64) -> ('a: any mod external_) = fun x -> x
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value mod external64'
+but was inferred to have kind `value mod external_'.
+
 val f : ('a : value mod external_). 'a -> 'a = <fun>
+Line 3, characters 8-20:
+3 | let f : ('a : value) -> ('a: immediate) = fun x -> x
+            ^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value'
+but was inferred to have kind `immediate'.
+
 val f : ('a : immediate). 'a -> 'a = <fun>
 |}]
 

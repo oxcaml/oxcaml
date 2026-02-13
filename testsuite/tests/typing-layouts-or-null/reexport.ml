@@ -147,6 +147,13 @@ end
 let fail = Or_null.This (Or_null.This 5)
 
 [%%expect{|
+Line 2, characters 8-26:
+2 |   type ('a : value_or_null) t = 'a or_null [@@or_null_reexport]
+            ^^^^^^^^^^^^^^^^^^
+Warning 191 [imprecise-kind-annotation]: The type variable `'a'
+was annotated with kind `value_or_null'
+but was inferred to have kind `value_or_null mod non_null'.
+
 module Or_null :
   sig
     type ('a : value_or_null mod non_null) t = 'a or_null = Null | This of 'a [@@or_null_reexport]
