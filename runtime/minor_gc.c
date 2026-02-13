@@ -142,8 +142,8 @@ void caml_set_minor_heap_size (asize_t wsize)
 
   if (domain_state->young_ptr != domain_state->young_end) {
     CAML_EV_COUNTER (EV_C_FORCE_MINOR_SET_MINOR_HEAP_SIZE, 1);
-    // Don't call caml_minor_collection, since that can run the
-    // caml_domain_external_interrupt_hook, which can allocate.
+    // Don't call caml_minor_collection, since that can run tick hooks, which
+    // can allocate.
     caml_empty_minor_heaps_once();
   }
   CAMLassert (domain_state->young_ptr == domain_state->young_end);
