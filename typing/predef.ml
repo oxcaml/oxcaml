@@ -349,6 +349,19 @@ let list_argument_sort = Jkind_types.Sort.Const.value
 let list_argument_jkind = Jkind.Builtin.value_or_null ~why:(
   Type_argument {parent_path = path_list; position = 1; arity = 1})
 
+let predef_jkinds =
+  List.map
+    (fun (builtin : Jkind.Const.Builtin.t) ->
+       ident_create builtin.name, builtin.jkind)
+    Jkind.Const.Builtin.builtins
+
+let all_predef_jkinds = List.map fst predef_jkinds
+
+let add_predef_jkinds add_jkind env =
+  List.fold_left
+    (fun env (id, jkind) -> add_jkind id jkind env) env
+    predef_jkinds
+
 let mk_add_type add_type =
   let add_type_with_jkind
       ?manifest type_ident
@@ -508,6 +521,18 @@ let mk_add_extension add_extension id args =
       ext_uid = Uid.of_predef_id id;
     }
 
+let mk_add_jkind add_jkind =
+  let add_jkind id jkind env =
+    let decl =
+      { jkind_manifest = Some jkind;
+        jkind_attributes = [];
+        jkind_uid = Uid.of_predef_id id;
+        jkind_loc = Location.none }
+    in
+    add_jkind id decl env
+  in
+  add_jkind
+
 let variant constrs =
   let mk_elt { cd_args } =
     let sorts = match cd_args with
@@ -531,11 +556,13 @@ let unrestricted tvar ca_sort =
 
 (* CR layouts: Changes will be needed here as we add support for the built-ins
    to work with non-values, and as we relax the mixed block restriction. *)
-let build_initial_env add_type add_extension empty_env =
+let build_initial_env add_type add_extension add_jkind empty_env =
   let add_type_with_jkind, add_type = mk_add_type add_type
   and add_type1 = mk_add_type1 add_type
   and add_type2 = mk_add_type2 add_type
-  and add_extension = mk_add_extension add_extension in
+  and add_extension = mk_add_extension add_extension
+  and add_jkind = mk_add_jkind add_jkind
+  in
   empty_env
   (* Predefined types *)
   |> add_type1 ident_array
@@ -728,6 +755,8 @@ let build_initial_env add_type add_extension empty_env =
   |> add_extension ident_undefined_recursive_module
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int]),
        Jkind_types.Sort.Const.value]
+  (* Predefined jkinds *)
+  |> add_predef_jkinds add_jkind
 
 let add_simd_stable_extension_types add_type env =
   let _, add_type = mk_add_type add_type in

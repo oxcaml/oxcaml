@@ -118,7 +118,7 @@ end
 Line 2, characters 48-58:
 2 |   [@@@implicit_kind: ('no : immutable_data with int -> int)]
                                                     ^^^^^^^^^^
-Error: 'with' syntax is not allowed on a right mode.
+Error: 'with' syntax is not allowed in kind declarations.
 |}]
 
 

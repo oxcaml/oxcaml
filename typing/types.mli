@@ -324,14 +324,22 @@ and 'd with_bounds =
     : with_bounds_types -> ('l * Allowance.disallowed) with_bounds
     (** Invariant : there must always be at least one type in this set **)
 
-and ('layout, 'd) layout_and_axes =
-  { layout : 'layout;
+and 'layout jkind_base =
+  | Layout of 'layout
+  | Kconstr of Path.t
+
+and ('layout, 'd) base_and_axes =
+  { base : 'layout jkind_base;
     mod_bounds : mod_bounds;
     with_bounds : 'd with_bounds
   }
   constraint 'd = 'l * 'r
 
-and 'd jkind_desc = (Jkind_types.Sort.t Jkind_types.Layout.t, 'd) layout_and_axes
+and 'd jkind_const_desc = (Jkind_types.Layout.Const.t, 'd) base_and_axes
+  constraint 'd = 'l * 'r
+and jkind_const_desc_lr = (allowed * allowed) jkind_const_desc
+
+and 'd jkind_desc = (Jkind_types.Sort.t Jkind_types.Layout.t, 'd) base_and_axes
   constraint 'd = 'l * 'r
 
 and jkind_desc_packed = Pack_jkind_desc : ('l * 'r) jkind_desc -> jkind_desc_packed
@@ -364,6 +372,14 @@ and jkind_l = (allowed * disallowed) jkind  (* the jkind of an actual type *)
 and jkind_r = (disallowed * allowed) jkind  (* the jkind expected of a type *)
 and jkind_lr = (allowed * allowed) jkind    (* the jkind of a variable *)
 and jkind_packed = Pack_jkind : ('l * 'r) jkind -> jkind_packed
+
+and jkind_declaration =
+  {
+    jkind_manifest : jkind_const_desc_lr option;
+    jkind_attributes : Parsetree.attributes;
+    jkind_uid : Shape.Uid.t;
+    jkind_loc : Location.t
+  }
 
 (* A map from [type_expr] to [With_bounds_type_info.t], specifically defined with a
    (best-effort) semantic comparison function on types to be used in the with-bounds of a
@@ -1061,6 +1077,7 @@ module type Wrapped = sig
   | Sig_modtype of Ident.t * modtype_declaration * visibility
   | Sig_class of Ident.t * class_declaration * rec_status * visibility
   | Sig_class_type of Ident.t * class_type_declaration * rec_status * visibility
+  | Sig_jkind of Ident.t * jkind_declaration * visibility
 
   and module_declaration =
   {

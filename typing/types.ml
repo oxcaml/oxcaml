@@ -163,14 +163,22 @@ and 'd with_bounds =
   | No_with_bounds : ('l * 'r) with_bounds
   | With_bounds : with_bounds_types -> ('l * Allowance.disallowed) with_bounds
 
-and ('layout, 'd) layout_and_axes =
-  { layout : 'layout;
+and 'layout jkind_base =
+  | Layout of 'layout
+  | Kconstr of Path.t
+
+and ('layout, 'd) base_and_axes =
+  { base : 'layout jkind_base;
     mod_bounds : mod_bounds;
     with_bounds : 'd with_bounds
   }
   constraint 'd = 'l * 'r
 
-and 'd jkind_desc = (Jkind_types.Sort.t Jkind_types.Layout.t, 'd) layout_and_axes
+and 'd jkind_const_desc = (Jkind_types.Layout.Const.t, 'd) base_and_axes
+  constraint 'd = 'l * 'r
+and jkind_const_desc_lr = (allowed * allowed) jkind_const_desc
+
+and 'd jkind_desc = (Jkind_types.Sort.t Jkind_types.Layout.t, 'd) base_and_axes
   constraint 'd = 'l * 'r
 
 and jkind_desc_packed = Pack_jkind_desc : ('l * 'r) jkind_desc -> jkind_desc_packed
@@ -193,6 +201,17 @@ and jkind_l = (allowed * disallowed) jkind
 and jkind_r = (disallowed * allowed) jkind
 and jkind_lr = (allowed * allowed) jkind
 and jkind_packed = Pack_jkind : ('l * 'r) jkind -> jkind_packed
+
+and jkind_declaration =
+  {
+    (* CR layouts: Though it's semantically correct to have a const jkind for
+       the manifest, it's not obvious if this is the right choice from a
+       performance perspective. See internal ticket 5719. *)
+    jkind_manifest : jkind_const_desc_lr option;
+    jkind_attributes : Parsetree.attributes;
+    jkind_uid : Shape.Uid.t;
+    jkind_loc : Location.t
+  }
 
 module TransientTypeOps = struct
   type t = type_expr
@@ -584,6 +603,7 @@ module type Wrapped = sig
   | Sig_modtype of Ident.t * modtype_declaration * visibility
   | Sig_class of Ident.t * class_declaration * rec_status * visibility
   | Sig_class_type of Ident.t * class_type_declaration * rec_status * visibility
+  | Sig_jkind of Ident.t * jkind_declaration * visibility
 
   and module_declaration =
   {
@@ -633,7 +653,7 @@ module Make_wrapped(Wrap : Wrap) = struct
       end
     | Sig_class _ ->
         Some Jkind_types.Sort.(of_const Const.for_class)
-    | Sig_type _ | Sig_modtype _ | Sig_class_type _ -> None
+    | Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _ -> None
 end
 
 module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
@@ -704,6 +724,8 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
         To.Sig_class (id,cd,rs,vis)
     | Sig_class_type (id,ctd,rs,vis) ->
         To.Sig_class_type (id,ctd,rs,vis)
+    | Sig_jkind (id,jkd,vis) ->
+        To.Sig_jkind (id,jkd,vis)
 end
 
 include Make_wrapped(struct type 'a t = 'a end)
@@ -944,7 +966,8 @@ let item_visibility = function
   | Sig_module (_, _, _, _, vis)
   | Sig_modtype (_, _, vis)
   | Sig_class (_, _, _, vis)
-  | Sig_class_type (_, _, _, vis) -> vis
+  | Sig_class_type (_, _, _, vis)
+  | Sig_jkind (_, _, vis) -> vis
 
 let rec bound_value_identifiers = function
     [] -> []
@@ -964,6 +987,7 @@ let signature_item_id = function
   | Sig_modtype (id, _, _)
   | Sig_class (id, _, _, _)
   | Sig_class_type (id, _, _, _)
+  | Sig_jkind (id, _, _)
     -> id
 
 let signature_item_representation sg =

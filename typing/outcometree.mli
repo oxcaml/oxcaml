@@ -197,6 +197,7 @@ and out_sig_item =
       * out_rec_status
   | Osig_type of out_type_decl * out_rec_status
   | Osig_value of out_val_decl
+  | Osig_jkind of out_jkind_decl
   | Osig_ellipsis
 and out_type_decl =
   { otype_name: string;
@@ -239,6 +240,10 @@ and out_ext_status =
   | Oext_first
   | Oext_next
   | Oext_exception
+and out_jkind_decl =
+  { ojkind_name: string;
+    ojkind_jkind: out_jkind option }
+
 
 type out_phrase =
   | Ophr_eval of out_value * out_type

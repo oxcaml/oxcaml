@@ -921,6 +921,14 @@ and type_kind i ppf x =
   | Ttype_open ->
       line i ppf "Ttype_open\n"
 
+and jkind_declaration i ppf x =
+  line i ppf "jkind_declaration %a %a\n" fmt_ident x.jkind_id
+       fmt_location x.jkind_loc;
+  attributes i ppf x.jkind_attributes;
+  let i = i+1 in
+  line i ppf "pjkind_manifest =\n";
+  option (i+1) jkind_annotation ppf x.jkind_annotation
+
 and type_extension i ppf x =
   line i ppf "type_extension\n";
   attributes i ppf x.tyext_attributes;
@@ -1206,6 +1214,9 @@ and signature_item i ppf x =
       list i class_type_declaration ppf l;
   | Tsig_attribute a ->
       attribute i ppf "Tsig_attribute" a
+  | Tsig_jkind jd ->
+      line i ppf "Tsig_jkind";
+      jkind_declaration i ppf jd
 
 and module_declaration i ppf md =
   line i ppf "%a" fmt_modname md.md_id;
@@ -1325,6 +1336,9 @@ and structure_item i ppf x =
       module_expr i ppf incl.incl_mod;
   | Tstr_attribute a ->
       attribute i ppf "Tstr_attribute" a
+  | Tstr_jkind jd ->
+      line i ppf "Tstr_jkind";
+      jkind_declaration i ppf jd
 
 and longident_x_with_constraint i ppf (li, _, wc) =
   line i ppf "%a\n" fmt_path li;
