@@ -2010,12 +2010,14 @@ static atomic_bool tick_thread_stop;
 
 CAMLextern void caml_stop_tick_thread(void)
 {
-  if (atomic_load_acquire(&tick_thread_running)) {
+  /* If multiple threads try to stop the tick thread at the same time, only one
+     should join it. This means that subsequent callers will return while the
+     tick thread is still running. */
+  if (atomic_exchange(&tick_thread_running, false)) {
     atomic_store_release(&tick_thread_stop, true);
     pthread_t thread = atomic_load_relaxed(&tick_thread_id);
     CAMLassert(thread);
     pthread_join(thread, NULL);
-    atomic_store_release(&tick_thread_running, false);
   }
 }
 
@@ -2083,6 +2085,8 @@ CAMLextern int caml_start_tick_thread(void)
       || atomic_load_acquire(&tick_thread_disabled)) {
     return 0;
   }
+
+  atomic_store_release(&tick_thread_stop, false);
 
 #ifdef POSIX_SIGNALS
   sigset_t mask, old_mask;
