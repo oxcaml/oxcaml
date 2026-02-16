@@ -312,6 +312,7 @@ val get_zero_alloc_attribute :
   zero_alloc_attribute
 
 val get_tydi_attribute : Parsetree.attributes -> bool
+val get_nonexpansive_attribute : Parsetree.attributes -> bool
 
 (* This returns the [zero_alloc_assume] if the input is an assume.  Otherwise,
    it returns None. If the input attribute is [Check], this issues a warning. *)

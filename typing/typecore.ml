@@ -4581,6 +4581,11 @@ let rec is_nonexpansive exp =
       { exp_desc = Texp_ident (_, _, {val_kind = Val_prim prim}, Id_prim _, _) },
       args, _, _, _) ->
      is_nonexpansive_prim prim args
+  | Texp_apply (
+    { exp_desc = Texp_ident _; exp_attributes },
+      args, _, _, _) ->
+      Builtin_attributes.get_nonexpansive_attribute exp_attributes
+      && List.for_all is_nonexpansive_arg (List.map snd args)
   | Texp_array (_, _, _ :: _, _)
   | Texp_apply _
   | Texp_try _

@@ -127,6 +127,7 @@ let builtin_attrs =
   ; "regalloc"
   ; "regalloc_param"
   ; "tydi"
+  ; "nonexpansive"
   ]
 
 let builtin_attrs =
@@ -723,6 +724,22 @@ let get_tydi_attribute attrs =
     (fun attr ->
       match attr.attr_name.txt with
       | "ocaml.tydi" | "tydi" ->
+          (match attr.attr_payload with
+          | PStr [] ->
+              mark_used attr.attr_name;
+              true
+          | _ ->
+              warn_payload attr.attr_loc attr.attr_name.txt
+                "empty payload expected";
+                false)
+      | _ -> false)
+    attrs
+
+let get_nonexpansive_attribute attrs =
+  List.exists
+    (fun attr ->
+      match attr.attr_name.txt with
+      | "ocaml.nonexpansive" | "nonexpansive" ->
           (match attr.attr_payload with
           | PStr [] ->
               mark_used attr.attr_name;
