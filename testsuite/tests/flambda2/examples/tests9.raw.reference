@@ -518,10 +518,8 @@
                                                                     (eq)
                                                                  in
                                                                  switch untagged
-                                                                   | 0 -> 
-                                                                   k10
-                                                                   | 1 -> 
-                                                                   k11)
+                                                                   | 0 -> k10
+                                                                   | 1 -> k11)
                                                                   where 
                                                                     k11 =
                                                                     cont k8
@@ -543,9 +541,9 @@
                                                                     (int_lessthan)
                                                                     in
                                                                     switch untagged
-                                                                    | 0 -> 
+                                                                    | 0 ->
                                                                     k11
-                                                                    | 1 -> 
+                                                                    | 1 ->
                                                                     k12)
                                                                     where 
                                                                     k12 =
@@ -688,10 +686,8 @@
                                                                     (eq)
                                                                  in
                                                                  switch untagged
-                                                                   | 0 -> 
-                                                                   k9
-                                                                   | 1 -> 
-                                                                   k10)
+                                                                   | 0 -> k9
+                                                                   | 1 -> k10)
                                                                   where 
                                                                     k10 =
                                                                     cont k7
@@ -713,9 +709,9 @@
                                                                     (int_lessthan)
                                                                     in
                                                                     switch untagged
-                                                                    | 0 -> 
+                                                                    | 0 ->
                                                                     k10
-                                                                    | 1 -> 
+                                                                    | 1 ->
                                                                     k11)
                                                                     where 
                                                                     k11 =
@@ -1104,10 +1100,8 @@
                                                                     (eq)
                                                                  in
                                                                  switch untagged
-                                                                   | 0 -> 
-                                                                   k10
-                                                                   | 1 -> 
-                                                                   k11)
+                                                                   | 0 -> k10
+                                                                   | 1 -> k11)
                                                                   where 
                                                                     k11 =
                                                                     cont k8
@@ -1129,9 +1123,9 @@
                                                                     (int_greaterthan)
                                                                     in
                                                                     switch untagged
-                                                                    | 0 -> 
+                                                                    | 0 ->
                                                                     k11
-                                                                    | 1 -> 
+                                                                    | 1 ->
                                                                     k12)
                                                                     where 
                                                                     k12 =
@@ -1274,10 +1268,8 @@
                                                                     (eq)
                                                                  in
                                                                  switch untagged
-                                                                   | 0 -> 
-                                                                   k9
-                                                                   | 1 -> 
-                                                                   k10)
+                                                                   | 0 -> k9
+                                                                   | 1 -> k10)
                                                                   where 
                                                                     k10 =
                                                                     cont k7
@@ -1299,9 +1291,9 @@
                                                                     (int_greaterthan)
                                                                     in
                                                                     switch untagged
-                                                                    | 0 -> 
+                                                                    | 0 ->
                                                                     k10
-                                                                    | 1 -> 
+                                                                    | 1 ->
                                                                     k11)
                                                                     where 
                                                                     k11 =

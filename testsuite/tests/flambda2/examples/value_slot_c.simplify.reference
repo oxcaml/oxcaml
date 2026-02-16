@@ -40,17 +40,15 @@ let code loopify(never) size(59) newer_version_of(f_3)
                where k3 =
                  let prim_1 = %phys_eq (x, 1) in
                  switch prim_1
-                   | 0 -> k1
-                            pop(regular k1)
-                            ($camlValue_slot_c__Pmakeblock121)
+                   | 0 ->
+                     k1 pop(regular k1) ($camlValue_slot_c__Pmakeblock121)
                    | 1 -> k2)
               where k2 =
                 let Pfield = %block_load.[`1`] (`*match*`) in
                 let prim = %phys_eq (Pfield, 3) in
                 switch prim
-                  | 0 -> k1
-                           pop(regular k1)
-                           ($camlValue_slot_c__Pmakeblock132)
+                  | 0 ->
+                    k1 pop(regular k1) ($camlValue_slot_c__Pmakeblock132)
                   | 1 -> k (0)))
 in
 let $camlValue_slot_c__f_4 = closure f_3_1 @f in
