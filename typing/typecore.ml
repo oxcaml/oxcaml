@@ -6275,6 +6275,12 @@ and type_expect_
   | Pexp_apply(sfunct, sargs) ->
       (* See Note [Type-checking applications] *)
       assert (sargs <> []);
+      let () =
+        match sfunct.pexp_desc with
+        | Pexp_ident _ ->
+            ignore (Builtin_attributes.get_nonexpansive_attribute sfunct.pexp_attributes : bool)
+        | _ -> ()
+      in
       check_dynamic (loc, Expression) (Always_dynamic Application)
         expected_mode;
       let pm = position_and_mode env expected_mode sexp in
