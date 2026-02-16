@@ -1370,9 +1370,10 @@ and slam ppf = function
   | SLfield (container, field) ->
     fprintf ppf "%a.%i" slam container field
   | SLhalves { sval_comptime; sval_runtime } ->
-    fprintf ppf "@[<hv 2>(%a,@ ⟪ %a ⟫)@]" slam sval_comptime lam sval_runtime
-  | SLproj_comptime value -> fprintf ppf "%a.0" slam value
-  | SLproj_runtime value -> fprintf ppf "%a.1" slam value
+    fprintf ppf "@[<hv 2>{ c = %a;@ r = ⟪ %a ⟫ }@]"
+      slam sval_comptime lam sval_runtime
+  | SLproj_comptime value -> fprintf ppf "%a.c" slam value
+  | SLproj_runtime value -> fprintf ppf "%a.r" slam value
   | SLtemplate func -> fprintf ppf "(template %a)" slambda_function func
   | SLinstantiate apply -> fprintf ppf "[%a]" slambda_apply apply
   | SLlet { slet_name; slet_value; slet_body } ->

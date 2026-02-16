@@ -1,80 +1,137 @@
+(* This file puts effort into making sure any lambda it builds is physically
+   equal to the input lambda where possible. As such, many of the functions pass
+   around the original lambda so they can use it if instead they would otherwise
+   produce structurally equal lambda.
+
+   There is additionally an invariant that the compile-time half of an
+   [SLhalves] contains no compile-time effects. *)
+
 open Lambda
 
-(** true if the provided slambda definitely has no side-effects, false if it
-    might have. *)
-let slambda_is_pure = function
-  | SLlayout _ | SLglobal _ | SLvar _ | SLmissing -> true
-  | SLrecord _ | SLfield _ | SLhalves _ | SLproj_comptime _ | SLproj_runtime _
-  | SLtemplate _ | SLinstantiate _ | SLlet _ ->
-    false
-
+(** Fracture a lambda constant, currently no constants have a compile time part
+    so does nothing. *)
 let fracture_const lambda _const =
   SLhalves { sval_comptime = SLmissing; sval_runtime = lambda }
 
 let rec fracture_lam lambda : slambda =
   match lambda with
   | Lvar id ->
+    (* We lift lambda idents into slambda which avoids the need to have a
+       environment mapping lambda idents to slambda idents. This works because
+       we always bind the compile-time part of an ident if it's possible that
+       it's used.
+
+       Note this isn't just an [SLvar] because it needs to do variable lookup at
+       runtime, not substitute in the value's runtime part. *)
     SLhalves
-      { sval_comptime = SLvar (Slambdaident.of_ident id);
+      { sval_comptime = SLproj_comptime (SLvar (Slambdaident.of_ident id));
         sval_runtime = lambda
       }
-  | Lmutvar _ -> SLhalves { sval_comptime = SLmissing; sval_runtime = lambda }
+  | Lmutvar _ ->
+    (* Mutable variables are always dynamic as we have no concept of mutation in
+       slambda. *)
+    SLhalves { sval_comptime = SLmissing; sval_runtime = lambda }
   | Lconst const -> fracture_const lambda const
   | Lapply ({ ap_func; ap_args; _ } as apply) ->
-    let func_unchanged, func = fracture_dynamic ap_func in
-    let args_unchanged, args = fracture_dynamic_list ap_args in
+    let func = fracture_dynamic ap_func in
+    let args = fracture_dynamic_list ap_args in
     SLhalves
       { sval_comptime = SLmissing;
         sval_runtime =
-          (if func_unchanged && args_unchanged
+          (if func == ap_func && args == ap_args
            then lambda
            else Lapply { apply with ap_func = func; ap_args = args })
       }
   | Lfunction lfun ->
-    let unchanged, ffun = fracture_fun lfun in
+    let ffun = fracture_fun lfun in
     SLhalves
       { sval_comptime = SLmissing;
-        sval_runtime = (if unchanged then lambda else Lfunction ffun)
+        sval_runtime = (if lfun == ffun then lambda else Lfunction ffun)
       }
-  | Llet (str, layout, id, duid, def, body) ->
-    slet (Slambdaident.of_ident id) def (fun def_unchanged def_c def_r ->
-        ignore def_c;
-        slet (Slambdaident.create_local "body") body
-          (fun body_unchanged body_c body_r ->
-            SLhalves
-              { sval_comptime = body_c;
-                sval_runtime =
-                  (if def_unchanged && body_unchanged
-                   then lambda
-                   else Llet (str, layout, id, duid, def_r, body_r))
-              }))
-  | Lmutlet (layout, id, duid, def, body) ->
-    slet (Slambdaident.of_ident id) def (fun def_unchanged def_c def_r ->
-        ignore def_c;
-        slet (Slambdaident.create_local "body") body
-          (fun body_unchanged body_c body_r ->
-            SLhalves
-              { sval_comptime = body_c;
-                sval_runtime =
-                  (if def_unchanged && body_unchanged
-                   then lambda
-                   else Lmutlet (layout, id, duid, def_r, body_r))
-              }))
+  | Llet (str, layout, id, duid, def, body) -> (
+    let def_id = Slambdaident.of_ident id in
+    let fdef = fracture_lam def in
+    let fbody = fracture_lam body in
+    match fdef, fbody with
+    | ( SLhalves { sval_comptime = _; sval_runtime = def_r },
+        SLhalves { sval_comptime = body_c; sval_runtime = body_r } )
+      when body_r == body && def_r == def ->
+      (* 1. [body_r == body] implies that body_r doesn't reference def in
+            slambda (as it has no slambda).
+         2. [def_r == def] implies def_r contains no compile-time effects (again
+            as it contains no slambda). *)
+      let sval_comptime =
+        match body_c with
+        | SLmissing ->
+          (* Small optimisation for the common case where binding def would be
+             pointless (due to it definitely not having compile-time effects) *)
+          SLmissing
+        | _ ->
+          (* [body_c] may reference def so we need to bind it here, note we use
+             (2) to uphold the invariant that [sval_comptime] conatins no
+             compile-time effects. *)
+          SLlet { slet_name = def_id; slet_value = fdef; slet_body = body_c }
+      in
+      (* We use (1) to know that we don't need to bind def. *)
+      SLhalves { sval_comptime; sval_runtime = lambda }
+    | _ ->
+      SLlet
+        { slet_name = def_id;
+          slet_value = fdef;
+          slet_body =
+            (let def_r =
+               Lsplice (try_to_find_location def, SLproj_runtime (SLvar def_id))
+             in
+             slet_local_loc "body" fbody (try_to_find_location body)
+               (fun body_c body_r ->
+                 SLhalves
+                   { sval_comptime = body_c;
+                     sval_runtime = Llet (str, layout, id, duid, def_r, body_r)
+                   }))
+        })
+  | Lmutlet (layout, id, duid, def, body) -> (
+    (* let mutable always binds dynamically, but we might still need to execute
+       the compile-time effects in def. *)
+    let fdef = fracture_lam def in
+    match fdef with
+    | SLhalves { sval_comptime = _; sval_runtime = def_r } ->
+      slet_local "body" body (fun body_c body_r ->
+          SLhalves
+            { sval_comptime = body_c;
+              sval_runtime =
+                (if def_r == def && body_r == body
+                 then lambda
+                 else Lmutlet (layout, id, duid, def_r, body_r))
+            })
+    | _ ->
+      let def_id = Slambdaident.of_ident id in
+      let def_r =
+        Lsplice (try_to_find_location def, SLproj_runtime (SLvar def_id))
+      in
+      SLlet
+        { slet_name = def_id;
+          slet_value = fdef;
+          slet_body =
+            slet_local "body" body (fun body_c body_r ->
+                SLhalves
+                  { sval_comptime = body_c;
+                    sval_runtime = Lmutlet (layout, id, duid, def_r, body_r)
+                  })
+        })
   | Lletrec (bindings, body) ->
     (* This only works because functions currently have no static part *)
     let bindings_unchanged, bindings =
       List.fold_left_map
         (fun unchanged ({ def } as binding) ->
-          let fun_unchanged, ffun = fracture_fun def in
-          unchanged && fun_unchanged, { binding with def = ffun })
+          let ffun = fracture_fun def in
+          unchanged && def == ffun, { binding with def = ffun })
         true bindings
     in
-    slet (Slambdaident.create_local "body") body
-      (fun body_unchanged body_c body_r ->
+    slet_local "body" body (fun body_c body_r ->
         SLhalves
           { sval_comptime = body_c;
             sval_runtime =
-              (if bindings_unchanged && body_unchanged
+              (if bindings_unchanged && body_r == body
                then lambda
                else Lletrec (bindings, body_r))
           })
@@ -84,179 +141,184 @@ let rec fracture_lam lambda : slambda =
         { sw_numconsts; sw_consts; sw_numblocks; sw_blocks; sw_failaction },
         loc,
         layout ) ->
-    let arg_unchanged, arg = fracture_dynamic arg in
-    let consts_unchanged, sw_consts = fracture_dynamic_alist sw_consts in
-    let blocks_unchanged, sw_blocks = fracture_dynamic_alist sw_blocks in
-    let failaction_unchanged, sw_failaction =
-      fracture_dynamic_opt sw_failaction
-    in
+    let farg = fracture_dynamic arg in
+    let consts = fracture_dynamic_alist sw_consts in
+    let blocks = fracture_dynamic_alist sw_blocks in
+    let failaction = fracture_dynamic_opt sw_failaction in
     SLhalves
       { sval_comptime = SLmissing;
         sval_runtime =
           (if
-             arg_unchanged && consts_unchanged && blocks_unchanged
-             && failaction_unchanged
+             farg == arg && consts == sw_consts && blocks == sw_blocks
+             && failaction == sw_failaction
            then lambda
            else
              Lswitch
-               ( arg,
+               ( farg,
                  { sw_numconsts;
-                   sw_consts;
+                   sw_consts = consts;
                    sw_numblocks;
-                   sw_blocks;
-                   sw_failaction
+                   sw_blocks = blocks;
+                   sw_failaction = failaction
                  },
                  loc,
                  layout ))
       }
   | Lstringswitch (arg, cases, default, loc, layout) ->
-    let arg_unchanged, arg = fracture_dynamic arg in
-    let cases_unchanged, cases = fracture_dynamic_alist cases in
-    let default_unchanged, default = fracture_dynamic_opt default in
+    let farg = fracture_dynamic arg in
+    let fcases = fracture_dynamic_alist cases in
+    let fdefault = fracture_dynamic_opt default in
     SLhalves
       { sval_comptime = SLmissing;
         sval_runtime =
-          (if arg_unchanged && cases_unchanged && default_unchanged
+          (if farg == arg && fcases == cases && fdefault == default
            then lambda
-           else Lstringswitch (arg, cases, default, loc, layout))
+           else Lstringswitch (farg, fcases, fdefault, loc, layout))
       }
   | Lstaticraise (lbl, args) ->
-    let args_unchanged, args = fracture_dynamic_list args in
+    let fargs = fracture_dynamic_list args in
     SLhalves
       { sval_comptime = SLmissing;
         sval_runtime =
-          (if args_unchanged then lambda else Lstaticraise (lbl, args))
+          (if fargs == args then lambda else Lstaticraise (lbl, fargs))
       }
   | Lstaticcatch (body, id, handler, pop_region, kind) ->
-    let unchanged_body, body = fracture_dynamic body in
-    let unchanged_handler, handler = fracture_dynamic handler in
-    let unchanged = unchanged_body && unchanged_handler in
+    let fbody = fracture_dynamic body in
+    let fhandler = fracture_dynamic handler in
     SLhalves
       { sval_comptime = SLmissing;
         sval_runtime =
-          (if unchanged
+          (if fbody == body && fhandler == handler
            then lambda
-           else Lstaticcatch (body, id, handler, pop_region, kind))
+           else Lstaticcatch (fbody, id, fhandler, pop_region, kind))
       }
   | Ltrywith (body, exn, duid, handler, kind) ->
-    let unchanged_body, body = fracture_dynamic body in
-    let unchanged_handler, handler = fracture_dynamic handler in
-    let unchanged = unchanged_body && unchanged_handler in
+    let fbody = fracture_dynamic body in
+    let fhandler = fracture_dynamic handler in
     SLhalves
       { sval_comptime = SLmissing;
         sval_runtime =
-          (if unchanged
+          (if fbody == body && fhandler == handler
            then lambda
-           else Ltrywith (body, exn, duid, handler, kind))
+           else Ltrywith (fbody, exn, duid, fhandler, kind))
       }
   | Lifthenelse (cond, ifso, ifnot, kind) ->
-    let unchanged_cond, cond = fracture_dynamic cond in
-    let unchanged_ifso, ifso = fracture_dynamic ifso in
-    let unchanged_ifnot, ifnot = fracture_dynamic ifnot in
-    let unchanged = unchanged_cond && unchanged_ifso && unchanged_ifnot in
+    let fcond = fracture_dynamic cond in
+    let fifso = fracture_dynamic ifso in
+    let fifnot = fracture_dynamic ifnot in
     SLhalves
       { sval_comptime = SLmissing;
         sval_runtime =
-          (if unchanged then lambda else Lifthenelse (cond, ifso, ifnot, kind))
+          (if fcond == cond && fifso == ifso && fifnot == ifnot
+           then lambda
+           else Lifthenelse (fcond, fifso, fifnot, kind))
       }
-  | Lsequence (lam1, lam2) ->
-    slet (Slambdaident.create_local "left") lam1
-      (fun left_unchanged left_c left_r ->
+  | Lsequence (left, right) ->
+    slet_local "left" left (fun left_c left_r ->
         ignore left_c;
-        slet (Slambdaident.create_local "right") lam2
-          (fun right_unchanged right_c right_r ->
+        slet_local "right" right (fun right_c right_r ->
             SLhalves
               { sval_comptime = right_c;
                 sval_runtime =
-                  (if left_unchanged && right_unchanged
+                  (if left_r == left && right_r == right
                    then lambda
                    else Lsequence (left_r, right_r))
               }))
   | Lwhile { wh_cond; wh_body } ->
-    let unchanged_cond, cond = fracture_dynamic wh_cond in
-    let unchanged_body, body = fracture_dynamic wh_body in
-    let unchanged = unchanged_cond && unchanged_body in
+    let fcond = fracture_dynamic wh_cond in
+    let fbody = fracture_dynamic wh_body in
     SLhalves
       { sval_comptime = SLmissing;
         sval_runtime =
-          (if unchanged
+          (if fcond == wh_cond && fbody == wh_body
            then lambda
-           else Lwhile { wh_cond = cond; wh_body = body })
+           else Lwhile { wh_cond = fcond; wh_body = fbody })
       }
   | Lfor { for_id; for_debug_uid; for_loc; for_from; for_to; for_dir; for_body }
     ->
-    let unchanged_from, for_from = fracture_dynamic for_from in
-    let unchanged_to, for_to = fracture_dynamic for_to in
-    let unchanged_body, for_body = fracture_dynamic for_body in
-    let unchanged = unchanged_from && unchanged_to && unchanged_body in
+    let ffor_from = fracture_dynamic for_from in
+    let ffor_to = fracture_dynamic for_to in
+    let ffor_body = fracture_dynamic for_body in
     SLhalves
       { sval_comptime = SLmissing;
         sval_runtime =
-          (if unchanged
+          (if
+             ffor_from == for_from && ffor_to == for_to && ffor_body == for_body
            then lambda
            else
              Lfor
                { for_id;
                  for_debug_uid;
                  for_loc;
-                 for_from;
-                 for_to;
+                 for_from = ffor_from;
+                 for_to = ffor_to;
                  for_dir;
-                 for_body
+                 for_body = ffor_body
                })
       }
   | Lassign (id, lam) ->
-    let unchanged, value = fracture_dynamic lam in
+    let value = fracture_dynamic lam in
     SLhalves
       { sval_comptime = SLmissing;
-        sval_runtime = (if unchanged then lambda else Lassign (id, value))
+        sval_runtime = (if lam == value then lambda else Lassign (id, value))
       }
   | Lsend (kind, met, obj, args, pos, mode, loc, layout) ->
-    let unchanged_met, met = fracture_dynamic met in
-    let unchanged_obj, obj = fracture_dynamic obj in
-    let unchanged_args, args = fracture_dynamic_list args in
+    let fmet = fracture_dynamic met in
+    let fobj = fracture_dynamic obj in
+    let fargs = fracture_dynamic_list args in
     SLhalves
       { sval_comptime = SLmissing;
         sval_runtime =
-          (if unchanged_met && unchanged_obj && unchanged_args
+          (if fmet == met && fobj == obj && fargs == args
            then lambda
-           else Lsend (kind, met, obj, args, pos, mode, loc, layout))
+           else Lsend (kind, fmet, fobj, fargs, pos, mode, loc, layout))
       }
   | Levent (lam, ev) ->
-    slet (Slambdaident.create_local "body") lam (fun unchanged body_c body_r ->
-        SLhalves
-          { sval_comptime = body_c;
-            sval_runtime = (if unchanged then lambda else Levent (body_r, ev))
-          })
-  | Lifused (id, lam) ->
-    slet (Slambdaident.create_local "body") lam (fun unchanged body_c body_r ->
-        SLhalves
-          { sval_comptime = body_c;
-            sval_runtime = (if unchanged then lambda else Lifused (id, body_r))
-          })
-  | Lregion (lam, layout) ->
-    slet (Slambdaident.create_local "body") lam (fun unchanged body_c body_r ->
+    slet_local "body" lam (fun body_c body_r ->
         SLhalves
           { sval_comptime = body_c;
             sval_runtime =
-              (if unchanged then lambda else Lregion (body_r, layout))
+              (if body_r == lam then lambda else Levent (body_r, ev))
+          })
+  | Lifused (id, lam) ->
+    slet_local "body" lam (fun body_c body_r ->
+        SLhalves
+          { sval_comptime = body_c;
+            sval_runtime =
+              (if body_r == lam then lambda else Lifused (id, body_r))
+          })
+  | Lregion (lam, layout) ->
+    slet_local "body" lam (fun body_c body_r ->
+        SLhalves
+          { sval_comptime = body_c;
+            sval_runtime =
+              (if body_r == lam then lambda else Lregion (body_r, layout))
           })
   | Lexclave body ->
-    let body_id = Slambdaident.create_local "body" in
-    slet body_id body (fun unchanged comptime runtime ->
+    slet_local "body" body (fun body_c body_r ->
         SLhalves
-          { sval_comptime = comptime;
-            sval_runtime = (if unchanged then lambda else Lexclave runtime)
+          { sval_comptime = body_c;
+            sval_runtime = (if body_r == body then lambda else Lexclave body_r)
           })
   | Lsplice (loc, _splice) ->
+    (* [Lsplice] can't exist because we're matching on tlambda (and producing
+       slambda) and Lsplice only exists in slambda. *)
     error
       ~loc:(Debuginfo.Scoped_location.to_location loc)
       (Invalid_constructor "Lsplice")
 
-and fracture_fun { kind; params; return; body; attr; loc; mode; ret_mode } =
-  let unchanged, body = fracture_dynamic body in
-  unchanged, lfunction' ~kind ~params ~return ~body ~attr ~loc ~mode ~ret_mode
+(** Fracture an [lfun]. Currently, functions only have a dynamic part so this
+    can always return an [lfun]. *)
+and fracture_fun
+    ({ kind; params; return; body; attr; loc; mode; ret_mode } as lfun) =
+  let fractured_body = fracture_dynamic body in
+  if fractured_body == body
+  then lfun
+  else
+    lfunction' ~kind ~params ~return ~body:fractured_body ~attr ~loc ~mode
+      ~ret_mode
 
+(** Fracture [lambda = Lprim (prim, args, loc)]. *)
 and fracture_prim lambda prim args loc =
   match prim with
   | Pgetglobal _ | Pmakeblock _ | Pfield _ | Pmixedfield _
@@ -299,60 +361,82 @@ and fracture_prim lambda prim args loc =
   | Parray_of_iarray | Pget_header _ | Ppeek _ | Ppoke _ | Pdls_get | Ptls_get
   | Pdomain_index | Ppoll | Pcpu_relax | Pget_idx _ | Pset_idx _ | Pget_ptr _
   | Pset_ptr _ ->
-    let unchanged_args, args = fracture_dynamic_list args in
+    let fargs = fracture_dynamic_list args in
     SLhalves
       { sval_comptime = SLmissing;
         sval_runtime =
-          (if unchanged_args then lambda else Lprim (prim, args, loc))
+          (if fargs == args then lambda else Lprim (prim, fargs, loc))
       }
 
-and slet name value body =
-  let value_slam = fracture_lam value in
-  match value_slam with
-  | SLhalves { sval_comptime = comptime; sval_runtime = runtime }
-    when slambda_is_pure comptime && runtime == value ->
-    body true comptime runtime
-  | SLhalves { sval_comptime = comptime; sval_runtime = runtime }
-    when slambda_is_pure comptime ->
-    body false comptime runtime
+(** [slet_local name value body] binds [value] to [name] in [body] in slambda.
+
+    Note this may not result in a [SLlet] if it is not necessary (in order to
+    preserve physical equality). However, if [value] has compile-time effects
+    they are guaranteed to be evaluated before (the slambda produced by) [body]
+    is evaluated.
+
+    [body] is a function, called as [body comptime runtime], where [comptime]
+    and [runtime] evaluate to the compile-time and run-time halves of the
+    fractured [value]. [comptime] is guaranteed to not contain any effects and
+    [runtime] is physically equal to [value] where possible. *)
+and slet_local name value body =
+  slet_local_loc name (fracture_lam value) (try_to_find_location value) body
+
+(** Same as [slet_local] but useful when you've already fractured [value]. *)
+and slet_local_loc name value value_loc body =
+  let name = Slambdaident.create_local name in
+  match value with
+  | SLhalves { sval_comptime = comptime; sval_runtime = runtime } ->
+    body comptime runtime
   | _ ->
     SLlet
       { slet_name = name;
-        slet_value = value_slam;
+        slet_value = value;
         slet_body =
-          body false (SLproj_comptime (SLvar name))
-            (Lsplice (try_to_find_location value, SLproj_runtime (SLvar name)))
+          body (SLproj_comptime (SLvar name))
+            (Lsplice (value_loc, SLproj_runtime (SLvar name)))
       }
 
+(** Helper function fracture [lambda] where we only need the dynamic part of the
+    result. *)
 and fracture_dynamic lam =
   match fracture_lam lam with
-  | SLhalves { sval_comptime = _; sval_runtime } when sval_runtime == lam ->
-    true, lam
-  | SLhalves { sval_comptime = _; sval_runtime } -> false, sval_runtime
-  | fractured ->
-    false, Lsplice (try_to_find_location lam, SLproj_runtime fractured)
+  | SLhalves { sval_comptime = _; sval_runtime } -> sval_runtime
+  | fractured -> Lsplice (try_to_find_location lam, SLproj_runtime fractured)
 
+(** Helper function fracture a [('a * lambda) list] where we only need the
+    dynamic part of the result. *)
 and fracture_dynamic_list lams =
-  List.fold_left_map
-    (fun unchanged lam ->
-      let unchanged_elem, elem = fracture_dynamic lam in
-      unchanged_elem && unchanged, elem)
-    true lams
+  let unchanged, fractured =
+    List.fold_left_map
+      (fun unchanged lam ->
+        let elem = fracture_dynamic lam in
+        unchanged && elem == lam, elem)
+      true lams
+  in
+  if unchanged then lams else fractured
 
-and fracture_dynamic_alist : 'a. ('a * lambda) list -> bool * ('a * lambda) list
-    =
+(** Helper function to fracture a [('a * lambda) list] where we only need the
+    dynamic part of the result. *)
+and fracture_dynamic_alist : 'a. ('a * lambda) list -> ('a * lambda) list =
  fun lams ->
-  List.fold_left_map
-    (fun unchanged (key, value) ->
-      let unchanged_value, value = fracture_dynamic value in
-      unchanged && unchanged_value, (key, value))
-    true lams
+  let unchanged, fractured =
+    List.fold_left_map
+      (fun unchanged (key, lam) ->
+        let value = fracture_dynamic lam in
+        unchanged && value == lam, (key, value))
+      true lams
+  in
+  if unchanged then lams else fractured
 
-and fracture_dynamic_opt lam =
-  match lam with
-  | None -> true, None
+(** Helper function to fracture a [lambda option] where we only need the dynamic
+    part of the result. *)
+and fracture_dynamic_opt lam_opt =
+  match lam_opt with
+  | None -> lam_opt
   | Some lam ->
-    let unchanged, lam = fracture_dynamic lam in
-    unchanged, Some lam
+    let flam = fracture_dynamic lam in
+    if flam == lam then lam_opt else Some lam
 
+(** This is the only externally accessible entry point to this module. *)
 let fracture lam = Profile.record "slambda_fracture" fracture_lam lam
