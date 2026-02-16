@@ -48,6 +48,7 @@ typedef cpuset_t cpu_set_t;
 #include "caml/backtrace.h"
 #include "caml/backtrace_prim.h"
 #include "caml/callback.h"
+#include "caml/camlatomic.h"
 #include "caml/debugger.h"
 #include "caml/domain.h"
 #include "caml/domain_state.h"
@@ -71,6 +72,7 @@ typedef cpuset_t cpu_set_t;
 #include "caml/startup_aux.h"
 #include "caml/sync.h"
 #include "caml/weak.h"
+#include "sync_posix.h"
 
 /* Check that the domain_state structure was laid out without padding,
    since the runtime assumes this in computing offsets */
@@ -180,6 +182,10 @@ struct dom_internal {
   caml_plat_mutex backup_thread_lock;
   caml_plat_cond backup_thread_cond;
 
+  /* Requested tick interval in us. If 0, this domain does not want any
+     ticks. */
+  atomic_uintnat tick_interval_usec;
+
   /* default domain lock (only used if systhreads is not loaded) */
   caml_plat_mutex default_domain_lock;
 
@@ -286,8 +292,9 @@ static void add_next_to_stw_domains(void)
   stw_domains.participating_domains++;
 #ifdef DEBUG
   /* Enforce here the invariant for early-exit in
-     [caml_interrupt_all_signal_safe], because the latter must be
-     async-signal-safe and one cannot CAMLassert inside it. */
+     [caml_interrupt_all_signal_safe] (which is also depended on by
+     [caml_tick]), because the former must be async-signal-safe and one cannot
+     CAMLassert inside it. */
   bool prev_has_interrupt_word = true;
   for (int i = 0; i < caml_params->max_domains; i++) {
     bool has_interrupt_word = all_domains[i].interrupt_word != NULL;
@@ -633,6 +640,9 @@ static void domain_create(uintnat initial_minor_heap_wsize,
      - But currently there is no orphaning process for allocation stats,
        we just reuse the previous stats from the previous domain
        with the same index.
+
+     Reusing the slot also allows us to avoid synchronization for domain
+     termination in [caml_tick].
   */
   bool fresh_state = d->state == NULL;
   if (fresh_state) {
@@ -669,9 +679,10 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   domain_state->young_limit = 0;
   domain_state->unique_id = d->unique_id;
+  atomic_store_release(&domain_state->requested_tick, false);
 
   /* Synchronized with [caml_interrupt_all_signal_safe], so that the
-     initializing write of young_limit happens before any
+     initializing writes of young_limit and [requested_tick] happen before any
      interrupt. */
   atomic_store_explicit(&d->interrupt_word, &domain_state->young_limit,
                         memory_order_release);
@@ -780,7 +791,6 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->requested_major_slice = 0;
   domain_state->requested_minor_gc = 0;
   domain_state->major_slice_epoch = 0;
-  domain_state->requested_external_interrupt = 0;
 
   domain_state->parser_trace = 0;
 
@@ -1038,6 +1048,8 @@ void caml_init_domains(uintnat max_domains, uintnat minor_heap_wsz)
     caml_plat_cond_init(&dom->backup_thread_cond);
     dom->backup_thread_running = 0;
     dom->backup_thread_msg = BT_INIT;
+
+    dom->tick_interval_usec = Default_tick_interval_usec;
   }
 
   domain_create(minor_heap_wsz, NULL);
@@ -1203,7 +1215,7 @@ static void caml_domain_stop_default(void)
   return;
 }
 
-static void caml_domain_external_interrupt_hook_default(void)
+static void caml_domain_tick_hook_default(void)
 {
   return;
 }
@@ -1225,8 +1237,8 @@ CAMLexport void (*caml_domain_unlock_hook)(void) =
 CAMLexport void (*caml_domain_stop_hook)(void) =
    caml_domain_stop_default;
 
-CAMLexport void (*caml_domain_external_interrupt_hook)(void) =
-   caml_domain_external_interrupt_hook_default;
+CAMLexport void (*caml_domain_tick_hook)(void) =
+   caml_domain_tick_hook_default;
 
 CAMLexport void (*caml_domain_send_interrupt_hook)(caml_domain_state*) =
    caml_domain_send_interrupt_hook_default;
@@ -1834,19 +1846,6 @@ void caml_interrupt_all_signal_safe(void)
   }
 }
 
-void caml_external_interrupt_all_signal_safe(uintnat flags)
-{
-  for (dom_internal *d = all_domains;
-       d < &all_domains[caml_params->max_domains];
-       d++) {
-    atomic_uintnat * interrupt_word =
-      atomic_load_acquire(&d->interrupt_word);
-    if (interrupt_word == NULL) return;
-    atomic_fetch_or(&d->state->requested_external_interrupt, flags);
-    interrupt_domain(d);
-  }
-}
-
 /* To avoid any risk of forgetting an action through a race,
    [caml_reset_young_limit] is the only way (apart from setting
    young_limit to -1 for immediate interruption) through which
@@ -1876,18 +1875,17 @@ void caml_reset_young_limit(caml_domain_state * dom_st)
       || dom_st->major_slice_epoch < atomic_load (&caml_major_slice_epoch)) {
     interrupt_domain_local(dom_st);
   }
-  /* We might be here due to a recently-recorded signal or forced
-     systhread switching, so we need to remember that we must run
-     signal handlers or systhread's yield. In addition, in the case of
-     long-running C code (that may regularly poll with
-     caml_process_pending_actions), we want to force a query of all
-     callbacks at every minor collection or major slice (similarly to
-     the OCaml behaviour).
+  /* We might be here due to a recently-recorded signal or tick, so we need to
+     remember that we must run signal handlers or tick handlers. In addition, in
+     the case of long-running C code (that may regularly poll with
+     caml_process_pending_actions), we want to force a query of all callbacks at
+     every minor collection or major slice (similarly to the OCaml behaviour).
 
      We don't need to check for internally triggered pending actions
      (Memprof and finalisers), because they will already have set
      action_pending if needed. */
-  if (caml_check_pending_signals() || Caml_state->requested_external_interrupt)
+  if (caml_check_pending_signals()
+      || atomic_load_acquire(&Caml_state->requested_tick))
     caml_set_action_pending(dom_st);
 }
 
@@ -1996,13 +1994,155 @@ void caml_handle_gc_interrupt(void)
   caml_poll_gc_work();
 }
 
-/* Preemptive systhread switching */
-void caml_process_external_interrupt(void)
+/* Tick thread */
+
+void caml_process_tick(void)
 {
-  if (atomic_load_acquire(&Caml_state->requested_external_interrupt)) {
-    caml_domain_external_interrupt_hook();
+  if (atomic_exchange(&Caml_state->requested_tick, false)) {
+    caml_domain_tick_hook();
   }
 }
+
+static _Atomic pthread_t tick_thread_id;
+static atomic_bool tick_thread_running;
+static atomic_bool tick_thread_disabled;
+static atomic_bool tick_thread_stop;
+
+CAMLextern void caml_stop_tick_thread(void)
+{
+  /* If multiple threads try to stop the tick thread at the same time, only one
+     should join it. This means that subsequent callers will return while the
+     tick thread is still running. */
+  if (atomic_exchange(&tick_thread_running, false)) {
+    atomic_store_release(&tick_thread_stop, true);
+    pthread_t thread = atomic_load_relaxed(&tick_thread_id);
+    CAMLassert(thread);
+    pthread_join(thread, NULL);
+  }
+}
+
+/* Compute the interval at which the tick thread will tick. This takes the
+ * minimum requested tick interval across all domains, which is currently a
+ * (very loose) heuristic that avoids any especially involved GCD calculation
+ *
+ * If this function returns 0, ticking is disabled.
+ */
+CAMLextern uintnat caml_effective_tick_interval_usec(void) {
+  if (atomic_load_relaxed(&tick_thread_disabled)) {
+    return 0;
+  }
+
+  uintnat res = 0;
+
+  for (int i = 0; i < caml_params->max_domains; i++) {
+    uintnat dom_tick_interval =
+      atomic_load_relaxed(&all_domains[i].tick_interval_usec);
+    if (dom_tick_interval == 0) { continue; }
+    if (res == 0) { res = dom_tick_interval; }
+    else if (dom_tick_interval < res) {
+      res = dom_tick_interval;
+    }
+  }
+
+  return res;
+}
+
+static void* caml_tick(void *arg)
+{
+  while (!atomic_load_acquire(&tick_thread_stop)) {
+    /* We re-calculate the interval each iteration of the loop so that the
+       per-domain tick interval can be changed. This hopefully doesn't cause
+       much contention since in practice tick intervals ought to rarely change.
+
+       We use the (quite loose) heuristic of always ticking at the minimum
+       requested interval, allowing domains which want coarser ticks to round up
+       to a multiple of that interval.
+    */
+    usleep(caml_effective_tick_interval_usec());
+
+    /* See [caml_interrupt_all_signal_safe] for why reading from this array can
+       be done without any synchronization */
+    for (dom_internal *d = all_domains;
+         d < &all_domains[caml_params->max_domains]; d++) {
+      /* Early exit: if the current domain was never initialized, then
+         neither have been any of the remaining ones. */
+      if (atomic_load_acquire(&d->interrupt_word) == NULL) break;
+      /* Note that even if the domain whose state we're writing to has
+         terminated by the time we got here, we won't run into issues, because
+         caml_state isn't freed or otherwise invalidated on domain
+         termination. */
+      atomic_store_release(&d->state->requested_tick, true);
+      interrupt_domain(d);
+    }
+  }
+
+  return NULL;
+}
+
+CAMLextern int caml_start_tick_thread(void)
+{
+  if (atomic_load_acquire(&tick_thread_running)
+      || atomic_load_acquire(&tick_thread_disabled)) {
+    return 0;
+  }
+
+  atomic_store_release(&tick_thread_stop, false);
+
+#ifdef POSIX_SIGNALS
+  sigset_t mask, old_mask;
+
+  /* Block all signals, so that we do not try to execute a C signal
+     handler in the new tick thread. */
+  sigfillset(&mask);
+  pthread_sigmask(SIG_BLOCK, &mask, &old_mask);
+#endif
+  pthread_t thread;
+  int err = pthread_create(&thread, /* attr=*/NULL, caml_tick, (void *)NULL);
+  atomic_store_relaxed(&tick_thread_id, thread);
+
+#ifdef POSIX_SIGNALS
+  /* Reset the mask after starting the thread */
+  pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
+#endif
+
+  if (err != 0) return err;
+
+  atomic_store_release(&tick_thread_running, true);
+  return 0;
+}
+
+CAMLprim value caml_enable_tick_thread(value v_enable)
+{
+  bool enable = Long_val(v_enable) ? 1 : 0;
+  bool prev = atomic_exchange_explicit(&tick_thread_disabled, !enable,
+                                       memory_order_acq_rel);
+
+  if (enable && !prev) {
+    int err = caml_start_tick_thread();
+    sync_check_error(err, "caml_enable_tick_thread");
+  } else {
+    caml_stop_tick_thread();
+  }
+
+  return Val_unit;
+}
+
+CAMLprim value caml_domain_set_tick_interval_usec(value interval_usec)
+{
+  CAMLparam1(interval_usec);
+  CAMLnoalloc;
+  atomic_store_relaxed(&domain_self->tick_interval_usec, Long_val(interval_usec));
+  CAMLreturn(Val_unit);
+}
+
+CAMLprim value caml_domain_get_tick_interval_usec(value v_unit)
+{
+  CAMLparam1(v_unit);
+  CAMLnoalloc;
+  CAMLreturn(Val_long(atomic_load_relaxed(&domain_self->tick_interval_usec)));
+}
+
+/* Backup thread */
 
 CAMLexport int caml_bt_is_in_blocking_section(void)
 {

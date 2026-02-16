@@ -18,6 +18,7 @@
 
 #include "config.h"
 #include "misc.h"
+#include <stdbool.h>
 
 /* On platforms supporting C11 atomics, this file just includes <stdatomic.h>.
 
@@ -32,6 +33,7 @@ extern "C++" {
 #define ATOMIC_UINTNAT_INIT(x) (x)
 typedef std::atomic<uintnat> atomic_uintnat;
 typedef std::atomic<intnat> atomic_intnat;
+typedef std::atomic<bool> atomic_bool;
 using std::memory_order_relaxed;
 using std::memory_order_acquire;
 using std::memory_order_release;
@@ -45,6 +47,7 @@ using std::memory_order_seq_cst;
 #define ATOMIC_UINTNAT_INIT(x) (x)
 typedef _Atomic uintnat atomic_uintnat;
 typedef _Atomic intnat atomic_intnat;
+typedef _Atomic bool atomic_bool;
 
 #elif defined(__GNUC__)
 
@@ -61,6 +64,7 @@ typedef enum memory_order {
 #define ATOMIC_UINTNAT_INIT(x) { (x) }
 typedef struct { uintnat repr; } atomic_uintnat;
 typedef struct { intnat repr; } atomic_intnat;
+typedef struct { bool repr; } atomic_bool;
 
 #define atomic_load_explicit(x, m) __atomic_load_n(&(x)->repr, (m))
 #define atomic_load(x) atomic_load_explicit((x), memory_order_seq_cst)
