@@ -2142,14 +2142,14 @@ module Lattices_mono = struct
         Fmt.fprintf ppf "min_with_%a . %a"
           print_obj mid (print_simple_morph mid) m
     | Const_max _ ->
-        Format.fprintf ppf "const_%a" (print dst) (max dst)
+        Fmt.fprintf ppf "const_%a" (print dst) (max dst)
     | Const_min _ ->
-        Format.fprintf ppf "const_%a" (print dst) (min dst)
+        Fmt.fprintf ppf "const_%a" (print dst) (min dst)
     | Const (_, c) ->
-        Format.fprintf ppf "const_%a" (print dst) c
+        Fmt.fprintf ppf "const_%a" (print dst) c
     | Compose (mb, ma) ->
         let mid = src dst mb in
-        Format.fprintf ppf "%a . %a"
+        Fmt.fprintf ppf "%a . %a"
           (print_morph dst) mb
           (print_morph mid) ma
 
@@ -3871,139 +3871,6 @@ module Report = struct
       (Location.Doc.loc ~capitalize_first:false)
       loc
 
-  let print_containing ppf { containing; container } =
-    match containing with
-    | Tuple ->
-        fprintf ppf "is an element of the tuple at %a"
-          Location.print_loc container
-    | Record (s, _) ->
-        fprintf ppf "is the field %a of the record at %a"
-          Misc.Style.inline_code s
-          Location.print_loc container
-    | Array _ ->
-        fprintf ppf "is an element of the array at %a"
-          Location.print_loc container
-    | Constructor (s, _) ->
-        fprintf ppf "is contained (via constructor %a) in the value at %a"
-          Misc.Style.inline_code s Location.print_loc container
-
-  let print_containing ppf { containing; container } =
-    match containing with
-    | Tuple ->
-        fprintf ppf "is an element of the tuple at %a"
-          Location.print_loc container
-    | Record (s, _) ->
-        fprintf ppf "is the field %a of the record at %a"
-          Misc.Style.inline_code s
-          Location.print_loc container
-    | Array _ ->
-        fprintf ppf "is an element of the array at %a"
-          Location.print_loc container
-    | Constructor (s, _) ->
-        fprintf ppf "is contained (via constructor %a) in the value at %a"
-          Misc.Style.inline_code s Location.print_loc container
-
-  (** Given a pinpoint and a const, where the pinpoint has been expressed,
-      prints the const to explain the mode on the pinpoint. *)
-  let print_const (type l r) ((_, pp_desc) : pinpoint) ppf :
-      (l * r) const -> unit = function
-    | Unknown -> Misc.fatal_error "Unknown hint should not be printed"
-    | Lazy_allocated_on_heap ->
-      (match pp_desc with
-      | Lazy ->
-        (* if we already said it's a lazy, we don't need to emphasize it again. *)
-        Fmt.pp_print_string ppf "lazy expressions always need"
-      | _ -> Fmt.pp_print_string ppf "it is a lazy expression and thus needs");
-      Fmt.pp_print_string ppf " to be allocated on the heap"
-    | Legacy m ->
-      (match pp_desc, m with
-      | ( (Ident { category = Class; _ } | Class | Structure_item (Class, _)),
-          Class ) ->
-        (* if we already said it's a class, we don't need to emphasize it again. *)
-        Fmt.pp_print_string ppf "classes are always"
-      | _ ->
-        Fmt.fprintf ppf "it is %t and thus always"
-          (print_legacy m ~definite:false ~capitalize:false));
-      Fmt.pp_print_string ppf " at the legacy modes"
-    | Tailcall_function ->
-      Fmt.pp_print_string ppf "it is the function in a tail call"
-    | Tailcall_argument ->
-      Fmt.pp_print_string ppf "it is an argument in a tail call"
-    | Mutable_read m ->
-      Fmt.fprintf ppf "its %a is being read" print_mutable_part m
-    | Mutable_write m ->
-      Fmt.fprintf ppf "its %a is being written" print_mutable_part m
-    | Lazy_forced -> (
-      match pp_desc with
-      | Lazy ->
-        (* if we already said it's a lazy, we don't need to emphasize it again. *)
-        Fmt.pp_print_string ppf "it is being forced"
-      | _ -> Fmt.pp_print_string ppf "it is a lazy value being forced")
-    | Function_return ->
-      Fmt.fprintf ppf
-        "it is a function return value.@ Hint: Use exclave_ to return a local \
-         value"
-    | Stack_expression ->
-      Fmt.fprintf ppf "it is %a-allocated" Misc.Style.inline_code "stack_"
-    | Module_allocated_on_heap ->
-      (match pp_desc with
-      | Ident { category = Module; _ }
-      | Functor | Module | Structure
-      | Structure_item (Module, _) ->
-        (* if we already said it's a module, we don't need to emphasize it again. *)
-        Fmt.pp_print_string ppf "modules always need"
-      | _ -> Fmt.pp_print_string ppf "it is a module and thus needs");
-      Fmt.pp_print_string ppf " to be allocated on the heap"
-    | Is_used_in pp ->
-      let print_pp = print_pinpoint pp |> Option.get in
-      Fmt.fprintf ppf "it is used in %t"
-        (print_pp ~definite:false ~capitalize:false)
-    | Always_dynamic x ->
-      Fmt.fprintf ppf "%t are always dynamic" (print_always_dynamic x)
-    | Branching -> Fmt.fprintf ppf "it has branches"
-    | Borrowed _ -> Fmt.fprintf ppf "it is borrowed"
-    | Escape_region reg ->
-      Fmt.fprintf ppf "it escapes %t" (print_region ~capitalize:false reg)
-    | Contained_by c -> print_containing ppf c
-
-  let print_allocation_l : allocation -> Fmt.formatter -> unit =
-   fun { txt; loc } ->
-    match txt with
-    | Unknown ->
-      Fmt.dprintf "is allocated at %a containing data"
-        (Location.Doc.loc ~capitalize_first:false)
-        loc
-    | Optional_argument ->
-      Fmt.dprintf
-        "is an optional argument wrapper (and thus allocated) of the value at \
-         %a"
-        (Location.Doc.loc ~capitalize_first:false)
-        loc
-    | Function_coercion ->
-      Fmt.dprintf
-        "is a partial application of the function at %a on omittable parameters"
-        (Location.Doc.loc ~capitalize_first:false)
-        loc
-    | Float_projection ->
-      Fmt.dprintf
-        "is projected (at %a) from a float record (and thus allocated)"
-        (Location.Doc.loc ~capitalize_first:false)
-        loc
-
-  let print_allocation_r : allocation -> Fmt.formatter -> unit =
-   fun { txt; _ } ->
-    match txt with
-    | Unknown -> Fmt.dprintf "is an allocation"
-    | Optional_argument ->
-      Fmt.dprintf
-        "is to be put in an optional argument wrapper (and thus an allocation)"
-    | Function_coercion ->
-      Fmt.dprintf
-        "is to omit some parameters by partial application (and thus an \
-         allocation)"
-    | Float_projection ->
-      Fmt.dprintf "is a float-record projection (and thus an allocation)"
-
   let modality_if_relevant ~fixpoint pp =
     if
       fixpoint
@@ -4082,6 +3949,109 @@ module Report = struct
           container
     in
     pr, pp
+
+  (** Given a pinpoint and a const, where the pinpoint has been expressed,
+      prints the const to explain the mode on the pinpoint. *)
+  let print_const (type l r) ((_, pp_desc) : pinpoint) ppf :
+      (l * r) const -> unit = function
+    | Unknown -> Misc.fatal_error "Unknown hint should not be printed"
+    | Lazy_allocated_on_heap ->
+      (match pp_desc with
+      | Lazy ->
+        (* if we already said it's a lazy, we don't need to emphasize it again. *)
+        Fmt.pp_print_string ppf "lazy expressions always need"
+      | _ -> Fmt.pp_print_string ppf "it is a lazy expression and thus needs");
+      Fmt.pp_print_string ppf " to be allocated on the heap"
+    | Legacy m ->
+      (match pp_desc, m with
+      | ( (Ident { category = Class; _ } | Class | Structure_item (Class, _)),
+          Class ) ->
+        (* if we already said it's a class, we don't need to emphasize it again. *)
+        Fmt.pp_print_string ppf "classes are always"
+      | _ ->
+        Fmt.fprintf ppf "it is %t and thus always"
+          (print_legacy m ~definite:false ~capitalize:false));
+      Fmt.pp_print_string ppf " at the legacy modes"
+    | Tailcall_function ->
+      Fmt.pp_print_string ppf "it is the function in a tail call"
+    | Tailcall_argument ->
+      Fmt.pp_print_string ppf "it is an argument in a tail call"
+    | Mutable_read m ->
+      Fmt.fprintf ppf "its %a is being read" print_mutable_part m
+    | Mutable_write m ->
+      Fmt.fprintf ppf "its %a is being written" print_mutable_part m
+    | Lazy_forced -> (
+      match pp_desc with
+      | Lazy ->
+        (* if we already said it's a lazy, we don't need to emphasize it again. *)
+        Fmt.pp_print_string ppf "it is being forced"
+      | _ -> Fmt.pp_print_string ppf "it is a lazy value being forced")
+    | Function_return ->
+      Fmt.fprintf ppf
+        "it is a function return value.@ Hint: Use exclave_ to return a local \
+         value"
+    | Stack_expression ->
+      Fmt.fprintf ppf "it is %a-allocated" Misc.Style.inline_code "stack_"
+    | Module_allocated_on_heap ->
+      (match pp_desc with
+      | Ident { category = Module; _ }
+      | Functor | Module | Structure
+      | Structure_item (Module, _) ->
+        (* if we already said it's a module, we don't need to emphasize it again. *)
+        Fmt.pp_print_string ppf "modules always need"
+      | _ -> Fmt.pp_print_string ppf "it is a module and thus needs");
+      Fmt.pp_print_string ppf " to be allocated on the heap"
+    | Is_used_in pp ->
+      let print_pp = print_pinpoint pp |> Option.get in
+      Fmt.fprintf ppf "it is used in %t"
+        (print_pp ~definite:false ~capitalize:false)
+    | Always_dynamic x ->
+      Fmt.fprintf ppf "%t are always dynamic" (print_always_dynamic x)
+    | Branching -> Fmt.fprintf ppf "it has branches"
+    | Borrowed _ -> Fmt.fprintf ppf "it is borrowed"
+    | Escape_region reg ->
+      Fmt.fprintf ppf "it escapes %t" (print_region ~capitalize:false reg)
+    | Contained_by c ->
+      let (pr, _) = print_is_contained_by ~fixpoint:false c in
+      Fmt.fprintf ppf "it %t" pr
+
+  let print_allocation_l : allocation -> Fmt.formatter -> unit =
+   fun { txt; loc } ->
+    match txt with
+    | Unknown ->
+      Fmt.dprintf "is allocated at %a containing data"
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
+    | Optional_argument ->
+      Fmt.dprintf
+        "is an optional argument wrapper (and thus allocated) of the value at \
+         %a"
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
+    | Function_coercion ->
+      Fmt.dprintf
+        "is a partial application of the function at %a on omittable parameters"
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
+    | Float_projection ->
+      Fmt.dprintf
+        "is projected (at %a) from a float record (and thus allocated)"
+        (Location.Doc.loc ~capitalize_first:false)
+        loc
+
+  let print_allocation_r : allocation -> Fmt.formatter -> unit =
+   fun { txt; _ } ->
+    match txt with
+    | Unknown -> Fmt.dprintf "is an allocation"
+    | Optional_argument ->
+      Fmt.dprintf
+        "is to be put in an optional argument wrapper (and thus an allocation)"
+    | Function_coercion ->
+      Fmt.dprintf
+        "is to omit some parameters by partial application (and thus an \
+         allocation)"
+    | Float_projection ->
+      Fmt.dprintf "is a float-record projection (and thus an allocation)"
 
   (** Given a pinpoint and a morph, where the pinpoint is the destination of the
       morph and have been expressed already, print the morph and return the
@@ -5917,8 +5887,8 @@ let alloc_as_value_unhint m =
   in
   { comonadic; monadic }
 
-let alloc_as_value m =
-  m |> Alloc.unhint |> alloc_as_value_unhint |> Value.hint ~monadic:Skip
+let alloc_as_value ?hint m =
+  m |> Alloc.unhint |> alloc_as_value_unhint |> Value.hint ~monadic:Skip ?comonadic:hint
 
 let alloc_to_value_l2r_unhint m =
   let { comonadic; monadic } = m in
@@ -5942,9 +5912,9 @@ let value_to_alloc_r2g_unhint m =
   in
   { comonadic; monadic }
 
-let value_to_alloc_r2g m =
+let value_to_alloc_r2g ?hint m =
   m |> Value.disallow_left |> Value.unhint |> value_to_alloc_r2g_unhint
-  |> Alloc.hint ~monadic:Skip
+  |> Alloc.hint ~monadic:Skip ?comonadic:hint
 
 let value_r2g ?hint m =
   Value.wrap ~monadic:Skip ?comonadic:hint
@@ -6058,21 +6028,25 @@ module Modality = struct
         match then_, t with
         | Join_const c1, Join_const c2 -> Join_const (Mode.Const.join c1 c2)
 
-      let apply_right : type l. ?hint:left_only Hint.morph ->
+      let apply_right : type l. ?is_contained_by:Hint.is_contained_by ->
         t -> (l * allowed) Mode.t -> Mode.r =
-        fun ?(hint = Hint.Unknown) t x ->
+        fun ?is_contained_by t x ->
           match t with
           | Join_const c ->
-              Mode.join_const ~hint c (Mode.disallow_left x)
+              let hint = Option.map (fun c -> Hint.Is_contained_by (Monadic, c)) is_contained_by in
+              Mode.join_const ?hint c (Mode.disallow_left x)
 
-      let apply_left : type r. ?hint:(allowed * r) neg Hint.const ->
+      let apply_left : type r. ?is_contained_by:Hint.is_contained_by ->
         t -> (allowed * r) Mode.t -> Mode.l =
-        fun ?(hint = (Hint.Unknown : _ Hint.const)) t x ->
+        fun ?is_contained_by t x ->
            match t with
            | Join_const c ->
+               let morph_hint = Option.map (fun c -> Hint.Is_contained_by (Monadic, c)) is_contained_by in
+               let morph_hint = Option.value ~default:Hint.Unknown morph_hint in
+               let hint = Option.map (fun c -> Hint.Contained_by c) is_contained_by in
                Mode.join
-                 [Mode.disallow_right (Mode.of_const ~hint c);
-                  Mode.disallow_right x]
+                 [Mode.disallow_right (Mode.of_const ?hint c);
+                  Mode.disallow_right (Mode.apply_hint morph_hint x)]
 
       let proj ax (Join_const c) : _ Atom.t = Join_const (Axis.proj ax c)
 
@@ -6119,13 +6093,13 @@ module Modality = struct
         Misc.fatal_error "modality Undefined should not be in sub."
 
     let apply_left : type r.
-        ?hint:(allowed * r) neg Hint.const ->
+        ?is_contained_by:Hint.is_contained_by ->
         t ->
         (allowed * r) Mode.t ->
         Mode.l =
-     fun ?hint t x ->
+     fun ?is_contained_by t x ->
       match t with
-      | Const c -> Const.apply_left ?hint c x |> Mode.disallow_right
+      | Const c -> Const.apply_left ?is_contained_by c x |> Mode.disallow_right
       | Undefined ->
         Misc.fatal_error "modality Undefined should not be applied."
       | Diff (_, m) -> Mode.join [Mode.allow_right m; x]
@@ -6216,20 +6190,26 @@ module Modality = struct
         | Meet_const c1, Meet_const c2 -> Meet_const (Mode.Const.meet c1 c2)
 
       let apply_left : type r.
-          ?hint:left_only Hint.morph -> t -> (allowed * r) Mode.t -> Mode.l
+          ?is_contained_by:Hint.is_contained_by ->
+          t -> (allowed * r) Mode.t -> Mode.l
           =
-       fun ?(hint = Hint.Unknown) t x ->
-        match t with
-        | Meet_const c -> Mode.meet_const ~hint c (Mode.disallow_right x)
-
-      let apply_right : type l. ?hint:(l * allowed) pos Hint.const
-        -> t -> (l * allowed) Mode.t -> Mode.r =
-       fun ?(hint = (Hint.Unknown : _ Hint.const)) t x ->
+       fun ?is_contained_by t x ->
         match t with
         | Meet_const c ->
+          let hint = Option.map (fun c -> Hint.Is_contained_by (Comonadic, c)) is_contained_by in
+          Mode.meet_const ?hint c (Mode.disallow_right x)
+
+      let apply_right : type l. ?is_contained_by:Hint.is_contained_by
+        -> t -> (l * allowed) Mode.t -> Mode.r =
+       fun ?is_contained_by t x ->
+        match t with
+        | Meet_const c ->
+            let morph_hint = Option.map (fun c -> Hint.Is_contained_by (Comonadic, c)) is_contained_by in
+            let morph_hint = Option.value ~default:Hint.Unknown morph_hint in
+            let hint = Option.map (fun c -> Hint.Contained_by c) is_contained_by in
             Mode.meet
-              [Mode.disallow_left (Mode.of_const ~hint c);
-               Mode.disallow_left x]
+              [Mode.disallow_left (Mode.of_const ?hint c);
+               Mode.disallow_left (Mode.apply_hint morph_hint x)]
 
       let proj ax (Meet_const c) : _ Atom.t = Meet_const (Axis.proj ax c)
 
@@ -6278,13 +6258,13 @@ module Modality = struct
         Misc.fatal_error "modality Undefined should not be in sub."
 
     let apply_left : type r.
-        ?hint:left_only Hint.morph ->
+        ?is_contained_by:Hint.is_contained_by ->
         t ->
         (allowed * r) Mode.t ->
         Mode.l =
-     fun ?hint t x ->
+     fun ?is_contained_by t x ->
       match t with
-      | Const c -> Const.apply_left ?hint c x |> Mode.disallow_right
+      | Const c -> Const.apply_left ?is_contained_by c x |> Mode.disallow_right
       | Undefined ->
         Misc.fatal_error "modality Undefined should not be applied."
       | Exactly (_mm, m) ->
@@ -6419,28 +6399,28 @@ module Modality = struct
 
     let equate = equate_from_submode' sub
 
-    let apply_left ?hint t { monadic; comonadic } =
+    let apply_left ?is_contained_by t { monadic; comonadic } =
       let monadic =
         Monadic.apply_left
-          ?hint:(Option.map (fun { monadic; _ } -> monadic) hint)
+          ?is_contained_by
           t.monadic monadic
       in
       let comonadic =
         Comonadic.apply_left
-          ?hint:(Option.map (fun { comonadic; _ } -> comonadic) hint)
+          ?is_contained_by
           t.comonadic comonadic
       in
       { monadic; comonadic }
 
-    let apply_right ?hint t { monadic; comonadic } =
+    let apply_right ?is_contained_by t { monadic; comonadic } =
       let monadic =
         Monadic.apply_right
-          ?hint:(Option.map (fun { monadic; _ } -> monadic) hint)
+          ?is_contained_by
           t.monadic monadic
       in
       let comonadic =
         Comonadic.apply_right
-          ?hint:(Option.map (fun { comonadic; _ } -> comonadic) hint)
+          ?is_contained_by
           t.comonadic comonadic
       in
       { monadic; comonadic }
@@ -6482,15 +6462,15 @@ module Modality = struct
     | _ -> false
   [@@ocaml.warning "-4"]
 
-  let apply_left ?hint t { monadic; comonadic } =
+  let apply_left ?is_contained_by t { monadic; comonadic } =
     let monadic =
       Monadic.apply_left
-        ?hint:(Option.map (fun { monadic; _ } -> monadic) hint)
+        ?is_contained_by
         t.monadic monadic
     in
     let comonadic =
       Comonadic.apply_left
-        ?hint:(Option.map (fun { comonadic; _ } -> comonadic) hint)
+        ?is_contained_by
         t.comonadic comonadic
     in
     { monadic; comonadic }

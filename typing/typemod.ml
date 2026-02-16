@@ -159,7 +159,7 @@ let apply_is_contained_by ~loc_md item ?modalities mode =
     { containing = Structure (item, Modality);
       container = (loc_md, Structure) }
   in
-  Ctype.apply_is_contained_by is_contained_by ?modalities mode
+  Ctype.apply_right_is_contained_by is_contained_by ?modalities mode
 
 (** Given a value whose location in the source code is described by [pp] and at
 [mode], infer the modalities on the value when it's placed as an [item] in a
@@ -206,11 +206,7 @@ let rebase_modalities ~loc ~loc_md item ~md_mode ~mode modalities =
     { containing = Structure (item, Modality);
       container = (loc, Structure)}
   in
-  let hint =
-    { monadic = Hint.Is_contained_by (Monadic, is_contained_by);
-      comonadic = Hint.Is_contained_by (Comonadic, is_contained_by) }
-  in
-  let mode = Modality.apply ~hint modalities mode in
+  let mode = Modality.apply_left ~is_contained_by modalities mode in
   infer_modalities pp ~loc_md item ~md_mode ~mode
 
 (** Similiar to [rebase_modalities] but lifted to signatures. *)
@@ -3000,7 +2996,7 @@ and  type_module_maybe_hold_locks ?(alias=false) ~hold_locks sttn funct_body
     (fun () -> type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       smod)
 
-and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
+and type_module_aux ~alias ~hold_locks sttn funct_body anchor env ?expected_mode smod =
   (* If the module is an identifier, there might be locks between the
   declaration site and the use site.
   - If [hold_locks] is [true], the locks are held and stored in [mod_mode].

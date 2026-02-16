@@ -786,7 +786,7 @@ module type S = sig
   val locality_as_regionality : Locality.l -> Regionality.l
 
   (** Similar to [locality_as_regionality], behaves as identity on other axes *)
-  val alloc_as_value : ('l * 'r) Alloc.t -> ('l * 'r) Value.t
+  val alloc_as_value : ?hint:('l * 'r) Hint.morph -> ('l * 'r) Alloc.t -> ('l * 'r) Value.t
 
   (** Similar to [local_to_regional], behaves as identity in other axes *)
   val alloc_to_value_l2r : ('l * 'r) Alloc.t -> ('l * disallowed) Value.t
@@ -796,7 +796,7 @@ module type S = sig
 
   (** Similar to [regional_to_global], behaves as identity on other axes *)
   val value_to_alloc_r2g :
-    ('l * 'r) Value.t -> (disallowed * 'r) Alloc.t
+    ?hint:(disallowed * 'r) Hint.morph -> ('l * 'r) Value.t -> (disallowed * 'r) Alloc.t
 
   (** Similar to [value_to_alloc_r2g], but followed by [alloc_as_value]. *)
   val value_r2g :
@@ -881,18 +881,14 @@ module type S = sig
 
       (** Apply a modality on left mode. *)
       val apply_left :
-        ?hint:
-          ((allowed * 'r) neg Hint.const,
-           left_only Hint.morph) monadic_comonadic ->
+        ?is_contained_by:Hint.is_contained_by ->
         t ->
         (allowed * 'r) Value.t ->
         Value.l
 
       (** Apply a modality on right mode. *)
       val apply_right :
-        ?hint:
-          (right_only neg Hint.morph,
-           ('l * allowed) Hint.const) monadic_comonadic ->
+        ?is_contained_by:Hint.is_contained_by ->
         t ->
         ('l * allowed) Value.t ->
         Value.r
@@ -939,10 +935,7 @@ module type S = sig
         [apply t m] is only called for [m >= md_mode] for inferred modalities.
     *)
     val apply_left :
-      ?hint:
-        ( (allowed * 'r) neg Hint.const,
-          left_only Hint.morph )
-        monadic_comonadic ->
+      ?is_contained_by: Hint.is_contained_by ->
       t ->
       (allowed * 'r) Value.t ->
       Value.l
