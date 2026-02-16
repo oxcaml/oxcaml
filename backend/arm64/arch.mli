@@ -43,30 +43,13 @@ type cmm_label = Label.t
 
 type bswap_bitwidth = Sixteen | Thirtytwo | Sixtyfour
 
+(* CR sspies: Upstream has renamed [Ifar_poll] -> [Ipoll_far] and similarly for
+   [Ifar_alloc]. We should probably do a similar change, but deferred to later
+   (as opposed to taking it during the 5.4 merge). *)
 type specific_operation =
-<<<<<<< oxcaml:backend/arm64/arch.mli
   | Ifar_poll
   | Ifar_alloc of { bytes : int; dbginfo : Cmm.alloc_dbginfo }
-||||||| upstream-base:asmcomp/arm64/arch.mli
-  | Ifar_poll of { return_label: cmm_label option }
-  | Ifar_alloc of { bytes : int; dbginfo : Debuginfo.alloc_dbginfo }
-  | Ifar_intop_checkbound
-  | Ifar_intop_imm_checkbound of { bound : int; }
-=======
-  | Ipoll_far of { return_label: cmm_label option }
-  | Ialloc_far of { bytes : int; dbginfo : Debuginfo.alloc_dbginfo }
-  | Icheckbound_far
-  | Icheckbound_imm_far of { bound : int; }
->>>>>>> upstream-incoming:asmcomp/arm64/arch.mli
   | Ishiftarith of arith_operation * int
-<<<<<<< oxcaml:backend/arm64/arch.mli
-||||||| upstream-base:asmcomp/arm64/arch.mli
-  | Ishiftcheckbound of { shift : int; }
-  | Ifar_shiftcheckbound of { shift : int; }
-=======
-  | Ishiftcheckbound of { shift : int; }
-  | Ishiftcheckbound_far of { shift : int; }
->>>>>>> upstream-incoming:asmcomp/arm64/arch.mli
   | Imuladd       (* multiply and add *)
   | Imulsub       (* multiply and subtract *)
   | Inegmulf      (* floating-point negate and multiply *)
@@ -117,16 +100,10 @@ val identity_addressing : addressing_mode
 
 val offset_addressing : addressing_mode -> int -> addressing_mode
 
-<<<<<<< oxcaml:backend/arm64/arch.mli
 val num_args_addressing : addressing_mode -> int
 
 val addressing_displacement_for_llvmize : addressing_mode -> int
 
-||||||| upstream-base:asmcomp/arm64/arch.mli
-val num_args_addressing : addressing_mode -> int
-
-=======
->>>>>>> upstream-incoming:asmcomp/arm64/arch.mli
 (* Printing operations and addressing modes *)
 
 val print_addressing :

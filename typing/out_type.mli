@@ -97,6 +97,10 @@ val tree_of_typexp: type_or_scheme -> type_expr -> out_type
 (** [tree_of_typexp] generate the [outcometree] for a prepared type
     expression.*)
 
+(* CR sspies: oxcaml re-exposes [tree_of_type_scheme] which upstream removed.
+   Implementation is in printtyp.ml. *)
+val tree_of_type_scheme: type_expr -> out_type
+
 val prepared_type_scheme: type_expr printer
 val prepared_type_expr: type_expr printer
 (** The printers [prepared_type_expr] and [prepared_type_scheme] should only be
@@ -150,8 +154,10 @@ val add_type_declaration_to_preparation :
 val prepared_type_declaration: Ident.t -> type_declaration printer
 
 val tree_of_value_description: Ident.t -> value_description -> out_sig_item
+(* CR sspies: oxcaml adds [?abbrev] to [tree_of_modtype_declaration].
+   Implementation is in printtyp.ml. *)
 val tree_of_modtype_declaration:
-    Ident.t -> modtype_declaration -> out_sig_item
+    ?abbrev:bool -> Ident.t -> modtype_declaration -> out_sig_item
 val tree_of_class_declaration:
     Ident.t -> class_declaration -> rec_status -> out_sig_item
 val tree_of_cltype_declaration:
@@ -159,9 +165,14 @@ val tree_of_cltype_declaration:
 
 (** {1 Module types }*)
 
+(* CR sspies: oxcaml changed [tree_of_module] to take [module_declaration]
+   instead of [module_type]. Implementation is in printtyp.ml. *)
 val tree_of_module:
-    Ident.t -> ?ellipsis:bool -> module_type -> rec_status -> out_sig_item
-val tree_of_modtype: module_type -> out_module_type
+    Ident.t -> ?ellipsis:bool -> module_declaration -> rec_status
+    -> out_sig_item
+(* CR sspies: oxcaml adds [?abbrev] to [tree_of_modtype].
+   Implementation is in printtyp.ml. *)
+val tree_of_modtype: ?abbrev:bool -> module_type -> out_module_type
 val tree_of_signature: Types.signature -> out_sig_item list
 
 val tree_of_class_type: type_or_scheme -> class_type -> out_class_type
@@ -197,6 +208,12 @@ module Ident_names: sig
   (** [with_fuzzy id f] locally disable ident disambiguation for [id] within
       [f] *)
   val with_fuzzy: Ident.t -> (unit -> 'a) -> 'a
+
+  (* CR sspies: oxcaml-specific addition. This was originally
+     [Printtyp.Naming_context.reset] (see printtyp.ml). Upstream's
+     [Ident_names] does not include [reset]; the top-level [Out_type.reset]
+     resets everything including ident names. *)
+  val reset: unit -> unit
 end
 
 (** The [Ident_conflicts] module keeps track of conflicts arising when

@@ -37,16 +37,9 @@ type compilation_unit_or_inferred =
 val with_info :
   backend:backend ->
   tool_name:string ->
-<<<<<<< oxcaml
-  source_file:string ->
-  output_prefix:string ->
+  (* CR sspies: This signature might need revisiting. *)
   compilation_unit:compilation_unit_or_inferred ->
   kind:Unit_info.intf_or_impl ->
-||||||| upstream-base
-  source_file:string ->
-  output_prefix:string ->
-=======
->>>>>>> upstream-incoming
   dump_ext:string ->
   Unit_info.t ->
   (info -> 'a) -> 'a

@@ -15697,7 +15697,7 @@ let report_error ~loc env =
   | Block_index_modality_mismatch { mut; err } ->
     let step, Modality.Error(ax, { left; right }) = err in
     let print_modality_doc id =
-      Printtyp.modality ~id:(fun ppf -> Format_doc.pp_print_string ppf id) ax
+      Printtyp.modality ~id:(fun ppf () -> Format_doc.pp_print_string ppf id) ax
     in
     let expected, actual = match step with
       | Left_le_right -> right, left

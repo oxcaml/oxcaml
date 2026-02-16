@@ -69,7 +69,6 @@ module Typ :
     val mk: ?loc:loc -> ?attrs:attrs -> core_type_desc -> core_type
     val attr: core_type -> attribute -> core_type
 
-<<<<<<< oxcaml
     val any: ?loc:loc -> ?attrs:attrs -> jkind_annotation option -> core_type
     val var: ?loc:loc -> ?attrs:attrs -> string -> jkind_annotation option
       -> core_type
@@ -78,20 +77,6 @@ module Typ :
     val tuple: ?loc:loc -> ?attrs:attrs -> (string option * core_type) list -> core_type
     val unboxed_tuple: ?loc:loc -> ?attrs:attrs
                        -> (string option * core_type) list -> core_type
-||||||| upstream-base
-    val any: ?loc:loc -> ?attrs:attrs -> unit -> core_type
-    val var: ?loc:loc -> ?attrs:attrs -> string -> core_type
-    val arrow: ?loc:loc -> ?attrs:attrs -> arg_label -> core_type -> core_type
-               -> core_type
-    val tuple: ?loc:loc -> ?attrs:attrs -> core_type list -> core_type
-=======
-    val any: ?loc:loc -> ?attrs:attrs -> unit -> core_type
-    val var: ?loc:loc -> ?attrs:attrs -> string -> core_type
-    val arrow: ?loc:loc -> ?attrs:attrs -> arg_label -> core_type -> core_type
-               -> core_type
-    val tuple: ?loc:loc -> ?attrs:attrs -> (string option * core_type) list
-               -> core_type
->>>>>>> upstream-incoming
     val constr: ?loc:loc -> ?attrs:attrs -> lid -> core_type list -> core_type
     val object_: ?loc:loc -> ?attrs:attrs -> object_field list
                    -> closed_flag -> core_type
@@ -101,19 +86,9 @@ module Typ :
     (* Invariant: One of the options must be [Some]. *)
     val variant: ?loc:loc -> ?attrs:attrs -> row_field list -> closed_flag
                  -> label list option -> core_type
-<<<<<<< oxcaml
     val poly: ?loc:loc -> ?attrs:attrs ->
       (str * jkind_annotation option) list -> core_type -> core_type
-    val package: ?loc:loc -> ?attrs:attrs -> lid -> (lid * core_type) list
-                 -> core_type
-||||||| upstream-base
-    val poly: ?loc:loc -> ?attrs:attrs -> str list -> core_type -> core_type
-    val package: ?loc:loc -> ?attrs:attrs -> lid -> (lid * core_type) list
-                 -> core_type
-=======
-    val poly: ?loc:loc -> ?attrs:attrs -> str list -> core_type -> core_type
     val package: ?loc:loc -> ?attrs:attrs -> package_type -> core_type
->>>>>>> upstream-incoming
     val open_ : ?loc:loc -> ?attrs:attrs -> lid -> core_type -> core_type
     val quote : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
     val splice : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
@@ -149,20 +124,13 @@ module Pat:
     val alias: ?loc:loc -> ?attrs:attrs -> pattern -> str -> pattern
     val constant: ?loc:loc -> ?attrs:attrs -> constant -> pattern
     val interval: ?loc:loc -> ?attrs:attrs -> constant -> constant -> pattern
-<<<<<<< oxcaml
     val unboxed_unit: ?loc:loc -> ?attrs:attrs -> unit -> pattern
     val unboxed_bool: ?loc:loc -> ?attrs:attrs -> bool -> pattern
-    val tuple: ?loc:loc -> ?attrs:attrs -> (string option * pattern) list ->
-      closed_flag -> pattern
     val unboxed_tuple: ?loc:loc -> ?attrs:attrs
                        -> (string option * pattern) list -> closed_flag
                        -> pattern
-||||||| upstream-base
-    val tuple: ?loc:loc -> ?attrs:attrs -> pattern list -> pattern
-=======
     val tuple: ?loc:loc -> ?attrs:attrs -> (string option * pattern) list
                -> closed_flag -> pattern
->>>>>>> upstream-incoming
     val construct: ?loc:loc -> ?attrs:attrs ->
       lid -> ((str * jkind_annotation option) list * pattern) option -> pattern
     val variant: ?loc:loc -> ?attrs:attrs -> label -> pattern option -> pattern
@@ -202,18 +170,12 @@ module Exp:
     val match_: ?loc:loc -> ?attrs:attrs -> expression -> case list
                 -> expression
     val try_: ?loc:loc -> ?attrs:attrs -> expression -> case list -> expression
-<<<<<<< oxcaml
     val unboxed_unit: ?loc:loc -> ?attrs:attrs -> unit -> expression
     val unboxed_bool: ?loc:loc -> ?attrs:attrs -> bool -> expression
-    val tuple: ?loc:loc -> ?attrs:attrs -> (string option * expression) list -> expression
     val unboxed_tuple: ?loc:loc -> ?attrs:attrs
                        -> (string option * expression) list -> expression
-||||||| upstream-base
-    val tuple: ?loc:loc -> ?attrs:attrs -> expression list -> expression
-=======
     val tuple: ?loc:loc -> ?attrs:attrs -> (string option * expression) list
                -> expression
->>>>>>> upstream-incoming
     val construct: ?loc:loc -> ?attrs:attrs -> lid -> expression option
                    -> expression
     val variant: ?loc:loc -> ?attrs:attrs -> label -> expression option
@@ -257,18 +219,10 @@ module Exp:
     val poly: ?loc:loc -> ?attrs:attrs -> expression -> core_type option
               -> expression
     val object_: ?loc:loc -> ?attrs:attrs -> class_structure -> expression
-<<<<<<< oxcaml
     val newtype: ?loc:loc -> ?attrs:attrs -> str -> jkind_annotation option ->
       expression  -> expression
-    val pack: ?loc:loc -> ?attrs:attrs -> module_expr -> expression
-||||||| upstream-base
-    val newtype: ?loc:loc -> ?attrs:attrs -> str -> expression -> expression
-    val pack: ?loc:loc -> ?attrs:attrs -> module_expr -> expression
-=======
-    val newtype: ?loc:loc -> ?attrs:attrs -> str -> expression -> expression
     val pack: ?loc:loc -> ?attrs:attrs -> module_expr -> package_type option
                -> expression
->>>>>>> upstream-incoming
     val open_: ?loc:loc -> ?attrs:attrs -> open_declaration -> expression
                -> expression
     val letop: ?loc:loc -> ?attrs:attrs -> binding_op
