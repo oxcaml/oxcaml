@@ -311,6 +311,8 @@ val get_zero_alloc_attribute :
   in_signature:bool -> on_application:bool-> default_arity:int -> Parsetree.attributes ->
   zero_alloc_attribute
 
+val get_tydi_attribute : Parsetree.attributes -> bool
+
 (* This returns the [zero_alloc_assume] if the input is an assume.  Otherwise,
    it returns None. If the input attribute is [Check], this issues a warning. *)
 val zero_alloc_attribute_only_assume_allowed :

@@ -6345,8 +6345,12 @@ and type_expect_
         | _ ->
             (rt, funct), sargs
       in
+      let is_tydi =
+        Builtin_attributes.get_tydi_attribute sfunct.pexp_attributes
+      in
       let (args, ty_ret, mode_ret, pm) =
         type_application env loc expected_mode pm funct funct_mode sargs rt
+          ty_expected ~is_tydi
       in
       let mode_ret = Alloc.disallow_right mode_ret in
       let ap_mode = Alloc.proj_comonadic Areality mode_ret in
@@ -9078,7 +9082,7 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
   | Omitted _ as arg -> (lbl, arg)
 
 and type_application env app_loc expected_mode position_and_mode
-      funct funct_mode sargs ret_tvar =
+      funct funct_mode sargs ret_tvar ty_expected ~is_tydi =
   let is_ignore funct =
     is_prim ~name:"%ignore" funct &&
     (try ignore (filter_arrow_mono env (instance funct.exp_type) Nolabel); true
@@ -9138,6 +9142,10 @@ and type_application env app_loc expected_mode position_and_mode
           let position_and_mode =
             if partial_app then position_and_mode_default else position_and_mode
           in
+          if is_tydi then begin
+            let ty_ret = instance ty_ret in
+            unify_exp_types app_loc env ty_ret (instance ty_expected)
+          end;
           let args =
             List.mapi (fun index arg ->
                 type_apply_arg env ~app_loc ~funct ~index
