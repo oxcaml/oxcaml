@@ -687,6 +687,8 @@ val same_constr: (t -> type_expr -> type_expr -> bool) ref
 (* Forward declaration to break mutual recursion with Ctype. *)
 val constrain_type_jkind:
   (t -> type_expr -> jkind_r -> (unit, Jkind.Violation.t) result) ref
+(* CR sspies: [print_longident] was dropped upstream; we might be able to
+   drop it as well. *)
 (* Forward declaration to break mutual recursion with Printtyp. *)
 val print_longident: Longident.t Format_doc.printer ref
 (* Forward declaration to break mutual recursion with Printtyp. *)

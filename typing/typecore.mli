@@ -291,15 +291,15 @@ type error =
   | Unrefuted_pattern of Typedtree.pattern
   | Invalid_extension_constructor_payload
   | Not_an_extension_constructor
+  | Invalid_atomic_loc_payload
+  | Label_not_atomic of Longident.t
+  | Atomic_in_pattern of Longident.t
   | Probe_format
   | Probe_name_format of string
   | Probe_name_undefined of string
   (* CR-soon mshinwell: Use an inlined record *)
   | Probe_is_enabled_format
   | Extension_not_enabled : _ Language_extension.t -> error
-  | Invalid_atomic_loc_payload
-  | Label_not_atomic of Longident.t
-  | Atomic_in_pattern of Longident.t
   | Modalities_on_atomic_field of Longident.t
   | Literal_overflow of string
   | Unknown_literal of string * char

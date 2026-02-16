@@ -25,7 +25,9 @@ val link : filepath list -> filepath -> unit
 val reset : unit -> unit
 
 val check_consistency: filepath -> Cmo_format.compilation_unit_descr -> unit
-(* CR sspies: upstream added linkdeps support - we may or may not want to take this (and adjust to compilation_unit_descr)
+(* CR sspies: upstream added linkdeps support - we may or may not want to take
+   this (and adjust to compilation_unit_descr)
+
 val linkdeps_unit :
   Linkdeps.t -> filename:string -> Cmo_format.compilation_unit -> unit
 *)

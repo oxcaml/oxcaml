@@ -43,6 +43,9 @@ type cmm_label = Label.t
 
 type bswap_bitwidth = Sixteen | Thirtytwo | Sixtyfour
 
+(* CR sspies: Upstream has renamed [Ifar_poll] -> [Ipoll_far] and similarly for
+   [Ifar_alloc]. We should probably do a similar change, but deferred to later
+   (as opposed to taking it during the 5.4 merge). *)
 type specific_operation =
   | Ifar_poll
   | Ifar_alloc of { bytes : int; dbginfo : Cmm.alloc_dbginfo }
