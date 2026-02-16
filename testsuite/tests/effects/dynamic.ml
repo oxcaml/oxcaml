@@ -69,11 +69,14 @@ let sync_thread f =
   let wait1, go1 = trigger () in
   let wait2, go2 = trigger () in
   let stop = Atomic.make false in
-  let t = Thread.create (fun () -> (while not (Atomic.get stop) do
-                                      wait1 ();
-                                      f ();
-                                      go2()
-                                    done)) () in
+  let t = Thread.create (fun () ->
+    let rec loop () =
+      wait1 ();
+      f ();
+      go2 ();
+      if not (Atomic.get stop)
+      then (loop ())
+    in loop ()) () in
   ((fun () -> (go1(); wait2())),
    (fun () -> (Atomic.set stop true; go1(); Thread.join t)))
 
@@ -101,35 +104,35 @@ let _ =
    - or after it returns;
 *)
 
-let test_with_temp d outside n =
+let test_with_temp d ~root outside n =
   let (wait, go) = trigger () in
   let t = Thread.create (fun () ->
     (wait ();
      Printf.printf "In other thread during with_temporarily [expect %d]: %d\n"
-       outside
+       root
        (Dynamic.get d))) () in
   (Dynamic.with_temporarily d n
      ~f:(fun () -> (Printf.printf "with_temporarily [expect %d]: %d\n" n (Dynamic.get d);
                     go (); Thread.join t;
-                    Printf.printf "with_temporarily still [expect %d]: %d\n" n (Dynamic.get d))))
+                    Printf.printf "with_temporarily still [expect %d]: %d\n" n (Dynamic.get d))));
+  Printf.printf "after with_temporarily [expect %d]: %d\n" outside (Dynamic.get d)
 
 let _ =
   print_endline "\n# Test 2";
   let d = Dynamic.make 7 in
-  (test_with_temp d 7 7);
-  Printf.printf "after with_temporarily [expect %d]: %d\n" 7 (Dynamic.get d)
+  (test_with_temp d ~root:7 7 8)
 
 (* Does with_temporarily work correctly in effect handlers? *)
 
 let _ =
   print_endline "\n# Test 3";
   let n = 20 in
-  let outside = n+10 in
-  let d = Dynamic.make outside in
+  let root = n+10 in
+  let d = Dynamic.make root in
   let check_other_thread, finish =
     sync_thread (fun () ->
       Printf.printf "In pre-existing thread [expect %d]: %d\n"
-        outside
+        root
         (Dynamic.get d)) in
 
   let f () =
@@ -142,7 +145,7 @@ let _ =
   let h : type a. a Effect.t -> ((a, 'b) Effect.Deep.continuation -> 'b) option = function
     | E () -> Some (fun k ->
       Printf.printf "in handler [expect %d]: %d\n" n (Dynamic.get d);
-      test_with_temp d outside (n+2);
+      test_with_temp d ~root n (n+2);
       check_other_thread();
       Dynamic.with_temporarily d (n+3) ~f:(fun () ->
         Effect.Deep.continue k ();
@@ -165,10 +168,10 @@ let _ =
 let _ =
   print_endline "\n# Test 4";
   let n = 40 in
-  let outside = n+10 in
-  let d = Dynamic.make outside in
+  let root = n+10 in
+  let d = Dynamic.make root in
   let check_other_thread, finish =
-    sync_thread (fun () -> Printf.printf "In pre-existing thread [expect %d]: %d\n" outside (Dynamic.get d)) in
+    sync_thread (fun () -> Printf.printf "In pre-existing thread [expect %d]: %d\n" root (Dynamic.get d)) in
 
   let f () =
     (Printf.printf "In fiber [expect %d]: %d\n" n (Dynamic.get d);
@@ -181,17 +184,17 @@ let _ =
 
   let h : type a. a Effect.t -> ((a, 'b) Effect.Deep.continuation -> 'b) option = function
     | E () -> Some (fun k ->
-      Printf.printf "in handler [expect %d): %d\n" n (Dynamic.get d);
+      Printf.printf "in handler [expect %d]: %d\n" n (Dynamic.get d);
       Dynamic.with_temporarily d (n+3) ~f:(fun () ->
         Effect.Deep.continue k ();
-        Printf.printf "after continuation returns [expect %d]: %d\n" (n+6) (Dynamic.get d)))
+        Printf.printf "after continuation returns [expect %d]: %d\n" (n+3) (Dynamic.get d)))
     | e -> None in
 
   (Dynamic.with_temporarily d n ~f:(fun () ->
    Effect.Deep.match_with f ()
      { retc = (fun () -> (Printf.printf "after fiber [expect %d]: %d\n" (n+3) (Dynamic.get d);
                           check_other_thread();
-                          test_with_temp d outside (n+5)));
+                          test_with_temp d ~root (n+3) (n+5)));
        exnc = (fun e -> raise e);
        effc = h };
    finish()))
