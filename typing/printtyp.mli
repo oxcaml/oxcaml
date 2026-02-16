@@ -18,7 +18,7 @@
 
 open Types
 
-type namespace := Shape.Sig_component_kind.t
+type namespace := Shape.Sig_component_kind.t option
 
 val namespaced_ident: namespace -> Ident.t -> string
 val string_of_path: Path.t -> string
@@ -26,11 +26,34 @@ val strings_of_paths: namespace -> Path.t list -> string list
 (** Print a list of paths, using the same naming context to
     avoid name collisions *)
 
+val raw_row_desc : Format.formatter -> row_desc -> unit
+val raw_type_expr: Format.formatter -> type_expr -> unit
+val raw_field : Format.formatter -> row_field -> unit
+
+(* CR sspies: We seem to be using [Types.arg_label] whereas upstream uses
+   [Asttypes.arg_label]. [string_of_label] moved to Asttypes upstream. *)
+val string_of_label: Types.arg_label -> string
+
+val expand_module_type: (Env.t -> module_type -> module_type) ref
+
 val rewrite_double_underscore_longidents: Env.t -> Longident.t -> Longident.t
 
 (** [printed_signature sourcefile ppf sg] print the signature [sg] of
         [sourcefile] with potential warnings for name collisions *)
 val printed_signature: string -> Format.formatter -> signature -> unit
+
+(* for [Translquote] *)
+type typobject_repr = { fields : (string * type_expr) list; open_row : bool }
+type typvariant_repr = {
+  fields : (string * bool * type_expr list) list;
+  name : (Path.t * type_expr list) option;
+  closed : bool;
+  present : (string * row_field) list;
+  all_present : bool;
+  tags : string list option
+}
+val tree_of_typobject_repr : type_expr -> typobject_repr
+val tree_of_typvariant_repr : row_desc -> typvariant_repr
 
 module type Printers := sig
 
@@ -96,6 +119,18 @@ module type Printers := sig
     val modtype: module_type printer
     val signature: signature printer
     val class_type: class_type printer
+
+    (* CR sspies: The signature of [modality] was changed to use
+       [unit printer] for [~id] (instead of [Format_doc.formatter -> unit])
+       so it fits into [Printers]. The call sites in
+       typecore.ml [report_block_index_error] and
+       includecore.ml [report_modality_sub_error] were updated to pass
+       [fun ppf () -> ...] instead of [fun ppf -> ...]. *)
+
+    (** Prints a modality. If it is the identity modality, prints [id],
+        which defaults to nothing. *)
+    val modality :
+      ?id:unit printer -> 'a Mode.Modality.Axis.t -> 'a printer
 
   end
 
