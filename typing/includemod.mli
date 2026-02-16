@@ -99,6 +99,7 @@ module Error: sig
     (functor_params_info, functor_params_symptom) diff
     (** the return mode of the functor is intentionally omitted, since the diff
         is only about parameters. *)
+
   and functor_params_info =
     { params: functor_parameter list; res: module_type }
 

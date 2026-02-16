@@ -69,7 +69,7 @@ type pattern_variable =
   {
     pv_id: Ident.t;
     pv_mode: Mode.Value.l;
-    pv_kind: value_kind;
+    pv_value_kind: value_kind;
     pv_type: type_expr;
     pv_loc: Location.t;
     pv_kind: pattern_variable_kind;

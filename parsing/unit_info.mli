@@ -95,9 +95,6 @@ val modname: t -> Compilation_unit.t
 (** [kind u] is the kind (interface or implementation) of the unit. *)
 val kind: t -> intf_or_impl
 
-(** [kind u] is the kind (interface or implementation) of the unit. *)
-val kind: t -> intf_or_impl
-
 (** [check_unit_name u] prints a warning if the derived module name [modname u]
     should not be used as a module name as specified
     by {!is_unit_name}[ ~strict:true]. *)
