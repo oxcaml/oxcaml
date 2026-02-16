@@ -554,19 +554,11 @@ let mode_morph f expected_mode =
     modality, returns the mode of the child. *)
 let apply_left_is_contained_by is_contained_by
   ?(modalities = Modality.Const.id) mode =
-  let hint =
-    { monadic = Hint.Contained_by is_contained_by;
-      comonadic = Hint.Is_contained_by (Comonadic, is_contained_by) }
-  in
-  Modality.Const.apply_left ~hint modalities mode
+  Modality.Const.apply_left ~is_contained_by modalities mode
 
 let apply_right_is_contained_by is_contained_by
   ?(modalities = Modality.Const.id) mode =
-  let hint =
-    { monadic = Hint.Is_contained_by (Monadic, is_contained_by);
-      comonadic = Hint.Contained_by is_contained_by }
-  in
-  Modality.Const.apply_right ~hint modalities mode
+  Modality.Const.apply_right ~is_contained_by modalities mode
 
 (** Similiar to [apply_is_contained_by] but for [expected_mode]. *)
 let mode_is_contained_by is_contained_by ?modalities expected_mode =
