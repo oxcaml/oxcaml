@@ -1,0 +1,21 @@
+(rule
+ (alias runtest)
+ (action
+  (progn
+   (with-stdout-to
+    symbols.output
+    (pipe-outputs
+     (run %{bin:ocamlopt.opt} -dlinear -c %{dep:symbols.ml})
+     (run ./filter.sh)))
+   (diff symbols.%{env:OXCAML_NAME_MANGLING=flat} symbols.output))))
+
+; Sanity check: $OXCAML_NAME_MANGLING should be set as the compiler was
+; configured
+
+(rule
+ (alias runtest)
+ (action
+  (ignore-stdout
+   (pipe-outputs
+    (run %{bin:ocamlopt.opt} -config)
+    (run grep "name_mangling_scheme: %{env:OXCAML_NAME_MANGLING=flat}")))))
