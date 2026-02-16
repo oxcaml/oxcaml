@@ -632,6 +632,7 @@ module Complex        = Complex
 module Condition      = Condition
 module Digest         = Digest
 module Domain         = Domain
+module Dynamic        = Dynamic
 module Dynarray       = Dynarray
 module Effect         = Effect
 module Either         = Either
