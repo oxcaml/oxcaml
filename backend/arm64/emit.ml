@@ -2297,6 +2297,9 @@ let begin_assembly _unix =
   let code_end = Cmm_helpers.make_symbol "code_end" in
   Emitaux.Dwarf_helpers.begin_dwarf ~code_begin ~code_end ~file_emitter
 
+(* Not implemented for arm64 *)
+let register_expect_asm_callback (_ : string -> unit) = ()
+
 let end_assembly () =
   let code_end = Cmm_helpers.make_symbol "code_end" in
   let code_end_sym = S.create_global code_end in

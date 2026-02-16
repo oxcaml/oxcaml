@@ -71,6 +71,12 @@ val directive : asm_line -> unit
 
 val reset_asm_code : unit -> unit
 
+type output_pos
+
+val current_output_pos : unit -> output_pos
+
+val output_from : output_pos -> asm_line list
+
 (** Code emission *)
 
 (** Post-process the stream of instructions. Dump it (using the provided syntax

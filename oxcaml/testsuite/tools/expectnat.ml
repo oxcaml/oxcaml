@@ -33,6 +33,8 @@ module Options = Oxcaml_args.Make_opttop_options (struct
 end);;
 
 let () =
+  Expectcommon.register_assembly_callback :=
+    Some Emit.register_expect_asm_callback;
   Expectcommon.run
     ~read_anonymous_arg
     ~extra_args:Options.list

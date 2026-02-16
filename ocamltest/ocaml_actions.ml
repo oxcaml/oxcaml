@@ -1484,6 +1484,22 @@ let runtime5 = Actions.make
   (Actions_helpers.predicate Config.runtime5
     "5.x runtime being used"
     "4.x runtime being used")
+
+(* CR ttebbi: We should also protect against non-default register allocation
+    options. *)
+let only_default_codegen = Actions.make
+  ~name:"only-default-codegen"
+  ~description:"Passes if all the codegen options are at the current default, \
+                useful for [%%expect_asm]"
+  ~does_something:false
+  (Actions_helpers.predicate
+    (Config.no_stack_checks
+      && not Config.poll_insertion
+      && not Config.with_address_sanitizer
+      && not Config.with_frame_pointers)
+    "default codegen"
+    "non-default codegen")
+
 let ocamldoc = Ocaml_tools.ocamldoc
 module Ocamldoc = (val ocamldoc)
 
@@ -1707,5 +1723,6 @@ let init () =
     stack_checks;
     no_stack_checks;
     runtime4;
-    runtime5
+    runtime5;
+    only_default_codegen
   ]
