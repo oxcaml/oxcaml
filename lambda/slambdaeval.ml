@@ -3,4 +3,4 @@ let do_eval slam =
   | SLhalves { sval_comptime = _; sval_runtime = lam } -> lam
   | _ -> Misc.fatal_error "slambda eval not yet implemented"
 
-let eval slam = Profile.(record static_eval) do_eval slam
+let eval slam = Profile.record "static_eval" do_eval slam

@@ -4264,7 +4264,9 @@ let rec map_return f = function
       f l
   | Lregion (l, layout) -> Lregion (map_return f l, layout)
   | Lexclave l -> Lexclave (map_return f l)
-  | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+  | Lsplice (loc, _) ->
+      error ~loc:(Scoped_location.to_location loc)
+        (Invalid_constructor "Lsplice")
 
 (* The 'opt' reference indicates if the optimization is worthy.
 

@@ -1,6 +1,7 @@
 open Lambda
 
-(* true if the provided slambda definitely has no side-effects, false if it might have. *)
+(** true if the provided slambda definitely has no side-effects, false if it
+    might have. *)
 let slambda_is_pure = function
   | SLlayout _ | SLglobal _ | SLvar _ | SLmissing -> true
   | SLrecord _ | SLfield _ | SLhalves _ | SLproj_comptime _ | SLproj_runtime _
@@ -10,7 +11,7 @@ let slambda_is_pure = function
 let fracture_const lambda _const =
   SLhalves { sval_comptime = SLmissing; sval_runtime = lambda }
 
-let rec fracture lambda : slambda =
+let rec fracture_lam lambda : slambda =
   match lambda with
   | Lvar id ->
     SLhalves
@@ -247,7 +248,10 @@ let rec fracture lambda : slambda =
           { sval_comptime = comptime;
             sval_runtime = (if unchanged then lambda else Lexclave runtime)
           })
-  | Lsplice _splice -> Misc.splices_should_not_exist_after_eval ()
+  | Lsplice (loc, _splice) ->
+    error
+      ~loc:(Debuginfo.Scoped_location.to_location loc)
+      (Invalid_constructor "Lsplice")
 
 and fracture_fun { kind; params; return; body; attr; loc; mode; ret_mode } =
   let unchanged, body = fracture_dynamic body in
@@ -303,7 +307,7 @@ and fracture_prim lambda prim args loc =
       }
 
 and slet name value body =
-  let value_slam = fracture value in
+  let value_slam = fracture_lam value in
   match value_slam with
   | SLhalves { sval_comptime = comptime; sval_runtime = runtime }
     when slambda_is_pure comptime && runtime == value ->
@@ -317,15 +321,16 @@ and slet name value body =
         slet_value = value_slam;
         slet_body =
           body false (SLproj_comptime (SLvar name))
-            (Lsplice (SLproj_runtime (SLvar name)))
+            (Lsplice (try_to_find_location value, SLproj_runtime (SLvar name)))
       }
 
 and fracture_dynamic lam =
-  match fracture lam with
+  match fracture_lam lam with
   | SLhalves { sval_comptime = _; sval_runtime } when sval_runtime == lam ->
     true, lam
   | SLhalves { sval_comptime = _; sval_runtime } -> false, sval_runtime
-  | fractured -> false, Lsplice (SLproj_runtime fractured)
+  | fractured ->
+    false, Lsplice (try_to_find_location lam, SLproj_runtime fractured)
 
 and fracture_dynamic_list lams =
   List.fold_left_map
@@ -349,3 +354,5 @@ and fracture_dynamic_opt lam =
   | Some lam ->
     let unchanged, lam = fracture_dynamic lam in
     unchanged, Some lam
+
+let fracture lam = Profile.record "slambda_fracture" fracture_lam lam

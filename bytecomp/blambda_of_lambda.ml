@@ -218,7 +218,10 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     { id; def = comp_fun def }
   in
   match (exp : Lambda.lambda) with
-  | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+  | Lsplice (loc, _) ->
+    Lambda.error
+      ~loc:(Debuginfo.Scoped_location.to_location loc)
+      (Invalid_constructor "Lsplice")
   | Lvar id | Lmutvar id -> Var id
   | Lconst cst -> Const cst
   | Lapply { ap_func; ap_args; ap_region_close } ->

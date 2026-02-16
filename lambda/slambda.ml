@@ -82,17 +82,19 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   Lambda.iter_head_constructor assert_no_splices lam
 
 let eval inspect_slambda (template_lam : Lambda.lambda) : Lambda.lambda =
-  let raw_lam =
-    Slambda_fracture.fracture template_lam
-    |> inspect_slambda |> Slambdaeval.eval
-  in
-  (try assert_no_splices raw_lam
-   with Found_a_splice ->
-     Misc.fatal_error "Encountered a splice in the program after slambda eval");
-  if
-    (not Language_extension.(is_enabled Layout_poly))
-    && not (template_lam == raw_lam)
-  then
-    Misc.fatal_error
-      "Slambda eval did something non-trivial but layout poly is disabled.";
-  raw_lam
+  Profile.record_call "slambda_eval" (fun () ->
+      let raw_lam =
+        Slambda_fracture.fracture template_lam
+        |> inspect_slambda |> Slambdaeval.eval
+      in
+      (try assert_no_splices raw_lam
+       with Found_a_splice ->
+         Misc.fatal_error
+           "Encountered a splice in the program after slambda eval");
+      if
+        (not Language_extension.(is_enabled Layout_poly))
+        && not (template_lam == raw_lam)
+      then
+        Misc.fatal_error
+          "Slambda eval did something non-trivial but layout poly is disabled.";
+      raw_lam)

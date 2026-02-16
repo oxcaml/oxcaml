@@ -1354,7 +1354,7 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(region@ %a)@]" lam expr
   | Lexclave expr ->
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
-  | Lsplice slambda ->
+  | Lsplice (_, slambda) ->
       fprintf ppf "$(%a)" slam slambda
 
 and slam ppf = function

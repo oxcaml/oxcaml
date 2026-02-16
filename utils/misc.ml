@@ -25,9 +25,6 @@ let fatal_errorf fmt =
 
 let fatal_error msg = fatal_errorf "%s" msg
 
-let splices_should_not_exist_after_eval () =
-  fatal_error "slambda splices should not exist in lambda after slambda eval"
-
 (* Exceptions *)
 
 let try_finally ?(always=(fun () -> ())) ?(exceptionally=(fun () -> ())) work =

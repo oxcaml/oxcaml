@@ -16,6 +16,15 @@
 open Misc
 open Asttypes
 
+type error =
+  | Slambda_unsupported of string
+  | Unevaluated_splice_var of Ident.t
+  | Invalid_constructor of string
+
+exception Error of Location.t option * error
+
+let error ?loc err = raise (Error (loc, err))
+
 type constant = Typedtree.constant
 
 type mutable_flag = Immutable | Immutable_unique | Mutable
@@ -639,7 +648,7 @@ let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
       Array.for_all
         (function
           | Value _ -> true
-          | Splice_variable _ -> Misc.splices_should_not_exist_after_eval ()
+          | Splice_variable _ -> error (Slambda_unsupported "mixed blocks")
           | _ -> false)
         shape
     in
@@ -900,7 +909,7 @@ type lambda =
   | Lifused of Ident.t * lambda
   | Lregion of lambda * layout
   | Lexclave of lambda
-  | Lsplice of slambda
+  | Lsplice of scoped_location * slambda
 
 and slambda =
   | SLlayout of layout
@@ -1036,12 +1045,6 @@ type arg_descr =
   { arg_param: Global_module.Parameter_name.t;
     arg_block_idx: int;
     main_repr: module_representation; }
-
-type error = Slambda_unsupported of string
-
-exception Error of Location.t option * error
-
-let error ?loc err = raise (Error (loc, err))
 
 let const_int n = Const_base (Const_int n)
 
@@ -1459,7 +1462,7 @@ let rec free_variables = function
       free_variables e
   | Lexclave e ->
       free_variables e
-  | Lsplice slambda -> free_variables_slambda slambda
+  | Lsplice (_, slambda) -> free_variables_slambda slambda
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
@@ -1822,8 +1825,9 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         Lregion (subst s l e, layout)
     | Lexclave e ->
         Lexclave (subst s l e)
-    | Lsplice _ ->
-        Misc.splices_should_not_exist_after_eval ()
+    | Lsplice (loc, _) ->
+        error ~loc:(Debuginfo.Scoped_location.to_location loc)
+          (Invalid_constructor "Lsplice")
   and subst_list s l li = List.map (subst s l) li
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
   and subst_lfun s l lf =
@@ -2866,7 +2870,9 @@ let may_allocate_in_region lam =
         rather, it's in the parent region *)
       ()
     | Lwhile {wh_cond; wh_body} -> loop wh_cond; loop wh_body
-    | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+    | Lsplice (loc, _) ->
+        error ~loc:(Debuginfo.Scoped_location.to_location loc)
+          (Invalid_constructor "Lsplice")
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
     | ( Lapply _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
       | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
@@ -2907,7 +2913,8 @@ let rec try_to_find_location lam =
   | Lswitch (_, _, loc, _)
   | Lstringswitch (_, _, _, loc, _)
   | Lsend (_, _, _, _, _, _, loc, _)
-  | Levent (_, { lev_loc = loc; _ }) ->
+  | Levent (_, { lev_loc = loc; _ })
+  | Lsplice (loc, _) ->
     loc
   | Llet (_, _, _, _, lam, _)
   | Lmutlet (_, _, _, lam, _)
@@ -2924,8 +2931,6 @@ let rec try_to_find_location lam =
     try_to_find_location lam
   | Lvar _ | Lmutvar _ | Lconst _ | Lletrec _ | Lstaticraise (_, []) ->
     Debuginfo.Scoped_location.Loc_unknown
-  | Lsplice _ ->
-    Misc.splices_should_not_exist_after_eval ()
 
 let try_to_find_debuginfo lam =
   Debuginfo.from_location (try_to_find_location lam)
@@ -3030,6 +3035,12 @@ let report_error ppf = function
     Format.fprintf ppf
       "Static computation and layout polymorphism are not yet supported in %s."
       where
+  | Unevaluated_splice_var ident ->
+    Format.fprintf ppf "Splice variable %a should have been evaluated."
+      Ident.print ident
+  | Invalid_constructor constructor ->
+    Format.fprintf ppf "Lambda constructor %s is not valid at this stage."
+     constructor
 
 let () =
   Location.register_error_of_exn (function

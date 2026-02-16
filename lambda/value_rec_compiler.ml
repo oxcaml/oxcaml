@@ -182,7 +182,9 @@ let compute_static_size lam =
          the latter meaning that [Value_rec_check] should have forbidden that case.
       *)
       assert false
-    | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+    | Lsplice (loc, _) ->
+      error ~loc:(Debuginfo.Scoped_location.to_location loc)
+        (Invalid_constructor "Lsplice")
   and compute_and_join_sizes env branches =
     List.fold_left (fun size branch ->
         join_sizes branch size (compute_expression_size env branch))
@@ -249,6 +251,9 @@ let compute_static_size lam =
            number of arguments instead.
            Note that flat float arrays/records use Pmakearray, so we don't need
            to check the tag here. *)
+        (* CR layout poly: This is no longer known before slambda eval, we
+           should merge Regular_block and Mixed_record (and fix the error
+           produced by [mixed_block_of_block_shape]). *)
         (match Lambda.mixed_block_of_block_shape shape with
          | None -> Block (Regular_block (List.length args))
          | Some arr -> Block (Mixed_record arr))
@@ -691,7 +696,9 @@ let rec split_static_function lfun block_var local_idents lam :
       "letrec binding is not a static function:@ lfun=%a@ lam=%a"
       Printlambda.lfunction lfun
       Printlambda.lambda lam
-  | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+  | Lsplice (loc, _) ->
+      error ~loc:(Debuginfo.Scoped_location.to_location loc)
+        (Invalid_constructor "Lsplice")
 and rebuild_arms :
   type a. _ -> _ -> _ -> (a * Lambda.lambda) list ->
   (a * Lambda.lambda) list split_result =

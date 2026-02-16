@@ -91,7 +91,7 @@ module Component_for_creation = struct
       Misc.fatal_errorf
         "Cannot convert %a to Flambda_arity.Component_for_creation"
         Printlambda.layout layout
-    | Psplicevar _ -> Misc.splices_should_not_exist_after_eval ()
+    | Psplicevar ident -> Lambda.error (Unevaluated_splice_var ident)
 end
 
 let nullary = []

@@ -850,7 +850,7 @@ type lambda =
   (* [Lexclave] closes the newest region opened.
      Note that [Lexclave] nesting is currently unsupported. *)
   | Lexclave of lambda
-  | Lsplice of slambda
+  | Lsplice of scoped_location * slambda
 
 and slambda =
   | SLlayout of layout
@@ -1417,6 +1417,9 @@ val static_cast
   -> loc:scoped_location
   -> lambda
 
-type error = Slambda_unsupported of string
+type error =
+  | Slambda_unsupported of string
+  | Unevaluated_splice_var of Ident.t
+  | Invalid_constructor of string
 
 val error : ?loc:Location.t -> error -> 'a

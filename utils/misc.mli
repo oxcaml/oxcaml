@@ -29,10 +29,6 @@ val fatal_errorf: ('a, Format.formatter, unit, 'b) format4 -> 'a
   (** Format the arguments according to the given format string
       and raise [Fatal_error] with the resulting string. *)
 
-val splices_should_not_exist_after_eval : unit -> _
-  (** Raise a [Fatal_error] explaining that a slambda splice shouldn't exist in
-      lambda code after slambda eval has happened. *)
-
 exception Fatal_error
 
 (** {1 Exceptions and finalization} *)
