@@ -671,7 +671,8 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->unique_id = d->unique_id;
   domain_state->requested_external_interrupt = 0;
 
-  /* Synchronized with [caml_interrupt_all_signal_safe], so that the
+  /* Synchronized with [caml_interrupt_all_signal_safe] and
+     [caml_external_interrupt_all_signal_safe], so that the
      initializing writes of young_limit and requested_external_interrupt happen
      before any interrupt.
   */
