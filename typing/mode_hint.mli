@@ -56,28 +56,6 @@ type always_dynamic =
   | Application
   | Try_with
 
-(* CR-someday zqian: Put [Modality.Const.t] here, once the dependency circle is
-   resolved. To fix that, we can move [Modality.Const] to in front of [Hint],
-   while [Modality] stays in place. *)
-type modality = Modality
-
-type containing =
-  | Tuple
-  | Record of string * modality
-  | Array of modality
-  | Constructor of string * modality
-(* CR-soon zqian: add the relation between structure and items *)
-
-type contains =
-  { containing : containing;
-    contained : pinpoint
-  }
-
-type is_contained_by =
-  { containing : containing;
-    container : Location.t
-  }
-
 type legacy =
   | Compilation_unit
   | Toplevel
@@ -93,6 +71,30 @@ type ('d0, 'd1) polarity =
   | Comonadic : ('l * 'r, 'l * 'r) polarity
   constraint 'd0 = _ * _ constraint 'd1 = _ * _
 [@@warning "-62"]
+
+(* CR-someday zqian: Put [Modality.Const.t] here, once the dependency circle is
+   resolved. To fix that, we can move [Modality.Const] to in front of [Hint],
+   while [Modality] stays in place. *)
+type modality = Modality
+
+type containing =
+  | Tuple
+  | Record of string * modality
+  | Array of modality
+  | Constructor of string * modality
+  | Structure of structure_item * modality
+(* Some structure items (such as classes) don't have modalities. We gloss over
+     for simplicity. *)
+
+type contains =
+  { containing : containing;
+    contained : pinpoint
+  }
+
+type is_contained_by =
+  { containing : containing;
+    container : pinpoint
+  }
 
 (* CR-soon zqian: add the const hint for "min on the LHS", and one for "max on
 the RHS". They are similiar to the [Skip] morph hint and should raise when being
@@ -126,30 +128,6 @@ type 'd const =
 type closure_details =
   { closure : pinpoint;
     closed : pinpoint
-  }
-
-(* CR-someday zqian: Put [Modality.Const.t] here, once the dependency circle is
-   resolved. To fix that, we can move [Modality.Const] to in front of [Hint],
-   while [Modality] stays in place. *)
-type modality = Modality
-
-type containing =
-  | Tuple
-  | Record of string * modality
-  | Array of modality
-  | Constructor of string * modality
-  | Structure of structure_item * modality
-(* Some structure items (such as classes) don't have modalities. We gloss over
-     for simplicity. *)
-
-type contains =
-  { containing : containing;
-    contained : pinpoint
-  }
-
-type is_contained_by =
-  { containing : containing;
-    container : pinpoint
   }
 
 type allocation_desc =

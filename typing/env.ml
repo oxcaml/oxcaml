@@ -1056,7 +1056,7 @@ module Normalize_mode = struct
     | Assert_normalized, true -> modality, mode
     | (Normalize | Normalize_exn), false ->
         Mode.Modality.undefined,
-        Mode.Modality.apply_left ~hint:{monadic = Unknown; comonadic = Unknown}
+        Mode.Modality.apply_left
           modality mode
     | Assert_normalized, false ->
         Misc.fatal_error "mode is not already normalized but expected otherwise"
