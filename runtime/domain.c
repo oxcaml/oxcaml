@@ -1811,6 +1811,9 @@ void caml_interrupt_self(void)
  */
 CAMLprim value caml_domain_preempt_self(value unit) {
   CAMLnoalloc;
+  if (Caml_state->preemption != Val_unit) {
+    return Val_unit;
+  }
   domain_root_set(&Caml_state->preemption, Val_long(1));
   caml_interrupt_self();
   return Val_unit;
@@ -1818,7 +1821,13 @@ CAMLprim value caml_domain_preempt_self(value unit) {
 
 void caml_domain_setup_preemption(void) {
   CAMLparam0();
+  if (Caml_state->preemption != Val_long(1)) {
+    CAMLreturn0;
+  }
   value cont = caml_alloc_3(Cont_tag, Val_ptr(NULL), Val_ptr(NULL), Val_ptr(NULL));
+  if (Caml_state->preemption != Val_long(1)) {
+    CAMLreturn0;
+  }
   domain_root_set(&Caml_state->preemption, cont);
   CAMLreturn0;
 }

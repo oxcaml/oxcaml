@@ -440,9 +440,7 @@ value caml_do_pending_actions_exn(void)
   if (Is_exception_result(exn)) goto exception;
 
   /* Check for a pending preemption */
-  if (Caml_state->preemption == Val_long(1)) {
-    caml_domain_setup_preemption();
-  }
+  caml_domain_setup_preemption();
 
   /* Process external interrupts (e.g. preemptive systhread switching).
      By doing this last, we do not need to set the action pending flag
