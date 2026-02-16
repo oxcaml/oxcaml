@@ -709,7 +709,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     else non_nullable Pintval
   | _ ->
     num_nodes_visited,
-    add_nullability_from_jkind env (Ctype.estimate_type_jkind env ty) Pgenval
+    add_nullability_from_jkind env (Ctype.estimate_type_jkind env scty) Pgenval
 
 and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
       (field : Types.mixed_block_element) ty
