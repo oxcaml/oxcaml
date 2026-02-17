@@ -2252,7 +2252,10 @@ let of_type_decl_overapproximate_unknown ~context env
     (* CR with-kinds: we could still compute the layout here. *)
     Some (Builtin.any ~why:Overapproximation_of_with_bounds)
   | _ ->
-    of_type_decl ~use_abstract_jkinds:false ~context ~transl_type env decl
+    (* CR with-kinds: any warnings we get while parsing here will
+       be raised again when doing the non-approximated jkind computation. *)
+    Warnings.without_warnings (fun () ->
+        of_type_decl ~use_abstract_jkinds:false ~context ~transl_type env decl)
     |> Option.map fst
 
 let for_unboxed_record lbls layouts =
