@@ -13,6 +13,11 @@ type t_sep : any mod separable
 type t_nonfloat : any mod non_float
 
 [%%expect{|
+Line 1, characters 26-41:
+1 | type t_maybesep : any mod maybe_separable
+                              ^^^^^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t_maybesep : any
 type t_sep : any mod separable
 type t_nonfloat : any mod non_float
@@ -23,6 +28,21 @@ type ('a : any mod separable) accepts_sep
 type ('a : any mod non_float) accepts_nonfloat
 
 [%%expect{|
+Line 1, characters 20-35:
+1 | type ('a :  any mod maybe_separable) accepts_maybesep
+                        ^^^^^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 1, characters 20-35:
+1 | type ('a :  any mod maybe_separable) accepts_maybesep
+                        ^^^^^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 1, characters 20-35:
+1 | type ('a :  any mod maybe_separable) accepts_maybesep
+                        ^^^^^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type ('a : any) accepts_maybesep
 type ('a : any mod separable) accepts_sep
 type ('a : any mod non_float) accepts_nonfloat

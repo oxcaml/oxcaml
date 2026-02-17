@@ -19,7 +19,7 @@ end = struct
 end
 
 module Hidden_float_u : sig
-  type t : float64 mod global many aliased
+  type t : float64 mod global many
   val hide : float# -> t
 end = struct
   type t = float#
@@ -27,7 +27,7 @@ end = struct
 end
 
 module Hidden_int64_u : sig
-  type t : bits64 mod global many aliased
+  type t : bits64 mod global many
   val hide : int64# -> t
 end = struct
   type t = int64#
