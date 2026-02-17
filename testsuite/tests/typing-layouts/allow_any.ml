@@ -31,16 +31,11 @@ val f : t @ contended -> t = <fun>
 |}]
 
 (* If we set the attribute but *don't* get a kind mismatch, we ought to be fine *)
-type t : value mod many portable uncontended = string
+type t : value mod many portable = string
 [@@unsafe_allow_any_mode_crossing]
 [%%expect{|
-Line 1, characters 33-44:
-1 | type t : value mod many portable uncontended = string
-                                     ^^^^^^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
-
 Lines 1-2, characters 0-34:
-1 | type t : value mod many portable uncontended = string
+1 | type t : value mod many portable = string
 2 | [@@unsafe_allow_any_mode_crossing]
 Error: [@@unsafe_allow_any_mode_crossing] is not allowed on this kind of type declaration.
        Only records, unboxed products, and variants are supported.
@@ -306,7 +301,7 @@ Error: Signature mismatch:
 |}]
 
 module A : sig
-  type t : value mod external_ global portable many uncontended unyielding
+  type t : value mod external_ global portable many
 end = struct
   type t = int
 end
@@ -318,16 +313,6 @@ module B = struct
   let a t = t.a
 end
 [%%expect{|
-Line 2, characters 52-63:
-2 |   type t : value mod external_ global portable many uncontended unyielding
-                                                        ^^^^^^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
-
-Line 2, characters 64-74:
-2 |   type t : value mod external_ global portable many uncontended unyielding
-                                                                    ^^^^^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
-
 module A : sig type t : value mod global many portable external_ end
 module B :
   sig
