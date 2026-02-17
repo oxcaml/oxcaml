@@ -837,7 +837,7 @@ module type S = sig
       (** Test if the given modality is a constant modality. *)
       val is_constant : 'a Axis.t -> 'a -> bool
 
-      val eq : 'a Axis.t -> 'a -> 'a -> bool
+      val le : 'a Axis.t -> 'a -> 'a -> bool
 
       val print : 'a Axis.t -> Fmt.formatter -> 'a -> unit
     end
