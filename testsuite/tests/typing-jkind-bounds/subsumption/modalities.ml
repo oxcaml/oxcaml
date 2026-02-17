@@ -124,6 +124,11 @@ end = struct
   type 'a t : immediate with 'a @@ many contended global portable
 end
 [%%expect {|
+Line 2, characters 31-38:
+2 |   type 'a t : value mod global aliased many portable contended
+                                   ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 module M : sig type 'a t : value mod global many portable contended end
 |}]
 
@@ -572,6 +577,11 @@ end = struct
   type 'a t : value mod internal with 'a @@ external_
 end
 [%%expect{|
+Line 4, characters 24-32:
+4 |   type 'a t : value mod internal with 'a @@ external_
+                            ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type 'a t : value mod internal with 'a @@ external_
@@ -597,6 +607,11 @@ end = struct
   type 'a t : value mod internal with 'a @@ internal
 end
 [%%expect{|
+Line 4, characters 24-32:
+4 |   type 'a t : value mod internal with 'a @@ internal
+                            ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 Lines 3-5, characters 6-3:
 3 | ......struct
 4 |   type 'a t : value mod internal with 'a @@ internal

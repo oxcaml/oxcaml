@@ -37,6 +37,11 @@ end
 [%%expect{|
 module Hidden_string : sig type t val hide : string -> t end
 module Hidden_int : sig type t : immediate val hide : int -> t end
+Line 18, characters 35-42:
+18 |   type t : float64 mod global many aliased
+                                        ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 module Hidden_float_u :
   sig type t : float64 mod global many val hide : float# -> t end
 module Hidden_function :

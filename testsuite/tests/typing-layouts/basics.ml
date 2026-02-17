@@ -2918,6 +2918,11 @@ let f (x : ('a : value mod uncontended)) = x ()
 
 [%%expect{|
 val f : (unit -> 'a) -> 'a = <fun>
+Line 2, characters 27-38:
+2 | let f (x : ('a : value mod uncontended)) = x ()
+                               ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 val f : (unit -> 'a) -> 'a = <fun>
 |}]
 
