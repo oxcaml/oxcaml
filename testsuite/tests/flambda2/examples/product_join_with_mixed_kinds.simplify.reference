@@ -1,23 +1,30 @@
-type float_rec =
-  { a : float;
-    b : float
-  }
-
-type (_, _) c =
-  | F : (float_rec, unit) c
-  | B : (int * int, int * int) c
-
-let f (type x y) (b : (x, y) c) w x (y : y) : x * unit =
-  let x : x =
-    match b with
-    | F -> { a = w; b = x }
-    | B ->
-      let u, v = y in
-      (* This creates a row_like of type Other ( value, value ) *)
-      let _ = Sys.opaque_identity (u + v) in
-      y
-  in
-  (* Here happens the join of Tag_254 ( float, float ) with Other ( value, value
-     ) If nothing was done to prevent it, there would be a join between products
-     with different kinds, which is prohibited *)
-  x, ()
+let code f_0 deleted in
+let code loopify(never) size(34) newer_version_of(f_0)
+      f_0_1 (b : imm tagged, w : float boxed, x : float boxed, y : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of val * imm tagged ] =
+  (let untagged = %untag_imm (b) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k4)
+    where k4 =
+      let Pfield = %block_load.[`1`] (y) in
+      let Pfield_1 = %block_load.[`0`] (y) in
+      let int_add = %int_barith.add (Pfield_1, Pfield) in
+      let Popaque = %opaque (int_add) in
+      cont k2 (y)
+    where k3 =
+      let prim = %unbox_num.`float` (x) in
+      let prim_1 = %unbox_num.`float` (w) in
+      let Pmakefloatblock = %block.floats (prim_1, prim) in
+      cont k2 (Pmakefloatblock)
+    where k2 (x_1 : val) =
+      let Pmakeblock = %block.[`0`] (x_1, 0) in
+      cont k (Pmakeblock)
+in
+let $camlProduct_join_with_mixed_kinds__f_1 = closure f_0_1 @f in
+let $camlProduct_join_with_mixed_kinds =
+  Block 0 ($camlProduct_join_with_mixed_kinds__f_1)
+in
+cont done ($camlProduct_join_with_mixed_kinds)
