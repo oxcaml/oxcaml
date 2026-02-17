@@ -138,7 +138,7 @@ type t =
   | Zero_alloc_all_hidden_arrow of string   (* 198 *)
   | Unchecked_zero_alloc_attribute          (* 199 *)
   | Unboxing_impossible                     (* 210 *)
-  | Mod_by_top of string                    (* 211 *)
+  | Redundant_modifier of string            (* 211 *)
   (* 212 taken *)
   | Modal_axis_specified_twice of
     { axis : string;
@@ -237,7 +237,7 @@ let number = function
   | Zero_alloc_all_hidden_arrow _ -> 198
   | Unchecked_zero_alloc_attribute -> 199
   | Unboxing_impossible -> 210
-  | Mod_by_top _ -> 211
+  | Redundant_modifier _ -> 211
   | Modal_axis_specified_twice _ -> 213
   | Atomic_float_record_boxed -> 214
   | Implied_attribute _ -> 215
@@ -626,8 +626,8 @@ let descriptions = [
     description = "The parameter or return value corresponding @unboxed attribute cannot be unboxed.";
     since = since 4 14 };
   { number = 211;
-    names = ["mod-by-top"];
-    description = "Including the top-most element of an axis in a kind's modifiers is a no-op.";
+    names = ["redundant-modifier"];
+    description = "This modifier is redundant.";
     since = since 4 14 };
   { number = 214;
     names = ["atomic-float-record-boxed"];
@@ -1314,11 +1314,8 @@ let message = function
       Printf.sprintf
         "This [@unboxed] attribute cannot be used.\n\
          The type of this value does not allow unboxing."
-  | Mod_by_top modifier ->
-      Printf.sprintf
-        "%s is the top-most modifier.\n\
-         Modifying by a top element is a no-op."
-        modifier
+  | Redundant_modifier _ ->
+      "This modifier is redundant."
   | Modal_axis_specified_twice {axis; overriden_by} ->
     Printf.sprintf
       "This %s is overriden by %s later."

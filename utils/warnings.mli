@@ -142,7 +142,7 @@ type t =
   | Zero_alloc_all_hidden_arrow of string   (* 198 *)
   | Unchecked_zero_alloc_attribute          (* 199 *)
   | Unboxing_impossible                     (* 210 *)
-  | Mod_by_top of string                    (* 211 *)
+  | Redundant_modifier of string            (* 211 *)
   | Modal_axis_specified_twice of {
       axis : string;
       overriden_by : string;
