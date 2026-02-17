@@ -162,7 +162,17 @@ Error: The layout of type "a" is float32
 type a : value mod local
 type b : value mod local = a
 [%%expect{|
+Line 1, characters 19-24:
+1 | type a : value mod local
+                       ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type a
+Line 2, characters 19-24:
+2 | type b : value mod local = a
+                       ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type b = a
 |}]
 
@@ -170,6 +180,11 @@ type a : value mod global
 type b : value mod local = a
 [%%expect{|
 type a : value mod global
+Line 2, characters 19-24:
+2 | type b : value mod local = a
+                       ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type b = a
 |}]
 
@@ -183,6 +198,11 @@ type b = a
 type a : value mod local
 type b : value mod global = a
 [%%expect{|
+Line 1, characters 19-24:
+1 | type a : value mod local
+                       ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type a
 Line 2, characters 0-29:
 2 | type b : value mod global = a
@@ -197,6 +217,11 @@ type a : value mod global
 type b : any mod local = a
 [%%expect{|
 type a : value mod global
+Line 2, characters 17-22:
+2 | type b : any mod local = a
+                     ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type b = a
 |}]
 
@@ -204,6 +229,11 @@ type a : value mod global
 type b : float32 mod local = a
 [%%expect{|
 type a : value mod global
+Line 2, characters 21-26:
+2 | type b : float32 mod local = a
+                         ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 Line 2, characters 0-30:
 2 | type b : float32 mod local = a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -216,14 +246,79 @@ Error: The layout of type "a" is value
 type a : value mod global aliased many immutable stateless external_ unyielding non_float
 type b : value mod local unique once contended nonportable internal = a
 [%%expect{|
+Line 1, characters 26-33:
+1 | type a : value mod global aliased many immutable stateless external_ unyielding non_float
+                              ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 1, characters 69-79:
+1 | type a : value mod global aliased many immutable stateless external_ unyielding non_float
+                                                                         ^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type a : immediate
+Line 2, characters 59-67:
+2 | type b : value mod local unique once contended nonportable internal = a
+                                                               ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 19-24:
+2 | type b : value mod local unique once contended nonportable internal = a
+                       ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 25-31:
+2 | type b : value mod local unique once contended nonportable internal = a
+                             ^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 32-36:
+2 | type b : value mod local unique once contended nonportable internal = a
+                                    ^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 47-58:
+2 | type b : value mod local unique once contended nonportable internal = a
+                                                   ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type b = a
 |}]
 
 type a : value mod global aliased once contended portable external_
 type b : value mod local unique many contended nonportable internal = a
 [%%expect{|
+Line 1, characters 26-33:
+1 | type a : value mod global aliased once contended portable external_
+                              ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 1, characters 34-38:
+1 | type a : value mod global aliased once contended portable external_
+                                      ^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type a : value mod global portable contended external_
+Line 2, characters 59-67:
+2 | type b : value mod local unique many contended nonportable internal = a
+                                                               ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 19-24:
+2 | type b : value mod local unique many contended nonportable internal = a
+                       ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 25-31:
+2 | type b : value mod local unique many contended nonportable internal = a
+                             ^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 47-58:
+2 | type b : value mod local unique many contended nonportable internal = a
+                                                   ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 Line 2, characters 0-71:
 2 | type b : value mod local unique many contended nonportable internal = a
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -243,7 +338,67 @@ type c : any mod local unique once uncontended nonportable internal
 type d : any = c
 [%%expect{|
 type a : any
+Line 2, characters 59-67:
+2 | type b : any mod local unique once uncontended nonportable internal = a
+                                                               ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 17-22:
+2 | type b : any mod local unique once uncontended nonportable internal = a
+                     ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 23-29:
+2 | type b : any mod local unique once uncontended nonportable internal = a
+                           ^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 30-34:
+2 | type b : any mod local unique once uncontended nonportable internal = a
+                                  ^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 35-46:
+2 | type b : any mod local unique once uncontended nonportable internal = a
+                                       ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 47-58:
+2 | type b : any mod local unique once uncontended nonportable internal = a
+                                                   ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type b = a
+Line 3, characters 59-67:
+3 | type c : any mod local unique once uncontended nonportable internal
+                                                               ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 17-22:
+3 | type c : any mod local unique once uncontended nonportable internal
+                     ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 23-29:
+3 | type c : any mod local unique once uncontended nonportable internal
+                           ^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 30-34:
+3 | type c : any mod local unique once uncontended nonportable internal
+                                  ^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 35-46:
+3 | type c : any mod local unique once uncontended nonportable internal
+                                       ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 47-58:
+3 | type c : any mod local unique once uncontended nonportable internal
+                                                   ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type c : any
 type d = c
 |}]
@@ -254,7 +409,67 @@ type c : value mod local unique once uncontended nonportable internal
 type d : value = c
 [%%expect{|
 type a
+Line 2, characters 61-69:
+2 | type b : value mod local unique once uncontended nonportable internal = a
+                                                                 ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 19-24:
+2 | type b : value mod local unique once uncontended nonportable internal = a
+                       ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 25-31:
+2 | type b : value mod local unique once uncontended nonportable internal = a
+                             ^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 32-36:
+2 | type b : value mod local unique once uncontended nonportable internal = a
+                                    ^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 37-48:
+2 | type b : value mod local unique once uncontended nonportable internal = a
+                                         ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 49-60:
+2 | type b : value mod local unique once uncontended nonportable internal = a
+                                                     ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type b = a
+Line 3, characters 61-69:
+3 | type c : value mod local unique once uncontended nonportable internal
+                                                                 ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 19-24:
+3 | type c : value mod local unique once uncontended nonportable internal
+                       ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 25-31:
+3 | type c : value mod local unique once uncontended nonportable internal
+                             ^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 32-36:
+3 | type c : value mod local unique once uncontended nonportable internal
+                                    ^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 37-48:
+3 | type c : value mod local unique once uncontended nonportable internal
+                                         ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 49-60:
+3 | type c : value mod local unique once uncontended nonportable internal
+                                                     ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type c
 type d = c
 |}]
@@ -265,7 +480,67 @@ type c : void mod local unique once uncontended nonportable internal
 type d : void = c
 [%%expect{|
 type a : void
+Line 2, characters 60-68:
+2 | type b : void mod local unique once uncontended nonportable internal = a
+                                                                ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 18-23:
+2 | type b : void mod local unique once uncontended nonportable internal = a
+                      ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 24-30:
+2 | type b : void mod local unique once uncontended nonportable internal = a
+                            ^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 31-35:
+2 | type b : void mod local unique once uncontended nonportable internal = a
+                                   ^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 36-47:
+2 | type b : void mod local unique once uncontended nonportable internal = a
+                                        ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 48-59:
+2 | type b : void mod local unique once uncontended nonportable internal = a
+                                                    ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type b = a
+Line 3, characters 60-68:
+3 | type c : void mod local unique once uncontended nonportable internal
+                                                                ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 18-23:
+3 | type c : void mod local unique once uncontended nonportable internal
+                      ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 24-30:
+3 | type c : void mod local unique once uncontended nonportable internal
+                            ^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 31-35:
+3 | type c : void mod local unique once uncontended nonportable internal
+                                   ^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 36-47:
+3 | type c : void mod local unique once uncontended nonportable internal
+                                        ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 48-59:
+3 | type c : void mod local unique once uncontended nonportable internal
+                                                    ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type c : void
 type d = c
 |}]
@@ -276,7 +551,27 @@ type c : value mod global aliased many immutable stateless unyielding external_ 
 type d : immediate = c
 [%%expect{|
 type a : immediate
+Line 2, characters 26-33:
+2 | type b : value mod global aliased many immutable stateless unyielding external_ non_float = a
+                              ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 59-69:
+2 | type b : value mod global aliased many immutable stateless unyielding external_ non_float = a
+                                                               ^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type b = a
+Line 3, characters 26-33:
+3 | type c : value mod global aliased many immutable stateless unyielding external_ non_float
+                              ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 59-69:
+3 | type c : value mod global aliased many immutable stateless unyielding external_ non_float
+                                                               ^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type c : immediate
 type d = c
 |}]
@@ -287,7 +582,27 @@ type c : value mod global aliased many immutable stateless unyielding external64
 type d : immediate64 = c
 [%%expect{|
 type a : immediate64
+Line 2, characters 26-33:
+2 | type b : value mod global aliased many immutable stateless unyielding external64 non_float = a
+                              ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 59-69:
+2 | type b : value mod global aliased many immutable stateless unyielding external64 non_float = a
+                                                               ^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type b = a
+Line 3, characters 26-33:
+3 | type c : value mod global aliased many immutable stateless unyielding external64 non_float
+                              ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 59-69:
+3 | type c : value mod global aliased many immutable stateless unyielding external64 non_float
+                                                               ^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type c : immediate64
 type d = c
 |}]
@@ -298,7 +613,17 @@ type c : float64 mod global aliased many immutable stateless external_
 type d : float64 = c
 [%%expect{|
 type a = float#
+Line 2, characters 28-35:
+2 | type b : float64 mod global aliased many immutable stateless external_ = a
+                                ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type b = a
+Line 3, characters 28-35:
+3 | type c : float64 mod global aliased many immutable stateless external_
+                                ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type c : float64 mod everything
 type d = c
 |}]
@@ -309,7 +634,17 @@ type c : float32 mod global aliased many immutable stateless external_
 type d : float32 = c
 [%%expect{|
 type a = float32#
+Line 2, characters 28-35:
+2 | type b : float32 mod global aliased many immutable stateless external_ = a
+                                ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type b = a
+Line 3, characters 28-35:
+3 | type c : float32 mod global aliased many immutable stateless external_
+                                ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type c : float32 mod everything
 type d = c
 |}]
@@ -320,7 +655,67 @@ type c : word mod local unique once uncontended nonportable internal
 type d : word = c
 [%%expect{|
 type a : word
+Line 2, characters 60-68:
+2 | type b : word mod local unique once uncontended nonportable internal = a
+                                                                ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 18-23:
+2 | type b : word mod local unique once uncontended nonportable internal = a
+                      ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 24-30:
+2 | type b : word mod local unique once uncontended nonportable internal = a
+                            ^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 31-35:
+2 | type b : word mod local unique once uncontended nonportable internal = a
+                                   ^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 36-47:
+2 | type b : word mod local unique once uncontended nonportable internal = a
+                                        ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 48-59:
+2 | type b : word mod local unique once uncontended nonportable internal = a
+                                                    ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type b = a
+Line 3, characters 60-68:
+3 | type c : word mod local unique once uncontended nonportable internal
+                                                                ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 18-23:
+3 | type c : word mod local unique once uncontended nonportable internal
+                      ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 24-30:
+3 | type c : word mod local unique once uncontended nonportable internal
+                            ^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 31-35:
+3 | type c : word mod local unique once uncontended nonportable internal
+                                   ^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 36-47:
+3 | type c : word mod local unique once uncontended nonportable internal
+                                        ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 48-59:
+3 | type c : word mod local unique once uncontended nonportable internal
+                                                    ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type c : word
 type d = c
 |}]
@@ -331,7 +726,67 @@ type c : bits32 mod local unique once uncontended nonportable internal
 type d : bits32 = c
 [%%expect{|
 type a : bits32
+Line 2, characters 62-70:
+2 | type b : bits32 mod local unique once uncontended nonportable internal = a
+                                                                  ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 20-25:
+2 | type b : bits32 mod local unique once uncontended nonportable internal = a
+                        ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 26-32:
+2 | type b : bits32 mod local unique once uncontended nonportable internal = a
+                              ^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 33-37:
+2 | type b : bits32 mod local unique once uncontended nonportable internal = a
+                                     ^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 38-49:
+2 | type b : bits32 mod local unique once uncontended nonportable internal = a
+                                          ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 50-61:
+2 | type b : bits32 mod local unique once uncontended nonportable internal = a
+                                                      ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type b = a
+Line 3, characters 62-70:
+3 | type c : bits32 mod local unique once uncontended nonportable internal
+                                                                  ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 20-25:
+3 | type c : bits32 mod local unique once uncontended nonportable internal
+                        ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 26-32:
+3 | type c : bits32 mod local unique once uncontended nonportable internal
+                              ^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 33-37:
+3 | type c : bits32 mod local unique once uncontended nonportable internal
+                                     ^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 38-49:
+3 | type c : bits32 mod local unique once uncontended nonportable internal
+                                          ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 50-61:
+3 | type c : bits32 mod local unique once uncontended nonportable internal
+                                                      ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type c : bits32
 type d = c
 |}]
@@ -342,7 +797,67 @@ type c : bits64 mod local unique once uncontended nonportable internal
 type d : bits64 = c
 [%%expect{|
 type a : bits64
+Line 2, characters 62-70:
+2 | type b : bits64 mod local unique once uncontended nonportable internal = a
+                                                                  ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 20-25:
+2 | type b : bits64 mod local unique once uncontended nonportable internal = a
+                        ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 26-32:
+2 | type b : bits64 mod local unique once uncontended nonportable internal = a
+                              ^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 33-37:
+2 | type b : bits64 mod local unique once uncontended nonportable internal = a
+                                     ^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 38-49:
+2 | type b : bits64 mod local unique once uncontended nonportable internal = a
+                                          ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 2, characters 50-61:
+2 | type b : bits64 mod local unique once uncontended nonportable internal = a
+                                                      ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type b = a
+Line 3, characters 62-70:
+3 | type c : bits64 mod local unique once uncontended nonportable internal
+                                                                  ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 20-25:
+3 | type c : bits64 mod local unique once uncontended nonportable internal
+                        ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 26-32:
+3 | type c : bits64 mod local unique once uncontended nonportable internal
+                              ^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 33-37:
+3 | type c : bits64 mod local unique once uncontended nonportable internal
+                                     ^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 38-49:
+3 | type c : bits64 mod local unique once uncontended nonportable internal
+                                          ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 3, characters 50-61:
+3 | type c : bits64 mod local unique once uncontended nonportable internal
+                                                      ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type c : bits64
 type d = c
 |}]
@@ -352,61 +867,121 @@ type d = c
 
 type t : any mod global aliased many immutable stateless external_ = int
 [%%expect{|
+Line 1, characters 24-31:
+1 | type t : any mod global aliased many immutable stateless external_ = int
+                            ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t = int
 |}]
 
 type t : any mod global aliased many immutable stateless external_ = float#
 [%%expect{|
+Line 1, characters 24-31:
+1 | type t : any mod global aliased many immutable stateless external_ = float#
+                            ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t = float#
 |}]
 
 type t : any mod global aliased many immutable stateless external_ = float32#
 [%%expect{|
+Line 1, characters 24-31:
+1 | type t : any mod global aliased many immutable stateless external_ = float32#
+                            ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t = float32#
 |}]
 
 type t : any mod global aliased many immutable stateless external_ = int64#
 [%%expect{|
+Line 1, characters 24-31:
+1 | type t : any mod global aliased many immutable stateless external_ = int64#
+                            ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t = int64#
 |}]
 
 type t : any mod global aliased many immutable stateless external_ = int32#
 [%%expect{|
+Line 1, characters 24-31:
+1 | type t : any mod global aliased many immutable stateless external_ = int32#
+                            ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t = int32#
 |}]
 
 type t : any mod global aliased many immutable stateless external_ = nativeint#
 [%%expect{|
+Line 1, characters 24-31:
+1 | type t : any mod global aliased many immutable stateless external_ = nativeint#
+                            ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t = nativeint#
 |}]
 
 type t : any mod global aliased many immutable stateless external_ = int8x16#
 [%%expect{|
+Line 1, characters 24-31:
+1 | type t : any mod global aliased many immutable stateless external_ = int8x16#
+                            ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t = int8x16#
 |}]
 
 type t : any mod global aliased many immutable stateless external_ = int16x8#
 [%%expect{|
+Line 1, characters 24-31:
+1 | type t : any mod global aliased many immutable stateless external_ = int16x8#
+                            ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t = int16x8#
 |}]
 
 type t : any mod global aliased many immutable stateless external_ = int32x4#
 [%%expect{|
+Line 1, characters 24-31:
+1 | type t : any mod global aliased many immutable stateless external_ = int32x4#
+                            ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t = int32x4#
 |}]
 
 type t : any mod global aliased many immutable stateless external_ = int64x2#
 [%%expect{|
+Line 1, characters 24-31:
+1 | type t : any mod global aliased many immutable stateless external_ = int64x2#
+                            ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t = int64x2#
 |}]
 
 type t : any mod global aliased many immutable stateless external_ = float32x4#
 [%%expect{|
+Line 1, characters 24-31:
+1 | type t : any mod global aliased many immutable stateless external_ = float32x4#
+                            ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t = float32x4#
 |}]
 
 type t : any mod global aliased many immutable stateless external_ = float64x2#
 [%%expect{|
+Line 1, characters 24-31:
+1 | type t : any mod global aliased many immutable stateless external_ = float64x2#
+                            ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t = float64x2#
 |}]
 
@@ -414,6 +989,11 @@ type indirect_int = int
 type t : any mod global aliased many immutable stateless external_ = indirect_int
 [%%expect{|
 type indirect_int = int
+Line 2, characters 24-31:
+2 | type t : any mod global aliased many immutable stateless external_ = indirect_int
+                            ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t = indirect_int
 |}]
 
@@ -1154,12 +1734,32 @@ Error: The kind of type "t" is value
 type 'a t : value mod global portable contended many aliased unyielding =
   { x : 'a @@ global portable contended many } [@@unboxed]
 [%%expect {|
+Line 1, characters 53-60:
+1 | type 'a t : value mod global portable contended many aliased unyielding =
+                                                         ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 1, characters 61-71:
+1 | type 'a t : value mod global portable contended many aliased unyielding =
+                                                                 ^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type 'a t = { x : 'a @@ global many portable contended; } [@@unboxed]
 |}]
 
 type 'a t : value mod global immutable stateless many aliased unyielding non_float =
   Foo of 'a @@ global immutable stateless many [@@unboxed]
 [%%expect {|
+Line 1, characters 54-61:
+1 | type 'a t : value mod global immutable stateless many aliased unyielding non_float =
+                                                          ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 1, characters 62-72:
+1 | type 'a t : value mod global immutable stateless many aliased unyielding non_float =
+                                                                  ^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 Lines 1-2, characters 0-58:
 1 | type 'a t : value mod global immutable stateless many aliased unyielding non_float =
 2 |   Foo of 'a @@ global immutable stateless many [@@unboxed]
@@ -1287,6 +1887,11 @@ type ('a : bits32 mod aliased) t = ('a : any mod global)
 type ('a : value mod global) t = 'a
 type ('a : immediate) t = 'a
 type ('a : immediate) t = 'a
+Line 4, characters 105-112:
+4 | type ('a : value mod external_ stateless many unyielding non_float) t = ('a : value mod immutable global aliased)
+                                                                                                             ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type ('a : immediate) t = 'a
 type 'a t = 'a
 type 'a t = 'a
@@ -1309,6 +1914,16 @@ let f : ('a : any mod global aliased) -> ('a: any mod contended) = fun x -> x
 let f : ('a : value mod external64) -> ('a: any mod external_) = fun x -> x
 let f : ('a : value) -> ('a: immediate) = fun x -> x
 [%%expect {|
+Line 1, characters 29-36:
+1 | let f : ('a : any mod global aliased) -> ('a: any mod contended) = fun x -> x
+                                 ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 1, characters 29-36:
+1 | let f : ('a : any mod global aliased) -> ('a: any mod contended) = fun x -> x
+                                 ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 val f : ('a : value_or_null mod global contended). 'a -> 'a = <fun>
 val f : ('a : value mod external_). 'a -> 'a = <fun>
 val f : ('a : immediate). 'a -> 'a = <fun>
