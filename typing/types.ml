@@ -1178,6 +1178,11 @@ module Transient_expr = struct
     | Tvar { name; jkind = _; evals_to } ->
       set_desc ty (Tvar { name; jkind = jkind'; evals_to })
     | _ -> Misc.fatal_error "set_var_jkind called on non-var"
+  let set_var_evals_to ty evals_to =
+    match ty.desc with
+    | Tvar { name; jkind; evals_to =_ } ->
+      set_desc ty (Tvar { name; jkind; evals_to })
+    | _ -> Misc.fatal_error "set_var_evals_to called on non-var"
   let get_scope ty = ty.scope land scope_mask
   let get_marks ty = ty.scope lsr 27
   let set_scope ty sc =
@@ -1552,7 +1557,14 @@ let link_type ty ty' =
   let ty' = repr ty' in
   if ty == ty' then () else begin
   log_type ty;
-  let desc = ty.desc in
+  let desc = ty.desc in begin
+  match desc with
+  | Tvar { evals_to = Some _ } ->
+    Misc.fatal_error "Evals-to constraint lost on linked variable"
+  | Tunivar { evals_to = Some _ } ->
+    Misc.fatal_error "Evals-to constraint lost on linked universal variable"
+  | _ -> ()
+  end;
   Transient_expr.set_desc ty (Tlink ty');
   (* Name is a user-supplied name for this unification variable (obtained
    * through a type annotation for instance). *)
@@ -1605,6 +1617,10 @@ let set_var_jkind ty jkind =
   let ty = repr ty in
   log_type ty;
   Transient_expr.set_var_jkind ty jkind
+let set_var_evals_to ty evals_to =
+  let ty = repr ty in
+  log_type ty;
+  Transient_expr.set_var_evals_to ty evals_to
 let set_univar rty ty =
   log_change (Cuniv (rty, !rty)); rty := Some ty
 let set_name nm v =

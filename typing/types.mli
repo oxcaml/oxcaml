@@ -1246,7 +1246,8 @@ val set_type_desc: type_expr -> type_desc -> unit
 val set_level: type_expr -> int -> unit
 val set_scope: type_expr -> int -> unit
 val set_var_jkind: type_expr -> jkind_lr -> unit
-        (* May only be called on Tvars *)
+val set_var_evals_to: type_expr -> evals_to option -> unit
+        (* [set_var_*] functions may only be called on Tvars *)
 val set_name:
     (Path.t * type_expr list) option ref ->
     (Path.t * type_expr list) option -> unit
