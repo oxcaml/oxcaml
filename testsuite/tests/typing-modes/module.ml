@@ -561,7 +561,7 @@ let use_portable_module ((module M) : (module SigWithModalModule) @ nonportable)
 Line 2, characters 28-31:
 2 |   let module _ @ portable = M.M in ()
                                 ^^^
-Error: This is "nonportable", but expected to be "portable".
+Error: The module is "nonportable" but is expected to be "portable".
 |}]
 
 let use_nonportable_module
@@ -571,7 +571,7 @@ let use_nonportable_module
 Line 3, characters 28-31:
 3 |   let module _ @ portable = M.M in ()
                                 ^^^
-Error: This is "nonportable", but expected to be "portable".
+Error: The module is "nonportable" but is expected to be "portable".
 |}]
 
 (* However, a module satisfying SigWithModalModule can be used as
@@ -647,7 +647,7 @@ module type SigWithNonmodalAlias = sig module M = AliasTarget end
 Line 7, characters 28-31:
 7 |   let module _ @ portable = X.M in
                                 ^^^
-Error: This is "nonportable", but expected to be "portable".
+Error: The module is "nonportable" but is expected to be "portable".
 |}]
 
 (* Explicit modality on alias: `module M = AliasTarget @@ portable` syntax *)
