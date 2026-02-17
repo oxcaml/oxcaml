@@ -3236,6 +3236,14 @@ let explain_incompatible_fields name (diff: Types.type_expr Errortrace.diff) =
     (Style.as_inline_code type_expr_with_reserved_names) diff.got
     (Style.as_inline_code type_expr_with_reserved_names) diff.expected
 
+let print_constraint ppf (lhs, rhs) =
+  dprintf "%a =@ %a"
+    type_expr_with_reserved_names lhs
+    type_expr_with_reserved_names rhs
+    ppf
+
+let print_constraint = Style.as_inline_code print_constraint
+
 let explanation (type variety) intro prev env
   : (Errortrace.expanded_type, variety) Errortrace.elt -> _ = function
   | Errortrace.Diff {got; expected} ->
