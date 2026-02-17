@@ -453,8 +453,8 @@ let rec typexp copy_scope s ty =
   in
   let desc = get_desc ty in
   match desc with
-    Tvar _ | Tunivar _ ->
-      if should_duplicate_vars || get_id ty < 0 then
+    Tvar { evals_to } | Tunivar { evals_to } ->
+      if Option.is_some evals_to || should_duplicate_vars || get_id ty < 0 then
         let desc =
           copy_type_desc ~keep_names:true (typexp copy_scope s) desc
         in
