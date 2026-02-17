@@ -56,15 +56,45 @@ type t_value_mod_external64 : value mod external64
 
 [%%expect{|
 type t_value_mod_global : value mod global
+Line 2, characters 35-40:
+2 | type t_value_mod_local : value mod local
+                                       ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t_value_mod_local
 type t_value_mod_many : value mod many
+Line 4, characters 34-38:
+4 | type t_value_mod_once : value mod once
+                                      ^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t_value_mod_once
+Line 5, characters 36-42:
+5 | type t_value_mod_unique : value mod unique
+                                        ^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t_value_mod_unique
 type t_value_mod_aliased : value mod aliased
+Line 7, characters 38-46:
+7 | type t_value_mod_internal : value mod internal
+                                          ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t_value_mod_internal
 type t_value_mod_contended : value mod contended
+Line 9, characters 41-52:
+9 | type t_value_mod_uncontended : value mod uncontended
+                                             ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t_value_mod_uncontended
 type t_value_mod_portable : value mod portable
+Line 11, characters 41-52:
+11 | type t_value_mod_nonportable : value mod nonportable
+                                              ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t_value_mod_nonportable
 type t_value_mod_external : value mod external_
 type t_value_mod_external64 : value mod external64
@@ -75,8 +105,33 @@ type t2 : bits64 mod once external64 aliased
 type t3 : immediate mod local aliased
 
 [%%expect {|
+Line 1, characters 22-30:
+1 | type t1 : float32 mod internal unique many local
+                          ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 1, characters 31-37:
+1 | type t1 : float32 mod internal unique many local
+                                   ^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 1, characters 43-48:
+1 | type t1 : float32 mod internal unique many local
+                                               ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t1 : float32 mod many
+Line 2, characters 21-25:
+2 | type t2 : bits64 mod once external64 aliased
+                         ^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t2 : bits64 mod aliased
+Line 3, characters 24-29:
+3 | type t3 : immediate mod local aliased
+                            ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type t3 : immediate
 |}]
 
@@ -212,6 +267,16 @@ let x : int as ('a: value mod global aliased many contended portable external_) 
 val x : int = 5
 val x : int = 5
 val x : int = 5
+Line 4, characters 37-44:
+4 | let x : int as ('a: value mod global aliased many contended portable external_) = 5
+                                         ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
+Line 4, characters 37-44:
+4 | let x : int as ('a: value mod global aliased many contended portable external_) = 5
+                                         ^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 val x : int = 5
 |}]
 

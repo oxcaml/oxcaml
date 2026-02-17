@@ -255,6 +255,11 @@ type w2 : value mod global unyielding
 type ('a : value mod global) u1
 type ('a : value mod global yielding) u2
 type w1 : value mod global yielding
+Line 7, characters 27-37:
+7 | type w2 : value mod global unyielding
+                               ^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type w2 : value mod global
 |}]
 

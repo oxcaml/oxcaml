@@ -105,17 +105,47 @@ type cross_shared : value mod shared
 type cross_uncontended : value mod uncontended
 [%%expect{|
 type cross_global : value mod global
+Line 2, characters 29-34:
+2 | type cross_local : value mod local
+                                 ^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type cross_local
 type cross_many : value mod many
+Line 4, characters 28-32:
+4 | type cross_once : value mod once
+                                ^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type cross_once
 type cross_portable : value mod portable
+Line 6, characters 35-46:
+6 | type cross_nonportable : value mod nonportable
+                                       ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type cross_nonportable
 type cross_unyielding : value mod unyielding
+Line 8, characters 32-40:
+8 | type cross_yielding : value mod yielding
+                                    ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type cross_yielding
 type cross_aliased : value mod aliased
+Line 10, characters 30-36:
+10 | type cross_unique : value mod unique
+                                   ^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type cross_unique
 type cross_contended : value mod contended
 type cross_shared : value mod shared
+Line 13, characters 35-46:
+13 | type cross_uncontended : value mod uncontended
+                                        ^^^^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type cross_uncontended
 |}]
 

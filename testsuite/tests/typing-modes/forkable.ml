@@ -313,6 +313,11 @@ type w2 : value mod global forkable
 type ('a : value mod global) u1
 type ('a : value mod global unforkable) u2
 type w1 : value mod global unforkable
+Line 7, characters 27-35:
+7 | type w2 : value mod global forkable
+                               ^^^^^^^^
+Warning 211 [redundant-modifier]: This modifier is redundant.
+
 type w2 : value mod global
 |}]
 
