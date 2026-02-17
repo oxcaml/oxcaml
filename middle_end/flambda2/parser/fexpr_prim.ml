@@ -152,6 +152,34 @@ let block_access_kind =
             | Naked_floats _ | Mixed _ -> None)
           value ])
 
+(* Awkwardly using function type to access number of argument *)
+let block_kind : (int -> P.Block_kind.t) param_cons =
+  D.(
+    either
+      ~no_match_handler:
+        P.Block_kind.(
+          fun bak ->
+            match bak 1 with
+            | Mixed _ as bak -> Misc.fatal_errorf "Unsupported %a" print bak
+            | Values _ | Naked_floats -> assert false)
+      [ case
+          ~box:(fun _ () -> fun _ -> P.Block_kind.Naked_floats)
+          ~unbox:(fun _ bak ->
+            match (bak 1 : P.Block_kind.t) with
+            | Naked_floats -> Some ()
+            | Values _ | Mixed _ -> None)
+          (flag "floats");
+        case
+          ~box:(fun _ tag ->
+            fun n ->
+             P.Block_kind.Values
+               (tag, List.init n (fun _ -> Flambda_kind.With_subkind.any_value)))
+          ~unbox:(fun _ bak ->
+            match (bak 1 : P.Block_kind.t) with
+            | Values (tag, _) -> Some tag
+            | Naked_floats | Mixed _ -> None)
+          (positional scannable_tag) ])
+
 let string_accessor_width =
   { decode =
       (fun _ i : P.string_accessor_width ->
@@ -779,13 +807,9 @@ let begin_try_ghost_region =
 let make_block =
   D.(
     variadic "%block"
-      ~params:
-        (param3 mutability (positional scannable_tag) alloc_mode_for_allocation)
-      (fun _ (m, t, a) n ->
-        let kind =
-          P.Block_kind.Values
-            (t, List.init n (fun _ -> Flambda_kind.With_subkind.any_value))
-        in
+      ~params:(param3 mutability block_kind alloc_mode_for_allocation)
+      (fun _ (m, k, a) n ->
+        let kind = k n in
         P.Make_block (kind, m, a)))
 
 let make_array =
@@ -893,11 +917,11 @@ module OfFlambda = struct
     | Begin_try_region { ghost = false } -> begin_try_region env ()
     | Begin_region { ghost = true } -> begin_ghost_region env ()
     | Begin_try_region { ghost = true } -> begin_try_ghost_region env ()
-    | Make_block (Values (tag, _), mutability, alloc) ->
-      make_block env (mutability, tag, alloc)
+    | Make_block (((Values _ | Naked_floats) as kind), mutability, alloc) ->
+      make_block env (mutability, (fun _ -> kind), alloc)
     | Make_array (kind, mutability, alloc) ->
       make_array env (kind, mutability, alloc)
-    | Make_block ((Naked_floats | Mixed (_, _)), _, _) ->
+    | Make_block (Mixed (_, _), _, _) ->
       Misc.fatal_errorf "TODO: Variadic primitive: %a" P.Without_args.print
         (P.Without_args.Variadic op)
 
