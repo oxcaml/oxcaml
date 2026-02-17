@@ -2883,15 +2883,10 @@ Error: This function application uses an expression with type "'a"
 |}]
 
 let f (x : ('a : value)) = x ()
-let f (x : ('a : value mod uncontended)) = x ()
+let f (x : ('a : value)) = x ()
 
 [%%expect{|
 val f : (unit -> 'a) -> 'a = <fun>
-Line 2, characters 27-38:
-2 | let f (x : ('a : value mod uncontended)) = x ()
-                               ^^^^^^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
-
 val f : (unit -> 'a) -> 'a = <fun>
 |}]
 

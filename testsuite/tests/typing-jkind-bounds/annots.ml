@@ -261,22 +261,12 @@ Error: Unrecognized modifier fizzbuzz.
 let x : int as ('a: value) = 5
 let x : int as ('a : immediate) = 5
 let x : int as ('a : any) = 5;;
-let x : int as ('a: value mod global aliased many contended portable external_) = 5
+let x : int as ('a: value mod global many contended portable external_) = 5
 
 [%%expect{|
 val x : int = 5
 val x : int = 5
 val x : int = 5
-Line 4, characters 37-44:
-4 | let x : int as ('a: value mod global aliased many contended portable external_) = 5
-                                         ^^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
-
-Line 4, characters 37-44:
-4 | let x : int as ('a: value mod global aliased many contended portable external_) = 5
-                                         ^^^^^^^
-Warning 211 [redundant-modifier]: This modifier is redundant.
-
 val x : int = 5
 |}]
 
