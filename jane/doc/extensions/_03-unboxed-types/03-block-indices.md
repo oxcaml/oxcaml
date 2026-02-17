@@ -224,7 +224,7 @@ Below, we show the different cases to consider. Note that:
    orange), while `o2` and `g2` refer to the offset and gap of the index after
    deepening (blue).
 
-<img src="assets/all_values_or_flats.png" width="600" height="auto" />
-<img src="assets/mixed_to_mixed.png" width="600" height="auto" />
-<img src="assets/mixed_to_all_values.png" width="600" height="auto" />
-<img src="assets/mixed_to_all_flats.png" width="600" height="auto" />
+<img src="/documentation/all_values_or_flats.png" width="600" height="auto" />
+<img src="/documentation/mixed_to_mixed.png" width="600" height="auto" />
+<img src="/documentation/mixed_to_all_values.png" width="600" height="auto" />
+<img src="/documentation/mixed_to_all_flats.png" width="600" height="auto" />
