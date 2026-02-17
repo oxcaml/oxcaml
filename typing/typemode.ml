@@ -650,10 +650,8 @@ let transl_modalities_with_default ~maturity ~default annots =
     List.fold_left
       (fun m { txt = Atom (ax, a) as t; loc } ->
         let current_a = Const.proj ax m in
-        (if Misc.Le_result.equal
-              ~le:(Per_axis.le ax) a current_a
-         then
-           Location.prerr_warning loc Warnings.Redundant_modality);
+        if Misc.Le_result.equal ~le:(Per_axis.le ax) a current_a
+        then Location.prerr_warning loc Warnings.Redundant_modality;
         let m = Const.set ax a m in
         List.fold_left
           (fun m (Atom (ax, a)) -> Const.set ax a m)
