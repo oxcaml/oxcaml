@@ -652,8 +652,7 @@ let transl_modalities_with_default ~maturity ~default annots =
         let current_a = Const.proj ax m in
         (if Per_axis.eq ax a current_a
          then
-           let modality = Format_doc.asprintf "%a" (Per_axis.print ax) a in
-           Location.prerr_warning loc (Warnings.Redundant_modality modality));
+           Location.prerr_warning loc Warnings.Redundant_modality);
         let m = Const.set ax a m in
         List.fold_left
           (fun m (Atom (ax, a)) -> Const.set ax a m)

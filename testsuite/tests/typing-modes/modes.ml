@@ -379,7 +379,7 @@ type r = {
 Line 2, characters 24-31:
 2 |   global_ x : string @@ aliased
                             ^^^^^^^
-Warning 217 [redundant-modality]: This aliased modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type r = { x : string @@ global; }
 |}]
@@ -391,7 +391,7 @@ type r = {
 Line 2, characters 16-23:
 2 |   x : string @@ aliased global many
                     ^^^^^^^
-Warning 217 [redundant-modality]: This aliased modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type r = { x : string @@ global many; }
 |}]
@@ -408,7 +408,7 @@ Warning 213: This uniqueness is overriden by aliased later.
 Line 2, characters 36-43:
 2 |   x : string @@ aliased global many aliased
                                         ^^^^^^^
-Warning 217 [redundant-modality]: This aliased modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type r = { x : string @@ global many; }
 |}]
@@ -418,7 +418,7 @@ type r = Foo of string @@ global aliased many
 Line 1, characters 33-40:
 1 | type r = Foo of string @@ global aliased many
                                      ^^^^^^^
-Warning 217 [redundant-modality]: This aliased modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type r = Foo of string @@ global many
 |}]
@@ -432,22 +432,22 @@ type r = {
 Line 2, characters 24-30:
 2 |   mutable x : string @@ global unyielding aliased many
                             ^^^^^^
-Warning 217 [redundant-modality]: This global modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 Line 2, characters 31-41:
 2 |   mutable x : string @@ global unyielding aliased many
                                    ^^^^^^^^^^
-Warning 217 [redundant-modality]: This unyielding modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 Line 2, characters 50-54:
 2 |   mutable x : string @@ global unyielding aliased many
                                                       ^^^^
-Warning 217 [redundant-modality]: This many modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 Line 2, characters 42-49:
 2 |   mutable x : string @@ global unyielding aliased many
                                               ^^^^^^^
-Warning 217 [redundant-modality]: This aliased modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type r = { mutable x : string; }
 |}]

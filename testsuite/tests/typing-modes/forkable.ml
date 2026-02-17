@@ -97,31 +97,31 @@ type 'a t0 = Mk0 of 'a @@ global
 Line 2, characters 33-41:
 2 | type 'a t1 = Mk1 of 'a @@ global forkable
                                      ^^^^^^^^
-Warning 217 [redundant-modality]: This forkable modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type 'a t1 = Mk1 of 'a @@ global
 type 'a t2 = Mk2 of 'a @@ global unforkable
 Line 4, characters 33-41:
 4 | type 'a t3 = Mk3 of 'a @@ global forkable unyielding
                                      ^^^^^^^^
-Warning 217 [redundant-modality]: This forkable modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 Line 4, characters 42-52:
 4 | type 'a t3 = Mk3 of 'a @@ global forkable unyielding
                                               ^^^^^^^^^^
-Warning 217 [redundant-modality]: This unyielding modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type 'a t3 = Mk3 of 'a @@ global
 Line 5, characters 33-41:
 5 | type 'a t4 = Mk4 of 'a @@ global forkable yielding
                                      ^^^^^^^^
-Warning 217 [redundant-modality]: This forkable modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type 'a t4 = Mk4 of 'a @@ global yielding
 Line 6, characters 44-54:
 6 | type 'a t5 = Mk5 of 'a @@ global unforkable unyielding
                                                 ^^^^^^^^^^
-Warning 217 [redundant-modality]: This unyielding modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type 'a t5 = Mk5 of 'a @@ global unforkable
 type 'a t6 = Mk6 of 'a @@ global unforkable yielding
@@ -129,31 +129,31 @@ type 'a t7 = Mk7 of 'a @@ forkable unyielding
 Line 9, characters 35-43:
 9 | type 'a t8 = Mk8 of 'a @@ forkable yielding
                                        ^^^^^^^^
-Warning 217 [redundant-modality]: This yielding modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type 'a t8 = Mk8 of 'a @@ forkable
 Line 10, characters 26-36:
 10 | type 'a t9 = Mk9 of 'a @@ unforkable unyielding
                                ^^^^^^^^^^
-Warning 217 [redundant-modality]: This unforkable modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type 'a t9 = Mk9 of 'a @@ unyielding
 Line 11, characters 28-38:
 11 | type 'a t10 = Mk10 of 'a @@ unforkable yielding
                                  ^^^^^^^^^^
-Warning 217 [redundant-modality]: This unforkable modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 Line 11, characters 39-47:
 11 | type 'a t10 = Mk10 of 'a @@ unforkable yielding
                                             ^^^^^^^^
-Warning 217 [redundant-modality]: This yielding modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type 'a t10 = Mk10 of 'a
 type 'a t11 = Mk11 of 'a @@ forkable
 Line 13, characters 28-38:
 13 | type 'a t12 = Mk12 of 'a @@ unforkable
                                  ^^^^^^^^^^
-Warning 217 [redundant-modality]: This unforkable modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type 'a t12 = Mk12 of 'a
 val with_global_unforkable : ((string -> unit) @ unforkable -> 'a) -> 'a =

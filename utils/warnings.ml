@@ -147,7 +147,7 @@ type t =
   | Atomic_float_record_boxed               (* 214 *)
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
   | Use_during_borrowing                    (* 216 *)
-  | Redundant_modality of string            (* 217 *)
+  | Redundant_modality                      (* 217 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -242,7 +242,7 @@ let number = function
   | Atomic_float_record_boxed -> 214
   | Implied_attribute _ -> 215
   | Use_during_borrowing -> 216
-  | Redundant_modality _ -> 217
+  | Redundant_modality -> 217
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -1335,10 +1335,8 @@ let message = function
       implied implying
   | Use_during_borrowing ->
       "This value is used while being borrowed."
-  | Redundant_modality modality ->
-    Printf.sprintf
-      "This %s modality is redundant."
-      modality
+  | Redundant_modality ->
+    "This modality is redundant."
 ;;
 
 let nerrors = ref 0

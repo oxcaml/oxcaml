@@ -150,7 +150,7 @@ type t =
   | Atomic_float_record_boxed               (* 214 *)
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
   | Use_during_borrowing                    (* 216 *)
-  | Redundant_modality of string            (* 217 *)
+  | Redundant_modality                      (* 217 *)
 
 type alert = {kind:string; message:string; def:loc; use:loc}
 

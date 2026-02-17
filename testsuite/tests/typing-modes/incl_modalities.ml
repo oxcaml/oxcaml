@@ -15,7 +15,7 @@ end
 Line 4, characters 24-35:
 4 |   val bar : 'a -> 'a @@ nonportable
                             ^^^^^^^^^^^
-Warning 217 [redundant-modality]: This nonportable modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 module type S =
   sig
@@ -44,7 +44,7 @@ end
 Line 2, characters 15-26:
 2 |   include S @@ nonportable
                    ^^^^^^^^^^^
-Warning 217 [redundant-modality]: This nonportable modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 module type S' =
   sig
@@ -66,7 +66,7 @@ end
 Line 4, characters 24-35:
 4 |   val bar : 'a -> 'a @@ nonportable
                             ^^^^^^^^^^^
-Warning 217 [redundant-modality]: This nonportable modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 module type S =
   sig end ->
@@ -96,7 +96,7 @@ end
 Line 2, characters 23-34:
 2 |   include functor S @@ nonportable
                            ^^^^^^^^^^^
-Warning 217 [redundant-modality]: This nonportable modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 module type S' =
   sig
@@ -344,7 +344,7 @@ module type S = sig val foo : 'a -> 'a @@ portable end
 Line 6, characters 15-26:
 6 |   include S @@ nonportable contended
                    ^^^^^^^^^^^
-Warning 217 [redundant-modality]: This nonportable modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 module type S' = sig val foo : 'a -> 'a @@ portable contended end
 |}]
