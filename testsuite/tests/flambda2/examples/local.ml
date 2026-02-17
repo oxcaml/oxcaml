@@ -8,7 +8,7 @@
 
 type 'a list =
   | []
-  | ( :: ) of ('a[@global]) * 'a list
+  | ( :: ) of 'a * 'a list
 
 external ( + ) : int -> int -> int = "%addint"
 
