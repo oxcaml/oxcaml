@@ -282,10 +282,19 @@ let fold_row f init row =
 let iter_row f row =
   fold_row (fun () v -> f v) () row
 
+let fold_evals_to f init =
+  ignore f; ignore init;
+  function
+  | (_ : evals_to) -> .
+
+let fold_evals_to_opt f init evals_to =
+  Option.map (fold_evals_to f init) evals_to
+  |> Option.value ~default:init
 
 let fold_type_expr f init ty =
   match get_desc ty with
-    Tvar _              -> init
+  | Tvar { name = _; jkind = _; evals_to } ->
+    fold_evals_to_opt f init evals_to
   | Tarrow (_, ty1, ty2, _) ->
       let result = f init ty1 in
       f result ty2
@@ -308,7 +317,8 @@ let fold_type_expr f init ty =
   | Tnil                -> init
   | Tlink _
   | Tsubst _            -> assert false
-  | Tunivar _           -> init
+  | Tunivar { name = _; jkind = _; evals_to } ->
+    fold_evals_to_opt f init evals_to
   | Tpoly (ty, tyl)     ->
     let result = f init ty in
     List.fold_left f result tyl
@@ -501,9 +511,19 @@ let copy_row f fixed row keep more =
 
 let copy_commu c = if is_commu_ok c then commu_ok else commu_var ()
 
+let map_evals_to f =
+  ignore f;
+  function
+  | (_ : evals_to) -> .
+
+let map_evals_to_opt f = Option.map (map_evals_to f)
+
 let rec copy_type_desc ?(keep_names=false) f = function
-    Tvar { name = _; jkind; evals_to } as tv ->
-     if keep_names then tv else Tvar { name=None; jkind; evals_to }
+  | Tvar { name; jkind; evals_to } ->
+     Tvar {
+       name = if keep_names then name else None;
+       jkind;
+       evals_to = map_evals_to_opt f evals_to }
   | Tarrow (p, ty1, ty2, c)-> Tarrow (p, f ty1, f ty2, copy_commu c)
   | Ttuple l            -> Ttuple (List.map (fun (label, t) -> label, f t) l)
   | Tunboxed_tuple l    ->
@@ -522,7 +542,11 @@ let rec copy_type_desc ?(keep_names=false) f = function
   | Tnil                -> Tnil
   | Tlink ty            -> copy_type_desc f (get_desc ty)
   | Tsubst _            -> assert false
-  | Tunivar _ as ty     -> ty (* always keep the name *)
+  | Tunivar { name; jkind; evals_to } ->
+     Tunivar {
+       name;
+       jkind;
+       evals_to = map_evals_to_opt f evals_to }
   | Tpoly (ty, tyl)     ->
       let tyl = List.map f tyl in
       Tpoly (f ty, tyl)

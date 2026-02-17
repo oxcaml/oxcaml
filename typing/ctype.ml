@@ -865,7 +865,7 @@ let rec generalize_structure ty =
   if level <> generic_level then begin
     if is_Tvar ty && level > !current_level then begin
       set_level ty !current_level;
-      iter_type_expr generalize_structure ty
+      iter_type_expr lower_all ty
     end else if level > !current_level then begin
       begin match get_desc ty with
         Tconstr (_, _, abbrev) ->
@@ -3596,7 +3596,8 @@ let reify uenv t =
           let path, t = create_fresh_constr level name jkind in
           link_type ty t;
           if level < fresh_constr_scope then
-            raise_for Unify (Escape (escape (Constructor path)))
+            raise_for Unify (Escape (escape (Constructor path)));
+          iter_type_expr iterator ty
       | Tvariant r ->
           if not (static_row r) then begin
             if is_fixed r then iterator (row_more r) else

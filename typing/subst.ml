@@ -455,6 +455,9 @@ let rec typexp copy_scope s ty =
   match desc with
     Tvar _ | Tunivar _ ->
       if should_duplicate_vars || get_id ty < 0 then
+        let desc =
+          copy_type_desc ~keep_names:true (typexp copy_scope s) desc
+        in
         let ty' =
           match s.additional_action with
           | Duplicate_variables -> newpersty desc
