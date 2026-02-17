@@ -46,7 +46,7 @@ let code loopify(never) size(5) newer_version_of(set_to_x_2)
         -> k * k1
         : imm tagged =
   let prim = %num_conv.[`tagged_imm`].[`imm`] (i) in
-  let Pbytessetu = %bytes_or_bigstring_set.bytes.[`8`] (b, prim, 120i) in
+  let Pbytessetu = %bytes_or_bigstring_set.bytes.[`8`] (b, prim, 120s) in
   cont k (0)
 in
 let $camlTests15__set_to_x_9 = closure set_to_x_2_1 @set_to_x in
