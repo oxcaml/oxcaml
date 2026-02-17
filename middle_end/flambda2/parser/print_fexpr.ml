@@ -239,6 +239,8 @@ let const ppf (c : Fexpr.const) =
   | Tagged_immediate i -> Format.fprintf ppf "%s" i
   | Naked_float f -> float ppf f
   | Naked_float32 f -> Format.fprintf ppf "%hs" f
+  | Naked_int8 i -> Format.fprintf ppf "%as" Numeric_types.Int8.print i
+  | Naked_int16 i -> Format.fprintf ppf "%aS" Numeric_types.Int16.print i
   | Naked_int32 i -> Format.fprintf ppf "%lil" i
   | Naked_int64 i -> Format.fprintf ppf "%LiL" i
   | Naked_nativeint i -> Format.fprintf ppf "%Lin" i

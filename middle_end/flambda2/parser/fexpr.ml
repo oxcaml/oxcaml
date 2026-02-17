@@ -56,6 +56,8 @@ type const =
   | Tagged_immediate of immediate
   | Naked_float32 of float
   | Naked_float of float
+  | Naked_int8 of Numeric_types.Int8.t
+  | Naked_int16 of Numeric_types.Int16.t
   | Naked_int32 of int32
   | Naked_int64 of int64
   | Naked_vec128 of Vector_types.Vec128.Bit_pattern.bits
