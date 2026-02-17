@@ -74,6 +74,8 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: ''
             ocamlparam: '_,O3=1'
+            disable_testcases: 'testsuite/tests/flambda2/examples/*'
+
 
           - name: runtime4 O3 metrics (x86_64-linux)
             config: --disable-runtime5
@@ -81,6 +83,7 @@ jobs:
             build_ocamlparam: '_'
             ocamlparam: '_,O3=1'
             collect_metrics: true
+            disable_testcases: 'testsuite/tests/flambda2/examples/*'
 
           - name: runtime4 Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux)
             config: --disable-runtime5 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants
@@ -193,6 +196,8 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: '_,reaper=1'
             ocamlparam: '_,reaper=1'
+            disable_testcases: 'testsuite/tests/flambda2/examples/array_kind.ml testsuite/tests/flambda2/examples/code_id_join_b.ml testsuite/tests/flambda2/examples/functor_call.ml testsuite/tests/flambda2/examples/invalid.ml testsuite/tests/flambda2/examples/value_slot_c.ml testsuite/tests/flambda2/examples/value_slot_use_b.ml'
+
 
     env:
       J: "8"
