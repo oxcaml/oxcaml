@@ -53,7 +53,7 @@
          -> k1 * k2
          : imm tagged =
    let next_depth = rec_info (succ my_depth) in
-   let prim = %untag_imm (120) in
+   let prim = %num_conv.[`tagged_imm`].[`int8`] (120) in
    let prim_1 = %num_conv.[`tagged_imm`].[`imm`] (i) in
    let Pbytessetu = %bytes_or_bigstring_set.bytes.[`8`] (b, prim_1, prim) in
    cont k1 (Pbytessetu)
