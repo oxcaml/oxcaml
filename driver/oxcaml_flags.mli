@@ -107,10 +107,16 @@ val opt_level : opt_level or_default ref
 
 val internal_assembler : bool ref
 
+val verify_binary_emitter : bool ref
+
 val gc_timings : bool ref
 
 val use_cached_generic_functions : bool ref
 val cached_generic_functions_path : string ref
+
+val dissector_assume_lld_without_64_bit_eh_frames : bool ref
+
+val manual_module_init : bool ref
 
 val symbol_visibility_protected : bool ref
 
@@ -184,11 +190,13 @@ module Flambda2 : sig
   module Dump : sig
     type target = Nowhere | Main_dump_stream | File of Misc.filepath
     type pass = Last_pass | This_pass of string
-
+    
     val rawfexpr : target ref
     val fexpr : target ref
     val fexpr_after : pass ref
     val flexpect : target ref
+    val fexpr_annot : bool ref
+    val fexpr_annot_after : string list ref
     val slot_offsets : bool ref
     val freshen : bool ref
     val flow : bool ref

@@ -1322,7 +1322,7 @@ let extract_section_relocations ?(section_names = [||]) symbols section =
   let result = ref [] in
   let i = ref 0 in
   while !i < n do
-    match relocs.(!i) with
+    begin match relocs.(!i) with
     | `Relocation_info ri -> (
       (* Check for ARM64_RELOC_ADDEND which carries an addend for the next reloc *)
       match ri.ri_type with
@@ -1378,7 +1378,7 @@ let extract_section_relocations ?(section_names = [||]) symbols section =
     | `Scattered_relocation_info _ ->
       (* Scattered relocations are not used on ARM64 *)
       ()
-    ;
+    end;
     incr i
   done;
   List.rev !result

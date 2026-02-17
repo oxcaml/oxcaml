@@ -160,12 +160,13 @@ let find_printer_type ppf lid =
         | ty_arg -> (ty_arg, path, true)
         | exception Ctype.Unify _ ->
             fprintf ppf "%a has a wrong type for a printing function.@."
-              Printtyp.longident lid;
+              (Format_doc.compat Printtyp.longident) lid;
             raise Exit
       end
   end
   | exception Not_found ->
-      fprintf ppf "Unbound value %a.@." Printtyp.longident lid;
+      fprintf ppf "Unbound value %a.@."
+        (Format_doc.compat Printtyp.longident) lid;
       raise Exit
 
 let dir_install_printer ppf lid =
@@ -186,7 +187,8 @@ let dir_remove_printer ppf lid =
     begin try
       remove_printer path
     with Not_found ->
-      fprintf ppf "No printer named %a.@." Printtyp.longident lid
+      fprintf ppf "No printer named %a.@."
+        (Format_doc.compat Printtyp.longident) lid
     end
   with Exit -> ()
 

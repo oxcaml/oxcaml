@@ -116,7 +116,7 @@ type t_void : void
 and 'a r : value & any = #{ a : 'a ; v : t_void }
 and bad = F : { x : 'a r } -> bad [@@unboxed]
 [%%expect{|
->> Fatal error: Jkind.sort_of_jkind
+>> Fatal error: Jkind.sort_of_jkind: layout is any
 Uncaught exception: Misc.Fatal_error
 
 |}]

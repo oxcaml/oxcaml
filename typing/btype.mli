@@ -399,29 +399,34 @@ module Jkind0 : sig
 
     val map_type_expr :
       (type_expr -> type_expr) -> ('l * 'r) with_bounds -> ('l * 'r) with_bounds
+
+    val is_empty : ('l * 'r) with_bounds -> bool
   end
 
-  module Layout_and_axes : sig
+  module Base_and_axes : sig
     include Allowance.Allow_disallow
-      with type (_, 'layout, 'd) sided = ('layout, 'd) layout_and_axes
+      with type (_, 'layout, 'd) sided = ('layout, 'd) base_and_axes
 
-    val map : ('a -> 'b) -> ('a, 'd) layout_and_axes -> ('b, 'd) layout_and_axes
+    val map_layout :
+      ('a -> 'b) -> ('a, 'd) base_and_axes -> ('b, 'd) base_and_axes
 
-    val map_option :
-      ('a -> 'b option) -> ('a, 'd) layout_and_axes ->
-      ('b, 'd) layout_and_axes option
+    val map_layout_option :
+      ('a -> 'b option) -> ('a, 'd) base_and_axes ->
+      ('b, 'd) base_and_axes option
 
     val try_allow_l :
-      ('layout, 'l * 'r) layout_and_axes ->
-      ('layout, allowed * 'r) layout_and_axes option
+      ('layout, 'l * 'r) base_and_axes ->
+      ('layout, allowed * 'r) base_and_axes option
 
     val try_allow_r :
-      ('layout, 'l * 'r) layout_and_axes ->
-      ('layout, 'l * allowed) layout_and_axes option
+      ('layout, 'l * 'r) base_and_axes ->
+      ('layout, 'l * allowed) base_and_axes option
   end
 
   module Const : sig
-    type 'd t = (Jkind_types.Layout.Const.t, 'd) layout_and_axes
+    type 'd t = 'd jkind_const_desc
+
+    val of_path : Path.t -> jkind_const_desc_lr
 
     (** This returns [true] iff both kinds have no with-bounds and they are
         shallowly equal. Normally, we want an equality check to happen only on
@@ -451,6 +456,9 @@ module Jkind0 : sig
 
       (** Value of types of this jkind are not retained at all at runtime *)
       val void : t
+
+      (** Same kind, not mod external_ *)
+      val void_internal : t
 
       (** This is the jkind of normal ocaml values or null pointers *)
       val value_or_null : t
@@ -492,14 +500,23 @@ module Jkind0 : sig
       (** The jkind of unboxed 64-bit floats with no mode crossing. *)
       val float64 : t
 
+      (** Same kind, not mod external_. *)
+      val float64_internal : t
+
       (** The jkind of unboxed 64-bit floats with mode crossing. *)
       val kind_of_unboxed_float : t
 
       (** The jkind of unboxed units with mode crossing. *)
       val kind_of_unboxed_unit : t
 
+      (** The jkind of unboxed bools with mode crossing. *)
+      val kind_of_unboxed_bool : t
+
       (** The jkind of unboxed 32-bit floats with no mode crossing. *)
       val float32 : t
+
+      (** Same kind, not mod external_. *)
+      val float32_internal : t
 
       (** The jkind of unboxed 32-bit floats with mode crossing. *)
       val kind_of_unboxed_float32 : t
@@ -507,17 +524,26 @@ module Jkind0 : sig
       (** The jkind of unboxed native-sized integers with no mode crossing. *)
       val word : t
 
+      (** Same kind, not mod external_. *)
+      val word_internal : t
+
       (** The jkind of unboxed native-sized integers with mode crossing. *)
       val kind_of_unboxed_nativeint : t
 
       (** The jkind of untagged immediates ([int#]) with no mode crossing. *)
       val untagged_immediate : t
 
+      (** Same kind, not mod external_. *)
+      val untagged_immediate_internal : t
+
       (** The jkind of untagged immediates ([int#]) with mode crossing. *)
-      val kind_of_untagged_immediate : t
+      val kind_of_untagged_int : t
 
       (** The jkind of unboxed 8-bit integers with no mode crossing. *)
       val bits8 : t
+
+      (** Same kind, not mod external_. *)
+      val bits8_internal : t
 
       (** The jkind of unboxed 8-bit integers with mode crossing. *)
       val kind_of_unboxed_int8 : t
@@ -525,17 +551,26 @@ module Jkind0 : sig
       (** The jkind of unboxed 16-bit integers with no mode crossing. *)
       val bits16 : t
 
+      (** Same kind, not mod external_. *)
+      val bits16_internal : t
+
       (** The jkind of unboxed 16-bit integers with mode crossing. *)
       val kind_of_unboxed_int16 : t
 
       (** The jkind of unboxed 32-bit integers with no mode crossing. *)
       val bits32 : t
 
+      (** Same kind, not mod external_. *)
+      val bits32_internal : t
+
       (** The jkind of unboxed 32-bit integers with mode crossing. *)
       val kind_of_unboxed_int32 : t
 
       (** The jkind of unboxed 64-bit integers with no mode crossing. *)
       val bits64 : t
+
+      (** Same kind, not mod external_. *)
+      val bits64_internal : t
 
       (** The jkind of unboxed 64-bit integers with mode crossing. *)
       val kind_of_unboxed_int64 : t
@@ -552,6 +587,15 @@ module Jkind0 : sig
       (** The jkind of unboxed 256-bit vectors with no mode crossing. *)
       val vec512 : t
 
+      (** Same kind, not mod external_. *)
+      val vec128_internal : t
+
+      (** Same kind, not mod external_. *)
+      val vec256_internal : t
+
+      (** Same kind, not mod external_. *)
+      val vec512_internal : t
+
       (** The jkind of unboxed 128-bit vectors with mode crossing. *)
       val kind_of_unboxed_128bit_vectors : t
 
@@ -561,8 +605,13 @@ module Jkind0 : sig
       (** The jkind of unboxed 512-bit vectors with mode crossing. *)
       val kind_of_unboxed_512bit_vectors : t
 
-      (** A list of all Builtin jkinds *)
-      val all : t list
+      (** A list of the core builtin jkinds exposed by predef. *)
+      val builtins : t list
+
+      (** A superset of [builtins], which also includes common kinds like
+          [float64 mod everything] (the kind of [float#]). Used in printing and
+          for memoization in subst. *)
+      val common_jkinds : t list
 
       val of_attribute : Builtin_attributes.jkind_attribute -> t
     end
@@ -573,6 +622,7 @@ module Jkind0 : sig
       type t =
         | Axis_disagreement of Jkind_axis.Axis.packed
         | Layout_disagreement
+        | With_bounds_on_left
         | Constrain_ran_out_of_fuel
     end
 
@@ -634,7 +684,7 @@ module Jkind0 : sig
     val mark_best : ('l * 'r) jkind -> ('l * disallowed) jkind
 
     val map_type_expr :
-      (type_expr -> type_expr) -> (allowed * 'r) jkind -> (allowed * 'r) jkind
+      (type_expr -> type_expr) -> ('l * 'r) jkind -> ('l * 'r) jkind
 
     val has_with_bounds : jkind_l -> bool
 

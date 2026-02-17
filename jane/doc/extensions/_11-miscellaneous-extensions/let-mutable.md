@@ -1,3 +1,9 @@
+---
+layout: documentation-page
+collectionName: Miscellaneous extensions
+title: Let mutable
+---
+
 # The `let mutable` extension
 
 The `let mutable` extension provides a mechanism for creating mutable variables.
@@ -38,7 +44,7 @@ let triangle_list n =
 
 Mutable `let` declarations may not be recursive, and they may not be used at the
 structure level or in class definitions. The pattern of a mutable `let`
-statement must be a single variable, possibly with a type annotation, e.g. `let
+statement must be a single variable, possibly with a type annotation, so `let
 mutable x, y = ..` and `let mutable add x y = ..` are not allowed. Mutable `let`
 statements must also not use `and`s.
 

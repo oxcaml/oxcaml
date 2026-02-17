@@ -391,6 +391,12 @@ let rec print_compact ppf t =
 
 let print_compact ppf { dbg; } = print_compact ppf dbg
 
+let doc_print_compact ppf t =
+  (* We use [deprecated_printer] instead of changing the formatting code in this
+     file to be compatible with upstream (which hasn't switched yet for this
+     file). *)
+  Format_doc.deprecated_printer (fun fmt -> print_compact fmt t) ppf
+
 let rec print_compact_extended ppf t =
   let print_item item =
     print_item ppf item;
@@ -429,4 +435,3 @@ let merge ~into:{ dbg = dbg1; assume_zero_alloc = a1; }
 let assume_zero_alloc t = t.assume_zero_alloc
 
 let get_dbg t = t.dbg
-

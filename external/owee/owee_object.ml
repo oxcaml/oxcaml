@@ -59,12 +59,21 @@ let extract_elf_rodata_section buf =
   | Some sec -> Some (Owee_elf.section_body_string buf sec)
   | None -> None
 
-let find_macho_section_body buf commands ~seg_name ~sect_name =
+(* Find a Mach-O section by segment and section name.
+   Try to find segment by name first (works for linked binaries).
+   For object files (.o), segment names are empty, so fall back to
+   searching all segments for the section by name. *)
+let find_macho_section commands ~seg_name ~sect_name =
   match Owee_macho.find_segment commands seg_name with
   | Some seg -> (
     match Owee_macho.find_section seg sect_name with
-    | Some sec -> Some (Owee_macho.section_body_string buf seg sec)
+    | Some sec -> Some (seg, sec)
     | None -> None)
+  | None -> Owee_macho.find_section_any_segment commands sect_name
+
+let find_macho_section_body buf commands ~seg_name ~sect_name =
+  match find_macho_section commands ~seg_name ~sect_name with
+  | Some (seg, sec) -> Some (Owee_macho.section_body_string buf seg sec)
   | None -> None
 
 let extract_macho_text_section buf =
@@ -139,22 +148,12 @@ let extract_macho_relocations buf ~seg_name ~sect_name =
   match Owee_macho.get_symbol_table commands with
   | None -> []
   | Some (symbols, _strtab) -> (
-    match Owee_macho.find_segment commands seg_name with
+    match find_macho_section commands ~seg_name ~sect_name with
     | None -> []
-    | Some seg ->
+    | Some (_seg, section) ->
       let section_names = build_macho_section_names commands in
-      let relocs =
-        Array.fold_left
-          (fun acc section ->
-            if String.equal section.Owee_macho.sec_sectname sect_name
-            then
-              Owee_macho.extract_section_relocations ~section_names symbols
-                section
-              @ acc
-            else acc)
-          [] seg.Owee_macho.seg_sections
-      in
-      List.map convert_macho_reloc relocs
+      Owee_macho.extract_section_relocations ~section_names symbols section
+      |> List.map convert_macho_reloc
       |> List.sort (fun a b -> compare a.r_offset b.r_offset))
 
 let extract_text_relocations buf =

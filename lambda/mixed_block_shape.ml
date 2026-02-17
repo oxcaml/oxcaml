@@ -180,7 +180,10 @@ let singleton_or_product_of_mixed_block_element
   | Bits32 -> Singleton Bits32
   | Bits64 -> Singleton Bits64
   | Vec128 -> Singleton Vec128
-  | Vec256 -> Singleton Vec256
+  | Vec256 ->
+    if Lambda.split_vectors
+    then Product Lambda.[| Vec128; Vec128 |]
+    else Singleton Vec256
   | Vec512 -> Singleton Vec512
   | Word -> Singleton Word
   | Untagged_immediate -> Singleton Untagged_immediate

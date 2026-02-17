@@ -15,6 +15,7 @@
 
 open Allowance
 open Solver_intf
+module Fmt = Format_doc
 
 module Magic_equal (X : Equal) :
   Equal with type ('a, 'b, 'c) t = ('a, 'b, 'c) X.t = struct
@@ -394,7 +395,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   let rec print_var : type a. ?traversed:VarSet.t -> a C.obj -> _ -> a var -> _
       =
    fun ?traversed obj ppf v ->
-    Format.fprintf ppf "modevar#%x[%a .. %a]" v.id (C.print obj) v.lower
+    Fmt.fprintf ppf "modevar#%x[%a .. %a]" v.id (C.print obj) v.lower
       (C.print obj) v.upper;
     match traversed with
     | None -> ()
@@ -404,33 +405,31 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       else
         let traversed = VarSet.add v.id traversed in
         let p = print_morphvar ~traversed obj in
-        Format.fprintf ppf "{%a}" (Format.pp_print_list p)
-          (var_map_to_list v.vlower)
+        Fmt.fprintf ppf "{%a}" (Fmt.pp_print_list p) (var_map_to_list v.vlower)
 
   and print_morphvar : type a l r.
       ?traversed:VarSet.t -> a C.obj -> _ -> (a, l * r) morphvar -> _ =
    fun ?traversed dst ppf (Amorphvar (v, f, _)) ->
     let src = C.src dst f in
-    Format.fprintf ppf "%a(%a)" (C.print_morph dst) f (print_var ?traversed src)
-      v
+    Fmt.fprintf ppf "%a(%a)" (C.print_morph dst) f (print_var ?traversed src) v
 
   let print_raw : type a l r.
-      ?verbose:bool -> a C.obj -> Format.formatter -> (a, l * r) mode -> unit =
+      ?verbose:bool -> a C.obj -> Fmt.formatter -> (a, l * r) mode -> unit =
    fun ?(verbose = false) (obj : a C.obj) ppf m ->
     let traversed = if verbose then Some VarSet.empty else None in
     match m with
     | Amode (a, _, _) -> C.print obj ppf a
     | Amodevar mv -> print_morphvar ?traversed obj ppf mv
     | Amodejoin (a, _, mvs) ->
-      Format.fprintf ppf "join(%a,%a)" (C.print obj) a
-        (Format.pp_print_list
-           ~pp_sep:(fun ppf () -> Format.fprintf ppf ",")
+      Fmt.fprintf ppf "join(%a,%a)" (C.print obj) a
+        (Fmt.pp_print_list
+           ~pp_sep:(fun ppf () -> Fmt.fprintf ppf ",")
            (print_morphvar ?traversed obj))
         (var_map_to_list mvs)
     | Amodemeet (a, _, mvs) ->
-      Format.fprintf ppf "meet(%a,%a)" (C.print obj) a
-        (Format.pp_print_list
-           ~pp_sep:(fun ppf () -> Format.fprintf ppf ",")
+      Fmt.fprintf ppf "meet(%a,%a)" (C.print obj) a
+        (Fmt.pp_print_list
+           ~pp_sep:(fun ppf () -> Fmt.fprintf ppf ",")
            (print_morphvar ?traversed obj))
         (var_map_to_list mvs)
 
@@ -1135,11 +1134,14 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     if C.le obj ceil floor
     then ceil
     else
-      Misc.fatal_errorf "mode is not tight: floor = %a, ceil = %a" (C.print obj)
-        floor (C.print obj) ceil
+      Misc.fatal_errorf "mode is not tight: floor = %a, ceil = %a"
+        (Fmt.compat (C.print obj))
+        floor
+        (Fmt.compat (C.print obj))
+        ceil
 
   let print : type a l r.
-      ?verbose:bool -> a C.obj -> Format.formatter -> (a, l * r) mode -> unit =
+      ?verbose:bool -> a C.obj -> Fmt.formatter -> (a, l * r) mode -> unit =
    fun ?verbose (obj : a C.obj) ppf m ->
     let ceil = get_loose_ceil obj m in
     let floor = get_loose_floor obj m in

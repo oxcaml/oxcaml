@@ -104,6 +104,7 @@ let iter_on_declaration f decl =
   | Module_binding mb -> f mb.mb_uid decl
   | Class cd -> f cd.ci_decl.cty_uid decl
   | Class_type ct -> f ct.ci_decl.cty_uid decl
+  | Jkind jd -> f jd.jkind_jkind.jkind_uid decl
 
 let iter_on_declarations ~(f: Shape.Uid.t -> item_declaration -> unit) = {
   Tast_iterator.default_iterator with
@@ -254,10 +255,10 @@ let iter_on_occurrences
       | Texp_extension_constructor (lid, path) ->
           f ~namespace:Extension_constructor exp_env path lid
       | Texp_constant _ | Texp_let _ | Texp_letmutable _ | Texp_function _
-      | Texp_apply _ | Texp_match _ | Texp_try _ | Texp_tuple _
-      | Texp_unboxed_tuple _ | Texp_variant _ | Texp_array _
-      | Texp_ifthenelse _ | Texp_sequence _ | Texp_while _ | Texp_for _
-      | Texp_send _
+      | Texp_apply _ | Texp_match _ | Texp_try _ | Texp_unboxed_unit
+      | Texp_unboxed_bool _ | Texp_tuple _ | Texp_unboxed_tuple _
+      | Texp_variant _ | Texp_array _ | Texp_ifthenelse _ | Texp_sequence _
+      | Texp_while _ | Texp_for _ | Texp_send _
       | Texp_letmodule _ | Texp_letexception _ | Texp_assert _ | Texp_lazy _
       | Texp_object _ | Texp_pack _ | Texp_letop _ | Texp_unreachable
       | Texp_list_comprehension _ | Texp_array_comprehension _ | Texp_probe _
@@ -287,7 +288,8 @@ let iter_on_occurrences
       | Ttyp_var _ | Ttyp_arrow _ | Ttyp_tuple _ | Ttyp_object _
       | Ttyp_unboxed_tuple _
       | Ttyp_quote _ | Ttyp_splice _ | Ttyp_of_kind _
-      | Ttyp_alias _ | Ttyp_variant _ | Ttyp_poly _ | Ttyp_call_pos -> ());
+      | Ttyp_alias _ | Ttyp_variant _ | Ttyp_poly _ | Ttyp_call_pos
+      | Ttyp_repr _ -> ());
       default_iterator.typ sub ct);
 
   pat =
@@ -300,10 +302,10 @@ let iter_on_occurrences
         iter_field_pats ~namespace:Label pat_env fields
       | Tpat_record_unboxed_product (fields, _) ->
         iter_field_pats ~namespace:Unboxed_label pat_env fields
-      | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ | Tpat_tuple _
-      | Tpat_unboxed_tuple _
-      | Tpat_variant _ | Tpat_array _ | Tpat_lazy _ | Tpat_value _
-      | Tpat_exception _ | Tpat_or _ -> ());
+      | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ 
+      | Tpat_unboxed_unit | Tpat_unboxed_bool _ | Tpat_tuple _
+      | Tpat_unboxed_tuple _ | Tpat_variant _ | Tpat_array _ | Tpat_lazy _
+      | Tpat_value _ | Tpat_exception _ | Tpat_or _ -> ());
       List.iter  (fun (pat_extra, _, _) ->
         match pat_extra with
         | Tpat_open (path, lid, _) ->
@@ -372,7 +374,7 @@ let iter_on_occurrences
       | Tsig_value _ | Tsig_type _ | Tsig_typesubst _ | Tsig_exception _
       | Tsig_module _ | Tsig_recmodule _ | Tsig_modtype _ | Tsig_modtypesubst _
       | Tsig_open _ | Tsig_include _ | Tsig_class _ | Tsig_class_type _
-      | Tsig_attribute _ -> ());
+      | Tsig_attribute _ | Tsig_jkind _ -> ());
       default_iterator.signature_item sub sig_item);
 
   structure_item =
@@ -386,7 +388,7 @@ let iter_on_occurrences
       | Tstr_eval _ | Tstr_value _ | Tstr_primitive _ | Tstr_type _
       | Tstr_exception _ | Tstr_module _ | Tstr_recmodule _
       | Tstr_modtype _ | Tstr_open _ | Tstr_class _ | Tstr_class_type _
-      | Tstr_include _ | Tstr_attribute _ -> ());
+      | Tstr_include _ | Tstr_attribute _ | Tstr_jkind _ -> ());
       default_iterator.structure_item sub str_item)
 }
 

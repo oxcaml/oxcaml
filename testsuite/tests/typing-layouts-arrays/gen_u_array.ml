@@ -43,7 +43,7 @@ module type S = sig
   val create : int -> element_arg -> t
     [@@ocaml.deprecated "Use Array.make/ArrayLabels.make instead."]
 
-  (* external create_float: int -> float array = "caml_make_float_vect"
+  (* external create_float: int -> float array = "caml_array_create_float"
   *
   * val make_float: int -> float array
   *   [@@ocaml.deprecated

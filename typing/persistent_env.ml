@@ -22,6 +22,7 @@ open Cmi_format
 module CU = Compilation_unit
 module Consistbl_data = Import_info.Intf.Nonalias.Kind
 module Consistbl = Consistbl.Make (CU.Name) (Consistbl_data)
+module Style = Misc.Style
 
 let add_delayed_check_forward = ref (fun _ -> assert false)
 
@@ -447,11 +448,11 @@ let remember_global { globals; _ } global ~precision ~mentioned_by =
       | exception Global_module.With_precision.Inconsistent ->
           let pp_mentioned_by ppf = function
             | Current ->
-                Format.fprintf ppf "this compilation unit"
+                Format_doc.fprintf ppf "this compilation unit"
             | Other modname ->
                 Style.as_inline_code Global_module.Name.print ppf modname
           in
-          Misc.fatal_errorf
+          Misc.fatal_errorf_doc
             "@[<hov>The name %a@ was bound to %a@ by %a@ \
              but it is instead bound to %a@ by %a.@]"
             (Style.as_inline_code Global_module.Name.print) global_name
@@ -754,7 +755,7 @@ let make_binding penv (global : Global_module.t) (impl : CU.t option) : binding 
       match impl with
       | Some unit -> unit
       | None ->
-          Misc.fatal_errorf
+          Misc.fatal_errorf_doc
             "Can't bind a parameter statically:@ %a"
             Global_module.print global
     in
@@ -871,11 +872,10 @@ let find_pers_struct
 
 let describe_prefix ppf prefix =
   if CU.Prefix.is_empty prefix then
-    Format.fprintf ppf "outside of any package"
+    Format_doc.fprintf ppf "outside of any package"
   else
-    Format.fprintf ppf "package %a" CU.Prefix.print prefix
+    Format_doc.fprintf ppf "package %a" CU.Prefix.print prefix
 
-module Style = Misc.Style
 (* Emits a warning if there is no valid cmi for name *)
 let check_pers_struct ~allow_hidden penv f ~loc name =
   let name_as_string = CU.Name.to_string (CU.Name.of_head_of_global_name name) in
@@ -887,61 +887,63 @@ let check_pers_struct ~allow_hidden penv f ~loc name =
       let warn = Warnings.No_cmi_file(name_as_string, None) in
         Location.prerr_warning loc warn
   | Cmi_format.Error err ->
-      let msg = Format.asprintf "%a" Cmi_format.report_error err in
+      let msg = Format.asprintf "%a"
+          Cmi_format.report_error err in
       let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
         Location.prerr_warning loc warn
   | Error err ->
       let msg =
         match err with
         | Illegal_renaming(name, ps_name, filename) ->
-            Format.asprintf
+            Format_doc.doc_printf
               " %a@ contains the compiled interface for @ \
                %a when %a was expected"
-              (Style.as_inline_code Location.print_filename) filename
-              (Style.as_inline_code CU.Name.print) ps_name
-              (Style.as_inline_code CU.Name.print) name
+              Location.Doc.quoted_filename filename
+              CU.Name.print_as_inline_code ps_name
+              CU.Name.print_as_inline_code name
         | Inconsistent_import _ ->
             (* Can't be raised by [find_pers_struct ~check:false] *)
             assert false
         | Need_recursive_types name ->
-            Format.asprintf
+            Format_doc.doc_printf
               "%a uses recursive types"
-              (Style.as_inline_code CU.Name.print) name
+              CU.Name.print_as_inline_code name
         | Inconsistent_package_declaration_between_imports _ ->
             (* Can't be raised by [find_pers_struct ~check:false] *)
             assert false
         | Direct_reference_from_wrong_package (unit, _filename, prefix) ->
-            Format.asprintf "%a is inaccessible from %a"
-              CU.print unit
+            Format_doc.doc_printf "%a is inaccessible from %a"
+              CU.print_as_inline_code unit
               describe_prefix prefix
         | Illegal_import_of_parameter (name, _) ->
-            Format.asprintf "%a is a parameter"
+            Format_doc.doc_printf "%a is a parameter"
               (Style.as_inline_code Global_module.Name.print) name
         | Not_compiled_as_parameter name ->
-            Format.asprintf "%a should be a parameter but isn't"
+            Format_doc.doc_printf "%a should be a parameter but isn't"
               (Style.as_inline_code Global_module.Name.print) name
         | Imported_module_has_unset_parameter { imported; parameter } ->
-            Format.asprintf "%a requires argument for %a"
+            Format_doc.doc_printf "%a requires argument for %a"
               (Style.as_inline_code Global_module.Name.print) imported
               (Style.as_inline_code Global_module.Parameter_name.print)
               parameter
         | Imported_module_has_no_such_parameter { imported; parameter; _ } ->
-            Format.asprintf "%a has no parameter %a"
-              (Style.as_inline_code CU.Name.print) imported
+            Format_doc.doc_printf "%a has no parameter %a"
+              CU.Name.print_as_inline_code imported
               (Style.as_inline_code Global_module.Parameter_name.print)
               parameter
         | Not_compiled_as_argument { value; _ } ->
-            Format.asprintf "%a is not compiled as an argument"
+            Format_doc.doc_printf "%a is not compiled as an argument"
               (Style.as_inline_code Global_module.Name.print) value
         | Argument_type_mismatch { value; expected; actual; _ } ->
-            Format.asprintf "%a implements %a, not %a"
+            Format_doc.doc_printf "%a implements %a, not %a"
               (Style.as_inline_code Global_module.Name.print) value
               (Style.as_inline_code Global_module.Parameter_name.print) actual
               (Style.as_inline_code Global_module.Parameter_name.print) expected
         | Unbound_module_as_argument_value { value; _ } ->
-            Format.asprintf "Can't find argument %a"
+            Format_doc.doc_printf "Can't find argument %a"
               (Style.as_inline_code Global_module.Name.print) value
       in
+      let msg = Format_doc.(asprintf "%a" pp_doc) msg in
       let warn = Warnings.No_cmi_file(name_as_string, Some msg) in
         Location.prerr_warning loc warn
 
@@ -1106,37 +1108,37 @@ let save_cmi penv psig =
     )
     ~exceptionally:(fun () -> remove_file filename)
 
-let report_error ppf =
-  let open Format in
+let report_error_doc ppf =
+  let open Format_doc in
   function
   | Illegal_renaming(modname, ps_name, filename) -> fprintf ppf
       "Wrong file naming: %a@ contains the compiled interface for@ \
        %a when %a was expected"
-      (Style.as_inline_code Location.print_filename) filename
-      (Style.as_inline_code CU.Name.print) ps_name
-      (Style.as_inline_code CU.Name.print) modname
+      Location.Doc.quoted_filename filename
+      CU.Name.print_as_inline_code ps_name
+      CU.Name.print_as_inline_code modname
   | Inconsistent_import(name, source1, source2) -> fprintf ppf
       "@[<hov>The files %a@ and %a@ \
               make inconsistent assumptions@ over interface %a@]"
-      (Style.as_inline_code Location.print_filename) source1
-      (Style.as_inline_code Location.print_filename) source2
-      (Style.as_inline_code CU.Name.print) name
+      Location.Doc.quoted_filename source1
+      Location.Doc.quoted_filename source2
+      CU.Name.print_as_inline_code name
   | Need_recursive_types(import) ->
       fprintf ppf
         "@[<hov>Invalid import of %a, which uses recursive types.@ \
          The compilation flag %a is required@]"
-        (Style.as_inline_code CU.Name.print) import
+        CU.Name.print_as_inline_code import
         Style.inline_code "-rectypes"
   | Inconsistent_package_declaration_between_imports (filename, unit1, unit2) ->
       fprintf ppf
         "@[<hov>The file %s@ is imported both as %a@ and as %a.@]"
         filename
-        (Style.as_inline_code CU.print) unit1
-        (Style.as_inline_code CU.print) unit2
+        CU.print_as_inline_code unit1
+        CU.print_as_inline_code unit2
   | Direct_reference_from_wrong_package(unit, filename, prefix) ->
       fprintf ppf
         "@[<hov>Invalid reference to %a (in file %s) from %a.@ %s]"
-        (Style.as_inline_code CU.print) unit
+        CU.print_as_inline_code unit
         filename
         describe_prefix prefix
         "Can only access members of this library's package or a containing package"
@@ -1147,7 +1149,7 @@ let report_error ppf =
          @[<hov>@{<hint>Hint@}: \
            @[<hov>Compile the current unit with \
            @{<inline_code>-parameter %a@}.@]@]"
-        (Style.as_inline_code Location.print_filename) filename
+        Location.Doc.quoted_filename filename
         (Style.as_inline_code Global_module.Name.print) modname
         Global_module.Name.print modname
   | Not_compiled_as_parameter modname ->
@@ -1179,22 +1181,22 @@ let report_error ppf =
             fprintf ppf
               "Compile %a@ with @{<inline_code>-parameter %a@}@ to make it a \
                parameter."
-              (Style.as_inline_code CU.Name.print) modname
+              CU.Name.print_as_inline_code modname
               Global_module.Parameter_name.print param
         | _ ->
           let print_params =
-            Format.pp_print_list ~pp_sep:Format.pp_print_space
+            Format_doc.pp_print_list ~pp_sep:Format_doc.pp_print_space
               (Style.as_inline_code Global_module.Parameter_name.print)
           in
           fprintf ppf "Parameters for %a:@ @[<hov>%a@]"
-            (Style.as_inline_code CU.Name.print) modname
+            CU.Name.print_as_inline_code modname
             print_params valid_parameters
       in
       fprintf ppf
         "@[<hov>The module %a@ has no parameter %a.@]@.\
          @[<hov>@{<hint>Hint@}: @[<hov>%a@]@]"
-        (Style.as_inline_code CU.Name.print) modname
-        (Style.as_inline_code Global_module.Parameter_name.print) param
+        CU.Name.print_as_inline_code modname
+        (Style.as_inline_code Global_module.Parameter_name.print ) param
         pp_hint ()
   | Not_compiled_as_argument { param; value; filename } ->
       fprintf ppf
@@ -1203,8 +1205,8 @@ let report_error ppf =
          @[<hov>@{<hint>Hint@}: \
            @[<hov>Compile %a@ with @{<inline_code>-as-argument-for %a@}.@]@]"
         (Style.as_inline_code Global_module.Name.print) value
-        (Style.as_inline_code Global_module.Parameter_name.print) param
-        (Style.as_inline_code Location.print_filename) filename
+        (Style.as_inline_code Global_module.Parameter_name.print ) param
+        (Style.as_inline_code Location.Doc.filename) filename
         Global_module.Parameter_name.print param
   | Argument_type_mismatch { value; filename; expected; actual; } ->
       fprintf ppf
@@ -1214,10 +1216,10 @@ let report_error ppf =
            @[<hov>%a@ was compiled with \
              @{<inline_code>-as-argument-for %a@}.@]@]"
         (Style.as_inline_code Global_module.Name.print) value
-        (Style.as_inline_code Global_module.Parameter_name.print) expected
+        (Style.as_inline_code Global_module.Parameter_name.print ) expected
         (Style.as_inline_code Global_module.Name.print) value
-        (Style.as_inline_code Global_module.Parameter_name.print) actual
-        (Style.as_inline_code Location.print_filename) filename
+        (Style.as_inline_code Global_module.Parameter_name.print ) actual
+        (Style.as_inline_code Location.Doc.filename) filename
         Global_module.Parameter_name.print expected
   | Unbound_module_as_argument_value { instance; value } ->
       fprintf ppf
@@ -1234,6 +1236,8 @@ let () =
              [Env] is often able to add location info to our errors by
              re-raising them with the [Env.Error_from_persistent_env]
              constructor. *)
-          Some (Location.error_of_printer_file report_error err)
+          Some (Location.error_of_printer_file report_error_doc err)
       | _ -> None
     )
+
+let report_error = Format_doc.compat report_error_doc

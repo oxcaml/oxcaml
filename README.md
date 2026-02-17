@@ -19,10 +19,16 @@ The supported platforms are x86-64 and arm64 Linux; and arm64 macOS.  x86 macOS 
 
 One-time setup:
 ```
-$ opam switch 5.4.0  # or "opam switch create 5.4.0" if you haven't got that switch already
+$ opam switch create oxcaml-dev --empty
+$ opam pin add -ny git+https://github.com/oxcaml/oxcaml
+$ opam switch set-invariant -y --packages oxcaml-dev
 $ eval $(opam env)
-$ opam pin menhir 20231231
-$ opam install dune.3.20.2 ocamlformat.0.28.1
+```
+
+You can check that an existing opam switch is using the currently required versions of tools by
+running:
+```
+$ opam upgrade oxcaml-dev
 ```
 
 You probably then want to fork the `oxcaml/oxcaml` repo to your own Github org.

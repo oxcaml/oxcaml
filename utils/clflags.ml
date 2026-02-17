@@ -262,6 +262,8 @@ let afl_inst_ratio = ref 100           (* -afl-inst-ratio *)
 let function_sections = ref false      (* -function-sections *)
 let probes = ref Config.probes         (* -probes *)
 
+let kind_verbosity = ref 0             (* -kind-verbosity *)
+
 let supports_optimized_probes =
   Config.probes
   && match Target_system.architecture () with

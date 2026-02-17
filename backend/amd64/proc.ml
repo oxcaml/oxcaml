@@ -434,7 +434,11 @@ let int_regs_destroyed_at_c_call_win64 =
   if Config.runtime5 then [|0;1;4;5;6;7;10;11;12|] else [|0;4;5;6;7;10;11|]
 
 let int_regs_destroyed_at_c_call =
-  if Config.runtime5 then [|0;1;2;3;4;5;6;7;10;11|] else [|0;2;3;4;5;6;7;10;11|]
+  if Config.runtime5 && not Config.no_stack_checks then
+    (* Clobbers r13 (9) to hold stack pointer. See emit.ml *)
+    [|0;2;3;4;5;6;7;9;10;11|]
+  else
+    [|0;2;3;4;5;6;7;10;11|]
 
 let destroyed_at_c_call_win64 =
   (* Win64: rbx, rbp, rsi, rdi, r12-r15, xmm6-xmm15 preserved *)
@@ -672,12 +676,14 @@ let is_destruction_point ~(more_destruction_points : bool) (terminator : Cfg_int
     false
   | Switch _ ->
     false
-  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _; _ }
-  | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _; _ }; _} ->
+  | Call_no_return { func_symbol = _; alloc; ty_res = _; ty_args = _;
+                     stack_ofs; stack_align = _; effects = _; }
+  | Prim {op = External { func_symbol = _; alloc; ty_res = _; ty_args = _;
+                          stack_ofs; stack_align = _; effects = _; }; _} ->
     if more_destruction_points then
       true
     else
-      if alloc then true else false
+      if alloc || stack_ofs > 0 then true else false
   | Invalid _ -> more_destruction_points
   | Call {op = Indirect _ | Direct _; _} ->
     true

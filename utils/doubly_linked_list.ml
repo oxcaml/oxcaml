@@ -369,6 +369,9 @@ let for_alli t ~f =
 
 let to_list t = fold_right t ~f:(fun hd tl -> hd :: tl) ~init:[]
 
+let[@tail_mod_cons] rec suffix pos =
+  match next pos with None -> [] | Some cell -> value cell :: suffix cell
+
 let to_array t =
   let len = length t in
   if len = 0

@@ -1,0 +1,40 @@
+let code g_1 deleted and code f_0 deleted in
+let $camlTests5__f_2 =
+  closure f_0_1 @f
+and $camlTests5__g_3 =
+  closure g_1_1 @g
+and code rec loopify(never) size(18) newer_version_of(g_1)
+      g_1_1 (y : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %int_comp.gt (y, 3) in
+  switch prim
+    | 0 -> k (7)
+    | 1 -> k2
+    where k2 =
+      let int_sub = %int_barith.sub (y, 1) in
+      apply direct(f_0_1)
+        ($camlTests5__f_2 ~ depth my_depth -> succ my_depth : _ -> imm tagged
+         )
+          (int_sub)
+          -> k * k1
+and code rec loopify(never) size(18) newer_version_of(f_0)
+      f_0_1 (x : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %int_comp.lt (x, 4) in
+  switch prim
+    | 0 -> k (42)
+    | 1 -> k2
+    where k2 =
+      let int_sub = %int_barith.sub (x, 1) in
+      apply direct(g_1_1)
+        ($camlTests5__g_3 ~ depth my_depth -> succ my_depth : _ -> imm tagged
+         )
+          (int_sub)
+          -> k * k1
+in
+let $camlTests5 = Block 0 ($camlTests5__f_2, $camlTests5__g_3) in
+cont done ($camlTests5)

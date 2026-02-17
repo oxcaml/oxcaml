@@ -19,20 +19,39 @@ type t =
     lifted_params : Lifted_cont_params.t;
     handler : Flambda.Expr.t;
     is_exn_handler : bool;
+    can_be_lifted : bool;
     is_cold : bool
   }
 
-let create ~cont ~params ~lifted_params ~handler ~is_exn_handler ~is_cold =
-  { cont; params; lifted_params; handler; is_exn_handler; is_cold }
+let create ~cont ~params ~lifted_params ~handler ~is_exn_handler ~can_be_lifted
+    ~is_cold =
+  { cont;
+    params;
+    lifted_params;
+    handler;
+    is_exn_handler;
+    can_be_lifted;
+    is_cold
+  }
 
-let print ppf { cont; params; lifted_params; handler; is_exn_handler; is_cold }
+let[@ocamlformat "disable"] print ppf
+    { cont; params; lifted_params; handler; is_exn_handler; can_be_lifted; is_cold }
     =
-  Format.fprintf ppf
-    "@[<hov 1>(@[<hv 1>(cont@ %a)@]@ @[<hv 1>(params@ %a)@]@ @[<hv \
-     1>(lifted_params@ %a)@]@ @[<hv 1>(is_exn_handler@ %b)@]@ @[<hv \
-     1>(is_cold@ %b)@]@ @[<hv 1>(handler@ %a)@]@ )@]"
-    Continuation.print cont Bound_parameters.print params
-    Lifted_cont_params.print lifted_params is_exn_handler is_cold
+  Format.fprintf ppf "@[<hov 1>(\
+      @[<hv 1>(cont@ %a)@]@ \
+      @[<hv 1>(params@ %a)@]@ \
+      @[<hv 1>(lifted_params@ %a)@]@ \
+      @[<hv 1>(is_exn_handler@ %b)@]@ \
+      @[<hv 1>(can_be_lifted@ %b)@]@ \
+      @[<hv 1>(is_cold@ %b)@]@ \
+      @[<hv 1>(handler@ %a)@]@ \
+    )@]"
+    Continuation.print cont
+    Bound_parameters.print params
+    Lifted_cont_params.print lifted_params
+    is_exn_handler
+    can_be_lifted
+    is_cold
     Flambda.Expr.print handler
 
 let with_handler handler t = { t with handler }

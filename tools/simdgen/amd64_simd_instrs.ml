@@ -1011,7 +1011,7 @@ let addpd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "addpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 88 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 88 }
 }
 let addps = {
     id = Addps
@@ -1020,7 +1020,7 @@ let addps = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "addps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 88 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 88 }
 }
 let addsd = {
     id = Addsd
@@ -1029,7 +1029,7 @@ let addsd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "addsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 88 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 88 }
 }
 let addss = {
     id = Addss
@@ -1038,7 +1038,7 @@ let addss = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "addss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 88 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 88 }
 }
 let addsubpd = {
     id = Addsubpd
@@ -1047,7 +1047,7 @@ let addsubpd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "addsubpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 208 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 208 }
 }
 let addsubps = {
     id = Addsubps
@@ -1056,7 +1056,7 @@ let addsubps = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "addsubps"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 208 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 208 }
 }
 let andn_r32_r32_r32m32 = {
     id = Andn_r32_r32_r32m32
@@ -1083,7 +1083,7 @@ let andnpd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "andnpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 85 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 85 }
 }
 let andnps = {
     id = Andnps
@@ -1092,7 +1092,7 @@ let andnps = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "andnps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 85 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 85 }
 }
 let andpd = {
     id = Andpd
@@ -1101,7 +1101,7 @@ let andpd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "andpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 84 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 84 }
 }
 let andps = {
     id = Andps
@@ -1110,7 +1110,7 @@ let andps = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "andps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 84 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 84 }
 }
 let bextr_r32_r32m32_r32 = {
     id = Bextr_r32_r32m32_r32
@@ -1137,7 +1137,7 @@ let blendpd = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "blendpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 13 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 13 }
 }
 let blendps = {
     id = Blendps
@@ -1146,7 +1146,7 @@ let blendps = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "blendps"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 12 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 12 }
 }
 let blendvpd = {
     id = Blendvpd
@@ -1155,7 +1155,7 @@ let blendvpd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "blendvpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 21 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 21 }
 }
 let blendvps = {
     id = Blendvps
@@ -1164,7 +1164,7 @@ let blendvps = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "blendvps"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 20 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 20 }
 }
 let blsi_r32_r32m32 = {
     id = Blsi_r32_r32m32
@@ -1245,7 +1245,7 @@ let cmppd = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "cmppd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 194 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 194 }
 }
 let cmpps = {
     id = Cmpps
@@ -1254,7 +1254,7 @@ let cmpps = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "cmpps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 194 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 194 }
 }
 let cmpsd = {
     id = Cmpsd
@@ -1263,7 +1263,7 @@ let cmpsd = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "cmpsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 194 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 194 }
 }
 let cmpss = {
     id = Cmpss
@@ -1272,7 +1272,7 @@ let cmpss = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "cmpss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 194 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 194 }
 }
 let comisd = {
     id = Comisd
@@ -1281,7 +1281,7 @@ let comisd = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "comisd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 47 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 47 }
 }
 let comiss = {
     id = Comiss
@@ -1290,7 +1290,7 @@ let comiss = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "comiss"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 47 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 47 }
 }
 let crc32_r32_r16m16 = {
     id = Crc32_r32_r16m16
@@ -1299,7 +1299,7 @@ let crc32_r32_r16m16 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "crc32"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 241 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F38; operand_size_override = true }; rm_reg = Reg; opcode = 241 }
 }
 let crc32_r32_r32m32 = {
     id = Crc32_r32_r32m32
@@ -1308,7 +1308,7 @@ let crc32_r32_r32m32 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "crc32"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 241 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 241 }
 }
 let crc32_r32_r8m8 = {
     id = Crc32_r32_r8m8
@@ -1317,7 +1317,7 @@ let crc32_r32_r8m8 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "crc32"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 240 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 240 }
 }
 let crc32_r64_r64m64 = {
     id = Crc32_r64_r64m64
@@ -1326,7 +1326,7 @@ let crc32_r64_r64m64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "crc32"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F38 }; rm_reg = Reg; opcode = 241 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 241 }
 }
 let crc32_r64_r8m8 = {
     id = Crc32_r64_r8m8
@@ -1335,7 +1335,7 @@ let crc32_r64_r8m8 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "crc32"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F38 }; rm_reg = Reg; opcode = 240 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 240 }
 }
 let cvtdq2pd = {
     id = Cvtdq2pd
@@ -1344,7 +1344,7 @@ let cvtdq2pd = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvtdq2pd"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 230 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 230 }
 }
 let cvtdq2ps = {
     id = Cvtdq2ps
@@ -1353,7 +1353,7 @@ let cvtdq2ps = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvtdq2ps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 91 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 91 }
 }
 let cvtpd2dq = {
     id = Cvtpd2dq
@@ -1362,7 +1362,7 @@ let cvtpd2dq = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvtpd2dq"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 230 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 230 }
 }
 let cvtpd2ps = {
     id = Cvtpd2ps
@@ -1371,7 +1371,7 @@ let cvtpd2ps = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvtpd2ps"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 90 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 90 }
 }
 let cvtps2dq = {
     id = Cvtps2dq
@@ -1380,7 +1380,7 @@ let cvtps2dq = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvtps2dq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 91 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 91 }
 }
 let cvtps2pd = {
     id = Cvtps2pd
@@ -1389,7 +1389,7 @@ let cvtps2pd = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvtps2pd"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 90 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 90 }
 }
 let cvtsd2si_r32_Xm64 = {
     id = Cvtsd2si_r32_Xm64
@@ -1398,7 +1398,7 @@ let cvtsd2si_r32_Xm64 = {
   ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvtsd2si"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 45 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 45 }
 }
 let cvtsd2si_r64_Xm64 = {
     id = Cvtsd2si_r64_Xm64
@@ -1407,7 +1407,7 @@ let cvtsd2si_r64_Xm64 = {
   ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvtsd2si"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 45 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 45 }
 }
 let cvtsd2ss = {
     id = Cvtsd2ss
@@ -1416,7 +1416,7 @@ let cvtsd2ss = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvtsd2ss"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 90 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 90 }
 }
 let cvtsi2sd_X_r32m32 = {
     id = Cvtsi2sd_X_r32m32
@@ -1425,7 +1425,7 @@ let cvtsi2sd_X_r32m32 = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvtsi2sd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 42 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 42 }
 }
 let cvtsi2sd_X_r64m64 = {
     id = Cvtsi2sd_X_r64m64
@@ -1434,7 +1434,7 @@ let cvtsi2sd_X_r64m64 = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvtsi2sd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 42 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 42 }
 }
 let cvtsi2ss_X_r32m32 = {
     id = Cvtsi2ss_X_r32m32
@@ -1443,7 +1443,7 @@ let cvtsi2ss_X_r32m32 = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvtsi2ss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 42 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 42 }
 }
 let cvtsi2ss_X_r64m64 = {
     id = Cvtsi2ss_X_r64m64
@@ -1452,7 +1452,7 @@ let cvtsi2ss_X_r64m64 = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvtsi2ss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 42 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 42 }
 }
 let cvtss2sd = {
     id = Cvtss2sd
@@ -1461,7 +1461,7 @@ let cvtss2sd = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvtss2sd"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 90 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 90 }
 }
 let cvtss2si_r32_Xm32 = {
     id = Cvtss2si_r32_Xm32
@@ -1470,7 +1470,7 @@ let cvtss2si_r32_Xm32 = {
   ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvtss2si"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 45 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 45 }
 }
 let cvtss2si_r64_Xm32 = {
     id = Cvtss2si_r64_Xm32
@@ -1479,7 +1479,7 @@ let cvtss2si_r64_Xm32 = {
   ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvtss2si"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 45 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 45 }
 }
 let cvttpd2dq = {
     id = Cvttpd2dq
@@ -1488,7 +1488,7 @@ let cvttpd2dq = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvttpd2dq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 230 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 230 }
 }
 let cvttps2dq = {
     id = Cvttps2dq
@@ -1497,7 +1497,7 @@ let cvttps2dq = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvttps2dq"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 91 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 91 }
 }
 let cvttsd2si_r32_Xm64 = {
     id = Cvttsd2si_r32_Xm64
@@ -1506,7 +1506,7 @@ let cvttsd2si_r32_Xm64 = {
   ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvttsd2si"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 44 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 44 }
 }
 let cvttsd2si_r64_Xm64 = {
     id = Cvttsd2si_r64_Xm64
@@ -1515,7 +1515,7 @@ let cvttsd2si_r64_Xm64 = {
   ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvttsd2si"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 44 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_w; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 44 }
 }
 let cvttss2si_r32_Xm32 = {
     id = Cvttss2si_r32_Xm32
@@ -1524,7 +1524,7 @@ let cvttss2si_r32_Xm32 = {
   ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvttss2si"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 44 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 44 }
 }
 let cvttss2si_r64_Xm32 = {
     id = Cvttss2si_r64_Xm32
@@ -1533,7 +1533,7 @@ let cvttss2si_r64_Xm32 = {
   ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "cvttss2si"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 44 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 44 }
 }
 let divpd = {
     id = Divpd
@@ -1542,7 +1542,7 @@ let divpd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "divpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 94 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 94 }
 }
 let divps = {
     id = Divps
@@ -1551,7 +1551,7 @@ let divps = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "divps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 94 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 94 }
 }
 let divsd = {
     id = Divsd
@@ -1560,7 +1560,7 @@ let divsd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "divsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 94 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 94 }
 }
 let divss = {
     id = Divss
@@ -1569,7 +1569,7 @@ let divss = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "divss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 94 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 94 }
 }
 let dppd = {
     id = Dppd
@@ -1578,7 +1578,7 @@ let dppd = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "dppd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 65 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 65 }
 }
 let dpps = {
     id = Dpps
@@ -1587,7 +1587,7 @@ let dpps = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "dpps"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 64 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 64 }
 }
 let extractps = {
     id = Extractps
@@ -1596,7 +1596,7 @@ let extractps = {
   ; res = Res [|{ loc = Temp [|R64;M32|]; enc = RM_rm }|]
   ; imm = Imm_spec
   ; mnemonic = "extractps"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 23 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 23 }
 }
 let haddpd = {
     id = Haddpd
@@ -1605,7 +1605,7 @@ let haddpd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "haddpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 124 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 124 }
 }
 let haddps = {
     id = Haddps
@@ -1614,7 +1614,7 @@ let haddps = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "haddps"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 124 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 124 }
 }
 let hsubpd = {
     id = Hsubpd
@@ -1623,7 +1623,7 @@ let hsubpd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "hsubpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 125 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 125 }
 }
 let hsubps = {
     id = Hsubps
@@ -1632,7 +1632,7 @@ let hsubps = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "hsubps"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 125 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 125 }
 }
 let insertps = {
     id = Insertps
@@ -1641,7 +1641,7 @@ let insertps = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "insertps"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 33 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 33 }
 }
 let lddqu = {
     id = Lddqu
@@ -1650,7 +1650,7 @@ let lddqu = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "lddqu"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 240 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 240 }
 }
 let ldmxcsr = {
     id = Ldmxcsr
@@ -1659,7 +1659,7 @@ let ldmxcsr = {
   ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "ldmxcsr"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 2; opcode = 174 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Spec 2; opcode = 174 }
 }
 let lzcnt_r16_r16m16 = {
     id = Lzcnt_r16_r16m16
@@ -1668,7 +1668,7 @@ let lzcnt_r16_r16m16 = {
   ; res = Res [|{ loc = Temp [|R16|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "lzcnt"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 189 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = true }; rm_reg = Reg; opcode = 189 }
 }
 let lzcnt_r32_r32m32 = {
     id = Lzcnt_r32_r32m32
@@ -1677,7 +1677,7 @@ let lzcnt_r32_r32m32 = {
   ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "lzcnt"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 189 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 189 }
 }
 let lzcnt_r64_r64m64 = {
     id = Lzcnt_r64_r64m64
@@ -1686,7 +1686,7 @@ let lzcnt_r64_r64m64 = {
   ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "lzcnt"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 189 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 189 }
 }
 let maskmovdqu = {
     id = Maskmovdqu
@@ -1695,7 +1695,7 @@ let maskmovdqu = {
   ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "maskmovdqu"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 247 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 247 }
 }
 let maxpd = {
     id = Maxpd
@@ -1704,7 +1704,7 @@ let maxpd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "maxpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 95 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 95 }
 }
 let maxps = {
     id = Maxps
@@ -1713,7 +1713,7 @@ let maxps = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "maxps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 95 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 95 }
 }
 let maxsd = {
     id = Maxsd
@@ -1722,7 +1722,7 @@ let maxsd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "maxsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 95 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 95 }
 }
 let maxss = {
     id = Maxss
@@ -1731,7 +1731,7 @@ let maxss = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "maxss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 95 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 95 }
 }
 let minpd = {
     id = Minpd
@@ -1740,7 +1740,7 @@ let minpd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "minpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 93 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 93 }
 }
 let minps = {
     id = Minps
@@ -1749,7 +1749,7 @@ let minps = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "minps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 93 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 93 }
 }
 let minsd = {
     id = Minsd
@@ -1758,7 +1758,7 @@ let minsd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "minsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 93 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 93 }
 }
 let minss = {
     id = Minss
@@ -1767,7 +1767,7 @@ let minss = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "minss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 93 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 93 }
 }
 let movapd_X_Xm128 = {
     id = Movapd_X_Xm128
@@ -1776,7 +1776,7 @@ let movapd_X_Xm128 = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "movapd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 40 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 40 }
 }
 let movapd_Xm128_X = {
     id = Movapd_Xm128_X
@@ -1785,7 +1785,7 @@ let movapd_Xm128_X = {
   ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; imm = Imm_none
   ; mnemonic = "movapd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 41 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 41 }
 }
 let movapd_m128_X = {
     id = Movapd_m128_X
@@ -1794,7 +1794,7 @@ let movapd_m128_X = {
   ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "movapd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 41 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 41 }
 }
 let movaps_X_Xm128 = {
     id = Movaps_X_Xm128
@@ -1803,7 +1803,7 @@ let movaps_X_Xm128 = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "movaps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 40 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 40 }
 }
 let movaps_Xm128_X = {
     id = Movaps_Xm128_X
@@ -1812,7 +1812,7 @@ let movaps_Xm128_X = {
   ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; imm = Imm_none
   ; mnemonic = "movaps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 41 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 41 }
 }
 let movd_X_r32m32 = {
     id = Movd_X_r32m32
@@ -1821,7 +1821,7 @@ let movd_X_r32m32 = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "movd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 110 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 110 }
 }
 let movd_r32m32_X = {
     id = Movd_r32m32_X
@@ -1830,7 +1830,7 @@ let movd_r32m32_X = {
   ; res = Res [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
   ; imm = Imm_none
   ; mnemonic = "movd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 126 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 126 }
 }
 let movddup = {
     id = Movddup
@@ -1839,7 +1839,7 @@ let movddup = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "movddup"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 18 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 18 }
 }
 let movdqa_X_Xm128 = {
     id = Movdqa_X_Xm128
@@ -1848,7 +1848,7 @@ let movdqa_X_Xm128 = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "movdqa"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 111 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 111 }
 }
 let movdqa_Xm128_X = {
     id = Movdqa_Xm128_X
@@ -1857,7 +1857,7 @@ let movdqa_Xm128_X = {
   ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; imm = Imm_none
   ; mnemonic = "movdqa"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 127 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 127 }
 }
 let movdqu_X_Xm128 = {
     id = Movdqu_X_Xm128
@@ -1866,7 +1866,7 @@ let movdqu_X_Xm128 = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "movdqu"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 111 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 111 }
 }
 let movdqu_Xm128_X = {
     id = Movdqu_Xm128_X
@@ -1875,7 +1875,7 @@ let movdqu_Xm128_X = {
   ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; imm = Imm_none
   ; mnemonic = "movdqu"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 127 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 127 }
 }
 let movhlps = {
     id = Movhlps
@@ -1884,7 +1884,7 @@ let movhlps = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "movhlps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 18 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 18 }
 }
 let movhpd_X_m64 = {
     id = Movhpd_X_m64
@@ -1893,7 +1893,7 @@ let movhpd_X_m64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "movhpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 22 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 22 }
 }
 let movhpd_m64_X = {
     id = Movhpd_m64_X
@@ -1902,7 +1902,7 @@ let movhpd_m64_X = {
   ; res = Res [|{ loc = Temp [|M64|]; enc = RM_rm }|]
   ; imm = Imm_none
   ; mnemonic = "movhpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 23 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 23 }
 }
 let movhps_X_m64 = {
     id = Movhps_X_m64
@@ -1911,7 +1911,7 @@ let movhps_X_m64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "movhps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 22 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 22 }
 }
 let movhps_m64_X = {
     id = Movhps_m64_X
@@ -1920,7 +1920,7 @@ let movhps_m64_X = {
   ; res = Res [|{ loc = Temp [|M64|]; enc = RM_rm }|]
   ; imm = Imm_none
   ; mnemonic = "movhps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 23 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 23 }
 }
 let movlhps = {
     id = Movlhps
@@ -1929,7 +1929,7 @@ let movlhps = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "movlhps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 22 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 22 }
 }
 let movlpd_X_m64 = {
     id = Movlpd_X_m64
@@ -1938,7 +1938,7 @@ let movlpd_X_m64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "movlpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 18 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 18 }
 }
 let movlpd_m64_X = {
     id = Movlpd_m64_X
@@ -1947,7 +1947,7 @@ let movlpd_m64_X = {
   ; res = Res [|{ loc = Temp [|M64|]; enc = RM_rm }|]
   ; imm = Imm_none
   ; mnemonic = "movlpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 19 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 19 }
 }
 let movlps_X_m64 = {
     id = Movlps_X_m64
@@ -1956,7 +1956,7 @@ let movlps_X_m64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "movlps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 18 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 18 }
 }
 let movlps_m64_X = {
     id = Movlps_m64_X
@@ -1965,7 +1965,7 @@ let movlps_m64_X = {
   ; res = Res [|{ loc = Temp [|M64|]; enc = RM_rm }|]
   ; imm = Imm_none
   ; mnemonic = "movlps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 19 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 19 }
 }
 let movmskpd = {
     id = Movmskpd
@@ -1974,7 +1974,7 @@ let movmskpd = {
   ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "movmskpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 80 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 80 }
 }
 let movmskps = {
     id = Movmskps
@@ -1983,7 +1983,7 @@ let movmskps = {
   ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "movmskps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 80 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 80 }
 }
 let movntdq = {
     id = Movntdq
@@ -1992,7 +1992,7 @@ let movntdq = {
   ; res = Res [|{ loc = Temp [|M128|]; enc = RM_rm }|]
   ; imm = Imm_none
   ; mnemonic = "movntdq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 231 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 231 }
 }
 let movntdqa = {
     id = Movntdqa
@@ -2001,7 +2001,7 @@ let movntdqa = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "movntdqa"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 42 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 42 }
 }
 let movnti_m32_r32 = {
     id = Movnti_m32_r32
@@ -2010,7 +2010,7 @@ let movnti_m32_r32 = {
   ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "movnti"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 195 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 195 }
 }
 let movnti_m64_r64 = {
     id = Movnti_m64_r64
@@ -2019,7 +2019,7 @@ let movnti_m64_r64 = {
   ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "movnti"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 195 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_w; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 195 }
 }
 let movntpd = {
     id = Movntpd
@@ -2028,7 +2028,7 @@ let movntpd = {
   ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "movntpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 43 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 43 }
 }
 let movntps = {
     id = Movntps
@@ -2037,7 +2037,7 @@ let movntps = {
   ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "movntps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 43 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 43 }
 }
 let movq_X_Xm64 = {
     id = Movq_X_Xm64
@@ -2046,7 +2046,7 @@ let movq_X_Xm64 = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "movq"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 126 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 126 }
 }
 let movq_X_r64m64 = {
     id = Movq_X_r64m64
@@ -2055,7 +2055,7 @@ let movq_X_r64m64 = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "movq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 110 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 110 }
 }
 let movq_Xm64_X = {
     id = Movq_Xm64_X
@@ -2064,7 +2064,7 @@ let movq_Xm64_X = {
   ; res = Res [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
   ; imm = Imm_none
   ; mnemonic = "movq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 214 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 214 }
 }
 let movq_r64m64_X = {
     id = Movq_r64m64_X
@@ -2073,7 +2073,7 @@ let movq_r64m64_X = {
   ; res = Res [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
   ; imm = Imm_none
   ; mnemonic = "movq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 126 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 126 }
 }
 let movsd_X_X = {
     id = Movsd_X_X
@@ -2082,7 +2082,7 @@ let movsd_X_X = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "movsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 16 }
 }
 let movsd_X_m64 = {
     id = Movsd_X_m64
@@ -2091,7 +2091,7 @@ let movsd_X_m64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "movsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 16 }
 }
 let movsd_Xm64_X = {
     id = Movsd_Xm64_X
@@ -2100,7 +2100,7 @@ let movsd_Xm64_X = {
   ; res = Res [|{ loc = Temp [|XMM;M64|]; enc = RM_rm }|]
   ; imm = Imm_none
   ; mnemonic = "movsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 17 }
 }
 let movsd_m64_X = {
     id = Movsd_m64_X
@@ -2109,7 +2109,7 @@ let movsd_m64_X = {
   ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "movsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 17 }
 }
 let movshdup = {
     id = Movshdup
@@ -2118,7 +2118,7 @@ let movshdup = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "movshdup"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 22 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 22 }
 }
 let movsldup = {
     id = Movsldup
@@ -2127,7 +2127,7 @@ let movsldup = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "movsldup"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 18 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 18 }
 }
 let movss_X_X = {
     id = Movss_X_X
@@ -2136,7 +2136,7 @@ let movss_X_X = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "movss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 16 }
 }
 let movss_X_m32 = {
     id = Movss_X_m32
@@ -2145,7 +2145,7 @@ let movss_X_m32 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "movss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 16 }
 }
 let movss_Xm32_X = {
     id = Movss_Xm32_X
@@ -2154,7 +2154,7 @@ let movss_Xm32_X = {
   ; res = Res [|{ loc = Temp [|XMM;M32|]; enc = RM_rm }|]
   ; imm = Imm_none
   ; mnemonic = "movss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 17 }
 }
 let movss_m32_X = {
     id = Movss_m32_X
@@ -2163,7 +2163,7 @@ let movss_m32_X = {
   ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "movss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 17 }
 }
 let movupd_X_Xm128 = {
     id = Movupd_X_Xm128
@@ -2172,7 +2172,7 @@ let movupd_X_Xm128 = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "movupd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 16 }
 }
 let movupd_Xm128_X = {
     id = Movupd_Xm128_X
@@ -2181,7 +2181,7 @@ let movupd_Xm128_X = {
   ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; imm = Imm_none
   ; mnemonic = "movupd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 17 }
 }
 let movupd_m128_X = {
     id = Movupd_m128_X
@@ -2190,7 +2190,7 @@ let movupd_m128_X = {
   ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "movupd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 17 }
 }
 let movups_X_Xm128 = {
     id = Movups_X_Xm128
@@ -2199,7 +2199,7 @@ let movups_X_Xm128 = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "movups"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 16 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 16 }
 }
 let movups_Xm128_X = {
     id = Movups_Xm128_X
@@ -2208,7 +2208,7 @@ let movups_Xm128_X = {
   ; res = Res [|{ loc = Temp [|XMM;M128|]; enc = RM_rm }|]
   ; imm = Imm_none
   ; mnemonic = "movups"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 17 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 17 }
 }
 let mpsadbw = {
     id = Mpsadbw
@@ -2217,7 +2217,7 @@ let mpsadbw = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "mpsadbw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 66 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 66 }
 }
 let mulpd = {
     id = Mulpd
@@ -2226,7 +2226,7 @@ let mulpd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "mulpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 89 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 89 }
 }
 let mulps = {
     id = Mulps
@@ -2235,7 +2235,7 @@ let mulps = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "mulps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 89 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 89 }
 }
 let mulsd = {
     id = Mulsd
@@ -2244,7 +2244,7 @@ let mulsd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "mulsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 89 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 89 }
 }
 let mulss = {
     id = Mulss
@@ -2253,7 +2253,7 @@ let mulss = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "mulss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 89 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 89 }
 }
 let mulx_r32_r32_r32m32_rdx = {
     id = Mulx_r32_r32_r32m32_rdx
@@ -2280,7 +2280,7 @@ let orpd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "orpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 86 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 86 }
 }
 let orps = {
     id = Orps
@@ -2289,7 +2289,7 @@ let orps = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "orps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 86 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 86 }
 }
 let pabsb_M_Mm64 = {
     id = Pabsb_M_Mm64
@@ -2298,7 +2298,7 @@ let pabsb_M_Mm64 = {
   ; res = Res [|{ loc = Temp [|MM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pabsb"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 28 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 28 }
 }
 let pabsb_X_Xm128 = {
     id = Pabsb_X_Xm128
@@ -2307,7 +2307,7 @@ let pabsb_X_Xm128 = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pabsb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 28 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 28 }
 }
 let pabsd_M_Mm64 = {
     id = Pabsd_M_Mm64
@@ -2316,7 +2316,7 @@ let pabsd_M_Mm64 = {
   ; res = Res [|{ loc = Temp [|MM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pabsd"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 30 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 30 }
 }
 let pabsd_X_Xm128 = {
     id = Pabsd_X_Xm128
@@ -2325,7 +2325,7 @@ let pabsd_X_Xm128 = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pabsd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 30 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 30 }
 }
 let pabsw_M_Mm64 = {
     id = Pabsw_M_Mm64
@@ -2334,7 +2334,7 @@ let pabsw_M_Mm64 = {
   ; res = Res [|{ loc = Temp [|MM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pabsw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 29 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 29 }
 }
 let pabsw_X_Xm128 = {
     id = Pabsw_X_Xm128
@@ -2343,7 +2343,7 @@ let pabsw_X_Xm128 = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pabsw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 29 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 29 }
 }
 let packssdw = {
     id = Packssdw
@@ -2352,7 +2352,7 @@ let packssdw = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "packssdw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 107 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 107 }
 }
 let packsswb = {
     id = Packsswb
@@ -2361,7 +2361,7 @@ let packsswb = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "packsswb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 99 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 99 }
 }
 let packusdw = {
     id = Packusdw
@@ -2370,7 +2370,7 @@ let packusdw = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "packusdw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 43 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 43 }
 }
 let packuswb = {
     id = Packuswb
@@ -2379,7 +2379,7 @@ let packuswb = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "packuswb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 103 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 103 }
 }
 let paddb = {
     id = Paddb
@@ -2388,7 +2388,7 @@ let paddb = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "paddb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 252 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 252 }
 }
 let paddd = {
     id = Paddd
@@ -2397,7 +2397,7 @@ let paddd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "paddd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 254 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 254 }
 }
 let paddq = {
     id = Paddq
@@ -2406,7 +2406,7 @@ let paddq = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "paddq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 212 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 212 }
 }
 let paddsb = {
     id = Paddsb
@@ -2415,7 +2415,7 @@ let paddsb = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "paddsb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 236 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 236 }
 }
 let paddsw = {
     id = Paddsw
@@ -2424,7 +2424,7 @@ let paddsw = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "paddsw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 237 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 237 }
 }
 let paddusb = {
     id = Paddusb
@@ -2433,7 +2433,7 @@ let paddusb = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "paddusb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 220 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 220 }
 }
 let paddusw = {
     id = Paddusw
@@ -2442,7 +2442,7 @@ let paddusw = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "paddusw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 221 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 221 }
 }
 let paddw = {
     id = Paddw
@@ -2451,7 +2451,7 @@ let paddw = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "paddw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 253 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 253 }
 }
 let palignr_M_Mm64 = {
     id = Palignr_M_Mm64
@@ -2460,7 +2460,7 @@ let palignr_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "palignr"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 15 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 15 }
 }
 let palignr_X_Xm128 = {
     id = Palignr_X_Xm128
@@ -2469,7 +2469,7 @@ let palignr_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "palignr"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 15 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 15 }
 }
 let pand = {
     id = Pand
@@ -2478,7 +2478,7 @@ let pand = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pand"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 219 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 219 }
 }
 let pandn = {
     id = Pandn
@@ -2487,7 +2487,7 @@ let pandn = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pandn"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 223 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 223 }
 }
 let pavgb_M_Mm64 = {
     id = Pavgb_M_Mm64
@@ -2496,7 +2496,7 @@ let pavgb_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pavgb"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 224 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 224 }
 }
 let pavgb_X_Xm128 = {
     id = Pavgb_X_Xm128
@@ -2505,7 +2505,7 @@ let pavgb_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pavgb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 224 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 224 }
 }
 let pavgw_M_Mm64 = {
     id = Pavgw_M_Mm64
@@ -2514,7 +2514,7 @@ let pavgw_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pavgw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 227 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 227 }
 }
 let pavgw_X_Xm128 = {
     id = Pavgw_X_Xm128
@@ -2523,7 +2523,7 @@ let pavgw_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pavgw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 227 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 227 }
 }
 let pblendvb = {
     id = Pblendvb
@@ -2532,7 +2532,7 @@ let pblendvb = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pblendvb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 16 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 16 }
 }
 let pblendw = {
     id = Pblendw
@@ -2541,7 +2541,7 @@ let pblendw = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "pblendw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 14 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 14 }
 }
 let pclmulqdq = {
     id = Pclmulqdq
@@ -2550,7 +2550,7 @@ let pclmulqdq = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "pclmulqdq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 68 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 68 }
 }
 let pcmpeqb = {
     id = Pcmpeqb
@@ -2559,7 +2559,7 @@ let pcmpeqb = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pcmpeqb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 116 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 116 }
 }
 let pcmpeqd = {
     id = Pcmpeqd
@@ -2568,7 +2568,7 @@ let pcmpeqd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pcmpeqd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 118 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 118 }
 }
 let pcmpeqq = {
     id = Pcmpeqq
@@ -2577,7 +2577,7 @@ let pcmpeqq = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pcmpeqq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 41 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 41 }
 }
 let pcmpeqw = {
     id = Pcmpeqw
@@ -2586,7 +2586,7 @@ let pcmpeqw = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pcmpeqw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 117 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 117 }
 }
 let pcmpestri = {
     id = Pcmpestri
@@ -2595,7 +2595,7 @@ let pcmpestri = {
   ; res = Res [|{ loc = Pin RCX; enc = Implicit }|]
   ; imm = Imm_spec
   ; mnemonic = "pcmpestri"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 97 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 97 }
 }
 let pcmpestrm = {
     id = Pcmpestrm
@@ -2604,7 +2604,7 @@ let pcmpestrm = {
   ; res = Res [|{ loc = Pin XMM0; enc = Implicit }|]
   ; imm = Imm_spec
   ; mnemonic = "pcmpestrm"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 96 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 96 }
 }
 let pcmpgtb = {
     id = Pcmpgtb
@@ -2613,7 +2613,7 @@ let pcmpgtb = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pcmpgtb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 100 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 100 }
 }
 let pcmpgtd = {
     id = Pcmpgtd
@@ -2622,7 +2622,7 @@ let pcmpgtd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pcmpgtd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 102 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 102 }
 }
 let pcmpgtq = {
     id = Pcmpgtq
@@ -2631,7 +2631,7 @@ let pcmpgtq = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pcmpgtq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 55 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 55 }
 }
 let pcmpgtw = {
     id = Pcmpgtw
@@ -2640,7 +2640,7 @@ let pcmpgtw = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pcmpgtw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 101 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 101 }
 }
 let pcmpistri = {
     id = Pcmpistri
@@ -2649,7 +2649,7 @@ let pcmpistri = {
   ; res = Res [|{ loc = Pin RCX; enc = Implicit }|]
   ; imm = Imm_spec
   ; mnemonic = "pcmpistri"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 99 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 99 }
 }
 let pcmpistrm = {
     id = Pcmpistrm
@@ -2658,7 +2658,7 @@ let pcmpistrm = {
   ; res = Res [|{ loc = Pin XMM0; enc = Implicit }|]
   ; imm = Imm_spec
   ; mnemonic = "pcmpistrm"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 98 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 98 }
 }
 let pdep_r32_r32_r32m32 = {
     id = Pdep_r32_r32_r32m32
@@ -2703,7 +2703,7 @@ let pextrb = {
   ; res = Res [|{ loc = Temp [|R64;M8|]; enc = RM_rm }|]
   ; imm = Imm_spec
   ; mnemonic = "pextrb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 20 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 20 }
 }
 let pextrd = {
     id = Pextrd
@@ -2712,7 +2712,7 @@ let pextrd = {
   ; res = Res [|{ loc = Temp [|R32;M32|]; enc = RM_rm }|]
   ; imm = Imm_spec
   ; mnemonic = "pextrd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 22 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 22 }
 }
 let pextrq = {
     id = Pextrq
@@ -2721,7 +2721,7 @@ let pextrq = {
   ; res = Res [|{ loc = Temp [|R64;M64|]; enc = RM_rm }|]
   ; imm = Imm_spec
   ; mnemonic = "pextrq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F3A }; rm_reg = Reg; opcode = 22 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 22 }
 }
 let pextrw_r64_M = {
     id = Pextrw_r64_M
@@ -2730,7 +2730,7 @@ let pextrw_r64_M = {
   ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
   ; imm = Imm_spec
   ; mnemonic = "pextrw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 197 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 197 }
 }
 let pextrw_r64_X = {
     id = Pextrw_r64_X
@@ -2739,7 +2739,7 @@ let pextrw_r64_X = {
   ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
   ; imm = Imm_spec
   ; mnemonic = "pextrw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 197 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 197 }
 }
 let pextrw_r64m16_X = {
     id = Pextrw_r64m16_X
@@ -2748,7 +2748,7 @@ let pextrw_r64m16_X = {
   ; res = Res [|{ loc = Temp [|R64;M16|]; enc = RM_rm }|]
   ; imm = Imm_spec
   ; mnemonic = "pextrw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 21 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 21 }
 }
 let phaddd_M_Mm64 = {
     id = Phaddd_M_Mm64
@@ -2757,7 +2757,7 @@ let phaddd_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "phaddd"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 2 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 2 }
 }
 let phaddd_X_Xm128 = {
     id = Phaddd_X_Xm128
@@ -2766,7 +2766,7 @@ let phaddd_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "phaddd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 2 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 2 }
 }
 let phaddsw_M_Mm64 = {
     id = Phaddsw_M_Mm64
@@ -2775,7 +2775,7 @@ let phaddsw_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "phaddsw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 3 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 3 }
 }
 let phaddsw_X_Xm128 = {
     id = Phaddsw_X_Xm128
@@ -2784,7 +2784,7 @@ let phaddsw_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "phaddsw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 3 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 3 }
 }
 let phaddw_M_Mm64 = {
     id = Phaddw_M_Mm64
@@ -2793,7 +2793,7 @@ let phaddw_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "phaddw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 1 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 1 }
 }
 let phaddw_X_Xm128 = {
     id = Phaddw_X_Xm128
@@ -2802,7 +2802,7 @@ let phaddw_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "phaddw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 1 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 1 }
 }
 let phminposuw = {
     id = Phminposuw
@@ -2811,7 +2811,7 @@ let phminposuw = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "phminposuw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 65 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 65 }
 }
 let phsubd_M_Mm64 = {
     id = Phsubd_M_Mm64
@@ -2820,7 +2820,7 @@ let phsubd_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "phsubd"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 6 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 6 }
 }
 let phsubd_X_Xm128 = {
     id = Phsubd_X_Xm128
@@ -2829,7 +2829,7 @@ let phsubd_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "phsubd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 6 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 6 }
 }
 let phsubsw_M_Mm64 = {
     id = Phsubsw_M_Mm64
@@ -2838,7 +2838,7 @@ let phsubsw_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "phsubsw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 7 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 7 }
 }
 let phsubsw_X_Xm128 = {
     id = Phsubsw_X_Xm128
@@ -2847,7 +2847,7 @@ let phsubsw_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "phsubsw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 7 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 7 }
 }
 let phsubw_M_Mm64 = {
     id = Phsubw_M_Mm64
@@ -2856,7 +2856,7 @@ let phsubw_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "phsubw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 5 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 5 }
 }
 let phsubw_X_Xm128 = {
     id = Phsubw_X_Xm128
@@ -2865,7 +2865,7 @@ let phsubw_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "phsubw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 5 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 5 }
 }
 let pinsrb = {
     id = Pinsrb
@@ -2874,7 +2874,7 @@ let pinsrb = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "pinsrb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 32 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 32 }
 }
 let pinsrd = {
     id = Pinsrd
@@ -2883,7 +2883,7 @@ let pinsrd = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "pinsrd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 34 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 34 }
 }
 let pinsrq = {
     id = Pinsrq
@@ -2892,7 +2892,7 @@ let pinsrq = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "pinsrq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F3A }; rm_reg = Reg; opcode = 34 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_w; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 34 }
 }
 let pinsrw_M_r32m16 = {
     id = Pinsrw_M_r32m16
@@ -2901,7 +2901,7 @@ let pinsrw_M_r32m16 = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "pinsrw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 196 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 196 }
 }
 let pinsrw_X_r32m16 = {
     id = Pinsrw_X_r32m16
@@ -2910,7 +2910,7 @@ let pinsrw_X_r32m16 = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "pinsrw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 196 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 196 }
 }
 let pmaddubsw_M_Mm64 = {
     id = Pmaddubsw_M_Mm64
@@ -2919,7 +2919,7 @@ let pmaddubsw_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmaddubsw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 4 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 4 }
 }
 let pmaddubsw_X_Xm128 = {
     id = Pmaddubsw_X_Xm128
@@ -2928,7 +2928,7 @@ let pmaddubsw_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmaddubsw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 4 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 4 }
 }
 let pmaddwd = {
     id = Pmaddwd
@@ -2937,7 +2937,7 @@ let pmaddwd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmaddwd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 245 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 245 }
 }
 let pmaxsb = {
     id = Pmaxsb
@@ -2946,7 +2946,7 @@ let pmaxsb = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmaxsb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 60 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 60 }
 }
 let pmaxsd = {
     id = Pmaxsd
@@ -2955,7 +2955,7 @@ let pmaxsd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmaxsd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 61 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 61 }
 }
 let pmaxsw_M_Mm64 = {
     id = Pmaxsw_M_Mm64
@@ -2964,7 +2964,7 @@ let pmaxsw_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmaxsw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 238 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 238 }
 }
 let pmaxsw_X_Xm128 = {
     id = Pmaxsw_X_Xm128
@@ -2973,7 +2973,7 @@ let pmaxsw_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmaxsw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 238 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 238 }
 }
 let pmaxub_M_Mm64 = {
     id = Pmaxub_M_Mm64
@@ -2982,7 +2982,7 @@ let pmaxub_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmaxub"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 222 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 222 }
 }
 let pmaxub_X_Xm128 = {
     id = Pmaxub_X_Xm128
@@ -2991,7 +2991,7 @@ let pmaxub_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmaxub"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 222 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 222 }
 }
 let pmaxud = {
     id = Pmaxud
@@ -3000,7 +3000,7 @@ let pmaxud = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmaxud"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 63 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 63 }
 }
 let pmaxuw = {
     id = Pmaxuw
@@ -3009,7 +3009,7 @@ let pmaxuw = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmaxuw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 62 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 62 }
 }
 let pminsb = {
     id = Pminsb
@@ -3018,7 +3018,7 @@ let pminsb = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pminsb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 56 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 56 }
 }
 let pminsd = {
     id = Pminsd
@@ -3027,7 +3027,7 @@ let pminsd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pminsd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 57 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 57 }
 }
 let pminsw_M_Mm64 = {
     id = Pminsw_M_Mm64
@@ -3036,7 +3036,7 @@ let pminsw_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pminsw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 234 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 234 }
 }
 let pminsw_X_Xm128 = {
     id = Pminsw_X_Xm128
@@ -3045,7 +3045,7 @@ let pminsw_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pminsw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 234 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 234 }
 }
 let pminub_M_Mm64 = {
     id = Pminub_M_Mm64
@@ -3054,7 +3054,7 @@ let pminub_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pminub"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 218 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 218 }
 }
 let pminub_X_Xm128 = {
     id = Pminub_X_Xm128
@@ -3063,7 +3063,7 @@ let pminub_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pminub"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 218 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 218 }
 }
 let pminud = {
     id = Pminud
@@ -3072,7 +3072,7 @@ let pminud = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pminud"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 59 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 59 }
 }
 let pminuw = {
     id = Pminuw
@@ -3081,7 +3081,7 @@ let pminuw = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pminuw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 58 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 58 }
 }
 let pmovmskb_r64_M = {
     id = Pmovmskb_r64_M
@@ -3090,7 +3090,7 @@ let pmovmskb_r64_M = {
   ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pmovmskb"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 215 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 215 }
 }
 let pmovmskb_r64_X = {
     id = Pmovmskb_r64_X
@@ -3099,7 +3099,7 @@ let pmovmskb_r64_X = {
   ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pmovmskb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 215 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 215 }
 }
 let pmovsxbd = {
     id = Pmovsxbd
@@ -3108,7 +3108,7 @@ let pmovsxbd = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pmovsxbd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 33 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 33 }
 }
 let pmovsxbq = {
     id = Pmovsxbq
@@ -3117,7 +3117,7 @@ let pmovsxbq = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pmovsxbq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 34 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 34 }
 }
 let pmovsxbw = {
     id = Pmovsxbw
@@ -3126,7 +3126,7 @@ let pmovsxbw = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pmovsxbw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 32 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 32 }
 }
 let pmovsxdq = {
     id = Pmovsxdq
@@ -3135,7 +3135,7 @@ let pmovsxdq = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pmovsxdq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 37 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 37 }
 }
 let pmovsxwd = {
     id = Pmovsxwd
@@ -3144,7 +3144,7 @@ let pmovsxwd = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pmovsxwd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 35 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 35 }
 }
 let pmovsxwq = {
     id = Pmovsxwq
@@ -3153,7 +3153,7 @@ let pmovsxwq = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pmovsxwq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 36 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 36 }
 }
 let pmovzxbd = {
     id = Pmovzxbd
@@ -3162,7 +3162,7 @@ let pmovzxbd = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pmovzxbd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 49 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 49 }
 }
 let pmovzxbq = {
     id = Pmovzxbq
@@ -3171,7 +3171,7 @@ let pmovzxbq = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pmovzxbq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 50 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 50 }
 }
 let pmovzxbw = {
     id = Pmovzxbw
@@ -3180,7 +3180,7 @@ let pmovzxbw = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pmovzxbw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 48 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 48 }
 }
 let pmovzxdq = {
     id = Pmovzxdq
@@ -3189,7 +3189,7 @@ let pmovzxdq = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pmovzxdq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 53 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 53 }
 }
 let pmovzxwd = {
     id = Pmovzxwd
@@ -3198,7 +3198,7 @@ let pmovzxwd = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pmovzxwd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 51 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 51 }
 }
 let pmovzxwq = {
     id = Pmovzxwq
@@ -3207,7 +3207,7 @@ let pmovzxwq = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "pmovzxwq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 52 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 52 }
 }
 let pmuldq = {
     id = Pmuldq
@@ -3216,7 +3216,7 @@ let pmuldq = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmuldq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 40 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 40 }
 }
 let pmulhrsw_M_Mm64 = {
     id = Pmulhrsw_M_Mm64
@@ -3225,7 +3225,7 @@ let pmulhrsw_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmulhrsw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 11 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 11 }
 }
 let pmulhrsw_X_Xm128 = {
     id = Pmulhrsw_X_Xm128
@@ -3234,7 +3234,7 @@ let pmulhrsw_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmulhrsw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 11 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 11 }
 }
 let pmulhuw_M_Mm64 = {
     id = Pmulhuw_M_Mm64
@@ -3243,7 +3243,7 @@ let pmulhuw_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmulhuw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 228 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 228 }
 }
 let pmulhuw_X_Xm128 = {
     id = Pmulhuw_X_Xm128
@@ -3252,7 +3252,7 @@ let pmulhuw_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmulhuw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 228 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 228 }
 }
 let pmulhw = {
     id = Pmulhw
@@ -3261,7 +3261,7 @@ let pmulhw = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmulhw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 229 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 229 }
 }
 let pmulld = {
     id = Pmulld
@@ -3270,7 +3270,7 @@ let pmulld = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmulld"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 64 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 64 }
 }
 let pmullw = {
     id = Pmullw
@@ -3279,7 +3279,7 @@ let pmullw = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmullw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 213 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 213 }
 }
 let pmuludq_M_Mm64 = {
     id = Pmuludq_M_Mm64
@@ -3288,7 +3288,7 @@ let pmuludq_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmuludq"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 244 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 244 }
 }
 let pmuludq_X_Xm128 = {
     id = Pmuludq_X_Xm128
@@ -3297,7 +3297,7 @@ let pmuludq_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pmuludq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 244 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 244 }
 }
 let popcnt_r16_r16m16 = {
     id = Popcnt_r16_r16m16
@@ -3306,7 +3306,7 @@ let popcnt_r16_r16m16 = {
   ; res = Res [|{ loc = Temp [|R16|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "popcnt"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 184 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = true }; rm_reg = Reg; opcode = 184 }
 }
 let popcnt_r32_r32m32 = {
     id = Popcnt_r32_r32m32
@@ -3315,7 +3315,7 @@ let popcnt_r32_r32m32 = {
   ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "popcnt"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 184 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 184 }
 }
 let popcnt_r64_r64m64 = {
     id = Popcnt_r64_r64m64
@@ -3324,7 +3324,7 @@ let popcnt_r64_r64m64 = {
   ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "popcnt"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 184 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 184 }
 }
 let por = {
     id = Por
@@ -3333,7 +3333,7 @@ let por = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "por"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 235 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 235 }
 }
 let psadbw_M_Mm64 = {
     id = Psadbw_M_Mm64
@@ -3342,7 +3342,7 @@ let psadbw_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psadbw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 246 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 246 }
 }
 let psadbw_X_Xm128 = {
     id = Psadbw_X_Xm128
@@ -3351,7 +3351,7 @@ let psadbw_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psadbw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 246 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 246 }
 }
 let pshufb_M_Mm64 = {
     id = Pshufb_M_Mm64
@@ -3360,7 +3360,7 @@ let pshufb_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pshufb"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 0 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 0 }
 }
 let pshufb_X_Xm128 = {
     id = Pshufb_X_Xm128
@@ -3369,7 +3369,7 @@ let pshufb_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pshufb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 0 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 0 }
 }
 let pshufd = {
     id = Pshufd
@@ -3378,7 +3378,7 @@ let pshufd = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_spec
   ; mnemonic = "pshufd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 112 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 112 }
 }
 let pshufhw = {
     id = Pshufhw
@@ -3387,7 +3387,7 @@ let pshufhw = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_spec
   ; mnemonic = "pshufhw"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 112 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 112 }
 }
 let pshuflw = {
     id = Pshuflw
@@ -3396,7 +3396,7 @@ let pshuflw = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_spec
   ; mnemonic = "pshuflw"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 112 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 112 }
 }
 let psignb_M_Mm64 = {
     id = Psignb_M_Mm64
@@ -3405,7 +3405,7 @@ let psignb_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psignb"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 8 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 8 }
 }
 let psignb_X_Xm128 = {
     id = Psignb_X_Xm128
@@ -3414,7 +3414,7 @@ let psignb_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psignb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 8 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 8 }
 }
 let psignd_M_Mm64 = {
     id = Psignd_M_Mm64
@@ -3423,7 +3423,7 @@ let psignd_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psignd"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 10 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 10 }
 }
 let psignd_X_Xm128 = {
     id = Psignd_X_Xm128
@@ -3432,7 +3432,7 @@ let psignd_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psignd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 10 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 10 }
 }
 let psignw_M_Mm64 = {
     id = Psignw_M_Mm64
@@ -3441,7 +3441,7 @@ let psignw_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psignw"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 9 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 9 }
 }
 let psignw_X_Xm128 = {
     id = Psignw_X_Xm128
@@ -3450,7 +3450,7 @@ let psignw_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psignw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 9 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 9 }
 }
 let pslld_X = {
     id = Pslld_X
@@ -3459,7 +3459,7 @@ let pslld_X = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "pslld"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 6; opcode = 114 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Spec 6; opcode = 114 }
 }
 let pslld_X_Xm128 = {
     id = Pslld_X_Xm128
@@ -3468,7 +3468,7 @@ let pslld_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pslld"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 242 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 242 }
 }
 let pslldq = {
     id = Pslldq
@@ -3477,7 +3477,7 @@ let pslldq = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "pslldq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 7; opcode = 115 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Spec 7; opcode = 115 }
 }
 let psllq_X = {
     id = Psllq_X
@@ -3486,7 +3486,7 @@ let psllq_X = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "psllq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 6; opcode = 115 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Spec 6; opcode = 115 }
 }
 let psllq_X_Xm128 = {
     id = Psllq_X_Xm128
@@ -3495,7 +3495,7 @@ let psllq_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psllq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 243 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 243 }
 }
 let psllw_X = {
     id = Psllw_X
@@ -3504,7 +3504,7 @@ let psllw_X = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "psllw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 6; opcode = 113 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Spec 6; opcode = 113 }
 }
 let psllw_X_Xm128 = {
     id = Psllw_X_Xm128
@@ -3513,7 +3513,7 @@ let psllw_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psllw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 241 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 241 }
 }
 let psrad_X = {
     id = Psrad_X
@@ -3522,7 +3522,7 @@ let psrad_X = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "psrad"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 4; opcode = 114 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Spec 4; opcode = 114 }
 }
 let psrad_X_Xm128 = {
     id = Psrad_X_Xm128
@@ -3531,7 +3531,7 @@ let psrad_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psrad"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 226 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 226 }
 }
 let psraw_X = {
     id = Psraw_X
@@ -3540,7 +3540,7 @@ let psraw_X = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "psraw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 4; opcode = 113 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Spec 4; opcode = 113 }
 }
 let psraw_X_Xm128 = {
     id = Psraw_X_Xm128
@@ -3549,7 +3549,7 @@ let psraw_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psraw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 225 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 225 }
 }
 let psrld_X = {
     id = Psrld_X
@@ -3558,7 +3558,7 @@ let psrld_X = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "psrld"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 2; opcode = 114 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Spec 2; opcode = 114 }
 }
 let psrld_X_Xm128 = {
     id = Psrld_X_Xm128
@@ -3567,7 +3567,7 @@ let psrld_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psrld"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 210 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 210 }
 }
 let psrldq = {
     id = Psrldq
@@ -3576,7 +3576,7 @@ let psrldq = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "psrldq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 3; opcode = 115 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Spec 3; opcode = 115 }
 }
 let psrlq_X = {
     id = Psrlq_X
@@ -3585,7 +3585,7 @@ let psrlq_X = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "psrlq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 2; opcode = 115 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Spec 2; opcode = 115 }
 }
 let psrlq_X_Xm128 = {
     id = Psrlq_X_Xm128
@@ -3594,7 +3594,7 @@ let psrlq_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psrlq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 211 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 211 }
 }
 let psrlw_X = {
     id = Psrlw_X
@@ -3603,7 +3603,7 @@ let psrlw_X = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "psrlw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 2; opcode = 113 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Spec 2; opcode = 113 }
 }
 let psrlw_X_Xm128 = {
     id = Psrlw_X_Xm128
@@ -3612,7 +3612,7 @@ let psrlw_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psrlw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 209 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 209 }
 }
 let psubb = {
     id = Psubb
@@ -3621,7 +3621,7 @@ let psubb = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psubb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 248 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 248 }
 }
 let psubd = {
     id = Psubd
@@ -3630,7 +3630,7 @@ let psubd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psubd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 250 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 250 }
 }
 let psubq_M_Mm64 = {
     id = Psubq_M_Mm64
@@ -3639,7 +3639,7 @@ let psubq_M_Mm64 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psubq"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 251 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 251 }
 }
 let psubq_X_Xm128 = {
     id = Psubq_X_Xm128
@@ -3648,7 +3648,7 @@ let psubq_X_Xm128 = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psubq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 251 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 251 }
 }
 let psubsb = {
     id = Psubsb
@@ -3657,7 +3657,7 @@ let psubsb = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psubsb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 232 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 232 }
 }
 let psubsw = {
     id = Psubsw
@@ -3666,7 +3666,7 @@ let psubsw = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psubsw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 233 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 233 }
 }
 let psubusb = {
     id = Psubusb
@@ -3675,7 +3675,7 @@ let psubusb = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psubusb"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 216 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 216 }
 }
 let psubusw = {
     id = Psubusw
@@ -3684,7 +3684,7 @@ let psubusw = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psubusw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 217 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 217 }
 }
 let psubw = {
     id = Psubw
@@ -3693,7 +3693,7 @@ let psubw = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "psubw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 249 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 249 }
 }
 let ptest = {
     id = Ptest
@@ -3702,7 +3702,7 @@ let ptest = {
   ; res = Res [|{ loc = Temp [|R64|]; enc = Implicit }|]
   ; imm = Imm_none
   ; mnemonic = "ptest"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38 }; rm_reg = Reg; opcode = 23 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F38; operand_size_override = false }; rm_reg = Reg; opcode = 23 }
 }
 let punpckhbw = {
     id = Punpckhbw
@@ -3711,7 +3711,7 @@ let punpckhbw = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "punpckhbw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 104 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 104 }
 }
 let punpckhdq = {
     id = Punpckhdq
@@ -3720,7 +3720,7 @@ let punpckhdq = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "punpckhdq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 106 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 106 }
 }
 let punpckhqdq = {
     id = Punpckhqdq
@@ -3729,7 +3729,7 @@ let punpckhqdq = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "punpckhqdq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 109 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 109 }
 }
 let punpckhwd = {
     id = Punpckhwd
@@ -3738,7 +3738,7 @@ let punpckhwd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "punpckhwd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 105 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 105 }
 }
 let punpcklbw = {
     id = Punpcklbw
@@ -3747,7 +3747,7 @@ let punpcklbw = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "punpcklbw"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 96 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 96 }
 }
 let punpckldq = {
     id = Punpckldq
@@ -3756,7 +3756,7 @@ let punpckldq = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "punpckldq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 98 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 98 }
 }
 let punpcklqdq = {
     id = Punpcklqdq
@@ -3765,7 +3765,7 @@ let punpcklqdq = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "punpcklqdq"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 108 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 108 }
 }
 let punpcklwd = {
     id = Punpcklwd
@@ -3774,7 +3774,7 @@ let punpcklwd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "punpcklwd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 97 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 97 }
 }
 let pxor = {
     id = Pxor
@@ -3783,7 +3783,7 @@ let pxor = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "pxor"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 239 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 239 }
 }
 let rcpps = {
     id = Rcpps
@@ -3792,7 +3792,7 @@ let rcpps = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "rcpps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 83 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 83 }
 }
 let rcpss = {
     id = Rcpss
@@ -3801,7 +3801,7 @@ let rcpss = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "rcpss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 83 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 83 }
 }
 let rorx_r32_r32m32 = {
     id = Rorx_r32_r32m32
@@ -3828,7 +3828,7 @@ let roundpd = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_spec
   ; mnemonic = "roundpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 9 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 9 }
 }
 let roundps = {
     id = Roundps
@@ -3837,7 +3837,7 @@ let roundps = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_spec
   ; mnemonic = "roundps"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 8 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 8 }
 }
 let roundsd = {
     id = Roundsd
@@ -3846,7 +3846,7 @@ let roundsd = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_spec
   ; mnemonic = "roundsd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 11 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 11 }
 }
 let roundss = {
     id = Roundss
@@ -3855,7 +3855,7 @@ let roundss = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_spec
   ; mnemonic = "roundss"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A }; rm_reg = Reg; opcode = 10 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F3A; operand_size_override = false }; rm_reg = Reg; opcode = 10 }
 }
 let rsqrtps = {
     id = Rsqrtps
@@ -3864,7 +3864,7 @@ let rsqrtps = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "rsqrtps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 82 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 82 }
 }
 let rsqrtss = {
     id = Rsqrtss
@@ -3873,7 +3873,7 @@ let rsqrtss = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "rsqrtss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 82 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 82 }
 }
 let sarx_r32_r32m32_r32 = {
     id = Sarx_r32_r32m32_r32
@@ -3936,7 +3936,7 @@ let shufpd = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "shufpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 198 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 198 }
 }
 let shufps = {
     id = Shufps
@@ -3945,7 +3945,7 @@ let shufps = {
   ; res = First_arg
   ; imm = Imm_spec
   ; mnemonic = "shufps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 198 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 198 }
 }
 let sqrtpd = {
     id = Sqrtpd
@@ -3954,7 +3954,7 @@ let sqrtpd = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "sqrtpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 81 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 81 }
 }
 let sqrtps = {
     id = Sqrtps
@@ -3963,7 +3963,7 @@ let sqrtps = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "sqrtps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 81 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 81 }
 }
 let sqrtsd = {
     id = Sqrtsd
@@ -3972,7 +3972,7 @@ let sqrtsd = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "sqrtsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 81 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 81 }
 }
 let sqrtss = {
     id = Sqrtss
@@ -3981,7 +3981,7 @@ let sqrtss = {
   ; res = Res [|{ loc = Temp [|XMM|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "sqrtss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 81 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 81 }
 }
 let stmxcsr = {
     id = Stmxcsr
@@ -3990,7 +3990,7 @@ let stmxcsr = {
   ; res = Res [|{ loc = Temp [|M32|]; enc = RM_rm }|]
   ; imm = Imm_none
   ; mnemonic = "stmxcsr"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Spec 3; opcode = 174 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Spec 3; opcode = 174 }
 }
 let subpd = {
     id = Subpd
@@ -3999,7 +3999,7 @@ let subpd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "subpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 92 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 92 }
 }
 let subps = {
     id = Subps
@@ -4008,7 +4008,7 @@ let subps = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "subps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 92 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 92 }
 }
 let subsd = {
     id = Subsd
@@ -4017,7 +4017,7 @@ let subsd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "subsd"
-  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 92 }
+  ; enc = { prefix = Legacy { prefix = Prx_F2; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 92 }
 }
 let subss = {
     id = Subss
@@ -4026,7 +4026,7 @@ let subss = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "subss"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 92 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 92 }
 }
 let tzcnt_r16_r16m16 = {
     id = Tzcnt_r16_r16m16
@@ -4035,7 +4035,7 @@ let tzcnt_r16_r16m16 = {
   ; res = Res [|{ loc = Temp [|R16|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "tzcnt"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 188 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = true }; rm_reg = Reg; opcode = 188 }
 }
 let tzcnt_r32_r32m32 = {
     id = Tzcnt_r32_r32m32
@@ -4044,7 +4044,7 @@ let tzcnt_r32_r32m32 = {
   ; res = Res [|{ loc = Temp [|R32|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "tzcnt"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 188 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 188 }
 }
 let tzcnt_r64_r64m64 = {
     id = Tzcnt_r64_r64m64
@@ -4053,7 +4053,7 @@ let tzcnt_r64_r64m64 = {
   ; res = Res [|{ loc = Temp [|R64|]; enc = RM_r }|]
   ; imm = Imm_none
   ; mnemonic = "tzcnt"
-  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F }; rm_reg = Reg; opcode = 188 }
+  ; enc = { prefix = Legacy { prefix = Prx_F3; rex = Rex_w; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 188 }
 }
 let ucomisd = {
     id = Ucomisd
@@ -4062,7 +4062,7 @@ let ucomisd = {
   ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "ucomisd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 46 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 46 }
 }
 let ucomiss = {
     id = Ucomiss
@@ -4071,7 +4071,7 @@ let ucomiss = {
   ; res = Res_none
   ; imm = Imm_none
   ; mnemonic = "ucomiss"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 46 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 46 }
 }
 let unpckhpd = {
     id = Unpckhpd
@@ -4080,7 +4080,7 @@ let unpckhpd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "unpckhpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 21 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 21 }
 }
 let unpckhps = {
     id = Unpckhps
@@ -4089,7 +4089,7 @@ let unpckhps = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "unpckhps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 21 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 21 }
 }
 let unpcklpd = {
     id = Unpcklpd
@@ -4098,7 +4098,7 @@ let unpcklpd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "unpcklpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 20 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 20 }
 }
 let unpcklps = {
     id = Unpcklps
@@ -4107,7 +4107,7 @@ let unpcklps = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "unpcklps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 20 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 20 }
 }
 let vaddpd_X_X_Xm128 = {
     id = Vaddpd_X_X_Xm128
@@ -9975,7 +9975,7 @@ let xorpd = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "xorpd"
-  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 87 }
+  ; enc = { prefix = Legacy { prefix = Prx_66; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 87 }
 }
 let xorps = {
     id = Xorps
@@ -9984,5 +9984,5 @@ let xorps = {
   ; res = First_arg
   ; imm = Imm_none
   ; mnemonic = "xorps"
-  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F }; rm_reg = Reg; opcode = 87 }
+  ; enc = { prefix = Legacy { prefix = Prx_none; rex = Rex_none; escape = Esc_0F; operand_size_override = false }; rm_reg = Reg; opcode = 87 }
 }

@@ -19,7 +19,7 @@ Line 8, characters 20-21:
 8 |   val bar = unique_ x
                         ^
 Error: This value is "aliased"
-         because it is used in an object (at Lines 7-9, characters 2-5).
+         because it is used in an object (at lines 7-9, characters 2-5).
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -34,7 +34,7 @@ let texp_object () =
 Line 5, characters 12-13:
 5 |   val bar = x
                 ^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is used here, but it has already been used as unique at:
 Line 3, characters 12-13:
 3 |   unique_id x;
                 ^
@@ -70,7 +70,7 @@ let texp_letmodule () =
 Line 5, characters 12-13:
 5 |     let y = x
                 ^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is used here, but it has already been used as unique at:
 Line 3, characters 12-13:
 3 |   unique_id x;
                 ^
@@ -98,7 +98,7 @@ let texp_open () =
 Line 4, characters 27-28:
 4 |   let open (struct let y = x end) in
                                ^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is used here, but it has already been used as unique at:
 Line 3, characters 12-13:
 3 |   unique_id x;
                 ^
@@ -129,7 +129,7 @@ let texp_pack () =
 Line 4, characters 33-34:
 4 |   let z = (module struct let y = x end : bar) in
                                      ^
-Error: This value is used here, but it has already been used as unique:
+Error: This value is used here, but it has already been used as unique at:
 Line 3, characters 12-13:
 3 |   unique_id x;
                 ^
@@ -149,7 +149,7 @@ Line 7, characters 12-17:
 7 |   unique_id M.foo
                 ^^^^^
 Error: This value is "aliased"
-         because it is used inside the function at Lines 6-7, characters 22-17
+         because it is used inside the function at lines 6-7, characters 22-17
          which is expected to be "many".
        However, the highlighted expression is expected to be "unique".
 |}]

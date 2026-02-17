@@ -46,8 +46,8 @@ type packed_sections =
 type callback = packed_sections -> unit
 
 (** Register a JIT callback. When code is generated, the callback will be
-    invoked with the assembled sections packed with their emitter module.
-    This handles architecture dispatch internally. *)
+    invoked with the assembled sections packed with their emitter module. This
+    handles architecture dispatch internally. *)
 val register : callback -> unit
 
 (** Unregister the JIT callback and restore previous state. *)

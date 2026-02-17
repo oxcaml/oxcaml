@@ -151,11 +151,11 @@ Line 4, characters 2-7:
 4 |   left'
       ^^^^^
 Error: This value is "local"
-         because it is the field "left" of the record at Line 3, characters 6-25
+         because it is the field "left" of the record at line 3, characters 6-25
          which is "local"
-         because it is allocated at Line 2, characters 10-25 containing data
+         because it is allocated at line 2, characters 10-25 containing data
          which is "local" to the parent region
-         because it is a record whose field "left" is the expression at Line 2, characters 12-16
+         because it is a record whose field "left" is the expression at line 2, characters 12-16
          which is "local" to the parent region.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it is a function return value.

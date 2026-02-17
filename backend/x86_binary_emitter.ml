@@ -709,7 +709,7 @@ let emit_vex_rm_reg b ops rm reg ~vex_m ~vex_w ~vex_v ~vex_l ~vex_p =
 
 let rd_of_reg = function
   | Regf reg -> rd_of_regf reg
-  | Reg32 reg | Reg64 reg -> rd_of_reg64 reg
+  | Reg16 reg | Reg32 reg | Reg64 reg -> rd_of_reg64 reg
   | _ -> assert false
 
 let emit_simd b (instr : Amd64_simd_instrs.instr) args =
@@ -777,11 +777,15 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
       | _ -> failwith instr.mnemonic)
     | _ -> failwith instr.mnemonic
   in
-  let emit_legacy_prefix = function
-    | Prx_none -> ()
+  let emit_legacy_prefix ~operand_size_override prefix =
+    let emit_operand_size_overide () =
+      if operand_size_override then buf_int8 b 0x66
+    in
+    match prefix with
+    | Prx_none -> emit_operand_size_overide ()
     | Prx_66 -> buf_int8 b 0x66
-    | Prx_F3 -> buf_int8 b 0xF3
-    | Prx_F2 -> buf_int8 b 0xF2
+    | Prx_F3 -> buf_int8 b 0xF3; emit_operand_size_overide ()
+    | Prx_F2 -> buf_int8 b 0xF2; emit_operand_size_overide ()
   in
   let legacy_escape = function
     | Esc_none -> [instr.enc.opcode]
@@ -806,13 +810,13 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
     | Prx_F2 -> 3
   in
   (match instr.enc.rm_reg, instr.enc.prefix with
-  | Spec rmod, Legacy { prefix; rex; escape } ->
+  | Spec rmod, Legacy { prefix; rex; escape; operand_size_override } ->
     let rm = rm_only () in
-    emit_legacy_prefix prefix;
+    emit_legacy_prefix prefix ~operand_size_override;
     emit_mod_rm_reg b (mk_rex rex) (legacy_escape escape) rm rmod
-  | Reg, Legacy { prefix; rex; escape } ->
+  | Reg, Legacy { prefix; rex; escape; operand_size_override } ->
     let rm, reg = rm_reg () in
-    emit_legacy_prefix prefix;
+    emit_legacy_prefix prefix ~operand_size_override;
     emit_mod_rm_reg b (mk_rex rex) (legacy_escape escape) rm reg
   | Reg, Vex { vex_m; vex_w; vex_l; vex_p } ->
     let rm, vex_v, reg = rm_vexv_reg () in
@@ -1011,7 +1015,7 @@ let emit_shift reg b dst src =
       assert (is_imm8L n);
       emit_mod_rm_reg b rexw [ 0xC1 ] rm reg;
       buf_int8L b n
-  | ((Reg64 _ | Reg32 _) as rm), Reg8L RCX ->
+  | ((Reg64 _ | Reg32 _ | Mem _) as rm), Reg8L RCX ->
       emit_mod_rm_reg b rexw [ 0xD3 ] rm reg
   | _ ->
       Format.eprintf "emit_shift: src=%a dst=%a@." print_old_arg src
@@ -1474,7 +1478,7 @@ let assemble_line b loc ins =
             (get_symbol b (Asm_symbol.encode sym)).sy_size
               <- Some (Int64.to_int n)
         | _ -> assert false)
-    | Directive (D.Align { fill_x86_bin_emitter=data; bytes = n}) -> (
+    | Directive (D.Align { fill=data; bytes = n}) -> (
         (* TODO: Buffer.length = 0 => set section align *)
         let pos = Buffer.length b.buf in
         let current = pos mod n in

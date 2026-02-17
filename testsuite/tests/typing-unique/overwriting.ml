@@ -16,7 +16,7 @@ Line 2, characters 10-41:
 2 |   let x = overwrite_ r with { x = "foo" } in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -28,7 +28,7 @@ Line 2, characters 10-59:
 2 |   let x = overwrite_ r with ({ x = "foo" } : record_update) in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -56,7 +56,8 @@ let overwrite_shared (r : record_update) =
 Line 3, characters 7-8:
 3 |   x.x, r.x
            ^
-Error: This value is read from here, but it has already been used as unique:
+Error: This value is read from here,
+       but it has already been used as unique at:
 Line 2, characters 21-22:
 2 |   let x = overwrite_ r with { x = "foo" } in
                          ^
@@ -82,7 +83,7 @@ Line 2, characters 31-32:
                                    ^
 Error: This value is "local"
        but is expected to be "global"
-         because it is the field "x" of the record at Line 2, characters 29-34
+         because it is the field "x" of the record at line 2, characters 29-34
          which is expected to be "global".
 |}]
 
@@ -94,7 +95,7 @@ Line 2, characters 22-23:
                           ^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is the field "x" of the record at Line 2, characters 20-25
+         because it is the field "x" of the record at line 2, characters 20-25
          which is expected to be "global".
 |}]
 
@@ -106,7 +107,7 @@ Line 2, characters 31-32:
                                    ^
 Error: This value is "local"
        but is expected to be "global"
-         because it is the field "x" of the record at Line 2, characters 29-34
+         because it is the field "x" of the record at line 2, characters 29-34
          which is expected to be "global".
 |}]
 
@@ -118,7 +119,7 @@ Line 2, characters 22-23:
                           ^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is the field "x" of the record at Line 2, characters 20-25
+         because it is the field "x" of the record at line 2, characters 20-25
          which is expected to be "global".
 |}]
 
@@ -129,7 +130,7 @@ Line 2, characters 11-34:
 2 |   exclave_ overwrite_ r with { x }
                ^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -143,7 +144,7 @@ Line 2, characters 2-25:
 2 |   overwrite_ r with { x }
       ^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -169,7 +170,7 @@ Line 4, characters 4-27:
 4 |     overwrite_ r with { x }
         ^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -201,7 +202,7 @@ Line 2, characters 11-34:
 2 |   exclave_ overwrite_ r with { x }
                ^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -212,7 +213,7 @@ Line 2, characters 2-25:
 2 |   overwrite_ r with { x }
       ^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -233,7 +234,7 @@ Line 2, characters 2-36:
 2 |   overwrite_ eq with { eq0 = "foo" }
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -279,7 +280,7 @@ Line 3, characters 2-41:
 3 |   overwrite_ eq with { eq0 = 1; eq1 = 2 }
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -290,7 +291,7 @@ Line 2, characters 2-31:
 2 |   overwrite_ eq with ("foo", _)
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -323,7 +324,7 @@ Line 3, characters 2-27:
 3 |   overwrite_ eq with (1, 2)
       ^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -344,7 +345,7 @@ Line 4, characters 4-49:
 4 |     overwrite_ mr with { a = None; b = many_fun }
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -358,7 +359,7 @@ Line 4, characters 39-47:
                                            ^^^^^^^^
 Error: This value is "once"
        but is expected to be "many"
-         because it is the field "b" of the record at Line 4, characters 23-49
+         because it is the field "b" of the record at line 4, characters 23-49
          which is expected to be "many".
 |}]
 
@@ -370,10 +371,10 @@ Line 3, characters 39-40:
 3 |     overwrite_ mr with { a = None; b = _ }
                                            ^
 Error: This value is "once"
-         because it is the field "b" of the record at Line 3, characters 15-17
+         because it is the field "b" of the record at line 3, characters 15-17
          which is "once".
        However, the highlighted expression is expected to be "many"
-         because it is the field "b" of the record at Line 3, characters 23-42
+         because it is the field "b" of the record at line 3, characters 23-42
          which is expected to be "many".
 |}]
 
@@ -386,10 +387,10 @@ Line 3, characters 15-17:
 3 |     overwrite_ mr with { a = None }
                    ^^
 Error: This value is "once"
-         because it is the field "b" of the record at Line 3, characters 15-17
+         because it is the field "b" of the record at line 3, characters 15-17
          which is "once".
        However, the highlighted expression is expected to be "many"
-         because it is the field "b" of the record at Line 3, characters 23-35
+         because it is the field "b" of the record at line 3, characters 23-35
          which is expected to be "many".
 |}]
 
@@ -402,7 +403,7 @@ Line 4, characters 4-53:
 4 |     overwrite_ mr with { a = None; b = portable_fun }
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -416,7 +417,7 @@ Line 4, characters 39-54:
                                            ^^^^^^^^^^^^^^^
 Error: This value is "nonportable"
        but is expected to be "portable"
-         because it is the field "b" of the record at Line 4, characters 23-56
+         because it is the field "b" of the record at line 4, characters 23-56
          which is expected to be "portable".
 |}]
 
@@ -431,9 +432,9 @@ Line 5, characters 34-49:
                                       ^^^^^^^^^^^^^^^
 Error: This value is "nonportable"
        but is expected to be "portable"
-         because it is contained (via constructor "Some") in the value at Line 5, characters 29-49
+         because it is contained (via constructor "Some") in the value at line 5, characters 29-49
          which is expected to be "portable"
-         because it is the field "a" of the record at Line 5, characters 23-69
+         because it is the field "a" of the record at line 5, characters 23-69
          which is expected to be "portable".
 |}]
 
@@ -446,7 +447,7 @@ Line 3, characters 4-42:
 3 |     overwrite_ mr with { a = None; b = _ }
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -459,7 +460,7 @@ Line 3, characters 4-35:
 3 |     overwrite_ mr with { a = None }
         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -537,7 +538,7 @@ Line 5, characters 17-53:
 5 |   | Constr1 _ -> overwrite_ c with Constr1 { x = "" }
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -600,7 +601,7 @@ Line 2, characters 22-49:
 2 |   | OptionA s as v -> overwrite_ v with OptionA s
                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -613,7 +614,7 @@ Line 3, characters 17-44:
 3 |   | OptionA s -> overwrite_ v with OptionA s
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -629,7 +630,7 @@ Line 5, characters 20-47:
 5 |      | OptionA s -> overwrite_ v with OptionA s
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -645,7 +646,7 @@ Line 5, characters 20-47:
 5 |      | OptionA _ -> overwrite_ v with OptionA s
                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -695,7 +696,7 @@ Line 2, characters 44-75:
 2 |   | (OptionA "foo" | OptionA "bar") as v -> overwrite_ v with OptionA "baz"
                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -707,7 +708,7 @@ Line 2, characters 53-84:
 2 |   | ((OptionA "foo" as v) | (OptionA "bar" as v)) -> overwrite_ v with OptionA "baz"
                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -768,7 +769,7 @@ Line 8, characters 30-59:
 8 |     | Some s when is_option_a (overwrite_ v with OptionA s) -> true
                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -776,13 +777,13 @@ let guards_bad = function
   | OptionA _ as v when is_option_a (overwrite_ v with OptionA "") -> true
   | _ -> false
 [%%expect{|
-Line 2, characters 4-13:
-2 |   | OptionA _ as v when is_option_a (overwrite_ v with OptionA "") -> true
-        ^^^^^^^^^
-Error: This value is read from here, but it is already being used as unique:
 Line 2, characters 48-49:
 2 |   | OptionA _ as v when is_option_a (overwrite_ v with OptionA "") -> true
                                                     ^
+Error: This value is used here as unique, but it is also being read from at:
+Line 2, characters 4-13:
+2 |   | OptionA _ as v when is_option_a (overwrite_ v with OptionA "") -> true
+        ^^^^^^^^^
 
 |}]
 
@@ -795,7 +796,7 @@ Line 3, characters 25-54:
 3 |   | { x = OptionA s } -> overwrite_ r.x with OptionA s
                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -853,7 +854,7 @@ Line 2, characters 10-13:
 2 |   unique_ r.m
               ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with some modality) of the record at Line 2, characters 10-11.
+         because it is the field "m" (with some modality) of the record at line 2, characters 10-11.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -867,7 +868,7 @@ Line 4, characters 15-18:
 4 |     overwrite_ r.m with OptionA s
                    ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with some modality) of the record at Line 4, characters 15-16.
+         because it is the field "m" (with some modality) of the record at line 4, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -882,7 +883,7 @@ Line 5, characters 15-18:
 5 |     overwrite_ r.m with OptionA s
                    ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with some modality) of the record at Line 5, characters 15-16.
+         because it is the field "m" (with some modality) of the record at line 5, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -897,7 +898,7 @@ Line 5, characters 15-18:
 5 |     overwrite_ r.m with OptionA s
                    ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with some modality) of the record at Line 5, characters 15-16.
+         because it is the field "m" (with some modality) of the record at line 5, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -912,9 +913,9 @@ Line 5, characters 15-20:
 5 |     overwrite_ r.m.x with OptionA s
                    ^^^^^
 Error: This value is "aliased"
-         because it is the field "x" of the record at Line 5, characters 15-18
+         because it is the field "x" of the record at line 5, characters 15-18
          which is "aliased"
-         because it is the field "m" (with some modality) of the record at Line 5, characters 15-16.
+         because it is the field "m" (with some modality) of the record at line 5, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -928,7 +929,7 @@ Line 4, characters 35-38:
 4 |     (r.m <- OptionB s), overwrite_ r.m with OptionA s
                                        ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with some modality) of the record at Line 4, characters 35-36.
+         because it is the field "m" (with some modality) of the record at line 4, characters 35-36.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -942,9 +943,9 @@ Line 4, characters 43-48:
 4 |     (r.m <- { x = OptionB s }), overwrite_ r.m.x with OptionA s
                                                ^^^^^
 Error: This value is "aliased"
-         because it is the field "x" of the record at Line 4, characters 43-46
+         because it is the field "x" of the record at line 4, characters 43-46
          which is "aliased"
-         because it is the field "m" (with some modality) of the record at Line 4, characters 43-44.
+         because it is the field "m" (with some modality) of the record at line 4, characters 43-44.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -959,7 +960,7 @@ Line 5, characters 28-31:
 5 |             else overwrite_ r.m with OptionA s
                                 ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with some modality) of the record at Line 5, characters 28-29.
+         because it is the field "m" (with some modality) of the record at line 5, characters 28-29.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -974,9 +975,9 @@ Line 5, characters 20-25:
 5 |     else overwrite_ r.m.x with OptionA s
                         ^^^^^
 Error: This value is "aliased"
-         because it is the field "x" of the record at Line 5, characters 20-23
+         because it is the field "x" of the record at line 5, characters 20-23
          which is "aliased"
-         because it is the field "m" (with some modality) of the record at Line 5, characters 20-21.
+         because it is the field "m" (with some modality) of the record at line 5, characters 20-21.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -991,7 +992,7 @@ Line 5, characters 15-18:
 5 |     overwrite_ r.m with OptionA s
                    ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with some modality) of the record at Line 5, characters 15-16.
+         because it is the field "m" (with some modality) of the record at line 5, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -1006,9 +1007,9 @@ Line 5, characters 15-20:
 5 |     overwrite_ r.m.x with OptionA s
                    ^^^^^
 Error: This value is "aliased"
-         because it is the field "x" of the record at Line 5, characters 15-18
+         because it is the field "x" of the record at line 5, characters 15-18
          which is "aliased"
-         because it is the field "m" (with some modality) of the record at Line 5, characters 15-16.
+         because it is the field "m" (with some modality) of the record at line 5, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -1028,7 +1029,7 @@ Line 7, characters 17-20:
 7 |       overwrite_ r.m with OptionB s
                      ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with some modality) of the record at Line 7, characters 17-18.
+         because it is the field "m" (with some modality) of the record at line 7, characters 17-18.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -1048,7 +1049,7 @@ Line 2, characters 10-34:
 2 |   let x = overwrite_ r with (_, _) in
               ^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -1060,7 +1061,7 @@ Line 2, characters 10-38:
 2 |   let x = overwrite_ r with ("foo", _) in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -1072,7 +1073,7 @@ Line 2, characters 10-42:
 2 |   let x = overwrite_ r with ("foo", "bar") in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -1114,7 +1115,7 @@ Line 2, characters 10-44:
 2 |   let x = overwrite_ r with (~x:(_), ~y:(_)) in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -1126,7 +1127,7 @@ Line 2, characters 10-46:
 2 |   let x = overwrite_ r with (~x:"foo", ~y:(_)) in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -1138,7 +1139,7 @@ Line 2, characters 10-48:
 2 |   let x = overwrite_ r with (~x:"foo", ~y:"bar") in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -1182,7 +1183,7 @@ Line 3, characters 12-47:
 3 |     let x = overwrite_ c with Con { x = "foo" } in
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -1195,7 +1196,7 @@ Line 3, characters 12-55:
 3 |     let x = overwrite_ c with Con { c1 with x = "foo" } in
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -1230,7 +1231,7 @@ Line 3, characters 16-49:
 3 |     let x = Con (overwrite_ c with { x = "foo" }) in
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -1243,6 +1244,6 @@ Line 3, characters 16-56:
 3 |     let x = Con (overwrite_ c with { c with x = "foo" }) in
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]

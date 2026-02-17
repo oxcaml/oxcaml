@@ -497,7 +497,10 @@ val box_int_gen :
 val unbox_int :
   Debuginfo.t -> Primitive.boxed_integer -> expression -> expression
 
-(** Used to prepare 32-bit integers on 64-bit platforms for a lsr operation *)
+(** For example, [bit_count Unboxed_int32] is [32] *)
+val bit_count : Primitive.unboxed_or_untagged_integer -> int
+
+(** Used to prepare small integers for a bitwise operations *)
 val make_unsigned_int :
   Primitive.unboxed_or_untagged_integer ->
   expression ->
@@ -700,6 +703,11 @@ val entry_point : Compilation_unit.t list -> phrase list
 
 (** Generate the caml_globals table *)
 val global_table : Compilation_unit.t list -> phrase
+
+(** Generate the caml_unit_deps_table for shared objects / complete objects.
+    Maps compilation unit names to their entry functions, gc_roots, and
+    dependencies. *)
+val unit_deps_table : (Compilation_unit.t * Import_info.t list) list -> phrase
 
 (** Add references to the given symbols *)
 val reference_symbols : symbol list -> phrase

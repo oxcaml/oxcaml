@@ -20,7 +20,7 @@ open Types
 type position = First | Second
 
 val swap_position : position -> position
-val print_pos : Format.formatter -> position -> unit
+val print_pos : position Format_doc.printer
 
 type expanded_type = { ty: type_expr; expanded: type_expr }
 

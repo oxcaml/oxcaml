@@ -115,6 +115,7 @@ compiler: runtime-stdlib
           oxcaml/testsuite/tools/asmgen_$(ARCH).o \
           testsuite/lib/lib.cm{,x}a \
           testsuite/lib/testing.cm{,x}a \
+          @middle_end/flambda2/tests/tools/all \
           $(ocamldir)/tools/dumpobj.bc
 
 # CR dkalinichenko: [runtest] is built using the main profile,
@@ -198,7 +199,7 @@ _build/_bootinstall: Makefile.config $(dune_config_targets)
 	ln -sf ../../default/$(boot_ocamlmklib) _build/_bootinstall/bin/ocamlmklib.opt
 	ln -sf ../../default/$(boot_ocamldep) _build/_bootinstall/bin/ocamldep.opt
 	ln -sf ../../default/$(boot_ocamlobjinfo) _build/_bootinstall/bin/ocamlobjinfo.opt
-	ln -sf "`which ocamllex`" _build/_bootinstall/bin/ocamllex.opt
+	ln -sf "`$(opam_exec) which ocamllex`" _build/_bootinstall/bin/ocamllex.opt
 	for prog in ocamlopt ocamlj ocamlc ocamllex ocamldep ocamlmklib; do \
 	  ln -sf "$$prog.opt" "_build/_bootinstall/bin/$$prog"; \
 	done
@@ -263,7 +264,7 @@ boot_build = _build/default
 # The following horror will be removed when work to allow the testsuite to
 # run on an installed tree (led by David Allsopp) is completed.
 .PHONY: runtest-upstream test install_for_test
-install_for_test: _install
+install_for_test: install
 	rm -rf _runtest
 	mkdir _runtest
 	ln -s ../_install _runtest/_install
@@ -274,6 +275,8 @@ install_for_test: _install
 	cp -a oxcaml/testsuite/tools/* _runtest/testsuite/tools/
 	cp $(main_build)/oxcaml/testsuite/tools/expect.exe _runtest/testsuite/tools/expect
 	chmod 755 _runtest/testsuite/tools/expect
+	cp $(main_build)/middle_end/flambda2/tests/tools/fexprc.exe _runtest/testsuite/tools/fexprc
+	chmod 755 _runtest/testsuite/tools/fexprc
 	cp $(main_build)/oxcaml/testsuite/tools/expectnat.exe _runtest/testsuite/tools/expectnat
 	chmod 755 _runtest/testsuite/tools/expectnat
 	cp $(main_build)/oxcaml/testsuite/tools/codegen_main.exe \
@@ -299,9 +302,6 @@ install_for_test: _install
 	 # replace backend-specific testsuite/tests/asmgen with their new versions
 	rm _runtest/testsuite/tests/asmgen/*
 	cp -a oxcaml/testsuite/tests/asmgen/* _runtest/testsuite/tests/asmgen/
-	 # replace backend-specific testsuite/tests/unboxed-primitive-args with their new versions
-	rm _runtest/testsuite/tests/unboxed-primitive-args/*
-	cp -a oxcaml/testsuite/tests/unboxed-primitive-args/* _runtest/testsuite/tests/unboxed-primitive-args/
 	 # add extension library tests that are not supported by the upstream compiler
 	rm _runtest/testsuite/tests/lib-extensions/*
 	cp -a oxcaml/testsuite/tests/lib-extensions/* _runtest/testsuite/tests/lib-extensions

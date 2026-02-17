@@ -26,15 +26,16 @@ let merge_cma ~target ~archives =
     (fun archive -> Load_path.add_dir ~hidden:false (Filename.dirname archive))
     archives;
   let error reporter err =
-    Format.eprintf "Error whilst merging .cma files:@ %a\n%!" reporter err;
+    Format.eprintf "Error whilst merging .cma files:@ %a\n%!"
+      (Format_doc.compat reporter) err;
     exit 1
   in
   try
     Bytelibrarian.create_archive archives target;
     Warnings.check_fatal ()
   with
-  | Bytelibrarian.Error err -> error Bytelibrarian.report_error err
-  | Bytelink.Error err -> error Bytelink.report_error err
+  | Bytelibrarian.Error err -> error Bytelibrarian.report_error_doc err
+  | Bytelink.Error err -> error Bytelink.report_error_doc err
   | Warnings.Errors ->
     (* Warnings should already have been printed to stderr. *)
     exit 1

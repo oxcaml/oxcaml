@@ -62,12 +62,23 @@ static_assert(sizeof(struct stack_info) == Stack_ctx_words * sizeof(value), "");
 
 static _Atomic int64_t fiber_id = 0;
 
+#define NUM_STACK_SIZE_CLASSES 5
+#define MAX_STACK_CACHE_LIMIT  Max_domains_max
+
 /* Parameters settable with OCAMLRUNPARAM */
 uintnat caml_init_main_stack_wsz = 0;   /* -Xmain_stack_size= */
 uintnat caml_init_thread_stack_wsz = 0; /* -Xthread_stack_size= */
 uintnat caml_init_fiber_stack_wsz = 0;  /* -Xfiber_stack_size= */
 
 uintnat caml_nohugepage_stacks = 1;
+
+uintnat caml_cache_stacks_per_class = /* -Xcache_stacks_per_class */
+#if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
+  1
+#else
+  128
+#endif
+  ;
 
 uintnat caml_get_init_stack_wsize (int context)
 {
@@ -125,37 +136,6 @@ void caml_change_max_stack_size (uintnat new_max_wsize)
                     Bsize_wsize(new_max_wsize) / 1024);
   }
   caml_max_stack_wsize = new_max_wsize;
-}
-
-#define NUM_STACK_SIZE_CLASSES 5
-
-struct stack_info** caml_alloc_stack_cache (void)
-{
-  int i;
-
-  struct stack_info** stack_cache =
-    (struct stack_info**)caml_stat_alloc_noexc(sizeof(struct stack_info*) *
-                                               NUM_STACK_SIZE_CLASSES);
-  if (stack_cache == NULL)
-    return NULL;
-
-  for(i = 0; i < NUM_STACK_SIZE_CLASSES; i++)
-    stack_cache[i] = NULL;
-
-  return stack_cache;
-}
-
-static void free_stack_memory(struct stack_info*);
-void caml_free_stack_cache(struct stack_info** cache)
-{
-  for (int i = 0; i < NUM_STACK_SIZE_CLASSES; i++) {
-    while (cache[i] != NULL) {
-      struct stack_info* stk = cache[i];
-      cache[i] = (struct stack_info*)stk->exception_ptr;
-      free_stack_memory(stk);
-    }
-  }
-  caml_stat_free(cache);
 }
 
 /* Round up to a power of 2 */
@@ -315,18 +295,36 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
                              int64_t id)
 {
   struct stack_info* stack;
-  struct stack_info **cache = Caml_state->stack_cache;
+  struct stack_cache* caches = Caml_state->stack_caches;
 
   static_assert(sizeof(struct stack_info) % sizeof(value) == 0, "");
   static_assert(sizeof(struct stack_handler) % sizeof(value) == 0, "");
 
-  CAMLassert(cache != NULL);
+  CAMLassert(caches != NULL);
 
-  if (cache_bucket != -1 &&
-      cache[cache_bucket] != NULL) {
-    stack = cache[cache_bucket];
-    cache[cache_bucket] =
-      (struct stack_info*)stack->exception_ptr;
+  if (cache_bucket != -1) {
+    struct stack_cache* cache = &caches[cache_bucket];
+    bool alloc = false;
+    do {
+      stack = cache->head;
+      if(stack) {
+        // Other domains may push to the cache, but not pop, so it's safe
+        // to read the exception pointer.
+        struct stack_info* top = (struct stack_info*)stack->exception_ptr;
+        alloc = atomic_compare_exchange_weak(&cache->head, &stack, top);
+        if(alloc) {
+          cache->len -= 1;
+        }
+      } else {
+        stack = alloc_for_stack(wosize, id);
+        if(stack == NULL) {
+          return NULL;
+        }
+        stack->cache_bucket = cache_bucket;
+        alloc = true;
+      }
+    } while(!alloc);
+
     CAMLassert(stack->cache_bucket == stack_cache_bucket(wosize));
   } else {
     /* couldn't get a cached stack, so have to create one */
@@ -346,6 +344,7 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   stack->sp = Stack_high(stack);
   stack->exception_ptr = NULL;
   stack->id = id;
+  stack->domain_idx = Caml_state->id;
   stack->local_arenas = NULL;
   stack->local_sp = 0;
   stack->local_top = NULL;
@@ -1006,38 +1005,131 @@ static void free_stack_memory(struct stack_info* stack)
 #endif
 }
 
-uintnat caml_cache_stacks_per_class =
-#if defined(USE_MMAP_MAP_STACK) || defined(STACK_GUARD_PAGES)
-  1
-#else
-  128
-#endif
-  ;
+struct stack_cache* caml_alloc_stack_caches(void)
+{
+  int i;
+
+  struct stack_cache* stack_caches =
+    (struct stack_cache*)
+    caml_stat_alloc_noexc(sizeof(struct stack_cache) * NUM_STACK_SIZE_CLASSES);
+
+  if (stack_caches == NULL)
+    return NULL;
+
+  for(i = 0; i < NUM_STACK_SIZE_CLASSES; i++) {
+    stack_caches[i].head = NULL;
+    stack_caches[i].len = MAX_STACK_CACHE_LIMIT;
+  }
+
+  return stack_caches;
+}
+
+void caml_free_stack_caches(struct stack_cache* caches)
+{
+  for (int i = 0; i < NUM_STACK_SIZE_CLASSES; i++) {
+    while (caches[i].head != NULL) {
+      struct stack_info* stk = caches[i].head;
+      caches[i].head = (struct stack_info*)stk->exception_ptr;
+      free_stack_memory(stk);
+    }
+  }
+  caml_stat_free(caches);
+}
+
+// Must not be greater than MAX_STACK_CACHE_LIMIT
+static uintnat caml_stack_cache_limit(int domain_idx)
+{
+  // It's common to use the initial domain to distribute fibers to a pool of
+  // worker domains, so we let it cache at least one fiber per running domain.
+  if(domain_idx == 0) {
+    uintnat n = atomic_load_relaxed(&caml_num_domains_running);
+    return n < caml_cache_stacks_per_class ? caml_cache_stacks_per_class : n;
+  }
+  return caml_cache_stacks_per_class;
+}
+
+void caml_enable_stack_caches(struct stack_cache* caches)
+{
+  CAMLassert(caches != NULL);
+
+  for(int i = 0; i < NUM_STACK_SIZE_CLASSES; i++) {
+    struct stack_cache* cache = &caches[i];
+
+    CAMLassert(cache->head == NULL);
+    CAMLassert(cache->len >= MAX_STACK_CACHE_LIMIT);
+
+    // Allow other domains to start pushing stacks
+    cache->len -= MAX_STACK_CACHE_LIMIT;
+  }
+}
+
+void caml_disable_stack_caches(struct stack_cache* caches)
+{
+  CAMLassert(caches != NULL);
+
+  for(int i = 0; i < NUM_STACK_SIZE_CLASSES; i++) {
+    struct stack_cache* cache = &caches[i];
+
+    // Stop other domains from pushing stacks
+    cache->len += MAX_STACK_CACHE_LIMIT;
+
+    while (cache->len > MAX_STACK_CACHE_LIMIT) {
+      struct stack_info* top = cache->head;
+
+      // len includes domains with pending pushes, so we may reach the end of
+      // the cache. If so, spin until the pushes resolve.
+      if(top == NULL) {
+        cpu_relax();
+        continue;
+      }
+
+      struct stack_info* next = (struct stack_info*)top->exception_ptr;
+      if(atomic_compare_exchange_weak(&cache->head, &top, next)) {
+        cache->len -= 1;
+        free_stack_memory(top);
+      }
+    }
+
+    CAMLassert(cache->head == NULL);
+    CAMLassert(cache->len >= MAX_STACK_CACHE_LIMIT);
+  }
+}
 
 void caml_free_stack (struct stack_info* stack)
 {
   CAMLnoalloc;
-  struct stack_info** cache = Caml_state->stack_cache;
+
+  // If this fiber was allocated by a domain at index [domain_idx], the stack
+  // cache at that index has been initialized and will never be freed.
+  struct stack_cache* caches = caml_get_stack_caches(stack->domain_idx);
+  int cache_bucket = stack->cache_bucket;
 
   CAMLassert(stack->magic == 42);
-  CAMLassert(cache != NULL);
+  CAMLassert(caches != NULL);
 
   // Don't need to update local_sp since this is no longer the current stack.
   caml_free_local_arenas(stack->local_arenas);
 
-  if (stack->cache_bucket != -1) {
-    struct stack_info* top = (struct stack_info*)cache[stack->cache_bucket];
-    int64_t count = top ? top->id : 0;
-    if (count < caml_cache_stacks_per_class) {
-      stack->exception_ptr = (void *)top;
-      stack->id = count + 1;
-      cache[stack->cache_bucket] = stack;
+  if (cache_bucket != -1) {
 #if defined(DEBUG) && defined(STACK_CHECKS_ENABLED)
-      memset(Stack_base(stack), 0x42,
-             (Stack_high(stack)-Stack_base(stack))*sizeof(value));
+    memset(Stack_base(stack), 0x42,
+          (Stack_high(stack)-Stack_base(stack))*sizeof(value));
 #endif
-    } else {
+    struct stack_cache* cache = &caches[cache_bucket];
+    uintnat limit = caml_stack_cache_limit(stack->domain_idx);
+    uintnat len = atomic_fetch_add(&cache->len, 1);
+    if (len >= limit) {
+      // The cache may have fewer than [len] stacks, but we know other domains
+      // have committed to pushing stacks up to [limit].
+      cache->len -= 1;
       free_stack_memory(stack);
+    } else {
+      bool freed = false;
+      do {
+        struct stack_info* top = cache->head;
+        stack->exception_ptr = (void *)top;
+        freed = atomic_compare_exchange_weak(&cache->head, &top, stack);
+      } while(!freed);
     }
   } else {
     free_stack_memory(stack);
@@ -1208,142 +1300,12 @@ typedef struct {
 
 #define Is_bound(b) Is_block((b)->dyn)
 
-/* Hash tables of bindings. Linear probing, add-only, growing when half full.
- *
- * At present we only use these for per-thread base values (those set
- * with set_root), but I'm keeping this code generic as we may want
- * other binding hash tables in future. */
-
-#define DYNAMIC_INIT_CAPACITY 8
-
-typedef struct {
-  size_t mask; /* capacity - 1 */
-  size_t count;
-  binding_t bindings;
-} binding_table_s, *binding_table_t;
-
-static void dynamic_table_fresh(binding_table_t table)
-{
-  table->mask = (size_t)-1;
-  table->count = 0;
-  table->bindings = NULL;
-}
-
-static void dynamic_table_add(binding_table_t table, value dyn, value val)
-{
-  size_t mask = table->mask;
-  value hash = Hash_dyn(dyn);
-  size_t i = hash & mask;
-  size_t j = i;
-  while(Is_block(table->bindings[j].dyn)) { /* collision */
-    j = (j + 1) & mask; /* linear probing */
-    CAMLassert (j != i); /* Caller guarantees table has space */
-  }
-  table->bindings[j].dyn = dyn;
-  table->bindings[j].val = val;
-}
-
-static bool dynamic_table_grow(binding_table_t table)
-{
-  size_t old_capacity = table->mask + 1;
-  size_t new_capacity = old_capacity ? old_capacity * 2 : DYNAMIC_INIT_CAPACITY;
-  size_t new_mask = new_capacity - 1;
-  CAMLassert(Is_power_of_2(new_capacity));
-
-  binding_t new_bindings = caml_stat_alloc_noexc(sizeof(binding_s) * new_capacity);
-  if (!new_bindings) {
-    return false;
-  }
-  for (size_t j = 0; j < new_capacity; ++ j) { /* ensure new table is empty */
-    new_bindings[j].dyn = Val_null;
-  }
-  binding_t old_bindings = table->bindings;
-  table->mask = new_mask;
-  table->bindings = new_bindings;
-
-  /* Copy existing bindings */
-  for (size_t i = 0; i < old_capacity; ++ i) {
-    if (Is_bound(&old_bindings[i])) {
-      dynamic_table_add(table, old_bindings[i].dyn, old_bindings[i].val);
-    }
-  }
-  if (old_bindings) {
-    caml_stat_free(old_bindings);
-  }
-  return true;
-}
-
-/* Find the binding of `dyn` in `table`, or an empty binding if not
- * present. Returns the binding in `*binding_out`, and a bool
- * indicating whether the binding was found. If the table is empty,
- * sets `binding_out` to NULL and returns `false`. Does not
- * allocate. */
-
-static bool dynamic_table_find(binding_table_t table, value dyn, binding_t *binding_out)
-{
-  if (table->bindings == NULL) {
-    *binding_out = NULL;
-    return false;
-  }
-  uintnat hash = Hash_dyn(dyn);
-  size_t i = hash & table->mask;
-  while (true) {
-    binding_t binding = table->bindings + i;
-    if (binding->dyn == dyn) { /* Found */
-      *binding_out = binding;
-      return true;
-    } else if (!Is_bound(binding)) { /* Not found */
-      *binding_out = binding;
-      return false;
-    }
-    /* Linear probe */
-    i = (i + 1) & table->mask;
-  }
-}
-
-/* Set `dyn` to `val` in `table`. Update if already present; otherwise
- * add (growing the table if half-full). May allocate on the C heap. */
-
-static bool dynamic_table_bind(binding_table_t table, value dyn, value val)
-{
-  binding_t binding = NULL;
-  bool found = dynamic_table_find(table, dyn, &binding);
-  if (!binding) { /* Table was empty */
-    bool res = dynamic_table_grow(table);
-    if (!res) {
-      return res;
-    }
-    found = dynamic_table_find(table, dyn, &binding);
-    CAMLassert(!found);
-  }
-  CAMLassert(binding);
-  if (found) { /* Update binding */
-    binding->val = val;
-  } else { /* Not found */
-    if (table->count * 2 == table->mask+1) {
-      /* grow when half-full (includes the special case of being empty) */
-      bool res = dynamic_table_grow(table);
-      if (!res) {
-        return res;
-      }
-      dynamic_table_add(table, dyn, val);
-    } else {
-      CAMLassert(!Is_bound(binding));
-      binding->dyn = dyn;
-      binding->val = val;
-    }
-    ++ table->count;
-  }
-  return true;
-}
-
 /* Per-thread dynamic binding data structure */
 
 /* Must match Dynamic_ definitions in amd64.S */
 
 typedef struct dynamic_thread_s {
   binding_s cache[DYNAMIC_CACHE_SIZE];
-  binding_table_s base;
 } dynamic_thread_s, *dynamic_thread_t;
 
 static void dynamic_flush_cache(dynamic_thread_t thread)
@@ -1360,35 +1322,16 @@ CAMLexport dynamic_thread_t caml_dynamic_new_thread(dynamic_thread_t parent)
 {
   dynamic_thread_t res = caml_stat_alloc_noexc(sizeof(dynamic_thread_s));
   if (!res) {
-    goto fail_alloc;
+    return NULL;
   }
   /* Not even going to think about the semantics of copying cache entries */
   dynamic_flush_cache(res);
-  dynamic_table_fresh(&res->base);
 
-  if (parent && parent->base.count) { /* Existing base bindings to copy */
-    size_t capacity = parent->base.mask + 1;
-    binding_t new_bindings = caml_stat_alloc_noexc(sizeof(binding_s) * capacity);
-    if (!new_bindings) {
-      goto fail_alloc_bindings;
-    }
-    memcpy(new_bindings, parent->base.bindings, sizeof(binding_s) * capacity);
-    res->base.mask = parent->base.mask;
-    res->base.count = parent->base.count;
-    res->base.bindings = new_bindings;
-  }
   return res;
-fail_alloc_bindings:
-  caml_stat_free(res);
-fail_alloc:
-  return NULL;
 }
 
 CAMLexport void caml_dynamic_delete_thread(dynamic_thread_t thread)
 {
-  if (thread->base.bindings) {
-    caml_stat_free(thread->base.bindings);
-  }
   caml_stat_free(thread);
 }
 
@@ -1413,34 +1356,6 @@ CAMLexport void caml_dynamic_scan_thread_roots(dynamic_thread_t thread,
       f(fdata, thread->cache[i].val, &thread->cache[i].val);
     }
   }
-  for (size_t i = 0; i < (size_t)thread->base.mask + 1; ++i) {
-    if (Is_bound(&thread->base.bindings[i])) {
-      f(fdata, thread->base.bindings[i].dyn, &thread->base.bindings[i].dyn);
-      f(fdata, thread->base.bindings[i].val, &thread->base.bindings[i].val);
-    }
-  }
-
-}
-
-CAMLprim value caml_dynamic_set_root(value dyn, value val)
-{
-  CAMLparam2(dyn, val); /* TODO: remove unless we can GC */
-  dynamic_thread_t thread = Caml_state->dynamic_bindings;
-  CAMLassert(thread);
-  bool res = dynamic_table_bind(&thread->base, dyn, val);
-  if (!res) {
-    caml_raise_out_of_memory();
-  }
-
-  /* invalidate cache */
-  uintnat hash = Hash_dyn(dyn);
-  uintnat index = hash & (DYNAMIC_CACHE_SIZE - 1);
-  binding_t entry = thread->cache + index;
-  if (entry->dyn == dyn) {
-    entry->dyn = Val_null;
-  }
-
-  CAMLreturn(Val_unit);
 }
 
 /* Get the current value of a dynamic variable. Does not allocate.
@@ -1470,15 +1385,7 @@ CAMLprim value caml_dynamic_get(value dyn)
     stack = Stack_parent(stack);
   }
 
-  /* Not bound on a fiber; check the thread base bindings */
-  binding_t binding = NULL;
-  bool found = dynamic_table_find(&thread->base, dyn, &binding);
-  if (found) {
-    val = binding->val;
-    goto found;
-  }
-
-  /* Back to the initial binding */
+  /* Not bound on a fiber; back to the initial binding */
   val = Val_dyn(dyn);
 
 found:

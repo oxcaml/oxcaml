@@ -625,7 +625,7 @@ Line 1, characters 48-49:
                                                     ^
 Error: This value is "local"
        but is expected to be "global"
-         because it is the field "x" (with some modality) of the record at Line 1, characters 46-54.
+         because it is the field "x" (with some modality) of the record at line 1, characters 46-54.
 |}]
 
 let f2 (x @ local) (f @ once) : t2 = exclave_ { x; f }
@@ -841,7 +841,7 @@ Line 1, characters 23-36:
                            ^^^^^^^^^^^^^
 Error: This value is "local" because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "global"
-         because it is an element of the tuple at Line 1, characters 23-39
+         because it is an element of the tuple at line 1, characters 23-39
          which is expected to be "global" because it is an allocation
          which is expected to be "local" to the parent region or "global"
          because it is a function return value.
@@ -1335,6 +1335,28 @@ val idx_imm : ('a, 'b) idx_imm -> ('a, 'b) idx_imm = <fun>
 val idx_mut : ('a, 'b) idx_mut -> ('a, 'b) idx_mut = <fun>
 |}]
 
+module Borrow = struct
+  let f () =
+    let x = "hello" in
+    let y = borrow_ x in
+    ()
+
+  let g x y =
+    String.concat (borrow_ x) (borrow_ y)
+
+  let h x =
+    match borrow_ x with
+    | true -> ()
+    | false -> ()
+end
+[%%expect{|
+Line 8, characters 18-29:
+8 |     String.concat (borrow_ x) (borrow_ y)
+                      ^^^^^^^^^^^
+Error: This value is "local" because it is borrowed.
+       However, the highlighted expression is expected to be "global".
+|}]
+
 (***************)
 (* Modal kinds *)
 
@@ -1360,29 +1382,44 @@ type existential_abstract =
     Mk : ('a : value mod portable). 'a abstract -> existential_abstract
 |}]
 
+module M : sig
+  kind_ immediate = value mod global many uncontended
+  kind_ immutable_data = value mod uncontended many
+  kind_ immutable = value mod uncontended
+  kind_ data = value mod many
+  kind_ abstract
+end = struct
+  kind_ immediate = value mod global many uncontended
+  kind_ immutable_data = value mod uncontended many
+  kind_ immutable = value mod uncontended
+  kind_ data = value mod many
+  kind_ abstract
+end
+[%%expect{|
+module M :
+  sig
+    kind_ immediate = value mod global many
+    kind_ immutable_data = value mod many
+    kind_ immutable = value
+    kind_ data = value mod many
+    kind_ abstract
+  end @@ stateless
+|}]
+
 (* not yet supported *)
 module _ : sig
   type 'a gel : kind_of_ 'a mod global
   type 'a t : _
-  kind_abbrev_ immediate = value mod global unique many sync uncontended
-  kind_abbrev_ immutable_data = value mod sync uncontended many
-  kind_abbrev_ immutable = value mod uncontended
-  kind_abbrev_ data = value mod sync many
 end = struct
   type 'a gel : kind_of_ 'a mod global
   type 'a t : _
-  kind_abbrev_ immediate = value mod global unique many sync uncontended
-  kind_abbrev_ immutable_data = value mod sync uncontended many
-  kind_abbrev_ immutable = value mod uncontended
-  kind_abbrev_ data = value mod sync many
 end
 
-(* CR layouts v2.8: Expect this output to change once modal kinds are
-   supported. Internal ticket 5118. *)
-
+(* CR layouts: Expect this output to change once `kind_of_` is   supported.
+   Internal ticket 2912. *)
 [%%expect{|
-Line 9, characters 16-27:
-9 |   type 'a gel : kind_of_ 'a mod global
+Line 5, characters 16-27:
+5 |   type 'a gel : kind_of_ 'a mod global
                     ^^^^^^^^^^^
 Error: Unimplemented kind syntax
 |}]
@@ -1570,7 +1607,7 @@ Line 2, characters 19-43:
 2 |     (a, b) as t -> overwrite_ t with (b, _)
                        ^^^^^^^^^^^^^^^^^^^^^^^^
 Alert Translcore: Overwrite not implemented.
-Uncaught exception: File "parsing/location.ml", line 1124, characters 2-8: Assertion failed
+Uncaught exception: File "parsing/location.ml", line 1136, characters 2-8: Assertion failed
 
 |}]
 
@@ -1656,3 +1693,97 @@ type ('a, _ : any) t
 (* quotations syntax *)
 
 (* Test will only be added once quotations work end-to-end. *)
+
+(*************************)
+(* unboxed unit literals *)
+
+let f #() = #()
+
+[%%expect{|
+val f : unit# -> unit# = <fun>
+|}]
+
+(*************************)
+(* unboxed bool literals *)
+
+let f = function #false -> #true | #true -> #false
+
+[%%expect{|
+val f : bool# -> bool# = <fun>
+|}]
+
+(***********************)
+(* layout polymorphism *)
+
+let f (_ : (repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) = ()
+[%%expect{|
+val f : ((repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) -> unit = <fun>
+|}]
+
+(*****************)
+(* let poly_ and val poly_ *)
+
+let poly_ id : 'a. 'a -> 'a = fun x -> x
+[%%expect{|
+Line 1, characters 0-40:
+1 | let poly_ id : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "let poly_" annotation is not yet implemented.
+|}]
+
+let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+[%%expect{|
+Line 1, characters 0-54:
+1 | let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "let poly_" annotation is not yet implemented.
+|}]
+
+module type S_poly = sig
+  val poly_ f : 'a. 'a -> 'a
+  val poly_ g : 'a 'b. 'a -> 'b -> 'a
+end
+[%%expect{|
+Line 2, characters 2-28:
+2 |   val poly_ f : 'a. 'a -> 'a
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "val poly_" annotation is not yet implemented.
+|}]
+
+let poly_ f : 'a. 'a -> 'a = fun x -> x
+and poly_ g : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+[%%expect{|
+Line 1, characters 0-39:
+1 | let poly_ f : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "let poly_" annotation is not yet implemented.
+|}]
+
+(* Mixed poly and non-poly in mutually recursive bindings *)
+let poly_ f : 'a. 'a -> 'a = fun x -> x
+and g = fun x -> x
+[%%expect{|
+Line 1, characters 0-39:
+1 | let poly_ f : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "let poly_" annotation is not yet implemented.
+|}]
+
+let h = fun x -> x
+and poly_ k : 'a. 'a -> 'a = fun x -> x
+[%%expect{|
+Line 2, characters 0-39:
+2 | and poly_ k : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "let poly_" annotation is not yet implemented.
+|}]
+
+let m = fun x -> x
+and poly_ n : 'a. 'a -> 'a = fun x -> x
+and p = fun x -> x
+[%%expect{|
+Line 2, characters 0-39:
+2 | and poly_ n : 'a. 'a -> 'a = fun x -> x
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "let poly_" annotation is not yet implemented.
+|}]

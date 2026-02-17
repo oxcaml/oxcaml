@@ -1,0 +1,9 @@
+File "c_sub1.ml", line 13, characters 0-32:
+13 | type s2 : value mod portable = t
+     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t" is A1.k1 mod portable
+         because of the definition of t at file "c_sub1.ml", line 1, characters 0-13.
+       But the kind of type "t" must be a subkind of value mod portable
+         because of the definition of s2 at file "c_sub1.ml", line 13, characters 0-32.
+       No .cmi file found containing A1.k1.
+       Hint: Adding "a1" to your dependencies might help.

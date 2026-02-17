@@ -416,6 +416,32 @@ let mk_ddissector_inputs f =
     Arg.String f,
     "<file>  Write dissector input analysis to <file>" )
 
+let mk_verify_binary_emitter f =
+  ( "-verify-binary-emitter",
+    Arg.Unit f,
+    " Verify binary emitter output matches system assembler output. Exits with \
+     error on mismatch. (ARM64 only)" )
+
+let mk_dissector_assume_lld_without_64_bit_eh_frames f =
+  ( "-dissector-assume-lld-without-64-bit-eh-frames",
+    Arg.Unit f,
+    " Assume LLD linker without 64-bit EH frame support (default)" )
+
+let mk_no_dissector_assume_lld_without_64_bit_eh_frames f =
+  ( "-no-dissector-assume-lld-without-64-bit-eh-frames",
+    Arg.Unit f,
+    " Do not assume LLD linker limitation" )
+
+let mk_manual_module_init f =
+  ( "-manual-module-init",
+    Arg.Unit f,
+    " Enable manual module initialization (emit unit dependency table)" )
+
+let mk_no_manual_module_init f =
+  ( "-no-manual-module-init",
+    Arg.Unit f,
+    " Disable manual module initialization (default)" )
+
 let mk_gc_timings f =
   ("-dgc-timings", Arg.Unit f, "Output information about time spent in the GC")
 
@@ -944,6 +970,18 @@ let mk_dfexpr f =
     Arg.Unit f,
     " Like -dflambda but outputs fexpr language\n     (Flambda 2 only)" )
 
+let mk_dfexpr_annot f =
+  ( "-dfexpr-annot",
+    Arg.Unit f,
+    " Dump fexpr of all passes alongside each compilation unit\n\
+    \     (Flambda 2 only)" )
+
+let mk_dfexpr_annot_after f =
+  ( "-dfexpr-annot-after",
+    Arg.String f,
+    " Dump fexpr of given pass alongside each compilation unit\n\
+    \     (Flambda 2 only)" )
+
 let mk_dfexpr_after f =
   let passes = [ "simplify"; "reaper" ] in
   ( "-dfexpr-after",
@@ -1169,6 +1207,7 @@ module type Oxcaml_options = sig
   val long_frames_threshold : int -> unit
   val caml_apply_inline_fast_path : unit -> unit
   val internal_assembler : unit -> unit
+  val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit
   val dissector_partition_size : float -> unit
   val ddissector : unit -> unit
@@ -1176,6 +1215,10 @@ module type Oxcaml_options = sig
   val ddissector_verbose : unit -> unit
   val ddissector_partitions : unit -> unit
   val ddissector_inputs : string -> unit
+  val dissector_assume_lld_without_64_bit_eh_frames : unit -> unit
+  val no_dissector_assume_lld_without_64_bit_eh_frames : unit -> unit
+  val manual_module_init : unit -> unit
+  val no_manual_module_init : unit -> unit
   val gc_timings : unit -> unit
   val no_mach_ir : unit -> unit
   val dllvmir : unit -> unit
@@ -1251,6 +1294,8 @@ module type Oxcaml_options = sig
   val dfexpr_to : string -> unit
   val dfexpr_after : string -> unit
   val dflexpect_to : string -> unit
+  val dfexpr_annot : unit -> unit
+  val dfexpr_annot_after : string -> unit
   val dslot_offsets : unit -> unit
   val dfreshen : unit -> unit
   val dflow : unit -> unit
@@ -1328,6 +1373,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_debug_long_frames_threshold F.long_frames_threshold;
       mk_caml_apply_inline_fast_path F.caml_apply_inline_fast_path;
       mk_internal_assembler F.internal_assembler;
+      mk_verify_binary_emitter F.verify_binary_emitter;
       mk_dissector F.dissector;
       mk_dissector_partition_size F.dissector_partition_size;
       mk_ddissector F.ddissector;
@@ -1335,6 +1381,12 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_ddissector_verbose F.ddissector_verbose;
       mk_ddissector_partitions F.ddissector_partitions;
       mk_ddissector_inputs F.ddissector_inputs;
+      mk_dissector_assume_lld_without_64_bit_eh_frames
+        F.dissector_assume_lld_without_64_bit_eh_frames;
+      mk_no_dissector_assume_lld_without_64_bit_eh_frames
+        F.no_dissector_assume_lld_without_64_bit_eh_frames;
+      mk_manual_module_init F.manual_module_init;
+      mk_no_manual_module_init F.no_manual_module_init;
       mk_gc_timings F.gc_timings;
       mk_no_mach_ir F.no_mach_ir;
       mk_dllvmir F.dllvmir;
@@ -1435,6 +1487,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dfexpr_to F.dfexpr_to;
       mk_dfexpr_after F.dfexpr_after;
       mk_dflexpect_to F.dflexpect_to;
+      mk_dfexpr_annot F.dfexpr_annot;
+      mk_dfexpr_annot_after F.dfexpr_annot_after;
       mk_dslot_offsets F.dslot_offsets;
       mk_dfreshen F.dfreshen;
       mk_dflow F.dflow;
@@ -1444,6 +1498,13 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_cached_generic_functions_path F.cached_generic_functions_path;
     ]
 end
+
+let set_dissector_partition_size f =
+  if f <= 0.0 || f >= 2.0 then
+    raise
+      (Arg.Bad
+         "-dissector-partition-size must be greater than 0 and less than 2 GiB");
+  Clflags.dissector_partition_size := Some f
 
 module Oxcaml_options_impl = struct
   let set r () = r := Oxcaml_flags.Set true
@@ -1578,13 +1639,23 @@ module Oxcaml_options_impl = struct
     set' Oxcaml_flags.caml_apply_inline_fast_path
 
   let internal_assembler = set' Oxcaml_flags.internal_assembler
+  let verify_binary_emitter = set' Oxcaml_flags.verify_binary_emitter
   let dissector = set' Clflags.dissector
-  let dissector_partition_size f = Clflags.dissector_partition_size := Some f
+  let dissector_partition_size = set_dissector_partition_size
   let ddissector = set' Clflags.ddissector
   let ddissector_sizes = set' Clflags.ddissector_sizes
   let ddissector_verbose = set' Clflags.ddissector_verbose
   let ddissector_partitions = set' Clflags.ddissector_partitions
   let ddissector_inputs f = Clflags.ddissector_inputs := Some f
+
+  let dissector_assume_lld_without_64_bit_eh_frames () =
+    Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames := true
+
+  let no_dissector_assume_lld_without_64_bit_eh_frames =
+    clear' Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames
+
+  let manual_module_init = set' Oxcaml_flags.manual_module_init
+  let no_manual_module_init = clear' Oxcaml_flags.manual_module_init
   let gc_timings = set' Oxcaml_flags.gc_timings
   let no_mach_ir () = ()
   let dllvmir () = set' Oxcaml_flags.dump_llvmir ()
@@ -1807,6 +1878,11 @@ module Oxcaml_options_impl = struct
 
   let dfexpr_to file = Flambda2.Dump.fexpr := Flambda2.Dump.File file
   let dflexpect_to file = Flambda2.Dump.flexpect := Flambda2.Dump.File file
+  let dfexpr_annot () = Flambda2.Dump.fexpr_annot := true
+
+  let dfexpr_annot_after pass =
+    Flambda2.Dump.fexpr_annot_after := pass :: !Flambda2.Dump.fexpr_annot_after
+
   let dslot_offsets = set' Flambda2.Dump.slot_offsets
   let dfreshen = set' Flambda2.Dump.freshen
   let dflow = set' Flambda2.Dump.flow
@@ -1959,6 +2035,7 @@ module Extra_params = struct
     in
     match name with
     | "internal-assembler" -> set' Oxcaml_flags.internal_assembler
+    | "verify-binary-emitter" -> set' Oxcaml_flags.verify_binary_emitter
     | "dgc-timings" -> set' Oxcaml_flags.gc_timings
     | "no-mach-ir" ->
         Oxcaml_options_impl.no_mach_ir ();
@@ -2250,7 +2327,7 @@ module Extra_params = struct
     | "dissector-partition-size" -> (
         match float_of_string_opt v with
         | Some f ->
-            Clflags.dissector_partition_size := Some f;
+            set_dissector_partition_size f;
             true
         | None ->
             raise
@@ -2261,6 +2338,15 @@ module Extra_params = struct
     | "ddissector-partitions" -> set' Clflags.ddissector_partitions
     | "ddissector-inputs" ->
         Clflags.ddissector_inputs := Some v;
+        true
+    | "dissector-assume-lld-without-64-bit-eh-frames" ->
+        set' Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames
+    | "no-dissector-assume-lld-without-64-bit-eh-frames" ->
+        Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames := false;
+        true
+    | "manual-module-init" -> set' Oxcaml_flags.manual_module_init
+    | "no-manual-module-init" ->
+        Oxcaml_flags.manual_module_init := false;
         true
     | _ -> false
 end

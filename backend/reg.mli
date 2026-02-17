@@ -32,9 +32,27 @@ end
    that it remembers adjacency between machine registers aliased at multiple types.
 *)
 
+module Stamp : sig
+  type t = private int
+
+  val compare : t -> t -> int
+
+  val equal : t -> t -> bool
+
+  val hash : t -> int
+
+  val to_string : t -> string
+
+  val format : Format.formatter -> t -> unit
+
+  val to_int : t -> int
+
+  val of_int_unsafe : int -> t
+end
+
 type t = private
   { name : Name.t; (* Name *)
-    stamp : int; (* Unique stamp *)
+    stamp : Stamp.t; (* Unique stamp *)
     typ : Cmm.machtype_component; (* Type of contents *)
     preassigned : bool; (* Pinned to a hardware register or stack slot *)
     mutable loc : location
@@ -73,6 +91,10 @@ and stack_location =
    first thing the callee does is copy them to registers or [Local]
    stack locations.  Neither GC nor thread context switches can occur
    between these two times. *)
+
+val format_stack_location : Format.formatter -> stack_location -> unit
+
+val format_location : Format.formatter -> location -> unit
 
 val equal_location : location -> location -> bool
 
@@ -180,7 +202,7 @@ module For_printing : sig
   val create :
     name:Name.t ->
     typ:Cmm.machtype_component ->
-    stamp:int ->
+    stamp:Stamp.t ->
     preassigned:bool ->
     loc:location ->
     t

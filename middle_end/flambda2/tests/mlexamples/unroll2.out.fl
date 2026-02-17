@@ -1,0 +1,77 @@
+let code foo_0 deleted in
+let code bar_1 deleted in
+let $camlUnroll2__foo_2 =
+  closure foo_0_1 @foo
+and code rec loopify(never) size(23) newer_version_of(foo_0)
+      foo_0_1 (x : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  let Popaque = %opaque (1) in
+  (let untagged = %untag_imm (Popaque) in
+   switch untagged
+     | 0 -> k2
+     | 1 -> k3)
+    where k3 =
+      let int_add = %int_barith.add (x, 1) in
+      apply direct(foo_0_1)
+        $camlUnroll2__foo_2 ~ depth my_depth -> succ my_depth
+          (int_add)
+          -> k * k1
+    where k2 =
+      let int_sub = %int_barith.sub (x, 1) in
+      apply direct(foo_0_1)
+        $camlUnroll2__foo_2 ~ depth my_depth -> succ my_depth
+          (int_sub)
+          -> k * k1
+in
+let code loopify(never) size(61) newer_version_of(bar_1)
+      bar_1_1 (x : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  let Popaque = %opaque (1) in
+  (let untagged = %untag_imm (Popaque) in
+   switch untagged
+     | 0 -> k2
+     | 1 -> k3)
+    where k3 =
+      let int_add = %int_barith.add (x, 1) in
+      let Popaque_1 = %opaque (1) in
+      ((let untagged = %untag_imm (Popaque_1) in
+        switch untagged
+          | 0 -> k3
+          | 1 -> k4)
+         where k4 =
+           let int_add_1 = %int_barith.add (int_add, 1) in
+           apply direct(foo_0_1) inlining_state(depth(20))
+             $camlUnroll2__foo_2 ~ depth unroll 1 1 -> unroll 0 2
+               (int_add_1)
+               -> k * k1
+         where k3 =
+           let int_sub = %int_barith.sub (int_add, 1) in
+           apply direct(foo_0_1) inlining_state(depth(20))
+             $camlUnroll2__foo_2 ~ depth unroll 1 1 -> unroll 0 2
+               (int_sub)
+               -> k * k1)
+    where k2 =
+      let int_sub = %int_barith.sub (x, 1) in
+      let Popaque_1 = %opaque (1) in
+      ((let untagged = %untag_imm (Popaque_1) in
+        switch untagged
+          | 0 -> k2
+          | 1 -> k3)
+         where k3 =
+           let int_add = %int_barith.add (int_sub, 1) in
+           apply direct(foo_0_1) inlining_state(depth(20))
+             $camlUnroll2__foo_2 ~ depth unroll 1 1 -> unroll 0 2
+               (int_add)
+               -> k * k1
+         where k2 =
+           let int_sub_1 = %int_barith.sub (int_sub, 1) in
+           apply direct(foo_0_1) inlining_state(depth(20))
+             $camlUnroll2__foo_2 ~ depth unroll 1 1 -> unroll 0 2
+               (int_sub_1)
+               -> k * k1)
+in
+let $camlUnroll2__bar_3 = closure bar_1_1 @bar in
+let $camlUnroll2 = Block 0 ($camlUnroll2__foo_2, $camlUnroll2__bar_3) in
+cont done ($camlUnroll2)

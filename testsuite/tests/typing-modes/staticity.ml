@@ -83,7 +83,7 @@ Line 3, characters 27-28:
 3 |     | Some x -> use_static x
                                ^
 Error: This value is "dynamic"
-         because it is contained (via constructor "Some") in the value at Line 3, characters 6-12
+         because it is contained (via constructor "Some") in the value at line 3, characters 6-12
          which is "dynamic".
        However, the highlighted expression is expected to be "static".
 |}]
@@ -123,7 +123,7 @@ Line 3, characters 27-28:
 3 |     | Some x -> use_static x
                                ^
 Error: This value is "dynamic"
-         because it is contained (via constructor "Some") in the value at Line 3, characters 6-12
+         because it is contained (via constructor "Some") in the value at line 3, characters 6-12
          which is "dynamic" because it has branches.
        However, the highlighted expression is expected to be "static".
 |}]
@@ -152,7 +152,7 @@ Line 3, characters 36-37:
 3 |     | (Bar x | Baz x) -> use_static x
                                         ^
 Error: This value is "dynamic"
-         because it is contained (via constructor "Baz") in the value at Line 3, characters 15-20
+         because it is contained (via constructor "Baz") in the value at line 3, characters 15-20
          which is "dynamic" because it has branches.
        However, the highlighted expression is expected to be "static".
 |}]
@@ -252,7 +252,7 @@ Line 1, characters 53-54:
 1 | let foo : _ @ dynamic -> _ @ static = fun (Foo x) -> x
                                                          ^
 Error: This value is "dynamic"
-         because it is contained (via constructor "Foo") in the value at Line 1, characters 42-49
+         because it is contained (via constructor "Foo") in the value at line 1, characters 42-49
          which is "dynamic".
        However, the highlighted expression is expected to be "static".
 |}]
@@ -263,7 +263,7 @@ Line 1, characters 61-62:
 1 | let foo : _ @ static -> _ @ static = fun (Bar x | Baz x ) -> x
                                                                  ^
 Error: This value is "dynamic"
-         because it is contained (via constructor "Baz") in the value at Line 1, characters 50-55
+         because it is contained (via constructor "Baz") in the value at line 1, characters 50-55
          which is "dynamic" because it has branches.
        However, the highlighted expression is expected to be "static".
 |}]
@@ -297,7 +297,7 @@ Line 2, characters 23-24:
 2 |     | Bar x | Baz x -> x
                            ^
 Error: This value is "dynamic"
-         because it is contained (via constructor "Baz") in the value at Line 2, characters 14-19
+         because it is contained (via constructor "Baz") in the value at line 2, characters 14-19
          which is "dynamic".
        However, the highlighted expression is expected to be "static".
 |}]
@@ -335,7 +335,7 @@ Line 3, characters 15-16:
 3 |     use_static x
                    ^
 Error: This value is "dynamic"
-         because it is contained (via constructor "Baz") in the value at Line 2, characters 17-22
+         because it is contained (via constructor "Baz") in the value at line 2, characters 17-22
          which is "dynamic" because it has branches.
        However, the highlighted expression is expected to be "static".
 |}]
@@ -428,7 +428,7 @@ module F : functor (X : sig end) -> sig end
 Line 3, characters 22-35:
 3 | module (Y @ static) = F(struct end)
                           ^^^^^^^^^^^^^
-Error: This is "dynamic", but expected to be "static".
+Error: The module is "dynamic" but is expected to be "static".
 |}]
 
 (* persistent modules are currently dynamic. *)
@@ -438,7 +438,7 @@ module (L @ static) = List
 Line 1, characters 22-26:
 1 | module (L @ static) = List
                           ^^^^
-Error: This is "dynamic", but expected to be "static".
+Error: The module is "dynamic" but is expected to be "static".
 |}]
 
 (* primitives are always static, unless you override *)

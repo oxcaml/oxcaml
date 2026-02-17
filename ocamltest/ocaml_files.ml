@@ -100,6 +100,10 @@ let codegen =
   Filename.make_path
     [Ocaml_directories.srcdir; "testsuite"; "tools"; Filename.mkexe "codegen"]
 
+let fexprc =
+  Filename.make_path
+    [Ocaml_directories.srcdir; "testsuite"; "tools"; Filename.mkexe "fexprc"]
+
 let asmgen_archmod =
   let objname =
     "asmgen_" ^ Ocamltest_config.arch ^ "." ^ Ocamltest_config.objext

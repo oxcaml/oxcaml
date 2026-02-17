@@ -350,6 +350,8 @@ let init_shape id modl =
         :: init_shape_struct env rem
     | Sig_class_type _ :: rem ->
         init_shape_struct env rem
+    | Sig_jkind (id, jkdecl, _) :: rem ->
+        init_shape_struct (Env.add_jkind ~check:false id jkdecl env) rem
   in
   try
     Ok(undefined_location modl.mod_loc,
@@ -940,7 +942,8 @@ and transl_structure ~scopes loc
           end
       | Tstr_modtype _
       | Tstr_class_type _
-      | Tstr_attribute _ ->
+      | Tstr_attribute _
+      | Tstr_jkind _->
           transl_structure ~scopes loc fields cc rootpath final_env rem
 
 (* construct functor application in "include functor" case *)
@@ -1336,7 +1339,8 @@ let transl_toplevel_item ~scopes item =
   | Tstr_modtype _
   | Tstr_type _
   | Tstr_class_type _
-  | Tstr_attribute _ ->
+  | Tstr_attribute _
+  | Tstr_jkind _ ->
       lambda_unit
 
 let transl_toplevel_item_and_close ~scopes itm =
@@ -1462,14 +1466,14 @@ let transl_instance instance_unit ~runtime_args ~main_module_block_repr
 
 (* Error report *)
 
-open Format
+open Format_doc
 module Style = Misc.Style
 
 let print_cycle ppf cycle =
-  let print_ident ppf (x,_) = Format.pp_print_string ppf (Ident.name x) in
+  let print_ident ppf (x,_) = pp_print_string ppf (Ident.name x) in
   let pp_sep ppf () = fprintf ppf "@ -> " in
-  Format.fprintf ppf "%a%a%s"
-    (Format.pp_print_list ~pp_sep print_ident) cycle
+  fprintf ppf "%a%a%s"
+    (pp_print_list ~pp_sep print_ident) cycle
     pp_sep ()
     (Ident.name @@ fst @@ List.hd cycle)
 (* we repeat the first element to make the cycle more apparent *)
@@ -1479,7 +1483,7 @@ let explanation_submsg (id, unsafe_info) =
   | Unnamed -> assert false (* can't be part of a cycle. *)
   | Unsafe {reason;loc;subid} ->
       let print fmt =
-        let printer = Format.dprintf fmt
+        let printer = doc_printf fmt
             Style.inline_code (Ident.name id)
             Style.inline_code (Ident.name subid) in
         Location.mkloc printer loc in
@@ -1509,7 +1513,7 @@ let report_error loc = function
       Location.errorf ~loc
         "Cannot instantiate using the packed module %a@ \
          as either the instantiated module or an argument"
-      Compilation_unit.print comp_unit
+        Compilation_unit.print_as_inline_code comp_unit
 
 let () =
   Location.register_error_of_exn

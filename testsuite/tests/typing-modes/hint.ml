@@ -19,12 +19,12 @@ Line 10, characters 16-19:
 10 |         let _ = bar in ()
                      ^^^
 Error: The value "bar" is "nonportable"
-         because it closes over the value "foo" at Line 7, characters 17-20
+         because it closes over the value "foo" at line 7, characters 17-20
          which is "nonportable"
-         because it contains a usage (of the value "x" at Line 4, characters 8-9)
+         because it contains a usage (of the value "x" at line 4, characters 8-9)
          which is expected to be "uncontended".
        However, the value "bar" highlighted is expected to be "portable"
-         because it is used inside the function at Lines 9-10, characters 25-25
+         because it is used inside the function at lines 9-10, characters 25-25
          which is expected to be "portable".
 |}]
 
@@ -41,12 +41,12 @@ Line 6, characters 38-41:
 6 |     let (baz @ portable) () = let _ = bar in ()
                                           ^^^
 Error: The value "bar" is "nonportable"
-         because it closes over the value "foo" at Line 5, characters 26-29
+         because it closes over the value "foo" at line 5, characters 26-29
          which is "nonportable"
-         because it contains a usage (of the value "x" at Line 4, characters 17-18)
+         because it contains a usage (of the value "x" at line 4, characters 17-18)
          which is expected to be "uncontended".
        However, the value "bar" highlighted is expected to be "portable"
-         because it is used inside the function at Line 6, characters 25-47
+         because it is used inside the function at line 6, characters 25-47
          which is expected to be "portable".
 |}]
 
@@ -83,11 +83,11 @@ Error: Signature mismatch:
        is not included in
          val baz : unit -> unit @@ portable (* in a structure at nonportable *)
        The left-hand side is "nonportable"
-         because it closes over the value "bar" at Line 8, characters 25-28
+         because it closes over the value "bar" at line 8, characters 25-28
          which is "nonportable"
-         because it closes over the value "foo" at Line 7, characters 26-29
+         because it closes over the value "foo" at line 7, characters 26-29
          which is "nonportable"
-         because it contains a usage (of the value "x" at Line 6, characters 17-18)
+         because it contains a usage (of the value "x" at line 6, characters 17-18)
          which is expected to be "uncontended".
        However, the right-hand side is "portable".
 |}]

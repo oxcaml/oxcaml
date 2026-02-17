@@ -28,8 +28,8 @@ val command_line_options : (string * Arg.spec * string) list
 (* Addressing modes *)
 
 type addressing_mode =
-  | Iindexed of int                          (* reg + displ *)
-  | Ibased of Asm_targets.Asm_symbol.t * int (* symbol + displ *)
+  | Iindexed of Arm64_ast.Ast.DSL.Validated_mem_offset.t  (* reg + displ *)
+  | Ibased of Asm_targets.Asm_symbol.t * int              (* symbol + displ *)
 
 (* We do not support the reg + shifted reg addressing mode, because
    what we really need is reg + shifted reg + displ,

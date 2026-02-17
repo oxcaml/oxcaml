@@ -181,7 +181,9 @@ let add_string b s =
     Bytes.unsafe_blit_string s 0 buffer position len;
   b.position <- new_position
 
-let add_bytes b s = add_string b (Bytes.unsafe_to_string s)
+let add_bytes b s =
+  add_string b (Bytes.unsafe_to_string s)
+  [@nontail]
 
 let add_buffer b bs =
   add_subbytes b bs.inner.buffer 0 bs.position

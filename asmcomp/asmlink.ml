@@ -35,6 +35,7 @@ type unit_link_info = Linkenv.unit_link_info =
     defines : Compilation_unit.t list;
     file_name : string;
     crc : Digest.t;
+    imports_cmx : Import_info.t list;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
@@ -92,8 +93,12 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
   else Emit.begin_assembly unix;
   let compile_phrase p = Asmgen.compile_phrase ~ppf_dump p in
   let name_list = List.flatten (List.map (fun u -> u.defines) units) in
+  (* In manual module init mode, entry_point and global_table should be empty *)
+  let init_name_list =
+    if !Oxcaml_flags.manual_module_init then [] else name_list
+  in
   emit_ocamlrunparam ~ppf_dump;
-  List.iter compile_phrase (Cmm_helpers.entry_point name_list);
+  List.iter compile_phrase (Cmm_helpers.entry_point init_name_list);
   List.iter compile_phrase
     (* Emit the GC roots table, for dynlink. *)
     (Cmm_helpers.emit_gc_roots_table ~symbols:[]
@@ -101,7 +106,7 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
   Array.iteri
     (fun i name -> compile_phrase (Cmm_helpers.predef_exception i name))
     Runtimedef.builtin_exceptions;
-  compile_phrase (Cmm_helpers.global_table name_list);
+  compile_phrase (Cmm_helpers.global_table init_name_list);
   let globals_map = Linkenv.make_globals_map linkenv units in
   compile_phrase (Cmm_helpers.globals_map globals_map);
   compile_phrase
@@ -129,7 +134,26 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     then Generic_fns.imported_units cached_gen @ all_comp_units
     else all_comp_units
   in
-  compile_phrase (Cmm_helpers.frame_table all_comp_units);
+  (* In manual module init mode, exclude user modules from the static frame
+     table; their frametables will be registered dynamically when each module is
+     initialized via caml_init_module. *)
+  let frame_table_units =
+    if !Oxcaml_flags.manual_module_init
+    then
+      let base = [startup_comp_unit; system_comp_unit] in
+      if !Oxcaml_flags.use_cached_generic_functions
+      then Generic_fns.imported_units cached_gen @ base
+      else base
+    else all_comp_units
+  in
+  compile_phrase (Cmm_helpers.frame_table frame_table_units);
+  (* Always emit unit_deps_table; empty when not in manual module init mode *)
+  let unit_deps =
+    if !Oxcaml_flags.manual_module_init
+    then List.map (fun u -> u.name, u.imports_cmx) units
+    else []
+  in
+  compile_phrase (Cmm_helpers.unit_deps_table unit_deps);
   if !Clflags.output_complete_object then force_linking_of_startup ~ppf_dump;
   if !Clflags.llvm_backend
   then Llvmize.end_assembly ()
@@ -157,8 +181,23 @@ let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units =
        (Generic_fns.compile ~cache:false ~shared:true genfns));
   let dynunits = List.map (fun u -> Option.get u.dynunit) units in
   compile_phrase (Cmm_helpers.plugin_header dynunits);
-  compile_phrase
-    (Cmm_helpers.global_table (List.map (fun unit -> unit.name) units));
+  (* In manual module init mode, global_table should be empty *)
+  (* CR mshinwell: why does caml_globals need to be populated in this case?
+     Note that the frametables are not registered here; they are done
+     dynamically by the natdynlink code, together with the GC roots. *)
+  let init_name_list =
+    if !Oxcaml_flags.manual_module_init
+    then []
+    else List.map (fun unit -> unit.name) units
+  in
+  compile_phrase (Cmm_helpers.global_table init_name_list);
+  (* Always emit unit_deps_table; empty when not in manual module init mode *)
+  let unit_deps =
+    if !Oxcaml_flags.manual_module_init
+    then List.map (fun u -> u.name, u.imports_cmx) units
+    else []
+  in
+  compile_phrase (Cmm_helpers.unit_deps_table unit_deps);
   if !Clflags.output_complete_object then force_linking_of_startup ~ppf_dump;
   (* this is to force a reference to all units, otherwise the linker might drop
      some of them (in case of libraries) *)
@@ -201,7 +240,7 @@ let link_shared_actual unix ml_objfiles output_name ~genfns ~units_tolink
   in
   let startup_obj = output_name ^ ".startup" ^ ext_obj in
   let sourcefile_for_dwarf = sourcefile_for_dwarf ~named_startup_file startup in
-  Asmgen.compile_unit ~output_prefix:output_name ~asm_filename:startup
+  Asmgen.compile_unit unix ~output_prefix:output_name ~asm_filename:startup
     ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
     ~may_reduce_heap:true ~ppf_dump (fun () ->
       Profile.record_call "make_shared_startup_file" (fun () ->
@@ -233,6 +272,11 @@ let call_linker ?dissector_args file_list_rev startup_file output_name =
          through as they can't be baked into partition files. *)
       Clflags.all_ccopts
         := Build_linker_args.linker_script_flag args :: !Clflags.all_ccopts;
+      (* When assuming LLD without 64-bit EH frame support, suppress LLD's
+         broken .eh_frame_hdr generation - we provide our own in the linker
+         script. *)
+      if !Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames
+      then Clflags.all_ccopts := "-Wl,--no-eh-frame-hdr" :: !Clflags.all_ccopts;
       let c_lib =
         if !Clflags.nopervasives || (main_obj_runtime && not main_dll)
         then ""
@@ -383,7 +427,7 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
       | exception Cm_bundle.Error error -> raise (Error (Cm_bundle_error error))
       | bundled_cm_obj -> bundled_cm_obj :: ml_objfiles
   in
-  Asmgen.compile_unit ~output_prefix:output_name ~asm_filename:startup
+  Asmgen.compile_unit unix ~output_prefix:output_name ~asm_filename:startup
     ~keep_asm:!Clflags.keep_startup_file ~obj_filename:startup_obj
     ~may_reduce_heap:true ~ppf_dump (fun () ->
       Profile.record_call "make_startup_file" (fun () ->
@@ -408,6 +452,12 @@ let link_actual unix linkenv ml_objfiles output_name ~cached_genfns_imports
               ~cached_genfns)
       in
       let linker_args = Build_linker_args.build result in
+      (* Add EH frame registration object if the dissector generated one. This
+         handles runtime frame registration when using LLD without 64-bit EH
+         frame support. *)
+      (match Dissector.Result.eh_frame_registration_obj result with
+      | Some eh_frame_obj -> Clflags.ccobjs := eh_frame_obj :: !Clflags.ccobjs
+      | None -> ());
       (* Print partition file paths if requested *)
       if !Clflags.ddissector_partitions
       then (
@@ -441,9 +491,9 @@ let link unix linkenv ml_objfiles output_name ~cached_genfns_imports ~genfns
 
 (* Error report *)
 
-open Format
+open Format_doc
 
-let report_error ppf = function
+let report_error_doc ppf = function
   | Dwarf_fission_objcopy_on_macos ->
     fprintf ppf
       "Error: -gdwarf-fission=objcopy is not supported on macOS systems.@ \
@@ -457,13 +507,15 @@ let report_error ppf = function
     fprintf ppf "Error running objcopy (exit code %d)" exitcode
   | Cm_bundle_error (Missing_intf_for_quote intf) ->
     fprintf ppf "Missing interface for module %a which is required by quote"
-      CU.Name.print intf
+      CU.Name.print_as_inline_code intf
   | Cm_bundle_error (Missing_impl_for_quote impl) ->
     fprintf ppf
       "Missing implementation for module %a which is required by quote"
-      CU.Name.print impl
+      CU.Name.print_as_inline_code impl
+
+let report_error = Format_doc.compat report_error_doc
 
 let () =
   Location.register_error_of_exn (function
-    | Error err -> Some (Location.error_of_printer_file report_error err)
+    | Error err -> Some (Location.error_of_printer_file report_error_doc err)
     | _ -> None)

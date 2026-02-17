@@ -45,7 +45,7 @@ type error =
 exception Error of error
 
 (** Pretty-print a dissector error. *)
-val report_error : Format.formatter -> error -> unit
+val report_error : Format_doc.formatter -> error -> unit
 
 (** Result of running the dissector. After the dissector runs, OCaml object
     files (ml_objfiles, startup_obj) are baked into the partition files.
@@ -66,6 +66,12 @@ module Result : sig
 
   (** Returns the path to the generated linker script. *)
   val linker_script : t -> string
+
+  (** Returns the path to the EH frame registration object file, if generated.
+      This object is generated when using the dissector with
+      -dissector-assume-lld-without-64-bit-eh-frames and contains .init/.fini
+      constructors to register the .eh_frame section at runtime. *)
+  val eh_frame_registration_obj : t -> string option
 end
 
 (** Run the dissector pass.

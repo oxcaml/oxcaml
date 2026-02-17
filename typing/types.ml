@@ -89,6 +89,7 @@ and type_desc =
   | Tvariant of row_desc
   | Tunivar of { name : string option; jkind : jkind_lr }
   | Tpoly of type_expr * type_expr list
+  | Trepr of type_expr * Jkind_types.Sort.univar list
   | Tpackage of Path.t * (Longident.t * type_expr) list
   | Tof_kind of jkind_lr
 
@@ -162,14 +163,22 @@ and 'd with_bounds =
   | No_with_bounds : ('l * 'r) with_bounds
   | With_bounds : with_bounds_types -> ('l * Allowance.disallowed) with_bounds
 
-and ('layout, 'd) layout_and_axes =
-  { layout : 'layout;
+and 'layout jkind_base =
+  | Layout of 'layout
+  | Kconstr of Path.t
+
+and ('layout, 'd) base_and_axes =
+  { base : 'layout jkind_base;
     mod_bounds : mod_bounds;
     with_bounds : 'd with_bounds
   }
   constraint 'd = 'l * 'r
 
-and 'd jkind_desc = (Jkind_types.Sort.t Jkind_types.Layout.t, 'd) layout_and_axes
+and 'd jkind_const_desc = (Jkind_types.Layout.Const.t, 'd) base_and_axes
+  constraint 'd = 'l * 'r
+and jkind_const_desc_lr = (allowed * allowed) jkind_const_desc
+
+and 'd jkind_desc = (Jkind_types.Sort.t Jkind_types.Layout.t, 'd) base_and_axes
   constraint 'd = 'l * 'r
 
 and jkind_desc_packed = Pack_jkind_desc : ('l * 'r) jkind_desc -> jkind_desc_packed
@@ -192,6 +201,17 @@ and jkind_l = (allowed * disallowed) jkind
 and jkind_r = (disallowed * allowed) jkind
 and jkind_lr = (allowed * allowed) jkind
 and jkind_packed = Pack_jkind : ('l * 'r) jkind -> jkind_packed
+
+and jkind_declaration =
+  {
+    (* CR layouts: Though it's semantically correct to have a const jkind for
+       the manifest, it's not obvious if this is the right choice from a
+       performance perspective. See internal ticket 5719. *)
+    jkind_manifest : jkind_const_desc_lr option;
+    jkind_attributes : Parsetree.attributes;
+    jkind_uid : Shape.Uid.t;
+    jkind_loc : Location.t
+  }
 
 module TransientTypeOps = struct
   type t = type_expr
@@ -583,6 +603,7 @@ module type Wrapped = sig
   | Sig_modtype of Ident.t * modtype_declaration * visibility
   | Sig_class of Ident.t * class_declaration * rec_status * visibility
   | Sig_class_type of Ident.t * class_type_declaration * rec_status * visibility
+  | Sig_jkind of Ident.t * jkind_declaration * visibility
 
   and module_declaration =
   {
@@ -632,7 +653,7 @@ module Make_wrapped(Wrap : Wrap) = struct
       end
     | Sig_class _ ->
         Some Jkind_types.Sort.(of_const Const.for_class)
-    | Sig_type _ | Sig_modtype _ | Sig_class_type _ -> None
+    | Sig_type _ | Sig_modtype _ | Sig_class_type _ | Sig_jkind _ -> None
 end
 
 module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
@@ -703,6 +724,8 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
         To.Sig_class (id,cd,rs,vis)
     | Sig_class_type (id,ctd,rs,vis) ->
         To.Sig_class_type (id,ctd,rs,vis)
+    | Sig_jkind (id,jkd,vis) ->
+        To.Sig_jkind (id,jkd,vis)
 end
 
 include Make_wrapped(struct type 'a t = 'a end)
@@ -915,6 +938,7 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
   | Product sorts ->
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
   | Base Void -> Void
+  | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
 
 let find_unboxed_type decl =
   match decl.type_kind with
@@ -942,7 +966,8 @@ let item_visibility = function
   | Sig_module (_, _, _, _, vis)
   | Sig_modtype (_, _, vis)
   | Sig_class (_, _, _, vis)
-  | Sig_class_type (_, _, _, vis) -> vis
+  | Sig_class_type (_, _, _, vis)
+  | Sig_jkind (_, _, vis) -> vis
 
 let rec bound_value_identifiers = function
     [] -> []
@@ -962,6 +987,7 @@ let signature_item_id = function
   | Sig_modtype (id, _, _)
   | Sig_class (id, _, _, _)
   | Sig_class_type (id, _, _, _)
+  | Sig_jkind (id, _, _)
     -> id
 
 let signature_item_representation sg =
@@ -1255,6 +1281,7 @@ let best_effort_compare_type_expr te1 te2 =
         | Tconstr (_, _, _) -> 5
         | Tpoly (_, _) -> 6
         | Tof_kind _ -> 7
+        | Trepr (_, _) -> 8
         (* Types we should never see *)
         | Tlink _ -> Misc.fatal_error "Tlink encountered in With_bounds_types"
       in
@@ -1277,6 +1304,14 @@ let best_effort_compare_type_expr te1 te2 =
         (* NOTE: this is mostly broken according to the semantics of type_expr, but probably
            fine for the particular "best-effort" comparison we want. *)
         List.compare (aux (depth + 1)) (t1 :: ts1) (t2 :: ts2)
+      | Trepr (t1, sort_vars1), Trepr (t2, sort_vars2) ->
+        (* Compare by establishing correspondence between univars and comparing
+           the inner types with that correspondence. *)
+        (match List.combine sort_vars1 sort_vars2 with
+         | exception Invalid_argument _ ->
+           Int.compare (List.length sort_vars1) (List.length sort_vars2)
+         | pairs ->
+           Jkind_types.Sort.enter_repr pairs (fun () -> aux (depth + 1) t1 t2))
       | _, _ -> rank te1 - rank te2
   in
   aux 0 te1 te2
@@ -1690,3 +1725,11 @@ let undo_compress (changes, _old) =
             Transient_expr.set_desc ty desc; r := !next
         | _ -> ())
         log
+
+let class_mode =
+  let hint : _ Mode.Hint.const = Legacy Class in
+  Mode.Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)
+
+let toplevel_mode =
+  let hint : _ Mode.Hint.const = Legacy Toplevel in
+  Mode.Value.(of_const ~hint_monadic:hint ~hint_comonadic:hint Const.legacy)

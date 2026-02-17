@@ -30,6 +30,7 @@ open! Int_replace_polymorphic_compare
 let debug = false
 
 module String = Misc.Stdlib.String
+module Fmt = Format_doc
 
 module Witness = struct
   type kind =
@@ -80,16 +81,16 @@ module Witness = struct
     match hint with
     | No_hint -> ()
     | Missing_summary ->
-      Format.fprintf ppf
+      Fmt.fprintf ppf
         "@.Hint: Build artifacts for the library containing the callee are not \
          available.@.Try adding the library as an explicit dependency.@."
     | Conservative ->
-      Format.fprintf ppf
+      Fmt.fprintf ppf
         "@.Hint: Recompile without -disable-precise-zero-alloc-checker for \
          more precise results.@."
 
   let print_kind ppf kind =
-    let open Format in
+    let open Format_doc in
     match kind with
     | Alloc { bytes; dbginfo = _ } -> fprintf ppf "allocation of %d bytes" bytes
     | Indirect_call { callee = None } -> fprintf ppf "indirect call"
@@ -110,8 +111,8 @@ module Witness = struct
     | Widen -> fprintf ppf "widen"
 
   let print ppf { kind; dbg; hint } =
-    Format.fprintf ppf "%a {%a}%a@," print_kind kind Debuginfo.print_compact dbg
-      print_hint hint
+    Format.fprintf ppf "%a {%a}%a@," (Fmt.compat print_kind) kind
+      Debuginfo.print_compact dbg (Fmt.compat print_hint) hint
 end
 
 let take_first_n t n ~to_seq ~of_seq ~cardinal =
@@ -1182,7 +1183,7 @@ end = struct
       then t1
       else if Transform.same_vars tr1 tr2
       then Transform (Transform.flatten tr1 tr2)
-      else Join (Join.trs tr1 tr2)
+      else bounded_join (fun () -> Join.trs tr1 tr2)
     | (Top w as top), Transform tr | Transform tr, (Top w as top) ->
       (* [has_witnesses]: Don't simplify (join Top x) to x if there are any
          witnesses in x. This makes the analysis more expensive because symbolic
@@ -1200,7 +1201,8 @@ end = struct
     | Safe, Join j | Join j, Safe -> Join (Join.add_safe j)
     | Var { var; witnesses }, Join j | Join j, Var { var; witnesses } ->
       Join (Join.add_var j var witnesses)
-    | Join j, Transform tr | Transform tr, Join j -> Join (Join.add_tr j tr)
+    | Join j, Transform tr | Transform tr, Join j ->
+      bounded_join (fun () -> Join.add_tr j tr)
     | Join j1, Join j2 -> bounded_join (Join.flatten j1 j2)
 
   (* CR gyorsh: Handling of constant cases here is an optimization, instead of
@@ -1648,21 +1650,20 @@ end = struct
     let print_item (item : Debuginfo.item) =
       (match item.dinfo_dir with
       | None -> ()
-      | Some dir -> Format.fprintf ppf "%a/" Location.print_filename dir);
-      Format.fprintf ppf "%a:%i" Location.print_filename item.dinfo_file
+      | Some dir -> Fmt.fprintf ppf "%a/" Location.Doc.filename dir);
+      Fmt.fprintf ppf "%a:%i" Location.Doc.filename item.dinfo_file
         item.dinfo_line;
       if item.dinfo_char_start >= 0
-      then
-        Format.fprintf ppf ",%i--%i" item.dinfo_char_start item.dinfo_char_end;
+      then Fmt.fprintf ppf ",%i--%i" item.dinfo_char_start item.dinfo_char_end;
       if include_scope
       then
-        Format.fprintf ppf "[%s]"
+        Fmt.fprintf ppf "[%s]"
           (Debuginfo.Scoped_location.string_of_scopes ~include_zero_alloc:false
              item.dinfo_scopes);
       match item.dinfo_function_symbol with
       | None -> ()
       | Some function_symbol ->
-        if include_fs then Format.fprintf ppf "[%s]" function_symbol
+        if include_fs then Fmt.fprintf ppf "[%s]" function_symbol
     in
     let rec loop items =
       match items with
@@ -1670,7 +1671,7 @@ end = struct
       | [item] -> print_item item
       | item :: tl ->
         print_item item;
-        Format.fprintf ppf "%s" sep;
+        Fmt.fprintf ppf "%s" sep;
         loop tl
     in
     loop items
@@ -1688,7 +1689,7 @@ end = struct
                 dbg.dinfo_scopes))
         |> String.concat ","
       in
-      Format.fprintf ppf
+      Fmt.fprintf ppf
         "Annotation check for zero_alloc%s failed on function %s (%s).%s"
         (if Annotation.is_strict t.a then " strict" else "")
         scoped_name t.fun_name
@@ -1711,16 +1712,16 @@ end = struct
         let items = List.rev items in
         if !Oxcaml_flags.zero_alloc_checker_details_extra
         then
-          Format.fprintf ppf "\ninlined from\n%a"
+          Fmt.fprintf ppf "\ninlined from\n%a"
             (print_debuginfo ~sep:"\n" ~include_fs:true ~include_scope:true)
             items
         else
-          Format.fprintf ppf " (%a)"
+          Fmt.fprintf ppf " (%a)"
             (print_debuginfo ~sep:";" ~include_fs:false ~include_scope:false)
             items
     in
     let pp_alloc_block_kind ppf k =
-      let pp s = Format.fprintf ppf " for %s" s in
+      let pp s = Fmt.fprintf ppf " for %s" s in
       match (k : Cmm.alloc_block_kind) with
       | Alloc_block_kind_other -> ()
       | Alloc_block_kind_closure -> pp "closure"
@@ -1747,19 +1748,15 @@ end = struct
       | Alloc_block_kind_vec512_u_array -> pp "unboxed_vec512_array"
     in
     let pp_alloc_dbginfo_item (item : Cmm.alloc_dbginfo_item) =
-      let pp_alloc ppf =
-        Format.fprintf ppf "allocate %d words%a%a" item.alloc_words
-          pp_alloc_block_kind item.alloc_block_kind pp_inlined_dbg
-          item.alloc_dbg
-      in
       let aloc = Debuginfo.to_location item.alloc_dbg in
-      Location.mkloc pp_alloc aloc
+      Location.msg ~loc:aloc "allocate %d words%a%a" item.alloc_words
+        pp_alloc_block_kind item.alloc_block_kind pp_inlined_dbg item.alloc_dbg
     in
     let print_comballoc dbg =
       match dbg with
       | [] -> "", []
       | [item] ->
-        Format.asprintf "%a" pp_alloc_block_kind item.Cmm.alloc_block_kind, []
+        Fmt.asprintf "%a" pp_alloc_block_kind item.Cmm.alloc_block_kind, []
       | alloc_dbginfo ->
         (* If one Ialloc is a result of combining multiple allocations, print
            details of each location. Currently, this cannot happen because
@@ -1783,11 +1780,11 @@ end = struct
         match w.kind with
         | Alloc { bytes = _; dbginfo } ->
           let comballoc_msg, sub = print_comballoc dbginfo in
-          ( Format.dprintf "%a%s%s" Witness.print_kind w.kind component_msg
+          ( Fmt.dprintf "%a%s%s" Witness.print_kind w.kind component_msg
               comballoc_msg,
             sub )
         | Widen ->
-          ( Format.dprintf
+          ( Fmt.dprintf
               "details are not available. This may be a false alarm due to \
                conservative analysis.\n\
                Hint: for more precise results, recompile this function with\n\
@@ -1800,20 +1797,19 @@ end = struct
             [] )
         | Indirect_call _ | Indirect_tailcall _ | Direct_call _
         | Direct_tailcall _ | Extcall _ ->
-          ( Format.dprintf "called function may allocate%s (%a)" component_msg
+          ( Fmt.dprintf "called function may allocate%s (%a)" component_msg
               Witness.print_kind w.kind,
             [] )
         | Arch_specific _ | Probe _ ->
-          ( Format.dprintf "expression may allocate%s@ (%a)" component_msg
+          ( Fmt.dprintf "expression may allocate%s@ (%a)" component_msg
               Witness.print_kind w.kind,
             [] )
       in
       let dbg = if Debuginfo.is_none w.dbg then t.fun_dbg else w.dbg in
       let loc = Debuginfo.to_location dbg in
       let pp ppf () =
-        print_main_msg ppf;
-        pp_inlined_dbg ppf dbg;
-        Witness.print_hint ppf w.hint
+        Fmt.fprintf ppf "%t%a%a" print_main_msg pp_inlined_dbg dbg
+          Witness.print_hint w.hint
       in
       Location.error_of_printer ~loc ~sub pp ()
     in
@@ -2801,7 +2797,8 @@ let drop_invalid_successors cfg_with_layout =
           let successors = Cfg.successor_labels ~normal:true ~exn:true block in
           block.terminator
             <- { block.terminator with
-                 desc = Invalid { r with label_after = None }
+                 desc = Invalid { r with label_after = None };
+                 res = [||]
                };
           block.exn <- None;
           block.can_raise <- false;

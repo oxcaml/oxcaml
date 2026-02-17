@@ -20,7 +20,7 @@ open Asttypes
 open Parsetree
 open Types
 open Mode
-open Format
+open Format_doc
 
 module Style = Misc.Style
 
@@ -51,14 +51,6 @@ type functor_dependency_error =
     Functor_applied
   | Functor_included
 
-type legacy_module =
-  | Compilation_unit
-  | Toplevel
-
-let print_legacy_module ppf = function
-  | Compilation_unit -> Format.fprintf ppf "compilation unit"
-  | Toplevel -> Format.fprintf ppf "toplevel"
-
 type error =
     Cannot_apply of module_type
   | Not_included of Includemod.explanation
@@ -70,6 +62,7 @@ type error =
   | Signature_parameter_expected of module_type
   | Signature_result_expected of module_type
   | Recursive_include_functor
+  | Recursive_jkind_declaration
   | With_no_component of Longident.t
   | With_mismatch of Longident.t * Includemod.explanation
   | With_makes_applicative_functor_ill_typed of
@@ -83,8 +76,8 @@ type error =
       { vars : type_expr list; item : value_description; mty : module_type }
   | Implementation_is_required of string
   | Interface_not_compiled of string
-  | Not_allowed_in_functor_body
-  | Not_includable_in_functor_body
+  | Not_allowed_in_functor_body of Mtype.Contains_type_or_jkind.t
+  | Not_includable_in_functor_body of Mtype.Contains_type_or_jkind.t
   | Not_a_packed_module of type_expr
   | Incomplete_packed_module of type_expr
   | Scoping_pack of Longident.t * type_expr
@@ -110,17 +103,9 @@ type error =
       old_source_file : Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
-  | Submode_failed of Mode.Value.error
-  | Item_weaker_than_structure of Mode.Value.error
-  | Legacy_module of legacy_module * Mode.Value.error
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
-
-let submode ~loc ~env mode expected_mode =
-  match Value.submode mode expected_mode with
-  | Ok () -> ()
-  | Error e -> raise (Error (loc, env, Submode_failed e))
 
 let new_mode_var_from_annots (m : Alloc.Const.Option.t) =
   let mode = Mode.Value.newvar () in
@@ -147,7 +132,24 @@ let rec path_concat head p =
   | Papply _ -> assert false
   | Pextra_ty (p, extra) -> Pextra_ty (path_concat head p, extra)
 
-let infer_modalities ~loc ~env ~md_mode ~mode =
+let location_of_structure sstr =
+  sstr
+  |> List.map (fun {pstr_loc; _} -> pstr_loc)
+  |> function
+  | [] -> Location.none
+  | (_ :: _) as xs -> Location.merge xs
+
+let apply_is_contained_by ~loc_md item ?modalities mode =
+  let is_contained_by : Hint.is_contained_by =
+    { containing = Structure (item, Modality);
+      container = (loc_md, Structure) }
+  in
+  Ctype.apply_is_contained_by is_contained_by ?modalities mode
+
+(** Given a value whose location in the source code is described by [pp] and at
+[mode], infer the modalities on the value when it's placed as an [item] in a
+structure. The structure is at [loc_md] and [md_mode] *)
+let infer_modalities pp ~loc_md item ~md_mode ~mode =
     (* Values are packed into a structure at modes weaker than they actually
       are. This is to allow our legacy zapping behavior. For example:
 
@@ -176,28 +178,41 @@ let infer_modalities ~loc ~env ~md_mode ~mode =
     For monadic (descriptive) axes, the restriction is not on the
     construction but on the projection, which is modelled by the
     [Diff] modality in [mode.ml]. *)
-    begin match Mode.Value.Comonadic.submode
-      mode.Mode.comonadic
-      md_mode.Mode.comonadic with
-      | Ok () -> ()
-      | Error e ->
-          raise (Error (loc, env, Item_weaker_than_structure (Comonadic e)))
-    end;
+    let mode' = md_mode |> apply_is_contained_by ~loc_md item in
+    Value.Comonadic.submode_err pp mode.comonadic mode'.comonadic;
     Mode.Modality.infer ~md_mode ~mode
 
-(** Given a signature [sg] and a [mode], where the modalities in [sg] are based
-on [mode], return a signature equivalent to [sg] but modalities based on
-[md_mode]. *)
-let rebase_modalities ~loc ~env ~md_mode ~mode sg =
+(** For an [include M] clause where [M] is at [mode] and [loc], and an [item] in
+[M] with [modalities] on it, calculate the modalities on the [item] to be used
+in the enclosing structure which is at [md_mode] and [loc_md]. *)
+let rebase_modalities ~loc ~loc_md item ~md_mode ~mode modalities =
+  let pp : Hint.pinpoint = (loc, Structure_item item) in
+  let is_contained_by : Hint.is_contained_by =
+    { containing = Structure (item, Modality);
+      container = (loc, Structure)}
+  in
+  let hint =
+    { monadic = Hint.Is_contained_by (Monadic, is_contained_by);
+      comonadic = Hint.Is_contained_by (Comonadic, is_contained_by) }
+  in
+  let mode = Modality.apply ~hint modalities mode in
+  infer_modalities pp ~loc_md item ~md_mode ~mode
+
+(** Similiar to [rebase_modalities] but lifted to signatures. *)
+let rebase_modalities_sg ~loc ~loc_md ~md_mode ~mode sg =
   List.map (function
     | Sig_value (id, vd, vis) ->
-        let mode = Mode.Modality.apply vd.val_modalities mode in
-        let val_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
+        let val_modalities =
+          vd.val_modalities
+          |> rebase_modalities ~loc ~loc_md (Value, id) ~md_mode ~mode
+        in
         let vd = {vd with val_modalities} in
         Sig_value (id, vd, vis)
     | Sig_module (id, pres, md, rec_, vis) ->
-        let mode = Mode.Modality.apply md.md_modalities mode in
-        let md_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
+        let md_modalities =
+          md.md_modalities
+          |> rebase_modalities ~loc ~loc_md (Module, id) ~md_mode ~mode
+        in
         let md = {md with md_modalities} in
         Sig_module (id, pres, md, rec_, vis)
     | item -> item
@@ -219,8 +234,15 @@ let extract_sig_open env loc mty =
       raise(Error(loc, env, Cannot_scrape_alias path))
   | mty -> raise(Error(loc, env, Structure_expected mty))
 
+let check_for_generated_type_or_jkind ~funct_body env loc mty exn =
+  if funct_body then
+    match Mtype.Contains_type_or_jkind.check env mty with
+    | None -> ()
+    | Some tj ->
+      raise (Error (loc, env, exn tj))
+
 (* Extract the signature and the mode of a functor's return, given the signature
- [sig_acc] and mode [md_mode] of the functor argument. *)
+   [sig_acc] and mode [md_mode] of the functor argument. *)
 let extract_sig_functor_open funct_body env loc mty sig_acc md_mode =
   let sig_acc = List.rev sig_acc in
   match Mtype.scrape_alias env mty with
@@ -262,10 +284,9 @@ let extract_sig_functor_open funct_body env loc mty sig_acc md_mode =
         match Mtype.scrape extended_env mty_result with
         | Mty_signature sg_result ->
             Tincl_functor { input_coercion; input_repr }, sg_result, mm_result
-        | Mty_functor (Unit,_, _)
-          when funct_body && Mtype.contains_type env mty ->
-            raise (Error (loc, env, Not_includable_in_functor_body))
-        | Mty_functor (Unit,mty_result, mm_result) -> begin
+        | Mty_functor (Unit, mty_result, mm_result) -> begin
+            check_for_generated_type_or_jkind ~funct_body env loc mty
+              (fun tj -> Not_includable_in_functor_body tj);
             match Mtype.scrape extended_env mty_result with
             | Mty_signature sg_result ->
               Tincl_gen_functor { input_coercion; input_repr }, sg_result,
@@ -1403,7 +1424,7 @@ and approx_sig_items env ssg=
   | item :: srem ->
       match item.psig_desc with
       | Psig_type (rec_flag, sdecls) ->
-          let decls = Typedecl.approx_type_decl sdecls in
+          let decls = Typedecl.approx_type_decl env sdecls in
           let rem = approx_sig_items env srem in
           map_rec_type ~rec_flag
             (fun rs (id, info) -> Sig_type(id, info, rs, Exported)) decls rem
@@ -1518,8 +1539,9 @@ and approx_sig_items env ssg=
             ]
           ) decls [rem]
           |> List.flatten
-      | Psig_kind_abbrev _ ->
-          Misc.fatal_error "kind_abbrev not supported!"
+      | Psig_jkind sdecl ->
+          (* CR layouts: support this - internal ticket 5793 *)
+          raise (Error(sdecl.pjkind_loc, env, Recursive_jkind_declaration))
       | _ ->
           approx_sig_items env srem
 
@@ -1598,6 +1620,7 @@ module Signature_names : sig
   val check_modtype   : ?info:info -> t -> Location.t -> Ident.t -> unit
   val check_class     : ?info:info -> t -> Location.t -> Ident.t -> unit
   val check_class_type: ?info:info -> t -> Location.t -> Ident.t -> unit
+  val check_jkind     : ?info:info -> t -> Location.t -> Ident.t -> unit
 
   val check_sig_item:
     ?info:info -> t -> Location.t -> Signature_group.rec_group -> unit
@@ -1645,6 +1668,7 @@ end = struct
     typexts: names_infos;
     classes: names_infos;
     class_types: names_infos;
+    jkinds: names_infos;
   }
 
   let new_names () = {
@@ -1655,6 +1679,7 @@ end = struct
     typexts = Hashtbl.create 16;
     classes = Hashtbl.create 16;
     class_types = Hashtbl.create 16;
+    jkinds = Hashtbl.create 16;
   }
 
   type t = {
@@ -1680,6 +1705,7 @@ end = struct
     | Extension_constructor -> names.typexts
     | Class -> names.classes
     | Class_type -> names.class_types
+    | Jkind -> names.jkinds
 
   let check_unsafe_subst loc env: _ result -> _ = function
     | Ok x -> x
@@ -1733,6 +1759,8 @@ end = struct
     check Sig_component_kind.Class t loc id info
   let check_class_type ?(info=`Exported) t loc id =
     check Sig_component_kind.Class_type t loc id info
+  let check_jkind ?(info=`Exported) t loc id =
+    check Sig_component_kind.Jkind t loc id info
 
   let classify =
     let open Sig_component_kind in
@@ -1744,6 +1772,7 @@ end = struct
     | Sig_value (id, _, _) -> Value, id
     | Sig_class (id, _, _, _) -> Class, id
     | Sig_class_type (id, _, _, _) -> Class_type, id
+    | Sig_jkind (id, _, _) -> Jkind, id
 
   let check_item ?info names loc kind id ids =
     let info =
@@ -1795,6 +1824,7 @@ end = struct
         | Sig_modtype (id, mtd, _) -> Module_type, id, mtd.mtd_loc
         | Sig_class (id, c, _, _) -> Class, id, c.cty_loc
         | Sig_class_type (id, ct, _, _) -> Class_type, id, ct.clty_loc
+        | Sig_jkind (id, jkd, _) -> Jkind, id, jkd.jkind_loc
       in
       if Ident.Map.mem user_id to_remove.hide then
         None
@@ -2051,7 +2081,8 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         in
         let sg =
           sg
-          |> rebase_modalities ~loc ~env ~md_mode ~mode
+          |> rebase_modalities_sg ~loc:smty.pmty_loc ~loc_md:psg_loc
+              ~md_mode ~mode
           |> remove_modality_and_zero_alloc_variables_sg env ~zap_modality
         in
         incl_kind, sg
@@ -2374,8 +2405,8 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
               Jkind.History.Implicit_jkind var_name
             in
             Env.add_implicit_jkind
-              ~loc:jkind_annot.pjkind_loc var_name
-              (Jkind.of_annotation ~context jkind_annot) env
+              ~loc:jkind_annot.pjka_loc var_name
+              (Jkind.of_annotation ~context env jkind_annot) env
           in
           List.fold_left register_default env
             (Builtin_attributes.get_implicit_jkind_attr attr)
@@ -2383,8 +2414,11 @@ and transl_signature env {psg_items; psg_modalities; psg_loc} =
         mksig (Tsig_attribute attr) env loc, [], newenv
     | Psig_extension (ext, _attrs) ->
         raise (Error_forward (Builtin_attributes.error_of_extension ext))
-    | Psig_kind_abbrev _ ->
-        Misc.fatal_error "kind_abbrev not supported!"
+    | Psig_jkind sdecl ->
+        let id, newenv, decl = Typedecl.transl_jkind_decl env sdecl in
+        Signature_names.check_jkind names decl.jkind_loc decl.jkind_id;
+        let item = Sig_jkind(id, decl.jkind_jkind, Exported) in
+        mksig (Tsig_jkind decl) env loc, [item], newenv
   in
   let rec transl_sig env sig_items sig_type = function
     | [] -> List.rev sig_items, List.rev sig_type, env
@@ -2936,21 +2970,22 @@ let simplify_app_summary app_view = match app_view.arg with
     | false, Some p -> Includemod.Error.Named p, mty, mode
     | false, None   -> Includemod.Error.Anonymous, mty, mode
 
-let rec type_module ?alias sttn funct_body anchor env ?expected_mode smod =
+let not_principal msg = Warnings.Not_principal (Format_doc.Doc.msg msg)
+
+let rec type_module ?alias sttn funct_body anchor env smod =
   let md, shape =
     type_module_maybe_hold_locks ?alias ~hold_locks:false sttn funct_body anchor
-      env ?expected_mode smod
+      env smod
   in
   md, shape
 
 and  type_module_maybe_hold_locks ?(alias=false) ~hold_locks sttn funct_body
-  anchor env ?expected_mode smod =
+  anchor env smod =
   Builtin_attributes.warning_scope smod.pmod_attributes
     (fun () -> type_module_aux ~alias ~hold_locks sttn funct_body anchor env
-      ?expected_mode smod)
+      smod)
 
-and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
-  ?expected_mode smod =
+and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
   (* If the module is an identifier, there might be locks between the
   declaration site and the use site.
   - If [hold_locks] is [true], the locks are held and stored in [mod_mode].
@@ -2967,7 +3002,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
   | Pmod_structure sstr ->
       Env.check_no_open_quotations smod.pmod_loc env Env.Struct_qt;
       let (str, sg, mode, names, shape, _finalenv) =
-        type_structure funct_body anchor env ?expected_mode sstr in
+        type_structure funct_body anchor env sstr in
       let md =
         { mod_desc = Tmod_structure str;
           mod_type = Mty_signature sg;
@@ -2985,7 +3020,6 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       md, shape
   | Pmod_functor(arg_opt, sbody) ->
       let alloc_mode, mode = register_allocation () in
-      Option.iter (fun x -> Value.submode_exn mode x) expected_mode;
       let newenv =
         Env.add_closure_lock (smod.pmod_loc, Functor) mode.comonadic env
       in
@@ -3056,19 +3090,13 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       in
       let arg, arg_shape =
         type_module_maybe_hold_locks ~alias ~hold_locks true funct_body
-          anchor env ~expected_mode:(mode.mode_modes |> Value.disallow_left)
-          sarg
+          anchor env sarg
       in
       let md, final_shape =
         match smty with
         | None ->
-            (* CR zqian: Ideally, we want to call [wrap_constraint_with_shape]
-            even when [smty] is [None], to get a mode error messsage that
-            specifies the bad item (instead of the whole module). This is
-            currently impossible because inferred modalities can't be on the
-            RHS. *)
             let arg_mode = Typedtree.mode_without_locks_exn arg.mod_mode in
-            submode ~loc:sarg.pmod_loc ~env arg_mode mode.mode_modes;
+            Value.submode_err (sarg.pmod_loc, Module) arg_mode mode.mode_modes;
             { arg with
               mod_mode = (Mode.Value.disallow_right mode.mode_modes, None)},
             arg_shape
@@ -3101,7 +3129,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
               not (Typecore.generalizable (Btype.generic_level-1) exp.exp_type)
             then
               Location.prerr_warning smod.pmod_loc
-                (Warnings.Not_principal "this module unpacking");
+                (not_principal "this module unpacking");
             modtype_of_package env smod.pmod_loc p fl
         | Tvar _ ->
             raise (Typecore.Error
@@ -3109,8 +3137,8 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
         | _ ->
             raise (Error(smod.pmod_loc, env, Not_a_packed_module exp.exp_type))
       in
-      if funct_body && Mtype.contains_type env mty then
-        raise (Error (smod.pmod_loc, env, Not_allowed_in_functor_body));
+      check_for_generated_type_or_jkind ~funct_body env smod.pmod_loc mty
+        (fun tj -> Not_allowed_in_functor_body tj);
       { mod_desc = Tmod_unpack(exp, mty);
         mod_type = mty;
         mod_mode = Value.disallow_right mode, None;
@@ -3131,7 +3159,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       let lid =
         (* Only used by [untypeast] *)
         let name =
-          Format.asprintf "*instance %a*" Global_module.Name.print glob
+          Format_doc.asprintf "*instance %a*" Global_module.Name.print glob
         in
         Location.(mkloc (Lident name) (ghostify smod.pmod_loc))
       in
@@ -3239,10 +3267,11 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
     match Mtype.scrape_alias env mty_res with
     | Mty_functor _ ->
         let mode_fun = mode_without_locks_exn funct.mod_mode in
-        submode ~loc ~env (Value.partial_apply mode_fun) mode_res;
+        Value.submode_err (loc, Module) (Value.partial_apply mode_fun) mode_res;
         Option.iter
           (fun mode_arg ->
-            submode ~loc ~env (Value.close_over mode_arg) mode_res)
+            Value.submode_err (loc, Module)
+              (Value.close_over mode_arg) mode_res)
           mode_arg
     | _ -> ()
   in
@@ -3262,8 +3291,8 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
           else
             raise (Error (app_view.f_loc, env, Apply_generative));
       end;
-      if funct_body && Mtype.contains_type env funct.mod_type then
-        raise (Error (apply_loc, env, Not_allowed_in_functor_body));
+      check_for_generated_type_or_jkind ~funct_body env apply_loc funct.mod_type
+        (fun tj -> Not_allowed_in_functor_body tj);
       check_curried_application_complete
         ~loc:app_view.loc ~mty_res ~mode_res:(alloc_as_value mm_res)
         ~mode_arg:None;
@@ -3418,6 +3447,7 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
         | Sig_class(id, cd, rs, _) -> Sig_class(id, cd, rs, visibility)
         | Sig_class_type(id, ctd, rs, _) ->
             Sig_class_type(id, ctd, rs, visibility)
+        | Sig_jkind(id, jkd, _) -> Sig_jkind(id, jkd, visibility)
       ) sg
     in
     let open_descr = {
@@ -3432,14 +3462,12 @@ and type_open_decl_aux ?used_slot ?toplevel funct_body names env od =
     } in
     open_descr, mode, sg, newenv
 
-and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
-  sstr =
+and type_structure ?(toplevel = None) funct_body anchor env sstr =
   (* CR implicit-types: implement implicit variable jkinds in structures. *)
   let env = Env.clear_implicit_jkinds env in
   let names = Signature_names.create () in
   let _, md_mode = register_allocation () in
-  Option.iter (fun x -> Value.submode md_mode x |> ignore)
-    expected_mode;
+  let loc_md = location_of_structure sstr in
 
   let type_str_include ~loc env shape_map sincl sig_acc =
     let smodl = sincl.pincl_mod in
@@ -3466,7 +3494,9 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
       Env.enter_signature_and_shape ~scope ~parent_shape:shape_map
         modl_shape sg ~mode env
     in
-    let sg = rebase_modalities ~loc ~env ~md_mode ~mode sg in
+    let sg =
+      rebase_modalities_sg ~loc:smodl.pmod_loc ~loc_md ~md_mode ~mode sg
+    in
     Signature_group.iter (Signature_names.check_sig_item names loc) sg;
     let incl =
       { incl_mod = modl;
@@ -3533,8 +3563,9 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
               Signature_names.check_value names first_loc id;
               let vd, mode =  Env.find_value_no_locks_exn id newenv in
               let vd = Subst.Lazy.force_value_description vd in
+              let pp : Hint.pinpoint = (first_loc, Expression) in
               let modalities =
-                infer_modalities ~loc:first_loc ~env ~md_mode ~mode
+                infer_modalities pp ~loc_md (Value, id) ~md_mode ~mode
               in
               let vd =
                 { vd with
@@ -3552,12 +3583,17 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         shape_map,
         newenv
     | Pstr_primitive sdesc ->
+        (* external declarations do not support poly_ *)
+        assert (not sdesc.pval_poly);
         let (desc, mode, newenv) =
           Typedecl.transl_value_decl env ~modal:Str_primitive
             ~why:Structure_item loc sdesc
         in
         assert (desc.val_val.val_modalities |> Modality.is_undefined);
-        let val_modalities = infer_modalities ~loc ~env ~md_mode ~mode in
+        let pp : Mode.Hint.pinpoint = (desc.val_loc, Expression) in
+        let val_modalities =
+          infer_modalities pp ~loc_md (Value, desc.val_id) ~md_mode ~mode
+        in
         let val_val = {desc.val_val with val_modalities} in
         let desc = {desc with val_val} in
         Signature_names.check_value names desc.val_loc desc.val_id;
@@ -3636,10 +3672,9 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         in
         let md_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
         let mode = mode_without_locks_exn modl.mod_mode in
-        let md_modalities = infer_modalities ~loc:pmb_loc ~env ~md_mode ~mode in
         let md =
           { md_type = enrich_module_type anchor name.txt modl.mod_type env;
-            md_modalities;
+            md_modalities = Modality.undefined;
             md_attributes = attrs;
             md_loc = pmb_loc;
             md_uid;
@@ -3653,9 +3688,13 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
           | None -> None, env, []
           | Some name ->
             let id, e = Env.enter_module_declaration
-              ~scope ~shape:md_shape name pres md ~mode:md_mode env
+              ~scope ~shape:md_shape name pres md ~mode env
             in
             Signature_names.check_module names pmb_loc id;
+            let pp : Mode.Hint.pinpoint = (modl.mod_loc, Module) in
+            let md_modalities =
+              infer_modalities pp ~loc_md (Module, id) ~md_mode ~mode
+            in
             Some id, e,
             [Sig_module(id, pres,
                         {md_type = modl.mod_type;
@@ -3755,8 +3794,9 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         Tstr_recmodule (List.map (fun (mb, _, _) -> mb) bindings2),
         map_rec (fun rs (id, mb, uid, _shape) ->
             let mode = mode_without_locks_exn mb.mb_expr.mod_mode in
+            let pp : Mode.Hint.pinpoint = (mb.mb_expr.mod_loc, Module) in
             let md_modalities =
-              infer_modalities ~loc:mb.mb_loc ~env ~md_mode ~mode
+              infer_modalities pp ~loc_md (Module, id) ~md_mode ~mode
             in
             Sig_module(id, Mp_present, {
                 md_type=mb.mb_expr.mod_type;
@@ -3780,15 +3820,21 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         let (od, mode, sg, newenv) =
           type_open_decl ~toplevel funct_body names env sod
         in
-        let sg = rebase_modalities ~loc ~env ~md_mode ~mode sg in
+        let sg =
+          rebase_modalities_sg ~loc:sod.popen_expr.pmod_loc ~loc_md
+            ~md_mode ~mode sg
+        in
         Tstr_open od, sg, shape_map, newenv
     | Pstr_class cl ->
-        begin match Mode.Value.submode Value.legacy md_mode with
-          | Ok () -> ()
-          | Error e ->
-              raise (Error (loc, env, Item_weaker_than_structure e))
-        end;
         let (classes, new_env) = Typeclass.class_declarations env cl in
+        let first_id, first_loc =
+          classes
+          |> List.hd
+          |> fun (cls : _ Typeclass.class_info) ->
+              cls.cls_id, cls.cls_decl.cty_loc
+        in
+        let mode = apply_is_contained_by ~loc_md (Class, first_id) md_mode in
+        Value.submode_err (first_loc, Class) Types.class_mode mode;
         let shape_map = List.fold_left (fun acc cls ->
             let open Typeclass in
             let loc = cls.cls_id_loc.Location.loc in
@@ -3856,8 +3902,14 @@ and type_structure ?(toplevel = None) funct_body anchor env ?expected_mode
         || not (Warnings.is_active (Misplaced_attribute "")) then
           Builtin_attributes.mark_alert_used x;
         Tstr_attribute x, [], shape_map, env
-    | Pstr_kind_abbrev _ ->
-        Misc.fatal_error "kind_abbrev not supported!"
+    | Pstr_jkind x ->
+        let id, env, decl = Typedecl.transl_jkind_decl env x in
+        Signature_names.check_jkind names decl.jkind_loc decl.jkind_id;
+        let shape_map =
+          Shape.Map.add_jkind shape_map id decl.jkind_jkind.jkind_uid
+        in
+        let item = Sig_jkind(id, decl.jkind_jkind, Exported) in
+        Tstr_jkind decl, [item], shape_map, env
   in
   let toplevel_sig = Option.value toplevel ~default:[] in
   let rec type_struct env shape_map sstr str_acc sig_acc
@@ -3907,13 +3959,9 @@ let type_toplevel_phrase env sig_acc s =
   Env.reset_required_globals ();
   Env.reset_probes ();
   Typecore.reset_allocations ();
-  let expected_mode = Value.(legacy |> disallow_left) in
   let (str, sg, mode, to_remove_from_sg, shape, env) =
-    type_structure ~toplevel:(Some sig_acc) false None env ~expected_mode s in
-  begin match Value.submode mode Value.legacy with
-  | Ok () -> ()
-  | Error e -> raise (Error (Location.none, env, (Legacy_module (Toplevel, e))))
-  end;
+    type_structure ~toplevel:(Some sig_acc) false None env s in
+  Value.submode_err (Location.none, Structure) mode toplevel_mode;
   remove_mode_and_jkind_variables env sg;
   remove_mode_and_jkind_variables_for_toplevel str;
   Typecore.optimise_allocations ();
@@ -4205,17 +4253,14 @@ let type_implementation target modulename initial_env ast =
       Env.reset_required_globals ();
       Env.reset_probes ();
       if !Clflags.print_types then (* #7656 *)
-        ignore @@ Warnings.parse_options false "-32-34-37-38-60";
+        ignore @@ Warnings.parse_options false "-32-34-37-38-60-191";
       if !Clflags.as_parameter then
         error Cannot_compile_implementation_as_parameter;
-      let expected_mode = Env.mode_unit |> Value.disallow_left in
       let (str, sg, mode, names, shape, finalenv) =
-        Profile.record_call "infer" (fun () ->
-          type_structure initial_env ~expected_mode ast) in
-      begin match Value.submode mode Env.mode_unit with
-      | Ok () -> ()
-      | Error e -> error (Legacy_module (Compilation_unit, e))
-      end;
+        Profile.record_call "infer" (fun () -> type_structure initial_env ast)
+      in
+      Value.submode_err (Location.in_file sourcefile, Structure)
+        mode Env.mode_unit;
       let uid = Uid.of_compilation_unit_id modulename in
       let shape = Shape.set_uid_if_none shape uid in
       if !Clflags.binary_annotations_cms then
@@ -4237,7 +4282,7 @@ let type_implementation target modulename initial_env ast =
         Typecore.optimise_allocations ();
         let shape = Shape_reduce.local_reduce Env.empty shape in
         Printtyp.wrap_printing_env ~error:false initial_env
-          (fun () -> fprintf std_formatter "%a@."
+          Format.(fun () -> fprintf std_formatter "%a@."
               (Printtyp.printed_signature sourcefile)
               simple_sg
           );
@@ -4563,10 +4608,10 @@ let report_error ~loc _env = function
         "@[This module is not a functor; it has type@ %a@]"
         (Style.as_inline_code modtype) mty
   | Not_included errs ->
-      let main = Includemod_errorprinter.err_msgs errs in
+      let main ppf = Includemod_errorprinter.err_msgs ppf errs in
       Location.errorf ~loc "@[<v>Signature mismatch:@ %t@]" main
   | Not_included_functor errs ->
-      let main = Includemod_errorprinter.err_msgs errs in
+      let main ppf = Includemod_errorprinter.err_msgs ppf errs in
       Location.errorf ~loc
         "@[<v>Signature mismatch in included functor's parameter:@ %t@]" main
   | Cannot_eliminate_dependency (dep_type, mty) ->
@@ -4603,32 +4648,35 @@ let report_error ~loc _env = function
   | Recursive_include_functor ->
       Location.errorf ~loc
         "@[Including a functor is not supported in recursive module signatures @]"
+  | Recursive_jkind_declaration ->
+      Location.errorf ~loc
+        "@[Kind declarations are not yet supported in recursive module \
+         signatures@]"
   | With_no_component lid ->
       Location.errorf ~loc
         "@[The signature constrained by %a has no component named %a@]"
         Style.inline_code "with"
         (Style.as_inline_code longident) lid
   | With_mismatch(lid, explanation) ->
-      let main = Includemod_errorprinter.err_msgs explanation in
       Location.errorf ~loc
         "@[<v>\
            @[In this %a constraint, the new definition of %a@ \
              does not match its original definition@ \
              in the constrained signature:@]@ \
-         %t@]"
+         %a@]"
         Style.inline_code "with"
-        (Style.as_inline_code longident) lid main
+        (Style.as_inline_code longident) lid
+        Includemod_errorprinter.err_msgs explanation
   | With_makes_applicative_functor_ill_typed(lid, path, explanation) ->
-      let main = Includemod_errorprinter.err_msgs explanation in
       Location.errorf ~loc
         "@[<v>\
            @[This %a constraint on %a makes the applicative functor @ \
              type %a ill-typed in the constrained signature:@]@ \
-         %t@]"
+         %a@]"
         Style.inline_code "with"
         (Style.as_inline_code longident) lid
         Style.inline_code (Path.name path)
-        main
+        Includemod_errorprinter.err_msgs explanation
   | With_changes_module_alias(lid, id, path) ->
       Location.errorf ~loc
         "@[<v>\
@@ -4648,7 +4696,7 @@ let report_error ~loc _env = function
         [ 12; 7; 3 ]
       in
       let pp_constraint ppf (p,mty) =
-        Format.fprintf ppf "%s := %a" (Path.name p) Printtyp.modtype mty
+        fprintf ppf "%s := %a" (Path.name p) Printtyp.modtype mty
       in
       Location.errorf ~loc
         "This %a constraint@ %a@ makes a packed module ill-formed.@ %a"
@@ -4701,18 +4749,20 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "@[The interface %a@ declares values, not just types.@ \
            An implementation must be provided.@]"
-        Location.print_filename intf_name
+        Location.Doc.quoted_filename intf_name
   | Interface_not_compiled intf_name ->
       Location.errorf ~loc
         "@[Could not find the .cmi file for interface@ %a.@]"
-        Location.print_filename intf_name
-  | Not_allowed_in_functor_body ->
+        Location.Doc.quoted_filename intf_name
+  | Not_allowed_in_functor_body tj ->
       Location.errorf ~loc
-        "@[This expression creates fresh types.@ %s@]"
+        "@[This expression creates fresh %s.@ %s@]"
+        (Mtype.Contains_type_or_jkind.to_string_plural tj)
         "It is not allowed inside applicative functors."
-  | Not_includable_in_functor_body ->
+  | Not_includable_in_functor_body tj ->
       Location.errorf ~loc
-        "@[This functor creates fresh types when applied.@ %s@]"
+        "@[This functor creates fresh %s when applied.@ %s@]"
+        (Mtype.Contains_type_or_jkind.to_string_plural tj)
         "Including it is not allowed inside applicative functors."
   | Not_a_packed_module ty ->
       Location.errorf ~loc
@@ -4743,7 +4793,9 @@ let report_error ~loc _env = function
         "The type of this packed module refers to %a, which is missing"
         (Style.as_inline_code path) p
   | Badly_formed_signature (context, err) ->
-      Location.errorf ~loc "@[In %s:@ %a@]" context Typedecl.report_error err
+      Location.errorf ~loc "@[In %s:@ %a@]"
+        context
+        Typedecl.report_error_doc err
   | Cannot_hide_id Illegal_shadowing
       { shadowed_item_kind; shadowed_item_id; shadowed_item_loc;
         shadower_id; user_id; user_kind; user_loc } ->
@@ -4801,7 +4853,7 @@ let report_error ~loc _env = function
         Style.inline_code (Path.name p)
         Misc.print_see_manual manual_ref
  | Strengthening_mismatch(lid, explanation) ->
-      let main = Includemod_errorprinter.err_msgs explanation in
+      let main ppf = Includemod_errorprinter.err_msgs ppf explanation in
       Location.errorf ~loc
         "@[<v>\
            @[In this strengthened module type, the type of %a@ \
@@ -4823,7 +4875,7 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "@[The interface for %a@ was compiled with -as-parameter.@ \
          It cannot be implemented directly.@]"
-        (Style.as_inline_code Compilation_unit.Name.print) modname
+        Compilation_unit.Name.print_as_inline_code modname
   | Argument_for_non_parameter(param, path) ->
       Location.errorf ~loc
         "Interface %a@ found for module@ %a@ is not flagged as a parameter.@ \
@@ -4834,9 +4886,9 @@ let report_error ~loc _env = function
         { new_arg_type; old_source_file; old_arg_type } ->
       let pp_arg_type ppf arg_type =
         match arg_type with
-        | None -> Format.fprintf ppf "without -as-argument-for"
+        | None -> Format_doc.fprintf ppf "without -as-argument-for"
         | Some arg_type ->
-            Format.fprintf ppf "with -as-argument-for %a"
+            Format_doc.fprintf ppf "with -as-argument-for %a"
               Global_module.Parameter_name.print arg_type
       in
       Location.errorf ~loc
@@ -4853,36 +4905,9 @@ let report_error ~loc _env = function
       Location.errorf ~loc
         "This instance has multiple arguments with the name %a."
         (Style.as_inline_code Global_module.Parameter_name.print) name
-  | Item_weaker_than_structure e ->
-      let Mode.Value.Error (ax, {left; right}) = Mode.Value.to_simple_error e in
-      let d =
-        match ax with
-        | Comonadic Areality -> Format.dprintf "a structure"
-        | _ ->
-            Format.dprintf "a %a structure"
-              (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
-      in
-      Location.errorf ~loc
-        "This is %a, but expected to be %a because it is inside %t."
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
-        d
-  | Submode_failed e ->
-      let Mode.Value.Error (ax, {left; right}) = Mode.Value.to_simple_error e in
-      Location.errorf ~loc
-        "This is %a, but expected to be %a."
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
-  | Legacy_module (reason, e) ->
-      let Mode.Value.Error (ax, {left; right}) = Mode.Value.to_simple_error e in
-      Location.errorf ~loc
-        "This is %a, but expected to be %a because it is a %a."
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) left
-        (Style.as_inline_code (Mode.Value.Const.print_axis ax)) right
-        print_legacy_module reason
 
 let report_error env ~loc err =
-  Printtyp.wrap_printing_env_error env
+  Printtyp.wrap_printing_env ~error:true env
     (fun () -> report_error env ~loc err)
 
 let () =

@@ -82,22 +82,24 @@ let report_error ppf = function
     let num_user_polls = List.length instrs - num_inserted_polls in
     if num_user_polls = 0
     then
-      Format.fprintf ppf
+      Format_doc.fprintf ppf
         "Function with poll-error attribute contains polling points (inserted \
          by the compiler)\n"
     else
-      Format.fprintf ppf
+      Format_doc.fprintf ppf
         "Function with poll-error attribute contains polling points:\n";
     List.iter
       ~f:(fun (p, dbg) ->
         match p with
         | Poll | Alloc | Function_call | External_call ->
-          Format.fprintf ppf "\t%s" (instr_type p);
+          Format_doc.fprintf ppf "\t%s" (instr_type p);
           if not (Debuginfo.is_none dbg)
           then (
-            Format.fprintf ppf " at ";
-            Location.print_loc ppf (Debuginfo.to_location dbg));
-          Format.fprintf ppf "\n")
+            Format_doc.fprintf ppf " at ";
+            (Location.Doc.loc ~capitalize_first:true)
+              ppf
+              (Debuginfo.to_location dbg));
+          Format_doc.fprintf ppf "\n")
       (List.sort
          ~cmp:(fun (_, left) (_, right) -> Debuginfo.compare left right)
          instrs)

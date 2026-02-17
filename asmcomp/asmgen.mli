@@ -73,14 +73,18 @@ val compile_phrase : ppf_dump:Format.formatter -> Cmm.phrase -> unit
 
 type error =
   | Assembler_error of string
+  | Binary_emitter_mismatch of string
   | Mismatched_for_pack of Compilation_unit.Prefix.t
   | Asm_generation of string * Emitaux.error
 
 exception Error of error
 
-val report_error : Format.formatter -> error -> unit
+val report_error : error Format_doc.format_printer
+
+val report_error_doc : error Format_doc.printer
 
 val compile_unit :
+  (module Compiler_owee.Unix_intf.S) ->
   output_prefix:string ->
   asm_filename:string ->
   keep_asm:bool ->

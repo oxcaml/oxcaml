@@ -83,6 +83,7 @@ module type Oxcaml_options = sig
   val long_frames_threshold : int -> unit
   val caml_apply_inline_fast_path : unit -> unit
   val internal_assembler : unit -> unit
+  val verify_binary_emitter : unit -> unit
   val dissector : unit -> unit
   val dissector_partition_size : float -> unit
   val ddissector : unit -> unit
@@ -90,6 +91,10 @@ module type Oxcaml_options = sig
   val ddissector_verbose : unit -> unit
   val ddissector_partitions : unit -> unit
   val ddissector_inputs : string -> unit
+  val dissector_assume_lld_without_64_bit_eh_frames : unit -> unit
+  val no_dissector_assume_lld_without_64_bit_eh_frames : unit -> unit
+  val manual_module_init : unit -> unit
+  val no_manual_module_init : unit -> unit
   val gc_timings : unit -> unit
   val no_mach_ir : unit -> unit
   val dllvmir : unit -> unit
@@ -165,6 +170,8 @@ module type Oxcaml_options = sig
   val dfexpr_to : string -> unit
   val dfexpr_after : string -> unit
   val dflexpect_to : string -> unit
+  val dfexpr_annot : unit -> unit
+  val dfexpr_annot_after : string -> unit
   val dslot_offsets : unit -> unit
   val dfreshen : unit -> unit
   val dflow : unit -> unit

@@ -47,7 +47,7 @@ let reg ppf r =
     | Vec512 -> "Z"
     | Valx2 -> "VV"
     | Float32 -> "S");
-  fprintf ppf "/%i" r.stamp;
+  fprintf ppf "/%s" (Reg.Stamp.to_string r.stamp);
   loc
     ~wrap_out:(fun ppf f -> fprintf ppf "[%t]" f)
     ~unknown:(fun _ -> ())

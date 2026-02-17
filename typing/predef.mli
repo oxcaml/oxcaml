@@ -42,6 +42,7 @@ val type_lexing_position:type_expr
 val type_atomic_loc:type_expr -> type_expr
 val type_code: type_expr -> type_expr
 val type_unboxed_unit: type_expr
+val type_unboxed_bool: type_expr
 val type_unboxed_float:type_expr
 val type_unboxed_float32:type_expr
 val type_unboxed_nativeint:type_expr
@@ -125,6 +126,7 @@ val path_lexing_position: Path.t
 val path_code: Path.t
 
 val path_unboxed_unit : Path.t
+val path_unboxed_bool : Path.t
 val path_unboxed_float: Path.t
 val path_unboxed_float32: Path.t
 val path_unboxed_nativeint: Path.t
@@ -212,6 +214,7 @@ val list_argument_jkind : jkind_lr
 val build_initial_env:
   (Ident.t -> type_declaration -> 'a -> 'a) ->
   (Ident.t -> extension_constructor -> 'a -> 'a) ->
+  (Ident.t -> jkind_declaration -> 'a -> 'a) ->
   'a -> 'a
 
 (* Add simd types to an environment.  This is separate from [build_initial_env]
@@ -267,3 +270,6 @@ val builtin_idents: (string * Ident.t) list
     so flambda can generate code to raise it. *)
 val ident_division_by_zero: Ident.t
 val all_predef_exns : Ident.t list
+
+(** All predefined jkinds, for the jkind cache in [subst.ml]. *)
+val all_predef_jkinds : Ident.t list

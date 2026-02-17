@@ -17,6 +17,15 @@
 
 open Cmo_format
 
+module Compunit : sig
+  type t = compunit
+  val name : t -> string
+  val is_packed : compunit -> bool
+  val to_ident : compunit -> Ident.t
+  module Set : Set.S with type elt = t
+  module Map : Map.S with type key = t
+end
+
 module Predef : sig
   type t = predef
   module Set : Set.S with type elt = t
@@ -28,7 +37,7 @@ module Global : sig
     | Glob_compunit of Compilation_unit.t
     | Glob_predef of predef
   val name: t -> string
-  val description: Format.formatter -> t -> unit
+  val description: t Format_doc.printer
   val of_compilation_unit: Compilation_unit.t -> t
   val of_ident: Ident.t -> t option
   module Set : Set.S with type elt = t
@@ -38,7 +47,9 @@ end
 (* Functions for batch linking *)
 
 val init: unit -> unit
-val patch_object: Misc.LongString.t -> (reloc_info * int) list -> unit
+val patch_object:
+  (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t ->
+  (reloc_info * int) list -> unit
 val require_primitive: string -> unit
 val initial_global_table: unit -> Obj.t array
 val output_global_map: out_channel -> unit
@@ -89,8 +100,7 @@ type error =
 
 exception Error of error
 
-open Format
-
-val report_error: formatter -> error -> unit
+val report_error: error Format_doc.format_printer
+val report_error_doc: error Format_doc.printer
 
 val reset: unit -> unit

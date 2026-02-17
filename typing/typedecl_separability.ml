@@ -152,6 +152,7 @@ let rec immediate_subtypes : type_expr -> type_expr list = fun ty ->
   | Tvar _ | Tunivar _ -> []
   | Tof_kind _ -> []
   | Tpoly (pty, _) -> [pty]
+  | Trepr (_, _) -> Misc.fatal_error "immediate_subtypes: Trepr"
   | Tconstr (_path, tys, _) -> tys
 
 and immediate_subtypes_object_row acc ty = match get_desc ty with
@@ -452,6 +453,8 @@ let check_type
        under a separating type constructor. *)
     | (Tpoly(pty,_)       , m      ) ->
         check_type hyps pty m
+    | (Trepr(_pty,_)       , _m    ) ->
+        assert false
     | (Tunivar(_)         , _      ) -> empty
     | (Tof_kind(_)         , _      ) -> empty
     (* Type constructor case. *)
@@ -485,7 +488,7 @@ let worst_msig decl = List.map (fun _ -> Deepsep) decl.type_params
 let msig_of_external_type env decl =
   let context = Ctype.mk_jkind_context_check_principal env in
   let is_external =
-    match Jkind.get_externality_upper_bound ~context decl.type_jkind with
+    match Jkind.get_externality_upper_bound ~context env decl.type_jkind with
     | Internal -> false
     | External | External64 -> true
   in

@@ -50,7 +50,8 @@ let simplify_switch (block : C.basic_block) labels =
   match labels_with_counts with
   | [(l, _)] ->
     (* All labels are the same and equal to l *)
-    block.terminator <- { block.terminator with desc = Always l }
+    block.terminator
+      <- { block.terminator with desc = Always l; arg = [||]; res = [||] }
   | [(l0, n); (ln, k)] ->
     assert (Label.equal labels.(0) l0);
     assert (Label.equal labels.(n) ln);
@@ -273,7 +274,8 @@ let block_known_values (block : C.basic_block) ~(is_after_regalloc : bool)
     match evaluate_terminator known_values block.terminator with
     | None -> false
     | Some succ ->
-      block.terminator <- { block.terminator with desc = Always succ };
+      block.terminator
+        <- { block.terminator with desc = Always succ; arg = [||]; res = [||] };
       true)
   else false
 
@@ -318,7 +320,12 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
       in
       match new_successor with
       | Some succ ->
-        block.terminator <- { block.terminator with desc = Always succ };
+        block.terminator
+          <- { block.terminator with
+               desc = Always succ;
+               arg = [||];
+               res = [||]
+             };
         true
       | None -> (
         if
@@ -354,7 +361,8 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
     if Label.Set.cardinal labels = 1
     then (
       let l = Label.Set.min_elt labels in
-      block.terminator <- { block.terminator with desc = Always l };
+      block.terminator
+        <- { block.terminator with desc = Always l; arg = [||]; res = [||] };
       false)
     else
       block_known_values block ~is_after_regalloc

@@ -113,7 +113,7 @@ let print_main_module_block_format mbf =
     print_string "Runtime parameters:\n";
     List.iter print_runtime_param params
 
-let print_required_global id =
+let print_required_compunit id =
   printf "\t%a\n" Compilation_unit.output id
 
 let print_arg_descr arg_descr =
@@ -128,7 +128,7 @@ let print_cmo_infos cu =
   Array.iter print_intf_import cu.cu_imports;
   print_main_module_block_format cu.cu_format;
   print_string "Required globals:\n";
-  List.iter print_required_global cu.cu_required_compunits;
+  List.iter print_required_compunit cu.cu_required_compunits;
   printf "Uses unsafe features: ";
   (match cu.cu_primitives with
     | [] -> printf "no\n"
@@ -265,6 +265,7 @@ let print_cmt_infos cmt =
         | Module_type mtd -> mtd.mtd_name
         | Class cd -> cd.ci_id_name
         | Class_type ctd -> ctd.ci_id_name
+        | Jkind jd -> jd.jkind_name
       in
       let pp_loc fmt { Location.txt; loc } =
         Format.fprintf fmt "%s (%a)"

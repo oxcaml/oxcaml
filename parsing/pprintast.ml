@@ -94,24 +94,54 @@ let needs_parens txt =
 let needs_spaces txt =
   first_is '*' txt || last_is '*' txt
 
+let tyvar_of_name s =
+  if String.length s >= 2 && s.[1] = '\'' then
+    (* without the space, this would be parsed as
+       a character literal *)
+    "' " ^ s
+  else if Lexer.is_keyword s then
+    "'\\#" ^ s
+  else if String.equal s "_" then
+    s
+  else
+    "'" ^ s
+
+(* Unlike upstream, we call this module [Doc_internal] and define [Doc] at the
+   end of the file to include [jkind_annotation]. *)
+module Doc_internal = struct
 (* Turn an arbitrary variable name into a valid OCaml identifier by adding \#
   in case it is a keyword, or parenthesis when it is an infix or prefix
   operator. *)
-let ident_of_name ppf txt =
-  let format : (_, _, _) format =
-    if Lexer.is_keyword txt then "\\#%s"
-    else if not (needs_parens txt) then "%s"
-    else if needs_spaces txt then "(@;%s@;)"
-    else "(%s)"
-  in fprintf ppf format txt
+  let ident_of_name ppf txt =
+    let format : (_, _, _) format =
+      if Lexer.is_keyword txt then "\\#%s"
+      else if not (needs_parens txt) then "%s"
+      else if needs_spaces txt then "(@;%s@;)"
+      else "(%s)"
+    in Format_doc.fprintf ppf format txt
 
-let protect_longident ppf print_longident longprefix txt =
+  let protect_longident ppf print_longident longprefix txt =
     if not (needs_parens txt) then
-      fprintf ppf "%a.%a" print_longident longprefix ident_of_name txt
+      Format_doc.fprintf ppf "%a.%a"
+        print_longident longprefix
+        ident_of_name txt
     else if needs_spaces txt then
-      fprintf ppf "%a.(@;%s@;)" print_longident longprefix txt
+      Format_doc.fprintf ppf "%a.(@;%s@;)" print_longident longprefix txt
     else
-      fprintf ppf "%a.(%s)" print_longident longprefix txt
+      Format_doc.fprintf ppf "%a.(%s)" print_longident longprefix txt
+
+  let rec longident f = function
+    | Lident s -> ident_of_name f s
+    | Ldot(y,s) -> protect_longident f longident y s
+    | Lapply (y,s) ->
+        Format_doc.fprintf f "%a(%a)" longident y longident s
+
+  let tyvar ppf s =
+    Format_doc.fprintf ppf "%s" (tyvar_of_name s)
+end
+
+let longident ppf l = Format_doc.compat Doc_internal.longident ppf l
+let ident_of_name ppf i = Format_doc.compat Doc_internal.ident_of_name ppf i
 
 let is_curry_attr attr =
   attr.attr_name.txt = Builtin_attributes.curry_attr_name
@@ -235,12 +265,6 @@ let paren: 'a . ?first:space_formatter -> ?last:space_formatter ->
     if b then (pp f "("; pp f first; fu f x; pp f last; pp f ")")
     else fu f x
 
-let rec longident f = function
-  | Lident s -> ident_of_name f s
-  | Ldot(y,s) -> protect_longident f longident y s
-  | Lapply (y,s) ->
-      pp f "%a(%a)" longident y longident s
-
 let longident_loc f x = pp f "%a" longident x.txt
 
 let constant f = function
@@ -267,6 +291,10 @@ let constant f = function
   | Pconst_unboxed_integer (x, suffix) ->
       paren (first_is '-' x) (fun f (x, suffix) -> pp f "%s%c" x suffix) f
         (Misc.format_as_unboxed_literal x, suffix)
+
+let bool f = function
+  | false -> pp f "false"
+  | true -> pp f "true"
 
 (* trailing space*)
 let mutable_flag f = function
@@ -296,20 +324,9 @@ let iter_loc f ctxt {txt; loc = _} = f ctxt txt
 
 let constant_string f s = pp f "%S" s
 
-let tyvar_of_name s =
-  if String.length s >= 2 && s.[1] = '\'' then
-    (* without the space, this would be parsed as
-       a character literal *)
-    "' " ^ s
-  else if Lexer.is_keyword s then
-    "'\\#" ^ s
-  else if String.equal s "_" then
-    s
-  else
-    "'" ^ s
 
-let tyvar ppf s =
-  Format.fprintf ppf "%s" (tyvar_of_name s)
+
+let tyvar ppf v = Format_doc.compat Doc_internal.tyvar ppf v
 
 let string_loc ppf x = fprintf ppf "%s" x.txt
 
@@ -451,9 +468,9 @@ and type_with_label ctxt f (label, c, mode) =
     pp f "?%a:%a" ident_of_name s
       (core_type_with_optional_legacy_modes core_type1 ctxt) (c, mode)
 
-and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
+and jkind_annotation ?(nested = false) ctxt f k = match k.pjka_desc with
   | Pjk_default -> pp f "_"
-  | Pjk_abbreviation s -> pp f "%s" s
+  | Pjk_abbreviation s -> longident_loc f s
   | Pjk_mod (t, modes) ->
     begin match modes with
     | [] -> Misc.fatal_error "malformed jkind annotation"
@@ -483,6 +500,8 @@ and tyvar_jkind tyvar f (str, jkind) =
   | Some lay -> pp f "(%a : %a)" tyvar str (jkind_annotation reset_ctxt) lay
 
 and tyvar_loc_jkind tyvar f (str, jkind) = tyvar_jkind tyvar f (str.txt,jkind)
+
+and tyvar_loc_repr tyvar f str = pp f "(repr_@ %a)" tyvar str.txt
 
 and tyvar_loc_option_jkind f (str, jkind) =
   match jkind with
@@ -514,7 +533,7 @@ and core_type ctxt f x =
     | Ptyp_alias (ct, s, j) ->
         pp f "@[<2>%a@;as@;%a@]" (core_type1 ctxt) ct
           tyvar_loc_option_jkind (s, j)
-    | Ptyp_poly ([], ct) ->
+    | Ptyp_poly ([], ct) | Ptyp_repr ([], ct) ->
         core_type ctxt f ct
     | Ptyp_poly (sl, ct) ->
         pp f "@[<2>%a%a@]"
@@ -526,6 +545,16 @@ and core_type ctxt f x =
                           (tyvar_loc_jkind tyvar) ~sep:"@;")
                           l)
           sl (core_type ctxt) ct
+    | Ptyp_repr (lv, ct) ->
+        pp f "@[<2>%a%a@]"
+               (fun f l -> match l with
+                  | [] -> ()
+                  | _ ->
+                      pp f "%a@;.@;"
+                        (list
+                          (tyvar_loc_repr tyvar) ~sep:"@;")
+                          l)
+          lv (core_type ctxt) ct
     | Ptyp_of_kind jkind ->
       pp f "@[(type@ :@ %a)@]" (jkind_annotation reset_ctxt) jkind
     | _ -> pp f "@[<2>%a@]" (core_type1 ctxt) x
@@ -616,7 +645,8 @@ and core_type1 ctxt f x =
     | Ptyp_splice t ->
         pp f "@[<hov2>$(%a)@]" (core_type ctxt) t
     | Ptyp_extension e -> extension ctxt f e
-    | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _ | Ptyp_of_kind _) ->
+    | (Ptyp_arrow _ | Ptyp_alias _ | Ptyp_poly _ | Ptyp_repr _
+      | Ptyp_of_kind _) ->
        paren true (core_type ctxt) f x
 
 and core_type2 ctxt f x =
@@ -763,6 +793,8 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
         record_pattern ctxt f ~unboxed:false l closed
     | Ppat_record_unboxed_product (l, closed) ->
         record_pattern ctxt f ~unboxed:true l closed
+    | Ppat_unboxed_unit -> pp f "#()"
+    | Ppat_unboxed_bool b -> pp f "#%a" bool b
     | Ppat_tuple (l, closed) ->
         labeled_tuple_pattern ctxt f ~unboxed:false l closed
     | Ppat_unboxed_tuple (l, closed) ->
@@ -1136,6 +1168,8 @@ and expression ctxt f x =
     | Pexp_splice e ->
         pp f "@[$%a@]" (simple_expr ctxt) e
     | Pexp_hole -> pp f "_"
+    | Pexp_borrow e ->
+        pp f "@[<hov2>borrow_@ %a@]" (expression2 reset_ctxt)  e
     | _ -> expression1 ctxt f x
 
 and expression1 ctxt f x =
@@ -1179,6 +1213,8 @@ and simple_expr ctxt f x =
     | Pexp_constant c -> constant f c;
     | Pexp_pack me ->
         pp f "(module@;%a)" (module_expr ctxt) me
+    | Pexp_unboxed_unit -> pp f "#()"
+    | Pexp_unboxed_bool b -> pp f "#%a" bool b
     | Pexp_tuple l ->
         labeled_tuple_expr ctxt f ~unboxed:false l
     | Pexp_unboxed_tuple l ->
@@ -1374,6 +1410,7 @@ and class_field ctxt f x =
               ppat_attributes=[]};
            pvb_expr=e;
            pvb_constraint=None;
+           pvb_is_poly=false;
            pvb_attributes=[];
            pvb_modes=[];
            pvb_loc=Location.none;
@@ -1461,10 +1498,15 @@ and sig_include ctxt f incl moda =
   include_ ctxt f ~contents:module_type incl;
   optional_space_atat_modalities f moda
 
-and kind_abbrev ctxt f name jkind =
-  pp f "@[<hov2>kind_abbrev_@ %a@ =@ %a@]"
-    string_loc name
-    (jkind_annotation ctxt) jkind
+and jkind_declaration ctxt f jd =
+  begin match jd.pjkind_manifest with
+  | None -> pp f "@[<hov2>kind_@ %a@]" string_loc jd.pjkind_name
+  | Some jkind ->
+     pp f "@[<hov2>kind_@ %a@ =@ %a@]"
+       string_loc jd.pjkind_name
+       (jkind_annotation ctxt) jkind
+  end;
+  item_attributes ctxt f jd.pjkind_attributes
 
 and module_type_with_optional_modes ctxt f (mty, mm) =
   match mm with
@@ -1560,7 +1602,9 @@ and signature_item ctxt f x : unit =
       type_def_list ctxt f (Recursive, false, l)
   | Psig_value vd ->
       let intro = if vd.pval_prim = [] then "val" else "external" in
-      pp f "@[<2>%s@ %a@ :@ %a@]%a" intro
+      if vd.pval_prim <> [] then assert (not vd.pval_poly);
+      let poly_str = if vd.pval_poly then "poly_ " else "" in
+      pp f "@[<2>%s@ %s%a@ :@ %a@]%a" intro poly_str
         ident_of_name vd.pval_name.txt
         (value_description ctxt) vd
         (item_attributes ctxt) vd.pval_attributes
@@ -1651,8 +1695,8 @@ and signature_item ctxt f x : unit =
   | Psig_extension(e, a) ->
       item_extension ctxt f e;
       item_attributes ctxt f a
-  | Psig_kind_abbrev (name, jkind) ->
-      kind_abbrev ctxt f name jkind
+  | Psig_jkind kd ->
+      jkind_declaration ctxt f kd
 
 and module_expr ctxt f x =
   if x.pmod_attributes <> [] then
@@ -1840,7 +1884,8 @@ and bindings ctxt f (mf,rf,l) =
       else
         [], x
     in
-    pp f "@[<2>%s %a%a%a%a@]%a" kwd mutable_flag mf rec_flag rf
+    let poly_str = if x.pvb_is_poly then "poly_ " else "" in
+    pp f "@[<2>%s %a%s%a%a%a@]%a" kwd mutable_flag mf poly_str rec_flag rf
       optional_legacy_modes legacy
       (binding ctxt) x
       (item_attributes ctxt) x.pvb_attributes
@@ -1958,6 +2003,7 @@ and structure_item ctxt f x =
       end
   | Pstr_class_type l -> class_type_declaration_list ctxt f l
   | Pstr_primitive vd ->
+      assert (not vd.pval_poly);
       pp f "@[<hov2>external@ %a@ :@ %a@]%a"
         ident_of_name vd.pval_name.txt
         (value_description ctxt) vd
@@ -2011,8 +2057,8 @@ and structure_item ctxt f x =
   | Pstr_extension(e, a) ->
       item_extension ctxt f e;
       item_attributes ctxt f a
-  | Pstr_kind_abbrev (name, jkind) ->
-      kind_abbrev ctxt f name jkind
+  | Pstr_jkind jd ->
+      jkind_declaration ctxt f jd
 
 (* Don't just use [core_type] because we do not want parens around params
    with jkind annotations *)
@@ -2461,3 +2507,9 @@ let binding = print_reset_with_maximal_extensions binding
 let payload = print_reset_with_maximal_extensions payload
 let type_declaration = print_reset_with_maximal_extensions type_declaration
 let jkind_annotation = print_reset_with_maximal_extensions jkind_annotation
+
+module Doc = struct
+  include Doc_internal
+  let jkind_annotation ppf jkind =
+    Format_doc.deprecated_printer (fun fmt -> jkind_annotation fmt jkind) ppf
+end

@@ -81,6 +81,12 @@ let fmt_constant f x =
       fprintf f "PConst_unboxed_float (%s,%a)" s fmt_char_option m;
 ;;
 
+let fmt_bool f x =
+  match x with
+  | false -> fprintf f "false";
+  | true -> fprintf f "true";
+;;
+
 let fmt_mutable_flag f x =
   match x with
   | Immutable -> fprintf f "Immutable";
@@ -257,6 +263,10 @@ let rec core_type i ppf x =
   | Ptyp_splice t ->
       line i ppf "Ptyp_splice\n";
       core_type i ppf t
+  | Ptyp_repr (lv, ct) ->
+      line i ppf "Ptyp_repr\n";
+      list i reprvar ppf lv;
+      core_type i ppf ct;
   | Ptyp_of_kind jkind ->
       line i ppf "Ptyp_of_kind %a\n" (jkind_annotation (i+1)) jkind
   | Ptyp_extension (s, arg) ->
@@ -267,6 +277,9 @@ let rec core_type i ppf x =
 and typevar i ppf (s, jkind) =
   line i ppf "var: %s\n" s.txt;
   jkind_annotation_opt (i+1) ppf jkind
+
+and reprvar i ppf s =
+  line i ppf "var: %s\n" s.txt
 
 and package_with i ppf (s, t) =
   line i ppf "with type %a\n" fmt_longident_loc s;
@@ -286,6 +299,8 @@ and pattern i ppf x =
   | Ppat_constant (c) -> line i ppf "Ppat_constant %a\n" fmt_constant c;
   | Ppat_interval (c1, c2) ->
       line i ppf "Ppat_interval %a..%a\n" fmt_constant c1 fmt_constant c2;
+  | Ppat_unboxed_unit -> line i ppf "Ppat_unboxed_unit\n";
+  | Ppat_unboxed_bool b -> line i ppf "Ppat_unboxed_bool %a\n" fmt_bool b;
   | Ppat_tuple (l, c) ->
       line i ppf "Ppat_tuple %a\n" fmt_closed_flag c;
       list i (labeled_tuple_element pattern) ppf l;
@@ -372,6 +387,8 @@ and expression i ppf x =
       line i ppf "Pexp_try\n";
       expression i ppf e;
       list i case ppf l;
+  | Pexp_unboxed_unit -> line i ppf "Pexp_unboxed_unit\n";
+  | Pexp_unboxed_bool b -> line i ppf "Pexp_unboxed_bool %a\n" fmt_bool b;
   | Pexp_tuple (l) ->
       line i ppf "Pexp_tuple\n";
       list i (labeled_tuple_element expression) ppf l;
@@ -511,6 +528,9 @@ and expression i ppf x =
       expression i ppf e
   | Pexp_hole ->
       line i ppf "Pexp_hole"
+  | Pexp_borrow e ->
+      line i ppf "Pexp_borrow\n";
+      expression i ppf e
   )
 
 and block_access i ppf = function
@@ -572,11 +592,11 @@ and jkind_annotation_opt i ppf jkind =
   | Some jkind -> jkind_annotation (i+1) ppf jkind
 
 and jkind_annotation i ppf (jkind : jkind_annotation) =
-  line i ppf "jkind %a\n" fmt_location jkind.pjkind_loc;
-  match jkind.pjkind_desc with
+  line i ppf "jkind %a\n" fmt_location jkind.pjka_loc;
+  match jkind.pjka_desc with
   | Pjk_default -> line i ppf "Pjk_default\n"
   | Pjk_abbreviation jkind ->
-      line i ppf "Pjk_abbreviation \"%s\"\n" jkind
+      line i ppf "Pjk_abbreviation %a\n" fmt_longident_loc jkind
   | Pjk_mod (jkind, m) ->
       line i ppf "Pjk_mod\n";
       jkind_annotation (i+1) ppf jkind;
@@ -657,6 +677,15 @@ and type_declaration i ppf x =
   line i ppf "ptype_manifest =\n";
   option (i+1) core_type ppf x.ptype_manifest
   )
+
+and jkind_declaration i ppf
+      { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc } =
+  line i ppf "jkind_declaration %a %a\n" fmt_string_loc pjkind_name
+       fmt_location pjkind_loc;
+  attributes i ppf pjkind_attributes;
+  let i = i+1 in
+  line i ppf "pjkind_manifest =\n";
+  option (i+1) jkind_annotation ppf pjkind_manifest
 
 and attribute i ppf k a =
   line i ppf "%s \"%s\"\n" k a.attr_name.txt;
@@ -1020,9 +1049,9 @@ and signature_item i ppf x =
       payload i ppf arg
   | Psig_attribute a ->
       attribute i ppf "Psig_attribute" a
-  | Psig_kind_abbrev (name, jkind) ->
-      line i ppf "Psig_kind_abbrev \"%s\"\n" name.txt;
-      jkind_annotation i ppf jkind
+  | Psig_jkind jd ->
+      line i ppf "Psig_jkind";
+      jkind_declaration i ppf jd
   )
 
 and modtype_declaration i ppf = function
@@ -1160,9 +1189,9 @@ and structure_item i ppf x =
       payload i ppf arg
   | Pstr_attribute a ->
       attribute i ppf "Pstr_attribute" a
-  | Pstr_kind_abbrev (name, jkind) ->
-      line i ppf "Pstr_kind_abbrev \"%s\"\n" name.txt;
-      jkind_annotation i ppf jkind
+  | Pstr_jkind jd ->
+      line i ppf "Pstr_kind";
+      jkind_declaration i ppf jd
   )
 
 and module_declaration i ppf pmd =

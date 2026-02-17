@@ -76,6 +76,7 @@ module Typ = struct
   let open_ ?loc ?attrs mod_ident t = mk ?loc ?attrs (Ptyp_open (mod_ident, t))
   let quote ?loc ?attrs t = mk ?loc ?attrs (Ptyp_quote t)
   let splice ?loc ?attrs t = mk ?loc ?attrs (Ptyp_splice t)
+  let repr ?loc ?attrs a b = mk ?loc ?attrs (Ptyp_repr (a, b))
   let of_kind ?loc ?attrs a = mk ?loc ?attrs (Ptyp_of_kind a)
 
   let force_poly t =
@@ -141,13 +142,15 @@ module Typ = struct
             Ptyp_splice (loop core_type)
         | Ptyp_of_kind jkind ->
             Ptyp_of_kind (loop_jkind jkind)
+        | Ptyp_repr (var_lst, core_type) ->
+            Ptyp_repr (var_lst, loop core_type)
         | Ptyp_extension (s, arg) ->
             Ptyp_extension (s, arg)
       in
       {t with ptyp_desc = desc}
     and loop_jkind jkind =
-      let pjkind_desc =
-        match jkind.pjkind_desc with
+      let pjka_desc =
+        match jkind.pjka_desc with
         | Pjk_default as x -> x
         | Pjk_abbreviation _ as x -> x
         | Pjk_mod (jkind, modes) -> Pjk_mod (loop_jkind jkind, modes)
@@ -156,7 +159,7 @@ module Typ = struct
         | Pjk_kind_of typ -> Pjk_kind_of (loop typ)
         | Pjk_product jkinds -> Pjk_product (List.map loop_jkind jkinds)
       in
-      { jkind with pjkind_desc }
+      { jkind with pjka_desc }
     and loop_row_field field =
       let prf_desc = match field.prf_desc with
         | Rtag(label,flag,lst) ->
@@ -191,6 +194,8 @@ module Pat = struct
   let alias ?loc ?attrs a b = mk ?loc ?attrs (Ppat_alias (a, b))
   let constant ?loc ?attrs a = mk ?loc ?attrs (Ppat_constant a)
   let interval ?loc ?attrs a b = mk ?loc ?attrs (Ppat_interval (a, b))
+  let unboxed_unit ?loc ?attrs () = mk ?loc ?attrs Ppat_unboxed_unit
+  let unboxed_bool ?loc ?attrs b = mk ?loc ?attrs (Ppat_unboxed_bool b)
   let tuple ?loc ?attrs a b = mk ?loc ?attrs (Ppat_tuple (a, b))
   let unboxed_tuple ?loc ?attrs a b = mk ?loc ?attrs (Ppat_unboxed_tuple (a, b))
   let construct ?loc ?attrs a b = mk ?loc ?attrs (Ppat_construct (a, b))
@@ -224,6 +229,8 @@ module Exp = struct
   let apply ?loc ?attrs a b = mk ?loc ?attrs (Pexp_apply (a, b))
   let match_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_match (a, b))
   let try_ ?loc ?attrs a b = mk ?loc ?attrs (Pexp_try (a, b))
+  let unboxed_unit ?loc ?attrs () = mk ?loc ?attrs Pexp_unboxed_unit
+  let unboxed_bool ?loc ?attrs b = mk ?loc ?attrs (Pexp_unboxed_bool b)
   let tuple ?loc ?attrs a = mk ?loc ?attrs (Pexp_tuple a)
   let unboxed_tuple ?loc ?attrs a = mk ?loc ?attrs (Pexp_unboxed_tuple a)
   let construct ?loc ?attrs a b = mk ?loc ?attrs (Pexp_construct (a, b))
@@ -280,6 +287,8 @@ module Exp = struct
       pbop_exp = exp;
       pbop_loc = loc;
     }
+
+  let borrow ?loc ?attrs a = mk ?loc ?attrs (Pexp_borrow a)
 end
 
 module Mty = struct
@@ -333,7 +342,7 @@ module Sig = struct
   let class_ ?loc a = mk ?loc (Psig_class a)
   let class_type ?loc a = mk ?loc (Psig_class_type a)
   let extension ?loc ?(attrs = []) a = mk ?loc (Psig_extension (a, attrs))
-  let kind_abbrev ?loc a b = mk ?loc (Psig_kind_abbrev (a, b))
+  let jkind ?loc a = mk ?loc (Psig_jkind a)
   let attribute ?loc a = mk ?loc (Psig_attribute a)
   let text txt =
     let f_txt = List.filter (fun ds -> docstring_body ds <> "") txt in
@@ -364,7 +373,7 @@ module Str = struct
   let class_type ?loc a = mk ?loc (Pstr_class_type a)
   let include_ ?loc a = mk ?loc (Pstr_include a)
   let extension ?loc ?(attrs = []) a = mk ?loc (Pstr_extension (a, attrs))
-  let kind_abbrev ?loc a b = mk ?loc (Pstr_kind_abbrev (a, b))
+  let jkind ?loc a = mk ?loc (Pstr_jkind a)
   let attribute ?loc a = mk ?loc (Pstr_attribute a)
   let text txt =
     let f_txt = List.filter (fun ds -> docstring_body ds <> "") txt in
@@ -464,8 +473,9 @@ end
 
 module Val = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-        ?(prim = []) ?(modalities=[]) name typ =
+        ?(prim = []) ?(poly = false) ?(modalities=[]) name typ =
     {
+     pval_poly = poly;
      pval_name = name;
      pval_type = typ;
      pval_attributes = add_docs_attrs docs attrs;
@@ -549,8 +559,9 @@ end
 
 module Vb = struct
   let mk ?(loc = !default_loc) ?(attrs = []) ?(docs = empty_docs)
-        ?(text = []) ?value_constraint ?(modes = []) pat expr =
+        ?(text = []) ?value_constraint ?(poly = false) ?(modes = []) pat expr =
     {
+     pvb_is_poly = poly;
      pvb_pat = pat;
      pvb_expr = expr;
      pvb_constraint=value_constraint;

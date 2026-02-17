@@ -272,6 +272,14 @@ static struct {
   NULL
 };
 
+/* Assumes the domain state at [domain_idx] has been initialized. */
+struct stack_cache* caml_get_stack_caches(int domain_idx) {
+  CAMLassert(domain_idx >= 0 && domain_idx < caml_params->max_domains);
+  CAMLassert(all_domains[domain_idx].state);
+  CAMLassert(all_domains[domain_idx].id == domain_idx);
+  return all_domains[domain_idx].state->stack_caches;
+}
+
 static void add_next_to_stw_domains(void)
 {
   CAMLassert(stw_domains.participating_domains < caml_params->max_domains);
@@ -626,19 +634,25 @@ static void domain_create(uintnat initial_minor_heap_wsize,
        we just reuse the previous stats from the previous domain
        with the same index.
   */
-  if (d->state == NULL) {
+  bool fresh_state = d->state == NULL;
+  if (fresh_state) {
     /* FIXME: Never freed. Not clear when to. */
     domain_state = (caml_domain_state*)
       caml_stat_calloc_noexc(1, sizeof(caml_domain_state));
     if (domain_state == NULL)
       goto fail_domain;
+
+    /* The stack cache is per domain index, and is never freed */
+    domain_state->stack_caches = caml_alloc_stack_caches();
+    if(domain_state->stack_caches == NULL)
+      goto fail_stack_caches;
+
     d->state = domain_state;
     domain_state->id = d->id;
   } else {
     domain_state = d->state;
     CAMLassert(domain_state->id == d->id);
   }
-
 
   /* Set domain_self if we have successfully allocated the
    * caml_domain_state. Otherwise domain_self will be NULL and it's up
@@ -655,10 +669,13 @@ static void domain_create(uintnat initial_minor_heap_wsize,
 
   domain_state->young_limit = 0;
   domain_state->unique_id = d->unique_id;
+  domain_state->requested_external_interrupt = 0;
 
-  /* Synchronized with [caml_interrupt_all_signal_safe], so that the
-     initializing write of young_limit happens before any
-     interrupt. */
+  /* Synchronized with [caml_interrupt_all_signal_safe] and
+     [caml_external_interrupt_all_signal_safe], so that the
+     initializing writes of young_limit and requested_external_interrupt happen
+     before any interrupt.
+  */
   atomic_store_explicit(&d->interrupt_word, &domain_state->young_limit,
                         memory_order_release);
 
@@ -716,10 +733,8 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_root_register(&domain_state->dls_state, Atom(0) /* Empty array */);
   domain_root_register(&domain_state->tls_state, Atom(0) /* Empty array */);
 
-  domain_state->stack_cache = caml_alloc_stack_cache();
-  if(domain_state->stack_cache == NULL) {
-    goto fail_stack_cache;
-  }
+  // Must happen after taking the domain lock
+  caml_enable_stack_caches(domain_state->stack_caches);
 
   domain_state->extern_state = NULL;
   domain_state->intern_state = NULL;
@@ -768,7 +783,6 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   domain_state->requested_major_slice = 0;
   domain_state->requested_minor_gc = 0;
   domain_state->major_slice_epoch = 0;
-  domain_state->requested_external_interrupt = 0;
 
   domain_state->parser_trace = 0;
 
@@ -792,8 +806,6 @@ static void domain_create(uintnat initial_minor_heap_wsize,
   return;
 
 fail_main_stack:
-  caml_free_stack_cache(domain_state->stack_cache);
-fail_stack_cache:
   domain_root_remove(&domain_state->dls_state);
   domain_root_remove(&domain_state->tls_state);
   free_minor_heap();
@@ -811,8 +823,12 @@ fail_dynamic:
   caml_memprof_delete_domain(domain_state);
 fail_memprof:
   atomic_store_explicit(&d->interrupt_word, NULL, memory_order_release);
-  caml_stat_free(d->state);
-  d->state = NULL;
+  if(fresh_state) {
+    caml_free_stack_caches(domain_state->stack_caches);
+fail_stack_caches:
+    caml_stat_free(d->state);
+    d->state = NULL;
+  }
   caml_domain_unlock_hook();
   domain_self = NULL;
   caml_state = NULL;
@@ -2188,7 +2204,8 @@ static void domain_terminate (void)
   if(domain_state->current_stack != NULL) {
     caml_free_stack(domain_state->current_stack);
   }
-  caml_free_stack_cache(domain_state->stack_cache);
+  caml_disable_stack_caches(domain_state->stack_caches);
+
   caml_free_backtrace_buffer(domain_state->backtrace_buffer);
   caml_free_gc_regs_buckets(domain_state->gc_regs_buckets);
 

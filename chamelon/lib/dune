@@ -1,0 +1,23 @@
+(library
+ (name chamelon_lib)
+ ; We don't use [unix] in [libraries] as that causes ocaml/otherlibs/unix/
+ ; to be built against the system compiler, which won't work.
+ (flags (:standard -I +unix -open Chamelon_compat))
+ (libraries chamelon_compat)
+ (enabled_if (= %{context_name} "default"))
+)
+
+(library
+ (name chamelon_lib)
+ (libraries chamelon_compat unix)
+ (flags (:standard -open Chamelon_compat))
+ (enabled_if (= %{context_name} "main"))
+)
+
+(env
+  (dev
+    (flags (:standard -no-principal -warn-error -A -w -70)))
+  (_
+    (flags (:standard -no-principal -w -70))))
+
+(include_subdirs unqualified)

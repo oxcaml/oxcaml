@@ -1,0 +1,1 @@
+val find_from : ?start:int -> string -> pattern:string -> int option

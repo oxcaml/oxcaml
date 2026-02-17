@@ -1,0 +1,132 @@
+let code pr2162_2_first_0 deleted in
+let code pr2162_2_1 deleted in
+let code pr2162_3_2 deleted in
+let code pr2162_3_as_int64_3 deleted in
+let code loopify(never) size(34) newer_version_of(pr2162_2_first_0)
+      pr2162_2_first_0_1 (z : imm tagged, x : imm tagged, y : float boxed)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float boxed =
+  (let untagged = %untag_imm (z) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k4)
+    where k4 =
+      let prim = %unbox_num.`float` (y) in
+      let prim_1 = %bfloat_arith.mul (prim, 0x1.8p+1) in
+      let a = %int_barith.mul (x, 2) in
+      let naked_immediate = %untag_imm (a) in
+      cont k2 (prim_1, naked_immediate)
+    where k3 =
+      let prim = %unbox_num.`float` (y) in
+      let prim_1 = %bfloat_arith.add (prim, 0x0p+0) in
+      let naked_immediate = %untag_imm (x) in
+      cont k2 (prim_1, naked_immediate)
+    where k2 (unboxed_float : float, naked_immediate : imm) =
+      let prim = %num_conv.[`imm`].[`float`] (naked_immediate) in
+      let prim_1 = %bfloat_arith.sub (prim, unboxed_float) in
+      let float_sub = %box_num.`float` (prim_1) in
+      cont k (float_sub)
+in
+let $camlTests4__pr2162_2_first_4 =
+  closure pr2162_2_first_0_1 @pr2162_2_first
+in
+let code loopify(never) size(34) newer_version_of(pr2162_2_1)
+      pr2162_2_1_1 (z : imm tagged, x : imm tagged, y : float boxed)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float boxed =
+  (let untagged = %untag_imm (z) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k4)
+    where k4 =
+      let prim = %unbox_num.`float` (y) in
+      let prim_1 = %bfloat_arith.mul (prim, 0x1.8p+1) in
+      let a = %int_barith.mul (x, 2) in
+      let naked_immediate = %untag_imm (a) in
+      cont k2 (prim_1, naked_immediate)
+    where k3 =
+      let prim = %unbox_num.`float` (y) in
+      let prim_1 = %bfloat_arith.add (prim, 0x0p+0) in
+      let naked_immediate = %untag_imm (x) in
+      cont k2 (prim_1, naked_immediate)
+    where k2 (unboxed_float : float, naked_immediate : imm) =
+      let prim = %num_conv.[`imm`].[`float`] (naked_immediate) in
+      let prim_1 = %bfloat_arith.sub (prim, unboxed_float) in
+      let float_sub = %box_num.`float` (prim_1) in
+      cont k (float_sub)
+in
+let $camlTests4__pr2162_2_5 = closure pr2162_2_1_1 @pr2162_2 in
+let code loopify(never) size(34) newer_version_of(pr2162_3_2)
+      pr2162_3_2_1 (z : imm tagged, x : imm tagged, y : float boxed)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float boxed =
+  (let untagged = %untag_imm (z) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k4)
+    where k4 =
+      let prim = %unbox_num.`float` (y) in
+      let prim_1 = %bfloat_arith.mul (prim, 0x1.8p+1) in
+      let int_mul = %int_barith.mul (x, 2) in
+      let naked_immediate = %untag_imm (int_mul) in
+      cont k2 (prim_1, naked_immediate)
+    where k3 =
+      let prim = %unbox_num.`float` (y) in
+      let prim_1 = %bfloat_arith.add (prim, 0x0p+0) in
+      let naked_immediate = %untag_imm (x) in
+      cont k2 (prim_1, naked_immediate)
+    where k2 (unboxed_float : float, naked_immediate : imm) =
+      let prim = %num_conv.[`imm`].[`float`] (naked_immediate) in
+      let prim_1 = %bfloat_arith.sub (prim, unboxed_float) in
+      let float_sub = %box_num.`float` (prim_1) in
+      cont k (float_sub)
+in
+let $camlTests4__pr2162_3_6 = closure pr2162_3_2_1 @pr2162_3 in
+let code loopify(never) size(49) newer_version_of(pr2162_3_as_int64_3)
+      pr2162_3_as_int64_3_1
+        (z : imm tagged, x : imm tagged, y : int64 boxed, y' : int32 boxed)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of int64 boxed * int32 boxed ] =
+  (let untagged = %untag_imm (z) in
+   switch untagged
+     | 0 -> k3
+     | 1 -> k4)
+    where k4 =
+      let prim = %unbox_num.`int64` (y) in
+      let prim_1 = %int_barith.`int64`.mul (prim, 3L) in
+      let prim_2 = %unbox_num.`int32` (y') in
+      let prim_3 = %int_barith.`int32`.mul (prim_2, 4l) in
+      let int_mul = %int_barith.mul (x, 2) in
+      let naked_immediate = %untag_imm (int_mul) in
+      cont k2 (prim_1, prim_3, naked_immediate)
+    where k3 =
+      let prim = %unbox_num.`int64` (y) in
+      let naked_immediate = %untag_imm (x) in
+      cont k2 (prim, 2l, naked_immediate)
+    where k2
+            (unboxed_int64 : int64,
+             unboxed_int32 : int32,
+             naked_immediate : imm) =
+      let prim = %num_conv.[`imm`].[`int32`] (naked_immediate) in
+      let prim_1 = %int_barith.`int32`.sub (prim, unboxed_int32) in
+      let int32_sub = %box_num.`int32` (prim_1) in
+      let prim_2 = %num_conv.[`imm`].[`int64`] (naked_immediate) in
+      let prim_3 = %int_barith.`int64`.sub (prim_2, unboxed_int64) in
+      let int64_sub = %box_num.`int64` (prim_3) in
+      let Pmakeblock = %block.[`0`] (int64_sub, int32_sub) in
+      cont k (Pmakeblock)
+in
+let $camlTests4__pr2162_3_as_int64_7 =
+  closure pr2162_3_as_int64_3_1 @pr2162_3_as_int64
+in
+let $camlTests4 =
+  Block 0 ($camlTests4__pr2162_2_first_4,
+           $camlTests4__pr2162_2_5,
+           $camlTests4__pr2162_3_6,
+           $camlTests4__pr2162_3_as_int64_7)
+in
+cont done ($camlTests4)

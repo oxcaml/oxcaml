@@ -473,6 +473,7 @@ module Repr_check = struct
   let sort_is_product : Jkind_types.Sort.Const.t -> bool = function
     | Product _ -> true
     | Base _ -> false
+    | Univar _ -> Misc.fatal_error "sort_is_product: univar"
 
   let valid_c_stub_arg = function
     | Same_as_ocaml_repr s ->
@@ -488,6 +489,8 @@ module Repr_check = struct
       not (sort_is_product s1) &&
       not (sort_is_product s2)
     | Same_as_ocaml_repr (Product _) -> false
+    | Same_as_ocaml_repr (Univar _) ->
+      Misc.fatal_error "valid_c_stub_return: univar"
 
   let check checks prim =
     let reprs = args_res_reprs prim in
@@ -539,7 +542,10 @@ let prim_has_valid_reprs ~loc prim =
     let stringlike_indexing_primitives =
       let widths : (_ * _ * Jkind_types.Sort.Const.t) list =
         [
+          ("8", "", C.value);
+          ("i8", "", C.value);
           ("16", "", C.value);
+          ("i16", "", C.value);
           ("32", "", C.value);
           ("f32", "", C.value);
           ("64", "", C.value);
@@ -549,6 +555,10 @@ let prim_has_valid_reprs ~loc prim =
           ("u256", "", C.value);
           ("a512", "", C.value);
           ("u512", "", C.value);
+          ("8", "#", C.bits8);
+          ("i8", "#", C.bits8);
+          ("16", "#", C.bits16);
+          ("i16", "#", C.bits16);
           ("32", "#", C.bits32);
           ("f32", "#", C.float32);
           ("64", "#", C.bits64);
@@ -564,6 +574,8 @@ let prim_has_valid_reprs ~loc prim =
         [
           ("", C.value);
           ("_indexed_by_nativeint#", C.word);
+          ("_indexed_by_int8#", C.bits8);
+          ("_indexed_by_int16#", C.bits16);
           ("_indexed_by_int32#", C.bits32);
           ("_indexed_by_int64#", C.bits64);
         ]
@@ -620,12 +632,16 @@ let prim_has_valid_reprs ~loc prim =
         "int_array";
         "unboxed_int64_array";
         "unboxed_int32_array";
+        "untagged_int16_array";
+        "untagged_int8_array";
         "unboxed_nativeint_array";
       ] in
       let safe_sigils = [""; "u"] in
       let indices = [
         ("", C.value);
         ("_indexed_by_nativeint#", C.word);
+        ("_indexed_by_int8#", C.bits8);
+        ("_indexed_by_int16#", C.bits16);
         ("_indexed_by_int32#", C.bits32);
         ("_indexed_by_int64#", C.bits64);
       ] in
@@ -925,6 +941,12 @@ let prim_has_valid_reprs ~loc prim =
       exactly [Same_as_ocaml_repr C.vec256; Same_as_ocaml_repr C.value]
     | "%unbox_vec256" ->
       exactly [Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.vec256]
+    | "%join_vec256" ->
+      exactly [Same_as_ocaml_repr C.vec128; Same_as_ocaml_repr C.vec128;
+               Same_as_ocaml_repr C.vec256]
+    | "%split_vec256" ->
+      exactly [Same_as_ocaml_repr C.vec256;
+               Same_as_ocaml_repr (Product [C.vec128; C.vec128])]
     | "%box_vec512" ->
       exactly [Same_as_ocaml_repr C.vec512; Same_as_ocaml_repr C.value]
     | "%unbox_vec512" ->
@@ -999,42 +1021,42 @@ module Style = Misc.Style
 let report_error ppf err =
   match err with
   | Old_style_float_with_native_repr_attribute ->
-    Format.fprintf ppf "Cannot use %a in conjunction with %a/%a."
+    Format_doc.fprintf ppf "Cannot use %a in conjunction with %a/%a."
       Style.inline_code "float"
       Style.inline_code "[@unboxed]"
       Style.inline_code  "[@untagged]"
   | Old_style_float_with_non_value ->
-    Format.fprintf ppf "Cannot use %a in conjunction with \
+    Format_doc.fprintf ppf "Cannot use %a in conjunction with \
                         types of non-value layouts."
       Style.inline_code "float"
   | Old_style_noalloc_with_noalloc_attribute ->
-    Format.fprintf ppf "Cannot use %a in conjunction with %a."
+    Format_doc.fprintf ppf "Cannot use %a in conjunction with %a."
       Style.inline_code "noalloc"
       Style.inline_code "[@@noalloc]"
   | No_native_primitive_with_repr_attribute ->
-    Format.fprintf ppf
+    Format_doc.fprintf ppf
       "@[The native code version of the primitive is mandatory@ \
       when attributes %a or %a are present.@]"
       Style.inline_code "[@untagged]"
       Style.inline_code "[@unboxed]"
   | No_native_primitive_with_non_value ->
-    Format.fprintf ppf
+    Format_doc.fprintf ppf
       "@[The native code version of the primitive is mandatory@ \
        for types with non-value layouts.@]"
   | Inconsistent_attributes_for_effects ->
-    Format.fprintf ppf "At most one of %a and %a can be specified."
+    Format_doc.fprintf ppf "At most one of %a and %a can be specified."
       Style.inline_code "[@no_effects]"
       Style.inline_code "[@only_generative_effects]"
   | Inconsistent_noalloc_attributes_for_effects ->
-    Format.fprintf ppf "Cannot use %a in conjunction with %a."
+    Format_doc.fprintf ppf "Cannot use %a in conjunction with %a."
       Style.inline_code "[@@no_generative_effects]"
       Style.inline_code "[@@noalloc]"
   | Invalid_representation_polymorphic_attribute ->
-    Format.fprintf ppf "Attribute %a can only be used \
+    Format_doc.fprintf ppf "Attribute %a can only be used \
                         on built-in primitives."
       Style.inline_code "[@layout_poly]"
   | Invalid_native_repr_for_primitive name ->
-    Format.fprintf ppf
+    Format_doc.fprintf ppf
       "The primitive [%s] is used in an invalid declaration.@ \
        The declaration contains argument/return types with the@ \
        wrong layout."

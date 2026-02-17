@@ -19,6 +19,8 @@
 
 val output_channel : out_channel ref
 
+val output_prefix : string ref
+
 val emit_string : string -> unit
 
 val emit_buffer : Buffer.t -> unit
@@ -116,7 +118,9 @@ end
 
 exception Error of error
 
-val report_error : Format.formatter -> error -> unit
+val report_error : error Format_doc.format_printer
+
+val report_error_doc : error Format_doc.printer
 
 type preproc_stack_check_result =
   { max_frame_size : int;

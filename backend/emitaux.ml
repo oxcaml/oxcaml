@@ -28,6 +28,8 @@ exception Error of error
 
 let output_channel = ref stdout
 
+let output_prefix = ref ""
+
 let emit_string s = output_string !output_channel s
 
 let emit_buffer b = Buffer.output_buffer !output_channel b
@@ -495,16 +497,18 @@ module Dwarf_helpers = struct
       Some (Dwarf.dwarf_for_fundecl dwarf fundecl ~fun_end_label ~ppf_dump)
 end
 
-let report_error ppf = function
+let report_error_doc ppf = function
   | Stack_frame_too_large n ->
-    Format.fprintf ppf
+    Format_doc.fprintf ppf
       "stack frame too large (%d bytes). \nUse -long-frames compiler flag." n
   | Stack_frame_way_too_large n ->
-    Format.fprintf ppf "stack frame too large (%d bytes)." n
+    Format_doc.fprintf ppf "stack frame too large (%d bytes)." n
   | Inconsistent_probe_init (name, dbg) ->
-    Format.fprintf ppf
+    Format_doc.fprintf ppf
       "Inconsistent use of ~enabled_at_init in [%%probe %s ..] at %a" name
-      Debuginfo.print_compact dbg
+      Debuginfo.doc_print_compact dbg
+
+let report_error = Format_doc.compat report_error_doc
 
 type preproc_stack_check_result =
   { max_frame_size : int;
@@ -603,7 +607,7 @@ let emit_elf_note ~section ~owner ~typ ~emit_desc =
   let module D = Asm_targets.Asm_directives in
   let module L = Asm_targets.Asm_label in
   let bytes = if Target_system.is_macos () then 8 else 4 in
-  D.align ~fill_x86_bin_emitter:Zero ~bytes;
+  D.align ~fill:Zero ~bytes;
   let a = L.create section in
   let b = L.create section in
   let c = L.create section in
@@ -614,11 +618,11 @@ let emit_elf_note ~section ~owner ~typ ~emit_desc =
   D.define_label a;
   D.string (owner ^ "\000");
   D.define_label b;
-  D.align ~fill_x86_bin_emitter:Zero ~bytes;
+  D.align ~fill:Zero ~bytes;
   D.define_label c;
   emit_desc ();
   D.define_label d;
-  D.align ~fill_x86_bin_emitter:Zero ~bytes
+  D.align ~fill:Zero ~bytes
 
 let reset () =
   reset_debug_info ();

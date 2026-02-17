@@ -14,21 +14,35 @@ type ident =
             point to [M]. This field would store [M.x]. *)
   }
 
-(** Description of pinpoints to accompany the location. The constructors are not
-    mutually exclusive - some might be more precise than others *)
+type structure_item = lock_item * Ident.t
+
+(** Pinpoint's description to accompany pinpoint's location. It's about the
+    syntax rather than the value. For example, we distinguish:
+    - between a module identifer and a module definition
+    - between a structure definition and a functor definition
+    - BUT NOT between two module identifiers where one is a functor and the
+      other is a structure.
+
+    The constructors are not mutually exclusive - some might be more precise
+    than others. *)
 type pinpoint_desc =
   | Unknown
   | Ident of ident  (** An identifier *)
   | Function  (** A function definition *)
+  | Module  (** A module definition *)
   | Functor  (** A functor definition *)
+  | Structure  (** A structure definition *)
   | Lazy  (** A lazy expression *)
   | Allocation  (** An allocation *)
   | Expression  (** An arbitrary expression *)
-  | Class  (** An class declaration *)
+  | Class  (** A class declaration *)
   | Object  (** An object declaration *)
-  | Loop  (** a loop *)
-  | Letop  (** let op *)
-  | Cases_result  (** the result of cases *)
+  | Loop  (** A loop *)
+  | Letop  (** A let op expression *)
+  | Cases_result  (** The result of cases *)
+  | Pattern  (** A pattern *)
+  | Structure_item of structure_item
+      (** an item in a structure being pointed at *)
 
 (** A pinpoint is a location in the source code, accompanied by additional
     description *)
@@ -42,13 +56,32 @@ type always_dynamic =
   | Application
   | Try_with
 
+type legacy =
+  | Compilation_unit
+  | Toplevel
+  | Class
+
+(* CR-soon zqian: add loop and function body to [region_desc] *)
+type region_desc = Borrow
+
+type region = Location.t * region_desc
+
+type ('d0, 'd1) polarity =
+  | Monadic : ('l * 'r, 'r * 'l) polarity
+  | Comonadic : ('l * 'r, 'l * 'r) polarity
+  constraint 'd0 = _ * _ constraint 'd1 = _ * _
+[@@warning "-62"]
+
+(* CR-soon zqian: add the const hint for "min on the LHS", and one for "max on
+the RHS". They are similiar to the [Skip] morph hint and should raise when being
+printed. *)
+
 (** Hint for a constant bound. See [Mode.Report.print_const] for what each
     non-trivial constructor means. *)
 type 'd const =
   | Unknown : ('l * 'r) const  (** The constant bound is not explained. *)
   | Lazy_allocated_on_heap : (disallowed * 'r) pos const
-  | Class_legacy_monadic : ('l * disallowed) neg const
-  | Class_legacy_comonadic : ('l * disallowed) pos const
+  | Legacy : legacy -> ('l * 'r) const
   | Tailcall_function : (disallowed * 'r) pos const
   | Tailcall_argument : (disallowed * 'r) pos const
   | Mutable_read : mutable_part -> (disallowed * 'r) neg const
@@ -62,14 +95,10 @@ type 'd const =
   | Is_used_in : pinpoint -> (disallowed * 'r) const
       (** A variant of [Is_closed_by] where the closure mode is constant.
           INVARIANT: The [pinpoint] cannot be [Unknown]. *)
+  | Borrowed : Location.t * ('l * 'r, 'd) polarity -> 'd const
+  | Escape_region : region -> (disallowed * 'r) const
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]
-
-type ('d0, 'd1) polarity =
-  | Monadic : ('l * 'r, 'r * 'l) polarity
-  | Comonadic : ('l * 'r, 'l * 'r) polarity
-  constraint 'd0 = _ * _ constraint 'd1 = _ * _
-[@@warning "-62"]
 
 type closure_details =
   { closure : pinpoint;
@@ -86,7 +115,9 @@ type containing =
   | Record of string * modality
   | Array of modality
   | Constructor of string * modality
-(* CR-soon zqian: add the relation between structure and items *)
+  | Structure of structure_item * modality
+(* Some structure items (such as classes) don't have modalities. We gloss over
+     for simplicity. *)
 
 type contains =
   { containing : containing;
@@ -95,7 +126,7 @@ type contains =
 
 type is_contained_by =
   { containing : containing;
-    container : Location.t
+    container : pinpoint
   }
 
 type allocation_desc =
@@ -111,11 +142,6 @@ type allocation = allocation_desc Location.loc
     [Mode.Report.print_morph] for what each non-trivial constructor means. *)
 type 'd morph =
   | Unknown : ('l * 'r) morph  (** The morphism is not explained. *)
-  | Unknown_non_rigid : ('l * 'r) morph
-      (** Similiar to [Unknown], but in the special case where the morph doesn't
-          change the bound, it can be skipped. *)
-  (* CR-soon zqian: usages of [Unknown_non_rigid] should be replaced with
-     corresponding proper hints *)
   | Skip : ('l * 'r) morph
       (** The morphism doesn't change the bound and should be skipped in
           printing. *)
@@ -137,5 +163,7 @@ type 'd morph =
   | Contains_l : ('l * disallowed, 'd) polarity * contains -> 'd morph
   | Is_contained_by : ('l * 'r, 'd) polarity * is_contained_by -> 'd morph
   | Contains_r : (disallowed * 'r, 'd) polarity * contains -> 'd morph
+    (* CR-someday zqian: add [Tail_of_region] which connects the mode of region
+       to the mode of the region's tail *)
   constraint 'd = _ * _
 [@@ocaml.warning "-62"]

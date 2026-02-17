@@ -8,7 +8,7 @@ let dup x = unique_ (x, x)
 Line 1, characters 24-25:
 1 | let dup x = unique_ (x, x)
                             ^
-Error: This value is used here, but it is already being used as unique:
+Error: This value is used here, but it is also being used as unique at:
 Line 1, characters 21-22:
 1 | let dup x = unique_ (x, x)
                          ^
@@ -28,7 +28,7 @@ Line 1, characters 24-25:
 1 | let dup (once_ x) = (x, x)
                             ^
 Error: This value is used here,
-       but it is defined as once and is already being used:
+       but it is defined as once and is also being used at:
 Line 1, characters 21-22:
 1 | let dup (once_ x) = (x, x)
                          ^
@@ -40,7 +40,7 @@ let dup (unique_ x) = (unique_ x, x, x)
 Line 1, characters 34-35:
 1 | let dup (unique_ x) = (unique_ x, x, x)
                                       ^
-Error: This value is used here, but it is already being used as unique:
+Error: This value is used here, but it is also being used as unique at:
 Line 1, characters 31-32:
 1 | let dup (unique_ x) = (unique_ x, x, x)
                                    ^
@@ -52,7 +52,7 @@ let dup (unique_ x) = (x, (unique_ x), x)
 Line 1, characters 26-37:
 1 | let dup (unique_ x) = (x, (unique_ x), x)
                               ^^^^^^^^^^^
-Error: This value is used here as unique, but it is already being used:
+Error: This value is used here as unique, but it is also being used at:
 Line 1, characters 23-24:
 1 | let dup (unique_ x) = (x, (unique_ x), x)
                            ^
@@ -65,7 +65,7 @@ let dup (unique_ x) = ((unique_ x), x)
 Line 1, characters 36-37:
 1 | let dup (unique_ x) = ((unique_ x), x)
                                         ^
-Error: This value is used here, but it is already being used as unique:
+Error: This value is used here, but it is also being used as unique at:
 Line 1, characters 23-34:
 1 | let dup (unique_ x) = ((unique_ x), x)
                            ^^^^^^^^^^^
@@ -89,7 +89,7 @@ Line 4, characters 9-10:
 4 |   g () @ g ()
              ^
 Error: This value is used here,
-       but it is defined as once and is already being used:
+       but it is defined as once and is also being used at:
 Line 4, characters 2-3:
 4 |   g () @ g ()
       ^
@@ -143,7 +143,7 @@ Line 4, characters 4-5:
         ^
 Error: The value "k" is "once"
        but is expected to be "many"
-         because it is used in a loop (at Lines 3-5, characters 2-6).
+         because it is used in a loop (at lines 3-5, characters 2-6).
 |}]
 
 (* The following is bad, because k is used uniquely *)
@@ -157,7 +157,7 @@ Line 4, characters 12-13:
 4 |     unique_ k
                 ^
 Error: This value is "aliased"
-         because it is used in a loop (at Lines 3-5, characters 2-6).
+         because it is used in a loop (at lines 3-5, characters 2-6).
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -173,7 +173,7 @@ Line 5, characters 14-15:
 5 |     let _ = g a in ()
                   ^
 Error: This value is "aliased"
-         because it is used in a loop (at Lines 4-6, characters 2-6).
+         because it is used in a loop (at lines 4-6, characters 2-6).
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -336,7 +336,7 @@ let inf4 (b : bool) (y : float) (unique_ x : float) =
 Line 2, characters 59-60:
 2 |   let _ = aliased_id y in let unique_ z = if b then x else y in z
                                                                ^
-Error: This value is used here as unique, but it has already been used:
+Error: This value is used here as unique, but it has already been used at:
 Line 2, characters 21-22:
 2 |   let _ = aliased_id y in let unique_ z = if b then x else y in z
                          ^
@@ -450,7 +450,7 @@ Line 4, characters 13-16:
 4 |   (bar ~d:3, bar ~d:5)
                  ^^^
 Error: This value is used here,
-       but it is defined as once and is already being used:
+       but it is defined as once and is also being used at:
 Line 4, characters 3-6:
 4 |   (bar ~d:3, bar ~d:5)
        ^^^
@@ -466,7 +466,7 @@ Line 4, characters 35-38:
 4 |   let baz = bar ~b:4 in (baz ~d:3, baz ~d:5)
                                        ^^^
 Error: This value is used here,
-       but it is defined as once and is already being used:
+       but it is defined as once and is also being used at:
 Line 4, characters 25-28:
 4 |   let baz = bar ~b:4 in (baz ~d:3, baz ~d:5)
                              ^^^
@@ -482,7 +482,7 @@ Line 4, characters 11-14:
 4 |   (foo (), foo ())
                ^^^
 Error: This value is used here,
-       but it is defined as once and is already being used:
+       but it is defined as once and is also being used at:
 Line 4, characters 3-6:
 4 |   (foo (), foo ())
        ^^^
@@ -563,7 +563,7 @@ type tree = Leaf | Node of tree * tree
 Line 5, characters 19-20:
 5 |        in Node (x, x)
                        ^
-Error: This value is used here, but it is already being used as unique:
+Error: This value is used here, but it is also being used as unique at:
 Line 5, characters 16-17:
 5 |        in Node (x, x)
                     ^
@@ -587,7 +587,7 @@ let f ~(call_pos : [%call_pos]) () =
 Line 2, characters 21-29:
 2 |   unique_ (call_pos, call_pos)
                          ^^^^^^^^
-Error: This value is used here, but it is already being used as unique:
+Error: This value is used here, but it is also being used as unique at:
 Line 2, characters 11-19:
 2 |   unique_ (call_pos, call_pos)
                ^^^^^^^^
@@ -603,7 +603,7 @@ Line 3, characters 33-36:
 3 |   | [| o |] -> let _ = unique_id arr in aliased_id o
                                      ^^^
 Error: This value is used here as unique,
-       but it has already been used in an array pattern:
+       but it has already been used in an array pattern at:
 Line 3, characters 4-11:
 3 |   | [| o |] -> let _ = unique_id arr in aliased_id o
         ^^^^^^^
@@ -619,7 +619,7 @@ Line 3, characters 50-51:
 3 |   | [: o :] -> let _ = unique_id arr in unique_id o
                                                       ^
 Error: This value is used here,
-       but it is part of a value that has already been used as unique:
+       but it is part of a value that has already been used as unique at:
 Line 3, characters 33-36:
 3 |   | [: o :] -> let _ = unique_id arr in unique_id o
                                      ^^^
@@ -642,7 +642,7 @@ Line 3, characters 25-28:
 3 |   | [| _ |] -> unique_id arr
                              ^^^
 Error: This value is used here as unique,
-       but it has already been used in an array pattern:
+       but it has already been used in an array pattern at:
 Line 3, characters 4-11:
 3 |   | [| _ |] -> unique_id arr
         ^^^^^^^
@@ -658,7 +658,7 @@ Line 3, characters 25-28:
 3 |   | [: _ :] -> unique_id arr
                              ^^^
 Error: This value is used here as unique,
-       but it has already been used in an array pattern:
+       but it has already been used in an array pattern at:
 Line 3, characters 4-11:
 3 |   | [: _ :] -> unique_id arr
         ^^^^^^^
@@ -674,7 +674,7 @@ Line 3, characters 24-27:
 3 |   | Some 1 -> unique_id opt
                             ^^^
 Error: This value is used here as unique,
-       but part of it has already been used in a constant pattern:
+       but part of it has already been used in a constant pattern at:
 Line 3, characters 9-10:
 3 |   | Some 1 -> unique_id opt
              ^
@@ -690,7 +690,7 @@ Line 3, characters 24-25:
 3 |   | lazy 1 -> unique_id l
                             ^
 Error: This value is used here as unique,
-       but it has already been used in a lazy pattern:
+       but it has already been used in a lazy pattern at:
 Line 3, characters 4-10:
 3 |   | lazy 1 -> unique_id l
         ^^^^^^

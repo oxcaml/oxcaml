@@ -87,7 +87,7 @@ external unsafe_set_mutable :
    not careful, this can lead to an array's contents pointing forwards. *)
 external make_mutable_local :
   ('a : value_or_null mod separable). int -> local_ 'a -> local_ 'a array
-  @@ portable = "caml_make_local_vect"
+  @@ portable = "caml_array_make_local"
 external unsafe_of_local_array :
   ('a : any mod separable). local_ 'a array -> local_ 'a iarray @@ portable
   = "%array_to_iarray"

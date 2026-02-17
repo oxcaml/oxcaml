@@ -60,6 +60,7 @@ module type Common_options = sig
   val _dump_debug_uid_tables : unit -> unit
   val _verbose_types : unit -> unit
   val _no_verbose_types : unit -> unit
+  val _kind_verbosity : int -> unit
   val _version : unit -> unit
   val _vnum : unit -> unit
   val _w : string -> unit

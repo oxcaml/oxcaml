@@ -129,7 +129,7 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-         because it closes over the value "best_bytes" at Line 3, characters 24-34
+         because it closes over the value "best_bytes" at line 3, characters 24-34
          which is "nonportable".
        However, the highlighted expression is expected to be "portable".
 |}]
@@ -145,7 +145,7 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "shareable"
-         because it contains a usage (of the value "r" at Line 3, characters 25-26)
+         because it contains a usage (of the value "r" at line 3, characters 25-26)
          which is expected to be "shared" or "uncontended"
          because its mutable field "a" is being read.
        However, the highlighted expression is expected to be "portable".
@@ -161,7 +161,7 @@ Line 3, characters 23-26:
 3 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "shareable"
-         because it contains a usage (of the value "r" at Line 2, characters 25-26)
+         because it contains a usage (of the value "r" at line 2, characters 25-26)
          which is expected to be "shared" or "uncontended"
          because its mutable field "a" is being read.
        However, the highlighted expression is expected to be "portable".
@@ -248,7 +248,7 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-         because it contains a usage (of the value "r" at Line 3, characters 27-28)
+         because it contains a usage (of the value "r" at line 3, characters 27-28)
          which is expected to be "uncontended".
        However, the highlighted expression is expected to be "portable".
 |}]
@@ -264,7 +264,7 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-         because it contains a usage (of the value "r" at Line 3, characters 27-28)
+         because it contains a usage (of the value "r" at line 3, characters 27-28)
          which is expected to be "uncontended".
        However, the highlighted expression is expected to be "portable".
 |}]
@@ -305,7 +305,7 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-         because it closes over the value "r" at Line 3, characters 25-26
+         because it closes over the value "r" at line 3, characters 25-26
          which is "nonportable".
        However, the highlighted expression is expected to be "portable".
 |}]
@@ -358,7 +358,7 @@ Line 1, characters 105-115:
                                                                                                              ^^^^^^^^^^
 Error: The value "best_bytes" is "nonportable"
        but is expected to be "portable"
-         because it is used inside the function at Line 1, characters 94-118
+         because it is used inside the function at line 1, characters 94-118
          which is expected to be "portable".
 |}]
 

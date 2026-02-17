@@ -149,6 +149,7 @@ let configuration_variables () =
   p_bool "probes" probes;
   p_bool "stack_allocation" stack_allocation;
 
+  p_bool "runtime5" runtime5;
   p_bool "no_stack_checks" no_stack_checks;
   p_bool "multidomain" multidomain;
   p_bool "poll_insertion" poll_insertion;

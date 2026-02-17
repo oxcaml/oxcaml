@@ -54,6 +54,21 @@ let dump_if_enabled ppf enabled ~header ~f a =
 let pp_flambda_as_fexpr ppf unit =
   Print_fexpr.flambda_unit ppf (unit |> Flambda_to_fexpr.conv)
 
+let dump_fexpr_annot ~prefixname suffix unit =
+  let dump =
+    Flambda_features.dump_fexpr_annot ()
+    || List.exists (String.equal suffix)
+         (Flambda_features.dump_fexpr_annot_after ())
+  in
+  if dump
+  then
+    Misc.protect_output_to_file
+      (prefixname ^ "." ^ suffix ^ ".fl")
+      (fun out ->
+        let ppf = Format.formatter_of_out_channel out in
+        pp_flambda_as_fexpr ppf unit;
+        Format.pp_print_flush ppf ())
+
 let print_rawflambda ppf unit =
   dump_if_enabled ppf
     (Flambda_features.dump_rawflambda ())
@@ -130,6 +145,125 @@ type flambda_result =
     reachable_names : NO.t
   }
 
+let flambda_to_flambda0 : type m.
+    ppf_dump:Format.formatter ->
+    prefixname:string ->
+    cmx_loader:Flambda_cmx.loader ->
+    machine_width:Target_system.Machine_width.t ->
+    mode:m Flambda_features.mode ->
+    close_prog_metadata:m Closure_conversion.close_program_metadata ->
+    code_slot_offsets:Slot_offsets.t Flambda2_identifiers.Code_id.Map.t ->
+    Flambda_unit.t ->
+    flambda_result =
+ fun ~ppf_dump:ppf ~prefixname ~cmx_loader ~machine_width ~mode
+     ~close_prog_metadata ~code_slot_offsets raw_flambda ->
+  Compiler_hooks.execute Raw_flambda2 raw_flambda;
+  print_rawflambda ppf raw_flambda;
+  dump_fexpr_annot ~prefixname "raw" raw_flambda;
+  let flambda, offsets, reachable_names, cmx, all_code =
+    match mode, close_prog_metadata with
+    | Classic, Classic (code, reachable_names, cmx, offsets) ->
+      (if Flambda_features.inlining_report ()
+       then
+         let output_prefix = prefixname ^ ".cps_conv" in
+         let inlining_tree =
+           Inlining_report.output_then_forget_decisions ~output_prefix
+         in
+         Compiler_hooks.execute Inlining_tree inlining_tree);
+      raw_flambda, offsets, reachable_names, cmx, code
+    | Normal, Normal ->
+      let round = 0 in
+      let { Simplify.free_names;
+            final_typing_env;
+            all_code;
+            slot_offsets;
+            unit = flambda
+          } =
+        Profile.record_call ~accumulate:true "simplify" (fun () ->
+            Simplify.run ~cmx_loader ~machine_width ~round ~code_slot_offsets
+              raw_flambda)
+      in
+      (if Flambda_features.inlining_report ()
+       then
+         let output_prefix = Printf.sprintf "%s.%d" prefixname round in
+         let inlining_tree =
+           Inlining_report.output_then_forget_decisions ~output_prefix
+         in
+         Compiler_hooks.execute Inlining_tree inlining_tree);
+      Compiler_hooks.execute Flambda2 flambda;
+      let last_pass_name = "simplify" in
+      print_flambda last_pass_name
+        (Flambda_features.dump_simplify ())
+        ppf flambda;
+      print_fexpr "simplify"
+        (Flambda_features.dump_fexpr (This_pass "simplify"))
+        ppf flambda;
+      print_flexpect "simplify" ppf ~raw_flambda flambda;
+      dump_fexpr_annot ~prefixname "simplify" flambda;
+      let ( flambda,
+            free_names,
+            all_code,
+            slot_offsets,
+            final_typing_env,
+            last_pass_name ) =
+        if Flambda_features.enable_reaper ()
+        then (
+          let flambda, free_names, all_code, slot_offsets, final_typing_env =
+            Profile.record_call ~accumulate:true "reaper" (fun () ->
+                Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader ~all_code
+                  ~final_typing_env flambda)
+          in
+          print_fexpr "reaper"
+            (Flambda_features.dump_fexpr (This_pass "reaper"))
+            ppf flambda;
+          print_flexpect "reaper" ppf ~raw_flambda flambda;
+          dump_fexpr_annot ~prefixname "reaper" flambda;
+          ( flambda,
+            free_names,
+            all_code,
+            slot_offsets,
+            final_typing_env,
+            "reaper" ))
+        else
+          ( flambda,
+            free_names,
+            all_code,
+            slot_offsets,
+            final_typing_env,
+            last_pass_name )
+      in
+      print_flambda last_pass_name
+        (Flambda_features.dump_flambda ())
+        ppf flambda;
+      print_fexpr last_pass_name
+        (Flambda_features.dump_fexpr Last_pass)
+        ppf flambda;
+      let { unit = flambda; exported_offsets; cmx; all_code; reachable_names } =
+        build_run_result flambda ~free_names ~final_typing_env ~all_code
+          slot_offsets
+      in
+      Compiler_hooks.execute Reaped_flambda2 flambda;
+      flambda, exported_offsets, reachable_names, cmx, all_code
+  in
+  (match cmx with
+  | None ->
+    () (* Either opaque was passed, or there is no need to export offsets *)
+  | Some cmx -> Compilenv.set_export_info cmx);
+  { flambda; offsets; reachable_names; all_code }
+
+let flambda_to_flambda ~ppf_dump ~prefixname ~machine_width
+    (unit : Flambda_unit.t) =
+  let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
+  let mode, close_prog_metadata =
+    match Flambda_features.mode () with
+    | Mode Normal -> Flambda_features.Normal, Closure_conversion.Normal
+    | Mode Classic ->
+      Misc.fatal_error "Unsupported classic mode in standalone middle-end pass"
+  in
+  flambda_to_flambda0 ~ppf_dump ~prefixname ~cmx_loader ~machine_width ~mode
+    ~close_prog_metadata
+    ~code_slot_offsets:Flambda2_identifiers.Code_id.Map.empty unit
+
 let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
     (program : Lambda.program) =
   let module_repr =
@@ -173,103 +307,15 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
   let (Mode mode) = Flambda_features.mode () in
   let { Closure_conversion.unit = raw_flambda;
         code_slot_offsets;
-        metadata = close_program_metadata
+        metadata = close_prog_metadata
       } =
     Profile.record_call "lambda_to_flambda" (fun () ->
         Lambda_to_flambda.lambda_to_flambda ~mode ~machine_width
           ~big_endian:Arch.big_endian ~cmx_loader ~compilation_unit ~module_repr
           module_initializer)
   in
-  Compiler_hooks.execute Raw_flambda2 raw_flambda;
-  print_rawflambda ppf raw_flambda;
-  let flambda, offsets, reachable_names, cmx, all_code =
-    match mode, close_program_metadata with
-    | Classic, Classic (code, reachable_names, cmx, offsets) ->
-      (if Flambda_features.inlining_report ()
-       then
-         let output_prefix = prefixname ^ ".cps_conv" in
-         let inlining_tree =
-           Inlining_report.output_then_forget_decisions ~output_prefix
-         in
-         Compiler_hooks.execute Inlining_tree inlining_tree);
-      raw_flambda, offsets, reachable_names, cmx, code
-    | Normal, Normal ->
-      let round = 0 in
-      let { Simplify.free_names;
-            final_typing_env;
-            all_code;
-            slot_offsets;
-            unit = flambda
-          } =
-        Profile.record_call ~accumulate:true "simplify" (fun () ->
-            Simplify.run ~cmx_loader ~machine_width ~round ~code_slot_offsets
-              raw_flambda)
-      in
-      (if Flambda_features.inlining_report ()
-       then
-         let output_prefix = Printf.sprintf "%s.%d" prefixname round in
-         let inlining_tree =
-           Inlining_report.output_then_forget_decisions ~output_prefix
-         in
-         Compiler_hooks.execute Inlining_tree inlining_tree);
-      Compiler_hooks.execute Flambda2 flambda;
-      let last_pass_name = "simplify" in
-      print_flambda last_pass_name
-        (Flambda_features.dump_simplify ())
-        ppf flambda;
-      print_fexpr "simplify"
-        (Flambda_features.dump_fexpr (This_pass "simplify"))
-        ppf flambda;
-      print_flexpect "simplify" ppf ~raw_flambda flambda;
-      let ( flambda,
-            free_names,
-            all_code,
-            slot_offsets,
-            final_typing_env,
-            last_pass_name ) =
-        if Flambda_features.enable_reaper ()
-        then (
-          let flambda, free_names, all_code, slot_offsets, final_typing_env =
-            Profile.record_call ~accumulate:true "reaper" (fun () ->
-                Flambda2_reaper.Reaper.run ~machine_width ~cmx_loader ~all_code
-                  ~final_typing_env flambda)
-          in
-          print_fexpr "reaper"
-            (Flambda_features.dump_fexpr (This_pass "reaper"))
-            ppf flambda;
-          print_flexpect "reaper" ppf ~raw_flambda flambda;
-          ( flambda,
-            free_names,
-            all_code,
-            slot_offsets,
-            final_typing_env,
-            "reaper" ))
-        else
-          ( flambda,
-            free_names,
-            all_code,
-            slot_offsets,
-            final_typing_env,
-            last_pass_name )
-      in
-      print_flambda last_pass_name
-        (Flambda_features.dump_flambda ())
-        ppf flambda;
-      print_fexpr last_pass_name
-        (Flambda_features.dump_fexpr Last_pass)
-        ppf flambda;
-      let { unit = flambda; exported_offsets; cmx; all_code; reachable_names } =
-        build_run_result flambda ~free_names ~final_typing_env ~all_code
-          slot_offsets
-      in
-      Compiler_hooks.execute Reaped_flambda2 flambda;
-      flambda, exported_offsets, reachable_names, cmx, all_code
-  in
-  (match cmx with
-  | None ->
-    () (* Either opaque was passed, or there is no need to export offsets *)
-  | Some cmx -> Compilenv.set_export_info cmx);
-  { flambda; offsets; reachable_names; all_code }
+  flambda_to_flambda0 ~ppf_dump:ppf ~prefixname ~cmx_loader ~machine_width ~mode
+    ~close_prog_metadata ~code_slot_offsets raw_flambda
 
 let reset_symbol_tables () =
   Compilenv.reset_info_tables ();

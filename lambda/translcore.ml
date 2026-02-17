@@ -489,6 +489,10 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                Matching.for_trywith ~scopes ~return_layout e.exp_loc (Lvar id)
                  (transl_cases_try ~scopes sort pat_expr_list),
                return_layout)
+  | Texp_unboxed_unit ->
+      Lprim(Punbox_unit, [lambda_unit], of_location ~scopes e.exp_loc)
+  | Texp_unboxed_bool b ->
+      Lconst(Const_base(Const_untagged_int8(Bool.to_int b)))
   | Texp_tuple (el, alloc_mode) ->
       let ll, shape =
         transl_value_list_with_shape ~scopes
@@ -1688,7 +1692,7 @@ and add_type_shapes_of_pattern ~env pattern =
   if !Clflags.debug && !Clflags.shape_format = Clflags.Debugging_shapes then
     let var_list = Typedtree.pat_bound_idents_full pattern in
     List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
-      let type_name = Format.asprintf "%a" Printtyp.type_expr type_expr in
+      let type_name = Format_doc.asprintf "%a" Printtyp.type_expr type_expr in
       Type_shape.add_to_type_shapes var_uid type_expr var_sort ~name:type_name
         (Env.shape_for_constr env))
     var_list
@@ -2711,9 +2715,9 @@ let transl_apply
 
 (* Error report *)
 
-open Format
+open Format_doc
 
-let report_error ppf = function
+let report_error_doc ppf = function
   | Free_super_var ->
       fprintf ppf
         "Ancestor names can only be used to select inherited methods"
@@ -2726,7 +2730,7 @@ let report_error ppf = function
       fprintf ppf
         "Unknown variable %a appearing in probe:@ Please \
          report this error to the Jane Street compilers team."
-        Ident.print id
+        Ident.doc_print id
   | Illegal_void_record_field ->
       fprintf ppf
         "Void sort detected where value was expected in a record field:@ Please \
@@ -2757,8 +2761,9 @@ let report_error ppf = function
          enforce, see [Lambda.Mixed_product_bytes_wrt_path] *)
       fprintf ppf
         "This block index cannot be created because it refers to values@ \
-         and non-values that are separated by 2^16 or more bytes in their@ \
+         and non-values that are separated by 2^%d or more bytes in their@ \
          block, or could be deepened to such an index."
+        (64 - Mixed_product_bytes.block_index_offset_bits)
   | Element_would_be_reordered_in_record ->
       fprintf ppf
         "Block indices into arrays whose element layout contains a@ \
@@ -2767,7 +2772,9 @@ let () =
   Location.register_error_of_exn
     (function
       | Error (loc, err) ->
-          Some (Location.error_of_printer ~loc report_error err)
+          Some (Location.error_of_printer ~loc report_error_doc err)
       | _ ->
         None
     )
+
+let report_error = Format_doc.compat report_error_doc

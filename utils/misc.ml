@@ -25,6 +25,11 @@ let fatal_errorf fmt =
 
 let fatal_error msg = fatal_errorf "%s" msg
 
+let fatal_errorf_doc fmt =
+  Format_doc.kdoc_printf (fun doc ->
+    fatal_errorf "%t" (fun ppf -> Format_doc.Doc.format ppf doc)
+  ) fmt
+
 (* Exceptions *)
 
 let try_finally ?(always=(fun () -> ())) ?(exceptionally=(fun () -> ())) work =
@@ -851,6 +856,14 @@ let no_overflow_mul a b =
 let no_overflow_lsl a k =
   0 <= k && k < Sys.word_size - 1 && min_int asr k <= a && a <= max_int asr k
 
+let no_overflow_add_int64 a b =
+  let open Int64 in
+  compare (logor (logxor a b) (logxor a (lognot (add a b)))) 0L < 0
+
+let no_overflow_sub_int64 a b =
+  let open Int64 in
+  compare (logor (logxor a (lognot b)) (logxor b (sub a b))) 0L < 0
+
 let letter_of_int n =
   let letter = String.make 1 (Char.chr (Char.code 'a' + n mod 26)) in
   let num = n / 26 in
@@ -1012,53 +1025,6 @@ let thd4 (_,_,x,_) = x
 let for4 (_,_,_,x) = x
 
 
-module LongString = struct
-  type t = bytes array
-
-  let create str_size =
-    let tbl_size = str_size / Sys.max_string_length + 1 in
-    let tbl = Array.make tbl_size Bytes.empty in
-    for i = 0 to tbl_size - 2 do
-      tbl.(i) <- Bytes.create Sys.max_string_length;
-    done;
-    tbl.(tbl_size - 1) <- Bytes.create (str_size mod Sys.max_string_length);
-    tbl
-
-  let length tbl =
-    let tbl_size = Array.length tbl in
-    Sys.max_string_length * (tbl_size - 1) + Bytes.length tbl.(tbl_size - 1)
-
-  let get tbl ind =
-    Bytes.get tbl.(ind / Sys.max_string_length) (ind mod Sys.max_string_length)
-
-  let set tbl ind c =
-    Bytes.set tbl.(ind / Sys.max_string_length) (ind mod Sys.max_string_length)
-              c
-
-  let blit src srcoff dst dstoff len =
-    for i = 0 to len - 1 do
-      set dst (dstoff + i) (get src (srcoff + i))
-    done
-
-  let output oc tbl pos len =
-    for i = pos to pos + len - 1 do
-      output_char oc (get tbl i)
-    done
-
-  let input_bytes_into tbl ic len =
-    let count = ref len in
-    Array.iter (fun str ->
-      let chunk = Int.min !count (Bytes.length str) in
-      really_input ic str 0 chunk;
-      count := !count - chunk) tbl
-
-  let input_bytes ic len =
-    let tbl = create len in
-    input_bytes_into tbl ic len;
-    tbl
-end
-
-
 let cut_at s c =
   let pos = String.index s c in
   String.sub s 0 pos, String.sub s (pos+1) (String.length s - pos - 1)
@@ -1181,14 +1147,15 @@ module Style = struct
 
 
   let as_inline_code printer ppf x =
-    Format.pp_open_stag ppf (Format.String_tag "inline_code");
+    let open Format_doc in
+    pp_open_stag ppf (Format.String_tag "inline_code");
     printer ppf x;
-    Format.pp_close_stag ppf ()
+    pp_close_stag ppf ()
 
-  let inline_code ppf s = as_inline_code Format.pp_print_string ppf s
+  let inline_code ppf s = as_inline_code Format_doc.pp_print_string ppf s
 
   let as_clflag flag printer ppf x =
-    Format.fprintf ppf "@{<inline_code>%s %a@}" flag printer x
+    Format_doc.fprintf ppf "@{<inline_code>%s %a@}" flag printer x
 
   (* either prints the tag of [s] or delegates to [or_else] *)
   let mark_open_tag ~or_else s =
@@ -1302,19 +1269,20 @@ let spellcheck env name =
   let env = List.sort_uniq (fun s1 s2 -> String.compare s2 s1) env in
   fst (List.fold_left (compare name) ([], max_int) env)
 
+
 let did_you_mean ppf get_choices =
+  let open Format_doc in
   (* flush now to get the error report early, in the (unheard of) case
      where the search in the get_choices function would take a bit of
      time; in the worst case, the user has seen the error, she can
      interrupt the process before the spell-checking terminates. *)
-  Format.fprintf ppf "@?";
+  fprintf ppf "@?";
   match get_choices () with
   | [] -> ()
   | choices ->
     let rest, last = split_last choices in
-    let comma ppf () = Format.fprintf ppf ", " in
-     Format.fprintf ppf "@\n@{<hint>Hint@}: Did you mean %a%s%a?@?"
-       (Format.pp_print_list ~pp_sep:comma Style.inline_code) rest
+     fprintf ppf "@\n@[@{<hint>Hint@}: Did you mean %a%s%a?@]"
+       (pp_print_list ~pp_sep:comma Style.inline_code) rest
        (if rest = [] then "" else " or ")
        Style.inline_code last
 
@@ -1517,7 +1485,6 @@ let pp_table ppf (columns : (string * string list) list) =
     print_separator ppf table_width
   done
 
-
 (* showing configuration and configuration variables *)
 let show_config_and_exit () =
   Config.print_config stdout;
@@ -1574,15 +1541,15 @@ let debug_prefix_map_flags () =
         []
   end
 
-let print_if ppf flag printer arg =
-  if !flag then Format.fprintf ppf "%a@." printer arg;
-  arg
-
 let print_see_manual ppf manual_section =
-  let open Format in
+  let open Format_doc in
   fprintf ppf "(see manual section %a)"
     (pp_print_list ~pp_sep:(fun f () -> pp_print_char f '.') pp_print_int)
     manual_section
+
+let print_if ppf flag printer arg =
+  if !flag then Format.fprintf ppf "%a@." printer arg;
+  arg
 
 let output_of_print print =
   let output out_channel t =
@@ -1596,6 +1563,9 @@ let output_of_print print =
     Format.pp_print_flush ppf ()
   in
   output
+
+let output_of_doc_print doc_print =
+  output_of_print (Format_doc.compat doc_print)
 
 let is_print_longer_than size p =
   let exception Limit_exceeded in

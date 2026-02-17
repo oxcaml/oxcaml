@@ -57,6 +57,7 @@ struct stack_info {
    * Stacks may be unpooled if either the stack size is not 2**N multiple of
    * [caml_fiber_wsz] or the stack is bigger than pooled sizes. */
   int cache_bucket;
+  int domain_idx; /* the index of the domain that allocated this fiber */
   size_t size; /* only used when USE_MMAP_MAP_STACK is defined */
   uintnat magic;
   int64_t id;
@@ -288,8 +289,16 @@ extern value caml_global_data;
 #define Trap_pc(tp) (((code_t *)(tp))[0])
 #define Trap_link(tp) ((tp)[1])
 
-struct stack_info** caml_alloc_stack_cache (void);
-void caml_free_stack_cache(struct stack_info**);
+struct stack_cache {
+  _Atomic(struct stack_info*) head;
+  _Atomic(uintnat) len;
+};
+
+struct stack_cache* caml_alloc_stack_caches(void);
+void caml_enable_stack_caches(struct stack_cache*);
+void caml_disable_stack_caches(struct stack_cache*);
+void caml_free_stack_caches(struct stack_cache*);
+
 CAMLextern struct stack_info* caml_alloc_main_stack (uintnat init_wsize);
 
 void caml_scan_stack(
