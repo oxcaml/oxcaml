@@ -35,10 +35,13 @@ let make_tagged_immediate ~loc:_ = function
     Misc.fatal_errorf "Must be a tagged immediate"
 
 let make_const_int (i, m) : const =
+  let i' = int_of_string i in
   match m with
   | None -> Tagged_immediate i
   | Some 'i' -> Naked_immediate i
   | Some 'n' -> Naked_nativeint (Int64.of_string i)
+  | Some 's' -> Naked_int8 (Numeric_types.Int8.of_int i')
+  | Some 'S' -> Naked_int16 (Numeric_types.Int16.of_int i')
   | Some 'l' -> Naked_int32 (Int32.of_string i)
   | Some 'L' -> Naked_int64 (Int64.of_string i)
   | Some c -> Misc.fatal_errorf "Unknown int modifier: %c" c
