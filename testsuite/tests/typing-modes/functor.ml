@@ -1176,7 +1176,7 @@ module type SigWithFunctorNoModality =
 Line 7, characters 28-31:
 7 |   let module _ @ portable = M.F in ()
                                 ^^^
-Error: This is "nonportable", but expected to be "portable".
+Error: The module is "nonportable" but is expected to be "portable".
 |}]
 
 (* Test 4: Compare type inclusion with and without modalities on functors.
@@ -1252,5 +1252,5 @@ let test_overridden_modality
 Line 3, characters 28-31:
 3 |   let module _ @ portable = M.F in
                                 ^^^
-Error: This is "nonportable", but expected to be "portable".
+Error: The module is "nonportable" but is expected to be "portable".
 |}]
