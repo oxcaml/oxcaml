@@ -31,8 +31,7 @@ type !'a t : value mod portable contended with 'a
 (** A domain of type ['a t] runs independently, eventually producing a
     result of type 'a, or an exception *)
 
-val spawn : (unit -> 'a) -> 'a t @@ nonportable
-[@@warning "-redundant-modality"]
+val spawn : (unit -> 'a) -> 'a t
 [@@alert do_not_spawn_domains
    "User programs should never spawn domains. To execute a function on a \
     domain, use [Multicore] from the threading library. This is because \
@@ -84,8 +83,7 @@ val self_index : unit -> int @@ portable
     @since 5.3
 *)
 
-val before_first_spawn : (unit -> unit) -> unit @@ nonportable
-[@@warning "-redundant-modality"]
+val before_first_spawn : (unit -> unit) -> unit
 (** [before_first_spawn f] registers [f] to be called before the first domain
     is spawned by the program. The functions registered with
     [before_first_spawn] are called on the main (initial) domain. The functions
@@ -94,8 +92,7 @@ val before_first_spawn : (unit -> unit) -> unit @@ nonportable
 
     @raise Invalid_argument if the program has already spawned a domain. *)
 
-val at_exit : (unit -> unit) -> unit @@ nonportable
-[@@warning "-redundant-modality"]
+val at_exit : (unit -> unit) -> unit
 (** [at_exit f] registers [f] to be called when the current domain exits. Note
     that [at_exit] callbacks are domain-local and only apply to the calling
     domain. The registered functions are called in 'last in, first out' order:
@@ -120,8 +117,6 @@ module DLS : sig
     (** Type of a DLS key *)
 
     val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key
-      @@ nonportable
-    [@@warning "-redundant-modality"]
     [@@alert unsafe_multidomain "Use [Domain.Safe.DLS.new_key]."]
     (** [new_key f] returns a new key bound to initialiser [f] for accessing
 ,        domain-local variables.
@@ -165,15 +160,13 @@ module DLS : sig
         explicit synchronization to avoid data races.
     *)
 
-    val get : 'a key -> 'a @@ nonportable
-    [@@warning "-redundant-modality"]
+    val get : 'a key -> 'a
     [@@alert unsafe_multidomain "Use [Domain.Safe.DLS.get]."]
     (** [get k] returns [v] if a value [v] is associated to the key [k] on
         the calling domain's domain-local state. Sets [k]'s value with its
         initialiser and returns it otherwise. *)
 
-    val set : 'a key -> 'a -> unit @@ nonportable
-    [@@warning "-redundant-modality"]
+    val set : 'a key -> 'a -> unit
     [@@alert unsafe_multidomain "Use [Domain.Safe.DLS.set]."]
     (** [set k v] updates the calling domain's domain-local state to associate
         the key [k] with value [v]. It overwrites any previous values associated
@@ -189,18 +182,14 @@ module TLS : sig
     (** Type of a TLS key *)
 
     val new_key : ?split_from_parent:('a -> 'a) -> (unit -> 'a) -> 'a key
-        @@ nonportable
-    [@@warning "-redundant-modality"]
     [@@alert unsafe_multidomain "Use [Domain.Safe.TLS.new_key]."]
     (** Like {!DLS.new_key}, but represents a distinct value in every thread. *)
 
-    val get : 'a key -> 'a @@ nonportable
-    [@@warning "-redundant-modality"]
+    val get : 'a key -> 'a
     [@@alert unsafe_multidomain "Use [Domain.Safe.TLS.get]."]
     (** Like {!DLS.get}, but reads the value for the current thread. *)
 
-    val set : 'a key -> 'a -> unit @@ nonportable
-    [@@warning "-redundant-modality"]
+    val set : 'a key -> 'a -> unit
     [@@alert unsafe_multidomain "Use [Domain.Safe.TLS.set]."]
     (** Like {!DLS.set}, but sets the value for the current thread. *)
 
