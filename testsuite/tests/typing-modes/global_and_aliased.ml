@@ -15,7 +15,7 @@ type 'a t2 = { x2 : 'a @@ aliased; } [@@unboxed]
 Line 3, characters 52-59:
 3 | type 'a t3 : value mod global = { x3 : 'a @@ global aliased } [@@unboxed]
                                                         ^^^^^^^
-Warning 217 [redundant-modality]: This aliased modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type 'a t3 = { x3 : 'a @@ global; } [@@unboxed]
 |}]
@@ -131,14 +131,14 @@ type 'a mut1 = { mutable x1 : 'a; }
 Line 2, characters 36-42:
 2 | type 'a mut2 = { mutable x2 : 'a @@ global }
                                         ^^^^^^
-Warning 217 [redundant-modality]: This global modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type 'a mut2 = { mutable x2 : 'a; }
 type 'a mut3 = { mutable x3 : 'a @@ local; }
 Line 4, characters 36-43:
 4 | type 'a mut4 = { mutable x4 : 'a @@ aliased }
                                         ^^^^^^^
-Warning 217 [redundant-modality]: This aliased modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type 'a mut4 = { mutable x4 : 'a; }
 type 'a mut5 = { mutable x5 : 'a @@ local unique; }

@@ -1193,7 +1193,7 @@ type ('a : immediate) t = { x : 'a @@ global; } [@@unboxed]
 Line 3, characters 64-69:
 3 | type ('a : value mod global) t : value mod global = { x : 'a @@ local } [@@unboxed]
                                                                     ^^^^^
-Warning 217 [redundant-modality]: This local modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type ('a : value mod global) t = { x : 'a; } [@@unboxed]
 type ('a : value mod global) t = Foo of 'a @@ global [@@unboxed]
@@ -1201,7 +1201,7 @@ type ('a : immediate) t = Foo of 'a @@ global [@@unboxed]
 Line 6, characters 65-70:
 6 | type ('a : value mod global) t : value mod global = Foo of 'a @@ local [@@unboxed]
                                                                      ^^^^^
-Warning 217 [redundant-modality]: This local modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type ('a : value mod global) t = Foo of 'a [@@unboxed]
 |}]
