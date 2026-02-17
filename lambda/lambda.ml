@@ -1268,11 +1268,10 @@ let make_key e =
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
-    | Levent _
-    (* CR layout poly: Anything calling this should probably be moved to after
-       slambda eval, we could possibly also make slambda keys. *)
-    | Lsplice _  ->
+    | Levent _ ->
         raise Not_simple
+    | Lsplice _ ->
+        error (Invalid_constructor "Lsplice")
 
   and tr_recs env es = List.map (tr_rec env) es
 
