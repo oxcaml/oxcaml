@@ -3293,14 +3293,14 @@ let static_cast ~src ~dst arg ~loc = unary (Static_cast {src; dst}) arg ~loc
 
 let report_error ppf = function
   | Slambda_unsupported where ->
-    Format.fprintf ppf
+    Format_doc.fprintf ppf
       "Static computation and layout polymorphism are not yet supported in %s."
       where
   | Unevaluated_splice_var ident ->
-    Format.fprintf ppf "Splice variable %a should have been evaluated."
-      Ident.print ident
+    Format_doc.fprintf ppf "Splice variable %a should have been evaluated."
+      Ident.doc_print ident
   | Invalid_constructor constructor ->
-    Format.fprintf ppf "Lambda constructor %s is not valid at this stage."
+    Format_doc.fprintf ppf "Lambda constructor %s is not valid at this stage."
      constructor
 
 let () =

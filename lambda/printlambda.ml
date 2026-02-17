@@ -1430,7 +1430,8 @@ let rec lam ppf = function
 
 and slam ppf = function
   | SLlayout layout -> fprintf ppf "⟪%a⟫" layout_annotation layout
-  | SLglobal cu -> fprintf ppf "(global %a)" Compilation_unit.print cu
+  | SLglobal cu ->
+    fprintf ppf "(global %a)" (Format_doc.compat Compilation_unit.print) cu
   | SLvar id -> Slambdaident.print ppf id
   | SLmissing -> fprintf ppf "(missing)"
   | SLrecord fields ->
