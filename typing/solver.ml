@@ -244,15 +244,17 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
     let compare (Key (obj1, id1, m1)) (Key (obj2, id2, m2)) =
       let c = Int.compare id1 id2 in
-      if c <> 0 then c else
-      match C.compare_obj obj1 obj2 with
-      | Less_than -> 1
-      | Greater_than -> -1
-      | Equal ->
+      if c <> 0
+      then c
+      else
+        match C.compare_obj obj1 obj2 with
+        | Less_than -> 1
+        | Greater_than -> -1
+        | Equal -> (
           match C.compare_morph obj1 m1 m2 with
           | Less_than -> 1
           | Greater_than -> -1
-          | Equal -> 0
+          | Equal -> 0)
   end)
 
   (** Map the function to the list, and returns the first [Error] found; Returns
@@ -765,7 +767,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
        not [morphvar]. *)
     Morphvar.(
       disallow_left (disallow_right mv0) == disallow_left (disallow_right mv1))
-    || match C.equal_morph dst f0 f1 with Not_equal -> false | Equal -> v0 == v1
+    ||
+    match C.equal_morph dst f0 f1 with
+    | Not_equal -> false
+    | Equal -> v0 == v1
 
   let submode_mvmv (type a) ~log (pp : H.Pinpoint.t) (dst : a C.obj)
       (Amorphvar (v, f, f_hint) as mv) (Amorphvar (u, g, g_hint) as mu) =
@@ -976,8 +981,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           | Amodejoin (b, b_hint, mvs') ->
             loop (C.join obj a b)
               (hint_join obj a a_hint_lower b b_hint)
-              (union_morphvars mvs' mvs)
-              xs)
+              (union_morphvars mvs' mvs) xs)
     in
     loop (C.min obj) Min VarMap.empty l
 
@@ -1013,8 +1017,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           | Amodemeet (b, b_hint, mvs') ->
             loop (C.meet obj a b)
               (hint_meet obj a a_hint_upper b b_hint)
-              (union_morphvars mvs' mvs)
-              xs)
+              (union_morphvars mvs' mvs) xs)
     in
     loop (C.max obj) Max VarMap.empty l
 
