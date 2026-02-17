@@ -74,12 +74,12 @@ Warning 213: This contention is overriden by contended later.
 Line 2, characters 29-34:
 2 |     val x : string @@ global local unique aliased once many uncontended contended
                                  ^^^^^
-Warning 217 [redundant-modality]: This local modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 Line 3, characters 15-26:
 3 |       portable nonportable
                    ^^^^^^^^^^^
-Warning 217 [redundant-modality]: This nonportable modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 module type S = sig val x : string @@ many aliased contended end
 |}]
@@ -420,7 +420,7 @@ end
 Line 3, characters 27-38:
 3 |         val x : int ref @@ uncontended
                                ^^^^^^^^^^^
-Warning 217 [redundant-modality]: This uncontended modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 module Inclusion_match : sig module M : sig val x : int ref end end @@
   stateless
@@ -689,7 +689,7 @@ end
 Line 2, characters 28-39:
 2 |   val foo : int @@ portable uncontended
                                 ^^^^^^^^^^^
-Warning 217 [redundant-modality]: This uncontended modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 module M : sig val foo : int @@ portable end @@ stateless
 |}]
@@ -707,7 +707,7 @@ end
 Line 3, characters 24-35:
 3 |   val t : t @@ portable uncontended
                             ^^^^^^^^^^^
-Warning 217 [redundant-modality]: This uncontended modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 module M : sig type t val t : t @@ portable end @@ stateless
 |}]
@@ -725,7 +725,7 @@ end
 Line 2, characters 36-47:
 2 |   val t : [`Foo | `Bar] @@ portable uncontended
                                         ^^^^^^^^^^^
-Warning 217 [redundant-modality]: This uncontended modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 module M : sig val t : [ `Bar | `Foo ] @@ portable end @@ stateless
 |}]
@@ -739,7 +739,7 @@ end
 Line 2, characters 69-80:
 2 |   val t : [`Foo | `Bar of 'a -> 'a | `Baz of string ref] @@ portable uncontended
                                                                          ^^^^^^^^^^^
-Warning 217 [redundant-modality]: This uncontended modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 Lines 3-5, characters 6-3:
 3 | ......struct
@@ -1031,7 +1031,7 @@ end
 Line 4, characters 24-32:
 4 |   val baz : 'a -> 'a @@ portable
                             ^^^^^^^^
-Warning 217 [redundant-modality]: This portable modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 module type T =
   sig

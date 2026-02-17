@@ -31,7 +31,7 @@ type r = {mutable s : string @@ global}
 Line 1, characters 32-38:
 1 | type r = {mutable s : string @@ global}
                                     ^^^^^^
-Warning 217 [redundant-modality]: This global modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type r = { mutable s : string; }
 |}]
@@ -41,7 +41,7 @@ type r = {mutable s : string @@ global yielding}
 Line 1, characters 32-38:
 1 | type r = {mutable s : string @@ global yielding}
                                     ^^^^^^
-Warning 217 [redundant-modality]: This global modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type r = { mutable s : string @@ yielding; }
 |}]
@@ -51,7 +51,7 @@ type r = {mutable s : string @@ yielding global}
 Line 1, characters 41-47:
 1 | type r = {mutable s : string @@ yielding global}
                                              ^^^^^^
-Warning 217 [redundant-modality]: This global modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type r = { mutable s : string @@ yielding; }
 |}]
@@ -66,7 +66,7 @@ type r = {mutable s : string @@ local yielding}
 Line 1, characters 38-46:
 1 | type r = {mutable s : string @@ local yielding}
                                           ^^^^^^^^
-Warning 217 [redundant-modality]: This yielding modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type r = { mutable s : string @@ local; }
 |}]
@@ -76,7 +76,7 @@ type r = {mutable s : string @@ yielding local}
 Line 1, characters 32-40:
 1 | type r = {mutable s : string @@ yielding local}
                                     ^^^^^^^^
-Warning 217 [redundant-modality]: This yielding modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type r = { mutable s : string @@ local; }
 |}]
@@ -136,7 +136,7 @@ type r' = {mutable s' : string @@ global}
 Line 1, characters 34-40:
 1 | type r' = {mutable s' : string @@ global}
                                       ^^^^^^
-Warning 217 [redundant-modality]: This global modality is redundant.
+Warning 217 [redundant-modality]: This modality is redundant.
 
 type r' = { mutable s' : string; }
 |}]
