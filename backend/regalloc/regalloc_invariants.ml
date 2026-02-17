@@ -15,6 +15,8 @@ let precondition : Cfg_with_layout.t -> unit =
       | Move -> ()
       | Spill -> fatal "instruction %a is a spill" InstructionId.format id
       | Reload -> fatal "instruction %a is a reload" InstructionId.format id
+      | Dummy_use ->
+        fatal "instruction %a is a dummy use" InstructionId.format id
       | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
       | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
       | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
@@ -103,10 +105,10 @@ let postcondition_layout : Cfg_with_layout.t -> unit =
       | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _
       | Stack_check _
       | Op
-          ( Move | Opaque | Begin_region | End_region | Dls_get | Tls_get
-          | Domain_index | Poll | Pause | Const_int _ | Const_float32 _
-          | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-          | Const_vec512 _ | Stackoffset _ | Load _
+          ( Move | Dummy_use | Opaque | Begin_region | End_region | Dls_get
+          | Tls_get | Domain_index | Poll | Pause | Const_int _
+          | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+          | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _
           | Store (_, _, _)
           | Intop _ | Int128op _
           | Intop_imm (_, _)

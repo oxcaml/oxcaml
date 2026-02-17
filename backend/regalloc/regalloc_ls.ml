@@ -301,13 +301,8 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
         save_cfg "ls" cfg_with_layout)
       cfg_with_infos
   in
-  let spilling_because_unused = Reg.Set.diff cfg_infos.res cfg_infos.arg in
+  Regalloc_rewrite.insert_dummy_uses cfg_with_infos cfg_infos;
   let state = State.make ~stack_slots ~affinity in
-  (match Reg.Set.elements spilling_because_unused with
-  | [] -> ()
-  | _ :: _ as spilled_nodes ->
-    rewrite state cfg_with_infos ~spilled_nodes ~block_temporaries:false;
-    Cfg_with_infos.invalidate_liveness cfg_with_infos);
   main ~round:1 state cfg_with_infos;
   Regalloc_rewrite.postlude
     (module State)

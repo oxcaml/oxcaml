@@ -545,18 +545,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
       ~initial:(Reg.Set.elements all_temporaries)
       ~stack_slots ~affinity ()
   in
-  let spilling_because_unused = Reg.Set.diff cfg_infos.res cfg_infos.arg in
-  (match Reg.Set.elements spilling_because_unused with
-  | [] -> ()
-  | _ :: _ as spilled_nodes ->
-    List.iter spilled_nodes ~f:(fun reg -> State.add_spilled_nodes state reg);
-    (* note: rewrite will remove the `spilling` registers from the "spilled"
-       work list and set the field to unknown. *)
-    let (_ : bool) =
-      rewrite state cfg_with_infos ~spilled_nodes ~reset:false
-        ~block_temporaries:false
-    in
-    ());
+  Regalloc_rewrite.insert_dummy_uses cfg_with_infos cfg_infos;
   main ~round:1 state cfg_with_infos;
   if debug then log_cfg_with_infos cfg_with_infos;
   Regalloc_rewrite.postlude

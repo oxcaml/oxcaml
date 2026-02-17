@@ -282,6 +282,7 @@ type t =
   | Move
   | Spill
   | Reload
+  | Dummy_use
   | Const_int of nativeint (* CR-someday xclerc: change to `Targetint.t` *)
   | Const_float32 of int32
   | Const_float of int64
@@ -338,6 +339,7 @@ let is_pure = function
   | Move -> true
   | Spill -> true
   | Reload -> true
+  | Dummy_use -> false
   | Const_int _ -> true
   | Const_float32 _ -> true
   | Const_float _ -> true
@@ -425,6 +427,7 @@ let dump ppf op =
   | Move -> Format.fprintf ppf "mov"
   | Spill -> Format.fprintf ppf "spill"
   | Reload -> Format.fprintf ppf "reload"
+  | Dummy_use -> Format.fprintf ppf "dummy_use"
   | Const_int n -> Format.fprintf ppf "const_int %nd" n
   | Const_float32 f ->
     Format.fprintf ppf "const_float32 %Fs" (Int32.float_of_bits f)

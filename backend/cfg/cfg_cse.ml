@@ -302,7 +302,7 @@ let insert_move :
 
 module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
   let class_of_operation0 : Operation.t -> op_class = function
-    | Move | Spill | Reload -> assert false (* treated specially *)
+    | Move | Spill | Reload | Dummy_use -> assert false (* treated specially *)
     | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
     | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ ->
       Op_pure
@@ -335,9 +335,10 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
 
   let is_cheap_operation : Operation.t -> bool = function
     | Const_int _ -> true
-    | Move | Spill | Reload | Const_float32 _ | Const_float _ | Const_symbol _
-    | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Opaque | Stackoffset _
-    | Load _ | Store _ | Alloc _ | Poll | Pause | Intop _ | Int128op _
+    | Move | Spill | Reload | Dummy_use | Const_float32 _ | Const_float _
+    | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Opaque
+    | Stackoffset _ | Load _ | Store _ | Alloc _ | Poll | Pause | Intop _
+    | Int128op _
     | Intop_imm (_, _)
     | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
     | Specific _ | Name_for_debugger _ | Probe_is_enabled _ | Begin_region
@@ -359,6 +360,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
          the argument reg. *)
       let n1 = set_move n i.arg.(0) i.res.(0) in
       n1
+    | Op Dummy_use -> n
     | Op Opaque ->
       (* Assume arbitrary side effects from Opaque *)
       empty_numbering

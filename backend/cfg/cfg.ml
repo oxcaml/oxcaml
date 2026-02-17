@@ -522,6 +522,7 @@ let same_location (r1 : Reg.t) (r2 : Reg.t) =
 let is_noop_move instr =
   match instr.desc with
   | Op (Move | Spill | Reload) -> same_location instr.arg.(0) instr.res.(0)
+  | Op Dummy_use -> false
   | Op (Csel _) -> (
     match instr.res.(0).loc with
     | Unknown -> false
@@ -611,10 +612,11 @@ let is_poll (instr : basic instruction) =
   | Op Poll -> true
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
-      ( Alloc _ | Move | Spill | Reload | Opaque | Pause | Begin_region
-      | End_region | Dls_get | Tls_get | Domain_index | Const_int _
-      | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-      | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _
+      ( Alloc _ | Move | Spill | Reload | Dummy_use | Opaque | Pause
+      | Begin_region | End_region | Dls_get | Tls_get | Domain_index
+      | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
+      | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
+      | Load _
       | Store (_, _, _)
       | Intop _ | Int128op _
       | Intop_imm (_, _)
@@ -629,10 +631,10 @@ let is_alloc (instr : basic instruction) =
   | Op (Alloc _) -> true
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
-      ( Poll | Move | Spill | Reload | Opaque | Begin_region | End_region
-      | Dls_get | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
-      | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-      | Const_vec512 _ | Stackoffset _ | Load _
+      ( Poll | Move | Spill | Reload | Dummy_use | Opaque | Begin_region
+      | End_region | Dls_get | Tls_get | Domain_index | Pause | Const_int _
+      | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+      | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _ | Int128op _
       | Intop_imm (_, _)
@@ -647,10 +649,10 @@ let is_end_region (b : basic) =
   | Op End_region -> true
   | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _ | Stack_check _
   | Op
-      ( Alloc _ | Poll | Move | Spill | Reload | Opaque | Begin_region | Dls_get
-      | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
-      | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-      | Const_vec512 _ | Stackoffset _ | Load _
+      ( Alloc _ | Poll | Move | Spill | Reload | Dummy_use | Opaque
+      | Begin_region | Dls_get | Tls_get | Domain_index | Pause | Const_int _
+      | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+      | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _
       | Store (_, _, _)
       | Intop _ | Int128op _
       | Intop_imm (_, _)
@@ -718,13 +720,13 @@ let remove_trap_instructions t removed_trap_handlers =
     | Op (Stackoffset n) ->
       update_basic_next (DLL.Cursor.next cursor) ~stack_offset:(stack_offset + n)
     | Op
-        ( Move | Spill | Reload | Const_int _ | Const_float _ | Const_float32 _
-        | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-        | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
-        | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
-        | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-        | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Poll
-        | Alloc _ | Pause )
+        ( Move | Spill | Reload | Dummy_use | Const_int _ | Const_float _
+        | Const_float32 _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+        | Const_vec512 _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
+        | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
+        | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
+        | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
+        | Domain_index | Poll | Alloc _ | Pause )
     | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->
       update_basic_next (DLL.Cursor.next cursor) ~stack_offset
   and update_body r ~stack_offset =
