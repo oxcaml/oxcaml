@@ -4519,7 +4519,9 @@ let report_error ppf = function
       | Bad_jkind (ty, violation) | Bad_jkind_sort (ty, violation) ->
         Some (ty, violation)
       | Unequal_var_jkinds _ | Unequal_tof_kind_jkinds _ | Diff _ | Variant _
-      | Obj _ | Escape _ | Incompatible_fields _ | Rec_occur _ -> None
+      | Obj _ | Escape _ | Incompatible_fields _ | Rec_occur _
+      | Bad_constraint _ ->
+        None
       in
       begin match List.find_map get_jkind_error err.trace with
       | Some (ty, violation) ->

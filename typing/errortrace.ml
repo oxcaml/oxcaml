@@ -98,6 +98,12 @@ type 'variety obj =
   (* Unification *)
   | Self_cannot_be_closed : unification obj
 
+type constraint_ =
+  | Incompatible of (type_expr * type_expr) * (type_expr * type_expr)
+  | Unsatisfied of {
+    equation : type_expr * type_expr;
+    subst : (type_expr * type_expr) option }
+
 type ('a, 'variety) elt =
   (* Common *)
   | Diff : 'a diff -> ('a, _) elt
@@ -113,6 +119,7 @@ type ('a, 'variety) elt =
   | Unequal_var_jkinds :
       type_expr * jkind_lr * type_expr * jkind_lr -> ('a, _) elt
   | Unequal_tof_kind_jkinds : jkind_lr * jkind_lr -> ('a, _) elt
+  | Bad_constraint : constraint_ -> ('a, _) elt
 
 type ('a, 'variety) t = ('a, 'variety) elt list
 
@@ -130,6 +137,7 @@ let map_elt (type variety) f : ('a, variety) elt -> ('b, variety) elt = function
   | Bad_jkind_sort _ as x -> x
   | Unequal_var_jkinds _ as x -> x
   | Unequal_tof_kind_jkinds _ as x -> x
+  | Bad_constraint _ as x -> x
 
 let map f t = List.map (map_elt f) t
 

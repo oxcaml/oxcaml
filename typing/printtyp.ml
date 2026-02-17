@@ -3306,6 +3306,31 @@ let explanation (type variety) intro prev env
       Some (dprintf "@ because their kinds are different.\
                      @ @[<v>%t@;%t@]"
               (fmt_history "the first" k1) (fmt_history "the second" k2))
+  | Errortrace.Bad_constraint (
+        Unsatisfied { equation = (lhs, rhs); subst = Some (x, ty) }) ->
+      reserve_names lhs; reserve_names rhs;
+      reserve_names x;   reserve_names ty;
+      Some (
+        dprintf
+          "@,@[The constraint@ %a@ has to be satisfied for@ %a.@]"
+          print_constraint (lhs, rhs)
+          print_constraint (x, ty))
+  | Errortrace.Bad_constraint (
+        Unsatisfied { equation = (lhs, rhs); subst = None }) ->
+      reserve_names lhs; reserve_names rhs;
+      Some (
+        dprintf
+          "@,@[The constraint@ %a@ has to be satisfied.@]"
+          print_constraint (lhs, rhs))
+  | Errortrace.Bad_constraint (
+        Incompatible ((lhs1, rhs1), (lhs2, rhs2))) ->
+      reserve_names lhs1; reserve_names rhs1;
+      reserve_names lhs2; reserve_names rhs2;
+      Some (
+        dprintf
+          "@,@[The constraints@ %a and@ %a@ have to be compatible.@]"
+          print_constraint (lhs1, rhs1)
+          print_constraint (lhs2, rhs2))
 
 let mismatch intro env trace =
   Errortrace.explain trace (fun ~prev h -> explanation intro prev env h)
@@ -3373,7 +3398,7 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
            | Unequal_tof_kind_jkinds _) ->
         true
     | Some (Diff _ | Escape _ | Variant _ | Obj _ | Incompatible_fields _
-           | Rec_occur _)
+           | Rec_occur _ | Bad_constraint _)
     | None ->
         false
   in

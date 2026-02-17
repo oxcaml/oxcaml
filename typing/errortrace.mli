@@ -84,6 +84,12 @@ type 'variety obj =
   (* Unification *)
   | Self_cannot_be_closed : unification obj
 
+type constraint_ =
+  | Incompatible of (type_expr * type_expr) * (type_expr * type_expr)
+  | Unsatisfied of {
+    equation : type_expr * type_expr;
+    subst : (type_expr * type_expr) option }
+
 type ('a, 'variety) elt =
   (* Common *)
   | Diff : 'a diff -> ('a, _) elt
@@ -98,6 +104,7 @@ type ('a, 'variety) elt =
   | Unequal_var_jkinds :
       type_expr * jkind_lr * type_expr * jkind_lr -> ('a, _) elt
   | Unequal_tof_kind_jkinds : jkind_lr * jkind_lr -> ('a, _) elt
+  | Bad_constraint : constraint_ -> ('a, _) elt
 
 type ('a, 'variety) t = ('a, 'variety) elt list
 
