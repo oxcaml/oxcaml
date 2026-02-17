@@ -623,6 +623,12 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 fatal_error "Ill-staged value of splice type"
               | ty -> tree_of_val depth obj ty
               end
+          | Tquote_eval _ -> begin
+              match Ctype.expand_head env ty with
+              | ty' when eq_type ty ty' ->
+                Oval_stuff "<eval>"
+              | ty -> tree_of_val depth obj ty
+              end
           | Tsubst _ | Tfield(_, _, _, _) | Tnil | Tlink _ | Tof_kind _ ->
               fatal_error "Printval.outval_of_value"
           | Tpoly (ty, _) ->

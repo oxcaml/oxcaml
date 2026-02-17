@@ -300,7 +300,7 @@ let iter_on_occurrences
         iter_field_pats ~namespace:Label pat_env fields
       | Tpat_record_unboxed_product (fields, _) ->
         iter_field_pats ~namespace:Unboxed_label pat_env fields
-      | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _ 
+      | Tpat_any | Tpat_var _ | Tpat_alias _ | Tpat_constant _
       | Tpat_unboxed_unit | Tpat_tuple _ | Tpat_unboxed_tuple _
       | Tpat_variant _ | Tpat_array _ | Tpat_lazy _ | Tpat_value _
       | Tpat_exception _ | Tpat_or _ -> ());

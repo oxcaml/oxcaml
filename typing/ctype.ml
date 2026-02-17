@@ -829,8 +829,12 @@ let rec generalize stage_offset ty =
           lower_all ty
         else
           iter_type_expr (generalize stage_offset) ty
-    | Tquote ty' -> generalize (stage_offset + 1) ty'
-    | Tsplice ty' -> generalize (stage_offset - 1) ty'
+    | Tquote ty' ->
+        generalize (stage_offset + 1) ty'
+    | Tquote_eval ty' ->
+        generalize (stage_offset + 1) ty'
+    | Tsplice ty' ->
+        generalize (stage_offset - 1) ty'
     | Tconstr (_, _, abbrev) ->
         iter_abbrev (generalize stage_offset) !abbrev;
         iter_type_expr (generalize stage_offset) ty
@@ -1578,11 +1582,13 @@ let instance_class params cty =
 
 (* [copy_sep] is used to instantiate first-class polymorphic types.
    * It first makes a separate copy of the type as a graph, omitting nodes
-     that have no free univars.
+     that have no free univars (considering only univars in [bound_univars]).
    * In this first pass, [visited] is used as a mapping for previously visited
-     nodes, and must already contain all the free univars in [ty].
+     nodes, and must already contain all the [bound_univars].
    * The remaining (univar-closed) parts of the type are then instantiated
-     with [copy] using a common [copy_scope].
+     with [copy] using a common [copy_scope], unless [partial] is [true]
+     in which case they are kept as-is. Note that the identity of unbound
+     univars is not going to be preserved if [partial] is [false].
    The reason to work in two passes lies in recursive types such as:
      [let h (x : < m : 'a. < n : 'a; p : 'b > > as 'b) = x#m]
    The type of [x#m] should be:
@@ -1590,14 +1596,9 @@ let instance_class params cty =
    I.e., the universal type variable ['a] is both instantiated as a fresh
    type variable ['c] when outside of its binder, and kept as universal
    when under its binder.
-   Assumption: in the first call to [copy_sep], all the free univars should
-   be bound by the same [Tpoly] node. This guarantees that they are only
-   bound when under this [Tpoly] node, which has no free univars, and as
-   such is not part of the separate copy. In turn, this allows the separate
-   copy to keep the sharing of the original type without breaking its
-   binding structure.
  *)
-let copy_sep ~copy_scope ~fixed ~(visited : type_expr TypeHash.t) sch =
+let copy_sep ~copy_scope ~fixed ~partial ~bound_univars
+    ~(visited : type_expr TypeHash.t) sch =
   let free = compute_univars sch in
   let delayed_copies = ref [] in
   let add_delayed_copy t ty =
@@ -1605,10 +1606,16 @@ let copy_sep ~copy_scope ~fixed ~(visited : type_expr TypeHash.t) sch =
       (fun () -> Transient_expr.set_stub_desc t (Tlink (copy copy_scope ty))) ::
       !delayed_copies
   in
-  let rec copy_rec ~may_share (ty : type_expr) =
-    let univars = free ty in
+  let rec copy_rec ~bound_univars ~may_share (ty : type_expr) =
+    let bound_univars =
+      match get_desc ty with
+      | Tpoly (_, tl) -> List.fold_right TypeSet.add tl bound_univars
+      | _ -> bound_univars
+    in
+    let copy_rec = copy_rec ~bound_univars in
+    let univars = TypeSet.inter (free ty) bound_univars in
     if is_Tvar ty || may_share && TypeSet.is_empty univars then
-      if get_level ty <> generic_level then ty else
+      if partial || get_level ty <> generic_level then ty else
       (* jkind not consulted during copy_sep, so Any is safe *)
       let t = newstub ~scope:(get_scope ty) (Jkind.Builtin.any ~why:Dummy_jkind) in
       add_delayed_copy t ty;
@@ -1623,7 +1630,9 @@ let copy_sep ~copy_scope ~fixed ~(visited : type_expr TypeHash.t) sch =
         | Tvariant row ->
             let more = row_more row in
             (* We shall really check the level on the row variable *)
-            let keep = is_Tvar more && get_level more <> generic_level in
+            let keep =
+              partial || is_Tvar more && get_level more <> generic_level
+            in
             (* In that case we should keep the original, but we still
                call copy to correct the levels *)
             if keep then
@@ -1647,11 +1656,12 @@ let copy_sep ~copy_scope ~fixed ~(visited : type_expr TypeHash.t) sch =
       t
     end
   in
-  let ty = copy_rec ~may_share:true sch in
+  let ty = copy_rec ~bound_univars ~may_share:true sch in
   List.iter (fun force -> force ()) !delayed_copies;
   ty
 
-let instance_poly' copy_scope ~keep_names ~fixed ~copy_var univars sch =
+let instance_poly' copy_scope
+    ~keep_names ~fixed ~partial ~copy_var univars sch =
   (* In order to compute univars below, [sch] should not contain [Tsubst] *)
   let copy_var =
     Option.value copy_var
@@ -1665,18 +1675,22 @@ let instance_poly' copy_scope ~keep_names ~fixed ~copy_var univars sch =
   let vars = List.map copy_var univars in
   let visited = TypeHash.create 17 in
   List.iter2 (TypeHash.add visited) univars vars;
-  let ty = copy_sep ~copy_scope ~fixed ~visited sch in
+  let bound_univars = List.fold_right TypeSet.add univars TypeSet.empty in
+  let ty =
+    copy_sep ~copy_scope ~fixed ~partial ~bound_univars ~visited sch
+  in
   vars, ty
 
 let instance_poly_fixed ?(keep_names=false) univars sch =
   For_copy.with_scope (fun copy_scope ->
-    instance_poly' copy_scope ~keep_names ~fixed:true ~copy_var:None univars sch
+    instance_poly' copy_scope
+      ~keep_names ~fixed:true ~partial:false ~copy_var:None univars sch
   )
 
 let instance_poly ?(keep_names=false) univars sch =
   For_copy.with_scope (fun copy_scope ->
-    snd (instance_poly' copy_scope ~keep_names ~fixed:false ~copy_var:None
-          univars sch)
+    snd (instance_poly' copy_scope
+      ~keep_names ~fixed:false ~partial:false ~copy_var:None univars sch)
   )
 
 (** The body of a [Tpoly] will likely have references to the [Tunivar]s bound in
@@ -1717,7 +1731,7 @@ let instance_poly_for_jkind univars sch =
   in
   For_copy.with_scope (fun copy_scope ->
     let _, ty =
-      instance_poly' copy_scope ~keep_names:false ~fixed:false
+      instance_poly' copy_scope ~keep_names:false ~fixed:false ~partial:false
         ~copy_var:(Some copy_var) univars sch
     in
     ty
@@ -1728,8 +1742,8 @@ let instance_label ~fixed lbl =
     let vars, ty_arg =
       match get_desc lbl.lbl_arg with
         Tpoly (ty, tl) ->
-          instance_poly' copy_scope ~keep_names:false ~copy_var:None ~fixed
-            tl ty
+          instance_poly' copy_scope
+            ~keep_names:false ~copy_var:None ~fixed ~partial:false tl ty
       | _ ->
           [], copy copy_scope lbl.lbl_arg
     in
@@ -2115,6 +2129,10 @@ let safe_abbrev env ty =
       cleanup_abbrev ();
       false
 
+let new_splice_ty t = newty2 ~level:(get_level t) (Tsplice t)
+let new_quote_ty t = newty2 ~level:(get_level t) (Tquote t)
+let new_quote_eval_ty t = newty2 ~level:(get_level t) (Tquote_eval t)
+
 (* Expand the head of a type once.
    Raise Cannot_expand if the type cannot be expanded.
    May raise Escape, if a recursion was hidden in the type. *)
@@ -2123,10 +2141,13 @@ let rec try_expand_once env ty =
     Tconstr _ -> expand_abbrev env ty
   | Tsplice t ->
       let t = try_expand_once env t in
-      newty2 ~level:(get_level t) (Tsplice t)
+      new_splice_ty t
   | Tquote t ->
       let t = try_expand_once env t in
-      newty2 ~level:(get_level t) (Tquote t)
+      new_quote_ty t
+  | Tquote_eval t ->
+      let t = try_expand_once env t in
+      new_quote_eval_ty t
   | _ -> raise Cannot_expand
 
 (* This one only raises Cannot_expand *)
@@ -2136,31 +2157,201 @@ let try_expand_safe env ty =
   with Escape _ ->
     Btype.backtrack snap; cleanup_abbrev (); raise Cannot_expand
 
-(* Cancel out a head-position pair of $ and <[_]>, or <[_]> and $. *)
-let rec try_quote_splice_cancel_once ty =
-  match get_desc ty with
-  | Tquote t -> begin
-      match get_desc t with
-      | Tsplice t' -> t'
-      | _ ->
-          let t = try_quote_splice_cancel_once t in
-          (* New types are only constructed whenever we expand the subterm *)
-          newty2 ~level:(get_level t) (Tquote t)
-    end
+(* Expand a head-position [eval] type constructor under quotes or splices,
+   in case we want to perform a reduction involving it. *)
+let rec try_expand_head_eval t =
+  match get_desc t with
+  | Tconstr (p, [t], _) when Path.same p Predef.path_eval ->
+    new_splice_ty (new_quote_eval_ty t)
+  | Tsplice t ->
+    new_splice_ty (try_expand_head_eval t)
+  | Tquote t ->
+    new_quote_ty (try_expand_head_eval t)
+  | Tquote_eval t ->
+    new_quote_eval_ty (try_expand_head_eval t)
+  | _ ->
+    raise Cannot_expand
+
+(* Note [Rewriting normal form]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Rewriting is used in typing of quotes, splices and evaluations.
+   We use it to normalise types with respect to the set of equations given by:
+   * Quote-splice isomorphism (<[$(t)]> = t and t = $(<[t]>)).
+   * Preservation of concrete types by eval (like [<[int]> eval = int] and
+       [<[s -> t]> eval = <[s]> eval -> <[t]> eval]).
+   * Coherency of eval (<[ $t eval ]> = t eval).
+
+   The available rewrites conveniently take the form of beta-reductions.
+   After applying beta-reductions exhaustively, we end up with the normal form
+   described in this note.
+
+   Since quotes and splices are inverses, we will more concisely write
+   [<[ t ]>^-1 = $t] and [$^-1 t = <[t]>].
+
+   It turns out that it is much more natural to beta-reduce [eval] in the form
+   [t qeval = <[t]> eval], hence we use the [Tquote_eval _] type former.
+
+   For any type expression [t] after full head-rewriting, it is of the form
+   [t = <[t' qeval^n]>^m] for natural [n], integer [m] and type expression [t']
+   without evals or concrete type formers in head-position.
+   If n > 0, then [t'] has to be a variable ([Tvar]/[Tunivar]) as otherwise
+   we can always beta-reduce. *)
+
+(* Perform one of the following head-position beta reductions via rewrites:
+   * Reduce a quoted-eval through a concrete (top-level) type constructor.
+   * Cancel a quote-splice pair. *)
+let rec try_reduce_once t =
+  try try_expand_head_eval t with Cannot_expand ->
+  let maybe_reduce_once t =
+    try try_reduce_once t
+    with Cannot_expand -> t
+  in
+  match get_desc t with
+  | Tquote_eval t -> begin
+    match get_desc t with
+    | Tvar _ | Tunivar _ -> raise Cannot_expand
+    (* [<[t1 -> t2]> eval]  ==>  [<[t1]> eval -> <[t2]> eval] *)
+    | Tarrow (a, t1, t2, c) ->
+      (* Distribute across the parameter type's [Tpoly] immediately *)
+      let t1' = new_quote_eval_ty t1 |> maybe_reduce_once in
+      let t2' = new_quote_eval_ty t2 in
+      Tarrow (a, t1', t2', c)
+    (* [<[t1 * t2]> eval]  ==>  [<[t1]> eval * <[t2]> eval] *)
+    | Ttuple tl ->
+      Ttuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
+    (* [<[#(t1 * t2)]> eval]  ==>  [#(<[t1]> eval * <[t2]> eval)] *)
+    | Tunboxed_tuple tl ->
+      Tunboxed_tuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
+    (* [<[(t1, t2) typ]> eval]  ==>  [(<[t1]> eval, <[t2]> eval) typ] *)
+    | Tconstr (p, tl, a) ->
+      (* CR-soon jbachurski: Is it safe to preserve [abbrev_memo] here? *)
+      Tconstr (p, List.map new_quote_eval_ty tl, a)
+    (* [<[ < .. > ]> eval]  ==>  [< <[..]> eval >] *)
+    | Tobject (t, ct) ->
+      Tobject (
+        maybe_reduce_once (new_quote_eval_ty t),
+        ref (
+          Option.map
+            (fun (p, tl) -> p, List.map new_quote_eval_ty tl)
+            !ct))
+    (* [<[ < a: t, .. > ]> eval] ==> [<a : <[t]> eval, <[..]> eval >] *)
+    | Tfield (s, k, t1, t2) ->
+      (* Distribute across the method type's [Tpoly] immediately *)
+      Tfield (
+        s, k, maybe_reduce_once (new_quote_eval_ty t1),
+        maybe_reduce_once (new_quote_eval_ty t2))
+    (* [<[<[t]>]> eval] = [<[<[t]> eval]>] ==> [<[<[t eval]>]>] *)
+    | Tquote t ->
+      Tquote (new_quote_eval_ty t)
+    (* [<[ $t ]> eval] ==> [t eval] *)
+    | Tsplice t ->
+      Tsplice (new_quote_eval_ty t)
+    (* [<[ <[t]> eval ]> eval] ==> [<[ <[t]> eval ]> eval] *)
+    | Tquote_eval _ ->
+      Tquote_eval (try_reduce_once t)
+    (* [<[ < > ]> eval] ==> [< >] *)
+    | Tnil -> Tnil
+    (* [<[ [ `A of t ... ] | ]> eval] ==> [ [ `A of <[t]> eval | ... ] ] *)
+    | Tvariant row ->
+      let Row { fields; more; closed; fixed; name} = row_repr row in
+      let map_rf rf =
+        match_row_field rf
+          ~present:(fun t ->
+            rf_present (Option.map new_quote_eval_ty t))
+          ~absent:(fun () -> rf_absent)
+          ~either:(fun no_arg ts matched use_ext_of ->
+            rf_either
+              ?use_ext_of ~no_arg (List.map new_quote_eval_ty ts) ~matched)
+      in
+      Tvariant
+        (create_row
+          ~fields:(List.map (fun (l, rf) -> l, map_rf rf) fields)
+          ~more ~closed ~fixed ~name)
+    (* [<['a. t]> eval] ==> ['b. (<[{$'b/'a} t]> eval)],
+        where {t/x} is a substitution of t for x. *)
+    | Tpoly (t, tl) ->
+      (* We quantify again, but with the univars [tl'] at an outer stage.
+          This means all instances of univars [tl] have to be replaced
+          by a corresponding instance in [tl'] spliced. *)
+      let copy tv =
+        newty3 ~level:(get_level tv) ~scope:(get_scope tv) (get_desc tv)
+        |> new_splice_ty
+      in
+      let tl', t' =
+        For_copy.with_scope (fun copy_scope ->
+          instance_poly' copy_scope ~keep_names:true
+            ~fixed:false ~partial:true ~copy_var:(Some copy) tl t)
+      in
+      let tl' =
+        ListLabels.map tl' ~f:(fun t ->
+          match get_desc t with Tsplice uv -> uv | _ -> assert false)
+      in
+      Tpoly (new_quote_eval_ty t', tl')
+    (*     [<[ module S with type typ = t ]> eval]
+        ==> [module S with type typ = <[t]> eval] *)
+    | Tpackage (p, fl) ->
+      Tpackage (p, List.map (fun (n, t) -> n, new_quote_eval_ty t) fl)
+    (* [<[ (of_kind k) ]> eval] ==> [of_kind k]] *)
+    | Tof_kind _ -> get_desc t
+    | Tlink _ | Tsubst _ -> assert false
+    end |> newty2 ~level:(get_level t)
   | Tsplice t -> begin
-      match get_desc t with
-      | Tquote t' -> t'
-      | _ ->
-          let t = try_quote_splice_cancel_once t in
-          newty2 ~level:(get_level t) (Tsplice t)
+    match get_desc t with
+    (* [$<[ t ]>] ==> [t] ]>] *)
+    | Tquote t ->
+      t
+    (* reduce in subterm *)
+    | Tsplice _
+    | Tquote_eval _ ->
+      new_splice_ty (try_reduce_once t)
+    | _ -> raise Cannot_expand
+    end
+  | Tquote t -> begin
+    match get_desc t with
+    (* [<[ $t ]>] ==> [t] ]>] *)
+    | Tsplice t ->
+      t
+    (* reduce in subterm *)
+    | Tquote _
+    | Tquote_eval _ ->
+      new_quote_ty (try_reduce_once t)
+    | _ -> raise Cannot_expand
     end
   | _ -> raise Cannot_expand
 
-(* Cancel out all head-position pairs of $ and <[_]>, or <[_]> and $. *)
-let rec try_quote_splice_cancel ty =
-  let ty' = try_quote_splice_cancel_once ty in
-  try try_quote_splice_cancel ty'
+(* Perform head-position reductions exhaustively til the normal form. *)
+let rec try_reduce ty =
+  let ty' = try_reduce_once ty in
+  try try_reduce ty'
   with Cannot_expand -> ty'
+
+let reduce_head ty =
+  let ty =
+    try try_reduce ty
+    with Cannot_expand -> ty
+  in
+  let rec scatter ~quotes ~evals ty =
+    if evals > 0 then
+      let ty = scatter ~quotes ~evals:(evals - 1) ty in
+      newty2 ~level:(get_level ty) (Tconstr (Predef.path_eval, [ty], ref Mnil))
+    else if evals < 0 then
+      assert false
+    else if quotes > 0 then
+      new_quote_ty (scatter ~quotes:(quotes - 1) ~evals ty)
+    else if quotes < 0 then
+      new_splice_ty (scatter ~quotes:(quotes + 1) ~evals ty)
+    else
+      ty
+  in
+  let rec gather ~quotes ~evals ty =
+    match get_desc ty with
+    | Tquote ty -> gather ~quotes:(quotes + 1) ~evals ty
+    | Tsplice ty -> gather ~quotes:(quotes - 1) ~evals ty
+    | Tquote_eval ty -> gather ~quotes:(quotes + 1) ~evals:(evals + 1) ty
+    | _ -> scatter ~quotes ~evals ty
+  in
+  gather ~quotes:0 ~evals:0 ty
 
 (* Fully expand the head of a type. *)
 let try_expand_head
@@ -2169,11 +2360,11 @@ let try_expand_head
     let ty' = try_once env ty in
     try loop try_once env ty'
     with Cannot_expand ->
-      try try_quote_splice_cancel ty'
+      try try_reduce ty'
       with Cannot_expand -> ty'
   in
   try loop try_once env ty
-  with Cannot_expand -> try_quote_splice_cancel ty
+  with Cannot_expand -> try_reduce ty
 
 (* Unsafe full expansion, may raise [Unify [Escape _]]. *)
 let expand_head_unif env ty =
@@ -2221,6 +2412,7 @@ let rec extract_concrete_typedecl env ty =
   | Tpoly(ty, _) -> extract_concrete_typedecl env ty
   | Tquote ty -> extract_concrete_typedecl env ty
   | Tsplice ty -> extract_concrete_typedecl env ty
+  | Tquote_eval ty -> extract_concrete_typedecl env ty
   | Tarrow _ | Ttuple _ | Tunboxed_tuple _ | Tobject _ | Tfield _ | Tnil
   | Tvariant _ | Tpackage _ | Tof_kind _ -> Has_no_typedecl
   | Tvar _ | Tunivar _ -> May_have_typedecl
@@ -2252,6 +2444,9 @@ let rec try_expand_once_opt env ty =
   | Tquote t ->
       let t = try_expand_once_opt env t in
       newty2 ~level:(get_level t) (Tquote t)
+  | Tquote_eval t ->
+      let t = try_expand_once_opt env t in
+      newty2 ~level:(get_level t) (Tquote_eval t)
   | _ -> raise Cannot_expand
 
 let try_expand_safe_opt env ty =
@@ -2369,7 +2564,7 @@ let contained_without_boxing env ty =
   | Tpoly (ty, _) -> [ty]
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
   | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _
-  | Tquote _ | Tsplice _ -> []
+  | Tquote _ | Tsplice _ | Tquote_eval _ -> []
 
 (* We use ty_prev to track the last type for which we found a definition,
    allowing us to return a type for which a definition was found even if
@@ -2481,6 +2676,7 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
   | Tquote _ -> Jkind.Builtin.value ~why:Tquote
   | Tsplice _ -> Jkind.Builtin.value ~why:Tsplice
+  | Tquote_eval _ -> Jkind.Builtin.value ~why:Tquote_eval
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->
@@ -3563,6 +3759,8 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp type_pairs env t1 t2
         | (Tsplice t1, Tsplice t2, _, _) ->
             mcomp type_pairs env t1 t2
+        | (Tquote_eval t1, Tquote_eval t2, _, _) ->
+            mcomp type_pairs env t1 t2
         | (Tsplice t1, _, _, _) ->
             mcomp type_pairs env t1 t2'
         | (_, Tsplice t2, _, _) ->
@@ -4190,8 +4388,11 @@ and unify3 uenv t1 t1' t2 t2' =
       unify3_var uenv jkind t1' t2 t2'
   | (_, Tvar { jkind }) ->
       unify3_var uenv jkind t2' t1 t1'
-  | (Tquote t1, Tquote t2)
+  | (Tquote t1, Tquote t2) ->
+      unify uenv t1 t2
   | (Tsplice t1, Tsplice t2) ->
+      unify uenv t1 t2
+  | (Tquote_eval t1, Tquote_eval t2) ->
       unify uenv t1 t2
   | (Tsplice s1, _) when is_flexible_ty s1 ->
       set_type_desc t2' d2;
@@ -5549,6 +5750,8 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tsplice t1, Tsplice t2) ->
               moregen inst_nongen variance type_pairs env t1 t2
+          | (Tquote_eval t1, Tquote_eval t2) ->
+              moregen inst_nongen variance type_pairs env t1 t2
           | (Tquote t1, _) ->
               let t2 = newty2 ~level:(get_level t2) (Tsplice t2) in
               moregen inst_nongen variance type_pairs env t1 t2
@@ -6012,6 +6215,8 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
           | (Tquote t1, Tquote t2) ->
               eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (Tsplice t1, Tsplice t2) ->
+              eqtype rename type_pairs subst env ~do_jkind_check t1 t2
+          | (Tquote_eval t1, Tquote_eval t2) ->
               eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (_, _) ->
               raise_unexplained_for Equality
@@ -6723,6 +6928,10 @@ let rec build_subtype env (visited : transient_expr list)
   | Tsplice t1 ->
       let (t1', c) = build_subtype env visited loops posi level t1 in
       if c > Unchanged then (newty (Tsplice t1'), c)
+      else (t, Unchanged)
+  | Tquote_eval t1 ->
+      let (t1', c) = build_subtype env visited loops posi level t1 in
+      if c > Unchanged then (newty (Tquote_eval t1'), c)
       else (t, Unchanged)
   | Tnil ->
       if posi then

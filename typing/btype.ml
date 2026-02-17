@@ -301,6 +301,7 @@ let fold_type_expr f init ty =
       f result (row_more row)
   | Tquote ty           -> f init ty
   | Tsplice ty          -> f init ty
+  | Tquote_eval ty      -> f init ty
   | Tfield (_, _, ty1, ty2) ->
       let result = f init ty1 in
       f result ty2
@@ -514,6 +515,7 @@ let rec copy_type_desc ?(keep_names=false) f = function
   | Tvariant _          -> assert false (* too ambiguous *)
   | Tquote ty           -> Tquote (f ty)
   | Tsplice ty          -> Tsplice (f ty)
+  | Tquote_eval ty      -> Tquote_eval (f ty)
   | Tfield (p, k, ty1, ty2) ->
       Tfield (p, field_kind_internal_repr k, f ty1, f ty2)
       (* the kind is kept shared, with indirections removed for performance *)

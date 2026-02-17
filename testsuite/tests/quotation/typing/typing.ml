@@ -447,12 +447,13 @@ mk_pair <[Some 123]>;;
 
 mk_pair <[fun () -> 42]>;;
 [%%expect {|
-- : <[unit -> int * unit -> int]> expr = <[((fun () -> 42), (fun () -> 42))]>
+- : <[(unit -> int) * (unit -> int)]> expr =
+<[((fun () -> 42), (fun () -> 42))]>
 |}];;
 
 mk_pair <[fun x -> x]>;;
 [%%expect {|
-- : <['_weak1 -> '_weak1 * '_weak1 -> '_weak1]> expr =
+- : <[('_weak1 -> '_weak1) * ('_weak1 -> '_weak1)]> expr =
 <[((fun x -> x), (fun x -> x))]>
 |}];;
 
@@ -580,7 +581,7 @@ Error: Signature mismatch:
        The type "<[(string -> unit) * (string -> unit)]> expr"
        is not compatible with the type
          "<[(string -> unit) * (int -> unit)]> expr"
-       Type "string" = "string" is not compatible with type "int"
+       Type "string" is not compatible with type "int"
 |}]
 
 (*  [M4] is analogous to [M3], but featuring an uninhabited type *)
@@ -623,5 +624,5 @@ Error: Signature mismatch:
          val x : <[int * string]> expr
        The type "<[int * int]> expr" is not compatible with the type
          "<[int * string]> expr"
-       Type "int" = "int" is not compatible with type "string"
+       Type "int" is not compatible with type "string"
 |}]

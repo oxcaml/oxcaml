@@ -147,7 +147,7 @@ let rec immediate_subtypes : type_expr -> type_expr list = fun ty ->
       (* these should only occur under Tobject and not at the toplevel,
          but "better safe than sorry" *)
       immediate_subtypes_object_row [] ty
-  | Tquote ty | Tsplice ty -> [ty]
+  | Tquote ty | Tsplice ty | Tquote_eval ty -> [ty]
   | Tlink _ | Tsubst _ -> assert false (* impossible due to Ctype.repr *)
   | Tvar _ | Tunivar _ -> []
   | Tof_kind _ -> []
@@ -414,6 +414,7 @@ let check_type
     | ((Tnil | Tfield _)  , Sep    )
     | (Tquote(_)          , Sep    )
     | (Tsplice(_)         , Sep    )
+    | (Tquote_eval(_)           , Sep    )
     | (Tpackage(_,_)      , Sep    )
     | (Tof_kind(_)        , Sep    ) -> empty
     (* "Deeply separable" case for these same constructors. *)
@@ -425,6 +426,7 @@ let check_type
     | ((Tnil | Tfield _)  , Deepsep)
     | (Tquote(_)          , Deepsep)
     | (Tsplice(_)         , Deepsep)
+    | (Tquote_eval(_)           , Deepsep)
     | (Tpackage(_,_)      , Deepsep) ->
         let tys = immediate_subtypes ty in
         let on_subtype context ty =

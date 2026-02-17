@@ -348,7 +348,7 @@ and expression_desc =
   | Texp_hole of unique_use
   | Texp_quotation of expression
   | Texp_antiquotation of expression
-  | Texp_eval of core_type * Jkind.sort
+  | Texp_eval of core_type
 
 and ident_kind =
   | Id_value
@@ -1086,7 +1086,7 @@ let shallow_iter_pattern_desc
   | Tpat_lazy p -> f.f p
   | Tpat_any
   | Tpat_var _
-  | Tpat_constant _ 
+  | Tpat_constant _
   | Tpat_unboxed_unit -> ()
   | Tpat_value p -> f.f p
   | Tpat_exception p -> f.f p

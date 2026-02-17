@@ -342,6 +342,7 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Eval_format
+  | Eval_non_value of type_expr * Jkind.Violation.t
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

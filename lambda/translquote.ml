@@ -2630,6 +2630,7 @@ let type_for_annotation ~env ~loc typ =
     match get_desc ty with Tvar _ | Tunivar _ -> false | _ -> true
   in
   let rec go aliased ty =
+    let ty = Ctype.reduce_head ty in
     let ctyp_desc =
       if aliasable ty && List.memq ty aliased
       then Ttyp_var (None, (Jkind.Builtin.any ~why:Wildcard).annotation)
@@ -2694,6 +2695,9 @@ let type_for_annotation ~env ~loc typ =
           fatal_errorf
             "Translquote [at %a]:@ Explicitly quantified type variables@ \
              cannot be spliced@ within quoted higher-rank function types"
+            Location.print_loc_in_lowercase loc
+        | Tquote_eval _ ->
+          fatal_errorf "Translquote [at %a]:@ unreduced Tquote_eval"
             Location.print_loc_in_lowercase loc
         | Tpackage (pack_path, pack_fields) ->
           Ttyp_package
@@ -3766,7 +3770,7 @@ and quote_expression_desc ~scopes ~transl stage e =
     | Texp_idx _ ->
       fatal_errorf "Translquote [at %a]: Texp_idx" Location.print_loc
         (to_location loc)
-    | Texp_eval (typ, _) -> Exp_desc.eval loc (quote_core_type ~scopes typ)
+    | Texp_eval typ -> Exp_desc.eval loc (quote_core_type ~scopes typ)
   in
   List.iter (update_env_without_extra ~loc) e.exp_extra;
   List.fold_right
