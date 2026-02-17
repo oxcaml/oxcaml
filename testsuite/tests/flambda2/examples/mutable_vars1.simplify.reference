@@ -1,5 +1,5 @@
 let code escape_string_0 deleted in
-let code loopify(never) size(63) newer_version_of(escape_string_0)
+let code loopify(never) size(64) newer_version_of(escape_string_0)
       escape_string_0_1 (s : val, s' : val)
         my_closure _region _ghost_region my_depth
         -> k * k1
@@ -21,11 +21,12 @@ let code loopify(never) size(63) newer_version_of(escape_string_0)
                | 0 -> k4
                | 1 -> k5
                where k5 =
-                 let prim_5 =
+                 let prim_5 = %num_conv.[`tagged_imm`].[`int8`] (c) in
+                 let prim_6 =
                    %num_conv.[`tagged_imm`].[`imm`] (n_289_unboxed0)
                  in
                  let Pbytessetu =
-                   %bytes_or_bigstring_set.bytes.[`8`] (s', prim_5, prim_3)
+                   %bytes_or_bigstring_set.bytes.[`8`] (s', prim_6, prim_5)
                  in
                  cont k3 (n_289_unboxed0)
                where k4 =

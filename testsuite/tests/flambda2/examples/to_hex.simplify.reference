@@ -142,7 +142,7 @@ apply ccall
                cont k (int_add)
          in
          let $camlTo_hex__char_hex_14 = closure char_hex_6_1 @char_hex in
-         let code loopify(never) size(100) newer_version_of(to_hex_7)
+         let code loopify(never) size(98) newer_version_of(to_hex_7)
                to_hex_7_1 (d : val)
                  my_closure _region _ghost_region my_depth
                  -> k * k1
@@ -191,20 +191,20 @@ apply ccall
                                   ($camlTo_hex__char_hex_14 : _ -> imm tagged
                                    )
                                     (int_lsr)
-                                    -> k5 * k1
-                                  where k5 (param : imm tagged) =
-                                    let unboxed_field = %untag_imm (param) in
-                                    cont k4 (unboxed_field))
-                                 where k4 (unboxed_field : imm) =
-                                   let naked_immediate = unboxed_field in
+                                    -> k4 * k1)
+                                 where k4 (apply_result : imm tagged) =
                                    let int_mul = %int_barith.mul (i, 2) in
                                    let prim_3 =
+                                     %num_conv.[`tagged_imm`].[`int8`]
+                                       (apply_result)
+                                   in
+                                   let prim_4 =
                                      %num_conv.[`tagged_imm`].[`imm`]
                                        (int_mul)
                                    in
                                    let Pbytessetu =
                                      %bytes_or_bigstring_set.bytes.[`8`]
-                                       (result, prim_3, naked_immediate)
+                                       (result, prim_4, prim_3)
                                    in
                                    ((let int_and = %int_barith.`and` (x, 15)
                                      in
@@ -212,31 +212,25 @@ apply ccall
                                        ($camlTo_hex__char_hex_14
                                         : _ -> imm tagged)
                                          (int_and)
-                                         -> k5 * k1
-                                       where k5 (param : imm tagged) =
-                                         let unboxed_field_1 =
-                                           %untag_imm (param)
-                                         in
-                                         cont k4 (unboxed_field_1))
-                                      where k4 (unboxed_field_1 : imm) =
-                                        let naked_immediate_1 =
-                                          unboxed_field_1
-                                        in
+                                         -> k4 * k1)
+                                      where k4 (apply_result_1 : imm tagged) =
                                         let int_add =
                                           %int_barith.add (int_mul, 1)
                                         in
-                                        let prim_4 =
+                                        let prim_5 =
+                                          %num_conv.[`tagged_imm`].[`int8`]
+                                            (apply_result_1)
+                                        in
+                                        let prim_6 =
                                           %num_conv.[`tagged_imm`].[`imm`]
                                             (int_add)
                                         in
                                         let Pbytessetu_1 =
                                           %bytes_or_bigstring_set.bytes.[`8`]
-                                            (result,
-                                             prim_4,
-                                             naked_immediate_1)
+                                            (result, prim_6, prim_5)
                                         in
-                                        let prim_5 = %int_comp.ne (i, 15) in
-                                        (switch prim_5
+                                        let prim_7 = %int_comp.ne (i, 15) in
+                                        (switch prim_7
                                            | 0 -> k (result)
                                            | 1 -> k4
                                            where k4 =
