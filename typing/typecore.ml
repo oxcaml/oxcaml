@@ -765,10 +765,11 @@ let register_allocation_value_mode ~loc
    parameter function needs to be made global if its partial application
    to one argument must be global. As a result, a function gets an
    [Alloc.lr] allocation mode that can be further constrained. *)
-let register_closure_allocation (mode : Value.r) : Alloc.lr * Value.r =
-  let alloc_mode, _ = Alloc.newvar_below (value_to_alloc_r2g mode) in
+let register_closure_allocation (mode : Value.r) ~loc : Alloc.lr * Value.r =
+  let (alloc_mode : Alloc.lr), _ = Alloc.newvar_below (value_to_alloc_r2g mode) in
+  let hint = (Hint.Allocation_r {loc; txt = Unknown}) in
   register_allocation_mode (Alloc.disallow_left alloc_mode);
-  let closed_over_mode = Value.disallow_left (alloc_as_value alloc_mode) in
+  let closed_over_mode = (alloc_as_value ~hint (Alloc.disallow_left alloc_mode)) in
   alloc_mode, closed_over_mode
 
 (** Register as allocation the expression constrained by the given
@@ -5561,7 +5562,7 @@ let split_function_ty
     ~mode_annots ~ret_mode_annots ~in_function ~is_first_val_param ~is_final_val_param
   =
   let alloc_mode, closed_over_mode =
-    register_closure_allocation (as_single_mode expected_mode)
+    register_closure_allocation ~loc (as_single_mode expected_mode)
   in
   if expected_mode.strictly_local then
     Locality.submode_exn ~pp:(loc, Function) Locality.local
