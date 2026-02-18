@@ -794,9 +794,7 @@ module type S = sig
 
   (** Similar to [regional_to_local], behaves as identity on other axes *)
   val value_to_alloc_r2l :
-    ?hint:('l * 'r) Hint.morph ->
-    ('l * 'r) Value.t ->
-    ('l * 'r) Alloc.t
+    ?hint:('l * 'r) Hint.morph -> ('l * 'r) Value.t -> ('l * 'r) Alloc.t
 
   (** Similar to [regional_to_global], behaves as identity on other axes *)
   val value_to_alloc_r2g :

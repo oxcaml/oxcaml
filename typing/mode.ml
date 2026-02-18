@@ -3061,8 +3061,7 @@ module Lattices_mono = struct
     match pm1 with
     | Proj_core (m1, ax1, obj1) ->
       let c1 = Axis.proj ax1 c1 in
-      Proj_and
-        (compose_simple dst m0 (Imply_const_and_core (m1, c1)), ax1, obj1)
+      Proj_and (compose_simple dst m0 (Imply_const_and_core (m1, c1)), ax1, obj1)
     | Proj_id (ax1, obj1) ->
       let c1 = Axis.proj ax1 c1 in
       Proj_and (compose_simple dst m0 (Imply_const c1), ax1, obj1)
@@ -3292,8 +3291,7 @@ module Lattices_mono = struct
       | And_min_core (ax1, m0) ->
         let obj0 = proj_obj ax1 dst in
         let c0 = Axis.proj ax1 c0 in
-        And_min_with
-          (ax1, compose_simple obj0 (Core_and_meet_const (c0, m0)) m1)
+        And_min_with (ax1, compose_simple obj0 (Core_and_meet_const (c0, m0)) m1)
       | Const_min_core -> Const_min a_obj
       | And_min_id ax1 -> And_min_with (ax1, m1)
       | Disallowed -> Compose (Simple sm0, And_min_with (ax1, m1))
@@ -3304,16 +3302,18 @@ module Lattices_mono = struct
 
   let refute_compose_and_with : type a b c q0 q1 d.
       c obj ->
-      (c, q0) Axis.t -> (b, q0, d) simple_morph ->
+      (c, q0) Axis.t ->
+      (b, q0, d) simple_morph ->
       (b, q1) Axis.t ->
-      (b, c, d) morph -> (a, b, d) morph ->
+      (b, c, d) morph ->
+      (a, b, d) morph ->
       (a, c, d) morph =
    fun dst ax0 m0' ax1 m0 m1 ->
     match ax0, m0', ax1, dst with
-    | _, (Core (Locality_restricted _)), _, _ -> .
-    | _, (Core_and_meet_const (_, Locality_restricted _)), _, _ -> .
-    | _, (Imply_const_and_core (Locality_restricted _, _)), _, _ -> .
-    | _, (Compose _), _, _ -> Compose (m0, m1)
+    | _, Core (Locality_restricted _), _, _ -> .
+    | _, Core_and_meet_const (_, Locality_restricted _), _, _ -> .
+    | _, Imply_const_and_core (Locality_restricted _, _), _, _ -> .
+    | _, Compose _, _, _ -> Compose (m0, m1)
     | _, _, _, _ -> .
 
   let compose : type a b c d.
@@ -4107,13 +4107,13 @@ module Report = struct
    fun a_obj b_obj a b ->
     match C.equal_obj a_obj b_obj with
     | Equal -> Misc.Le_result.equal ~le:(C.le a_obj) a b
-    | Not_equal ->
+    | Not_equal -> (
       match a_obj, b_obj with
       | Locality, Regionality ->
         Misc.Le_result.equal ~le:(C.le b_obj) (C.locality_as_regionality a) b
       | Regionality, Locality ->
         Misc.Le_result.equal ~le:(C.le a_obj) a (C.locality_as_regionality b)
-      | _, _ -> false
+      | _, _ -> false)
 
   let rec print_ahint : type a l r.
       ?sub:bool ->
