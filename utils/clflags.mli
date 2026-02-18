@@ -367,18 +367,8 @@ module Dump_option : sig
     | Flambda
       (* Note: no support for [-dflambda-let <stamp>] for now. *)
     | Cmm
-    | Selection
-    | Combine
     | CSE
-    | Live
-    | Spill
-    | Split
-    | Interf
-    | Prefer
-    | Regalloc
-    | Scheduling
     | Linear
-    | Interval
 
   val compare : t -> t -> int
 
