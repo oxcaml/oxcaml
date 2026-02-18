@@ -271,12 +271,13 @@ end = struct
         None) t.files
 
   let find_normalized t fn =
-    let fn = Misc.normalized_unit_filename fn in
+    match Misc.normalized_unit_filename fn with
+    | Error _ -> None
+    | Ok fn ->
     let search { basename; path } =
-      if Misc.normalized_unit_filename basename = fn then
-        Some path
-      else
-        None
+      match Misc.normalized_unit_filename basename with
+      | Ok basename -> if String.equal basename fn then Some path else None
+      | Error _ -> None
     in
     List.find_map search t.files
 
@@ -316,8 +317,12 @@ module Path_cache : sig
   (* Like [prepent_add], but only adds a single file to the cache. *)
   val prepend_add_single : hidden:bool -> string -> string -> unit
 
-  (* Search for a basename in cache. Ignore case if [uncap] is true *)
-  val find : uncap:bool -> string -> string * visibility
+  (* Search for a basename in cache by exact name. *)
+  val find : string -> string * visibility
+
+  (* Search in the uncapitalized tables. [fn_already_uncapped] should have
+     already been through [Misc.normalized_unit_filename]. *)
+  val find_uncap : fn_already_uncapped:string -> string * visibility
 end = struct
   module STbl = Misc.Stdlib.String.Tbl
 
@@ -337,13 +342,15 @@ end = struct
     STbl.clear !visible_files_uncap
 
   let prepend_add_single ~hidden base fn =
-    if hidden then begin
-      STbl.replace !hidden_files base fn;
-      STbl.replace !hidden_files_uncap (Misc.normalized_unit_filename base) fn
-    end else begin
-      STbl.replace !visible_files base fn;
-      STbl.replace !visible_files_uncap (String.uncapitalize_ascii base) fn
-    end
+    Result.iter (fun ubase ->
+        if hidden then begin
+          STbl.replace !hidden_files base fn;
+          STbl.replace !hidden_files_uncap ubase fn
+        end else begin
+          STbl.replace !visible_files base fn;
+          STbl.replace !visible_files_uncap ubase fn
+        end)
+      (Misc.normalized_unit_filename base)
 
   let prepend_add dir =
     List.iter
@@ -360,20 +367,21 @@ end = struct
     in
     List.iter
       (fun ({ basename = base; path = fn } : Dir.entry) ->
-         update base fn visible_files hidden_files;
-         let ubase = Misc.normalized_unit_filename base in
-         update ubase fn visible_files_uncap hidden_files_uncap)
+         Result.iter (fun ubase ->
+             update base fn visible_files hidden_files;
+             update ubase fn visible_files_uncap hidden_files_uncap)
+           (Misc.normalized_unit_filename base))
       (Dir.files dir)
 
-  let find fn visible_files hidden_files =
+  let find_in fn visible_files hidden_files =
     try (STbl.find !visible_files fn, Visible) with
     | Not_found -> (STbl.find !hidden_files fn, Hidden)
 
-  let find ~uncap fn =
-    if uncap then
-      find (String.uncapitalize_ascii fn) visible_files_uncap hidden_files_uncap
-    else
-      find fn visible_files hidden_files
+  let find fn =
+    find_in fn visible_files hidden_files
+
+  let find_uncap ~fn_already_uncapped =
+    find_in fn_already_uncapped visible_files_uncap hidden_files_uncap
 end
 
 type auto_include_callback =
@@ -418,7 +426,6 @@ let get_paths () =
 let get_visible_path_list () = List.rev_map Dir.path !visible_dirs
 let get_hidden_path_list () = List.rev_map Dir.path !hidden_dirs
 
-<<<<<<< oxcaml
 let init_manifests () =
   let manifests_reader = Dune_manifests_reader.create () in
   let load_manifest ~hidden ~basenames manifest_path =
@@ -441,42 +448,6 @@ let init_manifests () =
   List.iter
     (load_manifest ~hidden:true ~basenames:hidden_basenames)
     !Clflags.hidden_include_manifests
-||||||| upstream-base
-(* Optimized version of [add] below, for use in [init] and [remove_dir]: since
-   we are starting from an empty cache, we can avoid checking whether a unit
-   name already exists in the cache simply by adding entries in reverse
-   order. *)
-let prepend_add dir =
-  List.iter (fun base ->
-      let fn = Filename.concat dir.Dir.path base in
-      let filename = Misc.normalized_unit_filename base in
-      if dir.Dir.hidden then begin
-        STbl.replace !hidden_files base fn;
-        STbl.replace !hidden_files_uncap filename fn
-      end else begin
-        STbl.replace !visible_files base fn;
-        STbl.replace !visible_files_uncap filename fn
-      end
-    ) dir.Dir.files
-=======
-(* Optimized version of [add] below, for use in [init] and [remove_dir]: since
-   we are starting from an empty cache, we can avoid checking whether a unit
-   name already exists in the cache simply by adding entries in reverse
-   order. *)
-let prepend_add dir =
-  List.iter (fun base ->
-      Result.iter (fun filename ->
-          let fn = Filename.concat dir.Dir.path base in
-          if dir.Dir.hidden then begin
-            STbl.replace !hidden_files base fn;
-            STbl.replace !hidden_files_uncap filename fn
-          end else begin
-            STbl.replace !visible_files base fn;
-            STbl.replace !visible_files_uncap filename fn
-          end)
-        (Misc.normalized_unit_filename base)
-    ) dir.Dir.files
->>>>>>> upstream-incoming
 
 let init ~auto_include ~visible ~hidden =
   reset ();
@@ -505,43 +476,8 @@ let remove_dir dir =
    left-to-right precedence. *)
 let add (dir : Dir.t) =
   assert (not Config.merlin || Local_store.is_bound ());
-<<<<<<< oxcaml
   Path_cache.add dir;
   if (Dir.hidden dir) then
-||||||| upstream-base
-  let update base fn visible_files hidden_files =
-    if dir.hidden && not (STbl.mem !hidden_files base) then
-      STbl.replace !hidden_files base fn
-    else if not (STbl.mem !visible_files base) then
-      STbl.replace !visible_files base fn
-  in
-  List.iter
-    (fun base ->
-       let fn = Filename.concat dir.Dir.path base in
-       update base fn visible_files hidden_files;
-       let ubase = Misc.normalized_unit_filename base in
-       update ubase fn visible_files_uncap hidden_files_uncap)
-    dir.files;
-  if dir.hidden then
-=======
-  let update base fn visible_files hidden_files =
-    if dir.hidden && not (STbl.mem !hidden_files base) then
-      STbl.replace !hidden_files base fn
-    else if not (STbl.mem !visible_files base) then
-      STbl.replace !visible_files base fn
-  in
-  List.iter
-    (fun base ->
-       Result.iter (fun ubase ->
-           let fn = Filename.concat dir.Dir.path base in
-           update base fn visible_files hidden_files;
-           update ubase fn visible_files_uncap hidden_files_uncap
-         )
-         (Misc.normalized_unit_filename base)
-    )
-    dir.files;
-  if dir.hidden then
->>>>>>> upstream-incoming
     hidden_dirs := dir :: !hidden_dirs
   else
     visible_dirs := dir :: !visible_dirs
@@ -588,7 +524,7 @@ let find fn =
   assert (not Config.merlin || Local_store.is_bound ());
   try
     if is_basename fn && not !Sys.interactive then
-      fst (Path_cache.find ~uncap:false fn)
+      fst (Path_cache.find fn)
     else
       Misc.find_in_path (get_path_list ()) fn
   with Not_found ->
@@ -601,15 +537,7 @@ let find_normalized_with_visibility fn =
   | Ok fn_uncap ->
   try
     if is_basename fn && not !Sys.interactive then
-<<<<<<< oxcaml
-      Path_cache.find ~uncap:true fn
-||||||| upstream-base
-      find_file_in_cache (Misc.normalized_unit_filename fn)
-        visible_files_uncap hidden_files_uncap
-=======
-      find_file_in_cache fn_uncap
-        visible_files_uncap hidden_files_uncap
->>>>>>> upstream-incoming
+      Path_cache.find_uncap ~fn_already_uncapped:fn_uncap
     else
       try
         (Misc.find_in_path_normalized (get_visible_path_list ()) fn, Visible)
@@ -617,12 +545,6 @@ let find_normalized_with_visibility fn =
       | Not_found ->
         (Misc.find_in_path_normalized (get_hidden_path_list ()) fn, Hidden)
   with Not_found ->
-<<<<<<< oxcaml
-    let fn_uncap = String.uncapitalize_ascii fn in
-||||||| upstream-base
-    let fn_uncap = Misc.normalized_unit_filename fn in
-=======
->>>>>>> upstream-incoming
     (!auto_include_callback Dir.find_normalized fn_uncap, Visible)
 
 let find_normalized fn = fst (find_normalized_with_visibility fn)
