@@ -1389,19 +1389,9 @@ let out_jkind_of_const_jkind env jkind =
 
 (* CR layouts v2.8: This is just like [Jkind.format], and likely needs to
    be overhauled with [with]-types. Internal ticket 5096. *)
-<<<<<<< HEAD
 let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
   match desc.base with
-  | Layout (Sort (Var n)) ->
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-let rec out_jkind_of_desc (desc : 'd Jkind.Desc.t) =
-  match desc.layout with
-  | Sort (Var n) ->
-=======
-let rec out_jkind_of_desc (desc : 'd Jkind.Desc.t) =
-  match desc.layout with
-  | Sort (Var n, sa) ->
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+  | Layout (Sort (Var n, sa)) ->
     Ojkind_var ("'_representable_layout_" ^
                 Int.to_string (Jkind.Sort.Var.get_print_number n),
                 Jkind.Scannable_axes.to_string_list sa)
@@ -1426,19 +1416,9 @@ let rec out_jkind_of_desc (desc : 'd Jkind.Desc.t) =
 let out_jkind_option_of_jkind ~ignore_null env jkind =
   let desc = Jkind.get jkind in
   let elide =
-<<<<<<< HEAD
     Jkind.is_value_for_printing ~ignore_null env jkind (* C2.1 *)
     || (match desc.base with
-        | Layout (Sort (Var _)) -> not !Clflags.verbose_types (* X1 *)
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-    Jkind.is_value_for_printing ~ignore_null jkind (* C2.1 *)
-    || (match desc.layout with
-        | Sort (Var _) -> not !Clflags.verbose_types (* X1 *)
-=======
-    Jkind.is_value_for_printing ~ignore_null jkind (* C2.1 *)
-    || (match desc.layout with
-        | Sort ((Var _), _)-> not !Clflags.verbose_types (* X1 *)
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+        | Layout (Sort ((Var _), _)) -> not !Clflags.verbose_types (* X1 *)
         | _ -> false)
   in
   if elide then None else Some (out_jkind_of_desc env desc)

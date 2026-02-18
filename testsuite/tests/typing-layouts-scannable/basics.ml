@@ -149,7 +149,20 @@ type 'a t = 'a accepts_nonptr
 type ('a : value) t = 'a accepts_nonptr
 [%%expect{|
 type ('a : value non_pointer) t = 'a accepts_nonptr
-type ('a : value non_pointer) t = 'a accepts_nonptr
+Line 2, characters 22-39:
+2 | type ('a : value) t = 'a accepts_nonptr
+                          ^^^^^^^^^^^^^^^^^
+Error: Layout mismatch in final type declaration consistency check.
+       This is most often caused by the fact that type inference is not
+       clever enough to propagate layouts through variables in different
+       declarations. It is also not clever enough to produce a good error
+       message, so we'll say this instead:
+         The layout of 'a is value
+           because of the annotation on 'a in the declaration of the type t.
+         But the layout of 'a must be a sublayout of value non_pointer
+           because of the annotation on 'a in the declaration of the type t.
+       A good next step is to add a layout annotation on a parameter to
+       the declaration where this error is reported.
 |}]
 
 let f : ('a : value non_pointer) accepts_nonptr -> ('a : value) accepts_nonptr = fun x -> x
@@ -160,18 +173,13 @@ val f : ('a : value non_pointer). 'a accepts_nonptr -> 'a accepts_nonptr =
   <fun>
 val f : ('a : value non_pointer). 'a accepts_nonptr -> 'a accepts_nonptr =
   <fun>
-Line 3, characters 8-60:
-3 | let f : ('a : value). 'a accepts_nonptr -> 'a accepts_nonptr = fun x -> x
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The universal type variable 'a was declared to have kind value.
-       But it was inferred to have kind value non_pointer
-         because of the definition of accepts_nonptr at line 2, characters 0-42.
+val f : 'a accepts_nonptr -> 'a accepts_nonptr = <fun>
 |}]
 
 let f : (_ : value) accepts_nonptr -> unit = fun _ -> ()
 let g : (_ : value non_pointer) accepts_nonptr -> unit = fun _ -> ()
 [%%expect{|
-val f : ('a : value non_pointer). 'a accepts_nonptr -> unit = <fun>
+val f : 'a accepts_nonptr -> unit = <fun>
 val g : ('a : value non_pointer). 'a accepts_nonptr -> unit = <fun>
 |}]
 

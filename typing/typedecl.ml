@@ -1066,16 +1066,8 @@ let transl_declaration env sdecl (id, uid) =
          See https://github.com/oxcaml/oxcaml/pull/3399. *)
       match kind with
       | Type_record_unboxed_product _ ->
-<<<<<<< HEAD
         begin match Jkind.get_layout env jkind with
-        | Some Any ->
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-        begin match Jkind.get_layout jkind with
-        | Some Any ->
-=======
-        begin match Jkind.get_layout jkind with
         | Some (Any _) ->
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
           (* [jkind_default] has just what we need here *)
           let default_layout =
             match Jkind.extract_layout env jkind_default with
@@ -2187,7 +2179,14 @@ let rec update_decl_jkind env dpath decl =
                  [check_representable] *)
               let sort = Jkind.sort_of_jkind env jkind in
               let ld_sort = Jkind.Sort.default_to_value_and_get sort in
-              {lbl with ld_sort}, Jkind.extract_layout jkind
+              let layout =
+                match Jkind.extract_layout env jkind with
+                | Ok l -> l
+                | Error _ ->
+                  Misc.fatal_error
+                    "typedecl: extract_layout failed on representable type"
+              in
+              {lbl with ld_sort}, layout
             ) lbls
             |> List.split
           in
@@ -2617,7 +2616,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
           let jkind = (Env.find_type path env).type_jkind in
           let layout =
             match Jkind.get_layout env jkind with
-            | None -> Jkind_types.Layout.Const.Any
+            | None -> Jkind_types.Layout.Const.Any Jkind_types.Scannable_axes.max
             | Some l -> l
           in
           Contained (contained_parameters tyl layout), parents
@@ -3627,7 +3626,7 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
          transl)
     *)
     | Tvar {jkind} when is_layout_poly
-                      && Jkind.has_layout_any env jkind
+                      && Option.is_some (Jkind.has_layout_any env jkind)
                       && get_level ty = Btype.generic_level -> Poly
     | _ ->
       let sort =
@@ -3779,7 +3778,9 @@ let check_unboxable env loc ty =
     ()
 
 let has_ty_var_with_layout_any env ty =
-  Ctype.exists_free_variable (fun _ jkind -> Jkind.has_layout_any env jkind) ty
+  Ctype.exists_free_variable
+    (fun _ jkind -> Option.is_some (Jkind.has_layout_any env jkind))
+    ty
 
 let unexpected_layout_any_check env prim cty ty =
   if Primitive.prim_can_contain_layout_any prim ||

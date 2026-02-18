@@ -723,14 +723,8 @@ module Layout = struct
       | Base (b1, _), Base (b2, _) -> Sort.equal_base b1 b2
       | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
-<<<<<<< HEAD
       | Univar uv1, Univar uv2 -> Sort.equal_univar_univar uv1 uv2
-      | (Base _ | Any | Product _ | Univar _), _ -> false
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-      | (Base _ | Any | Product _), _ -> false
-=======
-      | (Base _ | Any _ | Product _), _ -> false
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+      | (Base _ | Any _ | Product _ | Univar _), _ -> false
 
     let rec get_sort : t -> Sort.Const.t option = function
       | Any _ -> None
@@ -791,73 +785,32 @@ module Layout = struct
         | Vec512, _ -> vec512
     end
 
-<<<<<<< HEAD
-    (* if so, scannable axis annotations should not trigger a warning *)
-    let is_value_or_any = function
-      | Any | Base Value -> true
-      | Base
-          ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
-          | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ) ->
-        false
-      | Product _ -> false
-      | Univar _ -> false
-
-    let of_sort s =
-      let rec of_sort : Sort.t -> _ = function
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-    (* if so, scannable axis annotations should not trigger a warning *)
-    let is_value_or_any = function
-      | Any | Base Value -> true
-      | Base
-          ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
-          | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ) ->
-        false
-      | Product _ -> false
-
-    let of_sort s =
-      let rec of_sort : Sort.t -> _ = function
-=======
     let of_sort s sa =
       let rec of_sort (s : Sort.t) sa =
         match s with
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
         | Var _ -> None
         | Base b -> Some (Static.of_base b sa)
         | Product sorts ->
           Option.map
             (fun x -> Product x)
             (* [Sort.get] is deep, so no need to repeat it here *)
-<<<<<<< HEAD
-            (Misc.Stdlib.List.map_option of_sort sorts)
-        | Univar uv -> Some (Univar uv)
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-            (Misc.Stdlib.List.map_option of_sort sorts)
-=======
             (* In all cases where sort products are turned into layout products,
                [Scannable_axes.max] is used. The sort product doesn't store
                enough information to make any other choice. *)
             (Misc.Stdlib.List.map_option
                (fun s -> of_sort s Scannable_axes.max)
                sorts)
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+        | Univar uv -> Some (Univar uv)
       in
       of_sort (Sort.get s) sa
 
-<<<<<<< HEAD
     let of_univar uv = Univar uv
 
-    let of_flat_sort : Sort.Flat.t -> _ = function
+    let of_flat_sort (s : Sort.Flat.t) sa =
+      match s with
       | Var _ -> None
       | Univar uv -> Some (of_univar uv)
-      | Base b -> Some (Static.of_base b)
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-    let of_flat_sort : Sort.Flat.t -> _ = function
-      | Var _ -> None
-      | Base b -> Some (Static.of_base b)
-=======
-    let of_flat_sort (s : Sort.Flat.t) sa =
-      match s with Var _ -> None | Base b -> Some (Static.of_base b sa)
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+      | Base b -> Some (Static.of_base b sa)
   end
 
   let rec of_const (const : Const.t) : _ t =
@@ -865,7 +818,7 @@ module Layout = struct
     | Any sa -> Any sa
     | Base (b, sa) -> Sort (Sort.of_base b, sa)
     | Product cs -> Product (List.map of_const cs)
-    | Univar uv -> Sort (Sort.Univar uv)
+    | Univar uv -> Sort (Sort.Univar uv, Scannable_axes.max)
 
   let product = function
     | [] -> Misc.fatal_error "Layout.product: empty product"

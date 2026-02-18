@@ -1868,26 +1868,18 @@ let instance_prim_layout env (desc : Primitive.description) ty =
          from an outer scope *)
       if level = generic_level && try_mark_node mark ty then begin
         begin match get_desc ty with
-<<<<<<< HEAD
-        | Tvar ({ jkind; _ } as r) when Jkind.has_layout_any env jkind ->
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-        | Tvar ({ jkind; _ } as r) when Jkind.has_layout_any jkind ->
-=======
-        | Tvar ({ jkind = { jkind = { layout = Any sa; _ }; _ }; _ } as r) ->
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-          For_copy.redirect_desc copy_scope ty
-<<<<<<< HEAD
-            (Tvar {r with jkind = get_jkind jkind})
-        | Tunivar ({ jkind; _ } as r) when Jkind.has_layout_any env jkind ->
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-            (Tvar {r with jkind = get_jkind jkind})
-        | Tunivar ({ jkind; _ } as r) when Jkind.has_layout_any jkind ->
-=======
-            (Tvar {r with jkind = get_jkind r.jkind sa})
-        | Tunivar ({ jkind = { jkind = { layout = Any sa; _ }; _ }; _ } as r) ->
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-          For_copy.redirect_desc copy_scope ty
-            (Tunivar {r with jkind = get_jkind r.jkind sa})
+        | Tvar ({ jkind; _ } as r) ->
+          (match Jkind.has_layout_any env jkind with
+          | Some sa ->
+            For_copy.redirect_desc copy_scope ty
+              (Tvar {r with jkind = get_jkind jkind sa})
+          | None -> ())
+        | Tunivar ({ jkind; _ } as r) ->
+          (match Jkind.has_layout_any env jkind with
+          | Some sa ->
+            For_copy.redirect_desc copy_scope ty
+              (Tunivar {r with jkind = get_jkind jkind sa})
+          | None -> ())
         | _ -> ()
         end;
         iter_type_expr (inner mark) ty
@@ -2454,7 +2446,7 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
              (estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty)
          with
          | Ok l -> l
-         | Error _ -> Jkind_types.Layout.Any
+         | Error _ -> Jkind_types.Layout.Any Jkind_types.Scannable_axes.max
            (* CR layouts: This is pretty sad - it means that products whose
               elements have fully abstract kinds sometimes can't get a fully
               accurate kind (and we conservatively give any). It shouldn't come
@@ -2683,7 +2675,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                        && List.length jkinds = num_components ->
                recur ty's_jkinds jkinds
              | Some ty's_jkinds, None
-                  when Jkind.has_layout_any env jkind
+                  when Option.is_some (Jkind.has_layout_any env jkind)
                     && List.length ty's_jkinds = num_components ->
                (* Even though [jkind] has layout any, it still might have
                   mode-crossing restrictions, so we recur, just duplicating
@@ -2881,16 +2873,8 @@ let check_and_update_generalized_ty_jkind ?name ~loc env ty =
       let context = mk_jkind_context_check_principal env in
       let ext = Jkind.get_externality_upper_bound ~context env jkind in
       Jkind_axis.Externality.le ext External64 &&
-<<<<<<< HEAD
       match Jkind.get_layout env jkind with
-      | Some (Base Value) | None -> true
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-      match Jkind.get_layout jkind with
-      | Some (Base Value) | None -> true
-=======
-      match Jkind.get_layout jkind with
       | Some (Base (Value, _)) | None -> true
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
       | _ -> false
     in
     if Language_extension.erasable_extensions_only ()
@@ -3110,18 +3094,9 @@ let local_non_recursive_abbrev uenv p ty =
 
    They carry redundant information but are added to save two calls to
    [get_desc] which are usually performed already at the call site. *)
-<<<<<<< HEAD
 let unify_univar env t1 t2 jkind1 jkind2 pairs =
-  if not (Jkind.equal env jkind1 jkind2) then
+  if not (Jkind.equal ~level:!current_level env jkind1 jkind2) then
     raise Cannot_unify_universal_variables;
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-let unify_univar t1 t2 jkind1 jkind2 pairs =
-  if not (Jkind.equal jkind1 jkind2) then raise Cannot_unify_universal_variables;
-=======
-let unify_univar t1 t2 jkind1 jkind2 pairs =
-  if not (Jkind.equal ~level:!current_level jkind1 jkind2) then
-    raise Cannot_unify_universal_variables;
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
   let rec inner t1 t2 = function
     (cl1, cl2) :: rem ->
       let find_univ t cl =
@@ -3862,18 +3837,10 @@ let add_jkind_equation ~reason uenv destination jkind1 =
                ticket 5112. *)
             match Jkind.try_allow_r jkind, Jkind.try_allow_r decl.type_jkind with
             | Some jkind, Some decl_jkind when
-<<<<<<< HEAD
-                   not (Jkind.equal env jkind decl_jkind) ->
+                   not (Jkind.equal ~level:!current_level env jkind decl_jkind) ->
                let refined_decl =
                  { decl with type_jkind = Jkind.disallow_right jkind }
                in
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-                   not (Jkind.equal jkind decl_jkind) ->
-               let refined_decl = { decl with type_jkind = Jkind.disallow_right jkind } in
-=======
-                   not (Jkind.equal ~level:!current_level jkind decl_jkind) ->
-               let refined_decl = { decl with type_jkind = Jkind.disallow_right jkind } in
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
                set_env uenv (Env.add_local_constraint p refined_decl env)
             | _ -> ()
           with
@@ -5870,13 +5837,7 @@ let all_distinct_vars_with_original_jkinds env vars =
          tys := TypeSet.add ty !tys;
          match get_desc ty with
          | Tvar { jkind = inferred_jkind } ->
-<<<<<<< HEAD
-           if Jkind.equate env inferred_jkind original_jkind
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-           if Jkind.equate inferred_jkind original_jkind
-=======
-           if Jkind.equate ~level:!current_level inferred_jkind original_jkind
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+           if Jkind.equate ~level:!current_level env inferred_jkind original_jkind
            then All_good
            else Jkind_mismatch { original_jkind; inferred_jkind; ty }
          | _ -> Unification_failure { name; ty }
@@ -5932,13 +5893,7 @@ let eqtype_subst env type_pairs subst t1 k1 t2 k2 ~do_jkind_check =
       !subst
   then ()
   else begin
-<<<<<<< HEAD
-    if do_jkind_check && not (Jkind.equal env k1 k2)
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-    if do_jkind_check && not (Jkind.equal k1 k2)
-=======
-    if do_jkind_check && not (Jkind.equal ~level:!current_level k1 k2)
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+    if do_jkind_check && not (Jkind.equal ~level:!current_level env k1 k2)
       then raise_for Equality (Unequal_var_jkinds (t1, k1, t2, k2));
     subst := (t1, t2) :: !subst;
     TypePairs.add type_pairs (t1, t2)
@@ -5969,16 +5924,8 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
     | (Tof_kind k1, Tof_kind k2) ->
-<<<<<<< HEAD
-      if not (Jkind.equal env k1 k2)
+      if not (Jkind.equal ~level:!current_level env k1 k2)
       then raise_for Equality (Unequal_tof_kind_jkinds (k1, k2))
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-      if not (Jkind.equal k1 k2)
-      then raise_for Equality (Unequal_tof_kind_jkinds (k1, k2))
-=======
-      if not (Jkind.equal ~level:!current_level k1 k2) then
-        raise_for Equality (Unequal_tof_kind_jkinds (k1, k2))
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
     | _ ->
         let t1' = expand_head_rigid env t1 in
         let t2' = expand_head_rigid env t2 in

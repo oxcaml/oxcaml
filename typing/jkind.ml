@@ -95,10 +95,6 @@ module Scannable_axes = struct
     ignore sa;
     { pointerness }
 
-  (* CR layouts-scannable: When more axes get added, I think this should get
-     printed like [{ nullability: ...; ... }]. Could also have Caps versions
-     of the points on the axis; poke around to see precedent. *)
-  let debug_print ppf { pointerness } = Pointerness.print ppf pointerness
 end
 
 (* A *layout* of a type describes the way values of that type are stored at
@@ -118,23 +114,13 @@ module Layout = struct
   module Const = struct
     include Jkind_types.Layout.Const
 
-<<<<<<< HEAD
-    let rec of_sort_const : Sort.Const.t -> t = function
-      | Base b -> Base b
-      | Product consts -> Product (List.map of_sort_const consts)
-      | Univar uv -> Univar uv
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-    let rec of_sort_const : Sort.Const.t -> t = function
-      | Base b -> Base b
-      | Product consts -> Product (List.map of_sort_const consts)
-=======
     let rec of_sort_const (s : Sort.Const.t) sa =
       match s with
       | Base b -> Static.of_base b sa
       | Product consts ->
         Product (List.map (fun s -> of_sort_const s sa) consts)
+      | Univar uv -> Univar uv
 
-    (* if so, scannable axis annotations should not trigger a warning *)
     let is_value_or_any = function
       | Any _ | Base (Value, _) -> true
       | Base
@@ -143,6 +129,7 @@ module Layout = struct
             _ ) ->
         false
       | Product _ -> false
+      | Univar _ -> false
 
     let rec equal_up_to_scannable_axes c1 c2 =
       match c1, c2 with
@@ -150,7 +137,8 @@ module Layout = struct
       | Any _, Any _ -> true
       | Product cs1, Product cs2 ->
         List.equal equal_up_to_scannable_axes cs1 cs2
-      | (Base _ | Any _ | Product _), _ -> false
+      | Univar u1, Univar u2 -> Sort.equal_univar_univar u1 u2
+      | (Base _ | Any _ | Product _ | Univar _), _ -> false
 
     let set_root_pointerness t pointerness =
       match t with
@@ -158,6 +146,7 @@ module Layout = struct
       | Base (b, sa) ->
         Static.of_base b (Scannable_axes.set_pointerness sa pointerness)
       | Product _ -> t
+      | Univar _ -> t
 
     (* Returns [None] if the root has no meaningful scannable axes. *)
     let get_root_scannable_axes t =
@@ -165,7 +154,7 @@ module Layout = struct
       | Any sa -> Some sa
       | Base (_, sa) -> if is_value_or_any t then Some sa else None
       | Product _ -> None
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+      | Univar _ -> None
 
     let to_string t =
       let rec to_string nested (t : t) =
@@ -195,10 +184,13 @@ module Layout = struct
   module Debug_printers = struct
     open Format
 
+    let scannable_axes ppf { Scannable_axes.pointerness } =
+      fprintf ppf "{pointerness=%s}" (Pointerness.to_string pointerness)
+
     let rec t format_sort ppf = function
-      | Any sa -> fprintf ppf "Any %a" Scannable_axes.debug_print sa
+      | Any sa -> fprintf ppf "Any %a" scannable_axes sa
       | Sort (s, sa) ->
-        fprintf ppf "Sort (%a, %a)" format_sort s Scannable_axes.debug_print sa
+        fprintf ppf "Sort (%a, %a)" format_sort s scannable_axes sa
       | Product ts ->
         fprintf ppf "Product [ %a ]"
           (pp_print_list
@@ -214,15 +206,9 @@ module Layout = struct
       | Base b ->
         Sort (Base b, sa)
         (* No need to call [Sort.get] here, because one [get] is deep. *)
-<<<<<<< HEAD
-      | Product sorts -> Product (List.map flatten_sort sorts)
-      | Univar x -> Sort (Univar x)
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-      | Product sorts -> Product (List.map flatten_sort sorts)
-=======
       | Product sorts ->
         Product (List.map (fun s -> flatten_sort s Scannable_axes.max) sorts)
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+      | Univar x -> Sort (Univar x, sa)
     in
     function
     | Any sa -> Any sa
@@ -350,27 +336,20 @@ module Layout = struct
 
   let format ppf layout =
     let rec pp_element ~nested ppf : _ Layout.t -> unit = function
-<<<<<<< HEAD
-      | Any -> Fmt.fprintf ppf "any"
-      | Sort s -> Sort.format ppf s
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-      | Any -> fprintf ppf "any"
-      | Sort s -> Sort.format ppf s
-=======
       | Any sa ->
-        (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
+        (Fmt.pp_print_list
+           ~pp_sep:(fun f () -> Fmt.fprintf f " ")
+           Fmt.pp_print_string)
           ppf
           ("any" :: Scannable_axes.to_string_list sa)
-      (* To ensure that scannable axes aren't printed on non-values, we
-         just check before printing. This is easier than maintaining the
-         invariant that [sa] = [Scannable_axes.max] in non-value cases. *)
       | Sort (s, sa) when Sort.is_possibly_scannable s ->
-        let sort_str = asprintf "%a" Sort.format s in
-        (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
+        let sort_str = Fmt.asprintf "%a" Sort.format s in
+        (Fmt.pp_print_list
+           ~pp_sep:(fun f () -> Fmt.fprintf f " ")
+           Fmt.pp_print_string)
           ppf
           (sort_str :: Scannable_axes.to_string_list sa)
-      | Sort (s, _) -> fprintf ppf "%a" Sort.format s
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+      | Sort (s, _) -> Fmt.fprintf ppf "%a" Sort.format s
       | Product ts ->
         let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
         Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
@@ -661,7 +640,7 @@ module Base = struct
     match base1, base2 with
     | Layout l1, Layout l2 -> Layout.sub ~level l1 l2
     | Kconstr k1, Kconstr k2 when Path.same k1 k2 -> Sub_result.Equal
-    | Kconstr _, Layout Layout.Any -> Sub_result.Less
+    | Kconstr _, Layout (Layout.Any _) -> Sub_result.Less
     | Kconstr _, Layout _ | Layout _, Kconstr _ | Kconstr _, Kconstr _ ->
       Sub_result.Not_le [Layout_disagreement]
 
@@ -671,8 +650,8 @@ module Base = struct
     match base1, base2 with
     | Layout l1, Layout l2 -> Option.is_some (Layout.intersection ~level l1 l2)
     | Kconstr _, Kconstr _ -> true
-    | Kconstr _, Layout Layout.Any -> true
-    | Layout Layout.Any, Kconstr _ -> true
+    | Kconstr _, Layout (Layout.Any _) -> true
+    | Layout (Layout.Any _), Kconstr _ -> true
     | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
 
   let map_layout ~f b =
@@ -723,7 +702,7 @@ module Base = struct
     match t1, t2 with
     | Layout _, Layout _ -> Some (t1, t2)
     | Kconstr p1, Kconstr p2 when Path.same p1 p2 -> Some (t1, t2)
-    | Kconstr _, Layout Layout.Any -> Some (t1, t2)
+    | Kconstr _, Layout (Layout.Any _) -> Some (t1, t2)
     | Kconstr _, Layout _ | Layout _, Kconstr _ | Kconstr _, Kconstr _ -> (
       match expand_pair env t1 t2 with
       | None -> None
@@ -1358,7 +1337,7 @@ module Jkind_desc = struct
       let t2 = Base_and_axes.jkind_desc_of_const t2 in
       Some (t1, t2)
 
-  let rec equate_or_equal ~allow_mutation env t1 t2 =
+  let rec equate_or_equal ~allow_mutation ~level env t1 t2 =
     let { base = base1;
           mod_bounds = mod_bounds1;
           with_bounds = (No_with_bounds : (allowed * allowed) with_bounds)
@@ -1373,7 +1352,7 @@ module Jkind_desc = struct
     in
     match base1, base2 with
     | Layout l1, Layout l2 ->
-      Layout.equate_or_equal ~allow_mutation l1 l2
+      Layout.equate_or_equal ~allow_mutation ~level l1 l2
       && Mod_bounds.equal mod_bounds1 mod_bounds2
     | Kconstr p1, Kconstr p2
       when Path.same p1 p2 && Mod_bounds.equal mod_bounds1 mod_bounds2 ->
@@ -1381,7 +1360,8 @@ module Jkind_desc = struct
     | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
       match expand_pair env t1 t2 with
       | None -> false
-      | Some (t1, t2) -> equate_or_equal ~allow_mutation env t1 t2)
+      | Some (t1, t2) ->
+        equate_or_equal ~allow_mutation ~level env t1 t2)
 
   let sub_expanded (type l r) ~level
       ({ base = base1; mod_bounds = bounds1; with_bounds = with_bounds1 } :
@@ -1408,7 +1388,7 @@ module Jkind_desc = struct
          normalize. For example, we could allow [k mod contended with int < any
          mod contended]. *)
       match base2 with
-      | Layout Any when Mod_bounds.is_max bounds2 -> Sub_result.Less
+      | Layout (Any _) when Mod_bounds.is_max bounds2 -> Sub_result.Less
       | _ -> Sub_result.combine bases (Sub_result.Not_le [With_bounds_on_left]))
 
   let sub (type l r) ~type_equal:_ ~context ~level env
@@ -1461,7 +1441,7 @@ module Jkind_desc = struct
       | None -> No_intersection
       | Some l -> make_intersection (Layout l))
     | Kconstr p1, Kconstr p2 when Path.same p1 p2 -> make_intersection base1
-    | Layout Layout.Any, base | base, Layout Layout.Any ->
+    | Layout (Layout.Any _), base | base, Layout (Layout.Any _) ->
       make_intersection base
     | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
       match expand_pair env t1 t2 with
@@ -1475,7 +1455,7 @@ module Jkind_desc = struct
       match t1, t2 with
       | Layout l1, Layout l2 -> Layout.sub ~level l1 l2
       | Kconstr _, Kconstr _ -> Sub_result.Equal
-      | Kconstr _, Layout Layout.Any -> Sub_result.Less
+      | Kconstr _, Layout (Layout.Any _) -> Sub_result.Less
       | Kconstr _, Layout _ | Layout _, Kconstr _ ->
         Misc.fatal_error
           "Jkind.sub_layout: [expand_until_comparable] spec wrong")
@@ -1492,7 +1472,7 @@ module Jkind_desc = struct
       sort )
 
   let of_sort_univar univar =
-    let layout = Layout.Sort (Sort.Univar univar) in
+    let layout = Layout.Sort (Sort.Univar univar, Scannable_axes.max) in
     { base = Layout layout;
       mod_bounds =
         Mod_bounds.max
@@ -1574,7 +1554,8 @@ module Const = struct
       | jkind -> get_layout_result env jkind)
 
   let equal env t1 t2 =
-    Jkind_desc.equate_or_equal ~allow_mutation:false env
+    Jkind_desc.equate_or_equal ~allow_mutation:false
+      ~level:Btype.generic_level env
       (Base_and_axes.jkind_desc_of_const t1)
       (Base_and_axes.jkind_desc_of_const t2)
 
@@ -1710,21 +1691,22 @@ module Const = struct
       in
       let actual = Base_and_axes.fully_expand_aliases_const env actual in
       let matching_layouts =
-<<<<<<< HEAD
         match base_jkind.base, actual.base with
         | Kconstr p1, Kconstr p2 -> Path.same p1 p2
-        | Layout l1, Layout l2 -> Jkind_types.Layout.Const.equal l1 l2
+        | Layout l1, Layout l2 ->
+          Layout.Const.equal_up_to_scannable_axes l1 l2
         | (Kconstr _ | Layout _), _ -> false
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-        Layout.Const.equal base.jkind.layout actual.layout
-=======
-        Layout.Const.equal_up_to_scannable_axes base.jkind.layout actual.layout
       in
       let scannable_axes =
-        if Layout.Const.is_value_or_any actual.layout
-        then get_scannable_axes_diff ~base:base.jkind.layout actual.layout
-        else []
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+        match actual.base with
+        | Kconstr _ -> []
+        | Layout l ->
+          if Layout.Const.is_value_or_any l
+          then
+            get_scannable_axes_diff ~base:(match base_jkind.base with
+              | Layout l -> l
+              | Kconstr _ -> Any Scannable_axes.max) l
+          else []
       in
       let modal_bounds =
         get_modal_bounds ~verbosity ~base:base_jkind.mod_bounds
@@ -1821,16 +1803,8 @@ module Const = struct
           | None ->
             (* If we fail, try again with nullable/maybe-separable jkinds. *)
             let layout_str =
-<<<<<<< HEAD
               match (jkind.base : Layout.Const.t jkind_base) with
-              | Layout (Base Value) ->
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-              match (jkind.layout : Layout.Const.t) with
-              | Base Value ->
-=======
-              match (jkind.layout : Layout.Const.t) with
-              | Base (Value, _) ->
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+              | Layout (Base (Value, _)) ->
                 (* As a special case, we'd still like to print in terms of the
                    value_or_null alias, even if we're printing an expanded
                    jkind. *)
@@ -1877,26 +1851,29 @@ module Const = struct
   (*******************************)
   (* converting user annotations *)
 
-<<<<<<< HEAD
-  let jkind_of_product_annotations (type l r) ~loc env (jkinds : (l * r) t list)
-      =
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-  let jkind_of_product_annotations (type l r) (jkinds : (l * r) t list) =
-=======
   let set_pointerness ~abbrev t = function
     | None -> t
     | Some (new_ptrness, loc) ->
-      (match Layout.Const.get_root_scannable_axes t.layout with
-      | None -> ()
-      | Some { pointerness } ->
-        if new_ptrness = pointerness
-        then
-          Location.prerr_warning loc (Warnings.Redundant_kind_modifier abbrev));
-      let new_layout = Layout.Const.set_root_pointerness t.layout new_ptrness in
-      { t with layout = new_layout }
+      (match t.base with
+       | Kconstr _ -> ()
+       | Layout l ->
+         (match Layout.Const.get_root_scannable_axes l with
+          | None -> ()
+          | Some { pointerness } ->
+            if new_ptrness = pointerness
+            then
+              Location.prerr_warning loc
+                (Warnings.Redundant_kind_modifier abbrev)));
+      match t.base with
+      | Kconstr _ -> t
+      | Layout l ->
+        let new_layout =
+          Layout.Const.set_root_pointerness l new_ptrness
+        in
+        { t with base = Layout new_layout }
 
-  let jkind_of_product_annotations (type l r) (jkinds : (l * r) t list) =
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+  let jkind_of_product_annotations (type l r) ~loc env (jkinds : (l * r) t list)
+      =
     let folder (type l r) (layouts_acc, mod_bounds_acc, with_bounds_acc)
         (kind : (l * r) t) =
       let { base; mod_bounds; with_bounds } =
@@ -1984,7 +1961,17 @@ module Const = struct
          This should emit a warning if the [jkind_without_sa] already has
          the specified scannable axes. This is why the helper currently
          returns an optional annotation (since none vs default matters). *)
-      set_pointerness ~abbrev:name.txt jkind_without_sa pointerness
+      let jkind_for_sa =
+        (* set_pointerness needs a Layout base, not Kconstr.
+           Expand Kconstr when scannable axes are present. *)
+        match pointerness, jkind_without_sa.base with
+        | None, _ | _, Layout _ -> jkind_without_sa
+        | Some _, Kconstr _ ->
+          Base_and_axes.fully_expand_aliases_const env jkind_without_sa
+      in
+      set_pointerness
+        ~abbrev:(String.concat "." (Longident.flatten name.txt))
+        jkind_for_sa pointerness
     | Pjk_mod (base, modifiers) ->
       let base =
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
@@ -2088,21 +2075,16 @@ module Desc = struct
      algorithm. Internal ticket 5096. *)
   let format_verbose ~verbosity env ppf t =
     let rec format_desc ~nested ppf (desc : _ t) =
-<<<<<<< HEAD
       match desc.base with
-      | Layout (Sort (Var n)) ->
-        Fmt.fprintf ppf "'s%d" (Sort.Var.get_print_number n)
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-      match desc.layout with
-      | Sort (Var n) -> fprintf ppf "'s%d" (Sort.Var.get_print_number n)
-=======
-      match desc.layout with
-      | Sort (Var n, sa) ->
-        let sort_var_str = asprintf "'s%d" (Sort.Var.get_print_number n) in
-        (pp_print_list ~pp_sep:(fun f () -> fprintf f " ") pp_print_string)
+      | Layout (Sort (Var n, sa)) ->
+        let sort_var_str =
+          Fmt.asprintf "'s%d" (Sort.Var.get_print_number n)
+        in
+        (Fmt.pp_print_list
+           ~pp_sep:(fun f () -> Fmt.fprintf f " ")
+           Fmt.pp_print_string)
           ppf
           (sort_var_str :: Scannable_axes.to_string_list sa)
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
       (* Analyze a product before calling [get_const]: the machinery in
          [Const.format] works better for atomic layouts, not products. *)
       | Layout (Product lays) ->
@@ -2119,130 +2101,6 @@ module Desc = struct
   let format ppf t = format_verbose ~verbosity:Not_verbose ppf t
 end
 
-<<<<<<< HEAD
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-module Jkind_desc = struct
-  let unsafely_set_bounds t ~from =
-    { t with mod_bounds = from.mod_bounds; with_bounds = from.with_bounds }
-
-  let equate_or_equal ~allow_mutation t1 t2 =
-    Layout_and_axes.equal (Layout.equate_or_equal ~allow_mutation) t1 t2
-
-  let sub (type l r) ~type_equal:_ ~context ~level
-      ~sub_previously_ran_out_of_fuel (sub : (allowed * r) jkind_desc)
-      ({ layout = lay2; mod_bounds = bounds2; with_bounds = No_with_bounds } :
-        (l * allowed) jkind_desc) =
-    let axes_max_on_right =
-      (* Optimization: if the upper_bound is max on the right, then that axis is
-         irrelevant - the left will always satisfy the right along that axis. *)
-      Mod_bounds.get_max_axes bounds2
-    in
-    let ( ({ layout = lay1; mod_bounds = bounds1; with_bounds = No_with_bounds } :
-            (_ * allowed) jkind_desc),
-          _ ) =
-      Layout_and_axes.normalize ~skip_axes:axes_max_on_right
-        ~previously_ran_out_of_fuel:sub_previously_ran_out_of_fuel
-        ~mode:Ignore_best ~context sub
-    in
-    let layout = Layout.sub ~level lay1 lay2 in
-    let bounds = Mod_bounds.less_or_equal bounds1 bounds2 in
-    Sub_result.combine layout bounds
-
-  let intersection ~level
-      { layout = lay1; mod_bounds = mod_bounds1; with_bounds = with_bounds1 }
-      { layout = lay2; mod_bounds = mod_bounds2; with_bounds = with_bounds2 } =
-    match Layout.intersection ~level lay1 lay2 with
-    | None -> None
-    | Some layout ->
-      Some
-        { layout;
-          mod_bounds = Mod_bounds.meet mod_bounds1 mod_bounds2;
-          with_bounds = With_bounds.meet with_bounds1 with_bounds2
-        }
-
-  let of_new_sort_var ~level nullability_upper_bound separability_upper_bound =
-    let layout, sort = Layout.of_new_sort_var ~level in
-    ( { layout;
-        mod_bounds =
-          Mod_bounds.max
-          |> Mod_bounds.set_nullability nullability_upper_bound
-          |> Mod_bounds.set_separability separability_upper_bound;
-        with_bounds = No_with_bounds
-      },
-      sort )
-
-  let get t = Layout_and_axes.map Layout.get t
-
-  module Debug_printers = struct
-    let t ppf t =
-      Layout_and_axes.debug_print
-        (Layout.Debug_printers.t Sort.Debug_printers.t)
-        ppf t
-  end
-end
-
-=======
-module Jkind_desc = struct
-  let unsafely_set_bounds t ~from =
-    { t with mod_bounds = from.mod_bounds; with_bounds = from.with_bounds }
-
-  let equate_or_equal ~allow_mutation ~level t1 t2 =
-    Layout_and_axes.equal (Layout.equate_or_equal ~allow_mutation ~level) t1 t2
-
-  let sub (type l r) ~type_equal:_ ~context ~level
-      ~sub_previously_ran_out_of_fuel (sub : (allowed * r) jkind_desc)
-      ({ layout = lay2; mod_bounds = bounds2; with_bounds = No_with_bounds } :
-        (l * allowed) jkind_desc) =
-    let axes_max_on_right =
-      (* Optimization: if the upper_bound is max on the right, then that axis is
-         irrelevant - the left will always satisfy the right along that axis. *)
-      Mod_bounds.get_max_axes bounds2
-    in
-    let ( ({ layout = lay1; mod_bounds = bounds1; with_bounds = No_with_bounds } :
-            (_ * allowed) jkind_desc),
-          _ ) =
-      Layout_and_axes.normalize ~skip_axes:axes_max_on_right
-        ~previously_ran_out_of_fuel:sub_previously_ran_out_of_fuel
-        ~mode:Ignore_best ~context sub
-    in
-    let layout = Layout.sub ~level lay1 lay2 in
-    let bounds = Mod_bounds.less_or_equal bounds1 bounds2 in
-    Sub_result.combine layout bounds
-
-  let intersection ~level
-      { layout = lay1; mod_bounds = mod_bounds1; with_bounds = with_bounds1 }
-      { layout = lay2; mod_bounds = mod_bounds2; with_bounds = with_bounds2 } =
-    match Layout.intersection ~level lay1 lay2 with
-    | None -> None
-    | Some layout ->
-      Some
-        { layout;
-          mod_bounds = Mod_bounds.meet mod_bounds1 mod_bounds2;
-          with_bounds = With_bounds.meet with_bounds1 with_bounds2
-        }
-
-  let of_new_sort_var ~level nullability_upper_bound separability_upper_bound =
-    let layout, sort = Layout.of_new_sort_var ~level in
-    ( { layout;
-        mod_bounds =
-          Mod_bounds.max
-          |> Mod_bounds.set_nullability nullability_upper_bound
-          |> Mod_bounds.set_separability separability_upper_bound;
-        with_bounds = No_with_bounds
-      },
-      sort )
-
-  let get t = Layout_and_axes.map Layout.get t
-
-  module Debug_printers = struct
-    let t ppf t =
-      Layout_and_axes.debug_print
-        (Layout.Debug_printers.t Sort.Debug_printers.t)
-        ppf t
-  end
-end
-
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
 (******************************)
 (* constants *)
 
@@ -2394,19 +2252,10 @@ let for_open_boxed_row =
       ~nullability:Nullability.Non_null ~separability:Separability.Non_float
   in
   fresh_jkind
-<<<<<<< HEAD
-    { base = Layout (Sort (Base Value));
+    { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
       mod_bounds;
       with_bounds = No_with_bounds
     }
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-    { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
-=======
-    { layout = Sort (Base Value, { pointerness = Maybe_pointer });
-      mod_bounds;
-      with_bounds = No_with_bounds
-    }
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
     ~annotation:None ~why:(Value_creation Polymorphic_variant)
 
 let limit_for_mode_crossing_rows = 100
@@ -2445,13 +2294,7 @@ let for_boxed_row row =
 
 let for_arrow =
   fresh_jkind
-<<<<<<< HEAD
-    { base = Layout (Sort (Base Value));
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-    { layout = Sort (Base Value);
-=======
-    { layout = Sort (Base Value, { pointerness = Maybe_pointer });
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+    { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
       mod_bounds = Mod_bounds.for_arrow;
       with_bounds = No_with_bounds
     }
@@ -2475,13 +2318,7 @@ let for_object =
       ~staticity:(Crossing.Per_axis.max (Crossing.Axis.Monadic Staticity))
   in
   fresh_jkind
-<<<<<<< HEAD
-    { base = Layout (Sort (Base Value));
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-    { layout = Sort (Base Value);
-=======
-    { layout = Sort (Base Value, { pointerness = Maybe_pointer });
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+    { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
       mod_bounds =
         Mod_bounds.create { comonadic; monadic } ~externality:Externality.max
           ~nullability:Non_null ~separability:Separability.Non_float;
@@ -2556,16 +2393,8 @@ let get t = Jkind_desc.get t.jkind
 let sort_of_jkind env (t : jkind_l) : sort =
   let rec sort_of_layout (t : _ Layout.t) =
     match t with
-<<<<<<< HEAD
-    | Any -> Misc.fatal_error "Jkind.sort_of_jkind: layout is any"
-    | Sort s -> s
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-    | Any -> Misc.fatal_error "Jkind.sort_of_jkind"
-    | Sort s -> s
-=======
-    | Any _ -> Misc.fatal_error "Jkind.sort_of_jkind"
+    | Any _ -> Misc.fatal_error "Jkind.sort_of_jkind: layout is any"
     | Sort (s, _) -> s
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
     | Product ls -> Sort.Product (List.map sort_of_layout ls)
   in
   let layout =
@@ -2726,25 +2555,18 @@ let decompose_product env jk =
   let deal_with_sort : Sort.t -> _ = function
     | Var _ -> None (* we've called [get] and there's *still* a variable *)
     | Base _ -> None
-<<<<<<< HEAD
-    | Product sorts -> Some (List.map (fun sort -> mk_jkind (Sort sort)) sorts)
-    | Univar _ -> Misc.fatal_error "Jkind.decompose_product: Univar in product"
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-    | Product sorts -> Some (List.map (fun sort -> mk_jkind (Sort sort)) sorts)
-=======
     | Product sorts ->
       Some
         (List.map
            (fun sort -> mk_jkind (Sort (sort, Scannable_axes.max)))
            sorts)
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+    | Univar _ -> Misc.fatal_error "Jkind.decompose_product: Univar in product"
   in
-<<<<<<< HEAD
   match extract_layout env jk with
   | Error _ -> None
   | Ok layout -> (
     match layout with
-    | Any -> None
+    | Any _ -> None
     | Product layouts ->
       (* CR layouts v7.1: The histories here are wrong (we are giving each
          component the history of the whole product).  They don't show up in
@@ -2753,32 +2575,7 @@ let decompose_product env jk =
          relevant bits of [Ctype.type_jkind_sub] to just work on layouts, or
          introduce product histories. *)
       Some (List.map mk_jkind layouts)
-    | Sort s -> deal_with_sort (Sort.get s))
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-  match jkind.layout with
-  | Any -> None
-  | Product layouts ->
-    (* CR layouts v7.1: The histories here are wrong (we are giving each
-       component the history of the whole product).  They don't show up in
-       errors, so it's fine for now, but we'll probably need to fix this as
-       part of improving errors around products. A couple options: re-work the
-       relevant bits of [Ctype.type_jkind_sub] to just work on layouts, or
-       introduce product histories. *)
-    Some (List.map mk_jkind layouts)
-  | Sort s -> deal_with_sort (Sort.get s)
-=======
-  match jkind.layout with
-  | Any _ -> None
-  | Product layouts ->
-    (* CR layouts v7.1: The histories here are wrong (we are giving each
-       component the history of the whole product).  They don't show up in
-       errors, so it's fine for now, but we'll probably need to fix this as
-       part of improving errors around products. A couple options: re-work the
-       relevant bits of [Ctype.type_jkind_sub] to just work on layouts, or
-       introduce product histories. *)
-    Some (List.map mk_jkind layouts)
-  | Sort (s, _) -> deal_with_sort (Sort.get s)
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+    | Sort (s, _) -> deal_with_sort (Sort.get s))
 
 (*********************************)
 (* pretty printing *)
@@ -3378,7 +3175,7 @@ module Violation = struct
         | Not_a_subjkind _ ->
           if Sub_result.is_le (Layout.sub ~level l1 l2) then Kind else Layout
         | No_intersection _ -> Layout)
-      | Kconstr _, Layout Layout.Any -> Kind
+      | Kconstr _, Layout (Layout.Any _) -> Kind
       | Kconstr _, Layout _ | Layout _, Kconstr _ -> (
         match t.violation with
         | Not_a_subjkind _ -> Kind
@@ -3391,23 +3188,11 @@ module Violation = struct
     let layout_or_kind =
       match mismatch_type with Kind -> "kind" | Layout -> "layout"
     in
-<<<<<<< HEAD
     let rec has_sort_var_layout : Sort.Flat.t Layout.t -> bool = function
-      | Sort (Var _) -> true
-      | Sort (Univar _) -> Misc.fatal_error "has_sort_var: univar"
-      | Product layouts -> List.exists has_sort_var_layout layouts
-      | Sort (Base _) | Any -> false
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-    let rec has_sort_var : Sort.Flat.t Layout.t -> bool = function
-      | Sort (Var _) -> true
-      | Product layouts -> List.exists has_sort_var layouts
-      | Sort (Base _) | Any -> false
-=======
-    let rec has_sort_var : Sort.Flat.t Layout.t -> bool = function
       | Sort (Var _, _) -> true
-      | Product layouts -> List.exists has_sort_var layouts
+      | Sort (Univar _, _) -> Misc.fatal_error "has_sort_var: univar"
+      | Product layouts -> List.exists has_sort_var_layout layouts
       | Sort (Base _, _) | Any _ -> false
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
     in
     let has_sort_var : Sort.Flat.t Layout.t jkind_base -> bool = function
       | Kconstr _ -> false
@@ -3512,7 +3297,7 @@ end
 (******************************)
 (* relations *)
 
-let equate_or_equal ~allow_mutation env
+let equate_or_equal ~allow_mutation ~level env
     { jkind = jkind1;
       annotation = _;
       history = _;
@@ -3527,12 +3312,14 @@ let equate_or_equal ~allow_mutation env
       ran_out_of_fuel_during_normalize = _;
       quality = _
     } =
-  Jkind_desc.equate_or_equal ~allow_mutation env jkind1 jkind2
+  Jkind_desc.equate_or_equal ~allow_mutation ~level env jkind1 jkind2
 
 (* CR layouts: Switch this back to ~allow_mutation:false. Internal ticket 5099. *)
-let equal ~level t1 t2 = equate_or_equal ~allow_mutation:true ~level t1 t2
+let equal ~level env t1 t2 =
+  equate_or_equal ~allow_mutation:true ~level env t1 t2
 
-let equate ~level t1 t2 = equate_or_equal ~allow_mutation:true ~level t1 t2
+let equate ~level env t1 t2 =
+  equate_or_equal ~allow_mutation:true ~level env t1 t2
 
 (* Not all jkind history reasons are created equal. Some are more helpful than
    others.  This function encodes that information.
@@ -3789,44 +3576,18 @@ let sub_jkind_l ~type_equal ~context ~level ?(allow_any_crossing = false) env
       Misc.fatal_error
         "Jkind.sub_jkind_l: Ignore_best normalize invariant violation.")
 
-<<<<<<< HEAD
 let is_obviously_max (t : (_ * allowed) jkind) =
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-let is_void_defaulting = function
-  | { jkind = { layout = Sort s; _ }; _ } -> Sort.is_void_defaulting s
-  | _ -> false
-
-let is_max (t : (_ * allowed) jkind) =
-=======
-let is_void_defaulting = function
-  | { jkind = { layout = Sort (s, _); _ }; _ } -> Sort.is_void_defaulting s
-  | _ -> false
-
-let is_max (t : (_ * allowed) jkind) =
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
   match t with
   (* This doesn't do any mutation because mutating a sort variable can't make it
      any, and modal upper bounds are constant. *)
-<<<<<<< HEAD
-  | { jkind = { base = Layout Any; mod_bounds; with_bounds = No_with_bounds };
+  | { jkind =
+        { base = Layout (Any sa); mod_bounds; with_bounds = No_with_bounds };
       _
     } ->
-    Mod_bounds.is_max mod_bounds
+    Scannable_axes.(equal sa max) && Mod_bounds.is_max mod_bounds
   | { jkind = { base = Layout _ | Kconstr _; mod_bounds = _; with_bounds = _ };
       _
     } ->
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-  | { jkind = { layout = Any; mod_bounds; with_bounds = No_with_bounds }; _ } ->
-    Mod_bounds.is_max mod_bounds
-  | { jkind = { layout = _; mod_bounds = _; with_bounds = No_with_bounds }; _ }
-    ->
-=======
-  | { jkind = { layout = Any sa; mod_bounds; with_bounds = No_with_bounds }; _ }
-    ->
-    Scannable_axes.(equal sa max) && Mod_bounds.is_max mod_bounds
-  | { jkind = { layout = _; mod_bounds = _; with_bounds = No_with_bounds }; _ }
-    ->
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
     false
 
 let mod_bounds_are_obviously_max (type l r) (t : (l * r) jkind) =
@@ -3836,22 +3597,14 @@ let mod_bounds_are_obviously_max (type l r) (t : (l * r) jkind) =
   | { jkind = { base = _; mod_bounds = _; with_bounds = With_bounds _ }; _ } ->
     false
 
-<<<<<<< HEAD
 let fully_expand_aliases env ({ jkind; _ } as jk) =
   { jk with jkind = Base_and_axes.fully_expand_aliases env jkind }
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-let has_layout_any jkind =
-  match jkind.jkind.layout with Any -> true | _ -> false
-=======
-let has_layout_any jkind =
-  match jkind.jkind.layout with Any _ -> true | _ -> false
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
 
 let has_layout_any env jkind =
   match extract_layout env jkind with
-  | Ok Any -> true
-  | Ok _ -> false
-  | Error _ -> false
+  | Ok (Any sa) -> Some sa
+  | Ok _ -> None
+  | Error _ -> None
 
 let is_value_for_printing ~ignore_null env { jkind; _ } =
   let jkind = Base_and_axes.fully_expand_aliases env jkind in

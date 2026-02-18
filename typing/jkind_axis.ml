@@ -211,15 +211,9 @@ module Pointerness = struct
     | Non_pointer -> "non_pointer"
     | Maybe_pointer -> "maybe_pointer"
 
-<<<<<<< HEAD
   let print ppf t = Format_doc.fprintf ppf "%s" (to_string t)
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-  let print ppf t = Format.fprintf ppf "%s" (to_string t)
-=======
-  let print ppf t = Format.fprintf ppf "%s" (to_string t)
 
   let is_max p = equal p max
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
 end
 
 module Axis = struct

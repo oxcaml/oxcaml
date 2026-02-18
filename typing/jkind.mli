@@ -708,26 +708,16 @@ val format_history :
 (** This checks for equality, and sets any variables to make two jkinds equal,
     if possible. e.g. [equate] on a var and [value] will set the variable to be
     [value] *)
-<<<<<<< HEAD
-val equate : Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-val equate : Types.jkind_lr -> Types.jkind_lr -> bool
-=======
-val equate : level:int -> Types.jkind_lr -> Types.jkind_lr -> bool
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+val equate :
+  level:int -> Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
 
 (** This checks for equality, but has the invariant that it can only be called
     when there is no need for unification; e.g. [equal] on a var and [value]
     will crash.
 
     CR layouts (v1.5): At the moment, this is actually the same as [equate]! *)
-<<<<<<< HEAD
-val equal : Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
-||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
-val equal : Types.jkind_lr -> Types.jkind_lr -> bool
-=======
-val equal : level:int -> Types.jkind_lr -> Types.jkind_lr -> bool
->>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+val equal :
+  level:int -> Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
 
 (** Checks whether two jkinds have a non-empty intersection. Might mutate sort
     variables. Works over any mix of l- and r-jkinds, because the only way not
@@ -874,7 +864,8 @@ val mod_bounds_are_obviously_max : 'd Types.jkind -> bool
 val fully_expand_aliases : Env.t -> 'd Types.jkind -> 'd Types.jkind
 
 (** Checks to see whether a jkind has layout any. Never does any mutation. *)
-val has_layout_any : Env.t -> ('l * allowed) Types.jkind -> bool
+val has_layout_any :
+  Env.t -> ('l * allowed) Types.jkind -> Jkind_types.Scannable_axes.t option
 
 (** Checks whether a jkind is [value]. This really should require a [jkind_lr],
     but it works on any [jkind], because it's used in printing and is somewhat

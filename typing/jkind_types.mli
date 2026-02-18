@@ -66,6 +66,8 @@ module Sort : sig
 
   type univar = { name : string option }
 
+  val equal_univar_univar : univar -> univar -> bool
+
   type t =
     | Var of var
     | Base of base
