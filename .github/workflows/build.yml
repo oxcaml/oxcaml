@@ -201,6 +201,181 @@ jobs:
             build_ocamlparam: '_,reaper=1'
             ocamlparam: '_,reaper=1'
 
+          - name: runtime5 (x86_64-linux) (structured)
+            config: --enable-runtime5 --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+            build_debug: true
+
+          - name: runtime5 dissector-assembler (x86_64-linux) (structured)
+            config: --enable-runtime5 --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
+            oxcaml_llvm_source_branch: llvmize-oxcaml
+            dissector_assembler: true
+
+          - name: runtime5 stack-checks (x86_64-linux) (structured)
+            config: --enable-runtime5 --enable-stack-checks --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+
+          - name: runtime5 poll-insertion (x86_64-linux) (structured)
+            config: --enable-runtime5 --enable-poll-insertion --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+
+          - name: runtime5 multidomain (x86_64-linux) (structured)
+            config: --enable-runtime5 --enable-stack-checks --enable-poll-insertion --enable-multidomain --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+
+          - name: runtime4 dev (x86_64-linux) (structured)
+            config: --disable-runtime5 --enable-dev --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+
+          # We use a custom install prefix for this workflow.
+          # Consider renaming it to indicate as such when convenient.
+          - name: runtime5 dev (x86_64-linux) (structured)
+            config: --enable-runtime5 --enable-dev --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+            install_path: _custom_install
+
+          - name: runtime5 debug stack-checks (x86_64-linux) (structured)
+            config: --enable-runtime5 --enable-stack-checks --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: ''
+            use_runtime: d
+            ocamlrunparam: "v=0,V=1"
+
+          - name: runtime5 debug (x86_64-linux) (structured)
+            config: --enable-runtime5 --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: ''
+            use_runtime: d
+            ocamlrunparam: "v=0,V=1"
+
+          - name: runtime4 O3 (x86_64-linux) (structured)
+            config: --disable-runtime5 --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: ''
+            ocamlparam: '_,O3=1'
+
+          - name: runtime4 O3 metrics (x86_64-linux) (structured)
+            config: --disable-runtime5 --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: '_'
+            ocamlparam: '_,O3=1'
+            collect_metrics: true
+
+          - name: runtime4 Oclassic frame-pointers poll-insertion flambda-invariants (x86_64-linux) (structured)
+            config: --disable-runtime5 --enable-frame-pointers --enable-poll-insertion --enable-flambda-invariants --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: ''
+            ocamlparam: '_,Oclassic=1'
+            disable_testcases: 'testsuite/tests/typing-local/regression_cmm_unboxing.ml testsuite/tests/int64-unboxing/test.ml testsuite/tests/flambda2/inlining_cost_of_primitive_on_parameters.ml testsuite/tests/flambda2/code_size_of_single_arg_switch.ml testsuite/tests/flambda2/code_size_of_boolean_not_switch.ml testsuite/tests/flambda2/removed_operations_of_switch.ml'
+
+          - name: runtime4 (aarch64-darwin) (structured)
+            config: --disable-runtime5 --disable-warn-error --enable-name-mangling=structured
+            os: warp-macos-15-arm64-6x
+
+          - name: runtime5 regalloc (aarch64-darwin) (structured)
+            config: --enable-runtime5 --disable-warn-error --enable-name-mangling=structured
+            os: warp-macos-15-arm64-6x
+            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
+            ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
+            run_regalloc_tool: true
+
+          - name: runtime5 debug regalloc (aarch64-darwin) (structured)
+            config: --enable-runtime5 --disable-warn-error --enable-name-mangling=structured
+            os: warp-macos-15-arm64-6x
+            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            use_runtime: d
+            ocamlrunparam: "v=0,V=1"
+            run_regalloc_tool: true
+
+          - name: runtime5 regalloc (aarch64-linux) (structured)
+            config: --enable-runtime5 --disable-warn-error --enable-name-mangling=structured
+            os: warp-ubuntu-latest-arm64-8x
+            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
+            ocamlparam: '_,w=-46,save-ir-before=register_allocation,verify-binary-emitter=1'
+            run_regalloc_tool: true
+
+          - name: runtime5 regalloc multidomain (aarch64-linux) (structured)
+            config: --enable-runtime5 --enable-poll-insertion --enable-multidomain --disable-warn-error --enable-name-mangling=structured
+            os: warp-ubuntu-latest-arm64-8x
+            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            run_regalloc_tool: true
+
+          - name: runtime4 regalloc (x86_64-linux) (structured)
+            config: --disable-runtime5 --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            ocamlparam: '_,w=-46,save-ir-before=register_allocation'
+            check_arch: true
+            run_regalloc_tool: true
+
+          - name: runtime5 frame-pointers irc (x86_64-linux) (structured)
+            config: --enable-runtime5 --enable-frame-pointers --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: '_,w=-46,regalloc=irc'
+            ocamlparam: '_,w=-46,regalloc=irc'
+            check_arch: true
+
+          - name: runtime5 cfg-invariants (x86_64-linux) (structured)
+            config: --enable-runtime5 --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
+            ocamlparam: '_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1'
+            check_arch: true
+
+          - name: runtime5 cfg-invariants (aarch64-linux) (structured)
+            config: --enable-runtime5 --enable-name-mangling=structured
+            os: warp-ubuntu-latest-arm64-8x
+            build_ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1"
+            ocamlparam: "_,w=-46,regalloc=cfg,cfg-invariants=1,cfg-eliminate-dead-trap-handlers=1"
+            check_arch: true
+
+          - name: runtime5 vectorizer (x86_64-linux) (structured)
+            config: --enable-runtime5 --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
+            ocamlparam: '_,w=-46,regalloc=cfg,vectorize=1'
+            check_arch: true
+
+          - name: runtime4 address-sanitizer (x86_64-linux) (structured)
+            config: --disable-runtime5 --enable-address-sanitizer --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+            cc: clang
+
+          - name: runtime5 address-sanitizer (x86_64-linux) (structured)
+            config: --enable-runtime5 --enable-address-sanitizer --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+            cc: clang
+
+          # See comment for the flat version
+          - name: runtime5 dwarf-tests (x86_64-linux) (structured)
+            config: --enable-runtime5 --enable-function-sections --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+            dwarf_tests_only: true
+            oxcaml_llvm_tag: oxcaml-lldb-16.0.6-minus1
+            oxcaml_llvm_source_branch: lldb
+
+          - name: runtime5 frame-pointers llvmize-tests (x86_64-linux) (structured)
+            config: --enable-runtime5 --enable-frame-pointers --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+            llvmize_tests_only: true
+            oxcaml_llvm_tag: oxcaml-llvmize-16.0.6-minus3
+            oxcaml_llvm_source_branch: llvmize-oxcaml
+
+          - name: runtime5 musl (x86_64-linux) (structured)
+            config: --enable-runtime5 --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+            cc: musl-gcc
+
+          - name: runtime5 reaper (structured)
+            config: --enable-runtime5 --enable-name-mangling=structured
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: '_,reaper=1'
+            ocamlparam: '_,reaper=1'
+
     env:
       J: "8"
       run_testsuite: "true"
