@@ -250,7 +250,7 @@ module Type_shape = struct
     let open Shape in
     let unknown_shape_any = Shape.unknown_type () in
     let unknown_shape_value =
-      Shape.at_layout (Shape.unknown_type ()) (Base Value)
+      Shape.at_layout (Shape.unknown_type ()) (Base Scannable)
     in
     (* Leaves indicate we do not know. *)
     let[@inline] cannot_proceed () =
@@ -378,7 +378,7 @@ end
 
 module Type_decl_shape = struct
   let rec mixed_block_shape_to_layout = function
-    | Types.Value -> Layout.Base Value
+    | Types.Scannable -> Layout.Base Scannable
     | Types.Float_boxed ->
       Layout.Base Float64
       (* [Float_boxed] records are unboxed in the variant at runtime,
@@ -452,7 +452,7 @@ module Type_decl_shape = struct
             (fun { Shape.field_name = _; field_value = _, ly } ->
               if
                 not
-                  (Layout.equal ly (Layout.Base Value)
+                  (Layout.equal ly (Layout.Base Scannable)
                   || Layout.equal ly (Layout.Base Void))
               then
                 if !Clflags.dwarf_pedantic
@@ -461,7 +461,7 @@ module Type_decl_shape = struct
                     "Type_shape: variant constructor with mismatched layout, \
                      has %a but expected value or void."
                     Layout.format ly
-                else Layout.Base Value
+                else Layout.Base Scannable
               else ly)
             args
         in
@@ -1116,6 +1116,64 @@ let add_to_type_shapes var_uid type_expr type_layout ~name:type_name uid_of_path
   let type_shape = Type_shape.of_type_expr type_expr uid_of_path in
   Uid.Tbl.add all_type_shapes var_uid { type_shape; type_name; type_layout }
 
+<<<<<<< HEAD
+||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
+let rec estimate_layout_from_type_shape (t : Shape.t) : Layout.t option =
+  match t.desc with
+  | Predef (t, _) -> Some (Shape.Predef.to_layout t)
+  | Constr (_, _) ->
+    None (* recursive occurrence, conservatively not handled for now *)
+  | Unboxed_tuple fields ->
+    let field_layouts = List.map estimate_layout_from_type_shape fields in
+    if List.for_all Option.is_some field_layouts
+    then Some (Layout.Product (List.map Option.get field_layouts))
+    else None
+  | Var _ -> None (* CR sspies: Find out what happens to type variables. *)
+  | Variant_unboxed { arg_layout; _ } ->
+    Some arg_layout
+    (* CR sspies: [arg_layout] could become unreliable in the future. Consider
+       recursively descending in that case. *)
+  | Tuple _ | Arrow | Variant _ | Poly_variant _ | Record _ ->
+    Some (Layout.Base Value)
+  | Alias t -> estimate_layout_from_type_shape t
+  | Mu t ->
+    estimate_layout_from_type_shape t
+    (* Simple treatment of recursion, we simply look inside. *)
+  | Unknown_type -> None
+  | At_layout (_, layout) -> Some layout
+  | Leaf | Abs _ | Mutrec _ | Error _ | Comp_unit _ | Rec_var _ | App _ | Proj _
+  | Struct _ | Proj_decl _ ->
+    None
+
+=======
+let rec estimate_layout_from_type_shape (t : Shape.t) : Layout.t option =
+  match t.desc with
+  | Predef (t, _) -> Some (Shape.Predef.to_layout t)
+  | Constr (_, _) ->
+    None (* recursive occurrence, conservatively not handled for now *)
+  | Unboxed_tuple fields ->
+    let field_layouts = List.map estimate_layout_from_type_shape fields in
+    if List.for_all Option.is_some field_layouts
+    then Some (Layout.Product (List.map Option.get field_layouts))
+    else None
+  | Var _ -> None (* CR sspies: Find out what happens to type variables. *)
+  | Variant_unboxed { arg_layout; _ } ->
+    Some arg_layout
+    (* CR sspies: [arg_layout] could become unreliable in the future. Consider
+       recursively descending in that case. *)
+  | Tuple _ | Arrow | Variant _ | Poly_variant _ | Record _ ->
+    Some (Layout.Base Scannable)
+  | Alias t -> estimate_layout_from_type_shape t
+  | Mu t ->
+    estimate_layout_from_type_shape t
+    (* Simple treatment of recursion, we simply look inside. *)
+  | Unknown_type -> None
+  | At_layout (_, layout) -> Some layout
+  | Leaf | Abs _ | Mutrec _ | Error _ | Comp_unit _ | Rec_var _ | App _ | Proj _
+  | Struct _ | Proj_decl _ ->
+    None
+
+>>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
 let print_table_all_type_decls ppf =
   let entries = Uid.Tbl.to_list all_type_decls in
   let entries = List.sort (fun (a, _) (b, _) -> Uid.compare a b) entries in

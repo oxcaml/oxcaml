@@ -11,8 +11,16 @@ type t_float64 : float64_internal
 type t_float64_mod_e : float64_internal mod everything
 [%%expect{|
 type t_value
+<<<<<<< HEAD
 type t_value_mod_e : value_or_null mod everything mod non_null separable
 type t_float64 : float64_internal
+||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
+type t_value_mod_e : value_or_null mod everything mod non_null separable
+type t_float64 : float64
+=======
+type t_value_mod_e : immediate separable
+type t_float64 : float64
+>>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
 type t_float64_mod_e : float64 mod everything
 |}]
 
@@ -260,9 +268,9 @@ type t : value_or_null mod everything
 Line 2, characters 0-20:
 2 | type bad : value = t
     ^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value_or_null mod everything
+Error: The layout of type "t" is value maybe_separable
          because of the definition of t at line 1, characters 0-37.
-       But the kind of type "t" must be a subkind of value
+       But the layout of type "t" must be a sublayout of value
          because of the definition of bad at line 2, characters 0-20.
 |}]
 
@@ -293,16 +301,13 @@ type t : immediate & immediate
 
 type t : value & float64 mod everything
 [%%expect{|
-type t
-  : value_or_null mod everything mod non_null separable
-    & float64 mod global many stateless immutable external_
+type t : immediate separable & float64 mod everything
 |}]
 
 type t : value & (immediate & bits64) & float32 mod everything
 [%%expect{|
 type t
-  : value_or_null mod everything mod non_null separable
-    & (value_or_null mod everything mod non_null separable
-      & bits64 mod global many stateless immutable external_)
-    & float32 mod global many stateless immutable external_
+  : immediate separable
+    & (immediate & bits64 mod everything)
+    & float32 mod everything
 |}]

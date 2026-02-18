@@ -1,0 +1,23 @@
+(data global "camlTestu__gc_roots": int 0)
+(data int 1792 global "camlTestu": addr G:"camlTestu__foo_1")
+(data
+ int 3063
+ global "camlTestu__foo_1":
+ addr G:"camlTestu__foo_0_1_code"
+ int 108086391056891909)
+(data
+ int 18428
+ "camlTestu__invalid44":
+ string "(Defining_expr_of_let (bound_pattern int64#_of_int64/37N)
+ (defining_expr ((Unbox_int64 apply_result/21N) ../testu.ml:3,12--55)))"
+ skip 6
+ byte 6)
+(function{../testu.ml:3,8-55} camlTestu__foo_0_1_code (x/342: val) : int
+ (extcall "caml_flambda2_invalid" L:"camlTestu__invalid44" int->.) )
+
+(function no_cse reduce_code_size linscan camlTestu__entry () : val
+ (catch (exit 1 G:"camlTestu") with(1 *ret*/340: val) 1) )
+
+(data)
+File "../testu.ml", line 1:
+Error: Assembler error, input left in file /tmp/camlasmd8ea96.s

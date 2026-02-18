@@ -583,8 +583,8 @@ let remove_mode_and_jkind_variables ty =
     if TypeSet.mem ty !visited then () else begin
       visited := TypeSet.add ty !visited;
       match get_desc ty with
-      | Tvar { jkind } -> Jkind.default_to_value jkind
-      | Tunivar { jkind } -> Jkind.default_to_value jkind
+      | Tvar { jkind } -> Jkind.default_to_scannable jkind
+      | Tunivar { jkind } -> Jkind.default_to_scannable jkind
       | Tarrow ((_,marg,mret),targ,tret,_) ->
          let _ = Alloc.zap_to_legacy marg in
          let _ = Alloc.zap_to_legacy mret in
@@ -2805,7 +2805,7 @@ let check_type_nullability env ty null =
 
 let check_type_separability env ty sep =
   let upper_bound =
-    Jkind.set_separability_upper_bound (Jkind.Builtin.any ~why:Dummy_jkind) sep
+    Jkind.set_root_separability (Jkind.Builtin.any ~why:Dummy_jkind) sep
   in
   match check_type_jkind env ty upper_bound with
   | Ok () -> true
@@ -2868,13 +2868,22 @@ let check_and_update_generalized_ty_jkind ?name ~loc env ty =
   let immediacy_check jkind =
     let is_immediate jkind =
       (* Just check externality and layout, because that's what actually matters
-         for upstream code. We check both for a known value and something that
-         might turn out later to be value. This is the conservative choice. *)
+         for upstream code. We check both for a known scannable and something
+         that might turn out later to be scannable. This is the conservative
+         choice. *)
       let context = mk_jkind_context_check_principal env in
       let ext = Jkind.get_externality_upper_bound ~context env jkind in
       Jkind_axis.Externality.le ext External64 &&
+<<<<<<< HEAD
       match Jkind.get_layout env jkind with
       | Some (Base (Value, _)) | None -> true
+||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
+      match Jkind.get_layout jkind with
+      | Some (Base (Value, _)) | None -> true
+=======
+      match Jkind.get_layout jkind with
+      | Some (Base (Scannable, _)) | None -> true
+>>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
       | _ -> false
     in
     if Language_extension.erasable_extensions_only ()

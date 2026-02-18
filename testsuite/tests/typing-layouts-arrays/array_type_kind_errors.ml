@@ -25,18 +25,18 @@ external size_in_bytes : ('a : any mod separable). 'a t -> int
   = "%array_element_size_in_bytes"
 [@@layout_poly]
 [%%expect{|
-type ('a : any mod separable) t
-external unsafe_get : ('a : any mod separable). 'a t -> int -> 'a
+type ('a : any separable) t
+external unsafe_get : ('a : any separable). 'a t -> int -> 'a
   = "%array_unsafe_get" [@@layout_poly]
-external unsafe_set : ('a : any mod separable). 'a t -> int -> 'a -> unit
+external unsafe_set : ('a : any separable). 'a t -> int -> 'a -> unit
   = "%array_unsafe_set" [@@layout_poly]
-external safe_get : ('a : any mod separable). 'a t -> int -> 'a
+external safe_get : ('a : any separable). 'a t -> int -> 'a
   = "%array_safe_get" [@@layout_poly]
-external safe_set : ('a : any mod separable). 'a t -> int -> 'a -> unit
+external safe_set : ('a : any separable). 'a t -> int -> 'a -> unit
   = "%array_safe_set" [@@layout_poly]
-external length : ('a : any mod separable). 'a t -> int = "%array_length"
+external length : ('a : any separable). 'a t -> int = "%array_length"
   [@@layout_poly]
-external size_in_bytes : ('a : any mod separable). 'a t -> int
+external size_in_bytes : ('a : any separable). 'a t -> int
   = "%array_element_size_in_bytes" [@@layout_poly]
 |}]
 
@@ -59,7 +59,7 @@ Error: This array operation cannot tell whether int64# t is an array type,
 
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of value
+       But the layout of int64# must be a value layout
          because it's the element type for an array operation with an opaque
          array type.
 |}]
@@ -81,7 +81,7 @@ Error: This array operation cannot tell whether int64# t is an array type,
 
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of value
+       But the layout of int64# must be a value layout
          because it's the element type for an array operation with an opaque
          array type.
 |}]
@@ -104,7 +104,7 @@ Error: This array operation cannot tell whether int64# t is an array type,
 
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of value
+       But the layout of int64# must be a value layout
          because it's the element type for an array operation with an opaque
          array type.
 |}]
@@ -126,7 +126,7 @@ Error: This array operation cannot tell whether int64# t is an array type,
 
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of value
+       But the layout of int64# must be a value layout
          because it's the element type for an array operation with an opaque
          array type.
 |}]
@@ -179,7 +179,7 @@ Error: This array operation cannot tell whether M.t is an array type,
 
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
-       But the layout of int64# must be a sublayout of value
+       But the layout of int64# must be a value layout
          because it's the element type for an array operation with an opaque
          array type.
 |}]

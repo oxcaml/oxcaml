@@ -1342,24 +1342,24 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
               Arg (
                 if not optional || Btype.is_optional l' then
                   let arg = Typecore.type_argument val_env sarg ty ty0 in
-                  arg, Jkind.Sort.value
+                  arg, Jkind.Sort.scannable
                 else
                   Typecore.type_option_some val_env sarg ty ty0,
                   (* CR layouts v5: Change the sort when options can hold
                      non-values. *)
-                  Jkind.Sort.value
+                  Jkind.Sort.scannable
               )
             in
             let eliminate_optional_arg () =
               Arg (Typecore.type_option_none val_env ty0 Location.none,
                    (* CR layouts v5: Change the sort when options can hold
                       non-values. *)
-                   Jkind.Sort.value
+                   Jkind.Sort.scannable
                   )
             in
             let eliminate_position_arg () =
               let arg = Typecore.src_pos (Location.ghostify scl.pcl_loc) [] val_env in
-              Arg (arg, Jkind.Sort.value)
+              Arg (arg, Jkind.Sort.scannable)
             in
             let remaining_sargs, arg =
               if ignore_labels then begin
@@ -1405,8 +1405,8 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                       let mode_closure = Mode.Alloc.disallow_left Mode.Alloc.legacy in
                       let mode_arg = Mode.Alloc.disallow_right Mode.Alloc.legacy in
                       let mode_ret = Mode.Alloc.disallow_right Mode.Alloc.legacy in
-                      let sort_arg = Jkind.Sort.value in
-                      let sort_ret = Jkind.Sort.value in
+                      let sort_arg = Jkind.Sort.scannable in
+                      let sort_ret = Jkind.Sort.scannable in
                       Omitted { mode_closure; mode_arg; mode_ret; sort_arg;
                                 sort_ret }
                     end
@@ -1450,7 +1450,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
              List.iter
                (fun (loc, mode, sort) ->
                   Typecore.escape ~loc ~env:val_env ~reason:Other mode;
-                  if not (Jkind.Sort.(equate sort value))
+                  if not (Jkind.Sort.(equate sort scannable))
                   then
                     raise (Error(loc, met_env,
                                  Non_value_let_binding (Ident.name id, sort)))
