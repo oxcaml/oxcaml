@@ -5,7 +5,7 @@
          : int64 =
    cont k1 (0L)
  in
- let code size(10)
+ let code inline(never) size(10)
        test_0 (u : imm tagged, a, b)
          my_closure _region _ghost_region my_depth
          -> k1 * k2

@@ -14,7 +14,7 @@
  in
  let $camlPartial_app_kind_check_classic__s2 = closure partial_f_2 @partial_f
  in
- let code size(1)
+ let code inline(never) size(1)
        test_0 (u : imm tagged, a, b)
          my_closure _region _ghost_region my_depth
          -> k1 * k2
