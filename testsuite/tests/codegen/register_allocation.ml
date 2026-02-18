@@ -1,5 +1,6 @@
 (* TEST
- flags += " -O3 -cfg-prologue-shrink-wrap -regalloc-param SPLIT_AROUND_LOOPS:on";
+ flags += " -O3 -cfg-prologue-shrink-wrap";
+ flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc cfg";
  flags += " -extension-universe upstream_compatible";
  include stdlib_upstream_compatible;
@@ -89,7 +90,7 @@ useless_movs:
 |}]
 
 
-(* CR ttebbi: This could benefit from calle-save registers. Also, we are using
+(* CR ttebbi: This could benefit from callee-save registers. Also, we are using
     two stack slots when we could do with one.
 *)
 let f x =
@@ -149,7 +150,7 @@ spill_in_loop.g:
   ret
 |}]
 
-(* CR ttebbi: The movq is unncecessary if incq was replaced with with lea. *)
+(* CR ttebbi: The movq is unnecessary if incq was replaced with lea. *)
 let f a b c = if a > 10 then b - c else a - b
 [%%expect_asm X86_64{|
 f:
@@ -173,7 +174,7 @@ f:
     the boxed version in a callee-saved register is unnecessary.
 *)
 type t = { mutable unboxed : float }
-let spill_xmm_on_caml_modify (a: float) (t: t) r =
+let spill_xmm_on_caml_modify (a : float) (t : t) r =
   let b = a +. 1. in
   t.unboxed <- b;
   r := a;
@@ -207,7 +208,7 @@ spill_xmm_on_caml_modify:
 (* CR ttebbi: The register allocator puts a bunch of loads in the beginning
     of the function, even though they are unnecessary on most paths.
 *)
-let unnecessary_moves (a: int) (b: int) (c: int) (d: int) f =
+let unnecessary_moves (a : int) (b : int) (c : int) (d : int) f =
   let x = a + b in
   if a < b then a else if c < d then (f b; x) else x
 ;;
@@ -241,7 +242,7 @@ unnecessary_moves:
 (* CR ttebbi: Moving the addition to after the call causes two spills instead
     of one. `movq  %rdi, %rbx` is also unnecessary.
 *)
-let spill_one_or_two (a: int) (b: int) f =
+let spill_one_or_two (a : int) (b : int) f =
   let x = a + b in f (); x
 ;;
 [%%expect_asm X86_64{|

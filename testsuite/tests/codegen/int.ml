@@ -125,7 +125,7 @@ rem:
 (* CR ttebbi: This could be:
     movq  %rax, %rbx
     and   $3, %rax
-    cmpq  $0, $rbx
+    cmpq  $0, %rbx
     leaq  -4(%rax), %rbx
     cmovgq %rax, %rcx
     ret
@@ -246,7 +246,7 @@ shift_right_logical:
 
 
 (* CR ttebbi: There is no need to repeat compq. *)
-let compare (x: int) (y: int) = compare x y
+let compare (x : int) (y : int) = compare x y
 [%%expect_asm X86_64{|
 compare:
   movq  %rax, %rdi
@@ -262,7 +262,7 @@ compare:
 |}]
 
 
-let equal (x: int) (y: int) = x = y
+let equal (x : int) (y : int) = x = y
 [%%expect_asm X86_64{|
 equal:
   cmpq  %rbx, %rax
@@ -274,7 +274,8 @@ equal:
 
 
 (* CR ttebbi: This is very inefficient, should be like `equal`. *)
-let equal_using_compare (x: int) (y: int) = Stdlib.compare x y = 0
+let equal_using_compare (x : int) (y : int) =
+  Stdlib.compare x y = 0
 [%%expect_asm X86_64{|
 equal_using_compare:
   movq  %rax, %rdi
@@ -295,7 +296,7 @@ equal_using_compare:
 
 
 (* CR ttebbi: This should be branchfree. *)
-let min (x: int) (y: int) = min x y
+let min (x : int) (y : int) = min x y
 [%%expect_asm X86_64{|
 min:
   movq  %rax, %rdi
@@ -309,7 +310,7 @@ min:
 |}]
 
 (* CR ttebbi: This should be branchfree. *)
-let max (x: int) (y: int) = max x y
+let max (x : int) (y : int) = max x y
 [%%expect_asm X86_64{|
 max:
   movq  %rax, %rdi

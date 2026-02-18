@@ -125,7 +125,7 @@ f:
 
 
 (* CR ttebbi: The two branches end up equivalent and could be merged. *)
-let inline_identical x g =
+let inline_identical x =
   let f () = x + 1 in
   if x > 0 then let _ = f() in f() else f()
 [%%expect_asm X86_64{|

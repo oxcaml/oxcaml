@@ -91,8 +91,9 @@ of_float:
   ret
 |}]
 
-(* CR ttebbi: This function only needs a stack for calling the GC, so we should avoid
-   adjusting %rsp in the common case. *)
+(* CR ttebbi: This function only needs a stack for calling
+   the GC, so we should avoid adjusting %rsp in the common
+   case. *)
 let to_float x = Float_u.to_float x
 [%%expect_asm X86_64{|
 to_float:
@@ -113,7 +114,8 @@ external float_equal :
   (float[@local_opt]) -> (float[@local_opt]) -> bool @@ portable = "%equal"
 
 
-(* CR ttebbi: We could save the neg instruction by negating the vcmpsd predicate. *)
+(* CR ttebbi: We could save the neg instruction by negating
+   the vcmpsd predicate. *)
 let equal x y = float_equal (Float_u.to_float x) (Float_u.to_float y)
 [%%expect_asm X86_64{|
 equal:
@@ -127,7 +129,8 @@ equal:
   ret
 |}]
 
-(* CR ttebbi: excessive amount of code, calls to caml_signbit, unnecessary spilling *)
+(* CR ttebbi: excessive amount of code, calls to
+   caml_signbit, unnecessary spilling *)
 let min x y = Float_u.min x y
 [%%expect_asm X86_64{|
 min:
@@ -170,7 +173,8 @@ min:
   ret
 |}]
 
-(* CR ttebbi: excessive amount of code, calls to caml_signbit, unnecessary spilling *)
+(* CR ttebbi: excessive amount of code, calls to
+   caml_signbit, unnecessary spilling *)
 let max x y = Float_u.max x y
 [%%expect_asm X86_64{|
 max:
@@ -213,7 +217,8 @@ max:
   ret
 |}]
 
-(* CR ttebbi: excessive amount of code, calls to caml_signbit, unnecessary spilling *)
+(* CR ttebbi: excessive amount of code, calls to
+   caml_signbit, unnecessary spilling *)
 let min_num x y = Float_u.min_num x y
 [%%expect_asm X86_64{|
 min_num:
@@ -256,7 +261,8 @@ min_num:
   ret
 |}]
 
-(* CR ttebbi: excessive amount of code, calls to caml_signbit, unnecessary spilling *)
+(* CR ttebbi: excessive amount of code, calls to
+   caml_signbit, unnecessary spilling *)
 let max_num x y = Float_u.max_num x y
 [%%expect_asm X86_64{|
 max_num:
@@ -320,7 +326,7 @@ min_unchecked:
       - useless spill and hence no need for a frame
       - could negate vcmpsd predicate to replace (~res)*2+1 with res*2+3
 *)
-let is_nan (x: Float_u.t) = Float.is_nan (Float_u.to_float x)
+let is_nan (x : Float_u.t) = Float.is_nan (Float_u.to_float x)
 [%%expect_asm X86_64{|
 is_nan:
   subq  $8, %rsp
@@ -338,7 +344,7 @@ is_nan:
       - useless spill and hence no need for a frame
       - could negate vcmpsd predicate to replace (~res)*2+1 with res*2+3
 *)
-let is_finite (x: Float_u.t) =
+let is_finite (x : Float_u.t) =
   let equal x y = float_equal (Float_u.to_float x) (Float_u.to_float y) in
   let zero_or_nan = Float_u.sub x x in
   equal zero_or_nan zero_or_nan
@@ -358,12 +364,13 @@ is_finite:
 
 
 (* CR ttebbi:
-    - OCaml's Float.compare is difficult to implement, but we could at least
-      compose the bits within xmm registers.
+   - OCaml's Float.compare is difficult to implement,
+     but we could at least compose the bits within xmm
+     registers.
    - Plenty of useless spills
 *)
-let compare (x: Float_u.t) (y: Float_u.t) : int =
-   Float_u.compare x y
+let compare (x : Float_u.t) (y : Float_u.t) : int =
+  Float_u.compare x y
 ;;
 [%%expect_asm X86_64{|
 compare:
@@ -392,11 +399,11 @@ compare:
   ret
 |}]
 
+(* CR ttebbi: We do not optimize the case where we check
+   for one value of Float.compare *)
 
-
-(* CR ttebbi: We do not optimize the case where we check for one value of Float.compare *)
-let compare_equal (x: Float_u.t) (y: Float_u.t) : bool =
-   Float_u.compare x y == 0
+let compare_equal (x : Float_u.t) (y : Float_u.t) : bool =
+  Float_u.compare x y == 0
 ;;
 [%%expect_asm X86_64{|
 compare_equal:

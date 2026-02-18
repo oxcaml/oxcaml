@@ -1,16 +1,22 @@
 (* TEST
-  flags += " -O3 -extension-universe upstream_compatible";
-  include stdlib_upstream_compatible;
-  expect.opt;
+ flags += " -O3 -extension-universe upstream_compatible";
+ include stdlib_upstream_compatible;
+ only-default-codegen;
+ expect.opt;
 *)
 
 open Stdlib_upstream_compatible
 
 
-(* CR ttebbi: The move instruction encoding with immediates is quite big (7-8 bytes).
-    It would be better to put the constant into a register.
-*)
-type t = { mutable a : int ; mutable b : int ; mutable c : int ; mutable d : int }
+(* CR ttebbi: The move instruction encoding with immediates
+   is quite big (7-8 bytes). It would be better to put the
+   constant into a register. *)
+type t =
+  { mutable a : int
+  ; mutable b : int
+  ; mutable c : int
+  ; mutable d : int
+  }
 let initialize_t t : unit =
   t.a <- 0;
   t.b <- 0;
@@ -47,7 +53,8 @@ f:
 |}]
 
 (* CR ttebbi: We could merge the and and test instructions *)
-let do_intersect t1 t2 = Int64_u.(if equal (logand t1 t2) #0L then #100L else #200L)
+let do_intersect t1 t2 =
+  Int64_u.(if equal (logand t1 t2) #0L then #100L else #200L)
 [%%expect_asm X86_64{|
 do_intersect:
   andq  %rbx, %rax
@@ -61,8 +68,9 @@ do_intersect:
 |}]
 
 
-(* CR ttebbi: We materialize comparison result bits despite only using them for a single
-    branch. Also, the `_ -> 0` case is duplicated for no good reason. *)
+(* CR ttebbi: We materialize comparison result bits despite
+   only using them for a single branch. Also, the `_ -> 0`
+   case is duplicated for no good reason. *)
 let combine_comparisons r f =
   match !r > 5, !r < 20 with
   | true, true -> !r
@@ -145,7 +153,8 @@ min32:
 |}]
 
 
-(* CR ttebbi: `leaq  8(%r15), %rbx` could be merged with the subsequent addition. *)
+(* CR ttebbi: `leaq  8(%r15), %rbx` could be merged with
+   the subsequent addition. *)
 let two_element_list x = [x; x]
 [%%expect_asm X86_64{|
 two_element_list:
@@ -170,7 +179,10 @@ two_element_list:
 
 
 (* CR ttebbi: This could all be folded away. *)
-let constant_folding (x: int) = if x < x then 1 + 2 else if x - x = 0 then 3 else 4
+let constant_folding (x : int) =
+  if x < x then 1 + 2
+  else if x - x = 0 then 3
+  else 4
 [%%expect_asm X86_64{|
 constant_folding:
   cmpq  %rax, %rax
