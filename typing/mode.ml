@@ -3302,6 +3302,20 @@ module Lattices_mono = struct
     | Imply_const_and_core _ -> Compose (Simple sm0, And_min_with (ax1, m1))
     | Compose _ -> Compose (Simple sm0, And_min_with (ax1, m1))
 
+  let refute_compose_and_with : type a b c q0 q1 d.
+      c obj ->
+      (c, q0) Axis.t -> (b, q0, d) simple_morph ->
+      (b, q1) Axis.t ->
+      (b, c, d) morph -> (a, b, d) morph ->
+      (a, c, d) morph =
+   fun dst ax0 m0' ax1 m0 m1 ->
+    match ax0, m0', ax1, dst with
+    | _, (Core (Locality_restricted _)), _, _ -> .
+    | _, (Core_and_meet_const (_, Locality_restricted _)), _, _ -> .
+    | _, (Imply_const_and_core (Locality_restricted _, _)), _, _ -> .
+    | _, (Compose _), _, _ -> Compose (m0, m1)
+    | _, _, _, _ -> .
+
   let compose : type a b c d.
       c obj -> (b, c, d) morph -> (a, b, d) morph -> (a, c, d) morph =
    fun dst m0 m1 ->
@@ -3403,12 +3417,20 @@ module Lattices_mono = struct
     | (_ as m0), Const (obj1, c1) -> Const (obj1, apply dst m0 c1)
     | (_ as m0), Compose (m1, m2) -> Compose (Compose (m0, m1), m2)
     | Compose (m0, m1), (_ as m2) -> Compose (Compose (m0, m1), m2)
-    | Proj_and (_m0, _ax0, _obj0), Proj_and (_m1, _ax1, _obj1) ->
-      failwith "should be refuted"
-    | And_max_with _, And_max_with _ -> failwith "should be refuted"
-    | And_max_with _, And_min_with _ -> failwith "should be refuted"
-    | And_min_with _, And_max_with _ -> failwith "should be refuted"
-    | And_min_with _, And_min_with _ -> failwith "should be refuted"
+    (* The remaining cases are unreachable by looking at the axes and objects *)
+    | _, Proj_and (Core (Locality_restricted _), _, _) -> .
+    | _, Proj_and (Core_and_meet_const (_, Locality_restricted _), _, _) -> .
+    | _, Proj_and (Imply_const_and_core (Locality_restricted _, _), _, _) -> .
+    | _, Proj_and (Compose _, _, _) -> Compose (m0, m1)
+    | And_max_with (ax0, m0'), And_max_with (ax1, _) ->
+      refute_compose_and_with dst ax0 m0' ax1 m0 m1
+    | And_max_with (ax0, m0'), And_min_with (ax1, _) ->
+      refute_compose_and_with dst ax0 m0' ax1 m0 m1
+    | And_min_with (ax0, m0'), And_max_with (ax1, _) ->
+      refute_compose_and_with dst ax0 m0' ax1 m0 m1
+    | And_min_with (ax0, m0'), And_min_with (ax1, _) ->
+      refute_compose_and_with dst ax0 m0' ax1 m0 m1
+    | _, _ -> .
 
   module For_hint = struct
     (** Describes the portion of the input that's responsible for a portion of
