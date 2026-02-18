@@ -121,6 +121,10 @@ let eq_locality_mode a b =
   | Alloc_heap, Alloc_local -> false
   | Alloc_local, Alloc_heap -> false
 
+type staticity =
+  | Static
+  | Dynamic
+
 type initialization_or_assignment =
   | Assignment of modify_mode
   | Heap_initialization
@@ -148,7 +152,7 @@ type primitive =
   | Pbytes_of_string
   | Pignore
     (* Globals *)
-  | Pgetglobal of Compilation_unit.t
+  | Pgetglobal of Compilation_unit.t * staticity
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
@@ -1783,42 +1787,42 @@ let transl_module_representation repr =
 
 (* Translate an access path *)
 
-let rec transl_address loc = function
-  | Env.Aunit cu -> Lprim(Pgetglobal cu, [], loc)
+let rec transl_address loc staticity = function
+  | Env.Aunit cu -> Lprim(Pgetglobal (cu, staticity), [], loc)
   | Env.Alocal id ->
       if Ident.is_predef id
       then Lprim (Pgetpredef id, [], loc)
       else Lvar id
   | Env.Adot(addr, module_repr, pos) ->
       let module_repr = transl_module_representation module_repr in
-      Lprim(mod_field pos module_repr, [transl_address loc addr], loc)
+      Lprim(mod_field pos module_repr, [transl_address loc staticity addr], loc)
 
-let transl_path find loc env path =
+let transl_path find loc env path staticity =
   match find path env with
   | exception Not_found ->
       fatal_error ("Cannot find address for: " ^ (Path.name path))
-  | addr -> transl_address loc addr
+  | addr -> transl_address loc staticity addr
 
 (* Translation of identifiers *)
 
-let transl_module_path loc env path =
-  transl_path Env.find_module_address loc env path
+let transl_module_path loc env path staticity =
+  transl_path Env.find_module_address loc env path staticity
 
-let transl_value_path loc env path =
-  transl_path Env.find_value_address loc env path
+let transl_value_path loc env path staticity =
+  transl_path Env.find_value_address loc env path staticity
 
 let transl_extension_path loc env path =
-  transl_path Env.find_constructor_address loc env path
+  transl_path Env.find_constructor_address loc env path Dynamic
 
 let transl_class_path loc env path =
-  transl_path Env.find_class_address loc env path
+  transl_path Env.find_class_address loc env path Dynamic
 
 let transl_prim mod_name name =
   let pers = Ident.create_persistent mod_name in
   let env = Env.add_persistent_structure pers Env.empty in
   let lid = Longident.Ldot (Longident.Lident mod_name, name) in
   match Env.find_value_by_name_lazy lid env with
-  | path, _ -> transl_value_path Loc_unknown env path
+  | path, _ -> transl_value_path Loc_unknown env path Dynamic
   | exception Not_found ->
       fatal_error ("Primitive " ^ name ^ " not found.")
 

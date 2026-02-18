@@ -2103,7 +2103,7 @@ let get_pat_args_lazy p rem =
 let prim_obj_tag =
   Lambda.simple_prim_on_values ~name:"caml_obj_tag" ~arity:1 ~alloc:false
 
-let get_mod_field modname field =
+let get_mod_field modname field staticity =
   lazy
     (let mod_ident = Ident.create_persistent modname in
      let env =
@@ -2117,12 +2117,13 @@ let get_mod_field modname field =
      | path, _ ->
          (* Loc_unknown is appropriate here: this references a compiler-internal
             primitive with no corresponding user source location. *)
-         transl_value_path Scoped_location.Loc_unknown env path
+         transl_value_path Scoped_location.Loc_unknown env path staticity
     )
 
-let code_force_lazy_block = get_mod_field "CamlinternalLazy" "force_lazy_block"
+let code_force_lazy_block =
+  get_mod_field "CamlinternalLazy" "force_lazy_block" Dynamic
 
-let code_force_lazy = get_mod_field "CamlinternalLazy" "force_gen"
+let code_force_lazy = get_mod_field "CamlinternalLazy" "force_gen" Dynamic
 
 (* inline_lazy_force inlines the beginning of the code of Lazy.force. When
    the value argument is tagged as:

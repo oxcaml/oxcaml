@@ -58,6 +58,10 @@ val modify_heap : modify_mode
 
 val modify_maybe_stack : modify_mode
 
+type staticity =
+  | Static
+  | Dynamic
+
 type initialization_or_assignment =
   (* [Assignment Alloc_local] is a mutation of a block that may be heap or local.
      [Assignment Alloc_heap] is a mutation of a block that's definitely heap. *)
@@ -123,7 +127,7 @@ type primitive =
   | Pbytes_of_string
   | Pignore
   (* Globals *)
-  | Pgetglobal of Compilation_unit.t
+  | Pgetglobal of Compilation_unit.t * staticity
   | Pgetpredef of Ident.t
   (* Operations on heap blocks *)
   | Pmakeblock of int * mutable_flag * block_shape * locality_mode
@@ -1241,12 +1245,17 @@ val transl_prim: string -> string -> lambda
 
 val free_variables: lambda -> Ident.Set.t
 
-val transl_module_path: scoped_location -> Env.t -> Path.t -> lambda
-val transl_value_path: scoped_location -> Env.t -> Path.t -> lambda
-val transl_extension_path: scoped_location -> Env.t -> Path.t -> lambda
-val transl_class_path: scoped_location -> Env.t -> Path.t -> lambda
+val transl_module_path :
+  scoped_location -> Env.t -> Path.t -> staticity -> lambda
+val transl_value_path :
+  scoped_location -> Env.t -> Path.t -> staticity -> lambda
+val transl_extension_path :
+  scoped_location -> Env.t -> Path.t -> lambda
+val transl_class_path :
+  scoped_location -> Env.t -> Path.t -> lambda
 
-val transl_address : scoped_location -> Persistent_env.address -> lambda
+val transl_address :
+  scoped_location -> staticity -> Persistent_env.address -> lambda
 
 val transl_mixed_product_shape : Types.mixed_product_shape -> mixed_block_shape
 

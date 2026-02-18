@@ -917,7 +917,7 @@ let transform_primitive0 env (prim : L.primitive) args loc =
   | Pignore, [arg] ->
     let result = L.Lconst (Const_base (Const_int 0)) in
     Transformed (L.Lsequence (arg, result))
-  | Pfield _, [L.Lprim (Pgetglobal cu, [], _)]
+  | Pfield _, [L.Lprim (Pgetglobal (cu, _), [], _)]
     when Compilation_unit.equal cu (Env.current_unit env) ->
     Misc.fatal_error
       "[Pfield (Pgetglobal ...)] for the current compilation unit is forbidden \

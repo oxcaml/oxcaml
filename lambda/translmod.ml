@@ -132,7 +132,7 @@ let rec apply_coercion loc strict restr arg =
         ~poly_sort:pc_poly_sort
         None
   | Tcoerce_alias (env, path, cc) ->
-      let lam = transl_module_path loc env path in
+      let lam = transl_module_path loc env path Dynamic in
       name_lambda strict arg Lambda.layout_module
         (fun _ -> apply_coercion loc Alias cc lam)
 
@@ -614,7 +614,7 @@ and transl_module ~scopes cc rootpath mexp =
   match mexp.mod_desc with
   | Tmod_ident (path,_) ->
       apply_coercion loc Strict cc
-        (transl_module_path loc mexp.mod_env path)
+        (transl_module_path loc mexp.mod_env path Dynamic)
   | Tmod_structure str ->
       let lam, _repr = transl_struct ~scopes loc [] cc rootpath str in
       lam
@@ -985,7 +985,7 @@ let scan_used_globals lam =
   let rec scan lam =
     Lambda.iter_head_constructor scan lam;
     match lam with
-      Lprim ((Pgetglobal cu), _, _) ->
+      Lprim ((Pgetglobal (cu, _)), _, _) ->
         globals := Compilation_unit.Set.add cu !globals
     | _ -> ()
   in
@@ -1173,7 +1173,7 @@ let toploop_getvalue id =
   Lapply{
     ap_loc=Loc_unknown;
     ap_func=Lprim(Pfield (toploop_getvalue_pos, Pointer, Reads_agree),
-                  [Lprim(Pgetglobal toploop_unit, [], Loc_unknown)],
+                  [Lprim(Pgetglobal (toploop_unit, Dynamic), [], Loc_unknown)],
                   Loc_unknown);
     ap_args=[Lconst(Const_base(
       Const_string (toplevel_name id, Location.none, None)))];
@@ -1193,7 +1193,7 @@ let toploop_setvalue id lam =
   Lapply{
     ap_loc=Loc_unknown;
     ap_func=Lprim(Pfield (toploop_setvalue_pos, Pointer, Reads_agree),
-                  [Lprim(Pgetglobal toploop_unit, [], Loc_unknown)],
+                  [Lprim(Pgetglobal (toploop_unit, Dynamic), [], Loc_unknown)],
                   Loc_unknown);
     ap_args=
       [Lconst(Const_base(
@@ -1361,7 +1361,7 @@ let transl_toplevel_definition str =
 
 let get_component = function
     None -> Lconst const_unit
-  | Some id -> Lprim(Pgetglobal id, [], Loc_unknown)
+  | Some id -> Lprim(Pgetglobal (id, Dynamic), [], Loc_unknown)
 
 let () =
   match Jkind.Sort.Const.for_module with
@@ -1405,10 +1405,10 @@ let transl_runtime_arg arg =
   match arg with
   | Argument_block { ra_unit; ra_field_idx; ra_main_repr } ->
       Lprim (mod_field ra_field_idx ra_main_repr,
-             [Lprim (Pgetglobal ra_unit, [], Loc_unknown)],
+             [Lprim (Pgetglobal (ra_unit, Dynamic), [], Loc_unknown)],
              Loc_unknown)
   | Main_module_block cu ->
-      Lprim (Pgetglobal cu, [], Loc_unknown)
+      Lprim (Pgetglobal (cu, Dynamic), [], Loc_unknown)
   | Unit ->
       lambda_unit
 
@@ -1423,7 +1423,7 @@ let transl_instance_impl
     (* Any parameterised module has a block with exactly one field, namely the
        instantiating functor (see [Lambda.main_module_block_format]) *)
     Lprim (mod_field 0 (Module_value_only { field_count = 1 }),
-           [Lprim (Pgetglobal base_compilation_unit, [], Loc_unknown)],
+           [Lprim (Pgetglobal (base_compilation_unit, Dynamic), [], Loc_unknown)],
            Loc_unknown)
   in
   let runtime_args_lam = List.map transl_runtime_arg runtime_args in
