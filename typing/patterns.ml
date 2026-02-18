@@ -95,9 +95,12 @@ module General = struct
   let view_desc = function
     | Tpat_any ->
        `Any
-    | Tpat_var (id, str, uid, sort, mode) ->
+    | Tpat_var { var_id = id; var_name = str; var_uid = uid; var_sort = sort;
+                 var_mode = mode } ->
        `Var (id, str, uid, sort, mode)
-    | Tpat_alias (p, id, str, uid, sort, mode, ty) ->
+    | Tpat_alias { alias_pattern = p; alias_id = id; alias_name = str;
+                   alias_uid = uid; alias_sort = sort; alias_mode = mode;
+                   alias_type_expr = ty } ->
        `Alias (p, id, str, uid, sort, mode, ty)
     | Tpat_constant cst ->
        `Constant cst
@@ -126,9 +129,13 @@ module General = struct
 
   let erase_desc = function
     | `Any -> Tpat_any
-    | `Var (id, str, uid, sort, mode) -> Tpat_var (id, str, uid, sort, mode)
+    | `Var (id, str, uid, sort, mode) ->
+       Tpat_var { var_id = id; var_name = str; var_uid = uid; var_sort = sort;
+                  var_mode = mode }
     | `Alias (p, id, str, uid, sort, mode, ty) ->
-       Tpat_alias (p, id, str, uid, sort, mode, ty)
+       Tpat_alias { alias_pattern = p; alias_id = id; alias_name = str;
+                    alias_uid = uid; alias_sort = sort; alias_mode = mode;
+                    alias_type_expr = ty }
     | `Constant cst -> Tpat_constant cst
     | `Unboxed_unit -> Tpat_unboxed_unit
     | `Unboxed_bool b -> Tpat_unboxed_bool b

@@ -2095,8 +2095,9 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       let ext1, uf1 = pattern_match_single pat1 paths in
       Ienv.Extension.disjunct ext0 ext1, UF.choose uf0 uf1
     | Tpat_any -> Ienv.Extension.empty, UF.unused
-    | Tpat_var (id, _, _, _, _) -> Ienv.Extension.singleton id paths, UF.unused
-    | Tpat_alias (pat', id, _, _, _, _, _) ->
+    | Tpat_var { var_id = id; _ } ->
+      Ienv.Extension.singleton id paths, UF.unused
+    | Tpat_alias { alias_pattern = pat'; alias_id = id; _ } ->
       let ext0 = Ienv.Extension.singleton id paths in
       let ext1, uf = pattern_match_single pat' paths in
       Ienv.Extension.conjunct ext0 ext1, uf

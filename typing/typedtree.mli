@@ -209,14 +209,23 @@ and 'k pattern_desc =
   (* value patterns *)
   | Tpat_any : value pattern_desc
         (** _ *)
-  | Tpat_var :
-      Ident.t * string loc * Uid.t * Jkind_types.Sort.t * Mode.Value.l ->
-      value pattern_desc
+  | Tpat_var : {
+      var_id: Ident.t;
+      var_name: string loc;
+      var_uid: Uid.t;
+      var_sort: Jkind_types.Sort.t;
+      var_mode: Mode.Value.l;
+    } -> value pattern_desc
         (** x *)
-  | Tpat_alias :
-      value general_pattern * Ident.t * string loc * Uid.t * Jkind_types.Sort.t
-      * Mode.Value.l * Types.type_expr
-        -> value pattern_desc
+  | Tpat_alias : {
+      alias_pattern: value general_pattern;
+      alias_id: Ident.t;
+      alias_name: string loc;
+      alias_uid: Uid.t;
+      alias_sort: Jkind_types.Sort.t;
+      alias_mode: Mode.Value.l;
+      alias_type_expr: Types.type_expr;
+    } -> value pattern_desc
         (** P as a *)
   | Tpat_constant : constant -> value pattern_desc
         (** 1, 'a', "true", 1.0, 1l, 1L, 1n *)

@@ -221,9 +221,13 @@ end = struct
     | Tpat_any
     | Tpat_var _ ->
         p
-    | Tpat_alias (q, id, s, uid, sort, mode, ty) ->
+    | Tpat_alias { alias_pattern; alias_id; alias_name;
+                   alias_uid; alias_sort; alias_mode;
+                   alias_type_expr } ->
         { p with pat_desc =
-            Tpat_alias (simpl_under_orpat q, id, s, uid, sort, mode, ty) }
+            Tpat_alias { alias_pattern = simpl_under_orpat alias_pattern;
+                        alias_id; alias_name; alias_uid; alias_sort;
+                        alias_mode; alias_type_expr } }
     | Tpat_or (p1, p2, o) ->
         let p1, p2 = (simpl_under_orpat p1, simpl_under_orpat p2) in
         if le_pat p1 p2 then
@@ -664,7 +668,7 @@ let rec flatten_pat_line size p k =
   | Tpat_tuple args -> (List.map snd args) :: k
   | Tpat_or (p1, p2, _) ->
       flatten_pat_line size p1 (flatten_pat_line size p2 k)
-  | Tpat_alias (p, _, _, _, _, _, _) ->
+  | Tpat_alias { alias_pattern = p; _ } ->
       (* Note: we are only called from flatten_matrix,
          which is itself only ever used in places
          where variables do not matter (default environments,
@@ -1302,7 +1306,7 @@ let rec omega_like p =
   | Tpat_any
   | Tpat_var _ ->
       true
-  | Tpat_alias (p, _, _, _, _, _, _) -> omega_like p
+  | Tpat_alias { alias_pattern = p; _ } -> omega_like p
   | Tpat_or (p1, p2, _) -> omega_like p1 || omega_like p2
   | _ -> false
 
@@ -3809,8 +3813,8 @@ let rec comp_match_handlers layout comp_fun partial ctx first_match next_matches
 let rec name_pattern default = function
   | ((pat, _), _) :: rem -> (
       match pat.pat_desc with
-      | Tpat_var (id, _, uid, _, _) -> id, uid
-      | Tpat_alias (_, id, _, uid, _, _, _) -> id, uid
+      | Tpat_var { var_id = id; var_uid = uid; _ } -> id, uid
+      | Tpat_alias { alias_id = id; alias_uid = uid; _ } -> id, uid
       | _ -> name_pattern default rem
     )
   | _ -> Ident.create_local default, Lambda.debug_uid_none
@@ -4378,8 +4382,9 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       (* This eliminates a useless variable (and stack slot in bytecode)
          for "let _ = ...". See #6865. *)
       Lsequence (param, body)
-  | Tpat_var (id, _, duid, _, _)
-  | Tpat_alias ({ pat_desc = Tpat_any }, id, _, duid, _, _, _) ->
+  | Tpat_var { var_id = id; var_uid = duid; _ }
+  | Tpat_alias { alias_pattern = { pat_desc = Tpat_any }; alias_id = id;
+                 alias_uid = duid; _ } ->
       (* Fast path, and keep track of simple bindings to unboxable numbers.
 
          Note: the (Tpat_alias (Tpat_any, id)) case needs to be

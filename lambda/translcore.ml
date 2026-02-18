@@ -299,8 +299,8 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
 
 let rec iter_exn_names f pat =
   match pat.pat_desc with
-  | Tpat_var (id, _, _, _, _) -> f id
-  | Tpat_alias (p, id, _, _, _, _, _) ->
+  | Tpat_var { var_id = id; _ } -> f id
+  | Tpat_alias { alias_pattern = p; alias_id = id; _ } ->
       f id;
       iter_exn_names f p
   | _ -> ()
@@ -2033,7 +2033,7 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
       let idlist =
         List.map
           (fun {vb_pat=pat} -> match pat.pat_desc with
-              Tpat_var (id,_,uid,_,_) -> id, uid
+              Tpat_var { var_id = id; var_uid = uid; _ } -> id, uid
             | _ -> assert false)
         pat_expr_list in
       let transl_case

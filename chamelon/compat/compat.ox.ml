@@ -320,12 +320,26 @@ type tpat_var_identifier = Jkind.Sort.t * Value.l
 
 let mkTpat_var ?id:(sort, mode = dummy_value_sort, dummy_value_mode)
     (ident, name) =
-  Tpat_var (ident, name, Uid.internal_not_actually_unique, sort, mode)
+  Tpat_var
+    { var_id = ident;
+      var_name = name;
+      var_uid = Uid.internal_not_actually_unique;
+      var_sort = sort;
+      var_mode = mode
+    }
 
 type tpat_alias_identifier = Jkind.Sort.t * Value.l * Types.type_expr
 
 let mkTpat_alias ~id:(sort, mode, ty) (p, ident, name) =
-  Tpat_alias (p, ident, name, Uid.internal_not_actually_unique, sort, mode, ty)
+  Tpat_alias
+    { alias_pattern = p;
+      alias_id = ident;
+      alias_name = name;
+      alias_uid = Uid.internal_not_actually_unique;
+      alias_sort = sort;
+      alias_mode = mode;
+      alias_type_expr = ty
+    }
 
 type tpat_array_identifier = mutability * Jkind.sort
 
@@ -365,9 +379,19 @@ type 'a matched_pattern_desc =
 
 let view_tpat (type a) (p : a pattern_desc) : a matched_pattern_desc =
   match p with
-  | Tpat_var (ident, name, _uid, sort, mode) ->
+  | Tpat_var
+      { var_id = ident; var_name = name; var_sort = sort; var_mode = mode; _ }
+    ->
     Tpat_var (ident, name, (sort, mode))
-  | Tpat_alias (p, ident, name, _uid, sort, mode, ty) ->
+  | Tpat_alias
+      { alias_pattern = p;
+        alias_id = ident;
+        alias_name = name;
+        alias_sort = sort;
+        alias_mode = mode;
+        alias_type_expr = ty;
+        _
+      } ->
     Tpat_alias (p, ident, name, (sort, mode, ty))
   | Tpat_array (mut, arg_sort, l) -> Tpat_array (l, (mut, arg_sort))
   | Tpat_tuple pats ->
