@@ -1384,18 +1384,18 @@ let message = function
            can't be erased for compatibility with upstream OCaml." id
   | Incompatible_with_upstream (Non_value_sort layout) ->
       msg "External declaration here is not upstream compatible.@ \
-           The only types with non-value layouts allowed are float#,@ \
-           int32#, int64#, and nativeint#.@ Unknown type with layout@ \
-           %s encountered." layout
+           @[The only types with non-value layouts allowed are@ \
+           float#, int32#, int64#, and nativeint#.@ \
+           Unknown type with layout@ %s encountered.@]" layout
   | Incompatible_with_upstream (Unboxed_attribute layout) ->
-      msg "%a attribute must be added to external declaration@ \
+      msg "%a attribute must be added@ to@ external@ declaration@ \
            argument type with layout %s for upstream compatibility."
         Style.inline_code "[@unboxed]" layout
   | Incompatible_with_upstream Immediate_void_variant ->
       msg "This variant is immediate@ \
-           because all its constructors have all-void arguments,@ but after@ \
-           erasure for upstream compatibility, void is no longer zero-width,@ \
-           so it won't be immediate."
+           because all its constructors have all-void arguments,@ \
+           @[but after erasure for upstream compatibility,@ \
+           void is no longer zero-width,@ so it won't be immediate.@]"
   | Incompatible_with_upstream Separability_check ->
       msg "This type relies on OxCaml's extended separability checking@ \
            and would not be accepted by upstream OCaml."
@@ -1406,18 +1406,17 @@ let message = function
            Probe names must be at most 100 characters long."
         Style.inline_code name
   | Zero_alloc_all_hidden_arrow s ->
-      msg "The type of this item is an@ \
-           alias of a function type, but the %a attribute for@ \
-           this signature does not apply to it because its type is not@ \
-           syntactically a function type.@ If it should be checked, use an@ \
-           explicit zero_alloc attribute with an arity.@ If not, use an explicit@ \
-           zero_alloc ignore attribute."
+      msg "The type of this item is an@ alias of a function type,@ \
+           but the %a attribute for@ this signature does not apply to it@ \
+           because its type is not syntactically a function type.@ \
+           @[If it should be checked, use an explicit zero_alloc attribute@ \
+           with an arity.@ If not, use an explicit zero_alloc ignore attribute.@]"
         Style.inline_code (Printf.sprintf "[@@@zero_alloc %s]" s)
   | Unchecked_zero_alloc_attribute ->
       msg "the zero_alloc attribute cannot be checked.@ \
-           The function it is attached to was optimized away.@ \
+           @[The function it is attached to was optimized away.@ \
            You can try to mark this function as %a@ \
-           or move the attribute to the relevant callers of this function."
+           or move the attribute to the relevant callers of this function.@]"
         Style.inline_code "[@inline never]"
   | Unboxing_impossible ->
       msg "This %a attribute cannot be used.@ \
@@ -1427,12 +1426,12 @@ let message = function
       msg "%s is the top-most modifier.@ \
            Modifying by a top element is a no-op." modifier
   | Modal_axis_specified_twice {axis; overriden_by} ->
-      msg "This %s is overriden by %s later." axis overriden_by
+      msg "This %s is overridden by %s later." axis overriden_by
   | Atomic_float_record_boxed ->
-      msg "This record contains atomic@ \
-           float fields, which prevents the float record optimization.@ The@ \
-           fields of this record will be boxed instead of being@ \
-           represented as a flat float array."
+      msg "This record contains atomic float fields,@ \
+           which prevents the float record optimization.@ \
+           @[The fields of this record will be boxed instead of being@ \
+           represented as a flat float array.@]"
   | Implied_attribute { implying; implied } ->
       msg "attribute %a is unused because it is implied by %a"
         Style.inline_code (Printf.sprintf "[@%s]" implied)
