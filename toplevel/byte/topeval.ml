@@ -15,7 +15,7 @@
 
 (* The interactive toplevel loop *)
 
-#18 "toplevel/byte/topeval.ml"
+(* #18 "toplevel/byte/topeval.ml" *)
 
 open Format
 open Misc
@@ -66,12 +66,21 @@ include Topcommon.MakeEvalPrinter(EvalBase)
 
 let may_trace = ref false (* Global lock on tracing *)
 
-let load_lambda ppf lam =
+let load_lambda ppf tlam =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
-  if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
-  let slam = Simplif.simplify_lambda_for_bytecode lam in
-  if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda slam;
-  let blam = Blambda_of_lambda.blambda_of_lambda ~compilation_unit:None slam in
+  if !Clflags.dump_tlambda then fprintf ppf "%a@." Printlambda.lambda tlam;
+  let rawlam =
+    Slambda.eval
+      (fun slam ->
+        if !Clflags.dump_slambda
+        then fprintf ppf "%a@." Printlambda.slambda slam;
+        slam)
+      tlam
+  in
+  if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda rawlam;
+  let lam = Simplif.simplify_lambda_for_bytecode rawlam in
+  if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda lam;
+  let blam = Blambda_of_lambda.blambda_of_lambda ~compilation_unit:None lam in
   if !Clflags.dump_blambda then fprintf ppf "%a@." Printblambda.blambda blam;
   let instrs, can_free = Bytegen.compile_phrase blam in
   if !Clflags.dump_instr then
