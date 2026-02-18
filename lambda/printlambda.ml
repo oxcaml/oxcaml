@@ -1454,9 +1454,16 @@ and slam ppf = function
   | SLproj_runtime value -> fprintf ppf "%a.r" slam value
   | SLtemplate func -> fprintf ppf "(template %a)" slambda_function func
   | SLinstantiate apply -> fprintf ppf "[%a]" slambda_apply apply
-  | SLlet { slet_name; slet_value; slet_body } ->
-    fprintf ppf "@[<hv 2>(let %a =@;<1 2>%a in@ %a)@]"
-      Slambdaident.print slet_name slam slet_value slam slet_body
+  | SLlet _ as slet ->
+    let rec letbody ~sp = function
+    | SLlet { slet_name; slet_value; slet_body} ->
+        if sp then fprintf ppf "@ ";
+        fprintf ppf "@[<2>%a =@ %a@]" Slambdaident.print slet_name slam slet_value;
+        letbody ~sp:true slet_body
+    | e -> e in
+    fprintf ppf "@[<2>(let@ @[<hv 1>(";
+    let expr = letbody ~sp:false slet in
+    fprintf ppf ")@]@ %a)@]" slam expr
 
 and slambda_function ppf { sfun_params; sfun_body } =
   let print_params ppf =
