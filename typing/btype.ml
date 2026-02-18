@@ -2073,11 +2073,21 @@ module Jkind0 = struct
     (* every context where this is used actually wants an [option] *)
     let mk_annot name =
       Some
+<<<<<<< ours
         Parsetree.{
           pjka_loc = Location.none;
           pjka_desc = Pjk_abbreviation { loc = Location.none;
                                          txt = (Lident name) }
         }
+||||||| base
+        Parsetree.
+          { pjkind_loc = Location.none; pjkind_desc = Pjk_abbreviation name }
+=======
+        Parsetree.
+          { pjkind_loc = Location.none;
+            pjkind_desc = Pjk_abbreviation (Location.mknoloc name, [])
+          }
+>>>>>>> theirs
 
     let mark_best (type l r) (t : (l * r) jkind) =
       { (disallow_right t) with quality = Best }

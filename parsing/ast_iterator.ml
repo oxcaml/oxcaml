@@ -865,7 +865,15 @@ let default_iterator =
          this.location this pjka_loc;
          match pjka_desc with
          | Pjk_default -> ()
+<<<<<<< ours
          | Pjk_abbreviation lid -> iter_loc this lid
+||||||| base
+         | Pjk_abbreviation (_ : string) -> ()
+=======
+         | Pjk_abbreviation (abbrev, sa_annot) ->
+            iter_loc this abbrev;
+            List.iter (iter_loc this) sa_annot
+>>>>>>> theirs
          | Pjk_mod (t, mode_list) ->
              this.jkind_annotation this t;
              this.modes this mode_list

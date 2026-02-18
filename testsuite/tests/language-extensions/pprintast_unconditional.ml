@@ -101,8 +101,16 @@ module Example = struct
     { pjka_loc = loc;
       pjka_desc =
         Pjk_with
+<<<<<<< ours
           ( { pjka_loc = loc;
               pjka_desc = Pjk_abbreviation { loc; txt = (Lident "value") };
+||||||| base
+          ( { pjkind_loc = loc;
+              pjkind_desc = Pjk_abbreviation "value";
+=======
+          ( { pjkind_loc = loc;
+              pjkind_desc = Pjk_abbreviation ({Location.txt = "value"; loc}, []);
+>>>>>>> theirs
             }
           , core_type
           , modalities

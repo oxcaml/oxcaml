@@ -568,8 +568,19 @@ and jkind_annotation i ppf (jkind : jkind_annotation) =
   line i ppf "jkind %a\n" fmt_location jkind.pjka_loc;
   match jkind.pjka_desc with
   | Pjk_default -> line i ppf "Pjk_default\n"
+<<<<<<< ours
   | Pjk_abbreviation jkind ->
       line i ppf "Pjk_abbreviation %a\n" fmt_longident_loc jkind
+||||||| base
+  | Pjk_abbreviation jkind ->
+      line i ppf "Pjk_abbreviation \"%s\"\n" jkind
+=======
+  | Pjk_abbreviation (abbrev, sa) ->
+      line i ppf "Pjk_abbreviation %a\n" fmt_string_loc abbrev;
+      List.iter (fun a ->
+        line (i+i) ppf "scannable_axis %a\n" fmt_string_loc a
+        ) sa
+>>>>>>> theirs
   | Pjk_mod (jkind, m) ->
       line i ppf "Pjk_mod\n";
       jkind_annotation (i+1) ppf jkind;
