@@ -336,7 +336,6 @@ module Sort = struct
    fun v t_op ->
     log_change (v, Ccontents v.contents);
     v.contents <- t_op;
-    (* avoid allocating closure *)
     match t_op with
     | None -> ()
     | Some t -> t_iter ~f:(fun u -> update_level u v) t
