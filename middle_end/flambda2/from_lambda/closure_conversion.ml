@@ -1165,7 +1165,7 @@ let close_primitive acc env ~let_bound_ids_with_kinds named
     in
     close_c_call acc env ~loc ~let_bound_ids_with_kinds prim ~args
       exn_continuation dbg ~current_region ~current_ghost_region k
-  | Pgetglobal cu, [] ->
+  | Pgetglobal (cu, _), [] ->
     if Compilation_unit.equal cu (Env.current_unit env)
     then
       Misc.fatal_errorf_doc "Pgetglobal %a in the same unit"

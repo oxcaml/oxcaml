@@ -117,7 +117,7 @@ let close_phrase lam =
     let layout = Lambda.layout_of_module_field repr pos in
     let glob =
       Lprim (mod_field pos repr,
-             [Lprim (Pgetglobal glb, [], Loc_unknown)],
+             [Lprim (Pgetglobal (glb, Dynamic), [], Loc_unknown)],
              Loc_unknown)
     in
     Llet(Strict, layout, id, Lambda.debug_uid_none, glob, l)

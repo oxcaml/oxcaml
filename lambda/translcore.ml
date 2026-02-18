@@ -312,7 +312,7 @@ let transl_ident loc env ty path desc kind =
   | Val_anc _, Id_value ->
       raise(Error(to_location loc, Free_super_var))
   | (Val_reg _ | Val_self _), Id_value ->
-      transl_value_path loc env path
+      transl_value_path loc env path Dynamic
   |  _ -> fatal_error "Translcore.transl_exp: bad Texp_ident"
 
 let can_apply_primitive p pmode pos args =
@@ -972,7 +972,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             let kind = if cache = [] then Public else Cached in
             Lsend (kind, tag, obj, cache, pos, mode, loc, layout)
         | Tmeth_ancestor(meth, path_self) ->
-            let self = transl_value_path loc e.exp_env path_self in
+            let self = transl_value_path loc e.exp_env path_self Dynamic in
             Lapply {ap_loc = loc;
                     ap_func = Lvar meth;
                     ap_args = [self];
@@ -1004,21 +1004,21 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       }
   | Texp_instvar(path_self, path, _) ->
       let loc = of_location ~scopes e.exp_loc in
-      let self = transl_value_path loc e.exp_env path_self in
-      let var = transl_value_path loc e.exp_env path in
+      let self = transl_value_path loc e.exp_env path_self Dynamic in
+      let var = transl_value_path loc e.exp_env path Dynamic in
       Lprim(Pfield_computed Reads_vary, [self; var], loc)
   | Texp_mutvar id -> Lmutvar id.txt
   | Texp_setinstvar(path_self, path, _, expr) ->
       let loc = of_location ~scopes e.exp_loc in
-      let self = transl_value_path loc e.exp_env path_self in
-      let var = transl_value_path loc e.exp_env path in
+      let self = transl_value_path loc e.exp_env path_self Dynamic in
+      let var = transl_value_path loc e.exp_env path Dynamic in
       transl_setinstvar ~scopes loc self var expr
   | Texp_setmutvar(id, expr_sort, expr) ->
       Lassign(id.txt, transl_exp ~scopes
         (Jkind.Sort.default_for_transl_and_get expr_sort) expr)
   | Texp_override(path_self, modifs) ->
       let loc = of_location ~scopes e.exp_loc in
-      let self = transl_value_path loc e.exp_env path_self in
+      let self = transl_value_path loc e.exp_env path_self Dynamic in
       let cpy = Ident.create_local "copy" in
       let cpy_duid = Lambda.debug_uid_none in
       Llet(Strict, Lambda.layout_object, cpy, cpy_duid,
@@ -1354,7 +1354,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
     let loc = of_location ~scopes e.exp_loc in
     Lprim (Pfield (0, Pointer, Reads_agree), [
       Lprim
-        (Pgetglobal (Compilation_unit.of_string "Camlinternaleval"), [], loc);
+        (Pgetglobal (Compilation_unit.of_string "Camlinternaleval", Dynamic), [], loc);
     ], loc)
 
 and pure_module m =

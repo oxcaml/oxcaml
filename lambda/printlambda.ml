@@ -396,8 +396,14 @@ let primitive ppf = function
   | Pbytes_to_string -> fprintf ppf "bytes_to_string"
   | Pbytes_of_string -> fprintf ppf "bytes_of_string"
   | Pignore -> fprintf ppf "ignore"
-  | Pgetglobal cu ->
-      fprintf ppf "global %a!" (Format_doc.compat Compilation_unit.print) cu
+  | Pgetglobal (cu, staticity) ->
+      let static =
+        match staticity with
+        | Static -> " static"
+        | Dynamic -> ""
+      in
+      fprintf ppf "global%s %a!"
+        static (Format_doc.compat Compilation_unit.print) cu
   | Pgetpredef id -> fprintf ppf "getpredef %a!" Ident.print id
   | Pmakeblock(tag, Immutable, shape, mode) ->
       fprintf ppf "make%sblock %i%a"
