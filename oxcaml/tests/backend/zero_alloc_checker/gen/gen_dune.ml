@@ -54,7 +54,10 @@ let () =
         then Printf.sprintf {|(:ml %s %s.ml)|} s name
         else Printf.sprintf {|%s (:ml %s.ml)|} s name
     in
-    let output = Option.value output ~default:(name ^ ".output") in
+    let output =
+      Option.value output
+        ~default:(name ^ ".%{env:OXCAML_NAME_MANGLING=flat}.output")
+    in
     let subst = function
       | "enabled_if" -> enabled_if
       | "name" -> name
@@ -201,11 +204,12 @@ let () =
     "test_signatures_first_class_modules";
   print_cmi_target "test_signatures_separate_a.ml";
   print_test_expected_output ~cutoff:default_cutoff
-    ~output:"test_signatures_separate.output"
+    ~output:"test_signatures_separate.%{env:OXCAML_NAME_MANGLING=flat}.output"
     ~extra_dep:(Some "test_signatures_separate_a.cmi") ~exit_code:2
     "test_signatures_separate_b";
   print_test_expected_output ~cutoff:default_cutoff
-    ~output:"test_signatures_separate.opt.output"
+    ~output:
+      "test_signatures_separate.opt.%{env:OXCAML_NAME_MANGLING=flat}.output"
     ~extra_flags:"-zero-alloc-check all"
     ~extra_dep:(Some "test_signatures_separate_a.cmi") ~exit_code:2
     "test_signatures_separate_b";
@@ -213,7 +217,8 @@ let () =
     "test_assume_inlining";
   print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
     "test_assume_error";
-  print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
+  print_test_expected_output ~cutoff:default_cutoff
+    ~output:"test_assume_stub.output" ~extra_dep:None ~exit_code:2
     "test_assume_stub";
   print_test_expected_output ~cutoff:default_cutoff
     ~extra_flags:"-zero-alloc-check default -zero-alloc-checker-join -2"
@@ -229,11 +234,12 @@ let () =
     ~extra_flags:"-zero-alloc-check default -zero-alloc-checker-join 0"
     ~extra_dep:None ~exit_code:2 "test_bounded_join4";
   print_test_expected_output ~cutoff:default_cutoff
-    ~output:"test_inference.output" ~extra_dep:(Some "test_inference.mli")
-    ~exit_code:2 "test_inference";
+    ~output:"test_inference.%{env:OXCAML_NAME_MANGLING=flat}.output"
+    ~extra_dep:(Some "test_inference.mli") ~exit_code:2 "test_inference";
   print_test_expected_output ~cutoff:default_cutoff
-    ~output:"test_inference.opt.output" ~extra_dep:(Some "test_inference.mli")
-    ~extra_flags:"-zero-alloc-check all" ~exit_code:2 "test_inference";
+    ~output:"test_inference.opt.%{env:OXCAML_NAME_MANGLING=flat}.output"
+    ~extra_dep:(Some "test_inference.mli") ~extra_flags:"-zero-alloc-check all"
+    ~exit_code:2 "test_inference";
   print_test_expected_output ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
     "test_remove_inferred_assume";
   print_test "test_remove_inferred_assume_workaround.ml";
@@ -275,19 +281,21 @@ let () =
     ~cutoff:default_cutoff ~extra_dep:None ~exit_code:2
     "test_assume_unless_opt_on_call2";
   print_test_expected_output ~cutoff:default_cutoff
-    ~output:"test_custom_error_msg.output" ~extra_dep:None
-    ~extra_flags:"-zero-alloc-check default" ~exit_code:2
+    ~output:"test_custom_error_msg.%{env:OXCAML_NAME_MANGLING=flat}.output"
+    ~extra_dep:None ~extra_flags:"-zero-alloc-check default" ~exit_code:2
     "test_custom_error_msg";
   print_test_expected_output ~cutoff:default_cutoff
-    ~output:"test_custom_error_msg.opt.output" ~extra_dep:None
-    ~extra_flags:"-zero-alloc-check all" ~exit_code:2 "test_custom_error_msg";
+    ~output:"test_custom_error_msg.opt.%{env:OXCAML_NAME_MANGLING=flat}.output"
+    ~extra_dep:None ~extra_flags:"-zero-alloc-check all" ~exit_code:2
+    "test_custom_error_msg";
   print_test_expected_output ~cutoff:default_cutoff
-    ~output:"test_custom_error_msg_sig.output"
+    ~output:"test_custom_error_msg_sig.%{env:OXCAML_NAME_MANGLING=flat}.output"
     ~extra_dep:(Some "test_custom_error_msg_sig.mli")
     ~extra_flags:"-zero-alloc-check default" ~exit_code:2
     "test_custom_error_msg_sig";
   print_test_expected_output ~cutoff:default_cutoff
-    ~output:"test_custom_error_msg_sig.opt.output"
+    ~output:
+      "test_custom_error_msg_sig.opt.%{env:OXCAML_NAME_MANGLING=flat}.output"
     ~extra_dep:(Some "test_custom_error_msg_sig.mli")
     ~extra_flags:"-zero-alloc-check all" ~exit_code:2
     "test_custom_error_msg_sig";
