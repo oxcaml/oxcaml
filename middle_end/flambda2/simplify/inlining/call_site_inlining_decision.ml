@@ -152,8 +152,9 @@ let inlining_does_decrease_code_size ~code_or_metadata cost_metrics =
   let inlined_code_size = Cost_metrics.size cost_metrics in
   not (Code_size.( <= ) original_code_size inlined_code_size)
 
-let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
-    ~return_arity : Call_site_inlining_decision_type.t =
+let might_inline dacc ~apply ~code_or_metadata ~function_type
+    ~has_inlined_always ~simplify_expr ~return_arity :
+    Call_site_inlining_decision_type.t =
   let denv = DA.denv dacc in
   let disable_inlining = DE.disable_inlining denv in
   let decision =
@@ -176,6 +177,8 @@ let might_inline dacc ~apply ~code_or_metadata ~function_type ~simplify_expr
       }
   else if Function_decl_inlining_decision_type.cannot_be_inlined decision
   then Definition_says_not_to_inline
+  else if has_inlined_always
+  then Attribute_always
   else if doing_speculative_inlining
   then Doing_speculative_inlining
   else
@@ -340,7 +343,7 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
             then Replay_history_says_must_inline
             else
               might_inline dacc ~apply ~code_or_metadata ~function_type
-                ~simplify_expr ~return_arity
+                ~has_inlined_always:false ~simplify_expr ~return_arity
           | `Unroll unroll_to ->
             if Simplify_rec_info_expr.can_unroll dacc rec_info
             then
@@ -351,7 +354,9 @@ let make_decision0 dacc ~simplify_expr ~function_type ~apply ~return_arity :
             else (
               fail_if_must_inline ();
               Unrolling_depth_exceeded)
-          | `Always -> Attribute_always))
+          | `Always ->
+            might_inline dacc ~apply ~code_or_metadata ~function_type
+              ~has_inlined_always:true ~simplify_expr ~return_arity))
 
 let make_decision dacc ~simplify_expr ~function_type ~apply ~return_arity :
     Call_site_inlining_decision_type.t =
