@@ -135,7 +135,7 @@ let register_closure_allocation (mode : Value.r option) : Alloc.lr * Value.lr =
     | Some m -> Alloc.meet [common_upper_bound; value_to_alloc_r2g m]
   in
   let alloc_mode, _ = Alloc.newvar_below upper_bound in
-  let closed_over_mode = alloc_as_value alloc_mode in
+  let closed_over_mode = alloc_as_value ~hint:Skip alloc_mode in
   alloc_mode, closed_over_mode
 
 open Typedtree

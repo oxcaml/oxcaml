@@ -793,7 +793,10 @@ module type S = sig
   val alloc_to_value_l2r : ('l * 'r) Alloc.t -> ('l * disallowed) Value.t
 
   (** Similar to [regional_to_local], behaves as identity on other axes *)
-  val value_to_alloc_r2l : ('l * 'r) Value.t -> ('l * 'r) Alloc.t
+  val value_to_alloc_r2l :
+    ?hint:('l * 'r) Hint.morph ->
+    ('l * 'r) Value.t ->
+    ('l * 'r) Alloc.t
 
   (** Similar to [regional_to_global], behaves as identity on other axes *)
   val value_to_alloc_r2g :
