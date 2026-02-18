@@ -562,11 +562,6 @@ Error: Signature mismatch:
          because of the definition of t at line 2, characters 2-26.
 |}]
 
-(* CR zeisbach: mod syntax actually applys on individual components of a
-   product, which might be another change from the existing behavior??
-   but when i tested it, it looked like the existing behavior did this,
-   at least for non-modal axes. but it also seemed to throw some away. *)
-
 module M : sig
   type t : value non_float & value non_float
 end = struct
@@ -577,7 +572,7 @@ module M : sig type t : value non_float & value non_float end
 |}]
 
 module M : sig
-  type t : (value & value) mod non_float
+  type t : (value & value) mod non_float (* annotation is ignored *)
 end = struct
   type t : (value mod non_float) & value
 end

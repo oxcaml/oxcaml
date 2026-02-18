@@ -50,7 +50,6 @@ let mutable_mode m0 : _ Mode.Value.t =
 type mod_bounds =
   { crossing : Mode.Crossing.t;
     externality: Jkind_axis.Externality.t;
-    nullability: Jkind_axis.Nullability.t;
   }
 
 module With_bounds_type_info = struct

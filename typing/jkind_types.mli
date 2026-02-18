@@ -104,7 +104,10 @@ module Sort : sig
 end
 
 module Scannable_axes : sig
-  type t = { separability : Jkind_axis.Separability.t }
+  type t =
+    { nullability : Jkind_axis.Nullability.t;
+      separability : Jkind_axis.Separability.t
+    }
 
   val max : t
 

@@ -16,6 +16,8 @@
 module type Axis_ops = sig
   include Mode_intf.Lattice
 
+  val to_string : t -> string
+
   val less_or_equal : t -> t -> Misc.Le_result.t
 
   val equal : t -> t -> bool
@@ -50,23 +52,12 @@ module Separability : sig
     | Separable
     | Maybe_separable
 
-  (* CR layouts-scannable: This included module may get refined over time.
-     There are more operations that make sense here. But also, this will
-     probably change as more things get refactored. Seems ok for now. *)
   include Axis_ops with type t := t
-
-  val to_string : t -> string
-
-  (* CR layouts-scannable: As more axes are ported, consider adding [is_max]
-     to the [Axis_ops] signature (which helps with printing) *)
-  val is_max : t -> bool
 end
 
 module Axis : sig
   module Nonmodal : sig
-    type 'a t =
-      | Externality : Externality.t t
-      | Nullability : Nullability.t t
+    type 'a t = Externality : Externality.t t
   end
 
   (** Represents an axis of a jkind *)
