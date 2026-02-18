@@ -86,7 +86,6 @@ probe_emission.ml
 probe_emission.mli
 reg.ml
 reg.mli
-regs.mli
 regs_utils.ml
 regs_utils.mli
 proc.mli
