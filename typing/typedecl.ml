@@ -1066,8 +1066,16 @@ let transl_declaration env sdecl (id, uid) =
          See https://github.com/oxcaml/oxcaml/pull/3399. *)
       match kind with
       | Type_record_unboxed_product _ ->
+<<<<<<< HEAD
         begin match Jkind.get_layout env jkind with
         | Some Any ->
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+        begin match Jkind.get_layout jkind with
+        | Some Any ->
+=======
+        begin match Jkind.get_layout jkind with
+        | Some (Any _) ->
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
           (* [jkind_default] has just what we need here *)
           let default_layout =
             match Jkind.extract_layout env jkind_default with
@@ -2172,17 +2180,18 @@ let rec update_decl_jkind env dpath decl =
     | Type_record_unboxed_product (lbls, rep, umc) ->
         begin match rep with
         | Record_unboxed_product ->
-          let lbls =
+          let (lbls, layouts) =
             List.map (fun (Types.{ld_type} as lbl) ->
               let jkind = Ctype.type_jkind env ld_type in
               (* This next line is guaranteed to be OK because of a call to
                  [check_representable] *)
               let sort = Jkind.sort_of_jkind env jkind in
               let ld_sort = Jkind.Sort.default_to_value_and_get sort in
-              {lbl with ld_sort}
+              {lbl with ld_sort}, Jkind.extract_layout jkind
             ) lbls
+            |> List.split
           in
-          let type_jkind = Jkind.for_unboxed_record lbls in
+          let type_jkind = Jkind.for_unboxed_record lbls layouts in
           (* See Note [Quality of jkinds during inference] for more information about when we
              mark jkinds as best *)
           let type_jkind = Jkind.mark_best type_jkind in
@@ -2581,7 +2590,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
     (* A type whose layout has [any] could contain all its parameters.
        CR layouts v11: update this function for [layout_of] layouts. *)
     let rec has_any : Jkind_types.Layout.Const.t -> bool = function
-      | Any -> true
+      | Any _ -> true
       | Base _ -> false
       | Product l -> List.exists has_any l
       | Univar _ -> Misc.fatal_error "Unboxed_recursion: univar"

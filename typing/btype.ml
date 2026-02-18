@@ -1268,6 +1268,8 @@ module Jkind0 = struct
     (* CR layouts: Remove this once we have a better story for printing with
        jkind abbreviations. *)
     module Builtin = struct
+      open Jkind_types
+
       type nonrec t =
         { jkind : (allowed * allowed) t;
           name : string
@@ -1279,7 +1281,7 @@ module Jkind0 = struct
         Mode.Crossing.(set ax (Per_axis.max ax) min)
 
       let mk_jkind ~crossing ~nullability ~separability ~externality
-          (layout : Jkind_types.Layout.Const.t) =
+          (layout : Layout.Const.t) =
         let mod_bounds =
           Mod_bounds.create crossing ~nullability ~separability ~externality
         in
@@ -1287,55 +1289,62 @@ module Jkind0 = struct
 
       let any =
         { jkind =
-            mk_jkind Any ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max
-              ~nullability:Maybe_null ~separability:Maybe_separable;
+            mk_jkind (Any Scannable_axes.max) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Maybe_null
+              ~separability:Maybe_separable;
           name = "any"
         }
 
       let any_mod_everything =
         { jkind =
-            mk_jkind Any ~crossing:cross_all_except_staticity
-              ~externality:Mod_bounds.Externality.min
-              ~nullability:Maybe_null
+            mk_jkind (Any Scannable_axes.max)
+              ~crossing:cross_all_except_staticity
+              ~externality:Mod_bounds.Externality.min ~nullability:Maybe_null
               ~separability:Maybe_separable;
           name = "any mod everything"
         }
 
       let value_or_null =
         { jkind =
-            mk_jkind (Base Value) ~crossing:Mode.Crossing.max
+            mk_jkind
+              (Base (Value, Scannable_axes.max)) ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.max
-              ~nullability:Maybe_null
-              ~separability:Maybe_separable;
+              ~nullability:Maybe_null ~separability:Maybe_separable;
           name = "value_or_null"
         }
 
       let value_or_null_mod_everything =
         { jkind =
-            mk_jkind (Base Value) ~crossing:cross_all_except_staticity
+            mk_jkind
+              (Base (Value, Scannable_axes.max))
+              ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min
-              ~nullability:Maybe_null
-              ~separability:Maybe_separable;
+              ~nullability:Maybe_null ~separability:Maybe_separable;
           name = "value_or_null mod everything"
         }
 
       let value =
         { jkind =
-            mk_jkind (Base Value) ~crossing:Mode.Crossing.max
+            mk_jkind
+              (Base (Value, Scannable_axes.max)) ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.max
-              ~nullability:Non_null
-              ~separability:Separable;
+              ~nullability:Non_null ~separability:Separable;
           name = "value"
         }
 
       let immutable_data =
         let open Mod_bounds in
         { jkind =
+<<<<<<< HEAD
             { base = Layout (Base Value);
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+            { layout = Base Value;
+=======
+            { layout = Base (Value, Scannable_axes.max);
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
               mod_bounds =
                 (let crossing =
-                   Mode.Crossing.create ~regionality:false ~linearity:true
+                   Crossing.create ~regionality:false ~linearity:true
                      ~portability:true ~forkable:true ~yielding:true
                      ~uniqueness:false ~contention:true ~statefulness:true
                      ~visibility:true ~staticity:false
@@ -1351,7 +1360,13 @@ module Jkind0 = struct
       let exn =
         let open Mod_bounds in
         { jkind =
+<<<<<<< HEAD
             { base = Layout (Base Value);
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+            { layout = Base Value;
+=======
+            { layout = Base (Value, Scannable_axes.max);
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:false
@@ -1370,10 +1385,16 @@ module Jkind0 = struct
       let sync_data =
         let open Mod_bounds in
         { jkind =
+<<<<<<< HEAD
             { base = Layout (Base Value);
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+            { layout = Base Value;
+=======
+            { layout = Base (Value, Scannable_axes.max);
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
               mod_bounds =
                 (let crossing =
-                   Mode.Crossing.create ~regionality:false ~linearity:true
+                   Crossing.create ~regionality:false ~linearity:true
                      ~portability:true ~forkable:true ~yielding:true
                      ~uniqueness:false ~contention:true ~statefulness:true
                      ~visibility:false ~staticity:false
@@ -1389,7 +1410,13 @@ module Jkind0 = struct
       let mutable_data =
         let open Mod_bounds in
         { jkind =
+<<<<<<< HEAD
             { base = Layout (Base Value);
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+            { layout = Base Value;
+=======
+            { layout = Base (Value, Scannable_axes.max);
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:true
@@ -1407,8 +1434,17 @@ module Jkind0 = struct
 
       let void =
         { jkind =
+<<<<<<< HEAD
             mk_jkind (Base Void) ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+            mk_jkind (Base Void) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+=======
+            mk_jkind (Base (Void, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
               ~separability:Non_float;
           name = "void"
         }
@@ -1423,7 +1459,8 @@ module Jkind0 = struct
 
       let void_mod_everything =
         { jkind =
-            mk_jkind (Base Void) ~crossing:cross_all_except_staticity
+            mk_jkind (Base (Void, Scannable_axes.max))
+              ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "void mod everything"
@@ -1431,9 +1468,13 @@ module Jkind0 = struct
 
       let kind_of_unboxed_unit = void_mod_everything
 
+      (* CR layouts-scannable: For now (to reduce the diff in tests),
+         [immediate] means [value maybe_pointer ...]. In a later PR, this will
+         be changed to [value non_pointer]. *)
       let immediate =
         { jkind =
-            mk_jkind (Base Value) ~crossing:cross_all_except_staticity
+            mk_jkind (Base (Value, Scannable_axes.max))
+              ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "immediate"
@@ -1441,7 +1482,8 @@ module Jkind0 = struct
 
       let immediate_or_null =
         { jkind =
-            mk_jkind (Base Value) ~crossing:cross_all_except_staticity
+            mk_jkind (Base (Value, Scannable_axes.max))
+              ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min
               ~nullability:Maybe_null
               ~separability:Non_float;
@@ -1503,8 +1545,17 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let float64 =
         { jkind =
+<<<<<<< HEAD
             mk_jkind (Base Float64) ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+            mk_jkind (Base Float64) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+=======
+            mk_jkind (Base (Float64, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
               ~separability:Non_float;
           (* [separability] is intentionally [Non_float]:
              only boxed floats are relevant for separability. *)
@@ -1527,7 +1578,8 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let kind_of_unboxed_float =
         { jkind =
-            mk_jkind (Base Float64) ~crossing:cross_all_except_staticity
+            mk_jkind (Base (Float64, Scannable_axes.max))
+              ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           (* [separability] is intentionally [Non_float]:
@@ -1539,8 +1591,17 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let float32 =
         { jkind =
+<<<<<<< HEAD
             mk_jkind (Base Float32) ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+            mk_jkind (Base Float32) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+=======
+            mk_jkind (Base (Float32, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
               ~separability:Non_float;
           (* [separability] is intentionally [Non_float]:
              only boxed floats are relevant for separability. *)
@@ -1563,7 +1624,8 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let kind_of_unboxed_float32 =
         { jkind =
-            mk_jkind (Base Float32) ~crossing:cross_all_except_staticity
+            mk_jkind (Base (Float32, Scannable_axes.max))
+              ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           (* [separability] is intentionally [Non_float]:
@@ -1575,8 +1637,17 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let word =
         { jkind =
+<<<<<<< HEAD
             mk_jkind (Base Word) ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+            mk_jkind (Base Word) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+=======
+            mk_jkind (Base (Word, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
               ~separability:Non_float;
           name = "word"
         }
@@ -1595,7 +1666,8 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let kind_of_unboxed_nativeint =
         { jkind =
-            mk_jkind (Base Word) ~crossing:cross_all_except_staticity
+            mk_jkind (Base (Word, Scannable_axes.max))
+              ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "word mod everything"
@@ -1603,8 +1675,17 @@ module Jkind0 = struct
 
       let untagged_immediate =
         { jkind =
+<<<<<<< HEAD
             mk_jkind (Base Untagged_immediate) ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+            mk_jkind (Base Untagged_immediate) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+=======
+            mk_jkind (Base (Untagged_immediate, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
               ~separability:Non_float;
           name = "untagged_immediate"
         }
@@ -1619,7 +1700,7 @@ module Jkind0 = struct
 
       let kind_of_untagged_int =
         { jkind =
-            mk_jkind (Base Untagged_immediate)
+            mk_jkind (Base (Untagged_immediate, Scannable_axes.max))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min
               ~nullability:Non_null ~separability:Non_float;
@@ -1630,8 +1711,17 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let bits8 =
         { jkind =
+<<<<<<< HEAD
             mk_jkind (Base Bits8) ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+            mk_jkind (Base Bits8) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+=======
+            mk_jkind (Base (Bits8, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
               ~separability:Non_float;
           name = "bits8"
         }
@@ -1650,7 +1740,8 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let kind_of_unboxed_int8 =
         { jkind =
-            mk_jkind (Base Bits8) ~crossing:cross_all_except_staticity
+            mk_jkind (Base (Bits8, Scannable_axes.max))
+              ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "bits8 mod everything"
@@ -1662,8 +1753,17 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let bits16 =
         { jkind =
+<<<<<<< HEAD
             mk_jkind (Base Bits16) ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+            mk_jkind (Base Bits16) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+=======
+            mk_jkind (Base (Bits16, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
               ~separability:Non_float;
           name = "bits16"
         }
@@ -1682,7 +1782,8 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let kind_of_unboxed_int16 =
         { jkind =
-            mk_jkind (Base Bits16) ~crossing:cross_all_except_staticity
+            mk_jkind (Base (Bits16, Scannable_axes.max))
+              ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "bits16 mod everything"
@@ -1692,8 +1793,17 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let bits32 =
         { jkind =
+<<<<<<< HEAD
             mk_jkind (Base Bits32) ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+            mk_jkind (Base Bits32) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+=======
+            mk_jkind (Base (Bits32, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
               ~separability:Non_float;
           name = "bits32"
         }
@@ -1712,7 +1822,8 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let kind_of_unboxed_int32 =
         { jkind =
-            mk_jkind (Base Bits32) ~crossing:cross_all_except_staticity
+            mk_jkind (Base (Bits32, Scannable_axes.max))
+              ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "bits32 mod everything"
@@ -1722,8 +1833,17 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let bits64 =
         { jkind =
+<<<<<<< HEAD
             mk_jkind (Base Bits64) ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+            mk_jkind (Base Bits64) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+=======
+            mk_jkind (Base (Bits64, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
               ~separability:Non_float;
           name = "bits64"
         }
@@ -1742,7 +1862,8 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let kind_of_unboxed_int64 =
         { jkind =
-            mk_jkind (Base Bits64) ~crossing:cross_all_except_staticity
+            mk_jkind (Base (Bits64, Scannable_axes.max))
+              ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "bits64 mod everything"
@@ -1750,7 +1871,8 @@ module Jkind0 = struct
 
       let kind_of_idx =
         { jkind =
-            mk_jkind (Base Bits64) ~crossing:cross_all_except_staticity
+            mk_jkind (Base (Bits64, Scannable_axes.max))
+              ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "bits64 mod everything"
@@ -1760,8 +1882,17 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let vec128 =
         { jkind =
+<<<<<<< HEAD
             mk_jkind (Base Vec128) ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+            mk_jkind (Base Vec128) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+=======
+            mk_jkind (Base (Vec128, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
               ~separability:Non_float;
           name = "vec128"
         }
@@ -1780,8 +1911,17 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let vec256 =
         { jkind =
+<<<<<<< HEAD
             mk_jkind (Base Vec256) ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+            mk_jkind (Base Vec256) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+=======
+            mk_jkind (Base (Vec256, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
               ~separability:Non_float;
           name = "vec256"
         }
@@ -1800,8 +1940,17 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let vec512 =
         { jkind =
+<<<<<<< HEAD
             mk_jkind (Base Vec512) ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+            mk_jkind (Base Vec512) ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+=======
+            mk_jkind (Base (Vec512, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
               ~separability:Non_float;
           name = "vec512"
         }
@@ -1820,7 +1969,8 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let kind_of_unboxed_128bit_vectors =
         { jkind =
-            mk_jkind (Base Vec128) ~crossing:cross_all_except_staticity
+            mk_jkind (Base (Vec128, Scannable_axes.max))
+              ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "vec128 mod everything"
@@ -1830,7 +1980,8 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let kind_of_unboxed_256bit_vectors =
         { jkind =
-            mk_jkind (Base Vec256) ~crossing:cross_all_except_staticity
+            mk_jkind (Base (Vec256, Scannable_axes.max))
+              ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "vec256 mod everything"
@@ -1840,7 +1991,8 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let kind_of_unboxed_512bit_vectors =
         { jkind =
-            mk_jkind (Base Vec512) ~crossing:cross_all_except_staticity
+            mk_jkind (Base (Vec512, Scannable_axes.max))
+              ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min ~nullability:Non_null
               ~separability:Non_float;
           name = "vec512 mod everything"
@@ -2258,9 +2410,18 @@ module Jkind0 = struct
           ~nullability:Non_null ~separability:Non_float
       in
       fresh_jkind
+<<<<<<< HEAD
         { base = Layout (Sort (Base Value));
           mod_bounds;
           with_bounds = No_with_bounds }
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+        { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+=======
+        { layout = Sort (Base Value, { pointerness = Maybe_pointer });
+          mod_bounds;
+          with_bounds = No_with_bounds
+        }
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
         ~annotation:None ~why:(Value_creation why)
 
   (* Note [With-bounds for GADTs]
@@ -2512,9 +2673,18 @@ module Jkind0 = struct
           ~nullability:Non_null ~separability:Separable
       in
       fresh_jkind
+<<<<<<< HEAD
         { base = Layout (Sort (Base Value));
           mod_bounds;
           with_bounds = No_with_bounds }
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+        { layout = Sort (Base Value); mod_bounds; with_bounds = No_with_bounds }
+=======
+        { layout = Sort (Base Value, { pointerness = Maybe_pointer });
+          mod_bounds;
+          with_bounds = No_with_bounds
+        }
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
         ~annotation:None ~why:(Primitive ident)
       |> mark_best
 
@@ -2525,9 +2695,18 @@ module Jkind0 = struct
           ~nullability:Maybe_null ~separability:Separable
       in
       fresh_jkind
+<<<<<<< HEAD
         { base = Layout Any;
           mod_bounds;
           with_bounds = No_with_bounds }
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+        { layout = Any; mod_bounds; with_bounds = No_with_bounds }
+=======
+        { layout = Any { pointerness = Maybe_pointer };
+          mod_bounds;
+          with_bounds = No_with_bounds
+        }
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
         ~annotation:None ~why:(Any_creation Array_type_argument)
 
     let for_or_null_argument ident =
@@ -2541,9 +2720,16 @@ module Jkind0 = struct
           ~nullability:Non_null ~separability:Maybe_separable
       in
       fresh_jkind
+<<<<<<< HEAD
         { base = Layout (Sort (Base Value));
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+        { layout = Sort (Base Value);
+=======
+        { layout = Sort (Base Value, { pointerness = Maybe_pointer });
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
           mod_bounds;
-          with_bounds = No_with_bounds }
+          with_bounds = No_with_bounds
+        }
         ~annotation:None ~why:(Value_creation why)
   end
 

@@ -87,20 +87,27 @@ module Sub_result : sig
   val is_le : t -> bool
 end
 
+module Scannable_axes : sig
+  type t = Jkind_types.Scannable_axes.t
+
+  (** Omits all axes that are max, for printing *)
+  val to_string_list : t -> string list
+end
+
 (* The layout of a type describes its memory layout. A layout is either the
    indeterminate [Any] or a sort, which is a concrete memory layout. *)
 module Layout : sig
   type 'sort t = 'sort Jkind_types.Layout.t =
-    | Sort of 'sort
+    | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
-    | Any
+    | Any of Scannable_axes.t
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t
 
     val get_sort : t -> Sort.Const.t option
 
-    val of_sort_const : Sort.Const.t -> t
+    val of_sort_const : Sort.Const.t -> Scannable_axes.t -> t
 
     val to_string : t -> string
   end
@@ -445,7 +452,8 @@ val of_type_decl_overapproximate_unknown :
 val for_boxed_record : Types.label_declaration list -> Types.jkind_l
 
 (** Choose an appropriate jkind for an unboxed record type. *)
-val for_unboxed_record : Types.label_declaration list -> Types.jkind_l
+val for_unboxed_record :
+  Types.label_declaration list -> sort Layout.t list -> Types.jkind_l
 
 (** Choose an appropriate jkind for a boxed variant type.
 
@@ -482,9 +490,6 @@ val for_object : Types.jkind_l
 
 (** The jkind for values that are not floats. *)
 val for_non_float : why:History.value_creation_reason -> 'd Types.jkind
-
-(** The jkind for [or_null] type arguments. *)
-val for_or_null_argument : Ident.t -> 'd Types.jkind
 
 (** The jkind for an abbreviation declaration. This implements the design in
     rule FIND_ABBREV in kind-inference.md, where we consider a definition
@@ -703,14 +708,26 @@ val format_history :
 (** This checks for equality, and sets any variables to make two jkinds equal,
     if possible. e.g. [equate] on a var and [value] will set the variable to be
     [value] *)
+<<<<<<< HEAD
 val equate : Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+val equate : Types.jkind_lr -> Types.jkind_lr -> bool
+=======
+val equate : level:int -> Types.jkind_lr -> Types.jkind_lr -> bool
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
 
 (** This checks for equality, but has the invariant that it can only be called
     when there is no need for unification; e.g. [equal] on a var and [value]
     will crash.
 
     CR layouts (v1.5): At the moment, this is actually the same as [equate]! *)
+<<<<<<< HEAD
 val equal : Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
+||||||| parent of dbd2b161fd (Add Pointerness as a scannable axis (#5006))
+val equal : Types.jkind_lr -> Types.jkind_lr -> bool
+=======
+val equal : level:int -> Types.jkind_lr -> Types.jkind_lr -> bool
+>>>>>>> dbd2b161fd (Add Pointerness as a scannable axis (#5006))
 
 (** Checks whether two jkinds have a non-empty intersection. Might mutate sort
     variables. Works over any mix of l- and r-jkinds, because the only way not
