@@ -6,10 +6,10 @@
   (and
    (= %{context_name} "main")
    (= %{architecture} "amd64")))
- (deps disabled256.expected disabled256.corrected)
  (action
-  (progn
-   (diff disabled256.expected disabled256.corrected))))
+  (diff
+   disabled256.%{env:OXCAML_NAME_MANGLING=flat}.expected
+   disabled256.corrected)))
 
 (rule
  (enabled_if
