@@ -451,7 +451,7 @@ let record_lifted_constant_definition_aux ~being_defined elt definition =
           record_symbol_binding_aux symbol free_names elt)
         closure_symbols_with_types elt)
 
-let record_lifted_constant_aux lifted_constant (elt : cont_info) =
+let normalize_lifted_constant_aux lifted_constant (elt : cont_info) =
   let being_defined =
     let bound_static = Lifted_constant.bound_static lifted_constant in
     (* Note: We're not registering code IDs in the set, because we can actually
@@ -480,10 +480,10 @@ let record_lifted_constant_aux lifted_constant (elt : cont_info) =
   in
   elt
 
-let record_lifted_constants_aux lifted_constants elt =
+let normalize_lifted_constants_aux lifted_constants elt =
   Lifted_constant_state.fold lifted_constants ~init:elt
     ~f:(fun elt lifted_constant ->
-      record_lifted_constant_aux lifted_constant elt)
+      normalize_lifted_constant_aux lifted_constant elt)
 
 let record_lifted_constants lifted_constants (t : t) =
   { t with
@@ -630,7 +630,8 @@ let normalize_acc ~specialization_map (t : T.Acc.t) =
         | None ->
           Misc.fatal_errorf
             "Data_flow: missing continuation info for top-level expression"
-        | Some elt -> Some (record_lifted_constants_aux t.lifted_constants elt))
+        | Some elt ->
+          Some (normalize_lifted_constants_aux t.lifted_constants elt))
       map
   in
   { t with map; extra = Continuation.Map.empty }
