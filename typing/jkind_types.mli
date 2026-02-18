@@ -47,7 +47,7 @@ module Sort : sig
   (* Comments in [Jkind_intf.ml] *)
   type base =
     | Void
-    | Value
+    | Scannable
     | Untagged_immediate
     | Float64
     | Float32
@@ -89,8 +89,7 @@ module Sort : sig
       [Var v], then [!v] is [None]. *)
   val get : t -> t
 
-  (** Determines if the sort is [Value] or an unfilled sort variable *)
-  val is_possibly_scannable : t -> bool
+  val is_scannable_or_var : t -> bool
 
   (** Decompose a sort into a list (of the given length) of fresh sort
       variables, equating the input sort with the product of the output sorts.
@@ -105,9 +104,13 @@ module Sort : sig
 end
 
 module Scannable_axes : sig
-  type t = { pointerness : Jkind_axis.Pointerness.t }
+  type t = { separability : Jkind_axis.Separability.t }
 
   val max : t
+
+  val value_axes : t
+
+  val immediate_axes : t
 
   val equal : t -> t -> bool
 end
@@ -140,7 +143,7 @@ module Layout : sig
 
   val of_const : Const.t -> Sort.t t
 
-  val of_new_sort_var : level:int -> Sort.t t * Sort.t
+  val of_new_sort_var : level:int -> Scannable_axes.t -> Sort.t t * Sort.t
 
   val get_const : Sort.t t -> Const.t option
 

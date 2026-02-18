@@ -26,7 +26,7 @@ type 'a non_float : value mod non_float
 type packed = P : 'a non_float -> packed [@@unboxed]
 
 [%%expect{|
-type 'a non_float : value mod non_float
+type 'a non_float : value non_float
 Line 3, characters 0-52:
 3 | type packed = P : 'a non_float -> packed [@@unboxed]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -58,7 +58,7 @@ Line 1, characters 0-71:
 Warning 187 [incompatible-with-upstream]: This type relies on OxCaml's extended separability checking
 and would not be accepted by upstream OCaml.
 
-type exists = E : ('a : value mod non_float). 'a -> exists [@@unboxed]
+type exists = E : ('a : value non_float). 'a -> exists [@@unboxed]
 |}]
 
 (* Non-value layouts. *)

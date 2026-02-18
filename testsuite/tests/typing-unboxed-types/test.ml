@@ -610,7 +610,7 @@ end
 [%%expect{|
 module Result_u :
   sig
-    type ('a, 'b) t : value & value
+    type ('a, 'b) t : value non_pointer & value
     val to_result : ('a, 'b) t -> ('a, 'b) Result.t
     val of_result : ('a, 'b) Result.t -> ('a, 'b) t
   end
@@ -648,7 +648,8 @@ end
 [%%expect{|
 module Result_u_VV :
   sig
-    type ('a : value & value, 'b : value & value) t : value & (value & value)
+    type ('a : value & value, 'b : value & value) t
+      : value non_pointer & (value & value)
     val ok_exn : ('a : value & value) ('b : value & value). ('a, 'b) t -> 'a
     val error_exn :
       ('a : value & value) ('b : value & value). ('a, 'b) t -> 'b

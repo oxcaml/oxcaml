@@ -35,11 +35,11 @@ type t6a = t6 array
 type t1 = #(int * bool option) array
 type t2 = #(int * string) array
 type t3 = #(string * int * int option) array
-type t4 : value & value
+type t4 : value non_pointer & value
 type t4a = t4 array
-type t5 : value & value
+type t5 : value & value non_pointer
 type t5a = t5 array
-type t6 : value & value & value & value
+type t6 : value & value non_pointer & value & value non_pointer
 type t6a = t6 array
 |}]
 
@@ -61,9 +61,9 @@ type t2 = #(int * float#) array
 type t3 = #(float# * int * int64# * bool) array
 type t4 : immediate & immediate
 type t4a = t4 array
-type t5 : value mod non_float & float64
+type t5 : value non_pointer & float64
 type t5a = t5 array
-type t6 : bits64 & value mod non_float & float64 & value mod non_float
+type t6 : bits64 & value non_pointer & float64 & value non_pointer
 type t6a = t6 array
 |}]
 
@@ -92,9 +92,9 @@ type t5 : value & float64
 type t5a = t5 array
 type t6 : bits64 & value
 type t6a = t6 array
-type t7 : value & bits64 & value
+type t7 : value & bits64 & value non_pointer
 type t7a = t7 array
-type t8 : value & bits64 & value
+type t8 : value non_pointer & bits64 & value
 type t8a = t8 array
 |}]
 
@@ -109,7 +109,7 @@ let f_scannable (x : #(int * float * string)) = make_vect 42 x
 
 let f_ignorable (x : #(float# * int * int64# * bool)) = make_vect 42 x
 [%%expect{|
-external make_vect : ('a : any mod separable). int -> 'a -> 'a array
+external make_vect : ('a : any separable). int -> 'a -> 'a array
   = "%makearray_dynamic" [@@layout_poly]
 val f_scannable : #(int * float * string) -> #(int * float * string) array =
   <fun>
@@ -214,7 +214,7 @@ let f_scannable (x : #(int * float * string) array) = len x
 
 let f_ignorable (x : #(float# * int * int64# * bool) array) = len x
 [%%expect{|
-external len : ('a : any mod separable). 'a array -> int = "%array_length"
+external len : ('a : any separable). 'a array -> int = "%array_length"
   [@@layout_poly]
 val f_scannable : #(int * float * string) array -> int = <fun>
 val f_ignorable : #(float# * int * int64# * bool) array -> int = <fun>
@@ -302,7 +302,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a array -> int -> 'a =
 let f_scannable (x : #(int * float * string) array) = get x 42
 let f_ignorable (x : #(float# * int * int64# * bool) array) = get x 42
 [%%expect{|
-external get : ('a : any mod separable). 'a array -> int -> 'a
+external get : ('a : any separable). 'a array -> int -> 'a
   = "%array_safe_get" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> #(int * float * string) =
   <fun>
@@ -406,7 +406,7 @@ let f_scannable (x : #(int * float * string) array) = set x 42 #(1, 2.0, "3")
 let f_ignorable (x : #(float# * int * int64# * bool) array) =
   set x 42 #(#1.0, 2, #3L, true)
 [%%expect{|
-external set : ('a : any mod separable). 'a array -> int -> 'a -> unit
+external set : ('a : any separable). 'a array -> int -> 'a -> unit
   = "%array_safe_set" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> unit = <fun>
 val f_ignorable : #(float# * int * int64# * bool) array -> unit = <fun>
@@ -509,7 +509,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a array -> int -> 'a =
 let f_scannable (x : #(int * float * string) array) = get x 42
 let f_ignorable (x : #(float# * int * int64# * bool) array) = get x 42
 [%%expect{|
-external get : ('a : any mod separable). 'a array -> int -> 'a
+external get : ('a : any separable). 'a array -> int -> 'a
   = "%array_unsafe_get" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> #(int * float * string) =
   <fun>
@@ -614,7 +614,7 @@ let f_scannable (x : #(int * float * string) array) = set x 42 #(1, 2.0, "3")
 let f_ignorable (x : #(float# * int * int64# * bool) array) =
   set x 42 #(#1.0, 2, #3L, true)
 [%%expect{|
-external set : ('a : any mod separable). 'a array -> int -> 'a -> unit
+external set : ('a : any separable). 'a array -> int -> 'a -> unit
   = "%array_unsafe_set" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> unit = <fun>
 val f_ignorable : #(float# * int * int64# * bool) array -> unit = <fun>
@@ -717,7 +717,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a array -> int64# -> 'a
 let f_scannable (x : #(int * float * string) array) = get x #42L
 let f_ignorable (x : #(float# * int * int64# * bool) array) = get x #42L
 [%%expect{|
-external get : ('a : any mod separable). 'a array -> int64# -> 'a
+external get : ('a : any separable). 'a array -> int64# -> 'a
   = "%array_safe_get_indexed_by_int64#" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> #(int * float * string) =
   <fun>
@@ -825,7 +825,7 @@ let f_scannable (x : #(int * float * string) array) = set x #42L #(1, 2.0, "3")
 let f_ignorable (x : #(float# * int * int64# * bool) array) =
   set x #42L #(#1.0, 2, #3L, true)
 [%%expect{|
-external set : ('a : any mod separable). 'a array -> int64# -> 'a -> unit
+external set : ('a : any separable). 'a array -> int64# -> 'a -> unit
   = "%array_safe_set_indexed_by_int64#" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> unit = <fun>
 val f_ignorable : #(float# * int * int64# * bool) array -> unit = <fun>
@@ -930,7 +930,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a array -> int64# -> 'a
 let f_scannable (x : #(int * float * string) array) = get x #42L
 let f_ignorable (x : #(float# * int * int64# * bool) array) = get x #42L
 [%%expect{|
-external get : ('a : any mod separable). 'a array -> int64# -> 'a
+external get : ('a : any separable). 'a array -> int64# -> 'a
   = "%array_unsafe_get_indexed_by_int64#" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> #(int * float * string) =
   <fun>
@@ -1037,7 +1037,7 @@ let f_scannable (x : #(int * float * string) array) = set x #42L #(1, 2.0, "3")
 let f_ignorable (x : #(float# * int * int64# * bool) array) =
   set x #42L #(#1.0, 2, #3L, true)
 [%%expect{|
-external set : ('a : any mod separable). 'a array -> int64# -> 'a -> unit
+external set : ('a : any separable). 'a array -> int64# -> 'a -> unit
   = "%array_unsafe_set_indexed_by_int64#" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> unit = <fun>
 val f_ignorable : #(float# * int * int64# * bool) array -> unit = <fun>
@@ -1142,7 +1142,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a array -> int32# -> 'a
 let f_scannable (x : #(int * float * string) array) = get x #42l
 let f_ignorable (x : #(float# * int * int64# * bool) array) = get x #42l
 [%%expect{|
-external get : ('a : any mod separable). 'a array -> int32# -> 'a
+external get : ('a : any separable). 'a array -> int32# -> 'a
   = "%array_safe_get_indexed_by_int32#" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> #(int * float * string) =
   <fun>
@@ -1250,7 +1250,7 @@ let f_scannable (x : #(int * float * string) array) = set x #42l #(1, 2.0, "3")
 let f_ignorable (x : #(float# * int * int64# * bool) array) =
   set x #42l #(#1.0, 2, #3L, true)
 [%%expect{|
-external set : ('a : any mod separable). 'a array -> int32# -> 'a -> unit
+external set : ('a : any separable). 'a array -> int32# -> 'a -> unit
   = "%array_safe_set_indexed_by_int32#" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> unit = <fun>
 val f_ignorable : #(float# * int * int64# * bool) array -> unit = <fun>
@@ -1355,7 +1355,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a array -> int32# -> 'a
 let f_scannable (x : #(int * float * string) array) = get x #42l
 let f_ignorable (x : #(float# * int * int64# * bool) array) = get x #42l
 [%%expect{|
-external get : ('a : any mod separable). 'a array -> int32# -> 'a
+external get : ('a : any separable). 'a array -> int32# -> 'a
   = "%array_unsafe_get_indexed_by_int32#" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> #(int * float * string) =
   <fun>
@@ -1463,7 +1463,7 @@ let f_scannable (x : #(int * float * string) array) = set x #42l #(1, 2.0, "3")
 let f_ignorable (x : #(float# * int * int64# * bool) array) =
   set x #42l #(#1.0, 2, #3L, true)
 [%%expect{|
-external set : ('a : any mod separable). 'a array -> int32# -> 'a -> unit
+external set : ('a : any separable). 'a array -> int32# -> 'a -> unit
   = "%array_unsafe_set_indexed_by_int32#" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> unit = <fun>
 val f_ignorable : #(float# * int * int64# * bool) array -> unit = <fun>
@@ -1569,7 +1569,7 @@ external[@layout_poly] get :
 let f_scannable (x : #(int * float * string) array) = get x #42n
 let f_ignorable (x : #(float# * int * int64# * bool) array) = get x #42n
 [%%expect{|
-external get : ('a : any mod separable). 'a array -> nativeint# -> 'a
+external get : ('a : any separable). 'a array -> nativeint# -> 'a
   = "%array_safe_get_indexed_by_nativeint#" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> #(int * float * string) =
   <fun>
@@ -1680,7 +1680,7 @@ let f_scannable (x : #(int * float * string) array) = set x #42n #(1, 2.0, "3")
 let f_ignorable (x : #(float# * int * int64# * bool) array) =
   set x #42n #(#1.0, 2, #3L, true)
 [%%expect{|
-external set : ('a : any mod separable). 'a array -> nativeint# -> 'a -> unit
+external set : ('a : any separable). 'a array -> nativeint# -> 'a -> unit
   = "%array_safe_set_indexed_by_nativeint#" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> unit = <fun>
 val f_ignorable : #(float# * int * int64# * bool) array -> unit = <fun>
@@ -1788,7 +1788,7 @@ external[@layout_poly] get :
 let f_scannable (x : #(int * float * string) array) = get x #42n
 let f_ignorable (x : #(float# * int * int64# * bool) array) = get x #42n
 [%%expect{|
-external get : ('a : any mod separable). 'a array -> nativeint# -> 'a
+external get : ('a : any separable). 'a array -> nativeint# -> 'a
   = "%array_unsafe_get_indexed_by_nativeint#" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> #(int * float * string) =
   <fun>
@@ -1899,7 +1899,7 @@ let f_scannable (x : #(int * float * string) array) = set x #42n #(1, 2.0, "3")
 let f_ignorable (x : #(float# * int * int64# * bool) array) =
   set x #42n #(#1.0, 2, #3L, true)
 [%%expect{|
-external set : ('a : any mod separable). 'a array -> nativeint# -> 'a -> unit
+external set : ('a : any separable). 'a array -> nativeint# -> 'a -> unit
   = "%array_unsafe_set_indexed_by_nativeint#" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> unit = <fun>
 val f_ignorable : #(float# * int * int64# * bool) array -> unit = <fun>
@@ -2009,7 +2009,7 @@ let f_scannable (x : #(int * float * string) array) = blit x 0 x 2 3
 let f_ignorable (x : #(float# * int * int64# * bool) array) = blit x 0 x 2 3
 [%%expect{|
 external blit :
-  ('a : any mod separable). 'a array -> int -> 'a array -> int -> int -> unit
+  ('a : any separable). 'a array -> int -> 'a array -> int -> int -> unit
   = "%arrayblit" [@@layout_poly]
 val f_scannable : #(int * float * string) array -> unit = <fun>
 val f_ignorable : #(float# * int * int64# * bool) array -> unit = <fun>
@@ -2118,7 +2118,7 @@ external[@layout_poly] get : ('a : any mod separable) . 'a array -> int -> 'a =
 let f1 (type a : value mod external_) (x : #(float# * a * int * int64#) array) =
   get x 42
 [%%expect{|
-external get : ('a : any mod separable). 'a array -> int -> 'a
+external get : ('a : any separable). 'a array -> int -> 'a
   = "%array_safe_get" [@@layout_poly]
 val f1 :
   ('a : value mod external_).
@@ -2149,7 +2149,7 @@ external[@layout_poly] len : ('a : any mod separable) . 'a array -> int =
 let f_any_1 (type a : any mod separable) (x : #(float# * a * int * int64#) array) =
   len x
 [%%expect{|
-external len : ('a : any mod separable). 'a array -> int = "%array_length"
+external len : ('a : any separable). 'a array -> int = "%array_length"
   [@@layout_poly]
 Line 5, characters 6-7:
 5 |   len x
@@ -2157,7 +2157,7 @@ Line 5, characters 6-7:
 Error: This expression has type "#(float# * a * int * int64#) array"
        but an expression was expected of type "'a array"
        The layout of #(float# * a * int * int64#) is
-           float64 & any & value & bits64
+           float64 & any separable & immediate & bits64
          because it is an unboxed tuple.
        But the layout of #(float# * a * int * int64#) must be representable
          because it's the layout polymorphic type in an external declaration
@@ -2173,7 +2173,8 @@ Line 2, characters 6-7:
           ^
 Error: This expression has type "#(string * a * bool option) array"
        but an expression was expected of type "'a array"
-       The layout of #(string * a * bool option) is value & any & value
+       The layout of #(string * a * bool option) is
+           value non_float & any separable & value non_float
          because it is an unboxed tuple.
        But the layout of #(string * a * bool option) must be representable
          because it's the layout polymorphic type in an external declaration
@@ -2190,7 +2191,7 @@ Line 2, characters 53-54:
 Error: This expression has type "#(float# * a * int * int64#) array"
        but an expression was expected of type "'a array"
        The layout of #(float# * a * int * int64#) is
-           float64 & any & value & bits64
+           float64 & any separable & immediate & bits64
          because it is an unboxed tuple.
        But the layout of #(float# * a * int * int64#) must be representable
          because it's the layout polymorphic type in an external declaration
@@ -2206,7 +2207,8 @@ Line 2, characters 52-53:
                                                         ^
 Error: This expression has type "#(string * a * bool option) array"
        but an expression was expected of type "'a array"
-       The layout of #(string * a * bool option) is value & any & value
+       The layout of #(string * a * bool option) is
+           value non_float & any separable & value non_float
          because it is an unboxed tuple.
        But the layout of #(string * a * bool option) must be representable
          because it's the layout polymorphic type in an external declaration
@@ -2364,7 +2366,7 @@ Line 1, characters 48-50:
 1 | external bytes_bad2 : ('a : any mod separable). 'a -> int
                                                     ^^
 Error: Types in an external must have a representable layout.
-       The layout of 'a is any
+       The layout of 'a is any separable
          because of the annotation on the universal variable 'a.
        But the layout of 'a must be representable
          because it's the type of an argument in an external declaration.
@@ -2407,7 +2409,7 @@ Line 1, characters 55-57:
 1 | external bytes_bad6 : ('a : any mod separable). int -> 'a
                                                            ^^
 Error: Types in an external must have a representable layout.
-       The layout of 'a is any
+       The layout of 'a is any separable
          because of the annotation on the universal variable 'a.
        But the layout of 'a must be representable
          because it's the type of the result of an external declaration.
@@ -2436,7 +2438,7 @@ Error: The primitive [%array_element_size_in_bytes] is used in an invalid declar
 external[@layout_poly] bytes_good1 : ('a : any mod separable). 'a array -> int
   = "%array_element_size_in_bytes"
 [%%expect{|
-external bytes_good1 : ('a : any mod separable). 'a array -> int
+external bytes_good1 : ('a : any separable). 'a array -> int
   = "%array_element_size_in_bytes" [@@layout_poly]
 |}]
 

@@ -57,7 +57,7 @@ module Maybe_naked = struct
     let all = List.concat_map (fun m -> [Value m; Naked m]) M.all
 
     let sort = function
-      | Value (_ : any_locality_mode M.t) -> Jkind_types.Sort.Const.value
+      | Value (_ : any_locality_mode M.t) -> Jkind_types.Sort.Const.scannable
       | Naked t -> M.naked_sort t
 
     let equal eq x y =
@@ -596,22 +596,22 @@ module Operation = struct
         sort, sort, sort
       | Shift (width, (Lsl | Lsr | Asr), Int) ->
         let sort = Integral.sort width in
-        sort, Jkind_types.Sort.Const.value, sort
+        sort, Jkind_types.Sort.Const.scannable, sort
       | Floating (width, (Add | Sub | Mul | Div)) ->
         let sort = Floating.sort width in
         sort, sort, sort
       | Icmp (width, (_ : Integer_comparison.t)) ->
         let sort = Integral.sort width in
-        sort, sort, Jkind_types.Sort.Const.value
+        sort, sort, Jkind_types.Sort.Const.scannable
       | Fcmp (width, (_ : Float_comparison.t)) ->
         let sort = Floating.sort width in
-        sort, sort, Jkind_types.Sort.Const.value
+        sort, sort, Jkind_types.Sort.Const.scannable
       | Three_way_compare_int ((Signed | Unsigned), width) ->
         let sort = Integral.sort width in
-        sort, sort, Jkind_types.Sort.Const.value
+        sort, sort, Jkind_types.Sort.Const.scannable
       | Three_way_compare_float width ->
         let sort = Floating.sort width in
-        sort, sort, Jkind_types.Sort.Const.value
+        sort, sort, Jkind_types.Sort.Const.scannable
 
     let to_string t =
       let make size name = String.concat "_" [to_string size; name] in
