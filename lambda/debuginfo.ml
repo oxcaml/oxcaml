@@ -290,6 +290,17 @@ end
 
 type t = { dbg : Dbg.t; assume_zero_alloc : ZA.Assume_info.t }
 
+(* CR gbury: find a better name *)
+let keep_last t =
+  let rec last = function
+    | [] -> None
+    | [x] -> Some x
+    | _ :: r -> last r
+  in
+  match last t.dbg with
+  | None -> t
+  | Some x -> { t with dbg = [x]; }
+
 let none = { dbg = []; assume_zero_alloc = ZA.Assume_info.none }
 
 let of_items items = { dbg = items; assume_zero_alloc = ZA.Assume_info.none }

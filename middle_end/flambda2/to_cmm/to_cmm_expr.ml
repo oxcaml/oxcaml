@@ -70,8 +70,12 @@ let warn_if_unused_inlined_attribute apply ~dbg_with_inlined =
         | Some explanation -> explanation ^ "\n")
         Debuginfo.print_compact dbg_with_inlined
     in
+    (* in practice, the actual location of the error is the deepest dbg in the stack,
+       where we failed the inlining, rather than the shallow part, which is the function
+       call whose inlining eventually revealed the non-inlined call. *)
+    let dbg = Debuginfo.keep_last dbg_with_inlined in
     Location.prerr_warning
-      (Debuginfo.to_location dbg_with_inlined)
+      (Debuginfo.to_location dbg)
       (Warnings.Inlining_impossible reason)
 
 let fail_if_probe apply =

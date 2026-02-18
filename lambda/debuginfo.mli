@@ -147,3 +147,5 @@ end
 
 val get_dbg : t -> Dbg.t
 
+val keep_last : t -> t
+
