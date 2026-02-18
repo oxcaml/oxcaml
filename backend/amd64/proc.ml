@@ -368,7 +368,7 @@ let unix_loc_external_arguments arg =
     ~first_stack:0
     arg
 
-let win64_int_external_arguments = Regs.[| RCX; RDX; R9; R9 |]
+let win64_int_external_arguments = Regs.[| RCX; RDX; R8; R9 |]
 let win64_float_external_arguments = Regs.[| MM0; MM1; MM2; MM3 |]
 
 let win64_loc_external_arguments arg =
