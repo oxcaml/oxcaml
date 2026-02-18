@@ -1,10 +1,10 @@
 (* TEST
-   only-default-codegen;
-   flags = " -O3";
-   expect.opt;
+ only-default-codegen;
+ flags = " -O3";
+ expect.opt;
 *)
 
-let immutable_load l  = (List.hd l) + (List.hd l)
+let immutable_load l = (List.hd l) + (List.hd l)
 [%%expect_asm X86_64{|
 immutable_load:
   testb $1, %al

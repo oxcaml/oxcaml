@@ -8,17 +8,18 @@
 open Stdlib_upstream_compatible
 
 type 'a vec = #{
-  size: int;
-  buffer: 'a array
+  size : int;
+  buffer : 'a array;
 }
 
 (* CR ttebbi:
   - Array bounds checks need a lot of instructions.
-  - We could inline a write-barrier fast path (like when the target object is
-   young). This is the only way to do something like creating short arrays of pointers
-   efficiently. *)
-let push (vec: 'a option vec) x = (* using option to avoid the float array case *)
-  let #{size; buffer } = vec in
+  - We could inline a write-barrier fast path (like when the
+    target object is young). This is the only way to do something
+    like creating short arrays of pointers efficiently. *)
+(* using option to avoid the float array case *)
+let push (vec : 'a option vec) x =
+  let #{size; buffer} = vec in
   buffer.(size) <- x;
   #{vec with size = size + 1}
 ;;
@@ -82,10 +83,9 @@ external int64_u_unsafe_get
     = "%array_unsafe_get_indexed_by_int64#"
   [@@layout_poly]
 
-(* CR ttebi: When indexing with an untagged index, there is no need to first
-    tag the index.
-*)
-let f (x : Int32_u.t array) (i: Int64_u.t) =
+(* CR ttebbi: When indexing with an untagged index,
+   there is no need to first tag the index. *)
+let f (x : Int32_u.t array) (i : Int64_u.t) =
   int64_u_unsafe_get x i |> Int32_u.to_int32 |> Int64_u.of_int32
 ;;
 [%%expect_asm X86_64{|

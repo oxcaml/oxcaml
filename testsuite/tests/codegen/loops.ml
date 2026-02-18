@@ -1,20 +1,23 @@
 (* TEST
-  flags = " -O3 -extension-universe upstream_compatible";
-  include stdlib_upstream_compatible;
-  only-default-codegen;
-  expect.opt;
+ flags = " -O3 -extension-universe upstream_compatible";
+ include stdlib_upstream_compatible;
+ only-default-codegen;
+ expect.opt;
 *)
 
 open Stdlib_upstream_compatible
 
 
-(* CR ttebbi: What could have been a nice dense loop got interrupted by the loop exit
-    path. In addition, we could consider loop rotation to remove the unconditional jump.
-*)
+(* CR ttebbi: What could have been a nice dense loop got
+   interrupted by the loop exit path. In addition, we could
+   consider loop rotation to remove the unconditional jump. *)
 let loop_code_layout n =
   let[@cold] cold () = () in
   let sum = ref 0 in
-  let rec loop x = sum := !sum + x; if x = 0 then (cold(); !sum) else loop (x - 1) in
+  let rec loop x =
+    sum := !sum + x;
+    if x = 0 then (cold (); !sum) else loop (x - 1)
+  in
   loop n
 [%%expect_asm X86_64{|
 loop_code_layout:
@@ -43,7 +46,10 @@ loop_code_layout.cold:
 
 (* CR ttebbi: loop peeling could avoid repeating List.hd *)
 let loop_with_non_dominating_load x l =
-  let[@inline always] rec loop i acc = if i > 0 then loop (i-1) (acc + (List.hd l)) else acc in
+  let[@inline always] rec loop i acc =
+    if i > 0 then loop (i - 1) (acc + List.hd l)
+    else acc
+  in
   loop 100 0
 [%%expect_asm X86_64{|
 loop_with_non_dominating_load:
@@ -67,7 +73,8 @@ loop_with_non_dominating_load:
 |}]
 
 
-(* CR ttebbi: Closure values are reloaded in the loop, despite having a dominating use. *)
+(* CR ttebbi: Closure values are reloaded in the loop,
+   despite having a dominating use. *)
 let f x =
   let[@cold] do_work () =
     let sum = ref (x + x) in
@@ -171,7 +178,7 @@ module M = struct
 
   external unsafe_get :
     (t[@local_opt]) -> (int[@local_opt]) -> #(f64 * f64 * f64)
-    @@ portable= "%array_unsafe_get"
+    @@ portable = "%array_unsafe_get"
 
   external length :
     (t[@local_opt]) @ immutable -> int @@ portable = "%array_length"
@@ -180,9 +187,10 @@ module M = struct
     let sum = ref 0.0 in
     for i = 0 to length t - 1 do
       let #(x,y,z) = unsafe_get t i in
-      sum := Float_u.(!sum +. to_float x *. to_float y *. to_float z)
+      sum :=
+        Float_u.(!sum +. to_float x *. to_float y *. to_float z)
     done;
-    Float_u.of_float(!sum)
+    Float_u.of_float (!sum)
 end
 [%%expect_asm X86_64{|
 M.f:

@@ -32,8 +32,9 @@ Variant_as_index.get:
 |}]
 
 
-(* CR ttebbi: The mutable breaks the optimization to access the same offset
-    unconditionally. There is an open PR https://github.com/oxcaml/oxcaml/pull/579 *)
+(* CR ttebbi: The mutable breaks the optimization to access
+   the same offset unconditionally. There is an open PR
+   https://github.com/oxcaml/oxcaml/pull/579 *)
 
 module Variant_with_uneven_mutability = struct
   type t =
@@ -66,25 +67,25 @@ type t =
   | C
   | D
 
-let f (t : t) : int =
+let variant_id (t : t) : int =
   match t with
   | A -> 0
   | B -> 1
   | C -> 2
   | D -> 3
 [%%expect_asm X86_64{|
-f:
+variant_id:
   ret
 |}]
 
-let f (t : t) : bool =
+let last_two (t : t) : bool =
   match t with
   | A -> false
   | B -> false
   | C -> true
   | D -> true
 [%%expect_asm X86_64{|
-f:
+last_two:
   cmpq  $5, %rax
   setge %al
   movzbq %al, %rax
@@ -95,14 +96,14 @@ f:
 (* CR ttebbi: This could be done looking at a single bit, and should certainly
     be branchfree. Also, this xor can be avoided by negating the bit extraction.
 *)
-let f (t : t) : bool =
+let even_variant (t : t) : bool =
   match t with
   | A -> true
   | B -> false
   | C -> true
   | D -> false
 [%%expect_asm X86_64{|
-f:
+even_variant:
   cmpq  $3, %rax
   je    .L108
   cmpq  $7, %rax
@@ -116,14 +117,14 @@ f:
   ret
 |}]
 
-let f (t : t) : int =
+let map_to_constants (t : t) : int =
   match t with
   | A -> 5
   | B -> 10
   | C -> 2
   | D -> 7
 [%%expect_asm X86_64{|
-f:
+map_to_constants:
   movq  camlTOP7__switch_block207@GOTPCREL(%rip), %rbx
   movq  -4(%rbx,%rax,4), %rax
   ret
@@ -133,12 +134,12 @@ type t =
   | C of int
   | D of int
 
-let f (t : t) : int =
+let boxed_variant_id (t : t) : int =
   match t with
   | C _ -> 0
   | D _ -> 1
 [%%expect_asm X86_64{|
-f:
+boxed_variant_id:
   movzbq -8(%rax), %rax
   leaq  1(%rax,%rax), %rax
   ret
@@ -150,13 +151,13 @@ type t =
   | A
   | B
 
-let f (t : t) : int =
+let map_to_constants_two (t : t) : int =
   match t with
   | A -> -1
   | B -> 1
 ;;
 [%%expect_asm X86_64{|
-f:
+map_to_constants_two:
   cmpq  $1, %rax
   jne   .L105
   movq  $-1, %rax
@@ -167,13 +168,13 @@ f:
 |}]
 
 
-(* CR ttebbi: We could eliminate jump tables when all the switch cases run the same code.
-*)
+(* CR ttebbi: We could eliminate jump tables when all the
+   switch cases run the same code. *)
 type t =
-    | A
-    | B
-    | C
-    | D
+  | A
+  | B
+  | C
+  | D
 
 let[@inline never] opaque_fun _ = ()
 
@@ -229,7 +230,7 @@ type s =
 (* CR ttebbi: We fail to avoid boxing here, see
     https://github.com/oxcaml/oxcaml/pull/2257
 *)
-let foo c a b =
+let double_match c a b =
   let m =
     match c with
     | C -> A a
@@ -240,7 +241,7 @@ let foo c a b =
   | A x -> x
   | B y -> y
 [%%expect_asm X86_64{|
-foo:
+double_match:
   subq  $8, %rsp
   movq  64(%r14), %rsi
   sarq  $1, %rax

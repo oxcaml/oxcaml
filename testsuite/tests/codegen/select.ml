@@ -1,13 +1,13 @@
 (* TEST
-   readonly_files = "intrinsics.ml stubs.c";
-   setup-ocamlopt.opt-build-env;
-   all_modules = "intrinsics.ml stubs.c";
-   compile_only = "true";
-   ocamlopt.opt;
+ readonly_files = "intrinsics.ml stubs.c";
+ setup-ocamlopt.opt-build-env;
+ all_modules = "intrinsics.ml stubs.c";
+ compile_only = "true";
+ ocamlopt.opt;
 
-   only-default-codegen;
-   flags = " -I ocamlopt.opt";
-   expect.opt;
+ only-default-codegen;
+ flags = " -I ocamlopt.opt";
+ expect.opt;
 *)
 
 
@@ -24,10 +24,9 @@ select_identity:
 |}]
 
 
-(* CR ttebbi: This could use fewer instructions by flipping the condition and
-    cmov registers.
-*)
-let select_cmp (x: int) = Intrinsics.select (x > 10) x 55
+(* CR ttebbi: This could use fewer instructions by flipping
+   the condition and cmov registers. *)
+let select_cmp (x : int) = Intrinsics.select (x > 10) x 55
 [%%expect_asm X86_64{|
 select_cmp:
   movq  %rax, %rbx
@@ -38,9 +37,8 @@ select_cmp:
 |}]
 
 
-(* CR ttebbi: We could constant-fold this.
-*)
-let select_constant (x: int) = Intrinsics.select true x 55
+(* CR ttebbi: We could constant-fold this. *)
+let select_constant (x : int) = Intrinsics.select true x 55
 [%%expect_asm X86_64{|
 select_constant:
   ret
