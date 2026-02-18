@@ -161,13 +161,19 @@ module T = struct
     | P MM8  -> 25 | P MM9  -> 26 | P MM10 -> 27 | P MM11 -> 28
     | P MM12 -> 29 | P MM13 -> 30 | P MM14 -> 31 | P MM15 -> 32
 
+  let check_typ_reg_class typ phys_reg =
+    let typ_reg_class = Reg_class.of_machtype typ in
+    let phys_reg_reg_class = Phys_reg.reg_class phys_reg in
+    if not (Reg_class.equal typ_reg_class phys_reg_reg_class)
+    then
+      Misc.fatal_errorf
+        "Class %a of register %a does not match class %a of type"
+        Reg_class.print phys_reg_reg_class Phys_reg.print phys_reg
+        Reg_class.print typ_reg_class
+    else typ_reg_class
+
   let dwarf_reg_number typ phys_reg =
-    if
-      not
-        (Reg_class.equal
-           (Reg_class.of_machtype typ)
-           (Phys_reg.reg_class phys_reg))
-    then Misc.fatal_error "Register class mismatch";
+    let _ : reg_class = check_typ_reg_class typ phys_reg in
     dwarf_reg_number phys_reg
 
   let to_target_name =
@@ -193,12 +199,7 @@ module T = struct
     Phys_reg.to_int phys_reg - first_in_class reg_class
 
   let register_name typ phys_reg =
-    if
-      not
-        (Reg_class.equal
-           (Reg_class.of_machtype typ)
-           (Phys_reg.reg_class phys_reg))
-    then Misc.fatal_error "Register class mismatch";
+    let _ : reg_class = check_typ_reg_class typ phys_reg in
     let index_in_class = index_in_class phys_reg in
     let names =
       match (typ : Cmm.machtype_component) with
@@ -214,8 +215,7 @@ module T = struct
        (the number of [value] slots, not their size in bytes) of the register
        from the [gc_regs] pointer during GC at runtime. Keep in sync with
        [amd64.S]. *)
-    let reg_class = Reg_class.of_machtype typ in
-    assert (Reg_class.equal reg_class (Phys_reg.reg_class phys_reg));
+    let reg_class = check_typ_reg_class typ phys_reg in
     let index = index_in_class phys_reg in
     match reg_class with
     | GPR -> index
