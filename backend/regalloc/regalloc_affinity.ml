@@ -4,11 +4,9 @@ open! Int_replace_polymorphic_compare
 module DLL = Oxcaml_utils.Doubly_linked_list
 module Phys_reg = Regs.Phys_reg
 
-type phys_reg = Phys_reg.t
-
 type affinity =
   { priority : int;
-    phys_reg : phys_reg
+    phys_reg : Phys_reg.t
   }
 
 let compare_desc_proprity { priority = left_priority; phys_reg = _ }
@@ -19,7 +17,8 @@ let compare_desc_proprity { priority = left_priority; phys_reg = _ }
    appear linked by a move instruction *)
 type moves = int Phys_reg.Tbl.t Reg.Tbl.t
 
-let incr_move : moves -> temp:Reg.t -> phys_reg:phys_reg -> delta:int -> unit =
+let incr_move : moves -> temp:Reg.t -> phys_reg:Phys_reg.t -> delta:int -> unit
+    =
  fun reg_tbl ~temp ~phys_reg ~delta ->
   let phys_reg_tbl =
     match Reg.Tbl.find_opt reg_tbl temp with
@@ -39,7 +38,7 @@ let incr_move : moves -> temp:Reg.t -> phys_reg:phys_reg -> delta:int -> unit =
 (* Returns a (temporary, physical register) pair if the passed instruction is a
    move between such registers, `None` otherwise *)
 let temp_and_phys_reg_of_instr :
-    Cfg.basic Cfg.instruction -> (Reg.t * phys_reg) option =
+    Cfg.basic Cfg.instruction -> (Reg.t * Phys_reg.t) option =
  fun instr ->
   match[@ocaml.warning "-fragile-match"] instr.desc with
   | Op Move -> (
