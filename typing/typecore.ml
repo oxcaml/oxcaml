@@ -766,10 +766,10 @@ let register_allocation_value_mode ~loc
    to one argument must be global. As a result, a function gets an
    [Alloc.lr] allocation mode that can be further constrained. *)
 let register_closure_allocation (mode : Value.r) ~loc : Alloc.lr * Value.r =
-  let (alloc_mode : Alloc.lr), _ = Alloc.newvar_below (value_to_alloc_r2g mode) in
   let hint = (Hint.Allocation_r {loc; txt = Unknown}) in
+  let (alloc_mode : Alloc.lr), _ = Alloc.newvar_below (value_to_alloc_r2g ~hint mode) in
   register_allocation_mode (Alloc.disallow_left alloc_mode);
-  let closed_over_mode = (alloc_as_value ~hint (Alloc.disallow_left alloc_mode)) in
+  let closed_over_mode = (alloc_as_value ~hint:Skip (Alloc.disallow_left alloc_mode)) in
   alloc_mode, closed_over_mode
 
 (** Register as allocation the expression constrained by the given
