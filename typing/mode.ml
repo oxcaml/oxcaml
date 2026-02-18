@@ -4156,7 +4156,13 @@ module Report = struct
    fun a_obj b_obj a b ->
     match C.equal_obj a_obj b_obj with
     | Equal -> Misc.Le_result.equal ~le:(C.le a_obj) a b
-    | Not_equal -> false
+    | Not_equal ->
+      match a_obj, b_obj with
+      | Locality, Regionality ->
+        Misc.Le_result.equal ~le:(C.le b_obj) (C.locality_as_regionality a) b
+      | Regionality, Locality ->
+        Misc.Le_result.equal ~le:(C.le a_obj) a (C.locality_as_regionality b)
+      | _, _ -> false
 
   let rec print_ahint : type a l r.
       ?sub:bool ->
@@ -5930,8 +5936,8 @@ let value_to_alloc_r2l_unhint m =
   in
   { comonadic; monadic }
 
-let value_to_alloc_r2l m =
-  m |> Value.unhint |> value_to_alloc_r2l_unhint |> Alloc.hint ~monadic:Skip
+let value_to_alloc_r2l ?hint m =
+  m |> Value.unhint |> value_to_alloc_r2l_unhint |> Alloc.hint ~monadic:Skip ?comonadic:hint
 
 module Modality = struct
   (* Inferred modalities
