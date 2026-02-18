@@ -869,12 +869,7 @@ val get_formatter_output_functions :
 
 type formatter_out_functions = {
   out_string : string -> int -> int -> unit;
-<<<<<<< oxcaml
-  out_width : string -> pos:int -> len:int -> int; (** @since 5.4 *)
-||||||| upstream-base
-=======
   out_width: string -> pos:int -> len:int -> int; (** @since 5.4 *)
->>>>>>> upstream-incoming
   out_flush : unit -> unit;
   out_newline : unit -> unit;
   out_spaces : int -> unit;
@@ -943,12 +938,7 @@ val get_formatter_out_functions : unit -> formatter_out_functions @@ nonportable
 
 val utf_8_scalar_width: string -> pos:int -> len:int -> int
 (** [utf_8_scalar_width s ~pos ~len] is the number of unicode scalar values in
-<<<<<<< oxcaml
     the substring [String.sub s pos len]. Invalid byte sequences are implicitly
-||||||| upstream-base
-=======
-    the substring [String.sub s pos len]. Invalid byte sequences are implictly
->>>>>>> upstream-incoming
     replaced by [U+FFFD] since this yields a better width approximation for
     other ascii-based encoding scheme like ISO-8859-15. This is the default
     [out_width] function since OCaml 5.4.

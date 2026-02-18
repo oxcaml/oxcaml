@@ -128,13 +128,9 @@ let locs = ref true                     (* -locs *)
 let directory = ref None                (* -directory *)
 let annotations = ref false             (* -annot *)
 let binary_annotations = ref false      (* -bin-annot *)
-<<<<<<< oxcaml
 let binary_annotations_cms = ref false  (* -bin-annot-cms *)
 let shape_format =                      (* -shape-format *)
   ref (if Config.oxcaml_dwarf then Debugging_shapes else Old_merlin)
-||||||| upstream-base
-=======
->>>>>>> upstream-incoming
 let store_occurrences = ref false       (* -bin-annot-occurrences *)
 and use_threads = ref false             (* -thread *)
 and noassert = ref false                (* -noassert *)
@@ -175,12 +171,8 @@ let dump_source = ref false             (* -dsource *)
 let dump_parsetree = ref false          (* -dparsetree *)
 and dump_typedtree = ref false          (* -dtypedtree *)
 and dump_shape = ref false              (* -dshape *)
-<<<<<<< oxcaml
 and dump_slambda = ref false            (* -dslambda *)
-||||||| upstream-base
-=======
 and dump_matchcomp = ref false          (* -dmatchcomp *)
->>>>>>> upstream-incoming
 and dump_rawlambda = ref false          (* -drawlambda *)
 and dump_lambda = ref false             (* -dlambda *)
 and dump_blambda = ref false             (* -dblambda *)
@@ -202,38 +194,9 @@ let optimize_for_speed = ref true       (* -compact *)
 and opaque = ref false                  (* -opaque *)
 
 and dump_cmm = ref false                (* -dcmm *)
-<<<<<<< oxcaml
-||||||| upstream-base
-let dump_selection = ref false          (* -dsel *)
-=======
-let dump_selection = ref false          (* -dsel *)
-let dump_combine = ref false            (* -dcombine *)
->>>>>>> upstream-incoming
 let dump_cse = ref false                (* -dcse *)
-<<<<<<< oxcaml
-||||||| upstream-base
-let dump_live = ref false               (* -dlive *)
-let dump_spill = ref false              (* -dspill *)
-let dump_split = ref false              (* -dsplit *)
-let dump_interf = ref false             (* -dinterf *)
-let dump_prefer = ref false             (* -dprefer *)
-let dump_regalloc = ref false           (* -dalloc *)
-let dump_reload = ref false             (* -dreload *)
-let dump_scheduling = ref false         (* -dscheduling *)
-=======
-let dump_live = ref false               (* -dlive *)
-let dump_spill = ref false              (* -dspill *)
-let dump_split = ref false              (* -dsplit *)
-let dump_interf = ref false             (* -dinterf *)
-let dump_prefer = ref false             (* -dprefer *)
-let dump_interval = ref false           (* -dinterval *)
-let dump_regalloc = ref false           (* -dalloc *)
-let dump_reload = ref false             (* -dreload *)
-let dump_scheduling = ref false         (* -dscheduling *)
->>>>>>> upstream-incoming
 let dump_linear = ref false             (* -dlinear *)
 let keep_startup_file = ref false       (* -dstartup *)
-<<<<<<< oxcaml
 let debug_ocaml = ref false             (* -debug-ocaml *)
 let llvm_backend = ref false            (* -llvm-backend *)
 let default_timings_precision  = 3
@@ -254,12 +217,6 @@ let set_profile_granularity v =
   match List.assoc_opt v profile_granularity_level_mapping with
   | Some granularity -> profile_granularity := granularity
   | None -> raise (Invalid_argument (Format.sprintf "profile granularity: %s" v))
-||||||| upstream-base
-let dump_combine = ref false            (* -dcombine *)
-let profile_columns : Profile.column list ref = ref [] (* -dprofile/-dtimings *)
-=======
-let profile_columns : Profile.column list ref = ref [] (* -dprofile/-dtimings *)
->>>>>>> upstream-incoming
 
 let native_code = ref false             (* set to true under ocamlopt *)
 let jsir = ref false                    (* set to true under ocamlj *)
@@ -929,18 +886,8 @@ module Dump_option = struct
     | Raw_flambda
     | Flambda
     | Cmm
-    | Selection
-    | Combine
     | CSE
-    | Live
-    | Spill
-    | Split
-    | Interf
-    | Prefer
-    | Regalloc
-    | Scheduling
     | Linear
-    | Interval
 
   let compare (op1 : t) op2 =
     Stdlib.compare op1 op2
@@ -959,18 +906,8 @@ module Dump_option = struct
     | Raw_flambda -> "rawflambda"
     | Flambda -> "flambda"
     | Cmm -> "cmm"
-    | Selection -> "selection"
-    | Combine -> "combine"
     | CSE -> "cse"
-    | Live -> "live"
-    | Spill -> "spill"
-    | Split -> "split"
-    | Interf -> "interf"
-    | Prefer -> "prefer"
-    | Regalloc -> "regalloc"
-    | Scheduling -> "scheduling"
     | Linear -> "linear"
-    | Interval -> "interval"
 
   let of_string = function
     | "source" -> Some Source
@@ -986,18 +923,8 @@ module Dump_option = struct
     | "rawflambda" -> Some Raw_flambda
     | "flambda" -> Some Flambda
     | "cmm" -> Some Cmm
-    | "selection" -> Some Selection
-    | "combine" -> Some Combine
     | "cse" -> Some CSE
-    | "live" -> Some Live
-    | "spill" -> Some Spill
-    | "split" -> Some Split
-    | "interf" -> Some Interf
-    | "prefer" -> Some Prefer
-    | "regalloc" -> Some Regalloc
-    | "scheduling" -> Some Scheduling
     | "linear" -> Some Linear
-    | "interval" -> Some Interval
     | _ -> None
 
   let flag = function
@@ -1014,18 +941,8 @@ module Dump_option = struct
     | Raw_flambda -> dump_rawflambda
     | Flambda -> dump_flambda
     | Cmm -> dump_cmm
-    | Selection -> dump_selection
-    | Combine -> dump_combine
     | CSE -> dump_cse
-    | Live -> dump_live
-    | Spill -> dump_spill
-    | Split -> dump_split
-    | Interf -> dump_interf
-    | Prefer -> dump_prefer
-    | Regalloc -> dump_regalloc
-    | Scheduling -> dump_scheduling
     | Linear -> dump_linear
-    | Interval -> dump_interval
 
   type middle_end =
     | Flambda
@@ -1060,18 +977,8 @@ module Dump_option = struct
     | Flambda
       -> Middle Flambda
     | Cmm
-    | Selection
-    | Combine
     | CSE
-    | Live
-    | Spill
-    | Split
-    | Interf
-    | Prefer
-    | Regalloc
-    | Scheduling
     | Linear
-    | Interval
       -> Backend
 
   let available (option : t) : (unit, string) result =

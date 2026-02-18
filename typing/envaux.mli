@@ -14,7 +14,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-<<<<<<< oxcaml
 (* Convert environment summaries to environments. The Boolean [allow_missing_modules]
    controls whether missing modules are allowed. If it set to [true], missing modules
    will not be opened into the environment such that their contents will be missing from
@@ -22,17 +21,6 @@
    modules are encountered. *)
 
 val env_from_summary : allow_missing_modules:bool -> Env.summary -> Subst.t -> Env.t
-||||||| upstream-base
-open Format
-
-(* Convert environment summaries to environments *)
-
-val env_from_summary : Env.summary -> Subst.t -> Env.t
-=======
-(* Convert environment summaries to environments *)
-
-val env_from_summary : Env.summary -> Subst.t -> Env.t
->>>>>>> upstream-incoming
 
 (* Empty the environment caches. To be called when load_path changes. *)
 

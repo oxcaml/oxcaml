@@ -123,12 +123,8 @@ val locs : bool ref
 val directory : string option ref
 val annotations : bool ref
 val binary_annotations : bool ref
-<<<<<<< oxcaml
 val binary_annotations_cms : bool ref
 val shape_format : shape_format ref
-||||||| upstream-base
-=======
->>>>>>> upstream-incoming
 val store_occurrences : bool ref
 val use_threads : bool ref
 val noassert : bool ref
@@ -169,12 +165,8 @@ val dump_source : bool ref
 val dump_parsetree : bool ref
 val dump_typedtree : bool ref
 val dump_shape : bool ref
-<<<<<<< oxcaml
 val dump_slambda : bool ref
-||||||| upstream-base
-=======
 val dump_matchcomp : bool ref
->>>>>>> upstream-incoming
 val dump_rawlambda : bool ref
 val dump_lambda : bool ref
 val dump_blambda : bool ref
@@ -375,18 +367,8 @@ module Dump_option : sig
     | Flambda
       (* Note: no support for [-dflambda-let <stamp>] for now. *)
     | Cmm
-    | Selection
-    | Combine
     | CSE
-    | Live
-    | Spill
-    | Split
-    | Interf
-    | Prefer
-    | Regalloc
-    | Scheduling
     | Linear
-    | Interval
 
   val compare : t -> t -> int
 
