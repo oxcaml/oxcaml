@@ -7823,9 +7823,10 @@ let check_constructor_crossing_destruction
         (fun () -> Ok min_bound))
     env lid tag ~res ~args held_locks
 
-let apply_left_is_contained_by is_contained_by ?(modalities = Modality.Const.id)
-  mode = Modality.Const.apply_left ~is_contained_by modalities mode
+let apply_left_is_contained_by is_contained_by
+    ?(modalities = Modality.Const.id) mode =
+  Modality.Const.apply_left ~is_contained_by modalities mode
 
-let apply_right_is_contained_by is_contained_by ?(modalities = Modality.Const.id)
-  mode =
+let apply_right_is_contained_by is_contained_by
+    ?(modalities = Modality.Const.id) mode =
   Modality.Const.apply_right ~is_contained_by modalities mode

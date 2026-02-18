@@ -3061,7 +3061,8 @@ module Lattices_mono = struct
     match pm1 with
     | Proj_core (m1, ax1, obj1) ->
       let c1 = Axis.proj ax1 c1 in
-      Proj_and (compose_simple dst m0 (Imply_const_and_core (m1, c1)), ax1, obj1)
+      Proj_and
+        (compose_simple dst m0 (Imply_const_and_core (m1, c1)), ax1, obj1)
     | Proj_id (ax1, obj1) ->
       let c1 = Axis.proj ax1 c1 in
       Proj_and (compose_simple dst m0 (Imply_const c1), ax1, obj1)
@@ -3291,7 +3292,8 @@ module Lattices_mono = struct
       | And_min_core (ax1, m0) ->
         let obj0 = proj_obj ax1 dst in
         let c0 = Axis.proj ax1 c0 in
-        And_min_with (ax1, compose_simple obj0 (Core_and_meet_const (c0, m0)) m1)
+        And_min_with
+          (ax1, compose_simple obj0 (Core_and_meet_const (c0, m0)) m1)
       | Const_min_core -> Const_min a_obj
       | And_min_id ax1 -> And_min_with (ax1, m1)
       | Disallowed -> Compose (Simple sm0, And_min_with (ax1, m1))
@@ -3421,14 +3423,18 @@ module Lattices_mono = struct
           (** The specified axis of the input object is responsible for the
               output. *)
 
-    (* CR zqian: the following functions are hard to write, and are redundant since all
-       the information are already in [apply]. A general and simpler apporach would work
-       like this: Say we have [b = f a] on RHS, and we want to figure out which axis of
-       [a] is responsible for a specific axis [ax] of [b] being low. We will iterate
-       through all axes; for each axis, set that to [max] and get [a'], and calculate [b'
-       = f a']. If [b'] is not strictly higher than [b] on [ax], then the current axis of
-       [a] is not responsible for the [ax] of [b] being low. The iteration might end with
-       no axis of [a] being responsible, in which case the morphism is solely
+    (* CR zqian: the following functions are hard to write,
+       and are redundant since all the information are already
+       in [apply]. A general and simpler apporach would work
+       like this: Say we have [b = f a] on RHS, and we want
+       to figure out which axis of [a] is responsible for a
+       specific axis [ax] of [b] being low. We will iterate
+       through all axes; for each axis, set that to [max] and
+       get [a'], and calculate [b' = f a']. If [b'] is not
+       strictly higher than [b] on [ax], then the current
+       axis of [a] is not responsible for the [ax] of [b]
+       being low. The iteration might end with no axis of [a]
+       being responsible, in which case the morphism is solely
        respoonsible. *)
 
     let find_responsible_axis_proj_core : type a b b_ax l r.
@@ -5837,7 +5843,8 @@ let value_to_alloc_r2l_unhint m =
   { comonadic; monadic }
 
 let value_to_alloc_r2l ?hint m =
-  m |> Value.unhint |> value_to_alloc_r2l_unhint |> Alloc.hint ~monadic:Skip ?comonadic:hint
+  m |> Value.unhint |> value_to_alloc_r2l_unhint
+  |> Alloc.hint ~monadic:Skip ?comonadic:hint
 
 module Modality = struct
   (* Inferred modalities
