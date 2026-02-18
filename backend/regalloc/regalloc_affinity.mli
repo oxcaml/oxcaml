@@ -9,11 +9,9 @@
     this basic version already seems useful, in particular for the linscan and
     greedy allocators. *)
 
-type phys_reg = Regs.Phys_reg.t
-
 type affinity =
   { priority : int;
-    phys_reg : phys_reg
+    phys_reg : Regs.Phys_reg.t
   }
 
 type t
