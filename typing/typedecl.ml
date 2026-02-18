@@ -1918,20 +1918,6 @@ let update_record_kind (type rep) env loc (form : rep record_form)
          mutable first_any : Ident.t option;
       }
   end in
-  (* The compiler does not like matching on records with mutable fields, so we
-     create an immutable copy for the match below. *)
-  let module Imm_element_rep = struct
-    type element_repr_summary =
-      {  values : bool;
-         floats: bool;
-         atomic_floats : bool;
-         atomic_fields : bool;
-         float64s : bool;
-         non_float64_unboxed_fields : bool;
-         voids : bool;
-         first_any : Ident.t option;
-    }
-  end in
 
   match form, lbls, rep with
   | Legacy, [(lbl, ld_type)], Some Record_unboxed ->
@@ -2006,18 +1992,23 @@ let update_record_kind (type rep) env loc (form : rep record_form)
              non_float64_unboxed_fields; atomic_fields; voids;
              first_any } = repr_summary
       in
-      let summary : Imm_element_rep.element_repr_summary =
-        { values; floats; atomic_floats; float64s;
-          non_float64_unboxed_fields; atomic_fields; voids; first_any }
-      in
-      match form, summary with
+      let refining_block_with_any = Option.is_none rep in
+      (* Important: If [refining_block_with_any] is true, we must use a plain
+         value block or mixed block. *)
+      match
+        (* Need to separate the GADT match from the labeled tuple *)
+        form,
+        ( ~refining_block_with_any, ~values, ~floats, ~atomic_floats,
+          ~float64s, ~non_float64_unboxed_fields, ~atomic_fields, ~voids,
+          ~first_any )
+      with
       (* We store floats flatly in mixed records if all fields are
          float/float64/void. *)
       | Legacy,
-        { values = false; floats = true; atomic_floats = false;
-          float64s = true; non_float64_unboxed_fields = false;
-          atomic_fields = false; first_any = None }
-         ->
+        ( ~refining_block_with_any:false, ~values:false, ~floats:true,
+          ~atomic_floats:false, ~float64s:true,
+          ~non_float64_unboxed_fields:false, ~atomic_fields:false,
+          ~first_any:None, .. ) ->
           let shape =
             List.map
               (fun ((repr : Element_repr.t option), _lbl) ->
@@ -2037,12 +2028,12 @@ let update_record_kind (type rep) env loc (form : rep record_form)
           assert_mixed_product_support loc Record ~value_prefix_len:0;
           Ok (Record_mixed shape)
       (* Forbid atomic fields in mixed (or potentially mixed) blocks *)
-      | Legacy, { values = true; voids = true; atomic_fields = true }
-      | Legacy, { floats = true; voids = true; atomic_fields = true }
-      | Legacy, { float64s = true; voids = true; atomic_fields = true }
-      | Legacy, { values = true; float64s = true; atomic_fields = true }
-      | Legacy, { non_float64_unboxed_fields = true; atomic_fields = true }
-      | Legacy, { first_any = Some _; atomic_fields = true } ->
+      | Legacy, ( ~values:true, ~voids:true, ~atomic_fields:true, ..
+                | ~floats:true, ~voids:true, ~atomic_fields:true, ..
+                | ~float64s:true, ~voids:true, ~atomic_fields:true, ..
+                | ~values:true, ~float64s:true, ~atomic_fields:true, ..
+                | ~non_float64_unboxed_fields:true, ~atomic_fields:true, ..
+                | ~first_any:(Some _), ~atomic_fields:true, .. ) ->
         begin
           let error =
             (* Print a different error if an atomic field itself is
@@ -2073,17 +2064,17 @@ let update_record_kind (type rep) env loc (form : rep record_form)
           raise error
         end
       (* Any record with a field of kind [any] can't be represented. *)
-      | _, { first_any = Some id } ->
+      | _,
+        ( ~first_any:(Some id), .. ) ->
           Result.Error (Unrepresentable_field (Ident.name id))
       (* For other mixed blocks, float fields are stored as flat
          only when they're unboxed.
       *)
-      | Legacy, ( { values = true; voids = true; atomic_fields = false }
-                | { floats = true; voids = true; atomic_fields = false }
-                | { float64s = true; voids = true; atomic_fields = false }
-                | { values = true; float64s = true; atomic_fields = false }
-                | { non_float64_unboxed_fields = true;
-                    atomic_fields = false } ) ->
+      | Legacy, ( ~values:true, ~voids:true, ~atomic_fields:false, ..
+                | ~floats:true, ~voids:true, ~atomic_fields:false, ..
+                | ~float64s:true, ~voids:true, ~atomic_fields:false, ..
+                | ~values:true, ~float64s:true, ~atomic_fields:false, ..
+                | ~non_float64_unboxed_fields:true, ~atomic_fields:false, ..) ->
           let shape =
             Element_repr.mixed_product_shape loc reprs Record
           in
@@ -2093,10 +2084,12 @@ let update_record_kind (type rep) env loc (form : rep record_form)
             | Ok `Not_mixed | Error _ -> Misc.fatal_error "expected mixed block"
           in
           Ok (Record_mixed shape)
-      (* value-only records are stored as boxed records *)
+      (* value-only records are stored as boxed records, as are records whose
+         declared types have fields of kind [any] *)
       | Legacy,
-        { values = true; float64s = false; non_float64_unboxed_fields = false;
-          voids = false }
+        ( ~values:true, ~float64s:false, ~non_float64_unboxed_fields: false,
+          ~voids:false, ..
+        | ~refining_block_with_any:true, .. )
       | Unboxed_product, _
         ->
           let sorts =
@@ -2117,18 +2110,18 @@ let update_record_kind (type rep) env loc (form : rep record_form)
          flat float records.
       *)
       | Legacy,
-        { values = false; floats = true ; atomic_floats = false;
-          float64s = false; non_float64_unboxed_fields = false;
-          voids = false; first_any = None } ->
+        ( ~values:false, ~floats:true, ~atomic_floats:false,
+          ~float64s:false, ~non_float64_unboxed_fields:false,
+          ~voids:false, ~first_any:None, .. ) ->
         Ok Record_float
       | Legacy,
-        { values = false; floats = false; atomic_floats = false;
-          float64s = true; non_float64_unboxed_fields = false;
-          voids = false; first_any = None } ->
+        ( ~values:false, ~floats:false, ~atomic_floats:false,
+          ~float64s:true, ~non_float64_unboxed_fields:false,
+          ~voids:false, ~first_any:None, .. ) ->
         Ok Record_ufloat
       (* Records with atomic float fields cannot use flat representation *)
       | Legacy,
-        { atomic_floats = true; floats; values; first_any = None; _ } ->
+        ( ~atomic_floats:true, ~first_any:None, .. ) ->
         if warn && floats && not values
         then Location.prerr_warning loc Warnings.Atomic_float_record_boxed;
         let rep =
@@ -2138,16 +2131,16 @@ let update_record_kind (type rep) env loc (form : rep record_form)
         in
         Ok rep
       | Legacy,
-        { voids=false; values=false; floats=true; atomic_floats=false;
-          atomic_fields=true; float64s=true; non_float64_unboxed_fields=false
-        } ->
+        ( ~voids:false, ~values:false, ~floats:true, ~atomic_floats:false,
+          ~atomic_fields:true, ~float64s:true,
+          ~non_float64_unboxed_fields:false, .. ) ->
         Misc.fatal_error
           "Typedecl.update_record_kind: invariant broken in repr_summary \
            (only floats, some atomic fields, no atomic floats?)"
       | Legacy,
-        { values = false; floats = false; atomic_floats = false;
-          float64s = false; non_float64_unboxed_fields = false;
-          voids = _; atomic_fields = _; first_any = None }
+        ( ~values:false, ~floats:false, ~atomic_floats:false,
+          ~float64s:false, ~non_float64_unboxed_fields:false,
+          ~voids:_, ~atomic_fields:_, ~first_any:None, .. )
         [@warning "+9"] ->
         Misc.fatal_error "Typedecl.update_record_kind: empty record"
     in

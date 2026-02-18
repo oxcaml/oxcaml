@@ -206,3 +206,31 @@ let test_nested_via_index =
 [%%expect{|
 val test_nested_via_index : int64 = 4L
 |}]
+
+(* Test that a record with [any] is never a flat float block *)
+
+module Secret_float : sig
+  type 'a pair := 'a t
+  type t
+  val to_float : t -> float
+  val mk_pair : unit -> t pair
+end = struct
+  type t = float
+  let to_float x = x
+  let mk_pair () = { fst = 42.0; snd = 99.0 }
+end
+[%%expect {|
+module Secret_float :
+  sig type t val to_float : t -> float val mk_pair : unit -> t/1 t/2 end
+|}]
+
+let test_secret_float =
+  let t = Secret_float.mk_pair () in
+  let f =
+    (* If the record is flat, this will segfault *)
+    Secret_float.to_float t.fst
+  in
+  f
+[%%expect {|
+val test_secret_float : float = 42.
+|}]
