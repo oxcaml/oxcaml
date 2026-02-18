@@ -1,0 +1,6 @@
+File "test_arch_specific_witness.ml", line 12, characters 5-15:
+Error: Annotation check for zero_alloc strict failed on function Test_arch_specific_witness.max_with_assume (camlTest_arch_specific_witness.max_with_assume_HIDE_STAMP).
+
+File "test_arch_specific_witness.ml", line 12, characters 48-87:
+Error: expression may allocate on a path to diverge
+       (architecture specific operation: simd)
