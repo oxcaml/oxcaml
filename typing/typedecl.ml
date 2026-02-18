@@ -1175,7 +1175,7 @@ let record_gets_unboxed_version = function
       Array.exists
         (fun (kind : mixed_block_element) ->
           match kind with
-          | Scannable _ | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
+          | Scannable | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
           | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate | Void -> false
           | Float_boxed -> true
           | Product shape -> shape_has_float_boxed shape)
@@ -1705,7 +1705,7 @@ module Element_repr = struct
   and t =
     | Unboxed_element of unboxed_element
     | Float_element
-    | Value_element of Jkind_types.Scannable_axes.t
+    | Value_element
     | Void
     (* This type technically permits [Float_element] to appear in an unboxed
        product, but we never generate that and make no attempt to apply the
@@ -1716,10 +1716,7 @@ module Element_repr = struct
   let to_shape_element t : mixed_block_element =
     let rec of_t : t -> mixed_block_element = function
     | Unboxed_element unboxed -> of_unboxed_element unboxed
-    | Float_element ->
-      (* A (boxed) [float] is separable and not null *)
-      Scannable Jkind_types.Scannable_axes.value_axes
-    | Value_element sa -> Scannable sa
+    | Float_element | Value_element -> Scannable
     | Void -> Void
     and of_unboxed_element : unboxed_element -> mixed_block_element = function
       | Float64 -> Float64
@@ -1742,33 +1739,37 @@ module Element_repr = struct
     then Float_element
     else
       let layout = Jkind.get_layout_defaulting_to_scannable jkind in
-      let rec layout_to_t : Jkind_types.Layout.Const.t -> t = function
-      | Any _ ->
-        Misc.fatal_error "Element_repr.classify: unexpected abstract layout"
-      | Base (Scannable, sa) -> Value_element sa
-      | Base (Float64, _) -> Unboxed_element Float64
-      | Base (Float32, _) -> Unboxed_element Float32
-      | Base (Word, _) -> Unboxed_element Word
-      | Base (Bits8, _) -> Unboxed_element Bits8
-      | Base (Bits16, _) -> Unboxed_element Bits16
-      | Base (Bits32, _) -> Unboxed_element Bits32
-      | Base (Bits64, _) -> Unboxed_element Bits64
-      | Base (Untagged_immediate, _) -> Unboxed_element Untagged_immediate
-      | Base (Vec128, _) -> Unboxed_element Vec128
-      | Base (Vec256, _) -> Unboxed_element Vec256
-      | Base (Vec512, _) -> Unboxed_element Vec512
-      | Base (Void, _) -> Void
-      | Product l ->
-        Unboxed_element (Product (Array.of_list (List.map layout_to_t l)))
+      let sort =
+        match Jkind.Layout.Const.get_sort layout with
+        | None ->
+          Misc.fatal_error "Element_repr.classify: unexpected abstract layout"
+        | Some s -> s
       in
-      layout_to_t layout
+      let rec sort_to_t : Jkind_types.Sort.Const.t -> t = function
+      | Base Scannable -> Value_element
+      | Base Float64 -> Unboxed_element Float64
+      | Base Float32 -> Unboxed_element Float32
+      | Base Word -> Unboxed_element Word
+      | Base Bits8 -> Unboxed_element Bits8
+      | Base Bits16 -> Unboxed_element Bits16
+      | Base Bits32 -> Unboxed_element Bits32
+      | Base Bits64 -> Unboxed_element Bits64
+      | Base Untagged_immediate -> Unboxed_element Untagged_immediate
+      | Base Vec128 -> Unboxed_element Vec128
+      | Base Vec256 -> Unboxed_element Vec256
+      | Base Vec512 -> Unboxed_element Vec512
+      | Base Void -> Void
+      | Product l ->
+        Unboxed_element (Product (Array.of_list (List.map sort_to_t l)))
+      in
+      sort_to_t sort
 
   let mixed_product_shape loc ts kind =
     let boxed_elements =
       let rec count_boxed_in_t acc : t -> int = function
         | Unboxed_element u -> count_boxed_in_unboxed_element acc u
         | Void -> acc
-        | Float_element | Value_element _ -> acc + 1
+        | Float_element | Value_element -> acc + 1
       and count_boxed_in_unboxed_element acc : unboxed_element -> int =
         function
         | Float64 | Float32 | Bits8 | Bits16 | Bits32 | Bits64
@@ -1933,7 +1934,7 @@ let rec update_decl_jkind env dpath decl =
                              | Vec128 | Vec256 | Vec512 | Word
                              | Untagged_immediate | Product _ ) ->
                repr_summary.non_float64_unboxed_fields <- true
-           | Value_element _ -> repr_summary.values <- true
+           | Value_element -> repr_summary.values <- true
            | Void ->
                repr_summary.voids <- true)
         reprs lbls;
@@ -1963,7 +1964,7 @@ let rec update_decl_jkind env dpath decl =
                   | Unboxed_element (Float32 | Bits8 | Bits16 | Bits32 | Bits64
                                     | Vec128 | Vec256 | Vec512 | Word
                                     | Untagged_immediate | Product _)
-                  | Value_element _ ->
+                  | Value_element ->
                       Misc.fatal_error "Expected only floats and float64s")
                 reprs
               |> Array.of_list
@@ -1983,7 +1984,7 @@ let rec update_decl_jkind env dpath decl =
                 List.find_map
                   (fun ((repr : Element_repr.t), lbl) ->
                      match repr with
-                     | Value_element _ | Float_element -> None
+                     | Value_element | Float_element -> None
                      | _ ->
                        if Types.is_atomic lbl.Types.ld_mutable
                        then Some lbl
@@ -3496,13 +3497,13 @@ let native_repr_of_type env kind ty sort_or_poly =
   | Untagged, Tconstr (_, _, _) ->
     let is_immediate = Ctype.is_always_gc_ignorable env ty in
     let is_non_nullable = Ctype.check_type_nullability env ty Non_null in
-    let is_scannable =
+    let is_value =
       match sort_or_poly with
       | Poly -> false
       | Sort (Base Scannable) -> true
       | Sort (Base _ | Product _) -> false
     in
-    if is_immediate && is_non_nullable && is_scannable
+    if is_immediate && is_non_nullable && is_value
     then Some (Unboxed_or_untagged_integer Untagged_int)
     else None
   | Unboxed, Tconstr (path, _, _) when Path.same path Predef.path_float ->
