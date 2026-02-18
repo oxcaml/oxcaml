@@ -128,7 +128,7 @@ type preproc_stack_check_result =
   }
 
 val preproc_stack_check :
-  fun_body:Linear.instruction ->
+  fun_body:Linear.instruction_data Oxcaml_utils.Doubly_linked_list.t ->
   frame_size:int ->
   trap_size:int ->
   preproc_stack_check_result

@@ -202,7 +202,7 @@ end
 
 (* CR mshinwell for TheNumbat: consider making simd_selection generate the AST
    types directly, as was done for amd64. *)
-let simd_instr (op : Simd.operation) (i : Linear.instruction) =
+let simd_instr (op : Simd.operation) (i : Linear.instruction_data) =
   let module Lane_index = Ast.Neon_reg_name.Lane_index in
   (* Check register constraints for instructions that require res = arg0 *)
   (match[@ocaml.warning "-4"] op with
@@ -932,49 +932,47 @@ let emit_load_symbol_addr dst s =
    bounds check points emitted out-of-line from the function body. See
    branch_relaxation.mli. *)
 
-let num_call_gc_points instr =
-  let rec loop instr call_gc =
-    match instr.desc with
-    | Lend -> call_gc
-    | Lop (Alloc { mode = Heap; _ }) when !fastcode_flag ->
-      loop instr.next (call_gc + 1)
-    | Lop Poll -> loop instr.next (call_gc + 1)
-    (* The following four should never be seen, since this function is run
-       before branch relaxation. *)
-    | Lop (Specific (Ifar_alloc _)) | Lop (Specific Ifar_poll) -> assert false
-    | Lop (Alloc { mode = Local | Heap; _ })
-    | Lop
-        (Specific
-           ( Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
-           | Inegmulsubf | Isqrtf | Imove32
-           | Ishiftarith (_, _)
-           | Ibswap _ | Isignext _ | Isimd _ ))
-    | Lop
-        ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
-        | Dls_get | Tls_get | Domain_index | Const_int _ | Const_float32 _
-        | Const_float _ | Const_symbol _ | Const_vec128 _ | Stackoffset _
-        | Load _
-        | Store (_, _, _)
-        | Intop _ | Int128op _
-        | Intop_imm (_, _)
-        | Intop_atomic _
-        | Floatop (_, _)
-        | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-        | Name_for_debugger _ )
-    | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
-    | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
-    | Lcondbranch (_, _)
-    | Lcondbranch3 (_, _, _)
-    | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-    | Lstackcheck _ ->
-      loop instr.next call_gc
-    | Lop (Const_vec256 _ | Const_vec512 _) ->
-      Misc.fatal_error "arm64: got 256/512 bit vector"
-    | Lop (Specific (Illvm_intrinsic intr)) ->
-      Misc.fatal_errorf
-        "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
-  in
-  loop instr 0
+let num_call_gc_points
+    (body : Linear.instruction_data Oxcaml_utils.Doubly_linked_list.t) =
+  let module DLL = Oxcaml_utils.Doubly_linked_list in
+  DLL.fold_left body ~init:0 ~f:(fun call_gc data ->
+      match data.Linear.desc with
+      | Lop (Alloc { mode = Heap; _ }) when !fastcode_flag -> call_gc + 1
+      | Lop Poll -> call_gc + 1
+      (* The following four should never be seen, since this function is run
+         before branch relaxation. *)
+      | Lop (Specific (Ifar_alloc _)) | Lop (Specific Ifar_poll) -> assert false
+      | Lop (Alloc { mode = Local | Heap; _ })
+      | Lop
+          (Specific
+             ( Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
+             | Inegmulsubf | Isqrtf | Imove32
+             | Ishiftarith (_, _)
+             | Ibswap _ | Isignext _ | Isimd _ ))
+      | Lop
+          ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
+          | Dls_get | Tls_get | Domain_index | Const_int _ | Const_float32 _
+          | Const_float _ | Const_symbol _ | Const_vec128 _ | Stackoffset _
+          | Load _
+          | Store (_, _, _)
+          | Intop _ | Int128op _
+          | Intop_imm (_, _)
+          | Intop_atomic _
+          | Floatop (_, _)
+          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
+          | Name_for_debugger _ )
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
+      | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
+      | Lcondbranch (_, _)
+      | Lcondbranch3 (_, _, _)
+      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
+      | Lstackcheck _ ->
+        call_gc
+      | Lop (Const_vec256 _ | Const_vec512 _) ->
+        Misc.fatal_error "arm64: got 256/512 bit vector"
+      | Lop (Specific (Illvm_intrinsic intr)) ->
+        Misc.fatal_errorf
+          "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr)
 
 let max_out_of_line_code_offset ~num_call_gc =
   if num_call_gc < 1
@@ -1034,10 +1032,9 @@ module BR = Branch_relaxation.Make (struct
           | Floatop (_, _)
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Name_for_debugger _ )
-      | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
-      | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
-      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-      | Lstackcheck _ ->
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
+      | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _ | Lswitch _
+      | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _ | Lstackcheck _ ->
         None
       | Lop (Const_vec256 _ | Const_vec512 _) ->
         Misc.fatal_error "arm64: got 256/512 bit vector"
@@ -1065,7 +1062,6 @@ module BR = Branch_relaxation.Make (struct
 
   let instr_size instr =
     match instr.Linear.desc with
-    | Lend -> 0
     | Lprologue -> prologue_size ()
     | Lepilogue_open -> epilogue_size ()
     | Lepilogue_close -> 0
@@ -1080,7 +1076,7 @@ module BR = Branch_relaxation.Make (struct
     | Lop (Intop_atomic _) ->
       Misc.fatal_errorf
         "emit_instr: builtins are not yet translated to atomics: %a"
-        Printlinear.instr instr
+        Printlinear.instr_data instr
     | Lcall_op Lcall_ind -> 1
     | Lcall_op (Lcall_imm _) -> 1
     | Lcall_op Ltailcall_ind -> epilogue_size ()
@@ -1530,7 +1526,6 @@ let emit_static_cast (cast : Cmm.static_cast) i =
 let emit_instr i =
   emit_debug_info i.dbg;
   match i.desc with
-  | Lend -> ()
   | Lprologue ->
     assert !prologue_required;
     let n = frame_size () in
@@ -1549,7 +1544,7 @@ let emit_instr i =
   | Lop (Intop_atomic _) ->
     Misc.fatal_errorf
       "emit_instr: builtins are not yet translated to atomics: %a"
-      Printlinear.instr i
+      Printlinear.instr_data i
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast cast i
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
@@ -1865,7 +1860,7 @@ let emit_instr i =
       (Intop_imm ((Imul | Idiv | Iclz _ | Ictz _ | Ipopcnt | Imod | Imulh _), _))
     ->
     Misc.fatal_errorf "emit_instr: immediate operand not supported for %a"
-      Printlinear.instr i
+      Printlinear.instr_data i
   | Lop (Specific Isqrtf) -> (
     match H.reg_fp_operand_3 i.res.(0) i.arg.(0) i.arg.(0) with
     | S_regs (rd, rn, _) -> A.ins2 FSQRT rd rn
@@ -2125,18 +2120,15 @@ let emit_instr i =
   try emit_instr i
   with exn ->
     Format.eprintf "Exception whilst emitting instruction:@ %a\n"
-      Printlinear.instr i;
+      Printlinear.instr_data i;
     raise exn
 
 (* Emission of an instruction sequence *)
 
-let rec emit_all i =
-  (* CR-soon xclerc for xclerc: get rid of polymorphic compare. *)
-  if Stdlib.compare i.desc Lend = 0
-  then ()
-  else (
-    emit_instr i;
-    emit_all i.next)
+let emit_all (body : Linear.instruction_data Oxcaml_utils.Doubly_linked_list.t)
+    =
+  let module DLL = Oxcaml_utils.Doubly_linked_list in
+  DLL.iter body ~f:(fun data -> emit_instr data)
 
 (* Emission of a function declaration *)
 

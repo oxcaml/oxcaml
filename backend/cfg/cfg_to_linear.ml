@@ -30,8 +30,8 @@ module CL = Cfg_with_layout
 module L = Linear
 module DLL = Oxcaml_utils.Doubly_linked_list
 
-let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
-    L.instruction =
+let make_instr_data ?(like : _ Cfg.instruction option) desc : L.instruction_data
+    =
   let arg, res, dbg, live, fdo, available_before, available_across =
     match like with
     | None ->
@@ -51,11 +51,11 @@ let to_linear_instr ?(like : _ Cfg.instruction option) desc ~next :
         like.available_before,
         like.available_across )
   in
-  { desc; next; arg; res; dbg; live; fdo; available_before; available_across }
+  { desc; arg; res; dbg; live; fdo; available_before; available_across }
 
-let basic_to_linear (i : _ Cfg.instruction) ~next =
+let basic_to_instr_data (i : _ Cfg.instruction) : L.instruction_data =
   let desc = Cfg_to_linear_desc.from_basic i.desc in
-  to_linear_instr ~like:i desc ~next
+  make_instr_data ~like:i desc
 
 (* Certain "unordered" outcomes of float comparisons are not expressible as a
    single Cmm.float_comparison operator, or a disjunction of disjoint
@@ -96,9 +96,7 @@ let mk_float_cond ~lt ~eq ~gt ~uo =
   | true, false, false, true -> Must_be_last
 
 let cross_section cfg_with_layout src dst =
-  if
-    !Oxcaml_flags.basic_block_sections
-    && not (Label.equal dst Linear_utils.labelled_insn_end.label)
+  if !Oxcaml_flags.basic_block_sections && not (Label.equal dst Label.none)
   then
     let src_section = CL.get_section cfg_with_layout src in
     let dst_section = CL.get_section cfg_with_layout dst in
@@ -112,9 +110,8 @@ let cross_section cfg_with_layout src dst =
   else false
 
 let linearize_terminator cfg_with_layout (func : string) start
-    (terminator : Cfg.terminator Cfg.instruction)
-    ~(next : Linear_utils.labelled_insn) ~has_epilogue :
-    L.instruction * Label.t option =
+    (terminator : Cfg.terminator Cfg.instruction) ~(next_label : Label.t option)
+    ~has_epilogue : L.instruction_data list * Label.t option =
   (* CR-someday gyorsh: refactor, a lot of redundant code for different cases *)
   (* CR-someday gyorsh: for successor labels that are not fallthrough, order of
      branch instructions should depend on perf data and possibly the relative
@@ -124,25 +121,37 @@ let linearize_terminator cfg_with_layout (func : string) start
   (* If one of the successors is a fallthrough label, do not emit a jump for it.
      Otherwise, the last jump is unconditional. *)
   let branch_or_fallthrough d lbl =
-    if
-      (not (Label.equal next.label lbl))
-      || cross_section cfg_with_layout start lbl
-    then d @ [L.Lbranch lbl]
-    else d
+    match next_label with
+    | Some next_lbl ->
+      if
+        (not (Label.equal next_lbl lbl))
+        || cross_section cfg_with_layout start lbl
+      then d @ [L.Lbranch lbl]
+      else d
+    | None -> d @ [L.Lbranch lbl]
   in
   let single d = [d], None in
   let emit_bool (c1, l1) (c2, l2) =
     let branch_or_fallthrough_next =
-      if cross_section cfg_with_layout start next.label
-      then [L.Lbranch next.label]
-      else []
+      match next_label with
+      | Some next_lbl ->
+        if cross_section cfg_with_layout start next_lbl
+        then [L.Lbranch next_lbl]
+        else []
+      | None -> []
     in
     (* c1 must be the inverse of c2 *)
-    match Label.equal l1 next.label, Label.equal l2 next.label with
-    | true, true -> branch_or_fallthrough_next
-    | false, true -> L.Lcondbranch (c1, l1) :: branch_or_fallthrough_next
-    | true, false -> L.Lcondbranch (c2, l2) :: branch_or_fallthrough_next
-    | false, false ->
+    match next_label with
+    | Some next_lbl -> (
+      match Label.equal l1 next_lbl, Label.equal l2 next_lbl with
+      | true, true -> branch_or_fallthrough_next
+      | false, true -> L.Lcondbranch (c1, l1) :: branch_or_fallthrough_next
+      | true, false -> L.Lcondbranch (c2, l2) :: branch_or_fallthrough_next
+      | false, false ->
+        if Label.equal l1 l2
+        then [L.Lbranch l1]
+        else [L.Lcondbranch (c1, l1); L.Lbranch l2])
+    | None ->
       if Label.equal l1 l2
       then [L.Lbranch l1]
       else [L.Lcondbranch (c1, l1); L.Lbranch l2]
@@ -255,12 +264,17 @@ let linearize_terminator cfg_with_layout (func : string) start
         in
         let last =
           match must_be_last with
-          | [] ->
-            if Label.Set.mem next.label successor_labels
-            then next.label
-            else
-              (* arbitrary choice (also see CR above) *)
-              Label.Set.min_elt successor_labels
+          | [] -> (
+            match next_label with
+            | Some next_lbl ->
+              if Label.Set.mem next_lbl successor_labels
+              then next_lbl
+              else
+                (* arbitrary choice (also see CR above) *)
+                Label.Set.min_elt successor_labels
+            | None ->
+              (* arbitrary choice *)
+              Label.Set.min_elt successor_labels)
           | [lbl] ->
             Printf.eprintf "One success label must be last: %s\n"
               (Label.to_string lbl);
@@ -295,10 +309,15 @@ let linearize_terminator cfg_with_layout (func : string) start
         (* If fallthrough label is a successor, do not emit a jump for it.
            Otherwise, the last jump could be unconditional. *)
         let last =
-          if Label.Set.mem next.label successor_labels
-          then next.label
-          else
-            (* arbitrary choice (see also CR above) *)
+          match next_label with
+          | Some next_lbl ->
+            if Label.Set.mem next_lbl successor_labels
+            then next_lbl
+            else
+              (* arbitrary choice (see also CR above) *)
+              Label.Set.min_elt successor_labels
+          | None ->
+            (* arbitrary choice *)
             Label.Set.min_elt successor_labels
         in
         let cond_successor_labels = Label.Set.remove last successor_labels in
@@ -313,11 +332,14 @@ let linearize_terminator cfg_with_layout (func : string) start
         then
           (* generates one cmp instruction for all conditional jumps here *)
           let find l =
-            if
-              (not (cross_section cfg_with_layout start l))
-              && Label.equal next.label l
-            then None
-            else Some l
+            match next_label with
+            | Some next_lbl ->
+              if
+                (not (cross_section cfg_with_layout start l))
+                && Label.equal next_lbl l
+              then None
+              else Some l
+            | None -> Some l
           in
           [L.Lcondbranch3 (find lt, find eq, find gt)], None
         else
@@ -355,19 +377,19 @@ let linearize_terminator cfg_with_layout (func : string) start
       desc_list @ [L.Lepilogue_close]
     | false -> desc_list
   in
-  let instr =
-    List.fold_left
-      (fun next desc ->
-        let instr = to_linear_instr desc ~next ~like:terminator in
+  let instr_data_list =
+    List.map
+      (fun desc ->
+        let instr_data = make_instr_data desc ~like:terminator in
         match has_epilogue with
         (* In order to match the debug info generated when the epilogue was not
            a linear instruction, we need to explicitly remove debug info, as
            they were already added to Lepilogue_open. *)
-        | true -> { instr with L.dbg = Debuginfo.none }
-        | false -> instr)
-      next.insn (List.rev desc_list)
+        | true -> { instr_data with L.dbg = Debuginfo.none }
+        | false -> instr_data)
+      desc_list
   in
-  instr, tailrec_label
+  instr_data_list, tailrec_label
 
 let need_starting_label (cfg_with_layout : CL.t) (block : Cfg.basic_block)
     ~(prev_block : Cfg.basic_block) =
@@ -394,16 +416,6 @@ let need_starting_label (cfg_with_layout : CL.t) (block : Cfg.basic_block)
         ->
         assert false)
 
-let adjust_stack_offset body (block : Cfg.basic_block)
-    ~(prev_block : Cfg.basic_block) =
-  let block_stack_offset = block.stack_offset in
-  let prev_stack_offset = prev_block.terminator.stack_offset in
-  if block_stack_offset = prev_stack_offset
-  then body
-  else
-    let delta_bytes = block_stack_offset - prev_stack_offset in
-    to_linear_instr (Ladjust_stack_offset { delta_bytes }) ~next:body
-
 let make_Llabel cfg_with_layout label =
   Linear.Llabel
     { label;
@@ -418,61 +430,87 @@ let make_Llabel cfg_with_layout label =
 let run cfg_with_layout =
   let cfg = CL.cfg cfg_with_layout in
   let layout = CL.layout cfg_with_layout in
-  let next = ref Linear_utils.labelled_insn_end in
+  let body_dll = DLL.make_empty () in
   let tailrec_label = ref None in
-  DLL.iter_right_cell layout ~f:(fun cell ->
+  DLL.iter_cell layout ~f:(fun cell ->
       let label = DLL.value cell in
       if not (Label.Tbl.mem cfg.blocks label)
       then Misc.fatal_errorf "Unknown block labelled %a\n" Label.format label;
       let block = Label.Tbl.find cfg.blocks label in
       assert (Label.equal label block.start);
-      let body =
-        let has_epilogue =
-          DLL.exists block.body ~f:(fun instr ->
-              match[@ocaml.warning "-4"] instr.Cfg.desc with
-              | Cfg.Epilogue -> true
-              | _ -> false)
-        in
-        let terminator, terminator_tailrec_label =
-          linearize_terminator cfg_with_layout cfg.fun_name block.start
-            block.terminator ~next:!next ~has_epilogue
-        in
-        (match !tailrec_label, terminator_tailrec_label with
-        | (Some _ | None), None -> ()
-        | None, Some _ -> tailrec_label := terminator_tailrec_label
-        | Some old_trl, Some new_trl -> assert (Label.equal old_trl new_trl));
-        DLL.fold_right
-          ~f:(fun i next -> basic_to_linear i ~next)
-          ~init:terminator block.body
+      let next_label =
+        match DLL.next cell with
+        | None -> None
+        | Some next_cell ->
+          let next_label = DLL.value next_cell in
+          Some next_label
       in
-      let insn =
+      let prev_block_opt =
         match DLL.prev cell with
-        | None -> body (* Entry block of the function. Don't add label. *)
+        | None -> None
         | Some prev_cell ->
-          let body =
-            if block.is_trap_handler
-            then to_linear_instr Lentertrap ~next:body
-            else body
-          in
-          let prev = DLL.value prev_cell in
-          let prev_block = Label.Tbl.find cfg.blocks prev in
-          let body =
-            if need_starting_label cfg_with_layout block ~prev_block
-            then
-              let instr =
-                to_linear_instr
-                  (make_Llabel cfg_with_layout block.start)
-                  ~next:body
-              in
-              { instr with
-                available_before = body.available_before;
-                available_across = body.available_across
-              }
-            else body
-          in
-          adjust_stack_offset body block ~prev_block
+          let prev_label = DLL.value prev_cell in
+          Some (Label.Tbl.find cfg.blocks prev_label)
       in
-      next := { Linear_utils.label; insn });
+      (match prev_block_opt with
+      | None -> ()
+      | Some prev_block ->
+        let block_stack_offset = block.stack_offset in
+        let prev_stack_offset = prev_block.terminator.stack_offset in
+        if block_stack_offset <> prev_stack_offset
+        then
+          let delta_bytes = block_stack_offset - prev_stack_offset in
+          let instr_data =
+            make_instr_data (Ladjust_stack_offset { delta_bytes })
+          in
+          DLL.add_end body_dll instr_data);
+      (match prev_block_opt with
+      | None -> ()
+      | Some prev_block ->
+        if need_starting_label cfg_with_layout block ~prev_block
+        then
+          let desc = make_Llabel cfg_with_layout block.start in
+          let first_body_instr_available =
+            match DLL.hd_cell block.body with
+            | None ->
+              ( block.terminator.available_before,
+                block.terminator.available_across )
+            | Some first_cell ->
+              let first_instr = DLL.value first_cell in
+              first_instr.available_before, first_instr.available_across
+          in
+          let available_before, available_across = first_body_instr_available in
+          let instr_data =
+            { (make_instr_data desc) with available_before; available_across }
+          in
+          DLL.add_end body_dll instr_data);
+      (match prev_block_opt with
+      | None -> ()
+      | Some _prev_block ->
+        if block.is_trap_handler
+        then
+          let instr_data = make_instr_data Lentertrap in
+          DLL.add_end body_dll instr_data);
+      let has_epilogue =
+        DLL.exists block.body ~f:(fun instr ->
+            match[@ocaml.warning "-4"] instr.Cfg.desc with
+            | Cfg.Epilogue -> true
+            | _ -> false)
+      in
+      DLL.iter block.body ~f:(fun instr ->
+          let instr_data = basic_to_instr_data instr in
+          DLL.add_end body_dll instr_data);
+      let terminator_instr_data_list, terminator_tailrec_label =
+        linearize_terminator cfg_with_layout cfg.fun_name block.start
+          block.terminator ~next_label ~has_epilogue
+      in
+      (match !tailrec_label, terminator_tailrec_label with
+      | (Some _ | None), None -> ()
+      | None, Some _ -> tailrec_label := terminator_tailrec_label
+      | Some old_trl, Some new_trl -> assert (Label.equal old_trl new_trl));
+      List.iter
+        (fun instr_data -> DLL.add_end body_dll instr_data)
+        terminator_instr_data_list);
   let fun_contains_calls = cfg.fun_contains_calls in
   let fun_num_stack_slots = cfg.fun_num_stack_slots in
   let fun_frame_required =
@@ -488,7 +526,7 @@ let run cfg_with_layout =
   in
   { Linear.fun_name = cfg.fun_name;
     fun_args = Reg.set_of_array cfg.fun_args;
-    fun_body = !next.insn;
+    fun_body = body_dll;
     fun_tailrec_entry_point_label = !tailrec_label;
     fun_fast = not (List.mem Cfg.Reduce_code_size cfg.fun_codegen_options);
     fun_dbg = cfg.fun_dbg;

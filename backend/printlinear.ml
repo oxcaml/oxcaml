@@ -43,7 +43,7 @@ let call_operation ?(print_reg = Printreg.reg) ppf op arg =
       (if enabled_at_init then "enabled_at_init " else "")
       name handler_code_sym regs arg
 
-let instr' ?(print_reg = Printreg.reg) ppf i =
+let instr_data' ?(print_reg = Printreg.reg) ppf data =
   let reg = print_reg in
   let regs = Printreg.regs' ~print_reg in
   let regsetaddr = Printreg.regsetaddr' ~print_reg in
@@ -60,42 +60,43 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
               set)
        | Unreachable -> true
      in
-     if ras_is_nonempty i.available_before || ras_is_nonempty i.available_across
+     if
+       ras_is_nonempty data.available_before
+       || ras_is_nonempty data.available_across
      then
-       if RAS.equal i.available_before i.available_across
+       if RAS.equal data.available_before data.available_across
        then
          fprintf ppf "@[<1>AB=AA={%a}@]@," (RAS.print ~print_reg:reg)
-           i.available_before
+           data.available_before
        else (
          fprintf ppf "@[<1>AB={%a}" (RAS.print ~print_reg:reg)
-           i.available_before;
-         fprintf ppf ",AA={%a}" (RAS.print ~print_reg:reg) i.available_across;
+           data.available_before;
+         fprintf ppf ",AA={%a}" (RAS.print ~print_reg:reg) data.available_across;
          fprintf ppf "@]@,"));
-  (match i.desc with
-  | Lend -> ()
+  (match data.desc with
   | Lprologue -> fprintf ppf "prologue"
   | Lepilogue_open -> fprintf ppf "epilogue_open"
   | Lepilogue_close -> fprintf ppf "epilogue_close"
   | Lop op ->
     (match[@warning "-4"] op with
-    | Alloc _ | Poll -> fprintf ppf "@[<1>{%a}@]@," regsetaddr i.live
+    | Alloc _ | Poll -> fprintf ppf "@[<1>{%a}@]@," regsetaddr data.live
     | _ -> ());
-    operation op i.arg ppf i.res
+    operation op data.arg ppf data.res
   | Lcall_op op ->
     (match op with
     | Lcall_ind | Lcall_imm _ | Lextcall _ | Lprobe _ ->
-      fprintf ppf "@[<1>{%a}@]@," regsetaddr i.live
+      fprintf ppf "@[<1>{%a}@]@," regsetaddr data.live
     | Ltailcall_imm _ | Ltailcall_ind -> ());
-    call_operation ppf op i.arg
+    call_operation ppf op data.arg
   | Lreloadretaddr -> fprintf ppf "reload retaddr"
-  | Lreturn -> fprintf ppf "return %a" regs i.arg
+  | Lreturn -> fprintf ppf "return %a" regs data.arg
   | Llabel { label = lbl; section_name } ->
     fprintf ppf "%a%a:" label lbl section_name_to_string section_name
   | Lbranch lbl -> fprintf ppf "goto %a" label lbl
   | Lcondbranch (tst, lbl) ->
-    fprintf ppf "if %a goto %a" (test tst) i.arg label lbl
+    fprintf ppf "if %a goto %a" (test tst) data.arg label lbl
   | Lcondbranch3 (lbl0, lbl1, lbl2) ->
-    fprintf ppf "switch3 %a" reg i.arg.(0);
+    fprintf ppf "switch3 %a" reg data.arg.(0);
     let case n = function
       | None -> ()
       | Some lbl -> fprintf ppf "@,case %i: goto %a" n label lbl
@@ -105,7 +106,7 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
     case 2 lbl2;
     fprintf ppf "@,endswitch"
   | Lswitch lblv ->
-    fprintf ppf "switch %a" reg i.arg.(0);
+    fprintf ppf "switch %a" reg data.arg.(0);
     for i = 0 to Array.length lblv - 1 do
       fprintf ppf "case %i: goto %a" i label lblv.(i)
     done;
@@ -115,18 +116,22 @@ let instr' ?(print_reg = Printreg.reg) ppf i =
     fprintf ppf "adjust pseudo stack offset by %d bytes" delta_bytes
   | Lpushtrap { lbl_handler } -> fprintf ppf "push trap %a" label lbl_handler
   | Lpoptrap { lbl_handler } -> fprintf ppf "pop trap %a" label lbl_handler
-  | Lraise k -> fprintf ppf "%s %a" (Lambda.raise_kind k) reg i.arg.(0)
+  | Lraise k -> fprintf ppf "%s %a" (Lambda.raise_kind k) reg data.arg.(0)
   | Lstackcheck { max_frame_size_bytes } ->
     fprintf ppf "stack check (%d bytes)" max_frame_size_bytes);
-  if (not (Debuginfo.is_none i.dbg)) && !Clflags.locations
-  then fprintf ppf " %s" (Debuginfo.to_string i.dbg)
+  if (not (Debuginfo.is_none data.dbg)) && !Clflags.locations
+  then fprintf ppf " %s" (Debuginfo.to_string data.dbg)
 
-let instr ppf i = instr' ppf i
+let instr_data ppf data = instr_data' ppf data
 
-let rec all_instr ppf i =
-  match[@warning "-4"] i.desc with
-  | Lend -> ()
-  | _ -> fprintf ppf "%a@,%a" instr i all_instr i.next
+let instr ppf cell =
+  let data = Oxcaml_utils.Doubly_linked_list.value cell in
+  instr_data' ppf data
+
+let all_instr ppf body =
+  Oxcaml_utils.Doubly_linked_list.iter_cell body ~f:(fun cell ->
+      let data = Oxcaml_utils.Doubly_linked_list.value cell in
+      fprintf ppf "%a@," instr_data data)
 
 let fundecl ppf f =
   let dbg =

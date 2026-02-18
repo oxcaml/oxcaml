@@ -516,42 +516,41 @@ type preproc_stack_check_result =
   }
 
 let preproc_stack_check ~fun_body ~frame_size ~trap_size =
-  let rec loop (i : Linear.instruction) fs max_fs nontail_flag =
-    match i.desc with
-    | Lend -> { max_frame_size = max_fs; contains_nontail_calls = nontail_flag }
-    | Ladjust_stack_offset { delta_bytes } ->
-      let s = fs + delta_bytes in
-      loop i.next s (max s max_fs) nontail_flag
-    | Lpushtrap _ ->
-      let s = fs + trap_size in
-      loop i.next s (max s max_fs) nontail_flag
-    | Lpoptrap _ -> loop i.next (fs - trap_size) max_fs nontail_flag
-    | Lop (Stackoffset n) ->
-      let s = fs + n in
-      loop i.next s (max s max_fs) nontail_flag
-    | Lcall_op (Lcall_ind | Lcall_imm _) -> loop i.next fs max_fs true
-    | Lprologue | Lepilogue_open | Lepilogue_close
-    | Lop
-        ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-        | Tls_get | Domain_index | Poll | Pause | Const_int _ | Const_float32 _
-        | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-        | Const_vec512 _ | Load _
-        | Store (_, _, _)
-        | Intop _ | Int128op _
-        | Intop_imm (_, _)
-        | Intop_atomic _
-        | Floatop (_, _)
-        | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-        | Specific _ | Name_for_debugger _ | Alloc _ )
-    | Lcall_op (Ltailcall_ind | Ltailcall_imm _ | Lextcall _ | Lprobe _)
-    | Lreloadretaddr | Lreturn | Llabel _ | Lbranch _ | Lcondbranch _
-    | Lcondbranch3 _ | Lswitch _ | Lentertrap | Lraise _ ->
-      loop i.next fs max_fs nontail_flag
-    | Lstackcheck _ ->
-      (* should not be already present *)
-      assert false
-  in
-  loop fun_body frame_size frame_size false
+  let max_fs = ref frame_size in
+  let nontail_flag = ref false in
+  let fs = ref frame_size in
+  Oxcaml_utils.Doubly_linked_list.iter fun_body ~f:(fun data ->
+      match data.Linear.desc with
+      | Ladjust_stack_offset { delta_bytes } ->
+        fs := !fs + delta_bytes;
+        max_fs := max !fs !max_fs
+      | Lpushtrap _ ->
+        fs := !fs + trap_size;
+        max_fs := max !fs !max_fs
+      | Lpoptrap _ -> fs := !fs - trap_size
+      | Lop (Stackoffset n) ->
+        fs := !fs + n;
+        max_fs := max !fs !max_fs
+      | Lcall_op (Lcall_ind | Lcall_imm _) -> nontail_flag := true
+      | Lprologue | Lepilogue_open | Lepilogue_close
+      | Lop
+          ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
+          | Tls_get | Domain_index | Poll | Pause | Const_int _
+          | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+          | Const_vec256 _ | Const_vec512 _ | Load _
+          | Store (_, _, _)
+          | Intop _ | Int128op _
+          | Intop_imm (_, _)
+          | Intop_atomic _
+          | Floatop (_, _)
+          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
+          | Specific _ | Name_for_debugger _ | Alloc _ )
+      | Lcall_op (Ltailcall_ind | Ltailcall_imm _ | Lextcall _ | Lprobe _)
+      | Lreloadretaddr | Lreturn | Llabel _ | Lbranch _ | Lcondbranch _
+      | Lcondbranch3 _ | Lswitch _ | Lentertrap | Lraise _ ->
+        ()
+      | Lstackcheck _ -> assert false);
+  { max_frame_size = !max_fs; contains_nontail_calls = !nontail_flag }
 
 let add_stack_checks_if_needed (fundecl : Linear.fundecl) ~stack_offset
     ~stack_threshold_size ~trap_size =
@@ -569,16 +568,20 @@ let add_stack_checks_if_needed (fundecl : Linear.fundecl) ~stack_offset
       contains_nontail_calls || max_frame_size >= stack_threshold_size
     in
     if insert_stack_check
-    then
-      let fun_body =
-        (* CR mshinwell: These availability sets aren't taking into account any
-           potential clobbers by the stack check. *)
-        Linear.instr_cons
-          (Lstackcheck { max_frame_size_bytes = max_frame_size })
-          [||] [||] ~available_before:fundecl.fun_body.available_before
-          ~available_across:fundecl.fun_body.available_across fundecl.fun_body
-      in
-      { fundecl with fun_body }
+    then (
+      match Oxcaml_utils.Doubly_linked_list.hd_cell fundecl.fun_body with
+      | None -> fundecl
+      | Some first_cell ->
+        let first_data = Oxcaml_utils.Doubly_linked_list.value first_cell in
+        let stack_check_data =
+          Linear.make_instr_data
+            (Lstackcheck { max_frame_size_bytes = max_frame_size })
+            [||] [||] ~available_before:first_data.Linear.available_before
+            ~available_across:first_data.Linear.available_across
+        in
+        Oxcaml_utils.Doubly_linked_list.add_begin fundecl.fun_body
+          stack_check_data;
+        fundecl)
     else fundecl
 
 let stapsdt_base_emitted = ref false

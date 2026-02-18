@@ -27,19 +27,24 @@
 
 open! Int_replace_polymorphic_compare [@@ocaml.warning "-66"]
 
-type labelled_insn =
-  { label : Label.t;
-    insn : Linear.instruction
-  }
-
-let labelled_insn_end = { label = Label.none; insn = Linear.end_instr }
-
-let rec defines_label (i : Linear.instruction) =
-  match i.desc with
-  | Lend | Llabel _ -> true
-  | Ladjust_stack_offset _ -> defines_label i.next
+let rec defines_label_desc (desc : Linear.instruction_desc)
+    (next_cell_opt : Linear.instruction option) =
+  match desc with
+  | Llabel _ -> true
+  | Ladjust_stack_offset _ -> (
+    match next_cell_opt with
+    | None -> false
+    | Some next_cell ->
+      let next_data = Oxcaml_utils.Doubly_linked_list.value next_cell in
+      let next_next = Oxcaml_utils.Doubly_linked_list.next next_cell in
+      defines_label_desc next_data.desc next_next)
   | Lprologue | Lepilogue_open | Lepilogue_close | Lop _ | Lcall_op _
   | Lreloadretaddr | Lreturn | Lbranch _ | Lcondbranch _ | Lcondbranch3 _
   | Lswitch _ | Lentertrap | Lpushtrap _ | Lpoptrap _ | Lraise _ | Lstackcheck _
     ->
     false
+
+let defines_label (cell : Linear.instruction) =
+  let data = Oxcaml_utils.Doubly_linked_list.value cell in
+  let next_cell = Oxcaml_utils.Doubly_linked_list.next cell in
+  defines_label_desc data.desc next_cell

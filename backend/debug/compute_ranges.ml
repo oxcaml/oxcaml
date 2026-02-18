@@ -47,12 +47,14 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
 
     let create ~(start_insn : L.instruction) ~start_pos ~start_pos_offset
         ~end_pos ~end_pos_offset ~subrange_info =
-      match start_insn.desc with
+      let module DLL = Oxcaml_utils.Doubly_linked_list in
+      let data = DLL.value start_insn in
+      match data.L.desc with
       | Llabel _ ->
         { start_pos; start_pos_offset; end_pos; end_pos_offset; subrange_info }
       | _ ->
         Misc.fatal_errorf "Subrange.create: bad [start_insn]: %a"
-          Printlinear.instr start_insn
+          Printlinear.instr_data data
 
     let start_pos t = t.start_pos
 
@@ -341,39 +343,70 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
       Format.fprintf ppf_dump "process_instruction:@ %a\n" Printlinear.instr
         insn;
     let used_label = ref None in
-    let get_label () =
+    let get_label ~at_function_end () =
       match !used_label with
       | Some label_and_insn -> label_and_insn
       | None ->
         (* Note that we can't reuse an existing label in the code since we rely
            on the ordering of range-related labels. *)
+        let module DLL = Oxcaml_utils.Doubly_linked_list in
         let label = Cmm.new_label () in
-        let label_insn : L.instruction =
+        let insn_data = DLL.value insn in
+        (* At function end, use properties matching Lend: Unreachable
+           availability, no debug info, no live registers *)
+        let available_before, available_across, dbg, fdo, live =
+          if at_function_end
+          then
+            ( Reg_availability_set.Unreachable,
+              Reg_availability_set.Unreachable,
+              Debuginfo.none,
+              Fdo_info.none,
+              Reg.Set.empty )
+          else
+            ( insn_data.L.available_before,
+              insn_data.L.available_across,
+              insn_data.L.dbg,
+              insn_data.L.fdo,
+              insn_data.L.live )
+        in
+        let label_data : L.instruction_data =
           { desc = Llabel { label; section_name = None };
-            next = insn;
             arg = [||];
             res = [||];
-            dbg = insn.dbg;
-            fdo = insn.fdo;
-            live = insn.live;
-            available_before = insn.available_before;
-            available_across = insn.available_across
+            dbg;
+            fdo;
+            live;
+            available_before;
+            available_across
           }
+        in
+        let label_insn =
+          if at_function_end
+          then (
+            (* At function end, add to the end of the DLL like Lend was *)
+            DLL.add_end fundecl.fun_body label_data;
+            match DLL.last_cell fundecl.fun_body with
+            | Some cell -> cell
+            | None ->
+              Misc.fatal_error "compute_ranges: empty fun_body after add_end")
+          else DLL.insert_and_return_before insn label_data
         in
         used_label := Some (label, label_insn);
         label, label_insn
     in
-    let open_subrange key ~start_pos_offset ~currently_open_subranges =
+    let open_subrange key ~start_pos_offset ~at_function_end
+        ~currently_open_subranges =
       if KM.mem key currently_open_subranges
       then Misc.fatal_errorf "Key %a already has an open range" S.Key.print key;
       (* If the range is later discarded, the inserted label may actually be
          useless, but this doesn't matter. It does not generate any code. *)
       if !Oxcaml_flags.dranges
       then Format.fprintf ppf_dump "opening subrange for %a\n%!" S.Key.print key;
-      let label, label_insn = get_label () in
+      let label, label_insn = get_label ~at_function_end () in
       KM.add key (label, start_pos_offset, label_insn) currently_open_subranges
     in
-    let close_subrange key ~end_pos_offset ~currently_open_subranges =
+    let close_subrange key ~end_pos_offset ~at_function_end
+        ~currently_open_subranges =
       if !Oxcaml_flags.dranges
       then
         Format.fprintf ppf_dump "closing subrange for key %a\n" S.Key.print key;
@@ -403,7 +436,7 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
               S.Index.Tbl.add t.ranges index range;
               range
           in
-          let label, _label_insn = get_label () in
+          let label, _label_insn = get_label ~at_function_end () in
           let subrange_info =
             Subrange_info.create key subrange_state ~fun_contains_calls
               ~fun_num_stack_slots
@@ -415,17 +448,14 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
           Range.add_subrange range ~subrange;
           currently_open_subranges)
     in
+    let module DLL = Oxcaml_utils.Doubly_linked_list in
+    let insn_data = DLL.value insn in
+    let known_available_after_prev_insn =
+      KM.bindings currently_open_subranges |> List.map fst |> KS.of_list
+    in
     let actions =
-      match[@ocaml.warning "-4"] insn.desc with
-      | Lend ->
-        (* This has special handling below *)
-        []
-      | _ ->
-        let known_available_after_prev_insn =
-          KM.bindings currently_open_subranges |> List.map fst |> KS.of_list
-        in
-        actions_at_instruction ~ppf_dump ~insn ~prev_insn
-          ~known_available_after_prev_insn
+      actions_at_instruction ~ppf_dump ~insn ~prev_insn
+        ~known_available_after_prev_insn
     in
     (* Apply actions *)
     let no_actions = List.compare_length_with actions 0 = 0 in
@@ -443,52 +473,66 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
           match action with
           | Open_one_byte_subrange ->
             let currently_open_subranges =
-              open_subrange key ~start_pos_offset:0 ~currently_open_subranges
+              open_subrange key ~start_pos_offset:0 ~at_function_end:false
+                ~currently_open_subranges
             in
-            close_subrange key ~end_pos_offset:1 ~currently_open_subranges
+            close_subrange key ~end_pos_offset:1 ~at_function_end:false
+              ~currently_open_subranges
           | Open_subrange ->
-            open_subrange key ~start_pos_offset:0 ~currently_open_subranges
+            open_subrange key ~start_pos_offset:0 ~at_function_end:false
+              ~currently_open_subranges
           | Open_subrange_one_byte_after ->
-            open_subrange key ~start_pos_offset:1 ~currently_open_subranges
+            open_subrange key ~start_pos_offset:1 ~at_function_end:false
+              ~currently_open_subranges
           | Close_subrange ->
-            close_subrange key ~end_pos_offset:0 ~currently_open_subranges
+            close_subrange key ~end_pos_offset:0 ~at_function_end:false
+              ~currently_open_subranges
           | Close_subrange_one_byte_after ->
-            close_subrange key ~end_pos_offset:1 ~currently_open_subranges)
+            close_subrange key ~end_pos_offset:1 ~at_function_end:false
+              ~currently_open_subranges)
         currently_open_subranges actions
     in
     if !Oxcaml_flags.dranges && not no_actions
     then Format.fprintf ppf_dump "finished applying actions.\n%!";
-    (* Close all subranges if at last instruction *)
-    let currently_open_subranges =
-      match insn.desc with
-      | Lend ->
-        if !Oxcaml_flags.dranges
-        then Format.fprintf ppf_dump "closing subranges for last insn\n%!";
-        let currently_open_subranges =
-          KM.fold
-            (fun key _ currently_open_subranges ->
-              close_subrange key ~end_pos_offset:0 ~currently_open_subranges)
-            currently_open_subranges currently_open_subranges
-        in
-        assert (KM.is_empty currently_open_subranges);
-        currently_open_subranges
-      | _ -> currently_open_subranges
+    (* Check if we're at the end of the function *)
+    let subrange_state =
+      Subrange_state.advance_over_instruction subrange_state insn
     in
+    let at_end_of_function = Option.is_none (DLL.next insn) in
+    (* Update first_insn based on labels created during normal action
+       processing, BEFORE end-of-function handling *)
     let first_insn =
       match !used_label with
       | None -> first_insn
       | Some (_label, label_insn) -> (
-        assert (label_insn.L.next == insn);
+        (* The label has already been inserted before insn by DLL operations *)
         (* (Note that by virtue of [Lprologue], we can insert labels prior to
            the first assembly instruction of the function.) *)
         match prev_insn with
         | None ->
           (* The label becomes the new first instruction. *)
           label_insn
-        | Some prev_insn ->
-          assert (prev_insn.L.next == insn);
-          prev_insn.next <- label_insn;
+        | Some _prev_insn ->
+          (* The linkage is already handled by DLL insertion *)
           first_insn)
+    in
+    (* Close all subranges if at end of function, AFTER updating first_insn. End
+       labels shouldn't affect first_insn. *)
+    let currently_open_subranges =
+      if at_end_of_function
+      then (
+        if !Oxcaml_flags.dranges
+        then Format.fprintf ppf_dump "closing subranges at end of function\n%!";
+        let currently_open_subranges =
+          KM.fold
+            (fun key _ currently_open_subranges ->
+              close_subrange key ~end_pos_offset:0 ~at_function_end:true
+                ~currently_open_subranges)
+            currently_open_subranges currently_open_subranges
+        in
+        assert (KM.is_empty currently_open_subranges);
+        currently_open_subranges)
+      else currently_open_subranges
     in
     (if !Dwarf_flags.ddebug_invariants
      then
@@ -514,21 +558,18 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
                 available_across:@ %a\n\
                 currently_open_subranges: %a"
                fundecl.fun_name KS.print not_open_but_should_be'
-               Printlinear.instr
-               { insn with L.next = L.end_instr }
-               KS.print should_be_open KS.print currently_open_subranges));
-    match insn.desc with
-    | Lend -> first_insn
-    | Lprologue | Lepilogue_open | Lepilogue_close | Lop _ | Lcall_op _
-    | Lreloadretaddr | Lreturn | Llabel _ | Lbranch _ | Lcondbranch _
-    | Lcondbranch3 _ | Lswitch _ | Lentertrap | Lpushtrap _ | Lpoptrap _
-    | Ladjust_stack_offset _ | Lraise _ | Lstackcheck _ ->
-      let subrange_state =
-        Subrange_state.advance_over_instruction subrange_state insn
-      in
-      process_instruction t fundecl ~fun_contains_calls ~fun_num_stack_slots
-        ~first_insn ~insn:insn.next ~prev_insn:(Some insn)
-        ~currently_open_subranges ~subrange_state ~ppf_dump
+               Printlinear.instr_data insn_data KS.print should_be_open KS.print
+               currently_open_subranges));
+    (* Return or recurse based on whether we're at the end *)
+    if at_end_of_function
+    then first_insn
+    else
+      match DLL.next insn with
+      | None -> Misc.fatal_error "compute_ranges: unreachable"
+      | Some next_insn ->
+        process_instruction t fundecl ~fun_contains_calls ~fun_num_stack_slots
+          ~first_insn ~insn:next_insn ~prev_insn:(Some insn)
+          ~currently_open_subranges ~subrange_state ~ppf_dump
 
   let process_instructions t fundecl ~fun_contains_calls ~fun_num_stack_slots
       ~first_insn ~ppf_dump =
@@ -543,16 +584,22 @@ module Make (S : Compute_ranges_intf.S_functor) = struct
   let empty = { ranges = S.Index.Tbl.create 1 }
 
   let create ~ppf_dump (fundecl : L.fundecl) =
+    let module DLL = Oxcaml_utils.Doubly_linked_list in
     if !Oxcaml_flags.dranges
     then Format.fprintf ppf_dump "Compute_ranges for %s\n" fundecl.fun_name;
     let t = { ranges = S.Index.Tbl.create 42 } in
-    let first_insn =
+    let first_insn_cell =
+      match DLL.hd_cell fundecl.fun_body with
+      | None -> Misc.fatal_error "Empty function body in compute_ranges"
+      | Some cell -> cell
+    in
+    let _first_insn =
       process_instructions t fundecl
         ~fun_contains_calls:fundecl.fun_contains_calls
         ~fun_num_stack_slots:fundecl.fun_num_stack_slots
-        ~first_insn:fundecl.fun_body ~ppf_dump
+        ~first_insn:first_insn_cell ~ppf_dump
     in
-    let fundecl : L.fundecl = { fundecl with fun_body = first_insn } in
+    (* fun_body is already the DLL and has been mutated in place *)
     t, fundecl
 
   let iter t ~f = S.Index.Tbl.iter (fun index range -> f index range) t.ranges

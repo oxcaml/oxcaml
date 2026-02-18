@@ -1231,7 +1231,7 @@ module Address_sanitizer : sig
   *)
   val emit_sanitize :
     ?dependencies:X86_ast.arg array ->
-    instr:instruction ->
+    instr:instruction_data ->
     address:X86_ast.arg ->
     Cmm.memory_chunk ->
     memory_access ->
@@ -1852,7 +1852,6 @@ let emit_instr ~first ~fallthrough i =
   let open Simd_instrs in
   emit_debug_info_linear i;
   match i.desc with
-  | Lend -> ()
   | Lprologue ->
     assert !prologue_required;
     if fp
@@ -2515,25 +2514,30 @@ let emit_instr ~first ~fallthrough i =
   | I.Extension_disabled _ as exn -> raise exn
   | exn ->
     Format.eprintf "Exception whilst emitting instruction:@ %a\n"
-      Printlinear.instr i;
+      Printlinear.instr_data i;
     raise exn
 
-let rec emit_all ~first ~fallthrough i =
-  match i.desc with
-  | Lend -> ()
-  | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
-  | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
-  | Lcondbranch (_, _)
-  | Lcondbranch3 (_, _, _)
-  | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _ | Lstackcheck _
-    ->
-    (try emit_instr ~first ~fallthrough i with
-    | I.Extension_disabled _ as exn -> raise exn
-    | exn ->
-      Format.eprintf "Exception whilst emitting instruction:@ %a\n"
-        Printlinear.instr i;
-      raise exn);
-    emit_all ~first:false ~fallthrough:(Linear.has_fallthrough i.desc) i.next
+let emit_all ~first ~fallthrough
+    (body : Linear.instruction_data Oxcaml_utils.Doubly_linked_list.t) =
+  let module DLL = Oxcaml_utils.Doubly_linked_list in
+  let first = ref first in
+  let fallthrough = ref fallthrough in
+  DLL.iter body ~f:(fun data ->
+      match data.Linear.desc with
+      | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
+      | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
+      | Lcondbranch (_, _)
+      | Lcondbranch3 (_, _, _)
+      | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
+      | Lstackcheck _ ->
+        (try emit_instr ~first:!first ~fallthrough:!fallthrough data with
+        | I.Extension_disabled _ as exn -> raise exn
+        | exn ->
+          Format.eprintf "Exception whilst emitting instruction:@ %a\n"
+            Printlinear.instr_data data;
+          raise exn);
+        first := false;
+        fallthrough := Linear.has_fallthrough data.Linear.desc)
 
 let all_functions = ref []
 
