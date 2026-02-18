@@ -68,15 +68,15 @@
  (enabled_if (= %{context_name} "main"))
  (targets test_assume_stub.output)
  (deps
-        test_assume_stub.heap_allocation.output
-        test_assume_stub.stack_allocation.output)
+        (:heap_output test_assume_stub.heap_allocation.%{env:OXCAML_NAME_MANGLING=flat}.output)
+        (:stack_output test_assume_stub.stack_allocation.%{env:OXCAML_NAME_MANGLING=flat}.output))
  (action
    (with-accepted-exit-codes 0
      (bash
         "if %{bin:ocamlopt.opt} -config | grep -q \"stack_allocation: true\" ;
         then
-           cp test_assume_stub.stack_allocation.output test_assume_stub.output
+           cp %{stack_output} test_assume_stub.output
         else
-           cp test_assume_stub.heap_allocation.output test_assume_stub.output
+           cp %{heap_output} test_assume_stub.output
         fi"))))
 
