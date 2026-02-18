@@ -4082,16 +4082,8 @@ jkind_desc:
   | jkind_annotation WITH core_type optional_atat_modalities_expr {
       Pjk_with ($1, $3, $4)
     }
-<<<<<<< ours
-  | mkrhs(type_longident) {
-      Pjk_abbreviation $1
-||||||| base
-  | ident {
-      Pjk_abbreviation $1
-=======
-  | mkrhs(ident) mkrhs(LIDENT)* {
+  | mkrhs(type_longident) mkrhs(LIDENT)* {
       Pjk_abbreviation ($1, $2)
->>>>>>> theirs
     }
   | KIND_OF ty=core_type {
       Pjk_kind_of ty

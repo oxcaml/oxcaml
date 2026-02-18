@@ -971,14 +971,8 @@ let default_mapper =
       let pjka_desc =
         match pjka_desc with
         | Pjk_default -> Pjk_default
-<<<<<<< ours
-        | Pjk_abbreviation lid -> Pjk_abbreviation (map_loc this lid)
-||||||| base
-        | Pjk_abbreviation (s : string) -> Pjk_abbreviation s
-=======
-        | Pjk_abbreviation (abbrev, sa) ->
-          Pjk_abbreviation (map_loc this abbrev, List.map (map_loc this) sa)
->>>>>>> theirs
+        | Pjk_abbreviation (lid, sa) ->
+          Pjk_abbreviation (map_loc this lid, List.map (map_loc this) sa)
         | Pjk_mod (t, mode_list) ->
           Pjk_mod (this.jkind_annotation this t, this.modes this mode_list)
         | Pjk_with (t, ty, modalities) ->

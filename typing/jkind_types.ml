@@ -774,6 +774,7 @@ module Layout = struct
           | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ) ->
         false
       | Product _ -> false
+      | Univar _ -> false
 
     let of_sort s =
       let rec of_sort : Sort.t -> _ = function

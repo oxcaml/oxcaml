@@ -16,7 +16,7 @@ type t : non_pointer value
 Line 1, characters 9-26:
 1 | type t : non_pointer value
              ^^^^^^^^^^^^^^^^^
-Error: Unknown layout non_pointer value
+Error: Unbound kind "non_pointer"
 |}]
 
 type t : value non_pointer = int [@@immediate]

@@ -275,13 +275,7 @@ module Error = struct
           required_layouts_level : Language_extension.maturity
         }
         -> t
-<<<<<<< ours
-||||||| base
-    | Unknown_jkind of Parsetree.jkind_annotation
-=======
-    | Unknown_jkind of Parsetree.jkind_annotation
     | Unknown_kind_modifier of string
->>>>>>> theirs
     | Multiple_jkinds of
         { from_annotation : Parsetree.jkind_annotation;
           from_attribute : Builtin_attributes.jkind_attribute Location.loc
@@ -1772,7 +1766,6 @@ module Const = struct
       sa_annots None
 
   let rec of_user_written_annotation_unchecked_level : type l r.
-<<<<<<< ours
       use_abstract_jkinds:bool ->
       _ ->
       (l * r) Context_with_transl.t ->
@@ -1781,81 +1774,27 @@ module Const = struct
    fun ~use_abstract_jkinds env context jkind ->
     let loc = jkind.pjka_loc in
     match jkind.pjka_desc with
-    | Pjk_abbreviation name ->
-      let p, _ = Env.lookup_jkind ~use:use_abstract_jkinds ~loc name.txt env in
-      of_path p |> allow_left |> allow_right
-||||||| base
-      (l * r) Context_with_transl.t -> Parsetree.jkind_annotation -> (l * r) t =
-   fun context jkind ->
-    match jkind.pjkind_desc with
-    | Pjk_abbreviation name ->
-      (* CR layouts v2.8: move this to predef. Internal ticket 3339. *)
-      (match name with
-        | "any" -> Builtin.any.jkind
-        | "value_or_null" -> Builtin.value_or_null.jkind
-        | "value" -> Builtin.value.jkind
-        | "void" -> Builtin.void.jkind
-        | "immediate64" -> Builtin.immediate64.jkind
-        | "immediate64_or_null" -> Builtin.immediate64_or_null.jkind
-        | "immediate" -> Builtin.immediate.jkind
-        | "immediate_or_null" -> Builtin.immediate_or_null.jkind
-        | "float64" -> Builtin.float64.jkind
-        | "float32" -> Builtin.float32.jkind
-        | "word" -> Builtin.word.jkind
-        | "untagged_immediate" -> Builtin.untagged_immediate.jkind
-        | "bits8" -> Builtin.bits8.jkind
-        | "bits16" -> Builtin.bits16.jkind
-        | "bits32" -> Builtin.bits32.jkind
-        | "bits64" -> Builtin.bits64.jkind
-        | "vec128" -> Builtin.vec128.jkind
-        | "vec256" -> Builtin.vec256.jkind
-        | "vec512" -> Builtin.vec512.jkind
-        | "immutable_data" -> Builtin.immutable_data.jkind
-        | "sync_data" -> Builtin.sync_data.jkind
-        | "mutable_data" -> Builtin.mutable_data.jkind
-        | _ -> raise ~loc:jkind.pjkind_loc (Unknown_jkind jkind))
-      |> allow_left |> allow_right
-=======
-      (l * r) Context_with_transl.t -> Parsetree.jkind_annotation -> (l * r) t =
-   fun context jkind ->
-    match jkind.pjkind_desc with
     | Pjk_abbreviation (name, sa_annot) ->
-      (* CR layouts v2.8: move this to predef. Internal ticket 3339. *)
-      let jkind_without_sa =
-        (match name.txt with
-          | "any" -> Builtin.any.jkind
-          | "value_or_null" -> Builtin.value_or_null.jkind
-          | "value" -> Builtin.value.jkind
-          | "void" -> Builtin.void.jkind
-          | "immediate64" -> Builtin.immediate64.jkind
-          | "immediate64_or_null" -> Builtin.immediate64_or_null.jkind
-          | "immediate" -> Builtin.immediate.jkind
-          | "immediate_or_null" -> Builtin.immediate_or_null.jkind
-          | "float64" -> Builtin.float64.jkind
-          | "float32" -> Builtin.float32.jkind
-          | "word" -> Builtin.word.jkind
-          | "untagged_immediate" -> Builtin.untagged_immediate.jkind
-          | "bits8" -> Builtin.bits8.jkind
-          | "bits16" -> Builtin.bits16.jkind
-          | "bits32" -> Builtin.bits32.jkind
-          | "bits64" -> Builtin.bits64.jkind
-          | "vec128" -> Builtin.vec128.jkind
-          | "vec256" -> Builtin.vec256.jkind
-          | "vec512" -> Builtin.vec512.jkind
-          | "immutable_data" -> Builtin.immutable_data.jkind
-          | "sync_data" -> Builtin.sync_data.jkind
-          | "mutable_data" -> Builtin.mutable_data.jkind
-          | _ -> raise ~loc:jkind.pjkind_loc (Unknown_jkind jkind))
-        |> allow_left |> allow_right
-      in
+      let p, _ = Env.lookup_jkind ~use:use_abstract_jkinds ~loc name.txt env in
+      let jkind_without_sa = of_path p |> allow_left |> allow_right in
       let pointerness = transl_scannable_axes sa_annot in
-      if
-        sa_annot <> []
-        && not (Layout.Const.is_value_or_any jkind_without_sa.layout)
-      then
-        Location.prerr_warning jkind.pjkind_loc
-          (Warnings.Ignored_kind_modifier
-             (name.txt, List.map Location.get_txt sa_annot));
+      if sa_annot <> []
+      then begin
+        let expanded =
+          Base_and_axes.fully_expand_aliases_const env jkind_without_sa
+        in
+        let base_is_value_or_any =
+          match expanded.base with
+          | Layout l -> Layout.Const.is_value_or_any l
+          | Kconstr _ -> false
+        in
+        if not base_is_value_or_any
+        then
+          Location.prerr_warning loc
+            (Warnings.Ignored_kind_modifier
+               ( String.concat "." (Longident.flatten name.txt),
+                 List.map Location.get_txt sa_annot ))
+      end;
       (* CR layouts-scannable: The correct behavior is to make a new jkind that
          differs only in the layout by adding in the non-[None] scannable axes.
          For inspiration, see [set_nullability_upper_bound].
@@ -1864,7 +1803,6 @@ module Const = struct
          returns an optional annotation (since none vs default matters). *)
       ignore pointerness;
       jkind_without_sa
->>>>>>> theirs
     | Pjk_mod (base, modifiers) ->
       let base =
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
@@ -3766,26 +3704,8 @@ end
 
 (*** formatting user errors ***)
 let report_error ~loc : Error.t -> _ = function
-<<<<<<< ours
-||||||| base
-  | Unknown_jkind jkind ->
-    Location.errorf ~loc
-      (* CR layouts v2.9: use the context to produce a better error message.
-         When RAE tried this, some types got printed like [t/2], but the
-         [/2] shouldn't be there. Investigate and fix. *)
-      "@[<v>Unknown layout %a@]"
-      Pprintast.jkind_annotation jkind
-=======
-  | Unknown_jkind jkind ->
-    Location.errorf ~loc
-      (* CR layouts v2.9: use the context to produce a better error message.
-         When RAE tried this, some types got printed like [t/2], but the
-         [/2] shouldn't be there. Investigate and fix. *)
-      "@[<v>Unknown layout %a@]"
-      Pprintast.jkind_annotation jkind
   | Unknown_kind_modifier saxis ->
     Location.errorf ~loc "@[<v>Unknown kind modifier %s@]" saxis
->>>>>>> theirs
   | Multiple_jkinds { from_annotation; from_attribute } ->
     Location.errorf ~loc
       "@[<v>A type declaration's layout can be given at most once.@;\

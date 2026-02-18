@@ -470,15 +470,9 @@ and type_with_label ctxt f (label, c, mode) =
 
 and jkind_annotation ?(nested = false) ctxt f k = match k.pjka_desc with
   | Pjk_default -> pp f "_"
-<<<<<<< ours
-  | Pjk_abbreviation s -> longident_loc f s
-||||||| base
-  | Pjk_abbreviation s -> pp f "%s" s
-=======
-  | Pjk_abbreviation (abbrev, sa) ->
-    let as_strs = List.map Location.get_txt (abbrev :: sa) in
-    (pp_print_list ~pp_sep:(fun f () -> pp f " ") pp_print_string) f as_strs
->>>>>>> theirs
+  | Pjk_abbreviation (s, sa) ->
+    longident_loc f s;
+    List.iter (fun a -> pp f " %s" (Location.get_txt a)) sa
   | Pjk_mod (t, modes) ->
     begin match modes with
     | [] -> Misc.fatal_error "malformed jkind annotation"

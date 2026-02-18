@@ -211,7 +211,7 @@ module Pointerness = struct
     | Non_pointer -> "non_pointer"
     | Maybe_pointer -> "maybe_pointer"
 
-  let print ppf t = Format.fprintf ppf "%s" (to_string t)
+  let print ppf t = Format_doc.fprintf ppf "%s" (to_string t)
 end
 
 module Axis = struct
