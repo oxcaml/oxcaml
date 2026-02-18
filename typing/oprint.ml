@@ -413,7 +413,7 @@ let rec print_out_type_0 ppf =
       print_out_type_0 ppf ty  (* no "." if there are no vars *)
   | Otyp_poly (sl, ty) ->
       fprintf ppf "@[<hov 2>%a.@ %a@]"
-        pr_var_jkinds sl
+        pr_var_constraints sl
         print_out_type_0 ty
   | ty ->
       print_out_type_1 ppf ty
@@ -693,14 +693,25 @@ and print_out_jkind_annot ppf = function
   | None -> ()
   | Some lay -> fprintf ppf "@ : %a" print_out_jkind lay
 
-and pr_var_jkind ppf (v, l) = match l with
-    | None -> pr_var ppf v
-    | Some lay -> fprintf ppf "(%a : %a)"
-                    pr_var v
-                    print_out_jkind lay
+and pr_jkind_opt ppf = function
+  | Some jkind -> fprintf ppf " : %a" print_out_jkind jkind
+  | None -> ()
 
-and pr_var_jkinds jks =
-  print_list pr_var_jkind (fun ppf -> fprintf ppf "@ ") jks
+and pr_evals_to_opt ppf = function
+  | name, Some evals_to ->
+    fprintf ppf "@ constraint %a eval =@ %a" pr_var name print_out_type evals_to
+  | _name, None -> ()
+
+and pr_var_constraint ppf { name; jkind; evals_to } =
+  match jkind, evals_to with
+  | None, None ->
+    pr_var ppf name
+  | Some _, _ | _, Some _ ->
+    fprintf ppf "(%a%a%a)"
+      pr_var name pr_jkind_opt jkind pr_evals_to_opt (name, evals_to)
+
+and pr_var_constraints vs =
+  print_list pr_var_constraint (fun ppf -> fprintf ppf "@ ") vs
 
 let out_label = ref print_out_label
 
@@ -1086,11 +1097,11 @@ and print_out_constr ppf constr =
           fprintf ppf "@[<2>%s of@ %a@]" name
             print_out_constr_args tyl
       end
-  | Some (vars_jkinds, ret_type) ->
+  | Some (vars, ret_type) ->
       fprintf ppf "@[<2>%s :@ " name;
-      begin match vars_jkinds with
+      begin match vars with
       | [] -> ()
-      | _ -> fprintf ppf "@[<hov>%a.@]@ " pr_var_jkinds vars_jkinds
+      | _ -> fprintf ppf "@[<hov>%a.@]@ " pr_var_constraints vars
       end;
       begin match tyl with
       | [] ->

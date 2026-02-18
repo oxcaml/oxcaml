@@ -282,10 +282,8 @@ let fold_row f init row =
 let iter_row f row =
   fold_row (fun () v -> f v) () row
 
-let fold_evals_to f init =
-  ignore f; ignore init;
-  function
-  | (_ : evals_to) -> .
+let fold_evals_to f init { target; n_quote_evals = _ } =
+  f init target
 
 let fold_evals_to_opt f init evals_to =
   Option.map (fold_evals_to f init) evals_to
@@ -511,10 +509,8 @@ let copy_row f fixed row keep more =
 
 let copy_commu c = if is_commu_ok c then commu_ok else commu_var ()
 
-let map_evals_to f =
-  ignore f;
-  function
-  | (_ : evals_to) -> .
+let map_evals_to f { target; n_quote_evals } =
+  { target = f target; n_quote_evals }
 
 let map_evals_to_opt f = Option.map (map_evals_to f)
 

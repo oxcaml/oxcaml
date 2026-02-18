@@ -150,7 +150,7 @@ and _ commutable_gen =
   | Cunknown : [> `none] commutable_gen
   | Cvar : {mutable commu: any commutable_gen} -> [> `var] commutable_gen
 
-and evals_to = |
+and evals_to = { target : type_expr; n_quote_evals : int }
 
 (* jkinds *)
 

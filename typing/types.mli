@@ -281,7 +281,10 @@ and abbrev_memo =
     This is only allowed when the real type is known.
 *)
 
-and evals_to = |
+(** Description of an evals-to constraint on a type variable or declaration.
+    The constraint is equivalent to [Tquote_eval^n_quote_evals 'a = target]
+    for some constrained type ['a]. We require [n_quote_evals > 0]. *)
+and evals_to = { target : type_expr; n_quote_evals : int }
 
 (**** Jkinds ****)
 

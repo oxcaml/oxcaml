@@ -111,8 +111,13 @@ and out_jkind =
   | Ojkind_var of string
   | Ojkind_product of out_jkind list
 
-(* should be empty if all the jkind annotations are missing *)
-and out_vars_jkinds = (string * out_jkind option) list
+and out_var_constraint =
+  { name: string;
+    jkind: out_jkind option;
+    evals_to: out_type option }
+
+(* empty if no annotations are present *)
+and out_var_constraints = out_var_constraint list
 
 and out_type_param = {
     ot_non_gen: bool;
@@ -144,7 +149,7 @@ and out_type =
   | Otyp_variant of out_variant * bool * (string list) option
   | Otyp_quote of out_type
   | Otyp_splice of out_type
-  | Otyp_poly of out_vars_jkinds * out_type
+  | Otyp_poly of out_var_constraints * out_type
   | Otyp_module of out_ident * (string * out_type) list
   | Otyp_attribute of out_type * out_attribute
   | Otyp_jkind_annot of out_type * out_jkind
@@ -157,7 +162,7 @@ and out_type =
 and out_constructor = {
   ocstr_name: string;
   ocstr_args: (out_type * out_modality list) list;
-  ocstr_return_type: (out_vars_jkinds * out_type) option;
+  ocstr_return_type: (out_var_constraints * out_type) option;
 }
 
 and out_variant =
@@ -216,7 +221,7 @@ and out_extension_constructor =
     oext_type_name: string;
     oext_type_params: string list;
     oext_args: (out_type * out_modality list) list;
-    oext_ret_type: (out_vars_jkinds * out_type) option;
+    oext_ret_type: (out_var_constraints * out_type) option;
     oext_private: Asttypes.private_flag }
 and out_type_extension =
   { otyext_name: string;

@@ -4232,6 +4232,7 @@ let type_implementation target modulename initial_env ast =
           remove_modality_and_zero_alloc_variables_sg finalenv ~zap_modality
             simple_sg
         in
+        Includemod.check_implementation finalenv ~modes:Includemod.modes_toplevel sg simple_sg;
         Typecore.force_delayed_checks ();
         Mode.erase_hints ();
         Typecore.optimise_allocations ();

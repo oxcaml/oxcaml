@@ -274,18 +274,18 @@ let none = newty (Ttuple [])                (* Clearly ill-formed type *)
 
 (**** Control variable stage in inference *)
 
-let rec update_variable_stage stage_offset ty name jkind =
-  if stage_offset = 0 then ()
+let rec update_variable_stage stage_offset ty name jkind evals_to =
+  if stage_offset = 0 then set_var_evals_to ty evals_to
   else if stage_offset < 0 then begin
     let v = newvar2 ?name (get_level ty) jkind in
     let ty' = newty2 ~level:(get_level ty) (Tquote v) in
     link_type ty ty';
-    update_variable_stage (stage_offset + 1) v name jkind
+    update_variable_stage (stage_offset + 1) v name jkind evals_to
   end else begin
     let v = newvar2 ?name (get_level ty) jkind in
     let ty' = newty2 ~level:(get_level ty) (Tsplice v) in
     link_type ty ty';
-    update_variable_stage (stage_offset - 1) v name jkind
+    update_variable_stage (stage_offset - 1) v name jkind evals_to
   end
 
 (**** information for [Typecore.unify_pat_*] ****)
@@ -833,9 +833,16 @@ let rec generalize stage_offset ty =
     set_level ty generic_level;
     (* recur into abbrev for the speed *)
     begin match get_desc ty with
-    | Tvar name ->
-      update_variable_stage stage_offset ty name.name name.jkind;
-      iter_type_expr (generalize stage_offset) ty
+    | Tvar { name; jkind; evals_to } ->
+      set_var_evals_to ty None; (* reset by [update_variable_stage ]*)
+      update_variable_stage stage_offset ty name jkind evals_to;
+      (* We always print type schemes with eval constraints with the
+         equations spliced, so the [target] ends up at a lower offset *)
+      begin match evals_to with
+      | Some { target; n_quote_evals } ->
+        generalize (stage_offset - n_quote_evals) target
+      | None -> ()
+      end
     | Tvariant row ->
         if stage_offset <> 0 && is_Tvar (row_more row) then
           lower_all ty
@@ -2341,32 +2348,55 @@ let rec try_reduce ty =
   try try_reduce ty'
   with Cannot_expand -> ty'
 
+let unwrap_quotes ty =
+  let rec loop n ty =
+    match get_desc ty with
+    | Tquote ty -> loop (n + 1) ty
+    | Tsplice ty -> loop (n - 1) ty
+    | _ -> n, ty
+  in
+  loop 0 ty
+
+let unwrap_quote_evals ty =
+  let rec loop n ty =
+    match get_desc ty with
+    | Tquote_eval ty -> loop (n + 1) ty
+    | _ -> n, ty
+  in
+  loop 0 ty
+
+let rec iterate ~positive ~negative n x =
+  if n > 0 then
+    iterate ~positive ~negative (n - 1) (positive x)
+  else if n < 0 then
+    iterate ~positive ~negative (n + 1) (negative x)
+  else
+    x
+
+let iterate_positive ~positive =
+  iterate ~positive ~negative:(fun _ -> assert false)
+
+let new_quotes_ty =
+  iterate ~positive:new_quote_ty ~negative:new_splice_ty
+
+let new_quote_evals_ty =
+  iterate_positive ~positive:new_quote_eval_ty
+
+let new_predef_eval ty =
+  newty2 ~level:(get_level ty) (Tconstr (Predef.path_eval, [ty], ref Mnil))
+
+let new_predef_evals_ty =
+  iterate_positive ~positive:new_predef_eval
+
 let reduce_head ty =
   let ty =
     try try_reduce ty
     with Cannot_expand -> ty
   in
-  let rec scatter ~quotes ~evals ty =
-    if evals > 0 then
-      let ty = scatter ~quotes ~evals:(evals - 1) ty in
-      newty2 ~level:(get_level ty) (Tconstr (Predef.path_eval, [ty], ref Mnil))
-    else if evals < 0 then
-      assert false
-    else if quotes > 0 then
-      new_quote_ty (scatter ~quotes:(quotes - 1) ~evals ty)
-    else if quotes < 0 then
-      new_splice_ty (scatter ~quotes:(quotes + 1) ~evals ty)
-    else
-      ty
-  in
-  let rec gather ~quotes ~evals ty =
-    match get_desc ty with
-    | Tquote ty -> gather ~quotes:(quotes + 1) ~evals ty
-    | Tsplice ty -> gather ~quotes:(quotes - 1) ~evals ty
-    | Tquote_eval ty -> gather ~quotes:(quotes + 1) ~evals:(evals + 1) ty
-    | _ -> scatter ~quotes ~evals ty
-  in
-  gather ~quotes:0 ~evals:0 ty
+  let quotes, ty = unwrap_quotes ty in
+  let quote_evals, ty = unwrap_quote_evals ty in
+  let quotes = quotes + quote_evals and evals = quote_evals in
+  ty |> new_quotes_ty quotes |> new_predef_evals_ty evals
 
 (* Fully expand the head of a type. *)
 let try_expand_head
@@ -3296,8 +3326,9 @@ let local_non_recursive_abbrev uenv p ty =
 
    They carry redundant information but are added to save two calls to
    [get_desc] which are usually performed already at the call site. *)
-let unify_univar t1 t2 jkind1 jkind2 pairs =
-  if not (Jkind.equal jkind1 jkind2) then raise Cannot_unify_universal_variables;
+let unify_univar t1 t2 jkind1 jkind2 evals_to1 evals_to2 pairs =
+  if not (Jkind.equal jkind1 jkind2) || evals_to1 <> evals_to2 then
+    raise Cannot_unify_universal_variables;
   let rec inner t1 t2 = function
     (cl1, cl2) :: rem ->
       let find_univ t cl =
@@ -3321,8 +3352,9 @@ let unify_univar t1 t2 jkind1 jkind2 pairs =
 
 (* The same as [unify_univar], but raises the appropriate exception instead of
    [Cannot_unify_universal_variables] *)
-let unify_univar_for tr_exn t1 t2 jkind1 jkind2 univar_pairs =
-  try unify_univar t1 t2 jkind1 jkind2 univar_pairs
+let unify_univar_for tr_exn
+    t1 t2 jkind1 jkind2 evals_to1 evals_to2 univar_pairs =
+  try unify_univar t1 t2 jkind1 jkind2 evals_to1 evals_to2 univar_pairs
   with Cannot_unify_universal_variables -> raise_unexplained_for tr_exn
 
 (* Test the occurrence of free univars in a type *)
@@ -3715,8 +3747,10 @@ let rec mcomp type_pairs env t1 t2 =
   in
   if eq_type t1 t2 then () else
   match (get_desc t1, get_desc t2, t1, t2) with
-  | (Tvar { jkind }, _, _, other)
-  | (_, Tvar { jkind }, other, _) -> check_jkinds other jkind
+  | (Tvar { jkind; evals_to }, _, _, other)
+  | (_, Tvar { jkind; evals_to }, other, _) ->
+      ignore evals_to; (* FIXME jbachurski *)
+      check_jkinds other jkind
   | (Tconstr (p1, [], _), Tconstr (p2, [], _), _, _) when Path.same p1 p2 ->
       ()
   | _ ->
@@ -3727,8 +3761,10 @@ let rec mcomp type_pairs env t1 t2 =
       if not (TypePairs.mem type_pairs (t1', t2')) then begin
         TypePairs.add type_pairs (t1', t2');
         match (get_desc t1', get_desc t2', t1', t2') with
-        | (Tvar { jkind }, _, _, other)
-        | (_, Tvar { jkind }, other, _)  -> check_jkinds other jkind
+        | (Tvar { jkind; evals_to }, _, _, other)
+        | (_, Tvar { jkind; evals_to }, other, _)  ->
+            ignore evals_to; (* FIXME jbachurski *)
+            check_jkinds other jkind
         | (Tarrow ((l1,_,_), t1, u1, _), Tarrow ((l2,_,_), t2, u2, _), _, _)
           when equivalent_with_nolabels l1 l2 ->
             mcomp type_pairs env t1 t2;
@@ -3770,8 +3806,9 @@ let rec mcomp type_pairs env t1 t2 =
                enter_poly env univar_pairs
                  t1 tl1 t2 tl2 (mcomp type_pairs env)
              with Escape _ -> raise Incompatible)
-        | (Tunivar {jkind=jkind1}, Tunivar {jkind=jkind2}, _, _) ->
-            (try unify_univar t1' t2' jkind1 jkind2 !univar_pairs
+        | (Tunivar {jkind=k1; evals_to=et1},
+           Tunivar {jkind=k2; evals_to=et2}, _, _) ->
+            (try unify_univar t1' t2' k1 k2 et1 et2 !univar_pairs
              with Cannot_unify_universal_variables -> raise Incompatible)
         | (Tquote t1, Tquote t2, _, _) ->
             mcomp type_pairs env t1 t2
@@ -4147,21 +4184,159 @@ let complete_type_list ?(allow_absent=false) env fl1 lv2 mty2 fl2 =
   | res -> res
   | exception Exit -> raise Not_found
 
-(* Checks if a type is a type variable under some quotes or splices *)
+(** Equational constraint implied by a evals-to constraint on a given type. *)
+let equation_of_eval_constraint ty { target; n_quote_evals } =
+  new_quote_evals_ty n_quote_evals ty, target
+
+(** Necessary and sufficient equational constraint implied by
+    intersecting a pair of evals-to constraints. *)
+let equation_of_eval_constraint_intersection
+    { target; n_quote_evals }
+    { target = target'; n_quote_evals = n_quote_evals' } =
+  if n_quote_evals >= n_quote_evals' then
+    new_quote_evals_ty (n_quote_evals - n_quote_evals') target, target'
+  else
+    target, new_quote_evals_ty (n_quote_evals' - n_quote_evals) target'
+
+let eval_constraint_incompatible t1 t2 et1 et2 =
+  Bad_constraint (Incompatible (
+    equation_of_eval_constraint t1 et1,
+    equation_of_eval_constraint t2 et2))
+
+let eval_constraint_unsatisfied tv ?ty evals_to =
+  match ty with
+  | Some ty ->
+    Bad_constraint (Unsatisfied {
+      equation = equation_of_eval_constraint tv evals_to;
+      subst = Some (tv, ty) })
+  | None ->
+    Bad_constraint (Unsatisfied {
+      equation = equation_of_eval_constraint tv evals_to;
+      subst = None })
+
+let rec eq_type_quoted (ty, ty') =
+  match get_desc ty, get_desc ty' with
+  | Tquote ty, Tquote ty' -> eq_type_quoted (ty, ty')
+  | Tsplice ty, Tsplice ty' -> eq_type_quoted (ty, ty')
+  | Tquote_eval ty, Tquote_eval ty' -> eq_type_quoted (ty, ty')
+  | _ -> eq_type ty ty'
+
+type elt' = { elt : 'a. unit -> (type_expr, 'a) elt }
+
+let with_trace (elt : elt') f =
+  try f () with
+  | Unify_trace trace ->
+    raise_trace_for Unify (elt.elt () :: trace)
+  | Moregen_trace trace ->
+    raise_trace_for Moregen (elt.elt () :: trace)
+  | Equality_trace trace ->
+    raise_trace_for Equality (elt.elt () :: trace)
+
+(** Equate a pair of (optional) evals-to constraints,
+    assuming the pair of constrained types is equated. *)
+let equate_eval_constraints equate t1 t2 et1 et2 =
+  with_trace
+    { elt = fun () -> eval_constraint_incompatible t1 t2 et1 et2 }
+    (fun () ->
+      let tt1, tt2 = equation_of_eval_constraint_intersection et1 et2 in
+      equate tt1 tt2)
+
+(** Attempt to construct an evals-to constraint for unifying against [ty]. *)
+let unwrap_eval_constraint ty =
+  let rec loop n ty =
+    match get_desc ty with
+    | Tvar { evals_to } ->
+      if n > 0 then
+        let instance =
+          match evals_to with
+          | Some { target; n_quote_evals } when n >= n_quote_evals ->
+            Some (n - n_quote_evals, target)
+          | _ ->
+            None
+        in
+        Some (~tv:ty, ~n_quote_evals:n, ~instance)
+      else
+        None
+    | Tquote_eval t ->
+      loop (n + 1) t
+    | _ ->
+      None
+  in
+  loop 0 ty
+
+
+(** Attempt to instantiate the evals-to constraint on a constrained variable
+    in a type [ty] under quotes, splices, an appropriate amount of evals.
+
+    Relies on [ty] being in beta normal form for completeness. *)
+let instantiate_eval_constraint ty =
+  let quotes, ty = unwrap_quotes ty in
+  match unwrap_eval_constraint ty with
+  | Some (~tv:_, ~n_quote_evals:_, ~instance:(Some (quote_evals, target))) ->
+    Some (target |> new_quote_evals_ty quote_evals |> new_quotes_ty quotes)
+  | _ ->
+    None
+
+let can_introduce_eval_constraint ty =
+  unwrap_eval_constraint ty |> Option.is_some
+
+(** Evals-to constrain the variable in [ty] to unify [ty] and [target].
+    Only called when [can_introduce_eval_constraint ty] is true.
+    [equate]s any necessarily equal types and sets the constraint on [ty]. *)
+let introduce_eval_constraint equate ty ~target =
+  match unwrap_eval_constraint ty with
+  | Some (~tv, ~n_quote_evals, ~instance:_) -> begin
+    let evals_to = { target; n_quote_evals } in
+    if eq_type_quoted (equation_of_eval_constraint tv evals_to) then () else
+    match get_desc tv with
+    | Tvar { evals_to = None } ->
+      set_var_evals_to tv (Some evals_to)
+    | Tvar { evals_to = Some evals_to' } ->
+      equate_eval_constraints equate ty ty evals_to evals_to'
+    | _ -> assert false
+    end
+  | None ->
+    assert false
+
+(** Ensure that any existing evals-to constraint on [tv]
+    is consistent with substituting it for [ty].
+    [equate]s any necessarily equal types and unsets the constraint on [tv]. *)
+let eliminate_eval_constraint equate tv ty =
+  match get_desc tv with
+  | Tvar { evals_to = None; _ } -> ()
+  | Tvar { evals_to = Some evals_to } -> begin
+    with_trace
+      { elt = fun () -> (eval_constraint_unsatisfied tv ~ty evals_to) }
+      (fun () ->
+        set_var_evals_to tv None;
+        (* Keep [t_tv] on the same side as [tv] for [moregen] *)
+        let t_ty, t_tv = equation_of_eval_constraint ty evals_to in
+        equate t_tv t_ty)
+    end
+  (* In [unify_var], this might be called after a recursive call links
+     [tv] against a concrete type. In that case, the only possibility
+     has to be that [tv] and [ty] were unified. This must have already
+     checked the evals-to constraint, so we can skip checking here. *)
+  | _ -> ()
+
+
+(* Checks if a type is a type variable under some quotes, splices, or evals *)
 let rec is_flexible_ty ty =
   match get_desc ty with
   | Tvar _ -> true
   | Tquote ty' -> is_flexible_ty ty'
   | Tsplice ty' -> is_flexible_ty ty'
+  | Tquote_eval ty' -> is_flexible_ty ty'
   | _ -> false
 
-(* Checks if a type is an instantiable type under some quotes or splices *)
+(* Checks if a type is an instantiable type under some quotes, splices, or evals *)
 let rec is_instantiable_ty env ty =
   match get_desc ty with
   | Tconstr (path, [], _) ->
       is_instantiable env ~for_jkind_eqn:false path
   | Tquote ty' -> is_instantiable_ty env ty'
   | Tsplice ty' -> is_instantiable_ty env ty'
+  | Tquote_eval ty' -> is_instantiable_ty env ty'
   | _ -> false
 
 (* Checks if a type is equatable under some quotes or splices *)
@@ -4201,7 +4376,7 @@ let unify_alloc_mode_for tr_exn a b =
    environment is built in subst. *)
 let rigid_variants = ref false
 
-let unify1_var uenv t1 t2 =
+let rec unify1_var uenv t1 t2 =
   let jkind = match get_desc t1 with
     | Tvar { jkind } -> jkind
     | _ -> assert false
@@ -4210,7 +4385,8 @@ let unify1_var uenv t1 t2 =
   let env = get_env uenv in
   match
     occur_univar_for Unify env t2;
-    unification_jkind_check uenv t2 (Jkind.disallow_left jkind)
+    unification_jkind_check uenv t2 (Jkind.disallow_left jkind);
+    eliminate_eval_constraint (unify uenv) t1 t2
   with
   | () ->
       begin
@@ -4226,7 +4402,7 @@ let unify1_var uenv t1 t2 =
       false
 
 (* Called from unify3 *)
-let unify3_var uenv jkind1 t1' t2 t2' =
+and unify3_var uenv jkind1 t1' t2 t2' =
   occur_for Unify uenv t1' t2;
   (* There are two possible ways forward here. Either the variable [t1']
      will succeed in unifying with [t2], in which case we're done; or
@@ -4238,7 +4414,8 @@ let unify3_var uenv jkind1 t1' t2 t2' =
   let snap = snapshot () in
   match
     occur_univar_for Unify (get_env uenv) t2;
-    unification_jkind_check uenv t2' (Jkind.disallow_left jkind1)
+    unification_jkind_check uenv t2' (Jkind.disallow_left jkind1);
+    eliminate_eval_constraint (unify uenv) t1' t2'
   with
   | () -> link_type t1' t2
   | exception Unify_trace _ when in_pattern_mode uenv ->
@@ -4288,7 +4465,7 @@ let unify3_var uenv jkind1 t1' t2 t2' =
       information is indeed lost, but it probably does not worth it.
 *)
 
-let rec unify uenv t1 t2 =
+and unify uenv t1 t2 =
   (* First step: special cases (optimizations) *)
   if unify_eq uenv t1 t2 then () else
   let reset_tracing = check_trace_gadt_instances (get_env uenv) in
@@ -4312,8 +4489,9 @@ let rec unify uenv t1 t2 =
         if unify1_var uenv t1 t2 then () else unify2 uenv t1 t2
     | (_, Tvar _) ->
         if unify1_var uenv t2 t1 then () else unify2 uenv t1 t2
-    | (Tunivar { jkind = k1 }, Tunivar { jkind = k2 }) ->
-        unify_univar_for Unify t1 t2 k1 k2 !univar_pairs;
+    | (Tunivar { jkind = k1; evals_to = et1 },
+       Tunivar { jkind = k2; evals_to = et2 }) ->
+        unify_univar_for Unify t1 t2 k1 k2 et1 et2 !univar_pairs;
         update_level_for Unify (get_env uenv) (get_level t1) t2;
         update_scope_for Unify (get_scope t1) t2;
         link_type t1 t2
@@ -4399,8 +4577,9 @@ and unify3 uenv t1 t1' t2 t2' =
     (not (eq_type t2 t2')) && (deep_occur t1'  t2) in
 
   begin match (d1, d2) with (* handle vars and univars specially *)
-    (Tunivar { jkind = k1 }, Tunivar { jkind = k2 }) ->
-      unify_univar_for Unify t1' t2' k1 k2 !univar_pairs;
+    (Tunivar { jkind = k1; evals_to = et1 },
+     Tunivar { jkind = k2; evals_to = et2 }) ->
+      unify_univar_for Unify t1' t2' k1 k2 et1 et2 !univar_pairs;
       link_type t1' t2'
   | (Tvar { jkind }, _) ->
       unify3_var uenv jkind t1' t2 t2'
@@ -4409,8 +4588,6 @@ and unify3 uenv t1 t1' t2 t2' =
   | (Tquote t1, Tquote t2) ->
       unify uenv t1 t2
   | (Tsplice t1, Tsplice t2) ->
-      unify uenv t1 t2
-  | (Tquote_eval t1, Tquote_eval t2) ->
       unify uenv t1 t2
   | (Tsplice s1, _) when is_flexible_ty s1 ->
       set_type_desc t2' d2;
@@ -4436,6 +4613,18 @@ and unify3 uenv t1 t1' t2 t2' =
         newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tsplice t1')
       in
       unify uenv t s2
+  | (Tquote_eval _, Tquote_eval _)
+      when can_introduce_eval_constraint t1' && can_introduce_eval_constraint t2' ->
+      (* FIXME jbachurski: Order-dependence; Principality *)
+      introduce_eval_constraint (unify uenv) t1' ~target:t2';
+      introduce_eval_constraint (unify uenv) t2' ~target:t1'
+  | (Tquote_eval _, _) when can_introduce_eval_constraint t1' ->
+      introduce_eval_constraint (unify uenv) t1' ~target:t2'
+  | (_, Tquote_eval _) when can_introduce_eval_constraint t2' ->
+      introduce_eval_constraint (unify uenv) t2' ~target:t1'
+  (* for irreducible evals on [Tvar] and [Tunivar] *)
+  | (Tquote_eval t1, Tquote_eval t2) ->
+      unify uenv t1 t2
   | (Tfield _, Tfield _) -> (* special case for GADTs *)
       unify_fields uenv t1' t2'
   | _ ->
@@ -4977,6 +5166,7 @@ let unify_var uenv t1 t2 =
         update_level_for Unify env (get_level t1) t2;
         update_scope_for Unify (get_scope t1) t2;
         unification_jkind_check uenv t2 (Jkind.disallow_left jkind);
+        eliminate_eval_constraint (unify uenv) t1 t2;
         link_type t1 t2;
         reset_trace_gadt_instances reset_tracing;
       with Unify_trace trace ->
@@ -5690,12 +5880,21 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
         (* use [check], not [constrain], here because [constrain] would be like
         instantiating [t2], which we do not wish to do *)
         check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
+        eliminate_eval_constraint
+          (moregen inst_nongen variance type_pairs env) t1 t2;
         link_type t1 t2
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
     | _ ->
         let t1' = expand_head env t1 in
         let t2' = expand_head env t2 in
+        (* Since we do not eliminate constraints on the right-hand side,
+           we might need to instantiate an eval constraint now. *)
+        let t2' =
+          match instantiate_eval_constraint t2' with
+          | Some t2'' -> t2''
+          | None -> t2'
+        in
         (* Expansion may have changed the representative of the types... *)
         if eq_type t1' t2' then () else
         let pairs = relevant_pairs type_pairs variance in
@@ -5708,6 +5907,8 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               (* use [check], not [constrain], here because [constrain] would be like
               instantiating [t2], which we do not wish to do *)
               check_type_jkind_exn env Moregen t2 (Jkind.disallow_left jkind);
+              eliminate_eval_constraint
+                (moregen inst_nongen variance type_pairs env) t1' t2;
               link_type t1' t2
           | (Tarrow ((l1,a1,r1), t1, u1, _),
              Tarrow ((l2,a2,r2), t2, u2, _)) when
@@ -5763,13 +5964,12 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tpoly (t1, tl1), Tpoly (t2, tl2)) ->
               enter_poly_for Moregen env univar_pairs t1 tl1 t2 tl2
                 (moregen inst_nongen variance type_pairs env)
-          | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
-              unify_univar_for Moregen t1' t2' k1 k2 !univar_pairs
+          | (Tunivar {jkind=k1; evals_to=et1},
+             Tunivar {jkind=k2; evals_to=et2}) ->
+              unify_univar_for Moregen t1' t2' k1 k2 et1 et2 !univar_pairs
           | (Tquote t1, Tquote t2) ->
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tsplice t1, Tsplice t2) ->
-              moregen inst_nongen variance type_pairs env t1 t2
-          | (Tquote_eval t1, Tquote_eval t2) ->
               moregen inst_nongen variance type_pairs env t1 t2
           | (Tquote t1, _) ->
               let t2 = newty2 ~level:(get_level t2) (Tsplice t2) in
@@ -5777,6 +5977,15 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tsplice t1, _) ->
               let t2 = newty2 ~level:(get_level t2) (Tquote t2) in
               moregen inst_nongen variance type_pairs env t1 t2
+          | (Tquote_eval _, _) when
+                unwrap_eval_constraint t1'
+                |> Option.map (fun (~tv, ~n_quote_evals:_, ~instance:_) ->
+                     may_instantiate inst_nongen tv)
+                |> Option.value ~default:false ->
+              introduce_eval_constraint
+                (moregen inst_nongen variance type_pairs env) t1' ~target:t2'
+          | (Tquote_eval t1, Tquote_eval t2) ->
+              moregen inst_nongen Invariant type_pairs env t1 t2
           | (_, _) ->
               raise_unexplained_for Moregen
         end
@@ -5862,8 +6071,8 @@ and moregen_row inst_nongen variance type_pairs env row1 row2 =
   end;
   let md1 = get_desc rm1 (* This lets us undo a following [link_type] *) in
   begin match md1, get_desc rm2 with
-    Tunivar {jkind=k1}, Tunivar {jkind=k2} ->
-      unify_univar_for Moregen rm1 rm2 k1 k2 !univar_pairs
+    Tunivar {jkind=k1; evals_to=et1}, Tunivar {jkind=k2; evals_to=et2} ->
+      unify_univar_for Moregen rm1 rm2 k1 k2 et1 et2 !univar_pairs
   | Tunivar _, _ | _, Tunivar _ ->
       raise_unexplained_for Moregen
   | _ when static_row row1 -> ()
@@ -6134,7 +6343,20 @@ let expand_head_rigid env ty =
   let ty' = expand_head env ty in
   rigid_variants := old; ty'
 
-let eqtype_subst type_pairs subst t1 k1 t2 k2 ~do_jkind_check =
+(** Equate a pair of (optional) evals-to constraints,
+    assuming the pair of constrained types is equated. *)
+let eq_eval_constraints_opt eqtype t1 t2 et1 et2 =
+  match et1, et2 with
+  | Some et1, Some et2 ->
+    equate_eval_constraints eqtype t1 t2 et1 et2
+  | Some et1, None ->
+    raise_for Equality (eval_constraint_unsatisfied t1 et1)
+  | None, Some et2 ->
+    raise_for Equality (eval_constraint_unsatisfied t2 et2)
+  | None, None -> ()
+
+let eqtype_subst eqtype type_pairs subst ~do_jkind_check
+      (t1, k1, et1) (t2, k2, et2) =
   if List.exists
       (fun (t,t') ->
         let found1 = eq_type t1 t in
@@ -6144,8 +6366,13 @@ let eqtype_subst type_pairs subst t1 k1 t2 k2 ~do_jkind_check =
       !subst
   then ()
   else begin
-    if do_jkind_check && not (Jkind.equal k1 k2)
-      then raise_for Equality (Unequal_var_jkinds (t1, k1, t2, k2));
+    if do_jkind_check then begin
+      (* check [jkind] *)
+      if not (Jkind.equal k1 k2)
+        then raise_for Equality (Unequal_var_jkinds (t1, k1, t2, k2));
+      (* check [evals_to]: notionally part of the [jkind] *)
+      eq_eval_constraints_opt eqtype t1 t2 et1 et2
+    end;
     subst := (t1, t2) :: !subst;
     TypePairs.add type_pairs (t1, t2)
   end
@@ -6170,8 +6397,11 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
   if check_phys_eq t1 t2 then () else
   try
     match (get_desc t1, get_desc t2) with
-      (Tvar { jkind = k1 }, Tvar { jkind = k2 }) when rename ->
-        eqtype_subst type_pairs subst t1 k1 t2 k2 ~do_jkind_check
+    | (Tvar { jkind = k1; evals_to = et1 },
+       Tvar { jkind = k2; evals_to = et2 }) when rename ->
+        eqtype_subst (eqtype rename type_pairs subst env ~do_jkind_check)
+          type_pairs subst ~do_jkind_check
+          (t1, k1, et1) (t2, k2, et2)
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
     | (Tof_kind k1, Tof_kind k2) ->
@@ -6185,8 +6415,11 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
         if not (TypePairs.mem type_pairs (t1', t2')) then begin
           TypePairs.add type_pairs (t1', t2');
           match (get_desc t1', get_desc t2') with
-            (Tvar { jkind = k1 }, Tvar { jkind = k2 }) when rename ->
-              eqtype_subst type_pairs subst t1' k1 t2' k2 ~do_jkind_check
+          | (Tvar { jkind = k1; evals_to = et1 },
+             Tvar { jkind = k2; evals_to = et2 }) when rename ->
+              eqtype_subst (eqtype rename type_pairs subst env ~do_jkind_check)
+                type_pairs subst ~do_jkind_check
+                (t1', k1, et1) (t2', k2, et2)
           | (Tarrow ((l1,a1,r1), t1, u1, _),
              Tarrow ((l2,a2,r2), t2, u2, _)) when
                (l1 = l2
@@ -6230,8 +6463,9 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
           | (Tpoly (t1, tl1), Tpoly (t2, tl2)) ->
               enter_poly_for Equality env univar_pairs t1 tl1 t2 tl2
                 (eqtype rename type_pairs subst env ~do_jkind_check)
-          | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
-              unify_univar_for Equality t1' t2' k1 k2 !univar_pairs
+          | (Tunivar {jkind=k1; evals_to=et1},
+             Tunivar {jkind=k2; evals_to=et2}) ->
+              unify_univar_for Equality t1' t2' k1 k2 et1 et2 !univar_pairs
           | (Tquote t1, Tquote t2) ->
               eqtype rename type_pairs subst env ~do_jkind_check t1 t2
           | (Tsplice t1, Tsplice t2) ->

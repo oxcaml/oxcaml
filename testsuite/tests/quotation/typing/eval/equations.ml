@@ -144,7 +144,17 @@ val f : 'a eval -> 'a eval = <fun>
 (* also tests that we cancel the quotes & splices *)
 let f (x : <[ $('a) eval ]> expr) : 'a eval eval = eval x
 [%%expect {|
-val f : 'a eval expr -> 'a eval eval = <fun>
+Line 1:
+Error: Values do not match:
+         val f : 'a eval expr -> 'a eval eval
+       is not included in
+         val f : 'a eval expr -> 'a eval eval
+       The type "'a eval expr -> 'a eval eval" is not compatible with the type
+         "'b eval expr -> 'b eval eval"
+       Type "'a eval eval" is not compatible with type "'b eval eval"
+       The constraints "<[<[<[<['a]>]>]>]> eval eval eval eval =
+       <[<['b]>]> eval eval" and "<[<[<['a]>]>]> eval eval eval = <['b]> eval"
+       have to be compatible.
 |}]
 let f (x : <[ $('a) eval ]> eval) : 'a eval eval = x
 [%%expect {|

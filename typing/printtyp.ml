@@ -685,9 +685,12 @@ and raw_row_desc ppf row =
                      | Some(p,tl) ->
                        fprintf ppf "Some(@,%a,@,%a)" path p raw_type_list tl)
 and raw_type_desc ppf = function
-    Tvar { name; jkind } ->
-      fprintf ppf "Tvar (@,%a,@,%a)"
+    Tvar { name; jkind; evals_to = None } ->
+      fprintf ppf "Tvar (@,%a,@,%a,@,evals_to=None)"
         print_name name Jkind.format jkind
+  | Tvar { name; jkind; evals_to = Some { target } } ->
+      fprintf ppf "@[<1>Tvar (@,%a,@,%a,@,evals_to=Some(@,%a))@]"
+        print_name name Jkind.format jkind raw_type target
   | Tarrow((l,arg,ret),t1,t2,c) ->
       fprintf ppf "@[<hov1>Tarrow((\"%s\",%a,%a),@,%a,@,%a,@,%s)@]"
         (string_of_label l)
@@ -1682,18 +1685,35 @@ and tree_of_typexp mode alloc_mode ty =
 (* qtvs = quantified type variables *)
 (* this silently drops any arguments that are not generic Tvar or Tunivar *)
 and tree_of_qtvs qtvs =
-  let tree_of_qtv v : (string * out_jkind option) option =
+  let tree_of_qtv v : out_var_constraint option =
     (* CR layouts: We ignore nullability here to avoid needlessly printing
        ['a : value_or_null] when it's not relevant (most cases).
        Unfortunately, this makes error messages really confusing, because
        we don't consider jkind annotations. *)
-    let tree jkind =
-      Some (Names.name_of_type Names.new_name v,
-            out_jkind_option_of_jkind ~ignore_null:true jkind)
+    let tree jkind evals_to =
+      Some {
+        name =
+          Names.name_of_type Names.new_name v;
+        jkind =
+          out_jkind_option_of_jkind ~ignore_null:true jkind;
+        evals_to =
+          Option.map
+            (fun { target; n_quote_evals } ->
+              let rec loop n ty =
+                if n > 0 then
+                  loop (n - 1) (newgenty (Tsplice ty))
+                else
+                  ty
+              in
+              loop n_quote_evals target
+              |> tree_of_typexp Type_scheme Alloc.Const.legacy)
+            evals_to }
     in
     match v.desc with
-    | Tvar { jkind } when v.level = generic_level -> tree jkind
-    | Tunivar { jkind } -> tree jkind
+    | Tvar { jkind; evals_to } when v.level = generic_level ->
+      tree jkind evals_to
+    | Tunivar { jkind; evals_to } ->
+      tree jkind evals_to
     | _ -> None
   in
   List.filter_map tree_of_qtv qtvs
@@ -1894,14 +1914,16 @@ let prepare_type_constructor_arguments args =
 
 (* returns an empty list if no variables in the list have a jkind annotation *)
 let zap_qtvs_if_boring qtvs =
-  if List.exists (fun (_v, l) -> Option.is_some l) qtvs
-  then qtvs
-  else []
+  let is_boring = function
+    | { name = _; jkind = None; evals_to = None } -> true
+    | _ -> false
+  in
+  if List.for_all is_boring qtvs then [] else qtvs
 
 (* get the free variables with their jkinds; do this *after* converting the
    type itself, so that the type names are available.
    This implements Case (C3) from Note [When to print jkind annotations]. *)
-let extract_qtvs tyl =
+let extract_qtvs tyl : out_var_constraints =
   let fvs = Ctype.free_non_row_variables_of_list tyl in
   (* The [Ctype.free*variables] family of functions returns the free
      variables in reverse order they were encountered in the list of types.
