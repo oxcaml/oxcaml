@@ -137,16 +137,8 @@ Line 1, characters 16-28:
 1 | type t4_wrong = #(int * int) t3
                     ^^^^^^^^^^^^
 Error: This type "#(int * int)" should be an instance of type
-<<<<<<< HEAD
          "('a : value & bits64_internal)"
-       The layout of #(int * int) is immediate & immediate
-||||||| parent of 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
-         "('a : value & bits64)"
-       The layout of #(int * int) is immediate & immediate
-=======
-         "('a : value & bits64)"
        The layout of #(int * int) is value non_pointer & value non_pointer
->>>>>>> 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
          because it is an unboxed tuple.
        But the layout of #(int * int) must be a sublayout of value & bits64
          because of the definition of t3 at line 1, characters 0-34.
@@ -163,16 +155,8 @@ Line 2, characters 16-30:
 2 | type t4_wrong = t4_wrong_inner t3
                     ^^^^^^^^^^^^^^
 Error: This type "t4_wrong_inner" should be an instance of type
-<<<<<<< HEAD
          "('a : value & bits64_internal)"
-       The layout of t4_wrong_inner is immediate & immediate
-||||||| parent of 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
-         "('a : value & bits64)"
-       The layout of t4_wrong_inner is immediate & immediate
-=======
-         "('a : value & bits64)"
        The layout of t4_wrong_inner is value non_pointer & value non_pointer
->>>>>>> 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
          because of the definition of t4_wrong_inner at line 1, characters 0-45.
        But the layout of t4_wrong_inner must be a sublayout of value & bits64
          because of the definition of t3 at line 1, characters 0-34.
@@ -195,17 +179,9 @@ type t9 = #(int * int64#) t7
 Line 2, characters 11-15:
 2 | type t10 = bool t6
                ^^^^
-<<<<<<< HEAD
 Error: This type "bool" should be an instance of type
          "('a : value & bits64_internal)"
-       The layout of bool is immediate
-||||||| parent of 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
-Error: This type "bool" should be an instance of type "('a : value & bits64)"
-       The layout of bool is immediate
-=======
-Error: This type "bool" should be an instance of type "('a : value & bits64)"
        The layout of bool is value non_pointer
->>>>>>> 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
          because it is the primitive type bool.
        But the layout of bool must be a sublayout of value & bits64
          because of the definition of t6 at line 1, characters 0-37.
@@ -228,17 +204,9 @@ type t9 = t9_record t7
 Line 3, characters 11-15:
 3 | type t10 = bool t6
                ^^^^
-<<<<<<< HEAD
 Error: This type "bool" should be an instance of type
          "('a : value & bits64_internal)"
-       The layout of bool is immediate
-||||||| parent of 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
-Error: This type "bool" should be an instance of type "('a : value & bits64)"
-       The layout of bool is immediate
-=======
-Error: This type "bool" should be an instance of type "('a : value & bits64)"
        The layout of bool is value non_pointer
->>>>>>> 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
          because it is the primitive type bool.
        But the layout of bool must be a sublayout of value & bits64
          because of the definition of t6 at line 1, characters 0-37.
@@ -252,16 +220,8 @@ Line 2, characters 24-38:
 2 | and 'a t7_wrong = { x : #(int * int64) t6_wrong }
                             ^^^^^^^^^^^^^^
 Error: This type "#(int * int64)" should be an instance of type
-<<<<<<< HEAD
          "('a : value & bits64_internal)"
-       The layout of #(int * int64) is immediate & value non_float
-||||||| parent of 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
-         "('a : value & bits64)"
-       The layout of #(int * int64) is immediate & value non_float
-=======
-         "('a : value & bits64)"
        The layout of #(int * int64) is value non_pointer & value non_float
->>>>>>> 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
          because it is an unboxed tuple.
        But the layout of #(int * int64) must be a sublayout of value & bits64
          because of the annotation on 'a in the declaration of the type

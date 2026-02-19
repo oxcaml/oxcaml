@@ -277,8 +277,9 @@ Line 2, characters 0-94:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "a" is value non_float
          because of the definition of a at line 1, characters 0-18.
-       But the layout of type "a" must be a sublayout of immediate
+       But the layout of type "a" must be a sublayout of value non_pointer
          because of the definition of b at line 2, characters 0-94.
+       Note: The layout of immediate is value non_pointer.
 |}]
 
 type a : immediate64
@@ -591,15 +592,8 @@ Line 7, characters 0-24:
     ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The layout of type "A.t" is value
          because of the definition of t at line 2, characters 2-16.
-<<<<<<< HEAD
        But the layout of type "A.t" must be a sublayout of value non_float
-||||||| parent of 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
-       But the layout of type "A.t" must be a sublayout of immediate
-=======
-       But the layout of type "A.t" must be a sublayout of value non_pointer
->>>>>>> 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
          because of the definition of t at line 7, characters 0-24.
-       Note: The layout of immediate is value non_pointer.
 |}]
 
 type t : value = private int
@@ -1220,15 +1214,8 @@ Lines 1-2, characters 0-65:
 2 |   Foo of 'a @@ global portable contended many aliased [@@unboxed]
 Error: The layout of type "t" is value
          because of the annotation on 'a in the declaration of the type t.
-<<<<<<< HEAD
        But the layout of type "t" must be a sublayout of value non_float
-||||||| parent of 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
-       But the layout of type "t" must be a sublayout of immediate
-=======
-       But the layout of type "t" must be a sublayout of value non_pointer
->>>>>>> 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
          because of the annotation on the declaration of the type t.
-       Note: The layout of immediate is value non_pointer.
 |}]
 (* CR layouts v2.8: this should be accepted. Internal ticket 5120. *)
 
@@ -1410,15 +1397,8 @@ Error: This expression has type "a" but an expression was expected of type
          "('a : immediate non_float)"
        The layout of a is value
          because of the annotation on the abstract type declaration for a.
-<<<<<<< HEAD
        But the layout of a must be a sublayout of value non_float
-||||||| parent of 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
-       But the layout of a must be a sublayout of immediate
-=======
-       But the layout of a must be a sublayout of value non_pointer
->>>>>>> 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
          because of the definition of f at line 16, characters 10-41.
-       Note: The layout of immediate is value non_pointer.
 |}]
 
 (********************)

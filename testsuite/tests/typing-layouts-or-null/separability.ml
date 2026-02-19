@@ -729,17 +729,9 @@ Line 3, characters 83-89:
 3 | type ('b : value & value & float64 mod non_null non_float) fails = unit constraint 'b = b
                                                                                        ^^^^^^
 Error: The type constraints are not consistent.
-<<<<<<< HEAD
        Type "('b : value & value & float64_internal)"
        is not compatible with type "b"
-       The layout of b is immediate & value maybe_separable & float64
-||||||| parent of 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
-       Type "('b : value & value & float64)" is not compatible with type "b"
-       The layout of b is immediate & value maybe_separable & float64
-=======
-       Type "('b : value & value & float64)" is not compatible with type "b"
        The layout of b is value non_pointer & value maybe_separable & float64
->>>>>>> 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
          because of the definition of b at line 1, characters 0-51.
        But the layout of b must be a sublayout of value & value & float64
          because of the annotation on 'b in the declaration of the type fails.

@@ -190,7 +190,7 @@ module Layout = struct
       equal component t
       ||
       match t with
-      | Base _ | Any _ -> false (* nothing left to descend into *)
+      | Base _ | Any _ | Univar _ -> false
       | Product ts -> List.exists (has_component ~component) ts
 
     module Debug_printers = struct
@@ -394,18 +394,6 @@ module Layout = struct
       | Any sa -> pp_string_list ppf ("any" :: Scannable_axes.to_string_list sa)
       | Sort (s, sa) -> (
         match Sort.get s with
-<<<<<<< HEAD
-        | Base Scannable when Scannable_axes.(equal sa immediate_axes) ->
-          Fmt.fprintf ppf "immediate"
-        | Base Scannable when Scannable_axes.(equal sa immediate64_axes) ->
-          Fmt.fprintf ppf "immediate64"
-||||||| parent of 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
-        | Base Scannable when Scannable_axes.(equal sa immediate_axes) ->
-          fprintf ppf "immediate"
-        | Base Scannable when Scannable_axes.(equal sa immediate64_axes) ->
-          fprintf ppf "immediate64"
-=======
->>>>>>> 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
         | Base Scannable ->
           let value_axes_diff =
             Scannable_axes.(to_string_list_diff ~base:value_axes sa)
@@ -3166,14 +3154,22 @@ module Violation = struct
      to print out better notes (maybe by looking at the full jkinds?) *)
   let report_layout_notes ppf violation mismatch_type ~print_as_value_layout =
     match mismatch_type with
-    | Mode -> ()
+    | Kind -> ()
     | Layout ->
-      let immediate_layout = Const.Builtin.immediate.jkind.layout in
-      let immediate64_layout = Const.Builtin.immediate64.jkind.layout in
+      let layout_const_of_builtin (b : Const.Builtin.t) =
+        match b.jkind.base with Types.Layout l -> Some l | Kconstr _ -> None
+      in
+      let immediate_layout = layout_const_of_builtin Const.Builtin.immediate in
+      let immediate64_layout =
+        layout_const_of_builtin Const.Builtin.immediate64
+      in
       let check_has_component component jkind =
-        match Layout.get_const jkind.jkind.layout with
+        match Desc.get_const (Jkind_desc.get jkind.jkind) with
         | None -> false
-        | Some const -> Layout.Const.has_component ~component const
+        | Some const -> (
+          match component, const.base with
+          | None, _ | _, Kconstr _ -> false
+          | Some c, Types.Layout l -> Layout.Const.has_component ~component:c l)
       in
       let check_both_jkinds jk1 jk2 =
         let should_check_jk2 = not print_as_value_layout in
@@ -3220,7 +3216,10 @@ module Violation = struct
      value (scannable) layouts, a more useful error should be reported.
      Specifically, the first mismatched axis should be reported as a reason,
      like "because it is not non_pointer" for a value vs immediate error. *)
-<<<<<<< HEAD
+  (* CR layouts-scannable: Also, better error messages should be reported for
+     products! For instance, an error message blaming an arity difference, or
+     an error message that drills down into two products to find the first
+     conflicing component. Note reporting should be adjusted appropriately. *)
   let categorize_mismatch ~level env t =
     let expand k1 k2 =
       (* We fully expand aliases here so that we can:
@@ -3248,15 +3247,6 @@ module Violation = struct
         let base1, base2, cmis = expand k1 k2 in
         base1, base2, cmis
     in
-||||||| parent of 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
-  let report_general ~level preamble pp_former former ppf t =
-=======
-  (* CR layouts-scannable: Also, better error messages should be reported for
-     products! For instance, an error message blaming an arity difference, or
-     an error message that drills down into two products to find the first
-     conflicing component. Note reporting should be adjusted appropriately. *)
-  let report_general ~level preamble pp_former former ppf t =
->>>>>>> 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
     (* Sometimes, when reporting a layout conflict, the scannable axes of
        the expected layout should not be shown since the information is
        unnecessary. For now, this condition is when the layout on the left is
@@ -3302,17 +3292,7 @@ module Violation = struct
       | Layout l -> has_sort_var_layout l
     in
     let indent = pp_print_custom_break ~fits:("", 0, "") ~breaks:("", 2, "") in
-<<<<<<< HEAD
-    (* On the left / for actual kinds, always print out the entire layout,
-       even if [mismatch_type] says to print as "a value layout" *)
     let format_base_or_kind (type l r) ppf (jkind : (l * r) jkind) =
-||||||| parent of 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
-    (* On the left / for actual kinds, always print out the entire layout,
-       even if [mismatch_type] says to print as "a value layout" *)
-    let format_layout_or_kind ppf jkind =
-=======
-    let format_layout_or_kind ppf jkind =
->>>>>>> 25e99dad4f (Improve error messages for layouts containing `value non_pointer` (#5128))
       match mismatch_type with
       | Kind -> fprintf ppf "%t%a" indent (format env) jkind
       | Layout -> (
