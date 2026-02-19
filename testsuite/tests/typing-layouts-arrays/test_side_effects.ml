@@ -32,8 +32,25 @@ let _ = Sys.opaque_identity (makearray_dynamic 5 (ignorable ()))
 
 let length1 () = print_endline "length1"; 5
 
-let _ = Sys.opaque_identity (makearray_dynamic (length1 ()) #5L)
+let _ = Sys.opaque_identity (makearray_dynamic (length1 ()) #0.s)
+let _ = Sys.opaque_identity (makearray_dynamic (length1 ()) #0.)
+let _ = Sys.opaque_identity (makearray_dynamic (length1 ()) #0s)
+let _ = Sys.opaque_identity (makearray_dynamic (length1 ()) #0S)
+let _ = Sys.opaque_identity (makearray_dynamic (length1 ()) #0l)
+let _ = Sys.opaque_identity (makearray_dynamic (length1 ()) #0L)
+let _ = Sys.opaque_identity (makearray_dynamic (length1 ()) #0n)
+let _ = Sys.opaque_identity (makearray_dynamic (length1 ()) #(0, "string"))
+let _ = Sys.opaque_identity (makearray_dynamic (length1 ()) #(0, #0.))
 
 let _ =
   let length2 () = print_endline "length2"; 5 in
-  Sys.opaque_identity (makearray_dynamic (length2 ()) #5L)
+  let _ = Sys.opaque_identity (makearray_dynamic (length2 ()) #0.s) in
+  let _ = Sys.opaque_identity (makearray_dynamic (length2 ()) #0.) in
+  let _ = Sys.opaque_identity (makearray_dynamic (length2 ()) #0s) in
+  let _ = Sys.opaque_identity (makearray_dynamic (length2 ()) #0S) in
+  let _ = Sys.opaque_identity (makearray_dynamic (length2 ()) #0l) in
+  let _ = Sys.opaque_identity (makearray_dynamic (length2 ()) #0L) in
+  let _ = Sys.opaque_identity (makearray_dynamic (length2 ()) #0n) in
+  let _ = Sys.opaque_identity (makearray_dynamic (length2 ()) #(0, "string")) in
+  let _ = Sys.opaque_identity (makearray_dynamic (length2 ()) #(0, #0.)) in
+  ()
