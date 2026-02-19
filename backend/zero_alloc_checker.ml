@@ -2209,8 +2209,24 @@ end = struct
     else Witnesses.empty
 
   let is_caml_internal s =
+    (* [structured_internal_prefix] finds the [Camlinternal] prefix in the
+       compilation unit name encoded using the structured name-mangling scheme.
+       For that, it must skip over the decimal number encoding the length of the
+       compilation unit name. *)
+    let rec structured_internal_prefix ~from s =
+      from < String.length s
+      &&
+      match String.get s from with
+      | '0' .. '9' -> structured_internal_prefix ~from:(from + 1) s
+      | _ -> String.begins_with s ~from ~prefix:"Camlinternal"
+    in
     String.starts_with s ~prefix:"caml_apply"
-    || String.starts_with s ~prefix:"camlCamlinternal"
+    ||
+    match Config.name_mangling_scheme with
+    | Flat -> String.starts_with s ~prefix:"camlCamlinternal"
+    | Structured ->
+      String.starts_with s ~prefix:"_CamlU"
+      && structured_internal_prefix ~from:6 s
 
   (* [find_callee] returns the value associated with the callee. *)
   let find_callee t callee ~desc dbg (k : Witness.kind) =
