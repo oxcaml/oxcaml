@@ -220,31 +220,44 @@ module Context = struct
               } =
           Cost_metrics.removed c
         in
+        let nested = Cost_metrics.nested_removed c in
         let table =
-          [ [ `String "Call";
+          [ [ `String "";
+              `String "Call";
               `String "Alloc";
               `String "Prim";
               `String "Branch";
               `String "Direct call of indirect";
               `String "Specialized poly compare";
               `String "Requested inline" ];
-            [ `Int call;
+            [ `String "Inside function";
+              `Int call;
               `Int alloc;
               `Int prim;
               `Int branch;
               `Int direct_call_of_indirect;
               `Int specialized_poly_compare;
-              `Int requested_inline ] ]
+              `Int requested_inline ];
+            [ `String "In nested closures";
+              `Int nested.call;
+              `Int nested.alloc;
+              `Int nested.prim;
+              `Int nested.branch;
+              `Int nested.direct_call_of_indirect;
+              `Int nested.specialized_poly_compare;
+              `Int nested.requested_inline ] ]
           |> Table.create
         in
         Format.fprintf ppf
-          "@[<v>@[<h>Code@ size@ was@ estimated@ to@ be@ %a@]@,\
+          "@[<v>@[<h>Code@ size@ was@ estimated@ to@ be@ %a (%a nested)@]@,\
            @,\
            @[<h>Benefits@ of@ inlining@ this@ call:@;\
            @]@,\
            @[<h>%a@]@]@,\
            @,"
-          Code_size.print (Cost_metrics.size c) Table.print table
+          Code_size.print (Cost_metrics.size c) Code_size.print
+          (Cost_metrics.nested_size c)
+          Table.print table
     in
     let print_depth ppf = function
       | None -> ()
