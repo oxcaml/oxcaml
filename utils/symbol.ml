@@ -113,6 +113,13 @@ let for_name compilation_unit name =
     linkage_name;
     hash = Hashtbl.hash linkage_name; }
 
+let for_structured_mangling_path ~compilation_unit ~path ~suffix =
+  let name = Structured_mangling.mangle_ident compilation_unit path in
+  let linkage_name = name ^ suffix |> Linkage_name.of_string in
+  { compilation_unit;
+    linkage_name;
+    hash = Hashtbl.hash linkage_name; }
+
 let for_local_ident id =
   assert (not (Ident.is_global_or_predef id));
   let compilation_unit = CU.get_current_exn () in
