@@ -249,7 +249,7 @@ type extra_binding =
     extra_args : EA.t RI.Map.t
   }
 
-let join_one_cse_equation ~cse_at_each_use prim bound_to_map
+let join_one_cse_equation ~machine_width ~cse_at_each_use prim bound_to_map
     (cse, extra_bindings, env_extension, allowed) =
   let has_value_on_all_paths =
     List.for_all cse_at_each_use ~f:(fun (_, id, _) ->
@@ -285,7 +285,8 @@ let join_one_cse_equation ~cse_at_each_use prim bound_to_map
            anyway. *)
         match[@ocaml.warning "-fragile-match"] EP.to_primitive prim with
         | Unary (Is_int { variant_only = true }, scrutinee) ->
-          TEE.add_is_int_relation env_extension (Name.var var) ~scrutinee
+          TEE.add_is_int_relation ~machine_width env_extension (Name.var var)
+            ~scrutinee
         | Unary (Get_tag, block) ->
           TEE.add_get_tag_relation env_extension (Name.var var) ~scrutinee:block
         | _ -> env_extension
@@ -352,7 +353,9 @@ let join0 ~typing_env_at_fork ~cse_at_fork ~cse_at_each_use ~params
        to the continuation at the join point. *)
     let cse', extra_bindings, env_extension', allowed =
       EP.Map.fold
-        (join_one_cse_equation ~cse_at_each_use)
+        (join_one_cse_equation
+           ~machine_width:(TE.machine_width typing_env_at_fork)
+           ~cse_at_each_use)
         new_cse
         (EP.Map.empty, [], TEE.empty, allowed)
     in
