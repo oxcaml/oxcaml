@@ -1662,7 +1662,7 @@ let rec tree_of_modal_typexp mode modal ty =
                      | Tunivar { jkind } ->
                        (match Jkind.get_layout !printing_env jkind with
                         | Some layout ->
-                          (match Jkind.Layout.Const.get_sort layout with
+                          (match Jkind_types.Layout.Const.get_sort layout with
                            | Some (Jkind.Sort.Const.Univar uv) ->
                              uv == sort_var
                            | _ -> false)

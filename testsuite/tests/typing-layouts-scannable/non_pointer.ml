@@ -476,11 +476,11 @@ Error: Signature mismatch:
        Modules do not match:
          sig type t = #(int or_null * float#) end
        is not included in
-         sig type t : value_or_null non_pointer & float64 end
+         sig type t : value_or_null non_pointer mod external_ & float64 end
        Type declarations do not match:
          type t = #(int or_null * float#)
        is not included in
-         type t : value_or_null non_pointer & float64
+         type t : value_or_null non_pointer mod external_ & float64
        The layout of the first is value maybe_separable maybe_null & float64
          because it is an unboxed tuple.
        But the layout of the first must be a sublayout of

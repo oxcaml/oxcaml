@@ -206,7 +206,7 @@ let rec layout_to_types_layout (ly : Layout.t) : Types.mixed_block_element =
   match ly with
   | Base base -> (
     match base with
-    | Scannable -> Scannable
+    | Scannable -> Scannable Jkind_types.Scannable_axes.max
     | Float64 -> Float64
     (* This is a case, where we potentially have mapped [Float_boxed] to
        [Float64], but that is fine, because they are reordered like other mixed

@@ -1744,52 +1744,7 @@ module Element_repr = struct
     if is_float env ty
     then Float_element
     else
-<<<<<<< HEAD
       let layout = Jkind.get_layout_defaulting_to_scannable env jkind in
-      let sort =
-        match Option.bind layout Jkind.Layout.Const.get_sort with
-        | None ->
-          Misc.fatal_error "Element_repr.classify: unexpected abstract layout"
-        | Some s -> s
-      in
-      let rec sort_to_t : Jkind_types.Sort.Const.t -> t = function
-      | Base Scannable -> Value_element
-      | Base Float64 -> Unboxed_element Float64
-      | Base Float32 -> Unboxed_element Float32
-      | Base Word -> Unboxed_element Word
-      | Base Bits8 -> Unboxed_element Bits8
-      | Base Bits16 -> Unboxed_element Bits16
-      | Base Bits32 -> Unboxed_element Bits32
-      | Base Bits64 -> Unboxed_element Bits64
-      | Base Untagged_immediate -> Unboxed_element Untagged_immediate
-      | Base Vec128 -> Unboxed_element Vec128
-      | Base Vec256 -> Unboxed_element Vec256
-      | Base Vec512 -> Unboxed_element Vec512
-      | Base Void -> Void
-||||||| parent of 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
-      let layout = Jkind.get_layout_defaulting_to_scannable jkind in
-      let sort =
-        match Jkind.Layout.Const.get_sort layout with
-        | None ->
-          Misc.fatal_error "Element_repr.classify: unexpected abstract layout"
-        | Some s -> s
-      in
-      let rec sort_to_t : Jkind_types.Sort.Const.t -> t = function
-      | Base Scannable -> Value_element
-      | Base Float64 -> Unboxed_element Float64
-      | Base Float32 -> Unboxed_element Float32
-      | Base Word -> Unboxed_element Word
-      | Base Bits8 -> Unboxed_element Bits8
-      | Base Bits16 -> Unboxed_element Bits16
-      | Base Bits32 -> Unboxed_element Bits32
-      | Base Bits64 -> Unboxed_element Bits64
-      | Base Untagged_immediate -> Unboxed_element Untagged_immediate
-      | Base Vec128 -> Unboxed_element Vec128
-      | Base Vec256 -> Unboxed_element Vec256
-      | Base Vec512 -> Unboxed_element Vec512
-      | Base Void -> Void
-=======
-      let layout = Jkind.get_layout_defaulting_to_scannable jkind in
       let rec layout_to_t : Jkind_types.Layout.Const.t -> t = function
       | Any _ ->
         Misc.fatal_error "Element_repr.classify: unexpected abstract layout"
@@ -1806,18 +1761,14 @@ module Element_repr = struct
       | Base (Vec256, _) -> Unboxed_element Vec256
       | Base (Vec512, _) -> Unboxed_element Vec512
       | Base (Void, _) -> Void
->>>>>>> 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
       | Product l ->
-<<<<<<< HEAD
-        Unboxed_element (Product (Array.of_list (List.map sort_to_t l)))
-      | Univar _ -> Misc.fatal_error "sort_to_t: unexpected univar"
-||||||| parent of 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
-        Unboxed_element (Product (Array.of_list (List.map sort_to_t l)))
-=======
         Unboxed_element (Product (Array.of_list (List.map layout_to_t l)))
->>>>>>> 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
+      | Univar _ -> Misc.fatal_error "layout_to_t: unexpected univar"
       in
-      layout_to_t layout
+      match layout with
+      | None ->
+        Misc.fatal_error "Element_repr.classify: unexpected abstract layout"
+      | Some layout -> layout_to_t layout
 
   let mixed_product_shape loc ts kind =
     let boxed_elements =

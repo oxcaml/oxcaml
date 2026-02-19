@@ -1947,69 +1947,8 @@ module Const = struct
     let loc = jkind.pjka_loc in
     match jkind.pjka_desc with
     | Pjk_abbreviation (name, sa_annot) ->
-<<<<<<< HEAD
       let p, _ = Env.lookup_jkind ~use:use_abstract_jkinds ~loc name.txt env in
       let jkind_without_sa = of_path p |> allow_left |> allow_right in
-||||||| parent of 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
-      (* CR layouts v2.8: move this to predef. Internal ticket 3339. *)
-      let jkind_without_sa =
-        (match name.txt with
-          | "any" -> Builtin.any.jkind
-          | "value_or_null" -> Builtin.value_or_null.jkind
-          | "value" -> Builtin.value.jkind
-          | "void" -> Builtin.void.jkind
-          | "immediate64" -> Builtin.immediate64.jkind
-          | "immediate64_or_null" -> Builtin.immediate64_or_null.jkind
-          | "immediate" -> Builtin.immediate.jkind
-          | "immediate_or_null" -> Builtin.immediate_or_null.jkind
-          | "float64" -> Builtin.float64.jkind
-          | "float32" -> Builtin.float32.jkind
-          | "word" -> Builtin.word.jkind
-          | "untagged_immediate" -> Builtin.untagged_immediate.jkind
-          | "bits8" -> Builtin.bits8.jkind
-          | "bits16" -> Builtin.bits16.jkind
-          | "bits32" -> Builtin.bits32.jkind
-          | "bits64" -> Builtin.bits64.jkind
-          | "vec128" -> Builtin.vec128.jkind
-          | "vec256" -> Builtin.vec256.jkind
-          | "vec512" -> Builtin.vec512.jkind
-          | "immutable_data" -> Builtin.immutable_data.jkind
-          | "sync_data" -> Builtin.sync_data.jkind
-          | "mutable_data" -> Builtin.mutable_data.jkind
-          | _ -> raise ~loc:jkind.pjkind_loc (Unknown_jkind jkind))
-        |> allow_left |> allow_right
-      in
-=======
-      (* CR layouts v2.8: move this to predef. Internal ticket 3339. *)
-      let jkind_without_sa =
-        (match name.txt with
-          | "any" -> Builtin.any.jkind
-          | "scannable" -> Builtin.scannable.jkind
-          | "value_or_null" -> Builtin.value_or_null.jkind
-          | "value" -> Builtin.value.jkind
-          | "void" -> Builtin.void.jkind
-          | "immediate64" -> Builtin.immediate64.jkind
-          | "immediate64_or_null" -> Builtin.immediate64_or_null.jkind
-          | "immediate" -> Builtin.immediate.jkind
-          | "immediate_or_null" -> Builtin.immediate_or_null.jkind
-          | "float64" -> Builtin.float64.jkind
-          | "float32" -> Builtin.float32.jkind
-          | "word" -> Builtin.word.jkind
-          | "untagged_immediate" -> Builtin.untagged_immediate.jkind
-          | "bits8" -> Builtin.bits8.jkind
-          | "bits16" -> Builtin.bits16.jkind
-          | "bits32" -> Builtin.bits32.jkind
-          | "bits64" -> Builtin.bits64.jkind
-          | "vec128" -> Builtin.vec128.jkind
-          | "vec256" -> Builtin.vec256.jkind
-          | "vec512" -> Builtin.vec512.jkind
-          | "immutable_data" -> Builtin.immutable_data.jkind
-          | "sync_data" -> Builtin.sync_data.jkind
-          | "mutable_data" -> Builtin.mutable_data.jkind
-          | _ -> raise ~loc:jkind.pjkind_loc (Unknown_jkind jkind))
-        |> allow_left |> allow_right
-      in
->>>>>>> 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
       let nullability, separability = transl_scannable_axes sa_annot in
       if sa_annot <> []
       then begin

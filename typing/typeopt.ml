@@ -26,16 +26,8 @@ type error =
       Jkind.Sort.t * Language_extension.maturity * type_expr option
   | Small_number_sort_without_extension of Jkind.Sort.t * type_expr option
   | Simd_sort_without_extension of Jkind.Sort.t * type_expr option
-<<<<<<< HEAD
   | Not_a_sort of Env.t * type_expr * Jkind.Violation.t
-  | Unsupported_product_in_lazy of Jkind.Sort.Const.t
-||||||| parent of 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
-  | Not_a_sort of type_expr * Jkind.Violation.t
-  | Unsupported_product_in_lazy of Jkind.Sort.Const.t
-=======
-  | Not_a_sort of type_expr * Jkind.Violation.t
   | Unsupported_product_in_lazy of Jkind.Layout.Const.t
->>>>>>> 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
   | Unsupported_vector_in_product_array
   | Mixed_product_array of Jkind.Layout.Const.t * type_expr
   | Unsupported_void_in_array
@@ -115,6 +107,7 @@ let maybe_pointer exp = maybe_pointer_type exp.exp_env exp.exp_type
 let rec layout_is_representable : Jkind.Layout.Const.t -> bool = function
   | Any _ -> false
   | Base _ -> true
+  | Univar _ -> false
   | Product sorts ->
     List.for_all layout_is_representable sorts
 
@@ -127,23 +120,13 @@ let rec layout_is_representable : Jkind.Layout.Const.t -> bool = function
    Internal ticket 5093 (which references the former name, [type_sort]). *)
 (* CR layouts v3.0: have a better error message
    for nullable jkinds.*)
-<<<<<<< HEAD
-let type_sort ~why env loc ty =
-  match Ctype.type_sort ~why ~fixed:false env ty with
-  | Ok sort -> sort
-  | Error err -> raise (Error (loc, Not_a_sort (env, ty, err)))
-||||||| parent of 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
-let type_sort ~why env loc ty =
-  match Ctype.type_sort ~why ~fixed:false env ty with
-  | Ok sort -> sort
-  | Error err -> raise (Error (loc, Not_a_sort (ty, err)))
-=======
 let type_representable_layout ~why env loc ty =
   let jkind = Ctype.type_jkind env ty in
-  let layout = Jkind.get_layout_defaulting_to_scannable jkind in
-  if layout_is_representable layout then
+  let layout = Jkind.get_layout_defaulting_to_scannable env jkind in
+  match layout with
+  | Some layout when layout_is_representable layout ->
     layout
-  else
+  | _ ->
     (* Surprisingly, it is possible to reach this branch; for example, when
        translating [f] in the following example:
 
@@ -160,14 +143,13 @@ let type_representable_layout ~why env loc ty =
     (match Ctype.type_sort ~why ~fixed:false env ty with
     | Ok _sort ->
       let jkind = Ctype.type_jkind env ty in
-      let layout = Jkind.get_layout_defaulting_to_scannable jkind in
-      (match Jkind_types.Layout.Const.get_sort layout with
+      let layout = Jkind.get_layout_defaulting_to_scannable env jkind in
+      (match Option.bind layout Jkind_types.Layout.Const.get_sort with
       | None -> Misc.fatal_error
                    "called type_sort but didn't get a representable layout"
-      | Some _ -> layout)
+      | Some _ -> Option.get layout)
     (* CR layouts: It seems as if this is unreachable (see ticket above). *)
-    | Error err -> raise (Error (loc, Not_a_sort (ty, err))))
->>>>>>> 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
+    | Error err -> raise (Error (loc, Not_a_sort (env, ty, err))))
 
 (* [classification]s are used for two things: things in arrays, and things in
    lazys. In the former case, we need detailed information about unboxed
@@ -257,38 +239,6 @@ let classify ~classify_product env ty layout : _ classification =
   | Trepr _ ->
       assert false
   end
-<<<<<<< HEAD
-  | Base Float64 -> Unboxed_float Unboxed_float64
-  | Base Float32 -> Unboxed_float Unboxed_float32
-  | Base Bits8 -> Unboxed_int Untagged_int8
-  | Base Bits16 -> Unboxed_int Untagged_int16
-  | Base Bits32 -> Unboxed_int Unboxed_int32
-  | Base Bits64 -> Unboxed_int Unboxed_int64
-  | Base Vec128 -> Unboxed_vector Unboxed_vec128
-  | Base Vec256 ->
-    if split_vectors
-    then Product (Pgcignorableproductarray
-                    [ Punboxedvector_ignorable Unboxed_vec128;
-                      Punboxedvector_ignorable Unboxed_vec128 ])
-    else Unboxed_vector Unboxed_vec256
-  | Base Vec512 -> Unboxed_vector Unboxed_vec512
-  | Base Word -> Unboxed_int Unboxed_nativeint
-  | Base Untagged_immediate -> Unboxed_int Untagged_int
-  | Base Void -> Void
-||||||| parent of 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
-  | Base Float64 -> Unboxed_float Unboxed_float64
-  | Base Float32 -> Unboxed_float Unboxed_float32
-  | Base Bits8 -> Unboxed_int Untagged_int8
-  | Base Bits16 -> Unboxed_int Untagged_int16
-  | Base Bits32 -> Unboxed_int Unboxed_int32
-  | Base Bits64 -> Unboxed_int Unboxed_int64
-  | Base Vec128 -> Unboxed_vector Unboxed_vec128
-  | Base Vec256 -> Unboxed_vector Unboxed_vec256
-  | Base Vec512 -> Unboxed_vector Unboxed_vec512
-  | Base Word -> Unboxed_int Unboxed_nativeint
-  | Base Untagged_immediate -> Unboxed_int Untagged_int
-  | Base Void -> Void
-=======
   | Base (Float64, _) -> Unboxed_float Unboxed_float64
   | Base (Float32, _) -> Unboxed_float Unboxed_float32
   | Base (Bits8, _) -> Unboxed_int Untagged_int8
@@ -296,12 +246,16 @@ let classify ~classify_product env ty layout : _ classification =
   | Base (Bits32, _) -> Unboxed_int Unboxed_int32
   | Base (Bits64, _) -> Unboxed_int Unboxed_int64
   | Base (Vec128, _) -> Unboxed_vector Unboxed_vec128
-  | Base (Vec256, _) -> Unboxed_vector Unboxed_vec256
+  | Base (Vec256, _) ->
+    if split_vectors
+    then Product (Pgcignorableproductarray
+                    [ Punboxedvector_ignorable Unboxed_vec128;
+                      Punboxedvector_ignorable Unboxed_vec128 ])
+    else Unboxed_vector Unboxed_vec256
   | Base (Vec512, _) -> Unboxed_vector Unboxed_vec512
   | Base (Word, _) -> Unboxed_int Unboxed_nativeint
   | Base (Untagged_immediate, _) -> Unboxed_int Untagged_int
   | Base (Void, _) -> Void
->>>>>>> 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
   | Product c -> Product (classify_product ty c)
   | Univar _ -> Misc.fatal_error "classify: Univar"
 
@@ -503,10 +457,12 @@ let value_kind_of_scannable_jkind env jkind =
     Jkind.get_externality_upper_bound ~context env jkind
   in
   match layout with
-<<<<<<< HEAD
-  (* CR layouts-scannable: Use scannable axes to improve codegen *)
-  | Some (Base (Scannable, _)) ->
-    value_kind_of_value_with_externality externality_upper_bound
+  | Some (Base (Scannable, { separability; _ })) -> (
+    (* use the better of the two [immediate_or_pointer]s *)
+    match pointerness_of_separability separability,
+          pointerness_of_scannable_with_externality externality_upper_bound with
+    | Immediate, Immediate | Immediate, Pointer | Pointer, Immediate -> Pintval
+    | Pointer, Pointer -> Pgenval)
   | None
   | Some ( Any _
          | Product _
@@ -515,30 +471,6 @@ let value_kind_of_scannable_jkind env jkind =
                   | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
                   | Vec512),
                   _ )) ->
-||||||| parent of 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
-  (* CR layouts-scannable: Use scannable axes to improve codegen *)
-  | Base (Scannable, _) ->
-    value_kind_of_value_with_externality externality_upper_bound
-  | Any _
-  | Product _
-  | Base
-    ( ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
-      | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512),
-      _ ) ->
-=======
-  | Base (Scannable, { separability; _ }) -> (
-    (* use the better of the two [immediate_or_pointer]s *)
-    match pointerness_of_separability separability,
-          pointerness_of_scannable_with_externality externality_upper_bound with
-    | Immediate, Immediate | Immediate, Pointer | Pointer, Immediate -> Pintval
-    | Pointer, Pointer -> Pgenval)
-  | Any _
-  | Product _
-  | Base
-    ( ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
-      | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512),
-      _ ) ->
->>>>>>> 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
     Misc.fatal_error "expected a layout of scannable"
 
 (* [value_kind] has a pre-condition that it is only called on values.  With the
