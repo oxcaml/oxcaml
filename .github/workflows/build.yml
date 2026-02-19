@@ -212,7 +212,7 @@ jobs:
           echo "C_INCLUDE_PATH=$PWD/musl-kernel/x86/include" >> "$GITHUB_ENV"
 
       - name: Install gdb (Linux)
-        if: runner.os == 'Linux' && contains(matrix.config, '--enable-runtime5')
+        if: runner.os == 'Linux' && contains(matrix.config, '--enable-runtime5') && matrix.cc != 'musl-gcc'
         run: sudo apt-get update && sudo apt-get install gdb
 
       - name: Install autoconf and bash and parallel (macOS)
