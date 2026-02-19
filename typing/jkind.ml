@@ -1619,6 +1619,12 @@ module Const = struct
       | [] -> None
 
     let convert ~(verbosity : Format_verbosity.t) env (jkind : _ t) =
+      let jkind =
+        match verbosity with
+        | Not_verbose -> jkind
+        | Expanded | Expanded_with_all_mod_bounds ->
+          Base_and_axes.fully_expand_aliases_const env jkind
+      in
       (* For each primitive jkind, we try to print the jkind in terms of it
          (this is possible if the primitive is a subjkind of it). We then choose
          the "simplest". The "simplest" is taken to mean the one with the least
