@@ -1,10 +1,11 @@
 (******************************************************************************
  *                                 Chamelon                                   *
  *                         Milla Valnet, OCamlPro                             *
+ *                         Basile Clément, OCamlPro                           *
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2023 OCamlPro                                                *
+ * Copyright (c) 2026 OCamlPro                                                *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
  * copy of this software and associated documentation files (the "Software"), *
@@ -25,20 +26,40 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-let () =
-  Arg.parse_dynamic Chamelon_args.spec_list Chamelon_args.anon_fun
-    Chamelon_args.usage_msg;
-  match !Chamelon_args.subcommand with
-  | None ->
-    Format.eprintf
-      "required COMMAND name is missing, must be 'run' or 'dune'.@.";
-    Arg.usage !Chamelon_args.spec_list Chamelon_args.usage_msg;
-    exit 2
-  | Some Run -> Chamelon_run.main ()
-  | Some Dune -> (
-    match !Chamelon_args.dune_subcommand with
-    | None ->
-      Format.eprintf "required COMMAND name is missing, must be 'build'.@.";
-      Arg.usage !Chamelon_args.spec_list Chamelon_args.usage_msg;
-      exit 2
-    | Some Build -> Chamelon_dune.main ())
+type t =
+  | Atom of string
+  | List of t list
+
+type sexp = t
+
+val print : Format.formatter -> t -> unit
+
+val from_string : string -> sexp list
+
+module Fields : sig
+  type _ t =
+    | [] : unit t
+    | ( :: ) : (string * (sexp -> 'a)) * 'b t -> ('a * 'b) t
+
+  val parse_list : 'a t -> sexp list -> 'a
+
+  val parse : 'a t -> sexp -> 'a
+end
+
+val variant_of_sexp :
+  ?default:(string -> sexp list -> 'a) ->
+  (string * (sexp list -> 'a)) list ->
+  sexp ->
+  'a
+
+val ( let+ ) : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c
+
+val one_arg : ('a -> 'b) -> 'a list -> 'b
+
+val pair : ('a -> 'b) -> ('a -> 'c) -> 'a list -> 'b * 'c
+
+val string_of_sexp : sexp -> string
+
+val bool_of_sexp : sexp -> bool
+
+val list_of_sexp : (sexp -> 'a) -> sexp -> 'a list

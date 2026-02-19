@@ -332,11 +332,13 @@ module Sort = struct
       log_change (u, Clevel u.level);
       u.level <- new_level)
 
-  let set : var -> t option -> unit =
+  let[@inline] set : var -> t option -> unit =
    fun v t_op ->
     log_change (v, Ccontents v.contents);
     v.contents <- t_op;
-    Option.iter (t_iter ~f:(fun u -> update_level u v)) t_op
+    match t_op with
+    | None -> ()
+    | Some t -> t_iter ~f:(fun u -> update_level u v) t
 
   module Static = struct
     (* Statically allocated values of various consts and sorts to save
