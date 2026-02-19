@@ -2,6 +2,7 @@
 layout: documentation-page
 collectionName: Kinds
 title: Intro
+slug: intro
 ---
 
 # The kind system
