@@ -43,3 +43,13 @@ type 'a t : immutable_data with 'a
 type 'a t
   : value mod forkable unyielding many stateless immutable non_float with 'a
 |}]
+
+type ('a : immutable_data) t
+[%%expect {|
+type ('a : immutable_data) t
+|}]
+
+type ('a : value mod stateless) t
+[%%expect {|
+type ('a : value mod stateless) t
+|}]
