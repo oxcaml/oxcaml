@@ -2611,9 +2611,9 @@ end = struct
 
       let operation t ~next (op : Operation.t) dbg =
         match op with
-        | Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
-        | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-        | Load _ | Floatop _
+        | Move | Spill | Dummy_use | Reload | Const_int _ | Const_float32 _
+        | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+        | Const_vec512 _ | Load _ | Floatop _
         | Intop_imm
             ( ( Iadd | Isub | Imul | Imulh _ | Idiv | Imod | Iand | Ior | Ixor
               | Ilsl | Ilsr | Iasr | Ipopcnt | Iclz _ | Ictz _ | Icomp _ ),
@@ -2632,7 +2632,6 @@ end = struct
             Misc.fatal_errorf "Expected pure operation, got %a\n" Operation.dump
               op;
           next
-        | Dummy_use -> next
         | Reinterpret_cast (Int_of_value | Value_of_int)
         | Name_for_debugger _ | Stackoffset _ | Probe_is_enabled _ | Opaque
         | Begin_region | End_region | Intop_atomic _ | Store _ | Pause ->

@@ -339,7 +339,7 @@ let is_pure = function
   | Move -> true
   | Spill -> true
   | Reload -> true
-  | Dummy_use -> false
+  | Dummy_use -> true
   | Const_int _ -> true
   | Const_float32 _ -> true
   | Const_float _ -> true
