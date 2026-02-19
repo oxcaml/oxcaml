@@ -1376,7 +1376,10 @@ module Jkind0 = struct
 
       let immediate =
         { jkind =
-            mk_jkind (Base (Scannable, Scannable_axes.immediate_axes))
+            mk_jkind
+              (Base
+                (Scannable,
+                  { nullability = Non_null; separability = Non_pointer }))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "immediate"
@@ -1426,7 +1429,10 @@ module Jkind0 = struct
       *)
       let immediate64 =
         { jkind =
-            mk_jkind (Base (Scannable, Scannable_axes.immediate64_axes))
+            mk_jkind
+              (Base
+                (Scannable,
+                  { nullability = Non_null; separability = Non_pointer64 }))
               ~crossing:cross_all_except_staticity ~externality:External64;
           name = "immediate64"
         }
