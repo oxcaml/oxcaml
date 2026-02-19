@@ -413,16 +413,8 @@ let bigarray_specialize_kind_and_layout env ~kind ~layout typ =
   | _ ->
       (kind, layout)
 
-<<<<<<< HEAD
-let value_kind_of_value_jkind env jkind =
-  let layout = Jkind.get_layout_defaulting_to_scannable env jkind in
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-let value_kind_of_value_jkind env jkind =
-  let layout = Jkind.get_layout_defaulting_to_scannable jkind in
-=======
 let value_kind_of_scannable_jkind env jkind =
-  let layout = Jkind.get_layout_defaulting_to_scannable jkind in
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+  let layout = Jkind.get_layout_defaulting_to_scannable env jkind in
   (* In other places, we use [Ctype.type_jkind_purely_if_principal]. Here, we omit
      the principality check, as we're just trying to compute optimizations. *)
   let context = Ctype.mk_jkind_context_always_principal env in
@@ -433,7 +425,6 @@ let value_kind_of_scannable_jkind env jkind =
   (* CR layouts-scannable: Use scannable axes to improve codegen *)
   | Some (Base (Scannable, _)) ->
     value_kind_of_value_with_externality externality_upper_bound
-<<<<<<< HEAD
   | None
   | Some ( Any _
          | Product _
@@ -442,24 +433,7 @@ let value_kind_of_scannable_jkind env jkind =
                   | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
                   | Vec512),
                   _ )) ->
-    Misc.fatal_error "expected a layout of value"
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-  | Any _
-  | Product _
-  | Base
-    ( ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
-      | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512),
-      _ ) ->
-    Misc.fatal_error "expected a layout of value"
-=======
-  | Any _
-  | Product _
-  | Base
-    ( ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
-      | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512),
-      _ ) ->
     Misc.fatal_error "expected a layout of scannable"
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
 
 (* [value_kind] has a pre-condition that it is only called on values.  With the
    current set of sort restrictions, there are two reasons this invariant may
@@ -541,20 +515,9 @@ let nullable raw_kind = { raw_kind; nullable = Nullable }
 
 let add_nullability_from_scannable_jkind jkind raw_kind =
   let nullable =
-<<<<<<< HEAD
-    match Jkind.get_nullability ~context env jkind with
-    | Non_null -> Non_nullable
-    | Maybe_null -> Nullable
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-    match Jkind.get_nullability ~context jkind with
-    | Non_null -> Non_nullable
-    | Maybe_null -> Nullable
-=======
     match Jkind.get_nullability jkind with
     | Some Non_null -> Non_nullable
-    | Some Maybe_null -> Nullable
-    | None -> Misc.fatal_error "expected a layout of scannable"
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+    | Some Maybe_null | None -> Nullable
   in
   { raw_kind; nullable }
 

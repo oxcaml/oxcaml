@@ -245,7 +245,7 @@ Line 11, characters 79-82:
 11 |   let _ =  assert (Stdlib_upstream_compatible.Int64_u.equal #42L (get_third [| #0L; #1L; #42L |]))
                                                                                     ^^^
 Error: This expression has type "int64#" but an expression was expected of type
-         "('a : bits32)"
+         "('a : bits32_internal)"
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
        But the layout of int64# must be a sublayout of bits32
@@ -267,7 +267,7 @@ end
 Line 9, characters 24-35:
 9 |   let f2 idx : int32# = get arr idx
                             ^^^^^^^^^^^
-Error: This expression has type "('a : float64)"
+Error: This expression has type "('a : float64_internal)"
        but an expression was expected of type "int32#"
        The layout of int32# is bits32
          because it is the unboxed version of the primitive type int32.

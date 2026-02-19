@@ -43,24 +43,12 @@ module Externality = struct
   let less_or_equal s1 s2 : Misc.Le_result.t =
     if equal s1 s2 then Equal else if le s1 s2 then Less else Not_le
 
-<<<<<<< HEAD
-  let print ppf = function
-    | External -> Fmt.fprintf ppf "external_"
-    | External64 -> Fmt.fprintf ppf "external64"
-    | Internal -> Fmt.fprintf ppf "internal"
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-  let print ppf = function
-    | External -> Format.fprintf ppf "external_"
-    | External64 -> Format.fprintf ppf "external64"
-    | Internal -> Format.fprintf ppf "internal"
-=======
   let to_string = function
     | External -> "external_"
     | External64 -> "external64"
     | Internal -> "internal"
 
-  let print ppf t = Format.fprintf ppf "%s" (to_string t)
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+  let print ppf t = Fmt.fprintf ppf "%s" (to_string t)
 
   let upper_bound_if_is_always_gc_ignorable () =
     (* We check that we're compiling to (64-bit) native code before counting
@@ -87,19 +75,9 @@ module Nullability = struct
   let less_or_equal s1 s2 : Misc.Le_result.t =
     if equal s1 s2 then Equal else if le s1 s2 then Less else Not_le
 
-<<<<<<< HEAD
-  let print ppf = function
-    | Non_null -> Fmt.fprintf ppf "non_null"
-    | Maybe_null -> Fmt.fprintf ppf "maybe_null"
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-  let print ppf = function
-    | Non_null -> Format.fprintf ppf "non_null"
-    | Maybe_null -> Format.fprintf ppf "maybe_null"
-=======
   let to_string = function Non_null -> "non_null" | Maybe_null -> "maybe_null"
 
-  let print ppf t = Format.fprintf ppf "%s" (to_string t)
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+  let print ppf t = Fmt.fprintf ppf "%s" (to_string t)
 end
 
 module Separability = struct
@@ -135,17 +113,7 @@ module Separability = struct
     | Separable -> "separable"
     | Maybe_separable -> "maybe_separable"
 
-<<<<<<< HEAD
   let print ppf t = Format_doc.fprintf ppf "%s" (to_string t)
-
-  let is_max p = equal p max
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-  let print ppf t = Format.fprintf ppf "%s" (to_string t)
-
-  let is_max p = equal p max
-=======
-  let print ppf t = Format.fprintf ppf "%s" (to_string t)
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
 end
 
 module Axis = struct

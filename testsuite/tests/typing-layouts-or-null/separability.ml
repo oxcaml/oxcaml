@@ -747,19 +747,9 @@ Line 3, characters 83-89:
 3 | type ('c : value & value & float64 mod non_null non_float) fails = unit constraint 'c = c
                                                                                        ^^^^^^
 Error: The type constraints are not consistent.
-<<<<<<< HEAD
        Type "('c : value & value & float64_internal)"
        is not compatible with type "c" = "#(float * float or_null * float#)"
-       The layout of c is value & value maybe_separable & float64
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-       Type "('c : value & value & float64)" is not compatible with type
-         "c" = "#(float * float or_null * float#)"
-       The layout of c is value & value maybe_separable & float64
-=======
-       Type "('c : value & value & float64)" is not compatible with type
-         "c" = "#(float * float or_null * float#)"
        The layout of c is value & value maybe_separable maybe_null & float64
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
          because it is an unboxed tuple.
        But the layout of c must be a sublayout of value & value & float64
          because of the annotation on 'c in the declaration of the type fails.

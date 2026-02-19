@@ -1818,16 +1818,8 @@ Error: Signature mismatch:
        Type declarations do not match:
          type 'a t : value_or_null mod everything
        is not included in
-<<<<<<< HEAD
          type 'a t : value_or_null mod everything separable
-       The layout of the first is value maybe_separable
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-         type 'a t : immediate_or_null separable
-       The layout of the first is value maybe_separable
-=======
-         type 'a t : immediate_or_null separable
        The layout of the first is value maybe_separable maybe_null
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
          because of the definition of t at line 4, characters 2-42.
        But the layout of the first must be a sublayout of value maybe_null
          because of the definition of t at line 2, characters 2-52.

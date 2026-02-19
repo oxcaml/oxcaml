@@ -558,7 +558,6 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
   let least_modalities =
     least_modalities ~include_implied:verbose ~mut:Immutable modality
   in
-<<<<<<< HEAD
   let modality_annots =
     List.map
       (fun (Atom (ax, m) : Modality.atom) ->
@@ -597,8 +596,7 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
       ( { Location.txt = Parsetree.Mode s; loc = Location.none },
         only_when_verbose )
     in
-    [ mk_annot Externality.max Externality.print (externality bounds);
-      mk_annot Nullability.max Nullability.print (nullability bounds) ]
+    [mk_annot Externality.max Externality.print (externality bounds)]
     |> List.partition_map (fun (annot, only_when_verbose) ->
         match only_when_verbose with false -> Left annot | true -> Right annot)
   in
@@ -608,29 +606,6 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
     | false -> []
   in
   modality_annots @ nonmodal_annots @ verbose_annots
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-  let nonmodal_annots =
-    let open Jkind.Mod_bounds in
-    let mk_annot default print value =
-      if (not verbose) && value = default
-      then None
-      else
-        let s = Format.asprintf "%a" print value in
-        Some { Location.txt = Parsetree.Mode s; loc = Location.none }
-    in
-    [ mk_annot Externality.max Externality.print (externality bounds);
-      mk_annot Nullability.max Nullability.print (nullability bounds) ]
-    |> List.filter_map Fun.id
-  in
-  modality_annots @ nonmodal_annots
-=======
-  let externality = Jkind.Mod_bounds.externality bounds in
-  if externality = Externality.max
-  then modality_annots
-  else
-    modality_annots
-    @ [Location.mknoloc (Parsetree.Mode (Externality.to_string externality))]
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
 
 let sort_dedup_modalities ~warn l =
   let open Modality in

@@ -972,28 +972,10 @@ module Jkind0 = struct
 
     let debug_print ppf
           { crossing;
-<<<<<<< HEAD
-            externality;
-            nullability } =
-      Format.fprintf ppf "@[{ crossing = %a;@ externality = %a;@ \
-        nullability = %a }@]"
-        (Format_doc.compat Crossing.print) crossing
-        (Format_doc.compat Externality.print) externality
-        (Format_doc.compat Nullability.print) nullability
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-            externality;
-            nullability } =
-      Format.fprintf ppf "@[{ crossing = %a;@ externality = %a;@ \
-        nullability = %a }@]"
-        Crossing.print crossing
-        Externality.print externality
-        Nullability.print nullability
-=======
             externality } =
       Format.fprintf ppf "@[{ crossing = %a;@ externality = %a }@]"
-        Crossing.print crossing
-        Externality.print externality
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+        (Format_doc.compat Crossing.print) crossing
+        (Format_doc.compat Externality.print) externality
 
     let equal t1 t2 =
       Misc.Le_result.equal ~le:Crossing.le (crossing t1) (crossing t2)
@@ -1232,25 +1214,9 @@ module Jkind0 = struct
         let ax : _ Mode.Crossing.Axis.t = Monadic Staticity in
         Mode.Crossing.(set ax (Per_axis.max ax) min)
 
-<<<<<<< HEAD
-      let mk_jkind ~crossing ~nullability ~externality
-          (layout : Layout.Const.t) =
-        let mod_bounds =
-          Mod_bounds.create crossing ~nullability ~externality
-        in
-        { base = Layout layout; mod_bounds; with_bounds = No_with_bounds }
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-      let mk_jkind ~crossing ~nullability ~externality
-          (layout : Layout.Const.t) =
-        let mod_bounds =
-          Mod_bounds.create crossing ~nullability ~externality
-        in
-        { layout; mod_bounds; with_bounds = No_with_bounds }
-=======
       let mk_jkind ~crossing ~externality (layout : Layout.Const.t) =
         let mod_bounds = Mod_bounds.create crossing ~externality in
-        { layout; mod_bounds; with_bounds = No_with_bounds }
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+        { base = Layout layout; mod_bounds; with_bounds = No_with_bounds }
 
       let any =
         { jkind =
@@ -1301,16 +1267,11 @@ module Jkind0 = struct
       let immutable_data =
         let open Mod_bounds in
         { jkind =
-<<<<<<< HEAD
-            { base = Layout (Base (Scannable, { separability = Non_float }));
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-            { layout = Base (Scannable, { separability = Non_float });
-=======
-            { layout =
-                Base
-                  (Scannable,
-                    { nullability = Non_null; separability = Non_float });
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+            { base =
+                Layout
+                  (Base
+                    (Scannable,
+                      { nullability = Non_null; separability = Non_float }));
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:true
@@ -1327,16 +1288,11 @@ module Jkind0 = struct
       let exn =
         let open Mod_bounds in
         { jkind =
-<<<<<<< HEAD
-            { base = Layout (Base (Scannable, { separability = Non_float }));
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-            { layout = Base (Scannable, { separability = Non_float });
-=======
-            { layout =
-                Base
-                  (Scannable,
-                    { nullability = Non_null; separability = Non_float });
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+            { base =
+                Layout
+                  (Base
+                    (Scannable,
+                      { nullability = Non_null; separability = Non_float }));
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:false
@@ -1353,16 +1309,11 @@ module Jkind0 = struct
       let sync_data =
         let open Mod_bounds in
         { jkind =
-<<<<<<< HEAD
-            { base = Layout (Base (Scannable, { separability = Non_float }));
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-            { layout = Base (Scannable, { separability = Non_float });
-=======
-            { layout =
-                Base
-                  (Scannable,
-                    { nullability = Non_null; separability = Non_float });
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+            { base =
+                Layout
+                  (Base
+                    (Scannable,
+                      { nullability = Non_null; separability = Non_float }));
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:true
@@ -1379,16 +1330,11 @@ module Jkind0 = struct
       let mutable_data =
         let open Mod_bounds in
         { jkind =
-<<<<<<< HEAD
-            { base = Layout (Base (Scannable, { separability = Non_float }));
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-            { layout = Base (Scannable, { separability = Non_float });
-=======
-            { layout =
-                Base
-                  (Scannable,
-                    { nullability = Non_null; separability = Non_float });
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+            { base =
+                Layout
+                  (Base
+                    (Scannable,
+                      { nullability = Non_null; separability = Non_float }));
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:true
@@ -1406,13 +1352,7 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Void, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
-=======
-              ~externality:Mod_bounds.Externality.max;
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+              ~externality:Mod_bounds.Externality.min;
           name = "void"
         }
 
@@ -1420,7 +1360,7 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Void, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
+              ~externality:Mod_bounds.Externality.max;
           name = "void_internal"
         }
 
@@ -1505,34 +1445,22 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Float64, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
-=======
-              ~externality:Mod_bounds.Externality.max;
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+              ~externality:Mod_bounds.Externality.min;
           name = "float64"
         }
 
-<<<<<<< HEAD
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
       let float64_internal =
         { jkind =
             mk_jkind (Base (Float64, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
+              ~externality:Mod_bounds.Externality.max;
           name = "float64_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-      (* CR or_null: nullability here should be [Maybe_null], but is set
-         to [Non_null] for now due to inference limitations. *)
-=======
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
       let kind_of_unboxed_float =
         { jkind =
             mk_jkind (Base (Float64, Scannable_axes.max))
@@ -1545,35 +1473,22 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Float32, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
-=======
-              ~externality:Mod_bounds.Externality.max;
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+              ~externality:Mod_bounds.Externality.min;
           name = "float32"
         }
 
-<<<<<<< HEAD
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
       let float32_internal =
         { jkind =
             mk_jkind (Base (Float32, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max
-              ~nullability:Non_null;
+              ~externality:Mod_bounds.Externality.max;
           name = "float32_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-      (* CR or_null: nullability here should be [Maybe_null], but is set
-         to [Non_null] for now due to inference limitations. *)
-=======
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
       let kind_of_unboxed_float32 =
         { jkind =
             mk_jkind (Base (Float32, Scannable_axes.max))
@@ -1586,35 +1501,22 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Word, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
-=======
-              ~externality:Mod_bounds.Externality.max;
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+              ~externality:Mod_bounds.Externality.min;
           name = "word"
         }
 
-<<<<<<< HEAD
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
       let word_internal =
         { jkind =
             mk_jkind (Base (Word, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max
-              ~nullability:Non_null;
+              ~externality:Mod_bounds.Externality.max;
           name = "word_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-      (* CR or_null: nullability here should be [Maybe_null], but is set
-         to [Non_null] for now due to inference limitations. *)
-=======
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
       let kind_of_unboxed_nativeint =
         { jkind =
             mk_jkind (Base (Word, Scannable_axes.max))
@@ -1627,13 +1529,7 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Untagged_immediate, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
-=======
-              ~externality:Mod_bounds.Externality.max;
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+              ~externality:Mod_bounds.Externality.min;
           name = "untagged_immediate"
         }
 
@@ -1643,7 +1539,7 @@ module Jkind0 = struct
               (Base (Untagged_immediate, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.max
-              ~nullability:Non_null;
+             ;
           name = "untagged_immediate_internal"
         }
 
@@ -1659,35 +1555,22 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Bits8, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
-=======
-              ~externality:Mod_bounds.Externality.max;
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+              ~externality:Mod_bounds.Externality.min;
           name = "bits8"
         }
 
-<<<<<<< HEAD
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
       let bits8_internal =
         { jkind =
             mk_jkind (Base (Bits8, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max
-              ~nullability:Non_null;
+              ~externality:Mod_bounds.Externality.max;
           name = "bits8_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-      (* CR or_null: nullability here should be [Maybe_null], but is set
-         to [Non_null] for now due to inference limitations. *)
-=======
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
       let kind_of_unboxed_int8 =
         { jkind =
             mk_jkind (Base (Bits8, Scannable_axes.max))
@@ -1696,49 +1579,30 @@ module Jkind0 = struct
           name = "bits8 mod everything"
         }
 
-<<<<<<< HEAD
       let kind_of_unboxed_bool = kind_of_unboxed_int8
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-      (* CR or_null: nullability here should be [Maybe_null], but is set
-         to [Non_null] for now due to inference limitations. *)
-=======
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
       let bits16 =
         { jkind =
             mk_jkind (Base (Bits16, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
-=======
-              ~externality:Mod_bounds.Externality.max;
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+              ~externality:Mod_bounds.Externality.min;
           name = "bits16"
         }
 
-<<<<<<< HEAD
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
       let bits16_internal =
         { jkind =
             mk_jkind (Base (Bits16, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max
-              ~nullability:Non_null;
+              ~externality:Mod_bounds.Externality.max;
           name = "bits16_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-      (* CR or_null: nullability here should be [Maybe_null], but is set
-         to [Non_null] for now due to inference limitations. *)
-=======
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
       let kind_of_unboxed_int16 =
         { jkind =
             mk_jkind (Base (Bits16, Scannable_axes.max))
@@ -1751,35 +1615,22 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Bits32, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
-=======
-              ~externality:Mod_bounds.Externality.max;
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+              ~externality:Mod_bounds.Externality.min;
           name = "bits32"
         }
 
-<<<<<<< HEAD
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
       let bits32_internal =
         { jkind =
             mk_jkind (Base (Bits32, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max
-              ~nullability:Non_null;
+              ~externality:Mod_bounds.Externality.max;
           name = "bits32_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-      (* CR or_null: nullability here should be [Maybe_null], but is set
-         to [Non_null] for now due to inference limitations. *)
-=======
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
       let kind_of_unboxed_int32 =
         { jkind =
             mk_jkind (Base (Bits32, Scannable_axes.max))
@@ -1792,35 +1643,22 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Bits64, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
-=======
-              ~externality:Mod_bounds.Externality.max;
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+              ~externality:Mod_bounds.Externality.min;
           name = "bits64"
         }
 
-<<<<<<< HEAD
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
       let bits64_internal =
         { jkind =
             mk_jkind (Base (Bits64, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max
-              ~nullability:Non_null;
+              ~externality:Mod_bounds.Externality.max;
           name = "bits64_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-      (* CR or_null: nullability here should be [Maybe_null], but is set
-         to [Non_null] for now due to inference limitations. *)
-=======
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
       let kind_of_unboxed_int64 =
         { jkind =
             mk_jkind (Base (Bits64, Scannable_axes.max))
@@ -1841,101 +1679,62 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Vec128, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
-=======
-              ~externality:Mod_bounds.Externality.max;
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+              ~externality:Mod_bounds.Externality.min;
           name = "vec128"
         }
 
-<<<<<<< HEAD
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
       let vec128_internal =
         { jkind =
             mk_jkind (Base (Vec128, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max
-              ~nullability:Non_null;
+              ~externality:Mod_bounds.Externality.max;
           name = "vec128_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-      (* CR or_null: nullability here should be [Maybe_null], but is set
-         to [Non_null] for now due to inference limitations. *)
-=======
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
       let vec256 =
         { jkind =
             mk_jkind (Base (Vec256, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
-=======
-              ~externality:Mod_bounds.Externality.max;
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+              ~externality:Mod_bounds.Externality.min;
           name = "vec256"
         }
 
-<<<<<<< HEAD
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
       let vec256_internal =
         { jkind =
             mk_jkind (Base (Vec256, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max
-              ~nullability:Non_null;
+              ~externality:Mod_bounds.Externality.max;
           name = "vec256_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-      (* CR or_null: nullability here should be [Maybe_null], but is set
-         to [Non_null] for now due to inference limitations. *)
-=======
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
       let vec512 =
         { jkind =
             mk_jkind (Base (Vec512, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
-=======
-              ~externality:Mod_bounds.Externality.max;
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+              ~externality:Mod_bounds.Externality.min;
           name = "vec512"
         }
 
-<<<<<<< HEAD
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
       let vec512_internal =
         { jkind =
             mk_jkind (Base (Vec512, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max
-              ~nullability:Non_null;
+              ~externality:Mod_bounds.Externality.max;
           name = "vec512_internal"
         }
 
       (* CR or_null: nullability here should be [Maybe_null], but is set
          to [Non_null] for now due to inference limitations. *)
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-      (* CR or_null: nullability here should be [Maybe_null], but is set
-         to [Non_null] for now due to inference limitations. *)
-=======
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
       let kind_of_unboxed_128bit_vectors =
         { jkind =
             mk_jkind (Base (Vec128, Scannable_axes.max))
@@ -2069,23 +1868,7 @@ module Jkind0 = struct
     end
 
     let product tys_modalities layouts =
-<<<<<<< HEAD
       let base = Layout (Jkind_types.Layout.product layouts) in
-      let relevant_for_shallow =
-        (* Shallow axes like nullability or separability are relevant for
-           1-field unboxed records and irrelevant for everything else. *)
-        match List.length layouts with 1 -> `Relevant | _ -> `Irrelevant
-      in
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-      let layout = Jkind_types.Layout.product layouts in
-      let relevant_for_shallow =
-        (* Shallow axes like nullability or separability are relevant for
-           1-field unboxed records and irrelevant for everything else. *)
-        match List.length layouts with 1 -> `Relevant | _ -> `Irrelevant
-      in
-=======
-      let layout = Jkind_types.Layout.product layouts in
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
       let mod_bounds = Mod_bounds.min in
       let with_bounds =
         List.fold_right
@@ -2373,16 +2156,11 @@ module Jkind0 = struct
           ~externality:Mod_bounds.Externality.max
       in
       fresh_jkind
-<<<<<<< HEAD
-        { base = Layout (Sort (Base Scannable, { separability = Non_float }));
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-        { layout = Sort (Base Scannable, { separability = Non_float });
-=======
-        { layout =
-            Sort
-              (Base Scannable,
-                { nullability = Non_null; separability = Non_float });
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+        { base =
+            Layout
+              (Sort
+                (Base Scannable,
+                  { nullability = Non_null; separability = Non_float }));
           mod_bounds;
           with_bounds = No_with_bounds }
         ~annotation:None ~why:(Value_creation why)
@@ -2635,16 +2413,11 @@ module Jkind0 = struct
         Mod_bounds.create crossing ~externality:Mod_bounds.Externality.max
       in
       fresh_jkind
-<<<<<<< HEAD
-        { base = Layout (Sort (Base Scannable, { separability = Separable }));
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-        { layout = Sort (Base Scannable, { separability = Separable });
-=======
-        { layout =
-            Sort
-              (Base Scannable,
-                { nullability = Non_null; separability = Separable });
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+        { base =
+            Layout
+              (Sort
+                (Base Scannable,
+                  { nullability = Non_null; separability = Separable }));
           mod_bounds;
           with_bounds = No_with_bounds }
         ~annotation:None ~why:(Primitive ident)
@@ -2656,13 +2429,9 @@ module Jkind0 = struct
           ~externality:Mod_bounds.Externality.max
       in
       fresh_jkind
-<<<<<<< HEAD
-        { base = Layout (Any { separability = Separable });
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-        { layout = Any { separability = Separable };
-=======
-        { layout = Any { nullability = Maybe_null; separability = Separable };
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+        { base =
+            Layout
+              (Any { nullability = Maybe_null; separability = Separable });
           mod_bounds;
           with_bounds = No_with_bounds }
         ~annotation:None ~why:(Any_creation Array_type_argument)
@@ -2677,18 +2446,12 @@ module Jkind0 = struct
           ~externality:Mod_bounds.Externality.max
       in
       fresh_jkind
-<<<<<<< HEAD
         { base =
             Layout
-              (Sort (Base Scannable, { separability = Maybe_separable }));
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-        { layout = Sort (Base Scannable, { separability = Maybe_separable });
-=======
-        { layout =
-            Sort
-              (Base Scannable,
-                { nullability = Non_null; separability = Maybe_separable });
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
+              (Sort
+                (Base Scannable,
+                  { nullability = Non_null;
+                    separability = Maybe_separable }));
           mod_bounds;
           with_bounds = No_with_bounds
         }

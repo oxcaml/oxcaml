@@ -2359,7 +2359,7 @@ Line 3, characters 0-66:
 3 | type t : value_or_null & bits32 = #{ a : int; b : t s; c : int32 }
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The kind of t is value_or_null & bits32
+       The kind of t is value_or_null & bits32_internal
          because of the annotation on the declaration of the type t.
        But the kind of t must be a subkind of any mod portable
          because of the definition of s at line 1, characters 0-30.

@@ -23,7 +23,6 @@ type t
           immutable
           portable
           contended
-          non_null
           local
           unique
           static
@@ -44,7 +43,6 @@ type t
           portable
           contended
           external_
-          non_null
           static
 |}]
 
@@ -53,7 +51,6 @@ type t : float64
 type t
   : float64
       mod external_
-          non_null
           local
           unforkable
           yielding
@@ -81,7 +78,6 @@ type t
           uncontended
           static
           internal
-          maybe_null
 |}]
 
 type t : value mod portable
@@ -89,7 +85,6 @@ type t : value mod portable
 type t
   : value
       mod portable
-          non_null
           local
           unforkable
           yielding
@@ -108,7 +103,6 @@ type t
   : value
       mod stateless
           portable
-          non_null
           local
           unforkable
           yielding
@@ -131,7 +125,6 @@ type 'a t
           immutable
           portable
           contended
-          non_null
           local
           unique
           static

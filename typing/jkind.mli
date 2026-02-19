@@ -570,15 +570,7 @@ val set_externality_upper_bound :
   Types.jkind_r -> Jkind_axis.Externality.t -> Types.jkind_r
 
 (** Gets the nullability from a jkind. *)
-<<<<<<< HEAD
-val get_nullability :
-  context:jkind_context -> Env.t -> 'd Types.jkind -> Jkind_axis.Nullability.t
-||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
-val get_nullability :
-  context:jkind_context -> Types.jkind_l -> Jkind_axis.Nullability.t
-=======
 val get_nullability : Types.jkind_l -> Jkind_axis.Nullability.t option
->>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
 
 (** Computes a jkind that is the same as the input but with an updated maximum
     mode for the nullability axis *)
