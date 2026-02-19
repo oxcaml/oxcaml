@@ -27,4 +27,4 @@
 
 open Lambda
 
-val eval : (slambda -> slambda) -> lambda -> lambda
+val eval : (slambda -> slambda) -> lambda -> slambda_halves

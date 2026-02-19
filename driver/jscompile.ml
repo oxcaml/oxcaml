@@ -47,6 +47,8 @@ let tlambda_to_jsir i tlambda ~as_arg_for =
          |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
          |> Slambda.eval
               (print_if i.ppf_dump Clflags.dump_slambda Printslambda.slambda)
+         |> fun { Lambda.sval_comptime = _; sval_runtime } ->
+         sval_runtime
          |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
          |> Simplif.simplify_lambda ~restrict_to_upstream_dwarf:true
               ~gdwarf_may_alter_codegen:false

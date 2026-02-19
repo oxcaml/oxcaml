@@ -225,7 +225,9 @@ let eval code =
   in
   Warnings.check_fatal () (* TODO: more error handling? *);
   (* TODO: assert program.arg_block_idx is none? *)
-  let raw_lambda = Slambda.eval Fun.id tlambda_program.code in
+  let { Lambda.sval_comptime = _; sval_runtime = raw_lambda } =
+    Slambda.eval Fun.id tlambda_program.code
+  in
   let lambda =
     Simplif.simplify_lambda
       ~restrict_to_upstream_dwarf:!Dwarf_flags.restrict_to_upstream_dwarf
