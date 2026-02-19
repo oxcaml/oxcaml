@@ -19,33 +19,9 @@ Every type is now classified by a *layout*, much like how every expression is cl
 by a *type*. The type system knows about a collection of fixed *base* layouts:
 
 * `value` is the layout occupied by almost every OCaml type. Every type you have ever
-<<<<<<< HEAD
-  conceived of before reading this description is a `value`.
+  conceived of before reading this description is a `value`. There are also finer classifications within `value`: see "Value layouts" below.
 * `value_or_null` is a superlayout of `value` including normal OCaml values
   and null pointers.
-* `immediate` is a sublayout of `value`, describing those values that are represented
-  without a pointer. That is, `int : immediate`, as well as `private` and `[@@unboxed]`
-  wrappers around `int`.  `immediate` is a sublayout of `value`, and so you can use an
-  `immediate` type wherever a `value` is expected, without any explicit conversion
-  necessary. Types declared with `[@@immediate]` have layout `immediate`.
-* `immediate64` is a variant of `immediate` that is like `immediate` on 64-bit platforms
-  and like `value` on all other platforms (like JavaScript). In the sublayout relation,
-  `immediate < immediate64 < value`. Types declared with `[@@immediate64]` have layout
-  `immediate64`.
-||||||| parent of cbc91759b3 (Document scannable axes (#5170))
-  conceived of before reading this description is a `value`.
-* `immediate` is a sublayout of `value`, describing those values that are represented
-  without a pointer. That is, `int : immediate`, as well as `private` and `[@@unboxed]`
-  wrappers around `int`.  `immediate` is a sublayout of `value`, and so you can use an
-  `immediate` type wherever a `value` is expected, without any explicit conversion
-  necessary. Types declared with `[@@immediate]` have layout `immediate`.
-* `immediate64` is a variant of `immediate` that is like `immediate` on 64-bit platforms
-  and like `value` on all other platforms (like JavaScript). In the sublayout relation,
-  `immediate < immediate64 < value`. Types declared with `[@@immediate64]` have layout
-  `immediate64`.
-=======
-  conceived of before reading this description is a `value`. There are also finer classifications within `value`: see "Value layouts" below.
->>>>>>> cbc91759b3 (Document scannable axes (#5170))
 * `float64` is the layout of the `float#` unboxed float type.
 * `float32` is the layout of the `float32#` unboxed 32-bit float type.
 * `void` is the layout of the `unit#` unbox unit type. It has no runtime representation.
