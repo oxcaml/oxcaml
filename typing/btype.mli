@@ -442,9 +442,17 @@ module Jkind0 : sig
       (** Value of types of this jkind are not retained at all at runtime *)
       val void : t
 
+<<<<<<< HEAD
       (** Same kind, not mod external_ *)
       val void_internal : t
 
+||||||| parent of 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
+=======
+      (** Value of types of this jkind can be scanned by the GC, but no other
+          scannable axis information about them is known. *)
+      val scannable : t
+
+>>>>>>> 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
       (** This is the jkind of normal ocaml values or null pointers *)
       val value_or_null : t
 
@@ -677,6 +685,8 @@ module Jkind0 : sig
       val any : why:Jkind_intf.History.any_creation_reason -> 'd jkind
       val void :
         why:Jkind_intf.History.void_creation_reason -> ('l * disallowed) jkind
+      val scannable :
+        why:Jkind_intf.History.scannable_creation_reason -> 'd Types.jkind
       val value_or_null :
         why:Jkind_intf.History.value_or_null_creation_reason -> 'd jkind
       val value : why:Jkind_intf.History.value_creation_reason -> 'd jkind

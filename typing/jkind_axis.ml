@@ -113,7 +113,21 @@ module Separability = struct
     | Separable -> "separable"
     | Maybe_separable -> "maybe_separable"
 
+<<<<<<< HEAD
   let print ppf t = Format_doc.fprintf ppf "%s" (to_string t)
+||||||| parent of 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
+  let print ppf t = Format.fprintf ppf "%s" (to_string t)
+=======
+  let print ppf t = Format.fprintf ppf "%s" (to_string t)
+
+  let upper_bound_if_is_always_gc_ignorable () =
+    (* We check that we're compiling to (64-bit) native code before counting
+        Non_pointer64 types as gc_ignorable, because bytecode is intended to be
+        platform independent. *)
+    if !Clflags.native_code && Sys.word_size = 64
+    then Non_pointer64
+    else Non_pointer
+>>>>>>> 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
 end
 
 module Axis = struct

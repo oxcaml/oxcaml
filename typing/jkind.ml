@@ -70,12 +70,6 @@ end
 module Scannable_axes = struct
   include Jkind_types.Scannable_axes
 
-  let less_or_equal { nullability = n1; separability = s1 }
-      { nullability = n2; separability = s2 } =
-    Misc.Le_result.combine
-      (Nullability.less_or_equal n1 n2)
-      (Separability.less_or_equal s1 s2)
-
   let le sa1 sa2 = Misc.Le_result.is_le (less_or_equal sa1 sa2)
 
   let meet { nullability = n1; separability = s1 }
@@ -1953,8 +1947,69 @@ module Const = struct
     let loc = jkind.pjka_loc in
     match jkind.pjka_desc with
     | Pjk_abbreviation (name, sa_annot) ->
+<<<<<<< HEAD
       let p, _ = Env.lookup_jkind ~use:use_abstract_jkinds ~loc name.txt env in
       let jkind_without_sa = of_path p |> allow_left |> allow_right in
+||||||| parent of 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
+      (* CR layouts v2.8: move this to predef. Internal ticket 3339. *)
+      let jkind_without_sa =
+        (match name.txt with
+          | "any" -> Builtin.any.jkind
+          | "value_or_null" -> Builtin.value_or_null.jkind
+          | "value" -> Builtin.value.jkind
+          | "void" -> Builtin.void.jkind
+          | "immediate64" -> Builtin.immediate64.jkind
+          | "immediate64_or_null" -> Builtin.immediate64_or_null.jkind
+          | "immediate" -> Builtin.immediate.jkind
+          | "immediate_or_null" -> Builtin.immediate_or_null.jkind
+          | "float64" -> Builtin.float64.jkind
+          | "float32" -> Builtin.float32.jkind
+          | "word" -> Builtin.word.jkind
+          | "untagged_immediate" -> Builtin.untagged_immediate.jkind
+          | "bits8" -> Builtin.bits8.jkind
+          | "bits16" -> Builtin.bits16.jkind
+          | "bits32" -> Builtin.bits32.jkind
+          | "bits64" -> Builtin.bits64.jkind
+          | "vec128" -> Builtin.vec128.jkind
+          | "vec256" -> Builtin.vec256.jkind
+          | "vec512" -> Builtin.vec512.jkind
+          | "immutable_data" -> Builtin.immutable_data.jkind
+          | "sync_data" -> Builtin.sync_data.jkind
+          | "mutable_data" -> Builtin.mutable_data.jkind
+          | _ -> raise ~loc:jkind.pjkind_loc (Unknown_jkind jkind))
+        |> allow_left |> allow_right
+      in
+=======
+      (* CR layouts v2.8: move this to predef. Internal ticket 3339. *)
+      let jkind_without_sa =
+        (match name.txt with
+          | "any" -> Builtin.any.jkind
+          | "scannable" -> Builtin.scannable.jkind
+          | "value_or_null" -> Builtin.value_or_null.jkind
+          | "value" -> Builtin.value.jkind
+          | "void" -> Builtin.void.jkind
+          | "immediate64" -> Builtin.immediate64.jkind
+          | "immediate64_or_null" -> Builtin.immediate64_or_null.jkind
+          | "immediate" -> Builtin.immediate.jkind
+          | "immediate_or_null" -> Builtin.immediate_or_null.jkind
+          | "float64" -> Builtin.float64.jkind
+          | "float32" -> Builtin.float32.jkind
+          | "word" -> Builtin.word.jkind
+          | "untagged_immediate" -> Builtin.untagged_immediate.jkind
+          | "bits8" -> Builtin.bits8.jkind
+          | "bits16" -> Builtin.bits16.jkind
+          | "bits32" -> Builtin.bits32.jkind
+          | "bits64" -> Builtin.bits64.jkind
+          | "vec128" -> Builtin.vec128.jkind
+          | "vec256" -> Builtin.vec256.jkind
+          | "vec512" -> Builtin.vec512.jkind
+          | "immutable_data" -> Builtin.immutable_data.jkind
+          | "sync_data" -> Builtin.sync_data.jkind
+          | "mutable_data" -> Builtin.mutable_data.jkind
+          | _ -> raise ~loc:jkind.pjkind_loc (Unknown_jkind jkind))
+        |> allow_left |> allow_right
+      in
+>>>>>>> 483811bda2 (Use scannable axes to influence Lambda transl (#5155))
       let nullability, separability = transl_scannable_axes sa_annot in
       if sa_annot <> []
       then begin
@@ -2835,6 +2890,12 @@ module Format_history = struct
       fprintf ppf "it is the primitive immediate_or_null type %s"
         (Ident.name id)
 
+  let format_scannable_creation_reason ppf :
+      History.scannable_creation_reason -> _ = function
+    | Dummy_jkind ->
+      format_with_notify_js ppf
+        "it's assigned a dummy kind that should have been overwritten"
+
   let format_value_or_null_creation_reason ppf ~layout_or_kind :
       History.value_or_null_creation_reason -> _ = function
     | Primitive id ->
@@ -2951,6 +3012,8 @@ module Format_history = struct
       format_immediate_creation_reason ppf immediate
     | Immediate_or_null_creation immediate ->
       format_immediate_or_null_creation_reason ppf immediate
+    | Scannable_creation scannable ->
+      format_scannable_creation_reason ppf scannable
     | Void_creation _ -> .
     | Value_or_null_creation value ->
       format_value_or_null_creation_reason ppf value ~layout_or_kind
@@ -3823,6 +3886,10 @@ module Debug_printers = struct
       History.immediate_or_null_creation_reason -> _ = function
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
 
+  let scannable_creation_reason ppf : History.scannable_creation_reason -> _ =
+    function
+    | Dummy_jkind -> fprintf ppf "Dummy_jkind"
+
   let value_or_null_creation_reason ppf :
       History.value_or_null_creation_reason -> _ = function
     | Primitive id -> fprintf ppf "Primitive %s" (Ident.unique_name id)
@@ -3898,6 +3965,8 @@ module Debug_printers = struct
     | Immediate_or_null_creation immediate ->
       fprintf ppf "Immediate_or_null_creation %a"
         immediate_or_null_creation_reason immediate
+    | Scannable_creation scannable ->
+      fprintf ppf "Scannable_creation %a" scannable_creation_reason scannable
     | Value_or_null_creation value ->
       fprintf ppf "Value_or_null_creation %a" value_or_null_creation_reason
         value
