@@ -23,7 +23,7 @@ let variables_iterator scope =
   let super = default_iterator in
   let pat sub (type k) (p : k general_pattern) =
     begin match p.pat_desc with
-    | Tpat_var { var_id = id; _ } | Tpat_alias { alias_id = id; _ } ->
+    | Tpat_var { id; _ } | Tpat_alias { id; _ } ->
         Stypes.record (Stypes.An_ident (p.pat_loc,
                                         Ident.name id,
                                         Annot.Idef scope))

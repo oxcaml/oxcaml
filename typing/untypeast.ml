@@ -337,7 +337,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
       { pat_extra=[Tpat_unpack, loc, _attrs]; pat_desc = Tpat_any; _ } ->
         Ppat_unpack { txt = None; loc  }
     | { pat_extra=[Tpat_unpack, _, _attrs];
-        pat_desc = Tpat_var { var_name = name; _ }; _ } ->
+        pat_desc = Tpat_var { name; _ }; _ } ->
         Ppat_unpack { name with txt = Some name.txt }
     | { pat_extra=[Tpat_type (_path, lid), _, _attrs]; _ } ->
         Ppat_type (map_loc sub lid)
@@ -350,7 +350,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | _ ->
     match pat.pat_desc with
       Tpat_any -> Ppat_any
-    | Tpat_var { var_id = id; var_name = name; _ } ->
+    | Tpat_var { id; name; _ } ->
         begin
           match (Ident.name id).[0] with
             'A'..'Z' ->
@@ -364,12 +364,12 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
        This avoids transforming a warning 27 into a 26.
      *)
     | Tpat_alias
-      { alias_pattern = {pat_desc = Tpat_any; pat_loc};
-        alias_name = name; _ }
+      { pattern = {pat_desc = Tpat_any; pat_loc};
+        name; _ }
          when pat_loc = pat.pat_loc ->
        Ppat_var name
 
-    | Tpat_alias { alias_pattern = pat; alias_name = name; _ } ->
+    | Tpat_alias { pattern = pat; name; _ } ->
         Ppat_alias (sub.pat sub pat, name)
     | Tpat_constant cst -> Ppat_constant (constant cst)
     | Tpat_unboxed_unit -> Ppat_unboxed_unit
@@ -1111,7 +1111,7 @@ let core_type sub ct =
 
 let class_structure sub cs =
   let rec remove_self = function
-    | { pat_desc = Tpat_alias { alias_pattern = p; alias_id = id; _ } }
+    | { pat_desc = Tpat_alias { pattern = p; id; _ } }
       when string_is_prefix "selfpat-" (Ident.name id) ->
         remove_self p
     | p -> p
@@ -1141,7 +1141,7 @@ let object_field sub {of_loc; of_desc; of_attributes;} =
   Of.mk ~loc ~attrs desc
 
 and is_self_pat = function
-  | { pat_desc = Tpat_alias { alias_id = id; _ } } ->
+  | { pat_desc = Tpat_alias { id; _ } } ->
       string_is_prefix "self-" (Ident.name id)
   | _ -> false
 

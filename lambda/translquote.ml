@@ -2503,11 +2503,11 @@ let is_module pat =
 let rec with_new_idents_pat pat =
   match pat.pat_desc with
   | Tpat_any -> ()
-  | Tpat_var { var_id = id; _ } ->
+  | Tpat_var { id; _ } ->
     if is_module pat
     then with_new_idents_modules [id]
     else with_new_idents_values [id]
-  | Tpat_alias { alias_pattern = pat; alias_id = id; _ } ->
+  | Tpat_alias { pattern = pat; id; _ } ->
     with_new_idents_values [id];
     with_new_idents_pat pat
   | Tpat_constant _ -> ()
@@ -2534,11 +2534,11 @@ let rec with_new_idents_pat pat =
 let rec without_idents_pat pat =
   match pat.pat_desc with
   | Tpat_any -> ()
-  | Tpat_var { var_id = id; _ } ->
+  | Tpat_var { id; _ } ->
     if is_module pat
     then without_idents_modules [id]
     else without_idents_values [id]
-  | Tpat_alias { alias_pattern = pat; alias_id = id; _ } ->
+  | Tpat_alias { pattern = pat; id; _ } ->
     without_idents_values [id];
     without_idents_pat pat
   | Tpat_constant _ -> ()
@@ -2779,11 +2779,11 @@ and quote_value_pattern ~scopes p =
   let pat_quoted =
     match p.pat_desc with
     | Tpat_any -> if is_module p then Pat.any_module else Pat.any
-    | Tpat_var { var_id = id; _ } ->
+    | Tpat_var { id; _ } ->
       if is_module p
       then Pat.unpack loc (Var.Module.mk (Lvar id))
       else Pat.var loc (Var.Value.mk (Lvar id))
-    | Tpat_alias { alias_pattern = pat; alias_id = id; _ } ->
+    | Tpat_alias { pattern = pat; id; _ } ->
       let pat = quote_value_pattern ~scopes pat in
       Pat.alias loc pat (Var.Value.mk (Lvar id))
     | Tpat_constant const ->
@@ -3078,7 +3078,7 @@ let rec case_binding ~scopes ~transl stage case =
     match pat.pat_desc with
     | Tpat_value pat -> (
       match (pat :> value general_pattern).pat_desc with
-      | Tpat_var { var_id = id; var_name = name; _ } ->
+      | Tpat_var { id; name; _ } ->
         with_new_idents_values [id];
         let exp = quote_expression ~scopes ~transl stage case.c_rhs in
         let res =
@@ -3477,7 +3477,7 @@ and quote_expression_desc ~scopes ~transl stage e =
                     Location.print_loc_in_lowercase loc'
               in
               match vb.vb_pat.pat_desc with
-              | Tpat_var { var_id = ident; _ } -> (ident, cstr), vb.vb_expr
+              | Tpat_var { id; _ } -> (id, cstr), vb.vb_expr
               | _ ->
                 fatal_errorf
                   "Translquote [at %a]: unexpected pattern in let rec - only a \

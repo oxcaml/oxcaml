@@ -1577,7 +1577,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
     ty, mode
   in
   match p.pat_desc with
-    Tpat_alias { alias_pattern = p1; _ } ->
+    Tpat_alias { pattern = p1; _ } ->
      build_as_type_and_mode env p1 ~mode
   | Tpat_tuple pl ->
       let labeled_tyl =
@@ -3071,8 +3071,7 @@ and type_pat_aux
         enter_variable tps loc name mode ~kind ty sp.ppat_attributes sort
       in
       rvp {
-        pat_desc = Tpat_var { var_id = id; var_name = name; var_uid = uid;
-                              var_sort = sort; var_mode = alloc_mode };
+        pat_desc = Tpat_var { id; name; uid; sort; mode = alloc_mode };
         pat_loc = loc; pat_extra=[];
         pat_type = ty;
         pat_attributes = sp.ppat_attributes;
@@ -3101,8 +3100,8 @@ and type_pat_aux
               ~kind:(Val_reg sort) sp.ppat_attributes sort
           in
           rvp {
-            pat_desc = Tpat_var { var_id = id; var_name = v; var_uid = uid;
-                                  var_sort = sort; var_mode = alloc_mode.mode };
+            pat_desc = Tpat_var { id; name = v; uid; sort;
+                                  mode = alloc_mode.mode };
             pat_loc = sp.ppat_loc;
             pat_extra=[Tpat_unpack, loc, sp.ppat_attributes];
             pat_type = t;
@@ -3119,10 +3118,8 @@ and type_pat_aux
           ~kind:(Val_reg sort) tps name.loc name mode
           ty_var sp.ppat_attributes sort
       in
-      rvp { pat_desc = Tpat_alias { alias_pattern = q; alias_id = id;
-                                    alias_name = name; alias_uid = uid;
-                                    alias_sort = sort; alias_mode = mode;
-                                    alias_type_expr = ty_var };
+      rvp { pat_desc = Tpat_alias { pattern = q; id; name; uid;
+                                    sort; mode; type_expr = ty_var };
             pat_loc = loc; pat_extra=[];
             pat_type = q.pat_type;
             pat_attributes = sp.ppat_attributes;
@@ -3858,7 +3855,7 @@ let rec check_counter_example_pat
           in
           check_rec ~info:(decrease 5) tp expected_ty k
       end
-  | Tpat_alias { alias_pattern = p; _ } -> check_rec ~info p expected_ty k
+  | Tpat_alias { pattern = p; _ } -> check_rec ~info p expected_ty k
   | Tpat_unboxed_unit ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       k @@
@@ -5353,8 +5350,8 @@ let rec name_pattern default = function
           Shape.Uid.internal_not_actually_unique
   | p :: rem ->
     match p.pat_desc with
-      Tpat_var { var_id = id; var_uid = uid; _ } -> id, uid
-    | Tpat_alias { alias_id = id; alias_uid = uid; _ } -> id, uid
+      Tpat_var { id; uid; _ } -> id, uid
+    | Tpat_alias { id; uid; _ } -> id, uid
     | _ -> name_pattern default rem
 
 let name_cases default lst =
@@ -9131,9 +9128,9 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         in
         let exp_env = Env.add_value ~mode id desc env in
         let uu = unique_use ~loc:sarg.pexp_loc ~env mode mode in
-        {pat_desc = Tpat_var { var_id = id; var_name = mknoloc name;
-                               var_uid = desc.val_uid; var_sort = sort;
-                               var_mode = Value.disallow_right mode };
+        {pat_desc = Tpat_var { id; name = mknoloc name;
+                               uid = desc.val_uid; sort;
+                               mode = Value.disallow_right mode };
          pat_type = ty;
          pat_extra=[];
          pat_attributes = [];
@@ -10389,8 +10386,8 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
       let update_exp_jkind (_, p, _) (exp, _) =
         let pat_name =
           match p.pat_desc with
-            Tpat_var { var_id = id; _ } -> Some id
-          | Tpat_alias { alias_id = id; _ } -> Some id
+            Tpat_var { id; _ } -> Some id
+          | Tpat_alias { id; _ } -> Some id
           | _ -> None in
         Ctype.check_and_update_generalized_ty_jkind
           ?name:pat_name ~loc:exp.exp_loc env exp.exp_type

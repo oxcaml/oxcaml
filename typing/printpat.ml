@@ -94,7 +94,7 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
   in
   match v.pat_desc with
   | Tpat_any -> fprintf ppf "_"
-  | Tpat_var { var_id = x; _ } -> fprintf ppf "%s" (Ident.name x)
+  | Tpat_var { id = x; _ } -> fprintf ppf "%s" (Ident.name x)
   | Tpat_constant c -> fprintf ppf "%s" (pretty_const c)
   | Tpat_unboxed_unit -> fprintf ppf "#()"
   | Tpat_unboxed_bool b -> fprintf ppf "#%a" bool b
@@ -131,7 +131,7 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
       fprintf ppf "@[[%c %a %c]@]" punct (pretty_vals " ;") vs punct
   | Tpat_lazy v ->
       fprintf ppf "@[<2>lazy@ %a@]" pretty_arg v
-  | Tpat_alias { alias_pattern = v; alias_id = x; _ } ->
+  | Tpat_alias { pattern = v; id = x; _ } ->
       fprintf ppf "@[(%a@ as %a)@]" pretty_val v Ident.doc_print x
   | Tpat_value v ->
       fprintf ppf "%a" pretty_val (v :> pattern)

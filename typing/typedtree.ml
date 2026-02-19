@@ -178,20 +178,20 @@ and 'k pattern_desc =
   (* value patterns *)
   | Tpat_any : value pattern_desc
   | Tpat_var : {
-      var_id: Ident.t;
-      var_name: string loc;
-      var_uid: Uid.t;
-      var_sort: Jkind_types.Sort.t;
-      var_mode: Mode.Value.l;
+      id: Ident.t;
+      name: string loc;
+      uid: Uid.t;
+      sort: Jkind_types.Sort.t;
+      mode: Mode.Value.l;
     } -> value pattern_desc
   | Tpat_alias : {
-      alias_pattern: value general_pattern;
-      alias_id: Ident.t;
-      alias_name: string loc;
-      alias_uid: Uid.t;
-      alias_sort: Jkind_types.Sort.t;
-      alias_mode: Mode.Value.l;
-      alias_type_expr: Types.type_expr;
+      pattern: value general_pattern;
+      id: Ident.t;
+      name: string loc;
+      uid: Uid.t;
+      sort: Jkind_types.Sort.t;
+      mode: Mode.Value.l;
+      type_expr: Types.type_expr;
     } -> value pattern_desc
   | Tpat_constant : constant -> value pattern_desc
   | Tpat_unboxed_unit : value pattern_desc
@@ -1104,7 +1104,7 @@ type pattern_action =
 let shallow_iter_pattern_desc
   : type k . pattern_action -> k pattern_desc -> unit
   = fun f -> function
-  | Tpat_alias { alias_pattern = p; _ } -> f.f p
+  | Tpat_alias { pattern = p; _ } -> f.f p
   | Tpat_tuple patl -> List.iter (fun (_, p) -> f.f p) patl
   | Tpat_unboxed_tuple patl -> List.iter (fun (_, p, _) -> f.f p) patl
   | Tpat_construct(_, _, patl, _) -> List.iter f.f patl
@@ -1117,7 +1117,7 @@ let shallow_iter_pattern_desc
   | Tpat_lazy p -> f.f p
   | Tpat_any
   | Tpat_var _
-  | Tpat_constant _ 
+  | Tpat_constant _
   | Tpat_unboxed_unit
   | Tpat_unboxed_bool _ -> ()
   | Tpat_value p -> f.f p
@@ -1129,12 +1129,10 @@ type pattern_transformation =
 let shallow_map_pattern_desc
   : type k . pattern_transformation -> k pattern_desc -> k pattern_desc
   = fun f d -> match d with
-  | Tpat_alias { alias_pattern; alias_id; alias_name;
-                 alias_uid; alias_sort; alias_mode;
-                 alias_type_expr } ->
-      Tpat_alias { alias_pattern = f.f alias_pattern; alias_id; alias_name;
-                   alias_uid; alias_sort; alias_mode;
-                   alias_type_expr }
+  | Tpat_alias { pattern = p1; id; name = s; uid; sort; mode = m;
+                 type_expr = ty } ->
+      Tpat_alias { pattern = f.f p1; id; name = s; uid; sort; mode = m;
+                   type_expr = ty }
   | Tpat_tuple pats ->
       Tpat_tuple (List.map (fun (label, pat) -> label, f.f pat) pats)
   | Tpat_unboxed_tuple pats ->
@@ -1203,13 +1201,11 @@ let rec iter_bound_idents
   : type k . _ -> k general_pattern -> _
   = fun f pat ->
   match pat.pat_desc with
-  | Tpat_var { var_id; var_name; var_uid; var_sort; _ } ->
-      f (var_id, var_name, pat.pat_type, var_sort, var_uid)
-  | Tpat_alias { alias_pattern; alias_id; alias_name;
-                 alias_uid; alias_sort;
-                 alias_type_expr; _ } ->
-      iter_bound_idents f alias_pattern;
-      f (alias_id, alias_name, alias_type_expr, alias_sort, alias_uid)
+  | Tpat_var { id; name = s; uid; sort; _ } ->
+      f (id, s, pat.pat_type, sort, uid)
+  | Tpat_alias { pattern = p; id; name = s; uid; sort; type_expr = ty; _ } ->
+      iter_bound_idents f p;
+      f (id, s, ty, sort, uid)
   | Tpat_or(p1, _, _) ->
       (* Invariant : both arguments bind the same variables *)
       iter_bound_idents f p1
@@ -1242,15 +1238,12 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
       match pat.pat_desc with
       (* [Tpat_var] and [Tpat_alias] are the only cases that directly
          bind an ident *)
-      | Tpat_var { var_id; var_name; var_uid; var_sort;
-                   var_mode } ->
-          f var_id var_name pat.pat_type var_uid var_mode (of_sort var_sort)
-      | Tpat_alias { alias_pattern; alias_id; alias_name;
-                     alias_uid; alias_sort; alias_mode;
-                     alias_type_expr } ->
-          loop f alias_pattern;
-          f alias_id alias_name alias_type_expr alias_uid alias_mode
-            (of_sort alias_sort)
+      | Tpat_var { id; name = s; uid; sort; mode } ->
+          f id s pat.pat_type uid mode (of_sort sort)
+      | Tpat_alias { pattern = p; id; name = s; uid; sort; mode;
+                     type_expr = ty } ->
+          loop f p;
+          f id s ty uid mode (of_sort sort)
       | Tpat_or (p1, p2, _) ->
         if both_sides_of_or then (loop f p1; loop f p2)
         else loop f p1
@@ -1311,7 +1304,7 @@ let let_bound_idents_with_modes_sorts_and_checks bindings =
         ~both_sides_of_or:true
         f vb.vb_pat;
        match vb.vb_pat.pat_desc, vb.vb_expr.exp_desc with
-       | Tpat_var { var_id = id; _ }, Texp_function fn ->
+       | Tpat_var { id; _ }, Texp_function fn ->
          let zero_alloc =
            match Zero_alloc.get fn.zero_alloc with
            | Default_zero_alloc ->
@@ -1367,22 +1360,18 @@ let alpha_var env id = List.assoc id env
 let rec alpha_pat
   : type k . _ -> k general_pattern -> k general_pattern
   = fun env p -> match p.pat_desc with
-  | Tpat_var { var_id; var_name; var_uid; var_sort;
-               var_mode } -> (* note the ``Not_found'' case *)
+  | Tpat_var { id; name = s; uid; sort; mode } ->
+      (* note the ``Not_found'' case *)
       {p with pat_desc =
-       try Tpat_var { var_id = alpha_var env var_id; var_name; var_uid;
-                      var_sort; var_mode } with
+       try Tpat_var { id = alpha_var env id; name = s; uid; sort; mode } with
        | Not_found -> Tpat_any}
-  | Tpat_alias { alias_pattern; alias_id; alias_name;
-                 alias_uid; alias_sort; alias_mode;
-                 alias_type_expr } ->
-      let new_p =  alpha_pat env alias_pattern in
+  | Tpat_alias { pattern = p1; id; name = s; uid; sort; mode;
+                 type_expr = ty } ->
+      let new_p =  alpha_pat env p1 in
       begin try
         {p with pat_desc =
-           Tpat_alias { alias_pattern = new_p;
-                        alias_id = alpha_var env alias_id;
-                        alias_name; alias_uid; alias_sort;
-                        alias_mode; alias_type_expr }}
+           Tpat_alias { pattern = new_p; id = alpha_var env id;
+                        name = s; uid; sort; mode; type_expr = ty }}
       with
       | Not_found -> new_p
       end
