@@ -192,6 +192,10 @@ let initialize_array0 env loc ~length array_set_kind width ~(init : L.lambda)
     creation_expr =
   let array = Ident.create_local "array" in
   let array_duid = Lambda.debug_uid_none in
+  let length_id = Ident.create_local "length" in
+  let length_duid = Lambda.debug_uid_none in
+  let init_id = Ident.create_local "init" in
+  let init_duid = Lambda.debug_uid_none in
   (* If the element size is 32-bit or less, zero-initialize the last 64-bit
      word, to ensure reproducibility. *)
   (* CR mshinwell: why does e.g. caml_make_unboxed_int32_vect not do this? *)
@@ -206,15 +210,17 @@ let initialize_array0 env loc ~length array_set_kind width ~(init : L.lambda)
         L.Lprim
           ( Parraysetu (array_set_kind, Ptagged_int_index),
             (* [Popaque] is used to conceal the out-of-bounds write. *)
-            [Lprim (Popaque L.layout_unit, [Lvar array], loc); length; zero_init],
+            [ Lprim (Popaque L.layout_unit, [Lvar array], loc);
+              Lvar length_id;
+              zero_init ],
             loc )
       in
       let length_is_greater_than_zero_and_is_not_zero_mod_elements_per_word =
         L.Lprim
           ( Psequand,
-            [ L.icmp ~loc Cgt L.int length (L.tagged_immediate 0);
+            [ L.icmp ~loc Cgt L.int (Lvar length_id) (L.tagged_immediate 0);
               L.icmp ~loc Cne L.int
-                (L.and_ L.int length
+                (L.and_ L.int (Lvar length_id)
                    (L.tagged_immediate (elements_per_word - 1))
                    ~loc)
                 (L.tagged_immediate 0) ],
@@ -230,10 +236,11 @@ let initialize_array0 env loc ~length array_set_kind width ~(init : L.lambda)
     let index = Ident.create_local "index" in
     let index_duid = Lambda.debug_uid_none in
     rec_catch_for_for_loop env loc index index_duid (L.tagged_immediate 0)
-      (L.pred L.int length ~loc) Upto
+      (L.pred L.int (Lvar length_id) ~loc)
+      Upto
       (Lprim
          ( Parraysetu (array_set_kind, Ptagged_int_index),
-           [Lvar array; Lvar index; init],
+           [Lvar array; Lvar index; Lvar init_id],
            loc ))
   in
   let term =
@@ -243,8 +250,21 @@ let initialize_array0 env loc ~length array_set_kind width ~(init : L.lambda)
         array,
         array_duid,
         creation_expr,
-        Lsequence
-          (maybe_zero_init_last_field, Lsequence (initialize, Lvar array)) )
+        Llet
+          ( Strict,
+            Pvalue { raw_kind = Pintval; nullable = Non_nullable },
+            length_id,
+            length_duid,
+            length,
+            Llet
+              ( Strict,
+                L.element_layout_for_array_set_kind array_set_kind,
+                init_id,
+                init_duid,
+                init,
+                Lsequence
+                  ( maybe_zero_init_last_field,
+                    Lsequence (initialize, Lvar array) ) ) ) )
   in
   env, Transformed term
 

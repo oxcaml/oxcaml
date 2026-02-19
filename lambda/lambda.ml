@@ -3196,6 +3196,38 @@ let array_element_size_in_bytes (array_kind : array_kind) =
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     (* All elements of unboxed product arrays are currently 8 bytes wide. *)
     count_initializers_array_kind array_kind * 8
+
+let rec layout_of_scannable_product_element_kind :
+    scannable_product_element_kind -> layout = function
+  | Pint_scannable | Paddr_scannable -> Pvalue generic_value
+  | Pproduct_scannable scannable ->
+    Punboxed_product
+      (List.map layout_of_scannable_product_element_kind scannable)
+
+let rec layout_of_ignorable_product_element_kind :
+    ignorable_product_element_kind -> layout = function
+  | Pint_ignorable -> Pvalue generic_value
+  | Punboxedfloat_ignorable f -> Punboxed_float f
+  | Punboxedoruntaggedint_ignorable i -> Punboxed_or_untagged_integer i
+  | Punboxedvector_ignorable v -> Punboxed_vector v
+  | Pproduct_ignorable ignorable ->
+    Punboxed_product
+      (List.map layout_of_ignorable_product_element_kind ignorable)
+
+let element_layout_for_array_set_kind : array_set_kind -> layout = function
+  | Pgenarray_set _ | Paddrarray_set _ | Pgcignorableaddrarray_set
+  | Pintarray_set | Pfloatarray_set ->
+    Pvalue generic_value
+  | Punboxedfloatarray_set f -> Punboxed_float f
+  | Punboxedoruntaggedintarray_set i -> Punboxed_or_untagged_integer i
+  | Punboxedvectorarray_set v -> Punboxed_vector v
+  | Pgcscannableproductarray_set (_, scannable) ->
+    Punboxed_product
+      (List.map layout_of_scannable_product_element_kind scannable)
+  | Pgcignorableproductarray_set ignorable ->
+    Punboxed_product
+      (List.map layout_of_ignorable_product_element_kind ignorable)
+
 let rec ignorable_product_element_kind_involves_int
     (kind : ignorable_product_element_kind) =
   match kind with
