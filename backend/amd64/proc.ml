@@ -326,39 +326,24 @@ let win64_loc_external_arguments arg =
   let reg = ref 0
   and ofs = ref (if Config.runtime5 then 0 else 32) in
   for i = 0 to Array.length arg - 1 do
-    match (arg.(i) : machtype_component) with
-    | Val | Int | Addr as ty ->
-        if !reg < Array.length win64_int_external_arguments then begin
-          loc.(i) <- phys_reg ty (P win64_int_external_arguments.(!reg));
-          incr reg
-        end else begin
-          loc.(i) <- stack_slot (Outgoing !ofs) ty;
-          ofs := !ofs + size_int
-        end
-    | Float ->
-        if !reg < Array.length win64_float_external_arguments then begin
-          loc.(i) <-
-            phys_reg Float (P win64_float_external_arguments.(!reg));
-          incr reg
-        end else begin
-          loc.(i) <- stack_slot (Outgoing !ofs) Float;
-          ofs := !ofs + size_float
-        end
-    | Float32 ->
-        if !reg < Array.length win64_float_external_arguments then begin
-          loc.(i) <-
-            phys_reg Float32 (P win64_float_external_arguments.(!reg));
-          incr reg
-        end else begin
-          loc.(i) <- stack_slot (Outgoing !ofs) Float32;
-          (* float32 slots still take up a full word *)
-          ofs := !ofs + size_float
-        end
-    | Vec128 | Vec256 | Vec512 ->
+    let ty : machtype_component = arg.(i) in
+    let arguments, size =
+      match ty with
+      | Val | Int | Addr -> win64_int_external_arguments, size_int
+      | Float | Float32 -> win64_float_external_arguments, size_float
+      | Vec128 | Vec256 | Vec512 ->
         (* CR mslater: (SIMD) win64 calling convention requires pass by reference *)
         Misc.fatal_error "SIMD external arguments are not supported on Win64"
-    | Valx2 ->
-      Misc.fatal_error "Unexpected machtype_component Valx2"
+      | Valx2 ->
+        Misc.fatal_error "Unexpected machtype_component Valx2"
+    in
+    if !reg < Array.length arguments then begin
+      loc.(i) <- phys_reg ty (P arguments.(!reg));
+      incr reg
+    end else begin
+      loc.(i) <- stack_slot (Outgoing !ofs) ty;
+      ofs := !ofs + size
+    end
   done;
   (loc, Misc.align !ofs 16, Align_16) (* keep stack 16-aligned *)
 
