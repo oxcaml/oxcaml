@@ -690,14 +690,10 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited (ty : type_expr)
           add_nullability_from_jkind env decl.type_jkind
             (value_kind_of_value_jkind env decl.type_jkind)
         | Type_open -> num_nodes_visited, non_nullable Pgenval
-        | Type_record (_, None, _)
-        | Type_record_unboxed_product (_, None, _) ->
-          (* TODO: Write a test case demonstrating that this can cause
-             unnecessary calls to ocaml_modify *)
-          (* TODO: Test that we don't get into trouble assuming non-nullable
-             (in particular, you should get an error declaring a custom
-             or_null type with an any) *)
+        | Type_record (_, None, _) ->
           num_nodes_visited, non_nullable Pgenval
+        | Type_record_unboxed_product (_, None, _) ->
+          num_nodes_visited, nullable Pgenval
     end
   | Ttuple labeled_fields ->
     if cannot_proceed () then
