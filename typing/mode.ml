@@ -195,6 +195,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Tailcall_argument -> Tailcall_argument
         | Function_return -> Function_return
         | Module_allocated_on_heap -> Module_allocated_on_heap
+        | Module_must_be_many -> Module_must_be_many
+        | Module_must_be_aliased -> Module_must_be_aliased
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
         | Branching -> Branching
@@ -216,6 +218,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Function_return -> Function_return
         | Stack_expression -> Stack_expression
         | Module_allocated_on_heap -> Module_allocated_on_heap
+        | Module_must_be_many -> Module_must_be_many
+        | Module_must_be_aliased -> Module_must_be_aliased
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
         | Branching -> Branching
@@ -237,6 +241,8 @@ module Hint_for_solver (* : Solver_intf.Hint *) = struct
         | Function_return -> Function_return
         | Stack_expression -> Stack_expression
         | Module_allocated_on_heap -> Module_allocated_on_heap
+        | Module_must_be_many -> Module_must_be_many
+        | Module_must_be_aliased -> Module_must_be_aliased
         | Is_used_in pp -> Is_used_in pp
         | Always_dynamic x -> Always_dynamic x
         | Branching -> Branching
@@ -2177,6 +2183,22 @@ module Report = struct
         Fmt.pp_print_string ppf "modules always need"
       | _ -> Fmt.pp_print_string ppf "it is a module and thus needs");
       Fmt.pp_print_string ppf " to be allocated on the heap"
+    | Module_must_be_many ->
+      (match pp_desc with
+      | Ident { category = Module; _ }
+      | Functor | Module | Structure
+      | Structure_item (Module, _) ->
+        Fmt.pp_print_string ppf "modules are always"
+      | _ -> Fmt.pp_print_string ppf "it is a module and thus");
+      Fmt.pp_print_string ppf " required to be many"
+    | Module_must_be_aliased ->
+      (match pp_desc with
+      | Ident { category = Module; _ }
+      | Functor | Module | Structure
+      | Structure_item (Module, _) ->
+        Fmt.pp_print_string ppf "modules are always"
+      | _ -> Fmt.pp_print_string ppf "it is a module and thus");
+      Fmt.pp_print_string ppf " required to be aliased"
     | Is_used_in pp ->
       let print_pp = print_pinpoint pp |> Option.get in
       Fmt.fprintf ppf "it is used in %t"

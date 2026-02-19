@@ -100,7 +100,8 @@ Lines 1-3, characters 18-3:
 Error: The module is "once"
          because it contains the value "foo" defined as the expression at line 2, characters 9-12
          which is "once".
-       However, the module highlighted is expected to be "many".
+       However, the module highlighted is expected to be "many"
+         because modules are always required to be many.
 |}]
 
 (* Monadic axes don't have such constraint *)
@@ -1263,10 +1264,10 @@ Error: The module "M" is "local"
          which is expected to be "global".
 |}]
 
-(* Empty signature crosses linearity and portability *)
+(* Empty signature crosses portability *)
 let _ =
-  let module M @ nonportable once = struct end in
-  let (foo @ portable many) () =
+  let module M @ nonportable = struct end in
+  let (foo @ portable) () =
     (module M : Empty)
   in
   foo
@@ -1274,16 +1275,49 @@ let _ =
 - : unit -> (module Empty) = <fun>
 |}]
 
-(* Functor crosses uniqueness and contention *)
+(* CR modes: but not linearity *)
 let _ =
-  let module (M @ unique uncontended) (X : Empty) = struct end in
-  let (foo @ many portable) () =
-    let _ @ unique uncontended = (module M : E2E) in
+  let module M @ once = struct end in
+  let (foo @ many) () =
+    (module M : Empty)
+  in
+  foo
+[%%expect{|
+Line 2, characters 15-34:
+2 |   let module M @ once = struct end in
+                   ^^^^^^^^^^^^^^^^^^^
+Error: The module is "once"
+       but is expected to be "many"
+         because modules are always required to be many.
+|}]
+
+(* Functor crosses contention *)
+let _ =
+  let module (M @ uncontended) (X : Empty) = struct end in
+  let (foo @ portable) () =
+    let _ @ uncontended = (module M : E2E) in
     ()
   in
   foo
 [%%expect{|
 - : unit -> unit = <fun>
+|}]
+
+(* CR modes: but not uniqueness *)
+let _ =
+  let module (M @ unique) (X : Empty) = struct end in
+  let (foo @ portable) () =
+    let _ @ unique = (module M : E2E) in
+    ()
+  in
+  foo
+[%%expect{|
+Line 2, characters 26-50:
+2 |   let module (M @ unique) (X : Empty) = struct end in
+                              ^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The module is "aliased"
+         because modules are always required to be aliased.
+       However, the module highlighted is expected to be "unique".
 |}]
 
 (* closing over M.x crosses modes *)

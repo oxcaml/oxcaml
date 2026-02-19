@@ -953,7 +953,7 @@ let unboxed_type sloc lident tys =
 let maybe_pmod_constraint mode expr =
   match mode with
   | [] -> expr
-  | _ :: _ -> Mod.constraint_ None mode expr
+  | _ :: _ -> Mod.constraint_ ~loc:expr.pmod_loc None mode expr
 %}
 
 /* Tokens */
