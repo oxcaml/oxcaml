@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -559,7 +559,7 @@ val group : ('a : value_or_null). ('a -> 'a -> bool) -> 'a t -> 'a t t
 
     @since 4.14 *)
 
-val memoize : ('a : value_or_null). 'a t -> 'a t
+val memoize : ('a : value_or_null). 'a t -> 'a t @@ portable stateful
 (** The sequence [memoize xs] has the same elements as the sequence [xs].
 
     Regardless of whether [xs] is ephemeral or persistent,
@@ -579,7 +579,7 @@ exception Forced_twice
 
     @since 4.14 *)
 
-val once : ('a : value_or_null). 'a t -> 'a t
+val once : ('a : value_or_null). 'a t -> 'a t @@ portable stateful
 (** The sequence [once xs] has the same elements as the sequence [xs].
 
     Regardless of whether [xs] is ephemeral or persistent,

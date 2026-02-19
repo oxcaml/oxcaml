@@ -60,48 +60,48 @@ type (+'a : any mod separable) t = 'a iarray
 
 (* Array operations *)
 
-external length : ('a : any mod separable). local_ 'a iarray -> int @@ portable
+external length : ('a : any mod separable). local_ 'a iarray -> int @@ stateless
   = "%array_length"
 [@@layout_poly]
 external get :
   ('a : any mod separable). ('a iarray[@local_opt]) -> int -> ('a[@local_opt])
-  @@ portable = "%array_safe_get"
+  @@ stateless = "%array_safe_get"
 [@@layout_poly]
 external ( .:() ) :
   ('a : any mod separable). ('a iarray[@local_opt]) -> int -> ('a[@local_opt])
-  @@ portable = "%array_safe_get"
+  @@ stateless = "%array_safe_get"
 [@@layout_poly]
 external unsafe_get :
   ('a : any mod separable). ('a iarray[@local_opt]) -> int -> ('a[@local_opt])
-  @@ portable = "%array_unsafe_get"
+  @@ stateless = "%array_unsafe_get"
 [@@layout_poly]
 external concat : ('a : any mod separable). 'a iarray list -> 'a iarray
-  @@ portable = "caml_array_concat"
+  @@ stateless = "caml_array_concat"
 external concat_local :
   ('a : any mod separable). local_ 'a iarray list -> local_ 'a iarray
-  @@ portable = "caml_array_concat_local"
+  @@ stateless = "caml_array_concat_local"
 
 external append_prim :
-  ('a : any mod separable). 'a iarray -> 'a iarray -> 'a iarray @@ portable
+  ('a : any mod separable). 'a iarray -> 'a iarray -> 'a iarray @@ stateless
   = "caml_array_append"
 external append_prim_local :
   ('a : any mod separable).
-  local_ 'a iarray -> local_ 'a iarray -> local_ 'a iarray @@ portable
+  local_ 'a iarray -> local_ 'a iarray -> local_ 'a iarray @@ stateless
   = "caml_array_append_local"
 external unsafe_sub :
-  ('a : any mod separable). 'a iarray -> int -> int -> 'a iarray @@ portable
+  ('a : any mod separable). 'a iarray -> int -> int -> 'a iarray @@ stateless
   = "caml_array_sub"
 external unsafe_sub_local :
   ('a : any mod separable). local_ 'a iarray -> int -> int -> local_ 'a iarray
-  @@ portable = "caml_array_sub_local"
+  @@ stateless = "caml_array_sub_local"
 external unsafe_of_array : ('a : any mod separable). 'a array -> 'a iarray
-  @@ portable = "%array_to_iarray"
+  @@ stateless = "%array_to_iarray"
 external unsafe_to_array : ('a : any mod separable). 'a iarray -> 'a array
-  @@ portable = "%array_of_iarray"
+  @@ stateless = "%array_of_iarray"
 
 (* Used only to reimplement [init] *)
 external unsafe_set_mutable :
-  ('a : any mod separable). 'a array -> int -> 'a -> unit @@ portable
+  ('a : any mod separable). 'a array -> int -> 'a -> unit @@ stateless
   = "%array_unsafe_set"
 [@@layout_poly]
 
@@ -113,13 +113,13 @@ external unsafe_set_mutable :
    that in order to isolate the unsafety. *)
 external make_mutable_local :
   ('a : value_or_null mod separable). int -> local_ 'a -> local_ 'a array
-  @@ portable = "caml_array_make_local"
+  @@ stateless = "caml_array_make_local"
 external unsafe_of_local_array :
-  ('a : any mod separable). local_ 'a array -> local_ 'a iarray @@ portable
+  ('a : any mod separable). local_ 'a array -> local_ 'a iarray @@ stateless
   = "%array_to_iarray"
 external unsafe_set_local :
   ('a : any mod separable). local_ 'a array -> int -> local_ 'a -> unit
-  @@ portable = "%array_unsafe_set"
+  @@ stateless = "%array_unsafe_set"
 [@@layout_poly]
 
 (* We can't use immutable array literals in this file, since we don't want to
