@@ -105,33 +105,6 @@ let stack_slot slot ty =
 
 let size_domainstate_args = 64 * size_int
 
-let loc_int make_stack int_registers ofs =
-  match !int_registers with
-  | reg :: regs ->
-    int_registers := regs;
-    phys_reg Int reg
-  | [] ->
-    ofs := Misc.align !ofs size_int;
-    let l = stack_slot (make_stack !ofs) Int in
-    ofs := !ofs + size_int;
-    l
-
-let loc_float_gen kind size make_stack float_registers ofs =
-  match !float_registers with
-  | reg :: regs ->
-    float_registers := regs;
-    phys_reg kind reg
-  | [] ->
-    ofs := Misc.align !ofs size;
-    let l = stack_slot (make_stack !ofs) kind in
-    ofs := !ofs + size;
-    l
-
-let loc_float = loc_float_gen Float Arch.size_float
-(* float32 slots still take up a full word *)
-let loc_float32 = loc_float_gen Float32 Arch.size_float
-let loc_vec128 = loc_float_gen Vec128 Arch.size_vec128
-
 let calling_conventions
     int_registers float_registers make_stack first_stack arg =
   let loc = Array.make (Array.length arg) Reg.dummy in
@@ -139,14 +112,23 @@ let calling_conventions
   let float_registers = ref float_registers in
   let ofs = ref first_stack in
   for i = 0 to Array.length arg - 1 do
-    loc.(i) <-
-      match (arg.(i) : Cmm.machtype_component) with
-      | Val | Int | Addr -> loc_int make_stack int_registers ofs
-      | Float -> loc_float make_stack float_registers ofs
-      | Vec128 -> loc_vec128 make_stack float_registers ofs
+    let ty : Cmm.machtype_component = arg.(i) in
+    let registers, size =
+      match ty with
+      | Val | Int | Addr -> int_registers, size_int
+      | Float | Float32 -> float_registers, Arch.size_float
+      | Vec128 -> float_registers, Arch.size_vec128
       | Vec256 | Vec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
-      | Float32 -> loc_float32 make_stack float_registers ofs
       | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
+    in
+    match !registers with
+    | reg :: regs ->
+      registers := regs;
+      loc.(i) <- phys_reg ty reg
+    | [] ->
+      ofs := Misc.align !ofs size;
+      loc.(i) <- stack_slot (make_stack !ofs) ty;
+      ofs := !ofs + size;
   done;
   (* CR mslater: (SIMD) will need to be 32/64 if vec256/512 are used. *)
   (loc, Misc.align (max 0 !ofs) 16)  (* keep stack 16-aligned *)
@@ -202,57 +184,34 @@ let loc_results_return res =
    bytes, while the AAPCS64 pads them to 8 bytes.
    Return values in r0...r1 or d0. *)
 
-let ext_loc_int divisor make_stack int_registers ofs =
-  match !int_registers with
-  | reg :: regs ->
-    int_registers := regs;
-    phys_reg Int reg
-  | [] ->
-    let size = if macosx then size_int / divisor else size_int in
-    ofs := Misc.align !ofs size;
-    let l = stack_slot (make_stack !ofs) Int in
-    ofs := !ofs + size;
-    l
-
-let ext_loc_float kind divisor make_stack float_registers ofs =
-  match !float_registers with
-  | reg :: regs ->
-    float_registers := regs;
-    phys_reg kind reg
-  | [] ->
-    let size = if macosx then size_float / divisor else size_float in
-    ofs := Misc.align !ofs size;
-    let l = stack_slot (make_stack !ofs) kind in
-    ofs := !ofs + size;
-    l
-
-let ext_loc_vec128 = loc_vec128
-
 let external_calling_conventions
     int_registers float_registers make_stack ty_args =
   let loc = Array.make (List.length ty_args) [| Reg.dummy |] in
   let int_registers = ref int_registers in
   let float_registers = ref float_registers in
   let ofs = ref 0 in
-  List.iteri (fun i ty_arg ->
-    begin match (ty_arg : Cmm.exttype) with
-    | XInt | XInt64 ->
-        loc.(i) <- [| ext_loc_int 1 make_stack int_registers ofs |]
-    | XInt32 ->
-        loc.(i) <- [| ext_loc_int 2 make_stack int_registers ofs |]
-    | XInt16 ->
-        loc.(i) <- [| ext_loc_int 4 make_stack int_registers ofs |]
-    | XInt8 ->
-        loc.(i) <- [| ext_loc_int 8 make_stack int_registers ofs |]
-    | XFloat ->
-        loc.(i) <- [| ext_loc_float Float 1 make_stack float_registers ofs |]
-    | XFloat32 ->
-        loc.(i) <- [| ext_loc_float Float32 2 make_stack float_registers ofs |]
-    | XVec128 ->
-        loc.(i) <- [| ext_loc_vec128 make_stack float_registers ofs |]
-    | XVec256 | XVec512 ->
+  List.iteri (fun i (ty_arg : Cmm.exttype) ->
+    let (ty : Cmm.machtype_component), registers, divisor, size =
+      match ty_arg with
+      | XInt | XInt64 -> Int, int_registers, 1, size_int
+      | XInt32 -> Int, int_registers, 2, size_int
+      | XInt16 -> Int, int_registers, 4, size_int
+      | XInt8 -> Int, int_registers, 8, size_int
+      | XFloat -> Float, float_registers, 1, size_float
+      | XFloat32 -> Float32, float_registers, 2, size_float
+      | XVec128 -> Vec128, float_registers, 1, size_vec128
+      | XVec256 | XVec512 ->
         Misc.fatal_error "XVec256 and XVec512 not supported on ARM64"
-    end)
+    in
+    match !registers with
+    | reg :: regs ->
+      registers := regs;
+      loc.(i) <- [| phys_reg ty reg |]
+    | [] ->
+      let size = if macosx then size / divisor else size in
+      ofs := Misc.align !ofs size;
+      loc.(i) <- [| stack_slot (make_stack !ofs) ty |];
+      ofs := !ofs + size)
     ty_args;
   (loc, Misc.align !ofs 16, Cmm.Align_16) (* keep stack 16-aligned *)
 
