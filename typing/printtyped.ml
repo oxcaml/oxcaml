@@ -315,8 +315,8 @@ let value_modes_var i ppf ms =
 let moda_desc i ppf modalities_annot =
   let modality_as_mode (Mode.Modality.Atom (ax, modality)) : Mode.Value.atom =
     match ax, modality with
-    | Comonadic ax, Meet_with mode -> Atom (Comonadic ax, mode)
-    | Monadic ax, Join_with mode -> Atom (Monadic ax, mode)
+    | Comonadic ax, Meet_const mode -> Atom (Comonadic ax, mode)
+    | Monadic ax, Join_const mode -> Atom (Monadic ax, mode)
   in
   let as_modes_annot =
     List.map (Location.map modality_as_mode) modalities_annot

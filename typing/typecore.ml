@@ -717,9 +717,9 @@ let tuple_pat_mode mode tuple_modes =
 let global_pat_mode {mode; _}=
   let mode =
     mode
-    |> Value.meet_with Areality Regionality.Const.Global
-    |> Value.meet_with Forkable Forkable.Const.Forkable
-    |> Value.meet_with Yielding Yielding.Const.Unyielding
+    |> Value.meet_const_with Areality Regionality.Const.Global
+    |> Value.meet_const_with Forkable Forkable.Const.Forkable
+    |> Value.meet_const_with Yielding Yielding.Const.Unyielding
   in
   simple_pat_mode mode
 

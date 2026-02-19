@@ -1156,10 +1156,10 @@ module Lattices_mono = struct
 
   type ('a, 'b, 'd) morph =
     | Id : ('a, 'a, 'l * 'r) morph  (** identity morphism *)
-    | Meet_with : 'a -> ('a, 'a, 'l * 'r) morph
+    | Meet_const : 'a -> ('a, 'a, 'l * 'r) morph
         (** Meet the input with the parameter *)
-    | Imply : 'a -> ('a, 'a, disallowed * 'r) morph
-        (** The right adjoint of [Meet_with] *)
+    | Imply_const : 'a -> ('a, 'a, disallowed * 'r) morph
+        (** The right adjoint of [Meet_const] *)
     | Proj : 't obj * ('t, 'r_) Axis.t -> ('t, 'r_, 'l * 'r) morph
         (** Project from a product to an axis *)
     | Max_with : ('t, 'r_) Axis.t -> ('r_, 't, disallowed * 'r) morph
@@ -1215,7 +1215,7 @@ module Lattices_mono = struct
       | Id -> Id
       | Proj (src, ax) -> Proj (src, ax)
       | Min_with ax -> Min_with ax
-      | Meet_with c -> Meet_with c
+      | Meet_const c -> Meet_const c
       | Compose (f, g) ->
         let f = allow_left f in
         let g = allow_left g in
@@ -1235,8 +1235,8 @@ module Lattices_mono = struct
       | Id -> Id
       | Proj (src, ax) -> Proj (src, ax)
       | Max_with ax -> Max_with ax
-      | Meet_with c -> Meet_with c
-      | Imply c -> Imply c
+      | Meet_const c -> Meet_const c
+      | Imply_const c -> Imply_const c
       | Compose (f, g) ->
         let f = allow_right f in
         let g = allow_right g in
@@ -1257,8 +1257,8 @@ module Lattices_mono = struct
       | Proj (src, ax) -> Proj (src, ax)
       | Min_with ax -> Min_with ax
       | Max_with ax -> Max_with ax
-      | Meet_with c -> Meet_with c
-      | Imply c -> Imply c
+      | Meet_const c -> Meet_const c
+      | Imply_const c -> Imply_const c
       | Compose (f, g) ->
         let f = disallow_left f in
         let g = disallow_left g in
@@ -1282,8 +1282,8 @@ module Lattices_mono = struct
       | Proj (src, ax) -> Proj (src, ax)
       | Min_with ax -> Min_with ax
       | Max_with ax -> Max_with ax
-      | Meet_with c -> Meet_with c
-      | Imply c -> Imply c
+      | Meet_const c -> Meet_const c
+      | Imply_const c -> Imply_const c
       | Compose (f, g) ->
         let f = disallow_right f in
         let g = disallow_right g in
@@ -1342,8 +1342,8 @@ module Lattices_mono = struct
     | Proj (src, _) -> src
     | Max_with ax -> proj_obj ax dst
     | Min_with ax -> proj_obj ax dst
-    | Meet_with _ -> dst
-    | Imply _ -> dst
+    | Meet_const _ -> dst
+    | Imply_const _ -> dst
     | Compose (f, g) ->
       let mid = src dst f in
       src mid g
@@ -1380,7 +1380,7 @@ module Lattices_mono = struct
         match Axis.eq ax1 ax2 with Some Refl -> Some Refl | None -> None)
       | Min_with ax1, Min_with ax2 -> (
         match Axis.eq ax1 ax2 with Some Refl -> Some Refl | None -> None)
-      | Meet_with c1, Meet_with c2 ->
+      | Meet_const c1, Meet_const c2 ->
         (* This polymorphic equality is correct only if runtime representation
            uniquely identifies a constant, which could be false. For example,
            the lattice of rational number would be represented as the tuple of
@@ -1389,7 +1389,7 @@ module Lattices_mono = struct
            not requird to be complete: i.e., it's allowed to return [None] when
            it should return [Some]. It would cause duplication but not error. *)
         if c1 = c2 then Some Refl else None
-      | Imply c1, Imply c2 -> if c1 = c2 then Some Refl else None
+      | Imply_const c1, Imply_const c2 -> if c1 = c2 then Some Refl else None
       | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Some Refl
       | Comonadic_to_monadic_min a1, Comonadic_to_monadic_min a2 -> (
         match eq_obj a1 a2 with None -> None | Some Refl -> Some Refl)
@@ -1408,12 +1408,12 @@ module Lattices_mono = struct
           match equal g1 g2 with None -> None | Some Refl -> Some Refl))
       | Map_comonadic f, Map_comonadic g -> (
         match equal f g with Some Refl -> Some Refl | None -> None)
-      | ( ( Id | Proj _ | Max_with _ | Min_with _ | Meet_with _
+      | ( ( Id | Proj _ | Max_with _ | Min_with _ | Meet_const _
           | Monadic_to_comonadic_min | Comonadic_to_monadic_min _
           | Comonadic_to_monadic_max _ | Monadic_to_comonadic_max
           | Local_to_regional | Locality_as_regionality | Global_to_regional
           | Regional_to_local | Regional_to_global | Compose _ | Map_comonadic _
-          | Imply _ ),
+          | Imply_const _ ),
           _ ) ->
         None
   end)
@@ -1424,8 +1424,8 @@ module Lattices_mono = struct
       b obj -> Fmt.formatter -> (a, b, l * r) morph -> unit =
    fun dst ppf -> function
     | Id -> Fmt.fprintf ppf "id"
-    | Meet_with c -> Fmt.fprintf ppf "meet(%a)" (print dst) c
-    | Imply c -> Fmt.fprintf ppf "imply(%a)" (print dst) c
+    | Meet_const c -> Fmt.fprintf ppf "meet_const(%a)" (print dst) c
+    | Imply_const c -> Fmt.fprintf ppf "imply_const(%a)" (print dst) c
     | Proj (_, ax) -> Fmt.fprintf ppf "proj_%a" Axis.print ax
     | Max_with ax -> Fmt.fprintf ppf "max_with_%a" Axis.print ax
     | Min_with ax -> Fmt.fprintf ppf "min_with_%a" Axis.print ax
@@ -1561,8 +1561,8 @@ module Lattices_mono = struct
     | Proj (_, ax) -> Axis.proj ax a
     | Max_with ax -> max_with dst ax a
     | Min_with ax -> min_with dst ax a
-    | Meet_with c -> meet dst c a
-    | Imply c -> imply dst c a
+    | Meet_const c -> meet dst c a
+    | Imply_const c -> imply dst c a
     | Monadic_to_comonadic_min -> monadic_to_comonadic_min dst a
     | Comonadic_to_monadic_min src -> comonadic_to_monadic_min src a
     | Comonadic_to_monadic_max src -> comonadic_to_monadic_max src a
@@ -1612,7 +1612,7 @@ module Lattices_mono = struct
         | NoneResponsible -> NoneResponsible
         | SourceIsSingle -> find_responsible_axis_single f
         | Axis c_ax -> find_responsible_axis_prod f c_ax)
-      | Id | Meet_with _ | Imply _ -> SourceIsSingle
+      | Id | Meet_const _ | Imply_const _ -> SourceIsSingle
       | Max_with _ | Min_with _ | Map_comonadic _ | Monadic_to_comonadic_min
       | Comonadic_to_monadic_min _ | Monadic_to_comonadic_max
       | Comonadic_to_monadic_max _ ->
@@ -1654,8 +1654,8 @@ module Lattices_mono = struct
         | SourceIsSingle -> find_responsible_axis_single f
         | Axis c_ax -> find_responsible_axis_prod f c_ax)
       | Id, ax -> Axis ax
-      | Meet_with _, ax -> Axis ax
-      | Imply _, ax -> Axis ax
+      | Meet_const _, ax -> Axis ax
+      | Imply_const _, ax -> Axis ax
       | Map_comonadic _, ax -> (
         (* The [Map_comonadic] morphism applies a morphsim to the areality axis and
            the result is put back into the areality axis. See [Lattices_mono.apply] *)
@@ -1699,13 +1699,13 @@ module Lattices_mono = struct
     match m1, m2 with
     | Id, m -> Some m
     | m, Id -> Some m
-    | Meet_with c1, Meet_with c2 -> Some (Meet_with (meet dst c1 c2))
-    | Imply c1, Imply c2 -> Some (Imply (meet dst c1 c2))
-    | Imply c1, Meet_with c2 when le dst c1 c2 -> Some (Imply c1)
-    | Meet_with c1, m2 when is_max c1 -> Some m2
-    | Imply c1, m2 when is_max c1 -> Some m2
-    | m2, Meet_with c1 when is_mid_max c1 -> Some m2
-    | m2, Imply c1 when is_mid_max c1 -> Some m2
+    | Meet_const c1, Meet_const c2 -> Some (Meet_const (meet dst c1 c2))
+    | Imply_const c1, Imply_const c2 -> Some (Imply_const (meet dst c1 c2))
+    | Imply_const c1, Meet_const c2 when le dst c1 c2 -> Some (Imply_const c1)
+    | Meet_const c1, m2 when is_max c1 -> Some m2
+    | Imply_const c1, m2 when is_max c1 -> Some m2
+    | m2, Meet_const c1 when is_mid_max c1 -> Some m2
+    | m2, Imply_const c1 when is_mid_max c1 -> Some m2
     | Compose (f1, f2), g -> (
       let mid = src dst f1 in
       match maybe_compose mid f2 g with
@@ -1716,8 +1716,8 @@ module Lattices_mono = struct
       match maybe_compose dst f g1 with
       | Some m -> Some (compose dst m g2)
       | None -> None)
-    | Proj (mid, ax), Meet_with c ->
-      Some (compose dst (Meet_with (Axis.proj ax c)) (Proj (mid, ax)))
+    | Proj (mid, ax), Meet_const c ->
+      Some (compose dst (Meet_const (Axis.proj ax c)) (Proj (mid, ax)))
     | Proj (_, ax1), Max_with ax2 -> (
       match Axis.eq ax1 ax2 with None -> None | Some Refl -> Some Id)
     | Proj (_, ax1), Min_with ax2 -> (
@@ -1739,37 +1739,38 @@ module Lattices_mono = struct
       let dst0 = proj_obj Areality dst in
       Some (Map_comonadic (compose dst0 f g))
     | Regional_to_local, Local_to_regional -> Some Id
-    | Regional_to_local, Global_to_regional -> Some (Imply Locality.Global)
+    | Regional_to_local, Global_to_regional ->
+      Some (Imply_const Locality.Global)
     | Regional_to_local, Locality_as_regionality -> Some Id
-    | Regional_to_local, Meet_with c ->
-      Some (compose dst (Meet_with (regional_to_local c)) Regional_to_local)
-    | Regional_to_global, Meet_with c ->
-      Some (compose dst (Meet_with (regional_to_global c)) Regional_to_global)
-    | Local_to_regional, Meet_with c ->
-      Some (compose dst (Meet_with (local_to_regional c)) Local_to_regional)
-    | Global_to_regional, Meet_with c ->
-      Some (compose dst (Meet_with (global_to_regional c)) Global_to_regional)
-    | Locality_as_regionality, Meet_with c ->
+    | Regional_to_local, Meet_const c ->
+      Some (compose dst (Meet_const (regional_to_local c)) Regional_to_local)
+    | Regional_to_global, Meet_const c ->
+      Some (compose dst (Meet_const (regional_to_global c)) Regional_to_global)
+    | Local_to_regional, Meet_const c ->
+      Some (compose dst (Meet_const (local_to_regional c)) Local_to_regional)
+    | Global_to_regional, Meet_const c ->
+      Some (compose dst (Meet_const (global_to_regional c)) Global_to_regional)
+    | Locality_as_regionality, Meet_const c ->
       Some
         (compose dst
-           (Meet_with (locality_as_regionality c))
+           (Meet_const (locality_as_regionality c))
            Locality_as_regionality)
-    | Map_comonadic f, Meet_with c ->
+    | Map_comonadic f, Meet_const c ->
       let dst0 = proj_obj Areality dst in
       let areality = Axis.proj Areality c in
       Some
         (compose dst
-           (Meet_with (set_areality (max dst0) c))
-           (Map_comonadic (compose dst0 f (Meet_with areality))))
-    | Map_comonadic f, Imply c ->
+           (Meet_const (set_areality (max dst0) c))
+           (Map_comonadic (compose dst0 f (Meet_const areality))))
+    | Map_comonadic f, Imply_const c ->
       let dst0 = proj_obj Areality dst in
       let areality = Axis.proj Areality c in
       Some
         (compose dst
-           (Imply (set_areality (max dst0) c))
-           (Map_comonadic (compose dst0 f (Imply areality))))
+           (Imply_const (set_areality (max dst0) c))
+           (Map_comonadic (compose dst0 f (Imply_const areality))))
     | Regional_to_global, Locality_as_regionality -> Some Id
-    | Regional_to_global, Local_to_regional -> Some (Meet_with Locality.Global)
+    | Regional_to_global, Local_to_regional -> Some (Meet_const Locality.Global)
     | Local_to_regional, Regional_to_local -> None
     | Local_to_regional, Regional_to_global -> None
     | Locality_as_regionality, Regional_to_local -> None
@@ -1779,10 +1780,10 @@ module Lattices_mono = struct
     | Global_to_regional, Regional_to_global -> None
     | Min_with _, _ -> None
     | Max_with _, _ -> None
-    | _, Meet_with _ -> None
-    | Meet_with _, _ -> None
-    | _, Imply _ -> None
-    | Imply _, _ -> None
+    | _, Meet_const _ -> None
+    | Meet_const _, _ -> None
+    | _, Imply_const _ -> None
+    | Imply_const _, _ -> None
     | _, Proj _ -> None
     | Map_comonadic _, _ -> None
     | Monadic_to_comonadic_min, _ -> None
@@ -1820,11 +1821,11 @@ module Lattices_mono = struct
       let f' = left_adjoint dst f in
       let g' = left_adjoint mid g in
       Compose (g', f')
-    | Meet_with _c ->
-      (* The downward closure of [Meet_with c]'s image is all [x <= c].
+    | Meet_const _c ->
+      (* The downward closure of [Meet_const c]'s image is all [x <= c].
          For those, [x <= meet c y] is equivalent to [x <= y]. *)
       Id
-    | Imply c -> Meet_with c
+    | Imply_const c -> Meet_const c
     | Comonadic_to_monadic_max _ -> Monadic_to_comonadic_min
     | Monadic_to_comonadic_max -> Comonadic_to_monadic_min dst
     | Global_to_regional -> Regional_to_global
@@ -1848,7 +1849,7 @@ module Lattices_mono = struct
       let f' = right_adjoint dst f in
       let g' = right_adjoint mid g in
       Compose (g', f')
-    | Meet_with c -> Imply c
+    | Meet_const c -> Imply_const c
     | Comonadic_to_monadic_min _ -> Monadic_to_comonadic_max
     | Monadic_to_comonadic_min -> Comonadic_to_monadic_max dst
     | Local_to_regional -> Regional_to_local
@@ -2702,13 +2703,13 @@ module Comonadic_gen (Obj : Obj) = struct
 
   let apply_hint hint m = wrap ~hint Fun.id m
 
-  let meet_const_unhint c m = Solver.Unhint.apply obj (Meet_with c) m
+  let meet_const_unhint c m = Solver.Unhint.apply obj (Meet_const c) m
 
   let meet_const ?hint c m = wrap ?hint (meet_const_unhint c) m
 
-  let imply_unhint c m = Solver.Unhint.apply obj (Imply c) m
+  let imply_const_unhint c m = Solver.Unhint.apply obj (Imply_const c) m
 
-  let imply c m = m |> disallow_left |> wrap (imply_unhint c)
+  let imply_const c m = m |> disallow_left |> wrap (imply_const_unhint c)
 
   module Guts = struct
     let get_floor m = Solver.get_floor obj m
@@ -2804,13 +2805,13 @@ module Monadic_gen (Obj : Obj) = struct
 
   let apply_hint hint m = wrap ~hint Fun.id m
 
-  let join_const_unhint c m = Solver.Unhint.apply Obj.obj (Meet_with c) m
+  let join_const_unhint c m = Solver.Unhint.apply Obj.obj (Meet_const c) m
 
   let join_const ?hint c m = wrap ?hint (join_const_unhint c) m
 
-  let subtract_unhint c m = Solver.Unhint.apply obj (Imply c) m
+  let subtract_const_unhint c m = Solver.Unhint.apply obj (Imply_const c) m
 
-  let subtract c m = m |> disallow_right |> wrap (subtract_unhint c)
+  let subtract_const c m = m |> disallow_right |> wrap (subtract_const_unhint c)
 
   module Guts = struct
     let get_ceil m = Solver.get_floor obj m
@@ -3177,7 +3178,7 @@ module Comonadic_with (Areality : Areality) = struct
   let max_with ax m =
     Solver.apply ~hint:Skip Obj.obj (Max_with ax) (Solver.disallow_left m)
 
-  let meet_with ax c m = meet_const (Const.max_with ax c) m
+  let meet_const_with ax c m = meet_const (Const.max_with ax c) m
 
   let zap_to_legacy m : Const.t =
     let areality = proj Areality m |> Areality.zap_to_legacy in
@@ -3309,7 +3310,7 @@ module Monadic = struct
 
   (* The monadic fragment is inverted. *)
 
-  let join_with ax c m = join_const (Const.min_with ax c) m
+  let join_const_with ax c m = join_const (Const.min_with ax c) m
 
   let min_with ax m =
     Solver.apply ~hint:Skip Obj.obj (Max_with ax) (Solver.disallow_left m)
@@ -3873,12 +3874,12 @@ module Value_with (Areality : Areality) = struct
     in
     { comonadic; monadic }
 
-  let join_with ax c { monadic; comonadic } =
-    let monadic = Monadic.join_with ax c monadic in
+  let join_const_with ax c { monadic; comonadic } =
+    let monadic = Monadic.join_const_with ax c monadic in
     { monadic; comonadic }
 
-  let meet_with ax c { monadic; comonadic } =
-    let comonadic = Comonadic.meet_with ax c comonadic in
+  let meet_const_with ax c { monadic; comonadic } =
+    let comonadic = Comonadic.meet_const_with ax c comonadic in
     { comonadic; monadic }
 
   let join l =
@@ -4152,11 +4153,11 @@ module Modality = struct
     type 'a axis = 'a Mode.Axis.t
 
     module Atom = struct
-      type 'a t = Join_with of 'a [@@unboxed]
+      type 'a t = Join_const of 'a [@@unboxed]
 
-      let is_id ax (Join_with c) = Mode.Const.Per_axis.(le ax c (min ax))
+      let is_id ax (Join_const c) = Mode.Const.Per_axis.(le ax c (min ax))
 
-      let is_constant ax (Join_with c) = Mode.Const.Per_axis.(le ax (max ax) c)
+      let is_constant ax (Join_const c) = Mode.Const.Per_axis.(le ax (max ax) c)
     end
 
     type error = Error : 'a axis * 'a Atom.t simple_error -> error
@@ -4178,7 +4179,7 @@ module Modality = struct
           else
             let (Error (ax, { left; right })) = Mode.axis_of_error c1 c2 in
             Error
-              (Error (ax, { left = Join_with left; right = Join_with right }))
+              (Error (ax, { left = Join_const left; right = Join_const right }))
 
       let concat ~then_ t =
         match then_, t with
@@ -4190,9 +4191,9 @@ module Modality = struct
        fun ?(hint = Hint.Unknown) t x ->
         match t with Join_const c -> Mode.join_const ~hint c x
 
-      let proj ax (Join_const c) : _ Atom.t = Join_with (Axis.proj ax c)
+      let proj ax (Join_const c) : _ Atom.t = Join_const (Axis.proj ax c)
 
-      let set ax (Join_with a : _ Atom.t) (Join_const c) =
+      let set ax (Join_const a : _ Atom.t) (Join_const c) =
         Join_const (Axis.set ax a c)
 
       let print ppf = function
@@ -4218,7 +4219,7 @@ module Modality = struct
           Error
             (Error
                ( ax,
-                 { left = Join_with left; right = Join_with (Axis.proj ax c) }
+                 { left = Join_const left; right = Join_const (Axis.proj ax c) }
                )))
       | Diff (_, _m1), Diff (_, _m2) ->
         (* [m1] is a left mode so it cannot appear on the right. So we can't do
@@ -4262,7 +4263,7 @@ module Modality = struct
            However, [subtract] requires [mm] to be constant. We get the ceil of
            [mm] to construct the floor of [c]. *)
         let cc = Mode.Guts.get_ceil mm in
-        let c = Mode.subtract cc m in
+        let c = Mode.subtract_const cc m in
         let c = Mode.zap_to_floor c in
         (* Note that we did not mutate [mm] but simply took its ceil, which
            might be mutated later. To satisfy the coherence condition (see the
@@ -4298,11 +4299,11 @@ module Modality = struct
     type 'a axis = 'a Mode.Axis.t
 
     module Atom = struct
-      type 'a t = Meet_with of 'a [@@unboxed]
+      type 'a t = Meet_const of 'a [@@unboxed]
 
-      let is_id ax (Meet_with c) = Mode.Const.Per_axis.(le ax (max ax) c)
+      let is_id ax (Meet_const c) = Mode.Const.Per_axis.(le ax (max ax) c)
 
-      let is_constant ax (Meet_with c) = Mode.Const.Per_axis.(le ax c (min ax))
+      let is_constant ax (Meet_const c) = Mode.Const.Per_axis.(le ax c (min ax))
     end
 
     type error = Error : 'a axis * 'a Atom.t simple_error -> error
@@ -4324,7 +4325,7 @@ module Modality = struct
           else
             let (Error (ax, { left; right })) = Mode.axis_of_error c1 c2 in
             Error
-              (Error (ax, { left = Meet_with left; right = Meet_with right }))
+              (Error (ax, { left = Meet_const left; right = Meet_const right }))
 
       let concat ~then_ t =
         match then_, t with
@@ -4336,9 +4337,9 @@ module Modality = struct
        fun ?(hint = Hint.Unknown) t x ->
         match t with Meet_const c -> Mode.meet_const ~hint c x
 
-      let proj ax (Meet_const c) : _ Atom.t = Meet_with (Axis.proj ax c)
+      let proj ax (Meet_const c) : _ Atom.t = Meet_const (Axis.proj ax c)
 
-      let set ax (Meet_with a : _ Atom.t) (Meet_const c) =
+      let set ax (Meet_const a : _ Atom.t) (Meet_const c) =
         Meet_const (Axis.set ax a c)
 
       let print ppf = function
@@ -4368,7 +4369,7 @@ module Modality = struct
           Error
             (Error
                ( ax,
-                 { left = Meet_with left; right = Meet_with (Axis.proj ax c) }
+                 { left = Meet_const left; right = Meet_const (Axis.proj ax c) }
                )))
       | Exactly (_, _m1), Exactly (_, _m2) ->
         (* [m1] is a left mode, so there is no good way to check.
@@ -4420,7 +4421,7 @@ module Modality = struct
            [imply] requires [mm] to be constant. We get the floor of [mm] to
            construct the ceil of [c]. *)
         let cc = Mode.Guts.get_floor mm in
-        let c = Mode.imply cc m in
+        let c = Mode.imply_const cc m in
         let c = Mode.zap_to_ceil c in
         (* Note that we did not mutate [mm] but simply took its floor, which
            might be mutated later. To satisfy the coherence condition (see the
@@ -4494,9 +4495,9 @@ module Modality = struct
 
     let print (type a) (ax : a Axis.t) ppf (t : a) =
       match ax, t with
-      | Comonadic ax, Meet_with t ->
+      | Comonadic ax, Meet_const t ->
         Value.Comonadic.Const.Per_axis.print ax ppf t
-      | Monadic ax, Join_with t -> Value.Monadic.Const.Per_axis.print ax ppf t
+      | Monadic ax, Join_const t -> Value.Monadic.Const.Per_axis.print ax ppf t
   end
 
   type error = Error : 'a Axis.t * 'a simple_error -> error
@@ -4695,37 +4696,37 @@ module Crossing = struct
          Therefore, [join_c1 <= join_c2] iff [c1 >= c2]. *)
 
       let min ax =
-        Modality (Join_with ((Mode.Const.Per_axis.max [@inlined hint]) ax))
+        Modality (Join_const ((Mode.Const.Per_axis.max [@inlined hint]) ax))
 
       let max ax =
-        Modality (Join_with ((Mode.Const.Per_axis.min [@inlined hint]) ax))
+        Modality (Join_const ((Mode.Const.Per_axis.min [@inlined hint]) ax))
 
-      let le ax (Modality (Join_with c1)) (Modality (Join_with c2)) =
+      let le ax (Modality (Join_const c1)) (Modality (Join_const c2)) =
         (Mode.Const.Per_axis.le [@inlined hint]) ax c2 c1
 
-      let join ax (Modality (Join_with c1)) (Modality (Join_with c2)) =
+      let join ax (Modality (Join_const c1)) (Modality (Join_const c2)) =
         Modality
-          (Join_with ((Mode.Const.Per_axis.meet [@inlined hint]) ax c1 c2))
+          (Join_const ((Mode.Const.Per_axis.meet [@inlined hint]) ax c1 c2))
 
-      let meet ax (Modality (Join_with c1)) (Modality (Join_with c2)) =
-        Modality (Join_with (Mode.Const.Per_axis.join ax c1 c2))
+      let meet ax (Modality (Join_const c1)) (Modality (Join_const c2)) =
+        Modality (Join_const (Mode.Const.Per_axis.join ax c1 c2))
 
-      let print ax ppf (Modality (Join_with c)) =
+      let print ax ppf (Modality (Join_const c)) =
         Mode.Const.Per_axis.print ax ppf c
     end
 
     type t = Modality of Modality.Const.t [@@unboxed]
 
-    let create ~uniqueness:(Atom.Modality (Join_with uniqueness))
-        ~contention:(Atom.Modality (Join_with contention))
-        ~visibility:(Atom.Modality (Join_with visibility))
-        ~staticity:(Atom.Modality (Join_with staticity)) =
+    let create ~uniqueness:(Atom.Modality (Join_const uniqueness))
+        ~contention:(Atom.Modality (Join_const contention))
+        ~visibility:(Atom.Modality (Join_const visibility))
+        ~staticity:(Atom.Modality (Join_const staticity)) =
       Modality (Join_const { uniqueness; contention; visibility; staticity })
 
     let modality m (Modality t) = Modality (Modality.Const.concat ~then_:t m)
 
     let apply_left (Modality (Join_const c)) m =
-      Mode.subtract_unhint c (Mode.join_const_unhint c m)
+      Mode.subtract_const_unhint c (Mode.join_const_unhint c m)
 
     let apply_right (Modality (Join_const c)) m =
       (* The right adjoint of join is a restriction of identity *)
@@ -4733,9 +4734,9 @@ module Crossing = struct
 
     let proj (type a) (ax : a Mode.Axis.t) (Modality (Join_const c)) : a Atom.t
         =
-      Modality (Join_with ((Axis.proj [@inlined hint]) ax c))
+      Modality (Join_const ((Axis.proj [@inlined hint]) ax c))
 
-    let set (type a) (ax : a Mode.Axis.t) (Modality (Join_with a) : a Atom.t)
+    let set (type a) (ax : a Mode.Axis.t) (Modality (Join_const a) : a Atom.t)
         (Modality (Join_const c)) =
       Modality (Join_const ((Axis.set [@inlined hint]) ax a c))
 
@@ -4770,33 +4771,33 @@ module Crossing = struct
          fragment. See comments there. *)
 
       let min ax =
-        Modality (Meet_with ((Mode.Const.Per_axis.min [@inlined hint]) ax))
+        Modality (Meet_const ((Mode.Const.Per_axis.min [@inlined hint]) ax))
 
       let max ax =
-        Modality (Meet_with ((Mode.Const.Per_axis.max [@inlined hint]) ax))
+        Modality (Meet_const ((Mode.Const.Per_axis.max [@inlined hint]) ax))
 
-      let le ax (Modality (Meet_with c1)) (Modality (Meet_with c2)) =
+      let le ax (Modality (Meet_const c1)) (Modality (Meet_const c2)) =
         (Mode.Const.Per_axis.le [@inlined hint]) ax c1 c2
 
-      let join ax (Modality (Meet_with c1)) (Modality (Meet_with c2)) =
+      let join ax (Modality (Meet_const c1)) (Modality (Meet_const c2)) =
         Modality
-          (Meet_with ((Mode.Const.Per_axis.join [@inlined hint]) ax c1 c2))
+          (Meet_const ((Mode.Const.Per_axis.join [@inlined hint]) ax c1 c2))
 
-      let meet ax (Modality (Meet_with c1)) (Modality (Meet_with c2)) =
-        Modality (Meet_with (Mode.Const.Per_axis.meet ax c1 c2))
+      let meet ax (Modality (Meet_const c1)) (Modality (Meet_const c2)) =
+        Modality (Meet_const (Mode.Const.Per_axis.meet ax c1 c2))
 
-      let print ax ppf (Modality (Meet_with c)) =
+      let print ax ppf (Modality (Meet_const c)) =
         Mode.Const.Per_axis.print ax ppf c
     end
 
     type t = Modality of Modality.Const.t [@@unboxed]
 
-    let create ~regionality:(Atom.Modality (Meet_with areality))
-        ~linearity:(Atom.Modality (Meet_with linearity))
-        ~portability:(Atom.Modality (Meet_with portability))
-        ~forkable:(Atom.Modality (Meet_with forkable))
-        ~yielding:(Atom.Modality (Meet_with yielding))
-        ~statefulness:(Atom.Modality (Meet_with statefulness)) =
+    let create ~regionality:(Atom.Modality (Meet_const areality))
+        ~linearity:(Atom.Modality (Meet_const linearity))
+        ~portability:(Atom.Modality (Meet_const portability))
+        ~forkable:(Atom.Modality (Meet_const forkable))
+        ~yielding:(Atom.Modality (Meet_const yielding))
+        ~statefulness:(Atom.Modality (Meet_const statefulness)) =
       Modality
         (Meet_const
            { areality;
@@ -4811,9 +4812,9 @@ module Crossing = struct
 
     let proj (type a) (ax : a Mode.Axis.t) (Modality (Meet_const c)) : a Atom.t
         =
-      Modality (Meet_with ((Axis.proj [@inlined hint]) ax c))
+      Modality (Meet_const ((Axis.proj [@inlined hint]) ax c))
 
-    let set (type a) (ax : a Mode.Axis.t) (Modality (Meet_with a) : a Atom.t)
+    let set (type a) (ax : a Mode.Axis.t) (Modality (Meet_const a) : a Atom.t)
         (Modality (Meet_const c)) =
       Modality (Meet_const ((Axis.set [@inlined hint]) ax a c))
 
@@ -4824,7 +4825,7 @@ module Crossing = struct
       Mode.meet_const_unhint c m
 
     let apply_right (Modality (Meet_const c)) m =
-      Mode.imply_unhint c (Mode.meet_const_unhint c m)
+      Mode.imply_const_unhint c (Mode.meet_const_unhint c m)
 
     let le (Modality (Meet_const c1)) (Modality (Meet_const c2)) =
       Mode.Const.le c1 c2
