@@ -467,47 +467,7 @@ end = struct
   type t = #(int or_null * float#)
 end
 [%%expect{|
-<<<<<<< HEAD
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = #(int or_null * float#)
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t = #(int or_null * float#) end
-       is not included in
-         sig type t : value_or_null non_pointer mod external_ & float64 end
-       Type declarations do not match:
-         type t = #(int or_null * float#)
-       is not included in
-         type t : value_or_null non_pointer mod external_ & float64
-       The layout of the first is value maybe_separable maybe_null & float64
-         because it is an unboxed tuple.
-       But the layout of the first must be a sublayout of
-           value non_pointer maybe_null & float64
-         because of the definition of t at line 2, characters 2-38.
-||||||| parent of afaee10f66 (Fix imprecise separability for `or_null` in `type_jkind` (#5178))
-Lines 3-5, characters 6-3:
-3 | ......struct
-4 |   type t = #(int or_null * float#)
-5 | end
-Error: Signature mismatch:
-       Modules do not match:
-         sig type t = #(int or_null * float#) end
-       is not included in
-         sig type t : value_or_null non_pointer & float64 end
-       Type declarations do not match:
-         type t = #(int or_null * float#)
-       is not included in
-         type t : value_or_null non_pointer & float64
-       The layout of the first is value maybe_separable maybe_null & float64
-         because it is an unboxed tuple.
-       But the layout of the first must be a sublayout of
-           value non_pointer maybe_null & float64
-         because of the definition of t at line 2, characters 2-38.
-=======
-module M : sig type t : value_or_null non_pointer & float64 end
->>>>>>> afaee10f66 (Fix imprecise separability for `or_null` in `type_jkind` (#5178))
+module M : sig type t : value_or_null non_pointer mod external_ & float64 end
 |}]
 
 (* modules and module inclusion *)

@@ -2432,7 +2432,8 @@ let mk_is_abstract env p =
 let mk_jkind_context env jkind_of_type =
   { Jkind.jkind_of_type; is_abstract = mk_is_abstract env }
 
-let apply_layout_wrapping_l ~unwrapped_ty:{ ty = _; or_null; modality = _ }
+let apply_layout_wrapping_l env
+      ~unwrapped_ty:{ ty = _; or_null; modality = _ }
       jkind : (_, unwrapped_type_expr) Result.t =
   match or_null with
   | Some (_, prev) ->
@@ -2441,11 +2442,20 @@ let apply_layout_wrapping_l ~unwrapped_ty:{ ty = _; or_null; modality = _ }
         ['a or_null] the same separability (per [Jkind.apply_or_null_l]). So
         here we recompute the layout based on the inner jkind. *)
     begin match Jkind.apply_or_null_l jkind with
-    | Ok jkind -> Ok (Jkind.extract_layout jkind)
+    | Ok jkind ->
+      begin match Jkind.extract_layout env jkind with
+      | Ok l -> Ok l
+      | Error _ ->
+        Ok (Jkind_types.Layout.Any Jkind_types.Scannable_axes.max)
+      end
     | Error () -> Error prev
     end
   | None ->
-    Ok (Jkind.extract_layout jkind)
+    begin match Jkind.extract_layout env jkind with
+    | Ok l -> Ok l
+    | Error _ ->
+      Ok (Jkind_types.Layout.Any Jkind_types.Scannable_axes.max)
+    end
 
 let apply_jkind_wrapping_l ~env ~level
           ~unwrapped_ty:{ ty; or_null; modality } jkind =
@@ -2458,7 +2468,8 @@ let apply_jkind_wrapping_l ~env ~level
         jkind_subst env level decl.type_params [ty] decl.type_jkind
       in
       begin match
-        apply_layout_wrapping_l ~unwrapped_ty:{ ty; modality; or_null } jkind
+        apply_layout_wrapping_l env
+          ~unwrapped_ty:{ ty; modality; or_null } jkind
       with
       | Ok layout -> Ok (Jkind.set_layout instance_jkind layout)
       | Error _ as e -> e
@@ -2497,70 +2508,26 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
   | Tarrow _ -> Jkind.for_arrow
   | Ttuple elts -> Jkind.for_boxed_tuple elts
   | Tunboxed_tuple ltys ->
-<<<<<<< HEAD
-     let tys_modalities =
-       List.map
-         (fun (_lbl, ty) ->
-            let { ty; modality } = expand_component ty in
-            (ty, modality))
-         ltys
-     in
-     (* CR layouts v2.8: This pretty ridiculous use of [estimate_type_jkind]
-        just to throw most of it away will go away once we get [layout_of].
-        Internal ticket 2912. *)
-     let layouts =
-       List.map (fun (ty, _modality (* ignore; we just care about layout *)) ->
-         match
-           Jkind.extract_layout env
-             (estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty)
-         with
-         | Ok l -> l
-         | Error _ -> Jkind_types.Layout.Any Jkind_types.Scannable_axes.max
-           (* CR layouts: This is pretty sad - it means that products whose
-              elements have fully abstract kinds sometimes can't get a fully
-              accurate kind (and we conservatively give any). It shouldn't come
-              up _too_ much because in any case such types are not
-              representable, so you can't do much with them.  But we should fix
-              it - possible solutions are tracked in internal ticket 5769. *)
-       ) tys_modalities
-     in
-||||||| parent of afaee10f66 (Fix imprecise separability for `or_null` in `type_jkind` (#5178))
-     let tys_modalities =
-       List.map
-         (fun (_lbl, ty) ->
-            let { ty; modality } = expand_component ty in
-            (ty, modality))
-         ltys
-     in
-     (* CR layouts v2.8: This pretty ridiculous use of [estimate_type_jkind]
-        just to throw most of it away will go away once we get [layout_of].
-        Internal ticket 2912. *)
-     let layouts =
-       List.map (fun (ty, _modality (* ignore; we just care about layout *)) ->
-         estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty |>
-         Jkind.extract_layout)
-         tys_modalities
-     in
-=======
     let rec compute_ty_modality_layout unwrapped_ty =
       let jkind =
-        (* CR layouts v2.8: This pretty ridiculous use of [estimate_type_jkind]
-           just to throw most of it away will go away once we get [layout_of].
-           Internal ticket 2912. *)
+        (* CR layouts v2.8: This pretty ridiculous use of
+           [estimate_type_jkind] just to throw most of it away will go
+           away once we get [layout_of]. Internal ticket 2912. *)
         estimate_type_jkind ~expand_component ~ignore_mod_bounds env
           unwrapped_ty.ty
       in
-      match apply_layout_wrapping_l ~unwrapped_ty jkind with
+      match apply_layout_wrapping_l env ~unwrapped_ty jkind with
       | Ok layout -> (unwrapped_ty.ty, unwrapped_ty.modality), layout
-      | Error prev_unwrapped_ty -> compute_ty_modality_layout prev_unwrapped_ty
+      | Error prev_unwrapped_ty ->
+        compute_ty_modality_layout prev_unwrapped_ty
     in
     let tys_modalities, layouts =
       List.map
-        (fun (_lbl, ty) -> compute_ty_modality_layout (expand_component ty))
+        (fun (_lbl, ty) ->
+          compute_ty_modality_layout (expand_component ty))
         ltys
       |> List.split
     in
->>>>>>> afaee10f66 (Fix imprecise separability for `or_null` in `type_jkind` (#5178))
      Jkind.Builtin.product ~why:Unboxed_tuple tys_modalities layouts
   | Tconstr (p, args, _) -> begin try
       let type_decl = Env.find_type p env in
@@ -2834,25 +2801,14 @@ let constrain_type_jkind ~fixed env ty jkind =
                let ty = expand_head_opt env ty in
                estimate_jkind_and_loop ~fuel ~expanded:true ty jkind
              else
-<<<<<<< HEAD
-               begin match unbox_once env ty with
+               begin match
+                 unbox_once env (mk_unwrapped_type_expr ty)
+               with
                | Missing path ->
-                 Error (Jkind.Violation.of_ ~context ~missing_cmi:path env
+                 Error (Jkind.Violation.of_ ~context ~missing_cmi:path
+                          env
                           (Not_a_subjkind (ty's_jkind, jkind,
                                            sub_failure_reasons)))
-||||||| parent of afaee10f66 (Fix imprecise separability for `or_null` in `type_jkind` (#5178))
-               begin match unbox_once env ty with
-               | Missing path -> Error (Jkind.Violation.of_
-                                          ~context ~missing_cmi:path
-                                          (Not_a_subjkind (ty's_jkind, jkind,
-                                                           sub_failure_reasons)))
-=======
-               begin match unbox_once env (mk_unwrapped_type_expr ty) with
-               | Missing path -> Error (Jkind.Violation.of_
-                                          ~context ~missing_cmi:path
-                                          (Not_a_subjkind (ty's_jkind, jkind,
-                                                           sub_failure_reasons)))
->>>>>>> afaee10f66 (Fix imprecise separability for `or_null` in `type_jkind` (#5178))
                | Final_result ->
                  Error
                    (Jkind.Violation.of_ ~context env
