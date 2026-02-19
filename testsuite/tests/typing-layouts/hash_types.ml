@@ -443,7 +443,7 @@ Error: The type "Bad2.t" has no unboxed version.
 
 type ('a : value & float64) t
 [%%expect{|
-type ('a : value & float64) t
+type ('a : value & float64_internal) t
 |}]
 
 type s = r#

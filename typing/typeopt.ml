@@ -414,13 +414,7 @@ let bigarray_specialize_kind_and_layout env ~kind ~layout typ =
       (kind, layout)
 
 let value_kind_of_value_jkind env jkind =
-<<<<<<< HEAD
-  let layout = Jkind.get_layout_defaulting_to_value env jkind in
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-  let layout = Jkind.get_layout_defaulting_to_value jkind in
-=======
-  let layout = Jkind.get_layout_defaulting_to_scannable jkind in
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+  let layout = Jkind.get_layout_defaulting_to_scannable env jkind in
   (* In other places, we use [Ctype.type_jkind_purely_if_principal]. Here, we omit
      the principality check, as we're just trying to compute optimizations. *)
   let context = Ctype.mk_jkind_context_always_principal env in
@@ -428,16 +422,8 @@ let value_kind_of_value_jkind env jkind =
     Jkind.get_externality_upper_bound ~context env jkind
   in
   match layout with
-<<<<<<< HEAD
-  (* CR layouts-scannable: use scannable axes to improve codegen *)
-  | Some (Base (Value, _)) ->
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-  (* CR layouts-scannable: use scannable axes to improve codegen *)
-  | Base (Value, _) ->
-=======
   (* CR layouts-scannable: Use scannable axes to improve codegen *)
-  | Base (Scannable, _) ->
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+  | Some (Base (Scannable, _)) ->
     value_kind_of_value_with_externality externality_upper_bound
   | None
   | Some ( Any _

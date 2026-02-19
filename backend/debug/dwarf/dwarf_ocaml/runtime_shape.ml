@@ -83,7 +83,7 @@ module Runtime_layout = struct
   let of_base_layout (t : Sort.base) : t Or_void.t =
     match t with
     | Void -> Void
-    | Value -> Other Value
+    | Scannable -> Other Value
     | Untagged_immediate -> Other Untagged_immediate
     | Float64 -> Other Float64
     | Float32 -> Other Float32
@@ -114,7 +114,7 @@ module Runtime_layout = struct
   let print fmt (t : t) = Format.pp_print_string fmt (to_string t)
 
   let to_base_layout : t -> Sort.base = function
-    | Value -> Value
+    | Value -> Scannable
     | Float64 -> Float64
     | Float32 -> Float32
     | Bits8 -> Bits8

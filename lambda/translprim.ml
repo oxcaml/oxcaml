@@ -204,16 +204,8 @@ let sort_of_native_repr ~poly_sort repr =
   match extern_repr_of_native_repr ~poly_sort repr with
   | Same_as_ocaml_repr s -> s
   | (Unboxed_float _ | Unboxed_or_untagged_integer _ |
-<<<<<<< HEAD
      Unboxed_vector _) ->
-    Jkind.Sort.Const.Base Value
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-      Unboxed_vector _) ->
-    Jkind.Sort.Const.Base Value
-=======
-      Unboxed_vector _) ->
     Jkind.Sort.Const.Base Scannable
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
 
 let to_lambda_prim prim ~poly_sort =
   let native_repr_args =

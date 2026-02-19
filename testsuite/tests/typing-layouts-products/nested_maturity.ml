@@ -8,5 +8,5 @@
 type t : void & value
 
 [%%expect{|
-type t : void & value
+type t : void_internal & value
 |}]

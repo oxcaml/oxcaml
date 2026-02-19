@@ -183,7 +183,7 @@ type ('a : float64, 'b : immediate) t = { x : string; y : 'a; z : 'b; }
 type ('a : value & float64 & value) t1
 type ('a : value) t2
 [%%expect{|
-type ('a : value & float64 & value) t1
+type ('a : value & float64_internal & value) t1
 type 'a t2
 |}]
 

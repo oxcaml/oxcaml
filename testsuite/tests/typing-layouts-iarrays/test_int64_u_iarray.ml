@@ -22,11 +22,11 @@ open Stdlib_upstream_compatible
 
 module Int64_u_array0 :
   Gen_u_iarray.S0 with type element_t = int64#
-                   and type ('a : any) array_t = 'a iarray 
+                   and type ('a : any separable) array_t = 'a iarray 
                    and type mutable_t = int64# array = struct
   type element_t = int64#
 
-  type ('a : any) array_t = 'a iarray
+  type ('a : any separable) array_t = 'a iarray
   type mutable_t = int64# array
 
   type element_arg = unit -> element_t

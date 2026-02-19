@@ -249,25 +249,5 @@ Line 1, characters 34-45:
                                       ^^^^^^^^^^^
 Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "non_pointer" later.
 
-Line 1, characters 9-25:
-1 | type t : void non_pointer & value non_pointer non_pointer mod global with int
-             ^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "void".
-
-Line 1, characters 34-45:
-1 | type t : void non_pointer & value non_pointer non_pointer mod global with int
-                                      ^^^^^^^^^^^
-Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "non_pointer" later.
-
-Line 1, characters 9-25:
-1 | type t : void non_pointer & value non_pointer non_pointer mod global with int
-             ^^^^^^^^^^^^^^^^
-Warning 184 [ignored-kind-modifier]: The kind modifier(s) "non_pointer" have no effect on the kind "void".
-
-Line 1, characters 34-45:
-1 | type t : void non_pointer & value non_pointer non_pointer mod global with int
-                                      ^^^^^^^^^^^
-Warning 185 [overridden-kind-modifier]: This kind modifier is overridden by "non_pointer" later.
-
-type t : void mod global & value non_pointer mod global
+type t : void_internal mod global & value non_pointer mod global
 |}]

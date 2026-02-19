@@ -594,19 +594,9 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
         only_when_verbose )
     in
     [ mk_annot Externality.max Externality.print (externality bounds);
-<<<<<<< HEAD
-      mk_annot Nullability.max Nullability.print (nullability bounds);
-      mk_annot Separability.max Separability.print (separability bounds) ]
+      mk_annot Nullability.max Nullability.print (nullability bounds) ]
     |> List.partition_map (fun (annot, only_when_verbose) ->
         match only_when_verbose with false -> Left annot | true -> Right annot)
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-      mk_annot Nullability.max Nullability.print (nullability bounds);
-      mk_annot Separability.max Separability.print (separability bounds) ]
-    |> List.filter_map Fun.id
-=======
-      mk_annot Nullability.max Nullability.print (nullability bounds) ]
-    |> List.filter_map Fun.id
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
   in
   let verbose_annots =
     match verbose with

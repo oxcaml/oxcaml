@@ -11,16 +11,8 @@ type t_float64 : float64_internal
 type t_float64_mod_e : float64_internal mod everything
 [%%expect{|
 type t_value
-<<<<<<< HEAD
-type t_value_mod_e : value_or_null mod everything mod non_null separable
-type t_float64 : float64_internal
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-type t_value_mod_e : value_or_null mod everything mod non_null separable
-type t_float64 : float64
-=======
 type t_value_mod_e : immediate separable
-type t_float64 : float64
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+type t_float64 : float64_internal
 type t_float64_mod_e : float64 mod everything
 |}]
 

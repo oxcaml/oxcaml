@@ -542,37 +542,10 @@ let prim_has_valid_reprs ~loc prim =
     let stringlike_indexing_primitives =
       let widths : (_ * _ * Jkind_types.Sort.Const.t) list =
         [
-<<<<<<< HEAD
-          ("8", "", C.value);
-          ("i8", "", C.value);
-          ("16", "", C.value);
-          ("i16", "", C.value);
-          ("32", "", C.value);
-          ("f32", "", C.value);
-          ("64", "", C.value);
-          ("a128", "", C.value);
-          ("u128", "", C.value);
-          ("a256", "", C.value);
-          ("u256", "", C.value);
-          ("a512", "", C.value);
-          ("u512", "", C.value);
-          ("8", "#", C.bits8);
-          ("i8", "#", C.bits8);
-          ("16", "#", C.bits16);
-          ("i16", "#", C.bits16);
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-          ("16", "", C.value);
-          ("32", "", C.value);
-          ("f32", "", C.value);
-          ("64", "", C.value);
-          ("a128", "", C.value);
-          ("u128", "", C.value);
-          ("a256", "", C.value);
-          ("u256", "", C.value);
-          ("a512", "", C.value);
-          ("u512", "", C.value);
-=======
+          ("8", "", C.scannable);
+          ("i8", "", C.scannable);
           ("16", "", C.scannable);
+          ("i16", "", C.scannable);
           ("32", "", C.scannable);
           ("f32", "", C.scannable);
           ("64", "", C.scannable);
@@ -582,7 +555,10 @@ let prim_has_valid_reprs ~loc prim =
           ("u256", "", C.scannable);
           ("a512", "", C.scannable);
           ("u512", "", C.scannable);
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+          ("8", "#", C.bits8);
+          ("i8", "#", C.bits8);
+          ("16", "#", C.bits16);
+          ("i16", "#", C.bits16);
           ("32", "#", C.bits32);
           ("f32", "#", C.float32);
           ("64", "#", C.bits64);
@@ -967,19 +943,13 @@ let prim_has_valid_reprs ~loc prim =
     | "%box_vec256" ->
       exactly [Same_as_ocaml_repr C.vec256; Same_as_ocaml_repr C.scannable]
     | "%unbox_vec256" ->
-<<<<<<< HEAD
-      exactly [Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.vec256]
+      exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.vec256]
     | "%join_vec256" ->
       exactly [Same_as_ocaml_repr C.vec128; Same_as_ocaml_repr C.vec128;
                Same_as_ocaml_repr C.vec256]
     | "%split_vec256" ->
       exactly [Same_as_ocaml_repr C.vec256;
                Same_as_ocaml_repr (Product [C.vec128; C.vec128])]
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-      exactly [Same_as_ocaml_repr C.value; Same_as_ocaml_repr C.vec256]
-=======
-      exactly [Same_as_ocaml_repr C.scannable; Same_as_ocaml_repr C.vec256]
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
     | "%box_vec512" ->
       exactly [Same_as_ocaml_repr C.vec512; Same_as_ocaml_repr C.scannable]
     | "%unbox_vec512" ->

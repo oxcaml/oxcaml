@@ -147,8 +147,8 @@ end
 [%%expect{|
 module type S8 =
   sig
-    type ('t : word & value) t = { x : 't; }
-    val f : ('a : word & value). 'a t -> 'a
+    type ('t : word_internal & value) t = { x : 't; }
+    val f : ('a : word_internal & value). 'a t -> 'a
   end
 |}]
 

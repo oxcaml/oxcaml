@@ -2874,16 +2874,8 @@ let check_and_update_generalized_ty_jkind ?name ~loc env ty =
       let context = mk_jkind_context_check_principal env in
       let ext = Jkind.get_externality_upper_bound ~context env jkind in
       Jkind_axis.Externality.le ext External64 &&
-<<<<<<< HEAD
       match Jkind.get_layout env jkind with
-      | Some (Base (Value, _)) | None -> true
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-      match Jkind.get_layout jkind with
-      | Some (Base (Value, _)) | None -> true
-=======
-      match Jkind.get_layout jkind with
       | Some (Base (Scannable, _)) | None -> true
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
       | _ -> false
     in
     if Language_extension.erasable_extensions_only ()

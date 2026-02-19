@@ -61,25 +61,13 @@ type t2 = #(int * float#) array
 type t3 = #(float# * int * int64# * bool) array
 type t4 : immediate & immediate
 type t4a = t4 array
-<<<<<<< HEAD
-type t5 : value mod external_ non_float & float64
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-type t5 : value mod non_float & float64
-=======
-type t5 : value non_pointer & float64
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+type t5 : value non_pointer mod external_ & float64
 type t5a = t5 array
-<<<<<<< HEAD
 type t6
   : bits64
-    & value mod external_ non_float
+    & value non_pointer mod external_
     & float64
-    & value mod external_ non_float
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-type t6 : bits64 & value mod non_float & float64 & value mod non_float
-=======
-type t6 : bits64 & value non_pointer & float64 & value non_pointer
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+    & value non_pointer mod external_
 type t6a = t6 array
 |}]
 
@@ -104,13 +92,13 @@ type t1 = #(float# * string) array
 type t2 = #(string * int64#) array
 type t3 = #(string * int64# * int) array
 type t4 = #(int * int64# * string) array
-type t5 : value & float64
+type t5 : value & float64_internal
 type t5a = t5 array
-type t6 : bits64 & value
+type t6 : bits64_internal & value
 type t6a = t6 array
-type t7 : value & bits64 & value non_pointer
+type t7 : value & bits64_internal & value non_pointer
 type t7a = t7 array
-type t8 : value non_pointer & bits64 & value
+type t8 : value non_pointer & bits64_internal & value
 type t8a = t8 array
 |}]
 

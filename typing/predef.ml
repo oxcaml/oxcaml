@@ -754,15 +754,9 @@ let build_initial_env add_type add_extension add_jkind empty_env =
        Jkind_types.Sort.Const.scannable]
   |> add_extension ident_undefined_recursive_module
        [newgenty (Ttuple[None, type_string; None, type_int; None, type_int]),
-<<<<<<< HEAD
-       Jkind_types.Sort.Const.value]
+       Jkind_types.Sort.Const.scannable]
   (* Predefined jkinds *)
   |> add_predef_jkinds add_jkind
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-       Jkind_types.Sort.Const.value]
-=======
-       Jkind_types.Sort.Const.scannable]
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
 
 let add_simd_stable_extension_types add_type env =
   let _, add_type = mk_add_type add_type in

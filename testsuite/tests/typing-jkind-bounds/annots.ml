@@ -663,16 +663,8 @@ Line 1, characters 26-33:
 1 | let f { fieldc } = fieldc "hello"
                               ^^^^^^^
 Error: This expression has type "string" but an expression was expected of type
-<<<<<<< HEAD
          "('a : word mod many aliased)"
-       The layout of string is value
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-         "('a : word mod many aliased external_)"
-       The layout of string is value
-=======
-         "('a : word mod many aliased external_)"
        The layout of string is value non_float
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
          because it is the primitive type string.
        But the layout of string must be a sublayout of word
          because of the definition of rc at line 1, characters 0-71.

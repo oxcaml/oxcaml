@@ -528,40 +528,15 @@ end
 (** Get a description of a jkind. *)
 val get : 'd Types.jkind -> 'd Desc.t
 
-<<<<<<< HEAD
-(** [get_layout_defaulting_to_value] extracts a constant layout, defaulting any
-    sort variable to [value]. Returns [None] in the case of an abstract kind. *)
-val get_layout_defaulting_to_value :
-  Env.t -> 'd Types.jkind -> Layout.Const.t option
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-(** [get_layout_defaulting_to_value] extracts a constant layout, defaulting any
-    sort variable to [value]. *)
-val get_layout_defaulting_to_value : 'd Types.jkind -> Layout.Const.t
-=======
 (** [get_layout_defaulting_to_scannable] extracts a constant layout, defaulting
-    any sort variable to [scannable]. *)
-val get_layout_defaulting_to_scannable : 'd Types.jkind -> Layout.Const.t
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+    any sort variable to [scannable]. Returns [None] in the case of an abstract
+    kind. *)
+val get_layout_defaulting_to_scannable :
+  Env.t -> 'd Types.jkind -> Layout.Const.t option
 
-<<<<<<< HEAD
-(** [default_to_value t] is [ignore (get_layout_defaulting_to_value t)] *)
-val default_to_value : 'd Types.jkind -> unit
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-(** [default_to_value t] is [ignore (get_layout_defaulting_to_value t)] *)
-val default_to_value : 'd Types.jkind -> unit
-
-(** [is_void t] is [Void = get_layout_defaulting_to_value t]. In particular, it
-    will default the jkind to value if needed to make this false. *)
-val is_void_defaulting : 'd Types.jkind -> bool
-=======
 (** [default_to_scannable t] is [ignore (get_layout_defaulting_to_scannable t)]
 *)
 val default_to_scannable : 'd Types.jkind -> unit
-
-(** [is_void t] is [Void = get_layout_defaulting_to_scannable t]. In particular,
-    it will default the jkind to scannable if needed to make this false. *)
-val is_void_defaulting : 'd Types.jkind -> bool
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
 (* CR layouts v5: When we have proper support for void, we'll want to change
    these three functions to default to void - it's the most efficient thing
    when we have a choice. *)
@@ -727,16 +702,14 @@ val format_history :
 (** This checks for equality, and sets any variables to make two jkinds equal,
     if possible. e.g. [equate] on a var and [value] will set the variable to be
     [value] *)
-val equate :
-  level:int -> Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
+val equate : level:int -> Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
 
 (** This checks for equality, but has the invariant that it can only be called
     when there is no need for unification; e.g. [equal] on a var and [value]
     will crash.
 
     CR layouts (v1.5): At the moment, this is actually the same as [equate]! *)
-val equal :
-  level:int -> Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
+val equal : level:int -> Env.t -> Types.jkind_lr -> Types.jkind_lr -> bool
 
 (** Checks whether two jkinds have a non-empty intersection. Might mutate sort
     variables. Works over any mix of l- and r-jkinds, because the only way not

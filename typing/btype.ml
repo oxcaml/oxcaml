@@ -1000,24 +1000,10 @@ module Jkind0 = struct
             externality;
             nullability } =
       Format.fprintf ppf "@[{ crossing = %a;@ externality = %a;@ \
-<<<<<<< HEAD
-        nullability = %a;@ separability = %a }@]"
+        nullability = %a }@]"
         (Format_doc.compat Crossing.print) crossing
         (Format_doc.compat Externality.print) externality
         (Format_doc.compat Nullability.print) nullability
-        (Format_doc.compat Separability.print) separability
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-        nullability = %a;@ separability = %a }@]"
-        Crossing.print crossing
-        Externality.print externality
-        Nullability.print nullability
-        Separability.print separability
-=======
-        nullability = %a }@]"
-        Crossing.print crossing
-        Externality.print externality
-        Nullability.print nullability
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
 
     let equal t1 t2 =
       Misc.Le_result.equal ~le:Crossing.le (crossing t1) (crossing t2)
@@ -1319,13 +1305,7 @@ module Jkind0 = struct
       let immutable_data =
         let open Mod_bounds in
         { jkind =
-<<<<<<< HEAD
-            { base = Layout (Base (Value, Scannable_axes.max));
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-            { layout = Base (Value, Scannable_axes.max);
-=======
-            { layout = Base (Scannable, { separability = Non_float });
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+            { base = Layout (Base (Scannable, { separability = Non_float }));
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:true
@@ -1343,13 +1323,7 @@ module Jkind0 = struct
       let exn =
         let open Mod_bounds in
         { jkind =
-<<<<<<< HEAD
-            { base = Layout (Base (Value, Scannable_axes.max));
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-            { layout = Base (Value, Scannable_axes.max);
-=======
-            { layout = Base (Scannable, { separability = Non_float });
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+            { base = Layout (Base (Scannable, { separability = Non_float }));
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:false
@@ -1367,13 +1341,7 @@ module Jkind0 = struct
       let sync_data =
         let open Mod_bounds in
         { jkind =
-<<<<<<< HEAD
-            { base = Layout (Base (Value, Scannable_axes.max));
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-            { layout = Base (Value, Scannable_axes.max);
-=======
-            { layout = Base (Scannable, { separability = Non_float });
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+            { base = Layout (Base (Scannable, { separability = Non_float }));
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:true
@@ -1391,13 +1359,7 @@ module Jkind0 = struct
       let mutable_data =
         let open Mod_bounds in
         { jkind =
-<<<<<<< HEAD
-            { base = Layout (Base (Value, Scannable_axes.max));
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-            { layout = Base (Value, Scannable_axes.max);
-=======
-            { layout = Base (Scannable, { separability = Non_float });
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+            { base = Layout (Base (Scannable, { separability = Non_float }));
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:true
@@ -1416,15 +1378,7 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Void, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
-              ~separability:Non_float;
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
-=======
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
           name = "void"
         }
 
@@ -1432,8 +1386,7 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Void, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
           name = "void_internal"
         }
 
@@ -1521,19 +1474,7 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Float64, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
-              ~separability:Non_float;
-          (* [separability] is intentionally [Non_float]:
-             only boxed floats are relevant for separability. *)
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
-          (* [separability] is intentionally [Non_float]:
-             only boxed floats are relevant for separability. *)
-=======
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
           name = "float64"
         }
 
@@ -1543,10 +1484,7 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Float64, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
-          (* [separability] is intentionally [Non_float]:
-             only boxed floats are relevant for separability. *)
+              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
           name = "float64_internal"
         }
 
@@ -1566,19 +1504,7 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Float32, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
-              ~separability:Non_float;
-          (* [separability] is intentionally [Non_float]:
-             only boxed floats are relevant for separability. *)
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
-          (* [separability] is intentionally [Non_float]:
-             only boxed floats are relevant for separability. *)
-=======
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
           name = "float32"
         }
 
@@ -1586,11 +1512,10 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let float32_internal =
         { jkind =
-            mk_jkind (Base (Float32, Scannable_axes.max)) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
-          (* [separability] is intentionally [Non_float]:
-             only boxed floats are relevant for separability. *)
+            mk_jkind (Base (Float32, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max
+              ~nullability:Non_null;
           name = "float32_internal"
         }
 
@@ -1610,15 +1535,7 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Word, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
-              ~separability:Non_float;
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
-=======
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
           name = "word"
         }
 
@@ -1626,9 +1543,10 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let word_internal =
         { jkind =
-            mk_jkind (Base (Word, Scannable_axes.max)) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
+            mk_jkind (Base (Word, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max
+              ~nullability:Non_null;
           name = "word_internal"
         }
 
@@ -1646,23 +1564,17 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Untagged_immediate, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
-              ~separability:Non_float;
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
-=======
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
           name = "untagged_immediate"
         }
 
       let untagged_immediate_internal =
         { jkind =
-            mk_jkind (Base (Untagged_immediate, Scannable_axes.max)) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
+            mk_jkind
+              (Base (Untagged_immediate, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max
+              ~nullability:Non_null;
           name = "untagged_immediate_internal"
         }
 
@@ -1680,15 +1592,7 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Bits8, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
-              ~separability:Non_float;
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
-=======
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
           name = "bits8"
         }
 
@@ -1696,9 +1600,10 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let bits8_internal =
         { jkind =
-            mk_jkind (Base (Bits8, Scannable_axes.max)) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
+            mk_jkind (Base (Bits8, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max
+              ~nullability:Non_null;
           name = "bits8_internal"
         }
 
@@ -1720,15 +1625,7 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Bits16, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
-              ~separability:Non_float;
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
-=======
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
           name = "bits16"
         }
 
@@ -1736,9 +1633,10 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let bits16_internal =
         { jkind =
-            mk_jkind (Base (Bits16, Scannable_axes.max)) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
+            mk_jkind (Base (Bits16, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max
+              ~nullability:Non_null;
           name = "bits16_internal"
         }
 
@@ -1758,15 +1656,7 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Bits32, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
-              ~separability:Non_float;
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
-=======
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
           name = "bits32"
         }
 
@@ -1774,9 +1664,10 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let bits32_internal =
         { jkind =
-            mk_jkind (Base (Bits32, Scannable_axes.max)) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
+            mk_jkind (Base (Bits32, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max
+              ~nullability:Non_null;
           name = "bits32_internal"
         }
 
@@ -1796,15 +1687,7 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Bits64, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
-              ~separability:Non_float;
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
-=======
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
           name = "bits64"
         }
 
@@ -1812,9 +1695,10 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let bits64_internal =
         { jkind =
-            mk_jkind (Base (Bits64, Scannable_axes.max)) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
+            mk_jkind (Base (Bits64, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max
+              ~nullability:Non_null;
           name = "bits64_internal"
         }
 
@@ -1842,15 +1726,7 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Vec128, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
-              ~separability:Non_float;
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
-=======
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
           name = "vec128"
         }
 
@@ -1858,9 +1734,10 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let vec128_internal =
         { jkind =
-            mk_jkind (Base (Vec128, Scannable_axes.max)) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
+            mk_jkind (Base (Vec128, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max
+              ~nullability:Non_null;
           name = "vec128_internal"
         }
 
@@ -1870,15 +1747,7 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Vec256, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
-              ~separability:Non_float;
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
-=======
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
           name = "vec256"
         }
 
@@ -1886,9 +1755,10 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let vec256_internal =
         { jkind =
-            mk_jkind (Base (Vec256, Scannable_axes.max)) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
+            mk_jkind (Base (Vec256, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max
+              ~nullability:Non_null;
           name = "vec256_internal"
         }
 
@@ -1898,15 +1768,7 @@ module Jkind0 = struct
         { jkind =
             mk_jkind (Base (Vec512, Scannable_axes.max))
               ~crossing:Mode.Crossing.max
-<<<<<<< HEAD
-              ~externality:Mod_bounds.Externality.min ~nullability:Non_null
-              ~separability:Non_float;
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
-=======
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null;
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+              ~externality:Mod_bounds.Externality.min ~nullability:Non_null;
           name = "vec512"
         }
 
@@ -1914,9 +1776,10 @@ module Jkind0 = struct
          to [Non_null] for now due to inference limitations. *)
       let vec512_internal =
         { jkind =
-            mk_jkind (Base (Vec512, Scannable_axes.max)) ~crossing:Mode.Crossing.max
-              ~externality:Mod_bounds.Externality.max ~nullability:Non_null
-              ~separability:Non_float;
+            mk_jkind (Base (Vec512, Scannable_axes.max))
+              ~crossing:Mode.Crossing.max
+              ~externality:Mod_bounds.Externality.max
+              ~nullability:Non_null;
           name = "vec512_internal"
         }
 
@@ -2362,13 +2225,7 @@ module Jkind0 = struct
           ~nullability:Non_null
       in
       fresh_jkind
-<<<<<<< HEAD
-        { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-        { layout = Sort (Base Value, { pointerness = Maybe_pointer });
-=======
-        { layout = Sort (Base Scannable, { separability = Non_float });
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+        { base = Layout (Sort (Base Scannable, { separability = Non_float }));
           mod_bounds;
           with_bounds = No_with_bounds }
         ~annotation:None ~why:(Value_creation why)
@@ -2622,13 +2479,7 @@ module Jkind0 = struct
           ~nullability:Non_null
       in
       fresh_jkind
-<<<<<<< HEAD
-        { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-        { layout = Sort (Base Value, { pointerness = Maybe_pointer });
-=======
-        { layout = Sort (Base Scannable, { separability = Separable });
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+        { base = Layout (Sort (Base Scannable, { separability = Separable }));
           mod_bounds;
           with_bounds = No_with_bounds }
         ~annotation:None ~why:(Primitive ident)
@@ -2641,13 +2492,7 @@ module Jkind0 = struct
           ~nullability:Maybe_null
       in
       fresh_jkind
-<<<<<<< HEAD
-        { base = Layout (Any { pointerness = Maybe_pointer });
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-        { layout = Any { pointerness = Maybe_pointer };
-=======
-        { layout = Any { separability = Separable };
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+        { base = Layout (Any { separability = Separable });
           mod_bounds;
           with_bounds = No_with_bounds }
         ~annotation:None ~why:(Any_creation Array_type_argument)
@@ -2663,13 +2508,9 @@ module Jkind0 = struct
           ~nullability:Non_null
       in
       fresh_jkind
-<<<<<<< HEAD
-        { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-        { layout = Sort (Base Value, { pointerness = Maybe_pointer });
-=======
-        { layout = Sort (Base Scannable, { separability = Maybe_separable });
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+        { base =
+            Layout
+              (Sort (Base Scannable, { separability = Maybe_separable }));
           mod_bounds;
           with_bounds = No_with_bounds
         }

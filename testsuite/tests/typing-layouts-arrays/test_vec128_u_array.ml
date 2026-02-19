@@ -38,10 +38,10 @@ module _ = Test_gen_u_array.Test (Int64x2_array)
 
 module Int64x2_u_array0 : Gen_u_array.S0
                         with type element_t = int64x2#
-                        and type ('a : any) array_t = 'a array = struct
+                        and type ('a : any separable) array_t = 'a array = struct
 
   type element_t = int64x2#
-  type ('a : any) array_t = 'a array
+  type ('a : any separable) array_t = 'a array
   type element_arg = unit -> element_t
   type t = element_t array
   let max_length = Sys.max_unboxed_vec128_array_length

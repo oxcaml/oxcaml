@@ -32,15 +32,9 @@ open Mode
 let dummy_jkind = Jkind.Builtin.value ~why:(Unknown "dummy_layout")
 
 let dummy_value_mode = Value.disallow_right Value.legacy
-<<<<<<< HEAD:chamelon/compat/compat.ox.ml
 
-let dummy_value_sort = Jkind.Sort.value
-
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031)):chamelon/compat.ox.ml
-let dummy_value_sort = Jkind.Sort.value
-=======
 let dummy_scannable_sort = Jkind.Sort.scannable
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031)):chamelon/compat.ox.ml
+
 let dummy_alloc_mode = Alloc.disallow_left Alloc.legacy
 
 let mkTvar name = Tvar { name; jkind = dummy_jkind }
@@ -137,18 +131,8 @@ type texp_function_identifier =
   }
 
 let texp_function_cases_identifier_defaults =
-<<<<<<< HEAD:chamelon/compat/compat.ox.ml
   { last_arg_mode = Alloc.disallow_right Alloc.legacy;
-    last_arg_sort = Jkind.Sort.value;
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031)):chamelon/compat.ox.ml
-  {
-    last_arg_mode = Alloc.disallow_right Alloc.legacy;
-    last_arg_sort = Jkind.Sort.value;
-=======
-  {
-    last_arg_mode = Alloc.disallow_right Alloc.legacy;
     last_arg_sort = Jkind.Sort.scannable;
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031)):chamelon/compat.ox.ml
     last_arg_exp_extra = [];
     last_arg_attributes = [];
     env = Env.empty;
@@ -156,33 +140,15 @@ let texp_function_cases_identifier_defaults =
   }
 
 let texp_function_param_identifier_defaults =
-<<<<<<< HEAD:chamelon/compat/compat.ox.ml
-  { param_sort = Jkind.Sort.value;
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031)):chamelon/compat.ox.ml
-  {
-    param_sort = Jkind.Sort.value;
-=======
-  {
-    param_sort = Jkind.Sort.scannable;
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031)):chamelon/compat.ox.ml
+  { param_sort = Jkind.Sort.scannable;
     param_mode = Alloc.disallow_right Alloc.legacy;
     param_curry = More_args { partial_mode = Alloc.disallow_right Alloc.legacy };
     param_newtypes = []
   }
 
 let texp_function_defaults =
-<<<<<<< HEAD:chamelon/compat/compat.ox.ml
   { alloc_mode = dummy_alloc_mode;
-    ret_sort = Jkind.Sort.value;
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031)):chamelon/compat.ox.ml
-  {
-    alloc_mode = dummy_alloc_mode;
-    ret_sort = Jkind.Sort.value;
-=======
-  {
-    alloc_mode = dummy_alloc_mode;
     ret_sort = Jkind.Sort.scannable;
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031)):chamelon/compat.ox.ml
     ret_mode = Alloc.disallow_right Alloc.legacy;
     zero_alloc = Zero_alloc.default
   }
@@ -352,13 +318,7 @@ let mkpattern_data ~pat_desc ~pat_loc ~pat_extra ~pat_type ~pat_env
 
 type tpat_var_identifier = Jkind.Sort.t * Value.l
 
-<<<<<<< HEAD:chamelon/compat/compat.ox.ml
-let mkTpat_var ?id:(sort, mode = dummy_value_sort, dummy_value_mode)
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031)):chamelon/compat.ox.ml
-let mkTpat_var ?id:(sort, mode = (dummy_value_sort, dummy_value_mode))
-=======
-let mkTpat_var ?id:(sort, mode = (dummy_scannable_sort, dummy_value_mode))
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031)):chamelon/compat.ox.ml
+let mkTpat_var ?id:(sort, mode = dummy_scannable_sort, dummy_value_mode)
     (ident, name) =
   Tpat_var (ident, name, Uid.internal_not_actually_unique, sort, mode)
 
@@ -466,8 +426,8 @@ type value_binding_identifier = Jkind.Sort.t
 
 let value_binding_identifier_from_texp_match_identifier jkind = jkind
 
-let mk_value_binding ?(id = Jkind.Sort.value) ~vb_pat ~vb_expr ~vb_attributes ()
-    =
+let mk_value_binding ?(id = Jkind.Sort.scannable) ~vb_pat ~vb_expr
+    ~vb_attributes () =
   { vb_pat;
     vb_expr;
     vb_attributes;

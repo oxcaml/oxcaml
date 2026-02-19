@@ -15,7 +15,7 @@ type t1 : float64 & value
 type t2 = #(string * float# * int)
 type t2 = #{ s : string; f : float#; i : int }
 [%%expect{|
-type t1 : float64 & value
+type t1 : float64_internal & value
 type t2 = #(string * float# * int)
 type t2 = #{ s : string; f : float#; i : int; }
 |}]
@@ -24,7 +24,7 @@ type t2 = #{ s : string; f : float#; i : int; }
 type t3 : value & (bits64 & (value & float32))
 type t4 = #(string * #(int * (bool * int) * char option))
 [%%expect{|
-type t3 : value & (bits64 & (value & float32))
+type t3 : value & (bits64_internal & (value & float32_internal))
 type t4 = #(string * #(int * (bool * int) * char option))
 |}]
 
@@ -110,7 +110,7 @@ type ('a : value & bits64) t3 = 'a
 type t4 = #(int * int64#) t3
 type t5 = t4 t3
 [%%expect{|
-type ('a : value & bits64) t3 = 'a
+type ('a : value & bits64_internal) t3 = 'a
 type t4 = #(int * int64#) t3
 type t5 = t4 t3
 |}]
@@ -120,7 +120,7 @@ type t4_inner = #{ i : int; i64 : int64# }
 type t4 = t4_inner t3
 type t5 = t4 t3
 [%%expect{|
-type ('a : value & bits64) t3 = 'a
+type ('a : value & bits64_internal) t3 = 'a
 type t4_inner = #{ i : int; i64 : int64#; }
 type t4 = t4_inner t3
 type t5 = t4 t3
@@ -132,7 +132,7 @@ Line 1, characters 16-28:
 1 | type t4_wrong = #(int * int) t3
                     ^^^^^^^^^^^^
 Error: This type "#(int * int)" should be an instance of type
-         "('a : value & bits64)"
+         "('a : value & bits64_internal)"
        The layout of #(int * int) is immediate & immediate
          because it is an unboxed tuple.
        But the layout of #(int * int) must be a sublayout of value & bits64
@@ -149,7 +149,7 @@ Line 2, characters 16-30:
 2 | type t4_wrong = t4_wrong_inner t3
                     ^^^^^^^^^^^^^^
 Error: This type "t4_wrong_inner" should be an instance of type
-         "('a : value & bits64)"
+         "('a : value & bits64_internal)"
        The layout of t4_wrong_inner is immediate & immediate
          because of the definition of t4_wrong_inner at line 1, characters 0-45.
        But the layout of t4_wrong_inner must be a sublayout of value & bits64
@@ -161,8 +161,8 @@ Error: This type "t4_wrong_inner" should be an instance of type
 type ('a : value & bits64) t6 = 'a t7
 and 'a t7 = { x : 'a t6 }
 [%%expect{|
-type ('a : value & bits64) t6 = 'a t7
-and ('a : value & bits64) t7 = { x : 'a t6; }
+type ('a : value & bits64_internal) t6 = 'a t7
+and ('a : value & bits64_internal) t7 = { x : 'a t6; }
 |}]
 
 type t9 = #(int * int64#) t7
@@ -172,7 +172,8 @@ type t9 = #(int * int64#) t7
 Line 2, characters 11-15:
 2 | type t10 = bool t6
                ^^^^
-Error: This type "bool" should be an instance of type "('a : value & bits64)"
+Error: This type "bool" should be an instance of type
+         "('a : value & bits64_internal)"
        The layout of bool is immediate
          because it is the primitive type bool.
        But the layout of bool must be a sublayout of value & bits64
@@ -182,8 +183,8 @@ Error: This type "bool" should be an instance of type "('a : value & bits64)"
 type ('a : value & bits64) t6 = 'a t7
 and 'a t7 = { x : 'a t6 }
 [%%expect{|
-type ('a : value & bits64) t6 = 'a t7
-and ('a : value & bits64) t7 = { x : 'a t6; }
+type ('a : value & bits64_internal) t6 = 'a t7
+and ('a : value & bits64_internal) t7 = { x : 'a t6; }
 |}]
 
 type t9_record = #{ i : int; i64 : int64# }
@@ -195,7 +196,8 @@ type t9 = t9_record t7
 Line 3, characters 11-15:
 3 | type t10 = bool t6
                ^^^^
-Error: This type "bool" should be an instance of type "('a : value & bits64)"
+Error: This type "bool" should be an instance of type
+         "('a : value & bits64_internal)"
        The layout of bool is immediate
          because it is the primitive type bool.
        But the layout of bool must be a sublayout of value & bits64
@@ -209,7 +211,7 @@ Line 2, characters 24-38:
 2 | and 'a t7_wrong = { x : #(int * int64) t6_wrong }
                             ^^^^^^^^^^^^^^
 Error: This type "#(int * int64)" should be an instance of type
-         "('a : value & bits64)"
+         "('a : value & bits64_internal)"
        The layout of #(int * int64) is immediate & value non_float
          because it is an unboxed tuple.
        But the layout of #(int * int64) must be a sublayout of value & bits64
@@ -241,15 +243,15 @@ Error:
 type 'a t11 = 'a t12
 and ('a : value & bits64) t12 = { x : 'a t11 }
 [%%expect{|
-type ('a : value & bits64) t11 = 'a t12
-and ('a : value & bits64) t12 = { x : 'a t11; }
+type ('a : value & bits64_internal) t11 = 'a t12
+and ('a : value & bits64_internal) t12 = { x : 'a t11; }
 |}]
 
 type 'a t11 = 'a t12
 and ('a : value & bits64) t12 = { x : 'a t11 }
 [%%expect{|
-type ('a : value & bits64) t11 = 'a t12
-and ('a : value & bits64) t12 = { x : 'a t11; }
+type ('a : value & bits64_internal) t11 = 'a t12
+and ('a : value & bits64_internal) t12 = { x : 'a t11; }
 |}]
 
 (* You can make a universal variable have a product layout, but you have to ask
@@ -261,14 +263,14 @@ let f_uvar_ok : 'a -> 'a t = fun x -> x
 
 let f_uvar_bad : 'a . 'a -> 'a t = fun x -> x
 [%%expect{|
-type ('a : float64 & value) t = 'a
-val f_uvar_good : ('a : float64 & value). 'a -> 'a t = <fun>
-val f_uvar_ok : ('a : float64 & value). 'a -> 'a t = <fun>
+type ('a : float64_internal & value) t = 'a
+val f_uvar_good : ('a : float64_internal & value). 'a -> 'a t = <fun>
+val f_uvar_ok : ('a : float64_internal & value). 'a -> 'a t = <fun>
 Line 6, characters 28-30:
 6 | let f_uvar_bad : 'a . 'a -> 'a t = fun x -> x
                                 ^^
 Error: This type "('a : value)" should be an instance of type
-         "('b : float64 & value)"
+         "('b : float64_internal & value)"
        The layout of 'a is value
          because it is or unifies with an unannotated universal variable.
        But the layout of 'a must overlap with float64 & value
@@ -284,8 +286,8 @@ type t3 : value & (float64 & immediate) & float64
 type t4 = t2 -> (t3 -> t3) -> t2
 [%%expect{|
 type t1 = #(int * bool) -> #(int * float# * #(int64# * string option))
-type t2 : value & float64
-type t3 : value & (float64 & value non_pointer) & float64
+type t2 : value & float64_internal
+type t3 : value & (float64_internal & value non_pointer) & float64_internal
 type t4 = t2 -> (t3 -> t3) -> t2
 |}]
 
@@ -851,7 +853,7 @@ module type S_constrain_type_jkind_deep =
   sig type t1 : any type t2 = #(int * t1) end
 module type S_constrain_type_jkind_deep' =
   sig type t1 = float# type t2 = #(int * t1) end
-type ('a : value & float64) t_constraint
+type ('a : value & float64_internal) t_constraint
 module F :
   functor (X : S_constrain_type_jkind_deep') ->
     sig type r = X.t2 t_constraint end
@@ -887,7 +889,10 @@ module type S_constrain_type_jkind_deeper' =
     type t3 = #(t2 * bool * int64#)
     type t4 = #(float# * t3 * int)
   end
-type ('a : float64 & ((value & float64) & value & bits64) & value)
+type ('a
+     : float64_internal
+       & ((value & float64_internal) & value & bits64_internal)
+       & value)
      t_constraint
 module F :
   functor (X : S_constrain_type_jkind_deeper') ->
@@ -1073,7 +1078,7 @@ type t : float64 & value
 let f_internal_kind_annot_does_not_mode_cross_local_1
   : local_ t -> t = fun x -> x
 [%%expect{|
-type t : float64 & value
+type t : float64_internal & value
 Line 3, characters 29-30:
 3 |   : local_ t -> t = fun x -> x
                                  ^
@@ -1088,16 +1093,8 @@ let f_external_kind_annot_mode_crosses_local_2
   : local_ t -> t = fun x -> x
 [%%expect{|
 type t
-<<<<<<< HEAD
-  : value mod global external_ non_float
-    & (float64 mod global & value mod global external_ non_float)
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-  : value mod global non_float
-    & (float64 mod global & value mod global non_float)
-=======
-  : value non_pointer mod global
-    & (float64 mod global & value non_pointer mod global)
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+  : value non_pointer mod global external_
+    & (float64 mod global & value non_pointer mod global external_)
 val f_external_kind_annot_mode_crosses_local_2 : t @ local -> t = <fun>
 |}]
 
@@ -1105,7 +1102,7 @@ type t : immediate & (value & float64)
 let f_internal_kind_annot_does_not_mode_cross_local_2
   : local_ t -> t = fun x -> x
 [%%expect{|
-type t : value non_pointer & (value & float64)
+type t : value non_pointer & (value & float64_internal)
 Line 3, characters 29-30:
 3 |   : local_ t -> t = fun x -> x
                                  ^
@@ -1581,7 +1578,7 @@ type t3 = #(int * bool) array
 type t4 = #(string * #(float# * bool option)) array
 [%%expect{|
 type ('a : value & value) t1 = 'a array
-type ('a : bits64 & (value & float64)) t2 = 'a array
+type ('a : bits64_internal & (value & float64_internal)) t2 = 'a array
 type t3 = #(int * bool) array
 type t4 = #(string * #(float# * bool option)) array
 |}]
@@ -1659,7 +1656,7 @@ type t4_record = #{ s : string; inner : t4_inner }
 type t4 = t4_record array
 [%%expect{|
 type ('a : value & value) t1 = 'a array
-type ('a : bits64 & (value & float64)) t2 = 'a array
+type ('a : bits64_internal & (value & float64_internal)) t2 = 'a array
 type t3_record = #{ i : int; b : bool; }
 type t3 = t3_record array
 type t4_inner = #{ f : float#; bo : bool option; }
@@ -2145,8 +2142,13 @@ type ('a : float64 & (float64 & (value & bits64 & value)) & bits64, 'b)
            g : 'a }
   constraint 'b = unboxed_record
 [%%expect{|
-type abstract_product : value & (float64 & value) & bits64 & value
-type ('a : float64 & (float64 & (value & bits64 & value)) & bits64, 'b)
+type abstract_product
+  : value & (float64_internal & value) & bits64_internal & value
+type ('a
+      : float64_internal
+        & (float64_internal & (value & bits64_internal & value))
+        & bits64_internal,
+      'b)
      nested_record = {
   a : 'a;
   b : abstract_product;
@@ -2157,7 +2159,11 @@ type ('a : float64 & (float64 & (value & bits64 & value)) & bits64, 'b)
   g : 'a;
   h : int option;
 } constraint 'b = unboxed_record
-type ('a : float64 & (float64 & (value & bits64 & value)) & bits64, 'b)
+type ('a
+      : float64_internal
+        & (float64_internal & (value & bits64_internal & value))
+        & bits64_internal,
+      'b)
      nested_variant =
     A of 'a
   | B of abstract_product * 'a * string * 'b * int
@@ -2181,7 +2187,11 @@ type ('a : float64 & (float64 & (value & bits64 & value)) & bits64, 'b)
   = ('a, 'b) nested_record#
   constraint 'b = unboxed_record
 [%%expect{|
-type ('a : float64 & (float64 & (value & bits64 & value)) & bits64, 'b)
+type ('a
+      : float64_internal
+        & (float64_internal & (value & bits64_internal & value))
+        & bits64_internal,
+      'b)
      nested_record_unboxed =
     ('a, 'b) nested_record#
   constraint 'b = unboxed_record

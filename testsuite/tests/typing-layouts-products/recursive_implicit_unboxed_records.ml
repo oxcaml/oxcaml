@@ -426,7 +426,7 @@ type ('a : value & float64) t
 type bad = r# t
 and r = { x:int; y:bool }
 [%%expect{|
-type ('a : value & float64) t
+type ('a : value & float64_internal) t
 Line 3, characters 0-25:
 3 | and r = { x:int; y:bool }
     ^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -517,14 +517,8 @@ module Sort = struct
 
   let rec default_to_scannable_and_get : t -> Const.t = function
     | Base b -> Static.Const.of_base b
-<<<<<<< HEAD
-    | Product ts -> Product (List.map default_to_value_and_get ts)
-    | Univar uv -> Univar uv
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-    | Product ts -> Product (List.map default_to_value_and_get ts)
-=======
     | Product ts -> Product (List.map default_to_scannable_and_get ts)
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
+    | Univar uv -> Univar uv
     | Var r -> (
       match r.contents with
       | None ->
@@ -671,30 +665,6 @@ module Sort = struct
     | Equal_mutated_both ->
       true
 
-<<<<<<< HEAD
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031))
-  let is_void_defaulting t =
-    (* CR layouts v5: this should probably default to void now *)
-    match default_to_value_and_get t with
-    | Base Void -> true
-    | Base
-        ( Value | Untagged_immediate | Float64 | Float32 | Word | Bits8 | Bits16
-        | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ) ->
-      false
-    | Product _ -> false
-
-=======
-  let is_void_defaulting t =
-    (* CR layouts v5: this should probably default to void now *)
-    match default_to_scannable_and_get t with
-    | Base Void -> true
-    | Base
-        ( Scannable | Untagged_immediate | Float64 | Float32 | Word | Bits8
-        | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512 ) ->
-      false
-    | Product _ -> false
-
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031))
   let decompose_into_product ~level t n =
     let ts = List.init n (fun _ -> new_var ~level) in
     if equate t (Product ts) then Some ts else None

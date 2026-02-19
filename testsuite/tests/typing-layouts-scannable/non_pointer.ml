@@ -22,7 +22,7 @@ type ('a : any non_pointer, 'b : any, 'c : any) t
 
 type t : value non_pointer & value maybe_separable & float64
 [%%expect{|
-type t : value non_pointer & value maybe_separable & float64
+type t : value non_pointer & value maybe_separable & float64_internal
 |}]
 
 (* Checking non_pointer annotations, based on [typing-layouts-or-null/separability.ml]
@@ -163,26 +163,6 @@ type succeeds = t_nonptr array
 type succeeds = t_nonptr_val array
 type fails = t_maybeptr_val array
 [%%expect{|
-<<<<<<< HEAD:testsuite/tests/typing-layouts-scannable/basics.ml
-type ('a : value non_pointer) t = 'a accepts_nonptr
-Line 2, characters 22-39:
-2 | type ('a : value) t = 'a accepts_nonptr
-                          ^^^^^^^^^^^^^^^^^
-Error: Layout mismatch in final type declaration consistency check.
-       This is most often caused by the fact that type inference is not
-       clever enough to propagate layouts through variables in different
-       declarations. It is also not clever enough to produce a good error
-       message, so we'll say this instead:
-         The layout of 'a is value
-           because of the annotation on 'a in the declaration of the type t.
-         But the layout of 'a must be a sublayout of value non_pointer
-           because of the annotation on 'a in the declaration of the type t.
-       A good next step is to add a layout annotation on a parameter to
-       the declaration where this error is reported.
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031)):testsuite/tests/typing-layouts-scannable/basics.ml
-type ('a : value non_pointer) t = 'a accepts_nonptr
-type ('a : value non_pointer) t = 'a accepts_nonptr
-=======
 type succeeds = t_nonptr array
 type succeeds = t_nonptr_val array
 Line 3, characters 13-27:
@@ -194,74 +174,8 @@ Error: This type "t_maybeptr_val" should be an instance of type
          because of the definition of t_maybeptr_val at line 1, characters 0-43.
        But the layout of t_maybeptr_val must be a sublayout of any separable
          because it's the type argument to the array type.
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031)):testsuite/tests/typing-layouts-scannable/non_pointer.ml
 |}]
 
-<<<<<<< HEAD:testsuite/tests/typing-layouts-scannable/basics.ml
-let f : ('a : value non_pointer) accepts_nonptr -> ('a : value) accepts_nonptr = fun x -> x
-let f : ('a : value non_pointer). 'a accepts_nonptr -> 'a accepts_nonptr = fun x -> x
-let f : ('a : value). 'a accepts_nonptr -> 'a accepts_nonptr = fun x -> x
-[%%expect{|
-val f : ('a : value non_pointer). 'a accepts_nonptr -> 'a accepts_nonptr =
-  <fun>
-val f : ('a : value non_pointer). 'a accepts_nonptr -> 'a accepts_nonptr =
-  <fun>
-val f : 'a accepts_nonptr -> 'a accepts_nonptr = <fun>
-|}]
-
-let f : (_ : value) accepts_nonptr -> unit = fun _ -> ()
-let g : (_ : value non_pointer) accepts_nonptr -> unit = fun _ -> ()
-[%%expect{|
-val f : 'a accepts_nonptr -> unit = <fun>
-val g : ('a : value non_pointer). 'a accepts_nonptr -> unit = <fun>
-|}]
-
-let f : (_ : value non_pointer) -> (_ : value) = fun _ -> assert false
-let g : (_ : value) -> (_ : value non_pointer) = fun _ -> assert false
-[%%expect{|
-val f : ('a : value non_pointer) 'b. 'a -> 'b = <fun>
-val g : 'a ('b : value non_pointer). 'a -> 'b = <fun>
-|}]
-
-(* CR layouts-separability: Once [immediate] means [scannable non_pointer],
-   add tests for this behavior! *)
-
-||||||| parent of 167f1f4837 (Make separability a scannable axis (#5031)):testsuite/tests/typing-layouts-scannable/basics.ml
-let f : ('a : value non_pointer) accepts_nonptr -> ('a : value) accepts_nonptr = fun x -> x
-let f : ('a : value non_pointer). 'a accepts_nonptr -> 'a accepts_nonptr = fun x -> x
-let f : ('a : value). 'a accepts_nonptr -> 'a accepts_nonptr = fun x -> x
-[%%expect{|
-val f : ('a : value non_pointer). 'a accepts_nonptr -> 'a accepts_nonptr =
-  <fun>
-val f : ('a : value non_pointer). 'a accepts_nonptr -> 'a accepts_nonptr =
-  <fun>
-Line 3, characters 8-60:
-3 | let f : ('a : value). 'a accepts_nonptr -> 'a accepts_nonptr = fun x -> x
-            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The universal type variable 'a was declared to have kind value.
-       But it was inferred to have kind value non_pointer
-         because of the definition of accepts_nonptr at line 2, characters 0-42.
-|}]
-
-let f : (_ : value) accepts_nonptr -> unit = fun _ -> ()
-let g : (_ : value non_pointer) accepts_nonptr -> unit = fun _ -> ()
-[%%expect{|
-val f : ('a : value non_pointer). 'a accepts_nonptr -> unit = <fun>
-val g : ('a : value non_pointer). 'a accepts_nonptr -> unit = <fun>
-|}]
-
-let f : (_ : value non_pointer) -> (_ : value) = fun _ -> assert false
-let g : (_ : value) -> (_ : value non_pointer) = fun _ -> assert false
-[%%expect{|
-val f : ('a : value non_pointer) 'b. 'a -> 'b = <fun>
-val g : 'a ('b : value non_pointer). 'a -> 'b = <fun>
-|}]
-
-(* CR layouts-separability: Once [immediate] means [scannable non_pointer],
-   add tests for this behavior! *)
-
-=======
->>>>>>> 167f1f4837 (Make separability a scannable axis (#5031)):testsuite/tests/typing-layouts-scannable/non_pointer.ml
 (* unboxed records *)
 
 type t_maybeptr_val : value maybe_separable
