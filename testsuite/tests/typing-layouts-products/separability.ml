@@ -105,13 +105,6 @@ and ok = F : 'a r -> ok [@@unboxed]
 |}]
 
 (* CR layouts v12: Double-check this is safe when we add [void]. *)
-(* CR reisenberg: This is obviously terrible. The workaround is not
-   to use [any] in the kind annotation there, when [void] would be
-   more accurate. I think fixing this properly will require enhancing
-   [Ctype.unbox_once] to look through unboxed records better.
-   My local branch [expand-unboxed-records] (in my [fl-kinds] clone)
-   has a start to a solution. But I think ccasinghino doesn't like
-   it, so we should discuss. *)
 type t_void : void
 and 'a r : value & any = #{ a : 'a ; v : t_void }
 and ok = F : { x : 'a r } -> ok [@@unboxed]
