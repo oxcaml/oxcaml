@@ -75,6 +75,9 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       Library (file_name, infos)
     else raise (Linkenv.Error (Not_an_object_file file_name))
 
+  (* CR sspies: once PR #12084 is backported, [is_required], [add_required], and
+     [remove_required] should be replaced with
+     [Linkdeps.add]/[Linkdeps.required]; see linkenv.mli for details. *)
   let scan_file linkenv ~shared genfns file
       (full_paths, objfiles, tolink, cached_genfns_imports) =
     match read_file file with
@@ -370,6 +373,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
             stdlib_and_support_files_for_eval
             ([], ml_objfiles, units_tolink, cached_genfns_imports)
         in
+        (* CR sspies: once PR #12084 is backported, this check should move to
+           [Linkdeps.check]; see linkenv.mli for details. *)
         (if not shared
          then
            match Linkenv.extract_missing_globals linkenv with
