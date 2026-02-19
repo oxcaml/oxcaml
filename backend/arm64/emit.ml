@@ -575,7 +575,7 @@ type stack_realloc =
     sc_max_frame_size_in_bytes : int (* Size for reallocation. *)
   }
 
-and env =
+type env =
   { fastcode_flag : bool;
     mutable stack_offset : int;
     num_stack_slots : int Stack_class.Tbl.t;
