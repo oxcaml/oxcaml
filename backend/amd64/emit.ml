@@ -1880,6 +1880,7 @@ let emit_instr ~first ~fallthrough i =
     let n = prologue_stack_offset () in
     if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:n
   | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
+  | Lop Dummy_use -> ()
   | Lop (Const_int n) ->
     if Nativeint.equal n 0n
     then

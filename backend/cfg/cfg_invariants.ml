@@ -256,6 +256,7 @@ let check_basic_arity t label (instr : Cfg.basic Cfg.instruction) =
         report t "%a (instr %a): %s uses incompatible registers %a -> %a"
           Label.print label InstructionId.print instr.id desc Printreg.reg
           args.(0) Printreg.reg res.(0)
+    | Dummy_use -> check ~expected_args:[1] ~expected_res:[0]
     | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
     | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ ->
       check ~expected_args:[0] ~expected_res:[1]
@@ -469,7 +470,7 @@ let check_stack_offset t label (block : Cfg.basic_block) =
               Cfg.dump_basic basic.desc new_stack_offset;
           new_stack_offset
         | Op
-            ( Move | Spill | Reload | Const_int _ | Const_float _
+            ( Move | Spill | Reload | Dummy_use | Const_int _ | Const_float _
             | Const_float32 _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
             | Const_vec512 _ | Load _ | Store _ | Intop _ | Int128op _
             | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _

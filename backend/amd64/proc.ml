@@ -609,7 +609,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
       Misc.fatal_errorf "destroyed_at_basic: Unexpected llvm_intrinsic %s: \
                          not using LLVM backend"
         intr
-  | Op (Move | Spill | Reload
+  | Op (Move | Spill | Reload | Dummy_use
        | Const_int _ | Const_float _ | Const_float32 _ | Const_symbol _
        | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
        | Stackoffset _

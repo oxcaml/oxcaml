@@ -274,14 +274,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
   let initial_temporaries = Reg.Set.cardinal all_temporaries in
   if debug then log "#temporaries=%d" initial_temporaries;
   let state = State.make ~stack_slots ~initial_temporaries ~affinity in
-  let spilling_because_unused = Reg.Set.diff cfg_infos.res cfg_infos.arg in
-  (match Reg.Set.elements spilling_because_unused with
-  | [] -> ()
-  | _ :: _ as spilled_nodes ->
-    (* note: rewrite will remove the `spilling` registers from the "spilled"
-       work list and set the field to unknown. *)
-    let (_ : bool) = rewrite state cfg_with_infos ~spilled_nodes in
-    Cfg_with_infos.invalidate_liveness cfg_with_infos);
+  Regalloc_rewrite.insert_dummy_uses cfg_with_infos cfg_infos;
   let flat =
     match Lazy.force Spilling_heuristics.value with
     | Flat_uses -> true
