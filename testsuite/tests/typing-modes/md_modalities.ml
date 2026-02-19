@@ -97,7 +97,10 @@ module type S = sig @@ portable
 end
 [%%expect{|
 module type S =
-  sig module M : sig val foo : 'a -> 'a end -> sig val bar : 'a -> 'a end end
+  sig
+    module M : sig val foo : 'a -> 'a end -> sig val bar : 'a -> 'a end @@
+      portable
+  end
 |}]
 
 module M : T = struct
@@ -111,7 +114,7 @@ module type S = sig @@ portable
 end
 [%%expect{|
 module M : T @@ stateless nonportable
-module type S = sig module M' = M end
+module type S = sig module M' = M @@ portable end
 |}]
 
 (* works for Mty_strenthen, and type check keeps working *)

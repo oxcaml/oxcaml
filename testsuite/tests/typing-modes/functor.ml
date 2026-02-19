@@ -1104,3 +1104,153 @@ module F (M : (S -> S) -> S) = (M : (S -> S @ portable) -> S)
 module F : functor (M : (S -> S) -> S) -> (S -> S @ portable) -> S @@
   stateless
 |}]
+
+(* Testing modalities on functors in signatures.
+
+   From the syntax documentation, there are two ways to add modalities to module
+   declarations in signatures:
+   1. `module (M @@ portable) ...` - modality on the name
+   2. `module M : ... @@ portable` - modality at the end of the type
+
+   Unlike signatures where modalities are applied deeply to values and then
+   reset, functor modalities are kept on [md_modalities] and applied when the
+   functor is accessed. *)
+
+(* Test 1: `module (F @@ portable)` syntax - modality on name *)
+module type SigWithModalFunctor1 = sig
+  module (F @@ portable) : S @ portable -> S @ portable
+end
+
+module TestModalFunctor1 : SigWithModalFunctor1 = struct
+  module F (M : S @ portable) = M
+end
+[%%expect{|
+module type SigWithModalFunctor1 =
+  sig module F : S @ portable -> S @ portable @@ portable end
+module TestModalFunctor1 : SigWithModalFunctor1 @@ stateless
+|}]
+
+(* Test 2: `module F : ... @@ portable` syntax - modality at end *)
+module type SigWithModalFunctor2 = sig
+  module F : S @ portable -> S @ portable @@ portable
+end
+
+module TestModalFunctor2 : SigWithModalFunctor2 = struct
+  module F (M : S @ portable) = M
+end
+[%%expect{|
+module type SigWithModalFunctor2 =
+  sig module F : S @ portable -> S @ portable @@ portable end
+module TestModalFunctor2 : SigWithModalFunctor2 @@ stateless
+|}]
+
+(* Test 3: When a functor has @@ portable, it can be accessed as portable
+   even from a nonportable module. Without the modality, this fails.
+   We use first-class modules to avoid REPL zapping. *)
+let use_functor_with_modality1
+    ((module M) : (module SigWithModalFunctor1) @ nonportable) =
+  let module _ @ portable = M.F in ()
+[%%expect{|
+val use_functor_with_modality1 : (module SigWithModalFunctor1) -> unit =
+  <fun>
+|}]
+
+let use_functor_with_modality2
+    ((module M) : (module SigWithModalFunctor2) @ nonportable) =
+  let module _ @ portable = M.F in ()
+[%%expect{|
+val use_functor_with_modality2 : (module SigWithModalFunctor2) -> unit =
+  <fun>
+|}]
+
+module type SigWithFunctorNoModality = sig
+  module F : S @ portable -> S @ portable
+end
+
+let use_functor_without_modality
+    ((module M) : (module SigWithFunctorNoModality) @ nonportable) =
+  let module _ @ portable = M.F in ()
+[%%expect{|
+module type SigWithFunctorNoModality =
+  sig module F : S @ portable -> S @ portable end
+Line 7, characters 28-31:
+7 |   let module _ @ portable = M.F in ()
+                                ^^^
+Error: The module is "nonportable" but is expected to be "portable".
+|}]
+
+(* Test 4: Compare type inclusion with and without modalities on functors.
+   A signature with @@ portable is stronger than one without. *)
+module type SigWithModalFunctor3 = sig
+  module F : S @ portable -> S @ portable @@ portable
+end
+
+module type SigWithFunctorNoModal = sig
+  module F : S @ portable -> S @ portable
+end
+
+module F (M : SigWithModalFunctor3) = (M : SigWithFunctorNoModal)
+[%%expect{|
+module type SigWithModalFunctor3 =
+  sig module F : S @ portable -> S @ portable @@ portable end
+module type SigWithFunctorNoModal =
+  sig module F : S @ portable -> S @ portable end
+module F : functor (M : SigWithModalFunctor3) -> SigWithFunctorNoModal @@
+  stateless
+|}]
+
+module F (M : SigWithFunctorNoModal) = (M : SigWithModalFunctor3)
+[%%expect{|
+Line 1, characters 40-41:
+1 | module F (M : SigWithFunctorNoModal) = (M : SigWithModalFunctor3)
+                                            ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           module F :
+             functor (Arg : S @ portable) ->
+               sig val f : unit -> unit end @ portable
+         end @ nonportable
+       is not included in
+         SigWithModalFunctor3 @ nonportable
+       In module "F":
+       Got "nonportable"
+       but expected "portable".
+|}]
+
+(* Test 5: Default modalities like `sig @@ portable` apply to the functor. *)
+module type SigWithDefaultModality = sig @@ portable
+  module F : S -> S
+end
+[%%expect{|
+module type SigWithDefaultModality = sig module F : S -> S @@ portable end
+|}]
+
+(* The functor F is portable. *)
+let test_default_modality
+    ((module M) : (module SigWithDefaultModality) @ nonportable) =
+  (* F itself can be accessed as portable *)
+  let module _ @ portable = M.F in
+  ()
+[%%expect{|
+val test_default_modality : (module SigWithDefaultModality) -> unit = <fun>
+|}]
+
+(* Test 6: Explicit modality on functor overrides the default modality. *)
+module type SigWithOverriddenModality = sig @@ portable
+  module F : S -> S @@ nonportable
+end
+[%%expect{|
+module type SigWithOverriddenModality = sig module F : S -> S end
+|}]
+
+let test_overridden_modality
+    ((module M) : (module SigWithOverriddenModality) @ nonportable) =
+  let module _ @ portable = M.F in
+  ()
+[%%expect{|
+Line 3, characters 28-31:
+3 |   let module _ @ portable = M.F in
+                                ^^^
+Error: The module is "nonportable" but is expected to be "portable".
+|}]
