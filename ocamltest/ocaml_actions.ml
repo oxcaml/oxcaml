@@ -1494,6 +1494,8 @@ let only_default_codegen = Actions.make
   ~does_something:false
   (Actions_helpers.predicate
     (Config.no_stack_checks
+      && Config.runtime5
+      && not Config.dev
       && not Config.poll_insertion
       && not Config.with_address_sanitizer
       && not Config.with_frame_pointers)

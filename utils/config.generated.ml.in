@@ -142,4 +142,6 @@ let cc_compress_debug_sections_flag = {@QS@|@cc_compress_debug_sections_flag@|@Q
 let objcopy_compress_debug_sections_flag = {@QS@|@objcopy_compress_debug_sections_flag@|@QS@}
 let objcopy = {@QS@|@objcopy@|@QS@}
 
+let dev = "@enable_dev@" = "yes"
+
 let oxcaml_dwarf = "@enable_oxcaml_dwarf@" = "yes"
