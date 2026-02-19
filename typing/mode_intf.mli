@@ -247,8 +247,45 @@ type 'd neg_hint_morph = 'd neg Mode_hint.morph constraint 'd = _ * _
 
 type 'd pos_hint_morph = 'd pos Mode_hint.morph constraint 'd = _ * _
 
+module type Total = sig
+  (** A lattice is total order, if for any [a] [b], [a <= b] or [b <= a].
+
+      If it's also finite, then the ordering can be represented as a monotone
+      injection [ord] into [int], where [a <= b] iff [ord a <= ord b]. *)
+
+  type t
+
+  val ord : t -> int
+
+  val min : t
+
+  val max : t
+end
+
 module type S = sig
+<<<<<<< HEAD
   val print_longident : (Fmt.formatter -> Longident.t -> unit) ref
+||||||| parent of e3b7d6f512 (Add `non_pointer64` on the separability axis (#5095))
+  val print_longident : (Format.formatter -> Longident.t -> unit) ref
+=======
+  module Lattices : sig
+    module Total : functor (L : Total) -> sig
+      val min : L.t
+
+      val max : L.t
+
+      val le : L.t -> L.t -> bool
+
+      val equal : L.t -> L.t -> bool
+
+      val join : L.t -> L.t -> L.t
+
+      val meet : L.t -> L.t -> L.t
+    end
+  end
+
+  val print_longident : (Format.formatter -> Longident.t -> unit) ref
+>>>>>>> e3b7d6f512 (Add `non_pointer64` on the separability axis (#5095))
 
   (* CR-someday zqian: find a better stroy to erase bounds (and hints) that incorporates
      into [disallow_*]. *)
