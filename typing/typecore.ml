@@ -11727,13 +11727,13 @@ let report_error ~loc env =
         "The instance variable %a is overridden several times"
         Style.inline_code v
   | Coercion_failure (ty_exp, err, b) ->
+    let intro =
+      let ty_exp = Printtyp.prepare_expansion ty_exp in
+      doc_printf "This expression cannot be coerced to type@;<1 2>%a;@ \
+                  it has type"
+        (Style.as_inline_code @@ Printtyp.type_expansion Type) ty_exp
+    in
     Location.error_of_printer ~loc (fun ppf () ->
-        let intro =
-          let ty_exp = Printtyp.prepare_expansion ty_exp in
-          doc_printf "This expression cannot be coerced to type@;<1 2>%a;@ \
-                      it has type"
-            (Style.as_inline_code @@ Printtyp.type_expansion Type) ty_exp
-        in
         Printtyp.report_unification_error ppf env err
           intro
           (Fmt.doc_printf "but is here used with type");
