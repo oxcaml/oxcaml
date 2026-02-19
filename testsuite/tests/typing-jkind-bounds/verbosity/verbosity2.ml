@@ -149,7 +149,7 @@ type 'a t
 type ('a : immutable_data) t
 [%%expect {|
 type ('a
-     : immutable_data
+     : value
          mod forkable
              unyielding
              many
