@@ -101,6 +101,15 @@ Error: The kind of type "t" is immutable_data with 'a with 'a My_list.t
          because of the annotation on the declaration of the type t.
 |}]
 
+(* We can however make the signature slightly stranger-looking to pass. *)
+module rec My_list : sig
+  type 'a t : immutable_data with 'a with 'a My_list.t =
+  | Nil | Cons of 'a * 'a My_list.t
+end = My_list
+[%%expect {|
+module rec My_list : sig type 'a t = Nil | Cons of 'a * 'a My_list.t end
+|}]
+
 module rec My_list : sig
   type 'a t = Nil | Cons of 'a * 'a My_list.t
 end = My_list

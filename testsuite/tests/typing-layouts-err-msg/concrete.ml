@@ -26,25 +26,13 @@ Error: This expression has type "t_any" but an expression was expected of type
          because a value of this type is matched against a pattern.
 |}]
 
-(* Constructor_declaration *)
-type t = A of t_any
-
-[%%expect{|
-type t = A of t_any
-|}]
-
-(* Label_declaration *)
-type t = {a: t_any}
-
-[%%expect{|
-type t = { a : t_any; }
-|}]
-
 (* Constructor_arg_projection *)
+type t = A of t_any
 let f (A _) = ()
 [%%expect {|
-Line 1, characters 9-10:
-1 | let f (A _) = ()
+type t = A of t_any
+Line 2, characters 9-10:
+2 | let f (A _) = ()
              ^
 Error: Constructor arguments being projected must be representable.
        The layout of t_any is any
@@ -83,10 +71,12 @@ Error: This type "t_any" should be an instance of type
 |}]
 
 (* Record_projection *)
+type t = {a: t_any}
 let f (t: t) = t.a
 [%%expect {|
-Line 1, characters 15-18:
-1 | let f (t: t) = t.a
+type t = { a : t_any; }
+Line 2, characters 15-18:
+2 | let f (t: t) = t.a
                    ^^^
 Error: Fields being projected must be representable.
        The layout of t_any is any
