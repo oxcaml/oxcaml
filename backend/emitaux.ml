@@ -51,6 +51,12 @@ type frame_descr =
 
 let frame_descriptors = ref ([] : frame_descr list)
 
+type frame_descr_snapshot = frame_descr list
+
+let save_frame_descriptors () = !frame_descriptors
+
+let restore_frame_descriptors saved = frame_descriptors := saved
+
 let is_none_dbg d = Debuginfo.Dbg.is_none (Debuginfo.get_dbg d)
 
 let get_flags debuginfo =

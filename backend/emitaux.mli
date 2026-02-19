@@ -52,6 +52,12 @@ val record_frame_descr :
   (* Location, if any *)
   unit
 
+type frame_descr_snapshot
+
+val save_frame_descriptors : unit -> frame_descr_snapshot
+
+val restore_frame_descriptors : frame_descr_snapshot -> unit
+
 type emit_frame_actions =
   { efa_code_label : Label.t -> unit;
     efa_data_label : Label.t -> unit;

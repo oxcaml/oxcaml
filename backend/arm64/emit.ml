@@ -1042,223 +1042,6 @@ module Cond_branch_impl = struct
       Misc.fatal_error "arm64: got 256/512 bit vector"
 end
 
-let br_memory_access_size (memory_chunk : Cmm.memory_chunk) =
-  match memory_chunk with
-  | Single { reg = Float64 } -> 2
-  | Single { reg = Float32 } -> 1
-  | Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-  | Thirtytwo_unsigned | Thirtytwo_signed | Word_int | Word_val | Double
-  | Onetwentyeight_unaligned | Onetwentyeight_aligned ->
-    1
-  | Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
-  | Fivetwelve_unaligned ->
-    Misc.fatal_error "arm64: got 256/512 bit vector"
-
-let br_prologue_size env =
-  (if env_initial_stack_offset env > 0 then 2 else 0)
-  + if env.contains_calls then 1 else 0
-
-let br_epilogue_size env = if env.contains_calls then 3 else 2
-
-let br_instr_size env instr =
-  match instr.Linear.desc with
-  | Lend -> 0
-  | Lprologue -> br_prologue_size env
-  | Lepilogue_open -> br_epilogue_size env
-  | Lepilogue_close -> 0
-  | Lop (Move | Spill | Reload) -> 1
-  | Lop (Const_int n) -> num_instructions_for_intconst n
-  | Lop (Const_float32 _) -> 2
-  | Lop (Const_float _) -> 2
-  | Lop (Const_vec128 _) -> 2
-  | Lop (Const_vec256 _ | Const_vec512 _) ->
-    Misc.fatal_error "arm64: got 256/512 bit vector"
-  | Lop (Const_symbol _) -> 2
-  | Lop (Intop_atomic _) ->
-    Misc.fatal_errorf
-      "emit_instr: builtins are not yet translated to atomics: %a"
-      Printlinear.instr instr
-  | Lcall_op Lcall_ind -> 1
-  | Lcall_op (Lcall_imm _) -> 1
-  | Lcall_op Ltailcall_ind -> br_epilogue_size env
-  | Lcall_op (Ltailcall_imm { func; _ }) ->
-    if String.equal func.sym_name env.function_name
-    then 1
-    else br_epilogue_size env
-  | Lcall_op
-      (Lextcall
-         { alloc;
-           stack_ofs;
-           stack_align = _;
-           func = _;
-           ty_res = _;
-           ty_args = _;
-           returns = _
-         }) ->
-    if Config.runtime5 && stack_ofs > 0 then 5 else if alloc then 3 else 5
-  | Lop (Stackoffset _) -> 2
-  | Lop (Load { memory_chunk; addressing_mode; is_atomic; mutability = _ }) ->
-    let based = match addressing_mode with Iindexed _ -> 0 | Ibased _ -> 1
-    and barrier = if is_atomic then 1 else 0
-    and single = br_memory_access_size memory_chunk in
-    based + barrier + single
-  | Lop (Store (memory_chunk, addressing_mode, assignment)) ->
-    let based = match addressing_mode with Iindexed _ -> 0 | Ibased _ -> 1
-    and barrier =
-      match memory_chunk, assignment with
-      | (Word_int | Word_val), true -> 1
-      | (Word_int | Word_val), false -> 0
-      | ( ( Byte_unsigned | Byte_signed | Sixteen_unsigned | Sixteen_signed
-          | Thirtytwo_unsigned | Thirtytwo_signed | Single _ | Double
-          | Onetwentyeight_unaligned | Onetwentyeight_aligned ),
-          _ ) ->
-        0
-      | ( ( Twofiftysix_aligned | Twofiftysix_unaligned | Fivetwelve_aligned
-          | Fivetwelve_unaligned ),
-          _ ) ->
-        Misc.fatal_error "arm64: got 256/512 bit vector"
-    and single = br_memory_access_size memory_chunk in
-    based + barrier + single
-  | Lop (Alloc { mode = Local; _ }) -> 9
-  | Lop (Alloc { mode = Heap; _ }) when env.fastcode_flag -> 5
-  | Lop (Specific (Ifar_alloc _)) when env.fastcode_flag -> 6
-  | Lop Poll -> 3
-  | Lop Pause -> 1
-  | Lop (Specific Ifar_poll) -> 4
-  | Lop (Alloc { mode = Heap; bytes = num_bytes; _ })
-  | Lop (Specific (Ifar_alloc { bytes = num_bytes; _ })) -> (
-    match num_bytes with
-    | 16 | 24 | 32 -> 1
-    | _ -> 1 + num_instructions_for_intconst (Nativeint.of_int num_bytes))
-  | Lop (Csel _) -> 4
-  | Lop (Begin_region | End_region) -> 1
-  | Lop (Intop (Icomp _)) -> 2
-  | Lop (Floatop (Float64, Icompf _)) -> 2
-  | Lop (Floatop (Float32, Icompf _)) -> 2
-  | Lop (Intop_imm (Icomp _, _)) -> 2
-  | Lop (Int128op (Iadd128 | Isub128 | Imul64 _)) -> 2
-  | Lop (Intop Imod) -> 2
-  | Lop (Intop (Imulh _)) -> 1
-  | Lop (Intop (Iclz _)) -> 1
-  | Lop (Intop (Ictz _)) -> if !Arch.feat_cssc then 1 else 2
-  | Lop (Intop Ipopcnt) -> if !Arch.feat_cssc then 1 else 4
-  | Lop
-      (Intop (Iadd | Isub | Imul | Idiv | Iand | Ior | Ixor | Ilsl | Ilsr | Iasr))
-    ->
-    1
-  | Lop
-      (Intop_imm
-         ( ( Iadd | Isub | Imul | Idiv | Imod | Imulh _ | Iand | Ior | Ixor
-           | Ilsl | Ilsr | Iasr | Iclz _ | Ictz _ | Ipopcnt ),
-           _ )) ->
-    1
-  | Lop (Floatop (Float64, (Iabsf | Inegf))) -> 1
-  | Lop (Floatop (Float32, (Iabsf | Inegf))) -> 1
-  | Lop (Specific Isqrtf) -> 1
-  | Lop
-      (Reinterpret_cast
-         (Value_of_int | Int_of_value | Float_of_int64 | Int64_of_float)) ->
-    1
-  | Lop
-      (Reinterpret_cast
-         ( Float32_of_float | Float_of_float32 | Float32_of_int32
-         | Int32_of_float32 )) ->
-    1
-  | Lop (Reinterpret_cast (V128_of_vec Vec128)) -> 1
-  | Lop
-      (Reinterpret_cast
-         (V128_of_vec (Vec256 | Vec512) | V256_of_vec _ | V512_of_vec _)) ->
-    Misc.fatal_error "arm64: got 256/512 bit vector"
-  | Lop (Static_cast (Float_of_int Float64 | Int_of_float Float64)) -> 1
-  | Lop
-      (Static_cast
-         ( Float_of_int Float32
-         | Int_of_float Float32
-         | Float_of_float32 | Float32_of_float )) ->
-    1
-  | Lop (Static_cast (Scalar_of_v128 Float16x8 | V128_of_scalar Float16x8)) ->
-    Misc.fatal_error "float16 scalar type not supported"
-  | Lop (Static_cast (Scalar_of_v128 (Int8x16 | Int16x8))) -> 2
-  | Lop
-      (Static_cast (Scalar_of_v128 (Int32x4 | Int64x2 | Float32x4 | Float64x2)))
-    ->
-    1
-  | Lop (Static_cast (V128_of_scalar _)) -> 1
-  | Lop
-      (Static_cast
-         ( V256_of_scalar _ | Scalar_of_v256 _ | V512_of_scalar _
-         | Scalar_of_v512 _ )) ->
-    Misc.fatal_error "arm64: got 256/512 bit vector"
-  | Lop (Floatop (Float64, (Iaddf | Isubf | Imulf | Idivf))) -> 1
-  | Lop (Floatop (Float32, (Iaddf | Isubf | Imulf | Idivf))) -> 1
-  | Lop (Specific Inegmulf) -> 1
-  | Lop Opaque -> 0
-  | Lop (Specific (Imuladdf | Inegmuladdf | Imulsubf | Inegmulsubf)) -> 1
-  | Lop (Specific (Ishiftarith _)) -> 1
-  | Lop (Specific (Imuladd | Imulsub)) -> 1
-  | Lop (Specific (Ibswap { bitwidth = Sixteen })) -> 2
-  | Lop (Specific (Ibswap { bitwidth = Thirtytwo | Sixtyfour })) -> 1
-  | Lop (Specific Imove32) -> 1
-  | Lop (Specific (Isignext _)) -> 1
-  | Lop (Name_for_debugger _) -> 0
-  | Lcall_op (Lprobe _) ->
-    Misc.fatal_error "Optimized probes not supported on arm64."
-  | Lop (Probe_is_enabled _) -> 3
-  | Lop Dls_get -> 1
-  | Lop Tls_get -> 1
-  | Lop Domain_index -> 1
-  | Lreloadretaddr -> 0
-  | Lreturn -> br_epilogue_size env
-  | Llabel _ -> 0
-  | Lbranch _ -> 1
-  | Lcondbranch (tst, _) -> (
-    match tst with
-    | Itruetest -> 1
-    | Ifalsetest -> 1
-    | Iinttest _ -> 2
-    | Iinttest_imm _ -> 2
-    | Ifloattest _ -> 2
-    | Ioddtest -> 1
-    | Ieventest -> 1)
-  | Lcondbranch3 (lbl0, lbl1, lbl2) -> (
-    1
-    + (match lbl0 with None -> 0 | Some _ -> 1)
-    + (match lbl1 with None -> 0 | Some _ -> 1)
-    + match lbl2 with None -> 0 | Some _ -> 1)
-  | Lswitch jumptbl -> 3 + Array.length jumptbl
-  | Lentertrap -> 0
-  | Ladjust_stack_offset _ -> 0
-  | Lpushtrap _ -> 4
-  | Lpoptrap _ -> 1
-  | Lraise k -> (
-    match k with
-    | Lambda.Raise_regular -> 1
-    | Lambda.Raise_reraise -> 1
-    | Lambda.Raise_notrace -> 4)
-  | Lstackcheck _ -> 5
-  | Lop (Specific (Isimd simd)) ->
-    A.with_measuring ~f:(fun () -> simd_instr simd instr)
-  | Lop (Specific (Illvm_intrinsic intr)) ->
-    Misc.fatal_errorf
-      "Emit.size:Unexpected llvm_intrinsic %s: not using LLVM backend" intr
-
-let branch_relax env body ~max_out_of_line_code_offset =
-  let module BR = Branch_relaxation.Make (struct
-    type distance = int
-
-    module Cond_branch = Cond_branch_impl
-
-    let offset_pc_at_branch = 0
-
-    let instr_size instr = br_instr_size env instr
-
-    let relax_poll () = Lop (Specific Ifar_poll)
-
-    let relax_allocation ~num_bytes ~dbginfo =
-      Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo }))
-  end) in
-  BR.relax body ~max_out_of_line_code_offset
-
 let cond_for_float_comparison : Cmm.float_comparison -> Float_cond.t = function
   | CFeq -> EQ
   | CFneq -> NE
@@ -2141,6 +1924,46 @@ let emit_instr env i =
     Format.eprintf "Exception whilst emitting instruction:@ %a\n"
       Printlinear.instr i;
     raise exn
+
+let measure_emit_instr env i =
+  let saved_stack_offset = env.stack_offset in
+  let saved_call_gc_sites = env.call_gc_sites in
+  let saved_local_realloc_sites = env.local_realloc_sites in
+  let saved_stack_realloc = env.stack_realloc in
+  let saved_float32_literals = env.float32_literals in
+  let saved_float_literals = env.float_literals in
+  let saved_vec128_literals = env.vec128_literals in
+  let saved_frame_descriptors = Emitaux.save_frame_descriptors () in
+  let count =
+    D.with_measuring ~f:(fun () ->
+      A.with_measuring ~f:(fun () -> emit_instr env i))
+  in
+  env.stack_offset <- saved_stack_offset;
+  env.call_gc_sites <- saved_call_gc_sites;
+  env.local_realloc_sites <- saved_local_realloc_sites;
+  env.stack_realloc <- saved_stack_realloc;
+  env.float32_literals <- saved_float32_literals;
+  env.float_literals <- saved_float_literals;
+  env.vec128_literals <- saved_vec128_literals;
+  Emitaux.restore_frame_descriptors saved_frame_descriptors;
+  count
+
+let branch_relax env body ~max_out_of_line_code_offset =
+  let module BR = Branch_relaxation.Make (struct
+    type distance = int
+
+    module Cond_branch = Cond_branch_impl
+
+    let offset_pc_at_branch = 0
+
+    let instr_size instr = measure_emit_instr env instr
+
+    let relax_poll () = Lop (Specific Ifar_poll)
+
+    let relax_allocation ~num_bytes ~dbginfo =
+      Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo }))
+  end) in
+  BR.relax body ~max_out_of_line_code_offset
 
 (* Emission of an instruction sequence *)
 
