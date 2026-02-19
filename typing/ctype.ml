@@ -2332,6 +2332,8 @@ let unbox_once env ty =
         end
       end
     end
+  | Tpoly (ty, []) ->
+    Stepped { ty; modality = Mode.Modality.Const.id }
   | Tpoly (ty, univars) ->
     Stepped
       { ty = instance_poly_for_jkind univars ty
@@ -2482,6 +2484,8 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
   | Tvariant row ->
      Jkind.for_boxed_row row
   | Tunivar { jkind } -> Jkind.disallow_right jkind
+  | Tpoly (ty, []) ->
+    estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty
   | Tpoly (ty, univars) ->
     (* The jkind of [ty] might mention the variables bound in this [Tpoly]
        node, and so just returning it here would be wrong. Instead, we need
