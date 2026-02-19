@@ -61,14 +61,15 @@ let () =
   in
   match
     trace (fun () ->
-      (* noalloc C calls *)
-      assert (log (Sys.opaque_identity 1.0) = 0.0);
       (* alloc C calls, including raising *)
       try mkarrays () |> fst
       with _ -> fst (mkarrays ()))
   with
   | _ -> assert false
   | exception (Invalid_argument _) -> ()
+
+(* FIXME: noalloc C calls have correct CFI info, but gdb is unable to
+   take backtraces past them when stack-switching is enabled *)
 
 (*
 (* This one fails in gdb 10 for unknown reasons, but passes in gdb 14.
