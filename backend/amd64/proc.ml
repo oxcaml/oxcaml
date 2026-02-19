@@ -179,16 +179,16 @@ let word_addressed = false
 let size_domainstate_args = 64 * size_int
 
 let calling_conventions
-      ~registers_int
-      ~registers_float
+      ~int_registers
+      ~float_registers
       ~make_stack
       ~first_stack
       arg =
   let loc = Array.make (Array.length arg) Reg.dummy in
-  let registers_int = ref registers_int in
-  let registers_float = ref registers_float in
+  let int_registers = ref int_registers in
+  let float_registers = ref float_registers in
   let ofs = ref first_stack in
-  let stack_vec256, stack_vec512 = ref false, ref false in
+  let max_size = ref 0 in
   (* A negative offset indicates a domainstate slot, which will
      generate unaligned moves. *)
   let align ofs size =
@@ -197,80 +197,30 @@ let calling_conventions
     else Misc.align ofs size
   in
   for i = 0 to Array.length arg - 1 do
-    match (arg.(i) : machtype_component) with
-    | Val | Int | Addr as ty ->
-      begin
-        match !registers_int with
-        | reg :: regs ->
-          loc.(i) <- phys_reg ty (P reg);
-          registers_int := regs;
-          assert (not (Reg.Set.mem loc.(i) destroyed_by_plt_stub_set))
-        | [] ->
-          loc.(i) <- stack_slot (make_stack !ofs) ty;
-          ofs := !ofs + size_int
-      end;
-    | Float ->
-      begin
-        match !registers_float with
-        | reg :: regs ->
-          loc.(i) <- phys_reg Float (P reg);
-          registers_float := regs
-        | [] ->
-          loc.(i) <- stack_slot (make_stack !ofs) Float;
-          ofs := !ofs + size_float
-      end
-    | Vec128 ->
-      begin
-        match !registers_float with
-        | reg :: regs ->
-          loc.(i) <- phys_reg Vec128 (P reg);
-          registers_float := regs
-        | [] ->
-          ofs := align !ofs size_vec128;
-          loc.(i) <- stack_slot (make_stack !ofs) Vec128;
-          ofs := !ofs + size_vec128
-      end
-    | Vec256 ->
-      begin
-        match !registers_float with
-        | reg :: regs ->
-          loc.(i) <- phys_reg Vec256 (P reg);
-          registers_float := regs
-        | [] ->
-          stack_vec256 := true;
-          ofs := align !ofs size_vec256;
-          loc.(i) <- stack_slot (make_stack !ofs) Vec256;
-          ofs := !ofs + size_vec256
-      end
-    | Vec512 ->
-      begin
-        match !registers_float with
-        | reg :: regs ->
-          loc.(i) <- phys_reg Vec512 (P reg);
-          registers_float := regs
-        | [] ->
-          stack_vec512 := true;
-          ofs := align !ofs size_vec512;
-          loc.(i) <- stack_slot (make_stack !ofs) Vec512;
-          ofs := !ofs + size_vec512
-      end
-    | Valx2 ->
-      Misc.fatal_error "Unexpected machtype_component Valx2"
-    | Float32 ->
-      begin
-        match !registers_float with
-        | reg :: regs ->
-          loc.(i) <- phys_reg Float32 (P reg);
-          registers_float := regs
-        | [] ->
-          loc.(i) <- stack_slot (make_stack !ofs) Float32;
-          (* float32 slots still take up a full word *)
-          ofs := !ofs + size_float
-      end
+    let ty : machtype_component = arg.(i) in
+    let registers, size =
+      match ty with
+      | Val | Int | Addr -> int_registers, size_int
+      | Float | Float32 -> float_registers, size_float
+      | Vec128 -> float_registers, size_vec128
+      | Vec256 -> float_registers, size_vec256
+      | Vec512 -> float_registers, size_vec512
+      | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
+    in
+    match !registers with
+    | reg :: regs ->
+      registers := regs;
+      loc.(i) <- phys_reg ty (P reg);
+      assert (not (Reg.Set.mem loc.(i) destroyed_by_plt_stub_set));
+    | [] ->
+      max_size := Int.max size !max_size;
+      ofs := align !ofs size;
+      loc.(i) <- stack_slot (make_stack !ofs) ty;
+      ofs := !ofs + size;
   done;
   let pre_align, post_align =
-    if !stack_vec512 then Align_64, 64
-    else if !stack_vec256 then Align_32, 32
+    if !max_size >= size_vec512 then Align_64, 64
+    else if !max_size >= size_vec256 then Align_32, 32
     else Align_16, 16
   in
   (loc, Misc.align (max 0 !ofs) post_align, pre_align)
@@ -285,16 +235,16 @@ let outgoing ofs : Reg.stack_location =
   else Domainstate (ofs + size_domainstate_args)
 let not_supported _ofs = fatal_error "Proc.loc_results: cannot call"
 
-let ocaml_registers_int = Regs.[RAX; RBX; RDI; RSI; RDX; RCX; R8; R9; R12; R13]
+let ocaml_int_registers = Regs.[RAX; RBX; RDI; RSI; RDX; RCX; R8; R9; R12; R13]
 
-let ocaml_registers_float =
+let ocaml_float_registers =
   Regs.[MM0; MM1; MM2; MM3; MM4; MM5; MM6; MM7; MM8; MM9]
 
 let loc_arguments arg =
   let (loc, ofs, _align) =
     calling_conventions
-        ~registers_int:ocaml_registers_int
-        ~registers_float:ocaml_registers_float
+        ~int_registers:ocaml_int_registers
+        ~float_registers:ocaml_float_registers
         ~make_stack:outgoing
         ~first_stack:(- size_domainstate_args)
         arg
@@ -304,8 +254,8 @@ let loc_arguments arg =
 let loc_parameters arg =
   let (loc, _ofs, _align) =
     calling_conventions
-      ~registers_int:ocaml_registers_int
-      ~registers_float:ocaml_registers_float
+      ~int_registers:ocaml_int_registers
+      ~float_registers:ocaml_float_registers
       ~make_stack:incoming
       ~first_stack:(- size_domainstate_args)
       arg
@@ -315,8 +265,8 @@ let loc_parameters arg =
 let loc_results_call res =
   let (loc, ofs, _align) =
     calling_conventions
-      ~registers_int:ocaml_registers_int
-      ~registers_float:ocaml_registers_float
+      ~int_registers:ocaml_int_registers
+      ~float_registers:ocaml_float_registers
       ~make_stack:outgoing
       ~first_stack:(- size_domainstate_args)
       res
@@ -326,8 +276,8 @@ let loc_results_call res =
 let loc_results_return res =
   let (loc, _ofs, _align) =
     calling_conventions
-      ~registers_int:ocaml_registers_int
-      ~registers_float:ocaml_registers_float
+      ~int_registers:ocaml_int_registers
+      ~float_registers:ocaml_float_registers
       ~make_stack:incoming
       ~first_stack:(- size_domainstate_args)
       res
@@ -353,8 +303,8 @@ let loc_external_results res =
     (* `~last_int:4 ~step_int:4` below is to get rdx as the second int register
        (See https://refspecs.linuxbase.org/elf/x86_64-abi-0.99.pdf, pages 21 and 22) *)
     calling_conventions
-      ~registers_int:[RAX; RDX]
-      ~registers_float:[MM0; MM1]
+      ~int_registers:[RAX; RDX]
+      ~float_registers:[MM0; MM1]
       ~make_stack:not_supported
       ~first_stack:0
       res
@@ -362,8 +312,8 @@ let loc_external_results res =
 
 let unix_loc_external_arguments arg =
   calling_conventions
-    ~registers_int:[RDI; RSI; RDX; RCX; R8; R9]
-    ~registers_float:[MM0; MM1; MM2; MM3; MM4; MM5; MM6; MM7]
+    ~int_registers:[RDI; RSI; RDX; RCX; R8; R9]
+    ~float_registers:[MM0; MM1; MM2; MM3; MM4; MM5; MM6; MM7]
     ~make_stack:outgoing
     ~first_stack:0
     arg
