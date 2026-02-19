@@ -263,11 +263,6 @@ module type Total = sig
 end
 
 module type S = sig
-<<<<<<< HEAD
-  val print_longident : (Fmt.formatter -> Longident.t -> unit) ref
-||||||| parent of e3b7d6f512 (Add `non_pointer64` on the separability axis (#5095))
-  val print_longident : (Format.formatter -> Longident.t -> unit) ref
-=======
   module Lattices : sig
     module Total : functor (L : Total) -> sig
       val min : L.t
@@ -284,8 +279,7 @@ module type S = sig
     end
   end
 
-  val print_longident : (Format.formatter -> Longident.t -> unit) ref
->>>>>>> e3b7d6f512 (Add `non_pointer64` on the separability axis (#5095))
+  val print_longident : (Fmt.formatter -> Longident.t -> unit) ref
 
   (* CR-someday zqian: find a better stroy to erase bounds (and hints) that incorporates
      into [disallow_*]. *)

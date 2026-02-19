@@ -370,15 +370,9 @@ module Layout = struct
       | Sort (s, sa) -> (
         match Sort.get s with
         | Base Scannable when Scannable_axes.(equal sa immediate_axes) ->
-<<<<<<< HEAD
           Fmt.fprintf ppf "immediate"
-||||||| parent of e3b7d6f512 (Add `non_pointer64` on the separability axis (#5095))
-          fprintf ppf "immediate"
-=======
-          fprintf ppf "immediate"
         | Base Scannable when Scannable_axes.(equal sa immediate64_axes) ->
-          fprintf ppf "immediate64"
->>>>>>> e3b7d6f512 (Add `non_pointer64` on the separability axis (#5095))
+          Fmt.fprintf ppf "immediate64"
         | Base Scannable ->
           let value_axes_diff =
             Scannable_axes.(to_string_list_diff ~base:value_axes sa)
