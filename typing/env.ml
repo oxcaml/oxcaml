@@ -1056,7 +1056,7 @@ module Normalize_mode = struct
     | Assert_normalized, true -> modality, mode
     | (Normalize | Normalize_exn), false ->
         Mode.Modality.undefined,
-        Mode.Modality.apply ~hint:{monadic = Unknown; comonadic = Unknown}
+        Mode.Modality.apply_left
           modality mode
     | Assert_normalized, false ->
         Misc.fatal_error "mode is not already normalized but expected otherwise"
@@ -4578,7 +4578,7 @@ let lookup_settable_variable ?(use=true) ~loc name env =
           let mode =
             m0
             |> walk_locks_for_mutable_mode ~errors:true ~loc ~env locks
-            |> Mode.Modality.Const.apply
+            |> Mode.Modality.Const.apply_right
                 Typemode.let_mutable_modalities
           in
           mutate_value ~use ~loc path vda;

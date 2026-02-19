@@ -550,15 +550,25 @@ let mode_morph f expected_mode =
   let tuple_modes = None in
   {expected_mode with mode; tuple_modes}
 
+(** Takes the mode of a container, a child's relation to it, and an optional
+    modality, returns the mode of the child. *)
+let apply_left_is_contained_by is_contained_by
+  ?(modalities = Modality.Const.id) mode =
+  Modality.Const.apply_left ~is_contained_by modalities mode
+
+let apply_right_is_contained_by is_contained_by
+  ?(modalities = Modality.Const.id) mode =
+  Modality.Const.apply_right ~is_contained_by modalities mode
+
 (** Similiar to [apply_is_contained_by] but for [expected_mode]. *)
 let mode_is_contained_by is_contained_by ?modalities expected_mode =
   as_single_mode expected_mode
-  |> apply_is_contained_by is_contained_by ?modalities
+  |> apply_right_is_contained_by is_contained_by ?modalities
   |> mode_default
 
 let mode_modality modality expected_mode =
   as_single_mode expected_mode
-  |> Modality.Const.apply modality
+  |> Modality.Const.apply_right modality
   |> mode_default
 
 (* used when entering a function;
@@ -749,6 +759,22 @@ let register_allocation_value_mode ~loc
       (Mode.Value.disallow_left mode)
   in
   alloc_mode, mode
+
+(* Unlike most allocations, which can be the highest mode allowed by
+   [expected_mode], functions have more constraints. For example, a two
+   parameter function needs to be made global if its partial application
+   to one argument must be global. As a result, a function gets an
+   [Alloc.lr] allocation mode that can be further constrained. *)
+let register_closure_allocation (mode : Value.r) ~loc : Alloc.lr * Value.r =
+  let hint = (Hint.Allocation_r {loc; txt = Unknown}) in
+  let (alloc_mode : Alloc.lr), _ =
+    Alloc.newvar_below (value_to_alloc_r2g ~hint mode)
+  in
+  register_allocation_mode (Alloc.disallow_left alloc_mode);
+  let closed_over_mode =
+    alloc_as_value ~hint:Skip (Alloc.disallow_left alloc_mode)
+  in
+  alloc_mode, closed_over_mode
 
 (** Register as allocation the expression constrained by the given
     [expected_mode]. Returns the mode of the allocation, and the expected mode
@@ -1728,7 +1754,7 @@ let solve_Ppat_tuple ~refine ~alloc_mode loc env args expected_ty =
         { containing = Tuple;
           container = (loc, Pattern) }
       in
-      let mode = apply_is_contained_by is_contained_by alloc_mode.mode in
+      let mode = apply_left_is_contained_by is_contained_by alloc_mode.mode in
       List.init arity (fun _ -> mode)
   in
   let ann =
@@ -1759,7 +1785,7 @@ let solve_Ppat_unboxed_tuple ~refine ~alloc_mode loc env args expected_ty =
         { containing = Tuple;
           container = (loc, Pattern) }
       in
-      let mode = apply_is_contained_by is_contained_by alloc_mode.mode in
+      let mode = apply_left_is_contained_by is_contained_by alloc_mode.mode in
       List.init arity (fun _ -> mode)
   in
   let ann =
@@ -2879,7 +2905,7 @@ and type_pat_aux
       {containing = Array Modality; container = (loc, Pattern)}
     in
     let alloc_mode =
-      apply_is_contained_by is_contained_by ~modalities alloc_mode.mode
+      apply_left_is_contained_by is_contained_by ~modalities alloc_mode.mode
     in
     let alloc_mode = simple_pat_mode alloc_mode in
     let pl =
@@ -3005,8 +3031,8 @@ and type_pat_aux
             container = (loc, Pattern) }
         in
         let mode =
-          apply_is_contained_by is_contained_by ~modalities:label.lbl_modalities
-            alloc_mode.mode
+          apply_left_is_contained_by is_contained_by
+            ~modalities:label.lbl_modalities alloc_mode.mode
         in
         let alloc_mode = simple_pat_mode mode in
         (label_lid, label, type_pat tps Value ~alloc_mode sarg ty_arg
@@ -3287,7 +3313,7 @@ and type_pat_aux
         List.map2
           (fun p (arg : Types.constructor_argument) ->
              let alloc_mode =
-              apply_is_contained_by is_contained_by
+              apply_left_is_contained_by is_contained_by
                 ~modalities:arg.ca_modalities alloc_mode.mode
              in
              let alloc_mode =
@@ -5539,15 +5565,8 @@ let split_function_ty
     env (expected_mode : expected_mode) ty_expected loc ~arg_label ~has_poly
     ~mode_annots ~ret_mode_annots ~in_function ~is_first_val_param ~is_final_val_param
   =
-  let alloc_mode, mode =
-      (* Unlike most allocations which can be the highest mode allowed by
-         [expected_mode] and their [alloc_mode] identical to [expected_mode] ,
-         functions have more constraints. For example, an outer function needs
-         to be made global if its inner function is global. As a result, a
-         function deserves a separate allocation mode.
-      *)
-      let mode, _ = Value.newvar_below (as_single_mode expected_mode) in
-      register_allocation_value_mode ~loc mode
+  let alloc_mode, closed_over_mode =
+    register_closure_allocation ~loc (as_single_mode expected_mode)
   in
   if expected_mode.strictly_local then
     Locality.submode_exn ~pp:(loc, Function) Locality.local
@@ -5590,7 +5609,7 @@ let split_function_ty
         let env =
           Env.add_closure_lock
             (loc, Function)
-            mode.comonadic
+            closed_over_mode.comonadic
             env
         in
         Env.add_region_lock env
@@ -5988,7 +6007,7 @@ and type_expect_
           (fun loc ty mode -> (* only change mode here, see type_label_exp *)
              List.map (fun (_, label, _) ->
                let mode =
-                apply_is_contained_by
+                apply_left_is_contained_by
                   { containing = Record (label.lbl_name, Modality);
                     container = (loc, Expression) }
                   ~modalities:label.lbl_modalities mode
@@ -6036,7 +6055,7 @@ and type_expect_
                   container = (extended_expr_loc, Expression) }
               in
               let mode =
-                apply_is_contained_by is_contained_by
+                apply_left_is_contained_by is_contained_by
                   ~modalities:lbl.lbl_modalities mode
               in
               check_construct_mutability ~loc:record_loc ~env lbl.lbl_mut
@@ -6165,7 +6184,7 @@ and type_expect_
             match path with
             | Path.Pident id ->
               let modalities = Typemode.let_mutable_modalities in
-              let mode = Modality.Const.apply modalities actual_mode in
+              let mode = Modality.Const.apply_left modalities actual_mode in
               submode ~loc ~env mode expected_mode;
               Texp_mutvar {loc = lid.loc; txt = id}
             | _ ->
@@ -6680,8 +6699,8 @@ and type_expect_
           container = (record.exp_loc, Expression) }
       in
       let mode =
-        apply_is_contained_by is_contained_by ~modalities:label.lbl_modalities
-          rmode
+        apply_left_is_contained_by is_contained_by
+          ~modalities:label.lbl_modalities rmode
       in
       let boxing : texp_field_boxing =
         let is_float_boxing =
@@ -6750,8 +6769,8 @@ and type_expect_
           container = (record.exp_loc, Expression) }
       in
       let mode =
-        apply_is_contained_by is_contained_by ~modalities:label.lbl_modalities
-          rmode
+        apply_left_is_contained_by is_contained_by
+          ~modalities:label.lbl_modalities rmode
       in
       let mode = cross_left env ty_arg mode in
       submode ~loc ~env mode expected_mode;
@@ -6799,8 +6818,9 @@ and type_expect_
       unify_exp env record ty_record;
       rue {
         exp_desc = Texp_setfield (record,
-          Locality.disallow_right (regional_to_local
-            (Value.proj_comonadic Areality rmode)),
+          Locality.disallow_right
+            (Alloc.proj_comonadic Areality
+               (value_to_alloc_r2l rmode)),
           label_loc, label, newval);
         exp_loc = loc; exp_extra = [];
         exp_type = instance Predef.type_unit;
@@ -9155,16 +9175,13 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
          cases, look toward the end of
          typing-layouts-missing-cmi/function_arg.ml *)
       let func texp =
-        let ret_mode = alloc_as_value mret in
         let e =
           {texp with exp_type = ty_res; exp_desc =
            Texp_apply
              (texp,
-              args @ [Nolabel, Arg (eta_var, arg_sort)], Nontail,
-              ret_mode
-              |> Value.proj_comonadic Areality
-              |> regional_to_global
-              |> Locality.disallow_right,
+              args @ [Nolabel, Arg (eta_var, arg_sort)],
+              Nontail,
+              Alloc.proj_comonadic Areality (Alloc.disallow_right mret),
               None)}
         in
         let e = {texp with exp_type = ty_res; exp_desc = Texp_exclave e} in
@@ -9396,7 +9413,7 @@ and type_tuple ~overwrite ~loc ~env ~(expected_mode : expected_mode) ~ty_expecte
   in
   let argument_mode =
     value_mode
-    |> apply_is_contained_by
+    |> apply_right_is_contained_by
       {containing = Tuple; container = (loc, Expression)}
   in
   (* CR layouts v5: non-values in tuples *)
@@ -9465,7 +9482,8 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
   assert (arity >= 2);
   let argument_mode =
     expected_mode.mode
-    |> apply_is_contained_by {containing = Tuple; container = (loc, Expression)}
+    |> apply_right_is_contained_by
+         { containing = Tuple; container = (loc, Expression) }
   in
   (* elements must be representable *)
   let labels_types_and_sorts =
@@ -9649,7 +9667,7 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
          let ty_args, _, _ = unify_as_construct ty in
          List.map (fun ty_arg ->
            let mode =
-            apply_is_contained_by
+            apply_left_is_contained_by
               { containing = Constructor (constr.cstr_name, Modality);
                 container = (loc, Expression) }
               ~modalities:ty_arg.Types.ca_modalities mode
