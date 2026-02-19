@@ -303,7 +303,7 @@ let rewrite_gen : type s.
           then
             (* insert block *)
             (* CR-soon xclerc for xclerc: now that we preprocess critical nodes,
-               no insertion should occur here. *)
+               no block insertion should occur here. *)
             let (_ : Cfg.basic_block list) =
               Cfg_with_layout.insert_block
                 (Cfg_with_infos.cfg_with_layout cfg_with_infos)
@@ -506,7 +506,7 @@ let insert_dummy_uses : Cfg_with_infos.t -> cfg_infos -> unit =
               in
               let new_instrs = DLL.make_single dummy_use in
               (* CR-soon xclerc for xclerc: now that we preprocess critical
-                 nodes, no insertion should occur here. *)
+                 nodes, no block insertion should occur here. *)
               let (_ : Cfg.basic_block list) =
                 Cfg_with_layout.insert_block
                   (Cfg_with_infos.cfg_with_layout cfg_with_infos)
