@@ -1702,8 +1702,8 @@ end = struct
   let error_messages t : Location.error list =
     let pp_inlined_dbg ppf dbg =
       (* Show inlined locations, if dbg has more than one item. The last item,
-         containing the actual allocation or function call,
-         will be shown at the start of the error message. *)
+         containing the actual allocation or function call, will be shown at the
+         start of the error message. *)
       let items = Debuginfo.to_items dbg in
       if List.compare_length_with items 1 > 0
       then
