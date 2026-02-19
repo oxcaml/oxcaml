@@ -767,9 +767,13 @@ let register_allocation_value_mode ~loc
    [Alloc.lr] allocation mode that can be further constrained. *)
 let register_closure_allocation (mode : Value.r) ~loc : Alloc.lr * Value.r =
   let hint = (Hint.Allocation_r {loc; txt = Unknown}) in
-  let (alloc_mode : Alloc.lr), _ = Alloc.newvar_below (value_to_alloc_r2g ~hint mode) in
+  let (alloc_mode : Alloc.lr), _ =
+    Alloc.newvar_below (value_to_alloc_r2g ~hint mode)
+  in
   register_allocation_mode (Alloc.disallow_left alloc_mode);
-  let closed_over_mode = (alloc_as_value ~hint:Skip (Alloc.disallow_left alloc_mode)) in
+  let closed_over_mode =
+    alloc_as_value ~hint:Skip (Alloc.disallow_left alloc_mode)
+  in
   alloc_mode, closed_over_mode
 
 (** Register as allocation the expression constrained by the given
@@ -3027,8 +3031,8 @@ and type_pat_aux
             container = (loc, Pattern) }
         in
         let mode =
-          apply_left_is_contained_by is_contained_by ~modalities:label.lbl_modalities
-            alloc_mode.mode
+          apply_left_is_contained_by is_contained_by
+            ~modalities:label.lbl_modalities alloc_mode.mode
         in
         let alloc_mode = simple_pat_mode mode in
         (label_lid, label, type_pat tps Value ~alloc_mode sarg ty_arg
@@ -6695,8 +6699,8 @@ and type_expect_
           container = (record.exp_loc, Expression) }
       in
       let mode =
-        apply_left_is_contained_by is_contained_by ~modalities:label.lbl_modalities
-          rmode
+        apply_left_is_contained_by is_contained_by
+          ~modalities:label.lbl_modalities rmode
       in
       let boxing : texp_field_boxing =
         let is_float_boxing =
@@ -6765,8 +6769,8 @@ and type_expect_
           container = (record.exp_loc, Expression) }
       in
       let mode =
-        apply_left_is_contained_by is_contained_by ~modalities:label.lbl_modalities
-          rmode
+        apply_left_is_contained_by is_contained_by
+          ~modalities:label.lbl_modalities rmode
       in
       let mode = cross_left env ty_arg mode in
       submode ~loc ~env mode expected_mode;
@@ -9478,7 +9482,8 @@ and type_unboxed_tuple ~loc ~env ~(expected_mode : expected_mode) ~ty_expected
   assert (arity >= 2);
   let argument_mode =
     expected_mode.mode
-    |> apply_right_is_contained_by {containing = Tuple; container = (loc, Expression)}
+    |> apply_right_is_contained_by
+         { containing = Tuple; container = (loc, Expression) }
   in
   (* elements must be representable *)
   let labels_types_and_sorts =

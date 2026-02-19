@@ -2996,7 +2996,8 @@ and  type_module_maybe_hold_locks ?(alias=false) ~hold_locks sttn funct_body
     (fun () -> type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       smod)
 
-and type_module_aux ~alias ~hold_locks sttn funct_body anchor env ?expected_mode smod =
+and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
+    ?expected_mode smod =
   (* If the module is an identifier, there might be locks between the
   declaration site and the use site.
   - If [hold_locks] is [true], the locks are held and stored in [mod_mode].
