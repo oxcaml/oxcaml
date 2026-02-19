@@ -469,11 +469,11 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   end;
   match x.pat_desc with
   | Tpat_any -> line i ppf "Tpat_any\n";
-  | Tpat_var (s,_,_,sort,m) ->
+  | Tpat_var { id = s; sort; mode = m; _ } ->
       line i ppf "Tpat_var \"%a\"\n" fmt_ident s;
       line i ppf "sort %a\n" fmt_sort sort;
       value_mode i ppf m
-  | Tpat_alias (p, s,_,_,sort,m,_) ->
+  | Tpat_alias { pattern = p; id = s; sort; mode = m; _ } ->
       line i ppf "Tpat_alias \"%a\"\n" fmt_ident s;
       line i ppf "sort %a\n" fmt_sort sort;
       value_mode i ppf m;
