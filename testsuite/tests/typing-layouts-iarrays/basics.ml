@@ -130,7 +130,7 @@ let d (x : 'a iarray) = get x 0
 [%%expect{|
 external get : ('a : any separable). 'a iarray -> int -> float
   = "%floatarray_safe_get"
-val d : ('a : value_or_null separable). 'a iarray -> float = <fun>
+val d : ('a : value maybe_null). 'a iarray -> float = <fun>
 |}];;
 
 external get : int32# iarray -> int -> float = "%floatarray_safe_get"
@@ -269,7 +269,7 @@ Line 2, characters 39-44:
 2 |   let[@warning "-10"] rec x = [: x :]; #42.0 in
                                            ^^^^^
 Error: This expression has type "float#" but an expression was expected of type
-         "('a : value_or_null separable)"
+         "('a : value maybe_null)"
        The layout of float# is float64
          because it is the unboxed version of the primitive type float.
        But the layout of float# must be a value layout
@@ -285,7 +285,7 @@ Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [: x :]; #42l in
                                            ^^^^
 Error: This expression has type "int32#" but an expression was expected of type
-         "('a : value_or_null separable)"
+         "('a : value maybe_null)"
        The layout of int32# is bits32
          because it is the unboxed version of the primitive type int32.
        But the layout of int32# must be a value layout
@@ -301,7 +301,7 @@ Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [: x :]; #42L in
                                            ^^^^
 Error: This expression has type "int64#" but an expression was expected of type
-         "('a : value_or_null separable)"
+         "('a : value maybe_null)"
        The layout of int64# is bits64
          because it is the unboxed version of the primitive type int64.
        But the layout of int64# must be a value layout
@@ -317,7 +317,7 @@ Line 2, characters 39-43:
 2 |   let[@warning "-10"] rec x = [: x :]; #42n in
                                            ^^^^
 Error: This expression has type "nativeint#"
-       but an expression was expected of type "('a : value_or_null separable)"
+       but an expression was expected of type "('a : value maybe_null)"
        The layout of nativeint# is word
          because it is the unboxed version of the primitive type nativeint.
        But the layout of nativeint# must be a value layout
@@ -333,7 +333,7 @@ Line 2, characters 39-45:
 2 |   let[@warning "-10"] rec x = [: x :]; #42.0s in
                                            ^^^^^^
 Error: This expression has type "float32#"
-       but an expression was expected of type "('a : value_or_null separable)"
+       but an expression was expected of type "('a : value maybe_null)"
        The layout of float32# is float32
          because it is the unboxed version of the primitive type float32.
        But the layout of float32# must be a value layout

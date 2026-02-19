@@ -71,7 +71,7 @@ Line 1, characters 24-40:
                             ^^^^^^^^^^^^^^^^
 Error: This expression has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value)"
-       The layout of 'a Or_null.t is value maybe_separable
+       The layout of 'a Or_null.t is value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of 'a Or_null.t must be a sublayout of value
          because of the definition of t at line 2, characters 2-79.
@@ -92,7 +92,7 @@ Line 4, characters 24-40:
                             ^^^^^^^^^^^^^^^^
 Error: This expression has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value)"
-       The layout of 'a Or_null.t is value maybe_separable
+       The layout of 'a Or_null.t is value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of 'a Or_null.t must be a sublayout of value
          because of the definition of t at line 2, characters 2-45.
@@ -106,7 +106,7 @@ type 'a t : value = 'a or_null [@@or_null_reexport]
 Line 1, characters 0-51:
 1 | type 'a t : value = 'a or_null [@@or_null_reexport]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "'a or_null" is value maybe_separable
+Error: The layout of type "'a or_null" is value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of type "'a or_null" must be a sublayout of value
          because of the definition of t at line 1, characters 0-51.
@@ -118,7 +118,7 @@ type 'a t : float64 = 'a or_null [@@or_null_reexport]
 Line 1, characters 0-53:
 1 | type 'a t : float64 = 'a or_null [@@or_null_reexport]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The layout of type "'a or_null" is value maybe_separable
+Error: The layout of type "'a or_null" is value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of type "'a or_null" must be a sublayout of float64
          because of the definition of t at line 1, characters 0-53.
@@ -156,9 +156,9 @@ Line 4, characters 24-40:
                             ^^^^^^^^^^^^^^^^
 Error: This expression has type "'a Or_null.t" = "'a or_null"
        but an expression was expected of type "('b : value maybe_separable)"
-       The kind of 'a Or_null.t is value_or_null mod everything with 'a
+       The layout of 'a Or_null.t is value maybe_separable maybe_null
          because it is the primitive type or_null.
-       But the kind of 'a Or_null.t must be a subkind of
+       But the layout of 'a Or_null.t must be a sublayout of
            value maybe_separable
          because of the definition of t at line 2, characters 2-63.
 |}]

@@ -109,7 +109,7 @@ Line 1, characters 13-18:
 1 | type fails = t_von accepts_sep
                  ^^^^^
 Error: This type "t_von" should be an instance of type "('a : any separable)"
-       The layout of t_von is value maybe_separable
+       The layout of t_von is value maybe_separable maybe_null
          because of the definition of t_von at line 1, characters 0-26.
        But the layout of t_von must be a sublayout of any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
@@ -122,7 +122,7 @@ Line 1, characters 13-18:
 1 | type fails = t_von accepts_nonfloat
                  ^^^^^
 Error: This type "t_von" should be an instance of type "('a : any non_float)"
-       The layout of t_von is value maybe_separable
+       The layout of t_von is value maybe_separable maybe_null
          because of the definition of t_von at line 1, characters 0-26.
        But the layout of t_von must be a sublayout of any non_float
          because of the definition of accepts_nonfloat at line 3, characters 0-46.
@@ -504,7 +504,7 @@ Line 1, characters 13-26:
                  ^^^^^^^^^^^^^
 Error: This type "t_val or_null" should be an instance of type
          "('a : any separable)"
-       The layout of t_val or_null is value maybe_separable
+       The layout of t_val or_null is value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of t_val or_null must be a sublayout of any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
@@ -559,7 +559,7 @@ Line 1, characters 13-26:
                  ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
          "('a : any separable)"
-       The layout of float or_null is value maybe_separable
+       The layout of float or_null is value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of float or_null must be a sublayout of any separable
          because of the definition of accepts_sep at line 2, characters 0-41.
@@ -613,7 +613,7 @@ Line 1, characters 13-26:
                  ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
          "('a : any separable)"
-       The layout of float or_null is value maybe_separable
+       The layout of float or_null is value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of float or_null must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -747,9 +747,19 @@ Line 3, characters 83-89:
 3 | type ('c : value & value & float64 mod non_null non_float) fails = unit constraint 'c = c
                                                                                        ^^^^^^
 Error: The type constraints are not consistent.
+<<<<<<< HEAD
        Type "('c : value & value & float64_internal)"
        is not compatible with type "c" = "#(float * float or_null * float#)"
        The layout of c is value & value maybe_separable & float64
+||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
+       Type "('c : value & value & float64)" is not compatible with type
+         "c" = "#(float * float or_null * float#)"
+       The layout of c is value & value maybe_separable & float64
+=======
+       Type "('c : value & value & float64)" is not compatible with type
+         "c" = "#(float * float or_null * float#)"
+       The layout of c is value & value maybe_separable maybe_null & float64
+>>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
          because it is an unboxed tuple.
        But the layout of c must be a sublayout of value & value & float64
          because of the annotation on 'c in the declaration of the type fails.
@@ -809,7 +819,8 @@ Line 1, characters 13-37:
                  ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type "float Or_null_reexport.t" = "float or_null"
        should be an instance of type "('a : any non_float)"
-       The layout of float Or_null_reexport.t is value maybe_separable
+       The layout of float Or_null_reexport.t is
+           value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of float Or_null_reexport.t must be a sublayout of
            any non_float
@@ -824,7 +835,8 @@ Line 1, characters 13-37:
                  ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This type "float Or_null_reexport.t" = "float or_null"
        should be an instance of type "('a : any separable)"
-       The layout of float Or_null_reexport.t is value maybe_separable
+       The layout of float Or_null_reexport.t is
+           value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of float Or_null_reexport.t must be a sublayout of
            any separable
@@ -855,7 +867,7 @@ Line 1, characters 13-31:
                  ^^^^^^^^^^^^^^^^^^
 Error: This type "float unbx or_null" should be an instance of type
          "('a : any separable)"
-       The layout of float unbx or_null is value maybe_separable
+       The layout of float unbx or_null is value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of float unbx or_null must be a sublayout of
            any separable
@@ -935,9 +947,10 @@ Error: Signature mismatch:
          type 'a t = float or_null
        is not included in
          type ('a : value non_float) t : value_or_null non_float
-       The layout of the first is value maybe_separable
+       The layout of the first is value maybe_separable maybe_null
          because it is the primitive type or_null.
-       But the layout of the first must be a sublayout of value non_float
+       But the layout of the first must be a sublayout of
+           value non_float maybe_null
          because of the definition of t at line 2, characters 2-65.
 |}]
 
@@ -954,7 +967,7 @@ module type S0 = sig
 end
 
 [%%expect{|
-module type S0 = sig type t : value_or_null separable end
+module type S0 = sig type t : value maybe_null end
 |}]
 
 module M5 : S0 = struct
@@ -990,10 +1003,10 @@ Error: Signature mismatch:
        Type declarations do not match:
          type t = float or_null
        is not included in
-         type t : value_or_null separable
-       The layout of the first is value maybe_separable
+         type t : value maybe_null
+       The layout of the first is value maybe_separable maybe_null
          because it is the primitive type or_null.
-       But the layout of the first must be a sublayout of value
+       But the layout of the first must be a sublayout of value maybe_null
          because of the definition of t at line 2, characters 2-38.
 |}]
 

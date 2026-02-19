@@ -120,8 +120,6 @@ module Modifier_axis_pair = struct
         P (Nonmodal ax, a)
       in
       match s with
-      | "maybe_null" -> nonmodal Nullability Maybe_null
-      | "non_null" -> nonmodal Nullability Non_null
       | "internal" -> nonmodal Externality Internal
       | "external64" -> nonmodal Externality External64
       | "external_" -> nonmodal Externality External
@@ -148,9 +146,9 @@ module Transled_modifiers = struct
       (* CR-soon zqian: Create a functor [Mode.Value.Const.Make] to generate
          different type operators applied on mode constants. *)
       externality : Jkind_axis.Externality.t Location.loc option;
-      nullability : Jkind_axis.Nullability.t Location.loc option;
       (* CR layouts-scannable: This is a temporary hack to support the previous
          syntax. The location is not being used for anything currently. *)
+      nullability : Jkind_axis.Nullability.t Location.loc option;
       separability : Jkind_axis.Separability.t Location.loc option
     }
 
@@ -164,9 +162,9 @@ module Transled_modifiers = struct
       yielding = None;
       statefulness = None;
       visibility = None;
+      staticity = None;
       externality = None;
       nullability = None;
-      staticity = None;
       separability = None
     }
 
@@ -183,7 +181,6 @@ module Transled_modifiers = struct
     | Modal (Monadic Visibility) -> t.visibility
     | Modal (Monadic Staticity) -> t.staticity
     | Nonmodal Externality -> t.externality
-    | Nonmodal Nullability -> t.nullability
 
   let set (type a) ~(axis : a Axis.t) (t : t) (value : a Location.loc option) :
       t =
@@ -199,7 +196,8 @@ module Transled_modifiers = struct
     | Modal (Monadic Visibility) -> { t with visibility = value }
     | Modal (Monadic Staticity) -> { t with staticity = value }
     | Nonmodal Externality -> { t with externality = value }
-    | Nonmodal Nullability -> { t with nullability = value }
+
+  let set_nullability t nullability = { t with nullability }
 
   let set_separability t separability = { t with separability }
 end
@@ -290,6 +288,12 @@ let transl_mod_bounds annots =
       | "maybe_separable" ->
         Transled_modifiers.set_separability bounds_so_far
           (Some { txt = Maybe_separable; loc })
+      | "non_null" ->
+        Transled_modifiers.set_nullability bounds_so_far
+          (Some { txt = Non_null; loc })
+      | "maybe_null" ->
+        Transled_modifiers.set_nullability bounds_so_far
+          (Some { txt = Maybe_null; loc })
       | "everything" ->
         Transled_modifiers.
           { areality =
@@ -312,8 +316,7 @@ let transl_mod_bounds annots =
             visibility =
               Some { txt = Per_axis.min (Modal (Monadic Visibility)); loc };
             staticity = None;
-            nullability =
-              Transled_modifiers.get ~axis:(Nonmodal Nullability) bounds_so_far;
+            nullability = bounds_so_far.nullability;
             separability = bounds_so_far.separability
           }
       | _ -> raise (Error (loc, Unrecognized_modifier (Modifier, txt))))
@@ -362,12 +365,9 @@ let transl_mod_bounds annots =
     Option.fold ~some:Location.get_txt ~none:Externality.max
       raw_modifiers.externality
   in
-  let nullability =
-    Option.fold ~some:Location.get_txt ~none:Nullability.max
-      raw_modifiers.nullability
-  in
   let crossing = Crossing.modality modality Crossing.max in
-  create crossing ~externality ~nullability, raw_modifiers.separability
+  ( create crossing ~externality,
+    (raw_modifiers.nullability, raw_modifiers.separability) )
 
 let default_mode_annots (annots : Alloc.Const.Option.t) =
   (* [forkable] has a different default depending on whether [areality]
@@ -550,11 +550,15 @@ let least_modalities ~include_implied ~mut (t : Modality.Const.t) =
 
 let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
     Parsetree.modes =
+  (* CR rtjoa: support (verbose = true) to not override
+     https://github.com/oxcaml/oxcaml/pull/5304 *)
+  ignore verbose;
   let crossing = Jkind.Mod_bounds.crossing bounds in
   let modality = Crossing.to_modality crossing in
   let least_modalities =
     least_modalities ~include_implied:verbose ~mut:Immutable modality
   in
+<<<<<<< HEAD
   let modality_annots =
     List.map
       (fun (Atom (ax, m) : Modality.atom) ->
@@ -604,6 +608,29 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
     | false -> []
   in
   modality_annots @ nonmodal_annots @ verbose_annots
+||||||| parent of 68ce059711 (Make nullability a scannable axis (#5086))
+  let nonmodal_annots =
+    let open Jkind.Mod_bounds in
+    let mk_annot default print value =
+      if (not verbose) && value = default
+      then None
+      else
+        let s = Format.asprintf "%a" print value in
+        Some { Location.txt = Parsetree.Mode s; loc = Location.none }
+    in
+    [ mk_annot Externality.max Externality.print (externality bounds);
+      mk_annot Nullability.max Nullability.print (nullability bounds) ]
+    |> List.filter_map Fun.id
+  in
+  modality_annots @ nonmodal_annots
+=======
+  let externality = Jkind.Mod_bounds.externality bounds in
+  if externality = Externality.max
+  then modality_annots
+  else
+    modality_annots
+    @ [Location.mknoloc (Parsetree.Mode (Externality.to_string externality))]
+>>>>>>> 68ce059711 (Make nullability a scannable axis (#5086))
 
 let sort_dedup_modalities ~warn l =
   let open Modality in
