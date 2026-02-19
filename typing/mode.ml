@@ -1051,7 +1051,7 @@ module Lattices = struct
     | Comonadic_with_regionality -> Comonadic_with_regionality.print
 
   let equal_obj : type a b. a obj -> b obj -> (a, b) equality =
-    fun a b ->
+   fun a b ->
     match a, b with
     | Locality, Locality -> Equal
     | Regionality, Regionality -> Equal
@@ -1067,16 +1067,15 @@ module Lattices = struct
     | Monadic_op, Monadic_op -> Equal
     | Comonadic_with_locality, Comonadic_with_locality -> Equal
     | Comonadic_with_regionality, Comonadic_with_regionality -> Equal
-    | ( ( Locality | Regionality | Uniqueness_op | Contention_op
-          | Visibility_op | Linearity | Portability | Forkable | Yielding
-          | Statefulness | Staticity_op | Monadic_op
-          | Comonadic_with_locality | Comonadic_with_regionality ),
+    | ( ( Locality | Regionality | Uniqueness_op | Contention_op | Visibility_op
+        | Linearity | Portability | Forkable | Yielding | Statefulness
+        | Staticity_op | Monadic_op | Comonadic_with_locality
+        | Comonadic_with_regionality ),
         _ ) ->
-        Not_equal
-
+      Not_equal
 
   let compare_obj : type a b. a obj -> b obj -> (a, b) comparison =
-    fun a b ->
+   fun a b ->
     match a, b with
     | Locality, Locality -> Equal
     | Locality, _ -> Less_than
@@ -1118,7 +1117,6 @@ module Lattices = struct
     | Comonadic_with_regionality, _ -> Less_than
     | _, Comonadic_with_regionality -> Greater_than
     | Comonadic_with_locality, Comonadic_with_locality -> Equal
-
 end
 
 module Lattices_mono = struct
@@ -1168,8 +1166,7 @@ module Lattices_mono = struct
           _ ) ->
         Not_equal
 
-    let compare :
-        type p r1 r2. (p, r1) t -> (p, r2) t -> (r1, r2) comparison =
+    let compare : type p r1 r2. (p, r1) t -> (p, r2) t -> (r1, r2) comparison =
      fun ax1 ax2 ->
       match ax1, ax2 with
       | Areality, Areality -> Equal
@@ -1439,8 +1436,7 @@ module Lattices_mono = struct
       let src0 = src dst0 f in
       comonadic_with_obj src0
 
-  let rec equal_morph :
-      type a1 l1 r1 a2 b l2 r2.
+  let rec equal_morph : type a1 l1 r1 a2 b l2 r2.
       b obj ->
       (a1, b, l1 * r1) morph ->
       (a2, b, l2 * r2) morph ->
@@ -1469,12 +1465,12 @@ module Lattices_mono = struct
     | Imply_const c1, Imply_const c2 -> if c1 = c2 then Equal else Not_equal
     | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Equal
     | Comonadic_to_monadic_min a1, Comonadic_to_monadic_min a2 -> begin
-        match equal_obj a1 a2 with Not_equal -> Not_equal | Equal -> Equal
-      end
+      match equal_obj a1 a2 with Not_equal -> Not_equal | Equal -> Equal
+    end
     | Monadic_to_comonadic_max, Monadic_to_comonadic_max -> Equal
     | Comonadic_to_monadic_max a1, Comonadic_to_monadic_max a2 -> begin
-        match equal_obj a1 a2 with Not_equal -> Not_equal | Equal -> Equal
-      end
+      match equal_obj a1 a2 with Not_equal -> Not_equal | Equal -> Equal
+    end
     | Local_to_regional, Local_to_regional -> Equal
     | Locality_as_regionality, Locality_as_regionality -> Equal
     | Global_to_regional, Global_to_regional -> Equal
@@ -1484,20 +1480,23 @@ module Lattices_mono = struct
       match equal_morph _dst f1 f2 with
       | Not_equal -> Not_equal
       | Equal -> (
-        match equal_morph (src _dst f1) g1 g2 with Not_equal -> Not_equal | Equal -> Equal))
+        match equal_morph (src _dst f1) g1 g2 with
+        | Not_equal -> Not_equal
+        | Equal -> Equal))
     | Map_comonadic f, Map_comonadic g -> (
-      match equal_morph (proj_obj Areality _dst) f g with Equal -> Equal | Not_equal -> Not_equal)
+      match equal_morph (proj_obj Areality _dst) f g with
+      | Equal -> Equal
+      | Not_equal -> Not_equal)
     | ( ( Id | Proj _ | Max_with _ | Min_with _ | Meet_const _
         | Monadic_to_comonadic_min | Comonadic_to_monadic_min _
         | Monadic_to_comonadic_max | Comonadic_to_monadic_max _
-        | Local_to_regional | Locality_as_regionality
-        | Global_to_regional | Regional_to_local
-        | Regional_to_global | Compose _ | Map_comonadic _ | Imply_const _ ),
+        | Local_to_regional | Locality_as_regionality | Global_to_regional
+        | Regional_to_local | Regional_to_global | Compose _ | Map_comonadic _
+        | Imply_const _ ),
         _ ) ->
       Not_equal
 
-  let rec compare_morph :
-      type a1 l1 r1 a2 b l2 r2.
+  let rec compare_morph : type a1 l1 r1 a2 b l2 r2.
       b obj ->
       (a1, b, l1 * r1) morph ->
       (a2, b, l2 * r2) morph ->
@@ -1511,11 +1510,11 @@ module Lattices_mono = struct
       match compare_obj src1 src2 with
       | Less_than -> Less_than
       | Greater_than -> Greater_than
-      | Equal ->
+      | Equal -> (
         match Axis.compare ax1 ax2 with
         | Less_than -> Less_than
         | Greater_than -> Greater_than
-        | Equal -> Equal)
+        | Equal -> Equal))
     | Proj _, _ -> Less_than
     | _, Proj _ -> Greater_than
     | Max_with ax1, Max_with ax2 -> (
@@ -1533,15 +1532,11 @@ module Lattices_mono = struct
     | Min_with _, _ -> Less_than
     | _, Min_with _ -> Greater_than
     | Meet_const c1, Meet_const c2 ->
-      if c1 = c2 then Equal
-      else if c1 < c2 then Less_than
-      else Greater_than
+      if c1 = c2 then Equal else if c1 < c2 then Less_than else Greater_than
     | Meet_const _, _ -> Less_than
     | _, Meet_const _ -> Greater_than
     | Imply_const c1, Imply_const c2 ->
-      if c1 = c2 then Equal
-      else if c1 < c2 then Less_than
-      else Greater_than
+      if c1 = c2 then Equal else if c1 < c2 then Less_than else Greater_than
     | Imply_const _, _ -> Less_than
     | _, Imply_const _ -> Greater_than
     | Monadic_to_comonadic_min, Monadic_to_comonadic_min -> Equal
@@ -1583,11 +1578,11 @@ module Lattices_mono = struct
       match compare_morph dst f1 f2 with
       | Less_than -> Less_than
       | Greater_than -> Greater_than
-      | Equal ->
+      | Equal -> (
         match compare_morph (src dst f1) g1 g2 with
         | Less_than -> Less_than
         | Greater_than -> Greater_than
-        | Equal -> Equal)
+        | Equal -> Equal))
     | Compose _, _ -> Less_than
     | _, Compose _ -> Greater_than
     | Map_comonadic f, Map_comonadic g -> (
@@ -1843,10 +1838,10 @@ module Lattices_mono = struct
         | Statefulness -> Axis Statefulness
         | Portability -> Axis Portability)
       | Max_with m_ax, ax | Min_with m_ax, ax -> begin
-          match Axis.equal m_ax ax with
-          | Not_equal -> NoneResponsible
-          | Equal -> SourceIsSingle
-        end
+        match Axis.equal m_ax ax with
+        | Not_equal -> NoneResponsible
+        | Equal -> SourceIsSingle
+      end
       | Monadic_to_comonadic_min, ax -> handle_monadic_to_comonadic ax
       | Monadic_to_comonadic_max, ax -> handle_monadic_to_comonadic ax
       | Comonadic_to_monadic_min _, ax -> handle_comonadic_to_monadic ax
@@ -3289,12 +3284,11 @@ module Comonadic_with (Areality : Areality) = struct
         P Forkable;
         P Yielding;
         P Statefulness ]
-      |> List.sort
-           (fun (P ax1) (P ax2) ->
-             match compare ax1 ax2 with
-             | Less_than -> -1
-             | Equal -> 0
-             | Greater_than -> 1)
+      |> List.sort (fun (P ax1) (P ax2) ->
+          match compare ax1 ax2 with
+          | Less_than -> -1
+          | Equal -> 0
+          | Greater_than -> 1)
   end
 
   let proj_obj ax = (C.proj_obj [@inlined hint]) ax Obj.obj
@@ -3437,12 +3431,11 @@ module Monadic = struct
 
     let all =
       [P Uniqueness; P Contention; P Visibility; P Staticity]
-      |> List.sort
-           (fun (P ax1) (P ax2) ->
-             match compare ax1 ax2 with
-             | Less_than -> -1
-             | Equal -> 0
-             | Greater_than -> 1)
+      |> List.sort (fun (P ax1) (P ax2) ->
+          match compare ax1 ax2 with
+          | Less_than -> -1
+          | Equal -> 0
+          | Greater_than -> 1)
   end
 
   let proj_obj ax = (C.proj_obj [@inlined hint]) ax Obj.obj
@@ -3584,11 +3577,11 @@ module Value_with (Areality : Areality) = struct
 
     let compare : type a b. a t -> b t -> (a, b) comparison =
      fun t1 t2 ->
-       match t1, t2 with
-       | Comonadic t1, Comonadic t2 -> Axis.compare t1 t2
-       | Comonadic _, _ -> Less_than
-       | _, Comonadic _ -> Greater_than
-       | Monadic t1, Monadic t2 -> Axis.compare t1 t2
+      match t1, t2 with
+      | Comonadic t1, Comonadic t2 -> Axis.compare t1 t2
+      | Comonadic _, _ -> Less_than
+      | _, Comonadic _ -> Greater_than
+      | Monadic t1, Monadic t2 -> Axis.compare t1 t2
 
     type packed = P : 'a t -> packed
 
@@ -3603,10 +3596,10 @@ module Value_with (Areality : Areality) = struct
           (fun (Comonadic.Axis.P ax) -> P (Comonadic ax))
           Comonadic.Axis.all
       |> List.sort (fun (P ax1) (P ax2) ->
-           match compare ax1 ax2 with
-           | Less_than -> -1
-           | Equal -> 0
-           | Greater_than -> 1)
+          match compare ax1 ax2 with
+          | Less_than -> -1
+          | Equal -> 0
+          | Greater_than -> 1)
   end
 
   let proj_obj : type a. a Axis.t -> a C.obj = function
@@ -5083,26 +5076,25 @@ module Crossing = struct
         match Axis.equal ax1 ax2 with Equal -> Equal | Not_equal -> Not_equal)
       | Comonadic ax1, Comonadic ax2 -> (
         match Axis.equal ax1 ax2 with Equal -> Equal | Not_equal -> Not_equal)
-      | Monadic _, Comonadic _
-      | Comonadic _, Monadic _ -> Not_equal
+      | Monadic _, Comonadic _ | Comonadic _, Monadic _ -> Not_equal
 
     let compare : type a b. a t -> b t -> (a, b) comparison =
      fun ax1 ax2 ->
       match ax1, ax2 with
       | Monadic ax1, Monadic ax2 -> begin
-          match Axis.compare ax1 ax2 with
-          | Less_than -> Less_than
-          | Equal -> Equal
-          | Greater_than -> Greater_than
-        end
+        match Axis.compare ax1 ax2 with
+        | Less_than -> Less_than
+        | Equal -> Equal
+        | Greater_than -> Greater_than
+      end
       | Monadic _, _ -> Less_than
       | _, Monadic _ -> Greater_than
       | Comonadic ax1, Comonadic ax2 -> begin
-          match Axis.compare ax1 ax2 with
-          | Less_than -> Less_than
-          | Equal -> Equal
-          | Greater_than -> Greater_than
-        end
+        match Axis.compare ax1 ax2 with
+        | Less_than -> Less_than
+        | Equal -> Equal
+        | Greater_than -> Greater_than
+      end
 
     let print : type a. Fmt.formatter -> a t -> unit =
      fun ppf -> function
