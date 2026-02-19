@@ -48,7 +48,8 @@ type iterator = {
   extension_constructor: iterator -> extension_constructor -> unit;
   include_declaration: iterator -> include_declaration -> unit;
   include_description: iterator -> include_description -> unit;
-  jkind_annotation:iterator -> jkind_annotation -> unit;
+  jkind_annotation: iterator -> jkind_annotation -> unit;
+  jkind_declaration: iterator -> jkind_declaration -> unit;
   label_declaration: iterator -> label_declaration -> unit;
   location: iterator -> Location.t -> unit;
   module_binding: iterator -> module_binding -> unit;
@@ -340,9 +341,7 @@ module MT = struct
         sub.attributes sub attrs;
         sub.extension sub x
     | Psig_attribute x -> sub.attribute sub x
-    | Psig_kind_abbrev (name, jkind) ->
-        iter_loc sub name;
-        sub.jkind_annotation sub jkind
+    | Psig_jkind x -> sub.jkind_declaration sub x
 end
 
 
@@ -393,9 +392,7 @@ module M = struct
     | Pstr_extension (x, attrs) ->
         sub.attributes sub attrs; sub.extension sub x
     | Pstr_attribute x -> sub.attribute sub x
-    | Pstr_kind_abbrev (name, jkind) ->
-        iter_loc sub name;
-        sub.jkind_annotation sub jkind
+    | Pstr_jkind x -> sub.jkind_declaration sub x
 end
 
 module E = struct
@@ -716,8 +713,8 @@ let default_iterator =
     type_exception = T.iter_type_exception;
     extension_constructor = T.iter_extension_constructor;
     value_description =
-      (fun this {pval_name; pval_type; pval_modalities; pval_prim = _; pval_loc;
-                 pval_attributes} ->
+      (fun this {pval_name; pval_type; pval_modalities; pval_prim = _;
+                 pval_poly=_; pval_loc; pval_attributes} ->
         iter_loc this pval_name;
         this.typ this pval_type;
         this.location this pval_loc;
@@ -791,7 +788,8 @@ let default_iterator =
 
 
     value_binding =
-      (fun this {pvb_pat; pvb_expr; pvb_attributes; pvb_loc; pvb_constraint; pvb_modes} ->
+      (fun this {pvb_pat; pvb_expr; pvb_attributes; pvb_loc; pvb_constraint;
+                 pvb_is_poly=_; pvb_modes} ->
          this.modes this pvb_modes;
          this.pat this pvb_pat;
          this.expr this pvb_expr;
@@ -863,11 +861,11 @@ let default_iterator =
       );
 
     jkind_annotation =
-      (fun this { pjkind_loc; pjkind_desc } ->
-         this.location this pjkind_loc;
-         match pjkind_desc with
+      (fun this { pjka_loc; pjka_desc } ->
+         this.location this pjka_loc;
+         match pjka_desc with
          | Pjk_default -> ()
-         | Pjk_abbreviation (_ : string) -> ()
+         | Pjk_abbreviation lid -> iter_loc this lid
          | Pjk_mod (t, mode_list) ->
              this.jkind_annotation this t;
              this.modes this mode_list
@@ -877,6 +875,15 @@ let default_iterator =
              this.modalities this modalities
          | Pjk_kind_of ty -> this.typ this ty
          | Pjk_product ts -> List.iter (this.jkind_annotation this) ts);
+
+    jkind_declaration =
+      (fun this { pjkind_name; pjkind_manifest; pjkind_attributes;
+                  pjkind_loc } ->
+         iter_loc this pjkind_name;
+         Option.iter (this.jkind_annotation this) pjkind_manifest;
+         this.attributes this pjkind_attributes;
+         this.location this pjkind_loc
+      );
 
     directive_argument =
       (fun this a ->

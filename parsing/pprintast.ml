@@ -468,9 +468,9 @@ and type_with_label ctxt f (label, c, mode) =
     pp f "?%a:%a" ident_of_name s
       (core_type_with_optional_legacy_modes core_type1 ctxt) (c, mode)
 
-and jkind_annotation ?(nested = false) ctxt f k = match k.pjkind_desc with
+and jkind_annotation ?(nested = false) ctxt f k = match k.pjka_desc with
   | Pjk_default -> pp f "_"
-  | Pjk_abbreviation s -> pp f "%s" s
+  | Pjk_abbreviation s -> longident_loc f s
   | Pjk_mod (t, modes) ->
     begin match modes with
     | [] -> Misc.fatal_error "malformed jkind annotation"
@@ -1410,6 +1410,7 @@ and class_field ctxt f x =
               ppat_attributes=[]};
            pvb_expr=e;
            pvb_constraint=None;
+           pvb_is_poly=false;
            pvb_attributes=[];
            pvb_modes=[];
            pvb_loc=Location.none;
@@ -1497,10 +1498,15 @@ and sig_include ctxt f incl moda =
   include_ ctxt f ~contents:module_type incl;
   optional_space_atat_modalities f moda
 
-and kind_abbrev ctxt f name jkind =
-  pp f "@[<hov2>kind_abbrev_@ %a@ =@ %a@]"
-    string_loc name
-    (jkind_annotation ctxt) jkind
+and jkind_declaration ctxt f jd =
+  begin match jd.pjkind_manifest with
+  | None -> pp f "@[<hov2>kind_@ %a@]" string_loc jd.pjkind_name
+  | Some jkind ->
+     pp f "@[<hov2>kind_@ %a@ =@ %a@]"
+       string_loc jd.pjkind_name
+       (jkind_annotation ctxt) jkind
+  end;
+  item_attributes ctxt f jd.pjkind_attributes
 
 and module_type_with_optional_modes ctxt f (mty, mm) =
   match mm with
@@ -1596,7 +1602,9 @@ and signature_item ctxt f x : unit =
       type_def_list ctxt f (Recursive, false, l)
   | Psig_value vd ->
       let intro = if vd.pval_prim = [] then "val" else "external" in
-      pp f "@[<2>%s@ %a@ :@ %a@]%a" intro
+      if vd.pval_prim <> [] then assert (not vd.pval_poly);
+      let poly_str = if vd.pval_poly then "poly_ " else "" in
+      pp f "@[<2>%s@ %s%a@ :@ %a@]%a" intro poly_str
         ident_of_name vd.pval_name.txt
         (value_description ctxt) vd
         (item_attributes ctxt) vd.pval_attributes
@@ -1687,8 +1695,8 @@ and signature_item ctxt f x : unit =
   | Psig_extension(e, a) ->
       item_extension ctxt f e;
       item_attributes ctxt f a
-  | Psig_kind_abbrev (name, jkind) ->
-      kind_abbrev ctxt f name jkind
+  | Psig_jkind kd ->
+      jkind_declaration ctxt f kd
 
 and module_expr ctxt f x =
   if x.pmod_attributes <> [] then
@@ -1876,7 +1884,8 @@ and bindings ctxt f (mf,rf,l) =
       else
         [], x
     in
-    pp f "@[<2>%s %a%a%a%a@]%a" kwd mutable_flag mf rec_flag rf
+    let poly_str = if x.pvb_is_poly then "poly_ " else "" in
+    pp f "@[<2>%s %a%s%a%a%a@]%a" kwd mutable_flag mf poly_str rec_flag rf
       optional_legacy_modes legacy
       (binding ctxt) x
       (item_attributes ctxt) x.pvb_attributes
@@ -1994,6 +2003,7 @@ and structure_item ctxt f x =
       end
   | Pstr_class_type l -> class_type_declaration_list ctxt f l
   | Pstr_primitive vd ->
+      assert (not vd.pval_poly);
       pp f "@[<hov2>external@ %a@ :@ %a@]%a"
         ident_of_name vd.pval_name.txt
         (value_description ctxt) vd
@@ -2047,8 +2057,8 @@ and structure_item ctxt f x =
   | Pstr_extension(e, a) ->
       item_extension ctxt f e;
       item_attributes ctxt f a
-  | Pstr_kind_abbrev (name, jkind) ->
-      kind_abbrev ctxt f name jkind
+  | Pstr_jkind jd ->
+      jkind_declaration ctxt f jd
 
 (* Don't just use [core_type] because we do not want parens around params
    with jkind annotations *)

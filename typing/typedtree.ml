@@ -641,6 +641,7 @@ and structure_item_desc =
   | Tstr_class_type of (Ident.t * string loc * class_type_declaration) list
   | Tstr_include of include_declaration
   | Tstr_attribute of attribute
+  | Tstr_jkind of jkind_declaration
 
 and module_binding =
     {
@@ -732,6 +733,7 @@ and signature_item_desc =
   | Tsig_class of class_description list
   | Tsig_class_type of class_type_declaration list
   | Tsig_attribute of attribute
+  | Tsig_jkind of jkind_declaration
 
 and module_declaration =
     {
@@ -1034,6 +1036,15 @@ and 'a class_infos =
     ci_attributes: attribute list;
    }
 
+and jkind_declaration =
+  { jkind_id: Ident.t;
+    jkind_name: string loc;
+    jkind_jkind: Types.jkind_declaration;
+    jkind_annotation: Parsetree.jkind_annotation option;
+    jkind_attributes: attribute list;
+    jkind_loc: Location.t
+   }
+
 type argument_interface = {
   ai_signature: Types.signature;
   ai_coercion_from_primary: module_coercion;
@@ -1060,6 +1071,7 @@ type item_declaration =
   | Module_type of module_type_declaration
   | Class of class_declaration
   | Class_type of class_type_declaration
+  | Jkind of jkind_declaration
 
 (* Auxiliary functions over the a.s.t. *)
 
@@ -1486,6 +1498,7 @@ let loc_of_decl ~uid =
   | Module_substitution msd -> msd.ms_name
   | Class cd -> cd.ci_id_name
   | Class_type ctd -> ctd.ci_id_name
+  | Jkind jd -> jd.jkind_name
 
 let min_mode_with_locks = (Mode.Value.(disallow_right legacy), None)
 

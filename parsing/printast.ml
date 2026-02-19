@@ -565,11 +565,11 @@ and jkind_annotation_opt i ppf jkind =
   | Some jkind -> jkind_annotation (i+1) ppf jkind
 
 and jkind_annotation i ppf (jkind : jkind_annotation) =
-  line i ppf "jkind %a\n" fmt_location jkind.pjkind_loc;
-  match jkind.pjkind_desc with
+  line i ppf "jkind %a\n" fmt_location jkind.pjka_loc;
+  match jkind.pjka_desc with
   | Pjk_default -> line i ppf "Pjk_default\n"
   | Pjk_abbreviation jkind ->
-      line i ppf "Pjk_abbreviation \"%s\"\n" jkind
+      line i ppf "Pjk_abbreviation %a\n" fmt_longident_loc jkind
   | Pjk_mod (jkind, m) ->
       line i ppf "Pjk_mod\n";
       jkind_annotation (i+1) ppf jkind;
@@ -723,6 +723,15 @@ and extension_constructor_kind i ppf x =
     | Pext_rebind li ->
         line i ppf "Pext_rebind\n";
         line (i+1) ppf "%a\n" fmt_longident_loc li;
+
+and jkind_declaration i ppf
+      { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc } =
+  line i ppf "jkind_declaration %a %a\n" fmt_string_loc pjkind_name
+       fmt_location pjkind_loc;
+  attributes i ppf pjkind_attributes;
+  let i = i+1 in
+  line i ppf "pjkind_manifest =\n";
+  option (i+1) jkind_annotation ppf pjkind_manifest
 
 and class_type i ppf x =
   line i ppf "class_type %a\n" fmt_location x.pcty_loc;
@@ -993,9 +1002,9 @@ and signature_item i ppf x =
       payload i ppf arg
   | Psig_attribute a ->
       attribute i ppf "Psig_attribute" a
-  | Psig_kind_abbrev (name, jkind) ->
-      line i ppf "Psig_kind_abbrev \"%s\"\n" name.txt;
-      jkind_annotation i ppf jkind
+  | Psig_jkind d ->
+      line i ppf "Psig_kind\n";
+      jkind_declaration i ppf d
 
 and modtype_declaration i ppf = function
   | None -> line i ppf "#abstract"
@@ -1129,9 +1138,9 @@ and structure_item i ppf x =
       payload i ppf arg
   | Pstr_attribute a ->
       attribute i ppf "Pstr_attribute" a
-  | Pstr_kind_abbrev (name, jkind) ->
-      line i ppf "Pstr_kind_abbrev \"%s\"\n" name.txt;
-      jkind_annotation i ppf jkind
+  | Pstr_jkind d ->
+      line i ppf "Pstr_kind\n";
+      jkind_declaration i ppf d
 
 and module_declaration i ppf pmd =
   str_opt_loc i ppf pmd.pmd_name;

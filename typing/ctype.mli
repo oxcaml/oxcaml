@@ -252,6 +252,7 @@ val prim_mode :
         (Mode.allowed * 'r) Mode.Locality.t option -> (Primitive.mode * Primitive.native_repr)
         -> (Mode.allowed * 'r) Mode.Locality.t
 val instance_prim:
+        Env.t ->
         Primitive.description -> type_expr ->
         type_expr *
         Mode.Locality.lr option * (Mode.Forkable.lr * Mode.Yielding.lr) option *
@@ -536,6 +537,10 @@ val nondep_class_declaration:
 val nondep_cltype_declaration:
   Env.t -> Ident.t list -> class_type_declaration -> class_type_declaration
         (* Same for class type declarations. *)
+val nondep_jkind_declaration:
+  Env.t -> Ident.t list -> jkind_declaration -> jkind_declaration
+        (* Same for jkind declarations. *)
+
 (*val correct_abbrev: Env.t -> Path.t -> type_expr list -> type_expr -> unit*)
 val is_contractive: Env.t -> Path.t -> bool
 val normalize_type: type_expr -> unit

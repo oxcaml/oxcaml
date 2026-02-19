@@ -63,7 +63,7 @@ let keyword_table =
     "include", INCLUDE;
     "inherit", INHERIT;
     "initializer", INITIALIZER;
-    "kind_abbrev_", KIND_ABBREV;
+    "kind_", KIND;
     "kind_of_", KIND_OF;
     "lazy", LAZY;
     "let", LET;
@@ -82,6 +82,7 @@ let keyword_table =
     "or", OR;
     "overwrite_", OVERWRITE;
 (*  "parser", PARSER; *)
+    "poly_", POLY;
     "private", PRIVATE;
     "rec", REC;
     "repr_", REPR;

@@ -247,6 +247,10 @@ let use_runtime =
   Variables.make ("use_runtime",
     "Whether the -use-runtime option should be used" )
 
+let fexpr_dump_files =
+  Variables.make ("fexpr_dump_file",
+    "Flambda passes dump files suffixes")
+
 let init () =
   List.iter register_variable
   [
@@ -313,4 +317,5 @@ let init () =
     shared_library_cflags;
     sharedobjext;
     use_runtime;
+    fexpr_dump_files;
   ]

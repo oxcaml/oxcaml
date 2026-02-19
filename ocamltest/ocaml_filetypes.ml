@@ -24,6 +24,7 @@ type t =
   | C_minus_minus
   | Lexer
   | Grammar
+  | Flambda
   | Binary_interface
   | Obj
   | Backend_specific of Ocaml_backends.t * backend_specific
@@ -42,6 +43,7 @@ let string_of_filetype = function
   | C_minus_minus -> "C minus minus source"
   | Lexer -> "lexer"
   | Grammar -> "grammar"
+  | Flambda -> "flambda source"
   | Binary_interface -> "binary interface"
   | Obj -> "object"
   | Backend_specific (backend, filetype) ->
@@ -57,6 +59,7 @@ let extension_of_filetype = function
   | C_minus_minus -> "cmm"
   | Lexer -> "mll"
   | Grammar -> "mly"
+  | Flambda -> "fl"
   | Binary_interface -> "cmi"
   | Obj -> Ocamltest_config.objext
   | Backend_specific (backend, filetype) ->
@@ -78,6 +81,7 @@ let filetype_of_extension = function
   | "cmm" -> C_minus_minus
   | "mll" -> Lexer
   | "mly" -> Grammar
+  | "fl" -> Flambda
   | "cmi" -> Binary_interface
   | "o" -> Obj
   | "obj" -> Obj
@@ -115,6 +119,7 @@ let[@ocaml.warning "-fragile-match"] action_of_filetype = function
   | Interface -> "Compiling interface"
   | C -> "Compiling C source file"
   | C_minus_minus -> "Processing C-- file"
+  | Flambda -> "Processing Flambda file"
   | Lexer -> "Generating lexer"
   | Grammar -> "Generating parser"
   | filetype -> ("nothing to do for " ^ (string_of_filetype filetype))

@@ -40,6 +40,13 @@ val lambda_to_flambda :
   Lambda.program ->
   flambda_result
 
+val flambda_to_flambda :
+  ppf_dump:Format.formatter ->
+  prefixname:string ->
+  machine_width:Target_system.Machine_width.t ->
+  Flambda_unit.t ->
+  flambda_result
+
 val reset_symbol_tables : unit -> unit
 
 val get_module_info :
