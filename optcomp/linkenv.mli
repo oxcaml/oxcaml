@@ -59,6 +59,11 @@ val make_globals_map :
 
 val add_ccobjs : t -> filepath -> Cmx_format.library_infos -> unit
 
+(* CR sspies: upstream replaced [is_required], [add_required],
+   [remove_required], [extract_missing_globals], and the [missing_globals] field
+   with [Linkdeps]. See also the CR below on [Missing_implementations]. Once we
+   align with upstream's [scan_file] using [Linkdeps.add]/[Linkdeps.required],
+   these can be removed. *)
 val is_required : t -> Compilation_unit.t -> bool
 
 val add_required : t -> filepath * CU.Name.t option -> Import_info.t -> unit
@@ -78,6 +83,11 @@ val check_cmx_consistency : t -> filepath -> Import_info.t array -> unit
 val check_consistency :
   t -> unit:unit_link_info -> Import_info.t array -> Import_info.t array -> unit
 
+(* CR sspies: Upstream PR #12084 removed [Missing_implementations] and
+   [Multiple_definition] from [Asmlink.error], replacing them with
+   [Link_error of Linkdeps.error]. Once we backport that change, these two
+   constructors should move from here into [Linkdeps.error] and
+   [asmlink.ml] should use [Link_error] accordingly. *)
 type error =
   | File_not_found of filepath
   | Not_an_object_file of filepath
