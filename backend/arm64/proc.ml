@@ -139,19 +139,14 @@ let calling_conventions
   let float_registers = ref float_registers in
   let ofs = ref first_stack in
   for i = 0 to Array.length arg - 1 do
-    match (arg.(i) : Cmm.machtype_component) with
-    | Val | Int | Addr ->
-        loc.(i) <- loc_int make_stack int_registers ofs
-    | Float ->
-        loc.(i) <- loc_float make_stack float_registers ofs
-    | Vec128 ->
-        loc.(i) <- loc_vec128 make_stack float_registers ofs
-    | Vec256 | Vec512 ->
-        Misc.fatal_error "arm64: got 256/512 bit vector"
-    | Float32 ->
-        loc.(i) <- loc_float32 make_stack float_registers ofs
-    | Valx2 ->
-        Misc.fatal_error "Unexpected machtype_component Valx2"
+    loc.(i) <-
+      match (arg.(i) : Cmm.machtype_component) with
+      | Val | Int | Addr -> loc_int make_stack int_registers ofs
+      | Float -> loc_float make_stack float_registers ofs
+      | Vec128 -> loc_vec128 make_stack float_registers ofs
+      | Vec256 | Vec512 -> Misc.fatal_error "arm64: got 256/512 bit vector"
+      | Float32 -> loc_float32 make_stack float_registers ofs
+      | Valx2 -> Misc.fatal_error "Unexpected machtype_component Valx2"
   done;
   (* CR mslater: (SIMD) will need to be 32/64 if vec256/512 are used. *)
   (loc, Misc.align (max 0 !ofs) 16)  (* keep stack 16-aligned *)

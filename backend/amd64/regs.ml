@@ -25,22 +25,22 @@ module T = struct
     | SIMD
 
   type[@ocamlformat "disable"] _ phys_reg_classed =
-    | RAX : [`GPR] phys_reg_classed | RBX : [`GPR] phys_reg_classed
-    | RDI : [`GPR] phys_reg_classed | RSI : [`GPR] phys_reg_classed
-    | RDX : [`GPR] phys_reg_classed | RCX : [`GPR] phys_reg_classed
-    | R8  : [`GPR] phys_reg_classed | R9  : [`GPR] phys_reg_classed
-    | R12 : [`GPR] phys_reg_classed | R13 : [`GPR] phys_reg_classed
-    | R10 : [`GPR] phys_reg_classed | R11 : [`GPR] phys_reg_classed
-    | RBP : [`GPR] phys_reg_classed
+    | RAX : [> `GPR] phys_reg_classed | RBX : [> `GPR] phys_reg_classed
+    | RDI : [> `GPR] phys_reg_classed | RSI : [> `GPR] phys_reg_classed
+    | RDX : [> `GPR] phys_reg_classed | RCX : [> `GPR] phys_reg_classed
+    | R8  : [> `GPR] phys_reg_classed | R9  : [> `GPR] phys_reg_classed
+    | R12 : [> `GPR] phys_reg_classed | R13 : [> `GPR] phys_reg_classed
+    | R10 : [> `GPR] phys_reg_classed | R11 : [> `GPR] phys_reg_classed
+    | RBP : [> `GPR] phys_reg_classed
 
-    | MM0  : [`SIMD] phys_reg_classed | MM1  : [`SIMD] phys_reg_classed
-    | MM2  : [`SIMD] phys_reg_classed | MM3  : [`SIMD] phys_reg_classed
-    | MM4  : [`SIMD] phys_reg_classed | MM5  : [`SIMD] phys_reg_classed
-    | MM6  : [`SIMD] phys_reg_classed | MM7  : [`SIMD] phys_reg_classed
-    | MM8  : [`SIMD] phys_reg_classed | MM9  : [`SIMD] phys_reg_classed
-    | MM10 : [`SIMD] phys_reg_classed | MM11 : [`SIMD] phys_reg_classed
-    | MM12 : [`SIMD] phys_reg_classed | MM13 : [`SIMD] phys_reg_classed
-    | MM14 : [`SIMD] phys_reg_classed | MM15 : [`SIMD] phys_reg_classed
+    | MM0  : [> `SIMD] phys_reg_classed | MM1  : [> `SIMD] phys_reg_classed
+    | MM2  : [> `SIMD] phys_reg_classed | MM3  : [> `SIMD] phys_reg_classed
+    | MM4  : [> `SIMD] phys_reg_classed | MM5  : [> `SIMD] phys_reg_classed
+    | MM6  : [> `SIMD] phys_reg_classed | MM7  : [> `SIMD] phys_reg_classed
+    | MM8  : [> `SIMD] phys_reg_classed | MM9  : [> `SIMD] phys_reg_classed
+    | MM10 : [> `SIMD] phys_reg_classed | MM11 : [> `SIMD] phys_reg_classed
+    | MM12 : [> `SIMD] phys_reg_classed | MM13 : [> `SIMD] phys_reg_classed
+    | MM14 : [> `SIMD] phys_reg_classed | MM15 : [> `SIMD] phys_reg_classed
 
   type phys_reg = P : _ phys_reg_classed -> phys_reg [@@unboxed]
 
