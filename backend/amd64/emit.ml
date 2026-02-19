@@ -675,10 +675,10 @@ let emit_stack_check ~size_in_bytes ~save_registers ~save_simd =
   let threshold_offset =
     (Domainstate.stack_ctx_words * 8) + Stack_check.stack_threshold_size
   in
-  if save_registers then I.push r10;
+  if save_registers then push r10;
   I.lea (mem64 NONE (-(size_in_bytes + threshold_offset)) (Scalar RSP)) r10;
   I.cmp (domain_field Domainstate.Domain_current_stack) r10;
-  if save_registers then I.pop r10;
+  if save_registers then pop r10;
   I.jb (emit_asm_label_arg overflow);
   D.define_label ret;
   stack_realloc
@@ -1832,10 +1832,14 @@ let emit_instr ~first ~last ~fallthrough i =
     then (
       I.add (int n) rsp;
       D.cfi_adjust_cfa_offset ~bytes:(-n));
-    if fp then I.pop rbp
+    if fp
+    then (
+      I.pop rbp;
+      D.cfi_adjust_cfa_offset ~bytes:(-8))
   | Lepilogue_close ->
     (* reset CFA back cause function body may continue *)
     let n = prologue_stack_offset () in
+    let n = if fp then n + 8 else n in
     if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:n
   | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
   | Lop (Const_int n) ->

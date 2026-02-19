@@ -115,7 +115,7 @@
 
 #ifdef WITH_FRAME_POINTERS
 #define ENTER_FUNCTION                      \
-        pushq   %rbp; CFI_ADJUST(8);        \
+        pushq   %rbp; CFI_ADJUST(8); CFI_OFFSET(rbp, -16); \
         movq    %rsp, %rbp;
 #define LEAVE_FUNCTION                      \
         popq    %rbp; CFI_ADJUST(-8);
