@@ -33,6 +33,7 @@ module String = Misc.Stdlib.String
 type probe =
   { stack_offset : int;
     num_stack_slots : int Stack_class.Tbl.t;
+    contains_calls : bool;
     probe_name : string;
     probe_enabled_at_init : bool;
     probe_handler_code_sym : string;
@@ -49,11 +50,12 @@ let probes = ref []
 
 let get_probes () = !probes
 
-let add_probe ~stack_offset ~num_stack_slots ~probe_name ~probe_enabled_at_init
-    ~probe_handler_code_sym ~probe_label ~probe_insn =
+let add_probe ~stack_offset ~num_stack_slots ~contains_calls ~probe_name
+    ~probe_enabled_at_init ~probe_handler_code_sym ~probe_label ~probe_insn =
   let probe =
     { stack_offset;
       num_stack_slots;
+      contains_calls;
       probe_name;
       probe_enabled_at_init;
       probe_handler_code_sym;
@@ -106,22 +108,33 @@ let emit_probe_note_desc ~probe_name ~probe_label ~semaphore_label ~probe_args =
   D.string (probe_name ^ "\000");
   D.string (probe_args ^ "\000")
 
-let emit_probe_notes0 ~slot_offset =
+let emit_probe_notes0 () =
   D.switch_to_section Stapsdt_note;
-  let stap_arg (arg : Reg.t) =
-    let arg_name =
-      match arg.loc with
-      | Stack s ->
-        Printf.sprintf "%d(%%rsp)"
-          (slot_offset s (Stack_class.of_machtype arg.Reg.typ))
-      | Reg reg -> Reg_class.register_name arg.Reg.typ reg
-      | Unknown ->
-        Misc.fatal_errorf "Cannot create probe: illegal argument: %a"
-          Printreg.reg arg
-    in
-    Printf.sprintf "%d@%s" (Select_utils.size_component arg.Reg.typ) arg_name
-  in
   let describe_one_probe p =
+    let slot_offset loc stack_class =
+      let offset =
+        Proc.slot_offset loc ~stack_class ~stack_offset:p.stack_offset
+          ~fun_contains_calls:p.contains_calls
+          ~fun_num_stack_slots:p.num_stack_slots
+      in
+      match offset with
+      | Bytes_relative_to_stack_pointer n -> n
+      | Bytes_relative_to_domainstate_pointer _ ->
+        Misc.fatal_errorf "Not a stack slot"
+    in
+    let stap_arg (arg : Reg.t) =
+      let arg_name =
+        match arg.loc with
+        | Stack s ->
+          Printf.sprintf "%d(%%rsp)"
+            (slot_offset s (Stack_class.of_machtype arg.Reg.typ))
+        | Reg reg -> Reg_class.register_name arg.Reg.typ reg
+        | Unknown ->
+          Misc.fatal_errorf "Cannot create probe: illegal argument: %a"
+            Printreg.reg arg
+      in
+      Printf.sprintf "%d@%s" (Select_utils.size_component arg.Reg.typ) arg_name
+    in
     let probe_name = p.probe_name in
     let enabled_at_init = p.probe_enabled_at_init in
     let args =
@@ -192,8 +205,8 @@ let emit_probe_semaphores ~add_def_symbol =
       add_def_symbol label)
     !probe_semaphores
 
-let emit_probe_notes ~slot_offset ~add_def_symbol =
-  (match !probes with [] -> () | _ -> emit_probe_notes0 ~slot_offset);
+let emit_probe_notes ~add_def_symbol =
+  (match !probes with [] -> () | _ -> emit_probe_notes0 ());
   if not (String.Map.is_empty !probe_semaphores)
   then (
     emit_dummy_probe_notes ();

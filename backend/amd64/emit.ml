@@ -2342,7 +2342,8 @@ let emit_instr ~first ~fallthrough i =
     Probe_emission.add_probe ~probe_label ~probe_insn:i ~probe_name:name
       ~probe_enabled_at_init:enabled_at_init
       ~probe_handler_code_sym:handler_code_sym ~stack_offset:!stack_offset
-      ~num_stack_slots:(Stack_class.Tbl.copy num_stack_slots);
+      ~num_stack_slots:(Stack_class.Tbl.copy num_stack_slots)
+      ~contains_calls:!contains_calls;
     D.define_label (label_to_asm_label ~section:Text probe_label);
     I.nop ();
     (* for uprobes and usdt probes as well *)
@@ -3041,7 +3042,7 @@ let end_assembly () =
   let frametable_sym = S.create_global (Cmm_helpers.make_symbol "frametable") in
   D.size frametable_sym;
   D.data ();
-  Probe_emission.emit_probe_notes ~slot_offset ~add_def_symbol;
+  Probe_emission.emit_probe_notes ~add_def_symbol;
   emit_trap_notes ();
   D.mark_stack_non_executable ();
   (* Note that [mark_stack_non_executable] switches the section on Linux. *)
