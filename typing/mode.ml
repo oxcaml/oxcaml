@@ -1522,7 +1522,7 @@ module Lattices_mono = struct
     let uniqueness = linear_to_unique m.linearity in
     let contention = portable_to_contended m.portability in
     let visibility = statefulness_to_visibility m.statefulness in
-    let staticity = Staticity.min in
+    let staticity = Staticity_op.min in
     { uniqueness; contention; visibility; staticity }
 
   let comonadic_to_monadic_max : type a.
@@ -1531,7 +1531,7 @@ module Lattices_mono = struct
     let uniqueness = linear_to_unique m.linearity in
     let contention = portable_to_contended m.portability in
     let visibility = statefulness_to_visibility m.statefulness in
-    let staticity = Staticity.max in
+    let staticity = Staticity_op.max in
     { uniqueness; contention; visibility; staticity }
 
   let monadic_to_comonadic_max : type a.
