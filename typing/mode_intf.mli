@@ -719,7 +719,8 @@ module type S = sig
     val min_with_monadic :
       'a Monadic.Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
 
-    val meet_const_with : 'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
+    val meet_const_with :
+      'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
 
     val join_const_with : 'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
 

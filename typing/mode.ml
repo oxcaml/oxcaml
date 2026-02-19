@@ -1739,7 +1739,8 @@ module Lattices_mono = struct
       let dst0 = proj_obj Areality dst in
       Some (Map_comonadic (compose dst0 f g))
     | Regional_to_local, Local_to_regional -> Some Id
-    | Regional_to_local, Global_to_regional -> Some (Imply_const Locality.Global)
+    | Regional_to_local, Global_to_regional ->
+      Some (Imply_const Locality.Global)
     | Regional_to_local, Locality_as_regionality -> Some Id
     | Regional_to_local, Meet_const c ->
       Some (compose dst (Meet_const (regional_to_local c)) Regional_to_local)
