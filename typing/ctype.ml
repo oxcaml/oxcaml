@@ -2754,7 +2754,8 @@ let constrain_type_jkind ~fixed env ty jkind =
                    in
                    match layouts with
                    | Some layouts ->
-                     (* This [why] might be wrong but we're about to correct it *)
+                     (* This [why] might be wrong but we're about to correct
+                        it *)
                      let jkind =
                        Jkind.Builtin.product ~why:Unboxed_record
                          tys_and_modalities layouts
