@@ -29,9 +29,7 @@ module type Equal = sig
   type ('a, 'b, 'd) t constraint 'd = 'l * 'r
 
   val equal :
-    ('a0, 'b, 'l0 * 'r0) t ->
-    ('a1, 'b, 'l1 * 'r1) t ->
-    ('a0, 'a1) equality
+    ('a0, 'b, 'l0 * 'r0) t -> ('a1, 'b, 'l1 * 'r1) t -> ('a0, 'a1) equality
 end
 
 (** A collection of lattices, indexed by [obj]; *)
@@ -160,18 +158,17 @@ module type Lattices_mono = sig
   (** Apply morphism on constant *)
   val apply : 'b obj -> ('a, 'b, 'd) morph -> 'a -> 'b
 
-  (** Checks if two morphisms are equal.  Used for deduplication only;
-      it is fine (but not recommended) to return [Not_equal] for equal
-      morphisms. *)
+  (** Checks if two morphisms are equal. Used for deduplication only; it is fine
+      (but not recommended) to return [Not_equal] for equal morphisms. *)
   val equal_morph :
     'b obj ->
     ('a0, 'b, 'l0 * 'r0) morph ->
     ('a1, 'b, 'l1 * 'r1) morph ->
     ('a0, 'a1) equality
 
-  (** Compares two morphisms. Should be compatible with [equal_morph].
-      Used for deduplication only; it is fine (but not recommended) to return
-      a nonzero value for equal morphisms. *)
+  (** Compares two morphisms. Should be compatible with [equal_morph]. Used for
+      deduplication only; it is fine (but not recommended) to return a nonzero
+      value for equal morphisms. *)
   val compare_morph :
     'b obj ->
     ('a0, 'b, 'd0) morph ->
