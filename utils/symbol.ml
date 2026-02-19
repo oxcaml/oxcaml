@@ -52,6 +52,10 @@ let caml_symbol_prefix = "caml"
 let this_is_ocamlc = ref false
 let force_runtime4_symbols = ref true
 
+
+(* CR sspies: Upstream has changed in 5.4 to use [.] as a separator only on
+   Linux and to use $ on other systems. The mangling convention in OxCaml hasn't
+   been changed yet to match. *)
 let upstream_runtime5_symbol_separator =
   match Config.ccomp_type with
   | "msvc" -> '$' (* MASM does not allow for dots in symbol names *)
