@@ -573,7 +573,7 @@ module N :
   sig
     module Plain : sig val f : int -> int end
     module type S_plain = sig module M : sig val f : int -> int end end
-  end @@ portable
+  end @@ stateless
 |}]
 
 (* This revised version of that example does not typecheck. It would be nice if
@@ -612,7 +612,7 @@ Lines 13-19, characters 6-3:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           module Plain : sig val f : int -> int end
+           module Plain : sig val f : int -> int end @@ stateless nonportable
            module type S_plain =
              sig module M : sig val f : int -> int end end
          end @ nonportable
