@@ -69,7 +69,7 @@ let may_trace = ref false (* Global lock on tracing *)
 let load_lambda ppf tlam =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_tlambda then fprintf ppf "%a@." Printlambda.lambda tlam;
-  let rawlam =
+  let { Lambda.sval_comptime = _; sval_runtime = rawlam} =
     Slambda.eval
       (fun slam ->
         if !Clflags.dump_slambda

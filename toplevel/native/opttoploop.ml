@@ -323,7 +323,7 @@ let default_load ppf (program : Lambda.program) =
 let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
   if !Clflags.dump_tlambda then fprintf ppf "%a@." Printlambda.lambda tlam;
-  let lam =
+  let { Lambda.sval_comptime = _; sval_runtime = rawlam } =
     Slambda.eval
       (fun slam ->
         if !Clflags.dump_slambda
@@ -331,17 +331,17 @@ let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
         slam)
       tlam
   in
-  if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
-  let slam =
-    Simplif.simplify_lambda lam
+  if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda rawlam;
+  let lam =
+    Simplif.simplify_lambda rawlam
       ~restrict_to_upstream_dwarf:
         !Dwarf_flags.restrict_to_upstream_dwarf
       ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
   in
-  if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda slam;
+  if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda lam;
   let program =
     { Lambda.
-      code = slam;
+      code = lam;
       main_module_block_format = Mb_struct { mb_repr = repr };
       arg_block_idx = None;
       compilation_unit;
