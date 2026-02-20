@@ -147,21 +147,21 @@ let all_record_args lbls =
       List.iter (fun ((_, lbl, _) as x) -> t.(lbl.lbl_pos) <- x) lbls;
       Array.to_list t
 
+let expand_representable_labels lbls =
+  match lbls with
+  | [] -> fatal_error "Matching.expand_representable_labels"
+  | { lbl_all; _ } :: _ -> lbl_all |> Array.to_list
+
 let expand_record_head h =
   let open Patterns.Head in
   match h.pat_desc with
-  | Record [] -> fatal_error "Matching.expand_record_head"
-  | Record ({ lbl_all } :: _) ->
-      { h with pat_desc = Record (Array.to_list lbl_all) }
-  | _ -> h
-
-let expand_record_unboxed_product_head h =
-  let open Patterns.Head in
-  match h.pat_desc with
-  | Record_unboxed_product [] ->
-      fatal_error "Matching.expand_record_unboxed_product_head"
-  | Record_unboxed_product ({ lbl_all } :: _) ->
-      { h with pat_desc = Record_unboxed_product (Array.to_list lbl_all) }
+  | Record (lbls, sorts, r) ->
+      { h with pat_desc =
+                  Record (expand_representable_labels lbls, sorts, r) }
+  | Record_unboxed_product (lbls, sorts, r) ->
+      { h with pat_desc =
+                  Record_unboxed_product (expand_representable_labels lbls,
+                                         sorts, r) }
   | _ -> h
 
 let bind_alias p id duid ~arg ~arg_sort ~action =
@@ -232,12 +232,13 @@ end = struct
           p1
         else
           { p with pat_desc = Tpat_or (p1, p2, o) }
-    | Tpat_record (lbls, closed) ->
+    | Tpat_record (lbls, sorts, r, closed) ->
         let all_lbls = all_record_args lbls in
-        { p with pat_desc = Tpat_record (all_lbls, closed) }
-    | Tpat_record_unboxed_product (lbls, closed) ->
+        { p with pat_desc = Tpat_record (all_lbls, sorts, r, closed) }
+    | Tpat_record_unboxed_product (lbls, sorts, r, closed) ->
         let all_lbls = all_record_args lbls in
-        { p with pat_desc = Tpat_record_unboxed_product (all_lbls, closed) }
+        { p with pat_desc =
+                   Tpat_record_unboxed_product (all_lbls, sorts, r, closed) }
     | _ -> p
 
   (* Explode or-patterns and turn aliases into bindings in actions *)
@@ -258,14 +259,14 @@ end = struct
             ( (General.view p, patl),
               bind_alias p id duid ~arg
                 ~arg_sort:(Jkind.Sort.default_for_transl_and_get sort) ~action )
-      | `Record ([], _) as view -> stop p view
-      | `Record (lbls, closed) ->
-          let full_view = `Record (all_record_args lbls, closed) in
+      | `Record ([], _, _, _) as view -> stop p view
+      | `Record (lbls, sorts, r, closed) ->
+          let full_view = `Record (all_record_args lbls, sorts, r, closed) in
           stop p full_view
-      | `Record_unboxed_product ([], _) as view -> stop p view
-      | `Record_unboxed_product (lbls, closed) ->
+      | `Record_unboxed_product ([], _, _, _) as view -> stop p view
+      | `Record_unboxed_product (lbls, sorts, r, closed) ->
           let full_view =
-            `Record_unboxed_product (all_record_args lbls, closed) in
+            `Record_unboxed_product (all_record_args lbls, sorts, r, closed) in
           stop p full_view
       | `Or _ -> (
           let orpat = General.view (simpl_under_orpat (General.erase p)) in
@@ -316,16 +317,18 @@ end = struct
       | `Unboxed_tuple ps ->
           `Unboxed_tuple
             (List.map (fun (label, p, sort) -> label, alpha_pat env p, sort) ps)
-      | `Construct (cstr, cst_descr, args) ->
-          `Construct (cstr, cst_descr, List.map (alpha_pat env) args)
+      | `Construct (cstr, cst_descr, r, args) ->
+          let alpha_arg env (sort, p) = (sort, alpha_pat env p) in
+          `Construct (cstr, cst_descr, r, List.map (alpha_arg env) args)
       | `Variant (cstr, argo, row_desc) ->
           `Variant (cstr, Option.map (alpha_pat env) argo, row_desc)
-      | `Record (fields, closed) ->
+      | `Record (fields, sorts, r, closed) ->
           let alpha_field env (lid, l, p) = (lid, l, alpha_pat env p) in
-          `Record (List.map (alpha_field env) fields, closed)
-      | `Record_unboxed_product (fields, closed) ->
+          `Record (List.map (alpha_field env) fields, sorts, r, closed)
+      | `Record_unboxed_product (fields, sorts, r, closed) ->
           let alpha_field env (lid, l, p) = (lid, l, alpha_pat env p) in
-          `Record_unboxed_product (List.map (alpha_field env) fields, closed)
+          `Record_unboxed_product (List.map (alpha_field env) fields, sorts, r,
+                                   closed)
       | `Array (am, arg_sort, ps) -> `Array (am, arg_sort, List.map (alpha_pat env) ps)
       | `Lazy p -> `Lazy (alpha_pat env p)
     in
@@ -420,14 +423,11 @@ end
 let expand_record_simple : Simple.pattern -> Simple.pattern =
  fun p ->
   match p.pat_desc with
-  | `Record (l, _) -> { p with pat_desc = `Record (all_record_args l, Closed) }
-  | _ -> p
-
-let expand_record_unboxed_product_simple : Simple.pattern -> Simple.pattern =
- fun p ->
-  match p.pat_desc with
- | `Record_unboxed_product (l, _) ->
-   { p with pat_desc = `Record_unboxed_product (all_record_args l, Closed) }
+  | `Record (l, sorts, r, _) ->
+   { p with pat_desc = `Record (all_record_args l, sorts, r, Closed) }
+  | `Record_unboxed_product (l, sorts, r, _) ->
+    { p with pat_desc =
+               `Record_unboxed_product (all_record_args l, sorts, r, Closed) }
   | _ -> p
 
 type initial_clause = pattern list clause
@@ -450,9 +450,7 @@ exception NoMatch
 
 let matcher discr (p : Simple.pattern) rem =
   let discr = expand_record_head discr in
-  let discr = expand_record_unboxed_product_head discr in
   let p = expand_record_simple p in
-  let p = expand_record_unboxed_product_simple p in
   let omegas = Patterns.(omegas (Head.arity discr)) in
   let ph, args = Patterns.Head.deconstruct p in
   let yes () = args @ rem in
@@ -471,7 +469,7 @@ let matcher discr (p : Simple.pattern) rem =
       | Unboxed_tuple _ ), Any ) ->
       omegas @ rem
   | Constant cst, Constant cst' -> yesif (const_compare cst cst' = 0)
-  | Construct cstr, Construct cstr' ->
+  | Construct (cstr, _, _), Construct (cstr', _, _) ->
       (* NB: may_equal_constr considers (potential) constructor rebinding;
           Types.may_equal_constr does check that the arities are the same,
           preserving row-size coherence. *)
@@ -484,10 +482,10 @@ let matcher discr (p : Simple.pattern) rem =
   | Tuple n1, Tuple n2 -> yesif (n1 = n2)
   | Unboxed_tuple l1, Unboxed_tuple l2 ->
     yesif (List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
-  | Record l, Record l' ->
+  | Record (l, _, _), Record (l', _, _) ->
       (* we already expanded the record fully *)
       yesif (List.length l = List.length l')
-  | Record_unboxed_product l, Record_unboxed_product l' ->
+  | Record_unboxed_product (l, _, _), Record_unboxed_product (l', _, _) ->
       (* we already expanded the record fully *)
       yesif (List.length l = List.length l')
   | Lazy, Lazy -> yes ()
@@ -1260,8 +1258,8 @@ let can_group discr pat =
   | Constant (Const_unboxed_int64 _), Constant (Const_unboxed_int64 _)
   | Constant (Const_unboxed_nativeint _), Constant (Const_unboxed_nativeint _)->
       true
-  | Construct { cstr_tag = Extension _ as discr_tag }, Construct pat_cstr
-    ->
+  | ( Construct ({ cstr_tag = Extension _ as discr_tag }, _, _),
+      Construct (pat_cstr, _, _) )->
       (* Extension constructors with distinct names may be equal thanks to
          constructor rebinding. So we need to produce a specialized
          submatrix for each syntactically-distinct constructor (with a threading
@@ -1543,7 +1541,7 @@ and split_no_or cls args def k =
           ((idef, next) :: nexts)
   and should_split group_discr =
     match group_discr.pat_desc with
-    | Patterns.Head.Construct { cstr_tag = Extension _ } ->
+    | Patterns.Head.Construct ({ cstr_tag = Extension _ }, _, _) ->
         (* it is unlikely that we will raise anything, so we split now *)
         true
     | _ -> false
@@ -1919,19 +1917,24 @@ let divide_unboxed_bool ctx m =
 (* Matching against a constructor *)
 
 let get_key_constr = function
-  | { pat_desc = Tpat_construct (_, cstr, _, _) } -> cstr
+  | { pat_desc = Tpat_construct (_, cstr, _, _, _) } -> cstr
   | _ -> assert false
 
 let get_pat_args_constr p rem =
   match p with
-  | { pat_desc = Tpat_construct (_, _, args, _) } ->
+  | { pat_desc = Tpat_construct (_, _, _, args, _) } ->
+    let args = List.map snd args in
     args @ rem
   | _ -> assert false
 
 let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
-  let cstr =
+  let cstr, cstr_shape, arg_sorts =
     match head.pat_desc with
-    | Patterns.Head.Construct cstr -> cstr
+    | Patterns.Head.Construct (cstr, shape, arg_sorts) ->
+      let arg_sorts =
+        List.map Jkind.Sort.default_for_transl_and_get arg_sorts
+      in
+      cstr, shape, arg_sorts
     | _ -> fatal_error "Matching.get_expr_args_constr"
   in
   let loc = head_loc ~scopes head in
@@ -1960,7 +1963,7 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
       | Splice_variable _ ->
         fatal_error "Matching.get_exr_args_constr: non-void layout"
     in
-    match cstr.cstr_shape with
+    match cstr_shape with
     | Constructor_uniform_value ->
       fatal_error
         "Matching.get_exr_args_constr: constant Constructor_uniform_value"
@@ -1974,7 +1977,7 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
       make_void_access binding_kind sort pos
     else
       let prim =
-        match cstr.cstr_shape with
+        match cstr_shape with
         | Constructor_uniform_value -> Pfield (pos, Pointer, sem)
         | Constructor_mixed shape ->
             let shape =
@@ -1998,9 +2001,9 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
     match cstr.cstr_repr with
     | Variant_boxed _ ->
       List.mapi
-      (fun i { ca_sort } ->
+      (fun i ca_sort ->
          make_field_access str ca_sort ~field:i ~pos:i)
-      cstr.cstr_args
+      arg_sorts
         @ rem
     | Variant_unboxed | Variant_with_null ->
       if cstr.cstr_constant then
@@ -2012,6 +2015,14 @@ let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
     | Variant_extensible ->
         List.mapi
           (fun i { ca_sort } ->
+             let ca_sort =
+               match ca_sort with
+               | Some ca_sort -> ca_sort
+               | None ->
+                   Misc.fatal_errorf
+                     "unexpected variable sort in extensible constructor %s"
+                     cstr.cstr_name
+             in
              make_field_access str ca_sort ~field:i ~pos:(i+1))
           cstr.cstr_args
         @ rem
@@ -2346,24 +2357,24 @@ let record_matching_line num_fields lbl_pat_list =
 let get_pat_args_record num_fields p rem =
   match p with
   | { pat_desc = Tpat_any } -> record_matching_line num_fields [] @ rem
-  | { pat_desc = Tpat_record (lbl_pat_list, _) } ->
+  | { pat_desc = Tpat_record (lbl_pat_list, _, _, _) } ->
       record_matching_line num_fields lbl_pat_list @ rem
   | _ -> assert false
 
 let get_pat_args_record_unboxed_product num_fields p rem =
   match p with
   | { pat_desc = Tpat_any } -> record_matching_line num_fields [] @ rem
-  | { pat_desc = Tpat_record_unboxed_product (lbl_pat_list, _) } ->
+  | { pat_desc = Tpat_record_unboxed_product (lbl_pat_list, _, _, _) } ->
       record_matching_line num_fields lbl_pat_list @ rem
   | _ -> assert false
 
 let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
   let loc = head_loc ~scopes head in
-  let all_labels =
+  let all_labels, all_sorts, lbl_repres =
     let open Patterns.Head in
     match head.pat_desc with
-    | Record (lbl :: _) -> lbl.lbl_all
-    | Record []
+    | Record (lbl :: _, sorts, rep) -> lbl.lbl_all, sorts, rep
+    | Record ([], _, _)
     | _ ->
         assert false
   in
@@ -2373,32 +2384,33 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
     else
       let lbl = all_labels.(pos) in
       let ptr, _ = Typeopt.maybe_pointer_type head.pat_env lbl.lbl_arg in
-      let lbl_layout = Typeopt.layout_of_sort lbl.lbl_loc lbl.lbl_sort in
+      let lbl_sort = label_sort lbl all_sorts in
+      let lbl_layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
       let sem =
         if Types.is_mutable lbl.lbl_mut then Reads_vary else Reads_agree
       in
       let ubr = Translmode.transl_unique_barrier head.pat_unique_barrier in
       let sem = add_barrier_to_read ubr sem in
       let access, sort, layout =
-        match lbl.lbl_repres with
+        match lbl_repres with
         | Record_boxed _
         | Record_inlined (_, Constructor_uniform_value, Variant_boxed _) ->
             Lprim (Pfield (lbl.lbl_pos, ptr, sem), [ arg ], loc),
-            lbl.lbl_sort, lbl_layout
+            lbl_sort, lbl_layout
         | Record_unboxed
         | Record_inlined (_, _, Variant_unboxed) -> arg, sort, layout
         | Record_float ->
            (* TODO: could optimise to Alloc_local sometimes *)
            Lprim (Pfloatfield (lbl.lbl_pos, sem, alloc_heap), [ arg ], loc),
            (* Here we are projecting a boxed float from a float record. *)
-           lbl.lbl_sort, lbl_layout
+           lbl_sort, lbl_layout
         | Record_ufloat ->
            Lprim (Pufloatfield (lbl.lbl_pos, sem), [ arg ], loc),
            (* Here we are projecting an unboxed float from a float record. *)
-           lbl.lbl_sort, lbl_layout
+           lbl_sort, lbl_layout
         | Record_inlined (_, Constructor_uniform_value, Variant_extensible) ->
             Lprim (Pfield (lbl.lbl_pos + 1, ptr, sem), [ arg ], loc),
-            lbl.lbl_sort, lbl_layout
+            lbl_sort, lbl_layout
         | Record_inlined (_, Constructor_mixed _, Variant_extensible) ->
             (* CR layouts v5.9: support this *)
             fatal_error
@@ -2414,7 +2426,7 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
                 shape
             in
             Lprim (Pmixedfield ([lbl.lbl_pos], shape, sem), [ arg ], loc),
-            lbl.lbl_sort, lbl_layout
+            lbl_sort, lbl_layout
         | Record_inlined (_, _, Variant_with_null) -> assert false
       in
       let str = if Types.is_mutable lbl.lbl_mut then StrictOpt else Alias in
@@ -2423,21 +2435,22 @@ let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
   in
   make_args 0
 
+(* CR lmaurer: This is a vastly not-okay amount of duplicated code. *)
 let get_expr_args_record_unboxed_product ~scopes head
       (arg, _mut, _sort, _layout) rem =
   let loc = head_loc ~scopes head in
-  let all_labels =
+  let all_labels, all_sorts =
     let open Patterns.Head in
     match head.pat_desc with
-    | Record_unboxed_product
-        ({ lbl_all ; lbl_repres = Record_unboxed_product} :: _) ->
-      lbl_all
+    | Record_unboxed_product (lbl :: _, sorts, _) ->
+        lbl.lbl_all, sorts
+    | Record_unboxed_product ([], _, _)
     | _ ->
       assert false
   in
   let lbl_layouts =
     Array.map (fun lbl ->
-      Typeopt.layout_of_sort lbl.lbl_loc lbl.lbl_sort
+      Typeopt.layout_of_sort lbl.lbl_loc (label_sort lbl all_sorts)
     ) all_labels
     |> Array.to_list
   in
@@ -2459,8 +2472,9 @@ let get_expr_args_record_unboxed_product ~scopes head
         else
           Alias
       in
-      let layout = Typeopt.layout_of_sort lbl.lbl_loc lbl.lbl_sort in
-      (access, str, lbl.lbl_sort, layout) :: make_args (pos + 1)
+      let lbl_sort = label_sort lbl all_sorts in
+      let layout = Typeopt.layout_of_sort lbl.lbl_loc lbl_sort in
+      (access, str, lbl_sort, layout) :: make_args (pos + 1)
   in
   make_args 0
 
@@ -2477,7 +2491,7 @@ let divide_record all_labels ~scopes head ctx pm =
     head ctx pm
 
 let divide_record_unboxed_product all_labels ~scopes head ctx pm =
-  let head = expand_record_unboxed_product_head head in
+  let head = expand_record_head head in
   divide_line (Context.specialize head)
     (get_expr_args_record_unboxed_product ~scopes)
     (get_pat_args_record_unboxed_product (Array.length all_labels))
@@ -3060,7 +3074,16 @@ let complete_pats_constrs = function
         cstr_pat.pat_desc in
       let pat_of_constr cstr =
         let open Patterns.Head in
-        to_omega_pattern { constr with pat_desc = Construct cstr } in
+        let fake_repr : constructor_representation =
+          Constructor_mixed [| Types.Bits64 |]
+        in
+        let sorts =
+          List.map
+            (fun _ -> Jkind.Sort.new_var ~level:(Ctype.get_current_level ()))
+            cstr.cstr_args
+        in
+        to_omega_pattern
+          { constr with pat_desc = Construct (cstr, fake_repr, sorts) } in
       List.map pat_of_constr
         (complete_constrs constr (List.map constr_of_pat constrs))
   | _ -> assert false
@@ -3971,12 +3994,12 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
           compile_no_test ~scopes value_kind
             (divide_unboxed_tuple ~scopes ph shape)
             Context.combine repr partial ctx pm
-      | Record [] | Record_unboxed_product [] -> assert false
-      | Record (lbl :: _) ->
+      | Record ([], _, _) | Record_unboxed_product ([], _, _) -> assert false
+      | Record ((lbl :: _), _, _) ->
           compile_no_test ~scopes value_kind
             (divide_record ~scopes lbl.lbl_all ph)
             Context.combine repr partial ctx pm
-      | Record_unboxed_product (lbl :: _) ->
+      | Record_unboxed_product ((lbl :: _), _, _) ->
           compile_no_test ~scopes value_kind
             (divide_record_unboxed_product ~scopes lbl.lbl_all ph)
             Context.combine repr partial ctx pm
@@ -3988,7 +4011,7 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
             partial divide_constant
             (combine_constant value_kind ploc arg cst partial)
             ctx pm
-      | Construct cstr ->
+      | Construct (cstr, _, _) ->
           compile_test
             (compile_match ~scopes value_kind repr partial)
             partial (divide_constructor ~scopes)
@@ -4076,8 +4099,8 @@ let is_record_with_mutable_field p =
     List.exists (fun (_, lbl, _) -> Types.is_mutable lbl.lbl_mut) lps
   in
   match p.pat_desc with
-  | Tpat_record (lps, _) -> fields_have_mutable_type lps
-  | Tpat_record_unboxed_product (lps, _) -> fields_have_mutable_type lps
+  | Tpat_record (lps, _, _, _) -> fields_have_mutable_type lps
+  | Tpat_record_unboxed_product (lps, _, _, _) -> fields_have_mutable_type lps
   | Tpat_alias _
   | Tpat_variant _
   | Tpat_lazy _

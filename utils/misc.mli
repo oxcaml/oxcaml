@@ -146,6 +146,13 @@ module Stdlib : sig
     (** [map_option f l] is [some_if_all_elements_are_some (map f l)], but with
         short circuiting. *)
 
+    val mapi_result
+       : (int -> 'a -> ('b, 'e) Result.t)
+      -> 'a t
+      -> ('b t, 'e) Result.t
+    (** [mapi_result f l] is similar to [map_option f l] but returns the first
+        error result if [f] returns one. *)
+
     val map2_option : ('a -> 'b -> 'c option) -> 'a t -> 'b t -> 'c t option
 
     val map2_prefix : ('a -> 'b -> 'c) -> 'a t -> 'b t -> ('c t * 'b t)

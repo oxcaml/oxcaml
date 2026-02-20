@@ -5180,11 +5180,12 @@ let report_lookup_error_doc ~level _loc env ppf = function
       fprintf ppf "@[The type %a has no unboxed version.@]"
         quoted_longident lid;
       begin match decl.type_kind with
-      | Type_record (_, Record_unboxed, _) ->
+      | Type_record (_, Some Record_unboxed, _) ->
           fprintf ppf
             "@.@[@{<hint>Hint@}: \
              [%@%@unboxed] records don't get unboxed versions.@]"
-      | Type_record (_, (Record_float | Record_ufloat | Record_mixed _), _) ->
+      | Type_record (_, Some (Record_float | Record_ufloat | Record_mixed _),
+                     _) ->
           fprintf ppf
             "@.@[@{<hint>Hint@}: Float records don't get unboxed versions.@]";
       | Type_record_unboxed_product _ ->

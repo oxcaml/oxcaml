@@ -337,6 +337,7 @@ type type_mismatch =
   | Unboxed_representation of position * attributes
   | Extensible_representation of position
   | With_null_representation of position
+  | Fixed_representation of position
   | Jkind of Jkind.Violation.t
   | Unsafe_mode_crossing of unsafe_mode_crossing_mismatch
 
@@ -718,6 +719,10 @@ let report_type_mismatch first second decl env ppf err =
          (choose ord first second) decl
          "has a constructor represented as a null pointer";
       pr "@ Hint: add [%@%@or_null_reexport]."
+  | Fixed_representation ord ->
+      pr "Their internal representations differ:@ %s %s %s."
+         (choose ord first second) decl
+         "has a fixed representation while the other varies"
   | Jkind v ->
       Jkind.Violation.report_with_name ~name:first
         ~level:(Ctype.get_current_level ()) env ppf v
@@ -904,7 +909,7 @@ module Record_diffing = struct
 
   let compare_with_representation (type rep) ~loc
         (record_form : rep record_form) env params1 params2 l r
-        (rep1 : rep) (rep2 : rep) =
+        (rep1 : rep option) (rep2 : rep option) =
     if not (equal ~loc env params1 params2 l r) then
       let patch = diffing loc env params1 params2 l r in
       Some (Record_mismatch (Label_mismatch patch))
@@ -912,43 +917,55 @@ module Record_diffing = struct
       match record_form with
       | Legacy ->
         begin match rep1, rep2 with
-        | Record_unboxed, Record_unboxed -> None
-        | Record_unboxed, _ -> Some (Unboxed_representation (First, []))
-        | _, Record_unboxed -> Some (Unboxed_representation (Second, []))
+        | None, None -> None
+        | Some _, None -> Some (Fixed_representation First)
+        | None, Some _ -> Some (Fixed_representation Second)
+        | Some rep1, Some rep2 ->
+          begin match rep1, rep2 with
+          | Record_unboxed, Record_unboxed -> None
+          | Record_unboxed, _ -> Some (Unboxed_representation (First, []))
+          | _, Record_unboxed -> Some (Unboxed_representation (Second, []))
 
-        | Record_inlined _, Record_inlined _ -> None
-        | Record_inlined _, _ ->
-           Some (Record_mismatch (Inlined_representation First))
-        | _, Record_inlined _ ->
-           Some (Record_mismatch (Inlined_representation Second))
+          | Record_inlined _, Record_inlined _ -> None
+          | Record_inlined _, _ ->
+             Some (Record_mismatch (Inlined_representation First))
+          | _, Record_inlined _ ->
+             Some (Record_mismatch (Inlined_representation Second))
 
-        | Record_float, Record_float -> None
-        | Record_float, _ ->
-           Some (Record_mismatch (Float_representation First))
-        | _, Record_float ->
-           Some (Record_mismatch (Float_representation Second))
+          | Record_float, Record_float -> None
+          | Record_float, _ ->
+             Some (Record_mismatch (Float_representation First))
+          | _, Record_float ->
+             Some (Record_mismatch (Float_representation Second))
 
-        | Record_ufloat, Record_ufloat -> None
-        | Record_ufloat, _ ->
-           Some (Record_mismatch (Ufloat_representation First))
-        | _, Record_ufloat ->
-           Some (Record_mismatch (Ufloat_representation Second))
+          | Record_ufloat, Record_ufloat -> None
+          | Record_ufloat, _ ->
+             Some (Record_mismatch (Ufloat_representation First))
+          | _, Record_ufloat ->
+             Some (Record_mismatch (Ufloat_representation Second))
 
-        | Record_mixed m1, Record_mixed m2 ->
-            begin match find_mismatch_in_mixed_record_representations m1 m2 with
-            | None -> None
-            | Some mismatch -> Some (Record_mismatch mismatch)
-            end
-        | Record_mixed _, _ ->
-           Some (Record_mismatch (Mixed_representation First))
-        | _, Record_mixed _ ->
-           Some (Record_mismatch (Mixed_representation Second))
+          | Record_mixed m1, Record_mixed m2 ->
+              begin match
+                find_mismatch_in_mixed_record_representations m1 m2
+              with
+              | None -> None
+              | Some mismatch -> Some (Record_mismatch mismatch)
+              end
+          | Record_mixed _, _ ->
+             Some (Record_mismatch (Mixed_representation First))
+          | _, Record_mixed _ ->
+             Some (Record_mismatch (Mixed_representation Second))
 
-        | Record_boxed _, Record_boxed _ -> None
+          | Record_boxed _, Record_boxed _ -> None
+          end
         end
       | Unboxed_product ->
         begin match rep1, rep2 with
-        | Record_unboxed_product, Record_unboxed_product -> None
+        | None, None
+        | Some (Record_unboxed_product _), Some (Record_unboxed_product _) ->
+            None
+        | Some _, None -> Some (Fixed_representation First)
+        | None, Some _ -> Some (Fixed_representation Second)
         end
 end
 
@@ -1507,7 +1524,8 @@ let type_declarations ?(equality = false) ~loc env ~mark name
     | (Type_record_unboxed_product(labels1,rep1,umc1),
        Type_record_unboxed_product(labels2,rep2,umc2)) -> begin
         Misc.Stdlib.Option.first_some
-          (mark_and_compare_records Unboxed_product labels1 rep1 labels2 rep2)
+          (mark_and_compare_records
+             Unboxed_product labels1 rep1 labels2 rep2)
           (fun () -> compare_unsafe_mode_crossing ~env umc1 umc2)
       end
     | (Type_open, Type_open) -> None

@@ -102,12 +102,13 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
       fprintf ppf "@[(%a)@]" (pretty_list pretty_labeled_val ",") vs
   | Tpat_unboxed_tuple vs ->
       fprintf ppf "@[#(%a)@]" (pretty_list pretty_labeled_val_sort ",") vs
-  | Tpat_construct (_, cstr, [], _) ->
+  | Tpat_construct (_, cstr, _, [], _) ->
       fprintf ppf "%s" cstr.cstr_name
-  | Tpat_construct (_, cstr, [w], None) ->
+  | Tpat_construct (_, cstr, _, [(_, w)], None) ->
       fprintf ppf "@[<2>%s@ %a@]" cstr.cstr_name pretty_arg w
-  | Tpat_construct (_, cstr, vs, vto) ->
+  | Tpat_construct (_, cstr, _, vs, vto) ->
       let name = cstr.cstr_name in
+      let vs = List.map snd vs in
       begin match (name, vs, vto) with
         ("::", [v1;v2], None) ->
           fprintf ppf "@[%a::@,%a@]" pretty_car v1 pretty_cdr v2
@@ -124,8 +125,8 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
       fprintf ppf "`%s" l
   | Tpat_variant (l, Some w, _) ->
       fprintf ppf "@[<2>`%s@ %a@]" l pretty_arg w
-  | Tpat_record (lvs,_) -> pretty_record ~unboxed:false lvs
-  | Tpat_record_unboxed_product (lvs,_) -> pretty_record ~unboxed:true lvs
+  | Tpat_record (lvs,_,_,_) -> pretty_record ~unboxed:false lvs
+  | Tpat_record_unboxed_product (lvs,_,_,_) -> pretty_record ~unboxed:true lvs
   | Tpat_array (am, _arg_sort, vs) ->
       let punct = if Types.is_mutable am then '|' else ':' in
       fprintf ppf "@[[%c %a %c]@]" punct (pretty_vals " ;") vs punct
@@ -141,19 +142,19 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
       fprintf ppf "@[(%a)@]" pretty_or v
 
 and pretty_car ppf v = match v.pat_desc with
-| Tpat_construct (_,cstr, [_ ; _], None)
+| Tpat_construct (_,cstr, _,[_ ; _], None)
     when is_cons cstr ->
       fprintf ppf "(%a)" pretty_val v
 | _ -> pretty_val ppf v
 
 and pretty_cdr ppf v = match v.pat_desc with
-| Tpat_construct (_,cstr, [v1 ; v2], None)
+| Tpat_construct (_,cstr, _, [(_, v1) ; (_, v2)], None)
     when is_cons cstr ->
       fprintf ppf "%a::@,%a" pretty_car v1 pretty_cdr v2
 | _ -> pretty_val ppf v
 
 and pretty_arg ppf v = match v.pat_desc with
-| Tpat_construct (_,_,_::_,None)
+| Tpat_construct (_,_,_,_::_,None)
 | Tpat_variant (_, Some _, _) -> fprintf ppf "(%a)" pretty_val v
 |  _ -> pretty_val ppf v
 

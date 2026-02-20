@@ -710,9 +710,8 @@ module Jkind0 : sig
         (type_expr * Mode.Modality.Const.t) list ->
         Jkind_types.Sort.t Jkind_types.Layout.t list ->
         jkind_l
-      val product_of_sorts :
-        why:Jkind_intf.History.product_creation_reason -> level:int -> int ->
-        jkind_l
+      val product_of_any :
+        why:Jkind_intf.History.product_creation_reason -> int -> jkind_l
     end
 
     val add_with_bounds :
@@ -724,6 +723,9 @@ module Jkind0 : sig
     val for_non_float : why:Jkind_intf.History.value_creation_reason -> 'd jkind
 
     val for_boxed_record : label_declaration list -> jkind_l
+    val for_boxed_record_with_updates :
+      (label_declaration * type_expr * Jkind_types.Sort.Const.t option) list ->
+      jkind_l
     val for_boxed_variant :
       loc:Location.t ->
       decl_params:Types.type_expr list ->

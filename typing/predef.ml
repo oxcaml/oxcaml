@@ -505,7 +505,7 @@ let mk_add_extension add_extension id args =
             (fun (ca_type, ca_sort) ->
               {
                 ca_type;
-                ca_sort;
+                ca_sort = Some ca_sort;
                 ca_modalities=Mode.Modality.Const.id;
                 ca_loc=Location.none
               })
@@ -533,15 +533,18 @@ let mk_add_jkind add_jkind =
   in
   add_jkind
 
+let array_of_list_map_option f (l : 'a list) : 'b array option =
+  Misc.Stdlib.List.map_option f l |> Option.map Array.of_list
+
 let variant constrs =
   let mk_elt { cd_args } =
     let sorts = match cd_args with
       | Cstr_tuple args ->
-        Misc.Stdlib.Array.of_list_map (fun { ca_sort } -> ca_sort) args
+        array_of_list_map_option (fun { ca_sort } -> ca_sort) args
       | Cstr_record lbls ->
-        Misc.Stdlib.Array.of_list_map (fun { ld_sort } -> ld_sort) lbls
+        array_of_list_map_option (fun { ld_sort } -> ld_sort) lbls
     in
-    Constructor_uniform_value, sorts
+    sorts |> Option.map (fun sorts -> Constructor_uniform_value, sorts)
   in
   Type_variant (
     constrs,
@@ -550,7 +553,7 @@ let variant constrs =
 
 let unrestricted tvar ca_sort =
   {ca_type=tvar;
-   ca_sort;
+   ca_sort=Some ca_sort;
    ca_modalities=Mode.Modality.Const.id;
    ca_loc=Location.none}
 
@@ -680,7 +683,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
                ld_mutable=Immutable;
                ld_modalities=Mode.Modality.Const.id;
                ld_type=field_type;
-               ld_sort=Jkind_types.Sort.Const.value;
+               ld_sort=Some Jkind_types.Sort.Const.value;
                ld_loc=Location.none;
                ld_attributes=[];
                ld_uid=Uid.of_predef_id id;
@@ -692,11 +695,11 @@ let build_initial_env add_type add_extension add_jkind empty_env =
            ("pos_bol", type_int);
            ("pos_cnum", type_int) ]
          in
-         Type_record (
-           labels,
-           (Record_boxed (List.map (fun label -> label.ld_sort) labels |> Array.of_list)),
-           None
-         )
+         let repres =
+           array_of_list_map_option (fun label -> label.ld_sort) labels
+           |> Option.map (fun sorts -> Record_boxed sorts)
+         in
+         Type_record (labels, repres, None)
        )
        (* CR layouts v2.8: Possibly remove this -- and simplify [mk_add_type] --
           when we have a better jkind subsumption check. Internal ticket 5104 *)

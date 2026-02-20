@@ -289,6 +289,10 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | Product _ -> Print_as "<unboxed product>"
       | Univar _ -> Print_as "<univar>"
 
+    let print_sort_option : Jkind.Sort.Const.t option -> _ = function
+      | None -> Print_as "<unknown>"
+      | Some sort -> print_sort sort
+
     let outval_of_value max_steps max_depth check_depth env obj ty =
 
       let printer_steps = ref max_steps in
@@ -516,7 +520,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                           let ty_args =
                             List.map2
                               (fun { ca_sort } ty_arg ->
-                                 (ty_arg, print_sort ca_sort)
+                                 (ty_arg, print_sort_option ca_sort)
                               ) l ty_args
                           in
                           tree_of_constr_with_args (tree_of_constr env path)
@@ -538,10 +542,35 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                                         (Out_name.create (Ident.name cd_id)),
                                       [ r ])
                     end
-                | {type_kind = Type_record(lbl_list, rep, _)} ->
+                | {type_kind = Type_record(lbl_list, rep, _); type_params} ->
                     begin match check_depth depth obj ty with
                       Some x -> x
                     | None ->
+                        let rep =
+                          match rep with
+                          | Some rep -> rep
+                          | None ->
+                              let label_params_and_types, record_params =
+                                Ctype.instance_label_declarations
+                                  ~fixed:false
+                                  (lbl_list |> Array.of_list)
+                                  ~params:type_params
+                              in
+                              List.iter2 (Ctype.unify env)
+                                record_params ty_list;
+                              let lds_and_types =
+                                List.map2 (fun lbl (_params, ty) -> lbl, ty)
+                                  lbl_list
+                                  (label_params_and_types |> Array.to_list)
+                              in
+                              match
+                                Typedecl.update_record_representation env
+                                  Location.none Legacy lds_and_types None
+                              with
+                              | Ok (_sorts, rep) -> rep
+                              | Error _ ->
+                                  Misc.fatal_error "unrepresentable record"
+                        in
                         let pos =
                           match rep with
                           | Record_inlined (_, _, Variant_extensible) -> 1
@@ -574,8 +603,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                           env path decl.type_params ty_list
                           lbl_list pos obj rep
                     end
-                | {type_kind = Type_record_unboxed_product
-                                 (lbl_list, Record_unboxed_product, _)} ->
+                | {type_kind = Type_record_unboxed_product (lbl_list, _, _)} ->
                     begin match check_depth depth obj ty with
                       Some x -> x
                     | None ->
@@ -639,7 +667,11 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
               let name = Ident.name ld_id in
               (* PR#5722: print full module path only
                  for first record field *)
-              let is_void = Jkind.Sort.Const.(equal void ld_sort) in
+              let is_void =
+                match ld_sort with
+                  | None -> false
+                  | Some ld_sort -> Jkind.Sort.Const.(equal void ld_sort)
+              in
               let lid =
                 if first then tree_of_label env path (Out_name.create name)
                 else Oide_ident (Out_name.create name)
@@ -677,6 +709,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         in
         Oval_record (tree_of_fields (pos = 0) pos lbl_list)
 
+      (* CR lmaurer: *Pretty please* let's cut down on the duplication here. *)
       and tree_of_record_unboxed_product_fields depth env path type_params
             ty_list lbl_list pos obj =
         let rec tree_of_fields first pos = function
@@ -690,7 +723,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 if first then tree_of_label env path (Out_name.create name)
                 else Oide_ident (Out_name.create name)
               and v =
-                match print_sort ld_sort with
+                match print_sort_option ld_sort with
                 | Print_as msg -> Oval_stuff msg
                 | Print_as_value ->
                   match lbl_list with
@@ -799,7 +832,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         in
         let args = instantiate_types env type_params ty_list cstr.cstr_args in
         let args = List.map2 (fun { ca_sort } arg ->
-            (arg, print_sort ca_sort))
+            (arg, print_sort_option ca_sort))
             cstr.cstr_args args
         in
         tree_of_constr_with_args

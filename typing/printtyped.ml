@@ -221,6 +221,9 @@ let tuple_component_label i ppf = function
 let typevars ppf vs =
   List.iter (typevar_jkind ~print_quote:true ppf) vs
 
+let sort i ppf sort =
+  line i ppf "%a\n" fmt_sort sort
+
 let sort_array i ppf sorts =
   array (i+1) (fun _ ppf l -> fprintf ppf "%a;@ " fmt_const_sort l)
     ppf sorts
@@ -236,8 +239,9 @@ let variant_representation i ppf = let open Types in function
     line i ppf "Variant_unboxed\n"
   | Variant_boxed cstrs ->
     line i ppf "Variant_boxed %a\n"
-      (array (i+1) (fun _ ppf (_cstr, sorts) ->
-         sort_array (i+1) ppf sorts))
+      (array (i+1) (fun _ ppf o ->
+         option (i+1) (fun _ ppf (_cstr, sorts) ->
+           sort_array (i+1) ppf sorts) ppf o))
       cstrs
   | Variant_extensible -> line i ppf "Variant_inlined\n"
   | Variant_with_null -> line i ppf "Variant_with_null\n"
@@ -259,7 +263,7 @@ let record_representation i ppf = let open Types in function
     array (i+1) mixed_block_element ppf shape
 
 let record_unboxed_product_representation i ppf = let open Types in function
-  | Record_unboxed_product ->
+  | Record_unboxed_product _ ->
     line i ppf "Record_unboxed_product\n"
 
 let attribute i ppf k a =
@@ -487,9 +491,9 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   | Tpat_unboxed_tuple (l) ->
       line i ppf "Tpat_unboxed_tuple\n";
       list i labeled_pattern_with_sorts ppf l;
-  | Tpat_construct (li, _, po, vto) ->
+  | Tpat_construct (li, _, _, po, vto) ->
       line i ppf "Tpat_construct %a\n" fmt_longident li;
-      list i pattern ppf po;
+      list i pattern ppf (List.map snd po);
       option i
         (fun i ppf (vl,ct) ->
           line i ppf "vars%a\n"
@@ -502,10 +506,10 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   | Tpat_variant (l, po, _) ->
       line i ppf "Tpat_variant \"%s\"\n" l;
       option i pattern ppf po;
-  | Tpat_record (l, _c) ->
+  | Tpat_record (l, _, _, _c) ->
       line i ppf "Tpat_record\n";
       list i longident_x_pattern ppf l;
-  | Tpat_record_unboxed_product (l, _c) ->
+  | Tpat_record_unboxed_product (l, _, _, _c) ->
       line i ppf "Tpat_record_unboxed_product\n";
       list i longident_x_pattern ppf l;
   | Tpat_array (am, arg_sort, l) ->
@@ -695,10 +699,10 @@ and expression i ppf x =
   | Texp_unboxed_tuple l ->
       line i ppf "Texp_unboxed_tuple\n";
       list i labeled_sorted_expression ppf l;
-  | Texp_construct (li, _, eo, am) ->
+  | Texp_construct (li, _, _, eo, am) ->
       line i ppf "Texp_construct %a\n" fmt_longident li;
       alloc_mode_option i ppf am;
-      list i expression ppf eo;
+      list i expression ppf (List.map snd eo);
   | Texp_variant (l, eo) ->
       line i ppf "Texp_variant \"%s\"\n" l;
       option i expression_alloc_mode ppf eo;
@@ -722,19 +726,25 @@ and expression i ppf x =
       record_unboxed_product_representation (i+1) ppf representation;
       line i ppf "extended_expression =\n";
       option (i+1) expression ppf (Option.map fst extended_expression);
-  | Texp_field (e, _, li, _, _, _) ->
+  | Texp_field { record = e; lid = li; record_sort; field_sort; _ } ->
       line i ppf "Texp_field\n";
       expression i ppf e;
+      sort i ppf record_sort;
       longident i ppf li;
-  | Texp_unboxed_field (e, _, li, _, _) ->
+      sort i ppf field_sort;
+  | Texp_unboxed_field { record = e; lid = li; record_sort; field_sort; _ } ->
       line i ppf "Texp_unboxed_field\n";
       expression i ppf e;
+      sort i ppf record_sort;
       longident i ppf li;
-  | Texp_setfield (e1, am, li, _, e2) ->
+      sort i ppf field_sort;
+  | Texp_setfield { record = e1; field_sort; modality = am; lid = li;
+                    newval = e2; _ } ->
       line i ppf "Texp_setfield\n";
       locality_mode i ppf am;
       expression i ppf e1;
       longident i ppf li;
+      sort i ppf field_sort;
       expression i ppf e2;
   | Texp_array (amut, sort, l, amode) ->
       line i ppf "Texp_array %a\n" fmt_mutable_mode_flag amut;
@@ -1381,7 +1391,7 @@ and longident_x_pattern : 'a. _ -> _ -> _ * 'a * _ -> _ =
   pattern (i+1) ppf p;
 
 and block_access i ppf = function
-  | Baccess_field (li, _) ->
+  | Baccess_field (li, _, _) ->
       line i ppf "Baccess_field %a\n" fmt_longident li
   | Baccess_array
         { mut; index_kind; index; base_ty = _; elt_ty = _; elt_sort } ->
@@ -1395,7 +1405,7 @@ and block_access i ppf = function
       expression i ppf index
 
 and unboxed_access i ppf = function
-  | Uaccess_unboxed_field (li, _) ->
+  | Uaccess_unboxed_field (li, _, _) ->
       line i ppf "Uaccess_unboxed_field %a\n" fmt_longident li
 
 and comprehension i ppf {comp_body; comp_clauses} =
@@ -1455,8 +1465,8 @@ and string_x_expression i ppf (s, _, e) =
   expression (i+1) ppf e;
 
 and record_field
-    : 'a. _ -> _ -> 'a * _ -> _
-  = fun i ppf (_, record_label_definition) ->
+    : 'a. _ -> _ -> 'a * _ * _ -> _
+  = fun i ppf (_, _, record_label_definition) ->
   match record_label_definition with
   | Overridden (li, e) ->
       line i ppf "%a\n" fmt_longident li;

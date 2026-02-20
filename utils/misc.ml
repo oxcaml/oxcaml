@@ -210,6 +210,17 @@ module Stdlib = struct
       in
       aux l1 l2 []
 
+    let mapi_result f l =
+      let rec aux l i acc =
+        match l with
+        | [] -> Ok (List.rev acc)
+        | x :: xs ->
+          match f i x with
+          | Error e -> Error e
+          | Ok x -> aux xs (i + 1) (x :: acc)
+      in
+      aux l 0 []
+
     let split_at n l =
       let rec aux n acc l =
         if n = 0

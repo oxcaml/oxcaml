@@ -478,7 +478,6 @@ and r = { x : int; y : float#; }
 and u = r#
 |}]
 
-(* CR layouts v7.2: improve this error message *)
 type s_bad = r# t
 and r = {x:int; y:bool}
 [%%expect{|
@@ -486,9 +485,9 @@ Line 2, characters 0-23:
 2 | and r = {x:int; y:bool}
     ^^^^^^^^^^^^^^^^^^^^^^^
 Error:
-       The kind of r# is value_or_null & float64
+       The layout of r# is value & value
          because it is an unboxed record.
-       But the kind of r# must be a subkind of value & float64
+       But the layout of r# must be a sublayout of value & float64
          because of the definition of t at line 1, characters 0-29.
 |}]
 
@@ -500,9 +499,9 @@ Line 3, characters 0-10:
 3 | and q = r#
     ^^^^^^^^^^
 Error:
-       The kind of q is value_or_null & float64
+       The layout of q is value & value
          because it is an unboxed record.
-       But the kind of q must be a subkind of value & float64
+       But the layout of q must be a sublayout of value & float64
          because of the definition of t at line 1, characters 0-29.
 |}]
 

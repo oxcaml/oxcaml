@@ -286,10 +286,10 @@ let swap_inner (t : tree) =
                          (consts (0)) (non_consts ([0: *, value<int>, *]))>]))
        (catch
          (if t/370
-           (let (*match*/379 =a? (field_imm 0 t/370))
-             (if *match*/379
-               (let (*match*/383 =a? (field_imm 2 t/370))
-                 (if *match*/383
+           (let (*match*/388 =a? (field_imm 0 t/370))
+             (if *match*/388
+               (let (*match*/392 =a? (field_imm 2 t/370))
+                 (if *match*/392
                    (makeblock 0 (value<
                                   (consts (0))
                                    (non_consts ([0:
@@ -346,8 +346,8 @@ let swap_inner (t : tree) =
                                                     (non_consts ([0: *,
                                                                   value<int>,
                                                                   *]))>]))>)
-                       (field_imm 0 *match*/379) (field_int 1 *match*/379)
-                       (field_imm 0 *match*/383))
+                       (field_imm 0 *match*/388) (field_int 1 *match*/388)
+                       (field_imm 0 *match*/392))
                      (field_int 1 t/370)
                      (makeblock 0 (value<
                                     (consts (0))
@@ -377,8 +377,8 @@ let swap_inner (t : tree) =
                                                     (non_consts ([0: *,
                                                                   value<int>,
                                                                   *]))>]))>)
-                       (field_imm 2 *match*/379) (field_int 1 *match*/383)
-                       (field_imm 2 *match*/383)))
+                       (field_imm 2 *match*/388) (field_int 1 *match*/392)
+                       (field_imm 2 *match*/392)))
                    (exit 19)))
                (exit 19)))
            (exit 19))
@@ -415,25 +415,25 @@ let match_guard r =
 (let
   (unique_use/293 =? (apply (field_imm 0 (global Toploop!)) "unique_use")
    aliased_use/290 =? (apply (field_imm 0 (global Toploop!)) "aliased_use")
-   match_guard/386 =
+   match_guard/395 =
      (function {nlocal = 0}
-       r/388[value<(consts ()) (non_consts ([0: *, *]))>]
+       r/397[value<(consts ()) (non_consts ([0: *, *]))>]
        : (consts ())
           (non_consts ([0: value<(consts ()) (non_consts ([0: *, *]))>, *]))
-       (let (y/389 =o? (field_mut 1 r/388))
-         (if (caml_string_equal y/389 "")
+       (let (y/398 =o? (field_mut 1 r/397))
+         (if (caml_string_equal y/398 "")
            (let
-             (r/460 =[value<(consts ()) (non_consts ([0: *, *]))>]
-                (apply aliased_use/290 r/388))
+             (r/469 =[value<(consts ()) (non_consts ([0: *, *]))>]
+                (apply aliased_use/290 r/397))
              (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*)
-               r/460 y/389))
+               r/469 y/398))
            (let
-             (y/390 =o? (field_mut 1 r/388)
-              r/461 =[value<(consts ()) (non_consts ([0: *, *]))>]
-                (apply unique_use/293 r/388))
+             (y/399 =o? (field_mut 1 r/397)
+              r/470 =[value<(consts ()) (non_consts ([0: *, *]))>]
+                (apply unique_use/293 r/397))
              (makeblock 0 (value<(consts ()) (non_consts ([0: *, *]))>,*)
-               r/461 y/390))))))
-  (apply (field_imm 1 (global Toploop!)) "match_guard" match_guard/386))
+               r/470 y/399))))))
+  (apply (field_imm 1 (global Toploop!)) "match_guard" match_guard/395))
 val match_guard : record @ unique -> record * string = <fun>
 |}]
 
