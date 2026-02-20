@@ -106,6 +106,10 @@ let rec eliminate_ref id = function
       Lexclave(eliminate_ref id e)
   | Lsplice (loc, _) ->
       error ~loc:(to_location loc) (Invalid_constructor "Lsplice")
+  | Ltemplate ({ loc; _}, _) ->
+    Lambda.error ~loc:(to_location loc) (Invalid_constructor "Ltemplate")
+  | Linstantiate { ap_loc; _ } ->
+    Lambda.error ~loc:(to_location ap_loc) (Invalid_constructor "Linstantiate")
 
 (* Simplification of exits *)
 
@@ -203,6 +207,10 @@ let simplify_exits lam =
   | Lexclave l -> count ~try_depth:(try_depth-1) l
   | Lsplice (loc, _) ->
       error ~loc:(to_location loc) (Invalid_constructor "Lsplice")
+  | Ltemplate ({ loc; _}, _) ->
+    Lambda.error ~loc:(to_location loc) (Invalid_constructor "Ltemplate")
+  | Linstantiate { ap_loc; _ } ->
+    Lambda.error ~loc:(to_location ap_loc) (Invalid_constructor "Linstantiate")
 
   and count_default ~try_depth sw = match sw.sw_failaction with
   | None -> ()
@@ -391,6 +399,10 @@ let simplify_exits lam =
   | Lexclave l -> Lexclave (simplif ~layout ~try_depth:(try_depth - 1) l)
   | Lsplice (loc, _) ->
       error ~loc:(to_location loc) (Invalid_constructor "Lsplice")
+  | Ltemplate ({ loc; _}, _) ->
+    Lambda.error ~loc:(to_location loc) (Invalid_constructor "Ltemplate")
+  | Linstantiate { ap_loc; _ } ->
+    Lambda.error ~loc:(to_location ap_loc) (Invalid_constructor "Linstantiate")
   in
   simplif ~layout:None ~try_depth:0 lam
 
@@ -556,6 +568,10 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
       count Ident.Map.empty l2
   | Lsplice (loc, _) ->
       error ~loc:(to_location loc) (Invalid_constructor "Lsplice")
+  | Ltemplate ({ loc; _}, _) ->
+    Lambda.error ~loc:(to_location loc) (Invalid_constructor "Ltemplate")
+  | Linstantiate { ap_loc; _ } ->
+    Lambda.error ~loc:(to_location ap_loc) (Invalid_constructor "Linstantiate")
 
   and count_lfunction fn =
     count Ident.Map.empty fn.body
@@ -726,6 +742,10 @@ let simplify_lets lam ~restrict_to_upstream_dwarf ~gdwarf_may_alter_codegen =
   | Lexclave l -> Lexclave (simplif l)
   | Lsplice (loc, _) ->
       error ~loc:(to_location loc) (Invalid_constructor "Lsplice")
+  | Ltemplate ({ loc; _}, _) ->
+    Lambda.error ~loc:(to_location loc) (Invalid_constructor "Ltemplate")
+  | Linstantiate { ap_loc; _ } ->
+    Lambda.error ~loc:(to_location ap_loc) (Invalid_constructor "Linstantiate")
   in
   simplif lam
 
@@ -825,6 +845,10 @@ let rec emit_tail_infos is_tail lambda =
       emit_tail_infos is_tail lam
   | Lsplice (loc, _) ->
       error ~loc:(to_location loc) (Invalid_constructor "Lsplice")
+  | Ltemplate ({ loc; _}, _) ->
+    Lambda.error ~loc:(to_location loc) (Invalid_constructor "Ltemplate")
+  | Linstantiate { ap_loc; _ } ->
+    Lambda.error ~loc:(to_location ap_loc) (Invalid_constructor "Linstantiate")
 and list_emit_tail_infos_fun f is_tail =
   List.iter (fun x -> emit_tail_infos is_tail (f x))
 and list_emit_tail_infos is_tail =

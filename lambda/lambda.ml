@@ -963,6 +963,8 @@ type lambda =
   | Lregion of lambda * layout
   | Lexclave of lambda
   | Lsplice of scoped_location * slambda
+  | Ltemplate of lfunction * layout Ident.Map.t
+  | Linstantiate of lambda_apply
 
 and slambda =
   | SLlayout of layout
@@ -1405,6 +1407,10 @@ let make_key e =
         Lapply {ap with ap_func = tr_rec env ap.ap_func;
                         ap_args = tr_recs env ap.ap_args;
                         ap_loc = Loc_unknown}
+    | Linstantiate ap ->
+        Linstantiate {ap with ap_func = tr_rec env ap.ap_func;
+                              ap_args = tr_recs env ap.ap_args;
+                              ap_loc = Loc_unknown}
     | Llet (Alias,_k,x,_x_duid,ex,e) -> (* Ignore aliases -> substitute *)
         let ex = tr_rec env ex in
         tr_rec (Ident.add x ex env) e
@@ -1446,7 +1452,7 @@ let make_key e =
     | Lifused (id,e) -> Lifused (id,tr_rec env e)
     | Lregion (e,layout) -> Lregion (tr_rec env e,layout)
     | Lexclave e -> Lexclave (tr_rec env e)
-    | Lletrec _|Lfunction _
+    | Lletrec _|Lfunction _| Ltemplate _
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
@@ -1644,6 +1650,9 @@ let rec free_variables = function
   | Lexclave e ->
       free_variables e
   | Lsplice (_, slambda) -> free_variables_slambda slambda
+  | Ltemplate (_, free_vars) -> Ident.Map.keys free_vars
+  | Linstantiate{ap_func = fn; ap_args = args} ->
+      free_variables_list (free_variables fn) args
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
@@ -3170,7 +3179,9 @@ let rec try_to_find_location lam =
   | Lstringswitch (_, _, _, loc, _)
   | Lsend (_, _, _, _, _, _, loc, _)
   | Levent (_, { lev_loc = loc; _ })
-  | Lsplice (loc, _) ->
+  | Lsplice (loc, _)
+  | Ltemplate ({ loc; _ }, _)
+  | Linstantiate { ap_loc = loc; _ } ->
     loc
   | Llet (_, _, _, _, lam, _)
   | Lmutlet (_, _, _, lam, _)

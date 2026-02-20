@@ -1189,6 +1189,14 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
     Lambda.error
       ~loc:(Debuginfo.Scoped_location.to_location loc)
       (Invalid_constructor "Lsplice")
+  | Ltemplate ({ loc; _}, _) ->
+    Lambda.error
+      ~loc:(Debuginfo.Scoped_location.to_location loc)
+      (Invalid_constructor "Ltemplate")
+  | Linstantiate { ap_loc; _ } ->
+    Lambda.error
+      ~loc:(Debuginfo.Scoped_location.to_location ap_loc)
+      (Invalid_constructor "Linstantiate")
 
 and cps_non_tail_simple :
     Acc.t ->
@@ -1688,7 +1696,15 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
         | Lsplice (loc, _) ->
           Lambda.error
             ~loc:(Debuginfo.Scoped_location.to_location loc)
-            (Invalid_constructor "Lsplice"))
+            (Invalid_constructor "Lsplice")
+        | Ltemplate ({ loc; _}, _) ->
+          Lambda.error
+            ~loc:(Debuginfo.Scoped_location.to_location loc)
+            (Invalid_constructor "Ltemplate")
+        | Linstantiate { ap_loc; _ } ->
+          Lambda.error
+            ~loc:(Debuginfo.Scoped_location.to_location ap_loc)
+            (Invalid_constructor "Linstantiate"))
       ([], wrappers) cases
   in
   cps_non_tail_var "scrutinee" acc env ccenv scrutinee

@@ -222,6 +222,14 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     Lambda.error
       ~loc:(Debuginfo.Scoped_location.to_location loc)
       (Invalid_constructor "Lsplice")
+  | Ltemplate ({ loc; _}, _) ->
+    Lambda.error
+      ~loc:(Debuginfo.Scoped_location.to_location loc)
+      (Invalid_constructor "Ltemplate")
+  | Linstantiate { ap_loc; _ } ->
+    Lambda.error
+      ~loc:(Debuginfo.Scoped_location.to_location ap_loc)
+      (Invalid_constructor "Linstantiate")
   | Lvar id | Lmutvar id -> Var id
   | Lconst cst -> Const cst
   | Lapply { ap_func; ap_args; ap_region_close } ->
