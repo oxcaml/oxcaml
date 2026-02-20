@@ -1192,6 +1192,9 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
          | None ->
            match Scalar.Operation.With_percent_prefix.of_string s with
            | exception Not_found ->
+             (* If another set of generated primitives is added,
+                `tools/listprims.ml` needs to be modified to keep
+                `primitives.txt` accurate. *)
              raise (Error (loc, Unknown_builtin_primitive s))
            | intrinsic ->
              let arity = Scalar.Operation.arity intrinsic in
@@ -1203,6 +1206,11 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
     | _ -> External lambda_prim
   in
   prim
+
+let indexing_primitive_names =
+  String.Map.fold (fun name _ l -> name :: l) indexing_primitives []
+let array_vec_primitive_names =
+  String.Map.fold (fun name _ l -> name :: l) array_vec_primitives []
 
 let lookup_primitive_and_mark_used loc ~poly_mode ~poly_sort pos p env path =
   match lookup_primitive loc ~poly_mode ~poly_sort pos p with
