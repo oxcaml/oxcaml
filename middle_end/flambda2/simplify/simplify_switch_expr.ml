@@ -748,7 +748,7 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
               | Not_refined_at_join -> `Not_enough_join_info
               | Invariant_in_all_uses _ ->
                 (* in this case, we don't need to specialize to know the
-                   scrutinee, or to simplify the switch, it will hapen without
+                   scrutinee, or to simplify the switch, it will happen without
                    specialization. *)
                 `No_reason_to_spec
               | Variable_refined_at_these_uses var_analysis -> (
@@ -778,7 +778,7 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
           | `Spec (join_analysis, specialized, generic) ->
             (* Specialization benefit estimation: we use heuristics similar to
                that of inlining to estimate the benefit based on code size and
-               removed operations (note that we use the join info the the typing
+               removed operations (note that we use the join info in the typing
                env to estimate which operations will be removed during
                specialization, rather that computing it speculatively like is
                done for inlining). *)
