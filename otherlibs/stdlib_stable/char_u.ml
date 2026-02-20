@@ -14,8 +14,8 @@
 
 type t = char#
 
-external of_int8_u : int8# -> char# @@ portable = "%identity"
-external to_int8_u : char# -> int8# @@ portable = "%identity"
+external of_int8_u : int8# -> char# @@ stateless = "%identity"
+external to_int8_u : char# -> int8# @@ stateless = "%identity"
 
 let code c = Int8_u.unsigned_to_int (to_int8_u c)
 

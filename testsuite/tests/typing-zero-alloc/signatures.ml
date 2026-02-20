@@ -866,7 +866,7 @@ end
 [%%expect{|
 module M_base_for_mto : sig val f : int -> int [@@zero_alloc] end
 module type S_base_mto =
-  sig val f : int -> int @@ portable [@@zero_alloc] end
+  sig val f : int -> int @@ stateless [@@zero_alloc] end
 module M_mto_base_good : S_base_mto
 Lines 11-13, characters 37-3:
 11 | .....................................struct
@@ -880,7 +880,7 @@ Error: Signature mismatch:
        Values do not match:
          val f : int -> int [@@zero_alloc opt]
        is not included in
-         val f : int -> int @@ portable [@@zero_alloc]
+         val f : int -> int @@ stateless [@@zero_alloc]
        The former provides a weaker "zero_alloc" guarantee than the latter.
 |}]
 
@@ -901,7 +901,7 @@ end
 [%%expect{|
 module M_strict_for_mto : sig val f : int -> int [@@zero_alloc strict] end
 module type S_strict_mto =
-  sig val f : int -> int @@ portable [@@zero_alloc strict] end
+  sig val f : int -> int @@ stateless [@@zero_alloc strict] end
 module M_mto_strict_good : S_strict_mto
 Lines 11-13, characters 41-3:
 11 | .........................................struct
@@ -915,7 +915,7 @@ Error: Signature mismatch:
        Values do not match:
          val f : int -> int [@@zero_alloc]
        is not included in
-         val f : int -> int @@ portable [@@zero_alloc strict]
+         val f : int -> int @@ stateless [@@zero_alloc strict]
        The former provides a weaker "zero_alloc" guarantee than the latter.
 |}]
 
@@ -940,10 +940,10 @@ module type S_no_nrn = module type of M_nrn_for_mto
 [%%expect{|
 module M_assume_for_mto : sig val f : int -> int * int [@@zero_alloc] end
 module type S_no_assume =
-  sig val f : int -> int * int @@ portable [@@zero_alloc] end
+  sig val f : int -> int * int @@ stateless [@@zero_alloc] end
 module M_nrn_for_mto : sig val f : int -> int * int [@@zero_alloc] end
 module type S_no_nrn =
-  sig val f : int -> int * int @@ portable [@@zero_alloc] end
+  sig val f : int -> int * int @@ stateless [@@zero_alloc] end
 |}]
 
 (**********************************************)
@@ -1153,7 +1153,7 @@ end
 module type S = module type of M_for_mto
 [%%expect{|
 module M_for_mto : sig val f : int -> int end
-module type S = sig val f : int -> int @@ portable end
+module type S = sig val f : int -> int @@ stateless end
 |}]
 
 (* [S] itself is fixed. *)
@@ -1164,11 +1164,11 @@ Line 1, characters 61-62:
                                                                  ^
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : int -> int @@ portable end
+         sig val f : int -> int @@ stateless end
        is not included in
          sig val f : int -> int [@@zero_alloc] end
        Values do not match:
-         val f : int -> int @@ portable
+         val f : int -> int @@ stateless
        is not included in
          val f : int -> int [@@zero_alloc]
        The former provides a weaker "zero_alloc" guarantee than the latter.
@@ -1185,18 +1185,18 @@ module type S' = module type of M_for_mto
 module F' (X : S') : sig val[@zero_alloc] f : int -> int end = X
 module F (X : S) : sig val[@zero_alloc] f : int -> int end = X
 [%%expect{|
-module type S' = sig val f : int -> int @@ portable [@@zero_alloc] end
+module type S' = sig val f : int -> int @@ stateless [@@zero_alloc] end
 module F' : functor (X : S') -> sig val f : int -> int [@@zero_alloc] end
 Line 7, characters 61-62:
 7 | module F (X : S) : sig val[@zero_alloc] f : int -> int end = X
                                                                  ^
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : int -> int @@ portable end
+         sig val f : int -> int @@ stateless end
        is not included in
          sig val f : int -> int [@@zero_alloc] end
        Values do not match:
-         val f : int -> int @@ portable
+         val f : int -> int @@ stateless
        is not included in
          val f : int -> int [@@zero_alloc]
        The former provides a weaker "zero_alloc" guarantee than the latter.

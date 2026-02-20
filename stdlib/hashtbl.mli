@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -68,7 +68,7 @@ type (!'a, !'b) t : mutable_data with 'a with 'b
 (** The type of hash tables from type ['a] to type ['b]. *)
 
 val create : ?random: (* thwart tools/sync_stdlib_docs *) bool ->
-             int -> ('a, 'b) t
+             int -> ('a, 'b) t @@ portable stateful
 (** [Hashtbl.create n] creates a new, empty hash table, with
    initial size [n].  For best results, [n] should be on the
    order of the expected number of elements that will be in
@@ -220,7 +220,7 @@ val length : ('a, 'b) t -> int
    [Hashtbl.length] gives the number of times [Hashtbl.iter] calls its
    first argument. *)
 
-val randomize : unit -> unit
+val randomize : unit -> unit @@ portable stateful
 (** After a call to [Hashtbl.randomize()], hash tables are created in
     randomized mode by default: {!create} returns randomized
     hash tables, unless the [~random:false] optional parameter is given.
@@ -239,13 +239,13 @@ val randomize : unit -> unit
 
     @since 4.00 *)
 
-val is_randomized : unit -> bool
+val is_randomized : unit -> bool @@ portable stateful
 (** Return [true] if the tables are currently created in randomized mode
     by default, [false] otherwise.
     @since 4.03 *)
 
 val rebuild : ?random (* thwart tools/sync_stdlib_docs *) :bool ->
-    ('a, 'b) t -> ('a, 'b) t
+    ('a, 'b) t -> ('a, 'b) t @@ portable stateful
 (** Return a copy of the given hashtable.  Unlike {!copy},
     {!rebuild}[ h] re-hashes all the (key, value) entries of
     the original table [h].  The returned hash table is randomized if
@@ -311,7 +311,7 @@ val replace_seq : ('a,'b) t -> ('a * 'b) Seq.t -> unit
 (** Add the given bindings to the table, using {!replace}
     @since 4.07 *)
 
-val of_seq : ('a * 'b) Seq.t -> ('a, 'b) t
+val of_seq : ('a * 'b) Seq.t -> ('a, 'b) t @@ portable stateful
 (** Build a table from the given bindings. The bindings are added
     in the same order they appear in the sequence, using {!replace_seq},
     which means that if two pairs have the same key, only the latest one

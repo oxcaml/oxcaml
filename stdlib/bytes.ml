@@ -27,34 +27,34 @@ open! Stdlib
 *)
 
 external length :
-  (bytes[@local_opt]) @ immutable -> int @@ portable = "%bytes_length"
+  (bytes[@local_opt]) @ immutable -> int @@ stateless = "%bytes_length"
 external string_length :
-  (string[@local_opt]) -> int @@ portable = "%string_length"
+  (string[@local_opt]) -> int @@ stateless = "%string_length"
 external get :
-  (bytes[@local_opt]) @ read -> int -> char @@ portable = "%bytes_safe_get"
+  (bytes[@local_opt]) @ read -> int -> char @@ stateless = "%bytes_safe_get"
 external set :
-  (bytes[@local_opt]) -> int -> char -> unit @@ portable = "%bytes_safe_set"
-external create : int -> bytes @@ portable = "caml_create_bytes"
-external create__stack : int -> bytes @ local @@ portable
+  (bytes[@local_opt]) -> int -> char -> unit @@ stateless = "%bytes_safe_set"
+external create : int -> bytes @@ stateless = "caml_create_bytes"
+external create__stack : int -> bytes @ local @@ stateless
   = "caml_create_local_bytes"
 external unsafe_get :
-  (bytes[@local_opt]) @ read -> int -> char @@ portable = "%bytes_unsafe_get"
+  (bytes[@local_opt]) @ read -> int -> char @@ stateless = "%bytes_unsafe_get"
 external unsafe_set :
-  (bytes[@local_opt]) -> int -> char -> unit @@ portable = "%bytes_unsafe_set"
+  (bytes[@local_opt]) -> int -> char -> unit @@ stateless = "%bytes_unsafe_set"
 external unsafe_fill :
-  (bytes[@local_opt]) -> int -> int -> char -> unit @@ portable
+  (bytes[@local_opt]) -> int -> int -> char -> unit @@ stateless
   = "caml_fill_bytes" [@@noalloc]
 external unsafe_to_string :
-  (bytes[@local_opt]) -> (string[@local_opt]) @@ portable = "%bytes_to_string"
+  (bytes[@local_opt]) -> (string[@local_opt]) @@ stateless = "%bytes_to_string"
 external unsafe_of_string :
-  (string[@local_opt]) -> (bytes[@local_opt]) @@ portable = "%bytes_of_string"
+  (string[@local_opt]) -> (bytes[@local_opt]) @@ stateless = "%bytes_of_string"
 
 external unsafe_blit :
   (bytes[@local_opt]) @ read -> int -> (bytes[@local_opt]) -> int -> int -> unit
-  @@ portable = "caml_blit_bytes" [@@noalloc]
+  @@ stateless = "caml_blit_bytes" [@@noalloc]
 external unsafe_blit_string :
   (string[@local_opt]) -> int -> (bytes[@local_opt]) -> int -> int -> unit
-  @@ portable = "caml_blit_string" [@@noalloc]
+  @@ stateless = "caml_blit_string" [@@noalloc]
 
 let make n c =
   let s = create n in
@@ -148,7 +148,7 @@ let rec unsafe_blits dst pos sep seplen = function
     unsafe_blits dst (pos + length hd + seplen) sep seplen tl
 
 let concat sep = function
-    [] -> Obj.magic_uncontended empty
+    [] -> create 0
   | l -> let seplen = length sep in
           unsafe_blits
             (create (sum_lengths 0 seplen l))
@@ -163,8 +163,8 @@ let cat s1 s2 =
   r
 
 
-external char_code: char -> int @@ portable = "%identity"
-external char_chr: int -> char @@ portable = "%identity"
+external char_code: char -> int @@ stateless = "%identity"
+external char_chr: int -> char @@ stateless = "%identity"
 
 let is_space = function
   | ' ' | '\012' | '\n' | '\r' | '\t' -> true
@@ -183,7 +183,7 @@ let trim s =
   if !j >= !i then
     sub s !i (!j - !i + 1)
   else
-    Obj.magic_uncontended empty
+    create 0
 
 let unsafe_escape s =
   (* We perform two passes on the input sequence, one to compute the
@@ -409,7 +409,7 @@ let rcontains_from s i c =
 type t = bytes
 
 let compare (x: t) (y: t) = Stdlib.compare x y
-external equal : t -> t -> bool @@ portable = "caml_bytes_equal" [@@noalloc]
+external equal : t -> t -> bool @@ stateless = "caml_bytes_equal" [@@noalloc]
 
 (* duplicated in string.ml *)
 let split_on_char sep s =
@@ -466,23 +466,23 @@ let of_seq i =
 
 (* The get_ functions are all duplicated in string.ml *)
 
-external unsafe_get_uint8 : bytes -> int -> int @@ portable = "%bytes_unsafe_get"
-external unsafe_get_uint16_ne : bytes -> int -> int @@ portable = "%caml_bytes_get16u"
-external get_uint8 : bytes -> int -> int @@ portable = "%bytes_safe_get"
-external get_uint16_ne : bytes -> int -> int @@ portable = "%caml_bytes_get16"
-external get_int32_ne : bytes -> int -> int32 @@ portable = "%caml_bytes_get32"
-external get_int64_ne : bytes -> int -> int64 @@ portable = "%caml_bytes_get64"
+external unsafe_get_uint8 : bytes -> int -> int @@ stateless = "%bytes_unsafe_get"
+external unsafe_get_uint16_ne : bytes -> int -> int @@ stateless = "%caml_bytes_get16u"
+external get_uint8 : bytes -> int -> int @@ stateless = "%bytes_safe_get"
+external get_uint16_ne : bytes -> int -> int @@ stateless = "%caml_bytes_get16"
+external get_int32_ne : bytes -> int -> int32 @@ stateless = "%caml_bytes_get32"
+external get_int64_ne : bytes -> int -> int64 @@ stateless = "%caml_bytes_get64"
 
-external unsafe_set_uint8 : bytes -> int -> int -> unit @@ portable = "%bytes_unsafe_set"
-external unsafe_set_uint16_ne : bytes -> int -> int -> unit @@ portable
+external unsafe_set_uint8 : bytes -> int -> int -> unit @@ stateless = "%bytes_unsafe_set"
+external unsafe_set_uint16_ne : bytes -> int -> int -> unit @@ stateless
                               = "%caml_bytes_set16u"
-external set_int8 : bytes -> int -> int -> unit @@ portable = "%bytes_safe_set"
-external set_int16_ne : bytes -> int -> int -> unit @@ portable = "%caml_bytes_set16"
-external set_int32_ne : bytes -> int -> int32 -> unit @@ portable = "%caml_bytes_set32"
-external set_int64_ne : bytes -> int -> int64 -> unit @@ portable = "%caml_bytes_set64"
-external swap16 : int -> int @@ portable = "%bswap16"
-external swap32 : int32 -> int32 @@ portable = "%bswap_int32"
-external swap64 : int64 -> int64 @@ portable = "%bswap_int64"
+external set_int8 : bytes -> int -> int -> unit @@ stateless = "%bytes_safe_set"
+external set_int16_ne : bytes -> int -> int -> unit @@ stateless = "%caml_bytes_set16"
+external set_int32_ne : bytes -> int -> int32 -> unit @@ stateless = "%caml_bytes_set32"
+external set_int64_ne : bytes -> int -> int64 -> unit @@ stateless = "%caml_bytes_set64"
+external swap16 : int -> int @@ stateless = "%bswap16"
+external swap32 : int32 -> int32 @@ stateless = "%bswap_int32"
+external swap64 : int64 -> int64 @@ stateless = "%bswap_int64"
 
 let unsafe_get_uint16_le b i =
   if Sys.big_endian

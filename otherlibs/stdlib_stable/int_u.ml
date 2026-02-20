@@ -21,11 +21,11 @@ type t = int#
 
 let size = Sys.int_size
 
-external of_int : int -> int# @@ portable = "%int#_of_int"
+external of_int : int -> int# @@ stateless = "%int#_of_int"
 
-external to_int : int# -> int @@ portable = "%int_of_int#"
+external to_int : int# -> int @@ stateless = "%int_of_int#"
 
-external ( < ) : int# -> int# -> bool @@ portable = "%int#_lessthan"
+external ( < ) : int# -> int# -> bool @@ stateless = "%int#_lessthan"
 
 let zero () = of_int 0
 
@@ -33,49 +33,49 @@ let one () = of_int 1
 
 let minus_one () = of_int (-1)
 
-external neg : int# -> int# @@ portable = "%int#_neg"
+external neg : int# -> int# @@ stateless = "%int#_neg"
 
-external add : int# -> int# -> int# @@ portable = "%int#_add"
+external add : int# -> int# -> int# @@ stateless = "%int#_add"
 
-external sub : int# -> int# -> int# @@ portable = "%int#_sub"
+external sub : int# -> int# -> int# @@ stateless = "%int#_sub"
 
-external mul : int# -> int# -> int# @@ portable = "%int#_mul"
+external mul : int# -> int# -> int# @@ stateless = "%int#_mul"
 
-external div : int# -> int# -> int# @@ portable = "%int#_div"
+external div : int# -> int# -> int# @@ stateless = "%int#_div"
 
-external rem : int# -> int# -> int# @@ portable = "%int#_mod"
+external rem : int# -> int# -> int# @@ stateless = "%int#_mod"
 
-external succ : int# -> int# @@ portable = "%int#_succ"
+external succ : int# -> int# @@ stateless = "%int#_succ"
 
-external pred : int# -> int# @@ portable = "%int#_pred"
+external pred : int# -> int# @@ stateless = "%int#_pred"
 
-external logand : int# -> int# -> int# @@ portable = "%int#_and"
+external logand : int# -> int# -> int# @@ stateless = "%int#_and"
 
-external logor : int# -> int# -> int# @@ portable = "%int#_or"
+external logor : int# -> int# -> int# @@ stateless = "%int#_or"
 
-external logxor : int# -> int# -> int# @@ portable = "%int#_xor"
+external logxor : int# -> int# -> int# @@ stateless = "%int#_xor"
 
 let[@inline] lognot x = logxor x (minus_one ())
 
-external shift_left : int# -> int -> int# @@ portable = "%int#_lsl"
+external shift_left : int# -> int -> int# @@ stateless = "%int#_lsl"
 
-external shift_right : int# -> int -> int# @@ portable = "%int#_asr"
+external shift_right : int# -> int -> int# @@ stateless = "%int#_asr"
 
-external shift_right_logical : int# -> int -> int# @@ portable = "%int#_lsr"
+external shift_right_logical : int# -> int -> int# @@ stateless = "%int#_lsr"
 
 let[@inline] abs x = if x < zero () then neg x else x
 
-external equal : int# -> int# -> bool @@ portable = "%int#_equal"
+external equal : int# -> int# -> bool @@ stateless = "%int#_equal"
 
-external compare : int# -> int# -> int @@ portable = "%int#_compare"
+external compare : int# -> int# -> int @@ stateless = "%int#_compare"
 
 let[@inline] min x y = if x < y then x else y
 
 let[@inline] max x y = if x < y then y else x
 
-external of_float : float -> int# @@ portable = "%int#_of_float"
+external of_float : float -> int# @@ stateless = "%int#_of_float"
 
-external to_float : int# -> float @@ portable = "%float_of_int#"
+external to_float : int# -> float @@ stateless = "%float_of_int#"
 
 let[@inline] to_string t = string_of_int (to_int t)
 
@@ -87,9 +87,9 @@ let min_int () = succ (max_int ())
 
 let[@inline] unsigned_to_int t =
   if t < zero () then None else Some (to_int t)
-external unsigned_compare : int# -> int# -> int @@ portable
+external unsigned_compare : int# -> int# -> int @@ stateless
   = "%int#_unsigned_compare"
-external unsigned_lt : int# -> int# -> bool @@ portable
+external unsigned_lt : int# -> int# -> bool @@ stateless
   = "%int#_unsigned_lessthan"
 
 (* Unsigned division from signed division of the same bitness. See Warren Jr.,

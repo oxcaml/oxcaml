@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -54,6 +54,7 @@ val negate : ('a : value_or_null) . ('a -> bool) -> ('a -> bool)
 
 val protect : ('a : value_or_null).
   finally:(unit -> unit) @ local once -> (unit -> 'a) @ local once -> 'a
+  @@ portable stateful
 (** [protect ~finally work] invokes [work ()] and then [finally ()]
     before [work ()] returns with its value or an exception. In the
     latter case the exception is re-raised after [finally ()]. If

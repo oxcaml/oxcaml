@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 open! Stdlib
 
@@ -132,7 +132,7 @@ val from_fun : (unit -> 'a) -> 'a t
 
     @since 4.00 *)
 
-val force_val : 'a t -> 'a
+val force_val : 'a t -> 'a @@ portable stateful
 (** [force_val x] forces the suspension [x] and returns its result.  If [x]
     has already been forced, [force_val x] returns the same value again
     without recomputing it.

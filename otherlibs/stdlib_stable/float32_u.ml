@@ -18,24 +18,24 @@ open! Stdlib
 
 type t = float32#
 
-external box_float : float# -> (float[@local_opt]) @@ portable = "%box_float"
+external box_float : float# -> (float[@local_opt]) @@ stateless = "%box_float"
 
-external unbox_float : (float[@local_opt]) -> float# @@ portable
+external unbox_float : (float[@local_opt]) -> float# @@ stateless
   = "%unbox_float"
 
-external box_int32 : int32# -> (int32[@local_opt]) @@ portable = "%box_int32"
+external box_int32 : int32# -> (int32[@local_opt]) @@ stateless = "%box_int32"
 
-external unbox_int32 : (int32[@local_opt]) -> int32# @@ portable
+external unbox_int32 : (int32[@local_opt]) -> int32# @@ stateless
   = "%unbox_int32"
 
-external box_int64 : int64# -> (int64[@local_opt]) @@ portable = "%box_int64"
+external box_int64 : int64# -> (int64[@local_opt]) @@ stateless = "%box_int64"
 
-external unbox_int64 : (int64[@local_opt]) -> int64# @@ portable
+external unbox_int64 : (int64[@local_opt]) -> int64# @@ stateless
   = "%unbox_int64"
 
-external to_float32 : t -> (float32[@local_opt]) @@ portable = "%box_float32"
+external to_float32 : t -> (float32[@local_opt]) @@ stateless = "%box_float32"
 
-external of_float32 : (float32[@local_opt]) -> t @@ portable = "%unbox_float32"
+external of_float32 : (float32[@local_opt]) -> t @@ stateless = "%unbox_float32"
 
 (* CR layouts: Investigate whether it's worth making these things externals.
    Are there situations where the middle-end won't inline them and remove the
@@ -224,13 +224,13 @@ module Bigstring = struct
 
   type t = (char, int8_unsigned_elt, c_layout) Array1.t
 
-  external get : t -> pos:int -> float32# @@ portable
+  external get : t -> pos:int -> float32# @@ stateless
     = "%caml_bigstring_getf32#"
-  external unsafe_get : t -> pos:int -> float32# @@ portable
+  external unsafe_get : t -> pos:int -> float32# @@ stateless
     = "%caml_bigstring_getf32u#"
-  external set : t -> pos:int -> float32# -> unit @@ portable
+  external set : t -> pos:int -> float32# -> unit @@ stateless
     = "%caml_bigstring_setf32#"
-  external unsafe_set : t -> pos:int -> float32# -> unit @@ portable
+  external unsafe_set : t -> pos:int -> float32# -> unit @@ stateless
     = "%caml_bigstring_setf32u#"
 end
 

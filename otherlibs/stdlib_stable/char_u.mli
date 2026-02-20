@@ -12,7 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 (** The type for untagged characters *)
 type t = char#

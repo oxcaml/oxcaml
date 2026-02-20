@@ -19,10 +19,10 @@ open! Stdlib
 
 type t = int32#
 
-external to_int32 : t -> (int32[@local_opt]) @@ portable =
+external to_int32 : t -> (int32[@local_opt]) @@ stateless =
   "%box_int32" [@@warning "-187"]
 
-external of_int32 : (int32[@local_opt]) -> t @@ portable =
+external of_int32 : (int32[@local_opt]) -> t @@ stateless =
   "%unbox_int32" [@@warning "-187"]
 
 let[@inline always] neg x = of_int32 (Int32.neg (to_int32 x))

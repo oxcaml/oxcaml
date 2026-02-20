@@ -14,7 +14,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
-@@ portable
+@@ stateless
 
 (** The OCaml Standard library.
 
@@ -32,19 +32,19 @@
 
 (** {1 Exceptions} *)
 
-external raise : ('a : value_or_null). exn -> 'a @ portable unique = "%reraise"
+external raise : ('a : value_or_null). exn -> 'a @ stateless unique = "%reraise"
 (** Raise the given exception value *)
 
-external raise_notrace : ('a : value_or_null). exn -> 'a @ portable unique
+external raise_notrace : ('a : value_or_null). exn -> 'a @ stateless unique
   = "%raise_notrace"
 (** A faster version [raise] which does not record the backtrace.
     @since 4.02
 *)
 
-val invalid_arg : ('a : value_or_null) . string -> 'a @ portable unique
+val invalid_arg : ('a : value_or_null) . string -> 'a @ stateless unique
 (** Raise exception [Invalid_argument] with the given string. *)
 
-val failwith : ('a : value_or_null) . string -> 'a @ portable unique
+val failwith : ('a : value_or_null) . string -> 'a @ stateless unique
 (** Raise exception [Failure] with the given string. *)
 
 exception Exit
@@ -856,30 +856,30 @@ val stderr : out_channel
 
 (** {2 Output functions on standard output} *)
 
-val print_char : char -> unit
+val print_char : char -> unit @@ portable stateful
 (** Print a character on standard output. *)
 
-val print_string : string @ local -> unit
+val print_string : string @ local -> unit @@ portable stateful
 (** Print a string on standard output. *)
 
-val print_bytes : bytes @ local -> unit
+val print_bytes : bytes @ local -> unit @@ portable stateful
 (** Print a byte sequence on standard output.
    @since 4.02 *)
 
-val print_int : int -> unit
+val print_int : int -> unit @@ portable stateful
 (** Print an integer, in decimal, on standard output. *)
 
-val print_float : float -> unit
+val print_float : float -> unit @@ portable stateful
 (** Print a floating-point number, in decimal, on standard output.
 
     The conversion of the number to a string uses {!string_of_float} and
     can involve a loss of precision. *)
 
-val print_endline : string @ local -> unit
+val print_endline : string @ local -> unit @@ portable stateful
 (** Print a string, followed by a newline character, on
    standard output and flush standard output. *)
 
-val print_newline : unit -> unit
+val print_newline : unit -> unit @@ portable stateful
 (** Print a newline character on standard output, and flush
    standard output. This can be used to simulate line
    buffering of standard output. *)
@@ -887,37 +887,37 @@ val print_newline : unit -> unit
 
 (** {2 Output functions on standard error} *)
 
-val prerr_char : char -> unit
+val prerr_char : char -> unit @@ portable stateful
 (** Print a character on standard error. *)
 
-val prerr_string : string @ local -> unit
+val prerr_string : string @ local -> unit @@ portable stateful
 (** Print a string on standard error. *)
 
-val prerr_bytes : bytes @ local -> unit
+val prerr_bytes : bytes @ local -> unit @@ portable stateful
 (** Print a byte sequence on standard error.
    @since 4.02 *)
 
-val prerr_int : int -> unit
+val prerr_int : int -> unit @@ portable stateful
 (** Print an integer, in decimal, on standard error. *)
 
-val prerr_float : float -> unit
+val prerr_float : float -> unit @@ portable stateful
 (** Print a floating-point number, in decimal, on standard error.
 
     The conversion of the number to a string uses {!string_of_float} and
     can involve a loss of precision. *)
 
-val prerr_endline : string @ local -> unit
+val prerr_endline : string @ local -> unit @@ portable stateful
 (** Print a string, followed by a newline character on standard
    error and flush standard error. *)
 
-val prerr_newline : unit -> unit
+val prerr_newline : unit -> unit @@ portable stateful
 (** Print a newline character on standard error, and flush
    standard error. *)
 
 
 (** {2 Input functions on standard input} *)
 
-val read_line : unit -> string
+val read_line : unit -> string @@ portable stateful
 (** Flush standard output, then read characters from standard input
    until a newline character is encountered.
 
@@ -928,7 +928,7 @@ val read_line : unit -> string
    line.
 *)
 
-val read_int_opt: unit -> int option
+val read_int_opt: unit -> int option @@ portable stateful
 (** Flush standard output, then read one line from standard input
    and convert it to an integer.
 
@@ -936,11 +936,11 @@ val read_int_opt: unit -> int option
    @since 4.05
 *)
 
-val read_int : unit -> int
+val read_int : unit -> int @@ portable stateful
 (** Same as {!Stdlib.read_int_opt}, but raise [Failure "int_of_string"]
    instead of returning [None]. *)
 
-val read_float_opt: unit -> float option
+val read_float_opt: unit -> float option @@ portable stateful
 (** Flush standard output, then read one line from standard input
    and convert it to a floating-point number.
 
@@ -949,7 +949,7 @@ val read_float_opt: unit -> float option
    @since 4.05
 *)
 
-val read_float : unit -> float
+val read_float : unit -> float @@ portable stateful
 (** Same as {!Stdlib.read_float_opt}, but raise [Failure "float_of_string"]
    instead of returning [None]. *)
 
@@ -1351,7 +1351,7 @@ external format_of_string :
 val ( ^^ ) :
   ('a, 'b, 'c, 'd, 'e, 'f) format6 ->
   ('f, 'b, 'c, 'e, 'g, 'h) format6 ->
-  ('a, 'b, 'c, 'd, 'g, 'h) format6
+  ('a, 'b, 'c, 'd, 'g, 'h) format6 @@ portable stateful
 (** [f1 ^^ f2] catenates format strings [f1] and [f2]. The result is a
   format string that behaves as the concatenation of format strings [f1] and
   [f2]: in case of formatted output, it accepts arguments from [f1], then
@@ -1362,7 +1362,7 @@ val ( ^^ ) :
 
 (** {1 Program termination} *)
 
-val exit : int -> 'a @@ nonportable
+val exit : int -> 'a @@ stateful
 (** Terminate the process, returning the given status code to the operating
     system: usually 0 to indicate no errors, and a small positive integer to
     indicate failure. All open output channels are flushed with [flush_all].
@@ -1373,7 +1373,7 @@ val exit : int -> 'a @@ nonportable
     An implicit [exit 2] is performed if the program terminates early because
     of an uncaught exception. *)
 
-val at_exit : (unit -> unit) -> unit @@ nonportable
+val at_exit : (unit -> unit) -> unit @@ stateful
 (** Register the given function to be called at program termination
    time. The functions registered with [at_exit] will be called when
    the program does any of the following:
@@ -1393,7 +1393,7 @@ module Safe : sig
       The provided closure must be [portable] as it might be called from another domain.
       In particular, the primary domain may call {!exit}, thus calling the provided
       closure even if it came from a secondary domain. *)
-end
+end @@ stateful
 
 (**/**)
 
@@ -1401,11 +1401,12 @@ end
 
 val valid_float_lexem : string -> string
 
-val unsafe_really_input : in_channel -> bytes -> int -> int -> unit @@ nonportable
+val unsafe_really_input :
+  in_channel -> bytes -> int -> int -> unit @@ stateful
 
-val do_at_exit : unit -> unit @@ nonportable
+val do_at_exit : unit -> unit @@ stateful
 
-val do_domain_local_at_exit : (unit -> unit) ref @@ nonportable
+val do_domain_local_at_exit : (unit -> unit) ref @@ stateful
 
 (**/**)
 
@@ -1485,4 +1486,4 @@ module Type           = Type
 module Uchar          = Uchar
 module Unit           = Unit
 module Weak           = Weak
-end @@ nonportable
+end @@ stateful

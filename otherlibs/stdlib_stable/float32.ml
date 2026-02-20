@@ -18,59 +18,59 @@
 
 type t = float32
 
-external float32_of_bits : int32 -> t @@ portable
+external float32_of_bits : int32 -> t @@ stateless
   = "caml_float32_of_bits_bytecode" "caml_float32_of_bits"
   [@@unboxed] [@@noalloc]
 
-external neg : (t[@local_opt]) -> (t[@local_opt]) @@ portable= "%negfloat32"
+external neg : (t[@local_opt]) -> (t[@local_opt]) @@ stateless= "%negfloat32"
 
-external add : (t[@local_opt]) -> (t[@local_opt]) -> (t[@local_opt]) @@ portable
+external add : (t[@local_opt]) -> (t[@local_opt]) -> (t[@local_opt]) @@ stateless
   = "%addfloat32"
 
-external sub : (t[@local_opt]) -> (t[@local_opt]) -> (t[@local_opt]) @@ portable
+external sub : (t[@local_opt]) -> (t[@local_opt]) -> (t[@local_opt]) @@ stateless
   = "%subfloat32"
 
-external mul : (t[@local_opt]) -> (t[@local_opt]) -> (t[@local_opt]) @@ portable
+external mul : (t[@local_opt]) -> (t[@local_opt]) -> (t[@local_opt]) @@ stateless
   = "%mulfloat32"
 
-external div : (t[@local_opt]) -> (t[@local_opt]) -> (t[@local_opt]) @@ portable
+external div : (t[@local_opt]) -> (t[@local_opt]) -> (t[@local_opt]) @@ stateless
   = "%divfloat32"
 
-external pow : t -> t -> t @@ portable = "caml_power_float32_bytecode" "powf"
+external pow : t -> t -> t @@ stateless = "caml_power_float32_bytecode" "powf"
   [@@unboxed] [@@noalloc]
 
 module Operators = struct
-  external ( ~-. ) : (t[@local_opt]) -> (t[@local_opt]) @@ portable
+  external ( ~-. ) : (t[@local_opt]) -> (t[@local_opt]) @@ stateless
     = "%negfloat32"
 
   external ( +. ) :
-    (t[@local_opt]) -> (t[@local_opt]) -> (t[@local_opt]) @@ portable
+    (t[@local_opt]) -> (t[@local_opt]) -> (t[@local_opt]) @@ stateless
     = "%addfloat32"
 
   external ( -. ) :
-    (t[@local_opt]) -> (t[@local_opt]) -> (t[@local_opt]) @@ portable
+    (t[@local_opt]) -> (t[@local_opt]) -> (t[@local_opt]) @@ stateless
     = "%subfloat32"
 
   external ( *. ) :
-    (t[@local_opt]) -> (t[@local_opt]) -> (t[@local_opt]) @@ portable
+    (t[@local_opt]) -> (t[@local_opt]) -> (t[@local_opt]) @@ stateless
     = "%mulfloat32"
 
   external ( /. ) :
-    (t[@local_opt]) -> (t[@local_opt]) -> (t[@local_opt]) @@ portable
+    (t[@local_opt]) -> (t[@local_opt]) -> (t[@local_opt]) @@ stateless
     = "%divfloat32"
 
-  external ( ** ) : t -> t -> t @@ portable
+  external ( ** ) : t -> t -> t @@ stateless
     = "caml_power_float32_bytecode" "powf"
     [@@unboxed] [@@noalloc]
 end
 
-external fma : t -> t -> t -> t @@ portable = "caml_fma_float32_bytecode" "fmaf"
+external fma : t -> t -> t -> t @@ stateless = "caml_fma_float32_bytecode" "fmaf"
   [@@unboxed] [@@noalloc]
 
-external rem : t -> t -> t @@ portable = "caml_fmod_float32_bytecode" "fmodf"
+external rem : t -> t -> t @@ stateless = "caml_fmod_float32_bytecode" "fmodf"
   [@@unboxed] [@@noalloc]
 
-external abs : (t[@local_opt]) -> (t[@local_opt]) @@ portable = "%absfloat32"
+external abs : (t[@local_opt]) -> (t[@local_opt]) @@ stateless = "%absfloat32"
 
 let zero = 0.s
 let one = 1.s
@@ -88,32 +88,32 @@ let max_float = float32_of_bits 0x7f7fffffl
 let min_float = float32_of_bits 0x00800000l
 let epsilon = float32_of_bits 0x34000000l
 
-external of_int : int -> t @@ portable = "%float32ofint"
-external to_int : (t[@local_opt]) -> int @@ portable = "%intoffloat32"
-external of_float : (float[@local_opt]) -> t @@ portable = "%float32offloat"
-external to_float : (t[@local_opt]) -> float @@ portable = "%floatoffloat32"
+external of_int : int -> t @@ stateless = "%float32ofint"
+external to_int : (t[@local_opt]) -> int @@ stateless = "%intoffloat32"
+external of_float : (float[@local_opt]) -> t @@ stateless = "%float32offloat"
+external to_float : (t[@local_opt]) -> float @@ stateless = "%floatoffloat32"
 
-external of_int64 : (int64[@local_opt]) -> t @@ portable
+external of_int64 : (int64[@local_opt]) -> t @@ stateless
   = "caml_float32_of_int64_bytecode" "caml_float32_of_int64"
   [@@unboxed] [@@noalloc] [@@builtin]
 
-external to_int64 : (t[@local_opt]) -> int64 @@ portable
+external to_int64 : (t[@local_opt]) -> int64 @@ stateless
   = "caml_float32_to_int64_bytecode" "caml_float32_to_int64"
   [@@unboxed] [@@noalloc] [@@builtin]
 
-external of_bits : (int32[@local_opt]) -> t @@ portable
+external of_bits : (int32[@local_opt]) -> t @@ stateless
   = "caml_float32_of_bits_bytecode" "caml_float32_of_bits"
   [@@unboxed] [@@noalloc] [@@builtin]
 
-external to_bits : (t[@local_opt]) -> int32 @@ portable
+external to_bits : (t[@local_opt]) -> int32 @@ stateless
   = "caml_float32_to_bits_bytecode" "caml_float32_to_bits"
   [@@unboxed] [@@noalloc] [@@builtin]
 
-external of_string : string -> t @@ portable = "caml_float32_of_string"
+external of_string : string -> t @@ stateless = "caml_float32_of_string"
 
 let of_string_opt s = try Some (of_string s) with Failure _ -> None
 
-external format : string -> t -> string @@ portable = "caml_format_float32"
+external format : string -> t -> string @@ stateless = "caml_format_float32"
 
 let to_string f = Stdlib.valid_float_lexem (format "%.9g" f)
 
@@ -124,124 +124,124 @@ type fpclass = Stdlib.fpclass =
   | FP_infinite
   | FP_nan
 
-external classify_float : (t[@unboxed]) -> fpclass @@ portable
+external classify_float : (t[@unboxed]) -> fpclass @@ stateless
   = "caml_classify_float32_bytecode" "caml_classify_float32"
   [@@noalloc]
 
-external sqrt : t -> t @@ portable = "caml_sqrt_float32_bytecode" "sqrtf"
+external sqrt : t -> t @@ stateless = "caml_sqrt_float32_bytecode" "sqrtf"
   [@@unboxed] [@@noalloc] [@@builtin]
 
-external cbrt : t -> t @@ portable = "caml_cbrt_float32_bytecode" "cbrtf"
+external cbrt : t -> t @@ stateless = "caml_cbrt_float32_bytecode" "cbrtf"
   [@@unboxed] [@@noalloc]
 
-external exp : t -> t @@ portable = "caml_exp_float32_bytecode" "expf"
+external exp : t -> t @@ stateless = "caml_exp_float32_bytecode" "expf"
   [@@unboxed] [@@noalloc]
 
-external exp2 : t -> t @@ portable = "caml_exp2_float32_bytecode" "exp2f"
+external exp2 : t -> t @@ stateless = "caml_exp2_float32_bytecode" "exp2f"
   [@@unboxed] [@@noalloc]
 
-external log : t -> t @@ portable = "caml_log_float32_bytecode" "logf"
+external log : t -> t @@ stateless = "caml_log_float32_bytecode" "logf"
   [@@unboxed] [@@noalloc]
 
-external log10 : t -> t @@ portable = "caml_log10_float32_bytecode" "log10f"
+external log10 : t -> t @@ stateless = "caml_log10_float32_bytecode" "log10f"
   [@@unboxed] [@@noalloc]
 
-external log2 : t -> t @@ portable = "caml_log2_float32_bytecode" "log2f"
+external log2 : t -> t @@ stateless = "caml_log2_float32_bytecode" "log2f"
   [@@unboxed] [@@noalloc]
 
-external expm1 : t -> t @@ portable = "caml_expm1_float32_bytecode" "expm1f"
+external expm1 : t -> t @@ stateless = "caml_expm1_float32_bytecode" "expm1f"
   [@@unboxed] [@@noalloc]
 
-external log1p : t -> t @@ portable = "caml_log1p_float32_bytecode" "log1pf"
+external log1p : t -> t @@ stateless = "caml_log1p_float32_bytecode" "log1pf"
   [@@unboxed] [@@noalloc]
 
-external cos : t -> t @@ portable = "caml_cos_float32_bytecode" "cosf"
+external cos : t -> t @@ stateless = "caml_cos_float32_bytecode" "cosf"
   [@@unboxed] [@@noalloc]
 
-external sin : t -> t @@ portable = "caml_sin_float32_bytecode" "sinf"
+external sin : t -> t @@ stateless = "caml_sin_float32_bytecode" "sinf"
   [@@unboxed] [@@noalloc]
 
-external tan : t -> t @@ portable = "caml_tan_float32_bytecode" "tanf"
+external tan : t -> t @@ stateless = "caml_tan_float32_bytecode" "tanf"
   [@@unboxed] [@@noalloc]
 
-external acos : t -> t @@ portable = "caml_acos_float32_bytecode" "acosf"
+external acos : t -> t @@ stateless = "caml_acos_float32_bytecode" "acosf"
   [@@unboxed] [@@noalloc]
 
-external asin : t -> t @@ portable = "caml_asin_float32_bytecode" "asinf"
+external asin : t -> t @@ stateless = "caml_asin_float32_bytecode" "asinf"
   [@@unboxed] [@@noalloc]
 
-external atan : t -> t @@ portable = "caml_atan_float32_bytecode" "atanf"
+external atan : t -> t @@ stateless = "caml_atan_float32_bytecode" "atanf"
   [@@unboxed] [@@noalloc]
 
-external atan2 : t -> t -> t @@ portable
+external atan2 : t -> t -> t @@ stateless
   = "caml_atan2_float32_bytecode" "atan2f"
   [@@unboxed] [@@noalloc]
 
-external hypot : t -> t -> t @@ portable
+external hypot : t -> t -> t @@ stateless
   = "caml_hypot_float32_bytecode" "hypotf"
   [@@unboxed] [@@noalloc]
 
-external cosh : t -> t @@ portable = "caml_cosh_float32_bytecode" "coshf"
+external cosh : t -> t @@ stateless = "caml_cosh_float32_bytecode" "coshf"
   [@@unboxed] [@@noalloc]
 
-external sinh : t -> t @@ portable = "caml_sinh_float32_bytecode" "sinhf"
+external sinh : t -> t @@ stateless = "caml_sinh_float32_bytecode" "sinhf"
   [@@unboxed] [@@noalloc]
 
-external tanh : t -> t @@ portable = "caml_tanh_float32_bytecode" "tanhf"
+external tanh : t -> t @@ stateless = "caml_tanh_float32_bytecode" "tanhf"
   [@@unboxed] [@@noalloc]
 
-external acosh : t -> t @@ portable = "caml_acosh_float32_bytecode" "acoshf"
+external acosh : t -> t @@ stateless = "caml_acosh_float32_bytecode" "acoshf"
   [@@unboxed] [@@noalloc]
 
-external asinh : t -> t @@ portable = "caml_asinh_float32_bytecode" "asinhf"
+external asinh : t -> t @@ stateless = "caml_asinh_float32_bytecode" "asinhf"
   [@@unboxed] [@@noalloc]
 
-external atanh : t -> t @@ portable = "caml_atanh_float32_bytecode" "atanhf"
+external atanh : t -> t @@ stateless = "caml_atanh_float32_bytecode" "atanhf"
   [@@unboxed] [@@noalloc]
 
-external erf : t -> t @@ portable = "caml_erf_float32_bytecode" "erff"
+external erf : t -> t @@ stateless = "caml_erf_float32_bytecode" "erff"
   [@@unboxed] [@@noalloc]
 
-external erfc : t -> t @@ portable = "caml_erfc_float32_bytecode" "erfcf"
+external erfc : t -> t @@ stateless = "caml_erfc_float32_bytecode" "erfcf"
   [@@unboxed] [@@noalloc]
 
-external trunc : t -> t @@ portable = "caml_trunc_float32_bytecode" "truncf"
+external trunc : t -> t @@ stateless = "caml_trunc_float32_bytecode" "truncf"
   [@@unboxed] [@@noalloc]
 
-external round : t -> t @@ portable = "caml_round_float32_bytecode" "roundf"
+external round : t -> t @@ stateless = "caml_round_float32_bytecode" "roundf"
   [@@unboxed] [@@noalloc]
 
-external ceil : t -> t @@ portable = "caml_ceil_float32_bytecode" "ceilf"
+external ceil : t -> t @@ stateless = "caml_ceil_float32_bytecode" "ceilf"
   [@@unboxed] [@@noalloc]
 
-external floor : t -> t @@ portable = "caml_floor_float32_bytecode" "floorf"
+external floor : t -> t @@ stateless = "caml_floor_float32_bytecode" "floorf"
   [@@unboxed] [@@noalloc]
 
 let is_integer x = x = trunc x && is_finite x
 
-external next_after : t -> t -> t @@ portable
+external next_after : t -> t -> t @@ stateless
   = "caml_nextafter_float32_bytecode" "nextafterf"
   [@@unboxed] [@@noalloc]
 
 let succ x = next_after x infinity
 let pred x = next_after x neg_infinity
 
-external copy_sign : t -> t -> t @@ portable
+external copy_sign : t -> t -> t @@ stateless
   = "caml_copysign_float32_bytecode" "copysignf"
   [@@unboxed] [@@noalloc]
 
-external sign_bit : (t[@unboxed]) -> bool @@ portable
+external sign_bit : (t[@unboxed]) -> bool @@ stateless
   = "caml_signbit_float32_bytecode" "caml_signbit_float32"
   [@@noalloc]
 
-external frexp : t -> t * int @@ portable = "caml_frexp_float32"
+external frexp : t -> t * int @@ stateless = "caml_frexp_float32"
 
-external ldexp : (t[@unboxed]) -> (int[@untagged]) -> (t[@unboxed]) @@ portable
+external ldexp : (t[@unboxed]) -> (int[@untagged]) -> (t[@unboxed]) @@ stateless
   = "caml_ldexp_float32_bytecode" "caml_ldexp_float32"
   [@@noalloc]
 
-external modf : t -> t * t @@ portable = "caml_modf_float32"
-external compare : t -> t -> int @@ portable = "%compare"
+external modf : t -> t * t @@ stateless = "caml_modf_float32"
+external compare : t -> t -> int @@ stateless = "%compare"
 
 let equal x y = compare x y = 0
 
@@ -256,11 +256,11 @@ let[@inline] max (x : t) (y : t) =
   else x
 
 module With_weird_nan_behavior = struct
-  external min : t -> t -> t @@ portable
+  external min : t -> t -> t @@ stateless
     = "caml_simd_float32_min_bytecode" "caml_simd_float32_min"
     [@@noalloc] [@@unboxed] [@@builtin]
 
-  external max : t -> t -> t @@ portable
+  external max : t -> t -> t @@ stateless
     = "caml_simd_float32_max_bytecode" "caml_simd_float32_max"
     [@@noalloc] [@@unboxed] [@@builtin]
 end
@@ -286,27 +286,27 @@ let[@inline] min_max_num (x : t) (y : t) =
   else if y > x || ((not (sign_bit y)) && sign_bit x) then (x, y)
   else (y, x)
 
-external iround_current : t -> int64 @@ portable
+external iround_current : t -> int64 @@ stateless
   = "caml_simd_cast_float32_int64_bytecode" "caml_simd_cast_float32_int64"
   [@@noalloc] [@@unboxed] [@@builtin]
 
-external round_current : (t[@unboxed]) -> (t[@unboxed]) @@ portable
+external round_current : (t[@unboxed]) -> (t[@unboxed]) @@ stateless
   = "caml_simd_float32_round_current_bytecode" "caml_simd_float32_round_current"
   [@@noalloc] [@@builtin]
 
-external round_down : (t[@unboxed]) -> (t[@unboxed]) @@ portable
+external round_down : (t[@unboxed]) -> (t[@unboxed]) @@ stateless
   = "caml_simd_float32_round_neg_inf_bytecode" "caml_simd_float32_round_neg_inf"
   [@@noalloc] [@@builtin]
 
-external round_up : (t[@unboxed]) -> (t[@unboxed]) @@ portable
+external round_up : (t[@unboxed]) -> (t[@unboxed]) @@ stateless
   = "caml_simd_float32_round_pos_inf_bytecode" "caml_simd_float32_round_pos_inf"
   [@@noalloc] [@@builtin]
 
-external round_towards_zero : (t[@unboxed]) -> (t[@unboxed]) @@ portable
+external round_towards_zero : (t[@unboxed]) -> (t[@unboxed]) @@ stateless
   = "caml_simd_float32_round_towards_zero_bytecode" "caml_simd_float32_round_towards_zero"
   [@@noalloc] [@@builtin]
 
-external seeded_hash_param : int -> int -> int -> 'a -> int @@ portable
+external seeded_hash_param : int -> int -> int -> 'a -> int @@ stateless
   = "caml_hash_exn"
   [@@noalloc]
 
@@ -314,20 +314,20 @@ let seeded_hash seed x = seeded_hash_param 10 100 seed x
 let hash x = seeded_hash_param 10 100 0 x
 
 module Bytes = struct
-  external get : bytes -> pos:int -> float32 @@ portable = "%caml_bytes_getf32"
-  external unsafe_get : bytes -> pos:int -> float32 @@ portable
+  external get : bytes -> pos:int -> float32 @@ stateless = "%caml_bytes_getf32"
+  external unsafe_get : bytes -> pos:int -> float32 @@ stateless
     = "%caml_bytes_getf32u"
-  external set : bytes -> pos:int -> float32 -> unit @@ portable
+  external set : bytes -> pos:int -> float32 -> unit @@ stateless
     = "%caml_bytes_setf32"
 
-  external unsafe_set : bytes -> pos:int -> float32 -> unit @@ portable
+  external unsafe_set : bytes -> pos:int -> float32 -> unit @@ stateless
     = "%caml_bytes_setf32u"
 end
 
 module String = struct
-  external get : string -> pos:int -> float32 @@ portable
+  external get : string -> pos:int -> float32 @@ stateless
     = "%caml_string_getf32"
-  external unsafe_get : string -> pos:int -> float32 @@ portable
+  external unsafe_get : string -> pos:int -> float32 @@ stateless
     = "%caml_string_getf32u"
 end
 
@@ -336,13 +336,13 @@ module Bigstring = struct
 
   type t = (char, int8_unsigned_elt, c_layout) Array1.t
 
-  external get : t -> pos:int -> float32 @@ portable = "%caml_bigstring_getf32"
-  external unsafe_get : t -> pos:int -> float32 @@ portable
+  external get : t -> pos:int -> float32 @@ stateless = "%caml_bigstring_getf32"
+  external unsafe_get : t -> pos:int -> float32 @@ stateless
     = "%caml_bigstring_getf32u"
-  external set : t -> pos:int -> float32 -> unit @@ portable
+  external set : t -> pos:int -> float32 -> unit @@ stateless
     = "%caml_bigstring_setf32"
 
-  external unsafe_set : t -> pos:int -> float32 -> unit @@ portable
+  external unsafe_set : t -> pos:int -> float32 -> unit @@ stateless
     = "%caml_bigstring_setf32u"
 end
 
@@ -351,62 +351,62 @@ module Bigarray = struct
 
   module Array1 = struct
     external get :
-      ('a, float32_elt, 'c) Array1.t -> int -> float32 @@ portable
+      ('a, float32_elt, 'c) Array1.t -> int -> float32 @@ stateless
       = "%caml_ba_float32_ref_1"
 
     external set :
-      ('a, float32_elt, 'c) Array1.t -> int -> float32 -> unit @@ portable
+      ('a, float32_elt, 'c) Array1.t -> int -> float32 -> unit @@ stateless
       = "%caml_ba_float32_set_1"
 
     external unsafe_get :
-      ('a, float32_elt, 'c) Array1.t -> int -> float32 @@ portable
+      ('a, float32_elt, 'c) Array1.t -> int -> float32 @@ stateless
       = "%caml_ba_float32_unsafe_ref_1"
 
     external unsafe_set :
-      ('a, float32_elt, 'c) Array1.t -> int -> float32 -> unit @@ portable
+      ('a, float32_elt, 'c) Array1.t -> int -> float32 -> unit @@ stateless
       = "%caml_ba_float32_unsafe_set_1"
   end
 
   module Array2 = struct
     external get : ('a, float32_elt, 'c) Array2.t -> int -> int -> float32
-      @@ portable
+      @@ stateless
       = "%caml_ba_float32_ref_2"
 
     external set :
       ('a, float32_elt, 'c) Array2.t -> int -> int -> float32 -> unit
-      @@ portable
+      @@ stateless
       = "%caml_ba_float32_set_2"
 
     external unsafe_get :
       ('a, float32_elt, 'c) Array2.t -> int -> int -> float32
-      @@ portable
+      @@ stateless
       = "%caml_ba_float32_unsafe_ref_2"
 
     external unsafe_set :
       ('a, float32_elt, 'c) Array2.t -> int -> int -> float32 -> unit
-      @@ portable
+      @@ stateless
       = "%caml_ba_float32_unsafe_set_2"
   end
 
   module Array3 = struct
     external get :
       ('a, float32_elt, 'c) Array3.t -> int -> int -> int -> float32
-      @@ portable
+      @@ stateless
       = "%caml_ba_float32_ref_3"
 
     external set :
       ('a, float32_elt, 'c) Array3.t -> int -> int -> int -> float32 -> unit
-      @@ portable
+      @@ stateless
       = "%caml_ba_float32_set_3"
 
     external unsafe_get :
       ('a, float32_elt, 'c) Array3.t -> int -> int -> int -> float32
-      @@ portable
+      @@ stateless
       = "%caml_ba_float32_unsafe_ref_3"
 
     external unsafe_set :
       ('a, float32_elt, 'c) Array3.t -> int -> int -> int -> float32 -> unit
-      @@ portable
+      @@ stateless
       = "%caml_ba_float32_unsafe_set_3"
   end
 end

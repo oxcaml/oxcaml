@@ -162,9 +162,9 @@ module U = Unit
 module U :
   sig
     type t = unit = ()
-    val equal : t -> t -> bool @@ portable
-    val compare : t -> t -> int @@ portable
-    val to_string : t -> string @@ portable
+    val equal : t -> t -> bool @@ stateless
+    val compare : t -> t -> int @@ stateless
+    val to_string : t -> string @@ stateless
   end
 |}];;
 
