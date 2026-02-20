@@ -320,6 +320,7 @@ module Operation : sig
               static case, will turn into an unboxing followed by an int64 ->
               int conversion, the latter of which takes the integer modulo 2^63
               (2^31 on 32-bit targets). *)
+    (* CR jrayman ^ *)
 
     val map : 'a t -> f:('a -> 'b) -> 'b t
 

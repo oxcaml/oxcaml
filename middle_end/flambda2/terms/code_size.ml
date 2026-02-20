@@ -422,7 +422,8 @@ let unary_prim_size ~machine_width prim =
   | Opaque_identity _ -> 0
   | Int_arith (kind, op) -> unary_int_prim_size ~machine_width kind op
   | Float_arith _ -> 2
-  | Num_conv { src; dst } -> arith_conversion_size ~machine_width src dst
+  | Num_conv { src; dst } ->
+    arith_conversion_size ~machine_width src dst (* CR jrayman *)
   | Boolean_not -> 1
   | Reinterpret_boxed_vector -> 0
   | Reinterpret_64_bit_word reinterpret -> (
