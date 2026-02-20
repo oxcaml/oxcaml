@@ -5,151 +5,127 @@
 
 #syntax quotations on
 
-let _ : unit = ()
-[%%expect {|
-- : unit = ()
-|}]
+
+(* Testing quote-splice cancellation in [reduce_head] for [unify] *)
 
 
-(* Cancellations with different numbers of layers *)
+(* One cancellation *)
 
-(* one *)
-
+(* <[$A]> = A *)
 let _ : <[$unit]> = ()
 [%%expect {|
 - : unit = ()
 |}]
-
+(* $(<[A]>) = A *)
 let _ : <[ $(<[unit]>) ]> expr = <[()]>
 [%%expect {|
 - : <[unit]> expr = <[()]>
 |}]
 
-(* two *)
+(* Two cancellations *)
 
+(* <[$A]> = A *)
 let _ : <[<[$($unit)]>]> = ()
 [%%expect {|
 - : unit = ()
 |}]
-
+(* $(<[A]>) = A *)
 let _ : <[<[ $($(<[<[unit]>]>)) ]> expr]> expr = <[<[()]>]>
 [%%expect {|
 - : <[<[unit]> expr]> expr = <[<[()]>]>
 |}]
-
-let _ : <[ $(<[$(<[unit]>)]>) ]> = <[()]>
+(* $(<[A]>) = A *)
+let _ : <[ $(<[$(<[unit]>)]>) ]> expr = <[()]>
 [%%expect {|
-Line 1, characters 35-41:
-1 | let _ : <[ $(<[$(<[unit]>)]>) ]> = <[()]>
-                                       ^^^^^^
-Error: This expression has type "<['a]> expr"
-       but an expression was expected of type "<[unit]>" = "<[unit]>"
+- : <[unit]> expr = <[()]>
 |}]
-
+(* <[$A]> = A *)
 let _ : <[$(<[$unit]>)]> = ()
 [%%expect {|
 - : unit = ()
 |}]
-
+(* $(<[A]>) = A and <[$A]> = A *)
 let _ : <[ $(<[<[$unit]>]>) ]> expr = <[()]>
 [%%expect {|
 - : <[unit]> expr = <[()]>
 |}]
-
+(* <[$A]> = A and $(<[A]>) = A *)
 let _ : <[ <[$($(<[unit]>))]> ]> expr = <[()]>
 [%%expect {|
 - : <[unit]> expr = <[()]>
 |}]
 
-(* three -- just the trivial ones *)
+(* Three cancellations *)
 
+(* <[$A]> = A *)
 let _ : <[<[<[$($($unit))]>]>]> = ()
 [%%expect {|
 - : unit = ()
 |}]
-
+(* $(<[A]>) = A *)
 let _ : <[<[<[ $($($(<[<[<[unit]>]>]>))) ]> expr]> expr]> expr = <[<[<[()]>]>]>
 [%%expect {|
 - : <[<[<[unit]> expr]> expr]> expr = <[<[<[()]>]>]>
 |}]
 
-(* cancellation without an expected concrete type *)
+(* Other cancellation examples *)
 
-let _ : <[ <[$('a)]> -> $(<['a]>) ]> expr = <[ fun x -> x ]>
+let _ : <[ <[$('a)]> -> $(<['a]>) ]> expr = <[ fun (x : 'a) -> (x : 'a) ]>
 [%%expect {|
-- : <[$('a) -> $('a)]> expr = <[fun x -> x]>
+- : <[$('a) -> $('a)]> expr = <[fun (x : 'a) -> (x : 'a)]>
 |}]
-
-let _ : <[<[$($('a))]>]> -> unit  = fun _ -> ()
+let _ : <[<[$($('a))]>]> -> unit  = fun (x : 'a) -> ()
 [%%expect {|
 - : 'a -> unit = <fun>
 |}]
 
 
-(* Flexibility checks -- unifying variable under quotes/splices *)
+(* Testing [unify]ing a variable under quotes/splices -- flexibility checks *)
 
-(* one *)
 
-let _ : <[ $('a) ]> expr = <[()]>
+(* Note that [generalize] type schemes have their quantified variables
+   normalised to stage 0 (i.e. all of these would become ['a -> 'a]).
+   This means in all tests with directly quoted variables we will eventually
+   remove the quotes, as we cannot have top-level splices.
+   However, unification should happen before this. *)
+
+(* <['a]> ~ unit *)
+let _ : <['a]> -> <['a]> = fun (() as x) -> x
 [%%expect {|
-- : <[unit]> expr = <[()]>
+- : unit -> unit = <fun>
+|}]
+(* <[<['a]>]> ~ unit *)
+let _ : <[<['a]>]> -> <[<['a]>]> = fun (() as x) -> x
+[%%expect {|
+- : unit -> unit = <fun>
+|}]
+(* <[<[<['a]>]>]> ~ unit *)
+let _ : <[<[<['a]>]>]> -> <[<[<['a]>]>]> = fun (() as x) -> x
+[%%expect {|
+- : unit -> unit = <fun>
 |}]
 
-(* two *)
+(* In tests with spliced variables, the variable ['a] always occurs at stage 0,
+   so we have no concerns about normalisation there. *)
 
-let _ : <[ <[ $($('a)) ]> expr ]> expr = <[<[()]>]>
+(* $('a) ~ unit *)
+let _ : <[ $('a) -> $('a) ]> expr  =
+  <[fun (() as x) -> x]>
 [%%expect {|
-- : <[<[unit]> expr]> expr = <[<[()]>]>
+- : <[unit -> unit]> expr = <[fun () as x -> x]>
+|}]
+(* $($('a)) ~ unit *)
+let _ : <[ <[ $($('a)) -> $($('a)) ]> expr ]> expr =
+  <[<[fun (() as x) -> x]>]>
+[%%expect {|
+- : <[<[unit -> unit]> expr]> expr = <[<[fun () as x -> x]>]>
+|}]
+(* $($($('a))) ~ unit *)
+let _ : <[ <[ <[ $($($('a))) -> $($($('a))) ]> expr ]> expr ]> expr =
+  <[<[<[fun (() as x) -> x]>]>]>
+[%%expect {|
+- : <[<[<[unit -> unit]> expr]> expr]> expr = <[<[<[fun () as x -> x]>]>]>
 |}]
 
-(* three *)
-
-let _ : <[ <[ <[ $($($('a))) ]> expr ]> expr ]> expr = <[<[<[()]>]>]>
-[%%expect {|
-- : <[<[<[unit]> expr]> expr]> expr = <[<[<[()]>]>]>
-|}]
-
-
-(* Flexibility checks -- unifying locally-equated type under quotes/splices *)
-
-(* FIXME: these are quote-miskinded, but we don't have quoted kinds yet anyway *)
-
-let f (x : Obj.t) (Equal : (<[$Obj.t * int]>, <[<[string]> * int]>) Type.eq) : <[<[string]>]> = x
-[%%expect {|
-val f :
-  Obj.t ->
-  (<[$(Obj.t) * int]>, <[<[string]> * int]>) Type.eq -> <[<[string]>]> =
-  <fun>
-|}]
-
-let f (x : string) (Equal : (<[<[Obj.t]> * int]>, <[$string * int]>) Type.eq) : <[<[Obj.t]>]> = x
-[%%expect {|
-val f :
-  string ->
-  (<[<[Obj.t]> * int]>, <[$(string) * int]>) Type.eq -> <[<[Obj.t]>]> = <fun>
-|}]
-
-let f (type a) (x : a) (Equal : (<[<[Obj.t]> * int]>, <[$a * int]>) Type.eq) : <[<[Obj.t]>]> = x
-[%%expect {|
-val f : 'a -> (<[<[Obj.t]> * int]>, <[$('a) * int]>) Type.eq -> <[<[Obj.t]>]> =
-  <fun>
-|}]
-
-let f (type a) (x : a) (Equal : (<[$a * int]>, <[<[string]> * int]>) Type.eq) : <[<[string]>]> = x
-[%%expect {|
-val f :
-  'a -> (<[$('a) * int]>, <[<[string]> * int]>) Type.eq -> <[<[string]>]> =
-  <fun>
-|}]
-
-let f (x : int) (Equal : (<[$int * int]>, <[<[string]> * int]>) Type.eq) : <[<[string]>]> = x
-[%%expect {|
-Line 1, characters 17-22:
-1 | let f (x : int) (Equal : (<[$int * int]>, <[<[string]> * int]>) Type.eq) : <[<[string]>]> = x
-                     ^^^^^
-Error: This pattern matches values of type
-         "(<[$(int) * int]>, <[$(int) * int]>) Type.eq"
-       but a pattern was expected which matches values of type
-         "(<[$(int) * int]>, <[<[string]> * int]>) Type.eq"
-       Type "$(int)" is not compatible with type "<[string]>"
-|}]
+(* TODO: Add tests for [unify]'s GADT cases
+         ([is_instantiable], [is_equatable], [mcomp]. *)
