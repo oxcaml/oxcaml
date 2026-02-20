@@ -1274,7 +1274,9 @@ let simplify_functor_stubs lam =
       in
       let regular_case () =
         if body' == lfunction.body then lam, No_applications
-        else Lfunction (map_lfunction (fun _ -> body') lfunction), No_applications
+        else
+          Lfunction (map_lfunction (fun _ -> body') lfunction),
+          No_applications
       in
       if is_stub_functor then
         match apps with
