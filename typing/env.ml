@@ -148,7 +148,7 @@ type module_unbound_reason =
 type stage_lock =
   | Quotation_lock
   | Splice_lock
-  | Toplevel_lock
+  | Toplevel_lock_for_directive
 
 type lock =
   | Const_closure_lock of bool * Mode.Hint.pinpoint *
@@ -3030,8 +3030,8 @@ let enter_splice ~loc env =
     raise (Error (Toplevel_splice loc));
   add_stage_lock Splice_lock {env with stage = env.stage - 1}
 
-let mark_toplevel env =
-  add_stage_lock Toplevel_lock env
+let mark_toplevel_in_quotations env =
+  add_stage_lock Toplevel_lock_for_directive env
 
 let check_no_open_quotations loc env context =
   if env.stage = 0
@@ -3041,12 +3041,13 @@ let check_no_open_quotations loc env context =
 let stage env = env.stage
 
 let stage_locks_offset locks =
-  ListLabels.fold_right locks ~init:0
-    ~f:(fun lock rel_stage ->
+  List.fold_right
+    (fun lock rel_stage ->
        match lock with
        | Quotation_lock -> rel_stage + 1
        | Splice_lock -> rel_stage - 1
-       | Toplevel_lock -> 0)
+       | Toplevel_lock_for_directive -> 0)
+    locks 0
 
 (* Insertion of all components of a signature *)
 
