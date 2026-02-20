@@ -46,31 +46,28 @@ mutable_load_branch:
   ret
 |}]
 
-let immutable_load_loop l =
-  let rec foo i acc = if i == 0 then acc else foo (i - 1) (acc + List.hd l) in
-  foo 10 (List.hd l)
+type t = {a: int; b: string}
+let immutable_load_loop (t: t) =
+  let rec foo i acc =
+    if i == 0
+    then acc
+    else foo (i - 1) (acc + t.a)
+  in
+  foo 10 (t.a)
 [%%expect_asm X86_64{|
 immutable_load_loop:
-  testb $1, %al
-  je    .L105
-  movq  camlStdlib__List__Pmakeblock2305@GOTPCREL(%rip), %rax
-  movq  48(%r14), %rsp
-  popq  48(%r14)
-  popq  %r11
-  jmp   *%r11
-.L105:
   movq  (%rax), %rbx
   movl  $21, %edi
   movq  %rbx, %rax
-  jmp   .L115
-.L113:
+  jmp   .L111
+.L109:
   ret
-.L115:
+.L111:
   leaq  -1(%rax,%rbx), %rax
   addq  $-2, %rdi
   cmpq  $1, %rdi
-  jne   .L115
-  jmp   .L113
+  jne   .L111
+  jmp   .L109
 |}]
 
 (* CR ttebbi: Load elimination inside the loop is not working. *)
