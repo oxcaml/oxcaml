@@ -26,6 +26,8 @@ val normal_type_for_var :
 
 val dwarf :
   Dwarf_state.t ->
+  value_type_proto_die:Proto_die.t ->
+  function_symbol:Asm_targets.Asm_symbol.t ->
   function_proto_die:Proto_die.t ->
   Available_ranges_vars.t ->
   unit

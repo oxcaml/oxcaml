@@ -1,10 +1,10 @@
 (******************************************************************************
  *                                  OxCaml                                    *
- *                       Mark Shinwell, Jane Street                           *
+ *                        Simon Spies, Jane Street                            *
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2024 Jane Street Group LLC                                   *
+ * Copyright (c) 2025 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -26,15 +26,16 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Generation of descriptions of inlined frames in DWARF. *)
+(** Utilities for sorting DWARF-4 location and range list entries. *)
 
-open! Dwarf_low
-open! Dwarf_high
+[@@@ocaml.warning "+a-4-30-40-41-42"]
 
-val dwarf :
-  Dwarf_state.t ->
-  Linear.fundecl ->
-  Inlined_frame_ranges.t ->
-  function_symbol:Asm_targets.Asm_symbol.t ->
-  function_proto_die:Proto_die.t ->
-  Proto_die.t Inlined_frame_ranges.Inlined_frames.Key.Map.t
+(** Sort entries by VMA within groups that share a base address. Base address
+    selection entries create boundaries: entries cannot be reordered across
+    these boundaries, but can be sorted within each group between consecutive
+    base address selection entries. *)
+val sort_preserving_base_addresses :
+  is_base_address_selection_entry:('a -> bool) ->
+  compare_ascending_vma:('a -> 'a -> int) ->
+  'a list ->
+  'a list

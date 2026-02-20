@@ -3046,11 +3046,6 @@ AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
   [oxcaml_dwarf_flags_for_compiler="-g -gno-upstream-dwarf -bin-annot-cms -shape-format debugging-shapes"],
   [oxcaml_dwarf_flags_for_compiler=""])
 
-# Ensure compatibility: oxcaml-dwarf-on-compiler requires function-sections to be disabled
-AS_IF([test x"$enable_oxcaml_dwarf_on_compiler" = "xyes"],
-  [AS_IF([test x"$function_sections" = "xtrue"],
-    [AC_MSG_ERROR([--enable-oxcaml-dwarf-on-compiler requires --disable-function-sections to be passed])])])
-
 # Configure assembly emission flag for compiler
 AS_IF([test x"$enable_keep_compiler_asm" = "xyes"],
   [assembly_flag_for_compiler="-S"],

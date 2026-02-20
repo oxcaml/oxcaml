@@ -432,6 +432,14 @@ module Dwarf_helpers = struct
 
   let ppf_dump = ref Format.err_formatter
 
+  let record_function_range ~function_symbol ~start_label ~end_label
+      ~offset_past_end_label =
+    Option.iter
+      (fun d ->
+        Dwarf.record_function_range d ~function_symbol ~start_label ~end_label
+          ~offset_past_end_label)
+      !dwarf
+
   let begin_dwarf ~code_begin ~code_end ~file_emitter =
     match !sourcefile_for_dwarf with
     | None -> ()
@@ -448,10 +456,21 @@ module Dwarf_helpers = struct
       in
       let code_begin = Asm_targets.Asm_symbol.create_global code_begin in
       let code_end = Asm_targets.Asm_symbol.create_global code_end in
+      let code_layout : Dwarf_state.code_layout =
+        if
+          !Clflags.function_sections
+          || !Oxcaml_flags.basic_block_sections
+          || !Oxcaml_flags.module_entry_functions_section
+        then
+          (* Use Function_sections mode - ranges will be recorded via
+             [record_function_range] as functions are emitted *)
+          Dwarf_state.Function_sections
+        else Dwarf_state.Continuous_code_section { code_begin; code_end }
+      in
       dwarf
         := Some
              (Dwarf.create ~sourcefile ~unit_name ~asm_directives
-                ~get_file_id:get_file_num ~code_begin ~code_end)
+                ~get_file_id:get_file_num ~code_layout)
 
   let reset_dwarf ppf =
     dwarf := None;
@@ -460,12 +479,7 @@ module Dwarf_helpers = struct
 
   let init ~ppf_dump ~disable_dwarf ~sourcefile =
     reset_dwarf ppf_dump;
-    let can_emit_dwarf =
-      !Clflags.debug
-      && ((not !Dwarf_flags.restrict_to_upstream_dwarf)
-         || !Dwarf_flags.dwarf_inlined_frames)
-      && not disable_dwarf
-    in
+    let can_emit_dwarf = !Clflags.debug && not disable_dwarf in
     match
       ( can_emit_dwarf,
         Target_system.architecture (),
@@ -476,16 +490,12 @@ module Dwarf_helpers = struct
 
   let emit_dwarf () =
     Option.iter
-      (Dwarf.emit
-         ~basic_block_sections:!Oxcaml_flags.basic_block_sections
-         ~binary_backend_available:!binary_backend_available)
+      (Dwarf.emit ~binary_backend_available:!binary_backend_available)
       !dwarf
 
   let emit_delayed_dwarf () =
     Option.iter
-      (Dwarf.emit_delayed
-         ~basic_block_sections:!Oxcaml_flags.basic_block_sections
-         ~binary_backend_available:!binary_backend_available)
+      (Dwarf.emit_delayed ~binary_backend_available:!binary_backend_available)
       !dwarf
 
   let record_dwarf_for_fundecl fundecl =

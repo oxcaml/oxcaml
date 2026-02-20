@@ -114,6 +114,13 @@ module Dwarf_helpers : sig
   val emit_delayed_dwarf : unit -> unit
 
   val record_dwarf_for_fundecl : Linear.fundecl -> Dwarf.fundecl option
+
+  val record_function_range :
+    function_symbol:Asm_targets.Asm_symbol.t ->
+    start_label:Asm_targets.Asm_label.t ->
+    end_label:Asm_targets.Asm_label.t ->
+    offset_past_end_label:int option ->
+    unit
 end
 
 exception Error of error
