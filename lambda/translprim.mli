@@ -57,6 +57,11 @@ val transl_primitive_application :
 val sort_of_native_repr :
   poly_sort:Jkind.Sort.t option -> Primitive.native_repr -> Jkind.Sort.Const.t
 
+(* Used by `tools/listprims.ml` to generate `primitives.txt` *)
+
+val indexing_primitive_names : string list
+val array_vec_primitive_names : string list
+
 (* Errors *)
 
 type invalid_stack_primitive =
