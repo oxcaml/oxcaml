@@ -718,6 +718,9 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
       let typer = Mpipeline.typer_result pipeline in
       let local_defs = Mtyper.get_typedtree typer in
       let let_pun_behavior = Mbrowse.Let_pun_behavior.Prefer_expression in
+      let record_pattern_pun_behavior =
+        Mbrowse.Record_pattern_pun_behavior.Prefer_label
+      in
       let env, _ = Mbrowse.leaf_node (Mtyper.node_at typer pos) in
       let path =
         match patho with
@@ -745,7 +748,7 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
           in
           match
             Locate.from_string ~config ~env ~local_defs ~pos ?namespaces
-              ~let_pun_behavior path
+              ~let_pun_behavior ~record_pattern_pun_behavior path
           with
           | `Found { file; location; _ } ->
             Locate.log ~title:"result" "found: %s" file;

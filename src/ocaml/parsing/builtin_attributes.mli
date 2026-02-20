@@ -368,4 +368,10 @@ val has_atomic: Parsetree.attributes -> bool
 (** The name of the attribute used to identify punned let expressions. When a let
     expression is punned, an attribute with this name is added to the pattern and
     expression nodes by the parser. *)
-val merlin_let_punned : string
+val merlin_punned_let : string
+
+(** The name of the attribute used to identify punned record patterns. When a record
+    pattern is punned, an attribute with this name is added to the pattern node by the
+    parser. (The label node doesn't have a place to insert an attribute, so it can't be
+    given one.) *)
+val merlin_punned_record_pattern : string

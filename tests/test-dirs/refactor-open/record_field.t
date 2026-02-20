@@ -1,6 +1,6 @@
 Refactor open for record fields
 
-  $ $MERLIN single refactor-open -action unqualify -position 4:7 <<EOF
+  $ $MERLIN single refactor-open -action unqualify -position 4:6 <<EOF
   > module M = struct
   >   type r = {i: int}
   > end

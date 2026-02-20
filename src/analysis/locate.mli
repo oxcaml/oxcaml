@@ -100,6 +100,7 @@ val from_string :
   local_defs:Mtyper.typedtree ->
   pos:Lexing.position ->
   ?let_pun_behavior:Mbrowse.Let_pun_behavior.t ->
+  ?record_pattern_pun_behavior:Mbrowse.Record_pattern_pun_behavior.t ->
   ?namespaces:Namespace_resolution.t ->
   string ->
   [> `File_not_found of result

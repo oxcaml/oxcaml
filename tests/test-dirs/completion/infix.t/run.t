@@ -1,4 +1,4 @@
-  $ $MERLIN single complete-prefix -position 11:10 -prefix "Z." \
+  $ $MERLIN single complete-prefix -position 9:10 -prefix "Z." \
   > -filename infix.ml < infix.ml | jq ".value.entries | sort_by(.name)"
   [
     {

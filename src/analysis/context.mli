@@ -62,6 +62,7 @@ val of_locate_context : Query_protocol.Locate_context.t -> t
 *)
 val inspect_browse_tree :
   ?let_pun_behavior:Mbrowse.Let_pun_behavior.t ->
+  ?record_pattern_pun_behavior:Mbrowse.Record_pattern_pun_behavior.t ->
   cursor:Std.Lexing.position ->
   Longident.t ->
   Mbrowse.t list ->

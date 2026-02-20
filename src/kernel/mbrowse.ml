@@ -35,6 +35,14 @@ type t = (Env.t * node) list
 
 module Let_pun_behavior = struct
   type t = Prefer_expression | Prefer_pattern
+
+  let default = Prefer_pattern
+end
+
+module Record_pattern_pun_behavior = struct
+  type t = Prefer_label | Prefer_pattern
+
+  let default = Prefer_pattern
 end
 
 let node_of_binary_part = Browse_raw.node_of_binary_part
@@ -106,60 +114,109 @@ let select_leafs pos root =
   !branches
 
 module Favorability = struct
-  type t = Neutral | Unfavored
+  type t = Unfavored | Neutral | Favored
 
   let based_on_ghostliness (loc : Location.t) =
     match loc.loc_ghost with
     | true -> Unfavored
     | false -> Neutral
-end
-type node_loc = { loc : Location.t; favorability : Favorability.t }
 
-let compare_locations pos (l1 : node_loc) (l2 : node_loc) =
-  let t2_first = 1 in
-  let t1_first = -1 in
-  match
-    (Location_aux.compare_pos pos l1.loc, Location_aux.compare_pos pos l2.loc)
-  with
-  (* Cursor inside both locations:
-       If one is unfavored, favor the other one.
-       Otherwise, favor the one closer to the end *)
-  | 0, 0 -> begin
-    match (l1.favorability, l2.favorability) with
-    | Unfavored, Neutral -> 1
-    | Neutral, Unfavored -> -1
-    | _ -> Lexing.compare_pos l1.loc.loc_end l2.loc.loc_end
-  end
-  (* Cursor inside one location: it has priority *)
-  | 0, _ -> t1_first
-  | _, 0 -> t2_first
-  (* Cursor outside locations: favor before *)
-  | n, m when n > 0 && m < 0 -> t1_first
-  | n, m when m > 0 && n < 0 -> t2_first
-  (* Cursor is after both, select the closest one *)
-  | _, _ -> Lexing.compare_pos l2.loc.loc_end l1.loc.loc_end
-
-let compare_nodes ?(let_pun_behavior = Let_pun_behavior.Prefer_pattern) pos
-    (n1, loc1) (n2, loc2) =
-  let loc_with_favorability node (loc : Location.t) : node_loc =
+  let based_on_let_punning ~(let_pun_behavior : Let_pun_behavior.t) node =
     let is_punned =
-      Browse_raw.has_attr ~name:Builtin_attributes.merlin_let_punned node
+      Browse_raw.has_attr ~name:Builtin_attributes.merlin_punned_let node
     in
-    let favorability : Favorability.t =
-      match (is_punned, node, let_pun_behavior) with
-      | true, Expression _, Prefer_expression -> Neutral
-      | true, Expression _, Prefer_pattern -> Unfavored
-      | true, Pattern _, Prefer_expression -> Unfavored
-      | true, Pattern _, Prefer_pattern -> Neutral
-      | _ -> Favorability.based_on_ghostliness loc
-    in
-    { loc = node_loc node; favorability }
-  in
-  compare_locations pos
-    (loc_with_favorability n1 loc1)
-    (loc_with_favorability n2 loc2)
+    match (is_punned, node, let_pun_behavior) with
+    | true, Expression _, Prefer_expression -> Favored
+    | true, Expression _, Prefer_pattern -> Unfavored
+    | true, Pattern _, Prefer_expression -> Unfavored
+    | true, Pattern _, Prefer_pattern -> Favored
+    | _ -> Neutral
 
-let best_node ?let_pun_behavior pos = function
+  let based_on_record_pattern_punning
+      ~(record_pattern_pun_behavior : Record_pattern_pun_behavior.t) node =
+    let is_punned =
+      Browse_raw.has_attr ~name:Builtin_attributes.merlin_punned_record_pattern
+        node
+    in
+    match (is_punned, node, record_pattern_pun_behavior) with
+    | true, Pattern _, Prefer_label -> Unfavored
+    | true, Pattern _, Prefer_pattern -> Favored
+    | _ -> Neutral
+end
+
+module Node_comparison_result = struct
+  type t = Left | Neutral | Right
+
+  let left_or_neutral = function
+    | Left | Neutral -> true
+    | Right -> false
+
+  let invert = function
+    | Left -> Right
+    | Right -> Left
+    | Neutral -> Neutral
+
+  let from_favorabilities (left : Favorability.t) (right : Favorability.t) =
+    match (left, right) with
+    | Unfavored, (Neutral | Favored) | Neutral, Favored -> Right
+    | (Neutral | Favored), Unfavored | Favored, Neutral -> Left
+    | Unfavored, Unfavored | Neutral, Neutral | Favored, Favored -> Neutral
+
+  let rec combine_lazy_list = function
+    | [] -> Neutral
+    | (lazy Left) :: _ -> Left
+    | (lazy Right) :: _ -> Right
+    | (lazy Neutral) :: rest -> combine_lazy_list rest
+end
+
+let closer_to_end_of_file (l1 : Location.t) (l2 : Location.t) :
+    Node_comparison_result.t =
+  match Lexing.compare_pos l1.loc_end l2.loc_end with
+  | r when r < 0 -> Left
+  | r when r > 0 -> Right
+  | _ -> Neutral
+
+let compare_locations pos l1 l2 : Node_comparison_result.t =
+  match (Location_aux.compare_pos pos l1, Location_aux.compare_pos pos l2) with
+  (* Cursor inside both locations *)
+  | 0, 0 -> Neutral
+  (* Cursor inside one location: it has priority *)
+  | 0, _ -> Left
+  | _, 0 -> Right
+  (* Cursor between the two locations: favor the one before the cursor *)
+  | n, m when n > 0 && m < 0 -> Left
+  | n, m when m > 0 && n < 0 -> Right
+  (* Cursor is after both, select the one whose end is earlier in the file *)
+  | _, _ -> closer_to_end_of_file l1 l2 |> Node_comparison_result.invert
+
+let compare_nodes ~let_pun_behavior ~record_pattern_pun_behavior pos
+    (node1, loc1) (node2, loc2) =
+  (* Prioritization order:
+     1. Choose the node whose location encompasses [pos]
+     2. If node is part of a let-punned pattern, choose the one on the preferred side
+        (based on [let_pun_behavior])
+     3. Choose the one that isn't marked as ghost
+     4. Choose the node that is closer to the end of the file *)
+  [ lazy (compare_locations pos loc1 loc2);
+    lazy
+      (Node_comparison_result.from_favorabilities
+         (Favorability.based_on_let_punning ~let_pun_behavior node1)
+         (Favorability.based_on_let_punning ~let_pun_behavior node2));
+    lazy
+      (Node_comparison_result.from_favorabilities
+         (Favorability.based_on_record_pattern_punning
+            ~record_pattern_pun_behavior node1)
+         (Favorability.based_on_record_pattern_punning
+            ~record_pattern_pun_behavior node2));
+    lazy
+      (Node_comparison_result.from_favorabilities
+         (Favorability.based_on_ghostliness loc1)
+         (Favorability.based_on_ghostliness loc2));
+    lazy (closer_to_end_of_file loc1 loc2)
+  ]
+  |> Node_comparison_result.combine_lazy_list
+
+let best_node ~let_pun_behavior ~record_pattern_pun_behavior pos = function
   | [] -> []
   | init :: xs ->
     let f acc x =
@@ -168,22 +225,28 @@ let best_node ?let_pun_behavior pos = function
         let loc = node_loc node in
         (node, loc)
       in
-      if
-        compare_nodes ?let_pun_behavior pos (leaf_with_loc acc)
-          (leaf_with_loc x)
-        <= 0
-      then acc
-      else x
+      match
+        compare_nodes ~let_pun_behavior ~record_pattern_pun_behavior pos
+          (leaf_with_loc acc) (leaf_with_loc x)
+      with
+      | Left | Neutral -> acc
+      | Right -> x
     in
     List.fold_left ~f ~init xs
 
-let enclosing ?let_pun_behavior pos roots =
-  match best_node ?let_pun_behavior pos roots with
+let enclosing ?(let_pun_behavior = Let_pun_behavior.default)
+    ?(record_pattern_pun_behavior = Record_pattern_pun_behavior.default) pos
+    roots =
+  match best_node ~let_pun_behavior ~record_pattern_pun_behavior pos roots with
   | [] -> []
-  | root -> best_node ?let_pun_behavior pos (select_leafs pos root)
+  | root ->
+    best_node ~let_pun_behavior ~record_pattern_pun_behavior pos
+      (select_leafs pos root)
 
-let deepest_before ?let_pun_behavior pos roots =
-  match enclosing ?let_pun_behavior pos roots with
+let deepest_before ?(let_pun_behavior = Let_pun_behavior.default)
+    ?(record_pattern_pun_behavior = Record_pattern_pun_behavior.default) pos
+    roots =
+  match enclosing ~let_pun_behavior ~record_pattern_pun_behavior pos roots with
   | [] -> []
   | root ->
     let rec aux path =
@@ -198,7 +261,9 @@ let deepest_before ?let_pun_behavior pos roots =
         then
           match acc with
           | Some (_, loc', node')
-            when compare_nodes pos (node', loc') (node, loc) <= 0 -> acc
+            when compare_nodes ~let_pun_behavior ~record_pattern_pun_behavior
+                   pos (node', loc') (node, loc)
+                 |> Node_comparison_result.left_or_neutral -> acc
           | Some _ | None -> Some (env, loc, node)
         else acc
       in

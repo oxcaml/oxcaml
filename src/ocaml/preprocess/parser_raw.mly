@@ -558,8 +558,8 @@ let exp_of_longident lid =
 let exp_of_label lbl =
   Exp.mk ~loc:lbl.loc (Pexp_ident (loc_lident lbl))
 
-let pat_of_label lbl =
-  Pat.mk ~loc:lbl.loc  (Ppat_var (loc_last lbl))
+let pat_of_label ~attrs lbl =
+  Pat.mk ~loc:lbl.loc ~attrs (Ppat_var (loc_last lbl))
 
 let mk_newtypes ~loc newtypes exp =
   let mk_one (name, jkind) exp =
@@ -717,8 +717,11 @@ let mklbs ext mf rf lb =
   } in
   addlb lbs lb
 
-let pun_attr =
-  Attr.mk ~loc:Location.none (Location.mkloc Builtin_attributes.merlin_let_punned Location.none) (PStr [])
+let let_pun_attr =
+  Attr.mk ~loc:Location.none (Location.mkloc Builtin_attributes.merlin_punned_let Location.none) (PStr [])
+
+let record_pattern_pun_attr =
+  Attr.mk ~loc:Location.none (Location.mkloc Builtin_attributes.merlin_punned_record_pattern Location.none) (PStr [])
 
 let val_of_let_bindings ~loc lbs =
   let bindings =
@@ -3490,7 +3493,7 @@ let_binding_body:
       { let p,e,c,modes = $1 in (p,e,c,modes,false) }
 /* BEGIN AVOID */
   | val_ident %prec below_HASH
-      { (mkpatvar ~loc:$loc ~attrs:[pun_attr] $1, ghexpvar ~loc:$loc ~attrs:[pun_attr] $1, None, [], true) }
+      { (mkpatvar ~loc:$loc ~attrs:[let_pun_attr] $1, ghexpvar ~loc:$loc ~attrs:[let_pun_attr] $1, None, [], true) }
   (* The production that allows puns is marked so that [make list-parse-errors]
      does not attempt to exploit it. That would be problematic because it
      would then generate bindings such as [let x], which are rejected by the
@@ -3531,7 +3534,7 @@ letop_binding_body:
       { (pat, exp) }
   | val_ident
       (* Let-punning *)
-      { (mkpatvar ~loc:$loc ~attrs:[pun_attr] $1, ghexpvar ~loc:$loc ~attrs:[pun_attr] $1) }
+      { (mkpatvar ~loc:$loc ~attrs:[let_pun_attr] $1, ghexpvar ~loc:$loc ~attrs:[let_pun_attr] $1) }
   (* CR zqian: support mode annotation on letop. *)
   | pat = simple_pattern COLON typ = core_type EQUAL exp = seq_expr
       { let loc = ($startpos(pat), $endpos(typ)) in
@@ -4050,7 +4053,7 @@ simple_delimited_pattern:
                But that the pattern was there and the label reconstructed (which
                piece of AST is marked as ghost is important for warning
                emission). *)
-            $sloc, make_ghost label, pat_of_label label
+            $sloc, make_ghost label, pat_of_label ~attrs:[record_pattern_pun_attr] label
         | Some pat ->
             ($startpos(octy), $endpos), label, pat
       in
