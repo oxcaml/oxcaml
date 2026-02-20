@@ -437,6 +437,10 @@ jobs:
         if: matrix.build_debug == true
         run: make debug
 
+      - name: Check ocamldebug runs
+        if: matrix.build_debug == true
+        run: _install/bin/ocamldebug _install/bin/ocamlc <<< ""
+
       - name: Run register allocation on artifacts
         if: matrix.run_regalloc_tool == true
         run: |
