@@ -82,7 +82,7 @@ module T = struct
       | P RAX -> "rax" | P RBX -> "rbx" | P RDI -> "rdi" | P RSI -> "rsi"
       | P RDX -> "rdx" | P RCX -> "rcx" | P R8  -> "r8"  | P R9  -> "r9"
       | P R12 -> "r12" | P R13 -> "r13" | P R10 -> "r10" | P R11 -> "r11"
-      | P RBP -> "rbP"
+      | P RBP -> "rbp"
 
       | P MM0  -> "mm0"  | P MM1 -> "mm1"   | P MM2  -> "mm2"  | P MM3  -> "mm3"
       | P MM4  -> "mm4"  | P MM5 -> "mm5"   | P MM6  -> "mm6"  | P MM7  -> "mm7"
