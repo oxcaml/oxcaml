@@ -151,11 +151,13 @@ let not_supported _ofs = fatal_error "Proc.loc_results: cannot call"
 
 let max_arguments_for_tailcalls = 16 (* in regs *) + 64 (* in domain state *)
 
-let int_registers =
-  Array.sub Regs.phys_gpr_regs 0 (if macosx then 8 else 16) |> Array.to_list
+let int_registers : Regs.Phys_reg.t list =
+  if macosx
+  then [X0; X1; X2; X3; X4; X5; X6; X7]
+  else [X0; X1; X2; X3; X4; X5; X6; X7; X8; X9; X10; X11; X12; X13; X14; X15]
 
-let float_registers =
-  Array.sub Regs.phys_simd_regs 0 16 |> Array.to_list
+let float_registers : Regs.Phys_reg.t list =
+  [D0; D1; D2; D3; D4; D5; D6; D7; D8; D9; D10; D11; D12; D13; D14; D15]
 
 let loc_arguments arg =
   calling_conventions int_registers float_registers
