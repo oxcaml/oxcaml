@@ -3,8 +3,8 @@
  expect;
 *)
 
-(* Test the [#mark_toplevel] directive, intended for introducing types
-   in expect tests. *)
+(* Test the [#mark_toplevel_in_quotations] directive,
+   intended for making names available as top-level in quotation tests. *)
 
 #syntax quotations on
 
@@ -23,7 +23,7 @@ Error: Identifier "t" is used at line 1, characters 11-12,
        inside a quotation (<[ ... ]>);
        it is introduced at line 1, characters 0-12, outside any quotations.
 |}];;
-#mark_toplevel;;
+#mark_toplevel_in_quotations;;
 (* [t] is now considered top-level *)
 let (x : <[t]> expr) = <[42]>
 [%%expect {|
@@ -61,9 +61,29 @@ Error: Identifier "M" is used at line 1, characters 14-17,
        inside a quotation (<[ ... ]>);
        it is introduced at file "_none_", line 1, outside any quotations.
 |}];;
-#mark_toplevel;;
-(* [M.t] is now considered top-level *)
+#mark_toplevel_in_quotations;;
 let id (x : <[M.t]> expr) = x
 [%%expect {|
 val id : <[M.t]> expr -> <[M.t]> expr = <fun>
+|}];;
+
+(** Records **)
+type r = { x : int }
+[%%expect {|
+type r = { x : int; }
+|}];;
+let r = <[ { x = 42 } ]>
+[%%expect {|
+Line 1, characters 13-14:
+1 | let r = <[ { x = 42 } ]>
+                 ^
+Error: Label "x" used at line 1, characters 13-14
+       cannot be used in this context;
+       "x" is not defined inside a quotation (<[ ... ]>).
+Hint: Label "x" is defined outside any quotations.
+|}];;
+#mark_toplevel_in_quotations;;
+let r = <[ { x = 42 } ]>
+[%%expect {|
+val r : <[r]> expr = <[{ x = 42; }]>
 |}];;

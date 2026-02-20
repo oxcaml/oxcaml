@@ -183,12 +183,13 @@ let _ = add_directive "mod_use" (Directive_string (with_error_fmt dir_mod_use))
              wraps the contents in a module.";
     }
 
-let _ = add_directive "mark_toplevel"
-    (Directive_none (fun () -> toplevel_env := Env.mark_toplevel !toplevel_env))
+let _ = add_directive "mark_toplevel_in_quotations"
+    (Directive_none (fun () ->
+      toplevel_env := Env.mark_toplevel_in_quotations !toplevel_env))
     {
       section = section_meta;
-      doc = "Mark everything in the current environment as accessible \
-             to at all stages.";
+      doc = "Mark all names in the current environment as available \
+             at all stages.";
     }
 
 (* Install, remove a printer *)
