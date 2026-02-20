@@ -1274,15 +1274,19 @@ let simplify_functor_stubs lam =
       in
       let regular_case () =
         if body' == lfunction.body then lam, No_applications
-        else Lfunction { lfunction with body = body' }, No_applications
+        else Lfunction (map_lfunction (fun _ -> body') lfunction), No_applications
       in
       if is_stub_functor then
         match apps with
         | One_application attr ->
-          Lfunction { lfunction with body = body'; attr }, No_applications
+            Lambda.lfunction ~kind:lfunction.kind ~params:lfunction.params
+              ~return:lfunction.return ~body:body' ~attr
+              ~loc:lfunction.loc ~mode:lfunction.mode
+              ~ret_mode:lfunction.ret_mode,
+            No_applications
         | No_applications | Any_applications -> regular_case ()
       else regular_case ()
-    | Llet (lkind, vkind, id, def, body) ->
+    | Llet (lkind, vkind, id, duid, def, body) ->
       let body_env =
         match def with
         | Lfunction { attr; params; _ }
@@ -1297,15 +1301,15 @@ let simplify_functor_stubs lam =
       let body', apps2 = rewrite body_env body in
       let apps = merge_apps apps1 apps2 in
       if def == def' && body == body' then lam, apps
-      else Llet (lkind, vkind, id, def', body'), apps
-    | Lmutlet (vkind, id, def, body) ->
+      else Llet (lkind, vkind, id, duid, def', body'), apps
+    | Lmutlet (vkind, id, duid, def, body) ->
       let def', apps1 = rewrite env def in
       let body', apps2 = rewrite env body in
       let apps = merge_apps apps1 apps2 in
       if def == def' && body == body' then lam, apps
-      else Lmutlet (vkind, id, def', body'), apps
+      else Lmutlet (vkind, id, duid, def', body'), apps
     | Lletrec (bindings, body) ->
-      let bindings', apps1 = rewrite_bindings env bindings in
+      let bindings', apps1 = rewrite_rec_bindings env bindings in
       let body', apps2 = rewrite env body in
       let apps = merge_apps apps1 apps2 in
       if bindings == bindings' && body == body' then lam, apps
@@ -1335,18 +1339,18 @@ let simplify_functor_stubs lam =
       let args', apps = rewrite_list env args in
       if args == args' then lam, apps
       else Lstaticraise (nfail, args'), apps
-    | Lstaticcatch (body, params, handler, vkind) ->
+    | Lstaticcatch (body, params, handler, pop_region, vkind) ->
       let body', apps1 = rewrite env body in
       let handler', apps2 = rewrite env handler in
       let apps = merge_apps apps1 apps2 in
       if body == body' && handler == handler' then lam, apps
-      else Lstaticcatch (body', params, handler', vkind), apps
-    | Ltrywith (body, exn_id, handler, vkind) ->
+      else Lstaticcatch (body', params, handler', pop_region, vkind), apps
+    | Ltrywith (body, exn_id, duid, handler, vkind) ->
       let body', apps1 = rewrite env body in
       let handler', apps2 = rewrite env handler in
       let apps = merge_apps apps1 apps2 in
       if body == body' && handler == handler' then lam, apps
-      else Ltrywith (body', exn_id, handler', vkind), apps
+      else Ltrywith (body', exn_id, duid, handler', vkind), apps
     | Lifthenelse (cond, if_true, if_false, vkind) ->
       let cond', apps1 = rewrite env cond in
       let if_true', apps2 = rewrite env if_true in
@@ -1366,7 +1370,7 @@ let simplify_functor_stubs lam =
       let body', apps2 = rewrite env lwhile.wh_body in
       let apps = merge_apps apps1 apps2 in
       if lwhile.wh_cond == cond' && lwhile.wh_body == body' then lam, apps
-      else Lwhile { lwhile with wh_cond = cond'; wh_body = body' }, apps
+      else Lwhile { wh_cond = cond'; wh_body = body' }, apps
     | Lfor lfor ->
       let from', apps1 = rewrite env lfor.for_from in
       let to', apps2 = rewrite env lfor.for_to in
@@ -1379,22 +1383,26 @@ let simplify_functor_stubs lam =
     | Lassign (id, expr) ->
       let expr', apps = rewrite env expr in
       if expr == expr' then lam, apps else Lassign (id, expr'), apps
-    | Lsend (mkind, obj, met, args, region, alloc_mode, loc) ->
+    | Lsend (mkind, obj, met, args, region, alloc_mode, loc, kind) ->
       let obj', apps1 = rewrite env obj in
       let met', apps2 = rewrite env met in
       let args', apps3 = rewrite_list env args in
       let apps = merge_apps apps1 (merge_apps apps2 apps3) in
       if obj == obj' && met == met' && args == args' then lam, apps
-      else Lsend (mkind, obj', met', args', region, alloc_mode, loc), apps
+      else Lsend (mkind, obj', met', args', region, alloc_mode, loc, kind), apps
     | Levent (expr, lev) ->
       let expr', apps = rewrite env expr in
       if expr == expr' then lam, apps else Levent (expr', lev), apps
     | Lifused (id, expr) ->
       let expr', apps = rewrite env expr in
       if expr == expr' then lam, apps else Lifused (id, expr'), apps
-    | Lregion expr ->
+    | Lregion (expr, kind) ->
       let expr', apps = rewrite env expr in
-      if expr == expr' then lam, apps else Lregion expr', apps
+      if expr == expr' then lam, apps else Lregion (expr', kind), apps
+    | Lexclave expr ->
+      let expr', apps = rewrite env expr in
+      if expr == expr' then lam, apps else Lexclave expr', apps
+    | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
   and rewrite_bindings :
     'a. Env.t -> ('a * lambda) list -> ('a * lambda) list * applications_in_body
     = fun env cases ->
@@ -1406,6 +1414,19 @@ let simplify_functor_stubs lam =
       let apps = merge_apps apps1 apps2 in
       if rest == rest' && action == action' then cases, apps
       else (key, action') :: rest', apps
+  and rewrite_rec_bindings env bindings =
+    match bindings with
+    | [] -> [], No_applications
+    | { id; debug_uid; def } :: rest ->
+      let rest', apps1 = rewrite_rec_bindings env rest in
+      let body', apps2 = rewrite env def.body in
+      let apps = merge_apps apps1 apps2 in
+      if rest == rest' && def.body == body' then bindings, apps
+      else
+        let binding =
+          { id; debug_uid; def = map_lfunction (fun _ -> body') def }
+        in
+        binding :: rest', apps
   and rewrite_list env lams =
     match lams with
     | [] -> lams, No_applications
