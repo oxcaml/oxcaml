@@ -1,0 +1,1905 @@
+diff --git a/.github/workflows/build-msvc.yml b/.github/workflows/build-msvc.yml
+new file mode 100644
+index 000000000000..fb34a011c4ba
+--- /dev/null
++++ b/.github/workflows/build-msvc.yml
+@@ -0,0 +1,99 @@
++name: Build with MSVC
++
++concurrency:
++  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
++  cancel-in-progress: true
++
++on:
++  push:
++    branches:
++      - '4.**'
++      - '5.**'
++      - 'trunk'
++  pull_request:
++
++jobs:
++  build:
++    permissions: {}
++
++    runs-on: windows-latest
++
++    timeout-minutes: 60
++
++    name: ${{ matrix.x86_64 && 'MSVC 64 bits' || 'MSVC 32 bits' }}
++
++    strategy:
++      matrix:
++        x86_64: [true, false]
++
++    steps:
++      - name: Save pristine PATH
++        run: |
++          echo "PRISTINE_PATH=${env:Path}" >> "${env:GITHUB_ENV}"
++
++      - name: Set up MSVC
++        uses: ilammy/msvc-dev-cmd@v1
++        with:
++          # This is cl version 19.38, Visual Studio version 17.8
++          toolset: 14.38
++          arch: ${{ matrix.x86_64 && 'x64' || 'x86' }}
++
++      - name: Fetch OCaml
++        uses: actions/checkout@v4
++        with:
++          submodules: true
++
++      - name: Restore Cygwin cache
++        uses: actions/cache/restore@v3
++        env:
++          PATH: ${{ env.PRISTINE_PATH }}
++        with:
++          path: |
++            C:\cygwin-packages
++          key: cygwin-packages
++
++      - name: Install Cygwin
++        uses: cygwin/cygwin-install-action@v3
++        with:
++          packages: make,bash,mingw64-x86_64-gcc-core
++          install-dir: 'D:\cygwin'
++
++      - name: Save Cygwin cache
++        uses: actions/cache/save@v3
++        env:
++          PATH: ${{ env.PRISTINE_PATH }}
++        with:
++          path: |
++            C:\cygwin-packages
++          key: cygwin-packages
++
++      - name: Build OCaml
++        shell: bash -e {0}
++        env:
++          HOST: ${{ matrix.x86_64 && 'x86_64-pc-windows' || 'i686-pc-windows' }}
++        run: >-
++          eval $(tools/msvs-promote-path) ;
++          ./configure --host=$HOST ;
++          make ;
++          runtime/ocamlrun ocamlc -config ;
++
++      - name: Assemble backend with MinGW GASM and compare
++        shell: bash -e {0}
++        run: >-
++          x86_64-w64-mingw32-gcc -c -I./runtime  -I ./flexdll -D__USE_MINGW_ANSI_STDIO=0 -DUNICODE -D_UNICODE -DWINDOWS_UNICODE=1 -DCAMLDLLIMPORT= -DIN_CAML_RUNTIME -DNATIVE_CODE -DTARGET_amd64 -DMODEL_default -DSYS_mingw64 -o runtime/amd64.o runtime/amd64.S ;
++          dumpbin /disasm:nobytes runtime/amd64nt.obj > runtime/amd64nt.dump ;
++          awk -f tools/ci/actions/canonicalize-dumpbin.awk runtime/amd64nt.dump runtime/amd64nt.dump > runtime/amd64nt.canonical ;
++          dumpbin /disasm:nobytes runtime/amd64.o > runtime/amd64.dump ;
++          awk -f tools/ci/actions/canonicalize-dumpbin.awk runtime/amd64.dump runtime/amd64.dump > runtime/amd64.canonical ;
++          git diff --no-index -- runtime/amd64*.canonical ;
++          wc -l runtime/amd64*.dump runtime/amd64*.canonical ;
++          # ^ The final wc is there to make sure that the canonical files are
++          # reasonable cleaned-up versions of the raw dumpbins and not simply
++          # empty
++        if: matrix.x86_64
++
++      - name: Run the test suite
++        shell: bash -e {0}
++        run: >-
++          eval $(tools/msvs-promote-path) ;
++          make tests ;
+diff --git a/.gitmodules b/.gitmodules
+index 67c9558a1606..d69d2a4d5ad3 100644
+--- a/.gitmodules
++++ b/.gitmodules
+@@ -1,3 +1,6 @@
+ [submodule "flexdll"]
+     path = flexdll
+     url = https://github.com/ocaml/flexdll.git
++[submodule "winpthreads"]
++    path = winpthreads
++    url = https://github.com/ocaml/winpthreads.git
+diff --git a/Changes b/Changes
+index 7fd4643096a0..ff04bdfc7bc7 100644
+--- a/Changes
++++ b/Changes
+@@ -3,6 +3,12 @@ _______________
+ 
+ (Changes that can break existing programs are marked with a "*")
+ 
++### Restored backend:
++
++- #12954: Restore the MSVC port
++  (David Allsopp, Antonin Décimo, Samuel Hym, and Miod Vallat, review by Nicolás
++   Ojeda Bär)
++
+ ### Language features:
+ 
+ ### Runtime system:
+diff --git a/HACKING.adoc b/HACKING.adoc
+index 3860a3f0b54d..078ec4ef95c8 100644
+--- a/HACKING.adoc
++++ b/HACKING.adoc
+@@ -214,6 +214,7 @@ has excellent documentation.
+   toplevel/::             interactive system
+   typing/::               typechecking -- see link:typing/HACKING.adoc[]
+   utils/::                utility libraries
++  winpthreads/::          winpthreads submodule -- see <<winpthreads,further>>
+   yacc/::                 parser generator
+ 
+ [#tips]
+@@ -658,4 +659,36 @@ If you would like to receive email notifications of all commits made to the main
+ git repository, you can subscribe to the caml-commits@inria.fr mailing list by
+ visiting https://sympa.inria.fr/sympa/info/caml-commits[its web page.]
+ 
++[#winpthreads]
++=== The `winpthreads` library for the MSVC port
++
++The `winpthreads` library is used to emulate `pthread` for the MSVC
++port. Upstream bundles it along with all the MinGW libraries so our
++`winpthreads` submodule points to `git subtree` repository rather than
++upstream directly.
++
++To recreate the `winpthreads` repository from upstream, you can do:
++
++----
++git clone -o upstream https://git.code.sf.net/p/mingw-w64/mingw-w64 winpthreads
++cd winpthreads
++git checkout upstream/master
++git branch -D master
++git subtree -P mingw-w64-libraries/winpthreads split -b master
++----
++
++As subtree splitting is deterministic, repeating these operations later will
++allow to update `master`, for instance by:
++
++----
++git fetch upstream
++git checkout upstream/master
++git subtree -P mingw-w64-libraries/winpthreads split -b tmp
++git checkout master
++git merge --ff-only tmp
++git branch -d tmp
++----
++
++and then go on updating the `winpthreads` submodule in the `ocaml` repository.
++
+ Happy Hacking!
+diff --git a/Makefile b/Makefile
+index ef708f50a36f..92133e3a3848 100644
+--- a/Makefile
++++ b/Makefile
+@@ -893,7 +893,7 @@ endif # ifeq "$(BOOTSTRAPPING_FLEXDLL)" "true"
+ 
+ INSTALL_COMPLIBDIR = $(DESTDIR)$(COMPLIBDIR)
+ INSTALL_FLEXDLLDIR = $(INSTALL_LIBDIR)/flexdll
+-FLEXDLL_MANIFEST = default_$(ARCH).manifest
++FLEXDLL_MANIFEST = default$(filter-out _i386,_$(ARCH)).manifest
+ 
+ DOC_FILES=\
+   Changes \
+@@ -1091,6 +1091,24 @@ partialclean::
+ 
+ ## Lists of source files
+ 
++ifneq "$(WINPTHREADS_SOURCE_DIR)" ""
++winpthreads_SOURCES = $(addprefix $(WINPTHREADS_SOURCE_DIR)/src/, \
++  cond.c \
++  misc.c \
++  mutex.c \
++  rwlock.c \
++  sched.c \
++  spinlock.c \
++  thread.c)
++
++winpthreads_OBJECTS = $(winpthreads_SOURCES:.c=.$(O))
++
++clean::
++	rm -f $(winpthreads_OBJECTS)
++else
++winpthreads_OBJECTS =
++endif
++
+ runtime_COMMON_C_SOURCES = \
+   addrmap \
+   afl \
+@@ -1209,30 +1227,37 @@ endif
+ 
+ ## List of object files for each target
+ 
+-libcamlrun_OBJECTS = $(runtime_BYTECODE_C_SOURCES:.c=.b.$(O))
++
++libcamlrun_OBJECTS = \
++  $(runtime_BYTECODE_C_SOURCES:.c=.b.$(O)) $(winpthreads_OBJECTS)
+ 
+ libcamlrun_non_shared_OBJECTS = \
+   $(subst $(UNIX_OR_WIN32).b.$(O),$(UNIX_OR_WIN32)_non_shared.b.$(O), \
+           $(libcamlrun_OBJECTS))
+ 
+ libcamlrund_OBJECTS = $(runtime_BYTECODE_C_SOURCES:.c=.bd.$(O)) \
+-  runtime/instrtrace.bd.$(O)
++  $(winpthreads_OBJECTS) runtime/instrtrace.bd.$(O)
+ 
+-libcamlruni_OBJECTS = $(runtime_BYTECODE_C_SOURCES:.c=.bi.$(O))
++libcamlruni_OBJECTS = \
++  $(runtime_BYTECODE_C_SOURCES:.c=.bi.$(O)) $(winpthreads_OBJECTS)
+ 
+-libcamlrunpic_OBJECTS = $(runtime_BYTECODE_C_SOURCES:.c=.bpic.$(O))
++libcamlrunpic_OBJECTS = \
++  $(runtime_BYTECODE_C_SOURCES:.c=.bpic.$(O)) $(winpthreads_OBJECTS)
+ 
+ libasmrun_OBJECTS = \
+-  $(runtime_NATIVE_C_SOURCES:.c=.n.$(O)) $(runtime_ASM_OBJECTS)
++  $(runtime_NATIVE_C_SOURCES:.c=.n.$(O)) $(runtime_ASM_OBJECTS) \
++  $(winpthreads_OBJECTS)
+ 
+ libasmrund_OBJECTS = \
+-  $(runtime_NATIVE_C_SOURCES:.c=.nd.$(O)) $(runtime_ASM_OBJECTS:.$(O)=.d.$(O))
++  $(runtime_NATIVE_C_SOURCES:.c=.nd.$(O)) $(runtime_ASM_OBJECTS:.$(O)=.d.$(O)) \
++  $(winpthreads_OBJECTS)
+ 
+ libasmruni_OBJECTS = \
+-  $(runtime_NATIVE_C_SOURCES:.c=.ni.$(O)) $(runtime_ASM_OBJECTS:.$(O)=.i.$(O))
++  $(runtime_NATIVE_C_SOURCES:.c=.ni.$(O)) $(runtime_ASM_OBJECTS:.$(O)=.i.$(O)) \
++  $(winpthreads_OBJECTS)
+ 
+ libasmrunpic_OBJECTS = $(runtime_NATIVE_C_SOURCES:.c=.npic.$(O)) \
+-  $(runtime_ASM_OBJECTS:.$(O)=_libasmrunpic.$(O))
++  $(runtime_ASM_OBJECTS:.$(O)=_libasmrunpic.$(O)) $(winpthreads_OBJECTS)
+ 
+ libcomprmarsh_OBJECTS = runtime/zstd.npic.$(O)
+ 
+diff --git a/Makefile.build_config.in b/Makefile.build_config.in
+index a3fa03b22aef..c287d8316690 100644
+--- a/Makefile.build_config.in
++++ b/Makefile.build_config.in
+@@ -110,6 +110,10 @@ DOCUMENTATION_TOOL_CMD=@documentation_tool_cmd@
+ FLEXDLL_SOURCE_DIR=@flexdll_source_dir@
+ BOOTSTRAPPING_FLEXDLL=@bootstrapping_flexdll@
+ 
++# The location of the Winpthreads sources to use (usually provided as the
++# winpthreads Git submodule)
++WINPTHREADS_SOURCE_DIR=@winpthreads_source_dir@
++
+ ### Where to install documentation
+ PACKAGE_TARNAME = @PACKAGE_TARNAME@
+ datarootdir = @datarootdir@
+diff --git a/README.win32.adoc b/README.win32.adoc
+index 901d3c30d10c..b130f1281d58 100644
+--- a/README.win32.adoc
++++ b/README.win32.adoc
+@@ -11,10 +11,6 @@ release use the 4.14 release which will continue to be supported and updated
+ while 5.0 reaches feature and stability parity. Similarly, if you need one of
+ the ports not yet supported in the 5.0 release you must use the 4.14 release.
+ 
+-The MSVC port is presently not supported, but will hopefully be added back in
+-later releases. On 32-bit systems, only the bytecode compiler is supported.
+-Native-code support for these 32-bit systems is under discussion.
+-
+ = Release notes for the Microsoft Windows ports of OCaml =
+ :toc: macro
+ 
+diff --git a/aclocal.m4 b/aclocal.m4
+index 6c41b80275a9..ddfb41758b6b 100644
+--- a/aclocal.m4
++++ b/aclocal.m4
+@@ -411,6 +411,16 @@ EOF
+   OCAML_CC_RESTORE_VARIABLES
+ ])
+ 
++AC_DEFUN([OCAML_TEST_WINPTHREADS_PTHREAD_H], [
++  OCAML_CC_SAVE_VARIABLES
++
++  AS_IF([test -n "$1"],[CPPFLAGS="-I $1 $CPPFLAGS"])
++  AC_CHECK_HEADER([pthread.h],[],
++    [AC_MSG_ERROR([cannot find or use pthread.h from winpthreads])])
++
++  OCAML_CC_RESTORE_VARIABLES
++])
++
+ AC_DEFUN([OCAML_HOST_IS_EXECUTABLE], [
+   AC_MSG_CHECKING([whether host executables can be run in the build])
+   old_cross_compiling="$cross_compiling"
+diff --git a/configure b/configure
+index 6ef78564a9ed..2ab7d34081a3 100755
+--- a/configure
++++ b/configure
+@@ -856,6 +856,7 @@ supports_shared_libraries
+ mklib
+ AR
+ shebangscripts
++winpthreads_source_dir
+ flexlink_flags
+ flexdll_dir
+ bootstrapping_flexdll
+@@ -1010,6 +1011,7 @@ enable_function_sections
+ enable_mmap_map_stack
+ with_afl
+ with_flexdll
++with_winpthreads_msvc
+ with_zstd
+ enable_shared
+ enable_static
+@@ -1719,6 +1721,8 @@ Optional Packages:
+   --with-target-sh        location of Posix sh on the target system
+   --with-afl              use the AFL fuzzer
+   --with-flexdll          bootstrap FlexDLL from the given sources
++  --with-winpthreads-msvc build winpthreads (only for the MSVC port) from the
++                          given sources
+   --without-zstd          disable compression of compilation artefacts
+   --with-pic[=PKGS]       try to use only PIC/non-PIC objects [default=use
+                           both]
+@@ -3436,6 +3440,7 @@ LINEAR_MAGIC_NUMBER=Caml1999L035
+ 
+ 
+ 
++
+ 
+ 
+  # TODO: rename this variable
+@@ -3675,8 +3680,6 @@ esac
+ # Systems that are known not to work, even in bytecode only.
+ 
+ case $host in #(
+-  *-pc-windows) :
+-    as_fn_error 69 "the MSVC compiler is not supported currently" "$LINENO" 5 ;; #(
+   i386-*-solaris*) :
+     as_fn_error $? "Building for 32 bits target is not supported. \
+ If your host is 64 bits, you can try with './configure CC=\"gcc -m64\"' \
+@@ -4119,6 +4122,17 @@ fi
+ 
+ 
+ 
++# Check whether --with-winpthreads-msvc was given.
++if test ${with_winpthreads_msvc+y}
++then :
++  withval=$with_winpthreads_msvc; if test x"$withval" = 'xyes'
++then :
++  with_winpthreads_msvc=winpthreads
++fi
++fi
++
++
++
+ # Check whether --with-zstd was given.
+ if test ${with_zstd+y}
+ then :
+@@ -13980,10 +13994,15 @@ case $ocaml_cv_cc_vendor in #(
+     internal_cppflags="${internal_cppflags}\$(WINDOWS_UNICODE)" ;; #(
+   mingw-*) :
+     as_fn_error $? "Unsupported C compiler for a MinGW-w64 build" "$LINENO" 5 ;; #(
++  msvc-0*|msvc-1[0-8]*|msvc-19[012]*|msvc-193[0-7]) :
++    # No C11 atomics support
++    as_fn_error 69 "This version of MSVC is too old. Please use Visual Studio version 17.8 or above." "$LINENO" 5 ;; #(
+   msvc-*) :
+     common_cflags="-nologo -O2 -Gy- -MD $cc_warnings"
+     common_cppflags="-D_CRT_SECURE_NO_DEPRECATE"
+     internal_cppflags='-DUNICODE -D_UNICODE'
++    internal_cflags='-experimental:c11atomics -std:c11'
++    CFLAGS="$CFLAGS -experimental:c11atomics -std:c11"
+ 
+   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the C compiler supports -d2VolatileMetadata-" >&5
+ printf %s "checking whether the C compiler supports -d2VolatileMetadata-... " >&6; }
+@@ -14008,7 +14027,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
+ 
+     if test "x$cl_has_volatile_metadata" = "xtrue"
+ then :
+-  internal_cflags='-d2VolatileMetadata-'
++  internal_cflags="$internal_cflags -d2VolatileMetadata-"
+ fi
+     internal_cppflags="$internal_cppflags -DWINDOWS_UNICODE="
+     internal_cppflags="${internal_cppflags}\$(WINDOWS_UNICODE)" ;; #(
+@@ -14481,6 +14500,106 @@ esac
+      ;;
+ esac
+ 
++# Winpthreads emulation library for the MSVC port
++{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for winpthreads sources" >&5
++printf %s "checking for winpthreads sources... " >&6; }
++if test x"$with_winpthreads_msvc" = "xno"
++then :
++  winpthreads_source_dir=''
++  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: disabled" >&5
++printf "%s\n" "disabled" >&6; }
++else $as_nop
++  winpthreadmsg=''
++  case $target in #(
++  *-pc-windows) :
++                       if test x"$with_winpthreads_msvc" = 'x' || test x"$with_winpthreads_msvc" = x'winpthreads'
++then :
++  if test -f 'winpthreads/src/winpthread_internal.h'
++then :
++  winpthreads_source_dir=winpthreads
++        iwinpthreadsdir="$ocamlsrcdir\winpthreads\include"
++else $as_nop
++  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: required but not available (uninitialized submodule?)" >&5
++printf "%s\n" "required but not available (uninitialized submodule?)" >&6; }
++        as_fn_error $? "exiting" "$LINENO" 5
++fi
++else $as_nop
++  rm -rf winpthreads-sources
++      if test -f "$with_winpthreads_msvc/src/winpthread_internal.h"
++then :
++  mkdir -p winpthreads-sources/src winpthreads-sources/include
++        cp "$with_winpthreads_msvc"/src/*.c winpthreads-sources/src
++        cp "$with_winpthreads_msvc"/src/*.h winpthreads-sources/src
++        cp "$with_winpthreads_msvc"/include/*.h winpthreads-sources/include
++        winpthreads_source_dir='winpthreads-sources'
++        iwinpthreadsdir="$ocamlsrcdir\\winpthreads-sources\\include"
++        winpthreadsmsg=" (from $with_winpthreads_msvc)"
++else $as_nop
++  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: requested but not available" >&5
++printf "%s\n" "requested but not available" >&6; }
++        as_fn_error $? "exiting" "$LINENO" 5
++fi
++fi
++    if test x"$winpthreads_source_dir" = 'x'
++then :
++  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
++printf "%s\n" "no" >&6; }
++else $as_nop
++  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $winpthreads_source_dir$winpthreadmsg" >&5
++printf "%s\n" "$winpthreads_source_dir$winpthreadmsg" >&6; }
++
++
++  saved_CC="$CC"
++  saved_CFLAGS="$CFLAGS"
++  saved_CPPFLAGS="$CPPFLAGS"
++  saved_LIBS="$LIBS"
++  saved_ac_ext="$ac_ext"
++  saved_ac_compile="$ac_compile"
++  # Move the content of confdefs.h to another file so it does not
++  # get included
++  mv confdefs.h confdefs.h.bak
++  touch confdefs.h
++
++
++  if test -n "$iwinpthreadsdir"
++then :
++  CPPFLAGS="-I $iwinpthreadsdir $CPPFLAGS"
++fi
++  ac_fn_c_check_header_compile "$LINENO" "pthread.h" "ac_cv_header_pthread_h" "$ac_includes_default"
++if test "x$ac_cv_header_pthread_h" = xyes
++then :
++
++else $as_nop
++  as_fn_error $? "cannot find or use pthread.h from winpthreads" "$LINENO" 5
++fi
++
++
++
++  # Restore the content of confdefs.h
++  mv confdefs.h.bak confdefs.h
++  ac_compile="$saved_ac_compile"
++  ac_ext="$saved_ac_ext"
++  CPPFLAGS="$saved_CPPFLAGS"
++  CFLAGS="$saved_CFLAGS"
++  CC="$saved_CC"
++  LIBS="$saved_LIBS"
++
++
++      internal_cppflags="$internal_cppflags -I$iwinpthreadsdir"
++fi ;; #(
++  *) :
++    if test x"$with_winpthreads_msvc" != 'x'
++then :
++  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: requested but not supported" >&5
++printf "%s\n" "requested but not supported" >&6; }
++      as_fn_error $? "exiting" "$LINENO" 5
++else $as_nop
++  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: skipping on that platform" >&5
++printf "%s\n" "skipping on that platform" >&6; }
++fi ;;
++esac
++fi
++
+ ## Program to use to install files
+ 
+   # Find a good install program.  We prefer a C program (faster),
+@@ -15358,7 +15477,7 @@ fi
+ # macOS and MinGW-w64 have problems with thread local storage accessed from DLLs
+ 
+ case $host in #(
+-  *-apple-darwin*|*-mingw32*) :
++  *-apple-darwin*|*-mingw32*|*-pc-windows) :
+      ;; #(
+   *) :
+     printf "%s\n" "#define HAS_FULL_THREAD_VARIABLES 1" >>confdefs.h
+@@ -15660,7 +15779,7 @@ case $host in #(
+   i686-pc-windows) :
+     arch=i386; system=win32 ;; #(
+   x86_64-pc-windows) :
+-    arch=amd64; system=win64 ;; #(
++    has_native_backend=yes; arch=amd64; system=win64 ;; #(
+   powerpc64le*-*-linux*) :
+     has_native_backend=yes; arch=power; model=ppc64le; system=linux ;; #(
+   powerpc64*-*-linux-musl*) :
+@@ -18849,7 +18968,7 @@ fi
+ 
+      PTHREAD_LIBS="-l:libpthread.a $link_gcc_eh" ;; #(
+   *-pc-windows) :
+-    PTHREAD_LIBS="-l:libpthread.lib" ;; #(
++    PTHREAD_LIBS='' ;; #(
+   *) :
+ 
+ 
+@@ -20304,9 +20423,9 @@ case $host in #(
+   *-*-mingw32*) :
+     cclibs="$cclibs -lole32 -luuid -lversion" ;; #(
+   *-pc-windows) :
+-    # For whatever reason, flexlink includes -ladvapi32 for mingw-w64, but
+-    # doesn't include advapi32.lib for MSVC
+-    cclibs="$cclibs ole32.lib uuid.lib advapi32.lib version.lib" ;; #(
++    # For whatever reason, flexlink includes -ladvapi32 and -lshell32 for
++    # mingw-w64, but doesn't include advapi32.lib and shell32.lib for MSVC
++    cclibs="$cclibs ole32.lib uuid.lib advapi32.lib shell32.lib version.lib" ;; #(
+   *) :
+      ;;
+ esac
+diff --git a/configure.ac b/configure.ac
+index b11f9e84d208..6b679acaeb6d 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -174,6 +174,7 @@ AC_SUBST([flexdll_source_dir])
+ AC_SUBST([bootstrapping_flexdll])
+ AC_SUBST([flexdll_dir])
+ AC_SUBST([flexlink_flags])
++AC_SUBST([winpthreads_source_dir])
+ AC_SUBST([shebangscripts])
+ AC_SUBST([AR])
+ AC_SUBST([mklib])
+@@ -301,8 +302,6 @@ AS_CASE([$host],
+ # Systems that are known not to work, even in bytecode only.
+ 
+ AS_CASE([$host],
+-  [*-pc-windows],
+-    [AC_MSG_ERROR([the MSVC compiler is not supported currently], 69)],
+   [i386-*-solaris*],
+     [AC_MSG_ERROR([Building for 32 bits target is not supported. \
+ If your host is 64 bits, you can try with './configure CC="gcc -m64"' \
+@@ -555,6 +554,11 @@ AC_ARG_WITH([flexdll],
+     [bootstrap FlexDLL from the given sources])],
+   [AS_IF([test x"$withval" = 'xyes'],[with_flexdll=flexdll])])
+ 
++AC_ARG_WITH([winpthreads-msvc],
++  [AS_HELP_STRING([--with-winpthreads-msvc],
++    [build winpthreads (only for the MSVC port) from the given sources])],
++  [AS_IF([test x"$withval" = 'xyes'], [with_winpthreads_msvc=winpthreads])])
++
+ AC_ARG_WITH([zstd],
+   [AS_HELP_STRING([--without-zstd],
+     [disable compression of compilation artefacts])])
+@@ -851,13 +855,19 @@ AS_CASE([$ocaml_cv_cc_vendor],
+     internal_cppflags="${internal_cppflags}\$(WINDOWS_UNICODE)"],
+   [mingw-*],
+     [AC_MSG_ERROR([Unsupported C compiler for a MinGW-w64 build])],
++  [msvc-0*|msvc-1[[0-8]]*|msvc-19[[012]]*|msvc-193[[0-7]]],
++    # No C11 atomics support
++    [AC_MSG_ERROR(m4_normalize([This version of MSVC is too old.
++    Please use Visual Studio version 17.8 or above.]), 69)],
+   [msvc-*],
+     [common_cflags="-nologo -O2 -Gy- -MD $cc_warnings"
+     common_cppflags="-D_CRT_SECURE_NO_DEPRECATE"
+     internal_cppflags='-DUNICODE -D_UNICODE'
++    internal_cflags='-experimental:c11atomics -std:c11'
++    CFLAGS="$CFLAGS -experimental:c11atomics -std:c11"
+     OCAML_CL_HAS_VOLATILE_METADATA
+     AS_IF([test "x$cl_has_volatile_metadata" = "xtrue"],
+-          [internal_cflags='-d2VolatileMetadata-'])
++          [internal_cflags="$internal_cflags -d2VolatileMetadata-"])
+     internal_cppflags="$internal_cppflags -DWINDOWS_UNICODE="
+     internal_cppflags="${internal_cppflags}\$(WINDOWS_UNICODE)"],
+   [xlc-*],
+@@ -1054,6 +1064,46 @@ AS_CASE([$ocaml_cv_cc_vendor,$host],
+   [gcc-*,powerpc-*-linux*],
+     [oc_ldflags="-mbss-plt"])
+ 
++# Winpthreads emulation library for the MSVC port
++AC_MSG_CHECKING([for winpthreads sources])
++AS_IF([test x"$with_winpthreads_msvc" = "xno"],
++  [winpthreads_source_dir=''
++  AC_MSG_RESULT([disabled])],
++  [winpthreadmsg=''
++  AS_CASE([$target],
++    [*-pc-windows],
++    [dnl When bootstrapping from the git submodule (winpthreads directory),
++     dnl just use that, however if another directory has been specified with
++     dnl --with-winpthreads-msvc=<path> then copy the contents of <path> to
++     dnl winpthreads-sources.
++    AS_IF([m4_normalize([test x"$with_winpthreads_msvc" = 'x'
++                          || test x"$with_winpthreads_msvc" = x'winpthreads'])],
++      [AS_IF([test -f 'winpthreads/src/winpthread_internal.h'],
++        [winpthreads_source_dir=winpthreads
++        iwinpthreadsdir="$ocamlsrcdir\winpthreads\include"],
++        [AC_MSG_RESULT([required but not available (uninitialized submodule?)])
++        AC_MSG_ERROR([exiting])])],
++      [rm -rf winpthreads-sources
++      AS_IF([test -f "$with_winpthreads_msvc/src/winpthread_internal.h"],
++        [mkdir -p winpthreads-sources/src winpthreads-sources/include
++        cp "$with_winpthreads_msvc"/src/*.c winpthreads-sources/src
++        cp "$with_winpthreads_msvc"/src/*.h winpthreads-sources/src
++        cp "$with_winpthreads_msvc"/include/*.h winpthreads-sources/include
++        winpthreads_source_dir='winpthreads-sources'
++        iwinpthreadsdir="$ocamlsrcdir\\winpthreads-sources\\include"
++        winpthreadsmsg=" (from $with_winpthreads_msvc)"],
++        [AC_MSG_RESULT([requested but not available])
++        AC_MSG_ERROR([exiting])])])
++    AS_IF([test x"$winpthreads_source_dir" = 'x'],
++      [AC_MSG_RESULT([no])],
++      [AC_MSG_RESULT([$winpthreads_source_dir$winpthreadmsg])
++      OCAML_TEST_WINPTHREADS_PTHREAD_H([$iwinpthreadsdir])
++      internal_cppflags="$internal_cppflags -I$iwinpthreadsdir"])],
++    [AS_IF([test x"$with_winpthreads_msvc" != 'x'],
++      [AC_MSG_RESULT([requested but not supported])
++      AC_MSG_ERROR([exiting])],
++      [AC_MSG_RESULT([skipping on that platform])])])])
++
+ ## Program to use to install files
+ AC_PROG_INSTALL
+ 
+@@ -1167,7 +1217,7 @@ AS_IF([! $cc_supports_atomic],
+ # macOS and MinGW-w64 have problems with thread local storage accessed from DLLs
+ 
+ AS_CASE([$host],
+-  [*-apple-darwin*|*-mingw32*], [],
++  [*-apple-darwin*|*-mingw32*|*-pc-windows], [],
+   [AC_DEFINE([HAS_FULL_THREAD_VARIABLES])]
+ )
+ 
+@@ -1339,7 +1389,7 @@ AS_CASE([$host],
+   [i686-pc-windows],
+     [arch=i386; system=win32],
+   [x86_64-pc-windows],
+-    [arch=amd64; system=win64],
++    [has_native_backend=yes; arch=amd64; system=win64],
+   [[powerpc64le*-*-linux*]],
+     [has_native_backend=yes; arch=power; model=ppc64le; system=linux],
+   [[powerpc64*-*-linux-musl*]],
+@@ -2277,7 +2327,7 @@ AS_CASE([$host],
+      AC_CHECK_LIB([gcc_eh], [printf], [link_gcc_eh="-lgcc_eh"])
+      PTHREAD_LIBS="-l:libpthread.a $link_gcc_eh"],
+   [*-pc-windows],
+-    [PTHREAD_LIBS="-l:libpthread.lib"],
++    [PTHREAD_LIBS=''],
+   [AX_PTHREAD(
+     [common_cflags="$common_cflags $PTHREAD_CFLAGS"
+     # The two following lines add flags and libraries for pthread to the
+@@ -2513,9 +2563,9 @@ AS_CASE([$host],
+   [*-*-mingw32*],
+     [cclibs="$cclibs -lole32 -luuid -lversion"],
+   [*-pc-windows],
+-    [# For whatever reason, flexlink includes -ladvapi32 for mingw-w64, but
+-    # doesn't include advapi32.lib for MSVC
+-    cclibs="$cclibs ole32.lib uuid.lib advapi32.lib version.lib"])
++    [# For whatever reason, flexlink includes -ladvapi32 and -lshell32 for
++    # mingw-w64, but doesn't include advapi32.lib and shell32.lib for MSVC
++    cclibs="$cclibs ole32.lib uuid.lib advapi32.lib shell32.lib version.lib"])
+ 
+ AC_CONFIG_COMMANDS_PRE([cclibs="$cclibs $mathlib $DLLIBS $PTHREAD_LIBS"])
+ 
+diff --git a/otherlibs/systhreads/st_stubs.c b/otherlibs/systhreads/st_stubs.c
+index 5d08ea03c070..e4268ba0b62d 100644
+--- a/otherlibs/systhreads/st_stubs.c
++++ b/otherlibs/systhreads/st_stubs.c
+@@ -15,13 +15,16 @@
+ 
+ #define CAML_INTERNALS
+ 
+-#if defined(_WIN32) && !defined(NATIVE_CODE)
++#if defined(_WIN32) && !defined(NATIVE_CODE) && !defined(_MSC_VER)
+ /* Ensure that pthread.h marks symbols __declspec(dllimport) so that they can be
+    picked up from the runtime (which will have linked winpthreads statically).
+    mingw-w64 11.0.0 introduced WINPTHREADS_USE_DLLIMPORT to do this explicitly;
+    prior versions co-opted this on the internal DLL_EXPORT, but this is ignored
+    in 11.0 and later unless IN_WINPTHREAD is also defined, so we can safely
+-   define both to support both versions. */
++   define both to support both versions.
++   When compiling with MSVC, we currently link directly the winpthreads objects
++   into our runtime, so we do not want to mark its symbols with
++   __declspec(dllimport). */
+ #define WINPTHREADS_USE_DLLIMPORT
+ #define DLL_EXPORT
+ #endif
+diff --git a/otherlibs/unix/channels_win32.c b/otherlibs/unix/channels_win32.c
+index fa7de1a195a7..b6b14cafd459 100644
+--- a/otherlibs/unix/channels_win32.c
++++ b/otherlibs/unix/channels_win32.c
+@@ -19,6 +19,7 @@
+ #include <caml/alloc.h>
+ #include <caml/io.h>
+ #include <caml/memory.h>
++#include <caml/platform.h>
+ #include "caml/unixsupport.h"
+ #include <fcntl.h>
+ #include <io.h>
+diff --git a/runtime/amd64nt.asm b/runtime/amd64nt.asm
+index f7ac3082188f..8a5a6219cc97 100644
+--- a/runtime/amd64nt.asm
++++ b/runtime/amd64nt.asm
+@@ -26,6 +26,12 @@
+         EXTRN  caml_program: NEAR
+         EXTRN  caml_array_bound_error_asm: NEAR
+         EXTRN  caml_stash_backtrace: NEAR
++        EXTRN  caml_try_realloc_stack: NEAR
++        EXTRN  caml_try_realloc_stack: NEAR
++        EXTRN  caml_exn_Stack_overflow: NEAR
++        EXTRN  caml_raise_unhandled_effect: NEAR
++        EXTRN  caml_raise_continuation_already_resumed: NEAR
++        EXTRN  caml_free_stack: NEAR
+ 
+ ; Load caml/domain_state.tbl (via domain_state.inc, to remove C-style comments)
+         domain_curr_field = 0
+@@ -47,6 +53,162 @@ Caml_state MACRO field:REQ
+         EXITM @CatStr(<[r14+>, %(domain_field_caml_&field), <*8]>)
+ ENDM
+ 
++SAVE_ALL_REGS MACRO
++    ; Save young_ptr
++        mov     Caml_state(young_ptr), r15
++    ; Now, use r15 to point to the gc_regs bucket
++    ; We save r11 first to allow it to be scratch
++        mov     r15, Caml_state(gc_regs_buckets)
++        mov    qword ptr [r15 + 11*8], r11
++        mov     r11,qword ptr [r15] ; next ptr
++        mov     Caml_state(gc_regs_buckets), r11
++        mov    qword ptr [r15 + 0*8], rax
++        mov    qword ptr [r15 + 1*8], rbx
++        mov    qword ptr [r15 + 2*8], rdi
++        mov    qword ptr [r15 + 3*8], rsi
++        mov    qword ptr [r15 + 4*8], rdx
++        mov    qword ptr [r15 + 5*8], rcx
++        mov    qword ptr [r15 + 6*8], r8
++        mov    qword ptr [r15 + 7*8], r9
++        mov    qword ptr [r15 + 8*8], r12
++        mov    qword ptr [r15 + 9*8], r13
++        mov    qword ptr [r15 + 10*8], r10
++              ;qword ptr [r15 + 11*8] contains r11 already
++        mov    qword ptr [r15 + 12*8], rbp
++        movsd   mmword ptr [r15 + (0+13)*8], xmm0
++        movsd   mmword ptr [r15 + (1+13)*8], xmm1
++        movsd   mmword ptr [r15 + (2+13)*8], xmm2
++        movsd   mmword ptr [r15 + (3+13)*8], xmm3
++        movsd   mmword ptr [r15 + (4+13)*8], xmm4
++        movsd   mmword ptr [r15 + (5+13)*8], xmm5
++        movsd   mmword ptr [r15 + (6+13)*8], xmm6
++        movsd   mmword ptr [r15 + (7+13)*8], xmm7
++        movsd   mmword ptr [r15 + (8+13)*8], xmm8
++        movsd   mmword ptr [r15 + (9+13)*8], xmm9
++        movsd   mmword ptr [r15 + (10+13)*8], xmm10
++        movsd   mmword ptr [r15 + (11+13)*8], xmm11
++        movsd   mmword ptr [r15 + (12+13)*8], xmm12
++        movsd   mmword ptr [r15 + (13+13)*8], xmm13
++        movsd   mmword ptr [r15 + (14+13)*8], xmm14
++        movsd   mmword ptr [r15 + (15+13)*8], xmm15
++ENDM
++
++RESTORE_ALL_REGS MACRO
++    ; Restore rax, freeing up the next ptr slot
++        mov     rax,qword ptr [r15 + 0*8]
++        mov     r11, Caml_state(gc_regs_buckets)
++        mov     qword ptr [r15], r11 ; next ptr
++        mov     Caml_state(gc_regs_buckets), r15
++    ; above:    rax,qword ptr [r15 + 0*8]
++        mov     rbx,qword ptr [r15 + 1*8]
++        mov     rdi,qword ptr [r15 + 2*8]
++        mov     rsi,qword ptr [r15 + 3*8]
++        mov     rdx,qword ptr [r15 + 4*8]
++        mov     rcx,qword ptr [r15 + 5*8]
++        mov     r8,qword ptr [r15 + 6*8]
++        mov     r9,qword ptr [r15 + 7*8]
++        mov     r12,qword ptr [r15 + 8*8]
++        mov     r13,qword ptr [r15 + 9*8]
++        mov     r10,qword ptr [r15 + 10*8]
++        mov     r11,qword ptr [r15 + 11*8]
++        mov     rbp,qword ptr [r15 + 12*8]
++        movsd   xmm0, mmword ptr [r15 + (0+13)*8]
++        movsd   xmm1, mmword ptr [r15 + (1+13)*8]
++        movsd   xmm2, mmword ptr [r15 + (2+13)*8]
++        movsd   xmm3, mmword ptr [r15 + (3+13)*8]
++        movsd   xmm4, mmword ptr [r15 + (4+13)*8]
++        movsd   xmm5, mmword ptr [r15 + (5+13)*8]
++        movsd   xmm6, mmword ptr [r15 + (6+13)*8]
++        movsd   xmm7, mmword ptr [r15 + (7+13)*8]
++        movsd   xmm8, mmword ptr [r15 + (8+13)*8]
++        movsd   xmm9, mmword ptr [r15 + (9+13)*8]
++        movsd   xmm10, mmword ptr [r15 + (10+13)*8]
++        movsd   xmm11, mmword ptr [r15 + (11+13)*8]
++        movsd   xmm12, mmword ptr [r15 + (12+13)*8]
++        movsd   xmm13, mmword ptr [r15 + (13+13)*8]
++        movsd   xmm14, mmword ptr [r15 + (14+13)*8]
++        movsd   xmm15, mmword ptr [r15 + (15+13)*8]
++        mov     r15, Caml_state(young_ptr)
++ENDM
++
++SWITCH_OCAML_TO_C MACRO
++    ; Fill in Caml_state->current_stack->sp
++        mov     r10, Caml_state(current_stack)
++        mov    qword ptr [r10], rsp
++    ; Fill in Caml_state->c_stack
++        mov     r11, Caml_state(c_stack)
++        mov    qword ptr [r11 + 40], rsp
++        mov    qword ptr [r11 + 32], r10
++    ; Switch to C stack
++        mov     rsp, qword ptr r11
++ENDM
++
++SWITCH_C_TO_OCAML MACRO
++        mov     rsp,qword ptr [rsp+40]
++ENDM
++
++; Callee-save regs are rbx, rbp, rsi, rdi, r12-r15, xmm6-xmm15
++
++PUSH_CALLEE_SAVE_REGS MACRO
++        push    rbx
++        push    rbp
++        push    rsi
++        push    rdi
++        push    r12
++        push    r13
++        push    r14
++        push    r15
++        sub     rsp, 10*16       ; stack 16-aligned + 10 saved xmm regs
++        movupd  xmmword ptr [rsp + 0*16], xmm6
++        movupd  xmmword ptr [rsp + 1*16], xmm7
++        movupd  xmmword ptr [rsp + 2*16], xmm8
++        movupd  xmmword ptr [rsp + 3*16], xmm9
++        movupd  xmmword ptr [rsp + 4*16], xmm10
++        movupd  xmmword ptr [rsp + 5*16], xmm11
++        movupd  xmmword ptr [rsp + 6*16], xmm12
++        movupd  xmmword ptr [rsp + 7*16], xmm13
++        movupd  xmmword ptr [rsp + 8*16], xmm14
++        movupd  xmmword ptr [rsp + 9*16], xmm15
++ENDM
++
++POP_CALLEE_SAVE_REGS MACRO
++        movupd  xmm6, xmmword ptr [rsp + 0*16]
++        movupd  xmm7, xmmword ptr [rsp + 1*16]
++        movupd  xmm8, xmmword ptr [rsp + 2*16]
++        movupd  xmm9, xmmword ptr [rsp + 3*16]
++        movupd  xmm10, xmmword ptr [rsp + 4*16]
++        movupd  xmm11, xmmword ptr [rsp + 5*16]
++        movupd  xmm12, xmmword ptr [rsp + 6*16]
++        movupd  xmm13, xmmword ptr [rsp + 7*16]
++        movupd  xmm14, xmmword ptr [rsp + 8*16]
++        movupd  xmm15, xmmword ptr [rsp + 9*16]
++        add     rsp, 10*16
++        pop     r15
++        pop     r14
++        pop     r13
++        pop     r12
++        pop     rdi
++        pop     rsi
++        pop     rbp
++        pop     rbx
++ENDM
++
++RESTORE_EXN_HANDLER_OCAML MACRO
++        mov     rsp, Caml_state(exn_handler)
++        lea     r11, Caml_state(exn_handler)
++        pop     qword ptr [r11]
++ENDM
++
++SWITCH_OCAML_STACKS MACRO
++        mov     qword ptr [rsi], rsp
++        mov     r12, Caml_state(exn_handler)
++        mov     qword ptr [rsi+8], r12
++        mov     Caml_state(current_stack), r10
++        mov     rsp,qword ptr [r10]
++        mov     r12,qword ptr [r10+8]
++        mov     Caml_state(exn_handler), r12
++ENDM
++
+         .CODE
+ 
+         PUBLIC  caml_system__code_begin
+@@ -56,96 +218,40 @@ caml_system__code_begin:
+ 
+ ; Allocation
+ 
++        PUBLIC  caml_call_realloc_stack
++        ALIGN   4
++caml_call_realloc_stack:
++        SAVE_ALL_REGS
++        mov     rcx,qword ptr [rsp+8]
++        SWITCH_OCAML_TO_C
++        call    caml_try_realloc_stack
++        SWITCH_C_TO_OCAML
++        cmp     rax, 0
++        jz      L104
++        RESTORE_ALL_REGS
++        ret
++L104:
++        RESTORE_ALL_REGS
++        lea     rax, caml_exn_Stack_overflow
++        add     rsp, 16
++        jmp     caml_raise_exn
++
+         PUBLIC  caml_call_gc
+-        ALIGN   16
++        ALIGN   4
+ caml_call_gc:
+-    ; Record lowest stack address and return address
+-        mov     r11, [rsp]
+-        mov     Caml_state(last_return_address), r11
+-        lea     r11, [rsp+8]
+-        mov     Caml_state(bottom_of_stack), r11
+-    ; Touch the stack to trigger a recoverable segfault
+-    ; if insufficient space remains
+-        sub     rsp, 01000h
+-        mov     [rsp], r11
+-        add     rsp, 01000h
+-    ; Save young_ptr
+-        mov     Caml_state(young_ptr), r15
+-    ; Build array of registers, save it into Caml_state(gc_regs)
+-        push    rbp
+-        push    r11
+-        push    r10
+-        push    r13
+-        push    r12
+-        push    r9
+-        push    r8
+-        push    rcx
+-        push    rdx
+-        push    rsi
+-        push    rdi
+-        push    rbx
+-        push    rax
+-        mov     Caml_state(gc_regs), rsp
+-    ; Save floating-point registers
+-        sub     rsp, 16*8
+-        movsd   QWORD PTR [rsp + 0*8], xmm0
+-        movsd   QWORD PTR [rsp + 1*8], xmm1
+-        movsd   QWORD PTR [rsp + 2*8], xmm2
+-        movsd   QWORD PTR [rsp + 3*8], xmm3
+-        movsd   QWORD PTR [rsp + 4*8], xmm4
+-        movsd   QWORD PTR [rsp + 5*8], xmm5
+-        movsd   QWORD PTR [rsp + 6*8], xmm6
+-        movsd   QWORD PTR [rsp + 7*8], xmm7
+-        movsd   QWORD PTR [rsp + 8*8], xmm8
+-        movsd   QWORD PTR [rsp + 9*8], xmm9
+-        movsd   QWORD PTR [rsp + 10*8], xmm10
+-        movsd   QWORD PTR [rsp + 11*8], xmm11
+-        movsd   QWORD PTR [rsp + 12*8], xmm12
+-        movsd   QWORD PTR [rsp + 13*8], xmm13
+-        movsd   QWORD PTR [rsp + 14*8], xmm14
+-        movsd   QWORD PTR [rsp + 15*8], xmm15
++        SAVE_ALL_REGS
++        mov     Caml_state(gc_regs), r15
+     ; Call the garbage collector
+-        sub rsp, 32      ; PR#5008: bottom 32 bytes are reserved for callee
+-        call caml_garbage_collection
+-        add rsp, 32      ; PR#5008
+-    ; Restore all regs used by the code generator
+-        movsd   xmm0, QWORD PTR [rsp + 0*8]
+-        movsd   xmm1, QWORD PTR [rsp + 1*8]
+-        movsd   xmm2, QWORD PTR [rsp + 2*8]
+-        movsd   xmm3, QWORD PTR [rsp + 3*8]
+-        movsd   xmm4, QWORD PTR [rsp + 4*8]
+-        movsd   xmm5, QWORD PTR [rsp + 5*8]
+-        movsd   xmm6, QWORD PTR [rsp + 6*8]
+-        movsd   xmm7, QWORD PTR [rsp + 7*8]
+-        movsd   xmm8, QWORD PTR [rsp + 8*8]
+-        movsd   xmm9, QWORD PTR [rsp + 9*8]
+-        movsd   xmm10, QWORD PTR [rsp + 10*8]
+-        movsd   xmm11, QWORD PTR [rsp + 11*8]
+-        movsd   xmm12, QWORD PTR [rsp + 12*8]
+-        movsd   xmm13, QWORD PTR [rsp + 13*8]
+-        movsd   xmm14, QWORD PTR [rsp + 14*8]
+-        movsd   xmm15, QWORD PTR [rsp + 15*8]
+-        add     rsp, 16*8
+-        pop     rax
+-        pop     rbx
+-        pop     rdi
+-        pop     rsi
+-        pop     rdx
+-        pop     rcx
+-        pop     r8
+-        pop     r9
+-        pop     r12
+-        pop     r13
+-        pop     r10
+-        pop     r11
+-        pop     rbp
+-    ; Restore Caml_state(young_ptr)
+-        mov     r15, Caml_state(young_ptr)
++        SWITCH_OCAML_TO_C
++        call    caml_garbage_collection
++        SWITCH_C_TO_OCAML
++        mov     r15, Caml_state(gc_regs)
++        RESTORE_ALL_REGS
+     ; Return to caller
+         ret
+ 
+         PUBLIC  caml_alloc1
+-        ALIGN   16
++        ALIGN   4
+ caml_alloc1:
+         sub     r15, 16
+         cmp     r15, Caml_state(young_limit)
+@@ -153,7 +259,7 @@ caml_alloc1:
+         ret
+ 
+         PUBLIC  caml_alloc2
+-        ALIGN   16
++        ALIGN   4
+ caml_alloc2:
+         sub     r15, 24
+         cmp     r15, Caml_state(young_limit)
+@@ -161,7 +267,7 @@ caml_alloc2:
+         ret
+ 
+         PUBLIC  caml_alloc3
+-        ALIGN   16
++        ALIGN   4
+ caml_alloc3:
+         sub     r15, 32
+         cmp     r15, Caml_state(young_limit)
+@@ -169,7 +275,7 @@ caml_alloc3:
+         ret
+ 
+         PUBLIC  caml_allocN
+-        ALIGN   16
++        ALIGN   4
+ caml_allocN:
+         cmp     r15, Caml_state(young_limit)
+         jb      caml_call_gc
+@@ -177,281 +283,395 @@ caml_allocN:
+ 
+ ; Call a C function from OCaml
+ 
++; Update [young_limit] when returning from non-noalloc extern calls.
++; Here is C code that can be used to generate RET_FROM_C_CALL for a
++; new back-end.
++
++;   #include <stdatomic.h>
++;   #include <stdint.h>
++
++;   typedef struct { _Atomic(uint64_t) young_limit;
++;                    _Bool action_pending; } caml_domain_state;
++
++;   void ret_from_c_call(caml_domain_state *dom_st)
++;   {
++;     if (__builtin_expect(dom_st->action_pending, 0))
++;       atomic_store_explicit(&dom_st->young_limit, (uint64_t)-1,
++;                             memory_order_relaxed);
++;   }
++
++RET_FROM_C_CALL MACRO
++        LOCAL L1
++        cmp     byte ptr Caml_state(action_pending), 0
++        jne     L1
++        ret
++L1:
++        mov     qword ptr Caml_state(young_limit), -1
++        ret
++ENDM
++
+         PUBLIC  caml_c_call
+-        ALIGN   16
++        ALIGN   4
+ caml_c_call:
+-    ; Record lowest stack address and return address
+-        pop     r12
+-        mov     Caml_state(last_return_address), r12
+-        mov     Caml_state(bottom_of_stack), rsp
+-    ; Touch the stack to trigger a recoverable segfault
+-    ; if insufficient space remains
+-        sub     rsp, 01000h
+-        mov     [rsp], rax
+-        add     rsp, 01000h
++    ; Arguments:
++    ;  C arguments         : rcx, rdx, r8 and r9
++    ;  C function          : rax
++        SWITCH_OCAML_TO_C
+     ; Make the alloc ptr available to the C code
+         mov     Caml_state(young_ptr), r15
+     ; Call the function (address in rax)
+         call    rax
+-    ; Reload alloc ptr
++    ; Prepare for return to OCaml
+         mov     r15, Caml_state(young_ptr)
+-    ; Return to caller
+-        push    r12
+-        ret
++    ; Load OCaml stack and restore global variables
++        SWITCH_C_TO_OCAML
++    ; Return to OCaml caller
++        RET_FROM_C_CALL
++
++        PUBLIC  caml_c_call_stack_args
++        ALIGN 4
++caml_c_call_stack_args:
++    ; Arguments:
++    ;  C arguments         : rcx, rdx, r8 and r9
++    ;    C function          : rax
++    ;    C stack args        : begin=r13 end=r12
++    ; Switch from OCaml to C
++        SWITCH_OCAML_TO_C
++    ; we use rbx (otherwise unused) to enable backtraces
++        mov     rbx, rsp
++    ; Make the alloc ptr available to the C code
++        mov     Caml_state(young_ptr), r15
++    ; Copy arguments from OCaml to C stack
++        add     rsp, 32
++L105:
++        sub     r12, 8
++        cmp     r12,r13
++        jb      L210
++        push    qword ptr [r12]
++        jmp     L105
++L210:
++        sub     rsp, 32
++    ; Call the function (address in %rax)
++        call    rax
++    ; Pop arguments back off the stack
++        mov     rsp, Caml_state(c_stack)
++    ; Prepare for return to OCaml
++        mov     r15, Caml_state(young_ptr)
++    ; Load ocaml stack and restore global variables
++        SWITCH_C_TO_OCAML
++    ; Return to OCaml caller
++        RET_FROM_C_CALL
+ 
+ ; Start the OCaml program
+ 
+         PUBLIC  caml_start_program
+-        ALIGN   16
++        ALIGN   4
+ caml_start_program:
+     ; Save callee-save registers
+-        push    rbx
+-        push    rbp
+-        push    rsi
+-        push    rdi
+-        push    r12
+-        push    r13
+-        push    r14
+-        push    r15
+-        sub     rsp, 8+10*16       ; stack 16-aligned + 10 saved xmm regs
+-        movapd  OWORD PTR [rsp + 0*16], xmm6
+-        movapd  OWORD PTR [rsp + 1*16], xmm7
+-        movapd  OWORD PTR [rsp + 2*16], xmm8
+-        movapd  OWORD PTR [rsp + 3*16], xmm9
+-        movapd  OWORD PTR [rsp + 4*16], xmm10
+-        movapd  OWORD PTR [rsp + 5*16], xmm11
+-        movapd  OWORD PTR [rsp + 6*16], xmm12
+-        movapd  OWORD PTR [rsp + 7*16], xmm13
+-        movapd  OWORD PTR [rsp + 8*16], xmm14
+-        movapd  OWORD PTR [rsp + 9*16], xmm15
++        PUSH_CALLEE_SAVE_REGS
+     ; First argument (rcx) is Caml_state. Load it in r14
+         mov     r14, rcx
+     ; Initial entry point is caml_program
+         lea     r12, caml_program
+     ; Common code for caml_start_program and caml_callback*
+ L106:
+-    ; Build a callback link
+-        sub     rsp, 8  ; stack 16-aligned
+-        push    Caml_state(gc_regs)
+-        push    Caml_state(last_return_address)
+-        push    Caml_state(bottom_of_stack)
+-    ; Setup alloc ptr
++    ; Load young_ptr into %r15
+         mov     r15, Caml_state(young_ptr)
+-    ; Build an exception handler
+-        lea     r13, L108
+-        push    r13
+-        push    Caml_state(exception_pointer)
+-        mov     Caml_state(exception_pointer), rsp
+-    ; Call the OCaml code
++    ; Build struct c_stack_link on the C stack
++        sub     rsp, 56 ; sizeof struct c_stack_link
++        mov     qword ptr [rsp + 32], 0
++        mov     qword ptr [rsp + 40], 0
++        mov     r10, Caml_state(c_stack)
++        mov     qword ptr [rsp + 48], r10
++        mov     Caml_state(c_stack), rsp
++    ; Load the OCaml stack.
++        mov     r11, Caml_state(current_stack)
++        mov     r10, qword ptr [r11]
++    ; Store the stack pointer to allow DWARF unwind XXX
++        sub     r10, 16
++        mov     qword ptr [r10], rsp ; C_STACK_SP
++    ; Store the gc_regs for callbacks during a GC
++        mov     r11, Caml_state(gc_regs)
++        mov     qword ptr [r10 + 8], r11
++    ; Build a handler for exceptions raised in OCaml on the OCaml stack.
++        sub     r10, 16
++        lea     r11, L108
++        mov     qword ptr [r10 + 8], r11
++    ; link in the previous exn_handler so that copying stacks works
++        mov     r11, Caml_state(exn_handler)
++        mov     qword ptr [r10], r11
++        mov     Caml_state(exn_handler), r10
++    ; Switch stacks and call the OCaml code
++        mov     rsp, r10
+         call    r12
+ L107:
+     ; Pop the exception handler
+-        pop     Caml_state(exception_pointer)
+-        pop     r12    ; dummy register
++        mov     r11, qword ptr [rsp]
++        mov     Caml_state(exn_handler), r11
++        lea     r10, [rsp+16]
+ L109:
++    ; Restore GC regs
++        mov     r11, qword ptr [r10+8]
++        mov     Caml_state(gc_regs), r11
++        add     r10, 16
+     ; Update alloc ptr
+         mov     Caml_state(young_ptr), r15
+-    ; Pop the callback restoring, link the global variables
+-        pop     Caml_state(bottom_of_stack)
+-        pop     Caml_state(last_return_address)
+-        pop     Caml_state(gc_regs)
+-        add     rsp, 8
++    ; Return to C stack.
++        mov     r11, Caml_state(current_stack)
++        mov     qword ptr [r11], r10
++        mov     rsp, Caml_state(c_stack)
++    ; Pop the struct c_stack_link
++        mov     r10, qword ptr [rsp+48]
++        mov     Caml_state(c_stack), r10
++        add     rsp, 56
+     ; Restore callee-save registers.
+-        movapd  xmm6, OWORD PTR [rsp + 0*16]
+-        movapd  xmm7, OWORD PTR [rsp + 1*16]
+-        movapd  xmm8, OWORD PTR [rsp + 2*16]
+-        movapd  xmm9, OWORD PTR [rsp + 3*16]
+-        movapd  xmm10, OWORD PTR [rsp + 4*16]
+-        movapd  xmm11, OWORD PTR [rsp + 5*16]
+-        movapd  xmm12, OWORD PTR [rsp + 6*16]
+-        movapd  xmm13, OWORD PTR [rsp + 7*16]
+-        movapd  xmm14, OWORD PTR [rsp + 8*16]
+-        movapd  xmm15, OWORD PTR [rsp + 9*16]
+-        add     rsp, 8+10*16
+-        pop     r15
+-        pop     r14
+-        pop     r13
+-        pop     r12
+-        pop     rdi
+-        pop     rsi
+-        pop     rbp
+-        pop     rbx
++        POP_CALLEE_SAVE_REGS
+     ; Return to caller
+         ret
+ L108:
+     ; Exception handler
+     ; Mark the bucket as an exception result and return it
+         or      rax, 2
++        ; exn handler already popped here
++        mov     r10, rsp
+         jmp     L109
+ 
+ ; Raise an exception from OCaml
+ 
+         PUBLIC  caml_raise_exn
+-        ALIGN   16
++        ALIGN   4
+ caml_raise_exn:
+-        mov     r11, Caml_state(backtrace_active)
+-        test    r11, 1
++        test    qword ptr Caml_state(backtrace_active), 1
+         jne     L110
+-        mov     rsp, Caml_state(exception_pointer) ; Cut stack
+-    ; Recover previous exception handler
+-        pop     Caml_state(exception_pointer)
+-        ret                                        ; Branch to handler
++        RESTORE_EXN_HANDLER_OCAML
++        ret
+ L110:
+-        mov     r12, rax                           ; Save exception bucket
+-        mov     rcx, rax                           ; Arg 1: exception bucket
+-        mov     rdx, [rsp]                         ; Arg 2: PC of raise
+-        lea     r8, [rsp+8]                        ; Arg 3: SP of raise
+-        mov     r9, Caml_state(exception_pointer)  ; Arg 4: SP of handler
+-        sub     rsp, 32                            ; Reserve 32 bytes on stack
++        mov     qword ptr Caml_state(backtrace_pos), 0
++L117:
++        mov     r13, rsp             ; Save OCaml stack pointer
++        mov     r12, rax             ; Save exception bucket
++        mov     rsp, Caml_state(c_stack)
++        mov     rcx, rax             ; Arg 1: exception bucket
++        mov     rdx, qword ptr [r13] ; Arg 2: PC of raise
++        lea     r8, [r13+8]          ; Arg 3: SP of raise
++        mov     r9, Caml_state(exn_handler) ; Arg 4: SP of handler
+         call    caml_stash_backtrace
+-        mov     rax, r12                           ; Recover exception bucket
+-        mov     rsp, Caml_state(exception_pointer) ; Cut stack
+-    ; Recover previous exception handler
+-        pop     Caml_state(exception_pointer)
+-        ret                                        ; Branch to handler
++        mov     rax, r12             ; Recover exception bucket
++        RESTORE_EXN_HANDLER_OCAML
++        ret
++
++        PUBLIC  caml_reraise_exn
++        ALIGN   4
++caml_reraise_exn:
++        test     qword ptr Caml_state(backtrace_active), 1
++        jne     L117
++        RESTORE_EXN_HANDLER_OCAML
++        ret
+ 
+ ; Raise an exception from C
+ 
+         PUBLIC  caml_raise_exception
+-        ALIGN   16
++        ALIGN   4
+ caml_raise_exception:
+-        mov     r14, rcx                             ; First arg is Caml_state
+-        mov     r11, Caml_state(backtrace_active)
+-        test    r11, 1
+-        jne     L112
+-        mov     rax, rdx                             ; Second arg is exn bucket
+-        mov     rsp, Caml_state(exception_pointer)
+-    ; Recover previous exception handler
+-        pop     Caml_state(exception_pointer)
+-        mov     r15, Caml_state(young_ptr)           ; Reload alloc ptr
+-        ret
+-L112:
+-        mov     r12, rdx                             ; Save exception bucket
+-        mov     rcx, rdx                             ; Arg 1: exception bucket
+-        mov     rdx, Caml_state(last_return_address) ; Arg 2: PC of raise
+-        mov     r8, Caml_state(bottom_of_stack)      ; Arg 3: SP of raise
+-        mov     r9, Caml_state(exception_pointer)    ; Arg 4: SP of handler
+-        sub     rsp, 32                              ; Reserve 32 bytes on stack
+-        call    caml_stash_backtrace
+-        mov     rax, r12                             ; Recover exception bucket
+-        mov     rsp, Caml_state(exception_pointer)
+-    ; Recover previous exception handler
+-        pop     Caml_state(exception_pointer)
+-        mov     r15, Caml_state(young_ptr)           ; Reload alloc ptr
+-        ret
++        mov     r14, rcx                   ; First argument is Caml_state
++        mov     rax, rdx                   ; Second argument is exn bucket
++        mov     r15, Caml_state(young_ptr) ; Reload alloc ptr
++    ; Discard the C stack pointer and reset to OCaml stack
++        mov     r10, Caml_state(current_stack)
++        mov     rsp, qword ptr [r10]
++        jmp     caml_raise_exn
+ 
+ ; Callback from C to OCaml
+ 
+         PUBLIC  caml_callback_asm
+-        ALIGN   16
++        ALIGN   4
+ caml_callback_asm:
+-    ; Save callee-save registers
+-        push    rbx
+-        push    rbp
+-        push    rsi
+-        push    rdi
+-        push    r12
+-        push    r13
+-        push    r14
+-        push    r15
+-        sub     rsp, 8+10*16       ; stack 16-aligned + 10 saved xmm regs
+-        movapd  OWORD PTR [rsp + 0*16], xmm6
+-        movapd  OWORD PTR [rsp + 1*16], xmm7
+-        movapd  OWORD PTR [rsp + 2*16], xmm8
+-        movapd  OWORD PTR [rsp + 3*16], xmm9
+-        movapd  OWORD PTR [rsp + 4*16], xmm10
+-        movapd  OWORD PTR [rsp + 5*16], xmm11
+-        movapd  OWORD PTR [rsp + 6*16], xmm12
+-        movapd  OWORD PTR [rsp + 7*16], xmm13
+-        movapd  OWORD PTR [rsp + 8*16], xmm14
+-        movapd  OWORD PTR [rsp + 9*16], xmm15
++        PUSH_CALLEE_SAVE_REGS
+     ; Initial loading of arguments
+         mov     r14, rcx      ; Caml_state
+         mov     rbx, rdx      ; closure
+-        mov     rax, [r8]     ; argument
+-        mov     r12, [rbx]    ; code pointer
++        mov     rax, qword ptr [r8]     ; argument
++        mov     r12, qword ptr [rbx]    ; code pointer
++        mov     rdi, 0 ; XXX dummy?
++        mov     rsi, 0 ; XXX dummy?
+         jmp     L106
+ 
+         PUBLIC  caml_callback2_asm
+-        ALIGN   16
++        ALIGN   4
+ caml_callback2_asm:
+-    ; Save callee-save registers
+-        push    rbx
+-        push    rbp
+-        push    rsi
+-        push    rdi
+-        push    r12
+-        push    r13
+-        push    r14
+-        push    r15
+-        sub     rsp, 8+10*16       ; stack 16-aligned + 10 saved xmm regs
+-        movapd  OWORD PTR [rsp + 0*16], xmm6
+-        movapd  OWORD PTR [rsp + 1*16], xmm7
+-        movapd  OWORD PTR [rsp + 2*16], xmm8
+-        movapd  OWORD PTR [rsp + 3*16], xmm9
+-        movapd  OWORD PTR [rsp + 4*16], xmm10
+-        movapd  OWORD PTR [rsp + 5*16], xmm11
+-        movapd  OWORD PTR [rsp + 6*16], xmm12
+-        movapd  OWORD PTR [rsp + 7*16], xmm13
+-        movapd  OWORD PTR [rsp + 8*16], xmm14
+-        movapd  OWORD PTR [rsp + 9*16], xmm15
++        PUSH_CALLEE_SAVE_REGS
+     ; Initial loading of arguments
+         mov     r14, rcx        ; Caml_state
+         mov     rdi, rdx        ; closure
+-        mov     rax, [r8]       ; first argument
+-        mov     rbx, [r8 + 8]   ; second argument
++        mov     rax, qword ptr [r8]       ; first argument
++        mov     rbx, qword ptr [r8 + 8]   ; second argument
+         lea     r12, caml_apply2  ; code pointer
++        mov     rsi, 0            ; XXX dummy?
+         jmp     L106
+ 
+         PUBLIC  caml_callback3_asm
+-        ALIGN   16
++        ALIGN   4
+ caml_callback3_asm:
+-    ; Save callee-save registers
+-        push    rbx
+-        push    rbp
+-        push    rsi
+-        push    rdi
+-        push    r12
+-        push    r13
+-        push    r14
+-        push    r15
+-        sub     rsp, 8+10*16       ; stack 16-aligned + 10 saved xmm regs
+-        movapd  OWORD PTR [rsp + 0*16], xmm6
+-        movapd  OWORD PTR [rsp + 1*16], xmm7
+-        movapd  OWORD PTR [rsp + 2*16], xmm8
+-        movapd  OWORD PTR [rsp + 3*16], xmm9
+-        movapd  OWORD PTR [rsp + 4*16], xmm10
+-        movapd  OWORD PTR [rsp + 5*16], xmm11
+-        movapd  OWORD PTR [rsp + 6*16], xmm12
+-        movapd  OWORD PTR [rsp + 7*16], xmm13
+-        movapd  OWORD PTR [rsp + 8*16], xmm14
+-        movapd  OWORD PTR [rsp + 9*16], xmm15
++        PUSH_CALLEE_SAVE_REGS
+     ; Initial loading of arguments
+         mov     r14, rcx        ; Caml_state
++        mov     rax, qword ptr [r8]       ; first argument
++        mov     rbx, qword ptr [r8 + 8]   ; second argument
+         mov     rsi, rdx        ; closure
+-        mov     rax, [r8]       ; first argument
+-        mov     rbx, [r8 + 8]   ; second argument
+-        mov     rdi, [r8 + 16]  ; third argument
++        mov     rdi, qword ptr [r8 + 16]  ; third argument
+         lea     r12, caml_apply3      ; code pointer
+         jmp     L106
+ 
++; Fibers
++
++        PUBLIC  caml_perform
++        ALIGN   4
++caml_perform:
++    ;  %rax: effect to perform
++    ;  %rbx: freshly allocated continuation
++        mov     rsi, Caml_state(current_stack) ; %rsi := old stack
++        lea     rdi, [rsi + 1] ; %rdi (last_fiber) := Val_ptr(old stack)
++        mov     qword ptr [rbx], rdi ; Initialise continuation
++do_perform:
++    ;  %rsi: old stack *;
++        mov     r11, qword ptr [rsi+16]  ; %r11 := old stack -> handler
++        mov     r10, qword ptr [r11+24] ; %r10 := parent stack
++        cmp     r10, 0                   ; parent is NULL?
++        je      L112
++        SWITCH_OCAML_STACKS ; preserves r11 and rsi
++     ; We have to null the Handler_parent after the switch because the
++     ; Handler_parent is needed to unwind the stack for backtraces
++        mov     qword ptr [r11+24], 0 ; Set parent of performer to NULL
++        mov     rsi, qword ptr [r11+16]  ; %rsi := effect handler
++        jmp     caml_apply3
++L112:
++    ; Switch back to original performer before raising Effect.Unhandled
++    ; (no-op unless this is a reperform)
++        mov     r10, qword ptr [rbx]  ; load performer stack from continuation
++        sub     r10, 1       ; r10 := Ptr_val(r10)
++        mov     rsi, Caml_state(current_stack)
++        SWITCH_OCAML_STACKS
++    ; No parent stack. Raise Effect.Unhandled.
++        mov     rcx, rax
++        lea     rax, caml_raise_unhandled_effect
++        jmp     caml_c_call
++
++        PUBLIC  caml_reperform
++        ALIGN   4
++caml_reperform:
++    ;  %rax: effect to reperform
++    ;  %rbx: continuation
++    ;  %rdi: last_fiber
++        mov     rsi, Caml_state(current_stack)    ; %rsi := old stack
++        mov     r10, qword ptr [rdi+15]
++        mov     qword ptr [r10+24], rsi       ; Append to last_fiber
++        lea     rdi, [rsi + 1]  ; %rdi (last_fiber) := Val_ptr(old stack)
++        jmp     do_perform
++
++        PUBLIC  caml_resume
++        ALIGN   4
++caml_resume:
++    ; %rax -> fiber, %rbx -> fun, %rdi -> arg, %rsi -> last_fiber
++        lea     r10, [rax-1]  ; %r10 (new stack) = Ptr_val(%rax)
++        mov     rax, rdi      ; %rax := argument to the function in %rbx
++    ;  check if stack null, then already used
++        test    r10, r10
++        jz      L502
++    ; Add current stack to the last fiber
++        mov     rdi, qword ptr [rsi+15]
++        mov     rsi, Caml_state(current_stack)
++        mov     qword ptr [rdi+24], rsi
++        SWITCH_OCAML_STACKS
++        jmp     qword ptr [rbx]
++L502:
++        lea     rax, caml_raise_continuation_already_resumed
++        jmp     caml_c_call
++
++        PUBLIC  caml_runstack
++        ALIGN   4
++caml_runstack:
++    ; %rax -> fiber, %rbx -> fun, %rdi -> arg
++        and     rax, -2       ; %rax = Ptr_val(%rax)
++    ; save old stack pointer and exception handler
++        mov     rcx, Caml_state(current_stack)
++        mov     r10, Caml_state(exn_handler)
++        mov     qword ptr [rcx], rsp
++        mov     qword ptr [rcx+8], r10
++    ; Load new stack pointer and set parent
++        mov     r11, qword ptr [rax+16]
++        mov     qword ptr [r11+24], rcx
++        mov     Caml_state(current_stack), rax
++        mov     r11, qword ptr [rax]
++    ; Create an exception handler on the target stack
++    ;  after 16byte DWARF & gc_regs block (which is unused here)
++        sub     r11, 32
++        lea     r10, fiber_exn_handler
++        mov     qword ptr [r11+8], r10
++    ; link the previous exn_handler so that copying stacks works
++        mov     r10, qword ptr [rax+8]
++        mov     qword ptr [r11], r10
++        mov     Caml_state(exn_handler), r11
++    ; Switch to the new stack
++        mov     rsp, r11
++        mov     rax, rdi ; first argument
++        call    qword ptr [rbx] ; closure in %rbx (second argument)
++frame_runstack:
++        lea     r11, [rsp+32] ; SP with exn handler popped
++        mov     rbx, qword ptr [r11]
++L610:
++        mov     rcx, Caml_state(current_stack) ; arg to caml_free_stack
++    ; restore parent stack and exn_handler into Caml_state
++        mov     r10, qword ptr [r11+24]
++        mov     r11, qword ptr [r10+8]
++        mov     Caml_state(current_stack), r10
++        mov     Caml_state(exn_handler), r11
++    ; free old stack by switching directly to c_stack; is a no-alloc call
++        mov     r13, qword ptr [r10]    ; saved across C call
++        mov     r12, rax ; save %rax across C call
++        mov     rsp, Caml_state(c_stack)
++        call  caml_free_stack
++    ; switch directly to parent stack with correct return
++        mov     rsp, r13
++        mov     rax, r12
++    ; Invoke handle_value (or handle_exn)
++        jmp     qword ptr [rbx]
++fiber_exn_handler:
++        lea     r11, [rsp+16]
++        mov     rbx, qword ptr [r11+8]
++        jmp     L610
++
+         PUBLIC  caml_ml_array_bound_error
+-        ALIGN   16
++        ALIGN   4
+ caml_ml_array_bound_error:
+         lea     rax, caml_array_bound_error_asm
+         jmp     caml_c_call
+ 
++        PUBLIC  caml_assert_stack_invariants
++        ALIGN   4
++caml_assert_stack_invariants:
++        mov     r11, Caml_state(current_stack)
++        mov     r10, rsp
++        sub     r10, r11
++        cmp     r10, 296
++        jge     L310
++        int     3
++L310:
++        ret
++
+         PUBLIC caml_system__code_end
+ caml_system__code_end:
+ 
+         .DATA
+-        PUBLIC  caml_system__frametable
+-caml_system__frametable LABEL QWORD
+-        QWORD   1           ; one descriptor
++        PUBLIC  caml_system$frametable
++caml_system$frametable LABEL QWORD
++        QWORD   2           ; two descriptors
+         QWORD   L107        ; return address into callback
+         WORD    -1          ; negative frame size => use callback link
+         WORD    0           ; no roots here
+         ALIGN   8
++        QWORD   frame_runstack
++        WORD    -1
++        WORD    0
+ 
+         PUBLIC  caml_negf_mask
+         ALIGN   16
+diff --git a/runtime/caml/io.h b/runtime/caml/io.h
+index 8a9e592da292..4ff505d024e3 100644
+--- a/runtime/caml/io.h
++++ b/runtime/caml/io.h
+@@ -23,7 +23,18 @@
+ #include "camlatomic.h"
+ #include "misc.h"
+ #include "mlvalues.h"
++
++#ifndef _MSC_VER
+ #include "platform.h"
++#else
++/* We avoid including platform.h (which is really only necessary here to declare
++   caml_plat_mutex) because that would end up pulling in pthread.h but we want
++   to hide it on the MSVC port as it is not the native way to handle threads.
++   So we inline here just the implementation of caml_plat_mutex on that port,
++   this should be kept in sync */
++#include <stdint.h>
++typedef intptr_t caml_plat_mutex;
++#endif
+ 
+ #ifndef IO_BUFFER_SIZE
+ #define IO_BUFFER_SIZE 65536
+diff --git a/runtime/caml/platform.h b/runtime/caml/platform.h
+index 96cc58d12b9b..7b68a9f0a480 100644
+--- a/runtime/caml/platform.h
++++ b/runtime/caml/platform.h
+@@ -26,6 +26,9 @@
+ #include "config.h"
+ #include "mlvalues.h"
+ #include "sys.h"
++#ifdef _MSC_VER
++#include <intrin.h>
++#endif
+ 
+ #if defined(MAP_ANON) && !defined(MAP_ANONYMOUS)
+ #define MAP_ANONYMOUS MAP_ANON
+@@ -50,6 +53,14 @@ Caml_inline void cpu_relax(void) {
+   /* Just a compiler barrier */
+   __asm__ volatile ("" ::: "memory");
+ #endif
++#elif defined(_MSC_VER)
++/* It would be better to use YieldProcessor to have a portable implementation
++   but this would require windows.h which we can't include here (it would
++   conflict with caml/instruct.h on ATOM, for instance)
++*/
++#if defined(_M_IX86) || defined(_M_X64)
++  _mm_pause();
++#endif
+ #endif
+ }
+ 
+diff --git a/testsuite/tests/c-api/external.ml b/testsuite/tests/c-api/external.ml
+index 5d3c96251751..7770c7f098d1 100644
+--- a/testsuite/tests/c-api/external.ml
++++ b/testsuite/tests/c-api/external.ml
+@@ -9,15 +9,15 @@ type data = A | B | C | D | E | F
+ 
+ external test_int : (int [@untagged])
+                     -> (char [@untagged]) -> (data [@untagged])
+-                    -> (int [@untagged]) = "unavailable" "test" [@@noalloc]
++                    -> (int [@untagged]) = "unavailable" "test_" [@@noalloc]
+ 
+ external test_char : (int [@untagged])
+                     -> (char [@untagged]) -> (data [@untagged])
+-                    -> (char [@untagged]) = "unavailable" "test" [@@noalloc]
++                    -> (char [@untagged]) = "unavailable" "test_" [@@noalloc]
+ 
+ external test_data : (int [@untagged])
+                     -> (char [@untagged]) -> (data [@untagged])
+-                    -> (data [@untagged]) = "unavailable" "test" [@@noalloc]
++                    -> (data [@untagged]) = "unavailable" "test_" [@@noalloc]
+ 
+ let _ = assert(test_int 1 '\001' B = 3)
+ let _ = assert(test_char 1 '\001' B = '\003')
+diff --git a/testsuite/tests/c-api/external_stubs.c b/testsuite/tests/c-api/external_stubs.c
+index 8d89952883ec..50556f3eb3c2 100644
+--- a/testsuite/tests/c-api/external_stubs.c
++++ b/testsuite/tests/c-api/external_stubs.c
+@@ -2,6 +2,6 @@
+ #include <stdlib.h>
+ #include <caml/mlvalues.h>
+ 
+-intnat test(intnat b,intnat c,intnat d) {
++intnat test_(intnat b,intnat c,intnat d) {
+   return(b+c+d);
+ }
+diff --git a/tools/ci/actions/canonicalize-dumpbin.awk b/tools/ci/actions/canonicalize-dumpbin.awk
+new file mode 100644
+index 000000000000..67f11aa68fa9
+--- /dev/null
++++ b/tools/ci/actions/canonicalize-dumpbin.awk
+@@ -0,0 +1,87 @@
++#**************************************************************************
++#*                                                                        *
++#*                                 OCaml                                  *
++#*                                                                        *
++#*                          Samuel Hym, Tarides                           *
++#*                                                                        *
++#*   Copyright 2023 Tarides                                               *
++#*                                                                        *
++#*   All rights reserved.  This file is distributed under the terms of    *
++#*   the GNU Lesser General Public License version 2.1, with the          *
++#*   special exception on linking described in the file LICENSE.          *
++#*                                                                        *
++#**************************************************************************
++
++# Awk script to remove the differences between the disassembly of amd64.o as
++# assembled by MinGW GCC and amd64nt.obj as assembled by MASM
++#
++# The main differences are:
++# - the encoding of some instructions is not the same even when they have the
++#   same mnemonic, so we process the result of `dumpbin /disasm:nobytes`
++# - some internal labels are exposed as such on one output, not on the other: so
++#   we process the file twice, the first pass to record the position of all
++#   internal labels (labels that don't start with `caml`), the second to replace
++#   them by their offset in `lea` instructions
++# - the final padding is different, with some `nop`s at the
++#   `caml_system__code_end` label in one output, not the other, so we drop
++#   everything after that label
++#
++# This script expects the input to be given twice:
++#   awk -f me input.dump input.dump
++# where the first input.dump is used for the first pass (recording label
++# positions) and printing nothing, the second input.dump is for the second pass
++# that actually prints the canonicalized assembly, with only the exported labels
++
++BEGIN {
++  # first pass (or second pass)
++  first=1
++  # to skip the final padding
++  skip=0
++  # the label that appeared on the previous line when we want to record it
++  label=""
++}
++ENDFILE {
++  # start the second pass
++  first=0
++}
++
++# On label lines
++/^[a-zA-Z0-9_]*:\s*$/ {
++  # In that an internal label?
++  if ($0 !~ /^caml/) {
++    if (first) {
++      sub(/:.*$/, "")
++      label=$0
++    }
++  } else {
++    if (!first) {
++      if($0 ~ /^caml_system__code_end/) {
++        # Drop everything after caml_system__code_end
++        skip=1
++      } else
++        print
++    }
++  }
++}
++
++# On mnemonic lines
++/^  [0-9A-F]*:/ {
++  # if we are on the first instruction after an internal label, we associate the
++  # label to the current position
++  if (label != "") {
++    sub(/^0*/,"",$1)
++    sub(/:$/,"",$1)
++    labels[label] = $1
++    label=""
++  } else {
++    if(!first) {
++      if ($2 == "lea") {
++        for(g in labels) {
++          sub(g,labels[g] "h")
++        }
++      }
++      if(!skip)
++        print
++    }
++  }
++}
+diff --git a/tools/ci/inria/main b/tools/ci/inria/main
+index 67d27aac53a4..5ece025cb4fc 100755
+--- a/tools/ci/inria/main
++++ b/tools/ci/inria/main
+@@ -161,7 +161,8 @@ cleanup=false
+ check_make_alldepend=false
+ jobs=''
+ bootstrap=false
+-init_submodule=false
++init_submodule_flexdll=false
++init_submodule_winpthreads=false
+ 
+ memory_model_tests="tests/memory-model/forbidden.ml \
+ tests/memory-model/publish.ml"
+@@ -192,7 +193,7 @@ case "${OCAML_ARCH}" in
+     instdir='C:/ocamlmgw'
+     cleanup=true
+     check_make_alldepend=true
+-    init_submodule=true
++    init_submodule_flexdll=true
+   ;;
+   mingw64)
+     build='--build=x86_64-pc-cygwin'
+@@ -200,21 +201,23 @@ case "${OCAML_ARCH}" in
+     instdir='C:/ocamlmgw64'
+     cleanup=true
+     check_make_alldepend=true
+-    init_submodule=true
++    init_submodule_flexdll=true
+   ;;
+   msvc)
+     build='--build=i686-pc-cygwin'
+     host='--host=i686-pc-windows'
+     instdir='C:/ocamlms'
+     cleanup=true
+-    init_submodule=true
++    init_submodule_flexdll=true
++    init_submodule_winpthreads=true
+   ;;
+   msvc64)
+     build='--build=x86_64-pc-cygwin'
+     host='--host=x86_64-pc-windows'
+     instdir='C:/ocamlms64'
+     cleanup=true
+-    init_submodule=true
++    init_submodule_flexdll=true
++    init_submodule_winpthreads=true
+   ;;
+   *) arch_error;;
+ esac
+@@ -240,10 +243,20 @@ fi
+ pwd
+ cd "$jenkinsdir"
+ 
+-if $init_submodule; then
++if $init_submodule_flexdll; then
+   git submodule update --init flexdll
+ elif [ -f flexdll/Makefile ]; then
+-  git submodule deinit --force flexdll
++  if grep -Fq flexdll .gitmodules; then
++    git submodule deinit --force flexdll
++  fi
++fi
++
++if $init_submodule_winpthreads; then
++  git submodule update --init winpthreads
++elif [ -f winpthreads/Makefile.in ]; then
++  if grep -Fq winpthreads .gitmodules; then
++    git submodule deinit --force winpthreads
++  fi
+ fi
+ 
+ #########################################################################
+diff --git a/winpthreads b/winpthreads
+new file mode 160000
+index 000000000000..d635af4d9bcc
+--- /dev/null
++++ b/winpthreads
+@@ -0,0 +1 @@
++Subproject commit d635af4d9bcce7f268b3e3c44f414611bbc66381

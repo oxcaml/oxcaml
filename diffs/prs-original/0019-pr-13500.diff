@@ -1,0 +1,498 @@
+diff --git a/Changes b/Changes
+index e68fddebce0b..6c9c95b2119c 100644
+--- a/Changes
++++ b/Changes
+@@ -30,6 +30,10 @@ Working version
+   entries found in ld.conf.
+   (David Allsopp, review by Stephen Dolan)
+ 
++- #13500: Add frame pointers support for ARM64 on Linux and macOS.
++  (Tim McGilchrist, review by KC Sivaramakrishnan, Fabrice Buoro
++   and Miod Vallat)
++
+ ### Code generation and optimizations:
+ 
+ ### Standard library:
+diff --git a/asmcomp/arm64/emit.mlp b/asmcomp/arm64/emit.mlp
+index f59a5aed7897..db259e68b447 100644
+--- a/asmcomp/arm64/emit.mlp
++++ b/asmcomp/arm64/emit.mlp
+@@ -82,10 +82,14 @@ let emit_wreg = function
+     {loc = Reg r} -> emit_string int_reg_name_w.(r)
+   | _ -> fatal_error "Emit.emit_wreg"
+ 
++let fp = Config.with_frame_pointers
++
+ let initial_stack_offset f =
+-  8 * f.fun_num_stack_slots.(0) +
+-  8 * f.fun_num_stack_slots.(1) +
+-  (if f.fun_frame_required then 8 else 0)
++  8 * f.fun_num_stack_slots.(0) + (* Local int variables *)
++  8 * f.fun_num_stack_slots.(1) + (* Local float variables *)
++    (if f.fun_frame_required then
++       8 + (if fp then 8 else 0) (* Return address plus optional Frame Pointer *)
++     else 0)
+ 
+ let frame_size env =
+   let sz =
+@@ -98,10 +102,9 @@ let slot_offset env loc cl =
+       assert (n >= 0);
+       frame_size env + n
+   | Local n ->
+-      env.stack_offset +
+-      (if cl = 0
+-       then n * 8
+-       else env.f.fun_num_stack_slots.(0) * 8 + n * 8)
++      if cl = 0
++      then env.stack_offset + n * 8
++      else env.stack_offset + (env.f.fun_num_stack_slots.(0) + n) * 8
+   | Outgoing n ->
+       assert (n >= 0);
+       n
+@@ -271,13 +274,16 @@ let emit_stack_adjustment n =
+ 
+ (* Deallocate the stack frame and reload the return address
+    before a return or tail call *)
+-
+ let output_epilogue env f =
+   let n = frame_size env in
+-  if env.f.fun_frame_required then
+-    `	ldr	x30, [sp, #{emit_int (n-8)}]\n`;
+   if n > 0 then
+     emit_stack_adjustment n;
++  if env.f.fun_frame_required then
++    if fp then (
++      `	ldp	x29, x30, [sp, #-16]\n`;
++    ) else (
++      `	ldr	x30, [sp, #-8]\n`;
++    );
+   f();
+   (* reset CFA back because function body may continue *)
+   if n > 0 then cfi_adjust_cfa_offset n
+@@ -293,7 +299,7 @@ let rec emit_addimm rd rs n =
+     let nl = n land 0xFFF and nh = n land 0xFFF_000 in
+     `	add	{emit_reg rd}, {emit_reg rs}, #{emit_int nh}\n`;
+     if nl <> 0 then
+-      `	add	{emit_reg rd}, {emit_reg rd}, #{emit_int nl}\n`
++    `	add	{emit_reg rd}, {emit_reg rd}, #{emit_int nl}\n`
+   end
+ 
+ and emit_subimm rd rs n =
+@@ -445,7 +451,7 @@ module BR = Branch_relaxation.Make (struct
+ 
+   let prologue_size f =
+     (if initial_stack_offset f > 0 then 2 else 0)
+-      + (if f.fun_frame_required then 1 else 0)
++      + (if f.fun_frame_required then (if fp then 2 else 1) else 0)
+ 
+   let epilogue_size f =
+     if f.fun_frame_required then 3 else 2
+@@ -535,7 +541,7 @@ module BR = Branch_relaxation.Make (struct
+         + begin match lbl1 with None -> 0 | Some _ -> 1 end
+         + begin match lbl2 with None -> 0 | Some _ -> 1 end
+     | Lswitch jumptbl -> 3 + Array.length jumptbl
+-    | Lentertrap -> 0
++    | Lentertrap -> if fp then 1 else 0
+     | Ladjust_trap_depth _ -> 0
+     | Lpushtrap _ -> 3
+     | Lpoptrap -> 1
+@@ -675,11 +681,20 @@ let emit_instr env i =
+     | Lend -> ()
+     | Lprologue ->
+       let n = frame_size env in
+-      if n > 0 then
+-        emit_stack_adjustment (-n);
+       if env.f.fun_frame_required then begin
+-        cfi_offset ~reg:30 (* return address *) ~offset:(-8);
+-        `	str	x30, [sp, #{emit_int (n-8)}]\n`
++          if fp then (
++            `	stp	x29, x30, [sp, #-16]\n`;
++            cfi_offset ~reg:29 (* frame pointer *) ~offset:(-16);
++            cfi_offset ~reg:30 (* return address *) ~offset:(-8)
++          ) else (
++            `	str	x30, [sp, #-8]\n`;
++            cfi_offset ~reg:30 (* return address *) ~offset:(-8)
++          );
++      end;
++      if n > 0 then begin
++          emit_stack_adjustment (-n);
++          if env.f.fun_frame_required && fp then
++            `	add	x29,  sp, #{emit_int (n-16)}\n`;
+       end
+     | Lop(Imove | Ispill | Ireload) ->
+         let src = i.arg.(0) and dst = i.res.(0) in
+@@ -747,18 +762,15 @@ let emit_instr env i =
+           `	bl	{emit_symbol "caml_c_call"}\n`;
+           `{record_frame env i.live (Dbg_other i.dbg)}\n`
+         end else begin
+-          (* Push frame pointer (x29) onto stack and restore later. *)
+-          `	str	x29, [sp, -16]!\n`;
+-          (* Store OCaml stack in the frame pointer register. *)
+-          `	mov	x29, sp\n`;
++          (* Store OCaml stack in x19 register and restore later. *)
++          `	mov	x19, sp\n`;
+           cfi_remember_state ();
+           cfi_def_cfa_register ~reg:29;
+           let offset = Domainstate.(idx_of_field Domain_c_stack) * 8 in
+           `	ldr	{emit_reg reg_tmp1}, [{emit_reg reg_domain_state_ptr}, {emit_int offset}]\n`;
+           `	mov	sp, {emit_reg reg_tmp1}\n`;
+           `	bl	{emit_symbol func}\n`;
+-          `	mov	sp, x29\n`;
+-          `	ldr	x29, [sp], 16\n`;
++          `	mov	sp, x19\n`;
+           cfi_restore_state ()
+         end
+     | Lop(Istackoffset n) ->
+@@ -1026,7 +1038,10 @@ let emit_instr env i =
+         done
+ *)
+     | Lentertrap ->
+-        ()
++       if fp then begin
++         let delta = (frame_size env) - 16 (* return address + frame pointer *) in
++         `	add	x29, sp, #{emit_int delta}\n`
++       end
+     | Ladjust_trap_depth { delta_traps } ->
+         (* each trap occupies 16 bytes on the stack *)
+         let delta = 16 * delta_traps in
+diff --git a/asmcomp/arm64/proc.ml b/asmcomp/arm64/proc.ml
+index 78845f33857c..1f6a87974655 100644
+--- a/asmcomp/arm64/proc.ml
++++ b/asmcomp/arm64/proc.ml
+@@ -248,9 +248,9 @@ let stack_ptr_dwarf_register_number = 31
+ (* Registers destroyed by operations *)
+ 
+ let destroyed_at_c_noalloc_call =
+-  (* x19-x28, d8-d15 preserved *)
++  (* x20-x28, d8-d15 preserved *)
+   Array.of_list (List.map phys_reg
+-    [0;1;2;3;4;5;6;7;8;9;10;11;12;13;14;15;
++    [0;1;2;3;4;5;6;7;8;9;10;11;12;13;14;15;16;
+      100;101;102;103;104;105;106;107;
+      116;117;118;119;120;121;122;123;
+      124;125;126;127;128;129;130;131])
+diff --git a/configure b/configure
+index 1972d6c200fb..c98e1f01784a 100755
+--- a/configure
++++ b/configure
+@@ -20452,7 +20452,7 @@ fi
+ if test x"$enable_frame_pointers" = "xyes"
+ then :
+   case $host in #(
+-  x86_64-*-linux*|x86_64-*-darwin*) :
++  x86_64-*-linux*|x86_64-*-darwin*|aarch64-*-linux*|aarch64-*-darwin*) :
+     case $ocaml_cc_vendor in #(
+   clang-*|gcc-*) :
+     common_cflags="$common_cflags -g  -fno-omit-frame-pointer"
+diff --git a/configure.ac b/configure.ac
+index abab7c6f1b34..f180632cc85a 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -2448,7 +2448,7 @@ AS_IF([$native_compiler],
+ 
+ AS_IF([test x"$enable_frame_pointers" = "xyes"],
+   [AS_CASE([$host],
+-    [x86_64-*-linux*|x86_64-*-darwin*],
++    [x86_64-*-linux*|x86_64-*-darwin*|aarch64-*-linux*|aarch64-*-darwin*],
+      [AS_CASE([$ocaml_cc_vendor],
+         [clang-*|gcc-*],
+          [common_cflags="$common_cflags -g  -fno-omit-frame-pointer"
+diff --git a/runtime/arm64.S b/runtime/arm64.S
+index b3a475454d64..fbb3cb5fc0d8 100644
+--- a/runtime/arm64.S
++++ b/runtime/arm64.S
+@@ -303,6 +303,32 @@ G(name):
+         ldr     TRAP_PTR, Caml_state(exn_handler)
+ .endm
+ 
++/* Updates the oldest saved frame pointer in the target fiber.
++
++   A fiber stack may need to grow, causing the reallocation of the entire fiber,
++   including stack_info and stack_handler structures.
++   caml_try_realloc_stack will not be able to update the linked list of
++   frame-pointers if it has been split (i.e., in a continuation).
++   caml_resume and caml_reperform use this macro to update the oldest saved x29
++   (highest one in the stack) in case the fiber was reallocated to reattach the
++   frame-pointer linked list.
++
++   REG: Stack_handler(target_fiber)
++
++   The frame pointer will be pushed into the stack immediately after these
++   instructions. The offset of the oldest saved x29 in a fiber from the stack
++   handler is 48 = 4 words (caml_runstack) + 2 words (x30 and x29).
++   */
++#ifdef WITH_FRAME_POINTERS
++.macro UPDATE_BASE_POINTER reg
++        sub     TMP2, sp, 16
++        str     TMP2, [\reg, -48]
++.endm
++#else
++.macro UPDATE_BASE_POINTER reg
++.endm
++#endif
++
+ #if defined(WITH_THREAD_SANITIZER) /* { */
+ 
+ /* Push the current value of the link register to the stack. */
+@@ -643,7 +669,7 @@ L(jump_to_caml):
+         CFI_OFFSET(30, -152)
+         stp     x29, x30, [sp, -160]!
+         CFI_ADJUST(160)
+-        add     x29, sp, #0
++        mov     x29, sp
+         stp     x19, x20, [sp, 16]
+         stp     x21, x22, [sp, 32]
+         stp     x23, x24, [sp, 48]
+@@ -962,7 +988,6 @@ END_FUNCTION(caml_callback3_asm)
+         LEAVE_FUNCTION
+ .endm
+ 
+-
+ /*
+  * A continuation is a one word object that points to a fiber. A fiber [f] will
+  * point to its parent at Handler_parent(Stack_handler(f)). In the following,
+@@ -1048,13 +1073,16 @@ END_FUNCTION(caml_perform)
+ 
+ FUNCTION(caml_reperform)
+         CFI_STARTPROC
+-    /*  x0: effect to perform
++    /*  x0: effect to reperform
+         x1: continuation
+         x2: last_fiber */
+         ldr     TMP, Stack_handler_from_cont(x2)
+         ldr     x2, Caml_state(current_stack) /* x2 := old stack */
+         str     x2, Handler_parent(TMP) /* Append to last_fiber */
+         add     x3, x2, 1 /* x3 (last_fiber) := Val_ptr(old stack) */
++    /* Need to update the oldest saved frame pointer here as the execution of
++       the handler may have caused the current fiber stack to reallocate. */
++        UPDATE_BASE_POINTER TMP
+         b       L(do_perform)
+         CFI_ENDPROC
+ END_FUNCTION(caml_reperform)
+@@ -1102,6 +1130,10 @@ FUNCTION(caml_resume)
+         ldr     x8, Stack_handler(x3)
+         ldr     x9, Caml_state(current_stack)
+         str     x9, Handler_parent(x8)
++    /* Need to update the oldest saved frame pointer here as the current fiber
++       stack may have been reallocated or we may be resuming a computation
++       that was not originally run here. */
++        UPDATE_BASE_POINTER x8
+         SWITCH_OCAML_STACKS x9, x0
+         mov     x0, x2
+         br      x4
+diff --git a/testsuite/tests/frame-pointers/exception_handler.ml b/testsuite/tests/frame-pointers/exception_handler.ml
+index 19773f78de8c..4bb5ddc9b1b3 100644
+--- a/testsuite/tests/frame-pointers/exception_handler.ml
++++ b/testsuite/tests/frame-pointers/exception_handler.ml
+@@ -11,8 +11,8 @@ external fp_backtrace : string -> unit = "fp_backtrace" [@@noalloc]
+ exception Exn1
+ exception Exn2
+ 
+-(* We want to be sure to use some stack space so that rbp is shifted,
+-* preventing inlining seems enough *)
++(* We want to be sure to use some stack space so that frame pointer is shifted,
++ * preventing inlining seems enough *)
+ let[@inline never] raiser i =
+   match i with
+   | 1 -> raise Exn1
+@@ -21,10 +21,10 @@ let[@inline never] raiser i =
+ 
+ let[@inline never][@local never] f x = x
+ 
+-(* This give us a chance to overwrite the memory address pointed by rbp if it
+-* is still within 'raiser' stack frame.
+-* Technically we don't need to overwrite it but by doing so we avoid some
+-* infinite loop while walking the stack. *)
++(* This give us a chance to overwrite the memory address pointed by frame
++ * pointer if it is still within 'raiser' stack frame.
++ * Technically we don't need to overwrite it but by doing so we avoid some
++ * infinite loop while walking the stack. *)
+ let[@inline never] handler () =
+   (* Force spilling of x0, x1, x2 *)
+   let x0 = Sys.opaque_identity 0x6f56df77 (* 0xdeadbeef *) in
+@@ -48,7 +48,7 @@ let[@inline never] nested i =
+   i
+ 
+ (* Check that we haven't broken anything by raising directly from this
+-* function, it doesn't require rbp to be adjusted *)
++ * function, it doesn't require the frame pointer to be adjusted. *)
+ let[@inline never] bare i =
+   begin
+     try
+diff --git a/testsuite/tests/frame-pointers/exceptions.ml b/testsuite/tests/frame-pointers/exceptions.ml
+new file mode 100644
+index 000000000000..cd931145b8c5
+--- /dev/null
++++ b/testsuite/tests/frame-pointers/exceptions.ml
+@@ -0,0 +1,34 @@
++(* TEST
++   frame_pointers;
++   readonly_files = "fp_backtrace.c";
++   all_modules = "${readonly_files} exceptions.ml";
++   native;
++ *)
++
++external fp_backtrace : string -> unit = "fp_backtrace" [@@noalloc]
++
++exception FortyTwo
++
++(* We want to ensure backtraces from raiser, handler and catcher are correct.
++ *)
++let [@inline never] handler i =
++  Printf.printf "# handler %d\n%!" i;
++  fp_backtrace Sys.argv.(0);
++  i + 1
++
++let [@inline never] raiser i =
++  Printf.printf "# raiser %d\n%!" i;
++  fp_backtrace Sys.argv.(0);
++  match i with
++  | 42 -> raise FortyTwo
++  | _ -> i
++
++let [@inline never] catcher i =
++  Printf.printf "# catcher %d\n%!" i;
++  fp_backtrace Sys.argv.(0);
++  try raiser i with
++  | FortyTwo -> ignore (handler i);
++                i
++
++let () =
++  ignore (catcher 42)
+diff --git a/testsuite/tests/frame-pointers/exceptions.reference b/testsuite/tests/frame-pointers/exceptions.reference
+new file mode 100644
+index 000000000000..3f7834b8525e
+--- /dev/null
++++ b/testsuite/tests/frame-pointers/exceptions.reference
+@@ -0,0 +1,14 @@
++# catcher 42
++camlExceptions.catcher
++camlExceptions.entry
++caml_program
++# raiser 42
++camlExceptions.raiser
++camlExceptions.catcher
++camlExceptions.entry
++caml_program
++# handler 42
++camlExceptions.handler
++camlExceptions.catcher
++camlExceptions.entry
++caml_program
+diff --git a/testsuite/tests/frame-pointers/fp_backtrace.c b/testsuite/tests/frame-pointers/fp_backtrace.c
+index 38e5952de2e4..7cb29880f1cc 100644
+--- a/testsuite/tests/frame-pointers/fp_backtrace.c
++++ b/testsuite/tests/frame-pointers/fp_backtrace.c
+@@ -19,13 +19,13 @@
+ 
+ typedef struct frame_info
+ {
+-  struct frame_info*  prev;     /* rbp */
+-  void*               retaddr;  /* rip */
++  struct frame_info*  prev;     /* base pointer / frame pointer */
++  void*               retaddr;  /* instruction pointer / program counter */
+ } frame_info;
+ 
+ /*
+  * A backtrace symbol looks like this on Linux:
+- * ./path/to/binary(camlModule_fn_123+0xAABBCC) [0xAABBCCDDEE]
++ * ./path/to/binary(camlModule.fn_123+0xAABBCC) [0xAABBCCDDEE]
+  *
+  * or this on macOS:
+  * 0   c_call.opt                          0x000000010e621079 camlC_call.entry + 57
+diff --git a/testsuite/tests/frame-pointers/stack_realloc.arm64.reference b/testsuite/tests/frame-pointers/stack_realloc.arm64.reference
+new file mode 100644
+index 000000000000..5b130f262c1d
+--- /dev/null
++++ b/testsuite/tests/frame-pointers/stack_realloc.arm64.reference
+@@ -0,0 +1,10 @@
++camlStack_realloc.callback
++caml_start_program
++caml_callback_exn
++caml_callback
++c_fun
++caml_c_call
++camlStack_realloc.f_comp
++caml_runstack
++camlStack_realloc.entry
++caml_program
+diff --git a/testsuite/tests/frame-pointers/stack_realloc.ml b/testsuite/tests/frame-pointers/stack_realloc.ml
+index cacc43c21652..a581342a5da2 100644
+--- a/testsuite/tests/frame-pointers/stack_realloc.ml
++++ b/testsuite/tests/frame-pointers/stack_realloc.ml
+@@ -2,7 +2,17 @@
+  frame_pointers;
+  readonly_files = "fp_backtrace.c stack_realloc_.c";
+  all_modules = "${readonly_files} stack_realloc.ml";
+- native;
++ {
++ (* NOTE clang on macOS and gcc on Linux are less eager to inline
++         certain C functions in the runtime. *)
++   reference = "${test_source_directory}/stack_realloc.arm64.reference";
++   arch_arm64;
++   native;
++ } {
++   reference = "${test_source_directory}/stack_realloc.reference";
++   arch_amd64;
++   native;
++ }
+ *)
+ 
+ open Effect
+@@ -22,7 +32,7 @@ let[@inline never] consume_stack () =
+    * and Stack_threshold_words = 32 *)
+   (* in words *)
+   let size = 128 in
+-  let allocated = 2 * 2 (* 2 spilled registers *) + 1 (* saved rbp *) in
++  let allocated = 2 * 2 (* 2 spilled registers *) + 1 (* saved frame pointer *) in
+   let count = size / allocated in
+   let[@inline never] rec gobbler i =
+     (* Force spilling of x0 and x1 *)
+diff --git a/testsuite/tests/frame-pointers/stack_realloc2.arm64.reference b/testsuite/tests/frame-pointers/stack_realloc2.arm64.reference
+new file mode 100644
+index 000000000000..967e48b23fbd
+--- /dev/null
++++ b/testsuite/tests/frame-pointers/stack_realloc2.arm64.reference
+@@ -0,0 +1,10 @@
++camlStack_realloc2.callback
++caml_start_program
++caml_callback_exn
++caml_callback
++c_fun
++caml_c_call
++camlStack_realloc2.f_comp
++caml_runstack
++camlStack_realloc2.entry
++caml_program
+diff --git a/testsuite/tests/frame-pointers/stack_realloc2.ml b/testsuite/tests/frame-pointers/stack_realloc2.ml
+index b2a602fa4a54..d24ac8876547 100644
+--- a/testsuite/tests/frame-pointers/stack_realloc2.ml
++++ b/testsuite/tests/frame-pointers/stack_realloc2.ml
+@@ -2,7 +2,17 @@
+  frame_pointers;
+  readonly_files = "fp_backtrace.c stack_realloc_.c";
+  all_modules = "${readonly_files} stack_realloc2.ml";
+- native;
++ {
++   (* NOTE clang on MacOS and gcc on Linux are less eager to inline
++           certain C functions in the runtime. *)
++   reference = "${test_source_directory}/stack_realloc2.arm64.reference";
++   arch_arm64;
++   native;
++ } {
++   reference = "${test_source_directory}/stack_realloc2.reference";
++   arch_amd64;
++   native;
++ }
+ *)
+ 
+ open Effect
+@@ -22,7 +32,7 @@ let[@inline never] consume_stack () =
+    * and Stack_threshold_words = 32 *)
+   (* in words *)
+   let size = 128 in
+-  let allocated = 2 * 2 (* 2 spilled registers *) + 1 (* saved rbp *) in
++  let allocated = 2 * 2 (* 2 spilled registers *) + 1 (* saved frame pointer *) in
+   let count = size / allocated in
+   let[@inline never] rec gobbler i =
+     (* Force spilling of x0 and x1 *)

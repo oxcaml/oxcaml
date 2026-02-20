@@ -1,0 +1,139 @@
+diff --git a/Changes b/Changes
+index 09562ffd576d..f7bddbaab877 100644
+--- a/Changes
++++ b/Changes
+@@ -128,10 +128,14 @@ Working version
+ - #13758: Propagate more value kinds in Flambda to allow more unboxing
+   (Vincent Laviron, review by Pierre Chambart)
+ 
++- #13759: Propagate more type information from clambda to cmm.
++  (Pierre Chambart, review by Gabriel Scherer)
++
+ - #13735: Follow the behaviour of the C compiler to decide whether to emit the
+   `.size` and `.type` directives and the `.note.GNU-stack` section
+   (Samuel Hym, review by Miod Vallat, Antonin Décimo and Gabriel Scherer)
+ 
++
+ ### Standard library:
+ 
+ - #13768: Add Either.get_left and Either.get_right
+diff --git a/asmcomp/cmm_helpers.ml b/asmcomp/cmm_helpers.ml
+index 1e7e689ee09d..7a3f9bc78246 100644
+--- a/asmcomp/cmm_helpers.ml
++++ b/asmcomp/cmm_helpers.ml
+@@ -649,8 +649,8 @@ let field_address ptr n dbg =
+   then ptr
+   else Cop(Cadda, [ptr; Cconst_int(n * size_addr, dbg)], dbg)
+ 
+-let get_field_gen mutability ptr n dbg =
+-  Cop(Cload {memory_chunk=Word_val; mutability; is_atomic=false},
++let get_field_gen ?(memory_chunk=Word_val) mutability ptr n dbg =
++  Cop(Cload {memory_chunk; mutability; is_atomic=false},
+       [field_address ptr n dbg], dbg)
+ 
+ let get_field_codepointer mutability ptr n dbg =
+diff --git a/asmcomp/cmm_helpers.mli b/asmcomp/cmm_helpers.mli
+index 728b99566b0a..934159acfef1 100644
+--- a/asmcomp/cmm_helpers.mli
++++ b/asmcomp/cmm_helpers.mli
+@@ -203,10 +203,11 @@ val mk_load_atomic : memory_chunk -> operation
+     [n]th field of the block pointed to by [ptr] *)
+ val field_address : expression -> int -> Debuginfo.t -> expression
+ 
+-(** [get_field_gen mut ptr n dbg] returns an expression for the access to the
+-    [n]th field of the block pointed to by [ptr] *)
++(** [get_field_gen ?memory_chunk mut ptr n dbg] returns an expression for
++    the access to the [n]th field of the block pointed to by [ptr]. *)
+ val get_field_gen :
+-  Asttypes.mutable_flag -> expression -> int -> Debuginfo.t -> expression
++  ?memory_chunk:memory_chunk -> Asttypes.mutable_flag -> expression -> int ->
++  Debuginfo.t -> expression
+ 
+ (** [set_field ptr n newval init dbg] returns an expression for setting the
+     [n]th field of the block pointed to by [ptr] to [newval] *)
+diff --git a/asmcomp/cmmgen.ml b/asmcomp/cmmgen.ml
+index c71ae30abd05..ed6f0c6bf3bc 100644
+--- a/asmcomp/cmmgen.ml
++++ b/asmcomp/cmmgen.ml
+@@ -121,9 +121,14 @@ let min_mut x y =
+   | Immutable,_ | _,Immutable -> Immutable
+   | Mutable,Mutable -> Mutable
+ 
+-let get_field env mut ptr n dbg =
++let get_field env imm_or_pointer mut ptr n dbg =
+   let mut = min_mut mut (mut_from_env env ptr) in
+-  get_field_gen mut ptr n dbg
++  let memory_chunk =
++    match imm_or_pointer with
++    | Immediate -> Word_int
++    | Pointer -> Word_val
++  in
++  get_field_gen ~memory_chunk mut ptr n dbg
+ 
+ (* Translate structured constants to Cmm data items *)
+ 
+@@ -334,6 +339,15 @@ let is_unboxed_number_cmm ~strict ~kind cmm =
+   aux cmm;
+   !r
+ 
++let machtype_of_value_kind (value_kind : Lambda.value_kind) =
++  match value_kind with
++  | Pgenval
++  | Pfloatval
++  | Pboxedintval _ ->
++      Cmm.typ_val
++  | Pintval ->
++      Cmm.typ_int
++
+ (* Translate an expression *)
+ 
+ let rec transl env e =
+@@ -703,12 +717,12 @@ and transl_catch env nfail ids body handler dbg =
+   let body = transl env_body body in
+   let new_env, rewrite, ids =
+     List.fold_right
+-      (fun (id, _kind, u) (env, rewrite, ids) ->
++      (fun (id, kind, u) (env, rewrite, ids) ->
+          match !u with
+          | No_unboxing | Boxed (_, true) | No_result ->
+              env,
+              (fun x -> x) :: rewrite,
+-             (id, Cmm.typ_val) :: ids
++             (id, machtype_of_value_kind kind) :: ids
+          | Boxed (bn, false) ->
+              let unboxed_id = V.create_local (VP.name id) in
+              add_unboxed_id (VP.var id) unboxed_id bn env,
+@@ -794,8 +808,8 @@ and transl_prim_1 env p arg dbg =
+     Popaque ->
+       opaque (transl env arg) dbg
+   (* Heap operations *)
+-  | Pfield(n, _, mut) ->
+-      get_field env mut (transl env arg) n dbg
++  | Pfield(n, imm_or_pointer, mut) ->
++      get_field env imm_or_pointer mut (transl env arg) n dbg
+   | Pfloatfield n ->
+       let ptr = transl env arg in
+       box_float dbg (floatfield n ptr dbg)
+@@ -1388,7 +1402,6 @@ and transl_switch dbg env arg index cases = match Array.length cases with
+     let cases = Array.map (transl env) cases in
+     transl_switch_clambda dbg arg index cases
+ 
+-
+ (* Translate a function definition *)
+ 
+ let transl_function f =
+@@ -1408,8 +1421,13 @@ let transl_function f =
+     else
+       [ Reduce_code_size ]
+   in
++  let fun_args =
++    List.map (fun (id, value_kind) ->
++        (id, machtype_of_value_kind value_kind))
++      f.params
++  in
+   Cfunction {fun_name = f.label;
+-             fun_args = List.map (fun (id, _) -> (id, typ_val)) f.params;
++             fun_args;
+              fun_body = cmm_body;
+              fun_codegen_options;
+              fun_poll = f.poll;

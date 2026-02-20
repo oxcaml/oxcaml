@@ -1,0 +1,1120 @@
+diff --git a/.depend b/.depend
+index 1795ecfa0f75..3f0918bf4032 100644
+--- a/.depend
++++ b/.depend
+@@ -114,6 +114,13 @@ utils/lazy_backtrack.cmo : \
+ utils/lazy_backtrack.cmx : \
+     utils/lazy_backtrack.cmi
+ utils/lazy_backtrack.cmi :
++utils/linkdeps.cmo : \
++    utils/misc.cmi \
++    utils/linkdeps.cmi
++utils/linkdeps.cmx : \
++    utils/misc.cmx \
++    utils/linkdeps.cmi
++utils/linkdeps.cmi :
+ utils/load_path.cmo : \
+     utils/misc.cmi \
+     utils/local_store.cmi \
+@@ -2020,6 +2027,7 @@ bytecomp/bytelibrarian.cmo : \
+     utils/misc.cmi \
+     parsing/location.cmi \
+     utils/load_path.cmi \
++    utils/linkdeps.cmi \
+     bytecomp/emitcode.cmi \
+     utils/config.cmi \
+     file_formats/cmo_format.cmi \
+@@ -2030,19 +2038,22 @@ bytecomp/bytelibrarian.cmx : \
+     utils/misc.cmx \
+     parsing/location.cmx \
+     utils/load_path.cmx \
++    utils/linkdeps.cmx \
+     bytecomp/emitcode.cmx \
+     utils/config.cmx \
+     file_formats/cmo_format.cmi \
+     utils/clflags.cmx \
+     bytecomp/bytelink.cmx \
+     bytecomp/bytelibrarian.cmi
+-bytecomp/bytelibrarian.cmi :
++bytecomp/bytelibrarian.cmi : \
++    utils/linkdeps.cmi
+ bytecomp/bytelink.cmo : \
+     bytecomp/symtable.cmi \
+     bytecomp/opcodes.cmi \
+     utils/misc.cmi \
+     parsing/location.cmi \
+     utils/load_path.cmi \
++    utils/linkdeps.cmi \
+     bytecomp/instruct.cmi \
+     bytecomp/emitcode.cmi \
+     bytecomp/dll.cmi \
+@@ -2059,6 +2070,7 @@ bytecomp/bytelink.cmx : \
+     utils/misc.cmx \
+     parsing/location.cmx \
+     utils/load_path.cmx \
++    utils/linkdeps.cmx \
+     bytecomp/instruct.cmx \
+     bytecomp/emitcode.cmx \
+     bytecomp/dll.cmx \
+@@ -2072,6 +2084,7 @@ bytecomp/bytelink.cmx : \
+ bytecomp/bytelink.cmi : \
+     bytecomp/symtable.cmi \
+     utils/misc.cmi \
++    utils/linkdeps.cmi \
+     file_formats/cmo_format.cmi
+ bytecomp/bytepackager.cmo : \
+     parsing/unit_info.cmi \
+@@ -2426,6 +2439,7 @@ asmcomp/asmlibrarian.cmo : \
+     utils/misc.cmi \
+     parsing/location.cmi \
+     utils/load_path.cmi \
++    utils/linkdeps.cmi \
+     middle_end/flambda/export_info.cmi \
+     utils/config.cmi \
+     middle_end/compilenv.cmi \
+@@ -2439,6 +2453,7 @@ asmcomp/asmlibrarian.cmx : \
+     utils/misc.cmx \
+     parsing/location.cmx \
+     utils/load_path.cmx \
++    utils/linkdeps.cmx \
+     middle_end/flambda/export_info.cmx \
+     utils/config.cmx \
+     middle_end/compilenv.cmx \
+@@ -2448,7 +2463,8 @@ asmcomp/asmlibrarian.cmx : \
+     utils/ccomp.cmx \
+     asmcomp/asmlink.cmx \
+     asmcomp/asmlibrarian.cmi
+-asmcomp/asmlibrarian.cmi :
++asmcomp/asmlibrarian.cmi : \
++    utils/linkdeps.cmi
+ asmcomp/asmlink.cmo : \
+     asmcomp/thread_sanitizer.cmi \
+     lambda/runtimedef.cmi \
+@@ -2456,6 +2472,7 @@ asmcomp/asmlink.cmo : \
+     utils/misc.cmi \
+     parsing/location.cmi \
+     utils/load_path.cmi \
++    utils/linkdeps.cmi \
+     asmcomp/emitaux.cmi \
+     asmcomp/emit.cmi \
+     utils/consistbl.cmi \
+@@ -2475,6 +2492,7 @@ asmcomp/asmlink.cmx : \
+     utils/misc.cmx \
+     parsing/location.cmx \
+     utils/load_path.cmx \
++    utils/linkdeps.cmx \
+     asmcomp/emitaux.cmx \
+     asmcomp/emit.cmx \
+     utils/consistbl.cmx \
+@@ -2489,6 +2507,7 @@ asmcomp/asmlink.cmx : \
+     asmcomp/asmlink.cmi
+ asmcomp/asmlink.cmi : \
+     utils/misc.cmi \
++    utils/linkdeps.cmi \
+     file_formats/cmx_format.cmi
+ asmcomp/asmpackager.cmo : \
+     parsing/unit_info.cmi \
+diff --git a/Changes b/Changes
+index 0a648dd4a933..de29c8079db8 100644
+--- a/Changes
++++ b/Changes
+@@ -27,6 +27,9 @@ _______________
+ 
+ ### Compiler user-interface and warnings:
+ 
++* #12084: Check link order when creating archive and when using ocamlopt
++  (Hugo Heuzard, review by Stefan Muenzel and Sébastien Hinderer)
++
+ ### Internal/compiler-libs changes:
+ 
+ ### Build system:
+diff --git a/Makefile b/Makefile
+index 36ef1f3d4990..e08060eeeca2 100644
+--- a/Makefile
++++ b/Makefile
+@@ -74,6 +74,7 @@ utils_SOURCES = $(addprefix utils/, \
+   ccomp.mli ccomp.ml \
+   warnings.mli warnings.ml \
+   consistbl.mli consistbl.ml \
++  linkdeps.mli linkdeps.ml \
+   strongly_connected_components.mli strongly_connected_components.ml \
+   targetint.mli targetint.ml \
+   int_replace_polymorphic_compare.mli int_replace_polymorphic_compare.ml \
+diff --git a/asmcomp/asmlibrarian.ml b/asmcomp/asmlibrarian.ml
+index 72a0303593c3..3eb5fbfe9ddf 100644
+--- a/asmcomp/asmlibrarian.ml
++++ b/asmcomp/asmlibrarian.ml
+@@ -22,6 +22,7 @@ open Cmx_format
+ type error =
+     File_not_found of string
+   | Archiver_error of string
++  | Link_error of Linkdeps.error
+ 
+ exception Error of error
+ 
+@@ -44,7 +45,7 @@ let read_info name =
+      The linker, which is the only one that reads .cmxa files, does not
+      need the approximation. *)
+   info.ui_export_info <- default_ui_export_info;
+-  (Filename.chop_suffix filename ".cmx" ^ ext_obj, (info, crc))
++  filename, (info, crc)
+ 
+ let create_archive file_list lib_name =
+   let archive_name = Filename.remove_extension lib_name ^ ext_lib in
+@@ -54,18 +55,31 @@ let create_archive file_list lib_name =
+     ~exceptionally:(fun () -> remove_file lib_name; remove_file archive_name)
+     (fun () ->
+        output_string outchan cmxa_magic_number;
+-       let (objfile_list, descr_list) =
+-         List.split (List.map read_info file_list) in
+-       List.iter2
+-         (fun file_name (unit, crc) ->
++       let units = List.map read_info file_list in
++       let objfiles = List.map (fun (filename,_) ->
++           Filename.chop_suffix filename ".cmx" ^ ext_obj)
++           units in
++       List.iter
++         (fun (file_name, (unit, crc)) ->
+             Asmlink.check_consistency file_name unit crc)
+-         file_list descr_list;
++         units;
++       let ldeps = Linkdeps.create ~complete:false in
++       List.iter
++         (fun (filename, (unit, _crc)) ->
++            Linkdeps.add ldeps
++              ~filename ~compunit:unit.ui_name
++              ~provides:unit.ui_defines
++              ~requires:(List.map fst unit.ui_imports_cmx))
++         (List.rev units);
++       (match Linkdeps.check ldeps with
++        | None -> ()
++        | Some e -> raise (Error (Link_error e)));
+        let infos =
+-         { lib_units = descr_list;
++         { lib_units = List.map snd units;
+            lib_ccobjs = !Clflags.ccobjs;
+            lib_ccopts = !Clflags.all_ccopts } in
+        output_value outchan infos;
+-       if Ccomp.create_archive archive_name objfile_list <> 0
++       if Ccomp.create_archive archive_name objfiles <> 0
+        then raise(Error(Archiver_error archive_name));
+     )
+ 
+@@ -77,6 +91,8 @@ let report_error ppf = function
+       fprintf ppf "Cannot find file %a" Style.inline_code name
+   | Archiver_error name ->
+       fprintf ppf "Error while creating the library %a" Style.inline_code name
++  | Link_error e ->
++      Linkdeps.report_error ~print_filename:Location.print_filename ppf e
+ 
+ let () =
+   Location.register_error_of_exn
+diff --git a/asmcomp/asmlibrarian.mli b/asmcomp/asmlibrarian.mli
+index 4d66827c0fb5..0e189e0291ee 100644
+--- a/asmcomp/asmlibrarian.mli
++++ b/asmcomp/asmlibrarian.mli
+@@ -22,6 +22,7 @@ val create_archive: string list -> string -> unit
+ type error =
+     File_not_found of string
+   | Archiver_error of string
++  | Link_error of Linkdeps.error
+ 
+ exception Error of error
+ 
+diff --git a/asmcomp/asmlink.ml b/asmcomp/asmlink.ml
+index 2e10f82387ca..9458879329bb 100644
+--- a/asmcomp/asmlink.ml
++++ b/asmcomp/asmlink.ml
+@@ -25,13 +25,12 @@ module String = Misc.Stdlib.String
+ type error =
+   | File_not_found of filepath
+   | Not_an_object_file of filepath
+-  | Missing_implementations of (modname * string list) list
+   | Inconsistent_interface of modname * filepath * filepath
+   | Inconsistent_implementation of modname * filepath * filepath
+   | Assembler_error of filepath
+   | Linking_error of int
+-  | Multiple_definition of modname * filepath * filepath
+   | Missing_cmx of filepath * modname
++  | Link_error of Linkdeps.error
+ 
+ exception Error of error
+ 
+@@ -44,15 +43,9 @@ let interfaces = ref ([] : string list)
+ module Cmx_consistbl = Consistbl.Make (Misc.Stdlib.String)
+ let crc_implementations = Cmx_consistbl.create ()
+ let implementations = ref ([] : string list)
+-let implementations_defined = ref ([] : (string * string) list)
+ let cmx_required = ref ([] : string list)
+ 
+ let check_consistency file_name unit crc =
+-  begin try
+-    let source = List.assoc unit.ui_name !implementations_defined in
+-    raise (Error(Multiple_definition(unit.ui_name, file_name, source)))
+-  with Not_found -> ()
+-  end;
+   begin try
+     List.iter
+       (fun (name, crco) ->
+@@ -88,8 +81,6 @@ let check_consistency file_name unit crc =
+   end;
+   implementations := unit.ui_name :: !implementations;
+   Cmx_consistbl.check crc_implementations unit.ui_name crc file_name;
+-  implementations_defined :=
+-    (unit.ui_name, file_name) :: !implementations_defined;
+   if unit.ui_symbol <> unit.ui_name then
+     cmx_required := unit.ui_name :: !cmx_required
+ 
+@@ -123,27 +114,6 @@ let runtime_lib () =
+ 
+ (* First pass: determine which units are needed *)
+ 
+-let missing_globals = (Hashtbl.create 17 : (string, string list ref) Hashtbl.t)
+-
+-let is_required name =
+-  try ignore (Hashtbl.find missing_globals name); true
+-  with Not_found -> false
+-
+-let add_required by (name, _crc) =
+-  try
+-    let rq = Hashtbl.find missing_globals name in
+-    rq := by :: !rq
+-  with Not_found ->
+-    Hashtbl.add missing_globals name (ref [by])
+-
+-let remove_required name =
+-  Hashtbl.remove missing_globals name
+-
+-let extract_missing_globals () =
+-  let mg = ref [] in
+-  Hashtbl.iter (fun md rq -> mg := (md, !rq) :: !mg) missing_globals;
+-  !mg
+-
+ type file =
+   | Unit of string * unit_infos * Digest.t
+   | Library of string * library_infos
+@@ -181,11 +151,13 @@ let read_file obj_name =
+   end
+   else raise(Error(Not_an_object_file file_name))
+ 
+-let scan_file file tolink = match file with
++let scan_file ldeps file tolink = match file with
+   | Unit (file_name,info,crc) ->
+       (* This is a .cmx file. It must be linked in any case. *)
+-      remove_required info.ui_name;
+-      List.iter (add_required file_name) info.ui_imports_cmx;
++      Linkdeps.add ldeps
++        ~filename:file_name ~compunit:info.ui_name
++        ~provides:info.ui_defines
++        ~requires:(List.map fst info.ui_imports_cmx);
+       (info, file_name, crc) :: tolink
+   | Library (file_name,infos) ->
+       (* This is an archive file. Each unit contained in it will be linked
+@@ -195,12 +167,12 @@ let scan_file file tolink = match file with
+         (fun (info, crc) reqd ->
+            if info.ui_force_link
+            || !Clflags.link_everything
+-           || is_required info.ui_name
++           || Linkdeps.required ldeps info.ui_name
+            then begin
+-             remove_required info.ui_name;
+-             List.iter (add_required (Printf.sprintf "%s(%s)"
+-                                        file_name info.ui_name))
+-               info.ui_imports_cmx;
++             Linkdeps.add ldeps
++               ~filename:file_name ~compunit:info.ui_name
++               ~provides:info.ui_defines
++               ~requires:(List.map fst info.ui_imports_cmx);
+              (info, file_name, crc) :: reqd
+            end else
+            reqd)
+@@ -293,7 +265,11 @@ let call_linker_shared file_list output_name =
+ let link_shared ~ppf_dump objfiles output_name =
+   Profile.record_call output_name (fun () ->
+     let obj_infos = List.map read_file objfiles in
+-    let units_tolink = List.fold_right scan_file obj_infos [] in
++    let ldeps = Linkdeps.create ~complete:false in
++    let units_tolink = List.fold_right (scan_file ldeps) obj_infos [] in
++    (match Linkdeps.check ldeps with
++     | None -> ()
++     | Some e -> raise (Error (Link_error e)));
+     List.iter
+       (fun (info, file_name, crc) -> check_consistency file_name info crc)
+       units_tolink;
+@@ -353,12 +329,11 @@ let link ~ppf_dump objfiles output_name =
+       else if !Clflags.output_c_object then stdlib :: objfiles
+       else stdlib :: (objfiles @ [stdexit]) in
+     let obj_infos = List.map read_file objfiles in
+-    let units_tolink = List.fold_right scan_file obj_infos [] in
+-    Array.iter remove_required Runtimedef.builtin_exceptions;
+-    begin match extract_missing_globals() with
+-      [] -> ()
+-    | mg -> raise(Error(Missing_implementations mg))
+-    end;
++    let ldeps = Linkdeps.create ~complete:true in
++    let units_tolink = List.fold_right (scan_file ldeps) obj_infos [] in
++    (match Linkdeps.check ldeps with
++     | None -> ()
++     | Some e -> raise (Error (Link_error e)));
+     List.iter
+       (fun (info, file_name, crc) -> check_consistency file_name info crc)
+       units_tolink;
+@@ -393,21 +368,6 @@ let report_error ppf = function
+   | Not_an_object_file name ->
+       fprintf ppf "The file %a is not a compilation unit description"
+         (Style.as_inline_code Location.print_filename) name
+-  | Missing_implementations l ->
+-     let print_references ppf = function
+-       | [] -> ()
+-       | r1 :: rl ->
+-           Style.inline_code ppf r1;
+-           List.iter (fun r -> fprintf ppf ",@ %a" Style.inline_code r) rl in
+-      let print_modules ppf =
+-        List.iter
+-         (fun (md, rq) ->
+-           fprintf ppf "@ @[<hov 2>%a referenced from %a@]"
+-             Style.inline_code md
+-             print_references rq) in
+-      fprintf ppf
+-       "@[<v 2>No implementations provided for the following modules:%a@]"
+-       print_modules l
+   | Inconsistent_interface(intf, file1, file2) ->
+       fprintf ppf
+        "@[<hov>Files %a@ and %a@ make inconsistent assumptions \
+@@ -427,12 +387,6 @@ let report_error ppf = function
+         (Style.as_inline_code Location.print_filename) file
+   | Linking_error exitcode ->
+       fprintf ppf "Error during linking (exit code %d)" exitcode
+-  | Multiple_definition(modname, file1, file2) ->
+-      fprintf ppf
+-        "@[<hov>Files %a@ and %a@ both define a module named %a@]"
+-        (Style.as_inline_code Location.print_filename) file1
+-        (Style.as_inline_code Location.print_filename) file2
+-        Style.inline_code modname
+   | Missing_cmx(filename, name) ->
+       fprintf ppf
+         "@[<hov>File %a@ was compiled without access@ \
+@@ -447,6 +401,8 @@ let report_error ppf = function
+         (Style.as_inline_code Location.print_filename) filename
+         Style.inline_code "-I"
+         Style.inline_code (name^".cmx")
++  | Link_error e ->
++      Linkdeps.report_error ~print_filename:Location.print_filename ppf e
+ 
+ let () =
+   Location.register_error_of_exn
+@@ -458,7 +414,6 @@ let () =
+ let reset () =
+   Cmi_consistbl.clear crc_interfaces;
+   Cmx_consistbl.clear crc_implementations;
+-  implementations_defined := [];
+   cmx_required := [];
+   interfaces := [];
+   implementations := [];
+diff --git a/asmcomp/asmlink.mli b/asmcomp/asmlink.mli
+index 6ee91ffb86d8..5796b2e42620 100644
+--- a/asmcomp/asmlink.mli
++++ b/asmcomp/asmlink.mli
+@@ -32,13 +32,12 @@ val extract_crc_implementations: unit -> crcs
+ type error =
+   | File_not_found of filepath
+   | Not_an_object_file of filepath
+-  | Missing_implementations of (modname * string list) list
+   | Inconsistent_interface of modname * filepath * filepath
+   | Inconsistent_implementation of modname * filepath * filepath
+   | Assembler_error of filepath
+   | Linking_error of int
+-  | Multiple_definition of modname * filepath * filepath
+   | Missing_cmx of filepath * modname
++  | Link_error of Linkdeps.error
+ 
+ exception Error of error
+ 
+diff --git a/bytecomp/bytelibrarian.ml b/bytecomp/bytelibrarian.ml
+index 001af5fa09f3..c573a6f53eb2 100644
+--- a/bytecomp/bytelibrarian.ml
++++ b/bytecomp/bytelibrarian.ml
+@@ -22,6 +22,7 @@ open Cmo_format
+ type error =
+     File_not_found of string
+   | Not_an_object_file of string
++  | Link_error of Linkdeps.error
+ 
+ exception Error of error
+ 
+@@ -71,7 +72,7 @@ let copy_object_file oc name =
+       Bytelink.check_consistency file_name compunit;
+       copy_compunit ic oc compunit;
+       close_in ic;
+-      [compunit]
++      [name,compunit]
+     end else
+     if buffer = cma_magic_number then begin
+       let toc_pos = input_binary_int ic in
+@@ -81,7 +82,7 @@ let copy_object_file oc name =
+       add_ccobjs toc;
+       List.iter (copy_compunit ic oc) toc.lib_units;
+       close_in ic;
+-      toc.lib_units
++      List.map (fun u -> name, u) toc.lib_units
+     end else
+       raise(Error(Not_an_object_file file_name))
+   with
+@@ -99,8 +100,15 @@ let create_archive file_list lib_name =
+        output_binary_int outchan 0;
+        let units =
+          List.flatten(List.map (copy_object_file outchan) file_list) in
++       let ldeps = Linkdeps.create ~complete:false in
++       List.iter
++         (fun (filename,u) -> Bytelink.linkdeps_unit ldeps ~filename u)
++         (List.rev units);
++       (match Linkdeps.check ldeps with
++        | None -> ()
++        | Some e -> raise (Error (Link_error e)));
+        let toc =
+-         { lib_units = units;
++         { lib_units = (List.map snd units);
+            lib_custom = !Clflags.custom_runtime;
+            lib_ccobjs = !Clflags.ccobjs @ !lib_ccobjs;
+            lib_ccopts = !Clflags.all_ccopts @ !lib_ccopts;
+@@ -122,6 +130,8 @@ let report_error ppf = function
+   | Not_an_object_file name ->
+       fprintf ppf "The file %a is not a bytecode object file"
+         (Style.as_inline_code Location.print_filename) name
++  | Link_error e ->
++      Linkdeps.report_error ~print_filename:Location.print_filename ppf e
+ 
+ let () =
+   Location.register_error_of_exn
+diff --git a/bytecomp/bytelibrarian.mli b/bytecomp/bytelibrarian.mli
+index 3670730d692e..5802c4d9ba9d 100644
+--- a/bytecomp/bytelibrarian.mli
++++ b/bytecomp/bytelibrarian.mli
+@@ -27,6 +27,7 @@ val create_archive: string list -> string -> unit
+ type error =
+     File_not_found of string
+   | Not_an_object_file of string
++  | Link_error of Linkdeps.error
+ 
+ exception Error of error
+ 
+diff --git a/bytecomp/bytelink.ml b/bytecomp/bytelink.ml
+index 2d2f5b989144..e88ac9ffd034 100644
+--- a/bytecomp/bytelink.ml
++++ b/bytecomp/bytelink.ml
+@@ -37,10 +37,8 @@ type error =
+   | Custom_runtime
+   | File_exists of filepath
+   | Cannot_open_dll of filepath
+-  | Required_compunit_unavailable of (compunit * compunit)
+   | Camlheader of string * filepath
+-  | Wrong_link_order of DepSet.t
+-  | Multiple_definition of compunit * filepath * filepath
++  | Link_error of Linkdeps.error
+ 
+ exception Error of error
+ 
+@@ -97,37 +95,24 @@ let add_ccobjs origin l =
+ 
+ (* First pass: determine which units are needed *)
+ 
+-let missing_compunits = ref Compunit.Map.empty
+-let provided_compunits = ref Compunit.Set.empty
+-let badly_ordered_dependencies : DepSet.t ref = ref DepSet.empty
++let required compunit =
++  (Symtable.required_compunits compunit.cu_reloc
++   @ compunit.cu_required_compunits)
++  |> List.map (fun (Compunit i) -> i)
+ 
+-let record_badly_ordered_dependency dep =
+-  badly_ordered_dependencies := DepSet.add dep !badly_ordered_dependencies
+-
+-let is_required (rel, _pos) =
++let provided compunit =
++  List.filter_map (fun (rel, _pos) ->
+   match rel with
+-    | Reloc_setcompunit cu ->
+-      Compunit.Map.mem cu !missing_compunits
+-    | _ -> false
+-
+-let add_required compunit =
+-  let add cu =
+-    if Compunit.Set.mem cu !provided_compunits then
+-      record_badly_ordered_dependency (cu, compunit.cu_name);
+-    missing_compunits :=
+-      Compunit.Map.add cu compunit.cu_name !missing_compunits
+-  in
+-  List.iter add (Symtable.required_compunits compunit.cu_reloc);
+-  List.iter add compunit.cu_required_compunits
++    | Reloc_setcompunit (Compunit id) -> Some id
++    | _ -> None) compunit.cu_reloc
+ 
+-let remove_required (rel, _pos) =
+-  match rel with
+-    Reloc_setcompunit cu ->
+-      missing_compunits := Compunit.Map.remove cu !missing_compunits;
+-      provided_compunits := Compunit.Set.add cu !provided_compunits;
+-  | _ -> ()
++let linkdeps_unit ldeps ~filename compunit =
++  let requires = required compunit in
++  let provides = provided compunit in
++  let Compunit compunit = compunit.cu_name in
++  Linkdeps.add ldeps ~filename ~compunit ~requires ~provides
+ 
+-let scan_file obj_name tolink =
++let scan_file ldeps obj_name tolink =
+   let file_name =
+     try
+       Load_path.find obj_name
+@@ -144,8 +129,7 @@ let scan_file obj_name tolink =
+       seek_in ic compunit_pos;
+       let compunit = (input_value ic : compilation_unit) in
+       close_in ic;
+-      add_required compunit;
+-      List.iter remove_required compunit.cu_reloc;
++      linkdeps_unit ldeps ~filename:obj_name compunit;
+       Link_object(file_name, compunit) :: tolink
+     end
+     else if buffer = cma_magic_number then begin
+@@ -159,12 +143,12 @@ let scan_file obj_name tolink =
+       let required =
+         List.fold_right
+           (fun compunit reqd ->
++             let Compunit name = compunit.cu_name in
+             if compunit.cu_force_link
+             || !Clflags.link_everything
+-            || List.exists is_required compunit.cu_reloc
++            || Linkdeps.required ldeps name
+             then begin
+-              add_required compunit;
+-              List.iter remove_required compunit.cu_reloc;
++              linkdeps_unit ldeps ~filename:obj_name compunit;
+               compunit :: reqd
+             end else
+               reqd)
+@@ -184,15 +168,9 @@ module Consistbl = Consistbl.Make (Misc.Stdlib.String)
+ 
+ let crc_interfaces = Consistbl.create ()
+ let interfaces = ref ([] : string list)
+-let implementations_defined = ref ([] : (compunit * string) list)
+ 
+ let check_consistency file_name cu =
+-  begin try
+-    let source = List.assoc cu.cu_name !implementations_defined in
+-    raise (Error (Multiple_definition(cu.cu_name, file_name, source)));
+-  with Not_found -> ()
+-  end;
+-  begin try
++  try
+     List.iter
+       (fun (name, crco) ->
+         interfaces := name :: !interfaces;
+@@ -206,9 +184,6 @@ let check_consistency file_name cu =
+       original_source = auth;
+     } ->
+     raise(Error(Inconsistent_import(name, user, auth)))
+-  end;
+-  implementations_defined :=
+-    (cu.cu_name, file_name) :: !implementations_defined
+ 
+ let extract_crc_interfaces () =
+   Consistbl.extract !interfaces crc_interfaces
+@@ -653,17 +628,11 @@ let link objfiles output_name =
+     | false, true, false -> "stdlib.cma" :: objfiles
+     | _                  -> "stdlib.cma" :: objfiles @ ["std_exit.cmo"]
+   in
+-  let tolink = List.fold_right scan_file objfiles [] in
+-  begin
+-    match Compunit.Map.bindings !missing_compunits with
+-    | [] -> ()
+-    | missing_dependency :: _ ->
+-        if DepSet.is_empty !badly_ordered_dependencies
+-        then
+-            raise (Error (Required_compunit_unavailable missing_dependency))
+-        else
+-            raise (Error (Wrong_link_order !badly_ordered_dependencies))
+-  end;
++  let ldeps = Linkdeps.create ~complete:true in
++  let tolink = List.fold_right (scan_file ldeps) objfiles [] in
++  (match Linkdeps.check ldeps with
++   | None -> ()
++   | Some e -> raise (Error (Link_error e)));
+   Clflags.ccobjs := !Clflags.ccobjs @ !lib_ccobjs; (* put user's libs last *)
+   Clflags.all_ccopts := !lib_ccopts @ !Clflags.all_ccopts;
+                                                    (* put user's opts first *)
+@@ -798,31 +767,12 @@ let report_error ppf = function
+   | Cannot_open_dll file ->
+       fprintf ppf "Error on dynamically loaded library: %a"
+         Location.print_filename file
+-  | Required_compunit_unavailable
+-    (Compunit unavailable, Compunit required_by) ->
+-      fprintf ppf "Module %a is unavailable (required by %a)"
+-        Style.inline_code unavailable
+-        Style.inline_code required_by
+   | Camlheader (msg, header) ->
+       fprintf ppf "System error while copying file %a: %a"
+         Style.inline_code header
+         Style.inline_code msg
+-  | Wrong_link_order depset ->
+-      let l = DepSet.elements depset in
+-      let depends_on ppf (dep, depending) =
+-        fprintf ppf "%a depends on %a"
+-        Style.inline_code (Compunit.name depending)
+-        Style.inline_code (Compunit.name dep)
+-      in
+-      fprintf ppf "@[<hov 2>Wrong link order: %a@]"
+-        (pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") depends_on) l
+-  | Multiple_definition(compunit, file1, file2) ->
+-      fprintf ppf
+-        "@[<hov>Files %a@ and %a@ both define a module named %a@]"
+-        (Style.as_inline_code Location.print_filename) file1
+-        (Style.as_inline_code Location.print_filename) file2
+-        Style.inline_code (Compunit.name compunit)
+-
++  | Link_error e ->
++      Linkdeps.report_error ~print_filename:Location.print_filename ppf e
+ 
+ let () =
+   Location.register_error_of_exn
+@@ -835,8 +785,6 @@ let reset () =
+   lib_ccobjs := [];
+   lib_ccopts := [];
+   lib_dllibs := [];
+-  missing_compunits := Compunit.Map.empty;
+   Consistbl.clear crc_interfaces;
+-  implementations_defined := [];
+   debug_info := [];
+   output_code_string_counter := 0
+diff --git a/bytecomp/bytelink.mli b/bytecomp/bytelink.mli
+index f061d9ddb6d4..bff16dbc8f59 100644
+--- a/bytecomp/bytelink.mli
++++ b/bytecomp/bytelink.mli
+@@ -25,6 +25,8 @@ val link : filepath list -> filepath -> unit
+ val reset : unit -> unit
+ 
+ val check_consistency: filepath -> Cmo_format.compilation_unit -> unit
++val linkdeps_unit :
++  Linkdeps.t -> filename:string -> Cmo_format.compilation_unit -> unit
+ 
+ val extract_crc_interfaces: unit -> crcs
+ 
+@@ -37,10 +39,8 @@ type error =
+   | Custom_runtime
+   | File_exists of filepath
+   | Cannot_open_dll of filepath
+-  | Required_compunit_unavailable of (Cmo_format.compunit * Cmo_format.compunit)
+   | Camlheader of string * filepath
+-  | Wrong_link_order of DepSet.t
+-  | Multiple_definition of Cmo_format.compunit * filepath * filepath
++  | Link_error of Linkdeps.error
+ 
+ exception Error of error
+ 
+diff --git a/testsuite/tests/badly-ordered-deps/main.bytecode.reference b/testsuite/tests/badly-ordered-deps/main.bytecode.reference
+index dc821a15df34..ca66cec2e365 100644
+--- a/testsuite/tests/badly-ordered-deps/main.bytecode.reference
++++ b/testsuite/tests/badly-ordered-deps/main.bytecode.reference
+@@ -1,2 +1,7 @@
+ File "_none_", line 1:
+-Error: Wrong link order: "Lib" depends on "Main"
++Error: Wrong link order: "Lib" (lib.cmo) depends on "Main" (main.cmo)
++File "_none_", line 1:
++Error: Wrong link order: "Lib" (lib.cmo) depends on "Main" (main.cmo)
++File "_none_", line 1:
++Error: No implementation provided for the following modules:
++         "Main" referenced from "Lib" (lib.cmo)
+diff --git a/testsuite/tests/badly-ordered-deps/main.ml b/testsuite/tests/badly-ordered-deps/main.ml
+index ba6c6cfb97c5..ededcf90c202 100644
+--- a/testsuite/tests/badly-ordered-deps/main.ml
++++ b/testsuite/tests/badly-ordered-deps/main.ml
+@@ -1,19 +1,59 @@
+ (* TEST
+  modules = "lib.ml";
+- setup-ocamlc.byte-build-env;
+- all_modules = "main.ml";
+- compile_only = "true";
+- ocamlc.byte;
+- all_modules = "lib.ml";
+- ocamlc.byte;
+- all_modules = "lib.cmo main.cmo";
+- compile_only = "false";
+- ocamlc_byte_exit_status = "2";
+- ocamlc.byte;
+- check-ocamlc.byte-output;
++ {
++   setup-ocamlc.byte-build-env;
++   all_modules = "main.ml";
++   compile_only = "true";
++   ocamlc.byte;
++   all_modules = "lib.ml";
++   ocamlc.byte;
++   {
++     all_modules = "lib.cmo main.cmo";
++     compile_only = "false";
++     ocamlc_byte_exit_status = "2";
++     ocamlc.byte;
++   }{
++     all_modules = "lib.cmo main.cmo";
++     compile_only = "false";
++     ocamlc_byte_exit_status = "2";
++     flags = "-a";
++     ocamlc.byte;
++  }{
++     all_modules = "lib.cmo";
++     compile_only = "false";
++     ocamlc_byte_exit_status = "2";
++     ocamlc.byte;
++     check-ocamlc.byte-output;
++  }
++}{
++   setup-ocamlopt.byte-build-env;
++   all_modules = "main.ml";
++   compile_only = "true";
++   ocamlopt.byte;
++   all_modules = "lib.ml";
++   ocamlopt.byte;
++   {
++     all_modules = "lib.cmx main.cmx";
++     compile_only = "false";
++     ocamlopt_byte_exit_status = "2";
++     ocamlopt.byte;
++   }{
++     all_modules = "lib.cmx main.cmx";
++     compile_only = "false";
++     ocamlopt_byte_exit_status = "2";
++     flags = "-a";
++     ocamlopt.byte;
++  }{
++     all_modules = "lib.cmx";
++     compile_only = "false";
++     ocamlopt_byte_exit_status = "2";
++     ocamlopt.byte;
++     check-ocamlopt.byte-output;
++  }
++}
+ *)
+ 
+-(* Make sure ocamlc prints badly ordered dependencies only once.
++(* Make sure ocamlc and ocamlopt print badly ordered dependencies only once.
+    See issue #12074. We test with ocamlc.byte only. *)
+ 
+ let value = ()
+diff --git a/testsuite/tests/badly-ordered-deps/main.native.reference b/testsuite/tests/badly-ordered-deps/main.native.reference
+new file mode 100644
+index 000000000000..db715c4d072a
+--- /dev/null
++++ b/testsuite/tests/badly-ordered-deps/main.native.reference
+@@ -0,0 +1,7 @@
++File "_none_", line 1:
++Error: Wrong link order: "Lib" (lib.cmx) depends on "Main" (main.cmx)
++File "_none_", line 1:
++Error: Wrong link order: "Lib" (lib.cmx) depends on "Main" (main.cmx)
++File "_none_", line 1:
++Error: No implementation provided for the following modules:
++         "Main" referenced from "Lib" (lib.cmx)
+diff --git a/testsuite/tests/lib-dynlink-initializers/test4_main.ml b/testsuite/tests/lib-dynlink-initializers/test4_main.ml
+deleted file mode 100644
+index d24880e07370..000000000000
+--- a/testsuite/tests/lib-dynlink-initializers/test4_main.ml
++++ /dev/null
+@@ -1,70 +0,0 @@
+-(* TEST
+- include dynlink;
+- readonly_files = "test4_plugin_a.ml test4_plugin_b.ml";
+- libraries = "";
+- shared-libraries;
+- {
+-   setup-ocamlc.byte-build-env;
+-   {
+-     module = "test4_main.ml";
+-     ocamlc.byte;
+-   }{
+-     module = "test4_plugin_b.ml";
+-     ocamlc.byte;
+-   }{
+-     module = "test4_plugin_a.ml";
+-     ocamlc.byte;
+-   }{
+-     program = "test4_plugin.cma";
+-     flags = "-a";
+-     all_modules = "test4_plugin_a.cmo test4_plugin_b.cmo";
+-     ocamlc.byte;
+-   }{
+-     program = "${test_build_directory}/test4.byte";
+-     libraries = "dynlink";
+-     all_modules = "test4_main.cmo";
+-     ocamlc.byte;
+-     run;
+-   }
+- }{
+-   native-dynlink;
+-   setup-ocamlopt.byte-build-env;
+-   {
+-     module = "test4_main.ml";
+-     ocamlopt.byte;
+-   }{
+-     module = "test4_plugin_b.ml";
+-     ocamlopt.byte;
+-   }{
+-     module = "test4_plugin_a.ml";
+-     ocamlopt.byte;
+-   }{
+-     program = "test4_plugin.cmxs";
+-     flags = "-shared";
+-     all_modules = "test4_plugin_a.cmx test4_plugin_b.cmx";
+-     ocamlopt.byte;
+-   }{
+-     program = "${test_build_directory}/test4.exe";
+-     libraries = "dynlink";
+-     all_modules = "test4_main.cmx";
+-     ocamlopt.byte;
+-     run;
+-   }
+- }
+-*)
+-
+-(* Check that a module in a shared library cannot refer to another
+-   module in the same shared library if it has not yet been loaded. *)
+-
+-let () =
+-  try
+-    if Dynlink.is_native then begin
+-      Dynlink.loadfile "test4_plugin.cmxs"
+-    end else begin
+-      Dynlink.loadfile "test4_plugin.cma"
+-    end;
+-    assert false
+-  with
+-  | Dynlink.Error (
+-      Dynlink.Linking_error (_,
+-        Dynlink.Uninitialized_global "Test4_plugin_b")) -> ()
+diff --git a/testsuite/tests/lib-dynlink-initializers/test4_plugin_a.ml b/testsuite/tests/lib-dynlink-initializers/test4_plugin_a.ml
+deleted file mode 100644
+index 0341c3bbe416..000000000000
+--- a/testsuite/tests/lib-dynlink-initializers/test4_plugin_a.ml
++++ /dev/null
+@@ -1,2 +0,0 @@
+-let () =
+-  print_int (Test4_plugin_b.f 42)
+diff --git a/testsuite/tests/lib-dynlink-initializers/test4_plugin_b.ml b/testsuite/tests/lib-dynlink-initializers/test4_plugin_b.ml
+deleted file mode 100644
+index 2f1eb893ec1d..000000000000
+--- a/testsuite/tests/lib-dynlink-initializers/test4_plugin_b.ml
++++ /dev/null
+@@ -1 +0,0 @@
+-let f x = x + 3 [@@inline never]
+diff --git a/utils/linkdeps.ml b/utils/linkdeps.ml
+new file mode 100644
+index 000000000000..78bef5a63537
+--- /dev/null
++++ b/utils/linkdeps.ml
+@@ -0,0 +1,139 @@
++(**************************************************************************)
++(*                                                                        *)
++(*                                 OCaml                                  *)
++(*                                                                        *)
++(*                              Hugo Heuzard                              *)
++(*                                                                        *)
++(*   Copyright 2020 Institut National de Recherche en Informatique et     *)
++(*     en Automatique.                                                    *)
++(*                                                                        *)
++(*   All rights reserved.  This file is distributed under the terms of    *)
++(*   the GNU Lesser General Public License version 2.1, with the          *)
++(*   special exception on linking described in the file LICENSE.          *)
++(*                                                                        *)
++(**************************************************************************)
++
++module Style = Misc.Style
++
++type compunit = string
++
++type filename = string
++
++type compunit_and_source = {
++  compunit  : compunit;
++  filename : filename;
++}
++
++module Compunit_and_source = struct
++  type t = compunit_and_source
++  module Set = Set.Make(struct type nonrec t = t let compare = compare end)
++end
++
++type refs = Compunit_and_source.Set.t
++
++type t = {
++  complete : bool;
++  missing_compunits : (compunit, refs) Hashtbl.t;
++  provided_compunits : (compunit, filename list) Hashtbl.t;
++  badly_ordered_deps : (Compunit_and_source.t, refs) Hashtbl.t;
++}
++
++type error =
++  | Missing_implementations of (compunit * compunit_and_source list) list
++  | Wrong_link_order of (compunit_and_source * compunit_and_source list) list
++  | Multiple_definitions of (compunit * filename list) list
++
++let create ~complete = {
++  complete;
++  missing_compunits = Hashtbl.create 17;
++  provided_compunits = Hashtbl.create 17;
++  badly_ordered_deps = Hashtbl.create 17;
++}
++
++let required t compunit = Hashtbl.mem t.missing_compunits compunit
++
++let update t k f =
++  let v = Hashtbl.find_opt t k in
++  Hashtbl.replace t k (f v)
++
++let add_required t by (name : string) =
++  let add s =
++    Compunit_and_source.Set.add by
++      (Option.value s ~default:Compunit_and_source.Set.empty) in
++  (try
++     let filename = List.hd (Hashtbl.find t.provided_compunits name) in
++     update t.badly_ordered_deps {compunit = name; filename } add
++   with Not_found -> ());
++  update t.missing_compunits name add
++
++let add t ~filename ~compunit ~provides ~requires =
++  List.iter (add_required t {compunit; filename}) requires;
++  List.iter (fun p ->
++    Hashtbl.remove t.missing_compunits p;
++    let l = Option.value ~default:[]
++        (Hashtbl.find_opt t.provided_compunits p) in
++    Hashtbl.replace t.provided_compunits p (filename :: l)) provides
++
++let check t =
++  let of_seq s =
++    Seq.map (fun (k,v) -> k, Compunit_and_source.Set.elements v) s
++    |> List.of_seq
++  in
++  let missing = of_seq (Hashtbl.to_seq t.missing_compunits) in
++  let badly_ordered_deps = of_seq (Hashtbl.to_seq t.badly_ordered_deps) in
++  let duplicated =
++    Hashtbl.to_seq t.provided_compunits
++    |> Seq.filter (fun (_, files) -> List.compare_length_with files 1 > 0)
++    |> List.of_seq
++  in
++  match duplicated, badly_ordered_deps, missing with
++  | [], [], [] -> None
++  | [], [], l ->
++      if t.complete
++      then Some (Missing_implementations l)
++      else None
++  | [], l,  _  ->
++      Some (Wrong_link_order l)
++  | l, _, _ ->
++      Some (Multiple_definitions l)
++
++(* Error report *)
++
++open Format
++
++let print_reference print_fname ppf {compunit; filename} =
++  fprintf ppf "%a (%a)" Style.inline_code compunit print_fname filename
++
++let pp_list_comma f =
++  pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") f
++
++let report_error ~print_filename ppf = function
++  | Missing_implementations l ->
++      let print_modules ppf =
++        List.iter
++          (fun (md, rq) ->
++             fprintf ppf "@ @[<hov 2>%a referenced from %a@]"
++               Style.inline_code md
++               (pp_list_comma (print_reference print_filename)) rq)
++      in
++      fprintf ppf
++        "@[<v 2>No implementation provided for the following modules:%a@]"
++        print_modules l
++  | Wrong_link_order l ->
++      let depends_on ppf (dep, depending) =
++        fprintf ppf "@ @[<hov 2>%a depends on %a@]"
++          (pp_list_comma (print_reference print_filename)) depending
++          (print_reference print_filename) dep
++      in
++      fprintf ppf "@[<hov 2>Wrong link order:%a@]"
++        (pp_list_comma depends_on) l
++  | Multiple_definitions l ->
++      let print ppf (compunit, files) =
++        fprintf ppf
++          "@ @[<hov>Multiple definitions of module %a in files %a@]"
++          Style.inline_code compunit
++          (pp_list_comma (Style.as_inline_code print_filename)) files
++
++      in
++      fprintf ppf "@[<hov 2> Duplicated implementations:%a@]"
++        (pp_list_comma print) l
+diff --git a/utils/linkdeps.mli b/utils/linkdeps.mli
+new file mode 100644
+index 000000000000..9a1c8f0295c0
+--- /dev/null
++++ b/utils/linkdeps.mli
+@@ -0,0 +1,64 @@
++(**************************************************************************)
++(*                                                                        *)
++(*                                 OCaml                                  *)
++(*                                                                        *)
++(*                              Hugo Heuzard                              *)
++(*                                                                        *)
++(*   Copyright 2020 Institut National de Recherche en Informatique et     *)
++(*     en Automatique.                                                    *)
++(*                                                                        *)
++(*   All rights reserved.  This file is distributed under the terms of    *)
++(*   the GNU Lesser General Public License version 2.1, with the          *)
++(*   special exception on linking described in the file LICENSE.          *)
++(*                                                                        *)
++(**************************************************************************)
++
++type t
++(** The state of the linking check.
++    It keeps track of compilation units provided and required so far. *)
++
++type compunit = string
++
++type filename = string
++
++val create : complete:bool -> t
++(** [create ~complete] returns an empty state. If [complete] is
++   [true], missing compilation units will be treated as errors.  *)
++
++val add : t
++  -> filename:filename -> compunit:compunit
++  -> provides:compunit list -> requires:compunit list -> unit
++(** [add t ~filename ~compunit ~provides ~requires] registers the
++    compilation unit [compunit] found in [filename] to [t].
++    - [provides] are units and sub-units provided by [compunit]
++    - [requires] are units required by [compunit]
++
++    [add] should be called in reverse topological order. *)
++
++val required : t -> compunit -> bool
++(** [required t compunit] returns [true] if [compunit] is a dependency of
++    previously added compilation units. *)
++
++type compunit_and_source = {
++  compunit : compunit;
++  filename : filename;
++}
++
++type error =
++  | Missing_implementations of (compunit * compunit_and_source list) list
++  | Wrong_link_order of (compunit_and_source * compunit_and_source list) list
++  | Multiple_definitions of (compunit * filename list) list
++
++val check : t -> error option
++(** [check t] should be called once all the compilation units to be linked
++    have been added.  It retuns some error if:
++    - There are some missing implementations
++      and [complete] is [true]
++    - Some implementation appear
++      before their dependencies *)
++
++open Format
++
++val report_error
++  :  print_filename:(formatter -> string -> unit)
++  -> formatter -> error -> unit
