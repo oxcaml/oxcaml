@@ -338,3 +338,50 @@ let main b =
   | 0 -> "zero"
   | 1 -> "one"
 ```
+
+### Match-in-Match
+
+Match-in-Match is an optimization that triggers when some branches of a (outer)
+match contain themselves an (inner) match, and that inner match could be
+subject to Match Elimination if it was only reachable from one of the branches
+of the outer match. In such a case, the innter match is duplicated for each of
+the branches of the outer match that reaches it, and each of the new inner
+match is simplified using Match Elimination.
+
+Match-in-Match's main interest is that it removes conditional jumps and join
+points in the control flow.
+
+Match-in-Match is not enabled by default, and requires to use the option
+`-flambda2-match-in-match`. This also requires to use the n-way join: if the
+join algorithm is not explicitly set on the command line or in the env, using
+the `-flambda2-match-in-match` option will automatically set the join algorithm
+default to be the n-way join.
+
+```ocaml
+(* Before Match-in-Match *)
+let main b =
+  let x = if b then 0 else 1 in
+  match x with
+  | 0 -> "zero"
+  | 1 -> "one"
+  | _ -> failwith "not 0 or 1"
+
+(* After Match-in-Match, but before Match Elimination *)
+let main b =
+  if b then
+    let x = 0 in
+    match x with
+    | 0 -> "zero"
+    | 1 -> "one"
+    | _ -> failwith "not 0 or 1"
+  else
+    let x = 1 in
+    match x with
+    | 0 -> "zero"
+    | 1 -> "one"
+    | _ -> failwith "not 0 or 1"
+
+(** After Match-in-Match and Match Elimination *)
+let main b =
+  if b then "zero" else "one"
+```
