@@ -822,7 +822,7 @@ let decide_continuation_specialization ~dacc ~switch ~scrutinee =
       | `No_reason_to_spec -> counters
       | `Not_lifting -> counters
       | `Cannot_specialize -> Profile.Counters.incr "cannot_spec" counters
-      | `Insuficient_lifting_budget ->
+      | `Insufficient_lifting_budget ->
         Profile.Counters.incr "no_lifting_budget" counters
       | `Not_enough_join_info -> Profile.Counters.incr "no_join_info" counters
       | `Too_many_unknown_uses ->
