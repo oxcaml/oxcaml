@@ -731,7 +731,7 @@ let decide_continuation_specialization0 ~dacc ~switch ~scrutinee =
         in
         (* is_lifting_allowed_by_budget ? *)
         if not (lifting_budget > 0 && lifting_cost <= lifting_budget)
-        then dacc, cont, `Insuficient_lifting_budget
+        then dacc, cont, `Insufficient_lifting_budget
         else
           (* Main Criterion: whether all callsites (but one) of the continuation
              determine the value of the scrutinee (and therefore the specialized
