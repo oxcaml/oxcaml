@@ -32,3 +32,5 @@ val create_range_list_entry :
 val create_base_address_selection_entry : base_address_symbol:Asm_symbol.t -> t
 
 val compare_ascending_vma : t -> t -> int
+
+val is_base_address_selection_entry : t -> bool

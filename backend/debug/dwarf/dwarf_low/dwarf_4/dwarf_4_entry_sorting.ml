@@ -1,10 +1,10 @@
 (******************************************************************************
  *                                  OxCaml                                    *
- *                       Mark Shinwell, Jane Street                           *
+ *                        Simon Spies, Jane Street                            *
  * -------------------------------------------------------------------------- *
  *                               MIT License                                  *
  *                                                                            *
- * Copyright (c) 2024 Jane Street Group LLC                                   *
+ * Copyright (c) 2025 Jane Street Group LLC                                   *
  * opensource-contacts@janestreet.com                                         *
  *                                                                            *
  * Permission is hereby granted, free of charge, to any person obtaining a    *
@@ -26,15 +26,17 @@
  * DEALINGS IN THE SOFTWARE.                                                  *
  ******************************************************************************)
 
-(** Generation of descriptions of inlined frames in DWARF. *)
+[@@@ocaml.warning "+a-4-30-40-41-42"]
 
-open! Dwarf_low
-open! Dwarf_high
-
-val dwarf :
-  Dwarf_state.t ->
-  Linear.fundecl ->
-  Inlined_frame_ranges.t ->
-  function_symbol:Asm_targets.Asm_symbol.t ->
-  function_proto_die:Proto_die.t ->
-  Proto_die.t Inlined_frame_ranges.Inlined_frames.Key.Map.t
+let sort_preserving_base_addresses ~is_base_address_selection_entry
+    ~compare_ascending_vma entries =
+  let rec process acc = function
+    | [] -> List.sort compare_ascending_vma acc
+    | entry :: rest ->
+      if is_base_address_selection_entry entry
+      then
+        let sorted_segment = List.sort compare_ascending_vma acc in
+        sorted_segment @ (entry :: process [] rest)
+      else process (entry :: acc) rest
+  in
+  process [] entries
