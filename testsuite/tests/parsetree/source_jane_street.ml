@@ -172,9 +172,9 @@ type t15 : any non_pointer
 type t16 : value non_pointer
 type t17 : value & value non_pointer
 [%%expect{|
-type t15 : any
-type t16
-type t17 : value & value
+type t15 : any non_pointer
+type t16 : value non_pointer
+type t17 : value & value non_pointer
 |}]
 
 type t = #(int * float#)
