@@ -1849,7 +1849,7 @@ let instance_prim_layout env (desc : Primitive.description) ty =
   then ty, None
   else
   let new_sort = ref None in
-  let get_jkind jkind =
+  let get_jkind jkind sa =
     let sort = match !new_sort with
     | Some sort -> sort
     | None ->
@@ -1857,7 +1857,7 @@ let instance_prim_layout env (desc : Primitive.description) ty =
       new_sort := Some sort;
       sort
     in
-    let jkind = Jkind.set_layout jkind (Jkind.Layout.Sort sort) in
+    let jkind = Jkind.set_layout jkind (Jkind.Layout.Sort (sort, sa)) in
     Jkind.History.update_reason
       jkind (Concrete_creation Layout_poly_in_external)
   in
@@ -1868,12 +1868,18 @@ let instance_prim_layout env (desc : Primitive.description) ty =
          from an outer scope *)
       if level = generic_level && try_mark_node mark ty then begin
         begin match get_desc ty with
-        | Tvar ({ jkind; _ } as r) when Jkind.has_layout_any env jkind ->
-          For_copy.redirect_desc copy_scope ty
-            (Tvar {r with jkind = get_jkind jkind})
-        | Tunivar ({ jkind; _ } as r) when Jkind.has_layout_any env jkind ->
-          For_copy.redirect_desc copy_scope ty
-            (Tunivar {r with jkind = get_jkind jkind})
+        | Tvar ({ jkind; _ } as r) -> (
+          match Jkind.extract_layout env jkind with
+          | Ok (Any sa) ->
+            For_copy.redirect_desc copy_scope ty
+              (Tvar {r with jkind = get_jkind jkind sa})
+          | _ -> ())
+        | Tunivar ({ jkind; _ } as r) -> (
+          match Jkind.extract_layout env jkind with
+          | Ok (Any sa) ->
+            For_copy.redirect_desc copy_scope ty
+              (Tunivar {r with jkind = get_jkind jkind sa})
+          | _ -> ())
         | _ -> ()
         end;
         iter_type_expr (inner mark) ty
@@ -2440,7 +2446,7 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
              (estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty)
          with
          | Ok l -> l
-         | Error _ -> Jkind_types.Layout.Any
+         | Error _ -> Jkind_types.Layout.Any Jkind_types.Scannable_axes.max
            (* CR layouts: This is pretty sad - it means that products whose
               elements have fully abstract kinds sometimes can't get a fully
               accurate kind (and we conservatively give any). It shouldn't come
@@ -2868,7 +2874,7 @@ let check_and_update_generalized_ty_jkind ?name ~loc env ty =
       let ext = Jkind.get_externality_upper_bound ~context env jkind in
       Jkind_axis.Externality.le ext External64 &&
       match Jkind.get_layout env jkind with
-      | Some (Base Value) | None -> true
+      | Some (Base (Value, _)) | None -> true
       | _ -> false
     in
     if Language_extension.erasable_extensions_only ()

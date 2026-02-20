@@ -1745,9 +1745,14 @@ let report_error_doc env ppf =
           dprintf "But it was inferred to have %t"
             (fun ppf -> let desc = Jkind.get inferred_jkind in
               match desc.base with
-              | Layout (Sort (Var _)) -> fprintf ppf "a representable kind"
-              | Layout (Sort (Univar _)) -> Misc.fatal_error "univar"
-              | Layout (Sort (Base _) | Any | Product _) | Kconstr _ ->
+              | Layout (Sort (Var _, sa)) ->
+                fprintf ppf "%a representable kind"
+                  (pp_print_list ~pp_sep:(fun f () -> fprintf f " ")
+                    pp_print_string)
+                  ("a" :: Jkind.Scannable_axes.to_string_list sa)
+              | Layout (Sort (Univar _, _)) ->
+                Misc.fatal_error "univar"
+              | Layout (Sort (Base _, _) | Any _ | Product _) | Kconstr _ ->
                 fprintf ppf "kind %a" (Jkind.format env)
                   inferred_jkind)))
         inferred_jkind
