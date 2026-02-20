@@ -1,0 +1,902 @@
+diff --git a/Changes b/Changes
+index 7d22201028f5..dacad461cec9 100644
+--- a/Changes
++++ b/Changes
+@@ -326,6 +326,16 @@ ___________
+   (Vincent Laviron, review by Hugo Heuzard, Nathanaëlle Courant
+    and Gabriel Scherer)
+ 
++* #13050: Use '$' instead of '.' to separate module names in symbol names.
++  This changes mangling of OCaml identifiers from
++  `camlModule.name_NNN` to `camlModule$name_NNN`. Additionally it
++  changes the encoding of special characters from $xx (two hex digits)
++  to $$xx (two dollar signs followed by two hex digits).
++  Mangled names are now consistent across all platforms.
++  (Tim McGilchrist, with contributions from Xavier Leroy,
++   reviewed by Xavier Leroy, Miod Vallat, Gabriel Scherer,
++   Nick Barnes and Hugo Heuzard)
++
+ ### Standard library:
+ 
+ - #13310: Add Stdlib.Pair
+diff --git a/asmcomp/emitaux.ml b/asmcomp/emitaux.ml
+index 306e24922399..61ec3d940f44 100644
+--- a/asmcomp/emitaux.ml
++++ b/asmcomp/emitaux.ml
+@@ -45,7 +45,7 @@ let emit_symbol s =
+       if c = Compilenv.symbol_separator then
+         output_char !output_channel c
+       else
+-        Printf.fprintf !output_channel "$%02x" (Char.code c)
++        Printf.fprintf !output_channel "$$%02x" (Char.code c)
+   done
+ 
+ let emit_string_literal s =
+diff --git a/asmcomp/x86_proc.ml b/asmcomp/x86_proc.ml
+index b7abe4d3d1ca..349a22e5a624 100644
+--- a/asmcomp/x86_proc.ml
++++ b/asmcomp/x86_proc.ml
+@@ -82,12 +82,8 @@ let string_of_symbol prefix s =
+     Buffer.add_string b prefix;
+     String.iter
+       (fun c ->
+-       (* FIXME: using $ to prefix escaped characters can make names
+-          ambiguous if the symbol separator is also set to $; a different
+-          escape prefix should be used in this case, if this ever causes
+-          problems in the real world. *)
+        if is_special_char c then
+-         Printf.bprintf b "$%02x" (Char.code c)
++         Printf.bprintf b "$$%02x" (Char.code c)
+        else
+          Buffer.add_char b c
+       )
+diff --git a/middle_end/compilenv.ml b/middle_end/compilenv.ml
+index d975c1781ce6..8ee77bc34382 100644
+--- a/middle_end/compilenv.ml
++++ b/middle_end/compilenv.ml
+@@ -90,10 +90,7 @@ let current_unit =
+     ui_export_info = default_ui_export_info;
+     ui_for_pack = None }
+ 
+-let symbol_separator =
+-  match Config.ccomp_type with
+-  | "msvc" -> '$' (* MASM does not allow for dots in symbol names *)
+-  | _ -> '.'
++let symbol_separator = '$'
+ 
+ let concat_symbol unitname id =
+   Printf.sprintf "%s%c%s" unitname symbol_separator id
+diff --git a/runtime/amd64.S b/runtime/amd64.S
+index 8457130cdb16..674c1a662cb7 100644
+--- a/runtime/amd64.S
++++ b/runtime/amd64.S
+@@ -406,19 +406,22 @@
+         .text
+ 
+ #if defined(FUNCTION_SECTIONS)
+-        TEXT_SECTION(caml_hot.code_begin)
+-        .globl  G(caml_hot.code_begin)
+-G(caml_hot.code_begin):
++        TEXT_SECTION(caml_hot$code_begin)
++        .globl  G(caml_hot$code_begin)
++G(caml_hot$code_begin):
+ 
+-        TEXT_SECTION(caml_hot.code_end)
+-        .globl  G(caml_hot.code_end)
+-G(caml_hot.code_end):
++        TEXT_SECTION(caml_hot$code_end)
++        .globl  G(caml_hot$code_end)
++G(caml_hot$code_end):
+ #endif
+ 
+ /******************************************************************************/
+ /* text section */
+ /******************************************************************************/
+ 
++/* Allocation functions and GC interface.
++   Referenced from C code in runtime/startup_nat.c */
++
+         TEXT_SECTION(caml_system__code_begin)
+         .globl  G(caml_system__code_begin)
+ G(caml_system__code_begin):
+@@ -1328,8 +1331,10 @@ ENDFUNCTION(G(caml_assert_stack_invariants))
+         .globl  G(caml_system__code_end)
+ G(caml_system__code_end):
+ 
++/* Frametable - GC roots for callback */
++/* Uses the same naming convention as ocamlopt generated modules. */
+         .data
+-OBJECT(G(caml_system.frametable))
++OBJECT(G(caml_system$frametable))
+         .quad   2           /* two descriptors */
+         .quad   LBL(108)    /* return address into callback */
+         .value  -1          /* negative frame size => use callback link */
+@@ -1338,7 +1343,7 @@ OBJECT(G(caml_system.frametable))
+         .quad   LBL(frame_runstack) /* return address into fiber_val_handler */
+         .value  -1          /* negative frame size => use callback link */
+         .value  0           /* no roots here */
+-ENDOBJECT(G(caml_system.frametable))
++ENDOBJECT(G(caml_system$frametable))
+ 
+ #if defined(SYS_macosx)
+         .literal16
+diff --git a/runtime/amd64nt.asm b/runtime/amd64nt.asm
+index efc6a5aa0e51..00d03e25a8f5 100644
+--- a/runtime/amd64nt.asm
++++ b/runtime/amd64nt.asm
+@@ -211,6 +211,8 @@ ENDM
+ 
+         .CODE
+ 
++; Allocation functions and GC interface.
++; Referenced from C code in runtime/startup_nat.c
+         PUBLIC  caml_system__code_begin
+ caml_system__code_begin:
+         ret  ; just one instruction, so that debuggers don't display
+@@ -665,6 +667,8 @@ L310:
+         PUBLIC caml_system__code_end
+ caml_system__code_end:
+ 
++; Frametable - GC roots for callback
++; Uses the same naming convention as ocamlopt generated modules.
+         .DATA
+         PUBLIC  caml_system$frametable
+ caml_system$frametable LABEL QWORD
+diff --git a/runtime/arm64.S b/runtime/arm64.S
+index fbb3cb5fc0d8..0f1d1139e843 100644
+--- a/runtime/arm64.S
++++ b/runtime/arm64.S
+@@ -102,13 +102,13 @@
+ #endif
+ 
+ #if defined(FUNCTION_SECTIONS)
+-        TEXT_SECTION(caml_hot.code_begin)
+-        .globl  G(caml_hot.code_begin)
+-G(caml_hot.code_begin):
++        TEXT_SECTION(caml_hot$code_begin)
++        .globl  G(caml_hot$code_begin)
++G(caml_hot$code_begin):
+ 
+-        TEXT_SECTION(caml_hot.code_end)
+-        .globl  G(caml_hot.code_end)
+-G(caml_hot.code_end):
++        TEXT_SECTION(caml_hot$code_end)
++        .globl  G(caml_hot$code_end)
++G(caml_hot$code_end):
+ #endif
+ 
+ #if defined(SYS_macosx)
+@@ -453,7 +453,9 @@ G(name):
+ 
+ #endif /* } WITH_THREAD_SANITIZER */
+ 
+-/* Allocation functions and GC interface */
++/* Allocation functions and GC interface.
++   Referenced from C code in runtime/startup_nat.c
++ */
+         TEXT_SECTION(caml_system__code_begin)
+         .globl  G(caml_system__code_begin)
+ G(caml_system__code_begin):
+@@ -1253,9 +1255,9 @@ END_FUNCTION(caml_ml_array_bound_error)
+         .globl  G(caml_system__code_end)
+ G(caml_system__code_end):
+ 
+-/* GC roots for callback */
+-
+-OBJECT(caml_system.frametable)
++/* Frametable - GC roots for callback */
++/* Uses the same naming convention as ocamlopt generated modules. */
++OBJECT(caml_system$frametable)
+         .quad   2               /* two descriptors */
+         .quad   L(caml_retaddr) /* return address into callback */
+         .short  -1              /* negative frame size => use callback link */
+@@ -1265,7 +1267,7 @@ OBJECT(caml_system.frametable)
+         .short  -1              /* negative frame size => use callback link */
+         .short  0               /* no roots here */
+         .align 3
+-        END_OBJECT(caml_system.frametable)
++        END_OBJECT(caml_system$frametable)
+ 
+ #if !defined(SYS_macosx)
+ /* Mark stack as non-executable */
+diff --git a/runtime/caml/frame_descriptors.h b/runtime/caml/frame_descriptors.h
+index 7e80ee2f502e..6c25f6154a5f 100644
+--- a/runtime/caml/frame_descriptors.h
++++ b/runtime/caml/frame_descriptors.h
+@@ -31,7 +31,7 @@
+  *
+  * - frame_return_to_C(): Whether the return is to C from OCaml, in
+  *   which case there is no actual stack frame, GC roots, allocation
+- *   sizes, or debug info.  See caml_system.frametable in the various
++ *   sizes, or debug info.  See caml_system$frametable in the various
+  *   architecture-specific OCaml/C interfaces.
+  *
+  * - frame_size(): The stack frame size, in bytes. All stack frames
+diff --git a/runtime/dynlink_nat.c b/runtime/dynlink_nat.c
+index 485e5be46627..c9fd44adf4b1 100644
+--- a/runtime/dynlink_nat.c
++++ b/runtime/dynlink_nat.c
+@@ -39,12 +39,7 @@ CAMLexport void (*caml_natdynlink_hook)(void* handle, const char* unit) = NULL;
+ #include <string.h>
+ #include <limits.h>
+ 
+-/* This should match the value of Compilenv.symbol_separator */
+-#ifdef _MSC_VER
+ #define CAML_SYM_SEPARATOR "$"
+-#else
+-#define CAML_SYM_SEPARATOR "."
+-#endif
+ 
+ #define Handle_val(v) (*((void **) Data_abstract_val(v)))
+ static value Val_handle(void* handle) {
+diff --git a/runtime/power.S b/runtime/power.S
+index bd087149b3c6..9dc3a8d6d323 100644
+--- a/runtime/power.S
++++ b/runtime/power.S
+@@ -76,13 +76,13 @@
+ .endm
+ 
+ #if defined(FUNCTION_SECTIONS)
+-        TEXT_SECTION caml_hot.code_begin
+-        .globl caml_hot.code_begin
+-caml_hot.code_begin:
++        TEXT_SECTION caml_hot$code_begin
++        .globl caml_hot$code_begin
++caml_hot$code_begin:
+ 
+-        TEXT_SECTION caml_hot.code_end
+-        .globl caml_hot.code_end
+-caml_hot.code_end:
++        TEXT_SECTION caml_hot$code_end
++        .globl caml_hot$code_end
++caml_hot$code_end:
+ #endif
+ 
+ .macro FUNCTION name
+@@ -393,6 +393,9 @@ caml_hot.code_end:
+ 
+ #endif /* } WITH_THREAD_SANITIZER */
+ 
++/* Allocation functions and GC interface.
++   Referenced from C code in runtime/startup_nat.c
++*/
+         TEXT_SECTION caml_system__code_begin
+         .globl  caml_system__code_begin
+ caml_system__code_begin:
+@@ -1188,10 +1191,10 @@ ENDFUNCTION caml_ml_array_bound_error
+         .globl  caml_system__code_end
+ caml_system__code_end:
+ 
+-/* Frame table */
+-
++/* Frametable - GC roots for callback */
++/* Uses the same naming convention as ocamlopt generated modules. */
+         .section ".data"
+-OBJECT caml_system.frametable
++OBJECT caml_system$frametable
+         .quad   2               /* two descriptors */
+         .quad   .Lcaml_retaddr + 4  /* return address into callback */
+         .short  -1              /* negative frame size => use callback link */
+diff --git a/runtime/riscv.S b/runtime/riscv.S
+index a3b796bc5396..9b16e6548cfe 100644
+--- a/runtime/riscv.S
++++ b/runtime/riscv.S
+@@ -63,13 +63,13 @@
+ #endif
+ 
+ #if defined(FUNCTION_SECTIONS)
+-        TEXT_SECTION(caml_hot.code_begin)
+-        .globl caml_hot.code_begin
+-caml_hot.code_begin:
++        TEXT_SECTION(caml_hot$code_begin)
++        .globl caml_hot$code_begin
++caml_hot$code_begin:
+ 
+-        TEXT_SECTION(caml_hot.code_end)
+-        .globl caml_hot.code_end
+-caml_hot.code_end:
++        TEXT_SECTION(caml_hot$code_end)
++        .globl caml_hot$code_end
++caml_hot$code_end:
+ #endif
+ 
+ /* Globals and labels */
+@@ -426,8 +426,9 @@ name:
+ 
+ #endif /* } WITH_THREAD_SANITIZER */
+ 
+-/* Invoke the garbage collector. */
+-
++/* Allocation functions and GC interface.
++   Referenced from C code in runtime/startup_nat.c
++ */
+         TEXT_SECTION(caml_system__code_begin)
+         .globl  caml_system__code_begin
+ caml_system__code_begin:
+@@ -1244,9 +1245,9 @@ END_FUNCTION(caml_ml_array_bound_error)
+         .globl  caml_system__code_end
+ caml_system__code_end:
+ 
+-/* GC roots for callback */
+-
+-OBJECT(caml_system.frametable)
++/* Frametable - GC roots for callback */
++/* Uses the same naming convention as ocamlopt generated modules. */
++OBJECT(caml_system$frametable)
+         .quad   2                 /* two descriptors */
+         .quad   L(caml_retaddr)   /* return address into callback */
+         .short  -1                /* negative frame size => use callback link */
+@@ -1256,7 +1257,6 @@ OBJECT(caml_system.frametable)
+         .short  -1                /* negative frame size => use callback link */
+         .short  0                 /* no roots */
+         .align  3
+-END_OBJECT(caml_system.frametable)
+-
++END_OBJECT(caml_system$frametable)
+ /* Mark stack as non-executable */
+         .section .note.GNU-stack,"",%progbits
+diff --git a/runtime/s390x.S b/runtime/s390x.S
+index 341c164264c4..672fd2ef16f9 100644
+--- a/runtime/s390x.S
++++ b/runtime/s390x.S
+@@ -47,13 +47,13 @@
+ #endif
+ 
+ #if defined(FUNCTION_SECTIONS)
+-        TEXT_SECTION(caml_hot.code_begin)
+-        .globl caml_hot.code_begin
+-caml_hot.code_begin:
++        TEXT_SECTION(caml_hot$code_begin)
++        .globl caml_hot$code_begin
++caml_hot$code_begin:
+ 
+-        TEXT_SECTION(caml_hot.code_end)
+-        .globl caml_hot.code_end
+-caml_hot.code_end:
++        TEXT_SECTION(caml_hot$code_end)
++        .globl caml_hot$code_end
++caml_hot$code_end:
+ #endif
+ 
+ #define FUNCTION(name) \
+@@ -156,8 +156,9 @@ caml_hot.code_end:
+ 
+ #define Caml_state(var) 8*domain_field_caml_##var(%r10)
+ 
+-/* Invoke the garbage collector. */
+-
++/* Allocation functions and GC interface.
++   Referenced from C code in runtime/startup_nat.c
++ */
+         TEXT_SECTION(caml_system__code_begin)
+         .globl  caml_system__code_begin
+ caml_system__code_begin:
+@@ -1204,10 +1205,10 @@ ENDFUNCTION(G(caml_ml_array_bound_error))
+         .globl  caml_system__code_end
+ caml_system__code_end:
+ 
+-/* Frame table */
+-
++/* Frametable - GC roots for callback */
++/* Uses the same naming convention as ocamlopt generated modules. */
+         .section ".data"
+-OBJECT(caml_system.frametable)
++OBJECT(caml_system$frametable)
+         .quad   2               /* two descriptors */
+         .quad   LBL(caml_retaddr)  /* return address into callback */
+         .short  -1              /* negative size count => use callback link */
+diff --git a/runtime/startup_nat.c b/runtime/startup_nat.c
+index 8d2fec273f74..a789ec8b68e0 100644
+--- a/runtime/startup_nat.c
++++ b/runtime/startup_nat.c
+@@ -42,7 +42,7 @@
+ extern char caml_system__code_begin, caml_system__code_end;
+ /* The two symbols above are defined in runtime/$ARCH.S.
+    They use the old `__` separator convention because the new convention
+-   gives `caml_system.code_begin`, which is not a valid C identifier. */
++   gives `caml_system$code_begin`, which is not a valid C identifier. */
+ 
+ /* Initialize the static data and code area limits. */
+ 
+diff --git a/testsuite/tests/asmcomp/func_sections.run b/testsuite/tests/asmcomp/func_sections.run
+index cb63628bcd2c..8a0038b0b789 100755
+--- a/testsuite/tests/asmcomp/func_sections.run
++++ b/testsuite/tests/asmcomp/func_sections.run
+@@ -7,4 +7,4 @@ ${program}
+ 
+ # now check the assembly file produced during compilation
+ asm=${test_build_directory}/func_sections.s
+-grep "\.section \.text\.caml\.camlFunc_sections\." "$asm" | wc -l | tr -d ' ' | sed '/^$/d'
++grep "\.section \.text\.caml\.camlFunc_sections\\$" "$asm" | wc -l | tr -d ' ' | sed '/^$/d'
+diff --git a/testsuite/tests/frame-pointers/c_call.reference b/testsuite/tests/frame-pointers/c_call.reference
+index 23095e7431c1..fa11f6d48f1e 100644
+--- a/testsuite/tests/frame-pointers/c_call.reference
++++ b/testsuite/tests/frame-pointers/c_call.reference
+@@ -1,12 +1,12 @@
+ fp_backtrace_many_args
+ caml_c_call_stack_args
+-camlC_call.f
+-camlC_call.entry
++camlC_call$f
++camlC_call$entry
+ caml_program
+ caml_c_call
+-camlC_call.f
+-camlC_call.entry
++camlC_call$f
++camlC_call$entry
+ caml_program
+-camlC_call.f
+-camlC_call.entry
++camlC_call$f
++camlC_call$entry
+ caml_program
+diff --git a/testsuite/tests/frame-pointers/effects.reference b/testsuite/tests/frame-pointers/effects.reference
+index 8ae3fc26dfb2..32a9062819ed 100644
+--- a/testsuite/tests/frame-pointers/effects.reference
++++ b/testsuite/tests/frame-pointers/effects.reference
+@@ -1,26 +1,26 @@
+ # computation f
+-camlEffects.f
++camlEffects$f
+ caml_runstack
+-camlEffects.entry
++camlEffects$entry
+ caml_program
+ # perform effect (E 0)
+ # caught effect (E 0). continuing...
+-camlEffects.h_effect_e
+-camlEffects.entry
++camlEffects$h_effect_e
++camlEffects$entry
+ caml_program
+ # perform returns 1
+-camlEffects.f
++camlEffects$f
+ caml_runstack
+-camlEffects.h_effect_e
+-camlEffects.entry
++camlEffects$h_effect_e
++camlEffects$entry
+ caml_program
+ # done 2
+-camlEffects.v_retc
+-camlEffects.h_effect_e
+-camlEffects.entry
++camlEffects$v_retc
++camlEffects$h_effect_e
++camlEffects$entry
+ caml_program
+ # continue returns 3
+-camlEffects.h_effect_e
+-camlEffects.entry
++camlEffects$h_effect_e
++camlEffects$entry
+ caml_program
+ # result=4
+diff --git a/testsuite/tests/frame-pointers/exception_handler.reference b/testsuite/tests/frame-pointers/exception_handler.reference
+index e012fb6d4ffd..1d4d8c5c9a22 100644
+--- a/testsuite/tests/frame-pointers/exception_handler.reference
++++ b/testsuite/tests/frame-pointers/exception_handler.reference
+@@ -1,16 +1,16 @@
+-camlException_handler.handler
+-camlException_handler.bare
+-camlException_handler.entry
++camlException_handler$handler
++camlException_handler$bare
++camlException_handler$entry
+ caml_program
+-camlException_handler.handler
+-camlException_handler.bare
+-camlException_handler.entry
++camlException_handler$handler
++camlException_handler$bare
++camlException_handler$entry
+ caml_program
+-camlException_handler.handler
+-camlException_handler.nested
+-camlException_handler.entry
++camlException_handler$handler
++camlException_handler$nested
++camlException_handler$entry
+ caml_program
+-camlException_handler.handler
+-camlException_handler.nested
+-camlException_handler.entry
++camlException_handler$handler
++camlException_handler$nested
++camlException_handler$entry
+ caml_program
+diff --git a/testsuite/tests/frame-pointers/reperform.reference b/testsuite/tests/frame-pointers/reperform.reference
+index e215f7716926..f8ab38d4bd40 100644
+--- a/testsuite/tests/frame-pointers/reperform.reference
++++ b/testsuite/tests/frame-pointers/reperform.reference
+@@ -1,17 +1,17 @@
+ # resumed...
+-camlReperform.foo
+-camlReperform.foo
+-camlReperform.foo
+-camlReperform.foo
+-camlReperform.foo
+-camlReperform.foo
++camlReperform$foo
++camlReperform$foo
++camlReperform$foo
++camlReperform$foo
++camlReperform$foo
++camlReperform$foo
+ caml_runstack
+-camlReperform.bar
+-camlReperform.bar
+-camlReperform.bar
+-camlReperform.bar
+-camlReperform.bar
+-camlReperform.bar
++camlReperform$bar
++camlReperform$bar
++camlReperform$bar
++camlReperform$bar
++camlReperform$bar
++camlReperform$bar
+ caml_runstack
+-camlReperform.entry
++camlReperform$entry
+ caml_program
+diff --git a/testsuite/tests/frame-pointers/stack_realloc.reference b/testsuite/tests/frame-pointers/stack_realloc.reference
+index e61d4104e0d5..fb1fde624539 100644
+--- a/testsuite/tests/frame-pointers/stack_realloc.reference
++++ b/testsuite/tests/frame-pointers/stack_realloc.reference
+@@ -1,9 +1,9 @@
+-camlStack_realloc.callback
++camlStack_realloc$callback
+ caml_start_program
+ caml_callback
+ c_fun
+ caml_c_call
+-camlStack_realloc.f_comp
++camlStack_realloc$f_comp
+ caml_runstack
+-camlStack_realloc.entry
++camlStack_realloc$entry
+ caml_program
+diff --git a/testsuite/tests/frame-pointers/stack_realloc2.reference b/testsuite/tests/frame-pointers/stack_realloc2.reference
+index 0051f3bad067..b31adfd44798 100644
+--- a/testsuite/tests/frame-pointers/stack_realloc2.reference
++++ b/testsuite/tests/frame-pointers/stack_realloc2.reference
+@@ -1,9 +1,9 @@
+-camlStack_realloc2.callback
++camlStack_realloc2$callback
+ caml_start_program
+ caml_callback
+ c_fun
+ caml_c_call
+-camlStack_realloc2.f_comp
++camlStack_realloc2$f_comp
+ caml_runstack
+-camlStack_realloc2.entry
++camlStack_realloc2$entry
+ caml_program
+diff --git a/testsuite/tests/native-debugger/linux-gdb-amd64.reference b/testsuite/tests/native-debugger/linux-gdb-amd64.reference
+index 0a236a6ae1f8..0039cd2260ad 100644
+--- a/testsuite/tests/native-debugger/linux-gdb-amd64.reference
++++ b/testsuite/tests/native-debugger/linux-gdb-amd64.reference
+@@ -28,8 +28,8 @@ Breakpoint 3, ocaml_to_c (unit=1) at meander_c.c:XX
+ 4	value ocaml_to_c (value unit) {
+ frame 0: ocaml_to_c
+ frame 1: caml_c_call
+-frame 2: camlMeander.omain
+-frame 3: camlMeander.entry
++frame 2: camlMeander$omain
++frame 3: camlMeander$entry
+ frame 4: caml_program
+ frame 5: caml_start_program
+ frame 6: caml_startup_common
+@@ -39,16 +39,16 @@ frame 9: caml_startup
+ frame 10: caml_main
+ frame 11: main
+ 
+-Breakpoint 4, camlMeander.c_to_ocaml () at meander.ml:5
++Breakpoint 4, camlMeander$c_to_ocaml () at meander.ml:5
+ 5	let c_to_ocaml () = raise E1
+-frame 0: camlMeander.c_to_ocaml
++frame 0: camlMeander$c_to_ocaml
+ frame 1: caml_start_program
+ frame 2: caml_callback_exn
+ frame 3: caml_callback
+ frame 4: ocaml_to_c
+ frame 5: caml_c_call
+-frame 6: camlMeander.omain
+-frame 7: camlMeander.entry
++frame 6: camlMeander$omain
++frame 7: camlMeander$entry
+ frame 8: caml_program
+ frame 9: caml_start_program
+ frame 10: caml_startup_common
+diff --git a/testsuite/tests/native-debugger/linux-gdb-arm64.reference b/testsuite/tests/native-debugger/linux-gdb-arm64.reference
+index 79149643926a..bc4719848ca5 100644
+--- a/testsuite/tests/native-debugger/linux-gdb-arm64.reference
++++ b/testsuite/tests/native-debugger/linux-gdb-arm64.reference
+@@ -28,8 +28,8 @@ Breakpoint 3, ocaml_to_c (unit=1) at meander_c.c:XX
+ 5	    caml_callback(*caml_named_value
+ frame 0: ocaml_to_c
+ frame 1: caml_c_call
+-frame 2: camlMeander.omain
+-frame 3: camlMeander.entry
++frame 2: camlMeander$omain
++frame 3: camlMeander$entry
+ frame 4: caml_program
+ frame 5: caml_start_program
+ frame 6: caml_startup_common
+@@ -39,16 +39,16 @@ frame 9: caml_startup
+ frame 10: caml_main
+ frame 11: main
+ 
+-Breakpoint 4, camlMeander.c_to_ocaml () at meander.ml:5
++Breakpoint 4, camlMeander$c_to_ocaml () at meander.ml:5
+ 5	let c_to_ocaml () = raise E1
+-frame 0: camlMeander.c_to_ocaml
++frame 0: camlMeander$c_to_ocaml
+ frame 1: caml_start_program
+ frame 2: caml_callback_exn
+ frame 3: caml_callback
+ frame 4: ocaml_to_c
+ frame 5: caml_c_call
+-frame 6: camlMeander.omain
+-frame 7: camlMeander.entry
++frame 6: camlMeander$omain
++frame 7: camlMeander$entry
+ frame 8: caml_program
+ frame 9: caml_start_program
+ frame 10: caml_startup_common
+diff --git a/testsuite/tests/native-debugger/linux-gdb-riscv.reference b/testsuite/tests/native-debugger/linux-gdb-riscv.reference
+index b3284fad8bee..86dd90621b8f 100644
+--- a/testsuite/tests/native-debugger/linux-gdb-riscv.reference
++++ b/testsuite/tests/native-debugger/linux-gdb-riscv.reference
+@@ -28,8 +28,8 @@ Breakpoint 3, ocaml_to_c (unit=1) at meander_c.c:XX
+ 5	    caml_callback(*caml_named_value
+ frame 0: ocaml_to_c
+ frame 1: caml_c_call
+-frame 2: camlMeander.omain
+-frame 3: camlMeander.entry
++frame 2: camlMeander$omain
++frame 3: camlMeander$entry
+ frame 4: caml_program
+ frame 5: caml_start_program
+ frame 6: caml_startup_common
+@@ -39,16 +39,16 @@ frame 9: caml_startup
+ frame 10: caml_main
+ frame 11: main
+ 
+-Breakpoint 4, camlMeander.c_to_ocaml () at meander.ml:5
++Breakpoint 4, camlMeander$c_to_ocaml () at meander.ml:5
+ 5	let c_to_ocaml () = raise E1
+-frame 0: camlMeander.c_to_ocaml
++frame 0: camlMeander$c_to_ocaml
+ frame 1: caml_start_program
+ frame 2: caml_callback_exn
+ frame 3: caml_callback
+ frame 4: ocaml_to_c
+ frame 5: caml_c_call
+-frame 6: camlMeander.omain
+-frame 7: camlMeander.entry
++frame 6: camlMeander$omain
++frame 7: camlMeander$entry
+ frame 8: caml_program
+ frame 9: caml_start_program
+ frame 10: caml_startup_common
+diff --git a/testsuite/tests/native-debugger/linux-lldb-amd64.reference b/testsuite/tests/native-debugger/linux-lldb-amd64.reference
+index fb200d875c6e..4bb23422c51b 100644
+--- a/testsuite/tests/native-debugger/linux-lldb-amd64.reference
++++ b/testsuite/tests/native-debugger/linux-lldb-amd64.reference
+@@ -8,8 +8,8 @@ Executing commands in 'XXXX'.
+ Breakpoint created for regex caml_start_program.
+ (lldb) create caml_program
+ Breakpoint created for regex caml_program.
+-(lldb) create camlMeander.c_to_ocaml*
+-Breakpoint created for regex camlMeander.c_to_ocaml*.
++(lldb) create camlMeander\$c_to_ocaml*
++Breakpoint created for regex camlMeander\$c_to_ocaml*.
+ (lldb) create ocaml_to_c
+ Breakpoint created for regex ocaml_to_c.
+ (lldb) run
+@@ -61,8 +61,8 @@ Process XXXX stopped
+ (lldb) backtrace
+ frame 0: meander`ocaml_to_c
+ frame 1: meander`caml_c_call
+-frame 2: meander`camlMeander.omain
+-frame 3: meander`camlMeander.entry
++frame 2: meander`camlMeander$omain
++frame 3: meander`camlMeander$entry
+ frame 4: meander`caml_program
+ frame 5: meander`caml_start_program
+ frame 6: meander`caml_startup_common
+@@ -79,7 +79,7 @@ This version of LLDB has no plugin for the language "assembler". Inspection of f
+ Process XXXX resuming
+ Process XXXX stopped
+ * thread #1, name = 'XXXX', stop reason = breakpoint 3.1
+-    frame #0: 0x00000000000000 meander`camlMeander.c_to_ocaml at meander.ml:5:20
++    frame #0: 0x00000000000000 meander`camlMeander$c_to_ocaml at meander.ml:5:20
+    2   	         : unit -> int = "ocaml_to_c"
+    3   	exception E1
+    4   	exception E2
+@@ -89,14 +89,14 @@ Process XXXX stopped
+    7   	          "c_to_ocaml" c_to_ocaml
+    8   	let omain () =
+ (lldb) backtrace
+-frame 0: meander`camlMeander.c_to_ocaml
++frame 0: meander`camlMeander$c_to_ocaml
+ frame 1: meander`caml_start_program
+ frame 2: meander`caml_callback_exn
+ frame 3: meander`caml_callback
+ frame 4: meander`ocaml_to_c
+ frame 5: meander`caml_c_call
+-frame 6: meander`camlMeander.omain
+-frame 7: meander`camlMeander.entry
++frame 6: meander`camlMeander$omain
++frame 7: meander`camlMeander$entry
+ frame 8: meander`caml_program
+ frame 9: meander`caml_start_program
+ frame 10: meander`caml_startup_common
+diff --git a/testsuite/tests/native-debugger/linux-lldb-arm64.reference b/testsuite/tests/native-debugger/linux-lldb-arm64.reference
+index daa1ff164c95..e14a5a3c35ff 100644
+--- a/testsuite/tests/native-debugger/linux-lldb-arm64.reference
++++ b/testsuite/tests/native-debugger/linux-lldb-arm64.reference
+@@ -8,8 +8,8 @@ Executing commands in 'XXXX'.
+ Breakpoint created for regex caml_start_program.
+ (lldb) create caml_program
+ Breakpoint created for regex caml_program.
+-(lldb) create camlMeander.c_to_ocaml*
+-Breakpoint created for regex camlMeander.c_to_ocaml*.
++(lldb) create camlMeander\$c_to_ocaml*
++Breakpoint created for regex camlMeander\$c_to_ocaml*.
+ (lldb) create ocaml_to_c
+ Breakpoint created for regex ocaml_to_c.
+ (lldb) run
+@@ -61,8 +61,8 @@ Process XXXX stopped
+ (lldb) backtrace
+ frame 0: meander`ocaml_to_c
+ frame 1: meander`caml_c_call
+-frame 2: meander`camlMeander.omain
+-frame 3: meander`camlMeander.entry
++frame 2: meander`camlMeander$omain
++frame 3: meander`camlMeander$entry
+ frame 4: meander`caml_program
+ frame 5: meander`caml_start_program
+ frame 6: meander`caml_startup_common
+@@ -94,8 +94,8 @@ frame 2: meander`caml_callback_exn
+ frame 3: meander`caml_callback
+ frame 4: meander`ocaml_to_c
+ frame 5: meander`caml_c_call
+-frame 6: meander`camlMeander.omain
+-frame 7: meander`camlMeander.entry
++frame 6: meander`camlMeander$omain
++frame 7: meander`camlMeander$entry
+ frame 8: meander`caml_program
+ frame 9: meander`caml_start_program
+ frame 10: meander`caml_startup_common
+diff --git a/testsuite/tests/native-debugger/lldb-script b/testsuite/tests/native-debugger/lldb-script
+index 3ab410c04f97..fd9731df30d9 100644
+--- a/testsuite/tests/native-debugger/lldb-script
++++ b/testsuite/tests/native-debugger/lldb-script
+@@ -2,7 +2,7 @@ settings set stop-disassembly-display never
+ command script import ./lldb_test.py
+ create caml_start_program
+ create caml_program
+-create camlMeander.c_to_ocaml*
++create camlMeander\$c_to_ocaml*
+ create ocaml_to_c
+ run
+ backtrace
+diff --git a/testsuite/tests/native-debugger/macos-lldb-amd64.reference b/testsuite/tests/native-debugger/macos-lldb-amd64.reference
+index 48fec32e7e1b..09e96c15dce4 100644
+--- a/testsuite/tests/native-debugger/macos-lldb-amd64.reference
++++ b/testsuite/tests/native-debugger/macos-lldb-amd64.reference
+@@ -8,8 +8,8 @@ Executing commands in 'XXXX'.
+ Breakpoint created for regex caml_start_program.
+ (lldb) create caml_program
+ Breakpoint created for regex caml_program.
+-(lldb) create camlMeander.c_to_ocaml*
+-Breakpoint created for regex camlMeander.c_to_ocaml*.
++(lldb) create camlMeander\$c_to_ocaml*
++Breakpoint created for regex camlMeander\$c_to_ocaml*.
+ (lldb) create ocaml_to_c
+ Breakpoint created for regex ocaml_to_c.
+ (lldb) run
+@@ -59,8 +59,8 @@ Target 0: (meander) stopped.
+ (lldb) backtrace
+ frame 0: meander`ocaml_to_c
+ frame 1: meander`caml_c_call
+-frame 2: meander`camlMeander.omain
+-frame 3: meander`camlMeander.entry
++frame 2: meander`camlMeander$omain
++frame 3: meander`camlMeander$entry
+ frame 4: meander`caml_program
+ frame 5: meander`caml_start_program
+ frame 6: meander`caml_startup_common
+@@ -73,17 +73,17 @@ frame 11: dyld`start
+ Process XXXX resuming
+ Process XXXX stopped
+ * thread #1, queue = 'XXXX', stop reason = breakpoint 3.1
+-    frame #0: 0x00000000000000 meander`camlMeander.c_to_ocaml
++    frame #0: 0x00000000000000 meander`camlMeander$c_to_ocaml
+ Target 0: (meander) stopped.
+ (lldb) backtrace
+-frame 0: meander`camlMeander.c_to_ocaml
++frame 0: meander`camlMeander$c_to_ocaml
+ frame 1: meander`caml_start_program
+ frame 2: meander`caml_callback_exn
+ frame 3: meander`caml_callback
+ frame 4: meander`ocaml_to_c
+ frame 5: meander`caml_c_call
+-frame 6: meander`camlMeander.omain
+-frame 7: meander`camlMeander.entry
++frame 6: meander`camlMeander$omain
++frame 7: meander`camlMeander$entry
+ frame 8: meander`caml_program
+ frame 9: meander`caml_start_program
+ frame 10: meander`caml_startup_common
+diff --git a/testsuite/tests/native-debugger/macos-lldb-arm64.reference b/testsuite/tests/native-debugger/macos-lldb-arm64.reference
+index 48fec32e7e1b..09e96c15dce4 100644
+--- a/testsuite/tests/native-debugger/macos-lldb-arm64.reference
++++ b/testsuite/tests/native-debugger/macos-lldb-arm64.reference
+@@ -8,8 +8,8 @@ Executing commands in 'XXXX'.
+ Breakpoint created for regex caml_start_program.
+ (lldb) create caml_program
+ Breakpoint created for regex caml_program.
+-(lldb) create camlMeander.c_to_ocaml*
+-Breakpoint created for regex camlMeander.c_to_ocaml*.
++(lldb) create camlMeander\$c_to_ocaml*
++Breakpoint created for regex camlMeander\$c_to_ocaml*.
+ (lldb) create ocaml_to_c
+ Breakpoint created for regex ocaml_to_c.
+ (lldb) run
+@@ -59,8 +59,8 @@ Target 0: (meander) stopped.
+ (lldb) backtrace
+ frame 0: meander`ocaml_to_c
+ frame 1: meander`caml_c_call
+-frame 2: meander`camlMeander.omain
+-frame 3: meander`camlMeander.entry
++frame 2: meander`camlMeander$omain
++frame 3: meander`camlMeander$entry
+ frame 4: meander`caml_program
+ frame 5: meander`caml_start_program
+ frame 6: meander`caml_startup_common
+@@ -73,17 +73,17 @@ frame 11: dyld`start
+ Process XXXX resuming
+ Process XXXX stopped
+ * thread #1, queue = 'XXXX', stop reason = breakpoint 3.1
+-    frame #0: 0x00000000000000 meander`camlMeander.c_to_ocaml
++    frame #0: 0x00000000000000 meander`camlMeander$c_to_ocaml
+ Target 0: (meander) stopped.
+ (lldb) backtrace
+-frame 0: meander`camlMeander.c_to_ocaml
++frame 0: meander`camlMeander$c_to_ocaml
+ frame 1: meander`caml_start_program
+ frame 2: meander`caml_callback_exn
+ frame 3: meander`caml_callback
+ frame 4: meander`ocaml_to_c
+ frame 5: meander`caml_c_call
+-frame 6: meander`camlMeander.omain
+-frame 7: meander`camlMeander.entry
++frame 6: meander`camlMeander$omain
++frame 7: meander`camlMeander$entry
+ frame 8: meander`caml_program
+ frame 9: meander`caml_start_program
+ frame 10: meander`caml_startup_common
+diff --git a/testsuite/tests/unwind/stack_walker.c b/testsuite/tests/unwind/stack_walker.c
+index acf36eb87953..ae759aeee173 100644
+--- a/testsuite/tests/unwind/stack_walker.c
++++ b/testsuite/tests/unwind/stack_walker.c
+@@ -38,10 +38,10 @@ value ml_perform_stack_walk(value unused) {
+             if (strlen(procname) > 4 &&
+                 !memcmp(procname, "caml", 4) &&
+                 'A' <= procname[4] && procname[4] <= 'Z' &&
+-                strchr(procname+4, '.')) {
++                strchr(procname+4, '$')) {
+               /* mangled OCaml name, unmangle and print */
+               const char* mangled = procname + 4;
+-              const char* mod_end = strchr(mangled, '.');
++              const char* mod_end = strchr(mangled, '$');
+               const char* id_begin = strchr(mod_end + 1, '_');
+               if (!id_begin) id_begin = mangled + strlen(mangled);
+               printf("%.*s.%.*s\n",
