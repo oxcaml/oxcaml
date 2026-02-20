@@ -1,0 +1,34 @@
+diff --git a/.depend b/.depend
+index b043fcbe510c..dac89504fef8 100644
+--- a/.depend
++++ b/.depend
+@@ -3009,6 +3009,7 @@ asmcomp/emit.cmi : \
+     asmcomp/linear.cmi \
+     asmcomp/cmm.cmi
+ asmcomp/emitaux.cmo : \
++    parsing/location.cmi \
+     utils/format_doc.cmi \
+     asmcomp/emitenv.cmi \
+     lambda/debuginfo.cmi \
+@@ -3019,6 +3020,7 @@ asmcomp/emitaux.cmo : \
+     asmcomp/arch.cmi \
+     asmcomp/emitaux.cmi
+ asmcomp/emitaux.cmx : \
++    parsing/location.cmx \
+     utils/format_doc.cmx \
+     asmcomp/emitenv.cmi \
+     lambda/debuginfo.cmx \
+diff --git a/Changes b/Changes
+index 7c129feacfaa..09bfade40984 100644
+--- a/Changes
++++ b/Changes
+@@ -239,6 +239,9 @@ _______________
+   since #11288 and broke ocamlbrowser.
+   (David Allsopp, report by Jacques Garrigue, review by ??)
+ 
++- #13251: Register printer for errors in Emitaux
++  (Vincent Laviron, review by Miod Vallat and Florian Angeletti)
++
+ ### Internal/compiler-libs changes:
+ 
+ - #11129, #11148: enforce that ppxs do not produce `parsetree`s with

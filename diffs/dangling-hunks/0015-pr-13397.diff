@@ -1,0 +1,143 @@
+diff --git a/bytecomp/bytegen.ml b/bytecomp/bytegen.ml
+index 4665ac84bcac..8d5a524166d5 100644
+--- a/bytecomp/bytegen.ml
++++ b/bytecomp/bytegen.ml
+@@ -164,7 +164,7 @@ let preserve_tailcall_for_prim = function
+   | Pbytes_set_64 _ | Pbigstring_load_16 _ | Pbigstring_load_32 _
+   | Pbigstring_load_64 _ | Pbigstring_set_16 _ | Pbigstring_set_32 _
+   | Pbigstring_set_64 _ | Pctconst _ | Pbswap16 | Pbbswap _ | Pint_as_pointer
+-  | Patomic_exchange | Patomic_cas | Patomic_fetch_add | Patomic_load _
++  | Patomic_load _
+   | Pdls_get ->
+       false
+ 
+@@ -489,9 +489,6 @@ let comp_primitive stack_info p sz args =
+   | Pbytes_to_string -> Kccall("caml_string_of_bytes", 1)
+   | Pbytes_of_string -> Kccall("caml_bytes_of_string", 1)
+   | Patomic_load _ -> Kccall("caml_atomic_load", 1)
+-  | Patomic_exchange -> Kccall("caml_atomic_exchange", 2)
+-  | Patomic_cas -> Kccall("caml_atomic_cas", 3)
+-  | Patomic_fetch_add -> Kccall("caml_atomic_fetch_add", 2)
+   | Pdls_get -> Kccall("caml_domain_dls_get", 1)
+   | Ppoll -> Kccall("caml_process_pending_actions_with_root", 1)
+   (* The cases below are handled in [comp_expr] before the [comp_primitive] call
+diff --git a/lambda/lambda.ml b/lambda/lambda.ml
+index 9fdbc8146e9f..cb3bdf94907a 100644
+--- a/lambda/lambda.ml
++++ b/lambda/lambda.ml
+@@ -144,9 +144,6 @@ type primitive =
+   | Pint_as_pointer
+   (* Atomic operations *)
+   | Patomic_load of {immediate_or_pointer : immediate_or_pointer}
+-  | Patomic_exchange
+-  | Patomic_cas
+-  | Patomic_fetch_add
+   (* Inhibition of optimisation *)
+   | Popaque
+   (* Fetching domain-local state *)
+diff --git a/lambda/lambda.mli b/lambda/lambda.mli
+index 6f5d9717914b..bd17d2ab23a6 100644
+--- a/lambda/lambda.mli
++++ b/lambda/lambda.mli
+@@ -154,9 +154,6 @@ type primitive =
+   | Pint_as_pointer
+   (* Atomic operations *)
+   | Patomic_load of {immediate_or_pointer : immediate_or_pointer}
+-  | Patomic_exchange
+-  | Patomic_cas
+-  | Patomic_fetch_add
+   (* Inhibition of optimisation *)
+   | Popaque
+   (* Fetching domain-local state *)
+diff --git a/lambda/printlambda.ml b/lambda/printlambda.ml
+index 76989a4035f7..886156e2091c 100644
+--- a/lambda/printlambda.ml
++++ b/lambda/printlambda.ml
+@@ -354,9 +354,6 @@ let primitive ppf = function
+       (match immediate_or_pointer with
+         | Immediate -> fprintf ppf "atomic_load_imm"
+         | Pointer -> fprintf ppf "atomic_load_ptr")
+-  | Patomic_exchange -> fprintf ppf "atomic_exchange"
+-  | Patomic_cas -> fprintf ppf "atomic_cas"
+-  | Patomic_fetch_add -> fprintf ppf "atomic_fetch_add"
+   | Popaque -> fprintf ppf "opaque"
+   | Pdls_get -> fprintf ppf "dls_get"
+   | Ppoll -> fprintf ppf "poll"
+@@ -466,9 +463,6 @@ let name_of_primitive = function
+       (match immediate_or_pointer with
+         | Immediate -> "atomic_load_imm"
+         | Pointer -> "atomic_load_ptr")
+-  | Patomic_exchange -> "Patomic_exchange"
+-  | Patomic_cas -> "Patomic_cas"
+-  | Patomic_fetch_add -> "Patomic_fetch_add"
+   | Popaque -> "Popaque"
+   | Prunstack -> "Prunstack"
+   | Presume -> "Presume"
+diff --git a/lambda/tmc.ml b/lambda/tmc.ml
+index 8b5b66642fcf..20a3bc1aa2c2 100644
+--- a/lambda/tmc.ml
++++ b/lambda/tmc.ml
+@@ -865,7 +865,7 @@ let rec choice ctx t =
+     | Prunstack | Pperform | Presume | Preperform | Pdls_get
+ 
+     (* we don't handle atomic primitives *)
+-    | Patomic_exchange | Patomic_cas | Patomic_fetch_add | Patomic_load _
++    | Patomic_load _
+ 
+     (* we don't handle array indices as destinations yet *)
+     | (Pmakearray _ | Pduparray _)
+diff --git a/lambda/translprim.ml b/lambda/translprim.ml
+index df46ea3a44af..2996def4b0a8 100644
+--- a/lambda/translprim.ml
++++ b/lambda/translprim.ml
+@@ -113,6 +113,14 @@ let gen_array_kind =
+ let prim_sys_argv =
+   Primitive.simple ~name:"caml_sys_argv" ~arity:1 ~alloc:true
+ 
++let prim_atomic_exchange =
++  Primitive.simple ~name:"caml_atomic_exchange" ~arity:2 ~alloc:false
++let prim_atomic_cas =
++  Primitive.simple ~name:"caml_atomic_cas" ~arity:3 ~alloc:false
++let prim_atomic_fetch_add =
++  Primitive.simple ~name:"caml_atomic_fetch_add" ~arity:2 ~alloc:false
++
++
+ let primitives_table =
+   create_hashtable 57 [
+     "%identity", Identity;
+@@ -366,9 +374,9 @@ let primitives_table =
+     "%compare", Comparison(Compare, Compare_generic);
+     "%atomic_load",
+     Primitive ((Patomic_load {immediate_or_pointer=Pointer}), 1);
+-    "%atomic_exchange", Primitive (Patomic_exchange, 2);
+-    "%atomic_cas", Primitive (Patomic_cas, 3);
+-    "%atomic_fetch_add", Primitive (Patomic_fetch_add, 2);
++    "%atomic_exchange", External prim_atomic_exchange;
++    "%atomic_cas", External prim_atomic_cas;
++    "%atomic_fetch_add", External prim_atomic_fetch_add;
+     "%runstack", Primitive (Prunstack, 3);
+     "%reperform", Primitive (Preperform, 3);
+     "%perform", Primitive (Pperform, 1);
+@@ -826,7 +834,7 @@ let lambda_primitive_needs_event_after = function
+   | Pfloatcomp _ | Pstringlength | Pstringrefu | Pbyteslength | Pbytesrefu
+   | Pbytessetu | Pmakearray ((Pintarray | Paddrarray | Pfloatarray), _)
+   | Parraylength _ | Parrayrefu _ | Parraysetu _ | Pisint | Pisout
+-  | Patomic_exchange | Patomic_cas | Patomic_fetch_add | Patomic_load _
++  | Patomic_load _
+   | Pintofbint _ | Pctconst _ | Pbswap16 | Pint_as_pointer | Popaque | Pdls_get
+       -> false
+ 
+diff --git a/lambda/value_rec_compiler.ml b/lambda/value_rec_compiler.ml
+index a240a7805e22..3950c3b6ba88 100644
+--- a/lambda/value_rec_compiler.ml
++++ b/lambda/value_rec_compiler.ml
+@@ -305,9 +305,6 @@ let compute_static_size lam =
+     | Pbbswap _
+     | Pint_as_pointer
+     | Patomic_load _
+-    | Patomic_exchange
+-    | Patomic_cas
+-    | Patomic_fetch_add
+     | Popaque
+     | Pdls_get ->
+         dynamic_size ()

@@ -1,0 +1,19 @@
+diff --git a/Changes b/Changes
+index 09562ffd576d..f7bddbaab877 100644
+--- a/Changes
++++ b/Changes
+@@ -128,10 +128,14 @@ Working version
+ - #13758: Propagate more value kinds in Flambda to allow more unboxing
+   (Vincent Laviron, review by Pierre Chambart)
+ 
++- #13759: Propagate more type information from clambda to cmm.
++  (Pierre Chambart, review by Gabriel Scherer)
++
+ - #13735: Follow the behaviour of the C compiler to decide whether to emit the
+   `.size` and `.type` directives and the `.note.GNU-stack` section
+   (Samuel Hym, review by Miod Vallat, Antonin Décimo and Gabriel Scherer)
+ 
++
+ ### Standard library:
+ 
+ - #13768: Add Either.get_left and Either.get_right
