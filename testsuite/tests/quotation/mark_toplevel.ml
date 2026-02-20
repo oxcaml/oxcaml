@@ -30,7 +30,7 @@ let (x : <[t]> expr) = <[42]>
 val x : <[t]> expr = <[42]>
 |}];;
 
-(* The directive does not apply retroactively, so this fails again *)
+(* The directive does not apply to future definitions *)
 type s = int
 let (x : <[s]> expr) = <[42]>
 [%%expect {|
