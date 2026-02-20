@@ -1,0 +1,13 @@
+File "w55_classic.ml", line 7, characters 26-48:
+7 | let[@inline always] g x = (f[@inlined always]) x
+                              ^^^^^^^^^^^^^^^^^^^^^^
+Warning 55 [inlining-impossible]: Cannot inline: 
+  the optimizer did not know what function was being applied (is it marked [@inline never]?)
+  (the full inlining stack was: w55_classic.ml:7,26--48)
+
+File "w55_classic.ml", line 7, characters 26-48:
+7 | let[@inline always] g x = (f[@inlined always]) x
+                              ^^^^^^^^^^^^^^^^^^^^^^
+Warning 55 [inlining-impossible]: Cannot inline: 
+  the optimizer did not know what function was being applied (is it marked [@inline never]?)
+  (the full inlining stack was: w55_classic.ml:9,10--13;w55_classic.ml:7,26--48)

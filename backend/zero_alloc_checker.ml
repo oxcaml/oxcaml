@@ -1701,15 +1701,16 @@ end = struct
 
   let error_messages t : Location.error list =
     let pp_inlined_dbg ppf dbg =
-      (* Show inlined locations, if dbg has more than one item. The first item
-         will be shown at the start of the error message. *)
+      (* Show inlined locations, if dbg has more than one item. The last item,
+         containing the actual allocation or function call, will be shown at the
+         start of the error message. *)
       let items = Debuginfo.to_items dbg in
       if List.compare_length_with items 1 > 0
       then
         (* Print the inlined stack starting from the innermost frame, i.e., the
            location that directly contains the witness instruction before
-           inlining. *)
-        let items = List.rev items in
+           inlining. Drop the first item which has already been printed. *)
+        let items = List.tl (List.rev items) in
         if !Oxcaml_flags.zero_alloc_checker_details_extra
         then
           Fmt.fprintf ppf "\ninlined from\n%a"

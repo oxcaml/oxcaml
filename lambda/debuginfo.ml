@@ -338,9 +338,14 @@ let from_location = function
     { dbg = [item_from_location ~scopes loc]; assume_zero_alloc; }
 
 let to_location { dbg; assume_zero_alloc=_ } =
-  match dbg with
-  | [] -> Location.none
-  | d :: _ ->
+  let rec last = function
+    | [] -> None
+    | [x] -> Some x
+    | _ :: r -> last r
+  in
+  match last dbg with
+  | None -> Location.none
+  | Some d ->
     let loc_start =
       { pos_fname = d.dinfo_file;
         pos_lnum = d.dinfo_line;
