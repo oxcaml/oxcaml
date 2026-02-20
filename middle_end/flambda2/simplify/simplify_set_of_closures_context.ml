@@ -76,7 +76,7 @@ let compute_value_slot_types_inside_function ~value_slot_types
       let type_prior_to_sets =
         (* See comment below about [degraded_value_slots]. *)
         if Value_slot.Set.mem value_slot degraded_value_slots
-        then T.any_value
+        then T.unknown (Value_slot.kind value_slot)
         else type_prior_to_sets
       in
       type_prior_to_sets)

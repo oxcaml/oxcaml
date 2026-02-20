@@ -315,8 +315,8 @@ let value_modes_var i ppf ms =
 let moda_desc i ppf modalities_annot =
   let modality_as_mode (Mode.Modality.Atom (ax, modality)) : Mode.Value.atom =
     match ax, modality with
-    | Comonadic ax, Meet_with mode -> Atom (Comonadic ax, mode)
-    | Monadic ax, Join_with mode -> Atom (Monadic ax, mode)
+    | Comonadic ax, Meet_const mode -> Atom (Comonadic ax, mode)
+    | Monadic ax, Join_const mode -> Atom (Monadic ax, mode)
   in
   let as_modes_annot =
     List.map (Location.map modality_as_mode) modalities_annot
@@ -469,11 +469,11 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
   end;
   match x.pat_desc with
   | Tpat_any -> line i ppf "Tpat_any\n";
-  | Tpat_var (s,_,_,sort,m) ->
+  | Tpat_var { id = s; sort; mode = m; _ } ->
       line i ppf "Tpat_var \"%a\"\n" fmt_ident s;
       line i ppf "sort %a\n" fmt_sort sort;
       value_mode i ppf m
-  | Tpat_alias (p, s,_,_,sort,m,_) ->
+  | Tpat_alias { pattern = p; id = s; sort; mode = m; _ } ->
       line i ppf "Tpat_alias \"%a\"\n" fmt_ident s;
       line i ppf "sort %a\n" fmt_sort sort;
       value_mode i ppf m;
@@ -921,6 +921,14 @@ and type_kind i ppf x =
   | Ttype_open ->
       line i ppf "Ttype_open\n"
 
+and jkind_declaration i ppf x =
+  line i ppf "jkind_declaration %a %a\n" fmt_ident x.jkind_id
+       fmt_location x.jkind_loc;
+  attributes i ppf x.jkind_attributes;
+  let i = i+1 in
+  line i ppf "pjkind_manifest =\n";
+  option (i+1) jkind_annotation ppf x.jkind_annotation
+
 and type_extension i ppf x =
   line i ppf "type_extension\n";
   attributes i ppf x.tyext_attributes;
@@ -1206,6 +1214,9 @@ and signature_item i ppf x =
       list i class_type_declaration ppf l;
   | Tsig_attribute a ->
       attribute i ppf "Tsig_attribute" a
+  | Tsig_jkind jd ->
+      line i ppf "Tsig_jkind";
+      jkind_declaration i ppf jd
 
 and module_declaration i ppf md =
   line i ppf "%a" fmt_modname md.md_id;
@@ -1325,6 +1336,9 @@ and structure_item i ppf x =
       module_expr i ppf incl.incl_mod;
   | Tstr_attribute a ->
       attribute i ppf "Tstr_attribute" a
+  | Tstr_jkind jd ->
+      line i ppf "Tstr_jkind";
+      jkind_declaration i ppf jd
 
 and longident_x_with_constraint i ppf (li, _, wc) =
   line i ppf "%a\n" fmt_path li;

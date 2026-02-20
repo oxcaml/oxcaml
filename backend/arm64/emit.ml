@@ -950,10 +950,10 @@ let num_call_gc_points instr =
            | Ishiftarith (_, _)
            | Ibswap _ | Isignext _ | Isimd _ ))
     | Lop
-        ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
-        | Dls_get | Tls_get | Domain_index | Const_int _ | Const_float32 _
-        | Const_float _ | Const_symbol _ | Const_vec128 _ | Stackoffset _
-        | Load _
+        ( Move | Spill | Reload | Dummy_use | Opaque | Pause | Begin_region
+        | End_region | Dls_get | Tls_get | Domain_index | Const_int _
+        | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+        | Stackoffset _ | Load _
         | Store (_, _, _)
         | Intop _ | Int128op _
         | Intop_imm (_, _)
@@ -1023,10 +1023,10 @@ module BR = Branch_relaxation.Make (struct
       | Lcondbranch (Ioddtest, _) | Lcondbranch (Ieventest, _) -> Some TB
       | Lcondbranch3 _ -> Some Bcc
       | Lop
-          ( Specific _ | Move | Spill | Reload | Opaque | Begin_region | Pause
-          | End_region | Dls_get | Tls_get | Domain_index | Const_int _
-          | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-          | Stackoffset _ | Load _
+          ( Specific _ | Move | Spill | Reload | Dummy_use | Opaque
+          | Begin_region | Pause | End_region | Dls_get | Tls_get | Domain_index
+          | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
+          | Const_vec128 _ | Stackoffset _ | Load _
           | Store (_, _, _)
           | Intop _ | Int128op _
           | Intop_imm (_, _)
@@ -1070,6 +1070,7 @@ module BR = Branch_relaxation.Make (struct
     | Lepilogue_open -> epilogue_size ()
     | Lepilogue_close -> 0
     | Lop (Move | Spill | Reload) -> 1
+    | Lop Dummy_use -> 0
     | Lop (Const_int n) -> num_instructions_for_intconst n
     | Lop (Const_float32 _) -> 2
     | Lop (Const_float _) -> 2
@@ -1553,6 +1554,7 @@ let emit_instr i =
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast cast i
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
+  | Lop Dummy_use -> ()
   | Lop (Specific Imove32) -> (
     let src = i.arg.(0) and dst = i.res.(0) in
     if not (Reg.same_loc src dst)
@@ -2300,6 +2302,9 @@ let begin_assembly _unix =
     D.align ~fill:Nop ~bytes:8);
   let code_end = Cmm_helpers.make_symbol "code_end" in
   Emitaux.Dwarf_helpers.begin_dwarf ~code_begin ~code_end ~file_emitter
+
+(* Not implemented for arm64 *)
+let register_expect_asm_callback (_ : string -> unit) = ()
 
 let end_assembly () =
   let code_end = Cmm_helpers.make_symbol "code_end" in

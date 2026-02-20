@@ -30,9 +30,6 @@ external bigstring_get_64_unboxed : bigstring -> int -> int64#
   = "%caml_bigstring_get64#"
 |}]
 
-[%%expect {|
-|}]
-
 external string_get_128_aligned : string -> int -> int8x16
   = "%caml_string_geta128"
 

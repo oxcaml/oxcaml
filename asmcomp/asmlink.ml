@@ -35,6 +35,7 @@ type unit_link_info = Linkenv.unit_link_info =
     defines : Compilation_unit.t list;
     file_name : string;
     crc : Digest.t;
+    imports_cmx : Import_info.t list;
     (* for shared libs *)
     dynunit : Cmxs_format.dynunit option
   }
@@ -92,8 +93,12 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
   else Emit.begin_assembly unix;
   let compile_phrase p = Asmgen.compile_phrase ~ppf_dump p in
   let name_list = List.flatten (List.map (fun u -> u.defines) units) in
+  (* In manual module init mode, entry_point and global_table should be empty *)
+  let init_name_list =
+    if !Oxcaml_flags.manual_module_init then [] else name_list
+  in
   emit_ocamlrunparam ~ppf_dump;
-  List.iter compile_phrase (Cmm_helpers.entry_point name_list);
+  List.iter compile_phrase (Cmm_helpers.entry_point init_name_list);
   List.iter compile_phrase
     (* Emit the GC roots table, for dynlink. *)
     (Cmm_helpers.emit_gc_roots_table ~symbols:[]
@@ -101,7 +106,7 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
   Array.iteri
     (fun i name -> compile_phrase (Cmm_helpers.predef_exception i name))
     Runtimedef.builtin_exceptions;
-  compile_phrase (Cmm_helpers.global_table name_list);
+  compile_phrase (Cmm_helpers.global_table init_name_list);
   let globals_map = Linkenv.make_globals_map linkenv units in
   compile_phrase (Cmm_helpers.globals_map globals_map);
   compile_phrase
@@ -129,7 +134,26 @@ let make_startup_file linkenv unix ~ppf_dump ~sourcefile_for_dwarf genfns units
     then Generic_fns.imported_units cached_gen @ all_comp_units
     else all_comp_units
   in
-  compile_phrase (Cmm_helpers.frame_table all_comp_units);
+  (* In manual module init mode, exclude user modules from the static frame
+     table; their frametables will be registered dynamically when each module is
+     initialized via caml_init_module. *)
+  let frame_table_units =
+    if !Oxcaml_flags.manual_module_init
+    then
+      let base = [startup_comp_unit; system_comp_unit] in
+      if !Oxcaml_flags.use_cached_generic_functions
+      then Generic_fns.imported_units cached_gen @ base
+      else base
+    else all_comp_units
+  in
+  compile_phrase (Cmm_helpers.frame_table frame_table_units);
+  (* Always emit unit_deps_table; empty when not in manual module init mode *)
+  let unit_deps =
+    if !Oxcaml_flags.manual_module_init
+    then List.map (fun u -> u.name, u.imports_cmx) units
+    else []
+  in
+  compile_phrase (Cmm_helpers.unit_deps_table unit_deps);
   if !Clflags.output_complete_object then force_linking_of_startup ~ppf_dump;
   if !Clflags.llvm_backend
   then Llvmize.end_assembly ()
@@ -157,8 +181,23 @@ let make_shared_startup_file unix ~ppf_dump ~sourcefile_for_dwarf genfns units =
        (Generic_fns.compile ~cache:false ~shared:true genfns));
   let dynunits = List.map (fun u -> Option.get u.dynunit) units in
   compile_phrase (Cmm_helpers.plugin_header dynunits);
-  compile_phrase
-    (Cmm_helpers.global_table (List.map (fun unit -> unit.name) units));
+  (* In manual module init mode, global_table should be empty *)
+  (* CR mshinwell: why does caml_globals need to be populated in this case?
+     Note that the frametables are not registered here; they are done
+     dynamically by the natdynlink code, together with the GC roots. *)
+  let init_name_list =
+    if !Oxcaml_flags.manual_module_init
+    then []
+    else List.map (fun unit -> unit.name) units
+  in
+  compile_phrase (Cmm_helpers.global_table init_name_list);
+  (* Always emit unit_deps_table; empty when not in manual module init mode *)
+  let unit_deps =
+    if !Oxcaml_flags.manual_module_init
+    then List.map (fun u -> u.name, u.imports_cmx) units
+    else []
+  in
+  compile_phrase (Cmm_helpers.unit_deps_table unit_deps);
   if !Clflags.output_complete_object then force_linking_of_startup ~ppf_dump;
   (* this is to force a reference to all units, otherwise the linker might drop
      some of them (in case of libraries) *)

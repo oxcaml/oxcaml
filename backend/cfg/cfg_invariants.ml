@@ -97,6 +97,23 @@ let check_layout t layout =
         report t "Node not found for label %a in layout" Label.print label)
     layout
 
+let check_arity t label ctor_print ctor kind expected actual_array =
+  let actual = Array.length actual_array in
+  let report expected =
+    report t "%a: %a with %d %s(s), expected %s@." Label.print label ctor_print
+      ctor actual kind expected
+  in
+  match expected with
+  | [] -> ()
+  | [expected] ->
+    if not (Int.equal expected actual) then report (Int.to_string expected)
+  | expected ->
+    if not (List.exists (Int.equal actual) expected)
+    then report (expected |> List.map Int.to_string |> String.concat ", ")
+
+let count_regs_in_locs locs =
+  Array.fold_left (fun acc r -> acc + Array.length r) 0 locs
+
 let check_tailrec_position t =
   (* tailrec entry point is either the entry block or the only successor of the
      entry block. *)
@@ -120,16 +137,215 @@ let check_tailrec_position t =
            followingsuccessors:@.%a@."
           Label.print tailrec_label Label.Set.print successors
 
-let check_terminator_arity t _label block =
-  match block.Cfg.terminator.desc with
-  | Raise _ ->
-    let len = Array.length block.Cfg.terminator.arg in
-    if len != 1 then report t "Raise with %d arguments" len
-  | Tailcall_self _ | Call _ | Prim _ | Tailcall_func _ | Never | Always _
-  | Parity_test _ | Truth_test _ | Float_test _ | Int_test _ | Switch _ | Return
-  | Call_no_return _ | Invalid _ ->
-    (* CR-soon xclerc for xclerc: extend check *)
+let check_terminator_arity t label block =
+  let term = block.Cfg.terminator in
+  let args = term.arg in
+  let res = term.res in
+  let check ~expected_args ~expected_res =
+    let print_desc = Cfg.dump_terminator ~sep:"; " in
+    check_arity t label print_desc term.desc "argument" expected_args args;
+    check_arity t label print_desc term.desc "result" expected_res res
+  in
+  (* For calls where we have precise type information (e.g. external calls), we
+     can recompute the calling convention. For OCaml function calls we lack the
+     argument types here, so we only check properties that are type-independent
+     (such as having no results). *)
+  let check_external ~ty_args ~ty_res =
+    (* Cmm may omit [ty_args] (empty list) for external calls; selection then
+       fills in a default based on the number of actual arguments (all XInt).
+       Mirror that here to avoid underestimating the arity. *)
+    let ty_args =
+      match ty_args with
+      | [] when Array.length args > 0 ->
+        List.init (Array.length args) (fun _ -> Cmm.XInt)
+      | _ -> ty_args
+    in
+    let locs, _, _ = Proc.loc_external_arguments ty_args in
+    let expected_args = [count_regs_in_locs locs] in
+    let expected_res = [Array.length (Proc.loc_external_results ty_res)] in
+    check ~expected_args ~expected_res
+  in
+  match term.desc with
+  | Never -> check ~expected_args:[0] ~expected_res:[0]
+  | Always _ -> check ~expected_args:[0] ~expected_res:[0]
+  | Parity_test _ -> check ~expected_args:[1] ~expected_res:[0]
+  | Truth_test _ -> check ~expected_args:[1] ~expected_res:[0]
+  | Float_test _ ->
+    (* Float comparisons are always between two operands. *)
+    check ~expected_args:[2] ~expected_res:[0]
+  | Int_test { imm; _ } ->
+    (* With an immediate, only one register is passed; otherwise two. *)
+    let expected_args = if Option.is_some imm then [1] else [2] in
+    check ~expected_args ~expected_res:[0]
+  | Switch _ -> check ~expected_args:[1] ~expected_res:[0]
+  | Return ->
+    (* Return carries the registers holding the function result in calling
+       convention order. Some generated helpers (e.g. curry wrappers) may have a
+       declared return type with more components than they actually return;
+       those are identified by the [caml_curry] prefix and are exempted. *)
+    let expected_args =
+      if String.starts_with t.cfg.fun_name ~prefix:"caml_curry"
+      then []
+      else [Proc.loc_results_return t.cfg.fun_ret_type |> Array.length]
+    in
+    check ~expected_args ~expected_res:[0]
+  | Raise _ -> check ~expected_args:[1] ~expected_res:[0]
+  | Tailcall_self _ ->
+    (* Self tailcalls reuse the current function's parameter passing convention,
+       hence the arity must match [fun_args]. *)
+    check ~expected_args:[Array.length t.cfg.fun_args] ~expected_res:[0]
+  | Tailcall_func (Indirect _) ->
+    (* The first argument is the callee; we cannot check the rest without the
+       callee's type, but the array must be non-empty and there are no results
+       for tailcalls. *)
+    if Array.length args = 0
+    then report t "%a: Indirect tailcall with no arguments" Label.print label;
+    check ~expected_args:[] ~expected_res:[0]
+  | Tailcall_func (Direct _) ->
+    (* No result registers are produced by a tailcall. *)
+    check ~expected_args:[] ~expected_res:[0]
+  | Call_no_return { ty_args; ty_res; _ } ->
+    (* External calls that do not return still follow the external calling
+       convention for both arguments and (nonexistent) results. *)
+    check_external ~ty_args ~ty_res
+  | Prim { op = External { ty_args; ty_res; _ }; _ } ->
+    (* External primitives carry precise type info, so we can recompute both arg
+       and result arities. We must mirror the selection-time defaulting of empty
+       [ty_args] to XInt per argument. *)
+    check_external ~ty_args ~ty_res
+  | Prim { op = Probe _; _ } ->
+    (* Probes are typed as [typ_void]; they should therefore not produce result
+       registers. We cannot reliably check their arguments here. *)
+    check ~expected_args:[] ~expected_res:[0]
+  | Call _ ->
+    (* We lack the callee's signature here. In particular, [caml_program] (the
+       startup thunk) is called for side effects and returns no registers, so we
+       cannot assert any result arity. *)
     ()
+  | Invalid { label_after; _ } ->
+    (* [Invalid] is emitted as a call to [caml_flambda2_invalid]. It always
+       passes the error message symbol as one OCaml-ABI argument; when zero
+       alloc checking is enabled it returns an [int] (so there is a successor
+       and one result register), otherwise it never returns. *)
+    let ty_res =
+      match label_after with None -> Cmm.typ_void | Some _ -> Cmm.typ_int
+    in
+    check_external ~ty_args:[Cmm.XInt] ~ty_res
+
+let check_basic_arity t label (instr : Cfg.basic Cfg.instruction) =
+  let args = instr.arg in
+  let res = instr.res in
+  let desc = Format.asprintf "%a" Cfg.dump_basic instr.desc in
+  let check ~expected_args ~expected_res =
+    check_arity t label Cfg.dump_basic instr.desc "argument" expected_args args;
+    check_arity t label Cfg.dump_basic instr.desc "result" expected_res res
+  in
+  match instr.desc with
+  | Reloadretaddr -> check ~expected_args:[0] ~expected_res:[0]
+  | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _ ->
+    check ~expected_args:[0] ~expected_res:[0]
+  | Op op -> (
+    match op with
+    | Move | Spill | Reload ->
+      check ~expected_args:[1] ~expected_res:[1];
+      if
+        Array.length args = 1
+        && Array.length res = 1
+        && not (Proc.types_are_compatible args.(0) res.(0))
+      then
+        report t "%a (instr %a): %s uses incompatible registers %a -> %a"
+          Label.print label InstructionId.print instr.id desc Printreg.reg
+          args.(0) Printreg.reg res.(0)
+    | Dummy_use -> check ~expected_args:[1] ~expected_res:[0]
+    | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
+    | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ ->
+      check ~expected_args:[0] ~expected_res:[1]
+    | Stackoffset _ -> check ~expected_args:[0] ~expected_res:[0]
+    | Load { addressing_mode; _ } ->
+      check
+        ~expected_args:[Arch.num_args_addressing addressing_mode]
+        ~expected_res:[1]
+    | Store (_, addr, _) ->
+      check ~expected_args:[1 + Arch.num_args_addressing addr] ~expected_res:[0]
+    | Intop op ->
+      let expected_args =
+        if Operation.is_unary_integer_operation op then [1] else [2]
+      in
+      check ~expected_args ~expected_res:[1]
+    | Int128op op ->
+      let expected_args, expected_res =
+        match op with Iadd128 | Isub128 -> [4], [2] | Imul64 _ -> [2], [2]
+      in
+      check ~expected_args ~expected_res
+    | Intop_imm _ -> check ~expected_args:[1] ~expected_res:[1]
+    | Intop_atomic { op; addr; _ } ->
+      let addr_args = Arch.num_args_addressing addr in
+      let data_args =
+        match op with
+        | Fetch_and_add | Add | Sub | Land | Lor | Lxor | Exchange -> 1
+        | Compare_set | Compare_exchange -> 2
+      in
+      let expected_res =
+        match op with
+        | Add | Sub | Land | Lor | Lxor -> [0]
+        | Fetch_and_add | Exchange | Compare_set | Compare_exchange -> [1]
+      in
+      check ~expected_args:[addr_args + data_args] ~expected_res
+    | Floatop (_, (Inegf | Iabsf)) -> check ~expected_args:[1] ~expected_res:[1]
+    | Floatop (_, (Iaddf | Isubf | Imulf | Idivf)) ->
+      check ~expected_args:[2] ~expected_res:[1]
+    | Floatop (_, Icompf _) -> check ~expected_args:[2] ~expected_res:[1; 2]
+    | Csel _ ->
+      let len_args = Array.length args in
+      if len_args < 3
+      then
+        report t "%a (instr %a): %s with %d argument(s), expected at least 3"
+          Label.print label InstructionId.print instr.id desc len_args;
+      check ~expected_args:[] ~expected_res:[1];
+      if Array.length res = 1
+      then
+        let ifso = args.(len_args - 2) in
+        let ifnot = args.(len_args - 1) in
+        let res0 = res.(0) in
+        if
+          (not (Proc.types_are_compatible res0 ifso))
+          || not (Proc.types_are_compatible res0 ifnot)
+        then
+          report t
+            "%a (instr %a): %s result type mismatches selected values %a/%a"
+            Label.print label InstructionId.print instr.id desc Printreg.reg
+            ifso Printreg.reg ifnot
+    | Reinterpret_cast _ | Static_cast _ ->
+      check ~expected_args:[1] ~expected_res:[1]
+    | Probe_is_enabled _ -> check ~expected_args:[0] ~expected_res:[1]
+    | Opaque ->
+      let len_args = Array.length args in
+      let len_res = Array.length res in
+      if len_args = 0 || len_res = 0
+      then
+        report t "%a (instr %a): %s expected non-empty args/results" Label.print
+          label InstructionId.print instr.id desc
+      else if len_args <> len_res
+      then
+        report t "%a (instr %a): %s with %d args but %d results" Label.print
+          label InstructionId.print instr.id desc len_args len_res
+      else
+        for i = 0 to len_args - 1 do
+          if not (Proc.types_are_compatible args.(i) res.(i))
+          then
+            report t "%a (instr %a): %s uses incompatible opaque pair %a -> %a"
+              Label.print label InstructionId.print instr.id desc Printreg.reg
+              args.(i) Printreg.reg res.(i)
+        done
+    | Begin_region -> check ~expected_args:[0] ~expected_res:[1]
+    | End_region -> check ~expected_args:[1] ~expected_res:[0]
+    | Specific _ -> ()
+    | Name_for_debugger { regs; _ } ->
+      check ~expected_args:[0; Array.length regs] ~expected_res:[0]
+    | Dls_get | Tls_get | Domain_index ->
+      check ~expected_args:[0] ~expected_res:[1]
+    | Poll | Pause -> check ~expected_args:[0] ~expected_res:[0]
+    | Alloc _ -> check ~expected_args:[0] ~expected_res:[1])
 
 let check_tailrec t _label block =
   (* check all Tailrec Self agree on the successor label *)
@@ -254,7 +470,7 @@ let check_stack_offset t label (block : Cfg.basic_block) =
               Cfg.dump_basic basic.desc new_stack_offset;
           new_stack_offset
         | Op
-            ( Move | Spill | Reload | Const_int _ | Const_float _
+            ( Move | Spill | Reload | Dummy_use | Const_int _ | Const_float _
             | Const_float32 _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
             | Const_vec512 _ | Load _ | Store _ | Intop _ | Int128op _
             | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
@@ -273,6 +489,7 @@ let check_stack_offset t label (block : Cfg.basic_block) =
   ()
 
 let check_block t label (block : Cfg.basic_block) =
+  DLL.iter block.body ~f:(check_basic_arity t label);
   check_terminator_arity t label block;
   check_tailrec t label block;
   check_can_raise t label block;

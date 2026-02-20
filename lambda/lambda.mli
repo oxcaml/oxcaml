@@ -649,6 +649,8 @@ val generic_value : value_kind
 *)
 val layout_of_extern_repr : extern_repr -> layout
 
+val element_layout_of_array_kind : array_kind -> layout
+
 val extern_repr_involves_unboxed_products : extern_repr -> bool
 
 type structured_constant =

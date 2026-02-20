@@ -266,7 +266,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op (Intop (Ipopcnt | Iclz _ | Ictz _))
   | Op (Intop_atomic _)
   | Op
-      ( Move | Spill | Reload
+      ( Move | Spill | Reload | Dummy_use
       | Floatop (_, (Inegf | Iabsf | Icompf _))
       | Const_float _ | Const_float32 _ | Const_vec128 _ | Const_vec256 _
       | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Name_for_debugger _

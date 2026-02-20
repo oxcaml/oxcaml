@@ -655,12 +655,13 @@ let extra_rhs_core_type ct ~pos =
   let docs = rhs_info pos in
   { ct with ptyp_attributes = add_info_attrs docs ct.ptyp_attributes }
 
-let mklb first ~loc (p, e, typ, modes, is_pun) attrs =
+let mklb first ~loc (p, e, typ, modes, is_pun, poly) attrs =
   {
     lb_pattern = p;
     lb_expression = e;
     lb_constraint=typ;
     lb_is_pun = is_pun;
+    lb_is_poly = poly;
     lb_modes = modes;
     lb_attributes = attrs;
     lb_docs = symbol_docs_lazy loc;
@@ -687,6 +688,7 @@ let val_of_let_bindings ~loc lbs =
     List.map
       (fun lb ->
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
+           ~poly:lb.lb_is_poly
            ~modes:lb.lb_modes
            ~docs:(Lazy.force lb.lb_docs)
            ~text:(Lazy.force lb.lb_text)
@@ -1033,7 +1035,7 @@ let maybe_pmod_constraint mode expr =
 %token INITIALIZER            "initializer"
 %token <string * char option> INT      "42"  (* just an example *)
 %token <string * char option> HASH_INT "#42l" (* just an example *)
-%token KIND_ABBREV            "kind_abbrev_"
+%token KIND                   "kind_"
 %token KIND_OF                "kind_of_"
 %token <string> LABEL         "~label:" (* just an example *)
 %token LAZY                   "lazy"
@@ -1074,6 +1076,7 @@ let maybe_pmod_constraint mode expr =
 %token OR                     "or"
 %token OVERWRITE              "overwrite_"
 /* %token PARSER              "parser" */
+%token POLY                   "poly_"
 %token PERCENT                "%"
 %token PLUS                   "+"
 %token PLUSDOT                "+."
@@ -1806,10 +1809,8 @@ structure_item:
           Pstr_extension ($1, add_docs_attrs docs $2) }
     | floating_attribute
         { Pstr_attribute $1 }
-    | kind_abbreviation_decl
-        { let name, jkind = $1 in
-          Pstr_kind_abbrev (name, jkind)
-        })
+    | jkind_decl
+        { Pstr_jkind $1 })
   | wrap_mkstr_ext(
       primitive_declaration
         { pstr_primitive $1 }
@@ -2095,10 +2096,8 @@ signature_item:
   | mksig(
       floating_attribute
         { Psig_attribute $1 }
-     | kind_abbreviation_decl
-        { let name, jkind = $1 in
-          Psig_kind_abbrev (name, jkind)
-        }
+     | jkind_decl
+        { Psig_jkind $1 }
     )
     { $1 }
   | wrap_mksig_ext(
@@ -3327,11 +3326,12 @@ let_binding_body_no_punning:
       }
 ;
 let_binding_body:
-  | let_binding_body_no_punning
-      { let p,e,c,modes = $1 in (p,e,c,modes,false) }
+  | poly_flag = poly_flag let_binding_body_no_punning
+      { let p,e,c,modes = $2 in (p,e,c,modes,false,poly_flag) }
 /* BEGIN AVOID */
-  | val_ident %prec below_HASH
-      { (mkpatvar ~loc:$loc $1, ghexpvar ~loc:$loc $1, None, [], true) }
+  | poly_flag = poly_flag val_ident %prec below_HASH
+      { (mkpatvar ~loc:$loc $2, ghexpvar ~loc:$loc $2, None, [], true,
+         poly_flag) }
   (* The production that allows puns is marked so that [make list-parse-errors]
      does not attempt to exploit it. That would be problematic because it
      would then generate bindings such as [let x], which are rejected by the
@@ -3907,6 +3907,7 @@ value_description:
   VAL
   ext = ext
   attrs1 = attributes
+  poly_flag = poly_flag
   id = mkrhs(val_ident)
   COLON
   ty = possibly_poly(core_type)
@@ -3915,7 +3916,7 @@ value_description:
     { let attrs = attrs1 @ attrs2 in
       let loc = make_loc $sloc in
       let docs = symbol_docs $sloc in
-      Val.mk id ty ~attrs ~modalities ~loc ~docs,
+      Val.mk id ty ~poly:poly_flag ~attrs ~modalities ~loc ~docs,
       ext }
 ;
 
@@ -4081,7 +4082,7 @@ jkind_desc:
   | jkind_annotation WITH core_type optional_atat_modalities_expr {
       Pjk_with ($1, $3, $4)
     }
-  | ident {
+  | mkrhs(type_longident) {
       Pjk_abbreviation $1
     }
   | KIND_OF ty=core_type {
@@ -4107,17 +4108,29 @@ reverse_product_jkind :
     { jkind :: jkinds }
 
 jkind_annotation: (* : jkind_annotation *)
-  jkind_desc { { pjkind_loc = make_loc $sloc; pjkind_desc = $1 } }
+  jkind_desc { { pjka_loc = make_loc $sloc; pjka_desc = $1 } }
 ;
 
 jkind_constraint:
   COLON jkind_annotation { $2 }
 ;
 
-kind_abbreviation_decl:
-  KIND_ABBREV abbrev=mkrhs(LIDENT) EQUAL jkind=jkind_annotation {
-    (abbrev, jkind)
-  }
+%inline jkind_manifest:
+  | /* empty */ { None }
+  | EQUAL jkind=jkind_annotation { Some jkind }
+;
+
+jkind_decl:
+  KIND
+  attrs1=attributes
+  pjkind_name=mkrhs(LIDENT)
+  pjkind_manifest=jkind_manifest
+  attrs2=post_item_attributes
+    {
+      let pjkind_attributes = attrs1 @ attrs2 in
+      let pjkind_loc = make_loc $sloc in
+      { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc }
+    }
 ;
 
 %inline type_param_with_jkind:
@@ -5236,6 +5249,10 @@ mutable_flag:
     /* empty */                                 { Immutable }
   | MUTABLE                                     { Mutable }
 ;
+poly_flag:
+    /* empty */                                 { false }
+  | POLY                                        { true }
+;
 mutable_or_global_flag:
     /* empty */
     { Immutable, [] }
@@ -5346,6 +5363,7 @@ single_attr_id:
   | OF { "of" }
   | OPEN { "open" }
   | OR { "or" }
+  | POLY { "poly_" }
   | PRIVATE { "private" }
   | REC { "rec" }
   | SIG { "sig" }

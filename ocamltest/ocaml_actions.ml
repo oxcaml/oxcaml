@@ -171,7 +171,7 @@ let prepare_module output_variable log env input =
       generate_lexer output_variable input log env
     | Grammar ->
       generate_parser output_variable input log env
-    | Text | C_minus_minus | Other _ ->
+    | Text | C_minus_minus | Flambda | Other _ ->
       raise (Cannot_compile_file_type (string_of_filetype input_type))
 
 let get_program_file backend env =
@@ -673,6 +673,80 @@ let ocamlmklib =
     ~description:"Run ocamlmklib to produce the program"
     ~does_something:false
     mklib
+
+let run_fexpr log env =
+  let testfile = Actions_helpers.testfile env in
+  let testfile_basename = Filename.basename testfile in
+  let what = Printf.sprintf "Running fexprc on %s" testfile in
+  Printf.fprintf log "%s\n%!" what;
+  let test_build_directory =
+    Actions_helpers.test_build_directory env in
+  let output_file = Filename.make_filename testfile_basename "output" in
+  let output = Filename.make_path [test_build_directory; output_file] in
+  let env = Environments.add Builtin_variables.output output env in
+  let commandline =
+  [
+    Ocaml_commands.fexprc;
+    backend_flags env Ocaml_backends.Native;
+    testfile
+  ] in
+  let exit_status =
+    Actions_helpers.run_cmd
+      ~environment:default_ocaml_env
+      ~stdout_variable:Builtin_variables.output
+      ~stderr_variable:Builtin_variables.output
+      ~append:true
+      log env commandline in
+  if exit_status=0
+  then (Result.pass, env)
+  else begin
+    let reason =
+      (Actions_helpers.mkreason
+        what (String.concat " " commandline) exit_status) in
+    (Result.fail_with_reason reason, env)
+  end
+
+let fexpr =
+  native_action @@
+  Actions.make ~name:"fexpr" ~description:"Run fexprc on the test file"
+    ~does_something:true
+    run_fexpr
+
+let run_fexpr_check log env =
+  let passes_sfx =
+    Actions_helpers.words_of_variable env Ocaml_variables.fexpr_dump_files
+  in
+  let test_build_dir = Actions_helpers.test_build_directory env in
+  let test_source_dir = Actions_helpers.test_source_directory env in
+  let test_name = Filename.chop_extension (Actions_helpers.testfile env) in
+  List.fold_left (fun (res, env) pass_sfx ->
+      let pass_dump_file = Filename.make_filename test_name pass_sfx in
+      let pass_ref_file =
+        Filename.(make_filename
+                    (chop_extension pass_dump_file)
+                    "reference")
+      in
+      let dump_file =
+        Filename.make_path [test_build_dir; pass_dump_file]
+      in
+      let ref_file =
+        Filename.make_path [test_source_dir; pass_ref_file]
+      in
+      let nr =
+        if Sys.file_exists dump_file && Sys.file_exists ref_file then
+          Actions_helpers.compare_files "fexpr" dump_file ref_file log env
+        else
+          (Result.fail_with_reason ("Expected a pass output "^pass_sfx), env)
+      in
+      if Result.is_pass res then nr else (res, env))
+    (Result.pass, env)
+    passes_sfx
+
+let check_fexpr_dump =
+  native_action @@
+  Actions.make ~name:"check-fexpr-dump"
+    ~description:"Compare passes fexpr dumps to reference"
+    ~does_something:true run_fexpr_check
 
 let finalise_codegen_cc test_basename _log env =
   let test_module =
@@ -1410,6 +1484,22 @@ let runtime5 = Actions.make
   (Actions_helpers.predicate Config.runtime5
     "5.x runtime being used"
     "4.x runtime being used")
+
+(* CR ttebbi: We should also protect against non-default register allocation
+    options. *)
+let only_default_codegen = Actions.make
+  ~name:"only-default-codegen"
+  ~description:"Passes if all the codegen options are at the current default, \
+                useful for [%%expect_asm]"
+  ~does_something:false
+  (Actions_helpers.predicate
+    (Config.no_stack_checks
+      && not Config.poll_insertion
+      && not Config.with_address_sanitizer
+      && not Config.with_frame_pointers)
+    "default codegen"
+    "non-default codegen")
+
 let ocamldoc = Ocaml_tools.ocamldoc
 module Ocamldoc = (val ocamldoc)
 
@@ -1624,6 +1714,8 @@ let init () =
     check_ocamldoc_output;
     ocamldebug;
     ocamlmklib;
+    fexpr;
+    check_fexpr_dump;
     codegen;
     cc;
     ocamlobjinfo;
@@ -1631,5 +1723,6 @@ let init () =
     stack_checks;
     no_stack_checks;
     runtime4;
-    runtime5
+    runtime5;
+    only_default_codegen
   ]

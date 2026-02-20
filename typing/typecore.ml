@@ -297,6 +297,7 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Eval_format
+  | Let_poly_not_yet_implemented
 
 
 let not_principal fmt =
@@ -716,9 +717,9 @@ let tuple_pat_mode mode tuple_modes =
 let global_pat_mode {mode; _}=
   let mode =
     mode
-    |> Value.meet_with Areality Regionality.Const.Global
-    |> Value.meet_with Forkable Forkable.Const.Forkable
-    |> Value.meet_with Yielding Yielding.Const.Unyielding
+    |> Value.meet_const_with Areality Regionality.Const.Global
+    |> Value.meet_const_with Forkable Forkable.Const.Forkable
+    |> Value.meet_const_with Yielding Yielding.Const.Unyielding
   in
   simple_pat_mode mode
 
@@ -1576,7 +1577,8 @@ and build_as_type_aux (env : Env.t) p ~mode =
     ty, mode
   in
   match p.pat_desc with
-    Tpat_alias(p1,_, _, _, _, _, _) -> build_as_type_and_mode env p1 ~mode
+    Tpat_alias { pattern = p1; _ } ->
+     build_as_type_and_mode env p1 ~mode
   | Tpat_tuple pl ->
       let labeled_tyl =
         List.map (fun (label, p) -> label, build_as_type env p) pl in
@@ -1791,6 +1793,7 @@ let solve_constructor_annotation
       (fun (name, jkind_annot_opt) ->
         let jkind =
           Jkind.of_annotation_option_default
+            !!penv
             ~context:(Existential_unpack name.txt)
             ~default:(Jkind.Builtin.value ~why:Existential_type_variable)
             jkind_annot_opt
@@ -3068,7 +3071,7 @@ and type_pat_aux
         enter_variable tps loc name mode ~kind ty sp.ppat_attributes sort
       in
       rvp {
-        pat_desc = Tpat_var (id, name, uid, sort, alloc_mode);
+        pat_desc = Tpat_var { id; name; uid; sort; mode = alloc_mode };
         pat_loc = loc; pat_extra=[];
         pat_type = ty;
         pat_attributes = sp.ppat_attributes;
@@ -3097,7 +3100,8 @@ and type_pat_aux
               ~kind:(Val_reg sort) sp.ppat_attributes sort
           in
           rvp {
-            pat_desc = Tpat_var (id, v, uid, sort, alloc_mode.mode);
+            pat_desc = Tpat_var { id; name = v; uid; sort;
+                                  mode = alloc_mode.mode };
             pat_loc = sp.ppat_loc;
             pat_extra=[Tpat_unpack, loc, sp.ppat_attributes];
             pat_type = t;
@@ -3114,7 +3118,8 @@ and type_pat_aux
           ~kind:(Val_reg sort) tps name.loc name mode
           ty_var sp.ppat_attributes sort
       in
-      rvp { pat_desc = Tpat_alias(q, id, name, uid, sort, mode, ty_var);
+      rvp { pat_desc = Tpat_alias { pattern = q; id; name; uid;
+                                    sort; mode; type_expr = ty_var };
             pat_loc = loc; pat_extra=[];
             pat_type = q.pat_type;
             pat_attributes = sp.ppat_attributes;
@@ -3850,7 +3855,7 @@ let rec check_counter_example_pat
           in
           check_rec ~info:(decrease 5) tp expected_ty k
       end
-  | Tpat_alias (p, _, _, _, _, _, _) -> check_rec ~info p expected_ty k
+  | Tpat_alias { pattern = p; _ } -> check_rec ~info p expected_ty k
   | Tpat_unboxed_unit ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       k @@
@@ -4726,6 +4731,7 @@ and is_nonexpansive_mod mexp =
                 te.tyext_constructors
           | Tstr_class _ -> false (* could be more precise *)
           | Tstr_attribute _ -> true
+          | Tstr_jkind _ -> true
         )
         str.str_items
   | Tmod_apply _ | Tmod_apply_unit _ -> false
@@ -5344,8 +5350,8 @@ let rec name_pattern default = function
           Shape.Uid.internal_not_actually_unique
   | p :: rem ->
     match p.pat_desc with
-      Tpat_var (id, _, uid, _, _) -> id, uid
-    | Tpat_alias(_, id, _, uid, _, _, _) -> id, uid
+      Tpat_var { id; uid; _ } -> id, uid
+    | Tpat_alias { id; uid; _ } -> id, uid
     | _ -> name_pattern default rem
 
 let name_cases default lst =
@@ -5721,7 +5727,13 @@ let vb_exp_constraint {pvb_expr=expr; pvb_pat=pat; pvb_constraint=ct; pvb_modes=
       List.fold_right mk_newtype locally_abstract_univars expr
 
 let vb_pat_constraint
-      ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; _ } as vb) =
+      ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; pvb_is_poly;
+        pvb_loc; _ } as vb) =
+  if pvb_is_poly then begin
+    Language_extension.assert_enabled ~loc:pvb_loc Layout_poly
+      Language_extension.Alpha;
+    raise (Error (pvb_loc, Env.empty, Let_poly_not_yet_implemented))
+  end;
   let spat =
     let open Ast_helper in
     let loc =
@@ -8166,7 +8178,7 @@ and type_ident env ?(recarg=Rejected) lid =
   let val_type, kind =
     match desc.val_kind with
     | Val_prim prim ->
-       let ty, mode, _, sort = instance_prim prim desc.val_type in
+       let ty, mode, _, sort = instance_prim env prim desc.val_type in
        let ty = instance ty in
        begin match prim.prim_native_repr_res, mode with
        (* if the locality of returned value of the primitive is poly
@@ -9116,8 +9128,9 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         in
         let exp_env = Env.add_value ~mode id desc env in
         let uu = unique_use ~loc:sarg.pexp_loc ~env mode mode in
-        {pat_desc = Tpat_var (id, mknoloc name, desc.val_uid, sort,
-          Value.disallow_right mode);
+        {pat_desc = Tpat_var { id; name = mknoloc name;
+                               uid = desc.val_uid; sort;
+                               mode = Value.disallow_right mode };
          pat_type = ty;
          pat_extra=[];
          pat_attributes = [];
@@ -10009,7 +10022,7 @@ and type_newtype
   fun env name jkind_annot_opt type_body  ->
   let { txt = name; loc = name_loc } : _ Location.loc = name in
   let jkind =
-    Jkind.of_annotation_option_default ~context:(Newtype_declaration name)
+    Jkind.of_annotation_option_default env ~context:(Newtype_declaration name)
       ~default:(Jkind.Builtin.value ~why:Univar) jkind_annot_opt
   in
   let ty =
@@ -10373,8 +10386,8 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
       let update_exp_jkind (_, p, _) (exp, _) =
         let pat_name =
           match p.pat_desc with
-            Tpat_var (id, _, _, _, _) -> Some id
-          | Tpat_alias(_, id, _, _, _, _, _) -> Some id
+            Tpat_var { id; _ } -> Some id
+          | Tpat_alias { id; _ } -> Some id
           | _ -> None in
         Ctype.check_and_update_generalized_ty_jkind
           ?name:pat_name ~loc:exp.exp_loc env exp.exp_type
@@ -11666,15 +11679,15 @@ let report_error ~loc env =
     Location.error_of_printer ~loc (fun ppf () ->
       fprintf ppf "Object types must have layout value.@ %a%a"
         (Jkind.Violation.report_with_name ~name:"the type of this expression"
-           ~level:(Ctype.get_current_level ())) err
-        pp_doc (report_type_expected_explanation_opt explanation))
+           ~level:(Ctype.get_current_level ()) env) err
+      pp_doc (report_type_expected_explanation_opt explanation))
       ()
   | Non_value_let_rec (err, ty) ->
     Location.error_of_printer ~loc (fun ppf () ->
       fprintf ppf "Variables bound in a \"let rec\" must have layout value.@ %a"
         (fun v -> Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(Ctype.get_current_level ()) v)
+           ~level:(Ctype.get_current_level ()) env v)
         err)
       ()
   | Undefined_method (ty, me, valid_methods) ->
@@ -11718,23 +11731,13 @@ let report_error ~loc env =
         "The instance variable %a is overridden several times"
         Style.inline_code v
   | Coercion_failure (ty_exp, err, b) ->
-      Location.error_of_printer ~loc (fun ppf () ->
-          (* Use deprecated_printer to defer prepare_expansion until after
-             reset() is called inside report_unification_error. This ensures
-             consistent type variable naming between the intro and trace. *)
-          let intro =
-            doc_printf "%t" (fun fmt_doc ->
-              deprecated_printer (fun fmt ->
-                let ty_exp = Printtyp.prepare_expansion ty_exp in
-                Format.fprintf fmt
-                  "This expression cannot be coerced to type@;<1 2>%a;@ \
-                   it has type"
-                  (Fmt.compat
-                     (Style.as_inline_code @@ Printtyp.type_expansion Type))
-                  ty_exp
-              ) fmt_doc
-            )
-          in
+    let intro =
+      let ty_exp = Printtyp.prepare_expansion ty_exp in
+      doc_printf "This expression cannot be coerced to type@;<1 2>%a;@ \
+                  it has type"
+        (Style.as_inline_code @@ Printtyp.type_expansion Type) ty_exp
+    in
+    Location.error_of_printer ~loc (fun ppf () ->
         Printtyp.report_unification_error ppf env err
           intro
           (Fmt.doc_printf "but is here used with type");
@@ -12233,25 +12236,25 @@ let report_error ~loc env =
         "@[Function arguments and returns must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ())) violation
+           ~level:(get_current_level ()) env) violation
   | Record_projection_not_rep (ty,violation) ->
       Location.errorf ~loc
         "@[Records being projected from must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ())) violation
+           ~level:(get_current_level ()) env) violation
   | Record_not_rep (ty,violation) ->
       Location.errorf ~loc
         "@[Record expressions must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ())) violation
+           ~level:(get_current_level ()) env) violation
   | Mutable_var_not_rep (ty, violation) ->
       Location.errorf ~loc
         "@[Mutable variables must be representable.@]@ %a"
         (Jkind.Violation.report_with_offender
            ~offender:(fun ppf -> Printtyp.type_expr ppf ty)
-           ~level:(get_current_level ())) violation
+           ~level:(get_current_level ()) env) violation
   | Invalid_label_for_src_pos arg_label ->
       Location.errorf ~loc
         "A position argument must not be %s."
@@ -12283,8 +12286,8 @@ let report_error ~loc env =
          be the kind of a function.@ \
          (Functions always have kind %a.)%t@]"
         (Style.as_inline_code Printtyp.type_expr) ty_fun
-        (Style.as_inline_code Jkind.format) jkind
-        (Style.as_inline_code Jkind.format) Jkind.for_arrow
+        (Style.as_inline_code (Jkind.format env)) jkind
+        (Style.as_inline_code (Jkind.format env)) Jkind.for_arrow
         hint
   | Overwrite_of_invalid_term ->
       Location.errorf ~loc
@@ -12297,6 +12300,10 @@ let report_error ~loc env =
         "The eval extension takes a single type as its argument, for \
          example %a."
         Style.inline_code "[%eval: int]"
+  | Let_poly_not_yet_implemented ->
+      Location.errorf ~loc
+        "The %a annotation is not yet implemented."
+        Style.inline_code "let poly_"
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

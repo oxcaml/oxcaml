@@ -249,7 +249,7 @@ end = struct
      as [Simd.Clmul_64] in amd64. *)
   let op_isomorphic (op1 : Operation.t) (op2 : Operation.t) =
     match op1, op2 with
-    | Move, Move | Spill, Spill | Reload, Reload -> true
+    | Move, Move | Spill, Spill | Reload, Reload | Dummy_use, Dummy_use -> true
     | Const_int _, Const_int _
     | Const_float32 _, Const_float32 _
     | Const_float _, Const_float _
@@ -295,6 +295,7 @@ end = struct
     | Move, _
     | Spill, _
     | Reload, _
+    | Dummy_use, _
     | Const_int _, _
     | Const_float32 _, _
     | Const_float _, _
@@ -804,7 +805,7 @@ end = struct
                 | None -> None
                 | Some op -> (
                   match op with
-                  | Move | Spill | Reload -> Some (reg, 0)
+                  | Move | Spill | Reload | Dummy_use -> Some (reg, 0)
                   | Intop_imm (Iadd, n) -> Some (reg, n)
                   | Intop_imm (Isub, n) -> Some (reg, -n)
                   | Intop_imm
@@ -1062,9 +1063,10 @@ end = struct
                instructions are vectorized. Currently, the debug info would be
                out of sync. *)
             create Arbitrary
-          | Spill | Reload ->
+          | Spill | Reload | Dummy_use ->
             Misc.fatal_error
-              "Unexpected instruction Spill or Reload during vectorize"
+              "Unexpected instruction Spill, Reload, or Dummy_use during \
+               vectorize"
           | Move | Reinterpret_cast _ | Static_cast _ | Const_int _
           | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
           | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop _
@@ -2319,7 +2321,7 @@ end = struct
           Some (Vectorize_utils.Width_in_bits.of_memory_chunk chunk)
         | Specific s -> Vectorize_specific.is_seed_store s
         | Alloc _ | Load _ | Move | Reinterpret_cast _ | Static_cast _ | Spill
-        | Reload | Const_int _ | Const_float32 _ | Const_float _
+        | Reload | Dummy_use | Const_int _ | Const_float32 _ | Const_float _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
         | Stackoffset _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
         | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Pause

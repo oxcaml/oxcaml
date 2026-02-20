@@ -93,7 +93,7 @@ module Instruction_requirements = struct
          emitted, and therefore need a prologue for the function call. *)
       | Op (Alloc _ | Poll) -> Requirements Requires_prologue
       | Op
-          ( Move | Spill | Reload | Const_int _ | Const_float32 _
+          ( Move | Spill | Reload | Dummy_use | Const_int _ | Const_float32 _
           | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
           | Const_vec512 _ | Load _ | Store _ | Intop _ | Int128op _
           | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _

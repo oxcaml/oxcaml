@@ -330,9 +330,14 @@ Caml_inline void prefetch_block(value v)
      already marked, not markable, or extremely short, then we waste
      somewhere between 1/8-1/2 of a prefetch operation (in expectation,
      depending on alignment, word size, and cache line size), which is
-     cheap enough to make this worthwhile. */
-  caml_prefetchw((const void *)Hp_val(v));
-  caml_prefetchw((const void *)&Field(v, 3));
+     cheap enough to make this worthwhile.
+
+     The prefetches are prefetchr (read), not prefetchw (write). The
+     major GC often writes mark bits but is readonly if no marking
+     need be done (because a block is already marked, or statically
+     allocated). In such cases, a prefetchw causes contention. */
+  caml_prefetchr((const void *)Hp_val(v));
+  caml_prefetchr((const void *)&Field(v, 3));
 }
 
 static void ephe_next_cycle (void)

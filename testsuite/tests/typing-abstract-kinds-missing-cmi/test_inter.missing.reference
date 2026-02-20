@@ -1,0 +1,12 @@
+File "c_inter.ml", line 2, characters 21-23:
+2 | type ('a : B.k3) s = 'a t
+                         ^^
+Error: This type "('a : B.k3)" should be an instance of type "('b : B.k1)"
+       The kind of 'a is A2.k3
+         because of the annotation on 'a in the declaration of the type s.
+       But the kind of 'a must overlap with A1.k1 mod portable
+         because of the definition of t at file "c_inter.ml", line 1, characters 0-18.
+       No .cmi file found containing A1.k1.
+       No .cmi file found containing A2.k3.
+       Hint: Adding "a1" to your dependencies might help.
+       Hint: Adding "a2" to your dependencies might help.

@@ -12,7 +12,8 @@ Error: This type "('a : void)" should be an instance of type
 Line 2, characters 11-15:
 2 | type ('a : valu) t0 = 'a list;;
                ^^^^
-Error: Unknown layout valu
+Error: Unbound kind "valu"
+Hint: Did you mean "value"?
 type t = float#
 type t = int#
 type t = Float.t#

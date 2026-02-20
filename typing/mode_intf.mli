@@ -719,9 +719,10 @@ module type S = sig
     val min_with_monadic :
       'a Monadic.Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
 
-    val meet_with : 'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
+    val meet_const_with :
+      'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
 
-    val join_with : 'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
+    val join_const_with : 'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
 
     val zap_to_legacy : lr -> Const.t
 
@@ -799,8 +800,8 @@ module type S = sig
     module Comonadic : sig
       module Atom : sig
         type 'a t =
-          | Meet_with of 'a
-              (** [Meet_with c] takes [x] and returns [meet c x]. [c] can be
+          | Meet_const of 'a
+              (** [Meet_const c] takes [x] and returns [meet c x]. [c] can be
                   [max] in which case it's the identity modality. *)
         [@@unboxed]
       end
@@ -809,8 +810,8 @@ module type S = sig
     module Monadic : sig
       module Atom : sig
         type 'a t =
-          | Join_with of 'a
-              (** [Join_with c] takes [x] and returns [join c x]. [c] can be
+          | Join_const of 'a
+              (** [Join_const c] takes [x] and returns [join c x]. [c] can be
                   [min] in which case it's the identity modality. *)
         [@@unboxed]
       end
@@ -1012,7 +1013,7 @@ module type S = sig
                   ]}
                   The type ['x r] can cross the portability axis. This is
                   represented as
-                  [Modality (Meet_with Portable) : Portability.Const.t t]. *)
+                  [Modality (Meet_const Portable) : Portability.Const.t t]. *)
         [@@unboxed]
       end
 

@@ -300,7 +300,7 @@ let classify_expression : Typedtree.expression -> sd =
     let old_env = env in
     let add_value_binding env vb =
       match vb.vb_pat.pat_desc with
-      | Tpat_var (id, _loc, _uid, _sort, _mode) ->
+      | Tpat_var { id; _ } ->
           let size = classify_expression old_env vb.vb_expr in
           Ident.add id size env
       | _ ->
@@ -1319,6 +1319,8 @@ and structure_item : Typedtree.structure_item -> bind_judg =
     | Tstr_include { incl_mod = mexp; incl_type = mty; _ } ->
       let included_ids = List.map Types.signature_item_id mty in
       Env.join (modexp mexp m) (Env.remove_list included_ids env)
+    | Tstr_jkind _ ->
+      env
 
 (* G |- module M = E : m -| G *)
 and module_binding : (Ident.t option * Typedtree.module_expr) -> bind_judg =
@@ -1529,8 +1531,8 @@ and pattern : type k . k general_pattern -> Env.t -> mode = fun pat env ->
 and is_destructuring_pattern : type k . k general_pattern -> bool =
   fun pat -> match pat.pat_desc with
     | Tpat_any -> false
-    | Tpat_var (_, _, _, _, _) -> false
-    | Tpat_alias (pat, _, _, _, _, _, _) -> is_destructuring_pattern pat
+    | Tpat_var _ -> false
+    | Tpat_alias { pattern = pat; _ } -> is_destructuring_pattern pat
     | Tpat_constant _ -> true
     | Tpat_unboxed_unit -> true
     | Tpat_unboxed_bool _ -> true

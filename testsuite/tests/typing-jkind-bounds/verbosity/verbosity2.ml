@@ -145,3 +145,43 @@ type 'a t
           internal
       with 'a
 |}]
+
+type ('a : immutable_data) t
+[%%expect {|
+type ('a
+     : value
+         mod forkable
+             unyielding
+             many
+             stateless
+             immutable
+             portable
+             contended
+             non_null
+             non_float
+             local
+             unique
+             static
+             internal)
+     t
+|}]
+
+type ('a : value mod stateless) t
+[%%expect {|
+type ('a
+     : value
+         mod stateless
+             portable
+             non_null
+             separable
+             local
+             unforkable
+             yielding
+             once
+             unique
+             read_write
+             uncontended
+             static
+             internal)
+     t
+|}]

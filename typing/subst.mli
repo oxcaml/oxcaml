@@ -50,6 +50,7 @@ val unsafe: t -> unsafe subst
 val add_type: Ident.t -> Path.t -> 'k subst -> 'k subst
 val add_module: Ident.t -> Path.t -> 'k subst -> 'k subst
 val add_modtype: Ident.t -> Path.t -> 'k subst -> 'k subst
+val add_jkind: Ident.t -> Path.t -> t -> t
 
 type additional_action_config =
    | Duplicate_variables
@@ -89,6 +90,7 @@ val extension_constructor:
         t -> extension_constructor -> extension_constructor
 val class_declaration: t -> class_declaration -> class_declaration
 val cltype_declaration: t -> class_type_declaration -> class_type_declaration
+val jkind_declaration: t -> jkind_declaration -> jkind_declaration
 
 (**
    When applied to a signature item, a substitution not only modifies the types

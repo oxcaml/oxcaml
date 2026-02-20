@@ -1682,7 +1682,7 @@ end = struct
     let uni = Modality.Const.proj (Monadic Uniqueness) modalities in
     let lin = Modality.Const.proj (Comonadic Linearity) modalities in
     match uni, lin with
-    | Join_with Aliased, Meet_with Many -> untracked
+    | Join_const Aliased, Meet_const Many -> untracked
     | _ -> child proj t
 
   let tuple_field i t = child (Projection.Tuple_field i) t
@@ -2095,8 +2095,8 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       let ext1, uf1 = pattern_match_single pat1 paths in
       Ienv.Extension.disjunct ext0 ext1, UF.choose uf0 uf1
     | Tpat_any -> Ienv.Extension.empty, UF.unused
-    | Tpat_var (id, _, _, _, _) -> Ienv.Extension.singleton id paths, UF.unused
-    | Tpat_alias (pat', id, _, _, _, _, _) ->
+    | Tpat_var { id; _ } -> Ienv.Extension.singleton id paths, UF.unused
+    | Tpat_alias { pattern = pat'; id; _ } ->
       let ext0 = Ienv.Extension.singleton id paths in
       let ext1, uf = pattern_match_single pat' paths in
       Ienv.Extension.conjunct ext0 ext1, uf

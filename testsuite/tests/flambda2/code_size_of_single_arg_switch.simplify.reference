@@ -1,5 +1,3 @@
-
-After simplify:
 let code switch_converted_to_lookup_table_0 deleted in
 let code switch_converted_to_lookup_table'_1 deleted in
 let code switch_converted_to_affine_2 deleted in
@@ -71,4 +69,3 @@ let $camlCode_size_of_single_arg_switch =
            $camlCode_size_of_single_arg_switch__switch_converted_to_affine'_7)
 in
 cont done ($camlCode_size_of_single_arg_switch)
-
