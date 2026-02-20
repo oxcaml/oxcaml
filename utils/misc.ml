@@ -1526,6 +1526,10 @@ let get_build_path_prefix_map =
     !map_cache
 
 let debug_prefix_map_flags () =
+  (* CR sspies: If [BUILD_PATH_PREFIX_MAP] is set but
+     [Config.as_debug_prefix_map_flag] is empty (i.e. the assembler does not
+     support debug prefix map flags), we should emit a warning, as the user's
+     intent to remap paths will be silently ignored. *)
   if String.equal Config.as_debug_prefix_map_flag "" then
     []
   else begin
