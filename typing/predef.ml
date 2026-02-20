@@ -335,8 +335,9 @@ and ident_some = ident_create "Some"
 and ident_null = ident_create "Null"
 and ident_this = ident_create "This"
 
-let option_argument_sort = Jkind_types.Sort.Const.value
-let option_argument_jkind = Jkind.Builtin.value_or_null ~why:(
+let option_argument_sort = None
+let option_argument_jkind = Jkind.Builtin.any ~why:(
+  (* XXX New creation reason *)
   Type_argument {parent_path = path_option; position = 1; arity = 1})
 
 let list_jkind param =
@@ -344,8 +345,8 @@ let list_jkind param =
   Jkind.add_with_bounds ~modality:Mode.Modality.Const.id ~type_expr:param |>
   Jkind.mark_best
 
-let list_sort = Jkind_types.Sort.Const.value
-let list_argument_sort = Jkind_types.Sort.Const.value
+let list_sort = Some Jkind_types.Sort.Const.value
+let list_argument_sort = Some Jkind_types.Sort.Const.value
 let list_argument_jkind = Jkind.Builtin.value_or_null ~why:(
   Type_argument {parent_path = path_list; position = 1; arity = 1})
 
@@ -553,7 +554,7 @@ let variant constrs =
 
 let unrestricted tvar ca_sort =
   {ca_type=tvar;
-   ca_sort=Some ca_sort;
+   ca_sort=ca_sort;
    ca_modalities=Mode.Modality.Const.id;
    ca_loc=Location.none}
 
@@ -826,7 +827,7 @@ let add_small_number_extension_types add_type env =
 let add_small_number_beta_extension_types _add_type env =
   env
 
-let or_null_argument_sort = Jkind_types.Sort.Const.value
+let or_null_argument_sort = Some Jkind_types.Sort.Const.value
 
 let or_null_kind tvar =
   let cstrs =
