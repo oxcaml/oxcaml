@@ -162,13 +162,18 @@ module T = struct
     | D24 -> 88 | D25 -> 89 | D26 -> 90 | D27 -> 91
     | D28 -> 92 | D29 -> 93 | D30 -> 94 | D31 -> 95
 
+  let check_typ_reg_class typ phys_reg =
+    let typ_reg_class = Reg_class.of_machtype typ in
+    let phys_reg_reg_class = Phys_reg.reg_class phys_reg in
+    if not (Reg_class.equal typ_reg_class phys_reg_reg_class)
+    then
+      Misc.fatal_errorf
+        "Class %a of register %a does not match class %a of type"
+        Reg_class.print phys_reg_reg_class Phys_reg.print phys_reg
+        Reg_class.print typ_reg_class
+
   let dwarf_reg_number typ phys_reg =
-    if
-      not
-        (Reg_class.equal
-           (Reg_class.of_machtype typ)
-           (Phys_reg.reg_class phys_reg))
-    then Misc.fatal_error "Register class mismatch";
+    check_typ_reg_class typ phys_reg;
     dwarf_reg_number phys_reg
 
   let gpr_name = phys_gpr_regs |> Array.map Phys_reg.name
@@ -183,12 +188,7 @@ module T = struct
     Array.init (Array.length phys_simd_regs) (Printf.sprintf "q%d")
 
   let register_name typ phys_reg =
-    if
-      not
-        (Reg_class.equal
-           (Reg_class.of_machtype typ)
-           (Phys_reg.reg_class phys_reg))
-    then Misc.fatal_error "Register class mismatch";
+    check_typ_reg_class typ phys_reg;
     let index_in_class = index_in_class phys_reg in
     let names =
       match (typ : Cmm.machtype_component) with
