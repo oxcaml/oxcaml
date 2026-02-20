@@ -39,6 +39,8 @@ let section_print = "Pretty-printing"
 let section_trace = "Tracing"
 let section_options = "Compiler options"
 
+let section_meta = "Runtime metaprogramming"
+
 let section_undocumented = "Undocumented"
 
 (* we will print the sections in the first list,
@@ -179,6 +181,14 @@ let _ = add_directive "mod_use" (Directive_string (with_error_fmt dir_mod_use))
       section = section_run;
       doc = "Usage is identical to #use but #mod_use \
              wraps the contents in a module.";
+    }
+
+let _ = add_directive "mark_toplevel"
+    (Directive_none (fun () -> toplevel_env := Env.mark_toplevel !toplevel_env))
+    {
+      section = section_meta;
+      doc = "Mark everything in the current environment as accessible \
+             to at all stages.";
     }
 
 (* Install, remove a printer *)
