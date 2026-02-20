@@ -1526,7 +1526,11 @@ let get_build_path_prefix_map =
     !map_cache
 
 let debug_prefix_map_flags () =
-  if not Config.as_has_debug_prefix_map then
+  (* CR sspies: If [BUILD_PATH_PREFIX_MAP] is set but
+     [Config.as_debug_prefix_map_flag] is empty (i.e. the assembler does not
+     support debug prefix map flags), we should emit a warning, as the user's
+     intent to remap paths will be silently ignored. *)
+  if String.equal Config.as_debug_prefix_map_flag "" then
     []
   else begin
     match get_build_path_prefix_map () with
@@ -1537,7 +1541,8 @@ let debug_prefix_map_flags () =
            match map_elem with
            | None -> acc
            | Some { Build_path_prefix_map.target; source; } ->
-             (Printf.sprintf "--debug-prefix-map %s=%s"
+             (Printf.sprintf "%s %s=%s"
+                Config.as_debug_prefix_map_flag
                 (Filename.quote source)
                 (Filename.quote target)) :: acc)
         map
