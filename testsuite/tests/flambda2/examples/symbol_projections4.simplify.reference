@@ -1,0 +1,88 @@
+let code h_1 deleted in
+let code g_2 deleted in
+let code f_0 deleted in
+let $camlSymbol_projections4__immstring10 = "FOO" in
+(let try_region = %begin_try_region () in
+ let try_ghost_region = %begin_try_ghost_region () in
+ cont k2 push(k1)
+   where k2 =
+     (apply ccall
+        ($`*extern*`.caml_sys_getenv : val -> val)
+          ($camlSymbol_projections4__immstring10)
+          -> k3 * k1
+        where k3 (param) =
+          cont k2
+        where k2 =
+          cont k pop(k1) (1))
+   where k1 exn (`exn` : val) =
+     let `unit` = %end_try_region (try_region) in
+     let unit_1 = %end_try_ghost_region (try_ghost_region) in
+     cont k (0))
+  where k (foo : imm tagged) =
+    let foo_1 = foo in
+    let set_of_closures
+          $camlSymbol_projections4__f_3 =
+          closure f_0_1 @f
+          with { foo = foo }
+        end
+    and code loopify(never) size(27) newer_version_of(f_0)
+          f_0_1 (x, b : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : [ 0 of val * val ] =
+      (let untagged = %untag_imm (b) in
+       switch untagged
+         | 0 -> k2
+         | 1 -> k3)
+        where k3 =
+          let Pmakeblock = %block.[`0`] (x, $camlSymbol_projections4__g_5) in
+          cont k (Pmakeblock)
+        where k2 =
+          let Pmakeblock = %block.[`0`] (x, $camlSymbol_projections4__h_4) in
+          cont k (Pmakeblock)
+    and set_of_closures
+          $camlSymbol_projections4__h_4 =
+          closure h_1_1 @h
+          with { foo_1 = foo_1 }
+        end
+    and code loopify(never) size(17) newer_version_of(h_1)
+          h_1_1 (y : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let foo_2 =
+        %project_value_slot.[`h`].[`foo_1`] ($camlSymbol_projections4__h_4)
+      in
+      (let untagged = %untag_imm (foo_2) in
+       switch untagged
+         | 0 -> k (y)
+         | 1 -> k2)
+        where k2 =
+          let int_add = %int_barith.add (y, y) in
+          let int_add_1 = %int_barith.add (int_add, y) in
+          cont k (int_add_1)
+    and set_of_closures
+          $camlSymbol_projections4__g_5 =
+          closure g_2_1 @g
+          with { foo_2 = foo_1 }
+        end
+    and code loopify(never) size(15) newer_version_of(g_2)
+          g_2_1 (y : imm tagged)
+            my_closure _region _ghost_region my_depth
+            -> k * k1
+            : imm tagged =
+      let foo_2 =
+        %project_value_slot.[`g`].[`foo_2`] ($camlSymbol_projections4__g_5)
+      in
+      (let untagged = %untag_imm (foo_2) in
+       switch untagged
+         | 0 -> k (y)
+         | 1 -> k2)
+        where k2 =
+          let int_add = %int_barith.add (y, y) in
+          cont k (int_add)
+    in
+    let $camlSymbol_projections4 =
+      Block 0 (foo, $camlSymbol_projections4__f_3)
+    in
+    cont done ($camlSymbol_projections4)

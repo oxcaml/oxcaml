@@ -1,0 +1,167 @@
+let $camlAlt_ergo__immstring46 = "alt_ergo.ml" in
+let $camlAlt_ergo__const_block48 =
+  Block 0 ($camlAlt_ergo__immstring46, 23, 4)
+in
+let $camlAlt_ergo__Pmakeblock51 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block48)
+in
+let $camlAlt_ergo__const_block54 =
+  Block 0 ($camlAlt_ergo__immstring46, 21, 14)
+in
+let $camlAlt_ergo__Pmakeblock57 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block54)
+in
+let code inv_borne_sup_1 deleted in
+let code inv_bornes_2 deleted in
+let $camlAlt_ergo__const_block93 =
+  Block 0 ($camlAlt_ergo__immstring46, 35, 24)
+in
+let $camlAlt_ergo__Pmakeblock96 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block93)
+in
+let code inv_3 deleted in
+let $camlAlt_ergo__const_block107 =
+  Block 0 ($camlAlt_ergo__immstring46, 40, 2)
+in
+let $camlAlt_ergo__Pmakeblock110 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure, $camlAlt_ergo__const_block107)
+in
+let code div_4 deleted in
+let code loopify(never) size(86) newer_version_of(inv_borne_sup_1)
+      inv_borne_sup_1_1
+        (b :
+           [ 0 |1 | 0 of [ 0 of imm tagged * imm tagged ]
+           |1 of [ 0 of imm tagged * imm tagged ] ],
+         is_int,
+         other)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 |1 | 0 of [ 0 of imm tagged * imm tagged ]
+          |1 of [ 0 of imm tagged * imm tagged ] ] =
+  let prim = %is_int (b) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k3
+    where k3 =
+      let untagged = %untag_imm (b) in
+      switch untagged
+        | 0 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock51)
+        | 1 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock57)
+    where k2 =
+      ((let Pfield = %block_load.[`0`] (b) in
+        let Pfield_1 = %block_load.[`0`] (Pfield) in
+        let Popaque = %opaque (0) in
+        let Pobj_magic = %opaque (Popaque) in
+        apply Pobj_magic (Pfield_1) -> k3 * k1
+          where k3 (param : imm tagged) =
+            let unboxed_field = %untag_imm (param) in
+            cont k2 (unboxed_field))
+         where k2 (unboxed_field : imm) =
+           let naked_immediate = unboxed_field in
+           (switch naked_immediate
+              | 0 -> k2
+              | 1 -> k (1)
+              where k2 =
+                ((let prim_1 = %get_tag (b) in
+                  switch prim_1
+                    | 0 -> k2
+                    | 1 -> k3)
+                   where k3 =
+                     let Pfield = %block_load.[`0`] (b) in
+                     let Pfield_1 = %block_load.[`1`] (Pfield) in
+                     let Popaque = %opaque (0) in
+                     let Pobj_magic = %opaque (Popaque) in
+                     let Pmakeblock = %block.[`0`] (Pobj_magic, Pfield_1) in
+                     let Pmakeblock_1 = %block.[`1`] (Pmakeblock) in
+                     cont k (Pmakeblock_1)
+                   where k2 =
+                     let Pfield = %block_load.[`0`] (b) in
+                     let Pfield_1 = %block_load.[`1`] (Pfield) in
+                     let Popaque = %opaque (0) in
+                     let Pobj_magic = %opaque (Popaque) in
+                     let Pmakeblock = %block.[`0`] (Pobj_magic, Pfield_1) in
+                     let Pmakeblock_1 = %block.[`0`] (Pmakeblock) in
+                     cont k (Pmakeblock_1))))
+in
+let $camlAlt_ergo__inv_borne_sup_6 = closure inv_borne_sup_1_1 @inv_borne_sup
+in
+let code loopify(never) size(14) newer_version_of(inv_bornes_2)
+      inv_bornes_2_1
+        (param : [ 0 of val * [ 0 |1 | 0 of val |1 of val ] ], is_int)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of [ 0 |1 | 0 of val |1 of val ] *
+              [ 0 |1 | 0 of val |1 of val ] ] =
+  let u = %block_load.[`1`] (param) in
+  (let Pfield = %block_load.[`0`] (param) in
+   apply direct(inv_borne_sup_1_1)
+     ($camlAlt_ergo__inv_borne_sup_6
+      : _ ->
+        [ 0 |1 | 0 of [ 0 of imm tagged * imm tagged ]
+        |1 of [ 0 of imm tagged * imm tagged ] ]
+      )
+       (u, is_int, Pfield)
+       -> k2 * k1)
+    where k2
+            (apply_result :
+               [ 0 |1 | 0 of [ 0 of imm tagged * imm tagged ]
+               |1 of [ 0 of imm tagged * imm tagged ] ]) =
+      let Pmakeblock = %block.[`0`] (apply_result, u) in
+      cont k (Pmakeblock)
+in
+let $camlAlt_ergo__inv_bornes_7 = closure inv_bornes_2_1 @inv_bornes in
+let code loopify(never) size(45) newer_version_of(inv_3) tupled 
+      inv_3_1 (param : [ 0 | 0 of val * val ], param_1, param_2)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val * [ 0 | 0 of val * val ] ] =
+  let prim = %is_int (param) in
+  switch prim
+    | 0 -> k2
+    | 1 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock96)
+    where k2 =
+      let Pfield = %block_load.[`1`] (param) in
+      let prim_1 = %is_int (Pfield) in
+      (switch prim_1
+         | 0 -> k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock96)
+         | 1 -> k2
+         where k2 =
+           let `*match*` = %block_load.[`0`] (param) in
+           ((let Pfield_1 = %block_load.[`1`] (`*match*`) in
+             let Pfield_2 = %block_load.[`0`] (`*match*`) in
+             let Pmakeblock = %block.[`0`] (Pfield_2, Pfield_1) in
+             apply direct(inv_bornes_2_1)
+               ($camlAlt_ergo__inv_bornes_7
+                : _ ->
+                  [ 0 of [ 0 |1 | 0 of val |1 of val ] *
+                      [ 0 |1 | 0 of val |1 of val ] ]
+                )
+                 (Pmakeblock, param_1)
+                 -> k2 * k1)
+              where k2
+                      (apply_result :
+                         [ 0 of [ 0 |1 | 0 of val |1 of val ] *
+                             [ 0 |1 | 0 of val |1 of val ] ]) =
+                let Pmakeblock = %block.[`0`] (apply_result, 0) in
+                cont k (Pmakeblock)))
+in
+let $camlAlt_ergo__inv_8 = closure inv_3_1 @inv in
+let code loopify(never) size(11) newer_version_of(div_4)
+      div_4_1 (i1, i2 : [ 0 of [ 0 | 0 of val * val ] * val * val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1 =
+  (let tuple_field = %block_load.tag[`0`].`size`[`3`].[`0`] (i2) in
+   let tuple_field_1 = %block_load.tag[`0`].`size`[`3`].[`1`] (i2) in
+   let tuple_field_2 = %block_load.tag[`0`].`size`[`3`].[`2`] (i2) in
+   apply direct(inv_3_1)
+     ($camlAlt_ergo__inv_8 : _ -> [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+       (tuple_field, tuple_field_1, tuple_field_2)
+       -> k3 * k1
+     where k3 (param : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+       cont k2)
+    where k2 =
+      cont k1 pop(regular k1) ($camlAlt_ergo__Pmakeblock110)
+in
+let $camlAlt_ergo__div_9 = closure div_4_1 @div in
+let $camlAlt_ergo = Block 0 ($camlAlt_ergo__div_9) in
+cont done ($camlAlt_ergo)

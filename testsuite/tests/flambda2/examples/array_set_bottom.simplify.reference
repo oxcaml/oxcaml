@@ -1,0 +1,14 @@
+let code f_0 deleted in
+let code loopify(never) size(3) newer_version_of(f_0)
+      f_0_1 (a : imm tagged, v : float boxed)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let Pobj_magic = %opaque (a) in
+  let prim = %unbox_num.`float` (v) in
+  let Parraysetu = %array_set.`float` (Pobj_magic, 0, prim) in
+  cont k (0)
+in
+let $camlArray_set_bottom__f_1 = closure f_0_1 @f in
+let $camlArray_set_bottom = Block 0 ($camlArray_set_bottom__f_1) in
+cont done ($camlArray_set_bottom)

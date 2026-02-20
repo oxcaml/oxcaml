@@ -1,0 +1,31 @@
+let code f_0 deleted in
+apply ccall ($`*extern*`.rand : val -> val) (0) -> k * error
+  where k (r0) =
+    (apply ccall ($`*extern*`.rand : val -> val) (0) -> k * error
+       where k (r1) =
+         (apply ccall ($`*extern*`.rand : val -> val) (0) -> k * error
+            where k (r2) =
+              let $camlLifting__f_1 =
+                closure f_0_1 @f
+              and code inline(always) loopify(never) size(10) newer_version_of(f_0)
+                    f_0_1 (x : imm tagged)
+                      my_closure _region _ghost_region my_depth
+                      -> k * k1
+                      : imm tagged =
+                let r2_1 =
+                  %project_value_slot.[`f`].[`r2`] ($camlLifting__f_1)
+                in
+                let r1_1 =
+                  %project_value_slot.[`f`].[`r1`] ($camlLifting__f_1)
+                in
+                let r0_1 =
+                  %project_value_slot.[`f`].[`r0`] ($camlLifting__f_1)
+                in
+                let int_add = %int_barith.add (x, r0_1) in
+                let int_add_1 = %int_barith.add (int_add, r1_1) in
+                let int_add_2 = %int_barith.add (int_add_1, r2_1) in
+                cont k (int_add_2)
+                with { r0 = r0; r1 = r1; r2 = r2 }
+              in
+              let $camlLifting = Block 0 (r2, $camlLifting__f_1) in
+              cont done ($camlLifting)))

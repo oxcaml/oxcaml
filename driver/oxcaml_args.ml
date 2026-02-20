@@ -994,11 +994,6 @@ let mk_dfexpr_to f =
     Arg.String f,
     "<file> Like -dfexpr but dumps to given file (Flambda 2 only)" )
 
-let mk_dflexpect_to f =
-  ( "-dflexpect-to",
-    Arg.String f,
-    "<file> Combine -drawfexpr and -dfexpr in an .flt file (Flambda 2 only)" )
-
 let mk_dslot_offsets f =
   ("-dslot-offsets", Arg.Unit f, " Dump closure offsets (Flambda 2 only)")
 
@@ -1293,7 +1288,6 @@ module type Oxcaml_options = sig
   val dfexpr : unit -> unit
   val dfexpr_to : string -> unit
   val dfexpr_after : string -> unit
-  val dflexpect_to : string -> unit
   val dfexpr_annot : unit -> unit
   val dfexpr_annot_after : string -> unit
   val dslot_offsets : unit -> unit
@@ -1486,7 +1480,6 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dfexpr F.dfexpr;
       mk_dfexpr_to F.dfexpr_to;
       mk_dfexpr_after F.dfexpr_after;
-      mk_dflexpect_to F.dflexpect_to;
       mk_dfexpr_annot F.dfexpr_annot;
       mk_dfexpr_annot_after F.dfexpr_annot_after;
       mk_dslot_offsets F.dslot_offsets;
@@ -1877,7 +1870,6 @@ module Oxcaml_options_impl = struct
     Flambda2.Dump.fexpr_after := Flambda2.Dump.This_pass pass
 
   let dfexpr_to file = Flambda2.Dump.fexpr := Flambda2.Dump.File file
-  let dflexpect_to file = Flambda2.Dump.flexpect := Flambda2.Dump.File file
   let dfexpr_annot () = Flambda2.Dump.fexpr_annot := true
 
   let dfexpr_annot_after pass =

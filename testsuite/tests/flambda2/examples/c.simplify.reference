@@ -1,0 +1,14 @@
+let code neg_0 deleted in
+let code loopify(never) size(9) newer_version_of(neg_0)
+      neg_0_1 (x : float boxed)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float boxed =
+  let prim = %unbox_num.`float` (x) in
+  let prim_1 = %ufloat_arith.neg (prim) in
+  let float_neg = %box_num.`float` (prim_1) in
+  cont k (float_neg)
+in
+let $camlC__neg_1 = closure neg_0_1 @neg in
+let $camlC = Block 0 ($camlC__neg_1) in
+cont done ($camlC)

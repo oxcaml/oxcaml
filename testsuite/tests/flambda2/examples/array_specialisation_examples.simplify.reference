@@ -1,0 +1,95 @@
+let $camlArray_specialisation_examples__string11 = "index out of bounds" in
+let $camlArray_specialisation_examples__block13 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument,
+           $camlArray_specialisation_examples__string11)
+in
+let code f_0 deleted in
+let code g_1 deleted in
+let code h_2 deleted in
+let code i_3 deleted in
+let code loopify(never) size(22) newer_version_of(f_0)
+      f_0_1 (arr : val array)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  (let prim = %array_length.generic (arr) in
+   let prim_1 = %int_comp.unsigned.lt (0, prim) in
+   switch prim_1
+     | 0 -> k2
+     | 1 -> k3)
+    where k3 =
+      let ifnot_result = %array_load.mut (arr, 0) in
+      cont k (ifnot_result)
+    where k2 =
+      cont k1 pop(regular k1) ($camlArray_specialisation_examples__block13)
+in
+let $camlArray_specialisation_examples__f_4 = closure f_0_1 @f in
+let code loopify(never) size(8) newer_version_of(g_1)
+      g_1_1 (x : [ 0 | 0 of val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  let a = %array.mut (x) in
+  let ifnot_result = %array_load.mut (a, 0) in
+  cont k (ifnot_result)
+in
+let $camlArray_specialisation_examples__g_5 = closure g_1_1 @g in
+let code loopify(never) size(8) newer_version_of(h_2)
+      h_2_1 (x : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let ifnot_result = %array.mut (x) in
+  let Parrayrefs = %array_load.`imm`.mut (ifnot_result, 0) in
+  cont k (Parrayrefs)
+in
+let $camlArray_specialisation_examples__h_6 = closure h_2_1 @h in
+let code loopify(never) size(62) newer_version_of(i_3)
+      i_3_1 (w : imm tagged, x : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let `region` = %begin_region () in
+  (let cond_result = %is_boxed_float (x) in
+   switch cond_result
+     | 0 -> k5
+     | 1 -> k4)
+    where k5 =
+      let ifnot_result = %array.mut.`local`[`region`] (x) in
+      cont k3 (ifnot_result)
+    where k4 =
+      let prim = %unbox_num.`float` (x) in
+      let ifso_result = %array.`float`.mut.`local`[`region`] (prim) in
+      cont k3 (ifso_result)
+    where k3 (if_then_else_result) =
+      ((let untagged = %untag_imm (w) in
+        switch untagged
+          | 0 -> k3
+          | 1 -> k2 (0))
+         where k3 =
+           ((let prim = %array_length (if_then_else_result) in
+             let prim_1 = %int_comp.unsigned.lt (0, prim) in
+             switch prim_1
+               | 0 -> k3
+               | 1 -> k4)
+              where k4 =
+                let Parrayrefs =
+                  %array_load.`imm`.mut (if_then_else_result, 0)
+                in
+                cont k2 (Parrayrefs)
+              where k3 =
+                cont k1
+                       pop(regular k1)
+                       ($camlArray_specialisation_examples__block13)))
+    where k2 (region_return : imm tagged) =
+      let `unit` = %end_region (`region`) in
+      cont k (region_return)
+in
+let $camlArray_specialisation_examples__i_7 = closure i_3_1 @i in
+let $camlArray_specialisation_examples =
+  Block 0 ($camlArray_specialisation_examples__f_4,
+           $camlArray_specialisation_examples__g_5,
+           $camlArray_specialisation_examples__h_6,
+           $camlArray_specialisation_examples__i_7)
+in
+cont done ($camlArray_specialisation_examples)

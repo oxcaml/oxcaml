@@ -1,0 +1,37 @@
+let $camlMeet_with_incompatible_kinds__float12 = 0x1.8p+1 in
+let code aux_0 deleted in
+let code f_1 deleted in
+let code inline(always) loopify(never) size(20) newer_version_of(aux_0)
+      aux_0_1 (x : [ 0 of [ 0 of imm tagged * val ] |1 of float ^ 1 ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float boxed =
+  (let prim = %get_tag (x) in
+   switch prim
+     | 0 -> k ($camlMeet_with_incompatible_kinds__float12)
+     | 1 -> k2)
+    where k2 =
+      let Pfield = %block_load.[`0`] (x) in
+      let prim = %block_load.`float`.[`0`] (Pfield) in
+      let Pfloatfield = %box_num.`float` (prim) in
+      cont k (Pfloatfield)
+in
+let $camlMeet_with_incompatible_kinds__aux_2 = closure aux_0_1 @aux in
+let code loopify(never) size(10) newer_version_of(f_1)
+      f_1_1 (x : [ 0 of [ 0 of imm tagged * val ] |1 of float ^ 1 ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of float boxed * imm tagged ] =
+  let Pfield = %block_load.[`0`] (x) in
+  let n = %block_load.[`0`] (Pfield) in
+  let Pmakeblock =
+    %block.[`0`] ($camlMeet_with_incompatible_kinds__float12, n)
+  in
+  cont k (Pmakeblock)
+in
+let $camlMeet_with_incompatible_kinds__f_3 = closure f_1_1 @f in
+let $camlMeet_with_incompatible_kinds =
+  Block 0 ($camlMeet_with_incompatible_kinds__aux_2,
+           $camlMeet_with_incompatible_kinds__f_3)
+in
+cont done ($camlMeet_with_incompatible_kinds)

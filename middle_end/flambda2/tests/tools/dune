@@ -1,5 +1,5 @@
 (executables
-  (names flexpect fldiff fexprc roundtrip)
+  (names fldiff fexprc roundtrip)
   (modes native)
   (libraries
    ocamlcommon ocamloptcomp

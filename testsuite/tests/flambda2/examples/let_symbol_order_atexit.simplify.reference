@@ -1,0 +1,50 @@
+let code id_0 deleted in
+let code do_at_exit_1 deleted in
+let code exit_3 deleted in
+let code loopify(never) size(1) newer_version_of(id_0)
+      id_0_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k (0)
+in
+let $camlLet_symbol_order_atexit__id_4 = closure id_0_1 @`id` in
+let exit_function = %block.mut.[`0`] ($camlLet_symbol_order_atexit__id_4) in
+let $camlLet_symbol_order_atexit__do_at_exit_5 =
+  closure do_at_exit_1_1 @do_at_exit
+and code loopify(never) size(8) newer_version_of(do_at_exit_1)
+      do_at_exit_1_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let exit_function_1 =
+    %project_value_slot.[`do_at_exit`].[`exit_function`]
+      ($camlLet_symbol_order_atexit__do_at_exit_5)
+  in
+  let Pfield = %block_load.mut.[`0`] (exit_function_1) in
+  apply Pfield (0) -> k * k1
+  with { exit_function = exit_function }
+in
+let code loopify(never) size(19) newer_version_of(exit_3)
+      exit_3_1 (retcode : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : val =
+  (let exit_function_1 =
+     %project_value_slot.[`do_at_exit`].[`exit_function`]
+       ($camlLet_symbol_order_atexit__do_at_exit_5)
+   in
+   let Pfield = %block_load.mut.[`0`] (exit_function_1) in
+   apply inlining_state(depth(10)) Pfield (0) -> k3 * k1
+     where k3 (param : imm tagged) =
+       cont k2)
+    where k2 =
+      apply ccall
+        ($`*extern*`.caml_sys_exit : val -> val) (retcode) -> k * k1
+in
+let $camlLet_symbol_order_atexit__exit_7 = closure exit_3_1 @exit in
+let $camlLet_symbol_order_atexit =
+  Block 0 ($camlLet_symbol_order_atexit__exit_7,
+           $camlLet_symbol_order_atexit__do_at_exit_5)
+in
+cont done ($camlLet_symbol_order_atexit)

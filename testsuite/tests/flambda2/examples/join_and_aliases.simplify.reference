@@ -1,0 +1,36 @@
+let $camlJoin_and_aliases__immstring24 = "join_and_aliases.ml" in
+let $camlJoin_and_aliases__const_block26 =
+  Block 0 ($camlJoin_and_aliases__immstring24, 31, 38)
+in
+let $camlJoin_and_aliases__Pmakeblock29 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure,
+           $camlJoin_and_aliases__const_block26)
+in
+let code f_0 deleted in
+let code loopify(never) size(35) newer_version_of(f_0)
+      f_0_1 (r : [ 0 of imm tagged |1 of val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let prim = %get_tag (r) in
+   switch prim
+     | 0 -> k2
+     | 1 -> k1 pop(reraise k1) ($Stdlib.camlStdlib__Exit1434))
+    where k2 =
+      ((let Popaque = %opaque (0) in
+        let untagged = %untag_imm (Popaque) in
+        switch untagged
+          | 0 -> k2 (42)
+          | 1 -> k3
+          where k3 =
+            let field_at_use = %block_load.tag[`0`].`size`[`1`].[`0`] (r) in
+            cont k2 (field_at_use))
+         where k2 (unboxed_field_0_0) =
+           let tag = 0i in
+           switch tag
+             | 0 -> k (unboxed_field_0_0)
+             | 1 -> k1 pop(regular k1) ($camlJoin_and_aliases__Pmakeblock29))
+in
+let $camlJoin_and_aliases__f_1 = closure f_0_1 @f in
+let $camlJoin_and_aliases = Block 0 ($camlJoin_and_aliases__f_1) in
+cont done ($camlJoin_and_aliases)

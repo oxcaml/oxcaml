@@ -1,0 +1,35 @@
+let code f_0 deleted in
+let code foo_1 deleted in
+let code bar_2 deleted in
+let code inline(never) loopify(never) size(3) newer_version_of(f_0)
+      f_0_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont k1 pop(reraise k1) ($Stdlib.camlStdlib__Exit1434)
+in
+let $camlFunction_never_returns__f_3 = closure f_0_1 @f in
+let code loopify(never) size(4) newer_version_of(foo_1)
+      foo_1_1 (x : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(f_0_1)
+    ($camlFunction_never_returns__f_3 : _ -> imm tagged) (0) -> never * k1
+in
+let $camlFunction_never_returns__foo_4 = closure foo_1_1 @foo in
+let code loopify(never) size(4) newer_version_of(bar_2)
+      bar_2_1 (x : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  apply direct(f_0_1) inlining_state(depth(1))
+    ($camlFunction_never_returns__f_3 : _ -> imm tagged) (0) -> never * k1
+in
+let $camlFunction_never_returns__bar_5 = closure bar_2_1 @bar in
+let $camlFunction_never_returns =
+  Block 0 ($camlFunction_never_returns__f_3,
+           $camlFunction_never_returns__foo_4,
+           $camlFunction_never_returns__bar_5)
+in
+cont done ($camlFunction_never_returns)

@@ -1,0 +1,21 @@
+let code foo_1 deleted in
+let code loopify(never) size(17) newer_version_of(foo_1)
+      foo_1_1 (x : imm tagged, y : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  cont self (x, y)
+    where rec self (accu, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let prim = %is_int (l) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (accu)
+         where k2 =
+           let Pfield = %block_load.[`1`] (l) in
+           let Pfield_1 = %block_load.[`0`] (l) in
+           let int_add = %int_barith.add (accu, Pfield_1) in
+           cont self (int_add, Pfield))
+in
+let $camlPartial_closure__foo_5 = closure foo_1_1 @foo in
+let $camlPartial_closure = Block 0 ($camlPartial_closure__foo_5) in
+cont done ($camlPartial_closure)
