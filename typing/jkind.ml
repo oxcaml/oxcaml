@@ -279,6 +279,7 @@ module Error = struct
         { from_annotation : Parsetree.jkind_annotation;
           from_attribute : Builtin_attributes.jkind_attribute Location.loc
         }
+    | Unknown_kind_modifier of string
     | Unimplemented_syntax
     | With_on_right : (_ * allowed) History.annotation_context -> t
     | Abstract_kind_in_product
@@ -1743,6 +1744,33 @@ module Const = struct
       with_bounds
     }
 
+  let transl_scannable_axes sa_annots =
+    (* CR layouts-scannable: This should work for more axes as they're added.
+       The current implementation is quite specialized. The [to_string] call
+       seems avoidable if an additional string is accumulated; this may not be
+       the best though. Consider refactoring as more axes are added. *)
+    let set_or_warn ~loc ~to_ pointerness =
+      match pointerness with
+      | Some overridden_by ->
+        Location.prerr_warning loc
+          (Warnings.Overridden_kind_modifier
+             (Pointerness.to_string overridden_by));
+        pointerness
+      | None -> Some to_
+    in
+    (* This will compute and report errors from right-to-left, which enables
+       better error messages while traversing the list only once. It comes at
+       the cost of warnings being reported in a slightly weirder order. *)
+    List.fold_right
+      (fun ({ txt; loc } : string Location.loc) pointerness ->
+        match txt with
+        | "non_pointer" ->
+          set_or_warn ~loc ~to_:Pointerness.Non_pointer pointerness
+        | "maybe_pointer" ->
+          set_or_warn ~loc ~to_:Pointerness.Maybe_pointer pointerness
+        | _ -> raise ~loc (Unknown_kind_modifier txt))
+      sa_annots None
+
   let rec of_user_written_annotation_unchecked_level : type l r.
       use_abstract_jkinds:bool ->
       _ ->
@@ -1752,9 +1780,29 @@ module Const = struct
    fun ~use_abstract_jkinds env context jkind ->
     let loc = jkind.pjka_loc in
     match jkind.pjka_desc with
-    | Pjk_abbreviation name ->
+    | Pjk_abbreviation (name, sa_annot) ->
       let p, _ = Env.lookup_jkind ~use:use_abstract_jkinds ~loc name.txt env in
-      of_path p |> allow_left |> allow_right
+      let jkind_without_sa = of_path p in
+      let pointerness = transl_scannable_axes sa_annot in
+      if
+        sa_annot <> []
+        &&
+        match get_layout_result env jkind_without_sa with
+        | Ok layout -> not (Layout.Const.is_value_or_any layout)
+        | Error _ -> false
+      then
+        Location.prerr_warning jkind.pjka_loc
+          (Warnings.Ignored_kind_modifier
+             ( Format.asprintf "%a" Pprintast.longident name.txt,
+               List.map Location.get_txt sa_annot ));
+      (* CR layouts-scannable: The correct behavior is to make a new jkind
+         that differs only in the layout by adding in the non-[None] scannable
+         axes. For inspiration, see [set_nullability_upper_bound].
+         This should emit a warning if the [jkind_without_sa] already has
+         the specified scannable axes. This is why the helper currently
+         returns an optional annotation (since none vs default matters). *)
+      ignore pointerness;
+      jkind_without_sa |> allow_left |> allow_right
     | Pjk_mod (base, modifiers) ->
       let base =
         of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
@@ -3682,6 +3730,8 @@ let report_error ~loc : Error.t -> _ = function
          layouts extension.@;\
          %t@]"
         Pprintast.Doc.jkind_annotation jkind hint)
+  | Unknown_kind_modifier saxis ->
+    Location.errorf ~loc "@[<v>Unknown kind modifier %s@]" saxis
   | Unimplemented_syntax ->
     Location.errorf ~loc "@[<v>Unimplemented kind syntax@]"
   | With_on_right c -> (

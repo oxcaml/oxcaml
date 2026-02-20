@@ -2075,8 +2075,8 @@ module Jkind0 = struct
       Some
         Parsetree.{
           pjka_loc = Location.none;
-          pjka_desc = Pjk_abbreviation { loc = Location.none;
-                                         txt = (Lident name) }
+          pjka_desc = Pjk_abbreviation ({ loc = Location.none;
+                                          txt = (Lident name) }, [])
         }
 
     let mark_best (type l r) (t : (l * r) jkind) =
