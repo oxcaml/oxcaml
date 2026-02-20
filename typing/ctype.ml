@@ -1685,6 +1685,8 @@ let instance_poly ?(keep_names=false) univars sch =
     vars escape the scope. To resolve this, we substitute all occurrences of
     them with a [Tof_kind]. *)
 let instance_poly_for_jkind univars sch =
+  (* avoid copying when there is nothing to instantiate *)
+  if List.is_empty univars then sch else
   (* Note [Tunivar best-ness]
      ~~~~~~~~~~~~~~~~~~~~~~~~
      [Tof_kind]s are always treated as having "best" quality. We've exhaustively
