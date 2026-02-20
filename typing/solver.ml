@@ -17,17 +17,6 @@ open Allowance
 open Solver_intf
 module Fmt = Format_doc
 
-module Magic_equal (X : Equal) :
-  Equal with type ('a, 'b, 'c) t = ('a, 'b, 'c) X.t = struct
-  type ('a, 'b, 'd) t = ('a, 'b, 'd) X.t
-
-  let equal : type a0 a1 b l0 l1 r0 r1.
-      (a0, b, l0 * r0) t -> (a1, b, l1 * r1) t -> (a0, a1) Misc.eq option =
-   fun x0 x1 ->
-    if Obj.repr x0 = Obj.repr x1 then Some (Obj.magic Misc.Refl) else None
-end
-[@@inline]
-
 module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   type ('a, 'd) hint =
     | Apply :
@@ -248,13 +237,24 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           a, Branch (Meet, ahint1, ahint2))
   end
 
-  type any_morph = Any_morph : ('a, 'b, 'd) C.morph -> any_morph
+  type key = Key : 'b C.obj * int * ('a, 'b, 'd) C.morph -> key
 
   module VarMap = Map.Make (struct
-    type t = int * any_morph
+    type t = key
 
-    let compare (i1, m1) (i2, m2) =
-      match Int.compare i1 i2 with 0 -> compare m1 m2 | i -> i
+    let compare (Key (obj1, id1, m1)) (Key (obj2, id2, m2)) =
+      let c = Int.compare id1 id2 in
+      if c <> 0
+      then c
+      else
+        match C.compare_obj obj1 obj2 with
+        | Less_than -> 1
+        | Greater_than -> -1
+        | Equal -> (
+          match C.compare_morph obj1 m1 m2 with
+          | Less_than -> 1
+          | Greater_than -> -1
+          | Equal -> 0)
   end)
 
   (** Map the function to the list, and returns the first [Error] found; Returns
@@ -323,7 +323,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   type anyvar = Var : 'a var -> anyvar [@@unboxed]
 
-  let get_key (Amorphvar (v, m, _)) = v.id, Any_morph m
+  let get_key dst (Amorphvar (v, m, _)) = Key (dst, v.id, m)
 
   module VarSet = Set.Make (Int)
 
@@ -558,7 +558,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         VarMap.fold
           (fun _ mv acc ->
             let mv = apply_morphvar dst morph hint mv in
-            VarMap.add (get_key mv) mv acc)
+            VarMap.add (get_key dst mv) mv acc)
           vs VarMap.empty
       in
       Amodejoin (C.apply dst morph a, Apply (hint, a_hint), vs)
@@ -568,7 +568,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         VarMap.fold
           (fun _ mv acc ->
             let mv = apply_morphvar dst morph hint mv in
-            VarMap.add (get_key mv) mv acc)
+            VarMap.add (get_key dst mv) mv acc)
           vs VarMap.empty
       in
       Amodemeet (C.apply dst morph a, Apply (hint, a_hint), vs)
@@ -760,20 +760,23 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             Apply (Comp_hint.Morph_hint.disallow_right f_hint, e_hint) )
 
   let eq_morphvar : type a l0 r0 l1 r1.
-      (a, l0 * r0) morphvar -> (a, l1 * r1) morphvar -> bool =
-   fun (Amorphvar (v0, f0, _f0_hint) as mv0)
+      a C.obj -> (a, l0 * r0) morphvar -> (a, l1 * r1) morphvar -> bool =
+   fun dst (Amorphvar (v0, f0, _f0_hint) as mv0)
        (Amorphvar (v1, f1, _f1_hint) as mv1) ->
     (* To align l0/l1, r0/r1; The existing disallow_left/right] is for [mode],
        not [morphvar]. *)
     Morphvar.(
       disallow_left (disallow_right mv0) == disallow_left (disallow_right mv1))
-    || match C.eq_morph f0 f1 with None -> false | Some Refl -> v0 == v1
+    ||
+    match C.equal_morph dst f0 f1 with
+    | Not_equal -> false
+    | Equal -> v0 == v1
 
   let submode_mvmv (type a) ~log (pp : H.Pinpoint.t) (dst : a C.obj)
       (Amorphvar (v, f, f_hint) as mv) (Amorphvar (u, g, g_hint) as mu) =
     if C.le dst (mupper dst mv) (mlower dst mu)
     then Ok ()
-    else if eq_morphvar mv mu
+    else if eq_morphvar dst mv mu
     then Ok ()
     else
       let muupper = mupper dst mu in
@@ -804,7 +807,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
               (g'_hint, Comp_hint.Morph_hint.disallow_right f_hint)
           in
           let x = Amorphvar (v, g'f, g'f_hint) in
-          let key = get_key x in
+          let key = get_key src x in
           if not (VarMap.mem key u.vlower)
           then set_vlower ~log u (VarMap.add key x u.vlower);
           Ok ())
@@ -940,9 +943,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let right = populate_hint obj right right_hint in
     { left; right }
 
-  let cons_dedup x xs = VarMap.add (get_key x) x xs
+  let add_morphvar dst x xs = VarMap.add (get_key dst x) x xs
 
-  let union_prefer_left t0 t1 = VarMap.union (fun _ a _b -> Some a) t0 t1
+  let union_morphvars t0 t1 = VarMap.union (fun _ a _b -> Some a) t0 t1
 
   let join (type a r) obj l =
     let rec loop :
@@ -974,12 +977,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             let mvlower = mlower obj mv in
             loop (C.join obj a mvlower)
               (hint_join obj a a_hint_lower mvlower (mlower_hint mv))
-              (cons_dedup mv mvs) xs
+              (add_morphvar obj mv mvs) xs
           | Amodejoin (b, b_hint, mvs') ->
             loop (C.join obj a b)
               (hint_join obj a a_hint_lower b b_hint)
-              (union_prefer_left mvs' mvs)
-              xs)
+              (union_morphvars mvs' mvs) xs)
     in
     loop (C.min obj) Min VarMap.empty l
 
@@ -1011,12 +1013,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             let mvupper = mupper obj mv in
             loop (C.meet obj a mvupper)
               (hint_meet obj a a_hint_upper mvupper (mupper_hint mv))
-              (cons_dedup mv mvs) xs
+              (add_morphvar obj mv mvs) xs
           | Amodemeet (b, b_hint, mvs') ->
             loop (C.meet obj a b)
               (hint_meet obj a a_hint_upper b b_hint)
-              (union_prefer_left mvs' mvs)
-              xs)
+              (union_morphvars mvs' mvs) xs)
     in
     loop (C.max obj) Max VarMap.empty l
 
@@ -1171,7 +1172,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       ( Amodevar
           (Amorphvar
              ( fresh ~lower:(mlower obj mv) ~lower_hint:(mlower_hint mv)
-                 ~vlower:(VarMap.singleton (get_key mv) mv)
+                 ~vlower:(VarMap.singleton (get_key obj mv) mv)
                  obj,
                C.id,
                Id )),
