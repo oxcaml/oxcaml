@@ -61,14 +61,8 @@ external set : ('a : value_or_null mod separable).
    @raise Invalid_argument
    if [n] is outside the range 0 to [length a - 1]. *)
 
-<<<<<<< oxcaml
 external make : ('a : value_or_null mod separable).
    int -> 'a -> 'a array = "caml_array_make"
-||||||| upstream-base
-external make : int -> 'a -> 'a array = "caml_make_vect"
-=======
-external make : int -> 'a -> 'a array = "caml_array_make"
->>>>>>> upstream-incoming
 (** [make n x] returns a fresh array of length [n],
    initialized with [x].
    All the elements of this new array are initially
@@ -81,14 +75,8 @@ external make : int -> 'a -> 'a array = "caml_array_make"
    If the value of [x] is a floating-point number, then the maximum
    size is only [Sys.max_array_length / 2].*)
 
-<<<<<<< oxcaml
 external create_float : ('a : value_or_null mod separable).
    int -> float array = "caml_array_create_float"
-||||||| upstream-base
-external create_float: int -> float array = "caml_make_float_vect"
-=======
-external create_float: int -> float array = "caml_array_create_float"
->>>>>>> upstream-incoming
 (** [create_float n] returns a fresh float array of length [n],
     with uninitialized data.
     @since 4.03 *)

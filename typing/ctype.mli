@@ -199,23 +199,12 @@ type existential_treatment =
   | Keep_existentials_flexible
   | Make_existentials_abstract of Pattern_env.t
 
-<<<<<<< oxcaml
-val instance_constructor: existential_treatment ->
-        constructor_description ->
-        Types.constructor_argument list * type_expr * type_expr list
-        (* Same, for a constructor. Also returns existentials. *)
-||||||| upstream-base
-val instance_constructor: existential_treatment ->
-        constructor_description -> type_expr list * type_expr * type_expr list
-        (* Same, for a constructor. Also returns existentials. *)
-=======
 val instance_constructor:
   existential_treatment ->
   Data_types.constructor_description ->
-  type_expr list * type_expr * type_expr list
+  Types.constructor_argument list * type_expr * type_expr list
 (* Same, for a constructor. Also returns existentials. *)
 
->>>>>>> upstream-incoming
 val instance_parameterized_type:
         ?keep_names:bool ->
         type_expr list -> type_expr -> type_expr list * type_expr
@@ -238,10 +227,10 @@ val instance_poly_fixed:
 val polyfy: Env.t -> type_expr -> type_expr list -> type_expr * bool
 
 val instance_label:
-<<<<<<< oxcaml
-        fixed:bool ->
-        _ gen_label_description -> type_expr list * type_expr * type_expr
-        (* Same, for a label *)
+  fixed:bool ->
+  _ Data_types.gen_label_description ->
+  type_expr list * type_expr * type_expr
+(* Same, for a label *)
 val prim_mode :
         (Mode.allowed * 'r) Mode.Locality.t option -> (Primitive.mode * Primitive.native_repr)
         -> (Mode.allowed * 'r) Mode.Locality.t
@@ -255,16 +244,6 @@ val instance_prim:
     user-syntax, [curry_mode m0 m1] gives the mode we implicitly interpret b->c
     to have. *)
 val curry_mode : Alloc.Const.t -> Alloc.Const.t -> Alloc.Const.t
-||||||| upstream-base
-        fixed:bool ->
-        label_description -> type_expr list * type_expr * type_expr
-        (* Same, for a label *)
-=======
-  fixed:bool ->
-  Data_types.label_description ->
-  type_expr list * type_expr * type_expr
-(* Same, for a label *)
->>>>>>> upstream-incoming
 
 val apply:
         ?use_current_level:bool ->
@@ -361,16 +340,11 @@ val filter_method: Env.t -> string -> type_expr -> type_expr
         (* A special case of unification (with {m : 'a; 'b}).  Raises
            [Filter_method_failed] instead of [Unify]. *)
 val occur_in: Env.t -> type_expr -> type_expr -> bool
+val deep_occur: type_expr -> type_expr -> bool
+        (* Check whether a type occurs structurally within another. *)
 val deep_occur_list: type_expr -> type_expr list -> bool
         (* Check whether a type occurs structurally within any type from
            a list of types. *)
-val deep_occur: type_expr -> type_expr -> bool
-<<<<<<< oxcaml
-        (* Check whether a type occurs structurally within another. *)
-||||||| upstream-base
-=======
-val deep_occur_list: type_expr -> type_expr list -> bool
->>>>>>> upstream-incoming
 val moregeneral: Env.t -> bool -> type_expr -> type_expr -> unit
         (* Check if the first type scheme is more general than the second. *)
 val is_moregeneral: Env.t -> bool -> type_expr -> type_expr -> bool
@@ -574,7 +548,6 @@ type closed_class_failure = {
 }
 
 val free_variables: ?env:Env.t -> type_expr -> type_expr list
-<<<<<<< oxcaml
         (* If env present, then check for incomplete definitions too;
            returns both normal variables and row variables*)
 val free_non_row_variables_of_list: type_expr list -> type_expr list
@@ -585,18 +558,12 @@ val free_variable_set_of_list: Env.t -> type_expr list -> Btype.TypeSet.t
 val exists_free_variable : (type_expr -> jkind_lr -> bool) -> type_expr -> bool
         (* Check if there exists a free variable that satisfies the
            given predicate. *)
-
+val free_variables_list: ?env:Env.t -> type_expr list -> type_expr list
+        (* If env present, then check for incomplete definitions too *)
 val closed_type_expr: ?env:Env.t -> type_expr -> bool
         (* If env present, expand abbreviations to see if expansion
            eliminates the variable *)
 
-||||||| upstream-base
-        (* If env present, then check for incomplete definitions too *)
-=======
-val free_variables_list: ?env:Env.t -> type_expr list -> type_expr list
-        (* If env present, then check for incomplete definitions too *)
-val closed_type_expr: ?env:Env.t -> type_expr -> bool
->>>>>>> upstream-incoming
 val closed_type_decl: type_declaration -> type_expr option
 val closed_extension_constructor: extension_constructor -> type_expr option
 val closed_class:

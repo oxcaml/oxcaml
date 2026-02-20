@@ -46,15 +46,9 @@
     very short running programs.
 *)
 
-<<<<<<< oxcaml
-(** The type for counter events emitted by the runtime. *)
-||||||| upstream-base
-(** The type for counter events emitted by the runtime *)
-=======
 (** The type for counter events emitted by the runtime. Counter events are used
   to measure a quantity at a point in time or record the occurence of an event.
   In the latter case their value will be one. *)
->>>>>>> upstream-incoming
 type runtime_counter =
 | EV_C_FORCE_MINOR_ALLOC_SMALL
 (**
@@ -140,15 +134,16 @@ Live blocks of a Domain's major heap pools.
 (**
 Live blocks of a Domain's major heap large allocations.
 @since 5.1 *)
-<<<<<<< oxcaml
 | EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE
 (**
-   Reallocation of the table of dependent memory from minor heap
+Reallocation of the table of dependent memory from minor heap.
 @since 5.4 *)
-| EV_C_MAJOR_SLICE_ALLOC_WORDS
+| EV_C_MAJOR_ALLOCATED_WORDS
 (**
-Words of heap allocation by this domain since the last major slice
-@since 5.4 *)
+Allocations to the major heap of this Domain in words, since the last major
+slice.
+@since 5.3
+*)
 | EV_C_MAJOR_SLICE_ALLOC_DEPENDENT_WORDS
 (**
 Words of off-heap allocation by this domain since the last major slice
@@ -163,24 +158,17 @@ Total pending GC work (for all domains) at start of slice
 @since 5.4 *)
 | EV_C_MAJOR_SLICE_BUDGET
 (**
-Work budget for this domain in the current slice
-@since 5.4 *)
+The budget in 'work' that a domain has to do during the major slice.
+@since 5.3
+*)
 | EV_C_MAJOR_SLICE_WORK_DONE
 (**
-Total work done by this domain in a slice
+Total work done by this domain in a slice.
 @since 5.4 *)
-||||||| upstream-base
-=======
 | EV_C_MAJOR_HEAP_WORDS
 (**
 Major heap size in words of a Domain.
 @since 5.3 *)
-| EV_C_MAJOR_ALLOCATED_WORDS
-(**
-Allocations to the major heap of this Domain in words, since the last major
-slice.
-@since 5.3
-*)
 | EV_C_MAJOR_ALLOCATED_WORK
 (**
 The amount of major GC 'work' needing to be done as a result of allocations to
@@ -220,12 +208,6 @@ The target amount of global 'work' that should be done by all domains at the
 end of the major slice (see EV_C_MAJOR_SLICE_COUNTER).
 @since 5.3
 *)
-| EV_C_MAJOR_SLICE_BUDGET
-(**
-The budget in 'work' that a domain has to do during the major slice.
-@since 5.3
-*)
->>>>>>> upstream-incoming
 
 (** The type for span events emitted by the runtime. *)
 type runtime_phase =
@@ -270,10 +252,6 @@ Event spanning the sweeping work of a major GC.
 @since 5.0
 *)
 | EV_MAJOR_MARK_ROOTS
-<<<<<<< oxcaml
-| EV_MAJOR_MEMPROF_ROOTS
-||||||| upstream-base
-=======
 (**
 Event spanning the marking of roots in a major GC.
 @since 5.0
@@ -283,7 +261,6 @@ Event spanning the marking of roots in a major GC.
 Event spanning the marking of memprof roots in a major GC.
 @since 5.3
 *)
->>>>>>> upstream-incoming
 | EV_MAJOR_MARK
 (**
 Event spanning the marking of the heap in a major GC.
@@ -295,11 +272,6 @@ Event spanning any minor GC work.
 @since 5.0
 *)
 | EV_MINOR_LOCAL_ROOTS
-<<<<<<< oxcaml
-| EV_MINOR_MEMPROF_ROOTS
-| EV_MINOR_MEMPROF_CLEAN
-||||||| upstream-base
-=======
 (**
 Event spanning the scanning and major allocation of local roots during a minor
 GC.
@@ -316,7 +288,6 @@ Event spanning cleaning and updating of memprof structures at the end of a
 minor GC.
 @since 5.3
 *)
->>>>>>> upstream-incoming
 | EV_MINOR_FINALIZED
 (**
 Event spanning the running of finalisers for dead custom blocks at the end of a
@@ -434,10 +405,6 @@ Event spanning the time spent as the leader of a stop-the-world.
 @since 5.0
 *)
 | EV_MAJOR_FINISH_SWEEPING
-<<<<<<< oxcaml
-| EV_MAJOR_MEMPROF_CLEAN
-||||||| upstream-base
-=======
 (**
 Event spanning the time spent finishing sweeping when forced to as part of
 domain termination.
@@ -449,7 +416,6 @@ Event spanning the time spent cleaning memprof structures at the end of a major
 GC.
 @since 5.3
 *)
->>>>>>> upstream-incoming
 | EV_MINOR_FINALIZERS_ADMIN
 (**
 Event spanning finalisers book-keeping at the end of a minor GC.
@@ -500,30 +466,20 @@ evacuation during a compaction.
 @since 5.2
 *)
 | EV_COMPACT_RELEASE
-<<<<<<< oxcaml
-| EV_MINOR_EPHE_CLEAN
-| EV_MINOR_DEPENDENT
-||||||| upstream-base
-=======
 (**
 Event spanning releasing the evacuated pools at the end of a compaction.
 @since 5.2
 *)
+| EV_MINOR_EPHE_CLEAN
+| EV_MINOR_DEPENDENT
 | EV_EMPTY_MINOR
 (**
 Event spanning a domain needing to empty its minor heap for a new allocation.
 This includes time spent trying to become stop-the-world leader.
 @since 5.4
 *)
->>>>>>> upstream-incoming
 
-<<<<<<< oxcaml
-(** Lifecycle events for the ring itself. *)
-||||||| upstream-base
-(** Lifecycle events for the ring itself *)
-=======
 (** Lifecycle events for Runtime_events and domains. *)
->>>>>>> upstream-incoming
 type lifecycle =
   EV_RING_START
 (**

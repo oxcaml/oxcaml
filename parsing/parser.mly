@@ -118,32 +118,6 @@ let mkoperator =
 let mkpatvar ~loc name =
   mkpat ~loc (Ppat_var (mkrhs name loc))
 
-<<<<<<< oxcaml
-(* See commentary about ghost locations at the declaration of Location.t *)
-let ghexp ~loc d = Exp.mk ~loc:(ghost_loc loc) d
-let ghpat ~loc d = Pat.mk ~loc:(ghost_loc loc) d
-||||||| upstream-base
-(*
-  Ghost expressions and patterns:
-  expressions and patterns that do not appear explicitly in the
-  source file they have the loc_ghost flag set to true.
-  Then the profiler will not try to instrument them and the
-  -annot option will not try to display their type.
-
-  Every grammar rule that generates an element with a location must
-  make at most one non-ghost element, the topmost one.
-
-  How to tell whether your location must be ghost:
-  A location corresponds to a range of characters in the source file.
-  If the location contains a piece of code that is syntactically
-  valid (according to the documentation), and corresponds to the
-  AST node, then the location must be real; in all other cases,
-  it must be ghost.
-*)
-let ghexp ~loc d = Exp.mk ~loc:(ghost_loc loc) d
-let ghpat ~loc d = Pat.mk ~loc:(ghost_loc loc) d
-let ghtyp ~loc d = Typ.mk ~loc:(ghost_loc loc) d
-=======
 (*
   See ./location.mli for when to use a ghost location or not.
 
@@ -152,7 +126,6 @@ let ghtyp ~loc d = Typ.mk ~loc:(ghost_loc loc) d
 *)
 let ghexp ~loc ?attrs d = Exp.mk ~loc:(ghost_loc loc) ?attrs d
 let ghpat ~loc ?attrs d = Pat.mk ~loc:(ghost_loc loc) ?attrs d
->>>>>>> upstream-incoming
 let ghtyp ~loc ?attrs d = Typ.mk ~loc:(ghost_loc loc) ?attrs d
 let ghloc ~loc d = { txt = d; loc = ghost_loc loc }
 let ghstr ~loc d = Str.mk ~loc:(ghost_loc loc) d
@@ -169,38 +142,6 @@ let neg_string f =
   then String.sub f 1 (String.length f - 1)
   else "-" ^ f
 
-<<<<<<< oxcaml
-let mkuminus ~oploc name arg =
-  let result =
-    match arg.pexp_desc with
-    | Pexp_constant const -> begin
-        match name, const with
-        | "-", Pconst_integer (n, m) ->
-           Some (Pconst_integer (neg_string n, m))
-        | "-", Pconst_unboxed_integer (n, m) ->
-           Some (Pconst_unboxed_integer (neg_string n, m))
-        | ("-" | "-."), Pconst_float (f, m) ->
-           Some (Pconst_float (neg_string f, m))
-        | ("-" | "-."), Pconst_unboxed_float (f, m) ->
-           Some (Pconst_unboxed_float (neg_string f, m))
-        | _, _ -> None
-      end
-    | _ -> None
-  in
-  match result with
-  | Some desc -> Pexp_constant desc, arg.pexp_attributes
-  | None ->
-      Pexp_apply (mkoperator ~loc:oploc ("~" ^ name), [Nolabel, arg]), []
-||||||| upstream-base
-let mkuminus ~oploc name arg =
-  match name, arg.pexp_desc with
-  | "-", Pexp_constant(Pconst_integer (n,m)) ->
-      Pexp_constant(Pconst_integer(neg_string n,m))
-  | ("-" | "-."), Pexp_constant(Pconst_float (f, m)) ->
-      Pexp_constant(Pconst_float(neg_string f, m))
-  | _ ->
-      Pexp_apply(mkoperator ~loc:oploc ("~" ^ name), [Nolabel, arg])
-=======
 (* Pre-apply the special [-], [-.], [+] and [+.] prefix operators into
    constants if possible, otherwise turn them into the corresponding prefix
    operators [~-], [~-.], etc.. *)
@@ -210,36 +151,32 @@ let mkuminus ~sloc ~oploc name arg =
     Pexp_constant({pconst_desc = Pconst_integer (n,m); pconst_loc=_}),
     [] ->
       Pexp_constant(mkconst ~loc:sloc (Pconst_integer(neg_string n, m)))
+  | "-",
+    Pexp_constant({pconst_desc = Pconst_unboxed_integer (n,m); pconst_loc=_}),
+    [] ->
+      Pexp_constant(mkconst ~loc:sloc (Pconst_unboxed_integer(neg_string n, m)))
   | ("-" | "-."),
     Pexp_constant({pconst_desc = Pconst_float (f, m); pconst_loc=_}), [] ->
       Pexp_constant(mkconst ~loc:sloc (Pconst_float(neg_string f, m)))
+  | ("-" | "-."),
+    Pexp_constant({pconst_desc = Pconst_unboxed_float (f, m); pconst_loc=_}),
+    [] ->
+      Pexp_constant(mkconst ~loc:sloc (Pconst_unboxed_float(neg_string f, m)))
   | _ ->
       Pexp_apply(mkoperator ~loc:oploc ("~" ^ name), [Nolabel, arg])
->>>>>>> upstream-incoming
 
 let mkuplus ~sloc ~oploc name arg =
   let desc = arg.pexp_desc in
-<<<<<<< oxcaml
-  match name, desc with
-  | "+", Pexp_constant (Pconst_integer _ | Pconst_unboxed_integer _)
-  | ("+" | "+."), Pexp_constant (Pconst_float _ | Pconst_unboxed_float _) ->
-     desc, arg.pexp_attributes
-||||||| upstream-base
-  match name, desc with
-  | "+", Pexp_constant(Pconst_integer _)
-  | ("+" | "+."), Pexp_constant(Pconst_float _) -> desc
-=======
   match name, desc, arg.pexp_attributes with
   | "+",
-    Pexp_constant({pconst_desc = Pconst_integer _ as desc; pconst_loc=_}),
+    Pexp_constant({pconst_desc = (Pconst_integer _ | Pconst_unboxed_integer _) as desc; pconst_loc=_}),
     []
   | ("+" | "+."),
-    Pexp_constant({pconst_desc = Pconst_float _ as desc; pconst_loc=_}),
+    Pexp_constant({pconst_desc = (Pconst_float _ | Pconst_unboxed_float _) as desc; pconst_loc=_}),
     [] ->
       Pexp_constant(mkconst ~loc:sloc desc)
->>>>>>> upstream-incoming
   | _ ->
-     Pexp_apply (mkoperator ~loc:oploc ("~" ^ name), [Nolabel, arg]), []
+     Pexp_apply (mkoperator ~loc:oploc ("~" ^ name), [Nolabel, arg])
 
 let mk_attr ~loc name payload =
   Builtin_attributes.(register_attr Parser name);
@@ -340,15 +277,9 @@ let rec mktailexp nilloc = let open Location in function
   | e1 :: el ->
       let exp_el, el_loc = mktailexp nilloc el in
       let loc = (e1.pexp_loc.loc_start, snd el_loc) in
-<<<<<<< oxcaml
-      let arg = ghexp ~loc (Pexp_tuple [None, e1; None, ghexp ~loc:el_loc exp_el]) in
-||||||| upstream-base
-      let arg = ghexp ~loc (Pexp_tuple [e1; ghexp ~loc:el_loc exp_el]) in
-=======
       let arg =
         ghexp ~loc (Pexp_tuple [None, e1; None, ghexp ~loc:el_loc exp_el])
       in
->>>>>>> upstream-incoming
       ghexp_cons_desc loc arg, loc
 
 let rec mktailpat nilloc = let open Location in function
@@ -358,16 +289,10 @@ let rec mktailpat nilloc = let open Location in function
   | p1 :: pl ->
       let pat_pl, el_loc = mktailpat nilloc pl in
       let loc = (p1.ppat_loc.loc_start, snd el_loc) in
-<<<<<<< oxcaml
-      let arg = ghpat ~loc (Ppat_tuple ([None, p1; None, ghpat ~loc:el_loc pat_pl], Closed)) in
-||||||| upstream-base
-      let arg = ghpat ~loc (Ppat_tuple [p1; ghpat ~loc:el_loc pat_pl]) in
-=======
       let arg =
         ghpat ~loc
           (Ppat_tuple ([None, p1; None, ghpat ~loc:el_loc pat_pl], Closed))
       in
->>>>>>> upstream-incoming
       ghpat_cons_desc loc arg, loc
 
 let mkstrexp e attrs =
@@ -474,7 +399,7 @@ let mkexp_type_constraint_with_modes ?(ghost=false) ~loc ~modes e t =
   | Pcoerce(t1, t2)  ->
      match modes with
      | [] ->
-      let mk = if ghost then ghexp else mkexp ?attrs:None in
+      let mk = if ghost then ghexp ?attrs:None else mkexp ?attrs:None in
       mk ~loc (Pexp_coerce(e, t1, t2))
      | _ :: _ -> not_expecting loc "mode annotations"
 
@@ -533,19 +458,9 @@ type ('dot,'index) array_family = {
 
 let bigarray_untuplify exp =
   match exp.pexp_desc with
-<<<<<<< oxcaml
-  | Pexp_tuple explist when
-        List.for_all (function None, _ -> true | _ -> false) explist ->
-    List.map (fun (_, e) -> e) explist
-||||||| upstream-base
-let bigarray_untuplify = function
-    { pexp_desc = Pexp_tuple explist; pexp_loc = _ } -> explist
-  | exp -> [exp]
-=======
   | Pexp_tuple explist
        when List.for_all (fun (l, _) -> Option.is_none l) explist ->
      List.map snd explist
->>>>>>> upstream-incoming
   | _ -> [exp]
 
 (* Immutable array indexing is a regular operator, so it doesn't need a special
@@ -671,6 +586,13 @@ let wrap_type_annotation ~loc ?(typloc=loc) ~modes newtypes core_type body =
 
 let pexp_extension ~id e = Pexp_extension (id, PStr [mkstrexp e []])
 
+let wrap_exp_attrs ~loc body (ext, attrs) =
+  (* todo: keep exact location for the entire attribute *)
+  let body = {body with pexp_attributes = attrs @ body.pexp_attributes} in
+  match ext with
+  | None -> body
+  | Some id -> ghexp ~loc (pexp_extension ~id body)
+
 let mkexp_attrs ~loc desc (ext, attrs) =
   (* todo: keep exact location for the entire attribute *)
   match ext with
@@ -678,19 +600,7 @@ let mkexp_attrs ~loc desc (ext, attrs) =
   | Some id ->
      mkexp ~loc (pexp_extension ~id (ghexp ~loc ~attrs desc))
 
-<<<<<<< oxcaml
-let mkexp_attrs ~loc d ext_attrs =
-  wrap_exp_attrs ~loc (mkexp ~loc d) ext_attrs
-
-let wrap_typ_attrs ~loc typ (ext, attrs) =
-||||||| upstream-base
-let mkexp_attrs ~loc d attrs =
-  wrap_exp_attrs ~loc (mkexp ~loc d) attrs
-
-let wrap_typ_attrs ~loc typ (ext, attrs) =
-=======
 let mktyp_attrs ~loc desc (ext, attrs) =
->>>>>>> upstream-incoming
   (* todo: keep exact location for the entire attribute *)
   match ext with
   | None -> mktyp ~loc ~attrs desc
@@ -711,25 +621,23 @@ let wrap_mod_attrs ~loc:_ attrs body =
 let wrap_mty_attrs ~loc:_ attrs body =
   {body with pmty_attributes = attrs @ body.pmty_attributes}
 
-let wrap_mkstr_ext ~loc (item, ext) =
+let wrap_str_ext ~loc body ext =
   match ext with
-<<<<<<< oxcaml
+  | None -> body
+  | Some id -> ghstr ~loc (Pstr_extension ((id, PStr [body]), []))
+
+let wrap_mkstr_ext ~loc (item, ext) =
+  wrap_str_ext ~loc (mkstr ~loc item) ext
+
+let wrap_sig_ext ~loc body ext =
+  match ext with
   | None -> body
   | Some id ->
       ghsig ~loc (Psig_extension ((id, PSig {psg_items=[body];
         psg_modalities=[]; psg_loc=make_loc loc}), []))
-||||||| upstream-base
-  | None -> body
-  | Some id -> ghsig ~loc (Psig_extension ((id, PSig [body]), []))
-=======
-  | None -> mkstr ~loc item
-  | Some id -> mkstr ~loc (Pstr_extension ((id, PStr [ghstr ~loc item]), []))
->>>>>>> upstream-incoming
 
 let wrap_mksig_ext ~loc (item, ext) =
-  match ext with
-  | None -> mksig ~loc item
-  | Some id -> mksig ~loc (Psig_extension ((id, PSig [ghsig ~loc item]), []))
+  wrap_sig_ext ~loc (mksig ~loc item) ext
 
 let mk_quotedext ~loc (id, idloc, str, strloc, delim) =
   let exp_id = mkloc id idloc in
@@ -936,10 +844,6 @@ let mk_functor_typ args mty_mm =
   in
   mty
 
-let mk_functor_typ args mty =
-  List.fold_left (fun acc (startpos, arg) ->
-      mkmty ~loc:(startpos, mty.pmty_loc.loc_end) (Pmty_functor (arg, acc)))
-    mty args
 
 (* Alternatively, we could keep the generic module type in the Parsetree
    and extract the package type during type-checking. In that case,
@@ -1284,13 +1188,8 @@ The precedences must be listed from low to high.
 %left     BAR                           /* pattern (p|p|p) */
 %nonassoc below_COMMA
 %left     COMMA                         /* expr/labeled_tuple (e,e,e) */
-<<<<<<< oxcaml
 %nonassoc below_FUNCTOR                 /* include M */
 %nonassoc FUNCTOR                       /* include functor M */
-||||||| upstream-base
-%left     COMMA                         /* expr/expr_comma_list (e,e,e) */
-=======
->>>>>>> upstream-incoming
 %right    MINUSGREATER                  /* function_type (t -> t -> t) */
 %right    OR BARBAR                     /* expr (e || e || e) */
 %nonassoc below_AMPERSAND
@@ -1314,26 +1213,16 @@ The precedences must be listed from low to high.
 %nonassoc below_DOT
 %nonassoc DOT DOTHASH DOTOP
 /* Finally, the first tokens of simple_expr are above everything else. */
-<<<<<<< oxcaml
-%nonassoc BACKQUOTE BANG BEGIN CHAR HASH_CHAR FALSE FLOAT HASH_FLOAT
-          INT HASH_INT OBJECT
-          LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
-          NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET DOLLAR
-          LBRACKETPERCENT QUOTED_STRING_EXPR HASHLBRACE HASHLPAREN UNDERSCORE
-          HASHFALSE HASHTRUE
-||||||| upstream-base
-%nonassoc BACKQUOTE BANG BEGIN CHAR FALSE FLOAT INT OBJECT
-          LBRACE LBRACELESS LBRACKET LBRACKETBAR LIDENT LPAREN
-          NEW PREFIXOP STRING TRUE UIDENT
-          LBRACKETPERCENT QUOTED_STRING_EXPR
-
-=======
 %nonassoc BACKQUOTE BANG BEGIN CHAR FALSE FLOAT INT OBJECT
           LBRACE LBRACELESS LBRACKET LBRACKETBAR LIDENT LPAREN
           NEW PREFIXOP STRING TRUE UIDENT
           LBRACKETPERCENT QUOTED_STRING_EXPR
           METAOCAML_BRACKET_OPEN METAOCAML_ESCAPE
->>>>>>> upstream-incoming
+          /* OxCaml additions: */
+          HASH_CHAR HASH_FLOAT HASH_INT
+          LBRACKETCOLON LESSLBRACKET DOLLAR
+          HASHLBRACE HASHLPAREN UNDERSCORE
+          HASHFALSE HASHTRUE
 
 /* Entry points */
 
@@ -2165,30 +2054,6 @@ module_type_atomic:
       { unclosed "sig" $loc($1) "end" $loc($4) }
   | STRUCT error
       { expecting $loc($1) "sig" }
-<<<<<<< oxcaml
-||||||| upstream-base
-  | FUNCTOR attrs = attributes args = functor_args
-    MINUSGREATER mty = module_type
-      %prec below_WITH
-      { wrap_mty_attrs ~loc:$sloc attrs (
-          List.fold_left (fun acc (startpos, arg) ->
-            mkmty ~loc:(startpos, $endpos) (Pmty_functor (arg, acc))
-          ) mty args
-        ) }
-  | MODULE TYPE OF attributes module_expr %prec below_LBRACKETAT
-      { mkmty ~loc:$sloc ~attrs:$4 (Pmty_typeof $5) }
-=======
-  | FUNCTOR attrs = attributes args = functor_args
-    MINUSGREATER mty = module_type
-      %prec below_WITH
-      { wrap_mty_attrs ~loc:$sloc attrs (mk_functor_typ args mty) }
-  | args = functor_args
-    MINUSGREATER mty = module_type
-      %prec below_WITH
-      { mk_functor_typ args mty }
-  | MODULE TYPE OF attributes module_expr %prec below_LBRACKETAT
-      { mkmty ~loc:$sloc ~attrs:$4 (Pmty_typeof $5) }
->>>>>>> upstream-incoming
   | LPAREN module_type RPAREN
       { $2 }
   | LPAREN module_type error
@@ -2196,22 +2061,6 @@ module_type_atomic:
   | mkmty(
       mkrhs(mty_longident)
         { Pmty_ident $1 }
-<<<<<<< oxcaml
-||||||| upstream-base
-    | LPAREN RPAREN MINUSGREATER module_type
-        { Pmty_functor(Unit, $4) }
-    | module_type MINUSGREATER module_type
-        %prec below_WITH
-        { Pmty_functor(Named (mknoloc None, $1), $3) }
-    | module_type WITH separated_nonempty_llist(AND, with_constraint)
-        { Pmty_with($1, $3) }
-=======
-    | module_type MINUSGREATER module_type
-        %prec below_WITH
-        { Pmty_functor(Named (mknoloc None, $1), $3) }
-    | module_type WITH separated_nonempty_llist(AND, with_constraint)
-        { Pmty_with($1, $3) }
->>>>>>> upstream-incoming
 /*  | LPAREN MODULE mkrhs(mod_longident) RPAREN
         { Pmty_alias $3 } */
     )
@@ -2698,16 +2547,8 @@ class_signature:
 class_self_type:
     LPAREN core_type RPAREN
       { $2 }
-<<<<<<< oxcaml
-  | mktyp((* empty *) { Ptyp_any None })
-      { $1 }
-||||||| upstream-base
-  | mktyp((* empty *) { Ptyp_any })
-      { $1 }
-=======
   | (* empty *)
-      { ghtyp ~loc:$sloc Ptyp_any }
->>>>>>> upstream-incoming
+      { ghtyp ~loc:$sloc (Ptyp_any None) }
 ;
 %inline class_sig_fields:
   flatten(text_csig(class_sig_field)*)
@@ -3035,13 +2876,7 @@ fun_expr:
         mkexp ~loc:$sloc (Pexp_letop{ let_; ands; body}) }
   | fun_expr COLONCOLON expr
       { mkexp_cons ~loc:$sloc $loc($2)
-<<<<<<< oxcaml
-          (ghexp ~loc:$sloc (Pexp_tuple[None, $1;None, $3])) }
-||||||| upstream-base
-      { mkexp_cons ~loc:$sloc $loc($2) (ghexp ~loc:$sloc (Pexp_tuple[$1;$3])) }
-=======
           (ghexp ~loc:$sloc (Pexp_tuple[None,$1;None,$3])) }
->>>>>>> upstream-incoming
   | mkrhs(label) LESSMINUS expr
       { mkexp ~loc:$sloc (Pexp_setvar($1, $3)) }
   | simple_expr DOT mkrhs(label_longident) LESSMINUS expr
@@ -3094,11 +2929,9 @@ fun_expr:
   | LAZY ext_attributes simple_expr %prec below_HASH
       { Pexp_lazy $3, $2 }
   | subtractive expr %prec prec_unary_minus
-      { let desc, attrs = mkuminus ~oploc:$loc($1) $1 $2 in
-        desc, (None, attrs) }
+      { mkuminus ~sloc:$sloc ~oploc:$loc($1) $1 $2, (None, []) }
   | additive expr %prec prec_unary_plus
-      { let desc, attrs = mkuplus ~oploc:$loc($1) $1 $2 in
-        desc, (None, attrs) }
+      { mkuplus ~sloc:$sloc ~oploc:$loc($1) $1 $2, (None, []) }
 ;
 %inline do_done_expr:
   | DO e = seq_expr DONE
@@ -3108,7 +2941,6 @@ fun_expr:
 ;
 %inline expr_:
   | simple_expr nonempty_llist(labeled_simple_expr)
-<<<<<<< oxcaml
       { mkexp ~loc:$sloc (Pexp_apply($1, $2)) }
   | stack(simple_expr) %prec below_HASH { $1 }
   | BORROW simple_expr %prec below_HASH
@@ -3119,23 +2951,9 @@ fun_expr:
     mkrhs(constr_longident) simple_expr %prec below_HASH
       { mkexp ~loc:$sloc (Pexp_construct($1, Some $2)) }
     ) { $1 }
-||||||| upstream-base
-      { Pexp_apply($1, $2) }
-  | expr_comma_list %prec below_COMMA
-      { Pexp_tuple($1) }
-  | mkrhs(constr_longident) simple_expr %prec below_HASH
-      { Pexp_construct($1, Some $2) }
-=======
-      { Pexp_apply($1, $2) }
-  | labeled_tuple %prec below_COMMA
-      { Pexp_tuple($1) }
-  | mkrhs(constr_longident) simple_expr %prec below_HASH
-      { Pexp_construct($1, Some $2) }
->>>>>>> upstream-incoming
   | name_tag simple_expr %prec below_HASH
       { mkexp ~loc:$sloc (Pexp_variant($1, Some $2)) }
   | e1 = fun_expr op = op(infix_operator) e2 = expr
-<<<<<<< oxcaml
       { mkexp ~loc:$sloc (mkinfix e1 op e2) }
 ;
 
@@ -3158,19 +2976,6 @@ spliceable_expr:
       { mkexp ~loc:$sloc (Pexp_ident ($1)) }
   | error
       { unspliceable $sloc }
-||||||| upstream-base
-      { mkinfix e1 op e2 }
-  | subtractive expr %prec prec_unary_minus
-      { mkuminus ~oploc:$loc($1) $1 $2 }
-  | additive expr %prec prec_unary_plus
-      { mkuplus ~oploc:$loc($1) $1 $2 }
-=======
-      { mkinfix e1 op e2 }
-  | subtractive expr %prec prec_unary_minus
-      { mkuminus ~sloc:$sloc ~oploc:$loc($1) $1 $2 }
-  | additive expr %prec prec_unary_plus
-      { mkuplus ~sloc:$sloc ~oploc:$loc($1) $1 $2 }
->>>>>>> upstream-incoming
 ;
 
 simple_expr:
@@ -3218,19 +3023,9 @@ simple_expr:
   | NEW ext_attributes mkrhs(class_longident)
       { Pexp_new($3), $2 }
   | LPAREN MODULE ext_attributes module_expr RPAREN
-<<<<<<< oxcaml
-      { Pexp_pack $4, $3 }
-  | LPAREN MODULE ext_attributes module_expr COLON package_type RPAREN
-      { Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $4), Some $6, []), $3 }
-||||||| upstream-base
-      { Pexp_pack $4, $3 }
-  | LPAREN MODULE ext_attributes module_expr COLON package_type RPAREN
-      { Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $4), $6), $3 }
-=======
       { Pexp_pack ($4, None), $3 }
   | LPAREN MODULE ext_attributes module_expr COLON package_type_ RPAREN
       { Pexp_pack ($4, Some $6), $3 }
->>>>>>> upstream-incoming
   | LPAREN MODULE ext_attributes module_expr COLON error
       { unclosed "(" $loc($1) ")" $loc($6) }
   | OBJECT ext_attributes class_structure END
@@ -3239,7 +3034,6 @@ simple_expr:
       { unclosed "object" $loc($1) "end" $loc($4) }
 ;
 
-<<<<<<< oxcaml
 comprehension_iterator:
   | EQUAL expr direction_flag expr
       { Pcomp_range { start = $2 ; stop = $4 ; direction = $3 } }
@@ -3357,8 +3151,7 @@ block_access:
     }
   | DOT ident _p=LPAREN seq_expr _e=error
     { indexop_unclosed_error $loc(_p) Paren $loc(_e) }
-||||||| upstream-base
-=======
+
 (* We include this parsing rule from the BER-MetaOCaml patchset
    (see https://okmij.org/ftp/ML/MetaOCaml.html)
    even though the lexer does *not* include any lexing rule
@@ -3373,7 +3166,6 @@ block_access:
     { mkexp ~loc:$sloc (pexp_extension ~id:(mknoloc "metaocaml.escape") e) }
   | METAOCAML_BRACKET_OPEN e = seq_expr METAOCAML_BRACKET_CLOSE
     { mkexp ~loc:$sloc (pexp_extension ~id:(mknoloc "metaocaml.bracket") e) }
->>>>>>> upstream-incoming
 ;
 
 %inline simple_expr_:
@@ -3463,13 +3255,7 @@ block_access:
     ptyp = package_type_ RPAREN
       { let modexp =
           mkexp_attrs ~loc:($startpos($3), $endpos)
-<<<<<<< oxcaml
-            (Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $6), Some $8, [])) $5 in
-||||||| upstream-base
-            (Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $6), $8)) $5 in
-=======
             (Pexp_pack ($6, Some ptyp)) $5 in
->>>>>>> upstream-incoming
         Pexp_open(od, modexp) }
   | mod_longident DOT
     LPAREN MODULE ext_attributes module_expr COLON error
@@ -3733,8 +3519,7 @@ fun_params:
   | nonempty_concat(fun_param_as_list) { $1 }
 ;
 
-<<<<<<< oxcaml
-(* Parsing labeled tuple expressions
+(* Parsing labeled tuple expressions:
 
    The grammar we want to parse is something like:
 
@@ -3778,89 +3563,6 @@ fun_params:
       { Some label,
         mkexp_type_constraint_with_modes
           ~loc:($startpos($2), $endpos) ~modes:[] (mkexpvar ~loc:$loc(label) label) c }
-||||||| upstream-base
-%inline expr_comma_list:
-  es = separated_nontrivial_llist(COMMA, expr)
-    { es }
-=======
-(* Parsing labeled tuple expressions:
-
-   The grammar we want to parse is something like:
-
-     labeled_tuple_element := expr | ~x:expr | ~x | ~(x:ty)
-     labeled_tuple := lt_element [, lt_element]+
-
-   (The last case of [labeled_tuple_element] is a punned label with a type
-   constraint, which is allowed for functions, so we allow it here).
-
-   So you might think [labeled_tuple] could therefore just be:
-
-     labeled_tuple :
-       separated_nontrivial_llist(COMMA, labeled_tuple_element)
-
-   But this doesn't work:
-
-   - If we don't mark [labeled_tuple_element] %inline, this causes many
-     reduce/reduce conflicts (basically just ambiguities) because
-     [labeled_tuple_element] trivially reduces to [expr].
-
-   - If we do mark [labeled_tuple_element] %inline, it is not allowed to have
-     %prec annotations.  Menhir doesn't permit these on %inline non-terminals
-     that are used in non-tail position.
-
-   To get around this, we do mark it inlined, and then because we can only use
-   it in tail position it is _manually_ inlined into the occurrences in
-   [separated_nontrivial_llist] where it doesn't appear in tail position.  This
-   results in [labeled_tuple] and [reversed_labeled_tuple_body] below.  So the
-   latter is just a list of comma-separated labeled tuple elements, with length
-   at least two, where the first element in the base case is inlined (resulting
-   in one base case for each case of [labeled_tuple_element].  *)
-%inline labeled_tuple_element :
-  | expr
-     { None, $1 }
-  | LABEL simple_expr %prec below_HASH
-     { Some $1, $2 }
-  | TILDE label = LIDENT
-     { let loc = $loc(label) in
-       Some label, mkexpvar ~loc label }
-  | TILDE LPAREN label = LIDENT c = type_constraint RPAREN %prec below_HASH
-      { Some label,
-        mkexp_constraint ~loc:($startpos($2), $endpos)
-          (mkexpvar ~loc:$loc(label) label) c }
-;
-reversed_labeled_tuple_body:
-  (* > 2 elements *)
-  xs = reversed_labeled_tuple_body
-  COMMA
-  x = labeled_tuple_element
-    { x :: xs }
-  (* base cases (2 elements) *)
-| x1 = expr
-  COMMA
-  x2 = labeled_tuple_element
-    { [ x2; None, x1 ] }
-| l1 = LABEL x1 = simple_expr
-  COMMA
-  x2 = labeled_tuple_element
-    { [ x2; Some l1, x1 ] }
-| TILDE l1 = LIDENT
-  COMMA
-  x2 = labeled_tuple_element
-  { let loc = $loc(l1) in
-    [ x2; Some l1, mkexpvar ~loc l1] }
-| TILDE LPAREN l1 = LIDENT c = type_constraint RPAREN
-  COMMA
-  x2 = labeled_tuple_element
-  { let x1 =
-      mkexp_constraint ~loc:($startpos($2), $endpos)
-        (mkexpvar ~loc:$loc(l1) l1) c
-    in
-    [ x2; Some l1, x1] }
-;
-%inline labeled_tuple:
-  xs = rev(reversed_labeled_tuple_body)
-    { xs }
->>>>>>> upstream-incoming
 ;
 reversed_labeled_tuple_body:
   (* > 2 elements *)
@@ -4015,14 +3717,7 @@ pattern_no_exn:
 %inline pattern_(self):
   | self COLONCOLON pattern
       { mkpat_cons ~loc:$sloc $loc($2)
-<<<<<<< oxcaml
-          (ghpat ~loc:$sloc (Ppat_tuple ([None, $1;None, $3], Closed)))
-      }
-||||||| upstream-base
-      { mkpat_cons ~loc:$sloc $loc($2) (ghpat ~loc:$sloc (Ppat_tuple[$1;$3])) }
-=======
           (ghpat ~loc:$sloc (Ppat_tuple ([None, $1; None, $3], Closed))) }
->>>>>>> upstream-incoming
   | self attribute
       { Pat.attr $1 $2 }
   | pattern_gen
@@ -4032,14 +3727,8 @@ pattern_no_exn:
         { Ppat_alias($1, $3) }
     | self AS error
         { expecting $loc($3) "identifier" }
-<<<<<<< oxcaml
-||||||| upstream-base
-    | pattern_comma_list(self) %prec below_COMMA
-        { Ppat_tuple(List.rev $1) }
-=======
     | labeled_tuple_pattern(self)
         { $1 }
->>>>>>> upstream-incoming
     | self COLONCOLON error
         { expecting $loc($3) "pattern" }
     | self BAR pattern
@@ -4047,68 +3736,7 @@ pattern_no_exn:
     | self BAR error
         { expecting $loc($3) "pattern" }
   ) { $1 }
-  | reversed_labeled_tuple_pattern(self)
-      { let closed, pats = $1 in
-        mkpat ~loc:$sloc (Ppat_tuple (List.rev pats, closed))
-      }
 ;
-
-(* Parsing labeled tuple patterns
-
-   Here we play essentially the same game we did for expressions - see the
-   comment beginning "Parsing labeled tuple expressions".
-
-   One difference is that we would need to manually inline the definition of
-   individual elements in two places: Once in the base case for lists 2 or more
-   elements, and once in the special case for open patterns with just one
-   element (e.g., [~x, ..]).  Rather than manually inlining
-   [labeled_tuple_pat_element] twice, we simply define it twice: once with the
-   [%prec] annotations needed for its occurrences in tail position, and once
-   without them suitable for use in other locations.
-*)
-%inline labeled_tuple_pat_element(self):
-  | self { None, $1 }
-  | LABEL simple_pattern %prec COMMA
-      { Some $1, $2 }
-  | TILDE label = LIDENT
-      { let loc = $loc(label) in
-        Some label, mkpatvar ~loc label }
-  | TILDE LPAREN label = LIDENT COLON cty = core_type RPAREN %prec COMMA
-      { let lbl_loc = $loc(label) in
-        let pat_loc = $startpos($2), $endpos in
-        let pat = mkpatvar ~loc:lbl_loc label in
-        Some label, mkpat_with_modes ~loc:pat_loc ~modes:[] ~pat ~cty:(Some cty) }
-
-(* If changing this, don't forget to change its copy just above. *)
-%inline labeled_tuple_pat_element_noprec(self):
-  | self { None, $1 }
-  | LABEL simple_pattern
-      { Some $1, $2 }
-  | TILDE label = LIDENT
-      { let loc = $loc(label) in
-        Some label, mkpatvar ~loc label }
-  | TILDE LPAREN label = LIDENT COLON cty = core_type RPAREN
-      { let lbl_loc = $loc(label) in
-        let pat_loc = $startpos($2), $endpos in
-        let pat = mkpatvar ~loc:lbl_loc label in
-        Some label, mkpat_with_modes ~loc:pat_loc ~modes:[] ~pat ~cty:(Some cty) }
-
-labeled_tuple_pat_element_list(self):
-  | labeled_tuple_pat_element_list(self) COMMA labeled_tuple_pat_element(self)
-      { $3 :: $1 }
-  | labeled_tuple_pat_element_noprec(self) COMMA labeled_tuple_pat_element(self)
-      { [ $3; $1 ] }
-  | self COMMA error
-      { expecting $loc($3) "pattern" }
-;
-
-reversed_labeled_tuple_pattern(self):
-  | labeled_tuple_pat_element_list(self) %prec below_COMMA
-      { Closed, $1 }
-  | labeled_tuple_pat_element_list(self) COMMA DOTDOT
-      { Open, $1 }
-  | labeled_tuple_pat_element_noprec(self) COMMA DOTDOT
-      { Open, [ $1 ] }
 
 pattern_gen:
     simple_pattern
@@ -4229,14 +3857,7 @@ simple_delimited_pattern:
           Ppat_unboxed_tuple (List.rev fields, closed) }
   ) { $1 }
 
-<<<<<<< oxcaml
-||||||| upstream-base
-pattern_comma_list(self):
-    pattern_comma_list(self) COMMA pattern      { $3 :: $1 }
-  | self COMMA pattern                          { [$3; $1] }
-  | self COMMA error                            { expecting $loc($3) "pattern" }
-;
-=======
+
 (* Parsing labeled tuple patterns:
 
    Here we play essentially the same game we did for expressions - see the
@@ -4261,8 +3882,8 @@ pattern_comma_list(self):
       { let lbl_loc = $loc(label) in
         let pat_loc = $startpos($2), $endpos in
         let pat = mkpatvar ~loc:lbl_loc label in
-        Some label, mkpat ~loc:pat_loc (Ppat_constraint(pat, cty)) }
-;
+        Some label, mkpat_with_modes ~loc:pat_loc ~modes:[] ~pat ~cty:(Some cty) }
+
 (* If changing this, don't forget to change its copy just above. *)
 %inline labeled_tuple_pat_element_noprec(self):
   | self { None, $1 }
@@ -4275,8 +3896,8 @@ pattern_comma_list(self):
       { let lbl_loc = $loc(label) in
         let pat_loc = $startpos($2), $endpos in
         let pat = mkpatvar ~loc:lbl_loc label in
-        Some label, mkpat ~loc:pat_loc (Ppat_constraint(pat, cty)) }
-;
+        Some label, mkpat_with_modes ~loc:pat_loc ~modes:[] ~pat ~cty:(Some cty) }
+
 labeled_tuple_pat_element_list(self):
   | labeled_tuple_pat_element_list(self) COMMA labeled_tuple_pat_element(self)
       { $3 :: $1 }
@@ -4285,6 +3906,7 @@ labeled_tuple_pat_element_list(self):
   | self COMMA error
       { expecting $loc($3) "pattern" }
 ;
+
 reversed_labeled_tuple_pattern(self):
   | labeled_tuple_pat_element_list(self) %prec below_COMMA
       { Closed, $1 }
@@ -4298,7 +3920,6 @@ labeled_tuple_pattern(self):
       { let closed, pat = $1 in
         Ppat_tuple(List.rev pat, closed) }
 ;
->>>>>>> upstream-incoming
 %inline pattern_semi_list:
   ps = separated_or_terminated_nonempty_list(SEMI, pattern)
     { ps }
@@ -4977,7 +4598,6 @@ strict_function_or_labeled_tuple_type:
           Ptyp_arrow(label, domain , codomain, arg_modes, []) }
     )
     { $1 }
-<<<<<<< oxcaml
   | mktyp(
       label = arg_label
       domain_with_modes = with_optional_mode_expr(extra_rhs(param_type))
@@ -4991,18 +4611,16 @@ strict_function_or_labeled_tuple_type:
             maybe_curry_typ codomain codomain_loc, arg_modes, ret_modes) }
     )
     { $1 }
-  (* These next three cases are for labled tuples - see comment on [tuple_type]
+  (* The next three cases are for labled tuples - see comment on [tuple_type]
      below.
 
-     The first two cases are present just to resolve a shift reduce conflict
-     in a module type [S with t := x:t1 * t2 -> ...] which might be the
-     beginning of
+     The first two cases are present just to resolve a shift/reduce conflict in a
+     module type [S with t := x:t1 * t2 -> ...] which might be the beginning of
        [S with t := x:t1 * t2 -> S']    or    [S with t := x:t1 * t2 -> t3]
-     They are the same as the previous two cases, but with [arg_label] replaced
-     with the more specific [LIDENT COLON] and [param_type] replaced with the
-     more specific [proper_tuple_type].  Apparently, this is sufficient for
-     menhir to be able to delay a decision about which of the above module type
-     cases we are in.  *)
+     They are the same as the previous two cases, but with [arg_label] specialized
+     to [LIDENT COLON] and the domain type specialized to [proper_tuple_type].
+     Apparently, this is sufficient for menhir to be able to delay a decision
+     about which of the above module type cases we are in.  *)
   | mktyp(
       label = LIDENT COLON
       tuple_with_modes = with_optional_mode_expr(proper_tuple_type)
@@ -5035,31 +4653,6 @@ strict_function_or_labeled_tuple_type:
             arg_modes,
             ret_modes)
          }
-||||||| upstream-base
-=======
-  (* The next two cases are for labled tuples - see comment on [tuple_type]
-     below.
-
-     The first case is present just to resolve a shift/reduce conflict in a
-     module type [S with t := x:t1 * t2 -> ...] which might be the beginning of
-       [S with t := x:t1 * t2 -> S']    or    [S with t := x:t1 * t2 -> t3]
-     It is the same as the previous case, but with [arg_label] specialized to
-     [LIDENT COLON] and the domain type specialized to [proper_tuple_type].
-     Apparently, this is sufficient for menhir to be able to delay a decision
-     about which of the above module type cases we are in.  *)
-  | mktyp(
-      label = LIDENT COLON
-      tuple = proper_tuple_type
-      MINUSGREATER
-      codomain = function_type
-        { let ty, ltys = tuple in
-          let tuple_loc = $loc(tuple) in
-          let domain =
-            mktyp ~loc:tuple_loc (Ptyp_tuple ((None, ty) :: ltys))
-          in
-          let domain = extra_rhs_core_type domain ~pos:(snd tuple_loc) in
-          Ptyp_arrow(Labelled label, domain, codomain) }
->>>>>>> upstream-incoming
     )
     { $1 }
   | label = LIDENT COLON proper_tuple_type %prec MINUSGREATER
@@ -5177,38 +4770,20 @@ optional_atat_modalities_expr:
 
    However, the special case of labeled tuples where the first element has a
    label is not parsed as a proper_tuple_type, but rather as a case of
-<<<<<<< oxcaml
-   strict_function_or_labled_tuple_type above.  This helps in dealing with
-   ambiguities around [x:t1 * t2 -> t3] which must continue to parse as a
-   function with one labeled argument even in the presense of labled tuples.
-||||||| upstream-base
- *)
-=======
-   function_type above.  This resolves ambiguities around [x:t1 * t2 -> t3]
-   which must continue to parse as a function with one labeled argument even in
-   the presence of labled tuples.
->>>>>>> upstream-incoming
+   strict_function_or_labled_tuple_type above.  This resolves ambiguities
+   around [x:t1 * t2 -> t3] which must continue to parse as a function with
+   one labeled argument even in the presence of labled tuples.
 *)
 tuple_type:
   | ty = atomic_type
     %prec below_HASH
       { ty }
-<<<<<<< oxcaml
   | proper_tuple_type %prec below_FUNCTOR
     { let ty, ltys = $1 in
       mktyp ~loc:$sloc (Ptyp_tuple ((None, ty) :: ltys))
     }
-||||||| upstream-base
-  | mktyp(
-      tys = separated_nontrivial_llist(STAR, atomic_type)
-        { Ptyp_tuple tys }
-    )
-    { $1 }
-=======
-  | proper_tuple_type %prec below_WITH
-    { let ty, ltys = $1 in
-      mktyp ~loc:$sloc (Ptyp_tuple ((None, ty) :: ltys)) }
 ;
+
 %inline proper_tuple_type:
   | ty = atomic_type
     STAR
@@ -5220,14 +4795,7 @@ tuple_type:
      { None, $1 }
   | label = LIDENT COLON ty = atomic_type %prec STAR
      { Some label, ty }
->>>>>>> upstream-incoming
 ;
-
-%inline proper_tuple_type:
-  | ty = atomic_type
-    STAR
-    ltys = separated_nonempty_llist(STAR, labeled_tuple_typ_element)
-      { ty, ltys }
 
 (* In the case of an unboxed tuple, we don't need the nonsense above because
    the [#( ... )] disambiguates.  However, we still must write out
@@ -5244,12 +4812,6 @@ tuple_type:
     STAR
     ltys = separated_nonempty_llist(STAR, labeled_tuple_typ_element)
     { (Some label, ty1) :: ltys }
-
-%inline labeled_tuple_typ_element :
-  | atomic_type %prec STAR
-     { None, $1 }
-  | label = LIDENT COLON ty = atomic_type %prec STAR
-     { Some label, ty }
 
 (* Atomic types are the most basic level in the syntax of types.
    Atomic types include:
@@ -5499,68 +5061,41 @@ meth_list:
 /* Constants */
 
 value_constant:
-  | INT               { let (n, m) = $1 in Pconst_integer (n, m) }
-  | CHAR              { Pconst_char $1 }
+  | INT               { let (n, m) = $1 in
+                        mkconst ~loc:$sloc (Pconst_integer (n, m)) }
+  | CHAR              { mkconst ~loc:$sloc (Pconst_char $1) }
   | STRING            { let (s, strloc, d) = $1 in
-                        Pconst_string (s, strloc, d) }
-  | FLOAT             { let (f, m) = $1 in Pconst_float (f, m) }
+                        mkconst ~loc:$sloc (Pconst_string (s, strloc, d)) }
+  | FLOAT             { let (f, m) = $1 in
+                        mkconst ~loc:$sloc (Pconst_float (f, m)) }
 ;
 unboxed_constant:
-  | HASH_INT          { unboxed_int $sloc $sloc Positive $1 }
-  | HASH_FLOAT        { unboxed_float Positive $1 }
-  | HASH_CHAR         { Pconst_untagged_char $1 }
+  | HASH_INT          { mkconst ~loc:$sloc (unboxed_int $sloc $sloc Positive $1) }
+  | HASH_FLOAT        { mkconst ~loc:$sloc (unboxed_float Positive $1) }
+  | HASH_CHAR         { mkconst ~loc:$sloc (Pconst_untagged_char $1) }
 ;
 constant:
-<<<<<<< oxcaml
     value_constant    { $1 }
   | unboxed_constant  { $1 }
 ;
 signed_value_constant:
     value_constant    { $1 }
-  | MINUS INT         { let (n, m) = $2 in Pconst_integer("-" ^ n, m) }
-  | MINUS FLOAT       { let (f, m) = $2 in Pconst_float("-" ^ f, m) }
-  | PLUS INT          { let (n, m) = $2 in Pconst_integer (n, m) }
-  | PLUS FLOAT        { let (f, m) = $2 in Pconst_float(f, m) }
-||||||| upstream-base
-  | INT          { let (n, m) = $1 in Pconst_integer (n, m) }
-  | CHAR         { Pconst_char $1 }
-  | STRING       { let (s, strloc, d) = $1 in Pconst_string (s, strloc, d) }
-  | FLOAT        { let (f, m) = $1 in Pconst_float (f, m) }
-=======
-  | INT          { let (n, m) = $1 in
-                   mkconst ~loc:$sloc (Pconst_integer (n, m)) }
-  | CHAR         { mkconst ~loc:$sloc (Pconst_char $1) }
-  | STRING       { let (s, strloc, d) = $1 in
-                   mkconst ~loc:$sloc (Pconst_string (s,strloc,d)) }
-  | FLOAT        { let (f, m) = $1 in
-                   mkconst ~loc:$sloc (Pconst_float (f, m)) }
->>>>>>> upstream-incoming
+  | MINUS INT         { let (n, m) = $2 in
+                        mkconst ~loc:$sloc (Pconst_integer("-" ^ n, m)) }
+  | MINUS FLOAT       { let (f, m) = $2 in
+                        mkconst ~loc:$sloc (Pconst_float("-" ^ f, m)) }
+  | PLUS INT          { let (n, m) = $2 in
+                        mkconst ~loc:$sloc (Pconst_integer (n, m)) }
+  | PLUS FLOAT        { let (f, m) = $2 in
+                        mkconst ~loc:$sloc (Pconst_float(f, m)) }
 ;
 signed_constant:
-<<<<<<< oxcaml
     signed_value_constant { $1 }
   | unboxed_constant      { $1 }
-  | MINUS HASH_INT        { unboxed_int $sloc $loc($2) Negative $2 }
-  | MINUS HASH_FLOAT      { unboxed_float Negative $2 }
-  | PLUS HASH_INT         { unboxed_int $sloc $loc($2) Positive $2 }
-  | PLUS HASH_FLOAT       { unboxed_float Positive $2 }
-||||||| upstream-base
-    constant     { $1 }
-  | MINUS INT    { let (n, m) = $2 in Pconst_integer("-" ^ n, m) }
-  | MINUS FLOAT  { let (f, m) = $2 in Pconst_float("-" ^ f, m) }
-  | PLUS INT     { let (n, m) = $2 in Pconst_integer (n, m) }
-  | PLUS FLOAT   { let (f, m) = $2 in Pconst_float(f, m) }
-=======
-    constant     { $1 }
-  | MINUS INT    { let (n, m) = $2 in
-                   mkconst ~loc:$sloc (Pconst_integer("-" ^ n, m)) }
-  | MINUS FLOAT  { let (f, m) = $2 in
-                   mkconst ~loc:$sloc (Pconst_float("-" ^ f, m)) }
-  | PLUS INT     { let (n, m) = $2 in
-                   mkconst ~loc:$sloc (Pconst_integer (n, m)) }
-  | PLUS FLOAT   { let (f, m) = $2 in
-                   mkconst ~loc:$sloc (Pconst_float(f, m)) }
->>>>>>> upstream-incoming
+  | MINUS HASH_INT        { mkconst ~loc:$sloc (unboxed_int $sloc $loc($2) Negative $2) }
+  | MINUS HASH_FLOAT      { mkconst ~loc:$sloc (unboxed_float Negative $2) }
+  | PLUS HASH_INT         { mkconst ~loc:$sloc (unboxed_int $sloc $loc($2) Positive $2) }
+  | PLUS HASH_FLOAT       { mkconst ~loc:$sloc (unboxed_float Positive $2) }
 ;
 
 /* Identifiers and long identifiers */

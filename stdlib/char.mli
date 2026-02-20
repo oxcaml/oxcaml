@@ -14,15 +14,10 @@
 (*                                                                        *)
 (**************************************************************************)
 
-<<<<<<< oxcaml
 @@ portable
 
 open! Stdlib
 
-(** Character operations. *)
-||||||| upstream-base
-(** Character operations. *)
-=======
 (** Character operations.
 
     Characters are the elements of [string] and [bytes]
@@ -37,7 +32,6 @@ open! Stdlib
 
 type t = char
 (** An alias for the type of characters. *)
->>>>>>> upstream-incoming
 
 external code : char -> int = "%identity"
 (** Return the integer code of the argument. *)
