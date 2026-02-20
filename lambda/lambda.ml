@@ -2948,6 +2948,11 @@ let array_element_size_in_bytes (array_kind : array_kind) =
   | Pgcscannableproductarray _ | Pgcignorableproductarray _ ->
     (* All elements of unboxed product arrays are currently 8 bytes wide. *)
     count_initializers_array_kind array_kind * 8
+
+let element_layout_of_array_kind ak =
+  (* [alloc_heap] is ignored by [array_ref_kind_result_layout]. *)
+  array_ref_kind_result_layout (array_ref_kind alloc_heap ak)
+
 let rec ignorable_product_element_kind_involves_int
     (kind : ignorable_product_element_kind) =
   match kind with
