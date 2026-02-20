@@ -123,6 +123,12 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
               }))
     else
       let bound_var = Bound_pattern.must_be_singleton bound_pattern in
+      let dacc =
+        DA.map_denv dacc
+          ~f:
+            (DE.map_specialization_cost
+               ~f:(Specialization_cost.add_prim bound_var prim))
+      in
       let dbg = DE.add_inlined_debuginfo (DA.denv dacc) dbg in
       match
         Simplify_primitive.simplify_primitive dacc prim dbg

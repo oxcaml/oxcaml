@@ -54,14 +54,27 @@ let cse_depth () =
 let join_depth () =
   !Oxcaml_flags.Flambda2.join_depth |> with_default ~f:(fun d -> d.join_depth)
 
+let match_in_match () =
+  !Oxcaml_flags.Flambda2.match_in_match
+  |> with_default ~f:(fun d -> d.match_in_match)
+
 type join_algorithm = Oxcaml_flags.join_algorithm =
   | Binary
   | N_way
   | Checked
 
 let join_algorithm () =
-  !Oxcaml_flags.Flambda2.join_algorithm
-  |> with_default ~f:(fun d -> d.join_algorithm)
+  if match_in_match ()
+  then (
+    (match !Oxcaml_flags.Flambda2.join_algorithm with
+    | Set (Binary | Checked) ->
+      Misc.fatal_errorf
+        "The match-in-match optimization requires the N-way join algorithm"
+    | Set N_way | Default -> ());
+    Oxcaml_flags.N_way)
+  else
+    !Oxcaml_flags.Flambda2.join_algorithm
+    |> with_default ~f:(fun d -> d.join_algorithm)
 
 let use_n_way_join () =
   match join_algorithm () with
@@ -318,9 +331,9 @@ module Expert = struct
     !Oxcaml_flags.Flambda2.Expert.cont_lifting_budget
     |> with_default ~f:(fun d -> d.cont_lifting_budget)
 
-  let cont_spec_budget () =
-    !Oxcaml_flags.Flambda2.Expert.cont_spec_budget
-    |> with_default ~f:(fun d -> d.cont_spec_budget)
+  let cont_spec_threshold () =
+    !Oxcaml_flags.Flambda2.Expert.cont_spec_threshold
+    |> with_default ~f:(fun d -> d.cont_spec_threshold)
 end
 
 let stack_allocation_enabled () = Config.stack_allocation

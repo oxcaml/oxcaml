@@ -47,9 +47,17 @@
     simplify_switch because that will be the interesting case for the
     match-in-match optimisation. *)
 
+(** The type of reasons for not lifting *)
+type reason =
+  | At_toplevel
+  | In_speculative_inlining
+  | In_continuation_specialization
+  | In_recursive_continuation
+  | In_inlinable_continuation
+
 (** The current continuation lifting status, stored in the dacc. *)
 type t = private
-  | Not_lifting
+  | Not_lifting of reason
   | Analyzing of
       { continuation : Continuation.t;
         is_exn_handler : bool;
@@ -62,7 +70,7 @@ type t = private
 val print : Format.formatter -> t -> unit
 
 (** Prevent any lifting of continuation. *)
-val no_lifting : t
+val no_lifting : reason -> t
 
 (** Delay the choice of lifting until the leaf of a continuation's handler. *)
 val think_about_lifting_out_of :
