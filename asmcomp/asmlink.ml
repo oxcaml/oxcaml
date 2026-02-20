@@ -452,7 +452,6 @@ let link unix linkenv ml_objfiles output_name ~cached_genfns_imports ~genfns
 
 (* Error report *)
 
-module Style = Misc.Style
 open Format_doc
 
 let report_error_doc ppf = function
