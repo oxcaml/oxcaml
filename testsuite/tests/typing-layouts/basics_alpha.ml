@@ -1068,30 +1068,14 @@ Error: This expression has type "('a : value)"
 |}];;
 
 (* option *)
-(* CR layouts v5: allow this *)
 type t13 = t_void option;;
 [%%expect{|
-Line 1, characters 11-17:
-1 | type t13 = t_void option;;
-               ^^^^^^
-Error: This type "t_void" should be an instance of type "('a : value_or_null)"
-       The layout of t_void is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a value layout
-         because the type argument of option has layout value_or_null.
+type t13 = t_void option
 |}];;
 
 let x13 (VV v) = Some v;;
 [%%expect{|
-Line 1, characters 22-23:
-1 | let x13 (VV v) = Some v;;
-                          ^
-Error: This expression has type "t_void" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of t_void is void
-         because of the definition of t_void at line 6, characters 0-19.
-       But the layout of t_void must be a value layout
-         because the type argument of option has layout value_or_null.
+val x13 : void_variant -> t_void option = <fun>
 |}];;
 
 let x13 v =
@@ -1107,7 +1091,7 @@ Error: This expression has type "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 6, characters 0-19.
        But the layout of t_void must be a value layout
-         because the type argument of option has layout value_or_null.
+         because it's the type of a constructor argument being projected.
 |}];;
 
 (* list *)
@@ -1355,19 +1339,19 @@ val f : ('a. 'a t2_void) -> 'b t2_void = <fun>
 (* Test 25: Optional parameter with exotic layout *)
 
 let f (x : t_void) =
-  let g ?(x2 = x) () = () in
+  let _g ?(x2 = x) () = () in
   ()
 
 [%%expect{|
-Line 2, characters 15-16:
-2 |   let g ?(x2 = x) () = () in
-                   ^
+Line 2, characters 16-17:
+2 |   let _g ?(x2 = x) () = () in
+                    ^
 Error: This expression has type "t_void" but an expression was expected of type
          "('a : value_or_null)"
        The layout of t_void is void
          because of the definition of t_void at line 1, characters 0-18.
        But the layout of t_void must be a value layout
-         because the type argument of option has layout value_or_null.
+         because it's the type of an optional argument.
 |}]
 
 (*********************************************************)
