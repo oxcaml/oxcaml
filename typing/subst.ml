@@ -167,8 +167,8 @@ end = struct
         ~ran_out_of_fuel_during_normalize
         ~annotation:
           (Some { pjka_loc = Location.none;
-                  pjka_desc = Pjk_abbreviation { loc = Location.none;
-                                                 txt = name } })
+                  pjka_desc = Pjk_abbreviation ({ loc = Location.none;
+                                                  txt = name }, []) })
         ~why:Jkind_intf.History.Imported)
       (const_builtins @ const_predefs)
 
