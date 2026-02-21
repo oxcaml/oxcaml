@@ -78,17 +78,17 @@ module Cmi = struct
     | "Caml1999I570" -> Some "5.2.0minus-24"
     | "Caml1999I571" -> Some "5.2.0minus-25"
     | "Caml1999I572" -> Some "5.2.0minus-29"
+    | "Caml1999I573" -> Some "5.2.0minus-31"
     | _ -> None
 
   let () = assert (to_version_opt Config.cmi_magic_number <> None)
 
-  open Format
-  module Style = Misc.Style
+  open Format_doc
 
-  let report_error ppf = function
+  let report_error_doc ppf = function
     | Not_an_interface filename ->
-        fprintf ppf "%a@ is not a compiled interface"
-        (Style.as_inline_code Location.print_filename) filename
+      fprintf ppf "%a@ is not a compiled interface"
+        Location.Doc.quoted_filename filename
     | Wrong_version_interface (filename, compiler_magic) ->
       let merlin_ocaml_version =
         let ocaml_version =
@@ -104,25 +104,27 @@ module Cmi = struct
           "%a@ seems to be compiled with a version of OCaml (with magic number \
            %s) that is not supported by Merlin.@.\
           This instance of Merlin handles %s."
-          Location.print_filename filename
+          Location.Doc.quoted_filename filename
           compiler_magic
           merlin_ocaml_version
       | Some version ->
         fprintf ppf
           "%a@ seems to be compiled with OCaml %s.@.\
            But this instance of Merlin handles %s."
-          Location.print_filename filename
+          Location.Doc.quoted_filename filename
           version
           merlin_ocaml_version
       end
     | Corrupted_interface filename ->
-        fprintf ppf "Corrupted compiled interface@ %a"
-        (Style.as_inline_code Location.print_filename) filename
+      fprintf ppf "Corrupted compiled interface@ %a"
+        Location.Doc.quoted_filename filename
 
   let () =
     Location.register_error_of_exn
       (function
-        | Error err -> Some (Location.error_of_printer_file report_error err)
+        | Error err -> Some (Location.error_of_printer_file report_error_doc err)
         | _ -> None
       )
+
+  let report_error = Format_doc.compat report_error_doc
 end

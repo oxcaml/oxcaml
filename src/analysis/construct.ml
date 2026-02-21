@@ -71,7 +71,7 @@ module Util = struct
   let var_of_id id = Location.mknoloc @@ Ident.name id
 
   let type_to_string t =
-    Printtyp.type_expr Format.str_formatter t;
+    Printtyp.Compat.type_expr Format.str_formatter t;
     Format.flush_str_formatter ()
 
   let unifiable env type_expr type_expected =
@@ -98,7 +98,7 @@ module Util = struct
         Logger.fmt
         (fun fmt -> Printast.expression 0 fmt exp)
         Logger.fmt
-        (fun fmt -> Printtyp.type_expr fmt type_expected);
+        (fun fmt -> Printtyp.Compat.type_expr fmt type_expected);
     Btype.backtrack snap;
     typeable
 
@@ -267,6 +267,8 @@ module Gen = struct
         @@ module_ env mod_decl.md_type
       in
       Str.module_ module_binding
+    | Sig_jkind (id, jkind_declaration, _visibility) ->
+      Str.jkind (Ptyp_of_type.jkind_declaration id jkind_declaration)
     | Sig_typext (id, ext_constructor, _, _) ->
       let lid =
         Untypeast.lident_of_path ext_constructor.ext_type_path
@@ -415,7 +417,7 @@ module Gen = struct
               else (
                 log ~title:"constructor" "%s's type is not unifiable with %a"
                   cstr_descr.Types.cstr_name Logger.fmt (fun fmt ->
-                    Printtyp.type_expr fmt type_expr);
+                    Printtyp.Compat.type_expr fmt type_expr);
                 None))
         | None -> []
       in
@@ -562,6 +564,9 @@ module Gen = struct
               Ast_helper.Exp.unboxed_tuple choice)
         | Tvariant row_desc -> variant env rtyp row_desc
         | Tquote _ | Tsplice _ -> []
+        | Trepr (ty, _) ->
+          (* CR modes: This isn't quite right, but it's probably good enough. *)
+          exp_or_hole env ty
         | Tpackage (path, lids_args) -> begin
           let open Ast_helper in
           try
@@ -598,7 +603,7 @@ module Gen = struct
               failwith
               @@ Format.asprintf
                    "Unexpected type constructor in fields list: %a"
-                   Printtyp.type_expr fields
+                   Printtyp.Compat.type_expr fields
           in
           let all_fields = aux [] fields |> Util.combinations in
           List.map all_fields ~f:(fun fields ->

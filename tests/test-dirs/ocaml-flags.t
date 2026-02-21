@@ -130,6 +130,7 @@ logic.
   -verbose
   -verbose-types
   -no-verbose-types
+  -kind-verbosity
   -version
   --version
   -vmthread

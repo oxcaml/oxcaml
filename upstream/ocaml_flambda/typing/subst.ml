@@ -53,6 +53,7 @@ type s =
   { types: type_replacement Path.Map.t;
     modules: Path.t Path.Map.t;
     modtypes: module_type Path.Map.t;
+    jkinds: Path.t Path.Map.t;
 
     additional_action: additional_action;
 
@@ -70,6 +71,7 @@ let identity =
   { types = Path.Map.empty;
     modules = Path.Map.empty;
     modtypes = Path.Map.empty;
+    jkinds = Path.Map.empty;
     additional_action = No_action;
     loc = None;
     last_compose = None;
@@ -114,6 +116,10 @@ let add_modtype_gen p ty s =
 let add_modtype_path p p' s = add_modtype_gen p (Mty_ident p') s
 let add_modtype id p s = add_modtype_path (Pident id) p s
 
+let add_jkind_path id p s =
+  { s with jkinds = Path.Map.add id p s.jkinds; last_compose = None }
+let add_jkind id p s = add_jkind_path (Pident id) p s
+
 type additional_action_config =
   | Duplicate_variables
   | Prepare_for_saving
@@ -136,18 +142,35 @@ end = struct
         ~ran_out_of_fuel_during_normalize
     : (l * r) builtins
     =
-    Jkind.Const.Builtin.all
-    |> List.map (fun (builtin : Jkind.Const.Builtin.t) ->
-      let const_jkind : (l * r) Jkind.Const.t =
-        builtin.jkind |> Jkind.Const.allow_left |> Jkind.Const.allow_right in
+    let const_builtins =
+      (* These are the versions with concrete kinds in the descs. *)
+      List.map
+        (fun (builtin : Jkind.Const.Builtin.t) ->
+           Longident.Lident builtin.name, builtin.jkind)
+        Jkind.Const.Builtin.common_jkinds
+    in
+    let const_predefs =
+      (* These are the versions with paths in the descs *)
+      List.map
+        (fun p -> Longident.Lident (Ident.name p),
+                  Jkind.Const.of_path (Pident p))
+        Predef.all_predef_jkinds
+    in
+    List.map (fun (name, const_jkind) ->
+      let const_jkind =
+        const_jkind |> Jkind.Const.allow_left |> Jkind.Const.allow_right
+      in
       const_jkind,
       Jkind.of_const
         const_jkind
         ~quality
         ~ran_out_of_fuel_during_normalize
-        ~annotation:(Some { pjkind_loc = Location.none;
-                            pjkind_desc = Pjk_abbreviation builtin.name })
+        ~annotation:
+          (Some { pjka_loc = Location.none;
+                  pjka_desc = Pjk_abbreviation { loc = Location.none;
+                                                 txt = name } })
         ~why:Jkind_intf.History.Imported)
+      (const_builtins @ const_predefs)
 
   let best_builtins =
     let sufficient_fuel =
@@ -319,6 +342,16 @@ let modtype_path s path =
             fatal_error "Subst.modtype_path"
          | Pident _ -> path
 
+let jkind_path s path =
+  try Path.Map.find path s.jkinds
+  with Not_found ->
+    match path with
+    | Pident _ -> path
+    | Pdot(p, n) ->
+       Pdot(module_path s p, n)
+    | Papply(_, _) | Pextra_ty _ ->
+       fatal_error "Subst.jkind_path"
+
 (* For values, extension constructors, classes and class types *)
 let value_path s path =
   match path with
@@ -368,16 +401,6 @@ let newpersty desc =
    We may decide to get rid of this check someday, too.
 *)
 let location_for_jkind_check_errors = ref Location.none
-
-let norm desc ~prepare_jkind =
-  match desc with
-  | Tvar { name; jkind } ->
-      let loc = !location_for_jkind_check_errors in
-      Tvar { name; jkind = prepare_jkind loc jkind }
-  | Tunivar { name; jkind } ->
-      let loc = !location_for_jkind_check_errors in
-      Tunivar { name; jkind = prepare_jkind loc jkind }
-    | desc -> desc
 
 let apply_type_function params args body =
   For_copy.with_scope (fun copy_scope ->
@@ -453,13 +476,22 @@ let rec typexp copy_scope s ty =
   in
   let desc = get_desc ty in
   match desc with
-    Tvar _ | Tunivar _ ->
-      if should_duplicate_vars || get_id ty < 0 then
+    Tvar { jkind = jk } | Tunivar { jkind = jk } ->
+      let desc, jkind_changed =
+        let jk' = jkind copy_scope s jk in
+        if jk == jk' then desc, false else
+          let desc =
+            match desc with
+            | Tvar tv -> Tvar { tv with jkind = jk' }
+            | Tunivar tv -> Tunivar { tv with jkind = jk' }
+            | _ -> assert false
+          in
+          desc, true
+      in
+      if should_duplicate_vars || get_id ty < 0 || jkind_changed then
         let ty' =
           match s.additional_action with
-          | Duplicate_variables -> newpersty desc
-          | Prepare_for_saving { prepare_jkind; _ } ->
-              newpersty (norm desc ~prepare_jkind)
+          | Duplicate_variables | Prepare_for_saving _ -> newpersty desc
           | No_action -> newty2 ~level:(get_level ty) desc
         in
         For_copy.redirect_desc copy_scope ty (Tsubst (ty', None));
@@ -578,6 +610,24 @@ let rec typexp copy_scope s ty =
     Transient_expr.set_stub_desc ty' desc;
     ty'
 
+and jkind : 'l 'r. _ -> _ -> ('l * 'r) jkind -> ('l * 'r) jkind =
+  fun copy_scope s jkind ->
+  let jkind =
+    match jkind.jkind.base with
+    | Kconstr p ->
+      let p' = jkind_path s p in
+      if Path.compare p p' = 0 then
+        jkind
+      else
+        { jkind with jkind = { jkind.jkind with base = Kconstr p'} }
+    | Layout _ -> jkind
+  in
+  let jkind = Jkind.map_type_expr (typexp copy_scope s) jkind in
+  match s.additional_action with
+  | Prepare_for_saving { prepare_jkind; _ } ->
+    prepare_jkind !location_for_jkind_check_errors jkind
+  | Duplicate_variables | No_action -> jkind
+
 (* [loc] is different than [s.loc]:
      - [s.loc] is a way for the external client of the module to indicate the
        location of the copy.
@@ -587,6 +637,10 @@ let rec typexp copy_scope s ty =
 let typexp copy_scope s loc ty =
   location_for_jkind_check_errors := loc;
   typexp copy_scope s ty
+
+let jkind copy_scope s loc jk =
+  location_for_jkind_check_errors := loc;
+  jkind copy_scope s jk
 
 (*
    Always make a copy of the type. If this is not done, type levels
@@ -639,6 +693,24 @@ let unsafe_mode_crossing copy_scope s loc
       Jkind.With_bounds.map_type_expr (typexp copy_scope s loc)
         unsafe_with_bounds }
 
+let jkind_const s
+      ({ with_bounds = No_with_bounds } as jkind : jkind_const_desc_lr) =
+  let jkind =
+    match jkind.base with
+    | Kconstr p ->
+      let base = Kconstr (jkind_path s p) in
+      { jkind with base }
+    | Layout _ -> jkind
+  in
+  jkind
+
+let jkind_declaration s decl =
+  { jkind_loc = loc s decl.jkind_loc;
+    jkind_uid = decl.jkind_uid;
+    jkind_manifest = Option.map (jkind_const s) decl.jkind_manifest;
+    jkind_attributes = attrs s decl.jkind_attributes;
+  }
+
 let rec type_declaration' copy_scope s decl =
   let unsafe_mode_crossing =
     Option.map (unsafe_mode_crossing copy_scope s decl.type_loc)
@@ -669,16 +741,7 @@ let rec type_declaration' copy_scope s decl =
           None -> None
         | Some ty -> Some(typexp copy_scope s decl.type_loc ty)
       end;
-    type_jkind =
-      begin
-        let jkind =
-          match s.additional_action with
-          | Prepare_for_saving { prepare_jkind; _ } ->
-            prepare_jkind decl.type_loc decl.type_jkind
-          | Duplicate_variables | No_action -> decl.type_jkind
-        in
-        Jkind.map_type_expr (typexp copy_scope s decl.type_loc) jkind
-      end;
+    type_jkind = jkind copy_scope s decl.type_loc decl.type_jkind;
     type_private = decl.type_private;
     type_variance = decl.type_variance;
     type_separability = decl.type_separability;
@@ -908,6 +971,12 @@ let rename_bound_idents scoping s sg =
     | Sig_typext(id, ec, es, vis) :: rest ->
         let id' = rename id in
         rename_bound_idents s (Sig_typext(id',ec,es,vis) :: sg) rest
+    | Sig_jkind (id, jkd, vis) :: rest ->
+        let id' = rename id in
+        rename_bound_idents
+          (add_jkind id (Pident id') s)
+          (Sig_jkind(id', jkd, vis) :: sg)
+          rest
   in
   rename_bound_idents s [] sg
 
@@ -1042,6 +1111,8 @@ and subst_lazy_signature_item' copy_scope scoping s comp =
       Sig_class(id, class_declaration' copy_scope s d, rs, vis)
   | Sig_class_type(id, d, rs, vis) ->
       Sig_class_type(id, cltype_declaration' copy_scope s d, rs, vis)
+  | Sig_jkind(id, d, vis) ->
+      Sig_jkind(id, jkind_declaration s d, vis)
 
 and modtype scoping s t =
   t |> lazy_modtype |> subst_lazy_modtype scoping s |> force_modtype
@@ -1059,6 +1130,7 @@ and compose s1 s2 =
         { types = merge_type_path_maps (type_replacement s2) s1.types s2.types;
           modules = merge_path_maps (module_path s2) s1.modules s2.modules;
           modtypes = merge_path_maps (modtype Keep s2) s1.modtypes s2.modtypes;
+          jkinds = merge_path_maps (jkind_path s2) s1.jkinds s2.jkinds;
           additional_action = begin
             match s1.additional_action, s2.additional_action with
             | action, No_action | No_action, action -> action
@@ -1183,7 +1255,7 @@ let value_description s descr =
   Lazy.(descr |> of_value_description |> value_description s |> force_value_description)
 
 (* Error report *)
-open Format
+open Format_doc
 
 let report_error ppf = function
   | Unconstrained_jkind_variable ->

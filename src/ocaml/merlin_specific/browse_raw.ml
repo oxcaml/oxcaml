@@ -89,6 +89,7 @@ type node =
   | Mode of Mode.Alloc.atom Location.loc
   | Modality of Mode.Modality.atom Location.loc
   | Jkind_annotation of Parsetree.jkind_annotation
+  | Jkind_declaration of Typedtree.jkind_declaration
   | Mod_bound of Parsetree.mode Location.loc
   | Attribute of attribute
 
@@ -143,6 +144,7 @@ let node_update_env env0 = function
   | Mode _
   | Modality _
   | Jkind_annotation _
+  | Jkind_declaration _
   | Mod_bound _
   | Attribute _ -> env0
 
@@ -179,7 +181,8 @@ let node_real_loc loc0 = function
   | Binding_op { bop_op_name = { loc } }
   | Mode { loc }
   | Modality { loc }
-  | Jkind_annotation { pjkind_loc = loc }
+  | Jkind_annotation { pjka_loc = loc }
+  | Jkind_declaration { jkind_loc = loc }
   | Mod_bound { loc }
   | Attribute { attr_name = { loc } } -> loc
   | Module_type_declaration_name { mtd_name = loc } -> loc.Location.loc
@@ -325,7 +328,8 @@ let of_exp_extra (exp, _, _) =
   | Texp_poly cto -> option_fold of_core_type cto
   | Texp_newtype (_, _, jkind, _) -> of_jkind_annotation_opt jkind
   | Texp_mode modes -> of_modes modes
-  | Texp_stack | Texp_inspected_type _ -> id_fold
+  | Texp_stack | Texp_inspected_type _ | Texp_borrowed | Texp_ghost_region ->
+    id_fold
 let of_expression e = app (Expression e) ** list_fold of_exp_extra e.exp_extra
 
 let of_pat_extra (pat, _, _) =
@@ -376,8 +380,9 @@ let of_comprehension { comp_body; comp_clauses } =
 
 let of_pattern_desc (type k) (desc : k pattern_desc) =
   match desc with
-  | Tpat_any | Tpat_var _ | Tpat_constant _ | Tpat_variant (_, None, _) ->
-    id_fold
+  | Tpat_any | Tpat_var _ | Tpat_constant _
+  | Tpat_variant (_, None, _)
+  | Tpat_unboxed_bool _ | Tpat_unboxed_unit -> id_fold
   | Tpat_alias (p, _, _, _, _, _, _)
   | Tpat_variant (_, Some p, _)
   | Tpat_lazy p
@@ -421,7 +426,11 @@ let of_unboxed_access = function
 let rec of_expression_desc loc = function
   | Texp_ident _ | Texp_constant _ | Texp_instvar _ | Texp_mutvar _
   | Texp_variant (_, None)
-  | Texp_new _ | Texp_src_pos | Texp_typed_hole -> id_fold
+  | Texp_unboxed_bool _
+  | Texp_unboxed_unit
+  | Texp_new _
+  | Texp_src_pos
+  | Texp_typed_hole -> id_fold
   | Texp_let (_, vbs, e) -> of_expression e ** list_fold of_value_binding vbs
   | Texp_letmutable (vb, e) -> of_expression e ** of_value_binding vb
   | Texp_function { params; body; ret_mode; _ } ->
@@ -608,6 +617,7 @@ and of_structure_item_desc = function
   | Tstr_include i -> app (Include_declaration i)
   | Tstr_open d -> app (Open_declaration d)
   | Tstr_attribute _ -> id_fold
+  | Tstr_jkind jkind -> app (Jkind_declaration jkind)
 
 and of_module_type_desc = function
   | Tmty_ident _ | Tmty_alias _ -> id_fold
@@ -647,6 +657,7 @@ and of_signature_item_desc = function
   | Tsig_modtypesubst _mts ->
     (* TODO. *)
     id_fold
+  | Tsig_jkind jkind -> app (Jkind_declaration jkind)
 
 and of_core_type_desc = function
   | Ttyp_var (_, jkind) -> of_jkind_annotation_opt jkind
@@ -672,8 +683,7 @@ and of_core_type_desc = function
     of_core_type ct ** of_jkind_annotation_opt jkind
   | Ttyp_variant (rfs, _, _) -> list_fold (fun rf -> app (Row_field rf)) rfs
   | Ttyp_package pt -> app (Package_type pt)
-  | Ttyp_quote ct -> of_core_type ct
-  | Ttyp_splice ct -> of_core_type ct
+  | Ttyp_quote ct | Ttyp_splice ct | Ttyp_repr (_, ct) -> of_core_type ct
 
 and of_class_type_desc = function
   | Tcty_constr (_, _, cts) -> list_fold of_core_type cts
@@ -837,7 +847,9 @@ let of_node node =
     | Binding_op { bop_exp = _ } -> id_fold
     | Mode _ -> id_fold
     | Modality _ -> id_fold
-    | Jkind_annotation { pjkind_desc } -> of_jkind_annotation_desc pjkind_desc
+    | Jkind_annotation { pjka_desc } -> of_jkind_annotation_desc pjka_desc
+    | Jkind_declaration { jkind_annotation } ->
+      option_fold of_jkind_annotation jkind_annotation
     | Mod_bound _ -> id_fold
     | Attribute _ -> id_fold
   in
@@ -900,6 +912,7 @@ let string_of_node = function
   | Mode _ -> "mode"
   | Modality _ -> "modality"
   | Jkind_annotation _ -> "jkind_annotation"
+  | Jkind_declaration _ -> "jkind_declaration"
   | Mod_bound _ -> "mod_bound"
   | Attribute _ -> "attribute"
 

@@ -685,12 +685,13 @@ type let_bindings =
     lbs_extension: string Asttypes.loc option }
 *)
 
-let mklb first ~loc (p, e, typ, modes, is_pun) attrs =
+let mklb first ~loc (p, e, typ, modes, is_pun, poly) attrs =
   {
     lb_pattern = p;
     lb_expression = e;
     lb_constraint=typ;
     lb_is_pun = is_pun;
+    lb_is_poly = poly;
     lb_modes = modes;
     lb_attributes = attrs;
     lb_docs = symbol_docs_lazy loc;
@@ -728,6 +729,7 @@ let val_of_let_bindings ~loc lbs =
     List.map
       (fun lb ->
          Vb.mk ~loc:lb.lb_loc ~attrs:lb.lb_attributes
+           ~poly:lb.lb_is_poly
            ~modes:lb.lb_modes
            ~docs:(Lazy.force lb.lb_docs)
            ~text:(Lazy.force lb.lb_text)
@@ -1072,6 +1074,7 @@ let merloc startpos ?endpos x =
 %token BARBAR [@symbol "||"]
 %token BARRBRACKET [@symbol "|]"]
 %token BEGIN [@symbol "begin"]
+%token BORROW [@symbol "borrow_"]
 %token <char> CHAR [@cost 2] [@recovery '_']
 %token <char> HASH_CHAR [@cost 2] [@recovery '_']
 %token CLASS [@symbol "class"]
@@ -1109,6 +1112,8 @@ let merloc startpos ?endpos x =
 %token GREATERRBRACKET [@symbol ">]"]
 %token HASHLPAREN [@symbol "#("]
 %token HASHLBRACE [@symbol "#{"]
+%token HASHFALSE [@symbol "#false"]
+%token HASHTRUE [@symbol "#true"]
 %token IF [@symbol "if"]
 %token IN [@symbol "in"]
 %token INCLUDE [@symbol "include"]
@@ -1126,7 +1131,7 @@ let merloc startpos ?endpos x =
 %token INITIALIZER [@symbol "initializer"]
 %token <string * char option> INT [@cost 1] [@recovery ("0",None)] [@printer string_of_INT]
 %token <string * char option> HASH_INT [@cost 1] [@recovery ("0",None)] [@printer string_of_INT]
-%token KIND_ABBREV [@symbol "kind_abbrev_"]
+%token KIND [@symbol "kind_"]
 %token KIND_OF [@symbol "kind_of_"]
 %token <string> LABEL [@cost 2] [@recovery "_"][@printer Printf.sprintf "LABEL(%S)"] [@symbol "label"]
 %token LAZY [@symbol "lazy"]
@@ -1167,6 +1172,7 @@ let merloc startpos ?endpos x =
 %token OR [@symbol "or"]
 %token OVERWRITE [@symbol "overwrite_"]
 /* %token PARSER */
+%token POLY [@symbol "poly_"]
 %token PERCENT [@symbol "%"]
 %token PLUS [@symbol "+"]
 %token PLUSDOT [@symbol "+."]
@@ -1179,6 +1185,7 @@ let merloc startpos ?endpos x =
 %token RBRACKET [@symbol "]"]
 %token RBRACKETGREATER [@symbol "]>"]
 %token REC [@symbol "rec"]
+%token REPR [@symbol "repr_"]
 %token RPAREN [@symbol ")"]
 %token SEMI [@symbol ";"]
 %token SEMISEMI [@symbol ";;"]
@@ -1288,6 +1295,7 @@ The precedences must be listed from low to high.
           LBRACE LBRACELESS LBRACKET LBRACKETBAR LBRACKETCOLON LIDENT LPAREN
           NEW PREFIXOP STRING TRUE UIDENT LESSLBRACKET DOLLAR
           LBRACKETPERCENT QUOTED_STRING_EXPR HASHLBRACE HASHLPAREN UNDERSCORE
+          HASHFALSE HASHTRUE
           DOTLESS DOTTILDE GREATERDOT
 
 /* Entry points */
@@ -1919,10 +1927,8 @@ structure [@recovery []]:
           Pstr_extension ($1, add_docs_attrs docs $2) }
     | floating_attribute
         { Pstr_attribute $1 }
-    | kind_abbreviation_decl
-        { let name, jkind = $1 in
-          Pstr_kind_abbrev (name, jkind)
-        })
+    | jkind_decl
+        { Pstr_jkind $1 })
   | wrap_mkstr_ext(
       primitive_declaration
         { pstr_primitive $1 }
@@ -2216,10 +2222,8 @@ signature_item:
   | mksig(
       floating_attribute
         { Psig_attribute $1 }
-     | kind_abbreviation_decl
-        { let name, jkind = $1 in
-          Psig_kind_abbrev (name, jkind)
-        }
+     | jkind_decl
+        { Psig_jkind $1 }
     )
     { $1 }
   | wrap_mksig_ext(
@@ -3048,6 +3052,8 @@ fun_:
   | simple_expr nonempty_llist(labeled_simple_expr)
       { mkexp ~loc:$sloc (Pexp_apply($1, $2)) }
   | stack(simple_expr) %prec below_HASH { $1 }
+  | BORROW simple_expr %prec below_HASH
+      { Exp.borrow ~loc:(make_loc $sloc) $2 }
   | labeled_tuple %prec below_COMMA
       { mkexp ~loc:$sloc (Pexp_tuple $1) }
   | maybe_stack (
@@ -3279,6 +3285,12 @@ block_access:
       { Pexp_ident ($1) }
   | mkrhs(constr_longident) %prec prec_constant_constructor
       { Pexp_construct($1, None) }
+  | HASHLPAREN RPAREN
+      { Pexp_unboxed_unit }
+  | HASHFALSE
+      { Pexp_unboxed_bool false }
+  | HASHTRUE
+      { Pexp_unboxed_bool true }
   | name_tag %prec prec_constant_constructor
       { Pexp_variant($1, None) }
   | op(PREFIXOP) simple_expr
@@ -3489,11 +3501,12 @@ let_binding_body_no_punning:
       }
 ;
 let_binding_body:
-  | let_binding_body_no_punning
-      { let p,e,c,modes = $1 in (p,e,c,modes,false) }
+  | poly_flag = poly_flag let_binding_body_no_punning
+      { let p,e,c,modes = $2 in (p,e,c,modes,false,poly_flag) }
 /* BEGIN AVOID */
-  | val_ident %prec below_HASH
-      { (mkpatvar ~loc:$loc ~attrs:[let_pun_attr] $1, ghexpvar ~loc:$loc ~attrs:[let_pun_attr] $1, None, [], true) }
+  | poly_flag = poly_flag val_ident %prec below_HASH
+      { (mkpatvar ~loc:$loc($2) ~attrs:[let_pun_attr] $2, ghexpvar ~loc:$loc($2) ~attrs:[let_pun_attr] $2,
+         None, [], true, poly_flag) }
   (* The production that allows puns is marked so that [make list-parse-errors]
      does not attempt to exploit it. That would be problematic because it
      would then generate bindings such as [let x], which are rejected by the
@@ -3965,6 +3978,12 @@ simple_pattern_not_ident:
       { Ppat_interval ($1, $3) }
   | mkrhs(constr_longident)
       { Ppat_construct($1, None) }
+  | HASHLPAREN RPAREN
+      { Ppat_unboxed_unit }
+  | HASHFALSE
+      { Ppat_unboxed_bool false }
+  | HASHTRUE
+      { Ppat_unboxed_bool true }
   | name_tag
       { Ppat_variant($1, None) }
   | hash mkrhs(type_longident)
@@ -4067,6 +4086,7 @@ value_description:
   VAL
   ext = ext
   attrs1 = attributes
+  poly_flag = poly_flag
   id = mkrhs(val_ident)
   COLON
   ty = possibly_poly(core_type)
@@ -4075,7 +4095,7 @@ value_description:
     { let attrs = attrs1 @ attrs2 in
       let loc = make_loc $sloc in
       let docs = symbol_docs $sloc in
-      Val.mk id ty ~attrs ~modalities ~loc ~docs,
+      Val.mk id ty ~poly:poly_flag ~attrs ~modalities ~loc ~docs,
       ext }
 ;
 
@@ -4241,7 +4261,7 @@ jkind_desc:
   | jkind_annotation WITH core_type optional_atat_modalities_expr {
       Pjk_with ($1, $3, $4)
     }
-  | ident {
+  | mkrhs(type_longident) {
       Pjk_abbreviation $1
     }
   | KIND_OF ty=core_type {
@@ -4267,17 +4287,29 @@ reverse_product_jkind :
     { jkind :: jkinds }
 
 jkind_annotation: (* : jkind_annotation *)
-  jkind_desc { { pjkind_loc = make_loc $sloc; pjkind_desc = $1 } }
+  jkind_desc { { pjka_loc = make_loc $sloc; pjka_desc = $1 } }
 ;
 
 jkind_constraint:
   COLON jkind_annotation { $2 }
 ;
 
-kind_abbreviation_decl:
-  KIND_ABBREV abbrev=mkrhs(LIDENT) EQUAL jkind=jkind_annotation {
-    (abbrev, jkind)
-  }
+%inline jkind_manifest:
+  | /* empty */ { None }
+  | EQUAL jkind=jkind_annotation { Some jkind }
+;
+
+jkind_decl:
+  KIND
+  attrs1=attributes
+  pjkind_name=mkrhs(LIDENT)
+  pjkind_manifest=jkind_manifest
+  attrs2=post_item_attributes
+    {
+      let pjkind_attributes = attrs1 @ attrs2 in
+      let pjkind_loc = make_loc $sloc in
+      { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc }
+    }
 ;
 
 %inline type_param_with_jkind:
@@ -4557,19 +4589,35 @@ with_type_binder:
     | LPAREN QUOTE tyvar=mkrhs(ident) COLON jkind=jkind_annotation RPAREN
       { (tyvar, Some jkind) }
 ;
+%inline typevar_repr: (* : string with_loc *)
+  LPAREN REPR QUOTE mkrhs(ident) RPAREN
+    { $4 }
+;
 %inline typevar_list:
   (* : (string with_loc * jkind_annotation option) list *)
   nonempty_llist(typevar)
+    { $1 }
+;
+%inline typevar_repr_list:
+  (* : string with_loc list *)
+  nonempty_llist(typevar_repr)
     { $1 }
 ;
 %inline poly(X):
   typevar_list DOT X
     { ($1, $3) }
 ;
+%inline repr(X):
+  typevar_repr_list DOT X
+    { ($1, $3) }
+;
 %inline strictly_poly(X):
 | poly(X)
     { let bound_vars, inner_type = $1 in
       mktyp ~loc:$sloc (Ptyp_poly (bound_vars, inner_type)) }
+| repr(X)
+    { let bound_vars, inner_type = $1 in
+      mktyp ~loc:$sloc (Ptyp_repr (bound_vars, inner_type)) }
 ;
 
 possibly_poly(X):
@@ -4842,6 +4890,11 @@ optional_atat_modalities_expr:
   | mktyp(
     LPAREN bound_vars = typevar_list DOT inner_type = core_type RPAREN
       { Ptyp_poly (bound_vars, inner_type) }
+    )
+    { $1 }
+  | mktyp(
+    LPAREN bound_vars = typevar_repr_list DOT inner_type = core_type RPAREN
+      { Ptyp_repr (bound_vars, inner_type) }
     )
     { $1 }
   | ty = tuple_type
@@ -5381,6 +5434,10 @@ mutable_flag:
     /* empty */                                 { Immutable }
   | MUTABLE                                     { Mutable }
 ;
+poly_flag:
+    /* empty */                                 { false }
+  | POLY                                        { true }
+;
 mutable_or_global_flag:
     /* empty */
     { Immutable, [] }
@@ -5458,6 +5515,7 @@ single_attr_id:
   | AS { "as" }
   | ASSERT { "assert" }
   | BEGIN { "begin" }
+  | BORROW { "borrow_" }
   | CLASS { "class" }
   | CONSTRAINT { "constraint" }
   | DO { "do" }
@@ -5490,6 +5548,7 @@ single_attr_id:
   | OF { "of" }
   | OPEN { "open" }
   | OR { "or" }
+  | POLY { "poly_" }
   | PRIVATE { "private" }
   | REC { "rec" }
   | SIG { "sig" }

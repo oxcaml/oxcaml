@@ -137,10 +137,10 @@ let classify_node = function
   | Include_declaration _ -> `Module
   | Include_description _ -> `Module
   | Mode _ | Modality _ | Mod_bound _ ->
-    (* CR-someday: Have proper completion for modes and modalities *)
+    (* CR modes: Have proper completion for modes and modalities *)
     `Expression
-  | Jkind_annotation _ ->
-    (* CR-someday: Have proper completion for jkinds *)
+  | Jkind_annotation _ | Jkind_declaration _ ->
+    (* CR modes: Have proper completion for jkinds *)
     `Type
   | Attribute _ ->
     (* CR-someday: Have proper completion for attributes *)
@@ -870,7 +870,7 @@ let application_context ~prefix path =
       Printtyp.reset ();
       let pr t =
         let ppf, to_string = Format.to_string () in
-        Printtyp.shared_type_scheme ppf t;
+        Printtyp.Compat.shared_type_scheme ppf t;
         to_string ()
       in
       (* Special case for optional arguments applied with ~,

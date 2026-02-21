@@ -193,7 +193,7 @@ let read_sexp getch =
   in
   read_sexp getch (getch ())
 
-let to_buf sexp buf = tell_sexp (Buffer.add_string buf) sexp
+let to_buf sexp buf = tell_sexp (fun str -> Buffer.add_string buf str) sexp
 
 let to_string sexp =
   let buf = Buffer.create 100 in

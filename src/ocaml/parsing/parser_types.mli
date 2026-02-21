@@ -12,6 +12,7 @@ type let_binding =
     lb_expression: expression;
     lb_constraint: value_constraint option;
     lb_is_pun: bool;
+    lb_is_poly: bool;
     lb_modes: modes;
     lb_attributes: attributes;
     lb_docs: docs Lazy.t;

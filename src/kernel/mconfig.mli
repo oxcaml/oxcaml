@@ -26,7 +26,8 @@ type ocaml =
     as_argument_for : string option;
     zero_alloc_check : Zero_alloc_annotations.Check.t;
     zero_alloc_assert : Zero_alloc_annotations.Assert.t;
-    infer_with_bounds : bool
+    infer_with_bounds : bool;
+    kind_verbosity : int
   }
 
 val dump_ocaml : ocaml -> json

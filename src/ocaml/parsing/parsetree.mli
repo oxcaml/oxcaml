@@ -210,6 +210,7 @@ and core_type_desc =
   | Ptyp_quote of core_type (** [<[T]>] *)
   | Ptyp_splice of core_type (** [$T] *)
   | Ptyp_of_kind of jkind_annotation (** [(type : k)] *)
+  | Ptyp_repr of string loc list * core_type
   | Ptyp_extension of extension  (** [[%id]]. *)
 
 and arg_label = Asttypes.arg_label =
@@ -277,6 +278,8 @@ and pattern_desc =
 
            Other forms of interval are recognized by the parser
            but rejected by the type-checker. *)
+  | Ppat_unboxed_unit (** [#()] *)
+  | Ppat_unboxed_bool of bool (** [#false] or [#true] *)
   | Ppat_tuple of (string option * pattern) list * Asttypes.closed_flag
       (** [Ppat_tuple(pl, Closed)] represents
           - [(P1, ..., Pn)]       when [pl] is [(None, P1);...;(None, Pn)]
@@ -413,6 +416,8 @@ and expression_desc =
       (** [match E0 with P1 -> E1 | ... | Pn -> En] *)
   | Pexp_try of expression * case list
       (** [try E0 with P1 -> E1 | ... | Pn -> En] *)
+  | Pexp_unboxed_unit (** [#()] *)
+  | Pexp_unboxed_bool of bool (** [#false] or [#true] *)
   | Pexp_tuple of (string option * expression) list
       (** [Pexp_tuple(el)] represents
           - [(E1, ..., En)]
@@ -535,6 +540,8 @@ and expression_desc =
   | Pexp_quote of expression (** runtime metaprogramming quotations <[E]> *)
   | Pexp_splice of expression (** runtime metaprogramming splicing $(E) *)
   | Pexp_hole (** _ *)
+  | Pexp_borrow of expression
+    (** borrow_ exp *)
 
 and case =
     {
@@ -703,6 +710,7 @@ and comprehension_expression =
 
 and value_description =
     {
+     pval_poly: bool; (** val poly_ *)
      pval_name: string loc;
      pval_type: core_type;
      pval_modalities : modalities;
@@ -875,6 +883,16 @@ and extension_constructor_kind =
        *)
   | Pext_rebind of Longident.t loc
   (** [Pext_rebind(D)] re-export the constructor [D] with the new name [C] *)
+
+and jkind_declaration =
+  {
+    pjkind_name : string loc;
+    pjkind_manifest : jkind_annotation option;
+    pjkind_attributes : attributes;
+    pjkind_loc : Location.t
+  }
+  (** [kind_ name] or [kind_ name = k] *)
+
 
 (** {1 Class language} *)
 (** {2 Type expressions for the class language} *)
@@ -1137,8 +1155,7 @@ and signature_item_desc =
       (** [class type ct1 = ... and ... and ctn = ...] *)
   | Psig_attribute of attribute  (** [[\@\@\@id]] *)
   | Psig_extension of extension * attributes  (** [[%%id]] *)
-  | Psig_kind_abbrev of string loc * jkind_annotation
-      (** [kind_abbrev_ name = k] *)
+  | Psig_jkind of jkind_declaration (** [kind_ name] or [kind_ name = k] *)
 
 and module_declaration =
     {
@@ -1302,8 +1319,7 @@ and structure_item_desc =
   | Pstr_include of include_declaration  (** [include ME] *)
   | Pstr_attribute of attribute  (** [[\@\@\@id]] *)
   | Pstr_extension of extension * attributes  (** [[%%id]] *)
-  | Pstr_kind_abbrev of string loc * jkind_annotation
-      (** [kind_abbrev_ name = k] *)
+  | Pstr_jkind of jkind_declaration (** [kind_ name] or [kind_ name = k] *)
 
 and value_constraint =
   | Pvc_constraint of {
@@ -1323,6 +1339,7 @@ and value_constraint =
 
 and value_binding =
   {
+    pvb_is_poly: bool; (** [let poly_ ] *)
     pvb_pat: pattern;
     pvb_expr: expression;
     pvb_constraint: value_constraint option;
@@ -1342,7 +1359,7 @@ and module_binding =
 
 and jkind_annotation_desc =
   | Pjk_default
-  | Pjk_abbreviation of string
+  | Pjk_abbreviation of Longident.t loc
   (* CR layouts v2.8: [mod] can have only layouts on the left, not
      full kind annotations. We may want to narrow this type some.
      Internal ticket 5085. *)
@@ -1352,8 +1369,8 @@ and jkind_annotation_desc =
   | Pjk_product of jkind_annotation list
 
 and jkind_annotation =
-  { pjkind_loc : Location.t
-  ; pjkind_desc : jkind_annotation_desc
+  { pjka_loc : Location.t
+  ; pjka_desc : jkind_annotation_desc
   }
 
 (** {1 Toplevel} *)

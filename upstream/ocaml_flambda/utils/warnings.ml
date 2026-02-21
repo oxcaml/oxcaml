@@ -70,7 +70,7 @@ type t =
   | Implicit_public_methods of string list  (* 15 *)
   | Unerasable_optional_argument            (* 16 *)
   | Undeclared_virtual_method of string     (* 17 *)
-  | Not_principal of string                 (* 18 *)
+  | Not_principal of Format_doc.t           (* 18 *)
   | Non_principal_labels of string          (* 19 *)
   | Ignored_extra_argument                  (* 20 *)
   | Nonreturning_statement                  (* 21 *)
@@ -135,6 +135,7 @@ type t =
   | Unerasable_position_argument            (* 188 *)
   | Unnecessarily_partial_tuple_pattern     (* 189 *)
   | Probe_name_too_long of string           (* 190 *)
+  | Unused_kind_declaration of string       (* 191 *)
   | Zero_alloc_all_hidden_arrow of string   (* 198 *)
   | Unchecked_zero_alloc_attribute          (* 199 *)
   | Unboxing_impossible                     (* 210 *)
@@ -146,6 +147,7 @@ type t =
     } (* 213 *)
   | Atomic_float_record_boxed               (* 214 *)
   | Implied_attribute of { implying: string; implied : string} (* 215 *)
+  | Use_during_borrowing                    (* 216 *)
 
 (* If you remove a warning, leave a hole in the numbering.  NEVER change
    the numbers of existing warnings.
@@ -232,6 +234,7 @@ let number = function
   | Unerasable_position_argument -> 188
   | Unnecessarily_partial_tuple_pattern -> 189
   | Probe_name_too_long _ -> 190
+  | Unused_kind_declaration _ -> 191
   | Zero_alloc_all_hidden_arrow _ -> 198
   | Unchecked_zero_alloc_attribute -> 199
   | Unboxing_impossible -> 210
@@ -239,6 +242,7 @@ let number = function
   | Modal_axis_specified_twice _ -> 213
   | Atomic_float_record_boxed -> 214
   | Implied_attribute _ -> 215
+  | Use_during_borrowing -> 216
 ;;
 (* DO NOT REMOVE the ;; above: it is used by
    the testsuite/ests/warnings/mnemonics.mll test to determine where
@@ -607,6 +611,10 @@ let descriptions = [
     names = ["probe-name-too-long"];
     description = "Probe name must be at most 100 characters long.";
     since = since 4 14 };
+  { number = 191;
+    names = ["unused-kind-declaration"];
+    description = "Unused kind declaration.";
+    since = since 5 2 };
   { number = 198;
     names = ["zero-alloc-all-hidden-arrow"];
     description = "A declaration whose type is an alias of a function type \
@@ -634,6 +642,10 @@ let descriptions = [
     names = ["implied-attribute"];
     description = "An attribute is unused because it is implied by another.";
     since = since 4 14 };
+  { number = 216;
+    names = ["use-during-borrowing"];
+    description = "Use of a value during an active borrow.";
+    since = since 5 3 };
 ]
 
 let name_to_number =
@@ -1032,7 +1044,9 @@ let message = function
       ^ String.concat " " l ^ "."
   | Unerasable_optional_argument -> "this optional argument cannot be erased."
   | Undeclared_virtual_method m -> "the virtual method "^m^" is not declared."
-  | Not_principal s -> s^" is not principal."
+  | Not_principal msg ->
+      Format_doc.asprintf "%a is not principal."
+        Format_doc.pp_doc msg
   | Non_principal_labels s -> s^" without principality."
   | Ignored_extra_argument -> "this argument will not be used by the function."
   | Nonreturning_statement ->
@@ -1150,7 +1164,7 @@ let message = function
         "Code should not depend on the actual values of\n\
          this constructor's arguments. They are only for information\n\
          and may change in future versions. %a"
-        Misc.print_see_manual ref_manual
+        (Format_doc.compat Misc.print_see_manual) ref_manual
   | Unreachable_case ->
       "this match case is unreachable.\n\
        Consider replacing it with a refutation case '<pat> -> .'"
@@ -1181,7 +1195,7 @@ let message = function
          %s.\n\
          Only the first match will be used to evaluate the guard expression.\n\
          %a"
-        vars_explanation Misc.print_see_manual ref_manual
+        vars_explanation (Format_doc.compat Misc.print_see_manual) ref_manual
   | No_cmx_file { missing_extension; module_name } ->
       Printf.sprintf
         "no %s file was found in path for module %s, \
@@ -1283,6 +1297,8 @@ let message = function
       Printf.sprintf
         "This probe name is too long: `%s'. \
          Probe names must be at most 100 characters long." name
+  | Unused_kind_declaration s ->
+      "unused kind " ^ s ^ "."
   | Zero_alloc_all_hidden_arrow s ->
       Printf.sprintf
       "The type of this item is an\n\
@@ -1319,6 +1335,8 @@ let message = function
     Printf.sprintf
       "attribute [@%s] is unused because it is implied by [@%s]"
       implied implying
+  | Use_during_borrowing ->
+      "This value is used while being borrowed."
 ;;
 
 let nerrors = ref 0

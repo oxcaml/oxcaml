@@ -102,6 +102,7 @@ type node =
   | Mode of Mode.Alloc.atom Location.loc
   | Modality of Mode.Modality.atom Location.loc
   | Jkind_annotation of Parsetree.jkind_annotation
+  | Jkind_declaration of jkind_declaration
   | Mod_bound of Parsetree.mode Location.loc
   | Attribute of attribute
       (** The location of an [Attribute] is considered to be the location of the

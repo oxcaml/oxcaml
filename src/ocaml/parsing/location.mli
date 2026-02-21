@@ -125,7 +125,6 @@ val input_phrase_buffer: Buffer.t option ref
 (** {1 Toplevel-specific functions} *)
 
 val echo_eof: unit -> unit
-val separate_new_message: formatter -> unit
 val reset: unit -> unit
 
 
@@ -211,10 +210,18 @@ val show_filename: string -> string
         Otherwise, returns the filename unchanged. *)
 
 val print_filename: formatter -> string -> unit
-
 val print_loc: formatter -> t -> unit
 val print_loc_in_lowercase: formatter -> t -> unit
 val print_locs: formatter -> t list -> unit
+val separate_new_message: formatter -> unit
+
+module Doc: sig
+  val separate_new_message: unit Format_doc.printer
+  val filename: string Format_doc.printer
+  val quoted_filename: string Format_doc.printer
+  val loc: capitalize_first:bool -> t Format_doc.printer
+  val locs: t list Format_doc.printer
+end
 
 (** {1 Toplevel-specific location highlighting} *)
 (*
@@ -226,9 +233,9 @@ val highlight_terminfo:
 
 (** {2 The type of reports and report printers} *)
 
-type msg = (Format.formatter -> unit) loc
+type msg = Format_doc.t loc
 
-val msg: ?loc:t -> ('a, Format.formatter, unit, msg) format4 -> 'a
+val msg: ?loc:t -> ('a, Format_doc.formatter, unit, msg) format4 -> 'a
 
 type report_kind =
   | Report_error
@@ -261,7 +268,7 @@ type report_printer = {
   pp_main_loc : report_printer -> report ->
     Format.formatter -> t -> unit;
   pp_main_txt : report_printer -> report ->
-    Format.formatter -> (Format.formatter -> unit) -> unit;
+    Format.formatter -> Format_doc.t -> unit;
   pp_submsgs : report_printer -> report ->
     Format.formatter -> msg list -> unit;
   pp_submsg : report_printer -> report ->
@@ -269,7 +276,7 @@ type report_printer = {
   pp_submsg_loc : report_printer -> report ->
     Format.formatter -> t -> unit;
   pp_submsg_txt : report_printer -> report ->
-    Format.formatter -> (Format.formatter -> unit) -> unit;
+    Format.formatter -> Format_doc.t -> unit;
 }
 (** A printer for [report]s, defined using open-recursion.
     The goal is to make it easy to define new printers by re-using code from
@@ -378,12 +385,12 @@ type error = report
 val error: ?loc:t -> ?sub:msg list -> ?source:error_source -> string -> error
 
 val errorf: ?loc:t -> ?sub:msg list -> ?source:error_source ->
-  ('a, Format.formatter, unit, error) format4 -> 'a
+  ('a, Format_doc.formatter, unit, error) format4 -> 'a
 
 val error_of_printer: ?loc:t -> ?sub:msg list -> ?source:error_source ->
-  (formatter -> 'a -> unit) -> 'a -> error
+  (Format_doc.formatter -> 'a -> unit) -> 'a -> error
 
-val error_of_printer_file: ?source:error_source -> (formatter -> 'a -> unit) -> 'a -> error
+val error_of_printer_file: ?source:error_source -> (Format_doc.formatter -> 'a -> unit) -> 'a -> error
 
 
 (** {1 Automatically reporting errors for raised exceptions} *)
@@ -407,7 +414,7 @@ exception Already_displayed_error
    printed. The exception will be caught, but nothing will be printed *)
 
 val raise_errorf: ?loc:t -> ?sub:msg list -> ?source:error_source ->
-  ('a, Format.formatter, unit, 'b) format4 -> 'a
+  ('a, Format_doc.formatter, unit, 'b) format4 -> 'a
 
 val report_exception: formatter -> exn -> unit
 (** Reraise the exception if it is unknown. *)

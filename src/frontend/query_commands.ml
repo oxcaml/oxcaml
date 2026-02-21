@@ -144,7 +144,7 @@ let dump pipeline = function
     in
     let aux item =
       let ppf, to_string = Format.to_string () in
-      Printtyp.signature ppf [ item ];
+      Printtyp.Compat.signature ppf [ item ];
       `String (to_string ())
     in
     `List (List.map ~f:aux sg)
@@ -599,7 +599,7 @@ let dispatch pipeline (type a) : a Query_protocol.t -> a = function
       |> Printtyp.wrap_printing_env env ~verbosity:(verbosity pipeline)
          @@ fun () ->
          List.map ~f:(fun (_, path, v) ->
-             Printtyp.path Format.str_formatter path;
+             Printtyp.Compat.path Format.str_formatter path;
              let name = Format.flush_str_formatter () in
              Printtyp.type_scheme env Format.str_formatter v.Types.val_type;
              let desc = Format.flush_str_formatter () in

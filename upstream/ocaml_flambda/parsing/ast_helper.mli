@@ -93,6 +93,7 @@ module Typ :
     val quote : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
     val splice : ?loc:loc -> ?attrs:attrs -> core_type -> core_type
     val of_kind : ?loc:loc -> ?attrs:attrs -> jkind_annotation -> core_type
+    val repr: ?loc:loc -> ?attrs:attrs -> str list -> core_type -> core_type
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> core_type
 
     val force_poly: core_type -> core_type
@@ -119,6 +120,8 @@ module Pat:
     val alias: ?loc:loc -> ?attrs:attrs -> pattern -> str -> pattern
     val constant: ?loc:loc -> ?attrs:attrs -> constant -> pattern
     val interval: ?loc:loc -> ?attrs:attrs -> constant -> constant -> pattern
+    val unboxed_unit: ?loc:loc -> ?attrs:attrs -> unit -> pattern
+    val unboxed_bool: ?loc:loc -> ?attrs:attrs -> bool -> pattern
     val tuple: ?loc:loc -> ?attrs:attrs -> (string option * pattern) list ->
       closed_flag -> pattern
     val unboxed_tuple: ?loc:loc -> ?attrs:attrs
@@ -162,6 +165,8 @@ module Exp:
     val match_: ?loc:loc -> ?attrs:attrs -> expression -> case list
                 -> expression
     val try_: ?loc:loc -> ?attrs:attrs -> expression -> case list -> expression
+    val unboxed_unit: ?loc:loc -> ?attrs:attrs -> unit -> expression
+    val unboxed_bool: ?loc:loc -> ?attrs:attrs -> bool -> expression
     val tuple: ?loc:loc -> ?attrs:attrs -> (string option * expression) list -> expression
     val unboxed_tuple: ?loc:loc -> ?attrs:attrs
                        -> (string option * expression) list -> expression
@@ -227,13 +232,15 @@ module Exp:
 
     val case: pattern -> ?guard:expression -> expression -> case
     val binding_op: str -> pattern -> expression -> loc -> binding_op
+    val borrow : ?loc:loc -> ?attrs:attrs -> expression -> expression
   end
 
 (** Value declarations *)
 module Val:
   sig
     val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?prim:string list ->
-      ?modalities:modality with_loc list -> str -> core_type -> value_description
+      ?poly:bool -> ?modalities:modality with_loc list -> str -> core_type ->
+      value_description
   end
 
 (** Type declarations *)
@@ -346,8 +353,7 @@ module Sig:
     val class_type: ?loc:loc -> class_type_declaration list -> signature_item
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> signature_item
     val attribute: ?loc:loc -> attribute -> signature_item
-    val kind_abbrev: ?loc:loc -> label with_loc -> jkind_annotation ->
-      signature_item
+    val jkind: ?loc:loc -> jkind_declaration -> signature_item
     val text: text -> signature_item list
   end
 
@@ -376,8 +382,7 @@ module Str:
     val class_type: ?loc:loc -> class_type_declaration list -> structure_item
     val include_: ?loc:loc -> include_declaration -> structure_item
     val extension: ?loc:loc -> ?attrs:attrs -> extension -> structure_item
-    val kind_abbrev: ?loc:loc -> label with_loc -> jkind_annotation ->
-      structure_item
+    val jkind: ?loc:loc -> jkind_declaration -> structure_item
     val attribute: ?loc:loc -> attribute -> structure_item
     val text: text -> structure_item list
   end
@@ -428,8 +433,8 @@ module Incl:
 module Vb:
   sig
     val mk: ?loc: loc -> ?attrs:attrs -> ?docs:docs -> ?text:text ->
-      ?value_constraint:value_constraint -> ?modes:mode with_loc list -> pattern ->
-      expression -> value_binding
+      ?value_constraint:value_constraint -> ?poly:bool ->
+      ?modes:mode with_loc list -> pattern -> expression -> value_binding
   end
 
 

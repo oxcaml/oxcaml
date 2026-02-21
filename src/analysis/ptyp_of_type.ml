@@ -87,7 +87,7 @@ and core_type type_expr =
       | _ ->
         failwith
         @@ Format.asprintf "Unexpected type constructor in fields list: %a"
-             Printtyp.type_expr type_expr
+             Printtyp.Compat.type_expr type_expr
     in
     let fields, closed = aux [] type_expr in
     Typ.object_ fields closed
@@ -125,9 +125,14 @@ and core_type type_expr =
         type_exprs
     in
     Typ.poly names @@ core_type type_expr
-  | Tof_kind _jkind -> (* CR modes: this is terrible *) Typ.any None
+  | Tof_kind _jkind ->
+    (* CR modes: this is terrible. Internal ticket 6599 *)
+    Typ.any None
   | Tquote type_expr -> Typ.quote (core_type type_expr)
   | Tsplice type_expr -> Typ.splice (core_type type_expr)
+  | Trepr (ty, _) ->
+    (* CR modes: We should do something proper here. Internal ticket 6601. *)
+    core_type ty
   | Tpackage (path, lids_type_exprs) ->
     let loc = mknoloc (Untypeast.lident_of_path path) in
     let args =
@@ -143,6 +148,20 @@ and modtype_declaration id { mtd_type; mtd_attributes; _ } =
 and module_declaration id { md_type; md_attributes; _ } =
   let name = Location.mknoloc (Some (Ident.name id)) in
   Ast_helper.Md.mk ~attrs:md_attributes name @@ module_type md_type
+
+and jkind_declaration id { jkind_manifest; jkind_attributes; _ } :
+    Parsetree.jkind_declaration =
+  { pjkind_name = Location.mknoloc (Ident.name id);
+    pjkind_manifest =
+      Option.map jkind_manifest ~f:(fun _ : Parsetree.jkind_annotation ->
+          (* CR modes: this is terrible. Internal ticket 6599 *)
+          { pjka_desc =
+              Pjk_abbreviation { txt = Lident "any"; loc = Location.none };
+            pjka_loc = Location.none
+          });
+    pjkind_attributes = jkind_attributes;
+    pjkind_loc = Location.none
+  }
 
 and extension_constructor id { ext_args; ext_ret_type; ext_attributes; _ } =
   Ast_helper.Te.decl ~attrs:ext_attributes
@@ -173,7 +192,8 @@ and value_description id
     pval_prim = [];
     pval_attributes = val_attributes;
     pval_modalities = const_modalities ~mut:Immutable modalities;
-    pval_loc = val_loc
+    pval_loc = val_loc;
+    pval_poly = false
   }
 
 and constructor_argument { ca_type; ca_loc; ca_modalities; ca_sort = _ } =
@@ -259,6 +279,8 @@ and signature_item (str_item : Types.signature_item) =
     Sig.modtype @@ modtype_declaration id modtype_decl
   | Sig_module (id, _, mod_decl, _, _) ->
     Sig.module_ @@ module_declaration id mod_decl
+  | Sig_jkind (id, jkind_decl, _visibility) ->
+    Sig.jkind @@ jkind_declaration id jkind_decl
   | Sig_typext (id, ext_constructor, _, _) ->
     let ext =
       Te.mk

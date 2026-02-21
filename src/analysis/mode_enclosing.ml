@@ -17,7 +17,7 @@ module Mode_info = struct
     let maybe_print (type t) (module Axis : Mode_intf.Const with type t = t)
         (mode : t) =
       if (not verbose) && Axis.equal Axis.legacy mode then None
-      else Some (Format.asprintf "%a" Axis.print mode)
+      else Some (Format_doc.asprintf "%a" Axis.print mode)
     in
     (* Exhaustively match so that we pick up new modes. *)
     let ({ areality;

@@ -53,7 +53,7 @@ type out_value =
   | Oval_int64 of int64
   | Oval_nativeint of nativeint
   | Oval_list of out_value list
-  | Oval_printer of (Format.formatter -> unit)
+  | Oval_printer of (Format_doc.formatter -> unit)
   | Oval_record of (out_ident * out_value) list
   | Oval_record_unboxed_product of (out_ident * out_value) list
   | Oval_string of string * int * out_string (* string, size-to-print, kind *)
@@ -145,6 +145,7 @@ and out_type =
   | Otyp_quote of out_type
   | Otyp_splice of out_type
   | Otyp_poly of out_vars_jkinds * out_type
+  | Otyp_repr of string list * out_type
   | Otyp_module of out_ident * (string * out_type) list
   | Otyp_attribute of out_type * out_attribute
   | Otyp_jkind_annot of out_type * out_jkind
@@ -196,6 +197,7 @@ and out_sig_item =
       * out_rec_status
   | Osig_type of out_type_decl * out_rec_status
   | Osig_value of out_val_decl
+  | Osig_jkind of out_jkind_decl
   | Osig_ellipsis
 and out_type_decl =
   { otype_name: string;
@@ -238,6 +240,10 @@ and out_ext_status =
   | Oext_first
   | Oext_next
   | Oext_exception
+and out_jkind_decl =
+  { ojkind_name: string;
+    ojkind_jkind: out_jkind option }
+
 
 type out_phrase =
   | Ophr_eval of out_value * out_type

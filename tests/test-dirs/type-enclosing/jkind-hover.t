@@ -86,18 +86,18 @@ Test that hovering over jkind annotations shows their full expansion.
   $ hover 6 11 1
   type t6 : bits32
              ^
-  "bits32" : "bits32 mod non_float"
+  "bits32" : "bits32 mod external_ non_float"
 
   $ hover 7 11 2
   type t7 : bits32 mod portable contended
              ^
-  "bits32 " : "bits32 mod non_float"
-  "bits32 mod portable contended" : "bits32 mod portable contended non_float"
+  "bits32 " : "bits32 mod external_ non_float"
+  "bits32 mod portable contended" : "bits32 mod portable contended external_ non_float"
 
   $ hover 8 11 1
   type t8 : void
              ^
-  "void" : "void mod non_float"
+  "void" : "void mod external_ non_float"
 
   $ hover 10 18 1
     val f : ('a : immediate). 'a -> 'a
@@ -107,7 +107,7 @@ Test that hovering over jkind annotations shows their full expansion.
   $ hover 11 18 1
     val g : ('b : bits32) -> ('b : value mod portable)
                     ^
-  "bits32)" : "bits32 mod non_float"
+  "bits32)" : "bits32 mod external_ non_float"
 
 # CR-someday: This is failing because of poor error recovery.
   $ hover 11 35 2

@@ -15,6 +15,7 @@ let nullable (type a) : a MenhirInterpreter.nonterminal -> bool =
   | N_rec_flag -> true
   | N_private_virtual_flags -> true
   | N_private_flag -> true
+  | N_poly_flag -> true
   | N_payload -> true
   | N_optional_poly_type_and_modes -> true
   | N_optional_atomic_constraint_ -> true

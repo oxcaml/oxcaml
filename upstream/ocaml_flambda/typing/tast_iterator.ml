@@ -35,6 +35,7 @@ type iterator =
     expr: iterator -> expression -> unit;
     extension_constructor: iterator -> extension_constructor -> unit;
     jkind_annotation: iterator -> Parsetree.jkind_annotation -> unit;
+    jkind_declaration: iterator -> jkind_declaration -> unit;
     location: iterator -> Location.t -> unit;
     modalities: iterator -> modalities -> unit;
     (* CR-someday lstevenson: If we ever want to inspect the [mode_modes] field,
@@ -163,6 +164,7 @@ let structure_item sub {str_loc; str_desc; str_env; _} =
   | Tstr_include incl -> str_include_infos sub incl
   | Tstr_open od -> sub.open_declaration sub od
   | Tstr_attribute attr -> sub.attribute sub attr
+  | Tstr_jkind jd -> sub.jkind_declaration sub jd
 
 let value_description sub x =
   sub.item_declaration sub (Value x);
@@ -248,6 +250,15 @@ let extension_constructor sub ec =
       Option.iter (sub.typ sub) cto
   | Text_rebind (_, lid) -> iter_loc sub lid
 
+let[@warning "+9"] jkind_declaration sub
+      ({jkind_id=_; jkind_name; jkind_jkind=_; jkind_annotation;
+        jkind_attributes; jkind_loc} as x) =
+  sub.item_declaration sub (Jkind x);
+  sub.location sub jkind_loc;
+  sub.attributes sub jkind_attributes;
+  iter_loc sub jkind_name;
+  Option.iter (sub.jkind_annotation sub) jkind_annotation
+
 let pat_extra sub (e, loc, attrs) =
   sub.location sub loc;
   sub.attributes sub attrs;
@@ -270,6 +281,8 @@ let pat
   | Tpat_any  -> ()
   | Tpat_var (_, s, _, _, _) -> iter_loc sub s
   | Tpat_constant _ -> ()
+  | Tpat_unboxed_unit -> ()
+  | Tpat_unboxed_bool _ -> ()
   | Tpat_tuple l -> List.iter (fun (_, p) -> sub.pat sub p) l
   | Tpat_unboxed_tuple l -> List.iter (fun (_, p, _) -> sub.pat sub p) l
   | Tpat_construct (lid, _, l, vto) ->
@@ -303,6 +316,8 @@ let extra sub = function
       sub.typ sub cty2
   | Texp_newtype _ -> ()
   | Texp_poly cto -> Option.iter (sub.typ sub) cto
+  | Texp_borrowed -> ()
+  | Texp_ghost_region -> ()
   | Texp_stack -> ()
   | Texp_mode modes -> sub.modes sub modes
   | Texp_inspected_type (Label_disambiguation _) -> ()
@@ -386,6 +401,8 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_try (exp, cases) ->
       sub.expr sub exp;
       List.iter (sub.case sub) cases
+  | Texp_unboxed_unit -> ()
+  | Texp_unboxed_bool _ -> ()
   | Texp_tuple (list, _) -> List.iter (fun (_,e) -> sub.expr sub e) list
   | Texp_unboxed_tuple list -> List.iter (fun (_,e,_) -> sub.expr sub e) list
   | Texp_construct (lid, _, args, _) ->
@@ -536,6 +553,7 @@ let signature_item sub {sig_loc; sig_desc; sig_env; _} =
   | Tsig_class_type list -> List.iter (sub.class_type_declaration sub) list
   | Tsig_open od -> sub.open_description sub od
   | Tsig_attribute _ -> ()
+  | Tsig_jkind d -> sub.jkind_declaration sub d
 
 let class_description sub x =
   sub.item_declaration sub (Class_type x);
@@ -732,6 +750,7 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
       sub.typ sub t
   | Ttyp_quote t -> sub.typ sub t
   | Ttyp_splice t -> sub.typ sub t
+  | Ttyp_repr (_, ct) -> sub.typ sub ct
   | Ttyp_of_kind jkind -> sub.jkind_annotation sub jkind
   | Ttyp_call_pos -> ()
 
@@ -822,6 +841,7 @@ let default_iterator =
     expr;
     extension_constructor;
     jkind_annotation;
+    jkind_declaration;
     location;
     modalities;
     modes;

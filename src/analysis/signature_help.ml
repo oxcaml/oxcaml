@@ -40,7 +40,7 @@ let extract_ident (exp_desc : Typedtree.expression_desc) =
 let pp_type env ppf ty =
   let module Printtyp = Type_utils.Printtyp in
   Printtyp.wrap_printing_env env ~verbosity:(Lvl 0) (fun () ->
-      Printtyp.shared_type_scheme ppf ty)
+      Printtyp.Compat.shared_type_scheme ppf ty)
 
 let rec type_is_arrow ty =
   match Types.get_desc ty with

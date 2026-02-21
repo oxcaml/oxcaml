@@ -64,15 +64,22 @@ module Sort : sig
 
   val equal_base : base -> base -> bool
 
+  type univar = { name : string option }
+
   type t =
     | Var of var
     | Base of base
     | Product of t list
+    | Univar of univar
 
   and var
 
   include
-    Jkind_intf.Sort with type t := t and type var := var and type base := base
+    Jkind_intf.Sort
+      with type t := t
+       and type var := var
+       and type univar := univar
+       and type base := base
 
   val set_change_log : (change -> unit) -> unit
 
@@ -97,6 +104,7 @@ module Sort : sig
   module Flat : sig
     type t =
       | Var of Var.id
+      | Univar of univar
       | Base of base
   end
 end
@@ -115,6 +123,7 @@ module Layout : sig
       | Any
       | Base of Sort.base
       | Product of t list
+      | Univar of Sort.univar
 
     val equal : t -> t -> bool
 

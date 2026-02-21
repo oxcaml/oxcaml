@@ -24,6 +24,7 @@ type token =
   | SEMISEMI
   | SEMI
   | RPAREN
+  | REPR
   | REC
   | RBRACKETGREATER
   | RBRACKET
@@ -34,6 +35,7 @@ type token =
   | QUESTION
   | PRIVATE
   | PREFIXOP of (string)
+  | POLY
   | PLUSEQ
   | PLUSDOT
   | PLUS
@@ -78,7 +80,7 @@ type token =
   | LAZY
   | LABEL of (string)
   | KIND_OF
-  | KIND_ABBREV
+  | KIND
   | INT of (string * char option)
   | INITIALIZER
   | INHERIT
@@ -94,9 +96,11 @@ type token =
   | HASH_INT of (string * char option)
   | HASH_FLOAT of (string * char option)
   | HASH_CHAR of (char)
+  | HASHTRUE
   | HASHOP of (string)
   | HASHLPAREN
   | HASHLBRACE
+  | HASHFALSE
   | HASH
   | GREATERRBRACKET
   | GREATERRBRACE
@@ -138,6 +142,7 @@ type token =
   | COLON
   | CLASS
   | CHAR of (char)
+  | BORROW
   | BEGIN
   | BARRBRACKET
   | BARBAR
@@ -222,6 +227,7 @@ module MenhirInterpreter : sig
     | T_SEMISEMI : unit terminal
     | T_SEMI : unit terminal
     | T_RPAREN : unit terminal
+    | T_REPR : unit terminal
     | T_REC : unit terminal
     | T_RBRACKETGREATER : unit terminal
     | T_RBRACKET : unit terminal
@@ -232,6 +238,7 @@ module MenhirInterpreter : sig
     | T_QUESTION : unit terminal
     | T_PRIVATE : unit terminal
     | T_PREFIXOP : (string) terminal
+    | T_POLY : unit terminal
     | T_PLUSEQ : unit terminal
     | T_PLUSDOT : unit terminal
     | T_PLUS : unit terminal
@@ -276,7 +283,7 @@ module MenhirInterpreter : sig
     | T_LAZY : unit terminal
     | T_LABEL : (string) terminal
     | T_KIND_OF : unit terminal
-    | T_KIND_ABBREV : unit terminal
+    | T_KIND : unit terminal
     | T_INT : (string * char option) terminal
     | T_INITIALIZER : unit terminal
     | T_INHERIT : unit terminal
@@ -292,9 +299,11 @@ module MenhirInterpreter : sig
     | T_HASH_INT : (string * char option) terminal
     | T_HASH_FLOAT : (string * char option) terminal
     | T_HASH_CHAR : (char) terminal
+    | T_HASHTRUE : unit terminal
     | T_HASHOP : (string) terminal
     | T_HASHLPAREN : unit terminal
     | T_HASHLBRACE : unit terminal
+    | T_HASHFALSE : unit terminal
     | T_HASH : unit terminal
     | T_GREATERRBRACKET : unit terminal
     | T_GREATERRBRACE : unit terminal
@@ -336,6 +345,7 @@ module MenhirInterpreter : sig
     | T_COLON : unit terminal
     | T_CLASS : unit terminal
     | T_CHAR : (char) terminal
+    | T_BORROW : unit terminal
     | T_BEGIN : unit terminal
     | T_BARRBRACKET : unit terminal
     | T_BARBAR : unit terminal
@@ -418,6 +428,7 @@ module MenhirInterpreter : sig
     | N_reversed_separated_nonempty_llist_AND_comprehension_clause_binding_ : (Parsetree.comprehension_clause_binding list) nonterminal
     | N_reversed_separated_nonempty_llist_AMPERSAND_core_type_no_attr_ : (Parsetree.core_type list) nonterminal
     | N_reversed_preceded_or_separated_nonempty_llist_BAR_match_case_ : (Parsetree.case list) nonterminal
+    | N_reversed_nonempty_llist_typevar_repr_ : (string Location.loc list) nonterminal
     | N_reversed_nonempty_llist_typevar_ : ((string Location.loc * Parsetree.jkind_annotation option) list) nonterminal
     | N_reversed_nonempty_llist_name_tag_ : (string list) nonterminal
     | N_reversed_nonempty_llist_labeled_simple_expr_ : ((Parsetree.arg_label * Parsetree.expression) list) nonterminal
@@ -442,6 +453,7 @@ module MenhirInterpreter : sig
     | N_post_item_attribute : (Parsetree.attribute) nonterminal
     | N_possibly_poly_core_type_no_attr_ : (Parsetree.core_type) nonterminal
     | N_possibly_poly_core_type_ : (Parsetree.core_type) nonterminal
+    | N_poly_flag : (bool) nonterminal
     | N_payload : (Parsetree.payload) nonterminal
     | N_pattern_with_modes_or_poly : (Parsetree.pattern) nonterminal
     | N_pattern_var : (Parsetree.pattern) nonterminal
@@ -515,7 +527,7 @@ module MenhirInterpreter : sig
     | N_mk_longident_mod_ext_longident_type_trailing_no_hash_ : (Longident.t) nonterminal
     | N_mk_longident_mod_ext_longident_type_trailing_hash_ : (Longident.t) nonterminal
     | N_mk_longident_mod_ext_longident_ident_ : (Longident.t) nonterminal
-    | N_mk_longident_mod_ext_longident___anonymous_51_ : (Longident.t) nonterminal
+    | N_mk_longident_mod_ext_longident___anonymous_52_ : (Longident.t) nonterminal
     | N_mk_longident_mod_ext_longident_UIDENT_ : (Longident.t) nonterminal
     | N_mk_longident_mod_ext_longident_LIDENT_ : (Longident.t) nonterminal
     | N_method_ : ((string Location.loc * Asttypes.private_flag * Parsetree.class_field_kind) *
@@ -546,7 +558,7 @@ module MenhirInterpreter : sig
     | N_let_binding_body_no_punning : (Parsetree.pattern * Parsetree.expression *
   Parsetree.value_constraint option * Parsetree.modes) nonterminal
     | N_let_binding_body : (Parsetree.pattern * Parsetree.expression *
-  Parsetree.value_constraint option * Parsetree.modes * bool) nonterminal
+  Parsetree.value_constraint option * Parsetree.modes * bool * bool) nonterminal
     | N_labeled_tuple_pat_element_list_pattern_no_exn_ : ((string option * Parsetree.pattern) list) nonterminal
     | N_labeled_tuple_pat_element_list_pattern_ : ((string option * Parsetree.pattern) list) nonterminal
     | N_labeled_simple_pattern : (Parsetree.arg_label * Parsetree.expression option * Parsetree.pattern) nonterminal
@@ -556,8 +568,8 @@ module MenhirInterpreter : sig
     | N_label_declarations : (Parsetree.label_declaration list) nonterminal
     | N_label_declaration_semi : (Parsetree.label_declaration) nonterminal
     | N_label_declaration : (Parsetree.label_declaration) nonterminal
-    | N_kind_abbreviation_decl : (string Location.loc * Parsetree.jkind_annotation) nonterminal
     | N_jkind_desc : (Parsetree.jkind_annotation_desc) nonterminal
+    | N_jkind_decl : (Parsetree.jkind_declaration) nonterminal
     | N_jkind_constraint : (Parsetree.jkind_annotation) nonterminal
     | N_jkind_annotation : (Parsetree.jkind_annotation) nonterminal
     | N_item_extension : (Parsetree.extension) nonterminal

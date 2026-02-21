@@ -47,3 +47,8 @@ type array_kind =
 type nullable =
   | Nullable
   | Non_nullable
+
+let split_vectors =
+  (* The compiler toggles this value based on the target architecture. Since we don't have
+     a target architecture, we arbitrarily choose the x86 case. *)
+  false

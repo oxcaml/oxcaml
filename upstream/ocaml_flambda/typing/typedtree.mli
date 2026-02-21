@@ -220,6 +220,10 @@ and 'k pattern_desc =
         (** P as a *)
   | Tpat_constant : constant -> value pattern_desc
         (** 1, 'a', "true", 1.0, 1l, 1L, 1n *)
+  | Tpat_unboxed_unit : value pattern_desc
+        (** #() *)
+  | Tpat_unboxed_bool : bool -> value pattern_desc
+        (** #false, #true *)
   | Tpat_tuple : (string option * value general_pattern) list -> value pattern_desc
         (** (P1, ..., Pn)                  [(None,P1); ...; (None,Pn)])
             (L1:P1, ... Ln:Pn)             [(Some L1,P1); ...; (Some Ln,Pn)])
@@ -348,6 +352,21 @@ and exp_extra =
             during inference. Generally, elaborated to a type constraint.
 
             See specific [type_inspection] cases for details. *)
+  | Texp_borrowed
+        (** Indicate that the current expression is wrapped in a [borrow_]
+        operator. The uniqueness analysis pairs this with an innermost
+        [Texp_ghost_region] and assumes that typecore guarantees the borrowed
+        value doesn't escape the ghost region.
+
+        Note that there could be other regions (such as loop or function body)
+        inner than the ghost region, and it's the innermost region that typecore
+        actually guarantees for. That is, the actual guarantee is stronger than
+        what's assumed by the UA. Therefore, such a mismatch would be sound. *)
+  | Texp_ghost_region
+        (** This expression is wrapped inside a ghost region. *)
+        (* NB. If an expression has both [Texp_borrowed] and
+        [Texp_ghost_region], we assume the [Texp_borrowed] is inner than
+        [Texp_ghost_region]. Currently it's impossible. *)
 
 and arg_label = Types.arg_label =
   | Nolabel
@@ -436,6 +455,10 @@ and expression_desc =
          *)
   | Texp_try of expression * value case list
         (** try E with P1 -> E1 | ... | PN -> EN *)
+  | Texp_unboxed_unit
+        (** #() *)
+  | Texp_unboxed_bool of bool
+        (** #false, #true *)
   | Texp_tuple of (string option * expression) list * alloc_mode
         (** [Texp_tuple(el)] represents
             - [(E1, ..., En)]
@@ -894,6 +917,7 @@ and structure_item_desc =
   | Tstr_class_type of (Ident.t * string loc * class_type_declaration) list
   | Tstr_include of include_declaration
   | Tstr_attribute of attribute
+  | Tstr_jkind of jkind_declaration
 
 and module_binding =
     {
@@ -998,6 +1022,7 @@ and signature_item_desc =
   | Tsig_class of class_description list
   | Tsig_class_type of class_type_declaration list
   | Tsig_attribute of attribute
+  | Tsig_jkind of jkind_declaration
 
 and module_declaration =
     {
@@ -1113,6 +1138,7 @@ and core_type_desc =
   | Ttyp_open of Path.t * Longident.t loc * core_type
   | Ttyp_quote of core_type
   | Ttyp_splice of core_type
+  | Ttyp_repr of string list * core_type
   | Ttyp_of_kind of Parsetree.jkind_annotation
   | Ttyp_call_pos
       (** [Ttyp_call_pos] represents the type of the value of a Position
@@ -1311,6 +1337,16 @@ and 'a class_infos =
     ci_attributes: attributes;
    }
 
+and jkind_declaration =
+  { jkind_id: Ident.t;
+    jkind_name: string loc;
+    jkind_jkind: Types.jkind_declaration;
+    jkind_annotation: Parsetree.jkind_annotation option;
+      (* The jkind_annotation field is just for untypast *)
+    jkind_attributes: attribute list;
+    jkind_loc: Location.t
+   }
+
 type argument_interface = {
   ai_signature: Types.signature;
   ai_coercion_from_primary: module_coercion;
@@ -1354,6 +1390,7 @@ type item_declaration =
   | Module_type of module_type_declaration
   | Class of class_declaration
   | Class_type of class_type_declaration
+  | Jkind of jkind_declaration
 (** [item_declaration] groups together items that correspond to the syntactic
     category of "declarations" which include types, values, modules, etc.
     declarations in signatures and their definitions in implementations. *)
@@ -1426,9 +1463,11 @@ val pat_bound_idents_full:
 val split_pattern:
   computation general_pattern -> pattern option * pattern option
 
-(** Whether an expression looks nice as the subject of a sentence in a error
-    message. *)
-val exp_is_nominal : expression -> bool
+(** Returns a format document if the expression reads nicely as the subject of a
+    sentence in a error message. *)
+val nominal_exp_doc :
+  Longident.t Format_doc.printer -> expression
+  -> Format_doc.t option
 
 (** Calculates the syntactic arity of a function based on its parameters and body. *)
 val function_arity : function_param list -> function_body -> int

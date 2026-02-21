@@ -19,6 +19,7 @@
 open! Int_replace_polymorphic_compare
 module List = Misc.Stdlib.List
 module String = Misc.Stdlib.String
+module Fmt = Format_doc
 
 type error =
   | Invalid_character of char * string
@@ -51,6 +52,10 @@ module Name : sig
   val to_parameter_name : t -> Global_module.Parameter_name.t
 
   val check_as_path_component : t -> unit
+
+  val print_as_inline_code : Fmt.formatter -> t -> unit
+
+  val print : Fmt.formatter -> t -> unit
 end = struct
   (* Be VERY careful changing this. Anything not equivalent to [string] will
      require bumping magic numbers due to changes in file formats, in addition
@@ -58,6 +63,8 @@ end = struct
      [Cmm_helpers.globals_map]. Furthermore there are uses of polymorphic
      compare hidden in [List.mem], [List.assoc] etc. *)
   type t = string
+
+  let doc_print = Fmt.pp_print_string
 
   include Identifiable.Make (struct
     type nonrec t = t
@@ -68,10 +75,12 @@ end = struct
 
     let hash = Hashtbl.hash
 
-    let print = String.print
+    let print ppf x = Fmt.compat doc_print ppf x
 
-    let output = Misc.output_of_print print
+    let output = Misc.output_of_doc_print doc_print
   end)
+
+  let print = doc_print
 
   let isupper chr = Char.equal (Char.uppercase_ascii chr) chr
 
@@ -104,6 +113,8 @@ end = struct
   let predef_exn = "*predef*"
 
   let to_string t = t
+
+  let print_as_inline_code ppf t = Misc.Style.inline_code ppf (to_string t)
 end
 
 module Prefix : sig
@@ -124,10 +135,17 @@ module Prefix : sig
   val empty : t
 
   val is_empty : t -> bool
+
+  val print : Fmt.formatter -> t -> unit
 end = struct
   (* As with [Name.t], changing this will change several file formats, requiring
      bumps of magic numbers. *)
   type t = Name.t list
+
+  let doc_print ppf p =
+    Fmt.pp_print_list
+      ~pp_sep:(fun ppf () -> Fmt.pp_print_string ppf ".")
+      Name.print ppf p
 
   include Identifiable.Make (struct
     type nonrec t = t
@@ -138,13 +156,12 @@ end = struct
 
     let hash = Hashtbl.hash
 
-    let print ppf p =
-      Format.pp_print_list
-        ~pp_sep:(fun ppf () -> Format.pp_print_string ppf ".")
-        Name.print ppf p
+    let print ppf p = Fmt.compat doc_print ppf p
 
-    let output = Misc.output_of_print print
+    let output = Misc.output_of_doc_print doc_print
   end)
+
+  let print = doc_print
 
   let is_valid_character first_char c =
     match c with
@@ -167,7 +184,7 @@ end = struct
     | None -> []
     | Some pack -> parse_for_pack pack
 
-  let to_string p = Format.asprintf "%a" print p
+  let to_string p = Fmt.asprintf "%a" print p
 
   let empty = []
 
@@ -440,7 +457,8 @@ let of_string str =
 
 let of_complete_global_exn glob =
   if not (Global_module.is_complete glob)
-  then Misc.fatal_errorf "of_complete_global_exn@ %a" Global_module.print glob;
+  then
+    Misc.fatal_errorf_doc "of_complete_global_exn@ %a" Global_module.print glob;
   of_global_name (glob |> Global_module.to_name)
 
 let dummy = create Prefix.empty (Name.of_string "*none*")
@@ -457,6 +475,18 @@ let with_for_pack_prefix t for_pack_prefix =
 
 let is_packed t = not (Prefix.is_empty (for_pack_prefix t))
 
+let rec doc_print ppf t =
+  let { for_pack_prefix; name; arguments } = descr t in
+  let () =
+    if Prefix.is_empty for_pack_prefix
+    then Fmt.fprintf ppf "%a" Name.print name
+    else Fmt.fprintf ppf "%a.%a" Prefix.print for_pack_prefix Name.print name
+  in
+  ListLabels.iter ~f:(print_arg ppf) arguments
+
+and print_arg ppf { param; value } =
+  Fmt.fprintf ppf "[%a:%a]" Name.print param doc_print value
+
 include Identifiable.Make (struct
   type nonrec t = t
 
@@ -464,20 +494,9 @@ include Identifiable.Make (struct
 
   let equal x y = if x == y then true else compare x y = 0
 
-  let rec print fmt t =
-    let { for_pack_prefix; name; arguments } = descr t in
-    let () =
-      if Prefix.is_empty for_pack_prefix
-      then Format.fprintf fmt "%a" Name.print name
-      else
-        Format.fprintf fmt "%a.%a" Prefix.print for_pack_prefix Name.print name
-    in
-    ListLabels.iter ~f:(print_arg fmt) arguments
+  let print ppf t = Fmt.compat doc_print ppf t
 
-  and print_arg fmt { param; value } =
-    Format.fprintf fmt "[%a:%a]" Name.print param print value
-
-  let output = Misc.output_of_print print
+  let output = Misc.output_of_doc_print doc_print
 
   let rec hash t =
     let { for_pack_prefix; name; arguments } = descr t in
@@ -489,6 +508,8 @@ include Identifiable.Make (struct
   and hash_arg { param; value } = Hashtbl.hash (Name.hash param, hash value)
 end)
 
+let print = doc_print
+
 let is_instance t =
   match instance_arguments t with [] -> false | _ :: _ -> true
 
@@ -497,7 +518,7 @@ let full_path_as_string t =
      can't share in the case where there is a prefix or arguments. *)
   if Prefix.is_empty (for_pack_prefix t) && not (is_instance t)
   then Name.to_string (name t)
-  else Format.asprintf "%a" print t
+  else Fmt.asprintf "%a" print t
 
 let create_instance t arguments =
   let { for_pack_prefix; name; arguments = existing_arguments } = descr t in
@@ -512,7 +533,7 @@ let create_instance t arguments =
 let split_instance_exn t =
   match descr t with
   | { arguments = []; _ } ->
-    Misc.fatal_errorf "@[<hov 1>Not an instance:@ %a@]" print t
+    Misc.fatal_errorf_doc "@[<hov 1>Not an instance:@ %a@]" print t
   | { name; for_pack_prefix; arguments } ->
     create_full for_pack_prefix name [], arguments
 
@@ -648,7 +669,7 @@ let which_cmx_file desired_comp_unit ~accessed_by : t =
         (* The current path is longer than the desired unit's path, which means
            we're attempting to go back up the pack hierarchy. This is an
            error. *)
-        Misc.fatal_errorf
+        Misc.fatal_errorf_doc
           "Compilation unit@ %a@ is inaccessible when compiling compilation \
            unit@ %a"
           print desired_comp_unit print accessed_by
@@ -662,7 +683,7 @@ let which_cmx_file desired_comp_unit ~accessed_by : t =
        especially here. *)
     create (ListLabels.rev prefix_rev |> Prefix.of_list) name
 
-let print_name ppf t = Format.fprintf ppf "%a" Name.print (name t)
+let print_name ppf t = Fmt.fprintf ppf "%a" Name.print (name t)
 
 let to_global_ident_for_bytecode t =
   Ident.create_persistent (full_path_as_string t)
@@ -671,11 +692,13 @@ let print_debug ppf t =
   let name = name t in
   let for_pack_prefix = for_pack_prefix t in
   if Prefix.is_empty for_pack_prefix
-  then Format.fprintf ppf "@[<hov 1>(@[<hov 1>(id@ %a)@])@]" Name.print name
+  then Fmt.fprintf ppf "@[<hov 1>(@[<hov 1>(id@ %a)@])@]" Name.print name
   else
-    Format.fprintf ppf
+    Fmt.fprintf ppf
       "@[<hov 1>(@[<hov 1>(for_pack_prefix@ %a)@]@;@[<hov 1>(name@ %a)@]"
       Prefix.print for_pack_prefix Name.print name
+
+let print_as_inline_code = Misc.Style.as_inline_code print
 
 let fwd_get_current : (unit -> t option) ref = ref (fun () -> assert false)
 

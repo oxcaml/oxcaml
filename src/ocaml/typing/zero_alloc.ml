@@ -90,7 +90,7 @@ type error =
 exception Error of error
 
 let print_error ppf error =
-  let pr fmt = Format.fprintf ppf fmt in
+  let pr fmt = Format_doc.fprintf ppf fmt in
   match error with
   | Less_general { missing_entirely } ->
     pr "The former provides a weaker \"zero_alloc\" guarantee than the latter.";

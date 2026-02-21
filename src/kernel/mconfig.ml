@@ -28,7 +28,8 @@ type ocaml =
     as_argument_for : string option;
     zero_alloc_check : Zero_alloc_annotations.Check.t;
     zero_alloc_assert : Zero_alloc_annotations.Assert.t;
-    infer_with_bounds : bool
+    infer_with_bounds : bool;
+    kind_verbosity : int
   }
 
 let dump_warnings st =
@@ -60,7 +61,9 @@ let dump_ocaml x =
       ( "zero_alloc_check",
         `String (Zero_alloc_annotations.Check.to_string x.zero_alloc_check) );
       ( "zero_alloc_assert",
-        `String (Zero_alloc_annotations.Assert.to_string x.zero_alloc_assert) )
+        `String (Zero_alloc_annotations.Assert.to_string x.zero_alloc_assert) );
+      ("infer_with_bounds", `Bool x.infer_with_bounds);
+      ("kind_verbosity", `Int x.kind_verbosity)
     ]
 
 (** Some paths can be resolved relative to a current working directory *)
@@ -686,7 +689,13 @@ let ocaml_ignored_flags =
     "-ddissector";
     "-ddissector-sizes";
     "-ddissector-verbose";
-    "-ddissector-partitions"
+    "-ddissector-partitions";
+    "-dissector-assume-lld-without-64-bit-eh-frames";
+    "-no-dissector-assume-lld-without-64-bit-eh-frames";
+    "-manual-module-init";
+    "-no-manual-module-init";
+    "-dfexpr-annot";
+    "-dfexpr-annot-after"
   ]
 
 let ocaml_ignored_parametrized_flags =
@@ -940,7 +949,11 @@ let ocaml_flags =
     ( "-infer-with-bounds",
       Marg.unit (fun ocaml -> { ocaml with infer_with_bounds = true }),
       "Infer with-bounds on kinds for type declarations. May impact \
-       performance." )
+       performance." );
+    ( "-kind-verbosity",
+      Marg.int (fun kind_verbosity ocaml -> { ocaml with kind_verbosity }),
+      "Set the verbosity used for printing kinds (0=not verbose, 1=expanded, \
+       2=expanded with all mod bounds)" )
   ]
 
 (** {1 Main configuration} *)
@@ -970,7 +983,8 @@ let initial =
         as_argument_for = None;
         zero_alloc_check = Zero_alloc_annotations.Check.Check_default;
         zero_alloc_assert = Zero_alloc_annotations.Assert.Assert_default;
-        infer_with_bounds = false
+        infer_with_bounds = false;
+        kind_verbosity = 0
       };
     merlin =
       { build_path = [];

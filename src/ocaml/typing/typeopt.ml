@@ -179,7 +179,8 @@ let classify ~classify_product env ty sort : _ classification =
       end
   | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _ | Tnil | Tvariant _
   | Tquote _ | Tsplice _-> Addr
-  | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _ | Tof_kind _ ->
+  | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _ | Tof_kind _
+  | Trepr _ ->
       assert false
   end
   | Base Float64 -> Unboxed_float Unboxed_float64
@@ -189,12 +190,16 @@ let classify ~classify_product env ty sort : _ classification =
   | Base Bits32 -> Unboxed_int Unboxed_int32
   | Base Bits64 -> Unboxed_int Unboxed_int64
   | Base Vec128 -> Unboxed_vector Unboxed_vec128
-  | Base Vec256 -> Unboxed_vector Unboxed_vec256
+  | Base Vec256 ->
+    if split_vectors
+    then Product (Pgcignorableproductarray ())
+    else Unboxed_vector Unboxed_vec256
   | Base Vec512 -> Unboxed_vector Unboxed_vec512
   | Base Word -> Unboxed_int Unboxed_nativeint
   | Base Untagged_immediate -> Unboxed_int Untagged_int
   | Base Void -> Void
   | Product c -> Product (classify_product ty c)
+  | Univar _ -> Misc.fatal_error "classify: Univar"
 
 let array_kind_of_elt ~elt_sort env loc ty =
   let elt_sort =
@@ -261,7 +266,7 @@ let array_type_kind ~elt_sort ~elt_ty env loc ty =
         (*= raise (Error(loc,
           Opaque_array_non_value {
             array_type = ty;
-            elt_kinding_failure = Some (elt_ty, e);
+            elt_kinding_failure = Some (env, elt_ty, e);
           })) *)
         ignore e;
         Misc.fatal_error "merlin-jst: non-value kind encountered in array_type_kind"
@@ -340,20 +345,22 @@ let bigarray_specialize_kind_and_layout env ~kind ~layout typ =
       (kind, layout)
 
 let value_kind_of_value_jkind env jkind =
-  let layout = Jkind.get_layout_defaulting_to_value jkind in
+  let layout = Jkind.get_layout_defaulting_to_value env jkind in
   (* In other places, we use [Ctype.type_jkind_purely_if_principal]. Here, we omit
      the principality check, as we're just trying to compute optimizations. *)
   let context = Ctype.mk_jkind_context_always_principal env in
   let externality_upper_bound =
-    Jkind.get_externality_upper_bound ~context jkind
+    Jkind.get_externality_upper_bound ~context env jkind
   in
   match layout with
-  | Base Value ->
+  | Some (Base Value) ->
     value_kind_of_value_with_externality externality_upper_bound
-  | Any
-  | Product _
-  | Base (Void | Untagged_immediate | Float64 | Float32 | Word | Bits8 |
-          Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512) ->
+  | None
+  | Some ( Any
+         | Product _
+         | Univar _
+         | Base ( Void | Untagged_immediate | Float64 | Float32 | Word | Bits8
+                | Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)) ->
     Misc.fatal_error "expected a layout of value"
 
 (* [value_kind] has a pre-condition that it is only called on values.  With the
@@ -436,7 +443,7 @@ let nullable raw_kind = { raw_kind; nullable = Nullable }
 let add_nullability_from_jkind env jkind raw_kind =
   let context = Ctype.mk_jkind_context_always_principal env in
   let nullable =
-    match Jkind.get_nullability ~context jkind with
+    match Jkind.get_nullability ~context env jkind with
     | Non_null -> Non_nullable
     | Maybe_null -> Nullable
   in
@@ -493,7 +500,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       | Error violation ->
         if (Jkind.Violation.is_missing_cmi violation)
         then raise Missing_cmi_fallback
-        else raise (Error (loc, Non_value_layout (ty, Some violation)))
+        else raise (Error (loc, Non_value_layout (env, ty, Some violation)))
   end;
   match get_desc scty with
   | Tconstr(p, _, _) when Path.same p Predef.path_int ->
@@ -696,6 +703,7 @@ and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
         | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil
         | Tlink _ | Tsubst _ | Tvariant _ | Tunivar _ | Tpoly _ | Tpackage _
         | Tquote _ | Tsplice _ | Tof_kind _ -> unknown ()
+        | Trepr _ -> Misc.fatal_error "value_kind_mixed_block_field: Trepr"
     in
     let (_, num_nodes_visited), kinds =
       Array.fold_left_map (fun (i, num_nodes_visited) field ->
@@ -944,7 +952,8 @@ let value_kind env loc ty =
     in
     value_kind
   with
-  | Missing_cmi_fallback -> raise (Error (loc, Non_value_layout (ty, None)))
+  | Missing_cmi_fallback ->
+    raise (Error (loc, Non_value_layout (env, ty, None)))
 
 let transl_mixed_block_element env loc ty mbe =
   try
@@ -954,7 +963,8 @@ let transl_mixed_block_element env loc ty mbe =
     in
     value_kind
   with
-  | Missing_cmi_fallback -> raise (Error (loc, Non_value_layout (ty, None)))
+  | Missing_cmi_fallback ->
+    raise (Error (loc, Non_value_layout (env, ty, None)))
 
 let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
   : Jkind.Sort.Const.t -> _ = function
@@ -981,13 +991,13 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
     Lambda.Punboxed_float Unboxed_float32
   | Base Vec128 when Language_extension.(is_at_least Layouts Stable) &&
                      Language_extension.(is_at_least SIMD Stable) ->
-    Lambda.Punboxed_vector Unboxed_vec128
+    Lambda.layout_unboxed_vector Unboxed_vec128
   | Base Vec256 when Language_extension.(is_at_least Layouts Stable) &&
                      Language_extension.(is_at_least SIMD Stable) ->
-    Lambda.Punboxed_vector Unboxed_vec256
+    Lambda.layout_unboxed_vector Unboxed_vec256
   | Base Vec512 when Language_extension.(is_at_least Layouts Stable) &&
                      Language_extension.(is_at_least SIMD Alpha) ->
-    Lambda.Punboxed_vector Unboxed_vec512
+    Lambda.layout_unboxed_vector Unboxed_vec512
   | Base Void when Language_extension.(is_at_least Layouts Stable) ->
     Lambda.Punboxed_product []
   | Product consts when Language_extension.(is_at_least Layouts Stable) ->
@@ -1001,6 +1011,7 @@ let[@inline always] rec layout_of_const_sort_generic ~value_kind ~error
              Bits16 | Bits32 | Bits64 | Vec128 | Vec256 | Vec512)
       | Product _) as const) ->
     error const
+  | Univar _ -> Misc.fatal_error "layout: unexpected univar"
 
 let layout env loc sort ty =
   layout_of_const_sort_generic sort
@@ -1023,6 +1034,7 @@ let layout env loc sort ty =
         raise (Error (loc, Sort_without_extension (Jkind.Sort.of_const const,
                                                    Stable,
                                                    Some ty)))
+      | Univar _ -> assert false
     )
 
 let layout_of_sort loc sort =
@@ -1044,6 +1056,7 @@ let layout_of_sort loc sort =
       as const ->
       raise (Error (loc, Sort_without_extension
                            (Jkind.Sort.of_const const, Stable, None)))
+    | Univar _ -> assert false
     )
 
 let layout_of_non_void_sort c =
@@ -1051,7 +1064,7 @@ let layout_of_non_void_sort c =
     c
     ~value_kind:(lazy Lambda.generic_value)
     ~error:(fun const ->
-      Misc.fatal_errorf "layout_of_const_sort: %a encountered"
+      Misc.fatal_errorf_doc "layout_of_const_sort: %a encountered"
         Jkind.Sort.Const.format const)
 
 let function_return_layout env loc sort ty =

@@ -235,6 +235,17 @@ module Type_shape = struct
     | None -> false
     | Some max_depth -> depth > max_depth
 
+  let unknown_shape_from_jkind jkind =
+    let layout =
+      match jkind.Types.jkind.base with
+      | Kconstr _ -> None
+      | Layout l -> Jkind_types.Layout.get_const l
+    in
+    let sort_opt = Option.bind layout Jkind_types.Layout.Const.get_sort in
+    match sort_opt with
+    | None -> Shape.unknown_type ()
+    | Some layout -> Shape.at_layout (Shape.unknown_type ()) layout
+
   (* Similarly to [value_kind], we track a set of visited types to avoid cycles
      in the lookup and we, additionally, carry a maximal depth for the recursion.
      We allow a deeper bound than [value_kind]. *)
@@ -247,13 +258,6 @@ module Type_shape = struct
     let unknown_shape_any = Shape.unknown_type () in
     let unknown_shape_value =
       Shape.at_layout (Shape.unknown_type ()) (Base Value)
-    in
-    let unknown_shape_from_jkind jkind =
-      let layout = Jkind_types.Layout.get_const jkind.Types.jkind.layout in
-      let sort_opt = Option.bind layout Jkind_types.Layout.Const.get_sort in
-      match sort_opt with
-      | None -> Shape.unknown_type ()
-      | Some layout -> Shape.at_layout (Shape.unknown_type ()) layout
     in
     (* Leaves indicate we do not know. *)
     let[@inline] cannot_proceed () =
@@ -297,6 +301,10 @@ module Type_shape = struct
                This code used to only work for [_type_vars = []]. Consider
                alternatively introducing abstractions here? *)
             of_type_expr_go ~depth ~visited type_expr subst shape_for_constr
+          | Trepr (type_expr, _sort_vars) ->
+            (* CR layout-polymorphism aivaskovic: sort variables do not
+               influence the type shape. *)
+            of_type_expr_go ~depth ~visited type_expr subst shape_for_constr
           | Tunboxed_tuple exprs ->
             Shape.unboxed_tuple (of_expr_list (List.map snd exprs))
           | Tobject _ | Tnil | Tfield _ ->
@@ -317,6 +325,7 @@ module Type_shape = struct
                 | Tfield (_, _, _, _)
                 | Tvariant _ | Tunivar _
                 | Tpoly (_, _)
+                | Trepr (_, _)
                 | Tpackage (_, _)
                 | Tquote _ | Tsplice _ | Tof_kind _ ->
                   assert false
@@ -437,7 +446,7 @@ module Type_decl_shape = struct
             then
               if !Clflags.dwarf_pedantic
               then
-                Misc.fatal_errorf
+                Misc.fatal_errorf_doc
                   "Type_shape: variant constructor with mismatched layout, has \
                    %a but expected %a"
                   Layout.format ly Layout.format ly2
@@ -455,7 +464,7 @@ module Type_decl_shape = struct
               then
                 if !Clflags.dwarf_pedantic
                 then
-                  Misc.fatal_errorf
+                  Misc.fatal_errorf_doc
                     "Type_shape: variant constructor with mismatched layout, \
                      has %a but expected value or void."
                     Layout.format ly
@@ -497,12 +506,7 @@ module Type_decl_shape = struct
     let module Types_predef = Predef in
     let open Shape in
     let unknown_shape () =
-      let jkind = type_declaration.type_jkind in
-      let layout = Jkind_types.Layout.get_const jkind.Types.jkind.layout in
-      let layout = Option.bind layout Jkind_types.Layout.Const.get_sort in
-      match layout with
-      | Some layout -> Shape.at_layout (Shape.unknown_type ()) layout
-      | None -> Shape.unknown_type ()
+      Type_shape.unknown_shape_from_jkind type_declaration.type_jkind
     in
     let type_params = type_declaration.type_params in
     let type_subst = List.combine type_params type_param_shapes in
@@ -1083,6 +1087,18 @@ let unfold_and_evaluate ?(diagnostics = Evaluation_diagnostics.no_diagnostics) t
     (Ident.Map.empty, Ident.Map.empty)
     t
 
+(** Instead of exposing [unfold_and_evaluate] directly, we expose the module
+    [Evaluated_shape] such that subsequent translations can, using types,
+    require evaluation to occur first. See
+    [Complex_shape.type_shape_to_complex_shape]. *)
+module Evaluated_shape = struct
+  type t = Shape.t
+
+  let unfold_and_evaluate = unfold_and_evaluate
+
+  let shape shape = shape
+end
+
 type shape_with_layout =
   { type_shape : Shape.t;
     type_layout : Layout.t;
@@ -1107,32 +1123,6 @@ let add_to_type_shapes var_uid type_expr type_layout ~name:type_name uid_of_path
   let type_shape = Type_shape.of_type_expr type_expr uid_of_path in
   Uid.Tbl.add all_type_shapes var_uid { type_shape; type_name; type_layout }
 
-let rec estimate_layout_from_type_shape (t : Shape.t) : Layout.t option =
-  match t.desc with
-  | Predef (t, _) -> Some (Shape.Predef.to_layout t)
-  | Constr (_, _) ->
-    None (* recursive occurrence, conservatively not handled for now *)
-  | Unboxed_tuple fields ->
-    let field_layouts = List.map estimate_layout_from_type_shape fields in
-    if List.for_all Option.is_some field_layouts
-    then Some (Layout.Product (List.map Option.get field_layouts))
-    else None
-  | Var _ -> None (* CR sspies: Find out what happens to type variables. *)
-  | Variant_unboxed { arg_layout; _ } ->
-    Some arg_layout
-    (* CR sspies: [arg_layout] could become unreliable in the future. Consider
-       recursively descending in that case. *)
-  | Tuple _ | Arrow | Variant _ | Poly_variant _ | Record _ ->
-    Some (Layout.Base Value)
-  | Alias t -> estimate_layout_from_type_shape t
-  | Mu t ->
-    estimate_layout_from_type_shape t
-    (* Simple treatment of recursion, we simply look inside. *)
-  | Unknown_type -> None
-  | At_layout (_, layout) -> Some layout
-  | Leaf | Abs _ | Mutrec _ | Error _ | Comp_unit _ | Rec_var _ | App _ | Proj _
-  | Struct _ | Proj_decl _ ->
-    None
 
 (* Merlin-only: The below functions are only used for printing when the compiler is passed
    the -ddebug-uids flag, which isn't relevant to Merlin *)
@@ -1158,7 +1148,7 @@ let print_table_all_type_shapes ppf =
         ( Format.asprintf "%a" Uid.print k,
           ( type_name,
             ( Format.asprintf "%a" Shape.print type_shape,
-              Format.asprintf "%a" Layout.format type_layout ) ) ))
+              Format_doc.asprintf "%a" Layout.format type_layout ) ) ))
       entries
   in
   let uids, rest = List.split entries in

@@ -169,7 +169,7 @@ let to_global = function
   | _ -> None
 
 let print ~with_scope ppf =
-  let open Format in
+  let open Format_doc in
   function
   | Global name -> fprintf ppf "%s!" name
   | Predef { name; stamp = n } ->
@@ -178,13 +178,14 @@ let print ~with_scope ppf =
       fprintf ppf "%s/%i" name n
   | Scoped { name; stamp = n; scope } ->
       fprintf ppf "%s/%i%s" name n
-        (if with_scope then sprintf "[%i]" scope else "")
+        (if with_scope then asprintf "[%i]" scope else "")
   | Global_with_args g ->
       fprintf ppf "%a!" Global_module.Name.print g
 
 let print_with_scope ppf id = print ~with_scope:true ppf id
 
-let print ppf id = print ~with_scope:false ppf id
+let doc_print ppf id = print ~with_scope:false ppf id
+let print ppf id = Format_doc.compat doc_print ppf id
 
 let to_global_exn id =
   match to_global id with

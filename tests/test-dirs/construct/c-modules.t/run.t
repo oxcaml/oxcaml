@@ -1,16 +1,16 @@
 Simple module construction
-  $ $MERLIN single construct -position 41:16 \
+  $ $MERLIN single construct -position 45:16 \
   > -filename module.ml <module.ml
   {
     "class": "return",
     "value": [
       {
         "start": {
-          "line": 41,
+          "line": 45,
           "col": 15
         },
         "end": {
-          "line": 41,
+          "line": 45,
           "col": 16
         }
       },
@@ -54,6 +54,7 @@ Simple module construction
         val f : (int) -> float
         module type STyp  = sig  end
         module D : Another
+        val trepr : 'a . ('a) -> 'a
       end
     module Submod =
       struct
@@ -62,8 +63,11 @@ Simple module construction
         let f = _
         module type STyp  = sig  end
         module D = struct let i = _ end
+        let trepr = _
       end
     module SubFunc(M:Sig) = struct let g = _ end
+    kind_ k_abstract
+    kind_ k_concrete = any
   end"
       ]
     ],
@@ -72,18 +76,18 @@ Simple module construction
 
 First class modules
 
-  $ $MERLIN single construct -position 43:26 \
+  $ $MERLIN single construct -position 47:26 \
   > -filename module.ml <module.ml
   {
     "class": "return",
     "value": [
       {
         "start": {
-          "line": 43,
+          "line": 47,
           "col": 25
         },
         "end": {
-          "line": 43,
+          "line": 47,
           "col": 26
         }
       },
@@ -94,18 +98,18 @@ First class modules
     "notifications": []
   }
 
-  $ $MERLIN single construct -position 45:17 \
+  $ $MERLIN single construct -position 49:17 \
   > -filename module.ml <module.ml
   {
     "class": "return",
     "value": [
       {
         "start": {
-          "line": 45,
+          "line": 49,
           "col": 16
         },
         "end": {
-          "line": 45,
+          "line": 49,
           "col": 17
         }
       },

@@ -303,6 +303,7 @@ end = struct
       | Module_type { mtd_attributes; _ } -> mtd_attributes
       | Class { ci_attributes; _ } | Class_type { ci_attributes; _ } ->
         ci_attributes
+      | Jkind { jkind_attributes; _ } -> jkind_attributes
     in
     match find_doc_attribute attributes with
     | Some (doc, _) -> `Found_doc (doc |> String.trim)
@@ -1185,7 +1186,7 @@ let get_doc ~config:mconfig ~env ~local_defs ~comments ~pos =
       match path with
       | `Completion_entry (namespace, path, _loc) ->
         log ~title:"get_doc" "completion: looking for the doc of '%a'"
-          Logger.fmt (fun fmt -> Path.print fmt path);
+          Logger.fmt (fun fmt -> (Format_doc.compat Path.print) fmt path);
 
         let from_path = from_path ~config ~env ~local_defs ~namespace path in
         begin

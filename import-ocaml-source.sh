@@ -130,6 +130,11 @@ for file in $(git diff --no-ext-diff --name-only HEAD^ HEAD); do
     parsing/unit_info.ml*)
       tgt=${base/#parsing/typing};;
 
+    # This src/utils/misc.ml depends on format_doc.ml, but src/ocaml/utils depends on
+    # src/utils. So we need to move it to fix a dependency cycle.
+    utils/format_doc.ml*)
+      tgt=${base/#utils/../utils};;
+
     # We have to inspect these files by hand, we only care about a subset of the
     # changes
     utils/clflags.ml*|utils/config.ml*)

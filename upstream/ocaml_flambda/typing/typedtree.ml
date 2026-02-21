@@ -112,9 +112,12 @@ module Unique_barrier = struct
   let print ppf t =
     let open Format in
     let print = function
-      | Enabled u -> fprintf ppf "Enabled(%a)" (Mode.Uniqueness.print ()) u
+      | Enabled u ->
+        fprintf ppf "Enabled(%a)"
+          (Format_doc.compat (Mode.Uniqueness.print ())) u
       | Resolved uc ->
-        fprintf ppf "Resolved(%a)" Mode.Uniqueness.Const.print uc
+        fprintf ppf "Resolved(%a)"
+          (Format_doc.compat Mode.Uniqueness.Const.print) uc
       | Not_computed -> fprintf ppf "Not_computed"
     in
     print !t
@@ -125,8 +128,8 @@ type unique_use = Mode.Uniqueness.r * Mode.Linearity.l
 let print_unique_use ppf (u,l) =
   let open Format in
   fprintf ppf "@[(%a,@ %a)@]"
-    (Mode.Uniqueness.print ()) u
-    (Mode.Linearity.print ()) l
+    (Format_doc.compat (Mode.Uniqueness.print ())) u
+    (Format_doc.compat (Mode.Linearity.print ())) l
 
 type alloc_mode = Mode.Alloc.r
 
@@ -181,6 +184,8 @@ and 'k pattern_desc =
       value general_pattern * Ident.t * string loc * Uid.t * Jkind_types.Sort.t
       * Mode.Value.l * Types.type_expr -> value pattern_desc
   | Tpat_constant : constant -> value pattern_desc
+  | Tpat_unboxed_unit : value pattern_desc
+  | Tpat_unboxed_bool : bool -> value pattern_desc
   | Tpat_tuple : (string option * value general_pattern) list -> value pattern_desc
   | Tpat_unboxed_tuple :
       (string option * value general_pattern * Jkind.sort) list ->
@@ -233,6 +238,8 @@ and exp_extra =
   | Texp_stack
   | Texp_mode of Mode.Alloc.Const.Option.t modes
   | Texp_inspected_type of [ `exp ] type_inspection
+  | Texp_borrowed
+  | Texp_ghost_region
 
 and arg_label = Types.arg_label =
   | Nolabel
@@ -260,6 +267,8 @@ and expression_desc =
         Mode.Locality.l * Zero_alloc.assume option
   | Texp_match of expression * Jkind.sort * computation case list * partial
   | Texp_try of expression * value case list
+  | Texp_unboxed_unit
+  | Texp_unboxed_bool of bool
   | Texp_tuple of (string option * expression) list * alloc_mode
   | Texp_unboxed_tuple of (string option * expression * Jkind.sort) list
   | Texp_construct of
@@ -598,6 +607,7 @@ and structure_item_desc =
   | Tstr_class_type of (Ident.t * string loc * class_type_declaration) list
   | Tstr_include of include_declaration
   | Tstr_attribute of attribute
+  | Tstr_jkind of jkind_declaration
 
 and module_binding =
     {
@@ -689,6 +699,7 @@ and signature_item_desc =
   | Tsig_class of class_description list
   | Tsig_class_type of class_type_declaration list
   | Tsig_attribute of attribute
+  | Tsig_jkind of jkind_declaration
 
 and module_declaration =
     {
@@ -798,6 +809,7 @@ and core_type_desc =
   | Ttyp_open of Path.t * Longident.t loc * core_type
   | Ttyp_quote of core_type
   | Ttyp_splice of core_type
+  | Ttyp_repr of string list * core_type
   | Ttyp_of_kind of Parsetree.jkind_annotation
   | Ttyp_call_pos
 
@@ -990,6 +1002,15 @@ and 'a class_infos =
     ci_attributes: attribute list;
    }
 
+and jkind_declaration =
+  { jkind_id: Ident.t;
+    jkind_name: string loc;
+    jkind_jkind: Types.jkind_declaration;
+    jkind_annotation: Parsetree.jkind_annotation option;
+    jkind_attributes: attribute list;
+    jkind_loc: Location.t
+   }
+
 type argument_interface = {
   ai_signature: Types.signature;
   ai_coercion_from_primary: module_coercion;
@@ -1016,6 +1037,7 @@ type item_declaration =
   | Module_type of module_type_declaration
   | Class of class_declaration
   | Class_type of class_type_declaration
+  | Jkind of jkind_declaration
 
 (* Auxiliary functions over the a.s.t. *)
 
@@ -1039,6 +1061,8 @@ let function_arity params body =
 let rec classify_pattern_desc : type k . k pattern_desc -> k pattern_category =
   function
   | Tpat_alias _ -> Value
+  | Tpat_unboxed_unit -> Value
+  | Tpat_unboxed_bool _ -> Value
   | Tpat_tuple _ -> Value
   | Tpat_unboxed_tuple _ -> Value
   | Tpat_construct _ -> Value
@@ -1083,7 +1107,9 @@ let shallow_iter_pattern_desc
   | Tpat_lazy p -> f.f p
   | Tpat_any
   | Tpat_var _
-  | Tpat_constant _ -> ()
+  | Tpat_constant _ 
+  | Tpat_unboxed_unit
+  | Tpat_unboxed_bool _ -> ()
   | Tpat_value p -> f.f p
   | Tpat_exception p -> f.f p
   | Tpat_or(p1, p2, _) -> f.f p1; f.f p2
@@ -1114,6 +1140,8 @@ let shallow_map_pattern_desc
       Tpat_variant (x1, Some (f.f p1), x2)
   | Tpat_var _
   | Tpat_constant _
+  | Tpat_unboxed_unit
+  | Tpat_unboxed_bool _
   | Tpat_any
   | Tpat_variant (_,None,_) -> d
   | Tpat_value p -> Tpat_value (f.f p)
@@ -1221,7 +1249,8 @@ let iter_pattern_full ~of_sort ~of_const_sort:_ ~both_sides_of_or f pat =
       | Tpat_array (_, _, patl) ->
         List.iter (loop f) patl
       | Tpat_lazy p | Tpat_exception p -> loop f p
-      | Tpat_any | Tpat_constant _ -> ()
+      | Tpat_any | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _ ->
+        ()
   in
   loop f pat
 
@@ -1374,16 +1403,34 @@ let split_pattern pat =
    - Similar to an identifier: words separated by '.' or '#'.
    - Do not contain spaces when printed.
   *)
-let rec exp_is_nominal exp =
-  match exp.exp_desc with
-  | _ when exp.exp_attributes <> [] -> false
-  | Texp_ident _ | Texp_instvar _ | Texp_constant _
-  | Texp_variant (_, None)
-  | Texp_construct (_, _, [], _) ->
-      true
-  | Texp_field (parent, _, _, _, _, _) | Texp_send (parent, _, _) ->
-      exp_is_nominal parent
-  | _ -> false
+let nominal_exp_doc lid t =
+  let open Format_doc.Doc in
+  let longident l = Format_doc.doc_printer lid l.Location.txt in
+  let rec nominal_exp_doc doc exp =
+    match exp.exp_desc with
+    | _ when exp.exp_attributes <> [] -> None
+    | Texp_ident (_,l,_,_,_,_) ->
+        Some (longident l doc)
+    | Texp_instvar (_,_,s) ->
+        Some (string s.Location.txt doc)
+    | Texp_constant _ -> assert false
+    | Texp_variant (lbl, None) ->
+        Some (printf "`%s" lbl doc)
+    | Texp_construct (l, _, [], _) -> Some (longident l doc)
+    | Texp_field (parent, _, lbl, _, _, _) ->
+        Option.map
+          (printf ".%t" (longident lbl))
+          (nominal_exp_doc doc parent)
+    | Texp_send (parent, meth, _) ->
+        let name = match meth with
+          | Tmeth_name name -> name
+          | Tmeth_val id | Tmeth_ancestor (id,_) -> Ident.name id in
+        Option.map
+          (printf "#%s" name)
+          (nominal_exp_doc doc parent)
+    | _ -> None
+  in
+  nominal_exp_doc empty t
 
 let loc_of_decl ~uid =
   let of_option { txt; loc } =
@@ -1414,6 +1461,7 @@ let loc_of_decl ~uid =
   | Module_substitution msd -> msd.ms_name
   | Class cd -> cd.ci_id_name
   | Class_type ctd -> ctd.ci_id_name
+  | Jkind jd -> jd.jkind_name
 
 let min_mode_with_locks = (Mode.Value.(disallow_right legacy), None)
 
@@ -1423,7 +1471,8 @@ let mode_without_locks_exn = function
 
 let rec fold_antiquote_exp f  acc exp =
   match exp.exp_desc with
-  | Texp_ident _ | Texp_constant _ -> acc
+  | Texp_ident _ | Texp_constant _ | Texp_unboxed_unit | Texp_unboxed_bool _ ->
+      acc
   | Texp_let (_, vbs, exp) ->
       let acc = fold_antiquote_value_bindings f acc vbs in
       fold_antiquote_exp f acc exp

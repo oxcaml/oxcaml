@@ -20,13 +20,13 @@ type 'ax annot_type =
 
 let print_annot_type (type a) ppf (annot_type : a annot_type) =
   match annot_type with
-  | Modifier -> Format.fprintf ppf "modifier"
-  | Mode -> Format.fprintf ppf "mode"
-  | Modality -> Format.fprintf ppf "modality"
+  | Modifier -> Format_doc.fprintf ppf "modifier"
+  | Mode -> Format_doc.fprintf ppf "mode"
+  | Modality -> Format_doc.fprintf ppf "modality"
 
 let print_annot_axis (type a) (annot_type : a annot_type) ppf (ax : a) =
   match annot_type with
-  | Modifier -> Format.fprintf ppf "%s" (Axis.name ax)
+  | Modifier -> Format_doc.fprintf ppf "%s" (Axis.name ax)
   | Mode -> Alloc.Axis.print ppf ax
   | Modality ->
     let (P ax) = Modality.Axis.to_value (P ax) in
@@ -422,7 +422,7 @@ let transl_mode_annots annots =
 let untransl_mode modes =
   let untransl_annot =
     Location.map (fun (Atom (ax, mode) : Mode.Alloc.atom) : Parsetree.mode ->
-        Mode (Format.asprintf "%a" (Mode.Alloc.Const.print_axis ax) mode))
+        Mode (Format_doc.asprintf "%a" (Mode.Alloc.Const.print_axis ax) mode))
   in
   List.map untransl_annot modes.mode_desc
 
@@ -447,7 +447,7 @@ let transl_modality ~maturity { txt = Parsetree.Modality modality; loc } =
 
 let untransl_modality =
   Location.map (fun (Atom (ax, t) : Modality.atom) : Parsetree.modality ->
-      Modality (Format.asprintf "%a" (Modality.Per_axis.print ax) t))
+      Modality (Format_doc.asprintf "%a" (Modality.Per_axis.print ax) t))
 
 (* For now, mutable implies:
    1. [global forkable unyielding]. This is for compatibility with existing code
@@ -520,7 +520,7 @@ let idx_expected_modalities ~(mut : bool) =
       "Typemode.idx_expected_modalities: mismatch with mutable implied \
        modalities"
 
-let least_modalities_implying mut (t : Modality.Const.t) =
+let least_modalities ~include_implied ~mut (t : Modality.Const.t) =
   let baseline =
     mutable_implied_modalities ~for_mutable_variable:false
       (Types.is_mutable mut)
@@ -534,7 +534,7 @@ let least_modalities_implying mut (t : Modality.Const.t) =
     List.filter_map
       (fun (Modality.Atom (ax, m_implied)) ->
         let m_projected = Modality.Const.proj ax t in
-        if m_projected <> m_implied
+        if m_projected <> m_implied || include_implied
         then Some (Modality.Atom (ax, m_projected))
         else None)
       implied
@@ -545,27 +545,59 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
     Parsetree.modes =
   let crossing = Jkind.Mod_bounds.crossing bounds in
   let modality = Crossing.to_modality crossing in
-  let modality_annots =
-    least_modalities_implying Types.Immutable modality
-    |> List.map (fun (Atom (ax, m) : Modality.atom) ->
-        let s = Format.asprintf "%a" (Modality.Per_axis.print ax) m in
-        { Location.txt = Parsetree.Mode s; loc = Location.none })
+  let least_modalities =
+    least_modalities ~include_implied:verbose ~mut:Immutable modality
   in
-  let nonmodal_annots =
+  let modality_annots =
+    List.map
+      (fun (Atom (ax, m) : Modality.atom) ->
+        let s = Format_doc.asprintf "%a" (Modality.Per_axis.print ax) m in
+        { Location.txt = Parsetree.Mode s; loc = Location.none })
+      least_modalities
+  in
+  (* These mod-bounds are top ones, which are redundant to print. But we include
+     them when printing verbosely. *)
+  let top_modality_annots () =
+    List.filter_map
+      (fun ax ->
+        let (P ax) = Modality.Axis.of_value ax in
+        let included_in_nonverbose =
+          List.exists
+            (fun (Atom (ax2, _) : Modality.atom) ->
+              Modality.Axis.P ax = Modality.Axis.P ax2)
+            least_modalities
+        in
+        match included_in_nonverbose with
+        | true -> None
+        | false ->
+          let s =
+            Format_doc.asprintf "%a"
+              (Modality.Per_axis.print ax)
+              (Modality.Const.proj ax modality)
+          in
+          Some { Location.txt = Parsetree.Mode s; loc = Location.none })
+      Value.Axis.all
+  in
+  let nonmodal_annots, top_nonmodal_annots =
     let open Jkind.Mod_bounds in
-    let mk_annot default print value =
-      if (not verbose) && value = default
-      then None
-      else
-        let s = Format.asprintf "%a" print value in
-        Some { Location.txt = Parsetree.Mode s; loc = Location.none }
+    let mk_annot top print value =
+      let only_when_verbose = value = top in
+      let s = Format_doc.asprintf "%a" print value in
+      ( { Location.txt = Parsetree.Mode s; loc = Location.none },
+        only_when_verbose )
     in
     [ mk_annot Externality.max Externality.print (externality bounds);
       mk_annot Nullability.max Nullability.print (nullability bounds);
       mk_annot Separability.max Separability.print (separability bounds) ]
-    |> List.filter_map Fun.id
+    |> List.partition_map (fun (annot, only_when_verbose) ->
+        match only_when_verbose with false -> Left annot | true -> Right annot)
   in
-  modality_annots @ nonmodal_annots
+  let verbose_annots =
+    match verbose with
+    | true -> top_modality_annots () @ top_nonmodal_annots
+    | false -> []
+  in
+  modality_annots @ nonmodal_annots @ verbose_annots
 
 let sort_dedup_modalities ~warn l =
   let open Modality in
@@ -592,9 +624,9 @@ let sort_dedup_modalities ~warn l =
     if warn
     then
       let (P ax0) = Axis.to_value (P ax0) in
-      let axis = Format.asprintf "%a" Mode.Value.Axis.print ax0 in
+      let axis = Format_doc.asprintf "%a" Mode.Value.Axis.print ax0 in
       let overriden_by =
-        Format.asprintf "%a" (Modality.Per_axis.print ax1) a1
+        Format_doc.asprintf "%a" (Modality.Per_axis.print ax1) a1
       in
       Location.prerr_warning loc0
         (Warnings.Modal_axis_specified_twice { axis; overriden_by })
@@ -657,7 +689,7 @@ let transl_alloc_mode annots =
 (* Error reporting *)
 
 let report_error ppf =
-  let open Format in
+  let open Format_doc in
   function
   | Duplicated_axis (annot_type, axis) ->
     fprintf ppf "The %a axis has already been specified."

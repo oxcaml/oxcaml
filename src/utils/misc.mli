@@ -24,6 +24,9 @@ val fatal_errorf: ('a, Format.formatter, unit, 'b) format4 -> 'a
   (** Format the arguments according to the given format string
       and raise [Fatal_error] with the resulting string. *)
 
+val fatal_errorf_doc: ('a, Format_doc.formatter, unit, 'b) format4 -> 'a
+  (** Like [fatal_errorf] but using [Format_doc]. *)
+
 exception Fatal_error of string * Printexc.raw_backtrace
 
 (** {1 Exceptions and finalization} *)
@@ -197,6 +200,14 @@ val no_overflow_lsl: int -> int -> bool
         (* [no_overflow_lsl n k] returns [true] if the computation of
            [n lsl k] does not overflow. *)
 
+val no_overflow_add_int64: int64 -> int64 -> bool
+       (** [no_overflow_add_int64 n1 n2] returns [true] if the computation of
+           [Int64.add n1 n2] does not overflow. *)
+
+val no_overflow_sub_int64: int64 -> int64 -> bool
+       (** [no_overflow_sub_int64 n1 n2] returns [true] if the computation of
+           [Int64.sub n1 n2] does not overflow. *)
+
 val letter_of_int : int -> string
 
 module Int_literal_converter : sig
@@ -301,7 +312,8 @@ val spellcheck : string list -> string -> string list
     list of suggestions taken from [env], that are close enough to
     [name] that it may be a typo for one of them. *)
 
-val did_you_mean : Format.formatter -> (unit -> string list) -> unit
+val did_you_mean :
+    Format_doc.formatter -> (unit -> string list) -> unit
 (** [did_you_mean ppf get_choices] hints that the user may have meant
     one of the option returned by calling [get_choices]. It does nothing
     if the returned list is empty.
@@ -423,8 +435,8 @@ module Style : sig
     inline_code: tag_style;
   }
 
-  val as_inline_code: (Format.formatter -> 'a -> unit as 'printer) -> 'printer
-  val inline_code: Format.formatter -> string -> unit
+  val as_inline_code: 'a Format_doc.printer -> 'a Format_doc.printer
+  val inline_code: string Format_doc.printer
 
   val default_styles: styles
   val get_styles: unit -> styles
@@ -439,7 +451,7 @@ module Style : sig
   (* adds functions to support color tags to the given formatter. *)
 end
 
-val print_see_manual : Format.formatter -> int list -> unit
+val print_see_manual : int list Format_doc.printer
 (** See manual section *)
 
 val output_of_print :
@@ -447,6 +459,10 @@ val output_of_print :
 (** [output_of_print print] produces an output function from a pretty printer.
     Note that naively using [Format.formatter_of_out_channel] typechecks but
     doesn't work because it fails to flush the formatter. *)
+
+val output_of_doc_print :
+  (Format_doc.formatter -> 'a -> unit) -> out_channel -> 'a -> unit
+(** Like [output_of_print] but for [Format_doc] printers. *)
 
 val is_print_longer_than: int -> (Format.formatter -> unit) -> bool
 (** Returns [true] if the printed string is longer than the given integer. Stops

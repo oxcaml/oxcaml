@@ -83,8 +83,8 @@ let placeholder = Ast_helper.Exp.hole ()
 let rec gen_patterns ?(recurse = true) env type_expr =
   let open Types in
   log ~title:"gen_patterns" "%a" Logger.fmt (fun fmt ->
-      Format.fprintf fmt "Generating patterns for type %a" Printtyp.type_expr
-        type_expr);
+      Format.fprintf fmt "Generating patterns for type %a"
+        Printtyp.Compat.type_expr type_expr);
   match get_desc type_expr with
   | Tlink _ -> assert false (* impossible after [Btype.repr] *)
   | Tvar _ -> raise (Not_allowed "non-immediate type")
@@ -143,7 +143,7 @@ let rec gen_patterns ?(recurse = true) env type_expr =
                 Format.fprintf fmt
                   "Eliminating '%s' branch, its return type is not compatible \
                    with the expected type (%a)"
-                  cstr_descr.cstr_name Printtyp.type_expr type_expr);
+                  cstr_descr.cstr_name Printtyp.Compat.type_expr type_expr);
             None)
           else
             let args =
@@ -177,7 +177,7 @@ let rec gen_patterns ?(recurse = true) env type_expr =
           None)
   | _ ->
     let fmt, to_string = Format.to_string () in
-    Printtyp.type_expr fmt type_expr;
+    Printtyp.Compat.type_expr fmt type_expr;
     raise (Not_allowed (to_string ()))
 
 and from_type_decl env path texpr =
@@ -368,7 +368,11 @@ let rec subst_patt initial ~by patt =
   else
     let open Typedtree in
     match patt.pat_desc with
-    | Tpat_any | Tpat_var _ | Tpat_constant _ -> patt
+    | Tpat_any
+    | Tpat_var _
+    | Tpat_constant _
+    | Tpat_unboxed_bool _
+    | Tpat_unboxed_unit -> patt
     | Tpat_alias (p, x, y, uid, s, m, ty) ->
       { patt with pat_desc = Tpat_alias (f p, x, y, uid, s, m, ty) }
     | Tpat_tuple lst ->
@@ -407,7 +411,11 @@ let rec rm_sub patt sub =
   let f p = rm_sub p sub in
   let open Typedtree in
   match patt.pat_desc with
-  | Tpat_any | Tpat_var _ | Tpat_constant _ -> patt
+  | Tpat_any
+  | Tpat_var _
+  | Tpat_constant _
+  | Tpat_unboxed_bool _
+  | Tpat_unboxed_unit -> patt
   | Tpat_alias (p, x, y, uid, s, m, ty) ->
     { patt with pat_desc = Tpat_alias (f p, x, y, uid, s, m, ty) }
   | Tpat_tuple lst ->
@@ -530,8 +538,9 @@ let find_branch patterns sub =
     else
       let open Typedtree in
       match patt.pat_desc with
-      | Tpat_any | Tpat_var _ | Tpat_constant _ | Tpat_variant (_, None, _) ->
-        false
+      | Tpat_any | Tpat_var _ | Tpat_constant _
+      | Tpat_variant (_, None, _)
+      | Tpat_unboxed_bool _ | Tpat_unboxed_unit -> false
       | Tpat_alias (p, _, _, _, _, _, _)
       | Tpat_variant (_, Some p, _)
       | Tpat_lazy p -> is_sub_patt p ~sub
@@ -652,6 +661,8 @@ module Conv = struct
         in
         mkpat (Ppat_array (mut, lst))
       | Tpat_lazy p -> mkpat (Ppat_lazy (loop p))
+      | Tpat_unboxed_bool b -> mkpat (Ppat_unboxed_bool b)
+      | Tpat_unboxed_unit -> mkpat Ppat_unboxed_unit
     in
     let ps = loop typed in
     (ps, constrs, labels, unboxed_labels)

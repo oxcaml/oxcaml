@@ -47,7 +47,8 @@ let should_ignore_lid (lid : Longident.t Location.loc) =
 let iterator ~current_buffer_path ~index ~reduce_for_uid =
   let add uid loc = index := Shape.Uid.Map.add_to_list uid loc !index in
   let f ~namespace env path (lid : Longident.t Location.loc) =
-    log ~title:"index_buffer" "Path: %a" Logger.fmt (Fun.flip Path.print path);
+    log ~title:"index_buffer" "Path: %a" Logger.fmt
+      (Fun.flip (Format_doc.compat Path.print) path);
     let lid = { lid with loc = set_fname ~file:current_buffer_path lid.loc } in
     let index_decl () =
       begin

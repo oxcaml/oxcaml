@@ -187,6 +187,22 @@ and type_desc =
       where 'a1 ... 'an are names given to types in tyl
       and occurrences of those types in ty. *)
 
+  | Trepr of type_expr * Jkind_types.Sort.univar list
+  (** [Trepr (ty, sl)] represents layout polymorphism (from [repr_] syntax).
+      [sl] is an ordered list of sort univars that abstract over the layouts of
+      type variables in [ty]. The i-th sort univar in [sl] corresponds
+      positionally to the i-th type variable quantified in [ty] (typically by
+      an inner [Tpoly] node), and appears in the [jkind] field of the
+      corresponding [Tvar] or [Tunivar] node in [ty].
+
+      The ordering of [sl] is semantically significant: two [Trepr] types with
+      the same sort univars in different orders represent incompatible types.
+
+      Example: [(repr_ 'a) (repr_ 'b). 'a -> 'b] translates to
+      [Trepr (Tpoly ('a -> 'b, ['a; 'b]), [s1; s2])] where [s1] and [s2] are
+      sort univars that appear in the jkinds of ['a] and ['b] respectively. *)
+
+
   | Tpackage of Path.t * (Longident.t * type_expr) list
   (** Type of a first-class module (a.k.a package). *)
 
@@ -308,14 +324,22 @@ and 'd with_bounds =
     : with_bounds_types -> ('l * Allowance.disallowed) with_bounds
     (** Invariant : there must always be at least one type in this set **)
 
-and ('layout, 'd) layout_and_axes =
-  { layout : 'layout;
+and 'layout jkind_base =
+  | Layout of 'layout
+  | Kconstr of Path.t
+
+and ('layout, 'd) base_and_axes =
+  { base : 'layout jkind_base;
     mod_bounds : mod_bounds;
     with_bounds : 'd with_bounds
   }
   constraint 'd = 'l * 'r
 
-and 'd jkind_desc = (Jkind_types.Sort.t Jkind_types.Layout.t, 'd) layout_and_axes
+and 'd jkind_const_desc = (Jkind_types.Layout.Const.t, 'd) base_and_axes
+  constraint 'd = 'l * 'r
+and jkind_const_desc_lr = (allowed * allowed) jkind_const_desc
+
+and 'd jkind_desc = (Jkind_types.Sort.t Jkind_types.Layout.t, 'd) base_and_axes
   constraint 'd = 'l * 'r
 
 and jkind_desc_packed = Pack_jkind_desc : ('l * 'r) jkind_desc -> jkind_desc_packed
@@ -348,6 +372,14 @@ and jkind_l = (allowed * disallowed) jkind  (* the jkind of an actual type *)
 and jkind_r = (disallowed * allowed) jkind  (* the jkind expected of a type *)
 and jkind_lr = (allowed * allowed) jkind    (* the jkind of a variable *)
 and jkind_packed = Pack_jkind : ('l * 'r) jkind -> jkind_packed
+
+and jkind_declaration =
+  {
+    jkind_manifest : jkind_const_desc_lr option;
+    jkind_attributes : Parsetree.attributes;
+    jkind_uid : Shape.Uid.t;
+    jkind_loc : Location.t
+  }
 
 (* A map from [type_expr] to [With_bounds_type_info.t], specifically defined with a
    (best-effort) semantic comparison function on types to be used in the with-bounds of a
@@ -1045,6 +1077,7 @@ module type Wrapped = sig
   | Sig_modtype of Ident.t * modtype_declaration * visibility
   | Sig_class of Ident.t * class_declaration * rec_status * visibility
   | Sig_class_type of Ident.t * class_type_declaration * rec_status * visibility
+  | Sig_jkind of Ident.t * jkind_declaration * visibility
 
   and module_declaration =
   {
@@ -1247,3 +1280,5 @@ val set_univar: type_expr option ref -> type_expr -> unit
 val link_kind: inside:field_kind -> field_kind -> unit
 val link_commu: inside:commutable -> commutable -> unit
 val set_commu_ok: commutable -> unit
+val class_mode : Mode.Value.lr
+val toplevel_mode : Mode.Value.lr

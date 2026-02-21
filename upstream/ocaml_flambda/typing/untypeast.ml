@@ -44,6 +44,7 @@ type mapper = {
                          -> extension_constructor;
   include_declaration: mapper -> T.include_declaration -> include_declaration;
   include_description: mapper -> T.include_description -> include_description;
+  jkind_declaration: mapper -> T.jkind_declaration -> jkind_declaration;
   label_declaration: mapper -> T.label_declaration -> label_declaration;
   location: mapper -> Location.t -> Location.t;
   module_binding: mapper -> T.module_binding -> module_binding;
@@ -209,6 +210,8 @@ let structure_item sub item =
         Pstr_include (sub.include_declaration sub incl)
     | Tstr_attribute x ->
         Pstr_attribute x
+    | Tstr_jkind x ->
+        Pstr_jkind (sub.jkind_declaration sub x)
   in
   Str.mk ~loc desc
 
@@ -319,6 +322,12 @@ let extension_constructor sub ext =
   | Text_rebind (_p, lid) ->
     Te.constructor ~loc ~attrs name (Pext_rebind (map_loc sub lid))
 
+let jkind_declaration _sub decl =
+  { pjkind_name = decl.jkind_name;
+    pjkind_manifest = decl.jkind_annotation;
+    pjkind_attributes = decl.jkind_attributes;
+    pjkind_loc = decl.jkind_jkind.jkind_loc }
+
 let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
   let loc = sub.location sub pat.pat_loc in
   (* todo: fix attributes on extras *)
@@ -362,6 +371,8 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | Tpat_alias (pat, _id, name, _uid, _sort, _mode, _ty) ->
         Ppat_alias (sub.pat sub pat, name)
     | Tpat_constant cst -> Ppat_constant (constant cst)
+    | Tpat_unboxed_unit -> Ppat_unboxed_unit
+    | Tpat_unboxed_bool b -> Ppat_unboxed_bool b
     | Tpat_tuple list ->
         Ppat_tuple
           ( List.map (fun (label, p) -> label, sub.pat sub p) list
@@ -432,6 +443,8 @@ let exp_extra sub (extra, loc, attrs) sexp =
         (* Type inspections are unnecessary in a Parsetree,
            as type inference reproduces them *)
         sexp.pexp_desc
+    | Texp_borrowed -> Pexp_borrow sexp
+    | Texp_ghost_region ->sexp.pexp_desc
   in
   Exp.mk ~loc ~attrs desc
 
@@ -553,6 +566,7 @@ let expression sub exp =
                         [], modes
                       | Texp_poly _ | Texp_newtype _ | Texp_stack
                       | Texp_inspected_type _ -> [], []
+                      | Texp_ghost_region | Texp_borrowed -> [], []
                     in
                     new_type_constraints @ ret_type_constraints,
                     new_mode_annotations @ ret_mode_annotations)
@@ -613,6 +627,8 @@ let expression sub exp =
       Pexp_match (sub.expr sub exp, List.map (sub.case sub) cases)
     | Texp_try (exp, cases) ->
         Pexp_try (sub.expr sub exp, List.map (sub.case sub) cases)
+    | Texp_unboxed_unit -> Pexp_unboxed_unit
+    | Texp_unboxed_bool b -> Pexp_unboxed_bool b
     | Texp_tuple (list, _) ->
         Pexp_tuple (List.map (fun (lbl, e) -> lbl, sub.expr sub e) list)
     | Texp_unboxed_tuple list ->
@@ -850,6 +866,8 @@ let signature_item sub item =
         Psig_class_type (List.map (sub.class_type_declaration sub) list)
     | Tsig_attribute x ->
         Psig_attribute x
+    | Tsig_jkind x ->
+        Psig_jkind (sub.jkind_declaration sub x)
   in
   Sig.mk ~loc desc
 
@@ -1081,6 +1099,9 @@ let core_type sub ct =
     | Ttyp_open (_path, mod_ident, t) -> Ptyp_open (mod_ident, sub.typ sub t)
     | Ttyp_quote t -> Ptyp_quote (sub.typ sub t)
     | Ttyp_splice t -> Ptyp_splice (sub.typ sub t)
+    | Ttyp_repr (list, ct) ->
+        let bound_vars = List.map (fun v -> mkloc v loc) list in
+        Ptyp_repr (bound_vars, sub.typ sub ct)
     | Ttyp_of_kind jkind -> Ptyp_of_kind jkind
     | Ttyp_call_pos ->
         Ptyp_extension call_pos_extension
@@ -1214,6 +1235,7 @@ let default_mapper =
     location = location;
     row_field = row_field ;
     object_field = object_field ;
+    jkind_declaration = jkind_declaration;
   }
 
 let untype_structure ?(mapper : mapper = default_mapper) structure =

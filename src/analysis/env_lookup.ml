@@ -61,6 +61,9 @@ let by_path path (namespace : Namespace.t) env =
       | Class_type ->
         let clty = Env.find_cltype path env in
         (clty.clty_loc, clty.clty_uid, Class)
+      | Jkind ->
+        let jk = Env.find_jkind path env in
+        (jk.jkind_loc, jk.jkind_uid, Jkind)
     in
     Some { uid; loc; namespace }
   with Not_found -> None
@@ -101,7 +104,7 @@ let by_longident (nss : Namespace.inferred list) ident env =
               "got constructor, fetching path and loc in type namespace";
             let path, loc = path_and_loc_of_cstr cd env in
             log ~title:"lookup" "found path: %a" Logger.fmt (fun fmt ->
-                Path.print fmt path);
+                (Format_doc.compat Path.print) fmt path);
             let path = Path.Pdot (path, cd.cstr_name) in
             raise (Found (path, Constructor, cd.cstr_uid, loc))
           | `Constr ->
@@ -156,7 +159,7 @@ let by_longident (nss : Namespace.inferred list) ident env =
   with Found (path, namespace, decl_uid, loc) ->
     log ~title:"env_lookup"
       "found: '%a' in namespace %s with decl_uid %a\nat loc %a" Logger.fmt
-      (fun fmt -> Path.print fmt path)
+      (fun fmt -> (Format_doc.compat Path.print) fmt path)
       (Shape.Sig_component_kind.to_string namespace)
       Logger.fmt
       (fun fmt -> Shape.Uid.print fmt decl_uid)

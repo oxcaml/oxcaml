@@ -58,6 +58,7 @@ let summary_prev = function
   | Env.Env_modtype (s, _, _)
   | Env.Env_class (s, _, _)
   | Env.Env_cltype (s, _, _)
+  | Env.Env_jkind (s, _, _)
   | Env.Env_functor_arg (s, _)
   | Env.Env_constraints (s, _)
   | Env.Env_copy_types s
@@ -87,6 +88,7 @@ let signature_of_env ?(ignore_extensions = true) env =
     | Env_modtype (_, i, m) -> Some (Sig_modtype (i, m, Exported))
     | Env_class (_, i, c) -> Some (Sig_class (i, c, Trec_not, Exported))
     | Env_cltype (_, i, c) -> Some (Sig_class_type (i, c, Trec_not, Exported))
+    | Env_jkind (_, i, jk) -> Some (Sig_jkind (i, jk, Exported))
     | Env_open _
     | Env_empty
     | Env_functor_arg _

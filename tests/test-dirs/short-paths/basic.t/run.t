@@ -17,7 +17,7 @@
         "sub": [],
         "valid": true,
         "message": "Some type variables are unbound in this type: class b : 'a -> a
-  The method x has type 'a where 'a is unbound"
+  The method x has type 'b where 'b is unbound"
       },
       {
         "start": {
@@ -91,7 +91,7 @@
         "valid": true,
         "message": "Some type variables are unbound in this type:
     class test : 'a -> object method b : 'b end
-  The method b has type 'b where 'b is unbound"
+  The method b has type 'a where 'a is unbound"
       },
       {
         "start": {
@@ -193,7 +193,7 @@
         "sub": [],
         "valid": true,
         "message": "Some type variables are unbound in this type: class b : 'a -> a
-  The method x has type 'a where 'a is unbound"
+  The method x has type 'b where 'b is unbound"
       },
       {
         "start": {
@@ -267,7 +267,7 @@
         "valid": true,
         "message": "Some type variables are unbound in this type:
     class test : 'a -> object method b : 'b end
-  The method b has type 'b where 'b is unbound"
+  The method b has type 'a where 'a is unbound"
       },
       {
         "start": {

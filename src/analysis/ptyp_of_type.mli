@@ -12,6 +12,9 @@ val modtype_declaration :
 val module_declaration :
   Ident.t -> Types.module_declaration -> Parsetree.module_declaration
 
+val jkind_declaration :
+  Ident.t -> Types.jkind_declaration -> Parsetree.jkind_declaration
+
 val signature_item : Types.signature_item -> Parsetree.signature_item
 
 val extension_constructor :

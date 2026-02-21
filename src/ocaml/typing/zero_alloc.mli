@@ -52,7 +52,7 @@ val undo_change : change -> unit
 
 (* These are the errors that may be raised by [sub_exn] below. *)
 type error
-val print_error : Format.formatter -> error -> unit
+val print_error : Format_doc.formatter -> error -> unit
 
 (* [sub t1 t2] checks whether the zero_alloc check t1 is stronger than the
    zero_alloc check t2. It returns [Ok ()] if so, and [Error e] if not.  If [t1]
