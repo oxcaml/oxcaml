@@ -414,16 +414,6 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
 let exp_extra sub (extra, loc, attrs) sexp =
   let loc = sub.location sub loc in
   let attrs = sub.attributes sub attrs in
-  match extra with
-  | Texp_then_call f ->
-    let f_pexp = sub.expr sub f in
-    let attr =
-      Ast_helper.Attr.mk
-        (Location.mkloc "then_call" loc)
-        (PStr [Ast_helper.Str.eval f_pexp])
-    in
-    { sexp with pexp_attributes = attr :: sexp.pexp_attributes }
-  | _ ->
   let desc =
     match extra with
       Texp_coerce (cty1, cty2) ->
@@ -438,7 +428,6 @@ let exp_extra sub (extra, loc, attrs) sexp =
     | Texp_stack -> Pexp_stack sexp
     | Texp_mode modes ->
         Pexp_constraint (sexp, None, Typemode.untransl_mode_annots modes)
-    | Texp_then_call _ -> assert false
   in
   Exp.mk ~loc ~attrs desc
 
@@ -518,6 +507,7 @@ let call_pos_extension = Location.mknoloc "call_pos_extension", PStr []
 let expression sub exp =
   let loc = sub.location sub exp.exp_loc in
   let attrs = sub.attributes sub exp.exp_attributes in
+  let attrs = ref attrs in
   let desc =
     match exp.exp_desc with
       Texp_ident (_path, lid, _, _, _) -> Pexp_ident (map_loc sub lid)
@@ -553,7 +543,6 @@ let expression sub exp =
                 | Some (Texp_mode _) (* CR zqian: [Texp_mode] should be possible here *)
                 | Some (Texp_poly _ | Texp_newtype _)
                 | Some Texp_stack
-                | Some (Texp_then_call _)
                 | None -> None
               in
               let constraint_ =
@@ -772,7 +761,18 @@ let expression sub exp =
     | Texp_antiquotation exp -> Pexp_splice (sub.expr sub exp)
     | Texp_eval (typ, _) ->
         Pexp_extension ({ txt = "ocaml.eval"; loc}, PTyp (sub.typ sub typ))
+    | Texp_then_call (e, f) ->
+        let sexp = sub.expr sub e in
+        let f_sexp = sub.expr sub f in
+        let attr =
+          Ast_helper.Attr.mk
+            (Location.mkloc "then_call" loc)
+            (PStr [Ast_helper.Str.eval f_sexp])
+        in
+        attrs := attr :: sexp.pexp_attributes;
+        sexp.pexp_desc
   in
+  let attrs = !attrs in
   List.fold_right (exp_extra sub) exp.exp_extra
     (Exp.mk ~loc ~attrs desc)
 

@@ -263,6 +263,8 @@ let classify_expression : Typedtree.expression -> sd =
       (* CR metaprogramming mshinwell: Make sure this is correct *)
       Static
 
+    | Texp_then_call (e, _) -> classify_expression env e
+
     | Texp_new _
     | Texp_instvar _
     | Texp_object _
@@ -1099,7 +1101,12 @@ let rec expression : Typedtree.expression -> term_judg =
         expression e << Dereference
     | Texp_eval _ ->
       (* CR metaprogramming mshinwell: Make sure this is correct *)
-      empty
+        empty
+    | Texp_then_call (e, f) ->
+        join [
+          expression e;
+          expression f << Dereference;
+        ]
 
 (* Function bodies.
     G |-{body} b : m

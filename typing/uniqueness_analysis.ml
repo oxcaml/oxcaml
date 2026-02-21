@@ -2535,6 +2535,10 @@ let rec check_uniqueness_exp ~overwrite (ienv : Ienv.t) exp : UF.t =
   | Texp_eval _ ->
     (* CR metaprogramming mshinwell: Make sure this is correct *)
     UF.unused
+  | Texp_then_call (e0, e1) ->
+    let uf0 = check_uniqueness_exp ~overwrite:None ienv e0 in
+    let uf1 = check_uniqueness_exp ~overwrite:None ienv e1 in
+    UF.seq uf0 uf1
 
 (**
 Corresponds to the first mode.

@@ -292,7 +292,6 @@ let extra sub = function
   | Texp_poly cto -> Option.iter (sub.typ sub) cto
   | Texp_stack -> ()
   | Texp_mode _ -> ()
-  | Texp_then_call f -> sub.expr sub f
 
 let function_param sub { fp_loc; fp_kind; fp_newtypes; _ } =
   sub.location sub fp_loc;
@@ -477,6 +476,9 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_quotation exp -> sub.expr sub exp
   | Texp_antiquotation exp -> sub.expr sub exp
   | Texp_eval (typ, _) -> sub.typ sub typ
+  | Texp_then_call (e, f) ->
+      sub.expr sub e;
+      sub.expr sub f
 
 let package_type sub {pack_fields; pack_txt; _} =
   List.iter (fun (lid, p) -> iter_loc sub lid; sub.typ sub p) pack_fields;

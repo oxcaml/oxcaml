@@ -364,33 +364,7 @@ let zero_alloc_of_application
   | None, _ -> Zero_alloc_utils.Assume_info.none
 
 let rec transl_exp ~scopes sort e =
-  let lam = transl_exp1 ~scopes ~in_new_scope:false sort e in
-  wrap_then_call ~scopes sort e lam
-
-and wrap_then_call ~scopes sort e lam =
-  match List.find_map (function
-    | (Texp_then_call f_exp, _, _) -> Some f_exp
-    | _ -> None) e.exp_extra
-  with
-  | None -> lam
-  | Some f_exp ->
-    let loc = of_location ~scopes e.exp_loc in
-    let layout = layout_exp sort e in
-    let tmp = Ident.create_local "then_call" in
-    Llet(Strict, layout, tmp, Lambda.debug_uid_none,
-      lam,
-      Lsequence(
-        Lapply {ap_func = transl_exp ~scopes Jkind.Sort.Const.for_function f_exp;
-                ap_args = [Lprim(Pobj_magic layout_any_value, [Lvar tmp], loc)];
-                ap_result_layout = layout_unit;
-                ap_region_close = Rc_normal;
-                ap_mode = alloc_heap;
-                ap_loc = loc;
-                ap_tailcall = Default_tailcall;
-                ap_inlined = Default_inlined;
-                ap_specialised = Default_specialise;
-                ap_probe = None},
-        Lvar tmp))
+  transl_exp1 ~scopes ~in_new_scope:false sort e
 
 (* ~in_new_scope tracks whether we just opened a new scope.
 
@@ -1368,6 +1342,25 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       Lprim
         (Pgetglobal (Compilation_unit.of_string "Camlinternaleval"), [], loc);
     ], loc)
+  | Texp_then_call (e, f_exp) ->
+    let loc = of_location ~scopes e.exp_loc in
+    let layout = layout_exp sort e in
+    let lam = transl_exp ~scopes sort e in
+    let tmp = Ident.create_local "then_call" in
+    Llet(Strict, layout, tmp, Lambda.debug_uid_none,
+      lam,
+      Lsequence(
+        Lapply {ap_func = transl_exp ~scopes Jkind.Sort.Const.for_function f_exp;
+                ap_args = [Lprim(Pobj_magic layout_any_value, [Lvar tmp], loc)];
+                ap_result_layout = layout_unit;
+                ap_region_close = Rc_normal;
+                ap_mode = alloc_heap;
+                ap_loc = loc;
+                ap_tailcall = Default_tailcall;
+                ap_inlined = Default_inlined;
+                ap_specialised = Default_specialise;
+                ap_probe = None},
+        Lvar tmp))
 
 and pure_module m =
   match m.mod_desc with

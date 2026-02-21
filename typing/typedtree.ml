@@ -208,7 +208,6 @@ and exp_extra =
                     Parsetree.jkind_annotation option * Uid.t
   | Texp_stack
   | Texp_mode of Mode.Alloc.Const.Option.t
-  | Texp_then_call of expression
 
 and arg_label = Types.arg_label =
   | Nolabel
@@ -322,6 +321,7 @@ and expression_desc =
   | Texp_quotation of expression
   | Texp_antiquotation of expression
   | Texp_eval of core_type * Jkind.sort
+  | Texp_then_call of expression * expression
 
 and ident_kind =
   | Id_value
@@ -1493,6 +1493,8 @@ let rec fold_antiquote_exp f  acc exp =
       fold_antiquote_exp (fold_antiquote_exp f) acc exp
   | Texp_antiquotation exp -> f acc exp
   | Texp_eval _ -> acc
+  | Texp_then_call (e1, e2) ->
+      fold_antiquote_exp f (fold_antiquote_exp f acc e2) e1
 
 and fold_antiquote_exp_opt f acc = function
   | None -> acc

@@ -10,6 +10,14 @@ let _ =
 - : int = 42
 |}]
 
+(* Non-expansive in the value restriction's view. *)
+let _ =
+  let x = ignore [@then_call (fun _ -> ())] in
+  (x : int -> unit), (x : bool -> unit);;
+[%%expect{|
+- : (int -> unit) * (bool -> unit) = (<fun>, <fun>)
+|}]
+
 (* let rec compatibility: [@then_call f] is transparent to the rec validity check *)
 let rec x = [1;2;3] [@then_call (fun _ -> ())];;
 [%%expect{|
@@ -24,7 +32,10 @@ let result =
   x, y, !result
 ;;
 [%%expect{|
-val x : int list = [1; 2; 3]
+Line 3, characters 14-20:
+3 |   let rec x = 1 :: y [@then_call result := (List.tl y); ignore] and y = 2 :: x in
+                  ^^^^^^
+Error: This kind of expression is not allowed as right-hand side of "let rec"
 |}]
 
 (* mode compatibility: this is accepted *)
@@ -33,17 +44,22 @@ let _ =
   ()
 ;;
 [%%expect{|
-val x : int list = [1; 2; 3]
+- : unit = ()
 |}]
 
 (* mode compatibility: this is rejected *)
 (* This test should fail! *)
 let _ =
-  let _ = stack_ [1;2;3] [@then_call ((fun (_ @ global) -> ()))] in
+  let f (x @ local) = exclave_ [x] [@then_call ((fun (_ @ global) -> ()))] in
   ()
 ;;
 [%%expect{|
-val x : int list = [1; 2; 3]
+Line 2, characters 32-33:
+2 |   let f (x @ local) = exclave_ [x] [@then_call ((fun (_ @ global) -> ()))] in
+                                    ^
+Error: This value is "local" but is expected to be "global"
+       because it is contained (via constructor "::") in the value at Line 2, characters 31-34
+       which is expected to be "global".
 |}]
 
 (* Type error: [@then_call print_int] rejected because print_int : int -> unit
@@ -66,4 +82,15 @@ Line 1, characters 22-28:
                           ^^^^^^
 Error: The function argument to "[@then_call]" must have type "'a -> unit" for all "'a",
        but here it has type "'a -> 'a".
+|}]
+
+(* Testing evaluation *)
+let _ =
+  let x = ref 0 in
+  let incr _ = incr x in
+  let _ = Some (Some (Some 3 [@then_call incr]) [@then_call incr]) [@then_call incr] [@then_call incr] in
+  !x
+
+[%%expect{|
+- : int = 4
 |}]
