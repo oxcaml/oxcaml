@@ -363,8 +363,8 @@ let zero_alloc_of_application
     end
   | None, _ -> Zero_alloc_utils.Assume_info.none
 
-let rec transl_exp ~scopes sort e =
-  transl_exp1 ~scopes ~in_new_scope:false sort e
+let rec transl_exp ?tail_pos_of_letrec ~scopes sort e =
+  transl_exp1 ~tail_pos_of_letrec ~scopes ~in_new_scope:false sort e
 
 (* ~in_new_scope tracks whether we just opened a new scope.
 
@@ -373,17 +373,17 @@ let rec transl_exp ~scopes sort e =
    parsed as a let-bound Pexp_function node [let f = fun x -> ...].
    We give it f's scope.
 *)
-and transl_exp1 ~scopes ~in_new_scope sort e =
+and transl_exp1 ~tail_pos_of_letrec ~scopes ~in_new_scope sort e =
   let eval_once =
     (* Whether classes for immediate objects must be cached *)
     match e.exp_desc with
       Texp_function _ | Texp_for _ | Texp_while _ -> false
     | _ -> true
   in
-  if eval_once then transl_exp0 ~scopes ~in_new_scope sort e else
-  Translobj.oo_wrap e.exp_env true (transl_exp0 ~scopes ~in_new_scope sort) e
+  if eval_once then transl_exp0 ~tail_pos_of_letrec ~scopes ~in_new_scope sort e else
+  Translobj.oo_wrap e.exp_env true (transl_exp0 ~tail_pos_of_letrec ~scopes ~in_new_scope sort) e
 
-and transl_exp0 ~in_new_scope ~scopes sort e =
+and transl_exp0 ~tail_pos_of_letrec ~in_new_scope ~scopes sort e =
   match e.exp_desc with
   | Texp_ident(path, _, desc, kind, _) ->
       transl_ident (of_location ~scopes e.exp_loc)
@@ -396,7 +396,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_letmutable(pat_expr, body) ->
       let return_layout = layout_exp sort body in
       transl_letmutable ~scopes ~return_layout pat_expr
-        (event_before ~scopes body (transl_exp ~scopes sort body))
+        (event_before ~scopes body (transl_exp ?tail_pos_of_letrec ~scopes sort body))
   | Texp_function { params; body; ret_sort; ret_mode; alloc_mode;
                     zero_alloc } ->
       let ret_sort = Jkind.Sort.default_for_transl_and_get ret_sort in
@@ -889,7 +889,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_list_comprehension comp ->
       let loc = of_location ~scopes e.exp_loc in
       Transl_list_comprehension.comprehension
-        ~transl_exp ~scopes ~loc comp
+        ~transl_exp:(transl_exp ?tail_pos_of_letrec:None)
+        ~scopes ~loc comp
   | Texp_array_comprehension (_amut, elt_sort, comp) ->
       (* We can ignore mutability here since we've already checked in in the
          type checker; both mutable and immutable arrays are created the same
@@ -906,7 +907,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         raise (Error(e.exp_loc, Unboxed_product_in_array_comprehension))
       end;
       Transl_array_comprehension.comprehension
-        ~transl_exp ~scopes ~loc ~array_kind comp
+        ~transl_exp:(transl_exp ?tail_pos_of_letrec:None)
+        ~scopes ~loc ~array_kind comp
   | Texp_ifthenelse(cond, ifso, Some ifnot) ->
       Lifthenelse(transl_exp ~scopes Jkind.Sort.Const.for_predef_value cond,
                   event_before ~scopes ifso (transl_exp ~scopes sort ifso),
@@ -1031,7 +1033,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_letmodule(None, loc, Mp_present, modl, body) ->
       let lam = !transl_module ~scopes Tcoerce_none None modl in
       Lsequence(Lprim(Pignore, [lam], of_location ~scopes loc.loc),
-                transl_exp ~scopes sort body)
+                transl_exp ~scopes ?tail_pos_of_letrec sort body)
   | Texp_letmodule(Some id, _loc, Mp_present, modl, body) ->
       let defining_expr =
         let mod_scopes = enter_module_definition ~scopes id in
@@ -1039,14 +1041,14 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       in
       (* CR sspies: Add a debug uid to [Texp_letmodule] for the binder. *)
       Llet(Strict, Lambda.layout_module, id, Lambda.debug_uid_none,
-          defining_expr, transl_exp ~scopes sort body)
+          defining_expr, transl_exp ?tail_pos_of_letrec ~scopes sort body)
   | Texp_letmodule(_, _, Mp_absent, _, body) ->
-      transl_exp ~scopes sort body
+      transl_exp ?tail_pos_of_letrec ~scopes sort body
   | Texp_letexception(cd, body) ->
       Llet(Strict, Lambda.layout_block,
            cd.ext_id,  Lambda.debug_uid_none,
            transl_extension_constructor ~scopes e.exp_env None cd,
-           transl_exp ~scopes sort body)
+           transl_exp ~scopes ?tail_pos_of_letrec sort body)
   | Texp_pack modl ->
       !transl_module ~scopes Tcoerce_none None modl
   | Texp_assert ({exp_desc=Texp_construct(_, {cstr_name="false"}, _, _)}, loc) ->
@@ -1347,11 +1349,19 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
     let layout = layout_exp sort e in
     let lam = transl_exp ~scopes sort e in
     let tmp = Ident.create_local "then_call" in
+    (* Be sure to pass the eventually-backpatched value into the function if
+       [e] is the value under construction.
+    *)
+    let arg =
+      match tail_pos_of_letrec with
+      | None -> tmp
+      | Some ident -> ident
+    in
     Llet(Strict, layout, tmp, Lambda.debug_uid_none,
       lam,
       Lsequence(
-        Lapply {ap_func = transl_exp ~scopes Jkind.Sort.Const.for_function f_exp;
-                ap_args = [Lprim(Pobj_magic layout_any_value, [Lvar tmp], loc)];
+        Lapply {ap_func = transl_exp ?tail_pos_of_letrec ~scopes Jkind.Sort.Const.for_function f_exp;
+                ap_args = [Lprim(Pobj_magic layout_any_value, [Lvar arg], loc)];
                 ap_result_layout = layout_unit;
                 ap_region_close = Rc_normal;
                 ap_mode = alloc_heap;
@@ -1978,11 +1988,11 @@ and transl_function ~in_new_scope ~scopes e params body
   Translattribute.add_function_attributes lam e.exp_loc attrs
 
 (* Like transl_exp, but used when a new scope was just introduced. *)
-and transl_scoped_exp ~scopes sort expr =
-  transl_exp1 ~scopes ~in_new_scope:true sort expr
+and transl_scoped_exp ?tail_pos_of_letrec ~scopes sort expr =
+  transl_exp1 ~tail_pos_of_letrec ~scopes ~in_new_scope:true sort expr
 
 (* Decides whether a pattern binding should introduce a new scope. *)
-and transl_bound_exp ~scopes ~in_structure pat sort expr loc attrs =
+and transl_bound_exp ?tail_pos_of_letrec ~scopes ~in_structure pat sort expr loc attrs =
   let should_introduce_scope =
     match expr.exp_desc with
     | Texp_function _ -> true
@@ -1995,8 +2005,8 @@ and transl_bound_exp ~scopes ~in_structure pat sort expr loc attrs =
       (* If this is a let-binding of a function, the scope will be updated
          with zero_alloc info in [transl_function]. *)
       let scopes = enter_value_definition ~scopes ~assume_zero_alloc id in
-      transl_scoped_exp ~scopes sort expr
-    | _ -> transl_exp ~scopes sort expr
+      transl_scoped_exp ?tail_pos_of_letrec ~scopes sort expr
+    | _ -> transl_exp ?tail_pos_of_letrec ~scopes sort expr
   in
   Translattribute.add_function_attributes lam loc attrs
 
@@ -2041,7 +2051,8 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
              vb_loc; vb_pat} (id, id_duid) =
         let vb_sort = Jkind.Sort.default_for_transl_and_get vb_sort in
         let def =
-          transl_bound_exp ~scopes ~in_structure vb_pat vb_sort expr vb_loc vb_attributes
+          transl_bound_exp ~scopes ~in_structure ~tail_pos_of_letrec:id
+            vb_pat vb_sort expr vb_loc vb_attributes
         in
         let def =
           if add_regions then maybe_region_exp vb_sort expr def else def

@@ -94,3 +94,15 @@ let _ =
 [%%expect{|
 - : int = 4
 |}]
+
+(* Testing evaluation *)
+let _ =
+  let remembered = ref None in
+  let rec x =
+    (1 :: x) [@then_call (fun y -> remembered := Some (Obj.repr y))]
+  in
+  Obj.repr x == Option.get !remembered
+
+[%%expect{|
+- : bool = true
+|}]
