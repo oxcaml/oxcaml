@@ -52,7 +52,7 @@ module InstrWorkList : sig
 end
 
 module Color : sig
-  type t = int
+  type t = Regs.Phys_reg.t
 end
 
 module Edge = Regalloc_interf_graph.Edge

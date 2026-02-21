@@ -149,35 +149,62 @@ let emit_label_arg ~section lbl_str =
 
 (* Override proc.ml *)
 
-let int_reg_name : X86_ast.reg64 array =
-  [| RAX; RBX; RDI; RSI; RDX; RCX; R8; R9; R12; R13; R10; R11; RBP |]
+let int_reg_name =
+  Regs.phys_gpr_regs_classed
+  |> Array.map (fun (phys_reg : [`GPR] Regs.phys_reg_classed) : X86_ast.reg64 ->
+      match phys_reg with
+      | RAX -> RAX
+      | RBX -> RBX
+      | RDI -> RDI
+      | RSI -> RSI
+      | RDX -> RDX
+      | RCX -> RCX
+      | R8 -> R8
+      | R9 -> R9
+      | R12 -> R12
+      | R13 -> R13
+      | R10 -> R10
+      | R11 -> R11
+      | RBP -> RBP)
 
-let xmm_reg_name = Array.init 16 (fun i -> X86_ast.XMM i)
+let phys_reg_to_regf (width : [`XMM | `YMM | `ZMM])
+    (phys_reg : [`SIMD] Regs.phys_reg_classed) : X86_ast.regf =
+  match phys_reg with
+  | ( MM0 | MM1 | MM2 | MM3 | MM4 | MM5 | MM6 | MM7 | MM8 | MM9 | MM10 | MM11
+    | MM12 | MM13 | MM14 | MM15 ) as mm -> (
+    let i = Regs.index_in_class (P mm) in
+    match width with `XMM -> XMM i | `YMM -> YMM i | `ZMM -> ZMM i)
 
-let ymm_reg_name = Array.init 16 (fun i -> X86_ast.YMM i)
+let xmm_reg_name =
+  Regs.phys_simd_regs_classed |> Array.map (phys_reg_to_regf `XMM)
 
-let zmm_reg_name = Array.init 16 (fun i -> X86_ast.ZMM i)
+let ymm_reg_name =
+  Regs.phys_simd_regs_classed |> Array.map (phys_reg_to_regf `YMM)
 
-let register_name typ r : X86_ast.arg =
+let zmm_reg_name =
+  Regs.phys_simd_regs_classed |> Array.map (phys_reg_to_regf `ZMM)
+
+let register_name typ phys_reg : X86_ast.arg =
+  let reg_index = Regs.index_in_class phys_reg in
   match (typ : Cmm.machtype_component) with
-  | Int | Val | Addr -> Reg64 int_reg_name.(r)
-  | Float | Float32 | Vec128 | Valx2 -> Regf xmm_reg_name.(r - 100)
+  | Int | Val | Addr -> Reg64 int_reg_name.(reg_index)
+  | Float | Float32 | Vec128 | Valx2 -> Regf xmm_reg_name.(reg_index)
   | Vec256 ->
     I.require_vec256 ();
-    Regf ymm_reg_name.(r - 100)
+    Regf ymm_reg_name.(reg_index)
   | Vec512 ->
     I.require_vec512 ();
-    Regf zmm_reg_name.(r - 100)
+    Regf zmm_reg_name.(reg_index)
 
-let phys_rax = phys_reg Int 0
+let phys_rax = phys_reg Int (P RAX)
 
-let phys_rdi = phys_reg Int 2
+let phys_rdi = phys_reg Int (P RDI)
 
-let phys_rdx = phys_reg Int 4
+let phys_rdx = phys_reg Int (P RDX)
 
-let phys_rcx = phys_reg Int 5
+let phys_rcx = phys_reg Int (P RCX)
 
-let phys_xmm0v () = phys_reg Vec128 100
+let phys_xmm0v () = phys_reg Vec128 (P MM0)
 
 let file_emitter ~file_num ~file_name =
   D.file ~file_num:(Some file_num) ~file_name
@@ -434,7 +461,7 @@ let x86_data_type_for_stack_slot : Cmm.machtype_component -> X86_ast.data_type =
 let reg : Reg.t -> X86_ast.arg =
  fun reg ->
   match reg with
-  | { loc = Reg.Reg r; typ = ty; _ } -> register_name ty r
+  | { loc = Reg.Reg phys_reg; typ = ty; _ } -> register_name ty phys_reg
   | { loc = Stack (Domainstate n); typ = ty; _ } ->
     let ofs = n + (Domainstate.(idx_of_field Domain_extra_params) * 8) in
     mem64 (x86_data_type_for_stack_slot ty) ofs (Scalar R14)
@@ -445,7 +472,7 @@ let reg : Reg.t -> X86_ast.arg =
   | { loc = Unknown; _ } -> assert false
 
 let reg64 = function
-  | { loc = Reg.Reg r; _ } -> int_reg_name.(r)
+  | { loc = Reg.Reg r; _ } -> int_reg_name.(Regs.index_in_class r)
   | { loc = Stack _ | Unknown; _ } -> assert false
 
 let res i n = reg i.res.(n)
@@ -462,7 +489,9 @@ let reg_low_32_name = Array.map (fun r -> X86_ast.Reg32 r) int_reg_name
 
 let emit_subreg tbl typ r =
   match r.loc with
-  | Reg.Reg r when r < 13 -> tbl.(r)
+  | Reg.Reg phys_reg
+    when Regs.Reg_class.equal GPR (Regs.Phys_reg.reg_class phys_reg) ->
+    tbl.(Regs.index_in_class phys_reg)
   | Stack s ->
     mem64 typ (slot_offset s (Stack_class.of_machtype r.Reg.typ)) (Scalar RSP)
   | Reg _ | Unknown -> assert false
@@ -522,9 +551,9 @@ let addressing addr typ i n =
 (* A global symbol that maybe calls the GC, suffixed by the class of simd
    register which should be saved *)
 let global_gc_sym ~simd name =
-  Cmm.global_symbol (name ^ Reg_class.Save_simd_regs.symbol_suffix simd)
+  Cmm.global_symbol (name ^ Regs.Save_simd_regs.symbol_suffix simd)
 
-let must_save_simd_regs live : Reg_class.Save_simd_regs.t =
+let must_save_simd_regs live : Regs.Save_simd_regs.t =
   let v128, v256, v512 = ref false, ref false, ref false in
   Reg.Set.iter
     (fun r ->
@@ -553,22 +582,25 @@ let must_save_simd_regs live : Reg_class.Save_simd_regs.t =
    the Arm backend. *)
 
 let record_frame_label live dbg =
+  let encode_reg_offset n = (n lsl 1) + 1 in
   let lbl = Cmm.new_label () in
   let live_offset = ref [] in
   let simd = must_save_simd_regs live in
   Reg.Set.iter
     (fun (r : Reg.t) ->
       match r with
-      | { typ = Val; loc = Reg r; _ } ->
-        assert (Reg_class.gc_regs_offset ~simd Val r = r);
-        live_offset := ((r lsl 1) + 1) :: !live_offset
+      | { typ = Val; loc = Reg phys_reg; _ } ->
+        let reg_offset = Regs.gc_regs_offset ~simd Val phys_reg in
+        live_offset := encode_reg_offset reg_offset :: !live_offset
       | { typ = Val; loc = Stack s; _ } as reg ->
         live_offset
           := slot_offset s (Stack_class.of_machtype reg.typ) :: !live_offset
-      | { typ = Valx2; loc = Reg r; _ } ->
-        let n = Reg_class.gc_regs_offset ~simd Valx2 r in
-        let encode n = (n lsl 1) + 1 in
-        live_offset := encode n :: encode (n + 1) :: !live_offset
+      | { typ = Valx2; loc = Reg phys_reg; _ } ->
+        let reg_offset = Regs.gc_regs_offset ~simd Valx2 phys_reg in
+        live_offset
+          := encode_reg_offset reg_offset
+             :: encode_reg_offset (reg_offset + 1)
+             :: !live_offset
       | { typ = Valx2; loc = Stack s; _ } as reg ->
         let n = slot_offset s (Stack_class.of_machtype reg.typ) in
         live_offset := n :: (n + Arch.size_addr) :: !live_offset
@@ -595,7 +627,7 @@ type gc_call =
     gc_return_lbl : L.t; (* Where to branch after GC *)
     gc_frame : L.t; (* Label of frame descriptor *)
     gc_dbg : Debuginfo.t; (* Location of the original instruction *)
-    gc_save_simd : Reg_class.Save_simd_regs.t
+    gc_save_simd : Regs.Save_simd_regs.t
         (* What SIMD regs, if any, we need to save *)
   }
 
@@ -603,8 +635,7 @@ let call_gc_sites = ref ([] : gc_call list)
 
 let call_gc_local_sym ~simd : Cmm.symbol =
   { sym_name =
-      Format.sprintf "caml_call_gc%s_"
-        (Reg_class.Save_simd_regs.symbol_suffix simd);
+      Format.sprintf "caml_call_gc%s_" (Regs.Save_simd_regs.symbol_suffix simd);
     sym_global = Local
   }
 
@@ -621,7 +652,7 @@ type local_realloc_call =
   { lr_lbl : L.t;
     lr_return_lbl : L.t;
     lr_dbg : Debuginfo.t;
-    lr_save_simd : Reg_class.Save_simd_regs.t
+    lr_save_simd : Regs.Save_simd_regs.t
   }
 
 let local_realloc_sites = ref ([] : local_realloc_call list)
@@ -688,7 +719,7 @@ type stack_realloc =
   { sc_label : L.t; (* Label of the reallocation code. *)
     sc_return : L.t; (* Label to return to after reallocation. *)
     sc_size_in_bytes : int; (* Size for reallocation. *)
-    sc_save_simd : Reg_class.Save_simd_regs.t
+    sc_save_simd : Regs.Save_simd_regs.t
         (* What SIMD regs, if any, we need to save. *)
   }
 
@@ -1322,7 +1353,7 @@ end = struct
     let index = (chunk_size lsl 1) + access in
     (* We take extra care to structure our code such that these are statically
        allocated as manifest constants in a flat array. *)
-    match (simd_regs : Reg_class.Save_simd_regs.t) with
+    match (simd_regs : Regs.Save_simd_regs.t) with
     | Save_none | Save_xmm -> (
       (* We combine the Save_none and Save_xmm cases here because the only
          reason we have different asan report functions is due to conditional
@@ -2445,7 +2476,7 @@ let emit_instr ~first ~fallthrough i =
        argument to Lswitch can still be assigned to one of these two registers,
        so we must be careful not to clobber it before use. *)
     let tmp1, tmp2 =
-      if Reg.equal_location i.arg.(0).loc (Reg 0) (* rax *)
+      if Reg.equal_location i.arg.(0).loc (Reg (P RAX))
       then phys_rdx, phys_rax
       else phys_rax, phys_rdx
     in
@@ -2763,7 +2794,7 @@ let begin_assembly unix =
   emit_global_label_for_symbol ~section:Text code_begin;
   if is_macosx system then I.nop ();
   (* PR#4690 *)
-  Reg_class.Save_simd_regs.all
+  Regs.Save_simd_regs.all
   |> List.iter (fun simd ->
       (match emit_cmm_symbol (call_gc_local_sym ~simd) with
       | `Symbol sym -> D.define_symbol_label ~section:Text sym

@@ -117,25 +117,25 @@ let collect_in_stats (cfg_with_infos : Cfg_with_infos.t)
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
   let cfg = Cfg_with_infos.cfg cfg_with_infos in
   let liveness = Cfg_with_infos.liveness cfg_with_infos in
-  let accumulate_regsets_per_class (tbl : Reg.Set.t ref Reg_class.Tbl.t)
+  let accumulate_regsets_per_class (tbl : Reg.Set.t ref Regs.Reg_class_tbl.t)
       (regs : Reg.Set.t) =
     Reg.Set.iter
       (fun (reg : Reg.t) ->
-        let reg_class = Reg_class.of_machtype reg.typ in
-        let regset_ref = Reg_class.Tbl.find tbl reg_class in
+        let reg_class = Regs.Reg_class.of_machtype reg.typ in
+        let regset_ref = Regs.Reg_class_tbl.find tbl reg_class in
         regset_ref := Reg.Set.add reg !regset_ref)
       regs
   in
   let is_high_pressure_point (type a) (instr : a Cfg.instruction) =
     let regsets_per_class =
-      Reg_class.Tbl.init ~f:(fun _reg_class -> ref Reg.Set.empty)
+      Regs.Reg_class_tbl.init ~f:(fun _reg_class -> ref Reg.Set.empty)
     in
     let live = InstructionId.Tbl.find liveness instr.id in
     accumulate_regsets_per_class regsets_per_class live.across;
     let res = ref false in
-    Reg_class.Tbl.iter regsets_per_class ~f:(fun reg_class regset ->
+    Regs.Reg_class_tbl.iter regsets_per_class ~f:(fun reg_class regset ->
         let is_high_pressure =
-          Reg.Set.cardinal !regset > Reg_class.num_available_registers reg_class
+          Reg.Set.cardinal !regset > Regs.num_available_registers reg_class
         in
         res := is_high_pressure || !res);
     !res
