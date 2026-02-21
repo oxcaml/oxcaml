@@ -342,6 +342,7 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Eval_format
+  | Then_call_not_polymorphic of type_expr
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

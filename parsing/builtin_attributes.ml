@@ -126,6 +126,7 @@ let builtin_attrs =
   ; "cold"
   ; "regalloc"
   ; "regalloc_param"
+  ; "then_call"
   ]
 
 let builtin_attrs =
@@ -1130,3 +1131,20 @@ let get_eval_payload payload =
   | _ -> Error ()
 
 let has_atomic attrs = has_attribute "atomic" attrs
+
+let then_call_attr attrs =
+  let rec loop acc = function
+    | [] -> None
+    | attr :: rest when attr_equals_builtin attr "then_call" ->
+      mark_used attr.attr_name;
+      begin match attr.attr_payload with
+      | PStr [{ pstr_desc = Pstr_eval (f_expr, []); _ }] ->
+        Some (f_expr, List.rev_append acc rest)
+      | _ ->
+        warn_payload attr.attr_loc attr.attr_name.txt
+          "A single expression is expected as the payload";
+        None
+      end
+    | attr :: rest -> loop (attr :: acc) rest
+  in
+  loop [] attrs

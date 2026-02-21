@@ -392,6 +392,7 @@ let extra sub = function
   | Texp_poly cto -> Texp_poly (Option.map (sub.typ sub) cto)
   | Texp_stack as d -> d
   | Texp_mode _ as d -> d
+  | Texp_then_call f -> Texp_then_call (sub.expr sub f)
 
 let function_body sub body =
   match body with

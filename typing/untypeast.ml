@@ -414,6 +414,16 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
 let exp_extra sub (extra, loc, attrs) sexp =
   let loc = sub.location sub loc in
   let attrs = sub.attributes sub attrs in
+  match extra with
+  | Texp_then_call f ->
+    let f_pexp = sub.expr sub f in
+    let attr =
+      Ast_helper.Attr.mk
+        (Location.mkloc "then_call" loc)
+        (PStr [Ast_helper.Str.eval f_pexp])
+    in
+    { sexp with pexp_attributes = attr :: sexp.pexp_attributes }
+  | _ ->
   let desc =
     match extra with
       Texp_coerce (cty1, cty2) ->
@@ -428,6 +438,7 @@ let exp_extra sub (extra, loc, attrs) sexp =
     | Texp_stack -> Pexp_stack sexp
     | Texp_mode modes ->
         Pexp_constraint (sexp, None, Typemode.untransl_mode_annots modes)
+    | Texp_then_call _ -> assert false
   in
   Exp.mk ~loc ~attrs desc
 
@@ -542,6 +553,7 @@ let expression sub exp =
                 | Some (Texp_mode _) (* CR zqian: [Texp_mode] should be possible here *)
                 | Some (Texp_poly _ | Texp_newtype _)
                 | Some Texp_stack
+                | Some (Texp_then_call _)
                 | None -> None
               in
               let constraint_ =

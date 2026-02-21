@@ -482,6 +482,10 @@ and expression_extra i ppf x attrs =
       line i ppf "Texp_mode\n";
       attributes i ppf attrs;
       alloc_const_option_mode i ppf m
+  | Texp_then_call f ->
+      line i ppf "Texp_then_call\n";
+      attributes i ppf attrs;
+      expression (i+1) ppf f
 
 and alloc_mode_raw: type l r. _ -> _ -> (l * r) Mode.Alloc.t -> _
   = fun i ppf m -> line i ppf "alloc_mode %a\n" (Mode.Alloc.print ()) m

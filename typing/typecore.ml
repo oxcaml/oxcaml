@@ -297,6 +297,7 @@ type error =
   | Overwrite_of_invalid_term
   | Unexpected_hole
   | Eval_format
+  | Then_call_not_polymorphic of type_expr
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -5748,9 +5749,51 @@ and type_expect ?recarg ?(overwrite=No_overwrite) env
          type_expect_ ?recarg ~overwrite env expected_mode sexp ty_expected_explained
       )
   in
+  let exp = wrap_then_call env sexp exp in
   Cmt_format.set_saved_types
     (Cmt_format.Partial_expression exp :: previous_saved_types);
   exp
+
+and wrap_then_call env sexp exp =
+  match Builtin_attributes.then_call_attr sexp.pexp_attributes with
+  | None -> exp
+  | Some (f_sexp, remaining_attributes) ->
+    let f_sexp = { f_sexp with pexp_attributes = remaining_attributes } in
+    let loc = f_sexp.pexp_loc in
+    let typed_f =
+      with_local_level
+        ~post:(fun exp -> generalize exp.exp_type)
+        (fun () -> type_exp env mode_legacy f_sexp)
+    in
+    (* Check that f has type 'a -> unit with 'a at generic level.
+       Note: [filter_arrow] wraps the argument type in [Tpoly(t, [])] when
+       [force_tpoly] is true (the default for unlabelled arguments), so we
+       unwrap that before checking. *)
+    let ty_f = expand_head env typed_f.exp_type in
+    (match get_desc ty_f with
+     | Tarrow ((Nolabel, _, _), ty_arg, ty_ret, _) ->
+       let inner_arg =
+         match get_desc (expand_head env ty_arg) with
+         | Tpoly (ty, []) -> expand_head env ty
+         | _ -> expand_head env ty_arg
+       in
+       (match get_desc inner_arg with
+        | Tvar _ when get_level inner_arg = generic_level -> ()
+        | _ ->
+          raise (Error (loc, env, Then_call_not_polymorphic typed_f.exp_type)));
+       (* Check that the return type is unit.  We instantiate [ty_ret] and
+          then check it is concretely unit (not just a free type variable
+          that could unify with anything). *)
+       let ty_ret_inst = expand_head env (instance ty_ret) in
+       (match get_desc ty_ret_inst with
+        | Tconstr (path, [], _) when Path.same path Predef.path_unit -> ()
+        | _ ->
+          raise (Error (loc, env, Then_call_not_polymorphic typed_f.exp_type)))
+     | _ ->
+       raise (Error (loc, env, Then_call_not_polymorphic typed_f.exp_type)));
+    { exp with
+      exp_extra = (Texp_then_call typed_f, loc, []) :: exp.exp_extra;
+    }
 
 and type_expect_
     ?(recarg=Rejected) ?(overwrite=No_overwrite)
@@ -12065,6 +12108,14 @@ let report_error ~loc env =
         "The eval extension takes a single type as its argument, for \
          example %a."
         Style.inline_code "[%eval: int]"
+  | Then_call_not_polymorphic ty_f ->
+      Location.errorf ~loc
+        "The function argument to %a must have type %a for all %a,@ \
+         but here it has type %a."
+        Style.inline_code "[@then_call]"
+        Style.inline_code "'a -> unit"
+        Style.inline_code "'a"
+        (Style.as_inline_code Printtyp.type_expr) ty_f
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env_error env

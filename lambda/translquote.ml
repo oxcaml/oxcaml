@@ -2805,6 +2805,7 @@ and quote_expression_extra _ _ extra lambda =
   | Texp_stack -> Exp_desc.stack loc (mk_exp_noattr loc lambda) |> Exp_desc.wrap
   | Texp_poly _ -> fatal_error "No support for Texp_poly yet"
   | Texp_mode _ -> lambda (* FIXME: add modes to quotation representation *)
+  | Texp_then_call _ -> lambda (* FIXME: add then_call to quotation representation *)
 
 and update_env_with_extra extra =
   let extra, _, _ = extra in
@@ -2813,6 +2814,7 @@ and update_env_with_extra extra =
   | Texp_constraint _ | Texp_coerce _ | Texp_stack -> ()
   | Texp_poly _ -> fatal_error "No support for Texp_poly yet"
   | Texp_mode _ -> ()
+  | Texp_then_call _ -> ()
 
 and update_env_without_extra extra =
   let extra, _, _ = extra in
@@ -2821,6 +2823,7 @@ and update_env_without_extra extra =
   | Texp_constraint _ | Texp_coerce _ | Texp_stack -> ()
   | Texp_poly _ -> fatal_error "No support for Texp_poly yet"
   | Texp_mode _ -> ()
+  | Texp_then_call _ -> ()
 
 and quote_expression_desc transl stage e =
   let env = e.exp_env in

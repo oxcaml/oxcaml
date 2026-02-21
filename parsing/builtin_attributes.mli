@@ -351,3 +351,10 @@ val get_eval_payload :
   Parsetree.payload -> (Parsetree.core_type, unit) result
 
 val has_atomic: Parsetree.attributes -> bool
+
+val then_call_attr :
+  Parsetree.attributes ->
+  (Parsetree.expression * Parsetree.attributes) option
+(** [then_call_attr attrs] extracts the payload of a [[@then_call f]] attribute.
+    Returns [Some (f_expr, remaining_attrs)] if present, [None] otherwise.
+    The function [f_expr] must have type ['a -> unit] for all ['a]. *)

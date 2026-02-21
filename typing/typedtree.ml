@@ -208,6 +208,7 @@ and exp_extra =
                     Parsetree.jkind_annotation option * Uid.t
   | Texp_stack
   | Texp_mode of Mode.Alloc.Const.Option.t
+  | Texp_then_call of expression
 
 and arg_label = Types.arg_label =
   | Nolabel
