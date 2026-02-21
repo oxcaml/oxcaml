@@ -42,6 +42,10 @@ module Nullability : sig
     | Maybe_null
 
   include Axis_ops with type t := t
+
+  val to_int : t -> int
+
+  val of_int : int -> t
 end
 
 module Separability : sig
@@ -53,6 +57,10 @@ module Separability : sig
     | Maybe_separable
 
   include Axis_ops with type t := t
+
+  val to_int : t -> int
+
+  val of_int : int -> t
 end
 
 module Axis : sig

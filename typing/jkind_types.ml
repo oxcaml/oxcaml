@@ -656,23 +656,30 @@ end
 module Scannable_axes = struct
   open Jkind_axis
 
-  type t =
-    { nullability : Jkind_axis.Nullability.t;
-      separability : Jkind_axis.Separability.t
-    }
+  (* Packed as an immediate int: nullability_ord + separability_ord * 2.
+     This avoids a boxed record allocation and eliminates a GC pointer
+     in every Layout value that carries scannable axes. *)
+  type t = int
 
-  let max = { nullability = Nullability.max; separability = Separability.max }
+  let nullability_count = 2
 
-  let value_axes = { nullability = Non_null; separability = Separable }
+  let create ~(nullability : Nullability.t) ~(separability : Separability.t) =
+    Nullability.to_int nullability
+    + (Separability.to_int separability * nullability_count)
 
-  let equal { nullability = n1; separability = s1 }
-      { nullability = n2; separability = s2 } =
-    Nullability.equal n1 n2 && Separability.equal s1 s2
+  let nullability t = Nullability.of_int (t mod nullability_count)
+
+  let separability t = Separability.of_int (t / nullability_count)
+
+  let max =
+    create ~nullability:Nullability.max ~separability:Separability.max
+
+  let value_axes = create ~nullability:Non_null ~separability:Separable
+
+  let equal (a : int) (b : int) = a = b
 end
 
 module Layout = struct
-  open Jkind_axis
-
   type 'sort t =
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
@@ -704,53 +711,10 @@ module Layout = struct
           (Misc.Stdlib.List.map_option get_sort ts)
 
     module Static = struct
-      let scannable_non_null_non_pointer =
-        Base
-          ( Sort.Scannable,
-            { nullability = Non_null; separability = Non_pointer } )
-
-      let scannable_non_null_non_pointer64 =
-        Base
-          ( Sort.Scannable,
-            { nullability = Non_null; separability = Non_pointer64 } )
-
-      let scannable_non_null_non_float =
-        Base
-          (Sort.Scannable, { nullability = Non_null; separability = Non_float })
-
-      let scannable_non_null_separable =
-        Base
-          (Sort.Scannable, { nullability = Non_null; separability = Separable })
-
-      let scannable_non_null_maybe_separable =
-        Base
-          ( Sort.Scannable,
-            { nullability = Non_null; separability = Maybe_separable } )
-
-      let scannable_maybe_null_non_pointer =
-        Base
-          ( Sort.Scannable,
-            { nullability = Maybe_null; separability = Non_pointer } )
-
-      let scannable_maybe_null_non_pointer64 =
-        Base
-          ( Sort.Scannable,
-            { nullability = Maybe_null; separability = Non_pointer64 } )
-
-      let scannable_maybe_null_non_float =
-        Base
-          ( Sort.Scannable,
-            { nullability = Maybe_null; separability = Non_float } )
-
-      let scannable_maybe_null_separable =
-        Base
-          ( Sort.Scannable,
-            { nullability = Maybe_null; separability = Separable } )
-
-      let scannable_maybe_null_maybe_separable =
-        Base
-          ( Sort.Scannable,
-            { nullability = Maybe_null; separability = Maybe_separable } )
+      (* Pre-allocate all 10 scannable layout variants, indexed by packed
+         Scannable_axes.t int. *)
+      let scannable_layouts =
+        Array.init 10 (fun sa -> Base (Sort.Scannable, sa))
 
       (* For all non-[Scannable] layouts, the scannable axes are ignored. We
          have to pick something, though, so we pick [Scannable_axes.max]. *)
@@ -763,7 +727,8 @@ module Layout = struct
 
       let word = Base (Sort.Word, Scannable_axes.max)
 
-      let untagged_immediate = Base (Sort.Untagged_immediate, Scannable_axes.max)
+      let untagged_immediate =
+        Base (Sort.Untagged_immediate, Scannable_axes.max)
 
       let bits8 = Base (Sort.Bits8, Scannable_axes.max)
 
@@ -780,61 +745,20 @@ module Layout = struct
       let vec512 = Base (Sort.Vec512, Scannable_axes.max)
 
       let of_base (b : Sort.base) (sa : Scannable_axes.t) =
-        match b, sa with
-        | Scannable, sa -> (
-          match sa with
-          | { nullability = Nullability.Non_null;
-              separability = Separability.Non_pointer
-            } ->
-            scannable_non_null_non_pointer
-          | { nullability = Nullability.Non_null;
-              separability = Separability.Non_pointer64
-            } ->
-            scannable_non_null_non_pointer64
-          | { nullability = Nullability.Non_null;
-              separability = Separability.Non_float
-            } ->
-            scannable_non_null_non_float
-          | { nullability = Nullability.Non_null;
-              separability = Separability.Separable
-            } ->
-            scannable_non_null_separable
-          | { nullability = Nullability.Non_null;
-              separability = Separability.Maybe_separable
-            } ->
-            scannable_non_null_maybe_separable
-          | { nullability = Nullability.Maybe_null;
-              separability = Separability.Non_pointer
-            } ->
-            scannable_maybe_null_non_pointer
-          | { nullability = Nullability.Maybe_null;
-              separability = Separability.Non_pointer64
-            } ->
-            scannable_maybe_null_non_pointer64
-          | { nullability = Nullability.Maybe_null;
-              separability = Separability.Non_float
-            } ->
-            scannable_maybe_null_non_float
-          | { nullability = Nullability.Maybe_null;
-              separability = Separability.Separable
-            } ->
-            scannable_maybe_null_separable
-          | { nullability = Nullability.Maybe_null;
-              separability = Separability.Maybe_separable
-            } ->
-            scannable_maybe_null_maybe_separable)
-        | Void, _ -> void
-        | Untagged_immediate, _ -> untagged_immediate
-        | Float64, _ -> float64
-        | Float32, _ -> float32
-        | Word, _ -> word
-        | Bits8, _ -> bits8
-        | Bits16, _ -> bits16
-        | Bits32, _ -> bits32
-        | Bits64, _ -> bits64
-        | Vec128, _ -> vec128
-        | Vec256, _ -> vec256
-        | Vec512, _ -> vec512
+        match b with
+        | Scannable -> scannable_layouts.(sa)
+        | Void -> void
+        | Untagged_immediate -> untagged_immediate
+        | Float64 -> float64
+        | Float32 -> float32
+        | Word -> word
+        | Bits8 -> bits8
+        | Bits16 -> bits16
+        | Bits32 -> bits32
+        | Bits64 -> bits64
+        | Vec128 -> vec128
+        | Vec256 -> vec256
+        | Vec512 -> vec512
     end
 
     let of_sort s sa =

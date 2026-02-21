@@ -70,41 +70,41 @@ end
 module Scannable_axes = struct
   include Jkind_types.Scannable_axes
 
-  let less_or_equal { nullability = n1; separability = s1 }
-      { nullability = n2; separability = s2 } =
+  let less_or_equal sa1 sa2 =
     Misc.Le_result.combine
-      (Nullability.less_or_equal n1 n2)
-      (Separability.less_or_equal s1 s2)
+      (Nullability.less_or_equal (nullability sa1) (nullability sa2))
+      (Separability.less_or_equal (separability sa1) (separability sa2))
 
   let le sa1 sa2 = Misc.Le_result.is_le (less_or_equal sa1 sa2)
 
-  let meet { nullability = n1; separability = s1 }
-      { nullability = n2; separability = s2 } =
-    { nullability = Nullability.meet n1 n2;
-      separability = Separability.meet s1 s2
-    }
+  let meet sa1 sa2 =
+    create
+      ~nullability:(Nullability.meet (nullability sa1) (nullability sa2))
+      ~separability:(Separability.meet (separability sa1) (separability sa2))
 
-  let to_string_list_diff
-      ~base:{ nullability = n_against; separability = s_against }
-      { nullability; separability } =
+  let to_string_list_diff ~base actual =
+    let n_against = nullability base in
+    let s_against = separability base in
+    let n = nullability actual in
+    let s = separability actual in
     let diff = [] in
     let diff =
-      if Nullability.equal n_against nullability
+      if Nullability.equal n_against n
       then diff
-      else Nullability.to_string nullability :: diff
+      else Nullability.to_string n :: diff
     in
     let diff =
-      if Separability.equal s_against separability
+      if Separability.equal s_against s
       then diff
-      else Separability.to_string separability :: diff
+      else Separability.to_string s :: diff
     in
     diff
 
   let to_string_list = to_string_list_diff ~base:max
 
-  let debug_print ppf { nullability; separability } =
+  let debug_print ppf sa =
     Format.fprintf ppf "@[{ nullability = %a;@ separability = %a }@]"
-      Nullability.print nullability Separability.print separability
+      Nullability.print (nullability sa) Separability.print (separability sa)
 end
 
 (* A *layout* of a type describes the way values of that type are stored at
@@ -150,14 +150,26 @@ module Layout = struct
 
     let set_root_nullability t nullability =
       match t with
-      | Any sa -> Any { sa with nullability }
-      | Base (b, sa) -> Static.of_base b { sa with nullability }
+      | Any sa ->
+        Any (Scannable_axes.create ~nullability
+               ~separability:(Scannable_axes.separability sa))
+      | Base (b, sa) ->
+        Static.of_base b
+          (Scannable_axes.create ~nullability
+             ~separability:(Scannable_axes.separability sa))
       | Product _ -> t
 
     let set_root_separability t separability =
       match t with
-      | Any sa -> Any { sa with separability }
-      | Base (b, sa) -> Static.of_base b { sa with separability }
+      | Any sa ->
+        Any (Scannable_axes.create
+               ~nullability:(Scannable_axes.nullability sa)
+               ~separability)
+      | Base (b, sa) ->
+        Static.of_base b
+          (Scannable_axes.create
+             ~nullability:(Scannable_axes.nullability sa)
+             ~separability)
       | Product _ -> t
 
     (* Returns [None] if the root has no meaningful scannable axes. *)
@@ -276,19 +288,25 @@ module Layout = struct
 
   let set_root_nullability t nullability =
     match t with
-    | Any sa -> Any { sa with nullability }
+    | Any sa ->
+      Any (Scannable_axes.create ~nullability
+             ~separability:(Scannable_axes.separability sa))
     | Sort (b, sa) ->
       if Sort.is_scannable_or_var b
-      then Sort (b, { sa with nullability })
+      then Sort (b, Scannable_axes.create ~nullability
+                      ~separability:(Scannable_axes.separability sa))
       else t
     | Product _ -> t
 
   let set_root_separability t separability =
     match t with
-    | Any sa -> Any { sa with separability }
+    | Any sa ->
+      Any (Scannable_axes.create
+             ~nullability:(Scannable_axes.nullability sa) ~separability)
     | Sort (b, sa) ->
       if Sort.is_scannable_or_var b
-      then Sort (b, { sa with separability })
+      then Sort (b, Scannable_axes.create
+                      ~nullability:(Scannable_axes.nullability sa) ~separability)
       else t
     | Product _ -> t
 
@@ -1432,8 +1450,8 @@ module Const = struct
     | Some { txt = new_nullability; loc } ->
       (match Layout.Const.get_root_scannable_axes t.layout with
       | None -> ()
-      | Some { nullability; separability = _ } ->
-        if new_nullability = nullability
+      | Some sa ->
+        if new_nullability = Scannable_axes.nullability sa
         then
           Location.prerr_warning loc (Warnings.Redundant_kind_modifier abbrev));
       let new_layout =
@@ -1447,8 +1465,8 @@ module Const = struct
     | Some { txt = new_separability; loc } ->
       (match Layout.Const.get_root_scannable_axes t.layout with
       | None -> ()
-      | Some { nullability = _; separability } ->
-        if new_separability = separability
+      | Some sa ->
+        if new_separability = Scannable_axes.separability sa
         then
           Location.prerr_warning loc (Warnings.Redundant_kind_modifier abbrev));
       let new_layout =
@@ -1462,8 +1480,10 @@ module Const = struct
     | Some { txt = new_nullability; loc = _ } -> (
       match Layout.Const.get_root_scannable_axes t.layout with
       | None -> t
-      | Some { nullability; separability = _ } ->
-        let result_nullability = Nullability.meet nullability new_nullability in
+      | Some sa ->
+        let result_nullability =
+          Nullability.meet (Scannable_axes.nullability sa) new_nullability
+        in
         let new_layout =
           Layout.Const.set_root_nullability t.layout result_nullability
         in
@@ -1475,9 +1495,9 @@ module Const = struct
     | Some { txt = new_separability; loc = _ } -> (
       match Layout.Const.get_root_scannable_axes t.layout with
       | None -> t
-      | Some { nullability = _; separability } ->
+      | Some sa ->
         let result_separability =
-          Separability.meet separability new_separability
+          Separability.meet (Scannable_axes.separability sa) new_separability
         in
         let new_layout =
           Layout.Const.set_root_separability t.layout result_separability
@@ -1767,7 +1787,7 @@ let of_new_legacy_sort_var ~why ~level =
 let of_new_non_float_sort_var ~why ~level =
   let jkind, sort =
     Jkind_desc.of_new_sort_var ~level
-      { nullability = Maybe_null; separability = Non_float }
+      (Scannable_axes.create ~nullability:Maybe_null ~separability:Non_float)
   in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
@@ -1859,7 +1879,7 @@ let for_open_boxed_row =
   fresh_jkind
     { layout =
         Sort
-          (Base Scannable, { nullability = Non_null; separability = Non_float });
+          (Base Scannable, Scannable_axes.create ~nullability:Non_null ~separability:Non_float);
       mod_bounds;
       with_bounds = No_with_bounds
     }
@@ -1903,7 +1923,7 @@ let for_arrow =
   fresh_jkind
     { layout =
         Sort
-          (Base Scannable, { nullability = Non_null; separability = Non_float });
+          (Base Scannable, Scannable_axes.create ~nullability:Non_null ~separability:Non_float);
       mod_bounds = Mod_bounds.for_arrow;
       with_bounds = No_with_bounds
     }
@@ -1929,7 +1949,7 @@ let for_object =
   fresh_jkind
     { layout =
         Sort
-          (Base Scannable, { nullability = Non_null; separability = Non_float });
+          (Base Scannable, Scannable_axes.create ~nullability:Non_null ~separability:Non_float);
       mod_bounds =
         Mod_bounds.create { comonadic; monadic } ~externality:Externality.max;
       with_bounds = No_with_bounds
@@ -1939,7 +1959,7 @@ let for_object =
 let for_array_element_sort ~level =
   let jkind_desc, sort =
     Jkind_desc.of_new_sort_var ~level
-      { nullability = Maybe_null; separability = Separable }
+      (Scannable_axes.create ~nullability:Maybe_null ~separability:Separable)
   in
   let jkind = { for_array_argument.jkind with layout = jkind_desc.layout } in
   ( fresh_jkind jkind ~annotation:None ~why:(Concrete_creation Array_element),
@@ -2038,7 +2058,7 @@ let set_externality_upper_bound jk externality_upper_bound =
 
 let get_nullability jk =
   get_root_scannable_axes jk
-  |> Option.map (fun ({ nullability; _ } : Scannable_axes.t) -> nullability)
+  |> Option.map Scannable_axes.nullability
 
 let set_root_nullability jk nullability =
   { jk with
@@ -2083,29 +2103,38 @@ let apply_modality_r modality jk =
 
 let apply_or_null_l jkind =
   match get_root_scannable_axes jkind with
-  | Some { nullability = Non_null; separability } ->
-    let jkind = set_root_nullability jkind Maybe_null in
-    let jkind =
-      match separability with
-      | Maybe_separable -> jkind
-      | Separable -> set_root_separability jkind Maybe_separable
-      | Non_float | Non_pointer64 | Non_pointer -> jkind
-    in
-    Ok jkind
-  | Some { nullability = Maybe_null; separability = _ } | None -> Error ()
+  | Some sa ->
+    let nullability = Scannable_axes.nullability sa in
+    if not (Nullability.equal nullability Non_null)
+    then Error ()
+    else
+      let jkind = set_root_nullability jkind Maybe_null in
+      let jkind =
+        match Scannable_axes.separability sa with
+        | Maybe_separable -> jkind
+        | Separable -> set_root_separability jkind Maybe_separable
+        | Non_float | Non_pointer64 | Non_pointer -> jkind
+      in
+      Ok jkind
+  | None -> Error ()
 
 let apply_or_null_r jkind =
   match get_root_scannable_axes jkind with
-  | Some { nullability = Maybe_null; separability } ->
-    let jkind = set_root_nullability jkind Non_null in
-    let jkind =
-      match separability with
-      | Maybe_separable -> jkind
-      | Separable -> set_root_separability jkind Non_float
-      | Non_float | Non_pointer64 | Non_pointer -> jkind
-    in
-    Ok jkind
-  | Some { nullability = Non_null; separability = _ } -> Error ()
+  | Some sa ->
+    let nullability = Scannable_axes.nullability sa in
+    if Nullability.equal nullability Non_null
+    then Error ()
+    else begin
+      assert (Nullability.equal nullability Maybe_null);
+      let jkind = set_root_nullability jkind Non_null in
+      let jkind =
+        match Scannable_axes.separability sa with
+        | Maybe_separable -> jkind
+        | Separable -> set_root_separability jkind Non_float
+        | Non_float | Non_pointer64 | Non_pointer -> jkind
+      in
+      Ok jkind
+    end
   | None ->
     Misc.fatal_error "or_null applied to a type without a scannable layout"
 

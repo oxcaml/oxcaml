@@ -73,6 +73,10 @@ module Nullability = struct
   let less_or_equal s1 s2 : Misc.Le_result.t =
     if equal s1 s2 then Equal else if le s1 s2 then Less else Not_le
 
+  let to_int = function Non_null -> 0 | Maybe_null -> 1
+
+  let of_int = function 0 -> Non_null | _ -> Maybe_null
+
   let to_string = function Non_null -> "non_null" | Maybe_null -> "maybe_null"
 
   let print ppf t = Format.fprintf ppf "%s" (to_string t)
@@ -103,6 +107,20 @@ module Separability = struct
 
   let less_or_equal s1 s2 : Misc.Le_result.t =
     if equal s1 s2 then Equal else if le s1 s2 then Less else Not_le
+
+  let to_int = function
+    | Non_pointer -> 0
+    | Non_pointer64 -> 1
+    | Non_float -> 2
+    | Separable -> 3
+    | Maybe_separable -> 4
+
+  let of_int = function
+    | 0 -> Non_pointer
+    | 1 -> Non_pointer64
+    | 2 -> Non_float
+    | 3 -> Separable
+    | _ -> Maybe_separable
 
   let to_string = function
     | Non_pointer -> "non_pointer"

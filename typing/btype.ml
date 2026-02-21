@@ -1208,7 +1208,7 @@ module Jkind0 = struct
             mk_jkind
               (Base
                 (Scannable,
-                  { nullability = Maybe_null; separability = Maybe_separable }))
+                  (Scannable_axes.create ~nullability:Maybe_null ~separability:Maybe_separable)))
               ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.max;
           name = "value_or_null"
@@ -1219,7 +1219,7 @@ module Jkind0 = struct
             mk_jkind
               (Base
                 (Scannable,
-                  { nullability = Maybe_null; separability = Maybe_separable }))
+                  (Scannable_axes.create ~nullability:Maybe_null ~separability:Maybe_separable)))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "value_or_null mod everything"
@@ -1240,7 +1240,7 @@ module Jkind0 = struct
             { layout =
                 Base
                   (Scannable,
-                    { nullability = Non_null; separability = Non_float });
+                    (Scannable_axes.create ~nullability:Non_null ~separability:Non_float));
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:true
@@ -1260,7 +1260,7 @@ module Jkind0 = struct
             { layout =
                 Base
                   (Scannable,
-                    { nullability = Non_null; separability = Non_float });
+                    (Scannable_axes.create ~nullability:Non_null ~separability:Non_float));
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:false
@@ -1280,7 +1280,7 @@ module Jkind0 = struct
             { layout =
                 Base
                   (Scannable,
-                    { nullability = Non_null; separability = Non_float });
+                    (Scannable_axes.create ~nullability:Non_null ~separability:Non_float));
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:true
@@ -1300,7 +1300,7 @@ module Jkind0 = struct
             { layout =
                 Base
                   (Scannable,
-                    { nullability = Non_null; separability = Non_float });
+                    (Scannable_axes.create ~nullability:Non_null ~separability:Non_float));
               mod_bounds =
                 (let crossing =
                    Crossing.create ~regionality:false ~linearity:true
@@ -1337,7 +1337,7 @@ module Jkind0 = struct
             mk_jkind
               (Base
                 (Scannable,
-                  { nullability = Non_null; separability = Non_pointer }))
+                  (Scannable_axes.create ~nullability:Non_null ~separability:Non_pointer)))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "immediate"
@@ -1348,7 +1348,7 @@ module Jkind0 = struct
             mk_jkind
               (Base
                 (Scannable,
-                  { nullability = Maybe_null; separability = Non_pointer }))
+                  (Scannable_axes.create ~nullability:Maybe_null ~separability:Non_pointer)))
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "immediate_or_null"
@@ -1390,7 +1390,7 @@ module Jkind0 = struct
             mk_jkind
               (Base
                 (Scannable,
-                  { nullability = Non_null; separability = Non_pointer64 }))
+                  (Scannable_axes.create ~nullability:Non_null ~separability:Non_pointer64)))
               ~crossing:cross_all_except_staticity ~externality:External64;
           name = "immediate64"
         }
@@ -1400,7 +1400,7 @@ module Jkind0 = struct
             mk_jkind
               (Base
                 (Scannable,
-                  { nullability = Maybe_null; separability = Non_pointer64 }))
+                  (Scannable_axes.create ~nullability:Maybe_null ~separability:Non_pointer64)))
               ~crossing:cross_all_except_staticity ~externality:External64;
           name = "immediate64_or_null"
         }
@@ -1969,7 +1969,7 @@ module Jkind0 = struct
         { layout =
             Sort
               (Base Scannable,
-                { nullability = Non_null; separability = Non_float });
+                (Jkind_types.Scannable_axes.create ~nullability:Non_null ~separability:Non_float));
           mod_bounds;
           with_bounds = No_with_bounds
         }
@@ -2226,7 +2226,7 @@ module Jkind0 = struct
         { layout =
             Sort
               (Base Scannable,
-                { nullability = Non_null; separability = Separable });
+                (Jkind_types.Scannable_axes.create ~nullability:Non_null ~separability:Separable));
           mod_bounds;
           with_bounds = No_with_bounds
         }
@@ -2239,7 +2239,7 @@ module Jkind0 = struct
           ~externality:Mod_bounds.Externality.max
       in
       fresh_jkind
-        { layout = Any { nullability = Maybe_null; separability = Separable };
+        { layout = Any (Jkind_types.Scannable_axes.create ~nullability:Maybe_null ~separability:Separable);
           mod_bounds;
           with_bounds = No_with_bounds
         }
@@ -2258,7 +2258,7 @@ module Jkind0 = struct
         { layout =
             Sort
               (Base Scannable,
-                { nullability = Non_null; separability = Maybe_separable });
+                (Jkind_types.Scannable_axes.create ~nullability:Non_null ~separability:Maybe_separable));
           mod_bounds;
           with_bounds = No_with_bounds
         }

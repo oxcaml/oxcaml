@@ -104,10 +104,18 @@ module Sort : sig
 end
 
 module Scannable_axes : sig
-  type t =
-    { nullability : Jkind_axis.Nullability.t;
-      separability : Jkind_axis.Separability.t
-    }
+  (** Packed as an immediate int to avoid boxed record allocation.
+      Use [create], [nullability], and [separability] to construct/access. *)
+  type t
+
+  val create :
+    nullability:Jkind_axis.Nullability.t ->
+    separability:Jkind_axis.Separability.t ->
+    t
+
+  val nullability : t -> Jkind_axis.Nullability.t
+
+  val separability : t -> Jkind_axis.Separability.t
 
   val max : t
 
