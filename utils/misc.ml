@@ -30,9 +30,6 @@ let fatal_errorf_doc fmt =
     fatal_errorf "%t" (fun ppf -> Format_doc.Doc.format ppf doc)
   ) fmt
 
-let splices_should_not_exist_after_eval () =
-  fatal_error "slambda splices should not exist in lambda after slambda eval"
-
 (* Exceptions *)
 
 let try_finally ?(always=(fun () -> ())) ?(exceptionally=(fun () -> ())) work =

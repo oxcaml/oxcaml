@@ -6,12 +6,14 @@ mixed_product_bytes.ml
 mixed_product_bytes.mli
 printslambda.ml
 printslambda.mli
+slambda_fracture.ml
+slambda_fracture.mli
 slambda.ml
 slambda.mli
-slambda0.ml
-slambda0.mli
 slambdaeval.ml
 slambdaeval.mli
+slambdaident.ml
+slambdaident.mli
 transl_array_comprehension.ml
 transl_array_comprehension.mli
 transl_comprehension_utils.ml

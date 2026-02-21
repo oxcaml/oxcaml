@@ -88,13 +88,16 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     | Some _, None -> Misc.fatal_error "No argument field"
     | None, Some _ -> Misc.fatal_error "Unexpected argument field"
 
-  let compile_from_slambda i slambda ~keep_symbol_tables ~as_arg_for =
-    slambda
-    |> Profile.(record generate) (fun (program : SL.program) ->
+  let compile_from_tlambda i tlambda ~keep_symbol_tables ~as_arg_for =
+    tlambda
+    |> Profile.(record generate) (fun (program : Lambda.program) ->
         Builtin_attributes.warn_unused ();
-        program
-        |> print_if i.ppf_dump Clflags.dump_slambda Printslambda.program
-        |> Slambdaeval.eval
+        program.code
+        |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
+        |> Slambda.eval
+             (print_if i.ppf_dump Clflags.dump_slambda Printslambda.slambda)
+        |> fun { Lambda.sval_comptime = _; sval_runtime } ->
+        { program with Lambda.code = sval_runtime }
         |> print_if i.ppf_dump Clflags.dump_debug_uid_tables (fun ppf _ ->
             Type_shape.print_debug_uid_tables ppf)
         |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.program
@@ -134,7 +137,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     typed
     |> Profile.(record transl)
          (Translmod.transl_implementation ~loc i.module_name)
-    |> compile_from_slambda i ~keep_symbol_tables ~as_arg_for
+    |> compile_from_tlambda i ~keep_symbol_tables ~as_arg_for
 
   type starting_point =
     | Parsing
@@ -205,7 +208,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           ~main_module_block_repr ~arg_block_idx
       in
       if not (Config.flambda || Config.flambda2) then Clflags.set_oclassic ();
-      compile_from_slambda info impl ~as_arg_for ~keep_symbol_tables
+      compile_from_tlambda info impl ~as_arg_for ~keep_symbol_tables
 
   let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables
       =

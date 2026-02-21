@@ -1111,7 +1111,7 @@ module With_subkind = struct
         "Flambda_kind.from_lambda_values_and_unboxed_numbers_only: cannot \
          convert %a"
         Printlambda.layout layout
-    | Psplicevar _ -> Misc.splices_should_not_exist_after_eval ()
+    | Psplicevar ident -> Lambda.error (Unevaluated_splice_var ident)
 
   include Container_types.Make (struct
     type nonrec t = t

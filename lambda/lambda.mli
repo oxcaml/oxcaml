@@ -900,9 +900,44 @@ type lambda =
   (* [Lexclave] closes the newest region opened.
      Note that [Lexclave] nesting is currently unsupported. *)
   | Lexclave of lambda
-  | Lsplice of lambda_splice
+  | Lsplice of scoped_location * slambda
 
-and slambda = lambda Slambda0.t0
+and slambda =
+  | SLlayout of layout
+  | SLglobal of Compilation_unit.t
+  | SLvar of Slambdaident.t
+  | SLmissing
+  | SLrecord of slambda list
+  | SLfield of slambda * int
+  | SLhalves of slambda_halves
+  | SLproj_comptime of slambda
+    (** Project out the compiletime half of a [slambda_halves] *)
+  | SLproj_runtime of slambda
+    (** Project out the runtime half of a [slambda_halves] *)
+  | SLtemplate of slambda_function
+  | SLinstantiate of slambda_apply
+  | SLlet of slambda_let
+
+and slambda_halves =
+  { sval_comptime: slambda;
+    sval_runtime: lambda
+  }
+
+and slambda_function =
+  { sfun_params: Slambdaident.t array;
+    sfun_body: slambda
+  }
+
+and slambda_apply =
+  { sapp_func: slambda;
+    sapp_arguments: slambda array
+  }
+
+and slambda_let =
+  { slet_name: Slambdaident.t;
+    slet_value: slambda;
+    slet_body: slambda
+  }
 
 and rec_binding = {
   id : Ident.t;
@@ -972,8 +1007,6 @@ and lambda_event_kind =
   | Lev_after of Types.type_expr
   | Lev_function
   | Lev_pseudo
-
-  and lambda_splice = { splice_loc : scoped_location; slambda : slambda; }
 
 (* A description of a parameter to be passed to the runtime representation of a
    parameterised module, namely a function (called the instantiating functor)
@@ -1184,6 +1217,9 @@ val iter_head_constructor: (lambda -> unit) -> lambda -> unit
 (** [iter_head_constructor f lam] apply [f] to only the first level of
     sub expressions of [lam]. It does not recursively traverse the
     expression.
+
+    Callers should note that if calling this before static evaluation and
+    [Simplif.undelay] you will need to handle [Lsplice] and [Ldelayed].
 *)
 
 val shallow_iter:
@@ -1191,7 +1227,11 @@ val shallow_iter:
   non_tail:(lambda -> unit) ->
   lambda -> unit
 (** Same as [iter_head_constructor], but use a different callback for
-    sub-terms which are in tail position or not. *)
+    sub-terms which are in tail position or not.
+
+    Callers should note that if calling this before static evaluation and
+    [Simplif.undelay] you will need to handle [Lsplice] and [Ldelayed].
+*)
 
 val transl_prim: string -> string -> lambda
 (** Translate a value from a persistent module. For instance:
@@ -1444,3 +1484,10 @@ val static_cast
   -> lambda
   -> loc:scoped_location
   -> lambda
+
+type error =
+  | Slambda_unsupported of string
+  | Unevaluated_splice_var of Ident.t
+  | Invalid_constructor of string
+
+val error : ?loc:Location.t -> error -> 'a

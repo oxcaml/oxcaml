@@ -685,7 +685,9 @@ let rec choice ctx t =
     | Lexclave lam ->
         let+ lam = choice ctx ~tail lam in
         Lexclave lam
-    | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+    | Lsplice (loc, _) ->
+      error ~loc:(Debuginfo.Scoped_location.to_location loc)
+        (Invalid_constructor "Lsplice")
 
   and choice_apply ctx ~tail apply =
     let exception No_tmc in

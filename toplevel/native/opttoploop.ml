@@ -24,8 +24,6 @@ open Typedtree
 open Outcometree
 open Ast_helper
 
-module SL = Slambda
-
 module Genprintval = Genprintval_native
 
 type res = Ok of Obj.t | Err of string
@@ -124,10 +122,6 @@ let close_phrase lam =
     in
     Llet(Strict, layout, id, Lambda.debug_uid_none, glob, l)
   ) (free_variables lam) lam
-
-let close_slambda_phrase slam =
-  match slam with
-  | SL.Quote lam -> SL.Quote (close_phrase lam)
 
 (* Return the value referred to by a path *)
 
@@ -326,26 +320,32 @@ let default_load ppf (program : Lambda.program) =
      files) *)
   res
 
-let load_slambda ppf ~compilation_unit program repr =
+let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
   if !Clflags.dump_debug_uid_tables then Type_shape.print_debug_uid_tables ppf;
-  if !Clflags.dump_slambda then fprintf ppf "%a@." Printslambda.program program;
-  let program = Slambdaeval.eval program in
-  let lam = program.code in
-  if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
-  let slam =
-    Simplif.simplify_lambda lam
+  if !Clflags.dump_tlambda then fprintf ppf "%a@." Printlambda.lambda tlam;
+  let { Lambda.sval_comptime = _; sval_runtime = rawlam } =
+    Slambda.eval
+      (fun slam ->
+        if !Clflags.dump_slambda
+        then fprintf ppf "%a@." Printslambda.slambda slam;
+        slam)
+      tlam
+  in
+  if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda rawlam;
+  let lam =
+    Simplif.simplify_lambda rawlam
       ~restrict_to_upstream_dwarf:
         !Dwarf_flags.restrict_to_upstream_dwarf
       ~gdwarf_may_alter_codegen:!Dwarf_flags.gdwarf_may_alter_codegen
   in
-  if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda slam;
+  if !Clflags.dump_lambda then fprintf ppf "%a@." Printlambda.lambda lam;
   let program =
     { Lambda.
-      code = slam;
+      code = lam;
       main_module_block_format = Mb_struct { mb_repr = repr };
       arg_block_idx = None;
       compilation_unit;
-      required_globals = program.required_globals;
+      required_globals;
     }
   in
   match !jit with
@@ -486,9 +486,9 @@ let execute_phrase print_outcome ppf phr =
             str, sg', true
         | _ -> str, sg', false
       in
-      let compilation_unit, program, repr =
-        let { SL.compilation_unit; main_module_block_format;
-              code = res } as program =
+      let compilation_unit, res, required_globals, repr =
+        let { Lambda.compilation_unit; main_module_block_format;
+              required_globals; code = res } =
           Translmod.transl_implementation compilation_unit
             (str, coercion, None) ~loc:Location.none
         in
@@ -499,15 +499,14 @@ let execute_phrase print_outcome ppf phr =
             Misc.fatal_error "Unexpected parameterised module in toplevel"
         in
         remember compilation_unit sg' repr;
-        let program = { program with code = close_slambda_phrase res } in
-        compilation_unit, program, repr
+        compilation_unit, close_phrase res, required_globals, repr
       in
       Warnings.check_fatal ();
       begin try
         toplevel_env := newenv;
         toplevel_sig := List.rev_append sg' oldsig;
         let res =
-          load_slambda ppf ~compilation_unit program repr
+          load_tlambda ppf ~required_globals ~compilation_unit res repr
         in
         let out_phr =
           match res with

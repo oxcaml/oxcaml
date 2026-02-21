@@ -15,7 +15,6 @@
 
 open Misc
 open Compile_common
-module SL = Slambda
 
 let tool_name = "ocamlj"
 let with_info = Compile_common.with_info ~backend:(Opt Js_of_ocaml) ~tool_name
@@ -39,40 +38,46 @@ let make_arg_descr ~param ~arg_block_idx ~main_repr : Lambda.arg_descr option =
   | Some _, None -> Misc.fatal_error "No argument field"
   | None, Some _ -> Misc.fatal_error "Unexpected argument field"
 
-let slambda_to_jsir i slambda ~as_arg_for =
-  slambda
-  |> Profile.(record ~accumulate:true generate) (fun (program : SL.program) ->
-      Builtin_attributes.warn_unused ();
-      program
-      |> print_if i.ppf_dump Clflags.dump_slambda Printslambda.program
-      |> Slambdaeval.eval
-      |> fun (program : Lambda.program) ->
-      program.code
-      |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
-      |> Simplif.simplify_lambda ~restrict_to_upstream_dwarf:true
-           ~gdwarf_may_alter_codegen:false
-      |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
-      |> fun lambda ->
-      let arg_descr =
-        make_arg_descr ~param:as_arg_for ~arg_block_idx:program.arg_block_idx
-          ~main_repr:
-            (Lambda.main_module_representation program.main_module_block_format)
-      in
-      lambda |> fun code ->
-      Flambda2.lambda_to_flambda ~machine_width:Thirty_two_no_gc_tag_bit
-        ~ppf_dump:i.ppf_dump
-        ~prefixname:(Unit_info.prefix i.target)
-        { program with code }
-      |> fun (flambda_result : Flambda2.flambda_result) ->
-      let jsir =
-        Flambda2_to_jsir.To_jsir.unit ~offsets:flambda_result.offsets
-          ~all_code:flambda_result.all_code
-          ~reachable_names:flambda_result.reachable_names flambda_result.flambda
-        |> print_if i.ppf_dump Clflags.dump_jsir
-             (fun ppf (jsir : Flambda2_to_jsir.To_jsir_result.program) ->
-               Jsoo_imports.Code.Print.program ppf (fun _ _ -> "") jsir.program)
-      in
-      (jsir, program.main_module_block_format, arg_descr))
+let tlambda_to_jsir i tlambda ~as_arg_for =
+  tlambda
+  |> Profile.(record ~accumulate:true generate)
+       (fun (program : Lambda.program) ->
+         Builtin_attributes.warn_unused ();
+         program.code
+         |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
+         |> Slambda.eval
+              (print_if i.ppf_dump Clflags.dump_slambda Printslambda.slambda)
+         |> fun { Lambda.sval_comptime = _; sval_runtime } ->
+         sval_runtime
+         |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda
+         |> Simplif.simplify_lambda ~restrict_to_upstream_dwarf:true
+              ~gdwarf_may_alter_codegen:false
+         |> print_if i.ppf_dump Clflags.dump_lambda Printlambda.lambda
+         |> fun lambda ->
+         let arg_descr =
+           make_arg_descr ~param:as_arg_for ~arg_block_idx:program.arg_block_idx
+             ~main_repr:
+               (Lambda.main_module_representation
+                  program.main_module_block_format)
+         in
+         lambda |> fun code ->
+         Flambda2.lambda_to_flambda ~machine_width:Thirty_two_no_gc_tag_bit
+           ~ppf_dump:i.ppf_dump
+           ~prefixname:(Unit_info.prefix i.target)
+           { program with code }
+         |> fun (flambda_result : Flambda2.flambda_result) ->
+         let jsir =
+           Flambda2_to_jsir.To_jsir.unit ~offsets:flambda_result.offsets
+             ~all_code:flambda_result.all_code
+             ~reachable_names:flambda_result.reachable_names
+             flambda_result.flambda
+           |> print_if i.ppf_dump Clflags.dump_jsir
+                (fun ppf (jsir : Flambda2_to_jsir.To_jsir_result.program) ->
+                  Jsoo_imports.Code.Print.program ppf
+                    (fun _ _ -> "")
+                    jsir.program)
+         in
+         (jsir, program.main_module_block_format, arg_descr))
 
 let emit_jsir i
     ({ program; imported_compilation_units } :
@@ -102,13 +107,13 @@ let to_jsir i Typedtree.{ structure; coercion; argument_interface; _ }
     | None -> None
   in
   let loc = Location.in_file (Unit_info.original_source_file i.target) in
-  let slambda =
+  let tlambda =
     (structure, coercion, argument_coercion)
     |> Profile.(record transl)
          (Translmod.transl_implementation ~loc i.module_name)
   in
   let jsir, main_module_block_format, arg_descr =
-    slambda_to_jsir i slambda ~as_arg_for
+    tlambda_to_jsir i tlambda ~as_arg_for
   in
   Compilenv.save_unit_info
     (Unit_info.Artifact.filename (Unit_info.cmjx i.target))
@@ -170,7 +175,7 @@ let implementation_aux ~start_from ~source_file ~output_prefix
           ~main_module_block_repr ~arg_block_idx
       in
       let jsir, main_module_block_format, arg_descr_computed =
-        slambda_to_jsir info impl ~as_arg_for
+        tlambda_to_jsir info impl ~as_arg_for
       in
       emit_jsir info jsir;
       Compilenv.save_unit_info

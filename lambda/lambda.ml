@@ -16,7 +16,14 @@
 open Misc
 open Asttypes
 
-module SL = Slambda0
+type error =
+  | Slambda_unsupported of string
+  | Unevaluated_splice_var of Ident.t
+  | Invalid_constructor of string
+
+exception Error of Location.t option * error
+
+let error ?loc err = raise (Error (loc, err))
 
 type constant = Typedtree.constant
 
@@ -687,7 +694,7 @@ let mixed_block_of_block_shape (shape : block_shape) : mixed_block_shape option
       Array.for_all
         (function
           | Value _ -> true
-          | Splice_variable _ -> Misc.splices_should_not_exist_after_eval ()
+          | Splice_variable _ -> error (Slambda_unsupported "mixed blocks")
           | _ -> false)
         shape
     in
@@ -951,9 +958,42 @@ type lambda =
   | Lifused of Ident.t * lambda
   | Lregion of lambda * layout
   | Lexclave of lambda
-  | Lsplice of lambda_splice
+  | Lsplice of scoped_location * slambda
 
-and slambda = lambda SL.t0
+and slambda =
+  | SLlayout of layout
+  | SLglobal of Compilation_unit.t
+  | SLvar of Slambdaident.t
+  | SLmissing
+  | SLrecord of slambda list
+  | SLfield of slambda * int
+  | SLhalves of slambda_halves
+  | SLproj_comptime of slambda
+  | SLproj_runtime of slambda
+  | SLtemplate of slambda_function
+  | SLinstantiate of slambda_apply
+  | SLlet of slambda_let
+
+and slambda_halves =
+  { sval_comptime: slambda;
+    sval_runtime: lambda
+  }
+
+and slambda_function =
+  { sfun_params: Slambdaident.t array;
+    sfun_body: slambda
+  }
+
+and slambda_apply =
+  { sapp_func: slambda;
+    sapp_arguments: slambda array
+  }
+
+and slambda_let =
+  { slet_name: Slambdaident.t;
+    slet_value: slambda;
+    slet_body: slambda
+  }
 
 and rec_binding = {
   id : Ident.t;
@@ -1018,8 +1058,6 @@ and lambda_event_kind =
   | Lev_after of Types.type_expr
   | Lev_function
   | Lev_pseudo
-
-and lambda_splice = { splice_loc : scoped_location; slambda : slambda }
 
 type runtime_param =
   | Rp_argument_block of Global_module.t
@@ -1408,11 +1446,10 @@ let make_key e =
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
-    | Levent _
-    (* CR layout poly: Anything calling this should probably be moved to after
-       slambda eval, we could possibly also make slambda keys. *)
-    | Lsplice _ ->
+    | Levent _ ->
         raise Not_simple
+    | Lsplice _ ->
+        error (Invalid_constructor "Lsplice")
 
   and tr_recs env es = List.map (tr_rec env) es
 
@@ -1602,12 +1639,39 @@ let rec free_variables = function
       free_variables e
   | Lexclave e ->
       free_variables e
-  | Lsplice { slambda = (SL.Quote e); _ } ->
-      free_variables e
+  | Lsplice (_, slambda) -> free_variables_slambda slambda
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
     set exprs
+
+and free_variables_slambda = function
+  | SLlayout _ | SLglobal _ | SLvar _ | SLmissing | SLfield _ -> Ident.Set.empty
+  | SLrecord fields ->
+      List.fold_left
+        (fun set field ->
+          Ident.Set.union (free_variables_slambda field) set)
+        Ident.Set.empty fields
+  | SLhalves { sval_comptime; sval_runtime } ->
+      Ident.Set.union
+        (free_variables_slambda sval_comptime)
+        (free_variables sval_runtime)
+  | SLproj_comptime slambda | SLproj_runtime slambda ->
+      free_variables_slambda slambda
+  | SLtemplate _ ->
+      (* Notably we don't recurse into templates as they would only introduce
+         new free variables into their call site. *)
+      Ident.Set.empty
+  | SLinstantiate { sapp_func; sapp_arguments } ->
+      (* Mechanically the result of instantiation could introduce new free
+         variables, however it's an invariant of slambda that it doesn't. *)
+      Array.fold_left
+        (fun set arg -> Ident.Set.union (free_variables_slambda arg) set)
+        (free_variables_slambda sapp_func) sapp_arguments
+  | SLlet { slet_name = _; slet_value; slet_body } ->
+      Ident.Set.union
+        (free_variables_slambda slet_value)
+        (free_variables_slambda slet_body)
 
 (* Check if an action has a "when" guard *)
 let static_label_sequence = Static_label.make_sequence ()
@@ -1773,7 +1837,7 @@ let block_of_module_representation ~loc = function
              layout poly usecases, however it should be easy to move this assert
              to after slambdaeval (or maybe during?). *)
           | Splice_variable _ ->
-            Misc.fatal_error "Layout poly doesn't support mixed modules yet")
+            error ~loc (Slambda_unsupported "mixed modules"))
         0 shape
     in
     Typedecl.assert_mixed_product_support loc Module
@@ -1944,8 +2008,9 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
         Lregion (subst s l e, layout)
     | Lexclave e ->
         Lexclave (subst s l e)
-    | Lsplice { splice_loc; slambda = (SL.Quote e) } ->
-        Lsplice { splice_loc; slambda = (SL.Quote (subst s l e)) }
+    | Lsplice (loc, _) ->
+        error ~loc:(Debuginfo.Scoped_location.to_location loc)
+          (Invalid_constructor "Lsplice")
   and subst_list s l li = List.map (subst s l) li
   and subst_decl s l decl = { decl with def = subst_lfun s l decl.def }
   and subst_lfun s l lf =
@@ -3057,10 +3122,9 @@ let may_allocate_in_region lam =
         rather, it's in the parent region *)
       ()
     | Lwhile {wh_cond; wh_body} -> loop wh_cond; loop wh_body
-    (* CR layout poly: Pessimistically return true, this really should only get
-       called after slambda eval but translcore does some early simplification.
-       We should fix that at some point. *)
-    | Lsplice _ -> raise Exit
+    | Lsplice (loc, _) ->
+        error ~loc:(Debuginfo.Scoped_location.to_location loc)
+          (Invalid_constructor "Lsplice")
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
     | ( Lapply _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
       | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
@@ -3102,7 +3166,7 @@ let rec try_to_find_location lam =
   | Lstringswitch (_, _, _, loc, _)
   | Lsend (_, _, _, _, _, _, loc, _)
   | Levent (_, { lev_loc = loc; _ })
-  | Lsplice { splice_loc = loc; _ }->
+  | Lsplice (loc, _) ->
     loc
   | Llet (_, _, _, _, lam, _)
   | Lmutlet (_, _, _, lam, _)
@@ -3231,3 +3295,22 @@ let icmp cmp size x y ~loc = binary (Icmp (size, cmp)) x y ~loc
 let phys_equal x y ~loc = Lprim (Pphys_equal Eq, [x;y], loc)
 
 let static_cast ~src ~dst arg ~loc = unary (Static_cast {src; dst}) arg ~loc
+
+let report_error ppf = function
+  | Slambda_unsupported where ->
+    Format_doc.fprintf ppf
+      "Static computation and layout polymorphism are not yet supported in %s."
+      where
+  | Unevaluated_splice_var ident ->
+    Format_doc.fprintf ppf "Splice variable %a should have been evaluated."
+      Ident.doc_print ident
+  | Invalid_constructor constructor ->
+    Format_doc.fprintf ppf "Lambda constructor %s is not valid at this stage."
+     constructor
+
+let () =
+  Location.register_error_of_exn (function
+    | Error (Some loc, err) ->
+      Some (Location.error_of_printer ~loc report_error err)
+    | Error (None, err) -> Some (Location.error_of_printer report_error err)
+    | _ -> None)
