@@ -141,6 +141,8 @@ module Layout : sig
 
     module Static : sig
       val of_base : Sort.base -> Scannable_axes.t -> t
+
+      val of_any : Scannable_axes.t -> t
     end
 
     val equal : t -> t -> bool
@@ -149,6 +151,8 @@ module Layout : sig
 
     val get_sort : t -> Sort.Const.t option
   end
+
+  val of_any : Scannable_axes.t -> _ t
 
   val of_const : Const.t -> Sort.t t
 

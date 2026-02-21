@@ -151,8 +151,9 @@ module Layout = struct
     let set_root_nullability t nullability =
       match t with
       | Any sa ->
-        Any (Scannable_axes.create ~nullability
-               ~separability:(Scannable_axes.separability sa))
+        Static.of_any
+          (Scannable_axes.create ~nullability
+             ~separability:(Scannable_axes.separability sa))
       | Base (b, sa) ->
         Static.of_base b
           (Scannable_axes.create ~nullability
@@ -162,9 +163,10 @@ module Layout = struct
     let set_root_separability t separability =
       match t with
       | Any sa ->
-        Any (Scannable_axes.create
-               ~nullability:(Scannable_axes.nullability sa)
-               ~separability)
+        Static.of_any
+          (Scannable_axes.create
+             ~nullability:(Scannable_axes.nullability sa)
+             ~separability)
       | Base (b, sa) ->
         Static.of_base b
           (Scannable_axes.create
@@ -235,7 +237,7 @@ module Layout = struct
         Product (List.map (fun s -> flatten_sort s Scannable_axes.max) sorts)
     in
     function
-    | Any sa -> Any sa
+    | Any sa -> Layout.of_any sa
     | Sort (s, sa) -> flatten_sort (Sort.get s) sa
     | Product ts -> Product (List.map get ts)
 
@@ -289,8 +291,9 @@ module Layout = struct
   let set_root_nullability t nullability =
     match t with
     | Any sa ->
-      Any (Scannable_axes.create ~nullability
-             ~separability:(Scannable_axes.separability sa))
+      Layout.of_any
+        (Scannable_axes.create ~nullability
+           ~separability:(Scannable_axes.separability sa))
     | Sort (b, sa) ->
       if Sort.is_scannable_or_var b
       then Sort (b, Scannable_axes.create ~nullability
@@ -301,8 +304,9 @@ module Layout = struct
   let set_root_separability t separability =
     match t with
     | Any sa ->
-      Any (Scannable_axes.create
-             ~nullability:(Scannable_axes.nullability sa) ~separability)
+      Layout.of_any
+        (Scannable_axes.create
+           ~nullability:(Scannable_axes.nullability sa) ~separability)
     | Sort (b, sa) ->
       if Sort.is_scannable_or_var b
       then Sort (b, Scannable_axes.create
@@ -313,7 +317,7 @@ module Layout = struct
   (* only meets at the root, meaning products are left unchanged. *)
   let meet_root_scannable_axes t sa =
     match t with
-    | Any sa' -> Any (Scannable_axes.meet sa sa')
+    | Any sa' -> Layout.of_any (Scannable_axes.meet sa sa')
     | Sort (s, sa') -> Sort (s, Scannable_axes.meet sa sa')
     | Product _ -> t
 
@@ -388,7 +392,7 @@ module Layout = struct
         products ts (List.map (fun x -> Sort (x, Scannable_axes.max)) sorts))
 
   let rec default_to_scannable_and_get : _ Layout.t -> Const.t = function
-    | Any sa -> Any sa
+    | Any sa -> Const.Static.of_any sa
     | Sort (s, sa) ->
       Const.of_sort_const (Sort.default_to_scannable_and_get s) sa
     | Product p -> Product (List.map default_to_scannable_and_get p)

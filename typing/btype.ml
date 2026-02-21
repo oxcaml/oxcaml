@@ -1190,14 +1190,14 @@ module Jkind0 = struct
 
       let any =
         { jkind =
-            mk_jkind (Any Scannable_axes.max) ~crossing:Mode.Crossing.max
+            mk_jkind (Layout.Const.Static.of_any Scannable_axes.max) ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.max;
           name = "any"
         }
 
       let any_mod_everything =
         { jkind =
-            mk_jkind (Any Scannable_axes.max)
+            mk_jkind (Layout.Const.Static.of_any Scannable_axes.max)
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min;
           name = "any mod everything"
@@ -2239,7 +2239,7 @@ module Jkind0 = struct
           ~externality:Mod_bounds.Externality.max
       in
       fresh_jkind
-        { layout = Any (Jkind_types.Scannable_axes.create ~nullability:Maybe_null ~separability:Separable);
+        { layout = Jkind_types.Layout.of_any (Jkind_types.Scannable_axes.create ~nullability:Maybe_null ~separability:Separable);
           mod_bounds;
           with_bounds = No_with_bounds
         }

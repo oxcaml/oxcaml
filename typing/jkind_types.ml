@@ -691,8 +691,6 @@ module Layout = struct
       | Base of Sort.base * Scannable_axes.t
       | Product of t list
 
-    let max = Any Scannable_axes.max
-
     let rec equal c1 c2 =
       match c1, c2 with
       | Base (Scannable, sa1), Base (Scannable, sa2) ->
@@ -711,8 +709,12 @@ module Layout = struct
           (Misc.Stdlib.List.map_option get_sort ts)
 
     module Static = struct
-      (* Pre-allocate all 10 scannable layout variants, indexed by packed
-         Scannable_axes.t int. *)
+      (* Pre-allocate all 10 Any and scannable layout variants, indexed by
+         packed Scannable_axes.t int. *)
+      let any_layouts = Array.init 10 (fun sa -> Any sa)
+
+      let of_any (sa : Scannable_axes.t) = any_layouts.(sa)
+
       let scannable_layouts =
         Array.init 10 (fun sa -> Base (Sort.Scannable, sa))
 
@@ -761,6 +763,8 @@ module Layout = struct
         | Vec512 -> vec512
     end
 
+    let max = Static.of_any Scannable_axes.max
+
     let of_sort s sa =
       let rec of_sort (s : Sort.t) sa =
         match s with
@@ -783,9 +787,20 @@ module Layout = struct
       match s with Var _ -> None | Base b -> Some (Static.of_base b sa)
   end
 
+  (* Pre-allocate all 10 [Any] values for [Layout.t]. The closure trick
+     gives [of_any] a polymorphic type despite the value restriction. *)
+  let of_any : Scannable_axes.t -> _ t =
+    let a0 = Any 0 and a1 = Any 1 and a2 = Any 2 and a3 = Any 3
+    and a4 = Any 4 and a5 = Any 5 and a6 = Any 6 and a7 = Any 7
+    and a8 = Any 8 and a9 = Any 9 in
+    fun (sa : Scannable_axes.t) ->
+      match sa with
+      | 0 -> a0 | 1 -> a1 | 2 -> a2 | 3 -> a3 | 4 -> a4
+      | 5 -> a5 | 6 -> a6 | 7 -> a7 | 8 -> a8 | _ -> a9
+
   let rec of_const (const : Const.t) : _ t =
     match const with
-    | Any sa -> Any sa
+    | Any sa -> of_any sa
     | Base (b, sa) -> Sort (Sort.of_base b, sa)
     | Product cs -> Product (List.map of_const cs)
 
@@ -795,7 +810,7 @@ module Layout = struct
     | lays -> Product lays
 
   let rec get_const of_sort : _ t -> Const.t option = function
-    | Any sa -> Some (Any sa)
+    | Any sa -> Some (Const.Static.of_any sa)
     | Sort (s, sa) -> of_sort s sa
     | Product layouts ->
       Option.map
