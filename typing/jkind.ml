@@ -80,9 +80,7 @@ module Scannable_axes = struct
 
   let meet { nullability = n1; separability = s1 }
       { nullability = n2; separability = s2 } =
-    { nullability = Nullability.meet n1 n2;
-      separability = Separability.meet s1 s2
-    }
+    Static.of_components (Nullability.meet n1 n2) (Separability.meet s1 s2)
 
   let to_string_list_diff
       ~base:{ nullability = n_against; separability = s_against }
@@ -150,14 +148,26 @@ module Layout = struct
 
     let set_root_nullability t nullability =
       match t with
-      | Any sa -> Any { sa with nullability }
-      | Base (b, sa) -> Static.of_base b { sa with nullability }
+      | Any sa ->
+        let sa' =
+          Scannable_axes.Static.of_components nullability sa.separability
+        in
+        Static.of_any sa'
+      | Base (b, sa) ->
+        Static.of_base b
+          (Scannable_axes.Static.of_components nullability sa.separability)
       | Product _ -> t
 
     let set_root_separability t separability =
       match t with
-      | Any sa -> Any { sa with separability }
-      | Base (b, sa) -> Static.of_base b { sa with separability }
+      | Any sa ->
+        let sa' =
+          Scannable_axes.Static.of_components sa.nullability separability
+        in
+        Static.of_any sa'
+      | Base (b, sa) ->
+        Static.of_base b
+          (Scannable_axes.Static.of_components sa.nullability separability)
       | Product _ -> t
 
     (* Returns [None] if the root has no meaningful scannable axes. *)
@@ -276,27 +286,47 @@ module Layout = struct
 
   let set_root_nullability t nullability =
     match t with
-    | Any sa -> Any { sa with nullability }
+    | Any sa ->
+      let sa' =
+        Scannable_axes.Static.of_components nullability sa.separability
+      in
+      if sa == sa' then t else Any sa'
     | Sort (b, sa) ->
       if Sort.is_scannable_or_var b
-      then Sort (b, { sa with nullability })
+      then
+        let sa' =
+          Scannable_axes.Static.of_components nullability sa.separability
+        in
+        if sa == sa' then t else Sort (b, sa')
       else t
     | Product _ -> t
 
   let set_root_separability t separability =
     match t with
-    | Any sa -> Any { sa with separability }
+    | Any sa ->
+      let sa' =
+        Scannable_axes.Static.of_components sa.nullability separability
+      in
+      if sa == sa' then t else Any sa'
     | Sort (b, sa) ->
       if Sort.is_scannable_or_var b
-      then Sort (b, { sa with separability })
+      then
+        let sa' =
+          Scannable_axes.Static.of_components sa.nullability separability
+        in
+        if sa == sa' then t else Sort (b, sa')
       else t
     | Product _ -> t
 
   (* only meets at the root, meaning products are left unchanged. *)
   let meet_root_scannable_axes t sa =
     match t with
-    | Any sa' -> Any (Scannable_axes.meet sa sa')
-    | Sort (s, sa') -> Sort (s, Scannable_axes.meet sa sa')
+    | Any sa' ->
+      let sa'' = Scannable_axes.meet sa sa' in
+      if sa' == sa'' then t else Any sa''
+    | Sort (s, sa') ->
+      let sa'' = Scannable_axes.meet sa sa' in
+      if sa' == sa'' then t else Sort (s, sa'')
     | Product _ -> t
 
   let sub ~level t1 t2 =
@@ -359,7 +389,9 @@ module Layout = struct
     | Any sa1, _ -> Some (meet_root_scannable_axes t2 sa1)
     | Sort (s1, sa1), Sort (s2, sa2) ->
       if Sort.equate s1 s2
-      then Some (Sort (s1, Scannable_axes.meet sa1 sa2))
+      then
+        let sa = Scannable_axes.meet sa1 sa2 in
+        if sa == sa1 then Some t1 else Some (Sort (s1, sa))
       else None
     | Product ts1, Product ts2 ->
       if List.compare_lengths ts1 ts2 = 0 then products ts1 ts2 else None
@@ -1766,8 +1798,7 @@ let of_new_legacy_sort_var ~why ~level =
 
 let of_new_non_float_sort_var ~why ~level =
   let jkind, sort =
-    Jkind_desc.of_new_sort_var ~level
-      { nullability = Maybe_null; separability = Non_float }
+    Jkind_desc.of_new_sort_var ~level Scannable_axes.Static.maybe_null_non_float
   in
   fresh_jkind jkind ~annotation:None ~why:(Concrete_creation why), sort
 
@@ -1857,9 +1888,7 @@ let for_open_boxed_row =
     Mod_bounds.create Crossing.max ~externality:Externality.max
   in
   fresh_jkind
-    { layout =
-        Sort
-          (Base Scannable, { nullability = Non_null; separability = Non_float });
+    { layout = Sort (Base Scannable, Scannable_axes.Static.non_null_non_float);
       mod_bounds;
       with_bounds = No_with_bounds
     }
@@ -1901,9 +1930,7 @@ let for_boxed_row row =
 
 let for_arrow =
   fresh_jkind
-    { layout =
-        Sort
-          (Base Scannable, { nullability = Non_null; separability = Non_float });
+    { layout = Sort (Base Scannable, Scannable_axes.Static.non_null_non_float);
       mod_bounds = Mod_bounds.for_arrow;
       with_bounds = No_with_bounds
     }
@@ -1927,9 +1954,7 @@ let for_object =
       ~staticity:(Crossing.Per_axis.max (Crossing.Axis.Monadic Staticity))
   in
   fresh_jkind
-    { layout =
-        Sort
-          (Base Scannable, { nullability = Non_null; separability = Non_float });
+    { layout = Sort (Base Scannable, Scannable_axes.Static.non_null_non_float);
       mod_bounds =
         Mod_bounds.create { comonadic; monadic } ~externality:Externality.max;
       with_bounds = No_with_bounds
@@ -1938,8 +1963,7 @@ let for_object =
 
 let for_array_element_sort ~level =
   let jkind_desc, sort =
-    Jkind_desc.of_new_sort_var ~level
-      { nullability = Maybe_null; separability = Separable }
+    Jkind_desc.of_new_sort_var ~level Scannable_axes.Static.maybe_null_separable
   in
   let jkind = { for_array_argument.jkind with layout = jkind_desc.layout } in
   ( fresh_jkind jkind ~annotation:None ~why:(Concrete_creation Array_element),

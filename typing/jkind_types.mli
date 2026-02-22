@@ -109,6 +109,31 @@ module Scannable_axes : sig
       separability : Jkind_axis.Separability.t
     }
 
+  module Static : sig
+    val non_null_non_pointer : t
+
+    val non_null_non_pointer64 : t
+
+    val non_null_non_float : t
+
+    val non_null_separable : t
+
+    val non_null_maybe_separable : t
+
+    val maybe_null_non_pointer : t
+
+    val maybe_null_non_pointer64 : t
+
+    val maybe_null_non_float : t
+
+    val maybe_null_separable : t
+
+    val maybe_null_maybe_separable : t
+
+    val of_components :
+      Jkind_axis.Nullability.t -> Jkind_axis.Separability.t -> t
+  end
+
   val max : t
 
   val value_axes : t
@@ -133,6 +158,8 @@ module Layout : sig
 
     module Static : sig
       val of_base : Sort.base -> Scannable_axes.t -> t
+
+      val of_any : Scannable_axes.t -> t
     end
 
     val equal : t -> t -> bool
@@ -140,6 +167,12 @@ module Layout : sig
     val max : t
 
     val get_sort : t -> Sort.Const.t option
+  end
+
+  module Static : sig
+    val of_base : Sort.base -> Scannable_axes.t -> Sort.t t
+
+    val any : Scannable_axes.t -> Sort.t t
   end
 
   val of_const : Const.t -> Sort.t t
