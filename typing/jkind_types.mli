@@ -107,7 +107,11 @@ end
 module Scannable_axes : sig
   type t = { pointerness : Jkind_axis.Pointerness.t }
 
+  val min : t
+
   val max : t
+
+  val of_pointerness : Jkind_axis.Pointerness.t -> t
 
   val equal : t -> t -> bool
 end
@@ -129,6 +133,8 @@ module Layout : sig
 
     module Static : sig
       val of_base : Sort.base -> Scannable_axes.t -> t
+
+      val of_any : Scannable_axes.t -> t
     end
 
     val equal : t -> t -> bool
@@ -136,6 +142,12 @@ module Layout : sig
     val max : t
 
     val get_sort : t -> Sort.Const.t option
+  end
+
+  module Static : sig
+    val of_any : Scannable_axes.t -> 'sort t
+
+    val of_base : Sort.base -> Scannable_axes.t -> Sort.t t
   end
 
   val of_const : Const.t -> Sort.t t

@@ -2118,7 +2118,10 @@ module Jkind0 = struct
           ~nullability:Non_null ~separability:Non_float
       in
       fresh_jkind
-        { layout = Sort (Base Value, { pointerness = Maybe_pointer });
+        { layout =
+            Sort
+              ( Base Value,
+                Jkind_types.Scannable_axes.of_pointerness Maybe_pointer );
           mod_bounds;
           with_bounds = No_with_bounds
         }
@@ -2373,7 +2376,7 @@ module Jkind0 = struct
           ~nullability:Non_null ~separability:Separable
       in
       fresh_jkind
-        { layout = Sort (Base Value, { pointerness = Maybe_pointer });
+        { layout = Sort (Base Value, Jkind_types.Scannable_axes.of_pointerness Maybe_pointer);
           mod_bounds;
           with_bounds = No_with_bounds
         }
@@ -2387,7 +2390,7 @@ module Jkind0 = struct
           ~nullability:Maybe_null ~separability:Separable
       in
       fresh_jkind
-        { layout = Any { pointerness = Maybe_pointer };
+        { layout = Any (Jkind_types.Scannable_axes.of_pointerness Maybe_pointer);
           mod_bounds;
           with_bounds = No_with_bounds
         }
@@ -2404,7 +2407,7 @@ module Jkind0 = struct
           ~nullability:Non_null ~separability:Maybe_separable
       in
       fresh_jkind
-        { layout = Sort (Base Value, { pointerness = Maybe_pointer });
+        { layout = Sort (Base Value, Jkind_types.Scannable_axes.of_pointerness Maybe_pointer);
           mod_bounds;
           with_bounds = No_with_bounds
         }

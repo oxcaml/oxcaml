@@ -71,7 +71,7 @@ module Scannable_axes = struct
   include Jkind_types.Scannable_axes
 
   let meet { pointerness = p1 } { pointerness = p2 } =
-    { pointerness = Pointerness.meet p1 p2 }
+    of_pointerness (Pointerness.meet p1 p2)
 
   let less_or_equal { pointerness = p1 } { pointerness = p2 } =
     Pointerness.less_or_equal p1 p2
@@ -79,7 +79,7 @@ module Scannable_axes = struct
   let le sa1 sa2 = Misc.Le_result.is_le (less_or_equal sa1 sa2)
 
   (*= let join { pointerness = p1 } { pointerness = p2 } =
-    { pointerness = Pointerness.join p1 p2 }
+    of_pointerness (Pointerness.join p1 p2)
 
   let print ppf { pointerness } = Pointerness.print ppf pointerness *)
 
@@ -93,7 +93,7 @@ module Scannable_axes = struct
   let set_pointerness sa pointerness =
     (* CR layouts-scannable: Once there are more axes, use [sa]! *)
     ignore sa;
-    { pointerness }
+    of_pointerness pointerness
 
   (* CR layouts-scannable: When more axes get added, I think this should get
      printed like [{ nullability: ...; ... }]. Could also have Caps versions
@@ -144,7 +144,9 @@ module Layout = struct
 
     let set_root_pointerness t pointerness =
       match t with
-      | Any sa -> Any (Scannable_axes.set_pointerness sa pointerness)
+      | Any sa ->
+        let sa' = Scannable_axes.set_pointerness sa pointerness in
+        if sa' == sa then t else Static.of_any sa'
       | Base (b, sa) ->
         Static.of_base b (Scannable_axes.set_pointerness sa pointerness)
       | Product _ -> t
@@ -205,7 +207,7 @@ module Layout = struct
         Product (List.map (fun s -> flatten_sort s Scannable_axes.max) sorts)
     in
     function
-    | Any sa -> Any sa
+    | Any sa -> Static.of_any sa
     | Sort (s, sa) -> flatten_sort (Sort.get s) sa
     | Product ts -> Product (List.map get ts)
 
@@ -249,8 +251,12 @@ module Layout = struct
   (* only meets at the root, meaning products are left unchanged. *)
   let meet_root_scannable_axes t sa =
     match t with
-    | Any sa' -> Any (Scannable_axes.meet sa sa')
-    | Sort (s, sa') -> Sort (s, Scannable_axes.meet sa sa')
+    | Any sa' ->
+      let sa_met = Scannable_axes.meet sa sa' in
+      if sa_met == sa' then t else Static.of_any sa_met
+    | Sort (s, sa') ->
+      let sa_met = Scannable_axes.meet sa sa' in
+      if sa_met == sa' then t else Sort (s, sa_met)
     | Product _ -> t
 
   let sub ~level t1 t2 =
@@ -313,7 +319,9 @@ module Layout = struct
     | Any sa1, _ -> Some (meet_root_scannable_axes t2 sa1)
     | Sort (s1, sa1), Sort (s2, sa2) ->
       if Sort.equate s1 s2
-      then Some (Sort (s1, Scannable_axes.meet sa1 sa2))
+      then
+        let sa = Scannable_axes.meet sa1 sa2 in
+        if sa == sa1 then Some t1 else Some (Sort (s1, sa))
       else None
     | Product ts1, Product ts2 ->
       if List.compare_lengths ts1 ts2 = 0 then products ts1 ts2 else None
@@ -324,7 +332,7 @@ module Layout = struct
         products ts (List.map (fun x -> Sort (x, Scannable_axes.max)) sorts))
 
   let rec default_to_value_and_get : _ Layout.t -> Const.t = function
-    | Any sa -> Any sa
+    | Any sa -> Const.Static.of_any sa
     | Sort (s, sa) -> Const.of_sort_const (Sort.default_to_value_and_get s) sa
     | Product p -> Product (List.map default_to_value_and_get p)
 
@@ -1826,7 +1834,7 @@ let for_open_boxed_row =
       ~nullability:Nullability.Non_null ~separability:Separability.Non_float
   in
   fresh_jkind
-    { layout = Sort (Base Value, { pointerness = Maybe_pointer });
+    { layout = Sort (Base Value, Scannable_axes.of_pointerness Maybe_pointer);
       mod_bounds;
       with_bounds = No_with_bounds
     }
@@ -1868,7 +1876,7 @@ let for_boxed_row row =
 
 let for_arrow =
   fresh_jkind
-    { layout = Sort (Base Value, { pointerness = Maybe_pointer });
+    { layout = Sort (Base Value, Scannable_axes.of_pointerness Maybe_pointer);
       mod_bounds = Mod_bounds.for_arrow;
       with_bounds = No_with_bounds
     }
@@ -1892,7 +1900,7 @@ let for_object =
       ~staticity:(Crossing.Per_axis.max (Crossing.Axis.Monadic Staticity))
   in
   fresh_jkind
-    { layout = Sort (Base Value, { pointerness = Maybe_pointer });
+    { layout = Sort (Base Value, Scannable_axes.of_pointerness Maybe_pointer);
       mod_bounds =
         Mod_bounds.create { comonadic; monadic } ~externality:Externality.max
           ~nullability:Non_null ~separability:Separability.Non_float;

@@ -653,7 +653,13 @@ module Scannable_axes = struct
 
   type t = { pointerness : Pointerness.t }
 
+  let min = { pointerness = Pointerness.min }
+
   let max = { pointerness = Pointerness.max }
+
+  let of_pointerness = function
+    | Pointerness.Non_pointer -> min
+    | Pointerness.Maybe_pointer -> max
 
   let equal { pointerness = p1 } { pointerness = p2 } = Pointerness.equal p1 p2
 end
@@ -672,8 +678,6 @@ module Layout = struct
       | Base of Sort.base * Scannable_axes.t
       | Product of t list
 
-    let max = Any Scannable_axes.max
-
     let rec equal c1 c2 =
       match c1, c2 with
       | Base (Value, sa1), Base (Value, sa2) -> Scannable_axes.equal sa1 sa2
@@ -691,11 +695,18 @@ module Layout = struct
           (Misc.Stdlib.List.map_option get_sort ts)
 
     module Static = struct
-      let value_non_pointer =
-        Base (Sort.Value, { pointerness = Pointerness.Non_pointer })
+      let any_min = Any Scannable_axes.min
 
-      let value_maybe_pointer =
-        Base (Sort.Value, { pointerness = Pointerness.Maybe_pointer })
+      let any_max = Any Scannable_axes.max
+
+      let of_any (sa : Scannable_axes.t) =
+        match sa.pointerness with
+        | Non_pointer -> any_min
+        | Maybe_pointer -> any_max
+
+      let value_non_pointer = Base (Sort.Value, Scannable_axes.min)
+
+      let value_maybe_pointer = Base (Sort.Value, Scannable_axes.max)
 
       let void = Base (Sort.Void, Scannable_axes.max)
 
@@ -740,6 +751,8 @@ module Layout = struct
         | Vec512, _ -> vec512
     end
 
+    let max = Static.any_max
+
     let of_sort s sa =
       let rec of_sort (s : Sort.t) sa =
         match s with
@@ -762,10 +775,67 @@ module Layout = struct
       match s with Var _ -> None | Base b -> Some (Static.of_base b sa)
   end
 
+  module Static = struct
+    let any_min : _ t = Any Scannable_axes.min
+
+    let any_max : _ t = Any Scannable_axes.max
+
+    let of_any (sa : Scannable_axes.t) : _ t =
+      match sa.pointerness with
+      | Non_pointer -> any_min
+      | Maybe_pointer -> any_max
+
+    let sort_value_min : Sort.t t = Sort (Sort.value, Scannable_axes.min)
+
+    let sort_value_max : Sort.t t = Sort (Sort.value, Scannable_axes.max)
+
+    let sort_void : Sort.t t = Sort (Sort.void, Scannable_axes.max)
+
+    let sort_float64 : Sort.t t = Sort (Sort.float64, Scannable_axes.max)
+
+    let sort_float32 : Sort.t t = Sort (Sort.float32, Scannable_axes.max)
+
+    let sort_word : Sort.t t = Sort (Sort.word, Scannable_axes.max)
+
+    let sort_untagged_immediate : Sort.t t =
+      Sort (Sort.untagged_immediate, Scannable_axes.max)
+
+    let sort_bits8 : Sort.t t = Sort (Sort.bits8, Scannable_axes.max)
+
+    let sort_bits16 : Sort.t t = Sort (Sort.bits16, Scannable_axes.max)
+
+    let sort_bits32 : Sort.t t = Sort (Sort.bits32, Scannable_axes.max)
+
+    let sort_bits64 : Sort.t t = Sort (Sort.bits64, Scannable_axes.max)
+
+    let sort_vec128 : Sort.t t = Sort (Sort.vec128, Scannable_axes.max)
+
+    let sort_vec256 : Sort.t t = Sort (Sort.vec256, Scannable_axes.max)
+
+    let sort_vec512 : Sort.t t = Sort (Sort.vec512, Scannable_axes.max)
+
+    let of_base (b : Sort.base) (sa : Scannable_axes.t) : Sort.t t =
+      match b, sa with
+      | Value, { pointerness = Pointerness.Non_pointer } -> sort_value_min
+      | Value, { pointerness = Pointerness.Maybe_pointer } -> sort_value_max
+      | Void, _ -> sort_void
+      | Untagged_immediate, _ -> sort_untagged_immediate
+      | Float64, _ -> sort_float64
+      | Float32, _ -> sort_float32
+      | Word, _ -> sort_word
+      | Bits8, _ -> sort_bits8
+      | Bits16, _ -> sort_bits16
+      | Bits32, _ -> sort_bits32
+      | Bits64, _ -> sort_bits64
+      | Vec128, _ -> sort_vec128
+      | Vec256, _ -> sort_vec256
+      | Vec512, _ -> sort_vec512
+  end
+
   let rec of_const (const : Const.t) : _ t =
     match const with
-    | Any sa -> Any sa
-    | Base (b, sa) -> Sort (Sort.of_base b, sa)
+    | Any sa -> Static.of_any sa
+    | Base (b, sa) -> Static.of_base b sa
     | Product cs -> Product (List.map of_const cs)
 
   let product = function
@@ -774,7 +844,7 @@ module Layout = struct
     | lays -> Product lays
 
   let rec get_const of_sort : _ t -> Const.t option = function
-    | Any sa -> Some (Any sa)
+    | Any sa -> Some (Const.Static.of_any sa)
     | Sort (s, sa) -> of_sort s sa
     | Product layouts ->
       Option.map
