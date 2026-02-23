@@ -51,8 +51,9 @@ let rec select_addr exp =
       else default
     | (Asymbol _ | Aadd (_, _) | Ascale (_, _) | Ascaledadd (_, _, _)), _ ->
       default)
-  | Cmm.Cop (Cmuli, [arg; Cconst_int (((3 | 5 | 9) as mult), _)], _)
-  | Cmm.Cop (Cmuli, [Cconst_int (((3 | 5 | 9) as mult), _); arg], _) ->
+  | Cmm.Cop (Cmuli, [(Cvar _ as arg); Cconst_int (((3 | 5 | 9) as mult), _)], _)
+  | Cmm.Cop (Cmuli, [Cconst_int (((3 | 5 | 9) as mult), _); (Cvar _ as arg)], _)
+    ->
     Ascaledadd (arg, arg, mult - 1), 0
   | Cmm.Cop (Cmuli, [arg; Cconst_int (((2 | 4 | 8) as mult), _)], _)
   | Cmm.Cop (Cmuli, [Cconst_int (((2 | 4 | 8) as mult), _); arg], _) -> (
