@@ -245,7 +245,7 @@ shift_right_logical:
 |}]
 
 
-(* CR ttebbi: There is no need to repeat compq. *)
+(* CR ttebbi: There is no need to repeat cmpq. *)
 let compare (x : int) (y : int) = compare x y
 [%%expect_asm X86_64{|
 compare:
