@@ -561,6 +561,7 @@ let has_unboxed attrs = has_attribute "unboxed" attrs
 let has_boxed attrs = has_attribute "boxed" attrs
 
 <<<<<<< oxcaml
+(* CR sspies: We seem to have moved some functions here from translattribute.ml to here. They changed upstream. I put the diff in the conflict markers below so it is not lost. *)
 let has_unsafe_allow_any_mode_crossing attrs =
   has_attribute "unsafe_allow_any_mode_crossing" attrs
 
@@ -1216,6 +1217,119 @@ let get_eval_payload payload =
   | _ -> Error ()
 
 ||||||| upstream-base
+let get_optional_payload get_from_exp =
+  let open Parsetree in
+  function
+  | PStr [] -> Result.Ok None
+  | other -> Result.map Option.some (get_payload get_from_exp other)
+
+let get_id_from_exp =
+  let open Parsetree in
+  function
+  | { pexp_desc = Pexp_ident { txt = Longident.Lident id } } -> Result.Ok id
+  | _ -> Result.Error ()
+
+let get_int_from_exp =
+  let open Parsetree in
+  function
+    | { pexp_desc = Pexp_constant (Pconst_integer(s, None)) } ->
+        begin match Misc.Int_literal_converter.int s with
+        | n -> Result.Ok n
+        | exception (Failure _) -> Result.Error ()
+        end
+    | _ -> Result.Error ()
+
+let get_construct_from_exp =
+  let open Parsetree in
+  function
+    | { pexp_desc =
+          Pexp_construct ({ txt = Longident.Lident constr }, None) } ->
+        Result.Ok constr
+    | _ -> Result.Error ()
+
+let get_bool_from_exp exp =
+  Result.bind (get_construct_from_exp exp)
+    (function
+      | "true" -> Result.Ok true
+      | "false" -> Result.Ok false
+      | _ -> Result.Error ())
+
+let parse_id_payload txt loc ~default ~empty cases payload =
+  let[@local] warn () =
+    let ( %> ) f g x = g (f x) in
+    let msg =
+      cases
+      |> List.map (fst %> Printf.sprintf "'%s'")
+      |> String.concat ", "
+      |> Printf.sprintf "It must be either %s or empty"
+    in
+    Location.prerr_warning loc (Warnings.Attribute_payload (txt, msg));
+    default
+  in
+  match get_optional_payload get_id_from_exp payload with
+  | Error () -> warn ()
+  | Ok None -> empty
+  | Ok (Some id) ->
+      match List.assoc_opt id cases with
+      | Some r -> r
+      | None -> warn ()
 =======
+let get_optional_payload get_from_exp =
+  let open Parsetree in
+  function
+  | PStr [] -> Result.Ok None
+  | other -> Result.map Option.some (get_payload get_from_exp other)
+
+let get_id_from_exp =
+  let open Parsetree in
+  function
+  | { pexp_desc = Pexp_ident { txt = Longident.Lident id } } -> Result.Ok id
+  | _ -> Result.Error ()
+
+let get_int_from_exp =
+  let open Parsetree in
+  function
+    | { pexp_desc = Pexp_constant
+            {pconst_desc = Pconst_integer(s, None); _} } ->
+        begin match Misc.Int_literal_converter.int s with
+        | n -> Result.Ok n
+        | exception (Failure _) -> Result.Error ()
+        end
+    | _ -> Result.Error ()
+
+let get_construct_from_exp =
+  let open Parsetree in
+  function
+    | { pexp_desc =
+          Pexp_construct ({ txt = Longident.Lident constr }, None) } ->
+        Result.Ok constr
+    | _ -> Result.Error ()
+
+let get_bool_from_exp exp =
+  Result.bind (get_construct_from_exp exp)
+    (function
+      | "true" -> Result.Ok true
+      | "false" -> Result.Ok false
+      | _ -> Result.Error ())
+
+let parse_id_payload txt loc ~default ~empty cases payload =
+  let[@local] warn () =
+    let ( %> ) f g x = g (f x) in
+    let msg =
+      cases
+      |> List.map (fst %> Printf.sprintf "'%s'")
+      |> String.concat ", "
+      |> Printf.sprintf "It must be either %s or empty"
+    in
+    Location.prerr_warning loc (Warnings.Attribute_payload (txt, msg));
+    default
+  in
+  match get_optional_payload get_id_from_exp payload with
+  | Error () -> warn ()
+  | Ok None -> empty
+  | Ok (Some id) ->
+      match List.assoc_opt id cases with
+      | Some r -> r
+      | None -> warn ()
 >>>>>>> upstream-incoming
 let has_atomic attrs = has_attribute "atomic" attrs
