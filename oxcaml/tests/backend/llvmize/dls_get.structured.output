@@ -1,0 +1,114 @@
+source_filename = "dls_get.ml"
+
+define  oxcamlcc { { i64, i64 }, { i64 } } @camlDls_get__should_grow_HIDE_STAMP(i64 %0, i64 %1, i64 %2) gc "oxcaml" {
+  %ds = alloca i64
+  store i64 %0, ptr %ds
+  %alloc = alloca i64
+  store i64 %1, ptr %alloc
+  %4 = alloca i64
+  store i64 %2, ptr %4
+  %5 = alloca i64
+  %6 = alloca ptr addrspace(1)
+  %7 = alloca ptr addrspace(1)
+  %8 = alloca i64
+  %9 = alloca i64
+  %10 = alloca i64
+  %11 = alloca i64
+  %12 = alloca i64
+  %13 = alloca i64
+  br label %L1
+L1:
+  br label %L101
+L101:
+  %14 = load i64, ptr %4
+  store i64 %14, ptr %5
+  %15 = load i64, ptr %ds
+  %16 = add i64 %15, 376
+  %17 = inttoptr i64 %16 to ptr
+  %18 = load i64, ptr %17
+  %19 = inttoptr i64 %18 to ptr addrspace(1)
+  store ptr addrspace(1) %19, ptr %6
+  %20 = load ptr addrspace(1), ptr %6
+  %21 = getelementptr i8, ptr addrspace(1) %20, i64 -8
+  store ptr addrspace(1) %21, ptr %7
+  %22 = load ptr addrspace(1), ptr %7
+  %23 = load i64, ptr addrspace(1) %22
+  store i64 %23, ptr %8
+  %24 = load i64, ptr %8
+  %25 = shl i64 %24, 8
+  store i64 %25, ptr %9
+  %26 = load i64, ptr %9
+  %27 = lshr i64 %26, 17
+  store i64 %27, ptr %10
+  %28 = load i64, ptr %5
+  %29 = load i64, ptr %10
+  %30 = icmp sge i64 %28, %29
+  %31 = zext i1 %30 to i64
+  store i64 %31, ptr %11
+  %32 = load i64, ptr %11
+  %33 = shl i64 %32, 1
+  store i64 %33, ptr %12
+  %34 = load i64, ptr %12
+  %35 = add i64 %34, 1
+  store i64 %35, ptr %13
+  %36 = load i64, ptr %13
+  store i64 %36, ptr %4
+  %37 = load i64, ptr %4
+  %38 = load i64, ptr %ds
+  %39 = load i64, ptr %alloc
+  %40 = insertvalue { { i64, i64 }, { i64 } } poison, i64 %38, 0, 0
+  %41 = insertvalue { { i64, i64 }, { i64 } } %40, i64 %39, 0, 1
+  %42 = insertvalue { { i64, i64 }, { i64 } } %41, i64 %37, 1, 0
+  ret { { i64, i64 }, { i64 } } %42
+}
+
+define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlDls_get__entry(i64 %0, i64 %1) gc "oxcaml" {
+  %ds = alloca i64
+  store i64 %0, ptr %ds
+  %alloc = alloca i64
+  store i64 %1, ptr %alloc
+  %3 = alloca i64
+  %4 = alloca ptr addrspace(1)
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  br label %L1
+L1:
+  br label %L115
+L115:
+  %8 = ptrtoint ptr @camlDls_get to i64
+  store i64 %8, ptr %5
+  %9 = load i64, ptr %5
+  store i64 %9, ptr %6
+  %10 = load i64, ptr %6
+  %11 = inttoptr i64 %10 to ptr addrspace(1)
+  store ptr addrspace(1) %11, ptr %4
+  store i64 1, ptr %7
+  %12 = load i64, ptr %7
+  store i64 %12, ptr %3
+  %13 = load ptr addrspace(1), ptr %3
+  %14 = load i64, ptr %ds
+  %15 = load i64, ptr %alloc
+  %16 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } poison, i64 %14, 0, 0
+  %17 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %16, i64 %15, 0, 1
+  %18 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %17, ptr addrspace(1) %13, 1, 0
+  ret { { i64, i64 }, { ptr addrspace(1) } } %18
+}
+
+define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) returns_twice noinline {
+  %3 = insertvalue { { i64, i64 }, { i64 } } poison, i64 0, 1, 0
+  %4 = insertvalue { { i64, i64 }, { i64 } } %3, i64 %0, 0, 0
+  %5 = insertvalue { { i64, i64 }, { i64 } } %4, i64 %1, 0, 1
+  ret { { i64, i64 }, { i64 } } %5
+}
+
+@camlDls_get__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
+@header.camlDls_get = global i64 1792, section ".data", align 8
+@camlDls_get = global { ptr } { ptr @camlDls_get__should_grow_1 }, section ".data", align 8
+@header.camlDls_get__should_grow_1 = global i64 3063, section ".data", align 8
+@camlDls_get__should_grow_1 = global { ptr, i64 } { ptr @camlDls_get__should_grow_HIDE_STAMP, i64 108086391056891909 }, section ".data", align 8
+
+
+
+!0 = !{ i32 1, !"oxcaml_module", !"Dls_get" }
+!llvm.module.flags = !{ !0 }
