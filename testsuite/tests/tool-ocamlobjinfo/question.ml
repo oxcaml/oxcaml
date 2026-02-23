@@ -16,6 +16,7 @@
    ocamlobjinfo;
 
    runtime5;
+   flat-name-mangling;
    check-program-output;
  }{
    program = "question.cmx";

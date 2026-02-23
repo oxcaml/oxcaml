@@ -1,6 +1,7 @@
 (* TEST
  flags += " -O3";
  only-default-codegen;
+ flat-name-mangling;
  expect.opt;
 *)
 
