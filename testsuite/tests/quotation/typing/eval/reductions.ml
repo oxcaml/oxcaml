@@ -97,6 +97,27 @@ val f : <[($('a), $('b)) Either.t]> expr -> ('a eval, 'b eval) Either.t =
   <fun>
 |}]
 
+(* Arrows *)
+let f (x : <[$('a) -> $('b)]> expr) : 'a eval -> 'b eval = eval x
+[%%expect {|
+val f : <[$('a) -> $('b)]> expr -> 'a eval -> 'b eval = <fun>
+|}]
+let f (x : <[l:$('a) -> $('b)]> expr) : l:('a eval) -> 'b eval = eval x
+[%%expect {|
+val f : <[l:$('a) -> $('b)]> expr -> l:'a eval -> 'b eval = <fun>
+|}]
+let f (x : <[?l:$('a) -> $('b)]> expr) : ?l:('a eval) -> 'b eval = eval x
+[%%expect {|
+val f : <[?l:$('a) -> $('b)]> expr -> ?l:'a eval -> 'b eval = <fun>
+|}]
+let f (x : <[$('a) @ local -> $('b) @ local]> expr)
+    : 'a eval @ local -> 'b eval @ local = eval x
+[%%expect {|
+val f :
+  <[$('a) @ local -> $('b) @ local]> expr ->
+  'a eval @ local -> 'b eval @ local = <fun>
+|}]
+
 (* Tuples *)
 let f (x : <[$('a) * $('b) * $('c)]> expr)
     : 'a eval * 'b eval * 'c eval = eval x
