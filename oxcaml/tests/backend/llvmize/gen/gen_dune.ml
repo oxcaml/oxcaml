@@ -24,7 +24,7 @@ let rule_of_task = function
       common_flags
   | Output_ir { source; output } ->
     Format.sprintf
-      {|(with-outputs-to %s.output.corrected (pipe-outputs (run cat %s.ll) (run ./${filter})))|}
+      {|(with-outputs-to %s.%%{env:OXCAML_NAME_MANGLING=flat}.output.corrected (pipe-outputs (run cat %s.ll) (run ./${filter})))|}
       output source
   | C filename -> Format.sprintf "(run clang %s.c ${c_flags})" filename
 
@@ -35,7 +35,8 @@ let dependency_of_task = function
   | Output_ir _ -> None
 
 let target_of_task = function
-  | Output_ir { output; _ } -> Some (output ^ ".output.corrected")
+  | Output_ir { output; _ } ->
+    Some (output ^ ".%{env:OXCAML_NAME_MANGLING=flat}.output.corrected")
   | Ocaml_default filename | Ocaml_llvm { filename; stop_after_llvmize = false }
     ->
     Some (filename ^ ".cmx")
@@ -149,7 +150,8 @@ module F = struct
     List.iter
       (function
         | Output_ir { output; _ } ->
-          pp_compare_output_rule ppf ~output:(output ^ ".output")
+          pp_compare_output_rule ppf
+            ~output:(output ^ ".%{env:OXCAML_NAME_MANGLING=flat}.output")
         | C _ | Ocaml_default _ | Ocaml_llvm _ -> ())
       tasks
 end
