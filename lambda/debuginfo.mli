@@ -30,7 +30,8 @@ module Scoped_location : sig
   type scopes = private
     | Empty
     | Cons of {item: scope_item; str: string; str_fun: string; name : string; prev: scopes;
-               assume_zero_alloc: ZA.Assume_info.t}
+               assume_zero_alloc: ZA.Assume_info.t;
+               mangling_item: Structured_mangling.path_item option}
 
   val string_of_scopes : include_zero_alloc:bool -> scopes -> string
 
@@ -126,6 +127,11 @@ val merge : into:t -> t -> t
 
 val assume_zero_alloc : t -> ZA.Assume_info.t
 
+(** [to_structured_mangling_path] converts the debug info into a mangling path.
+    In all cases, the [name] is used to populate the last element of the path.
+*)
+val to_structured_mangling_path : name:string -> t -> Structured_mangling.path
+
 module Dbg : sig
   type t
 
@@ -146,4 +152,3 @@ module Dbg : sig
 end
 
 val get_dbg : t -> Dbg.t
-
