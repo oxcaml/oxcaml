@@ -50,8 +50,7 @@ let f x =
 f:
   movq  %rax, %rbx
   addq  $2, %rbx
-  movq  %rbx, %rdi
-  addq  %rax, %rdi
+  leaq  (%rbx,%rax), %rdi
   addq  %rdi, %rbx
   leaq  -3(%rax,%rbx), %rax
   ret

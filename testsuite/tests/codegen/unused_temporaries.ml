@@ -47,7 +47,7 @@ compare:
   vmovq %xmm0, %rbx
   neg   %rbx
   subq  %rdi, %rbx
-  addq  %rax, %rbx
-  leaq  1(%rbx,%rbx), %rax
+  addq  %rbx, %rax
+  leaq  1(%rax,%rax), %rax
   ret
 |}]

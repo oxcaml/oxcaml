@@ -40,12 +40,10 @@ mul:
   ret
 |}]
 
-(* CR ttebbi: imul could be replaced with lea (x*2+x-2) *)
 let mul_3 x = x * 3
 [%%expect_asm X86_64{|
 mul_3:
-  imulq $3, %rax
-  addq  $-2, %rax
+  leaq  -2(%rax,%rax,2), %rax
   ret
 |}]
 
@@ -78,8 +76,8 @@ div_by_constant:
   movabsq $7653754429286296943, %rdi
   imulq %rdi
   sarq  $9, %rdx
-  addq  %rbx, %rdx
-  leaq  1(%rdx,%rdx), %rax
+  leaq  (%rdx,%rbx), %rax
+  leaq  1(%rax,%rax), %rax
   ret
 |}]
 
@@ -134,13 +132,12 @@ let rem_2 x = x mod 2
 [%%expect_asm X86_64{|
 rem_2:
   sarq  $1, %rax
-  movq  $-2, %rsi
+  movq  $-2, %rdi
   movq  %rax, %rbx
   shrq  $63, %rbx
-  movq  %rax, %rdi
-  addq  %rbx, %rdi
-  andq  %rsi, %rdi
-  subq  %rdi, %rax
+  addq  %rax, %rbx
+  andq  %rdi, %rbx
+  subq  %rbx, %rax
   leaq  1(%rax,%rax), %rax
   ret
 |}]
@@ -360,8 +357,7 @@ collatz:
   movq  $-2, %rcx
   movq  %rdi, %rsi
   shrq  $63, %rsi
-  movq  %rdi, %rdx
-  addq  %rsi, %rdx
+  leaq  (%rdi,%rsi), %rdx
   movq  %rdx, %rsi
   andq  %rcx, %rsi
   subq  %rsi, %rdi
@@ -374,7 +370,7 @@ collatz:
   jg    .L110
   jmp   .L108
 .L126:
-  imulq $3, %rbx
+  leaq  (%rbx,%rbx,2), %rbx
   cmpq  $3, %rbx
   jg    .L110
   jmp   .L108

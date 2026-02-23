@@ -49,7 +49,7 @@ mul:
 let mul_3 x = Int64_u.mul x #3L
 [%%expect_asm X86_64{|
 mul_3:
-  imulq $3, %rax
+  leaq  (%rax,%rax,2), %rax
   ret
 |}]
 
@@ -85,9 +85,8 @@ div_by_constant:
   shrq  $63, %rbx
   movabsq $7653754429286296943, %rdi
   imulq %rdi
-  movq  %rdx, %rax
-  sarq  $9, %rax
-  addq  %rbx, %rax
+  sarq  $9, %rdx
+  leaq  (%rdx,%rbx), %rax
   ret
 |}]
 

@@ -2185,6 +2185,11 @@ let emit_instr ~first ~fallthrough i =
     instr_for_intop op cl (res i 0)
   | Lop (Intop (Imulh { signed = true })) -> I.imul (arg i 1) None
   | Lop (Intop (Imulh { signed = false })) -> I.mul (arg i 1)
+  | Lop (Intop Iadd) when Reg.equal_location i.arg.(1).loc i.res.(0).loc ->
+    I.add (arg i 0) (res i 0)
+  | Lop (Intop Iadd) when not (Reg.equal_location i.arg.(0).loc i.res.(0).loc)
+    ->
+    I.lea (mem64 NONE 0 ~base:(arg64 i 0) (arg_idx i 1)) (res i 0)
   | Lop (Intop ((Iadd | Isub | Imul | Iand | Ior | Ixor) as op)) ->
     (* We have i.arg.(0) = i.res.(0) *)
     instr_for_intop op (arg i 1) (res i 0)
