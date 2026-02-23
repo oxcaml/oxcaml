@@ -203,15 +203,6 @@ val instance_constructor: existential_treatment ->
         constructor_description ->
         Types.constructor_argument list * type_expr * type_expr list
         (* Same, for a constructor. Also returns existentials. *)
-val instance_constructors: existential_treatment ->
-        constructor_description list ->
-        type_expr ->
-        (Types.constructor_argument list * type_expr * type_expr list) list
-        * type_expr
-        (* Same, for a whole list of constructors. The particular type of the
-           variant with those constructors is supplied so that it can it can
-           be unified with the copy in the copy scope, thus filling in univars
-           in constructor argument and return types. *)
 val instance_parameterized_type:
         ?keep_names:bool ->
         type_expr list -> type_expr -> type_expr list * type_expr

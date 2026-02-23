@@ -125,6 +125,12 @@ external box_int64 : int64# -> int64 = "%box_int64"
 external box_int64 : int64# -> int64 = "%box_int64"
 |}]
 
+(* Test that typing and genprintval work when the actual type has kind value *)
+let test_block_with_values = { fst = 1; snd = 2 } |> Sys.opaque_identity
+[%%expect {|
+val test_block_with_values : int t = {fst = 1; snd = 2}
+|}]
+
 let make_test_block () = { fst = #1L; snd = #2L } |> Sys.opaque_identity
 [%%expect {|
 val make_test_block : unit -> int64# t = <fun>

@@ -520,7 +520,22 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                           let ty_args =
                             List.map2
                               (fun { ca_sort } ty_arg ->
-                                 (ty_arg, print_sort_option ca_sort)
+                                 let sort =
+                                   match ca_sort with
+                                   | Some sort -> Some sort
+                                   | None ->
+                                       begin match
+                                         Ctype.type_sort env ty_arg ~fixed:true
+                                           ~why:Constructor_arg_projection
+                                       with
+                                       | Ok sort ->
+                                           Some (
+                                             Jkind.Sort.
+                                               default_for_transl_and_get sort)
+                                       | Error _ -> None
+                                       end
+                                 in
+                                 (ty_arg, print_sort_option sort)
                               ) l ty_args
                           in
                           tree_of_constr_with_args (tree_of_constr env path)

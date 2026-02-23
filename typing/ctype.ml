@@ -1443,56 +1443,44 @@ type existential_treatment =
   | Keep_existentials_flexible
   | Make_existentials_abstract of Pattern_env.t
 
-let instance_constructor' copy_scope existential_treatment cstr =
-  let name_counter = ref 0 in
-  let copy_existential =
-    match existential_treatment with
-    | Keep_existentials_flexible -> copy copy_scope
-    | Make_existentials_abstract penv ->
-        fun existential ->
-          (* CR layouts v1.5: Add test case that hits this once we have syntax
-             for it *)
-          let jkind =
-            match get_desc existential with
-            | Tvar { jkind } -> jkind
-            | Tvariant _ -> Jkind.Builtin.value ~why:Row_variable
-                (* Existential row variable *)
-            | _ -> assert false
-          in
-          let decl = new_local_type (Existential cstr.cstr_name) jkind in
-          let name = existential_name name_counter existential in
-          let env = penv.env in
-          let fresh_constr_scope = penv.equations_scope in
-          let (id, new_env) =
-            Env.enter_type (get_new_abstract_name env name) decl env
-              ~scope:fresh_constr_scope in
-          Pattern_env.set_env penv new_env;
-          let to_unify = newty (Tconstr (Path.Pident id,[],ref Mnil)) in
-          let tv = copy copy_scope existential in
-          assert (is_Tvar tv);
-          link_type tv to_unify;
-          tv
-  in
-  let ty_ex = List.map copy_existential cstr.cstr_existentials in
-  let ty_res = copy copy_scope cstr.cstr_res in
-  let ty_args =
-    List.map (fun ca -> {ca with ca_type = copy copy_scope ca.ca_type})
-      cstr.cstr_args
-  in
-  (ty_args, ty_res, ty_ex)
-
 let instance_constructor existential_treatment cstr =
   For_copy.with_scope (fun copy_scope ->
-    instance_constructor' copy_scope existential_treatment cstr
-  )
-
-let instance_constructors existential_treatment cstrs ty =
-  For_copy.with_scope (fun copy_scope ->
-    let cstrs =
-      List.map (instance_constructor' copy_scope existential_treatment) cstrs
+    let name_counter = ref 0 in
+    let copy_existential =
+      match existential_treatment with
+      | Keep_existentials_flexible -> copy copy_scope
+      | Make_existentials_abstract penv ->
+          fun existential ->
+            (* CR layouts v1.5: Add test case that hits this once we have syntax
+               for it *)
+            let jkind =
+              match get_desc existential with
+              | Tvar { jkind } -> jkind
+              | Tvariant _ -> Jkind.Builtin.value ~why:Row_variable
+                  (* Existential row variable *)
+              | _ -> assert false
+            in
+            let decl = new_local_type (Existential cstr.cstr_name) jkind in
+            let name = existential_name name_counter existential in
+            let env = penv.env in
+            let fresh_constr_scope = penv.equations_scope in
+            let (id, new_env) =
+              Env.enter_type (get_new_abstract_name env name) decl env
+                ~scope:fresh_constr_scope in
+            Pattern_env.set_env penv new_env;
+            let to_unify = newty (Tconstr (Path.Pident id,[],ref Mnil)) in
+            let tv = copy copy_scope existential in
+            assert (is_Tvar tv);
+            link_type tv to_unify;
+            tv
     in
-    let ty = copy copy_scope ty in
-    cstrs, ty
+    let ty_ex = List.map copy_existential cstr.cstr_existentials in
+    let ty_res = copy copy_scope cstr.cstr_res in
+    let ty_args =
+      List.map (fun ca -> {ca with ca_type = copy copy_scope ca.ca_type})
+        cstr.cstr_args
+    in
+    (ty_args, ty_res, ty_ex)
   )
 
 let instance_parameterized_type ?keep_names sch_args sch =
