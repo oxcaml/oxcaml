@@ -119,13 +119,10 @@ external float_equal :
 let equal x y = float_equal (Float_u.to_float x) (Float_u.to_float y)
 [%%expect_asm X86_64{|
 equal:
-  subq  $8, %rsp
   vcmpsd $0, %xmm1, %xmm0, %xmm0
   vmovq %xmm0, %rax
   neg   %rax
-  vmovsd %xmm0, (%rsp)
   leaq  1(%rax,%rax), %rax
-  addq  $8, %rsp
   ret
 |}]
 
@@ -329,13 +326,10 @@ min_unchecked:
 let is_nan (x : Float_u.t) = Float.is_nan (Float_u.to_float x)
 [%%expect_asm X86_64{|
 is_nan:
-  subq  $8, %rsp
   vcmpsd $4, %xmm0, %xmm0, %xmm0
   vmovq %xmm0, %rax
   neg   %rax
-  vmovsd %xmm0, (%rsp)
   leaq  1(%rax,%rax), %rax
-  addq  $8, %rsp
   ret
 |}]
 
@@ -351,14 +345,11 @@ let is_finite (x : Float_u.t) =
 ;;
 [%%expect_asm X86_64{|
 is_finite:
-  subq  $8, %rsp
   vsubsd %xmm0, %xmm0, %xmm0
   vcmpsd $0, %xmm0, %xmm0, %xmm0
   vmovq %xmm0, %rax
   neg   %rax
-  vmovsd %xmm0, (%rsp)
   leaq  1(%rax,%rax), %rax
-  addq  $8, %rsp
   ret
 |}]
 
@@ -374,28 +365,22 @@ let compare (x : Float_u.t) (y : Float_u.t) : int =
 ;;
 [%%expect_asm X86_64{|
 compare:
-  subq  $8, %rsp
   vcmpsd $0, %xmm1, %xmm1, %xmm2
   vmovq %xmm2, %rbx
   neg   %rbx
-  vmovsd %xmm2, (%rsp)
   vcmpsd $0, %xmm0, %xmm0, %xmm2
   vmovq %xmm2, %rax
   neg   %rax
-  vmovsd %xmm2, (%rsp)
   subq  %rbx, %rax
   vcmpsd $1, %xmm1, %xmm0, %xmm2
   vmovq %xmm2, %rdi
   neg   %rdi
-  vmovsd %xmm2, (%rsp)
   vcmpsd $1, %xmm0, %xmm1, %xmm0
   vmovq %xmm0, %rbx
   neg   %rbx
-  vmovsd %xmm0, (%rsp)
   subq  %rdi, %rbx
   addq  %rax, %rbx
   leaq  1(%rbx,%rbx), %rax
-  addq  $8, %rsp
   ret
 |}]
 
@@ -407,24 +392,19 @@ let compare_equal (x : Float_u.t) (y : Float_u.t) : bool =
 ;;
 [%%expect_asm X86_64{|
 compare_equal:
-  subq  $8, %rsp
   vcmpsd $0, %xmm1, %xmm1, %xmm2
   vmovq %xmm2, %rbx
   neg   %rbx
-  vmovsd %xmm2, (%rsp)
   vcmpsd $0, %xmm0, %xmm0, %xmm2
   vmovq %xmm2, %rax
   neg   %rax
-  vmovsd %xmm2, (%rsp)
   subq  %rbx, %rax
   vcmpsd $1, %xmm1, %xmm0, %xmm2
   vmovq %xmm2, %rdi
   neg   %rdi
-  vmovsd %xmm2, (%rsp)
   vcmpsd $1, %xmm0, %xmm1, %xmm0
   vmovq %xmm0, %rbx
   neg   %rbx
-  vmovsd %xmm0, (%rsp)
   subq  %rdi, %rbx
   addq  %rax, %rbx
   leaq  1(%rbx,%rbx), %rax
@@ -432,6 +412,5 @@ compare_equal:
   sete  %al
   movzbq %al, %rax
   leaq  1(%rax,%rax), %rax
-  addq  $8, %rsp
   ret
 |}]
