@@ -4484,13 +4484,17 @@ module Modality = struct
       module Comonadic = Comonadic.Atom
     end
 
-    let is_id : type a. a Axis.t -> a -> bool = function
-      | Monadic ax -> Monadic.is_id ax
-      | Comonadic ax -> Comonadic.is_id ax
+    let is_id : type a. a Axis.t -> a -> bool =
+     fun ax t ->
+      match ax with
+      | Monadic ax -> Monadic.is_id ax t
+      | Comonadic ax -> Comonadic.is_id ax t
 
-    let is_constant : type a. a Axis.t -> a -> bool = function
-      | Monadic ax -> Monadic.is_constant ax
-      | Comonadic ax -> Comonadic.is_constant ax
+    let is_constant : type a. a Axis.t -> a -> bool =
+     fun ax t ->
+      match ax with
+      | Monadic ax -> Monadic.is_constant ax t
+      | Comonadic ax -> Comonadic.is_constant ax t
 
     let print (type a) (ax : a Axis.t) ppf (t : a) =
       match ax, t with

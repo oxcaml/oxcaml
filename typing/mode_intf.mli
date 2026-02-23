@@ -55,6 +55,7 @@ module type Const_product = sig
   (** [max_with ax elt] returns [max] but with the axis [ax] set to [elt]. *)
   val max_with : 'a axis -> 'a -> t
 
+  (** For interfacing with the user only; potentially slow. *)
   module Per_axis :
     Solver_intf.Lattices with type 'a obj := 'a axis and type 'a elt := 'a
 end
@@ -545,6 +546,7 @@ module type S = sig
 
       val proj : 'a Axis.t -> ('r * 'l) t -> ('a, 'l * 'r) mode
 
+      (** For interfacing with the user only; potentially slow. *)
       module Per_axis : sig
         val zap_to_floor : 'a Axis.t -> ('a, 'l * allowed) mode -> 'a
 
@@ -564,6 +566,7 @@ module type S = sig
 
       val proj : 'a Axis.t -> ('l * 'r) t -> ('a, 'l * 'r) mode
 
+      (** For interfacing with the user only; potentially slow. *)
       module Per_axis : sig
         val zap_to_floor : 'a Axis.t -> ('a, allowed * 'r) mode -> 'a
 
@@ -831,6 +834,7 @@ module type S = sig
 
     type atom = Atom : 'a Axis.t * 'a -> atom
 
+    (** For interfacing with the user only; potentially slow. *)
     module Per_axis : sig
       (** Test if the given modality is the identity modality. *)
       val is_id : 'a Axis.t -> 'a -> bool
@@ -1082,6 +1086,7 @@ module type S = sig
       val to_modality : packed -> Modality.Axis.packed
     end
 
+    (** For interfacing with the user only; potentially slow. *)
     module Per_axis :
       Solver_intf.Lattices with type 'a elt := 'a and type 'a obj := 'a Axis.t
 
