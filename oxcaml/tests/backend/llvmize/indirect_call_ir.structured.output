@@ -1,0 +1,108 @@
+source_filename = "indirect_call.ml"
+
+define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlIndirect_call__apply_HIDE_STAMP(i64 %0, i64 %1, ptr addrspace(1) %2, ptr addrspace(1) %3) gc "oxcaml" {
+  %ds = alloca i64
+  store i64 %0, ptr %ds
+  %alloc = alloca i64
+  store i64 %1, ptr %alloc
+  %5 = alloca ptr addrspace(1)
+  store ptr addrspace(1) %2, ptr %5
+  %6 = alloca ptr addrspace(1)
+  store ptr addrspace(1) %3, ptr %6
+  %7 = alloca ptr addrspace(1)
+  %8 = alloca ptr addrspace(1)
+  %9 = alloca i64
+  %10 = alloca ptr addrspace(1)
+  br label %L1
+L1:
+  br label %L101
+L101:
+  %11 = load ptr addrspace(1), ptr %5
+  store ptr addrspace(1) %11, ptr %7
+  %12 = load ptr addrspace(1), ptr %6
+  store ptr addrspace(1) %12, ptr %8
+  %13 = load ptr addrspace(1), ptr %7
+  %14 = load i64, ptr addrspace(1) %13
+  store i64 %14, ptr %9
+  %15 = load ptr addrspace(1), ptr %8
+  store ptr addrspace(1) %15, ptr %5
+  %16 = load ptr addrspace(1), ptr %7
+  store ptr addrspace(1) %16, ptr %6
+  %17 = load ptr addrspace(1), ptr %5
+  %18 = load ptr addrspace(1), ptr %6
+  %19 = load i64, ptr %ds
+  %20 = load i64, ptr %alloc
+  %21 = load ptr, ptr %9
+  %22 = call oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } %21(i64 %19, i64 %20, ptr addrspace(1) %17, ptr addrspace(1) %18) "statepoint-id"="0"
+  %23 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %22, 0, 0
+  %24 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %22, 0, 1
+  store i64 %23, ptr %ds
+  store i64 %24, ptr %alloc
+  %25 = extractvalue { { i64, i64 }, { ptr addrspace(1) } } %22, 1, 0
+  store ptr addrspace(1) %25, ptr %5
+  br label %L103
+L103:
+  %26 = load ptr addrspace(1), ptr %5
+  store ptr addrspace(1) %26, ptr %10
+  %27 = load ptr addrspace(1), ptr %10
+  store ptr addrspace(1) %27, ptr %5
+  %28 = load ptr addrspace(1), ptr %5
+  %29 = load i64, ptr %ds
+  %30 = load i64, ptr %alloc
+  %31 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } poison, i64 %29, 0, 0
+  %32 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %31, i64 %30, 0, 1
+  %33 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %32, ptr addrspace(1) %28, 1, 0
+  ret { { i64, i64 }, { ptr addrspace(1) } } %33
+}
+
+define  oxcamlcc { { i64, i64 }, { ptr addrspace(1) } } @camlIndirect_call__entry(i64 %0, i64 %1) gc "oxcaml" {
+  %ds = alloca i64
+  store i64 %0, ptr %ds
+  %alloc = alloca i64
+  store i64 %1, ptr %alloc
+  %3 = alloca i64
+  %4 = alloca ptr addrspace(1)
+  %5 = alloca i64
+  %6 = alloca i64
+  %7 = alloca i64
+  br label %L1
+L1:
+  br label %L109
+L109:
+  %8 = ptrtoint ptr @camlIndirect_call to i64
+  store i64 %8, ptr %5
+  %9 = load i64, ptr %5
+  store i64 %9, ptr %6
+  %10 = load i64, ptr %6
+  %11 = inttoptr i64 %10 to ptr addrspace(1)
+  store ptr addrspace(1) %11, ptr %4
+  store i64 1, ptr %7
+  %12 = load i64, ptr %7
+  store i64 %12, ptr %3
+  %13 = load ptr addrspace(1), ptr %3
+  %14 = load i64, ptr %ds
+  %15 = load i64, ptr %alloc
+  %16 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } poison, i64 %14, 0, 0
+  %17 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %16, i64 %15, 0, 1
+  %18 = insertvalue { { i64, i64 }, { ptr addrspace(1) } } %17, ptr addrspace(1) %13, 1, 0
+  ret { { i64, i64 }, { ptr addrspace(1) } } %18
+}
+
+define private oxcamlcc { { i64, i64 }, { i64 } } @wrap_try(i64 %0, i64 %1) returns_twice noinline {
+  %3 = insertvalue { { i64, i64 }, { i64 } } poison, i64 0, 1, 0
+  %4 = insertvalue { { i64, i64 }, { i64 } } %3, i64 %0, 0, 0
+  %5 = insertvalue { { i64, i64 }, { i64 } } %4, i64 %1, 0, 1
+  ret { { i64, i64 }, { i64 } } %5
+}
+
+@camlIndirect_call__gc_roots = global { i64 } { i64 0 }, section ".data", align 8
+@header.camlIndirect_call = global i64 1792, section ".data", align 8
+@camlIndirect_call = global { ptr } { ptr @camlIndirect_call__apply_1 }, section ".data", align 8
+@header.camlIndirect_call__apply_1 = global i64 4087, section ".data", align 8
+@camlIndirect_call__apply_1 = global { ptr, i64, ptr } { ptr @caml_curry2, i64 180143985094819847, ptr @camlIndirect_call__apply_HIDE_STAMP }, section ".data", align 8
+@caml_curry2 = external global ptr
+
+
+
+!0 = !{ i32 1, !"oxcaml_module", !"Indirect_call" }
+!llvm.module.flags = !{ !0 }
