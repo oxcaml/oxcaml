@@ -440,10 +440,6 @@ jobs:
         if: matrix.check_arch == true
         run: make check_all_arches
 
-      - name: Build debug target
-        if: matrix.build_debug == true
-        run:
-
       - name: Build and test ocamldebug
         if: matrix.build_debug == true
         run: |
