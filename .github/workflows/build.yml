@@ -442,7 +442,18 @@ jobs:
 
       - name: Build debug target
         if: matrix.build_debug == true
-        run: make debug
+        run:
+
+      - name: Build and test ocamldebug
+        if: matrix.build_debug == true
+        run: |
+          if [[ -n "${{matrix.install_path}}" ]]; then
+            install_path="${{matrix.install_path}}"
+          else
+            install_path="_install"
+          fi
+          make debug || exit 1
+          $install_path/bin/ocamldebug $install_path/bin/ocamlc <<< ""
 
       - name: Run register allocation on artifacts
         if: matrix.run_regalloc_tool == true
