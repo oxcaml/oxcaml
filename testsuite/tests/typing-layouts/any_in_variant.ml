@@ -106,6 +106,17 @@ let yeah (type a : bits64) a : a t = Yeah a
 val yeah : ('a : bits64). 'a -> 'a t = <fun>
 |}]
 
+(* Test that typing and genprintval work when the actual type has kind value *)
+let test_block_with_value = Yeah 1
+[%%expect {|
+val test_block_with_value : int t = Yeah 1
+|}]
+
+let test_block = Yeah #1L
+[%%expect {|
+val test_block : int64# t = Yeah <abstr>
+|}]
+
 type ('a : any) any_list = [] | (::) of 'a * 'a any_list
 
 let rec map_unboxed_pair
@@ -120,16 +131,10 @@ let rec box_all (l : #('a * 'b) any_list) : ('a * 'b) any_list =
   | [] -> []
   | #(a, b) :: l' -> (a, b) :: box_all l'
 
-let rec to_list (l : _ any_list) : _ list =
-  match l with
-  | [] -> []
-  | a :: l' -> a :: to_list l'
-
 let test =
   [#(1, 2); #(3, 4); #(5, 6)]
   |> map_unboxed_pair ~f:(fun #(a, b) -> #(a + 1, b + 2))
   |> box_all
-  |> to_list
 
 [%%expect {|
 type ('a : any) any_list = [] | (::) of 'a * 'a any_list
@@ -137,6 +142,6 @@ val map_unboxed_pair :
   #('a * 'b) any_list -> f:(#('a * 'b) -> #('c * 'd)) -> #('c * 'd) any_list =
   <fun>
 val box_all : #('a * 'b) any_list -> ('a * 'b) any_list = <fun>
-val to_list : 'a any_list -> 'a list = <fun>
-val test : (int * int) list = [(2, 4); (4, 6); (6, 8)]
+val test : (int * int) any_list =
+  (::) ((2, 4), (::) ((4, 6), (::) ((6, 8), [])))
 |}]
