@@ -289,14 +289,7 @@ type should_fail = t_any option
 
 [%%expect{|
 type t_any : any
-Line 3, characters 19-24:
-3 | type should_fail = t_any option
-                       ^^^^^
-Error: This type "t_any" should be an instance of type "('a : value_or_null)"
-       The layout of t_any is any
-         because of the definition of t_any at line 1, characters 0-16.
-       But the layout of t_any must be a sublayout of value
-         because the type argument of option has layout value_or_null.
+type should_fail = t_any option
 |}]
 
 type t_value_or_null : value_or_null
@@ -314,15 +307,7 @@ type should_fail = t_any_mod_separable option
 
 [%%expect{|
 type t_any_mod_separable : any mod separable
-Line 3, characters 19-38:
-3 | type should_fail = t_any_mod_separable option
-                       ^^^^^^^^^^^^^^^^^^^
-Error: This type "t_any_mod_separable" should be an instance of type
-         "('a : value_or_null)"
-       The layout of t_any_mod_separable is any
-         because of the definition of t_any_mod_separable at line 1, characters 0-44.
-       But the layout of t_any_mod_separable must be a sublayout of value
-         because the type argument of option has layout value_or_null.
+type should_fail = t_any_mod_separable option
 |}]
 
 type t_value : value
@@ -342,7 +327,7 @@ let should_work_option3 = None
 val should_work_option1 : float or_null option = Some (This 3.4)
 val should_work_option2 :
   ('a : value_or_null mod non_null). 'a or_null option = Some Null
-val should_work_option3 : 'a option = None
+val should_work_option3 : ('a : any). 'a option = None
 |}]
 
 let should_work_list_option = [ Some (This 3.4); None; Some Null ]

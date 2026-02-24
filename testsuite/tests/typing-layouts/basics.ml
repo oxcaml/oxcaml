@@ -1252,27 +1252,12 @@ Error: This expression has type "('a : value)"
 (* CR layouts v5: allow this *)
 type t13f = t_float64 option;;
 [%%expect{|
-Line 1, characters 12-21:
-1 | type t13f = t_float64 option;;
-                ^^^^^^^^^
-Error: This type "t_float64" should be an instance of type "('a : value_or_null)"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
-         because the type argument of option has layout value_or_null.
+type t13f = t_float64 option
 |}];;
 
 let x13f (v : t_float64) = Some v;;
 [%%expect{|
-Line 1, characters 32-33:
-1 | let x13f (v : t_float64) = Some v;;
-                                    ^
-Error: This expression has type "t_float64"
-       but an expression was expected of type "('a : value_or_null)"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
-         because the type argument of option has layout value_or_null.
+val x13f : t_float64 -> t_float64 option = <fun>
 |}];;
 
 let x13f v =
@@ -1288,7 +1273,7 @@ Error: This expression has type "('a : value_or_null)"
        The layout of t_float64 is float64
          because of the definition of t_float64 at line 4, characters 0-24.
        But the layout of t_float64 must be a sublayout of value
-         because the type argument of option has layout value_or_null.
+         because it's the type of a constructor argument being projected.
 |}];;
 
 (* list *)
@@ -1552,15 +1537,12 @@ let f (x : t_float64) =
   ()
 
 [%%expect{|
-Line 2, characters 15-16:
+Line 2, characters 6-7:
 2 |   let g ?(x2 = x) () = () in
-                   ^
-Error: This expression has type "t_float64"
-       but an expression was expected of type "('a : value_or_null)"
-       The layout of t_float64 is float64
-         because of the definition of t_float64 at line 4, characters 0-24.
-       But the layout of t_float64 must be a sublayout of value
-         because the type argument of option has layout value_or_null.
+          ^
+Warning 26 [unused-var]: unused variable g.
+
+val f : t_float64 -> unit = <fun>
 |}]
 
 (*********************************************************)
