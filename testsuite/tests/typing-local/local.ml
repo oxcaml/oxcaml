@@ -1092,9 +1092,7 @@ Line 4, characters 2-5:
 4 |   foo ()
       ^^^
 Error: This value is "local"
-         because it closes over the value "r" at line 3, characters 22-23
-         which is "local".
-       However, the highlighted expression is expected to be "local" to the parent region or "global"
+       but is expected to be "local" to the parent region or "global"
          because it is the function in a tail call.
 |}]
 

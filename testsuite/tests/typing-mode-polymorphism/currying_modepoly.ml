@@ -1,5 +1,5 @@
 (* TEST
-  flags+="-rectypes";
+  flags+="-rectypes -extension mode_polymorphism_alpha";
   expect;
 *)
 
@@ -46,7 +46,7 @@ Error: This value is "local"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
   Hint: This is a partial application
-        Adding 1 more argument will make the value non-local
+        Adding 1 more argument may make the value non-local
 |}]
 let apply4 x = g x x x x
 [%%expect{|
@@ -308,34 +308,21 @@ let overapp ~(local_ a) ~b = (); fun ~c ~d -> ()
 let () = overapp ~a:1 ~b:2 ~c:3 ~d:4
 [%%expect{|
 val overapp : a:'a @ local -> b:'b -> (c:'c -> d:'d -> unit) = <fun>
-Line 3, characters 9-26:
-3 | let () = overapp ~a:1 ~b:2 ~c:3 ~d:4
-             ^^^^^^^^^^^^^^^^^
-Error: This application is complete, but surplus arguments were provided afterwards.
-       When passing or calling local values, extra arguments are passed in a separate application.
-  Hint: Try wrapping the marked application in parentheses.
 |}]
 
 let () = overapp ~b:2 ~a:1 ~c:3 ~d:4
 [%%expect{|
-Line 1, characters 20-21:
-1 | let () = overapp ~b:2 ~a:1 ~c:3 ~d:4
-                        ^
-Error: This application is complete, but surplus arguments were provided afterwards.
-       When passing or calling local values, extra arguments are passed in a separate application.
-  Hint: Try splitting the application in two. The arguments that come
-  after this one in the function's type should be applied separately.
 |}]
 
 let () = overapp ~c:1 ~b:2
 [%%expect{|
-Line 1, characters 25-26:
+Line 1, characters 9-26:
 1 | let () = overapp ~c:1 ~b:2
-                             ^
-Error: This application is complete, but surplus arguments were provided afterwards.
-       When passing or calling local values, extra arguments are passed in a separate application.
-  Hint: Try splitting the application in two. The arguments that come
-  after this one in the function's type should be applied separately.
+             ^^^^^^^^^^^^^^^^^
+Error: This expression has type "a:'a @ local -> (d:'b -> unit)"
+       but an expression was expected of type "unit"
+  Hint: This function application is partial,
+  maybe some arguments are missing.
 |}]
 
 let () = overapp ~d:1 ~a:2
@@ -343,10 +330,10 @@ let () = overapp ~d:1 ~a:2
 Line 1, characters 9-26:
 1 | let () = overapp ~d:1 ~a:2
              ^^^^^^^^^^^^^^^^^
-Error: This application is complete, but surplus arguments were provided afterwards.
-       When passing or calling local values, extra arguments are passed in a separate application.
-  Hint: Try splitting the application in two. The arguments that come
-  after b in the function's type should be applied separately.
+Error: This expression has type "b:'a -> (c:'b -> unit) @ local"
+       but an expression was expected of type "unit"
+  Hint: This function application is partial,
+  maybe some arguments are missing.
 |}]
 
 

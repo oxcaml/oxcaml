@@ -1,4 +1,5 @@
 (* TEST
+ flags += "-extension mode_polymorphism_alpha";
  expect;
 *)
 
@@ -6,7 +7,7 @@
 fun (x : < x : int >) y z -> (y :> 'a), (x :> 'a), (z :> 'a);;
 [%%expect{|
 - : < x : int > ->
-    < x : int > -> < x : int > -> < x : int > * < x : int > * < x : int >
+    (< x : int > -> < x : int > -> < x : int > * < x : int > * < x : int >) @ local
 = <fun>
 |}];;
 (* - : (< x : int > as 'a) -> 'a -> 'a * 'a = <fun> *)
@@ -265,11 +266,11 @@ type 'a u = 'a
 |}];;
 fun (x : t) (y : 'a u) -> x = y;;
 [%%expect{|
-- : t -> t u -> bool = <fun>
+- : t -> (t u -> bool) @ local = <fun>
 |}];;
 fun (x : t) (y : 'a u) -> y = x;;
 [%%expect{|
-- : t -> t u -> bool = <fun>
+- : t -> (t u -> bool) @ local = <fun>
 |}];;
 (* - : t -> t u -> bool = <fun> *)
 

@@ -1,4 +1,5 @@
 (* TEST
+ flags += "-extension mode_polymorphism_alpha";
  expect;
 *)
 
@@ -148,6 +149,11 @@ let g = ( (fun _ -> f) :> 'a -> E.t)
 module type T = sig type t end
 val type_of : 'x -> (module T with type t = 'x) = <fun>
 val f : (x:int -> y:int -> int) -> int = <fun>
+Line 4, characters 11-26:
+4 | module E = (val type_of f)
+               ^^^^^^^^^^^^^^^
+Warning 18 [not-principal]: this module unpacking is not principal.
+
 module E : sig type t = (x:int -> y:int -> int) -> int end
 val g : 'a -> E.t = <fun>
 |}]

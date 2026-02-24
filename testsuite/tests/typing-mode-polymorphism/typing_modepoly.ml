@@ -1,5 +1,7 @@
 (* TEST
    expect;
+ flags += "-extension mode_polymorphism_alpha";
+ expect;
 *)
 
 (* Non-representable [val] in signature *)

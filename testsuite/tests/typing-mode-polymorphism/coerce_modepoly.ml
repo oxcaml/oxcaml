@@ -1,5 +1,6 @@
 (* TEST
-   expect;
+ flags += "-extension mode_polymorphism_alpha";
+ expect;
 *)
 
 (* We must put this in a module to stop the top-level from squeezing out
@@ -14,5 +15,5 @@ module M = struct
 end
 
 [%%expect{|
-module M : sig val f : 'a @ local -> unit end
+module M : sig val f : 'a -> unit end
 |}]
