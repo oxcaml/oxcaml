@@ -131,10 +131,52 @@ let print_unique_use ppf (u,l) =
     (Format_doc.compat (Mode.Uniqueness.print ())) u
     (Format_doc.compat (Mode.Linearity.print ())) l
 
-type alloc_mode = Mode.Alloc.r
+type alloc_mode_r = Mode.Locality.r
+
+let submode_with_constant_l_exn
+  ?hint ?(pp = (Location.none, Unknown : Hint.pinpoint)) c alloc_mode =
+  Mode.Locality.submode_exn ~pp (Mode.Locality.of_const ?hint c) alloc_mode
+
+let submode_with_constant_l_err ?hint pp c alloc_mode =
+  Mode.Locality.submode_err pp (Mode.Locality.of_const ?hint c) alloc_mode
+
+let zap_alloc_r_to_ceil (alloc_mode : alloc_mode_r) =
+  Mode.Locality.zap_to_ceil alloc_mode
+
+let print_alloc_mode_r ppf alloc_mode =
+  let open Format in
+  fprintf ppf "alloc_mode %a\n"
+    (Format_doc.compat (Mode.Locality.print ()))
+    alloc_mode
+
+let create_alloc_mode_r m = m
+
+let alloc_mode_r_legacy = Mode.Locality.disallow_left Mode.Locality.legacy
+
+type alloc_mode_l = Mode.Locality.l
+
+let submode_with_constant_r_exn
+  ?hint ?(pp = (Location.none, Unknown : Hint.pinpoint)) alloc_mode c =
+  Mode.Locality.submode_exn ~pp alloc_mode (Mode.Locality.of_const ?hint c)
+
+let submode_with_constant_r_err ?hint pp alloc_mode c =
+  Mode.Locality.submode_err pp alloc_mode (Mode.Locality.of_const ?hint c)
+
+let zap_alloc_l_to_floor (alloc_mode : alloc_mode_l) =
+  Mode.Locality.zap_to_floor alloc_mode
+
+let print_alloc_mode_l ppf alloc_mode =
+  let open Format in
+  fprintf ppf "alloc_mode %a\n"
+    (Format_doc.compat (Mode.Locality.print ()))
+    alloc_mode
+
+let create_alloc_mode_l m = m
+
+let alloc_mode_l_legacy = Mode.Locality.disallow_right Mode.Locality.legacy
 
 type texp_field_boxing =
-  | Boxing of alloc_mode * unique_use
+  | Boxing of alloc_mode_r * unique_use
   | Non_boxing of unique_use
 
 let aliased_many_use =
@@ -267,9 +309,9 @@ and expression_desc =
   | Texp_function of
       { params : function_param list;
         body : function_body;
-        ret_mode : Mode.Alloc.l modes;
+        ret_mode : alloc_mode_l modes;
         ret_sort : Jkind.sort;
-        alloc_mode : alloc_mode;
+        alloc_mode : alloc_mode_r;
         zero_alloc : Zero_alloc.t;
       }
   | Texp_apply of
@@ -279,16 +321,17 @@ and expression_desc =
   | Texp_try of expression * value case list
   | Texp_unboxed_unit
   | Texp_unboxed_bool of bool
-  | Texp_tuple of (string option * expression) list * alloc_mode
+  | Texp_tuple of (string option * expression) list * alloc_mode_r
   | Texp_unboxed_tuple of (string option * expression * Jkind.sort) list
   | Texp_construct of
-      Longident.t loc * constructor_description * expression list * alloc_mode option
-  | Texp_variant of label * (expression * alloc_mode) option
+      Longident.t loc * constructor_description * expression list
+      * alloc_mode_r option
+  | Texp_variant of label * (expression * alloc_mode_r) option
   | Texp_record of {
       fields : ( Types.label_description * record_label_definition ) array;
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
-      alloc_mode : alloc_mode option
+      alloc_mode : alloc_mode_r option
     }
   | Texp_record_unboxed_product of {
       fields :
@@ -298,7 +341,7 @@ and expression_desc =
     }
   | Texp_atomic_loc of
       expression * Jkind.sort * Longident.t loc * label_description *
-      alloc_mode
+      alloc_mode_r
   | Texp_field of
       expression * Jkind.sort * Longident.t loc * label_description *
         texp_field_boxing * Unique_barrier.t
@@ -307,7 +350,7 @@ and expression_desc =
         unique_use
   | Texp_setfield of
       expression * Mode.Locality.l * Longident.t loc * label_description * expression
-  | Texp_array of mutability * Jkind.Sort.t * expression list * alloc_mode
+  | Texp_array of mutability * Jkind.Sort.t * expression list * alloc_mode_r
   | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
   | Texp_array_comprehension of mutability * Jkind.sort * comprehension
@@ -427,7 +470,7 @@ and 'k case =
     }
 
 and function_curry =
-  | More_args of { partial_mode : Mode.Alloc.l }
+  | More_args of { partial_mode : alloc_mode_l }
   | Final_arg
 
 and function_param =
@@ -438,7 +481,7 @@ and function_param =
     fp_partial: partial;
     fp_kind: function_param_kind;
     fp_sort: Jkind.sort;
-    fp_mode: Mode.Alloc.l modes;
+    fp_mode: alloc_mode_l modes;
     fp_curry: function_curry;
     fp_newtypes: (Ident.t * string loc *
                   Parsetree.jkind_annotation option * Uid.t) list;
@@ -456,7 +499,7 @@ and function_body =
 and function_cases =
   { fc_cases: value case list;
     fc_env : Env.t;
-    fc_arg_mode: Mode.Alloc.l;
+    fc_arg_mode: alloc_mode_l;
     fc_arg_sort: Jkind.sort;
     fc_ret_type : Types.type_expr;
     fc_partial: partial;
@@ -488,9 +531,9 @@ and ('a, 'b) arg_or_omitted =
   | Omitted of 'b
 
 and omitted_parameter =
-  { mode_closure : Mode.Alloc.r;
-    mode_arg : Mode.Alloc.l;
-    mode_ret : Mode.Alloc.l;
+  { mode_closure : alloc_mode_r;
+    mode_arg : alloc_mode_l;
+    mode_ret : alloc_mode_l;
     sort_arg : Jkind.sort;
     sort_ret : Jkind.sort }
 
