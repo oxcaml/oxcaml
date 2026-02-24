@@ -37,9 +37,6 @@ type compilation_unit_or_inferred =
 val with_info :
   backend:backend ->
   tool_name:string ->
-  (* CR sspies: This signature might need revisiting. *)
-  compilation_unit:compilation_unit_or_inferred ->
-  kind:Unit_info.intf_or_impl ->
   dump_ext:string ->
   Unit_info.t ->
   (info -> 'a) -> 'a

@@ -69,8 +69,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     Compile_common.with_info ~backend:(Opt Backend.backend) ~tool_name ~dump_ext
 
   let interface ~source_file ~output_prefix =
-    with_info ~source_file ~output_prefix ~dump_ext:"cmi"
-      ~compilation_unit:Inferred_from_output_prefix ~kind:Intf
+    let unit_info =
+      let for_pack_prefix = Compilation_unit.Prefix.from_clflags () in
+      Unit_info.make ~source_file ~for_pack_prefix Intf output_prefix
+    in
+    with_info ~dump_ext:"cmi" unit_info
     @@ fun info ->
     Compile_common.interface
       ~hook_parse_tree:(Compiler_hooks.execute Compiler_hooks.Parse_tree_intf)
@@ -153,11 +156,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       Misc.fatal_errorf "Cannot start from %s"
         (Clflags.Compiler_pass.to_string start_from)
 
-  let implementation_aux ~start_from ~source_file ~output_prefix
-      ~keep_symbol_tables
-      ~(compilation_unit : Compile_common.compilation_unit_or_inferred) =
-    with_info ~source_file ~output_prefix ~dump_ext:Backend.ext_flambda_obj
-      ~compilation_unit ~kind:Impl
+  let implementation_aux ~start_from ~keep_symbol_tables unit_info =
+    with_info ~dump_ext:Backend.ext_flambda_obj unit_info
     @@ fun info ->
     if !Oxcaml_flags.internal_assembler
     then Emitaux.binary_backend_available := true;
@@ -209,17 +209,23 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
 
   let implementation ~start_from ~source_file ~output_prefix ~keep_symbol_tables
       =
+    let unit_info =
+      let for_pack_prefix = Compilation_unit.Prefix.from_clflags () in
+      Unit_info.make ~source_file ~for_pack_prefix Impl output_prefix
+    in
     let start_from = start_from |> starting_point_of_compiler_pass in
-    implementation_aux ~start_from ~source_file ~output_prefix
-      ~keep_symbol_tables ~compilation_unit:Inferred_from_output_prefix
+    implementation_aux ~start_from ~keep_symbol_tables unit_info
 
   let instance ~source_file ~output_prefix ~compilation_unit ~runtime_args
       ~main_module_block_repr ~arg_descr ~keep_symbol_tables =
+    let unit_info =
+      Unit_info.make_with_known_compilation_unit ~source_file Impl
+        output_prefix compilation_unit
+    in
     let start_from =
       Instantiation { runtime_args; main_module_block_repr; arg_descr }
     in
-    implementation_aux ~start_from ~source_file ~output_prefix
-      ~keep_symbol_tables ~compilation_unit:(Exactly compilation_unit)
+    implementation_aux ~start_from ~keep_symbol_tables unit_info
 
   module Link = Optlink.Make (Backend)
 
