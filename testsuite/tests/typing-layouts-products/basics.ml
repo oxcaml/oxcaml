@@ -1839,8 +1839,8 @@ Line 6, characters 28-52:
 Error: Type "coerce_record" is not a subtype of "coerce_int_record"
 |}]
 
-(************************************************)
-(* Test 16: Not allowed as an optional argument *)
+(********************************************)
+(* Test 16: Allowed as an optional argument *)
 
 let f_optional_utuple ?(x = #(1,2)) () = x
 [%%expect{|

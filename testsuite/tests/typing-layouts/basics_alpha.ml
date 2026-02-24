@@ -1319,15 +1319,10 @@ val f : ('a. 'a t2_void) -> 'b t2_void = <fun>
 (* Test 25: Optional parameter with exotic layout *)
 
 let f (x : t_void) =
-  let g ?(x2 = x) () = () in
+  let _g ?(x2 = x) () = () in
   ()
 
 [%%expect{|
-Line 2, characters 6-7:
-2 |   let g ?(x2 = x) () = () in
-          ^
-Warning 26 [unused-var]: unused variable g.
-
 val f : t_void -> unit = <fun>
 |}]
 

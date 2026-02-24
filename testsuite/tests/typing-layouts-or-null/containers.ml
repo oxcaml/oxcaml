@@ -281,33 +281,33 @@ val should_work_list_of_list : int or_null list list =
   [[This 1; Null]; []; [This 2; This 3]]
 |}]
 
-(* Option type arguments are [value_or_null]: *)
+(* Option type arguments are [any]: *)
 
 type t_any : any
 
-type should_fail = t_any option
+type should_work = t_any option
 
 [%%expect{|
 type t_any : any
-type should_fail = t_any option
+type should_work = t_any option
 |}]
 
 type t_value_or_null : value_or_null
 
-type should_fail = t_value_or_null option
+type should_work = t_value_or_null option
 
 [%%expect{|
 type t_value_or_null : value_or_null
-type should_fail = t_value_or_null option
+type should_work = t_value_or_null option
 |}]
 
 type t_any_mod_separable : any mod separable
 
-type should_fail = t_any_mod_separable option
+type should_work = t_any_mod_separable option
 
 [%%expect{|
 type t_any_mod_separable : any mod separable
-type should_fail = t_any_mod_separable option
+type should_work = t_any_mod_separable option
 |}]
 
 type t_value : value
