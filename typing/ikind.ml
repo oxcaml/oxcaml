@@ -56,7 +56,7 @@ module Solver = struct
   module TyTbl = Btype.TypeHash
 
   let constr_to_string (path : Path.t) : string =
-    Format.asprintf "%a" Path.print path
+    Format_doc.asprintf "%a" Path.print path
 
   (* Hash table for caching constructor kinds. *)
   module ConstrTbl = Path.Tbl
@@ -254,8 +254,15 @@ module Solver = struct
       type l r. ctx -> (l * r) Types.jkind -> Ldd.node =
    fun ctx jkind ->
     (* Base is the modality bounds stored on this jkind. *)
+    let mod_bounds = jkind.jkind.mod_bounds in
+    let mod_bounds =
+      Types.Jkind_mod_bounds.create mod_bounds.crossing
+        ~externality:mod_bounds.externality
+        ~nullability:mod_bounds.nullability
+        ~separability:mod_bounds.separability
+    in
     let base =
-      Ldd.const (Types.Jkind_mod_bounds.to_axis_lattice jkind.jkind.mod_bounds)
+      Ldd.const (Types.Jkind_mod_bounds.to_axis_lattice mod_bounds)
     in
     (* For each with-bound (ty, axes), contribute
        modality(axes_mask, kind ty). *)
@@ -337,6 +344,7 @@ module Solver = struct
         Ldd.const Axis_lattice.arrow
       | Types.Tlink _ -> failwith "Tlink shouldn't appear in kind"
       | Types.Tsubst _ -> failwith "Tsubst shouldn't appear in kind"
+      | Types.Trepr (ty, _sort_vars) -> kind ctx ty
       | Types.Tpoly (ty, _) ->
         (* CR ikinds: this is sound but not fully precise.
           Internal ticket 5746. *)
@@ -813,7 +821,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
           Format.asprintf "Poly(base=%s; coeffs=[%s])"
             (Ldd.pp base) coeffs
       in
-      Format.eprintf "[ikind] %a: %s@." Path.print path ikind_msg);
+      Format.eprintf "[ikind] %a: %s@."
+        (Format_doc.compat Path.print) path ikind_msg);
     ikind
 
 (* Package the above into a full evaluation context. *)
@@ -851,10 +860,11 @@ let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
       let stored_jkind =
         match context.lookup_type path with
         | None -> "?"
-        | Some decl -> Format.asprintf "%a" Jkind.format decl.type_jkind
+        | Some decl ->
+          Format.asprintf "%a" (Format_doc.compat Jkind.format) decl.type_jkind
       in
-      Format.eprintf "[ikind] %a: stored=%s, base=%s, coeffs=[%s]@." Path.print
-        path stored_jkind
+      Format.eprintf "[ikind] %a: stored=%s, base=%s, coeffs=[%s]@."
+        (Format_doc.compat Path.print) path stored_jkind
         (Ldd.pp payload.base)
         (String.concat "; "
            (Array.to_list (Array.map Ldd.pp payload.coeffs))));
@@ -882,6 +892,25 @@ let type_declaration_ikind_of_jkind ~(context : Jkind.jkind_context)
         (String.concat "; "
            (Array.to_list (Array.map Ldd.pp payload.coeffs)));
     Types.Constructor_ikind payload
+
+let predef_ikind_context =
+  let unreachable _ =
+    failwith
+      "[predef_ikind_context] We unexpectedly hit a type when computing \
+       ikinds for predef types"
+  in
+  {
+    Jkind.jkind_of_type = unreachable;
+    is_abstract = unreachable;
+    lookup_type = unreachable;
+    debug_print_env = unreachable;
+  }
+
+let predef_ikind_of_jkind ~params type_jkind =
+  type_declaration_ikind_of_jkind
+    ~context:predef_ikind_context ~params type_jkind
+
+let () = Predef.set_ikind_of_jkind predef_ikind_of_jkind
 
 let sub_jkind_l ?allow_any_crossing ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
@@ -911,7 +940,9 @@ let sub_jkind_l ?allow_any_crossing ?origin
         in
         Format.eprintf
           "[ikind-subjkind] call%s allow_any=true@;sub=%a@;super=%a@."
-          origin_suffix Jkind.format sub Jkind.format super);
+          origin_suffix
+          (Format_doc.compat Jkind.format) sub
+          (Format_doc.compat Jkind.format) super);
       Ok ())
     else
       let ctx = make_ctx ~mode:Solver.Normal ~context in
@@ -939,7 +970,10 @@ let sub_jkind_l ?allow_any_crossing ?origin
            @;\
            sub_poly=%s@;\
            super_poly=%s@."
-          origin_suffix Jkind.format sub Jkind.format super (Ldd.pp sub_poly)
+          origin_suffix
+          (Format_doc.compat Jkind.format) sub
+          (Format_doc.compat Jkind.format) super
+          (Ldd.pp sub_poly)
           (Ldd.pp super_poly));
       match violating_axes with
       | [] -> Ok ()
@@ -955,7 +989,8 @@ let sub_jkind_l ?allow_any_crossing ?origin
             in
             Format.eprintf
               "[ikind-subjkind] failure on axes: %s@;sub=%a@;super=%a@." axes
-              Jkind.format sub Jkind.format super
+              (Format_doc.compat Jkind.format) sub
+              (Format_doc.compat Jkind.format) super
         in
         (* Do not try to adjust allowances; Violation.Not_a_subjkind
            accepts an r-jkind. *)
@@ -992,7 +1027,7 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
     let ctx = make_ctx ~mode:Solver.Round_up ~context in
     let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
     let mb = Types.Jkind_mod_bounds.of_axis_lattice lat in
-    Jkind.Mod_bounds.to_mode_crossing mb
+    Types.Jkind_mod_bounds.crossing mb
 
 (* Intentionally no ikind versions of sub_or_intersect / sub_or_error.
    Keep Jkind as the single source for classification and error reporting. *)
@@ -1074,6 +1109,7 @@ and max_arity_in_type (acc : int Path.Map.t) (ty : Types.type_expr) =
   | Tarrow (_, t1, t2, _) -> max_arity_in_type (max_arity_in_type acc t1) t2
   | Tpoly (t, ts) ->
     List.fold_left max_arity_in_type (max_arity_in_type acc t) ts
+  | Trepr (t, _sort_vars) -> max_arity_in_type acc t
   | Tobject (t, name) -> (
     let acc = max_arity_in_type acc t in
     match !name with

@@ -364,16 +364,6 @@ Line 4, characters 40-48:
                                             ^^^^^^^^
 Warning 213: This portability is overriden by portable later.
 
-Line 4, characters 40-48:
-4 |   type 'a t : immutable_data with 'a @@ portable contended portable
-                                            ^^^^^^^^
-Warning 213: This portability is overriden by portable later.
-
-Line 4, characters 40-48:
-4 |   type 'a t : immutable_data with 'a @@ portable contended portable
-                                            ^^^^^^^^
-Warning 213: This portability is overriden by portable later.
-
 module M : sig type 'a t : immutable_data with 'a @@ portable end
 |}]
 
@@ -459,9 +449,10 @@ val r : Xm.t = <abstr>
 Line 2, characters 23-24:
 2 | fork (fun () -> Xm.set r 1);;
                            ^
-Error: The value "r" is "nonportable" but is expected to be "portable"
-       because it is used inside the function at Line 2, characters 5-27
-       which is expected to be "portable".
+Error: The value "r" is "nonportable"
+       but is expected to be "portable"
+         because it is used inside the function at line 2, characters 5-27
+         which is expected to be "portable".
 |}]
 
 
@@ -475,7 +466,7 @@ Line 2, characters 16-18:
 2 | fork (fun () -> r' := 1);;
                     ^^
 Error: This value is "contended"
-       because it is used inside the function at Line 2, characters 5-24
-       which is expected to be "portable".
+         because it is used inside the function at line 2, characters 5-24
+         which is expected to be "portable".
        However, the highlighted expression is expected to be "uncontended".
 |}]

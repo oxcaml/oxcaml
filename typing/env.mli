@@ -17,7 +17,7 @@
 
 open Types
 open Misc
-module Jkind = Btype.Jkind0
+module Jkind0 = Btype.Jkind0
 
 type value_unbound_reason =
   | Val_unbound_instance_variable
@@ -257,7 +257,7 @@ type lookup_error =
       }
   | Cannot_scrape_alias of Longident.t * Path.t
   | Local_value_used_in_exclave of Mode.Hint.lock_item * Longident.t
-  | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
+  | Non_value_used_in_object of Longident.t * type_expr * Jkind0.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of Mode.Hint.pinpoint
@@ -683,9 +683,7 @@ val scrape_alias:
 val same_constr: (t -> type_expr -> type_expr -> bool) ref
 (* Forward declaration to break mutual recursion with Ctype. *)
 val constrain_type_jkind:
-  (t -> type_expr -> jkind_r -> (unit, Jkind.Violation.t) result) ref
-(* Forward declaration to break mutual recursion with Ctype. *)
-val initial_ikind_context: (t -> Jkind.jkind_context) ref
+  (t -> type_expr -> jkind_r -> (unit, Jkind0.Violation.t) result) ref
 (* Forward declaration to break mutual recursion with Printtyp. *)
 val print_longident: Longident.t Format_doc.printer ref
 (* Forward declaration to break mutual recursion with Printtyp. *)
@@ -695,7 +693,7 @@ val print_type_expr: Types.type_expr Format_doc.printer ref
 (* Forward declaration to break mutual recursion with Jkind. *)
 val report_jkind_violation_with_offender:
   (offender:(Format_doc.formatter -> unit) ->
-   level:int -> Format_doc.formatter -> Jkind.Violation.t -> unit) ref
+   level:int -> Format_doc.formatter -> Jkind0.Violation.t -> unit) ref
 
 
 (** Folds *)

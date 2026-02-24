@@ -113,7 +113,10 @@ module Layout : sig
 end
 
 module Mod_bounds : sig
-  val debug_print : Format.formatter -> Types.mod_bounds -> unit
+  type t = Types.mod_bounds
+
+  val to_mode_crossing : t -> Mode.Crossing.t
+  val debug_print : Format.formatter -> t -> unit
 end
 
 module With_bounds : sig
@@ -126,18 +129,11 @@ module With_bounds : sig
     ('l * 'r) Types.with_bounds ->
     ('l * 'r) Types.with_bounds
 
-<<<<<<< HEAD
-  val format : Format.formatter -> ('l * 'r) Types.with_bounds -> unit
+  val format : Format_doc.formatter -> ('l * 'r) Types.with_bounds -> unit
 
   val to_seq :
     ('l * 'r) Types.with_bounds ->
     (Types.type_expr * Types.With_bounds_type_info.t) Seq.t
-
-||||||| 73bc7b39d5
-  val format : Format.formatter -> ('l * 'r) Types.with_bounds -> unit
-=======
-  val format : Format_doc.formatter -> ('l * 'r) Types.with_bounds -> unit
->>>>>>> origin/main
 end
 
 (** A [jkind] is a full description of the runtime representation of values of a

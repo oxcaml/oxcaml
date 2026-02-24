@@ -24,7 +24,7 @@ open Types
 
 open Local_store
 
-module Jkind = Btype.Jkind0
+module Jkind0 = Btype.Jkind0
 module String = Misc.Stdlib.String
 
 let add_delayed_check_forward = ref (fun _ -> assert false)
@@ -845,7 +845,7 @@ type lookup_error =
       }
   | Cannot_scrape_alias of Longident.t * Path.t
   | Local_value_used_in_exclave of Mode.Hint.lock_item * Longident.t
-  | Non_value_used_in_object of Longident.t * type_expr * Jkind.Violation.t
+  | Non_value_used_in_object of Longident.t * type_expr * Jkind0.Violation.t
   | No_unboxed_version of Longident.t * type_declaration
   | Error_from_persistent_env of Persistent_env.error
   | Mutable_value_used_in_closure of Mode.Hint.pinpoint
@@ -903,8 +903,6 @@ let same_constr = ref (fun _ _ _ -> assert false)
 let constrain_type_jkind = ref (fun _ _ _ -> assert false)
 
 let check_well_formed_module = ref (fun _ -> assert false)
-
-let initial_ikind_context = ref (fun _ -> assert false)
 
 (* Helper to decide whether to report an identifier shadowing
    by some 'open'. For labels and constructors, we do not report
@@ -1564,7 +1562,7 @@ and find_type_unboxed_version path env seen =
       type_jkind = jkind;
       type_ikind =
         Types.ikinds_todo
-          (Format.asprintf "env unboxed alias path=%a" Path.print path);
+          (Format_doc.asprintf "env unboxed alias path=%a" Path.print path);
       type_private = decl.type_private;
       type_manifest = Some man;
       type_variance = decl.type_variance;
@@ -3558,7 +3556,7 @@ let unboxed_type ~errors ~env ~loc ~lid ty =
        not a specific instance of that variable. *)
     match
       !constrain_type_jkind env ty
-        Jkind.Builtin.(value_or_null ~why:Captured_in_object)
+        Jkind0.Builtin.(value_or_null ~why:Captured_in_object)
     with
     | Ok () -> ()
     | Result.Error err ->
@@ -4754,7 +4752,7 @@ let print_type_expr : Types.type_expr printer ref =
 let report_jkind_violation_with_offender =
   ref ((fun ~offender:_ ~level:_ _ _ -> assert false)
        : offender:(Format_doc.formatter -> unit) ->
-         level:int -> Format_doc.formatter -> Jkind.Violation.t -> unit)
+         level:int -> Format_doc.formatter -> Jkind0.Violation.t -> unit)
 
 let spellcheck ppf extract env lid =
   let choices ~path name = Misc.spellcheck (extract path env) name in

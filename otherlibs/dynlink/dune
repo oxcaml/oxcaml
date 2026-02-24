@@ -129,24 +129,12 @@
   zero_alloc
   types
   oprint
-<<<<<<< HEAD
   typemode
-  jkind
-  ;; IKINDS
   ldd_intf
   ldd
   axis_lattice
-  ikind
   value_rec_types
-||||||| 73bc7b39d5
-  typemode
-  jkind
-  value_rec_types
-=======
->>>>>>> origin/main
   btype
-  typemode
-  value_rec_types
   lazy_backtrack
   type_shape
   zero_alloc_utils
@@ -161,6 +149,8 @@
   persistent_env
   env
   jkind
+  ;; IKINDS
+  ikind
   errortrace
   ctype
   signature_group
@@ -736,14 +726,8 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Primitive.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Oprint.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Btype.cmo
-<<<<<<< HEAD
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ikind.cmo
-||||||| 73bc7b39d5
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind.cmo
-=======
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typemode.cmo
->>>>>>> origin/main
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Subst.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Signature_with_global_bindings.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Bytesections.cmo
@@ -758,7 +742,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Predef.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Type_shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Env.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ikind.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Errortrace.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ctype.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Signature_group.cmo
@@ -862,14 +846,8 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Primitive.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Oprint.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Btype.cmx
-<<<<<<< HEAD
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ikind.cmx
-||||||| 73bc7b39d5
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind.cmx
-=======
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typemode.cmx
->>>>>>> origin/main
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Subst.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Signature_with_global_bindings.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Bytesections.cmx
@@ -884,7 +862,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Predef.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Type_shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Env.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ikind.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Errortrace.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ctype.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Signature_group.cmx

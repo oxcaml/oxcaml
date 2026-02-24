@@ -141,13 +141,7 @@ COMPILERLIBS_SOURCES=\
   typing/zero_alloc.ml \
   typing/types.ml \
   typing/oprint.ml \
-<<<<<<< HEAD
   typing/typemode.ml \
-  typing/jkind.ml \
-||||||| 73bc7b39d5
-  typing/jkind.ml \
-=======
->>>>>>> origin/main
   typing/typedtree.ml \
   typing/global_counters.ml \
   typing/ldd_intf.ml \
@@ -155,7 +149,6 @@ COMPILERLIBS_SOURCES=\
   typing/axis_lattice.ml \
   typing/axis_lattice_array.ml \
   typing/axis_lattice_array_conv.ml \
-  typing/ikind.ml \
   typing/btype.ml \
   typing/subst.ml \
   typing/signature_with_global_bindings.ml \
@@ -165,6 +158,7 @@ COMPILERLIBS_SOURCES=\
   typing/persistent_env.ml \
   typing/env.ml \
   typing/jkind.ml \
+  typing/ikind.ml \
   typing/errortrace.ml \
   typing/signature_group.ml \
   typing/ctype.ml \

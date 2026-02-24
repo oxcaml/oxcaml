@@ -46,7 +46,7 @@ module Rigid_name = struct
 
   let to_string = function
     | Atom { constr; arg_index } ->
-      let constr_s = Format.asprintf "%a" Path.print constr in
+      let constr_s = Format_doc.asprintf "%a" Path.print constr in
       Printf.sprintf "%s.%d" constr_s arg_index
     | Param i -> Printf.sprintf "param[%d]" i
     | Unknown id ->
@@ -118,7 +118,14 @@ type mod_bounds =
     separability: Jkind_axis.Separability.t;
   }
 
-<<<<<<< HEAD
+module Jkind_mod_bounds = struct
+  module Crossing = Mode.Crossing
+  module Externality = Jkind_axis.Externality
+  module Nullability = Jkind_axis.Nullability
+  module Separability = Jkind_axis.Separability
+
+  type t = mod_bounds
+
   let crossing t = t.crossing
 
   let[@inline] modal ax t = t |> crossing |> (Crossing.proj [@inlined hint]) ax
@@ -404,195 +411,18 @@ type mod_bounds =
           externality;
           nullability;
           separability } =
-    Format.fprintf ppf "@[{ crossing = %a;@ externality = %a;@ \
-      nullability = %a;@ separability = %a }@]"
-      Crossing.print crossing
-      Externality.print externality
-      Nullability.print nullability
-      Separability.print separability
+    let crossing_s = Format_doc.asprintf "%a" Crossing.print crossing in
+    let externality_s = Format_doc.asprintf "%a" Externality.print externality in
+    let nullability_s = Format_doc.asprintf "%a" Nullability.print nullability in
+    let separability_s = Format_doc.asprintf "%a" Separability.print separability in
+    Format.fprintf ppf "@[{ crossing = %s;@ externality = %s;@ \
+      nullability = %s;@ separability = %s }@]"
+      crossing_s
+      externality_s
+      nullability_s
+      separability_s
 end
 
-
-||||||| 73bc7b39d5
-  let crossing t = t.crossing
-
-  let[@inline] modal ax t = t |> crossing |> (Crossing.proj [@inlined hint]) ax
-  let areality = Crossing.Axis.Comonadic Areality
-  let linearity = Crossing.Axis.Comonadic Linearity
-  let uniqueness = Crossing.Axis.Monadic Uniqueness
-  let portability = Crossing.Axis.Comonadic Portability
-  let contention = Crossing.Axis.Monadic Contention
-  let forkable = Crossing.Axis.Comonadic Forkable
-  let yielding = Crossing.Axis.Comonadic Yielding
-  let statefulness = Crossing.Axis.Comonadic Statefulness
-  let visibility = Crossing.Axis.Monadic Visibility
-  let staticity = Crossing.Axis.Monadic Staticity
-  let[@inline] externality t = t.externality
-  let[@inline] nullability t = t.nullability
-  let[@inline] separability t = t.separability
-
-  let[@inline] create
-      crossing
-      ~externality
-      ~nullability
-      ~separability =
-    {
-      crossing;
-      externality;
-      nullability;
-      separability;
-    }
-
-  let[@inline] set_crossing crossing t = { t with crossing }
-  let[@inline] set_externality externality t = { t with externality }
-  let[@inline] set_nullability nullability t = { t with nullability }
-  let[@inline] set_separability separability t = { t with separability }
-
-  let[@inline] set_max_in_set t max_axes =
-    let open Jkind_axis.Axis_set in
-    let[@inline] modal ax =
-      if mem max_axes (Modal ax)
-      then (Crossing.Per_axis.max [@inlined hint]) ax
-      else modal ax t
-    in
-    (* a little optimization *)
-    if is_empty max_axes then t else
-    let regionality = modal areality in
-    let linearity = modal linearity in
-    let uniqueness = modal uniqueness in
-    let portability = modal portability in
-    let contention = modal contention in
-    let forkable = modal forkable in
-    let yielding = modal yielding in
-    let statefulness = modal statefulness in
-    let visibility = modal visibility in
-    let staticity = modal staticity in
-    let externality =
-      if mem max_axes (Nonmodal Externality)
-      then Externality.max
-      else t.externality
-    in
-    let nullability =
-      if mem max_axes (Nonmodal Nullability)
-      then Nullability.max
-      else t.nullability
-    in
-    let separability =
-      if mem max_axes (Nonmodal Separability)
-      then Separability.max
-      else t.separability
-    in
-    let monadic =
-      Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
-    in
-    let comonadic =
-      Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
-        ~forkable ~statefulness
-    in
-    let crossing : Mode.Crossing.t = { monadic; comonadic } in
-    {
-      crossing;
-      externality;
-      nullability;
-      separability;
-    }
-
-  let[@inline] set_min_in_set t min_axes =
-    let open Jkind_axis.Axis_set in
-    let modal ax =
-      if mem min_axes (Modal ax)
-      then (Crossing.Per_axis.min [@inlined hint]) ax
-      else modal ax t
-    in
-    (* a little optimization *)
-    if is_empty min_axes then t else
-    let regionality = modal areality in
-    let linearity = modal linearity in
-    let uniqueness = modal uniqueness in
-    let portability = modal portability in
-    let contention = modal contention in
-    let forkable = modal forkable in
-    let yielding = modal yielding in
-    let statefulness = modal statefulness in
-    let visibility = modal visibility in
-    let staticity = modal staticity in
-    let externality =
-      if mem min_axes (Nonmodal Externality)
-      then Externality.min
-      else t.externality
-    in
-    let nullability =
-      if mem min_axes (Nonmodal Nullability)
-      then Nullability.min
-      else t.nullability
-    in
-    let separability =
-      if mem min_axes (Nonmodal Separability)
-      then Separability.min
-      else t.separability
-    in
-    let monadic =
-      Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
-    in
-    let comonadic =
-      Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
-        ~forkable ~statefulness
-    in
-    let crossing : Mode.Crossing.t = { monadic; comonadic } in
-    {
-      crossing;
-      externality;
-      nullability;
-      separability;
-    }
-
-  let[@inline] is_max_within_set t axes =
-    let open Jkind_axis.Axis_set in
-    let modal ax =
-      not (mem axes (Modal ax)) ||
-      Crossing.Per_axis.((le [@inlined hint]) ax ((max [@inlined hint]) ax)
-        (modal ax t))
-    in
-    modal areality &&
-    modal linearity &&
-    modal uniqueness &&
-    modal portability &&
-    modal contention &&
-    modal forkable &&
-    modal yielding &&
-    modal statefulness &&
-    modal visibility &&
-    modal staticity &&
-    (not (mem axes (Nonmodal Externality)) ||
-     Externality.(le max (externality t))) &&
-    (not (mem axes (Nonmodal Nullability)) ||
-     Nullability.(le max (nullability t))) &&
-    (not (mem axes (Nonmodal Separability)) ||
-     Separability.(le max (separability t)))
-
-  let max =
-    { crossing = Mode.Crossing.max;
-      externality = Externality.max;
-      nullability = Nullability.max;
-      separability = Separability.max }
-
-  let[@inline] is_max m = m = max
-  let debug_print ppf
-        { crossing;
-          externality;
-          nullability;
-          separability } =
-    Format.fprintf ppf "@[{ crossing = %a;@ externality = %a;@ \
-      nullability = %a;@ separability = %a }@]"
-      Crossing.print crossing
-      Externality.print externality
-      Nullability.print nullability
-      Separability.print separability
-end
-
-
-=======
->>>>>>> origin/main
 module With_bounds_type_info = struct
   type t = {relevant_axes : Jkind_axis.Axis_set.t } [@@unboxed]
 

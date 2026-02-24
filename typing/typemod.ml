@@ -2838,7 +2838,7 @@ let rec package_constraints_sig env loc sg constrs =
         when List.mem_assoc [Ident.name id] constrs ->
           let ty = List.assoc [Ident.name id] constrs in
           let reason =
-            Format.asprintf "package constraint path=%a" Path.print (Pident id)
+            Format_doc.asprintf "package constraint path=%a" Path.print (Pident id)
           in
           Sig_type
             ( id,
@@ -3361,8 +3361,8 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
                   Format.eprintf
                     "[nondep-supertype] unexpected coercion@;original=%a@;\
                      nondep=%a@."
-                    Printtyp.modtype mty_res
-                    Printtyp.modtype nondep_mty;
+                    (Format_doc.compat Printtyp.modtype) mty_res
+                    (Format_doc.compat Printtyp.modtype) nondep_mty;
                 fatal_error
                   "unexpected coercion from original module type to \
                    nondep_supertype one"
@@ -3371,8 +3371,8 @@ and type_one_application ~ctx:(apply_loc,sfunct,md_f,args)
                   Format.eprintf
                     "[nondep-supertype] inclusion failure@;original=%a@;\
                      nondep=%a@."
-                    Printtyp.modtype mty_res
-                    Printtyp.modtype nondep_mty;
+                    (Format_doc.compat Printtyp.modtype) mty_res
+                    (Format_doc.compat Printtyp.modtype) nondep_mty;
                 fatal_error
                   "nondep_supertype not included in original module type"
             end;

@@ -349,18 +349,14 @@ let list_argument_sort = Jkind_types.Sort.Const.value
 let list_argument_jkind = Jkind.Builtin.value_or_null ~why:(
   Type_argument {parent_path = path_list; position = 1; arity = 1})
 
-let predef_ikind_context =
-  let unreachable _ = failwith "[predef_ikind_context] We unexpectedly hit a type when computing ikinds for predef types" in
-  {
-    Jkind.jkind_of_type = unreachable;
-    is_abstract = unreachable;
-    lookup_type = unreachable;
-    debug_print_env = unreachable;
-  }
+let ikind_of_jkind_ref :
+    (params:type_expr list -> jkind_l -> type_ikind) ref =
+  ref (fun ~params:_ _jkind -> Types.ikinds_todo "predef")
+
+let set_ikind_of_jkind f = ikind_of_jkind_ref := f
 
 let ikind_of_jkind ~params jkind =
-  Ikind.type_declaration_ikind_of_jkind
-    ~context:predef_ikind_context ~params jkind
+  (!ikind_of_jkind_ref) ~params jkind
 
 let mk_add_type add_type =
   let add_type_with_jkind
@@ -376,28 +372,12 @@ let mk_add_type add_type =
         let type_jkind =
           Jkind.of_builtin ~why:(Unboxed_primitive type_ident) unboxed_jkind
         in
-<<<<<<< HEAD
         let type_jkind = Jkind.mark_best type_jkind in
         let type_ikind = ikind_of_jkind ~params:[] type_jkind in
-        let type_kind =
-          match kind with
-            | Type_abstract Definition -> Type_abstract Definition
-            | _ ->
-              Misc.fatal_error "Predef.mk_add_type: non-abstract unboxed kind"
-        in
-||||||| 73bc7b39d5
-        let type_kind =
-          match kind with
-            | Type_abstract Definition -> Type_abstract Definition
-            | _ ->
-              Misc.fatal_error "Predef.mk_add_type: non-abstract unboxed kind"
-        in
-=======
         (* All unboxed versions of types explicitly added in the predef are
            abstract, as they are special cased. Other unboxed versions are
            automatically derived. *)
         let type_kind = Type_abstract Definition in
->>>>>>> origin/main
         let type_manifest =
           match manifest with
           | None -> None
@@ -496,14 +476,8 @@ let mk_add_type2 add_type type_ident ~jkind ~param1_jkind ~param2_jkind
     { type_params = [param1; param2];
       type_arity = 2;
       type_kind = Type_abstract Definition;
-<<<<<<< HEAD
       type_jkind;
       type_ikind;
-||||||| 73bc7b39d5
-      type_jkind = Jkind.mark_best (jkind);
-=======
-      type_jkind = Jkind.mark_best jkind;
->>>>>>> origin/main
       type_loc = Location.none;
       type_private = Asttypes.Public;
       type_manifest = None;

@@ -2438,7 +2438,7 @@ let mk_jkind_context env jkind_of_type =
     in
     let pp_item ppf (name, path, decl) =
       Format.fprintf ppf "- %s (%a): %a"
-        name Path.print path pp_kind decl
+        name (Format_doc.compat Path.print) path pp_kind decl
     in
     let items = List.rev !items in
     Format.fprintf ppf
@@ -2810,11 +2810,7 @@ let constrain_type_jkind env ty jkind =
   constrain_type_jkind ~fixed:false env ty jkind
 
 let () =
-  Env.constrain_type_jkind := constrain_type_jkind;
-  let initial_ikind_context env =
-    mk_jkind_context env (fun ty -> Some (type_jkind env ty))
-  in
-  Env.initial_ikind_context := initial_ikind_context
+  Env.constrain_type_jkind := constrain_type_jkind
 
 let check_type_externality env ty ext =
   let upper_bound =

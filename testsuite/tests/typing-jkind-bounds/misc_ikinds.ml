@@ -124,11 +124,27 @@ module A :
     type comparator_witness : value mod portable
     val comparator : comparator_witness wrap
   end
-module B :
-  sig
-    type comparator_witness : value mod portable
-    val comparator : comparator_witness wrap @@ portable
-  end
+Lines 23-25, characters 6-3:
+23 | ......struct
+24 |   include Make_nonportable (A)
+25 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type comparator_witness = A.comparator_witness
+           val comparator : A.comparator_witness wrap
+         end @ nonportable
+       is not included in
+         sig
+           type comparator_witness : value mod portable
+           val comparator : comparator_witness wrap @@ portable
+         end @ nonportable
+       Values do not match:
+         val comparator : A.comparator_witness wrap (* in a structure at nonportable *)
+       is not included in
+         val comparator : comparator_witness wrap @@ portable (* in a structure at nonportable *)
+       The left-hand side is "nonportable"
+       but the right-hand side is "portable".
 |}]
 
 module Id(A : sig type t : value end) : sig type t : value = A.t end = struct

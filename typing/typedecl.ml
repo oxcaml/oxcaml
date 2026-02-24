@@ -2807,7 +2807,7 @@ let name_recursion sdecl id decl =
         type_manifest = Some ty';
         type_ikind =
           Types.ikinds_todo
-            (Format.asprintf "name_recursion path=%a"
+            (Format_doc.asprintf "name_recursion path=%a"
               Path.print (Path.Pident id)) }
 else decl
   | _ -> decl
@@ -2887,7 +2887,7 @@ let normalize_decl_jkinds env decls =
         Ikind.sub_jkind_l
           ~origin:(Format.asprintf
                      "typedecl:normalize %a (%a)"
-                     Path.print path
+                     (Format_doc.compat Path.print) path
                      Location.print_loc decl.type_loc)
           ~type_equal
           ~context
@@ -4176,7 +4176,7 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
           type_ikind =
             (let reason =
                Format.asprintf "transl_with_constraint unboxed path=%a"
-                 Path.print (Path.unboxed_version path)
+                 (Format_doc.compat Path.print) (Path.unboxed_version path)
              in
              Types.ikinds_todo reason);
           type_private = priv;
@@ -4214,7 +4214,8 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
       type_jkind;
       type_ikind =
         (let reason =
-           Format.asprintf "transl_with_constraint path=%a" Path.print decl_path
+           Format.asprintf "transl_with_constraint path=%a"
+             (Format_doc.compat Path.print) decl_path
          in
          Types.ikinds_todo reason);
       type_private = priv;

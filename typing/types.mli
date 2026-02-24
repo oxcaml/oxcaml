@@ -83,7 +83,6 @@ val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
     Note on mutability: TBD.
  *)
 
-<<<<<<< HEAD
 (** The mod-bounds of a jkind *)
 module Jkind_mod_bounds : sig
   module Crossing = Mode.Crossing
@@ -139,53 +138,6 @@ module Jkind_mod_bounds : sig
   val debug_print : Format.formatter -> t -> unit
 end
 
-
-||||||| 73bc7b39d5
-(** The mod-bounds of a jkind *)
-module Jkind_mod_bounds : sig
-  module Crossing = Mode.Crossing
-  module Externality = Jkind_axis.Externality
-  module Nullability = Jkind_axis.Nullability
-  module Separability = Jkind_axis.Separability
-
-  type t
-
-  val create :
-    Crossing.t->
-    externality:Externality.t ->
-    nullability:Nullability.t ->
-    separability:Separability.t ->
-    t
-
-  val crossing : t -> Crossing.t
-  val externality : t -> Externality.t
-  val nullability : t -> Nullability.t
-  val separability : t -> Separability.t
-
-  val set_crossing : Crossing.t -> t -> t
-  val set_externality : Externality.t -> t -> t
-  val set_nullability : Nullability.t -> t -> t
-  val set_separability : Separability.t -> t -> t
-
-  (** [set_max_in_set bounds axes] sets all the axes in [axes] to their [max] within
-      [bounds] *)
-  val set_max_in_set : t -> Jkind_axis.Axis_set.t -> t
-
-  (** [set_min_in_set bounds axes] sets all the axes in [axes] to their [min] within
-      [bounds] *)
-  val set_min_in_set : t -> Jkind_axis.Axis_set.t -> t
-
-  (** [is_max_within_set bounds axes] returns whether or not all the axes in [axes] are
-      [max] within [bounds] *)
-  val is_max_within_set : t -> Jkind_axis.Axis_set.t -> bool
-  val is_max : t -> bool
-
-  val debug_print : Format.formatter -> t -> unit
-end
-
-
-=======
->>>>>>> origin/main
 (** Information tracked about an individual type within the with-bounds for a jkind *)
 module With_bounds_type_info : sig
   (** The axes that the with-bound applies to *)

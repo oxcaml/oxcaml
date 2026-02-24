@@ -2660,8 +2660,6 @@ module Violation = struct
   let report_with_offender ~offender ~level =
     report_general ~level "" pp_t offender
 
-  let () = Env.report_jkind_violation_with_offender := report_with_offender
-
   let report_with_offender_sort ~offender ~level =
     report_general ~level "A representable layout was expected, but " pp_t
       offender
@@ -2839,43 +2837,7 @@ let sub_jkind_l ~type_equal ~context ~level ?(allow_any_crossing = false) sub
     super =
   (* This function implements the "SUB" judgement from kind-inference.md. *)
   let open Misc.Stdlib.Monad.Result.Syntax in
-<<<<<<< HEAD
   let require_le = require_le_for_sub_jkind_l ~context sub super in
-||||||| 73bc7b39d5
-  let require_le sub_result =
-    Sub_result.require_le sub_result
-    |> Result.map_error (fun reasons ->
-           (* When we report an error, we want to show the best-normalized
-              version of sub, but the original super. When this check fails, it
-              is usually the case that the super was written by the user and the
-              sub was inferred. Thus, we should display the user-written jkind,
-              but simplify the inferred one, since the inferred one is probably
-              overly complex. *)
-           (* CR layouts v2.8: It would be useful report to the user why this
-              violation occurred, specifically which axes the violation is
-              along. Internal ticket 5100. *)
-           let best_sub = normalize ~mode:Require_best ~context sub in
-           Violation.of_ ~context
-             (Not_a_subjkind (best_sub, super, Nonempty_list.to_list reasons)))
-  in
-=======
-  let require_le sub_result =
-    Sub_result.require_le sub_result
-    |> Result.map_error (fun reasons ->
-        (* When we report an error, we want to show the best-normalized
-              version of sub, but the original super. When this check fails, it
-              is usually the case that the super was written by the user and the
-              sub was inferred. Thus, we should display the user-written jkind,
-              but simplify the inferred one, since the inferred one is probably
-              overly complex. *)
-        (* CR layouts v2.8: It would be useful report to the user why this
-              violation occurred, specifically which axes the violation is
-              along. Internal ticket 5100. *)
-        let best_sub = normalize ~mode:Require_best ~context sub in
-        Violation.of_ ~context
-          (Not_a_subjkind (best_sub, super, Nonempty_list.to_list reasons)))
-  in
->>>>>>> origin/main
   let* () =
     (* Validate layouts *)
     sub_jkind_l_layout ~context ~level sub super

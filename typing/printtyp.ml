@@ -1907,6 +1907,8 @@ let tree_of_type_scheme ty =
 
 let () =
   Env.print_type_expr := type_expr;
+  Env.report_jkind_violation_with_offender :=
+    Jkind.Violation.report_with_offender;
   Jkind.set_outcometrees_of_types (fun tys ->
     prepare_for_printing tys;
     List.map (tree_of_typexp Type) tys);
