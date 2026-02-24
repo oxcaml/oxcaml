@@ -39,7 +39,7 @@ let free_vars ?(param=false) ty =
           end
         (* XXX: What about Tobject ? *)
         | _ ->
-            iter_type_expr loop ty
+            iter_type_expr loop (Fun.const ()) ty
     in
     loop ty
   end;

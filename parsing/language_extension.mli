@@ -21,6 +21,7 @@ type 'a t = 'a Language_extension_kernel.t =
   | Mode : maturity t
   | Unique : maturity t
   | Overwriting : unit t
+  | Mode_polymorphism : maturity t
   | Include_functor : unit t
   | Polymorphic_parameters : unit t
   | Immutable_arrays : unit t

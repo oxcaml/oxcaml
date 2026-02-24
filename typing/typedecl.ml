@@ -1476,7 +1476,8 @@ let rec check_constraints_rec env loc visited ty =
       check_constraints_rec env loc visited ty
   | _ ->
       Ctype.iter_type_expr_with_stages
-        (fun env -> check_constraints_rec env loc visited) env ty
+        (fun env -> check_constraints_rec env loc visited) env
+        (Fun.const ()) ty
   end
 
 let check_constraints_labels env visited l pl =
@@ -2689,7 +2690,8 @@ let check_well_founded ~abs_env env loc path to_check visited ty0 =
               List.iter (check_subtype parents trace ty env) tyl
         end
     | _ ->
-        Ctype.iter_type_expr_with_stages (check_subtype parents trace ty) env ty
+        Ctype.iter_type_expr_with_stages
+          (check_subtype parents trace ty) env (Fun.const ()) ty
   and check_subtype parents trace outer_ty env inner_ty =
       check parents (Contains (outer_ty, inner_ty) :: trace) env inner_ty
   in
@@ -2973,7 +2975,7 @@ let check_regularity ~abs_env env loc path decl to_check =
           check_regular cpath args prev_exp trace env ty
       | _ ->
           Ctype.iter_type_expr_with_stages
-            (check_subtype cpath args prev_exp trace ty) env ty
+            (check_subtype cpath args prev_exp trace ty) env (Fun.const ()) ty
     end
     and check_subtype cpath args prev_exp trace outer_ty env inner_ty =
       let trace = Contains (outer_ty, inner_ty) :: trace in
@@ -3382,7 +3384,7 @@ let transl_type_decl env rec_flag sdecl_list =
   List.iter2
     (fun sdecl tdecl ->
       let decl = tdecl.typ_type in
-       match Ctype.closed_type_decl decl with
+       match Mode.Alloc.with_zap_scope Ctype.closed_type_decl decl with
          Some ty -> raise(Error(sdecl.ptype_loc, Unbound_type_var(ty,decl)))
        | None   -> ())
     sdecl_list tdecls;
@@ -3675,7 +3677,10 @@ let transl_type_extension extend env loc styext =
   (* Check that all type variables are closed *)
   List.iter
     (fun (ext, _shape) ->
-       match Ctype.closed_extension_constructor ext.ext_type with
+       match Mode.Alloc.with_zap_scope
+               Ctype.closed_extension_constructor
+               ext.ext_type
+       with
          Some ty ->
            raise(Error(ext.ext_loc, Unbound_type_var_ext(ty, ext.ext_type)))
        | None -> ())
@@ -3731,7 +3736,10 @@ let transl_exception env sext =
       end
   in
   (* Check that all type variables are closed *)
-  begin match Ctype.closed_extension_constructor ext.ext_type with
+  begin match
+    Mode.Alloc.with_zap_scope
+      Ctype.closed_extension_constructor ext.ext_type
+  with
     Some ty ->
       raise (Error(ext.ext_loc, Unbound_type_var_ext(ty, ext.ext_type)))
   | None -> ()
@@ -4080,7 +4088,10 @@ let check_unboxable env loc ty =
       | _ -> acc
     with Not_found -> acc
   in
-  let all_unboxable_types = Btype.fold_type_expr check_type Path.Set.empty ty in
+  let all_unboxable_types =
+    Btype.fold_type_expr check_type
+      (fun a _ -> a) Path.Set.empty ty
+  in
   Path.Set.fold
     (fun p () ->
        Location.prerr_warning loc
@@ -4520,7 +4531,10 @@ let transl_with_constraint id ?fixed_row_path ~sig_env ~sig_decl ~outer_env
   in
   Option.iter (fun p -> set_private_row env sdecl.ptype_loc p new_sig_decl)
     fixed_row_path;
-  begin match Ctype.closed_type_decl new_sig_decl with None -> ()
+  begin match
+    Mode.Alloc.with_zap_scope
+      Ctype.closed_type_decl new_sig_decl
+  with None -> ()
   | Some ty -> raise(Error(loc, Unbound_type_var(ty, new_sig_decl)))
   end;
   let new_sig_decl = name_recursion sdecl id new_sig_decl in
