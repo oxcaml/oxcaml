@@ -219,6 +219,7 @@ val set_ikind_of_jkind :
 val build_initial_env:
   (Ident.t -> type_declaration -> 'a -> 'a) ->
   (Ident.t -> extension_constructor -> 'a -> 'a) ->
+  (Ident.t -> jkind_declaration -> 'a -> 'a) ->
   'a -> 'a
 
 (* Add simd types to an environment.  This is separate from [build_initial_env]
@@ -274,3 +275,6 @@ val builtin_idents: (string * Ident.t) list
     so flambda can generate code to raise it. *)
 val ident_division_by_zero: Ident.t
 val all_predef_exns : Ident.t list
+
+(** All predefined jkinds, for the jkind cache in [subst.ml]. *)
+val all_predef_jkinds : Ident.t list

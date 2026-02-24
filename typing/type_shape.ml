@@ -228,6 +228,17 @@ module Type_shape = struct
     | None -> false
     | Some max_depth -> depth > max_depth
 
+  let unknown_shape_from_jkind jkind =
+    let layout =
+      match jkind.Types.jkind.base with
+      | Kconstr _ -> None
+      | Layout l -> Jkind_types.Layout.get_const l
+    in
+    let sort_opt = Option.bind layout Jkind_types.Layout.Const.get_sort in
+    match sort_opt with
+    | None -> Shape.unknown_type ()
+    | Some layout -> Shape.at_layout (Shape.unknown_type ()) layout
+
   (* Similarly to [value_kind], we track a set of visited types to avoid cycles
      in the lookup and we, additionally, carry a maximal depth for the recursion.
      We allow a deeper bound than [value_kind]. *)
@@ -240,13 +251,6 @@ module Type_shape = struct
     let unknown_shape_any = Shape.unknown_type () in
     let unknown_shape_value =
       Shape.at_layout (Shape.unknown_type ()) (Base Value)
-    in
-    let unknown_shape_from_jkind jkind =
-      let layout = Jkind_types.Layout.get_const jkind.Types.jkind.layout in
-      let sort_opt = Option.bind layout Jkind_types.Layout.Const.get_sort in
-      match sort_opt with
-      | None -> Shape.unknown_type ()
-      | Some layout -> Shape.at_layout (Shape.unknown_type ()) layout
     in
     (* Leaves indicate we do not know. *)
     let[@inline] cannot_proceed () =
@@ -495,12 +499,7 @@ module Type_decl_shape = struct
     let module Types_predef = Predef in
     let open Shape in
     let unknown_shape () =
-      let jkind = type_declaration.type_jkind in
-      let layout = Jkind_types.Layout.get_const jkind.Types.jkind.layout in
-      let layout = Option.bind layout Jkind_types.Layout.Const.get_sort in
-      match layout with
-      | Some layout -> Shape.at_layout (Shape.unknown_type ()) layout
-      | None -> Shape.unknown_type ()
+      Type_shape.unknown_shape_from_jkind type_declaration.type_jkind
     in
     let type_params = type_declaration.type_params in
     let type_subst = List.combine type_params type_param_shapes in

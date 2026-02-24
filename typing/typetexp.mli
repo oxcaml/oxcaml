@@ -137,7 +137,11 @@ val transl_type_param:
    the level defaults to the current level. The jkind_lr is the jkind to
    use if no annotation is provided. *)
 
-val get_type_param_jkind: Path.t -> Parsetree.core_type -> jkind_lr
+val get_type_param_jkind: Env.t -> Path.t -> Parsetree.core_type -> jkind_lr
+(* [get_type_param_jkind] is only used in contexts where the jkind will be
+   translated again later, so it does not treat the kind it is passed as "used"
+   for the purpose of warnings. *)
+
 val get_type_param_name: Parsetree.core_type -> string option
 
 exception Already_bound

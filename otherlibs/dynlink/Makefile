@@ -150,9 +150,9 @@ COMPILERLIBS_SOURCES=\
   typing/axis_lattice_array.ml \
   typing/axis_lattice_array_conv.ml \
   typing/btype.ml \
+  typing/predef.ml \
   typing/subst.ml \
   typing/signature_with_global_bindings.ml \
-  typing/predef.ml \
   typing/datarepr.ml \
   file_formats/cmi_format.ml \
   typing/persistent_env.ml \
