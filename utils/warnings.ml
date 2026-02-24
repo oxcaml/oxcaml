@@ -603,7 +603,7 @@ let descriptions = [
     names = ["unnecessarily-partial-tuple-pattern"];
     description = "A tuple pattern ends in .. but fully matches its expected \
                    type.";
-    since = since 5 1 };
+    since = since 5 4 };
   { number = 186;
     names = ["unmutated-mutable"];
     description =
