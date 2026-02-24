@@ -103,6 +103,8 @@ val dump_rawfexpr : unit -> dump_target
 
 val dump_fexpr_annot : unit -> bool
 
+val dump_fexpr_annot_after : unit -> string list
+
 type pass = Oxcaml_flags.Flambda2.Dump.pass =
   | Last_pass
   | This_pass of string

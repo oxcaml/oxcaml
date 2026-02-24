@@ -55,7 +55,12 @@ let pp_flambda_as_fexpr ppf unit =
   Print_fexpr.flambda_unit ppf (unit |> Flambda_to_fexpr.conv)
 
 let dump_fexpr_annot ~prefixname suffix unit =
-  if Flambda_features.dump_fexpr_annot ()
+  let dump =
+    Flambda_features.dump_fexpr_annot ()
+    || List.exists (String.equal suffix)
+         (Flambda_features.dump_fexpr_annot_after ())
+  in
+  if dump
   then
     Misc.protect_output_to_file
       (prefixname ^ "." ^ suffix ^ ".fl")
@@ -140,61 +145,23 @@ type flambda_result =
     reachable_names : NO.t
   }
 
-let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
-    (program : Lambda.program) =
-  let module_repr =
-    Lambda.main_module_representation program.main_module_block_format
-  in
-  let compilation_unit = program.compilation_unit in
-  let module_initializer = program.code in
-  (* Make sure -linscan is enabled in classic mode. Doing this here to be sure
-     it happens exactly when -Oclassic is in effect, which we don't know at CLI
-     processing time because there may be an [@@@flambda_oclassic] or
-     [@@@flambda_o3] attribute. *)
-  if Flambda_features.classic_mode () then Clflags.use_linscan := true;
-  Misc.Style.setup (Flambda_features.colour ());
-  (* CR-someday mshinwell: Note for future WebAssembly work: this thing about
-     the length of arrays will need fixing, I don't think it only applies to the
-     Cmm translation.
-
-     This is partially fixed now, but the float array optimization case for
-     array length in the Cmm translation assumes the floats are word width. *)
-  (* The Flambda 2 code won't currently operate on 32-bit hosts; see
-     [Name_occurrences]. *)
-  if Sys.word_size <> 64
-  then Misc.fatal_error "Flambda 2 can only run on 64-bit hosts at present";
-  (* At least one place in the Cmm translation code (for unboxed arrays) cannot
-     cope with big-endian systems, and it seems unlikely any such systems will
-     have to be supported in the future anyway. *)
-  if Arch.big_endian
-  then Misc.fatal_error "Flambda2 only supports little-endian hosts";
-  (* When the float array optimisation is enabled, the length of an array needs
-     to be computed differently according to the array kind, in the case where
-     the width of a float is not equal to the machine word width (at present,
-     this happens only on 32-bit targets). *)
-  if
-    Cmm_helpers.wordsize_shift <> Cmm_helpers.numfloat_shift
-    && Flambda_features.flat_float_array ()
-  then
-    Misc.fatal_error
-      "Cannot compile on targets where floats are not word-width when the \
-       float array optimisation is enabled";
-  let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
-  let (Mode mode) = Flambda_features.mode () in
-  let { Closure_conversion.unit = raw_flambda;
-        code_slot_offsets;
-        metadata = close_program_metadata
-      } =
-    Profile.record_call "lambda_to_flambda" (fun () ->
-        Lambda_to_flambda.lambda_to_flambda ~mode ~machine_width
-          ~big_endian:Arch.big_endian ~cmx_loader ~compilation_unit ~module_repr
-          module_initializer)
-  in
+let flambda_to_flambda0 : type m.
+    ppf_dump:Format.formatter ->
+    prefixname:string ->
+    cmx_loader:Flambda_cmx.loader ->
+    machine_width:Target_system.Machine_width.t ->
+    mode:m Flambda_features.mode ->
+    close_prog_metadata:m Closure_conversion.close_program_metadata ->
+    code_slot_offsets:Slot_offsets.t Flambda2_identifiers.Code_id.Map.t ->
+    Flambda_unit.t ->
+    flambda_result =
+ fun ~ppf_dump:ppf ~prefixname ~cmx_loader ~machine_width ~mode
+     ~close_prog_metadata ~code_slot_offsets raw_flambda ->
   Compiler_hooks.execute Raw_flambda2 raw_flambda;
   print_rawflambda ppf raw_flambda;
   dump_fexpr_annot ~prefixname "raw" raw_flambda;
   let flambda, offsets, reachable_names, cmx, all_code =
-    match mode, close_program_metadata with
+    match mode, close_prog_metadata with
     | Classic, Classic (code, reachable_names, cmx, offsets) ->
       (if Flambda_features.inlining_report ()
        then
@@ -283,6 +250,72 @@ let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
     () (* Either opaque was passed, or there is no need to export offsets *)
   | Some cmx -> Compilenv.set_export_info cmx);
   { flambda; offsets; reachable_names; all_code }
+
+let flambda_to_flambda ~ppf_dump ~prefixname ~machine_width
+    (unit : Flambda_unit.t) =
+  let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
+  let mode, close_prog_metadata =
+    match Flambda_features.mode () with
+    | Mode Normal -> Flambda_features.Normal, Closure_conversion.Normal
+    | Mode Classic ->
+      Misc.fatal_error "Unsupported classic mode in standalone middle-end pass"
+  in
+  flambda_to_flambda0 ~ppf_dump ~prefixname ~cmx_loader ~machine_width ~mode
+    ~close_prog_metadata
+    ~code_slot_offsets:Flambda2_identifiers.Code_id.Map.empty unit
+
+let lambda_to_flambda ~ppf_dump:ppf ~prefixname ~machine_width
+    (program : Lambda.program) =
+  let module_repr =
+    Lambda.main_module_representation program.main_module_block_format
+  in
+  let compilation_unit = program.compilation_unit in
+  let module_initializer = program.code in
+  (* Make sure -linscan is enabled in classic mode. Doing this here to be sure
+     it happens exactly when -Oclassic is in effect, which we don't know at CLI
+     processing time because there may be an [@@@flambda_oclassic] or
+     [@@@flambda_o3] attribute. *)
+  if Flambda_features.classic_mode () then Clflags.use_linscan := true;
+  Misc.Style.setup (Flambda_features.colour ());
+  (* CR-someday mshinwell: Note for future WebAssembly work: this thing about
+     the length of arrays will need fixing, I don't think it only applies to the
+     Cmm translation.
+
+     This is partially fixed now, but the float array optimization case for
+     array length in the Cmm translation assumes the floats are word width. *)
+  (* The Flambda 2 code won't currently operate on 32-bit hosts; see
+     [Name_occurrences]. *)
+  if Sys.word_size <> 64
+  then Misc.fatal_error "Flambda 2 can only run on 64-bit hosts at present";
+  (* At least one place in the Cmm translation code (for unboxed arrays) cannot
+     cope with big-endian systems, and it seems unlikely any such systems will
+     have to be supported in the future anyway. *)
+  if Arch.big_endian
+  then Misc.fatal_error "Flambda2 only supports little-endian hosts";
+  (* When the float array optimisation is enabled, the length of an array needs
+     to be computed differently according to the array kind, in the case where
+     the width of a float is not equal to the machine word width (at present,
+     this happens only on 32-bit targets). *)
+  if
+    Cmm_helpers.wordsize_shift <> Cmm_helpers.numfloat_shift
+    && Flambda_features.flat_float_array ()
+  then
+    Misc.fatal_error
+      "Cannot compile on targets where floats are not word-width when the \
+       float array optimisation is enabled";
+  let cmx_loader = Flambda_cmx.create_loader ~get_module_info in
+  let (Mode mode) = Flambda_features.mode () in
+  let { Closure_conversion.unit = raw_flambda;
+        code_slot_offsets;
+        metadata = close_prog_metadata
+      } =
+    Profile.record_call "lambda_to_flambda" (fun () ->
+        Lambda_to_flambda.lambda_to_flambda ~mode ~machine_width
+          ~big_endian:Arch.big_endian ~cmx_loader ~compilation_unit ~module_repr
+          module_initializer)
+  in
+  flambda_to_flambda0 ~ppf_dump:ppf ~prefixname ~cmx_loader ~machine_width ~mode
+    ~close_prog_metadata ~code_slot_offsets raw_flambda
 
 let reset_symbol_tables () =
   Compilenv.reset_info_tables ();

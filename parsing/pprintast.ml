@@ -1410,6 +1410,7 @@ and class_field ctxt f x =
               ppat_attributes=[]};
            pvb_expr=e;
            pvb_constraint=None;
+           pvb_is_poly=false;
            pvb_attributes=[];
            pvb_modes=[];
            pvb_loc=Location.none;
@@ -1596,7 +1597,9 @@ and signature_item ctxt f x : unit =
       type_def_list ctxt f (Recursive, false, l)
   | Psig_value vd ->
       let intro = if vd.pval_prim = [] then "val" else "external" in
-      pp f "@[<2>%s@ %a@ :@ %a@]%a" intro
+      if vd.pval_prim <> [] then assert (not vd.pval_poly);
+      let poly_str = if vd.pval_poly then "poly_ " else "" in
+      pp f "@[<2>%s@ %s%a@ :@ %a@]%a" intro poly_str
         ident_of_name vd.pval_name.txt
         (value_description ctxt) vd
         (item_attributes ctxt) vd.pval_attributes
@@ -1876,7 +1879,8 @@ and bindings ctxt f (mf,rf,l) =
       else
         [], x
     in
-    pp f "@[<2>%s %a%a%a%a@]%a" kwd mutable_flag mf rec_flag rf
+    let poly_str = if x.pvb_is_poly then "poly_ " else "" in
+    pp f "@[<2>%s %a%s%a%a%a@]%a" kwd mutable_flag mf poly_str rec_flag rf
       optional_legacy_modes legacy
       (binding ctxt) x
       (item_attributes ctxt) x.pvb_attributes
@@ -1994,6 +1998,7 @@ and structure_item ctxt f x =
       end
   | Pstr_class_type l -> class_type_declaration_list ctxt f l
   | Pstr_primitive vd ->
+      assert (not vd.pval_poly);
       pp f "@[<hov2>external@ %a@ :@ %a@]%a"
         ident_of_name vd.pval_name.txt
         (value_description ctxt) vd

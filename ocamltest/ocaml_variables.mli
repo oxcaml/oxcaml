@@ -141,4 +141,6 @@ val sharedobjext : Variables.t
 
 val use_runtime : Variables.t
 
+val fexpr_dump_files : Variables.t
+
 val init : unit -> unit

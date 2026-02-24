@@ -195,6 +195,16 @@ void caml_raise_with_string(value tag, char const *msg)
   CAMLnoreturn;
 }
 
+static value caml_exn_with_arg(value tag, value arg)
+{
+  CAMLparam2(tag, arg);
+  CAMLlocal1(bucket);
+  bucket = caml_alloc_small(2, 0);
+  Field(bucket, 0) = tag;
+  Field(bucket, 1) = arg;
+  CAMLreturn(bucket);
+}
+
 void caml_failwith (char const *msg)
 {
   caml_raise_with_string((value) caml_exn_Failure, msg);
@@ -328,4 +338,9 @@ int caml_is_special_exception(value exn) {
   return exn == (value) caml_exn_Match_failure
     || exn == (value) caml_exn_Assert_failure
     || exn == (value) caml_exn_Undefined_recursive_module;
+}
+
+value caml_failure_exn (value msg)
+{
+  return caml_exn_with_arg((value) caml_exn_Failure, msg);
 }

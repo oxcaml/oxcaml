@@ -2797,7 +2797,8 @@ let drop_invalid_successors cfg_with_layout =
           let successors = Cfg.successor_labels ~normal:true ~exn:true block in
           block.terminator
             <- { block.terminator with
-                 desc = Invalid { r with label_after = None }
+                 desc = Invalid { r with label_after = None };
+                 res = [||]
                };
           block.exn <- None;
           block.can_raise <- false;

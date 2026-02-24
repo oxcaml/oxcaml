@@ -43,6 +43,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       defines : Compilation_unit.t list;
       file_name : string;
       crc : Digest.t;
+      imports_cmx : Import_info.t list;
       (* for shared libs *)
       dynunit : Cmxs_format.dynunit option
     }
@@ -103,6 +104,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
           crc;
           defines = info.ui_defines;
           file_name;
+          imports_cmx = info.ui_imports_cmx;
           dynunit
         }
       in
@@ -187,11 +189,15 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
                       dynu_quoted_globals = quoted_globals |> Array.of_list
                     }
               in
+              let imports_cmx =
+                imports_list infos.lib_imports_cmx info.li_imports_cmx
+              in
               let unit =
                 { name = info.li_name;
                   crc = info.li_crc;
                   defines = info.li_defines;
                   file_name;
+                  imports_cmx;
                   dynunit
                 }
               in
@@ -388,6 +394,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         name = u.ui_unit;
         defines = u.ui_defines;
         crc;
+        imports_cmx = u.ui_imports_cmx;
         dynunit = None
       }
     in

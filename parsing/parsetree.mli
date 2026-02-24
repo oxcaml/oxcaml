@@ -710,6 +710,7 @@ and comprehension_expression =
 
 and value_description =
     {
+     pval_poly: bool; (** val poly_ *)
      pval_name: string loc;
      pval_type: core_type;
      pval_modalities : modalities;
@@ -1330,6 +1331,7 @@ and value_constraint =
 
 and value_binding =
   {
+    pvb_is_poly: bool; (** [let poly_ ] *)
     pvb_pat: pattern;
     pvb_expr: expression;
     pvb_constraint: value_constraint option;

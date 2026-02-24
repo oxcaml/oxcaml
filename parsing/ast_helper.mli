@@ -239,7 +239,8 @@ module Exp:
 module Val:
   sig
     val mk: ?loc:loc -> ?attrs:attrs -> ?docs:docs -> ?prim:string list ->
-      ?modalities:modality with_loc list -> str -> core_type -> value_description
+      ?poly:bool -> ?modalities:modality with_loc list -> str -> core_type ->
+      value_description
   end
 
 (** Type declarations *)
@@ -434,8 +435,8 @@ module Incl:
 module Vb:
   sig
     val mk: ?loc: loc -> ?attrs:attrs -> ?docs:docs -> ?text:text ->
-      ?value_constraint:value_constraint -> ?modes:mode with_loc list -> pattern ->
-      expression -> value_binding
+      ?value_constraint:value_constraint -> ?poly:bool ->
+      ?modes:mode with_loc list -> pattern -> expression -> value_binding
   end
 
 

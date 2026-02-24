@@ -82,6 +82,7 @@ let keyword_table =
     "or", OR;
     "overwrite_", OVERWRITE;
 (*  "parser", PARSER; *)
+    "poly_", POLY;
     "private", PRIVATE;
     "rec", REC;
     "repr_", REPR;
