@@ -163,8 +163,7 @@ f:
   movl  $1, %eax
   movl  $1, %edi
 .L108:
-  movq  %rdi, %rsi
-  imulq $3, %rsi
+  leaq  (%rdi,%rdi,2), %rsi
   leaq  -3(%rax,%rsi), %rax
   cmpq  %rbx, %rdi
   je    .L115
@@ -207,27 +206,25 @@ M.f:
   shrq  $63, %rdi
   movabsq $6148914691236517206, %rsi
   imulq %rsi
-  addq  %rdi, %rdx
-  leaq  -1(%rdx,%rdx), %rax
+  leaq  (%rdx,%rdi), %rax
+  leaq  -1(%rax,%rax), %rax
   cmpq  $1, %rax
-  jl    .L130
+  jl    .L129
   vxorpd %xmm0, %xmm0, %xmm0
   movl  $1, %edi
 .L115:
-  movq  %rdi, %rsi
-  imulq $3, %rsi
-  addq  $-2, %rsi
+  leaq  -2(%rdi,%rdi,2), %rsi
   vmovsd -4(%rbx,%rsi,4), %xmm1
   vmulsd 4(%rbx,%rsi,4), %xmm1, %xmm1
   vmulsd 12(%rbx,%rsi,4), %xmm1, %xmm1
   vaddsd %xmm1, %xmm0, %xmm0
   cmpq  %rax, %rdi
-  je    .L126
+  je    .L125
   addq  $2, %rdi
   jmp   .L115
-.L126:
+.L125:
   ret
-.L130:
+.L129:
   vxorpd %xmm0, %xmm0, %xmm0
   ret
 |}]

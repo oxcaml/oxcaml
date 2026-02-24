@@ -51,6 +51,10 @@ let rec select_addr exp =
       else default
     | (Asymbol _ | Aadd (_, _) | Ascale (_, _) | Ascaledadd (_, _, _)), _ ->
       default)
+  | Cmm.Cop (Cmuli, [(Cvar _ as arg); Cconst_int (((3 | 5 | 9) as mult), _)], _)
+  | Cmm.Cop (Cmuli, [Cconst_int (((3 | 5 | 9) as mult), _); (Cvar _ as arg)], _)
+    ->
+    Ascaledadd (arg, arg, mult - 1), 0
   | Cmm.Cop (Cmuli, [arg; Cconst_int (((2 | 4 | 8) as mult), _)], _)
   | Cmm.Cop (Cmuli, [Cconst_int (((2 | 4 | 8) as mult), _); arg], _) -> (
     let default = Ascale (arg, mult), 0 in
@@ -128,7 +132,7 @@ let specific x : Cfg.basic_or_terminator = Basic (Op (Specific x))
 let pseudoregs_for_operation op arg res =
   match (op : Operation.t) with
   (* Two-address binary operations: arg.(0) and res.(0) must be the same *)
-  | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor) | Specific Ipackf32 ->
+  | Intop (Isub | Imul | Iand | Ior | Ixor) | Specific Ipackf32 ->
     [| res.(0); arg.(1) |], res
   | Floatop ((Float32 | Float64), (Iaddf | Isubf | Imulf | Idivf))
   | Specific (Ifloatarithmem (_, _, _)) ->
@@ -209,7 +213,7 @@ let pseudoregs_for_operation op arg res =
     arg, res
   (* Other instructions are regular *)
   | Intop_atomic { op = Add | Sub | Land | Lor | Lxor; _ }
-  | Intop (Ipopcnt | Iclz _ | Ictz _ | Icomp _)
+  | Intop (Ipopcnt | Iclz _ | Ictz _ | Icomp _ | Iadd)
   | Intop_imm ((Imulh _ | Idiv | Imod | Icomp _ | Ipopcnt | Iclz _ | Ictz _), _)
   | Specific
       ( Isextend32 | Izextend32 | Ilea _
@@ -359,7 +363,7 @@ let select_operation'
     Cfg_selectgen_target_intf.select_operation_result =
   match op with
   (* Recognize the LEA instruction *)
-  | Caddi | Caddv | Cadda | Csubi | Cor -> (
+  | Caddi | Caddv | Cadda | Csubi | Cor | Cmuli -> (
     match select_addressing Word_int (Cop (op, args, dbg)) with
     | Iindexed _, _ | Iindexed2 0, _ -> Use_default
     | ((Iindexed2 _ | Iscaled _ | Iindexed2scaled _ | Ibased _) as addr), arg ->
