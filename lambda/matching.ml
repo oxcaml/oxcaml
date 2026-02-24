@@ -1196,6 +1196,9 @@ type ('args, 'head_pat, 'matrix) pm_or_compiled = {
 *)
 let compose_mut m1 m2 =
   match m1, m2 with
+  (* CR sspies: [Immutable_unique] is new, and this is only a guess *)
+  | Immutable_unique, Immutable | Immutable, Immutable_unique
+  | Immutable_unique, Immutable_unique -> Immutable_unique
   | Immutable, Immutable -> Immutable
   | Mutable, _ | _, Mutable -> Mutable
 
@@ -4269,7 +4272,7 @@ and compile_match_simplified ~scopes value_kind repr partial ctx
 and compute_arg_partial partial mut =
   match partial.tempo, mut with
   | Following, Mutable -> Arg { partial with global = Partial }
-  | First, _ | _, Immutable -> Arg partial
+  | First, _ | _, (Immutable | Immutable_unique) -> Arg partial
 
 and mut_of_binding_kind =
   (* This is somewhat of a hack: we notice that a pattern-matching
@@ -4313,7 +4316,7 @@ and bind_match_arg kind v v_duid arg arg_layout (lam, jumps) =
        by calling [Context.erase_first_col] below.
     *)
     match mut_of_binding_kind kind with
-    | Immutable -> jumps
+    | Immutable | Immutable_unique -> jumps
     | Mutable ->
         Jumps.map Context.erase_first_col jumps in
   (bind_check kind v v_duid arg_layout arg lam,
