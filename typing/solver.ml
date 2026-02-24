@@ -316,6 +316,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
          - for all [f u \in v.vlower] and [g w \in v.vupper] we
            have either [g'f \in w.vlower] or [f'g \in u.vupper]. *)
       id : int;  (** For identification/printing *)
+      mutable subst : 'a var option;
+          (** Similar to Tsubst in a type, the [subst] field holds an optional
+              copy used during instantiation *)
       mutable gencopy : 'a var option
           (** Calls to [generalize_structure] creates additional copies to make
               sure the bounds of a generalize structure is rigid: [gencopy]
@@ -368,6 +371,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   (** [append_changes l0 l1] returns a log that's equivalent to [l0] followed by
       [l1]. *)
   let append_changes l0 l1 = l1 @ l0
+
+  type copy_change =
+    | Coptcopy : 'a C.obj * int * 'a var * 'a var option -> copy_change
+
+  type copy_scope = { mutable saved_copies : copy_change list }
 
   type ('a, 'd) mode =
     | Amode :
@@ -703,6 +711,14 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | None -> ()
     | Some log -> log := Cvupper (v, v.vupper) :: !log);
     v.vupper <- vupper
+
+  (** Function used internally by copy, where [changes] maintains the cleanup
+      once the copy is done. Unlike other setters, the [changes] is here
+      mandatory *)
+  let set_optcopy ~changes obj ~copy_to_level v copy =
+    changes.saved_copies
+      <- Coptcopy (obj, copy_to_level, v, v.subst) :: changes.saved_copies;
+    v.subst <- copy
 
   (** Function used internally by generalize_structure to cache newly created
       copies *)
@@ -1227,6 +1243,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let vupper = Option.value vupper ~default:VarMap.empty in
     let level = if !debug_modes then id mod 5 else level in
     let gencopy = None in
+    let subst = None in
     let var =
       { level;
         upper;
@@ -1236,7 +1253,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         vlower;
         vupper;
         id;
-        gencopy
+        gencopy;
+        subst
       }
     in
     vars := id + 1, Var var :: l;
@@ -1401,6 +1419,103 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           let obj = C.src obj f in
           generalize_structure_v ~log obj ~current_level v)
         mvs
+
+  let fresh_mode_copy_scope () = { saved_copies = [] }
+
+  let undo_copy_change = function
+    | Coptcopy (dst, update_to_level, v, copy) ->
+      Option.iter
+        (fun u -> update_level_finalize ~log:None dst update_to_level u)
+        v.subst;
+      v.subst <- copy
+
+  let cleanup_mode_copy_scope l = List.iter undo_copy_change l.saved_copies
+
+  let with_copy_scope f =
+    let scope = fresh_mode_copy_scope () in
+    Fun.protect
+      ~finally:(fun () -> cleanup_mode_copy_scope scope)
+      (fun () -> f scope)
+
+  let rec copy_v : type a.
+      copy_scope:_ ->
+      copy_from_level:int ->
+      copy_to_level:int ->
+      a C.obj ->
+      a var ->
+      a var =
+   fun ~copy_scope ~copy_from_level ~copy_to_level obj v ->
+    if v.level < copy_from_level
+    then v
+    else begin
+      (* generalize_structure might have already created a copy, cached in [gencopy].
+         If such a copy exist, we return it *)
+      match v.gencopy with
+      | Some v' -> v'
+      | None -> (
+        match v.subst with
+        | Some v' -> v'
+        | None ->
+          let copy = fresh ~upper:v.upper ~lower:v.lower ~level:v.level obj in
+          set_optcopy ~changes:copy_scope obj ~copy_to_level v (Some copy);
+          let vupper =
+            VarMap.map
+              (fun (Amorphvar (u, f, f_hint)) ->
+                let src = C.src obj f in
+                let ucopy =
+                  copy_v ~copy_scope ~copy_from_level ~copy_to_level src u
+                in
+                Amorphvar (ucopy, f, f_hint))
+              v.vupper
+          in
+          let vlower =
+            VarMap.map
+              (fun (Amorphvar (u, f, f_hint)) ->
+                let src = C.src obj f in
+                let ucopy =
+                  copy_v ~copy_scope ~copy_from_level ~copy_to_level src u
+                in
+                Amorphvar (ucopy, f, f_hint))
+              v.vlower
+          in
+          copy.vupper <- vupper;
+          copy.vlower <- vlower;
+          set_level ~log:None copy copy_to_level;
+          copy)
+    end
+
+  let copy (type a l r) ~copy_scope ~copy_from_level ~copy_to_level
+      (obj : a C.obj) (a : (a, l * r) mode) : (a, l * r) mode =
+    match a with
+    | Amodevar (Amorphvar (v, f, f_hint)) ->
+      let obj = C.src obj f in
+      let vcopy = copy_v ~copy_scope ~copy_from_level ~copy_to_level obj v in
+      if vcopy == v then a else Amodevar (Amorphvar (vcopy, f, f_hint))
+    | Amode _ -> a
+    | Amodejoin (a, a_hint, mvs) ->
+      let mvscopy =
+        VarMap.map
+          (fun (Amorphvar (v, f, f_hint)) ->
+            let obj = C.src obj f in
+            let vcopy =
+              copy_v ~copy_scope ~copy_from_level ~copy_to_level obj v
+            in
+            Amorphvar (vcopy, f, f_hint))
+          mvs
+      in
+      Amodejoin (a, a_hint, mvscopy)
+    | Amodemeet (a, a_hint, mvs) ->
+      let mvscopy =
+        VarMap.map
+          (fun (Amorphvar (v, f, f_hint)) ->
+            let obj = C.src obj f in
+            let vcopy =
+              copy_v ~copy_scope ~copy_from_level ~copy_to_level obj v
+            in
+            Amorphvar (vcopy, f, f_hint))
+          mvs
+      in
+      Amodemeet (a, a_hint, mvscopy)
 
   let update_level (type a l r) (level : int) (obj : a C.obj)
       (a : (a, l * r) mode) ~log =
