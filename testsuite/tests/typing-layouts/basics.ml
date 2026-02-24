@@ -1264,7 +1264,6 @@ Error: The value "v" has type "('a : value)"
 |}];;
 
 (* option *)
-(* CR layouts v5: allow this *)
 type t13f = t_float64 option;;
 [%%expect{|
 type t13f = t_float64 option
@@ -1548,15 +1547,10 @@ val f : ('a. 'a t2_float) -> 'b t2_float = <fun>
 (* CR layouts v5: bring void version here from layouts_alpha *)
 
 let f (x : t_float64) =
-  let g ?(x2 = x) () = () in
+  let _g ?(x2 = x) () = () in
   ()
 
 [%%expect{|
-Line 2, characters 6-7:
-2 |   let g ?(x2 = x) () = () in
-          ^
-Warning 26 [unused-var]: unused variable g.
-
 val f : t_float64 -> unit = <fun>
 |}]
 
