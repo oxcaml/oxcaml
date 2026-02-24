@@ -1,5 +1,5 @@
 (* TEST
- flags += "-dlambda -dno-unique-ids";
+ flags += "-dlambda -dno-unique-ids -extension mode_polymorphism_alpha";
  expect;
 *)
 
@@ -8,7 +8,7 @@
 
 let f = fun [@inline] (type a) (x : a) -> x
 [%%expect{|
-(let (f = (function {nlocal = 0} x always_inline x))
+(let (f = (function {nlocal = 1} x[L] always_inline : local x))
   (apply (field_imm 1 (global Toploop!)) "f" f))
 val f : 'a -> 'a = <fun>
 |}]

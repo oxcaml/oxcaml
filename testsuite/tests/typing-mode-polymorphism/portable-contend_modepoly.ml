@@ -1,4 +1,5 @@
 (* TEST
+   flags += "-extension mode_polymorphism_alpha";
    include stdlib_stable;
    expect;
 *)
@@ -129,8 +130,9 @@ Line 4, characters 23-26:
 4 |     let _ @ portable = bar in
                            ^^^
 Error: This value is "nonportable"
-         because it closes over the value "best_bytes" at line 3, characters 24-34
-         which is "nonportable".
+         because it contains a usage (of the value "r" at line 3, characters 17-18)
+         which is expected to be "uncontended"
+         because its mutable field "a" is being written.
        However, the highlighted expression is expected to be "portable".
 |}]
 

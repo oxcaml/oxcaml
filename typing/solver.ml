@@ -591,6 +591,99 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         mvs
         (not (VarMap.is_empty mvs))
 
+  type var_iterator =
+    { iter : 'a. 'a C.obj -> ('a, allowed * allowed) mode -> unit }
+  [@@unboxed]
+
+  let mode_iter : type a l r. a C.obj -> (a, l * r) mode -> var_iterator -> unit
+      =
+   fun dst m { iter } ->
+    match m with
+    | Amodevar (Amorphvar (v, f, _f_hint)) ->
+      let src = C.src dst f in
+      iter src (Amodevar (Amorphvar (v, C.id, Id)))
+    | _ -> ()
+
+  let rec iter_covariant_morphvar : type a r.
+      visited:(int, unit) Hashtbl.t ->
+      a C.obj ->
+      (int -> (a, allowed * disallowed) mode -> unit) ->
+      (a, allowed * r) morphvar ->
+      unit =
+   fun ~visited dst iter (Amorphvar (v, f, f_hint)) ->
+    if Hashtbl.mem visited v.id
+    then ()
+    else begin
+      Hashtbl.add visited v.id ();
+      VarMap.iter
+        (fun _ (Amorphvar (u, g, g_hint)) ->
+          let fg = C.compose dst (C.disallow_right f) g in
+          let fg_hint =
+            Comp_hint.Morph_hint.Compose
+              (Comp_hint.Morph_hint.disallow_right f_hint, g_hint)
+          in
+          let mu = Amorphvar (u, fg, fg_hint) in
+          if u.level <> generic_level then iter u.id (Amodevar mu);
+          iter_covariant_morphvar ~visited dst iter mu)
+        v.vlower
+    end
+
+  let iter_covariant : type a r.
+      a C.obj ->
+      (a, allowed * r) mode ->
+      (int -> (a, allowed * disallowed) mode -> unit) ->
+      unit =
+   fun dst m iter ->
+    match m with
+    | Amode _ -> ()
+    | Amodevar mv ->
+      let visited = Hashtbl.create 17 in
+      iter_covariant_morphvar ~visited dst iter mv
+    | Amodejoin (_, _, mvs) ->
+      let visited = Hashtbl.create 17 in
+      VarMap.iter (fun _ mv -> iter_covariant_morphvar ~visited dst iter mv) mvs
+
+  let rec iter_contravariant_morphvar : type a l.
+      visited:(int, unit) Hashtbl.t ->
+      a C.obj ->
+      (int -> (a, disallowed * allowed) mode -> unit) ->
+      (a, l * allowed) morphvar ->
+      unit =
+   fun ~visited dst iter (Amorphvar (v, f, f_hint)) ->
+    if Hashtbl.mem visited v.id
+    then ()
+    else begin
+      Hashtbl.add visited v.id ();
+      VarMap.iter
+        (fun _ (Amorphvar (u, g, g_hint)) ->
+          let fg = C.compose dst (C.disallow_left f) g in
+          let fg_hint =
+            Comp_hint.Morph_hint.Compose
+              (Comp_hint.Morph_hint.disallow_left f_hint, g_hint)
+          in
+          let mu = Amorphvar (u, fg, fg_hint) in
+          if u.level <> generic_level then iter u.id (Amodevar mu);
+          iter_contravariant_morphvar ~visited dst iter mu)
+        v.vupper
+    end
+
+  let iter_contravariant : type a l.
+      a C.obj ->
+      (a, l * allowed) mode ->
+      (int -> (a, disallowed * allowed) mode -> unit) ->
+      unit =
+   fun dst m iter ->
+    match m with
+    | Amode _ -> ()
+    | Amodevar mv ->
+      let visited = Hashtbl.create 17 in
+      iter_contravariant_morphvar ~visited dst iter mv
+    | Amodemeet (_, _, mvs) ->
+      let visited = Hashtbl.create 17 in
+      VarMap.iter
+        (fun _ mv -> iter_contravariant_morphvar ~visited dst iter mv)
+        mvs
+
   let apply_morphvar dst morph morph_hint (Amorphvar (var, morph', morph'_hint))
       =
     Amorphvar
@@ -1221,8 +1314,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   let vars = ref (0, [])
 
-  let debug_modes = ref true
-
   let fresh ?upper ?upper_hint ?lower ?lower_hint ?vlower ?vupper ~level obj =
     let id, l = !vars in
     let upper, upper_hint =
@@ -1241,7 +1332,6 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     in
     let vlower = Option.value vlower ~default:VarMap.empty in
     let vupper = Option.value vupper ~default:VarMap.empty in
-    let level = if !debug_modes then id mod 5 else level in
     let gencopy = None in
     let subst = None in
     let var =
@@ -1543,20 +1633,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           update_level_v ~log obj level v)
         mvs
 
-  let cnt = ref 0
-
   let submode (type a r l) (pp : H.Pinpoint.t) (obj : a C.obj)
       (a : (a, allowed * r) mode) (b : (a, l * allowed) mode) ~log =
-    if !debug_modes
-    then begin
-      if !cnt mod 10 = 0 then update_level (!cnt mod 3) obj a ~log;
-      if !cnt mod 15 = 0 then update_level (!cnt mod 5) obj b ~log
-    end;
-    if !debug_modes && !cnt mod 29 = 0
-    then begin
-      let current_level = !cnt mod 13 in
-      generalize ~current_level ~log obj a
-    end;
     let submode_cc ~log:_ _pp obj left left_hint right right_hint =
       if C.le obj left right
       then Ok ()

@@ -1,5 +1,5 @@
 (* TEST
- flags += " -w +A -strict-sequence ";
+ flags += "-w +A -strict-sequence -extension mode_polymorphism_alpha";
  expect;
 *)
 
@@ -41,7 +41,7 @@ maybe some arguments are missing.
 
 let _ = if true then Array.get else (fun _ _ -> 12);;
 [%%expect {|
-- : int array -> int -> int = <fun>
+- : int array -> (int -> int) @ local = <fun>
 |}]
 
 let _ = if true then Array.get [||] else (fun _ -> 12);;

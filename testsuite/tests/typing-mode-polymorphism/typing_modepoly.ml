@@ -1,5 +1,5 @@
 (* TEST
- flags += "-extension runtime_metaprogramming";
+ flags += "-extension runtime_metaprogramming -extension mode_polymorphism_alpha";
  expect;
 *)
 
@@ -346,7 +346,7 @@ Error: Type variable "'a" is used outside any quotations,
 
 <[fun (type a) (type b) (x : a) (y : b) -> (x, y)]>;;
 [%%expect {|
-- : <[$('a) -> $('b) -> $('a) * $('b)]> expr =
+- : <[$('a) -> ($('b) -> $('a) * $('b)) @ local]> expr =
 <[fun (type a) (type b) (x : a) (y : b) -> (x, y)]>
 |}];;
 
@@ -379,25 +379,25 @@ Error: Identifier "t5" is used at line 3, characters 11-14,
 
 <[fun (x : 'a) (y : 'b) -> (x, y)]>;;
 [%%expect {|
-- : <[$('a) -> $('b) -> $('a) * $('b)]> expr =
+- : <[$('a) -> ($('b) -> $('a) * $('b)) @ local]> expr =
 <[fun (x : 'a) (y : 'b) -> (x, y)]>
 |}];;
 
 <[fun (f : 'a. 'a -> 'a) (x : 'b) -> f x]>;;
 [%%expect {|
-- : <[('a. 'a -> 'a) -> $('b) -> $('b)]> expr =
+- : <[('a. 'a -> 'a) -> ($('b) -> $('b)) @ local]> expr =
 <[fun (f : 'a. 'a -> 'a) (x : 'b) -> f x]>
 |}];;
 
 <[fun (f : 'a. 'a -> 'a) (x : 'a) -> f x]>;;
 [%%expect {|
-- : <[('a. 'a -> 'a) -> $('a) -> $('a)]> expr =
+- : <[('a. 'a -> 'a) -> ($('a) -> $('a)) @ local]> expr =
 <[fun (f : 'a. 'a -> 'a) (x : 'a__1) -> f x]>
 |}];;
 
 <[fun (x : 'a) (f : 'a. 'a -> 'a) -> f x]>;;
 [%%expect {|
-- : <[$('a) -> ('a0. 'a0 -> 'a0) -> $('a)]> expr =
+- : <[$('a) -> (('a0. 'a0 -> 'a0) -> $('a)) @ local]> expr =
 <[fun (x : 'a) (f : 'a__1. 'a__1 -> 'a__1) -> f x]>
 |}];;
 
@@ -405,8 +405,9 @@ Error: Identifier "t5" is used at line 3, characters 11-14,
 [%%expect {|
 - : <[
      ('a. 'a -> 'a) ->
-     ('b 'c. 'b list -> ('b -> 'c) -> 'c list) ->
-     $('d) list -> ($('d) -> $('e)) -> $('e) list]>
+     (('b 'c. 'b list -> ('b -> 'c) -> 'c list) ->
+      ($('d) list -> ($('d) -> $('e)) -> $('e) list)) @ local
+     ]>
     expr
 =
 <[fun (f : 'a. 'a -> 'a) (g : 'b 'c. 'b list -> ('b -> 'c) -> 'c list) -> f g

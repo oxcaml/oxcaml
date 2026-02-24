@@ -1,5 +1,5 @@
 (* TEST
- flags += "-dlambda";
+ flags += "-dlambda -extension mode_polymorphism_alpha";
  stack-allocation;
  expect;
 *)
@@ -26,7 +26,7 @@ let f x =
 type t = { a : bool; mutable b : int option; }
 (let
   (f/290 =
-     (function {nlocal = 0} x/292 : int
+     (function {nlocal = 1} x/292[L] : int
        (if (field_int 0 x/292)
          (let (*match*/296 =o? (field_mut 1 x/292))
            (if *match*/296
@@ -57,7 +57,7 @@ let f x =
 type t = { a : bool; mutable b : int option; }
 (let
   (f/303 =
-     (function {nlocal = 0} x/304 : int
+     (function {nlocal = 1} x/304[L] : int
        (if (field_int 0 x/304)
          (let (*match*/308 =o? (field_mut 1 x/304))
            (if *match*/308 (field_imm 0 *match*/308) 1))
@@ -86,7 +86,7 @@ let f r =
 [%%expect {|
 (let
   (f/310 =
-     (function {nlocal = 0} r/311 : int
+     (function {nlocal = 1} r/311[L] : int
        (region
          (let
            (*match*/313 =[value<(consts (0)) (non_consts ([0: ?]))>]
@@ -97,7 +97,7 @@ let f r =
                  (if *match*/315 (exit 7) 0))
                (exit 7))
             with (7)
-             (if (seq (setfield_ptr 0 r/311 0) 0) 1
+             (if (seq (setfield_ptr(maybe-stack) 0 r/311 0) 0) 1
                (if *match*/313
                  (let
                    (*match*/317 =o? (field_mut 0 (field_imm 0 *match*/313)))
@@ -124,8 +124,8 @@ let test = function
 type _ t = Int : int -> int t | Bool : bool -> bool t
 (let
   (test/321 =
-     (function {nlocal = 0}
-       param/324[value<(consts (0)) (non_consts ([0: ?]))>] : int
+     (function {nlocal = 1}
+       param/324[L][value<(consts (0)) (non_consts ([0: ?]))>] : int
        (if param/324 (field_imm 0 (field_imm 0 param/324)) 0)))
   (apply (field_imm 1 (global Toploop!)) "test" test/321))
 val test : int t option -> int = <fun>
@@ -146,7 +146,7 @@ let test = function
 type _ t = Int : int -> int t | Bool : bool -> bool t
 (let
   (test/329 =
-     (function {nlocal = 0} param/331 : int
+     (function {nlocal = 1} param/331[L] : int
        (let (*match*/332 =o? (field_mut 0 param/331))
          (if *match*/332 (field_imm 0 (field_imm 0 *match*/332)) 0))))
   (apply (field_imm 1 (global Toploop!)) "test" test/329))
@@ -171,7 +171,7 @@ let test n =
 type _ t = Int : int -> int t | Bool : bool -> bool t
 (let
   (test/337 =
-     (function {nlocal = 0} n/338? : int
+     (function {nlocal = 1} n/338[L]? : int
        (region
          (let
            (*match*/341 =[value<(consts (0)) (non_consts ([0: ?]))>]

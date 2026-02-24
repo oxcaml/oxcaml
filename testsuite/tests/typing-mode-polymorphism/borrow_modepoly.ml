@@ -1,4 +1,5 @@
 (* TEST
+ flags += "-extension mode_polymorphism_alpha";
   expect;
 *)
 
@@ -731,7 +732,7 @@ Error: This value is "local"
        but is expected to be "local" to the parent region or "global"
          because it escapes the borrow region at line 4, characters 10-50.
   Hint: This is a partial application
-        Adding 1 more argument will make the value non-local
+        Adding 1 more argument may make the value non-local
 |}]
 
 let rec foo x =
@@ -781,10 +782,5 @@ let foo () =
   (let z2 = borrow_ y in aliased_aliased_use z1 z2);
   unique_aliased_use y z1
 [%%expect{|
-Line 6, characters 2-22:
-6 |   unique_aliased_use y z1
-      ^^^^^^^^^^^^^^^^^^^^
-Error: This application is complete, but surplus arguments were provided afterwards.
-       When passing or calling once values, extra arguments are passed in a separate application.
-  Hint: Try wrapping the marked application in parentheses.
+val foo : unit -> unit = <fun>
 |}]
