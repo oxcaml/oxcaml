@@ -4,7 +4,7 @@
    readonly_files = "fp_backtrace.c stack_realloc_.c";
    all_modules = "${readonly_files} stack_realloc2.ml";
    (* the mangled names appear in the output *)
-   flat-name-mangling;
+   structured-name-mangling;
    native;
 *)
 

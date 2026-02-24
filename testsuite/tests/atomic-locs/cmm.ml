@@ -37,7 +37,7 @@ let set_imm (r : int atomic) v =
    no-frame_pointers;
    (* the output also depends on the current name-mangling scheme, so run the
       test only when the expected one is selected *)
-   flat-name-mangling;
+   structured-name-mangling;
 
    flags = "-c -dcmm -dno-locations -dno-unique-ids";
 

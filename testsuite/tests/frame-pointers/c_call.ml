@@ -4,7 +4,7 @@
  readonly_files = "fp_backtrace.c c_call_.c";
  all_modules = "${readonly_files} c_call.ml";
  (* the mangled names appear in the output *)
- flat-name-mangling;
+ structured-name-mangling;
  native;
 *)
 
