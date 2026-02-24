@@ -473,6 +473,16 @@ and jkind_packed = Pack_jkind : ('l * 'r) jkind -> jkind_packed
 
 val ikinds_todo : string -> type_ikind
 
+module Ikind_substitution : sig
+  type lookup_result =
+    | Lookup_identity
+    | Lookup_path of Path.t
+    | Lookup_type_fun of type_expr list * type_expr
+
+  val substitute_decl_ikind_with_lookup :
+    (lookup:(Path.t -> lookup_result) -> type_ikind -> type_ikind) ref
+end
+
 (* A map from [type_expr] to [With_bounds_type_info.t], specifically defined with a
    (best-effort) semantic comparison function on types to be used in the with-bounds of a
    jkind.

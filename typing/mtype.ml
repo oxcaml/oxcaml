@@ -102,16 +102,18 @@ and strengthen_lazy_sig' ~aliasable sg p =
               { decl with
                 type_private = Public;
                 type_manifest = manif;
-                (* Keep the declaration ikind through strengthening.
-                   Replacing it with a todo can lose constraints during
-                   inclusion checks under [-ikinds]. *)
-                type_ikind = decl.type_ikind
+                type_ikind =
+                  Types.ikinds_todo
+                    (Format_doc.asprintf "strengthen abstract path=%a"
+                       Path.print path)
               }
             end else begin
               { decl with
                 type_manifest = manif;
-                (* Same rationale as above. *)
-                type_ikind = decl.type_ikind
+                type_ikind =
+                  Types.ikinds_todo
+                    (Format_doc.asprintf "strengthen manifest path=%a"
+                       Path.print path)
               }
             end
       in
@@ -588,14 +590,19 @@ let enrich_typedecl env p id decl =
                     in
                     { d with
                       type_manifest = Some orig_ty_unboxed;
-                      type_ikind = d.type_ikind
+                      type_ikind =
+                        Types.ikinds_todo
+                          (Format_doc.asprintf "enrich unboxed path=%a"
+                             Path.print (Path.unboxed_version p))
                     })
                   decl.type_unboxed_version
               in
               { decl with
                 type_manifest = Some orig_ty;
                 type_unboxed_version;
-                type_ikind = decl.type_ikind
+                type_ikind =
+                  Types.ikinds_todo
+                    (Format_doc.asprintf "enrich manifest path=%a" Path.print p)
               }
         end
 
