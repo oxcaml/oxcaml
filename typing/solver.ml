@@ -315,7 +315,11 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
            but not necessarily [v.upper <= f u.upper].
          - for all [f u \in v.vlower] and [g w \in v.vupper] we
            have either [g'f \in w.vlower] or [f'g \in u.vupper]. *)
-      id : int  (** For identification/printing *)
+      id : int;  (** For identification/printing *)
+      mutable gencopy : 'a var option
+          (** Calls to [generalize_structure] creates additional copies to make
+              sure the bounds of a generalize structure is rigid: [gencopy]
+              caches such copies *)
     }
 
   and 'b lmorphvar = ('b, left_only) morphvar
@@ -341,6 +345,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Cvlower : 'a var * 'a lmorphvar VarMap.t -> change
     | Cvupper : 'a var * 'a rmorphvar VarMap.t -> change
     | Clevel : 'a var * int -> change
+    | Cgencopy : 'a var * 'a var option -> change
 
   type changes = change list
 
@@ -354,6 +359,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | Cvlower (v, vlower) -> v.vlower <- vlower
     | Cvupper (v, vupper) -> v.vupper <- vupper
     | Clevel (v, level) -> v.level <- level
+    | Cgencopy (v, copy) -> v.gencopy <- copy
 
   let empty_changes = []
 
@@ -386,6 +392,9 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             morphvars have their own hints). *)
     constraint 'd = _ * _
   [@@ocaml.warning "-62"]
+
+  (** Levels *)
+  let generic_level = Ident.highest_scope
 
   (** Prints a mode variable, including the set of variables related to it
       (recursively). To handle cycles, [traversed] is the set of variables that
@@ -694,6 +703,14 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     | None -> ()
     | Some log -> log := Cvupper (v, v.vupper) :: !log);
     v.vupper <- vupper
+
+  (** Function used internally by generalize_structure to cache newly created
+      copies *)
+  let set_gencopy ~log v copy =
+    (match log with
+    | None -> ()
+    | Some log -> log := Cgencopy (v, v.gencopy) :: !log);
+    v.gencopy <- copy
 
   (** When called, graph must be fixed so maintain INVARIANT *)
   let set_level ~log v level =
@@ -1209,8 +1226,18 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     let vlower = Option.value vlower ~default:VarMap.empty in
     let vupper = Option.value vupper ~default:VarMap.empty in
     let level = if !debug_modes then id mod 5 else level in
+    let gencopy = None in
     let var =
-      { level; upper; upper_hint; lower; lower_hint; vlower; vupper; id }
+      { level;
+        upper;
+        upper_hint;
+        lower;
+        lower_hint;
+        vlower;
+        vupper;
+        id;
+        gencopy
+      }
     in
     vars := id + 1, Var var :: l;
     var
@@ -1236,6 +1263,130 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       right : 'a;
       right_hint : ('a, right_only) hint_raw
     }
+
+  (* Moves every reachable variable from [u] such that
+  [current_level] < [u.level] < [generic_level] to
+  [generic_level + (u.level - current_level)], preserving the exact topology *)
+  let rec generalize_topology : type a.
+      log:_ -> a C.obj -> current_level:int -> a var -> unit =
+   fun ~log dst ~current_level u ->
+    if u.level <= current_level || u.level >= generic_level
+    then ()
+    else begin
+      let new_level = generic_level + (u.level - current_level) in
+      set_level ~log u new_level;
+      let do_gen _ (Amorphvar (v, f, _f_hint)) =
+        let src = C.src dst f in
+        generalize_topology ~log src ~current_level v
+      in
+      VarMap.iter do_gen u.vupper;
+      VarMap.iter do_gen u.vlower
+    end
+
+  (* creates a copy of the variable [u] such that [u] < [copy] and [copy] < [u] via
+  submode, and lowers the [copy] to [current_level].
+  The [copy] is cached in the [gencopy] of [u] *)
+  let create_gencopy : type a.
+      log:_ -> a C.obj -> current_level:int -> a var -> unit =
+   fun ~log dst ~current_level u ->
+    (* If bounds are already tight, there is no need to create a copy *)
+    if not (C.le dst u.upper u.lower)
+    then begin
+      match u.gencopy with
+      | Some _ -> ()
+      | None ->
+        let copy = fresh ~upper:u.upper ~lower:u.lower ~level:u.level dst in
+        let ok1 =
+          submode_mvmv ~log H.Pinpoint.unknown dst
+            (Amorphvar (copy, C.id, Comp_hint.Morph_hint.Id))
+            (Amorphvar (u, C.id, Comp_hint.Morph_hint.Id))
+        in
+        let ok2 =
+          submode_mvmv ~log H.Pinpoint.unknown dst
+            (Amorphvar (u, C.id, Comp_hint.Morph_hint.Id))
+            (Amorphvar (copy, C.id, Comp_hint.Morph_hint.Id))
+        in
+        assert (Result.is_ok ok1 && Result.is_ok ok2);
+        update_level_v ~log dst current_level copy;
+        set_gencopy ~log u (Some copy)
+    end
+
+  let generalize_v : type a.
+      log:_ -> a C.obj -> current_level:int -> a var -> unit =
+   fun ~log dst ~current_level u ->
+    generalize_topology ~log dst ~current_level u;
+    update_level_v ~log dst generic_level u
+
+  (* generalize_structure has three cases:
+    (1) if bounds are tight, the var is moved to generic_level
+    (2) if bounds are fully open, do nothing --- we consider only the case where bounds
+        are precise by virtue of having no vupper/vlower
+    (3) if bounds are non-trivial (neither tight nor fully open) we make a copy, move the
+        original var to generic_level, and mark the two variables as equivalent by adding
+        constraint arrows via [add_vlower] and [add_vupper]
+  *)
+  let generalize_structure_v : type a.
+      log:_ -> a C.obj -> current_level:int -> a var -> unit =
+   fun ~log dst ~current_level u ->
+    if C.le dst u.upper u.lower
+    then begin
+      (* the bounds are tight *)
+      generalize_topology ~log dst ~current_level u;
+      update_level_v ~log dst generic_level u
+    end
+    else if
+      C.le dst (C.max dst) u.upper
+      && C.le dst u.lower (C.min dst)
+      && VarMap.is_empty u.vlower && VarMap.is_empty u.vupper
+    then
+      (* the bounds are fully open *)
+      update_level_v ~log dst current_level u
+    else begin
+      (* the bounds are non-trivial *)
+      generalize_topology ~log dst ~current_level u;
+      update_level_v ~log dst generic_level u;
+      create_gencopy ~log dst ~current_level u
+    end
+
+  let generalize (type a l r) ~current_level (obj : a C.obj)
+      (a : (a, l * r) mode) ~log =
+    match a with
+    | Amodevar (Amorphvar (v, f, _f_hint)) ->
+      let obj = C.src obj f in
+      generalize_v ~log obj ~current_level v
+    | Amode _ -> ()
+    | Amodejoin (_, _, mvs) ->
+      VarMap.iter
+        (fun _ (Amorphvar (v, f, _f_hint)) ->
+          let obj = C.src obj f in
+          generalize_v ~log obj ~current_level v)
+        mvs
+    | Amodemeet (_, _, mvs) ->
+      VarMap.iter
+        (fun _ (Amorphvar (v, f, _f_hint)) ->
+          let obj = C.src obj f in
+          generalize_v ~log obj ~current_level v)
+        mvs
+
+  let generalize_structure (type a l r) ~current_level (obj : a C.obj)
+      (a : (a, l * r) mode) ~log =
+    match a with
+    | Amodevar (Amorphvar (v, f, _f_hint)) ->
+      let obj = C.src obj f in
+      generalize_structure_v ~log obj ~current_level v
+    | Amode _ -> ()
+    | Amodejoin (_, _, mvs) ->
+      VarMap.iter
+        (fun _ (Amorphvar (v, f, _f_hint)) ->
+          let obj = C.src obj f in
+          generalize_structure_v ~log obj ~current_level v)
+        mvs
+    | Amodemeet (_, _, mvs) ->
+      VarMap.iter
+        (fun _ (Amorphvar (v, f, _f_hint)) ->
+          let obj = C.src obj f in
+          generalize_structure_v ~log obj ~current_level v)
+        mvs
 
   let update_level (type a l r) (level : int) (obj : a C.obj)
       (a : (a, l * r) mode) ~log =
