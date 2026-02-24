@@ -383,8 +383,5 @@ val has_f16c : bool
 val has_fma : bool
 (* Whether the compiler was configured on a machine with FMA *)
 
-val dev : bool
-(* Whether the compiler was configured with --enable-dev *)
-
 val oxcaml_dwarf : bool
 (* Whether OxCaml DWARF is used by default *)

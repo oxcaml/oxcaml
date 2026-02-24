@@ -196,7 +196,6 @@ AC_SUBST([legacy_layout])
 main_build_profile=main
 AS_IF([test x"$enable_dev" = xyes], [main_build_profile=dev])
 AC_SUBST([main_build_profile])
-AC_SUBST([enable_dev])
 
 # Configuration variables
 

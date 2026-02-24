@@ -72,7 +72,8 @@ let invoke_expect_asm_callbacks () =
 let record_for_expect_asm ~name ~debug_info ~asm_start =
   if
     (not (List.is_empty !expect_asm_callbacks))
-    && not (String.ends_with ~suffix:"__entry" name)
+    && (not (String.ends_with ~suffix:"__entry" name))
+    && not (String.starts_with ~prefix:"caml_curry" name)
   then
     let name =
       match Debuginfo.to_items debug_info with

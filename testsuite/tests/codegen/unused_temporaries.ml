@@ -1,16 +1,21 @@
 (* TEST
- include stdlib_upstream_compatible;
- flags += "-O3";
+ readonly_files = "intrinsics.ml";
+ setup-ocamlopt.opt-build-env;
+ all_modules = "intrinsics.ml";
+ compile_only = "true";
+ ocamlopt.opt;
+
  only-default-codegen;
+ flags = " -O3 -extension-universe upstream_compatible -I ocamlopt.opt";
  expect.opt;
 *)
 
-open Stdlib_upstream_compatible
+open Intrinsics
 
 let is_nan (x: Float_u.t) =
   Float.is_nan (Float_u.to_float x)
 [%%expect{|
-val is_nan : Stdlib_upstream_compatible.Float_u.t -> bool = <fun>
+val is_nan : Intrinsics.Float_u.t -> bool = <fun>
 |}]
 [%%expect_asm X86_64{|
 is_nan:
@@ -24,9 +29,7 @@ is_nan:
 let[@inline always] compare x y =
   Float.compare (Float_u.to_float x) (Float_u.to_float y)
 [%%expect{|
-val compare :
-  Stdlib_upstream_compatible.Float_u.t ->
-  Stdlib_upstream_compatible.Float_u.t -> int = <fun>
+val compare : Intrinsics.Float_u.t -> Intrinsics.Float_u.t -> int = <fun>
 |}]
 [%%expect_asm X86_64{|
 compare:

@@ -1,11 +1,16 @@
 (* TEST
- flags += " -O3 -extension-universe upstream_compatible";
- include stdlib_upstream_compatible;
+ readonly_files = "intrinsics.ml";
+ setup-ocamlopt.opt-build-env;
+ all_modules = "intrinsics.ml";
+ compile_only = "true";
+ ocamlopt.opt;
+
  only-default-codegen;
+ flags = " -O3 -extension-universe upstream_compatible -I ocamlopt.opt";
  expect.opt;
 *)
 
-open Stdlib_upstream_compatible
+open Intrinsics
 
 type 'a vec = #{
   size : int;
@@ -45,34 +50,6 @@ push:
   popq  48(%r14)
   popq  %r11
   jmp   *%r11
-
-caml_curryVV_V_RVV:
-  subq  $8, %rsp
-  movq  %rax, %rsi
-  subq  $48, %r15
-  cmpq  (%r14), %r15
-  jb    .L133
-.L135:
-  leaq  8(%r15), %rax
-  movq  $5367, -8(%rax)
-  movq  caml_curryVV_V_RVV_1@GOTPCREL(%rip), %rdx
-  movq  %rdx, (%rax)
-  movabsq $108086391056891909, %rdx
-  movq  %rdx, 8(%rax)
-  movq  %rsi, 16(%rax)
-  movq  %rbx, 24(%rax)
-  movq  %rdi, 32(%rax)
-  addq  $8, %rsp
-  ret
-
-caml_curryVV_V_RVV_1:
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  movq  32(%rax), %rsi
-  movq  24(%rax), %rbx
-  movq  16(%rax), %rax
-  movq  16(%rsi), %rdx
-  jmp   *%rdx
 |}]
 
 
@@ -93,30 +70,4 @@ f:
   leaq  1(%rbx,%rbx), %rbx
   movslq -2(%rax,%rbx,2), %rax
   ret
-
-caml_curryV_I_RI:
-  subq  $8, %rsp
-  movq  %rax, %rdi
-  subq  $40, %r15
-  cmpq  (%r14), %r15
-  jb    .L118
-.L120:
-  leaq  8(%r15), %rax
-  movq  $4343, -8(%rax)
-  movq  caml_curryV_I_RI_1@GOTPCREL(%rip), %rsi
-  movq  %rsi, (%rax)
-  movabsq $108086391056891909, %rsi
-  movq  %rsi, 8(%rax)
-  movq  %rdi, 16(%rax)
-  movq  %rbx, 24(%rax)
-  addq  $8, %rsp
-  ret
-
-caml_curryV_I_RI_1:
-  movq  %rax, %rsi
-  movq  24(%rbx), %rdi
-  movq  16(%rbx), %rax
-  movq  16(%rdi), %rdx
-  movq  %rsi, %rbx
-  jmp   *%rdx
 |}]

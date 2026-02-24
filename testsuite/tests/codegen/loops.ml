@@ -1,11 +1,16 @@
 (* TEST
- flags = " -O3 -extension-universe upstream_compatible";
- include stdlib_upstream_compatible;
+ readonly_files = "intrinsics.ml";
+ setup-ocamlopt.opt-build-env;
+ all_modules = "intrinsics.ml";
+ compile_only = "true";
+ ocamlopt.opt;
+
  only-default-codegen;
+ flags = " -O3 -extension-universe upstream_compatible -I ocamlopt.opt";
  expect.opt;
 *)
 
-open Stdlib_upstream_compatible
+open Intrinsics
 
 
 (* CR ttebbi: What could have been a nice dense loop got

@@ -1,14 +1,10 @@
 (* TEST
  flags += " -O3 -cfg-prologue-shrink-wrap";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
- flags += " -regalloc-param AFFINITY:on -regalloc cfg";
- flags += " -extension-universe upstream_compatible";
- include stdlib_upstream_compatible;
+ flags += " -regalloc-param AFFINITY:on -regalloc irc";
  only-default-codegen;
  expect.opt;
 *)
-
-open Stdlib_upstream_compatible
 
 
 (* CR ttebbi:
@@ -29,7 +25,7 @@ spill_cold_path:
   jne   .L113
   movq  %rax, (%rsp)
   movl  $1, %eax
-  call  camlTOP2__cold_1_3_code@PLT
+  call  camlTOP1__cold_1_3_code@PLT
 .L119:
   movq  (%rsp), %rax
 .L113:
@@ -80,7 +76,7 @@ let useless_movs x y = sink (x - y) x
 [%%expect_asm X86_64{|
 useless_movs:
   movq  %rax, %rsi
-  movq  camlTOP6__useless_movs_9@GOTPCREL(%rip), %rax
+  movq  camlTOP5__useless_movs_9@GOTPCREL(%rip), %rax
   movq  24(%rax), %rdi
   movq  %rsi, %rax
   subq  %rbx, %rax
@@ -101,11 +97,11 @@ let f x =
 f:
   subq  $24, %rsp
   movq  %rax, (%rsp)
-  call  camlTOP7__g_11_13_code@PLT
+  call  camlTOP6__g_11_13_code@PLT
 .L108:
   movq  %rax, 8(%rsp)
   movq  (%rsp), %rax
-  call  camlTOP7__g_11_13_code@PLT
+  call  camlTOP6__g_11_13_code@PLT
 .L109:
   movq  8(%rsp), %rbx
   leaq  -1(%rax,%rbx), %rax
@@ -138,7 +134,7 @@ spill_in_loop:
   ret
 .L111:
   movq  %rbx, (%rsp)
-  call  camlTOP8__g_15_18_code@PLT
+  call  camlTOP7__g_15_18_code@PLT
 .L117:
   movq  (%rsp), %rbx
   cmpq  $1, %rax

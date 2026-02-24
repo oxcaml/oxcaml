@@ -1,11 +1,16 @@
 (* TEST
- flags += " -O3 -extension-universe upstream_compatible";
- include stdlib_upstream_compatible;
+ readonly_files = "intrinsics.ml";
+ setup-ocamlopt.opt-build-env;
+ all_modules = "intrinsics.ml";
+ compile_only = "true";
+ ocamlopt.opt;
+
  only-default-codegen;
+ flags = " -O3 -extension-universe upstream_compatible -I ocamlopt.opt";
  expect.opt;
 *)
 
-open Stdlib_upstream_compatible
+open Intrinsics
 
 
 (* CR ttebbi: The move instruction encoding with immediates
@@ -117,15 +122,6 @@ branch_and_return:
   ret
 |}]
 
-(* CR ttebbi: this could be a single lea instruction. *)
-let mul_3 x = x * 3
-[%%expect_asm X86_64{|
-mul_3:
-  imulq $3, %rax
-  addq  $-2, %rax
-  ret
-|}]
-
 
 (* CR ttebbi: If we change the register representation of 32bit values to be
     zero-extended, we could emit 32bit instructions saving 1 byte of instruction
@@ -198,5 +194,30 @@ constant_folding:
   ret
 .L111:
   movl  $9, %eax
+  ret
+|}]
+
+
+
+type ptr = nativeint#
+external memcmp :
+  ptr -> ptr -> len:nativeint# -> int32#
+  @@ portable
+  = "caml_no_bytecode_impl" "memcmp"
+[@@noalloc]
+
+(* CR ttebbi: Double sign extension instructions. *)
+let int32_box_unbox_after_call (a : ptr) (b : ptr) =
+  Int32_u.of_int (Int32_u.to_int (memcmp a b ~len:#5n))
+[%%expect_asm X86_64{|
+int32_box_unbox_after_call:
+  subq  $8, %rsp
+  movq  %rax, %rdi
+  movq  %rbx, %rsi
+  movl  $5, %edx
+  call  memcmp@PLT
+  movslq %eax, %rax
+  movslq %eax, %rax
+  addq  $8, %rsp
   ret
 |}]

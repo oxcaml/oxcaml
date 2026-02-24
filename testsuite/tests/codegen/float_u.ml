@@ -1,11 +1,16 @@
 (* TEST
- flags += " -O3 -extension-universe upstream_compatible";
- include stdlib_upstream_compatible;
+ readonly_files = "intrinsics.ml";
+ setup-ocamlopt.opt-build-env;
+ all_modules = "intrinsics.ml";
+ compile_only = "true";
+ ocamlopt.opt;
+
  only-default-codegen;
+ flags = " -O3 -extension-universe upstream_compatible -I ocamlopt.opt";
  expect.opt;
 *)
 
-open Stdlib_upstream_compatible
+open Intrinsics
 
 
 let neg x = Float_u.neg x
@@ -358,7 +363,6 @@ is_finite:
    - OCaml's Float.compare is difficult to implement,
      but we could at least compose the bits within xmm
      registers.
-   - Plenty of useless spills
 *)
 let compare (x : Float_u.t) (y : Float_u.t) : int =
   Float_u.compare x y

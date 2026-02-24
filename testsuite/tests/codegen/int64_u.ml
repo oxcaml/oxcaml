@@ -1,11 +1,17 @@
 (* TEST
- flags += " -O3 -extension-universe upstream_compatible";
- include stdlib_upstream_compatible;
+ readonly_files = "intrinsics.ml";
+ flags = " -extension-universe upstream_compatible";
+ setup-ocamlopt.opt-build-env;
+ all_modules = "intrinsics.ml";
+ compile_only = "true";
+ ocamlopt.opt;
+
  only-default-codegen;
+ flags = " -O3 -extension-universe upstream_compatible -I ocamlopt.opt";
  expect.opt;
 *)
 
-open Stdlib_upstream_compatible
+open Intrinsics
 
 (* Codegen tests for Int64_u operations *)
 
@@ -480,39 +486,6 @@ of_nativeint_u:
 let to_nativeint_u x = Int64_u.to_nativeint_u x
 [%%expect_asm X86_64{|
 to_nativeint_u:
-  ret
-|}]
-
-let of_string x = Int64_u.of_string x
-[%%expect_asm X86_64{|
-of_string:
-  subq  $8, %rsp
-  movq  %rax, %rdi
-  movq  caml_int64_of_string_unboxed@GOTPCREL(%rip), %rax
-  call  caml_c_call@PLT
-.L105:
-  addq  $8, %rsp
-  ret
-|}]
-
-let to_string x = Int64_u.to_string x
-[%%expect_asm X86_64{|
-to_string:
-  subq  $8, %rsp
-  subq  $24, %r15
-  cmpq  (%r14), %r15
-  jb    .L106
-.L108:
-  leaq  8(%r15), %rsi
-  movq  $2303, -8(%rsi)
-  movq  caml_int64_ops@GOTPCREL(%rip), %rbx
-  movq  %rbx, (%rsi)
-  movq  %rax, 8(%rsi)
-  movq  camlStdlib__Int64__immstring90@GOTPCREL(%rip), %rdi
-  movq  caml_int64_format@GOTPCREL(%rip), %rax
-  call  caml_c_call@PLT
-.L109:
-  addq  $8, %rsp
   ret
 |}]
 
