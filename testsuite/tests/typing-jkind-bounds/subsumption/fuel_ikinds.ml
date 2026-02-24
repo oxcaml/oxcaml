@@ -22,6 +22,12 @@ type t : immutable_data = int list list list list list list list list list list 
 type t = int list list list list list list list list list list list list list
 |}]
 
+type 'a t : immutable_data with 'a = 'a list list list list list list list list list list list list list
+[%%expect {|
+type 'a t =
+    'a list list list list list list list list list list list list list
+|}]
+
 (* Differences in fuel consumption do not cause errors for module inclusion check
    when both types have manifests *)
 module M : sig

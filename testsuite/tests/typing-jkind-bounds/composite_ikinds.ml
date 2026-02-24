@@ -1,6 +1,6 @@
 (* TEST
-    flags = "-ikinds";
-    expect;
+   flags = "-ikinds";
+   expect;
 *)
 
 let use_global : 'a @ global -> unit = fun _ -> ()

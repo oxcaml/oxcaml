@@ -1,6 +1,6 @@
 (* TEST
-    flags = "-ikinds";
-    expect;
+   flags = "-ikinds";
+   expect;
 *)
 
 let use_global : 'a @ global -> unit = fun _ -> ()
@@ -726,4 +726,46 @@ type 'a t3 = T : 'a t2 -> 'a t3
 type 'a t1 constraint 'a = [< `A ]
 type 'a t2 = 'a t1 constraint 'a = [< `A ]
 type 'a t3 = T : 'b t2 -> ([< `A ] as 'b) t3
+|}]
+
+(*********************************************************)
+
+type zero = Zero
+type 'a succ = Succ
+type _ t : immutable_data =
+  | Zero : zero t
+  | Succ : 'a t -> 'a succ t
+[%%expect {|
+type zero = Zero
+type 'a succ = Succ
+type _ t = Zero : zero t | Succ : 'a t -> 'a succ t
+|}]
+
+type zero = private Zero
+type 'a succ = private Succ
+type _ t : immutable_data =
+  | Zero : zero t
+  | Succ : 'a t -> 'a succ t
+[%%expect {|
+type zero = private Zero
+type 'a succ = private Succ
+type _ t = Zero : zero t | Succ : 'a t -> 'a succ t
+|}]
+
+type zero
+type !'a succ
+type _ t : immutable_data =
+  | Zero : zero t
+  | Succ : 'a t -> 'a succ t
+[%%expect {|
+type zero
+type !'a succ
+type _ t = Zero : zero t | Succ : 'a t -> 'a succ t
+|}]
+
+type _ t : value mod portable =
+  | Zero : [ `zero ] t
+  | Succ : 'a t -> [ `succ of 'a ] t
+[%%expect {|
+type _ t = Zero : [ `zero ] t | Succ : 'a t -> [ `succ of 'a ] t
 |}]

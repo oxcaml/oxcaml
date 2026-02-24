@@ -1028,6 +1028,7 @@ and 'a t2 = Base of 'a | T1 of 'a t1
 
 type 'a t = Degen of ('a * 'a) t | Leaf
 let f (x : int t) = cross_portable x
+(* CR layouts v2.8: This should be accepted. *)
 [%%expect {|
 type 'a t = Degen of ('a * 'a) t | Leaf
 Line 2, characters 35-36:

@@ -1,6 +1,6 @@
 (* TEST
-    flags = "-ikinds";
-    expect;
+   flags = "-ikinds";
+   expect;
 *)
 
 let use_global : 'a @ global -> unit = fun _ -> ()
@@ -325,7 +325,9 @@ Error: The kind of type "t2" is immutable_data
          because of the annotation on the declaration of the type t2.
 |}]
 type t3 : immediate with [ `A of string] t1 = C of string  (* should be accepted *)
-(* CR layouts v2.8: This should be accepted. Internal ticket 6481 *)
+(* CR layouts v2.8: This should be accepted, but still fails in principal mode.
+   ikinds regression vs non-ikinds.
+   Internal ticket 6481. *)
 [%%expect{|
 type t3 = C of string
 |}, Principal{|
@@ -352,7 +354,9 @@ Error: The kind of type "t2" is immutable_data
          because of the annotation on the declaration of the type t2.
 |}]
 type t3 : immediate with [ `A of string | `B of int | `C ] t1 = C of string  (* should be accepted *)
-(* CR layouts v2.8: This should be accepted. Internal ticket 6481 *)
+(* CR layouts v2.8: This should be accepted, but still fails in principal mode.
+   ikinds regression vs non-ikinds.
+   Internal ticket 6481. *)
 [%%expect{|
 type t3 = C of string
 |}, Principal{|

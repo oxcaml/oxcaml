@@ -1,6 +1,6 @@
 (* TEST
-    flags = "-ikinds";
-    expect;
+   flags = "-ikinds";
+   expect;
 *)
 (* Tests for universally quantified types *)
 
