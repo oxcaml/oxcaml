@@ -46,11 +46,13 @@ Error: Identifier "s" is used at line 2, characters 11-12,
 (** Modules **)
 module M : sig
   type t
+  val x : t
 end = struct
   type t = int
+  let x = 42
 end
 [%%expect {|
-module M : sig type t end
+module M : sig type t val x : t end
 |}];;
 let id (x : <[M.t]> expr) = x
 [%%expect {|
@@ -65,6 +67,10 @@ Error: Identifier "M" is used at line 1, characters 14-17,
 let id (x : <[M.t]> expr) = x
 [%%expect {|
 val id : <[M.t]> expr -> <[M.t]> expr = <fun>
+|}];;
+let _ : <[M.t -> M.t]> expr = <[ fun (x : M.t) -> M.x ]>
+[%%expect {|
+- : <[M.t -> M.t]> expr = <[fun (x : M.t) -> M.x]>
 |}];;
 
 (** Records **)
