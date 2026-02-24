@@ -233,7 +233,8 @@ module type Solver_mono = sig
   (* CR-soon zqian: [to_const_exn] should return hints as well. *)
 
   (** Given a mode whose lower and upper bounds are equal, returns that bound.
-      Raises exception if the condition does not hold. *)
+      Raises exception if the condition does not hold, or if the variable is
+      generic *)
   val to_const_exn : 'a obj -> ('a, allowed * allowed) mode -> 'a
 
   (** The minimum mode in the lattice *)
@@ -241,6 +242,9 @@ module type Solver_mono = sig
 
   (** The maximum mode in the lattice *)
   val max : 'a obj -> ('a, 'l * 'r) mode
+
+  (** The level of generic variables *)
+  val generic_level : int
 
   (* CR-someday zqian: [zap_*] should take optional hint, pointing to the location in
      the source code where zapping happens *)
@@ -297,6 +301,25 @@ module type Solver_mono = sig
   (** Lowers a level of a variable. *)
   val update_level :
     int -> 'a obj -> ('a, 'l * 'r) mode -> log:changes ref option -> unit
+
+  (** Generalizes all reachable variables whose level is above [current_level],
+      by putting their level to [generic_level]. *)
+  val generalize :
+    current_level:int ->
+    'a obj ->
+    ('a, 'l * 'r) mode ->
+    log:changes ref option ->
+    unit
+
+  (** Generalizes all reachable variables whose level is above [current_level],
+      whose value is fully determined, by putting their level to
+      [generic_level].*)
+  val generalize_structure :
+    current_level:int ->
+    'a obj ->
+    ('a, 'l * 'r) mode ->
+    log:changes ref option ->
+    unit
 
   (** Creates a new mode variable above the given mode and returns [true]. In
       the speical case where the given mode is top, returns the constant top and
