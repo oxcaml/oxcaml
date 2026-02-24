@@ -1524,8 +1524,7 @@ let type_declarations ?(equality = false) ~loc env ~mark name
     | (Type_record_unboxed_product(labels1,rep1,umc1),
        Type_record_unboxed_product(labels2,rep2,umc2)) -> begin
         Misc.Stdlib.Option.first_some
-          (mark_and_compare_records
-             Unboxed_product labels1 rep1 labels2 rep2)
+          (mark_and_compare_records Unboxed_product labels1 rep1 labels2 rep2)
           (fun () -> compare_unsafe_mode_crossing ~env umc1 umc2)
       end
     | (Type_open, Type_open) -> None

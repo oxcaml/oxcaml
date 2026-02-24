@@ -2407,9 +2407,7 @@ and transl_record_unboxed_product ~scopes loc env fields repres opt_init_expr =
 and transl_idx ~scopes loc env ba uas =
   let ua_to_pos (Uaccess_unboxed_field (_, lbl, _)) =
     (* erase singleton unboxed products before lambda *)
-    if Array.length lbl.lbl_all == 1
-    then None
-    else Some lbl.lbl_pos
+    if Array.length lbl.lbl_all == 1 then None else Some lbl.lbl_pos
   in
   let uas_path = List.filter_map ua_to_pos uas in
   begin match ba with
