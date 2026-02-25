@@ -8,6 +8,18 @@ type ('a : value) t : value_or_null = 'a or_null [@@or_null_reexport]
 type 'a t = 'a or_null = Null | This of 'a [@@or_null_reexport]
 |}]
 
+module Test_with_any = struct
+  type ('a : any) t : value_or_null = 'a or_null [@@or_null_reexport]
+end
+(* Ideally the above would simply fail. Test that at least we don't actually
+   allow ['a] to have kind [any] *)
+[%%expect {|
+module Test_with_any :
+  sig
+    type ('a : value_or_null mod non_null) t = 'a or_null = Null | This of 'a [@@or_null_reexport]
+  end
+|}]
+
 let to_option (x : 'a or_null) =
   match x with
   | Null -> None

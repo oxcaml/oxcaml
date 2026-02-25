@@ -305,8 +305,8 @@ let fold_type_expr f init ty =
       let result = f init ty1 in
       f result ty2
   | Tnil                -> init
-  | Tlink _
-  | Tsubst _            -> assert false
+  | Tlink _             -> assert false
+  | Tsubst (ty, _)      -> f init ty
   | Tunivar _           -> init
   | Tpoly (ty, tyl)     ->
     let result = f init ty in
@@ -2160,11 +2160,10 @@ module Jkind0 = struct
            through the product, by one step, never loses any information. *)
         |> mark_best
 
-      let product_of_sorts ~why ~level arity =
+      let product_of_any ~why arity =
         let layout =
           Jkind_types.Layout.product
-            (List.init arity
-               (fun _ -> fst (Jkind_types.Layout.of_new_sort_var ~level)))
+            (List.init arity (fun _ -> Jkind_types.Layout.Any))
         in
         let desc : _ jkind_desc =
           { base = Layout layout;
@@ -2226,30 +2225,42 @@ module Jkind0 = struct
       | Mutable { atomic = Nonatomic; _ } -> Builtin.mutable_data)
         ~why
 
+    let all_void_sort_option sort =
+      match sort with
+      | Some sort -> Jkind_types.Sort.Const.all_void sort
+      | None -> false
+
+    let all_void_labels_with_updates lbls_updated =
+      List.for_all (fun (_, _, sort) -> all_void_sort_option sort) lbls_updated
+
     let all_void_labels lbls =
       List.for_all
         (fun (lbl : label_declaration) ->
-           Jkind_types.Sort.Const.(all_void lbl.ld_sort))
+           all_void_sort_option lbl.ld_sort)
         lbls
 
     let add_labels_as_with_bounds lbls jkind =
       List.fold_right
-        (fun (lbl : label_declaration) ->
-          add_with_bounds ~type_expr:lbl.ld_type ~modality:lbl.ld_modalities)
+        (fun ((lbl : label_declaration), ld_type, _sort) ->
+          add_with_bounds ~type_expr:ld_type ~modality:lbl.ld_modalities)
         lbls jkind
 
-    let for_boxed_record lbls =
-      if all_void_labels lbls
+    let for_boxed_record_with_updates lbls =
+      if all_void_labels_with_updates lbls
       then Builtin.immediate ~why:Empty_record
       else
         let base =
           lbls
-          |> List.map (fun (ld : label_declaration) -> ld.ld_mutable)
+          |> List.map (fun ((ld : label_declaration), _, _) -> ld.ld_mutable)
           |> List.fold_left combine_mutability Immutable
           |> jkind_of_mutability ~why:Boxed_record
           |> mark_best
         in
         add_labels_as_with_bounds lbls base
+
+    let for_boxed_record lbls =
+      for_boxed_record_with_updates
+        (List.map (fun lbl -> lbl, lbl.ld_type, lbl.ld_sort) lbls)
 
     let for_non_float ~(why : Jkind_intf.History.value_creation_reason) =
       let mod_bounds =
@@ -2385,7 +2396,7 @@ module Jkind0 = struct
             match cstr.cd_args with
             | Cstr_tuple args ->
               List.for_all
-                (fun arg -> Jkind_types.Sort.Const.(all_void arg.ca_sort)) args
+                (fun arg -> all_void_sort_option arg.ca_sort) args
             | Cstr_record lbls -> all_void_labels lbls)
           cstrs
       in

@@ -26,32 +26,32 @@ Error: This expression has type "t_any" but an expression was expected of type
          because a value of this type is matched against a pattern.
 |}]
 
-(* Constructor_declaration *)
+(* Constructor_arg_projection *)
 type t = A of t_any
-
-[%%expect{|
-Line 1, characters 9-19:
-1 | type t = A of t_any
-             ^^^^^^^^^^
-Error: Constructor argument types must have a representable layout.
+let f (A _) = ()
+[%%expect {|
+type t = A of t_any
+Line 2, characters 9-10:
+2 | let f (A _) = ()
+             ^
+Error: Constructor arguments being projected must be representable.
        The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-16.
        But the layout of t_any must be representable
-         because it's the type of a constructor field.
+         because it's the type of a constructor argument being projected.
 |}]
 
-(* Label_declaration *)
-type t = {a: t_any}
-
-[%%expect{|
-Line 1, characters 10-18:
-1 | type t = {a: t_any}
-              ^^^^^^^^
-Error: Record element types must have a representable layout.
+(* Constructor_arg_assignment *)
+let _ = A (assert false)
+[%%expect {|
+Line 1, characters 8-24:
+1 | let _ = A (assert false)
+            ^^^^^^^^^^^^^^^^
+Error: Constructor arguments must be representable.
        The layout of t_any is any
          because of the definition of t_any at line 1, characters 0-16.
        But the layout of t_any must be representable
-         because it is the type of record field a.
+         because it's the type of a constructor argument being assigned a value.
 |}]
 
 (* Unannotated_type_parameter *)
@@ -71,10 +71,32 @@ Error: This type "t_any" should be an instance of type
 |}]
 
 (* Record_projection *)
-(* Can't have a type with layout any in a record *)
+type t = {a: t_any}
+let f (t: t) = t.a
+[%%expect {|
+type t = { a : t_any; }
+Line 2, characters 15-18:
+2 | let f (t: t) = t.a
+                   ^^^
+Error: Fields being projected must be representable.
+       The layout of t_any is any
+         because of the definition of t_any at line 1, characters 0-16.
+       But the layout of t_any must be representable
+         because it's the type of a field being projected.
+|}]
 
 (* Record_assignment *)
-(* Can't have a type with layout any in a record *)
+let _ = { a = assert false }
+[%%expect {|
+Line 1, characters 14-26:
+1 | let _ = { a = assert false }
+                  ^^^^^^^^^^^^
+Error: Values of fields must be representable.
+       The layout of t_any is any
+         because of the definition of t_any at line 1, characters 0-16.
+       But the layout of t_any must be representable
+         because it's the type of a field being assigned a value.
+|}]
 
 (* Let_binding *)
 let x: t_any = assert false

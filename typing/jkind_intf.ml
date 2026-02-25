@@ -231,11 +231,16 @@ module History = struct
   (* For sort variables that are topmost on the jkind lattice. *)
   type concrete_creation_reason =
     | Match
-    | Constructor_declaration of int
-    | Label_declaration of Ident.t
+    | Extension_constructor_declaration of int
+    | Extension_label_declaration of Ident.t
     | Record_projection
     | Record_assignment
     | Record_functional_update
+    | Field_projection
+    | Field_assignment
+    | Field_functional_update
+    | Constructor_arg_projection
+    | Constructor_arg_assignment
     | Let_binding
     | Function_argument
     | Function_result
@@ -247,7 +252,6 @@ module History = struct
     | Layout_poly_in_external
     | Unboxed_tuple_element
     | Peek_or_poke
-    | Old_style_unboxed_type
     | Array_element
     | Idx_element
     | Structure_item
@@ -378,6 +382,7 @@ module History = struct
           arity : int
         }
     | Overapproximation_of_with_bounds
+    | Old_style_unboxed_type
 
   type product_creation_reason =
     | Unboxed_tuple

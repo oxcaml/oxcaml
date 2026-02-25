@@ -56,17 +56,18 @@ let remove_cons_mapper (cons_to_rem, cons_typ) =
             if cons_to_rem = cd.cstr_name
             then { e with exp_desc = apply_dummy2.exp_desc }
             else Tast_mapper.default.expr mapper e
-          | O (Texp_record record) ->
+          | Texp_record record ->
             let lab_list = Array.to_seq record.fields in
             let nlab_list =
-              Seq.filter (fun (ld, _) -> ld.lbl_name = cons_to_rem) lab_list
+              Seq.filter (fun (ld, _, _) -> ld.lbl_name = cons_to_rem) lab_list
             in
             { e with
               exp_desc =
                 (if Seq.is_empty nlab_list
                  then apply_dummy2.exp_desc
                  else
-                   Texp_record { record with fields = Array.of_seq nlab_list })
+                   mkTexp_record ~id:record.id
+                     (Array.of_seq nlab_list, record.extended_expression))
             }
           | Texp_function (f, id) ->
             let f_as_cases = Function_compat.function_to_cases_view f in
@@ -79,14 +80,16 @@ let remove_cons_mapper (cons_to_rem, cons_typ) =
                          (let l =
                             List.fold_left
                               (fun l val_case ->
-                                match val_case.c_lhs.pat_desc with
-                                | Tpat_construct (_, cd, _, _) ->
+                                match
+                                  Compat.view_tpat val_case.c_lhs.pat_desc
+                                with
+                                | Tpat_construct (_, cd, _, _, _) ->
                                   if cons_to_rem = cd.cstr_name
                                   then l
                                   else
                                     Tast_mapper.default.case mapper val_case
                                     :: l
-                                | Tpat_record (lab_list, flag) ->
+                                | Tpat_record (lab_list, flag, id) ->
                                   let nlab_list =
                                     List.filter
                                       (fun (_, ld, _) ->
@@ -100,12 +103,12 @@ let remove_cons_mapper (cons_to_rem, cons_typ) =
                                       c_lhs =
                                         { val_case.c_lhs with
                                           pat_desc =
-                                            Tpat_record (nlab_list, flag)
+                                            mkTpat_record ~id (nlab_list, flag)
                                         }
                                     }
                                     :: l
-                                | Tpat_record_unboxed_product (lab_list, flag)
-                                  ->
+                                | Tpat_record_unboxed_product
+                                    (lab_list, flag, id) ->
                                   let nlab_list =
                                     List.filter
                                       (fun (_, ld, _) ->
@@ -119,7 +122,7 @@ let remove_cons_mapper (cons_to_rem, cons_typ) =
                                       c_lhs =
                                         { val_case.c_lhs with
                                           pat_desc =
-                                            Tpat_record_unboxed_product
+                                            mkTpat_record_unboxed_product ~id
                                               (nlab_list, flag)
                                         }
                                     }
@@ -141,30 +144,16 @@ let remove_cons_mapper (cons_to_rem, cons_typ) =
                          (fun l comp_case ->
                            match comp_case.c_lhs.pat_desc with
                            | Tpat_value tva -> (
-                             match (tva :> value general_pattern).pat_desc with
-                             | Tpat_construct (_, cd, _, _) ->
+                             match
+                               Compat.view_tpat
+                                 (tva :> value general_pattern).pat_desc
+                             with
+                             | Tpat_construct (_, cd, _, _, _) ->
                                if cons_to_rem = cd.cstr_name
                                then l
                                else
                                  Tast_mapper.default.case mapper comp_case :: l
-                             | Tpat_record (lab_list, flag) ->
-                               let nlab_list =
-                                 List.filter
-                                   (fun (_, ld, _) -> ld.lbl_name = cons_to_rem)
-                                   lab_list
-                               in
-                               if nlab_list = []
-                               then l
-                               else
-                                 { comp_case with
-                                   c_lhs =
-                                     as_computation_pattern
-                                       { comp_case.c_lhs with
-                                         pat_desc = Tpat_record (nlab_list, flag)
-                                       }
-                                 }
-                                 :: l
-                             | Tpat_record_unboxed_product (lab_list, flag) ->
+                             | Tpat_record (lab_list, flag, id) ->
                                let nlab_list =
                                  List.filter
                                    (fun (_, ld, _) -> ld.lbl_name = cons_to_rem)
@@ -178,7 +167,26 @@ let remove_cons_mapper (cons_to_rem, cons_typ) =
                                      as_computation_pattern
                                        { comp_case.c_lhs with
                                          pat_desc =
-                                           Tpat_record_unboxed_product
+                                           mkTpat_record ~id (nlab_list, flag)
+                                       }
+                                 }
+                                 :: l
+                             | Tpat_record_unboxed_product (lab_list, flag, id)
+                               ->
+                               let nlab_list =
+                                 List.filter
+                                   (fun (_, ld, _) -> ld.lbl_name = cons_to_rem)
+                                   lab_list
+                               in
+                               if nlab_list = []
+                               then l
+                               else
+                                 { comp_case with
+                                   c_lhs =
+                                     as_computation_pattern
+                                       { comp_case.c_lhs with
+                                         pat_desc =
+                                           mkTpat_record_unboxed_product ~id
                                              (nlab_list, flag)
                                        }
                                  }

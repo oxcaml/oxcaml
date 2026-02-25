@@ -36,14 +36,20 @@ Error: This pattern matches values of type "t_any_mod_separable"
 type t = { x : t_any_mod_separable }
 
 [%%expect{|
-Line 1, characters 11-34:
-1 | type t = { x : t_any_mod_separable }
-               ^^^^^^^^^^^^^^^^^^^^^^^
-Error: Record element types must have a representable layout.
+type t = { x : t_any_mod_separable; }
+|}]
+
+let f t = t.x
+
+[%%expect{|
+Line 1, characters 10-13:
+1 | let f t = t.x
+              ^^^
+Error: Fields being projected must be representable.
        The layout of t_any_mod_separable is any
          because of the definition of t_any_mod_separable at line 2, characters 0-44.
        But the layout of t_any_mod_separable must be representable
-         because it is the type of record field x.
+         because it's the type of a field being projected.
 |}]
 
 module type S1 = sig

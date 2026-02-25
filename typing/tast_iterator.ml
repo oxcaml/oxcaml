@@ -285,9 +285,9 @@ let pat
   | Tpat_unboxed_bool _ -> ()
   | Tpat_tuple l -> List.iter (fun (_, p) -> sub.pat sub p) l
   | Tpat_unboxed_tuple l -> List.iter (fun (_, p, _) -> sub.pat sub p) l
-  | Tpat_construct (lid, _, l, vto) ->
+  | Tpat_construct (lid, _, _, l, vto) ->
       iter_loc sub lid;
-      List.iter (sub.pat sub) l;
+      List.iter (sub.pat sub) (List.map snd l);
       Option.iter (fun (vs, ct) ->
         List.iter
           (fun (v, jk) ->
@@ -296,9 +296,9 @@ let pat
           vs;
         sub.typ sub ct) vto
   | Tpat_variant (_, po, _) -> Option.iter (sub.pat sub) po
-  | Tpat_record (l, _) ->
+  | Tpat_record (l, _, _, _) ->
       List.iter (fun (lid, _, i) -> iter_loc sub lid; sub.pat sub i) l
-  | Tpat_record_unboxed_product (l, _) ->
+  | Tpat_record_unboxed_product (l, _, _, _) ->
       List.iter (fun (lid, _, i) -> iter_loc sub lid; sub.pat sub i) l
   | Tpat_array (_, _, l) -> List.iter (sub.pat sub) l
   | Tpat_alias { pattern = p; name = s; _ } -> sub.pat sub p; iter_loc sub s
@@ -361,12 +361,12 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   sub.env sub exp_env;
   let iter_fields fields =
     Array.iter (function
-      | _, Kept _ -> ()
-      | _, Overridden (lid, exp) -> iter_loc sub lid; sub.expr sub exp)
+      | _, _, Kept _ -> ()
+      | _, _, Overridden (lid, exp) -> iter_loc sub lid; sub.expr sub exp)
       fields
   in
   let iter_block_access sub = function
-    | Baccess_field (lid, _) -> iter_loc sub lid
+    | Baccess_field (lid, _, _) -> iter_loc sub lid
     | Baccess_array
       { mut = _; index_kind = _; index; base_ty = _; elt_ty = _; elt_sort = _
       } ->
@@ -374,7 +374,7 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
     | Baccess_block (_, idx) -> sub.expr sub idx
   in
   let iter_unboxed_access sub = function
-    | Uaccess_unboxed_field (lid, _) -> iter_loc sub lid
+    | Uaccess_unboxed_field (lid, _, _) -> iter_loc sub lid
   in
   match exp_desc with
   | Texp_ident (_, lid, _, _, _, _)  -> iter_loc sub lid
@@ -405,9 +405,9 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_unboxed_bool _ -> ()
   | Texp_tuple (list, _) -> List.iter (fun (_,e) -> sub.expr sub e) list
   | Texp_unboxed_tuple list -> List.iter (fun (_,e,_) -> sub.expr sub e) list
-  | Texp_construct (lid, _, args, _) ->
+  | Texp_construct (lid, _, _, args, _) ->
       iter_loc sub lid;
-      List.iter (sub.expr sub) args
+      List.iter (sub.expr sub) (List.map snd args)
   | Texp_variant (_, expo) ->
       Option.iter (fun (expr, _) -> sub.expr sub expr) expo
   | Texp_record { fields; extended_expression; _} ->
@@ -416,13 +416,13 @@ let expr sub {exp_loc; exp_extra; exp_desc; exp_env; exp_attributes; _} =
   | Texp_record_unboxed_product { fields; extended_expression; _} ->
       iter_fields fields;
       Option.iter (fun (exp, _) -> sub.expr sub exp) extended_expression;
-  | Texp_field (exp, _, lid, _, _, _) ->
+  | Texp_field { record = exp; lid; _ } ->
       iter_loc sub lid;
       sub.expr sub exp
-  | Texp_unboxed_field (exp, _, lid, _, _) ->
+  | Texp_unboxed_field { record = exp; lid; _ } ->
       iter_loc sub lid;
       sub.expr sub exp
-  | Texp_setfield (exp1, _, lid, _, exp2) ->
+  | Texp_setfield { record = exp1; lid; newval = exp2; _ } ->
       iter_loc sub lid;
       sub.expr sub exp1;
       sub.expr sub exp2

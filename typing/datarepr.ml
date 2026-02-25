@@ -16,7 +16,6 @@
 (* Compute constructor and label descriptions from type declarations,
    determining their representation. *)
 
-open Asttypes
 open Types
 open Btype
 module Jkind = Btype.Jkind0
@@ -101,7 +100,7 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
       [
         {
           ca_type = newgenconstr path type_params;
-          ca_sort = Jkind_types.Sort.Const.value;
+          ca_sort = Some Jkind_types.Sort.Const.value;
           ca_modalities = Mode.Modality.Const.id;
           ca_loc = Location.none
         }
@@ -110,7 +109,7 @@ let constructor_args ~current_unit priv cd_args cd_res path rep =
 
 let constructor_descrs ~current_unit ty_path decl cstrs rep =
   let ty_res = newgenconstr ty_path decl.type_params in
-  let cstr_shapes_and_arg_jkinds, is_unboxed =
+  let cstr_shapes_and_arg_sorts, is_unboxed =
     match rep, cstrs with
     | Variant_extensible, _ -> assert false
     | Variant_boxed x, _ -> x, false
@@ -125,9 +124,13 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
          written here should be irrelevant, and so would like to understand
          this interaction better. *)
       begin match cd_args with
-      | Cstr_tuple [{ ca_sort = sort }]
-      | Cstr_record [{ ld_sort = sort }] ->
-        [| Constructor_uniform_value, [| sort |] |], true
+      | Cstr_tuple [{ ca_sort = Some sort }]
+      | Cstr_record [{ ld_sort = Some sort }] ->
+        [| Some (Constructor_uniform_value, [| sort |]) |],
+        true
+      | Cstr_tuple [{ ca_sort = None }]
+      | Cstr_record [{ ld_sort = None }] ->
+        [| None |], true
       | Cstr_tuple ([] | _ :: _) | Cstr_record ([] | _ :: _) ->
         Misc.fatal_error "Multiple arguments in [@@unboxed] variant"
       end
@@ -137,21 +140,33 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       (* CR layouts v3.5: this hardcodes ['a or_null]. Fix when we allow
          users to write their own null constructors. *)
       (* CR layouts v3.3: generalize to [any]. *)
-      [| Constructor_uniform_value, [| |]
-       ; Constructor_uniform_value, [| Jkind_types.Sort.Const.value |] |],
+      [| Some (Constructor_uniform_value, [| |])
+       ; Some (Constructor_uniform_value,
+               [| Jkind_types.Sort.Const.value |]) |],
       false
   in
   let num_consts = ref 0 and num_nonconsts = ref 0 in
   let cstr_constant =
     Array.map
-      (fun (_, sorts) ->
-         let all_void = Array.for_all Jkind_types.Sort.Const.all_void sorts in
+      (fun shape_and_arg_sorts_opt ->
+         let all_void =
+           match shape_and_arg_sorts_opt with
+           | None ->
+             (* Someday we'll want to let a constructor be constant iff the type
+                argument is void (after all, [unit# option] is [bool]), but
+                we're not there yet. For now, assume [Some #()] (so to speak) is
+                an empty block, which is to say, assume that unknown sorts
+                aren't all void. *)
+             false
+           | Some (_, sorts) ->
+             Array.for_all Jkind_types.Sort.Const.all_void sorts
+         in
          (* constant constructors are constructors of non-[@@unboxed] variants
             with 0 bits of payload *)
          let is_const = all_void && not is_unboxed in
          if is_const then incr num_consts else incr num_nonconsts;
          is_const)
-      cstr_shapes_and_arg_jkinds
+      cstr_shapes_and_arg_sorts
   in
   let describe_constructor (src_index, const_tag, nonconst_tag, acc)
         {cd_id; cd_args; cd_res; cd_loc; cd_attributes; cd_uid} =
@@ -161,7 +176,7 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
       | Some ty_res' -> ty_res'
       | None -> ty_res
     in
-    let cstr_shape, _ = cstr_shapes_and_arg_jkinds.(src_index) in
+    let cstr_shape = Option.map fst cstr_shapes_and_arg_sorts.(src_index) in
     let cstr_constant = cstr_constant.(src_index) in
     let runtime_tag, const_tag, nonconst_tag =
       if cstr_constant
@@ -175,7 +190,10 @@ let constructor_descrs ~current_unit ty_path decl cstrs rep =
     in
     let cstr_existentials, cstr_args, cstr_inlined =
       (* This is the representation of the inner record, IF there is one *)
-      let record_repr = Record_inlined (cstr_tag, cstr_shape, rep) in
+      let record_repr =
+        Option.map (fun shape -> Record_inlined (cstr_tag, shape, rep))
+          cstr_shape
+      in
       constructor_args ~current_unit decl.type_private cd_args cd_res
         Path.(Pextra_ty (ty_path, Pcstr_ty cstr_name)) record_repr
     in
@@ -213,7 +231,7 @@ let extension_descr ~current_unit path_ext ext =
   let existentials, cstr_args, cstr_inlined =
     constructor_args ~current_unit ext.ext_private ext.ext_args ext.ext_ret_type
       Path.(Pextra_ty (path_ext, Pext_ty))
-      (Record_inlined (cstr_tag, ext.ext_shape, Variant_extensible))
+      (Some (Record_inlined (cstr_tag, ext.ext_shape, Variant_extensible)))
   in
     { cstr_name = Path.last path_ext;
       cstr_res = ty_res;
@@ -222,7 +240,7 @@ let extension_descr ~current_unit path_ext ext =
       cstr_arity = List.length cstr_args;
       cstr_tag;
       cstr_repr = Variant_extensible;
-      cstr_shape = ext.ext_shape;
+      cstr_shape = Some ext.ext_shape;
       cstr_constant = ext.ext_constant;
       cstr_consts = -1;
       cstr_nonconsts = -1;
@@ -242,13 +260,13 @@ let dummy_label (type rep) (record_form : rep record_form)
     : rep gen_label_description =
   let repres : rep = match record_form with
   | Legacy -> Record_unboxed
-  | Unboxed_product -> Record_unboxed_product
+  | Unboxed_product -> Record_unboxed_product [||]
   in
   { lbl_name = ""; lbl_res = none; lbl_arg = none;
     lbl_mut = Immutable; lbl_modalities = Mode.Modality.Const.id;
-    lbl_sort = Jkind_types.Sort.Const.void;
+    lbl_sort = Some Jkind_types.Sort.Const.void;
     lbl_pos = -1; lbl_all = [||];
-    lbl_repres = repres;
+    lbl_repres = Some repres;
     lbl_private = Public;
     lbl_loc = Location.none;
     lbl_attributes = [];

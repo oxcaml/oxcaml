@@ -227,6 +227,18 @@ val instance_label:
         fixed:bool ->
         _ gen_label_description -> type_expr list * type_expr * type_expr
         (* Same, for a label *)
+val instance_labels:
+        fixed:bool ->
+        _ gen_label_description array ->
+        (type_expr list * type_expr) array * type_expr
+        (* Same, for a whole list of labels *)
+val instance_label_declarations:
+        fixed:bool ->
+        label_declaration array ->
+        params:type_expr list ->
+        (type_expr list * type_expr) array * type_expr list
+        (* Same, but for label declarations and the type parameters from the
+           type declaration *)
 val prim_mode :
         (Mode.allowed * 'r) Mode.Locality.t option -> (Primitive.mode * Primitive.native_repr)
         -> (Mode.allowed * 'r) Mode.Locality.t
@@ -642,6 +654,12 @@ val type_sort :
   fixed:bool ->
   Env.t -> type_expr -> (Jkind.sort, Jkind.Violation.t) result
 
+(* Find a type's jkind and sort (if fixed is false: constraining it to be an
+   arbitrary sort variable, if needed) *)
+val type_jkind_and_sort :
+  why:Jkind.History.concrete_creation_reason ->
+  fixed:bool ->
+  Env.t -> type_expr -> (Types.jkind_lr * Jkind.sort, Jkind.Violation.t) result
 
 (* Jkind checking. [constrain_type_jkind] will update the jkind of type
    variables to make the check true, if possible.  [check_decl_jkind] and
