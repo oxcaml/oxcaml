@@ -759,8 +759,6 @@ let cfi_restore_state () = if should_generate_cfi () then emit Cfi_restore_state
 let cfi_def_cfa_register ~reg =
   if should_generate_cfi () then emit (Cfi_def_cfa_register reg)
 
-(* Helper function to construct CFI directive values for use in optimization
-   passes that need to create new directives. *)
 let make_cfi_adjust_cfa_offset_directive bytes =
   Directive.Cfi_adjust_cfa_offset bytes
 
