@@ -176,6 +176,9 @@ module Flambda2 = struct
     let reaper_unbox = true
     let reaper_max_unbox_size = 10
     let reaper_change_calling_conventions = true
+    let simplify_stubs =
+      (* CR pchambart: should be changed to true after proper testing *)
+      false
     let unicode = true
     let kind_checks = false
   end
@@ -195,6 +198,7 @@ module Flambda2 = struct
     reaper_unbox : bool;
     reaper_max_unbox_size : int;
     reaper_change_calling_conventions : bool;
+    simplify_stubs : bool;
     unicode : bool;
     kind_checks : bool;
   }
@@ -215,6 +219,7 @@ module Flambda2 = struct
     reaper_max_unbox_size = Default.reaper_max_unbox_size;
     reaper_change_calling_conventions =
       Default.reaper_change_calling_conventions;
+    simplify_stubs = Default.simplify_stubs;
     unicode = Default.unicode;
     kind_checks = Default.kind_checks;
   }
@@ -263,6 +268,7 @@ module Flambda2 = struct
   let reaper_unbox = ref Default
   let reaper_max_unbox_size = ref Default
   let reaper_change_calling_conventions = ref Default
+  let simplify_stubs = ref Default
 
   module Dump = struct
     type target = Nowhere | Main_dump_stream | File of Misc.filepath
