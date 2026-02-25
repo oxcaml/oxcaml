@@ -72,6 +72,11 @@ val newgenstub: scope:int -> jkind_lr -> type_expr
         (* Return a fresh generic node, to be instantiated
            by [Transient_expr.set_stub_desc] *)
 
+val new_quote_ty: type_expr -> type_expr
+        (* Quote a type expression *)
+val new_splice_ty: type_expr -> type_expr
+        (* Splice a type expression *)
+
 (**** Types ****)
 
 val is_Tvar: type_expr -> bool
