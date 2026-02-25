@@ -117,6 +117,19 @@ let save_sections_to_files sections section_tbl =
         then "section_" ^ String.sub name 1 (String.length name - 1)
         else "section_" ^ name
       in
+      let safe_name =
+        if String.length safe_name >= 248
+        then (
+          (* [safe_name ^ ".relocs"] will have more than 255 bytes, so let’s
+             save the section name in a separate file *)
+          let h = Digest.BLAKE256.(to_hex (string name)) in
+          let safe_name = "section_hash-" ^ h in
+          let name_filename = Filename.concat dir (safe_name ^ ".name") in
+          Out_channel.with_open_bin name_filename (fun oc ->
+              output_string oc name);
+          safe_name)
+        else safe_name
+      in
       (* Save binary content *)
       let bin_filename = Filename.concat dir (safe_name ^ ".bin") in
       let oc = open_out_bin bin_filename in
