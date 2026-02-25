@@ -109,7 +109,7 @@ Error: The kind of type "bad" is immediate with unit_u with v1 with v2
          because of the annotation on the declaration of the type bad.
 |}]
 
-type vme : void_internal mod external_
+type vme : void
 type t : value mod external_ = A of vme
 [%%expect{|
 type vme : void
