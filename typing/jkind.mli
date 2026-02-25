@@ -780,17 +780,9 @@ val sub :
   type_equal:(Types.type_expr -> Types.type_expr -> bool) ->
   context:jkind_context ->
   level:int ->
-<<<<<<< HEAD
+  Env.t ->
   (allowed * 'r) Types.jkind ->
   ('l * allowed) Types.jkind ->
-||||||| c79b6d1beb
-  Types.jkind_l ->
-  Types.jkind_r ->
-=======
-  Env.t ->
-  Types.jkind_l ->
-  Types.jkind_r ->
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
   bool
 
 type sub_or_intersect =
@@ -823,18 +815,6 @@ val sub_or_error :
   ('l * allowed) Types.jkind ->
   (unit, Violation.t) result
 
-<<<<<<< HEAD
-(** Compares the layouts of two jkinds.
-*)
-val sub_jkind_l_layout :
-  context:jkind_context ->
-  level:int ->
-  Types.jkind_l ->
-  Types.jkind_l ->
-  (unit, Violation.t) result
-
-||||||| c79b6d1beb
-=======
 (** [sub_layout t1 t2] says whether [t1]'s layout is a sublayout of [t2]s. Might
     update either [t1] or [t2] to make their layouts equal. Does not check
     bounds at all. *)
@@ -846,7 +826,6 @@ val sub_layout_or_error :
   Types.jkind_l ->
   (unit, Violation.t) result
 
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
 (** Like [sub], but compares a left jkind against another left jkind.
     Pre-condition: the super jkind must be fully settled; no variables which
     might be filled in later. *)

@@ -411,10 +411,6 @@ module Solver = struct
     Ldd.solve_pending ();
     base, coeffs
 
-  let leq_with_reason (left : Ldd.node) (right : Ldd.node) :
-      Jkind_axis.Axis.packed list =
-    Ldd.leq_with_reason left right
-
   let round_up (k : Ldd.node) : Axis_lattice.t = Ldd.round_up k
 end
 
@@ -860,8 +856,7 @@ let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
       let stored_jkind =
         match context.lookup_type path with
         | None -> "?"
-        | Some decl ->
-          Format.asprintf "%a" (Format_doc.compat Jkind.format) decl.type_jkind
+        | Some _decl -> "<stored-jkind>"
       in
       Format.eprintf "[ikind] %a: stored=%s, base=%s, coeffs=[%s]@."
         (Format_doc.compat Path.print) path stored_jkind
@@ -914,17 +909,18 @@ let () = Predef.set_ikind_of_jkind predef_ikind_of_jkind
 
 let sub_jkind_l ?allow_any_crossing ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
-    ~(context : Jkind.jkind_context) ~level (sub : Types.jkind_l)
+    ~(context : Jkind.jkind_context) ~level env (sub : Types.jkind_l)
     (super : Types.jkind_l) : (unit, Jkind.Violation.t) result =
   let open Misc.Stdlib.Monad.Result.Syntax in
   if not (enable_sub_jkind_l && !Clflags.ikinds)
   then
-    Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context ~level sub super
+    Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context ~level env sub
+      super
   else
     (* Check layouts first; if that fails, print both sides with full
        info and return the error. *)
     let* () =
-      match Jkind.sub_jkind_l_layout ~context ~level sub super with
+      match Jkind.sub_layout_or_error ~context ~level env sub super with
       | Ok () -> Ok ()
       | Error v -> Error v
     in
@@ -939,10 +935,8 @@ let sub_jkind_l ?allow_any_crossing ?origin
           match origin with None -> "" | Some o -> " origin=" ^ o
         in
         Format.eprintf
-          "[ikind-subjkind] call%s allow_any=true@;sub=%a@;super=%a@."
-          origin_suffix
-          (Format_doc.compat Jkind.format) sub
-          (Format_doc.compat Jkind.format) super);
+          "[ikind-subjkind] call%s allow_any=true@."
+          origin_suffix);
       Ok ())
     else
       let ctx = make_ctx ~mode:Solver.Normal ~context in
@@ -965,14 +959,10 @@ let sub_jkind_l ?allow_any_crossing ?origin
         in
         Format.eprintf
           "[ikind-subjkind] call%s allow_any=false@;\
-           sub=%a@;\
-           super=%a@;\
            @;\
            sub_poly=%s@;\
            super_poly=%s@."
           origin_suffix
-          (Format_doc.compat Jkind.format) sub
-          (Format_doc.compat Jkind.format) super
           (Ldd.pp sub_poly)
           (Ldd.pp super_poly));
       match violating_axes with
@@ -988,9 +978,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
               |> String.concat ", "
             in
             Format.eprintf
-              "[ikind-subjkind] failure on axes: %s@;sub=%a@;super=%a@." axes
-              (Format_doc.compat Jkind.format) sub
-              (Format_doc.compat Jkind.format) super
+              "[ikind-subjkind] failure on axes: %s@." axes
         in
         (* Do not try to adjust allowances; Violation.Not_a_subjkind
            accepts an r-jkind. *)
@@ -1000,89 +988,72 @@ let sub_jkind_l ?allow_any_crossing ?origin
             violating_axes
         in
         Error
-          (Jkind.Violation.of_ ~context
+          (Jkind.Violation.of_ ~context env
              (Jkind.Violation.Not_a_subjkind (sub, super, axis_reasons)))
 
-let sub ?origin ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
-    ~(context : Jkind.jkind_context) ~level
-    (sub : (Allowance.allowed * 'r1) Types.jkind)
-    (super : ('l2 * Allowance.allowed) Types.jkind) : bool =
-  ignore origin;
-  if not !Clflags.ikinds
-  then Jkind.sub ~type_equal ~context ~level sub super
-  else
-    let ctx = make_ctx ~mode:Solver.Normal ~context in
-    match
-      Solver.leq_with_reason (Solver.ckind_of_jkind ctx sub)
-        (Solver.ckind_of_jkind ctx super)
-    with
-    | [] -> true
-    | _ -> false
-
 let crossing_of_jkind ~(context : Jkind.jkind_context)
-    (jkind : ('l * 'r) Types.jkind) : Mode.Crossing.t =
+    env (jkind : ('l * 'r) Types.jkind) : Mode.Crossing.t =
   if not (enable_crossing && !Clflags.ikinds)
-  then Jkind.get_mode_crossing ~context jkind
+  then Jkind.get_mode_crossing ~context env jkind
   else
     let ctx = make_ctx ~mode:Solver.Round_up ~context in
     let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
     let mb = Types.Jkind_mod_bounds.of_axis_lattice lat in
     Types.Jkind_mod_bounds.crossing mb
 
-(* Intentionally no ikind versions of sub_or_intersect / sub_or_error.
-   Keep Jkind as the single source for classification and error reporting. *)
 type sub_or_intersect = Jkind.sub_or_intersect
 
 let sub_or_intersect ?origin:_origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
-    ~(context : Jkind.jkind_context) ~level
+    ~(context : Jkind.jkind_context) ~level env
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) : sub_or_intersect =
-  (* CR jujacobs: fix this *)
   if not (enable_sub_or_intersect && !Clflags.ikinds)
-  then Jkind.sub_or_intersect ~type_equal ~context ~level t1 t2
+  then Jkind.sub_or_intersect ~type_equal ~context ~level env t1 t2
   else
-    let layout_sub = Jkind.Layout.sub ~level t1.jkind.layout t2.jkind.layout in
-    match layout_sub with
-    | Not_le reasons ->
-      if Jkind.has_intersection ~level t1 t2
-      then Jkind.Has_intersection reasons
-      else Jkind.Disjoint reasons
-    | Equal | Less -> (
+    match Jkind.sub_or_intersect ~type_equal ~context ~level env t1 t2 with
+    | Jkind.Disjoint _ as disjoint -> disjoint
+    | Jkind.May_have_intersection _ as maybe -> maybe
+    | Jkind.Sub ->
       (* The RHS is a jkind_r (no with-bounds), so its ikind is constant. *)
       let ctx = make_ctx ~mode:Solver.Round_up ~context in
       let sub_poly = Solver.ckind_of_jkind ctx t1 in
       let super_poly = Solver.ckind_of_jkind ctx t2 in
-      (* Layouts already checked above. Remaining failure reasons are
-         per-axis disagreements. *)
-      match Solver.leq_with_reason sub_poly super_poly with
+      (* Layout subchecking already succeeded above. Remaining failure reasons
+         here are per-axis disagreements in ikind mode. *)
+      match Ldd.leq_with_reason sub_poly super_poly with
       | [] -> Jkind.Sub
       | violating_axes ->
-        let axis_reasons =
-          List.map
-            (fun axis -> Jkind.Sub_failure_reason.Axis_disagreement axis)
-            violating_axes
-        in
         let reasons : Jkind.Sub_failure_reason.t Misc.Nonempty_list.t =
-          match axis_reasons with
-          | [] -> [ Layout_disagreement ]
+          match
+            List.map
+              (fun axis -> Jkind.Sub_failure_reason.Axis_disagreement axis)
+              violating_axes
+          with
+          | [] -> [ Jkind.Sub_failure_reason.Layout_disagreement ]
           | hd :: tl -> hd :: tl
         in
-        Jkind.Has_intersection reasons)
+        Jkind.May_have_intersection reasons
 
 let sub_or_error ?origin:_origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
-    ~(context : Jkind.jkind_context) ~level
+    ~(context : Jkind.jkind_context) ~level env
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) :
     (unit, Jkind.Violation.t) result =
   if not (enable_sub_or_error && !Clflags.ikinds)
-  then Jkind.sub_or_error ~type_equal ~context ~level t1 t2
-  else if sub ~type_equal ~context ~level t1 t2
-  then Ok ()
+  then Jkind.sub_or_error ~type_equal ~context ~level env t1 t2
   else
-    (* Delegate to Jkind for detailed error reporting. *)
-    Jkind.sub_or_error ~type_equal ~context ~level t1 t2
+    let ctx = make_ctx ~mode:Solver.Normal ~context in
+    match
+      Ldd.leq_with_reason
+        (Solver.ckind_of_jkind ctx t1)
+        (Solver.ckind_of_jkind ctx t2)
+    with
+    | [] -> Ok ()
+    | _ ->
+      (* Delegate to Jkind for detailed error reporting. *)
+      Jkind.sub_or_error ~type_equal ~context ~level env t1 t2
 
 (** Substitute constructor ikinds according to [lookup] without requiring
     Env. *)

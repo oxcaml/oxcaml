@@ -741,17 +741,7 @@ let rec type_declaration' copy_scope s decl =
           None -> None
         | Some ty -> Some(typexp copy_scope s decl.type_loc ty)
       end;
-<<<<<<< HEAD
-    type_jkind =
-      begin
-        let jkind =
-          match s.additional_action with
-          | Prepare_for_saving { prepare_jkind; _ } ->
-            prepare_jkind decl.type_loc decl.type_jkind
-          | Duplicate_variables | No_action -> decl.type_jkind
-        in
-        Jkind.map_type_expr (typexp copy_scope s decl.type_loc) jkind
-      end;
+    type_jkind = jkind copy_scope s decl.type_loc decl.type_jkind;
     type_ikind = (
       (* Preserve constructor ikinds via [s.types] (path rename or identity-env
          inlined type functions), avoiding Env. *)
@@ -772,20 +762,6 @@ let rec type_declaration' copy_scope s decl =
       !Types.Ikind_substitution.substitute_decl_ikind_with_lookup
         ~lookup decl.type_ikind
     );
-||||||| c79b6d1beb
-    type_jkind =
-      begin
-        let jkind =
-          match s.additional_action with
-          | Prepare_for_saving { prepare_jkind; _ } ->
-            prepare_jkind decl.type_loc decl.type_jkind
-          | Duplicate_variables | No_action -> decl.type_jkind
-        in
-        Jkind.map_type_expr (typexp copy_scope s decl.type_loc) jkind
-      end;
-=======
-    type_jkind = jkind copy_scope s decl.type_loc decl.type_jkind;
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
     type_private = decl.type_private;
     type_variance = decl.type_variance;
     type_separability = decl.type_separability;

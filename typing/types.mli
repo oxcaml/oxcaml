@@ -479,7 +479,14 @@ and jkind_r = (disallowed * allowed) jkind  (* the jkind expected of a type *)
 and jkind_lr = (allowed * allowed) jkind    (* the jkind of a variable *)
 and jkind_packed = Pack_jkind : ('l * 'r) jkind -> jkind_packed
 
-<<<<<<< HEAD
+and jkind_declaration =
+  {
+    jkind_manifest : jkind_const_desc_lr option;
+    jkind_attributes : Parsetree.attributes;
+    jkind_uid : Shape.Uid.t;
+    jkind_loc : Location.t
+  }
+
 val ikinds_todo : string -> type_ikind
 
 module Ikind_substitution : sig
@@ -491,18 +498,6 @@ module Ikind_substitution : sig
   val substitute_decl_ikind_with_lookup :
     (lookup:(Path.t -> lookup_result) -> type_ikind -> type_ikind) ref
 end
-
-||||||| c79b6d1beb
-=======
-and jkind_declaration =
-  {
-    jkind_manifest : jkind_const_desc_lr option;
-    jkind_attributes : Parsetree.attributes;
-    jkind_uid : Shape.Uid.t;
-    jkind_loc : Location.t
-  }
-
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
 (* A map from [type_expr] to [With_bounds_type_info.t], specifically defined with a
    (best-effort) semantic comparison function on types to be used in the with-bounds of a
    jkind.

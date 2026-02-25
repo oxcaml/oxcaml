@@ -571,20 +571,6 @@ and jkind_r = (disallowed * allowed) jkind
 and jkind_lr = (allowed * allowed) jkind
 and jkind_packed = Pack_jkind : ('l * 'r) jkind -> jkind_packed
 
-<<<<<<< HEAD
-module Ikind_substitution = struct
-  type lookup_result =
-    | Lookup_identity
-    | Lookup_path of Path.t
-    | Lookup_type_fun of type_expr list * type_expr
-
-  let substitute_decl_ikind_with_lookup :
-      (lookup:(Path.t -> lookup_result) -> type_ikind -> type_ikind) ref =
-    ref (fun ~lookup:_ ikind_entry -> ikind_entry)
-end
-
-||||||| c79b6d1beb
-=======
 and jkind_declaration =
   {
     (* CR layouts: Though it's semantically correct to have a const jkind for
@@ -596,7 +582,16 @@ and jkind_declaration =
     jkind_loc : Location.t
   }
 
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
+module Ikind_substitution = struct
+  type lookup_result =
+    | Lookup_identity
+    | Lookup_path of Path.t
+    | Lookup_type_fun of type_expr list * type_expr
+
+  let substitute_decl_ikind_with_lookup :
+      (lookup:(Path.t -> lookup_result) -> type_ikind -> type_ikind) ref =
+    ref (fun ~lookup:_ ikind_entry -> ikind_entry)
+end
 module TransientTypeOps = struct
   type t = type_expr
   let compare t1 t2 = t1.id - t2.id

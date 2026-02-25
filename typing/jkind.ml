@@ -3062,20 +3062,10 @@ module Violation = struct
   let report_with_offender ~offender ~level env =
     report_general ~level env "" pp_t offender
 
-<<<<<<< HEAD
-  let report_with_offender_sort ~offender ~level =
-    report_general ~level "A representable layout was expected, but " pp_t
-||||||| c79b6d1beb
-  let () = Env.report_jkind_violation_with_offender := report_with_offender
-
-  let report_with_offender_sort ~offender ~level =
-    report_general ~level "A representable layout was expected, but " pp_t
-=======
   let () = Env.report_jkind_violation_with_offender := report_with_offender
 
   let report_with_offender_sort ~offender ~level env =
     report_general ~level env "A representable layout was expected, but " pp_t
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
       offender
 
   let report_with_name ~name ~level env =
@@ -3254,38 +3244,6 @@ let sub_or_error ~type_equal ~context ~level env t1 t2 =
       (Violation.of_ ~context env
          (Violation.Not_a_subjkind (t1, t2, Nonempty_list.to_list reason)))
 
-<<<<<<< HEAD
-let require_le_for_sub_jkind_l ~context sub super sub_result =
-  Sub_result.require_le sub_result
-  |> Result.map_error (fun reasons ->
-         (* When we report an error, we want to show the best-normalized
-            version of sub, but the original super. When this check fails, it
-            is usually the case that the super was written by the user and the
-            sub was inferred. Thus, we should display the user-written jkind,
-            but simplify the inferred one, since the inferred one is probably
-            overly complex. *)
-         (* CR layouts v2.8: It would be useful report to the user why this
-            violation occurred, specifically which axes the violation is
-            along. *)
-         let best_sub = normalize ~mode:Require_best ~context sub in
-         Violation.of_ ~context
-           (Not_a_subjkind (best_sub, super, Nonempty_list.to_list reasons)))
-
-let sub_jkind_l_layout ~context ~level sub super =
-  let open Misc.Stdlib.Monad.Result.Syntax in
-  let require_le = require_le_for_sub_jkind_l ~context sub super in
-  let* () =
-    (* Validate layouts *)
-    require_le (Layout.sub ~level sub.jkind.layout super.jkind.layout)
-  in
-  Ok ()
-
-let sub_jkind_l ~type_equal ~context ~level ?(allow_any_crossing = false) sub
-    super =
-||||||| c79b6d1beb
-let sub_jkind_l ~type_equal ~context ~level ?(allow_any_crossing = false) sub
-    super =
-=======
 let sub_layout_or_error ~context ~level env t1 t2 =
   match Jkind_desc.sub_layout ~level env t1.jkind t2.jkind with
   | Equal | Less -> Ok ()
@@ -3296,29 +3254,8 @@ let sub_layout_or_error ~context ~level env t1 t2 =
 
 let sub_jkind_l ~type_equal ~context ~level ?(allow_any_crossing = false) env
     sub super =
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
   (* This function implements the "SUB" judgement from kind-inference.md. *)
   let open Misc.Stdlib.Monad.Result.Syntax in
-<<<<<<< HEAD
-  let require_le = require_le_for_sub_jkind_l ~context sub super in
-||||||| c79b6d1beb
-  let require_le sub_result =
-    Sub_result.require_le sub_result
-    |> Result.map_error (fun reasons ->
-        (* When we report an error, we want to show the best-normalized
-              version of sub, but the original super. When this check fails, it
-              is usually the case that the super was written by the user and the
-              sub was inferred. Thus, we should display the user-written jkind,
-              but simplify the inferred one, since the inferred one is probably
-              overly complex. *)
-        (* CR layouts v2.8: It would be useful report to the user why this
-              violation occurred, specifically which axes the violation is
-              along. Internal ticket 5100. *)
-        let best_sub = normalize ~mode:Require_best ~context sub in
-        Violation.of_ ~context
-          (Not_a_subjkind (best_sub, super, Nonempty_list.to_list reasons)))
-  in
-=======
   let require_le sub_result =
     Sub_result.require_le sub_result
     |> Result.map_error (fun reasons ->
@@ -3337,16 +3274,9 @@ let sub_jkind_l ~type_equal ~context ~level ?(allow_any_crossing = false) env
   in
   let sub_jkind = Base_and_axes.fully_expand_aliases env sub.jkind in
   let super_jkind = Base_and_axes.fully_expand_aliases env super.jkind in
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
   let* () =
     (* Validate layouts *)
-<<<<<<< HEAD
-    sub_jkind_l_layout ~context ~level sub super
-||||||| c79b6d1beb
-    require_le (Layout.sub ~level sub.jkind.layout super.jkind.layout)
-=======
     require_le (Base.sub_expanded ~level sub_jkind.base super_jkind.base)
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
   in
   match allow_any_crossing with
   | true -> Ok ()

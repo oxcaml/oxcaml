@@ -2674,13 +2674,7 @@ let constrain_type_jkind ~fixed env ty jkind =
 
     | _ ->
        match
-<<<<<<< HEAD
-         Ikind.sub_or_intersect ~type_equal ~context ~level:!current_level
-||||||| c79b6d1beb
-         Jkind.sub_or_intersect ~type_equal ~context ~level:!current_level
-=======
-         Jkind.sub_or_intersect ~type_equal ~context ~level:!current_level env
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
+         Ikind.sub_or_intersect ~type_equal ~context ~level:!current_level env
            ty's_jkind jkind
        with
        | Sub -> Ok ()
@@ -5404,13 +5398,7 @@ let zap_modalities_to_floor_if_at_least level =
 
 let crossing_of_jkind env jkind =
   let context = mk_jkind_context_check_principal env in
-<<<<<<< HEAD
-  Ikind.crossing_of_jkind ~context jkind
-||||||| c79b6d1beb
-  Jkind.get_mode_crossing ~context jkind
-=======
-  Jkind.get_mode_crossing ~context env jkind
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
+  Ikind.crossing_of_jkind ~context env jkind
 
 let crossing_of_ty env ?modalities ty =
   let crossing =
@@ -7755,18 +7743,10 @@ let check_decl_jkind env decl jkind =
     | _ -> decl.type_jkind
   in
   match
-<<<<<<< HEAD
     Ikind.sub_jkind_l
       ~origin:
         (Format.asprintf "ctype:decl %a" Location.print_loc decl.type_loc)
-      ~type_equal ~context ~level:!current_level decl_jkind jkind
-||||||| c79b6d1beb
-    Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level
-      decl_jkind jkind
-=======
-    Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level env
-      decl_jkind jkind
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
+      ~type_equal ~context ~level:!current_level env decl_jkind jkind
   with
   | Ok () -> Ok ()
   | Error _ as err ->
@@ -7775,19 +7755,11 @@ let check_decl_jkind env decl jkind =
     | Some ty ->
       let ty_jkind = type_jkind env ty in
       match
-<<<<<<< HEAD
         Ikind.sub_jkind_l
           ~origin:
             (Format.asprintf "ctype:manifest %a"
                Location.print_loc decl.type_loc)
-          ~type_equal ~context ~level:!current_level ty_jkind jkind
-||||||| c79b6d1beb
-        Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level ty_jkind
-          jkind
-=======
-        Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level env
-          ty_jkind jkind
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
+          ~type_equal ~context ~level:!current_level env ty_jkind jkind
       with
       | Ok () -> Ok ()
       | Error _ as err -> err
@@ -7805,15 +7777,9 @@ let constrain_decl_jkind env decl jkind =
     let type_equal = type_equal env in
     let context = mk_jkind_context_always_principal env in
     match
-<<<<<<< HEAD
       (* Use Ikind when enabled so axis constraints are checked; it falls
          back to [Jkind.sub_or_error] when ikinds are disabled. *)
-      Ikind.sub_or_error ~type_equal ~context ~level:!current_level
-||||||| c79b6d1beb
-      Jkind.sub_or_error ~type_equal ~context ~level:!current_level
-=======
-      Jkind.sub_or_error ~type_equal ~context ~level:!current_level env
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
+      Ikind.sub_or_error ~type_equal ~context ~level:!current_level env
         decl.type_jkind jkind
     with
     | Ok () as ok -> ok

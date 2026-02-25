@@ -349,7 +349,6 @@ let list_argument_sort = Jkind_types.Sort.Const.value
 let list_argument_jkind = Jkind.Builtin.value_or_null ~why:(
   Type_argument {parent_path = path_list; position = 1; arity = 1})
 
-<<<<<<< HEAD
 let ikind_of_jkind_ref :
     (params:type_expr list -> jkind_l -> type_ikind) ref =
   ref (fun ~params:_ _jkind -> Types.ikinds_todo "predef")
@@ -359,8 +358,6 @@ let set_ikind_of_jkind f = ikind_of_jkind_ref := f
 let ikind_of_jkind ~params jkind =
   (!ikind_of_jkind_ref) ~params jkind
 
-||||||| c79b6d1beb
-=======
 let predef_jkinds =
   List.map
     (fun (builtin : Jkind.Const.Builtin.t) ->
@@ -373,8 +370,6 @@ let add_predef_jkinds add_jkind env =
   List.fold_left
     (fun env (id, jkind) -> add_jkind id jkind env) env
     predef_jkinds
-
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
 let mk_add_type add_type =
   let add_type_with_jkind
       ?manifest type_ident

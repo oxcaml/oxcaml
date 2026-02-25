@@ -727,14 +727,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Oprint.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Btype.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Typemode.cmo
-<<<<<<< HEAD
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind.cmo
-||||||| c79b6d1beb
-=======
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Unit_info.cmo
-  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Predef.cmo
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Subst.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Signature_with_global_bindings.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Bytesections.cmo
@@ -748,6 +741,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Persistent_env.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Type_shape.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Env.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Jkind.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ikind.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Errortrace.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Ctype.cmo
@@ -853,14 +847,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Oprint.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Btype.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Typemode.cmx
-<<<<<<< HEAD
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind.cmx
-||||||| c79b6d1beb
-=======
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Unit_info.cmx
-  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Predef.cmx
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Subst.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Signature_with_global_bindings.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Bytesections.cmx
@@ -874,6 +861,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Persistent_env.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Type_shape.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Env.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Jkind.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ikind.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Errortrace.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Ctype.cmx

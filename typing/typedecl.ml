@@ -1527,7 +1527,6 @@ let narrow_to_manifest_jkind env loc path decl =
            (e.g. due to with-bounds/Best). *)
         let type_equal = Ctype.type_equal env in
         let context = Ctype.mk_jkind_context_always_principal env in
-<<<<<<< HEAD
         (match
            Ikind.sub_jkind_l
              ~origin:(Format.asprintf
@@ -1536,45 +1535,20 @@ let narrow_to_manifest_jkind env loc path decl =
              ~type_equal
              ~context
              ~level:(Ctype.get_current_level ())
+             env
              manifest_jkind
              decl.type_jkind
          with
          | Ok () -> ()
-         | Error v -> raise (Error (loc, Jkind_mismatch_of_type (ty,v))))
+         | Error v ->
+             raise (Error (loc, Jkind_mismatch_of_type (env, ty, v))))
     | Some type_jkind ->
         (* Legacy path: refine via [constrain_type_jkind] when ikinds disabled
            and we can allow-right. *)
         (match Ctype.constrain_type_jkind env ty type_jkind with
          | Ok () -> ()
-         | Error v -> raise (Error (loc, Jkind_mismatch_of_type (ty,v))))
-||||||| c79b6d1beb
-        match
-          Jkind.sub_jkind_l ~type_equal ~context
-            ~level:(Ctype.get_current_level ()) manifest_jkind decl.type_jkind
-        with
-        | Ok () -> ()
-        | Error v -> raise (Error (loc, Jkind_mismatch_of_type (ty,v)))
-      end
-    | Some type_jkind -> begin
-        match Ctype.constrain_type_jkind env ty type_jkind with
-        | Ok () -> ()
-        | Error v -> raise (Error (loc, Jkind_mismatch_of_type (ty,v)))
-      end
-=======
-        match
-          Jkind.sub_jkind_l ~type_equal ~context
-            ~level:(Ctype.get_current_level ()) env manifest_jkind
-            decl.type_jkind
-        with
-        | Ok () -> ()
-        | Error v -> raise (Error (loc, Jkind_mismatch_of_type (env, ty, v)))
-      end
-    | Some type_jkind -> begin
-        match Ctype.constrain_type_jkind env ty type_jkind with
-        | Ok () -> ()
-        | Error v -> raise (Error (loc, Jkind_mismatch_of_type (env, ty, v)))
-      end
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
+         | Error v ->
+             raise (Error (loc, Jkind_mismatch_of_type (env, ty, v))))
     end;
     let context =
       Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty))
@@ -2898,20 +2872,10 @@ let normalize_decl_jkinds env decls =
       Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty))
     in
     let normalized_jkind =
-<<<<<<< HEAD
-      Jkind.normalize ~mode:Require_best ~context:normalization_context
-||||||| c79b6d1beb
       Jkind.normalize
         ~mode:Require_best
-        ~context:(Ctype.mk_jkind_context env (fun ty ->
-          Some (Ctype.type_jkind env ty)))
-=======
-      Jkind.normalize
-        ~mode:Require_best
-        ~context:(Ctype.mk_jkind_context env (fun ty ->
-          Some (Ctype.type_jkind env ty)))
+        ~context:normalization_context
         env
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
         decl.type_jkind
     in
     let decl =

@@ -4853,7 +4853,7 @@ let env_of_only_summary env_from_summary env =
 let report_jkind_violation_with_offender =
   ref ((fun ~offender:_ ~level:_ _ _ _ -> assert false)
        : offender:(Format_doc.formatter -> unit) -> level:int -> t ->
-         Format_doc.formatter -> Jkind.Violation.t -> unit)
+         Format_doc.formatter -> Jkind0.Violation.t -> unit)
 
 (* Error report *)
 
@@ -4870,20 +4870,6 @@ let print_path: Path.t printer ref = ref (fun _ _ -> assert false)
 let print_type_expr : Types.type_expr printer ref =
   ref (fun _ _ -> assert false)
 
-<<<<<<< HEAD
-let report_jkind_violation_with_offender =
-  ref ((fun ~offender:_ ~level:_ _ _ -> assert false)
-       : offender:(Format_doc.formatter -> unit) ->
-         level:int -> Format_doc.formatter -> Jkind0.Violation.t -> unit)
-
-||||||| c79b6d1beb
-let report_jkind_violation_with_offender =
-  ref ((fun ~offender:_ ~level:_ _ _ -> assert false)
-       : offender:(Format_doc.formatter -> unit) ->
-         level:int -> Format_doc.formatter -> Jkind.Violation.t -> unit)
-
-=======
->>>>>>> 604616285413ce916c4efa2279891d3695cb6b38
 let spellcheck ppf extract env lid =
   let choices ~path name = Misc.spellcheck (extract path env) name in
   match lid with
