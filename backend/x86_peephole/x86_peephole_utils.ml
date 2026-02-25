@@ -189,8 +189,8 @@ let reg_appears_in_arg target arg =
       match target with
       | Reg64 r | Reg32 r | Reg16 r | Reg8L r ->
         (match addr.base with
-        | Some base when equal_reg64 r base -> true
-        | _ -> false)
+          | Some base when equal_reg64 r base -> true
+          | _ -> false)
         || (addr.scale <> 0 && equal_reg_idx (Scalar r) addr.idx)
       | Imm _ | Sym _ | Reg8H _ | Regf _ | Mem _ | Mem64_RIP _ -> false)
     | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
@@ -210,8 +210,8 @@ let reg_in_memory_address target arg =
     match underlying_reg64 target with
     | Some target_r64 ->
       (match addr.base with
-      | Some base when equal_reg64 target_r64 base -> true
-      | _ -> false)
+        | Some base when equal_reg64 target_r64 base -> true
+        | _ -> false)
       || (addr.scale <> 0 && equal_reg_idx (Scalar target_r64) addr.idx)
     | None -> false)
   | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ | Imm _ | Sym _
@@ -223,10 +223,10 @@ let is_control_flow = function
   | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | ADD _
   | SUB _ | IMUL _ | MUL _ | IDIV _ | AND _ | OR _ | XOR _ | SAL _ | SAR _
   | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO | SET _ | CMOV _
-  | BSF _ | BSR _ | BSWAP _ | XCHG _
-  | LOCK_CMPXCHG _ | LOCK_XADD _ | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _
-  | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE | HLT | LEAVE
-  | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _ | ADC _ | SBB _ ->
+  | BSF _ | BSR _ | BSWAP _ | XCHG _ | LOCK_CMPXCHG _ | LOCK_XADD _ | LOCK_ADD _
+  | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _ | PREFETCH _
+  | NOP | PAUSE | HLT | LEAVE | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE
+  | SIMD _ | ADC _ | SBB _ ->
     false
 
 (* CR xclerc: in `writes_to_arg` and `reads_from_arg`, when there are
@@ -288,10 +288,7 @@ let reads_from_arg target = function
   | ADC (src, dst)
   | SBB (src, dst) ->
     reg_appears_in_arg target src || reg_appears_in_arg target dst
-  | LEA (src, _)
-  | BSF (src, _)
-  | BSR (src, _) ->
-    reg_appears_in_arg target src
+  | LEA (src, _) | BSF (src, _) | BSR (src, _) -> reg_appears_in_arg target src
   | SAL (src, dst) | SAR (src, dst) | SHR (src, dst) ->
     reg_appears_in_arg target src || reg_appears_in_arg target dst
   | CMOV (_, src, dst) ->
@@ -358,17 +355,17 @@ let reads_flags = function
   | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | ADD _
   | SUB _ | IMUL _ | MUL _ | IDIV _ | AND _ | OR _ | XOR _ | SAL _ | SAR _
   | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO | BSF _ | BSR _
-  | BSWAP _ | JMP _ | CALL _ | RET | XCHG _
-  | LOCK_CMPXCHG _ | LOCK_XADD _ | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _
-  | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE | HLT | LEAVE
-  | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _ ->
+  | BSWAP _ | JMP _ | CALL _ | RET | XCHG _ | LOCK_CMPXCHG _ | LOCK_XADD _
+  | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _
+  | PREFETCH _ | NOP | PAUSE | HLT | LEAVE | RDTSC | RDPMC | LFENCE | SFENCE
+  | MFENCE | SIMD _ ->
     false
 
 let writes_flags = function
   | ADD _ | SUB _ | AND _ | OR _ | XOR _ | CMP _ | TEST _ | INC _ | DEC _
   | NEG _ | MUL _ | IMUL _ | IDIV _ | BSF _ | BSR _ | SAL _ | SAR _ | SHR _
-  | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _
-  | LOCK_OR _ | LOCK_XOR _ | LOCK_XADD _ | LOCK_CMPXCHG _ | ADC _ | SBB _ ->
+  | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _ | LOCK_OR _ | LOCK_XOR _ | LOCK_XADD _
+  | LOCK_CMPXCHG _ | ADC _ | SBB _ ->
     true
   | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | CDQ | CQO
   | SET _ | CMOV _ | BSWAP _ | J _ | JMP _ | CALL _ | RET | XCHG _ | CLDEMOTE _
