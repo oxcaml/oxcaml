@@ -1844,9 +1844,39 @@ module Const = struct
                 }
               jkind
           in
-          (* convert_with_base is guaranteed to succeed since the layout
-             matches and the modal bounds are all max *)
-          Option.get out_jkind_verbose
+          (match out_jkind_verbose with
+          | Some out_jkind -> out_jkind
+          | None ->
+            (* If we fail, try again with nullable/maybe-separable
+               jkinds. *)
+            let expanded =
+              Base_and_axes.fully_expand_aliases_const env jkind
+            in
+            let layout_str =
+              match (expanded.base : Layout.Const.t jkind_base) with
+              | Layout (Base (Scannable, _)) ->
+                (* As a special case, we'd still like to print in terms
+                   of the value_or_null alias, even if we're printing an
+                   expanded jkind. *)
+                "value_or_null"
+              | _ ->
+                Base.to_string Layout.Const.to_string expanded.base
+            in
+            let out_jkind_verbose =
+              convert_with_base ~verbosity env
+                ~base:
+                  { jkind =
+                      { base = jkind.base;
+                        mod_bounds = Mod_bounds.max;
+                        with_bounds = No_with_bounds
+                      };
+                    name = layout_str
+                  }
+                jkind
+            in
+            (* convert_with_base is guaranteed to succeed since the
+               layout matches and the modal bounds are all max *)
+            Option.get out_jkind_verbose)
       in
       let base = Outcometree.Ojkind_const_abbreviation (base, scannable_axes) in
       (* Add on [mod] bounds, if there are any *)
