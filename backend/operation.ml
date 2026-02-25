@@ -566,9 +566,10 @@ let equal left right =
     Cmm.equal_reinterpret_cast left_c right_c
   | Static_cast left_c, Static_cast right_c ->
     Cmm.equal_static_cast left_c right_c
-  | ( Probe_is_enabled { name = left_name },
-      Probe_is_enabled { name = right_name } ) ->
+  | ( Probe_is_enabled { name = left_name; enabled_at_init = left_eai },
+      Probe_is_enabled { name = right_name; enabled_at_init = right_eai } ) ->
     String.equal left_name right_name
+    && Option.equal Bool.equal left_eai right_eai
   | Opaque, Opaque | Begin_region, Begin_region | End_region, End_region -> true
   | Specific left_op, Specific right_op ->
     Arch.equal_specific_operation left_op right_op
@@ -588,16 +589,20 @@ let equal left right =
     && Option.equal Int.equal left_wp right_wp
     && Option.equal Backend_var.Provenance.equal left_prov right_prov
   | Dls_get, Dls_get | Tls_get, Tls_get | Poll, Poll | Pause, Pause -> true
+  | Dummy_use, Dummy_use | Domain_index, Domain_index -> true
+  | Int128op left_op, Int128op right_op ->
+    equal_int128_operation left_op right_op
   | ( Alloc { bytes = left_bytes; dbginfo = left_dbg; mode = left_mode },
       Alloc { bytes = right_bytes; dbginfo = right_dbg; mode = right_mode } ) ->
     Int.equal left_bytes right_bytes
     && equal_alloc_dbginfo left_dbg right_dbg
     && Cmm.Alloc_mode.equal left_mode right_mode
-  | ( ( Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
-      | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-      | Stackoffset _ | Load _ | Store _ | Intop _ | Intop_imm _
-      | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
-      | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-      | Name_for_debugger _ | Dls_get | Tls_get | Poll | Pause | Alloc _ ),
+  | ( ( Move | Spill | Reload | Dummy_use | Const_int _ | Const_float32 _
+      | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+      | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Intop _
+      | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
+      | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
+      | Begin_region | End_region | Specific _ | Name_for_debugger _ | Dls_get
+      | Tls_get | Domain_index | Poll | Pause | Alloc _ ),
       _ ) ->
     false

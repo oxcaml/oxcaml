@@ -452,6 +452,9 @@ let equal_alloc_block_kind left right =
   | Alloc_block_kind_vec512, Alloc_block_kind_vec512
   | Alloc_block_kind_float_array, Alloc_block_kind_float_array
   | Alloc_block_kind_float32_u_array, Alloc_block_kind_float32_u_array
+  | Alloc_block_kind_int_u_array, Alloc_block_kind_int_u_array
+  | Alloc_block_kind_int8_u_array, Alloc_block_kind_int8_u_array
+  | Alloc_block_kind_int16_u_array, Alloc_block_kind_int16_u_array
   | Alloc_block_kind_int32_u_array, Alloc_block_kind_int32_u_array
   | Alloc_block_kind_int64_u_array, Alloc_block_kind_int64_u_array
   | Alloc_block_kind_vec128_u_array, Alloc_block_kind_vec128_u_array
@@ -465,9 +468,10 @@ let equal_alloc_block_kind left right =
       | Alloc_block_kind_vec128 | Alloc_block_kind_vec256
       | Alloc_block_kind_vec512 | Alloc_block_kind_boxed_int _
       | Alloc_block_kind_float_array | Alloc_block_kind_float32_u_array
-      | Alloc_block_kind_int32_u_array | Alloc_block_kind_int64_u_array
-      | Alloc_block_kind_vec128_u_array | Alloc_block_kind_vec256_u_array
-      | Alloc_block_kind_vec512_u_array ),
+      | Alloc_block_kind_int_u_array | Alloc_block_kind_int8_u_array
+      | Alloc_block_kind_int16_u_array | Alloc_block_kind_int32_u_array
+      | Alloc_block_kind_int64_u_array | Alloc_block_kind_vec128_u_array
+      | Alloc_block_kind_vec256_u_array | Alloc_block_kind_vec512_u_array ),
       _ ) ->
     false
 

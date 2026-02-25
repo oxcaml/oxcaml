@@ -825,9 +825,10 @@ let equal_float_test (left : float_test) (right : float_test) =
 
 let equal_func_call_operation left right =
   match left, right with
-  | Indirect, Indirect -> true
+  | Indirect left_callees, Indirect right_callees ->
+    Option.equal (List.equal Cmm.equal_symbol) left_callees right_callees
   | Direct left_sym, Direct right_sym -> Cmm.equal_symbol left_sym right_sym
-  | (Indirect | Direct _), _ -> false
+  | (Indirect _ | Direct _), _ -> false
 
 let equal_external_call_operation left right =
   String.equal left.func_symbol right.func_symbol
@@ -888,8 +889,24 @@ let equal_terminator left right =
     equal_with_label_after equal_func_call_operation left_call right_call
   | Prim left_prim, Prim right_prim ->
     equal_with_label_after equal_prim_call_operation left_prim right_prim
+  | ( Invalid
+        { message = left_msg;
+          stack_ofs = left_ofs;
+          stack_align = left_align;
+          label_after = left_lbl
+        },
+      Invalid
+        { message = right_msg;
+          stack_ofs = right_ofs;
+          stack_align = right_align;
+          label_after = right_lbl
+        } ) ->
+    String.equal left_msg right_msg
+    && Int.equal left_ofs right_ofs
+    && Cmm.equal_stack_align left_align right_align
+    && Option.equal Label.equal left_lbl right_lbl
   | ( ( Never | Always _ | Parity_test _ | Truth_test _ | Float_test _
       | Int_test _ | Switch _ | Return | Raise _ | Tailcall_self _
-      | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ ),
+      | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ),
       _ ) ->
     false
