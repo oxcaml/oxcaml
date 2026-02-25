@@ -119,6 +119,11 @@ let newgenvar ?name jkind = newgenty (Tvar { name; jkind })
 let newgenstub ~scope jkind =
   newty3 ~level:generic_level ~scope (Tvar { name=None; jkind })
 
+let new_quote_ty t =
+  newty2 ~level:(get_level t) (Tquote t)
+let new_splice_ty t =
+  newty2 ~level:(get_level t) (Tsplice t)
+
 (**** Check some types ****)
 
 let is_Tvar ty = match get_desc ty with Tvar _ -> true | _ -> false
