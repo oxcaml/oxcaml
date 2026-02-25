@@ -103,7 +103,8 @@ type error =
        intro_stage : Env.stage;
        usage_stage : Env.stage}
   | Mismatched_jkind_annotation of
-    { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
+      { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
+  | Must_provide_zero_alloc_arity
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -880,7 +881,22 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             | _ :: _ ->
               { mode_modes = acc_mode; mode_desc = [] }
           in
-          let zero_alloc = Zero_alloc.create_var loc 1 in
+          let zero_alloc =
+            Builtin_attributes.get_zero_alloc_attribute
+              ~in_signature:false
+              ~on_application:false
+              ~on_function_argument:true
+              ~default_arity:(-1)
+              arg.ptyp_attributes
+          in
+          begin
+            let open Builtin_attributes in
+            match zero_alloc with
+            | (Check {arity; _} | Assume {arity; _}) when arity = -1 ->
+              raise (Error (arg.ptyp_loc, env, Must_provide_zero_alloc_arity))
+            | Default_zero_alloc | Ignore_assert_all | Check _ | Assume _ -> ()
+          end;
+          let zero_alloc = Zero_alloc.create_const zero_alloc in
           let ret_cty = loop acc_mode rest in
           let arg_ty = arg_cty.ctyp_type in
           let arg_ty =
@@ -1154,14 +1170,21 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       ctyp (Ttyp_variant (tfields, closed, present)) ty
   | Ptyp_poly(vars, st) ->
       let zero_alloc =
-        Zero_alloc.create_const
-          (Builtin_attributes.get_zero_alloc_attribute
-             ~in_signature:false
-             ~on_application:false
-             ~on_function_argument:false
-             ~default_arity:1
-             styp.ptyp_attributes)
+        Builtin_attributes.get_zero_alloc_attribute
+          ~in_signature:false
+          ~on_application:false
+          ~on_function_argument:false
+          ~default_arity:(-1)
+          styp.ptyp_attributes
       in
+      begin
+        let open Builtin_attributes in
+        match zero_alloc with
+        | (Check {arity; _} | Assume {arity; _}) when arity = -1 ->
+          raise (Error (loc, env, Polymorphic_optional_param))
+        | Default_zero_alloc | Ignore_assert_all | Check _ | Assume _ -> ()
+      end;
+      let zero_alloc = Zero_alloc.create_const zero_alloc in
       let desc, typ =
         transl_type_poly env ~policy ~row_context ~zero_alloc mode styp.ptyp_loc
           vars st
@@ -1860,6 +1883,9 @@ let report_error_doc env ppf =
       Env.print_stage usage_stage
       Env.print_stage intro_stage
       Env.print_with_quote_promote (name, intro_stage, usage_stage)
+  | Must_provide_zero_alloc_arity ->
+    fprintf ppf
+      "Zero-alloc annotations on function arguments must specify arity."
 
 let () =
   Location.register_error_of_exn

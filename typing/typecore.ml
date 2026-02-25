@@ -300,6 +300,7 @@ type error =
   | Let_poly_not_yet_implemented
   | Wrong_arg_zero_alloc of Zero_alloc.error
   | Unsupported_arg_zero_alloc
+  | Must_provide_zero_alloc_arity
 
 
 let not_principal fmt =
@@ -3467,7 +3468,8 @@ and type_pat_aux
       let path, new_env =
         !type_open Asttypes.Fresh !!penv sp.ppat_loc lid in
       Pattern_env.set_env penv new_env;
-      let p = type_pat tps category ~penv p expected_ty sort ~zero_alloc:Zero_alloc.default in
+      let zero_alloc = Zero_alloc.default in
+      let p = type_pat tps category ~penv p expected_ty sort ~zero_alloc in
       let new_env = !!penv in
       begin match Env.remove_last_open path new_env with
       | None -> assert false
@@ -3611,16 +3613,8 @@ let type_self_pattern env spat =
   let alloc_mode = simple_pat_mode Value.legacy in
   let equations_scope = get_current_level () in
   let new_penv = Pattern_env.make env
-                   ~equations_scope ~allow_recursive_equations:false in
-  let zero_alloc =
-    Builtin_attributes.get_zero_alloc_attribute
-      ~in_signature:false
-      ~on_application:false
-      ~on_function_argument:false
-      ~default_arity:1
-      spat.ppat_attributes
-    |> Zero_alloc.create_const
-  in
+      ~equations_scope ~allow_recursive_equations:false in
+  let zero_alloc = Zero_alloc.default in
   let pat =
     type_pat tps Value ~no_existentials:In_self_pattern ~alloc_mode
       ~mutable_flag:Immutable new_penv spat nv
@@ -4324,9 +4318,15 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
                   ~in_signature:false
                   ~on_application:false
                   ~on_function_argument:true
-                  ~default_arity:1
+                  ~default_arity:0
                   sarg.pexp_attributes
-                |> Zero_alloc.create_const
+              in
+              let zero_alloc =
+                match zero_alloc with
+                | (Check { arity; _ } | Assume { arity; _ }) when arity = 0 ->
+                  raise (Error (sarg.pexp_loc, env, Must_provide_zero_alloc_arity))
+                | Default_zero_alloc | Ignore_assert_all | Check _ | Assume _ ->
+                  Zero_alloc.create_const zero_alloc
               in
               let ty_arg = newmono ~zero_alloc ty_arg_mono in
               let ty_res =
@@ -4856,15 +4856,7 @@ let rec approx_type env sty =
         then type_option (newvar Predef.option_argument_jkind)
         else newvar (Jkind.Builtin.any ~why:Inside_of_Tarrow)
       in
-      let zero_alloc =
-        Builtin_attributes.get_zero_alloc_attribute
-          ~in_signature:false
-          ~on_application:false
-          ~on_function_argument:false
-          ~default_arity:1
-          arg_sty.ptyp_attributes
-        |> Zero_alloc.create_const
-      in
+      let zero_alloc = Zero_alloc.default in
       let ret = approx_type env sty in
       let marg = Alloc.of_const arg_mode.mode_modes in
       let mret = Alloc.newvar () in
@@ -4931,15 +4923,7 @@ let type_approx_fun_one_param
     | Some spat ->
         let mode_annots = mode_annots_from_pat spat in
         let has_poly = has_poly_constraint spat in
-        let zero_alloc =
-          Builtin_attributes.get_zero_alloc_attribute
-            ~in_signature:false
-            ~on_application:false
-            ~on_function_argument:false
-            ~default_arity:1
-            spat.ppat_attributes
-          |> Zero_alloc.create_const
-        in
+        let zero_alloc = Zero_alloc.default in
         if has_poly && is_optional label then
           raise(Error(spat.ppat_loc, env, Optional_poly_param));
         Some mode_annots, has_poly, zero_alloc
@@ -5847,7 +5831,7 @@ let pat_modes ~force_toplevel rec_mode_var (attrs, zero_alloc, spat) =
   in
   attrs, zero_alloc, pat_mode, exp_mode, spat
 
-let add_typed_zero_alloc_attribute expr attributes zero_alloc' =
+let add_typed_zero_alloc_attribute expr attributes =
   let open Builtin_attributes in
   let to_string : zero_alloc_attribute -> string = function
     | Check { strict; loc = _} ->
@@ -5882,41 +5866,47 @@ let add_typed_zero_alloc_attribute expr attributes zero_alloc' =
       let exp_desc = Texp_function { fn with zero_alloc } in
       { expr with exp_desc }
     end
-  | _ -> begin
-      match Zero_alloc.get zero_alloc' with
-      | Default_zero_alloc | Ignore_assert_all -> ()
-      | Check {loc; _} | Assume {loc; _} ->
-        Location.prerr_warning loc (Warnings.Misplaced_attribute "zero_alloc")
-    end;
-    expr
+  | _ -> expr
 
-let add_parsed_zero_alloc_attribute ({pvb_attributes = attributes; _} as vb) =
-  let open Builtin_attributes in
+let add_parsed_zero_alloc_attribute
+      ~default_arity
+      ({ pvb_pat = pat; pvb_attributes = attributes; _ } as vb)
+  =
   let zero_alloc =
-    get_zero_alloc_attribute
-      ~in_signature:false
-      ~on_application:false
-      ~on_function_argument:false
-      ~default_arity:1
-      attributes
-    |> Zero_alloc.create_const
+    match pat.ppat_desc with
+    | Ppat_any | Ppat_var _ ->
+      Builtin_attributes.get_zero_alloc_attribute
+        ~in_signature:false
+        ~on_application:false
+        ~on_function_argument:false
+        ~default_arity
+        attributes
+      |> Zero_alloc.create_const
+    | Ppat_alias _ | Ppat_constant _ | Ppat_interval _ | Ppat_tuple _
+    | Ppat_unboxed_tuple _ | Ppat_construct _ | Ppat_variant _
+    | Ppat_record _ | Ppat_record_unboxed_product _ | Ppat_array _
+    | Ppat_or _ | Ppat_constraint _ | Ppat_type _ | Ppat_lazy _
+    | Ppat_unpack _ | Ppat_exception _ | Ppat_extension _
+    | Ppat_open _ | Ppat_unboxed_unit | Ppat_unboxed_bool _ ->
+      Zero_alloc.default
   in
   vb, zero_alloc
 
-let check_zero_alloc env exp ~zero_alloc =
+let check_zero_alloc env exp ~zero_alloc_expected =
+  let check_arg_compatible zero_alloc =
+    match Zero_alloc.equal zero_alloc zero_alloc_expected with
+    | Ok () -> ()
+    | Error e ->
+      if Zero_alloc.error_is_arity_mismatch e
+      then () (* reported elsewhere *)
+      else raise (Error (exp.exp_loc, env, Wrong_arg_zero_alloc e))
+  in
   match exp.exp_desc with
-  | Texp_function {zero_alloc = zero_alloc'; _} -> begin
-      match Zero_alloc.sub zero_alloc' zero_alloc with
-      | Ok () -> ()
-      | Error e -> raise (Error (exp.exp_loc, env, Wrong_arg_zero_alloc e))
-    end
-  | Texp_ident {desc = {val_zero_alloc = zero_alloc'; _}; _} -> begin
-      match Zero_alloc.sub zero_alloc' zero_alloc with
-      | Ok () -> ()
-      | Error e -> raise (Error (exp.exp_loc, env, Wrong_arg_zero_alloc e))
-    end
+  | Texp_function { zero_alloc; _ } -> check_arg_compatible zero_alloc
+  | Texp_ident { desc = {val_zero_alloc; _}; _ } ->
+    check_arg_compatible val_zero_alloc
   | _ ->
-    match Zero_alloc.sub Zero_alloc.default zero_alloc with
+    match Zero_alloc.equal Zero_alloc.default zero_alloc_expected with
     | Ok () -> ()
     | Error _ -> raise (Error (exp.exp_loc, env, Unsupported_arg_zero_alloc))
 
@@ -7494,15 +7484,7 @@ and type_expect_
             { exp with exp_type = instance ty }
         | Tvar _ ->
             let exp = type_exp env expected_mode sbody in
-            let zero_alloc =
-              Builtin_attributes.get_zero_alloc_attribute
-                ~in_signature:false
-                ~on_application:false
-                ~on_function_argument:false
-                ~default_arity:1
-                exp.exp_attributes
-              |> Zero_alloc.create_const
-            in
+            let zero_alloc = Zero_alloc.default in
             let exp = {exp with exp_type = newmono ~zero_alloc exp.exp_type} in
             unify_exp env exp ty;
             exp
@@ -8425,10 +8407,16 @@ and type_function
           ~in_signature:false
           ~on_application:false
           ~on_function_argument:true
-          ~default_arity:1
+          ~default_arity:0
           pat.ppat_attributes
-        |> Zero_alloc.create_const
       in
+      begin
+        match zero_alloc with
+        | (Check { arity; _ } | Assume { arity; _ }) when arity = 0 ->
+          raise (Error (pparam_loc, env, Must_provide_zero_alloc_arity))
+        | Default_zero_alloc | Ignore_assert_all | Check _ | Assume _ -> ()
+      end;
+      let zero_alloc = Zero_alloc.create_const zero_alloc in
       let env,
           { filtered_arrow = { ty_arg; arg_mode; ty_ret; ret_mode };
             arg_sort; ret_sort;
@@ -9431,7 +9419,7 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
       let _ = Env.summary env in begin
         match Zero_alloc.get zero_alloc with
         | Zero_alloc.Check _ ->
-          check_zero_alloc env arg ~zero_alloc
+          check_zero_alloc env arg ~zero_alloc_expected:zero_alloc
         | _ -> ()
       end;
       (lbl, Arg (arg, mode_arg, sort_arg), sch)
@@ -9964,16 +9952,9 @@ and map_half_typed_cases
                   (fun () -> instance ?partial:take_partial_instance ty_arg)
               in
               let zero_alloc =
-                if is_Tpoly ty_arg then
-                  thd3 (tpoly_get_poly ty_arg)
-                else
-                  Builtin_attributes.get_zero_alloc_attribute
-                    ~on_application:false
-                    ~in_signature:false
-                    ~on_function_argument:true
-                    ~default_arity:1
-                    pattern.ppat_attributes
-                  |> Zero_alloc.create_const
+                if is_Tpoly ty_arg
+                then thd3 (tpoly_get_poly ty_arg)
+                else Zero_alloc.default
               in
               let (pat, ext_env, force, pvs, mvs) =
                 type_pattern category ~lev ~alloc_mode:pat_mode env pattern
@@ -10288,15 +10269,7 @@ and type_cases
 *)
 and type_function_cases_expect
     env expected_mode ty_expected loc cases attrs ~first ~in_function =
-  let zero_alloc =
-    Builtin_attributes.get_zero_alloc_attribute
-      ~in_signature:false
-      ~on_application:false
-      ~on_function_argument:true
-      ~default_arity:1
-      attrs
-    |> Zero_alloc.create_const
-  in
+  let zero_alloc = Zero_alloc.default in
   Builtin_attributes.warning_scope attrs begin fun () ->
     let env,
         { filtered_arrow = { ty_arg; ty_ret; arg_mode; ret_mode };
@@ -10352,7 +10325,16 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
     | Pexp_newtype (_, _, e) -> sexp_is_fun e
     | _ -> false
   in
+  let rec arity_of_fun sexp =
+    match sexp.pexp_desc with
+    | Pexp_function (params, _, _) -> List.length params
+    | Pexp_constraint (e, _, _)
+    | Pexp_newtype (_, _, e) -> arity_of_fun e
+    (* function is only ever invoked if sexp_is_fun is true *)
+    | _ -> assert false
+  in
   let vb_is_fun { pvb_expr = sexp; _ } = sexp_is_fun sexp in
+  let vb_fun_arity { pvb_expr = sexp; _ } = arity_of_fun sexp in
   let entirely_functions = List.for_all vb_is_fun spat_sexp_list in
   let rec_mode_var =
     match rec_flag with
@@ -10370,16 +10352,19 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
         Some m
     | Nonrecursive -> None
   in
-  let spat_sexp_list = List.map add_parsed_zero_alloc_attribute spat_sexp_list in
+  let spat_sexp_list =
+    List.map
+      (fun vb ->
+         if vb_is_fun vb then
+           let default_arity = vb_fun_arity vb in
+           add_parsed_zero_alloc_attribute ~default_arity vb
+         else (vb, Zero_alloc.default))
+      spat_sexp_list
+  in
   let spatl = List.map vb_pat_constraint spat_sexp_list in
   let spatl = List.map (pat_modes ~force_toplevel rec_mode_var) spatl in
   let attrs_list = List.map (fun (attrs, _, _, _, _) -> attrs) spatl in
   let is_recursive = (rec_flag = Recursive) in
-  (* main issue is: Texp vs Pexp reading of attributes;
-     do it twice for zero alloc!
-     read at pexp first;
-     then, when we do it later in add_zero_alloc_attribute, verify that was previously
-     done correctly and issue a warning or error if not *)
 
   let (pat_list, exp_list, new_env, mvs, sorts, _pvs) =
     with_local_level begin fun () ->
@@ -10562,10 +10547,12 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   let l = List.combine sorts l in
   let l =
     List.map2
-      (fun (s, ((_,p,_), (e, _))) (pvb, zero_alloc') ->
+      (fun (s, ((_,p,_), (e, _))) (pvb, _) ->
         (* We check for [zero_alloc] attributes written on the [let] and move
            them to the function. *)
-        let e = add_typed_zero_alloc_attribute e pvb.pvb_attributes zero_alloc' in
+        let e =
+          add_typed_zero_alloc_attribute e pvb.pvb_attributes
+        in
         (* vb_rec_kind will be computed later for recursive bindings *)
         {vb_pat=p; vb_expr=e; vb_sort = s; vb_attributes=pvb.pvb_attributes;
          vb_loc=pvb.pvb_loc; vb_rec_kind = Dynamic;
@@ -10752,15 +10739,7 @@ and type_andops env sarg sands expected_sort expected_ty =
             let ty_result, op_result_sort =
               new_rep_var ~why:Function_result ()
             in
-            let zero_alloc =
-              Builtin_attributes.get_zero_alloc_attribute
-                ~in_signature:false
-                ~on_application:false
-                ~on_function_argument:false
-                ~default_arity:1
-                sexp.pexp_attributes
-              |> Zero_alloc.create_const
-            in
+            let zero_alloc = Zero_alloc.default in
             let arrow_desc = (Nolabel, Alloc.legacy, Alloc.legacy) in
             let ty_rest_fun =
               newty (Tarrow(arrow_desc, newmono ~zero_alloc ty_arg, ty_result, commu_ok)) in
@@ -10903,8 +10882,8 @@ and type_n_ary_function
     in
     let zero_alloc =
       match zero_alloc with
-      | Default_zero_alloc when not on_function_argument -> Zero_alloc.create_var loc syntactic_arity
-      | (Check _ | Assume _ | Ignore_assert_all | Default_zero_alloc) ->
+      | Default_zero_alloc -> Zero_alloc.create_var loc syntactic_arity
+      | Ignore_assert_all | Check _ | Assume _ ->
         Zero_alloc.create_const zero_alloc
     in
     begin match contains_gadt with
@@ -12492,6 +12471,9 @@ let report_error ~loc env =
         "@[This function application expects an argument that does not \
          allocate.@ \
          Argument must be an identifier or a function binding.@]"
+  | Must_provide_zero_alloc_arity ->
+      Location.errorf ~loc
+        "Zero-alloc annotations on function arguments must specify arity."
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

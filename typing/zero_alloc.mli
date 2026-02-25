@@ -45,6 +45,11 @@ val create_var : Location.t -> int -> t
    [const] and has no effect. *)
 val get : t -> const
 
+(* Get zero alloc information from attributes, create a variable if no annotation. *)
+val prepare_zero_alloc :
+  in_signature:bool -> on_application:bool-> on_function_argument:bool -> default_arity:int ->
+  loc:Location.t -> Parsetree.attributes -> t
+
 (* For types.ml's backtracking mechanism. *)
 type change
 val set_change_log : (change -> unit) -> unit
@@ -52,11 +57,14 @@ val undo_change : change -> unit
 
 (* These are the errors that may be raised by [sub_exn] below. *)
 type error
+val error_is_arity_mismatch : error -> bool
 val print_error : Format_doc.formatter -> error -> unit
 
 (* [sub t1 t2] checks whether the zero_alloc check t1 is stronger than the
    zero_alloc check t2. It returns [Ok ()] if so, and [Error e] if not.  If [t1]
    is a variable, it may be set to make the relation hold. *)
 val sub : t -> t -> (unit, error) Result.t
+
+val equal : t -> t -> (unit, error) Result.t
 
 val debug_printer : Format.formatter -> t -> unit

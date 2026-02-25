@@ -1077,11 +1077,12 @@ let parse_zero_alloc_attribute ~in_signature ~on_application ~on_function_argume
             Default_zero_alloc)
 
 
-let get_zero_alloc_attribute ~in_signature ~on_application ~on_function_argument ~default_arity l =
+let get_zero_alloc_attribute ~in_signature ~on_application ~on_function_argument
+      ~default_arity l =
   let attr = select_attribute is_zero_alloc_attribute l in
   let res =
-      parse_zero_alloc_attribute ~in_signature ~on_application ~on_function_argument
-        ~default_arity attr
+      parse_zero_alloc_attribute ~in_signature ~on_application
+        ~on_function_argument ~default_arity attr
   in
   (match attr, res with
    | None, Default_zero_alloc -> ()

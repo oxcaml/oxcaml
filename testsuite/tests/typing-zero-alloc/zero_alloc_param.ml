@@ -17,7 +17,20 @@ end = struct
   let[@zero_alloc] f' (g' [@zero_alloc]) = g' 123
 end;;
 [%%expect {|
-module M : sig val f' : (int -> 'b) -> 'b [@@zero_alloc] end
+Line 4, characters 22-40:
+4 |   let[@zero_alloc] f' (g' [@zero_alloc]) = g' 123
+                          ^^^^^^^^^^^^^^^^^^
+Error: Zero-alloc annotations on function arguments must specify arity.
+|}];;
+
+module M' = struct
+  let[@zero_alloc] f' (g' [@zero_alloc]) = g' 123 456
+end;;
+[%%expect {|
+Line 2, characters 22-40:
+2 |   let[@zero_alloc] f' (g' [@zero_alloc]) = g' 123 456
+                          ^^^^^^^^^^^^^^^^^^
+Error: Zero-alloc annotations on function arguments must specify arity.
 |}];;
 
 module M2 : sig
@@ -26,7 +39,103 @@ end = struct
   let[@zero_alloc] f' (g' [@zero_alloc arity 2]) = g' 123 456
 end;;
 [%%expect {|
-module M2 : sig val f' : (int -> int -> 'b) -> 'b [@@zero_alloc] end
+module M2 :
+  sig
+    val f' : (int -> int -> 'b) [@zero_alloc arity 2] -> 'b [@@zero_alloc]
+  end
+|}];;
+
+module M2' : sig
+  val f': ((int -> int -> 'b) [@zero_alloc]) -> 'b [@@zero_alloc]
+end = struct
+  let[@zero_alloc] f' (g' [@zero_alloc arity 2]) = g' 123 456
+end;;
+[%%expect {|
+Line 2, characters 12-28:
+2 |   val f': ((int -> int -> 'b) [@zero_alloc]) -> 'b [@@zero_alloc]
+                ^^^^^^^^^^^^^^^^
+Error: Zero-alloc annotations on function arguments must specify arity.
+|}];;
+
+module M2'' : sig
+  val f': ((int -> int -> 'b) [@zero_alloc arity 2]) -> 'b [@@zero_alloc]
+end = struct
+  let[@zero_alloc] f' (g' [@zero_alloc arity 1]) = g' 123 456
+end;;
+[%%expect {|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let[@zero_alloc] f' (g' [@zero_alloc arity 1]) = g' 123 456
+5 | end..
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           val f' : (int -> int -> 'a) [@zero_alloc arity 1] -> 'a
+             [@@zero_alloc]
+         end
+       is not included in
+         sig
+           val f' : (int -> int -> 'b) [@zero_alloc arity 2] -> 'b
+             [@@zero_alloc]
+         end
+       Values do not match:
+         val f' : (int -> int -> 'a) [@zero_alloc arity 1] -> 'a
+           [@@zero_alloc]
+       is not included in
+         val f' : (int -> int -> 'b) [@zero_alloc arity 2] -> 'b
+           [@@zero_alloc]
+       The type "(int -> int -> 'a) [@zero_alloc arity 1] -> 'a"
+       is not compatible with the type
+         "(int -> int -> 'b) [@zero_alloc arity 2] -> 'b"
+       Zero-alloc attributes should match.
+|}];;
+
+module M2''' : sig
+  val f': ((int -> int -> 'b) [@zero_alloc arity 2]) -> 'b [@@zero_alloc]
+end = struct
+  let[@zero_alloc] f' g' = g' 123 456
+end;;
+[%%expect {|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   let[@zero_alloc] f' g' = g' 123 456
+5 | end..
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f' : (int -> int -> 'a) -> 'a [@@zero_alloc] end
+       is not included in
+         sig
+           val f' : (int -> int -> 'b) [@zero_alloc arity 2] -> 'b
+             [@@zero_alloc]
+         end
+       Values do not match:
+         val f' : (int -> int -> 'a) -> 'a [@@zero_alloc]
+       is not included in
+         val f' : (int -> int -> 'b) [@zero_alloc arity 2] -> 'b
+           [@@zero_alloc]
+       The type "(int -> int -> 'a) -> 'a" is not compatible with the type
+         "(int -> int -> 'b) [@zero_alloc arity 2] -> 'b"
+       Zero-alloc attributes should match.
+|}];;
+
+
+type t = int -> int;;
+[%%expect {|
+type t = int -> int
+|}];;
+
+module type S = sig
+  val f : (t [@zero_alloc arity 1]) -> int
+end;;
+[%%expect {|
+module type S = sig val f : t -> int end
+|}];;
+
+module type S' = sig
+  val f : t [@zero_alloc arity 1]
+end;;
+[%%expect {|
+module type S' = sig val f : t end
 |}];;
 
 let[@zero_alloc] f x = x;;
@@ -34,7 +143,7 @@ let[@zero_alloc] f x = x;;
 val f : 'a -> 'a [@@zero_alloc] = <fun>
 |}];;
 
-let[@zero_alloc] g (f [@zero_alloc]) = f 42;;
+let[@zero_alloc] g (f [@zero_alloc arity 1]) = f 42;;
 [%%expect {|
 val g : (int -> 'a) [@zero_alloc arity 1] -> 'a [@@zero_alloc] = <fun>
 |}];;
@@ -76,7 +185,7 @@ let _ = g (fun[@zero_alloc] x -> (x, 123));;
 - : int * int = (42, 123)
 |}];;
 
-(* Function abstraction argument that is not zero_alloc. *)
+(* Function abstraction argument that is not marked zero_alloc. *)
 let _ = g (fun x -> 1);;
 [%%expect {|
 - : int = 1
@@ -101,8 +210,7 @@ Line 3, characters 4-5:
 3 |   g s;;
         ^
 Error: Function argument zero alloc assumption violated.
-       The former provides a weaker "zero_alloc" guarantee than the latter.
-       Hint: Add a "zero_alloc" attribute to the implementation.
+       There is a mismatch between the two "zero_alloc" guarantees.
 |}];;
 
 (* Examples where the zero-alloc argument requirement fails, when the argument

@@ -3566,12 +3566,22 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp_fields type_pairs env t1' t2'
         | (Tnil, Tnil, _, _) ->
             ()
-        | (Tpoly (t1, [], _), Tpoly (t2, [], _), _, _) ->
-            mcomp type_pairs env t1 t2
-        | (Tpoly (t1, tl1, _), Tpoly (t2, tl2, _), _, _) ->
+        | (Tpoly (t1'', [], za1), Tpoly (t2'', [], za2), _, _) ->
+            begin
+              match Zero_alloc.equal za1 za2 with
+              | Ok () -> ()
+              | Error _ -> raise_for Unify (Incompatible_zero_alloc (za1, za2))
+            end;
+            mcomp type_pairs env t1'' t2''
+        | (Tpoly (t1'', tl1, za1), Tpoly (t2'', tl2, za2), _, _) ->
+            begin
+              match Zero_alloc.equal za1 za2 with
+              | Ok () -> ()
+              | Error _ -> raise_for Unify (Incompatible_zero_alloc (za1, za2))
+            end;
             (try
                enter_poly env univar_pairs
-                 t1 tl1 t2 tl2 (mcomp type_pairs env)
+                 t1'' tl1 t2'' tl2 (mcomp type_pairs env)
              with Escape _ -> raise Incompatible)
         | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2), _, _) ->
             (* For layout-polymorphic types, establish correspondence between
@@ -4328,10 +4338,20 @@ and unify3 uenv t1 t1' t2 t2' =
           end
       | (Tnil, Tnil) ->
           ()
-      | (Tpoly (t1, [], _), Tpoly (t2, [], _)) ->
-          unify uenv t1 t2
-      | (Tpoly (t1, tl1, _), Tpoly (t2, tl2, _)) ->
-          enter_poly_for Unify (get_env uenv) univar_pairs t1 tl1 t2 tl2
+      | (Tpoly (t1'', [], za1), Tpoly (t2'', [], za2)) ->
+          begin
+            match Zero_alloc.equal za1 za2 with
+            | Ok () -> ()
+            | Error _ -> raise_for Unify (Incompatible_zero_alloc (za1, za2))
+          end;
+          unify uenv t1'' t2''
+      | (Tpoly (t1'', tl1, za1), Tpoly (t2'', tl2, za2)) ->
+          begin
+            match Zero_alloc.equal za1 za2 with
+            | Ok () -> ()
+            | Error _ -> raise_for Unify (Incompatible_zero_alloc (za1, za2))
+          end;
+          enter_poly_for Unify (get_env uenv) univar_pairs t1'' tl1 t2'' tl2
             (unify uenv)
       | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2)) ->
           (* For layout-polymorphic types, establish correspondence between
@@ -5506,10 +5526,20 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
                 t1' t2'
           | (Tnil, Tnil) ->
               ()
-          | (Tpoly (t1, [], _), Tpoly (t2, [], _)) ->
-              moregen inst_nongen variance type_pairs env t1 t2
-          | (Tpoly (t1, tl1, _), Tpoly (t2, tl2, _)) ->
-              enter_poly_for Moregen env univar_pairs t1 tl1 t2 tl2
+          | (Tpoly (t1'', [], za1), Tpoly (t2'', [], za2)) ->
+              begin
+                match Zero_alloc.equal za1 za2 with
+                | Ok () -> ()
+                | Error _ -> raise_for Moregen (Incompatible_zero_alloc (za1, za2))
+              end;
+              moregen inst_nongen variance type_pairs env t1'' t2''
+          | (Tpoly (t1'', tl1, za1), Tpoly (t2'', tl2, za2)) ->
+              begin
+                match Zero_alloc.equal za1 za2 with
+                | Ok () -> ()
+                | Error _ -> raise_for Moregen (Incompatible_zero_alloc (za1, za2))
+              end;
+              enter_poly_for Moregen env univar_pairs t1'' tl1 t2'' tl2
                 (moregen inst_nongen variance type_pairs env)
           | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2)) ->
               (* For layout-polymorphic types, establish correspondence
@@ -5980,10 +6010,20 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
                 t1' t2'
           | (Tnil, Tnil) ->
               ()
-          | (Tpoly (t1, [], _), Tpoly (t2, [], _)) ->
-              eqtype rename type_pairs subst env t1 t2 ~do_jkind_check
-          | (Tpoly (t1, tl1, _), Tpoly (t2, tl2, _)) ->
-              enter_poly_for Equality env univar_pairs t1 tl1 t2 tl2
+          | (Tpoly (t1'', [], za1), Tpoly (t2'', [], za2)) ->
+              begin
+                match Zero_alloc.equal za1 za2 with
+                | Ok () -> ()
+                | Error _ -> raise_for Equality (Incompatible_zero_alloc (za1, za2))
+              end;
+              eqtype rename type_pairs subst env t1'' t2'' ~do_jkind_check
+          | (Tpoly (t1'', tl1, za1), Tpoly (t2'', tl2, za2)) ->
+              begin
+                match Zero_alloc.equal za1 za2 with
+                | Ok () -> ()
+                | Error _ -> raise_for Equality (Incompatible_zero_alloc (za1, za2))
+              end;
+              enter_poly_for Equality env univar_pairs t1'' tl1 t2'' tl2
                 (eqtype rename type_pairs subst env ~do_jkind_check)
           | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2)) ->
               (* For layout-polymorphic types, establish correspondence
@@ -6869,13 +6909,27 @@ let rec subtype_rec env trace t1 t2 cstrs =
         with Exit ->
           (trace, t1, t2, !univar_pairs)::cstrs
         end
-    | (Tpoly (u1, [], _), Tpoly (u2, [], _)) ->
+    | (Tpoly (u1, [], za1), Tpoly (u2, [], za2)) ->
+        begin
+          match Zero_alloc.equal za1 za2 with
+          | Ok () -> ()
+          | Error _ -> raise_for Unify (Incompatible_zero_alloc (za1, za2))
+        end;
         subtype_rec env trace u1 u2 cstrs
-    | (Tpoly (u1, tl1, _), Tpoly (u2, [], _)) ->
+    | (Tpoly (u1, tl1, za1), Tpoly (u2, [], za2)) ->
+        begin
+          match Zero_alloc.equal za1 za2 with
+          | Ok () -> ()
+          | Error _ -> raise_for Unify (Incompatible_zero_alloc (za1, za2))
+        end;
         let u1' = instance_poly tl1 u1 in
         subtype_rec env trace u1' u2 cstrs
-    | (Tpoly (u1, tl1, _), Tpoly (u2, tl2, _)) ->
-        (* check_compatible_zero_alloc Unify za1 za2; *)
+    | (Tpoly (u1, tl1, za1), Tpoly (u2, tl2, za2)) ->
+        begin
+          match Zero_alloc.equal za1 za2 with
+          | Ok () -> ()
+          | Error _ -> raise_for Unify (Incompatible_zero_alloc (za1, za2))
+        end;
         begin try
           enter_poly env univar_pairs u1 tl1 u2 tl2
             (fun t1 t2 -> subtype_rec env trace t1 t2 cstrs)

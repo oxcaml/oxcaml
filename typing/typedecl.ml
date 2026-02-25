@@ -3943,7 +3943,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
         Builtin_attributes.get_zero_alloc_attribute ~in_signature:true
           ~on_application:false
           ~on_function_argument:false
-          ~default_arity valdecl.pval_attributes
+          ~default_arity
+          valdecl.pval_attributes
       in
       let zero_alloc =
         match zero_alloc with
@@ -3967,10 +3968,10 @@ let transl_value_decl env loc ~modal ~why valdecl =
              | Assert_all -> create_const ~opt:false
              | Assert_all_opt -> create_const ~opt:true)
         | Ignore_assert_all -> Zero_alloc.ignore_assert_all
-        | Check za ->
-          if default_arity = 0 && za.arity <= 0 then
+        | Check {arity; _} ->
+          if default_arity = 0 && arity <= 0 then
             raise (Error(valdecl.pval_loc, Zero_alloc_attr_non_function));
-          if za.arity <= 0 then
+          if arity <= 0 then
             raise (Error(valdecl.pval_loc, Zero_alloc_attr_bad_user_arity));
           Zero_alloc.create_const zero_alloc
         | Assume _ ->
@@ -4580,7 +4581,8 @@ let report_error_doc ppf = function
       | Bad_jkind (ty, violation) | Bad_jkind_sort (ty, violation) ->
         Some (ty, violation)
       | Unequal_var_jkinds _ | Unequal_tof_kind_jkinds _ | Diff _ | Variant _
-      | Obj _ | Escape _ | Incompatible_fields _ | Rec_occur _ -> None
+      | Obj _ | Escape _ | Incompatible_fields _ | Rec_occur _
+      | Incompatible_zero_alloc _ -> None
       in
       begin match List.find_map get_jkind_error err.trace with
       | Some (ty, violation) ->

@@ -144,7 +144,6 @@ let primitive_descriptions pd1 pd2 =
     native_repr_args pd1.prim_native_repr_args pd2.prim_native_repr_args
 
 let value_descriptions ~loc env name
-    ~on_function_argument
     ~mmodes
     (vd1 : Types.value_description)
     (vd2 : Types.value_description) =
@@ -154,13 +153,7 @@ let value_descriptions ~loc env name
     loc
     vd1.val_attributes vd2.val_attributes
     name;
-  let za_sub =
-    if on_function_argument then
-      Zero_alloc.sub vd2.val_zero_alloc vd1.val_zero_alloc
-    else
-      Zero_alloc.sub vd1.val_zero_alloc vd2.val_zero_alloc
-  in
-  begin match za_sub with
+  begin match Zero_alloc.sub vd1.val_zero_alloc vd2.val_zero_alloc with
   | Ok () -> ()
   | Error e -> raise (Dont_match (Zero_alloc e))
   end;

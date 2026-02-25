@@ -86,6 +86,11 @@ let get (t : t) =
 type error =
   | Less_general of { missing_entirely : bool }
   | Arity_mismatch of int * int
+  | Incompatible
+
+let error_is_arity_mismatch = function
+  | Less_general _ | Incompatible -> false
+  | Arity_mismatch _ -> true
 
 exception Error of error
 
@@ -96,6 +101,8 @@ let print_error ppf error =
     pr "The former provides a weaker \"zero_alloc\" guarantee than the latter.";
     if missing_entirely then
       pr "@ Hint: Add a \"zero_alloc\" attribute to the implementation."
+  | Incompatible ->
+    pr "There is a mismatch between the two \"zero_alloc\" guarantees."
   | Arity_mismatch (n1, n2) ->
     pr "zero_alloc arity mismatch:@ \
         When using \"zero_alloc\" in a signature, the syntactic arity of@ \
@@ -229,3 +236,20 @@ let sub za1 za2 =
     Ok ()
   with
   | Error e -> Result.Error e
+
+let equal za1 za2 =
+  try
+    sub_exn za1 za2;
+    sub_exn za2 za2;
+    Ok ()
+  with
+  | Error (Arity_mismatch _ as e) -> Result.Error e
+  | Error _ -> Result.Error Incompatible
+
+
+let prepare_zero_alloc ~in_signature ~on_application ~on_function_argument ~default_arity ~loc l =
+  let open Builtin_attributes in
+  match get_zero_alloc_attribute ~in_signature ~on_application
+          ~on_function_argument ~default_arity l with
+  | Default_zero_alloc -> create_var loc default_arity
+  | (Ignore_assert_all | Check _ | Assume _) as za -> create_const za

@@ -3274,9 +3274,6 @@ let explain_variant (type variety) : variety Errortrace.variant -> _ = function
       Some(doc_printf "@,The %a variant type is open and the %a is not"
              Errortrace.print_pos pos
              Errortrace.print_pos (Errortrace.swap_position pos))
-  (* Zero alloc *)
-  | Errortrace.Incompatible_zero_alloc ->
-      Some(doc_printf "@,@[Zero-alloc attributes are incompatible@]")
 
 let explain_escape pre = function
   | Errortrace.Univ u ->
@@ -3403,6 +3400,8 @@ let explanation (type variety) intro prev env
       Some (doc_printf "@ because their kinds are different.\
                      @ @[<v>%t@;%t@]"
               (fmt_history "the first" k1) (fmt_history "the second" k2))
+  | Errortrace.Incompatible_zero_alloc (_za1, _za2) ->
+      Some(doc_printf "@,@[Zero-alloc attributes should match.@]")
 
 let mismatch intro env trace =
   Errortrace.explain trace (fun ~prev h -> explanation intro prev env h)
@@ -3465,7 +3464,7 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
            | Unequal_tof_kind_jkinds _) ->
         true
     | Some (Diff _ | Escape _ | Variant _ | Obj _ | Incompatible_fields _
-           | Rec_occur _)
+           | Rec_occur _ | Incompatible_zero_alloc _)
     | None ->
         false
   in
