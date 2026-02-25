@@ -481,6 +481,15 @@ val low_bits : bits:int -> dbg:Debuginfo.t -> expression -> expression
     register *)
 val sign_extend : bits:int -> dbg:Debuginfo.t -> expression -> expression
 
+(** sign-extend a given integer expression from [source_bits] bits to
+    [target_bits] bits *)
+val sign_extend_to :
+  source_bits:int ->
+  target_bits:int ->
+  dbg:Debuginfo.t ->
+  expression ->
+  expression
+
 (** zero-extend a given integer expression from [bits] bits to an entire
     register *)
 val zero_extend : bits:int -> dbg:Debuginfo.t -> expression -> expression

@@ -1847,24 +1847,33 @@ let zero_extend ~bits ~dbg e =
         | e -> zero_extend_via_mask e)
       (low_bits ~bits e ~dbg)
 
-let rec sign_extend ~bits ~dbg e =
-  assert (0 < bits && bits <= arch_bits);
-  let unused_bits = arch_bits - bits in
+let rec sign_extend_to ~source_bits ~target_bits ~dbg e =
+  assert (0 < source_bits && source_bits <= target_bits);
+  let unused_bits = target_bits - source_bits in
   let sign_extend_via_shift e =
     asr_const (lsl_const0 e unused_bits dbg) unused_bits dbg
   in
-  if bits = arch_bits
+  if source_bits = target_bits
   then e
   else
     map_tail
       (fun e ->
         match prefer_or e with
         | Cop (Cand, [x; y], _) when is_constant y ->
-          and_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
+          and_int
+            (sign_extend_to ~source_bits ~target_bits x ~dbg)
+            (sign_extend_to ~source_bits ~target_bits y ~dbg)
+            dbg
         | Cop (Cor, [x; y], _) when is_constant y ->
-          or_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
+          or_int
+            (sign_extend_to ~source_bits ~target_bits x ~dbg)
+            (sign_extend_to ~source_bits ~target_bits y ~dbg)
+            dbg
         | Cop (Cxor, [x; y], _) when is_constant y ->
-          xor_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
+          xor_int
+            (sign_extend_to ~source_bits ~target_bits x ~dbg)
+            (sign_extend_to ~source_bits ~target_bits y ~dbg)
+            dbg
         | Cop (((Casr | Clsr) as op), [inner; Cconst_int (n, _)], _) as e
           when is_defined_shift n ->
           (* see middle_end/flambda2/z3/sign_extension.py for proof *)
@@ -1886,13 +1895,16 @@ let rec sign_extend ~bits ~dbg e =
           let load memory_chunk =
             Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg)
           in
-          match memory_chunk, bits with
+          match memory_chunk, source_bits with
           | (Byte_signed | Byte_unsigned), 8 -> load Byte_signed
           | (Sixteen_signed | Sixteen_unsigned), 16 -> load Sixteen_signed
           | (Thirtytwo_signed | Thirtytwo_unsigned), 32 -> load Thirtytwo_signed
           | _ -> sign_extend_via_shift e)
         | e -> sign_extend_via_shift e)
-      (low_bits ~bits e ~dbg)
+      (low_bits ~bits:source_bits e ~dbg)
+
+let sign_extend ~bits ~dbg e =
+  sign_extend_to ~source_bits:bits ~target_bits:arch_bits ~dbg e
 
 let unboxed_or_untagged_packed_array_ref arr index dbg ~log2_size_addr
     ~memory_chunk =
