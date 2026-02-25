@@ -75,15 +75,15 @@ let fastcode_flag = ref true
 
 (* Names for special regs *)
 
-let reg_domain_state_ptr = phys_reg Int 25 (* x28 *)
+let reg_domain_state_ptr = phys_reg Int X28
 
-let reg_trap_ptr = phys_reg Int 23 (* x26 *)
+let reg_trap_ptr = phys_reg Int X26
 
 let reg_x_trap_ptr = H.reg_x reg_trap_ptr
 
-let reg_alloc_ptr = phys_reg Int 24 (* x27 *)
+let reg_alloc_ptr = phys_reg Int X27
 
-let reg_tmp1 = phys_reg Int 26 (* x16 *)
+let reg_tmp1 = phys_reg Int X16
 
 (* AST register for reg_tmp1, used as memory base *)
 let reg_tmp1_base = R.reg_x 16
@@ -92,13 +92,13 @@ let reg_x_tmp1 = H.reg_x reg_tmp1
 
 let reg_x_alloc_ptr = H.reg_x reg_alloc_ptr
 
-let reg_x8 = phys_reg Int 8 (* x8 *)
+let reg_x8 = phys_reg Int X8
 
 let reg_x_x8 = H.reg_x reg_x8
 
-let reg_stack_arg_begin = H.reg_x (phys_reg Int 17)
+let reg_stack_arg_begin = H.reg_x (phys_reg Int X20)
 
-let reg_stack_arg_end = H.reg_x (phys_reg Int 18)
+let reg_stack_arg_end = H.reg_x (phys_reg Int X21)
 
 (** Turn a Linear label into an assembly label. The section is checked against
     the section tracked by [D] when emitting label definitions. *)
@@ -555,12 +555,13 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
 (* Record live pointers at call points *)
 
 let record_frame_label live dbg =
+  let encode_reg_offset n = (n lsl 1) + 1 in
   let lbl = Cmm.new_label () in
   let live_offset = ref [] in
   Reg.Set.iter
     (function
       | { typ = Val; loc = Reg r; _ } ->
-        live_offset := ((r lsl 1) + 1) :: !live_offset
+        live_offset := encode_reg_offset (Regs.index_in_class r) :: !live_offset
       | { typ = Val; loc = Stack s; _ } as reg ->
         live_offset
           := slot_offset s (Stack_class.of_machtype reg.typ) :: !live_offset
@@ -950,10 +951,10 @@ let num_call_gc_points instr =
            | Ishiftarith (_, _)
            | Ibswap _ | Isignext _ | Isimd _ ))
     | Lop
-        ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
-        | Dls_get | Tls_get | Domain_index | Const_int _ | Const_float32 _
-        | Const_float _ | Const_symbol _ | Const_vec128 _ | Stackoffset _
-        | Load _
+        ( Move | Spill | Reload | Dummy_use | Opaque | Pause | Begin_region
+        | End_region | Dls_get | Tls_get | Domain_index | Const_int _
+        | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+        | Stackoffset _ | Load _
         | Store (_, _, _)
         | Intop _ | Int128op _
         | Intop_imm (_, _)
@@ -1023,10 +1024,10 @@ module BR = Branch_relaxation.Make (struct
       | Lcondbranch (Ioddtest, _) | Lcondbranch (Ieventest, _) -> Some TB
       | Lcondbranch3 _ -> Some Bcc
       | Lop
-          ( Specific _ | Move | Spill | Reload | Opaque | Begin_region | Pause
-          | End_region | Dls_get | Tls_get | Domain_index | Const_int _
-          | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-          | Stackoffset _ | Load _
+          ( Specific _ | Move | Spill | Reload | Dummy_use | Opaque
+          | Begin_region | Pause | End_region | Dls_get | Tls_get | Domain_index
+          | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
+          | Const_vec128 _ | Stackoffset _ | Load _
           | Store (_, _, _)
           | Intop _ | Int128op _
           | Intop_imm (_, _)
@@ -1070,6 +1071,7 @@ module BR = Branch_relaxation.Make (struct
     | Lepilogue_open -> epilogue_size ()
     | Lepilogue_close -> 0
     | Lop (Move | Spill | Reload) -> 1
+    | Lop Dummy_use -> 0
     | Lop (Const_int n) -> num_instructions_for_intconst n
     | Lop (Const_float32 _) -> 2
     | Lop (Const_float _) -> 2
@@ -1553,6 +1555,7 @@ let emit_instr i =
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast cast i
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
+  | Lop Dummy_use -> ()
   | Lop (Specific Imove32) -> (
     let src = i.arg.(0) and dst = i.res.(0) in
     if not (Reg.same_loc src dst)
@@ -2169,6 +2172,7 @@ let fundecl fundecl =
   (* Define both a symbol and a label so the function can be referenced either
      way. Local references use the label form to avoid ELF visibility issues. *)
   D.define_joint_label_and_symbol ~section:Text fun_sym;
+  let fun_start_label = L.create_label_for_local_symbol Text fun_sym in
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
   let num_call_gc = num_call_gc_points fundecl.fun_body in
@@ -2183,7 +2187,10 @@ let fundecl fundecl =
   | None -> ()
   | Some fun_end_label ->
     let fun_end_label = label_to_asm_label ~section:Text fun_end_label in
-    D.define_label fun_end_label);
+    D.define_label fun_end_label;
+    Emitaux.Dwarf_helpers.record_function_range ~function_symbol:fun_sym
+      ~start_label:fun_start_label ~end_label:fun_end_label
+      ~offset_past_end_label:None);
   D.cfi_endproc ();
   (* The type symbol and the size are system specific. They are not output on
      macOS. The asm directives take care of correctly handling this distinction.
@@ -2296,6 +2303,9 @@ let begin_assembly _unix =
     D.align ~fill:Nop ~bytes:8);
   let code_end = Cmm_helpers.make_symbol "code_end" in
   Emitaux.Dwarf_helpers.begin_dwarf ~code_begin ~code_end ~file_emitter
+
+(* Not implemented for arm64 *)
+let register_expect_asm_callback (_ : string -> unit) = ()
 
 let end_assembly () =
   let code_end = Cmm_helpers.make_symbol "code_end" in

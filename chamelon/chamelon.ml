@@ -30,7 +30,15 @@ let () =
     Chamelon_args.usage_msg;
   match !Chamelon_args.subcommand with
   | None ->
-    Format.eprintf "required COMMAND name is missing, must be 'run'.@.";
+    Format.eprintf
+      "required COMMAND name is missing, must be 'run' or 'dune'.@.";
     Arg.usage !Chamelon_args.spec_list Chamelon_args.usage_msg;
     exit 2
   | Some Run -> Chamelon_run.main ()
+  | Some Dune -> (
+    match !Chamelon_args.dune_subcommand with
+    | None ->
+      Format.eprintf "required COMMAND name is missing, must be 'build'.@.";
+      Arg.usage !Chamelon_args.spec_list Chamelon_args.usage_msg;
+      exit 2
+    | Some Build -> Chamelon_dune.main ())

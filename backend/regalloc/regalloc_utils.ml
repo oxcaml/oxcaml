@@ -329,9 +329,9 @@ end
 
 let same_reg_class : Reg.t -> Reg.t -> bool =
  fun reg1 reg2 ->
-  Reg_class.equal
-    (Reg_class.of_machtype reg1.typ)
-    (Reg_class.of_machtype reg2.typ)
+  Regs.Reg_class.equal
+    (Regs.Reg_class.of_machtype reg1.typ)
+    (Regs.Reg_class.of_machtype reg2.typ)
 
 let same_stack_class : Reg.t -> Reg.t -> bool =
  fun reg1 reg2 ->

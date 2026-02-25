@@ -279,7 +279,7 @@ let pat
   List.iter (pat_extra sub) extra;
   match pat_desc with
   | Tpat_any  -> ()
-  | Tpat_var (_, s, _, _, _) -> iter_loc sub s
+  | Tpat_var { name = s; _ } -> iter_loc sub s
   | Tpat_constant _ -> ()
   | Tpat_unboxed_unit -> ()
   | Tpat_unboxed_bool _ -> ()
@@ -301,7 +301,7 @@ let pat
   | Tpat_record_unboxed_product (l, _) ->
       List.iter (fun (lid, _, i) -> iter_loc sub lid; sub.pat sub i) l
   | Tpat_array (_, _, l) -> List.iter (sub.pat sub) l
-  | Tpat_alias (p, _, s, _, _, _, _) -> sub.pat sub p; iter_loc sub s
+  | Tpat_alias { pattern = p; name = s; _ } -> sub.pat sub p; iter_loc sub s
   | Tpat_lazy p -> sub.pat sub p
   | Tpat_value p -> sub.pat sub (p :> pattern)
   | Tpat_exception p -> sub.pat sub p

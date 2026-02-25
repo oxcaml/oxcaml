@@ -26,7 +26,7 @@ let ccomp_type = {@QS@|@ccomptype@|@QS@}
 let c_compiler = {@QS@|@CC@|@QS@}
 let c_output_obj = {@QS@|@outputobj@|@QS@}
 let c_has_debug_prefix_map = @cc_has_debug_prefix_map@
-let as_has_debug_prefix_map = @as_has_debug_prefix_map@
+let as_debug_prefix_map_flag = {@QS@|@as_debug_prefix_map_flag@|@QS@}
 let ocamlc_cflags = {@QS@|@ocamlc_cflags@|@QS@}
 let ocamlc_cppflags = {@QS@|@ocamlc_cppflags@|@QS@}
 (* #7678: ocamlopt uses these only to compile .c files, and the behaviour for

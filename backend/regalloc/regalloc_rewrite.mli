@@ -49,6 +49,12 @@ val prelude :
   Cfg_with_infos.t ->
   cfg_infos * Regalloc_stack_slots.t * Regalloc_affinity.t
 
+(* Inserts dummy temporary uses, so that temporaries which are written but not
+   read are live. If such temporaries are never live, then they don't "interact"
+   with any other temporary and register allocators may assign any hardware
+   register to them. No instructions will be emitted for dummy uses. *)
+val insert_dummy_uses : Cfg_with_infos.t -> cfg_infos -> unit
+
 (* Runs the last steps common to register allocators, updating the CFG (stack
    slots, live fields, and prologue), running [f], and checking
    postconditions. *)

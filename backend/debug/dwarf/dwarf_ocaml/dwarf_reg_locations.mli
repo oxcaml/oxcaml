@@ -20,4 +20,4 @@ val reg_location_description :
   Reg.t ->
   offset:Stack_reg_offset.t option ->
   need_rvalue:bool ->
-  Simple_location_description.t option
+  Simple_location_description.t
