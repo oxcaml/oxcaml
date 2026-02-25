@@ -350,7 +350,7 @@ let enter_set_of_closures
     if in_stub then Disable_inlining Stub else disable_inlining
   in
   let disable_partial_application_stub_generation =
-    if in_stub && (Flambda_features.simplify_stubs ())
+    if in_stub && Flambda_features.simplify_stubs ()
     then true
     else disable_partial_application_stub_generation
   in
