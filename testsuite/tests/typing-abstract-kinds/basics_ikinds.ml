@@ -1127,14 +1127,7 @@ type a : k1 with t1
 type b = a require_k1
 [%%expect{|
 type a : k1 with t1
-Line 2, characters 9-10:
-2 | type b = a require_k1
-             ^
-Error: This type "a" should be an instance of type "('a : k1)"
-       The kind of a is k1 with t1
-         because of the definition of a at line 1, characters 0-19.
-       But the kind of a must be a subkind of k1
-         because of the definition of require_k1 at line 5, characters 0-25.
+type b = a require_k1
 |}]
 
 (* This one should always be rejected. *)
