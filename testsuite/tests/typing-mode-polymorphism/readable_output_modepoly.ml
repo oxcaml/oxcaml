@@ -55,7 +55,10 @@ let[@tail_mod_cons] rec map f = function
               (apply map_dps block 1 f (field_imm 1 param) tailcall)))
           (setfield_ptr(heap-init)_computed dst offset 0))))
   (apply (field_imm 1 (global Toploop!)) "map" map))
-val map : ('a -> 'b) -> 'a list -> 'b list = <fun>
+val map :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'q & global many > 'q | aliased] ->
+  ('a list @ [< 'p & 'n > 'p] -> 'b list @ [< 'o & global > 'o | 'm]) @ [< global > nonportable] =
+  <fun>
 |}]
 
 (* check that TMC works for records as well *)
@@ -114,7 +117,10 @@ let[@tail_mod_cons] rec rec_map f = function
               (apply rec_map_dps block 1 f (field_imm 1 *match*) tailcall)))
           (setfield_ptr(heap-init)_computed dst offset 0))))
   (apply (field_imm 1 (global Toploop!)) "rec_map" rec_map))
-val rec_map : ('a -> 'b) -> 'a rec_list -> 'b rec_list = <fun>
+val rec_map :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'q & global many > 'q | aliased] ->
+  ('a rec_list @ [< 'p & 'n > 'p] -> 'b rec_list @ [< 'o & global > 'o | 'm]) @ [< global > nonportable] =
+  <fun>
 |}]
 
 (* check the case where several constructors are nested;
@@ -208,7 +214,9 @@ let[@tail_mod_cons] rec trip = function
               (apply trip_dps block 1 (field_imm 1 param) tailcall)))
           (setfield_ptr(heap-init)_computed dst offset 0))))
   (apply (field_imm 1 (global Toploop!)) "trip" trip))
-val trip : 'a list -> ('a * int) list = <fun>
+val trip :
+  'a list @ [< 'n & 'o & global many > 'o] ->
+  ('a * int) list @ [< 'm & global > 'm | 'n | aliased] = <fun>
 |}]
 
 (* check nested-constructors whose arguments
@@ -283,7 +291,10 @@ let[@tail_mod_cons] rec effects f = function
               (apply effects_dps block 1 f (field_imm 1 param) tailcall)))
           (setfield_ptr(heap-init)_computed dst offset 0))))
   (apply (field_imm 1 (global Toploop!)) "effects" effects))
-val effects : ('a -> 'b) -> ('a * 'a) list -> 'b list = <fun>
+val effects :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'q & global many > 'q | aliased] ->
+  (('a * 'a) list @ [< 'p & 'n > 'p] -> 'b list @ [< 'o & global > 'o | 'm]) @ [< global > nonportable] =
+  <fun>
 |}]
 
 (* Check the case where several constructors
@@ -360,7 +371,10 @@ let[@tail_mod_cons] rec map_stutter f xs =
                   (apply map_stutter_dps block 1 f (field_imm 1 xs) tailcall)))
               (setfield_ptr(heap-init)_computed block 1 0))))))
   (apply (field_imm 1 (global Toploop!)) "map_stutter" map_stutter))
-val map_stutter : ('a option -> 'b) -> 'a list -> 'b list = <fun>
+val map_stutter :
+  ('a option @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'q & global many > 'q | aliased] ->
+  ('a list @ [< 'p & 'n > 'p] -> 'b list @ [< 'o & global > 'o | 'm]) @ [< global > nonportable] =
+  <fun>
 |}]
 
 (* Check the case where several constructors
@@ -438,5 +452,9 @@ type 'a stream = { hd : 'a; tl : unit -> 'a stream; }
               (apply smap_stutter_dps block 1 f (apply (field_imm 1 xs) 0)
                 (%int_sub n 1) tailcall))))))
   (apply (field_imm 1 (global Toploop!)) "smap_stutter" smap_stutter))
-val smap_stutter : ('a option -> 'b) -> 'a stream -> int -> 'b list = <fun>
+val smap_stutter :
+  ('a option @ [> 'n | aliased nonportable] -> 'b @ [< 'm & global]) @ [< 'p & global many > 'p | aliased] ->
+  ('a stream @ [< 'n & global > aliased nonportable] ->
+   (int @ [< many uncontended] -> 'b list @ [< 'o & global > 'o | 'm]) @ [< global > nonportable]) @ [< global > nonportable] =
+  <fun>
 |}]

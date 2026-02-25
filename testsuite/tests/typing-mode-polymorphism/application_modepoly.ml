@@ -11,7 +11,7 @@ Printexc.record_backtrace false;;
 
 let _ = Array.get;;
 [%%expect {|
-- : 'a array -> int -> 'a = <fun>
+- : 'a array -> (int -> 'a) @ [> aliased nonportable] = <fun>
 |}]
 
 let _ = Array.get [||];;
@@ -41,7 +41,7 @@ maybe some arguments are missing.
 
 let _ = if true then Array.get else (fun _ _ -> 12);;
 [%%expect {|
-- : int array -> (int -> int) @ local = <fun>
+- : int array -> (int -> int) @ [> local aliased nonportable] = <fun>
 |}]
 
 let _ = if true then Array.get [||] else (fun _ -> 12);;
@@ -65,7 +65,7 @@ type t = {r: int -> int -> int}
 let f x = let _ = x.r in ();;
 [%%expect {|
 type t = { r : int -> int -> int; }
-val f : t -> unit = <fun>
+val f : t @ 'm -> unit @ [< global] = <fun>
 |}]
 
 let f x = let _ = x.r 1 in ();;
@@ -76,14 +76,15 @@ Line 1, characters 18-23:
 Warning 5 [ignored-partial-application]: this function application is partial,
 maybe some arguments are missing.
 
-val f : t -> unit = <fun>
+val f : t @ 'm -> unit @ [< global] = <fun>
 |}]
 
 let f a b = a + b;;
 match f 42 with
 | _ -> ();;
 [%%expect {|
-val f : int -> int -> int = <fun>
+val f : int @ [< global] -> (int @ 'm -> int @ [< global]) @ [< global] =
+  <fun>
 Line 2, characters 6-10:
 2 | match f 42 with
           ^^^^
@@ -98,7 +99,8 @@ match f 42 with
 | _ -> ()
 | exception _ -> ();;
 [%%expect {|
-val f : int -> int -> int = <fun>
+val f : int @ [< global] -> (int @ 'm -> int @ [< global]) @ [< global] =
+  <fun>
 Line 2, characters 6-10:
 2 | match f 42 with
           ^^^^
@@ -112,7 +114,8 @@ let f a b = a + b;;
 match f 42 with
 | x -> ignore (x 34);;
 [%%expect {|
-val f : int -> int -> int = <fun>
+val f : int @ [< global] -> (int @ 'm -> int @ [< global]) @ [< global] =
+  <fun>
 - : unit = ()
 |}]
 
@@ -121,7 +124,8 @@ let f a b = a + b;;
 match (f 42 : _) with
 | _ -> ();;
 [%%expect {|
-val f : int -> int -> int = <fun>
+val f : int @ [< global] -> (int @ 'm -> int @ [< global]) @ [< global] =
+  <fun>
 - : unit = ()
 |}]
 
@@ -137,12 +141,13 @@ Exception: Stdlib.Exit.
 
 let f a b = a + b;;
 [%%expect {|
-val f : int -> int -> int = <fun>
+val f : int @ [< global] -> (int @ 'm -> int @ [< global]) @ [< global] =
+  <fun>
 |}]
 let g x = x + 1
 let _ = g (f 1);;
 [%%expect {|
-val g : int -> int = <fun>
+val g : int @ 'm -> int @ [< global] = <fun>
 Line 2, characters 10-15:
 2 | let _ = g (f 1);;
               ^^^^^

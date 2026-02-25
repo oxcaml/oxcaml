@@ -18,7 +18,9 @@ let f l = { fold = List.fold_left l };;
 [%%expect {|
 type 'a t = { t : 'a; }
 type 'a fold = { fold : 'b. f:('b -> 'a -> 'b) -> init:'b -> 'b; }
-val f : 'a list -> 'a fold = <fun>
+val f :
+  'a list @ [< global many uncontended] -> 'a fold @ [< global > nonportable] =
+  <fun>
 - : int = 6
 |}];;
 
@@ -33,7 +35,7 @@ let id x = x;;
 let {id} = id { id };;
 [%%expect {|
 type id = { id : 'a. 'a -> 'a; }
-val id : 'a -> 'a = <fun>
+val id : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
 val id : 'a -> 'a = <fun>
 |}];;
 
@@ -90,7 +92,9 @@ match px with
 
 fun {pv=v} -> true::v, 1::v;;
 [%%expect {|
-- : pty -> bool list * int list = <fun>
+- : pty @ [< 'm & global many] ->
+    bool list * int list @ [< global > 'm | aliased]
+= <fun>
 |}];;
 
 class ['b] ilist l = object
@@ -105,7 +109,7 @@ class ['b] ilist :
   'b list ->
   object ('c)
     val l : 'b list
-    method add : 'b -> 'c
+    method add : 'b @ [< global many uncontended] -> 'c
     method fold : f:('a -> 'b -> 'a) -> init:'a -> 'a
   end
 |}];;
@@ -148,7 +152,9 @@ let ilist2 l = object
 end
 ;;
 [%%expect {|
-val ilist2 : 'a list -> 'a vlist = <fun>
+val ilist2 :
+  'a list @ [< global many uncontended] ->
+  'a vlist @ [< global > aliased nonportable] = <fun>
 |}];;
 
 class ['a] ilist3 l = object
@@ -181,7 +187,7 @@ class ['a] ilist4 :
   'a list ->
   object ('c)
     val l : 'a list
-    method add : 'a -> 'c
+    method add : 'a @ [< global many uncontended] -> 'c
     method fold : f:('b -> 'a -> 'b) -> init:'b -> 'b
   end
 |}];;
@@ -200,7 +206,7 @@ class ['a] ilist5 :
   'a list ->
   object ('c)
     val l : 'a list
-    method add : 'a -> 'c
+    method add : 'a @ [< global many uncontended] -> 'c
     method fold : f:('b -> 'a -> 'b) -> init:'b -> 'b
     method fold2 : f:('b -> 'a -> 'b) -> init:'b -> 'b
   end
@@ -463,7 +469,9 @@ val p1 : point = <obj>
 val cp : color_point = <obj>
 val c : circle = <obj>
 val d : float = 11.
-val f : < m : 'a. 'a -> 'a > -> < m : 'b. 'b -> 'b > = <fun>
+val f :
+  < m : 'a. 'a -> 'a > @ [< 'm mod aliased] ->
+  < m : 'b. 'b -> 'b > @ [< global > 'm mod global many] = <fun>
 Line 9, characters 41-42:
 9 | let f (x : < m : 'a. 'a -> 'a list >) = (x : < m : 'b. 'b -> 'c >)
                                              ^
@@ -586,8 +594,12 @@ let f3 f = f#id 1, f#id true
 let f4 f = ignore(f : id); f#id 1, f#id true
 ;;
 [%%expect {|
-val f1 : id -> int * bool = <fun>
-val f2 : id -> int * bool = <fun>
+val f1 :
+  id @ [< uncontended] -> int * bool @ [< global > aliased nonportable] =
+  <fun>
+val f2 :
+  id @ [< many uncontended] -> int * bool @ [< global > aliased nonportable] =
+  <fun>
 Line 5, characters 24-28:
 5 | let f3 f = f#id 1, f#id true
                             ^^^^
@@ -616,7 +628,8 @@ let app = new c #m (new id2)
 type 'a foo = 'a foo list
 ;;
 [%%expect {|
-class id2 : object method id : 'a -> 'a method mono : int -> int end
+class id2 :
+  object method id : 'a -> 'a method mono : int @ 'm -> int @ [< global] end
 val app : int * bool = (1, true)
 Line 9, characters 0-25:
 9 | type 'a foo = 'a foo list
@@ -643,45 +656,53 @@ fun (x : <m:'a. 'a * <p:'b. 'b * 'c * 'd> as 'c> as 'd) -> x#m;;
 (* printer is wrong on the next (no official syntax) *)
 fun (x : <m:'a.<p:'a;..> >) -> x#m;;
 [%%expect {|
-- : (< m : 'a. 'a * 'b > as 'b) -> 'c * 'b = <fun>
-- : (< m : 'a. 'b * 'a list > as 'b) -> 'b * 'c list = <fun>
+- : (< m : 'a. 'a * 'b > as 'b) @ [< global uncontended] ->
+    'c * 'b @ [< global > aliased nonportable]
+= <fun>
+- : (< m : 'a. 'b * 'a list > as 'b) @ [< global uncontended] ->
+    'b * 'c list @ [< global > aliased nonportable]
+= <fun>
 val f :
-  (< m : 'b. 'a * (< n : 'b; .. > as 'b) > as 'a) ->
-  'a * (< n : 'c; .. > as 'c) = <fun>
-- : (< p : 'b. < m : 'b; n : 'a; .. > as 'b > as 'a) ->
+  (< m : 'b. 'a * (< n : 'b; .. > as 'b) > as 'a) @ [< uncontended] ->
+  'a * (< n : 'c; .. > as 'c) @ [< global > aliased nonportable] = <fun>
+- : (< p : 'b. < m : 'b; n : 'a; .. > as 'b > as 'a) @ [< global uncontended] ->
     (< m : 'c; n : 'a; .. > as 'c)
 = <fun>
-- : (< m : 'a. 'a * < p : 'b. 'b * 'd * 'c > as 'd > as 'c) ->
+- : (< m : 'a. 'a * < p : 'b. 'b * 'd * 'c > as 'd > as 'c) @ [< global uncontended] ->
     ('f * < p : 'b. 'b * 'e * 'c > as 'e)
 = <fun>
-- : < m : 'a. < p : 'a; .. > as 'b > -> 'b = <fun>
+- : < m : 'a. < p : 'a; .. > as 'b > @ [< global uncontended] -> 'b = <fun>
 |}, Principal{|
-- : (< m : 'a. 'a * 'b > as 'b) -> 'c * (< m : 'a. 'a * 'd > as 'd) = <fun>
-- : (< m : 'a. 'b * 'a list > as 'b) ->
-    (< m : 'a. 'c * 'a list > as 'c) * 'd list
+- : (< m : 'a. 'a * 'b > as 'b) @ [< global uncontended] ->
+    'c * (< m : 'a. 'a * 'd > as 'd) @ [< global > aliased nonportable]
+= <fun>
+- : (< m : 'a. 'b * 'a list > as 'b) @ [< global uncontended] ->
+    (< m : 'a. 'c * 'a list > as 'c) * 'd list @ [< global > aliased nonportable]
 = <fun>
 val f :
-  (< m : 'b. 'a * (< n : 'b; .. > as 'b) > as 'a) ->
-  (< m : 'd. 'c * (< n : 'd; .. > as 'd) > as 'c) * (< n : 'e; .. > as 'e) =
+  (< m : 'b. 'a * (< n : 'b; .. > as 'b) > as 'a) @ [< uncontended] ->
+  (< m : 'd. 'c * (< n : 'd; .. > as 'd) > as 'c) * (< n : 'e; .. > as 'e) @ [< global > aliased nonportable] =
   <fun>
-- : (< p : 'b. < m : 'b; n : 'a; .. > as 'b > as 'a) ->
+- : (< p : 'b. < m : 'b; n : 'a; .. > as 'b > as 'a) @ [< global uncontended] ->
     (< m : 'c; n : < p : 'e. < m : 'e; n : 'd; .. > as 'e > as 'd; .. > as 'c)
 = <fun>
-- : (< m : 'a. 'a * < p : 'b. 'b * 'd * 'c > as 'd > as 'c) ->
+- : (< m : 'a. 'a * < p : 'b. 'b * 'd * 'c > as 'd > as 'c) @ [< global uncontended] ->
     ('f *
      < p : 'b.
              'b * 'e *
              (< m : 'a. 'a * < p : 'b0. 'b0 * 'h * 'g > as 'h > as 'g) >
      as 'e)
 = <fun>
-- : < m : 'a. < p : 'a; .. > as 'b > -> 'b = <fun>
+- : < m : 'a. < p : 'a; .. > as 'b > @ [< global uncontended] -> 'b = <fun>
 |}];;
 
 type sum = T of < id: 'a. 'a -> 'a > ;;
 fun (T x) -> x#id;;
 [%%expect {|
 type sum = T of < id : 'a. 'a -> 'a >
-- : sum -> 'a -> 'a = <fun>
+- : sum @ [< global uncontended] ->
+    ('a -> 'a) @ [< global > aliased nonportable]
+= <fun>
 |}];;
 
 type record = { r: < id: 'a. 'a -> 'a > } ;;
@@ -689,8 +710,12 @@ fun x -> x.r#id;;
 fun {r=x} -> x#id;;
 [%%expect {|
 type record = { r : < id : 'a. 'a -> 'a >; }
-- : record -> 'a -> 'a = <fun>
-- : record -> 'a -> 'a = <fun>
+- : record @ [< global uncontended] ->
+    ('a -> 'a) @ [< global > aliased nonportable]
+= <fun>
+- : record @ [< global uncontended] ->
+    ('a -> 'a) @ [< global > aliased nonportable]
+= <fun>
 |}];;
 
 class myself = object (self)
@@ -756,7 +781,7 @@ let append (l : 'a #olist) (l' : 'b #olist) =
   l#fold ~init:l' ~f:(fun x acc -> acc#cons x)
 ;;
 [%%expect {|
-val id : 'a -> 'a = <fun>
+val id : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
 class c : object method id : 'a -> 'a end
 class c' : object method id : 'a -> 'a end
 class d :
@@ -770,12 +795,19 @@ class ['a] olist :
   'a list ->
   object ('c)
     val l : 'a list
-    method cons : 'a -> 'c
+    method cons : 'a @ [< global many uncontended] -> 'c
     method fold : f:('a -> 'b -> 'b) -> init:'b -> 'b
   end
-val sum : int #olist -> int = <fun>
-val count : 'a #olist -> int = <fun>
-val append : 'a #olist -> ('a #olist as 'b) -> 'b = <fun>
+val sum :
+  int #olist @ [< uncontended] -> int @ [< global > aliased nonportable] =
+  <fun>
+val count :
+  'a #olist @ [< uncontended] -> int @ [< global > aliased nonportable] =
+  <fun>
+val append :
+  'a #olist @ [< global uncontended] ->
+  (('a #olist as 'b) @ [< uncontended] -> 'b) @ [< global > nonportable] =
+  <fun>
 |}];;
 
 type 'a t = unit
@@ -842,13 +874,19 @@ Error: This field value has type "'b option ref" which is less general than
 let f (x: <m:'a.<p: 'a * 'b> as 'b>) (y : 'b) = ();;
 let f (x: <m:'a. 'a * (<p:int*'b> as 'b)>) (y : 'b) = ();;
 [%%expect {|
-val f : < m : 'a. < p : 'a * 'c > as 'c > -> 'b -> unit = <fun>
-val f : < m : 'a. 'a * (< p : int * 'b > as 'b) > -> 'b -> unit = <fun>
-|}, Principal{|
-val f : < m : 'a. < p : 'a * 'c > as 'c > -> 'b -> unit = <fun>
 val f :
-  < m : 'a. 'a * (< p : int * 'b > as 'b) > ->
-  (< p : int * 'c > as 'c) -> unit = <fun>
+  < m : 'a. < p : 'a * 'c > as 'c > @ 'n ->
+  ('b @ 'm -> unit @ [< global]) @ [< global] = <fun>
+val f :
+  < m : 'a. 'a * (< p : int * 'b > as 'b) > @ 'n ->
+  ('b @ 'm -> unit @ [< global]) @ [< global] = <fun>
+|}, Principal{|
+val f :
+  < m : 'a. < p : 'a * 'c > as 'c > @ [< global] ->
+  ('b @ 'm -> unit @ [< global]) @ [< global] = <fun>
+val f :
+  < m : 'a. 'a * (< p : int * 'b > as 'b) > @ [< global] ->
+  ((< p : int * 'c > as 'c) @ 'm -> unit @ [< global]) @ [< global] = <fun>
 |}];;
 
 (* PR#3643 *)
@@ -1017,11 +1055,15 @@ fun (x : 'a t as 'a) -> (x : 'b t);;
 type u = 'a t as 'a;;
 [%%expect {|
 type 'a t = < a : 'a >
-- : ('a t as 'a) -> 'a t = <fun>
+- : ('a t as 'a) @ [< 'm mod aliased & global] ->
+    'a t @ [< global > 'm mod global many]
+= <fun>
 type u = 'a t as 'a
 |}, Principal{|
 type 'a t = < a : 'a >
-- : ('a t as 'a) -> ('b t as 'b) t = <fun>
+- : ('a t as 'a) @ [< 'm mod aliased & global] ->
+    ('b t as 'b) t @ [< global > 'm mod global many]
+= <fun>
 type u = 'a t as 'a
 |}];;
 
@@ -1108,15 +1150,16 @@ let o = object (_ : 's)
 end;;
 [%%expect {|
 class c : object method m : int end
-val f : unit -> c = <fun>
-val f : unit -> c = <fun>
+val f : unit @ 'm -> c @ [< global > aliased nonportable] = <fun>
+val f : unit @ 'm -> c @ [< global > aliased nonportable] = <fun>
 Line 4, characters 11-60:
 4 | let f () = object method private n = 1 method m = {<>}#n end;;
                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Warning 15 [implicit-public-methods]: the following private methods were made public implicitly:
  n.
 
-val f : unit -> < m : int; n : int > = <fun>
+val f : unit @ 'm -> < m : int; n : int > @ [< global > aliased nonportable] =
+  <fun>
 Line 5, characters 27-39:
 5 | let f () = object (self:c) method n = 1 method m = 2 end;;
                                ^^^^^^^^^^^^
@@ -1181,16 +1224,16 @@ Line 3, characters 2-64:
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : (< m : 'a. 'a * ('a * 'b) > as 'b) -> unit end
+         sig val f : (< m : 'a. 'a * ('a * 'b) > as 'b) @ 'n -> unit @ 'm end
        is not included in
          sig
            val f : < m : 'b. 'b * ('b * < m : 'c. 'c * 'a > as 'a) > -> unit
          end
        Values do not match:
-         val f : (< m : 'a. 'a * ('a * 'b) > as 'b) -> unit
+         val f : (< m : 'a. 'a * ('a * 'b) > as 'b) @ 'n -> unit @ 'm
        is not included in
          val f : < m : 'b. 'b * ('b * < m : 'c. 'c * 'a > as 'a) > -> unit
-       The type "(< m : 'a. 'a * ('a * 'd) > as 'd) -> unit"
+       The type "(< m : 'a. 'a * ('a * 'd) > as 'd) @ 'n -> unit @ 'm"
        is not compatible with the type
          "< m : 'b. 'b * ('b * < m : 'c. 'c * 'e > as 'e) > -> unit"
        The method "m" has type "'a. 'a * ('a * < m : 'a. 'f >) as 'f",
@@ -1217,8 +1260,9 @@ let f x y =
   x = y;;
 [%%expect {|
 val f :
-  (< m : 'a. 'a -> (< m : 'a. 'a -> 'c * <  > > as 'c) * < .. >; .. > as 'b) ->
-  'b -> bool = <fun>
+  (< m : 'a. 'a -> (< m : 'a. 'a -> 'c * <  > > as 'c) * < .. >; .. > as 'b) @ [< global many uncontended] ->
+  ('b @ [< global many uncontended] -> bool @ [< global]) @ [< global > nonportable] =
+  <fun>
 |}];;
 
 
@@ -1239,9 +1283,9 @@ fun x -> (x : p :> q);;
 [%%expect {|
 type t = [ `A | `B ]
 type v = private [> t ]
-- : t -> v = <fun>
+- : t @ [< global] -> v @ [< global] = <fun>
 type u = private [< t ]
-- : u -> v = <fun>
+- : u @ [< global] -> v @ [< global] = <fun>
 Line 6, characters 9-21:
 6 | fun x -> (x : v :> u);;
              ^^^^^^^^^^^^
@@ -1279,34 +1323,60 @@ fun x -> (f (x,x))#m;; (* Warning 18 *)
 let f x = if true then [| (x : < m : 'a. 'a -> 'a >) |] else [|x|];;
 fun x -> (f x).(0)#m;; (* Warning 18 *)
 [%%expect {|
-val f : < m : 'a. 'a -> 'a > -> < m : 'a. 'a -> 'a > = <fun>
-- : < m : 'a. 'a -> 'a > -> 'b -> 'b = <fun>
-val f : < m : 'a. 'a -> 'a > * 'b -> < m : 'a. 'a -> 'a > = <fun>
-- : < m : 'a. 'a -> 'a > -> 'b -> 'b = <fun>
-val f : < m : 'a. 'a -> 'a > -> < m : 'a. 'a -> 'a > array = <fun>
-- : < m : 'a. 'a -> 'a > -> 'b -> 'b = <fun>
+val f :
+  < m : 'a. 'a -> 'a > @ [< 'm mod aliased] ->
+  < m : 'a. 'a -> 'a > @ [< global > 'm mod global many] = <fun>
+- : < m : 'a. 'a -> 'a > @ [< global uncontended] ->
+    ('b -> 'b) @ [< global > aliased nonportable]
+= <fun>
+val f :
+  < m : 'a. 'a -> 'a > * 'b @ [< 'm mod aliased] ->
+  < m : 'a. 'a -> 'a > @ [< global > 'm mod global many] = <fun>
+- : < m : 'a. 'a -> 'a > @ [< global many uncontended] ->
+    ('b -> 'b) @ [< global > aliased nonportable]
+= <fun>
+val f :
+  < m : 'a. 'a -> 'a > @ 'm ->
+  < m : 'a. 'a -> 'a > array @ [< global > nonportable] = <fun>
+- : < m : 'a. 'a -> 'a > @ [< global uncontended] ->
+    ('b -> 'b) @ [< global > aliased nonportable]
+= <fun>
 |}, Principal{|
-val f : < m : 'a. 'a -> 'a > -> < m : 'a. 'a -> 'a > = <fun>
+val f :
+  < m : 'a. 'a -> 'a > @ [< 'm & 'n & 'm mod aliased & 'n mod aliased & global] ->
+  < m : 'a. 'a -> 'a > @ [< global > 'm | 'n mod global many | 'm | 'n mod global many] =
+  <fun>
 Line 2, characters 9-16:
 2 | fun x -> (f x)#m;; (* Warning 18 *)
              ^^^^^^^
 Warning 18 [not-principal]: this use of a polymorphic method is not principal.
 
-- : < m : 'a. 'a -> 'a > -> 'b -> 'b = <fun>
-val f : < m : 'a. 'a -> 'a > * 'b -> < m : 'a. 'a -> 'a > = <fun>
+- : < m : 'a. 'a -> 'a > @ [< global uncontended] ->
+    ('b -> 'b) @ [< global > aliased nonportable]
+= <fun>
+val f :
+  < m : 'a. 'a -> 'a > * 'b @ [< 'm & 'n & 'm mod aliased & 'n mod aliased & global] ->
+  < m : 'a. 'a -> 'a > @ [< global > 'm | 'n mod global many | 'm | 'n mod global many] =
+  <fun>
 Line 4, characters 9-20:
 4 | fun x -> (f (x,x))#m;; (* Warning 18 *)
              ^^^^^^^^^^^
 Warning 18 [not-principal]: this use of a polymorphic method is not principal.
 
-- : < m : 'a. 'a -> 'a > -> 'b -> 'b = <fun>
-val f : < m : 'a. 'a -> 'a > -> < m : 'a. 'a -> 'a > array = <fun>
+- : < m : 'a. 'a -> 'a > @ [< global many uncontended] ->
+    ('b -> 'b) @ [< global > aliased nonportable]
+= <fun>
+val f :
+  < m : 'a. 'a -> 'a > @ [< global many] ->
+  < m : 'a. 'a -> 'a > array @ [< global > nonportable] = <fun>
 Line 6, characters 9-20:
 6 | fun x -> (f x).(0)#m;; (* Warning 18 *)
              ^^^^^^^^^^^
 Warning 18 [not-principal]: this use of a polymorphic method is not principal.
 
-- : < m : 'a. 'a -> 'a > -> 'b -> 'b = <fun>
+- : < m : 'a. 'a -> 'a > @ [< global uncontended] ->
+    ('b -> 'b) @ [< global > aliased nonportable]
+= <fun>
 |}];;
 
 (* Not really principal? *)
@@ -1323,27 +1393,39 @@ let h x =
 [%%expect {|
 class c : object method id : 'a -> 'a end
 type u = c option
-val just : 'a option -> 'a = <fun>
-val f : c -> 'a -> 'a = <fun>
-val g : c -> 'a -> 'a = <fun>
-val h : < id : 'a; .. > -> 'a = <fun>
+val just : 'a option @ [< 'm] -> 'a @ [> 'm] = <fun>
+val f :
+  c @ [< global uncontended] -> ('a -> 'a) @ [< global > aliased nonportable] =
+  <fun>
+val g :
+  c @ [< global many uncontended] ->
+  ('a -> 'a) @ [< global > aliased nonportable] = <fun>
+val h :
+  < id : 'a; .. > @ [< global many uncontended] ->
+  'a @ [< global > aliased nonportable] = <fun>
 |}, Principal{|
 class c : object method id : 'a -> 'a end
 type u = c option
-val just : 'a option -> 'a = <fun>
+val just : 'a option @ [< 'm] -> 'a @ [> 'm] = <fun>
 Line 4, characters 42-62:
 4 | let f x = let l = [Some x; (None : u)] in (just(List.hd l))#id;;
                                               ^^^^^^^^^^^^^^^^^^^^
 Warning 18 [not-principal]: this use of a polymorphic method is not principal.
 
-val f : c -> 'a -> 'a = <fun>
+val f :
+  c @ [< global many uncontended] ->
+  ('a -> 'a) @ [< global > aliased nonportable] = <fun>
 Line 7, characters 36-47:
 7 |   let x = List.hd [Some x; none] in (just x)#id;;
                                         ^^^^^^^^^^^
 Warning 18 [not-principal]: this use of a polymorphic method is not principal.
 
-val g : c -> 'a -> 'a = <fun>
-val h : < id : 'a; .. > -> 'a = <fun>
+val g :
+  c @ [< global many uncontended] ->
+  ('a -> 'a) @ [< global > aliased nonportable] = <fun>
+val h :
+  < id : 'a; .. > @ [< global many uncontended] ->
+  'a @ [< global > aliased nonportable] = <fun>
 |}];;
 
 (* Only solved for parameterless abbreviations *)
@@ -1352,8 +1434,10 @@ let just = function None -> failwith "just" | Some x -> x;;
 let f x = let l = [Some x; (None : _ u)] in (just(List.hd l))#id;;
 [%%expect {|
 type 'a u = c option
-val just : 'a option -> 'a = <fun>
-val f : c -> 'a -> 'a = <fun>
+val just : 'a option @ [< 'm] -> 'a @ [> 'm] = <fun>
+val f :
+  c @ [< global many uncontended] ->
+  ('a -> 'a) @ [< global > aliased nonportable] = <fun>
 |}];;
 
 (* polymorphic recursion *)
@@ -1378,11 +1462,15 @@ let zero : 'a. [> `Int of int | `B of 'a] as 'a  = `Int 0;; (* ok *)
 let zero : 'a. [< `Int of int] as 'a = `Int 0;; (* fails *)
 [%%expect {|
 val f : 'a -> int = <fun>
-val g : 'a -> int = <fun>
+val g :
+  'a @ [< global many uncontended] -> int @ [< global > aliased nonportable] =
+  <fun>
 type 'a t = Leaf of 'a | Node of ('a * 'a) t
 val depth : 'a t -> int = <fun>
 val depth : 'a t -> int = <fun>
-val d : ('a * 'a) t -> int = <fun>
+val d :
+  ('a * 'a) t @ [< global many uncontended > aliased nonportable] ->
+  int @ [< global > aliased nonportable] = <fun>
 Line 9, characters 2-46:
 9 |   function Leaf x -> x | Node x -> 1 + depth x;; (* fails *)
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1413,7 +1501,10 @@ let rec id : 'a. 'a -> 'a = fun x -> x
 and neg i b = (id (-i), id (not b));;
 [%%expect {|
 val id : 'a -> 'a = <fun>
-val neg : int -> bool -> int * bool = <fun>
+val neg :
+  int @ 'n ->
+  (bool @ 'm -> int * bool @ [< global > aliased nonportable]) @ [< global] =
+  <fun>
 |}];;
 
 (* De Xavier *)
@@ -1432,8 +1523,12 @@ and transf_alist : 'a. _ -> ('a*t) list -> ('a*t) list = fun f -> function
   | (k,v)::tl -> (k, transf f v) :: transf_alist f tl
 ;;
 [%%expect {|
-val transf : (int -> t) -> t -> t = <fun>
-val transf_alist : (int -> t) -> ('a * t) list -> ('a * t) list = <fun>
+val transf :
+  (int @ 'n -> t @ [< 'm & global]) @ [< global many uncontended > aliased nonportable] ->
+  (t @ [< global > aliased] -> t @ [< global > 'm | aliased]) @ [< global > nonportable] =
+  <fun>
+val transf_alist :
+  (int @ 'm -> t @ [< global]) -> ('a * t) list -> ('a * t) list = <fun>
 |}];;
 
 (* PR#4862 *)
@@ -1512,14 +1607,25 @@ let using_match b =
   f 0,f
 ;;
 [%%expect {|
-val using_match : bool -> int * ('a -> 'a) = <fun>
+val using_match :
+  bool @ 'n ->
+  int * ('a @ [< 'm & global] -> 'a @ [< global > 'm]) @ [< global > aliased] =
+  <fun>
 |}];;
 
 match (fun x -> x), fun x -> x with x, y -> x, y;;
 match fun x -> x with x -> x, x;;
 [%%expect {|
-- : ('a -> 'a) * ('b -> 'b) = (<fun>, <fun>)
-- : ('a -> 'a) * ('b -> 'b) = (<fun>, <fun>)
+- : ('a @ [< 'n & 'n & 'n & global] ->
+     'a @ [< 'm & 'm & 'm & 'm & global > 'm | 'm | 'm | 'm | 'n | 'n | 'n]) *
+    ('b @ [< 'p & 'p & 'p & global] ->
+     'b @ [< 'o & 'o & 'o & 'o & global > 'o | 'o | 'o | 'o | 'p | 'p | 'p])
+= (<fun>, <fun>)
+- : ('a @ [< 'n & 'n & global] ->
+     'a @ [< 'm & 'm & 'm & 'm & global > 'm | 'm | 'm | 'm | 'n | 'n]) *
+    ('b @ [< 'p & 'p & global] ->
+     'b @ [< 'o & 'o & 'o & 'o & global > 'o | 'o | 'o | 'o | 'p | 'p])
+= (<fun>, <fun>)
 |}];;
 
 (* PR#6744 *)
@@ -1565,8 +1671,9 @@ let f (n : < m : 'a 'r. [< `Foo of 'a & int | `Bar] as 'r >) =
   (n : < m : 'b 'r. [< `Foo of 'b & int | `Bar] as 'r >)
 [%%expect{|
 val f :
-  < m : 'a 'c. [< `Bar | `Foo of 'a & int ] as 'c > ->
-  < m : 'b 'd. [< `Bar | `Foo of 'b & int ] as 'd > = <fun>
+  < m : 'a 'c. [< `Bar | `Foo of 'a & int ] as 'c > @ [< 'm mod aliased] ->
+  < m : 'b 'd. [< `Bar | `Foo of 'b & int ] as 'd > @ [< global > 'm mod global many] =
+  <fun>
 |}]
 (* fail? *)
 let f (n : < m : 'a 'r. [< `Foo of 'a & int | `Bar] as 'r >) =
@@ -1587,8 +1694,9 @@ let f (n : < m : 'a. [< `Foo of 'a & int | `Bar] >) =
   (n : < m : 'b. [< `Foo of 'b & int | `Bar] >)
 [%%expect{|
 val f :
-  < m : 'c 'a. [< `Bar | `Foo of 'a & int ] as 'c > ->
-  < m : 'd 'b. [< `Bar | `Foo of 'b & int ] as 'd > = <fun>
+  < m : 'c 'a. [< `Bar | `Foo of 'a & int ] as 'c > @ [< 'm mod aliased] ->
+  < m : 'd 'b. [< `Bar | `Foo of 'b & int ] as 'd > @ [< global > 'm mod global many] =
+  <fun>
 |}]
 
 (* PR#6171 *)
@@ -1624,10 +1732,17 @@ let rec f1 o c x =
 type 'a t = V1 of 'a
 type ('c, 't) pvariant = [ `V of 'c * 't t ]
 class ['c] clss : object method mthod : 'c -> 't t -> ('c, 't) pvariant end
-val f2 : 'a -> 'b -> 'c t -> 'c t = <fun>
+val f2 :
+  'a @ [< global] ->
+  ('b @ [< global] ->
+   ('c t @ [< 'm & global] -> 'c t @ [< global > 'm]) @ [< global]) @ [< global] =
+  <fun>
 val f1 :
-  < mthod : 't. 'a -> 't t -> [< `V of 'a * 't t ]; .. > ->
-  'a -> 'b t -> 'b t = <fun>
+  < mthod : 't. 'a -> 't t -> [< `V of 'a * 't t ]; .. > @ [< global many uncontended] ->
+  ('a @ [< global many uncontended] ->
+   ('b t @ [< 'm & global many uncontended] ->
+    'b t @ [< global > 'm | aliased]) @ [< global > nonportable]) @ [< global > nonportable] =
+  <fun>
 |}]
 
 (* PR#7285 *)
@@ -1636,7 +1751,7 @@ let f (x : int) : ('a,'a) foo = Obj.magic x;;
 let x = f 3;;
 [%%expect{|
 type (+'a, -'b) foo = private int
-val f : int -> ('a, 'a) foo = <fun>
+val f : int @ 'm -> ('a, 'a) foo @ [< global] = <fun>
 val x : ('_weak1, '_weak1) foo = 3
 |}]
 
@@ -1661,7 +1776,9 @@ let c (f : u -> u) =
 [%%expect{|
 type u
 type 'a t = u
-val c : (u -> u) -> < apply : 'a. u -> u > = <fun>
+val c :
+  (u -> u) @ [< global many] ->
+  < apply : 'a. u -> u > @ [< global > aliased nonportable] = <fun>
 |}]
 
 (* PR#7496 *)
@@ -1672,10 +1789,12 @@ type t = { x : 'a. ([< `Foo of int & float ] as 'a) -> unit };;
 let f t = { x = t.x };;
 [%%expect{|
 val f :
-  < m : 'a. ([< `Foo of int & float ] as 'a) -> unit > ->
-  < m : 'b. ([< `Foo of int & float ] as 'b) -> unit > = <fun>
+  < m : 'a. ([< `Foo of int & float ] as 'a) -> unit > @ [< 'm mod aliased] ->
+  < m : 'b. ([< `Foo of int & float ] as 'b) -> unit > @ [< global > 'm mod global many] =
+  <fun>
 type t = { x : 'a. ([< `Foo of int & float ] as 'a) -> unit; }
-val f : t -> t = <fun>
+val f : t @ [< 'm mod aliased contended & global] -> t @ [< global > 'm] =
+  <fun>
 |}]
 
 type t = <m:int>
@@ -1776,7 +1895,11 @@ Error: Illegal open object type
 
 let g = fun (y : ('a * 'b)) x -> (x : < <m: 'a> ; <m: 'b> >)
 [%%expect{|
-val g : 'a * 'a -> < m : 'a > -> < m : 'a > = <fun>
+val g :
+  'a * 'a @ [< global] ->
+  (< m : 'a > @ [< 'm mod aliased] ->
+   < m : 'a > @ [< global > 'm mod global many]) @ [< global] =
+  <fun>
 |}]
 
 type 'a t = <m: 'a ; m: int>
@@ -1826,7 +1949,7 @@ let id x = x;;
 [%%expect{|
 type 'a t = 'a constraint 'a = 'b list
 type 'a s = 'a list
-val id : 'a -> 'a = <fun>
+val id : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
 |}]
 
 let x : [ `Foo of _ s | `Foo of 'a t ] = id (`Foo []);;
@@ -1843,9 +1966,22 @@ val x : [ `Foo of 'a list t ] = `Foo []
 class c = object (self) method m ?(x=0) () = x method n = self#m () end;;
 class d = object (self) inherit c method n' = self#m () end;;
 [%%expect{|
-class c : object method m : ?x:int -> unit -> int method n : int end
+class c :
+  object
+    method m :
+      ?x:int @ [< 'm & 'm & 'm & 'm & global many uncontended] ->
+      (unit @ 'n -> int @ [< global many uncontended > 'm | 'm | 'm | 'm]) @ [< global > nonportable]
+    method n : int
+  end
 class d :
-  object method m : ?x:int -> unit -> int method n : int method n' : int end
+  object
+    method m :
+      ?x:int @ [< 'm & 'm & 'm & 'm & 'm & 'm & 'm & 'm & 'm & global many uncontended] ->
+      (unit @ 'n ->
+       int @ [< global many uncontended > 'm | 'm | 'm | 'm | 'm | 'm | 'm | 'm | 'm]) @ [< global > nonportable]
+    method n : int
+    method n' : int
+  end
 |}]
 
 (* #1132 *)
@@ -2008,7 +2144,7 @@ val fail_example_corrected : 'a -> [< `X of 'a | `Y ] -> 'a = <fun>
 
 let discrepancy: 'a. <x:'a; ..> -> 'a = fun o -> o#y (); o#x
 [%%expect {|
-val discrepancy : < x : 'a; y : unit -> 'b; .. > -> 'a = <fun>
+val discrepancy : < x : 'a; y : unit @ 'n -> 'b @ 'm; .. > -> 'a = <fun>
 |}]
 
 
@@ -2108,7 +2244,7 @@ val fail_example_corrected : 'a -> [< `X of 'a | `Y ] -> 'a = <fun>
 
 let discrepancy: 'a. <x:'a; ..> -> 'a = fun o -> o#y (); o#x
 [%%expect {|
-val discrepancy : < x : 'a; y : unit -> 'b; .. > -> 'a = <fun>
+val discrepancy : < x : 'a; y : unit @ 'n -> 'b @ 'm; .. > -> 'a = <fun>
 |}]
 
 
@@ -2208,7 +2344,7 @@ val fail_example_corrected : 'a -> [< `X of 'a | `Y ] -> 'a = <fun>
 
 let discrepancy: 'a. <x:'a; ..> -> 'a = fun o -> o#y (); o#x
 [%%expect {|
-val discrepancy : < x : 'a; y : unit -> 'b; .. > -> 'a = <fun>
+val discrepancy : < x : 'a; y : unit @ 'n -> 'b @ 'm; .. > -> 'a = <fun>
 |}]
 
 

@@ -44,7 +44,7 @@ Uncaught exception: Misc.Fatal_error
 let with_record = function
     { a; b } as t -> { t with b = a }
 [%%expect{|
-val with_record : record -> record = <fun>
+val with_record : record @ 'm -> record @ [> aliased] = <fun>
 |}]
 
 let overwrite_record = function

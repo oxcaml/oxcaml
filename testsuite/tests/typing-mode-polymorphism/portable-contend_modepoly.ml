@@ -46,7 +46,8 @@ Error: This value is "contended"
 
 let foo (r @ contended) = {r with a = best_bytes ()}
 [%%expect{|
-val foo : r @ contended -> r @ contended = <fun>
+val foo : r @ [< global > contended] -> r @ [< global > aliased contended] =
+  <fun>
 |}]
 
 let foo (r @ contended) = {r with b = best_bytes ()}
@@ -73,35 +74,43 @@ Error: This value is "shared"
 (* reading mutable field from shared record is fine *)
 let foo (r @ shared) = r.a
 [%%expect{|
-val foo : r @ shared -> bytes @ shared = <fun>
+val foo : r @ [< shared > shared] -> bytes @ [< global > aliased shared] =
+  <fun>
 |}]
 
 let foo (r @ shared) = {r with b = best_bytes ()}
 [%%expect{|
-val foo : r @ shared -> r @ shared = <fun>
+val foo : r @ [< shared > shared] -> r @ [< global > aliased shared] = <fun>
 |}]
 
 (* reading immutable field from contended record is fine *)
 let foo (r @ contended) = r.b
 [%%expect{|
-val foo : r @ contended -> bytes @ contended = <fun>
+val foo :
+  r @ [< 'm & global > contended] ->
+  bytes @ [< global > 'm mod many portable | contended] = <fun>
 |}]
 
 (* reading immutable field from corrupted record is fine *)
 let foo (r @ corrupted) = r.b
 [%%expect{|
-val foo : r @ corrupted -> bytes @ corrupted = <fun>
+val foo :
+  r @ [< 'm & global corrupted > corrupted] ->
+  bytes @ [< global > 'm mod many portable | corrupted] = <fun>
 |}]
 
 (* reading immutable field from shared record is fine *)
 let foo (r @ shared) = r.b
 [%%expect{|
-val foo : r @ shared -> bytes @ shared = <fun>
+val foo :
+  r @ [< 'm & global shared > shared] ->
+  bytes @ [< global > 'm mod many portable | shared] = <fun>
 |}]
 
 let foo (r @ shared) = {r with a = best_bytes ()}
 [%%expect{|
-val foo : r @ shared -> r @ shared = <fun>
+val foo : r @ [< global shared > shared] -> r @ [< global > aliased shared] =
+  <fun>
 |}]
 
 (* Force top level to be uncontended and nonportable *)
@@ -125,7 +134,7 @@ let x @ portable = fun a -> a
 
 let y @ portable = x
 [%%expect{|
-val x : 'a -> 'a = <fun>
+val x : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
 Line 3, characters 19-20:
 3 | let y @ portable = x
                        ^
@@ -184,11 +193,11 @@ Lines 3-6, characters 6-3:
 6 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val r : r val bar : unit -> unit end @ nonportable
+         sig val r : r val bar : unit @ 'n -> unit @ 'm end @ nonportable
        is not included in
          sig val bar : unit -> unit @@ portable end @ nonportable
        Values do not match:
-         val bar : unit -> unit (* in a structure at nonportable *)
+         val bar : unit @ 'n -> unit @ 'm (* in a structure at nonportable *)
        is not included in
          val bar : unit -> unit @@ portable (* in a structure at nonportable *)
        The first is weaker than "corruptible"
@@ -214,11 +223,11 @@ Lines 3-6, characters 6-3:
 6 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val r : r val bar : unit -> unit end @ shareable
+         sig val r : r val bar : unit @ 'n -> unit @ 'm end @ shareable
        is not included in
          sig val bar : unit -> unit @@ portable end @ nonportable
        Values do not match:
-         val bar : unit -> unit (* in a structure at shareable *)
+         val bar : unit @ 'n -> unit @ 'm (* in a structure at shareable *)
        is not included in
          val bar : unit -> unit @@ portable (* in a structure at nonportable *)
        The first is "shareable"
@@ -244,11 +253,11 @@ Lines 3-6, characters 6-3:
 6 | end
 Error: Signature mismatch:
        Modules do not match:
-         sig val r : r val bar : unit -> unit end @ corruptible
+         sig val r : r val bar : unit @ 'n -> unit @ 'm end @ corruptible
        is not included in
          sig val bar : unit -> unit @@ portable end @ nonportable
        Values do not match:
-         val bar : unit -> unit (* in a structure at corruptible *)
+         val bar : unit @ 'n -> unit @ 'm (* in a structure at corruptible *)
        is not included in
          val bar : unit -> unit @@ portable (* in a structure at nonportable *)
        The first is "corruptible"
@@ -281,7 +290,7 @@ let foo () =
     let _ @ portable = bar in
     ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 
@@ -340,7 +349,10 @@ let foo (r @ shared) =
     | [| x; y |] -> ()
     | _ -> ()
 [%%expect{|
-val foo : ('a : value maybe_null). 'a array @ shared -> unit = <fun>
+val foo :
+  ('a : value maybe_null).
+    'a array @ [< shared > shared] -> unit @ [< global] =
+  <fun>
 |}]
 
 (* Closing over write gives nonportable *)
@@ -388,7 +400,7 @@ let foo () =
     let _ @ portable = bar in
     ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 let foo () =
@@ -397,7 +409,7 @@ let foo () =
     let _ @ portable = bar in
     ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 let foo () =
@@ -406,7 +418,7 @@ let foo () =
     let _ @ portable = bar in
     ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 (* Closing over nonportable forces nonportable. *)
@@ -438,7 +450,7 @@ Error: This function when partially applied returns a value which is "nonportabl
 (* closing over an uncontended use of a variable gives nonportable *)
 let use_uncontended (x @ uncontended) = ()
 [%%expect{|
-val use_uncontended : 'a -> unit = <fun>
+val use_uncontended : 'a @ [< uncontended] -> unit @ [< global] = <fun>
 |}]
 
 let foo : 'a @ uncontended portable -> (unit -> unit) @ portable = fun a () -> use_uncontended a
@@ -461,7 +473,7 @@ val foo : unit @ portable -> (unit -> unit) @ portable = <fun>
 (* closing over shared uses gives shareable *)
 let use_shared (x @ shared) = ()
 [%%expect{|
-val use_shared : 'a @ shared -> unit = <fun>
+val use_shared : 'a @ [< shared > shared] -> unit @ [< global] = <fun>
 |}]
 
 let foo : 'a @ shared portable -> (unit -> unit) @ portable = fun a () -> use_shared a
@@ -484,7 +496,8 @@ val foo : 'a @ portable shared -> (unit -> unit) @ portable = <fun>
 (* closing over corrupted use gives corruptible *)
 let use_corrupted (x @ corrupted) = ()
 [%%expect{|
-val use_corrupted : 'a @ corrupted -> unit = <fun>
+val use_corrupted : 'a @ [< corrupted > corrupted] -> unit @ [< global] =
+  <fun>
 |}]
 
 let foo : 'a @ corrupted portable -> (unit -> unit) @ portable = fun a () -> use_corrupted a
@@ -529,21 +542,24 @@ let foo (x : int @ nonportable) (y : int @ contended) =
     let _ @ shared = y in
     ()
 [%%expect{|
-val foo : int -> int @ contended -> unit = <fun>
+val foo :
+  int @ [< global > nonportable] ->
+  (int @ [> contended] -> unit @ [< global]) @ [< global > nonportable] =
+  <fun>
 |}]
 
 let foo (x : int @ shared) =
     let _ @ uncontended = x in
     ()
 [%%expect{|
-val foo : int @ shared -> unit = <fun>
+val foo : int @ [< shared > shared] -> unit @ [< global] = <fun>
 |}]
 
 let foo (x : int @ corrupted) =
     let _ @ uncontended = x in
     ()
 [%%expect{|
-val foo : int @ corrupted -> unit = <fun>
+val foo : int @ [< corrupted > corrupted] -> unit @ [< global] = <fun>
 |}]
 
 (* TESTING immutable array *)
@@ -552,7 +568,9 @@ module Iarray = Stdlib_stable.Iarray
 let foo (r : int iarray @ contended) = Iarray.get r 42
 [%%expect{|
 module Iarray = Stdlib_stable.Iarray
-val foo : int iarray @ contended -> int = <fun>
+val foo :
+  int iarray @ [< global > contended] ->
+  int @ [< global > aliased nonportable] = <fun>
 |}]
 
 let foo (r @ contended) = Iarray.get r 42
@@ -587,19 +605,23 @@ Error: This value is "shared" but is expected to be "corrupted" or "uncontended"
 (* corrupted submodes to contended *)
 let foo (x @ corrupted) = (x : @ contended)
 [%%expect{|
-val foo : 'a @ corrupted -> 'a @ contended = <fun>
+val foo :
+  'a @ [< 'm & global corrupted > corrupted] ->
+  'a @ [< global > 'm | contended] = <fun>
 |}]
 
 (* uncontended submodes to corrupted *)
 let foo (x @ uncontended) = (x : @ corrupted)
 [%%expect{|
-val foo : 'a -> 'a @ corrupted = <fun>
+val foo :
+  'a @ [< 'm & global uncontended] -> 'a @ [< global > 'm | corrupted] =
+  <fun>
 |}]
 
 (* Writing to a mutable field from a corrupted record succeeds *)
 let foo (r @ corrupted) = r.a <- best_bytes ()
 [%%expect{|
-val foo : r @ corrupted -> unit = <fun>
+val foo : r @ [< corrupted > corrupted] -> unit @ [< global] = <fun>
 |}]
 
 (* Reading a mutable field from a corrupted record is rejected *)
@@ -616,7 +638,9 @@ Error: This value is "corrupted"
 (* Reading an immutable field from a corrupted record is fine *)
 let foo (r @ corrupted) = r.b
 [%%expect{|
-val foo : r @ corrupted -> bytes @ corrupted = <fun>
+val foo :
+  r @ [< 'm & global corrupted > corrupted] ->
+  bytes @ [< global > 'm mod many portable | corrupted] = <fun>
 |}]
 
 (* TESTING corruptible mode *)
@@ -641,13 +665,16 @@ Error: This value is "shareable" but is expected to be "corruptible".
 (* portable submodes to corruptible *)
 let foo (x @ portable) = (x : @ corruptible)
 [%%expect{|
-val foo : 'a @ portable -> 'a = <fun>
+val foo : 'a @ [< 'm & global portable] -> 'a @ [< global > 'm | corruptible] =
+  <fun>
 |}]
 
 (* corruptible submodes to nonportable *)
 let foo (x @ corruptible) = (x : @ nonportable)
 [%%expect{|
-val foo : 'a @ corruptible -> 'a = <fun>
+val foo :
+  'a @ [< 'm & global corruptible > corruptible] ->
+  'a @ [< global > 'm | nonportable] = <fun>
 |}]
 
 (* Closing over a corrupted value yields a corruptible function *)
@@ -679,13 +706,17 @@ Error: This value is "contended"
 (* TESTING implication: write implies corrupted *)
 let foo (r @ write) = (r : @ corrupted)
 [%%expect{|
-val foo : 'a @ write -> 'a @ write = <fun>
+val foo :
+  'a @ [< 'm & global corrupted > corrupted] ->
+  'a @ [< global > 'm | corrupted] = <fun>
 |}]
 
 (* TESTING implication: writing implies corruptible *)
 let foo (f @ writing) = (f : @ corruptible)
 [%%expect{|
-val foo : 'a @ writing -> 'a = <fun>
+val foo :
+  'a @ [< 'm & global corruptible > corruptible] ->
+  'a @ [< global > 'm | corruptible] = <fun>
 |}]
 
 (* Modalities: contention. *)
@@ -705,121 +736,158 @@ type 'a contended = { contended : 'a @@ contended; }
 let f (x @ uncontended) = { uncontended = x }
 
 [%%expect{|
-val f : 'a -> 'a uncontended = <fun>
+val f : 'a @ [< 'm & global uncontended] -> 'a uncontended @ [< global > 'm] =
+  <fun>
 |}]
 
 let f (x @ shared) = { uncontended = x }
 
 [%%expect{|
-val f : 'a @ shared -> 'a uncontended @ shared = <fun>
+val f :
+  'a @ [< 'm & global shared > shared] ->
+  'a uncontended @ [< global > 'm | shared] = <fun>
 |}]
 
 let f (x @ corrupted) = { uncontended = x }
 
 [%%expect{|
-val f : 'a @ corrupted -> 'a uncontended @ corrupted = <fun>
+val f :
+  'a @ [< 'm & global corrupted > corrupted] ->
+  'a uncontended @ [< global > 'm | corrupted] = <fun>
 |}]
 
 let f (x @ contended) = { uncontended = x }
 
 [%%expect{|
-val f : 'a @ contended -> 'a uncontended @ contended = <fun>
+val f :
+  'a @ [< 'm & global > contended] ->
+  'a uncontended @ [< global > 'm | contended] = <fun>
 |}]
 
 let f (x @ uncontended) = { shared = x }
 
 [%%expect{|
-val f : 'a -> 'a shared = <fun>
+val f :
+  'a @ [< 'm mod shared & global uncontended] -> 'a shared @ [< global > 'm] =
+  <fun>
 |}]
 
 let f (x @ shared) = { shared = x }
 
 [%%expect{|
-val f : 'a @ shared -> 'a shared = <fun>
+val f :
+  'a @ [< 'm mod shared & global shared > shared] ->
+  'a shared @ [< global > 'm] = <fun>
 |}]
 
 let f (x @ corrupted) = { shared = x }
 
 [%%expect{|
-val f : 'a @ corrupted -> 'a shared @ corrupted = <fun>
+val f :
+  'a @ [< 'm mod shared & global corrupted > corrupted] ->
+  'a shared @ [< global > 'm | corrupted] = <fun>
 |}]
 
 let f (x @ contended) = { shared = x }
 
 [%%expect{|
-val f : 'a @ contended -> 'a shared @ corrupted = <fun>
+val f :
+  'a @ [< 'm mod shared & global > contended] ->
+  'a shared @ [< global > 'm | corrupted] = <fun>
 |}]
 
 let f (x @ uncontended) = { corrupted = x }
 
 [%%expect{|
-val f : 'a -> 'a corrupted = <fun>
+val f :
+  'a @ [< 'm mod corrupted & global uncontended] ->
+  'a corrupted @ [< global > 'm] = <fun>
 |}]
 
 let f (x @ shared) = { corrupted = x }
 
 [%%expect{|
-val f : 'a @ shared -> 'a corrupted @ shared = <fun>
+val f :
+  'a @ [< 'm mod corrupted & global shared > shared] ->
+  'a corrupted @ [< global > 'm | shared] = <fun>
 |}]
 
 let f (x @ corrupted) = { corrupted = x }
 
 [%%expect{|
-val f : 'a @ corrupted -> 'a corrupted = <fun>
+val f :
+  'a @ [< 'm mod corrupted & global corrupted > corrupted] ->
+  'a corrupted @ [< global > 'm] = <fun>
 |}]
 
 let f (x @ contended) = { corrupted = x }
 
 [%%expect{|
-val f : 'a @ contended -> 'a corrupted @ shared = <fun>
+val f :
+  'a @ [< 'm mod corrupted & global > contended] ->
+  'a corrupted @ [< global > 'm | shared] = <fun>
 |}]
 
 let f (x @ uncontended) = { contended = x }
 
 [%%expect{|
-val f : 'a -> 'a contended = <fun>
+val f :
+  'a @ [< 'm mod contended & global uncontended] ->
+  'a contended @ [< global > 'm] = <fun>
 |}]
 
 let f (x @ shared) = { contended = x }
 
 [%%expect{|
-val f : 'a @ shared -> 'a contended = <fun>
+val f :
+  'a @ [< 'm mod contended & global shared > shared] ->
+  'a contended @ [< global > 'm] = <fun>
 |}]
 
 let f (x @ corrupted) = { contended = x }
 
 [%%expect{|
-val f : 'a @ corrupted -> 'a contended = <fun>
+val f :
+  'a @ [< 'm mod contended & global corrupted > corrupted] ->
+  'a contended @ [< global > 'm] = <fun>
 |}]
 
 let f (x @ contended) = { contended = x }
 
 [%%expect{|
-val f : 'a @ contended -> 'a contended = <fun>
+val f :
+  'a @ [< 'm mod contended & global > contended] ->
+  'a contended @ [< global > 'm] = <fun>
 |}]
 
 let f { uncontended = x } = (x : @ uncontended)
 
 [%%expect{|
-val f : 'a uncontended -> 'a = <fun>
+val f : 'a uncontended @ [< 'm & global uncontended] -> 'a @ [< global > 'm] =
+  <fun>
 |}]
 
 let f { uncontended = x } = (x : @ shared)
 
 [%%expect{|
-val f : 'a uncontended -> 'a @ shared = <fun>
+val f :
+  'a uncontended @ [< 'm & global shared] -> 'a @ [< global > 'm | shared] =
+  <fun>
 |}]
 
 let f { uncontended = x } = (x : @ corrupted)
 
 [%%expect{|
-val f : 'a uncontended -> 'a @ corrupted = <fun>
+val f :
+  'a uncontended @ [< 'm & global corrupted] ->
+  'a @ [< global > 'm | corrupted] = <fun>
 |}]
 
 let f { uncontended = x } = (x : @ contended)
 
 [%%expect{|
-val f : 'a uncontended -> 'a @ contended = <fun>
+val f : 'a uncontended @ [< 'm & global] -> 'a @ [< global > 'm | contended] =
+  <fun>
 |}]
 
 let f { shared = x } = (x : @ uncontended)
@@ -836,7 +904,8 @@ Error: This value is "shared"
 let f { shared = x } = (x : @ shared)
 
 [%%expect{|
-val f : 'a shared -> 'a @ shared = <fun>
+val f : 'a shared @ [< 'm & global shared] -> 'a @ [< global > 'm | shared] =
+  <fun>
 |}]
 
 let f { shared = x } = (x : @ corrupted)
@@ -853,7 +922,8 @@ Error: This value is "shared"
 let f { shared = x } = (x : @ contended)
 
 [%%expect{|
-val f : 'a shared -> 'a @ contended = <fun>
+val f : 'a shared @ [< 'm & global] -> 'a @ [< global > 'm | contended] =
+  <fun>
 |}]
 
 let f { corrupted = x } = (x : @ uncontended)
@@ -881,13 +951,16 @@ Error: This value is "corrupted"
 let f { corrupted = x } = (x : @ corrupted)
 
 [%%expect{|
-val f : 'a corrupted -> 'a @ corrupted = <fun>
+val f :
+  'a corrupted @ [< 'm & global corrupted] ->
+  'a @ [< global > 'm | corrupted] = <fun>
 |}]
 
 let f { corrupted = x } = (x : @ contended)
 
 [%%expect{|
-val f : 'a corrupted -> 'a @ contended = <fun>
+val f : 'a corrupted @ [< 'm & global] -> 'a @ [< global > 'm | contended] =
+  <fun>
 |}]
 
 let f { contended = x } = (x : @ uncontended)
@@ -926,7 +999,8 @@ Error: This value is "contended"
 let f { contended = x } = (x : @ contended)
 
 [%%expect{|
-val f : 'a contended -> 'a @ contended = <fun>
+val f : 'a contended @ [< 'm & global] -> 'a @ [< global > 'm | contended] =
+  <fun>
 |}]
 
 (* Modalities: portability. *)
@@ -946,25 +1020,32 @@ type 'a portable = { portable : 'a @@ portable; }
 let f (x @ nonportable) = { nonportable = x }
 
 [%%expect{|
-val f : 'a -> 'a nonportable = <fun>
+val f :
+  'a @ [< 'm & global > nonportable] ->
+  'a nonportable @ [< global > 'm | nonportable] = <fun>
 |}]
 
 let f (x @ shareable) = { nonportable = x }
 
 [%%expect{|
-val f : 'a @ shareable -> 'a nonportable = <fun>
+val f :
+  'a @ [< 'm & global shareable > shareable] ->
+  'a nonportable @ [< global > 'm | shareable] = <fun>
 |}]
 
 let f (x @ corruptible) = { nonportable = x }
 
 [%%expect{|
-val f : 'a @ corruptible -> 'a nonportable = <fun>
+val f :
+  'a @ [< 'm & global corruptible > corruptible] ->
+  'a nonportable @ [< global > 'm | corruptible] = <fun>
 |}]
 
 let f (x @ portable) = { nonportable = x }
 
 [%%expect{|
-val f : 'a @ portable -> 'a nonportable = <fun>
+val f : 'a @ [< 'm & global portable] -> 'a nonportable @ [< global > 'm] =
+  <fun>
 |}]
 
 let f (x @ nonportable) = { shareable = x }
@@ -981,7 +1062,9 @@ Error: This value is "nonportable"
 let f (x @ shareable) = { shareable = x }
 
 [%%expect{|
-val f : 'a @ shareable -> 'a shareable = <fun>
+val f :
+  'a @ [< 'm & global shareable > shareable] ->
+  'a shareable @ [< global > 'm | shareable] = <fun>
 |}]
 
 let f (x @ corruptible) = { shareable = x }
@@ -998,7 +1081,8 @@ Error: This value is "corruptible"
 let f (x @ portable) = { shareable = x }
 
 [%%expect{|
-val f : 'a @ portable -> 'a shareable = <fun>
+val f : 'a @ [< 'm & global portable] -> 'a shareable @ [< global > 'm] =
+  <fun>
 |}]
 
 let f (x @ nonportable) = { corruptible = x }
@@ -1026,13 +1110,16 @@ Error: This value is "shareable"
 let f (x @ corruptible) = { corruptible = x }
 
 [%%expect{|
-val f : 'a @ corruptible -> 'a corruptible = <fun>
+val f :
+  'a @ [< 'm & global corruptible > corruptible] ->
+  'a corruptible @ [< global > 'm | corruptible] = <fun>
 |}]
 
 let f (x @ portable) = { corruptible = x }
 
 [%%expect{|
-val f : 'a @ portable -> 'a corruptible = <fun>
+val f : 'a @ [< 'm & global portable] -> 'a corruptible @ [< global > 'm] =
+  <fun>
 |}]
 
 let f (x @ nonportable) = { portable = x }
@@ -1071,103 +1158,134 @@ Error: This value is "corruptible"
 let f (x @ portable) = { portable = x }
 
 [%%expect{|
-val f : 'a @ portable -> 'a portable = <fun>
+val f : 'a @ [< 'm & global portable] -> 'a portable @ [< global > 'm] =
+  <fun>
 |}]
 
 let f { nonportable = x } = (x : @ nonportable)
 
 [%%expect{|
-val f : 'a nonportable -> 'a = <fun>
+val f :
+  'a nonportable @ [< 'm & global] -> 'a @ [< global > 'm | nonportable] =
+  <fun>
 |}]
 
 let f { nonportable = x } = (x : @ shareable)
 
 [%%expect{|
-val f : 'a nonportable @ shareable -> 'a = <fun>
+val f :
+  'a nonportable @ [< 'm & global shareable] ->
+  'a @ [< global > 'm | shareable] = <fun>
 |}]
 
 let f { nonportable = x } = (x : @ corruptible)
 
 [%%expect{|
-val f : 'a nonportable @ corruptible -> 'a = <fun>
+val f :
+  'a nonportable @ [< 'm & global corruptible] ->
+  'a @ [< global > 'm | corruptible] = <fun>
 |}]
 
 let f { nonportable = x } = (x : @ portable)
 
 [%%expect{|
-val f : 'a nonportable @ portable -> 'a = <fun>
+val f : 'a nonportable @ [< 'm & global portable] -> 'a @ [< global > 'm] =
+  <fun>
 |}]
 
 let f { shareable = x } = (x : @ nonportable)
 
 [%%expect{|
-val f : 'a shareable -> 'a = <fun>
+val f :
+  'a shareable @ [< 'm & global] ->
+  'a @ [< global > 'm mod shareable | nonportable] = <fun>
 |}]
 
 let f { shareable = x } = (x : @ shareable)
 
 [%%expect{|
-val f : 'a shareable -> 'a = <fun>
+val f :
+  'a shareable @ [< 'm & global] ->
+  'a @ [< global > 'm mod shareable | shareable] = <fun>
 |}]
 
 let f { shareable = x } = (x : @ corruptible)
 
 [%%expect{|
-val f : 'a shareable @ corruptible -> 'a = <fun>
+val f :
+  'a shareable @ [< 'm & global corruptible] ->
+  'a @ [< global > 'm mod shareable | corruptible] = <fun>
 |}]
 
 let f { shareable = x } = (x : @ portable)
 
 [%%expect{|
-val f : 'a shareable @ corruptible -> 'a = <fun>
+val f :
+  'a shareable @ [< 'm & global corruptible] ->
+  'a @ [< global > 'm mod shareable] = <fun>
 |}]
 
 let f { corruptible = x } = (x : @ nonportable)
 
 [%%expect{|
-val f : 'a corruptible -> 'a = <fun>
+val f :
+  'a corruptible @ [< 'm & global] ->
+  'a @ [< global > 'm mod corruptible | nonportable] = <fun>
 |}]
 
 let f { corruptible = x } = (x : @ shareable)
 
 [%%expect{|
-val f : 'a corruptible @ shareable -> 'a = <fun>
+val f :
+  'a corruptible @ [< 'm & global shareable] ->
+  'a @ [< global > 'm mod corruptible | shareable] = <fun>
 |}]
 
 let f { corruptible = x } = (x : @ corruptible)
 
 [%%expect{|
-val f : 'a corruptible -> 'a = <fun>
+val f :
+  'a corruptible @ [< 'm & global] ->
+  'a @ [< global > 'm mod corruptible | corruptible] = <fun>
 |}]
 
 let f { corruptible = x } = (x : @ portable)
 
 [%%expect{|
-val f : 'a corruptible @ shareable -> 'a = <fun>
+val f :
+  'a corruptible @ [< 'm & global shareable] ->
+  'a @ [< global > 'm mod corruptible] = <fun>
 |}]
 
 let f { portable = x } = (x : @ nonportable)
 
 [%%expect{|
-val f : 'a portable -> 'a = <fun>
+val f :
+  'a portable @ [< 'm & global] ->
+  'a @ [< global > 'm mod portable | nonportable] = <fun>
 |}]
 
 let f { portable = x } = (x : @ shareable)
 
 [%%expect{|
-val f : 'a portable -> 'a = <fun>
+val f :
+  'a portable @ [< 'm & global] ->
+  'a @ [< global > 'm mod portable | shareable] = <fun>
 |}]
 
 let f { portable = x } = (x : @ corruptible)
 
 [%%expect{|
-val f : 'a portable -> 'a = <fun>
+val f :
+  'a portable @ [< 'm & global] ->
+  'a @ [< global > 'm mod portable | corruptible] = <fun>
 |}]
 
 let f { portable = x } = (x : @ portable)
 
 [%%expect{|
-val f : 'a portable -> 'a = <fun>
+val f : 'a portable @ [< 'm & global] -> 'a @ [< global > 'm mod portable] =
+  <fun>
 |}]
 
 (* Modality composition: contention. *)
@@ -1175,97 +1293,128 @@ val f : 'a portable -> 'a = <fun>
 let f ({ uncontended } @ uncontended) = uncontended
 
 [%%expect{|
-val f : 'a uncontended -> 'a = <fun>
+val f : 'a uncontended @ [< 'm & global uncontended] -> 'a @ [< global > 'm] =
+  <fun>
 |}]
 
 let f ({ uncontended } @ shared) = uncontended
 
 [%%expect{|
-val f : 'a uncontended @ shared -> 'a @ shared = <fun>
+val f :
+  'a uncontended @ [< 'm & global shared > shared] ->
+  'a @ [< global > 'm | shared] = <fun>
 |}]
 
 let f ({ uncontended } @ corrupted) = uncontended
 
 [%%expect{|
-val f : 'a uncontended @ corrupted -> 'a @ corrupted = <fun>
+val f :
+  'a uncontended @ [< 'm & global corrupted > corrupted] ->
+  'a @ [< global > 'm | corrupted] = <fun>
 |}]
 
 let f ({ uncontended } @ contended) = uncontended
 
 [%%expect{|
-val f : 'a uncontended @ contended -> 'a @ contended = <fun>
+val f :
+  'a uncontended @ [< 'm & global > contended] ->
+  'a @ [< global > 'm | contended] = <fun>
 |}]
 
 let f ({ shared } @ uncontended) = shared
 
 [%%expect{|
-val f : 'a shared -> 'a @ shared = <fun>
+val f :
+  'a shared @ [< 'm & global uncontended] -> 'a @ [< global > 'm | shared] =
+  <fun>
 |}]
 
 let f ({ shared } @ shared) = shared
 
 [%%expect{|
-val f : 'a shared @ shared -> 'a @ shared = <fun>
+val f :
+  'a shared @ [< 'm & global shared > shared] ->
+  'a @ [< global > 'm | shared] = <fun>
 |}]
 
 let f ({ shared } @ corrupted) = shared
 
 [%%expect{|
-val f : 'a shared @ corrupted -> 'a @ contended = <fun>
+val f :
+  'a shared @ [< 'm & global corrupted > corrupted] ->
+  'a @ [< global > 'm | contended] = <fun>
 |}]
 
 let f ({ shared } @ contended) = shared
 
 [%%expect{|
-val f : 'a shared @ contended -> 'a @ contended = <fun>
+val f :
+  'a shared @ [< 'm & global > contended] -> 'a @ [< global > 'm | contended] =
+  <fun>
 |}]
 
 let f ({ corrupted } @ uncontended) = corrupted
 
 [%%expect{|
-val f : 'a corrupted -> 'a @ corrupted = <fun>
+val f :
+  'a corrupted @ [< 'm & global uncontended] ->
+  'a @ [< global > 'm | corrupted] = <fun>
 |}]
 
 let f ({ corrupted } @ shared) = corrupted
 
 [%%expect{|
-val f : 'a corrupted @ shared -> 'a @ contended = <fun>
+val f :
+  'a corrupted @ [< 'm & global shared > shared] ->
+  'a @ [< global > 'm | contended] = <fun>
 |}]
 
 let f ({ corrupted } @ corrupted) = corrupted
 
 [%%expect{|
-val f : 'a corrupted @ corrupted -> 'a @ corrupted = <fun>
+val f :
+  'a corrupted @ [< 'm & global corrupted > corrupted] ->
+  'a @ [< global > 'm | corrupted] = <fun>
 |}]
 
 let f ({ corrupted } @ contended) = corrupted
 
 [%%expect{|
-val f : 'a corrupted @ contended -> 'a @ contended = <fun>
+val f :
+  'a corrupted @ [< 'm & global > contended] ->
+  'a @ [< global > 'm | contended] = <fun>
 |}]
 
 let f ({ contended } @ uncontended) = contended
 
 [%%expect{|
-val f : 'a contended -> 'a @ contended = <fun>
+val f :
+  'a contended @ [< 'm & global uncontended] ->
+  'a @ [< global > 'm | contended] = <fun>
 |}]
 
 let f ({ contended } @ shared) = contended
 
 [%%expect{|
-val f : 'a contended @ shared -> 'a @ contended = <fun>
+val f :
+  'a contended @ [< 'm & global shared > shared] ->
+  'a @ [< global > 'm | contended] = <fun>
 |}]
 
 let f ({ contended } @ corrupted) = contended
 
 [%%expect{|
-val f : 'a contended @ corrupted -> 'a @ contended = <fun>
+val f :
+  'a contended @ [< 'm & global corrupted > corrupted] ->
+  'a @ [< global > 'm | contended] = <fun>
 |}]
 
 let f ({ contended } @ contended) = contended
 
 [%%expect{|
-val f : 'a contended @ contended -> 'a @ contended = <fun>
+val f :
+  'a contended @ [< 'm & global > contended] ->
+  'a @ [< global > 'm | contended] = <fun>
 |}]
 
 (* Modality composition: portability.
@@ -1275,97 +1424,128 @@ val f : 'a contended @ contended -> 'a @ contended = <fun>
 let f ({ nonportable } @ nonportable) = (nonportable : @ nonportable)
 
 [%%expect{|
-val f : 'a nonportable -> 'a = <fun>
+val f :
+  'a nonportable @ [< 'm & global > nonportable] ->
+  'a @ [< global > 'm | nonportable] = <fun>
 |}]
 
 let f ({ nonportable } @ shareable) = (nonportable : @ shareable)
 
 [%%expect{|
-val f : 'a nonportable @ shareable -> 'a = <fun>
+val f :
+  'a nonportable @ [< 'm & global shareable > shareable] ->
+  'a @ [< global > 'm | shareable] = <fun>
 |}]
 
 let f ({ nonportable } @ corruptible) = (nonportable : @ corruptible)
 
 [%%expect{|
-val f : 'a nonportable @ corruptible -> 'a = <fun>
+val f :
+  'a nonportable @ [< 'm & global corruptible > corruptible] ->
+  'a @ [< global > 'm | corruptible] = <fun>
 |}]
 
 let f ({ nonportable } @ portable) = (nonportable : @ portable)
 
 [%%expect{|
-val f : 'a nonportable @ portable -> 'a = <fun>
+val f : 'a nonportable @ [< 'm & global portable] -> 'a @ [< global > 'm] =
+  <fun>
 |}]
 
 let f ({ shareable } @ nonportable) = (shareable : @ shareable)
 
 [%%expect{|
-val f : 'a shareable -> 'a = <fun>
+val f :
+  'a shareable @ [< 'm & global > nonportable] ->
+  'a @ [< global > 'm mod shareable | shareable] = <fun>
 |}]
 
 let f ({ shareable } @ shareable) = (shareable : @ shareable)
 
 [%%expect{|
-val f : 'a shareable @ shareable -> 'a = <fun>
+val f :
+  'a shareable @ [< 'm & global shareable > shareable] ->
+  'a @ [< global > 'm mod shareable | shareable] = <fun>
 |}]
 
 let f ({ shareable } @ corruptible) = (shareable : @ portable)
 
 [%%expect{|
-val f : 'a shareable @ corruptible -> 'a = <fun>
+val f :
+  'a shareable @ [< 'm & global corruptible > corruptible] ->
+  'a @ [< global > 'm mod shareable] = <fun>
 |}]
 
 let f ({ shareable } @ portable) = (shareable : @ portable)
 
 [%%expect{|
-val f : 'a shareable @ portable -> 'a = <fun>
+val f :
+  'a shareable @ [< 'm & global portable] ->
+  'a @ [< global > 'm mod shareable] = <fun>
 |}]
 
 let f ({ corruptible } @ nonportable) = (corruptible : @ corruptible)
 
 [%%expect{|
-val f : 'a corruptible -> 'a = <fun>
+val f :
+  'a corruptible @ [< 'm & global > nonportable] ->
+  'a @ [< global > 'm mod corruptible | corruptible] = <fun>
 |}]
 
 let f ({ corruptible } @ shareable) = (corruptible : @ portable)
 
 [%%expect{|
-val f : 'a corruptible @ shareable -> 'a = <fun>
+val f :
+  'a corruptible @ [< 'm & global shareable > shareable] ->
+  'a @ [< global > 'm mod corruptible] = <fun>
 |}]
 
 let f ({ corruptible } @ corruptible) = (corruptible : @ corruptible)
 
 [%%expect{|
-val f : 'a corruptible @ corruptible -> 'a = <fun>
+val f :
+  'a corruptible @ [< 'm & global corruptible > corruptible] ->
+  'a @ [< global > 'm mod corruptible | corruptible] = <fun>
 |}]
 
 let f ({ corruptible } @ portable) = (corruptible : @ portable)
 
 [%%expect{|
-val f : 'a corruptible @ portable -> 'a = <fun>
+val f :
+  'a corruptible @ [< 'm & global portable] ->
+  'a @ [< global > 'm mod corruptible] = <fun>
 |}]
 
 let f ({ portable } @ nonportable) = (portable : @ portable)
 
 [%%expect{|
-val f : 'a portable -> 'a = <fun>
+val f :
+  'a portable @ [< 'm & global > nonportable] ->
+  'a @ [< global > 'm mod portable] = <fun>
 |}]
 
 let f ({ portable } @ shareable) = (portable : @ portable)
 
 [%%expect{|
-val f : 'a portable @ shareable -> 'a = <fun>
+val f :
+  'a portable @ [< 'm & global shareable > shareable] ->
+  'a @ [< global > 'm mod portable] = <fun>
 |}]
 
 let f ({ portable } @ corruptible) = (portable : @ portable)
 
 [%%expect{|
-val f : 'a portable @ corruptible -> 'a = <fun>
+val f :
+  'a portable @ [< 'm & global corruptible > corruptible] ->
+  'a @ [< global > 'm mod portable] = <fun>
 |}]
 
 let f ({ portable } @ portable) = (portable : @ portable)
 
 [%%expect{|
-val f : 'a portable @ portable -> 'a = <fun>
+val f :
+  'a portable @ [< 'm & global portable] -> 'a @ [< global > 'm mod portable] =
+  <fun>
 |}]
 
 (* Mode crossing: contention. *)

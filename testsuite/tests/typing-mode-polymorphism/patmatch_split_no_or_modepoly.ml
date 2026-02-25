@@ -25,7 +25,7 @@ let last_is_anys = function
            (if (field_imm 1 param/16) (exit 1) 2))
         with (1) 3)))
   (apply (field_imm 1 (global Toploop!)) "last_is_anys" last_is_anys/14))
-val last_is_anys : bool * bool -> int = <fun>
+val last_is_anys : bool * bool @ 'n -> int @ 'm = <fun>
 |}]
 
 let last_is_vars = function
@@ -45,7 +45,7 @@ let last_is_vars = function
            (if (field_imm 1 param/25) (exit 3) 2))
         with (3) 3)))
   (apply (field_imm 1 (global Toploop!)) "last_is_vars" last_is_vars/21))
-val last_is_vars : bool * bool -> int = <fun>
+val last_is_vars : bool * bool @ 'n -> int @ 'm = <fun>
 |}]
 
 (******************************************************************************)
@@ -95,5 +95,5 @@ let f = function
                (if (%eq (field_imm 0 *match*/35) C/31) 3 4))
              (if (field_imm 2 param/34) 12 11))))))
   (apply (field_imm 1 (global Toploop!)) "f" f/32))
-val f : t * bool * bool -> int = <fun>
+val f : t * bool * bool @ 'n -> int @ 'm = <fun>
 |}]
