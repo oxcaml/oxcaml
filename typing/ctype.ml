@@ -4346,13 +4346,6 @@ and unify3 uenv t1 t1' t2 t2' =
           reify uenv t1';
           record_equation uenv t1' t2';
           add_gadt_equation uenv path t1'
-      | (Tconstr (_,_,_), _) | (_, Tconstr (_,_,_)) when in_pattern_mode uenv ->
-          reify uenv t1';
-          reify uenv t2';
-          if can_generate_equations uenv then (
-            mcomp_for Unify (get_env uenv) t1' t2';
-            record_equation uenv t1' t2'
-          )
       | (Tsplice s1, _)
         when is_instantiable_ty (get_env uenv) s1
           && instantiable_scope s1 > instantiable_scope t2'
@@ -4393,6 +4386,13 @@ and unify3 uenv t1 t1' t2 t2' =
       | (_, Tquote _) | (_, Tsplice _)
         when in_pattern_mode uenv
           && (is_equatable_ty t1 || is_equatable_ty t2) ->
+          reify uenv t1';
+          reify uenv t2';
+          if can_generate_equations uenv then (
+            mcomp_for Unify (get_env uenv) t1' t2';
+            record_equation uenv t1' t2'
+          )
+      | (Tconstr (_,_,_), _) | (_, Tconstr (_,_,_)) when in_pattern_mode uenv ->
           reify uenv t1';
           reify uenv t2';
           if can_generate_equations uenv then (
