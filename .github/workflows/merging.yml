@@ -1,0 +1,122 @@
+name: build
+on:
+  workflow_dispatch:
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the OxCaml repo
+        uses: actions/checkout@master
+
+      - name: Pretend we're running in a container (makes setup-ocaml go faster)
+        if: runner.os == 'Linux'
+        run: sudo touch /.dockerenv
+        # makes setup-ocaml skip apt-get, which is slow on first invocation
+
+      - name: Set up Opam
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: oxcaml-ci-deps.5.2.0-with-ocaml.5.4.0
+          opam-repositories: |
+            local: file://${{ github.workspace }}/tools/ci/local-opam
+            default: https://github.com/ocaml/opam-repository.git
+          opam-disable-sandboxing: true
+          opam-pin: false
+
+      - name: Set up Opam environment
+        # this command adds the opam environment to the PATH.
+        run: |
+          opam env --set-root --set-switch --shell=cmd | sed -n 's/^set //p' | tee -a "$GITHUB_ENV"
+
+      - name: Get the current state of play
+        run: |
+          echo "::group::Building ${{ github.event.pull_request.base.ref }}"
+          cp .github/workflows/boot-files.txt .
+          git fetch origin ${{ github.event.pull_request.base.ref }}
+          git checkout FETCH_HEAD
+          autoconf
+          ./configure -C \
+            --prefix $PWD/_install \
+            --enable-runtime5 --enable-dev --enable-multidomain --enable-poll-insertion
+          make boot-compiler || true
+          test -e .github/workflows/boot-files.txt && cp .github/workflows/boot-files.txt .
+          cat boot-files.txt | cut -f2 | RUNTIME_DIR=runtime xargs dune build --root=. --workspace=duneconf/boot.ws || true
+          for i in $(cat boot-files.txt | cut -f2); do
+            test ! -e _build/default/$i || echo $i
+          done > building
+          echo "::endgroup::"
+          echo "::group::List of currently building files"
+          cat building
+          echo "::endgroup::"
+
+      - name: See what builds now
+        run: |
+          echo "::group::Building ${{ github.sha }}"
+          make distclean
+          git checkout ${{ github.sha }}
+          autoconf
+          ./configure -C \
+            --prefix $PWD/_install \
+            --enable-runtime5 --enable-dev --enable-multidomain --enable-poll-insertion
+          make boot-compiler || true
+          test -e .github/workflows/boot-files.txt && cp .github/workflows/boot-files.txt .
+          cat boot-files.txt | cut -f2 | RUNTIME_DIR=runtime xargs dune build --root=. --workspace=duneconf/boot.ws || true
+          for i in $(cat boot-files.txt | cut -f2); do
+            test ! -e _build/default/$i || echo $i
+          done > building-now
+          echo "::endgroup::"
+          echo These files build...
+          cat building-now
+
+      - name: See what's still broken
+        run: |
+          for i in $(cat boot-files.txt | cut -f2); do
+            if [ ! -e _build/default/$i ]; then
+              source="$(fgrep "$i" boot-files.txt | cut -f1)"
+              if [ -e "$source" ]; then
+                if fgrep -q '<<<<<' "$source"; then
+                  echo "$source (has merge conflicts)"
+                else
+                  echo "$source"
+                fi
+              else
+                echo "$i (generated file?)"
+              fi
+            fi
+          done | sort
+
+      - name: This PR's status
+        run: |
+          success=true
+          echo 'Files changed in the PR itself...'
+          for source in $(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }}) ; do
+            artefact="$(fgrep "$source"$'\t' boot-files.txt | cut -f2)"
+            if [ -z "$artefact" ]; then
+              echo "$source: can't determine artefact"
+            elif [ -f _build/default/$artefact ] ; then
+              echo "$source: OK"
+            else
+              if $success; then
+                success=false
+              fi
+              echo "$source FAILS ($artefact not built)"
+            fi
+          done
+          echo
+          for i in $(cat building); do
+            if ! test -e _build/default/$i; then
+              if $success; then
+                success=false
+                echo 'Previously building file(s) no longer build...'
+              fi
+              fgrep "$i" boot-files.txt
+           fi
+          done
+          $success || echo
+          echo 'New files now building...'
+          for i in $(diff -u building building-now | sed -ne 's/^+\([^+]\)/\1/p'); do
+            fgrep "$i" boot-files.txt
+          done | sort
+          $success
