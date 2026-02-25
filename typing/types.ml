@@ -293,13 +293,13 @@ module Jkind_mod_bounds = struct
 
   let extract_monadic axis t =
     let (Crossing.Monadic.Atom.Modality
-           (Mode.Modality.Monadic.Atom.Join_with value)) = modal axis t
+           (Mode.Modality.Monadic.Atom.Join_const value)) = modal axis t
     in
     value
 
   let extract_comonadic axis t =
     let (Crossing.Comonadic.Atom.Modality
-           (Mode.Modality.Comonadic.Atom.Meet_with value)) = modal axis t
+           (Mode.Modality.Comonadic.Atom.Meet_const value)) = modal axis t
     in
     value
 
@@ -331,37 +331,37 @@ module Jkind_mod_bounds = struct
       Monadic.create
         ~uniqueness:
           (Monadic.Atom.Modality
-             (Mode.Modality.Monadic.Atom.Join_with uniqueness))
+             (Mode.Modality.Monadic.Atom.Join_const uniqueness))
         ~contention:
           (Monadic.Atom.Modality
-             (Mode.Modality.Monadic.Atom.Join_with contention))
+             (Mode.Modality.Monadic.Atom.Join_const contention))
         ~visibility:
           (Monadic.Atom.Modality
-             (Mode.Modality.Monadic.Atom.Join_with visibility))
+             (Mode.Modality.Monadic.Atom.Join_const visibility))
         ~staticity:
           (Monadic.Atom.Modality
-             (Mode.Modality.Monadic.Atom.Join_with staticity))
+             (Mode.Modality.Monadic.Atom.Join_const staticity))
     in
     let comonadic =
       Comonadic.create
         ~regionality:
           (Comonadic.Atom.Modality
-             (Mode.Modality.Comonadic.Atom.Meet_with areality))
+             (Mode.Modality.Comonadic.Atom.Meet_const areality))
         ~linearity:
           (Comonadic.Atom.Modality
-             (Mode.Modality.Comonadic.Atom.Meet_with linearity))
+             (Mode.Modality.Comonadic.Atom.Meet_const linearity))
         ~portability:
           (Comonadic.Atom.Modality
-             (Mode.Modality.Comonadic.Atom.Meet_with portability))
+             (Mode.Modality.Comonadic.Atom.Meet_const portability))
         ~forkable:
           (Comonadic.Atom.Modality
-             (Mode.Modality.Comonadic.Atom.Meet_with forkable))
+             (Mode.Modality.Comonadic.Atom.Meet_const forkable))
         ~yielding:
           (Comonadic.Atom.Modality
-             (Mode.Modality.Comonadic.Atom.Meet_with yielding))
+             (Mode.Modality.Comonadic.Atom.Meet_const yielding))
         ~statefulness:
           (Comonadic.Atom.Modality
-             (Mode.Modality.Comonadic.Atom.Meet_with statefulness))
+             (Mode.Modality.Comonadic.Atom.Meet_const statefulness))
     in
     { monadic; comonadic }
 
