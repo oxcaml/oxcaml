@@ -38,7 +38,7 @@ is typically far more convenient to preserve externality information than it is
 to enforce some semantic property of an unboxed type by hiding it. For this
 reason, the kinds `bits8`, `bits16`, `bits32`, `bits64`, `float32`, `float64`,
 `untagged_immediate`, `vec128`, `vec256`, `vec512`, `void`, and `word` all imply
-`mod external_` by default.
+`mod external_`.
 
 In the future, we plan to make externality a mode, rather than just a property
 of types.
