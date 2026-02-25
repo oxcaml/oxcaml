@@ -945,7 +945,7 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
   | Tagged _ -> (
     let wrap f =
       (* the operators below operate on tagged immediates directly *)
-      wrap tagged_immediate f
+      wrap kind f
     in
     match op with
     | Add -> wrap C.add_int_caml
@@ -957,10 +957,11 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
     | Or -> wrap C.or_int_caml
     | Xor -> wrap C.xor_int_caml)
   | Untagged untagged -> (
-    let wrap f =
-      (* the operators below operate on register-width naked nativeints *)
-      wrap naked_nativeint f
-    in
+    (* Division and modulo inspect all bits of their operands (they are not
+       compatible with modular arithmetic), so we must cast to nativeint width
+       to ensure proper sign-extension before the operation. *)
+    let wrap_nativeint f = wrap naked_nativeint f in
+    let wrap f = wrap kind f in
     let dividend_cannot_be_min_int =
       C.Scalar_type.Integer.bit_width untagged < C.arch_bits
     in
@@ -968,8 +969,8 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
     | Add -> wrap C.add_int
     | Sub -> wrap C.sub_int
     | Mul -> wrap C.mul_int
-    | Div -> wrap (C.div_int ~dividend_cannot_be_min_int)
-    | Mod -> wrap (C.mod_int ~dividend_cannot_be_min_int)
+    | Div -> wrap_nativeint (C.div_int ~dividend_cannot_be_min_int)
+    | Mod -> wrap_nativeint (C.mod_int ~dividend_cannot_be_min_int)
     | And -> wrap C.and_int
     | Or -> wrap C.or_int
     | Xor -> wrap C.xor_int)
@@ -985,30 +986,24 @@ let binary_int_shift_primitive _env dbg kind (op : P.int_shift_op) x y =
     | Asr -> C.asr_int_caml_raw x y ~dbg)
   | kind ->
     let kind = integral_of_standard_int kind in
-    let right_shift_kind signedness =
-      (* right shifts can operate directly on any untagged integers of the
-         correct signedness, as they do not require sign- or zero-extension
-         after the shift, since the cmm scalar types are already stored sign- or
-         zero-extended *)
-      C.Scalar_type.Integer.with_signedness
+    let bits =
+      C.Scalar_type.Integer.bit_width
         (C.Scalar_type.Integral.untagged_or_identity kind)
-        ~signedness
     in
-    let f, (op_kind : C.Scalar_type.Integer.t) =
+    (* Right shifts require the value to be properly extended to register width:
+       sign-extended for [Asr], zero-extended for [Lsr]. Left shifts don't
+       inspect the upper bits so no extension is needed. *)
+    let result =
       match op with
-      | Asr -> C.asr_int, right_shift_kind Signed
-      | Lsr -> C.lsr_int, right_shift_kind Unsigned
-      | Lsl ->
-        (* Left shifts operate on nativeints since they might shift arbitrary
-           bits into the high bits of the register. *)
-        C.lsl_int, C.Scalar_type.Integer.nativeint
+      | Asr ->
+        let x = C.sign_extend ~bits x ~dbg in
+        C.asr_int x y dbg
+      | Lsr ->
+        let x = C.zero_extend ~bits x ~dbg in
+        C.lsr_int x y dbg
+      | Lsl -> C.lsl_int x y dbg
     in
-    C.Scalar_type.Integral.conjugate ~outer:kind ~inner:(Untagged op_kind) ~dbg
-      ~f:(fun x ->
-        (* [kind] only applies to [x], the [y] argument is always a bare
-           register-sized integer *)
-        f x y dbg)
-      x
+    result
 
 let binary_int_comp_primitive _env dbg kind cmp x y =
   match
@@ -1032,20 +1027,43 @@ let binary_int_comp_primitive _env dbg kind cmp x y =
   | Tagged _, Le Unsigned -> C.ule ~dbg (C.ignore_low_bit_int x) y
   | Tagged _, Gt Unsigned -> C.ugt ~dbg (C.ignore_low_bit_int x) y
   | Tagged _, Ge Unsigned -> C.uge ~dbg x (C.ignore_low_bit_int y)
+  | Tagged _, Eq -> C.eq ~dbg x y
+  | Tagged _, Neq -> C.neq ~dbg x y
   (* Naked integers. *)
-  | Untagged _, Lt Signed -> C.lt ~dbg x y
-  | Untagged _, Le Signed -> C.le ~dbg x y
-  | Untagged _, Gt Signed -> C.gt ~dbg x y
-  | Untagged _, Ge Signed -> C.ge ~dbg x y
-  | Untagged _, Lt Unsigned -> C.ult ~dbg x y
-  | Untagged _, Le Unsigned -> C.ule ~dbg x y
-  | Untagged _, Gt Unsigned -> C.ugt ~dbg x y
-  | Untagged _, Ge Unsigned -> C.uge ~dbg x y
-  | (Tagged _ | Untagged _), Eq -> C.eq ~dbg x y
-  | (Tagged _ | Untagged _), Neq -> C.neq ~dbg x y
+  | Untagged untagged, cmp -> (
+    let bits = C.Scalar_type.Integer.bit_width untagged in
+    let x, y =
+      match cmp with
+      | Lt Signed | Le Signed | Gt Signed | Ge Signed ->
+        C.sign_extend ~bits x ~dbg, C.sign_extend ~bits y ~dbg
+      | Lt Unsigned | Le Unsigned | Gt Unsigned | Ge Unsigned | Eq | Neq ->
+        C.zero_extend ~bits x ~dbg, C.zero_extend ~bits y ~dbg
+    in
+    match cmp with
+    | Lt Signed -> C.lt ~dbg x y
+    | Le Signed -> C.le ~dbg x y
+    | Gt Signed -> C.gt ~dbg x y
+    | Ge Signed -> C.ge ~dbg x y
+    | Lt Unsigned -> C.ult ~dbg x y
+    | Le Unsigned -> C.ule ~dbg x y
+    | Gt Unsigned -> C.ugt ~dbg x y
+    | Ge Unsigned -> C.uge ~dbg x y
+    | Eq -> C.eq ~dbg x y
+    | Neq -> C.neq ~dbg x y)
 
-let binary_int_comp_primitive_yielding_int _env dbg _kind
+let binary_int_comp_primitive_yielding_int _env dbg kind
     (signed : P.signed_or_unsigned) x y =
+  let bits =
+    match integral_of_standard_int kind with
+    | Untagged untagged -> C.Scalar_type.Integer.bit_width untagged
+    | Tagged tagged ->
+      C.Scalar_type.Tagged_integer.bit_width_including_tag_bit tagged
+  in
+  let x, y =
+    match signed with
+    | Signed -> C.sign_extend ~bits x ~dbg, C.sign_extend ~bits y ~dbg
+    | Unsigned -> C.zero_extend ~bits x ~dbg, C.zero_extend ~bits y ~dbg
+  in
   match signed with
   | Signed -> C.mk_compare_ints_untagged dbg x y
   | Unsigned -> C.mk_unsigned_compare_ints_untagged dbg x y

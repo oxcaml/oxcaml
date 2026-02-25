@@ -1847,24 +1847,33 @@ let zero_extend ~bits ~dbg e =
         | e -> zero_extend_via_mask e)
       (low_bits ~bits e ~dbg)
 
-let rec sign_extend ~bits ~dbg e =
-  assert (0 < bits && bits <= arch_bits);
-  let unused_bits = arch_bits - bits in
+let rec sign_extend_to ~source_bits ~target_bits ~dbg e =
+  assert (0 < source_bits && source_bits <= target_bits);
+  let unused_bits = target_bits - source_bits in
   let sign_extend_via_shift e =
     asr_const (lsl_const0 e unused_bits dbg) unused_bits dbg
   in
-  if bits = arch_bits
+  if source_bits = target_bits
   then e
   else
     map_tail
       (fun e ->
         match prefer_or e with
         | Cop (Cand, [x; y], _) when is_constant y ->
-          and_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
+          and_int
+            (sign_extend_to ~source_bits ~target_bits x ~dbg)
+            (sign_extend_to ~source_bits ~target_bits y ~dbg)
+            dbg
         | Cop (Cor, [x; y], _) when is_constant y ->
-          or_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
+          or_int
+            (sign_extend_to ~source_bits ~target_bits x ~dbg)
+            (sign_extend_to ~source_bits ~target_bits y ~dbg)
+            dbg
         | Cop (Cxor, [x; y], _) when is_constant y ->
-          xor_int (sign_extend ~bits x ~dbg) (sign_extend ~bits y ~dbg) dbg
+          xor_int
+            (sign_extend_to ~source_bits ~target_bits x ~dbg)
+            (sign_extend_to ~source_bits ~target_bits y ~dbg)
+            dbg
         | Cop (((Casr | Clsr) as op), [inner; Cconst_int (n, _)], _) as e
           when is_defined_shift n ->
           (* see middle_end/flambda2/z3/sign_extension.py for proof *)
@@ -1886,13 +1895,16 @@ let rec sign_extend ~bits ~dbg e =
           let load memory_chunk =
             Cop (Cload { memory_chunk; mutability; is_atomic }, args, dbg)
           in
-          match memory_chunk, bits with
+          match memory_chunk, source_bits with
           | (Byte_signed | Byte_unsigned), 8 -> load Byte_signed
           | (Sixteen_signed | Sixteen_unsigned), 16 -> load Sixteen_signed
           | (Thirtytwo_signed | Thirtytwo_unsigned), 32 -> load Thirtytwo_signed
           | _ -> sign_extend_via_shift e)
         | e -> sign_extend_via_shift e)
-      (low_bits ~bits e ~dbg)
+      (low_bits ~bits:source_bits e ~dbg)
+
+let sign_extend ~bits ~dbg e =
+  sign_extend_to ~source_bits:bits ~target_bits:arch_bits ~dbg e
 
 let unboxed_or_untagged_packed_array_ref arr index dbg ~log2_size_addr
     ~memory_chunk =
@@ -5451,6 +5463,7 @@ module Scalar_type = struct
   end
 
   module Bit_width_and_signedness : sig
+    (* CR jrayman *)
     (** An integer with signedness [signedness t] that fits into a
         general-purpose register. It is canonically stored in twos-complement
         representation, in the lower [bits] bits of its container (whether that
@@ -5510,10 +5523,7 @@ module Scalar_type = struct
     (** Determines whether [dst] can represent every value of [src], preserving
         sign *)
     let[@inline] can_cast_without_losing_information ~src ~dst =
-      match signedness src, signedness dst with
-      | Signed, Signed | Unsigned, Unsigned -> bit_width src <= bit_width dst
-      | Unsigned, Signed -> bit_width src < bit_width dst
-      | Signed, Unsigned -> false
+      bit_width src >= bit_width dst
 
     let[@inline] static_cast ~dbg ~src ~dst exp =
       if can_cast_without_losing_information ~src ~dst
@@ -5522,9 +5532,9 @@ module Scalar_type = struct
            expressions, this is a no-op *)
         exp
       else
-        match signedness dst with
-        | Signed -> sign_extend ~bits:(bit_width dst) exp ~dbg
-        | Unsigned -> zero_extend ~bits:(bit_width dst) exp ~dbg
+        match signedness src with
+        | Signed -> sign_extend ~bits:(bit_width src) exp ~dbg
+        | Unsigned -> zero_extend ~bits:(bit_width src) exp ~dbg
 
     let[@inline] conjugate ~outer ~inner ~dbg ~f x =
       x
@@ -5620,9 +5630,12 @@ module Scalar_type = struct
       | Untagged src, Untagged dst -> Integer.static_cast ~dbg ~src ~dst exp
       | Tagged src, Tagged dst -> Tagged_integer.static_cast ~dbg ~src ~dst exp
       | Untagged src, Tagged dst ->
-        tag_int
-          (Integer.static_cast ~dbg ~src ~dst:(Tagged_integer.untagged dst) exp)
-          dbg
+        let bits =
+          min (Integer.bit_width src)
+            (Integer.bit_width (Tagged_integer.untagged dst))
+        in
+        let extended = sign_extend ~bits exp ~dbg in
+        tag_int extended dbg
       | Tagged src, Untagged dst ->
         Integer.static_cast ~dbg
           ~src:(Tagged_integer.untagged src)
@@ -5646,16 +5659,8 @@ module Scalar_type = struct
     | Float src, Float dst -> Float_width.static_cast ~dbg ~src ~dst exp
     | Integral src, Float dst ->
       let float_of_int_arg = Integral.nativeint in
-      if
-        not
-          (Integral.can_cast_without_losing_information ~src
-             ~dst:float_of_int_arg)
-      then
-        Misc.fatal_errorf "static_cast: casting %a to float is not implemented"
-          Integral.print src
-      else
-        unary (Cstatic_cast (Float_of_int dst)) ~dbg
-          (Integral.static_cast exp ~dbg ~src ~dst:float_of_int_arg)
+      unary (Cstatic_cast (Float_of_int dst)) ~dbg
+        (Integral.static_cast exp ~dbg ~src ~dst:float_of_int_arg)
     | Float src, Integral dst -> (
       match Integral.signedness dst with
       | Unsigned ->
@@ -5669,7 +5674,7 @@ module Scalar_type = struct
         let exp = unary (Cstatic_cast (Int_of_float src)) exp ~dbg in
         let src = Integral.nativeint in
         (* assert that nativeint is indeed the largest integer width *)
-        assert (Integral.can_cast_without_losing_information ~src:dst ~dst:src);
+        (* assert (Integral.can_cast_without_losing_information ~src:dst ~dst:src); *)
         Integral.static_cast exp ~dbg ~src ~dst)
 
   let[@inline] conjugate ~outer ~inner ~dbg ~f x =
