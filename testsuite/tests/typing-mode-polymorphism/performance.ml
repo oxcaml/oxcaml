@@ -1,5 +1,5 @@
 (* TEST
- flags += "-extension mode_polymorphism_alpha";
+ flags += "-extension mode_polymorphism_alpha -extension mode_polymorphism_printing";
  native;
 *)
 

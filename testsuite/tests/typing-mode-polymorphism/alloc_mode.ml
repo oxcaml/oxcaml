@@ -1,5 +1,5 @@
 (* TEST
- flags += "-dlambda -extension mode_polymorphism_alpha";
+ flags += "-dlambda -extension mode_polymorphism_alpha -extension mode_polymorphism_printing";
  expect;
 *)
 
@@ -23,7 +23,10 @@ let foo r x = r.i <- x
      (function {nlocal = 1} r/294[L] x/295 : int
        (setfield_ptr(maybe-stack) 0 r/294 x/295)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/292))
-val foo : 'a myref -> 'a -> unit = <fun>
+val foo :
+  'a myref @ [< 'm @@ past & global corrupted] ->
+  ('a @ [< global many uncontended] -> unit @ 'n) @ [> 'm | corruptible] =
+  <fun>
 |}]
 
 let foo (r @ local) x = r.i <- x
@@ -33,7 +36,10 @@ let foo (r @ local) x = r.i <- x
      (function {nlocal = 2} r/297[L] x/298 : int
        (setfield_ptr(maybe-stack) 0 r/297 x/298)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/296))
-val foo : 'a myref @ local -> 'a -> unit = <fun>
+val foo :
+  'a myref @ [< 'm @@ past & corrupted > local] ->
+  ('a @ [< global many uncontended] -> unit @ 'n) @ [> 'm | local corruptible] =
+  <fun>
 |}]
 
 (* Can be [setfield_ptr] *)
@@ -43,7 +49,10 @@ let foo (r @ global) x = r.i <- x
   (foo/299 =
      (function {nlocal = 1} r/300 x/301 : int (setfield_ptr 0 r/300 x/301)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/299))
-val foo : 'a myref -> 'a -> unit = <fun>
+val foo :
+  'a myref @ [< 'm @@ past & global corrupted] ->
+  ('a @ [< global many uncontended] -> unit @ 'n) @ [> 'm | corruptible] =
+  <fun>
 |}]
 
 let foo () =
@@ -62,7 +71,7 @@ let foo () =
          (function {nlocal = 1} param/307[L][value<int>] : int
            (apply store/304 r/303)))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/302))
-val foo : unit -> unit -> unit = <fun>
+val foo : unit @ 'o -> (unit @ 'n -> unit @ 'm) @ [> corruptible] = <fun>
 |}]
 
 let foo () =
@@ -83,7 +92,8 @@ Warning 26 [unused-var]: unused variable "r".
              (setfield_ptr(maybe-stack) 0 r/314 "foobar"))))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/310))
 
-val foo : unit -> string myref -> unit = <fun>
+val foo : unit @ 'o -> (string myref @ [< corrupted] -> unit @ 'n) @ 'm =
+  <fun>
 |}]
 
 let foo () =
@@ -102,7 +112,7 @@ let foo () =
          (function {nlocal = 1} param/322[L][value<int>] : int
            (apply store/319 r/318)))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/317))
-val foo : unit -> unit -> unit = <fun>
+val foo : unit @ 'o -> (unit @ 'n -> unit @ 'm) @ [> corruptible] = <fun>
 |}]
 
 
@@ -125,14 +135,16 @@ let fst x = fun y -> x
      (function {nlocal = 1} x/326? : stack
        (function {nlocal = 1} y/327[L]? : stack x/326)))
   (apply (field_imm 1 (global Toploop!)) "fst" fst/325))
-val fst : 'a -> 'b -> 'a = <fun>
+val fst : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
+  <fun>
 |}]
 
 let fst' x y = x
 [%%expect{|
 (let (fst'/328 = (function {nlocal = 1} x/330[L]? y/331[L]? : stack x/330))
   (apply (field_imm 1 (global Toploop!)) "fst'" fst'/328))
-val fst' : 'a -> 'b -> 'a = <fun>
+val fst' : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
+  <fun>
 |}]
 
 (* if explicitly annotated, the returned function is local [function[L]],
@@ -144,7 +156,9 @@ let fst_local (x @ local) = exclave_ fun y -> x
      (function {nlocal = 1} x/334[L]? : stack
        (function[L] {nlocal = 1} y/335[L]? : stack x/334)))
   (apply (field_imm 1 (global Toploop!)) "fst_local" fst_local/332))
-val fst_local : 'a @ local -> 'b -> 'a @ local = <fun>
+val fst_local :
+  'a @ [< 'm > local] ->
+  ('b @ 'n -> 'a @ [> 'm | local]) @ [> close('m) | local] = <fun>
 |}]
 
 let foo = fst 42
@@ -153,7 +167,7 @@ let foo = fst 42
   (fst/325 =? (apply (field_imm 0 (global Toploop!)) "fst")
    foo/336 = (apply fst/325 42))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/336))
-val foo : '_weak1 -> int = <fun>
+val foo : '_weak1 -> int @ [> aliased] = <fun>
 |}]
 
 let foo () =
@@ -165,5 +179,5 @@ let foo () =
      (function {nlocal = 1} param/338[L][value<int>] : stack
        (apply[L] fst_local/332 42)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/337))
-val foo : unit -> ('a -> int @ local) @ local = <fun>
+val foo : unit @ 'n -> ('a @ 'm -> int @ [> local]) @ [> local] = <fun>
 |}]

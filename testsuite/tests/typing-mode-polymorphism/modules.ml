@@ -1,11 +1,11 @@
 (* TEST
- flags += "-extension mode_polymorphism_alpha";
+ flags += "-extension mode_polymorphism_alpha -extension mode_polymorphism_printing";
  expect;
 *)
 
 let use_portable (x @ portable) = x
 [%%expect{|
-val use_portable : 'a @ portable -> 'a = <fun>
+val use_portable : 'a @ [< 'm & portable] -> 'a @ [> 'm] = <fun>
 |}]
 
 module M = struct
