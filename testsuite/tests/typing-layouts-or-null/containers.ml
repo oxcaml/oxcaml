@@ -30,7 +30,7 @@ Line 3, characters 19-34:
                        ^^^^^^^^^^^^^^^
 Error: This type "t_value_or_null" should be an instance of type
          "('a : any separable)"
-       The layout of t_value_or_null is value maybe_separable
+       The layout of t_value_or_null is value maybe_separable maybe_null
          because of the definition of t_value_or_null at line 1, characters 0-36.
        But the layout of t_value_or_null must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -76,7 +76,7 @@ Line 1, characters 19-32:
                        ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
          "('a : any separable)"
-       The layout of float or_null is value maybe_separable
+       The layout of float or_null is value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of float or_null must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -125,7 +125,7 @@ Line 3, characters 19-34:
                        ^^^^^^^^^^^^^^^
 Error: This type "t_value_or_null" should be an instance of type
          "('a : any separable)"
-       The layout of t_value_or_null is value maybe_separable
+       The layout of t_value_or_null is value maybe_separable maybe_null
          because of the definition of t_value_or_null at line 1, characters 0-36.
        But the layout of t_value_or_null must be a sublayout of any separable
          because it's the type argument to the array type.
@@ -171,7 +171,7 @@ Line 1, characters 19-32:
                        ^^^^^^^^^^^^^
 Error: This type "float or_null" should be an instance of type
          "('a : any separable)"
-       The layout of float or_null is value maybe_separable
+       The layout of float or_null is value maybe_separable maybe_null
          because it is the primitive type or_null.
        But the layout of float or_null must be a sublayout of any separable
          because it's the type argument to the array type.

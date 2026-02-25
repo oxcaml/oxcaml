@@ -250,7 +250,10 @@ Error:
          because of the definition of t1 at line 1, characters 0-38.
 |}]
 
-type 'a t = #{ a : 'a ; a' : 'a } constraint 'a = r
+(* CR layouts-scannable: The annotation on ['a] is temporarily necessary while
+   inference for mutual recursive types + scannable axes is broken. See tests
+   in [typing-layouts-scannable/mutual_recursion.ml] for more examples. *)
+type 'a t = #{ a : 'a ; a' : 'a } constraint ('a : immediate & float64) = r
 and r = #{ i : int ; f : float# }
 [%%expect{|
 type 'a t = #{ a : 'a; a' : 'a; } constraint 'a = r
