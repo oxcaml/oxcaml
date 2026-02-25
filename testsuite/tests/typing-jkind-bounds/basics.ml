@@ -39,7 +39,7 @@ Error: Unimplemented kind syntax
 kind_ immediate = value mod everything non_float
 
 [%%expect{|
-kind_ immediate = immediate
+kind_ immediate = immediate non_float
 |}]
 
 kind_ immutable_data =
@@ -111,7 +111,7 @@ Line 2, characters 0-18:
     ^^^^^^^^^^^^^^^^^^
 Error: The layout of type "a" is any
          because of the definition of a at line 1, characters 0-12.
-       But the layout of type "a" must be a sublayout of value
+       But the layout of type "a" must be a value layout
          because of the definition of b at line 2, characters 0-18.
 |}]
 
@@ -209,7 +209,7 @@ Error: The layout of type "a" is value
          because of the definition of b at line 2, characters 0-30.
 |}]
 
-type a : value mod global aliased many immutable stateless external_ unyielding non_float
+type a : value non_pointer mod global aliased many immutable stateless external_ unyielding
 type b : value mod local unique once contended nonportable internal = a
 [%%expect{|
 type a : immediate
@@ -267,19 +267,23 @@ type d = c
 |}]
 
 type a : immediate
-type b : value mod global aliased many immutable stateless unyielding external_ non_float = a
-type c : value mod global aliased many immutable stateless unyielding external_ non_float
+type b : value non_pointer mod global aliased many immutable stateless unyielding external_= a
+type c : value non_pointer mod global aliased many immutable stateless unyielding external_
 type d : immediate = c
 [%%expect{|
-type a : immediate
-type b = a
-type c : immediate
-type d = c
+type a : immediate non_float
+Line 2, characters 0-94:
+2 | type b : value non_pointer mod global aliased many immutable stateless unyielding external_= a
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The layout of type "a" is value non_float
+         because of the definition of a at line 1, characters 0-18.
+       But the layout of type "a" must be a sublayout of immediate
+         because of the definition of b at line 2, characters 0-94.
 |}]
 
 type a : immediate64
-type b : value mod global aliased many immutable stateless unyielding external64 non_float = a
-type c : value mod global aliased many immutable stateless unyielding external64 non_float
+type b : value non_pointer mod global aliased many immutable stateless unyielding external64 = a
+type c : value non_pointer mod global aliased many immutable stateless unyielding external64
 type d : immediate64 = c
 [%%expect{|
 type a : immediate64
@@ -568,7 +572,7 @@ end
 type t : immediate = A.t
 
 [%%expect {|
-module A : sig type t : immediate end
+module A : sig type t : immediate non_float end
 type t = A.t
 |}]
 
@@ -585,9 +589,9 @@ module A : sig type t end
 Line 7, characters 0-24:
 7 | type t : immediate = A.t
     ^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "A.t" is value
+Error: The layout of type "A.t" is value
          because of the definition of t at line 2, characters 2-16.
-       But the kind of type "A.t" must be a subkind of immediate
+       But the layout of type "A.t" must be a sublayout of value non_float
          because of the definition of t at line 7, characters 0-24.
 |}]
 
@@ -799,7 +803,7 @@ Error: The kind of type "t" is immutable_data with t_value
 type u : immediate
 type t : value mod portable many contended = { x : string; y : int; z : u }
 [%%expect {|
-type u : immediate
+type u : immediate non_float
 type t = { x : string; y : int; z : u; }
 |}]
 
@@ -885,13 +889,13 @@ type ('a : immediate) t : any mod many = { x : 'a } [@@unboxed]
 type ('a : immediate) t : any mod aliased = { x : 'a } [@@unboxed]
 type ('a : immediate) t : immediate = { x : 'a } [@@unboxed]
 [%%expect {|
-type ('a : immediate) t = { x : 'a; } [@@unboxed]
-type ('a : immediate) t = { x : 'a; } [@@unboxed]
-type ('a : immediate) t = { x : 'a; } [@@unboxed]
-type ('a : immediate) t = { x : 'a; } [@@unboxed]
-type ('a : immediate) t = { x : 'a; } [@@unboxed]
-type ('a : immediate) t = { x : 'a; } [@@unboxed]
-type ('a : immediate) t = { x : 'a; } [@@unboxed]
+type ('a : immediate non_float) t = { x : 'a; } [@@unboxed]
+type ('a : immediate non_float) t = { x : 'a; } [@@unboxed]
+type ('a : immediate non_float) t = { x : 'a; } [@@unboxed]
+type ('a : immediate non_float) t = { x : 'a; } [@@unboxed]
+type ('a : immediate non_float) t = { x : 'a; } [@@unboxed]
+type ('a : immediate non_float) t = { x : 'a; } [@@unboxed]
+type ('a : immediate non_float) t = { x : 'a; } [@@unboxed]
 |}]
 
 type u : value
@@ -976,7 +980,7 @@ val v : int = 5
 
 type ('a : immediate) t : value mod many portable = { mutable x : 'a }
 [%%expect {|
-type ('a : immediate) t = { mutable x : 'a; }
+type ('a : immediate non_float) t = { mutable x : 'a; }
 |}]
 
 type ('a : immediate) t : value mod global = { mutable x : 'a }
@@ -1159,11 +1163,10 @@ type 'a t : value mod global immutable stateless many aliased unyielding non_flo
 Lines 1-2, characters 0-66:
 1 | type 'a t : value mod global immutable stateless many aliased unyielding non_float =
 2 |   Foo of 'a @@ global immutable stateless many aliased [@@unboxed]
-Error: The kind of type "t" is value
+Error: The layout of type "t" is value
          because it instantiates an unannotated type parameter of t,
-         chosen to have kind value.
-       But the kind of type "t" must be a subkind of
-           immutable_data mod global unforkable yielding
+         chosen to have layout value.
+       But the layout of type "t" must be a sublayout of value non_float
          because of the annotation on the declaration of the type t.
 |}]
 (* CR layouts v2.8: this could be accepted, if we infer ('a : value mod
@@ -1189,10 +1192,10 @@ type ('a : immediate) t : immediate = Foo of 'a @@ global [@@unboxed]
 type ('a : value mod global) t : value mod global = Foo of 'a @@ local [@@unboxed]
 [%%expect {|
 type ('a : value mod global) t = { x : 'a @@ global; } [@@unboxed]
-type ('a : immediate) t = { x : 'a @@ global; } [@@unboxed]
+type ('a : immediate non_float) t = { x : 'a @@ global; } [@@unboxed]
 type ('a : value mod global) t = { x : 'a; } [@@unboxed]
 type ('a : value mod global) t = Foo of 'a @@ global [@@unboxed]
-type ('a : immediate) t = Foo of 'a @@ global [@@unboxed]
+type ('a : immediate non_float) t = Foo of 'a @@ global [@@unboxed]
 type ('a : value mod global) t = Foo of 'a [@@unboxed]
 |}]
 
@@ -1208,9 +1211,9 @@ type ('a : value mod external_) t : immediate =
 Lines 1-2, characters 0-65:
 1 | type ('a : value mod external_) t : immediate =
 2 |   Foo of 'a @@ global portable contended many aliased [@@unboxed]
-Error: The kind of type "t" is value mod external_
+Error: The layout of type "t" is value
          because of the annotation on 'a in the declaration of the type t.
-       But the kind of type "t" must be a subkind of immediate
+       But the layout of type "t" must be a sublayout of value non_float
          because of the annotation on the declaration of the type t.
 |}]
 (* CR layouts v2.8: this should be accepted. Internal ticket 5120. *)
@@ -1271,9 +1274,9 @@ type ('a : value) t = ('a : value)
 type ('a : bits32 mod aliased) t = ('a : any mod global)
 [%%expect {|
 type ('a : value mod global) t = 'a
-type ('a : immediate) t = 'a
-type ('a : immediate) t = 'a
-type ('a : immediate) t = 'a
+type ('a : immediate non_float) t = 'a
+type ('a : immediate non_float) t = 'a
+type ('a : immediate non_float) t = 'a
 type 'a t = 'a
 type 'a t = 'a
 type ('a : bits32 mod global) t = 'a
@@ -1297,7 +1300,7 @@ let f : ('a : value) -> ('a: immediate) = fun x -> x
 [%%expect {|
 val f : ('a : value_or_null mod global contended). 'a -> 'a = <fun>
 val f : ('a : value mod external_). 'a -> 'a = <fun>
-val f : ('a : immediate). 'a -> 'a = <fun>
+val f : ('a : immediate non_float). 'a -> 'a = <fun>
 |}]
 
 let f : ('a : value) -> ('a: float32) = fun x -> x
@@ -1357,7 +1360,7 @@ let f (type a : value) (x : a t) =
 
 [%%expect{|
 type _ t =
-    A : ('a : immediate). 'a t
+    A : ('a : immediate non_float). 'a t
   | B : ('b : value mod portable aliased). 'b -> 'b t
   | C : 'c t
 val f : 'a t -> unit = <fun>
@@ -1383,17 +1386,17 @@ let f (type a : value) (x : a t) =
 
 [%%expect{|
 type _ t =
-    A : ('a : immediate). 'a t
+    A : ('a : immediate non_float). 'a t
   | B : ('b : value mod portable aliased). 'b -> 'b t
   | C : 'c t
 Line 17, characters 6-7:
 17 |     f y
            ^
 Error: This expression has type "a" but an expression was expected of type
-         "('a : immediate)"
-       The kind of a is value
+         "('a : immediate non_float)"
+       The layout of a is value
          because of the annotation on the abstract type declaration for a.
-       But the kind of a must be a subkind of immediate
+       But the layout of a must be a sublayout of value non_float
          because of the definition of f at line 16, characters 10-41.
 |}]
 
@@ -1437,7 +1440,7 @@ Line 1, characters 42-52:
                                               ^^^^^^^^^^
 Error: This expression has type "<  >" but an expression was expected of type
          "('a : value mod portable)"
-       The kind of <  > is value mod global many non_float
+       The kind of <  > is value non_float mod global many
          because it's the type of an object.
        But the kind of <  > must be a subkind of value mod portable
          because of the annotation on the wildcard _ at line 1, characters 19-37.
@@ -1450,7 +1453,7 @@ Line 1, characters 43-53:
                                                ^^^^^^^^^^
 Error: This expression has type "<  >" but an expression was expected of type
          "('a : value mod contended)"
-       The kind of <  > is value mod global many non_float
+       The kind of <  > is value non_float mod global many
          because it's the type of an object.
        But the kind of <  > must be a subkind of value mod contended
          because of the annotation on the wildcard _ at line 1, characters 19-38.
@@ -1463,7 +1466,7 @@ Line 1, characters 43-53:
                                                ^^^^^^^^^^
 Error: This expression has type "<  >" but an expression was expected of type
          "('a : value mod external_)"
-       The kind of <  > is value mod global many non_float
+       The kind of <  > is value non_float mod global many
          because it's the type of an object.
        But the kind of <  > must be a subkind of value mod external_
          because of the annotation on the wildcard _ at line 1, characters 19-38.
@@ -1650,25 +1653,6 @@ Error: This expression has type "int t" but an expression was expected of type
 |}]
 
 (*********************************)
-(* Test 15: extensible variants *)
-
-(* The best kind an extensible variant can get is [value mod non_float] *)
-type extensible : value mod non_float = ..
-[%%expect{|
-type extensible = ..
-|}]
-
-(* Since the kind is [best], it should normalize away *)
-module M : sig
-  type t : immediate with extensible
-end = struct
-  type t : value mod non_float
-end
-[%%expect{|
-module M : sig type t : value mod non_float end
-|}]
-
-(*********************************)
 (* Test 16: principality *)
 
 let id x = x
@@ -1715,12 +1699,12 @@ type extensible = ..
 
 (* Since the kind is [best], it should normalize away *)
 module M : sig
-  type t : immediate with extensible
+  type t : immediate non_float with extensible
 end = struct
   type t : value mod non_float
 end
 [%%expect{|
-module M : sig type t : value mod non_float end
+module M : sig type t : value non_float end
 |}]
 
 (**************************)
@@ -1831,15 +1815,14 @@ Error: Signature mismatch:
        Modules do not match:
          sig type 'a t : value_or_null mod everything end
        is not included in
-         sig type 'a t : value_or_null mod everything mod separable end
+         sig type 'a t : value_or_null mod everything separable end
        Type declarations do not match:
          type 'a t : value_or_null mod everything
        is not included in
-         type 'a t : value_or_null mod everything mod separable
-       The kind of the first is value_or_null mod everything
+         type 'a t : value_or_null mod everything separable
+       The layout of the first is value maybe_separable
          because of the definition of t at line 4, characters 2-42.
-       But the kind of the first must be a subkind of
-           value_or_null mod everything mod separable
+       But the layout of the first must be a sublayout of value
          because of the definition of t at line 2, characters 2-52.
 |}]
 
