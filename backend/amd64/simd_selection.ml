@@ -1138,15 +1138,15 @@ let select_operation_cfg ~dbg op args =
   |> or_else select_operation_f16c
   |> or_else select_operation_fma
 
-let rax = Proc.phys_reg Int 0
+let rax = Proc.phys_reg Int (P RAX)
 
-let rdi = Proc.phys_reg Int 2
+let rdi = Proc.phys_reg Int (P RDI)
 
-let rcx = Proc.phys_reg Int 5
+let rcx = Proc.phys_reg Int (P RCX)
 
-let rdx = Proc.phys_reg Int 4
+let rdx = Proc.phys_reg Int (P RDX)
 
-let xmm0v = Proc.phys_reg Vec128 100
+let xmm0v = Proc.phys_reg Vec128 (P MM0)
 
 let to_phys_reg (pinned_reg : Simd.reg) =
   match pinned_reg with

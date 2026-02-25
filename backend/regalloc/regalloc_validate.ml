@@ -110,7 +110,7 @@ end = struct
   end
 
   type t =
-    | Reg of int
+    | Reg of Regs.Phys_reg.t
     | Stack of Stack.t
 
   let of_reg reg =

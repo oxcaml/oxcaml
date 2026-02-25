@@ -10,10 +10,9 @@ let filter_unavailable : Reg.t array -> Reg.t array =
   let is_available (reg : Reg.t) : bool =
     match reg.loc with
     | Unknown -> true
-    | Reg r ->
-      let reg_class = Reg_class.of_machtype reg.typ in
-      r - Reg_class.first_available_register reg_class
-      < Reg_class.num_available_registers reg_class
+    | Reg phys_reg ->
+      let reg_class = Regs.Reg_class.of_machtype reg.typ in
+      Regs.index_in_class phys_reg < Regs.num_available_registers reg_class
     | Stack _ -> true
   in
   let num_available =
@@ -327,9 +326,8 @@ let assign_colors : State.t -> Cfg_with_layout.t -> unit =
       then (
         log "%a" Printreg.reg n;
         indent ());
-      let reg_class = Reg_class.of_machtype n.typ in
-      let reg_num_avail = Reg_class.num_available_registers reg_class in
-      let reg_first_avail = Reg_class.first_available_register reg_class in
+      let reg_class = Regs.Reg_class.of_machtype n.typ in
+      let reg_num_avail = Regs.num_available_registers reg_class in
       let ok_colors = Array.make reg_num_avail true in
       let counter = ref reg_num_avail in
       (* returns the index of the first available physical register in the
@@ -349,7 +347,7 @@ let assign_colors : State.t -> Cfg_with_layout.t -> unit =
       let rec get_available = function
         | [] -> get_first_available ()
         | { Regalloc_affinity.priority = _; phys_reg } :: tl ->
-          let idx = phys_reg - reg_first_avail in
+          let idx = Regs.index_in_class phys_reg in
           if idx >= 0 && idx < reg_num_avail && Array.unsafe_get ok_colors idx
           then idx
           else get_available tl
@@ -364,10 +362,11 @@ let assign_colors : State.t -> Cfg_with_layout.t -> unit =
             match State.color state alias with
             | None -> assert false
             | Some color ->
-              if debug then log "color %d is not available" color;
-              if Array.unsafe_get ok_colors (color - reg_first_avail)
+              if debug
+              then log "color %a is not available" Regs.Phys_reg.print color;
+              if Array.unsafe_get ok_colors (Regs.index_in_class color)
               then (
-                Array.unsafe_set ok_colors (color - reg_first_avail) false;
+                Array.unsafe_set ok_colors (Regs.index_in_class color) false;
                 decr counter;
                 if !counter > 0
                 then mark_adjacent_colors_and_get_available tl
@@ -384,8 +383,8 @@ let assign_colors : State.t -> Cfg_with_layout.t -> unit =
         State.add_spilled_nodes state n)
       else (
         State.add_colored_nodes state n;
-        let c = first_avail + reg_first_avail in
-        if debug then log "coloring with %d" c;
+        let c = (Regs.registers reg_class).(first_avail) in
+        if debug then log "coloring with %a" Regs.Phys_reg.print c;
         State.set_color state n (Some c));
       if debug then dedent ());
   State.iter_coalesced_nodes state ~f:(fun n ->
