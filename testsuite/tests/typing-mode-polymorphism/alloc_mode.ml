@@ -1,5 +1,5 @@
 (* TEST
- flags += "-dlambda -extension mode_polymorphism_alpha";
+ flags += "-dlambda -extension mode_polymorphism_alpha -extension mode_polymorphism_printing";
  expect;
 *)
 
@@ -23,7 +23,11 @@ let foo r x = r.i <- x
      (function {nlocal = 1} r/0[L] x/0 : int
        (setfield_ptr(maybe-stack) 0 r/0 x/0)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/0))
-val foo : 'a myref -> 'a -> unit = <fun>
+val foo :
+  'a myref @ [< 'm @@ past & global corrupted write] ->
+  ('a @ [< global many uncontended forkable unyielding read_write] ->
+   unit @ 'n) @ [> 'm | corruptible writing] =
+  <fun>
 |}]
 
 let foo (r @ local) x = r.i <- x
@@ -33,7 +37,11 @@ let foo (r @ local) x = r.i <- x
      (function {nlocal = 2} r/1[L] x/1 : int
        (setfield_ptr(maybe-stack) 0 r/1 x/1)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/1))
-val foo : 'a myref @ local -> 'a -> unit = <fun>
+val foo :
+  'a myref @ [< 'm @@ past & corrupted write > local unforkable yielding] ->
+  ('a @ [< global many uncontended forkable unyielding read_write] ->
+   unit @ 'n) @ [> 'm | local corruptible unforkable yielding writing] =
+  <fun>
 |}]
 
 (* Can be [setfield_ptr] *)
@@ -41,7 +49,11 @@ let foo (r @ global) x = r.i <- x
 [%%expect{|
 (let (foo/2 = (function {nlocal = 1} r/2 x/2 : int (setfield_ptr 0 r/2 x/2)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/2))
-val foo : 'a myref -> 'a -> unit = <fun>
+val foo :
+  'a myref @ [< 'm @@ past & global corrupted forkable unyielding write] ->
+  ('a @ [< global many uncontended forkable unyielding read_write] ->
+   unit @ 'n) @ [> 'm | corruptible writing] =
+  <fun>
 |}]
 
 let foo () =
@@ -59,7 +71,9 @@ let foo () =
          (function {nlocal = 1} param/1[L][value<int>] : int
            (apply store/0 r/3)))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/3))
-val foo : unit -> unit -> unit = <fun>
+val foo :
+  unit @ 'n -> (unit @ 'm -> unit @ [> dynamic]) @ [> corruptible writing] =
+  <fun>
 |}]
 
 let foo () =
@@ -80,7 +94,8 @@ Warning 26 [unused-var]: unused variable "r".
              (setfield_ptr(maybe-stack) 0 r/6 "foobar"))))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/4))
 
-val foo : unit -> string myref -> unit = <fun>
+val foo : unit @ 'o -> (string myref @ [< corrupted write] -> unit @ 'n) @ 'm =
+  <fun>
 |}]
 
 let foo () =
@@ -98,7 +113,9 @@ let foo () =
          (function {nlocal = 1} param/4[L][value<int>] : int
            (apply store/1 r/7)))))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/5))
-val foo : unit -> unit -> unit = <fun>
+val foo :
+  unit @ 'n -> (unit @ 'm -> unit @ [> dynamic]) @ [> corruptible writing] =
+  <fun>
 |}]
 
 
@@ -121,14 +138,16 @@ let fst x = fun y -> x
      (function {nlocal = 1} x/3? : stack
        (function {nlocal = 1} y/0[L]? : stack x/3)))
   (apply (field_imm 1 (global Toploop!)) "fst" fst/0))
-val fst : 'a -> 'b -> 'a = <fun>
+val fst : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
+  <fun>
 |}]
 
 let fst' x y = x
 [%%expect{|
 (let (fst'/0 = (function {nlocal = 1} x/4[L]? y/1[L]? : stack x/4))
   (apply (field_imm 1 (global Toploop!)) "fst'" fst'/0))
-val fst' : 'a -> 'b -> 'a = <fun>
+val fst' : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
+  <fun>
 |}]
 
 (* if explicitly annotated, the returned function is local [function[L]],
@@ -140,7 +159,10 @@ let fst_local (x @ local) = exclave_ fun y -> x
      (function {nlocal = 1} x/5[L]? : stack
        (function[L] {nlocal = 1} y/2[L]? : stack x/5)))
   (apply (field_imm 1 (global Toploop!)) "fst_local" fst_local/0))
-val fst_local : 'a @ local -> 'b -> 'a @ local = <fun>
+val fst_local :
+  'a @ [< 'm > local unforkable yielding] ->
+  ('b @ 'n -> 'a @ [> 'm | local unforkable yielding]) @ [> close('m) | local unforkable yielding] =
+  <fun>
 |}]
 
 let foo = fst 42
@@ -149,7 +171,7 @@ let foo = fst 42
   (fst/0 =? (apply (field_imm 0 (global Toploop!)) "fst")
    foo/6 = (apply fst/0 42))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/6))
-val foo : '_weak1 -> int = <fun>
+val foo : '_weak1 -> int @ [> aliased] = <fun>
 |}]
 
 let foo () =
@@ -161,7 +183,10 @@ let foo () =
      (function {nlocal = 1} param/5[L][value<int>] : stack
        (apply[L] fst_local/0 42)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/7))
-val foo : unit -> ('a -> int @ local) @ local = <fun>
+val foo :
+  unit @ 'n ->
+  ('a @ 'm -> int @ [> local unforkable yielding]) @ [> local unforkable yielding dynamic] =
+  <fun>
 |}]
 
 
@@ -177,13 +202,13 @@ let id x = x
 [%%expect{|
 (let (use_yield/0 = (function {nlocal = 1} param/6[L]? : int 0))
   (apply (field_imm 1 (global Toploop!)) "use_yield" use_yield/0))
-val use_yield : 'a @ yielding -> unit = <fun>
+val use_yield : 'a @ [> yielding] -> unit @ 'm = <fun>
 (let (use_unyielding/0 = (function {nlocal = 1} param/7[L]? : int 0))
   (apply (field_imm 1 (global Toploop!)) "use_unyielding" use_unyielding/0))
-val use_unyielding : 'a -> unit = <fun>
+val use_unyielding : 'a @ [< unyielding] -> unit @ 'm = <fun>
 (let (id/0 = (function {nlocal = 1} x/6[L]? : stack x/6))
   (apply (field_imm 1 (global Toploop!)) "id" id/0))
-val id : 'a -> 'a = <fun>
+val id : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
 |}]
 
 (* Toplevel [id] and constant [42] are unyielding: can be plain [apply]. *)
@@ -195,7 +220,7 @@ let apply_unyielding () = id 42
      (function {nlocal = 1} param/8[L][value<int>] : int (apply id/0 42)))
   (apply (field_imm 1 (global Toploop!)) "apply_unyielding"
     apply_unyielding/0))
-val apply_unyielding : unit -> int = <fun>
+val apply_unyielding : unit @ 'm -> int @ [> dynamic] = <fun>
 |}]
 
 (* [x] is yielding, despite [id] being mode-polymorphic: must be
@@ -207,7 +232,8 @@ let apply_yielding (x @ yielding) = id x
    apply_yielding/0 =
      (function {nlocal = 1} x/7? : stack (apply[yielding] id/0 x/7)))
   (apply (field_imm 1 (global Toploop!)) "apply_yielding" apply_yielding/0))
-val apply_yielding : 'a @ yielding -> 'a @ yielding = <fun>
+val apply_yielding :
+  'a @ [< 'm & global > yielding] -> 'a @ [> 'm | yielding dynamic] = <fun>
 |}]
 
 (* [f] and [x] have polymorphic modes, so either may be yielding: must be
@@ -218,7 +244,9 @@ let app f x = f x
   (app/0 =
      (function {nlocal = 1} f/0[L] x/8[L]? : stack (apply[yielding] f/0 x/8)))
   (apply (field_imm 1 (global Toploop!)) "app" app/0))
-val app : ('a -> 'b) -> 'a -> 'b = <fun>
+val app :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global] ->
+  ('a @ [< 'n] -> 'b @ [> 'm | dynamic]) @ [> 'o] = <fun>
 |}]
 
 (* Both arguments are yielding: must be [apply[yielding]]. *)
@@ -230,7 +258,9 @@ let app_yielding (f @ yielding) (x @ yielding) = app f x
      (function {nlocal = 1} f/1 x/9[L]? : stack
        (apply[yielding] app/0 f/1 x/9)))
   (apply (field_imm 1 (global Toploop!)) "app_yielding" app_yielding/0))
-val app_yielding : ('a @ yielding -> 'b) @ yielding -> 'a @ yielding -> 'b =
+val app_yielding :
+  ('a @ [> 'n | yielding] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global > yielding] ->
+  ('a @ [< 'n > yielding] -> 'b @ [> 'm | dynamic]) @ [> 'o | nonportable yielding stateful] =
   <fun>
 |}]
 
@@ -255,7 +285,9 @@ let rec forward =
                  (apply forward/0 (%int_sub x/11 1)))))
           (makeblock 0 g/0)))
       (apply (field_imm 1 (global Toploop!)) "forward" forward/0))))
-val forward : int -> int = <fun>
+val forward :
+  int @ [< many uncontended read_write > dynamic] ->
+  int @ [< global > dynamic] = <fun>
 |}]
 
 (* Same wrapper, but closing over the yielding [y]: all calls must be
@@ -289,7 +321,11 @@ let forward_yielding (y @ yielding) =
              f/2)))))
   (apply (field_imm 1 (global Toploop!)) "forward_yielding"
     forward_yielding/0))
-val forward_yielding : 'a @ yielding -> int -> int = <fun>
+val forward_yielding :
+  'a @ [< 'm @@ past & global many > yielding] ->
+  (int @ [< many uncontended read_write > dynamic] ->
+   int @ [< global > dynamic]) @ [> 'm | nonportable yielding stateful] =
+  <fun>
 |}]
 
 (* A first-class primitive's synthesized application ([Id_prim]) uses its

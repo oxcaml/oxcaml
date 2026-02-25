@@ -1,12 +1,6 @@
 (* TEST
- flags += "-extension mode_polymorphism_alpha";
+ flags += "-extension mode_polymorphism_alpha -extension mode_polymorphism_printing";
  expect;
-*)
-
-(*
- * This file tests that mode polymorphism works, without printing mode variables.
- * The modes printed are not always representative of the underlying modes: they have
- * been zapped in order to be printed
 *)
 
 let use_uncontended (x @ uncontended) = ()
@@ -15,11 +9,11 @@ let use_unique (x @ unique) = ()
 let use_static (x @ static) = ()
 let use_global (x @ global) = ()
 [%%expect{|
-val use_uncontended : 'a -> unit = <fun>
-val use_portable : 'a @ portable -> unit = <fun>
-val use_unique : 'a @ unique -> unit = <fun>
-val use_static : 'a @ static -> unit = <fun>
-val use_global : 'a -> unit = <fun>
+val use_uncontended : 'a @ [< uncontended] -> unit @ 'm = <fun>
+val use_portable : 'a @ [< portable] -> unit @ 'm = <fun>
+val use_unique : 'a @ [< unique] -> unit @ 'm = <fun>
+val use_static : 'a @ [< static] -> unit @ 'm = <fun>
+val use_global : 'a @ [< global forkable unyielding] -> unit @ 'm = <fun>
 |}]
 
 (* BASIC POLYMORPHISM *)
@@ -32,12 +26,13 @@ let foo =
   let _ = foo y in
   foo
 [%%expect{|
-val foo : '_weak1 -> '_weak1 = <fun>
+val foo : '_weak1 -> '_weak1 @ [> aliased nonportable stateful dynamic] =
+  <fun>
 |}]
 
 let id x = x
 [%%expect{|
-val id : 'a -> 'a = <fun>
+val id : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
 |}]
 
 let () =
@@ -53,8 +48,8 @@ let () =
 let foo (x @ portable) = id x
 let id' = id
 [%%expect{|
-val foo : 'a @ portable -> 'a = <fun>
-val id' : 'a -> 'a = <fun>
+val foo : 'a @ [< 'm & global portable] -> 'a @ [> 'm | dynamic] = <fun>
+val id' : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
 |}]
 
 let foo (x @ nonportable) =
@@ -70,14 +65,14 @@ Error: This value is "nonportable" but is expected to be "portable".
 let bar (c @ unique) =
   use_unique (id c)
 [%%expect{|
-val bar : 'a @ unique -> unit = <fun>
+val bar : 'a @ [< global unique] -> unit @ [> dynamic] = <fun>
 |}]
 
 let bar (c @ local) =
   let _ = use_unique (id c) in
   ()
 [%%expect{|
-val bar : 'a @ local unique -> unit = <fun>
+val bar : 'a @ [< unique > local unforkable yielding] -> unit @ 'm = <fun>
 |}]
 
 let bar (x @ aliased) =
@@ -128,9 +123,17 @@ let which = function
   | false -> f
   | true -> g
 [%%expect{|
-val f : string -> string = <fun>
-val g : string @ portable -> string = <fun>
-val which : bool -> string @ portable -> string = <fun>
+val f :
+  string @ [< 'm . contended immutable] ->
+  string @ [> 'm @@ many portable forkable unyielding stateless] = <fun>
+val g :
+  string @ [< 'm . contended immutable & portable] ->
+  string @ [> 'm @@ many portable forkable unyielding stateless] = <fun>
+val which :
+  bool @ 'n ->
+  (string @ [< 'm . contended immutable & portable] ->
+   string @ [> 'm @@ many portable forkable unyielding stateless]) @ [> aliased nonportable stateful dynamic] =
+  <fun>
 |}]
 
 (* The least upper bound between portable and nonportable is nonportable *)
@@ -138,20 +141,20 @@ let foo (x @ portable) =
   let f = which true in
   use_portable (f x) (* x is weakened to nonportable before it's applied to f *)
 [%%expect{|
-val foo : string @ portable -> unit = <fun>
+val foo : string @ [< global portable] -> unit @ [> dynamic] = <fun>
 |}]
 
 let foo (x @ portable) =
   let f = which false in
   use_global (f x) (* x is weakened to nonportable before it's applied to f *)
 [%%expect{|
-val foo : string @ portable -> unit = <fun>
+val foo : string @ [< global portable] -> unit @ [> dynamic] = <fun>
 |}]
 
 (* mode variables used at some mode imposes a bound on them *)
 let id x = use_portable x; x
 [%%expect{|
-val id : 'a @ portable -> 'a = <fun>
+val id : 'a @ [< 'm & many portable] -> 'a @ [> 'm | aliased] = <fun>
 |}]
 
 let foo (x @ nonportable) =
@@ -182,7 +185,8 @@ Error: This value is "contended" but is expected to be "uncontended".
 
 let close_over x = fun () -> x
 [%%expect{|
-val close_over : 'a -> unit -> 'a = <fun>
+val close_over :
+  'a @ [< 'm & global] -> (unit @ 'n -> 'a @ [> 'm]) @ [> close('m)] = <fun>
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
@@ -199,7 +203,10 @@ Error: This value is "nonportable" but is expected to be "portable".
 
 let close_over x = fun () -> fun () -> x
 [%%expect{|
-val close_over : 'a -> unit -> unit -> 'a = <fun>
+val close_over :
+  'a @ [< 'm & global] ->
+  (unit @ 'o -> (unit @ 'n -> 'a @ [> 'm]) @ [> close('m)]) @ [> close('m)] =
+  <fun>
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
@@ -219,13 +226,13 @@ let foo (x @ portable) =
   let const_x = close_over x in
   use_portable (const_x ())
 [%%expect{|
-val foo : 'a @ portable -> unit = <fun>
+val foo : 'a @ [< global portable] -> unit @ [> dynamic] = <fun>
 |}]
 
 let foo (x @ portable) =
   use_portable (close_over x)
 [%%expect{|
-val foo : 'a @ portable -> unit = <fun>
+val foo : 'a @ [< global portable] -> unit @ [> dynamic] = <fun>
 |}]
 
 (* MODE CROSSING *)
@@ -237,7 +244,10 @@ let foo (x : int @ portable) (y : int @ nonportable) =
   use_portable x;
   use_portable y
 [%%expect{|
-val foo : int @ portable -> int -> unit = <fun>
+val foo :
+  int @ [< 'm @@ past & global portable] ->
+  (int @ [> nonportable] -> unit @ [> dynamic]) @ [> 'm | nonportable stateful] =
+  <fun>
 |}]
 
 (* LOCAL AND MODE POLYMORPHISM *)
@@ -249,7 +259,7 @@ let foo (x @ local) =
   let x = id x in
   use_global x
 [%%expect{|
-val id : 'a -> 'a = <fun>
+val id : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
 Line 5, characters 13-14:
 5 |   use_global x
                  ^
@@ -263,7 +273,7 @@ let foo (x @ local) =
   let x = some x in
   ()
 [%%expect{|
-val some : 'a -> 'a option = <fun>
+val some : 'a @ [< 'm & global] -> 'a option @ [> 'm] = <fun>
 Line 4, characters 15-16:
 4 |   let x = some x in
                    ^
@@ -277,7 +287,7 @@ let foo (x @ local) =
   let x = some x in
   use_global x
 [%%expect{|
-val some : 'a -> 'a option @ local = <fun>
+val some : 'a @ [< 'm] -> 'a option @ [> 'm | local] = <fun>
 Line 5, characters 13-14:
 5 |   use_global x
                  ^
@@ -291,7 +301,9 @@ let foo (x @ local) =
   let y = id_local x in
   y
 [%%expect{|
-val id_local : 'a @ local -> 'a @ local = <fun>
+val id_local :
+  'a @ [< 'm > local unforkable yielding] ->
+  'a @ [> 'm | local unforkable yielding] = <fun>
 Line 5, characters 2-3:
 5 |   y
       ^
@@ -306,7 +318,9 @@ let foo (local_ x) = exclave_
   let y = id_local x in
   y
 [%%expect{|
-val foo : 'a @ local -> 'a @ local = <fun>
+val foo :
+  'a @ [< 'm > local unforkable yielding] ->
+  'a @ [> 'm | local unforkable yielding dynamic] = <fun>
 |}]
 
 (* MULTIPLE MODE AXES *)
@@ -316,5 +330,6 @@ let foo (x @ uncontended portable) =
   use_uncontended (id x);
   use_portable (id x)
 [%%expect{|
-val foo : 'a @ portable -> unit = <fun>
+val foo : 'a @ [< global many portable uncontended] -> unit @ [> dynamic] =
+  <fun>
 |}]
