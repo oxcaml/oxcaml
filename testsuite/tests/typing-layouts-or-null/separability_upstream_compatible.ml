@@ -38,7 +38,7 @@ type packed = P : 'a non_float -> packed [@@unboxed]
 
 type 'a non_float_external : value mod non_float external_
 [%%expect{|
-type 'a non_float_external : value mod external_ non_float
+type 'a non_float_external : value non_float mod external_
 |}]
 
 (* CR separability: this type should warn, but the incompatibility-with-upstream
@@ -85,7 +85,7 @@ type 'a void_not_external : void with string
 type packed_void_not_external =
     P : 'a void_not_external -> packed_void_not_external [@@unboxed]
 [%%expect{|
-type 'a void_not_external : void mod non_float
+type 'a void_not_external : void
 Lines 3-4, characters 0-68:
 3 | type packed_void_not_external =
 4 |     P : 'a void_not_external -> packed_void_not_external [@@unboxed]
