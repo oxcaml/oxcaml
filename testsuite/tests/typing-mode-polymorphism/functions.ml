@@ -3,23 +3,17 @@
  expect;
 *)
 
-(*
- * This file tests that mode polymorphism works, without printing mode variables.
- * The modes printed are not always representative of the underlying modes: they have
- * been zapped in order to be printed
-*)
-
 let use_uncontended (x @ uncontended) = ()
 let use_portable (x @ portable) = ()
 let use_unique (x @ unique) = ()
 let use_static (x @ static) = ()
 let use_global (x @ global) = ()
 [%%expect{|
-val use_uncontended : 'a -> unit = <fun>
-val use_portable : 'a @ portable -> unit = <fun>
-val use_unique : 'a @ unique -> unit = <fun>
-val use_static : 'a -> unit = <fun>
-val use_global : 'a -> unit = <fun>
+val use_uncontended : 'a @ [< uncontended] -> unit @ 'm = <fun>
+val use_portable : 'a @ [< portable] -> unit @ 'm = <fun>
+val use_unique : 'a @ [< unique] -> unit @ 'm = <fun>
+val use_static : 'a @ 'n -> unit @ 'm = <fun>
+val use_global : 'a @ [< global] -> unit @ 'm = <fun>
 |}]
 
 (* FUNCTION APPLICATION *)
@@ -28,8 +22,8 @@ val use_global : 'a -> unit = <fun>
 let id x = x
 let id' x = id x
 [%%expect{|
-val id : 'a -> 'a = <fun>
-val id' : 'a -> 'a = <fun>
+val id : 'a @ [< 'm] -> 'a @ [> 'm] = <fun>
+val id' : 'a @ [< 'm & global] -> 'a @ [> 'm] = <fun>
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
@@ -71,7 +65,9 @@ Error: This value is "nonportable" but is expected to be "portable".
 (* higher-order application should propagate mode constraints *)
 let apply f = fun x -> f x
 [%%expect{|
-val apply : ('a -> 'b) -> 'a -> 'b = <fun>
+val apply :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global] ->
+  ('a @ [< 'n] -> 'b @ [> 'm]) @ 'o = <fun>
 |}]
 
 let foo (x @ unique) (y @ aliased) =
@@ -103,7 +99,11 @@ Error: This value is "nonportable" but is expected to be "portable".
 
 let compose f g x = f (g x)
 [%%expect{|
-val compose : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b = <fun>
+val compose :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ 'mm1 ->
+  (('c @ [> 'p] -> 'a @ [< 'n & global]) @ 'mm0 ->
+   ('c @ [< 'p] -> 'b @ [> 'm]) @ 'q) @ 'o =
+  <fun>
 |}]
 
 (* mode polymorphism propagates through composition *)
@@ -128,17 +128,17 @@ let chain x =
   let z = id y in
   z
 [%%expect{|
-val chain : 'a -> 'a = <fun>
+val chain : 'a @ [< 'm & global] -> 'a @ [> 'm] = <fun>
 |}]
 
 let foo (x @ unique) = use_unique (chain x)
 [%%expect{|
-val foo : 'a @ unique -> unit = <fun>
+val foo : 'a @ [< global unique] -> unit @ 'm = <fun>
 |}]
 
 let foo (x @ portable) = use_portable (chain x)
 [%%expect{|
-val foo : 'a @ portable -> unit = <fun>
+val foo : 'a @ [< global portable] -> unit @ 'm = <fun>
 |}]
 
 (* RECURSIVE FUNCTIONS *)
@@ -146,19 +146,25 @@ val foo : 'a @ portable -> unit = <fun>
 let rec recursive x n =
   if n <= 0 then x else recursive x (n - 1)
 [%%expect{|
-val recursive : 'a -> int -> 'a = <fun>
+val recursive :
+  'a @ [< 'n & 'o & global > 'o] ->
+  (int @ [< many uncontended] -> 'a @ [< 'm & global > 'm | 'n]) @ [> nonportable] =
+  <fun>
 |}]
 
 let foo (x @ portable) =
   let x = recursive x 10 in
   use_portable x
 [%%expect{|
-val foo : 'a @ portable -> unit = <fun>
+val foo : 'a @ [< global portable] -> unit @ 'm = <fun>
 |}]
 
 let recursive' = recursive
 [%%expect{|
-val recursive' : 'a -> int -> 'a = <fun>
+val recursive' :
+  'a @ [< 'n & 'o & global > 'o] ->
+  (int @ [< many uncontended] -> 'a @ [< 'm & global > 'm | 'n]) @ [> nonportable] =
+  <fun>
 |}]
 
 let foo (x @ nonportable) =
@@ -175,7 +181,10 @@ let rec map f = function
   | [] -> []
   | x :: xs -> f x :: map f xs
 [%%expect{|
-val map : ('a -> 'b) -> 'a list -> 'b list = <fun>
+val map :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'q & many > 'q | aliased] ->
+  ('a list @ [< 'p & 'n > 'p] -> 'b list @ [< 'o & global > 'o | 'm]) @ [> nonportable] =
+  <fun>
 |}]
 
 let foo (y @ portable) =
@@ -184,7 +193,28 @@ let foo (y @ portable) =
   let lg = map g l in
   use_portable lg
 [%%expect{|
-val foo : 'a @ portable -> unit = <fun>
+val foo : 'a @ [< global many portable] -> unit @ 'm = <fun>
+|}]
+
+let foo (y @ nonportable) =
+  let g () = y in
+  let l = [(); (); ()] in
+  let lg = map g l in
+  use_portable lg
+[%%expect{|
+Line 5, characters 15-17:
+5 |   use_portable lg
+                   ^^
+Error: This value is "nonportable" but is expected to be "portable".
+|}]
+
+let foo (y @ portable) =
+  let g () = y in
+  let l = [(); (); ()] in
+  let lg = map g l in
+  use_portable lg
+[%%expect{|
+val foo : 'a @ [< global many portable] -> unit @ 'm = <fun>
 |}]
 
 let foo (y @ nonportable) =
@@ -204,7 +234,8 @@ Error: This value is "nonportable" but is expected to be "portable".
 (* using a value and returning it *)
 let use_and_return x = ignore x; x
 [%%expect{|
-val use_and_return : 'a -> 'a = <fun>
+val use_and_return :
+  'a @ [< 'm & global many uncontended] -> 'a @ [> 'm | aliased] = <fun>
 |}]
 
 (* contended values cannot be use_and_returned due to uncontended bound *)

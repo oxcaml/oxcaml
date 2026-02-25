@@ -3,28 +3,22 @@
  expect;
 *)
 
-(*
- * This file tests that mode polymorphism works, without printing mode variables.
- * The modes printed are not always representative of the underlying modes: they have
- * been zapped in order to be printed
-*)
-
 let use_uncontended (x @ uncontended) = ()
 let use_portable (x @ portable) = ()
 let use_unique (x @ unique) = ()
 let use_static (x @ static) = ()
 let use_global (x @ global) = ()
 [%%expect{|
-val use_uncontended : 'a -> unit = <fun>
-val use_portable : 'a @ portable -> unit = <fun>
-val use_unique : 'a @ unique -> unit = <fun>
-val use_static : 'a -> unit = <fun>
-val use_global : 'a -> unit = <fun>
+val use_uncontended : 'a @ [< uncontended] -> unit @ 'm = <fun>
+val use_portable : 'a @ [< portable] -> unit @ 'm = <fun>
+val use_unique : 'a @ [< unique] -> unit @ 'm = <fun>
+val use_static : 'a @ 'n -> unit @ 'm = <fun>
+val use_global : 'a @ [< global] -> unit @ 'm = <fun>
 |}]
 
 let id ~label1 = label1
 [%%expect{|
-val id : label1:'a -> 'a = <fun>
+val id : label1:'a @ [< 'm] -> 'a @ [> 'm] = <fun>
 |}]
 
 let () =
@@ -36,7 +30,7 @@ let () =
 
 let fst ~label1 ~label2 = label1
 [%%expect{|
-val fst : label1:'a -> label2:'b -> 'a = <fun>
+val fst : label1:'a @ [< 'n] -> (label2:'b @ 'o -> 'a @ [> 'n]) @ 'm = <fun>
 |}]
 
 let () =
@@ -91,7 +85,7 @@ Error: This value is "local" but is expected to be "global".
 
 let snd ~label1 ~label2 = label2
 [%%expect{|
-val snd : label1:'a -> label2:'b -> 'b = <fun>
+val snd : label1:'a @ 'o -> (label2:'b @ [< 'n] -> 'b @ [> 'n]) @ 'm = <fun>
 |}]
 
 let () =
@@ -103,7 +97,7 @@ let () =
 
 let foo = fst ~label2:()
 [%%expect{|
-val foo : label1:'a -> 'a = <fun>
+val foo : label1:'a @ [< 'n & 'n] -> 'a @ [< 'm > 'm | 'n | 'n] = <fun>
 |}]
 
 (* partially applying a labelled function yield
@@ -129,12 +123,13 @@ let () =
 
 let foo = fun x -> fst ~label1:x
 [%%expect{|
-val foo : 'a -> label2:'b -> 'a = <fun>
+val foo : 'a @ [< 'n & global] -> (label2:'b @ 'o -> 'a @ [> 'n]) @ 'm =
+  <fun>
 |}]
 
 let foo ?label1 x = x
 [%%expect{|
-val foo : ?label1:'a -> 'b -> 'b = <fun>
+val foo : ?label1:'a @ 'o -> ('b @ [< 'n] -> 'b @ [> 'n]) @ 'm = <fun>
 |}]
 
 let () =
@@ -157,7 +152,7 @@ Error: This value is "local" but is expected to be "global".
 
 let foo x ?label1 = x
 [%%expect{|
-val foo : 'a -> ?label1:'b -> 'a = <fun>
+val foo : 'a @ [< 'n] -> (?label1:'b @ 'o -> 'a @ [> 'n]) @ 'm = <fun>
 |}]
 
 let () =
@@ -193,5 +188,5 @@ let bar (x @ uncontended) =
   let y = f ~label1:() in
   use_portable y
 [%%expect{|
-val bar : 'a @ portable -> unit = <fun>
+val bar : 'a @ [< global portable uncontended] -> unit @ 'm = <fun>
 |}]
