@@ -550,29 +550,61 @@ let least_modalities ~include_implied ~mut (t : Modality.Const.t) =
 
 let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
     Parsetree.modes =
-  (* CR rtjoa: support (verbose = true) to not override
-     https://github.com/oxcaml/oxcaml/pull/5304 *)
-  ignore verbose;
   let crossing = Jkind.Mod_bounds.crossing bounds in
   let modality = Crossing.to_modality crossing in
+  let least_modalities =
+    least_modalities ~include_implied:verbose ~mut:Immutable modality
+  in
   let modality_annots =
+    List.map
+      (fun (Atom (ax, m) : Modality.atom) ->
+        let s = Format_doc.asprintf "%a" (Modality.Per_axis.print ax) m in
+        { Location.txt = Parsetree.Mode s; loc = Location.none })
+      least_modalities
+  in
+  (* These mod-bounds are top ones, which are redundant to print. But we
+     include them when printing verbosely. *)
+  let top_modality_annots () =
     List.filter_map
       (fun ax ->
         let (P ax) = Modality.Axis.of_value ax in
-        let m = Modality.Const.proj ax modality in
-        if Modality.Per_axis.is_id ax m
-        then None
-        else
-          let s = Format_doc.asprintf "%a" (Modality.Per_axis.print ax) m in
+        let included_in_nonverbose =
+          List.exists
+            (fun (Atom (ax2, _) : Modality.atom) ->
+              Modality.Axis.P ax = Modality.Axis.P ax2)
+            least_modalities
+        in
+        match included_in_nonverbose with
+        | true -> None
+        | false ->
+          let s =
+            Format_doc.asprintf "%a"
+              (Modality.Per_axis.print ax)
+              (Modality.Const.proj ax modality)
+          in
           Some { Location.txt = Parsetree.Mode s; loc = Location.none })
       Value.Axis.all
   in
-  let externality = Jkind.Mod_bounds.externality bounds in
-  if externality = Externality.max
-  then modality_annots
-  else
-    modality_annots
-    @ [Location.mknoloc (Parsetree.Mode (Externality.to_string externality))]
+  let nonmodal_annots, top_nonmodal_annots =
+    let open Jkind.Mod_bounds in
+    let mk_annot top print value =
+      let only_when_verbose = value = top in
+      let s = Format_doc.asprintf "%a" print value in
+      ( { Location.txt = Parsetree.Mode s; loc = Location.none },
+        only_when_verbose )
+    in
+    [ mk_annot Externality.max Externality.print (externality bounds) ]
+    |> List.partition_map (fun (annot, only_when_verbose) ->
+        match only_when_verbose with
+        | false -> Left annot
+        | true -> Right annot)
+  in
+  let verbose_annots =
+    match verbose with
+    | true -> top_modality_annots () @ top_nonmodal_annots
+    | false -> []
+  in
+  modality_annots @ nonmodal_annots @ verbose_annots
 
 let sort_dedup_modalities ~warn l =
   let open Modality in
