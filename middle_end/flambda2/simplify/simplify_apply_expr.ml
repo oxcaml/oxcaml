@@ -918,7 +918,7 @@ let simplify_direct_function_call ~simplify_expr dacc apply
     ~callee's_code_id_from_type ~callee's_code_ids_from_call_kind
     ~callee's_function_slot ~coming_from_indirect ~result_arity ~result_types
     ~recursive ~must_be_detupled ~closure_alloc_mode_from_type function_decl
-    ~down_to_up =
+    ~down_to_up ~call =
   (match Apply.probe apply, Apply.inlined apply with
   | None, _ | Some _, Never_inlined -> ()
   | Some _, (Hint_inlined | Unroll _ | Default_inlined | Always_inlined _) ->
@@ -1047,14 +1047,20 @@ let simplify_direct_function_call ~simplify_expr dacc apply
             "Non-singleton-value return arity for partially-applied OCaml \
              function:@ %a"
             Apply.print apply;
-        simplify_direct_partial_application ~simplify_expr dacc apply
-          ~callee's_code_id ~callee's_code_metadata ~callee's_function_slot
-          ~param_arity:params_arity
-          ~param_modes:(Code_metadata.param_modes callee's_code_metadata)
-          ~args_arity ~result_arity ~recursive ~down_to_up ~coming_from_indirect
-          ~closure_alloc_mode_from_type
-          ~first_complex_local_param:
-            (Code_metadata.first_complex_local_param callee's_code_metadata))
+        if DE.disable_partial_application_stub_generation (DA.denv dacc)
+        then
+          simplify_function_call_where_callee's_type_unavailable dacc apply
+            (call : Call_kind.Function_call.t)
+            ~down_to_up
+        else
+          simplify_direct_partial_application ~simplify_expr dacc apply
+            ~callee's_code_id ~callee's_code_metadata ~callee's_function_slot
+            ~param_arity:params_arity
+            ~param_modes:(Code_metadata.param_modes callee's_code_metadata)
+            ~args_arity ~result_arity ~recursive ~down_to_up
+            ~coming_from_indirect ~closure_alloc_mode_from_type
+            ~first_complex_local_param:
+              (Code_metadata.first_complex_local_param callee's_code_metadata))
       else
         Misc.fatal_errorf
           "Function with %d params when simplifying direct OCaml function call \
@@ -1147,7 +1153,7 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
         ~result_types:(Code_metadata.result_types callee's_code_metadata)
         ~recursive:(Code_metadata.recursive callee's_code_metadata)
         ~must_be_detupled ~closure_alloc_mode_from_type func_decl_type
-        ~down_to_up
+        ~down_to_up ~call
     | Need_meet -> type_unavailable ()
     | Invalid ->
       let rebuild uacc ~after_rebuild =
