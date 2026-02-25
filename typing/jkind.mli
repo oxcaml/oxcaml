@@ -822,8 +822,8 @@ val sub_layout_or_error :
   context:jkind_context ->
   level:int ->
   Env.t ->
-  Types.jkind_l ->
-  Types.jkind_l ->
+  (allowed * 'r1) Types.jkind ->
+  ('l2 * 'r2) Types.jkind ->
   (unit, Violation.t) result
 
 (** Like [sub], but compares a left jkind against another left jkind.

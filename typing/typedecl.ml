@@ -1521,6 +1521,10 @@ let narrow_to_manifest_jkind env loc path decl =
        up for a little while. Internal ticket 5115. *)
     begin match Jkind.try_allow_r decl.type_jkind with
     | None ->
+        if !Clflags.ikinds_debug then
+          Format.eprintf
+            "[ikind-narrow] path=%a branch=ikind_sub_jkind_l@."
+            (Format_doc.compat Path.print) path;
         (* Under -ikinds we keep [decl.type_jkind] in left/Best form, so
            [try_allow_r] returns [None] and we route through Ikind. We also
            fall back here when [decl.type_jkind] cannot allow-right
@@ -1541,13 +1545,25 @@ let narrow_to_manifest_jkind env loc path decl =
          with
          | Ok () -> ()
          | Error v ->
+             if !Clflags.ikinds_debug then
+               Format.eprintf
+                 "[ikind-narrow] path=%a branch=ikind_sub_jkind_l error@."
+                 (Format_doc.compat Path.print) path;
              raise (Error (loc, Jkind_mismatch_of_type (env, ty, v))))
     | Some type_jkind ->
+        if !Clflags.ikinds_debug then
+          Format.eprintf
+            "[ikind-narrow] path=%a branch=constrain_type_jkind@."
+            (Format_doc.compat Path.print) path;
         (* Legacy path: refine via [constrain_type_jkind] when ikinds disabled
            and we can allow-right. *)
         (match Ctype.constrain_type_jkind env ty type_jkind with
          | Ok () -> ()
          | Error v ->
+             if !Clflags.ikinds_debug then
+               Format.eprintf
+                 "[ikind-narrow] path=%a branch=constrain_type_jkind error@."
+                 (Format_doc.compat Path.print) path;
              raise (Error (loc, Jkind_mismatch_of_type (env, ty, v))))
     end;
     let context =

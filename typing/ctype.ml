@@ -2673,10 +2673,29 @@ let constrain_type_jkind ~fixed env ty jkind =
       loop ~fuel ~expanded:false t ty's_jkind jkind
 
     | _ ->
-       match
+       if !Clflags.ikinds_debug
+       then
+         Format.eprintf
+           "@[<v>[ikind-ctype] constrain_type_jkind: sub_or_intersect call@,\
+            [ikind-ctype]   lhs(ty_jkind)=%a@,\
+            [ikind-ctype]   rhs(bound)=%a@]@."
+           (Format_doc.compat (Jkind.format env))
+           ty's_jkind
+           (Format_doc.compat (Jkind.format env))
+           jkind;
+       let sub_result =
          Ikind.sub_or_intersect ~type_equal ~context ~level:!current_level env
            ty's_jkind jkind
-       with
+       in
+       if !Clflags.ikinds_debug
+       then
+         Format.eprintf
+           "[ikind-ctype] constrain_type_jkind: sub_or_intersect=%s@."
+           (match sub_result with
+            | Sub -> "Sub"
+            | Disjoint _ -> "Disjoint"
+            | May_have_intersection _ -> "May_have_intersection");
+       match sub_result with
        | Sub -> Ok ()
        | Disjoint sub_failure_reasons ->
           (* Reporting that [ty's_jkind] must be a subjkind of [jkind] is not
@@ -2690,7 +2709,49 @@ let constrain_type_jkind ~fixed env ty jkind =
           Error (Jkind.Violation.of_ ~context env
                    (Not_a_subjkind (ty's_jkind, jkind,
                                     Nonempty_list.to_list sub_failure_reasons)))
-       | May_have_intersection sub_failure_reasons ->
+        | May_have_intersection sub_failure_reasons ->
+           if !Clflags.ikinds_debug
+           then
+             Format.eprintf
+               "@[<v>[ikind-ctype] constrain_type_jkind: may_intersect \
+                reasons=[%s]@,\
+                [ikind-ctype]   lhs(verbose)=%a@,\
+                [ikind-ctype]   rhs(verbose)=%a@,\
+                [ikind-ctype]   lhs.mod_bounds=%a@,\
+                [ikind-ctype]   rhs.mod_bounds=%a@,\
+                [ikind-ctype]   lhs.with_bounds=%a@,\
+                [ikind-ctype]   rhs.with_bounds=%a@]@."
+               (String.concat ", "
+                  (List.map
+                     (fun (reason : Jkind.Sub_failure_reason.t) ->
+                        match reason with
+                        | Axis_disagreement (Jkind_axis.Axis.Pack axis) ->
+                          "Axis_disagreement("
+                          ^ Jkind_axis.Axis.name axis
+                          ^ ")"
+                        | Layout_disagreement -> "Layout_disagreement"
+                        | With_bounds_on_left -> "With_bounds_on_left"
+                        | Constrain_ran_out_of_fuel ->
+                          "Constrain_ran_out_of_fuel")
+                     (Misc.Nonempty_list.to_list sub_failure_reasons)))
+               (Format_doc.compat
+                  (Jkind.format_verbose
+                     ~verbosity:Jkind.Format_verbosity.Expanded_with_all_mod_bounds
+                     env))
+               ty's_jkind
+               (Format_doc.compat
+                  (Jkind.format_verbose
+                     ~verbosity:Jkind.Format_verbosity.Expanded_with_all_mod_bounds
+                     env))
+               jkind
+               Jkind.Mod_bounds.debug_print
+               ty's_jkind.jkind.mod_bounds
+               Jkind.Mod_bounds.debug_print
+               jkind.jkind.mod_bounds
+               Jkind.With_bounds.debug_print
+               ty's_jkind.jkind.with_bounds
+               Jkind.With_bounds.debug_print
+               jkind.jkind.with_bounds;
            let sub_failure_reasons = Nonempty_list.to_list sub_failure_reasons in
            let product ~fuel tys =
              let num_components = List.length tys in

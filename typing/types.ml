@@ -26,6 +26,7 @@ module Rigid_name = struct
         { constr : Path.t;
           arg_index : int
         }
+    | KAtom of Path.t
     | Param of int
     | Unknown of unknown_id
 
@@ -37,9 +38,12 @@ module Rigid_name = struct
       | Atom a1, Atom a2 ->
         let h = Path.compare a1.constr a2.constr in
         if h != 0 then h else Int.compare a1.arg_index a2.arg_index
+      | KAtom p1, KAtom p2 -> Path.compare p1 p2
       | Param x, Param y -> Int.compare x y
-      | Atom _, Param _ -> -1
-      | Param _, Atom _ -> 1
+      | Atom _, _ -> -1
+      | _, Atom _ -> 1
+      | KAtom _, _ -> -1
+      | _, KAtom _ -> 1
       | Unknown x, Unknown y -> Shape.Uid.compare x y
       | Unknown _, _ -> 1
       | _, Unknown _ -> -1
@@ -48,11 +52,16 @@ module Rigid_name = struct
     | Atom { constr; arg_index } ->
       let constr_s = Format_doc.asprintf "%a" Path.print constr in
       Printf.sprintf "%s.%d" constr_s arg_index
+    | KAtom path ->
+      let path_s = Format_doc.asprintf "%a" Path.print path in
+      Printf.sprintf "katom[%s]" path_s
     | Param i -> Printf.sprintf "param[%d]" i
     | Unknown id ->
       Format.asprintf "unknown[%a]" Shape.Uid.print id
 
   let atomic constr arg_index = Atom { constr; arg_index }
+
+  let katom path = KAtom path
 
   let param i = Param i
 

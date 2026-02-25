@@ -158,6 +158,10 @@ module Rigid_name : sig
               indices refer to the coefficients of the i-th argument. This
               is a positional index, not a type-variable id. *)
         }
+    | KAtom of Path.t
+        (** A jkind-atom path. Unlike [Atom], this refers to a jkind alias
+            path and should be interpreted through jkind lookup in an
+            environment when possible. *)
     | Param of int
         (** [Param id] only occurs in formulas for type constructors. Refers to
             a type-parameter of the constructor, where [id] is the
@@ -174,6 +178,8 @@ module Rigid_name : sig
   val to_string : t -> string
 
   val atomic : Path.t -> int -> t
+
+  val katom : Path.t -> t
 
   val param : int -> t
 
