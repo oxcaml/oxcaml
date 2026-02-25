@@ -648,7 +648,7 @@ let compile_unit unix ~output_prefix ~asm_filename ~keep_asm ~obj_filename
 let end_gen_implementation unix ?toplevel ~ppf_dump ~sourcefile make_cmm =
   (* CR spies: Debug information is disabled for the top-level, because the
      binary emitter does not support all directives emitted by the DWARF
-     emitter. *)
+     emitter. See [testsuite/tests/tool-toplevel/dwarf_binary_emitter.ml]. *)
   Emitaux.Dwarf_helpers.init ~ppf_dump ~disable_dwarf:(Option.is_some toplevel)
     ~sourcefile;
   emit_begin_assembly ~sourcefile unix;
