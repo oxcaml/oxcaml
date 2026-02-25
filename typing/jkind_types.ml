@@ -904,6 +904,8 @@ module Scannable_axes = struct
 
   let immediate_axes = { separability = Separability.Non_pointer }
 
+  let immediate64_axes = { separability = Separability.Non_pointer64 }
+
   let equal { separability = s1 } { separability = s2 } =
     Separability.equal s1 s2
 end
@@ -951,6 +953,9 @@ module Layout = struct
       let scannable_non_pointer =
         Base (Sort.Scannable, { separability = Separability.Non_pointer })
 
+      let scannable_non_pointer64 =
+        Base (Sort.Scannable, { separability = Separability.Non_pointer64 })
+
       let scannable_non_float =
         Base (Sort.Scannable, { separability = Separability.Non_float })
 
@@ -988,6 +993,8 @@ module Layout = struct
         match b, sa with
         | Scannable, { separability = Separability.Non_pointer } ->
           scannable_non_pointer
+        | Scannable, { separability = Separability.Non_pointer64 } ->
+          scannable_non_pointer64
         | Scannable, { separability = Separability.Non_float } ->
           scannable_non_float
         | Scannable, { separability = Separability.Separable } ->

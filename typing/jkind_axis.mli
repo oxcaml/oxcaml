@@ -45,6 +45,7 @@ end
 module Separability : sig
   type t =
     | Non_pointer
+    | Non_pointer64
     | Non_float
     | Separable
     | Maybe_separable
