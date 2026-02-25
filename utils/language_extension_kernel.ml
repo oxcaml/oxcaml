@@ -10,6 +10,7 @@ type _ t =
   | Unique : maturity t
   | Overwriting : unit t
   | Mode_polymorphism : maturity t
+  | Mode_polymorphism_printing : unit t
   | Include_functor : unit t
   | Polymorphic_parameters : unit t
   | Immutable_arrays : unit t
@@ -29,6 +30,7 @@ let to_string : type a. a t -> string = function
   | Unique -> "unique"
   | Overwriting -> "overwriting"
   | Mode_polymorphism -> "mode_polymorphism"
+  | Mode_polymorphism_printing -> "mode_polymorphism_printing"
   | Include_functor -> "include_functor"
   | Polymorphic_parameters -> "polymorphic_parameters"
   | Immutable_arrays -> "immutable_arrays"
