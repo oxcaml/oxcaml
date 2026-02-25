@@ -4,14 +4,15 @@
 name: Nix Flake Actions
 
 on:
-  push:
-    branches:
-      - main
-      - '*microbranch'
-    tags:
-      - '*'
-  pull_request:
-  merge_group:
+  workflow_dispatch:
+#  push:
+#    branches:
+#      - main
+#      - '*microbranch'
+#    tags:
+#      - '*'
+#  pull_request:
+#  merge_group:
 
 jobs:
   nix-matrix:

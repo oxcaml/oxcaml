@@ -3,12 +3,13 @@
 # @jvanburen @glittershark @mshinwell
 name: ocamlformat
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
-  merge_group:
+  workflow_dispatch:
+#  push:
+#    branches:
+#      - main
+#  pull_request:
+#    types: [opened, synchronize, reopened, labeled, unlabeled]
+#  merge_group:
 jobs:
   check:
     name: check (${{ matrix.system }})
