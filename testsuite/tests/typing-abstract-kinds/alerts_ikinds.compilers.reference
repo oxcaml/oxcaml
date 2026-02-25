@@ -1,0 +1,17 @@
+File "alerts.ml", line 10, characters 12-29:
+10 |   kind_ k = Kind_with_alert.k
+                 ^^^^^^^^^^^^^^^^^
+Alert kind_alert: Kind_with_alert.k
+foo
+
+File "alerts.ml", line 14, characters 11-28:
+14 |   type t : Kind_with_alert.k
+                ^^^^^^^^^^^^^^^^^
+Alert kind_alert: Kind_with_alert.k
+foo
+
+File "alerts.ml", line 18, characters 13-30:
+18 |   type ('a : Kind_with_alert.k) t
+                  ^^^^^^^^^^^^^^^^^
+Alert kind_alert: Kind_with_alert.k
+foo
