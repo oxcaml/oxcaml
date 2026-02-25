@@ -47,6 +47,12 @@ let equal_regf left right =
   | XMM n1, XMM n2 | YMM n1, YMM n2 | ZMM n1, ZMM n2 -> n1 = n2
   | (XMM _ | YMM _ | ZMM _), _ -> false
 
+let equal_reg_idx left right =
+  match left, right with
+  | Scalar r1, Scalar r2 -> equal_reg64 r1 r2
+  | Vector r1, Vector r2 -> equal_regf r1 r2
+  | (Scalar _ | Vector _), _ -> false
+
 let equal_arch left right =
   match left, right with X64, X64 | X86, X86 -> true | (X64 | X86), _ -> false
 
@@ -73,7 +79,7 @@ let equal_data_type left right =
 let equal_addr left right =
   equal_arch left.arch right.arch
   && equal_data_type left.typ right.typ
-  && equal_reg64 left.idx right.idx
+  && equal_reg_idx left.idx right.idx
   && left.scale = right.scale
   && Option.equal equal_reg64 left.base right.base
   && Option.equal String.equal left.sym right.sym
@@ -185,7 +191,7 @@ let reg_appears_in_arg target arg =
         (match addr.base with
         | Some base when equal_reg64 r base -> true
         | _ -> false)
-        || (addr.scale <> 0 && equal_reg64 r addr.idx)
+        || (addr.scale <> 0 && equal_reg_idx (Scalar r) addr.idx)
       | Imm _ | Sym _ | Reg8H _ | Regf _ | Mem _ | Mem64_RIP _ -> false)
     | Imm _ | Sym _ | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _
     | Mem64_RIP _ ->
@@ -206,7 +212,7 @@ let reg_in_memory_address target arg =
       (match addr.base with
       | Some base when equal_reg64 target_r64 base -> true
       | _ -> false)
-      || (addr.scale <> 0 && equal_reg64 target_r64 addr.idx)
+      || (addr.scale <> 0 && equal_reg_idx (Scalar target_r64) addr.idx)
     | None -> false)
   | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ | Imm _ | Sym _
   | Mem64_RIP _ ->
@@ -217,7 +223,7 @@ let is_control_flow = function
   | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | ADD _
   | SUB _ | IMUL _ | MUL _ | IDIV _ | AND _ | OR _ | XOR _ | SAL _ | SAR _
   | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO | SET _ | CMOV _
-  | BSF _ | BSR _ | BSWAP _ | POPCNT _ | TZCNT _ | LZCNT _ | XCHG _
+  | BSF _ | BSR _ | BSWAP _ | XCHG _
   | LOCK_CMPXCHG _ | LOCK_XADD _ | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _
   | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE | HLT | LEAVE
   | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _ | ADC _ | SBB _ ->
@@ -242,9 +248,6 @@ let writes_to_arg target = function
   | SHR (_, dst)
   | BSF (_, dst)
   | BSR (_, dst)
-  | POPCNT (_, dst)
-  | TZCNT (_, dst)
-  | LZCNT (_, dst)
   | CMOV (_, _, dst)
   | ADC (_, dst)
   | SBB (_, dst) ->
@@ -287,10 +290,7 @@ let reads_from_arg target = function
     reg_appears_in_arg target src || reg_appears_in_arg target dst
   | LEA (src, _)
   | BSF (src, _)
-  | BSR (src, _)
-  | POPCNT (src, _)
-  | TZCNT (src, _)
-  | LZCNT (src, _) ->
+  | BSR (src, _) ->
     reg_appears_in_arg target src
   | SAL (src, dst) | SAR (src, dst) | SHR (src, dst) ->
     reg_appears_in_arg target src || reg_appears_in_arg target dst
@@ -358,7 +358,7 @@ let reads_flags = function
   | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | ADD _
   | SUB _ | IMUL _ | MUL _ | IDIV _ | AND _ | OR _ | XOR _ | SAL _ | SAR _
   | SHR _ | CMP _ | TEST _ | INC _ | DEC _ | NEG _ | CDQ | CQO | BSF _ | BSR _
-  | BSWAP _ | POPCNT _ | TZCNT _ | LZCNT _ | JMP _ | CALL _ | RET | XCHG _
+  | BSWAP _ | JMP _ | CALL _ | RET | XCHG _
   | LOCK_CMPXCHG _ | LOCK_XADD _ | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _
   | LOCK_OR _ | LOCK_XOR _ | CLDEMOTE _ | PREFETCH _ | NOP | PAUSE | HLT | LEAVE
   | RDTSC | RDPMC | LFENCE | SFENCE | MFENCE | SIMD _ ->
@@ -367,7 +367,7 @@ let reads_flags = function
 let writes_flags = function
   | ADD _ | SUB _ | AND _ | OR _ | XOR _ | CMP _ | TEST _ | INC _ | DEC _
   | NEG _ | MUL _ | IMUL _ | IDIV _ | BSF _ | BSR _ | SAL _ | SAR _ | SHR _
-  | POPCNT _ | TZCNT _ | LZCNT _ | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _
+  | LOCK_ADD _ | LOCK_SUB _ | LOCK_AND _
   | LOCK_OR _ | LOCK_XOR _ | LOCK_XADD _ | LOCK_CMPXCHG _ | ADC _ | SBB _ ->
     true
   | MOV _ | MOVSX _ | MOVSXD _ | MOVZX _ | PUSH _ | POP _ | LEA _ | CDQ | CQO
