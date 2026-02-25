@@ -150,7 +150,7 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
          returns from extcalls *)
       (* Extcalls of arity 0 are allowed (these never return). *)
       return_values
-    | [kind] -> maybe_sign_extend kind dbg return_values
+    | [_] -> return_values
     | [_; _] as kinds ->
       (* CR xclerc: we currently support only pairs as unboxed return values. *)
       (* CR mshinwell: we also currently only support 64 bit integer and float
@@ -209,11 +209,7 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
         C.tuple_field exp ~component_tys n dbg
       in
       C.make_tuple
-        (List.mapi
-           (fun i kind ->
-             maybe_sign_extend kind dbg
-               (get_unarized_return_value return_values i))
-           kinds)
+        (List.mapi (fun i _ -> get_unarized_return_value return_values i) kinds)
     | _ ->
       Misc.fatal_errorf
         "C functions are currently limited to a single return value or a pair \
