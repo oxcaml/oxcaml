@@ -449,9 +449,11 @@ jobs:
             exit 1
           fi
 
+          OXCAML_LLVM_FORK="${{ matrix.oxcaml_llvm_fork }}"
+          : ${OXCAML_LLVM_FORK:=ocaml-flambda}
           OXCAML_LLVM_TAG="${{ matrix.oxcaml_llvm_tag }}"
           OXCAML_LLVM_SOURCE_BRANCH="${{ matrix.oxcaml_llvm_source_branch }}"
-          OXCAML_LLVM_URL="https://github.com/ocaml-flambda/llvm-project/releases/download/${OXCAML_LLVM_TAG}/${OXCAML_LLVM_TAG}-llvm-linux-${ARCH}-${OXCAML_LLVM_SOURCE_BRANCH}.tar.gz"
+          OXCAML_LLVM_URL="https://github.com/${OXCAML_LLVM_FORK}/llvm-project/releases/download/${OXCAML_LLVM_TAG}/${OXCAML_LLVM_TAG}-llvm-linux-${ARCH}-${OXCAML_LLVM_SOURCE_BRANCH}.tar.gz"
 
           # Download and extract custom OxCaml LLVM (includes LLDB and other LLVM tools)
           cd $GITHUB_WORKSPACE
