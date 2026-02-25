@@ -43,7 +43,7 @@ val is_control_flow : instruction -> bool
 
 val is_register : arg -> bool
 
-val is_safe_self_move_arg : arg -> bool
+val is_non_zero_extending_arg : arg -> bool
 
 val is_safe_for_dead_register_opt : arg -> bool
 
