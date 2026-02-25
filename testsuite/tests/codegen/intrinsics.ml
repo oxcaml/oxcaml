@@ -30,6 +30,10 @@ module Int32 = struct
   external compare :
     (int32[@local_opt]) -> (int32[@local_opt]) -> int
     @@ portable = "%compare"
+
+  external bswap :
+    (int32[@local_opt]) -> (int32[@local_opt])
+    @@ portable = "%bswap_int32"
 end
 
 module Int32_u = struct
@@ -50,10 +54,71 @@ module Int32_u = struct
   let[@inline always] compare x y =
     Int32.compare (to_int32 x) (to_int32 y)
 
+  let[@inline always] bswap x =
+    of_int32 (Int32.bswap (to_int32 x))
+
   let[@inline always] min x y =
     let x' = to_int32 x in
     let y' = to_int32 y in
     if x' <= y' then x else y
+end
+
+module Nativeint = struct
+  external neg :
+    (nativeint[@local_opt]) -> (nativeint[@local_opt])
+    @@ portable = "%nativeint_neg"
+
+  external add :
+    (nativeint[@local_opt]) -> (nativeint[@local_opt])
+    -> (nativeint[@local_opt]) @@ portable = "%nativeint_add"
+
+  external sub :
+    (nativeint[@local_opt]) -> (nativeint[@local_opt])
+    -> (nativeint[@local_opt]) @@ portable = "%nativeint_sub"
+
+  external mul :
+    (nativeint[@local_opt]) -> (nativeint[@local_opt])
+    -> (nativeint[@local_opt]) @@ portable = "%nativeint_mul"
+
+  external logand :
+    (nativeint[@local_opt]) -> (nativeint[@local_opt])
+    -> (nativeint[@local_opt]) @@ portable = "%nativeint_and"
+
+  external logor :
+    (nativeint[@local_opt]) -> (nativeint[@local_opt])
+    -> (nativeint[@local_opt]) @@ portable = "%nativeint_or"
+
+  external logxor :
+    (nativeint[@local_opt]) -> (nativeint[@local_opt])
+    -> (nativeint[@local_opt]) @@ portable = "%nativeint_xor"
+
+  external shift_left :
+    (nativeint[@local_opt]) -> int -> (nativeint[@local_opt])
+    @@ portable = "%nativeint_lsl"
+
+  external shift_right :
+    (nativeint[@local_opt]) -> int -> (nativeint[@local_opt])
+    @@ portable = "%nativeint_asr"
+
+  external shift_right_logical :
+    (nativeint[@local_opt]) -> int -> (nativeint[@local_opt])
+    @@ portable = "%nativeint_lsr"
+
+  external of_int : int -> (nativeint[@local_opt])
+    @@ portable = "%nativeint_of_int"
+
+  external to_int : (nativeint[@local_opt]) -> int
+    @@ portable = "%nativeint_to_int"
+
+  external of_int32 : int32 -> nativeint
+    @@ portable = "%nativeint_of_int32"
+
+  external to_int32 : nativeint -> int32
+    @@ portable = "%nativeint_to_int32"
+
+  external bswap :
+    (nativeint[@local_opt]) -> (nativeint[@local_opt])
+    @@ portable = "%bswap_native"
 end
 
 module Nativeint_u = struct
@@ -64,6 +129,21 @@ module Nativeint_u = struct
 
   external of_nativeint : (nativeint[@local_opt]) -> t @@ portable =
     "%unbox_nativeint" [@@warning "-187"]
+
+  let[@inline always] neg x =
+    of_nativeint (Nativeint.neg (to_nativeint x))
+  let[@inline always] add x y =
+    of_nativeint (Nativeint.add (to_nativeint x) (to_nativeint y))
+  let[@inline always] sub x y =
+    of_nativeint (Nativeint.sub (to_nativeint x) (to_nativeint y))
+  let[@inline always] logand x y =
+    of_nativeint (Nativeint.logand (to_nativeint x) (to_nativeint y))
+  let[@inline always] of_int x =
+    of_nativeint (Nativeint.of_int x)
+  let[@inline always] to_int x =
+    Nativeint.to_int (to_nativeint x)
+  let[@inline always] bswap x =
+    of_nativeint (Nativeint.bswap (to_nativeint x))
 end
 
 module Float = struct
@@ -261,6 +341,10 @@ module Int64 = struct
   external compare :
     (int64[@local_opt]) -> (int64[@local_opt]) -> int
     @@ portable = "%compare"
+
+  external bswap :
+    (int64[@local_opt]) -> (int64[@local_opt])
+    @@ portable = "%bswap_int64"
 end
 
 module Int64_u = struct
@@ -312,6 +396,9 @@ module Int64_u = struct
     of_int64 (Int64.add (to_int64 x) 1L)
   let[@inline always] pred x =
     of_int64 (Int64.sub (to_int64 x) 1L)
+
+  let[@inline always] bswap x =
+    of_int64 (Int64.bswap (to_int64 x))
 
   let[@inline always] abs x =
     let n = to_int64 x in
@@ -391,3 +478,206 @@ module Int64_u = struct
     let x' = to_int64 x and y' = to_int64 y in
     if x' >= y' then x else y
 end
+
+module Bytes = struct
+  (* uint8 load/store (unsigned, tagged result) *)
+  external unsafe_get : bytes -> int -> int
+    @@ portable = "%bytes_unsafe_get"
+
+  external unsafe_set : bytes -> int -> int -> unit
+    @@ portable = "%bytes_unsafe_set"
+
+  (* signed 8-bit load (tagged result) *)
+  external unsafe_get_int8 : bytes -> int -> int
+    @@ portable = "%caml_bytes_geti8u"
+
+  (* unsigned 16-bit load/store (tagged result) *)
+  external unsafe_get_uint16_ne : bytes -> int -> int
+    @@ portable = "%caml_bytes_get16u"
+
+  external unsafe_set_uint16_ne : bytes -> int -> int -> unit
+    @@ portable = "%caml_bytes_set16u"
+
+  (* signed 16-bit load (tagged result) *)
+  external unsafe_get_int16_ne : bytes -> int -> int
+    @@ portable = "%caml_bytes_geti16u"
+
+  (* unboxed int32 load/store *)
+  external unsafe_get_int32_ne : bytes -> int -> int32#
+    @@ portable = "%caml_bytes_get32u#" [@@warning "-187"]
+
+  external unsafe_set_int32_ne : bytes -> int -> int32# -> unit
+    @@ portable = "%caml_bytes_set32u#" [@@warning "-187"]
+
+  (* safe (bounds-checked) int32 load *)
+  external get_int32_ne : bytes -> int -> int32#
+    @@ portable = "%caml_bytes_get32#" [@@warning "-187"]
+
+  (* unboxed int64 load/store *)
+  external unsafe_get_int64_ne : bytes -> int -> int64#
+    @@ portable = "%caml_bytes_get64u#" [@@warning "-187"]
+
+  external unsafe_set_int64_ne : bytes -> int -> int64# -> unit
+    @@ portable = "%caml_bytes_set64u#" [@@warning "-187"]
+
+  (* int64 load indexed by int64# *)
+  external unsafe_get_int64_ne_indexed_by_int64 :
+    bytes -> int64# -> int64#
+    @@ portable = "%caml_bytes_get64u#_indexed_by_int64#"
+    [@@warning "-187"]
+
+  (* unboxed float32 load/store *)
+  external unsafe_get_float32_ne : bytes -> int -> float32#
+    @@ portable = "%caml_bytes_getf32u#" [@@warning "-187"]
+
+  external unsafe_set_float32_ne : bytes -> int -> float32# -> unit
+    @@ portable = "%caml_bytes_setf32u#" [@@warning "-187"]
+
+  external length : bytes -> int @@ portable = "%bytes_length"
+end
+
+module String = struct
+  external unsafe_get_int32_ne : string -> int -> int32#
+    @@ portable = "%caml_string_get32u#" [@@warning "-187"]
+
+  external unsafe_get_int64_ne : string -> int -> int64#
+    @@ portable = "%caml_string_get64u#" [@@warning "-187"]
+
+  external unsafe_get_float32_ne : string -> int -> float32#
+    @@ portable = "%caml_string_getf32u#" [@@warning "-187"]
+
+  external length : string -> int @@ portable = "%string_length"
+end
+
+module Floatarray = struct
+  external unsafe_get :
+    (floatarray[@local_opt]) @ shared -> int -> (float[@local_opt])
+    @@ portable = "%floatarray_unsafe_get"
+
+  external unsafe_set :
+    (floatarray[@local_opt]) -> int -> (float[@local_opt]) -> unit
+    @@ portable = "%floatarray_unsafe_set"
+
+  external length :
+    (floatarray[@local_opt]) @ immutable -> int
+    @@ stateless = "%floatarray_length"
+end
+
+module Array = struct
+  external unsafe_get :
+    ('a : any mod separable).
+    ('a array[@local_opt]) -> int -> 'a
+    @@ portable = "%array_unsafe_get"
+    [@@layout_poly]
+
+  external unsafe_set :
+    ('a : any mod separable).
+    ('a array[@local_opt]) -> int -> 'a -> unit
+    @@ portable = "%array_unsafe_set"
+    [@@layout_poly]
+
+  external get :
+    ('a : any mod separable).
+    ('a array[@local_opt]) -> int -> 'a
+    @@ portable = "%array_safe_get"
+    [@@layout_poly]
+
+  external set :
+    ('a : any mod separable).
+    ('a array[@local_opt]) -> int -> 'a -> unit
+    @@ portable = "%array_safe_set"
+    [@@layout_poly]
+
+  external length :
+    ('a : any mod separable).
+    ('a array[@local_opt]) @ immutable -> int
+    @@ stateless = "%array_length"
+    [@@layout_poly]
+end
+
+module Float32 = struct
+  external neg :
+    (float32[@local_opt]) -> (float32[@local_opt])
+    @@ portable = "%negfloat32"
+
+  external add :
+    (float32[@local_opt]) -> (float32[@local_opt]) -> (float32[@local_opt])
+    @@ portable = "%addfloat32"
+
+  external sub :
+    (float32[@local_opt]) -> (float32[@local_opt]) -> (float32[@local_opt])
+    @@ portable = "%subfloat32"
+
+  external mul :
+    (float32[@local_opt]) -> (float32[@local_opt]) -> (float32[@local_opt])
+    @@ portable = "%mulfloat32"
+
+  external div :
+    (float32[@local_opt]) -> (float32[@local_opt]) -> (float32[@local_opt])
+    @@ portable = "%divfloat32"
+
+  external abs :
+    (float32[@local_opt]) -> (float32[@local_opt])
+    @@ portable = "%absfloat32"
+
+  external sqrt : float32 -> float32 @@ portable =
+    "caml_sqrt_float32_bytecode" "sqrtf" [@@unboxed] [@@noalloc]
+
+  external of_float :
+    (float[@local_opt]) -> (float32[@local_opt])
+    @@ portable = "%float32offloat"
+
+  external to_float :
+    (float32[@local_opt]) -> (float[@local_opt])
+    @@ portable = "%floatoffloat32"
+
+  external of_int : int -> float32 @@ portable = "%float32ofint"
+  external to_int : (float32[@local_opt]) -> int @@ portable = "%intoffloat32"
+end
+
+module Float32_u = struct
+  type t = float32#
+
+  external to_float32 : t -> (float32[@local_opt]) @@ portable =
+    "%box_float32" [@@warning "-187"]
+
+  external of_float32 : (float32[@local_opt]) -> t @@ portable =
+    "%unbox_float32" [@@warning "-187"]
+
+  let[@inline always] neg x =
+    of_float32 (Float32.neg (to_float32 x))
+  let[@inline always] add x y =
+    of_float32 (Float32.add (to_float32 x) (to_float32 y))
+  let[@inline always] sub x y =
+    of_float32 (Float32.sub (to_float32 x) (to_float32 y))
+  let[@inline always] mul x y =
+    of_float32 (Float32.mul (to_float32 x) (to_float32 y))
+  let[@inline always] div x y =
+    of_float32 (Float32.div (to_float32 x) (to_float32 y))
+  let[@inline always] abs x =
+    of_float32 (Float32.abs (to_float32 x))
+  let[@inline always] sqrt x =
+    of_float32 (Float32.sqrt (to_float32 x))
+  let[@inline always] of_float x =
+    of_float32 (Float32.of_float x)
+  let[@inline always] to_float x =
+    Float32.to_float (to_float32 x)
+end
+
+module Int = struct
+  external bswap16 : int -> int @@ portable = "%bswap16"
+end
+
+external reinterpret_tagged_int63_as_unboxed_int64 :
+  int -> int64# @@ portable =
+  "%reinterpret_tagged_int63_as_unboxed_int64" [@@warning "-187"]
+
+external reinterpret_unboxed_int64_as_tagged_int63 :
+  int64# -> int @@ portable =
+  "%reinterpret_unboxed_int64_as_tagged_int63" [@@warning "-187"]
+
+external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
+
+external opaque : 'a -> 'a = "%opaque"
+
+external obj_is_int : 'a -> bool = "%obj_is_int"

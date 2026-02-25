@@ -1,6 +1,5 @@
 (* TEST
  readonly_files = "intrinsics.ml";
- flags = " -extension-universe upstream_compatible";
  setup-ocamlopt.opt-build-env;
  all_modules = "intrinsics.ml";
  compile_only = "true";
@@ -15,6 +14,7 @@ open Intrinsics
 
 (* Codegen tests for Int64_u operations *)
 
+(* CR ttebbi: This should use the neg instruction. *)
 let neg x = Int64_u.neg x
 [%%expect_asm X86_64{|
 neg:
@@ -627,5 +627,22 @@ let of_int64 x = Int64_u.of_int64 x
 [%%expect_asm X86_64{|
 of_int64:
   movq  8(%rax), %rax
+  ret
+|}]
+
+let bswap64 x = Int64_u.bswap x
+[%%expect_asm X86_64{|
+bswap64:
+  bswap %rax
+  ret
+|}]
+
+let bytes_get_int64_bswap (buf : bytes) (i : int) =
+  Int64_u.bswap (Bytes.unsafe_get_int64_ne buf i)
+[%%expect_asm X86_64{|
+bytes_get_int64_bswap:
+  sarq  $1, %rbx
+  movq  (%rax,%rbx), %rax
+  bswap %rax
   ret
 |}]
