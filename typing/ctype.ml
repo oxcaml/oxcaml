@@ -4243,29 +4243,13 @@ and unify3 uenv t1 t1' t2 t2' =
   | (Tsplice t1, Tsplice t2) ->
       unify uenv t1 t2
   | (Tsplice s1, _) when is_flexible_ty s1 ->
-      set_type_desc t2' d2;
-      let t =
-        newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tquote t2')
-      in
-      unify uenv s1 t
+      unify uenv s1 (new_quote_ty t2')
   | (Tquote s1, _) when is_flexible_ty s1 ->
-      set_type_desc t2' d2;
-      let t =
-        newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tsplice t2')
-      in
-      unify uenv s1 t
+      unify uenv s1 (new_splice_ty t2')
   | (_, Tsplice s2) when is_flexible_ty s2 ->
-      set_type_desc t1' d1;
-      let t =
-        newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tquote t1')
-      in
-      unify uenv t s2
+      unify uenv (new_quote_ty t1') s2
   | (_, Tquote s2) when is_flexible_ty s2 ->
-      set_type_desc t1' d1;
-      let t =
-        newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tsplice t1')
-      in
-      unify uenv t s2
+      unify uenv (new_splice_ty t1') s2
   | (Tfield _, Tfield _) -> (* special case for GADTs *)
       unify_fields uenv t1' t2'
   | _ ->
@@ -4354,38 +4338,22 @@ and unify3 uenv t1 t1' t2 t2' =
         when is_instantiable_ty (get_env uenv) s1
           && instantiable_scope s1 > instantiable_scope t2'
           && can_generate_equations uenv ->
-          set_type_desc t2' d2;
-          let t =
-            newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tquote t2')
-          in
-          unify uenv s1 t
+          unify uenv s1 (new_quote_ty t2')
       | (Tquote s1, _)
         when is_instantiable_ty (get_env uenv) s1
           && instantiable_scope s1 > instantiable_scope t2'
           && can_generate_equations uenv ->
-          set_type_desc t2' d2;
-          let t =
-            newty3 ~level:(get_level t2') ~scope:(get_scope t2') (Tsplice t2')
-          in
-          unify uenv s1 t
+          unify uenv s1 (new_splice_ty t2')
       | (_, Tsplice s2)
         when is_instantiable_ty (get_env uenv) s2
           && instantiable_scope s2 >= instantiable_scope t1'
           && can_generate_equations uenv ->
-          set_type_desc t1' d1;
-          let t =
-            newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tquote t1')
-          in
-          unify uenv t s2
+          unify uenv (new_quote_ty t1') s2
       | (_, Tquote s2)
         when is_instantiable_ty (get_env uenv) s2
           && instantiable_scope s2 >= instantiable_scope t1'
           && can_generate_equations uenv ->
-          set_type_desc t1' d1;
-          let t =
-            newty3 ~level:(get_level t1') ~scope:(get_scope t1') (Tsplice t1')
-          in
-          unify uenv t s2
+          unify uenv (new_splice_ty t1') s2
       | (Tquote _, _) | (Tsplice _, _)
       | (_, Tquote _) | (_, Tsplice _)
         when in_pattern_mode uenv
