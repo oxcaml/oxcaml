@@ -471,6 +471,28 @@ let constructor_ikind ~base ~coeffs : Types.constructor_ikind =
   done;
   ({ Types.base = base; coeffs } : Types.constructor_ikind)
 
+let pp_coeffs (coeffs : Ldd.node array) : string =
+  coeffs |> Array.map Ldd.pp |> Array.to_list |> String.concat "; "
+
+let with_ikinds_enabled (f : unit -> Types.constructor_ikind) :
+    Types.type_ikind =
+  if not !Clflags.ikinds
+  then Types.ikinds_todo "ikinds disabled"
+  else Types.Constructor_ikind (f ())
+
+let origin_suffix_of = function None -> "" | Some o -> " origin=" ^ o
+
+let pp_axes (axes : Jkind_axis.Axis.packed list) : string =
+  axes
+  |> List.map (fun (Jkind_axis.Axis.Pack ax) -> Jkind_axis.Axis.name ax)
+  |> String.concat ", "
+
+let axis_disagreement_reasons (axes : Jkind_axis.Axis.packed list) :
+    Jkind.Sub_failure_reason.t list =
+  List.map
+    (fun axis -> Jkind.Sub_failure_reason.Axis_disagreement axis)
+    axes
+
 let label_mutability_contribution (lbl : Types.label_declaration) =
   Ldd.const (
     match lbl.ld_mutable with
@@ -490,6 +512,33 @@ let shallow_axes_are_relevant_for_rep = function
     `Relevant
   | `Variant Types.Variant_unboxed -> `Relevant
   | `Record _ | `Variant _ -> `Irrelevant
+
+let sum_record_label_contributions
+    ~(base : Ldd.node)
+    ~relevant_for_shallow
+    ~(payload_kind : Types.type_expr -> Ldd.node)
+    ~(validate_label : Types.label_declaration -> unit)
+    (lbls : Types.label_declaration list) : Ldd.node =
+  Ldd.sum lbls
+    ~base
+    ~f:(fun (lbl : Types.label_declaration) ->
+      validate_label lbl;
+      let mask =
+        Axis_lattice.mask_of_modality ~relevant_for_shallow
+          lbl.ld_modalities
+      in
+      Ldd.join
+        (label_mutability_contribution lbl)
+        (Ldd.meet (Ldd.const mask) (payload_kind lbl.ld_type)))
+
+let no_validation (_ : Types.label_declaration) = ()
+
+let validate_immutable_unboxed_label (lbl : Types.label_declaration) =
+  match lbl.ld_mutable with
+  | Immutable -> ()
+  | Mutable _ ->
+    failwith
+      "ikind: mutable fields in unboxed records are not supported"
 
 (* Build an id-set for quick membership checks on type expressions. *)
 let type_id_set (tys : Types.type_expr list) =
@@ -701,18 +750,11 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
           in
           let kind : Solver.ckind =
            fun (ctx : Solver.ctx) ->
-            Ldd.sum lbls
+            sum_record_label_contributions
               ~base:immutable_base
-              ~f:(fun (lbl : Types.label_declaration) ->
-                let mask =
-                  Axis_lattice.mask_of_modality ~relevant_for_shallow
-                    lbl.ld_modalities
-                in
-                Ldd.join
-                  (label_mutability_contribution lbl)
-                  (Ldd.meet
-                     (Ldd.const mask)
-                     (Solver.kind ctx lbl.ld_type)))
+              ~relevant_for_shallow
+              ~payload_kind:(fun ty -> Solver.kind ctx ty)
+              ~validate_label:no_validation lbls
           in
           Solver.Ty { args = type_decl.type_params; kind; abstract = false }
         | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
@@ -723,25 +765,11 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
             let relevant_for_shallow =
               match List.length lbls with 1 -> `Relevant | _ -> `Irrelevant
             in
-            Ldd.sum lbls
+            sum_record_label_contributions
               ~base
-              ~f:(fun (lbl : Types.label_declaration) ->
-                (* Check that the label is not mutable. *)
-                (match lbl.ld_mutable with
-                | Immutable -> ()
-                | Mutable _ ->
-                  failwith
-                    ("ikind: mutable fields in unboxed records are "
-                     ^ "not supported"));
-                let mask =
-                  Axis_lattice.mask_of_modality ~relevant_for_shallow
-                    lbl.ld_modalities
-                in
-                Ldd.join
-                  (label_mutability_contribution lbl)
-                  (Ldd.meet
-                     (Ldd.const mask)
-                     (Solver.kind ctx lbl.ld_type)))
+              ~relevant_for_shallow
+              ~payload_kind:(fun ty -> Solver.kind ctx ty)
+              ~validate_label:validate_immutable_unboxed_label lbls
           in
           Solver.Ty { args = type_decl.type_params; kind; abstract = false }
         | Types.Type_variant (_cstrs, Types.Variant_with_null, _umc_opt) ->
@@ -810,18 +838,11 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
                       (Ldd.const mask)
                       (payload_kind arg.ca_type))
               | Types.Cstr_record lbls ->
-                Ldd.sum lbls
+                sum_record_label_contributions
                   ~base:Ldd.bot
-                  ~f:(fun (lbl : Types.label_declaration) ->
-                    let mask =
-                      Axis_lattice.mask_of_modality
-                        ~relevant_for_shallow lbl.ld_modalities
-                    in
-                    Ldd.join
-                      (label_mutability_contribution lbl)
-                      (Ldd.meet
-                         (Ldd.const mask)
-                         (payload_kind lbl.ld_type)))
+                  ~relevant_for_shallow
+                  ~payload_kind
+                  ~validate_label:no_validation lbls
             in
             Ldd.sum cstrs
               ~base:(Ldd.const base_lat0)
@@ -898,11 +919,8 @@ let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
     ikind for all of them at once. Alternatively, keep the cache
     between calls to this function from the same mutually recursive
     group. *)
-  if not !Clflags.ikinds
-  then Types.ikinds_todo "ikinds disabled"
-  else
+  with_ikinds_enabled (fun () ->
     let ikind = type_declaration_ikind ~context ~path in
-    let payload = ikind in
     (if !Clflags.ikinds_debug
     then
       let stored_jkind =
@@ -912,17 +930,14 @@ let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
       in
       Format.eprintf "[ikind] %a: stored=%s, base=%s, coeffs=[%s]@."
         (Format_doc.compat Path.print) path stored_jkind
-        (Ldd.pp payload.base)
-        (String.concat "; "
-           (Array.to_list (Array.map Ldd.pp payload.coeffs))));
-    Types.Constructor_ikind ikind
+        (Ldd.pp ikind.base)
+        (pp_coeffs ikind.coeffs));
+    ikind)
 
 let type_declaration_ikind_of_jkind ~(context : Jkind.jkind_context)
     ~(params : Types.type_expr list) (type_jkind : Types.jkind_l) :
     Types.type_ikind =
-  if not !Clflags.ikinds
-  then Types.ikinds_todo "ikinds disabled"
-  else
+  with_ikinds_enabled (fun () ->
     let poly = normalize ~context type_jkind in
     let rigid_vars =
       List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
@@ -936,9 +951,8 @@ let type_declaration_ikind_of_jkind ~(context : Jkind.jkind_context)
     then
       Format.eprintf "[ikind] from jkind: base=%s; coeffs=[%s]@."
         (Ldd.pp payload.base)
-        (String.concat "; "
-           (Array.to_list (Array.map Ldd.pp payload.coeffs)));
-    Types.Constructor_ikind payload
+        (pp_coeffs payload.coeffs);
+    payload)
 
 let predef_ikind_context =
   let unreachable _ =
@@ -1003,9 +1017,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
     then (
       (if !Clflags.ikinds_debug
       then
-        let origin_suffix =
-          match origin with None -> "" | Some o -> " origin=" ^ o
-        in
+        let origin_suffix = origin_suffix_of origin in
         Format.eprintf
           "[ikind-subjkind] call%s allow_any=true@."
           origin_suffix);
@@ -1017,9 +1029,7 @@ let sub_jkind_l ?allow_any_crossing ?origin
       let violating_axes = Ldd.leq_with_reason sub_poly super_poly in
       (if !Clflags.ikinds_debug
       then
-        let origin_suffix =
-          match origin with None -> "" | Some o -> " origin=" ^ o
-        in
+        let origin_suffix = origin_suffix_of origin in
         Format.eprintf
           "[ikind-subjkind] call%s allow_any=false@;\
            @;\
@@ -1034,22 +1044,13 @@ let sub_jkind_l ?allow_any_crossing ?origin
         let () =
           if !Clflags.ikinds_debug
           then
-            let axes =
-              violating_axes
-              |> List.map (fun (Jkind_axis.Axis.Pack ax) ->
-                     Jkind_axis.Axis.name ax)
-              |> String.concat ", "
-            in
+            let axes = pp_axes violating_axes in
             Format.eprintf
               "[ikind-subjkind] failure on axes: %s@." axes
         in
         (* Do not try to adjust allowances; Violation.Not_a_subjkind
            accepts an r-jkind. *)
-        let axis_reasons =
-          List.map
-            (fun axis -> Jkind.Sub_failure_reason.Axis_disagreement axis)
-            violating_axes
-        in
+        let axis_reasons = axis_disagreement_reasons violating_axes in
         Error
           (Jkind.Violation.of_ ~context env
              (Jkind.Violation.Not_a_subjkind (sub, super, axis_reasons)))
@@ -1071,15 +1072,15 @@ let sub_or_intersect ?origin
     ~(context : Jkind.jkind_context) ~level env
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) : sub_or_intersect =
-  let debug_polys ~outcome =
+  let debug_polys ?polys ~outcome () =
     if !Clflags.ikinds_debug
     then (
       let sub_poly, super_poly =
-        compute_subcheck_polys ~context env t1 t2
+        match polys with
+        | Some polys -> polys
+        | None -> compute_subcheck_polys ~context env t1 t2
       in
-      let origin_suffix =
-        match origin with None -> "" | Some o -> " origin=" ^ o
-      in
+      let origin_suffix = origin_suffix_of origin in
       Format.eprintf
         "[ikind-sub-or-intersect] outcome=%s%s@;\
          @;\
@@ -1102,13 +1103,13 @@ let sub_or_intersect ?origin
          classification when layouts fail. *)
       (match Jkind.sub_or_intersect ~type_equal ~context ~level env t1 t2 with
        | Jkind.Disjoint _ as disjoint ->
-         debug_polys ~outcome:"Disjoint";
+         debug_polys ~outcome:"Disjoint" ();
          disjoint
        | Jkind.May_have_intersection _ as maybe ->
-         debug_polys ~outcome:"May_have_intersection";
+         debug_polys ~outcome:"May_have_intersection" ();
          maybe
        | Jkind.Sub ->
-         debug_polys ~outcome:"Sub";
+         debug_polys ~outcome:"Sub" ();
          Jkind.Sub)
     | Ok () ->
       let sub_poly, super_poly =
@@ -1116,28 +1117,21 @@ let sub_or_intersect ?origin
       in
       match Ldd.leq_with_reason sub_poly super_poly with
       | [] ->
-        debug_polys ~outcome:"Sub";
+        debug_polys ~polys:(sub_poly, super_poly) ~outcome:"Sub" ();
         Jkind.Sub
       | violating_axes ->
         if !Clflags.ikinds_debug
         then (
-          let axes =
-            violating_axes
-            |> List.map (fun (Jkind_axis.Axis.Pack ax) ->
-                   Jkind_axis.Axis.name ax)
-            |> String.concat ", "
-          in
+          let axes = pp_axes violating_axes in
           Format.eprintf
             "[ikind-sub-or-intersect] outcome=May_have_intersection \
              axes=[%s]@."
             axes);
-        debug_polys ~outcome:"May_have_intersection";
+        debug_polys
+          ~polys:(sub_poly, super_poly)
+          ~outcome:"May_have_intersection" ();
         let reasons : Jkind.Sub_failure_reason.t Misc.Nonempty_list.t =
-          match
-            List.map
-              (fun axis -> Jkind.Sub_failure_reason.Axis_disagreement axis)
-              violating_axes
-          with
+          match axis_disagreement_reasons violating_axes with
           | [] -> [ Jkind.Sub_failure_reason.Layout_disagreement ]
           | hd :: tl -> hd :: tl
         in
@@ -1181,9 +1175,7 @@ and max_arity_in_type (acc : int Path.Map.t) (ty : Types.type_expr) =
     let prev = match Path.Map.find_opt path acc with None -> 0 | Some m -> m in
     let acc = if n > prev then Path.Map.add path n acc else acc in
     List.fold_left max_arity_in_type acc args
-  | Ttuple elts ->
-    List.fold_left (fun a (_, t) -> max_arity_in_type a t) acc elts
-  | Tunboxed_tuple elts ->
+  | Ttuple elts | Tunboxed_tuple elts ->
     List.fold_left (fun a (_, t) -> max_arity_in_type a t) acc elts
   | Tarrow (_, t1, t2, _) -> max_arity_in_type (max_arity_in_type acc t1) t2
   | Tpoly (t, ts) ->
