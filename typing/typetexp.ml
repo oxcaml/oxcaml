@@ -103,7 +103,7 @@ type error =
        intro_stage : Env.stage;
        usage_stage : Env.stage}
   | Mismatched_jkind_annotation of
-      { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
+    { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Must_provide_zero_alloc_arity
 
 exception Error of Location.t * Env.t * error

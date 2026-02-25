@@ -3491,6 +3491,11 @@ let equivalent_with_nolabels l1 l2 =
   | (Nolabel | Labelled _), (Nolabel | Labelled _) -> true
   | _ -> false)
 
+let verify_zero_alloc_equal context za1 za2 =
+  match Zero_alloc.equal za1 za2 with
+  | Ok () -> ()
+  | Error _ -> raise_for context (Incompatible_zero_alloc (za1, za2))
+
 (* the [tk] means we're comparing a type against a jkind; axes do
    not matter, so a jkind extracted from a type_declaration does
    not need to be substed *)
@@ -3567,18 +3572,10 @@ let rec mcomp type_pairs env t1 t2 =
         | (Tnil, Tnil, _, _) ->
             ()
         | (Tpoly (t1'', [], za1), Tpoly (t2'', [], za2), _, _) ->
-            begin
-              match Zero_alloc.equal za1 za2 with
-              | Ok () -> ()
-              | Error _ -> raise_for Unify (Incompatible_zero_alloc (za1, za2))
-            end;
+            verify_zero_alloc_equal Unify za1 za2;
             mcomp type_pairs env t1'' t2''
         | (Tpoly (t1'', tl1, za1), Tpoly (t2'', tl2, za2), _, _) ->
-            begin
-              match Zero_alloc.equal za1 za2 with
-              | Ok () -> ()
-              | Error _ -> raise_for Unify (Incompatible_zero_alloc (za1, za2))
-            end;
+            verify_zero_alloc_equal Unify za1 za2;
             (try
                enter_poly env univar_pairs
                  t1'' tl1 t2'' tl2 (mcomp type_pairs env)
@@ -4339,18 +4336,10 @@ and unify3 uenv t1 t1' t2 t2' =
       | (Tnil, Tnil) ->
           ()
       | (Tpoly (t1'', [], za1), Tpoly (t2'', [], za2)) ->
-          begin
-            match Zero_alloc.equal za1 za2 with
-            | Ok () -> ()
-            | Error _ -> raise_for Unify (Incompatible_zero_alloc (za1, za2))
-          end;
+          verify_zero_alloc_equal Unify za1 za2;
           unify uenv t1'' t2''
       | (Tpoly (t1'', tl1, za1), Tpoly (t2'', tl2, za2)) ->
-          begin
-            match Zero_alloc.equal za1 za2 with
-            | Ok () -> ()
-            | Error _ -> raise_for Unify (Incompatible_zero_alloc (za1, za2))
-          end;
+          verify_zero_alloc_equal Unify za1 za2;
           enter_poly_for Unify (get_env uenv) univar_pairs t1'' tl1 t2'' tl2
             (unify uenv)
       | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2)) ->
@@ -5527,18 +5516,10 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           | (Tnil, Tnil) ->
               ()
           | (Tpoly (t1'', [], za1), Tpoly (t2'', [], za2)) ->
-              begin
-                match Zero_alloc.equal za1 za2 with
-                | Ok () -> ()
-                | Error _ -> raise_for Moregen (Incompatible_zero_alloc (za1, za2))
-              end;
+              verify_zero_alloc_equal Moregen za1 za2;
               moregen inst_nongen variance type_pairs env t1'' t2''
           | (Tpoly (t1'', tl1, za1), Tpoly (t2'', tl2, za2)) ->
-              begin
-                match Zero_alloc.equal za1 za2 with
-                | Ok () -> ()
-                | Error _ -> raise_for Moregen (Incompatible_zero_alloc (za1, za2))
-              end;
+              verify_zero_alloc_equal Moregen za1 za2;
               enter_poly_for Moregen env univar_pairs t1'' tl1 t2'' tl2
                 (moregen inst_nongen variance type_pairs env)
           | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2)) ->
@@ -6011,18 +5992,10 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
           | (Tnil, Tnil) ->
               ()
           | (Tpoly (t1'', [], za1), Tpoly (t2'', [], za2)) ->
-              begin
-                match Zero_alloc.equal za1 za2 with
-                | Ok () -> ()
-                | Error _ -> raise_for Equality (Incompatible_zero_alloc (za1, za2))
-              end;
+              verify_zero_alloc_equal Equality za1 za2;
               eqtype rename type_pairs subst env t1'' t2'' ~do_jkind_check
           | (Tpoly (t1'', tl1, za1), Tpoly (t2'', tl2, za2)) ->
-              begin
-                match Zero_alloc.equal za1 za2 with
-                | Ok () -> ()
-                | Error _ -> raise_for Equality (Incompatible_zero_alloc (za1, za2))
-              end;
+              verify_zero_alloc_equal Equality za1 za2;
               enter_poly_for Equality env univar_pairs t1'' tl1 t2'' tl2
                 (eqtype rename type_pairs subst env ~do_jkind_check)
           | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2)) ->
@@ -6910,26 +6883,14 @@ let rec subtype_rec env trace t1 t2 cstrs =
           (trace, t1, t2, !univar_pairs)::cstrs
         end
     | (Tpoly (u1, [], za1), Tpoly (u2, [], za2)) ->
-        begin
-          match Zero_alloc.equal za1 za2 with
-          | Ok () -> ()
-          | Error _ -> raise_for Unify (Incompatible_zero_alloc (za1, za2))
-        end;
+        verify_zero_alloc_equal Unify za1 za2;
         subtype_rec env trace u1 u2 cstrs
     | (Tpoly (u1, tl1, za1), Tpoly (u2, [], za2)) ->
-        begin
-          match Zero_alloc.equal za1 za2 with
-          | Ok () -> ()
-          | Error _ -> raise_for Unify (Incompatible_zero_alloc (za1, za2))
-        end;
+        verify_zero_alloc_equal Unify za1 za2;
         let u1' = instance_poly tl1 u1 in
         subtype_rec env trace u1' u2 cstrs
     | (Tpoly (u1, tl1, za1), Tpoly (u2, tl2, za2)) ->
-        begin
-          match Zero_alloc.equal za1 za2 with
-          | Ok () -> ()
-          | Error _ -> raise_for Unify (Incompatible_zero_alloc (za1, za2))
-        end;
+        verify_zero_alloc_equal Unify za1 za2;
         begin try
           enter_poly env univar_pairs u1 tl1 u2 tl2
             (fun t1 t2 -> subtype_rec env trace t1 t2 cstrs)

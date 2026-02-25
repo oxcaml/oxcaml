@@ -65,6 +65,9 @@ val print_error : Format_doc.formatter -> error -> unit
    is a variable, it may be set to make the relation hold. *)
 val sub : t -> t -> (unit, error) Result.t
 
+(* [equal t1 t2] checks whether the zero_alloc checks t1 and t2 are the same.
+   It returns [Ok ()] if so, and [Error e] if not.  The values [t1] and [t2] are
+   expected to be either constants or the same variable. *)
 val equal : t -> t -> (unit, error) Result.t
 
 val debug_printer : Format.formatter -> t -> unit
