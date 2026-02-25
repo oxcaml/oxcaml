@@ -38,12 +38,7 @@ is typically far more convenient to preserve externality information than it is
 to enforce some semantic property of an unboxed type by hiding it. For this
 reason, the kinds `bits8`, `bits16`, `bits32`, `bits64`, `float32`, `float64`,
 `untagged_immediate`, `vec128`, `vec256`, `vec512`, `void`, and `word` all imply
-`mod external_` by default.
-
-To refer to the kinds of these base layouts _without_ externality crossing, one
-may append the suffix `_internal`, e.g. `bits8_internal`. In other words,
-`bits8` is synonymous with `bits8_internal mod external_`, and likewise for the
-other non-`value` base layouts listed above.
+`mod external_`.
 
 In the future, we plan to make externality a mode, rather than just a property
 of types.
