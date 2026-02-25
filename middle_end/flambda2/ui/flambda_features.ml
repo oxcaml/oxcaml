@@ -96,6 +96,10 @@ let reaper_change_calling_conventions () =
   !Oxcaml_flags.Flambda2.reaper_change_calling_conventions
   |> with_default ~f:(fun d -> d.reaper_change_calling_conventions)
 
+let simplify_stubs () =
+  !Oxcaml_flags.Flambda2.simplify_stubs
+  |> with_default ~f:(fun d -> d.simplify_stubs)
+
 let flat_float_array () = Config.flat_float_array
 
 let function_result_types ~is_a_functor =

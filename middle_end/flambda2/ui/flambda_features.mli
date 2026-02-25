@@ -63,6 +63,8 @@ val reaper_unbox : unit -> bool
 
 val reaper_change_calling_conventions : unit -> bool
 
+val simplify_stubs : unit -> bool
+
 val kind_checks : unit -> bool
 
 val flat_float_array : unit -> bool

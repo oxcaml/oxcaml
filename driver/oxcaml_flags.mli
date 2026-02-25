@@ -143,6 +143,7 @@ module Flambda2 : sig
     val reaper_local_fields : bool
     val reaper_unbox : bool
     val reaper_change_calling_conventions : bool
+    val simplify_stubs : bool
     val unicode : bool
     val kind_checks : bool
   end
@@ -164,6 +165,7 @@ module Flambda2 : sig
     reaper_local_fields : bool;
     reaper_unbox : bool;
     reaper_change_calling_conventions : bool;
+    simplify_stubs : bool;
     unicode : bool;
     kind_checks : bool;
   }
@@ -184,6 +186,7 @@ module Flambda2 : sig
   val reaper_local_fields : bool or_default ref
   val reaper_unbox : bool or_default ref
   val reaper_change_calling_conventions : bool or_default ref
+  val simplify_stubs : bool or_default ref
   val unicode : bool or_default ref
   val kind_checks : bool or_default ref
 
