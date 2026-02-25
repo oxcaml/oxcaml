@@ -236,7 +236,7 @@ let apply_lea_optimization cell1 cell2 dst idx_reg base_reg_opt displ =
       Mem
         { arch = X64;
           typ = QWORD;
-          idx = idx_reg;
+          idx = Scalar idx_reg;
           scale = 1;
           base = base_reg_opt;
           sym = None;
