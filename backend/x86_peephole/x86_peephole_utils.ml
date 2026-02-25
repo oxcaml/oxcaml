@@ -155,7 +155,7 @@ let is_register = function
   | Reg8L _ | Reg8H _ | Reg16 _ | Reg32 _ | Reg64 _ | Regf _ -> true
   | Imm _ | Sym _ | Mem _ | Mem64_RIP _ -> false
 
-let is_safe_self_move_arg = function
+let is_non_zero_extending_arg = function
   | Reg8L _ | Reg8H _ | Reg16 _ | Reg64 _ -> true
   | Imm _ | Sym _ | Reg32 _ | Regf _ | Mem _ | Mem64_RIP _ -> false
 

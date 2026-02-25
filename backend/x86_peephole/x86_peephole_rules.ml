@@ -60,7 +60,7 @@ let remove_mov_x_x stats cell =
      this rule is superfluous. *)
   match DLL.value cell with
   | Ins (MOV (src, dst))
-    when U.equal_args src dst && U.is_safe_self_move_arg src ->
+    when U.equal_args src dst && U.is_non_zero_extending_arg src ->
     (* Get next cell before deleting *)
     let next = DLL.next cell in
     (* Delete the redundant instruction *)
@@ -76,7 +76,9 @@ let remove_useless_mov stats cell =
   | [cell1; cell2] -> (
     match DLL.value cell1, DLL.value cell2 with
     | Ins (MOV (src1, dst1)), Ins (MOV (src2, dst2))
-      when U.equal_args src1 dst2 && U.equal_args dst1 src2 ->
+      when U.equal_args src1 dst2 && U.equal_args dst1 src2
+           && U.is_non_zero_extending_arg src1
+           && U.is_non_zero_extending_arg dst1 ->
       (* Get the cell after cell2 before deleting *)
       let after_cell2 = DLL.next cell2 in
       (* Delete the second MOV (the first one is still useful) *)
