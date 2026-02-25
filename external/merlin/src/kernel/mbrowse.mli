@@ -73,7 +73,7 @@ val enclosing :
   t list ->
   t
 
-val enclosing_from :
+val range_enclosing :
   start:Lexing.position -> stop:Lexing.position -> t list -> t
 
 val of_structure : Typedtree.structure -> t
