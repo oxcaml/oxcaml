@@ -274,7 +274,7 @@ let deepest_before ?(let_pun_behavior = Let_pun_behavior.default)
     in
     aux root
 
-let enclosing_from ~start ~stop roots =
+let range_enclosing ~start ~stop roots =
   List.filter
     ~f:(fun (_, node) ->
       let loc = node_loc node in
