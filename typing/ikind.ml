@@ -959,6 +959,26 @@ let predef_ikind_of_jkind ~params type_jkind =
 
 let () = Predef.set_ikind_of_jkind predef_ikind_of_jkind
 
+(* Compute polynomials for a subcheck:
+   - compute [super] in Normal mode
+   - only round up [sub] if [super] is constant *)
+let compute_subcheck_polys ~(context : Jkind.jkind_context) env
+    (sub : ('l1 * 'r1) Types.jkind) (super : ('l2 * 'r2) Types.jkind) :
+    Ldd.node * Ldd.node =
+  let ctx = make_ctx ~mode:Solver.Normal ~env:(Some env) ~context in
+  let super_poly = Solver.ckind_of_jkind ctx super in
+  let super_is_constant =
+    Ldd.solve_pending ();
+    Ldd.is_const super_poly
+  in
+  let sub_ctx =
+    if super_is_constant
+    then Solver.reset_for_mode ctx ~mode:Solver.Round_up
+    else ctx
+  in
+  let sub_poly = Solver.ckind_of_jkind sub_ctx sub in
+  sub_poly, super_poly
+
 let sub_jkind_l ?allow_any_crossing ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) ~level env (sub : Types.jkind_l)
@@ -991,18 +1011,9 @@ let sub_jkind_l ?allow_any_crossing ?origin
           origin_suffix);
       Ok ())
     else
-      let ctx = make_ctx ~mode:Solver.Normal ~env:(Some env) ~context in
-      let super_poly = Solver.ckind_of_jkind ctx super in
-      let super_is_constant =
-        Ldd.solve_pending ();
-        Ldd.is_const super_poly
+      let sub_poly, super_poly =
+        compute_subcheck_polys ~context env sub super
       in
-      let sub_ctx =
-        if super_is_constant
-        then Solver.reset_for_mode ctx ~mode:Solver.Round_up
-        else ctx
-      in
-      let sub_poly = Solver.ckind_of_jkind sub_ctx sub in
       let violating_axes = Ldd.leq_with_reason sub_poly super_poly in
       (if !Clflags.ikinds_debug
       then
@@ -1060,25 +1071,12 @@ let sub_or_intersect ?origin
     ~(context : Jkind.jkind_context) ~level env
     (t1 : (Allowance.allowed * 'r1) Types.jkind)
     (t2 : ('l2 * Allowance.allowed) Types.jkind) : sub_or_intersect =
-  let compute_polys () =
-    let ctx = make_ctx ~mode:Solver.Normal ~env:(Some env) ~context in
-    let super_poly = Solver.ckind_of_jkind ctx t2 in
-    let super_is_constant =
-      Ldd.solve_pending ();
-      Ldd.is_const super_poly
-    in
-    let sub_ctx =
-      if super_is_constant
-      then Solver.reset_for_mode ctx ~mode:Solver.Round_up
-      else ctx
-    in
-    let sub_poly = Solver.ckind_of_jkind sub_ctx t1 in
-    sub_poly, super_poly
-  in
   let debug_polys ~outcome =
     if !Clflags.ikinds_debug
     then (
-      let sub_poly, super_poly = compute_polys () in
+      let sub_poly, super_poly =
+        compute_subcheck_polys ~context env t1 t2
+      in
       let origin_suffix =
         match origin with None -> "" | Some o -> " origin=" ^ o
       in
@@ -1113,7 +1111,9 @@ let sub_or_intersect ?origin
          debug_polys ~outcome:"Sub";
          Jkind.Sub)
     | Ok () ->
-      let sub_poly, super_poly = compute_polys () in
+      let sub_poly, super_poly =
+        compute_subcheck_polys ~context env t1 t2
+      in
       match Ldd.leq_with_reason sub_poly super_poly with
       | [] ->
         debug_polys ~outcome:"Sub";
