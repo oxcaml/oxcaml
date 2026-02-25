@@ -483,8 +483,7 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       transl_match ~scopes ~arg_sort ~return_sort:sort e arg pat_expr_list
         partial
-  | Texp_match(arg, arg_sort, pat_expr_list, eff_pat_expr_list, partial) ->
-  (* CR sspies: We need to fix the code here for oxcaml's layouts *)
+  | Texp_match(arg, _arg_sort, pat_expr_list, eff_pat_expr_list, partial) ->
   (* need to separate the values from exceptions for transl_handler *)
       let split_case (val_cases, exn_cases as acc)
             ({ c_lhs; c_rhs } as case) =
@@ -2627,64 +2626,103 @@ and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
        handler, Same_region, return_layout)
   ) classic static_handlers
 
-(* CR sspies: Presumably that's not how we stack allocate. *)
-and prim_alloc_stack =
-  Pccall (Primitive.simple ~name:"caml_alloc_stack" ~arity:3 ~alloc:true)
+(* Translate a match or try expression with effect handler cases.
 
+   Surface syntax:
+     match body with
+     | val_pat -> val_rhs            (* value cases *)
+     | exception exn_pat -> exn_rhs  (* exception cases *)
+     | effect eff_pat, k -> eff_rhs  (* effect cases *)
+
+   This compiles to [Pwith_stack(val_fun, exn_fun, eff_fun, body_fun, arg)]
+   which runs [body_fun arg] on a new fiber. The handler functions are:
+   - [val_fun]:  called when [body] returns normally; receives the
+                 scrutinee's return value
+   - [exn_fun]:  called when [body] raises; receives the exception
+   - [eff_fun]:  called when [body] performs an effect; receives the effect,
+                 a continuation [k], and a tail continuation [ktail]
+   - [body_fun]: computes the scrutinee
+   - [arg]:      the argument to [body_fun]
+
+   We always wrap the body as [body_fun = fun _ -> body] and [arg = 0].
+
+   Effect handlers require all types to have layout [value]. *)
 and transl_handler ~scopes e body val_caselist exn_caselist eff_caselist =
+  let scrutinee_sort = Jkind.Sort.Const.for_predef_value in
+  let scrutinee_layout = Lambda.layout_block in
+  let result_sort = Jkind.Sort.Const.for_predef_value in
+  let result_layout = Lambda.layout_block in
+  let mk_param name debug_uid layout =
+    { name; debug_uid; layout;
+      attributes = Lambda.default_param_attribute;
+      mode = alloc_heap }
+  in
   let val_fun =
     match val_caselist with
     | None ->
         let param = Ident.create_local "param" in
-        lfunction ~kind:Curried ~params:[param, Pgenval]
-         ~return:Pgenval ~body:(Lvar param)
-         ~attr:default_function_attribute ~loc:Loc_unknown
+        lfunction ~kind:(Curried {nlocal=0})
+          ~params:[mk_param param Lambda.debug_uid_none scrutinee_layout]
+          ~return:result_layout ~body:(Lvar param)
+          ~attr:default_function_attribute ~loc:Loc_unknown
+          ~mode:alloc_heap ~ret_mode:alloc_heap
     | Some (val_caselist, partial) ->
-        let val_cases = transl_cases ~scopes val_caselist in
-        let param = Typecore.name_cases "param" val_caselist in
+        let val_cases = transl_cases ~scopes result_sort val_caselist in
+        let param, param_duid = Typecore.name_cases "param" val_caselist in
         let body =
-          Matching.for_function ~scopes e.exp_loc None (Lvar param) val_cases
-            partial
+          Matching.for_function ~scopes
+            ~arg_sort:scrutinee_sort
+            ~arg_layout:scrutinee_layout ~return_layout:result_layout
+            e.exp_loc None (Lvar param) val_cases partial
         in
-        lfunction ~kind:Curried ~params:[param, Pgenval]
-          ~return:Pgenval ~attr:default_function_attribute
-          ~loc:Loc_unknown ~body
+        lfunction ~kind:(Curried {nlocal=0})
+          ~params:[mk_param param param_duid scrutinee_layout]
+          ~return:result_layout ~attr:default_function_attribute
+          ~loc:Loc_unknown ~body ~mode:alloc_heap ~ret_mode:alloc_heap
   in
   let exn_fun =
-    let exn_cases = transl_cases ~scopes exn_caselist in
-    let param = Typecore.name_cases "exn" exn_caselist in
-    let body = Matching.for_trywith ~scopes e.exp_loc (Lvar param) exn_cases in
-    lfunction ~kind:Curried ~params:[param, Pgenval] ~return:Pgenval
+    let exn_cases = transl_cases ~scopes result_sort exn_caselist in
+    let param, param_duid = Typecore.name_cases "exn" exn_caselist in
+    let body =
+      Matching.for_trywith ~scopes ~return_layout:result_layout e.exp_loc
+        (Lvar param) exn_cases
+    in
+    lfunction ~kind:(Curried {nlocal=0})
+      ~params:[mk_param param param_duid Lambda.layout_exception]
+      ~return:result_layout
       ~attr:default_function_attribute ~loc:Loc_unknown ~body
+      ~mode:alloc_heap ~ret_mode:alloc_heap
   in
   let eff_fun =
-    let param = Typecore.name_cases "eff" eff_caselist in
+    let param, param_duid = Typecore.name_cases "eff" eff_caselist in
     let cont = Ident.create_local "k" in
     let cont_tail = Ident.create_local "ktail" in
-    let eff_cases = transl_cases ~scopes ~cont eff_caselist in
+    let eff_cases = transl_cases ~scopes ~cont result_sort eff_caselist in
     let body =
-      Matching.for_handler ~scopes e.exp_loc (Lvar param) (Lvar cont)
-        (Lvar cont_tail) eff_cases
+      Matching.for_handler ~scopes ~return_layout:result_layout e.exp_loc
+        (Lvar param) (Lvar cont) (Lvar cont_tail) eff_cases
     in
-    lfunction ~kind:Curried
-      ~params:[(param, Pgenval); (cont, Pgenval); (cont_tail, Pgenval)]
-      ~return:Pgenval ~attr:default_function_attribute ~loc:Loc_unknown ~body
+    lfunction ~kind:(Curried {nlocal=0})
+      ~params:[mk_param param param_duid Lambda.layout_block;
+               mk_param cont Lambda.debug_uid_none Lambda.layout_function;
+               mk_param cont_tail Lambda.debug_uid_none Lambda.layout_function]
+      ~return:result_layout ~attr:default_function_attribute
+      ~loc:Loc_unknown ~body ~mode:alloc_heap ~ret_mode:alloc_heap
   in
+  (* Upstream decomposes [body] into [f x] when it is an application, avoiding
+     the thunk. We always use the thunk path because we cannot verify that the
+     arg has layout [value] from [Lapply]. *)
   let (body_fun, arg) =
-    match transl_exp ~scopes body with
-    | Lapply { ap_func = fn; ap_args = [arg]; _ }
-        when is_evaluated fn && is_evaluated arg -> (fn, arg)
-    | body ->
-       let param = Ident.create_local "param" in
-       (lfunction ~kind:Curried ~params:[param, Pgenval] ~return:Pgenval
-                  ~attr:default_function_attribute ~loc:Loc_unknown
-                  ~body,
-        Lconst(Const_base(Const_int 0)))
+    let body = transl_exp ~scopes scrutinee_sort body in
+    let param = Ident.create_local "param" in
+    (lfunction ~kind:(Curried {nlocal=0})
+       ~params:[mk_param param Lambda.debug_uid_none Lambda.layout_int]
+       ~return:scrutinee_layout
+       ~attr:default_function_attribute ~loc:Loc_unknown
+       ~body ~mode:alloc_heap ~ret_mode:alloc_heap,
+     Lconst(Const_base(Const_int 0)))
   in
-  let alloc_stack =
-    Lprim(prim_alloc_stack, [val_fun; exn_fun; eff_fun], Loc_unknown)
-  in
-  Lprim(Prunstack, [alloc_stack; body_fun; arg],
+  Lprim(Pwith_stack, [val_fun; exn_fun; eff_fun; body_fun; arg],
         of_location ~scopes e.exp_loc)
 
 and transl_letop ~scopes loc env let_ ands param param_debug_uid param_sort case
