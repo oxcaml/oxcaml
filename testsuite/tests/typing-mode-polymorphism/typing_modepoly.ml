@@ -267,7 +267,10 @@ Error: Splices ($) are not allowed in the initial stage,
 
 let foo1 (x: 'a) = <[fun (y : $'a) -> 1]>;;
 [%%expect {|
-val foo1 : 'a -> <[$('a) -> int]> expr = <fun>
+val foo1 :
+  'a @ 'n ->
+  <[$('a) @ 'm -> int @ [< global]]> expr @ [< global > aliased nonportable] =
+  <fun>
 |}];;
 
 let foo2 (x: 'a) = <[fun (y : 'a) -> 1]>;;
@@ -292,12 +295,22 @@ Error: Type variable "'a" is used inside 2 layers of quotation (<[ ... ]>),
 
 let foo4 (x: <['a]> expr) = <[fun (y : 'b) -> ($x, y)]>;;
 [%%expect {|
-val foo4 : 'a expr -> <[$('b) -> $('a) * $('b)]> expr = <fun>
+val foo4 :
+  'a expr @ [< global many uncontended] ->
+  <[
+   $('b) @ [< 'm & global] ->
+   $('a) * $('b) @ [< global > 'm | aliased nonportable]]>
+  expr @ [< global > aliased nonportable] = <fun>
 |}];;
 
 let foo5 (x: <['a]> expr) = <[fun (y : 'a) -> ($x, y)]>;;
 [%%expect {|
-val foo5 : 'a expr -> <[$('a) -> $('a) * $('a)]> expr = <fun>
+val foo5 :
+  'a expr @ [< global many uncontended] ->
+  <[
+   $('a) @ [< 'm & global] ->
+   $('a) * $('a) @ [< global > 'm | aliased nonportable]]>
+  expr @ [< global > aliased nonportable] = <fun>
 |}];;
 
 let foo6 (type a) (type b) x = <[fun (y : a) -> y]>;;
@@ -312,17 +325,25 @@ Error: Identifier "a" is used at line 1, characters 42-43,
 
 let foo7 (type a) (type b) x = <[fun (y : $a) -> y]>;;
 [%%expect {|
-val foo7 : 'b -> <[$('a) -> $('a)]> expr = <fun>
+val foo7 :
+  'b @ 'n ->
+  <[$('a) @ [< 'm & global] -> $('a) @ [< global > 'm]]> expr @ [< global > aliased nonportable] =
+  <fun>
 |}];;
 
 let foo7' = (fun (type a) (type b) x -> <[fun (y : $a) -> y]>) 42;;
 [%%expect {|
-val foo7' : <[$('_a) -> $('_a)]> expr = <[fun (y : _) -> y]>
+val foo7' :
+  <[$('_a) -> $('_a) @ [< 'm & global > 'm | aliased nonportable]]> expr =
+  <[fun (y : _) -> y]>
 |}];;
 
 let foo7'' () = (fun (type a) (type b) x -> <[fun (y : $a) -> y]>) 42;;
 [%%expect {|
-val foo7'' : unit -> <[$('a) -> $('a)]> expr = <fun>
+val foo7'' :
+  unit @ 'o ->
+  <[$('a) @ [< 'n & global] -> $('a) @ [< 'm & global > 'm | 'n]]> expr @ [< global > aliased nonportable] =
+  <fun>
 |}];;
 
 let foo8 (type a) (type b) x = <[fun ((p, q) : $a * $b) -> ($x, (p, q))]> <["foo"]>;;
@@ -330,7 +351,11 @@ let foo8 (type a) (type b) x = <[fun ((p, q) : $a * $b) -> ($x, (p, q))]> <["foo
 Line 1, characters 31-73:
 1 | let foo8 (type a) (type b) x = <[fun ((p, q) : $a * $b) -> ($x, (p, q))]> <["foo"]>;;
                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "<[$(a) * $(b) -> 'a * ($(a) * $(b))]> expr"
+Error: This expression has type
+         "<[
+          $(a) * $(b) @ [< global] ->
+          'a * ($(a) * $(b)) @ [> aliased nonportable]]>
+         expr"
        This is not a function; it cannot be applied.
 |}];;
 
@@ -346,8 +371,11 @@ Error: Type variable "'a" is used outside any quotations,
 
 <[fun (type a) (type b) (x : a) (y : b) -> (x, y)]>;;
 [%%expect {|
-- : <[$('a) -> ($('b) -> $('a) * $('b)) @ local]> expr =
-<[fun (type a) (type b) (x : a) (y : b) -> (x, y)]>
+- : <[
+     $('a) @ [< 'n & global] ->
+     ($('b) @ [< 'm & global] -> $('a) * $('b) @ [> 'm | 'n]) @ [> local]]>
+    expr
+= <[fun (type a) (type b) (x : a) (y : b) -> (x, y)]>
 |}];;
 
 type t4 = A | B;;
@@ -379,34 +407,49 @@ Error: Identifier "t5" is used at line 3, characters 11-14,
 
 <[fun (x : 'a) (y : 'b) -> (x, y)]>;;
 [%%expect {|
-- : <[$('a) -> ($('b) -> $('a) * $('b)) @ local]> expr =
-<[fun (x : 'a) (y : 'b) -> (x, y)]>
+- : <[
+     $('a) @ [< 'n & global] ->
+     ($('b) @ [< 'm & global] -> $('a) * $('b) @ [> 'm | 'n]) @ [> local]]>
+    expr
+= <[fun (x : 'a) (y : 'b) -> (x, y)]>
 |}];;
 
 <[fun (f : 'a. 'a -> 'a) (x : 'b) -> f x]>;;
 [%%expect {|
-- : <[('a. 'a -> 'a) -> ($('b) -> $('b)) @ local]> expr =
-<[fun (f : 'a. 'a -> 'a) (x : 'b) -> f x]>
+- : <[
+     ('a. 'a -> 'a) @ 'm ->
+     ($('b) @ [< global many uncontended] -> $('b) @ [> aliased nonportable]) @ [> local]
+     ]>
+    expr
+= <[fun (f : 'a. 'a -> 'a) (x : 'b) -> f x]>
 |}];;
 
 <[fun (f : 'a. 'a -> 'a) (x : 'a) -> f x]>;;
 [%%expect {|
-- : <[('a. 'a -> 'a) -> ($('a) -> $('a)) @ local]> expr =
-<[fun (f : 'a. 'a -> 'a) (x : 'a__1) -> f x]>
+- : <[
+     ('a. 'a -> 'a) @ 'm ->
+     ($('a) @ [< global many uncontended] -> $('a) @ [> aliased nonportable]) @ [> local]
+     ]>
+    expr
+= <[fun (f : 'a. 'a -> 'a) (x : 'a__1) -> f x]>
 |}];;
 
 <[fun (x : 'a) (f : 'a. 'a -> 'a) -> f x]>;;
 [%%expect {|
-- : <[$('a) -> (('a0. 'a0 -> 'a0) -> $('a)) @ local]> expr =
-<[fun (x : 'a) (f : 'a__1. 'a__1 -> 'a__1) -> f x]>
+- : <[
+     $('a) @ [< global many uncontended] ->
+     (('a0. 'a0 -> 'a0) @ 'm -> $('a) @ [> aliased nonportable]) @ [> local nonportable]
+     ]>
+    expr
+= <[fun (x : 'a) (f : 'a__1. 'a__1 -> 'a__1) -> f x]>
 |}];;
 
 <[fun (f : 'a. 'a -> 'a) (g: 'b 'c. 'b list -> ('b -> 'c) -> 'c list) -> f g]>;;
 [%%expect {|
 - : <[
-     ('a. 'a -> 'a) ->
-     (('b 'c. 'b list -> ('b -> 'c) -> 'c list) ->
-      ($('d) list -> ($('d) -> $('e)) -> $('e) list)) @ local
+     ('a. 'a -> 'a) @ 'm ->
+     (('b 'c. 'b list -> ('b -> 'c) -> 'c list) @ [< global many] ->
+      ($('d) list -> ($('d) -> $('e)) -> $('e) list) @ [> aliased nonportable]) @ [> local]
      ]>
     expr
 =
@@ -428,7 +471,9 @@ Error: This expression has type "<[int -> int]>"
 
 let mk_pair x = <[$x, $x]>;;
 [%%expect {|
-val mk_pair : 'a expr -> <[$('a) * $('a)]> expr = <fun>
+val mk_pair :
+  'a expr @ [< global many uncontended] ->
+  <[$('a) * $('a)]> expr @ [< global > aliased nonportable] = <fun>
 |}];;
 
 mk_pair <[123]>;;
@@ -453,26 +498,29 @@ mk_pair <[Some 123]>;;
 
 mk_pair <[fun () -> 42]>;;
 [%%expect {|
-- : <[(unit -> int) * (unit -> int)]> expr =
+- : <[(unit -> int @ 'm) * (unit -> int @ 'm)]> expr =
 <[((fun () -> 42), (fun () -> 42))]>
 |}];;
 
 mk_pair <[fun x -> x]>;;
 [%%expect {|
-- : <[('_weak1 -> '_weak1) * ('_weak1 -> '_weak1)]> expr =
-<[((fun x -> x), (fun x -> x))]>
+- : <[
+     ('_weak1 -> '_weak1 @ [> aliased nonportable]) *
+     ('_weak1 -> '_weak1 @ [> aliased nonportable])]>
+    expr
+= <[((fun x -> x), (fun x -> x))]>
 |}];;
 
 (* Type algebra checks. *)
 
 fun (x: 'a) -> (x: <[<[<[$($($'a))]>]>]>);;
 [%%expect {|
-- : 'a -> 'a = <fun>
+- : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
 |}];;
 
 fun (x: <[<[<[$($($'a))]>]>]>) -> (x: 'a);;
 [%%expect {|
-- : 'a -> 'a = <fun>
+- : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
 |}];;
 
 fun (x: <[<[<[$($'a)]>]>]>) -> (x: 'a);;
@@ -489,18 +537,27 @@ Error: Type variable "'a" is used outside any quotations,
 
 let eta (type a) (x : a expr) : a expr = <[ $x ]>
 [%%expect {|
-val eta : 'a expr -> 'a expr = <fun>
+val eta :
+  'a expr @ [< global many uncontended] ->
+  'a expr @ [< global > aliased nonportable] = <fun>
 |}]
 
 let eta1 (type a) = <[ fun (x : $a expr) : $a expr -> <[ $x ]> ]>
 [%%expect {|
-val eta1 : <[$('a) expr -> $('a) expr]> expr =
-  <[fun (x : _ expr) -> (<[$x]> : _ expr)]>
+val eta1 :
+  <[
+   $('a) expr @ [< global many uncontended] ->
+   $('a) expr @ [< global > aliased nonportable]]>
+  expr = <[fun (x : _ expr) -> (<[$x]> : _ expr)]>
 |}]
 
 let eta1' = <[ fun (type a) (x : a) : a -> $(<[ x ]>) ]>
 [%%expect {|
-val eta1' : <[$('a) -> $('a)]> expr = <[fun (type a) (x : a) -> (x : a)]>
+val eta1' :
+  <[
+   $('a) @ [< global many uncontended] ->
+   $('a) @ [< global > aliased nonportable]]>
+  expr = <[fun (type a) (x : a) -> (x : a)]>
 |}]
 
 (* Applicative *)
@@ -508,11 +565,17 @@ val eta1' : <[$('a) -> $('a)]> expr = <[fun (type a) (x : a) -> (x : a)]>
 let app (type a b) (f : <[$a -> $b]> expr) (x : a expr) =
   <[ $f $x ]>
 [%%expect {|
-val app : <[$('a) -> $('b)]> expr -> 'a expr -> 'b expr = <fun>
+val app :
+  <[$('a) -> $('b)]> expr @ [< global many uncontended] ->
+  ('a expr @ [< global many uncontended] ->
+   'b expr @ [< global > aliased nonportable]) @ [< global > nonportable] =
+  <fun>
 |}]
 
 let both (type a b) (p : a expr * b expr) : <[$a * $b]> expr =
   let (x, y) = p in <[ $x, $y ]>
 [%%expect {|
-val both : 'a expr * 'b expr -> <[$('a) * $('b)]> expr = <fun>
+val both :
+  'a expr * 'b expr @ [< global many uncontended] ->
+  <[$('a) * $('b)]> expr @ [< global > aliased nonportable] = <fun>
 |}]

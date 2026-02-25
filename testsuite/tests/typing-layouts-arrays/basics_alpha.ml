@@ -124,7 +124,8 @@ let d (x : float# array) = get (Obj.magic x : floatarray) 0
 
 [%%expect{|
 external get : floatarray -> int -> float = "%floatarray_safe_get"
-val d : float# array -> float = <fun>
+val d : float# array @ [< global uncontended] -> float @ [< global > aliased] =
+  <fun>
 |}];;
 
 external get : ('a : any mod separable). 'a array -> int -> float = "%floatarray_safe_get"
@@ -133,7 +134,10 @@ let d (x : 'a array) = get x 0
 [%%expect{|
 external get : ('a : any mod separable). 'a array -> int -> float
   = "%floatarray_safe_get"
-val d : ('a : value_or_null mod separable). 'a array -> float = <fun>
+val d :
+  ('a : value_or_null mod separable).
+    'a array @ [< global many uncontended] -> float @ [< global > aliased] =
+  <fun>
 |}];;
 
 external get : int32# array -> int -> float = "%floatarray_safe_get"
@@ -197,11 +201,21 @@ let f5 (x : float32# array) = get x 0
 [%%expect{|
 external get : ('a : any mod separable). 'a array -> int -> 'a
   = "%array_safe_get" [@@layout_poly]
-val f1 : float# array -> float# = <fun>
-val f2 : int32# array -> int32# = <fun>
-val f3 : int64# array -> int64# = <fun>
-val f4 : nativeint# array -> nativeint# = <fun>
-val f5 : float32# array -> float32# = <fun>
+val f1 :
+  float# array @ [< global uncontended] ->
+  float# @ [< global > aliased nonportable] = <fun>
+val f2 :
+  int32# array @ [< global uncontended] ->
+  int32# @ [< global > aliased nonportable] = <fun>
+val f3 :
+  int64# array @ [< global uncontended] ->
+  int64# @ [< global > aliased nonportable] = <fun>
+val f4 :
+  nativeint# array @ [< global uncontended] ->
+  nativeint# @ [< global > aliased nonportable] = <fun>
+val f5 :
+  float32# array @ [< global uncontended] ->
+  float32# @ [< global > aliased nonportable] = <fun>
 |}];;
 
 external[@layout_poly] set : ('a : any mod separable). 'a array -> int -> 'a -> unit = "%array_safe_set"
@@ -214,11 +228,26 @@ let f5 (x : float32# array) v = set x 0 v
 [%%expect{|
 external set : ('a : any mod separable). 'a array -> int -> 'a -> unit
   = "%array_safe_set" [@@layout_poly]
-val f1 : float# array -> float# -> unit = <fun>
-val f2 : int32# array -> int32# -> unit = <fun>
-val f3 : int64# array -> int64# -> unit = <fun>
-val f4 : nativeint# array -> nativeint# -> unit = <fun>
-val f5 : float32# array -> float32# -> unit = <fun>
+val f1 :
+  float# array @ [< global uncontended] ->
+  (float# @ [< global many uncontended] -> unit @ [< global]) @ [< global > nonportable] =
+  <fun>
+val f2 :
+  int32# array @ [< global uncontended] ->
+  (int32# @ [< global many uncontended] -> unit @ [< global]) @ [< global > nonportable] =
+  <fun>
+val f3 :
+  int64# array @ [< global uncontended] ->
+  (int64# @ [< global many uncontended] -> unit @ [< global]) @ [< global > nonportable] =
+  <fun>
+val f4 :
+  nativeint# array @ [< global uncontended] ->
+  (nativeint# @ [< global many uncontended] -> unit @ [< global]) @ [< global > nonportable] =
+  <fun>
+val f5 :
+  float32# array @ [< global uncontended] ->
+  (float32# @ [< global many uncontended] -> unit @ [< global]) @ [< global > nonportable] =
+  <fun>
 |}]
 
 (***********************************)

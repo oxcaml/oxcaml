@@ -3,40 +3,41 @@
  expect;
 *)
 
-(*
- * This file tests that mode polymorphism works, without printing mode variables.
- * The modes printed are not always representative of the underlying modes: they have
- * been zapped in order to be printed
-*)
-
 let use_uncontended (x @ uncontended) = ()
 let use_portable (x @ portable) = ()
 let use_unique (x @ unique) = ()
 let use_static (x @ static) = ()
 let use_global (x @ global) = ()
 [%%expect{|
-val use_uncontended : 'a -> unit = <fun>
-val use_portable : 'a @ portable -> unit = <fun>
-val use_unique : 'a @ unique -> unit = <fun>
-val use_static : 'a -> unit = <fun>
-val use_global : 'a -> unit = <fun>
+val use_uncontended : 'a @ [< uncontended] -> unit @ [< global] = <fun>
+val use_portable : 'a @ [< portable] -> unit @ [< global] = <fun>
+val use_unique : 'a @ [< unique] -> unit @ [< global] = <fun>
+val use_static : 'a @ 'm -> unit @ [< global] = <fun>
+val use_global : 'a @ [< global] -> unit @ [< global] = <fun>
 |}]
 
 type 'a myref = { mutable i : 'a }
 let alloc x = { i = x }
 [%%expect{|
 type 'a myref = { mutable i : 'a; }
-val alloc : 'a -> 'a myref = <fun>
+val alloc : 'a @ [< global many] -> 'a myref @ [< global > nonportable] =
+  <fun>
 |}]
 
 let store_local (x @ local) y = x.i <- y
 [%%expect{|
-val store_local : 'a myref @ local -> 'a -> unit = <fun>
+val store_local :
+  'a myref @ [< uncontended > local] ->
+  ('a @ [< global many uncontended] -> unit @ [< global]) @ [> local nonportable] =
+  <fun>
 |}]
 
 let store_global (x @ global) y = x.i <- y
 [%%expect{|
-val store_global : 'a myref -> 'a -> unit = <fun>
+val store_global :
+  'a myref @ [< global uncontended] ->
+  ('a @ [< global many uncontended] -> unit @ [< global]) @ [< global > nonportable] =
+  <fun>
 |}]
 
 let () =
@@ -73,7 +74,7 @@ type 'a myrecord = { j : 'a }
 let create x = { j = x }
 [%%expect{|
 type 'a myrecord = { j : 'a; }
-val create : 'a -> 'a myrecord = <fun>
+val create : 'a @ [< 'm & global] -> 'a myrecord @ [< global > 'm] = <fun>
 |}]
 
 (* but immutable fields are *)
@@ -99,7 +100,7 @@ Error: This value is "aliased"
 let foo () =
   use_portable (alloc 42)
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}, Principal{|
 Line 2, characters 15-25:
 2 |   use_portable (alloc 42)
@@ -125,5 +126,7 @@ Error: This value is "once" but is expected to be "many".
 
 let foo (x @ contended) = alloc x
 [%%expect{|
-val foo : 'a @ contended -> 'a myref @ contended = <fun>
+val foo :
+  'a @ [< global many > contended] ->
+  'a myref @ [< global > nonportable contended] = <fun>
 |}]

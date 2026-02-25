@@ -5,7 +5,7 @@
 
 let unique_use (local_ unique_ _x) = ()
 [%%expect{|
-val unique_use : 'a @ local unique -> unit = <fun>
+val unique_use : 'a @ [< unique > local] -> unit @ [< global] = <fun>
 |}]
 
 let global_aliased_use : 'a -> unit = fun _ -> ()
@@ -15,28 +15,32 @@ val global_aliased_use : 'a -> unit = <fun>
 
 let local_aliased_use (local_ a) = ()
 [%%expect{|
-val local_aliased_use : 'a @ local -> unit = <fun>
+val local_aliased_use : 'a @ [> local] -> unit @ [< global] = <fun>
 |}]
 
 let unique_aliased_use (local_ unique_ x) (local_ y) = ()
 [%%expect{|
-val unique_aliased_use : 'a @ local unique -> ('b @ local -> unit) @ local =
-  <fun>
+val unique_aliased_use :
+  'a @ [< unique > local] ->
+  ('b @ [> local] -> unit @ [< global]) @ [> local] = <fun>
 |}]
 
 let aliased_unique_use (local_ x) (local_ unique_ y) = ()
 [%%expect{|
-val aliased_unique_use : 'a @ local -> 'b @ local unique -> unit = <fun>
+val aliased_unique_use :
+  'a @ [> local] ->
+  ('b @ [< unique > local] -> unit @ [< global]) @ [> local] = <fun>
 |}]
 
 let aliased_aliased_use (local_ x) (local_ y) = ()
 [%%expect{|
-val aliased_aliased_use : 'a @ local -> 'b @ local -> unit = <fun>
+val aliased_aliased_use :
+  'a @ [> local] -> ('b @ [> local] -> unit @ [< global]) @ [> local] = <fun>
 |}]
 
 let local_returning (local_ x) = [%exclave] x
 [%%expect{|
-val local_returning : 'a @ local -> 'a @ local = <fun>
+val local_returning : 'a @ [< 'm > local] -> 'a @ [> 'm | local] = <fun>
 |}]
 
 (* Cannot borrow at top level let *)
@@ -104,7 +108,7 @@ Line 3, characters 6-7:
           ^
 Warning 26 [unused-var]: unused variable x.
 
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 (* borrowed values are aliased and cannot be used as unique *)
@@ -207,7 +211,7 @@ Line 4, characters 21-22:
                          ^
 Warning 216 [use-during-borrowing]: This value is used while being borrowed.
 
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 (* local_aliased_use is not recognized as borrow *)
@@ -222,7 +226,7 @@ Line 4, characters 20-21:
                         ^
 Warning 216 [use-during-borrowing]: This value is used while being borrowed.
 
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 
@@ -258,7 +262,7 @@ let foo () =
   local_aliased_use y);
   unique_use x
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 
@@ -288,7 +292,7 @@ Line 4, characters 7-8:
            ^
 Warning 26 [unused-var]: unused variable z.
 
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 let foo () =
@@ -328,7 +332,7 @@ Line 4, characters 7-8:
            ^
 Warning 26 [unused-var]: unused variable z.
 
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 
@@ -446,7 +450,7 @@ Line 4, characters 36-37:
                                         ^
 Warning 216 [use-during-borrowing]: This value is used while being borrowed.
 
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 (* Moreover, that aliased use will clash with later unique use *)
@@ -499,7 +503,7 @@ let foo () =
   unique_use x;
   ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 (* borrow after unique usage is bad *)
@@ -527,7 +531,7 @@ let foo () =
   unique_use x;
   ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 (* but you need to borrow both of course *)
@@ -688,7 +692,10 @@ let foo () =
   in
   ref bar
 [%%expect{|
-val foo : unit -> (unit -> unit) ref = <fun>
+val foo :
+  unit @ 'n ->
+  (unit @ 'm -> unit @ [< global]) ref @ [< global > aliased nonportable] =
+  <fun>
 |}]
 
 (* The function is aliased *)
@@ -702,7 +709,7 @@ let foo () =
   unique_use bar;
   ()
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
 
 (* borrowing requiring the original value to be many *)
@@ -724,7 +731,9 @@ let foo () =
   f ();
   ()
 [%%expect{|
-val aliased_local_and_legacy_use : 'a @ local -> unit -> unit = <fun>
+val aliased_local_and_legacy_use :
+  'a @ [> local aliased] -> (unit @ 'm -> unit @ [< global]) @ [> local] =
+  <fun>
 Line 4, characters 10-50:
 4 |   let f = aliased_local_and_legacy_use (borrow_ x) in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -739,7 +748,8 @@ let rec foo x =
   let _ = foo (borrow_ x) in
   ()
 [%%expect{|
-val foo : 'a @ local -> unit = <fun>
+val foo : 'a @ [< 'm & many > 'm | local aliased] -> unit @ [< global] =
+  <fun>
 |}]
 
 (* id function cannot leak *)
@@ -748,7 +758,7 @@ let foo x =
   let _ = id (borrow_ x) in
   ()
 [%%expect{|
-val id : 'a @ local -> 'a @ local = <fun>
+val id : 'a @ [< 'm > local] -> 'a @ [> 'm | local] = <fun>
 Line 3, characters 10-24:
 3 |   let _ = id (borrow_ x) in
               ^^^^^^^^^^^^^^
@@ -782,5 +792,5 @@ let foo () =
   (let z2 = borrow_ y in aliased_aliased_use z1 z2);
   unique_aliased_use y z1
 [%%expect{|
-val foo : unit -> unit = <fun>
+val foo : unit @ 'm -> unit @ [< global] = <fun>
 |}]
