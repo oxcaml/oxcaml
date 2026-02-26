@@ -29,9 +29,27 @@ module Name = struct
     | Var var -> Var (V.create_local (prefix ^ "-" ^ V.name var))
 end
 
+module Stamp = struct
+  type t = int
+
+  let compare = Int.compare
+
+  let equal = Int.equal
+
+  let hash = Fun.id
+
+  let to_string = string_of_int
+
+  let format fmt s = Format.fprintf fmt "%d" s
+
+  let to_int = Fun.id
+
+  let of_int_unsafe = Fun.id
+end
+
 type t =
   { name : Name.t;
-    stamp : int;
+    stamp : Stamp.t;
     typ : Cmm.machtype_component;
     preassigned : bool;
     mutable loc : location
@@ -39,7 +57,7 @@ type t =
 
 and location =
   | Unknown
-  | Reg of int
+  | Reg of Regs.Phys_reg.t
   | Stack of stack_location
 
 and stack_location =
@@ -47,6 +65,19 @@ and stack_location =
   | Incoming of int
   | Outgoing of int
   | Domainstate of int
+
+let format_stack_location fmt loc =
+  match loc with
+  | Local i -> Format.fprintf fmt "local %d" i
+  | Incoming i -> Format.fprintf fmt "incoming %d" i
+  | Outgoing i -> Format.fprintf fmt "outgoing %d" i
+  | Domainstate i -> Format.fprintf fmt "domainstate %d" i
+
+let format_location fmt loc =
+  match loc with
+  | Unknown -> Format.fprintf fmt "unknown"
+  | Reg i -> Format.fprintf fmt "reg %a" Regs.Phys_reg.print i
+  | Stack s -> Format.fprintf fmt "stack (%a)" format_stack_location s
 
 type reg = t
 
@@ -284,7 +315,7 @@ let compare_stack_location left right =
 let equal_location left right =
   match left, right with
   | Unknown, Unknown -> true
-  | Reg left, Reg right -> Int.equal left right
+  | Reg left, Reg right -> Regs.Phys_reg.equal left right
   | Stack left, Stack right -> equal_stack_location left right
   | Unknown, (Reg _ | Stack _)
   | Reg _, (Unknown | Stack _)
@@ -296,7 +327,7 @@ let compare_location left right =
   | Unknown, Unknown -> 0
   | Unknown, (Reg _ | Stack _) -> -1
   | (Reg _ | Stack _), Unknown -> 1
-  | Reg left, Reg right -> Int.compare left right
+  | Reg left, Reg right -> Regs.Phys_reg.compare left right
   | Reg _, Stack _ -> -1
   | Stack _, Reg _ -> 1
   | Stack left, Stack right -> compare_stack_location left right
@@ -307,9 +338,9 @@ let same_loc left right =
   match left.loc with
   | Unknown -> true
   | Reg _ ->
-    Reg_class.equal
-      (Reg_class.of_machtype left.typ)
-      (Reg_class.of_machtype right.typ)
+    Regs.Reg_class.equal
+      (Regs.Reg_class.of_machtype left.typ)
+      (Regs.Reg_class.of_machtype right.typ)
   | Stack _ ->
     Stack_class.equal
       (Stack_class.of_machtype left.typ)
@@ -332,8 +363,8 @@ let compare_loc left right =
     | Unknown -> 0
     | Reg _ ->
       Stdlib.compare
-        (Reg_class.of_machtype left.typ)
-        (Reg_class.of_machtype right.typ)
+        (Regs.Reg_class.of_machtype left.typ)
+        (Regs.Reg_class.of_machtype right.typ)
     | Stack _ ->
       Stdlib.compare
         (Stack_class.of_machtype left.typ)
@@ -355,7 +386,7 @@ let hash_stack_loc = function
 
 let hash_loc = function
   | Unknown -> -1
-  | Reg r -> r
+  | Reg r -> Regs.Phys_reg.hash r
   | Stack stack_loc -> hash_stack_loc stack_loc
 
 let is_of_type_addr t =

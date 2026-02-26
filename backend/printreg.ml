@@ -25,7 +25,7 @@ let loc ?(wrap_out = fun ppf f -> f ppf) ~unknown ppf loc typ =
   match loc with
   | Unknown -> unknown ppf
   | Reg r ->
-    wrap_out ppf (fun ppf -> fprintf ppf "%s" (Reg_class.register_name typ r))
+    wrap_out ppf (fun ppf -> fprintf ppf "%s" (Regs.register_name typ r))
   | Stack (Local s) ->
     wrap_out ppf (fun ppf ->
         fprintf ppf "s[%s:%i]" (Stack_class.tag (Stack_class.of_machtype typ)) s)
@@ -47,7 +47,7 @@ let reg ppf r =
     | Vec512 -> "Z"
     | Valx2 -> "VV"
     | Float32 -> "S");
-  fprintf ppf "/%i" r.stamp;
+  fprintf ppf "/%s" (Reg.Stamp.to_string r.stamp);
   loc
     ~wrap_out:(fun ppf f -> fprintf ppf "[%t]" f)
     ~unknown:(fun _ -> ())

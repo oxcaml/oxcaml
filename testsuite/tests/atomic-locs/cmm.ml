@@ -1,5 +1,7 @@
 (* TEST_BELOW *)
 
+(* CR-someday mslater: this should also work on arm once atomics are builtins *)
+
 (* standard atomics *)
 
 let standard_atomic_get (r : 'a Atomic.t) =

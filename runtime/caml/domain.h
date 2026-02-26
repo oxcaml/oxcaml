@@ -76,6 +76,7 @@ void caml_interrupt_all_signal_safe(void);
 void caml_external_interrupt_all_signal_safe(uintnat flags);
 void caml_reset_young_limit(caml_domain_state *);
 void caml_update_young_limit_after_c_call(caml_domain_state *);
+struct stack_cache* caml_get_stack_caches(int domain_idx);
 
 CAMLextern void caml_reset_domain_lock(void);
 CAMLextern int caml_bt_is_in_blocking_section(void);

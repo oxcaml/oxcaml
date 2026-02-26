@@ -18,7 +18,7 @@
 open Asttypes
 open Typedtree
 open Types
-open Format
+open Format_doc
 
 let is_cons = function
 | {cstr_name = "::"} -> true
@@ -94,7 +94,7 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
   in
   match v.pat_desc with
   | Tpat_any -> fprintf ppf "_"
-  | Tpat_var (x,_,_,_,_) -> fprintf ppf "%s" (Ident.name x)
+  | Tpat_var { id = x; _ } -> fprintf ppf "%s" (Ident.name x)
   | Tpat_constant c -> fprintf ppf "%s" (pretty_const c)
   | Tpat_unboxed_unit -> fprintf ppf "#()"
   | Tpat_unboxed_bool b -> fprintf ppf "#%a" bool b
@@ -131,8 +131,8 @@ let rec pretty_val : type k . _ -> k general_pattern -> _ = fun ppf v ->
       fprintf ppf "@[[%c %a %c]@]" punct (pretty_vals " ;") vs punct
   | Tpat_lazy v ->
       fprintf ppf "@[<2>lazy@ %a@]" pretty_arg v
-  | Tpat_alias (v, x, _, _, _, _, _) ->
-      fprintf ppf "@[(%a@ as %a)@]" pretty_val v Ident.print x
+  | Tpat_alias { pattern = v; id = x; _ } ->
+      fprintf ppf "@[(%a@ as %a)@]" pretty_val v Ident.doc_print x
   | Tpat_value v ->
       fprintf ppf "%a" pretty_val (v :> pattern)
   | Tpat_exception v ->
@@ -196,20 +196,30 @@ and pretty_lvals : 'a. _ -> (_ * 'a gen_label_description * _) list -> _ =
       fprintf ppf "%s=%a;@ %a"
         lbl.lbl_name pretty_val v pretty_lvals rest
 
+let top_pretty ppf v =
+  fprintf ppf "@[%a@]" pretty_val v
+
 let pretty_pat ppf p =
-  fprintf ppf "@[%a@]" pretty_val p
+  top_pretty ppf p ;
+  pp_print_flush ppf ()
 
 type 'k matrix = 'k general_pattern list list
 
 let pretty_line ppf line =
-  Format.fprintf ppf "@[";
+  fprintf ppf "@[";
   List.iter (fun p ->
-    Format.fprintf ppf "<%a>@ "
-      pretty_val p
-  ) line;
-  Format.fprintf ppf "@]"
+      fprintf ppf "<%a>@ "
+        pretty_val p
+    ) line;
+  fprintf ppf "@]"
 
 let pretty_matrix ppf (pss : 'k matrix) =
-  Format.fprintf ppf "@[<v 2>  %a@]"
-    (Format.pp_print_list ~pp_sep:Format.pp_print_cut pretty_line)
+  fprintf ppf "@[<v 2>  %a@]"
+    (pp_print_list ~pp_sep:pp_print_cut pretty_line)
     pss
+
+module Compat = struct
+  let pretty_pat ppf x = compat pretty_pat ppf x
+  let pretty_line ppf x = compat pretty_line ppf x
+  let pretty_matrix ppf x = compat pretty_matrix ppf x
+end

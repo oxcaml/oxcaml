@@ -93,7 +93,10 @@ end = struct
       | Reg.Incoming offset ->
         Incoming { index = byte_offset_to_word_index offset }
       | Reg.Outgoing offset ->
-        Outgoing { index = byte_offset_to_word_index offset }
+        (* macOS on arm requires unaligned stack locations for C calls. *)
+        if Target_system.is_macos () && Target_system.is_arm ()
+        then Outgoing { index = offset / word_size }
+        else Outgoing { index = byte_offset_to_word_index offset }
       | Reg.Domainstate offset ->
         Domainstate { index = byte_offset_to_word_index offset }
 
@@ -107,7 +110,7 @@ end = struct
   end
 
   type t =
-    | Reg of int
+    | Reg of Regs.Phys_reg.t
     | Stack of Stack.t
 
   let of_reg reg =
@@ -152,7 +155,7 @@ end
 module Reg_id : sig
   type t =
     | Preassigned of { location : Location.t }
-    | Named of { stamp : int }
+    | Named of { stamp : Reg.Stamp.t }
 
   val compare : t -> t -> int
 
@@ -162,7 +165,7 @@ module Reg_id : sig
 end = struct
   type t =
     | Preassigned of { location : Location.t }
-    | Named of { stamp : int }
+    | Named of { stamp : Reg.Stamp.t }
 
   let of_reg (reg : Reg.t) =
     let loc = Location.of_reg reg in
@@ -213,7 +216,7 @@ end = struct
   module For_print = struct
     type t =
       { name : Reg.Name.t;
-        stamp : int;
+        stamp : Reg.Stamp.t;
         preassigned : bool;
         typ : Cmm.machtype_component
       }
@@ -309,7 +312,7 @@ module Description : sig
 
   (** Will return [Some _] for the instructions that existed in the CFG before
       allocation and [None] otherwise. Currently, only instructions that
-      register allocation can add are [Spill] and [Reload]. *)
+      register allocation can add are [Spill], [Reload], and [Dummy_use]. *)
   val find_basic : t -> basic instruction -> basic Instruction.t option
 
   (** Will return [Some _] for the terminators that existed in CFG before
@@ -345,7 +348,7 @@ end = struct
   let reg_fun_args t = t.reg_fun_args
 
   let is_regalloc_specific_basic (desc : Cfg.basic) =
-    match desc with Op (Reload | Spill) -> true | _ -> false
+    match desc with Op (Reload | Spill | Dummy_use) -> true | _ -> false
 
   let add_instr_id ~seen_ids ~context id =
     if Hashtbl.mem seen_ids id
@@ -1186,11 +1189,12 @@ module Transfer (Desc_val : Description_value) :
 
   let basic t instr () : (domain, error) result =
     match Description.find_basic description instr with
-    | None ->
-      (match instr.desc with
-      | Op (Spill | Reload | Move) -> ()
-      | _ -> assert false);
-      Result.ok @@ rename_location t ~loc_instr:instr
+    | None -> (
+      match instr.desc with
+      | Op (Spill | Reload | Move) ->
+        Result.ok @@ rename_location t ~loc_instr:instr
+      | Op Dummy_use -> Result.ok t
+      | _ -> assert false)
     | Some instr_before -> (
       match instr.desc with
       | Op Move

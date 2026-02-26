@@ -89,7 +89,8 @@ and let_cont_expr =
   | Non_recursive of
       { handler : non_recursive_let_cont_handler;
         num_free_occurrences : Num_occurrences.t Or_unknown.t;
-        is_applied_with_traps : bool
+        is_applied_with_traps : bool;
+        can_be_lifted : bool
       }
   | Recursive of recursive_let_cont_handlers
 
@@ -213,7 +214,8 @@ and apply_renaming_let_expr ({ let_abst; defining_expr } as t) renaming =
 
 and apply_renaming_let_cont_expr let_cont renaming =
   match let_cont with
-  | Non_recursive { handler; num_free_occurrences; is_applied_with_traps } ->
+  | Non_recursive
+      { handler; num_free_occurrences; is_applied_with_traps; can_be_lifted } ->
     let handler' =
       apply_renaming_non_recursive_let_cont_handler handler renaming
     in
@@ -221,7 +223,11 @@ and apply_renaming_let_cont_expr let_cont renaming =
     then let_cont
     else
       Non_recursive
-        { handler = handler'; num_free_occurrences; is_applied_with_traps }
+        { handler = handler';
+          num_free_occurrences;
+          is_applied_with_traps;
+          can_be_lifted
+        }
   | Recursive handlers ->
     let handlers' =
       apply_renaming_recursive_let_cont_handlers handlers renaming
@@ -392,7 +398,11 @@ and ids_for_export_named t =
 and ids_for_export_let_cont_expr t =
   match t with
   | Non_recursive
-      { handler; num_free_occurrences = _; is_applied_with_traps = _ } ->
+      { handler;
+        num_free_occurrences = _;
+        is_applied_with_traps = _;
+        can_be_lifted = _
+      } ->
     ids_for_export_non_recursive_let_cont_handler handler
   | Recursive handlers -> ids_for_export_recursive_let_cont_handlers handlers
 
@@ -617,8 +627,12 @@ and print_function_params_and_body ppf t =
 and print_let_cont_expr ppf t =
   let rec gather_let_conts let_conts let_cont =
     match let_cont with
-    | Non_recursive { handler; num_free_occurrences; is_applied_with_traps = _ }
-      ->
+    | Non_recursive
+        { handler;
+          num_free_occurrences;
+          is_applied_with_traps = _;
+          can_be_lifted = _
+        } ->
       let print k ~body =
         let let_conts, body =
           match descr body with
@@ -1602,14 +1616,21 @@ module Let_cont_expr = struct
 
   let print = print_let_cont_expr
 
-  let create_non_recursive' ~cont handler ~body
+  let create0 ~can_be_lifted ~cont handler ~body
       ~num_free_occurrences_of_cont_in_body:num_free_occurrences
       ~is_applied_with_traps =
     let handler = Non_recursive_let_cont_handler.create cont handler ~body in
     Expr.create_let_cont
-      (Non_recursive { handler; num_free_occurrences; is_applied_with_traps })
+      (Non_recursive
+         { handler; num_free_occurrences; is_applied_with_traps; can_be_lifted })
 
-  let create_non_recursive cont handler ~body ~free_names_of_body =
+  let create_non_recursive' ~cont handler ~body
+      ~num_free_occurrences_of_cont_in_body ~is_applied_with_traps =
+    create0 ~can_be_lifted:true ~cont handler ~body
+      ~num_free_occurrences_of_cont_in_body ~is_applied_with_traps
+
+  let create_non_recursive0 ~can_be_lifted cont handler ~body
+      ~free_names_of_body =
     let num_free_occurrences_of_cont_in_body, is_applied_with_traps =
       (* Only the continuations of [free_names_of_body] are used.
          [Closure_conversion_aux] relies on this property. *)
@@ -1621,8 +1642,12 @@ module Let_cont_expr = struct
           Name_occurrences.continuation_is_applied_with_traps free_names_of_body
             cont )
     in
-    create_non_recursive' ~cont handler ~body
+    create0 ~can_be_lifted ~cont handler ~body
       ~num_free_occurrences_of_cont_in_body ~is_applied_with_traps
+
+  let create_non_recursive = create_non_recursive0 ~can_be_lifted:true
+
+  let create_non_liftable = create_non_recursive0 ~can_be_lifted:false
 
   let create_recursive ~invariant_params handlers ~body =
     if Continuation_handlers.contains_exn_handler handlers

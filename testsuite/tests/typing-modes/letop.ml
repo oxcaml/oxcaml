@@ -52,7 +52,7 @@ Line 4, characters 17-18:
 4 |     portable_use a
                      ^
 Error: This value is "nonportable"
-         because it is an element of the tuple at Line 2, characters 4-8
+         because it is an element of the tuple at line 2, characters 4-8
          which is "nonportable".
        However, the highlighted expression is expected to be "portable".
 |}]
@@ -66,7 +66,7 @@ Line 4, characters 17-18:
 4 |     portable_use b
                      ^
 Error: This value is "nonportable"
-         because it is an element of the tuple at Line 2, characters 4-8
+         because it is an element of the tuple at line 2, characters 4-8
          which is "nonportable".
        However, the highlighted expression is expected to be "portable".
 |}]

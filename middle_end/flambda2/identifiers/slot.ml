@@ -91,8 +91,9 @@ end) : S = struct
           (Compilation_unit.get_current_exn ())
       then Format.fprintf ppf "%s/%d" t.name t.name_stamp
       else
-        Format.fprintf ppf "%a.%s/%d" Compilation_unit.print t.compilation_unit
-          t.name t.name_stamp;
+        Format.fprintf ppf "%a.%s/%d"
+          (Format_doc.compat Compilation_unit.print)
+          t.compilation_unit t.name t.name_stamp;
       Format.fprintf ppf " @<1>\u{2237} %a%s" Flambda_kind.print t.kind
         (if t.is_always_immediate then "(immediate)" else "");
       Format.fprintf ppf ")%t@]" Flambda_colours.pop

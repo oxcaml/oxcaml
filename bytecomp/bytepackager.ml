@@ -370,27 +370,27 @@ let package_files ~ppf_dump initial_env files targetfile =
 
 (* Error report *)
 
-open Format
+open Format_doc
 module Style = Misc.Style
 
-let report_error ppf = function
+let report_error_doc ppf = function
     Forward_reference(file, compunit) ->
       fprintf ppf "Forward reference to %a in file %a"
-        (Style.as_inline_code CU.print) compunit
-        (Style.as_inline_code Location.print_filename) file
+        CU.print_as_inline_code compunit
+        Location.Doc.quoted_filename file
   | Multiple_definition(file, compunit) ->
       fprintf ppf "File %a redefines %a"
-        (Style.as_inline_code Location.print_filename) file
-        (Style.as_inline_code CU.print) compunit
+        Location.Doc.quoted_filename file
+        CU.print_as_inline_code compunit
   | Not_an_object_file file ->
       fprintf ppf "%a is not a bytecode object file"
-        (Style.as_inline_code Location.print_filename) file
+        Location.Doc.quoted_filename file
   | Illegal_renaming(name, file, compunit) ->
       fprintf ppf "Wrong file naming: %a@ contains the code for\
                    @ %a when %a was expected"
-        (Style.as_inline_code Location.print_filename) file
-        (Style.as_inline_code CU.print) name
-        (Style.as_inline_code CU.print) compunit
+        Location.Doc.quoted_filename file
+        CU.print_as_inline_code name
+        CU.print_as_inline_code compunit
   | File_not_found file ->
       fprintf ppf "File %a not found"
         Style.inline_code file
@@ -398,6 +398,8 @@ let report_error ppf = function
 let () =
   Location.register_error_of_exn
     (function
-      | Error err -> Some (Location.error_of_printer_file report_error err)
+      | Error err -> Some (Location.error_of_printer_file report_error_doc err)
       | _ -> None
     )
+
+let report_error = Format_doc.compat report_error_doc

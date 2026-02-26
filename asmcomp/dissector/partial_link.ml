@@ -40,12 +40,13 @@ exception Error of error
 
 let report_error ppf = function
   | Linker_error { partition_index; exit_code; files } ->
-    Format.fprintf ppf
+    Format_doc.fprintf ppf
       "@[<v>Dissector: partial link of partition %d failed with exit code %d@,\
        Files in partition:@,\
       \  @[<v>%a@]@]"
       partition_index exit_code
-      (Format.pp_print_list ~pp_sep:Format.pp_print_cut Format.pp_print_string)
+      (Format_doc.pp_print_list ~pp_sep:Format_doc.pp_print_cut
+         Format_doc.pp_print_string)
       files
 
 let () =

@@ -1,0 +1,41 @@
+let $camlTests7__immstring7 = "Cow" in
+let $camlTests7__immstring10 = "Sheep" in
+let code f_0 deleted in
+let code foo_1 deleted in
+let $camlTests7__empty_block4 = Block 0 () in
+let code loopify(never) size(16) newer_version_of(f_0)
+      f_0_1 (x : imm tagged, str : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %string_length (str) in
+  let Pstringlength = %tag_imm (prim) in
+  let int_add = %int_barith.add (x, 3) in
+  let int_add_1 = %int_barith.add (int_add, 5) in
+  let int_add_2 = %int_barith.add (int_add_1, Pstringlength) in
+  let int_add_3 = %int_barith.add (int_add_2, Pstringlength) in
+  cont k (int_add_3)
+in
+let $camlTests7__f_2 = closure f_0_1 @f in
+let code loopify(never) size(13) newer_version_of(foo_1)
+      foo_1_1 (af : float ^ 2, y : float boxed)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float boxed =
+  let prim = %block_load.`float`.[`1`] (af) in
+  let prim_1 = %block_load.`float`.[`0`] (af) in
+  let prim_2 = %bfloat_arith.mul (prim_1, prim) in
+  let prim_3 = %unbox_num.`float` (y) in
+  let prim_4 = %bfloat_arith.add (prim_2, prim_3) in
+  let float_add = %box_num.`float` (prim_4) in
+  cont k (float_add)
+in
+let $camlTests7__foo_3 = closure foo_1_1 @foo in
+let $camlTests7 =
+  Block 0 ($camlTests7__empty_block4,
+           $camlTests7__immstring7,
+           $camlTests7__immstring10,
+           $camlTests7__f_2,
+           $camlTests7__foo_3)
+in
+cont done ($camlTests7)

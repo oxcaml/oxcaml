@@ -33,7 +33,7 @@ let run s =
     List.iter
       (fun (mode : Mode.Modality.atom Location.loc) ->
         match mode.txt with
-        | Atom (Comonadic Portability, Meet_with Portable) ->
+        | Atom (Comonadic Portability, Meet_const Portable) ->
           has_portable_annotation := true
         | _ -> ())
       modalities.moda_desc;

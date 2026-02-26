@@ -149,6 +149,10 @@ let dump_flambda () = !Clflags.dump_flambda
 
 let dump_rawfexpr () = !Oxcaml_flags.Flambda2.Dump.rawfexpr
 
+let dump_fexpr_annot () = !Oxcaml_flags.Flambda2.Dump.fexpr_annot
+
+let dump_fexpr_annot_after () = !Oxcaml_flags.Flambda2.Dump.fexpr_annot_after
+
 type pass = Oxcaml_flags.Flambda2.Dump.pass =
   | Last_pass
   | This_pass of string

@@ -143,17 +143,15 @@ let parse_markdown_doc filename =
       let pos = initial_pos filename in
       read_text pos [])
 
-let make_compilation_unit ~extension ~filename ?(tag = "") () =
-  let basename = Filename.chop_suffix filename extension |> Filename.basename in
-  let name = String.capitalize_ascii basename ^ tag in
-  Compilation_unit.create Compilation_unit.Prefix.empty
-    (name |> Compilation_unit.Name.of_string)
+let make_unit_info ~filename =
+  Unit_info.make ~source_file:filename
+    ~for_pack_prefix:Compilation_unit.Prefix.empty Impl filename
 
 let parse filename =
   parse_fexpr filename
   |> Result.map (fun fexpr ->
-      let comp_unit = make_compilation_unit ~extension:".fl" ~filename () in
-      let unit_info = Unit_info.make_dummy ~input_name:filename comp_unit in
+      let unit_info = make_unit_info ~filename in
+      let comp_unit = Unit_info.modname unit_info in
       let old_unit_info = Env.get_unit_name () in
       Env.set_unit_name (Some unit_info);
       let flambda = Fexpr_to_flambda.conv comp_unit fexpr in

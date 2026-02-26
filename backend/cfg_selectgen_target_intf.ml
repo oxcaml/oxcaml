@@ -105,6 +105,8 @@ module type S = sig
   val is_store_out_of_range :
     Cmm.memory_chunk -> byte_offset:int -> is_store_out_of_range_result
 
+  val is_offset_out_of_range : int -> is_store_out_of_range_result
+
   val insert_move_extcall_arg :
     Cmm.exttype -> Reg.t array -> Reg.t array -> insert_move_extcall_arg_result
 

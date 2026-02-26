@@ -29,13 +29,15 @@
  }
 *)
 
+(* CR-someday mslater: this should also work on arm once atomics are builtins *)
+
 (* This test verifies that immediate atomics do not call runtime wrapper functions
    in native amd64 builds. *)
 
 let a = Atomic.make 0
 let _ = Atomic.get a
 let _ = Atomic.set a 1
-let _ = Atomic.exchange a 2 
+let _ = Atomic.exchange a 2
 let _ = Atomic.compare_and_set a 2 3
 let _ = Atomic.compare_exchange a 3 4
 let _ = Atomic.fetch_and_add a 1
@@ -54,7 +56,7 @@ let _ = a.x <- 1
 let a = {x = 0}
 let _ = Atomic.Loc.get [%atomic.loc a.x]
 let _ = Atomic.Loc.set [%atomic.loc a.x] 1
-let _ = Atomic.Loc.exchange [%atomic.loc a.x] 2 
+let _ = Atomic.Loc.exchange [%atomic.loc a.x] 2
 let _ = Atomic.Loc.compare_and_set [%atomic.loc a.x] 2 3
 let _ = Atomic.Loc.compare_exchange [%atomic.loc a.x] 3 4
 let _ = Atomic.Loc.fetch_and_add [%atomic.loc a.x] 1
@@ -79,7 +81,7 @@ external atomic_logxor_field : int atomic -> int -> int -> unit = "%atomic_lxor_
 let a = {x = 0}
 let _ = atomic_get_field a 0
 let _ = atomic_set_field a 0 1
-let _ = atomic_exchange_field a 0 2 
+let _ = atomic_exchange_field a 0 2
 let _ = atomic_compare_and_set_field a 0 2 3
 let _ = atomic_compare_exchange_field a 0 3 4
 let _ = atomic_fetch_and_add_field a 0 1

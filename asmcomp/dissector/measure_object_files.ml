@@ -37,9 +37,9 @@ exception Error of error
 
 let report_error ppf = function
   | File_not_found filename ->
-    Format.fprintf ppf "Dissector: file not found: %s" filename
+    Format_doc.fprintf ppf "Dissector: file not found: %s" filename
   | Duplicate_file filename ->
-    Format.fprintf ppf "Dissector: duplicate file in link: %s" filename
+    Format_doc.fprintf ppf "Dissector: duplicate file in link: %s" filename
 
 let () =
   Location.register_error_of_exn (function

@@ -71,15 +71,15 @@ let reg_b7 = O.reg_op (R.reg_b 7)
 
 (* Names for special regs *)
 
-let reg_domain_state_ptr = phys_reg Int 25 (* x28 *)
+let reg_domain_state_ptr = phys_reg Int X28
 
-let reg_trap_ptr = phys_reg Int 23 (* x26 *)
+let reg_trap_ptr = phys_reg Int X26
 
 let reg_x_trap_ptr = H.reg_x reg_trap_ptr
 
-let reg_alloc_ptr = phys_reg Int 24 (* x27 *)
+let reg_alloc_ptr = phys_reg Int X27
 
-let reg_tmp1 = phys_reg Int 26 (* x16 *)
+let reg_tmp1 = phys_reg Int X16
 
 (* AST register for reg_tmp1, used as memory base *)
 let reg_tmp1_base = R.reg_x 16
@@ -88,13 +88,13 @@ let reg_x_tmp1 = H.reg_x reg_tmp1
 
 let reg_x_alloc_ptr = H.reg_x reg_alloc_ptr
 
-let reg_x8 = phys_reg Int 8 (* x8 *)
+let reg_x8 = phys_reg Int X8
 
 let reg_x_x8 = H.reg_x reg_x8
 
-let reg_stack_arg_begin = H.reg_x (phys_reg Int 17)
+let reg_stack_arg_begin = H.reg_x (phys_reg Int X20)
 
-let reg_stack_arg_end = H.reg_x (phys_reg Int 18)
+let reg_stack_arg_end = H.reg_x (phys_reg Int X21)
 
 (** Turn a Linear label into an assembly label. The section is checked against
     the section tracked by [D] when emitting label definitions. *)
@@ -609,7 +609,7 @@ let record_frame_label env live dbg =
   Reg.Set.iter
     (function
       | { typ = Val; loc = Reg r; _ } ->
-        live_offset := ((r lsl 1) + 1) :: !live_offset
+        live_offset := ((Regs.index_in_class r lsl 1) + 1) :: !live_offset
       | { typ = Val; loc = Stack s; _ } as reg ->
         live_offset
           := env_slot_offset env s (Stack_class.of_machtype reg.typ)
@@ -964,10 +964,10 @@ module Cond_branch_impl = struct
     | Lcondbranch (Ioddtest, _) | Lcondbranch (Ieventest, _) -> Some TB
     | Lcondbranch3 _ -> Some Bcc
     | Lop
-        ( Specific _ | Move | Spill | Reload | Opaque | Begin_region | Pause
-        | End_region | Dls_get | Tls_get | Domain_index | Const_int _
-        | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
-        | Stackoffset _ | Load _
+        ( Specific _ | Move | Spill | Reload | Dummy_use | Opaque
+        | Begin_region | Pause | End_region | Dls_get | Tls_get | Domain_index
+        | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
+        | Const_vec128 _ | Stackoffset _ | Load _
         | Store (_, _, _)
         | Intop _ | Int128op _
         | Intop_imm (_, _)
@@ -1291,6 +1291,7 @@ let emit_instr env i =
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast env cast i
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Move | Spill | Reload) -> move env i.arg.(0) i.res.(0)
+  | Lop Dummy_use -> ()
   | Lop (Specific Imove32) -> (
     let src = i.arg.(0) and dst = i.res.(0) in
     if not (Reg.same_loc src dst)
@@ -1970,6 +1971,7 @@ let fundecl fundecl =
   global_maybe_protected fun_sym;
   D.type_symbol ~ty:Function fun_sym;
   D.define_joint_label_and_symbol ~section:Text fun_sym;
+  let fun_start_label = L.create_label_for_local_symbol Text fun_sym in
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
   let num_call_gc = branch_relax env fundecl.fun_body in
@@ -1982,7 +1984,10 @@ let fundecl fundecl =
   | None -> ()
   | Some fun_end_label ->
     let fun_end_label = label_to_asm_label ~section:Text fun_end_label in
-    D.define_label fun_end_label);
+    D.define_label fun_end_label;
+    Emitaux.Dwarf_helpers.record_function_range ~function_symbol:fun_sym
+      ~start_label:fun_start_label ~end_label:fun_end_label
+      ~offset_past_end_label:None);
   D.cfi_endproc ();
   D.type_symbol ~ty:Function fun_sym;
   D.size fun_sym;
@@ -2091,6 +2096,9 @@ let begin_assembly _unix =
     D.align ~fill:Nop ~bytes:8);
   let code_end = Cmm_helpers.make_symbol "code_end" in
   Emitaux.Dwarf_helpers.begin_dwarf ~code_begin ~code_end ~file_emitter
+
+(* Not implemented for arm64 *)
+let register_expect_asm_callback (_ : string -> unit) = ()
 
 let end_assembly () =
   let code_end = Cmm_helpers.make_symbol "code_end" in

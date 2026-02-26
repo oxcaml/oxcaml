@@ -276,8 +276,12 @@ module Transfer = struct
                 := RD_quotient_set.add regd
                      (RD_quotient_set.filter_reg_by_loc !avail_after reg)
           done;
-          dprintf "...ident = %a\n%!" Ident.print_with_scope ident;
-          dprintf "...regd = %a\n%!" Ident.print_with_scope ident;
+          dprintf "...ident = %a\n%!"
+            (Format_doc.compat Ident.print_with_scope)
+            ident;
+          dprintf "...regd = %a\n%!"
+            (Format_doc.compat Ident.print_with_scope)
+            ident;
           dprintf "...avail_before %a\n%!" RD_quotient_set.print avail_before;
           dprintf "...avail_across %a\n%!" RD_quotient_set.print avail_before;
           dprintf "...avail_after %a\n%!" RD_quotient_set.print !avail_after;
@@ -357,13 +361,13 @@ module Transfer = struct
           dprintf "...avail_after %a\n%!" RD_quotient_set.print avail_after;
           ok avail_across, ok avail_after
         | Op
-            ( Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-            | Const_vec128 _ | Const_vec256 _ | Const_vec512 _ | Stackoffset _
-            | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
-            | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
-            | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region
-            | End_region | Specific _ | Dls_get | Tls_get | Domain_index | Poll
-            | Alloc _ | Pause )
+            ( Dummy_use | Const_int _ | Const_float32 _ | Const_float _
+            | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
+            | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _
+            | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
+            | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
+            | Begin_region | End_region | Specific _ | Dls_get | Tls_get
+            | Domain_index | Poll | Alloc _ | Pause )
         | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
         | Stack_check _ ->
           let is_op_end_region = Cfg.is_end_region in

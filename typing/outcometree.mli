@@ -53,7 +53,7 @@ type out_value =
   | Oval_int64 of int64
   | Oval_nativeint of nativeint
   | Oval_list of out_value list
-  | Oval_printer of (Format.formatter -> unit)
+  | Oval_printer of (Format_doc.formatter -> unit)
   | Oval_record of (out_ident * out_value) list
   | Oval_record_unboxed_product of (out_ident * out_value) list
   | Oval_string of string * int * out_string (* string, size-to-print, kind *)
@@ -99,7 +99,7 @@ type out_ret_mode =
 (** Represents a constant jkind *)
 type out_jkind_const =
   | Ojkind_const_default
-  | Ojkind_const_abbreviation of string
+  | Ojkind_const_abbreviation of string * string list
   (** The base of [Ojkind_const_mod] is optional to enable printing individual axes *)
   | Ojkind_const_mod of out_jkind_const option * string list
   | Ojkind_const_with of out_jkind_const * out_type * out_modality list
@@ -108,7 +108,8 @@ type out_jkind_const =
 
 and out_jkind =
   | Ojkind_const of out_jkind_const
-  | Ojkind_var of string
+  | Ojkind_var of string * string list
+  (** The [string list] represents the scannable axes on the variable *)
   | Ojkind_product of out_jkind list
 
 (* should be empty if all the jkind annotations are missing *)
@@ -197,6 +198,7 @@ and out_sig_item =
       * out_rec_status
   | Osig_type of out_type_decl * out_rec_status
   | Osig_value of out_val_decl
+  | Osig_jkind of out_jkind_decl
   | Osig_ellipsis
 and out_type_decl =
   { otype_name: string;
@@ -239,6 +241,10 @@ and out_ext_status =
   | Oext_first
   | Oext_next
   | Oext_exception
+and out_jkind_decl =
+  { ojkind_name: string;
+    ojkind_jkind: out_jkind option }
+
 
 type out_phrase =
   | Ophr_eval of out_value * out_type

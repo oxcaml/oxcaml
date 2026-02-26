@@ -72,7 +72,7 @@ Line 2, characters 21-22:
                          ^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is contained (via constructor "Bar0") in the value at Line 2, characters 11-23
+         because it is contained (via constructor "Bar0") in the value at line 2, characters 11-23
          which is expected to be "global".
 |}]
 
@@ -91,7 +91,7 @@ Line 2, characters 24-25:
                             ^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is the field "y" of the record at Line 2, characters 11-26
+         because it is the field "y" of the record at line 2, characters 11-26
          which is expected to be "global".
 |}]
 
@@ -142,7 +142,7 @@ Line 2, characters 12-13:
                 ^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is an element of the tuple at Line 2, characters 11-17
+         because it is an element of the tuple at line 2, characters 11-17
          which is expected to be "global".
 |}]
 
@@ -161,7 +161,7 @@ Line 2, characters 13-14:
                  ^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is an element of the array at Line 2, characters 11-19
+         because it is an element of the array at line 2, characters 11-19
          which is expected to be "global".
 |}]
 
@@ -176,7 +176,7 @@ Line 2, characters 16-17:
                     ^
 Error: The value "n" is "local" to the parent region
        but is expected to be "global"
-         because it is used inside the lazy expression at Line 2, characters 11-17
+         because it is used inside the lazy expression at line 2, characters 11-17
          which is expected to be "global".
 |}]
 
@@ -194,7 +194,7 @@ Line 2, characters 11-14:
 2 |   fun r -> r.y
                ^^^
 Error: This value is "local" to the parent region
-         because it is the field "y" of the record at Line 2, characters 11-12
+         because it is the field "y" of the record at line 2, characters 11-12
          which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
@@ -293,7 +293,7 @@ Line 4, characters 21-22:
 4 |     | Bar0 (_, y) -> y
                          ^
 Error: This value is "local" to the parent region
-         because it is contained (via constructor "Bar0") in the value at Line 4, characters 6-17
+         because it is contained (via constructor "Bar0") in the value at line 4, characters 6-17
          which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
@@ -326,7 +326,7 @@ Line 4, characters 16-17:
 4 |     | {y; _} -> y
                     ^
 Error: This value is "local" to the parent region
-         because it is the field "y" of the record at Line 4, characters 6-12
+         because it is the field "y" of the record at line 4, characters 6-12
          which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]

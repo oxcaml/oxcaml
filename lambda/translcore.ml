@@ -299,8 +299,8 @@ let fuse_method_arity (parent : fusable_function) : fusable_function =
 
 let rec iter_exn_names f pat =
   match pat.pat_desc with
-  | Tpat_var (id, _, _, _, _) -> f id
-  | Tpat_alias (p, id, _, _, _, _, _) ->
+  | Tpat_var { id; _ } -> f id
+  | Tpat_alias { pattern = p; id; _ } ->
       f id;
       iter_exn_names f p
   | _ -> ()
@@ -1692,7 +1692,7 @@ and add_type_shapes_of_pattern ~env pattern =
   if !Clflags.debug && !Clflags.shape_format = Clflags.Debugging_shapes then
     let var_list = Typedtree.pat_bound_idents_full pattern in
     List.iter (fun (_ident, _loc, type_expr, var_uid, var_sort) ->
-      let type_name = Format.asprintf "%a" Printtyp.type_expr type_expr in
+      let type_name = Format_doc.asprintf "%a" Printtyp.type_expr type_expr in
       Type_shape.add_to_type_shapes var_uid type_expr var_sort ~name:type_name
         (Env.shape_for_constr env))
     var_list
@@ -2033,7 +2033,7 @@ and transl_let ~scopes ~return_layout ?(add_regions=false) ?(in_structure=false)
       let idlist =
         List.map
           (fun {vb_pat=pat} -> match pat.pat_desc with
-              Tpat_var (id,_,uid,_,_) -> id, uid
+              Tpat_var { id; uid; _ } -> id, uid
             | _ -> assert false)
         pat_expr_list in
       let transl_case
@@ -2715,9 +2715,9 @@ let transl_apply
 
 (* Error report *)
 
-open Format
+open Format_doc
 
-let report_error ppf = function
+let report_error_doc ppf = function
   | Free_super_var ->
       fprintf ppf
         "Ancestor names can only be used to select inherited methods"
@@ -2730,7 +2730,7 @@ let report_error ppf = function
       fprintf ppf
         "Unknown variable %a appearing in probe:@ Please \
          report this error to the Jane Street compilers team."
-        Ident.print id
+        Ident.doc_print id
   | Illegal_void_record_field ->
       fprintf ppf
         "Void sort detected where value was expected in a record field:@ Please \
@@ -2772,7 +2772,9 @@ let () =
   Location.register_error_of_exn
     (function
       | Error (loc, err) ->
-          Some (Location.error_of_printer ~loc report_error err)
+          Some (Location.error_of_printer ~loc report_error_doc err)
       | _ ->
         None
     )
+
+let report_error = Format_doc.compat report_error_doc

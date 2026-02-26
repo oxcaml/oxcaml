@@ -795,6 +795,19 @@ module Int32 = struct
   [@@noalloc] [@@unboxed] [@@builtin]
 end
 
+module Int16 = struct
+  type t = int16
+
+  external popcnt : t -> t = "caml_vec128_unreachable" "caml_popcnt_int16"
+  [@@noalloc] [@@unboxed] [@@builtin]
+
+  external lzcnt : t -> t = "caml_vec128_unreachable" "caml_lzcnt_int16"
+  [@@noalloc] [@@unboxed] [@@builtin]
+
+  external tzcnt : t -> t = "caml_vec128_unreachable" "caml_bmi_tzcnt_int16"
+  [@@noalloc] [@@unboxed] [@@builtin]
+end
+
 module Sse_other_builtins = struct
   (* CR gyorsh: Add arm64 support for intrinsics below. This file contains amd64
      intrinsics that don't have an equivalent arm64 neon intrinsic. They can be

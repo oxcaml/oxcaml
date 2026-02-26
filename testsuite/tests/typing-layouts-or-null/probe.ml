@@ -1,5 +1,4 @@
 (* TEST
- arch_amd64;
  not-macos;
  native;
  setup-ocamlopt.opt-build-env;

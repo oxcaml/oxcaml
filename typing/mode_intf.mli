@@ -12,6 +12,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Fmt = Format_doc
 open Allowance
 
 (* While all our lattices are bi-Heyting algebras (see [mode.ml]), the extra
@@ -34,7 +35,7 @@ module type Lattice = sig
 
   val meet : t -> t -> t
 
-  val print : Format.formatter -> t -> unit
+  val print : Fmt.formatter -> t -> unit
 end
 
 module type Const = sig
@@ -54,6 +55,7 @@ module type Const_product = sig
   (** [max_with ax elt] returns [max] but with the axis [ax] set to [elt]. *)
   val max_with : 'a axis -> 'a -> t
 
+  (** For interfacing with the user only; potentially slow. *)
   module Per_axis :
     Solver_intf.Lattices with type 'a obj := 'a axis and type 'a elt := 'a
 end
@@ -77,7 +79,7 @@ type print_error_result =
   | Mode  (** A mode constant is printed *)
   | Mode_with_hint  (** A mode constant with hints is printed *)
 
-type print_error = (Format.formatter -> print_error_result) simple_error
+type print_error = (Fmt.formatter -> print_error_result) simple_error
 
 module type Common = sig
   module Const : Const
@@ -179,7 +181,7 @@ module type Common = sig
 
   val newvar_below : ('l * allowed) t -> ('l_ * 'r) t * bool
 
-  val print : ?verbose:bool -> unit -> Format.formatter -> ('l * 'r) t -> unit
+  val print : ?verbose:bool -> unit -> Fmt.formatter -> ('l * 'r) t -> unit
 
   val zap_to_ceil : ('l * allowed) t -> Const.t
 
@@ -209,7 +211,7 @@ module type Axis = sig
 
   type packed = P : 'a t -> packed
 
-  val print : Format.formatter -> 'a t -> unit
+  val print : Fmt.formatter -> 'a t -> unit
 
   (** List of all axes, ordered by [compare]. *)
   val all : packed list
@@ -247,7 +249,7 @@ type 'd neg_hint_morph = 'd neg Mode_hint.morph constraint 'd = _ * _
 type 'd pos_hint_morph = 'd pos Mode_hint.morph constraint 'd = _ * _
 
 module type S = sig
-  val print_longident : (Format.formatter -> Longident.t -> unit) ref
+  val print_longident : (Fmt.formatter -> Longident.t -> unit) ref
 
   (* CR-someday zqian: find a better stroy to erase bounds (and hints) that incorporates
      into [disallow_*]. *)
@@ -262,7 +264,7 @@ module type S = sig
       otherwise. Defaults to the latter. *)
   val print_pinpoint :
     Hint.pinpoint ->
-    (definite:bool -> capitalize:bool -> Format.formatter -> unit) option
+    (definite:bool -> capitalize:bool -> Fmt.formatter -> unit) option
 
   type nonrec 'a simple_error = 'a simple_error
 
@@ -526,7 +528,7 @@ module type S = sig
       | Contention : (monadic, Contention.Const.t) t
       | Staticity : (monadic, Staticity.Const.t) t
 
-    val print : Format.formatter -> ('p, 'r) t -> unit
+    val print : Fmt.formatter -> ('p, 'r) t -> unit
 
     val eq : ('p, 'r0) t -> ('p, 'r1) t -> ('r0, 'r1) Misc.eq option
   end
@@ -544,6 +546,7 @@ module type S = sig
 
       val proj : 'a Axis.t -> ('r * 'l) t -> ('a, 'l * 'r) mode
 
+      (** For interfacing with the user only; potentially slow. *)
       module Per_axis : sig
         val zap_to_floor : 'a Axis.t -> ('a, 'l * allowed) mode -> 'a
 
@@ -563,6 +566,7 @@ module type S = sig
 
       val proj : 'a Axis.t -> ('l * 'r) t -> ('a, 'l * 'r) mode
 
+      (** For interfacing with the user only; potentially slow. *)
       module Per_axis : sig
         val zap_to_floor : 'a Axis.t -> ('a, allowed * 'r) mode -> 'a
 
@@ -631,7 +635,7 @@ module type S = sig
 
         val value : t -> default:some -> some
 
-        val print : Format.formatter -> t -> unit
+        val print : Fmt.formatter -> t -> unit
 
         val proj : 'a Axis.t -> t -> 'a option
 
@@ -660,7 +664,7 @@ module type S = sig
       val comonadic_to_monadic_min : Comonadic.Const.t -> Monadic.Const.t
 
       (** Prints a constant on any axis. *)
-      val print_axis : 'a Axis.t -> Format.formatter -> 'a -> unit
+      val print_axis : 'a Axis.t -> Fmt.formatter -> 'a -> unit
     end
 
     (** Existentially holds a mode together with its axis. *)
@@ -718,9 +722,10 @@ module type S = sig
     val min_with_monadic :
       'a Monadic.Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
 
-    val meet_with : 'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
+    val meet_const_with :
+      'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
 
-    val join_with : 'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
+    val join_const_with : 'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * 'r) t
 
     val zap_to_legacy : lr -> Const.t
 
@@ -798,8 +803,8 @@ module type S = sig
     module Comonadic : sig
       module Atom : sig
         type 'a t =
-          | Meet_with of 'a
-              (** [Meet_with c] takes [x] and returns [meet c x]. [c] can be
+          | Meet_const of 'a
+              (** [Meet_const c] takes [x] and returns [meet c x]. [c] can be
                   [max] in which case it's the identity modality. *)
         [@@unboxed]
       end
@@ -808,8 +813,8 @@ module type S = sig
     module Monadic : sig
       module Atom : sig
         type 'a t =
-          | Join_with of 'a
-              (** [Join_with c] takes [x] and returns [join c x]. [c] can be
+          | Join_const of 'a
+              (** [Join_const c] takes [x] and returns [join c x]. [c] can be
                   [min] in which case it's the identity modality. *)
         [@@unboxed]
       end
@@ -829,6 +834,7 @@ module type S = sig
 
     type atom = Atom : 'a Axis.t * 'a -> atom
 
+    (** For interfacing with the user only; potentially slow. *)
     module Per_axis : sig
       (** Test if the given modality is the identity modality. *)
       val is_id : 'a Axis.t -> 'a -> bool
@@ -836,7 +842,7 @@ module type S = sig
       (** Test if the given modality is a constant modality. *)
       val is_constant : 'a Axis.t -> 'a -> bool
 
-      val print : 'a Axis.t -> Format.formatter -> 'a -> unit
+      val print : 'a Axis.t -> Fmt.formatter -> 'a -> unit
     end
 
     type error = Error : 'a Axis.t * 'a simple_error -> error
@@ -895,7 +901,7 @@ module type S = sig
       val equate : t -> t -> (unit, equate_error) Result.t
 
       (** Printing for debugging. *)
-      val print : Format.formatter -> t -> unit
+      val print : Fmt.formatter -> t -> unit
     end
 
     (** A modality that acts on [Value] modes. Conceptually it is a record where
@@ -940,7 +946,7 @@ module type S = sig
     val equate : t -> t -> (unit, equate_error) Result.t
 
     (** Printing for debugging. *)
-    val print : Format.formatter -> t -> unit
+    val print : Fmt.formatter -> t -> unit
 
     (** Given [md_mode] the mode of a module, and [mode] the mode of a value to
         be put in that module, return the inferred modality to be put on the
@@ -1011,7 +1017,7 @@ module type S = sig
                   ]}
                   The type ['x r] can cross the portability axis. This is
                   represented as
-                  [Modality (Meet_with Portable) : Portability.Const.t t]. *)
+                  [Modality (Meet_const Portable) : Portability.Const.t t]. *)
         [@@unboxed]
       end
 
@@ -1080,6 +1086,7 @@ module type S = sig
       val to_modality : packed -> Modality.Axis.packed
     end
 
+    (** For interfacing with the user only; potentially slow. *)
     module Per_axis :
       Solver_intf.Lattices with type 'a elt := 'a and type 'a obj := 'a Axis.t
 
@@ -1142,6 +1149,6 @@ module type S = sig
       (Alloc.Monadic.r, Alloc.Comonadic.l) monadic_comonadic
 
     (** Print the mode crossing by axis. Omit axes that do not cross. *)
-    val print : Format.formatter -> t -> unit
+    val print : Fmt.formatter -> t -> unit
   end
 end

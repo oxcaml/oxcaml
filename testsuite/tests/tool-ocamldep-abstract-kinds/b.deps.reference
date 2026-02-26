@@ -1,0 +1,6 @@
+b.cmo : \
+    a2.cmo \
+    a1.cmo
+b.cmx : \
+    a2.cmx \
+    a1.cmx

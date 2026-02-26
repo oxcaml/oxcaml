@@ -186,7 +186,7 @@ let parse_args mnemonic enc args =
   let args = parse_args mnemonic [] enc args imm res in
   Array.of_list args, !imm, !res
 
-let parse_enc mnemonic enc =
+let parse_enc mnemonic enc ~operand_size_override =
   let enc = String.uppercase_ascii enc in
   let parse_opcode_rm_reg enc =
     let opcode, rest =
@@ -240,7 +240,10 @@ let parse_enc mnemonic enc =
       | _ -> Esc_none, rest
     in
     let opcode, rm_reg = parse_opcode_rm_reg rest in
-    { prefix = Legacy { prefix; escape; rex }; rm_reg; opcode }
+    { prefix = Legacy { prefix; escape; rex; operand_size_override };
+      rm_reg;
+      opcode
+    }
   in
   let parse_vex () =
     let prefix, rest = first_word enc in
@@ -434,11 +437,14 @@ let print_one bind instr =
     | Vexm_0F3A -> "Vexm_0F3A"
   in
   let print_prefix : prefix -> string = function
-    | Legacy { prefix; rex; escape } ->
-      sprintf "Legacy { prefix = %s; rex = %s; escape = %s }"
+    | Legacy { prefix; rex; escape; operand_size_override } ->
+      sprintf
+        "Legacy { prefix = %s; rex = %s; escape = %s; operand_size_override = \
+         %b }"
         (print_legacy_prefix prefix)
         (print_legacy_rex rex)
         (print_legacy_escape escape)
+        operand_size_override
     | Vex { vex_m; vex_w; vex_l; vex_p } ->
       sprintf "Vex { vex_m = %s; vex_w = %b; vex_l = %b; vex_p = %s }"
         (print_vex_map vex_m) vex_w vex_l
@@ -504,6 +510,18 @@ let parse_ext = function
   | "FMA" -> Some [| FMA |]
   | _ -> None
 
+let arg_has_int16 arg =
+  match arg.loc with
+  | Pin _ -> false
+  | Temp temps ->
+    Array.exists
+      (function
+        | R16 -> true
+        | R8 | R32 | R64 | M8 | M16 | M32 | M64 | M128 | M256 | MM | XMM | YMM
+        | VM32X | VM32Y | VM64X | VM64Y ->
+          false)
+      temps
+
 let amd64 () =
   let csv = In_channel.with_open_text "amd64/amd64.csv" parse in
   let lines =
@@ -518,7 +536,10 @@ let amd64 () =
             let args, imm, res =
               String.split_on_char ',' args |> parse_args mnemonic encs
             in
-            let enc = parse_enc mnemonic enc in
+            let enc =
+              parse_enc mnemonic enc
+                ~operand_size_override:(Array.exists arg_has_int16 args)
+            in
             Some { id = Dummy; ext; args; res; imm; mnemonic; enc }
           | None -> None
         with Unsupported -> None)

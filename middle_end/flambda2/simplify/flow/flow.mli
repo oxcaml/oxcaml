@@ -27,7 +27,7 @@ module Acc : sig
   (** Initialize the analysis so that the stack consists of a single toplevel
       continuation. *)
   val init_toplevel :
-    dummy_toplevel_cont:Continuation.t -> Bound_parameters.t -> t -> t
+    dummy_toplevel_cont:Continuation.t -> Bound_parameters.t -> t
 
   (** Add a new continuation on the stack. Used when entering a continuation
       handler. *)
@@ -42,6 +42,12 @@ module Acc : sig
   (** Pop the current top of the stack. Used when exiting the current
       continuation handler. *)
   val exit_continuation : Continuation.t -> t -> t
+
+  (** Record that the current expression defines some lifted constants; this is
+      not liked to the current continuation. Note: this should only be called at
+      top-level, where the constants will be placed, and not from the fonction
+      where the constants come from. *)
+  val record_lifted_constants : Lifted_constant_state.t -> t -> t
 
   (** That variable is defined in the current handler *)
   val record_defined_var : Variable.t -> t -> t

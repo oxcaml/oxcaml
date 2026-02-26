@@ -1183,7 +1183,8 @@ module Shape_with_layout = struct
        shape once it is more cleaned up. *)
 
     let print fmt { type_shape; type_layout } =
-      Format.fprintf fmt "%a @ %a" Shape.print type_shape Layout.format
+      Format.fprintf fmt "%a @ %a" Shape.print type_shape
+        (Format_doc.compat Layout.format)
         type_layout
 
     let hash { type_shape; type_layout } =
@@ -1544,10 +1545,9 @@ let runtime_shape_to_dwarf_die_with_aliased_name (type_name : string)
     create_typedef_die ~reference ~name:full_name ~parent_proto_die unnamed_die;
     reference
 
-let variable_to_die state (var_uid : Uid.t) ~parent_proto_die =
-  let fallback_value_die =
-    Proto_die.reference (DS.value_type_proto_die state)
-  in
+let variable_to_die state ~value_type_proto_die (var_uid : Uid.t)
+    ~parent_proto_die =
+  let fallback_value_die = Proto_die.reference value_type_proto_die in
   (* Once we reach the backend, layouts such as Product [Product [Bits64;
      Bits64]; Float64] have de facto been flattened into a sequence of base
      layouts [Bits64; Bits64; Float64]. Below, we compute the index into the

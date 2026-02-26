@@ -139,13 +139,13 @@ module Lambda_utils : sig
       arguments have been given labels, but otherwise they mirror the primitives
       exactly *)
   module Primitive : sig
-    (** [make_vect ~length ~init] calls the [caml_make_vect] C primitive, which
+    (** [make_vect ~length ~init] calls the [caml_array_make] C primitive, which
         creates an array of the given [length] containing that many copies of
         the given [init]ial value *)
     val make_vect :
       loc:scoped_location -> length:lambda -> init:lambda -> lambda
 
-    (** [make_float_vect len] calls the [caml_make_float_vect] C primitive,
+    (** [make_float_vect len] calls the [caml_array_create_float] C primitive,
         which creates an unboxed float array of length [len] whose contents are
         uninitialized *)
     val make_float_vect : loc:scoped_location -> lambda -> lambda

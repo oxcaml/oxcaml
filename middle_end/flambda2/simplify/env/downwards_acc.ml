@@ -120,6 +120,8 @@ let denv t = t.denv
 
 let flow_acc t = t.flow_acc
 
+let[@inline always] with_flow_acc flow_acc t = { t with flow_acc }
+
 let[@inline always] map_flow_acc t ~f = { t with flow_acc = f t.flow_acc }
 
 let[@inline always] map_denv t ~f = { t with denv = f t.denv }

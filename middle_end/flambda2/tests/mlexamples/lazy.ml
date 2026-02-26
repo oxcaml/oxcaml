@@ -741,8 +741,8 @@ open Stdlib
 
    If OCaml was configured with the -flat-float-array option (which is currently
    the default), the following is also true: We cannot use representation (3)
-   for a [float Lazy.t] because [caml_make_array] assumes that only a [float]
-   value can have tag [Double_tag].
+   for a [float Lazy.t] because [caml_array_of_uniform_array] assumes that only
+   a [float] value can have tag [Double_tag].
 
    We have to use the built-in type constructor [lazy_t] to let the compiler
    implement the special typing and compilation rules for the [lazy] keyword. *)

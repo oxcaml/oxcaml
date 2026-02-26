@@ -57,7 +57,7 @@ module type Sort = sig
 
     val equal : t -> t -> bool
 
-    val format : Format.formatter -> t -> unit
+    val format : Format_doc.formatter -> t -> unit
 
     val all_void : t -> bool
 
@@ -199,11 +199,7 @@ module type Sort = sig
       if possible *)
   val equate : t -> t -> bool
 
-  val format : Format.formatter -> t -> unit
-
-  (** Checks whether this sort is [void], defaulting to [value] if a sort
-      variable is unfilled. *)
-  val is_void_defaulting : t -> bool
+  val format : Format_doc.formatter -> t -> unit
 
   (** [default_to_value_and_get] extracts the sort as a `const`. If it's a
       variable, it is set to [value] first. *)
@@ -282,6 +278,7 @@ module History = struct
     | Implicit_jkind : string -> (allowed * allowed) annotation_context
     | Type_wildcard : Location.t -> (allowed * allowed) annotation_context
     | Type_of_kind : Location.t -> (allowed * allowed) annotation_context
+    | Jkind_declaration : Path.t -> (allowed * allowed) annotation_context
     | With_error_message :
         string * 'd annotation_context
         -> 'd annotation_context
@@ -380,6 +377,7 @@ module History = struct
           position : int;
           arity : int
         }
+    | Overapproximation_of_with_bounds
 
   type product_creation_reason =
     | Unboxed_tuple

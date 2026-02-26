@@ -50,8 +50,8 @@ module Typedtree_search =
 
     let iter_val_pattern = function
       | Typedtree.Tpat_any -> None
-      | Typedtree.Tpat_var (name, _, _, _, _)
-      | Typedtree.Tpat_alias (_, name, _, _, _, _, _) ->
+      | Typedtree.Tpat_var { id = name; _ }
+      | Typedtree.Tpat_alias { id = name; _ } ->
         Some (Name.from_ident name)
       | Typedtree.Tpat_tuple _ -> None (* FIXME when we will handle tuples *)
       | _ -> None
@@ -112,6 +112,7 @@ module Typedtree_search =
       | Typedtree.Tstr_include _ -> ()
       | Typedtree.Tstr_eval _ -> ()
       | Typedtree.Tstr_attribute _ -> ()
+      | Typedtree.Tstr_jkind _ -> Misc.fatal_error "Tstr_jkind"
 
     let tables typedtree =
       let t = Hashtbl.create 13 in
@@ -252,14 +253,14 @@ module Analyser =
     let tt_param_info_from_pattern env f_desc pat =
       let rec iter_pattern pat =
         match pat.pat_desc with
-          Typedtree.Tpat_var (ident, _, _, _, _) ->
+          Typedtree.Tpat_var { id = ident; _ } ->
             let name = Name.from_ident ident in
             Simple_name { sn_name = name ;
                           sn_text = f_desc name ;
                           sn_type = Odoc_env.subst_type env pat.pat_type
                         }
 
-        | Typedtree.Tpat_alias (pat, _, _, _, _, _, _) ->
+        | Typedtree.Tpat_alias { pattern = pat; _ } ->
             iter_pattern pat
 
         | Typedtree.Tpat_tuple patlist ->
@@ -335,7 +336,7 @@ module Analyser =
        let (pat, exp) = pat_exp in
        let comment_opt = Odoc_sig.analyze_alerts comment_opt attrs in
        match (pat.pat_desc, exp.exp_desc) with
-         (Tpat_var (ident, _, _, _, _), Texp_function { params; body; _ }) ->
+         (Tpat_var { id = ident; _ }, Texp_function { params; body; _ }) ->
            (* a new function is defined *)
            let name_pre = Name.from_ident ident in
            let name = Name.parens_if_infix name_pre in
@@ -361,7 +362,7 @@ module Analyser =
            in
            [ new_value ]
 
-       | (Typedtree.Tpat_var (ident, _, _, _, _), _) ->
+       | (Typedtree.Tpat_var { id = ident; _ }, _) ->
            (* a new value is defined *)
            let name_pre = Name.from_ident ident in
            let name = Name.parens_if_infix name_pre in
@@ -670,14 +671,14 @@ module Analyser =
               a default value. In this case, we look for the good parameter pattern *)
            let (parameter, next_tt_class_exp) =
              match pat.Typedtree.pat_desc with
-               Typedtree.Tpat_var (ident, _, _, _, _)
+               Typedtree.Tpat_var { id = ident; _ }
                when String.starts_with (Name.from_ident ident) ~prefix:"*opt*"
                 ->
                  (
                   (* there must be a Tcl_let just after *)
                   match tt_class_expr2.Typedtree.cl_desc with
                     Typedtree.Tcl_let (_,
-                      {vb_pat={pat_desc = Typedtree.Tpat_var (id,_,_,_,_) };
+                      {vb_pat={pat_desc = Typedtree.Tpat_var { id; _ } };
                        vb_expr=exp} :: _, _, tt_class_expr3) ->
                       let name = Name.from_ident id in
                       let new_param = Simple_name
@@ -1022,7 +1023,7 @@ module Analyser =
    and analyse_structure_item env current_module_name loc pos_limit comment_opt parsetree_item_desc _typedtree
         table table_values =
       match parsetree_item_desc with
-      | Parsetree.Pstr_kind_abbrev _ -> Misc.fatal_error "Pstr_kind_abbrev"
+      | Parsetree.Pstr_jkind _ -> Misc.fatal_error "Pstr_kind"
       | Parsetree.Pstr_eval _ ->
           (* don't care *)
           (0, env, [])

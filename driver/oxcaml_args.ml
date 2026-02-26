@@ -432,6 +432,16 @@ let mk_no_dissector_assume_lld_without_64_bit_eh_frames f =
     Arg.Unit f,
     " Do not assume LLD linker limitation" )
 
+let mk_manual_module_init f =
+  ( "-manual-module-init",
+    Arg.Unit f,
+    " Enable manual module initialization (emit unit dependency table)" )
+
+let mk_no_manual_module_init f =
+  ( "-no-manual-module-init",
+    Arg.Unit f,
+    " Disable manual module initialization (default)" )
+
 let mk_gc_timings f =
   ("-dgc-timings", Arg.Unit f, "Output information about time spent in the GC")
 
@@ -960,6 +970,18 @@ let mk_dfexpr f =
     Arg.Unit f,
     " Like -dflambda but outputs fexpr language\n     (Flambda 2 only)" )
 
+let mk_dfexpr_annot f =
+  ( "-dfexpr-annot",
+    Arg.Unit f,
+    " Dump fexpr of all passes alongside each compilation unit\n\
+    \     (Flambda 2 only)" )
+
+let mk_dfexpr_annot_after f =
+  ( "-dfexpr-annot-after",
+    Arg.String f,
+    " Dump fexpr of given pass alongside each compilation unit\n\
+    \     (Flambda 2 only)" )
+
 let mk_dfexpr_after f =
   let passes = [ "simplify"; "reaper" ] in
   ( "-dfexpr-after",
@@ -1195,6 +1217,8 @@ module type Oxcaml_options = sig
   val ddissector_inputs : string -> unit
   val dissector_assume_lld_without_64_bit_eh_frames : unit -> unit
   val no_dissector_assume_lld_without_64_bit_eh_frames : unit -> unit
+  val manual_module_init : unit -> unit
+  val no_manual_module_init : unit -> unit
   val gc_timings : unit -> unit
   val no_mach_ir : unit -> unit
   val dllvmir : unit -> unit
@@ -1270,6 +1294,8 @@ module type Oxcaml_options = sig
   val dfexpr_to : string -> unit
   val dfexpr_after : string -> unit
   val dflexpect_to : string -> unit
+  val dfexpr_annot : unit -> unit
+  val dfexpr_annot_after : string -> unit
   val dslot_offsets : unit -> unit
   val dfreshen : unit -> unit
   val dflow : unit -> unit
@@ -1359,6 +1385,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
         F.dissector_assume_lld_without_64_bit_eh_frames;
       mk_no_dissector_assume_lld_without_64_bit_eh_frames
         F.no_dissector_assume_lld_without_64_bit_eh_frames;
+      mk_manual_module_init F.manual_module_init;
+      mk_no_manual_module_init F.no_manual_module_init;
       mk_gc_timings F.gc_timings;
       mk_no_mach_ir F.no_mach_ir;
       mk_dllvmir F.dllvmir;
@@ -1459,6 +1487,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_dfexpr_to F.dfexpr_to;
       mk_dfexpr_after F.dfexpr_after;
       mk_dflexpect_to F.dflexpect_to;
+      mk_dfexpr_annot F.dfexpr_annot;
+      mk_dfexpr_annot_after F.dfexpr_annot_after;
       mk_dslot_offsets F.dslot_offsets;
       mk_dfreshen F.dfreshen;
       mk_dflow F.dflow;
@@ -1624,6 +1654,8 @@ module Oxcaml_options_impl = struct
   let no_dissector_assume_lld_without_64_bit_eh_frames =
     clear' Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames
 
+  let manual_module_init = set' Oxcaml_flags.manual_module_init
+  let no_manual_module_init = clear' Oxcaml_flags.manual_module_init
   let gc_timings = set' Oxcaml_flags.gc_timings
   let no_mach_ir () = ()
   let dllvmir () = set' Oxcaml_flags.dump_llvmir ()
@@ -1846,6 +1878,11 @@ module Oxcaml_options_impl = struct
 
   let dfexpr_to file = Flambda2.Dump.fexpr := Flambda2.Dump.File file
   let dflexpect_to file = Flambda2.Dump.flexpect := Flambda2.Dump.File file
+  let dfexpr_annot () = Flambda2.Dump.fexpr_annot := true
+
+  let dfexpr_annot_after pass =
+    Flambda2.Dump.fexpr_annot_after := pass :: !Flambda2.Dump.fexpr_annot_after
+
   let dslot_offsets = set' Flambda2.Dump.slot_offsets
   let dfreshen = set' Flambda2.Dump.freshen
   let dflow = set' Flambda2.Dump.flow
@@ -2306,6 +2343,10 @@ module Extra_params = struct
         set' Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames
     | "no-dissector-assume-lld-without-64-bit-eh-frames" ->
         Oxcaml_flags.dissector_assume_lld_without_64_bit_eh_frames := false;
+        true
+    | "manual-module-init" -> set' Oxcaml_flags.manual_module_init
+    | "no-manual-module-init" ->
+        Oxcaml_flags.manual_module_init := false;
         true
     | _ -> false
 end

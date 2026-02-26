@@ -369,7 +369,7 @@ let compute_file_layout ~original_data_end ~igot_and_iplt ~total_symbols
   }
 
 (* Sections that should be renamed for Large_code partitions *)
-let sections_to_rename = [".text"; ".rodata"; ".data"; ".bss"; ".eh_frame"]
+let sections_to_rename = [".text"; ".rodata"; ".data"; ".bss"]
 
 (* Check if a section base name (without .rela prefix) needs renaming *)
 let base_needs_rename base =

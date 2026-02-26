@@ -370,9 +370,9 @@ Line 3, characters 39-40:
                                            ^
 Error: This value is "local"
        but is expected to be "global"
-         because it is an element of the tuple at Line 3, characters 37-45
+         because it is an element of the tuple at line 3, characters 37-45
          which is expected to be "global"
-         because it is an element (with some modality) of the array at Line 3, characters 34-48.
+         because it is an element (with some modality) of the array at line 3, characters 34-48.
 |}]
 
 (* Extracting local values from iarrays via pattern matching:
@@ -386,9 +386,9 @@ Line 3, characters 32-33:
 3 |   | [: #(s, _) :] -> use_global s
                                     ^
 Error: This value is "local" to the parent region
-         because it is an element of the tuple at Line 3, characters 7-14
+         because it is an element of the tuple at line 3, characters 7-14
          which is "local" to the parent region
-         because it is an element of the array at Line 3, characters 4-17
+         because it is an element of the array at line 3, characters 4-17
          which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]
@@ -409,9 +409,9 @@ Line 3, characters 13-14:
 3 |   use_global s
                  ^
 Error: This value is "local" to the parent region
-         because it is an element of the tuple at Line 2, characters 9-16
+         because it is an element of the tuple at line 2, characters 9-16
          which is "local" to the parent region
-         because it is an element of the array at Line 2, characters 6-19
+         because it is an element of the array at line 2, characters 6-19
          which is "local" to the parent region.
        However, the highlighted expression is expected to be "global".
 |}]

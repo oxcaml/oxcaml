@@ -67,7 +67,7 @@ let create_archive file_list lib_name =
       seek_out outchan ofs_pos_toc;
       output_binary_int outchan pos_toc)
 
-open Format
+open Format_doc
 module Style = Misc.Style
 
 let report_error ppf = function
@@ -75,7 +75,7 @@ let report_error ppf = function
       fprintf ppf "Cannot find file %a" Style.inline_code name
   | Not_an_object_file name ->
       fprintf ppf "The file %a is not a JavaScript IR object file"
-        (Style.as_inline_code Location.print_filename)
+        (Style.as_inline_code Location.Doc.filename)
         name
 
 let () =

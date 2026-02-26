@@ -30,7 +30,7 @@ Line 4, characters 22-25:
 4 |   let _ @ shareable = bar in
                           ^^^
 Error: This value is "nonportable"
-         because it contains a usage (of the value "a" at Line 3, characters 15-16)
+         because it contains a usage (of the value "a" at line 3, characters 15-16)
          which is expected to be "uncontended".
        However, the highlighted expression is expected to be "shareable".
 |}]
@@ -54,7 +54,7 @@ Line 1, characters 64-65:
                                                                     ^
 Error: The value "f" is "shareable"
        but is expected to be "portable"
-         because it is used inside the function at Line 1, characters 54-68
+         because it is used inside the function at line 1, characters 54-68
          which is expected to be "portable".
 |}]
 
@@ -65,7 +65,7 @@ Line 1, characters 67-68:
                                                                        ^
 Error: The value "f" is "nonportable"
        but is expected to be "shareable"
-         because it is used inside the function at Line 1, characters 57-71
+         because it is used inside the function at line 1, characters 57-71
          which is expected to be "shareable".
 |}]
 
@@ -92,7 +92,7 @@ Line 1, characters 43-46:
 1 | let get : 'a t -> 'a @ portable = fun t -> t.x
                                                ^^^
 Error: This value is "shareable"
-         because it is the field "x" (with some modality) of the record at Line 1, characters 43-44.
+         because it is the field "x" (with some modality) of the record at line 1, characters 43-44.
        However, the highlighted expression is expected to be "portable".
 |}]
 

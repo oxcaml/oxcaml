@@ -406,7 +406,11 @@ and subst_params_and_body env params_and_body =
 and subst_let_cont env (let_cont_expr : Let_cont_expr.t) =
   match let_cont_expr with
   | Non_recursive
-      { handler; num_free_occurrences = _; is_applied_with_traps = _ } ->
+      { handler;
+        num_free_occurrences = _;
+        is_applied_with_traps = _;
+        can_be_lifted = _
+      } ->
     Non_recursive_let_cont_handler.pattern_match handler ~f:(fun cont ~body ->
         let body = subst_expr env body in
         let handler =
@@ -1271,12 +1275,14 @@ and let_cont_exprs env (let_cont1 : Let_cont.t) (let_cont2 : Let_cont.t) :
   | ( Non_recursive
         { handler = handler1;
           num_free_occurrences = _;
-          is_applied_with_traps = _
+          is_applied_with_traps = _;
+          can_be_lifted = can_be_lifted1
         },
       Non_recursive
         { handler = handler2;
           num_free_occurrences = _;
-          is_applied_with_traps = _
+          is_applied_with_traps = _;
+          can_be_lifted = can_be_lifted2
         } ) ->
     let module Non_rec = Non_recursive_let_cont_handler in
     let sorts_match =
@@ -1297,7 +1303,7 @@ and let_cont_exprs env (let_cont1 : Let_cont.t) (let_cont2 : Let_cont.t) :
              ~approximant:(fun () ->
                ( subst_expr env body1,
                  subst_cont_handler env (Non_rec.handler handler1) ))
-             ~cond:sorts_match
+             ~cond:(sorts_match && Bool.equal can_be_lifted1 can_be_lifted2)
         |> Comparison.map ~f:(fun (body, handler) ->
             Let_cont.create_non_recursive cont handler ~body
               ~free_names_of_body:Unknown))

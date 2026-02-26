@@ -26,10 +26,9 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
   in
   let dacc =
     DA.with_are_lifting_conts dacc Are_lifting_conts.no_lifting
-    |> DA.map_flow_acc
-         ~f:
-           (Flow.Acc.init_toplevel ~dummy_toplevel_cont
-              (Bound_parameters.append params implicit_params))
+    |> DA.with_flow_acc
+         (Flow.Acc.init_toplevel ~dummy_toplevel_cont
+            (Bound_parameters.append params implicit_params))
   in
   let expr, uacc =
     simplify dacc ~down_to_up:(fun dacc ~rebuild ->

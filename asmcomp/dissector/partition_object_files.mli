@@ -44,7 +44,7 @@ type error =
 exception Error of error
 
 (** Pretty-print a partitioning error. *)
-val report_error : Format.formatter -> error -> unit
+val report_error : Format_doc.formatter -> error -> unit
 
 (** Default partition size threshold in bytes (1 GiB). *)
 val default_partition_size : int64

@@ -294,6 +294,7 @@ let unary_exn ~env ~res (f : Flambda_primitive.unary_primitive) x =
       | Tagged_int63_as_unboxed_int64 -> raise Primitive_not_supported
     in
     use_prim' (Extern extern_name)
+  | Reinterpret_boxed_vector -> identity ~env ~res x
   | Unbox_number _ | Box_number _ | Untag_immediate | Tag_immediate ->
     (* everything is untagged and "unboxed" in JS: see README *)
     identity ~env ~res x
@@ -353,7 +354,9 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
     let op_name =
       match width with
       | Eight -> "unsafe_get"
+      | Eight_signed -> "geti8"
       | Sixteen -> "get16"
+      | Sixteen_signed -> "geti16"
       | Thirty_two -> "get32"
       | Single -> "getf32"
       | Sixty_four -> "get64"
@@ -367,8 +370,8 @@ let binary_exn ~env ~res (f : Flambda_primitive.binary_primitive) x y =
       | Bigstring -> (
         match width with
         | Eight -> "caml_ba_get_1"
-        | Sixteen | Thirty_two | Single | Sixty_four | One_twenty_eight _
-        | Two_fifty_six _ | Five_twelve _ ->
+        | Eight_signed | Sixteen | Sixteen_signed | Thirty_two | Single
+        | Sixty_four | One_twenty_eight _ | Two_fifty_six _ | Five_twelve _ ->
           "caml_ba_uint8_" ^ op_name)
     in
     use_prim' (Extern extern_name)
@@ -544,13 +547,13 @@ let ternary_exn ~env ~res (f : Flambda_primitive.ternary_primitive) x y z =
       | _, One_twenty_eight _ | _, Two_fifty_six _ | _, Five_twelve _ ->
         (* No SIMD *)
         raise Primitive_not_supported
-      | Bytes, Eight -> "caml_bytes_unsafe_set"
-      | Bytes, Sixteen -> "caml_bytes_set16"
+      | Bytes, (Eight | Eight_signed) -> "caml_bytes_unsafe_set"
+      | Bytes, (Sixteen | Sixteen_signed) -> "caml_bytes_set16"
       | Bytes, Thirty_two -> "caml_bytes_set32"
       | Bytes, Single -> "caml_bytes_setf32"
       | Bytes, Sixty_four -> "caml_bytes_set64"
-      | Bigstring, Eight -> "caml_ba_set_1"
-      | Bigstring, Sixteen -> "caml_ba_uint8_set16"
+      | Bigstring, (Eight | Eight_signed) -> "caml_ba_set_1"
+      | Bigstring, (Sixteen | Sixteen_signed) -> "caml_ba_uint8_set16"
       | Bigstring, Thirty_two -> "caml_ba_uint8_set32"
       | Bigstring, Single -> "caml_ba_uint8_setf32"
       | Bigstring, Sixty_four -> "caml_ba_uint8_set64"

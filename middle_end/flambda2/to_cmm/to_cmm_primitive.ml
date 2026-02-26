@@ -672,7 +672,13 @@ let string_like_load_aux ~ptr_out_of_heap ~dbg width ~str ~index =
     (* CR mshinwell: should not be Mutable for [string] *)
     C.load ~dbg Byte_unsigned Mutable
       ~addr:(C.add_int_ptr ~ptr_out_of_heap str index dbg)
+  | Eight_signed ->
+    C.load ~dbg Byte_signed Mutable
+      ~addr:(C.add_int_ptr ~ptr_out_of_heap str index dbg)
   | Sixteen -> C.unaligned_load_16 ~ptr_out_of_heap str index dbg
+  | Sixteen_signed ->
+    C.sign_extend ~bits:16 ~dbg
+      (C.unaligned_load_16 ~ptr_out_of_heap str index dbg)
   | Thirty_two ->
     C.sign_extend ~bits:32 ~dbg
       (C.unaligned_load_32 ~ptr_out_of_heap str index dbg)
@@ -704,10 +710,11 @@ let string_like_load ~dbg kind width ~str ~index =
 let bytes_or_bigstring_set_aux ~ptr_out_of_heap ~dbg width ~bytes ~index
     ~new_value =
   match (width : P.string_accessor_width) with
-  | Eight ->
+  | Eight | Eight_signed ->
     let addr = C.add_int_ptr ~ptr_out_of_heap bytes index dbg in
     C.store ~dbg Byte_unsigned Assignment ~addr ~new_value
-  | Sixteen -> C.unaligned_set_16 ~ptr_out_of_heap bytes index new_value dbg
+  | Sixteen | Sixteen_signed ->
+    C.unaligned_set_16 ~ptr_out_of_heap bytes index new_value dbg
   | Thirty_two -> C.unaligned_set_32 ~ptr_out_of_heap bytes index new_value dbg
   | Single -> C.unaligned_set_f32 ~ptr_out_of_heap bytes index new_value dbg
   | Sixty_four -> C.unaligned_set_64 ~ptr_out_of_heap bytes index new_value dbg
@@ -1149,6 +1156,7 @@ let unary_primitive env res dbg f arg =
       | Unboxed_float64_as_unboxed_int64 -> C.float_as_int64 ~dbg arg
     in
     None, res, cmm
+  | Reinterpret_boxed_vector -> None, res, arg
   | Unbox_number kind -> None, res, unbox_number ~dbg kind arg
   | Untag_immediate -> Some (Env.Untag arg), res, C.untag_int arg dbg
   | Box_number (kind, alloc_mode) ->
@@ -1206,9 +1214,9 @@ let unary_primitive env res dbg f arg =
       None, res, expr)
   | Is_boxed_float ->
     (* As a note, this omits the [Is_in_value_area] check that exists in
-       [caml_make_array], which is used by non-Flambda 2 compilers. This seems
-       reasonable given known existing use cases of naked pointers and the fact
-       that they will be forbidden entirely in OCaml 5. *)
+       [caml_array_of_uniform_array], which is used by non-Flambda 2 compilers.
+       This seems reasonable given known existing use cases of naked pointers
+       and the fact that they will be forbidden entirely in OCaml 5. *)
     ( None,
       res,
       C.ite

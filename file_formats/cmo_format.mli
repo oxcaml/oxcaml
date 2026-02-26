@@ -15,6 +15,9 @@
 
 (* Symbol table information for .cmo and .cma files *)
 
+(* Names of compilation units as represented in CMO files *)
+type compunit = Compunit of string [@@unboxed]
+
 (* Predefined symbols as represented in CMO files *)
 
 type predef =
@@ -23,7 +26,7 @@ type predef =
 (* Relocation information *)
 
 type reloc_info =
-  | Reloc_literal of Lambda.structured_constant (* structured constant *)
+    Reloc_literal of Obj.t                  (* structured constant *)
   | Reloc_getcompunit of Compilation_unit.t (* reference to a compunit *)
   | Reloc_getpredef of predef (* reference to a predef *)
   | Reloc_setcompunit of Compilation_unit.t (* definition of a compunit *)

@@ -12,6 +12,8 @@
 (*                                                                        *)
 (**************************************************************************)
 
+module Fmt = Format_doc
+
 module type Axis_ops = sig
   include Mode_intf.Lattice
 
@@ -66,9 +68,9 @@ module Externality = struct
     | External, External -> External
 
   let print ppf = function
-    | External -> Format.fprintf ppf "external_"
-    | External64 -> Format.fprintf ppf "external64"
-    | Internal -> Format.fprintf ppf "internal"
+    | External -> Fmt.fprintf ppf "external_"
+    | External64 -> Fmt.fprintf ppf "external64"
+    | Internal -> Fmt.fprintf ppf "internal"
 
   let upper_bound_if_is_always_gc_ignorable () =
     (* We check that we're compiling to (64-bit) native code before counting
@@ -112,8 +114,8 @@ module Nullability = struct
     | Non_null, Non_null -> Non_null
 
   let print ppf = function
-    | Non_null -> Format.fprintf ppf "non_null"
-    | Maybe_null -> Format.fprintf ppf "maybe_null"
+    | Non_null -> Fmt.fprintf ppf "non_null"
+    | Maybe_null -> Fmt.fprintf ppf "maybe_null"
 end
 
 module Separability = struct
@@ -163,9 +165,55 @@ module Separability = struct
     | Non_float, Non_float -> Non_float
 
   let print ppf = function
-    | Non_float -> Format.fprintf ppf "non_float"
-    | Separable -> Format.fprintf ppf "separable"
-    | Maybe_separable -> Format.fprintf ppf "maybe_separable"
+    | Non_float -> Fmt.fprintf ppf "non_float"
+    | Separable -> Fmt.fprintf ppf "separable"
+    | Maybe_separable -> Fmt.fprintf ppf "maybe_separable"
+end
+
+module Pointerness = struct
+  type t =
+    | Non_pointer
+    | Maybe_pointer
+
+  let max = Maybe_pointer
+
+  let min = Non_pointer
+
+  let equal p1 p2 =
+    match p1, p2 with
+    | Non_pointer, Non_pointer -> true
+    | Maybe_pointer, Maybe_pointer -> true
+    | (Non_pointer | Maybe_pointer), _ -> false
+
+  let less_or_equal p1 p2 : Misc.Le_result.t =
+    match p1, p2 with
+    | Non_pointer, Non_pointer -> Equal
+    | Non_pointer, Maybe_pointer -> Less
+    | Maybe_pointer, Non_pointer -> Not_le
+    | Maybe_pointer, Maybe_pointer -> Equal
+
+  let le p1 p2 = Misc.Le_result.is_le (less_or_equal p1 p2)
+
+  let meet p1 p2 =
+    match p1, p2 with
+    | Non_pointer, (Non_pointer | Maybe_pointer) | Maybe_pointer, Non_pointer ->
+      Non_pointer
+    | Maybe_pointer, Maybe_pointer -> Maybe_pointer
+
+  let join p1 p2 =
+    match p1, p2 with
+    | Maybe_pointer, (Maybe_pointer | Non_pointer) | Non_pointer, Maybe_pointer
+      ->
+      Maybe_pointer
+    | Non_pointer, Non_pointer -> Non_pointer
+
+  let to_string = function
+    | Non_pointer -> "non_pointer"
+    | Maybe_pointer -> "maybe_pointer"
+
+  let print ppf t = Fmt.fprintf ppf "%s" (to_string t)
+
+  let is_max p = equal p max
 end
 
 module Axis = struct
@@ -203,7 +251,7 @@ module Axis = struct
       let (P ax) =
         P ax |> Mode.Crossing.Axis.to_modality |> Mode.Modality.Axis.to_value
       in
-      Format.asprintf "%a" Mode.Value.Axis.print ax
+      Fmt.asprintf "%a" Mode.Value.Axis.print ax
     | Nonmodal Externality -> "externality"
     | Nonmodal Nullability -> "nullability"
     | Nonmodal Separability -> "separability"
@@ -246,7 +294,7 @@ module Per_axis = struct
       | Nullability -> Nullability.join a b
       | Separability -> Separability.join a b
 
-    let print : type a. a t -> Format.formatter -> a -> unit = function
+    let print : type a. a t -> Fmt.formatter -> a -> unit = function
       | Externality -> Externality.print
       | Nullability -> Nullability.print
       | Separability -> Separability.print
@@ -286,7 +334,7 @@ module Per_axis = struct
     | Modal ax -> (Mode.Crossing.Per_axis.join [@inlined hint]) ax a b
     | Nonmodal ax -> (Nonmodal.join [@inlined hint]) ax a b
 
-  let print : type a. a t -> Format.formatter -> a -> unit = function
+  let print : type a. a t -> Fmt.formatter -> a -> unit = function
     | Modal ax -> Mode.Crossing.Per_axis.print ax
     | Nonmodal ax -> Nonmodal.print ax
 
@@ -297,8 +345,8 @@ module Per_axis = struct
     | Nonmodal ax0, Nonmodal ax1 -> Nonmodal.eq_obj ax0 ax1
     | _ -> None
 
-  let print_obj : type a. Format.formatter -> a t -> unit =
-   fun ppf ax -> Format.pp_print_string ppf (name ax)
+  let print_obj : type a. Fmt.formatter -> a t -> unit =
+   fun ppf ax -> Fmt.pp_print_string ppf (name ax)
 end
 
 module Axis_set = struct

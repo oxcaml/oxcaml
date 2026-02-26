@@ -89,9 +89,12 @@ and let_cont_expr = private
             (** [num_free_occurrences] can be used, for example, to decide
                 whether to inline out a linearly-used continuation. It will
                 always be strictly greater than zero. *)
-        is_applied_with_traps : bool
+        is_applied_with_traps : bool;
             (** [is_applied_with_traps] is used to prevent inlining of
                 continuations that are applied with a trap action *)
+        can_be_lifted : bool
+            (** [can_be_lifted] is used to prevent some continuations from being
+                lifted during continuation specialization. *)
       }
   | Recursive of recursive_let_cont_handlers
 
@@ -407,6 +410,15 @@ module Let_cont_expr : sig
     body:expr ->
     num_free_occurrences_of_cont_in_body:Num_occurrences.t Or_unknown.t ->
     is_applied_with_traps:bool ->
+    expr
+
+  (** Same as [create_non_recursive] but marks the continuation as a wrapper.
+      Wrapper continuations are not lifted during specialization *)
+  val create_non_liftable :
+    Continuation.t ->
+    Continuation_handler.t ->
+    body:expr ->
+    free_names_of_body:Name_occurrences.t Or_unknown.t ->
     expr
 
   (** Create a definition of a set of possibly-recursive continuations. *)

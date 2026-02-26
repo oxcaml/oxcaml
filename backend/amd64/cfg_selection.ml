@@ -51,6 +51,10 @@ let rec select_addr exp =
       else default
     | (Asymbol _ | Aadd (_, _) | Ascale (_, _) | Ascaledadd (_, _, _)), _ ->
       default)
+  | Cmm.Cop (Cmuli, [(Cvar _ as arg); Cconst_int (((3 | 5 | 9) as mult), _)], _)
+  | Cmm.Cop (Cmuli, [Cconst_int (((3 | 5 | 9) as mult), _); (Cvar _ as arg)], _)
+    ->
+    Ascaledadd (arg, arg, mult - 1), 0
   | Cmm.Cop (Cmuli, [arg; Cconst_int (((2 | 4 | 8) as mult), _)], _)
   | Cmm.Cop (Cmuli, [Cconst_int (((2 | 4 | 8) as mult), _); arg], _) -> (
     let default = Ascale (arg, mult), 0 in
@@ -89,11 +93,11 @@ let rec select_addr exp =
 
 exception Use_default_exn
 
-let rax = phys_reg Int 0
+let rax = phys_reg Int (P RAX)
 
-let rcx = phys_reg Int 5
+let rcx = phys_reg Int (P RCX)
 
-let rdx = phys_reg Int 4
+let rdx = phys_reg Int (P RDX)
 
 let select_locality (l : Cmm.prefetch_temporal_locality_hint) :
     Arch.prefetch_temporal_locality_hint =
@@ -128,7 +132,7 @@ let specific x : Cfg.basic_or_terminator = Basic (Op (Specific x))
 let pseudoregs_for_operation op arg res =
   match (op : Operation.t) with
   (* Two-address binary operations: arg.(0) and res.(0) must be the same *)
-  | Intop (Iadd | Isub | Imul | Iand | Ior | Ixor) | Specific Ipackf32 ->
+  | Intop (Isub | Imul | Iand | Ior | Ixor) | Specific Ipackf32 ->
     [| res.(0); arg.(1) |], res
   | Floatop ((Float32 | Float64), (Iaddf | Isubf | Imulf | Idivf))
   | Specific (Ifloatarithmem (_, _, _)) ->
@@ -209,7 +213,7 @@ let pseudoregs_for_operation op arg res =
     arg, res
   (* Other instructions are regular *)
   | Intop_atomic { op = Add | Sub | Land | Lor | Lxor; _ }
-  | Intop (Ipopcnt | Iclz _ | Ictz _ | Icomp _)
+  | Intop (Ipopcnt | Iclz _ | Ictz _ | Icomp _ | Iadd)
   | Intop_imm ((Imulh _ | Idiv | Imod | Icomp _ | Ipopcnt | Iclz _ | Ictz _), _)
   | Specific
       ( Isextend32 | Izextend32 | Ilea _
@@ -217,9 +221,9 @@ let pseudoregs_for_operation op arg res =
       | Ilfence | Isfence | Imfence
       | Ioffset_loc (_, _)
       | Irdtsc | Icldemote _ | Iprefetch _ )
-  | Move | Spill | Reload | Reinterpret_cast _ | Static_cast _ | Const_int _
-  | Const_float32 _ | Const_float _ | Const_vec128 _ | Const_vec256 _
-  | Const_vec512 _ | Const_symbol _ | Stackoffset _ | Load _
+  | Move | Spill | Reload | Dummy_use | Reinterpret_cast _ | Static_cast _
+  | Const_int _ | Const_float32 _ | Const_float _ | Const_vec128 _
+  | Const_vec256 _ | Const_vec512 _ | Const_symbol _ | Stackoffset _ | Load _
   | Store (_, _, _)
   | Alloc _ | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
   | Begin_region | End_region | Poll | Dls_get | Tls_get | Domain_index ->
@@ -315,6 +319,10 @@ let is_store_out_of_range _chunk ~byte_offset:_ :
     Cfg_selectgen_target_intf.is_store_out_of_range_result =
   Within_range
 
+let is_offset_out_of_range _byte_offset :
+    Cfg_selectgen_target_intf.is_store_out_of_range_result =
+  Within_range
+
 let insert_move_extcall_arg _exttype _src _dst :
     Cfg_selectgen_target_intf.insert_move_extcall_arg_result =
   Use_default
@@ -355,7 +363,7 @@ let select_operation'
     Cfg_selectgen_target_intf.select_operation_result =
   match op with
   (* Recognize the LEA instruction *)
-  | Caddi | Caddv | Cadda | Csubi | Cor -> (
+  | Caddi | Caddv | Cadda | Csubi | Cor | Cmuli -> (
     match select_addressing Word_int (Cop (op, args, dbg)) with
     | Iindexed _, _ | Iindexed2 0, _ -> Use_default
     | ((Iindexed2 _ | Iscaled _ | Iindexed2scaled _ | Ibased _) as addr), arg ->

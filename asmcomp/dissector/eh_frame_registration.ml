@@ -35,14 +35,6 @@ let linker_script_sections =
   \    __EH_FRAME_BEGIN__ = .;\n\
   \    *(.eh_frame)\n\
   \    *(.eh_frame.*)\n\
-   }\n\
-   .eh_frame_hdr : {\n\
-  \    /* Empty .eh_frame_hdr - runtime registration handles unwinding */\n\
-  \    BYTE(1)                        /* version = 1 */\n\
-  \    BYTE(0x1b)                     /* eh_frame_ptr: DW_EH_PE_pcrel|sdata4 */\n\
-  \    BYTE(0xff)                     /* fde_count: DW_EH_PE_omit */\n\
-  \    BYTE(0xff)                     /* table: DW_EH_PE_omit */\n\
-  \    LONG(ADDR(.eh_frame) - .)      /* eh_frame pointer (relative) */\n\
    }\n"
 
 (* C code for manual EH frame registration: uses .init and .fini constructors to

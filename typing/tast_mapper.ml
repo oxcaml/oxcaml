@@ -41,6 +41,8 @@ type mapper =
       extension_constructor;
     jkind_annotation:
       mapper -> Parsetree.jkind_annotation -> Parsetree.jkind_annotation;
+    jkind_declaration:
+      mapper -> jkind_declaration -> jkind_declaration;
     location: mapper -> Location.t -> Location.t;
     modalities: mapper -> modalities -> modalities;
     (* CR-someday lstevenson: If we ever want to inspect the [mode_modes] field,
@@ -195,6 +197,7 @@ let structure_item sub {str_loc; str_desc; str_env} =
         Tstr_include (str_include_infos sub incl)
     | Tstr_open od -> Tstr_open (sub.open_declaration sub od)
     | Tstr_attribute attr -> Tstr_attribute (sub.attribute sub attr)
+    | Tstr_jkind d -> Tstr_jkind (sub.jkind_declaration sub d)
   in
   {str_desc; str_env; str_loc}
 
@@ -300,6 +303,18 @@ let extension_constructor sub x =
   let ext_attributes = sub.attributes sub x.ext_attributes in
   {x with ext_loc; ext_name; ext_kind; ext_attributes}
 
+let[@warning "+9"] jkind_declaration sub
+     {jkind_id; jkind_name; jkind_jkind; jkind_annotation; jkind_attributes;
+      jkind_loc} =
+  let jkind_name = map_loc sub jkind_name in
+  let jkind_annotation =
+    Option.map (sub.jkind_annotation sub) jkind_annotation
+  in
+  let jkind_attributes = sub.attributes sub jkind_attributes in
+  let jkind_loc = sub.location sub jkind_loc in
+  {jkind_id; jkind_name; jkind_jkind; jkind_annotation; jkind_attributes;
+   jkind_loc}
+
 let pat_extra sub = function
   | Tpat_unpack as d -> d
   | Tpat_type (path,loc) -> Tpat_type (path, map_loc sub loc)
@@ -323,8 +338,8 @@ let pat
     | Tpat_constant _
     | Tpat_unboxed_unit
     | Tpat_unboxed_bool _ -> x.pat_desc
-    | Tpat_var (id, s, uid, sort, m) ->
-      Tpat_var (id, map_loc sub s, uid, sort, m)
+    | Tpat_var { id; name; uid; sort; mode } ->
+      Tpat_var { id; name = map_loc sub name; uid; sort; mode }
     | Tpat_tuple l ->
         Tpat_tuple (List.map (fun (label, p) -> label, sub.pat sub p) l)
     | Tpat_unboxed_tuple l ->
@@ -346,8 +361,10 @@ let pat
         Tpat_record_unboxed_product
           (List.map (tuple3 (map_loc sub) id (sub.pat sub)) l, closed)
     | Tpat_array (am, arg_sort, l) -> Tpat_array (am, arg_sort, List.map (sub.pat sub) l)
-    | Tpat_alias (p, id, s, uid, sort, m, ty) ->
-        Tpat_alias (sub.pat sub p, id, map_loc sub s, uid, sort, m, ty)
+    | Tpat_alias { pattern; id; name; uid; sort; mode; type_expr } ->
+        Tpat_alias { pattern = sub.pat sub pattern; id;
+                     name = map_loc sub name; uid;
+                     sort; mode; type_expr }
     | Tpat_lazy p -> Tpat_lazy (sub.pat sub p)
     | Tpat_value p ->
        (as_computation_pattern (sub.pat sub (p :> pattern))).pat_desc
@@ -762,6 +779,7 @@ let signature_item sub x =
           (List.map (sub.class_type_declaration sub) list)
     | Tsig_open od -> Tsig_open (sub.open_description sub od)
     | Tsig_attribute attr -> Tsig_attribute (sub.attribute sub attr)
+    | Tsig_jkind jd -> Tsig_jkind (sub.jkind_declaration sub jd)
   in
   {sig_loc; sig_desc; sig_env}
 
@@ -1132,6 +1150,7 @@ let default =
     expr;
     extension_constructor;
     jkind_annotation;
+    jkind_declaration;
     location;
     modalities;
     modes;

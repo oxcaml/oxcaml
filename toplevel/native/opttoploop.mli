@@ -112,21 +112,21 @@ val print_warning : Location.t -> formatter -> Warnings.t -> unit
 val input_name : string ref
 
 val print_out_value :
-  (formatter -> Outcometree.out_value -> unit) ref
+  Outcometree.out_value Oprint.toplevel_printer
 val print_out_type :
-  (formatter -> Outcometree.out_type -> unit) ref
+  Outcometree.out_type Oprint.printer
 val print_out_class_type :
-  (formatter -> Outcometree.out_class_type -> unit) ref
+  Outcometree.out_class_type Oprint.printer
 val print_out_module_type :
-  (formatter -> Outcometree.out_module_type -> unit) ref
+  Outcometree.out_module_type Oprint.printer
 val print_out_type_extension :
-  (formatter -> Outcometree.out_type_extension -> unit) ref
+  Outcometree.out_type_extension Oprint.printer
 val print_out_sig_item :
-  (formatter -> Outcometree.out_sig_item -> unit) ref
+  Outcometree.out_sig_item Oprint.printer
 val print_out_signature :
-  (formatter -> Outcometree.out_sig_item list -> unit) ref
+  Outcometree.out_sig_item list Oprint.printer
 val print_out_phrase :
-  (formatter -> Outcometree.out_phrase -> unit) ref
+  Outcometree.out_phrase Oprint.toplevel_printer
 
 (* Hooks for external line editor *)
 

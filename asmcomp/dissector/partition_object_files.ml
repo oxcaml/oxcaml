@@ -40,7 +40,7 @@ exception Error of error
 
 let report_error ppf = function
   | File_exceeds_partition_size { filename; size; threshold } ->
-    Format.fprintf ppf
+    Format_doc.fprintf ppf
       "Dissector: file %s has allocated section size %Ld bytes, which exceeds \
        partition threshold %Ld bytes"
       filename size threshold

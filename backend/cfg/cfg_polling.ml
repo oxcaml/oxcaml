@@ -82,22 +82,24 @@ let report_error ppf = function
     let num_user_polls = List.length instrs - num_inserted_polls in
     if num_user_polls = 0
     then
-      Format.fprintf ppf
+      Format_doc.fprintf ppf
         "Function with poll-error attribute contains polling points (inserted \
          by the compiler)\n"
     else
-      Format.fprintf ppf
+      Format_doc.fprintf ppf
         "Function with poll-error attribute contains polling points:\n";
     List.iter
       ~f:(fun (p, dbg) ->
         match p with
         | Poll | Alloc | Function_call | External_call ->
-          Format.fprintf ppf "\t%s" (instr_type p);
+          Format_doc.fprintf ppf "\t%s" (instr_type p);
           if not (Debuginfo.is_none dbg)
           then (
-            Format.fprintf ppf " at ";
-            Location.print_loc ppf (Debuginfo.to_location dbg));
-          Format.fprintf ppf "\n")
+            Format_doc.fprintf ppf " at ";
+            (Location.Doc.loc ~capitalize_first:true)
+              ppf
+              (Debuginfo.to_location dbg));
+          Format_doc.fprintf ppf "\n")
       (List.sort
          ~cmp:(fun (_, left) (_, right) -> Debuginfo.compare left right)
          instrs)
@@ -189,10 +191,10 @@ module Polls_before_prtc_transfer = struct
       else Ok Always_polls
     | Op (Alloc _) -> Ok Always_polls
     | Op
-        ( Move | Spill | Reload | Opaque | Begin_region | End_region | Dls_get
-        | Tls_get | Domain_index | Pause | Const_int _ | Const_float32 _
-        | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-        | Const_vec512 _ | Stackoffset _ | Load _
+        ( Move | Spill | Reload | Dummy_use | Opaque | Begin_region | End_region
+        | Dls_get | Tls_get | Domain_index | Pause | Const_int _
+        | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+        | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _
         | Store (_, _, _)
         | Intop _ | Int128op _
         | Intop_imm (_, _)
@@ -356,12 +358,13 @@ let add_poll_or_alloc_basic :
   match instr.desc with
   | Op op -> (
     match op with
-    | Move | Spill | Reload | Const_int _ | Const_float32 _ | Const_float _
-    | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
-    | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _ | Intop_imm _
-    | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _ | Static_cast _
-    | Probe_is_enabled _ | Opaque | Begin_region | End_region | Specific _
-    | Name_for_debugger _ | Dls_get | Tls_get | Domain_index | Pause ->
+    | Move | Spill | Reload | Dummy_use | Const_int _ | Const_float32 _
+    | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
+    | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _
+    | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
+    | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region | End_region
+    | Specific _ | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
+    | Pause ->
       points
     | Poll -> (Poll, instr.dbg) :: points
     | Alloc _ -> (Alloc, instr.dbg) :: points)

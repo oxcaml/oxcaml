@@ -244,6 +244,12 @@ let is_store_out_of_range kind ~byte_offset :
     Cfg_selectgen_target_intf.is_store_out_of_range_result =
   if is_offset kind byte_offset then Within_range else Out_of_range
 
+let is_offset_out_of_range byte_offset :
+    Cfg_selectgen_target_intf.is_store_out_of_range_result =
+  if Validated_mem_offset.is_valid ~scale:1 ~offset:byte_offset
+  then Within_range
+  else Out_of_range
+
 let insert_move_extcall_arg (ty_arg : Cmm.exttype) src dst :
     Cfg_selectgen_target_intf.insert_move_extcall_arg_result =
   let ty_arg_is_small_int =
@@ -267,10 +273,10 @@ let pseudoregs_for_operation op arg res =
       | Imulsubf | Inegmulsubf | Isqrtf | Imove32 | Ifar_alloc _
       | Ishiftarith (_, _)
       | Ibswap _ | Isignext _ )
-  | Move | Spill | Reload | Opaque | Pause | Begin_region | End_region | Dls_get
-  | Tls_get | Domain_index | Poll | Const_int _ | Const_float32 _
-  | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-  | Const_vec512 _ | Stackoffset _ | Load _
+  | Move | Spill | Reload | Dummy_use | Opaque | Pause | Begin_region
+  | End_region | Dls_get | Tls_get | Domain_index | Poll | Const_int _
+  | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
+  | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _
   | Store (_, _, _)
   | Intop _ | Int128op _
   | Intop_imm (_, _)

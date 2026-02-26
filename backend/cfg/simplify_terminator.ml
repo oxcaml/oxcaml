@@ -50,7 +50,8 @@ let simplify_switch (block : C.basic_block) labels =
   match labels_with_counts with
   | [(l, _)] ->
     (* All labels are the same and equal to l *)
-    block.terminator <- { block.terminator with desc = Always l }
+    block.terminator
+      <- { block.terminator with desc = Always l; arg = [||]; res = [||] }
   | [(l0, n); (ln, k)] ->
     assert (Label.equal labels.(0) l0);
     assert (Label.equal labels.(n) ln);
@@ -117,12 +118,13 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
           replace instr.res.(0) value
         | Some _ | None -> remove instr.res.(0))
       | Op
-          ( Spill | Reload | Const_symbol _ | Const_vec128 _ | Const_vec256 _
-          | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Intop _
-          | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
-          | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
-          | Begin_region | End_region | Specific _ | Name_for_debugger _
-          | Dls_get | Poll | Pause | Alloc _ | Tls_get | Domain_index )
+          ( Spill | Reload | Dummy_use | Const_symbol _ | Const_vec128 _
+          | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _ | Store _
+          | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _
+          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
+          | Opaque | Begin_region | End_region | Specific _
+          | Name_for_debugger _ | Dls_get | Poll | Pause | Alloc _ | Tls_get
+          | Domain_index )
       | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
       | Stack_check _ ->
         Array.iter
@@ -273,7 +275,8 @@ let block_known_values (block : C.basic_block) ~(is_after_regalloc : bool)
     match evaluate_terminator known_values block.terminator with
     | None -> false
     | Some succ ->
-      block.terminator <- { block.terminator with desc = Always succ };
+      block.terminator
+        <- { block.terminator with desc = Always succ; arg = [||]; res = [||] };
       true)
   else false
 
@@ -318,7 +321,12 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
       in
       match new_successor with
       | Some succ ->
-        block.terminator <- { block.terminator with desc = Always succ };
+        block.terminator
+          <- { block.terminator with
+               desc = Always succ;
+               arg = [||];
+               res = [||]
+             };
         true
       | None -> (
         if
@@ -354,7 +362,8 @@ let block (cfg : C.t) (block : C.basic_block) : bool =
     if Label.Set.cardinal labels = 1
     then (
       let l = Label.Set.min_elt labels in
-      block.terminator <- { block.terminator with desc = Always l };
+      block.terminator
+        <- { block.terminator with desc = Always l; arg = [||]; res = [||] };
       false)
     else
       block_known_values block ~is_after_regalloc

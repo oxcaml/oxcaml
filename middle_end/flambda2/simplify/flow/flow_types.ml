@@ -193,6 +193,7 @@ module Acc = struct
     { stack : Continuation_info.t list;
       map : Continuation_info.t Continuation.Map.t;
       extra : Continuation_extra_params_and_args.t Continuation.Map.t;
+      lifted_constants : Lifted_constant_state.t;
       dummy_toplevel_cont : Continuation.t
     }
 
@@ -207,16 +208,19 @@ module Acc = struct
   let print_extra ppf extra =
     Continuation.Map.print Continuation_extra_params_and_args.print ppf extra
 
-  let [@ocamlformat "disable"] print ppf { stack; map; extra; dummy_toplevel_cont = _ } =
+  let [@ocamlformat "disable"] print ppf
+      { stack; map; extra; lifted_constants; dummy_toplevel_cont = _ } =
     Format.fprintf ppf
       "@[<hov 1>(\
        @[<hov 1>(stack %a)@]@ \
        @[<hov 1>(map %a)@]@ \
-       @[<hov 1>(extra %a)@]\
+       @[<hov 1>(extra %a)@]@ \
+       @[<hov 1>(lifted_constants %a)@]\
        )@]"
       print_stack stack
       print_map map
       print_extra extra
+      Lifted_constant_state.print lifted_constants
 end
 
 (* Result of the flow analysis: reachable code ids *)

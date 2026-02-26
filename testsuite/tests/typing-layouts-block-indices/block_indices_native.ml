@@ -4,7 +4,6 @@
  include stdlib_upstream_compatible;
  modules = "stubs.c";
  flambda2;
- arch_amd64;
  native;
 *)
 

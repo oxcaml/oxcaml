@@ -44,6 +44,7 @@ type mapper = {
                          -> extension_constructor;
   include_declaration: mapper -> T.include_declaration -> include_declaration;
   include_description: mapper -> T.include_description -> include_description;
+  jkind_declaration: mapper -> T.jkind_declaration -> jkind_declaration;
   label_declaration: mapper -> T.label_declaration -> label_declaration;
   location: mapper -> Location.t -> Location.t;
   module_binding: mapper -> T.module_binding -> module_binding;
@@ -209,6 +210,8 @@ let structure_item sub item =
         Pstr_include (sub.include_declaration sub incl)
     | Tstr_attribute x ->
         Pstr_attribute x
+    | Tstr_jkind x ->
+        Pstr_jkind (sub.jkind_declaration sub x)
   in
   Str.mk ~loc desc
 
@@ -319,6 +322,12 @@ let extension_constructor sub ext =
   | Text_rebind (_p, lid) ->
     Te.constructor ~loc ~attrs name (Pext_rebind (map_loc sub lid))
 
+let jkind_declaration _sub decl =
+  { pjkind_name = decl.jkind_name;
+    pjkind_manifest = decl.jkind_annotation;
+    pjkind_attributes = decl.jkind_attributes;
+    pjkind_loc = decl.jkind_jkind.jkind_loc }
+
 let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
   let loc = sub.location sub pat.pat_loc in
   (* todo: fix attributes on extras *)
@@ -328,7 +337,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
       { pat_extra=[Tpat_unpack, loc, _attrs]; pat_desc = Tpat_any; _ } ->
         Ppat_unpack { txt = None; loc  }
     | { pat_extra=[Tpat_unpack, _, _attrs];
-        pat_desc = Tpat_var (_,name, _, _, _); _ } ->
+        pat_desc = Tpat_var { name; _ }; _ } ->
         Ppat_unpack { name with txt = Some name.txt }
     | { pat_extra=[Tpat_type (_path, lid), _, _attrs]; _ } ->
         Ppat_type (map_loc sub lid)
@@ -341,7 +350,7 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | _ ->
     match pat.pat_desc with
       Tpat_any -> Ppat_any
-    | Tpat_var (id, name,_,_,_) ->
+    | Tpat_var { id; name; _ } ->
         begin
           match (Ident.name id).[0] with
             'A'..'Z' ->
@@ -355,11 +364,12 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
        This avoids transforming a warning 27 into a 26.
      *)
     | Tpat_alias
-      ({pat_desc = Tpat_any; pat_loc}, _id, name, _uid, _sort, _mode, _ty)
+      { pattern = {pat_desc = Tpat_any; pat_loc};
+        name; _ }
          when pat_loc = pat.pat_loc ->
        Ppat_var name
 
-    | Tpat_alias (pat, _id, name, _uid, _sort, _mode, _ty) ->
+    | Tpat_alias { pattern = pat; name; _ } ->
         Ppat_alias (sub.pat sub pat, name)
     | Tpat_constant cst -> Ppat_constant (constant cst)
     | Tpat_unboxed_unit -> Ppat_unboxed_unit
@@ -857,6 +867,8 @@ let signature_item sub item =
         Psig_class_type (List.map (sub.class_type_declaration sub) list)
     | Tsig_attribute x ->
         Psig_attribute x
+    | Tsig_jkind x ->
+        Psig_jkind (sub.jkind_declaration sub x)
   in
   Sig.mk ~loc desc
 
@@ -1099,7 +1111,7 @@ let core_type sub ct =
 
 let class_structure sub cs =
   let rec remove_self = function
-    | { pat_desc = Tpat_alias (p, id, _s, _uid, _sort, _mode, _ty) }
+    | { pat_desc = Tpat_alias { pattern = p; id; _ } }
       when string_is_prefix "selfpat-" (Ident.name id) ->
         remove_self p
     | p -> p
@@ -1129,7 +1141,7 @@ let object_field sub {of_loc; of_desc; of_attributes;} =
   Of.mk ~loc ~attrs desc
 
 and is_self_pat = function
-  | { pat_desc = Tpat_alias(_pat, id, _, _uid, _sort, _mode, _ty) } ->
+  | { pat_desc = Tpat_alias { id; _ } } ->
       string_is_prefix "self-" (Ident.name id)
   | _ -> false
 
@@ -1224,6 +1236,7 @@ let default_mapper =
     location = location;
     row_field = row_field ;
     object_field = object_field ;
+    jkind_declaration = jkind_declaration;
   }
 
 let untype_structure ?(mapper : mapper = default_mapper) structure =
