@@ -180,6 +180,7 @@ val optimize_for_speed : bool ref
 val dump_cmm : bool ref
 val dump_cse : bool ref
 val dump_linear : bool ref
+val dump_solver_graph_trace : bool ref
 val debug_ocaml : bool ref
 val keep_startup_file : bool ref
 val native_code : bool ref

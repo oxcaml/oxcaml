@@ -85,6 +85,7 @@ module type Core_options = sig
   val _dparsetree : unit -> unit
   val _dtypedtree : unit -> unit
   val _dshape : unit -> unit
+  val _dsolver_graph_trace : unit -> unit
   val _dslambda : unit -> unit
   val _drawlambda : unit -> unit
   val _dlambda : unit -> unit

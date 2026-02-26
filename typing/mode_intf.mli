@@ -315,6 +315,10 @@ module type S = sig
 
   val with_copy_scope : (copy_scope -> 'a) -> 'a
 
+  (** Trace expression typing boundaries in solver trace output when
+      [-dsolver-graph-trace] is enabled. *)
+  val with_solver_trace_expression : loc:Location.t -> (unit -> 'a) -> 'a
+
   type nonrec allowed = allowed
 
   type nonrec disallowed = disallowed

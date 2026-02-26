@@ -4288,23 +4288,270 @@ module type Obj = sig
   val obj : const C.obj
 end
 
+let solver_trace_prefix = "SOLVER_TRACE "
+
+let solver_trace_id = 1
+
+let solver_trace_started = ref false
+
+let solver_trace_end_registered = ref false
+
+let solver_trace_step_next_id = ref 0
+
+let solver_trace_event_next_id = ref 0
+
+let solver_trace_step_stack : int list ref = ref []
+
+let solver_trace_expr_next_id = ref 0
+
+let solver_trace_expr_stack : int list ref = ref []
+
+let fresh_solver_trace_step_id () =
+  incr solver_trace_step_next_id;
+  !solver_trace_step_next_id
+
+let fresh_solver_trace_event_id () =
+  incr solver_trace_event_next_id;
+  !solver_trace_event_next_id
+
+let fresh_solver_trace_expr_id () =
+  incr solver_trace_expr_next_id;
+  !solver_trace_expr_next_id
+
+let json_escape s =
+  let b = Buffer.create (String.length s) in
+  String.iter
+    (function
+      | '"' -> Buffer.add_string b "\\\""
+      | '\\' -> Buffer.add_string b "\\\\"
+      | '\b' -> Buffer.add_string b "\\b"
+      | '\012' -> Buffer.add_string b "\\f"
+      | '\n' -> Buffer.add_string b "\\n"
+      | '\r' -> Buffer.add_string b "\\r"
+      | '\t' -> Buffer.add_string b "\\t"
+      | c ->
+        if Char.code c < 0x20
+        then Buffer.add_string b (Printf.sprintf "\\u%04x" (Char.code c))
+        else Buffer.add_char b c)
+    s;
+  Buffer.contents b
+
+let json_string s = "\"" ^ json_escape s ^ "\""
+
+let json_int_list xs =
+  "[" ^ String.concat "," (List.map string_of_int xs) ^ "]"
+
+let json_int_option = function None -> "null" | Some i -> string_of_int i
+
+let json_trace_edge ({ var_id; modality } : S.trace_edge) =
+  Printf.sprintf
+    {|{"var_id":%d,"modality":%s}|}
+    var_id (json_string modality)
+
+let json_trace_edge_list edges =
+  "[" ^ String.concat "," (List.map json_trace_edge edges) ^ "]"
+
+let current_solver_trace_step_id () =
+  match !solver_trace_step_stack with [] -> None | step_id :: _ -> Some step_id
+
+let current_solver_trace_expr_id () =
+  match !solver_trace_expr_stack with [] -> None | expr_id :: _ -> Some expr_id
+
+let json_position (pos : Lexing.position) =
+  Printf.sprintf
+    {|{"line":%d,"col":%d,"cnum":%d}|}
+    pos.pos_lnum (pos.pos_cnum - pos.pos_bol) pos.pos_cnum
+
+let json_location (loc : Location.t) =
+  Printf.sprintf
+    {|{"file":%s,"start":%s,"end":%s}|}
+    (json_string loc.loc_start.pos_fname)
+    (json_position loc.loc_start)
+    (json_position loc.loc_end)
+
+let emit_solver_trace_line payload =
+  Format.eprintf "%s%s@." solver_trace_prefix payload
+
+let json_trace_change_kind (kind : S.trace_change_kind) =
+  match kind with Apply -> "\"apply\"" | Undo -> "\"undo\""
+
+let emit_solver_trace_event (event : S.trace_event) =
+  let event_id = fresh_solver_trace_event_id () in
+  let step_id = json_int_option (current_solver_trace_step_id ()) in
+  match event with
+  | Level_event { kind; var_id; old_level; new_level } ->
+    emit_solver_trace_line
+      (Printf.sprintf
+         {|{"kind":"trace_delta","trace_id":%d,"event_id":%d,"step_id":%s,"op":%s,"field":"level","var_id":%d,"old":%d,"new":%d}|}
+         solver_trace_id event_id step_id (json_trace_change_kind kind) var_id
+         old_level new_level)
+  | Lower_event { kind; var_id; old_lower; new_lower } ->
+    emit_solver_trace_line
+      (Printf.sprintf
+         {|{"kind":"trace_delta","trace_id":%d,"event_id":%d,"step_id":%s,"op":%s,"field":"lower","var_id":%d,"old":%s,"new":%s}|}
+         solver_trace_id event_id step_id (json_trace_change_kind kind) var_id
+         (json_string old_lower) (json_string new_lower))
+  | Upper_event { kind; var_id; old_upper; new_upper } ->
+    emit_solver_trace_line
+      (Printf.sprintf
+         {|{"kind":"trace_delta","trace_id":%d,"event_id":%d,"step_id":%s,"op":%s,"field":"upper","var_id":%d,"old":%s,"new":%s}|}
+         solver_trace_id event_id step_id (json_trace_change_kind kind) var_id
+         (json_string old_upper) (json_string new_upper))
+  | Vlower_event { kind; var_id; old_vlower; new_vlower } ->
+    emit_solver_trace_line
+      (Printf.sprintf
+         {|{"kind":"trace_delta","trace_id":%d,"event_id":%d,"step_id":%s,"op":%s,"field":"vlower","var_id":%d,"old":%s,"new":%s}|}
+         solver_trace_id event_id step_id (json_trace_change_kind kind) var_id
+         (json_trace_edge_list old_vlower)
+         (json_trace_edge_list new_vlower))
+  | Vupper_event { kind; var_id; old_vupper; new_vupper } ->
+    emit_solver_trace_line
+      (Printf.sprintf
+         {|{"kind":"trace_delta","trace_id":%d,"event_id":%d,"step_id":%s,"op":%s,"field":"vupper","var_id":%d,"old":%s,"new":%s}|}
+         solver_trace_id event_id step_id (json_trace_change_kind kind) var_id
+         (json_trace_edge_list old_vupper)
+         (json_trace_edge_list new_vupper))
+  | Gencopy_event { kind; var_id; old_gencopy; new_gencopy } ->
+    emit_solver_trace_line
+      (Printf.sprintf
+         {|{"kind":"trace_delta","trace_id":%d,"event_id":%d,"step_id":%s,"op":%s,"field":"gencopy","var_id":%d,"old":%s,"new":%s}|}
+         solver_trace_id event_id step_id (json_trace_change_kind kind) var_id
+         (json_int_option old_gencopy) (json_int_option new_gencopy))
+  | Var_create_event
+      { var_id;
+        init_level;
+        init_lower;
+        init_upper;
+        init_vlower;
+        init_vupper;
+        provenance;
+        related_var_ids
+      } ->
+    emit_solver_trace_line
+      (Printf.sprintf
+         {|{"kind":"trace_var_create","trace_id":%d,"event_id":%d,"step_id":%s,"var_id":%d,"level":%d,"lower":%s,"upper":%s,"vlower":%s,"vupper":%s,"provenance":%s,"related_var_ids":%s}|}
+         solver_trace_id event_id step_id var_id init_level
+         (json_string init_lower) (json_string init_upper)
+         (json_trace_edge_list init_vlower)
+         (json_trace_edge_list init_vupper)
+         (json_string provenance) (json_int_list related_var_ids))
+
+let ensure_solver_trace_started () =
+  if not !solver_trace_started
+  then (
+    solver_trace_started := true;
+    emit_solver_trace_line
+      (Printf.sprintf {|{"kind":"trace_start","trace_id":%d}|} solver_trace_id);
+    if not !solver_trace_end_registered
+    then (
+      solver_trace_end_registered := true;
+      at_exit (fun () ->
+          if !solver_trace_started
+          then
+            emit_solver_trace_line
+              (Printf.sprintf
+                 {|{"kind":"trace_end","trace_id":%d,"steps":%d,"events":%d}|}
+                 solver_trace_id !solver_trace_step_next_id
+                 !solver_trace_event_next_id)))
+          )
+
+let on_solver_trace_event event =
+  if !Clflags.dump_solver_graph_trace
+  then (
+    ensure_solver_trace_started ();
+    emit_solver_trace_event event)
+
+let () = S.set_trace_event_hook (Some on_solver_trace_event)
+
+let begin_solver_trace_step () =
+  if !Clflags.dump_solver_graph_trace
+  then (
+    ensure_solver_trace_started ();
+    let step_id = fresh_solver_trace_step_id () in
+    solver_trace_step_stack := step_id :: !solver_trace_step_stack;
+    emit_solver_trace_line
+      (Printf.sprintf
+         {|{"kind":"trace_step_start","trace_id":%d,"step_id":%d}|}
+         solver_trace_id step_id);
+    Some step_id)
+  else None
+
+let end_solver_trace_step step_id ~result =
+  (match !solver_trace_step_stack with
+  | top :: rest when top = step_id -> solver_trace_step_stack := rest
+  | _ ->
+    solver_trace_step_stack
+      := List.filter (fun id -> id <> step_id) !solver_trace_step_stack);
+  emit_solver_trace_line
+    (Printf.sprintf
+       {|{"kind":"trace_step_end","trace_id":%d,"step_id":%d,"result":%s}|}
+       solver_trace_id step_id (json_string result))
+
+let begin_solver_trace_expression ~loc =
+  ensure_solver_trace_started ();
+  let event_id = fresh_solver_trace_event_id () in
+  let step_id = json_int_option (current_solver_trace_step_id ()) in
+  let expr_id = fresh_solver_trace_expr_id () in
+  let parent_expr_id = json_int_option (current_solver_trace_expr_id ()) in
+  emit_solver_trace_line
+    (Printf.sprintf
+       {|{"kind":"trace_expr_enter","trace_id":%d,"event_id":%d,"step_id":%s,"expr_id":%d,"parent_expr_id":%s,"loc":%s}|}
+       solver_trace_id event_id step_id expr_id parent_expr_id
+       (json_location loc));
+  solver_trace_expr_stack := expr_id :: !solver_trace_expr_stack;
+  expr_id
+
+let end_solver_trace_expression expr_id ~result =
+  (match !solver_trace_expr_stack with
+  | top :: rest when top = expr_id -> solver_trace_expr_stack := rest
+  | _ ->
+    solver_trace_expr_stack
+      := List.filter (fun id -> id <> expr_id) !solver_trace_expr_stack);
+  let event_id = fresh_solver_trace_event_id () in
+  let step_id = json_int_option (current_solver_trace_step_id ()) in
+  emit_solver_trace_line
+    (Printf.sprintf
+       {|{"kind":"trace_expr_exit","trace_id":%d,"event_id":%d,"step_id":%s,"expr_id":%d,"result":%s}|}
+       solver_trace_id event_id step_id expr_id (json_string result))
+
+let with_solver_trace_expression ~loc op =
+  if not !Clflags.dump_solver_graph_trace
+  then op ()
+  else (
+    let expr_id = begin_solver_trace_expression ~loc in
+    match op () with
+    | x ->
+      end_solver_trace_expression expr_id ~result:"ok";
+      x
+    | exception exn ->
+      end_solver_trace_expression expr_id ~result:"error";
+      raise exn)
+
 let try_with_log op =
   let log' = ref S.empty_changes in
   let log = Some log' in
+  let trace_step = begin_solver_trace_step () in
+  let finish result =
+    Option.iter (fun step_id -> end_solver_trace_step step_id ~result) trace_step
+  in
   match op ~log with
   | Ok _ as x ->
     !append_changes log';
+    finish "ok";
     x
   | Error _ as x ->
     S.undo_changes !log';
+    finish "error";
     x
 [@@inline]
 
 let with_log op =
   let log' = ref S.empty_changes in
   let log = Some log' in
+  let trace_step = begin_solver_trace_step () in
   let r = op ~log in
   !append_changes log';
+  Option.iter (fun step_id -> end_solver_trace_step step_id ~result:"ok") trace_step;
   r
 [@@inline]
 

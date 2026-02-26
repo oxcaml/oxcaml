@@ -347,8 +347,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   module VarSet = Set.Make (Int)
 
   type change =
-    | Cupper : 'a var * 'a * ('a, right_only) Comp_hint.t -> change
-    | Clower : 'a var * 'a * ('a, left_only) Comp_hint.t -> change
+    | Cupper : 'a C.obj * 'a var * 'a * ('a, right_only) Comp_hint.t -> change
+    | Clower : 'a C.obj * 'a var * 'a * ('a, left_only) Comp_hint.t -> change
     | Cvlower : 'a var * 'a lmorphvar VarMap.t -> change
     | Cvupper : 'a var * 'a rmorphvar VarMap.t -> change
     | Clevel : 'a var * int -> change
@@ -356,17 +356,145 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   type changes = change list
 
+  type trace_edge =
+    { var_id : int;
+      modality : string
+    }
+
+  let compare_trace_edge a b =
+    match Int.compare a.var_id b.var_id with
+    | 0 -> String.compare a.modality b.modality
+    | n -> n
+
+  let trace_edges_of_vlower (vlower : 'a lmorphvar VarMap.t) : trace_edge list =
+    VarMap.fold
+      (fun key (Amorphvar (u, _, _)) edges ->
+        let modality =
+          match key with
+          | Key (dst, _, key_morph) ->
+            Fmt.asprintf "%a" (C.print_morph dst) key_morph
+        in
+        { var_id = u.id; modality } :: edges)
+      vlower []
+    |> List.sort_uniq compare_trace_edge
+
+  let trace_edges_of_vupper (vupper : 'a rmorphvar VarMap.t) : trace_edge list =
+    VarMap.fold
+      (fun key (Amorphvar (u, _, _)) edges ->
+        let modality =
+          match key with
+          | Key (dst, _, key_morph) ->
+            Fmt.asprintf "%a" (C.print_morph dst) key_morph
+        in
+        { var_id = u.id; modality } :: edges)
+      vupper []
+    |> List.sort_uniq compare_trace_edge
+
+  let string_of_const obj a = Fmt.asprintf "%a" (C.print obj) a
+
+  let gencopy_id_of_var_opt gencopy = Option.map (fun v -> v.id) gencopy
+
+  type trace_var_creation =
+    { var_id : int;
+      init_level : int;
+      init_lower : string;
+      init_upper : string;
+      init_vlower : trace_edge list;
+      init_vupper : trace_edge list;
+      provenance : string;
+      related_var_ids : int list
+    }
+
+  type trace_change_kind =
+    | Apply
+    | Undo
+
+  type trace_event =
+    | Level_event of
+        { kind : trace_change_kind;
+          var_id : int;
+          old_level : int;
+          new_level : int
+        }
+    | Lower_event of
+        { kind : trace_change_kind;
+          var_id : int;
+          old_lower : string;
+          new_lower : string
+        }
+    | Upper_event of
+        { kind : trace_change_kind;
+          var_id : int;
+          old_upper : string;
+          new_upper : string
+        }
+    | Vlower_event of
+        { kind : trace_change_kind;
+          var_id : int;
+          old_vlower : trace_edge list;
+          new_vlower : trace_edge list
+        }
+    | Vupper_event of
+        { kind : trace_change_kind;
+          var_id : int;
+          old_vupper : trace_edge list;
+          new_vupper : trace_edge list
+        }
+    | Gencopy_event of
+        { kind : trace_change_kind;
+          var_id : int;
+          old_gencopy : int option;
+          new_gencopy : int option
+        }
+    | Var_create_event of trace_var_creation
+
+  let trace_event_hook : (trace_event -> unit) option ref = ref None
+
+  let set_trace_event_hook hook = trace_event_hook := hook
+
+  let emit_trace_event event =
+    match !trace_event_hook with None -> () | Some f -> f event
+
   let undo_change = function
-    | Cupper (v, upper, upper_hint) ->
+    | Cupper (obj, v, upper, upper_hint) ->
+      let old_upper = string_of_const obj v.upper in
       v.upper <- upper;
-      v.upper_hint <- upper_hint
-    | Clower (v, lower, lower_hint) ->
+      v.upper_hint <- upper_hint;
+      let new_upper = string_of_const obj v.upper in
+      emit_trace_event
+        (Upper_event { kind = Undo; var_id = v.id; old_upper; new_upper })
+    | Clower (obj, v, lower, lower_hint) ->
+      let old_lower = string_of_const obj v.lower in
       v.lower <- lower;
-      v.lower_hint <- lower_hint
-    | Cvlower (v, vlower) -> v.vlower <- vlower
-    | Cvupper (v, vupper) -> v.vupper <- vupper
-    | Clevel (v, level) -> v.level <- level
-    | Cgencopy (v, copy) -> v.gencopy <- copy
+      v.lower_hint <- lower_hint;
+      let new_lower = string_of_const obj v.lower in
+      emit_trace_event
+        (Lower_event { kind = Undo; var_id = v.id; old_lower; new_lower })
+    | Cvlower (v, vlower) ->
+      let old_vlower = trace_edges_of_vlower v.vlower in
+      v.vlower <- vlower;
+      let new_vlower = trace_edges_of_vlower v.vlower in
+      emit_trace_event
+        (Vlower_event { kind = Undo; var_id = v.id; old_vlower; new_vlower })
+    | Cvupper (v, vupper) ->
+      let old_vupper = trace_edges_of_vupper v.vupper in
+      v.vupper <- vupper;
+      let new_vupper = trace_edges_of_vupper v.vupper in
+      emit_trace_event
+        (Vupper_event { kind = Undo; var_id = v.id; old_vupper; new_vupper })
+    | Clevel (v, level) ->
+      let old_level = v.level in
+      v.level <- level;
+      let new_level = v.level in
+      emit_trace_event
+        (Level_event { kind = Undo; var_id = v.id; old_level; new_level })
+    | Cgencopy (v, copy) ->
+      let old_gencopy = gencopy_id_of_var_opt v.gencopy in
+      v.gencopy <- copy;
+      let new_gencopy = gencopy_id_of_var_opt v.gencopy in
+      emit_trace_event
+        (Gencopy_event
+           { kind = Undo; var_id = v.id; old_gencopy; new_gencopy })
 
   let empty_changes = []
 
@@ -375,6 +503,149 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   (** [append_changes l0 l1] returns a log that's equivalent to [l0] followed by
       [l1]. *)
   let append_changes l0 l1 = l1 @ l0
+
+  type trace_delta =
+    | Level of { var_id : int; old_level : int; new_level : int }
+    | Lower of { var_id : int; old_lower : string; new_lower : string }
+    | Upper of { var_id : int; old_upper : string; new_upper : string }
+    | Vlower of
+        { var_id : int;
+          old_vlower : trace_edge list;
+          new_vlower : trace_edge list
+        }
+    | Vupper of
+        { var_id : int;
+          old_vupper : trace_edge list;
+          new_vupper : trace_edge list
+        }
+    | Gencopy of
+        { var_id : int;
+          old_gencopy : int option;
+          new_gencopy : int option
+        }
+
+  type lower_old =
+    | Lower_old : 'a C.obj * 'a var * 'a -> lower_old
+
+  type upper_old =
+    | Upper_old : 'a C.obj * 'a var * 'a -> upper_old
+
+  type level_old =
+    | Level_old : 'a var * int -> level_old
+
+  type vlower_old =
+    | Vlower_old : 'a var * trace_edge list -> vlower_old
+
+  type vupper_old =
+    | Vupper_old : 'a var * trace_edge list -> vupper_old
+
+  type gencopy_old =
+    | Gencopy_old : 'a var * int option -> gencopy_old
+
+  module IntSet = Set.Make (Int)
+
+  let ids_of_morphvars (mvs : ('a, 'd) morphvar VarMap.t) : int list =
+    VarMap.fold
+      (fun _ (Amorphvar (u, _, _)) ids -> u.id :: ids)
+      mvs []
+    |> List.sort_uniq Int.compare
+
+  type trace_capture_bucket = trace_var_creation list ref
+
+  let trace_capture_stack : trace_capture_bucket list ref = ref []
+
+  let compare_trace_var_creation a b = Int.compare a.var_id b.var_id
+
+  let with_trace_capture f =
+    let bucket = ref [] in
+    trace_capture_stack := bucket :: !trace_capture_stack;
+    Fun.protect
+      ~finally:(fun () ->
+        match !trace_capture_stack with
+        | top :: rest when top == bucket -> trace_capture_stack := rest
+        | _ -> assert false)
+      (fun () ->
+        let r = f () in
+        let creations =
+          List.rev !bucket |> List.sort compare_trace_var_creation
+        in
+        r, creations)
+
+  let iter_trace_deltas changes ~f =
+    let touched = ref IntSet.empty in
+    let lower_olds = Hashtbl.create 17 in
+    let upper_olds = Hashtbl.create 17 in
+    let level_olds = Hashtbl.create 17 in
+    let vlower_olds = Hashtbl.create 17 in
+    let vupper_olds = Hashtbl.create 17 in
+    let gencopy_olds = Hashtbl.create 17 in
+    let mark_touched id = touched := IntSet.add id !touched in
+    let gencopy_id gencopy = Option.map (fun v -> v.id) gencopy in
+    List.iter
+      (function
+        | Cupper (obj, v, old_upper, _) ->
+          mark_touched v.id;
+          Hashtbl.replace upper_olds v.id (Upper_old (obj, v, old_upper))
+        | Clower (obj, v, old_lower, _) ->
+          mark_touched v.id;
+          Hashtbl.replace lower_olds v.id (Lower_old (obj, v, old_lower))
+        | Cvlower (v, old_vlower) ->
+          mark_touched v.id;
+          Hashtbl.replace vlower_olds v.id
+            (Vlower_old (v, trace_edges_of_vlower old_vlower))
+        | Cvupper (v, old_vupper) ->
+          mark_touched v.id;
+          Hashtbl.replace vupper_olds v.id
+            (Vupper_old (v, trace_edges_of_vupper old_vupper))
+        | Clevel (v, old_level) ->
+          mark_touched v.id;
+          Hashtbl.replace level_olds v.id (Level_old (v, old_level))
+        | Cgencopy (v, old_gencopy) ->
+          mark_touched v.id;
+          Hashtbl.replace gencopy_olds v.id
+            (Gencopy_old (v, gencopy_id old_gencopy)))
+      changes;
+    let emit_for_var var_id =
+      (match Hashtbl.find_opt level_olds var_id with
+      | Some (Level_old (v, old_level)) ->
+        let new_level = v.level in
+        if old_level <> new_level
+        then f (Level { var_id; old_level; new_level })
+      | None -> ());
+      (match Hashtbl.find_opt lower_olds var_id with
+      | Some (Lower_old (obj, v, old_lower)) ->
+        let old_lower = string_of_const obj old_lower in
+        let new_lower = string_of_const obj v.lower in
+        if not (String.equal old_lower new_lower)
+        then f (Lower { var_id; old_lower; new_lower })
+      | None -> ());
+      (match Hashtbl.find_opt upper_olds var_id with
+      | Some (Upper_old (obj, v, old_upper)) ->
+        let old_upper = string_of_const obj old_upper in
+        let new_upper = string_of_const obj v.upper in
+        if not (String.equal old_upper new_upper)
+        then f (Upper { var_id; old_upper; new_upper })
+      | None -> ());
+      (match Hashtbl.find_opt vlower_olds var_id with
+      | Some (Vlower_old (v, old_vlower)) ->
+        let new_vlower = trace_edges_of_vlower v.vlower in
+        if not (List.equal (fun a b -> compare_trace_edge a b = 0) old_vlower new_vlower)
+        then f (Vlower { var_id; old_vlower; new_vlower })
+      | None -> ());
+      (match Hashtbl.find_opt vupper_olds var_id with
+      | Some (Vupper_old (v, old_vupper)) ->
+        let new_vupper = trace_edges_of_vupper v.vupper in
+        if not (List.equal (fun a b -> compare_trace_edge a b = 0) old_vupper new_vupper)
+        then f (Vupper { var_id; old_vupper; new_vupper })
+      | None -> ());
+      match Hashtbl.find_opt gencopy_olds var_id with
+      | Some (Gencopy_old (v, old_gencopy)) ->
+        let new_gencopy = gencopy_id v.gencopy in
+        if old_gencopy <> new_gencopy
+        then f (Gencopy { var_id; old_gencopy; new_gencopy })
+      | None -> ()
+    in
+    IntSet.iter emit_for_var !touched
 
   type copy_change =
     | Coptcopy : 'a C.obj * int * 'a var * 'a var option -> copy_change
@@ -777,37 +1048,53 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       [not (a <= v.lower)]. Arguments are not checked and used directly. They
       must satisfy the INVARIANT listed above. *)
   let update_lower (type a) ~log (obj : a C.obj) v a a_hint =
+    let old_lower = string_of_const obj v.lower in
     (match log with
     | None -> ()
-    | Some log -> log := Clower (v, v.lower, v.lower_hint) :: !log);
+    | Some log -> log := Clower (obj, v, v.lower, v.lower_hint) :: !log);
     v.lower <- C.join obj v.lower a;
-    v.lower_hint <- hint_biased_join obj a a_hint v.lower v.lower_hint
+    v.lower_hint <- hint_biased_join obj a a_hint v.lower v.lower_hint;
+    let new_lower = string_of_const obj v.lower in
+    emit_trace_event
+      (Lower_event { kind = Apply; var_id = v.id; old_lower; new_lower })
 
   (** Calling [update_upper ~log obj v a a_hint] assumes that
       [not (v.upper <= a)]. Arguments are not checked and used directly. They
       must satisfy the INVARIANT listed above. *)
   let update_upper (type a) ~log (obj : a C.obj) v a a_hint =
+    let old_upper = string_of_const obj v.upper in
     (match log with
     | None -> ()
-    | Some log -> log := Cupper (v, v.upper, v.upper_hint) :: !log);
+    | Some log -> log := Cupper (obj, v, v.upper, v.upper_hint) :: !log);
     v.upper <- C.meet obj v.upper a;
-    v.upper_hint <- hint_biased_meet obj v.upper v.upper_hint a a_hint
+    v.upper_hint <- hint_biased_meet obj v.upper v.upper_hint a a_hint;
+    let new_upper = string_of_const obj v.upper in
+    emit_trace_event
+      (Upper_event { kind = Apply; var_id = v.id; old_upper; new_upper })
 
   (** Arguments are not checked and used directly. They must satisfy the
       INVARIANT listed above. *)
   let set_vlower ~log v vlower =
+    let old_vlower = trace_edges_of_vlower v.vlower in
     (match log with
     | None -> ()
     | Some log -> log := Cvlower (v, v.vlower) :: !log);
-    v.vlower <- vlower
+    v.vlower <- vlower;
+    let new_vlower = trace_edges_of_vlower v.vlower in
+    emit_trace_event
+      (Vlower_event { kind = Apply; var_id = v.id; old_vlower; new_vlower })
 
   (** Arguments are not checked and used directly. They must satisfy the
       INVARIANT listed above. *)
   let set_vupper ~log v vupper =
+    let old_vupper = trace_edges_of_vupper v.vupper in
     (match log with
     | None -> ()
     | Some log -> log := Cvupper (v, v.vupper) :: !log);
-    v.vupper <- vupper
+    v.vupper <- vupper;
+    let new_vupper = trace_edges_of_vupper v.vupper in
+    emit_trace_event
+      (Vupper_event { kind = Apply; var_id = v.id; old_vupper; new_vupper })
 
   (** Function used internally by copy, where [changes] maintains the cleanup
       once the copy is done. Unlike other setters, the [changes] is here
@@ -820,17 +1107,26 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
   (** Function used internally by generalize_structure to cache newly created
       copies *)
   let set_gencopy ~log v copy =
+    let old_gencopy = gencopy_id_of_var_opt v.gencopy in
     (match log with
     | None -> ()
     | Some log -> log := Cgencopy (v, v.gencopy) :: !log);
-    v.gencopy <- copy
+    v.gencopy <- copy;
+    let new_gencopy = gencopy_id_of_var_opt v.gencopy in
+    emit_trace_event
+      (Gencopy_event
+         { kind = Apply; var_id = v.id; old_gencopy; new_gencopy })
 
   (** When called, graph must be fixed so maintain INVARIANT *)
   let set_level ~log v level =
+    let old_level = v.level in
     (match log with
     | None -> ()
     | Some log -> log := Clevel (v, v.level) :: !log);
-    v.level <- level
+    v.level <- level;
+    let new_level = v.level in
+    emit_trace_event
+      (Level_event { kind = Apply; var_id = v.id; old_level; new_level })
 
   (** Returns [Ok ()] if success; [Error x] if failed, and [x] is the next best
       (read: strictly lower) guess to replace the constant argument that MIGHT
@@ -1316,7 +1612,16 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
 
   let vars = ref (0, [])
 
-  let fresh ?upper ?upper_hint ?lower ?lower_hint ?vlower ?vupper ~level obj =
+  type creation_provenance =
+    { kind : string;
+      related_var_ids : int list
+    }
+
+  let default_creation_provenance =
+    { kind = "fresh"; related_var_ids = [] }
+
+  let fresh ?upper ?upper_hint ?lower ?lower_hint ?vlower ?vupper
+      ?(provenance = default_creation_provenance) ~level obj =
     let id, l = !vars in
     let upper, upper_hint =
       match upper, upper_hint with
@@ -1350,6 +1655,21 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       }
     in
     vars := id + 1, Var var :: l;
+    let creation : trace_var_creation =
+      { var_id = id;
+        init_level = level;
+        init_lower = string_of_const obj lower;
+        init_upper = string_of_const obj upper;
+        init_vlower = trace_edges_of_vlower vlower;
+        init_vupper = trace_edges_of_vupper vupper;
+        provenance = provenance.kind;
+        related_var_ids = List.sort_uniq Int.compare provenance.related_var_ids
+      }
+    in
+    emit_trace_event (Var_create_event creation);
+    (match !trace_capture_stack with
+    | bucket :: _ -> bucket := creation :: !bucket
+    | [] -> ());
     var
 
   let unhint_morphvar (Amorphvar (v, f, _)) =
@@ -1404,7 +1724,14 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       match u.gencopy with
       | Some _ -> ()
       | None ->
-        let copy = fresh ~upper:u.upper ~lower:u.lower ~level:u.level dst in
+        let copy =
+          fresh ~upper:u.upper ~lower:u.lower
+            ~provenance:
+              { kind = "create_gencopy";
+                related_var_ids = [u.id]
+              }
+            ~level:u.level dst
+        in
         let ok1 =
           submode_mvmv ~log H.Pinpoint.unknown dst
             (Amorphvar (copy, C.id, Comp_hint.Morph_hint.Id))
@@ -1533,7 +1860,14 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         match v.subst with
         | Some v' -> v'
         | None ->
-          let copy = fresh ~upper:v.upper ~lower:v.lower ~level:v.level obj in
+          let copy =
+            fresh ~upper:v.upper ~lower:v.lower
+              ~provenance:
+                { kind = "copy";
+                  related_var_ids = [v.id]
+                }
+              ~level:v.level obj
+          in
           set_optcopy ~changes:copy_scope obj ~copy_to_level v (Some copy);
           let vupper =
             VarMap.map
@@ -1555,8 +1889,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
                 Amorphvar (ucopy, f, f_hint))
               v.vlower
           in
-          copy.vupper <- vupper;
-          copy.vlower <- vlower;
+          set_vupper ~log:None copy vupper;
+          set_vlower ~log:None copy vlower;
           set_level ~log:None copy copy_to_level;
           copy)
     end
@@ -1966,7 +2300,14 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     else print_raw ?verbose obj ppf m
 
   let newvar obj level =
-    let u = fresh ~level obj in
+    let u =
+      fresh
+        ~provenance:
+          { kind = "newvar";
+            related_var_ids = []
+          }
+        ~level obj
+    in
     Amodevar (Amorphvar (u, C.id, Id))
 
   let newvar_above (type a r) (obj : a C.obj) (level : int)
@@ -1980,6 +2321,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             (Amorphvar
                ( fresh ~lower:a
                    ~lower_hint:(Comp_hint.disallow_right a_hint_lower)
+                   ~provenance:
+                     { kind = "newvar_above_const";
+                       related_var_ids = []
+                     }
                    ~level obj,
                  C.id,
                  Id )),
@@ -1993,12 +2338,23 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             (Amorphvar
                ( fresh ~lower:(mlower obj mv) ~lower_hint:(mlower_hint mv)
                    ~vlower:(VarMap.singleton (get_key obj mv) mv)
+                   ~provenance:
+                     { kind = "newvar_above_var";
+                       related_var_ids = [v.id]
+                     }
                    ~level obj,
                  C.id,
                  Id )),
           true )
       else
-        let u = fresh ~level obj in
+        let u =
+          fresh
+            ~provenance:
+              { kind = "newvar_above_bridge";
+                related_var_ids = [v.id]
+              }
+            ~level obj
+        in
         let mu = Amorphvar (u, C.id, Id) in
         let ok = submode_mvmv ~log:None H.Pinpoint.unknown obj mv mu in
         assert (Result.is_ok ok);
@@ -2009,12 +2365,24 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         (* [~lower] is not precise here, but it doesn't need to be *)
         ( Amodevar
             (Amorphvar
-               ( fresh ~lower:a ~lower_hint:a_hint ~vlower:mvs ~level obj,
+               ( fresh ~lower:a ~lower_hint:a_hint ~vlower:mvs
+                   ~provenance:
+                     { kind = "newvar_above_join";
+                       related_var_ids = ids_of_morphvars mvs
+                     }
+                   ~level obj,
                  C.id,
                  Id )),
           true )
       else
-        let u = fresh ~level obj in
+        let u =
+          fresh
+            ~provenance:
+              { kind = "newvar_above_join_bridge";
+                related_var_ids = ids_of_morphvars mvs
+              }
+            ~level obj
+        in
         let mu = Amorphvar (u, C.id, Id) in
         submode_cmv H.Pinpoint.unknown obj ~log:None a a_hint mu
         |> Result.get_ok;
@@ -2036,6 +2404,10 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             (Amorphvar
                ( fresh ~upper:a
                    ~upper_hint:(Comp_hint.disallow_left a_hint_upper)
+                   ~provenance:
+                     { kind = "newvar_below_const";
+                       related_var_ids = []
+                     }
                    ~level obj,
                  C.id,
                  Id )),
@@ -2049,12 +2421,23 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             (Amorphvar
                ( fresh ~upper:(mupper obj mv) ~upper_hint:(mupper_hint mv)
                    ~vupper:(VarMap.singleton (get_key obj mv) mv)
+                   ~provenance:
+                     { kind = "newvar_below_var";
+                       related_var_ids = [v.id]
+                     }
                    ~level obj,
                  C.id,
                  Id )),
           true )
       else
-        let u = fresh ~level obj in
+        let u =
+          fresh
+            ~provenance:
+              { kind = "newvar_below_bridge";
+                related_var_ids = [v.id]
+              }
+            ~level obj
+        in
         let mu = Amorphvar (u, C.id, Id) in
         submode_mvmv H.Pinpoint.unknown obj ~log:None mu mv |> Result.get_ok;
         allow_left (Amodevar mu), true
@@ -2064,12 +2447,24 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         (* [~upper] is not precise here, but it doesn't need to be *)
         ( Amodevar
             (Amorphvar
-               ( fresh ~upper:a ~upper_hint:a_hint ~vupper:mvs ~level obj,
+               ( fresh ~upper:a ~upper_hint:a_hint ~vupper:mvs
+                   ~provenance:
+                     { kind = "newvar_below_meet";
+                       related_var_ids = ids_of_morphvars mvs
+                     }
+                   ~level obj,
                  C.id,
                  Id )),
           true )
       else
-        let u = fresh ~level obj in
+        let u =
+          fresh
+            ~provenance:
+              { kind = "newvar_below_meet_bridge";
+                related_var_ids = ids_of_morphvars mvs
+              }
+            ~level obj
+        in
         let mu = Amorphvar (u, C.id, Id) in
         submode_mvc H.Pinpoint.unknown obj ~log:None mu a a_hint
         |> Result.get_ok;

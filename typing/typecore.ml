@@ -5931,16 +5931,17 @@ let rec type_exp ?recarg ?(overwrite=No_overwrite) env expected_mode sexp =
 
 and type_expect ?recarg ?(overwrite=No_overwrite) env
       (expected_mode : expected_mode) sexp ty_expected_explained =
-  let previous_saved_types = Cmt_format.get_saved_types () in
-  let exp =
-    Builtin_attributes.warning_scope sexp.pexp_attributes
-      (fun () ->
-         type_expect_ ?recarg ~overwrite env expected_mode sexp ty_expected_explained
-      )
-  in
-  Cmt_format.set_saved_types
-    (Cmt_format.Partial_expression exp :: previous_saved_types);
-  exp
+  Mode.with_solver_trace_expression ~loc:sexp.pexp_loc (fun () ->
+      let previous_saved_types = Cmt_format.get_saved_types () in
+      let exp =
+        Builtin_attributes.warning_scope sexp.pexp_attributes
+          (fun () ->
+             type_expect_ ?recarg ~overwrite env expected_mode sexp
+               ty_expected_explained)
+      in
+      Cmt_format.set_saved_types
+        (Cmt_format.Partial_expression exp :: previous_saved_types);
+      exp)
 
 and type_expect_
     ?(recarg=Rejected) ?(overwrite=No_overwrite)

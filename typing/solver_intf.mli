@@ -228,6 +228,92 @@ module type Solver_mono = sig
   (** Undo the sequence of changes recorded. *)
   val undo_changes : changes -> unit
 
+  type trace_edge =
+    { var_id : int;
+      modality : string
+    }
+
+  type trace_delta =
+    | Level of { var_id : int; old_level : int; new_level : int }
+    | Lower of { var_id : int; old_lower : string; new_lower : string }
+    | Upper of { var_id : int; old_upper : string; new_upper : string }
+    | Vlower of
+        { var_id : int;
+          old_vlower : trace_edge list;
+          new_vlower : trace_edge list
+        }
+    | Vupper of
+        { var_id : int;
+          old_vupper : trace_edge list;
+          new_vupper : trace_edge list
+        }
+    | Gencopy of
+        { var_id : int;
+          old_gencopy : int option;
+          new_gencopy : int option
+        }
+
+  val iter_trace_deltas : changes -> f:(trace_delta -> unit) -> unit
+
+  type trace_var_creation =
+    { var_id : int;
+      init_level : int;
+      init_lower : string;
+      init_upper : string;
+      init_vlower : trace_edge list;
+      init_vupper : trace_edge list;
+      provenance : string;
+      related_var_ids : int list
+    }
+
+  val with_trace_capture :
+    (unit -> 'a) -> 'a * trace_var_creation list
+
+  type trace_change_kind =
+    | Apply
+    | Undo
+
+  type trace_event =
+    | Level_event of
+        { kind : trace_change_kind;
+          var_id : int;
+          old_level : int;
+          new_level : int
+        }
+    | Lower_event of
+        { kind : trace_change_kind;
+          var_id : int;
+          old_lower : string;
+          new_lower : string
+        }
+    | Upper_event of
+        { kind : trace_change_kind;
+          var_id : int;
+          old_upper : string;
+          new_upper : string
+        }
+    | Vlower_event of
+        { kind : trace_change_kind;
+          var_id : int;
+          old_vlower : trace_edge list;
+          new_vlower : trace_edge list
+        }
+    | Vupper_event of
+        { kind : trace_change_kind;
+          var_id : int;
+          old_vupper : trace_edge list;
+          new_vupper : trace_edge list
+        }
+    | Gencopy_event of
+        { kind : trace_change_kind;
+          var_id : int;
+          old_gencopy : int option;
+          new_gencopy : int option
+        }
+    | Var_create_event of trace_var_creation
+
+  val set_trace_event_hook : (trace_event -> unit) option -> unit
+
   (** A mode with carrier type ['a] and allowance ['d]. See Note [Allowance] in
       allowance.mli.*)
   type ('a, 'd) mode constraint 'd = 'l * 'r

@@ -539,6 +539,7 @@ let read_one_param ppf position name v =
   | "dump-into-file" -> Clflags.dump_into_file := true
   | "dump-into-csv" -> Clflags.dump_into_csv := true
   | "dump-dir" -> Clflags.dump_dir := Some v
+  | "dump-solver-graph-trace" -> Clflags.dump_solver_graph_trace := true
   | "profile-output" ->
     (check_relative_path ~on_error:(print_error ppf) "profile-output" v)
     |> Option.iter (fun path -> Clflags.profile_output_name := Some path)
