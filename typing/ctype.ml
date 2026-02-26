@@ -5604,16 +5604,10 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
               with Invalid_argument _ -> raise_unexplained_for Moregen)
           | (Tunivar {jkind=k1}, Tunivar {jkind=k2}) ->
               unify_univar_for Moregen env t1' t2' k1 k2 !univar_pairs
-          | (Tquote t1, Tquote t2) ->
-              moregen inst_nongen variance type_pairs env t1 t2
-          | (Tsplice t1, Tsplice t2) ->
-              moregen inst_nongen variance type_pairs env t1 t2
           | (Tquote t1, _) ->
-              let t2 = newty2 ~level:(get_level t2) (Tsplice t2) in
-              moregen inst_nongen variance type_pairs env t1 t2
+              moregen inst_nongen variance type_pairs env t1 (new_splice_ty t2)
           | (Tsplice t1, _) ->
-              let t2 = newty2 ~level:(get_level t2) (Tquote t2) in
-              moregen inst_nongen variance type_pairs env t1 t2
+              moregen inst_nongen variance type_pairs env t1 (new_quote_ty t2)
           | (_, _) ->
               raise_unexplained_for Moregen
         end
