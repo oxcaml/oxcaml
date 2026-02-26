@@ -91,7 +91,7 @@ clz_native_nonzero:
 (* CR ttebbi: We should do tzcnt(x-1)-1 *)
 let ctz_int x = Builtins.int_ctz x
 [%%expect_asm X86_64{|
-ctz_untagged:
+ctz_int:
   movl  $1, %ebx
   salq  $63, %rbx
   sarq  $1, %rax

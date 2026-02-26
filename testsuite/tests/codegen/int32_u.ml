@@ -12,9 +12,8 @@
 
 open Intrinsics
 
-(* CR ttebbi: If we change the register representation of 32bit values to be
-    zero-extended, we could emit 32bit instructions saving 1 byte of instruction
-    encoding and remove the sign extensions.
+(* CR ttebbi: We should use 32bit instructions. If we change the register
+   representation of 32bit values, we could also remove the sign extension.
 *)
 let add x y = Int32_u.add x y
 [%%expect_asm X86_64{|
