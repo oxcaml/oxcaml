@@ -532,7 +532,7 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
     ins2 FCMP (rn, rm);
     ins4 FCSEL (rd, rn, rm, O.cond Cond.GT)
 
-(* Record calls to the GC -- we've moved them out of the way *)
+(* Emitter environment, to avoid global state *)
 
 type gc_call =
   { gc_lbl: L.t;                      (* Entry label *)
@@ -540,31 +540,11 @@ type gc_call =
     gc_frame_lbl: L.t }               (* Label of frame descriptor *)
 [@@ocamlformat "disable"]
 
-let emit_call_gc gc =
-  labelled_ins1 gc.gc_lbl BL (runtime_function S.Predef.caml_call_gc);
-  labelled_ins1 gc.gc_frame_lbl B (local_label gc.gc_return_lbl)
-
-(* Record calls to local stack reallocation *)
-
 type local_realloc_call =
   { lr_lbl : L.t;
     lr_return_lbl : L.t;
     lr_dbg : Debuginfo.t
   }
-
-let file_emitter ~file_num ~file_name =
-  D.file ~file_num:(Some file_num) ~file_name
-
-let emit_debug_info ?discriminator dbg =
-  Emitaux.emit_debug_info_gen ?discriminator dbg file_emitter D.loc
-
-let emit_local_realloc lr =
-  D.define_label lr.lr_lbl;
-  emit_debug_info lr.lr_dbg;
-  A.ins1 BL (runtime_function S.Predef.caml_call_local_realloc);
-  A.ins1 B (local_label lr.lr_return_lbl)
-
-(* Local stack reallocation *)
 
 type stack_realloc =
   { sc_label : L.t; (* Label of the reallocation code. *)
@@ -588,7 +568,6 @@ type env =
     mutable vec128_literals : (Cmm.vec128_bits * L.t) list
   }
 
-(* Env-based wrappers for stack layout helpers *)
 let env_frame_size env =
   frame_size ~stack_offset:env.stack_offset ~contains_calls:env.contains_calls
     ~num_stack_slots:env.num_stack_slots
@@ -633,6 +612,27 @@ let record_frame env live dbg =
   let lbl = record_frame_label env live dbg in
   D.define_label lbl
 
+(* Misc debug info emission helpers *)
+
+let file_emitter ~file_num ~file_name =
+  D.file ~file_num:(Some file_num) ~file_name
+
+let emit_debug_info ?discriminator dbg =
+  Emitaux.emit_debug_info_gen ?discriminator dbg file_emitter D.loc
+
+(* Record calls to the GC -- we've moved them out of the way *)
+let emit_call_gc gc =
+  labelled_ins1 gc.gc_lbl BL (runtime_function S.Predef.caml_call_gc);
+  labelled_ins1 gc.gc_frame_lbl B (local_label gc.gc_return_lbl)
+
+(* Record calls to local stack reallocation *)
+let emit_local_realloc lr =
+  D.define_label lr.lr_lbl;
+  emit_debug_info lr.lr_dbg;
+  A.ins1 BL (runtime_function S.Predef.caml_call_local_realloc);
+  A.ins1 B (local_label lr.lr_return_lbl)
+
+(* Local stack reallocation *)
 let emit_stack_realloc env =
   match env.stack_realloc with
   | None -> ()
