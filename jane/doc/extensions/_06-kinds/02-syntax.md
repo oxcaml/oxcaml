@@ -454,9 +454,10 @@ lists containing one or more repetitions. Any nonterminal not defined here is
 defined in the OCaml [manual][].
 
 **Note on syntax for scannable axes:** Previously, scannable axes used to be
-non-modal axes, and were written like `value mod non_null`. Now, we can also
-write them as `value non_null`, and will soon remove the ability to specify them
-via the `mod` syntax.
+non-modal axes, and were written like `value mod non_null`, which upper-bounds
+the nullability to `non_null`. Now, we can also write them as `value non_null`,
+which overrides the nullability to `non_null`. We will soon remove the ability
+to upper-bound scannable axes via the `mod` syntax.
 
 First we define the syntax for kinds:
 
