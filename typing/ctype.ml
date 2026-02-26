@@ -2818,7 +2818,7 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
     in
     let tys_modalities, layouts =
       List.map
-        (fun (_lbl, ty) -> compute_ty_modality_layout (expand_component ty))
+        (fun (_lbl, ty) -> compute_ty_modality_layout (expand_component env ty))
         ltys
       |> List.split
     in
@@ -2895,7 +2895,7 @@ let rec estimate_type_jkind_unwrapped
 let type_jkind env ty =
   let unwrapped_ty = get_unboxed_type_approximation env ty in
   estimate_type_jkind_unwrapped (get_level ty) ~unwrapped_ty
-    ~expand_component:(get_unboxed_type_approximation env) env
+    ~expand_component:get_unboxed_type_approximation env
 
 (* CR layouts v2.8: This function is quite suspect. See Jane Street internal
    gdoc titled "Let's kill type_jkind_purely". Internal ticket 3782. *)
@@ -2921,7 +2921,7 @@ let () = type_jkind_purely_if_principal' := type_jkind_purely_if_principal
 
 let estimate_type_jkind =
   estimate_type_jkind
-    ~expand_component:(fun ty -> mk_unwrapped_type_expr ty)
+    ~expand_component:(fun _env ty -> mk_unwrapped_type_expr ty)
 
 (* After type_jkind_purely_if_principal is defined, we can use it directly *)
 let mk_jkind_context_check_principal env =
