@@ -942,48 +942,6 @@ let max_out_of_line_code_offset ~num_call_gc =
    insert veneers anyway. (See section 4.6.7 of the document "ELF for the ARM
    64-bit architecture (AArch64)".) *)
 
-module Cond_branch_impl = struct
-  type t =
-    | TB
-    | CB
-    | Bcc
-
-  let all = [TB; CB; Bcc]
-
-  let max_displacement = function
-    | TB -> 32 * 1024 / 4
-    | CB | Bcc -> 1 * 1024 * 1024 / 4
-
-  let classify_instr = function
-    | Lop (Alloc _) | Lop Poll -> Some Bcc
-    | Lcondbranch (Itruetest, _) | Lcondbranch (Ifalsetest, _) -> Some CB
-    | Lcondbranch (Iinttest _, _)
-    | Lcondbranch (Iinttest_imm _, _)
-    | Lcondbranch (Ifloattest _, _) ->
-      Some Bcc
-    | Lcondbranch (Ioddtest, _) | Lcondbranch (Ieventest, _) -> Some TB
-    | Lcondbranch3 _ -> Some Bcc
-    | Lop
-        ( Specific _ | Move | Spill | Reload | Dummy_use | Opaque
-        | Begin_region | Pause | End_region | Dls_get | Tls_get | Domain_index
-        | Const_int _ | Const_float32 _ | Const_float _ | Const_symbol _
-        | Const_vec128 _ | Stackoffset _ | Load _
-        | Store (_, _, _)
-        | Intop _ | Int128op _
-        | Intop_imm (_, _)
-        | Intop_atomic _
-        | Floatop (_, _)
-        | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-        | Name_for_debugger _ )
-    | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
-    | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
-    | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-    | Lstackcheck _ ->
-      None
-    | Lop (Const_vec256 _ | Const_vec512 _) ->
-      Misc.fatal_error "arm64: got 256/512 bit vector"
-end
-
 let cond_for_float_comparison : Cmm.float_comparison -> Float_cond.t = function
   | CFeq -> EQ
   | CFneq -> NE
@@ -1871,27 +1829,27 @@ let emit_instr env i =
 let measure_emit_instr env i =
   let saved_frame_descriptors = Emitaux.save_frame_descriptors () in
   let saved_debug_info = Emitaux.save_debug_info () in
-  let count =
+  let m =
     D.with_measuring ~f:(fun () ->
         A.with_measuring ~f:(fun () -> emit_instr env i))
   in
   Emitaux.restore_debug_info saved_debug_info;
   Emitaux.restore_frame_descriptors saved_frame_descriptors;
-  count
+  m
 
 let compute_instruction_sizes env code =
   let sizes = ref [] in
   let rec walk instr =
     match instr.Linear.desc with
     | Lend -> ()
-    | Lprologue | Lepilogue_open | Lepilogue_close
-    | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _
-    | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
+    | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
+    | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
     | Lcondbranch (_, _)
     | Lcondbranch3 (_, _, _)
-    | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _
-    | Lraise _ | Lstackcheck _ ->
-      sizes := measure_emit_instr env instr :: !sizes;
+    | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
+    | Lstackcheck _ ->
+      let m = measure_emit_instr env instr in
+      sizes := (m.count, m.min_max_displacement) :: !sizes;
       walk instr.next
   in
   walk code;
@@ -1899,24 +1857,20 @@ let compute_instruction_sizes env code =
 
 let branch_relax env body =
   (* Record copy so the sizing pass can mutate its own mutable fields
-     (stack_offset, call_gc_sites, etc.) without affecting [env],
-     which is used later by [emit_all]. *)
-  let sizing_env =
-    { env with stack_offset = env.stack_offset }
-  in
+     (stack_offset, call_gc_sites, etc.) without affecting [env], which is used
+     later by [emit_all]. *)
+  let sizing_env = { env with stack_offset = env.stack_offset } in
   let initial_sizes = compute_instruction_sizes sizing_env body in
   let num_call_gc = List.length sizing_env.call_gc_sites in
-  let max_out_of_line_code_offset =
-    max_out_of_line_code_offset ~num_call_gc
-  in
+  let max_out_of_line_code_offset = max_out_of_line_code_offset ~num_call_gc in
   let module BR = Branch_relaxation.Make (struct
     type distance = int
 
-    module Cond_branch = Cond_branch_impl
-
     let offset_pc_at_branch = 0
 
-    let instr_size instr = measure_emit_instr sizing_env instr
+    let instr_size instr =
+      let m = measure_emit_instr sizing_env instr in
+      m.count, m.min_max_displacement
 
     let relax_poll () = Lop (Specific Ifar_poll)
 
