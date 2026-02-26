@@ -87,3 +87,41 @@ to_float:
   addq  $8, %rsp
   ret
 |}]
+
+let of_int x = Float32_u.of_int x
+[%%expect_asm X86_64{|
+of_int:
+  sarq  $1, %rax
+  vcvtsi2ssq %rax, %xmm0, %xmm0
+  ret
+|}]
+
+let to_int x = Float32_u.to_int x
+[%%expect_asm X86_64{|
+to_int:
+  vcvttss2si %xmm0, %rax
+  leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
+let eq x y = Float32_u.eq x y
+[%%expect_asm X86_64{|
+eq:
+  vcmpss $0, %xmm1, %xmm0, %xmm0
+  vmovd %xmm0, %eax
+  movslq %eax, %rax
+  neg   %rax
+  leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
+let lt x y = Float32_u.lt x y
+[%%expect_asm X86_64{|
+lt:
+  vcmpss $1, %xmm1, %xmm0, %xmm0
+  vmovd %xmm0, %eax
+  movslq %eax, %rax
+  neg   %rax
+  leaq  1(%rax,%rax), %rax
+  ret
+|}]

@@ -229,8 +229,8 @@ bswap32:
   ret
 |}]
 
-(* CR ttebbi: The movzwq already zero-extends, so the
-   andl is redundant. *)
+(* CR ttebbi: "xchg  %ah, %al" is rather slow, a 32bit byte swap followed by a
+   shift would be faster. Also, we zero-extend twice. *)
 let bswap16 x = Int.bswap16 x
 [%%expect_asm X86_64{|
 bswap16:
@@ -299,6 +299,21 @@ nativeint_to_int64:
   ret
 |}]
 
+let compare32 x y = Int32_u.compare x y
+[%%expect_asm X86_64{|
+compare32:
+  movq  %rax, %rdi
+  cmpq  %rbx, %rdi
+  setl  %al
+  movzbq %al, %rsi
+  cmpq  %rbx, %rdi
+  setg  %al
+  movzbq %al, %rax
+  subq  %rsi, %rax
+  leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
 (* Optimization barrier *)
 
 let opaque_int (x : int) = opaque x
@@ -314,5 +329,18 @@ let is_int (x : 'a) = obj_is_int x
 is_int:
   andl  $1, %eax
   leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
+let is_int_branch (x : 'a) f = if obj_is_int x then f()
+[%%expect_asm X86_64{|
+is_int_branch:
+  testb $1, %al
+  je    .L107
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+.L107:
+  movl  $1, %eax
   ret
 |}]

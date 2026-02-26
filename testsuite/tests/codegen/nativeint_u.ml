@@ -36,10 +36,51 @@ neg:
   ret
 |}]
 
+let mul x y = Nativeint_u.mul x y
+[%%expect_asm X86_64{|
+mul:
+  imulq %rbx, %rax
+  ret
+|}]
+
 let logand x y = Nativeint_u.logand x y
 [%%expect_asm X86_64{|
 logand:
   andq  %rbx, %rax
+  ret
+|}]
+
+let logor x y = Nativeint_u.logor x y
+[%%expect_asm X86_64{|
+logor:
+  orq   %rbx, %rax
+  ret
+|}]
+
+let logxor x y = Nativeint_u.logxor x y
+[%%expect_asm X86_64{|
+logxor:
+  xorq  %rbx, %rax
+  ret
+|}]
+
+(* CR ttebbi: We could use sarx / sarxl to save the move and relax register
+   constraints. *)
+let shift_left x y = Nativeint_u.shift_left x y
+[%%expect_asm X86_64{|
+shift_left:
+  movq  %rbx, %rcx
+  sarq  $1, %rcx
+  salq  %cl, %rax
+  ret
+|}]
+
+let shift_right x y = Nativeint_u.shift_right x y
+[%%expect_asm X86_64{|
+shift_right:
+  movq  %rbx, %rcx
+  sarq  $1, %rcx
+  sarq  %cl, %rax
   ret
 |}]
 
@@ -54,6 +95,19 @@ let to_int x = Nativeint_u.to_int x
 [%%expect_asm X86_64{|
 to_int:
   leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
+let of_int32 x = Nativeint_u.of_int32 (Int32_u.to_int32 x)
+[%%expect_asm X86_64{|
+of_int32:
+  ret
+|}]
+
+let to_int32 x = Int32_u.of_int32 (Nativeint_u.to_int32 x)
+[%%expect_asm X86_64{|
+to_int32:
+  movslq %eax, %rax
   ret
 |}]
 

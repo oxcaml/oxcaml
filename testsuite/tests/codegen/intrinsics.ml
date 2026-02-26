@@ -136,12 +136,26 @@ module Nativeint_u = struct
     of_nativeint (Nativeint.add (to_nativeint x) (to_nativeint y))
   let[@inline always] sub x y =
     of_nativeint (Nativeint.sub (to_nativeint x) (to_nativeint y))
+  let[@inline always] mul x y =
+    of_nativeint (Nativeint.mul (to_nativeint x) (to_nativeint y))
   let[@inline always] logand x y =
     of_nativeint (Nativeint.logand (to_nativeint x) (to_nativeint y))
+  let[@inline always] logor x y =
+    of_nativeint (Nativeint.logor (to_nativeint x) (to_nativeint y))
+  let[@inline always] logxor x y =
+    of_nativeint (Nativeint.logxor (to_nativeint x) (to_nativeint y))
+  let[@inline always] shift_left x y =
+    of_nativeint (Nativeint.shift_left (to_nativeint x) y)
+  let[@inline always] shift_right x y =
+    of_nativeint (Nativeint.shift_right (to_nativeint x) y)
   let[@inline always] of_int x =
     of_nativeint (Nativeint.of_int x)
   let[@inline always] to_int x =
     Nativeint.to_int (to_nativeint x)
+  let[@inline always] of_int32 x =
+    of_nativeint (Nativeint.of_int32 x)
+  let[@inline always] to_int32 x =
+    Nativeint.to_int32 (to_nativeint x)
   let[@inline always] bswap x =
     of_nativeint (Nativeint.bswap (to_nativeint x))
 end
@@ -480,53 +494,44 @@ module Int64_u = struct
 end
 
 module Bytes = struct
-  (* uint8 load/store (unsigned, tagged result) *)
   external unsafe_get : bytes -> int -> int
     @@ portable = "%bytes_unsafe_get"
 
   external unsafe_set : bytes -> int -> int -> unit
     @@ portable = "%bytes_unsafe_set"
 
-  (* signed 8-bit load (tagged result) *)
   external unsafe_get_int8 : bytes -> int -> int
     @@ portable = "%caml_bytes_geti8u"
 
-  (* unsigned 16-bit load/store (tagged result) *)
   external unsafe_get_uint16_ne : bytes -> int -> int
     @@ portable = "%caml_bytes_get16u"
 
   external unsafe_set_uint16_ne : bytes -> int -> int -> unit
     @@ portable = "%caml_bytes_set16u"
 
-  (* signed 16-bit load (tagged result) *)
   external unsafe_get_int16_ne : bytes -> int -> int
     @@ portable = "%caml_bytes_geti16u"
 
-  (* unboxed int32 load/store *)
   external unsafe_get_int32_ne : bytes -> int -> int32#
     @@ portable = "%caml_bytes_get32u#" [@@warning "-187"]
 
   external unsafe_set_int32_ne : bytes -> int -> int32# -> unit
     @@ portable = "%caml_bytes_set32u#" [@@warning "-187"]
 
-  (* safe (bounds-checked) int32 load *)
   external get_int32_ne : bytes -> int -> int32#
     @@ portable = "%caml_bytes_get32#" [@@warning "-187"]
 
-  (* unboxed int64 load/store *)
   external unsafe_get_int64_ne : bytes -> int -> int64#
     @@ portable = "%caml_bytes_get64u#" [@@warning "-187"]
 
   external unsafe_set_int64_ne : bytes -> int -> int64# -> unit
     @@ portable = "%caml_bytes_set64u#" [@@warning "-187"]
 
-  (* int64 load indexed by int64# *)
   external unsafe_get_int64_ne_indexed_by_int64 :
     bytes -> int64# -> int64#
     @@ portable = "%caml_bytes_get64u#_indexed_by_int64#"
     [@@warning "-187"]
 
-  (* unboxed float32 load/store *)
   external unsafe_get_float32_ne : bytes -> int -> float32#
     @@ portable = "%caml_bytes_getf32u#" [@@warning "-187"]
 
@@ -633,6 +638,30 @@ module Float32 = struct
 
   external of_int : int -> float32 @@ portable = "%float32ofint"
   external to_int : (float32[@local_opt]) -> int @@ portable = "%intoffloat32"
+
+  external eq :
+    (float32[@local_opt]) -> (float32[@local_opt]) -> bool
+    @@ portable = "%eqfloat32"
+
+  external ne :
+    (float32[@local_opt]) -> (float32[@local_opt]) -> bool
+    @@ portable = "%noteqfloat32"
+
+  external lt :
+    (float32[@local_opt]) -> (float32[@local_opt]) -> bool
+    @@ portable = "%ltfloat32"
+
+  external le :
+    (float32[@local_opt]) -> (float32[@local_opt]) -> bool
+    @@ portable = "%lefloat32"
+
+  external gt :
+    (float32[@local_opt]) -> (float32[@local_opt]) -> bool
+    @@ portable = "%gtfloat32"
+
+  external ge :
+    (float32[@local_opt]) -> (float32[@local_opt]) -> bool
+    @@ portable = "%gefloat32"
 end
 
 module Float32_u = struct
@@ -662,6 +691,14 @@ module Float32_u = struct
     of_float32 (Float32.of_float x)
   let[@inline always] to_float x =
     Float32.to_float (to_float32 x)
+  let[@inline always] of_int x =
+    of_float32 (Float32.of_int x)
+  let[@inline always] to_int x =
+    Float32.to_int (to_float32 x)
+  let[@inline always] eq x y =
+    Float32.eq (to_float32 x) (to_float32 y)
+  let[@inline always] lt x y =
+    Float32.lt (to_float32 x) (to_float32 y)
 end
 
 module Int = struct
@@ -681,3 +718,34 @@ external cpu_relax : unit -> unit @@ portable = "%cpu_relax"
 external opaque : 'a -> 'a = "%opaque"
 
 external obj_is_int : 'a -> bool = "%obj_is_int"
+
+external get_header : 'a -> nativeint = "%get_header"
+  [@@warning "-187"]
+
+external int_as_pointer : int -> 'a = "%int_as_pointer"
+
+(* Stdlib primitives *)
+
+external ignore :
+  ('a : value_or_null). 'a -> unit @@ portable = "%ignore"
+
+external fst :
+  ('a * 'b[@local_opt]) -> ('a[@local_opt]) @@ portable = "%field0_immut"
+
+external snd :
+  ('a * 'b[@local_opt]) -> ('b[@local_opt]) @@ portable = "%field1_immut"
+
+external ref :
+  ('a : value_or_null). 'a -> ('a ref[@local_opt])
+  @@ portable = "%makemutable"
+
+external ( ! ) :
+  ('a : value_or_null). ('a ref[@local_opt]) -> 'a
+  @@ portable = "%field0"
+
+external ( := ) :
+  ('a : value_or_null). ('a ref[@local_opt]) -> 'a -> unit
+  @@ portable = "%setfield0"
+
+external incr : (int ref[@local_opt]) -> unit @@ portable = "%incr"
+external decr : (int ref[@local_opt]) -> unit @@ portable = "%decr"

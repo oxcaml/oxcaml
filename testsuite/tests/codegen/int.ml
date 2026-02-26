@@ -272,7 +272,7 @@ equal:
 
 (* CR ttebbi: This is very inefficient, should be like `equal`. *)
 let equal_using_compare (x : int) (y : int) =
-  Stdlib.compare x y = 0
+  Int.compare x y = 0
 [%%expect_asm X86_64{|
 equal_using_compare:
   movq  %rax, %rdi

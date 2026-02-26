@@ -62,8 +62,7 @@ external int64_u_unsafe_get
 
 (* CR ttebbi: When indexing with an untagged index,
    there is no need to first tag the index. *)
-let int32_unsafe_get_indexed_by_int64
-    (x : Int32_u.t array) (i : Int64_u.t) =
+let int32_unsafe_get_indexed_by_int64 (x : Int32_u.t array) (i : Int64_u.t) =
   int64_u_unsafe_get x i |> Int32_u.to_int32 |> Int64_u.of_int32
 ;;
 [%%expect_asm X86_64{|
@@ -76,7 +75,7 @@ int32_unsafe_get_indexed_by_int64:
 (* Unsafe get/set for each element type *)
 
 let int_unsafe_get (a : int array) (i : int) =
-  Stdlib.Array.unsafe_get a i
+  Array.unsafe_get a i
 [%%expect_asm X86_64{|
 int_unsafe_get:
   movq  -4(%rax,%rbx,4), %rax
@@ -84,7 +83,7 @@ int_unsafe_get:
 |}]
 
 let int_unsafe_set (a : int array) (i : int) (v : int) =
-  Stdlib.Array.unsafe_set a i v
+  Array.unsafe_set a i v
 [%%expect_asm X86_64{|
 int_unsafe_set:
   movq  %rdi, -4(%rax,%rbx,4)
@@ -93,7 +92,7 @@ int_unsafe_set:
 |}]
 
 let ref_unsafe_get (a : string array) (i : int) =
-  Stdlib.Array.unsafe_get a i
+  Array.unsafe_get a i
 [%%expect_asm X86_64{|
 ref_unsafe_get:
   movq  -4(%rax,%rbx,4), %rax
@@ -101,7 +100,7 @@ ref_unsafe_get:
 |}]
 
 let ref_unsafe_set (a : string array) (i : int) (v : string) =
-  Stdlib.Array.unsafe_set a i v
+  Array.unsafe_set a i v
 [%%expect_asm X86_64{|
 ref_unsafe_set:
   subq  $8, %rsp
@@ -114,7 +113,7 @@ ref_unsafe_set:
 |}]
 
 let poly_unsafe_get (a : 'a array) (i : int) =
-  Stdlib.Array.unsafe_get a i
+  Array.unsafe_get a i
 [%%expect_asm X86_64{|
 poly_unsafe_get:
   subq  $8, %rsp
@@ -139,7 +138,7 @@ poly_unsafe_get:
 |}]
 
 let poly_unsafe_set (a : 'a array) (i : int) (v : 'a) =
-  Stdlib.Array.unsafe_set a i v
+  Array.unsafe_set a i v
 [%%expect_asm X86_64{|
 poly_unsafe_set:
   subq  $8, %rsp
@@ -214,7 +213,7 @@ float_unsafe_set:
 let float_unsafe_get_plain (a : float array) (i : int) =
   Float_u.of_float (Array.unsafe_get a i)
 [%%expect_asm X86_64{|
-float_unsafe_get:
+float_unsafe_get_plain:
   vmovsd -4(%rax,%rbx,4), %xmm0
   ret
 |}]
@@ -222,7 +221,7 @@ float_unsafe_get:
 let float_unsafe_set_plain (a : float array) (i : int) (v : float#) =
   Array.unsafe_set a i (Float_u.to_float v)
 [%%expect_asm X86_64{|
-float_unsafe_set:
+float_unsafe_set_plain:
   vmovsd %xmm0, -4(%rax,%rbx,4)
   movl  $1, %eax
   ret
@@ -318,7 +317,7 @@ int16_unsafe_set:
 
 (* Array length *)
 
-let int_length (a : int array) = Stdlib.Array.length a
+let int_length (a : int array) = Array.length a
 [%%expect_asm X86_64{|
 int_length:
   movq  -8(%rax), %rax
@@ -328,7 +327,7 @@ int_length:
   ret
 |}]
 
-let poly_length (a : 'a array) = Stdlib.Array.length a
+let poly_length (a : 'a array) = Array.length a
 [%%expect_asm X86_64{|
 poly_length:
   movq  -8(%rax), %rax
@@ -419,7 +418,7 @@ int8_length:
 (* Safe (bounds-checked) array access *)
 
 let int_safe_get (a : int array) (i : int) =
-  Stdlib.Array.get a i
+  Array.get a i
 [%%expect_asm X86_64{|
 int_safe_get:
   movq  -8(%rax), %rdi
@@ -430,7 +429,7 @@ int_safe_get:
   movq  -4(%rax,%rbx,4), %rax
   ret
 .L115:
-  movq  camlTOP36__block1073@GOTPCREL(%rip), %rax
+  movq  camlTOP38__block1142@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -438,7 +437,7 @@ int_safe_get:
 |}]
 
 let ref_safe_set (a : string array) (i : int) (v : string) =
-  Stdlib.Array.set a i v
+  Array.set a i v
 [%%expect_asm X86_64{|
 ref_safe_set:
   subq  $8, %rsp
@@ -454,7 +453,7 @@ ref_safe_set:
   addq  $8, %rsp
   ret
 .L116:
-  movq  camlTOP37__block1115@GOTPCREL(%rip), %rax
+  movq  camlTOP39__block1184@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -465,7 +464,7 @@ ref_safe_set:
    for the tag check (to distingish float arrays).
 *)
 let poly_safe_get (a : 'a array) (i : int) =
-  Stdlib.Array.get a i
+  Array.get a i
 [%%expect_asm X86_64{|
 poly_safe_get:
   subq  $8, %rsp
@@ -493,7 +492,7 @@ poly_safe_get:
   addq  $8, %rsp
   ret
 .L123:
-  movq  camlTOP38__block1158@GOTPCREL(%rip), %rax
+  movq  camlTOP40__block1227@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -501,7 +500,7 @@ poly_safe_get:
 |}]
 
 let poly_safe_set (a : 'a array) (i : int) (v : 'a) =
-  Stdlib.Array.set a i v
+  Array.set a i v
 [%%expect_asm X86_64{|
 poly_safe_set:
   subq  $8, %rsp
@@ -526,7 +525,7 @@ poly_safe_set:
   addq  $8, %rsp
   ret
 .L124:
-  movq  camlTOP39__block1213@GOTPCREL(%rip), %rax
+  movq  camlTOP41__block1282@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -547,7 +546,7 @@ int64_safe_get:
   movq  -4(%rax,%rbx,4), %rax
   ret
 .L116:
-  movq  camlTOP40__block1270@GOTPCREL(%rip), %rax
+  movq  camlTOP42__block1339@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -566,7 +565,7 @@ float_safe_get:
   vmovsd -4(%rax,%rbx,4), %xmm0
   ret
 .L115:
-  movq  camlTOP41__block1311@GOTPCREL(%rip), %rax
+  movq  camlTOP43__block1380@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -585,7 +584,7 @@ float_safe_get_plain:
   vmovsd -4(%rax,%rbx,4), %xmm0
   ret
 .L115:
-  movq  camlTOP42__block1352@GOTPCREL(%rip), %rax
+  movq  camlTOP44__block1421@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
@@ -609,7 +608,7 @@ int32_safe_get:
   movslq -2(%rax,%rbx,2), %rax
   ret
 .L120:
-  movq  camlTOP43__block1397@GOTPCREL(%rip), %rax
+  movq  camlTOP45__block1466@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
