@@ -4367,17 +4367,11 @@ and unify3 uenv t1 t1' t2 t2' =
           && instantiable_scope s2 >= instantiable_scope t1'
           && can_generate_equations uenv ->
           unify uenv (new_splice_ty t1') s2
+      | (Tconstr (_,_,_), _) | (_, Tconstr (_,_,_))
       | (Tquote _, _) | (Tsplice _, _)
       | (_, Tquote _) | (_, Tsplice _)
         when in_pattern_mode uenv
           && (is_equatable_ty t1 || is_equatable_ty t2) ->
-          reify uenv t1';
-          reify uenv t2';
-          if can_generate_equations uenv then (
-            mcomp_for Unify (get_env uenv) t1' t2';
-            record_equation uenv t1' t2'
-          )
-      | (Tconstr (_,_,_), _) | (_, Tconstr (_,_,_)) when in_pattern_mode uenv ->
           reify uenv t1';
           reify uenv t2';
           if can_generate_equations uenv then (
