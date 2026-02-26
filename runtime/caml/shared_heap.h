@@ -111,7 +111,6 @@ Caml_inline int is_not_markable(value v) {
   return Has_status_val(v, NOT_MARKABLE);
 }
 
-<<<<<<< oxcaml
 Caml_inline status caml_allocation_status(void) {
   return
     caml_marking_started()
@@ -181,9 +180,6 @@ void caml_shared_add_pool_stats(struct caml_heap_state *,
                                 uintnat /* pool_live_words */,
                                 uintnat /* pool_frag_words */);
 
-||||||| upstream-base
-=======
->>>>>>> upstream-incoming
 void caml_redarken_pool(struct pool*, scanning_action, void*);
 
 intnat caml_sweep(struct caml_heap_state*, intnat);

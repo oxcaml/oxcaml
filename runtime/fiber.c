@@ -20,15 +20,9 @@
 
 #include "caml/config.h"
 #include <string.h>
-<<<<<<< oxcaml
 #include <stdbool.h>
 #include <stdio.h>
 #ifdef HAS_UNISTD
-||||||| upstream-base
-#ifdef HAS_UNISTD
-=======
-#ifndef _WIN32
->>>>>>> upstream-incoming
 #include <unistd.h>
 #endif
 #include <assert.h>
@@ -147,34 +141,8 @@ void caml_change_max_stack_size (uintnat new_max_wsize)
 /* Round up to a power of 2 */
 static uintnat round_up_p2(uintnat x, uintnat p2)
 {
-<<<<<<< oxcaml
   CAMLassert (Is_power_of_2(p2));
   return (x + p2 - 1) & ~(p2 - 1);
-||||||| upstream-base
-  int i;
-
-  struct stack_info** stack_cache =
-    (struct stack_info**)caml_stat_alloc_noexc(sizeof(struct stack_info*) *
-                                               NUM_STACK_SIZE_CLASSES);
-  if (stack_cache == NULL)
-    return NULL;
-
-  for(i = 0; i < NUM_STACK_SIZE_CLASSES; i++)
-    stack_cache[i] = NULL;
-
-  return stack_cache;
-=======
-  struct stack_info** stack_cache =
-    (struct stack_info**)caml_stat_alloc_noexc(sizeof(struct stack_info*) *
-                                               NUM_STACK_SIZE_CLASSES);
-  if (stack_cache == NULL)
-    return NULL;
-
-  for (int i = 0; i < NUM_STACK_SIZE_CLASSES; i++)
-    stack_cache[i] = NULL;
-
-  return stack_cache;
->>>>>>> upstream-incoming
 }
 
 /* Allocate a stack with at least the specified number of words.
@@ -182,7 +150,6 @@ static uintnat round_up_p2(uintnat x, uintnat p2)
    well-defined), but other fields are uninitialised */
 Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize, int64_t id)
 {
-<<<<<<< oxcaml
   /* Ensure 16-byte alignment of the [struct stack_handler*]. */
   const int stack_alignment = 16;
 
@@ -194,36 +161,6 @@ Caml_inline struct stack_info* alloc_for_stack (mlsize_t wosize, int64_t id)
                sizeof(value) * wosize +
                8 + /* For 16-byte aligning handler */
                sizeof(struct stack_handler);
-||||||| upstream-base
-  size_t len = sizeof(struct stack_info) +
-               sizeof(value) * wosize +
-               8 /* for alignment to 16-bytes, needed for arm64 */ +
-               sizeof(struct stack_handler);
-#ifdef USE_MMAP_MAP_STACK
-=======
-  size_t stack_len = sizeof(struct stack_info) + sizeof(value) * wosize;
-  size_t len;
-
-  /* Some platforms require 16-byte alignment of the stack pointer, which
-     will be _at the end_ of this allocation, so we need to ask for a bit more
-     memory to make sure that
-       caml_round_up(allocated stack base + stack_len, 16) + sizeof handler
-     will fit the allocated space.
-
-     When using mmap, we can rely upon the stack base being page-aligned
-     and thus aligned to a 16 byte boundary, and can round up here;
-     otherwise we need to always ask for 15 more bytes in order to cope with
-     all misalignment possibilities, even though it is likely that the
-     result of caml_stat_alloc_noexc() will be at least aligned to an
-     8-byte boundary. */
-#ifdef USE_MMAP_MAP_STACK
-  len = caml_round_up(stack_len, 16) + sizeof(struct stack_handler);
-#else
-  len = stack_len + (16 - 1) + sizeof(struct stack_handler);
-#endif
-
-#ifdef USE_MMAP_MAP_STACK
->>>>>>> upstream-incoming
   struct stack_info* si;
   si = mmap(NULL, len, PROT_WRITE | PROT_READ,
              MAP_ANONYMOUS | MAP_PRIVATE | MAP_STACK, -1, 0);
@@ -397,23 +334,6 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
     }
 
     stack->cache_bucket = cache_bucket;
-<<<<<<< oxcaml
-||||||| upstream-base
-
-    /* Ensure 16-byte alignment because some architectures require it */
-    hand = (struct stack_handler*)
-     (((uintnat)stack + sizeof(struct stack_info) + sizeof(value) * wosize + 15)
-      & ~((uintnat)15));
-    stack->handler = hand;
-=======
-
-    /* Ensure 16-byte alignment because some architectures (e.g. arm64)
-       require it. alloc_for_stack() has allocated extra room to prevent
-       this computation from overflowing. */
-    hand = (struct stack_handler*)caml_round_up(
-      (uintnat)stack + sizeof(struct stack_info) + sizeof(value) * wosize, 16);
-    stack->handler = hand;
->>>>>>> upstream-incoming
   }
 
   struct stack_handler* hand = stack->handler;
@@ -657,15 +577,9 @@ Caml_inline void scan_stack_frames(
   value * regs;
   frame_descr * d;
   value *root;
-<<<<<<< oxcaml
-  caml_frame_descrs fds = caml_get_frame_descrs();
+  caml_frame_descrs *fds = caml_get_frame_descrs();
   /* does not change during marking */
   struct global_heap_state colors = caml_global_heap_state;
-||||||| upstream-base
-  caml_frame_descrs fds = caml_get_frame_descrs();
-=======
-  caml_frame_descrs * fds = caml_get_frame_descrs();
->>>>>>> upstream-incoming
 
   sp = (char*)stack->sp;
   regs = gc_regs;
@@ -870,18 +784,15 @@ CAMLexport void caml_do_local_roots (
   value * v_gc_regs,
   dynamic_thread_t dynamic_bindings)
 {
-  struct caml__roots_block *lr;
-  int i, j;
-  value* sp;
 #ifdef NATIVE_CODE
   caml_local_arenas* locals = caml_refresh_locals(current_stack);
 #endif
 
   caml_dynamic_scan_thread_roots(dynamic_bindings, f, fflags, fdata);
-  for (lr = local_roots; lr != NULL; lr = lr->next) {
-    for (i = 0; i < lr->ntables; i++){
-      for (j = 0; j < lr->nitems; j++){
-        sp = &(lr->tables[i][j]);
+  for (struct caml__roots_block *lr = local_roots; lr != NULL; lr = lr->next) {
+    for (int i = 0; i < lr->ntables; i++){
+      for (int j = 0; j < lr->nitems; j++){
+        value *sp = &(lr->tables[i][j]);
         if (*sp != 0) {
 #ifdef NATIVE_CODE
           visit (f, fdata, locals, caml_global_heap_state, sp);
@@ -961,11 +872,7 @@ int caml_try_realloc_stack(asize_t required_space)
   stack_used = Stack_high(old_stack) - (value*)old_stack->sp;
   wsize = Stack_high(old_stack) - Stack_base(old_stack);
   uintnat max_stack_wsize = caml_max_stack_wsize;
-<<<<<<< oxcaml
-||||||| upstream-base
-=======
   wsize = wsize & (~1); // zero alignment bit
->>>>>>> upstream-incoming
   do {
     if (wsize >= max_stack_wsize) return 0;
     wsize *= 2;
@@ -1015,17 +922,8 @@ int caml_try_realloc_stack(asize_t required_space)
      frame is also a normal exception trap frame.  However
      Caml_state->async_exn_handler itself must be updated. */
   caml_rewrite_exception_stack(old_stack, (value**)&Caml_state->exn_handler,
-<<<<<<< oxcaml
                                (value**) &Caml_state->async_exn_handler,
                                new_stack);
-||||||| upstream-base
-                              new_stack);
-#ifdef WITH_FRAME_POINTERS
-  rewrite_frame_pointers(old_stack, new_stack);
-#endif
-=======
-                              new_stack);
->>>>>>> upstream-incoming
 #endif
 
   /* Update stack pointers in Caml_state->c_stack. It is possible to have
@@ -1059,7 +957,6 @@ int caml_try_realloc_stack(asize_t required_space)
 #endif
         link->stack = new_stack;
         link->sp = (char*)link->sp + delta;
-<<<<<<< oxcaml
       }
       if (link->async_exn_handler >= (char*) Stack_base(old_stack)
           && link->async_exn_handler < (char*) Stack_high(old_stack)) {
@@ -1074,11 +971,6 @@ int caml_try_realloc_stack(asize_t required_space)
       } else {
         fiber_debug_log("Not touching link->async_exn_handler %p",
           link->async_exn_handler);
-||||||| upstream-base
-        link->sp = (void*)((char*)Stack_high(new_stack) -
-                           ((char*)Stack_high(old_stack) - (char*)link->sp));
-=======
->>>>>>> upstream-incoming
       }
     }
   }

@@ -727,16 +727,8 @@ value caml_bytecode_interpreter(code_t prog, asize_t prog_size,
       *--sp = accu;
       p = &Field(accu, 0);
       *p++ = (value) (pc + pc[0]);
-<<<<<<< oxcaml
       *p++ = Make_closinfo(0, envofs, nfuncs < 2);
-      for (i = 1; i < nfuncs; i++) {
-||||||| upstream-base
-      *p++ = Make_closinfo(0, envofs);
-      for (i = 1; i < nfuncs; i++) {
-=======
-      *p++ = Make_closinfo(0, envofs);
       for (int i = 1; i < nfuncs; i++) {
->>>>>>> upstream-incoming
         *p++ = Make_header(i * 3, Infix_tag, 0); /* color irrelevant */
         *--sp = (value) p;
         *p++ = (value) (pc + pc[i]);

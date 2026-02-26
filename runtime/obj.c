@@ -17,6 +17,7 @@
 
 /* Operations on objects */
 
+#include <assert.h>
 #include <string.h>
 #include "caml/camlatomic.h"
 #include "caml/alloc.h"
@@ -150,7 +151,6 @@ CAMLprim value caml_obj_with_tag(value new_tag_v, value arg)
 {
   CAMLparam2 (new_tag_v, arg);
   CAMLlocal1 (res);
-<<<<<<< oxcaml
   mlsize_t sz, i;
   tag_t tag_for_alloc;
   uintnat infix_offset = 0;
@@ -182,13 +182,6 @@ CAMLprim value caml_obj_with_tag(value new_tag_v, value arg)
   } else {
     tag_for_alloc = new_tag;
   }
-||||||| upstream-base
-  mlsize_t sz, i;
-  tag_t tg;
-=======
-  mlsize_t sz;
-  tag_t tg;
->>>>>>> upstream-incoming
 
   sz = Wosize_val(arg);
   if (sz == 0) {
@@ -200,19 +193,10 @@ CAMLprim value caml_obj_with_tag(value new_tag_v, value arg)
     res = caml_alloc(sz, tag_for_alloc);
     memcpy(Bp_val(res), Bp_val(arg), sz * sizeof(value));
   } else if (sz <= Max_young_wosize) {
-<<<<<<< oxcaml
     reserved_t reserved = Reserved_val(arg);
     res = caml_alloc_small_with_reserved(sz, tag_for_alloc, reserved);
     for (i = 0; i < sz; i++) Field(res, i) = Field(arg, i);
-||||||| upstream-base
-    res = caml_alloc_small(sz, tg);
-    for (i = 0; i < sz; i++) Field(res, i) = Field(arg, i);
-=======
-    res = caml_alloc_small(sz, tg);
-    for (mlsize_t i = 0; i < sz; i++) Field(res, i) = Field(arg, i);
->>>>>>> upstream-incoming
   } else {
-<<<<<<< oxcaml
     mlsize_t scannable_sz = Scannable_wosize_val(arg);
     reserved_t reserved = Reserved_val(arg);
 
@@ -252,20 +236,6 @@ CAMLprim value caml_obj_with_tag(value new_tag_v, value arg)
       Field(res, i) = Field(arg, i);
     }
 
-||||||| upstream-base
-    res = caml_alloc_shr(sz, tg);
-    /* It is safe to use [caml_initialize] even if [tag == Closure_tag]
-       and some of the "values" being copied are actually code pointers.
-       That's because the new "value" does not point to the minor heap. */
-    for (i = 0; i < sz; i++) caml_initialize(&Field(res, i), Field(arg, i));
-=======
-    res = caml_alloc_shr(sz, tg);
-    /* It is safe to use [caml_initialize] even if [tag == Closure_tag]
-       and some of the "values" being copied are actually code pointers.
-       That's because the new "value" does not point to the minor heap. */
-    for (mlsize_t i = 0; i < sz; i++)
-      caml_initialize(&Field(res, i), Field(arg, i));
->>>>>>> upstream-incoming
     /* Give gc a chance to run, and run memprof callbacks */
     caml_process_pending_actions();
   }
@@ -423,7 +393,6 @@ struct queue_chunk {
   value entries[ENTRIES_PER_QUEUE_CHUNK];
 };
 
-<<<<<<< oxcaml
 /* Return 0 for uniform blocks and 1+n for a mixed block with scannable prefix
    len n.
  */
@@ -443,8 +412,7 @@ CAMLprim value caml_succ_scannable_prefix_len (value v) {
 CAMLprim value caml_is_null(value v)
 {
   return Is_null(v) ? Val_true : Val_false;
-||||||| upstream-base
-=======
+}
 
 /* For compiling let rec over values */
 
@@ -455,11 +423,61 @@ CAMLprim value caml_alloc_dummy(value size)
   return caml_alloc (wosize, 0);
 }
 
+/* [size] is a [value] representing number of words (fields) */
+CAMLprim value caml_alloc_dummy_function(value size,value arity)
+{
+  /* the arity argument is used by the js_of_ocaml runtime */
+  return caml_alloc_dummy(size);
+}
+
 /* [size] is a [value] representing number of floats. */
 CAMLprim value caml_alloc_dummy_float (value size)
 {
   mlsize_t wosize = Long_val(size) * Double_wosize;
   return caml_alloc (wosize, 0);
+}
+
+/* [size] is a [value] representing the number of fields.
+   [scannable_size] is a [value] representing the length of the prefix of
+   fields that contains pointer values.
+*/
+CAMLprim value caml_alloc_dummy_mixed (value size, value scannable_size)
+{
+  mlsize_t wosize = Long_val(size);
+#ifdef NATIVE_CODE
+  mlsize_t scannable_wosize = Long_val(scannable_size);
+  /* The below code runs for bytecode and native code, and critically assumes
+     that a double record field can be stored in one word. That's true both for
+     32-bit and 64-bit bytecode (as a double record field in a mixed record is
+     always boxed), and for 64-bit native code (as the double record field is
+     stored flat, taking up 1 word).
+  */
+  static_assert(Double_wosize == 1, "");
+  reserved_t reserved =
+    Reserved_mixed_block_scannable_wosize_native(scannable_wosize);
+#else
+  /* [scannable_size] can't be used meaningfully in bytecode */
+  (void)scannable_size;
+  reserved_t reserved = Faux_mixed_block_sentinel;
+#endif // NATIVE_CODE
+  return caml_alloc_with_reserved (wosize, 0, reserved);
+}
+
+CAMLprim value caml_alloc_dummy_infix(value vsize, value voffset)
+{
+  mlsize_t wosize = Long_val(vsize), offset = Long_val(voffset);
+  value v = caml_alloc(wosize, Closure_tag);
+  /* The following choice of closure info causes the GC to skip
+     the whole block contents.  This is correct since the dummy
+     block contains no pointers into the heap.  However, the block
+     cannot be marshaled or hashed, because not all closinfo fields
+     and infix header fields are correctly initialized. */
+  Closinfo_val(v) = Make_closinfo(0, wosize, 1);
+  if (offset > 0) {
+    v += Bsize_wsize(offset);
+    (((header_t *) (v)) [-1]) = Make_header(offset, Infix_tag, 0);
+  }
+  return v;
 }
 
 /* This is a specialized primitive despite being expressible in terms
@@ -477,6 +495,8 @@ CAMLprim value caml_update_dummy(value dummy, value newval)
   tag_t tag;
 
   tag = Tag_val (newval);
+  CAMLassert (tag != Infix_tag);
+  CAMLassert(tag != Closure_tag);
 
   if (Wosize_val(dummy) == 0) {
       /* Size-0 blocks are statically-allocated atoms. We cannot
@@ -497,13 +517,26 @@ CAMLprim value caml_update_dummy(value dummy, value newval)
       Store_double_flat_field (dummy, i, Double_flat_field (newval, i));
     }
   } else {
-    CAMLassert (tag < No_scan_tag);
+    CAMLassert (Scannable_tag(tag));
     CAMLassert (Tag_val(dummy) != Infix_tag);
+    CAMLassert (Reserved_val(dummy) == Reserved_val(newval));
     Unsafe_store_tag_val(dummy, tag);
     size = Wosize_val(newval);
     CAMLassert (size == Wosize_val(dummy));
-    for (mlsize_t i = 0; i < size; i++){
+    mlsize_t scannable_size = Scannable_wosize_val(newval);
+    CAMLassert (scannable_size == Scannable_wosize_val(dummy));
+    /* See comment above why this is safe even if [tag == Closure_tag]
+       and some of the "values" being copied are actually code pointers.
+
+       This reasoning does not apply to arbitrary flat fields, which might have
+       the same shape as pointers into the minor heap, so we need to handle the
+       non-scannable suffix of mixed blocks specially.
+    */
+    for (mlsize_t i = 0; i < scannable_size; i++){
       caml_modify (&Field(dummy, i), Field(newval, i));
+    }
+    for (mlsize_t i = scannable_size; i < size; i++) {
+      Field(dummy, i) = Field(newval, i);
     }
   }
   return Val_unit;
@@ -528,5 +561,4 @@ CAMLprim value caml_update_dummy_lazy(value dummy, value newval)
     break;
   }
   return Val_unit;
->>>>>>> upstream-incoming
 }

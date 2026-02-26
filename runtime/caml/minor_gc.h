@@ -57,12 +57,7 @@ struct caml_ref_table CAML_TABLE_STRUCT(value *);
 struct caml_ephe_ref_elt {
   value ephe;      /* an ephemeron in major heap */
   mlsize_t offset; /* the offset that points in the minor heap  */
-<<<<<<< oxcaml
   value stash;     /* copy of the field if it requires minor-GC cleaning */
-||||||| upstream-base
-=======
-  value locked;    /* only used during minor GC; see minor_gc.c */
->>>>>>> upstream-incoming
 };
 struct caml_ephe_ref_table CAML_TABLE_STRUCT(struct caml_ephe_ref_elt);
 
@@ -148,12 +143,7 @@ Caml_inline void add_to_ephe_ref_table (struct caml_ephe_ref_table *tbl,
   ephe_ref = tbl->ptr++;
   ephe_ref->ephe = ar;
   ephe_ref->offset = offset;
-<<<<<<< oxcaml
   ephe_ref->stash = caml_ephe_none;
-||||||| upstream-base
-=======
-  ephe_ref->locked = Val_unit;
->>>>>>> upstream-incoming
   CAMLassert(ephe_ref->offset < Wosize_val(ephe_ref->ephe));
 }
 

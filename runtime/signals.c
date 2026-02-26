@@ -81,16 +81,8 @@ static bool check_pending_unblocked_signals(void)
 
 CAMLexport int caml_check_pending_signals(void)
 {
-<<<<<<< oxcaml
-  int i;
   bool pending = false;
-  for (i = 0; i < NSIG_WORDS; i++) {
-||||||| upstream-base
-  int i;
-  for (i = 0; i < NSIG_WORDS; i++) {
-=======
   for (int i = 0; i < NSIG_WORDS; i++) {
->>>>>>> upstream-incoming
     if (atomic_load_relaxed(&caml_pending_signals[i]))
       pending = true;
   }
@@ -204,54 +196,6 @@ CAMLexport void (*caml_leave_blocking_section_hook)(void) =
 
 static int check_pending_actions(caml_domain_state * dom_st);
 
-<<<<<<< oxcaml
-||||||| upstream-base
-CAMLexport void caml_enter_blocking_section(void)
-{
-  caml_domain_state * domain = Caml_state;
-  while (1) {
-    /* Process all pending signals now */
-    if (check_pending_actions(domain)) {
-      /* First reset young_limit, and set action_pending in case there
-         are further async callbacks pending beyond OCaml signal
-         handlers. */
-      caml_handle_gc_interrupt();
-      caml_raise_if_exception(caml_process_pending_signals_exn());
-    }
-    caml_enter_blocking_section_hook ();
-    /* Check again if a signal arrived in the meanwhile. If none,
-       done; otherwise, try again. Since we do not hold the domain
-       lock, we cannot read [young_ptr] and we cannot call
-       [Caml_check_gc_interrupt]. */
-    if (atomic_load_relaxed(&domain->young_limit) != UINTNAT_MAX) break;
-    caml_leave_blocking_section_hook ();
-  }
-}
-
-=======
-CAMLexport void caml_enter_blocking_section(void)
-{
-  caml_domain_state * domain = Caml_state;
-  while (1) {
-    /* Process all pending signals now */
-    if (check_pending_actions(domain)) {
-      /* First reset young_limit, and set action_pending in case there
-         are further async callbacks pending beyond OCaml signal
-         handlers. */
-      caml_handle_gc_interrupt();
-      caml_get_value_or_raise(caml_process_pending_signals_res());
-    }
-    caml_enter_blocking_section_hook ();
-    /* Check again if a signal arrived in the meanwhile. If none,
-       done; otherwise, try again. Since we do not hold the domain
-       lock, we cannot read [young_ptr] and we cannot call
-       [Caml_check_gc_interrupt]. */
-    if (atomic_load_relaxed(&domain->young_limit) != CAML_UINTNAT_MAX) break;
-    caml_leave_blocking_section_hook ();
-  }
-}
-
->>>>>>> upstream-incoming
 CAMLexport void caml_enter_blocking_section_no_pending(void)
 {
   caml_enter_blocking_section_hook ();
@@ -272,7 +216,7 @@ CAMLexport void caml_enter_blocking_section(void)
        are further async callbacks pending beyond OCaml signal
        handlers. */
     caml_handle_gc_interrupt();
-    caml_raise_async_if_exception(caml_process_pending_signals_exn(), "");
+    caml_get_value_or_raise_async(caml_process_pending_signals_res(), "");
   }
 
   /* Drop the systhreads lock */
@@ -318,36 +262,6 @@ void caml_init_signal_handling(void) {
   for (mlsize_t i = 0; i < NSIG; i++)
     Field(caml_signal_handlers, i) = Val_unit;
   caml_register_generational_global_root(&caml_signal_handlers);
-}
-
-static void check_async_exn(value res, const char *msg)
-{
-  value exn;
-  const value *break_exn;
-
-  if (!Is_exception_result(res))
-    return;
-
-  exn = Extract_exception(res);
-
-  /* [Break] is not introduced as a predefined exception (in predef.ml and
-     stdlib.ml) since it causes trouble in conjunction with warnings about
-     constructor shadowing e.g. in format.ml.
-     "Sys.Break" must match stdlib/sys.mlp. */
-  break_exn = caml_named_value("Sys.Break");
-  if (break_exn != NULL && exn == *break_exn)
-    return;
-
-  caml_fatal_uncaught_exception_with_message(exn, msg);
-}
-
-value caml_raise_async_if_exception(value res, const char* where)
-{
-  if (Is_exception_result(res)) {
-    check_async_exn(res, where);
-    caml_raise_async(Extract_exception(res));
-  }
-  return res;
 }
 
 /* Execute a signal handler immediately */
@@ -476,44 +390,19 @@ caml_result caml_do_pending_actions_res(void)
   Caml_state->action_pending = 0;
 
   /* Call signal handlers first */
-<<<<<<< oxcaml
-  value exn = caml_process_pending_signals_exn();
-  check_async_exn(exn, "signal handler");
-  if (Is_exception_result(exn)) goto exception;
-||||||| upstream-base
-  value exn = caml_process_pending_signals_exn();
-  if (Is_exception_result(exn)) goto exception;
-=======
-  caml_result result = caml_process_pending_signals_res();
-  if (caml_result_is_exception(result)) goto exception;
->>>>>>> upstream-incoming
+  caml_result res = caml_process_pending_signals_res();
+  caml_check_async(res, "signal handler");
+  if (caml_result_is_exception(res)) goto exception;
 
   /* Call memprof callbacks */
-<<<<<<< oxcaml
-  exn = caml_memprof_run_callbacks_exn();
-  check_async_exn(exn, "memprof callback");
-  if (Is_exception_result(exn)) goto exception;
-||||||| upstream-base
-  exn = caml_memprof_handle_postponed_exn();
-  if (Is_exception_result(exn)) goto exception;
-#endif
-=======
-  result = caml_memprof_run_callbacks_res();
-  if (caml_result_is_exception(result)) goto exception;
->>>>>>> upstream-incoming
+  res = caml_memprof_run_callbacks_res();
+  caml_check_async(res, "memprof callback");
+  if (caml_result_is_exception(res)) goto exception;
 
   /* Call finalisers */
-<<<<<<< oxcaml
-  exn = caml_final_do_calls_exn();
-  check_async_exn(exn, "finaliser");
-  if (Is_exception_result(exn)) goto exception;
-||||||| upstream-base
-  exn = caml_final_do_calls_exn();
-  if (Is_exception_result(exn)) goto exception;
-=======
-  result = caml_final_do_calls_res();
-  if (caml_result_is_exception(result)) goto exception;
->>>>>>> upstream-incoming
+  res = caml_final_do_calls_res();
+  caml_check_async(res, "finaliser");
+  if (caml_result_is_exception(res)) goto exception;
 
   /* Process external interrupts (e.g. preemptive systhread switching).
      By doing this last, we do not need to set the action pending flag
@@ -521,13 +410,7 @@ caml_result caml_do_pending_actions_res(void)
      at this point. */
   caml_process_external_interrupt();
 
-<<<<<<< oxcaml
-  return Val_unit;
-||||||| upstream-base
-  return Val_unit;
-=======
   return Result_unit;
->>>>>>> upstream-incoming
 
 exception:
   /* If an exception is raised during an asynchronous callback, then
@@ -535,7 +418,7 @@ exception:
      needed. Therefore, we set [Caml_state->action_pending] again in
      order to force reexamination of callbacks. */
   caml_set_action_pending(Caml_state);
-  return result;
+  return res;
 }
 
 caml_result caml_process_pending_actions_with_root_res(value root)
@@ -551,17 +434,8 @@ caml_result caml_process_pending_actions_with_root_res(value root)
 
 CAMLprim value caml_process_pending_actions_with_root(value root)
 {
-<<<<<<< oxcaml
-  return caml_raise_async_if_exception(
-    caml_process_pending_actions_with_root_exn(root),
-    "");
-||||||| upstream-base
-  return caml_raise_if_exception(
-    caml_process_pending_actions_with_root_exn(root));
-=======
-  return caml_get_value_or_raise(
-    caml_process_pending_actions_with_root_res(root));
->>>>>>> upstream-incoming
+  return caml_get_value_or_raise_async(
+    caml_process_pending_actions_with_root_res(root), "");
 }
 
 CAMLexport caml_result caml_process_pending_actions_res(void)
@@ -706,7 +580,6 @@ CAMLexport int caml_rev_convert_signal_number(int signo)
   return signo;
 }
 
-<<<<<<< oxcaml
 #ifdef __linux__
 static size_t max_size_t(size_t a, size_t b)
 {
@@ -714,17 +587,12 @@ static size_t max_size_t(size_t a, size_t b)
 }
 #endif
 
-void * caml_init_signal_stack(size_t* signal_stack_size)
-||||||| upstream-base
-void * caml_init_signal_stack(void)
-=======
 CAMLprim value caml_sys_rev_convert_signal_number(value signo)
 {
   return Val_int(caml_rev_convert_signal_number(Int_val(signo)));
 }
 
-void * caml_init_signal_stack(void)
->>>>>>> upstream-incoming
+void * caml_init_signal_stack(size_t* signal_stack_size)
 {
 #ifdef POSIX_SIGNALS
   stack_t stk;
@@ -939,13 +807,7 @@ CAMLprim value caml_install_signal_handler(value signal_number, value action)
     caml_modify(&Field(caml_signal_handlers, sig), Field(action, 0));
   }
   caml_plat_unlock(&signal_install_mutex);
-<<<<<<< oxcaml
-  (void) caml_raise_async_if_exception(caml_process_pending_signals_exn(), "");
-||||||| upstream-base
-  caml_raise_if_exception(caml_process_pending_signals_exn());
-=======
-  caml_get_value_or_raise(caml_process_pending_signals_res());
->>>>>>> upstream-incoming
+  caml_get_value_or_raise_async(caml_process_pending_signals_res(), "");
   CAMLreturn (res);
  err:
   caml_plat_unlock(&signal_install_mutex);

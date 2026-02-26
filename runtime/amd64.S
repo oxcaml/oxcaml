@@ -175,13 +175,7 @@ G(name):
      Version 1.0
      https://github.com/hjl-tools/x86-psABI/wiki/x86-64-psABI-1.0.pdf */
 
-<<<<<<< oxcaml
 #define DW_CFA_def_cfa_expression 0x0f
-||||||| upstream-base
-#define DW_CFA_def_cfa_expression 0x0f
-#define DW_REG_rbx                3
-=======
->>>>>>> upstream-incoming
 #define DW_REG_rbp                6
 #define DW_REG_rsp                7
 #define DW_REG_r13                13
@@ -233,15 +227,8 @@ X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(27) X(
 
    If a C function is called which might call back into OCaml,
    then nothing may be pushed to the C stack between SWITCH_OCAML_TO_C
-<<<<<<< oxcaml
    and the next call on the C stack. (This is to ensure frame pointers
    are correctly maintained if the stack is reallocated) */
-||||||| upstream-base
-/* Switch from OCaml to C stack. Clobbers %r10, %r11. */
-=======
-   and the next C call. (This is to ensure frame pointers are correctly
-   maintained if the stack is reallocated) */
->>>>>>> upstream-incoming
 #ifdef ASM_CFI_SUPPORTED
 #define SWITCH_OCAML_TO_C_CFI                                   \
         CFI_REMEMBER_STATE;                                     \
@@ -484,37 +471,16 @@ X(16) X(17) X(18) X(19) X(20) X(21) X(22) X(23) X(24) X(25) X(26) X(27) X(27) X(
         .text
 
 #if defined(FUNCTION_SECTIONS)
-<<<<<<< oxcaml
-        TEXT_SECTION(caml_hot.code_begin)
-        .globl  G(caml_hot.code_begin)
-        .globl  G(caml_hot__code_begin)
-G(caml_hot.code_begin):
-G(caml_hot__code_begin):
-||||||| upstream-base
-        TEXT_SECTION(caml_hot.code_begin)
-        .globl  G(caml_hot.code_begin)
-G(caml_hot.code_begin):
-=======
         TEXT_SECTION(CAMLSEP(hot,code_begin))
         .globl  G(CAMLSEP(hot,code_begin))
 G(CAMLSEP(hot,code_begin)):
->>>>>>> upstream-incoming
 
-<<<<<<< oxcaml
-        TEXT_SECTION(caml_hot.code_end)
-        .globl  G(caml_hot.code_end)
-        .globl  G(caml_hot__code_end)
-G(caml_hot.code_end):
-G(caml_hot__code_end):
-||||||| upstream-base
-        TEXT_SECTION(caml_hot.code_end)
-        .globl  G(caml_hot.code_end)
-G(caml_hot.code_end):
-=======
         TEXT_SECTION(CAMLSEP(hot,code_end))
         .globl  G(CAMLSEP(hot,code_end))
+        .globl  G(CAMLSEP(hot,code_end))
+        .globl  G(caml_hot__code_end)
 G(CAMLSEP(hot,code_end)):
->>>>>>> upstream-incoming
+G(caml_hot__code_end):
 #endif
 
 /******************************************************************************/
@@ -676,7 +642,6 @@ G(caml_system__code_begin):
 #define TSAN_RESTORE_CALLER_REGS
 #endif
 
-<<<<<<< oxcaml
 #define Make_call_realloc_stack(suffix, simd)        \
     FUNCTION(G(caml_call_realloc_stack ## suffix))   \
     CFI_STARTPROC                                  ; \
@@ -700,7 +665,7 @@ G(caml_system__code_begin):
         LEA_VAR(caml_exn_Stack_overflow, %rdi);      \
         C_call  (GCALL(caml_raise_async));           \
     CFI_ENDPROC                          ;           \
-    ENDFUNCTION(G(caml_call_realloc_stack ## suffix))
+    END_FUNCTION(G(caml_call_realloc_stack ## suffix))
 
 
 Make_call_realloc_stack(, NO)
@@ -726,7 +691,7 @@ LBL(caml_call_gc ## suffix):                         \
         LEAVE_FUNCTION;                              \
         ret;                                         \
     CFI_ENDPROC                 ;                    \
-    ENDFUNCTION(G(caml_call_gc ## suffix))
+    END_FUNCTION(G(caml_call_gc ## suffix))
 
 Make_call_gc(, NO)
 Make_call_gc(_sse, XMM)
@@ -734,11 +699,6 @@ Make_call_gc(_avx, YMM)
 Make_call_gc(_avx512, ZMM)
 
 FUNCTION(G(caml_raise_stack_overflow_nat))
-||||||| upstream-base
-FUNCTION(G(caml_call_realloc_stack))
-=======
-FUNCTION(caml_call_realloc_stack)
->>>>>>> upstream-incoming
 CFI_STARTPROC
         CFI_SIGNAL_FRAME
         /* We assume that we are always on the OCaml stack at this point.
@@ -750,59 +710,14 @@ CFI_STARTPROC
         SWITCH_OCAML_TO_C
         CHECK_STACK_ALIGNMENT; jmp GCALL(caml_raise_stack_overflow)
 CFI_ENDPROC
-<<<<<<< oxcaml
-ENDFUNCTION(G(caml_raise_stack_overflow_nat))
-||||||| upstream-base
-ENDFUNCTION(G(caml_call_realloc_stack))
-=======
-END_FUNCTION(caml_call_realloc_stack)
->>>>>>> upstream-incoming
+END_FUNCTION(G(caml_raise_stack_overflow_nat))
 
-<<<<<<< oxcaml
 #define r15_sub_words(n) subq $8+8*n, %r15
 #define r15_sub_1        r15_sub_words(1)
 #define r15_sub_2        r15_sub_words(2)
 #define r15_sub_3        r15_sub_words(3)
 #define r15_sub_N        /* do nothing */
-||||||| upstream-base
-FUNCTION(G(caml_call_gc))
-CFI_STARTPROC
-        CFI_SIGNAL_FRAME
-        ENTER_FUNCTION
-LBL(caml_call_gc):
-        SAVE_ALL_REGS
-        movq    %r15, Caml_state(gc_regs)
-        SWITCH_OCAML_TO_C
-        C_call (GCALL(caml_garbage_collection))
-        SWITCH_C_TO_OCAML
-        movq    Caml_state(gc_regs), %r15
-        RESTORE_ALL_REGS
-        LEAVE_FUNCTION
-        ret
-CFI_ENDPROC
-ENDFUNCTION(G(caml_call_gc))
-=======
-FUNCTION(caml_call_gc)
-CFI_STARTPROC
-        CFI_SIGNAL_FRAME
-        ENTER_FUNCTION
-LBL(caml_call_gc):
-        SAVE_ALL_REGS
-        movq    %r15, Caml_state(gc_regs)
-        TSAN_ENTER_FUNCTION(0)
-        SWITCH_OCAML_TO_C
-        C_call (GCALL(caml_garbage_collection))
-        SWITCH_C_TO_OCAML
-        TSAN_EXIT_FUNCTION
-        movq    Caml_state(gc_regs), %r15
-        RESTORE_ALL_REGS
-        LEAVE_FUNCTION
-        ret
-CFI_ENDPROC
-END_FUNCTION(caml_call_gc)
->>>>>>> upstream-incoming
 
-<<<<<<< oxcaml
 #define Make_alloc_fun(base_name, words, simd) \
 FUNCTION(G(base_name ## simd))                 \
 CFI_STARTPROC;                                 \
@@ -813,91 +728,15 @@ CFI_STARTPROC;                                 \
         LEAVE_FUNCTION;                        \
         ret;                                   \
 CFI_ENDPROC ;                                  \
-ENDFUNCTION(G(base_name ## simd)) ;
-||||||| upstream-base
-FUNCTION(G(caml_alloc1))
-CFI_STARTPROC
-        ENTER_FUNCTION
-        subq    $16, %r15
-        cmpq    Caml_state(young_limit), %r15
-        jb      LBL(caml_call_gc)
-        LEAVE_FUNCTION
-        ret
-CFI_ENDPROC
-ENDFUNCTION(G(caml_alloc1))
-=======
-FUNCTION(caml_alloc1)
-CFI_STARTPROC
-        ENTER_FUNCTION
-        subq    $16, %r15
-        cmpq    Caml_state(young_limit), %r15
-        jb      LBL(caml_call_gc)
-        LEAVE_FUNCTION
-        ret
-CFI_ENDPROC
-END_FUNCTION(caml_alloc1)
->>>>>>> upstream-incoming
+END_FUNCTION(G(base_name ## simd)) ;
 
-<<<<<<< oxcaml
 #define Make_alloc_funs(words) \
 Make_alloc_fun(caml_alloc ## words, words,) \
 Make_alloc_fun(caml_alloc ## words, words, _sse) \
 Make_alloc_fun(caml_alloc ## words, words, _avx) \
 Make_alloc_fun(caml_alloc ## words, words, _avx512)
-||||||| upstream-base
-FUNCTION(G(caml_alloc2))
-CFI_STARTPROC
-        ENTER_FUNCTION
-        subq    $24, %r15
-        cmpq    Caml_state(young_limit), %r15
-        jb      LBL(caml_call_gc)
-        LEAVE_FUNCTION
-        ret
-CFI_ENDPROC
-ENDFUNCTION(G(caml_alloc2))
-=======
-FUNCTION(caml_alloc2)
-CFI_STARTPROC
-        ENTER_FUNCTION
-        subq    $24, %r15
-        cmpq    Caml_state(young_limit), %r15
-        jb      LBL(caml_call_gc)
-        LEAVE_FUNCTION
-        ret
-CFI_ENDPROC
-END_FUNCTION(caml_alloc2)
->>>>>>> upstream-incoming
 
-<<<<<<< oxcaml
-Make_alloc_funs(1) /* caml_alloc1* */
-Make_alloc_funs(2) /* caml_alloc2* */
-Make_alloc_funs(3) /* caml_alloc3* */
-Make_alloc_funs(N) /* caml_allocN* */
-||||||| upstream-base
-FUNCTION(G(caml_alloc3))
-CFI_STARTPROC
-        ENTER_FUNCTION
-        subq    $32, %r15
-        cmpq    Caml_state(young_limit), %r15
-        jb      LBL(caml_call_gc)
-        LEAVE_FUNCTION
-        ret
-CFI_ENDPROC
-ENDFUNCTION(G(caml_alloc3))
-=======
-FUNCTION(caml_alloc3)
-CFI_STARTPROC
-        ENTER_FUNCTION
-        subq    $32, %r15
-        cmpq    Caml_state(young_limit), %r15
-        jb      LBL(caml_call_gc)
-        LEAVE_FUNCTION
-        ret
-CFI_ENDPROC
-END_FUNCTION(caml_alloc3)
->>>>>>> upstream-incoming
 
-<<<<<<< oxcaml
 #define Make_call_local_realloc(suffix, simd)        \
     FUNCTION(G(caml_call_local_realloc ## suffix)) ; \
     CFI_STARTPROC               ;                    \
@@ -911,33 +750,12 @@ END_FUNCTION(caml_alloc3)
         LEAVE_FUNCTION;                              \
         ret;                                         \
    CFI_ENDPROC                  ;                    \
-   ENDFUNCTION(G(caml_call_local_realloc ## suffix))
+   END_FUNCTION(G(caml_call_local_realloc ## suffix))
 
 Make_call_local_realloc(, NO)
 Make_call_local_realloc(_sse, XMM)
 Make_call_local_realloc(_avx, YMM)
 Make_call_local_realloc(_avx512, ZMM)
-||||||| upstream-base
-FUNCTION(G(caml_allocN))
-CFI_STARTPROC
-        ENTER_FUNCTION
-        cmpq    Caml_state(young_limit), %r15
-        jb      LBL(caml_call_gc)
-        LEAVE_FUNCTION
-        ret
-CFI_ENDPROC
-ENDFUNCTION(G(caml_allocN))
-=======
-FUNCTION(caml_allocN)
-CFI_STARTPROC
-        ENTER_FUNCTION
-        cmpq    Caml_state(young_limit), %r15
-        jb      LBL(caml_call_gc)
-        LEAVE_FUNCTION
-        ret
-CFI_ENDPROC
-END_FUNCTION(caml_allocN)
->>>>>>> upstream-incoming
 
 /******************************************************************************/
 /* Call a C function from OCaml */
@@ -1006,7 +824,6 @@ LBL(caml_c_call):
 CFI_ENDPROC
 END_FUNCTION(caml_c_call)
 
-<<<<<<< oxcaml
 #if defined(SYS_mingw64) || defined (SYS_cygwin)
 /* Allocate the shadow store on Windows (the c_stack_link store was used \
    in calling caml_c_call_copy_stack_args) */
@@ -1053,7 +870,7 @@ END_FUNCTION(caml_c_call)
         popq    %rbp; CFI_ADJUST(-8);                                   \
         ret         ;                                                   \
     CFI_ENDPROC                 ;                                       \
-    ENDFUNCTION(G(caml_c_call_copy_stack_args ## suffix)) ;             \
+    END_FUNCTION(G(caml_c_call_copy_stack_args ## suffix)) ;            \
                                                                         \
     FUNCTION(G(caml_c_call_stack_args ## suffix)) ;                     \
     CFI_STARTPROC                       ;                               \
@@ -1077,121 +894,13 @@ END_FUNCTION(caml_c_call)
         LEAVE_FUNCTION;                                                 \
         RET_FROM_C_CALL         ;                                       \
     CFI_ENDPROC                 ;                                       \
-    ENDFUNCTION(G(caml_c_call_stack_args ## suffix));                   \
+    END_FUNCTION(G(caml_c_call_stack_args ## suffix));
 
 /* We don't need an SSE variant for this because the stack is always
    16-aligned */
 Make_c_call_stack_args()
 Make_c_call_stack_args(_avx)
 Make_c_call_stack_args(_avx512)
-||||||| upstream-base
-FUNCTION(G(caml_c_call_stack_args))
-CFI_STARTPROC
-        CFI_SIGNAL_FRAME
-        ENTER_FUNCTION
-    /* Arguments:
-        C arguments         : %rdi, %rsi, %rdx, %rcx, %r8, and %r9
-        C function          : %rax
-        C stack args        : begin=%r13 end=%r12 */
-    /* Switch from OCaml to C */
-        SWITCH_OCAML_TO_C
-    /* we use %rbx (otherwise unused) to enable backtraces */
-        movq    %rsp, %rbx
-#ifdef ASM_CFI_SUPPORTED
-        .cfi_escape DW_CFA_def_cfa_expression, 5,           \
-          /* %rbp points to the c_stack_link structure */   \
-          DW_OP_breg + DW_REG_rbx, Cstack_sp, DW_OP_deref,  \
-          DW_OP_plus_uconst, RETADDR_ENTRY_SIZE
-#endif
-    /* Make the alloc ptr available to the C code */
-        movq    %r15, Caml_state(young_ptr)
-    /* Copy arguments from OCaml to C stack */
-#if defined(SYS_mingw64) || defined (SYS_cygwin)
-        addq    $32, %rsp
-#endif
-LBL(105):
-        subq    $8, %r12
-        cmpq    %r13,%r12
-        jb      LBL(106)
-        push    (%r12); CFI_ADJUST(8)
-        jmp     LBL(105)
-LBL(106):
-#if defined(SYS_mingw64) || defined (SYS_cygwin)
-        subq    $32, %rsp
-#endif
-    /* Call the function (address in %rax) */
-        C_call  (*%rax)
-    /* Pop arguments back off the stack */
-        movq    Caml_state(c_stack), %rsp
-    /* Prepare for return to OCaml */
-        movq    Caml_state(young_ptr), %r15
-    /* Load ocaml stack and restore global variables */
-        SWITCH_C_TO_OCAML
-    /* Return to OCaml caller */
-        LEAVE_FUNCTION
-        RET_FROM_C_CALL
-CFI_ENDPROC
-ENDFUNCTION(G(caml_c_call_stack_args))
-=======
-FUNCTION(caml_c_call_stack_args)
-CFI_STARTPROC
-        CFI_SIGNAL_FRAME
-        ENTER_FUNCTION
-    /* Arguments:
-        C arguments         : %rdi, %rsi, %rdx, %rcx, %r8, and %r9
-        C function          : %rax
-        C stack args        : begin=%r13 end=%r12 */
-    /* Switch from OCaml to C */
-        SWITCH_OCAML_TO_C
-    /* Make the alloc ptr available to the C code */
-        movq    %r15, Caml_state(young_ptr)
-    /* Copy the arguments and call */
-        C_call  (GCALL(caml_c_call_copy_stack_args))
-    /* Prepare for return to OCaml */
-        movq    Caml_state(young_ptr), %r15
-    /* Load ocaml stack and restore global variables */
-        SWITCH_C_TO_OCAML
-    /* Return to OCaml caller */
-        LEAVE_FUNCTION
-        RET_FROM_C_CALL
-CFI_ENDPROC
-END_FUNCTION(caml_c_call_stack_args)
-
-/* To correctly maintain frame pointers during stack reallocation,
-   the runtime assumes that the caml_c_call stub does not push
-   anything to the stack before the first frame pointer on the C stack.
-   To guarantee this when stack arguments are used, the actual pushing
-   of arguments is done by this separate function */
-FUNCTION(caml_c_call_copy_stack_args)
-CFI_STARTPROC
-    /* Set up a frame pointer even without WITH_FRAME_POINTERS,
-       which we use to pop an unknown number of arguments later */
-        pushq   %rbp; CFI_ADJUST(8)
-        movq    %rsp, %rbp
-        CFI_DEF_CFA_REGISTER(DW_REG_rbp)
-    /* Copy arguments from OCaml to C stack */
-LBL(105):
-        subq    $8, %r12
-        cmpq    %r13,%r12
-        jb      LBL(106)
-        push    (%r12)
-        jmp     LBL(105)
-LBL(106):
-#if defined(SYS_mingw64) || defined (SYS_cygwin)
-    /* Allocate the shadow store on Windows (the c_stack_link store was used
-       in calling caml_c_call_copy_stack_args) */
-        subq    $32, %rsp
-#endif
-    /* Call the function (address in %rax) */
-        C_call  (*%rax)
-    /* Pop arguments back off the stack */
-        movq    %rbp, %rsp
-        CFI_DEF_CFA_REGISTER(DW_REG_rsp)
-        popq    %rbp; CFI_ADJUST(-8)
-        ret
-CFI_ENDPROC
-END_FUNCTION(caml_c_call_copy_stack_args)
->>>>>>> upstream-incoming
 
 /******************************************************************************/
 /* Start the OCaml program */
@@ -1796,21 +1505,15 @@ CFI_STARTPROC
 CFI_ENDPROC
 END_FUNCTION(caml_ml_array_bound_error)
 
-<<<<<<< oxcaml
 FUNCTION(G(caml_ml_array_align_error))
 CFI_STARTPROC
         ENTER_FUNCTION
         LEA_VAR(caml_array_align_error_asm, %rax)
         jmp     LBL(caml_c_call)
 CFI_ENDPROC
-ENDFUNCTION(G(caml_ml_array_align_error))
+END_FUNCTION(G(caml_ml_array_align_error))
 
 FUNCTION(G(caml_assert_stack_invariants))
-||||||| upstream-base
-FUNCTION(G(caml_assert_stack_invariants))
-=======
-FUNCTION(caml_assert_stack_invariants)
->>>>>>> upstream-incoming
 CFI_STARTPROC
         movq    Caml_state(current_stack), %r11
         movq    %rsp, %r10
@@ -1830,7 +1533,6 @@ G(caml_system__code_end):
 /* Frametable - GC roots for callback */
 /* Uses the same naming convention as ocamlopt generated modules. */
         .data
-<<<<<<< oxcaml
         .globl  G(caml_system__frametable)
         .align  EIGHT_ALIGN
 G(caml_system__frametable):
@@ -1838,36 +1540,10 @@ G(caml_system__frametable):
         .4byte  LBL(108) - . /* return address into callback */
         .value  -1           /* negative frame size => use callback link */
         .value  0            /* no roots here */
-||||||| upstream-base
-        .globl  G(caml_system.frametable)
         .align  EIGHT_ALIGN
-G(caml_system.frametable):
-        .quad   2           /* two descriptors */
-        .quad   LBL(108)    /* return address into callback */
-        .value  -1          /* negative frame size => use callback link */
-        .value  0           /* no roots here */
-=======
-OBJECT(CAMLSEP(system,frametable))
-        .quad   2           /* two descriptors */
-        .quad   LBL(108)    /* return address into callback */
-        .value  -1          /* negative frame size => use callback link */
-        .value  0           /* no roots here */
->>>>>>> upstream-incoming
-        .align  EIGHT_ALIGN
-<<<<<<< oxcaml
         .4byte  LBL(frame_runstack) - . /* return address into fiber_val_handler */
         .value  -1                      /* negative frame size => use callback link */
         .value  0                       /* no roots here */
-||||||| upstream-base
-        .quad   LBL(frame_runstack) /* return address into fiber_val_handler */
-        .value  -1          /* negative frame size => use callback link */
-        .value  0           /* no roots here */
-=======
-        .quad   LBL(frame_runstack) /* return address into fiber_val_handler */
-        .value  -1          /* negative frame size => use callback link */
-        .value  0           /* no roots here */
-END_OBJECT(CAMLSEP(system,frametable))
->>>>>>> upstream-incoming
 
 #if defined(SYS_macosx)
         .literal16

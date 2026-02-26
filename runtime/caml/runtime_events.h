@@ -120,15 +120,9 @@ typedef enum {
     EV_COMPACT_EVACUATE,
     EV_COMPACT_FORWARD,
     EV_COMPACT_RELEASE,
-<<<<<<< oxcaml
-    EV_MINOR_EPHE_CLEAN,
-    EV_MINOR_DEPENDENT,
-||||||| upstream-base
-    EV_COMPACT_RELEASE
-=======
     EV_EMPTY_MINOR,
     EV_MINOR_EPHE_CLEAN,
->>>>>>> upstream-incoming
+    EV_MINOR_DEPENDENT,
 } ev_runtime_phase;
 
 typedef enum {
@@ -145,6 +139,7 @@ typedef enum {
     EV_C_REQUEST_MINOR_REALLOC_REF_TABLE,
     EV_C_REQUEST_MINOR_REALLOC_EPHE_REF_TABLE,
     EV_C_REQUEST_MINOR_REALLOC_CUSTOM_TABLE,
+    EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE,
 
     EV_C_MAJOR_HEAP_POOL_WORDS,
     EV_C_MAJOR_HEAP_POOL_LIVE_WORDS,
@@ -152,31 +147,13 @@ typedef enum {
     EV_C_MAJOR_HEAP_POOL_FRAG_WORDS,
     EV_C_MAJOR_HEAP_POOL_LIVE_BLOCKS,
     EV_C_MAJOR_HEAP_LARGE_BLOCKS,
-    /* CR sspies: EV_C_MAJOR_SLICE_ALLOC_WORDS has been renamed to
-       EV_C_MAJOR_ALLOCATED_WORDS to match upstream. */
-    /* CR sspies: EV_C_MAJOR_SLICE_BUDGET and EV_C_MAJOR_ALLOCATED_WORDS
-       have been moved in the variant to match upstream. */
-<<<<<<< oxcaml
-    EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE,
+
     EV_C_MAJOR_SLICE_ALLOC_WORDS,
     EV_C_MAJOR_SLICE_ALLOC_DEPENDENT_WORDS,
     EV_C_MAJOR_SLICE_NEW_WORK,
     EV_C_MAJOR_SLICE_TOTAL_WORK,
     EV_C_MAJOR_SLICE_BUDGET,
     EV_C_MAJOR_SLICE_WORK_DONE,
-||||||| upstream-base
-=======
-
-    EV_C_MAJOR_HEAP_WORDS,
-    EV_C_MAJOR_ALLOCATED_WORDS,
-    EV_C_MAJOR_ALLOCATED_WORK,
-    EV_C_MAJOR_DEPENDENT_WORK,
-    EV_C_MAJOR_EXTRA_WORK,
-    EV_C_MAJOR_WORK_COUNTER,
-    EV_C_MAJOR_ALLOC_COUNTER,
-    EV_C_MAJOR_SLICE_TARGET,
-    EV_C_MAJOR_SLICE_BUDGET
->>>>>>> upstream-incoming
 } ev_runtime_counter;
 
 typedef enum {
@@ -224,14 +201,10 @@ CAMLextern void caml_runtime_events_resume(void);
    [0] otherwise. */
 CAMLextern int caml_runtime_events_are_active(void);
 
-<<<<<<< oxcaml
-||||||| upstream-base
-=======
 #ifdef __cplusplus
 }
 #endif
 
->>>>>>> upstream-incoming
 #ifdef CAML_INTERNALS
 
 struct runtime_events_buffer_header {

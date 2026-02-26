@@ -57,147 +57,6 @@ ENDM
 SAVE_ALL_REGS MACRO
     ; Save young_ptr
         mov     Caml_state(young_ptr), r15
-<<<<<<< oxcaml
-    ; Build array of registers, save it into Caml_state(gc_regs)
-        push    rbp
-        push    r11
-        push    r10
-        push    r13
-        push    r12
-        push    r9
-        push    r8
-        push    rcx
-        push    rdx
-        push    rsi
-        push    rdi
-        push    rbx
-        push    rax
-        mov     Caml_state(gc_regs), rsp
-    ; Save floating-point registers
-        sub     rsp, 16*16
-        movupd  QWORD PTR [rsp + 0*16], xmm0
-        movupd  QWORD PTR [rsp + 1*16], xmm1
-        movupd  QWORD PTR [rsp + 2*16], xmm2
-        movupd  QWORD PTR [rsp + 3*16], xmm3
-        movupd  QWORD PTR [rsp + 4*16], xmm4
-        movupd  QWORD PTR [rsp + 5*16], xmm5
-        movupd  QWORD PTR [rsp + 6*16], xmm6
-        movupd  QWORD PTR [rsp + 7*16], xmm7
-        movupd  QWORD PTR [rsp + 8*16], xmm8
-        movupd  QWORD PTR [rsp + 9*16], xmm9
-        movupd  QWORD PTR [rsp + 10*16], xmm10
-        movupd  QWORD PTR [rsp + 11*16], xmm11
-        movupd  QWORD PTR [rsp + 12*16], xmm12
-        movupd  QWORD PTR [rsp + 13*16], xmm13
-        movupd  QWORD PTR [rsp + 14*16], xmm14
-        movupd  QWORD PTR [rsp + 15*16], xmm15
-    ; Call the garbage collector
-        sub rsp, 32      ; PR#5008: bottom 32 bytes are reserved for callee
-        call caml_garbage_collection
-        add rsp, 32      ; PR#5008
-    ; Restore all regs used by the code generator
-        movupd  xmm0, QWORD PTR [rsp + 0*16]
-        movupd  xmm1, QWORD PTR [rsp + 1*16]
-        movupd  xmm2, QWORD PTR [rsp + 2*16]
-        movupd  xmm3, QWORD PTR [rsp + 3*16]
-        movupd  xmm4, QWORD PTR [rsp + 4*16]
-        movupd  xmm5, QWORD PTR [rsp + 5*16]
-        movupd  xmm6, QWORD PTR [rsp + 6*16]
-        movupd  xmm7, QWORD PTR [rsp + 7*16]
-        movupd  xmm8, QWORD PTR [rsp + 8*16]
-        movupd  xmm9, QWORD PTR [rsp + 9*16]
-        movupd  xmm10, QWORD PTR [rsp + 10*16]
-        movupd  xmm11, QWORD PTR [rsp + 11*16]
-        movupd  xmm12, QWORD PTR [rsp + 12*16]
-        movupd  xmm13, QWORD PTR [rsp + 13*16]
-        movupd  xmm14, QWORD PTR [rsp + 14*16]
-        movupd  xmm15, QWORD PTR [rsp + 15*16]
-        add     rsp, 16*16
-        pop     rax
-        pop     rbx
-        pop     rdi
-        pop     rsi
-        pop     rdx
-        pop     rcx
-        pop     r8
-        pop     r9
-        pop     r12
-        pop     r13
-        pop     r10
-        pop     r11
-        pop     rbp
-    ; Restore Caml_state(young_ptr)
-||||||| upstream-base
-    ; Build array of registers, save it into Caml_state(gc_regs)
-        push    rbp
-        push    r11
-        push    r10
-        push    r13
-        push    r12
-        push    r9
-        push    r8
-        push    rcx
-        push    rdx
-        push    rsi
-        push    rdi
-        push    rbx
-        push    rax
-        mov     Caml_state(gc_regs), rsp
-    ; Save floating-point registers
-        sub     rsp, 16*8
-        movsd   QWORD PTR [rsp + 0*8], xmm0
-        movsd   QWORD PTR [rsp + 1*8], xmm1
-        movsd   QWORD PTR [rsp + 2*8], xmm2
-        movsd   QWORD PTR [rsp + 3*8], xmm3
-        movsd   QWORD PTR [rsp + 4*8], xmm4
-        movsd   QWORD PTR [rsp + 5*8], xmm5
-        movsd   QWORD PTR [rsp + 6*8], xmm6
-        movsd   QWORD PTR [rsp + 7*8], xmm7
-        movsd   QWORD PTR [rsp + 8*8], xmm8
-        movsd   QWORD PTR [rsp + 9*8], xmm9
-        movsd   QWORD PTR [rsp + 10*8], xmm10
-        movsd   QWORD PTR [rsp + 11*8], xmm11
-        movsd   QWORD PTR [rsp + 12*8], xmm12
-        movsd   QWORD PTR [rsp + 13*8], xmm13
-        movsd   QWORD PTR [rsp + 14*8], xmm14
-        movsd   QWORD PTR [rsp + 15*8], xmm15
-    ; Call the garbage collector
-        sub rsp, 32      ; PR#5008: bottom 32 bytes are reserved for callee
-        call caml_garbage_collection
-        add rsp, 32      ; PR#5008
-    ; Restore all regs used by the code generator
-        movsd   xmm0, QWORD PTR [rsp + 0*8]
-        movsd   xmm1, QWORD PTR [rsp + 1*8]
-        movsd   xmm2, QWORD PTR [rsp + 2*8]
-        movsd   xmm3, QWORD PTR [rsp + 3*8]
-        movsd   xmm4, QWORD PTR [rsp + 4*8]
-        movsd   xmm5, QWORD PTR [rsp + 5*8]
-        movsd   xmm6, QWORD PTR [rsp + 6*8]
-        movsd   xmm7, QWORD PTR [rsp + 7*8]
-        movsd   xmm8, QWORD PTR [rsp + 8*8]
-        movsd   xmm9, QWORD PTR [rsp + 9*8]
-        movsd   xmm10, QWORD PTR [rsp + 10*8]
-        movsd   xmm11, QWORD PTR [rsp + 11*8]
-        movsd   xmm12, QWORD PTR [rsp + 12*8]
-        movsd   xmm13, QWORD PTR [rsp + 13*8]
-        movsd   xmm14, QWORD PTR [rsp + 14*8]
-        movsd   xmm15, QWORD PTR [rsp + 15*8]
-        add     rsp, 16*8
-        pop     rax
-        pop     rbx
-        pop     rdi
-        pop     rsi
-        pop     rdx
-        pop     rcx
-        pop     r8
-        pop     r9
-        pop     r12
-        pop     r13
-        pop     r10
-        pop     r11
-        pop     rbp
-    ; Restore Caml_state(young_ptr)
-=======
     ; Now, use r15 to point to the gc_regs bucket
     ; We save r11 first to allow it to be scratch
         mov     r15, Caml_state(gc_regs_buckets)
@@ -270,7 +129,6 @@ RESTORE_ALL_REGS MACRO
         movsd   xmm13, mmword ptr [r15 + (13+13)*8]
         movsd   xmm14, mmword ptr [r15 + (14+13)*8]
         movsd   xmm15, mmword ptr [r15 + (15+13)*8]
->>>>>>> upstream-incoming
         mov     r15, Caml_state(young_ptr)
 ENDM
 
@@ -811,14 +669,12 @@ caml_ml_array_bound_error:
         lea     rax, caml_array_bound_error_asm
         jmp     caml_c_call
 
-<<<<<<< oxcaml
         PUBLIC  caml_ml_array_align_error
         ALIGN   16
 caml_ml_array_align_error:
         lea     rax, caml_array_align_error_asm
         jmp     caml_c_call
-||||||| upstream-base
-=======
+
         PUBLIC  caml_assert_stack_invariants
         ALIGN   4
 caml_assert_stack_invariants:
@@ -830,7 +686,6 @@ caml_assert_stack_invariants:
         int     3
 L310:
         ret
->>>>>>> upstream-incoming
 
         PUBLIC caml_system__code_end
 caml_system__code_end:
@@ -838,28 +693,12 @@ caml_system__code_end:
 ; Frametable - GC roots for callback
 ; Uses the same naming convention as ocamlopt generated modules.
         .DATA
-<<<<<<< oxcaml
         PUBLIC  caml_system__frametable
 caml_system__frametable LABEL QWORD
         QWORD   1                ; one descriptor
         DWORD   L107 - THIS BYTE ; return address into callback
         WORD    -1               ; negative frame size => use callback link
         WORD    0                ; no roots here
-||||||| upstream-base
-        PUBLIC  caml_system__frametable
-caml_system__frametable LABEL QWORD
-        QWORD   1           ; one descriptor
-        QWORD   L107        ; return address into callback
-        WORD    -1          ; negative frame size => use callback link
-        WORD    0           ; no roots here
-=======
-        PUBLIC  caml_system$frametable
-caml_system$frametable LABEL QWORD
-        QWORD   2           ; two descriptors
-        QWORD   L107        ; return address into callback
-        WORD    -1          ; negative frame size => use callback link
-        WORD    0           ; no roots here
->>>>>>> upstream-incoming
         ALIGN   8
         QWORD   frame_runstack
         WORD    -1

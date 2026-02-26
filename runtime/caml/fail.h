@@ -77,18 +77,12 @@ struct caml_exception_context {
 
 int caml_is_special_exception(value exn);
 
-<<<<<<< oxcaml
-CAMLextern value caml_raise_async_if_exception(value res, const char* where);
-
 CAMLnoreturn_start
 CAMLextern void caml_raise_async(value res)
 CAMLnoreturn_end;
-||||||| upstream-base
-CAMLextern value caml_raise_if_exception(value res);
-=======
+
 /* from runtime/sync.c */
 CAMLextern void caml_check_error(int err, char const * msg);
->>>>>>> upstream-incoming
 
 #endif /* CAML_INTERNALS */
 
@@ -114,28 +108,16 @@ CAMLnoret CAMLextern void caml_failwith_value (value msg);
 CAMLnoret CAMLextern void caml_invalid_argument (char const *msg);
 CAMLnoret CAMLextern void caml_invalid_argument_value (value msg);
 CAMLnoret CAMLextern void caml_raise_out_of_memory (void);
-<<<<<<< oxcaml
-
 CAMLnoret CAMLextern void caml_raise_out_of_fibers (void);
-
-||||||| upstream-base
-
-=======
->>>>>>> upstream-incoming
 CAMLnoret CAMLextern void caml_raise_stack_overflow (void);
 CAMLnoret CAMLextern void caml_raise_sys_error (value);
 CAMLnoret CAMLextern void caml_raise_end_of_file (void);
 CAMLnoret CAMLextern void caml_raise_zero_divide (void);
 CAMLnoret CAMLextern void caml_raise_not_found (void);
 CAMLnoret CAMLextern void caml_array_bound_error (void);
-<<<<<<< oxcaml
 
 CAMLnoret CAMLextern void caml_array_align_error (void);
 
-||||||| upstream-base
-
-=======
->>>>>>> upstream-incoming
 CAMLnoret CAMLextern void caml_raise_sys_blocked_io (void);
 
 /* Non-raising variants of the above functions. The exception is
@@ -154,21 +136,34 @@ CAMLextern value caml_exception_failure_value (value msg);
 CAMLextern value caml_exception_invalid_argument (char const *msg);
 CAMLextern value caml_exception_invalid_argument_value (value msg);
 CAMLextern value caml_exception_out_of_memory (void);
+CAMLextern value caml_exception_out_of_fibers (void);
 CAMLextern value caml_exception_stack_overflow (void);
 CAMLextern value caml_exception_sys_error (value msg);
 CAMLextern value caml_exception_end_of_file (void);
 CAMLextern value caml_exception_zero_divide (void);
 CAMLextern value caml_exception_not_found (void);
 CAMLextern value caml_exception_array_bound_error (void);
+CAMLextern value caml_exception_array_align_error (void);
 CAMLextern value caml_exception_sys_blocked_io (void);
+
+extern void caml_check_async(caml_result res, const char *msg);
 
 /* Returns the value of a [caml_result] or raises the exception.
    This function replaced [caml_raise_if_exception] in 5.3. */
-Caml_inline value caml_get_value_or_raise (struct caml_result_private result)
+Caml_inline value caml_get_value_or_raise (caml_result result)
 {
-  if (result.is_exception)
+  if (caml_result_is_exception(result))
     caml_raise(result.data);
   else
+    return result.data;
+}
+
+Caml_inline value caml_get_value_or_raise_async (caml_result result, const char *where)
+{
+  if (caml_result_is_exception(result)) {
+    caml_check_async(result, where);
+    caml_raise(result.data);
+  } else
     return result.data;
 }
 
@@ -177,7 +172,7 @@ Caml_inline value caml_get_value_or_raise (struct caml_result_private result)
 Caml_inline value caml_result_get_encoded_exception(
   struct caml_result_private result)
 {
-  if (result.is_exception)
+  if (caml_result_is_exception(result))
     return Make_exception_result(result.data);
   else
     return result.data;

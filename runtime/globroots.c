@@ -182,42 +182,6 @@ CAMLexport void caml_modify_generational_global_root(value *r, value newval)
 
 #ifdef NATIVE_CODE
 
-<<<<<<< oxcaml
-||||||| upstream-base
-/* Linked-list of natdynlink'd globals */
-
-typedef struct link {
-  void *data;
-  struct link *next;
-} link;
-
-static link *cons(void *data, link *tl) {
-  link *lnk = caml_stat_alloc(sizeof(link));
-  lnk->data = data;
-  lnk->next = tl;
-  return lnk;
-}
-
-#define iter_list(list,lnk) \
-  for (lnk = list; lnk != NULL; lnk = lnk->next)
-
-
-=======
-/* Linked-list of natdynlink'd globals */
-
-typedef struct link {
-  void *data;
-  struct link *next;
-} link;
-
-static link *cons(void *data, link *tl) {
-  link *lnk = caml_stat_alloc(sizeof(link));
-  lnk->data = data;
-  lnk->next = tl;
-  return lnk;
-}
-
->>>>>>> upstream-incoming
 /* protected by roots_mutex */
 static struct skiplist caml_dyn_globals = SKIPLIST_STATIC_INITIALIZER;
 
@@ -237,21 +201,9 @@ static void caml_register_dyn_global(void *v) {
 }
 
 void caml_register_dyn_globals(void **globals, int nglobals) {
-<<<<<<< oxcaml
-  int i;
-  caml_plat_lock_blocking(&roots_mutex);
-  for (i = 0; i < nglobals; i++)
-    caml_register_dyn_global(globals[i]);
-||||||| upstream-base
-  int i;
-  caml_plat_lock(&roots_mutex);
-  for (i = 0; i < nglobals; i++)
-    caml_dyn_globals = cons(globals[i],caml_dyn_globals);
-=======
   caml_plat_lock_blocking(&roots_mutex);
   for (int i = 0; i < nglobals; i++)
-    caml_dyn_globals = cons(globals[i],caml_dyn_globals);
->>>>>>> upstream-incoming
+    caml_register_dyn_global(globals[i]);
   caml_plat_unlock(&roots_mutex);
 }
 
@@ -295,71 +247,27 @@ static void compute_index_for_global_root_scan(value* glob_block, int* start,
 
 static void scan_native_globals(scanning_action f, void* fdata)
 {
-<<<<<<< oxcaml
-  int i, j;
-  value* glob;
-  value glob_block;
-  int start, stop;
-||||||| upstream-base
-  int i, j;
-  static link* dyn_globals;
-  value* glob;
-  link* lnk;
-
-  caml_plat_lock(&roots_mutex);
-  dyn_globals = caml_dyn_globals;
-  caml_plat_unlock(&roots_mutex);
-=======
-  link* dyn_globals;
-
-  caml_plat_lock_blocking(&roots_mutex);
-  dyn_globals = caml_dyn_globals;
-  caml_plat_unlock(&roots_mutex);
->>>>>>> upstream-incoming
-
   /* The global roots */
-<<<<<<< oxcaml
-  for (i = 0; caml_globals[i] != 0; i++) {
-    for(glob = caml_globals[i]; *glob != 0; glob++) {
-      glob_block = *glob;
-      compute_index_for_global_root_scan(&glob_block, &start, &stop);
-      for (j = start; j < stop; j++) {
-        f(fdata, Field(glob_block, j), &Field(glob_block, j));
-||||||| upstream-base
-  for (i = 0; caml_globals[i] != 0; i++) {
-    for(glob = caml_globals[i]; *glob != 0; glob++) {
-      for (j = 0; j < Wosize_val(*glob); j++){
-        f(fdata, Field(*glob, j), &Field(*glob, j));
-=======
   for (int i = 0; caml_globals[i] != 0; i++) {
-    for (value *glob = caml_globals[i]; *glob != 0; glob++) {
-      for (int j = 0; j < Wosize_val(*glob); j++) {
-        f(fdata, Field(*glob, j), &Field(*glob, j));
->>>>>>> upstream-incoming
+    for(value *glob = caml_globals[i]; *glob != 0; glob++) {
+      value glob_block = *glob;
+      int start, stop;
+      compute_index_for_global_root_scan(&glob_block, &start, &stop);
+      for (int j = start; j < stop; j++) {
+        f(fdata, Field(glob_block, j), &Field(glob_block, j));
       }
     }
   }
 
   /* Dynamic (natdynlink) global roots */
-<<<<<<< oxcaml
   caml_plat_lock_blocking(&roots_mutex);
+  int start, stop;
   FOREACH_SKIPLIST_ELEMENT(e, &caml_dyn_globals, {
-    for(glob = (value *) (e->key); *glob != 0; glob++) {
-      glob_block = *glob;
+    for(value *glob = (value *) (e->key); *glob != 0; glob++) {
+      value glob_block = *glob;
       compute_index_for_global_root_scan(&glob_block, &start, &stop);
-      for (j = start; j < stop; j++) {
+      for (int j = start; j < stop; j++) {
         f(fdata, Field(glob_block, j), &Field(glob_block, j));
-||||||| upstream-base
-  iter_list(dyn_globals, lnk) {
-    for(glob = (value *) lnk->data; *glob != 0; glob++) {
-      for (j = 0; j < Wosize_val(*glob); j++){
-        f(fdata, Field(*glob, j), &Field(*glob, j));
-=======
-  for (link *lnk = dyn_globals; lnk != NULL; lnk = lnk->next) {
-    for (value *glob = (value *) lnk->data; *glob != 0; glob++) {
-      for (int j = 0; j < Wosize_val(*glob); j++) {
-        f(fdata, Field(*glob, j), &Field(*glob, j));
->>>>>>> upstream-incoming
       }
     }
   })

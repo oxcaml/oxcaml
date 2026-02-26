@@ -80,17 +80,12 @@ CAMLprim value caml_floatarray_get(value array, value index)
   double d;
   value res;
 
-<<<<<<< oxcaml
   // [caml_floatarray_get] may be called on a floatarray
   // or a mixed block.
-  CAMLassert (  Tag_val(array) == Double_array_tag
+  CAMLassert (  Wosize_val(array) == 0
+             || Tag_val(array) == Double_array_tag
              || index > Scannable_wosize_val(array) );
 
-||||||| upstream-base
-  CAMLassert (Tag_val(array) == Double_array_tag);
-=======
-  CAMLassert (Wosize_val(array) == 0 || Tag_val(array) == Double_array_tag);
->>>>>>> upstream-incoming
   if (idx < 0 || idx >= Wosize_val(array) / Double_wosize)
     caml_array_bound_error();
   d = Double_flat_field(array, idx);
@@ -341,7 +336,6 @@ CAMLprim value caml_floatarray_create(value len)
   return caml_process_pending_actions_with_root(result);
 }
 
-<<<<<<< oxcaml
 CAMLprim value caml_floatarray_create_local(value len)
 {
   mlsize_t wosize = Long_val(len) * Double_wosize;
@@ -367,26 +361,30 @@ CAMLprim value caml_make_local_unboxed_float64_vect(value len)
   return caml_floatarray_create_local(len);
 }
 
-/* [len] is a [value] representing number of words or floats */
-static value make_array_gen(value len, value init, int local)
-||||||| upstream-base
-/* [len] is a [value] representing number of words or floats */
-CAMLprim value caml_make_vect(value len, value init)
-=======
-CAMLprim value caml_floatarray_make_unboxed(intnat size, double init)
+static value floatarray_make_unboxed(intnat size, double init, bool local)
 {
   if (size == 0) {
     return Atom(0);
   }
-  value res;
+  CAMLparam0();
+  CAMLlocal1(res);
   mlsize_t wsize = size * Double_wosize;
   if (wsize > Max_wosize) caml_invalid_argument("Array.make");
-  res = caml_alloc(wsize, Double_array_tag);
+  res = local ?
+      caml_alloc_local(wsize, Double_array_tag) :
+      caml_alloc(wsize, Double_array_tag);
   for (mlsize_t i = 0; i < size; i++) {
     Store_double_flat_field(res, i, init);
   }
   /* Give the GC a chance to run, and run memprof callbacks */
-  return caml_process_pending_actions_with_root(res);
+  if (!local)
+    caml_process_pending_actions ();
+  CAMLreturn (res);
+}
+
+CAMLprim value caml_floatarray_make_unboxed(intnat size, double init)
+{
+  return floatarray_make_unboxed(size, init, false);
 }
 
 /* [int -> float -> floatarray] */
@@ -395,106 +393,35 @@ CAMLprim value caml_floatarray_make(value len, value init)
   return caml_floatarray_make_unboxed(Long_val(len), Double_val(init));
 }
 
-/* [int -> 'a -> uniform_array] */
-CAMLprim value caml_uniform_array_make(value len, value init)
->>>>>>> upstream-incoming
+static value uniform_array_make(value len, value init, bool local)
 {
-  CAMLparam2 (len, init);
-  CAMLlocal1 (res);
   mlsize_t size = Long_val(len);
+  CAMLparam1 (init);
+  CAMLlocal1 (res);
   if (size == 0) {
-<<<<<<< oxcaml
     res = Atom(0);
-#ifdef FLAT_FLOAT_ARRAY
-  } else if (Is_block(init)
-             && Tag_val(init) == Double_tag) {
-    mlsize_t wsize;
-    double d;
-    d = Double_val(init);
-    if (size > Max_unboxed_float_array_wosize) caml_invalid_argument("Array.make");
-    wsize = size * Double_wosize;
-    res = local ?
-      caml_alloc_local(wsize, Double_array_tag) :
-      caml_alloc(wsize, Double_array_tag);
-    for (i = 0; i < size; i++) {
-      Store_double_flat_field(res, i, d);
-    }
-#endif
-  } else {
-    if (size > Max_array_wosize) caml_invalid_argument("Array.make");
-    else if (local) { /* local array */
-      res = caml_alloc_local(size, 0);
-      for (i = 0; i < size; i++) Field(res, i) = init;
-    } else if (size <= Max_young_wosize) { /* array on minor heap */
-      res = caml_alloc_small(size, 0);
-      for (i = 0; i < size; i++) Field(res, i) = init;
-    } else { /* array on major heap */
-      bool init_on_minor = (Is_block(init) && Is_young(init) &&
-                            !caml_maybe_minor_gc_before_writes(size));
-      res = caml_alloc_shr(size, 0);
-      if (init_on_minor) {
-        /* init is still on the minor heap (we didn't just collect),
-         * so every entry needs a remembered set entry */
-        for (i = 0; i < size; i++) {
-          Ref_table_add(&Caml_state->minor_tables->major_ref, &Field(res, i));
-          Field(res, i) = init;
-        }
-      } else {
-        for (i = 0; i < size; i++) Field(res, i) = init;
-      }
-||||||| upstream-base
-    res = Atom(0);
-#ifdef FLAT_FLOAT_ARRAY
-  } else if (Is_block(init)
-             && Tag_val(init) == Double_tag) {
-    mlsize_t wsize;
-    double d;
-    d = Double_val(init);
-    wsize = size * Double_wosize;
-    if (wsize > Max_wosize) caml_invalid_argument("Array.make");
-    res = caml_alloc(wsize, Double_array_tag);
-    for (i = 0; i < size; i++) {
-      Store_double_flat_field(res, i, d);
-    }
-#endif
-  } else {
-    if (size <= Max_young_wosize) {
-      res = caml_alloc_small(size, 0);
-      for (i = 0; i < size; i++) Field(res, i) = init;
-    }
-    else if (size > Max_wosize) caml_invalid_argument("Array.make");
-    else {
-      if (Is_block(init) && Is_young(init)) {
-        /* We don't want to create so many major-to-minor references,
-           so [init] is moved to the major heap by doing a minor GC. */
-        CAML_EV_COUNTER (EV_C_FORCE_MINOR_MAKE_VECT, 1);
-        caml_minor_collection ();
-      }
-      CAMLassert(!(Is_block(init) && Is_young(init)));
-      res = caml_alloc_shr(size, 0);
-      /* We now know that [init] is not in the minor heap, so there is
-         no need to call [caml_initialize]. */
-      for (i = 0; i < size; i++) Field(res, i) = init;
-=======
-    CAMLreturn(Atom(0));
-  } else if (size <= Max_young_wosize) {
+  }
+  else if (size > Max_array_wosize) caml_invalid_argument("Array.make");
+  else if (local) { /* local array */
+    res = caml_alloc_local(size, 0);
+    for (mlsize_t i = 0; i < size; i++) Field(res, i) = init;
+  } else if (size <= Max_young_wosize) { /* array on minor heap */
     res = caml_alloc_small(size, 0);
     for (mlsize_t i = 0; i < size; i++) Field(res, i) = init;
-  }
-  else if (size > Max_wosize) caml_invalid_argument("Array.make");
-  else {
-    if (Is_block(init) && Is_young(init)) {
-      /* We don't want to create so many major-to-minor references,
-         so [init] is moved to the major heap by doing a minor GC. */
-      CAML_EV_COUNTER (EV_C_FORCE_MINOR_MAKE_VECT, 1);
-      caml_minor_collection ();
->>>>>>> upstream-incoming
-    }
-    CAMLassert(!(Is_block(init) && Is_young(init)));
+  } else { /* array on major heap */
+    bool init_on_minor = (Is_block(init) && Is_young(init) &&
+                          !caml_maybe_minor_gc_before_writes(size));
     res = caml_alloc_shr(size, 0);
-    /* We now know that [init] is not in the minor heap, so there is
-       no need to call [caml_initialize]. */
-    for (mlsize_t i = 0; i < size; i++) Field(res, i) = init;
+    if (init_on_minor) {
+      /* init is still on the minor heap (we didn't just collect),
+       * so every entry needs a remembered set entry */
+      for (mlsize_t i = 0; i < size; i++) {
+        Ref_table_add(&Caml_state->minor_tables->major_ref, &Field(res, i));
+        Field(res, i) = init;
+      }
+    } else {
+      for (mlsize_t i = 0; i < size; i++) Field(res, i) = init;
+    }
   }
   /* Give the GC a chance to run, and run memprof callbacks.
      This matches the semantics of allocations directly from OCaml code. */
@@ -502,21 +429,37 @@ CAMLprim value caml_uniform_array_make(value len, value init)
   CAMLreturn (res);
 }
 
-<<<<<<< oxcaml
+/* [int -> 'a -> uniform_array] */
+CAMLprim value caml_uniform_array_make(value len, value init)
+{
+  return uniform_array_make(len, init, false);
+}
+
 /* Naming convention: "make" is used for functions that take an init value,
    while "create" is used for functions that create arrays with uninitialized
    contents.
    See https://github.com/ocaml/ocaml/pull/13003#issuecomment-2046623594 */
-
 CAMLprim value caml_array_make(value len, value init)
 {
-  return make_array_gen(len, init, 0);
+#ifdef FLAT_FLOAT_ARRAY
+  if (Is_block(init)
+      && Tag_val(init) == Double_tag) {
+    return caml_floatarray_make(len, init);
+  }
+#endif
+  return uniform_array_make(len, init, false);
 }
-
 CAMLprim value caml_array_make_local(value len, value init)
 {
-  return make_array_gen(len, init, 1);
+#ifdef FLAT_FLOAT_ARRAY
+  if (Is_block(init)
+      && Tag_val(init) == Double_tag) {
+    return floatarray_make_unboxed(Long_val(len), Double_val(init), true);
+  }
+#endif
+  return uniform_array_make(len, init, true);
 }
+
 
 CAMLprim value caml_makearray_dynamic_non_scannable_unboxed_product(
   value v_num_components, value v_is_local,
@@ -657,30 +600,12 @@ CAMLprim value caml_makearray_dynamic_scannable_unboxed_product(
   if (!is_local) caml_process_pending_actions ();
 
   CAMLreturn(res);
-||||||| upstream-base
-=======
-/* [len] is a [value] representing number of words or floats */
-CAMLprim value caml_array_make(value len, value init)
-{
-#ifdef FLAT_FLOAT_ARRAY
-  if (Is_block(init)
-      && Tag_val(init) == Double_tag) {
-    return caml_floatarray_make(len, init);
-  }
-#endif
-  return caml_uniform_array_make(len, init);
->>>>>>> upstream-incoming
 }
 
 /* [len] is a [value] representing number of floats */
 /* [ int -> float array ] */
-<<<<<<< oxcaml
 /* This function is named "create" (not "make") because it does not take an
    init value. See the comment above caml_array_make for more details. */
-||||||| upstream-base
-CAMLprim value caml_make_float_vect(value len)
-=======
->>>>>>> upstream-incoming
 CAMLprim value caml_array_create_float(value len)
 {
 #ifdef FLAT_FLOAT_ARRAY
@@ -896,13 +821,7 @@ CAMLprim value caml_make_untagged_int_vect_bytecode(value len)
    boxed floats and returns the corresponding flat-allocated [float array].
    In all other cases, it just returns its argument unchanged.
 */
-<<<<<<< oxcaml
 static value uniform_array_gen(value init, int local)
-||||||| upstream-base
-CAMLprim value caml_make_array(value init)
-=======
-CAMLprim value caml_array_of_uniform_array(value init)
->>>>>>> upstream-incoming
 {
 #ifdef FLAT_FLOAT_ARRAY
   CAMLparam1 (init);
@@ -941,7 +860,6 @@ CAMLprim value caml_array_of_uniform_array(value init)
 #endif
 }
 
-<<<<<<< oxcaml
 CAMLprim value caml_array_of_uniform_array(value init)
 {
   return uniform_array_gen(init, 0);
@@ -970,37 +888,15 @@ CAMLprim value caml_make_float_vect(value len)
   return caml_array_create_float(len);
 }
 
-CAMLprim value caml_make_array(value init)
-{
-  return caml_array_of_uniform_array(init);
-}
-
-CAMLprim value caml_make_array_local(value init)
-{
-  return caml_array_of_uniform_array_local(init);
-}
-||||||| upstream-base
-=======
-
-/* #13003: previous names for array-creation primitives,
-   kept for backward-compatibility only. */
-
-CAMLprim value caml_make_vect(value len, value init)
-{
-  return caml_array_make(len, init);
-}
-
-CAMLprim value caml_make_float_vect(value len)
-{
-  return caml_array_create_float(len);
-}
-
 CAMLprim value caml_make_array(value array)
 {
   return caml_array_of_uniform_array(array);
 }
 
->>>>>>> upstream-incoming
+CAMLprim value caml_make_array_local(value array)
+{
+  return caml_array_of_uniform_array_local(array);
+}
 
 /* Blitting */
 
@@ -1055,7 +951,6 @@ CAMLprim value caml_floatarray_blit(value a1, value ofs1, value a2, value ofs2,
   return Val_unit;
 }
 
-<<<<<<< oxcaml
 CAMLprim value caml_untagged_int8_vect_blit(value a1, value ofs1, value a2,
                                             value ofs2, value n)
 {
@@ -1122,15 +1017,8 @@ CAMLprim value caml_untagged_int_vect_blit(value a1, value ofs1, value a2,
   return Val_unit;
 }
 
-CAMLprim value caml_array_blit(value a1, value ofs1, value a2, value ofs2,
-                               value n)
-||||||| upstream-base
-CAMLprim value caml_array_blit(value a1, value ofs1, value a2, value ofs2,
-                               value n)
-=======
 CAMLprim value caml_uniform_array_blit(
   value a1, value ofs1, value a2, value ofs2, value n)
->>>>>>> upstream-incoming
 {
   volatile value * src, * dst;
   intnat count;
@@ -1175,7 +1063,16 @@ CAMLprim value caml_uniform_array_blit(
   return Val_unit;
 }
 
-<<<<<<< oxcaml
+CAMLprim value caml_array_blit(value a1, value ofs1, value a2, value ofs2,
+                               value n)
+{
+#ifdef FLAT_FLOAT_ARRAY
+  if (Tag_val(a2) == Double_array_tag)
+    return caml_floatarray_blit(a1, ofs1, a2, ofs2, n);
+#endif
+  return caml_uniform_array_blit(a1, ofs1, a2, ofs2, n);
+}
+
 /* In bytecode, an index is represented as a block containing a list of field
    positions. See [jane/doc/extensions/_03-unboxed-types/03-block-indices.md].
 */
@@ -1269,33 +1166,6 @@ CAMLprim value caml_deepen_idx_bytecode(value idx_prefix, value idx_suffix) {
   return block;
 }
 
-/* A generic function for extraction and concatenation of sub-arrays */
-||||||| upstream-base
-/* A generic function for extraction and concatenation of sub-arrays */
-=======
-CAMLprim value caml_array_blit(value a1, value ofs1, value a2, value ofs2,
-                               value n)
-{
-#ifdef FLAT_FLOAT_ARRAY
-  if (Tag_val(a2) == Double_array_tag)
-    return caml_floatarray_blit(a1, ofs1, a2, ofs2, n);
-#endif
-  return caml_uniform_array_blit(a1, ofs1, a2, ofs2, n);
-}
->>>>>>> upstream-incoming
-
-<<<<<<< oxcaml
-static value caml_array_gather(intnat num_arrays,
-                               value arrays[/*num_arrays*/],
-                               intnat offsets[/*num_arrays*/],
-                               intnat lengths[/*num_arrays*/],
-                               int local)
-||||||| upstream-base
-static value caml_array_gather(intnat num_arrays,
-                               value arrays[/*num_arrays*/],
-                               intnat offsets[/*num_arrays*/],
-                               intnat lengths[/*num_arrays*/])
-=======
 /* generic [gather] functions for extraction and concatenation of sub-arrays */
 
 /* [wo_memcpy] copies [nvals] values from [src] to [dst], assuming no
@@ -1326,11 +1196,11 @@ static void wo_memcpy(value * const dst,
 
 /* The lengths are specified in number of floats,
    as returned by [caml_array_length]. */
-static value caml_floatarray_gather(intnat num_arrays,
-                                    value arrays[/*num_arrays*/],
-                                    intnat offsets[/*num_arrays*/],
-                                    intnat lengths[/*num_arrays*/])
->>>>>>> upstream-incoming
+static value floatarray_gather(intnat num_arrays,
+                               value arrays[/*num_arrays*/],
+                               intnat offsets[/*num_arrays*/],
+                               intnat lengths[/*num_arrays*/],
+                               bool local)
 {
   CAMLparamN(arrays, num_arrays);
   value res;                    /* no need to register it as a root */
@@ -1345,47 +1215,17 @@ static value caml_floatarray_gather(intnat num_arrays,
   }
   if (size == 0) {
     /* If total size = 0, just return empty array */
-    res = Atom(0);
+    CAMLreturn(Atom(0));
   }
-<<<<<<< oxcaml
-#ifdef FLAT_FLOAT_ARRAY
-  else if (isfloat) {
-    /* This is an array of floats.  We can use memcpy directly. */
-    if (size > Max_unboxed_float_array_wosize) caml_invalid_argument("Array.concat");
-    wsize = size * Double_wosize;
-    res = local ?
-      caml_alloc_local(wsize, Double_array_tag) :
-      caml_alloc(wsize, Double_array_tag);
-    for (i = 0, pos = 0; i < num_arrays; i++) {
-      /* [res] is freshly allocated, and no other domain has a reference to it.
-         Hence, a plain [memcpy] is sufficient. */
-      memcpy((double *)res + pos,
-             (double *)arrays[i] + offsets[i],
-             lengths[i] * sizeof(double));
-      pos += lengths[i];
-    }
-    CAMLassert(pos == size);
-||||||| upstream-base
-#ifdef FLAT_FLOAT_ARRAY
-  else if (isfloat) {
-    /* This is an array of floats.  We can use memcpy directly. */
-    if (size > Max_wosize/Double_wosize) caml_invalid_argument("Array.concat");
-    wsize = size * Double_wosize;
-    res = caml_alloc(wsize, Double_array_tag);
-    for (i = 0, pos = 0; i < num_arrays; i++) {
-      /* [res] is freshly allocated, and no other domain has a reference to it.
-         Hence, a plain [memcpy] is sufficient. */
-      memcpy((double *)res + pos,
-             (double *)arrays[i] + offsets[i],
-             lengths[i] * sizeof(double));
-      pos += lengths[i];
-    }
-    CAMLassert(pos == size);
-=======
   /* This is an array of floats.  We can use memcpy directly. */
   if (size > Max_wosize/Double_wosize) caml_invalid_argument("Array.concat");
   mlsize_t wsize = size * Double_wosize; /* total size, in words */
-  res = caml_alloc(wsize, Double_array_tag);
+  res = local ?
+    caml_alloc_local(wsize, Double_array_tag) :
+    (wsize <= Max_young_wosize) ?
+    caml_alloc_small(wsize, Double_array_tag) :
+    caml_alloc_shr(wsize, Double_array_tag);
+
   mlsize_t pos = 0;
   for (mlsize_t i = 0; i < num_arrays; i++) {
     /* [res] is freshly allocated, and no other domain has a reference to it.
@@ -1399,10 +1239,11 @@ static value caml_floatarray_gather(intnat num_arrays,
   CAMLreturn(res);
 }
 
-static value caml_uniform_array_gather(intnat num_arrays,
-                                       value arrays[/*num_arrays*/],
-                                       intnat offsets[/*num_arrays*/],
-                                       intnat lengths[/*num_arrays*/])
+static value uniform_array_gather(intnat num_arrays,
+                                  value arrays[/*num_arrays*/],
+                                  intnat offsets[/*num_arrays*/],
+                                  intnat lengths[/*num_arrays*/],
+                                  bool local)
 {
   CAMLparamN(arrays, num_arrays);
   value res;                    /* no need to register it as a root */
@@ -1417,41 +1258,11 @@ static value caml_uniform_array_gather(intnat num_arrays,
   if (size == 0) {
     /* If total size = 0, just return an empty array */
     res = Atom(0);
->>>>>>> upstream-incoming
   }
-<<<<<<< oxcaml
-#endif
-  else if (size > Max_array_wosize) {
-    /* Array of values, too big. */
-    caml_invalid_argument("Array.concat");
-  } else if (size <= Max_young_wosize || local) {
-    /* Array of values, local or small enough to fit in young generation.
-       We can use memcpy directly. */
-    res = local ?
-      caml_alloc_local(size, 0) :
-      caml_alloc_small(size, 0);
-    for (i = 0, pos = 0; i < num_arrays; i++) {
-      /* [res] is freshly allocated, and no other domain has a reference to it.
-         Hence, a plain [memcpy] is sufficient. */
-      memcpy((value*)&Field(res, pos),
-             (value*)&Field(arrays[i], offsets[i]),
-             lengths[i] * sizeof(value));
-||||||| upstream-base
-#endif
-  else if (size <= Max_young_wosize) {
-    /* Array of values, small enough to fit in young generation.
-       We can use memcpy directly. */
-    res = caml_alloc_small(size, 0);
-    for (i = 0, pos = 0; i < num_arrays; i++) {
-      /* [res] is freshly allocated, and no other domain has a reference to it.
-         Hence, a plain [memcpy] is sufficient. */
-      memcpy((value*)&Field(res, pos),
-             (value*)&Field(arrays[i], offsets[i]),
-             lengths[i] * sizeof(value));
-=======
-  else if (size <= Max_young_wosize) {
+  if (size > Max_wosize/Double_wosize) caml_invalid_argument("Array.concat");
+  else if (size <= Max_young_wosize || local) {
     /* Array of values, small enough to fit in young generation. */
-    res = caml_alloc_small(size, 0);
+    res = local ? caml_alloc_local(size, 0) : caml_alloc_small(size, 0);
     mlsize_t pos = 0;
     for (mlsize_t i = 0; i < num_arrays; i++) {
       /* Here we can do a direct copy since this cannot create old-to-young
@@ -1459,7 +1270,6 @@ static value caml_uniform_array_gather(intnat num_arrays,
       value *dst = (value *) &Field(res, pos);
       atomic_value *src = (atomic_value *) &Field(arrays[i], offsets[i]);
       wo_memcpy(dst, src, lengths[i]);
->>>>>>> upstream-incoming
       pos += lengths[i];
     }
     CAMLassert(pos == size);
@@ -1490,7 +1300,8 @@ static value caml_uniform_array_gather(intnat num_arrays,
 static value caml_array_gather(intnat num_arrays,
                                value arrays[/*num_arrays*/],
                                intnat offsets[/*num_arrays*/],
-                               intnat lengths[/*num_arrays*/])
+                               intnat lengths[/*num_arrays*/],
+                               bool local)
 {
 #ifdef FLAT_FLOAT_ARRAY
   for (mlsize_t i = 0; i < num_arrays; i++) {
@@ -1500,7 +1311,7 @@ static value caml_array_gather(intnat num_arrays,
     if (Wosize_val(arrays[i]) == 0)
       continue;
     else if (Tag_val(arrays[i]) == Double_array_tag)
-      return caml_floatarray_gather(num_arrays, arrays, offsets, lengths);
+      return floatarray_gather(num_arrays, arrays, offsets, lengths, local);
     else
       break;
   }
@@ -1508,7 +1319,7 @@ static value caml_array_gather(intnat num_arrays,
      Calling the uniform_ version below is correct
      -- it will return an empty array. */
 #endif
-  return caml_uniform_array_gather(num_arrays, arrays, offsets, lengths);
+  return uniform_array_gather(num_arrays, arrays, offsets, lengths, local);
 }
 
 CAMLprim value caml_floatarray_sub(value a, value ofs, value len)
@@ -1516,7 +1327,15 @@ CAMLprim value caml_floatarray_sub(value a, value ofs, value len)
   value arrays[1] = { a };
   intnat offsets[1] = { Long_val(ofs) };
   intnat lengths[1] = { Long_val(len) };
-  return caml_floatarray_gather(1, arrays, offsets, lengths);
+  return floatarray_gather(1, arrays, offsets, lengths, false);
+}
+
+CAMLprim value caml_floatarray_sub_local(value a, value ofs, value len)
+{
+  value arrays[1] = { a };
+  intnat offsets[1] = { Long_val(ofs) };
+  intnat lengths[1] = { Long_val(len) };
+  return floatarray_gather(1, arrays, offsets, lengths, true);
 }
 
 CAMLprim value caml_uniform_array_sub(value a, value ofs, value len)
@@ -1524,7 +1343,15 @@ CAMLprim value caml_uniform_array_sub(value a, value ofs, value len)
   value arrays[1] = { a };
   intnat offsets[1] = { Long_val(ofs) };
   intnat lengths[1] = { Long_val(len) };
-  return caml_uniform_array_gather(1, arrays, offsets, lengths);
+  return uniform_array_gather(1, arrays, offsets, lengths, false);
+}
+
+CAMLprim value caml_uniform_array_sub_local(value a, value ofs, value len)
+{
+  value arrays[1] = { a };
+  intnat offsets[1] = { Long_val(ofs) };
+  intnat lengths[1] = { Long_val(len) };
+  return uniform_array_gather(1, arrays, offsets, lengths, true);
 }
 
 CAMLprim value caml_array_sub(value a, value ofs, value len)
@@ -1532,7 +1359,7 @@ CAMLprim value caml_array_sub(value a, value ofs, value len)
   value arrays[1] = { a };
   intnat offsets[1] = { Long_val(ofs) };
   intnat lengths[1] = { Long_val(len) };
-  return caml_array_gather(1, arrays, offsets, lengths, 0);
+  return caml_array_gather(1, arrays, offsets, lengths, false);
 }
 
 CAMLprim value caml_array_sub_local(value a, value ofs, value len)
@@ -1540,7 +1367,7 @@ CAMLprim value caml_array_sub_local(value a, value ofs, value len)
   value arrays[1] = { a };
   intnat offsets[1] = { Long_val(ofs) };
   intnat lengths[1] = { Long_val(len) };
-  return caml_array_gather(1, arrays, offsets, lengths, 1);
+  return caml_array_gather(1, arrays, offsets, lengths, true);
 }
 
 CAMLprim value caml_floatarray_append(value a1, value a2)
@@ -1549,7 +1376,16 @@ CAMLprim value caml_floatarray_append(value a1, value a2)
   intnat offsets[2] = { 0, 0 };
   /* sizes are specified in number of floats */
   intnat lengths[2] = { caml_array_length(a1), caml_array_length(a2) };
-  return caml_floatarray_gather(2, arrays, offsets, lengths);
+  return floatarray_gather(2, arrays, offsets, lengths, false);
+}
+
+CAMLprim value caml_floatarray_append_local(value a1, value a2)
+{
+  value arrays[2] = { a1, a2 };
+  intnat offsets[2] = { 0, 0 };
+  /* sizes are specified in number of floats */
+  intnat lengths[2] = { caml_array_length(a1), caml_array_length(a2) };
+  return floatarray_gather(2, arrays, offsets, lengths, true);
 }
 
 CAMLprim value caml_uniform_array_append(value a1, value a2)
@@ -1557,7 +1393,15 @@ CAMLprim value caml_uniform_array_append(value a1, value a2)
   value arrays[2] = { a1, a2 };
   intnat offsets[2] = { 0, 0 };
   intnat lengths[2] = { caml_array_length(a1), caml_array_length(a2) };
-  return caml_uniform_array_gather(2, arrays, offsets, lengths);
+  return uniform_array_gather(2, arrays, offsets, lengths, false);
+}
+
+CAMLprim value caml_uniform_array_append_local(value a1, value a2)
+{
+  value arrays[2] = { a1, a2 };
+  intnat offsets[2] = { 0, 0 };
+  intnat lengths[2] = { caml_array_length(a1), caml_array_length(a2) };
+  return uniform_array_gather(2, arrays, offsets, lengths, true);
 }
 
 CAMLprim value caml_array_append(value a1, value a2)
@@ -1565,32 +1409,28 @@ CAMLprim value caml_array_append(value a1, value a2)
   value arrays[2] = { a1, a2 };
   intnat offsets[2] = { 0, 0 };
   intnat lengths[2] = { caml_array_length(a1), caml_array_length(a2) };
-  return caml_array_gather(2, arrays, offsets, lengths, 0);
+  return caml_array_gather(2, arrays, offsets, lengths, false);
 }
 
-<<<<<<< oxcaml
 CAMLprim value caml_array_append_local(value a1, value a2)
 {
   value arrays[2] = { a1, a2 };
   intnat offsets[2] = { 0, 0 };
   intnat lengths[2] = { caml_array_length(a1), caml_array_length(a2) };
-  return caml_array_gather(2, arrays, offsets, lengths, 1);
+  return caml_array_gather(2, arrays, offsets, lengths, true);
 }
 
-static value array_concat_gen(value al, int local)
-||||||| upstream-base
-CAMLprim value caml_array_concat(value al)
-=======
 /* Function pointer type for the [caml_*_gather] functions. */
 typedef value (*gather_impl)(intnat num_arrays,
                              value arrays[/*num_arrays*/],
                              intnat offsets[/*num_arrays*/],
-                             intnat lengths[/*num_arrays*/]);
+                             intnat lengths[/*num_arrays*/],
+                             bool local);
 
-static value generic_array_concat(gather_impl gather, value al)
->>>>>>> upstream-incoming
+static value generic_array_concat(gather_impl gather, value al, bool local)
 {
 #define STATIC_SIZE 16
+   /* array root registered in gather function */
   value static_arrays[STATIC_SIZE], * arrays;
   intnat static_offsets[STATIC_SIZE], * offsets;
   intnat static_lengths[STATIC_SIZE], * lengths;
@@ -1606,6 +1446,9 @@ static value generic_array_concat(gather_impl gather, value al)
     lengths = static_lengths;
   } else {
     arrays = caml_stat_alloc(n * sizeof(value));
+    if (arrays == NULL) {
+      caml_raise_out_of_memory();
+    }
     offsets = caml_stat_alloc_noexc(n * sizeof(intnat));
     if (offsets == NULL) {
       caml_stat_free(arrays);
@@ -1624,16 +1467,7 @@ static value generic_array_concat(gather_impl gather, value al)
     offsets[i] = 0;
     lengths[i] = caml_array_length(Field(l, 0));
   }
-<<<<<<< oxcaml
-  /* Do the concatenation */
-  res = caml_array_gather(n, arrays, offsets, lengths, local);
-||||||| upstream-base
-  /* Do the concatenation */
-  res = caml_array_gather(n, arrays, offsets, lengths);
-=======
-  /* Call the [gather] function. */
-  res = (*gather)(n, arrays, offsets, lengths);
->>>>>>> upstream-incoming
+  res = (*gather)(n, arrays, offsets, lengths, local);
   /* Free the extra storage if needed */
   if (n > STATIC_SIZE) {
     caml_stat_free(arrays);
@@ -1643,40 +1477,34 @@ static value generic_array_concat(gather_impl gather, value al)
   return res;
 }
 
-<<<<<<< oxcaml
-CAMLprim value caml_array_concat(value al)
-{
-  return array_concat_gen(al, 0);
-}
-
-CAMLprim value caml_array_concat_local(value al)
-{
-  return array_concat_gen(al, 1);
-}
-
-CAMLprim value caml_array_fill(value array,
-                               value v_ofs,
-                               value v_len,
-                               value val)
-||||||| upstream-base
-CAMLprim value caml_array_fill(value array,
-                               value v_ofs,
-                               value v_len,
-                               value val)
-=======
 CAMLprim value caml_floatarray_concat(value al)
 {
-  return generic_array_concat(&caml_floatarray_gather, al);
+  return generic_array_concat(&floatarray_gather, al, false);
+}
+
+CAMLprim value caml_floatarray_concat_local(value al)
+{
+  return generic_array_concat(&floatarray_gather, al, true);
 }
 
 CAMLprim value caml_uniform_array_concat(value al)
 {
-  return generic_array_concat(&caml_uniform_array_gather, al);
+  return generic_array_concat(&uniform_array_gather, al, false);
+}
+
+CAMLprim value caml_uniform_array_concat_local(value al)
+{
+  return generic_array_concat(&uniform_array_gather, al, true);
 }
 
 CAMLprim value caml_array_concat(value al)
 {
-  return generic_array_concat(&caml_array_gather, al);
+  return generic_array_concat(&caml_array_gather, al, false);
+}
+
+CAMLprim value caml_array_concat_local(value al)
+{
+  return generic_array_concat(&caml_array_gather, al, true);
 }
 
 CAMLprim value caml_floatarray_fill_unboxed(
@@ -1696,7 +1524,6 @@ CAMLprim value caml_floatarray_fill(
 
 CAMLprim value caml_uniform_array_fill(
   value array, value v_ofs, value v_len, value val)
->>>>>>> upstream-incoming
 {
   intnat ofs = Long_val(v_ofs);
   intnat len = Long_val(v_len);
@@ -1727,7 +1554,19 @@ CAMLprim value caml_uniform_array_fill(
   return Val_unit;
 }
 
-<<<<<<< oxcaml
+CAMLprim value caml_array_fill(value array,
+                               value v_ofs,
+                               value v_len,
+                               value val)
+{
+#ifdef FLAT_FLOAT_ARRAY
+  if (Tag_val(array) == Double_array_tag) {
+    return caml_floatarray_fill(array, v_ofs, v_len, val);
+  }
+#endif
+  return caml_uniform_array_fill(array, v_ofs, v_len, val);
+}
+
 CAMLprim value caml_iarray_of_array(value a)
 {
   return a;
@@ -1784,18 +1623,3 @@ CAMLprim value caml_array_unsafe_set_indexed_by_nativeint(value, value, value);
 Array_access_index_by(int64, int64_t, Int64_val)
 Array_access_index_by(int32, int32_t, Int32_val)
 Array_access_index_by(nativeint, intnat, Nativeint_val)
-||||||| upstream-base
-=======
-CAMLprim value caml_array_fill(value array,
-                               value v_ofs,
-                               value v_len,
-                               value val)
-{
-#ifdef FLAT_FLOAT_ARRAY
-  if (Tag_val(array) == Double_array_tag) {
-    return caml_floatarray_fill(array, v_ofs, v_len, val);
-  }
-#endif
-  return caml_uniform_array_fill(array, v_ofs, v_len, val);
-}
->>>>>>> upstream-incoming
