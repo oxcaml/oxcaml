@@ -1428,6 +1428,14 @@ let new_local_type ?(loc = Location.none) ?manifest_and_scope origin jkind =
     type_unboxed_version = None;
   }
 
+let new_local_jkind ?(loc = Location.none) ?manifest () =
+  {
+    jkind_manifest = manifest;
+    jkind_attributes = [];
+    jkind_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
+    jkind_loc = loc;
+  }
+
 let existential_name name_counter ty =
   let name =
     match get_desc ty with

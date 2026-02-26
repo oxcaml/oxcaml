@@ -39,6 +39,7 @@ type value_mismatch =
   | Zero_alloc of Zero_alloc.error
   | Modality of Mode.Modality.error
   | Mode of Mode.Value.error
+  | Poly_arity_mismatch
 
 exception Dont_match of value_mismatch
 

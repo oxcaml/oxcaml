@@ -453,7 +453,8 @@ let mk_value_description ~val_type ~val_kind ~val_attributes =
     val_modalities = Mode.Modality.(Const.id |> of_const);
     val_attributes;
     val_uid = Uid.internal_not_actually_unique;
-    val_zero_alloc = Zero_alloc.default
+    val_zero_alloc = Zero_alloc.default;
+    val_lpoly = []
   }
 
 let mkTtyp_any = Ttyp_var (None, None)
