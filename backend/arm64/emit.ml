@@ -936,12 +936,6 @@ let max_out_of_line_code_offset ~num_call_gc =
     assert (max_offset >= 0);
     max_offset
 
-(* CR-someday mshinwell: B and BL have +/- 128Mb ranges; for the moment we
-   assume we will never exceed this. It would seem to be most likely to occur
-   for branches between functions; in this case, the linker should be able to
-   insert veneers anyway. (See section 4.6.7 of the document "ELF for the ARM
-   64-bit architecture (AArch64)".) *)
-
 let cond_for_float_comparison : Cmm.float_comparison -> Float_cond.t = function
   | CFeq -> EQ
   | CFneq -> NE
@@ -1837,6 +1831,8 @@ let measure_emit_instr env i =
   Emitaux.restore_frame_descriptors saved_frame_descriptors;
   m
 
+(* Branch relaxation, including instruction size computation pass *)
+
 let compute_instruction_sizes env code =
   let sizes = ref [] in
   let rec walk instr =
@@ -1854,6 +1850,12 @@ let compute_instruction_sizes env code =
   in
   walk code;
   List.rev !sizes
+
+(* CR-someday mshinwell: B and BL have +/- 128Mb ranges; for the moment we
+   assume we will never exceed this. It would seem to be most likely to occur
+   for branches between functions; in this case, the linker should be able to
+   insert veneers anyway. (See section 4.6.7 of the document "ELF for the ARM
+   64-bit architecture (AArch64)".) *)
 
 let branch_relax env body =
   (* Record copy so the sizing pass can mutate its own mutable fields
