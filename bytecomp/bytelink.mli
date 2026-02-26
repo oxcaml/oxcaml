@@ -25,12 +25,9 @@ val link : filepath list -> filepath -> unit
 val reset : unit -> unit
 
 val check_consistency: filepath -> Cmo_format.compilation_unit_descr -> unit
-(* CR sspies: upstream added linkdeps support - we may or may not want to take
-   this (and adjust to compilation_unit_descr)
 
 val linkdeps_unit :
-  Linkdeps.t -> filename:string -> Cmo_format.compilation_unit -> unit
-*)
+  Linkdeps.t -> filename:string -> Cmo_format.compilation_unit_descr -> unit
 
 val extract_crc_interfaces: unit -> Import_info.t list
 
@@ -43,14 +40,9 @@ type error =
   | Custom_runtime
   | File_exists of filepath
   | Cannot_open_dll of filepath
-  | Required_compunit_unavailable of Compilation_unit.t * Compilation_unit.t
   | Camlheader of string * filepath
-  | Wrong_link_order of DepSet.t
-  | Multiple_definition of Compilation_unit.t * filepath * filepath
-  (* CR sspies: upstream linkdeps changes - may or may not want
   | Link_error of Linkdeps.error
   | Needs_custom_runtime of filepath
-  *)
 
 exception Error of error
 

@@ -15,7 +15,7 @@
 
 module Style = Misc.Style
 
-type compunit = string
+type compunit = Compilation_unit.t
 
 type filename = string
 
@@ -56,7 +56,7 @@ let update t k f =
   let v = Hashtbl.find_opt t k in
   Hashtbl.replace t k (f v)
 
-let add_required t by (name : string) =
+let add_required t by (name : compunit) =
   let add s =
     Compunit_and_source.Set.add by
       (Option.value s ~default:Compunit_and_source.Set.empty) in
@@ -102,7 +102,7 @@ let check t =
 open Format_doc
 
 let print_reference print_fname ppf {compunit; filename} =
-  fprintf ppf "%a (%a)" Style.inline_code compunit print_fname filename
+  fprintf ppf "%a (%a)" Compilation_unit.print_as_inline_code compunit print_fname filename
 
 let pp_list_comma f =
   pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") f
@@ -113,7 +113,7 @@ let report_error_doc ~print_filename ppf = function
         List.iter
           (fun (md, rq) ->
              fprintf ppf "@ @[<hov 2>%a referenced from %a@]"
-               Style.inline_code md
+               Compilation_unit.print_as_inline_code md
                (pp_list_comma (print_reference print_filename)) rq)
       in
       fprintf ppf
@@ -131,7 +131,7 @@ let report_error_doc ~print_filename ppf = function
       let print ppf (compunit, files) =
         fprintf ppf
           "@ @[<hov>Multiple definitions of module %a in files %a@]"
-          Style.inline_code compunit
+          Compilation_unit.print_as_inline_code compunit
           (pp_list_comma (Style.as_inline_code print_filename)) files
 
       in
