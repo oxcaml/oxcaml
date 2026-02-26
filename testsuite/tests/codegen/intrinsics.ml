@@ -1,21 +1,3 @@
-external select
-  : 'a.
-  bool -> ('a[@local_opt]) -> ('a[@local_opt]) -> ('a[@local_opt])
-  = "caml_csel_value"
-[@@noalloc]
-[@@no_effects]
-[@@no_coeffects]
-[@@builtin]
-
-external select_int64
-  :  bool
-  -> (int64[@unboxed])
-  -> (int64[@unboxed])
-  -> (int64[@unboxed])
-  @@ portable
-  = "caml_csel_value" "caml_csel_int64_unboxed"
-[@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
-
 module Int32 = struct
   external add :
     (int32[@local_opt]) -> (int32[@local_opt]) -> (int32[@local_opt])
@@ -751,6 +733,36 @@ external incr : (int ref[@local_opt]) -> unit @@ portable = "%incr"
 external decr : (int ref[@local_opt]) -> unit @@ portable = "%decr"
 
 module Builtins = struct
+  (* Conditional select *)
+
+  external select :
+    'a.
+    bool -> ('a[@local_opt]) -> ('a[@local_opt])
+    -> ('a[@local_opt])
+    = "caml_csel_value"
+    [@@noalloc] [@@no_effects] [@@no_coeffects] [@@builtin]
+
+  external select_int32 :
+    bool -> (int32#[@unboxed]) -> (int32#[@unboxed])
+    -> (int32#[@unboxed]) @@ portable
+    = "caml_csel_value" "caml_csel_int32_unboxed"
+    [@@noalloc] [@@no_effects] [@@no_coeffects] [@@builtin]
+    [@@warning "-187"]
+
+  external select_int64 :
+    bool -> (int64#[@unboxed]) -> (int64#[@unboxed])
+    -> (int64#[@unboxed]) @@ portable
+    = "caml_csel_value" "caml_csel_int64_unboxed"
+    [@@noalloc] [@@no_effects] [@@no_coeffects] [@@builtin]
+    [@@warning "-187"]
+
+  external select_nativeint :
+    bool -> (nativeint#[@unboxed]) -> (nativeint#[@unboxed])
+    -> (nativeint#[@unboxed]) @@ portable
+    = "caml_csel_value" "caml_csel_nativeint_unboxed"
+    [@@noalloc] [@@no_effects] [@@no_coeffects] [@@builtin]
+    [@@warning "-187"]
+
   (* Count leading zeros *)
 
   external int_clz : int -> (int[@untagged])
@@ -973,69 +985,223 @@ module Builtins = struct
 
   (* Native pointer atomics - int *)
 
-  external native_pointer_cas_int :
-    nativeint# -> int -> int -> int
-    = "" "caml_native_pointer_compare_and_swap_int_untagged"
-    [@@noalloc] [@@builtin] [@@warning "-187"]
-
   external native_pointer_fetch_add_int :
-    nativeint# -> int -> int
+    (nativeint[@unboxed]) -> (int[@untagged])
+    -> (int[@untagged])
     = "" "caml_native_pointer_fetch_and_add_int_untagged"
-    [@@noalloc] [@@builtin] [@@warning "-187"]
+    [@@noalloc] [@@builtin]
 
   external native_pointer_fetch_sub_int :
-    nativeint# -> int -> int
+    (nativeint[@unboxed]) -> (int[@untagged])
+    -> (int[@untagged])
     = "" "caml_native_pointer_fetch_and_sub_int_untagged"
-    [@@noalloc] [@@builtin] [@@warning "-187"]
+    [@@noalloc] [@@builtin]
+
+  external native_pointer_cas_int :
+    (nativeint[@unboxed]) -> (int[@untagged])
+    -> (int[@untagged]) -> bool
+    = "" "caml_native_pointer_compare_and_swap_int_untagged"
+    [@@noalloc] [@@builtin]
 
   (* Native pointer atomics - int64 *)
 
-  external native_pointer_cas_int64 :
-    nativeint# -> int64# -> int64# -> bool
-    = "" "caml_native_pointer_compare_and_swap_int64_unboxed"
-    [@@noalloc] [@@builtin] [@@warning "-187"]
-
   external native_pointer_fetch_add_int64 :
-    nativeint# -> int64# -> int64#
+    (nativeint[@unboxed]) -> (int64[@unboxed])
+    -> (int64[@unboxed])
     = "" "caml_native_pointer_fetch_and_add_int64_unboxed"
-    [@@noalloc] [@@builtin] [@@warning "-187"]
+    [@@noalloc] [@@builtin]
 
   external native_pointer_fetch_sub_int64 :
-    nativeint# -> int64# -> int64#
+    (nativeint[@unboxed]) -> (int64[@unboxed])
+    -> (int64[@unboxed])
     = "" "caml_native_pointer_fetch_and_sub_int64_unboxed"
-    [@@noalloc] [@@builtin] [@@warning "-187"]
+    [@@noalloc] [@@builtin]
+
+  external native_pointer_cas_int64 :
+    (nativeint[@unboxed]) -> (int64[@unboxed])
+    -> (int64[@unboxed]) -> bool
+    = "" "caml_native_pointer_compare_and_swap_int64_unboxed"
+    [@@noalloc] [@@builtin]
 
   (* Native pointer atomics - int32 *)
 
-  external native_pointer_cas_int32 :
-    nativeint# -> int32# -> int32# -> bool
-    = "" "caml_native_pointer_compare_and_swap_int32_unboxed"
-    [@@noalloc] [@@builtin] [@@warning "-187"]
-
   external native_pointer_fetch_add_int32 :
-    nativeint# -> int32# -> int32#
+    (nativeint[@unboxed]) -> (int32[@unboxed])
+    -> (int32[@unboxed])
     = "" "caml_native_pointer_fetch_and_add_int32_unboxed"
-    [@@noalloc] [@@builtin] [@@warning "-187"]
+    [@@noalloc] [@@builtin]
 
   external native_pointer_fetch_sub_int32 :
-    nativeint# -> int32# -> int32#
+    (nativeint[@unboxed]) -> (int32[@unboxed])
+    -> (int32[@unboxed])
     = "" "caml_native_pointer_fetch_and_sub_int32_unboxed"
-    [@@noalloc] [@@builtin] [@@warning "-187"]
+    [@@noalloc] [@@builtin]
+
+  external native_pointer_cas_int32 :
+    (nativeint[@unboxed]) -> (int32[@unboxed])
+    -> (int32[@unboxed]) -> bool
+    = "" "caml_native_pointer_compare_and_swap_int32_unboxed"
+    [@@noalloc] [@@builtin]
 
   (* Native pointer atomics - nativeint *)
 
-  external native_pointer_cas_nativeint :
-    nativeint# -> nativeint# -> nativeint# -> bool
-    = "" "caml_native_pointer_compare_and_swap_nativeint_unboxed"
-    [@@noalloc] [@@builtin] [@@warning "-187"]
-
   external native_pointer_fetch_add_nativeint :
-    nativeint# -> nativeint# -> nativeint#
+    (nativeint[@unboxed]) -> (nativeint[@unboxed])
+    -> (nativeint[@unboxed])
     = "" "caml_native_pointer_fetch_and_add_nativeint_unboxed"
-    [@@noalloc] [@@builtin] [@@warning "-187"]
+    [@@noalloc] [@@builtin]
 
   external native_pointer_fetch_sub_nativeint :
-    nativeint# -> nativeint# -> nativeint#
+    (nativeint[@unboxed]) -> (nativeint[@unboxed])
+    -> (nativeint[@unboxed])
     = "" "caml_native_pointer_fetch_and_sub_nativeint_unboxed"
-    [@@noalloc] [@@builtin] [@@warning "-187"]
+    [@@noalloc] [@@builtin]
+
+  external native_pointer_cas_nativeint :
+    (nativeint[@unboxed]) -> (nativeint[@unboxed])
+    -> (nativeint[@unboxed]) -> bool
+    = "" "caml_native_pointer_compare_and_swap_nativeint_unboxed"
+    [@@noalloc] [@@builtin]
+
+  (* Ext_pointer: OCaml int encoding of 2-byte-aligned external
+     pointer. The LSB is set (not shifted like normal int tagging). *)
+
+  type ext_pointer = private int
+
+  external ext_pointer_load_untagged_int :
+    ext_pointer -> (int[@untagged])
+    = "" "caml_ext_pointer_load_unboxed_nativeint"
+    [@@noalloc] [@@builtin] [@@no_effects]
+
+  external ext_pointer_store_untagged_int :
+    ext_pointer -> (int[@untagged]) -> unit
+    = "" "caml_ext_pointer_store_unboxed_nativeint"
+    [@@noalloc] [@@builtin] [@@no_coeffects]
+
+  external ext_pointer_load_unboxed_nativeint :
+    ext_pointer -> (nativeint[@unboxed])
+    = "" "caml_ext_pointer_load_unboxed_nativeint"
+    [@@noalloc] [@@builtin] [@@no_effects]
+
+  external ext_pointer_store_unboxed_nativeint :
+    ext_pointer -> (nativeint[@unboxed]) -> unit
+    = "" "caml_ext_pointer_store_unboxed_nativeint"
+    [@@noalloc] [@@builtin] [@@no_coeffects]
+
+  external ext_pointer_load_unboxed_int64 :
+    ext_pointer -> (int64[@unboxed])
+    = "" "caml_ext_pointer_load_unboxed_int64"
+    [@@noalloc] [@@builtin] [@@no_effects]
+
+  external ext_pointer_store_unboxed_int64 :
+    ext_pointer -> (int64[@unboxed]) -> unit
+    = "" "caml_ext_pointer_store_unboxed_int64"
+    [@@noalloc] [@@builtin] [@@no_coeffects]
+
+  external ext_pointer_load_unboxed_int32 :
+    ext_pointer -> (int32[@unboxed])
+    = "" "caml_ext_pointer_load_unboxed_int32"
+    [@@noalloc] [@@builtin] [@@no_effects]
+
+  external ext_pointer_store_unboxed_int32 :
+    ext_pointer -> (int32[@unboxed]) -> unit
+    = "" "caml_ext_pointer_store_unboxed_int32"
+    [@@noalloc] [@@builtin] [@@no_coeffects]
+
+  external ext_pointer_load_unboxed_float :
+    ext_pointer -> (float[@unboxed])
+    = "" "caml_ext_pointer_load_unboxed_float"
+    [@@noalloc] [@@builtin] [@@no_effects]
+
+  external ext_pointer_store_unboxed_float :
+    ext_pointer -> (float[@unboxed]) -> unit
+    = "" "caml_ext_pointer_store_unboxed_float"
+    [@@noalloc] [@@builtin] [@@no_coeffects]
+
+  external ext_pointer_load_unsigned_int8 :
+    ext_pointer -> int
+    = "" "caml_ext_pointer_load_unsigned_int8"
+    [@@noalloc] [@@builtin]
+
+  external ext_pointer_store_unsigned_int8 :
+    ext_pointer -> int -> unit
+    = "" "caml_ext_pointer_store_unsigned_int8"
+    [@@noalloc] [@@builtin]
+
+  external ext_pointer_load_signed_int16 :
+    ext_pointer -> int
+    = "" "caml_ext_pointer_load_signed_int16"
+    [@@noalloc] [@@builtin]
+
+  external ext_pointer_store_unsigned_int16 :
+    ext_pointer -> int -> unit
+    = "" "caml_ext_pointer_store_unsigned_int16"
+    [@@noalloc] [@@builtin]
+
+  (* Ext_pointer atomics *)
+
+  external ext_pointer_fetch_add_int :
+    ext_pointer -> (int[@untagged]) -> (int[@untagged])
+    = "" "caml_ext_pointer_fetch_and_add_int_untagged"
+    [@@noalloc] [@@builtin]
+
+  external ext_pointer_cas_int :
+    ext_pointer -> (int[@untagged])
+    -> (int[@untagged]) -> bool
+    = "" "caml_ext_pointer_compare_and_swap_int_untagged"
+    [@@noalloc] [@@builtin]
+
+  external ext_pointer_fetch_add_int64 :
+    ext_pointer -> (int64[@unboxed])
+    -> (int64[@unboxed])
+    = "" "caml_ext_pointer_fetch_and_add_int64_unboxed"
+    [@@noalloc] [@@builtin]
+
+  external ext_pointer_fetch_add_int32 :
+    ext_pointer -> (int32[@unboxed])
+    -> (int32[@unboxed])
+    = "" "caml_ext_pointer_fetch_and_add_int32_unboxed"
+    [@@noalloc] [@@builtin]
+
+  external ext_pointer_fetch_add_nativeint :
+    ext_pointer -> (nativeint[@unboxed])
+    -> (nativeint[@unboxed])
+    = "" "caml_ext_pointer_fetch_and_add_nativeint_unboxed"
+    [@@noalloc] [@@builtin]
+
+  (* Bigstring: (char, int8_unsigned_elt, c_layout) Array1.t *)
+
+  type bigstring =
+    (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout)
+    Bigarray.Array1.t
+
+  external bigstring_fetch_add_int :
+    bigstring -> (int[@untagged]) -> (int[@untagged])
+    -> (int[@untagged])
+    = "" "caml_bigstring_fetch_and_add_int_untagged"
+    [@@noalloc] [@@builtin]
+
+  external bigstring_fetch_add_int64 :
+    bigstring -> (int[@untagged]) -> (int64[@unboxed])
+    -> (int64[@unboxed])
+    = "" "caml_bigstring_fetch_and_add_int64_unboxed"
+    [@@noalloc] [@@builtin]
+
+  external bigstring_fetch_add_int32 :
+    bigstring -> (int[@untagged]) -> (int32[@unboxed])
+    -> (int32[@unboxed])
+    = "" "caml_bigstring_fetch_and_add_int32_unboxed"
+    [@@noalloc] [@@builtin]
+
+  external bigstring_cas_int :
+    bigstring -> (int[@untagged]) -> (int[@untagged])
+    -> (int[@untagged]) -> bool
+    = "" "caml_bigstring_compare_and_swap_int_untagged"
+    [@@noalloc] [@@builtin]
+
+  external bigstring_cas_int64 :
+    bigstring -> (int[@untagged]) -> (int64[@unboxed])
+    -> (int64[@unboxed]) -> bool
+    = "" "caml_bigstring_compare_and_swap_int64_unboxed"
+    [@@noalloc] [@@builtin]
 end
