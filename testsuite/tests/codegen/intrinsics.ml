@@ -749,3 +749,293 @@ external ( := ) :
 
 external incr : (int ref[@local_opt]) -> unit @@ portable = "%incr"
 external decr : (int ref[@local_opt]) -> unit @@ portable = "%decr"
+
+module Builtins = struct
+  (* Count leading zeros *)
+
+  external int_clz : int -> (int[@untagged])
+    = "" "caml_int_clz_tagged_to_untagged"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external int64_clz :
+    (int64[@unboxed]) -> (int[@untagged])
+    = "" "caml_int64_clz_unboxed_to_untagged"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external int64_clz_nonzero :
+    (int64[@unboxed]) -> (int[@untagged])
+    = "" "caml_int64_clz_nonzero_unboxed_to_untagged"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external int32_clz :
+    (int32[@unboxed]) -> (int[@untagged])
+    = "" "caml_int32_clz_unboxed_to_untagged"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external int32_clz_nonzero :
+    (int32[@unboxed]) -> (int[@untagged])
+    = "" "caml_int32_clz_nonzero_unboxed_to_untagged"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external nativeint_clz :
+    (nativeint[@unboxed]) -> (int[@untagged])
+    = "" "caml_nativeint_clz_unboxed_to_untagged"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external nativeint_clz_nonzero :
+    (nativeint[@unboxed]) -> (int[@untagged])
+    = "" "caml_nativeint_clz_nonzero_unboxed_to_untagged"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  (* Count trailing zeros *)
+
+  external int_ctz :
+    (int[@untagged]) -> (int[@untagged])
+    = "" "caml_int_ctz_untagged_to_untagged"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external int64_ctz :
+    (int64[@unboxed]) -> (int[@untagged])
+    = "" "caml_int64_ctz_unboxed_to_untagged"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external int64_ctz_nonzero :
+    (int64[@unboxed]) -> (int[@untagged])
+    = "" "caml_int64_ctz_nonzero_unboxed_to_untagged"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external int32_ctz :
+    (int32[@unboxed]) -> (int[@untagged])
+    = "" "caml_int32_ctz_unboxed_to_untagged"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external int32_ctz_nonzero :
+    (int32[@unboxed]) -> (int[@untagged])
+    = "" "caml_int32_ctz_nonzero_unboxed_to_untagged"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external nativeint_ctz :
+    (nativeint[@unboxed]) -> (int[@untagged])
+    = "" "caml_nativeint_ctz_unboxed_to_untagged"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external nativeint_ctz_nonzero :
+    (nativeint[@unboxed]) -> (int[@untagged])
+    = "" "caml_nativeint_ctz_nonzero_unboxed_to_untagged"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  (* Population count *)
+
+  external int_popcnt : int -> (int[@untagged])
+    = "" "caml_int_popcnt_tagged_to_untagged"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external int64_popcnt :
+    (int64[@unboxed]) -> (int[@untagged])
+    = "" "caml_int64_popcnt_unboxed_to_untagged"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external int32_popcnt :
+    (int32[@unboxed]) -> (int[@untagged])
+    = "" "caml_int32_popcnt_unboxed_to_untagged"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external nativeint_popcnt :
+    (nativeint[@unboxed]) -> (int[@untagged])
+    = "" "caml_nativeint_popcnt_unboxed_to_untagged"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  (* High multiply *)
+
+  external int64_mulhi_s :
+    (int64[@unboxed]) -> (int64[@unboxed]) -> (int64[@unboxed])
+    = "" "caml_signed_int64_mulh_unboxed"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  external int64_mulhi_u :
+    (int64[@unboxed]) -> (int64[@unboxed]) -> (int64[@unboxed])
+    = "" "caml_unsigned_int64_mulh_unboxed"
+    [@@noalloc] [@@builtin] [@@no_effects] [@@no_coeffects]
+
+  (* Prefetch *)
+
+  external prefetch_read_high :
+    'a -> unit = "" "caml_prefetch_read_high"
+    [@@noalloc] [@@builtin]
+
+  external prefetch_read_moderate :
+    'a -> unit = "" "caml_prefetch_read_moderate"
+    [@@noalloc] [@@builtin]
+
+  external prefetch_read_low :
+    'a -> unit = "" "caml_prefetch_read_low"
+    [@@noalloc] [@@builtin]
+
+  external prefetch_read_none :
+    'a -> unit = "" "caml_prefetch_read_none"
+    [@@noalloc] [@@builtin]
+
+  external prefetch_write_high :
+    'a -> unit = "" "caml_prefetch_write_high"
+    [@@noalloc] [@@builtin]
+
+  external prefetch_write_low :
+    'a -> unit = "" "caml_prefetch_write_low"
+    [@@noalloc] [@@builtin]
+
+  (* Pause *)
+
+  external pause_hint : unit -> unit
+    = "" "caml_pause_hint"
+    [@@noalloc] [@@builtin]
+
+  (* Native pointer load/store *)
+
+  external native_pointer_load_int64 :
+    nativeint# -> int64#
+    = "" "caml_native_pointer_load_unboxed_int64"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_store_int64 :
+    nativeint# -> int64# -> unit
+    = "" "caml_native_pointer_store_unboxed_int64"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_load_int32 :
+    nativeint# -> int32#
+    = "" "caml_native_pointer_load_unboxed_int32"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_store_int32 :
+    nativeint# -> int32# -> unit
+    = "" "caml_native_pointer_store_unboxed_int32"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_load_nativeint :
+    nativeint# -> nativeint#
+    = "" "caml_native_pointer_load_unboxed_nativeint"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_store_nativeint :
+    nativeint# -> nativeint# -> unit
+    = "" "caml_native_pointer_store_unboxed_nativeint"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_load_float :
+    nativeint# -> float#
+    = "" "caml_native_pointer_load_unboxed_float"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_store_float :
+    nativeint# -> float# -> unit
+    = "" "caml_native_pointer_store_unboxed_float"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_load_uint8 :
+    nativeint# -> int
+    = "" "caml_native_pointer_load_unsigned_int8"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_store_uint8 :
+    nativeint# -> int -> unit
+    = "" "caml_native_pointer_store_unsigned_int8"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_load_sint8 :
+    nativeint# -> int
+    = "" "caml_native_pointer_load_signed_int8"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_store_sint8 :
+    nativeint# -> int -> unit
+    = "" "caml_native_pointer_store_signed_int8"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_load_uint16 :
+    nativeint# -> int
+    = "" "caml_native_pointer_load_unsigned_int16"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_store_uint16 :
+    nativeint# -> int -> unit
+    = "" "caml_native_pointer_store_unsigned_int16"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_load_sint16 :
+    nativeint# -> int
+    = "" "caml_native_pointer_load_signed_int16"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_store_sint16 :
+    nativeint# -> int -> unit
+    = "" "caml_native_pointer_store_signed_int16"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  (* Native pointer atomics - int *)
+
+  external native_pointer_cas_int :
+    nativeint# -> int -> int -> int
+    = "" "caml_native_pointer_compare_and_swap_int_untagged"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_fetch_add_int :
+    nativeint# -> int -> int
+    = "" "caml_native_pointer_fetch_and_add_int_untagged"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_fetch_sub_int :
+    nativeint# -> int -> int
+    = "" "caml_native_pointer_fetch_and_sub_int_untagged"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  (* Native pointer atomics - int64 *)
+
+  external native_pointer_cas_int64 :
+    nativeint# -> int64# -> int64# -> bool
+    = "" "caml_native_pointer_compare_and_swap_int64_unboxed"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_fetch_add_int64 :
+    nativeint# -> int64# -> int64#
+    = "" "caml_native_pointer_fetch_and_add_int64_unboxed"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_fetch_sub_int64 :
+    nativeint# -> int64# -> int64#
+    = "" "caml_native_pointer_fetch_and_sub_int64_unboxed"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  (* Native pointer atomics - int32 *)
+
+  external native_pointer_cas_int32 :
+    nativeint# -> int32# -> int32# -> bool
+    = "" "caml_native_pointer_compare_and_swap_int32_unboxed"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_fetch_add_int32 :
+    nativeint# -> int32# -> int32#
+    = "" "caml_native_pointer_fetch_and_add_int32_unboxed"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_fetch_sub_int32 :
+    nativeint# -> int32# -> int32#
+    = "" "caml_native_pointer_fetch_and_sub_int32_unboxed"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  (* Native pointer atomics - nativeint *)
+
+  external native_pointer_cas_nativeint :
+    nativeint# -> nativeint# -> nativeint# -> bool
+    = "" "caml_native_pointer_compare_and_swap_nativeint_unboxed"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_fetch_add_nativeint :
+    nativeint# -> nativeint# -> nativeint#
+    = "" "caml_native_pointer_fetch_and_add_nativeint_unboxed"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+
+  external native_pointer_fetch_sub_nativeint :
+    nativeint# -> nativeint# -> nativeint#
+    = "" "caml_native_pointer_fetch_and_sub_nativeint_unboxed"
+    [@@noalloc] [@@builtin] [@@warning "-187"]
+end
