@@ -266,4 +266,8 @@ val equal_basic : basic -> basic -> bool
 
 val equal_terminator : terminator -> terminator -> bool
 
+val hash_basic : basic -> int
+
+val hash_terminator : terminator -> int
+
 val invalid_stack_offset : int

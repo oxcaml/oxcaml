@@ -910,3 +910,78 @@ let equal_terminator left right =
       | Tailcall_func _ | Call_no_return _ | Call _ | Prim _ | Invalid _ ),
       _ ) ->
     false
+
+let hash_combine h1 h2 = (h1 * 65599) + h2
+
+let hash_bool_test (t : bool_test) =
+  hash_combine (Label.hash t.ifso) (Label.hash t.ifnot)
+
+let hash_int_test (t : int_test) =
+  hash_combine (Label.hash t.lt)
+    (hash_combine (Label.hash t.eq)
+       (hash_combine (Label.hash t.gt)
+          (hash_combine (Hashtbl.hash t.is_signed) (Hashtbl.hash t.imm))))
+
+let hash_float_test (t : float_test) =
+  hash_combine (Hashtbl.hash t.width)
+    (hash_combine (Label.hash t.lt)
+       (hash_combine (Label.hash t.eq)
+          (hash_combine (Label.hash t.gt) (Label.hash t.uo))))
+
+let hash_func_call_operation = function
+  | Indirect callees -> hash_combine 0 (Hashtbl.hash callees)
+  | Direct sym -> hash_combine 1 (Hashtbl.hash sym)
+
+let hash_external_call_operation op =
+  hash_combine
+    (Hashtbl.hash op.func_symbol)
+    (hash_combine (Bool.to_int op.alloc)
+       (hash_combine (Hashtbl.hash op.effects)
+          (hash_combine (Hashtbl.hash op.ty_res)
+             (hash_combine (Hashtbl.hash op.ty_args)
+                (hash_combine op.stack_ofs (Hashtbl.hash op.stack_align))))))
+
+let hash_prim_call_operation = function
+  | External op -> hash_combine 0 (hash_external_call_operation op)
+  | Probe { name; handler_code_sym; enabled_at_init } ->
+    hash_combine 1
+      (hash_combine (Hashtbl.hash name)
+         (hash_combine
+            (Hashtbl.hash handler_code_sym)
+            (Bool.to_int enabled_at_init)))
+
+let hash_with_label_after hash_op { op; label_after } =
+  hash_combine (hash_op op) (Label.hash label_after)
+
+let hash_basic = function
+  | Op op -> hash_combine 0 (Operation.hash op)
+  | Reloadretaddr -> 1
+  | Pushtrap { lbl_handler } -> hash_combine 2 (Label.hash lbl_handler)
+  | Poptrap { lbl_handler } -> hash_combine 3 (Label.hash lbl_handler)
+  | Prologue -> 4
+  | Epilogue -> 5
+  | Stack_check { max_frame_size_bytes } -> hash_combine 6 max_frame_size_bytes
+
+let hash_terminator = function
+  | Never -> 0
+  | Always lbl -> hash_combine 1 (Label.hash lbl)
+  | Parity_test test -> hash_combine 2 (hash_bool_test test)
+  | Truth_test test -> hash_combine 3 (hash_bool_test test)
+  | Float_test test -> hash_combine 4 (hash_float_test test)
+  | Int_test test -> hash_combine 5 (hash_int_test test)
+  | Switch labels ->
+    Array.fold_left (fun acc lbl -> hash_combine acc (Label.hash lbl)) 6 labels
+  | Return -> 7
+  | Raise kind -> hash_combine 8 (Hashtbl.hash kind)
+  | Tailcall_self { destination } -> hash_combine 9 (Label.hash destination)
+  | Tailcall_func op -> hash_combine 10 (hash_func_call_operation op)
+  | Call_no_return op -> hash_combine 11 (hash_external_call_operation op)
+  | Call call ->
+    hash_combine 12 (hash_with_label_after hash_func_call_operation call)
+  | Prim prim ->
+    hash_combine 13 (hash_with_label_after hash_prim_call_operation prim)
+  | Invalid { message; stack_ofs; stack_align; label_after } ->
+    hash_combine 14
+      (hash_combine (Hashtbl.hash message)
+         (hash_combine stack_ofs
+            (hash_combine (Hashtbl.hash stack_align) (Hashtbl.hash label_after))))
