@@ -37,7 +37,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
       | Lcondbranch3 (_, _, _)
       | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
       | Lstackcheck _ ->
-        let size, _ = List.hd sizes in
+        let { Branch_relaxation_intf.size; _ } = List.hd sizes in
         fill_map (pc + size) instr.next (List.tl sizes)
     in
     fill_map 0 code sizes
@@ -107,7 +107,10 @@ module Make (T : Branch_relaxation_intf.S) = struct
       | Lcondbranch3 (_, _, _)
       | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
       | Lstackcheck _ -> (
-        let size, max_displacement = List.hd sizes in
+        let ({ size; max_displacement } :
+              Branch_relaxation_intf.instruction_size) =
+          List.hd sizes
+        in
         let rest = List.tl sizes in
         let overflows =
           instr_overflows ~code_size ~max_out_of_line_code_offset instr
@@ -116,21 +119,22 @@ module Make (T : Branch_relaxation_intf.S) = struct
         if not overflows
         then
           let did_fix, rest_sizes = fixup did_fix (pc + size) instr.next rest in
-          did_fix, (size, max_displacement) :: rest_sizes
+          did_fix,
+          { Branch_relaxation_intf.size; max_displacement } :: rest_sizes
         else
           match instr.desc with
           | Lop Poll ->
             instr.desc <- T.relax_poll ();
             let new_size = T.instr_size instr in
             let did_fix, rest_sizes =
-              fixup true (pc + fst new_size) instr.next rest
+              fixup true (pc + new_size.size) instr.next rest
             in
             did_fix, new_size :: rest_sizes
           | Lop (Alloc { bytes = num_bytes; dbginfo; _ }) ->
             instr.desc <- T.relax_allocation ~num_bytes ~dbginfo;
             let new_size = T.instr_size instr in
             let did_fix, rest_sizes =
-              fixup true (pc + fst new_size) instr.next rest
+              fixup true (pc + new_size.size) instr.next rest
             in
             did_fix, new_size :: rest_sizes
           | Lcondbranch (test, lbl) ->
@@ -148,11 +152,14 @@ module Make (T : Branch_relaxation_intf.S) = struct
             instr.next <- branch_instr;
             let inverted_size = T.instr_size instr in
             let branch_size = T.instr_size branch_instr in
+            let label_size : Branch_relaxation_intf.instruction_size =
+              { size = 0; max_displacement = None }
+            in
             let did_fix, rest_sizes =
               fixup true
-                (pc + fst inverted_size)
+                (pc + inverted_size.size)
                 instr.next
-                (branch_size :: (0, None) :: rest)
+                (branch_size :: label_size :: rest)
             in
             did_fix, inverted_size :: rest_sizes
           | Lcondbranch3 (lbl0, lbl1, lbl2) ->
@@ -205,8 +212,11 @@ module Make (T : Branch_relaxation_intf.S) = struct
     in
     let min_of_max_branch_offsets =
       List.fold_left
-        (fun acc (_size, disp) ->
-          match disp with None -> acc | Some d -> min acc d)
+        (fun acc ({ max_displacement; _ } :
+              Branch_relaxation_intf.instruction_size) ->
+          match max_displacement with
+          | None -> acc
+          | Some d -> min acc d)
         max_int initial_sizes
     in
     let rec loop sizes =

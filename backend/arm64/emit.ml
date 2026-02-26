@@ -921,7 +921,6 @@ let emit_load_symbol_addr dst s =
       (symbol (Needs_reloc PAGE_OFF) s)
       O.optional_none)
 
-
 let cond_for_float_comparison : Cmm.float_comparison -> Float_cond.t = function
   | CFeq -> EQ
   | CFneq -> NE
@@ -1806,6 +1805,8 @@ let emit_instr env i =
       Printlinear.instr i;
     raise exn
 
+(* Branch relaxation, including instruction size computation pass *)
+
 let measure_emit_instr env i =
   let saved_frame_descriptors = Emitaux.save_frame_descriptors () in
   let saved_debug_info = Emitaux.save_debug_info () in
@@ -1816,8 +1817,6 @@ let measure_emit_instr env i =
   Emitaux.restore_debug_info saved_debug_info;
   Emitaux.restore_frame_descriptors saved_frame_descriptors;
   m
-
-(* Branch relaxation, including instruction size computation pass *)
 
 let compute_instruction_sizes env code =
   let sizes = ref [] in
@@ -1831,7 +1830,11 @@ let compute_instruction_sizes env code =
     | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
     | Lstackcheck _ ->
       let m = measure_emit_instr env instr in
-      sizes := (m.count, m.min_max_displacement) :: !sizes;
+      sizes
+        := { Branch_relaxation_intf.size = m.count;
+             max_displacement = m.min_max_displacement
+           }
+           :: !sizes;
       walk instr.next
   in
   walk code;
@@ -1846,38 +1849,30 @@ let compute_instruction_sizes env code =
 let measure_instruction_count f =
   let saved_frame_descriptors = Emitaux.save_frame_descriptors () in
   let saved_debug_info = Emitaux.save_debug_info () in
-  let m =
-    D.with_measuring ~f:(fun () -> A.with_measuring ~f)
-  in
+  let m = D.with_measuring ~f:(fun () -> A.with_measuring ~f) in
   Emitaux.restore_debug_info saved_debug_info;
   Emitaux.restore_frame_descriptors saved_frame_descriptors;
   m.count
 
 let out_of_line_code_block_sizes env =
   List.rev_map
-    (fun gc ->
-      measure_instruction_count (fun () -> emit_call_gc gc))
+    (fun gc -> measure_instruction_count (fun () -> emit_call_gc gc))
     env.call_gc_sites
   @ List.rev_map
-      (fun lr ->
-        measure_instruction_count (fun () ->
-            emit_local_realloc lr))
+      (fun lr -> measure_instruction_count (fun () -> emit_local_realloc lr))
       env.local_realloc_sites
-  @ (match env.stack_realloc with
-    | None -> []
-    | Some _ ->
-      [measure_instruction_count (fun () ->
-           emit_stack_realloc env)])
+  @
+  match env.stack_realloc with
+  | None -> []
+  | Some _ -> [measure_instruction_count (fun () -> emit_stack_realloc env)]
 
 let branch_relax env body =
   (* Record copy so the sizing pass can mutate its own mutable fields
-     (stack_offset, call_gc_sites, etc.) without affecting [env],
-     which is used later by [emit_all]. *)
+     (stack_offset, call_gc_sites, etc.) without affecting [env], which is used
+     later by [emit_all]. *)
   let sizing_env = { env with stack_offset = env.stack_offset } in
   let initial_sizes = compute_instruction_sizes sizing_env body in
-  let out_of_line_code_block_sizes =
-    out_of_line_code_block_sizes sizing_env
-  in
+  let out_of_line_code_block_sizes = out_of_line_code_block_sizes sizing_env in
   let module BR = Branch_relaxation.Make (struct
     type distance = int
 
@@ -1885,7 +1880,9 @@ let branch_relax env body =
 
     let instr_size instr =
       let m = measure_emit_instr sizing_env instr in
-      m.count, m.min_max_displacement
+      { Branch_relaxation_intf.size = m.count;
+        max_displacement = m.min_max_displacement
+      }
 
     let relax_poll () = Lop (Specific Ifar_poll)
 

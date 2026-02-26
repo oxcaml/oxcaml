@@ -27,7 +27,7 @@ module Make (T : Branch_relaxation_intf.S) : sig
       from this list. *)
   val relax :
     Linear.instruction ->
-    initial_sizes:(T.distance * T.distance option) list ->
+    initial_sizes:Branch_relaxation_intf.instruction_size list ->
     out_of_line_code_block_sizes:T.distance list ->
     unit
 end

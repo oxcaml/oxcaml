@@ -15,15 +15,17 @@
 (**************************************************************************)
 [@@@ocaml.warning "+a-40-41-42"]
 
+type instruction_size =
+  { size : int;
+    max_displacement : int option
+  }
+
 module type S = sig
   type distance = int
 
   val offset_pc_at_branch : distance
 
-  (** Returns [(size, max_displacement)] where [max_displacement] is
-      [Some n] if the instruction contains a conditional branch with
-      maximum displacement [n], or [None] otherwise. *)
-  val instr_size : Linear.instruction -> distance * distance option
+  val instr_size : Linear.instruction -> instruction_size
 
   val relax_allocation
      : num_bytes:int
