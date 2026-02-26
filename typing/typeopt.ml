@@ -524,14 +524,12 @@ let nullable raw_kind = { raw_kind; nullable = Nullable }
    have a jkind. We should pick one, or rationalize why there are two.
 *)
 
-let add_nullability_from_scannable_jkind jkind raw_kind =
+let add_nullability_from_scannable_jkind env jkind raw_kind =
   let nullable =
-    match Jkind.get_nullability jkind with
+    match Jkind.get_nullability env jkind with
     | Some Non_null -> Non_nullable
     | Some Maybe_null -> Nullable
-    (* This can happen when the jkind is abstract (Kconstr).
-       Be conservative and assume nullable. *)
-    | None -> Nullable
+    | None -> Misc.fatal_error "expected a layout of scannable"
   in
   { raw_kind; nullable }
 
@@ -670,7 +668,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
       in
       if cannot_proceed () then
         num_nodes_visited,
-        add_nullability_from_scannable_jkind decl.type_jkind
+        add_nullability_from_scannable_jkind env decl.type_jkind
           (value_kind_of_scannable_jkind env decl.type_jkind)
       else
         let visited = Numbers.Int.Set.add (get_id ty) visited in
@@ -703,7 +701,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
             "Typeopt.value_kind: non-unary unboxed record can't have kind value"
         | Type_abstract _ ->
           num_nodes_visited,
-          add_nullability_from_scannable_jkind decl.type_jkind
+          add_nullability_from_scannable_jkind env decl.type_jkind
             (value_kind_of_scannable_jkind env decl.type_jkind)
         | Type_open -> num_nodes_visited, non_nullable Pgenval
     end
@@ -736,7 +734,7 @@ let rec value_kind env ~loc ~visited ~depth ~num_nodes_visited ty
     else non_nullable Pintval
   | _ ->
     num_nodes_visited,
-    add_nullability_from_scannable_jkind
+    add_nullability_from_scannable_jkind env
       (Ctype.estimate_type_jkind env scty) Pgenval
 
 and value_kind_mixed_block_field env ~loc ~visited ~depth ~num_nodes_visited
