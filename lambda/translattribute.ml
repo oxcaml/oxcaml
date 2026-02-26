@@ -204,7 +204,8 @@ let parse_regalloc_param_attribute attr =
   | Some {Parsetree.attr_name = {txt; loc}; attr_payload = payload} ->
       match payload with
       | PStr [{pstr_desc=Pstr_eval(
-          {pexp_desc=Pexp_constant(Pconst_string(s, _, _)); _}, _); _}] ->
+          {pexp_desc=Pexp_constant
+            {pconst_desc=Pconst_string(s, _, _); _}; _}, _); _}] ->
           Some s
       | _ ->
           Location.prerr_warning loc
