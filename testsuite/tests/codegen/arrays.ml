@@ -112,6 +112,7 @@ ref_unsafe_set:
   ret
 |}]
 
+(* CR ttebbi: Stackframe creation is only necessary on the GC-calling path. *)
 let poly_unsafe_get (a : 'a array) (i : int) =
   Array.unsafe_get a i
 [%%expect_asm X86_64{|

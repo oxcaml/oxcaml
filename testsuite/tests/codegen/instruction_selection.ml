@@ -122,32 +122,6 @@ branch_and_return:
 |}]
 
 
-(* CR ttebbi: If we change the register representation of 32bit values to be
-    zero-extended, we could emit 32bit instructions saving 1 byte of instruction
-    encoding and remove the sign extensions.
-*)
-let add32 x y = Int32_u.add x y
-[%%expect_asm X86_64{|
-add32:
-  addq  %rbx, %rax
-  movslq %eax, %rax
-  ret
-|}]
-
-let min32 x y = Int32_u.min x y
-[%%expect_asm X86_64{|
-min32:
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  cmpq  %rax, %rdi
-  jg    .L105
-  movq  %rdi, %rax
-  ret
-.L105:
-  ret
-|}]
-
-
 (* CR ttebbi: `leaq  8(%r15), %rbx` could be merged with
    the subsequent addition. *)
 let two_element_list x = [x; x]
@@ -221,14 +195,6 @@ int32_box_unbox_after_call:
   ret
 |}]
 
-let bswap32 x = Int32_u.bswap x
-[%%expect_asm X86_64{|
-bswap32:
-  bswap %eax
-  movslq %eax, %rax
-  ret
-|}]
-
 (* CR ttebbi: "xchg  %ah, %al" is rather slow, a 32bit byte swap followed by a
    shift would be faster. Also, we zero-extend twice. *)
 let bswap16 x = Int.bswap16 x
@@ -299,22 +265,6 @@ nativeint_to_int64:
   ret
 |}]
 
-(* CR ttebbi: We can use a single compare and do the subtraction before sign
-   extending. *)
-let compare32 x y = Int32_u.compare x y
-[%%expect_asm X86_64{|
-compare32:
-  movq  %rax, %rdi
-  cmpq  %rbx, %rdi
-  setl  %al
-  movzbq %al, %rsi
-  cmpq  %rbx, %rdi
-  setg  %al
-  movzbq %al, %rax
-  subq  %rsi, %rax
-  leaq  1(%rax,%rax), %rax
-  ret
-|}]
 
 (* Optimization barrier *)
 

@@ -104,6 +104,8 @@ to_int:
   ret
 |}]
 
+(* CR ttebbi: The 32bit bitmask can be turned into a boolean using either
+   (x >> 30) | 1 or using the negated comparison and sign_extend(x)*2+3 *)
 let eq x y = Float32_u.eq x y
 [%%expect_asm X86_64{|
 eq:

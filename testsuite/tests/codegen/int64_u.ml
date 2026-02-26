@@ -513,6 +513,8 @@ float_of_bits:
   ret
 |}]
 
+(* CR ttebbi: Double cmp instruction, subtraction should be done on byte
+   registers. *)
 let compare x y = Int64_u.compare x y
 [%%expect_asm X86_64{|
 compare:
