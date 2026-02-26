@@ -407,6 +407,14 @@ Error: This expression has type "a or_null"
        Note: The layout of immediate is value non_pointer.
 |}]
 
+module M : sig
+  type t : immediate_or_null & float64
+end = struct
+  type t = #(int or_null * float#)
+end
+[%%expect{|
+module M : sig type t : value_or_null non_pointer mod external_ & float64 end
+|}]
 
 (* modules and module inclusion *)
 
