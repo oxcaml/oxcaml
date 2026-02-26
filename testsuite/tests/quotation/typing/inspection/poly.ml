@@ -96,6 +96,13 @@ let () =
   test <[ ignore (((fun x -> x) $f) : t3''') ]>
 ;;
 
+(* eval types *)
+(* FIXME: For ~eval:true, we need to allow evaluating programs with quotes. *)
+let () =
+  let (f : <[t3'''']> expr) = <[fun f -> (f <[42]>, f <["abc"]>)]> in
+  test ~eval:false <[ ignore (((fun x -> x) $f) : t3'''') ]>
+;;
+
 (* funky object types *)
 let () =
   let (f : <[('a. < x : 'a; .. > -> 'a) -> int * string]> expr) =
