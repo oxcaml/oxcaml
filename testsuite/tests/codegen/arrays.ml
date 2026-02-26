@@ -462,7 +462,8 @@ ref_safe_set:
 |}]
 
 (* CR ttebbi: The header is loaded twice: once for the bounds check and once
-   for the tag check (to distingish float arrays).
+   for the tag check (to distingish float arrays). The non-float case should
+   be the inline one for code compactness.
 *)
 let poly_safe_get (a : 'a array) (i : int) =
   Array.get a i

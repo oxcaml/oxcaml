@@ -63,17 +63,17 @@ set_b:
 
 (* Ref incr/decr *)
 
-let incr r = incr r
+let do_incr r = incr r
 [%%expect_asm X86_64{|
-incr:
+do_incr:
   addq  $2, (%rax)
   movl  $1, %eax
   ret
 |}]
 
-let decr r = decr r
+let do_decr r = decr r
 [%%expect_asm X86_64{|
-decr:
+do_decr:
   addq  $-2, (%rax)
   movl  $1, %eax
   ret
@@ -167,6 +167,66 @@ assign:
 let do_ignore x = ignore x
 [%%expect_asm X86_64{|
 do_ignore:
+  movl  $1, %eax
+  ret
+|}]
+
+(* Records with unboxed fields *)
+
+type unboxed_int64 = { a : int; b : int64#; c : int }
+
+let get_unboxed_int64 (r : unboxed_int64) = r.b
+[%%expect_asm X86_64{|
+get_unboxed_int64:
+  movq  16(%rax), %rax
+  ret
+|}]
+
+let get_after_unboxed (r : unboxed_int64) = r.c
+[%%expect_asm X86_64{|
+get_after_unboxed:
+  movq  8(%rax), %rax
+  ret
+|}]
+
+type unboxed_float = { x : float#; y : int }
+
+let get_unboxed_float (r : unboxed_float) = r.x
+[%%expect_asm X86_64{|
+get_unboxed_float:
+  vmovsd 8(%rax), %xmm0
+  ret
+|}]
+
+let get_after_float (r : unboxed_float) = r.y
+[%%expect_asm X86_64{|
+get_after_float:
+  movq  (%rax), %rax
+  ret
+|}]
+
+type unboxed_int32 = { i : int32#; j : int }
+
+let get_unboxed_int32 (r : unboxed_int32) = r.i
+[%%expect_asm X86_64{|
+get_unboxed_int32:
+  movslq 8(%rax), %rax
+  ret
+|}]
+
+type mutable_unboxed = { mutable p : int64#; q : int }
+
+let get_mut_unboxed (r : mutable_unboxed) = r.p
+[%%expect_asm X86_64{|
+get_mut_unboxed:
+  movq  8(%rax), %rax
+  ret
+|}]
+
+let set_mut_unboxed (r : mutable_unboxed) (v : int64#) = r.p <- v
+[%%expect_asm X86_64{|
+set_mut_unboxed:
+  movq  %rbx, 8(%rax)
   movl  $1, %eax
   ret
 |}]
