@@ -13,12 +13,12 @@
 
 let f (x : <[int]> eval) : int = x
 [%%expect {|
-val f : int -> int = <fun>
+val f : <[int]> eval -> int = <fun>
 |}]
 
 let f (x : <[string]> eval) : string = x
 [%%expect {|
-val f : string -> string = <fun>
+val f : <[string]> eval -> string = <fun>
 |}]
 
 let f (x : <[int]> eval) : string = x
@@ -26,8 +26,8 @@ let f (x : <[int]> eval) : string = x
 Line 1, characters 36-37:
 1 | let f (x : <[int]> eval) : string = x
                                         ^
-Error: This expression has type "int" but an expression was expected of type
-         "string"
+Error: This expression has type "<[int]> eval" = "int"
+       but an expression was expected of type "string"
 |}]
 
 (* Quotes & splices reduce underneath as normal *)
@@ -79,7 +79,7 @@ val f : ('a : any). 'a expr -> 'a eval = <fun>
 |}]
 let f (x : <[int]> expr) = eval x
 [%%expect {|
-val f : <[int]> expr -> int = <fun>
+val f : <[int]> expr -> <[int]> eval = <fun>
 |}]
 
 
@@ -181,7 +181,8 @@ val f :
 let f (x : <[('a. 'a -> 'a) -> int]> expr)
     : ('a. <[ $('a) -> $('a) ]> eval) -> int = eval x
 [%%expect {|
-val f : <[('a. 'a -> 'a) -> int]> expr -> ('a. 'a eval -> 'a eval) -> int =
+val f :
+  <[('a. 'a -> 'a) -> int]> expr -> ('a. <[$('a) -> $('a)]> eval) -> int =
   <fun>
 |}]
 (* fully re-staged *)
@@ -198,7 +199,7 @@ let f (x : <[('a. 'a -> $('b) -> 'a) -> $('b)]> expr)
 val f :
   ('b : any).
     <[('a. 'a -> $('b) -> 'a) -> $('b)]> expr ->
-    ('a. 'a eval -> 'b eval -> 'a eval) -> 'b eval =
+    ('a. <[$('a) -> $('b) -> $('a)]> eval) -> 'b eval =
   <fun>
 |}]
 (* nested quantifiers *)
@@ -293,7 +294,7 @@ val f : <[<[$($('a)) expr]> expr]> expr -> <[<[$($('a)) eval]> eval]> eval =
 let f (x : <[int]> expr) : <[int]> eval =
   eval0 x
 [%%expect {|
-val f : <[int]> expr -> int = <fun>
+val f : <[int]> expr -> <[int]> eval = <fun>
 |}]
 let f (x : <[ <[int]> expr ]> expr) : int =
   eval0 <[$eval1 $x]>
