@@ -47,6 +47,7 @@ set_a:
   ret
 |}]
 
+(* CR ttebbi: We could use lea to shorten the write barrier calling sequence. *)
 let set_b r v = r.b <- v
 [%%expect_asm X86_64{|
 set_b:

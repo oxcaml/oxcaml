@@ -299,6 +299,8 @@ nativeint_to_int64:
   ret
 |}]
 
+(* CR ttebbi: We can use a single compare and do the subtraction before sign
+   extending. *)
 let compare32 x y = Int32_u.compare x y
 [%%expect_asm X86_64{|
 compare32:

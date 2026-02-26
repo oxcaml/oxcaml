@@ -176,6 +176,10 @@ bytes_get_int64_bswap:
   ret
 |}]
 
+(* CR ttebbi: This bounds check is way too long, even given the complex
+   length encoding. If we use an unsigned right shift to untag the int, then
+   we could add the extra 3 bytes to the index instead of subtracting it from
+   the length, removing the need for computing max(0, length - 3). *)
 let bytes_safe_get_int32 (buf : bytes) (i : int) =
   Bytes.get_int32_ne buf i
 [%%expect_asm X86_64{|
@@ -204,6 +208,8 @@ bytes_safe_get_int32:
   jmp   *%r11
 |}]
 
+(* CR ttebbi: No need to clear the topmost bit, since out-of-bounds is
+   undefined already. *)
 let bytes_get_int64_indexed_by_int64
     (buf : bytes) (i : Int64_u.t) =
   Bytes.unsafe_get_int64_ne_indexed_by_int64 buf i
