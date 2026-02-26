@@ -368,7 +368,7 @@ val inf6 : 'a @ unique -> 'a = <fun>
 
 let unique_default_args ?(x @ unique = 1.0) () = x
 [%%expect{|
-val unique_default_args : ?x:float @ unique -> unit -> float = <fun>
+val unique_default_args : ?x:float @ unique -> (unit -> float) = <fun>
 |}]
 
 (* Unique Local *)
@@ -507,7 +507,7 @@ type box = { x : int; }
 
 let curry (b1 : box @ unique) (b2 : box @ unique) = ()
 [%%expect{|
-val curry : box @ unique -> box @ unique -> unit = <fun>
+val curry : box @ unique -> (box @ unique -> unit) = <fun>
 |}]
 
 let curry : box @ unique -> box @ unique -> unit = fun b1 b2 -> ()
@@ -515,22 +515,31 @@ let curry : box @ unique -> box @ unique -> unit = fun b1 b2 -> ()
 val curry : box @ unique -> box @ unique -> unit = <fun>
 |}]
 
-let curry : box @ unique -> (box @ unique -> unit) = fun b1 b2 -> ()
+let use_unique (x @ unique) = ()
 [%%expect{|
-Line 1, characters 53-68:
-1 | let curry : box @ unique -> (box @ unique -> unit) = fun b1 b2 -> ()
-                                                         ^^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "once",
-       but expected to be "many".
+val use_unique : 'a @ unique -> unit = <fun>
 |}]
 
-let curry : box @ unique -> (box @ unique -> unit) = fun b1 -> function | b2 -> ()
+let curry : box @ unique -> (box @ unique -> unit) = fun b1 b2 -> use_unique b1; ()
 [%%expect{|
-Line 1, characters 53-82:
-1 | let curry : box @ unique -> (box @ unique -> unit) = fun b1 -> function | b2 -> ()
-                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "once",
-       but expected to be "many".
+Line 1, characters 57-59:
+1 | let curry : box @ unique -> (box @ unique -> unit) = fun b1 b2 -> use_unique b1; ()
+                                                             ^^
+Error: The pattern is "aliased"
+         because it is used inside the function at line 1, characters 53-83
+         which is expected to be "many".
+       However, the pattern highlighted is expected to be "unique".
+|}]
+
+let curry : box @ unique -> (box @ unique -> unit) = fun b1 -> function | b2 -> use_unique b1; ()
+[%%expect{|
+Line 1, characters 57-59:
+1 | let curry : box @ unique -> (box @ unique -> unit) = fun b1 -> function | b2 -> use_unique b1; ()
+                                                             ^^
+Error: The pattern is "aliased"
+         because it is used inside the function at line 1, characters 53-97
+         which is expected to be "many".
+       However, the pattern highlighted is expected to be "unique".
 |}]
 
 (* For nested functions, inner functions are not constrained *)
