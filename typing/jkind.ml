@@ -1929,6 +1929,50 @@ module Const = struct
       in
       { t with base = new_layout }
 
+  let meet_nullability env (nul : Nullability.t Location.loc option) t =
+    match nul with
+    | None -> t
+    | Some { txt = new_nullability; loc = _ } ->
+      let t =
+        match t.base with
+        | Kconstr _ -> Base_and_axes.fully_expand_aliases_const env t
+        | Layout _ -> t
+      in
+      let new_base =
+        match t.base with
+        | Layout layout -> (
+          match Layout.Const.get_root_scannable_axes layout with
+          | None -> t.base
+          | Some { nullability; separability = _ } ->
+            Layout
+              (Layout.Const.set_root_nullability layout
+                 (Nullability.meet nullability new_nullability)))
+        | Kconstr _ -> t.base
+      in
+      { t with base = new_base }
+
+  let meet_separability env (sep : Separability.t Location.loc option) t =
+    match sep with
+    | None -> t
+    | Some { txt = new_separability; loc = _ } ->
+      let t =
+        match t.base with
+        | Kconstr _ -> Base_and_axes.fully_expand_aliases_const env t
+        | Layout _ -> t
+      in
+      let new_base =
+        match t.base with
+        | Layout layout -> (
+          match Layout.Const.get_root_scannable_axes layout with
+          | None -> t.base
+          | Some { nullability = _; separability } ->
+            Layout
+              (Layout.Const.set_root_separability layout
+                 (Separability.meet separability new_separability)))
+        | Kconstr _ -> t.base
+      in
+      { t with base = new_base }
+
   let jkind_of_product_annotations (type l r) ~loc env (jkinds : (l * r) t list)
       =
     let folder (type l r) (layouts_acc, mod_bounds_acc, with_bounds_acc)
@@ -2039,48 +2083,9 @@ module Const = struct
         Typemode.transl_mod_bounds modifiers
       in
       let mod_bounds = Mod_bounds.meet base.mod_bounds mod_bounds in
-      (* CR layouts-scannable: There are no warnings that are raised when
-         these annotations are redundant/etc, since any warnings would be
-         reported 3 times. If callers only call this function once before
-         the old syntax is deprecated, additional warnings should be added
-         here. *)
-      let apply_scannable_axis base_base mod_bounds axis_opt set_fn =
-        match axis_opt with
-        | None -> base_base, mod_bounds
-        | Some axis_loc ->
-          let ax = Location.get_txt axis_loc in
-          (* When applying scannable axes via `mod`, we may need to
-             expand Kconstr kinds to access the layout. When we do, we
-             should also use the expanded kind's mod_bounds (which are
-             more precise than Mod_bounds.max used by of_path for
-             Kconstr). *)
-          let base_base, mod_bounds =
-            match base_base with
-            | Kconstr p -> (
-              match Base.expand_once env base_base with
-              | Some expanded ->
-                let expanded_mod_bounds =
-                  match Env.find_jkind p env with
-                  | { jkind_manifest = Some { mod_bounds = mb; _ }; _ } ->
-                    Mod_bounds.meet mod_bounds mb
-                  | _ | (exception Not_found) -> mod_bounds
-                in
-                expanded, expanded_mod_bounds
-              | None -> base_base, mod_bounds)
-            | Layout _ -> base_base, mod_bounds
-          in
-          ( Base.map_layout ~f:(fun layout -> set_fn layout ax) base_base,
-            mod_bounds )
-      in
-      let new_base, mod_bounds =
-        apply_scannable_axis base.base mod_bounds nullability
-          Layout.Const.set_root_nullability
-      in
-      let new_base, mod_bounds =
-        apply_scannable_axis new_base mod_bounds separability
-          Layout.Const.set_root_separability
-      in
-      { base = new_base; mod_bounds; with_bounds = No_with_bounds }
+      { base = base.base; mod_bounds; with_bounds = No_with_bounds }
+      |> meet_nullability env nullability
+      |> meet_separability env separability
     | Pjk_product ts ->
       let jkinds =
         List.map
