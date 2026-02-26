@@ -121,15 +121,15 @@ module Make (T : Branch_relaxation_intf.S) = struct
         else
           match instr.desc with
           | Lop Poll ->
-            let new_desc, new_size = T.relax_poll () in
-            instr.desc <- new_desc;
+            instr.desc <- T.relax_poll ();
+            let new_size = T.instr_size instr in
             let did_fix, rest_sizes =
               fixup true (pc + new_size) instr.next rest
             in
             did_fix, new_size :: rest_sizes
           | Lop (Alloc { bytes = num_bytes; dbginfo; _ }) ->
-            let new_desc, new_size = T.relax_allocation ~num_bytes ~dbginfo in
-            instr.desc <- new_desc;
+            instr.desc <- T.relax_allocation ~num_bytes ~dbginfo;
+            let new_size = T.instr_size instr in
             let did_fix, rest_sizes =
               fixup true (pc + new_size) instr.next rest
             in
@@ -137,7 +137,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
           | Lcondbranch (test, lbl) ->
             let lbl2 = Cmm.new_label () in
             let llabel = Llabel { label = lbl2; section_name = None } in
-            let cont =
+            let branch_instr =
               instr_cons (Lbranch lbl) [||] [||]
                 (instr_cons llabel [||] [||] instr.next
                    ~available_before:Reg_availability_set.Unreachable
@@ -146,28 +146,27 @@ module Make (T : Branch_relaxation_intf.S) = struct
                 ~available_across:Reg_availability_set.Unreachable
             in
             instr.desc <- Lcondbranch (Operation.invert_test test, lbl2);
-            instr.next <- cont;
+            instr.next <- branch_instr;
+            let branch_size = T.instr_size branch_instr in
             let did_fix, rest_sizes =
-              fixup true (pc + size) instr.next (T.branch_size :: 0 :: rest)
+              fixup true (pc + size) instr.next (branch_size :: 0 :: rest)
             in
             did_fix, size :: rest_sizes
           | Lcondbranch3 (lbl0, lbl1, lbl2) ->
+            let original_next = instr.next in
             let cont =
               expand_optbranch lbl0 0 instr.arg
                 (expand_optbranch lbl1 1 instr.arg
-                   (expand_optbranch lbl2 2 instr.arg instr.next))
+                   (expand_optbranch lbl2 2 instr.arg original_next))
             in
             instr.desc <- cont.desc;
             instr.next <- cont.next;
-            let num_expanded =
-              (if Option.is_some lbl0 then 1 else 0)
-              + (if Option.is_some lbl1 then 1 else 0)
-              + if Option.is_some lbl2 then 1 else 0
+            let rec measure_expanded i sizes =
+              if i == original_next
+              then sizes
+              else measure_expanded i.next (T.instr_size i :: sizes)
             in
-            let new_sizes =
-              List.init num_expanded (fun _ -> T.expanded_condbranch_size)
-              @ rest
-            in
+            let new_sizes = List.rev (measure_expanded instr []) @ rest in
             fixup true pc instr new_sizes
           | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
           | Lreturn | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _

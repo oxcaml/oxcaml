@@ -1922,33 +1922,8 @@ let measure_emit_instr env i =
   Emitaux.restore_frame_descriptors saved_frame_descriptors;
   count
 
-let measure_desc env desc ~arg ~res =
-  let dummy_instr =
-    { Linear.desc;
-      next = Linear.end_instr;
-      arg;
-      res;
-      dbg = Debuginfo.none;
-      fdo = Fdo_info.none;
-      live = Reg.Set.empty;
-      available_before = Reg_availability_set.Unreachable;
-      available_across = Reg_availability_set.Unreachable
-    }
-  in
-  measure_emit_instr env dummy_instr
-
 let branch_relax env body ~max_out_of_line_code_offset =
   let sizing_env = { env with stack_offset = env.stack_offset } in
-  let dummy_reg = Reg.create_at_location Int (Reg 0) in
-  let dummy_label = Cmm.new_label () in
-  let the_branch_size =
-    measure_desc sizing_env (Lbranch dummy_label) ~arg:[||] ~res:[||]
-  in
-  let the_expanded_condbranch_size =
-    measure_desc sizing_env
-      (Lcondbranch (Iinttest_imm (Ceq, 0), dummy_label))
-      ~arg:[| dummy_reg |] ~res:[||]
-  in
   let module BR = Branch_relaxation.Make (struct
     type distance = int
 
@@ -1974,17 +1949,12 @@ let branch_relax env body ~max_out_of_line_code_offset =
       walk code;
       List.rev !sizes
 
-    let branch_size = the_branch_size
+    let instr_size instr = measure_emit_instr sizing_env instr
 
-    let expanded_condbranch_size = the_expanded_condbranch_size
-
-    let relax_poll () =
-      let desc = Lop (Specific Ifar_poll) in
-      desc, measure_desc sizing_env desc ~arg:[||] ~res:[||]
+    let relax_poll () = Lop (Specific Ifar_poll)
 
     let relax_allocation ~num_bytes ~dbginfo =
-      let desc = Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo })) in
-      desc, measure_desc sizing_env desc ~arg:[||] ~res:[| dummy_reg |]
+      Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo }))
   end) in
   BR.relax body ~max_out_of_line_code_offset
 

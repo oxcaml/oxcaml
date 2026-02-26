@@ -59,23 +59,20 @@ module type S = sig
      order. *)
   val compute_instruction_sizes : Linear.instruction -> distance list
 
-  (* Size of an unconditional branch instruction (Lbranch). *)
-  val branch_size : distance
-
-  (* Size of an expanded Lcondbranch3 arm:
-     Lcondbranch (Iinttest_imm (Ceq, n), l). *)
-  val expanded_condbranch_size : distance
+  (* The size of a single instruction. Used for measuring instructions
+     newly created during fixup (branches, expanded condbranches,
+     relaxed allocations/polls). *)
+  val instr_size : Linear.instruction -> distance
 
   (* Insertion of target-specific code to relax operations that cannot
-     be relaxed generically. Returns the new instruction desc and its
-     size. It is assumed that these rewrites do not change the size of
-     out-of-line code (cf. branch_relaxation.mli). *)
+     be relaxed generically.  It is assumed that these rewrites do not
+     change the size of out-of-line code (cf. branch_relaxation.mli). *)
   val relax_allocation
      : num_bytes:int
     -> dbginfo:Cmm.alloc_dbginfo
-    -> Linear.instruction_desc * distance
+    -> Linear.instruction_desc
 
   val relax_poll
      : unit
-    -> Linear.instruction_desc * distance
+    -> Linear.instruction_desc
 end
