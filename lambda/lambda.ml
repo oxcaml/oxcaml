@@ -2855,7 +2855,7 @@ let layout_of_module_field repr pos =
     layout_of_mixed_block_element shape.(pos)
 
 let rec mixed_block_element_of_layout (layout : layout) :
-    'a mixed_block_element =
+    _ mixed_block_element =
   match layout with
   | Punboxed_product layouts ->
     Product (List.map mixed_block_element_of_layout layouts |> Array.of_list)
