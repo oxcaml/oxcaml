@@ -274,8 +274,7 @@ val foo : unit -> unit = <fun>
 
 let foo (unique_ y) (z @ portable) = z
 [%%expect{|
-val foo :
-  'a @ [< unique] -> ('b @ [< 'm & portable] -> 'b @ [> 'm]) @ [> once] =
+val foo : 'a @ [< unique] -> ('b @ [< 'n & portable] -> 'b @ [> 'n]) @ 'm =
   <fun>
 |}]
 
@@ -284,7 +283,7 @@ let foo (local_ x) (unique_ y) (z @ portable) = exclave_ (x, y, z)
 val foo :
   'a @ [< 'o > local] ->
   ('b @ [< 'n & unique] ->
-   ('c @ [< 'm & portable] -> 'a * 'b * 'c @ [> 'm | 'n | 'o | local]) @ [> local once]) @ [> local] =
+   ('c @ [< 'm & portable] -> 'a * 'b * 'c @ [> 'm | 'n | 'o | local]) @ [> local]) @ [> local] =
   <fun>
 |}]
 

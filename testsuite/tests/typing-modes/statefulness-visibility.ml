@@ -416,11 +416,13 @@ Error: This value is "stateful"
 let foo : int Atomic.t @ read_write -> (unit -> unit) @ stateless =
     fun a () -> Atomic.set a 2
 [%%expect{|
-Line 2, characters 4-30:
+Line 2, characters 8-9:
 2 |     fun a () -> Atomic.set a 2
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "stateful",
-       but expected to be "stateless".
+            ^
+Error: The pattern is "immutable"
+         because it is used inside the function at line 2, characters 4-30
+         which is expected to be "stateless".
+       However, the pattern highlighted is expected to be "read_write".
 |}]
 
 let a @ read_write = Atomic.make 42
