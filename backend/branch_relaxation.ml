@@ -193,14 +193,13 @@ module Make (T : Branch_relaxation_intf.S) = struct
 
   (* Iterate branch expansion till all conditional branches are OK *)
 
-  let relax code ~max_out_of_line_code_offset =
+  let relax code ~initial_sizes ~max_out_of_line_code_offset =
     let min_of_max_branch_offsets =
       List.fold_left
         (fun min_of_max_branch_offsets branch ->
           min min_of_max_branch_offsets (T.Cond_branch.max_displacement branch))
         max_int T.Cond_branch.all
     in
-    let initial_sizes = T.compute_instruction_sizes code in
     let rec loop sizes =
       let code_size, map = label_map code sizes in
       if code_size >= min_of_max_branch_offsets

@@ -925,50 +925,6 @@ let emit_load_symbol_addr dst s =
    bounds check points emitted out-of-line from the function body. See
    branch_relaxation.mli. *)
 
-let num_call_gc_points env instr =
-  let rec loop instr call_gc =
-    match instr.desc with
-    | Lend -> call_gc
-    | Lop (Alloc { mode = Heap; _ }) when env.fastcode_flag ->
-      loop instr.next (call_gc + 1)
-    | Lop Poll -> loop instr.next (call_gc + 1)
-    (* The following four should never be seen, since this function is run
-       before branch relaxation. *)
-    | Lop (Specific (Ifar_alloc _)) | Lop (Specific Ifar_poll) -> assert false
-    | Lop (Alloc { mode = Local | Heap; _ })
-    | Lop
-        (Specific
-           ( Imuladd | Imulsub | Inegmulf | Imuladdf | Inegmuladdf | Imulsubf
-           | Inegmulsubf | Isqrtf | Imove32
-           | Ishiftarith (_, _)
-           | Ibswap _ | Isignext _ | Isimd _ ))
-    | Lop
-        ( Move | Spill | Reload | Opaque | Pause | Begin_region | End_region
-        | Dls_get | Tls_get | Domain_index | Const_int _ | Const_float32 _
-        | Const_float _ | Const_symbol _ | Const_vec128 _ | Stackoffset _
-        | Load _
-        | Store (_, _, _)
-        | Intop _ | Int128op _
-        | Intop_imm (_, _)
-        | Intop_atomic _
-        | Floatop (_, _)
-        | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-        | Name_for_debugger _ )
-    | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
-    | Lentertrap | Lpoptrap _ | Lcall_op _ | Llabel _ | Lbranch _
-    | Lcondbranch (_, _)
-    | Lcondbranch3 (_, _, _)
-    | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-    | Lstackcheck _ ->
-      loop instr.next call_gc
-    | Lop (Const_vec256 _ | Const_vec512 _) ->
-      Misc.fatal_error "arm64: got 256/512 bit vector"
-    | Lop (Specific (Illvm_intrinsic intr)) ->
-      Misc.fatal_errorf
-        "Emit: Unexpected llvm_intrinsic %s: not using LLVM backend" intr
-  in
-  loop instr 0
-
 let max_out_of_line_code_offset ~num_call_gc =
   if num_call_gc < 1
   then 0
@@ -1922,35 +1878,42 @@ let measure_emit_instr env i =
   Emitaux.restore_frame_descriptors saved_frame_descriptors;
   count
 
-let branch_relax env body ~max_out_of_line_code_offset =
+let compute_instruction_sizes env code =
+  let sizes = ref [] in
+  let rec walk instr =
+    match instr.Linear.desc with
+    | Lend -> ()
+    | Lprologue | Lepilogue_open | Lepilogue_close
+    | Lreloadretaddr | Lreturn | Lentertrap | Lpoptrap _
+    | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
+    | Lcondbranch (_, _)
+    | Lcondbranch3 (_, _, _)
+    | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _
+    | Lraise _ | Lstackcheck _ ->
+      sizes := measure_emit_instr env instr :: !sizes;
+      walk instr.next
+  in
+  walk code;
+  List.rev !sizes
+
+let branch_relax env body =
   (* Record copy so the sizing pass can mutate its own mutable fields
-     (stack_offset, call_gc_sites, etc.) without affecting [env], which is used
-     later by [emit_all]. *)
-  let sizing_env = { env with stack_offset = env.stack_offset } in
+     (stack_offset, call_gc_sites, etc.) without affecting [env],
+     which is used later by [emit_all]. *)
+  let sizing_env =
+    { env with stack_offset = env.stack_offset }
+  in
+  let initial_sizes = compute_instruction_sizes sizing_env body in
+  let num_call_gc = List.length sizing_env.call_gc_sites in
+  let max_out_of_line_code_offset =
+    max_out_of_line_code_offset ~num_call_gc
+  in
   let module BR = Branch_relaxation.Make (struct
     type distance = int
 
     module Cond_branch = Cond_branch_impl
 
     let offset_pc_at_branch = 0
-
-    let compute_instruction_sizes code =
-      let sizes = ref [] in
-      let rec walk instr =
-        match instr.Linear.desc with
-        | Lend -> ()
-        | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr
-        | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _
-        | Lbranch _
-        | Lcondbranch (_, _)
-        | Lcondbranch3 (_, _, _)
-        | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
-        | Lstackcheck _ ->
-          sizes := measure_emit_instr sizing_env instr :: !sizes;
-          walk instr.next
-      in
-      walk code;
-      List.rev !sizes
 
     let instr_size instr = measure_emit_instr sizing_env instr
 
@@ -1959,7 +1922,8 @@ let branch_relax env body ~max_out_of_line_code_offset =
     let relax_allocation ~num_bytes ~dbginfo =
       Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo }))
   end) in
-  BR.relax body ~max_out_of_line_code_offset
+  BR.relax body ~initial_sizes ~max_out_of_line_code_offset;
+  num_call_gc
 
 (* Emission of an instruction sequence *)
 
@@ -2008,9 +1972,7 @@ let fundecl fundecl =
   D.define_joint_label_and_symbol ~section:Text fun_sym;
   emit_debug_info fundecl.fun_dbg;
   D.cfi_startproc ();
-  let num_call_gc = num_call_gc_points env fundecl.fun_body in
-  let max_out_of_line_code_offset = max_out_of_line_code_offset ~num_call_gc in
-  branch_relax env fundecl.fun_body ~max_out_of_line_code_offset;
+  let num_call_gc = branch_relax env fundecl.fun_body in
   emit_all env fundecl.fun_body;
   List.iter emit_call_gc env.call_gc_sites;
   List.iter emit_local_realloc env.local_realloc_sites;

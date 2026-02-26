@@ -54,11 +54,6 @@ module type S = sig
      to a branch target. *)
   val offset_pc_at_branch : distance
 
-  (* Walk all instructions computing sizes. Returns one int per
-     instruction (including labels, which have size 0), in linked-list
-     order. *)
-  val compute_instruction_sizes : Linear.instruction -> distance list
-
   (* The size of a single instruction. Used for measuring instructions
      newly created during fixup (branches, expanded condbranches,
      relaxed allocations/polls). *)
