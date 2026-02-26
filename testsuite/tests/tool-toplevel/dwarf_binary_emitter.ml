@@ -1,7 +1,6 @@
 (* TEST
  {
    not-macos;
-   arch_amd64;
    flags = "-internal-assembler";
    toplevel.opt;
  }
