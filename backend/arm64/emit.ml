@@ -112,9 +112,6 @@ let global_maybe_protected sym =
 
 (* Layout of the stack frame *)
 
-let initial_stack_offset ~contains_calls ~num_stack_slots =
-  Proc.initial_stack_offset ~contains_calls ~num_stack_slots
-
 let frame_size ~stack_offset ~contains_calls ~num_stack_slots =
   Proc.frame_size ~stack_offset ~contains_calls ~num_stack_slots
 
@@ -592,10 +589,6 @@ type env =
   }
 
 (* Env-based wrappers for stack layout helpers *)
-let env_initial_stack_offset env =
-  initial_stack_offset ~contains_calls:env.contains_calls
-    ~num_stack_slots:env.num_stack_slots
-
 let env_frame_size env =
   frame_size ~stack_offset:env.stack_offset ~contains_calls:env.contains_calls
     ~num_stack_slots:env.num_stack_slots
@@ -713,13 +706,6 @@ let emit_intconst dst n =
           (O.imm_sixteen_of_nativeint nf)
           (O.optional_lsl_by_multiple_of_16_bits p);
         List.iter (emit_movk dst) l
-
-let num_instructions_for_intconst n =
-  if Arm64_ast.Logical_immediates.is_logical_immediate n
-  then 1
-  else
-    let dz = decompose_int 0x0000n n and dn = decompose_int 0xFFFFn n in
-    max 1 (min (List.length dz) (List.length dn))
 
 (* Recognize float constants appropriate for FMOV dst, #fpimm instruction: "a
    normalized binary floating point encoding with 1 sign bit, 4 bits of fraction
@@ -1926,29 +1912,43 @@ let emit_instr env i =
     raise exn
 
 let measure_emit_instr env i =
-  let saved_stack_offset = env.stack_offset in
-  let saved_call_gc_sites = env.call_gc_sites in
-  let saved_local_realloc_sites = env.local_realloc_sites in
-  let saved_stack_realloc = env.stack_realloc in
-  let saved_float32_literals = env.float32_literals in
-  let saved_float_literals = env.float_literals in
-  let saved_vec128_literals = env.vec128_literals in
   let saved_frame_descriptors = Emitaux.save_frame_descriptors () in
+  let saved_debug_info = Emitaux.save_debug_info () in
   let count =
     D.with_measuring ~f:(fun () ->
-      A.with_measuring ~f:(fun () -> emit_instr env i))
+        A.with_measuring ~f:(fun () -> emit_instr env i))
   in
-  env.stack_offset <- saved_stack_offset;
-  env.call_gc_sites <- saved_call_gc_sites;
-  env.local_realloc_sites <- saved_local_realloc_sites;
-  env.stack_realloc <- saved_stack_realloc;
-  env.float32_literals <- saved_float32_literals;
-  env.float_literals <- saved_float_literals;
-  env.vec128_literals <- saved_vec128_literals;
+  Emitaux.restore_debug_info saved_debug_info;
   Emitaux.restore_frame_descriptors saved_frame_descriptors;
   count
 
+let measure_desc env desc ~arg ~res =
+  let dummy_instr =
+    { Linear.desc;
+      next = Linear.end_instr;
+      arg;
+      res;
+      dbg = Debuginfo.none;
+      fdo = Fdo_info.none;
+      live = Reg.Set.empty;
+      available_before = Reg_availability_set.Unreachable;
+      available_across = Reg_availability_set.Unreachable
+    }
+  in
+  measure_emit_instr env dummy_instr
+
 let branch_relax env body ~max_out_of_line_code_offset =
+  let sizing_env = { env with stack_offset = env.stack_offset } in
+  let dummy_reg = Reg.create_at_location Int (Reg 0) in
+  let dummy_label = Cmm.new_label () in
+  let the_branch_size =
+    measure_desc sizing_env (Lbranch dummy_label) ~arg:[||] ~res:[||]
+  in
+  let the_expanded_condbranch_size =
+    measure_desc sizing_env
+      (Lcondbranch (Iinttest_imm (Ceq, 0), dummy_label))
+      ~arg:[| dummy_reg |] ~res:[||]
+  in
   let module BR = Branch_relaxation.Make (struct
     type distance = int
 
@@ -1956,12 +1956,35 @@ let branch_relax env body ~max_out_of_line_code_offset =
 
     let offset_pc_at_branch = 0
 
-    let instr_size instr = measure_emit_instr env instr
+    let compute_instruction_sizes code =
+      let sizes = ref [] in
+      let rec walk instr =
+        match instr.Linear.desc with
+        | Lend -> ()
+        | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr
+        | Lreturn | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _
+        | Lbranch _
+        | Lcondbranch (_, _)
+        | Lcondbranch3 (_, _, _)
+        | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
+        | Lstackcheck _ ->
+          sizes := measure_emit_instr sizing_env instr :: !sizes;
+          walk instr.next
+      in
+      walk code;
+      List.rev !sizes
 
-    let relax_poll () = Lop (Specific Ifar_poll)
+    let branch_size = the_branch_size
+
+    let expanded_condbranch_size = the_expanded_condbranch_size
+
+    let relax_poll () =
+      let desc = Lop (Specific Ifar_poll) in
+      desc, measure_desc sizing_env desc ~arg:[||] ~res:[||]
 
     let relax_allocation ~num_bytes ~dbginfo =
-      Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo }))
+      let desc = Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo })) in
+      desc, measure_desc sizing_env desc ~arg:[||] ~res:[| dummy_reg |]
   end) in
   BR.relax body ~max_out_of_line_code_offset
 

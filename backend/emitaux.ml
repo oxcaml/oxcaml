@@ -385,6 +385,17 @@ let reset_debug_info () =
   file_pos_nums := [];
   file_pos_num_cnt := 1
 
+type debug_info_snapshot =
+  { fpn : (string * int) list;
+    fpnc : int
+  }
+
+let save_debug_info () = { fpn = !file_pos_nums; fpnc = !file_pos_num_cnt }
+
+let restore_debug_info snapshot =
+  file_pos_nums := snapshot.fpn;
+  file_pos_num_cnt := snapshot.fpnc
+
 let get_file_num ~file_emitter file_name =
   try List.assoc file_name !file_pos_nums
   with Not_found ->

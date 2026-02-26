@@ -54,18 +54,28 @@ module type S = sig
      to a branch target. *)
   val offset_pc_at_branch : distance
 
-  (* The maximum size of a given instruction. *)
-  val instr_size : Linear.instruction -> distance
+  (* Walk all instructions computing sizes. Returns one int per
+     instruction (including labels, which have size 0), in linked-list
+     order. *)
+  val compute_instruction_sizes : Linear.instruction -> distance list
 
-  (* Insertion of target-specific code to relax operations that cannot be
-     relaxed generically.  It is assumed that these rewrites do not change
-     the size of out-of-line code (cf. branch_relaxation.mli). *)
+  (* Size of an unconditional branch instruction (Lbranch). *)
+  val branch_size : distance
+
+  (* Size of an expanded Lcondbranch3 arm:
+     Lcondbranch (Iinttest_imm (Ceq, n), l). *)
+  val expanded_condbranch_size : distance
+
+  (* Insertion of target-specific code to relax operations that cannot
+     be relaxed generically. Returns the new instruction desc and its
+     size. It is assumed that these rewrites do not change the size of
+     out-of-line code (cf. branch_relaxation.mli). *)
   val relax_allocation
      : num_bytes:int
     -> dbginfo:Cmm.alloc_dbginfo
-    -> Linear.instruction_desc
+    -> Linear.instruction_desc * distance
 
   val relax_poll
      : unit
-    -> Linear.instruction_desc
+    -> Linear.instruction_desc * distance
 end
