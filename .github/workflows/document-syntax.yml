@@ -23,11 +23,10 @@ jobs:
           PR_NUMBER=${{ github.event.pull_request.number }}
           COMMENT="## Parser Change Checklist
 
-          This PR modifies the parser. Please check that the following tests are updated:
+          This PR modifies the parser. Please check that:
 
-          - [ ] \`parsetree/source_jane_street.ml\`
-
-          This test should have examples of every new bit of syntax you are adding. Feel free to just check the box if your PR does not actually change the syntax (because it is refactoring the parser, say)."
+          - [ ] \`parsetree/source_jane_street.ml\` has been updated. This test should have examples of every new bit of syntax you are adding. Feel free to just check the box if your PR does not actually change the syntax (because it is refactoring the parser, say)."
+          - [ ] \`ppxlib\` has been updated internally (if necessary). Breaking \`ppxlib\` blocks others from testing their PRs, so you should not merge until it is fixed.
 
            # Check if comment already exists
           if ! gh pr view $PR_NUMBER --json comments -q '.comments[].body' --repo $REPO | grep -q "Parser Change Checklist"; then
