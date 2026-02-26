@@ -2572,9 +2572,18 @@ let get_root_scannable_axes jk =
   | Layout l -> Layout.get_root_scannable_axes l
   | Kconstr _ -> None
 
-let get_nullability jk =
-  get_root_scannable_axes jk
-  |> Option.map (fun ({ nullability; _ } : Scannable_axes.t) -> nullability)
+let get_nullability env jk =
+  let sa =
+    match get_root_scannable_axes jk with
+    | Some _ as sa -> sa
+    | None ->
+      (* Expand abstract kinds (Kconstr) to access the layout *)
+      let expanded = Base_and_axes.fully_expand_aliases env jk.jkind in
+      match expanded.base with
+      | Layout l -> Layout.get_root_scannable_axes l
+      | Kconstr _ -> None
+  in
+  Option.map (fun ({ nullability; _ } : Scannable_axes.t) -> nullability) sa
 
 let set_root_nullability jk nullability =
   { jk with
