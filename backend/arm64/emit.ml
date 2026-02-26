@@ -1923,6 +1923,9 @@ let measure_emit_instr env i =
   count
 
 let branch_relax env body ~max_out_of_line_code_offset =
+  (* Record copy so the sizing pass can mutate its own mutable fields
+     (stack_offset, call_gc_sites, etc.) without affecting [env], which is used
+     later by [emit_all]. *)
   let sizing_env = { env with stack_offset = env.stack_offset } in
   let module BR = Branch_relaxation.Make (struct
     type distance = int

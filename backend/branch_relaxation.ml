@@ -147,11 +147,13 @@ module Make (T : Branch_relaxation_intf.S) = struct
             in
             instr.desc <- Lcondbranch (Operation.invert_test test, lbl2);
             instr.next <- branch_instr;
+            let inverted_size = T.instr_size instr in
             let branch_size = T.instr_size branch_instr in
             let did_fix, rest_sizes =
-              fixup true (pc + size) instr.next (branch_size :: 0 :: rest)
+              fixup true (pc + inverted_size) instr.next
+                (branch_size :: 0 :: rest)
             in
-            did_fix, size :: rest_sizes
+            did_fix, inverted_size :: rest_sizes
           | Lcondbranch3 (lbl0, lbl1, lbl2) ->
             let original_next = instr.next in
             let cont =
