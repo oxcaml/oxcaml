@@ -186,7 +186,7 @@ let rec map f = function
   | x :: xs -> f x :: map f xs
 [%%expect{|
 val map :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'mm0 & many > 'mm0 | aliased] ->
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'mm0 & 'mm0 mod aliased contended & 'mm0 & many > 'mm0 | 'mm0 | 'mm0 | aliased] ->
   ('a list @ [< 'q & 'q & 'n > 'q | 'q] ->
    'b list @ [< 'o & 'p & 'o & 'p & global > 'o | 'p | 'o | 'p | 'm]) @ [> nonportable] =
   <fun>
