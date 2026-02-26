@@ -624,7 +624,8 @@ and transl_module ~scopes cc rootpath mexp =
       apply_coercion loc Strict cc
         (transl_module_path loc mexp.mod_env path)
   | Tmod_structure str ->
-      transl_struct ~scopes loc [] cc rootpath str
+      let lam, _repr = transl_struct ~scopes loc [] cc rootpath str in
+      lam
   | Tmod_functor _ ->
       oo_wrap mexp.mod_env true (fun () ->
         compile_functor ~scopes mexp cc rootpath loc) ()
@@ -658,7 +659,7 @@ and transl_apply ~scopes ~loc ~cc mod_env funct translated_arg =
        ap_probe=None;})
 
 and transl_struct ~scopes loc fields cc rootpath
-      {str_final_env; str_items; _} =
+      {str_final_env; str_items; _} : lambda * _ =
   transl_structure ~scopes loc fields cc rootpath str_final_env str_items
 
 (* The function  transl_structure is called by  the bytecode compiler.
@@ -668,13 +669,14 @@ and transl_structure ~scopes loc
   (fields : (Ident.t * Jkind.Sort.t) list) cc rootpath final_env =
   function
     [] ->
-      let body =
+      let body, repr =
         match cc with
           Tcoerce_none ->
             let ids, sorts = List.split (List.rev fields) in
             let repr = transl_module_representation (Array.of_list sorts) in
             Lprim(block_of_module_representation ~loc:(to_location loc) repr,
-                  List.map (fun id -> Lvar id) ids, loc)
+                  List.map (fun id -> Lvar id) ids, loc),
+              repr
         | Tcoerce_structure
           { input_repr = _; output_repr; pos_cc_list; id_pos_list; } ->
                 (* Do not ignore id_pos_list ! *)
@@ -718,29 +720,31 @@ and transl_structure ~scopes loc
               List.filter (fun (id,_,_) -> not (Ident.Set.mem id ids))
                 id_pos_list
             in
-            wrap_id_pos_list loc id_pos_list get_field get_layout lam
+            wrap_id_pos_list loc id_pos_list get_field get_layout lam,
+              output_repr
         | _ ->
             fatal_error "Translmod.transl_structure"
       in
       (* This debugging event provides information regarding the structure
          items. It is ignored by the OCaml debugger but is used by
          Js_of_ocaml to preserve variable names. *)
-      if !Clflags.debug && not !Clflags.native_code then
-        Levent(body,
-               {lev_loc = loc;
-                lev_kind = Lev_pseudo;
-                lev_repr = None;
-                lev_env = final_env})
-      else
-        body
+      (if !Clflags.debug && not !Clflags.native_code then
+         Levent(body,
+                {lev_loc = loc;
+                 lev_kind = Lev_pseudo;
+                 lev_repr = None;
+                 lev_env = final_env})
+       else
+         body),
+      repr
   | item :: rem ->
       match item.str_desc with
       | Tstr_eval (expr, sort, _) ->
-          let body =
+          let body, repr =
             transl_structure ~scopes loc fields cc rootpath final_env rem
           in
           let sort = Jkind.Sort.default_for_transl_and_get sort in
-          Lsequence(transl_exp ~scopes sort expr, body)
+          Lsequence(transl_exp ~scopes sort expr, body), repr
       | Tstr_value(rec_flag, pat_expr_list) ->
           (* Translate bindings first *)
           let mk_lam_let =
@@ -753,10 +757,10 @@ and transl_structure ~scopes loc
               fields
           in
           (* Then, translate remainder of struct *)
-          let body =
+          let body, repr =
             transl_structure ~scopes loc ext_fields cc rootpath final_env rem
           in
-          mk_lam_let body
+          mk_lam_let body, repr
       | Tstr_primitive descr ->
           record_primitive descr.val_val;
           transl_structure ~scopes loc fields cc rootpath final_env rem
@@ -769,17 +773,17 @@ and transl_structure ~scopes loc
                 ext.ext_id, Jkind.Sort.(of_const Const.for_type_extension))
               tyext.tyext_constructors
           in
-          let body =
+          let body, repr =
             transl_structure ~scopes loc (List.rev_append newfields fields)
               cc rootpath final_env rem
           in
-          transl_type_extension ~scopes item.str_env rootpath tyext body
+          transl_type_extension ~scopes item.str_env rootpath tyext body, repr
       | Tstr_exception ext ->
           let id = ext.tyexn_constructor.ext_id in
           let id_duid = Lambda.debug_uid_none in
           (* CR sspies: Can we find a better [debug_uid] here? *)
           let path = field_path rootpath id in
-          let body =
+          let body, repr =
             transl_structure ~scopes loc
               ((id, Jkind.Sort.(of_const Const.for_exception)) :: fields)
               cc rootpath final_env rem
@@ -788,7 +792,7 @@ and transl_structure ~scopes loc
                transl_extension_constructor ~scopes
                                             item.str_env
                                             path
-                                            ext.tyexn_constructor, body)
+                                            ext.tyexn_constructor, body), repr
       | Tstr_module ({mb_presence=Mp_present} as mb) ->
           let id = mb.mb_id in
           let field =
@@ -808,18 +812,18 @@ and transl_structure ~scopes loc
                                                  mb.mb_attributes
           in
           (* Translate remainder second *)
-          let body =
+          let body, repr =
             transl_structure ~scopes loc (cons_opt field fields)
               cc rootpath final_env rem
           in
-          begin match id with
+          (begin match id with
           | None ->
               Lsequence (Lprim(Pignore, [module_body],
                                of_location ~scopes mb.mb_name.loc), body)
           | Some id ->
               Llet(pure_module mb.mb_expr, Lambda.layout_module, id,
               id_duid, module_body, body)
-          end
+          end), repr
       | Tstr_module ({mb_presence=Mp_absent}) ->
           transl_structure ~scopes loc fields cc rootpath final_env rem
       | Tstr_recmodule bindings ->
@@ -829,7 +833,7 @@ and transl_structure ~scopes loc
                 (fun id -> id, Jkind.Sort.(of_const Const.for_module)) mb.mb_id)
               bindings
           in
-          let body =
+          let body, repr =
             transl_structure ~scopes loc (List.rev_append newfields fields)
               cc rootpath final_env rem
           in
@@ -843,17 +847,17 @@ and transl_structure ~scopes loc
                     Tcoerce_none (field_path rootpath id) modl
             ) bindings body
           in
-          lam
+          lam, repr
       | Tstr_class cl_list ->
           let (ids, class_bindings) = transl_class_bindings ~scopes cl_list in
           let newfields =
             List.map (fun id -> id, Jkind.Sort.(of_const Const.for_class)) ids
           in
-          let body =
+          let body, repr =
             transl_structure ~scopes loc (List.rev_append newfields fields)
               cc rootpath final_env rem
           in
-          Value_rec_compiler.compile_letrec class_bindings body
+          Value_rec_compiler.compile_letrec class_bindings body, repr
       | Tstr_include incl ->
           let ids_with_sorts =
             bound_value_identifiers_and_sorts incl.incl_type
@@ -870,7 +874,7 @@ and transl_structure ~scopes loc
                 let lambda_layout =
                   Typeopt.layout_of_sort (to_location loc) const_sort
                 in
-                let body =
+                let body, repr =
                   rebind_idents (pos + 1) ((id, sort) :: newfields)
                     ids_with_sorts
                 in
@@ -879,9 +883,9 @@ and transl_structure ~scopes loc
                 Llet(Alias, lambda_layout, id, id_duid,
                      Lprim(mod_field pos incl_repr,
                            [Lvar mid],
-                           of_location ~scopes incl.incl_loc), body)
+                           of_location ~scopes incl.incl_loc), body), repr
           in
-          let body = rebind_idents 0 fields ids_with_sorts in
+          let body, repr = rebind_idents 0 fields ids_with_sorts in
           let loc = of_location ~scopes incl.incl_loc in
           let let_kind, modl =
             match incl.incl_kind with
@@ -894,7 +898,7 @@ and transl_structure ~scopes loc
                 Strict, transl_include_functor ~generative:true modl
                           input_coercion scopes loc ~input_repr
           in
-          Llet(let_kind, Lambda.layout_module, mid, mid_duid, modl, body)
+          Llet(let_kind, Lambda.layout_module, mid, mid_duid, modl, body), repr
 
       | Tstr_open od ->
           let pure = pure_module od.open_expr in
@@ -920,7 +924,7 @@ and transl_structure ~scopes loc
                   let lambda_layout =
                     Typeopt.layout_of_sort (to_location loc) const_sort
                   in
-                  let body=
+                  let body, repr =
                     rebind_idents (pos + 1) ((id, sort) :: newfields)
                       ids_with_sorts
                   in
@@ -928,11 +932,12 @@ and transl_structure ~scopes loc
                   (* CR sspies: Can we find a better [debug_uid] here? *)
                   Llet(Alias, lambda_layout, id, id_duid,
                       Lprim(mod_field pos open_repr, [Lvar mid],
-                            of_location ~scopes od.open_loc), body)
+                            of_location ~scopes od.open_loc), body), repr
               in
-              let body = rebind_idents 0 fields ids_with_sorts in
+              let body, repr = rebind_idents 0 fields ids_with_sorts in
               Llet(pure, Lambda.layout_module, mid, mid_duid,
-                   transl_module ~scopes Tcoerce_none None od.open_expr, body)
+                   transl_module ~scopes Tcoerce_none None od.open_expr, body),
+              repr
           end
       | Tstr_modtype _
       | Tstr_class_type _
@@ -1067,12 +1072,20 @@ let transl_implementation compilation_unit impl ~loc =
   primitive_declarations := [];
   Translprim.clear_used_primitives ();
   let scopes = enter_compilation_unit ~scopes:empty_scopes compilation_unit in
+  let result_ref = ref None in
   let body =
     Translobj.transl_label_init (fun () ->
       let body, repr, arg_block_idx =
         transl_implementation_module ~loc ~scopes compilation_unit impl
       in
+      result_ref := Some (repr, arg_block_idx);
       body)
+  in
+  let repr, arg_block_idx =
+    match !result_ref with
+    | Some r -> r
+    | None -> fatal_error "Translmod.transl_implementation: \
+                           repr and arg_block_idx missing."
   in
   let body, main_module_block_format =
     match has_parameters () with
