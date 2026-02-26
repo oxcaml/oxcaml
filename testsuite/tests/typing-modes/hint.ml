@@ -91,3 +91,32 @@ Error: Signature mismatch:
          which is expected to be "uncontended".
        However, the right-hand side is "portable".
 |}]
+
+
+let local_callback : (local_ string -> unit) -> unit = fun _ -> ()
+
+type 'a t =
+  | None
+  | Very_very_long_constructor_name_because_we're_testing_wrapping of 'a
+
+let escaped_ref : string t ref = ref None
+
+let () =
+  local_callback
+    (fun ba -> escaped_ref :=
+        Very_very_long_constructor_name_because_we're_testing_wrapping ba)
+
+[%%expect{|
+val local_callback : (string @ local -> unit) -> unit = <fun>
+type 'a t =
+    None
+  | Very_very_long_constructor_name_because_we're_testing_wrapping of 'a
+val escaped_ref : string t ref = {contents = None}
+Line 12, characters 71-73:
+12 |         Very_very_long_constructor_name_because_we're_testing_wrapping ba)
+                                                                            ^^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is contained (via constructor "Very_very_long_constructor_name_because_we're_testing_wrapping") in the value at line 12, characters 8-73
+         which is expected to be "global".
+|}]
