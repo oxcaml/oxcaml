@@ -60,8 +60,7 @@ let mkstr ~loc d = Str.mk ~loc:(make_loc loc) d
 let mkclass ~loc ?attrs d = Cl.mk ~loc:(make_loc loc) ?attrs d
 let mkcty ~loc ?attrs d = Cty.mk ~loc:(make_loc loc) ?attrs d
 
-let pstr_typext (te, ext) =
-  (Pstr_typext te, ext)
+let pstr_typext (te, ext) = (Pstr_typext te, ext)
 let pstr_primitive (vd, ext) =
   (Pstr_primitive vd, ext)
 let pstr_type ((nr, ext), tys) =
