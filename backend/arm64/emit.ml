@@ -535,10 +535,10 @@ let simd_instr (op : Simd.operation) (i : Linear.instruction) =
 (* Emitter environment, to avoid global state *)
 
 type gc_call =
-  { gc_lbl: L.t;                      (* Entry label *)
-    gc_return_lbl: L.t;               (* Where to branch after GC *)
-    gc_frame_lbl: L.t }               (* Label of frame descriptor *)
-[@@ocamlformat "disable"]
+  { gc_lbl : L.t; (* Entry label *)
+    gc_return_lbl : L.t; (* Where to branch after GC *)
+    gc_frame_lbl : L.t (* Label of frame descriptor *)
+  }
 
 type local_realloc_call =
   { lr_lbl : L.t;
