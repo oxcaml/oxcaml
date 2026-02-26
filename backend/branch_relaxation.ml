@@ -107,8 +107,8 @@ module Make (T : Branch_relaxation_intf.S) = struct
       | Lcondbranch3 (_, _, _)
       | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _
       | Lstackcheck _ -> (
-        let ({ size; max_displacement } :
-              Branch_relaxation_intf.instruction_size) =
+        let ({ size; max_displacement }
+              : Branch_relaxation_intf.instruction_size) =
           List.hd sizes
         in
         let rest = List.tl sizes in
@@ -119,8 +119,8 @@ module Make (T : Branch_relaxation_intf.S) = struct
         if not overflows
         then
           let did_fix, rest_sizes = fixup did_fix (pc + size) instr.next rest in
-          did_fix,
-          { Branch_relaxation_intf.size; max_displacement } :: rest_sizes
+          ( did_fix,
+            { Branch_relaxation_intf.size; max_displacement } :: rest_sizes )
         else
           match instr.desc with
           | Lop Poll ->
@@ -156,9 +156,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
               { size = 0; max_displacement = None }
             in
             let did_fix, rest_sizes =
-              fixup true
-                (pc + inverted_size.size)
-                instr.next
+              fixup true (pc + inverted_size.size) instr.next
                 (branch_size :: label_size :: rest)
             in
             did_fix, inverted_size :: rest_sizes
@@ -212,11 +210,9 @@ module Make (T : Branch_relaxation_intf.S) = struct
     in
     let min_of_max_branch_offsets =
       List.fold_left
-        (fun acc ({ max_displacement; _ } :
-              Branch_relaxation_intf.instruction_size) ->
-          match max_displacement with
-          | None -> acc
-          | Some d -> min acc d)
+        (fun acc
+             ({ max_displacement; _ } : Branch_relaxation_intf.instruction_size)
+           -> match max_displacement with None -> acc | Some d -> min acc d)
         max_int initial_sizes
     in
     let rec loop sizes =
@@ -224,8 +220,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
       if code_size >= min_of_max_branch_offsets
       then begin
         let did_fix, new_sizes =
-          fixup_branches ~code_size ~max_out_of_line_code_offset
-            map code sizes
+          fixup_branches ~code_size ~max_out_of_line_code_offset map code sizes
         in
         if did_fix then loop new_sizes
       end

@@ -19,12 +19,11 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
 module Make (T : Branch_relaxation_intf.S) : sig
-  (** [out_of_line_code_block_sizes] gives the size (in [distance]
-      units) of each block of code emitted out-of-line after the
-      function body (e.g. GC call points, stack reallocation stubs),
-      listed in emission order.  The maximum offset from the end of
-      the function body to any such block's entry label is derived
-      from this list. *)
+  (** [out_of_line_code_block_sizes] gives the size (in [distance] units) of
+      each block of code emitted out-of-line after the function body (e.g. GC
+      call points, stack reallocation stubs), listed in emission order. The
+      maximum offset from the end of the function body to any such block's entry
+      label is derived from this list. *)
   val relax :
     Linear.instruction ->
     initial_sizes:Branch_relaxation_intf.instruction_size list ->

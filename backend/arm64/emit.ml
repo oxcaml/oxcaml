@@ -1840,12 +1840,6 @@ let compute_instruction_sizes env code =
   walk code;
   List.rev !sizes
 
-(* CR-someday mshinwell: B and BL have +/- 128Mb ranges; for the moment we
-   assume we will never exceed this. It would seem to be most likely to occur
-   for branches between functions; in this case, the linker should be able to
-   insert veneers anyway. (See section 4.6.7 of the document "ELF for the ARM
-   64-bit architecture (AArch64)".) *)
-
 let measure_instruction_count f =
   let saved_frame_descriptors = Emitaux.save_frame_descriptors () in
   let saved_debug_info = Emitaux.save_debug_info () in

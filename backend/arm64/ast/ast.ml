@@ -2653,6 +2653,13 @@ module Instruction = struct
           Operand.Wrapped.print ppf op)
         operands_arr)
 
+  (* CR-someday mshinwell: B and BL have +/- 128Mb ranges; for the moment we
+     assume we will never exceed this. It would seem to be most likely to occur
+     for branches between functions; in this case, the linker should be able to
+     insert veneers anyway. (See section 4.6.7 of the document "ELF for the ARM
+     64-bit architecture (AArch64)".)
+
+     Follow-up: see comment in binary_emitter/relocation.ml *)
   let max_displacement (I { name; _ }) =
     match name with
     | TBZ | TBNZ -> Some 0x2000
