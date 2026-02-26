@@ -921,20 +921,6 @@ let emit_load_symbol_addr dst s =
       (symbol (Needs_reloc PAGE_OFF) s)
       O.optional_none)
 
-(* The following functions are used for calculating the sizes of the call GC and
-   bounds check points emitted out-of-line from the function body. See
-   branch_relaxation.mli. *)
-
-let max_out_of_line_code_offset ~num_call_gc =
-  if num_call_gc < 1
-  then 0
-  else
-    let size_of_call_gc = 2 in
-    let size_of_last_thing = size_of_call_gc in
-    let total_size = size_of_call_gc * num_call_gc in
-    let max_offset = total_size - size_of_last_thing in
-    assert (max_offset >= 0);
-    max_offset
 
 let cond_for_float_comparison : Cmm.float_comparison -> Float_cond.t = function
   | CFeq -> EQ
@@ -1857,14 +1843,41 @@ let compute_instruction_sizes env code =
    insert veneers anyway. (See section 4.6.7 of the document "ELF for the ARM
    64-bit architecture (AArch64)".) *)
 
+let measure_instruction_count f =
+  let saved_frame_descriptors = Emitaux.save_frame_descriptors () in
+  let saved_debug_info = Emitaux.save_debug_info () in
+  let m =
+    D.with_measuring ~f:(fun () -> A.with_measuring ~f)
+  in
+  Emitaux.restore_debug_info saved_debug_info;
+  Emitaux.restore_frame_descriptors saved_frame_descriptors;
+  m.count
+
+let out_of_line_code_block_sizes env =
+  List.rev_map
+    (fun gc ->
+      measure_instruction_count (fun () -> emit_call_gc gc))
+    env.call_gc_sites
+  @ List.rev_map
+      (fun lr ->
+        measure_instruction_count (fun () ->
+            emit_local_realloc lr))
+      env.local_realloc_sites
+  @ (match env.stack_realloc with
+    | None -> []
+    | Some _ ->
+      [measure_instruction_count (fun () ->
+           emit_stack_realloc env)])
+
 let branch_relax env body =
   (* Record copy so the sizing pass can mutate its own mutable fields
-     (stack_offset, call_gc_sites, etc.) without affecting [env], which is used
-     later by [emit_all]. *)
+     (stack_offset, call_gc_sites, etc.) without affecting [env],
+     which is used later by [emit_all]. *)
   let sizing_env = { env with stack_offset = env.stack_offset } in
   let initial_sizes = compute_instruction_sizes sizing_env body in
-  let num_call_gc = List.length sizing_env.call_gc_sites in
-  let max_out_of_line_code_offset = max_out_of_line_code_offset ~num_call_gc in
+  let out_of_line_code_block_sizes =
+    out_of_line_code_block_sizes sizing_env
+  in
   let module BR = Branch_relaxation.Make (struct
     type distance = int
 
@@ -1879,8 +1892,8 @@ let branch_relax env body =
     let relax_allocation ~num_bytes ~dbginfo =
       Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo }))
   end) in
-  BR.relax body ~initial_sizes ~max_out_of_line_code_offset;
-  num_call_gc
+  BR.relax body ~initial_sizes ~out_of_line_code_block_sizes;
+  List.length sizing_env.call_gc_sites
 
 (* Emission of an instruction sequence *)
 

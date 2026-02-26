@@ -194,7 +194,15 @@ module Make (T : Branch_relaxation_intf.S) = struct
 
   (* Iterate branch expansion till all conditional branches are OK *)
 
-  let relax code ~initial_sizes ~max_out_of_line_code_offset =
+  let max_out_of_line_code_offset block_sizes =
+    match List.rev block_sizes with
+    | [] | [_] -> 0
+    | _last :: rest -> List.fold_left ( + ) 0 rest
+
+  let relax code ~initial_sizes ~out_of_line_code_block_sizes =
+    let max_out_of_line_code_offset =
+      max_out_of_line_code_offset out_of_line_code_block_sizes
+    in
     let min_of_max_branch_offsets =
       List.fold_left
         (fun acc (_size, disp) ->
@@ -206,7 +214,8 @@ module Make (T : Branch_relaxation_intf.S) = struct
       if code_size >= min_of_max_branch_offsets
       then begin
         let did_fix, new_sizes =
-          fixup_branches ~code_size ~max_out_of_line_code_offset map code sizes
+          fixup_branches ~code_size ~max_out_of_line_code_offset
+            map code sizes
         in
         if did_fix then loop new_sizes
       end
