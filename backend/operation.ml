@@ -606,3 +606,134 @@ let equal left right =
       | Poll | Pause | Alloc _ ),
       _ ) ->
     false
+
+let hash_combine h1 h2 = (h1 * 65599) + h2
+
+let rec hash_trap_stack = function
+  | Uncaught -> 0
+  | Specific_trap (lbl, ts) ->
+    hash_combine 1 (hash_combine (Static_label.hash lbl) (hash_trap_stack ts))
+
+let hash_integer_comparison (cmp : integer_comparison) = Hashtbl.hash cmp
+
+let hash_integer_operation = function
+  | Iadd -> 0
+  | Isub -> 1
+  | Imul -> 2
+  | Imulh { signed } -> hash_combine 3 (Bool.to_int signed)
+  | Idiv -> 4
+  | Imod -> 5
+  | Iand -> 6
+  | Ior -> 7
+  | Ixor -> 8
+  | Ilsl -> 9
+  | Ilsr -> 10
+  | Iasr -> 11
+  | Iclz { arg_is_non_zero } -> hash_combine 12 (Bool.to_int arg_is_non_zero)
+  | Ictz { arg_is_non_zero } -> hash_combine 13 (Bool.to_int arg_is_non_zero)
+  | Ipopcnt -> 14
+  | Icomp cmp -> hash_combine 15 (hash_integer_comparison cmp)
+
+let hash_int128_operation = function
+  | Iadd128 -> 0
+  | Isub128 -> 1
+  | Imul64 { signed } -> hash_combine 2 (Bool.to_int signed)
+
+let hash_float_comparison (cmp : float_comparison) = Hashtbl.hash cmp
+
+let hash_float_width (w : float_width) = Hashtbl.hash w
+
+let hash_float_operation = function
+  | Inegf -> 0
+  | Iabsf -> 1
+  | Iaddf -> 2
+  | Isubf -> 3
+  | Imulf -> 4
+  | Idivf -> 5
+  | Icompf cmp -> hash_combine 6 (hash_float_comparison cmp)
+
+let hash_mutable_flag = function Immutable -> 0 | Mutable -> 1
+
+let hash_test = function
+  | Itruetest -> 0
+  | Ifalsetest -> 1
+  | Iinttest cmp -> hash_combine 2 (hash_integer_comparison cmp)
+  | Iinttest_imm (cmp, n) ->
+    hash_combine 3 (hash_combine (hash_integer_comparison cmp) n)
+  | Ifloattest (w, cmp) ->
+    hash_combine 4
+      (hash_combine (hash_float_width w) (hash_float_comparison cmp))
+  | Ioddtest -> 5
+  | Ieventest -> 6
+
+let hash_alloc_dbginfo_item item =
+  hash_combine item.Cmm.alloc_words
+    (hash_combine
+       (Hashtbl.hash item.Cmm.alloc_block_kind)
+       (Hashtbl.hash item.Cmm.alloc_dbg))
+
+let hash_alloc_dbginfo dbginfo =
+  List.fold_left
+    (fun acc item -> hash_combine acc (hash_alloc_dbginfo_item item))
+    0 dbginfo
+
+let hash = function
+  | Move -> 0
+  | Spill -> 1
+  | Reload -> 2
+  | Dummy_use -> 3
+  | Const_int n -> hash_combine 4 (Hashtbl.hash n)
+  | Const_float32 f -> hash_combine 5 (Hashtbl.hash f)
+  | Const_float f -> hash_combine 6 (Hashtbl.hash f)
+  | Const_symbol s -> hash_combine 7 (Hashtbl.hash s)
+  | Const_vec128 v -> hash_combine 8 (Hashtbl.hash v)
+  | Const_vec256 v -> hash_combine 9 (Hashtbl.hash v)
+  | Const_vec512 v -> hash_combine 10 (Hashtbl.hash v)
+  | Stackoffset n -> hash_combine 11 n
+  | Load { memory_chunk; addressing_mode; mutability; is_atomic } ->
+    hash_combine 12
+      (hash_combine
+         (Hashtbl.hash memory_chunk)
+         (hash_combine
+            (Hashtbl.hash addressing_mode)
+            (hash_combine
+               (hash_mutable_flag mutability)
+               (Bool.to_int is_atomic))))
+  | Store (chunk, addr, b) ->
+    hash_combine 13
+      (hash_combine (Hashtbl.hash chunk)
+         (hash_combine (Hashtbl.hash addr) (Bool.to_int b)))
+  | Intop op -> hash_combine 14 (hash_integer_operation op)
+  | Int128op op -> hash_combine 15 (hash_int128_operation op)
+  | Intop_imm (op, n) ->
+    hash_combine 16 (hash_combine (hash_integer_operation op) n)
+  | Intop_atomic { op; size; addr } ->
+    hash_combine 17
+      (hash_combine (Hashtbl.hash op)
+         (hash_combine (Hashtbl.hash size) (Hashtbl.hash addr)))
+  | Floatop (w, op) ->
+    hash_combine 18
+      (hash_combine (hash_float_width w) (hash_float_operation op))
+  | Csel test -> hash_combine 19 (hash_test test)
+  | Reinterpret_cast c -> hash_combine 20 (Hashtbl.hash c)
+  | Static_cast c -> hash_combine 21 (Hashtbl.hash c)
+  | Probe_is_enabled { name; enabled_at_init } ->
+    hash_combine 22
+      (hash_combine (Hashtbl.hash name) (Hashtbl.hash enabled_at_init))
+  | Opaque -> 23
+  | Begin_region -> 24
+  | End_region -> 25
+  | Specific s -> hash_combine 26 (Hashtbl.hash s)
+  | Name_for_debugger { ident; which_parameter; provenance; regs = _ } ->
+    hash_combine 27
+      (hash_combine (Hashtbl.hash ident)
+         (hash_combine (Hashtbl.hash which_parameter) (Hashtbl.hash provenance)))
+  | Dls_get -> 28
+  | Tls_get -> 29
+  | Domain_index -> 30
+  | Poll -> 31
+  | Pause -> 32
+  | Alloc { bytes; dbginfo; mode } ->
+    hash_combine 33
+      (hash_combine bytes
+         (hash_combine (hash_alloc_dbginfo dbginfo) (Hashtbl.hash mode)))

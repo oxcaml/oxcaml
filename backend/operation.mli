@@ -35,11 +35,15 @@ type trap_stack =
 
 val equal_trap_stack : trap_stack -> trap_stack -> bool
 
+val hash_trap_stack : trap_stack -> int
+
 type integer_comparison = Cmm.integer_comparison
 
 val string_of_integer_comparison : integer_comparison -> string
 
 val equal_integer_comparison : integer_comparison -> integer_comparison -> bool
+
+val hash_integer_comparison : integer_comparison -> int
 
 val invert_integer_comparison : integer_comparison -> integer_comparison
 
@@ -74,15 +78,23 @@ val is_unary_integer_operation : integer_operation -> bool
 
 val equal_integer_operation : integer_operation -> integer_operation -> bool
 
+val hash_integer_operation : integer_operation -> int
+
 val equal_int128_operation : int128_operation -> int128_operation -> bool
+
+val hash_int128_operation : int128_operation -> int
 
 type float_comparison = Cmm.float_comparison
 
 val equal_float_comparison : float_comparison -> float_comparison -> bool
 
+val hash_float_comparison : float_comparison -> int
+
 type float_width = Cmm.float_width
 
 val equal_float_width : float_width -> float_width -> bool
+
+val hash_float_width : float_width -> int
 
 type float_operation =
   | Inegf
@@ -99,11 +111,15 @@ val format_float_operation : Format.formatter -> float_operation -> unit
 
 val equal_float_operation : float_operation -> float_operation -> bool
 
+val hash_float_operation : float_operation -> int
+
 type mutable_flag =
   | Immutable
   | Mutable
 
 val equal_mutable_flag : mutable_flag -> mutable_flag -> bool
+
+val hash_mutable_flag : mutable_flag -> int
 
 val of_ast_mutable_flag : Asttypes.mutable_flag -> mutable_flag
 
@@ -191,3 +207,5 @@ val is_pure : t -> bool
 val dump : Format.formatter -> t -> unit
 
 val equal : t -> t -> bool
+
+val hash : t -> int
