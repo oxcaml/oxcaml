@@ -168,7 +168,7 @@ module Flambda2 = struct
     let reaper_change_calling_conventions = true
     let simplify_stubs =
       (* CR pchambart: should be changed to true after proper testing *)
-      false
+      true
     let unicode = true
     let kind_checks = false
   end
