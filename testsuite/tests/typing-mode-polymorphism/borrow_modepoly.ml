@@ -17,7 +17,7 @@ let local_aliased_use (local_ a) = ()
 val local_aliased_use : 'a @ local -> unit = <fun>
 |}]
 
-let unique_aliased_use (local_ unique_ x) (local_ y) = ()
+let unique_aliased_use (local_ unique_ x) (local_ y) = unique_use x; ()
 [%%expect{|
 val unique_aliased_use : 'a @ local unique -> 'b @ local -> unit = <fun>
 |}]
