@@ -44,6 +44,7 @@ type value_mismatch =
   | Zero_alloc of Zero_alloc.error
   | Modality of Mode.Modality.error
   | Mode of Mode.Value.error
+  | Poly_arity_mismatch
 
 exception Dont_match of value_mismatch
 
@@ -168,8 +169,13 @@ let value_descriptions ~loc env name
   | Ok () -> ()
   | Error e -> raise (Dont_match (Mode e))
   end;
+  let lpairs =
+    try List.combine vd1.val_lpoly vd2.val_lpoly
+    with Invalid_argument _ -> raise (Dont_match Poly_arity_mismatch)
+  in
   match vd1.val_kind with
   | Val_prim p1 -> begin
+     assert (List.is_empty vd1.val_lpoly);
      match vd2.val_kind with
      | Val_prim p2 -> begin
          let locality = [ Mode.Locality.global; Mode.Locality.local ] in
@@ -209,7 +215,7 @@ let value_descriptions ~loc env name
            pc_env = env; pc_loc = vd1.Types.val_loc; } in
         Tcoerce_primitive pc
      end
-  | _ ->
+  | _ -> Jkind_types.Sort.enter_repr lpairs (fun () ->
      match Ctype.moregeneral env true vd1.val_type vd2.val_type with
      | exception Ctype.Moregen err -> raise (Dont_match (Type err))
      | () -> begin
@@ -217,6 +223,7 @@ let value_descriptions ~loc env name
          | Val_prim _ -> raise (Dont_match Not_a_primitive)
          | _ -> Tcoerce_none
      end
+    )
 
 (* Inclusion between manifest types (particularly for private row types) *)
 
@@ -428,6 +435,8 @@ let report_value_mismatch first second env ppf err =
       let got = first ^ " is" in
       let expected = second ^ " is" in
       report_mode_sub_error got expected ppf e
+  | Poly_arity_mismatch ->
+      pr "The number of locally abstract layouts differs."
 
 let report_type_inequality env ppf err =
   let msg = Fmt.Doc.msg in

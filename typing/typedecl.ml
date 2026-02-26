@@ -3969,7 +3969,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
         in
         md_mode, modalities, Valmi_sig_value raw_modalities
   in
-  let cty = Typetexp.transl_type_scheme env valdecl.pval_type in
+  let lpoly, cty = Typetexp.transl_type_scheme env valdecl.pval_type in
   let sort =
     match Ctype.type_sort ~why ~fixed:false env cty.ctyp_type with
     | Ok sort -> sort
@@ -4028,6 +4028,7 @@ let transl_value_decl env loc ~modal ~why valdecl =
       in
       { val_type = ty;
         val_kind = Val_reg sort;
+        val_lpoly = lpoly;
         Types.val_loc = loc;
         val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = zero_alloc;
@@ -4071,7 +4072,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
       && not (String.starts_with ~prefix:"%" prim.prim_name)
       then raise(Error(valdecl.pval_type.ptyp_loc, Missing_native_external));
       check_unboxable env loc ty;
-      { val_type = ty; val_kind = Val_prim prim; Types.val_loc = loc;
+      { val_type = ty; val_kind = Val_prim prim; val_lpoly = lpoly;
+        Types.val_loc = loc;
         val_attributes = valdecl.pval_attributes; val_modalities;
         val_zero_alloc = Zero_alloc.default;
         val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());

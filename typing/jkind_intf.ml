@@ -21,12 +21,29 @@ module type Sort = sig
   type t
 
   (** Rigid sort variables similiar to [Tunivar] for types. They can be
-      specified to be equal by [enter_repr] but cannot be equated/unified. *)
-  type univar = { name : string option }
+      specified to be equal by [enter_repr] but cannot be equated/unified.
+      Univars are identified by physical equality. *)
+  type univar
+
+  val new_univar : ?name:string -> unit -> univar
 
   (** [enter_repr pairs f] establishes correspondence between sort univars (for
       Trepr) using the given list of pairs, then calls [f]. *)
   val enter_repr : (univar * univar) list -> (unit -> 'a) -> 'a
+
+  (* CR-soon zqian: should just crash if the univar hasn't been registered. *)
+
+  (** Look up the print name of a univar from the global association list.
+      Returns ["_"] if the univar has not been registered via
+      {!print_with_univars}. *)
+  val to_string_univar : univar -> string
+
+  (** [print_with_univars univars callback] assigns a name to each univar (using
+      the univar's own name if available, or generating a fresh one), adds the
+      assignments to {!sort_univar_names} for use during printing, calls
+      [callback] with the list of assigned names, then restores
+      {!sort_univar_names}. *)
+  val print_with_univars : univar list -> (string list -> 'a) -> 'a
 
   (** These are the constant sorts -- fully determined and without variables *)
   type base =

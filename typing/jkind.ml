@@ -178,8 +178,7 @@ module Layout = struct
             [ (if nested then "(" else "");
               String.concat " & " (List.map (to_string true) ts);
               (if nested then ")" else "") ]
-        | Univar { name = Some n } -> n
-        | Univar { name = None } -> "_"
+        | Univar uv -> Sort.to_string_univar uv
       in
       to_string false t
 
@@ -3206,7 +3205,7 @@ module Violation = struct
     in
     let rec has_sort_var_layout : Sort.Flat.t Layout.t -> bool = function
       | Sort (Var _, _) -> true
-      | Sort (Univar _, _) -> Misc.fatal_error "has_sort_var: univar"
+      | Sort (Univar _, _) -> false
       | Product layouts -> List.exists has_sort_var_layout layouts
       | Sort (Base _, _) | Any _ -> false
     in

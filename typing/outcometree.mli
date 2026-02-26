@@ -115,6 +115,8 @@ and out_jkind =
 (* should be empty if all the jkind annotations are missing *)
 and out_vars_jkinds = (string * out_jkind option) list
 
+and out_sort_univar = string
+
 and out_type_param = {
     ot_non_gen: bool;
     ot_name: string;
@@ -147,6 +149,7 @@ and out_type =
   | Otyp_splice of out_type
   | Otyp_poly of out_vars_jkinds * out_type
   | Otyp_repr of string list * out_type
+  | Otyp_newlayout of out_sort_univar list * out_type
   | Otyp_module of out_ident * (string * out_type) list
   | Otyp_attribute of out_type * out_attribute
   | Otyp_jkind_annot of out_type * out_jkind

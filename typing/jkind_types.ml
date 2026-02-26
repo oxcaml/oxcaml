@@ -30,13 +30,16 @@ module Sort = struct
 
   type univar = { name : string option }
 
+  let new_univar ?name () = { name = Sys.opaque_identity name }
+
   (* Tracking univar correspondences for Trepr unification *)
   let univar_pairs : (univar * univar) list ref = ref []
 
   let equal_univar_univar uv1 uv2 =
     uv1 == uv2
-    || List.mem (uv1, uv2) !univar_pairs
-    || List.mem (uv2, uv1) !univar_pairs
+    || List.exists
+         (fun (p1, p2) -> (p1 == uv1 && p2 == uv2) || (p1 == uv2 && p2 == uv1))
+         !univar_pairs
 
   (* Establish correspondence between sort univars positionally.
      Since Trepr respects order, we just pair them up directly. *)
@@ -44,6 +47,42 @@ module Sort = struct
     let old_univars = !univar_pairs in
     univar_pairs := pairs @ old_univars;
     Misc.try_finally f ~always:(fun () -> univar_pairs := old_univars)
+
+  (* Global association list mapping univars to names for printing *)
+  let sort_univar_names : (univar * string) list ref = ref []
+
+  let to_string_univar uv =
+    List.assq_opt uv !sort_univar_names
+    (* CR-someday zqian: if not found we should just crash. Find all such call
+       sites and wrap them inside [print_with_univars]. *)
+    |> Option.value ~default:(Option.value ~default:"_" uv.name)
+
+  let print_with_univar (uv : univar) callback =
+    let saved = !sort_univar_names in
+    let is_used s = List.exists (fun (_, name) -> name = s) saved in
+    let find_name s =
+      let rec loop idx =
+        let name = s ^ string_of_int idx in
+        if is_used name then loop (idx + 1) else name
+      in
+      if is_used s then loop 0 else s
+    in
+    let name =
+      match uv.name with Some n -> find_name n | None -> find_name "l"
+    in
+    sort_univar_names := (uv, name) :: saved;
+    Misc.try_finally
+      (fun () -> callback name)
+      ~always:(fun () -> sort_univar_names := saved)
+
+  let print_with_univars univars callback =
+    let rec loop univars names_acc =
+      match univars with
+      | [] -> callback (List.rev names_acc)
+      | uv :: rest ->
+        print_with_univar uv (fun name -> loop rest (name :: names_acc))
+    in
+    loop univars []
 
   type t =
     | Var of var
@@ -54,6 +93,11 @@ module Sort = struct
   and var =
     { mutable contents : t option;
       mutable level : int;
+      (* The level can be set to generic_level to indicate "this variable has
+         been considered for generalization and can be skipped" - this is used
+         to avoid infinite loops when traversing sort variable graphs. However,
+         polymorphic sort variables are represented as univars (not by levels).
+         *)
       uid : int (* For debugging / printing only *)
     }
 
@@ -113,8 +157,7 @@ module Sort = struct
         | Product cs ->
           let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
           Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf cs
-        | Univar { name = Some n } -> Fmt.fprintf ppf "%s" n
-        | Univar { name = None } -> Fmt.fprintf ppf "_"
+        | Univar uv -> Fmt.fprintf ppf "%s" (to_string_univar uv)
       in
       pp_element ~nested:false ppf c
 
@@ -677,8 +720,7 @@ module Sort = struct
       | Product ts ->
         let pp_sep ppf () = Fmt.fprintf ppf " & " in
         Fmt.pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
-      | Univar { name = Some n } -> Fmt.fprintf ppf "%s" n
-      | Univar { name = None } -> Fmt.fprintf ppf "_"
+      | Univar uv -> Fmt.fprintf ppf "%s" (to_string_univar uv)
     in
     pp_element ~nested:false ppf t
 
@@ -806,12 +848,10 @@ module Layout = struct
       in
       of_sort (Sort.get s) sa
 
-    let of_univar uv = Univar uv
-
     let of_flat_sort (s : Sort.Flat.t) sa =
       match s with
       | Var _ -> None
-      | Univar uv -> Some (of_univar uv)
+      | Univar uv -> Some (Univar uv)
       | Base b -> Some (Static.of_base b sa)
   end
 

@@ -574,6 +574,7 @@ module type Wrapped = sig
     { val_type: type_expr wrapped;                (* Type of the value *)
       val_modalities : Mode.Modality.t;     (* Modalities on the value *)
       val_kind: value_kind;
+      val_lpoly: Jkind_types.Sort.univar list;
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
@@ -679,12 +680,13 @@ module Map_wrapped(From : Wrapped)(To : Wrapped) = struct
       | Unit -> To.Unit
       | Named (id,mty,mm) -> To.Named (id, module_type m mty,mm)
 
-  let value_description m {val_type; val_modalities; val_kind; val_zero_alloc;
-                           val_attributes; val_loc; val_uid} =
+  let value_description m {val_type; val_modalities; val_kind; val_lpoly;
+                           val_zero_alloc; val_attributes; val_loc; val_uid} =
     To.{
       val_type = m.map_type_expr m val_type;
       val_modalities;
       val_kind;
+      val_lpoly;
       val_zero_alloc;
       val_attributes;
       val_loc;

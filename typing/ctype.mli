@@ -181,6 +181,9 @@ val instance_list: type_expr list -> type_expr list
 val new_local_type:
         ?loc:Location.t -> ?manifest_and_scope:(type_expr * int) ->
         type_origin -> (allowed * 'r) jkind -> type_declaration
+val new_local_jkind:
+        ?loc:Location.t -> ?manifest:jkind_const_desc_lr ->
+        unit -> jkind_declaration
 
 module Pattern_env : sig
   type t = private
