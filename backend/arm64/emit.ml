@@ -621,11 +621,13 @@ let emit_debug_info ?discriminator dbg =
   Emitaux.emit_debug_info_gen ?discriminator dbg file_emitter D.loc
 
 (* Record calls to the GC -- we've moved them out of the way *)
+
 let emit_call_gc gc =
   labelled_ins1 gc.gc_lbl BL (runtime_function S.Predef.caml_call_gc);
   labelled_ins1 gc.gc_frame_lbl B (local_label gc.gc_return_lbl)
 
 (* Record calls to local stack reallocation *)
+
 let emit_local_realloc lr =
   D.define_label lr.lr_lbl;
   emit_debug_info lr.lr_dbg;
@@ -633,6 +635,7 @@ let emit_local_realloc lr =
   A.ins1 B (local_label lr.lr_return_lbl)
 
 (* Local stack reallocation *)
+
 let emit_stack_realloc env =
   match env.stack_realloc with
   | None -> ()
