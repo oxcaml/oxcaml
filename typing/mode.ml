@@ -6544,9 +6544,12 @@ module Crossing = struct
       Mode.subtract_const_unhint c
         (Mode.unhint (Mode.join [Mode.of_const c; m]))
 
-    let apply_right (Modality (Join_const c)) m =
+    let apply_right_unhint (Modality (Join_const c)) m =
       (* The right adjoint of join is a restriction of identity *)
       Mode.join_const_unhint c m
+
+    let apply_right t m =
+      Monadic.hint ~hint:Crossing (apply_right_unhint t (S.Unhint.unhint m))
 
     let proj (type a) (ax : a Mode.Axis.t) (Modality (Join_const c)) : a Atom.t
         =
@@ -6639,9 +6642,14 @@ module Crossing = struct
 
     let modality m (Modality t) = Modality (Modality.Const.concat ~then_:t m)
 
-    let apply_left (Modality (Meet_const c)) m =
+    let apply_left_unhint (Modality (Meet_const c)) m =
       (* The left adjoint of meet is a restriction of identity *)
       Mode.meet_const_unhint c m
+
+    let apply_left t m =
+      Alloc.Comonadic.hint ~hint:Crossing
+        (comonadic_locality_as_regionality (S.Unhint.unhint m)
+        |> apply_left_unhint t |> comonadic_regional_to_local)
 
     let apply_right (Modality (Meet_const c)) m =
       Mode.imply_const_unhint c (Mode.unhint (Mode.meet [Mode.of_const c; m]))
@@ -6770,7 +6778,7 @@ module Crossing = struct
   let apply_left_unhint t { monadic; comonadic } =
     let monadic = Monadic.apply_left t.monadic monadic in
     let comonadic =
-      Comonadic.apply_left t.comonadic (S.Unhint.unhint comonadic)
+      Comonadic.apply_left_unhint t.comonadic (S.Unhint.unhint comonadic)
     in
     { monadic; comonadic }
 
@@ -6779,7 +6787,9 @@ module Crossing = struct
       (apply_left_unhint t (Value.disallow_right m))
 
   let apply_right_unhint t { monadic; comonadic } =
-    let monadic = Monadic.apply_right t.monadic (S.Unhint.unhint monadic) in
+    let monadic =
+      Monadic.apply_right_unhint t.monadic (S.Unhint.unhint monadic)
+    in
     let comonadic = Comonadic.apply_right t.comonadic comonadic in
     { monadic; comonadic }
 
@@ -6810,10 +6820,10 @@ module Crossing = struct
 
   let apply_left_right_alloc t m =
     let { monadic; comonadic } = Alloc.unhint m in
-    let monadic = Monadic.apply_right t.monadic monadic in
+    let monadic = Monadic.apply_right_unhint t.monadic monadic in
     let comonadic =
       comonadic |> comonadic_locality_as_regionality
-      |> Comonadic.apply_left t.comonadic
+      |> Comonadic.apply_left_unhint t.comonadic
       |> comonadic_regional_to_local
       (* the left adjoint of [locality_as_regionality]*)
     in

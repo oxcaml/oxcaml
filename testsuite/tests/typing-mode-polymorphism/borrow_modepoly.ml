@@ -19,7 +19,8 @@ val local_aliased_use : 'a @ local -> unit = <fun>
 
 let unique_aliased_use (local_ unique_ x) (local_ y) = ()
 [%%expect{|
-val unique_aliased_use : 'a @ local unique -> 'b @ local -> unit = <fun>
+val unique_aliased_use : 'a @ local unique -> ('b @ local -> unit) @ local =
+  <fun>
 |}]
 
 let aliased_unique_use (local_ x) (local_ unique_ y) = ()
@@ -780,5 +781,10 @@ let foo () =
   (let z2 = borrow_ y in aliased_aliased_use z1 z2);
   unique_aliased_use y z1
 [%%expect{|
-val foo : unit -> unit = <fun>
+Line 6, characters 2-22:
+6 |   unique_aliased_use y z1
+      ^^^^^^^^^^^^^^^^^^^^
+Error: This application is complete, but surplus arguments were provided afterwards.
+       When passing or calling once values, extra arguments are passed in a separate application.
+  Hint: Try wrapping the marked application in parentheses.
 |}]

@@ -320,27 +320,52 @@ Error: This function when partially applied returns a value which is "nonportabl
        but expected to be "portable".
 |}]
 
-(* closing over uncontended gives nonportable *)
-let foo : 'a @ uncontended portable -> (unit -> unit) @ portable = fun a () -> ()
+(* closing over an uncontended use of a variable gives nonportable *)
+let use_uncontended (x @ uncontended) = ()
 [%%expect{|
-Line 1, characters 67-81:
-1 | let foo : 'a @ uncontended portable -> (unit -> unit) @ portable = fun a () -> ()
-                                                                       ^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "nonportable",
-       but expected to be "portable".
+val use_uncontended : 'a -> unit = <fun>
 |}]
 
-(* closing over shared gives shareable *)
+let foo : 'a @ uncontended portable -> (unit -> unit) @ portable = fun a () -> use_uncontended a
+[%%expect{|
+Line 1, characters 71-72:
+1 | let foo : 'a @ uncontended portable -> (unit -> unit) @ portable = fun a () -> use_uncontended a
+                                                                           ^
+Error: The pattern is "contended"
+         because it is used inside the function at line 1, characters 67-96
+         which is expected to be "portable".
+       However, the pattern highlighted is expected to be "uncontended".
+|}]
+
+(* closing over an uncontended variable without using it can be portable *)
+let foo : 'a @ uncontended portable -> (unit -> unit) @ portable = fun a () -> a
+[%%expect{|
+val foo : unit @ portable -> (unit -> unit) @ portable = <fun>
+|}]
+
+(* closing over shared uses gives shareable *)
+let use_shared (x @ shared) = ()
+[%%expect{|
+val use_shared : 'a @ shared -> unit = <fun>
+|}]
+
+let foo : 'a @ shared portable -> (unit -> unit) @ portable = fun a () -> use_shared a
+[%%expect{|
+Line 1, characters 66-67:
+1 | let foo : 'a @ shared portable -> (unit -> unit) @ portable = fun a () -> use_shared a
+                                                                      ^
+Error: The pattern is "contended"
+         because it is used inside the function at line 1, characters 62-86
+         which is expected to be "portable".
+       However, the pattern highlighted is expected to be "shared" or "uncontended".
+|}]
+
+(* closing over a shared variable without using it can be portable *)
 let foo : 'a @ shared portable -> (unit -> unit) @ portable = fun a () -> ()
 [%%expect{|
-Line 1, characters 62-76:
-1 | let foo : 'a @ shared portable -> (unit -> unit) @ portable = fun a () -> ()
-                                                                  ^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "shareable",
-       but expected to be "portable".
+val foo : 'a @ portable shared -> (unit -> unit) @ portable = <fun>
 |}]
-(* CR modes: These three tests are in principle fine to allow (they don't cause a data
-   race), since a is never used *)
+
 
 let foo : ('a @ contended portable -> (string -> string) @ portable) @ nonportable contended = fun a b -> best_bytes ()
 (* CR layouts v2.8: arrows should cross contention. Internal ticket 5121. *)

@@ -323,21 +323,13 @@ Error: This function when partially applied returns a value which is "nonportabl
 (* closing over uncontended gives nonportable *)
 let foo : 'a @ uncontended portable -> (unit -> unit) @ portable = fun a () -> ()
 [%%expect{|
-Line 1, characters 67-81:
-1 | let foo : 'a @ uncontended portable -> (unit -> unit) @ portable = fun a () -> ()
-                                                                       ^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "nonportable",
-       but expected to be "portable".
+val foo : 'a @ portable -> (unit -> unit) @ portable = <fun>
 |}]
 
 (* closing over shared gives shareable *)
 let foo : 'a @ shared portable -> (unit -> unit) @ portable = fun a () -> ()
 [%%expect{|
-Line 1, characters 62-76:
-1 | let foo : 'a @ shared portable -> (unit -> unit) @ portable = fun a () -> ()
-                                                                  ^^^^^^^^^^^^^^
-Error: This function when partially applied returns a value which is "shareable",
-       but expected to be "portable".
+val foo : 'a @ portable shared -> (unit -> unit) @ portable = <fun>
 |}]
 (* CR modes: These three tests are in principle fine to allow (they don't cause a data
    race), since a is never used *)
