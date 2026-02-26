@@ -1,18 +1,18 @@
 (**************************************************************************)
-(*                                                                        *)
-(*                                 OCaml                                  *)
-(*                                                                        *)
-(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
-(*             Mark Shinwell and Leo White, Jane Street Europe            *)
-(*                                                                        *)
-(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
-(*     en Automatique.                                                    *)
-(*   Copyright 2017--2018 Jane Street Group LLC                           *)
-(*                                                                        *)
-(*   All rights reserved.  This file is distributed under the terms of    *)
-(*   the GNU Lesser General Public License version 2.1, with the          *)
-(*   special exception on linking described in the file LICENSE.          *)
-(*                                                                        *)
+(* *)
+(* OCaml *)
+(* *)
+(* Xavier Leroy, projet Cristal, INRIA Rocquencourt *)
+(* Mark Shinwell and Leo White, Jane Street Europe *)
+(* *)
+(* Copyright 1996 Institut National de Recherche en Informatique et *)
+(* en Automatique. *)
+(* Copyright 2017--2018 Jane Street Group LLC *)
+(* *)
+(* All rights reserved. This file is distributed under the terms of *)
+(* the GNU Lesser General Public License version 2.1, with the *)
+(* special exception on linking described in the file LICENSE. *)
+(* *)
 (**************************************************************************)
 
 (** Construction of dynlink functionality given the platform-specific code. *)
@@ -25,10 +25,16 @@ module Make (_ : Dynlink_platform_intf.S) : sig
   val does_symbol_exist : bytecode_or_asm_symbol:string -> bool
   val adapt_filename : string -> string
   val set_allowed_units : string list -> unit
-  val allow_only: string list -> unit
+  val allow_only : string list -> unit
   val prohibit : string list -> unit
   val main_program_units : unit -> string list
   val public_dynamically_loaded_units : unit -> string list
   val all_units : unit -> string list
   val allow_unsafe_modules : bool -> unit
+
+  type handle
+
+  val dlopen : ?priv:bool -> string -> handle
+  val initialize : handle -> unit
+  val run : handle -> unit
 end

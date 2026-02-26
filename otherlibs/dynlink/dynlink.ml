@@ -97,3 +97,19 @@ let all_units () =
 let allow_unsafe_modules allow =
   if is_native then N.allow_unsafe_modules allow
   else B.allow_unsafe_modules allow
+
+type handle =
+  | Native_handle of N.handle
+  | Bytecode_handle of B.handle
+
+let dlopen ?(priv = false) file =
+  if is_native then Native_handle (N.dlopen ~priv file)
+  else Bytecode_handle (B.dlopen ~priv file)
+
+let initialize = function
+  | Native_handle h -> N.initialize h
+  | Bytecode_handle h -> B.initialize h
+
+let run = function
+  | Native_handle h -> N.run h
+  | Bytecode_handle h -> B.run h

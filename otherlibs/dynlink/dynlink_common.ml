@@ -1,18 +1,18 @@
 (**************************************************************************)
-(*                                                                        *)
-(*                                 OCaml                                  *)
-(*                                                                        *)
-(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
-(*             Mark Shinwell and Leo White, Jane Street Europe            *)
-(*                                                                        *)
-(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
-(*     en Automatique.                                                    *)
-(*   Copyright 2017--2019 Jane Street Group LLC                           *)
-(*                                                                        *)
-(*   All rights reserved.  This file is distributed under the terms of    *)
-(*   the GNU Lesser General Public License version 2.1, with the          *)
-(*   special exception on linking described in the file LICENSE.          *)
-(*                                                                        *)
+(* *)
+(* OCaml *)
+(* *)
+(* Xavier Leroy, projet Cristal, INRIA Rocquencourt *)
+(* Mark Shinwell and Leo White, Jane Street Europe *)
+(* *)
+(* Copyright 1996 Institut National de Recherche en Informatique et *)
+(* en Automatique. *)
+(* Copyright 2017--2019 Jane Street Group LLC *)
+(* *)
+(* All rights reserved. This file is distributed under the terms of *)
+(* the GNU Lesser General Public License version 2.1, with the *)
+(* special exception on linking described in the file LICENSE. *)
+(* *)
 (**************************************************************************)
 
 open! Dynlink_compilerlibs
@@ -23,8 +23,7 @@ module String = struct
   module Map = struct
     include Map
 
-    let keys t =
-      fold (fun key _data keys -> Set.add key keys) t Set.empty
+    let keys t = fold (fun key _data keys -> Set.add key keys) t Set.empty
   end
 end
 
@@ -33,109 +32,114 @@ module Make (P : Dynlink_platform_intf.S) = struct
   module UH = P.Unit_header
 
   type interface_dep =
-    | Name  (* the only use of the interface can be via a module alias *)
+    | Name (* the only use of the interface can be via a module alias *)
     | Contents of Digest.t
 
   type implem = Digest.t option * DT.filename * DT.implem_state
 
   module State = struct
-    type t = {
-      ifaces : (interface_dep * DT.filename) String.Map.t;
-      (* Interfaces that have been depended upon. *)
-      implems : implem String.Map.t;
-      (* Implementations that exist in the main program or have been
-         dynamically loaded. *)
-      defined_symbols : String.Set.t;
-      (* Symbols corresponding to compilation units or packed modules (cf.
-         [Asmpackager.build_package_cmx]).  Used as a sanity check. *)
-      allowed_units : String.Set.t;
-      (* Units that are allowed to be referenced by a subsequently-loaded
-         dynamic library. *)
-      main_program_units : String.Set.t;
-      (* Units forming part of the main program (i.e. not dynamically
-         linked). *)
-      public_dynamically_loaded_units : String.Set.t;
-      (* All units that have been dynamically linked, not including those that
-         were privately loaded. *)
-    }
+    type t =
+      { ifaces : (interface_dep * DT.filename) String.Map.t
+      ; (* Interfaces that have been depended upon. *)
+        implems : implem String.Map.t
+      ; (* Implementations that exist in the main program or have been dynamically loaded. *)
+        defined_symbols : String.Set.t
+      ; (* Symbols corresponding to compilation units or packed modules (cf.
+           [Asmpackager.build_package_cmx]). Used as a sanity check. *)
+        allowed_units : String.Set.t
+      ; (* Units that are allowed to be referenced by a subsequently-loaded dynamic
+           library. *)
+        main_program_units : String.Set.t
+      ; (* Units forming part of the main program (i.e. not dynamically linked). *)
+        public_dynamically_loaded_units : String.Set.t
+      (* All units that have been dynamically linked, not including those that were
+         privately loaded. *)
+      }
 
-    let empty = {
-      ifaces = String.Map.empty;
-      implems = String.Map.empty;
-      defined_symbols = String.Set.empty;
-      allowed_units = String.Set.empty;
-      main_program_units = String.Set.empty;
-      public_dynamically_loaded_units = String.Set.empty;
-    }
+    let empty =
+      { ifaces = String.Map.empty
+      ; implems = String.Map.empty
+      ; defined_symbols = String.Set.empty
+      ; allowed_units = String.Set.empty
+      ; main_program_units = String.Set.empty
+      ; public_dynamically_loaded_units = String.Set.empty
+      }
+    ;;
   end
 
-(* Limit the number of concurrent users to one *)
-  module Global: sig
-    type t = {
-      mutable state:State.t;
-      mutable inited:bool;
-      mutable unsafe_allowed:bool;
-    }
-    val lock: Mutex.t option
-    val with_lock: (t->'a) -> 'a
-  end
-  = struct
+  (* Limit the number of concurrent users to one *)
+  module Global : sig
+    type t =
+      { mutable state : State.t
+      ; mutable inited : bool
+      ; mutable unsafe_allowed : bool
+      }
+
+    val lock : Mutex.t option
+    val with_lock : (t -> 'a) -> 'a
+  end = struct
     external runtime5 : unit -> bool = "%runtime5"
 
     let lock =
-      (* We cannot call [Mutex.create] on runtime4 without making the dynlink
-         library depend on the threads library. *)
-      if runtime5 () then Some (Mutex.create ())
-      else None
+      (* We cannot call [Mutex.create] on runtime4 without making the dynlink library
+         depend on the threads library. *)
+      if runtime5 () then Some (Mutex.create ()) else None
+    ;;
 
-    type t = {
-      mutable state:State.t;
-      mutable inited:bool;
-      mutable unsafe_allowed:bool;
-    }
-    let state = {
-      state = State.empty;
-      inited = false;
-      unsafe_allowed = false;
-    }
+    type t =
+      { mutable state : State.t
+      ; mutable inited : bool
+      ; mutable unsafe_allowed : bool
+      }
+
+    let state = { state = State.empty; inited = false; unsafe_allowed = false }
 
     let with_lock0 f =
       match lock with
       | None -> f ()
       | Some lock ->
         Mutex.lock lock;
-        Fun.protect f
-          ~finally:(fun () -> Mutex.unlock lock)
+        Fun.protect f ~finally:(fun () -> Mutex.unlock lock)
+    ;;
 
     let with_lock f = with_lock0 (fun () -> f state)
   end
+
   open Global
 
-  let allow_unsafe_modules b =
-    with_lock (fun global -> global.unsafe_allowed <- b)
+  let allow_unsafe_modules b = with_lock (fun global -> global.unsafe_allowed <- b)
 
   let check_symbols_disjoint ~descr syms1 syms2 =
     let exe = Sys.executable_name in
     let overlap = String.Set.inter syms1 syms2 in
-    if not (String.Set.is_empty overlap) then begin
+    if not (String.Set.is_empty overlap)
+    then (
       let msg =
-        Format.asprintf "%s: symbols multiply-defined %s: %a"
-          exe (Lazy.force descr)
-          (Format.pp_print_list ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
-            Format.pp_print_string)
+        Format.asprintf
+          "%s: symbols multiply-defined %s: %a"
+          exe
+          (Lazy.force descr)
+          (Format.pp_print_list
+             ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+             Format.pp_print_string)
           (String.Set.elements overlap)
       in
-      failwith msg
-    end
+      failwith msg)
+  ;;
 
   let default_available_units global =
     let exe = Sys.executable_name in
     let ifaces, implems, defined_symbols =
       P.fold_initial_units
         ~init:(String.Map.empty, String.Map.empty, String.Set.empty)
-        ~f:(fun (ifaces, implems, defined_symbols)
-                ~compunit ~interface ~implementation
-                ~defined_symbols:defined_symbols_this_unit ->
+        ~f:
+          (fun
+            (ifaces, implems, defined_symbols)
+            ~compunit
+            ~interface
+            ~implementation
+            ~defined_symbols:defined_symbols_this_unit
+          ->
           let ifaces =
             match interface with
             | None -> String.Map.add compunit (Name, exe) ifaces
@@ -144,14 +148,13 @@ module Make (P : Dynlink_platform_intf.S) = struct
           let implems =
             match implementation with
             | None -> implems
-            | Some (crc, state) ->
-              String.Map.add compunit (crc, exe, state) implems
+            | Some (crc, state) -> String.Map.add compunit (crc, exe, state) implems
           in
-          let defined_symbols_this_unit =
-            String.Set.of_list defined_symbols_this_unit
-          in
-          check_symbols_disjoint ~descr:(lazy "in the executable file")
-            defined_symbols_this_unit defined_symbols;
+          let defined_symbols_this_unit = String.Set.of_list defined_symbols_this_unit in
+          check_symbols_disjoint
+            ~descr:(lazy "in the executable file")
+            defined_symbols_this_unit
+            defined_symbols;
           let defined_symbols =
             String.Set.union defined_symbols_this_unit defined_symbols
           in
@@ -159,126 +162,129 @@ module Make (P : Dynlink_platform_intf.S) = struct
     in
     let main_program_units = String.Map.keys implems in
     let state : State.t =
-      { ifaces;
-        implems;
-        defined_symbols;
-        allowed_units = main_program_units;
-        main_program_units;
-        public_dynamically_loaded_units = String.Set.empty;
+      { ifaces
+      ; implems
+      ; defined_symbols
+      ; allowed_units = main_program_units
+      ; main_program_units
+      ; public_dynamically_loaded_units = String.Set.empty
       }
     in
     global.state <- state
+  ;;
 
   let init () =
     with_lock (fun global ->
-    if not global.inited then begin
-      P.init ();
-      default_available_units global;
-      global.inited <- true
-    end)
+      if not global.inited
+      then (
+        P.init ();
+        default_available_units global;
+        global.inited <- true))
+  ;;
 
   let set_loaded_implem filename ui implems =
     String.Map.add (UH.name ui) (UH.crc ui, filename, DT.Loaded) implems
+  ;;
 
   let set_loaded filename ui (state : State.t) =
     { state with implems = set_loaded_implem filename ui state.implems }
+  ;;
 
   let check_interface_imports filename ui ifaces =
-    List.fold_left (fun ifaces (name, crc) ->
+    List.fold_left
+      (fun ifaces (name, crc) ->
         match String.Map.find name ifaces with
-        | exception Not_found -> begin
-            match crc with
-            | None -> String.Map.add name (Name, filename) ifaces
-            | Some crc -> String.Map.add name (Contents crc, filename) ifaces
-          end
+        | exception Not_found ->
+          (match crc with
+           | None -> String.Map.add name (Name, filename) ifaces
+           | Some crc -> String.Map.add name (Contents crc, filename) ifaces)
         | old_crc, _old_src ->
-          match old_crc, crc with
-          | (Name | Contents _), None -> ifaces
-          | Name, Some crc ->
-            String.Map.add name (Contents crc, filename) ifaces
-          | Contents old_crc, Some crc ->
-            if old_crc <> crc then raise (DT.Error (Inconsistent_import name))
-            else ifaces)
+          (match old_crc, crc with
+           | (Name | Contents _), None -> ifaces
+           | Name, Some crc -> String.Map.add name (Contents crc, filename) ifaces
+           | Contents old_crc, Some crc ->
+             if old_crc <> crc
+             then raise (DT.Error (Inconsistent_import name))
+             else ifaces))
       ifaces
       (UH.interface_imports ui)
+  ;;
 
-  let check_implementation_imports ~allowed_units filename ui implems =
-    List.iter (fun (name, crc) ->
-      if not (String.Set.mem name allowed_units) then begin
-        raise (DT.Error (Unavailable_unit name))
-      end;
-      match String.Map.find name implems with
-      | exception Not_found -> raise (DT.Error (Unavailable_unit name))
-      | ((old_crc, _old_src, unit_state) : implem) ->
-        begin match old_crc, crc with
-        | (None | Some _), None -> ()
-        | None, Some _crc ->
-          (* The [None] behaves like a CRC different from every other. *)
-          raise (DT.Error (Inconsistent_implementation name))
-        | Some old_crc, Some crc ->
-          if old_crc <> crc then begin
-            raise (DT.Error (Inconsistent_implementation name))
-          end
-        end;
-        match unit_state with
-        | Not_initialized ->
-          raise (DT.Error (Linking_error (
-            filename, Uninitialized_global name)))
-        | Check_inited i ->
-          if P.num_globals_inited () < i then begin
-            raise (DT.Error (Linking_error (
-              filename, Uninitialized_global name)))
-          end
-        | Loaded -> ())
+  let check_implementation_imports ~allowed_units ~staged filename ui implems =
+    List.iter
+      (fun (name, crc) ->
+        if not (String.Set.mem name allowed_units)
+        then raise (DT.Error (Unavailable_unit name));
+        match String.Map.find name implems with
+        | exception Not_found -> raise (DT.Error (Unavailable_unit name))
+        | ((old_crc, _old_src, unit_state) : implem) ->
+          (match old_crc, crc with
+           | (None | Some _), None -> ()
+           | None, Some _crc ->
+             (* The [None] behaves like a CRC different from every other. *)
+             raise (DT.Error (Inconsistent_implementation name))
+           | Some old_crc, Some crc ->
+             if old_crc <> crc then raise (DT.Error (Inconsistent_implementation name)));
+          (match unit_state with
+           | Not_initialized ->
+             raise (DT.Error (Linking_error (filename, Uninitialized_global name)))
+           | Check_inited i ->
+             if P.num_globals_inited () < i
+             then raise (DT.Error (Linking_error (filename, Uninitialized_global name)))
+           | Loaded -> ()
+           | Opened ->
+             if not staged
+             then raise (DT.Error (Linking_error (filename, Uninitialized_global name)))))
       (UH.implementation_imports ui)
+  ;;
 
-  let check_name filename ui priv ifaces implems =
+  let check_name filename ui priv ifaces implems ~staged =
     let name = UH.name ui in
-    if String.Map.mem name implems then begin
-      raise (DT.Error (Module_already_loaded name))
-    end;
-    if priv && String.Map.mem name ifaces then begin
-      raise (DT.Error (Private_library_cannot_implement_interface name))
-    end;
-    String.Map.add name (UH.crc ui, filename, DT.Not_initialized) implems
+    if String.Map.mem name implems then raise (DT.Error (Module_already_loaded name));
+    if priv && String.Map.mem name ifaces
+    then raise (DT.Error (Private_library_cannot_implement_interface name));
+    let initial_state = if staged then DT.Opened else DT.Not_initialized in
+    String.Map.add name (UH.crc ui, filename, initial_state) implems
+  ;;
 
   let check_unsafe_module unsafe_allowed ui =
-    if not unsafe_allowed && UH.unsafe_module ui then begin
-      raise (DT.Error Unsafe_file)
-    end
+    if (not unsafe_allowed) && UH.unsafe_module ui then raise (DT.Error Unsafe_file)
+  ;;
 
-  let check filename (units : UH.t list) (state : State.t)
-      ~unsafe_allowed ~priv =
+  let check filename (units : UH.t list) (state : State.t) ~unsafe_allowed ~priv ~staged =
     List.iter (fun ui -> check_unsafe_module unsafe_allowed ui) units;
-    let new_units =
-      String.Set.of_list (List.map (fun ui -> UH.name ui) units)
-    in
+    let new_units = String.Set.of_list (List.map (fun ui -> UH.name ui) units) in
     let implems =
-      List.fold_left (fun implems ui ->
-          check_name filename ui priv state.ifaces implems)
-        state.implems units
+      List.fold_left
+        (fun implems ui -> check_name filename ui priv state.ifaces implems ~staged)
+        state.implems
+        units
     in
     let ifaces =
-      List.fold_left (fun ifaces ui ->
-          check_interface_imports filename ui ifaces)
-        state.ifaces units
+      List.fold_left
+        (fun ifaces ui -> check_interface_imports filename ui ifaces)
+        state.ifaces
+        units
     in
     let allowed_units = String.Set.union state.allowed_units new_units in
     let (_ : implem String.Map.t) =
       List.fold_left
         (fun acc ui ->
-           check_implementation_imports ~allowed_units filename ui acc;
-           set_loaded_implem filename ui acc)
-        implems units
+          check_implementation_imports ~allowed_units ~staged filename ui acc;
+          set_loaded_implem filename ui acc)
+        implems
+        units
     in
     let defined_symbols =
-      List.fold_left (fun defined_symbols ui ->
+      List.fold_left
+        (fun defined_symbols ui ->
           let descr =
-            lazy (Printf.sprintf "between the executable file (and any \
-                existing dynamically-loaded units) and the unit `%s' being \
-                dynamically loaded from %s"
-              (UH.name ui)
-              filename)
+            lazy
+              (Printf.sprintf
+                 "between the executable file (and any existing dynamically-loaded \
+                  units) and the unit `%s' being dynamically loaded from %s"
+                 (UH.name ui)
+                 filename)
           in
           let symbols = String.Set.of_list (UH.defined_symbols ui) in
           check_symbols_disjoint ~descr symbols defined_symbols;
@@ -286,70 +292,69 @@ module Make (P : Dynlink_platform_intf.S) = struct
         state.defined_symbols
         units
     in
-    if priv then begin
-      state
-    end else begin
+    if priv
+    then state
+    else (
       let public_dynamically_loaded_units =
         String.Set.union state.public_dynamically_loaded_units new_units
       in
       let state =
         { state with
-          implems;
-          ifaces;
-          defined_symbols;
-          allowed_units;
-          public_dynamically_loaded_units;
+          implems
+        ; ifaces
+        ; defined_symbols
+        ; allowed_units
+        ; public_dynamically_loaded_units
         }
       in
-      state
-    end
+      state)
+  ;;
 
   let set_allowed_units allowed_units =
     let allowed_units = String.Set.of_list allowed_units in
-    with_lock (fun global ->
-        global.state <- { global.state with allowed_units }
-      )
+    with_lock (fun global -> global.state <- { global.state with allowed_units })
+  ;;
 
   let allow_only units =
     with_lock (fun global ->
-        let allowed_units =
-          String.Set.inter global.state.allowed_units
-            (String.Set.of_list units)
-        in
-        global.state <- { global.state with allowed_units }
-      )
+      let allowed_units =
+        String.Set.inter global.state.allowed_units (String.Set.of_list units)
+      in
+      global.state <- { global.state with allowed_units })
+  ;;
 
   let prohibit units =
     with_lock (fun global ->
-        let allowed_units =
-          String.Set.diff global.state.allowed_units
-            (String.Set.of_list units)
-        in
-        global.state <- { global.state with
-          allowed_units;
-        }
-      )
+      let allowed_units =
+        String.Set.diff global.state.allowed_units (String.Set.of_list units)
+      in
+      global.state <- { global.state with allowed_units })
+  ;;
 
   let main_program_units () =
     init ();
-    let global_state = with_lock (fun {state;_} -> state) in
+    let global_state = with_lock (fun { state; _ } -> state) in
     String.Set.elements global_state.main_program_units
+  ;;
 
   let public_dynamically_loaded_units () =
     init ();
-    let global_state = with_lock (fun {state;_} -> state) in
+    let global_state = with_lock (fun { state; _ } -> state) in
     String.Set.elements global_state.public_dynamically_loaded_units
+  ;;
 
   let all_units () =
     init ();
-    let global_state = with_lock (fun {state;_} -> state) in
-    String.Set.elements (String.Set.union
-      global_state.main_program_units
-      global_state.public_dynamically_loaded_units)
+    let global_state = with_lock (fun { state; _ } -> state) in
+    String.Set.elements
+      (String.Set.union
+         global_state.main_program_units
+         global_state.public_dynamically_loaded_units)
+  ;;
 
   let dll_filename fname =
-    if Filename.is_implicit fname then Filename.concat (Sys.getcwd ()) fname
-    else fname
+    if Filename.is_implicit fname then Filename.concat (Sys.getcwd ()) fname else fname
+  ;;
 
   let load priv filename =
     init ();
@@ -357,53 +362,104 @@ module Make (P : Dynlink_platform_intf.S) = struct
     match P.load ~filename ~priv with
     | exception exn -> raise (DT.Error (Cannot_open_dynamic_library exn))
     | handle, units ->
-      try
-        with_lock (fun ({unsafe_allowed; _ } as global) ->
-            global.state <- check filename units global.state
-                ~unsafe_allowed
-                ~priv;
-            (* [register] must be called after [check]:
-               1. so as not to leave outdated entries in the frame table
-                  list (etc) after a failure of [check];
-               2. so that the duplicate dyn-globals test only triggers in
-                  public-loading mode in the event of a bug in [Dynlink],
-                  matching the 4.x semantics. *)
-            P.register handle units ~priv ~filename;
-            (* [run_shared_startup] doesn't take [lock] because a lock isn't
-               needed for the native implementation (neither for [run]) and
-               the bytecode implementation, where [run] does need a lock,
-               has [run_shared_startup] as a no-op. *)
-            P.run_shared_startup handle;
-          );
-        List.iter
-          (fun unit_header ->
-             (* Linked modules might call Dynlink themselves,
-                we need to release the lock *)
+      (try
+         with_lock (fun ({ unsafe_allowed; _ } as global) ->
+           global.state
+           <- check filename units global.state ~unsafe_allowed ~priv ~staged:false;
+           (* [register] must be called after [check]:
+              1. so as not to leave outdated entries in the frame table list (etc) after a
+                 failure of [check];
+              2. so that the duplicate dyn-globals test only triggers in public-loading
+                 mode in the event of a bug in [Dynlink], matching the 4.x semantics. *)
+           P.register handle units ~priv ~filename;
+           (* [run_shared_startup] doesn't take [lock] because a lock isn't needed for the
+              native implementation (neither for [run]) and the bytecode implementation,
+              where [run] does need a lock, has [run_shared_startup] as a no-op. *)
+           P.run_shared_startup handle);
+         List.iter
+           (fun unit_header ->
+             (* Linked modules might call Dynlink themselves, we need to release the lock *)
              P.run Global.lock handle ~unit_header ~priv;
-             if not priv then with_lock (fun global ->
-                 global.state <- set_loaded filename unit_header global.state
-               )
-          )
-          units;
-        P.finish handle
-      with exn ->
-        P.finish handle;
-        raise exn
+             if not priv
+             then
+               with_lock (fun global ->
+                 global.state <- set_loaded filename unit_header global.state))
+           units;
+         P.finish handle
+       with
+       | exn ->
+         P.finish handle;
+         raise exn)
+  ;;
 
   let loadfile filename = load false filename
   let loadfile_private filename = load true filename
 
+  type handle =
+    { platform_handle : P.handle
+    ; units : UH.t list
+    ; filename : string
+    ; priv : bool
+    ; mutable stage : [ `Opened | `Initialized | `Run ]
+    }
+
+  let dlopen ?(priv = false) filename =
+    init ();
+    let filename = dll_filename filename in
+    let platform_handle, units =
+      match P.load ~filename ~priv with
+      | exception exn -> raise (DT.Error (Cannot_open_dynamic_library exn))
+      | result -> result
+    in
+    with_lock (fun ({ unsafe_allowed; _ } as global) ->
+      global.state <- check filename units global.state ~unsafe_allowed ~priv ~staged:true);
+    { platform_handle; units; filename; priv; stage = `Opened }
+  ;;
+
+  let initialize h =
+    (match h.stage with
+     | `Opened -> ()
+     | `Initialized | `Run -> invalid_arg "Dynlink.initialize: handle already initialized");
+    with_lock (fun _global ->
+      P.register h.platform_handle h.units ~priv:h.priv ~filename:h.filename);
+    P.run_shared_startup h.platform_handle;
+    h.stage <- `Initialized
+  ;;
+
+  let run h =
+    (match h.stage with
+     | `Initialized -> ()
+     | `Opened -> invalid_arg "Dynlink.run: handle not yet initialized"
+     | `Run -> invalid_arg "Dynlink.run: handle already run");
+    try
+      List.iter
+        (fun unit_header ->
+          P.run Global.lock h.platform_handle ~unit_header ~priv:h.priv;
+          if not h.priv
+          then
+            with_lock (fun global ->
+              global.state <- set_loaded h.filename unit_header global.state))
+        h.units;
+      P.finish h.platform_handle;
+      h.stage <- `Run
+    with
+    | exn ->
+      P.finish h.platform_handle;
+      h.stage <- `Run;
+      raise exn
+  ;;
+
   let unsafe_get_global_value ~bytecode_or_asm_symbol =
     with_lock (fun _ ->
-        (* The bytecode implementation reads the global symtable *)
-        P.unsafe_get_global_value ~bytecode_or_asm_symbol
-      )
+      (* The bytecode implementation reads the global symtable *)
+      P.unsafe_get_global_value ~bytecode_or_asm_symbol)
+  ;;
 
   let does_symbol_exist ~bytecode_or_asm_symbol =
     with_lock (fun _ ->
-        (* The bytecode implementation reads the global symtable *)
-        P.does_symbol_exist ~bytecode_or_asm_symbol
-      )
+      (* The bytecode implementation reads the global symtable *)
+      P.does_symbol_exist ~bytecode_or_asm_symbol)
+  ;;
 
   let is_native = P.is_native
   let adapt_filename = P.adapt_filename
