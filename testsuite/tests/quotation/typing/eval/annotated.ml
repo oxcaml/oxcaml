@@ -19,15 +19,15 @@ val eval : 'a expr -> 'a eval = <fun>
 
 let f (e : <[int list]> expr) = eval e
 [%%expect {|
-val f : <[int list]> expr -> int list = <fun>
+val f : <[int list]> expr -> <[int list]> eval = <fun>
 |}]
 let f e = eval (e : <[int list]> expr)
 [%%expect {|
-val f : <[int list]> expr -> int list = <fun>
+val f : <[int list]> expr -> <[int list]> eval = <fun>
 |}]
 let f e = (eval : <[int list]> expr -> _) e
 [%%expect {|
-val f : <[int list]> expr -> int list = <fun>
+val f : <[int list]> expr -> <[int list]> eval = <fun>
 |}]
 let f e = (eval : <[int list]> expr -> int list) e
 [%%expect {|
