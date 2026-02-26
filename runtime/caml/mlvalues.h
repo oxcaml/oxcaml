@@ -145,7 +145,6 @@ Caml_inline int Is_block(value x) {
 #define Unsigned_long_val(x) ((uintnat)(x) >> 1)
 #define Unsigned_int_val(x)  ((int) Unsigned_long_val(x))
 
-<<<<<<< oxcaml
 /* The widening conversion in Val_long will do sign extension, because
    the signedness of the thing being casted determines the choice on
    sign extension, not the signedness of the target type. */
@@ -155,20 +154,6 @@ Caml_inline int Is_block(value x) {
 #define Int16_val(x) ((int16_t) Long_val(x))
 #define Int8_val(x)  ((int8_t) Long_val(x))
 
-/* Encoded exceptional return values, when functions are suffixed with
-   _exn. Encoded exceptions are invalid values and must not be seen
-   by the garbage collector. */
-#define Make_exception_result(v) ((v) | 2)
-#define Is_exception_result(v) (((v) & 3) == 2)
-#define Extract_exception(v) ((v) & ~3)
-||||||| upstream-base
-/* Encoded exceptional return values, when functions are suffixed with
-   _exn. Encoded exceptions are invalid values and must not be seen
-   by the garbage collector. */
-#define Make_exception_result(v) ((v) | 2)
-#define Is_exception_result(v) (((v) & 3) == 2)
-#define Extract_exception(v) ((v) & ~3)
-=======
 /* A 'result' type for OCaml computations. */
 
 /* The [caml_result] type represents the result of computing an OCaml
@@ -203,8 +188,6 @@ Caml_inline int caml_result_is_exception(struct caml_result_private result)
 }
 
 #define Result_unit Result_value(Val_unit)
-
->>>>>>> upstream-incoming
 
 /* Structure of the header:
 
