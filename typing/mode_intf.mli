@@ -711,6 +711,8 @@ module type S = sig
       (** Similar to [comonadic_to_monadic_min] but for constants *)
       val comonadic_to_monadic_min : Comonadic.Const.t -> Monadic.Const.t
 
+      val monadic_to_comonadic_min : Monadic.Const.t -> Comonadic.Const.t
+
       (** Prints a constant on any axis. *)
       val print_axis : 'a Axis.t -> Fmt.formatter -> 'a -> unit
     end
@@ -1239,6 +1241,11 @@ module type S = sig
         visibility:Visibility.Const.t Atom.t ->
         staticity:Staticity.Const.t Atom.t ->
         t
+
+      val apply_right :
+        t ->
+        (disallowed * 'r) Alloc.Monadic.t ->
+        (disallowed * 'r) Alloc.Monadic.t
     end
 
     module Comonadic : sig
@@ -1271,6 +1278,11 @@ module type S = sig
       (** Create the mode crossing for a type whose values are always
           constructed at the given mode. *)
       val always_constructed_at : Value.Comonadic.Const.t -> t
+
+      val apply_left :
+        t ->
+        ('l * disallowed) Alloc.Comonadic.t ->
+        ('l * disallowed) Alloc.Comonadic.t
     end
 
     (** The mode crossing capability on all axes, split into monadic and
