@@ -27,16 +27,11 @@ typedef enum {
 
 extern gc_phase_t caml_gc_phase;
 
-<<<<<<< oxcaml
 Caml_inline int caml_marking_started(void) {
   return caml_gc_phase != Phase_sweep_main;
 }
 extern atomic_uintnat caml_gc_mark_phase_requested;
 
-||||||| upstream-base
-intnat caml_opportunistic_major_work_available (void);
-=======
->>>>>>> upstream-incoming
 intnat caml_opportunistic_major_work_available (caml_domain_state*);
 void caml_opportunistic_major_collection_slice (intnat);
 /* auto-triggered slice from within the GC */
@@ -51,7 +46,6 @@ void caml_teardown_major_gc(void);
 void caml_darken(void*, value, volatile value* ignored);
 void caml_darken_cont(value);
 void caml_mark_root(value, value*);
-<<<<<<< oxcaml
 void caml_mark_roots_stw(int, caml_domain_state**);
 
 /* Compaction modes */
@@ -62,13 +56,7 @@ enum {
 };
 
 void caml_finish_major_cycle(int compaction_mode);
-||||||| upstream-base
-void caml_empty_mark_stack(void);
-void caml_finish_major_cycle(int force_compaction);
-=======
-void caml_empty_mark_stack(void);
-void caml_finish_major_cycle(int force_compaction);
->>>>>>> upstream-incoming
+
 /* Reset any internal accounting the GC uses to set collection pacing.
  * For use at times when we have disturbed the usual pacing, for
  * example, after any synchronous major collection.
@@ -84,11 +72,6 @@ void caml_orphan_finalisers(caml_domain_state*);
    so it need not be atomic */
 extern uintnat caml_major_cycles_completed;
 
-<<<<<<< oxcaml
-||||||| upstream-base
-double caml_mean_space_overhead(void);
-
-=======
 Caml_inline void caml_update_major_allocated_words(
   caml_domain_state *self, intnat words, int direct
 ) {
@@ -101,7 +84,6 @@ Caml_inline void caml_update_major_allocated_words(
   }
 }
 
->>>>>>> upstream-incoming
 #endif /* CAML_INTERNALS */
 
 #endif /* CAML_MAJOR_GC_H */

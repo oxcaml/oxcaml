@@ -27,11 +27,6 @@
 #include <stdarg.h>
 #include <limits.h>
 
-<<<<<<< oxcaml
-||||||| upstream-base
-#include "camlatomic.h"
-
-=======
 /* Detection of available C attributes and compiler extensions */
 
 #ifndef __has_c_attribute
@@ -46,7 +41,6 @@
 #define __has_builtin(x) 0
 #endif
 
->>>>>>> upstream-incoming
 /* Deprecation warnings */
 
 #if __has_attribute(deprecated) || defined(__GNUC__)
@@ -182,36 +176,40 @@ CAMLdeprecated_typedef(addr, char *);
 #define CAMLthread_local _Thread_local
 #endif
 
-<<<<<<< oxcaml
-||||||| upstream-base
 /* Prefetching */
 
 #ifdef CAML_INTERNALS
-#if defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__))
-#define caml_prefetch(p) __builtin_prefetch((p), 1, 3)
-/* 1 = intent to write; 3 = all cache levels */
-#else
-#define caml_prefetch(p)
-#endif
-#endif /* CAML_INTERNALS */
 
-=======
-/* Prefetching */
-
-#ifdef CAML_INTERNALS
 #if (__has_builtin(__builtin_prefetch) || defined(__GNUC__))
-#define caml_prefetch(p) __builtin_prefetch((p), 1, 3)
+#define caml_prefetchr(p) __builtin_prefetch((p), 0, 3)
+/* 0 = intent to read; 3 = all cache levels */
+#define caml_prefetchw(p) __builtin_prefetch((p), 1, 3)
 /* 1 = intent to write; 3 = all cache levels */
-#elif defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_AMD64))
+
+#elif defined(_MSC_VER)
 #include <intrin.h>
-#define caml_prefetch(p) _mm_prefetch((char const *) p, _MM_HINT_T0)
+#if (defined(_M_IX86) || defined(_M_AMD64))
+/* MSVC Intel. See #14570.
+   0 - PREFETCHNTA; 1 - PREFETCHT0; 2 - PREFETCHT1; 3 - PREFETCHT2
+   4 - PREFETCHW; 5 - PREFETCHNTA */
+#define caml_prefetchr(p) _mm_prefetch((char const *) p, _MM_HINT_T0)
 /* PreFetchCacheLine(PF_TEMPORAL_LEVEL_1, p) */
-#else
-#define caml_prefetch(p)
+#define caml_prefetchw(p) _mm_prefetch((char const *) p, 4)
+
+#elif defined(_M_ARM64)
+/* MSVC ARM64. See #14570 */
+#define caml_prefetchr(p) __prefetch2(p, 0)
+#define caml_prefetchw(p) __prefetch2(p, 16)
+#endif
+#endif
+
+#if !defined(caml_prefetchr)
+/* Not GCC or Clang or MSVC */
+#define caml_prefetchr(p) ((void)(p))
+#define caml_prefetchw(p) ((void)(p))
 #endif
 #endif /* CAML_INTERNALS */
 
->>>>>>> upstream-incoming
 /* CAMLunused is preserved for compatibility reasons.
    Instead of the legacy GCC/Clang-only
      CAMLunused foo;
@@ -377,13 +375,7 @@ typedef char char_os;
    from the callsite, making debuggers able to see it. */
 #define CAMLassert(x) \
   (CAMLlikely(x) ? (void) 0 : caml_failed_assert ( #x , __OSFILE__, __LINE__))
-<<<<<<< oxcaml
-CAMLextern void caml_failed_assert (char *, char_os *, int)
-||||||| upstream-base
-CAMLnoret CAMLextern void caml_failed_assert (char *, char_os *, int);
-=======
 CAMLextern void caml_failed_assert (const char *, const char_os *, int)
->>>>>>> upstream-incoming
 #if defined(__has_feature)
   /* However, we do inform clang-analyzer that this function never returns,
      since that improves analysis without breaking debugging */
@@ -473,7 +465,6 @@ CAMLnoret CAMLextern void caml_fatal_error (const char *, ...)
 #endif
 ;
 
-<<<<<<< oxcaml
 CAMLnoreturn_start
 CAMLextern void caml_fatal_out_of_memory (void)
 CAMLnoreturn_end;
@@ -486,29 +477,6 @@ CAMLnoreturn_end;
 #define Caml_has_builtin(x) 0
 #endif
 
-/* Prefetching */
-
-#if defined(__GNUC__) || Caml_has_builtin(__builtin_prefetch)
-#define caml_prefetchr(p) __builtin_prefetch((p), 0, 3)
-/* 0 = intent to read; 3 = all cache levels */
-#define caml_prefetchw(p) __builtin_prefetch((p), 1, 3)
-/* 1 = intent to write; 3 = all cache levels */
-#else
-#define caml_prefetchr(p)
-#define caml_prefetchw(p)
-#endif
-
-||||||| upstream-base
-/* Detection of available C built-in functions, the Clang way. */
-
-#ifdef __has_builtin
-#define Caml_has_builtin(x) __has_builtin(x)
-#else
-#define Caml_has_builtin(x) 0
-#endif
-
-=======
->>>>>>> upstream-incoming
 /* Integer arithmetic with overflow detection.
    The functions return 0 if no overflow, 1 if overflow.
    The result of the operation is always stored at [*res].
@@ -604,12 +572,8 @@ extern double caml_log1p(double);
 #define caml_stat_strdup_noexc_to_os caml_stat_strdup_noexc_to_utf16
 #define caml_stat_strdup_of_os caml_stat_strdup_of_utf16
 #define caml_stat_strdup_noexc_of_os caml_stat_strdup_noexc_of_utf16
-<<<<<<< oxcaml
-||||||| upstream-base
-=======
 #define caml_stat_char_array_to_os caml_stat_char_array_to_utf16
 #define caml_stat_char_array_of_os caml_stat_char_array_of_utf16
->>>>>>> upstream-incoming
 #define caml_copy_string_of_os caml_copy_string_of_utf16
 
 #else /* _WIN32 */
@@ -653,12 +617,8 @@ extern double caml_log1p(double);
 #define caml_stat_strdup_noexc_to_os caml_stat_strdup_noexc
 #define caml_stat_strdup_of_os caml_stat_strdup
 #define caml_stat_strdup_noexc_of_os caml_stat_strdup_noexc
-<<<<<<< oxcaml
-||||||| upstream-base
-=======
 #define caml_stat_char_array_to_os caml_stat_memdup
 #define caml_stat_char_array_of_os caml_stat_memdup
->>>>>>> upstream-incoming
 #define caml_copy_string_of_os caml_copy_string
 
 #endif /* _WIN32 */
@@ -709,7 +669,6 @@ CAMLextern int caml_read_directory(char_os * dirname,
 
 extern _Atomic uintnat caml_verb_gc;
 
-<<<<<<< oxcaml
 /* Bits which may be set in caml_verb_gc. Keep in sync with the OCaml
  * manual, the ocamlrun.1 man page, and gc.mli */
 
@@ -757,49 +716,6 @@ extern _Atomic uintnat caml_verb_gc;
 #define CAML_GC_MSG_VERBOSE (CAML_GC_MSG_MAJOR           | \
                              CAML_GC_MSG_DOMAIN          | \
                              CAML_GC_MSG_COMPACT)
-||||||| upstream-base
-void caml_gc_log (char *, ...)
-#ifdef __GNUC__
-  __attribute__ ((format (printf, 1, 2)))
-=======
-/* Bits which may be set in caml_verb_gc. The quotations are from the
- * OCaml manual. */
-
-/* "Start and end of major GC cycle" (unused) */
-#define CAML_GC_MSG_MAJOR           0x0001
-/* "Minor collection and major GC slice" (unused) */
-#define CAML_GC_MSG_MINOR           0x0002
-/* "Growing and shrinking of the heap" */
-#define CAML_GC_MSG_HEAPSIZE        0x0004
-/* "Resizing of stacks and memory manager tables" */
-#define CAML_GC_MSG_STACKSIZE       0x0008
-/* "Heap compaction" (unused) */
-#define CAML_GC_MSG_COMPACT         0x0010
-/* "Change of GC parameters" */
-#define CAML_GC_MSG_PARAMS          0x0020
-/* "Computation of major GC slice size" */
-#define CAML_GC_MSG_SLICESIZE       0x0040
-/* "Calling of finalization functions" */
-#define CAML_GC_MSG_FINALIZE        0x0080
-/* "Startup messages" */
-#define CAML_GC_MSG_STARTUP         0x0100
-/* "Computation of compaction-triggering condition" (unused) */
-#define CAML_GC_MSG_COMPACT_TRIGGER 0x0200
-/* "Output GC statistics at program exit" */
-#define CAML_GC_MSG_STATS           0x0400
-/* "GC debugging messages */
-#define CAML_GC_MSG_DEBUG           0x0800
-/* "Address space reservation changes" */
-#define CAML_GC_MSG_ADDRSPACE       0x1000
-
-/* Default set of messages when runtime invoked with -v */
-
-#define CAML_GC_MSG_VERBOSE (CAML_GC_MSG_MAJOR     | \
-                             CAML_GC_MSG_HEAPSIZE  | \
-                             CAML_GC_MSG_STACKSIZE | \
-                             CAML_GC_MSG_COMPACT   | \
-                             CAML_GC_MSG_PARAMS)
->>>>>>> upstream-incoming
 
 /* Use to control messages which should be output at any non-zero verbosity */
 
@@ -913,9 +829,6 @@ CAMLextern int caml_snwprintf(wchar_t * buf,
 #define CAML_GENSYM_2(name, l) CAML_GENSYM_3(name, l)
 #define CAML_GENSYM(name) CAML_GENSYM_2(name, __LINE__)
 
-<<<<<<< oxcaml
-||||||| upstream-base
-=======
 #define MSEC_PER_SEC  UINT64_C(1000)
 #define USEC_PER_MSEC UINT64_C(1000)
 #define USEC_PER_SEC  UINT64_C(1000000)
@@ -937,7 +850,6 @@ Caml_inline struct timespec caml_timespec_of_nsec(uint64_t nsec)
         (nsec % NSEC_PER_SEC) };
 }
 
->>>>>>> upstream-incoming
 #endif /* CAML_INTERNALS */
 
 /* The [backtrace_slot] type represents values stored in
@@ -954,14 +866,10 @@ typedef void * backtrace_slot;
 #define IO_BUFFER_SIZE 65536
 #endif
 
-<<<<<<< oxcaml
-||||||| upstream-base
-=======
 /* GC policy settings */
 typedef intnat caml_gc_policy;
 #define CAML_GC_RAMP_UP             0x0001
 
->>>>>>> upstream-incoming
 #ifdef __cplusplus
 }
 #endif

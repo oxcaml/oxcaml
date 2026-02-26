@@ -145,7 +145,7 @@ static void remove_entry(caml_frame_descrs *table, frame_descr * d) {
   uintnat r;
   uintnat j;
 
-  i = Hash_retaddr(d->retaddr, table->mask);
+  i = Hash_retaddr(Retaddr_frame(d), table->mask);
   while (table->descriptors[i] != d) {
     i = (i+1) & table->mask;
   }
@@ -157,7 +157,7 @@ static void remove_entry(caml_frame_descrs *table, frame_descr * d) {
   i = (i+1) & table->mask;
   // r3
   if(table->descriptors[i] == NULL) return;
-  r = Hash_retaddr(table->descriptors[i]->retaddr, table->mask);
+  r = Hash_retaddr(Retaddr_frame(table->descriptors[i]), table->mask);
   /* If r is between i and j (cyclically), i.e. if
      table->descriptors[i]->retaddr don't need to be moved */
   if(( ( j < r )  && ( r <= i ) ) ||
@@ -295,16 +295,7 @@ static void stw_register_frametables(
     caml_domain_state** participating)
 {
   Caml_global_barrier_if_final(participating_count) {
-<<<<<<< oxcaml
-    register_frametables_from_stw_single(frametables);
-||||||| upstream-base
-  barrier_status b = caml_global_barrier_begin ();
-
-  if (caml_global_barrier_is_final(b)) {
-    register_frametables_from_stw_single((frametable_array*) frametables);
-=======
-    register_frametables_from_stw_single((caml_frametable_list*) frametables);
->>>>>>> upstream-incoming
+    register_frametables_from_stw_single((caml_frametable_list *) frametables);
   }
 }
 
@@ -398,16 +389,8 @@ frame_descr* caml_find_frame_descr(caml_frame_descrs *fds, uintnat pc)
   while (1) {
     d = fds->descriptors[h];
     if (d == 0) return NULL; /* can happen if some code compiled without -g */
-<<<<<<< oxcaml
     if (Retaddr_frame(d) == pc) break;
-    h = (h+1) & fds.mask;
-||||||| upstream-base
-    if (d->retaddr == pc) break;
-    h = (h+1) & fds.mask;
-=======
-    if (d->retaddr == pc) break;
     h = (h+1) & fds->mask;
->>>>>>> upstream-incoming
   }
   return d;
 }

@@ -109,15 +109,7 @@ void caml_lf_skiplist_init(struct lf_skiplist *sk) {
                                    NUM_LEVELS * sizeof(struct lf_skipcell *));
   if (sk->tail == NULL)
     caml_fatal_error("caml_lf_skiplist_init: out of memory");
-<<<<<<< oxcaml
-  sk->tail->key = UINTNAT_MAX;
-||||||| upstream-base
-  sk->tail = caml_stat_alloc(SIZEOF_LF_SKIPCELL +
-                             NUM_LEVELS * sizeof(struct lf_skipcell *));
-  sk->tail->key = UINTNAT_MAX;
-=======
   sk->tail->key = CAML_UINTNAT_MAX;
->>>>>>> upstream-incoming
   sk->tail->data = 0;
   sk->tail->garbage_next = NULL;
   sk->tail->top_level = NUM_LEVELS - 1;

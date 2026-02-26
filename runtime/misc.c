@@ -41,14 +41,6 @@ void caml_print_loc(const char_os *file_os, int line) {
   fprintf(stderr, "[%02d] file %s; line %d ### ",
           (Caml_state_opt != NULL) ? Caml_state_opt->id : -1, file, line);
   caml_stat_free(file);
-<<<<<<< oxcaml
-#if Caml_has_builtin(__builtin_trap) || defined(__GNUC__)
-  __builtin_trap();
-#endif
-  abort();
-||||||| upstream-base
-  abort();
-=======
 }
 
 void caml_failed_assert (const char * expr, const char_os * file_os, int line)
@@ -64,7 +56,6 @@ CAMLnoret void caml_debug_abort(const char_os * file_os, int line) {
   fprintf(stderr, "Abort\n");
   fflush(stderr);
   caml_abort();
->>>>>>> upstream-incoming
 }
 #endif
 
@@ -89,15 +80,8 @@ void caml_alloc_point_here(void)
 
 atomic_uintnat caml_verb_gc = 0;
 
-<<<<<<< oxcaml
 static void print_log(const char* msg, int newline, va_list ap)
-||||||| upstream-base
-void caml_gc_log (char *msg, ...)
-=======
-void caml_gc_log (const char *msg, ...)
->>>>>>> upstream-incoming
 {
-<<<<<<< oxcaml
   char buf[GC_LOG_LENGTH];
   int pos = 0;
   if (!(atomic_load_relaxed(&caml_verb_gc) & CAML_GC_MSG_NO_TIMESTAMP)) {
@@ -121,27 +105,6 @@ void caml_gc_log (const char *msg, ...)
     va_start (ap, msg);
     print_log(msg, 1, ap);
     va_end (ap);
-||||||| upstream-base
-  if ((atomic_load_relaxed(&caml_verb_gc) & 0x800) != 0) {
-    char fmtbuf[GC_LOG_LENGTH];
-    va_list args;
-    va_start (args, msg);
-    snprintf(fmtbuf, GC_LOG_LENGTH, "[%02d] %s\n",
-             (Caml_state_opt != NULL) ? Caml_state_opt->id : -1, msg);
-    vfprintf(stderr, fmtbuf, args);
-    va_end (args);
-    fflush(stderr);
-=======
-  if ((atomic_load_relaxed(&caml_verb_gc) & CAML_GC_MSG_DEBUG) != 0) {
-    char fmtbuf[GC_LOG_LENGTH];
-    va_list args;
-    va_start (args, msg);
-    snprintf(fmtbuf, GC_LOG_LENGTH, "[%02d] %s\n",
-             (Caml_state_opt != NULL) ? Caml_state_opt->id : -1, msg);
-    vfprintf(stderr, fmtbuf, args);
-    va_end (args);
-    fflush(stderr);
->>>>>>> upstream-incoming
   }
 }
 
