@@ -1382,7 +1382,7 @@ val mod_field:
 
 val structured_constant_layout : structured_constant -> layout
 
-val mixed_block_element_of_layout : layout -> unit mixed_block_element
+val mixed_block_element_of_layout : layout -> 'a mixed_block_element
 
 (** [Pintval] if a type of [value] jkind is GC-ignorable based on its provided
     externality, and [Pgenval] otherwise. *)
