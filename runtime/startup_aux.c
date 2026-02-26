@@ -104,15 +104,9 @@ static void init_startup_params(void)
   params.use_hugetlb_pages = 0;
 
 #ifdef DEBUG
-<<<<<<< oxcaml
   // Silenced in oxcaml to make it easier to run tests that
   // check program output.
   // atomic_store_relaxed(&caml_verb_gc, CAML_GC_MSG_VERBOSE | CAML_GC_MSG_MINOR);
-||||||| upstream-base
-  atomic_store_relaxed(&caml_verb_gc, 0x3F);
-=======
-  atomic_store_relaxed(&caml_verb_gc, CAML_GC_MSG_VERBOSE | CAML_GC_MSG_MINOR);
->>>>>>> upstream-incoming
 #endif
 #ifndef NATIVE_CODE
   cds_file = caml_secure_getenv(T("CAML_DEBUG_FILE"));
@@ -143,7 +137,6 @@ static void scanmult (char_os *opt, uintnat *var)
 
 static void parse_gc_tweak(char_os** opt_p)
 {
-<<<<<<< oxcaml
   char_os *opt = *opt_p;
   char_os *name = opt;
   while (*opt != '\0') {
@@ -169,16 +162,10 @@ static void parse_gc_tweak(char_os** opt_p)
   }
   *opt_p = opt;
 }
-||||||| upstream-base
-  init_startup_params();
-=======
-  init_startup_params();
-  uintnat val;
->>>>>>> upstream-incoming
-
 
 static void parse_ocamlrunparam(char_os* opt)
 {
+  uintnat val;
   if (opt != NULL){
     while (*opt != '\0'){
       switch (*opt++){
@@ -261,12 +248,6 @@ int caml_startup_aux(int pooling)
   if (shutdown_happened == 1)
     caml_fatal_error("caml_startup was called after the runtime "
                      "was shut down with caml_shutdown");
-
-#ifdef DEBUG
-  /* Note this must be executed after the call to caml_parse_ocamlrunparam. */
-  CAML_GC_MESSAGE(ANY, "### OCaml runtime: debug mode ###\n");
-  CAML_GC_MESSAGE(ANY, "### set OCAMLRUNPARAM=v=0 to silence this message\n");
-#endif
 
   /* Second and subsequent calls are ignored,
      since the runtime has already started */

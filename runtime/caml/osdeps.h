@@ -201,22 +201,16 @@ CAMLextern wchar_t* caml_stat_strdup_noexc_to_utf16(const char *s);
 CAMLalloc(caml_stat_free, 1) CAMLreturns_nonnull()
 CAMLextern wchar_t* caml_stat_strdup_to_utf16(const char *s);
 
-<<<<<<< oxcaml
-/* [caml_stat_strdup_noexc_of_utf16(s)] returns a null-terminated copy of [s],
-||||||| upstream-base
-/* [caml_stat_strdup_of_utf16(s)] returns a NULL-terminated copy of [s],
-=======
 /* [caml_stat_strdup_noexc_of_utf16(s)] returns a NUL-terminated copy of [s],
->>>>>>> upstream-incoming
    re-encoded in UTF-8 if [caml_windows_unicode_runtime_enabled] is non-zero or
    the current Windows code page otherwise.
 
-<<<<<<< oxcaml
    The returned string is allocated with [caml_stat_alloc_noexc], so
    it should be freed using [caml_stat_free].
 
    If allocation fails, this returns NULL.
 */
+CAMLalloc(caml_stat_free, 1)
 CAMLextern char* caml_stat_strdup_noexc_of_utf16(const wchar_t *s);
 
 /* [caml_stat_strdup_of_utf16(s)] returns a null-terminated copy of [s],
@@ -225,28 +219,6 @@ CAMLextern char* caml_stat_strdup_noexc_of_utf16(const wchar_t *s);
 
    The returned string is allocated with [caml_stat_alloc_noexc], so
    it should be freed using [caml_stat_free].
-
-   If allocation fails, this raises Out_of_memory.
-||||||| upstream-base
-   The returned string is allocated with [caml_stat_alloc], so it should be free
-   using [caml_stat_free].
-=======
-   The returned string is allocated with [caml_stat_alloc_noexc], so it should
-   be freed using [caml_stat_free].
-
-   If allocation fails, this returns NULL. This function never raises any
-   exceptions when [s] is valid UTF-16 but may raise [Sys_error] if it is not.
->>>>>>> upstream-incoming
-*/
-CAMLalloc(caml_stat_free, 1)
-CAMLextern char* caml_stat_strdup_noexc_of_utf16(const wchar_t *s);
-
-/* [caml_stat_strdup_of_utf16(s)] returns a NUL-terminated copy of [s],
-   re-encoded in UTF-8 if [caml_windows_unicode_runtime_enabled] is non-zero or
-   the current Windows code page otherwise.
-
-   The returned string is allocated with [caml_stat_alloc], so it should be
-   freed using [caml_stat_free].
 
    If allocation fails, this raises Out_of_memory. This function may also raise
    [Sys_error] if [s] is not valid UTF-16.

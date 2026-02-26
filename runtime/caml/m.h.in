@@ -91,7 +91,6 @@
 
 #undef USE_MMAP_MAP_STACK
 
-<<<<<<< oxcaml
 #undef STACK_ALLOCATION
 
 #undef STACK_CHECKS_ENABLED
@@ -119,10 +118,8 @@
 #undef HAS_AVX
 
 #undef HAS_AVX2
-||||||| upstream-base
-=======
+
 #undef WITH_NONEXECSTACK_NOTE
 
 /* Define WITH_NONEXECSTACK_NOTE when an explicit ".note.GNU-stack" section
    is to be added to indicate the stack should not be executable */
->>>>>>> upstream-incoming

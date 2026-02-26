@@ -364,17 +364,9 @@ CAMLprim value caml_get_exception_backtrace(value unit)
   } else {
     backtrace = caml_get_exception_raw_backtrace(Val_unit);
 
-<<<<<<< oxcaml
     mlsize_t backtrace_size = Wosize_val(backtrace);
     arr = caml_alloc(backtrace_size, 0);
-    for (i = 0; i < backtrace_size; i++) {
-||||||| upstream-base
-    arr = caml_alloc(Wosize_val(backtrace), 0);
-    for (i = 0; i < Wosize_val(backtrace); i++) {
-=======
-    arr = caml_alloc(Wosize_val(backtrace), 0);
-    for (intnat i = 0; i < Wosize_val(backtrace); i++) {
->>>>>>> upstream-incoming
+    for (intnat i = 0; i < backtrace_size; i++) {
       backtrace_slot slot = Backtrace_slot_val(Field(backtrace, i));
       debuginfo dbg = caml_debuginfo_extract(slot);
       Store_field(arr, i, caml_convert_debuginfo(dbg));

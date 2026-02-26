@@ -71,16 +71,8 @@ void caml_garbage_collection(void)
 
   { /* Compute the total allocation size at this point,
        including allocations combined by Comballoc */
-<<<<<<< oxcaml
     unsigned char* alloc_len = frame_end_of_live_ofs(d);
-    int i, nallocs = *alloc_len++;
-||||||| upstream-base
-    unsigned char* alloc_len = (unsigned char*)(&d->live_ofs[d->num_live]);
-    int i, nallocs = *alloc_len++;
-=======
-    unsigned char* alloc_len = (unsigned char*)(&d->live_ofs[d->num_live]);
-    int nallocs = *alloc_len++;
->>>>>>> upstream-incoming
+    int  nallocs = *alloc_len++;
     intnat allocsz = 0;
 
     if (nallocs == 0) {

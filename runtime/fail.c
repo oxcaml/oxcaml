@@ -21,6 +21,8 @@
 #include "caml/fail.h"
 #include "caml/memory.h"
 #include "caml/mlvalues.h"
+#include "caml/callback.h"
+#include "caml/printexc.h"
 
 #define Assert_is_exn_constructor(v)                                    \
   (CAMLassert(Is_block(v)), CAMLassert(Tag_val(v) == Object_tag))
@@ -112,12 +114,19 @@ CAMLexport void caml_invalid_argument_value(value msg)
 
 CAMLexport void caml_raise_out_of_memory(void)
 {
+  /* Note that this is not an async exn. */
   caml_raise(caml_exception_out_of_memory());
+}
+
+CAMLexport void caml_raise_out_of_fibers(void)
+{
+  /* Note that this is not an async exn. */
+  caml_raise(caml_exception_out_of_fibers());
 }
 
 CAMLexport void caml_raise_stack_overflow(void)
 {
-  caml_raise(caml_exception_stack_overflow());
+  caml_raise_async(caml_exception_stack_overflow());
 }
 
 CAMLexport void caml_raise_sys_error(value msg)
@@ -140,12 +149,35 @@ CAMLexport void caml_raise_not_found(void)
   caml_raise(caml_exception_not_found());
 }
 
+CAMLexport void caml_raise_sys_blocked_io(void)
+{
+  caml_raise(caml_exception_sys_blocked_io());
+}
+
 CAMLexport void caml_array_bound_error(void)
 {
   caml_raise(caml_exception_array_bound_error());
 }
 
-CAMLexport void caml_raise_sys_blocked_io(void)
+CAMLexport void caml_array_align_error(void)
 {
-  caml_raise(caml_exception_sys_blocked_io());
+  caml_raise(caml_exception_array_align_error());
+}
+
+void caml_check_async(caml_result res, const char *msg)
+{
+  if (!caml_result_is_exception(res))
+    return;
+
+  value exn = res.data;
+
+  /* [Break] is not introduced as a predefined exception (in predef.ml and
+     stdlib.ml) since it causes trouble in conjunction with warnings about
+     constructor shadowing e.g. in format.ml.
+     "Sys.Break" must match stdlib/sys.mlp. */
+  const value *break_exn = caml_named_value("Sys.Break");
+  if (break_exn != NULL && exn == *break_exn)
+    return;
+
+  caml_fatal_uncaught_exception_with_message(exn, msg);
 }

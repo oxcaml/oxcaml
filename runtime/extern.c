@@ -402,14 +402,6 @@ static void close_extern_output(struct caml_extern_state* s)
 
 static void free_extern_output(struct caml_extern_state* s)
 {
-<<<<<<< oxcaml
-  struct caml_output_block * blk, * nextblk;
-
-||||||| upstream-base
-  struct output_block * blk, * nextblk;
-
-=======
->>>>>>> upstream-incoming
   if (s->extern_userprovided_output == NULL) {
     for (struct caml_output_block *blk = s->extern_output_first, *nextblk;
          blk != NULL;
@@ -483,13 +475,7 @@ static void extern_failwith(struct caml_extern_state* s, const char *msg)
 
 static void extern_stack_overflow(struct caml_extern_state* s)
 {
-<<<<<<< oxcaml
   CAML_GC_MESSAGE(DEBUG,
-||||||| upstream-base
-  caml_gc_message (0x04, "Stack overflow in marshaling value\n");
-=======
-  CAML_GC_MESSAGE(HEAPSIZE,
->>>>>>> upstream-incoming
                   "Stack overflow in marshaling value\n");
   free_extern_output(s);
   caml_raise_out_of_memory();
@@ -1178,12 +1164,6 @@ CAMLexport void caml_output_value_to_malloc(value v, value flags,
   int header_len;
   intnat data_len;
   char * res;
-<<<<<<< oxcaml
-  struct caml_output_block * blk, * nextblk;
-||||||| upstream-base
-  struct output_block * blk, * nextblk;
-=======
->>>>>>> upstream-incoming
   struct caml_extern_state* s = init_extern_state ();
 
   init_extern_output(s);

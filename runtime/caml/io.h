@@ -24,13 +24,6 @@
 #include "misc.h"
 #include "mlvalues.h"
 
-<<<<<<< oxcaml
-||||||| upstream-base
-#ifndef IO_BUFFER_SIZE
-#define IO_BUFFER_SIZE 65536
-#endif
-
-=======
 #ifndef _MSC_VER
 #include "platform.h"
 #else
@@ -43,7 +36,6 @@
 typedef intptr_t caml_plat_mutex;
 #endif
 
->>>>>>> upstream-incoming
 #if defined(_WIN32)
 typedef __int64 file_offset;
 #else

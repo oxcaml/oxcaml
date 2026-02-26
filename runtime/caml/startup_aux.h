@@ -47,13 +47,8 @@ struct caml_params {
   uintnat init_custom_major_ratio;
   uintnat init_custom_minor_ratio;
   uintnat init_custom_minor_max_bsz;
-<<<<<<< oxcaml
   uintnat init_custom_work_clamp;
 
-||||||| upstream-base
-
-=======
->>>>>>> upstream-incoming
   uintnat init_max_stack_wsz;
 
   uintnat backtrace_enabled;
@@ -61,11 +56,7 @@ struct caml_params {
   uintnat cleanup_on_exit;
   uintnat event_trace;
   uintnat max_domains;
-<<<<<<< oxcaml
   uintnat use_hugetlb_pages;
-||||||| upstream-base
-=======
->>>>>>> upstream-incoming
 };
 
 extern const struct caml_params* const caml_params;

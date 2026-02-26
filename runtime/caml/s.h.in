@@ -109,7 +109,6 @@
 #undef HAS_PTHREAD_NP_H
 
 #undef HAS_PRCTL
-<<<<<<< oxcaml
 
 #undef HAS_PTHREAD_SETNAME_NP
 
@@ -120,10 +119,6 @@
 #undef HAS_DECL_SETTHREADDESCRIPTION
 
 #undef HAS_UNISTD
-||||||| upstream-base
-#undef HAS_UNISTD
-=======
->>>>>>> upstream-incoming
 
 #undef HAS_PTHREAD_SETNAME_NP
 

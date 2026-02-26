@@ -27,34 +27,19 @@ type runtime_counter =
 | EV_C_REQUEST_MINOR_REALLOC_REF_TABLE
 | EV_C_REQUEST_MINOR_REALLOC_EPHE_REF_TABLE
 | EV_C_REQUEST_MINOR_REALLOC_CUSTOM_TABLE
+| EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE
 | EV_C_MAJOR_HEAP_POOL_WORDS
 | EV_C_MAJOR_HEAP_POOL_LIVE_WORDS
 | EV_C_MAJOR_HEAP_LARGE_WORDS
 | EV_C_MAJOR_HEAP_POOL_FRAG_WORDS
 | EV_C_MAJOR_HEAP_POOL_LIVE_BLOCKS
 | EV_C_MAJOR_HEAP_LARGE_BLOCKS
-(* CR sspies: EV_C_MAJOR_SLICE_ALLOC_WORDS has been renamed to
-   EV_C_MAJOR_ALLOCATED_WORDS to match upstream. *)
-<<<<<<< oxcaml
-| EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE
 | EV_C_MAJOR_SLICE_ALLOC_WORDS
 | EV_C_MAJOR_SLICE_ALLOC_DEPENDENT_WORDS
 | EV_C_MAJOR_SLICE_NEW_WORK
 | EV_C_MAJOR_SLICE_TOTAL_WORK
 | EV_C_MAJOR_SLICE_BUDGET
 | EV_C_MAJOR_SLICE_WORK_DONE
-||||||| upstream-base
-=======
-| EV_C_MAJOR_HEAP_WORDS
-| EV_C_MAJOR_ALLOCATED_WORDS
-| EV_C_MAJOR_ALLOCATED_WORK
-| EV_C_MAJOR_DEPENDENT_WORK
-| EV_C_MAJOR_EXTRA_WORK
-| EV_C_MAJOR_WORK_COUNTER
-| EV_C_MAJOR_ALLOC_COUNTER
-| EV_C_MAJOR_SLICE_TARGET
-| EV_C_MAJOR_SLICE_BUDGET
->>>>>>> upstream-incoming
 
 type runtime_phase =
 | EV_EXPLICIT_GC_SET
@@ -105,13 +90,9 @@ type runtime_phase =
 | EV_COMPACT_EVACUATE
 | EV_COMPACT_FORWARD
 | EV_COMPACT_RELEASE
-<<<<<<< oxcaml
+| EV_EMPTY_MINOR
 | EV_MINOR_EPHE_CLEAN
 | EV_MINOR_DEPENDENT
-||||||| upstream-base
-=======
-| EV_EMPTY_MINOR
->>>>>>> upstream-incoming
 
 type lifecycle =
   EV_RING_START
@@ -138,6 +119,8 @@ let runtime_counter_name counter =
       "request_minor_realloc_ephe_ref_table"
   | EV_C_REQUEST_MINOR_REALLOC_CUSTOM_TABLE ->
       "request_minor_realloc_custom_table"
+  | EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE ->
+      "request_minor_realloc_dependent_table"
   | EV_C_MAJOR_HEAP_POOL_WORDS ->
       "major_heap_pool_words"
   | EV_C_MAJOR_HEAP_POOL_LIVE_WORDS ->
@@ -150,9 +133,6 @@ let runtime_counter_name counter =
       "major_heap_pool_live_blocks"
   | EV_C_MAJOR_HEAP_LARGE_BLOCKS ->
       "major_heap_large_blocks"
-<<<<<<< oxcaml
-  | EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE ->
-      "request_minor_realloc_dependent_table"
   | EV_C_MAJOR_SLICE_ALLOC_WORDS ->
     "major_slice_alloc_words"
   | EV_C_MAJOR_SLICE_ALLOC_DEPENDENT_WORDS ->
@@ -165,28 +145,6 @@ let runtime_counter_name counter =
     "major_slice_budget"
   | EV_C_MAJOR_SLICE_WORK_DONE ->
     "major_slice_work_done"
-||||||| upstream-base
-=======
-  | EV_C_MAJOR_HEAP_WORDS ->
-      "major_heap_words"
-  | EV_C_MAJOR_ALLOCATED_WORDS ->
-      "major_allocated_words"
-  | EV_C_MAJOR_ALLOCATED_WORK ->
-      "major_allocated_work"
-  | EV_C_MAJOR_DEPENDENT_WORK ->
-      "major_dependent_work"
-  | EV_C_MAJOR_EXTRA_WORK ->
-      "major_extra_work"
-  | EV_C_MAJOR_WORK_COUNTER ->
-      "major_work_counter"
-  | EV_C_MAJOR_ALLOC_COUNTER ->
-      "major_alloc_counter"
-  | EV_C_MAJOR_SLICE_TARGET ->
-      "major_slice_target"
-  | EV_C_MAJOR_SLICE_BUDGET ->
-      "major_slice_budget"
-
->>>>>>> upstream-incoming
 
 let runtime_phase_name phase =
   match phase with
@@ -238,13 +196,9 @@ let runtime_phase_name phase =
   | EV_COMPACT_EVACUATE -> "compaction_evacuate"
   | EV_COMPACT_FORWARD -> "compaction_forward"
   | EV_COMPACT_RELEASE -> "compaction_release"
-<<<<<<< oxcaml
+  | EV_EMPTY_MINOR -> "empty_minor"
   | EV_MINOR_EPHE_CLEAN -> "minor_ephe_clean"
   | EV_MINOR_DEPENDENT -> "minor_dependent"
-||||||| upstream-base
-=======
-  | EV_EMPTY_MINOR -> "empty_minor"
->>>>>>> upstream-incoming
 
 let lifecycle_name lifecycle =
   match lifecycle with
@@ -338,26 +292,25 @@ module User = struct
        the write buffer across calls.
 
        To be safe for multi-domain programs, we use domain-local
-<<<<<<< oxcaml
-       storage for the write buffer. To accomodate for multi-threaded
+       storage for the write buffer. To accommodate multi-threaded
        programs (without depending on the Thread module), we store
        a list of caches for each domain. This might leak a bit of
        memory: the number of buffers for a domain is equal to the
        maximum number of threads that requested a buffer concurrently,
        and we never free those buffers. *)
     let create_buffer () = Bytes.create 1024 in
-    let open struct 
-      type buffer_cache = bytes Modes.Contended.t list Atomic.t 
+    let open struct
+      type buffer_cache = bytes Modes.Contended.t list Atomic.t
     end in
-    let write_buffer_cache = 
+    let write_buffer_cache =
       Domain.Safe.DLS.new_key (fun () : buffer_cache -> Atomic.make [])
     in
     let rec pop_or_create buffers =
       match Atomic.get buffers with
       | [] -> {Modes.Contended.contended = create_buffer ()}
       | (b :: bs) as old_buffers ->
-        if Atomic.compare_and_set buffers old_buffers bs 
-        then b 
+        if Atomic.compare_and_set buffers old_buffers bs
+        then b
         else pop_or_create buffers
     in
     let rec push buffers buf =
@@ -371,53 +324,11 @@ module User = struct
       let buffers = Domain.Safe.DLS.get write_buffer_cache in
       let buf = pop_or_create buffers in
       Fun.protect ~finally:(fun () -> push buffers buf)
-        (fun () -> 
+        (fun () ->
           (* Safe because [buffers] contains unique references and no other
              thread could have popped [buf]. *)
           let buf = Obj.magic_uncontended buf.Modes.Contended.contended in
           consumer buf)
-||||||| upstream-base
-  let write event value = user_write event value
-=======
-       storage for the write buffer. To accommodate for multi-threaded
-       programs (without depending on the Thread module), we store
-       a list of caches for each domain. This might leak a bit of
-       memory: the number of buffers for a domain is equal to the
-       maximum number of threads that requested a buffer concurrently,
-       and we never free those buffers. *)
-    let create_buffer () = Bytes.create 1024 in
-    let write_buffer_cache = Domain.DLS.new_key (fun () -> ref []) in
-    let pop_or_create buffers =
-      (* intended to be thread-safe *)
-      (* begin atomic *)
-      match !buffers with
-      | [] ->
-          (* end atomic *)
-          create_buffer ()
-      | b::bs ->
-          buffers := bs;
-          (* end atomic *)
-          b
-    in
-    let[@poll error] compare_and_set r old_val new_val =
-      if !r == old_val then (r := new_val; true)
-      else false
-    in
-    let rec push buffers buf =
-      (* intended to be thread-safe *)
-      let old_buffers = !buffers in
-      let new_buffers = buf :: old_buffers in
-      (* retry if !buffers changed under our feet: *)
-      if compare_and_set buffers old_buffers new_buffers
-      then ()
-      else push buffers buf
-    in
-    fun consumer ->
-      let buffers = Domain.DLS.get write_buffer_cache in
-      let buf = pop_or_create buffers in
-      Fun.protect ~finally:(fun () -> push buffers buf)
-        (fun () -> consumer buf)
->>>>>>> upstream-incoming
 
   let write (type a) (event : a t) (value : a) =
     if runtime_events_are_active () then
