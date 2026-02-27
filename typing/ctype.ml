@@ -2217,18 +2217,15 @@ let try_expand_safe env ty =
    * Reduce a quoted-eval through a concrete (top-level) type constructor.
    * Cancel a quote-splice pair. *)
 let rec try_reduce_once t =
-  let maybe_reduce_once t =
-    try try_reduce_once t
-    with Cannot_expand -> t
-  in
+  let try_reduce_poly t = if is_Tpoly t then try_reduce_once t else t in
   match get_desc t with
   | Tquote_eval t -> begin
     match get_desc t with
     | Tvar _ | Tunivar _ -> raise Cannot_expand
     (* [<[t1 -> t2]> eval]  ==>  [<[t1]> eval -> <[t2]> eval] *)
     | Tarrow (a, t1, t2, c) ->
-      (* Distribute across the parameter type's [Tpoly] immediately *)
-      let t1' = new_quote_eval_ty t1 |> maybe_reduce_once in
+      (* Reduce the parameter type's [Tpoly] immediately *)
+      let t1' = new_quote_eval_ty t1 |> try_reduce_once in
       let t2' = new_quote_eval_ty t2 in
       Tarrow (a, t1', t2', c)
     (* [<[t1 * t2]> eval]  ==>  [<[t1]> eval * <[t2]> eval] *)
@@ -2244,26 +2241,36 @@ let rec try_reduce_once t =
       Tconstr (p, List.map new_quote_eval_ty tl, a)
     (* [<[ < .. > ]> eval]  ==>  [< <[..]> eval >] *)
     | Tobject (t, ct) ->
+      (* Attempt to reduce the field list immediately:
+         - If the object type is open, then its final element ([Tvar] or [Tunivar])
+           will [raise Cannot_expand]. [Cannot_expand] propagates to this expansion
+           so the [Tobject] does not reduce at all.
+         - If the object type is closed, its final element is a [Tnil] and
+           the entire [Tobject] will reduce just fine. *)
       Tobject (
-        maybe_reduce_once (new_quote_eval_ty t),
+        try_reduce_once (new_quote_eval_ty t),
         ref (
           Option.map
             (fun (p, tl) -> p, List.map new_quote_eval_ty tl)
             !ct))
     (* [<[ < a: t, .. > ]> eval] ==> [<a : <[t]> eval, <[..]> eval >] *)
-    | Tfield (s, k, t1, t2) ->
-      (* Distribute across the method type's [Tpoly] immediately *)
+    | Tfield (s, k, t_method, t_rest) ->
       Tfield (
-        s, k, maybe_reduce_once (new_quote_eval_ty t1),
-        maybe_reduce_once (new_quote_eval_ty t2))
+        s, k,
+        (* If the method type's [Tpoly] is present, we reduce it. *)
+        try_reduce_poly (new_quote_eval_ty t_method),
+        (* Immediately reduce the other fields to make sure we don't get stuck. *)
+        try_reduce_once (new_quote_eval_ty t_rest))
+    | Tnil -> Tnil
     (* reduce in subterm *)
     | Tquote _ | Tsplice _ | Tquote_eval _ ->
       Tquote_eval (try_reduce_once t)
     (* [<[ < > ]> eval] ==> [< >] *)
-    | Tnil -> Tnil
     (* [<[ [ `A of t ... ] | ]> eval] ==> [ [ `A of <[t]> eval | ... ] ] *)
     | Tvariant row ->
-      Tvariant (copy_row new_quote_eval_ty true row false (row_more row))
+      (* Immediately beta-reduce [more] -- this should only reduce closed variant types *)
+      let more = row_more row |> new_quote_eval_ty |> try_reduce_once in
+      Tvariant (copy_row new_quote_eval_ty true row false more)
     (* [<['a. t]> eval] ==> ['b. (<[{$'b/'a} t]> eval)],
         where {t/x} is a substitution of t for x. *)
     | Tpoly (t, tl) ->
