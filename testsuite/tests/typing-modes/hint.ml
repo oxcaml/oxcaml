@@ -102,6 +102,40 @@ Error: Signature mismatch:
 |}]
 
 
+(* Test: Optional_argument allocation hint.
+   The Allocation_r Optional_argument hint is attached by register_allocation in
+   type_option_some, but in practice the hint chain is lost during mode
+   constraint solving. The error below should ideally mention "optional argument
+   wrapper" but currently does not. *)
+let opt_ref : string option ref = ref None
+let opt_f ?(x = "default") () = opt_ref := Some x; x
+let opt_g (local_ s : string) = opt_f ~x:s ()
+[%%expect{|
+val opt_ref : string option ref = {contents = None}
+val opt_f : ?x:string -> unit -> string = <fun>
+Line 3, characters 41-42:
+3 | let opt_g (local_ s : string) = opt_f ~x:s ()
+                                             ^
+Error: This value is "local" to the parent region but is expected to be "global".
+|}]
+
+(* Test: Function_coercion Allocation_r hint.
+   Coercing a function with optional args to a simpler type creates a closure
+   allocation. *)
+let coerce_f (local_ f : ?a:string -> string -> string) =
+  (f : string -> string)
+[%%expect{|
+Line 2, characters 3-4:
+2 |   (f : string -> string)
+       ^
+Error: This value is "local" to the parent region
+       but is expected to be "global"
+         because it is to omit some parameters by partial application (and thus an allocation)
+         which is expected to be "local" to the parent region or "global"
+         because it is a function return value.
+         Hint: Use exclave_ to return a local value.
+|}]
+
 let local_callback : (local_ string -> unit) -> unit = fun _ -> ()
 
 type 'a t =

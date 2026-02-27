@@ -2195,6 +2195,13 @@ module Report = struct
       Fmt.dprintf "is allocated at@;<1 2>%a@ containing data"
         (Location.Doc.loc ~capitalize_first:false)
         loc
+    (* Allocation_l appears when the hint chain traces backwards through an
+       allocation (via left_adjoint of Allocation_r). This requires extracting
+       a component from the allocated value. For Optional_argument and
+       Function_coercion, the allocated values (Some wrappers and closures)
+       are opaque to users, so this path is not known to be reachable.
+       For Float_projection, the contents are unboxed floats which cross
+       all modes, so the submode check on the contents never fails. *)
     | Optional_argument ->
       Fmt.dprintf
         "is an optional argument wrapper (and thus allocated) of the value at@;\
@@ -2217,6 +2224,10 @@ module Report = struct
    fun { txt; _ } ->
     match txt with
     | Unknown -> Fmt.dprintf "is an allocation"
+    (* The Optional_argument hint is attached by register_allocation in
+       type_option_some, but in practice the hint chain is lost during mode
+       constraint solving: the error appears without the allocation hint.
+       See testsuite/tests/typing-modes/hint.ml for an attempt. *)
     | Optional_argument ->
       Fmt.dprintf
         "is to be put in an optional argument wrapper (and thus an allocation)"
@@ -2224,6 +2235,9 @@ module Report = struct
       Fmt.dprintf
         "is to omit some parameters by partial application (and thus an \
          allocation)"
+    (* Float_projection: the contents of the boxing are unboxed floats which
+       cross all modes, so the submode check on the contents never fails and
+       this hint never appears in an error. *)
     | Float_projection ->
       Fmt.dprintf "is a float-record projection (and thus an allocation)"
 
