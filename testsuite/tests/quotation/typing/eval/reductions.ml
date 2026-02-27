@@ -134,6 +134,7 @@ val f : <[#($('a) * $('b) * $('c))]> expr -> #('a eval * 'b eval * 'c eval) =
 |}]
 
 (* Objects *)
+(* closed object *)
 let f (x : <[ <a: $('a); b: $('b)> ]> expr)
     : <a: 'a eval; b: 'b eval> = eval x
 [%%expect {|
@@ -142,7 +143,31 @@ val f :
     <[< a : $('a); b : $('b) >]> expr -> < a : 'a eval; b : 'b eval > =
   <fun>
 |}]
-(* Objects with polymorphic methods *)
+(* error! open object should not eval *)
+let f (x : <[ <a: $('a); b: $('b); ..> ]> expr)
+    : <a: 'a eval; b: 'b eval; ..> = eval x
+[%%expect {|
+Line 2, characters 37-43:
+2 |     : <a: 'a eval; b: 'b eval; ..> = eval x
+                                         ^^^^^^
+Error: This expression has type
+         "<[< a : 'a; b : 'b; .. > as 'c]> eval" = "<['c]> eval"
+       but an expression was expected of type
+         "< a : <['a]> eval; b : <['b]> eval; .. >"
+|}]
+(* open object should eval once closed *)
+let f (x : <[ <a: $('a); b: $('b); ..> ]> expr)
+    : <a: 'a eval; b: 'b eval; c: int>
+    = let y = eval x in
+      ignore (x : <[ <a: _; b: _; c: int > ]> expr); y
+[%%expect {|
+val f :
+  ('a : any) ('b : any).
+    <[< a : $('a); b : $('b); c : int >]> expr ->
+    < a : 'a eval; b : 'b eval; c : int > =
+  <fun>
+|}]
+(* polymorphic methods *)
 let f (x : <[ <a: 'c. 'c -> $('a); b: 'd. 'd -> $('b)> ]> expr)
     : <a: 'c. 'c eval -> 'a eval; b: 'd. 'd eval -> 'b eval> = eval x
 [%%expect {|
@@ -154,6 +179,7 @@ val f :
 |}]
 
 (* Polymorphic variants *)
+(* closed variant *)
 let f (x : <[[ `A of $('a) | `B of $('b) | `C ]]> expr)
     : [ `A of 'a eval | `B of 'b eval | `C ] = eval x
 [%%expect {|
@@ -161,19 +187,51 @@ val f :
   <[[ `A of $('a) | `B of $('b) | `C ]]> expr ->
   [ `A of 'a eval | `B of 'b eval | `C ] = <fun>
 |}]
-let f (x : <[[> `A of $('a) | `B of $('b) | `C | `D ]]> expr)
+(* error! upper-open variant should not eval *)
+let f (x : <[[> `A of $('a) | `B of $('b) | `C ]]> expr)
     : [> `A of 'a eval | `B of 'b eval | `C ] = eval x
 [%%expect {|
-val f :
-  <[[> `A of $('_a) | `B of $('_b) | `C | `D ] as '_weak1]> expr -> '_weak1 =
-  <fun>
+Line 2, characters 48-54:
+2 |     : [> `A of 'a eval | `B of 'b eval | `C ] = eval x
+                                                    ^^^^^^
+Error: This expression has type
+         "<[[> `A of $('a) | `B of $('b) | `C ] as 'c]> eval" = "<['c]> eval"
+       but an expression was expected of type
+         "[> `A of 'a eval | `B of 'b eval | `C ]"
 |}]
-let f (x : <[[< `A of $('a) | `B of $('b1) & $('b2) | `C ]]> expr)
-    : [< `A of 'a eval | `B of 'b1 eval & 'b2 eval | `C | `D ] = eval x
+(* upper-open variant should eval once closed *)
+let f (x : <[[> `A of $('a) | `B of $('b) | `C ]]> expr)
+    : [ `A of 'a eval | `B of 'b eval | `C | `D ]
+    = let y = eval x in
+      ignore (x : <[[ `A of _ | `B of _ | `C | `D ]]> expr); y
 [%%expect {|
 val f :
-  <[[< `A of $('_a) | `B of $('_b1) & $('_b2) | `C ] as '_weak2]> expr ->
-  '_weak2 = <fun>
+  <[[ `A of $('a) | `B of $('b) | `C | `D ]]> expr ->
+  [ `A of 'a eval | `B of 'b eval | `C | `D ] = <fun>
+|}]
+(* error! lower-open variant should not eval *)
+let f (x : <[[< `A of $('a) | `B of $('b1) & $('b2) | `C ]]> expr)
+    : [< `A of 'a eval | `B of 'b1 eval & 'b2 eval | `C ] = eval x
+[%%expect {|
+Line 2, characters 60-66:
+2 |     : [< `A of 'a eval | `B of 'b1 eval & 'b2 eval | `C ] = eval x
+                                                                ^^^^^^
+Error: This expression has type
+         "<[[< `A of $('a) | `B of $('b1) & $('b2) | `C ] as 'b]> eval" =
+           "<['b]> eval"
+       but an expression was expected of type
+         "[< `A of 'a eval | `B of 'b1 eval & 'b2 eval | `C ]"
+|}]
+(* lower-open variant should eval once closed *)
+let f (x : <[[< `A of $('a) | `B of $('b1) & $('b2) | `C ]]> expr)
+    : [ `A of 'a eval | `B of 'b eval ]
+    = let y = eval x in
+      ignore (x : <[[ `A of _ | `B of _ ]]> expr); y
+
+[%%expect {|
+val f :
+  <[[ `A of $('a) | `B of $('b) ]]> expr -> [ `A of 'a eval | `B of 'b eval ] =
+  <fun>
 |}]
 
 (* Quantifiers *)
