@@ -2060,7 +2060,11 @@ static void* caml_tick(void *arg)
        requested interval, allowing domains which want coarser ticks to round up
        to a multiple of that interval.
     */
-    usleep(caml_effective_tick_interval_usec());
+    intnat interval = caml_effective_tick_interval_usec();
+
+    /* NOTE: This can't be spuriously woken up by a signal, since this thread is
+       started with signals masked */
+    usleep(interval);
 
     /* See [caml_interrupt_all_signal_safe] for why reading from this array can
        be done without any synchronization */
