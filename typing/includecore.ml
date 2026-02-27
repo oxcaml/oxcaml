@@ -211,9 +211,11 @@ let value_descriptions ~loc env name
   | Ok () -> ()
   | Error e -> raise (Dont_match (Mode e))
   end;
+  let val_lpoly1 = Val_lpoly.get_exn vd1.val_lpoly in
+  let val_lpoly2 = Val_lpoly.get_exn vd2.val_lpoly in
   match vd1.val_kind with
   | Val_prim p1 -> begin
-     assert (List.is_empty vd1.val_lpoly);
+     assert (List.is_empty (Val_lpoly.get_exn vd1.val_lpoly));
      match vd2.val_kind with
      | Val_prim p2 -> begin
          let locality = [ Mode.Locality.global; Mode.Locality.local ] in
@@ -232,7 +234,7 @@ let value_descriptions ~loc env name
              Option.iter (Mode.Forkable.equate_exn fork) mode_f2;
              Option.iter (Mode.Yielding.equate_exn yield) mode_y2;
              try
-               moregeneral_lpoly env vd1.val_lpoly vd2.val_lpoly ty1 ty2
+               moregeneral_lpoly env val_lpoly1 val_lpoly2 ty1 ty2
              with Ctype.Moregen err ->
                raise (Dont_match (Type err))
            ) yielding
@@ -244,7 +246,7 @@ let value_descriptions ~loc env name
        end
      | _ ->
         let ty1, mode_l1, _, sort1 = Ctype.instance_prim env p1 vd1.val_type in
-        (try moregeneral_lpoly env vd1.val_lpoly vd2.val_lpoly ty1 vd2.val_type
+        (try moregeneral_lpoly env val_lpoly1 val_lpoly2 ty1 vd2.val_type
          with Ctype.Moregen err -> raise (Dont_match (Type err)));
         let pc =
           {pc_desc = p1; pc_type = vd2.Types.val_type;
@@ -255,7 +257,7 @@ let value_descriptions ~loc env name
      end
   | _ ->
      match moregeneral_lpoly env
-             vd1.val_lpoly vd2.val_lpoly vd1.val_type vd2.val_type with
+             val_lpoly1 val_lpoly2 vd1.val_type vd2.val_type with
      | exception Ctype.Moregen err -> raise (Dont_match (Type err))
      | () -> begin
        match vd2.val_kind with

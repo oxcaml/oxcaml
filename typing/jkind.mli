@@ -552,6 +552,10 @@ val default_to_value : 'd Types.jkind -> unit
    these three functions to default to void - it's the most efficient thing
    when we have a choice. *)
 
+(** Generalize the sorts in a jkind when in sort generalization context. Only
+    has an effect when called within {!Sort.with_generalize}. *)
+val generalize : current_level:int -> 'd Types.jkind -> unit
+
 (** Returns the sort corresponding to the jkind. Call only on representable
     jkinds - raises on Any. *)
 val sort_of_jkind : Env.t -> Types.jkind_l -> sort

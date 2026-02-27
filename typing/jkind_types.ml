@@ -396,8 +396,13 @@ module Sort = struct
     | Some t ->
       if is_genvar
       then begin
-        let r = List.assq v !sub_map in
-        r := Some t
+        (* CR-someday zqian: [Printtyp] sometimes invokes sort equate without
+           wrapping in [sub_with], so layout-poly genvars may not be in
+           [sub_map]. Fix [Printtyp] to always use [sub_with] and restore the
+           [List.assq] assertion. *)
+        match List.assq_opt v !sub_map with
+        | Some r -> r := Some t
+        | None -> ()
       end;
       t_iter ~f:(fun u -> update_level u v) t
 
@@ -626,6 +631,48 @@ module Sort = struct
         if result != s then set r (Some result);
         (* path compression *)
         result)
+
+  (* Sort generalization context for let poly_ *)
+  let in_sort_generalization_context : var list ref option ref = ref None
+
+  (* Generalize sort variables when in sort generalization context.
+     This is called from Ctype.generalize when processing let poly_ bindings.
+     For each free sort variable, the level is set to Ident.highest_scope,
+     making it a generic sort variable (genvar), and the var is accumulated.
+     The level is also used to mark the variable as visited, avoiding infinite
+     loops when traversing sort variable graphs. *)
+  let rec generalize_rec ~current_level ~vars_ref sort =
+    match sort with
+    | Var v ->
+      if v.level > current_level && v.level <> Ident.highest_scope
+      then begin
+        (* Mark as visited / make generic *)
+        v.level <- Ident.highest_scope;
+        match v.contents with
+        | Some s -> generalize_rec ~current_level ~vars_ref s
+        | None ->
+          (* The var is now a genvar; accumulate it *)
+          vars_ref := v :: !vars_ref
+      end
+    | Product sorts -> List.iter (generalize_rec ~current_level ~vars_ref) sorts
+    | Base _ | Univar _ -> ()
+
+  let generalize ~current_level sort =
+    match !in_sort_generalization_context with
+    | None -> () (* Not in generalization context *)
+    | Some vars_ref -> generalize_rec ~current_level ~vars_ref sort
+
+  (* Wrapper to run a function in sort generalization context. Returns the
+     result of [f] and the vars generalized during [f]. *)
+  let with_generalize f =
+    let vars_ref = ref [] in
+    let old_context = !in_sort_generalization_context in
+    in_sort_generalization_context := Some vars_ref;
+    let result =
+      Misc.try_finally f ~always:(fun () ->
+          in_sort_generalization_context := old_context)
+    in
+    result, List.rev !vars_ref
 
   let rec default_to_value_and_get : t -> Const.t = function
     | Base b -> Static.Const.of_base b
