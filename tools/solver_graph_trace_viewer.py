@@ -1025,7 +1025,8 @@ function nodeIdsCreatedInRange(rangeSpec) {{
     const ls = loc.start && loc.start.cnum;
     const le = loc.end && loc.end.cnum;
     if (!Number.isFinite(ls) || !Number.isFinite(le)) return;
-    if (rangesOverlap(start, end, ls, le)) ids.add(nodeId);
+    if (le <= ls) return;
+    if (ls >= start && le <= end) ids.add(nodeId);
   }});
   return ids;
 }}
@@ -1096,6 +1097,178 @@ function stepLabelFor(item, eventId) {{
   return `step ${{item.step_id}} - ${{shortActionForItem(item)}}`;
 }}
 
+let applyingHashState = false;
+
+function parseIntStrict(raw) {{
+  if (raw === null || raw === undefined) return null;
+  const text = String(raw).trim();
+  if (!/^-?\\d+$/.test(text)) return null;
+  const n = Number(text);
+  if (!Number.isSafeInteger(n)) return null;
+  return n;
+}}
+
+function parseHashState() {{
+  const rawHash = window.location.hash.startsWith("#")
+    ? window.location.hash.slice(1)
+    : window.location.hash;
+  const state = {{
+    params: new URLSearchParams(rawHash),
+    eventId: null,
+    stepId: null,
+    index: null,
+    hasNode: false,
+    nodeId: null,
+    hasColumns: false,
+    columns: false,
+    hasBacktrace: false,
+    backtrace: false,
+    hasSourceRange: false,
+    sourceRange: null,
+  }};
+
+  if (rawHash && !rawHash.includes("=")) {{
+    const directEvent = parseIntStrict(rawHash);
+    if (directEvent !== null) state.eventId = directEvent;
+  }}
+
+  const {{ params }} = state;
+  const eventParam = parseIntStrict(params.get("event"));
+  if (eventParam !== null) state.eventId = eventParam;
+  const stepParam = parseIntStrict(params.get("step"));
+  if (stepParam !== null) state.stepId = stepParam;
+  const indexParam = parseIntStrict(params.get("index"));
+  if (indexParam !== null) state.index = indexParam;
+
+  if (params.has("node")) {{
+    state.hasNode = true;
+    state.nodeId = parseIntStrict(params.get("node"));
+  }}
+
+  if (params.has("columns")) {{
+    state.hasColumns = true;
+    const raw = String(params.get("columns") || "").toLowerCase();
+    state.columns = raw === "1" || raw === "true" || raw === "yes";
+  }}
+
+  if (params.has("bt")) {{
+    state.hasBacktrace = true;
+    const raw = String(params.get("bt") || "").toLowerCase();
+    state.backtrace = raw === "1" || raw === "true" || raw === "yes";
+  }}
+
+  if (
+    params.has("sfile") &&
+    params.has("sstart") &&
+    params.has("send")
+  ) {{
+    const file = params.get("sfile");
+    const start = parseIntStrict(params.get("sstart"));
+    const end = parseIntStrict(params.get("send"));
+    if (
+      typeof file === "string" &&
+      file.length > 0 &&
+      start !== null &&
+      end !== null &&
+      end > start
+    ) {{
+      state.hasSourceRange = true;
+      state.sourceRange = {{ file, start, end }};
+    }}
+  }}
+
+  return state;
+}}
+
+function indexForStepId(stepId) {{
+  for (let i = 0; i < eventOrder.length; i += 1) {{
+    const eventId = eventOrder[i];
+    const item = events[String(eventId)];
+    if (item && item.step_id === stepId) return i;
+  }}
+  return -1;
+}}
+
+function indexFromHashState(state) {{
+  if (state && Number.isInteger(state.eventId)) {{
+    const idx = eventOrder.indexOf(state.eventId);
+    if (idx >= 0) return idx;
+  }}
+  if (state && Number.isInteger(state.stepId)) {{
+    const idx = indexForStepId(state.stepId);
+    if (idx >= 0) return idx;
+  }}
+  if (state && Number.isInteger(state.index)) {{
+    return clampIndex(state.index);
+  }}
+  return null;
+}}
+
+function syncUrlHashState() {{
+  if (applyingHashState) return;
+  const params = new URLSearchParams();
+  const eventId = eventOrder[currentIndex];
+  if (Number.isInteger(eventId)) params.set("event", String(eventId));
+  params.set("index", String(currentIndex));
+  const item = events[String(eventId)];
+  if (item && Number.isInteger(item.step_id)) {{
+    params.set("step", String(item.step_id));
+  }}
+  if (levelColumnsEnabled) params.set("columns", "1");
+  if (selectedNodeId !== null && selectedNodeId !== undefined) {{
+    params.set("node", String(selectedNodeId));
+  }}
+  if (selectedSourceRange) {{
+    params.set("sfile", String(selectedSourceRange.file));
+    params.set("sstart", String(selectedSourceRange.start));
+    params.set("send", String(selectedSourceRange.end));
+  }}
+  if (isBacktraceOpen()) params.set("bt", "1");
+  const hash = params.toString();
+  const currentHash = window.location.hash.startsWith("#")
+    ? window.location.hash.slice(1)
+    : window.location.hash;
+  if (hash === currentHash) return;
+  const url = new URL(window.location.href);
+  url.hash = hash;
+  history.replaceState(null, "", url.toString());
+}}
+
+function applyHashState(options = {{}}) {{
+  const applyIndex =
+    options.applyIndex === undefined ? true : !!options.applyIndex;
+  const state = parseHashState();
+  applyingHashState = true;
+  try {{
+    const nextColumns = state.hasColumns ? !!state.columns : false;
+    if (levelColumnsEnabled !== nextColumns) {{
+      levelColumnsEnabled = nextColumns;
+      resetLayoutCache();
+    }}
+    if (levelColumnsToggle) levelColumnsToggle.checked = nextColumns;
+
+    selectedNodeId =
+      state.hasNode && Number.isInteger(state.nodeId) ? state.nodeId : null;
+
+    if (state.hasSourceRange && state.sourceRange) {{
+      selectedSourceRange = state.sourceRange;
+    }} else selectedSourceRange = null;
+
+    const targetIndex = applyIndex ? indexFromHashState(state) : null;
+    if (targetIndex !== null) {{
+      setIndex(targetIndex, {{ skipHash: true }});
+    }} else {{
+      render(currentIndex);
+    }}
+
+    if (state.hasBacktrace && state.backtrace) {{
+      openBacktraceDialog({{ skipHash: true }});
+    }} else closeBacktraceDialog({{ skipHash: true }});
+  }} finally {{
+    applyingHashState = false;
+  }}
+}}
+
 function jumpToEvent(eventId) {{
   const idx = eventOrder.indexOf(eventId);
   if (idx >= 0) setIndex(idx);
@@ -1108,12 +1281,13 @@ function isTypingTarget(target) {{
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
 }}
 
-function setIndex(nextIndex) {{
+function setIndex(nextIndex, options = {{}}) {{
   const clamped = clampIndex(nextIndex);
   currentIndex = clamped;
   select.value = String(clamped);
   range.value = String(clamped);
   render(clamped);
+  if (!options.skipHash) syncUrlHashState();
 }}
 
 function initControls() {{
@@ -1142,6 +1316,7 @@ function initControls() {{
       levelColumnsEnabled = !!levelColumnsToggle.checked;
       resetLayoutCache();
       render(currentIndex);
+      syncUrlHashState();
     }});
   }}
 }}
@@ -1169,12 +1344,14 @@ function isBacktraceOpen() {{
   return !backtraceOverlay.hasAttribute("hidden");
 }}
 
-function openBacktraceDialog() {{
+function openBacktraceDialog(options = {{}}) {{
   backtraceOverlay.removeAttribute("hidden");
+  if (!options.skipHash) syncUrlHashState();
 }}
 
-function closeBacktraceDialog() {{
+function closeBacktraceDialog(options = {{}}) {{
   backtraceOverlay.setAttribute("hidden", "");
+  if (!options.skipHash) syncUrlHashState();
 }}
 
 function initKeyboardNavigation() {{
@@ -1472,6 +1649,7 @@ function maybeCaptureSourceSelection() {{
   }};
   lastSelectionCaptureMs = Date.now();
   render(currentIndex);
+  syncUrlHashState();
 }}
 
 function scheduleCaptureSourceSelection() {{
@@ -2968,6 +3146,7 @@ function drawGraph(eventId, index) {{
     if (selectedNodeId !== null) {{
       selectedNodeId = null;
       render(currentIndex);
+      syncUrlHashState();
     }}
   }};
   const item = events[String(eventId)];
@@ -3306,6 +3485,7 @@ function drawGraph(eventId, index) {{
       event.stopPropagation();
       selectedNodeId = selectedNodeId === id ? null : id;
       render(currentIndex);
+      syncUrlHashState();
     }});
     group.addEventListener("keydown", (event) => {{
       if (event.key !== "Enter" && event.key !== " ") return;
@@ -3313,6 +3493,7 @@ function drawGraph(eventId, index) {{
       event.stopPropagation();
       selectedNodeId = selectedNodeId === id ? null : id;
       render(currentIndex);
+      syncUrlHashState();
     }});
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     circle.setAttribute("cx", String(pos.x));
@@ -3488,17 +3669,23 @@ sourceView.addEventListener("click", () => {{
   if (!selectedSourceRange) return;
   selectedSourceRange = null;
   render(currentIndex);
+  syncUrlHashState();
 }});
 sourceSelectionClear.addEventListener("click", () => {{
   selectedSourceRange = null;
   render(currentIndex);
+  syncUrlHashState();
 }});
 backtraceOpen.addEventListener("click", openBacktraceDialog);
 backtraceClose.addEventListener("click", closeBacktraceDialog);
 backtraceOverlay.addEventListener("click", (event) => {{
   if (event.target === backtraceOverlay) closeBacktraceDialog();
 }});
-setIndex(Number(select.value || 0));
+window.addEventListener("hashchange", () => {{
+  applyHashState({{ applyIndex: true }});
+}});
+applyHashState({{ applyIndex: true }});
+syncUrlHashState();
 </script>
 </body>
 </html>
