@@ -34,6 +34,13 @@ type compilation_unit_or_inferred =
   | Exactly of Compilation_unit.t
   | Inferred_from_output_prefix
 
+val unit_info_from_cu_or_output_prefix :
+  source_file:string ->
+  Unit_info.intf_or_impl ->
+  output_prefix:string ->
+  compilation_unit:compilation_unit_or_inferred ->
+  Unit_info.t
+
 val with_info :
   backend:backend ->
   tool_name:string ->

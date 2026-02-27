@@ -34,6 +34,16 @@ type compilation_unit_or_inferred =
   | Exactly of Compilation_unit.t
   | Inferred_from_output_prefix
 
+let unit_info_from_cu_or_output_prefix ~source_file kind ~output_prefix
+    ~compilation_unit =
+  match compilation_unit with
+  | Exactly compilation_unit ->
+      Unit_info.make_with_known_compilation_unit ~source_file kind
+        output_prefix compilation_unit
+  | Inferred_from_output_prefix ->
+      let for_pack_prefix = Compilation_unit.Prefix.from_clflags () in
+      Unit_info.make ~source_file ~for_pack_prefix kind output_prefix
+
 let with_info ~backend ~tool_name ~dump_ext unit_info k =
   Compmisc.init_path ();
   Compmisc.init_parameters ();
