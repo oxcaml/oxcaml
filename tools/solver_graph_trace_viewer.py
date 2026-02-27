@@ -489,6 +489,32 @@ select, input[type="range"] {{
   background: #ffe9a8;
   box-shadow: 0 0 0 1px #f59e0b inset;
 }}
+.source-node {{
+  background: #f5d0fe;
+  box-shadow: 0 0 0 1px #c026d3 inset;
+}}
+.source-sel {{
+  background: #dbeafe;
+  box-shadow: 0 0 0 1px #60a5fa inset;
+}}
+.source-hi.source-sel {{
+  background: #dff6c8;
+  box-shadow:
+    0 0 0 1px #f59e0b inset,
+    0 0 0 2px #60a5fa inset;
+}}
+.source-hi.source-node {{
+  background: #fde68a;
+  box-shadow:
+    0 0 0 1px #f59e0b inset,
+    0 0 0 2px #c026d3 inset;
+}}
+.source-node.source-sel {{
+  background: #e9d5ff;
+  box-shadow:
+    0 0 0 1px #c026d3 inset,
+    0 0 0 2px #60a5fa inset;
+}}
 .tok-kw {{
   color: #9d174d;
   font-weight: 600;
@@ -518,6 +544,44 @@ select, input[type="range"] {{
   color: var(--muted);
   margin-top: 8px;
 }}
+button {{
+  font-family: inherit;
+  font-size: 11px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  padding: 3px 8px;
+  cursor: pointer;
+}}
+button:hover {{
+  background: #f8f2e5;
+}}
+.node-ops {{
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  max-height: 28vh;
+  overflow: auto;
+  font-size: 11px;
+  line-height: 1.35;
+}}
+.node-op {{
+  padding: 6px 8px;
+  border-bottom: 1px solid #eee6d8;
+}}
+.node-op:last-child {{
+  border-bottom: none;
+}}
+.node-op-step {{
+  color: var(--muted);
+  margin-bottom: 2px;
+}}
+.node-op-body {{
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}}
 </style>
 </head>
 <body>
@@ -535,7 +599,19 @@ select, input[type="range"] {{
         <div id=\"source-meta\" class=\"source-meta\"></div>
         <pre id=\"source-view\" class=\"source-view\"></pre>
       </div>
+      <div class=\"event-card source-card\">
+        <div class=\"event-title\">Creation Range Filter</div>
+        <div id=\"source-selection-meta\" class=\"source-meta\"></div>
+        <button id=\"source-selection-clear\" type=\"button\">
+          Clear Selection
+        </button>
+      </div>
       <div id=\"step-event\" class=\"event-card\"></div>
+      <div id=\"node-trace\" class=\"event-card source-card\">
+        <div class=\"event-title\">Selected Node Trace</div>
+        <div id=\"node-trace-meta\" class=\"source-meta\"></div>
+        <div id=\"node-trace-ops\" class=\"node-ops\"></div>
+      </div>
     </section>
     <section class=\"panel\">
       <svg id=\"graph\" viewBox=\"0 0 1200 800\" preserveAspectRatio=\"xMidYMid meet\">
@@ -547,6 +623,7 @@ select, input[type="range"] {{
         Node subtitle shows current level.
         Edge arrows indicate direction.
         Hover a source or destination node to show that edge's modality label.
+        Click a node to select it and inspect its history.
       </div>
     </section>
   </div>
@@ -566,6 +643,10 @@ const resultEl = document.getElementById("result");
 const stepEvent = document.getElementById("step-event");
 const sourceMeta = document.getElementById("source-meta");
 const sourceView = document.getElementById("source-view");
+const sourceSelectionMeta = document.getElementById("source-selection-meta");
+const sourceSelectionClear = document.getElementById("source-selection-clear");
+const nodeTraceMeta = document.getElementById("node-trace-meta");
+const nodeTraceOps = document.getElementById("node-trace-ops");
 const graph = document.getElementById("graph");
 const LAYOUT_WIDTH = 1200;
 const LAYOUT_HEIGHT = 800;
@@ -599,9 +680,15 @@ const layoutCache = new Map();
 let layoutComputedUpto = -1;
 let currentIndex = 0;
 const nodeKindById = new Map();
+const nodeCreationById = new Map();
 let lastSourceFile = sourceFileOrder.length > 0 ? sourceFileOrder[0] : null;
 let lastSourceStart = 0;
 let lastSourceEnd = 0;
+let currentSourceFile = null;
+let selectedSourceRange = null;
+let selectedNodeId = null;
+let hoveredNodeId = null;
+let lastSelectionCaptureMs = 0;
 
 function edgeKey(edge) {{
   return `${{edge.src}}|${{edge.dst}}|${{edge.label}}|${{edge.modality || ""}}`;
@@ -749,6 +836,78 @@ function initNodeKindIndex() {{
       maybeIndexNodeKind(id, node.lower, node.upper);
     }});
   }});
+}}
+
+function initNodeCreationIndex() {{
+  eventOrder.forEach((eventId) => {{
+    const item = events[String(eventId)];
+    if (!item) return;
+    const event = item.event || {{}};
+    if (event.kind !== "trace_var_create") return;
+    if (typeof event.var_id !== "number") return;
+    if (nodeCreationById.has(event.var_id)) return;
+    const activeExpr =
+      item.active_expr && typeof item.active_expr === "object"
+        ? item.active_expr
+        : null;
+    const loc =
+      activeExpr && activeExpr.loc && typeof activeExpr.loc === "object"
+        ? activeExpr.loc
+        : null;
+    nodeCreationById.set(event.var_id, {{
+      event_id: eventId,
+      step_id: item.step_id,
+      provenance: event.provenance || null,
+      expr_id:
+        activeExpr && typeof activeExpr.expr_id === "number"
+          ? activeExpr.expr_id
+          : null,
+      loc,
+    }});
+  }});
+}}
+
+function shortFileName(file) {{
+  if (typeof file !== "string" || file.length === 0) return "?";
+  const parts = file.split("/");
+  if (parts.length <= 2) return file;
+  return `.../${{parts.slice(-2).join("/")}}`;
+}}
+
+function formatLocationCompact(loc) {{
+  if (!loc || typeof loc !== "object") return "unknown";
+  const file = shortFileName(loc.file || "");
+  const start = loc.start || {{}};
+  const end = loc.end || {{}};
+  const sl = Number.isFinite(start.line) ? start.line : "?";
+  const sc = Number.isFinite(start.col) ? start.col : "?";
+  const el = Number.isFinite(end.line) ? end.line : "?";
+  const ec = Number.isFinite(end.col) ? end.col : "?";
+  return `${{file}}:${{sl}}:${{sc}}-${{el}}:${{ec}}`;
+}}
+
+function rangesOverlap(a0, a1, b0, b1) {{
+  return a0 < b1 && b0 < a1;
+}}
+
+function nodeIdsCreatedInRange(rangeSpec) {{
+  const ids = new Set();
+  if (!rangeSpec || typeof rangeSpec !== "object") return ids;
+  const file = rangeSpec.file;
+  const start = rangeSpec.start;
+  const end = rangeSpec.end;
+  if (typeof file !== "string") return ids;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return ids;
+  nodeCreationById.forEach((creation, nodeId) => {{
+    const loc = creation && creation.loc;
+    if (!loc || typeof loc !== "object") return;
+    if (loc.file !== file) return;
+    const ls = loc.start && loc.start.cnum;
+    const le = loc.end && loc.end.cnum;
+    if (!Number.isFinite(ls) || !Number.isFinite(le)) return;
+    if (rangesOverlap(start, end, ls, le)) ids.add(nodeId);
+  }});
+  return ids;
 }}
 
 function varLabel(id, node = null) {{
@@ -920,85 +1079,217 @@ function formatLocation(loc) {{
   return `${{file}}:${{sl}}:${{sc}}-${{el}}:${{ec}}`;
 }}
 
-function renderSourceWindow(source, startRaw, endRaw, highlightFocus) {{
+function normalizeRange(startRaw, endRaw, maxLen) {{
   let start = Number.isFinite(startRaw) ? startRaw : 0;
   let end = Number.isFinite(endRaw) ? endRaw : start;
-  start = Math.max(0, Math.min(start, source.length));
-  end = Math.max(0, Math.min(end, source.length));
+  start = Math.max(0, Math.min(start, maxLen));
+  end = Math.max(0, Math.min(end, maxLen));
   if (end < start) {{
     const tmp = start;
     start = end;
     end = tmp;
   }}
-  const context = 320;
-  const lo = Math.max(0, start - context);
-  const hi = Math.min(source.length, end + context);
-  const prefix = lo > 0 ? "...\\n" : "";
-  const suffix = hi < source.length ? "\\n..." : "";
-  const before = source.slice(lo, start);
-  const focus = source.slice(start, end);
-  const after = source.slice(end, hi);
+  return {{ start, end }};
+}}
+
+function renderSourceWindow(
+  source,
+  focusStartRaw,
+  focusEndRaw,
+  highlightFocus,
+  selectedRangeRaw,
+  nodeRangeRaw
+) {{
+  const focus = normalizeRange(focusStartRaw, focusEndRaw, source.length);
+  const selected = selectedRangeRaw
+    ? normalizeRange(selectedRangeRaw.start, selectedRangeRaw.end, source.length)
+    : null;
+  const nodeRange = nodeRangeRaw
+    ? normalizeRange(nodeRangeRaw.start, nodeRangeRaw.end, source.length)
+    : null;
+  const cuts = new Set([0, source.length, focus.start, focus.end]);
+  if (selected) {{
+    cuts.add(selected.start);
+    cuts.add(selected.end);
+  }}
+  if (nodeRange) {{
+    cuts.add(nodeRange.start);
+    cuts.add(nodeRange.end);
+  }}
+  const sortedCuts = Array.from(cuts).sort((a, b) => a - b);
   sourceView.replaceChildren();
-  if (prefix.length > 0) {{
-    appendSourceCode(sourceView, prefix, false);
-  }}
-  appendSourceCode(sourceView, before, false);
-  if (highlightFocus) {{
-    if (focus.length > 0) {{
-      appendSourceCode(sourceView, focus, true);
-    }} else {{
-      const span = document.createElement("span");
-      span.className = "source-hi";
-      span.textContent = " ";
-      sourceView.appendChild(span);
+  for (let i = 0; i + 1 < sortedCuts.length; i += 1) {{
+    const start = sortedCuts[i];
+    const end = sortedCuts[i + 1];
+    if (end <= start) continue;
+    const text = source.slice(start, end);
+    const classes = [];
+    if (
+      highlightFocus &&
+      focus.end > focus.start &&
+      start >= focus.start &&
+      end <= focus.end
+    ) {{
+      classes.push("source-hi");
     }}
-  }} else {{
-    appendSourceCode(sourceView, focus, false);
-  }}
-  appendSourceCode(sourceView, after, false);
-  if (suffix.length > 0) {{
-    appendSourceCode(sourceView, suffix, false);
+    if (
+      selected &&
+      selected.end > selected.start &&
+      start >= selected.start &&
+      end <= selected.end
+    ) {{
+      classes.push("source-sel");
+    }}
+    if (
+      nodeRange &&
+      nodeRange.end > nodeRange.start &&
+      start >= nodeRange.start &&
+      end <= nodeRange.end
+    ) {{
+      classes.push("source-node");
+    }}
+    appendSourceCode(sourceView, text, classes);
   }}
 }}
 
 function renderSourceForItem(item) {{
+  const focusedNodeId =
+    selectedNodeId !== null && selectedNodeId !== undefined
+      ? selectedNodeId
+      : hoveredNodeId;
+  const focusedCreation =
+    focusedNodeId !== null && focusedNodeId !== undefined
+      ? nodeCreationById.get(focusedNodeId)
+      : null;
+  const focusedLoc =
+    focusedCreation &&
+    focusedCreation.loc &&
+    typeof focusedCreation.loc === "object"
+      ? focusedCreation.loc
+      : null;
+  const focusedFile =
+    focusedLoc && typeof focusedLoc.file === "string" ? focusedLoc.file : null;
+  const focusedSource =
+    focusedFile && typeof sourceFiles[focusedFile] === "string"
+      ? sourceFiles[focusedFile]
+      : null;
+  const focusedStart = focusedLoc && focusedLoc.start && focusedLoc.start.cnum;
+  const focusedEnd = focusedLoc && focusedLoc.end && focusedLoc.end.cnum;
+  const focusedRange =
+    Number.isFinite(focusedStart) && Number.isFinite(focusedEnd)
+      ? {{ start: focusedStart, end: focusedEnd }}
+      : null;
+
   const active = item && item.active_expr ? item.active_expr : null;
   if (!active || !active.loc) {{
     const fallbackFile =
-      lastSourceFile || (sourceFileOrder.length > 0 ? sourceFileOrder[0] : null);
+      focusedFile ||
+      lastSourceFile ||
+      (sourceFileOrder.length > 0 ? sourceFileOrder[0] : null);
     if (!fallbackFile) {{
-      sourceMeta.textContent = "No source file available in trace.";
+      sourceMeta.textContent = "";
       sourceView.textContent = "";
+      currentSourceFile = null;
       return;
     }}
-    const fallbackSource = sourceFiles[fallbackFile];
+    const fallbackSource =
+      fallbackFile === focusedFile && focusedSource
+        ? focusedSource
+        : sourceFiles[fallbackFile];
     if (typeof fallbackSource !== "string") {{
-      sourceMeta.textContent = "No source file available in trace.";
+      sourceMeta.textContent = "";
       sourceView.textContent = "";
+      currentSourceFile = null;
       return;
     }}
-    sourceMeta.textContent =
-      `No active expression range. Showing ${{fallbackFile}}.`;
-    renderSourceWindow(fallbackSource, lastSourceStart, lastSourceEnd, false);
+    sourceMeta.textContent = "";
+    currentSourceFile = fallbackFile;
+    renderSourceWindow(
+      fallbackSource,
+      lastSourceStart,
+      lastSourceEnd,
+      false,
+      selectedSourceRange && selectedSourceRange.file === fallbackFile
+        ? selectedSourceRange
+        : null,
+      focusedRange && fallbackFile === focusedFile ? focusedRange : null
+    );
     return;
   }}
   const loc = active.loc;
-  const exprId =
-    typeof active.expr_id === "number" ? `expr#${{active.expr_id}}` : "expr#?";
-  sourceMeta.textContent = `${{exprId}} @ ${{formatLocation(loc)}}`;
+  sourceMeta.textContent = "";
   const file = typeof loc.file === "string" ? loc.file : "";
-  const source = sourceFiles[file];
+  const useFocusedFile = focusedRange && focusedFile && focusedSource;
+  const sourceFile = useFocusedFile ? focusedFile : file;
+  const source = useFocusedFile ? focusedSource : sourceFiles[file];
   if (typeof source !== "string") {{
-    sourceMeta.textContent = `${{exprId}} @ ${{formatLocation(loc)}} (source unavailable)`;
+    sourceMeta.textContent = "";
+    currentSourceFile = null;
     return;
   }}
-  const start = loc.start && loc.start.cnum;
-  const end = loc.end && loc.end.cnum;
-  lastSourceFile = file;
+  const start = useFocusedFile ? focusedStart : loc.start && loc.start.cnum;
+  const end = useFocusedFile ? focusedEnd : loc.end && loc.end.cnum;
+  lastSourceFile = sourceFile;
   lastSourceStart = Number.isFinite(start) ? start : 0;
   lastSourceEnd =
     Number.isFinite(end) ? end : Number.isFinite(start) ? start : 0;
-  renderSourceWindow(source, lastSourceStart, lastSourceEnd, true);
+  currentSourceFile = sourceFile;
+  renderSourceWindow(
+    source,
+    lastSourceStart,
+    lastSourceEnd,
+    !useFocusedFile,
+    selectedSourceRange && selectedSourceRange.file === sourceFile
+      ? selectedSourceRange
+      : null,
+    focusedRange && sourceFile === focusedFile ? focusedRange : null
+  );
+}}
+
+function getSelectionOffsetsInSourceView() {{
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {{
+    return null;
+  }}
+  const rangeSel = selection.getRangeAt(0);
+  if (!sourceView.contains(rangeSel.startContainer)) return null;
+  if (!sourceView.contains(rangeSel.endContainer)) return null;
+  const startRange = document.createRange();
+  startRange.selectNodeContents(sourceView);
+  startRange.setEnd(rangeSel.startContainer, rangeSel.startOffset);
+  const endRange = document.createRange();
+  endRange.selectNodeContents(sourceView);
+  endRange.setEnd(rangeSel.endContainer, rangeSel.endOffset);
+  let start = startRange.toString().length;
+  let end = endRange.toString().length;
+  if (end < start) {{
+    const tmp = start;
+    start = end;
+    end = tmp;
+  }}
+  return {{ start, end }};
+}}
+
+function updateSourceSelectionMeta() {{
+  sourceSelectionMeta.textContent = "";
+}}
+
+function maybeCaptureSourceSelection() {{
+  const offsets = getSelectionOffsetsInSourceView();
+  if (!offsets) return;
+  if (!currentSourceFile || !sourceFiles[currentSourceFile]) return;
+  if (offsets.end <= offsets.start) return;
+  selectedSourceRange = {{
+    file: currentSourceFile,
+    start: offsets.start,
+    end: offsets.end,
+  }};
+  lastSelectionCaptureMs = Date.now();
+  render(currentIndex);
+}}
+
+function scheduleCaptureSourceSelection() {{
+  window.setTimeout(maybeCaptureSourceSelection, 0);
 }}
 
 const OCAML_KEYWORDS = new Set([
@@ -1036,9 +1327,9 @@ function appendSourceChunk(container, text, classes) {{
   container.appendChild(span);
 }}
 
-function appendSourceCode(container, text, focused) {{
+function appendSourceCode(container, text, baseClassesRaw) {{
   if (!text) return;
-  const baseClasses = focused ? ["source-hi"] : [];
+  const baseClasses = Array.isArray(baseClassesRaw) ? baseClassesRaw : [];
   OCAML_TOKEN_RE.lastIndex = 0;
   let last = 0;
   while (true) {{
@@ -1159,6 +1450,142 @@ function diffEdgeItems(oldItems, newItems) {{
     if (!newMap.has(item.key)) removed.push(item.text);
   }});
   return {{ added, removed }};
+}}
+
+function diffEdgeObjects(oldItems, newItems) {{
+  const oldMap = new Map(oldItems.map((item) => [item.key, item]));
+  const newMap = new Map(newItems.map((item) => [item.key, item]));
+  const added = [];
+  const removed = [];
+  newItems.forEach((item) => {{
+    if (!oldMap.has(item.key)) added.push(item);
+  }});
+  oldItems.forEach((item) => {{
+    if (!newMap.has(item.key)) removed.push(item);
+  }});
+  return {{ added, removed }};
+}}
+
+function truncateText(text, maxLen = 120) {{
+  const s = String(text);
+  if (s.length <= maxLen) return s;
+  return `${{s.slice(0, maxLen - 3)}}...`;
+}}
+
+function describeNodeEvent(nodeId, eventId) {{
+  const item = events[String(eventId)];
+  if (!item) return null;
+  const event = item.event || {{}};
+  if (!event.kind) return null;
+  const step = stepLabelFor(item, eventId);
+  if (event.kind === "trace_var_create") {{
+    if (event.var_id === nodeId) {{
+      const creation = nodeCreationById.get(nodeId);
+      const locText =
+        creation && creation.loc
+          ? formatLocation(creation.loc)
+          : "unknown expression range";
+      const provenance = event.provenance || "unknown";
+      return {{
+        step,
+        body:
+          `create ${{varLabel(nodeId)}}` +
+          ` (provenance=${{provenance}}, range=${{locText}})`,
+      }};
+    }}
+    const lowerEdges = edgeRefItems(event.vlower, "vlower", event.var_id);
+    const upperEdges = edgeRefItems(event.vupper, "vupper", event.var_id);
+    const touches =
+      lowerEdges
+        .concat(upperEdges)
+        .filter((e) => e.src === nodeId || e.dst === nodeId);
+    if (touches.length === 0) return null;
+    return {{
+      step,
+      body:
+        `create ${{varLabel(event.var_id)}} with incident edge` +
+        ` ${{truncateText(touches.map((t) => t.text).join("; "), 150)}}`,
+    }};
+  }}
+  if (event.kind !== "trace_delta") return null;
+  const field = event.field || "?";
+  const op = item.op || event.op || "apply";
+  if (field === "vlower" || field === "vupper") {{
+    const oldItems = edgeRefItems(event.old, field, event.var_id);
+    const newItems = edgeRefItems(event.new, field, event.var_id);
+    const diff = diffEdgeObjects(oldItems, newItems);
+    const touches = diff.added
+      .concat(diff.removed)
+      .filter((e) => e.src === nodeId || e.dst === nodeId);
+    if (event.var_id !== nodeId && touches.length === 0) return null;
+    const added = diff.added.map((e) => e.text);
+    const removed = diff.removed.map((e) => e.text);
+    if (event.var_id === nodeId) {{
+      return {{
+        step,
+        body:
+          `${{opLabel(op)}} ${{fieldLabel(field)}} on ${{varLabel(nodeId)}}` +
+          ` (+${{added.length}}/-${{removed.length}})` +
+          `${{added.length ? ` added: ${{truncateText(added.join('; '), 140)}}` : ""}}` +
+          `${{removed.length ? ` removed: ${{truncateText(removed.join('; '), 140)}}` : ""}}`,
+      }};
+    }}
+    return {{
+      step,
+      body:
+        `${{opLabel(op)}} ${{fieldLabel(field)}} on ${{varLabel(event.var_id)}}` +
+        ` touching ${{varLabel(nodeId)}}: ` +
+        truncateText(touches.map((t) => t.text).join("; "), 150),
+    }};
+  }}
+  if (event.var_id !== nodeId) return null;
+  return {{
+    step,
+    body:
+      `${{opLabel(op)}} ${{fieldLabel(field)}}: ` +
+      `${{truncateText(formatFieldValue(field, event.old), 80)}} -> ` +
+      `${{truncateText(formatFieldValue(field, event.new), 80)}}`,
+  }};
+}}
+
+function renderSelectedNodeTrace() {{
+  nodeTraceOps.replaceChildren();
+  if (selectedNodeId === null || selectedNodeId === undefined) {{
+    nodeTraceMeta.textContent = "No node selected.";
+    return;
+  }}
+  const creation = nodeCreationById.get(selectedNodeId);
+  if (creation && creation.loc) {{
+    nodeTraceMeta.textContent =
+      `${{varLabel(selectedNodeId)}} created at ${{formatLocation(creation.loc)}}`;
+  }} else {{
+    nodeTraceMeta.textContent =
+      `${{varLabel(selectedNodeId)}} (creation range unavailable)`;
+  }}
+  const ops = [];
+  eventOrder.forEach((eventId) => {{
+    const summary = describeNodeEvent(selectedNodeId, eventId);
+    if (summary) ops.push(summary);
+  }});
+  if (ops.length === 0) {{
+    const empty = document.createElement("div");
+    empty.className = "node-op";
+    empty.textContent = "No operations recorded for this node.";
+    nodeTraceOps.appendChild(empty);
+    return;
+  }}
+  ops.forEach((entry) => {{
+    const row = document.createElement("div");
+    row.className = "node-op";
+    const step = document.createElement("div");
+    step.className = "node-op-step";
+    step.textContent = entry.step;
+    const body = document.createElement("div");
+    body.className = "node-op-body";
+    body.textContent = entry.body;
+    row.append(step, body);
+    nodeTraceOps.appendChild(row);
+  }});
 }}
 
 function appendEventRow(grid, key, value) {{
@@ -2176,12 +2603,25 @@ function ensureLayoutComputed(index) {{
 
 function drawGraph(eventId, index) {{
   clearGraph();
+  hoveredNodeId = null;
+  graph.onclick = () => {{
+    if (selectedNodeId !== null) {{
+      selectedNodeId = null;
+      render(currentIndex);
+    }}
+  }};
   const item = events[String(eventId)];
   const snapshot = snapshotFor(eventId);
   const changed = item.changed_edges || {{ added: [], removed: [] }};
   const changedAdded = changed.added || [];
   const changedRemoved = changed.removed || [];
   const changedNodes = new Set(item.changed_nodes || []);
+  const createdInSelectedRange = nodeIdsCreatedInRange(selectedSourceRange);
+  const focusNodeIds = new Set(createdInSelectedRange);
+  if (selectedNodeId !== null && selectedNodeId !== undefined) {{
+    focusNodeIds.add(selectedNodeId);
+  }}
+  const hasFocusSelection = focusNodeIds.size > 0;
   const orderedIds = nodeIdsForLayout(item);
   if (orderedIds.length === 0) return;
 
@@ -2211,18 +2651,20 @@ function drawGraph(eventId, index) {{
   defs.appendChild(marker);
   graph.appendChild(defs);
 
-  let hoveredNodeId = null;
   const edgeLabelEntries = [];
   const nodePopupEntries = [];
   function updateEdgeLabelVisibility() {{
+    const focusIds = new Set();
+    if (hoveredNodeId !== null) focusIds.add(hoveredNodeId);
+    if (selectedNodeId !== null) focusIds.add(selectedNodeId);
     edgeLabelEntries.forEach((entry) => {{
       const show =
-        hoveredNodeId !== null &&
-        (entry.src === hoveredNodeId || entry.dst === hoveredNodeId);
+        focusIds.size > 0 &&
+        (focusIds.has(entry.src) || focusIds.has(entry.dst));
       entry.group.style.display = show ? "" : "none";
     }});
     nodePopupEntries.forEach((entry) => {{
-      const show = hoveredNodeId !== null && entry.nodeId === hoveredNodeId;
+      const show = focusIds.has(entry.nodeId);
       entry.group.style.display = show ? "" : "none";
     }});
   }}
@@ -2267,6 +2709,16 @@ function drawGraph(eventId, index) {{
     if (removed) return "#b42318";
     if (changedEdgeKeys.has(edgeKey(edge))) return "#d97706";
     return edge.label === "vlower" ? "#1d4ed8" : "#0f766e";
+  }}
+
+  function nodeOpacity(id) {{
+    if (!hasFocusSelection) return 1;
+    return focusNodeIds.has(id) ? 1 : 0.5;
+  }}
+
+  function edgeOpacity(edge) {{
+    if (!hasFocusSelection) return 1;
+    return focusNodeIds.has(edge.src) || focusNodeIds.has(edge.dst) ? 1 : 0.5;
   }}
 
   function edgeText(edge) {{
@@ -2374,6 +2826,7 @@ function drawGraph(eventId, index) {{
       "stroke-width",
       removed ? "1.8" : changedEdgeKeys.has(edgeKey(edge)) ? "2.2" : "1.3"
     );
+    path.setAttribute("opacity", String(edgeOpacity(edge)));
     if (removed) {{
       path.setAttribute("stroke-dasharray", "6,4");
     }} else if (edge.modality === "id") {{
@@ -2394,6 +2847,7 @@ function drawGraph(eventId, index) {{
     label.setAttribute("font-size", "9");
     label.setAttribute("fill", stroke);
     label.textContent = edgeText(edge);
+    labelGroup.setAttribute("opacity", String(edgeOpacity(edge)));
     labelGroup.appendChild(label);
     graph.appendChild(labelGroup);
     const bbox = label.getBBox();
@@ -2426,28 +2880,62 @@ function drawGraph(eventId, index) {{
     const palette = nodePalette(prefix);
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
     group.setAttribute("tabindex", "0");
+    group.setAttribute("opacity", String(nodeOpacity(id)));
+    group.addEventListener("click", (event) => {{
+      event.stopPropagation();
+      selectedNodeId = selectedNodeId === id ? null : id;
+      render(currentIndex);
+    }});
+    group.addEventListener("keydown", (event) => {{
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      event.stopPropagation();
+      selectedNodeId = selectedNodeId === id ? null : id;
+      render(currentIndex);
+    }});
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     circle.setAttribute("cx", String(pos.x));
     circle.setAttribute("cy", String(pos.y));
     circle.setAttribute("r", String(NODE_RADIUS));
     circle.setAttribute("fill", palette.fill);
-    circle.setAttribute("stroke", changedNodes.has(id) ? "#d97706" : palette.stroke);
-    circle.setAttribute("stroke-width", changedNodes.has(id) ? "2.2" : "1.2");
+    const isSelected = selectedNodeId === id;
+    const isChanged = changedNodes.has(id);
+    const isInRange = createdInSelectedRange.has(id);
+    let stroke = palette.stroke;
+    let strokeWidth = 1.2;
+    if (isInRange) {{
+      stroke = "#0f766e";
+      strokeWidth = 2.0;
+    }}
+    if (isChanged) {{
+      stroke = "#d97706";
+      strokeWidth = 2.2;
+    }}
+    if (isSelected) {{
+      stroke = "#111827";
+      strokeWidth = 2.6;
+    }}
+    circle.setAttribute("stroke", stroke);
+    circle.setAttribute("stroke-width", String(strokeWidth));
     group.addEventListener("mouseenter", () => {{
       hoveredNodeId = id;
       updateEdgeLabelVisibility();
+      renderSourceForItem(item);
     }});
     group.addEventListener("mouseleave", () => {{
       if (hoveredNodeId === id) hoveredNodeId = null;
       updateEdgeLabelVisibility();
+      renderSourceForItem(item);
     }});
     group.addEventListener("focus", () => {{
       hoveredNodeId = id;
       updateEdgeLabelVisibility();
+      renderSourceForItem(item);
     }});
     group.addEventListener("blur", () => {{
       if (hoveredNodeId === id) hoveredNodeId = null;
       updateEdgeLabelVisibility();
+      renderSourceForItem(item);
     }});
     const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
     label.setAttribute("x", String(pos.x));
@@ -2492,7 +2980,16 @@ function drawGraph(eventId, index) {{
     upperText.setAttribute("font-size", "8.5");
     upperText.setAttribute("fill", "#3f3a33");
     upperText.textContent = `upper: ${{formatValue(node.upper)}}`;
-    popupGroup.append(lowerText, upperText);
+    const creation = nodeCreationById.get(id);
+    const creationText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    creationText.setAttribute("x", String(popupX));
+    creationText.setAttribute("y", String(popupY + 20));
+    creationText.setAttribute("text-anchor", "start");
+    creationText.setAttribute("font-size", "8.5");
+    creationText.setAttribute("fill", "#3f3a33");
+    creationText.textContent =
+      `created: ${{creation && creation.loc ? formatLocationCompact(creation.loc) : "unknown"}}`;
+    popupGroup.append(lowerText, upperText, creationText);
     graph.appendChild(popupGroup);
     const popupBox = popupGroup.getBBox();
     const popupBg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
@@ -2505,6 +3002,7 @@ function drawGraph(eventId, index) {{
     popupBg.setAttribute("stroke", "#cfc5b5");
     popupBg.setAttribute("stroke-width", "0.9");
     popupGroup.insertBefore(popupBg, lowerText);
+    popupGroup.setAttribute("opacity", String(nodeOpacity(id)));
     nodePopupEntries.push({{ group: popupGroup, nodeId: id }});
     }});
   }}
@@ -2525,6 +3023,9 @@ function render(index) {{
     stepEvent.textContent = "";
     sourceMeta.textContent = "";
     sourceView.textContent = "";
+    sourceSelectionMeta.textContent = "";
+    nodeTraceMeta.textContent = "";
+    nodeTraceOps.textContent = "";
     clearGraph();
     return;
   }}
@@ -2538,12 +3039,35 @@ function render(index) {{
   resultEl.className = result === "error" ? "meta result-error" : "meta result-ok";
   renderStepEvent(item, eventId);
   renderSourceForItem(item);
+  updateSourceSelectionMeta();
+  renderSelectedNodeTrace();
   drawGraph(eventId, index);
 }}
 
 initNodeKindIndex();
+initNodeCreationIndex();
 initControls();
 initKeyboardNavigation();
+sourceView.addEventListener("mouseup", scheduleCaptureSourceSelection);
+sourceView.addEventListener("keyup", scheduleCaptureSourceSelection);
+sourceView.addEventListener("click", () => {{
+  if (Date.now() - lastSelectionCaptureMs < 250) return;
+  const selection = window.getSelection();
+  const hasExpandedSelection =
+    selection &&
+    selection.rangeCount > 0 &&
+    !selection.isCollapsed &&
+    sourceView.contains(selection.anchorNode) &&
+    sourceView.contains(selection.focusNode);
+  if (hasExpandedSelection) return;
+  if (!selectedSourceRange) return;
+  selectedSourceRange = null;
+  render(currentIndex);
+}});
+sourceSelectionClear.addEventListener("click", () => {{
+  selectedSourceRange = null;
+  render(currentIndex);
+}});
 setIndex(Number(select.value || 0));
 </script>
 </body>
