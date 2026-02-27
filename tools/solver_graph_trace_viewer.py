@@ -15,6 +15,24 @@ def parse_args():
     parser.add_argument("--input", required=True, help="Input compiler log file")
     parser.add_argument("--output", required=True, help="Output HTML file")
     parser.add_argument(
+        "--default-source-file",
+        default=None,
+        help=(
+            "Fallback source path for trace_expr_enter events where "
+            "loc.file is empty (useful for expect-tool traces)."
+        ),
+    )
+    parser.add_argument(
+        "--drop-backtraces",
+        action="store_true",
+        help="Drop backtrace payloads while importing trace events.",
+    )
+    parser.add_argument(
+        "--no-snapshots",
+        action="store_true",
+        help="Do not precompute full graph snapshots per event.",
+    )
+    parser.add_argument(
         "--trace",
         type=int,
         default=None,
@@ -35,10 +53,13 @@ def parse_trace_line(raw_line):
         return None
 
 
-def load_trace(path):
+def load_trace(path, default_source_file=None, drop_backtraces=False):
     events = []
     step_results = {}
     synthetic_event_id = 0
+    block_id = 0
+    saw_trace = False
+    saw_non_trace_since_last_trace = False
     supported_event_kinds = {
         "trace_delta",
         "trace_var_create",
@@ -50,7 +71,14 @@ def load_trace(path):
         for line in f:
             event = parse_trace_line(line)
             if event is None:
+                if saw_trace:
+                    saw_non_trace_since_last_trace = True
                 continue
+            if saw_trace and saw_non_trace_since_last_trace:
+                block_id += 1
+            saw_trace = True
+            saw_non_trace_since_last_trace = False
+            event["_input_block"] = block_id
             kind = event.get("kind")
             if kind == "trace_step_end":
                 step_id = event.get("step_id")
@@ -59,6 +87,16 @@ def load_trace(path):
                 continue
             if kind not in supported_event_kinds:
                 continue
+
+            if drop_backtraces:
+                event.pop("backtrace", None)
+            if (
+                default_source_file is not None
+                and kind == "trace_expr_enter"
+                and isinstance(event.get("loc"), dict)
+                and event["loc"].get("file") == ""
+            ):
+                event["loc"]["file"] = default_source_file
 
             event_id = event.get("event_id")
             if isinstance(event_id, int):
@@ -211,7 +249,7 @@ def pop_expr_stack(stack, expr_id):
             return
 
 
-def build_timeline(events, step_results):
+def build_timeline(events, step_results, include_snapshots=True):
     state = {}
     timeline = {}
     order = []
@@ -263,12 +301,11 @@ def build_timeline(events, step_results):
         if expr_stack:
             active_expr = copy.deepcopy(expr_context.get(expr_stack[-1]))
 
-        timeline[event_id] = {
+        timeline_event = {
             "event": event,
             "op": op,
             "step_id": step_id,
             "step_result": step_result,
-            "snapshot": copy.deepcopy(state),
             "changed_nodes": sorted(changed_nodes),
             "changed_edges": {
                 "added": [
@@ -282,6 +319,9 @@ def build_timeline(events, step_results):
             },
             "active_expr": active_expr,
         }
+        if include_snapshots:
+            timeline_event["snapshot"] = copy.deepcopy(state)
+        timeline[event_id] = timeline_event
 
     return timeline, order
 
@@ -317,6 +357,115 @@ def collect_sources(events, base_dir):
             except UnicodeDecodeError:
                 continue
     return sources
+
+
+def annotate_blocks(timeline, order):
+    current_block = 0
+    max_block = 0
+    for event_id in order:
+        item = timeline[event_id]
+        event = item.get("event")
+        if isinstance(event, dict):
+            input_block = event.get("_input_block")
+            if isinstance(input_block, int):
+                current_block = input_block
+        item["block_id"] = current_block
+        max_block = max(max_block, current_block)
+    return max_block
+
+
+def iter_edge_var_ids(values):
+    if not isinstance(values, list):
+        return
+    for value in values:
+        if isinstance(value, int):
+            yield value
+        elif isinstance(value, dict):
+            var_id = value.get("var_id")
+            if isinstance(var_id, int):
+                yield var_id
+
+
+def node_refs_for_event(event):
+    refs = set()
+    if not isinstance(event, dict):
+        return refs
+    var_id = event.get("var_id")
+    if isinstance(var_id, int):
+        refs.add(var_id)
+    kind = event.get("kind")
+    if kind == "trace_var_create":
+        refs.update(iter_edge_var_ids(event.get("vlower")))
+        refs.update(iter_edge_var_ids(event.get("vupper")))
+    elif kind == "trace_delta":
+        field = event.get("field")
+        if field in {"vlower", "vupper"}:
+            refs.update(iter_edge_var_ids(event.get("old")))
+            refs.update(iter_edge_var_ids(event.get("new")))
+    return refs
+
+
+def compute_future_relevant_nodes_by_block(timeline, order, max_block):
+    refs_by_block = [set() for _ in range(max_block + 1)]
+    for event_id in order:
+        item = timeline[event_id]
+        block_id = item.get("block_id")
+        if not isinstance(block_id, int):
+            continue
+        refs = node_refs_for_event(item.get("event"))
+        changed = item.get("changed_edges")
+        if isinstance(changed, dict):
+            for key in ("added", "removed"):
+                edges = changed.get(key)
+                if not isinstance(edges, list):
+                    continue
+                for edge in edges:
+                    if not isinstance(edge, dict):
+                        continue
+                    src = edge.get("src")
+                    dst = edge.get("dst")
+                    if isinstance(src, int):
+                        refs.add(src)
+                    if isinstance(dst, int):
+                        refs.add(dst)
+        refs_by_block[block_id].update(refs)
+
+    future = set()
+    result = {}
+    for block_id in range(max_block, -1, -1):
+        result[str(block_id)] = sorted(future)
+        future.update(refs_by_block[block_id])
+    return result
+
+
+def compute_block_relevant_nodes(timeline, order, max_block):
+    refs_by_block = [set() for _ in range(max_block + 1)]
+    for event_id in order:
+        item = timeline[event_id]
+        block_id = item.get("block_id")
+        if not isinstance(block_id, int):
+            continue
+        refs = node_refs_for_event(item.get("event"))
+        changed = item.get("changed_edges")
+        if isinstance(changed, dict):
+            for key in ("added", "removed"):
+                edges = changed.get(key)
+                if not isinstance(edges, list):
+                    continue
+                for edge in edges:
+                    if not isinstance(edge, dict):
+                        continue
+                    src = edge.get("src")
+                    dst = edge.get("dst")
+                    if isinstance(src, int):
+                        refs.add(src)
+                    if isinstance(dst, int):
+                        refs.add(dst)
+        refs_by_block[block_id].update(refs)
+    return {
+        str(block_id): sorted(refs_by_block[block_id])
+        for block_id in range(max_block + 1)
+    }
 
 
 def html_document(data, initial_event):
@@ -676,6 +825,8 @@ button:hover {{
     <section class=\"panel\">
       <h1>Solver Graph Trace Viewer</h1>
       <div class=\"meta\" id=\"summary\"></div>
+      <label for=\"block-select\">Block</label>
+      <select id=\"block-select\"></select>
       <label for=\"event-select\">Step</label>
       <select id=\"event-select\"></select>
       <label for=\"event-range\">Step Timeline</label>
@@ -743,11 +894,15 @@ button:hover {{
 const EVENT_DATA = {data_json};
 const INITIAL_EVENT = {initial_event_json};
 
-const eventOrder = EVENT_DATA.event_order;
+const allEventOrder = EVENT_DATA.event_order;
+let eventOrder = allEventOrder.slice();
 const events = EVENT_DATA.events;
 const sourceFiles = EVENT_DATA.sources || {{}};
 const sourceFileOrder = Object.keys(sourceFiles).sort();
+const futureRelevantByBlock = EVENT_DATA.future_relevant_by_block || {{}};
+const blockRelevantByBlock = EVENT_DATA.block_relevant_by_block || {{}};
 
+const blockSelect = document.getElementById("block-select");
 const select = document.getElementById("event-select");
 const range = document.getElementById("event-range");
 const summary = document.getElementById("summary");
@@ -774,6 +929,7 @@ const LAYOUT_MIN_SEP = 76;
 const EDGE_TARGET = 108;
 const NODE_RADIUS = 24;
 const LEVEL_INFINITY_BASE = 100000000;
+const LEVEL_INFINITY_WINDOW = 4096;
 const DEFAULT_NODE_PALETTE = {{
   fill: "#f4f1eb",
   stroke: "#5c5548",
@@ -794,13 +950,26 @@ const NODE_PREFIX_PALETTE = {{
   y: {{ fill: "#ffe6a6", stroke: "#9b6a08", text: "#6c4a08", level: "#8d620d" }},
 }};
 
-let unionBasePositions = null;
+const unionBasePositionsByBlock = new Map();
 const layoutCache = new Map();
-let layoutComputedUpto = -1;
+const fullEventIndexById = new Map(
+  allEventOrder.map((eventId, index) => [eventId, index])
+);
+const blockEventIds = new Map();
+const blockIds = [];
+const blockEventCounts = new Map();
+const snapshotCache = new Map();
+snapshotCache.set(-1, {{}});
+const SNAPSHOT_CACHE_STRIDE = 192;
+const futureRelevantSetCache = new Map();
+const blockRelevantSetCache = new Map();
+let lastSnapshotIndex = -1;
+let lastSnapshotState = {{}};
 let currentIndex = 0;
 let levelColumnsEnabled = false;
 const nodeKindById = new Map();
 const nodeCreationById = new Map();
+const recentActiveLocByEventId = new Map();
 let lastSourceFile = sourceFileOrder.length > 0 ? sourceFileOrder[0] : null;
 let lastSourceStart = 0;
 let lastSourceEnd = 0;
@@ -809,6 +978,7 @@ let selectedSourceRange = null;
 let selectedNodeId = null;
 let hoveredNodeId = null;
 let lastSelectionCaptureMs = 0;
+let selectedBlockFilter = "all";
 
 function edgeKey(edge) {{
   return `${{edge.src}}|${{edge.dst}}|${{edge.label}}|${{edge.modality || ""}}`;
@@ -825,6 +995,235 @@ function normalizeEdgeRef(ref) {{
     }};
   }}
   return null;
+}}
+
+function eventBlockId(item, fallback = 0) {{
+  if (item && Number.isInteger(item.block_id)) return item.block_id;
+  return fallback;
+}}
+
+function initBlockIndex() {{
+  allEventOrder.forEach((eventId) => {{
+    const item = events[String(eventId)] || null;
+    const blockId = eventBlockId(item, 0);
+    if (!blockEventIds.has(blockId)) {{
+      blockEventIds.set(blockId, []);
+      blockIds.push(blockId);
+    }}
+    blockEventIds.get(blockId).push(eventId);
+  }});
+  blockIds.sort((a, b) => a - b);
+  blockIds.forEach((blockId) => {{
+    const ids = blockEventIds.get(blockId) || [];
+    blockEventCounts.set(blockId, ids.length);
+  }});
+}}
+
+function normalizeBlockFilter(rawValue) {{
+  if (rawValue === "all" || rawValue === null || rawValue === undefined) {{
+    return "all";
+  }}
+  const asNum = Number(rawValue);
+  if (!Number.isInteger(asNum) || !blockEventIds.has(asNum)) return "all";
+  return String(asNum);
+}}
+
+function eventOrderForBlockFilter(filterValue) {{
+  if (filterValue === "all") return allEventOrder.slice();
+  const blockId = Number(filterValue);
+  const ids = blockEventIds.get(blockId);
+  return Array.isArray(ids) ? ids.slice() : [];
+}}
+
+function blockLabel(blockId) {{
+  const count = blockEventCounts.get(blockId) || 0;
+  return `block ${{blockId}} (${{count}} events)`;
+}}
+
+function futureRelevantSetForBlock(blockId) {{
+  const key = Number(blockId);
+  if (futureRelevantSetCache.has(key)) {{
+    return futureRelevantSetCache.get(key);
+  }}
+  const raw = futureRelevantByBlock[String(key)];
+  const set = new Set();
+  if (Array.isArray(raw)) {{
+    raw.forEach((id) => {{
+      const n = Number(id);
+      if (Number.isFinite(n)) set.add(n);
+    }});
+  }}
+  futureRelevantSetCache.set(key, set);
+  return set;
+}}
+
+function blockRelevantSetForBlock(blockId) {{
+  const key = Number(blockId);
+  if (blockRelevantSetCache.has(key)) {{
+    return blockRelevantSetCache.get(key);
+  }}
+  const raw = blockRelevantByBlock[String(key)];
+  const set = new Set();
+  if (Array.isArray(raw)) {{
+    raw.forEach((id) => {{
+      const n = Number(id);
+      if (Number.isFinite(n)) set.add(n);
+    }});
+  }}
+  blockRelevantSetCache.set(key, set);
+  return set;
+}}
+
+function pruneStateToRelevantNodes(state, keepSet) {{
+  Object.keys(state).forEach((rawId) => {{
+    const id = Number(rawId);
+    if (!keepSet.has(id)) {{
+      delete state[rawId];
+    }}
+  }});
+  Object.keys(state).forEach((rawId) => {{
+    const node = state[rawId];
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node.vlower)) {{
+      node.vlower = node.vlower.filter((edge) => keepSet.has(edge.var_id));
+    }}
+    if (Array.isArray(node.vupper)) {{
+      node.vupper = node.vupper.filter((edge) => keepSet.has(edge.var_id));
+    }}
+    if (
+      node.gencopy !== null &&
+      node.gencopy !== undefined &&
+      !keepSet.has(Number(node.gencopy))
+    ) {{
+      node.gencopy = null;
+    }}
+  }});
+}}
+
+function edgeRefsFromRaw(values) {{
+  if (!Array.isArray(values)) return [];
+  const out = [];
+  values.forEach((value) => {{
+    const edge = normalizeEdgeRef(value);
+    if (!edge) return;
+    out.push(edge);
+  }});
+  return out;
+}}
+
+function eventNodeRefs(item) {{
+  const refs = new Set();
+  if (!item) return refs;
+  const event = item.event || {{}};
+  const varId = event.var_id;
+  if (Number.isFinite(varId)) refs.add(Number(varId));
+  const kind = event.kind;
+  if (kind === "trace_var_create") {{
+    edgeRefsFromRaw(event.vlower).forEach((e) => refs.add(e.var_id));
+    edgeRefsFromRaw(event.vupper).forEach((e) => refs.add(e.var_id));
+  }} else if (kind === "trace_delta") {{
+    const field = event.field;
+    if (field === "vlower" || field === "vupper") {{
+      edgeRefsFromRaw(event.old).forEach((e) => refs.add(e.var_id));
+      edgeRefsFromRaw(event.new).forEach((e) => refs.add(e.var_id));
+    }}
+  }}
+  const changed = item.changed_edges || {{}};
+  ["added", "removed"].forEach((key) => {{
+    const edges = changed[key];
+    if (!Array.isArray(edges)) return;
+    edges.forEach((edge) => {{
+      const src = Number(edge.src);
+      const dst = Number(edge.dst);
+      if (Number.isFinite(src)) refs.add(src);
+      if (Number.isFinite(dst)) refs.add(dst);
+    }});
+  }});
+  return refs;
+}}
+
+function deepCloneState(state) {{
+  if (typeof structuredClone === "function") return structuredClone(state);
+  return JSON.parse(JSON.stringify(state));
+}}
+
+function normalizeEdgeRefs(values) {{
+  if (!Array.isArray(values)) return [];
+  const out = [];
+  values.forEach((value) => {{
+    const edge = normalizeEdgeRef(value);
+    if (!edge) return;
+    out.push(edge);
+  }});
+  out.sort((a, b) => {{
+    if (a.var_id !== b.var_id) return a.var_id - b.var_id;
+    return (a.modality || "").localeCompare(b.modality || "");
+  }});
+  return out;
+}}
+
+function ensureNodeInState(state, varId) {{
+  const key = String(varId);
+  if (!state[key]) {{
+    state[key] = {{
+      level: null,
+      lower: null,
+      upper: null,
+      vlower: [],
+      vupper: [],
+      gencopy: null,
+    }};
+  }}
+  return state[key];
+}}
+
+function applyTraceEventToState(state, rawEvent) {{
+  if (!rawEvent || typeof rawEvent !== "object") return;
+  const kind = rawEvent.kind;
+  if (kind === "trace_var_create") {{
+    if (!Number.isFinite(rawEvent.var_id)) return;
+    const node = ensureNodeInState(state, rawEvent.var_id);
+    node.level = Number.isFinite(rawEvent.level) ? rawEvent.level : null;
+    node.lower = rawEvent.lower ?? null;
+    node.upper = rawEvent.upper ?? null;
+    node.vlower = normalizeEdgeRefs(rawEvent.vlower);
+    node.vupper = normalizeEdgeRefs(rawEvent.vupper);
+    if (rawEvent.provenance !== undefined) {{
+      node.provenance = rawEvent.provenance;
+    }}
+    if (Array.isArray(rawEvent.related_var_ids)) {{
+      node.related_var_ids = rawEvent.related_var_ids.slice();
+    }}
+    return;
+  }}
+  if (kind !== "trace_delta") return;
+  if (!Number.isFinite(rawEvent.var_id) || typeof rawEvent.field !== "string") {{
+    return;
+  }}
+  const node = ensureNodeInState(state, rawEvent.var_id);
+  const field = rawEvent.field;
+  if (field === "vlower" || field === "vupper") {{
+    node[field] = normalizeEdgeRefs(rawEvent.new);
+  }} else {{
+    node[field] = rawEvent.new;
+  }}
+}}
+
+function nearestSnapshotIndex(targetIndex) {{
+  let best = -1;
+  snapshotCache.forEach((_value, idx) => {{
+    if (idx <= targetIndex && idx > best) best = idx;
+  }});
+  return best;
+}}
+
+function setLayoutCacheEntry(eventId, positions) {{
+  layoutCache.set(eventId, positions);
+  if (layoutCache.size <= 420) return;
+  const oldestKey = layoutCache.keys().next().value;
+  if (oldestKey !== undefined && oldestKey !== eventId) {{
+    layoutCache.delete(oldestKey);
+  }}
 }}
 
 function edgeGroupKey(edge) {{
@@ -940,7 +1339,7 @@ function maybeIndexNodeKind(id, lower, upper) {{
 }}
 
 function initNodeKindIndex() {{
-  eventOrder.forEach((eventId) => {{
+  allEventOrder.forEach((eventId) => {{
     const item = events[String(eventId)];
     const event = (item && item.event) || {{}};
     if (
@@ -949,7 +1348,7 @@ function initNodeKindIndex() {{
     ) {{
       maybeIndexNodeKind(event.var_id, event.lower, event.upper);
     }}
-    const snapshot = (item && item.snapshot) || {{}};
+    const snapshot = snapshotFor(eventId);
     Object.entries(snapshot).forEach(([rawId, node]) => {{
       const id = Number(rawId);
       if (!Number.isFinite(id)) return;
@@ -959,7 +1358,7 @@ function initNodeKindIndex() {{
 }}
 
 function initNodeCreationIndex() {{
-  eventOrder.forEach((eventId) => {{
+  allEventOrder.forEach((eventId) => {{
     const item = events[String(eventId)];
     if (!item) return;
     const event = item.event || {{}};
@@ -987,6 +1386,28 @@ function initNodeCreationIndex() {{
   }});
 }}
 
+function initRecentActiveLocIndex() {{
+  let lastLoc = null;
+  allEventOrder.forEach((eventId) => {{
+    const item = events[String(eventId)] || null;
+    const activeExpr =
+      item && item.active_expr && typeof item.active_expr === "object"
+        ? item.active_expr
+        : null;
+    const loc =
+      activeExpr && activeExpr.loc && typeof activeExpr.loc === "object"
+        ? activeExpr.loc
+        : null;
+    if (loc) lastLoc = loc;
+    if (lastLoc) recentActiveLocByEventId.set(eventId, lastLoc);
+  }});
+}}
+
+function recentActiveLocForEvent(eventId) {{
+  if (!Number.isInteger(eventId)) return null;
+  return recentActiveLocByEventId.get(eventId) || null;
+}}
+
 function shortFileName(file) {{
   if (typeof file !== "string" || file.length === 0) return "?";
   const parts = file.split("/");
@@ -996,14 +1417,82 @@ function shortFileName(file) {{
 
 function formatLocationCompact(loc) {{
   if (!loc || typeof loc !== "object") return "unknown";
-  const file = shortFileName(loc.file || "");
+  const resolved = resolveLocationForDisplay(loc);
+  const file = shortFileName(resolved.file || "");
+  const sl = resolved.start.line;
+  const sc = resolved.start.col;
+  const el = resolved.end.line;
+  const ec = resolved.end.col;
+  return `${{file}}:${{sl}}:${{sc}}-${{el}}:${{ec}}`;
+}}
+
+const sourceLineStartsCache = new Map();
+
+function getSourceLineStarts(file) {{
+  if (sourceLineStartsCache.has(file)) return sourceLineStartsCache.get(file);
+  const source = sourceFiles[file];
+  if (typeof source !== "string") return null;
+  const starts = [0];
+  for (let i = 0; i < source.length; i += 1) {{
+    if (source[i] === "\\n") starts.push(i + 1);
+  }}
+  sourceLineStartsCache.set(file, starts);
+  return starts;
+}}
+
+function lineColFromCnum(file, cnum) {{
+  if (!Number.isFinite(cnum)) return null;
+  const source = sourceFiles[file];
+  if (typeof source !== "string") return null;
+  const starts = getSourceLineStarts(file);
+  if (!starts) return null;
+  const clamped = Math.max(0, Math.min(Math.floor(cnum), source.length));
+  let lo = 0;
+  let hi = starts.length - 1;
+  while (lo <= hi) {{
+    const mid = (lo + hi) >> 1;
+    if (starts[mid] <= clamped) lo = mid + 1;
+    else hi = mid - 1;
+  }}
+  const idx = Math.max(0, hi);
+  return {{
+    line: idx + 1,
+    col: clamped - starts[idx],
+  }};
+}}
+
+function resolveLocationForDisplay(loc) {{
+  if (!loc || typeof loc !== "object") {{
+    return {{
+      file: "?",
+      start: {{ line: "?", col: "?" }},
+      end: {{ line: "?", col: "?" }},
+    }};
+  }}
+  const file = typeof loc.file === "string" ? loc.file : "?";
   const start = loc.start || {{}};
   const end = loc.end || {{}};
-  const sl = Number.isFinite(start.line) ? start.line : "?";
-  const sc = Number.isFinite(start.col) ? start.col : "?";
-  const el = Number.isFinite(end.line) ? end.line : "?";
-  const ec = Number.isFinite(end.col) ? end.col : "?";
-  return `${{file}}:${{sl}}:${{sc}}-${{el}}:${{ec}}`;
+  const startByCnum = lineColFromCnum(file, start.cnum);
+  const endByCnum = lineColFromCnum(file, end.cnum);
+  return {{
+    file,
+    start: {{
+      line: startByCnum
+        ? startByCnum.line
+        : Number.isFinite(start.line)
+          ? start.line
+          : "?",
+      col: startByCnum
+        ? startByCnum.col
+        : Number.isFinite(start.col)
+          ? start.col
+          : "?",
+    }},
+    end: {{
+      line: endByCnum ? endByCnum.line : Number.isFinite(end.line) ? end.line : "?",
+      col: endByCnum ? endByCnum.col : Number.isFinite(end.col) ? end.col : "?",
+    }},
+  }};
 }}
 
 function rangesOverlap(a0, a1, b0, b1) {{
@@ -1069,6 +1558,47 @@ function clampIndex(index) {{
   return Math.max(0, Math.min(index, eventOrder.length - 1));
 }}
 
+function rebuildEventSelector(preferredEventId = null) {{
+  select.replaceChildren();
+  eventOrder.forEach((eventId, index) => {{
+    const item = events[String(eventId)];
+    const option = document.createElement("option");
+    option.value = String(index);
+    option.textContent = stepLabelFor(item, eventId);
+    select.appendChild(option);
+  }});
+  range.max = String(Math.max(0, eventOrder.length - 1));
+
+  let nextIndex = 0;
+  if (Number.isInteger(preferredEventId)) {{
+    const preferredIndex = eventOrder.indexOf(preferredEventId);
+    if (preferredIndex >= 0) nextIndex = preferredIndex;
+  }} else if (eventOrder.length > 0) {{
+    const largeTrace = eventOrder.length > 4000;
+    const wanted = eventOrder.indexOf(INITIAL_EVENT);
+    nextIndex = wanted >= 0 ? wanted : largeTrace ? 0 : eventOrder.length - 1;
+  }}
+
+  currentIndex = clampIndex(nextIndex);
+  select.value = String(currentIndex);
+  range.value = String(currentIndex);
+}}
+
+function setBlockFilter(filterValue, preferredEventId = null) {{
+  const normalized = normalizeBlockFilter(filterValue);
+  selectedBlockFilter = normalized;
+  eventOrder = eventOrderForBlockFilter(selectedBlockFilter);
+  if (blockSelect) blockSelect.value = selectedBlockFilter;
+  resetLayoutCache();
+  rebuildEventSelector(preferredEventId);
+}}
+
+function currentBlockLabel() {{
+  if (selectedBlockFilter === "all") return "all blocks";
+  const blockId = Number(selectedBlockFilter);
+  return `block ${{blockId}}`;
+}}
+
 function shortActionForItem(item) {{
   const event = item.event || {{}};
   if (event.kind === "trace_var_create") {{
@@ -1117,6 +1647,8 @@ function parseHashState() {{
     eventId: null,
     stepId: null,
     index: null,
+    hasBlock: false,
+    block: "all",
     hasNode: false,
     nodeId: null,
     hasColumns: false,
@@ -1139,6 +1671,10 @@ function parseHashState() {{
   if (stepParam !== null) state.stepId = stepParam;
   const indexParam = parseIntStrict(params.get("index"));
   if (indexParam !== null) state.index = indexParam;
+  if (params.has("block")) {{
+    state.hasBlock = true;
+    state.block = normalizeBlockFilter(params.get("block"));
+  }}
 
   if (params.has("node")) {{
     state.hasNode = true;
@@ -1210,6 +1746,9 @@ function syncUrlHashState() {{
   const eventId = eventOrder[currentIndex];
   if (Number.isInteger(eventId)) params.set("event", String(eventId));
   params.set("index", String(currentIndex));
+  if (selectedBlockFilter !== "all") {{
+    params.set("block", String(selectedBlockFilter));
+  }}
   const item = events[String(eventId)];
   if (item && Number.isInteger(item.step_id)) {{
     params.set("step", String(item.step_id));
@@ -1240,6 +1779,12 @@ function applyHashState(options = {{}}) {{
   const state = parseHashState();
   applyingHashState = true;
   try {{
+    const hashBlock = state.hasBlock ? state.block : "all";
+    const preferredEventId = Number.isInteger(state.eventId)
+      ? state.eventId
+      : null;
+    setBlockFilter(hashBlock, preferredEventId);
+
     const nextColumns = state.hasColumns ? !!state.columns : false;
     if (levelColumnsEnabled !== nextColumns) {{
       levelColumnsEnabled = nextColumns;
@@ -1271,7 +1816,16 @@ function applyHashState(options = {{}}) {{
 
 function jumpToEvent(eventId) {{
   const idx = eventOrder.indexOf(eventId);
-  if (idx >= 0) setIndex(idx);
+  if (idx >= 0) {{
+    setIndex(idx);
+    return;
+  }}
+  const item = events[String(eventId)];
+  if (!item) return;
+  const blockId = eventBlockId(item, 0);
+  setBlockFilter(String(blockId), eventId);
+  const nextIdx = eventOrder.indexOf(eventId);
+  if (nextIdx >= 0) setIndex(nextIdx);
 }}
 
 function isTypingTarget(target) {{
@@ -1291,19 +1845,27 @@ function setIndex(nextIndex, options = {{}}) {{
 }}
 
 function initControls() {{
-  eventOrder.forEach((eventId, index) => {{
-    const item = events[String(eventId)];
-    const option = document.createElement("option");
-    option.value = String(index);
-    option.textContent = stepLabelFor(item, eventId);
-    select.appendChild(option);
-  }});
-  range.max = String(Math.max(0, eventOrder.length - 1));
-  const wanted = eventOrder.indexOf(INITIAL_EVENT);
-  const selected = wanted >= 0 ? wanted : Math.max(eventOrder.length - 1, 0);
-  currentIndex = selected;
-  select.value = String(currentIndex);
-  range.value = String(currentIndex);
+  initBlockIndex();
+  if (blockSelect) {{
+    const allOption = document.createElement("option");
+    allOption.value = "all";
+    allOption.textContent = `all blocks (${{allEventOrder.length}} events)`;
+    blockSelect.appendChild(allOption);
+    blockIds.forEach((blockId) => {{
+      const option = document.createElement("option");
+      option.value = String(blockId);
+      option.textContent = blockLabel(blockId);
+      blockSelect.appendChild(option);
+    }});
+    blockSelect.addEventListener("change", () => {{
+      const previousEventId = eventOrder[currentIndex];
+      setBlockFilter(blockSelect.value, previousEventId);
+      render(currentIndex);
+      syncUrlHashState();
+    }});
+  }}
+
+  setBlockFilter("all", INITIAL_EVENT);
   select.addEventListener("change", () => {{
     setIndex(Number(select.value));
   }});
@@ -1420,10 +1982,11 @@ function formatLevelValue(value) {{
     return String(value);
   }}
   if (!Number.isInteger(value)) return String(value);
-  if (value < LEVEL_INFINITY_BASE) return String(value);
-  const extra = value - LEVEL_INFINITY_BASE;
-  if (extra === 0) return "\\u221E";
-  return `\\u221E+${{extra}}`;
+  const delta = value - LEVEL_INFINITY_BASE;
+  if (Math.abs(delta) > LEVEL_INFINITY_WINDOW) return String(value);
+  if (delta === 0) return "\\u221E";
+  if (delta > 0) return `\\u221E+${{delta}}`;
+  return `\\u221E${{delta}}`;
 }}
 
 function formatFieldValue(field, value) {{
@@ -1432,13 +1995,12 @@ function formatFieldValue(field, value) {{
 
 function formatLocation(loc) {{
   if (!loc || typeof loc !== "object") return "unknown";
-  const file = typeof loc.file === "string" ? loc.file : "?";
-  const start = loc.start || {{}};
-  const end = loc.end || {{}};
-  const sl = Number.isFinite(start.line) ? start.line : "?";
-  const sc = Number.isFinite(start.col) ? start.col : "?";
-  const el = Number.isFinite(end.line) ? end.line : "?";
-  const ec = Number.isFinite(end.col) ? end.col : "?";
+  const resolved = resolveLocationForDisplay(loc);
+  const file = resolved.file;
+  const sl = resolved.start.line;
+  const sc = resolved.start.col;
+  const el = resolved.end.line;
+  const ec = resolved.end.col;
   return `${{file}}:${{sl}}:${{sc}}-${{el}}:${{ec}}`;
 }}
 
@@ -1513,9 +2075,38 @@ function renderSourceWindow(
     }}
     appendSourceCode(sourceView, text, classes);
   }}
+  scrollSourceIntoViewForHighlight();
 }}
 
-function renderSourceForItem(item) {{
+function highlightedNodesForScroll() {{
+  let nodes = sourceView.querySelectorAll(".source-hi");
+  if (nodes.length > 0) return nodes;
+  nodes = sourceView.querySelectorAll(".source-node");
+  if (nodes.length > 0) return nodes;
+  nodes = sourceView.querySelectorAll(".source-sel");
+  return nodes;
+}}
+
+function scrollSourceIntoViewForHighlight() {{
+  const nodes = highlightedNodesForScroll();
+  if (!nodes || nodes.length === 0) return;
+  const first = nodes[0];
+  const last = nodes[nodes.length - 1];
+  const viewRect = sourceView.getBoundingClientRect();
+  const firstRect = first.getBoundingClientRect();
+  const lastRect = last.getBoundingClientRect();
+  const top = sourceView.scrollTop + (firstRect.top - viewRect.top);
+  const bottom = sourceView.scrollTop + (lastRect.bottom - viewRect.top);
+  const visibleTop = sourceView.scrollTop;
+  const visibleBottom = visibleTop + sourceView.clientHeight;
+  const margin = 12;
+  if (top >= visibleTop + margin && bottom <= visibleBottom - margin) return;
+  const center = 0.5 * (top + bottom);
+  const target = Math.max(0, center - 0.5 * sourceView.clientHeight);
+  sourceView.scrollTop = target;
+}}
+
+function renderSourceForItem(item, eventId = null) {{
   const focusedNodeId =
     selectedNodeId !== null && selectedNodeId !== undefined
       ? selectedNodeId
@@ -1544,68 +2135,93 @@ function renderSourceForItem(item) {{
       : null;
 
   const active = item && item.active_expr ? item.active_expr : null;
-  if (!active || !active.loc) {{
-    const fallbackFile =
-      focusedFile ||
-      lastSourceFile ||
-      (sourceFileOrder.length > 0 ? sourceFileOrder[0] : null);
-    if (!fallbackFile) {{
-      sourceMeta.textContent = "";
-      sourceView.textContent = "";
-      currentSourceFile = null;
-      return;
-    }}
-    const fallbackSource =
-      fallbackFile === focusedFile && focusedSource
-        ? focusedSource
-        : sourceFiles[fallbackFile];
-    if (typeof fallbackSource !== "string") {{
-      sourceMeta.textContent = "";
-      sourceView.textContent = "";
-      currentSourceFile = null;
-      return;
-    }}
+  const activeLoc = active && active.loc ? active.loc : null;
+  const activeFile =
+    activeLoc && typeof activeLoc.file === "string" ? activeLoc.file : null;
+  const activeSource =
+    activeFile && typeof sourceFiles[activeFile] === "string"
+      ? sourceFiles[activeFile]
+      : null;
+  const activeStart = activeLoc && activeLoc.start && activeLoc.start.cnum;
+  const activeEnd = activeLoc && activeLoc.end && activeLoc.end.cnum;
+  const hasActiveRange = Number.isFinite(activeStart) && Number.isFinite(activeEnd);
+
+  if (activeSource && hasActiveRange) {{
     sourceMeta.textContent = "";
-    currentSourceFile = fallbackFile;
+    lastSourceFile = activeFile;
+    lastSourceStart = activeStart;
+    lastSourceEnd = activeEnd;
+    currentSourceFile = activeFile;
     renderSourceWindow(
-      fallbackSource,
-      lastSourceStart,
-      lastSourceEnd,
-      false,
-      selectedSourceRange && selectedSourceRange.file === fallbackFile
+      activeSource,
+      activeStart,
+      activeEnd,
+      true,
+      selectedSourceRange && selectedSourceRange.file === activeFile
         ? selectedSourceRange
         : null,
-      focusedRange && fallbackFile === focusedFile ? focusedRange : null
+      focusedRange && focusedFile === activeFile ? focusedRange : null
     );
     return;
   }}
-  const loc = active.loc;
-  sourceMeta.textContent = "";
-  const file = typeof loc.file === "string" ? loc.file : "";
-  const useFocusedFile = focusedRange && focusedFile && focusedSource;
-  const sourceFile = useFocusedFile ? focusedFile : file;
-  const source = useFocusedFile ? focusedSource : sourceFiles[file];
-  if (typeof source !== "string") {{
+
+  const recentLoc = recentActiveLocForEvent(eventId);
+  const recentFile =
+    recentLoc && typeof recentLoc.file === "string" ? recentLoc.file : null;
+  const recentSource =
+    recentFile && typeof sourceFiles[recentFile] === "string"
+      ? sourceFiles[recentFile]
+      : null;
+  const recentStart = recentLoc && recentLoc.start && recentLoc.start.cnum;
+  const recentEnd = recentLoc && recentLoc.end && recentLoc.end.cnum;
+  const hasRecentRange = Number.isFinite(recentStart) && Number.isFinite(recentEnd);
+
+  const fallbackFile =
+    recentFile ||
+    focusedFile ||
+    lastSourceFile ||
+    (sourceFileOrder.length > 0 ? sourceFileOrder[0] : null);
+  if (!fallbackFile) {{
     sourceMeta.textContent = "";
+    sourceView.textContent = "";
     currentSourceFile = null;
     return;
   }}
-  const start = useFocusedFile ? focusedStart : loc.start && loc.start.cnum;
-  const end = useFocusedFile ? focusedEnd : loc.end && loc.end.cnum;
-  lastSourceFile = sourceFile;
-  lastSourceStart = Number.isFinite(start) ? start : 0;
+  const fallbackSource =
+    fallbackFile === recentFile && recentSource
+      ? recentSource
+      : fallbackFile === focusedFile && focusedSource
+        ? focusedSource
+        : sourceFiles[fallbackFile];
+  if (typeof fallbackSource !== "string") {{
+    sourceMeta.textContent = "";
+    sourceView.textContent = "";
+    currentSourceFile = null;
+    return;
+  }}
+  const fallbackStart =
+    fallbackFile === recentFile && hasRecentRange ? recentStart : lastSourceStart;
+  const fallbackEnd =
+    fallbackFile === recentFile && hasRecentRange ? recentEnd : lastSourceEnd;
+  lastSourceFile = fallbackFile;
+  lastSourceStart = Number.isFinite(fallbackStart) ? fallbackStart : 0;
   lastSourceEnd =
-    Number.isFinite(end) ? end : Number.isFinite(start) ? start : 0;
-  currentSourceFile = sourceFile;
+    Number.isFinite(fallbackEnd)
+      ? fallbackEnd
+      : Number.isFinite(fallbackStart)
+        ? fallbackStart
+        : 0;
+  sourceMeta.textContent = "";
+  currentSourceFile = fallbackFile;
   renderSourceWindow(
-    source,
+    fallbackSource,
     lastSourceStart,
     lastSourceEnd,
-    !useFocusedFile,
-    selectedSourceRange && selectedSourceRange.file === sourceFile
+    lastSourceEnd > lastSourceStart,
+    selectedSourceRange && selectedSourceRange.file === fallbackFile
       ? selectedSourceRange
       : null,
-    focusedRange && sourceFile === focusedFile ? focusedRange : null
+    focusedRange && fallbackFile === focusedFile ? focusedRange : null
   );
 }}
 
@@ -2136,9 +2752,50 @@ function renderStepEvent(item, eventId) {{
   stepEvent.append(title, meaning, chips, grid);
 }}
 
+function snapshotForEventIndex(targetIndex) {{
+  if (targetIndex < 0) return {{}};
+  const cachedIndex = nearestSnapshotIndex(targetIndex);
+  let state = deepCloneState(snapshotCache.get(cachedIndex) || {{}});
+  let currentBlock = 0;
+  if (cachedIndex >= 0) {{
+    const cachedEventId = allEventOrder[cachedIndex];
+    const cachedItem = events[String(cachedEventId)] || null;
+    currentBlock = eventBlockId(cachedItem, 0);
+  }}
+  for (let i = cachedIndex + 1; i <= targetIndex; i += 1) {{
+    const eventId = allEventOrder[i];
+    const item = events[String(eventId)] || null;
+    const blockId = eventBlockId(item, currentBlock);
+    if (i > 0 && blockId !== currentBlock) {{
+      const keepSet = futureRelevantSetForBlock(currentBlock);
+      pruneStateToRelevantNodes(state, keepSet);
+      if (
+        selectedBlockFilter !== "all" &&
+        String(blockId) === String(selectedBlockFilter)
+      ) {{
+        const blockSeed = blockRelevantSetForBlock(blockId);
+        pruneStateToRelevantNodes(state, blockSeed);
+      }}
+      currentBlock = blockId;
+    }}
+    const rawEvent = item && item.event ? item.event : null;
+    applyTraceEventToState(state, rawEvent);
+    if (i % SNAPSHOT_CACHE_STRIDE === 0) {{
+      snapshotCache.set(i, deepCloneState(state));
+    }}
+  }}
+  snapshotCache.set(targetIndex, deepCloneState(state));
+  return state;
+}}
+
 function snapshotFor(eventId) {{
   const item = events[String(eventId)];
-  return item ? item.snapshot : {{}};
+  if (item && item.snapshot && typeof item.snapshot === "object") {{
+    return item.snapshot;
+  }}
+  const index = fullEventIndexById.get(eventId);
+  if (!Number.isInteger(index)) return {{}};
+  return snapshotForEventIndex(index);
 }}
 
 function edgesFromSnapshot(snapshot) {{
@@ -2179,46 +2836,122 @@ function seededUnit(seed) {{
   return x - Math.floor(x);
 }}
 
-function nodeIdsForLayout(item) {{
-  const snapshot = item.snapshot || {{}};
+function nodeIdsForLayout(item, eventId) {{
+  const snapshot = snapshotFor(eventId);
   const ids = new Set(Object.keys(snapshot).map(Number));
-  const changed = item.changed_edges || {{ added: [], removed: [] }};
-  (changed.added || []).forEach((edge) => {{
-    ids.add(Number(edge.src));
-    ids.add(Number(edge.dst));
-  }});
-  (changed.removed || []).forEach((edge) => {{
-    ids.add(Number(edge.src));
-    ids.add(Number(edge.dst));
-  }});
-  (item.changed_nodes || []).forEach((id) => ids.add(Number(id)));
+  eventNodeRefs(item).forEach((id) => ids.add(id));
   return Array.from(ids).sort((a, b) => a - b);
 }}
 
-function allNodeIdsAcrossTimeline() {{
+function allNodeIdsAcrossTimeline(blockId = null) {{
   const ids = new Set();
-  eventOrder.forEach((eventId) => {{
+  const order =
+    blockId === null ? allEventOrder : blockEventIds.get(blockId) || [];
+  order.forEach((eventId) => {{
     const item = events[String(eventId)];
-    nodeIdsForLayout(item).forEach((id) => ids.add(id));
+    eventNodeRefs(item).forEach((id) => ids.add(id));
   }});
+  if (order.length > 0) {{
+    const firstSnapshot = snapshotFor(order[0]);
+    Object.keys(firstSnapshot).forEach((rawId) => {{
+      const id = Number(rawId);
+      if (Number.isFinite(id)) ids.add(id);
+    }});
+  }}
   return Array.from(ids).sort((a, b) => a - b);
 }}
 
-function layoutEdgesFor(item) {{
-  const snapshotEdges = edgesFromSnapshot(item.snapshot || {{}});
-  const changed = item.changed_edges || {{ added: [], removed: [] }};
+function eventEdgesForUnion(item) {{
   const union = new Map();
-  snapshotEdges.forEach((edge) => union.set(edgeKey(edge), edge));
-  (changed.added || []).forEach((edge) => union.set(edgeKey(edge), edge));
-  (changed.removed || []).forEach((edge) => union.set(edgeKey(edge), edge));
+  if (!item) return [];
+  const event = item.event || {{}};
+  if (event.kind === "trace_var_create") {{
+    const src = Number(event.var_id);
+    edgeRefsFromRaw(event.vlower).forEach((edge) => {{
+      const e = {{
+        src: edge.var_id,
+        dst: src,
+        label: "vlower",
+        modality: edge.modality,
+      }};
+      union.set(edgeKey(e), e);
+    }});
+    edgeRefsFromRaw(event.vupper).forEach((edge) => {{
+      const e = {{
+        src,
+        dst: edge.var_id,
+        label: "vupper",
+        modality: edge.modality,
+      }};
+      union.set(edgeKey(e), e);
+    }});
+  }}
+  if (event.kind === "trace_delta") {{
+    const field = event.field;
+    const src = Number(event.var_id);
+    if (field === "vlower" || field === "vupper") {{
+      const addEdges = (values) => {{
+        edgeRefsFromRaw(values).forEach((edge) => {{
+          const e =
+            field === "vlower"
+              ? {{
+                  src: edge.var_id,
+                  dst: src,
+                  label: "vlower",
+                  modality: edge.modality,
+                }}
+              : {{
+                  src,
+                  dst: edge.var_id,
+                  label: "vupper",
+                  modality: edge.modality,
+                }};
+          union.set(edgeKey(e), e);
+        }});
+      }};
+      addEdges(event.old);
+      addEdges(event.new);
+    }}
+  }}
+  const changed = item.changed_edges || {{}};
+  ["added", "removed"].forEach((key) => {{
+    const edges = changed[key];
+    if (!Array.isArray(edges)) return;
+    edges.forEach((edge) => {{
+      if (!edge || !Number.isFinite(Number(edge.src))) return;
+      if (!Number.isFinite(Number(edge.dst))) return;
+      const e = {{
+        src: Number(edge.src),
+        dst: Number(edge.dst),
+        label: edge.label,
+        modality: edge.modality || null,
+      }};
+      union.set(edgeKey(e), e);
+    }});
+  }});
   return Array.from(union.values());
 }}
 
-function allEdgesEverForLayout() {{
+function layoutEdgesFor(item, eventId) {{
+  const snapshotEdges = edgesFromSnapshot(snapshotFor(eventId));
   const union = new Map();
-  eventOrder.forEach((eventId) => {{
+  snapshotEdges.forEach((edge) => union.set(edgeKey(edge), edge));
+  eventEdgesForUnion(item).forEach((edge) => union.set(edgeKey(edge), edge));
+  return Array.from(union.values());
+}}
+
+function allEdgesEverForLayout(blockId = null) {{
+  const union = new Map();
+  const order =
+    blockId === null ? allEventOrder : blockEventIds.get(blockId) || [];
+  if (order.length > 0) {{
+    edgesFromSnapshot(snapshotFor(order[0])).forEach((edge) => {{
+      union.set(edgeKey(edge), edge);
+    }});
+  }}
+  order.forEach((eventId) => {{
     const item = events[String(eventId)];
-    layoutEdgesFor(item).forEach((edge) => {{
+    eventEdgesForUnion(item).forEach((edge) => {{
       union.set(edgeKey(edge), edge);
     }});
   }});
@@ -2227,15 +2960,19 @@ function allEdgesEverForLayout() {{
 
 function resetLayoutCache() {{
   layoutCache.clear();
-  layoutComputedUpto = -1;
+  unionBasePositionsByBlock.clear();
+  snapshotCache.clear();
+  snapshotCache.set(-1, {{}});
+  futureRelevantSetCache.clear();
+  blockRelevantSetCache.clear();
 }}
 
 function normalizeNodeLevel(rawLevel) {{
   return Number.isFinite(rawLevel) ? rawLevel : null;
 }}
 
-function levelColumnsForItem(item, nodeIds) {{
-  const snapshot = (item && item.snapshot) || {{}};
+function levelColumnsForItem(item, nodeIds, eventId) {{
+  const snapshot = snapshotFor(eventId);
   const levels = [];
   const seenLevels = new Set();
   const levelById = new Map();
@@ -2916,25 +3653,37 @@ function annealUnionLayout(initial, nodeIds, springs) {{
   return polishedEnergy < bestScore ? polished : dropZPositions(best || collapsed);
 }}
 
-function computeUnionBaseLayout() {{
-  if (unionBasePositions !== null) return;
-  const ids = allNodeIdsAcrossTimeline();
+function computeUnionBaseLayout(blockId) {{
+  if (unionBasePositionsByBlock.has(blockId)) return;
+  const ids = allNodeIdsAcrossTimeline(blockId);
   if (ids.length === 0) {{
-    unionBasePositions = new Map();
+    unionBasePositionsByBlock.set(blockId, new Map());
     return;
   }}
-  const unionEdges = allEdgesEverForLayout();
+  const unionEdges = allEdgesEverForLayout(blockId);
   const springs = springsFromEdges(ids, unionEdges);
   const positions = initialGridPositions(ids);
+  if (ids.length > 1200) {{
+    unionBasePositionsByBlock.set(blockId, positions);
+    return;
+  }}
   const clusterTarget = Math.max(20, EDGE_TARGET * 0.23);
-  const warmup = Math.min(220, 90 + ids.length * 2);
+  const warmup = Math.min(120, 50 + ids.length);
   relaxAllNodes(positions, ids, springs, warmup, clusterTarget);
-  unionBasePositions = annealUnionLayout(positions, ids, springs);
+  if (ids.length > 700) {{
+    unionBasePositionsByBlock.set(blockId, positions);
+    return;
+  }}
+  unionBasePositionsByBlock.set(
+    blockId,
+    annealUnionLayout(positions, ids, springs)
+  );
 }}
 
-function basePositionForNode(id) {{
-  computeUnionBaseLayout();
-  const existing = unionBasePositions.get(id);
+function basePositionForNode(id, blockId = null) {{
+  computeUnionBaseLayout(blockId);
+  const positions = unionBasePositionsByBlock.get(blockId) || new Map();
+  const existing = positions.get(id);
   if (existing) return existing;
   const spanX = LAYOUT_WIDTH - 2 * LAYOUT_PAD;
   const spanY = LAYOUT_HEIGHT - 2 * LAYOUT_PAD;
@@ -2944,7 +3693,7 @@ function basePositionForNode(id) {{
   }};
 }}
 
-function clonePositionsForIds(previous, nodeIds) {{
+function clonePositionsForIds(previous, nodeIds, blockId = null) {{
   const next = new Map();
   nodeIds.forEach((id) => {{
     const p = previous && previous.get(id);
@@ -2952,7 +3701,7 @@ function clonePositionsForIds(previous, nodeIds) {{
       next.set(id, {{ x: p.x, y: p.y }});
       return;
     }}
-    const base = basePositionForNode(id);
+    const base = basePositionForNode(id, blockId);
     next.set(id, {{ x: base.x, y: base.y }});
   }});
   return next;
@@ -2963,10 +3712,11 @@ function placeNewNodeLocally(
   positions,
   fixedIds,
   springs,
-  levelColumns = null
+  levelColumns = null,
+  blockId = null
 ) {{
   if (!positions.has(newId)) {{
-    const base = basePositionForNode(newId);
+    const base = basePositionForNode(newId, blockId);
     positions.set(newId, {{ x: base.x, y: base.y }});
   }}
   const p0 = positions.get(newId);
@@ -3080,63 +3830,66 @@ function placeNewNodeLocally(
   }}
 }}
 
-function ensureLayoutComputed(index) {{
-  computeUnionBaseLayout();
+function ensureLayoutForIndex(index) {{
   const clamped = Math.max(0, Math.min(index, eventOrder.length - 1));
-  if (clamped <= layoutComputedUpto) return;
+  const eventId = eventOrder[clamped];
+  if (layoutCache.has(eventId)) return;
 
-  for (let i = layoutComputedUpto + 1; i <= clamped; i += 1) {{
-    const eventId = eventOrder[i];
-    const item = events[String(eventId)];
-    const orderedIds = nodeIdsForLayout(item);
-    const layoutEdges = layoutEdgesFor(item);
-    const springs = springsFromEdges(orderedIds, layoutEdges);
-    const levelColumns = levelColumnsEnabled
-      ? levelColumnsForItem(item, orderedIds)
-      : null;
+  const item = events[String(eventId)];
+  const currBlock = eventBlockId(item, 0);
+  computeUnionBaseLayout(currBlock);
+  const orderedIds = nodeIdsForLayout(item, eventId);
+  const layoutEdges = layoutEdgesFor(item, eventId);
+  const springs = springsFromEdges(orderedIds, layoutEdges);
+  const levelColumns = levelColumnsEnabled
+    ? levelColumnsForItem(item, orderedIds, eventId)
+    : null;
 
-    let positions;
-    if (i === 0) {{
-      positions = new Map();
-      orderedIds.forEach((id) => {{
-        const base = basePositionForNode(id);
-        positions.set(id, {{ x: base.x, y: base.y }});
-      }});
-      relaxAllNodes(
+  let positions;
+  const prevId = clamped > 0 ? eventOrder[clamped - 1] : null;
+  const prevItem = prevId === null ? null : events[String(prevId)];
+  const prevPositions = prevId === null ? null : layoutCache.get(prevId) || null;
+  const prevBlock = eventBlockId(prevItem, 0);
+  const blockChanged = prevId !== null && prevBlock !== currBlock;
+
+  if (!prevPositions || blockChanged) {{
+    positions = new Map();
+    orderedIds.forEach((id) => {{
+      const base = basePositionForNode(id, currBlock);
+      positions.set(id, {{ x: base.x, y: base.y }});
+    }});
+    relaxAllNodes(
+      positions,
+      orderedIds,
+      springs,
+      levelColumns ? 62 : 46,
+      EDGE_TARGET,
+      levelColumns
+    );
+  }} else {{
+    positions = clonePositionsForIds(prevPositions, orderedIds, currBlock);
+    const existingIds = orderedIds.filter((id) => prevPositions.has(id));
+    const newIds = orderedIds.filter((id) => !prevPositions.has(id));
+    newIds.forEach((newId) => {{
+      placeNewNodeLocally(
+        newId,
         positions,
-        orderedIds,
+        existingIds,
         springs,
-        levelColumns ? 66 : 52,
-        EDGE_TARGET,
-        levelColumns
+        levelColumns,
+        currBlock
       );
-    }} else {{
-      const previous = layoutCache.get(eventOrder[i - 1]) || new Map();
-      positions = clonePositionsForIds(previous, orderedIds);
-      const existingIds = orderedIds.filter((id) => previous.has(id));
-      const newIds = orderedIds.filter((id) => !previous.has(id));
-      newIds.forEach((newId) => {{
-        placeNewNodeLocally(
-          newId,
-          positions,
-          existingIds,
-          springs,
-          levelColumns
-        );
-      }});
-      relaxAllNodes(
-        positions,
-        orderedIds,
-        springs,
-        levelColumns ? 34 : 24,
-        EDGE_TARGET,
-        levelColumns
-      );
-    }}
-
-    layoutCache.set(eventId, positions);
+    }});
+    relaxAllNodes(
+      positions,
+      orderedIds,
+      springs,
+      levelColumns ? 30 : 20,
+      EDGE_TARGET,
+      levelColumns
+    );
   }}
-  layoutComputedUpto = clamped;
+  layoutCache.set(eventId, positions);
 }}
 
 function drawGraph(eventId, index) {{
@@ -3155,19 +3908,20 @@ function drawGraph(eventId, index) {{
   const changedAdded = changed.added || [];
   const changedRemoved = changed.removed || [];
   const changedNodes = new Set(item.changed_nodes || []);
+  const currentBlock = eventBlockId(item, 0);
   const createdInSelectedRange = nodeIdsCreatedInRange(selectedSourceRange);
   const focusNodeIds = new Set(createdInSelectedRange);
   if (selectedNodeId !== null && selectedNodeId !== undefined) {{
     focusNodeIds.add(selectedNodeId);
   }}
   const hasFocusSelection = focusNodeIds.size > 0;
-  const orderedIds = nodeIdsForLayout(item);
+  const orderedIds = nodeIdsForLayout(item, eventId);
   if (orderedIds.length === 0) return;
   const levelColumns = levelColumnsEnabled
-    ? levelColumnsForItem(item, orderedIds)
+    ? levelColumnsForItem(item, orderedIds, eventId)
     : null;
 
-  ensureLayoutComputed(index);
+  ensureLayoutForIndex(index);
   const edges = edgesFromSnapshot(snapshot);
   const positions = layoutCache.get(eventId) || new Map();
 
@@ -3333,8 +4087,10 @@ function drawGraph(eventId, index) {{
   }}
 
   function drawEdge(edge, removed) {{
-    const src = positions.get(edge.src) || basePositionForNode(edge.src);
-    const dst = positions.get(edge.dst) || basePositionForNode(edge.dst);
+    const src =
+      positions.get(edge.src) || basePositionForNode(edge.src, currentBlock);
+    const dst =
+      positions.get(edge.dst) || basePositionForNode(edge.dst, currentBlock);
     if (!src || !dst) return;
     const stroke = edgeColor(edge, removed);
     const bend = edgeBends.get(edgeKey(edge)) || 0;
@@ -3465,7 +4221,7 @@ function drawGraph(eventId, index) {{
 
   function drawNodes() {{
     orderedIds.forEach((id) => {{
-    const pos = positions.get(id) || basePositionForNode(id);
+    const pos = positions.get(id) || basePositionForNode(id, currentBlock);
     const node = snapshot[String(id)] || {{
       level: null,
       lower: null,
@@ -3522,22 +4278,22 @@ function drawGraph(eventId, index) {{
     group.addEventListener("mouseenter", () => {{
       hoveredNodeId = id;
       updateEdgeLabelVisibility();
-      renderSourceForItem(item);
+      renderSourceForItem(item, eventId);
     }});
     group.addEventListener("mouseleave", () => {{
       if (hoveredNodeId === id) hoveredNodeId = null;
       updateEdgeLabelVisibility();
-      renderSourceForItem(item);
+      renderSourceForItem(item, eventId);
     }});
     group.addEventListener("focus", () => {{
       hoveredNodeId = id;
       updateEdgeLabelVisibility();
-      renderSourceForItem(item);
+      renderSourceForItem(item, eventId);
     }});
     group.addEventListener("blur", () => {{
       if (hoveredNodeId === id) hoveredNodeId = null;
       updateEdgeLabelVisibility();
-      renderSourceForItem(item);
+      renderSourceForItem(item, eventId);
     }});
     const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
     label.setAttribute("x", String(pos.x));
@@ -3636,15 +4392,18 @@ function render(index) {{
   }}
   const eventId = eventOrder[index];
   const item = events[String(eventId)];
+  const blockId = eventBlockId(item, 0);
   summary.textContent =
     `Step ${{index + 1}} / ${{eventOrder.length}}` +
+    ` | ${{currentBlockLabel()}}` +
+    ` | event block ${{blockId}}` +
     " | keys: \u2190/\u2192, j/k, Home/End";
   const result = item.step_result || "unknown";
   resultEl.textContent = `Result: ${{result}}`;
   resultEl.className = result === "error" ? "meta result-error" : "meta result-ok";
   renderStepEvent(item, eventId);
   updateBacktracePanel(item, eventId);
-  renderSourceForItem(item);
+  renderSourceForItem(item, eventId);
   updateSourceSelectionMeta();
   renderSelectedNodeTrace();
   drawGraph(eventId, index);
@@ -3652,6 +4411,7 @@ function render(index) {{
 
 initNodeKindIndex();
 initNodeCreationIndex();
+initRecentActiveLocIndex();
 initControls();
 initKeyboardNavigation();
 sourceView.addEventListener("mouseup", scheduleCaptureSourceSelection);
@@ -3694,14 +4454,31 @@ syncUrlHashState();
 
 def main():
     args = parse_args()
-    events, step_results = load_trace(args.input)
-    timeline, order = build_timeline(events, step_results)
+    events, step_results = load_trace(
+        args.input,
+        default_source_file=args.default_source_file,
+        drop_backtraces=args.drop_backtraces,
+    )
+    timeline, order = build_timeline(
+        events,
+        step_results,
+        include_snapshots=not args.no_snapshots,
+    )
     base_dir = os.path.dirname(os.path.abspath(args.input))
     sources = collect_sources(events, base_dir)
+    max_block = annotate_blocks(timeline, order)
+    future_relevant_by_block = compute_future_relevant_nodes_by_block(
+        timeline, order, max_block
+    )
+    block_relevant_by_block = compute_block_relevant_nodes(
+        timeline, order, max_block
+    )
     data = {
         "event_order": order,
         "events": {str(event_id): timeline[event_id] for event_id in order},
         "sources": sources,
+        "future_relevant_by_block": future_relevant_by_block,
+        "block_relevant_by_block": block_relevant_by_block,
     }
     html = html_document(data, args.trace)
     with open(args.output, "w", encoding="utf-8") as f:
