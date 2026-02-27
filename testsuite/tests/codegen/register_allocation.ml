@@ -122,8 +122,7 @@ f.g:
 |}]
 
 
-(* CR ttebbi: n gets spilled on every loop iteration. *)
-let spill_in_loop n =
+let loop_readonly_use_spilled_var n =
   let[@inline never] g x y = x - 1 in
   let rec loop x =
       if x < 0 then n + x else loop (g x n)
@@ -131,9 +130,11 @@ let spill_in_loop n =
   loop n
 ;;
 [%%expect_asm X86_64{|
-spill_in_loop:
+loop_readonly_use_spilled_var:
   subq  $8, %rsp
   movq  %rax, %rbx
+  movq  %rbx, (%rsp)
+  movq  %rbx, %rax
   cmpq  $1, %rax
   jge   .L111
 .L108:
@@ -141,7 +142,6 @@ spill_in_loop:
   addq  $8, %rsp
   ret
 .L111:
-  movq  %rbx, (%rsp)
   call  camlTOP8__g_15_18_code@PLT
 .L117:
   movq  (%rsp), %rbx
@@ -149,8 +149,66 @@ spill_in_loop:
   jge   .L111
   jmp   .L108
 
-spill_in_loop.g:
+loop_readonly_use_spilled_var.g:
   addq  $-2, %rax
+  ret
+|}]
+
+let spill_unspill_loop_movement not_used_in_loop read_in_loop =
+  let[@inline never] f x = x in
+  let written_in_loop = ref 0 in
+  for i = 1 to read_in_loop do
+    written_in_loop := f read_in_loop;
+    if i > 5 then
+      (let _ =  f read_in_loop in ())
+  done;
+  not_used_in_loop + !written_in_loop
+[%%expect_asm X86_64{|
+spill_unspill_loop_movement:
+  subq  $40, %rsp
+  movq  %rax, %rdi
+  movq  %rbx, %rax
+  cmpq  $3, %rax
+  jl    .L133
+  movq  %rax, (%rsp)
+  movq  %rdi, 16(%rsp)
+  movl  $3, %ebx
+.L111:
+  movq  %rbx, 8(%rsp)
+  call  camlTOP9__f_20_23_code@PLT
+.L143:
+  movq  %rax, %rsi
+  movq  (%rsp), %rax
+  movq  8(%rsp), %rbx
+  cmpq  $11, %rbx
+  jle   .L123
+  movq  %rsi, 24(%rsp)
+  movq  %rbx, 8(%rsp)
+  call  camlTOP9__f_20_23_code@PLT
+.L144:
+  movq  (%rsp), %rax
+  movq  8(%rsp), %rbx
+  movq  24(%rsp), %rsi
+  cmpq  %rax, %rbx
+  je    .L128
+  jmp   .L125
+.L123:
+  cmpq  %rax, %rbx
+  je    .L128
+.L125:
+  addq  $2, %rbx
+  jmp   .L111
+.L128:
+  movq  16(%rsp), %rdi
+  jmp   .L136
+.L133:
+  movl  $1, %esi
+.L136:
+  leaq  -1(%rdi,%rsi), %rax
+  addq  $40, %rsp
+  ret
+
+spill_unspill_loop_movement.f:
   ret
 |}]
 
@@ -346,35 +404,35 @@ let spill_slot_lifetime () =
 spill_slot_lifetime:
   subq  $56, %rsp
   movl  $1, %eax
-  call  camlTOP15__get_one_30_33_code@PLT
+  call  camlTOP16__get_one_34_37_code@PLT
 .L127:
   vmovsd %xmm0, (%rsp)
   movl  $1, %eax
-  call  camlTOP15__get_one_30_33_code@PLT
+  call  camlTOP16__get_one_34_37_code@PLT
 .L128:
   vmovsd %xmm0, 8(%rsp)
   movl  $1, %eax
-  call  camlTOP15__get_one_30_33_code@PLT
+  call  camlTOP16__get_one_34_37_code@PLT
 .L129:
   vmovsd %xmm0, 16(%rsp)
   movl  $1, %eax
-  call  camlTOP15__get_one_30_33_code@PLT
+  call  camlTOP16__get_one_34_37_code@PLT
 .L130:
   vmovsd %xmm0, 24(%rsp)
   movl  $1, %eax
-  call  camlTOP15__get_one_30_33_code@PLT
+  call  camlTOP16__get_one_34_37_code@PLT
 .L131:
   vmovsd %xmm0, 32(%rsp)
   movl  $1, %eax
-  call  camlTOP15__get_one_30_33_code@PLT
+  call  camlTOP16__get_one_34_37_code@PLT
 .L132:
   vmovsd %xmm0, 40(%rsp)
   movl  $1, %eax
-  call  camlTOP15__get_one_30_33_code@PLT
+  call  camlTOP16__get_one_34_37_code@PLT
 .L133:
   vmovsd %xmm0, 48(%rsp)
   movl  $1, %eax
-  call  camlTOP15__get_one_30_33_code@PLT
+  call  camlTOP16__get_one_34_37_code@PLT
 .L134:
   vxorpd %xmm1, %xmm1, %xmm1
   vmovsd (%rsp), %xmm2
