@@ -183,6 +183,7 @@ and 'k pattern_desc =
       uid: Uid.t;
       sort: Jkind_types.Sort.t;
       mode: Mode.Value.l;
+      lpoly: Val_lpoly.t;
     } -> value pattern_desc
   | Tpat_alias : {
       pattern: value general_pattern;
@@ -192,6 +193,7 @@ and 'k pattern_desc =
       sort: Jkind_types.Sort.t;
       mode: Mode.Value.l;
       type_expr: Types.type_expr;
+      lpoly: Val_lpoly.t;
     } -> value pattern_desc
   | Tpat_constant : constant -> value pattern_desc
   | Tpat_unboxed_unit : value pattern_desc
@@ -1126,9 +1128,9 @@ let shallow_map_pattern_desc
   : type k . pattern_transformation -> k pattern_desc -> k pattern_desc
   = fun f d -> match d with
   | Tpat_alias { pattern = p1; id; name = s; uid; sort; mode = m;
-                 type_expr = ty } ->
+                 type_expr = ty; lpoly } ->
       Tpat_alias { pattern = f.f p1; id; name = s; uid; sort; mode = m;
-                   type_expr = ty }
+                   type_expr = ty; lpoly }
   | Tpat_tuple pats ->
       Tpat_tuple (List.map (fun (label, pat) -> label, f.f pat) pats)
   | Tpat_unboxed_tuple pats ->
@@ -1356,18 +1358,19 @@ let alpha_var env id = List.assoc id env
 let rec alpha_pat
   : type k . _ -> k general_pattern -> k general_pattern
   = fun env p -> match p.pat_desc with
-  | Tpat_var { id; name = s; uid; sort; mode } ->
+  | Tpat_var { id; name = s; uid; sort; mode; lpoly } ->
       (* note the ``Not_found'' case *)
       {p with pat_desc =
-       try Tpat_var { id = alpha_var env id; name = s; uid; sort; mode } with
+       try Tpat_var { id = alpha_var env id; name = s; uid; sort; mode;
+                      lpoly } with
        | Not_found -> Tpat_any}
   | Tpat_alias { pattern = p1; id; name = s; uid; sort; mode;
-                 type_expr = ty } ->
+                 type_expr = ty; lpoly } ->
       let new_p =  alpha_pat env p1 in
       begin try
         {p with pat_desc =
            Tpat_alias { pattern = new_p; id = alpha_var env id;
-                        name = s; uid; sort; mode; type_expr = ty }}
+                        name = s; uid; sort; mode; type_expr = ty; lpoly }}
       with
       | Not_found -> new_p
       end

@@ -71,6 +71,7 @@ type pattern_variable =
     pv_as_var: bool;
     pv_attributes: Typedtree.attributes;
     pv_sort: Jkind.Sort.t;
+    pv_lpoly: Types.Val_lpoly.t;
   }
 
 val mk_expected:
@@ -301,6 +302,7 @@ type error =
   | Illegal_letrec_pat
   | Illegal_letrec_expr
   | Illegal_mutable_pat
+  | Mixed_poly_nonpoly_bindings
   | Illegal_class_expr
   | Letop_type_clash of string * Errortrace.unification_error
   | Andop_type_clash of string * Errortrace.unification_error

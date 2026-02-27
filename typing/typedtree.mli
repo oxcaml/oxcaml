@@ -215,6 +215,7 @@ and 'k pattern_desc =
       uid: Uid.t;
       sort: Jkind_types.Sort.t;
       mode: Mode.Value.l;
+      lpoly: Types.Val_lpoly.t;
     } -> value pattern_desc
         (** x *)
   | Tpat_alias : {
@@ -225,6 +226,7 @@ and 'k pattern_desc =
       sort: Jkind_types.Sort.t;
       mode: Mode.Value.l;
       type_expr: Types.type_expr;
+      lpoly: Types.Val_lpoly.t;
     } -> value pattern_desc
         (** P as a *)
   | Tpat_constant : constant -> value pattern_desc
