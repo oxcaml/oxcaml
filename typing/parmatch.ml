@@ -64,7 +64,8 @@ let extra_pat =
     (Tpat_var { id = Ident.create_local "+"; name = mknoloc "+";
       uid = Uid.internal_not_actually_unique;
       sort = Jkind.Sort.(of_const Const.for_boxed_variant);
-      mode = Mode.Value.disallow_right Mode.Value.max })
+      mode = Mode.Value.disallow_right Mode.Value.max;
+      lpoly = Val_lpoly.determined [] })
     Ctype.none Env.empty
 
 
@@ -1110,7 +1111,8 @@ let build_other ext env =
                        name = {txt="*extension*"; loc = d.pat_loc};
                        uid = Uid.internal_not_actually_unique;
                        sort = Jkind.Sort.(of_const Const.for_constructor);
-                       mode = Mode.Value.disallow_right Mode.Value.max })
+                       mode = Mode.Value.disallow_right Mode.Value.max;
+                       lpoly = Val_lpoly.determined [] })
             Ctype.none Env.empty
       | Construct _ ->
           begin match ext with
@@ -1123,7 +1125,7 @@ let build_other ext env =
           | _ ->
               build_other_constrs env d
           end
-      | Unboxed_bool b -> 
+      | Unboxed_bool b ->
         make_pat (Tpat_unboxed_bool (not b)) d.pat_type Env.empty
       | Variant { cstr_row; type_row } ->
           let tags =
@@ -2498,9 +2500,9 @@ type amb_row = { row : pattern list ; varsets : Ident.Set.t list; }
 let simplify_head_amb_pat head_bound_variables varsets ~add_column p ps k =
   let rec simpl head_bound_variables varsets p ps k =
     match (Patterns.General.view p).pat_desc with
-    | `Alias (p,x,_,_,_,_,_) ->
+    | `Alias (p,x,_,_,_,_,_,_) ->
       simpl (Ident.Set.add x head_bound_variables) varsets p ps k
-    | `Var (x, _, _, _, _) ->
+    | `Var (x, _, _, _, _, _) ->
       simpl (Ident.Set.add x head_bound_variables) varsets Patterns.omega ps k
     | `Or (p1,p2,_) ->
       simpl head_bound_variables varsets p1 ps

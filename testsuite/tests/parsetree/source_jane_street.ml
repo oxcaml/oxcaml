@@ -1687,18 +1687,29 @@ val f : ((repr_ 'a) (repr_ 'b). 'a -> 'b -> unit) -> unit = <fun>
 
 let poly_ id : 'a. 'a -> 'a = fun x -> x
 [%%expect{|
-Line 1, characters 0-40:
+Line 1, characters 10-12:
 1 | let poly_ id : 'a. 'a -> 'a = fun x -> x
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "let poly_" annotation is not yet implemented.
+              ^^
+Warning 217: This "let poly_" binding generalizes no layout variables. Consider using a regular "let" instead.
+
+val id : 'a -> 'a = <fun>
+|}]
+
+let poly_ id = fun x -> x
+[%%expect{|
+>> Fatal error: layout: unexpected univar
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
 [%%expect{|
-Line 1, characters 0-54:
+Line 1, characters 10-15:
 1 | let poly_ const : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "let poly_" annotation is not yet implemented.
+              ^^^^^
+Warning 217: This "let poly_" binding generalizes no layout variables. Consider using a regular "let" instead.
+
+val const : 'a -> 'b -> 'a = <fun>
 |}]
 
 module type S_poly = sig
@@ -1715,20 +1726,28 @@ Error: The "val poly_" annotation is not yet implemented.
 let poly_ f : 'a. 'a -> 'a = fun x -> x
 and poly_ g : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
 [%%expect{|
-Line 1, characters 0-39:
+Line 2, characters 10-11:
+2 | and poly_ g : 'a 'b. 'a -> 'b -> 'a = fun x _ -> x
+              ^
+Warning 217: This "let poly_" binding generalizes no layout variables. Consider using a regular "let" instead.
+
+Line 1, characters 10-11:
 1 | let poly_ f : 'a. 'a -> 'a = fun x -> x
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "let poly_" annotation is not yet implemented.
+              ^
+Warning 217: This "let poly_" binding generalizes no layout variables. Consider using a regular "let" instead.
+
+val f : 'a -> 'a = <fun>
+val g : 'a -> 'b -> 'a = <fun>
 |}]
 
 (* Mixed poly and non-poly in mutually recursive bindings *)
 let poly_ f : 'a. 'a -> 'a = fun x -> x
 and g = fun x -> x
 [%%expect{|
-Line 1, characters 0-39:
-1 | let poly_ f : 'a. 'a -> 'a = fun x -> x
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "let poly_" annotation is not yet implemented.
+Line 2, characters 0-18:
+2 | and g = fun x -> x
+    ^^^^^^^^^^^^^^^^^^
+Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
 |}]
 
 let h = fun x -> x
@@ -1737,7 +1756,7 @@ and poly_ k : 'a. 'a -> 'a = fun x -> x
 Line 2, characters 0-39:
 2 | and poly_ k : 'a. 'a -> 'a = fun x -> x
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "let poly_" annotation is not yet implemented.
+Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
 |}]
 
 let m = fun x -> x
@@ -1747,7 +1766,7 @@ and p = fun x -> x
 Line 2, characters 0-39:
 2 | and poly_ n : 'a. 'a -> 'a = fun x -> x
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "let poly_" annotation is not yet implemented.
+Error: All bindings in a "let" must be either all "poly_" or all non-"poly_"
 |}]
 
 module type S = sig
