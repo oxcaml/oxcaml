@@ -1049,7 +1049,11 @@ void caml_init_domains(uintnat max_domains, uintnat minor_heap_wsz)
     dom->backup_thread_running = 0;
     dom->backup_thread_msg = BT_INIT;
 
-    dom->tick_interval_usec = Default_tick_interval_usec;
+    /* Start out with the tick interval at 0, because we start out not ticking.
+
+       [caml_domain_set_tick_interval_usec] will start the tick thread as soon
+       as this is changed to a nonzero value by any domain. */
+    dom->tick_interval_usec = 0;
   }
 
   domain_create(minor_heap_wsz, NULL);
@@ -2135,11 +2139,18 @@ CAMLprim value caml_enable_tick_thread(value v_enable)
   return Val_unit;
 }
 
-CAMLprim value caml_domain_set_tick_interval_usec(value interval_usec)
+CAMLprim value caml_domain_set_tick_interval_usec(value v_interval_usec)
 {
-  CAMLparam1(interval_usec);
+  CAMLparam1(v_interval_usec);
   CAMLnoalloc;
-  atomic_store_relaxed(&domain_self->tick_interval_usec, Long_val(interval_usec));
+  uintnat interval_usec = Long_val(v_interval_usec);
+  atomic_store_relaxed(&domain_self->tick_interval_usec, interval_usec);
+  if (interval_usec != 0) {
+    caml_enable_tick_thread(Val_true);
+    /* NOTE: It might be nice to also disable the tick thread if we set back to
+       0, but it's non-trivial to know if nothing else wants ticks; for now, we
+       just let the tick thread keep running in this case (which seems fine). */
+  }
   CAMLreturn(Val_unit);
 }
 
