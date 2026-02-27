@@ -664,8 +664,8 @@ void caml_thread_tick_hook(void)
      changed while we are waiting to preempt, but that's fine; we'll stabilize
      on the next go around. */
   uintnat ticks_per_preemption =
-      ceil((float)Thread_timeout_usec /
-           (float)(caml_effective_tick_interval_usec()));
+      ceil((double)Thread_timeout_usec /
+           (double)(caml_effective_tick_interval_usec()));
 
   if (++Ticks_elapsed >= ticks_per_preemption) {
     Ticks_elapsed = 0;
