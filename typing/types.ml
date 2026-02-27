@@ -567,6 +567,26 @@ module type Wrap = sig
   type 'a t
 end
 
+module Val_lpoly = struct
+  type state =
+    | To_generalize of Location.t
+    | Determined of Jkind_types.Sort.univar list
+
+  type t = state ref
+
+  let get_exn t = match !t with
+    | To_generalize _ -> Misc.fatal_error "layouts has not been generalized"
+    | Determined l -> l
+
+  let determined l = ref (Determined l)
+  let to_generalize ~loc = ref (To_generalize loc)
+
+  let generalize ?(on_determined = fun () -> ()) ~on_to_generalize t =
+    match !t with
+    | To_generalize loc -> t := Determined (on_to_generalize loc)
+    | Determined _ -> on_determined ()
+end
+
 module type Wrapped = sig
   type 'a wrapped
 
@@ -574,7 +594,7 @@ module type Wrapped = sig
     { val_type: type_expr wrapped;                (* Type of the value *)
       val_modalities : Mode.Modality.t;     (* Modalities on the value *)
       val_kind: value_kind;
-      val_lpoly: Jkind_types.Sort.univar list;
+      val_lpoly: Val_lpoly.t;
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
