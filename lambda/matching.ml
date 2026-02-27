@@ -222,10 +222,10 @@ end = struct
     | Tpat_var _ ->
         p
     | Tpat_alias { pattern = q; id; name = s; uid; sort; mode;
-                   type_expr = ty } ->
+                   type_expr = ty; lpoly } ->
         { p with pat_desc =
             Tpat_alias { pattern = simpl_under_orpat q; id; name = s;
-                         uid; sort; mode; type_expr = ty } }
+                         uid; sort; mode; type_expr = ty; lpoly } }
     | Tpat_or (p1, p2, o) ->
         let p1, p2 = (simpl_under_orpat p1, simpl_under_orpat p2) in
         if le_pat p1 p2 then
@@ -251,9 +251,10 @@ end = struct
       in
       match p.pat_desc with
       | `Any -> stop p `Any
-      | `Var (id, s, uid, sort, mode) ->
-        continue p (`Alias (Patterns.omega, id, s, uid, sort, mode, p.pat_type))
-      | `Alias (p, id, _, duid, sort, _, _) ->
+      | `Var (id, s, uid, sort, mode, lpoly) ->
+        continue p (`Alias (Patterns.omega, id, s, uid, sort, mode, p.pat_type,
+                            lpoly))
+      | `Alias (p, id, _, duid, sort, _, _, _) ->
           aux
             ( (General.view p, patl),
               bind_alias p id duid ~arg
@@ -363,11 +364,12 @@ end = struct
       match p.pat_desc with
       | `Or (p1, p2, _) ->
           split_explode p1 aliases (split_explode p2 aliases rem)
-      | `Alias (p, id, _, _, _, _, _) -> split_explode p (id :: aliases) rem
-      | `Var (id, str, uid, sort, mode) ->
+      | `Alias (p, id, _, _, _, _, _, _) -> split_explode p (id :: aliases) rem
+      | `Var (id, str, uid, sort, mode, lpoly) ->
           explode
             { p with pat_desc =
-                `Alias (Patterns.omega, id, str, uid, sort, mode, p.pat_type) }
+                `Alias (Patterns.omega, id, str, uid, sort, mode, p.pat_type,
+                        lpoly) }
             aliases rem
       | #view as view ->
           (* We are doing two things here:
@@ -616,7 +618,8 @@ end = struct
           match p.pat_desc with
           | `Or (p1, p2, _) ->
               filter_rec ((left, p1, right) :: (left, p2, right) :: rem)
-          | `Alias (p, _, _, _, _, _, _) -> filter_rec ((left, p, right) :: rem)
+          | `Alias (p, _, _, _, _, _, _, _) ->
+              filter_rec ((left, p, right) :: rem)
           | `Var _ -> filter_rec ((left, Patterns.omega, right) :: rem)
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
@@ -744,7 +747,7 @@ end = struct
       | (p, ps) :: rem -> (
           let p = General.view p in
           match p.pat_desc with
-          | `Alias (p, _, _, _, _, _, _) -> filter_rec ((p, ps) :: rem)
+          | `Alias (p, _, _, _, _, _, _, _) -> filter_rec ((p, ps) :: rem)
           | `Var _ -> filter_rec ((Patterns.omega, ps) :: rem)
           | `Or (p1, p2, _) -> filter_rec_or p1 p2 ps rem
           | #Simple.view as view -> (

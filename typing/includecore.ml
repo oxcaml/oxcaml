@@ -170,12 +170,14 @@ let value_descriptions ~loc env name
   | Error e -> raise (Dont_match (Mode e))
   end;
   let lpairs =
-    try List.combine vd1.val_lpoly vd2.val_lpoly
+    try List.combine
+          (Val_lpoly.get_exn vd1.val_lpoly)
+          (Val_lpoly.get_exn vd2.val_lpoly)
     with Invalid_argument _ -> raise (Dont_match Poly_arity_mismatch)
   in
   match vd1.val_kind with
   | Val_prim p1 -> begin
-     assert (List.is_empty vd1.val_lpoly);
+     assert (List.is_empty (Val_lpoly.get_exn vd1.val_lpoly));
      match vd2.val_kind with
      | Val_prim p2 -> begin
          let locality = [ Mode.Locality.global; Mode.Locality.local ] in
