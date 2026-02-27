@@ -476,64 +476,64 @@ module Int64_u = struct
 end
 
 module Bytes = struct
-  external unsafe_get : bytes -> int -> int
+  external unsafe_get : (bytes[@local_opt]) -> int -> int
     @@ portable = "%bytes_unsafe_get"
 
-  external unsafe_set : bytes -> int -> int -> unit
+  external unsafe_set : (bytes[@local_opt]) -> int -> int -> unit
     @@ portable = "%bytes_unsafe_set"
 
-  external unsafe_get_int8 : bytes -> int -> int
+  external unsafe_get_int8 : (bytes[@local_opt]) -> int -> int
     @@ portable = "%caml_bytes_geti8u"
 
-  external unsafe_get_uint16_ne : bytes -> int -> int
+  external unsafe_get_uint16_ne : (bytes[@local_opt]) -> int -> int
     @@ portable = "%caml_bytes_get16u"
 
-  external unsafe_set_uint16_ne : bytes -> int -> int -> unit
+  external unsafe_set_uint16_ne : (bytes[@local_opt]) -> int -> int -> unit
     @@ portable = "%caml_bytes_set16u"
 
-  external unsafe_get_int16_ne : bytes -> int -> int
+  external unsafe_get_int16_ne : (bytes[@local_opt]) -> int -> int
     @@ portable = "%caml_bytes_geti16u"
 
-  external unsafe_get_int32_ne : bytes -> int -> int32#
+  external unsafe_get_int32_ne : (bytes[@local_opt]) -> int -> int32#
     @@ portable = "%caml_bytes_get32u#" [@@warning "-187"]
 
-  external unsafe_set_int32_ne : bytes -> int -> int32# -> unit
+  external unsafe_set_int32_ne : (bytes[@local_opt]) -> int -> int32# -> unit
     @@ portable = "%caml_bytes_set32u#" [@@warning "-187"]
 
-  external get_int32_ne : bytes -> int -> int32#
+  external get_int32_ne : (bytes[@local_opt]) -> int -> int32#
     @@ portable = "%caml_bytes_get32#" [@@warning "-187"]
 
-  external unsafe_get_int64_ne : bytes -> int -> int64#
+  external unsafe_get_int64_ne : (bytes[@local_opt]) -> int -> int64#
     @@ portable = "%caml_bytes_get64u#" [@@warning "-187"]
 
-  external unsafe_set_int64_ne : bytes -> int -> int64# -> unit
+  external unsafe_set_int64_ne : (bytes[@local_opt]) -> int -> int64# -> unit
     @@ portable = "%caml_bytes_set64u#" [@@warning "-187"]
 
   external unsafe_get_int64_ne_indexed_by_int64 :
-    bytes -> int64# -> int64#
+    (bytes[@local_opt]) -> int64# -> int64#
     @@ portable = "%caml_bytes_get64u#_indexed_by_int64#"
     [@@warning "-187"]
 
-  external unsafe_get_float32_ne : bytes -> int -> float32#
+  external unsafe_get_float32_ne : (bytes[@local_opt]) -> int -> float32#
     @@ portable = "%caml_bytes_getf32u#" [@@warning "-187"]
 
-  external unsafe_set_float32_ne : bytes -> int -> float32# -> unit
+  external unsafe_set_float32_ne : (bytes[@local_opt]) -> int -> float32# -> unit
     @@ portable = "%caml_bytes_setf32u#" [@@warning "-187"]
 
-  external length : bytes -> int @@ portable = "%bytes_length"
+  external length : (bytes[@local_opt]) -> int @@ portable = "%bytes_length"
 end
 
 module String = struct
-  external unsafe_get_int32_ne : string -> int -> int32#
+  external unsafe_get_int32_ne : (string[@local_opt]) -> int -> int32#
     @@ portable = "%caml_string_get32u#" [@@warning "-187"]
 
-  external unsafe_get_int64_ne : string -> int -> int64#
+  external unsafe_get_int64_ne : (string[@local_opt]) -> int -> int64#
     @@ portable = "%caml_string_get64u#" [@@warning "-187"]
 
-  external unsafe_get_float32_ne : string -> int -> float32#
+  external unsafe_get_float32_ne : (string[@local_opt]) -> int -> float32#
     @@ portable = "%caml_string_getf32u#" [@@warning "-187"]
 
-  external length : string -> int @@ portable = "%string_length"
+  external length : (string[@local_opt]) -> int @@ portable = "%string_length"
 end
 
 module Floatarray = struct
