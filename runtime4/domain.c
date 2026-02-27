@@ -159,3 +159,15 @@ CAMLprim value caml_domain_tls_get(value unused)
 {
   return Caml_state->tls_state;
 }
+
+/* Unified tick thread */
+
+CAMLprim value caml_domain_set_tick_interval_usec(void)
+{
+  caml_failwith("Domains not supported on runtime4");
+}
+
+CAMLprim value caml_domain_get_tick_interval_usec(void)
+{
+  caml_failwith("Domains not supported on runtime4");
+}
