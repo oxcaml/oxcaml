@@ -204,6 +204,18 @@ Caml_inline void domain_set_pending(dom_internal *d)
 { atomic_store_release(&d->pending, 1); }
 
 static struct {
+  _Atomic pthread_t thread_id;
+  atomic_bool running;
+  atomic_bool disabled;
+  atomic_bool stop;
+} tick_thread = {
+  0,
+  false,
+  false,
+  false
+};
+
+static struct {
   /* enter barrier for STW sections, participating domains arrive into
      the barrier before executing the STW callback */
   caml_plat_barrier domains_still_running;
@@ -2008,22 +2020,17 @@ void caml_process_tick(void)
   }
 }
 
-static _Atomic pthread_t tick_thread_id;
-static atomic_bool tick_thread_running;
-static atomic_bool tick_thread_disabled;
-static atomic_bool tick_thread_stop;
-
 CAMLextern void caml_stop_tick_thread(void)
 {
   /* If multiple threads try to stop the tick thread at the same time, only one
      should join it. This means that subsequent callers will return while the
      tick thread is still running. */
-  if (atomic_exchange(&tick_thread_running, false)) {
-    atomic_store_release(&tick_thread_stop, true);
-    pthread_t thread = atomic_load_relaxed(&tick_thread_id);
+  if (atomic_exchange(&tick_thread.running, false)) {
+    atomic_store_release(&tick_thread.stop, true);
+    pthread_t thread = atomic_load_relaxed(&tick_thread.thread_id);
     CAMLassert(thread);
     pthread_join(thread, NULL);
-    atomic_store_release(&tick_thread_stop, false);
+    atomic_store_release(&tick_thread.stop, false);
   }
 }
 
@@ -2034,7 +2041,7 @@ CAMLextern void caml_stop_tick_thread(void)
  * If this function returns 0, ticking is disabled.
  */
 CAMLextern uintnat caml_effective_tick_interval_usec(void) {
-  if (atomic_load_relaxed(&tick_thread_disabled)) {
+  if (atomic_load_relaxed(&tick_thread.disabled)) {
     return 0;
   }
 
@@ -2055,7 +2062,7 @@ CAMLextern uintnat caml_effective_tick_interval_usec(void) {
 
 static void* caml_tick(void *arg)
 {
-  while (!atomic_load_acquire(&tick_thread_stop)) {
+  while (!atomic_load_acquire(&tick_thread.stop)) {
     /* We re-calculate the interval each iteration of the loop so that the
        per-domain tick interval can be changed. This hopefully doesn't cause
        much contention since in practice tick intervals ought to rarely change.
@@ -2091,11 +2098,11 @@ static void* caml_tick(void *arg)
 
 CAMLextern int caml_start_tick_thread(void)
 {
-  if (atomic_load_acquire(&tick_thread_disabled))
+  if (atomic_load_acquire(&tick_thread.disabled))
     return 0;
 
   bool expected = false;
-  if (!atomic_compare_exchange_strong(&tick_thread_running, &expected, true))
+  if (!atomic_compare_exchange_strong(&tick_thread.running, &expected, true))
     return 0;
 
 #ifdef POSIX_SIGNALS
@@ -2115,18 +2122,18 @@ CAMLextern int caml_start_tick_thread(void)
 #endif
 
   if (err != 0) {
-    atomic_store_release(&tick_thread_running, false);
+    atomic_store_release(&tick_thread.running, false);
     return err;
   }
 
-  atomic_store_relaxed(&tick_thread_id, thread);
+  atomic_store_relaxed(&tick_thread.thread_id, thread);
   return 0;
 }
 
 CAMLprim value caml_enable_tick_thread(value v_enable)
 {
   bool enable = Long_val(v_enable) ? 1 : 0;
-  bool prev = atomic_exchange_explicit(&tick_thread_disabled, !enable,
+  bool prev = atomic_exchange_explicit(&tick_thread.disabled, !enable,
                                        memory_order_acq_rel);
 
   if (enable && !prev) {
