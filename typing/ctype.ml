@@ -291,19 +291,23 @@ module Pattern_env : sig
   type t = private
     { mutable env : Env.t;
       equations_scope : int;
-      allow_recursive_equations : bool; }
-  val make: Env.t -> equations_scope:int -> allow_recursive_equations:bool -> t
+      allow_recursive_equations : bool;
+      is_lpoly : bool; }
+  val make: ?is_lpoly:bool -> Env.t -> equations_scope:int
+    -> allow_recursive_equations:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
 end = struct
   type t =
     { mutable env : Env.t;
       equations_scope : int;
-      allow_recursive_equations : bool; }
-  let make env ~equations_scope ~allow_recursive_equations =
+      allow_recursive_equations : bool;
+      is_lpoly : bool; }
+  let make ?(is_lpoly=false) env ~equations_scope ~allow_recursive_equations =
     { env;
       equations_scope;
-      allow_recursive_equations; }
+      allow_recursive_equations;
+      is_lpoly; }
   let copy ?equations_scope penv =
     let equations_scope =
       match equations_scope with None -> penv.equations_scope | Some s -> s in
@@ -830,7 +834,8 @@ let rec generalize stage_offset ty =
         generalize (stage_offset - 1) ty'
     (* Normalize the variable to be at [stage_offset = 0] *)
     | Tvar name ->
-        update_variable_stage stage_offset ty name.name name.jkind
+        update_variable_stage stage_offset ty name.name name.jkind;
+        Jkind.generalize ~current_level:!current_level name.jkind
     (* Do not generalize cross-stage row-polymorphic types, as we cannot
        quote or splice row variables.
        Weak type variables that arise here are considered cross-stage,

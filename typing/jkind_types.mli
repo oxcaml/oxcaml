@@ -104,6 +104,17 @@ module Sort : sig
   *)
   val decompose_into_product : t -> int -> t list option
 
+  (** Run a function with sort generalization enabled (for let poly_ support).
+      Returns the result of [f] and the list of generic sort variables created
+      during [f]. *)
+  val with_generalize : (unit -> 'a) -> 'a * var list
+
+  (** Generalize sort variables when in sort generalization context. Sets the
+      level of sort variables to Ident.highest_scope and accumulates them. This
+      should be called from Ctype.generalize. Only has an effect when called
+      within {!with_generalize}. *)
+  val generalize : current_level:int -> t -> unit
+
   module Flat : sig
     type t =
       | Var of Var.id
