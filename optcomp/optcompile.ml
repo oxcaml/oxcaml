@@ -73,8 +73,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       let for_pack_prefix = Compilation_unit.Prefix.from_clflags () in
       Unit_info.make ~source_file ~for_pack_prefix Intf output_prefix
     in
-    with_info ~dump_ext:"cmi" unit_info
-    @@ fun info ->
+    with_info ~dump_ext:"cmi" unit_info @@ fun info ->
     Compile_common.interface
       ~hook_parse_tree:(Compiler_hooks.execute Compiler_hooks.Parse_tree_intf)
       ~hook_typed_tree:(Compiler_hooks.execute Compiler_hooks.Typed_tree_intf)
@@ -157,8 +156,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         (Clflags.Compiler_pass.to_string start_from)
 
   let implementation_aux ~start_from ~keep_symbol_tables unit_info =
-    with_info ~dump_ext:Backend.ext_flambda_obj unit_info
-    @@ fun info ->
+    with_info ~dump_ext:Backend.ext_flambda_obj unit_info @@ fun info ->
     if !Oxcaml_flags.internal_assembler
     then Emitaux.binary_backend_available := true;
     Compilenv.reset info.target;

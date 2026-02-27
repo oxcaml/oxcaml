@@ -25,8 +25,7 @@ let interface ~source_file ~output_prefix =
     let for_pack_prefix = Compilation_unit.Prefix.from_clflags () in
     Unit_info.make ~source_file ~for_pack_prefix Intf output_prefix
   in
-  with_info ~dump_ext:"cmi" unit_info
-  @@ fun info ->
+  with_info ~dump_ext:"cmi" unit_info @@ fun info ->
   Compile_common.interface
     ~hook_parse_tree:(fun _ -> ())
     ~hook_typed_tree:(fun _ -> ())
@@ -134,8 +133,7 @@ let starting_point_of_compiler_pass start_from =
         (Clflags.Compiler_pass.to_string start_from)
 
 let implementation_aux ~start_from ~keep_symbol_tables:_ unit_info =
-  with_info ~dump_ext:"cmo" unit_info
-  @@ fun info ->
+  with_info ~dump_ext:"cmo" unit_info @@ fun info ->
   match start_from with
   | Parsing ->
       let backend info typed =

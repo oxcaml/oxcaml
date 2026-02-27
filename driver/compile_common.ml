@@ -38,7 +38,7 @@ let with_info ~backend ~tool_name ~dump_ext unit_info k =
   Compmisc.init_path ();
   Compmisc.init_parameters ();
   let compilation_unit = Unit_info.modname unit_info in
-  Env.set_current_unit unit_info;
+  Env.set_current_unit (Some unit_info);
   let env = Compmisc.initial_env() in
   let dump_file = String.concat "." [Unit_info.prefix unit_info; dump_ext] in
   Compmisc.with_ppf_dump ~file_prefix:dump_file @@ fun ppf_dump ->
