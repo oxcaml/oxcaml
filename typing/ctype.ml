@@ -2229,8 +2229,8 @@ let rec try_reduce_once t =
     (* [<[ < .. > ]> eval]  ==>  [< <[..]> eval >] *)
     | Tobject (t, ct) ->
       (* Attempt to reduce the field list immediately:
-         - If the object type is open, then its final element ([Tvar] or [Tunivar])
-           will [raise Cannot_expand]. [Cannot_expand] propagates to this expansion
+         - If the object type is open, then its tail ([Tvar] or [Tunivar])
+           will [raise Cannot_expand]. [Cannot_expand] propagates to here
            so the [Tobject] does not reduce at all.
          - If the object type is closed, its final element is a [Tnil] and
            the entire [Tobject] will reduce just fine. *)
@@ -2246,7 +2246,7 @@ let rec try_reduce_once t =
         s, k,
         (* If the method type's [Tpoly] is present, we reduce it. *)
         try_reduce_poly (new_quote_eval_ty t_method),
-        (* Immediately reduce the other fields to make sure we don't get stuck. *)
+        (* Immediately reduce other fields to make sure we don't get stuck. *)
         try_reduce_once (new_quote_eval_ty t_rest))
     | Tnil -> Tnil
     (* reduce in subterm *)
@@ -2255,7 +2255,7 @@ let rec try_reduce_once t =
     (* [<[ < > ]> eval] ==> [< >] *)
     (* [<[ [ `A of t ... ] | ]> eval] ==> [ [ `A of <[t]> eval | ... ] ] *)
     | Tvariant row ->
-      (* Immediately beta-reduce [more] -- this should only reduce closed variant types *)
+      (* Immediately beta-reduce [more] -- only reduces closed variant types *)
       let more = row_more row |> new_quote_eval_ty |> try_reduce_once in
       Tvariant (copy_row new_quote_eval_ty true row false more)
     (* [<['a. t]> eval] ==> ['b. (<[{$'b/'a} t]> eval)],
@@ -2274,7 +2274,9 @@ let rec try_reduce_once t =
             ~fixed:false ~partial:true ~copy_var:(Some copy) tl t)
       in
       let tl' =
-        List.map (fun t -> match get_desc t with Tsplice uv -> uv | _ -> assert false) tl'
+        List.map
+          (fun t -> match get_desc t with Tsplice uv -> uv | _ -> assert false)
+          tl'
       in
       Tpoly (new_quote_eval_ty t', tl')
     (* [<[(sort 'a). t]> eval] ==> [(sort 'a). <[t]> eval] *)
