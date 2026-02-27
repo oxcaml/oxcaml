@@ -2708,7 +2708,7 @@ function drawGraph(eventId, index) {{
   function edgeColor(edge, removed) {{
     if (removed) return "#b42318";
     if (changedEdgeKeys.has(edgeKey(edge))) return "#d97706";
-    return edge.label === "vlower" ? "#1d4ed8" : "#0f766e";
+    return edge.label === "vlower" ? "#15803d" : "#a21caf";
   }}
 
   function nodeOpacity(id) {{
