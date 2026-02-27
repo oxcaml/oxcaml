@@ -93,6 +93,8 @@ CAMLextern int caml_start_tick_thread(void);
 /* Stop the tick thread */
 CAMLextern void caml_stop_tick_thread(void);
 CAMLextern uintnat caml_effective_tick_interval_usec(void);
+CAMLextern value caml_domain_set_tick_interval_usec(value);
+CAMLextern value caml_domain_get_tick_interval_usec(value);
 
 /* These hooks are not modified after other domains are spawned. */
 CAMLextern void (*caml_atfork_hook)(void);
