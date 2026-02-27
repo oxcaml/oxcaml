@@ -573,6 +573,19 @@ button:hover {{
   padding: 6px 8px;
   border-bottom: 1px solid #eee6d8;
 }}
+.node-op.node-op-link {{
+  cursor: pointer;
+}}
+.node-op.node-op-link:hover {{
+  background: #f8f2e5;
+}}
+.node-op.node-op-link:focus {{
+  outline: 2px solid #0f766e;
+  outline-offset: -2px;
+}}
+.node-op.node-op-current {{
+  background: #fff1c7;
+}}
 .node-op:last-child {{
   border-bottom: none;
 }}
@@ -594,6 +607,21 @@ button:hover {{
   margin-bottom: 10px;
 }}
 .backtrace-toolbar .meta {{
+  margin: 0;
+}}
+.layout-toggle {{
+  margin-top: 8px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}}
+.layout-toggle label {{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}}
+.layout-toggle input {{
   margin: 0;
 }}
 .backtrace-overlay {{
@@ -652,6 +680,12 @@ button:hover {{
       <select id=\"event-select\"></select>
       <label for=\"event-range\">Step Timeline</label>
       <input id=\"event-range\" type=\"range\" min=\"0\" max=\"0\" value=\"0\" />
+      <div class=\"layout-toggle\">
+        <label for=\"level-columns-toggle\">
+          <input id=\"level-columns-toggle\" type=\"checkbox\" />
+          Sort Nodes By Level Columns
+        </label>
+      </div>
       <div class=\"backtrace-toolbar\">
         <button id=\"backtrace-open\" type=\"button\">View Backtrace (b)</button>
         <div class=\"meta\" id=\"result\"></div>
@@ -686,6 +720,8 @@ button:hover {{
         Edge arrows indicate direction.
         Hover a source or destination node to show that edge's modality label.
         Click a node to select it and inspect its history.
+        Enable "Sort Nodes By Level Columns" to group nodes by level.
+        Column guides appear when level sorting is enabled.
       </div>
     </section>
   </div>
@@ -716,6 +752,7 @@ const select = document.getElementById("event-select");
 const range = document.getElementById("event-range");
 const summary = document.getElementById("summary");
 const resultEl = document.getElementById("result");
+const levelColumnsToggle = document.getElementById("level-columns-toggle");
 const stepEvent = document.getElementById("step-event");
 const sourceMeta = document.getElementById("source-meta");
 const sourceView = document.getElementById("source-view");
@@ -761,6 +798,7 @@ let unionBasePositions = null;
 const layoutCache = new Map();
 let layoutComputedUpto = -1;
 let currentIndex = 0;
+let levelColumnsEnabled = false;
 const nodeKindById = new Map();
 const nodeCreationById = new Map();
 let lastSourceFile = sourceFileOrder.length > 0 ? sourceFileOrder[0] : null;
@@ -1058,6 +1096,11 @@ function stepLabelFor(item, eventId) {{
   return `step ${{item.step_id}} - ${{shortActionForItem(item)}}`;
 }}
 
+function jumpToEvent(eventId) {{
+  const idx = eventOrder.indexOf(eventId);
+  if (idx >= 0) setIndex(idx);
+}}
+
 function isTypingTarget(target) {{
   if (!target || !(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
@@ -1093,6 +1136,14 @@ function initControls() {{
   range.addEventListener("input", () => {{
     setIndex(Number(range.value));
   }});
+  levelColumnsEnabled = !!(levelColumnsToggle && levelColumnsToggle.checked);
+  if (levelColumnsToggle) {{
+    levelColumnsToggle.addEventListener("change", () => {{
+      levelColumnsEnabled = !!levelColumnsToggle.checked;
+      resetLayoutCache();
+      render(currentIndex);
+    }});
+  }}
 }}
 
 function currentBacktrace(item) {{
@@ -1622,6 +1673,7 @@ function describeNodeEvent(nodeId, eventId) {{
           : "unknown expression range";
       const provenance = event.provenance || "unknown";
       return {{
+        event_id: eventId,
         step,
         body:
           `create ${{varLabel(nodeId)}}` +
@@ -1636,6 +1688,7 @@ function describeNodeEvent(nodeId, eventId) {{
         .filter((e) => e.src === nodeId || e.dst === nodeId);
     if (touches.length === 0) return null;
     return {{
+      event_id: eventId,
       step,
       body:
         `create ${{varLabel(event.var_id)}} with incident edge` +
@@ -1657,6 +1710,7 @@ function describeNodeEvent(nodeId, eventId) {{
     const removed = diff.removed.map((e) => e.text);
     if (event.var_id === nodeId) {{
       return {{
+        event_id: eventId,
         step,
         body:
           `${{opLabel(op)}} ${{fieldLabel(field)}} on ${{varLabel(nodeId)}}` +
@@ -1666,6 +1720,7 @@ function describeNodeEvent(nodeId, eventId) {{
       }};
     }}
     return {{
+      event_id: eventId,
       step,
       body:
         `${{opLabel(op)}} ${{fieldLabel(field)}} on ${{varLabel(event.var_id)}}` +
@@ -1675,6 +1730,7 @@ function describeNodeEvent(nodeId, eventId) {{
   }}
   if (event.var_id !== nodeId) return null;
   return {{
+    event_id: eventId,
     step,
     body:
       `${{opLabel(op)}} ${{fieldLabel(field)}}: ` +
@@ -1711,7 +1767,19 @@ function renderSelectedNodeTrace() {{
   }}
   ops.forEach((entry) => {{
     const row = document.createElement("div");
-    row.className = "node-op";
+    const isCurrent = entry.event_id === eventOrder[currentIndex];
+    row.className = isCurrent ? "node-op node-op-link node-op-current" : "node-op node-op-link";
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
+    row.title = "Jump to this event";
+    row.addEventListener("click", () => {{
+      jumpToEvent(entry.event_id);
+    }});
+    row.addEventListener("keydown", (event) => {{
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      jumpToEvent(entry.event_id);
+    }});
     const step = document.createElement("div");
     step.className = "node-op-step";
     step.textContent = entry.step;
@@ -1979,6 +2047,68 @@ function allEdgesEverForLayout() {{
   return Array.from(union.values());
 }}
 
+function resetLayoutCache() {{
+  layoutCache.clear();
+  layoutComputedUpto = -1;
+}}
+
+function normalizeNodeLevel(rawLevel) {{
+  return Number.isFinite(rawLevel) ? rawLevel : null;
+}}
+
+function levelColumnsForItem(item, nodeIds) {{
+  const snapshot = (item && item.snapshot) || {{}};
+  const levels = [];
+  const seenLevels = new Set();
+  const levelById = new Map();
+
+  nodeIds.forEach((id) => {{
+    const node = snapshot[String(id)] || null;
+    const level = normalizeNodeLevel(node ? node.level : null);
+    levelById.set(id, level);
+    const key = level === null ? "null" : String(level);
+    if (seenLevels.has(key)) return;
+    seenLevels.add(key);
+    levels.push(level);
+  }});
+
+  levels.sort((a, b) => {{
+    if (a === null && b === null) return 0;
+    if (a === null) return 1;
+    if (b === null) return -1;
+    return a - b;
+  }});
+
+  const span = LAYOUT_WIDTH - 2 * LAYOUT_PAD;
+  const columnCount = Math.max(1, levels.length);
+  const step = span / columnCount;
+  const centerByLevel = new Map();
+  const columns = [];
+  levels.forEach((level, idx) => {{
+    const center = LAYOUT_PAD + step * (idx + 0.5);
+    centerByLevel.set(level, center);
+    columns.push({{ level, center, index: idx }});
+  }});
+
+  const targetById = new Map();
+  levelById.forEach((level, id) => {{
+    const x = centerByLevel.get(level);
+    if (Number.isFinite(x)) targetById.set(id, x);
+  }});
+
+  return {{
+    levels,
+    columns,
+    targetById,
+    step,
+    left: LAYOUT_PAD,
+    right: LAYOUT_WIDTH - LAYOUT_PAD,
+    halfWidth: Math.max(20, step * 0.47),
+    pull: 0.068,
+    outsidePull: 0.24,
+  }};
+}}
+
 function initialGridPositions(nodeIds) {{
   const positions = new Map();
   const nodeCount = Math.max(nodeIds.length, 1);
@@ -2091,12 +2221,49 @@ function applyCollisionForces(disp, positions, nodeIds) {{
   }}
 }}
 
+function applyLevelColumnForces(disp, positions, nodeIds, levelColumns) {{
+  if (!levelColumns) return;
+  const targets = levelColumns.targetById || new Map();
+  const halfWidth = levelColumns.halfWidth || 32;
+  const pull = levelColumns.pull || 0.03;
+  const outsidePull = levelColumns.outsidePull || 0.08;
+  nodeIds.forEach((id) => {{
+    const p = positions.get(id);
+    const d = disp.get(id);
+    const targetX = targets.get(id);
+    if (!p || !d || !Number.isFinite(targetX)) return;
+    const dx = targetX - p.x;
+    d.x += dx * pull;
+    const outside = Math.abs(dx) - halfWidth;
+    if (outside > 0) {{
+      d.x += Math.sign(dx) * outside * outsidePull;
+      d.x += Math.sign(dx) * outside * outside * 0.012;
+    }}
+  }});
+}}
+
+function confineToLevelColumns(positions, nodeIds, levelColumns) {{
+  if (!levelColumns) return;
+  const targets = levelColumns.targetById || new Map();
+  const halfWidth = levelColumns.halfWidth || 32;
+  nodeIds.forEach((id) => {{
+    const p = positions.get(id);
+    const targetX = targets.get(id);
+    if (!p || !Number.isFinite(targetX)) return;
+    const minX = targetX - halfWidth;
+    const maxX = targetX + halfWidth;
+    if (p.x < minX) p.x = minX;
+    else if (p.x > maxX) p.x = maxX;
+  }});
+}}
+
 function relaxAllNodes(
   positions,
   nodeIds,
   springs,
   iterations,
-  targetEdge = EDGE_TARGET
+  targetEdge = EDGE_TARGET,
+  levelColumns = null
 ) {{
   let step = 1.3;
   for (let it = 0; it < iterations; it += 1) {{
@@ -2105,6 +2272,7 @@ function relaxAllNodes(
 
     applySpringForces(disp, positions, springs, targetEdge);
     applyCollisionForces(disp, positions, nodeIds);
+    applyLevelColumnForces(disp, positions, nodeIds, levelColumns);
 
     nodeIds.forEach((id) => {{
       const d = disp.get(id);
@@ -2115,6 +2283,7 @@ function relaxAllNodes(
       p.x += d.x * step;
       p.y += d.y * step;
     }});
+    confineToLevelColumns(positions, nodeIds, levelColumns);
     step *= 0.984;
   }}
 }}
@@ -2611,12 +2780,25 @@ function clonePositionsForIds(previous, nodeIds) {{
   return next;
 }}
 
-function placeNewNodeLocally(newId, positions, fixedIds, springs) {{
+function placeNewNodeLocally(
+  newId,
+  positions,
+  fixedIds,
+  springs,
+  levelColumns = null
+) {{
   if (!positions.has(newId)) {{
     const base = basePositionForNode(newId);
     positions.set(newId, {{ x: base.x, y: base.y }});
   }}
   const p0 = positions.get(newId);
+  const targetX =
+    levelColumns && levelColumns.targetById
+      ? levelColumns.targetById.get(newId)
+      : null;
+  if (Number.isFinite(targetX)) {{
+    p0.x = 0.55 * p0.x + 0.45 * targetX;
+  }}
   const neighbors = [];
   springs.forEach((spring) => {{
     if (spring.a === newId && positions.has(spring.b)) neighbors.push(spring.b);
@@ -2694,8 +2876,28 @@ function placeNewNodeLocally(newId, positions, fixedIds, springs) {{
     const border = boundaryForce(p);
     d.x += border.x;
     d.y += border.y;
+    if (Number.isFinite(targetX)) {{
+      const dx = targetX - p.x;
+      d.x += dx * 0.08;
+      const halfWidth =
+        levelColumns && Number.isFinite(levelColumns.halfWidth)
+          ? levelColumns.halfWidth
+          : 36;
+      const outside = Math.abs(dx) - halfWidth;
+      if (outside > 0) d.x += Math.sign(dx) * outside * 0.3;
+    }}
     p.x += d.x * step;
     p.y += d.y * step;
+    if (Number.isFinite(targetX)) {{
+      const halfWidth =
+        levelColumns && Number.isFinite(levelColumns.halfWidth)
+          ? levelColumns.halfWidth
+          : 36;
+      const minX = targetX - halfWidth;
+      const maxX = targetX + halfWidth;
+      if (p.x < minX) p.x = minX;
+      else if (p.x > maxX) p.x = maxX;
+    }}
     step *= 0.965;
   }}
 }}
@@ -2711,6 +2913,9 @@ function ensureLayoutComputed(index) {{
     const orderedIds = nodeIdsForLayout(item);
     const layoutEdges = layoutEdgesFor(item);
     const springs = springsFromEdges(orderedIds, layoutEdges);
+    const levelColumns = levelColumnsEnabled
+      ? levelColumnsForItem(item, orderedIds)
+      : null;
 
     let positions;
     if (i === 0) {{
@@ -2719,16 +2924,36 @@ function ensureLayoutComputed(index) {{
         const base = basePositionForNode(id);
         positions.set(id, {{ x: base.x, y: base.y }});
       }});
-      relaxAllNodes(positions, orderedIds, springs, 52);
+      relaxAllNodes(
+        positions,
+        orderedIds,
+        springs,
+        levelColumns ? 66 : 52,
+        EDGE_TARGET,
+        levelColumns
+      );
     }} else {{
       const previous = layoutCache.get(eventOrder[i - 1]) || new Map();
       positions = clonePositionsForIds(previous, orderedIds);
       const existingIds = orderedIds.filter((id) => previous.has(id));
       const newIds = orderedIds.filter((id) => !previous.has(id));
       newIds.forEach((newId) => {{
-        placeNewNodeLocally(newId, positions, existingIds, springs);
+        placeNewNodeLocally(
+          newId,
+          positions,
+          existingIds,
+          springs,
+          levelColumns
+        );
       }});
-      relaxAllNodes(positions, orderedIds, springs, 24);
+      relaxAllNodes(
+        positions,
+        orderedIds,
+        springs,
+        levelColumns ? 34 : 24,
+        EDGE_TARGET,
+        levelColumns
+      );
     }}
 
     layoutCache.set(eventId, positions);
@@ -2759,6 +2984,9 @@ function drawGraph(eventId, index) {{
   const hasFocusSelection = focusNodeIds.size > 0;
   const orderedIds = nodeIdsForLayout(item);
   if (orderedIds.length === 0) return;
+  const levelColumns = levelColumnsEnabled
+    ? levelColumnsForItem(item, orderedIds)
+    : null;
 
   ensureLayoutComputed(index);
   const edges = edgesFromSnapshot(snapshot);
@@ -2785,6 +3013,64 @@ function drawGraph(eventId, index) {{
   marker.appendChild(markerPath);
   defs.appendChild(marker);
   graph.appendChild(defs);
+
+  function drawLevelColumnGuides(columnsData) {{
+    if (!columnsData) return;
+    const columns = columnsData.columns || [];
+    if (columns.length === 0) return;
+
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    g.setAttribute("pointer-events", "none");
+
+    const left = columnsData.left;
+    const right = columnsData.right;
+    const top = LAYOUT_PAD - 10;
+    const bottom = LAYOUT_HEIGHT - LAYOUT_PAD + 10;
+    const step = columnsData.step || (right - left);
+
+    const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    bg.setAttribute("x", String(left));
+    bg.setAttribute("y", String(top));
+    bg.setAttribute("width", String(Math.max(0, right - left)));
+    bg.setAttribute("height", String(Math.max(0, bottom - top)));
+    bg.setAttribute("fill", "#f8f5ee");
+    bg.setAttribute("fill-opacity", "0.28");
+    bg.setAttribute("stroke", "#d7cebd");
+    bg.setAttribute("stroke-width", "0.7");
+    g.appendChild(bg);
+
+    for (let i = 1; i < columns.length; i += 1) {{
+      const x = left + step * i;
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", String(x));
+      line.setAttribute("y1", String(top));
+      line.setAttribute("x2", String(x));
+      line.setAttribute("y2", String(bottom));
+      line.setAttribute("stroke", "#c6b9a3");
+      line.setAttribute("stroke-width", "0.9");
+      line.setAttribute("stroke-dasharray", "5,5");
+      g.appendChild(line);
+    }}
+
+    columns.forEach((col) => {{
+      const lbl = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      lbl.setAttribute("x", String(col.center));
+      lbl.setAttribute("y", String(top - 4));
+      lbl.setAttribute("text-anchor", "middle");
+      lbl.setAttribute("font-size", "9");
+      lbl.setAttribute("fill", "#7a6d57");
+      const levelText =
+        col.level === null || col.level === undefined
+          ? "?"
+          : formatLevelValue(col.level);
+      lbl.textContent = `L=${{levelText}}`;
+      g.appendChild(lbl);
+    }});
+
+    graph.appendChild(g);
+  }}
+
+  drawLevelColumnGuides(levelColumns);
 
   const edgeLabelEntries = [];
   const nodePopupEntries = [];
