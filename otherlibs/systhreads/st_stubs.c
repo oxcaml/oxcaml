@@ -730,6 +730,12 @@ CAMLprim value caml_thread_initialize(value unit)
   caml_domain_send_interrupt_hook = caml_thread_domain_send_interrupt_hook;
   caml_atfork_hook = caml_thread_reinitialize;
 
+  /* CR-someday: It would be nice to find a way to recover the original tick
+     interval if it was nonzero before we set it here. But for now, in practice,
+     it never will be, because all schedulers that set the tick interval will do
+     so after systhreads is initialized */
+  caml_domain_set_tick_interval_usec(Thread_timeout_usec);
+
   threads_initialized = true;
 
   return Val_unit;
