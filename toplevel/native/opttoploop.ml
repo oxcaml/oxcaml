@@ -408,13 +408,14 @@ let name_expression ~loc ~attrs sort exp =
       val_zero_alloc = Zero_alloc.default;
       val_modalities = Mode.Modality.(Const.id |> of_const);
       val_uid = Uid.internal_not_actually_unique;
-      val_lpoly = []; }
+      val_lpoly = Val_lpoly.determined []; }
   in
   let sg = [Sig_value(id, vd, Exported)] in
   let pat =
     { pat_desc =
         Tpat_var { id; name = mknoloc name; uid = vd.val_uid; sort;
-                   mode = Mode.Value.disallow_right Mode.Value.legacy };
+                   mode = Mode.Value.disallow_right Mode.Value.legacy;
+                   lpoly = Val_lpoly.determined [] };
       pat_loc = loc;
       pat_extra = [];
       pat_type = exp.exp_type;

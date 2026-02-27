@@ -2387,8 +2387,8 @@ let tree_of_value_description id decl =
     (* Important: process the fvs *after* the type; tree_of_type_scheme
        resets the naming context. Both must be inside print_with_univars
        so that sort univar names are registered when jkinds are printed. *)
-    Jkind_types.Sort.print_with_univars decl.val_lpoly (fun names ->
-      names, extract_qtvs [decl.val_type])
+    Jkind_types.Sort.print_with_univars (Val_lpoly.get_exn decl.val_lpoly)
+      (fun names -> names, extract_qtvs [decl.val_type])
   in
   let apparent_arity =
     let rec count n typ =

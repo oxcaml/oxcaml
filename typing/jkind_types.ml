@@ -555,6 +555,51 @@ module Sort = struct
         (* path compression *)
         result)
 
+  (* Sort generalization context for let poly_ *)
+  let in_sort_generalization_context : univar list ref option ref = ref None
+
+  (* Generalize sort variables when in sort generalization context.
+     This is called from Ctype.generalize when processing let poly_ bindings.
+     For each free sort variable, a fresh univar is created and the var is
+     set to point to it, so subsequent lookups resolve to the univar.
+     The level is set to Ident.highest_scope to mark the variable as visited,
+     avoiding infinite loops when traversing sort variable graphs. *)
+  let rec generalize_rec ~current_level ~univars_ref sort =
+    match sort with
+    | Var v ->
+      if v.level > current_level && v.level <> Ident.highest_scope
+      then begin
+        (* Mark as visited to avoid infinite loops *)
+        v.level <- Ident.highest_scope;
+        match v.contents with
+        | Some s -> generalize_rec ~current_level ~univars_ref s
+        | None ->
+          (* Create a univar, link the var to it, and accumulate the univar *)
+          let uv = new_univar () in
+          set v (Some (Univar uv));
+          univars_ref := uv :: !univars_ref
+      end
+    | Product sorts ->
+      List.iter (generalize_rec ~current_level ~univars_ref) sorts
+    | Base _ | Univar _ -> ()
+
+  let generalize ~current_level sort =
+    match !in_sort_generalization_context with
+    | None -> () (* Not in generalization context *)
+    | Some univars_ref -> generalize_rec ~current_level ~univars_ref sort
+
+  (* Wrapper to run a function in sort generalization context. Returns the
+     result of [f] and the univars created for each generalized sort variable. *)
+  let with_generalize f =
+    let univars_ref = ref [] in
+    let old_context = !in_sort_generalization_context in
+    in_sort_generalization_context := Some univars_ref;
+    let result =
+      Misc.try_finally f ~always:(fun () ->
+          in_sort_generalization_context := old_context)
+    in
+    result, List.rev !univars_ref
+
   let rec default_to_value_and_get : t -> Const.t = function
     | Base b -> Static.Const.of_base b
     | Product ts -> Product (List.map default_to_value_and_get ts)
