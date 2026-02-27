@@ -375,3 +375,93 @@ let f (x : (<[ <m : $('a) list > ]> as 'a) eval) : (< m : 'b list > as 'b) = x
 Uncaught exception: Stack overflow
 
 |}]
+
+(** Quote-kinded types **)
+
+(* Test that quote-kinded (and quote-kind-parameterised) type constructors
+   do not beta-reduce under quote-eval. *)
+(* CR quoted-kinds jbachurski: For now, these tests indicate incompleteness lurking
+   in the system that will be fixed by quoted kinds. *)
+
+(* CR quoted-kinds jbachurski: Annotate [t : <[value]>]. *)
+module QuoteKinded : sig
+  type t
+end = struct
+  type t = <[int]>
+end
+(* CR quoted-kinds jbachurski: Annotate ['a : <[value]>]. *)
+module QuoteKindedParam : sig
+  type 'a t
+end = struct
+  type 'a t = 'a expr
+end
+[%%expect {|
+module QuoteKinded : sig type t end
+module QuoteKindedParam : sig type 'a t end
+|}]
+#mark_toplevel_in_quotations
+
+(* CR quoted-kinds jbachurski: None of the types on [x] should reduce and hence all tests
+   with annotated results should error. *)
+
+(* [expr] should not reduce, as it has a quote-kinded parameter *)
+let f (x : <[$('a) expr]> eval) : 'a eval expr = x
+[%%expect {|
+val f : <[$('a) expr]> eval -> 'a eval expr = <fun>
+|}]
+let f (x : <[<[int]> expr]> eval) : <[<[int]>]> eval expr = x
+[%%expect {|
+val f : <[<[int]> expr]> eval -> <[<[int]>]> eval expr = <fun>
+|}]
+
+(* [eval] should not reduce, as it has a quote-kinded parameter *)
+(* CR quoted-kinds jbachurski: This test already fails, but for the wrong reason --
+   [Ctype.expand_head] will expand the [Tconstr] containing [Tquote_eval] and
+   will never see the inner expansion. *)
+let f (x : <['a eval]> eval) : <['a]> eval eval = x
+[%%expect {|
+Line 1, characters 50-51:
+1 | let f (x : <['a eval]> eval) : <['a]> eval eval = x
+                                                      ^
+Error: This expression has type "<['a eval]> eval"
+       but an expression was expected of type "<['a]> eval eval"
+       Type "'a eval" is not compatible with type "$(<['a]> eval)"
+|}]
+let f (x : <[$('a) eval]> eval) = x
+[%%expect {|
+val f : ('a : any). <[$('a) eval]> eval -> <[$('a) eval]> eval = <fun>
+|}]
+(* The inner eval is allowed to reduce on [int], but not the outer on [<[int]> eval]. *)
+let f (x : <[<[int]> eval]> eval) : <[<[int]>]> eval eval = x
+[%%expect {|
+Line 1, characters 60-61:
+1 | let f (x : <[<[int]> eval]> eval) : <[<[int]>]> eval eval = x
+                                                                ^
+Error: This expression has type "<[<[int]> eval]> eval" = "int"
+       but an expression was expected of type "<[<[int]>]> eval eval"
+|}]
+let f (x : <[<[int]> eval]> eval) = x
+[%%expect {|
+val f : <[<[int]> eval]> eval -> <[<[int]> eval]> eval = <fun>
+|}]
+
+(* quote-kinded types should not reduce *)
+let f (x : <[QuoteKinded.t]> eval expr) : QuoteKinded.t expr = x
+[%%expect {|
+val f : <[QuoteKinded.t]> eval expr -> QuoteKinded.t expr = <fun>
+|}]
+
+(* quote-kind-parameterised types should not reduce *)
+let f (x : <[$('a) QuoteKindedParam.t]> eval expr) : 'a eval QuoteKindedParam.t expr = x
+[%%expect {|
+val f :
+  <[$('a) QuoteKindedParam.t]> eval expr -> 'a eval QuoteKindedParam.t expr =
+  <fun>
+|}]
+let f (x : <[<[int]> QuoteKindedParam.t]> eval expr)
+         : <[<[int]>]> eval QuoteKindedParam.t expr = x
+[%%expect {|
+val f :
+  <[<[int]> QuoteKindedParam.t]> eval expr ->
+  <[<[int]>]> eval QuoteKindedParam.t expr = <fun>
+|}]
