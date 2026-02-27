@@ -4375,48 +4375,54 @@ let emit_solver_trace_line payload =
 let json_trace_change_kind (kind : S.trace_change_kind) =
   match kind with Apply -> "\"apply\"" | Undo -> "\"undo\""
 
+let json_current_callstack () =
+  Printexc.get_callstack 64
+  |> Printexc.raw_backtrace_to_string
+  |> json_string
+
 let emit_solver_trace_event (event : S.trace_event) =
   let event_id = fresh_solver_trace_event_id () in
   let step_id = json_int_option (current_solver_trace_step_id ()) in
+  let backtrace = json_current_callstack () in
   match event with
   | Level_event { kind; var_id; old_level; new_level } ->
     emit_solver_trace_line
       (Printf.sprintf
-         {|{"kind":"trace_delta","trace_id":%d,"event_id":%d,"step_id":%s,"op":%s,"field":"level","var_id":%d,"old":%d,"new":%d}|}
+         {|{"kind":"trace_delta","trace_id":%d,"event_id":%d,"step_id":%s,"op":%s,"field":"level","var_id":%d,"old":%d,"new":%d,"backtrace":%s}|}
          solver_trace_id event_id step_id (json_trace_change_kind kind) var_id
-         old_level new_level)
+         old_level new_level backtrace)
   | Lower_event { kind; var_id; old_lower; new_lower } ->
     emit_solver_trace_line
       (Printf.sprintf
-         {|{"kind":"trace_delta","trace_id":%d,"event_id":%d,"step_id":%s,"op":%s,"field":"lower","var_id":%d,"old":%s,"new":%s}|}
+         {|{"kind":"trace_delta","trace_id":%d,"event_id":%d,"step_id":%s,"op":%s,"field":"lower","var_id":%d,"old":%s,"new":%s,"backtrace":%s}|}
          solver_trace_id event_id step_id (json_trace_change_kind kind) var_id
-         (json_string old_lower) (json_string new_lower))
+         (json_string old_lower) (json_string new_lower) backtrace)
   | Upper_event { kind; var_id; old_upper; new_upper } ->
     emit_solver_trace_line
       (Printf.sprintf
-         {|{"kind":"trace_delta","trace_id":%d,"event_id":%d,"step_id":%s,"op":%s,"field":"upper","var_id":%d,"old":%s,"new":%s}|}
+         {|{"kind":"trace_delta","trace_id":%d,"event_id":%d,"step_id":%s,"op":%s,"field":"upper","var_id":%d,"old":%s,"new":%s,"backtrace":%s}|}
          solver_trace_id event_id step_id (json_trace_change_kind kind) var_id
-         (json_string old_upper) (json_string new_upper))
+         (json_string old_upper) (json_string new_upper) backtrace)
   | Vlower_event { kind; var_id; old_vlower; new_vlower } ->
     emit_solver_trace_line
       (Printf.sprintf
-         {|{"kind":"trace_delta","trace_id":%d,"event_id":%d,"step_id":%s,"op":%s,"field":"vlower","var_id":%d,"old":%s,"new":%s}|}
+         {|{"kind":"trace_delta","trace_id":%d,"event_id":%d,"step_id":%s,"op":%s,"field":"vlower","var_id":%d,"old":%s,"new":%s,"backtrace":%s}|}
          solver_trace_id event_id step_id (json_trace_change_kind kind) var_id
          (json_trace_edge_list old_vlower)
-         (json_trace_edge_list new_vlower))
+         (json_trace_edge_list new_vlower) backtrace)
   | Vupper_event { kind; var_id; old_vupper; new_vupper } ->
     emit_solver_trace_line
       (Printf.sprintf
-         {|{"kind":"trace_delta","trace_id":%d,"event_id":%d,"step_id":%s,"op":%s,"field":"vupper","var_id":%d,"old":%s,"new":%s}|}
+         {|{"kind":"trace_delta","trace_id":%d,"event_id":%d,"step_id":%s,"op":%s,"field":"vupper","var_id":%d,"old":%s,"new":%s,"backtrace":%s}|}
          solver_trace_id event_id step_id (json_trace_change_kind kind) var_id
          (json_trace_edge_list old_vupper)
-         (json_trace_edge_list new_vupper))
+         (json_trace_edge_list new_vupper) backtrace)
   | Gencopy_event { kind; var_id; old_gencopy; new_gencopy } ->
     emit_solver_trace_line
       (Printf.sprintf
-         {|{"kind":"trace_delta","trace_id":%d,"event_id":%d,"step_id":%s,"op":%s,"field":"gencopy","var_id":%d,"old":%s,"new":%s}|}
+         {|{"kind":"trace_delta","trace_id":%d,"event_id":%d,"step_id":%s,"op":%s,"field":"gencopy","var_id":%d,"old":%s,"new":%s,"backtrace":%s}|}
          solver_trace_id event_id step_id (json_trace_change_kind kind) var_id
-         (json_int_option old_gencopy) (json_int_option new_gencopy))
+         (json_int_option old_gencopy) (json_int_option new_gencopy) backtrace)
   | Var_create_event
       { var_id;
         init_level;
@@ -4429,30 +4435,34 @@ let emit_solver_trace_event (event : S.trace_event) =
       } ->
     emit_solver_trace_line
       (Printf.sprintf
-         {|{"kind":"trace_var_create","trace_id":%d,"event_id":%d,"step_id":%s,"var_id":%d,"level":%d,"lower":%s,"upper":%s,"vlower":%s,"vupper":%s,"provenance":%s,"related_var_ids":%s}|}
+         {|{"kind":"trace_var_create","trace_id":%d,"event_id":%d,"step_id":%s,"var_id":%d,"level":%d,"lower":%s,"upper":%s,"vlower":%s,"vupper":%s,"provenance":%s,"related_var_ids":%s,"backtrace":%s}|}
          solver_trace_id event_id step_id var_id init_level
          (json_string init_lower) (json_string init_upper)
          (json_trace_edge_list init_vlower)
          (json_trace_edge_list init_vupper)
-         (json_string provenance) (json_int_list related_var_ids))
+         (json_string provenance) (json_int_list related_var_ids) backtrace)
 
 let ensure_solver_trace_started () =
   if not !solver_trace_started
   then (
+    let backtrace = json_current_callstack () in
     solver_trace_started := true;
     emit_solver_trace_line
-      (Printf.sprintf {|{"kind":"trace_start","trace_id":%d}|} solver_trace_id);
+      (Printf.sprintf
+         {|{"kind":"trace_start","trace_id":%d,"backtrace":%s}|}
+         solver_trace_id backtrace);
     if not !solver_trace_end_registered
     then (
       solver_trace_end_registered := true;
       at_exit (fun () ->
+          let backtrace = json_current_callstack () in
           if !solver_trace_started
           then
             emit_solver_trace_line
               (Printf.sprintf
-                 {|{"kind":"trace_end","trace_id":%d,"steps":%d,"events":%d}|}
+                 {|{"kind":"trace_end","trace_id":%d,"steps":%d,"events":%d,"backtrace":%s}|}
                  solver_trace_id !solver_trace_step_next_id
-                 !solver_trace_event_next_id)))
+                 !solver_trace_event_next_id backtrace)))
           )
 
 let on_solver_trace_event event =
@@ -4466,17 +4476,19 @@ let () = S.set_trace_event_hook (Some on_solver_trace_event)
 let begin_solver_trace_step () =
   if !Clflags.dump_solver_graph_trace
   then (
+    let backtrace = json_current_callstack () in
     ensure_solver_trace_started ();
     let step_id = fresh_solver_trace_step_id () in
     solver_trace_step_stack := step_id :: !solver_trace_step_stack;
     emit_solver_trace_line
       (Printf.sprintf
-         {|{"kind":"trace_step_start","trace_id":%d,"step_id":%d}|}
-         solver_trace_id step_id);
+         {|{"kind":"trace_step_start","trace_id":%d,"step_id":%d,"backtrace":%s}|}
+         solver_trace_id step_id backtrace);
     Some step_id)
   else None
 
 let end_solver_trace_step step_id ~result =
+  let backtrace = json_current_callstack () in
   (match !solver_trace_step_stack with
   | top :: rest when top = step_id -> solver_trace_step_stack := rest
   | _ ->
@@ -4484,10 +4496,11 @@ let end_solver_trace_step step_id ~result =
       := List.filter (fun id -> id <> step_id) !solver_trace_step_stack);
   emit_solver_trace_line
     (Printf.sprintf
-       {|{"kind":"trace_step_end","trace_id":%d,"step_id":%d,"result":%s}|}
-       solver_trace_id step_id (json_string result))
+       {|{"kind":"trace_step_end","trace_id":%d,"step_id":%d,"result":%s,"backtrace":%s}|}
+       solver_trace_id step_id (json_string result) backtrace)
 
 let begin_solver_trace_expression ~loc =
+  let backtrace = json_current_callstack () in
   ensure_solver_trace_started ();
   let event_id = fresh_solver_trace_event_id () in
   let step_id = json_int_option (current_solver_trace_step_id ()) in
@@ -4495,13 +4508,14 @@ let begin_solver_trace_expression ~loc =
   let parent_expr_id = json_int_option (current_solver_trace_expr_id ()) in
   emit_solver_trace_line
     (Printf.sprintf
-       {|{"kind":"trace_expr_enter","trace_id":%d,"event_id":%d,"step_id":%s,"expr_id":%d,"parent_expr_id":%s,"loc":%s}|}
+       {|{"kind":"trace_expr_enter","trace_id":%d,"event_id":%d,"step_id":%s,"expr_id":%d,"parent_expr_id":%s,"loc":%s,"backtrace":%s}|}
        solver_trace_id event_id step_id expr_id parent_expr_id
-       (json_location loc));
+       (json_location loc) backtrace);
   solver_trace_expr_stack := expr_id :: !solver_trace_expr_stack;
   expr_id
 
 let end_solver_trace_expression expr_id ~result =
+  let backtrace = json_current_callstack () in
   (match !solver_trace_expr_stack with
   | top :: rest when top = expr_id -> solver_trace_expr_stack := rest
   | _ ->
@@ -4511,8 +4525,8 @@ let end_solver_trace_expression expr_id ~result =
   let step_id = json_int_option (current_solver_trace_step_id ()) in
   emit_solver_trace_line
     (Printf.sprintf
-       {|{"kind":"trace_expr_exit","trace_id":%d,"event_id":%d,"step_id":%s,"expr_id":%d,"result":%s}|}
-       solver_trace_id event_id step_id expr_id (json_string result))
+       {|{"kind":"trace_expr_exit","trace_id":%d,"event_id":%d,"step_id":%s,"expr_id":%d,"result":%s,"backtrace":%s}|}
+       solver_trace_id event_id step_id expr_id (json_string result) backtrace)
 
 let with_solver_trace_expression ~loc op =
   if not !Clflags.dump_solver_graph_trace

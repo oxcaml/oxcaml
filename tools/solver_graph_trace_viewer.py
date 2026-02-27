@@ -359,6 +359,9 @@ body {{
   border-radius: 10px;
   padding: 10px;
 }}
+.panel-graph {{
+  position: relative;
+}}
 h1 {{
   margin: 0 0 10px 0;
   font-size: 16px;
@@ -582,6 +585,62 @@ button:hover {{
   white-space: pre-wrap;
   word-break: break-word;
 }}
+.backtrace-toolbar {{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  margin-bottom: 10px;
+}}
+.backtrace-toolbar .meta {{
+  margin: 0;
+}}
+.backtrace-overlay {{
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 28, 28, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  z-index: 30;
+}}
+.backtrace-overlay[hidden] {{
+  display: none;
+}}
+.backtrace-dialog {{
+  width: min(1100px, 96vw);
+  max-height: 84vh;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0;
+  background: #fffdf7;
+  color: var(--ink);
+}}
+.backtrace-body {{
+  padding: 10px;
+}}
+.backtrace-head {{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}}
+.backtrace-view {{
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  padding: 8px;
+  max-height: 66vh;
+  overflow: auto;
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: pre-wrap;
+  word-break: break-word;
+}}
 </style>
 </head>
 <body>
@@ -593,7 +652,10 @@ button:hover {{
       <select id=\"event-select\"></select>
       <label for=\"event-range\">Step Timeline</label>
       <input id=\"event-range\" type=\"range\" min=\"0\" max=\"0\" value=\"0\" />
-      <div class=\"meta\" id=\"result\"></div>
+      <div class=\"backtrace-toolbar\">
+        <button id=\"backtrace-open\" type=\"button\">View Backtrace (b)</button>
+        <div class=\"meta\" id=\"result\"></div>
+      </div>
       <div class=\"event-card source-card\">
         <div class=\"event-title\">Source Focus</div>
         <div id=\"source-meta\" class=\"source-meta\"></div>
@@ -613,7 +675,7 @@ button:hover {{
         <div id=\"node-trace-ops\" class=\"node-ops\"></div>
       </div>
     </section>
-    <section class=\"panel\">
+    <section class=\"panel panel-graph\">
       <svg id=\"graph\" viewBox=\"0 0 1200 800\" preserveAspectRatio=\"xMidYMid meet\">
       </svg>
       <div class=\"legend\">
@@ -626,6 +688,20 @@ button:hover {{
         Click a node to select it and inspect its history.
       </div>
     </section>
+  </div>
+  <div id=\"backtrace-overlay\" class=\"backtrace-overlay\" hidden>
+    <div id=\"backtrace-dialog\" class=\"backtrace-dialog\" role=\"dialog\" aria-modal=\"true\" aria-label=\"Event Backtrace\">
+      <div class=\"backtrace-body\">
+        <div class=\"backtrace-head\">
+          <div>
+            <div class=\"event-title\">Event Backtrace</div>
+            <div id=\"backtrace-meta\" class=\"source-meta\"></div>
+          </div>
+          <button id=\"backtrace-close\" type=\"button\">Close</button>
+        </div>
+        <pre id=\"backtrace-view\" class=\"backtrace-view\"></pre>
+      </div>
+    </div>
   </div>
 <script>
 const EVENT_DATA = {data_json};
@@ -648,6 +724,12 @@ const sourceSelectionClear = document.getElementById("source-selection-clear");
 const nodeTraceMeta = document.getElementById("node-trace-meta");
 const nodeTraceOps = document.getElementById("node-trace-ops");
 const graph = document.getElementById("graph");
+const backtraceOpen = document.getElementById("backtrace-open");
+const backtraceOverlay = document.getElementById("backtrace-overlay");
+const backtraceDialog = document.getElementById("backtrace-dialog");
+const backtraceClose = document.getElementById("backtrace-close");
+const backtraceMeta = document.getElementById("backtrace-meta");
+const backtraceView = document.getElementById("backtrace-view");
 const LAYOUT_WIDTH = 1200;
 const LAYOUT_HEIGHT = 800;
 const LAYOUT_PAD = 96;
@@ -1013,8 +1095,61 @@ function initControls() {{
   }});
 }}
 
+function currentBacktrace(item) {{
+  const event = (item && item.event) || {{}};
+  return typeof event.backtrace === "string" ? event.backtrace : "";
+}}
+
+function updateBacktracePanel(item, eventId) {{
+  if (!item) {{
+    backtraceMeta.textContent = "";
+    backtraceView.textContent = "";
+    return;
+  }}
+  const event = item.event || {{}};
+  const backtrace = currentBacktrace(item);
+  backtraceMeta.textContent =
+    `${{stepLabelFor(item, eventId)}} | ${{event.kind || "event"}}`;
+  backtraceView.textContent =
+    backtrace.length > 0 ? backtrace : "No backtrace recorded for this event.";
+}}
+
+function isBacktraceOpen() {{
+  return !backtraceOverlay.hasAttribute("hidden");
+}}
+
+function openBacktraceDialog() {{
+  backtraceOverlay.removeAttribute("hidden");
+}}
+
+function closeBacktraceDialog() {{
+  backtraceOverlay.setAttribute("hidden", "");
+}}
+
 function initKeyboardNavigation() {{
   document.addEventListener("keydown", (event) => {{
+    if (event.key === "Escape" && isBacktraceOpen()) {{
+      event.preventDefault();
+      closeBacktraceDialog();
+      return;
+    }}
+
+    if (
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      event.key.toLowerCase() === "b"
+    ) {{
+      if (isTypingTarget(event.target)) return;
+      event.preventDefault();
+      if (isBacktraceOpen()) {{
+        closeBacktraceDialog();
+      }} else {{
+        openBacktraceDialog();
+      }}
+      return;
+    }}
+
     if (eventOrder.length === 0) return;
     if (event.altKey || event.ctrlKey || event.metaKey) return;
     if (isTypingTarget(event.target)) return;
@@ -3026,6 +3161,9 @@ function render(index) {{
     sourceSelectionMeta.textContent = "";
     nodeTraceMeta.textContent = "";
     nodeTraceOps.textContent = "";
+    backtraceMeta.textContent = "";
+    backtraceView.textContent = "";
+    closeBacktraceDialog();
     clearGraph();
     return;
   }}
@@ -3038,6 +3176,7 @@ function render(index) {{
   resultEl.textContent = `Result: ${{result}}`;
   resultEl.className = result === "error" ? "meta result-error" : "meta result-ok";
   renderStepEvent(item, eventId);
+  updateBacktracePanel(item, eventId);
   renderSourceForItem(item);
   updateSourceSelectionMeta();
   renderSelectedNodeTrace();
@@ -3067,6 +3206,11 @@ sourceView.addEventListener("click", () => {{
 sourceSelectionClear.addEventListener("click", () => {{
   selectedSourceRange = null;
   render(currentIndex);
+}});
+backtraceOpen.addEventListener("click", openBacktraceDialog);
+backtraceClose.addEventListener("click", closeBacktraceDialog);
+backtraceOverlay.addEventListener("click", (event) => {{
+  if (event.target === backtraceOverlay) closeBacktraceDialog();
 }});
 setIndex(Number(select.value || 0));
 </script>
