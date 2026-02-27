@@ -57,9 +57,12 @@ def load_trace(path, default_source_file=None, drop_backtraces=False):
     events = []
     step_results = {}
     synthetic_event_id = 0
-    block_id = 0
+    legacy_block_id = 0
     saw_trace = False
     saw_non_trace_since_last_trace = False
+    saw_expect_blocks = False
+    current_expect_block_id = None
+    next_expect_block_id = 0
     supported_event_kinds = {
         "trace_delta",
         "trace_var_create",
@@ -69,15 +72,27 @@ def load_trace(path, default_source_file=None, drop_backtraces=False):
 
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
+            if "[%%expect" in line and "{|" in line:
+                saw_expect_blocks = True
+                current_expect_block_id = next_expect_block_id
+                next_expect_block_id += 1
+
             event = parse_trace_line(line)
             if event is None:
                 if saw_trace:
                     saw_non_trace_since_last_trace = True
+                if current_expect_block_id is not None and "|}]" in line:
+                    current_expect_block_id = None
                 continue
-            if saw_trace and saw_non_trace_since_last_trace:
-                block_id += 1
-            saw_trace = True
-            saw_non_trace_since_last_trace = False
+
+            if saw_expect_blocks and current_expect_block_id is not None:
+                block_id = current_expect_block_id
+            else:
+                if saw_trace and saw_non_trace_since_last_trace:
+                    legacy_block_id += 1
+                saw_trace = True
+                saw_non_trace_since_last_trace = False
+                block_id = legacy_block_id
             event["_input_block"] = block_id
             kind = event.get("kind")
             if kind == "trace_step_end":
@@ -436,36 +451,6 @@ def compute_future_relevant_nodes_by_block(timeline, order, max_block):
         result[str(block_id)] = sorted(future)
         future.update(refs_by_block[block_id])
     return result
-
-
-def compute_block_relevant_nodes(timeline, order, max_block):
-    refs_by_block = [set() for _ in range(max_block + 1)]
-    for event_id in order:
-        item = timeline[event_id]
-        block_id = item.get("block_id")
-        if not isinstance(block_id, int):
-            continue
-        refs = node_refs_for_event(item.get("event"))
-        changed = item.get("changed_edges")
-        if isinstance(changed, dict):
-            for key in ("added", "removed"):
-                edges = changed.get(key)
-                if not isinstance(edges, list):
-                    continue
-                for edge in edges:
-                    if not isinstance(edge, dict):
-                        continue
-                    src = edge.get("src")
-                    dst = edge.get("dst")
-                    if isinstance(src, int):
-                        refs.add(src)
-                    if isinstance(dst, int):
-                        refs.add(dst)
-        refs_by_block[block_id].update(refs)
-    return {
-        str(block_id): sorted(refs_by_block[block_id])
-        for block_id in range(max_block + 1)
-    }
 
 
 def html_document(data, initial_event):
@@ -900,7 +885,6 @@ const events = EVENT_DATA.events;
 const sourceFiles = EVENT_DATA.sources || {{}};
 const sourceFileOrder = Object.keys(sourceFiles).sort();
 const futureRelevantByBlock = EVENT_DATA.future_relevant_by_block || {{}};
-const blockRelevantByBlock = EVENT_DATA.block_relevant_by_block || {{}};
 
 const blockSelect = document.getElementById("block-select");
 const select = document.getElementById("event-select");
@@ -927,6 +911,7 @@ const LAYOUT_HEIGHT = 800;
 const LAYOUT_PAD = 96;
 const LAYOUT_MIN_SEP = 76;
 const EDGE_TARGET = 108;
+const ANNEAL_UNION_LAYOUT = false;
 const NODE_RADIUS = 24;
 const LEVEL_INFINITY_BASE = 100000000;
 const LEVEL_INFINITY_WINDOW = 4096;
@@ -962,7 +947,7 @@ const snapshotCache = new Map();
 snapshotCache.set(-1, {{}});
 const SNAPSHOT_CACHE_STRIDE = 192;
 const futureRelevantSetCache = new Map();
-const blockRelevantSetCache = new Map();
+const blockTouchedSetCache = new Map();
 let lastSnapshotIndex = -1;
 let lastSnapshotState = {{}};
 let currentIndex = 0;
@@ -970,6 +955,9 @@ let levelColumnsEnabled = false;
 const nodeKindById = new Map();
 const nodeCreationById = new Map();
 const recentActiveLocByEventId = new Map();
+let nodeKindIndexReady = false;
+let nodeCreationIndexReady = false;
+let recentActiveLocIndexReady = false;
 let lastSourceFile = sourceFileOrder.length > 0 ? sourceFileOrder[0] : null;
 let lastSourceStart = 0;
 let lastSourceEnd = 0;
@@ -979,6 +967,78 @@ let selectedNodeId = null;
 let hoveredNodeId = null;
 let lastSelectionCaptureMs = 0;
 let selectedBlockFilter = "all";
+
+function perfEnabledFromHash() {{
+  const rawHash = window.location.hash.startsWith("#")
+    ? window.location.hash.slice(1)
+    : window.location.hash;
+  const params = new URLSearchParams(rawHash);
+  const raw = String(params.get("perf") || "").toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
+}}
+
+const PERF_ENABLED = perfEnabledFromHash();
+const perfBuckets = new Map();
+
+function perfNow() {{
+  if (typeof performance !== "undefined" && performance.now) {{
+    return performance.now();
+  }}
+  return Date.now();
+}}
+
+function perfStart(name) {{
+  if (!PERF_ENABLED) return null;
+  return {{ name, t0: perfNow() }};
+}}
+
+function perfEnd(token) {{
+  if (!PERF_ENABLED || !token) return;
+  const dt = perfNow() - token.t0;
+  const prev = perfBuckets.get(token.name);
+  if (!prev) {{
+    perfBuckets.set(token.name, {{ total: dt, count: 1, max: dt }});
+    return;
+  }}
+  prev.total += dt;
+  prev.count += 1;
+  if (dt > prev.max) prev.max = dt;
+}}
+
+function perfWrap(name, fn) {{
+  const token = perfStart(name);
+  try {{
+    return fn();
+  }} finally {{
+    perfEnd(token);
+  }}
+}}
+
+function solverVizPerfReport() {{
+  const rows = Array.from(perfBuckets.entries())
+    .map(([name, data]) => {{
+      const total = data.total;
+      const count = data.count;
+      const avg = count > 0 ? total / count : 0;
+      return {{
+        phase: name,
+        total_ms: Math.round(total * 10) / 10,
+        count,
+        avg_ms: Math.round(avg * 10) / 10,
+        max_ms: Math.round(data.max * 10) / 10,
+      }};
+    }})
+    .sort((a, b) => b.total_ms - a.total_ms);
+  if (rows.length > 0) console.table(rows);
+  return rows;
+}}
+
+if (typeof globalThis !== "undefined") {{
+  globalThis.solverVizPerfReport = solverVizPerfReport;
+}}
+if (typeof window !== "undefined") {{
+  window.solverVizPerfReport = solverVizPerfReport;
+}}
 
 function edgeKey(edge) {{
   return `${{edge.src}}|${{edge.dst}}|${{edge.label}}|${{edge.modality || ""}}`;
@@ -1057,20 +1117,18 @@ function futureRelevantSetForBlock(blockId) {{
   return set;
 }}
 
-function blockRelevantSetForBlock(blockId) {{
+function blockTouchedSetForBlock(blockId) {{
   const key = Number(blockId);
-  if (blockRelevantSetCache.has(key)) {{
-    return blockRelevantSetCache.get(key);
+  if (blockTouchedSetCache.has(key)) {{
+    return blockTouchedSetCache.get(key);
   }}
-  const raw = blockRelevantByBlock[String(key)];
   const set = new Set();
-  if (Array.isArray(raw)) {{
-    raw.forEach((id) => {{
-      const n = Number(id);
-      if (Number.isFinite(n)) set.add(n);
-    }});
-  }}
-  blockRelevantSetCache.set(key, set);
+  const ids = blockEventIds.get(key) || [];
+  ids.forEach((eventId) => {{
+    const item = events[String(eventId)] || null;
+    eventNodeRefs(item).forEach((id) => set.add(id));
+  }});
+  blockTouchedSetCache.set(key, set);
   return set;
 }}
 
@@ -1339,6 +1397,7 @@ function maybeIndexNodeKind(id, lower, upper) {{
 }}
 
 function initNodeKindIndex() {{
+  if (nodeKindIndexReady) return;
   allEventOrder.forEach((eventId) => {{
     const item = events[String(eventId)];
     const event = (item && item.event) || {{}};
@@ -1348,16 +1407,30 @@ function initNodeKindIndex() {{
     ) {{
       maybeIndexNodeKind(event.var_id, event.lower, event.upper);
     }}
-    const snapshot = snapshotFor(eventId);
-    Object.entries(snapshot).forEach(([rawId, node]) => {{
+  }});
+  if (allEventOrder.length > 0) {{
+    const firstSnapshot = snapshotFor(allEventOrder[0]);
+    Object.entries(firstSnapshot).forEach(([rawId, node]) => {{
       const id = Number(rawId);
       if (!Number.isFinite(id)) return;
       maybeIndexNodeKind(id, node.lower, node.upper);
     }});
-  }});
+  }}
+  nodeKindIndexReady = true;
+}}
+
+function maybeIndexNodeKindForEvent(id, eventId) {{
+  if (nodeKindById.has(id)) return true;
+  if (!Number.isInteger(eventId)) return false;
+  const snapshot = snapshotFor(eventId);
+  const node = snapshot[String(id)];
+  if (!node || typeof node !== "object") return false;
+  maybeIndexNodeKind(id, node.lower, node.upper);
+  return nodeKindById.has(id);
 }}
 
 function initNodeCreationIndex() {{
+  if (nodeCreationIndexReady) return;
   allEventOrder.forEach((eventId) => {{
     const item = events[String(eventId)];
     if (!item) return;
@@ -1384,9 +1457,15 @@ function initNodeCreationIndex() {{
       loc,
     }});
   }});
+  nodeCreationIndexReady = true;
+}}
+
+function ensureNodeCreationIndex() {{
+  initNodeCreationIndex();
 }}
 
 function initRecentActiveLocIndex() {{
+  if (recentActiveLocIndexReady) return;
   let lastLoc = null;
   allEventOrder.forEach((eventId) => {{
     const item = events[String(eventId)] || null;
@@ -1401,9 +1480,15 @@ function initRecentActiveLocIndex() {{
     if (loc) lastLoc = loc;
     if (lastLoc) recentActiveLocByEventId.set(eventId, lastLoc);
   }});
+  recentActiveLocIndexReady = true;
+}}
+
+function ensureRecentActiveLocIndex() {{
+  initRecentActiveLocIndex();
 }}
 
 function recentActiveLocForEvent(eventId) {{
+  ensureRecentActiveLocIndex();
   if (!Number.isInteger(eventId)) return null;
   return recentActiveLocByEventId.get(eventId) || null;
 }}
@@ -1500,6 +1585,7 @@ function rangesOverlap(a0, a1, b0, b1) {{
 }}
 
 function nodeIdsCreatedInRange(rangeSpec) {{
+  ensureNodeCreationIndex();
   const ids = new Set();
   if (!rangeSpec || typeof rangeSpec !== "object") return ids;
   const file = rangeSpec.file;
@@ -1520,21 +1606,29 @@ function nodeIdsCreatedInRange(rangeSpec) {{
   return ids;
 }}
 
-function varLabel(id, node = null) {{
+function varLabel(id, node = null, eventId = null) {{
+  initNodeKindIndex();
   let kind = nodeKindById.get(id);
   if (!kind && node) {{
     kind = nodeKindFromNode(node);
     nodeKindById.set(id, kind);
   }}
+  if (!kind && maybeIndexNodeKindForEvent(id, eventId)) {{
+    kind = nodeKindById.get(id);
+  }}
   if (!kind) kind = "unknown";
   return `${{kindPrefix(kind)}}${{id}}`;
 }}
 
-function varPrefix(id, node = null) {{
+function varPrefix(id, node = null, eventId = null) {{
+  initNodeKindIndex();
   let kind = nodeKindById.get(id);
   if (!kind && node) {{
     kind = nodeKindFromNode(node);
     nodeKindById.set(id, kind);
+  }}
+  if (!kind && maybeIndexNodeKindForEvent(id, eventId)) {{
+    kind = nodeKindById.get(id);
   }}
   if (!kind) kind = "unknown";
   return kindPrefix(kind);
@@ -1544,13 +1638,13 @@ function nodePalette(prefix) {{
   return NODE_PREFIX_PALETTE[prefix] || DEFAULT_NODE_PALETTE;
 }}
 
-function varLabelFromEvent(event) {{
+function varLabelFromEvent(event, eventId = null) {{
   if (!event || typeof event.var_id !== "number") return "x?";
   if (event.kind === "trace_var_create") {{
     const kind = classifyNodeKind(event.lower, event.upper);
     return `${{kindPrefix(kind)}}${{event.var_id}}`;
   }}
-  return varLabel(event.var_id);
+  return varLabel(event.var_id, null, eventId);
 }}
 
 function clampIndex(index) {{
@@ -1599,10 +1693,10 @@ function currentBlockLabel() {{
   return `block ${{blockId}}`;
 }}
 
-function shortActionForItem(item) {{
+function shortActionForItem(item, eventId = null) {{
   const event = item.event || {{}};
   if (event.kind === "trace_var_create") {{
-    return `create ${{varLabelFromEvent(event)}}`;
+    return `create ${{varLabelFromEvent(event, eventId)}}`;
   }}
   if (event.kind === "trace_expr_enter") {{
     const exprId =
@@ -1617,14 +1711,14 @@ function shortActionForItem(item) {{
   }}
   const field = event.field || "?";
   const op = item.op || event.op || "apply";
-  return `${{varLabelFromEvent(event)}}.${{field}} (${{op}})`;
+  return `${{varLabelFromEvent(event, eventId)}}.${{field}} (${{op}})`;
 }}
 
 function stepLabelFor(item, eventId) {{
   if (item.step_id === null || item.step_id === undefined) {{
-    return `step ? - ${{shortActionForItem(item)}}`;
+    return `step ? - ${{shortActionForItem(item, eventId)}}`;
   }}
-  return `step ${{item.step_id}} - ${{shortActionForItem(item)}}`;
+  return `step ${{item.step_id}} - ${{shortActionForItem(item, eventId)}}`;
 }}
 
 let applyingHashState = false;
@@ -2107,6 +2201,7 @@ function scrollSourceIntoViewForHighlight() {{
 }}
 
 function renderSourceForItem(item, eventId = null) {{
+  ensureNodeCreationIndex();
   const focusedNodeId =
     selectedNodeId !== null && selectedNodeId !== undefined
       ? selectedNodeId
@@ -2330,18 +2425,18 @@ function appendSourceCode(container, text, baseClassesRaw) {{
   }}
 }}
 
-function edgeRefLabel(rawRef) {{
+function edgeRefLabel(rawRef, eventId = null) {{
   const ref = normalizeEdgeRef(rawRef);
   if (!ref) return null;
-  const name = varLabel(ref.var_id);
+  const name = varLabel(ref.var_id, null, eventId);
   return ref.modality ? `${{name}} (m=${{ref.modality}})` : name;
 }}
 
-function edgeRefList(rawValue) {{
+function edgeRefList(rawValue, eventId = null) {{
   if (!Array.isArray(rawValue)) return [];
   const labels = [];
   rawValue.forEach((ref) => {{
-    const label = edgeRefLabel(ref);
+    const label = edgeRefLabel(ref, eventId);
     if (label !== null) labels.push(label);
   }});
   labels.sort();
@@ -2392,7 +2487,7 @@ function listDiff(oldItems, newItems) {{
   return {{ added, removed }};
 }}
 
-function edgeRefItems(rawValue, field, ownerVarId) {{
+function edgeRefItems(rawValue, field, ownerVarId, eventId = null) {{
   if (!Array.isArray(rawValue)) return [];
   const items = [];
   rawValue.forEach((rawRef) => {{
@@ -2406,7 +2501,8 @@ function edgeRefItems(rawValue, field, ownerVarId) {{
         : null;
     const key = `${{src}}|${{dst}}|${{modality || ""}}`;
     const text =
-      `${{varLabel(src)}} \u2192 ${{varLabel(dst)}}` +
+      `${{varLabel(src, null, eventId)}} \u2192 ` +
+      `${{varLabel(dst, null, eventId)}}` +
       `${{modality ? ` (m=${{modality}})` : ""}}`;
     items.push({{ key, src, dst, modality, text }});
   }});
@@ -2470,12 +2566,22 @@ function describeNodeEvent(nodeId, eventId) {{
         event_id: eventId,
         step,
         body:
-          `create ${{varLabel(nodeId)}}` +
+          `create ${{varLabel(nodeId, null, eventId)}}` +
           ` (provenance=${{provenance}}, range=${{locText}})`,
       }};
     }}
-    const lowerEdges = edgeRefItems(event.vlower, "vlower", event.var_id);
-    const upperEdges = edgeRefItems(event.vupper, "vupper", event.var_id);
+    const lowerEdges = edgeRefItems(
+      event.vlower,
+      "vlower",
+      event.var_id,
+      eventId
+    );
+    const upperEdges = edgeRefItems(
+      event.vupper,
+      "vupper",
+      event.var_id,
+      eventId
+    );
     const touches =
       lowerEdges
         .concat(upperEdges)
@@ -2485,7 +2591,7 @@ function describeNodeEvent(nodeId, eventId) {{
       event_id: eventId,
       step,
       body:
-        `create ${{varLabel(event.var_id)}} with incident edge` +
+        `create ${{varLabel(event.var_id, null, eventId)}} with incident edge` +
         ` ${{truncateText(touches.map((t) => t.text).join("; "), 150)}}`,
     }};
   }}
@@ -2493,13 +2599,18 @@ function describeNodeEvent(nodeId, eventId) {{
   const field = event.field || "?";
   const op = item.op || event.op || "apply";
   if (field === "vlower" || field === "vupper") {{
-    const oldItems = edgeRefItems(event.old, field, event.var_id);
-    const newItems = edgeRefItems(event.new, field, event.var_id);
+    const oldItems = edgeRefItems(event.old, field, event.var_id, eventId);
+    const newItems = edgeRefItems(event.new, field, event.var_id, eventId);
     const diff = diffEdgeObjects(oldItems, newItems);
     const touches = diff.added
       .concat(diff.removed)
       .filter((e) => e.src === nodeId || e.dst === nodeId);
-    if (event.var_id !== nodeId && touches.length === 0) return null;
+    const touchesAll = oldItems
+      .concat(newItems)
+      .filter((e) => e.src === nodeId || e.dst === nodeId);
+    if (event.var_id !== nodeId && touches.length === 0 && touchesAll.length === 0) {{
+      return null;
+    }}
     const added = diff.added.map((e) => e.text);
     const removed = diff.removed.map((e) => e.text);
     if (event.var_id === nodeId) {{
@@ -2507,7 +2618,8 @@ function describeNodeEvent(nodeId, eventId) {{
         event_id: eventId,
         step,
         body:
-          `${{opLabel(op)}} ${{fieldLabel(field)}} on ${{varLabel(nodeId)}}` +
+          `${{opLabel(op)}} ${{fieldLabel(field)}} on ` +
+          `${{varLabel(nodeId, null, eventId)}}` +
           ` (+${{added.length}}/-${{removed.length}})` +
           `${{added.length ? ` added: ${{truncateText(added.join('; '), 140)}}` : ""}}` +
           `${{removed.length ? ` removed: ${{truncateText(removed.join('; '), 140)}}` : ""}}`,
@@ -2517,9 +2629,14 @@ function describeNodeEvent(nodeId, eventId) {{
       event_id: eventId,
       step,
       body:
-        `${{opLabel(op)}} ${{fieldLabel(field)}} on ${{varLabel(event.var_id)}}` +
-        ` touching ${{varLabel(nodeId)}}: ` +
-        truncateText(touches.map((t) => t.text).join("; "), 150),
+        `${{opLabel(op)}} ${{fieldLabel(field)}} on ` +
+        `${{varLabel(event.var_id, null, eventId)}}` +
+        ` touching ${{varLabel(nodeId, null, eventId)}}: ` +
+        truncateText(
+          (touches.length > 0 ? touches : touchesAll).map((t) => t.text).join("; "),
+          150
+        ) +
+        `${{touches.length === 0 ? " (no net edge diff)" : ""}}`,
     }};
   }}
   if (event.var_id !== nodeId) return null;
@@ -2534,18 +2651,22 @@ function describeNodeEvent(nodeId, eventId) {{
 }}
 
 function renderSelectedNodeTrace() {{
+  ensureNodeCreationIndex();
   nodeTraceOps.replaceChildren();
   if (selectedNodeId === null || selectedNodeId === undefined) {{
     nodeTraceMeta.textContent = "No node selected.";
     return;
   }}
   const creation = nodeCreationById.get(selectedNodeId);
+  const currentEventId = eventOrder[currentIndex];
   if (creation && creation.loc) {{
     nodeTraceMeta.textContent =
-      `${{varLabel(selectedNodeId)}} created at ${{formatLocation(creation.loc)}}`;
+      `${{varLabel(selectedNodeId, null, currentEventId)}}` +
+      ` created at ${{formatLocation(creation.loc)}}`;
   }} else {{
     nodeTraceMeta.textContent =
-      `${{varLabel(selectedNodeId)}} (creation range unavailable)`;
+      `${{varLabel(selectedNodeId, null, currentEventId)}}` +
+      ` (creation range unavailable)`;
   }}
   const ops = [];
   eventOrder.forEach((eventId) => {{
@@ -2553,6 +2674,45 @@ function renderSelectedNodeTrace() {{
     if (summary) ops.push(summary);
   }});
   if (ops.length === 0) {{
+    if (selectedBlockFilter !== "all") {{
+      const globalOps = [];
+      allEventOrder.forEach((eventId) => {{
+        const summary = describeNodeEvent(selectedNodeId, eventId);
+        if (summary) globalOps.push(summary);
+      }});
+      if (globalOps.length > 0) {{
+        nodeTraceMeta.textContent =
+          `${{varLabel(selectedNodeId, null, currentEventId)}}` +
+          ` (no operations in this block; showing full trace history)`;
+        globalOps.forEach((entry) => {{
+          const row = document.createElement("div");
+          const isCurrent = entry.event_id === eventOrder[currentIndex];
+          row.className = isCurrent
+            ? "node-op node-op-link node-op-current"
+            : "node-op node-op-link";
+          row.setAttribute("role", "button");
+          row.setAttribute("tabindex", "0");
+          row.title = "Jump to this event";
+          row.addEventListener("click", () => {{
+            jumpToEvent(entry.event_id);
+          }});
+          row.addEventListener("keydown", (event) => {{
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            jumpToEvent(entry.event_id);
+          }});
+          const step = document.createElement("div");
+          step.className = "node-op-step";
+          step.textContent = entry.step;
+          const body = document.createElement("div");
+          body.className = "node-op-body";
+          body.textContent = entry.body;
+          row.append(step, body);
+          nodeTraceOps.appendChild(row);
+        }});
+        return;
+      }}
+    }}
     const empty = document.createElement("div");
     empty.className = "node-op";
     empty.textContent = "No operations recorded for this node.";
@@ -2690,27 +2850,37 @@ function renderStepEvent(item, eventId) {{
     appendEventRow(grid, "step", stepLabelFor(item, eventId));
     appendEventRow(grid, "result", exitResult);
   }} else if (event.kind === "trace_var_create") {{
-    title.textContent = `Create solver node ${{varLabelFromEvent(event)}}`;
+    title.textContent = `Create solver node ${{varLabelFromEvent(event, eventId)}}`;
     meaning.textContent =
       "A fresh mode variable was created with initial bounds, level, and graph links.";
     addChip("create");
-    addChip(varLabelFromEvent(event));
+    addChip(varLabelFromEvent(event, eventId));
     addChip(`provenance: ${{event.provenance || "unknown"}}`);
     appendEventRow(grid, "step", stepLabelFor(item, eventId));
     appendEventRow(grid, "level", formatLevelValue(event.level));
     appendEventRow(grid, "lower", formatValue(event.lower));
     appendEventRow(grid, "upper", formatValue(event.upper));
-    appendEventRow(grid, "vlower", summarizeList(edgeRefList(event.vlower)));
-    appendEventRow(grid, "vupper", summarizeList(edgeRefList(event.vupper)));
+    appendEventRow(
+      grid,
+      "vlower",
+      summarizeList(edgeRefList(event.vlower, eventId))
+    );
+    appendEventRow(
+      grid,
+      "vupper",
+      summarizeList(edgeRefList(event.vupper, eventId))
+    );
     appendEventRow(
       grid,
       "related vars",
-      summarizeList((event.related_var_ids || []).map((id) => varLabel(id)))
+      summarizeList(
+        (event.related_var_ids || []).map((id) => varLabel(id, null, eventId))
+      )
     );
   }} else {{
     const field = event.field || "?";
     const op = item.op || event.op || "apply";
-    const varName = varLabelFromEvent(event);
+    const varName = varLabelFromEvent(event, eventId);
     title.textContent =
       `${{opLabel(op)}} ${{fieldLabel(field)}} on ${{varName}}`;
     meaning.textContent = fieldMeaning(field, op);
@@ -2720,8 +2890,8 @@ function renderStepEvent(item, eventId) {{
     addChip(fieldLabel(field));
 
     if (field === "vlower" || field === "vupper") {{
-      const oldItems = edgeRefItems(event.old, field, event.var_id);
-      const newItems = edgeRefItems(event.new, field, event.var_id);
+      const oldItems = edgeRefItems(event.old, field, event.var_id, eventId);
+      const newItems = edgeRefItems(event.new, field, event.var_id, eventId);
       const diff = diffEdgeItems(oldItems, newItems);
       const addedCount = diff.added.length;
       const removedCount = diff.removed.length;
@@ -2753,6 +2923,8 @@ function renderStepEvent(item, eventId) {{
 }}
 
 function snapshotForEventIndex(targetIndex) {{
+  const perfToken = perfStart("snapshotForEventIndex");
+  try {{
   if (targetIndex < 0) return {{}};
   const cachedIndex = nearestSnapshotIndex(targetIndex);
   let state = deepCloneState(snapshotCache.get(cachedIndex) || {{}});
@@ -2769,13 +2941,6 @@ function snapshotForEventIndex(targetIndex) {{
     if (i > 0 && blockId !== currentBlock) {{
       const keepSet = futureRelevantSetForBlock(currentBlock);
       pruneStateToRelevantNodes(state, keepSet);
-      if (
-        selectedBlockFilter !== "all" &&
-        String(blockId) === String(selectedBlockFilter)
-      ) {{
-        const blockSeed = blockRelevantSetForBlock(blockId);
-        pruneStateToRelevantNodes(state, blockSeed);
-      }}
       currentBlock = blockId;
     }}
     const rawEvent = item && item.event ? item.event : null;
@@ -2786,6 +2951,9 @@ function snapshotForEventIndex(targetIndex) {{
   }}
   snapshotCache.set(targetIndex, deepCloneState(state));
   return state;
+  }} finally {{
+    perfEnd(perfToken);
+  }}
 }}
 
 function snapshotFor(eventId) {{
@@ -2838,13 +3006,29 @@ function seededUnit(seed) {{
 
 function nodeIdsForLayout(item, eventId) {{
   const snapshot = snapshotFor(eventId);
-  const ids = new Set(Object.keys(snapshot).map(Number));
+  const ids = new Set();
+  const blockId = eventBlockId(item, 0);
+  const touchedFilter =
+    selectedBlockFilter !== "all" &&
+    String(blockId) === String(selectedBlockFilter)
+      ? blockTouchedSetForBlock(blockId)
+      : null;
+  Object.keys(snapshot).forEach((rawId) => {{
+    const id = Number(rawId);
+    if (!Number.isFinite(id)) return;
+    if (touchedFilter && !touchedFilter.has(id)) return;
+    ids.add(id);
+  }});
   eventNodeRefs(item).forEach((id) => ids.add(id));
+  if (selectedNodeId !== null && selectedNodeId !== undefined) {{
+    ids.add(Number(selectedNodeId));
+  }}
   return Array.from(ids).sort((a, b) => a - b);
 }}
 
 function allNodeIdsAcrossTimeline(blockId = null) {{
   const ids = new Set();
+  const touchedFilter = blockId === null ? null : blockTouchedSetForBlock(blockId);
   const order =
     blockId === null ? allEventOrder : blockEventIds.get(blockId) || [];
   order.forEach((eventId) => {{
@@ -2855,6 +3039,7 @@ function allNodeIdsAcrossTimeline(blockId = null) {{
     const firstSnapshot = snapshotFor(order[0]);
     Object.keys(firstSnapshot).forEach((rawId) => {{
       const id = Number(rawId);
+      if (touchedFilter && !touchedFilter.has(id)) return;
       if (Number.isFinite(id)) ids.add(id);
     }});
   }}
@@ -2964,7 +3149,7 @@ function resetLayoutCache() {{
   snapshotCache.clear();
   snapshotCache.set(-1, {{}});
   futureRelevantSetCache.clear();
-  blockRelevantSetCache.clear();
+  blockTouchedSetCache.clear();
 }}
 
 function normalizeNodeLevel(rawLevel) {{
@@ -3495,6 +3680,8 @@ function relaxAllNodes3D(
 }}
 
 function annealUnionLayout(initial, nodeIds, springs) {{
+  const perfToken = perfStart("annealUnionLayout");
+  try {{
   const neighbors = buildNeighborSets(nodeIds, springs);
   const componentById = componentIndexByNode(nodeIds, springs);
   const clusterTarget = Math.max(20, EDGE_TARGET * 0.23);
@@ -3651,9 +3838,14 @@ function annealUnionLayout(initial, nodeIds, springs) {{
     2.0
   );
   return polishedEnergy < bestScore ? polished : dropZPositions(best || collapsed);
+  }} finally {{
+    perfEnd(perfToken);
+  }}
 }}
 
 function computeUnionBaseLayout(blockId) {{
+  const perfToken = perfStart("computeUnionBaseLayout");
+  try {{
   if (unionBasePositionsByBlock.has(blockId)) return;
   const ids = allNodeIdsAcrossTimeline(blockId);
   if (ids.length === 0) {{
@@ -3670,6 +3862,10 @@ function computeUnionBaseLayout(blockId) {{
   const clusterTarget = Math.max(20, EDGE_TARGET * 0.23);
   const warmup = Math.min(120, 50 + ids.length);
   relaxAllNodes(positions, ids, springs, warmup, clusterTarget);
+  if (!ANNEAL_UNION_LAYOUT) {{
+    unionBasePositionsByBlock.set(blockId, positions);
+    return;
+  }}
   if (ids.length > 700) {{
     unionBasePositionsByBlock.set(blockId, positions);
     return;
@@ -3678,6 +3874,9 @@ function computeUnionBaseLayout(blockId) {{
     blockId,
     annealUnionLayout(positions, ids, springs)
   );
+  }} finally {{
+    perfEnd(perfToken);
+  }}
 }}
 
 function basePositionForNode(id, blockId = null) {{
@@ -3893,6 +4092,7 @@ function ensureLayoutForIndex(index) {{
 }}
 
 function drawGraph(eventId, index) {{
+  ensureNodeCreationIndex();
   clearGraph();
   hoveredNodeId = null;
   graph.onclick = () => {{
@@ -4232,7 +4432,7 @@ function drawGraph(eventId, index) {{
       provenance: null,
       related_var_ids: [],
     }};
-    const prefix = varPrefix(id, node);
+    const prefix = varPrefix(id, node, eventId);
     const palette = nodePalette(prefix);
     const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
     group.setAttribute("tabindex", "0");
@@ -4301,7 +4501,7 @@ function drawGraph(eventId, index) {{
     label.setAttribute("text-anchor", "middle");
     label.setAttribute("font-size", "11");
     label.setAttribute("fill", palette.text);
-    label.textContent = varLabel(id, node);
+    label.textContent = varLabel(id, node, eventId);
     const levelLabel = document.createElementNS(
       "http://www.w3.org/2000/svg",
       "text"
@@ -4409,11 +4609,10 @@ function render(index) {{
   drawGraph(eventId, index);
 }}
 
-initNodeKindIndex();
-initNodeCreationIndex();
-initRecentActiveLocIndex();
-initControls();
-initKeyboardNavigation();
+const startupToken = perfStart("startup");
+perfWrap("initNodeKindIndex", () => initNodeKindIndex());
+perfWrap("initControls", () => initControls());
+perfWrap("initKeyboardNavigation", () => initKeyboardNavigation());
 sourceView.addEventListener("mouseup", scheduleCaptureSourceSelection);
 sourceView.addEventListener("keyup", scheduleCaptureSourceSelection);
 sourceView.addEventListener("click", () => {{
@@ -4444,8 +4643,14 @@ backtraceOverlay.addEventListener("click", (event) => {{
 window.addEventListener("hashchange", () => {{
   applyHashState({{ applyIndex: true }});
 }});
-applyHashState({{ applyIndex: true }});
-syncUrlHashState();
+perfWrap("applyHashState_initial", () => applyHashState({{ applyIndex: true }}));
+perfWrap("syncUrlHashState_initial", () => syncUrlHashState());
+perfEnd(startupToken);
+if (PERF_ENABLED) {{
+  window.setTimeout(() => {{
+    solverVizPerfReport();
+  }}, 0);
+}}
 </script>
 </body>
 </html>
@@ -4470,15 +4675,11 @@ def main():
     future_relevant_by_block = compute_future_relevant_nodes_by_block(
         timeline, order, max_block
     )
-    block_relevant_by_block = compute_block_relevant_nodes(
-        timeline, order, max_block
-    )
     data = {
         "event_order": order,
         "events": {str(event_id): timeline[event_id] for event_id in order},
         "sources": sources,
         "future_relevant_by_block": future_relevant_by_block,
-        "block_relevant_by_block": block_relevant_by_block,
     }
     html = html_document(data, args.trace)
     with open(args.output, "w", encoding="utf-8") as f:
