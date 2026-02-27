@@ -361,14 +361,9 @@ CAMLexport struct caml_locking_scheme* caml_get_default_locking_scheme(void)
   return Default_locking_scheme(Caml_state->id);
 }
 
-CAMLprim value caml_thread_cleanup(value unit);
-
 static void reset_active(void)
 {
   Active_thread = NULL;
-  /* If no other OCaml thread remains, ask the tick thread to stop
-     so that it does not prevent the whole process from exiting (#9971) */
-  caml_thread_cleanup(Val_unit);
 }
 
 /* Hooks for caml_enter_blocking_section and
@@ -610,7 +605,6 @@ static void caml_thread_domain_stop_hook(void) {
 
     /* another domain thread may be joining on this domain's descriptor */
     caml_threadstatus_terminate(Terminated(Active_thread->descr));
-    /* Shut down the tick thread */
     reset_active();
     /* We free the thread info but not its resources: they are owned
        by Caml_state at this point, and will be cleaned-up later. */
