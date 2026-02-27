@@ -156,14 +156,16 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 
 <[ function | `A x -> x | `B (_, foo) -> foo ]>;;
 [%%expect {|
-- : <[([< `A of '_weak6 | `B of '_weak7 * '_weak6 ] as '_weak5) -> '_weak6]>
+- : <[
+     ([< `A of $('_weak6) | `B of $('_weak7) * $('_weak6) ] as '_weak5) ->
+     $('_weak6)]>
     expr
 = <[function | `A x -> x | `B (_, foo) -> foo]>
 |}];;
 
 <[ function | `A x -> x | `B (_, foo) -> foo | _ -> 42 ]>;;
 [%%expect {|
-- : <[([> `A of int | `B of '_weak9 * int ] as '_weak8) -> int]> expr =
+- : <[([> `A of int | `B of $('_weak9) * int ] as '_weak8) -> int]> expr =
 <[function | `A x -> x | `B (_, foo) -> foo | _ -> 42]>
 |}];;
 

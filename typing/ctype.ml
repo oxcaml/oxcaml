@@ -822,24 +822,35 @@ let rec generalize stage_offset ty =
   let level = get_level ty in
   if (level > !current_level) && (level <> generic_level) then begin
     set_level ty generic_level;
-    (* recur into abbrev for the speed *)
     begin match get_desc ty with
-    | Tvar name -> update_variable_stage stage_offset ty name.name name.jkind
-    | Tvariant row ->
-        if stage_offset <> 0 && is_Tvar (row_more row) then
-          lower_all ty
-        else
-          iter_type_expr (generalize stage_offset) ty
+    (* Keep track of [stage_offset] *)
     | Tquote ty' ->
         generalize (stage_offset + 1) ty'
     | Tquote_eval ty' ->
         generalize (stage_offset + 1) ty'
     | Tsplice ty' ->
         generalize (stage_offset - 1) ty'
+    (* Normalize the variable to be at [stage_offset = 0] *)
+    | Tvar name ->
+        update_variable_stage stage_offset ty name.name name.jkind
+    (* Do not update the stage of row variables *)
+    (* CR metaprogramming jbachurski: Never generalising cross-stage
+       row-polymorphic types seems a extreme but probably correct.
+       We should probably have support for quoting/splicing row variables. *)
+    | Tobject _ when stage_offset <> 0 && is_Tvar (proxy ty) ->
+        set_level (proxy ty) generic_level;
+        iter_type_expr (generalize stage_offset) ty;
+        lower_all ty
+    | Tvariant row when stage_offset <> 0 && is_Tvar (row_more row) ->
+        set_level (row_more row) generic_level;
+        iter_type_expr (generalize stage_offset) ty;
+        lower_all ty
+    (* recur into abbrev for the speed *)
     | Tconstr (_, _, abbrev) ->
         iter_abbrev (generalize stage_offset) !abbrev;
         iter_type_expr (generalize stage_offset) ty
-    | _ -> iter_type_expr (generalize stage_offset) ty
+    | _ ->
+        iter_type_expr (generalize stage_offset) ty
     end;
   end
 
