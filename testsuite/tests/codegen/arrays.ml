@@ -7,6 +7,9 @@
 
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
+ flags += " -cfg-prologue-shrink-wrap";
+ flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
+ flags += " -regalloc-param AFFINITY:on -regalloc irc";
  expect.opt;
 *)
 
@@ -117,11 +120,11 @@ let poly_unsafe_get (a : 'a array) (i : int) =
   Array.unsafe_get a i
 [%%expect_asm X86_64{|
 poly_unsafe_get:
-  subq  $8, %rsp
   movq  %rax, %rdi
   movzbq -8(%rdi), %rax
   cmpq  $254, %rax
   jne   .L108
+  subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    .L112
@@ -134,7 +137,6 @@ poly_unsafe_get:
   ret
 .L108:
   movq  -4(%rdi,%rbx,4), %rax
-  addq  $8, %rsp
   ret
 |}]
 
@@ -142,7 +144,6 @@ let poly_unsafe_set (a : 'a array) (i : int) (v : 'a) =
   Array.unsafe_set a i v
 [%%expect_asm X86_64{|
 poly_unsafe_set:
-  subq  $8, %rsp
   movq  %rdi, %rsi
   movzbq -8(%rax), %rdi
   cmpq  $254, %rdi
@@ -150,9 +151,9 @@ poly_unsafe_set:
   vmovsd (%rsi), %xmm0
   vmovsd %xmm0, -4(%rax,%rbx,4)
   movl  $1, %eax
-  addq  $8, %rsp
   ret
 .L108:
+  subq  $8, %rsp
   leaq  -4(%rax,%rbx,4), %rdi
   call  caml_modify@PLT
   movl  $1, %eax
@@ -469,7 +470,6 @@ let poly_safe_get (a : 'a array) (i : int) =
   Array.get a i
 [%%expect_asm X86_64{|
 poly_safe_get:
-  subq  $8, %rsp
   movq  %rax, %rdi
   movq  -8(%rdi), %rax
   salq  $8, %rax
@@ -479,6 +479,7 @@ poly_safe_get:
   movzbq -8(%rdi), %rax
   cmpq  $254, %rax
   jne   .L116
+  subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    .L126
@@ -491,9 +492,9 @@ poly_safe_get:
   ret
 .L116:
   movq  -4(%rdi,%rbx,4), %rax
-  addq  $8, %rsp
   ret
 .L123:
+  subq  $8, %rsp
   movq  camlTOP40__block1227@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
@@ -505,7 +506,6 @@ let poly_safe_set (a : 'a array) (i : int) (v : 'a) =
   Array.set a i v
 [%%expect_asm X86_64{|
 poly_safe_set:
-  subq  $8, %rsp
   movq  %rdi, %rsi
   movq  -8(%rax), %rdi
   salq  $8, %rdi
@@ -518,15 +518,16 @@ poly_safe_set:
   vmovsd (%rsi), %xmm0
   vmovsd %xmm0, -4(%rax,%rbx,4)
   movl  $1, %eax
-  addq  $8, %rsp
   ret
 .L116:
+  subq  $8, %rsp
   leaq  -4(%rax,%rbx,4), %rdi
   call  caml_modify@PLT
   movl  $1, %eax
   addq  $8, %rsp
   ret
 .L124:
+  subq  $8, %rsp
   movq  camlTOP41__block1282@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)

@@ -6,7 +6,10 @@
  ocamlopt.opt;
 
  only-default-codegen;
- flags = " -O3 -extension-universe upstream_compatible -I ocamlopt.opt";
+ flags = " -O3 -I ocamlopt.opt";
+ flags += " -cfg-prologue-shrink-wrap";
+ flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
+ flags += " -regalloc-param AFFINITY:on -regalloc irc";
  expect.opt;
 *)
 
@@ -56,9 +59,9 @@ let for_loop_layout n f =
   done
 [%%expect_asm X86_64{|
 for_loop_layout:
-  subq  $24, %rsp
   cmpq  $1, %rax
   jl    .L119
+  subq  $24, %rsp
   movl  $1, %edi
 .L108:
   movq  %rdi, 16(%rsp)
@@ -81,7 +84,6 @@ for_loop_layout:
   ret
 .L119:
   movl  $1, %eax
-  addq  $24, %rsp
   ret
 |}]
 

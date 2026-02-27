@@ -6,7 +6,10 @@
  ocamlopt.opt;
 
  only-default-codegen;
- flags = " -I ocamlopt.opt";
+ flags = " -O3 -I ocamlopt.opt";
+ flags += " -cfg-prologue-shrink-wrap";
+ flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
+ flags += " -regalloc-param AFFINITY:on -regalloc irc";
  expect.opt;
 *)
 

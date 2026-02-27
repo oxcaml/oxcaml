@@ -6,7 +6,10 @@
  ocamlopt.opt;
 
  only-default-codegen;
- flags = " -O3 -extension-universe upstream_compatible -I ocamlopt.opt";
+ flags = " -O3 -I ocamlopt.opt";
+ flags += " -cfg-prologue-shrink-wrap";
+ flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
+ flags += " -regalloc-param AFFINITY:on -regalloc irc";
  expect.opt;
 *)
 
@@ -361,13 +364,13 @@ to_int:
 let unsigned_to_int x = Int64_u.unsigned_to_int x
 [%%expect_asm X86_64{|
 unsigned_to_int:
-  subq  $8, %rsp
   movq  %rax, %rbx
   cmpq  $0, %rbx
   jl    .L112
   movabsq $4611686018427387903, %rax
   cmpq  %rax, %rbx
   jg    .L109
+  subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    .L115
@@ -380,11 +383,9 @@ unsigned_to_int:
   ret
 .L109:
   movl  $1, %eax
-  addq  $8, %rsp
   ret
 .L112:
   movl  $1, %eax
-  addq  $8, %rsp
   ret
 |}]
 
