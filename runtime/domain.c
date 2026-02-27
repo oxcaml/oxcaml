@@ -2018,6 +2018,7 @@ CAMLextern void caml_stop_tick_thread(void)
     pthread_t thread = atomic_load_relaxed(&tick_thread_id);
     CAMLassert(thread);
     pthread_join(thread, NULL);
+    atomic_store_release(&tick_thread_stop, false);
   }
 }
 
@@ -2081,12 +2082,12 @@ static void* caml_tick(void *arg)
 
 CAMLextern int caml_start_tick_thread(void)
 {
-  if (atomic_load_acquire(&tick_thread_running)
-      || atomic_load_acquire(&tick_thread_disabled)) {
+  if (atomic_load_acquire(&tick_thread_disabled))
     return 0;
-  }
 
-  atomic_store_release(&tick_thread_stop, false);
+  bool expected = false;
+  if (!atomic_compare_exchange_strong(&tick_thread_running, &expected, true))
+    return 0;
 
 #ifdef POSIX_SIGNALS
   sigset_t mask, old_mask;
@@ -2098,16 +2099,18 @@ CAMLextern int caml_start_tick_thread(void)
 #endif
   pthread_t thread;
   int err = pthread_create(&thread, /* attr=*/NULL, caml_tick, (void *)NULL);
-  atomic_store_relaxed(&tick_thread_id, thread);
 
 #ifdef POSIX_SIGNALS
   /* Reset the mask after starting the thread */
   pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
 #endif
 
-  if (err != 0) return err;
+  if (err != 0) {
+    atomic_store_release(&tick_thread_running, false);
+    return err;
+  }
 
-  atomic_store_release(&tick_thread_running, true);
+  atomic_store_relaxed(&tick_thread_id, thread);
   return 0;
 }
 
