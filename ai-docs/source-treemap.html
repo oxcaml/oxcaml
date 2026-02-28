@@ -73,6 +73,11 @@
         font-size: 0.9rem;
       }
 
+      .diff-info {
+        color: #3d4f89;
+        font-size: 0.88rem;
+      }
+
       .breadcrumb-link {
         color: #2647a8;
         cursor: pointer;
@@ -174,6 +179,13 @@
       <h1 id="title">OxCaml Source Treemap</h1>
       <div class="toolbar">
         <div class="control">
+          <label for="vizMode">Viz</label>
+          <select id="vizMode">
+            <option value="type">Type Color</option>
+            <option value="changeBands">Change Bands</option>
+          </select>
+        </div>
+        <div class="control">
           <label><input id="showMl" type="checkbox" checked /> .ml</label>
         </div>
         <div class="control">
@@ -200,6 +212,7 @@
         <div class="control">
           <label><input id="showAsm" type="checkbox" checked /> .asm</label>
         </div>
+        <div class="control diff-info" id="diffInfo"></div>
       </div>
       <div id="breadcrumbs" class="breadcrumbs" aria-label="Navigation path"></div>
     </header>
@@ -221,7 +234,9 @@
         showCmm: true,
         showS: true,
         showAsm: true,
+        vizMode: "type",
         rawRows: [],
+        diffMeta: null,
         drillRootPath: "",
         treeCache: null,
         treeCacheKey: "",
@@ -230,6 +245,7 @@
 
       const controls = {
         title: document.getElementById("title"),
+        vizMode: document.getElementById("vizMode"),
         showMl: document.getElementById("showMl"),
         showMli: document.getElementById("showMli"),
         showMll: document.getElementById("showMll"),
@@ -239,6 +255,7 @@
         showCmm: document.getElementById("showCmm"),
         showS: document.getElementById("showS"),
         showAsm: document.getElementById("showAsm"),
+        diffInfo: document.getElementById("diffInfo"),
         breadcrumbs: document.getElementById("breadcrumbs"),
         tooltip: document.getElementById("tooltip"),
       };
@@ -253,6 +270,11 @@
       const rerenderQueued = debounce(() => {
         renderTreemap();
       }, 70);
+
+      controls.vizMode.addEventListener("change", () => {
+        state.vizMode = controls.vizMode.value === "changeBands" ? "changeBands" : "type";
+        rerenderQueued();
+      });
 
       controls.showMl.addEventListener("change", () => {
         state.showMl = controls.showMl.checked;
@@ -311,9 +333,10 @@
       window.addEventListener("resize", debounce(renderTreemap, 120));
 
       (async function init() {
+        const cacheToken = `v=${Date.now()}`;
         const [treemapResponse, typingSummaryResponse] = await Promise.all([
-          fetch("source-treemap-data.json"),
-          fetch("source-treemap-typing-summaries.json"),
+          fetch(`source-treemap-data.json?${cacheToken}`, { cache: "no-store" }),
+          fetch(`source-treemap-typing-summaries.json?${cacheToken}`, { cache: "no-store" }),
         ]);
         const [jsonRows, typingSummaryPayload] = await Promise.all([
           treemapResponse.json(),
@@ -323,6 +346,7 @@
               return { summaries: [] };
             }),
         ]);
+        state.diffMeta = extractTreemapMeta(jsonRows);
         state.rawRows = parseTreemapRows(jsonRows);
         loadTypingSummaries(typingSummaryPayload);
         renderTreemap();
@@ -345,17 +369,30 @@
           name: "source",
           path: "",
           value: 0,
+          addedLines: 0,
+          deletedLines: 0,
+          hasDiff: false,
           children: [],
           childIndex: new Map(),
           isDir: true,
           depth: 0,
         };
 
-        iterateDataRows((rowPath, rowBytes, rowExt) => {
+        iterateDataRows((row) => {
+          const rowPath = row.path;
+          const rowBytes = row.bytes;
+          const rowExt = row.extension;
           if (!isTrackableSourcePath(rowPath)) return;
           if (!extensionEnabled[rowExt]) return;
           const bytes = Number(rowBytes);
-          if (!Number.isFinite(bytes)) return;
+          if (!Number.isFinite(bytes) || bytes <= 0) return;
+          const addedLines = Math.max(0, Number(row.addedLines) || 0);
+          const deletedLines = Math.max(0, Number(row.deletedLines) || 0);
+          const oldLinesBefore = Math.max(0, Number(row.oldLinesBefore) || 0);
+          const hasDiff = !!row.hasDiff;
+          const changeStatus = String(row.changeStatus || "unchanged");
+          const bytesBefore = Math.max(0, Number(row.bytesBefore) || 0);
+          const bytesAfter = Math.max(0, Number(row.bytesAfter) || 0);
 
           const parts = String(rowPath).split("/");
           const file = parts.pop();
@@ -371,6 +408,9 @@
                 name: dir,
                 path: prefix,
                 value: 0,
+                addedLines: 0,
+                deletedLines: 0,
+                hasDiff: false,
                 children: [],
                 childIndex: new Map(),
                 isDir: true,
@@ -381,6 +421,9 @@
               current.childIndex.set(dir, child);
             }
             child.value += bytes;
+            child.addedLines += addedLines;
+            child.deletedLines += deletedLines;
+            child.hasDiff = child.hasDiff || hasDiff;
             current = child;
           }
 
@@ -391,32 +434,62 @@
             value: bytes,
             isDir: false,
             extension: rowExt,
+            bytesBefore,
+            bytesAfter,
+            addedLines,
+            deletedLines,
+            oldLinesBefore,
+            hasDiff,
+            changeStatus,
             depth: current.depth + 1,
             parent: current,
           });
           current.value += bytes;
+          current.addedLines += addedLines;
+          current.deletedLines += deletedLines;
+          current.hasDiff = current.hasDiff || hasDiff;
         });
 
         pruneAndSort(root);
         return root;
       }
 
+      function normalizeRow(row) {
+        if (!row || typeof row !== "object") {
+          return null;
+        }
+        const path = String(row.path || "");
+        if (!path) return null;
+        const extension = String(row.extension || "").toLowerCase();
+        return {
+          path,
+          bytes: Number(row.bytes),
+          bytesBefore: Number(row.bytesBefore),
+          bytesAfter: Number(row.bytesAfter),
+          extension,
+          hasDiff: !!row.hasDiff,
+          changeStatus: String(row.changeStatus || "unchanged"),
+          addedLines: Number(row.addedLines) || 0,
+          deletedLines: Number(row.deletedLines) || 0,
+          oldLinesBefore: Number(row.oldLinesBefore) || 0,
+        };
+      }
+
       function parseTreemapRows(rawRows) {
         if (!rawRows) return [];
-        if (Array.isArray(rawRows)) return rawRows;
+        if (Array.isArray(rawRows)) {
+          return rawRows.map(normalizeRow).filter(Boolean);
+        }
+        if (rawRows && Array.isArray(rawRows.rows)) {
+          return rawRows.rows.map(normalizeRow).filter(Boolean);
+        }
         if (rawRows && rawRows.kind === "packed") return rawRows;
 
         const text = String(rawRows);
         if (text[0] === "[" && text.includes('{"path"')) {
           try {
             const parsed = JSON.parse(text);
-            return parsed.map((row) => {
-              return {
-                path: row.path,
-                bytes: row.bytes,
-                extension: row.extension,
-              };
-            });
+            return parsed.map(normalizeRow).filter(Boolean);
           } catch {
             return [];
           }
@@ -445,20 +518,46 @@
         };
       }
 
+      function extractTreemapMeta(rawRows) {
+        if (!rawRows || typeof rawRows !== "object") return null;
+        if (rawRows.meta && typeof rawRows.meta === "object") return rawRows.meta;
+        const rows = Array.isArray(rawRows.rows) ? rawRows.rows : Array.isArray(rawRows) ? rawRows : [];
+        const hasAnyDiff = rows.some((row) => row && row.hasDiff);
+        if (!hasAnyDiff) return null;
+        return {
+          diff: {
+            from: "unknown",
+            to: "unknown",
+            sizeBasis: "max",
+          },
+        };
+      }
+
       function iterateDataRows(fn) {
         const rows = state.rawRows;
         if (!rows) return;
 
         if (rows.kind === "packed") {
           for (let i = 0; i < rows.paths.length; i++) {
-            fn(rows.paths[i], rows.bytes[i], rows.extensions[i], i);
+            fn({
+              path: rows.paths[i],
+              bytes: rows.bytes[i],
+              extension: rows.extensions[i],
+              bytesBefore: rows.bytes[i],
+              bytesAfter: rows.bytes[i],
+              hasDiff: false,
+              changeStatus: "present",
+              addedLines: 0,
+              deletedLines: 0,
+              oldLinesBefore: 0,
+            });
           }
           return;
         }
 
         if (Array.isArray(rows)) {
           for (const row of rows) {
-            fn(row.path, row.bytes, row.extension);
+            fn(row);
           }
         }
       }
@@ -510,6 +609,7 @@
         clearSvg();
         layoutNode(displayRoot, 0, 0, w, h, 0);
         controls.title.textContent = `OxCaml Source Treemap (${visibleFileCount} files)`;
+        updateDiffInfo();
         renderBreadcrumbs(state.drillRootPath);
 
         const nodes = [];
@@ -537,7 +637,7 @@
           rect.setAttribute("width", String(Math.max(0, n.x1 - n.x0)));
           rect.setAttribute("height", String(Math.max(0, n.y1 - n.y0)));
           rect.setAttribute("class", `cell ${n.isDir ? "dir" : "file"}`);
-          rect.setAttribute("fill", colorForNode(n, maxDepth));
+          rect.setAttribute("fill", fillColorForNode(n, maxDepth));
 
           rect.addEventListener("mousemove", (event) => {
             showNodeTooltip(event, n);
@@ -552,6 +652,9 @@
           rect.addEventListener("mouseleave", hideTooltip);
 
           cell.appendChild(rect);
+          if (!n.isDir && state.vizMode === "changeBands") {
+            renderChangeBands(cell, n);
+          }
 
           const showFileLabel = shouldShowFileLabel(n);
           const showDirHeader = shouldShowDirHeader(n) && n.isDir;
@@ -609,6 +712,18 @@
           const headerWidth = Math.max(0, width - 6);
 
           const headerCell = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          const clipBoundsId = `dir-header-bounds-${hi}`;
+          const clipBounds = document.createElementNS("http://www.w3.org/2000/svg", "clipPath");
+          clipBounds.setAttribute("id", clipBoundsId);
+          const clipBoundsRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          clipBoundsRect.setAttribute("x", String(node.x0));
+          clipBoundsRect.setAttribute("y", String(node.y0));
+          clipBoundsRect.setAttribute("width", String(Math.max(0, width)));
+          clipBoundsRect.setAttribute("height", String(Math.max(0, height)));
+          clipBounds.appendChild(clipBoundsRect);
+          defs.appendChild(clipBounds);
+          headerCell.setAttribute("clip-path", `url(#${clipBoundsId})`);
+
           const headerBg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
           headerBg.setAttribute("x", String(node.x0 + 3));
           headerBg.setAttribute("y", String(headerDisplayY));
@@ -780,6 +895,7 @@
       }
 
       function formatNodeTooltip(node, kind, location) {
+        const changeSummary = formatChangeSummary(node);
         if (isTypingFileNode(node)) {
           const summary = state.typingSummaries.get(node.path) || {
             oneLine: "Typing summary unavailable",
@@ -791,11 +907,127 @@ ${summary.oneLine}
 ${summary.paragraph}
 
 ${kind} · ${formatBytes(node.value)}
-Path: ${location}`;
+${changeSummary ? `${changeSummary}\n` : ""}Path: ${location}`;
         }
         return `${node.name}
 ${kind} · ${formatBytes(node.value)}
-Path: ${location}`;
+${changeSummary ? `${changeSummary}\n` : ""}Path: ${location}`;
+      }
+
+      function formatChangeSummary(node) {
+        if (!node || !node.hasDiff) return "";
+        const added = Math.max(0, Number(node.addedLines) || 0);
+        const deleted = Math.max(0, Number(node.deletedLines) || 0);
+        const status = node.isDir ? "aggregate" : String(node.changeStatus || "modified");
+        return `Change (${status}) · +${formatCount(added)} / -${formatCount(deleted)} (activity ${formatCount(added + deleted)} lines)`;
+      }
+
+      function formatCount(value) {
+        return Number(value || 0).toLocaleString();
+      }
+
+      function deriveChangeBandFractions(node) {
+        if (!node || node.isDir || !node.hasDiff) {
+          return { addFrac: 0, delFrac: 0, keepFrac: 1 };
+        }
+        const status = String(node.changeStatus || "modified");
+        const added = Math.max(0, Number(node.addedLines) || 0);
+        const deleted = Math.max(0, Number(node.deletedLines) || 0);
+        if (status === "added" && deleted === 0) {
+          return { addFrac: 1, delFrac: 0, keepFrac: 0 };
+        }
+        if (status === "deleted" && added === 0) {
+          return { addFrac: 0, delFrac: 1, keepFrac: 0 };
+        }
+        if (added === 0 && deleted === 0) {
+          return { addFrac: 0, delFrac: 0, keepFrac: 1 };
+        }
+        const oldLines = Math.max(deleted, Number(node.oldLinesBefore) || 0);
+        const unchanged = Math.max(0, oldLines - deleted);
+        const total = added + deleted + unchanged;
+        if (!Number.isFinite(total) || total <= 0) {
+          return { addFrac: 0, delFrac: 0, keepFrac: 1 };
+        }
+        return {
+          addFrac: added / total,
+          delFrac: deleted / total,
+          keepFrac: unchanged / total,
+        };
+      }
+
+      function renderChangeBands(cell, node) {
+        const width = Math.max(0, node.x1 - node.x0);
+        const height = Math.max(0, node.y1 - node.y0);
+        if (width <= 0 || height <= 0) return;
+        const { addFrac, delFrac } = deriveChangeBandFractions(node);
+        const addedLines = Math.max(0, Number(node.addedLines) || 0);
+        const deletedLines = Math.max(0, Number(node.deletedLines) || 0);
+        let greenH = height * addFrac;
+        let redH = height * delFrac;
+        const minBandPx = height >= 10 ? 1.4 : height >= 6 ? 1 : 0.6;
+        if (addedLines > 0 && addFrac < 1) {
+          greenH = Math.max(greenH, minBandPx);
+        }
+        if (deletedLines > 0 && delFrac < 1) {
+          redH = Math.max(redH, minBandPx);
+        }
+        const coloredTotal = greenH + redH;
+        if (coloredTotal > height && coloredTotal > 0) {
+          const shrink = height / coloredTotal;
+          greenH *= shrink;
+          redH *= shrink;
+        }
+        const middleH = Math.max(0, height - greenH - redH);
+
+        if (middleH > 0.2) {
+          const unchangedRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          unchangedRect.setAttribute("x", String(node.x0));
+          unchangedRect.setAttribute("y", String(node.y0));
+          unchangedRect.setAttribute("width", String(width));
+          unchangedRect.setAttribute("height", String(middleH));
+          unchangedRect.setAttribute("fill", "rgba(145, 154, 183, 0.58)");
+          unchangedRect.setAttribute("pointer-events", "none");
+          cell.appendChild(unchangedRect);
+        }
+        if (redH > 0.2) {
+          const deletedRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          deletedRect.setAttribute("x", String(node.x0));
+          deletedRect.setAttribute("y", String(node.y0 + middleH));
+          deletedRect.setAttribute("width", String(width));
+          deletedRect.setAttribute("height", String(redH));
+          deletedRect.setAttribute("fill", "rgba(214, 82, 82, 0.84)");
+          deletedRect.setAttribute("pointer-events", "none");
+          cell.appendChild(deletedRect);
+        }
+        if (greenH > 0.2) {
+          const addedRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          addedRect.setAttribute("x", String(node.x0));
+          addedRect.setAttribute("y", String(node.y0 + middleH + redH));
+          addedRect.setAttribute("width", String(width));
+          addedRect.setAttribute("height", String(greenH));
+          addedRect.setAttribute("fill", "rgba(59, 183, 106, 0.84)");
+          addedRect.setAttribute("pointer-events", "none");
+          cell.appendChild(addedRect);
+        }
+      }
+
+      function fillColorForNode(node, maxDepth) {
+        if (node.isDir) return colorForNode(node, maxDepth);
+        if (state.vizMode === "changeBands") return "rgba(129, 140, 171, 0.55)";
+        return colorForNode(node, maxDepth);
+      }
+
+      function updateDiffInfo() {
+        if (!controls.diffInfo) return;
+        const diff = state.diffMeta && state.diffMeta.diff;
+        if (diff) {
+          const from = diff.from || "unknown";
+          const to = diff.to || "unknown";
+          const basis = diff.sizeBasis ? `, size=${diff.sizeBasis}` : "";
+          controls.diffInfo.textContent = `Diff: ${from} -> ${to}${basis}`;
+          return;
+        }
+        controls.diffInfo.textContent = "Diff: current working tree";
       }
 
       function hideTooltip() {
