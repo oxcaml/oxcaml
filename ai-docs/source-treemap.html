@@ -1,0 +1,1133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OxCaml Source Treemap</title>
+    <style>
+      :root {
+        --bg: #f3f6ff;
+        --panel: #fdfdff;
+        --line: #cad3ff;
+        --text: #0e1633;
+        --muted: #5b6688;
+        --accent: #3d6fff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        font-family: "Atkinson Hyperlegible", "Segoe UI", "Inter", sans-serif;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        background: radial-gradient(circle at 12% 10%, #ffffff 0%, #eef2ff 45%, #dde7ff 100%);
+      }
+
+      header {
+        padding: 1rem 1.2rem;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.35rem;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+        align-items: center;
+      }
+
+      .control {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.92rem;
+      }
+
+      label {
+        color: var(--muted);
+      }
+
+      select,
+      input[type="range"] {
+        accent-color: var(--accent);
+      }
+
+      .breadcrumbs {
+        margin-top: 0.4rem;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .breadcrumb-link {
+        color: #2647a8;
+        cursor: pointer;
+      }
+
+      .breadcrumb-link:hover {
+        text-decoration: underline;
+      }
+
+      main {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+        position: relative;
+      }
+
+      #chart-wrap {
+        position: relative;
+        flex: 1;
+        min-width: 0;
+        margin: 0.75rem;
+        border: 1px solid #b9c4ef;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #f9fbff;
+      }
+
+      #treemap {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      .cell {
+        stroke: rgba(15, 23, 51, 0.28);
+        stroke-width: 1px;
+      }
+
+      .cell.dir {
+        fill-opacity: 0.72;
+      }
+
+      .cell.file {
+        fill-opacity: 0.86;
+      }
+
+      .label {
+        fill: #f8fbff;
+        font-size: 12px;
+        paint-order: stroke;
+        stroke: rgba(4, 12, 29, 0.38);
+        stroke-width: 0.35;
+        pointer-events: none;
+        dominant-baseline: hanging;
+        text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+      }
+
+      .tooltip {
+        position: fixed;
+        pointer-events: none;
+        background: #111a34;
+        color: #ecf0ff;
+        border-radius: 6px;
+        padding: 0.65rem 0.8rem;
+        font-size: 12px;
+        line-height: 1.45;
+        max-width: 380px;
+        max-height: 45vh;
+        overflow-y: auto;
+        overflow-wrap: break-word;
+        white-space: pre-wrap;
+        display: none;
+        z-index: 10;
+        box-shadow: 0 6px 20px rgba(9, 15, 37, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        backdrop-filter: blur(2px);
+        font-family: "Inter", "Segoe UI", sans-serif;
+      }
+
+      .tooltip p {
+        margin: 0;
+        margin-bottom: 0.35rem;
+      }
+
+      .tooltip p:last-child {
+        margin-bottom: 0;
+      }
+
+      @media (max-width: 900px) {
+        .toolbar {
+          gap: 0.55rem;
+          font-size: 0.9rem;
+        }
+      }
+    </style>
+  </head>
+    <body>
+      <header>
+      <h1 id="title">OxCaml Source Treemap</h1>
+      <div class="toolbar">
+        <div class="control">
+          <label><input id="showMl" type="checkbox" checked /> .ml</label>
+        </div>
+        <div class="control">
+          <label><input id="showMli" type="checkbox" checked /> .mli</label>
+        </div>
+        <div class="control">
+          <label><input id="showMll" type="checkbox" checked /> .mll</label>
+        </div>
+        <div class="control">
+          <label><input id="showMly" type="checkbox" checked /> .mly</label>
+        </div>
+        <div class="control">
+          <label><input id="showC" type="checkbox" checked /> .c</label>
+        </div>
+        <div class="control">
+          <label><input id="showH" type="checkbox" checked /> .h</label>
+        </div>
+        <div class="control">
+          <label><input id="showCmm" type="checkbox" checked /> .cmm</label>
+        </div>
+        <div class="control">
+          <label><input id="showS" type="checkbox" checked /> .s</label>
+        </div>
+        <div class="control">
+          <label><input id="showAsm" type="checkbox" checked /> .asm</label>
+        </div>
+      </div>
+      <div id="breadcrumbs" class="breadcrumbs" aria-label="Navigation path"></div>
+    </header>
+    <main>
+      <div id="chart-wrap">
+        <svg id="treemap" role="img" aria-label="Treemap of oxcaml source file sizes"></svg>
+        <div id="tooltip" class="tooltip"></div>
+      </div>
+    </main>
+
+    <script>
+      const state = {
+        showMl: true,
+        showMli: true,
+        showMll: true,
+        showMly: true,
+        showC: true,
+        showH: true,
+        showCmm: true,
+        showS: true,
+        showAsm: true,
+        rawRows: [],
+        drillRootPath: "",
+        treeCache: null,
+        treeCacheKey: "",
+        typingSummaries: new Map(),
+      };
+
+      const controls = {
+        title: document.getElementById("title"),
+        showMl: document.getElementById("showMl"),
+        showMli: document.getElementById("showMli"),
+        showMll: document.getElementById("showMll"),
+        showMly: document.getElementById("showMly"),
+        showC: document.getElementById("showC"),
+        showH: document.getElementById("showH"),
+        showCmm: document.getElementById("showCmm"),
+        showS: document.getElementById("showS"),
+        showAsm: document.getElementById("showAsm"),
+        breadcrumbs: document.getElementById("breadcrumbs"),
+        tooltip: document.getElementById("tooltip"),
+      };
+
+      const svg = document.getElementById("treemap");
+      const wrap = document.getElementById("chart-wrap");
+      const queryParams = new URLSearchParams(window.location.search);
+      const githubRepo = queryParams.get("githubRepo") || "https://github.com/oxcaml/oxcaml";
+      const githubBranch = queryParams.get("githubBranch") || queryParams.get("branch") || "main";
+      const phi = (1 + Math.sqrt(5)) / 2;
+      const padding = 1.8;
+      const rerenderQueued = debounce(() => {
+        renderTreemap();
+      }, 70);
+
+      controls.showMl.addEventListener("change", () => {
+        state.showMl = controls.showMl.checked;
+        state.treeCacheKey = "";
+        rerenderQueued();
+      });
+
+      controls.showMli.addEventListener("change", () => {
+        state.showMli = controls.showMli.checked;
+        state.treeCacheKey = "";
+        rerenderQueued();
+      });
+
+      controls.showMll.addEventListener("change", () => {
+        state.showMll = controls.showMll.checked;
+        state.treeCacheKey = "";
+        rerenderQueued();
+      });
+
+      controls.showMly.addEventListener("change", () => {
+        state.showMly = controls.showMly.checked;
+        state.treeCacheKey = "";
+        rerenderQueued();
+      });
+
+      controls.showC.addEventListener("change", () => {
+        state.showC = controls.showC.checked;
+        state.treeCacheKey = "";
+        rerenderQueued();
+      });
+
+      controls.showH.addEventListener("change", () => {
+        state.showH = controls.showH.checked;
+        state.treeCacheKey = "";
+        rerenderQueued();
+      });
+
+      controls.showCmm.addEventListener("change", () => {
+        state.showCmm = controls.showCmm.checked;
+        state.treeCacheKey = "";
+        rerenderQueued();
+      });
+
+      controls.showS.addEventListener("change", () => {
+        state.showS = controls.showS.checked;
+        state.treeCacheKey = "";
+        rerenderQueued();
+      });
+
+      controls.showAsm.addEventListener("change", () => {
+        state.showAsm = controls.showAsm.checked;
+        state.treeCacheKey = "";
+        rerenderQueued();
+      });
+
+      window.addEventListener("resize", debounce(renderTreemap, 120));
+
+      (async function init() {
+        const [treemapResponse, typingSummaryResponse] = await Promise.all([
+          fetch("source-treemap-data.json"),
+          fetch("source-treemap-typing-summaries.json"),
+        ]);
+        const [jsonRows, typingSummaryPayload] = await Promise.all([
+          treemapResponse.json(),
+          typingSummaryResponse
+            .json()
+            .catch(() => {
+              return { summaries: [] };
+            }),
+        ]);
+        state.rawRows = parseTreemapRows(jsonRows);
+        loadTypingSummaries(typingSummaryPayload);
+        renderTreemap();
+      })();
+
+      function buildTree() {
+        const extensionEnabled = {
+          ml: state.showMl,
+          mli: state.showMli,
+          mll: state.showMll,
+          mly: state.showMly,
+          c: state.showC,
+          h: state.showH,
+          cmm: state.showCmm,
+          s: state.showS,
+          asm: state.showAsm,
+        };
+
+        const root = {
+          name: "source",
+          path: "",
+          value: 0,
+          children: [],
+          childIndex: new Map(),
+          isDir: true,
+          depth: 0,
+        };
+
+        iterateDataRows((rowPath, rowBytes, rowExt) => {
+          if (!isTrackableSourcePath(rowPath)) return;
+          if (!extensionEnabled[rowExt]) return;
+          const bytes = Number(rowBytes);
+          if (!Number.isFinite(bytes)) return;
+
+          const parts = String(rowPath).split("/");
+          const file = parts.pop();
+          let current = root;
+          let prefix = "";
+
+          for (let i = 0; i < parts.length; i++) {
+            const dir = parts[i];
+            prefix = prefix ? `${prefix}/${dir}` : dir;
+            let child = current.childIndex.get(dir);
+            if (!child) {
+              child = {
+                name: dir,
+                path: prefix,
+                value: 0,
+                children: [],
+                childIndex: new Map(),
+                isDir: true,
+                depth: current.depth + 1,
+                parent: current,
+              };
+              current.children.push(child);
+              current.childIndex.set(dir, child);
+            }
+            child.value += bytes;
+            current = child;
+          }
+
+          const fullPath = String(rowPath);
+          current.children.push({
+            name: file,
+            path: fullPath,
+            value: bytes,
+            isDir: false,
+            extension: rowExt,
+            depth: current.depth + 1,
+            parent: current,
+          });
+          current.value += bytes;
+        });
+
+        pruneAndSort(root);
+        return root;
+      }
+
+      function parseTreemapRows(rawRows) {
+        if (!rawRows) return [];
+        if (Array.isArray(rawRows)) return rawRows;
+        if (rawRows && rawRows.kind === "packed") return rawRows;
+
+        const text = String(rawRows);
+        if (text[0] === "[" && text.includes('{"path"')) {
+          try {
+            const parsed = JSON.parse(text);
+            return parsed.map((row) => {
+              return {
+                path: row.path,
+                bytes: row.bytes,
+                extension: row.extension,
+              };
+            });
+          } catch {
+            return [];
+          }
+        }
+
+        const lines = text.split("\n");
+        const paths = [];
+        const bytes = [];
+        const extensions = [];
+        for (const line of lines) {
+          if (!line) continue;
+          const a = line.indexOf("\t");
+          if (a < 0) continue;
+          const b = line.lastIndexOf("\t");
+          if (b <= a) continue;
+
+          paths.push(line.slice(0, a));
+          bytes.push(Number(line.slice(a + 1, b)));
+          extensions.push(line.slice(b + 1));
+        }
+        return {
+          kind: "packed",
+          paths,
+          bytes,
+          extensions,
+        };
+      }
+
+      function iterateDataRows(fn) {
+        const rows = state.rawRows;
+        if (!rows) return;
+
+        if (rows.kind === "packed") {
+          for (let i = 0; i < rows.paths.length; i++) {
+            fn(rows.paths[i], rows.bytes[i], rows.extensions[i], i);
+          }
+          return;
+        }
+
+        if (Array.isArray(rows)) {
+          for (const row of rows) {
+            fn(row.path, row.bytes, row.extension);
+          }
+        }
+      }
+
+      function hasRows(rows) {
+        if (!rows) return false;
+        if (rows.kind === "packed") return Array.isArray(rows.paths) && rows.paths.length > 0;
+        return Array.isArray(rows) ? rows.length > 0 : false;
+      }
+
+      function pruneAndSort(node) {
+        if (!node.children || !node.children.length) return node;
+        const kept = [];
+        for (const child of node.children) {
+          pruneAndSort(child);
+          if ((child.children && child.children.length) || child.value > 0) {
+            kept.push(child);
+          }
+        }
+        node.children = kept.sort((a, b) => b.value - a.value);
+        node.value = node.children.reduce((sum, child) => sum + child.value, 0);
+      }
+
+      function isTrackableSourcePath(pathValue) {
+        const path = String(pathValue || "");
+        if (!path) return false;
+        return !path.startsWith("_install/") && !path.startsWith("/_install/");
+      }
+
+      function renderTreemap() {
+        const hasData = hasRows(state.rawRows);
+        if (!hasData) {
+          return;
+        }
+        const filterKey = `${state.showMl ? 1 : 0}|${state.showMli ? 1 : 0}|${state.showMll ? 1 : 0}|${state.showMly ? 1 : 0}|${state.showC ? 1 : 0}|${state.showH ? 1 : 0}|${state.showCmm ? 1 : 0}|${state.showS ? 1 : 0}|${state.showAsm ? 1 : 0}`;
+        if (!state.treeCache || state.treeCacheKey !== filterKey) {
+          state.treeCache = buildTree();
+          state.treeCacheKey = filterKey;
+        }
+        const root = state.treeCache;
+        const w = wrap.clientWidth;
+        const h = wrap.clientHeight;
+        svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+        svg.setAttribute("width", w);
+        svg.setAttribute("height", h);
+        const displayRoot = getDisplayRoot(root);
+        const visibleFileCount = nodeCount(displayRoot);
+
+        clearSvg();
+        layoutNode(displayRoot, 0, 0, w, h, 0);
+        controls.title.textContent = `OxCaml Source Treemap (${visibleFileCount} files)`;
+        renderBreadcrumbs(state.drillRootPath);
+
+        const nodes = [];
+        const dirHeaderNodes = [];
+        flattenNodes(displayRoot, nodes);
+        const headerRects = [];
+
+        const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+        const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        const maxDepth = Math.max(...nodes.map((n) => n.depth));
+        let droppedNodes = 0;
+        nodes.forEach((n, i) => {
+          if (!hasFiniteRect(n)) {
+            droppedNodes += 1;
+            return;
+          }
+          if (!Number.isFinite(n.x0) || !Number.isFinite(n.y0) || !Number.isFinite(n.x1) || !Number.isFinite(n.y1)) {
+            droppedNodes += 1;
+            return;
+          }
+          const cell = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          rect.setAttribute("x", String(n.x0));
+          rect.setAttribute("y", String(n.y0));
+          rect.setAttribute("width", String(Math.max(0, n.x1 - n.x0)));
+          rect.setAttribute("height", String(Math.max(0, n.y1 - n.y0)));
+          rect.setAttribute("class", `cell ${n.isDir ? "dir" : "file"}`);
+          rect.setAttribute("fill", colorForNode(n, maxDepth));
+
+          rect.addEventListener("mousemove", (event) => {
+            showNodeTooltip(event, n);
+          });
+          if (!n.isDir) {
+            cell.addEventListener("click", (event) => {
+              event.stopPropagation();
+              openSourceFile(n);
+            });
+            cell.style.cursor = "pointer";
+          }
+          rect.addEventListener("mouseleave", hideTooltip);
+
+          cell.appendChild(rect);
+
+          const showFileLabel = shouldShowFileLabel(n);
+          const showDirHeader = shouldShowDirHeader(n) && n.isDir;
+          if (showFileLabel) {
+            const width = n.x1 - n.x0;
+            const height = n.y1 - n.y0;
+            const fileFontSize = Math.max(7, Math.min(12, Math.floor(height * 0.65)));
+            if (fileFontSize >= 10) {
+              const textY = Math.max(
+                n.y0 + 3,
+                Math.min(n.y1 - fileFontSize - 2, n.y0 + height * 0.66)
+              );
+            const clipId = `clip-${i}`;
+            const clip = document.createElementNS("http://www.w3.org/2000/svg", "clipPath");
+            clip.setAttribute("id", clipId);
+            const clipRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            clipRect.setAttribute("x", String(n.x0 + 3));
+            clipRect.setAttribute("y", String(n.y0 + 3));
+            clipRect.setAttribute("width", String(Math.max(0, width - 6)));
+            clipRect.setAttribute("height", String(Math.max(0, height - 2)));
+            clip.appendChild(clipRect);
+            defs.appendChild(clip);
+
+            const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            text.setAttribute("x", String(n.x0 + 8));
+            text.setAttribute("y", String(textY));
+            text.setAttribute("class", "label");
+            text.setAttribute("clip-path", `url(#${clipId})`);
+            text.setAttribute("font-size", String(fileFontSize));
+            text.textContent = shortLabel(n.name, width, height);
+            text.style.fill = "#f6f8ff";
+            text.style.fontWeight = "600";
+            text.setAttribute("dominant-baseline", "hanging");
+            cell.appendChild(text);
+            }
+          }
+
+          if (showDirHeader) {
+            dirHeaderNodes.push(n);
+          }
+
+          g.appendChild(cell);
+        });
+
+        for (let hi = 0; hi < dirHeaderNodes.length; hi++) {
+          const node = dirHeaderNodes[hi];
+          if (!hasFiniteRect(node)) continue;
+          const width = node.x1 - node.x0;
+          const height = node.y1 - node.y0;
+          const headerHeight = Math.max(9, Math.min(13, (height - 4) * 0.6));
+          const placement = placeDirHeader(node, headerHeight, headerRects);
+          if (!placement) continue;
+          const headerY = placement.y0;
+          const headerDisplayY = Math.max(node.y0 + 1, headerY);
+          const headerWidth = Math.max(0, width - 6);
+
+          const headerCell = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          const headerBg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          headerBg.setAttribute("x", String(node.x0 + 3));
+          headerBg.setAttribute("y", String(headerDisplayY));
+          headerBg.setAttribute("width", String(headerWidth));
+          headerBg.setAttribute("height", String(headerHeight));
+          headerBg.setAttribute("fill", "rgba(8, 23, 74, 0.62)");
+          headerBg.setAttribute("stroke", "rgba(226, 236, 255, 0.8)");
+          headerBg.setAttribute("stroke-width", "1");
+          headerBg.setAttribute("rx", "2");
+
+          const clipDirId = `dir-header-${hi}`;
+          const clip = document.createElementNS("http://www.w3.org/2000/svg", "clipPath");
+          clip.setAttribute("id", clipDirId);
+          const clipRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          clipRect.setAttribute("x", String(node.x0 + 3));
+          clipRect.setAttribute("y", String(headerDisplayY));
+          clipRect.setAttribute("width", String(Math.max(0, headerWidth - 2)));
+          clipRect.setAttribute("height", String(Math.max(0, headerHeight - 1)));
+          clip.appendChild(clipRect);
+          defs.appendChild(clip);
+
+          const headerTextFont = Math.max(6, Math.min(8, Math.floor(headerHeight * 0.55)));
+          const headerText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+          headerText.setAttribute("x", String(node.x0 + 9));
+          headerText.setAttribute("y", String(headerDisplayY + Math.max(1, Math.floor((headerHeight - headerTextFont) / 2))));
+          headerText.setAttribute("class", "label");
+          headerText.setAttribute("clip-path", `url(#${clipDirId})`);
+          headerText.setAttribute("font-size", String(headerTextFont));
+          headerText.style.fill = "#ffffff";
+          headerText.style.fontWeight = "800";
+          headerText.style.dominantBaseline = "hanging";
+          headerText.textContent = shortLabel(node.name, width, height);
+
+          headerCell.appendChild(headerBg);
+          headerCell.appendChild(headerText);
+          headerCell.addEventListener("mousemove", (event) => {
+            showNodeTooltip(
+              event,
+              {
+                ...node,
+                nodeType: "Directory",
+              }
+            );
+          });
+          headerCell.addEventListener("click", (event) => {
+            event.stopPropagation();
+            navigateToPath(node.path);
+          });
+          headerCell.addEventListener("mouseleave", hideTooltip);
+          g.appendChild(headerCell);
+
+          headerRects.push({
+            path: node.path,
+            rect: {
+              x0: node.x0 + 3,
+              x1: node.x0 + 3 + headerWidth,
+              y0: headerDisplayY,
+              y1: headerDisplayY + headerHeight,
+            },
+          });
+        }
+
+        svg.appendChild(defs);
+        svg.appendChild(g);
+        if (droppedNodes > 0) {
+          console.warn(`Treemap: skipped ${droppedNodes} nodes due to non-finite geometry`);
+        }
+      }
+
+      function clearSvg() {
+        while (svg.firstChild) {
+          svg.removeChild(svg.firstChild);
+        }
+      }
+
+      function getDisplayRoot(root) {
+        if (!state.drillRootPath) return root;
+        const parts = state.drillRootPath.split("/").filter(Boolean);
+        let current = root;
+        for (const part of parts) {
+          const next = current.childIndex?.get(part);
+          if (!next || !next.isDir) {
+            state.drillRootPath = "";
+            return root;
+          }
+          current = next;
+        }
+        return current;
+      }
+
+      function navigateToPath(path) {
+        const nextPath = path || "";
+        if (state.drillRootPath === nextPath) return;
+        state.drillRootPath = nextPath;
+        renderTreemap();
+      }
+
+      function renderBreadcrumbs(path) {
+        const parts = path ? path.split("/").filter(Boolean) : [];
+        let html = "";
+        let acc = "";
+        const crumbs = [{ path: "", label: "oxcaml" }];
+        for (const part of parts) {
+          acc = acc ? `${acc}/${part}` : part;
+          crumbs.push({ path: acc, label: part });
+        }
+        html = crumbs
+          .map((crumb) => `<span class="breadcrumb-link" data-breadcrumb-path="${crumb.path}">${crumb.label}</span>`)
+          .join(" / ");
+        controls.breadcrumbs.innerHTML = html;
+        controls.breadcrumbs.querySelectorAll("[data-breadcrumb-path]").forEach((item) => {
+          item.addEventListener("click", () => {
+            navigateToPath(item.getAttribute("data-breadcrumb-path") || "");
+          });
+        });
+      }
+
+      function isTypingFileNode(node) {
+        return !!(node && !node.isDir && typeof node.path === "string" && node.path.startsWith("typing/"));
+      }
+
+      function openSourceFile(node) {
+        if (!node || node.isDir) return;
+        const path = String(node.path || "").trim();
+        if (!path) return;
+        const encodedPath = path
+          .split("/")
+          .map((segment) => encodeURIComponent(segment))
+          .join("/");
+        const fileUrl = `${githubRepo}/blob/${githubBranch}/${encodedPath}`;
+        window.open(fileUrl, "_blank", "noopener,noreferrer");
+      }
+
+      function loadTypingSummaries(payload) {
+        state.typingSummaries.clear();
+        const list = (payload && Array.isArray(payload.summaries)) ? payload.summaries : [];
+        for (const summary of list) {
+          if (!summary || typeof summary.path !== "string") continue;
+          if (!summary.oneLine || !summary.paragraph) continue;
+          state.typingSummaries.set(summary.path, {
+            oneLine: String(summary.oneLine),
+            paragraph: String(summary.paragraph),
+          });
+        }
+      }
+
+      function showNodeTooltip(event, node) {
+        const kind = node.nodeType || (node.isDir ? "Directory" : "File");
+        const location = node.path || node.path === "" ? node.path : node.name;
+        const baseSummary = formatNodeTooltip(node, kind, location);
+        controls.tooltip.style.display = "block";
+        controls.tooltip.textContent = baseSummary;
+        positionTooltip(event.clientX, event.clientY);
+      }
+
+      function positionTooltip(cursorX, cursorY) {
+        const tooltip = controls.tooltip;
+        const margin = 10;
+        const baseX = cursorX + 10;
+        const baseY = cursorY + 10;
+        const tooltipWidth = tooltip.offsetWidth;
+        const tooltipHeight = tooltip.offsetHeight;
+        const maxX = window.innerWidth - tooltipWidth - margin;
+        const maxY = window.innerHeight - tooltipHeight - margin;
+        const x = Math.max(margin, Math.min(baseX, maxX));
+        const y = Math.max(margin, Math.min(baseY, maxY));
+        tooltip.style.left = `${x}px`;
+        tooltip.style.top = `${y}px`;
+      }
+
+      function formatNodeTooltip(node, kind, location) {
+        if (isTypingFileNode(node)) {
+          const summary = state.typingSummaries.get(node.path) || {
+            oneLine: "Typing summary unavailable",
+            paragraph: "Typing summary data is unavailable for this file.",
+          };
+          return `${node.name}
+${summary.oneLine}
+
+${summary.paragraph}
+
+${kind} · ${formatBytes(node.value)}
+Path: ${location}`;
+        }
+        return `${node.name}
+${kind} · ${formatBytes(node.value)}
+Path: ${location}`;
+      }
+
+      function hideTooltip() {
+        controls.tooltip.style.display = "none";
+      }
+
+      function flattenNodes(node, out) {
+        if (!node) return;
+        if (node.depth > 0 && node.value > 0) {
+          out.push(node);
+        }
+        if (!node.children) return;
+        for (const child of node.children) {
+          flattenNodes(child, out);
+        }
+      }
+
+      function shouldShowFileLabel(node) {
+        if (!hasFiniteRect(node)) return false;
+        if (node.isDir) return false;
+        const width = node.x1 - node.x0;
+        const height = node.y1 - node.y0;
+        if (width < 44 || height < 18) return false;
+        return node.value >= 2500;
+      }
+
+      function shouldShowDirHeader(node) {
+        if (!hasFiniteRect(node)) return false;
+        if (!node.isDir) return false;
+        return node.depth > 0 && node.value > 0;
+      }
+
+      function layoutNode(node, x0, y0, x1, y1) {
+        if (!Number.isFinite(x0) || !Number.isFinite(y0) || !Number.isFinite(x1) || !Number.isFinite(y1)) return;
+        if (!node) return;
+        node.x0 = x0;
+        node.y0 = y0;
+        node.x1 = x1;
+        node.y1 = y1;
+
+        if (!node.children || node.children.length === 0) return;
+        if (node.value <= 0) {
+          for (const child of node.children) {
+            child.x0 = x0;
+            child.y0 = y0;
+            child.x1 = x1;
+            child.y1 = y1;
+          }
+          return;
+        }
+
+        const innerX0 = x0 + padding;
+        const innerY0 = y0 + padding;
+        const innerX1 = x1 - padding;
+        const innerY1 = y1 - padding;
+        if (innerX1 <= innerX0 || innerY1 <= innerY0) return;
+        layoutSquarify(node, innerX0, innerY0, innerX1, innerY1, phi);
+
+        for (const child of node.children) {
+          layoutNode(child, child.x0, child.y0, child.x1, child.y1);
+        }
+      }
+
+      function layoutBinary(parent, x0, y0, x1, y1) {
+        const nodes = parent.children;
+        if (!nodes.length) return;
+        const sums = new Array(nodes.length + 1);
+        let sum = 0;
+        for (let i = 0; i < nodes.length; i++) {
+          sum += nodes[i].value;
+          sums[i + 1] = sum;
+        }
+
+        partition(0, nodes.length, parent.value, x0, y0, x1, y1);
+
+        function partition(i, j, value, xa, ya, xb, yb) {
+          if (i >= j - 1) {
+            const node = nodes[i];
+            node.x0 = xa;
+            node.y0 = ya;
+            node.x1 = xb;
+            node.y1 = yb;
+            return;
+          }
+
+          const valueOffset = sums[i];
+          const valueTarget = (value / 2) + valueOffset;
+          let k = i + 1;
+          const hi = j - 1;
+
+          while (k < hi) {
+            const mid = (k + hi) >>> 1;
+            if (sums[mid] < valueTarget) k = mid + 1;
+            else hi = mid;
+          }
+          if ((valueTarget - sums[k - 1]) < (sums[k] - valueTarget) && i + 1 < k) --k;
+
+          const valueLeft = sums[k] - valueOffset;
+          const valueRight = value - valueLeft;
+
+          if ((xb - xa) > (yb - ya)) {
+            const xk = value ? (xa * valueRight + xb * valueLeft) / value : xb;
+            partition(i, k, valueLeft, xa, ya, xk, yb);
+            partition(k, j, valueRight, xk, ya, xb, yb);
+          } else {
+            const yk = value ? (ya * valueRight + yb * valueLeft) / value : yb;
+            partition(i, k, valueLeft, xa, ya, xb, yk);
+            partition(k, j, valueRight, xa, yk, xb, yb);
+          }
+        }
+      }
+
+      function layoutSliceDice(parent, x0, y0, x1, y1) {
+        if ((parent.depth & 1) === 1) {
+          layoutSlice(parent, x0, y0, x1, y1);
+        } else {
+          layoutDice(parent, x0, y0, x1, y1);
+        }
+      }
+
+      function layoutSlice(parent, x0, y0, x1, y1) {
+        const nodes = parent.children;
+        const k = parent.value ? (y1 - y0) / parent.value : 0;
+        let y = y0;
+        for (const node of nodes) {
+          const h = node.value * k;
+          node.x0 = x0;
+          node.x1 = x1;
+          node.y0 = y;
+          node.y1 = y + h;
+          y = node.y1;
+        }
+      }
+
+      function layoutDice(parent, x0, y0, x1, y1) {
+        const nodes = parent.children;
+        const k = parent.value ? (x1 - x0) / parent.value : 0;
+        let x = x0;
+        for (const node of nodes) {
+          const w = node.value * k;
+          node.y0 = y0;
+          node.y1 = y1;
+          node.x0 = x;
+          node.x1 = x + w;
+          x = node.x1;
+        }
+      }
+
+      function layoutSquarify(parent, x0, y0, x1, y1, ratio) {
+        const nodes = parent.children;
+        if (!nodes.length) return;
+        const rows = [];
+        let i0 = 0;
+        let i1 = 0;
+        const n = nodes.length;
+        let value = parent.value;
+        let minValue;
+        let maxValue;
+        let nodeValue;
+        let sumValue;
+        let row;
+        let newRatio;
+        let minRatio;
+        let alpha;
+        let beta;
+
+        while (i0 < n) {
+          const dx = x1 - x0;
+          const dy = y1 - y0;
+          do {
+            sumValue = nodes[i1].value;
+            i1 += 1;
+          } while (!sumValue && i1 < n);
+          if (!sumValue) break;
+
+          minValue = maxValue = sumValue;
+          alpha = Math.max(dy / dx, dx / dy) / (value * ratio);
+          beta = sumValue * sumValue * alpha;
+          minRatio = Math.max(maxValue / beta, beta / minValue);
+
+          for (; i1 < n; ++i1) {
+            sumValue += nodeValue = nodes[i1].value;
+            if (!nodeValue) continue;
+            if (nodeValue < minValue) minValue = nodeValue;
+            if (nodeValue > maxValue) maxValue = nodeValue;
+            beta = sumValue * sumValue * alpha;
+            newRatio = Math.max(maxValue / beta, beta / minValue);
+            if (newRatio > minRatio) {
+              sumValue -= nodeValue;
+              break;
+            }
+            minRatio = newRatio;
+          }
+
+          row = {
+            value: sumValue,
+            dice: dx < dy,
+            children: nodes.slice(i0, i1),
+          };
+          if (row.dice) {
+            const y2 = value ? y0 + (dy * sumValue) / value : y1;
+            layoutDice(row, x0, y0, x1, y2);
+            y0 = y2;
+          } else {
+            const x2 = value ? x0 + (dx * sumValue) / value : x1;
+            layoutSlice(row, x0, y0, x2, y1);
+            x0 = x2;
+          }
+
+          rows.push(row);
+          value -= sumValue;
+          i0 = i1;
+        }
+      }
+
+      function hasFiniteRect(node) {
+        return (
+          node &&
+          Number.isFinite(node.x0) &&
+          Number.isFinite(node.y0) &&
+          Number.isFinite(node.x1) &&
+          Number.isFinite(node.y1)
+        );
+      }
+
+      function colorForNode(node, maxDepth) {
+        const tone = Math.floor((node.depth / Math.max(1, maxDepth)) * 70);
+        if (node.isDir) {
+          const sat = 55 + tone;
+          return `hsl(220, ${sat}%, ${42 + ((node.depth * 5) % 14)}%)`;
+        }
+        const fileTone = (n) => Math.min(18, Math.max(8, node.depth * 2));
+        const filePalette = {
+          ml: `hsl(205, ${72 + tone}%, ${50 + fileTone()}%)`,
+          mli: `hsl(224, ${66 + tone}%, ${55 + fileTone()}%)`,
+          mll: `hsl(35, ${63 + tone}%, ${54 + fileTone()}%)`,
+          mly: `hsl(44, ${60 + tone}%, ${48 + fileTone()}%)`,
+          c: `hsl(24, ${62 + tone}%, ${50 + fileTone()}%)`,
+          h: `hsl(15, ${58 + tone}%, ${55 + fileTone()}%)`,
+          cmm: `hsl(278, ${52 + tone}%, ${56 + fileTone()}%)`,
+          s: `hsl(130, ${45 + tone}%, ${43 + fileTone()}%)`,
+          asm: `hsl(9, ${54 + tone}%, ${56 + fileTone()}%)`,
+        };
+        return filePalette[node.extension] || `hsl(32, ${58 + tone}%, ${53 + ((node.depth * 3) % 9)}%)`;
+      }
+
+      function shortLabel(name, width, height) {
+        const base = String(name).replace(/^.*\//, "");
+        const slots = Math.floor((width - 8) / 6.8);
+        if (slots < 1 || height < 10 || base.length === 0) return "";
+        if (base.length <= slots) return base;
+        if (slots <= 1) return base[0];
+        if (slots === 2) return `${base[0]}…`;
+        return `${base.slice(0, Math.max(2, slots - 1))}…`;
+      }
+
+      function nodeCount(node) {
+        let count = 0;
+        if (node.depth > 0) count += 1;
+        if (!node.children) return count;
+        for (const child of node.children) {
+          count += nodeCount(child);
+        }
+        return count;
+      }
+
+      function headerRectIntersects(a, b) {
+        if (a.x1 <= b.x0 || a.x0 >= b.x1 || a.y1 <= b.y0 || a.y0 >= b.y1) return false;
+        return true;
+      }
+
+      function isNestedPath(aPath, bPath) {
+        if (!aPath || !bPath) return false;
+        return aPath === bPath || bPath.startsWith(`${aPath}/`) || aPath.startsWith(`${bPath}/`);
+      }
+
+      function hasHeaderCollision(rect, list, path) {
+        for (const item of list) {
+          if (!isNestedPath(path, item.path)) continue;
+          if (headerRectIntersects(rect, item.rect)) return true;
+        }
+        return false;
+      }
+
+      function placeDirHeader(node, baseHeight, occupied) {
+        if (!hasFiniteRect(node)) return null;
+        const width = node.x1 - node.x0;
+        const height = node.y1 - node.y0;
+        const headerHeight = Math.max(8, Math.min(baseHeight, Math.max(8, height - 3)));
+        const headerWidth = Math.max(0, width - 6);
+        const startY = node.y0 + 2;
+        const maxY = node.y1 - headerHeight - 2;
+        if (headerWidth < 4 || headerHeight < 6 || !Number.isFinite(height) || height < 1) return null;
+
+        const margin = 2;
+        if (startY > maxY) {
+          return { y0: startY };
+        }
+        for (let y = startY; y <= maxY; y += 3) {
+          const candidate = {
+            x0: node.x0 + 3 + margin,
+            x1: node.x0 + 3 + headerWidth - margin,
+            y0: y + margin,
+            y1: y + headerHeight - margin,
+          };
+          if (!hasHeaderCollision(candidate, occupied, node.path)) {
+            return { y0: y };
+          }
+        }
+        return null;
+      }
+
+      function formatBytes(bytes) {
+        if (bytes >= 1024 * 1024 * 1024) {
+          return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+        }
+        if (bytes >= 1024 * 1024) {
+          return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+        }
+        if (bytes >= 1024) {
+          return `${(bytes / 1024).toFixed(2)} KB`;
+        }
+        return `${bytes} B`;
+      }
+
+      function debounce(fn, wait) {
+        let t;
+        return () => {
+          clearTimeout(t);
+          t = setTimeout(fn, wait);
+        };
+      }
+    </script>
+  </body>
+</html>
