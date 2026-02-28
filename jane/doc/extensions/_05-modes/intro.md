@@ -170,7 +170,7 @@ even when they are nonportable.
 {: .table }
 
 Forkable is a future axis that tracks whether a function is permitted to access
-shared values in its parent stack. See [parallelism](../../parallelism/01-intro/).
+shared values in its parent stack. See [parallelism](../../parallelism/intro/).
 
 Forkable has different defaults depending on the locality axis: *global* values are
 defaulted to *forkable*, while *local* values are defaulted to *unforkable*.
