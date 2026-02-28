@@ -75,6 +75,10 @@
         font-size: 0.88rem;
       }
 
+      #fileFilter {
+        min-width: 20rem;
+      }
+
       button {
         border: 1px solid #9eb0ea;
         background: #f6f9ff;
@@ -99,6 +103,121 @@
       .diff-info {
         color: #3d4f89;
         font-size: 0.88rem;
+      }
+
+      .subtle-info {
+        color: #4f5f93;
+        font-size: 0.84rem;
+      }
+
+      .compare-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.6rem;
+        margin-top: 0.55rem;
+      }
+
+      .compare-controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.45rem;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      .mode-toggle {
+        display: inline-flex;
+        border: 1px solid #9eb0ea;
+        border-radius: 6px;
+        overflow: hidden;
+      }
+
+      .mode-btn {
+        border: 0;
+        border-right: 1px solid #9eb0ea;
+        background: #eef3ff;
+        border-radius: 0;
+        padding: 0.25rem 0.55rem;
+      }
+
+      .mode-btn:last-child {
+        border-right: 0;
+      }
+
+      .mode-btn.active {
+        background: #335fda;
+        color: #f4f7ff;
+      }
+
+      .preset-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.45rem;
+        margin-top: 0.45rem;
+      }
+
+      .preset-btn {
+        font-size: 0.8rem;
+        padding: 0.2rem 0.45rem;
+      }
+
+      .ref-picker {
+        position: fixed;
+        min-width: 320px;
+        max-width: 520px;
+        max-height: min(54vh, 420px);
+        overflow: auto;
+        z-index: 30;
+        border: 1px solid #95aae9;
+        border-radius: 8px;
+        background: #fdfdff;
+        box-shadow: 0 10px 26px rgba(12, 24, 56, 0.25);
+        padding: 0.4rem;
+      }
+
+      .picker-section {
+        margin-bottom: 0.4rem;
+      }
+
+      .picker-section:last-child {
+        margin-bottom: 0;
+      }
+
+      .picker-title {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: #4960a7;
+        padding: 0.1rem 0.25rem 0.2rem;
+      }
+
+      .picker-item {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 0.22rem 0.32rem;
+        border-radius: 4px;
+        border: 0;
+        background: transparent;
+        color: #1d2d5f;
+        font-size: 0.84rem;
+      }
+
+      .picker-item:hover,
+      .picker-item.active {
+        background: #e7eeff;
+      }
+
+      .picker-empty {
+        color: #6a769a;
+        padding: 0.26rem 0.3rem;
+        font-size: 0.82rem;
       }
 
       .breadcrumb-link {
@@ -202,53 +321,30 @@
       <h1 id="title">OxCaml Source Treemap</h1>
       <div class="toolbar">
         <div class="control">
-          <label for="vizMode">Viz</label>
-          <select id="vizMode">
-            <option value="type">Type Color</option>
-            <option value="changeBands">Change Bands</option>
-          </select>
+          <label for="fileFilter">File filter</label>
+          <input
+            id="fileFilter"
+            type="text"
+            placeholder="Fuzzy path/file filter (e.g. typsm)"
+            autocomplete="off"
+          />
         </div>
-        <div class="control">
-          <label><input id="showMl" type="checkbox" checked /> .ml</label>
-        </div>
-        <div class="control">
-          <label><input id="showMli" type="checkbox" checked /> .mli</label>
-        </div>
-        <div class="control">
-          <label><input id="showMll" type="checkbox" checked /> .mll</label>
-        </div>
-        <div class="control">
-          <label><input id="showMly" type="checkbox" checked /> .mly</label>
-        </div>
-        <div class="control">
-          <label><input id="showC" type="checkbox" checked /> .c</label>
-        </div>
-        <div class="control">
-          <label><input id="showH" type="checkbox" checked /> .h</label>
-        </div>
-        <div class="control">
-          <label><input id="showCmm" type="checkbox" checked /> .cmm</label>
-        </div>
-        <div class="control">
-          <label><input id="showS" type="checkbox" checked /> .s</label>
-        </div>
-        <div class="control">
-          <label><input id="showAsm" type="checkbox" checked /> .asm</label>
-        </div>
-        <div class="control">
-          <label for="fromRef">From</label>
-          <input id="fromRef" type="text" list="refOptions" placeholder="5.3.0" />
-        </div>
-        <div class="control">
-          <label for="toRef">To</label>
-          <input id="toRef" type="text" list="refOptions" placeholder="5.4.0" />
-        </div>
-        <div class="control">
-          <button id="applyDiff" type="button">Load Diff</button>
-        </div>
-        <div class="control diff-info" id="diffInfo"></div>
       </div>
-      <datalist id="refOptions"></datalist>
+      <div class="compare-row">
+        <div class="compare-controls">
+          <label for="fromRef">Commit</label>
+          <input id="fromRef" type="text" placeholder="5.4.0" autocomplete="off" />
+          <label for="toRef">Compare Against</label>
+          <input id="toRef" type="text" placeholder="optional (e.g. 5.3.0)" autocomplete="off" />
+          <label id="changedOnlyWrap" class="hidden" for="changedOnly">
+            <input id="changedOnly" type="checkbox" />
+            Changes only
+          </label>
+        </div>
+      </div>
+      <div id="refPicker" class="ref-picker hidden">
+        <div id="refPickerSections"></div>
+      </div>
       <div id="breadcrumbs" class="breadcrumbs" aria-label="Navigation path"></div>
     </header>
     <main>
@@ -260,43 +356,42 @@
 
     <script>
       const state = {
-        showMl: true,
-        showMli: true,
-        showMll: true,
-        showMly: true,
-        showC: true,
-        showH: true,
-        showCmm: true,
-        showS: true,
-        showAsm: true,
+        fileFilter: "",
+        changedOnly: false,
         vizMode: "type",
         rawRows: [],
         diffMeta: null,
+        lastLoadMeta: null,
         apiAvailable: false,
         apiRefs: [],
+        apiRefsPayload: null,
+        refCatalog: {
+          releases: [],
+          tags: [],
+          branches: [],
+          recent: [],
+        },
+        picker: {
+          inputId: "",
+          activeIndex: -1,
+          items: [],
+        },
         drillRootPath: "",
         treeCache: null,
         treeCacheKey: "",
         typingSummaries: new Map(),
+        visibleFileCount: 0,
       };
 
       const controls = {
         title: document.getElementById("title"),
-        vizMode: document.getElementById("vizMode"),
-        showMl: document.getElementById("showMl"),
-        showMli: document.getElementById("showMli"),
-        showMll: document.getElementById("showMll"),
-        showMly: document.getElementById("showMly"),
-        showC: document.getElementById("showC"),
-        showH: document.getElementById("showH"),
-        showCmm: document.getElementById("showCmm"),
-        showS: document.getElementById("showS"),
-        showAsm: document.getElementById("showAsm"),
+        fileFilter: document.getElementById("fileFilter"),
+        changedOnly: document.getElementById("changedOnly"),
+        changedOnlyWrap: document.getElementById("changedOnlyWrap"),
         fromRef: document.getElementById("fromRef"),
         toRef: document.getElementById("toRef"),
-        applyDiff: document.getElementById("applyDiff"),
-        refOptions: document.getElementById("refOptions"),
-        diffInfo: document.getElementById("diffInfo"),
+        refPicker: document.getElementById("refPicker"),
+        refPickerSections: document.getElementById("refPickerSections"),
         breadcrumbs: document.getElementById("breadcrumbs"),
         tooltip: document.getElementById("tooltip"),
       };
@@ -305,81 +400,69 @@
       const wrap = document.getElementById("chart-wrap");
       const queryParams = new URLSearchParams(window.location.search);
       const githubRepo = queryParams.get("githubRepo") || "https://github.com/oxcaml/oxcaml";
+      const githubRepoBase = githubRepo.replace(/\/+$/, "");
       const githubBranch = queryParams.get("githubBranch") || queryParams.get("branch") || "main";
       const phi = (1 + Math.sqrt(5)) / 2;
       const padding = 1.8;
+      const autoMainBaseValue = "__AUTO_MAIN_BASE__";
       const rerenderQueued = debounce(() => {
         renderTreemap();
       }, 70);
 
-      controls.vizMode.addEventListener("change", () => {
-        state.vizMode = controls.vizMode.value === "changeBands" ? "changeBands" : "type";
-        rerenderQueued();
-      });
-
-      controls.applyDiff.addEventListener("click", () => {
+      const autoLoadQueued = debounce(() => {
         loadSelectedDiffFromApi();
+      }, 220);
+
+      const pickerInputIds = ["fromRef", "toRef"];
+      for (const id of pickerInputIds) {
+        const input = controls[id];
+        input.addEventListener("focus", () => {
+          openRefPicker(id);
+        });
+        input.addEventListener("input", () => {
+          openRefPicker(id);
+        });
+        input.addEventListener("change", () => {
+          autoLoadQueued();
+        });
+        input.addEventListener("keydown", (event) => {
+          const hadActivePickerItem =
+            !controls.refPicker.classList.contains("hidden") && state.picker.activeIndex >= 0;
+          handlePickerKeydown(event);
+          if (event.key === "Enter" && !hadActivePickerItem) {
+            autoLoadQueued();
+          }
+        });
+      }
+
+      document.addEventListener("mousedown", (event) => {
+        if (!controls.refPicker || controls.refPicker.classList.contains("hidden")) return;
+        const target = event.target;
+        if (!(target instanceof Node)) return;
+        const currentInput = controls[state.picker.inputId];
+        if (controls.refPicker.contains(target)) return;
+        if (currentInput && currentInput.contains && currentInput.contains(target)) return;
+        closeRefPicker();
       });
 
-      controls.showMl.addEventListener("change", () => {
-        state.showMl = controls.showMl.checked;
-        state.treeCacheKey = "";
+      controls.fileFilter.addEventListener("input", () => {
+        state.fileFilter = controls.fileFilter.value || "";
         rerenderQueued();
       });
 
-      controls.showMli.addEventListener("change", () => {
-        state.showMli = controls.showMli.checked;
-        state.treeCacheKey = "";
+      controls.changedOnly.addEventListener("change", () => {
+        state.changedOnly = !!controls.changedOnly.checked;
         rerenderQueued();
       });
 
-      controls.showMll.addEventListener("change", () => {
-        state.showMll = controls.showMll.checked;
-        state.treeCacheKey = "";
-        rerenderQueued();
-      });
-
-      controls.showMly.addEventListener("change", () => {
-        state.showMly = controls.showMly.checked;
-        state.treeCacheKey = "";
-        rerenderQueued();
-      });
-
-      controls.showC.addEventListener("change", () => {
-        state.showC = controls.showC.checked;
-        state.treeCacheKey = "";
-        rerenderQueued();
-      });
-
-      controls.showH.addEventListener("change", () => {
-        state.showH = controls.showH.checked;
-        state.treeCacheKey = "";
-        rerenderQueued();
-      });
-
-      controls.showCmm.addEventListener("change", () => {
-        state.showCmm = controls.showCmm.checked;
-        state.treeCacheKey = "";
-        rerenderQueued();
-      });
-
-      controls.showS.addEventListener("change", () => {
-        state.showS = controls.showS.checked;
-        state.treeCacheKey = "";
-        rerenderQueued();
-      });
-
-      controls.showAsm.addEventListener("change", () => {
-        state.showAsm = controls.showAsm.checked;
-        state.treeCacheKey = "";
-        rerenderQueued();
-      });
-
-      window.addEventListener("resize", debounce(renderTreemap, 120));
+      window.addEventListener("resize", debounce(() => {
+        closeRefPicker();
+        renderTreemap();
+      }, 120));
 
       (async function init() {
         const cacheToken = `v=${Date.now()}`;
-        controls.applyDiff.disabled = true;
+        disableLoadControls(true);
         let treemapPayload = null;
         const typingSummaryPromise = fetch(`source-treemap-typing-summaries.json?${cacheToken}`, { cache: "no-store" })
           .then((response) => response.json())
@@ -391,18 +474,17 @@
         if (refsPayload && Array.isArray(refsPayload.refs)) {
           state.apiAvailable = true;
           state.apiRefs = refsPayload.refs.slice();
-          populateRefOptions(state.apiRefs);
-          const initialFrom = queryParams.get("from") || refsPayload.defaultFrom || "5.3.0";
-          const initialTo = queryParams.get("to") || refsPayload.defaultTo || "5.4.0";
-          controls.fromRef.value = initialFrom;
-          controls.toRef.value = initialTo;
-          treemapPayload = await fetchJsonMaybe(
-            `/api/diff?from=${encodeURIComponent(initialFrom)}&to=${encodeURIComponent(initialTo)}&sizeBasis=max&${cacheToken}`
-          );
-          controls.applyDiff.disabled = false;
+          state.apiRefsPayload = refsPayload;
+          state.refCatalog = buildRefCatalog(refsPayload);
+          applyInitialSelection(refsPayload);
+          const selection = buildDiffSelection();
+          if (selection) {
+            treemapPayload = await fetchPayloadForSelection(selection, cacheToken);
+            state.vizMode = selection.secondary ? "changeBands" : "type";
+          }
+          disableLoadControls(false);
         } else {
-          controls.fromRef.disabled = true;
-          controls.toRef.disabled = true;
+          disableLoadControls(true);
         }
 
         if (!treemapPayload) {
@@ -411,24 +493,14 @@
 
         const typingSummaryPayload = await typingSummaryPromise;
         state.diffMeta = extractTreemapMeta(treemapPayload);
+        state.lastLoadMeta = state.diffMeta;
         state.rawRows = parseTreemapRows(treemapPayload);
         loadTypingSummaries(typingSummaryPayload);
         renderTreemap();
+        updateLoadStatus();
       })();
 
       function buildTree() {
-        const extensionEnabled = {
-          ml: state.showMl,
-          mli: state.showMli,
-          mll: state.showMll,
-          mly: state.showMly,
-          c: state.showC,
-          h: state.showH,
-          cmm: state.showCmm,
-          s: state.showS,
-          asm: state.showAsm,
-        };
-
         const root = {
           name: "source",
           path: "",
@@ -447,14 +519,18 @@
           const rowBytes = row.bytes;
           const rowExt = row.extension;
           if (!isTrackableSourcePath(rowPath)) return;
-          if (!extensionEnabled[rowExt]) return;
-          const bytes = Number(rowBytes);
-          if (!Number.isFinite(bytes) || bytes <= 0) return;
+          if (!matchesFileFilter(rowPath, state.fileFilter)) return;
           const addedLines = Math.max(0, Number(row.addedLines) || 0);
           const deletedLines = Math.max(0, Number(row.deletedLines) || 0);
           const oldLinesBefore = Math.max(0, Number(row.oldLinesBefore) || 0);
           const hasDiff = !!row.hasDiff;
           const changeStatus = String(row.changeStatus || "unchanged");
+          if (state.changedOnly && isComparisonMode() && !rowHasDiffChange(row)) return;
+          const useDiffSizedLayout = state.changedOnly && isComparisonMode();
+          const bytes = useDiffSizedLayout
+            ? addedLines + deletedLines
+            : Number(rowBytes);
+          if (!Number.isFinite(bytes) || bytes <= 0) return;
           const bytesBefore = Math.max(0, Number(row.bytesBefore) || 0);
           const bytesAfter = Math.max(0, Number(row.bytesAfter) || 0);
 
@@ -613,38 +689,273 @@
         }
       }
 
-      function populateRefOptions(refs) {
-        if (!controls.refOptions) return;
-        controls.refOptions.innerHTML = "";
-        const uniqueRefs = Array.from(new Set((refs || []).filter(Boolean))).slice(0, 400);
-        for (const refName of uniqueRefs) {
-          const option = document.createElement("option");
-          option.value = refName;
-          controls.refOptions.appendChild(option);
+      function disableLoadControls(disabled) {
+        controls.fromRef.disabled = disabled;
+        controls.toRef.disabled = disabled;
+      }
+
+      function isReleaseTag(refName) {
+        return /^\d+\.\d+\.\d+$/.test(String(refName || ""));
+      }
+
+      function buildRefCatalog(payload) {
+        const tags = Array.isArray(payload.tags) ? payload.tags : [];
+        const branches = Array.isArray(payload.branches) ? payload.branches : [];
+        const recent = Array.isArray(payload.recentCommits) ? payload.recentCommits : [];
+        const releases = tags.filter(isReleaseTag).slice(0, 40);
+        const otherTags = tags.filter((tag) => !isReleaseTag(tag)).slice(0, 200);
+        return {
+          releases,
+          tags: otherTags,
+          branches: branches.slice(0, 120),
+          recent: recent.slice(0, 120),
+        };
+      }
+
+      function applyInitialSelection(refsPayload) {
+        const defaultTo = refsPayload.defaultTo || "5.4.0";
+        const defaultFrom = refsPayload.defaultFrom || "5.3.0";
+        const primary = queryParams.get("primary") || queryParams.get("to") || defaultTo;
+        const secondary = queryParams.get("secondary") || queryParams.get("from") || "";
+        controls.fromRef.value = primary;
+        controls.toRef.value = secondary;
+      }
+
+      function buildDiffSelection() {
+        const primary = String(controls.fromRef.value || "").trim();
+        const secondary = String(controls.toRef.value || "").trim();
+        if (!primary) return null;
+        return {
+          primary,
+          secondary,
+        };
+      }
+
+      function updateQueryForSelection(selection) {
+        const params = new URLSearchParams(window.location.search);
+        params.set("primary", selection.primary);
+        if (selection.secondary) params.set("secondary", selection.secondary);
+        else params.delete("secondary");
+        params.delete("mode");
+        params.delete("from");
+        params.delete("to");
+        params.delete("commit");
+        params.delete("baseline");
+        params.delete("parent");
+        params.delete("singleFrom");
+        const next = `${window.location.pathname}?${params.toString()}`;
+        window.history.replaceState(null, "", next);
+      }
+
+      async function fetchPayloadForSelection(selection, cacheToken) {
+        const token = cacheToken || `v=${Date.now()}`;
+        if (!selection.secondary) {
+          return fetchJsonMaybe(
+            `/api/tree?ref=${encodeURIComponent(selection.primary)}&${token}`
+          );
         }
+        return fetchJsonMaybe(
+          `/api/diff?from=${encodeURIComponent(selection.secondary)}&to=${encodeURIComponent(selection.primary)}&sizeBasis=max&${token}`
+        );
       }
 
       async function loadSelectedDiffFromApi() {
         if (!state.apiAvailable) return;
-        const from = String(controls.fromRef.value || "").trim();
-        const to = String(controls.toRef.value || "").trim();
-        if (!from || !to) return;
-        controls.applyDiff.disabled = true;
+        const selection = buildDiffSelection();
+        if (!selection) return;
+        closeRefPicker();
         try {
-          const payload = await fetchJsonStrict(
-            `/api/diff?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&sizeBasis=max&v=${Date.now()}`
-          );
+          const payload = await fetchPayloadForSelection(selection);
+          if (!payload) {
+            console.warn(`Load failed for selection: ${selection.primary}${selection.secondary ? ` vs ${selection.secondary}` : ""}`);
+            return;
+          }
           state.diffMeta = extractTreemapMeta(payload);
+          state.lastLoadMeta = state.diffMeta;
           state.rawRows = parseTreemapRows(payload);
           state.treeCache = null;
           state.treeCacheKey = "";
+          state.vizMode = selection.secondary ? "changeBands" : "type";
+          updateQueryForSelection(selection);
           renderTreemap();
+          updateLoadStatus();
         } catch (error) {
-          controls.diffInfo.textContent = `Diff load failed: ${from} -> ${to}`;
           console.error(error);
-        } finally {
-          controls.applyDiff.disabled = false;
         }
+      }
+
+      function buildPickerSections(inputId, queryText) {
+        const q = String(queryText || "").trim().toLowerCase();
+        const sections = [];
+        const catalog = state.refCatalog;
+        const byQuery = (value) => !q || value.toLowerCase().includes(q);
+        if (inputId === "toRef") {
+          const primary = String(controls.fromRef.value || "").trim();
+          if (primary) {
+            sections.push({
+              title: "Suggested",
+              items: [{
+                value: autoMainBaseValue,
+                label: "Auto: branch point",
+                kind: "autoMainBase",
+              }],
+            });
+          }
+        }
+
+        const releases = (catalog.releases || []).filter(byQuery).slice(0, 50).map((value) => {
+          return { value, label: value };
+        });
+        const tags = (catalog.tags || []).filter(byQuery).slice(0, 80).map((value) => {
+          return { value, label: value };
+        });
+        const branches = (catalog.branches || []).filter(byQuery).slice(0, 80).map((value) => {
+          return { value, label: value };
+        });
+        const recent = (catalog.recent || []).filter((item) => {
+          const value = String(item && item.ref ? item.ref : "");
+          const subject = String(item && item.subject ? item.subject : "");
+          if (!q) return true;
+          return value.toLowerCase().includes(q) || subject.toLowerCase().includes(q);
+        }).slice(0, 70).map((item) => {
+          const sha = String(item.ref || "");
+          const subject = String(item.subject || "");
+          const short = sha.slice(0, 10);
+          return {
+            value: sha,
+            label: subject ? `${short} ${subject}` : short,
+          };
+        });
+
+        if (releases.length) sections.push({ title: "Releases", items: releases });
+        if (branches.length) sections.push({ title: "Branches", items: branches });
+        if (tags.length) sections.push({ title: "Tags", items: tags });
+        if (recent.length) sections.push({ title: "Recent", items: recent });
+        return sections;
+      }
+
+      function openRefPicker(inputId) {
+        if (!state.apiAvailable) return;
+        const input = controls[inputId];
+        if (!input || input.disabled) return;
+        state.picker.inputId = inputId;
+        const sections = buildPickerSections(inputId, input.value);
+        state.picker.items = [];
+        state.picker.activeIndex = -1;
+        controls.refPickerSections.innerHTML = "";
+        for (const section of sections) {
+          const sectionEl = document.createElement("div");
+          sectionEl.className = "picker-section";
+          const titleEl = document.createElement("div");
+          titleEl.className = "picker-title";
+          titleEl.textContent = section.title;
+          sectionEl.appendChild(titleEl);
+          for (const item of section.items) {
+            const index = state.picker.items.length;
+            state.picker.items.push(item);
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "picker-item";
+            button.textContent = item.label;
+            button.dataset.pickerIndex = String(index);
+            button.addEventListener("mousedown", (event) => {
+              event.preventDefault();
+            });
+            button.addEventListener("click", () => {
+              applyPickerItem(index);
+            });
+            sectionEl.appendChild(button);
+          }
+          controls.refPickerSections.appendChild(sectionEl);
+        }
+        if (state.picker.items.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "picker-empty";
+          empty.textContent = "No matching refs";
+          controls.refPickerSections.appendChild(empty);
+        }
+        const rect = input.getBoundingClientRect();
+        controls.refPicker.style.left = `${Math.round(rect.left)}px`;
+        controls.refPicker.style.top = `${Math.round(rect.bottom + 6)}px`;
+        controls.refPicker.style.minWidth = `${Math.max(280, Math.round(rect.width + 80))}px`;
+        controls.refPicker.classList.remove("hidden");
+      }
+
+      function closeRefPicker() {
+        controls.refPicker.classList.add("hidden");
+        state.picker.inputId = "";
+        state.picker.activeIndex = -1;
+        state.picker.items = [];
+      }
+
+      async function resolveAutoMainBase(primaryRef) {
+        const ref = String(primaryRef || "").trim();
+        if (!ref) return "";
+        const token = `v=${Date.now()}`;
+        const payload = await fetchJsonMaybe(
+          `/api/merge-base?ref=${encodeURIComponent(ref)}&target=${encodeURIComponent("origin/main")}&${token}`
+        );
+        if (!payload || !payload.mergeBase) return "";
+        return String(payload.mergeBase);
+      }
+
+      async function applyPickerItem(index) {
+        if (!Number.isFinite(index) || index < 0 || index >= state.picker.items.length) return;
+        const input = controls[state.picker.inputId];
+        if (!input) return;
+        const selected = state.picker.items[index];
+        if (selected && selected.kind === "autoMainBase" && state.picker.inputId === "toRef") {
+          const resolved = await resolveAutoMainBase(controls.fromRef.value);
+          if (!resolved) {
+            console.warn("Auto branch-point lookup failed. Restart treemap-live-server to enable /api/merge-base.");
+            closeRefPicker();
+            return;
+          }
+          input.value = resolved;
+        } else {
+          input.value = selected.value;
+        }
+        closeRefPicker();
+        loadSelectedDiffFromApi();
+      }
+
+      function handlePickerKeydown(event) {
+        if (controls.refPicker.classList.contains("hidden")) return;
+        if (!state.picker.items.length) return;
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          state.picker.activeIndex = (state.picker.activeIndex + 1) % state.picker.items.length;
+          updatePickerActiveItem();
+          return;
+        }
+        if (event.key === "ArrowUp") {
+          event.preventDefault();
+          state.picker.activeIndex = (state.picker.activeIndex - 1 + state.picker.items.length) % state.picker.items.length;
+          updatePickerActiveItem();
+          return;
+        }
+        if (event.key === "Enter") {
+          if (state.picker.activeIndex >= 0) {
+            event.preventDefault();
+            applyPickerItem(state.picker.activeIndex);
+          }
+          return;
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          closeRefPicker();
+        }
+      }
+
+      function updatePickerActiveItem() {
+        const buttons = controls.refPickerSections.querySelectorAll(".picker-item");
+        buttons.forEach((button) => {
+          const idx = Number(button.getAttribute("data-picker-index"));
+          button.classList.toggle("active", idx === state.picker.activeIndex);
+          if (idx === state.picker.activeIndex) {
+            button.scrollIntoView({ block: "nearest" });
+          }
+        });
       }
 
       function iterateDataRows(fn) {
@@ -701,12 +1012,61 @@
         return !path.startsWith("_install/") && !path.startsWith("/_install/");
       }
 
+      function normalizeFilterQuery(value) {
+        return String(value || "").trim().toLowerCase().replace(/\s+/g, "");
+      }
+
+      function fuzzySubsequenceMatch(textValue, queryValue) {
+        const text = String(textValue || "");
+        const query = String(queryValue || "");
+        if (!query) return true;
+        let q = 0;
+        for (let i = 0; i < text.length && q < query.length; i++) {
+          if (text[i] === query[q]) q += 1;
+        }
+        return q === query.length;
+      }
+
+      function matchesFileFilter(pathValue, queryValue) {
+        const path = String(pathValue || "").toLowerCase();
+        const query = normalizeFilterQuery(queryValue);
+        if (!query) return true;
+        const compactPath = path.replace(/\s+/g, "");
+        if (fuzzySubsequenceMatch(compactPath, query)) return true;
+        const basename = compactPath.slice(compactPath.lastIndexOf("/") + 1);
+        return fuzzySubsequenceMatch(basename, query);
+      }
+
+      function isComparisonMode() {
+        return state.vizMode === "changeBands";
+      }
+
+      function rowHasDiffChange(row) {
+        if (!row) return false;
+        const added = Math.max(0, Number(row.addedLines) || 0);
+        const deleted = Math.max(0, Number(row.deletedLines) || 0);
+        if (added + deleted > 0) return true;
+        const status = String(row.changeStatus || "");
+        return status === "added" || status === "deleted" || status === "modified";
+      }
+
+      function updateChangedOnlyVisibility() {
+        const show = isComparisonMode();
+        controls.changedOnlyWrap.classList.toggle("hidden", !show);
+        controls.changedOnly.disabled = !show;
+      }
+
       function renderTreemap() {
         const hasData = hasRows(state.rawRows);
         if (!hasData) {
           return;
         }
-        const filterKey = `${state.showMl ? 1 : 0}|${state.showMli ? 1 : 0}|${state.showMll ? 1 : 0}|${state.showMly ? 1 : 0}|${state.showC ? 1 : 0}|${state.showH ? 1 : 0}|${state.showCmm ? 1 : 0}|${state.showS ? 1 : 0}|${state.showAsm ? 1 : 0}`;
+        updateChangedOnlyVisibility();
+        const filterKey = [
+          normalizeFilterQuery(state.fileFilter),
+          state.changedOnly && isComparisonMode() ? "changed" : "all",
+          state.vizMode,
+        ].join("|");
         if (!state.treeCache || state.treeCacheKey !== filterKey) {
           state.treeCache = buildTree();
           state.treeCacheKey = filterKey;
@@ -719,11 +1079,13 @@
         svg.setAttribute("height", h);
         const displayRoot = getDisplayRoot(root);
         const visibleFileCount = nodeCount(displayRoot);
+        state.visibleFileCount = visibleFileCount;
 
         clearSvg();
         layoutNode(displayRoot, 0, 0, w, h, 0);
         controls.title.textContent = `OxCaml Source Treemap (${visibleFileCount} files)`;
         updateDiffInfo();
+        updateLoadStatus();
         renderBreadcrumbs(state.drillRootPath);
 
         const nodes = [];
@@ -959,16 +1321,72 @@
         return !!(node && !node.isDir && typeof node.path === "string" && node.path.startsWith("typing/"));
       }
 
-      function openSourceFile(node) {
+      function nodeHasDiffChange(node) {
+        if (!node || node.isDir) return false;
+        const added = Math.max(0, Number(node.addedLines) || 0);
+        const deleted = Math.max(0, Number(node.deletedLines) || 0);
+        if (added + deleted > 0) return true;
+        const status = String(node.changeStatus || "");
+        return status === "added" || status === "deleted" || status === "modified";
+      }
+
+      async function sha256Hex(text) {
+        const bytes = new TextEncoder().encode(String(text || ""));
+        const digest = await crypto.subtle.digest("SHA-256", bytes);
+        const hash = Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("");
+        return hash;
+      }
+
+      function openExternalUrl(url) {
+        const popup = window.open("", "_blank");
+        if (!popup) return null;
+        try {
+          popup.opener = null;
+        } catch (_err) {
+        }
+        popup.location.href = url;
+        return popup;
+      }
+
+      async function openSourceFile(node) {
         if (!node || node.isDir) return;
-        const path = String(node.path || "").trim();
-        if (!path) return;
-        const encodedPath = path
+        const filePath = String(node.path || "").trim();
+        if (!filePath) return;
+        const encodedPath = filePath
           .split("/")
           .map((segment) => encodeURIComponent(segment))
           .join("/");
-        const fileUrl = `${githubRepo}/blob/${githubBranch}/${encodedPath}`;
-        window.open(fileUrl, "_blank", "noopener,noreferrer");
+        const meta = state.diffMeta || {};
+        const diff = meta.diff || null;
+        const tree = meta.tree || null;
+
+        if (diff && !tree) {
+          const fromRef = String(diff.fromResolved || diff.from || "").trim();
+          const toRef = String(diff.toResolved || diff.to || "").trim();
+          if (fromRef && toRef) {
+            if (!nodeHasDiffChange(node)) {
+              const unchangedUrl = `${githubRepoBase}/blob/${encodeURIComponent(toRef)}/${encodedPath}`;
+              openExternalUrl(unchangedUrl);
+              return;
+            }
+            const compareBaseUrl =
+              `${githubRepoBase}/compare/${encodeURIComponent(fromRef)}...${encodeURIComponent(toRef)}`;
+            const popup = openExternalUrl(compareBaseUrl);
+            if (popup && window.crypto && window.crypto.subtle) {
+              try {
+                const hash = await sha256Hex(filePath);
+                popup.location.replace(`${compareBaseUrl}#diff-${hash}`);
+              } catch (_err) {
+              }
+            }
+            return;
+          }
+        }
+
+        const treeRef = tree ? String(tree.resolved || tree.ref || "").trim() : "";
+        const targetRef = treeRef || githubBranch;
+        const fileUrl = `${githubRepoBase}/blob/${encodeURIComponent(targetRef)}/${encodedPath}`;
+        openExternalUrl(fileUrl);
       }
 
       function loadTypingSummaries(payload) {
@@ -1020,11 +1438,11 @@ ${summary.oneLine}
 
 ${summary.paragraph}
 
-${kind} · ${formatBytes(node.value)}
+${kind} · ${formatNodeMagnitude(node)}
 ${changeSummary ? `${changeSummary}\n` : ""}Path: ${location}`;
         }
         return `${node.name}
-${kind} · ${formatBytes(node.value)}
+${kind} · ${formatNodeMagnitude(node)}
 ${changeSummary ? `${changeSummary}\n` : ""}Path: ${location}`;
       }
 
@@ -1040,9 +1458,20 @@ ${changeSummary ? `${changeSummary}\n` : ""}Path: ${location}`;
         return Number(value || 0).toLocaleString();
       }
 
-      function deriveChangeBandFractions(node) {
+      function formatNodeMagnitude(node) {
+        if (state.changedOnly && isComparisonMode()) {
+          const added = Math.max(0, Number(node && node.addedLines) || 0);
+          const deleted = Math.max(0, Number(node && node.deletedLines) || 0);
+          return `${formatCount(added + deleted)} changed lines`;
+        }
+        return formatBytes(node.value);
+      }
+
+      function deriveChangeBandFractions(node, diffOnly) {
         if (!node || node.isDir || !node.hasDiff) {
-          return { addFrac: 0, delFrac: 0, keepFrac: 1 };
+          return diffOnly
+            ? { addFrac: 0, delFrac: 0, keepFrac: 0 }
+            : { addFrac: 0, delFrac: 0, keepFrac: 1 };
         }
         const status = String(node.changeStatus || "modified");
         const added = Math.max(0, Number(node.addedLines) || 0);
@@ -1054,18 +1483,31 @@ ${changeSummary ? `${changeSummary}\n` : ""}Path: ${location}`;
           return { addFrac: 0, delFrac: 1, keepFrac: 0 };
         }
         if (added === 0 && deleted === 0) {
-          return { addFrac: 0, delFrac: 0, keepFrac: 1 };
+          return diffOnly
+            ? { addFrac: 0, delFrac: 0, keepFrac: 0 }
+            : { addFrac: 0, delFrac: 0, keepFrac: 1 };
         }
-        const oldLines = Math.max(deleted, Number(node.oldLinesBefore) || 0);
-        const unchanged = Math.max(0, oldLines - deleted);
-        const total = added + deleted + unchanged;
+        if (!diffOnly) {
+          const oldLines = Math.max(deleted, Number(node.oldLinesBefore) || 0);
+          const unchanged = Math.max(0, oldLines - deleted);
+          const total = added + deleted + unchanged;
+          if (!Number.isFinite(total) || total <= 0) {
+            return { addFrac: 0, delFrac: 0, keepFrac: 1 };
+          }
+          return {
+            addFrac: added / total,
+            delFrac: deleted / total,
+            keepFrac: unchanged / total,
+          };
+        }
+        const total = added + deleted;
         if (!Number.isFinite(total) || total <= 0) {
-          return { addFrac: 0, delFrac: 0, keepFrac: 1 };
+          return { addFrac: 0, delFrac: 0, keepFrac: 0 };
         }
         return {
           addFrac: added / total,
           delFrac: deleted / total,
-          keepFrac: unchanged / total,
+          keepFrac: 0,
         };
       }
 
@@ -1073,11 +1515,13 @@ ${changeSummary ? `${changeSummary}\n` : ""}Path: ${location}`;
         const width = Math.max(0, node.x1 - node.x0);
         const height = Math.max(0, node.y1 - node.y0);
         if (width <= 0 || height <= 0) return;
-        const { addFrac, delFrac } = deriveChangeBandFractions(node);
+        const diffOnly = state.changedOnly && isComparisonMode();
+        const { addFrac, delFrac, keepFrac } = deriveChangeBandFractions(node, diffOnly);
         const addedLines = Math.max(0, Number(node.addedLines) || 0);
         const deletedLines = Math.max(0, Number(node.deletedLines) || 0);
         let greenH = height * addFrac;
         let redH = height * delFrac;
+        let middleH = height * keepFrac;
         const minBandPx = height >= 10 ? 1.4 : height >= 6 ? 1 : 0.6;
         if (addedLines > 0 && addFrac < 1) {
           greenH = Math.max(greenH, minBandPx);
@@ -1085,15 +1529,25 @@ ${changeSummary ? `${changeSummary}\n` : ""}Path: ${location}`;
         if (deletedLines > 0 && delFrac < 1) {
           redH = Math.max(redH, minBandPx);
         }
-        const coloredTotal = greenH + redH;
-        if (coloredTotal > height && coloredTotal > 0) {
-          const shrink = height / coloredTotal;
+        if (diffOnly) {
+          middleH = 0;
+          const coloredTotal = greenH + redH;
+          if (coloredTotal > 0) {
+            const stretch = height / coloredTotal;
+            greenH *= stretch;
+            redH *= stretch;
+          }
+        } else {
+          middleH = Math.max(0, height - greenH - redH);
+        }
+        const totalH = middleH + greenH + redH;
+        if (totalH > height && totalH > 0) {
+          const shrink = height / totalH;
+          middleH *= shrink;
           greenH *= shrink;
           redH *= shrink;
         }
-        const middleH = Math.max(0, height - greenH - redH);
-
-        if (middleH > 0.2) {
+        if (!diffOnly && middleH > 0.2) {
           const unchangedRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
           unchangedRect.setAttribute("x", String(node.x0));
           unchangedRect.setAttribute("y", String(node.y0));
@@ -1133,15 +1587,48 @@ ${changeSummary ? `${changeSummary}\n` : ""}Path: ${location}`;
 
       function updateDiffInfo() {
         if (!controls.diffInfo) return;
-        const diff = state.diffMeta && state.diffMeta.diff;
+        const meta = state.diffMeta || {};
+        const diff = meta.diff;
+        const tree = meta.tree;
+        if (tree) {
+          const ref = tree.ref || tree.resolved || String(controls.fromRef.value || "").trim() || "unknown";
+          controls.diffInfo.textContent = `Showing commit: ${ref}`;
+          return;
+        }
         if (diff) {
           const from = diff.from || "unknown";
           const to = diff.to || "unknown";
-          const basis = diff.sizeBasis ? `, size=${diff.sizeBasis}` : "";
-          controls.diffInfo.textContent = `Diff: ${from} -> ${to}${basis}`;
+          controls.diffInfo.textContent = `Comparing: ${to} against ${from}`;
           return;
         }
-        controls.diffInfo.textContent = "Diff: current working tree";
+        controls.diffInfo.textContent = "Showing: current workspace snapshot";
+      }
+
+      function updateLoadStatus() {
+        if (!controls.loadStatus) return;
+        const meta = state.lastLoadMeta;
+        const stats = meta && meta.stats ? meta.stats : null;
+        if (!stats) {
+          controls.loadStatus.textContent = "";
+          return;
+        }
+        const rowsNum = Number(stats.rows || 0);
+        const rows = rowsNum.toLocaleString();
+        const visibleNum = Number(state.visibleFileCount || 0);
+        const visible = visibleNum.toLocaleString();
+        const buildMs = Number(stats.buildMs || 0);
+        if (Number.isFinite(Number(stats.changedFiles))) {
+          const changed = Number(stats.changedFiles || 0).toLocaleString();
+          controls.loadStatus.textContent =
+            rowsNum === visibleNum
+              ? `Changed files: ${changed} / ${rows}, build: ${buildMs} ms`
+              : `Changed files: ${changed} / ${rows}, shown: ${visible}, build: ${buildMs} ms`;
+          return;
+        }
+        controls.loadStatus.textContent =
+          rowsNum === visibleNum
+            ? `Files: ${rows}, build: ${buildMs} ms`
+            : `Files: ${visible} shown (${rows} loaded), build: ${buildMs} ms`;
       }
 
       function hideTooltip() {
@@ -1165,6 +1652,7 @@ ${changeSummary ? `${changeSummary}\n` : ""}Path: ${location}`;
         const width = node.x1 - node.x0;
         const height = node.y1 - node.y0;
         if (width < 44 || height < 18) return false;
+        if (state.changedOnly && isComparisonMode()) return true;
         return node.value >= 2500;
       }
 
@@ -1400,7 +1888,7 @@ ${changeSummary ? `${changeSummary}\n` : ""}Path: ${location}`;
 
       function nodeCount(node) {
         let count = 0;
-        if (node.depth > 0) count += 1;
+        if (node.depth > 0 && !node.isDir) count += 1;
         if (!node.children) return count;
         for (const child of node.children) {
           count += nodeCount(child);

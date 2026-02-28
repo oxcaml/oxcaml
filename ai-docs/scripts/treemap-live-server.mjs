@@ -36,6 +36,7 @@ if (!fs.existsSync(webRoot) || !fs.statSync(webRoot).isDirectory()) {
 }
 
 const treeCache = new Map();
+const treeRowsCache = new Map();
 const diffCache = new Map();
 const lineCountCache = new Map();
 let refsCache = null;
@@ -45,6 +46,29 @@ const server = http.createServer((req, res) => {
     const requestUrl = new URL(req.url || "/", `http://${req.headers.host || `${host}:${port}`}`);
     if (requestUrl.pathname === "/api/refs") {
       const payload = getRefsPayload();
+      sendJson(res, 200, payload);
+      return;
+    }
+    if (requestUrl.pathname === "/api/tree") {
+      const refName = requestUrl.searchParams.get("ref") || defaultTo;
+      const payload = buildTreePayload(refName);
+      sendJson(res, 200, payload);
+      return;
+    }
+    if (requestUrl.pathname === "/api/parents") {
+      const refName = requestUrl.searchParams.get("ref") || "HEAD";
+      const payload = getParentsPayload(refName);
+      sendJson(res, 200, payload);
+      return;
+    }
+    if (requestUrl.pathname === "/api/merge-base") {
+      const refName = requestUrl.searchParams.get("ref") || "";
+      const targetName = requestUrl.searchParams.get("target") || "origin/main";
+      if (!String(refName).trim()) {
+        sendJson(res, 400, { error: "Missing ref query parameter" });
+        return;
+      }
+      const payload = getMergeBasePayload(refName, targetName);
       sendJson(res, 200, payload);
       return;
     }
@@ -162,6 +186,30 @@ function getTreeForCommit(commitSha) {
   const tree = parseLsTreeRows(gitText(["ls-tree", "-r", "-l", commitSha]));
   treeCache.set(commitSha, tree);
   return tree;
+}
+
+function getTreeRowsForCommit(commitSha) {
+  const cached = treeRowsCache.get(commitSha);
+  if (cached) return cached;
+  const tree = getTreeForCommit(commitSha);
+  const rows = [];
+  for (const [filePath, info] of tree) {
+    rows.push({
+      path: filePath,
+      bytes: info.bytes,
+      bytesBefore: info.bytes,
+      bytesAfter: info.bytes,
+      extension: info.extension,
+      hasDiff: false,
+      changeStatus: "present",
+      addedLines: 0,
+      deletedLines: 0,
+      oldLinesBefore: 0,
+    });
+  }
+  rows.sort((a, b) => a.path.localeCompare(b.path));
+  treeRowsCache.set(commitSha, rows);
+  return rows;
 }
 
 function parseNumstat(output) {
@@ -337,15 +385,51 @@ function buildDiffPayload(fromRef, toRef, sizeBasis) {
   return payload;
 }
 
+function buildTreePayload(refName) {
+  const resolved = resolveCommit(refName);
+  const t0 = Date.now();
+  const rows = getTreeRowsForCommit(resolved);
+  return {
+    meta: {
+      generatedAt: new Date().toISOString(),
+      tree: {
+        ref: String(refName),
+        resolved,
+      },
+      stats: {
+        rows: rows.length,
+        buildMs: Date.now() - t0,
+      },
+    },
+    rows,
+  };
+}
+
 function listRefs() {
   const tagLines = gitText(["tag", "--sort=-v:refname"]).split("\n").filter(Boolean);
   const branchLines = gitText(["for-each-ref", "--format=%(refname:short)", "refs/heads"])
+    .split("\n")
+    .filter(Boolean);
+  const recentLines = gitText(["log", "--no-decorate", "--pretty=format:%H\t%s", "-n", "120"])
     .split("\n")
     .filter(Boolean);
   const head = gitText(["rev-parse", "--abbrev-ref", "HEAD"]).trim();
 
   const tags = tagLines.slice(0, 300);
   const branches = branchLines.slice(0, 120);
+  const recentCommits = recentLines.map((line) => {
+    const tab = line.indexOf("\t");
+    if (tab < 0) {
+      return {
+        ref: line.trim(),
+        subject: "",
+      };
+    }
+    return {
+      ref: line.slice(0, tab),
+      subject: line.slice(tab + 1),
+    };
+  });
   const refs = Array.from(new Set([...tags, ...branches]));
   const from = tags.includes(defaultFrom) ? defaultFrom : tags[1] || tags[0] || "HEAD~1";
   const to = tags.includes(defaultTo) ? defaultTo : tags[0] || "HEAD";
@@ -356,7 +440,67 @@ function listRefs() {
     refs,
     tags,
     branches,
+    recentCommits,
     head,
+  };
+}
+
+function getParentsPayload(refName) {
+  const resolved = resolveCommit(refName);
+  const line = gitText(["rev-list", "--parents", "-n", "1", resolved]).trim();
+  const parts = line ? line.split(" ").filter(Boolean) : [];
+  const parents = parts.length > 1 ? parts.slice(1) : [];
+  return {
+    ref: String(refName),
+    resolved,
+    parents,
+  };
+}
+
+function resolveCommitMaybe(refName) {
+  try {
+    return resolveCommit(refName);
+  } catch {
+    return "";
+  }
+}
+
+function resolveMainTarget(targetName) {
+  const requested = String(targetName || "").trim();
+  const candidates = [];
+  if (requested) candidates.push(requested);
+  if (!candidates.includes("origin/main")) candidates.push("origin/main");
+  if (!candidates.includes("main")) candidates.push("main");
+  for (const candidate of candidates) {
+    const resolved = resolveCommitMaybe(candidate);
+    if (resolved) {
+      return {
+        targetUsed: candidate,
+        targetResolved: resolved,
+      };
+    }
+  }
+  return {
+    targetUsed: "HEAD",
+    targetResolved: resolveCommit("HEAD"),
+  };
+}
+
+function getMergeBasePayload(refName, targetName) {
+  const ref = String(refName || "").trim();
+  const refResolved = resolveCommit(ref);
+  const { targetUsed, targetResolved } = resolveMainTarget(targetName);
+  const mergeBase = gitText(["merge-base", refResolved, targetResolved]).trim();
+  if (!mergeBase) {
+    throw new Error(`No merge-base found for ${ref} and ${targetUsed}`);
+  }
+  return {
+    ref,
+    refResolved,
+    targetRequested: String(targetName || ""),
+    targetUsed,
+    targetResolved,
+    mergeBase,
   };
 }
 
