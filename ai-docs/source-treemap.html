@@ -110,6 +110,10 @@
         font-size: 0.84rem;
       }
 
+      .subtle-info.error {
+        color: #9a2a41;
+      }
+
       .compare-row {
         display: flex;
         flex-wrap: wrap;
@@ -342,6 +346,9 @@
           </label>
         </div>
       </div>
+      <div class="compare-row">
+        <div id="refMessage" class="subtle-info"></div>
+      </div>
       <div id="refPicker" class="ref-picker hidden">
         <div id="refPickerSections"></div>
       </div>
@@ -375,12 +382,16 @@
           inputId: "",
           activeIndex: -1,
           items: [],
+          filterActive: false,
         },
         drillRootPath: "",
         treeCache: null,
         treeCacheKey: "",
-        typingSummaries: new Map(),
         visibleFileCount: 0,
+        summaryByKey: new Map(),
+        hoverSummaryTimerId: 0,
+        hoverSummaryKey: "",
+        currentTooltipNode: null,
       };
 
       const controls = {
@@ -390,6 +401,7 @@
         changedOnlyWrap: document.getElementById("changedOnlyWrap"),
         fromRef: document.getElementById("fromRef"),
         toRef: document.getElementById("toRef"),
+        refMessage: document.getElementById("refMessage"),
         refPicker: document.getElementById("refPicker"),
         refPickerSections: document.getElementById("refPickerSections"),
         breadcrumbs: document.getElementById("breadcrumbs"),
@@ -402,6 +414,7 @@
       const githubRepo = queryParams.get("githubRepo") || "https://github.com/oxcaml/oxcaml";
       const githubRepoBase = githubRepo.replace(/\/+$/, "");
       const githubBranch = queryParams.get("githubBranch") || queryParams.get("branch") || "main";
+      const viewerPage = queryParams.get("viewerPage") || "source-viewer.html";
       const phi = (1 + Math.sqrt(5)) / 2;
       const padding = 1.8;
       const autoMainBaseValue = "__AUTO_MAIN_BASE__";
@@ -409,28 +422,25 @@
         renderTreemap();
       }, 70);
 
-      const autoLoadQueued = debounce(() => {
-        loadSelectedDiffFromApi();
-      }, 220);
-
       const pickerInputIds = ["fromRef", "toRef"];
       for (const id of pickerInputIds) {
         const input = controls[id];
         input.addEventListener("focus", () => {
+          state.picker.filterActive = false;
           openRefPicker(id);
         });
         input.addEventListener("input", () => {
+          state.picker.filterActive = true;
           openRefPicker(id);
         });
-        input.addEventListener("change", () => {
-          autoLoadQueued();
-        });
         input.addEventListener("keydown", (event) => {
-          const hadActivePickerItem =
-            !controls.refPicker.classList.contains("hidden") && state.picker.activeIndex >= 0;
-          handlePickerKeydown(event);
-          if (event.key === "Enter" && !hadActivePickerItem) {
-            autoLoadQueued();
+          const pickerOpen = !controls.refPicker.classList.contains("hidden");
+          const handled = handlePickerKeydown(event);
+          if (handled) return;
+          const pickerHasItems = state.picker.items.length > 0;
+          if (event.key === "Enter" && (!pickerOpen || !pickerHasItems)) {
+            event.preventDefault();
+            loadSelectedDiffFromApi();
           }
         });
       }
@@ -464,11 +474,6 @@
         const cacheToken = `v=${Date.now()}`;
         disableLoadControls(true);
         let treemapPayload = null;
-        const typingSummaryPromise = fetch(`source-treemap-typing-summaries.json?${cacheToken}`, { cache: "no-store" })
-          .then((response) => response.json())
-          .catch(() => {
-            return { summaries: [] };
-          });
 
         const refsPayload = await fetchJsonMaybe(`/api/refs?${cacheToken}`);
         if (refsPayload && Array.isArray(refsPayload.refs)) {
@@ -491,11 +496,9 @@
           treemapPayload = await fetchJsonStrict(`source-treemap-data.json?${cacheToken}`);
         }
 
-        const typingSummaryPayload = await typingSummaryPromise;
         state.diffMeta = extractTreemapMeta(treemapPayload);
         state.lastLoadMeta = state.diffMeta;
         state.rawRows = parseTreemapRows(treemapPayload);
-        loadTypingSummaries(typingSummaryPayload);
         renderTreemap();
         updateLoadStatus();
       })();
@@ -689,6 +692,12 @@
         }
       }
 
+      function setRefMessage(text, isError) {
+        if (!controls.refMessage) return;
+        controls.refMessage.textContent = String(text || "");
+        controls.refMessage.classList.toggle("error", !!isError);
+      }
+
       function disableLoadControls(disabled) {
         controls.fromRef.disabled = disabled;
         controls.toRef.disabled = disabled;
@@ -713,7 +722,7 @@
       }
 
       function applyInitialSelection(refsPayload) {
-        const defaultTo = refsPayload.defaultTo || "5.4.0";
+        const defaultTo = "origin/main";
         const defaultFrom = refsPayload.defaultFrom || "5.3.0";
         const primary = queryParams.get("primary") || queryParams.get("to") || defaultTo;
         const secondary = queryParams.get("secondary") || queryParams.get("from") || "";
@@ -767,9 +776,10 @@
         try {
           const payload = await fetchPayloadForSelection(selection);
           if (!payload) {
-            console.warn(`Load failed for selection: ${selection.primary}${selection.secondary ? ` vs ${selection.secondary}` : ""}`);
+            setRefMessage(`Load failed: ${selection.primary}${selection.secondary ? ` vs ${selection.secondary}` : ""}`, true);
             return;
           }
+          setRefMessage("", false);
           state.diffMeta = extractTreemapMeta(payload);
           state.lastLoadMeta = state.diffMeta;
           state.rawRows = parseTreemapRows(payload);
@@ -780,6 +790,10 @@
           renderTreemap();
           updateLoadStatus();
         } catch (error) {
+          setRefMessage(
+            `Load failed: ${selection.primary}${selection.secondary ? ` vs ${selection.secondary}` : ""}`,
+            true
+          );
           console.error(error);
         }
       }
@@ -839,7 +853,8 @@
         const input = controls[inputId];
         if (!input || input.disabled) return;
         state.picker.inputId = inputId;
-        const sections = buildPickerSections(inputId, input.value);
+        const queryText = state.picker.filterActive ? input.value : "";
+        const sections = buildPickerSections(inputId, queryText);
         state.picker.items = [];
         state.picker.activeIndex = -1;
         controls.refPickerSections.innerHTML = "";
@@ -886,6 +901,7 @@
         state.picker.inputId = "";
         state.picker.activeIndex = -1;
         state.picker.items = [];
+        state.picker.filterActive = false;
       }
 
       async function resolveAutoMainBase(primaryRef) {
@@ -907,12 +923,17 @@
         if (selected && selected.kind === "autoMainBase" && state.picker.inputId === "toRef") {
           const resolved = await resolveAutoMainBase(controls.fromRef.value);
           if (!resolved) {
-            console.warn("Auto branch-point lookup failed. Restart treemap-live-server to enable /api/merge-base.");
+            setRefMessage(
+              "Auto branch-point lookup failed. Restart treemap-live-server to enable /api/merge-base.",
+              true
+            );
             closeRefPicker();
             return;
           }
+          setRefMessage("", false);
           input.value = resolved;
         } else {
+          setRefMessage("", false);
           input.value = selected.value;
         }
         closeRefPicker();
@@ -920,31 +941,32 @@
       }
 
       function handlePickerKeydown(event) {
-        if (controls.refPicker.classList.contains("hidden")) return;
-        if (!state.picker.items.length) return;
+        if (controls.refPicker.classList.contains("hidden")) return false;
+        if (!state.picker.items.length) return false;
         if (event.key === "ArrowDown") {
           event.preventDefault();
           state.picker.activeIndex = (state.picker.activeIndex + 1) % state.picker.items.length;
           updatePickerActiveItem();
-          return;
+          return true;
         }
         if (event.key === "ArrowUp") {
           event.preventDefault();
           state.picker.activeIndex = (state.picker.activeIndex - 1 + state.picker.items.length) % state.picker.items.length;
           updatePickerActiveItem();
-          return;
+          return true;
         }
         if (event.key === "Enter") {
-          if (state.picker.activeIndex >= 0) {
-            event.preventDefault();
-            applyPickerItem(state.picker.activeIndex);
-          }
-          return;
+          event.preventDefault();
+          const idx = state.picker.activeIndex >= 0 ? state.picker.activeIndex : 0;
+          applyPickerItem(idx);
+          return true;
         }
         if (event.key === "Escape") {
           event.preventDefault();
           closeRefPicker();
+          return true;
         }
+        return false;
       }
 
       function updatePickerActiveItem() {
@@ -1317,10 +1339,6 @@
         });
       }
 
-      function isTypingFileNode(node) {
-        return !!(node && !node.isDir && typeof node.path === "string" && node.path.startsWith("typing/"));
-      }
-
       function nodeHasDiffChange(node) {
         if (!node || node.isDir) return false;
         const added = Math.max(0, Number(node.addedLines) || 0);
@@ -1337,78 +1355,147 @@
         return hash;
       }
 
-      function openExternalUrl(url) {
-        const popup = window.open("", "_blank");
-        if (!popup) return null;
-        try {
-          popup.opener = null;
-        } catch (_err) {
-        }
-        popup.location.href = url;
-        return popup;
+      function buildViewerUrl(params) {
+        const q = new URLSearchParams(params);
+        return `${viewerPage}?${q.toString()}`;
+      }
+
+      function openViewer(params) {
+        window.location.href = buildViewerUrl(params);
       }
 
       async function openSourceFile(node) {
         if (!node || node.isDir) return;
         const filePath = String(node.path || "").trim();
         if (!filePath) return;
-        const encodedPath = filePath
-          .split("/")
-          .map((segment) => encodeURIComponent(segment))
-          .join("/");
         const meta = state.diffMeta || {};
         const diff = meta.diff || null;
         const tree = meta.tree || null;
+        const baseParams = {
+          path: filePath,
+          repo: githubRepoBase,
+          branch: githubBranch,
+        };
 
         if (diff && !tree) {
           const fromRef = String(diff.fromResolved || diff.from || "").trim();
           const toRef = String(diff.toResolved || diff.to || "").trim();
           if (fromRef && toRef) {
-            if (!nodeHasDiffChange(node)) {
-              const unchangedUrl = `${githubRepoBase}/blob/${encodeURIComponent(toRef)}/${encodedPath}`;
-              openExternalUrl(unchangedUrl);
-              return;
-            }
-            const compareBaseUrl =
-              `${githubRepoBase}/compare/${encodeURIComponent(fromRef)}...${encodeURIComponent(toRef)}`;
-            const popup = openExternalUrl(compareBaseUrl);
-            if (popup && window.crypto && window.crypto.subtle) {
-              try {
-                const hash = await sha256Hex(filePath);
-                popup.location.replace(`${compareBaseUrl}#diff-${hash}`);
-              } catch (_err) {
-              }
-            }
+            openViewer({
+              ...baseParams,
+              mode: "diff",
+              from: fromRef,
+              to: toRef,
+            });
             return;
           }
         }
 
         const treeRef = tree ? String(tree.resolved || tree.ref || "").trim() : "";
         const targetRef = treeRef || githubBranch;
-        const fileUrl = `${githubRepoBase}/blob/${encodeURIComponent(targetRef)}/${encodedPath}`;
-        openExternalUrl(fileUrl);
+        openViewer({
+          ...baseParams,
+          mode: "file",
+          ref: targetRef,
+        });
       }
 
-      function loadTypingSummaries(payload) {
-        state.typingSummaries.clear();
-        const list = (payload && Array.isArray(payload.summaries)) ? payload.summaries : [];
-        for (const summary of list) {
-          if (!summary || typeof summary.path !== "string") continue;
-          if (!summary.oneLine || !summary.paragraph) continue;
-          state.typingSummaries.set(summary.path, {
-            oneLine: String(summary.oneLine),
-            paragraph: String(summary.paragraph),
-          });
+      function summaryRequestForNode(node) {
+        if (!node || node.isDir || !node.path) return null;
+        const filePath = String(node.path || "").trim();
+        if (!filePath) return null;
+        const meta = state.diffMeta || {};
+        const diff = meta.diff || null;
+        const tree = meta.tree || null;
+        if (diff && !tree) {
+          const from = String(diff.fromResolved || diff.from || "").trim();
+          const to = String(diff.toResolved || diff.to || "").trim();
+          if (from && to) {
+            return {
+              mode: "diff",
+              path: filePath,
+              from,
+              to,
+            };
+          }
+        }
+        const treeRef = tree ? String(tree.resolved || tree.ref || "").trim() : "";
+        const ref = treeRef || String(controls.fromRef.value || "").trim() || githubBranch;
+        return {
+          mode: "file",
+          path: filePath,
+          ref,
+        };
+      }
+
+      function summaryKeyForRequest(request) {
+        if (!request) return "";
+        if (request.mode === "diff") {
+          return `diff|${request.from}|${request.to}|${request.path}`;
+        }
+        return `file|${request.ref}|${request.path}`;
+      }
+
+      async function fetchUnifiedSummary(request, trigger) {
+        if (!request) return null;
+        const params = new URLSearchParams();
+        params.set("path", request.path);
+        params.set("trigger", trigger ? "1" : "0");
+        if (request.mode === "diff") {
+          params.set("from", request.from);
+          params.set("to", request.to);
+        } else {
+          params.set("ref", request.ref);
+        }
+        params.set("v", String(Date.now()));
+        return fetchJsonMaybe(`/api/summary?${params.toString()}`);
+      }
+
+      function clearHoverSummaryTimer() {
+        if (state.hoverSummaryTimerId) {
+          clearTimeout(state.hoverSummaryTimerId);
+          state.hoverSummaryTimerId = 0;
         }
       }
 
+      function scheduleHoverSummary(node) {
+        const request = summaryRequestForNode(node);
+        const key = summaryKeyForRequest(request);
+        if (!key) {
+          state.hoverSummaryKey = "";
+          clearHoverSummaryTimer();
+          return;
+        }
+        const existing = state.summaryByKey.get(key);
+        if (existing && existing.status === "ready") return;
+        if (state.hoverSummaryKey === key && state.hoverSummaryTimerId) return;
+        clearHoverSummaryTimer();
+        state.hoverSummaryKey = key;
+        state.hoverSummaryTimerId = window.setTimeout(async () => {
+          state.hoverSummaryTimerId = 0;
+          state.summaryByKey.set(key, { status: "pending" });
+          const payload = await fetchUnifiedSummary(request, true);
+          if (!payload) return;
+          state.summaryByKey.set(key, payload);
+          if (!state.currentTooltipNode) return;
+          const currentRequest = summaryRequestForNode(state.currentTooltipNode);
+          const currentKey = summaryKeyForRequest(currentRequest);
+          if (currentKey !== key) return;
+          const kind = state.currentTooltipNode.nodeType || (state.currentTooltipNode.isDir ? "Directory" : "File");
+          const location = state.currentTooltipNode.path || state.currentTooltipNode.name;
+          controls.tooltip.textContent = formatNodeTooltip(state.currentTooltipNode, kind, location);
+        }, 1000);
+      }
+
       function showNodeTooltip(event, node) {
+        state.currentTooltipNode = node;
         const kind = node.nodeType || (node.isDir ? "Directory" : "File");
         const location = node.path || node.path === "" ? node.path : node.name;
         const baseSummary = formatNodeTooltip(node, kind, location);
         controls.tooltip.style.display = "block";
         controls.tooltip.textContent = baseSummary;
         positionTooltip(event.clientX, event.clientY);
+        scheduleHoverSummary(node);
       }
 
       function positionTooltip(cursorX, cursorY) {
@@ -1428,21 +1515,19 @@
 
       function formatNodeTooltip(node, kind, location) {
         const changeSummary = formatChangeSummary(node);
-        if (isTypingFileNode(node)) {
-          const summary = state.typingSummaries.get(node.path) || {
-            oneLine: "Typing summary unavailable",
-            paragraph: "Typing summary data is unavailable for this file.",
-          };
-          return `${node.name}
-${summary.oneLine}
-
-${summary.paragraph}
-
-${kind} · ${formatNodeMagnitude(node)}
-${changeSummary ? `${changeSummary}\n` : ""}Path: ${location}`;
+        let summaryText = "";
+        const request = summaryRequestForNode(node);
+        const key = summaryKeyForRequest(request);
+        if (key) {
+          const summary = state.summaryByKey.get(key);
+          if (summary && summary.status === "ready" && summary.oneLine && summary.paragraph) {
+            summaryText = `${summary.oneLine}\n\n${summary.paragraph}\n\n`;
+          } else if (summary && summary.status === "pending") {
+            summaryText = "AI summary loading…\n\n";
+          }
         }
         return `${node.name}
-${kind} · ${formatNodeMagnitude(node)}
+${summaryText}${kind} · ${formatNodeMagnitude(node)}
 ${changeSummary ? `${changeSummary}\n` : ""}Path: ${location}`;
       }
 
@@ -1632,6 +1717,9 @@ ${changeSummary ? `${changeSummary}\n` : ""}Path: ${location}`;
       }
 
       function hideTooltip() {
+        state.currentTooltipNode = null;
+        state.hoverSummaryKey = "";
+        clearHoverSummaryTimer();
         controls.tooltip.style.display = "none";
       }
 

@@ -4,8 +4,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import http from "node:http";
+import os from "node:os";
 import { URL } from "node:url";
 import { execFileSync } from "node:child_process";
+import { DatabaseSync } from "node:sqlite";
 
 const allowedExtensions = new Set(["ml", "mli", "mll", "mly", "c", "h", "cmm", "s", "asm"]);
 const pathSpecs = Array.from(allowedExtensions, (ext) => `*.${ext}`);
@@ -39,7 +41,75 @@ const treeCache = new Map();
 const treeRowsCache = new Map();
 const diffCache = new Map();
 const lineCountCache = new Map();
+const summaryInFlight = new Map();
 let refsCache = null;
+
+const summaryRetryMs = 20_000;
+const summaryDbPath = path.join(webRoot, "source-summaries.sqlite");
+const summaryDb = new DatabaseSync(summaryDbPath);
+summaryDb.exec(`
+  PRAGMA journal_mode=WAL;
+  CREATE TABLE IF NOT EXISTS summaries (
+    summary_key TEXT PRIMARY KEY,
+    mode TEXT NOT NULL,
+    path TEXT NOT NULL,
+    ref_resolved TEXT,
+    from_resolved TEXT,
+    to_resolved TEXT,
+    status TEXT NOT NULL,
+    one_line TEXT,
+    paragraph TEXT,
+    last_error TEXT,
+    started_at_ms INTEGER NOT NULL DEFAULT 0,
+    updated_at_ms INTEGER NOT NULL DEFAULT 0
+  );
+`);
+
+const summarySelectStmt = summaryDb.prepare(`
+  SELECT
+    summary_key, mode, path, ref_resolved, from_resolved, to_resolved,
+    status, one_line, paragraph, last_error, started_at_ms, updated_at_ms
+  FROM summaries
+  WHERE summary_key = ?
+`);
+
+const summaryUpsertPendingStmt = summaryDb.prepare(`
+  INSERT INTO summaries (
+    summary_key, mode, path, ref_resolved, from_resolved, to_resolved,
+    status, one_line, paragraph, last_error, started_at_ms, updated_at_ms
+  ) VALUES (?, ?, ?, ?, ?, ?, 'pending', NULL, NULL, NULL, ?, ?)
+  ON CONFLICT(summary_key) DO UPDATE SET
+    mode = excluded.mode,
+    path = excluded.path,
+    ref_resolved = excluded.ref_resolved,
+    from_resolved = excluded.from_resolved,
+    to_resolved = excluded.to_resolved,
+    status = 'pending',
+    one_line = NULL,
+    paragraph = NULL,
+    last_error = NULL,
+    started_at_ms = excluded.started_at_ms,
+    updated_at_ms = excluded.updated_at_ms
+`);
+
+const summaryMarkReadyStmt = summaryDb.prepare(`
+  UPDATE summaries
+  SET status = 'ready',
+      one_line = ?,
+      paragraph = ?,
+      last_error = NULL,
+      started_at_ms = 0,
+      updated_at_ms = ?
+  WHERE summary_key = ?
+`);
+
+const summaryMarkFailedStmt = summaryDb.prepare(`
+  UPDATE summaries
+  SET status = 'pending',
+      last_error = ?,
+      updated_at_ms = ?
+  WHERE summary_key = ?
+`);
 
 const server = http.createServer((req, res) => {
   try {
@@ -58,6 +128,37 @@ const server = http.createServer((req, res) => {
     if (requestUrl.pathname === "/api/parents") {
       const refName = requestUrl.searchParams.get("ref") || "HEAD";
       const payload = getParentsPayload(refName);
+      sendJson(res, 200, payload);
+      return;
+    }
+    if (requestUrl.pathname === "/api/file") {
+      const refName = requestUrl.searchParams.get("ref") || "HEAD";
+      const filePath = requestUrl.searchParams.get("path") || "";
+      const payload = getFilePayload(refName, filePath);
+      sendJson(res, 200, payload);
+      return;
+    }
+    if (requestUrl.pathname === "/api/file-diff") {
+      const fromRef = requestUrl.searchParams.get("from") || defaultFrom;
+      const toRef = requestUrl.searchParams.get("to") || defaultTo;
+      const filePath = requestUrl.searchParams.get("path") || "";
+      const payload = getFileDiffPayload(fromRef, toRef, filePath);
+      sendJson(res, 200, payload);
+      return;
+    }
+    if (requestUrl.pathname === "/api/summary") {
+      const fromRef = String(requestUrl.searchParams.get("from") || "").trim();
+      const toRef = String(requestUrl.searchParams.get("to") || "").trim();
+      const refName = String(requestUrl.searchParams.get("ref") || "").trim();
+      const filePath = requestUrl.searchParams.get("path") || "";
+      const trigger = String(requestUrl.searchParams.get("trigger") || "1") !== "0";
+      const payload = getSummaryPayload({
+        refName,
+        fromRef,
+        toRef,
+        filePath,
+        trigger,
+      });
       sendJson(res, 200, payload);
       return;
     }
@@ -134,6 +235,23 @@ function isTrackableSourcePath(filePath) {
   if (!rel) return false;
   if (rel.startsWith("_install/") || rel.startsWith("/_install/")) return false;
   return allowedExtensions.has(extensionOf(rel));
+}
+
+function normalizeRepoPath(filePath) {
+  const raw = String(filePath || "").trim().replace(/\\/g, "/");
+  if (!raw) throw new Error("Missing file path");
+  if (raw.startsWith("/") || raw.includes("\0")) {
+    throw new Error(`Invalid file path: ${raw}`);
+  }
+  const parts = raw.split("/");
+  if (parts.some((part) => !part || part === "." || part === "..")) {
+    throw new Error(`Invalid file path: ${raw}`);
+  }
+  const normalized = parts.join("/");
+  if (!isTrackableSourcePath(normalized)) {
+    throw new Error(`Unsupported or untracked source path: ${normalized}`);
+  }
+  return normalized;
 }
 
 function normalizeSizeBasis(raw) {
@@ -407,16 +525,20 @@ function buildTreePayload(refName) {
 
 function listRefs() {
   const tagLines = gitText(["tag", "--sort=-v:refname"]).split("\n").filter(Boolean);
-  const branchLines = gitText(["for-each-ref", "--format=%(refname:short)", "refs/heads"])
+  const localBranchLines = gitText(["for-each-ref", "--format=%(refname:short)", "refs/heads"])
     .split("\n")
     .filter(Boolean);
+  const remoteBranchLines = gitText(["for-each-ref", "--format=%(refname:short)", "refs/remotes/origin"])
+    .split("\n")
+    .filter(Boolean)
+    .filter((name) => name !== "origin/HEAD");
   const recentLines = gitText(["log", "--no-decorate", "--pretty=format:%H\t%s", "-n", "120"])
     .split("\n")
     .filter(Boolean);
   const head = gitText(["rev-parse", "--abbrev-ref", "HEAD"]).trim();
 
   const tags = tagLines.slice(0, 300);
-  const branches = branchLines.slice(0, 120);
+  const branches = Array.from(new Set([...remoteBranchLines, ...localBranchLines])).slice(0, 180);
   const recentCommits = recentLines.map((line) => {
     const tab = line.indexOf("\t");
     if (tab < 0) {
@@ -501,6 +623,268 @@ function getMergeBasePayload(refName, targetName) {
     targetUsed,
     targetResolved,
     mergeBase,
+  };
+}
+
+function getFilePayload(refName, filePath) {
+  const pathInRepo = normalizeRepoPath(filePath);
+  const resolved = resolveCommit(refName);
+  const spec = `${resolved}:${pathInRepo}`;
+  const content = gitText(["show", spec]);
+  return {
+    ref: String(refName),
+    resolved,
+    path: pathInRepo,
+    extension: extensionOf(pathInRepo),
+    content,
+    sizeBytes: Buffer.byteLength(content, "utf8"),
+  };
+}
+
+function getFileDiffPayload(fromRef, toRef, filePath) {
+  const pathInRepo = normalizeRepoPath(filePath);
+  const fromResolved = resolveCommit(fromRef);
+  const toResolved = resolveCommit(toRef);
+  const patch = gitText([
+    "diff",
+    "--no-color",
+    "--unified=120",
+    fromResolved,
+    toResolved,
+    "--",
+    pathInRepo,
+  ]);
+  return {
+    from: String(fromRef),
+    to: String(toRef),
+    fromResolved,
+    toResolved,
+    path: pathInRepo,
+    extension: extensionOf(pathInRepo),
+    patch,
+    hasDiff: patch.trim().length > 0,
+  };
+}
+
+function clipForPrompt(text, maxChars) {
+  const input = String(text || "");
+  if (input.length <= maxChars) return input;
+  return `${input.slice(0, maxChars)}\n\n[...truncated for summary...]`;
+}
+
+function parseSummaryText(text) {
+  const raw = String(text || "").replace(/\r/g, "").trim();
+  if (!raw) {
+    return {
+      oneLine: "Summary unavailable.",
+      paragraph: "No summary content was returned.",
+    };
+  }
+  const lines = raw.split("\n");
+  const firstIndex = lines.findIndex((line) => line.trim().length > 0);
+  if (firstIndex < 0) {
+    return {
+      oneLine: "Summary unavailable.",
+      paragraph: "No summary content was returned.",
+    };
+  }
+  let oneLine = lines[firstIndex].trim();
+  if (oneLine.length > 220) {
+    oneLine = `${oneLine.slice(0, 217)}...`;
+  }
+  const paragraphRaw = lines.slice(firstIndex + 1).join(" ").replace(/\s+/g, " ").trim();
+  const paragraph = paragraphRaw || oneLine;
+  return { oneLine, paragraph };
+}
+
+function runCodexSparkSummary(promptText) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "oxcaml-summary-"));
+  const outputFile = path.join(tempDir, "last-message.txt");
+  try {
+    execFileSync(
+      "codex",
+      [
+        "--ask-for-approval",
+        "never",
+        "exec",
+        "-m",
+        "gpt-5.3-codex-spark",
+        "-c",
+        "model_reasoning_effort=\"low\"",
+        "--sandbox",
+        "read-only",
+        "--output-last-message",
+        outputFile,
+        promptText,
+      ],
+      {
+        cwd: repoRoot,
+        encoding: "utf8",
+        maxBuffer,
+      }
+    );
+    return fs.readFileSync(outputFile, "utf8");
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
+function buildFileSummaryPrompt(filePayload) {
+  const preview = clipForPrompt(filePayload.content, 42_000);
+  return [
+    "You are summarizing a source file for a treemap viewer.",
+    "Output format requirements:",
+    "1) First line: a single concise one-line summary.",
+    "2) Then one blank line.",
+    "3) Then exactly one paragraph summary (3-5 sentences).",
+    "Do not use bullets, markdown headings, code fences, or extra sections.",
+    "",
+    `Path: ${filePayload.path}`,
+    `Ref: ${filePayload.resolved}`,
+    "",
+    "Source file content:",
+    preview,
+  ].join("\n");
+}
+
+function buildDiffSummaryPrompt(diffPayload) {
+  const preview = clipForPrompt(diffPayload.patch, 42_000);
+  return [
+    "You are summarizing a source diff for a treemap viewer.",
+    "Output format requirements:",
+    "1) First line: a single concise one-line summary of the change.",
+    "2) Then one blank line.",
+    "3) Then exactly one paragraph summary (3-5 sentences).",
+    "Focus on what changed and why it matters.",
+    "Do not use bullets, markdown headings, code fences, or extra sections.",
+    "",
+    `Path: ${diffPayload.path}`,
+    `From: ${diffPayload.fromResolved}`,
+    `To: ${diffPayload.toResolved}`,
+    "",
+    "Unified diff:",
+    preview || "(No textual diff available.)",
+  ].join("\n");
+}
+
+function getSummarySpec({ refName, fromRef, toRef, filePath }) {
+  const pathInRepo = normalizeRepoPath(filePath);
+  const hasDiffRefs = !!fromRef || !!toRef;
+  if (hasDiffRefs) {
+    if (!fromRef || !toRef) {
+      throw new Error("Both from and to are required for diff summaries");
+    }
+    const fromResolved = resolveCommit(fromRef);
+    const toResolved = resolveCommit(toRef);
+    return {
+      mode: "diff",
+      path: pathInRepo,
+      from: String(fromRef),
+      to: String(toRef),
+      fromResolved,
+      toResolved,
+      summaryKey: `diff|${fromResolved}|${toResolved}|${pathInRepo}`,
+    };
+  }
+
+  const ref = String(refName || "HEAD");
+  const resolved = resolveCommit(ref);
+  return {
+    mode: "file",
+    path: pathInRepo,
+    ref,
+    resolved,
+    summaryKey: `file|${resolved}|${pathInRepo}`,
+  };
+}
+
+function readSummaryRow(summaryKey) {
+  const row = summarySelectStmt.get(summaryKey);
+  return row || null;
+}
+
+function queueSummaryJob(spec, nowMs) {
+  summaryUpsertPendingStmt.run(
+    spec.summaryKey,
+    spec.mode,
+    spec.path,
+    spec.mode === "file" ? spec.resolved : null,
+    spec.mode === "diff" ? spec.fromResolved : null,
+    spec.mode === "diff" ? spec.toResolved : null,
+    nowMs,
+    nowMs
+  );
+  if (summaryInFlight.has(spec.summaryKey)) return;
+  const runPromise = (async () => {
+    try {
+      let prompt = "";
+      if (spec.mode === "diff") {
+        const diffPayload = getFileDiffPayload(spec.fromResolved, spec.toResolved, spec.path);
+        prompt = buildDiffSummaryPrompt(diffPayload);
+      } else {
+        const filePayload = getFilePayload(spec.resolved, spec.path);
+        prompt = buildFileSummaryPrompt(filePayload);
+      }
+      const raw = runCodexSparkSummary(prompt);
+      const parsed = parseSummaryText(raw);
+      summaryMarkReadyStmt.run(
+        parsed.oneLine,
+        parsed.paragraph,
+        Date.now(),
+        spec.summaryKey
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      summaryMarkFailedStmt.run(message, Date.now(), spec.summaryKey);
+    } finally {
+      summaryInFlight.delete(spec.summaryKey);
+    }
+  })();
+  summaryInFlight.set(spec.summaryKey, runPromise);
+}
+
+function getSummaryPayload({ refName, fromRef, toRef, filePath, trigger }) {
+  const spec = getSummarySpec({ refName, fromRef, toRef, filePath });
+  const nowMs = Date.now();
+  const row = readSummaryRow(spec.summaryKey);
+  if (row && row.status === "ready" && row.one_line && row.paragraph) {
+    return {
+      status: "ready",
+      mode: spec.mode,
+      path: spec.path,
+      ref: spec.mode === "file" ? spec.ref : undefined,
+      resolved: spec.mode === "file" ? spec.resolved : undefined,
+      from: spec.mode === "diff" ? spec.from : undefined,
+      to: spec.mode === "diff" ? spec.to : undefined,
+      fromResolved: spec.mode === "diff" ? spec.fromResolved : undefined,
+      toResolved: spec.mode === "diff" ? spec.toResolved : undefined,
+      oneLine: String(row.one_line),
+      paragraph: String(row.paragraph),
+      cached: true,
+      updatedAtMs: Number(row.updated_at_ms || 0),
+    };
+  }
+
+  const startedAtMs = Number(row && row.started_at_ms ? row.started_at_ms : 0);
+  const ageMs = startedAtMs > 0 ? nowMs - startedAtMs : Number.POSITIVE_INFINITY;
+  const shouldStart = !!trigger && (!row || ageMs >= summaryRetryMs);
+  if (shouldStart) {
+    queueSummaryJob(spec, nowMs);
+  }
+
+  return {
+    status: "pending",
+    mode: spec.mode,
+    path: spec.path,
+    ref: spec.mode === "file" ? spec.ref : undefined,
+    resolved: spec.mode === "file" ? spec.resolved : undefined,
+    from: spec.mode === "diff" ? spec.from : undefined,
+    to: spec.mode === "diff" ? spec.to : undefined,
+    fromResolved: spec.mode === "diff" ? spec.fromResolved : undefined,
+    toResolved: spec.mode === "diff" ? spec.toResolved : undefined,
+    startedAtMs: shouldStart ? nowMs : startedAtMs,
+    retryAfterMs: summaryRetryMs,
+    lastError: row && row.last_error ? String(row.last_error) : "",
   };
 }
 

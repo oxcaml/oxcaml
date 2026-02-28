@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OxCaml Source Viewer</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    <style>
+      :root {
+        --bg: #eff3ff;
+        --panel: #ffffff;
+        --line: #cad4f5;
+        --text: #0f1832;
+        --muted: #566286;
+        --accent: #2f5fd6;
+        --danger-bg: #ffe8ec;
+        --danger-fg: #7d1b30;
+        --add-bg: #e7f8ed;
+        --add-fg: #0f5b33;
+        --ctx-bg: #f7f9ff;
+        --hunk-bg: #e6ecff;
+        --meta-bg: #eef2ff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(circle at 10% 8%, #ffffff 0%, #edf2ff 42%, #dfe7ff 100%);
+        color: var(--text);
+        font-family: "Atkinson Hyperlegible", "Segoe UI", "Inter", sans-serif;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(4px);
+        border-bottom: 1px solid var(--line);
+        padding: 0.8rem 1rem;
+      }
+
+      .nav-row,
+      .control-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.45rem 0.85rem;
+      }
+
+      .control-row {
+        margin-top: 0.5rem;
+      }
+
+      .nav-row a {
+        color: #2752c4;
+        font-size: 0.9rem;
+        text-decoration: none;
+      }
+
+      .nav-row a:hover {
+        text-decoration: underline;
+      }
+
+      h1 {
+        margin: 0.55rem 0 0.24rem;
+        font-size: 1.08rem;
+        font-weight: 700;
+        word-break: break-all;
+      }
+
+      #meta {
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+
+      button,
+      input[type="text"] {
+        border: 1px solid #b7c4f0;
+        border-radius: 6px;
+        background: #f8faff;
+        color: #1a2d64;
+        font-size: 0.85rem;
+      }
+
+      button {
+        cursor: pointer;
+        padding: 0.24rem 0.5rem;
+      }
+
+      input[type="text"] {
+        padding: 0.26rem 0.45rem;
+        min-width: 13rem;
+      }
+
+      label {
+        color: #384c84;
+        font-size: 0.85rem;
+      }
+
+      main {
+        display: flex;
+        flex-direction: column;
+        gap: 0.66rem;
+        min-height: 0;
+        flex: 1;
+        padding: 0.72rem;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+
+      .summary {
+        padding: 0.7rem 0.8rem;
+      }
+
+      .summary h2 {
+        margin: 0 0 0.35rem;
+        font-size: 0.94rem;
+        color: #1f3d87;
+      }
+
+      .summary-status {
+        color: var(--muted);
+        font-size: 0.84rem;
+        margin-bottom: 0.32rem;
+        min-height: 1rem;
+      }
+
+      .summary-status.error {
+        color: var(--danger-fg);
+      }
+
+      .summary-status.loading::before {
+        content: "";
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border: 2px solid #c2cff8;
+        border-top-color: #2f5fd6;
+        border-radius: 50%;
+        animation: spin 0.75s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      #summaryOneLine {
+        margin: 0 0 0.3rem;
+        font-size: 0.92rem;
+        font-weight: 700;
+      }
+
+      #summaryParagraph {
+        margin: 0;
+        font-size: 0.9rem;
+        line-height: 1.42;
+      }
+
+      .viewer {
+        min-height: 0;
+        flex: 1;
+        overflow: auto;
+      }
+
+      .viewer.wrap-on .code-cell code {
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      table.code-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-family: "JetBrains Mono", "Menlo", "SFMono-Regular", "Consolas", monospace;
+        font-size: 12px;
+        line-height: 1.42;
+      }
+
+      .line-no,
+      .line-no-new {
+        width: 56px;
+        text-align: right;
+        padding: 0 8px;
+        color: #7582aa;
+        border-right: 1px solid #e3e9fd;
+        user-select: none;
+        vertical-align: top;
+      }
+
+      .line-no-new {
+        border-right: 1px solid #dae3ff;
+      }
+
+      .line-mark {
+        width: 28px;
+        text-align: center;
+        color: #5f6f9f;
+        border-right: 1px solid #e3e9fd;
+        user-select: none;
+        vertical-align: top;
+        font-weight: 700;
+      }
+
+      .code-cell {
+        padding: 0 10px;
+        vertical-align: top;
+        white-space: pre;
+        overflow: hidden;
+      }
+
+      .code-cell code {
+        white-space: pre;
+        display: block;
+      }
+
+      tr.file-line:nth-child(odd) {
+        background: #fcfdff;
+      }
+
+      tr.diff-line.ctx {
+        background: var(--ctx-bg);
+      }
+
+      tr.diff-line.add {
+        background: var(--add-bg);
+      }
+
+      tr.diff-line.del {
+        background: var(--danger-bg);
+      }
+
+      tr.diff-line.hunk {
+        background: var(--hunk-bg);
+      }
+
+      tr.diff-line.meta {
+        background: var(--meta-bg);
+      }
+
+      tr.diff-line.add .code-cell {
+        color: var(--add-fg);
+      }
+
+      tr.diff-line.del .code-cell {
+        color: var(--danger-fg);
+      }
+
+      tr.diff-line.add .line-mark {
+        color: #1f6f43;
+      }
+
+      tr.diff-line.del .line-mark {
+        color: #8b253d;
+      }
+
+      tr.diff-line.hunk .code-cell,
+      tr.diff-line.meta .code-cell {
+        color: #2f457d;
+      }
+
+      .line-match {
+        background: #ffeaa6;
+        color: #2d2500;
+      }
+
+      .inline-del {
+        background: rgba(183, 39, 71, 0.22);
+        border-radius: 3px;
+      }
+
+      .inline-add {
+        background: rgba(43, 162, 88, 0.22);
+        border-radius: 3px;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="nav-row">
+        <a id="githubLink" target="_blank" rel="noreferrer">Open on GitHub</a>
+      </div>
+      <h1 id="filePath">Loading…</h1>
+      <div id="meta"></div>
+      <div class="control-row">
+        <button id="copyBtn" type="button">Copy</button>
+        <label><input id="wrapToggle" type="checkbox" /> Wrap</label>
+        <label><input id="lineToggle" type="checkbox" checked /> Line numbers</label>
+        <label id="contextToggleWrap" class="hidden"><input id="contextToggle" type="checkbox" /> Hide context</label>
+        <input id="findInput" type="text" placeholder="Find in file/diff" autocomplete="off" />
+      </div>
+    </header>
+    <main>
+      <section class="panel summary">
+        <h2>AI Summary</h2>
+        <div id="summaryStatus" class="summary-status">Waiting to load…</div>
+        <p id="summaryOneLine"></p>
+        <p id="summaryParagraph"></p>
+      </section>
+      <section id="viewer" class="panel viewer wrap-on">
+        <table id="codeTable" class="code-table">
+          <tbody id="codeBody">
+            <tr><td class="code-cell"><code>Loading…</code></td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/ocaml.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/armasm.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const mode = params.get("mode") === "diff" ? "diff" : "file";
+      const pathValue = String(params.get("path") || "").trim();
+      const refValue = String(params.get("ref") || "").trim();
+      const fromValue = String(params.get("from") || "").trim();
+      const toValue = String(params.get("to") || "").trim();
+      const githubRepo = (params.get("repo") || "https://github.com/oxcaml/oxcaml").replace(/\/+$/, "");
+      const githubBranch = String(params.get("branch") || "main").trim();
+
+      const elPath = document.getElementById("filePath");
+      const elMeta = document.getElementById("meta");
+      const elGitHub = document.getElementById("githubLink");
+      const elViewer = document.getElementById("viewer");
+      const elBody = document.getElementById("codeBody");
+      const elSummaryStatus = document.getElementById("summaryStatus");
+      const elSummaryOneLine = document.getElementById("summaryOneLine");
+      const elSummaryParagraph = document.getElementById("summaryParagraph");
+      const elCopyBtn = document.getElementById("copyBtn");
+      const elWrapToggle = document.getElementById("wrapToggle");
+      const elLineToggle = document.getElementById("lineToggle");
+      const elContextToggleWrap = document.getElementById("contextToggleWrap");
+      const elContextToggle = document.getElementById("contextToggle");
+      const elFindInput = document.getElementById("findInput");
+
+      let currentRawText = "";
+      let currentRenderedRows = [];
+      let currentLanguage = "plaintext";
+
+      function encodePathForGitHub(value) {
+        return String(value || "")
+          .split("/")
+          .map((part) => encodeURIComponent(part))
+          .join("/");
+      }
+
+      function languageForPath(path) {
+        const ext = String(path || "").split(".").pop().toLowerCase();
+        const map = {
+          ml: "ocaml",
+          mli: "ocaml",
+          mll: "ocaml",
+          mly: "ocaml",
+          c: "c",
+          h: "c",
+          cmm: "plaintext",
+          s: "asm",
+          asm: "asm",
+        };
+        return map[ext] || "plaintext";
+      }
+
+      async function fetchJson(url) {
+        const response = await fetch(url, { cache: "no-store" });
+        if (!response.ok) {
+          const body = await response.text();
+          throw new Error(`Request failed (${response.status}): ${body}`);
+        }
+        return response.json();
+      }
+
+      function setSummaryStatus(text, isError, isLoading) {
+        elSummaryStatus.textContent = isLoading ? "" : String(text || "");
+        elSummaryStatus.classList.toggle("error", !!isError);
+        elSummaryStatus.classList.toggle("loading", !!isLoading);
+      }
+
+      function highlightCodeFragment(text, language) {
+        const source = String(text || "");
+        if (window.hljs && language && language !== "plaintext") {
+          try {
+            return window.hljs.highlight(source, { language }).value;
+          } catch (_err) {
+          }
+        }
+        if (window.hljs && source && language === "plaintext") {
+          try {
+            return window.hljs.highlightAuto(source, ["ocaml", "c", "cpp", "armasm", "bash"]).value;
+          } catch (_err) {
+          }
+        }
+        const escaped = source
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        return escaped;
+      }
+
+      function clearBody() {
+        while (elBody.firstChild) {
+          elBody.removeChild(elBody.firstChild);
+        }
+      }
+
+      function addRow(row) {
+        const tr = document.createElement("tr");
+        tr.className = row.className || "";
+        tr.dataset.searchText = row.searchText || "";
+
+        if (row.oldNo !== null) {
+          const tdOld = document.createElement("td");
+          tdOld.className = "line-no";
+          tdOld.textContent = row.oldNo > 0 ? String(row.oldNo) : "";
+          tr.appendChild(tdOld);
+        }
+
+        if (row.newNo !== null) {
+          const tdNew = document.createElement("td");
+          tdNew.className = "line-no-new";
+          tdNew.textContent = row.newNo > 0 ? String(row.newNo) : "";
+          tr.appendChild(tdNew);
+        }
+
+        const tdMark = document.createElement("td");
+        tdMark.className = "line-mark";
+        tdMark.textContent = row.mark || "";
+        tr.appendChild(tdMark);
+
+        const tdCode = document.createElement("td");
+        tdCode.className = "code-cell";
+        const code = document.createElement("code");
+        code.innerHTML = row.html;
+        tdCode.appendChild(code);
+        tr.appendChild(tdCode);
+        elBody.appendChild(tr);
+      }
+
+      function renderFileLines(text, language) {
+        const lines = String(text || "").split("\n");
+        currentRenderedRows = [];
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          currentRenderedRows.push({
+            className: "file-line",
+            oldNo: null,
+            newNo: i + 1,
+            mark: "",
+            kind: "file",
+            html: highlightCodeFragment(line, language),
+            searchText: line.toLowerCase(),
+          });
+        }
+        rerenderRows();
+      }
+
+      function parseHunkHeader(line) {
+        const m = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(line);
+        if (!m) return null;
+        return {
+          oldStart: Number(m[1]),
+          oldLen: Number(m[2] || 1),
+          newStart: Number(m[3]),
+          newLen: Number(m[4] || 1),
+        };
+      }
+
+      function escapeHtml(text) {
+        return String(text || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      function intralineDiffHtml(oldText, newText) {
+        const a = String(oldText || "");
+        const b = String(newText || "");
+        let prefix = 0;
+        const maxPrefix = Math.min(a.length, b.length);
+        while (prefix < maxPrefix && a[prefix] === b[prefix]) {
+          prefix += 1;
+        }
+        let suffix = 0;
+        const maxSuffix = Math.min(a.length - prefix, b.length - prefix);
+        while (suffix < maxSuffix && a[a.length - 1 - suffix] === b[b.length - 1 - suffix]) {
+          suffix += 1;
+        }
+        const aMid = a.slice(prefix, a.length - suffix);
+        const bMid = b.slice(prefix, b.length - suffix);
+        const aHtml =
+          `${escapeHtml(a.slice(0, prefix))}` +
+          `<span class="inline-del">${escapeHtml(aMid)}</span>` +
+          `${escapeHtml(a.slice(a.length - suffix))}`;
+        const bHtml =
+          `${escapeHtml(b.slice(0, prefix))}` +
+          `<span class="inline-add">${escapeHtml(bMid)}</span>` +
+          `${escapeHtml(b.slice(b.length - suffix))}`;
+        return { aHtml, bHtml };
+      }
+
+      function pushDiffRow(kind, oldNo, newNo, text, language, mark, htmlOverride) {
+        currentRenderedRows.push({
+          className: `diff-line ${kind}`,
+          oldNo,
+          newNo,
+          mark,
+          kind,
+          html: htmlOverride || highlightCodeFragment(text, language),
+          searchText: String(text || "").toLowerCase(),
+        });
+      }
+
+      function renderDiffPatch(patch, language) {
+        const lines = String(patch || "").split("\n");
+        currentRenderedRows = [];
+        let oldLine = 0;
+        let newLine = 0;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (line.startsWith("@@")) {
+            const info = parseHunkHeader(line);
+            if (info) {
+              oldLine = info.oldStart;
+              newLine = info.newStart;
+            }
+            pushDiffRow("hunk", 0, 0, line, "plaintext", "@@");
+            continue;
+          }
+
+          if (line.startsWith("diff --git") || line.startsWith("index ") || line.startsWith("--- ") || line.startsWith("+++ ")) {
+            pushDiffRow("meta", 0, 0, line, "plaintext", "•");
+            continue;
+          }
+
+          if (line.startsWith("+")) {
+            const body = line.slice(1);
+            pushDiffRow("add", 0, newLine++, body, language, "+", highlightCodeFragment(body, language));
+            continue;
+          }
+
+          if (line.startsWith("-") && !line.startsWith("--- ")) {
+            const deleted = [];
+            while (i < lines.length && lines[i].startsWith("-") && !lines[i].startsWith("--- ")) {
+              deleted.push(lines[i].slice(1));
+              i += 1;
+            }
+            const added = [];
+            let j = i;
+            while (j < lines.length && lines[j].startsWith("+") && !lines[j].startsWith("+++ ")) {
+              added.push(lines[j].slice(1));
+              j += 1;
+            }
+            const paired = Math.min(deleted.length, added.length);
+            for (let k = 0; k < paired; k++) {
+              const pair = intralineDiffHtml(deleted[k], added[k]);
+              pushDiffRow("del", oldLine++, 0, deleted[k], language, "-", pair.aHtml);
+              pushDiffRow("add", 0, newLine++, added[k], language, "+", pair.bHtml);
+            }
+            for (let k = paired; k < deleted.length; k++) {
+              pushDiffRow("del", oldLine++, 0, deleted[k], language, "-", highlightCodeFragment(deleted[k], language));
+            }
+            for (let k = paired; k < added.length; k++) {
+              pushDiffRow("add", 0, newLine++, added[k], language, "+", highlightCodeFragment(added[k], language));
+            }
+            if (added.length > 0) {
+              i = j - 1;
+            } else {
+              i = i - 1;
+            }
+            continue;
+          }
+
+          if (line.startsWith(" ")) {
+            const body = line.slice(1);
+            pushDiffRow("ctx", oldLine++, newLine++, body, language, " ", highlightCodeFragment(body, language));
+            continue;
+          }
+
+          pushDiffRow("ctx", 0, 0, line, "plaintext", " ");
+        }
+        rerenderRows();
+      }
+
+      function rerenderRows() {
+        clearBody();
+        const query = String(elFindInput.value || "").trim().toLowerCase();
+        for (const row of currentRenderedRows) {
+          if (query && !row.searchText.includes(query)) continue;
+          if (mode === "diff" && elContextToggle.checked && row.kind === "ctx") continue;
+          addRow(row);
+        }
+        const hideLines = !elLineToggle.checked;
+        for (const cell of elBody.querySelectorAll(".line-no, .line-no-new, .line-mark")) {
+          cell.style.display = hideLines ? "none" : "";
+        }
+      }
+
+      async function loadContent() {
+        if (!pathValue) {
+          throw new Error("Missing path in URL");
+        }
+        currentLanguage = languageForPath(pathValue);
+        elPath.textContent = pathValue;
+        const encodedPath = encodePathForGitHub(pathValue);
+
+        if (mode === "diff") {
+          elContextToggleWrap.classList.remove("hidden");
+          if (!fromValue || !toValue) throw new Error("Diff view requires both from and to refs");
+          const payload = await fetchJson(
+            `/api/file-diff?from=${encodeURIComponent(fromValue)}&to=${encodeURIComponent(toValue)}&path=${encodeURIComponent(pathValue)}&v=${Date.now()}`
+          );
+          const patch = String(payload.patch || "");
+          currentRawText = patch;
+          renderDiffPatch(patch, currentLanguage);
+          elMeta.textContent =
+            `Diff: ${String(payload.fromResolved || fromValue).slice(0, 12)} → ${String(payload.toResolved || toValue).slice(0, 12)}`;
+          elGitHub.href = `${githubRepo}/compare/${encodeURIComponent(payload.fromResolved || fromValue)}...${encodeURIComponent(payload.toResolved || toValue)}`;
+          return;
+        }
+        elContextToggleWrap.classList.add("hidden");
+
+        const useRef = refValue || githubBranch;
+        const payload = await fetchJson(
+          `/api/file?ref=${encodeURIComponent(useRef)}&path=${encodeURIComponent(pathValue)}&v=${Date.now()}`
+        );
+        const content = String(payload.content || "");
+        currentRawText = content;
+        renderFileLines(content, currentLanguage);
+        elMeta.textContent = `File @ ${String(payload.resolved || useRef).slice(0, 12)}`;
+        elGitHub.href = `${githubRepo}/blob/${encodeURIComponent(payload.resolved || useRef)}/${encodedPath}`;
+      }
+
+      async function loadSummary() {
+        if (!pathValue) return;
+        setSummaryStatus("", false, true);
+        try {
+          const startedMs = Date.now();
+          while (true) {
+            const url = mode === "diff"
+              ? `/api/summary?from=${encodeURIComponent(fromValue)}&to=${encodeURIComponent(toValue)}&path=${encodeURIComponent(pathValue)}&trigger=1&v=${Date.now()}`
+              : `/api/summary?ref=${encodeURIComponent(refValue || githubBranch)}&path=${encodeURIComponent(pathValue)}&trigger=1&v=${Date.now()}`;
+            const summary = await fetchJson(url);
+            const status = String(summary && summary.status ? summary.status : "");
+            const isLegacyReady = !status && summary && summary.oneLine && summary.paragraph;
+            if (status === "ready" || isLegacyReady) {
+              elSummaryOneLine.textContent = String(summary.oneLine || "");
+              elSummaryParagraph.textContent = String(summary.paragraph || "");
+              setSummaryStatus("", false, false);
+              return;
+            }
+            if (Date.now() - startedMs >= 90_000) {
+              setSummaryStatus("Still generating…", false, false);
+              return;
+            }
+            await new Promise((resolve) => {
+              window.setTimeout(resolve, 1000);
+            });
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          setSummaryStatus(message, true, false);
+        }
+      }
+
+      function scheduleSummaryLoad() {
+        if ("requestIdleCallback" in window) {
+          window.requestIdleCallback(() => {
+            loadSummary();
+          }, { timeout: 1200 });
+          return;
+        }
+        setTimeout(() => {
+          loadSummary();
+        }, 280);
+      }
+
+      elWrapToggle.addEventListener("change", () => {
+        elViewer.classList.toggle("wrap-on", !!elWrapToggle.checked);
+      });
+
+      elLineToggle.addEventListener("change", () => {
+        rerenderRows();
+      });
+
+      elFindInput.addEventListener("input", () => {
+        rerenderRows();
+      });
+
+      elContextToggle.addEventListener("change", () => {
+        rerenderRows();
+      });
+
+      elCopyBtn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(currentRawText);
+          elCopyBtn.textContent = "Copied";
+          setTimeout(() => {
+            elCopyBtn.textContent = "Copy";
+          }, 900);
+        } catch (_err) {
+          elCopyBtn.textContent = "Copy failed";
+          setTimeout(() => {
+            elCopyBtn.textContent = "Copy";
+          }, 1200);
+        }
+      });
+
+      (async function init() {
+        try {
+          await loadContent();
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          currentRawText = message;
+          currentRenderedRows = [{
+            className: "diff-line del",
+            oldNo: 0,
+            newNo: 0,
+            html: highlightCodeFragment(message, "plaintext"),
+            searchText: message.toLowerCase(),
+          }];
+          rerenderRows();
+          setSummaryStatus("Summary unavailable while content failed to load.", true, false);
+          return;
+        }
+        scheduleSummaryLoad();
+      })();
+    </script>
+  </body>
+</html>
