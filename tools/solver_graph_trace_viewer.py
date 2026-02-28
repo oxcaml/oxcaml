@@ -53,6 +53,25 @@ def parse_trace_line(raw_line):
         return None
 
 
+def infer_default_source_file(input_path):
+    abs_input = os.path.abspath(input_path)
+    candidates = []
+    if abs_input.endswith(".ml.corrected"):
+        candidates.append(abs_input[: -len(".corrected")])
+    if abs_input.endswith(".compilers.reference"):
+        stem = abs_input[: -len(".compilers.reference")]
+        candidates.append(stem)
+        if not stem.endswith(".ml"):
+            candidates.append(stem + ".ml")
+    base, ext = os.path.splitext(abs_input)
+    if ext == ".corrected":
+        candidates.append(base)
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
 def load_trace(path, default_source_file=None, drop_backtraces=False):
     events = []
     step_results = {}
@@ -341,7 +360,7 @@ def build_timeline(events, step_results, include_snapshots=True):
     return timeline, order
 
 
-def collect_sources(events, base_dir):
+def collect_sources(events, base_dir, default_source_file=None):
     files = set()
     for event in events:
         if event.get("kind") != "trace_expr_enter":
@@ -353,6 +372,8 @@ def collect_sources(events, base_dir):
         if not file:
             continue
         files.add(file)
+    if isinstance(default_source_file, str) and default_source_file:
+        files.add(default_source_file)
     sources = {}
     for file in sorted(files):
         candidates = [file]
@@ -803,9 +824,125 @@ button:hover {{
   white-space: pre-wrap;
   word-break: break-word;
 }}
+.tuning-toggle {{
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 35;
+}}
+.tuning-panel {{
+  position: fixed;
+  top: 46px;
+  right: 10px;
+  width: min(340px, 94vw);
+  max-height: 84vh;
+  overflow: auto;
+  z-index: 34;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.14);
+}}
+.tuning-panel[hidden] {{
+  display: none;
+}}
+.tuning-head {{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}}
+.tuning-grid {{
+  display: grid;
+  gap: 8px;
+}}
+.tuning-row {{
+  display: grid;
+  gap: 3px;
+}}
+.tuning-row-head {{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}}
+.tuning-value {{
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}}
 </style>
 </head>
 <body>
+  <button id=\"tuning-toggle\" class=\"tuning-toggle\" type=\"button\">
+    Layout Tuning
+  </button>
+  <div id=\"tuning-panel\" class=\"tuning-panel\" hidden>
+    <div class=\"tuning-head\">
+      <div class=\"event-title\">Layout Tuning</div>
+      <button id=\"tuning-reset\" type=\"button\">Reset</button>
+    </div>
+    <div class=\"tuning-grid\">
+      <div class=\"tuning-row\">
+        <div class=\"tuning-row-head\">
+          <label for=\"tune-edge-target\">Edge Target</label>
+          <span id=\"tune-edge-target-value\" class=\"tuning-value\"></span>
+        </div>
+        <input id=\"tune-edge-target\" type=\"range\" min=\"20\" max=\"420\" step=\"1\" />
+      </div>
+      <div class=\"tuning-row\">
+        <div class=\"tuning-row-head\">
+          <label for=\"tune-min-sep\">Min Separation</label>
+          <span id=\"tune-min-sep-value\" class=\"tuning-value\"></span>
+        </div>
+        <input id=\"tune-min-sep\" type=\"range\" min=\"8\" max=\"320\" step=\"1\" />
+      </div>
+      <div class=\"tuning-row\">
+        <div class=\"tuning-row-head\">
+          <label for=\"tune-anchor-k\">Union Anchor Pull</label>
+          <span id=\"tune-anchor-k-value\" class=\"tuning-value\"></span>
+        </div>
+        <input id=\"tune-anchor-k\" type=\"range\" min=\"0\" max=\"10\" step=\"0.001\" />
+      </div>
+      <div class=\"tuning-row\">
+        <div class=\"tuning-row-head\">
+          <label for=\"tune-step-iter\">Per-step Iter Scale</label>
+          <span id=\"tune-step-iter-value\" class=\"tuning-value\"></span>
+        </div>
+        <input id=\"tune-step-iter\" type=\"range\" min=\"0.1\" max=\"10\" step=\"0.05\" />
+      </div>
+      <div class=\"tuning-row\">
+        <div class=\"tuning-row-head\">
+          <label for=\"tune-spring-k\">Spring Stiffness</label>
+          <span id=\"tune-spring-k-value\" class=\"tuning-value\"></span>
+        </div>
+        <input id=\"tune-spring-k\" type=\"range\" min=\"0\" max=\"2\" step=\"0.005\" />
+      </div>
+      <div class=\"tuning-row\">
+        <div class=\"tuning-row-head\">
+          <label for=\"tune-repulsion-k\">Repulsion Strength</label>
+          <span id=\"tune-repulsion-k-value\" class=\"tuning-value\"></span>
+        </div>
+        <input id=\"tune-repulsion-k\" type=\"range\" min=\"0\" max=\"10\" step=\"0.01\" />
+      </div>
+      <div class=\"tuning-row\">
+        <div class=\"tuning-row-head\">
+          <label for=\"tune-col-spring-x\">Column X Spring Scale</label>
+          <span id=\"tune-col-spring-x-value\" class=\"tuning-value\"></span>
+        </div>
+        <input id=\"tune-col-spring-x\" type=\"range\" min=\"0\" max=\"1\" step=\"0.005\" />
+      </div>
+      <div class=\"tuning-row\">
+        <div class=\"tuning-row-head\">
+          <label for=\"tune-canvas-scale\">Layout Bounds</label>
+          <span id=\"tune-canvas-scale-value\" class=\"tuning-value\"></span>
+        </div>
+        <input id=\"tune-canvas-scale\" type=\"range\" min=\"0.5\" max=\"5\" step=\"0.01\" />
+      </div>
+    </div>
+  </div>
   <div class=\"layout\">
     <section class=\"panel\">
       <h1>Solver Graph Trace Viewer</h1>
@@ -851,6 +988,8 @@ button:hover {{
       <div class=\"legend\">
         Node border in orange means changed in selected step.
         Node color is keyed by node prefix letter.
+        Node corner glyph shows creation reason
+        (• new, ↑ above, ↓ below, ↔ bridge, G gencopy, C copy).
         Edge in orange means edge change in selected step.
         Node subtitle shows current level.
         Edge arrows indicate direction.
@@ -900,19 +1039,56 @@ const sourceSelectionClear = document.getElementById("source-selection-clear");
 const nodeTraceMeta = document.getElementById("node-trace-meta");
 const nodeTraceOps = document.getElementById("node-trace-ops");
 const graph = document.getElementById("graph");
+const tuningToggle = document.getElementById("tuning-toggle");
+const tuningPanel = document.getElementById("tuning-panel");
+const tuningReset = document.getElementById("tuning-reset");
+const tuneEdgeTarget = document.getElementById("tune-edge-target");
+const tuneEdgeTargetValue = document.getElementById("tune-edge-target-value");
+const tuneMinSep = document.getElementById("tune-min-sep");
+const tuneMinSepValue = document.getElementById("tune-min-sep-value");
+const tuneAnchorK = document.getElementById("tune-anchor-k");
+const tuneAnchorKValue = document.getElementById("tune-anchor-k-value");
+const tuneStepIter = document.getElementById("tune-step-iter");
+const tuneStepIterValue = document.getElementById("tune-step-iter-value");
+const tuneSpringK = document.getElementById("tune-spring-k");
+const tuneSpringKValue = document.getElementById("tune-spring-k-value");
+const tuneRepulsionK = document.getElementById("tune-repulsion-k");
+const tuneRepulsionKValue = document.getElementById("tune-repulsion-k-value");
+const tuneColSpringX = document.getElementById("tune-col-spring-x");
+const tuneColSpringXValue = document.getElementById("tune-col-spring-x-value");
+const tuneCanvasScale = document.getElementById("tune-canvas-scale");
+const tuneCanvasScaleValue = document.getElementById("tune-canvas-scale-value");
 const backtraceOpen = document.getElementById("backtrace-open");
 const backtraceOverlay = document.getElementById("backtrace-overlay");
 const backtraceDialog = document.getElementById("backtrace-dialog");
 const backtraceClose = document.getElementById("backtrace-close");
 const backtraceMeta = document.getElementById("backtrace-meta");
 const backtraceView = document.getElementById("backtrace-view");
-const LAYOUT_WIDTH = 1200;
-const LAYOUT_HEIGHT = 800;
+const BASE_LAYOUT_WIDTH = 1200;
+const BASE_LAYOUT_HEIGHT = 800;
 const LAYOUT_PAD = 96;
-const LAYOUT_MIN_SEP = 76;
-const EDGE_TARGET = 108;
+const DEFAULT_EDGE_TARGET = 60;
+const DEFAULT_MIN_SEP = 93;
+const DEFAULT_SPRING_K = 0.115;
+const DEFAULT_REPULSION_K = 1.02;
+const DEFAULT_PER_STEP_ANCHOR_K = 0.5;
+const DEFAULT_STEP_ITER_SCALE = 1.1;
+const DEFAULT_LAYOUT_BOUNDS_SCALE = 1;
+const DEFAULT_LEVEL_COLUMNS_SPRING_X_SCALE = 0.005;
+let LAYOUT_MIN_SEP = DEFAULT_MIN_SEP;
+let EDGE_TARGET = DEFAULT_EDGE_TARGET;
+let SOLVER_SPRING_K = DEFAULT_SPRING_K;
+let SOLVER_REPULSION_K = DEFAULT_REPULSION_K;
+let PER_STEP_ANCHOR_K = DEFAULT_PER_STEP_ANCHOR_K;
+let PER_STEP_ITER_SCALE = DEFAULT_STEP_ITER_SCALE;
+let LAYOUT_BOUNDS_SCALE = DEFAULT_LAYOUT_BOUNDS_SCALE;
+let LEVEL_COLUMNS_SPRING_X_SCALE = DEFAULT_LEVEL_COLUMNS_SPRING_X_SCALE;
+let LAYOUT_WIDTH = BASE_LAYOUT_WIDTH;
+let LAYOUT_HEIGHT = BASE_LAYOUT_HEIGHT;
 const ANNEAL_UNION_LAYOUT = false;
 const NODE_RADIUS = 24;
+const MAX_LAYOUT_DELTA_2D = 34;
+const MAX_LAYOUT_DELTA_3D = 38;
 const LEVEL_INFINITY_BASE = 100000000;
 const LEVEL_INFINITY_WINDOW = 4096;
 const DEFAULT_NODE_PALETTE = {{
@@ -967,6 +1143,7 @@ let selectedNodeId = null;
 let hoveredNodeId = null;
 let lastSelectionCaptureMs = 0;
 let selectedBlockFilter = "all";
+let tuningApplyTimer = null;
 
 function perfEnabledFromHash() {{
   const rawHash = window.location.hash.startsWith("#")
@@ -1638,6 +1815,79 @@ function nodePalette(prefix) {{
   return NODE_PREFIX_PALETTE[prefix] || DEFAULT_NODE_PALETTE;
 }}
 
+function classifyCreationReason(provenance) {{
+  if (typeof provenance !== "string" || provenance.length === 0) {{
+    return "unknown";
+  }}
+  if (provenance === "create_gencopy") return "gencopy";
+  if (provenance === "copy") return "copy";
+  if (provenance === "newvar") return "new";
+  if (provenance === "fresh") return "fresh";
+  if (provenance.includes("bridge")) return "bridge";
+  if (provenance.startsWith("newvar_above")) return "above";
+  if (provenance.startsWith("newvar_below")) return "below";
+  if (provenance.startsWith("newvar")) return "new";
+  return "unknown";
+}}
+
+function creationReasonGlyph(reasonClass) {{
+  switch (reasonClass) {{
+    case "new":
+      return "•";
+    case "above":
+      return "↑";
+    case "below":
+      return "↓";
+    case "bridge":
+      return "↔";
+    case "gencopy":
+      return "G";
+    case "copy":
+      return "C";
+    case "fresh":
+      return "F";
+    default:
+      return "?";
+  }}
+}}
+
+function creationReasonColor(reasonClass) {{
+  switch (reasonClass) {{
+    case "above":
+      return "#1f7a4f";
+    case "below":
+      return "#6b46c1";
+    case "bridge":
+      return "#a16207";
+    case "gencopy":
+      return "#7c3aed";
+    case "copy":
+      return "#0f766e";
+    case "new":
+      return "#4b5563";
+    case "fresh":
+      return "#6b7280";
+    default:
+      return "#6b7280";
+  }}
+}}
+
+function nodeCreationProvenance(id, node = null) {{
+  ensureNodeCreationIndex();
+  const creation = nodeCreationById.get(id);
+  if (
+    creation &&
+    typeof creation.provenance === "string" &&
+    creation.provenance.length > 0
+  ) {{
+    return creation.provenance;
+  }}
+  if (node && typeof node.provenance === "string" && node.provenance.length > 0) {{
+    return node.provenance;
+  }}
+  return null;
+}}
+
 function varLabelFromEvent(event, eventId = null) {{
   if (!event || typeof event.var_id !== "number") return "x?";
   if (event.kind === "trace_var_create") {{
@@ -1938,7 +2188,160 @@ function setIndex(nextIndex, options = {{}}) {{
   if (!options.skipHash) syncUrlHashState();
 }}
 
+function formatTuneFixed(value, digits = 3) {{
+  if (!Number.isFinite(value)) return "?";
+  return value.toFixed(digits);
+}}
+
+function applyLayoutBoundsScale() {{
+  const scale = Number.isFinite(LAYOUT_BOUNDS_SCALE) && LAYOUT_BOUNDS_SCALE > 0
+    ? LAYOUT_BOUNDS_SCALE
+    : 1;
+  LAYOUT_WIDTH = BASE_LAYOUT_WIDTH * scale;
+  LAYOUT_HEIGHT = BASE_LAYOUT_HEIGHT * scale;
+  graph.setAttribute("viewBox", `0 0 ${{LAYOUT_WIDTH}} ${{LAYOUT_HEIGHT}}`);
+}}
+
+function refreshTuningValueLabels() {{
+  if (tuneEdgeTargetValue) tuneEdgeTargetValue.textContent = `${{Math.round(EDGE_TARGET)}}`;
+  if (tuneMinSepValue) tuneMinSepValue.textContent = `${{Math.round(LAYOUT_MIN_SEP)}}`;
+  if (tuneAnchorKValue) tuneAnchorKValue.textContent = formatTuneFixed(PER_STEP_ANCHOR_K, 4);
+  if (tuneStepIterValue) tuneStepIterValue.textContent = `${{formatTuneFixed(PER_STEP_ITER_SCALE, 2)}}x`;
+  if (tuneSpringKValue) tuneSpringKValue.textContent = formatTuneFixed(SOLVER_SPRING_K, 3);
+  if (tuneRepulsionKValue) tuneRepulsionKValue.textContent = formatTuneFixed(SOLVER_REPULSION_K, 2);
+  if (tuneColSpringXValue) tuneColSpringXValue.textContent = formatTuneFixed(LEVEL_COLUMNS_SPRING_X_SCALE, 3);
+  if (tuneCanvasScaleValue) tuneCanvasScaleValue.textContent = `${{formatTuneFixed(LAYOUT_BOUNDS_SCALE, 2)}}x`;
+}}
+
+function applyLayoutTuning() {{
+  if (tuningApplyTimer !== null) {{
+    window.clearTimeout(tuningApplyTimer);
+    tuningApplyTimer = null;
+  }}
+  resetLayoutCache();
+  render(currentIndex);
+}}
+
+function scheduleLayoutTuningApply() {{
+  if (tuningApplyTimer !== null) window.clearTimeout(tuningApplyTimer);
+  tuningApplyTimer = window.setTimeout(() => {{
+    tuningApplyTimer = null;
+    applyLayoutTuning();
+  }}, 70);
+}}
+
+function setSliderValue(slider, value) {{
+  if (!slider || !Number.isFinite(value)) return;
+  slider.value = String(value);
+}}
+
+function initTuningPanel() {{
+  if (tuningToggle && tuningPanel) {{
+    tuningToggle.setAttribute("aria-expanded", "false");
+    tuningToggle.addEventListener("click", () => {{
+      const open = tuningPanel.hasAttribute("hidden");
+      if (open) tuningPanel.removeAttribute("hidden");
+      else tuningPanel.setAttribute("hidden", "");
+      tuningToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    }});
+  }}
+
+  setSliderValue(tuneEdgeTarget, EDGE_TARGET);
+  setSliderValue(tuneMinSep, LAYOUT_MIN_SEP);
+  setSliderValue(tuneAnchorK, PER_STEP_ANCHOR_K);
+  setSliderValue(tuneStepIter, PER_STEP_ITER_SCALE);
+  setSliderValue(tuneSpringK, SOLVER_SPRING_K);
+  setSliderValue(tuneRepulsionK, SOLVER_REPULSION_K);
+  setSliderValue(tuneColSpringX, LEVEL_COLUMNS_SPRING_X_SCALE);
+  setSliderValue(tuneCanvasScale, LAYOUT_BOUNDS_SCALE);
+  refreshTuningValueLabels();
+  applyLayoutBoundsScale();
+
+  if (tuneEdgeTarget) {{
+    tuneEdgeTarget.addEventListener("input", () => {{
+      EDGE_TARGET = Number(tuneEdgeTarget.value);
+      refreshTuningValueLabels();
+      scheduleLayoutTuningApply();
+    }});
+  }}
+  if (tuneMinSep) {{
+    tuneMinSep.addEventListener("input", () => {{
+      LAYOUT_MIN_SEP = Number(tuneMinSep.value);
+      refreshTuningValueLabels();
+      scheduleLayoutTuningApply();
+    }});
+  }}
+  if (tuneAnchorK) {{
+    tuneAnchorK.addEventListener("input", () => {{
+      PER_STEP_ANCHOR_K = Number(tuneAnchorK.value);
+      refreshTuningValueLabels();
+      scheduleLayoutTuningApply();
+    }});
+  }}
+  if (tuneStepIter) {{
+    tuneStepIter.addEventListener("input", () => {{
+      PER_STEP_ITER_SCALE = Number(tuneStepIter.value);
+      refreshTuningValueLabels();
+      scheduleLayoutTuningApply();
+    }});
+  }}
+  if (tuneSpringK) {{
+    tuneSpringK.addEventListener("input", () => {{
+      SOLVER_SPRING_K = Number(tuneSpringK.value);
+      refreshTuningValueLabels();
+      scheduleLayoutTuningApply();
+    }});
+  }}
+  if (tuneRepulsionK) {{
+    tuneRepulsionK.addEventListener("input", () => {{
+      SOLVER_REPULSION_K = Number(tuneRepulsionK.value);
+      refreshTuningValueLabels();
+      scheduleLayoutTuningApply();
+    }});
+  }}
+  if (tuneColSpringX) {{
+    tuneColSpringX.addEventListener("input", () => {{
+      LEVEL_COLUMNS_SPRING_X_SCALE = Number(tuneColSpringX.value);
+      refreshTuningValueLabels();
+      scheduleLayoutTuningApply();
+    }});
+  }}
+  if (tuneCanvasScale) {{
+    tuneCanvasScale.addEventListener("input", () => {{
+      LAYOUT_BOUNDS_SCALE = Number(tuneCanvasScale.value);
+      refreshTuningValueLabels();
+      applyLayoutBoundsScale();
+      scheduleLayoutTuningApply();
+    }});
+  }}
+
+  if (tuningReset) {{
+    tuningReset.addEventListener("click", () => {{
+      EDGE_TARGET = DEFAULT_EDGE_TARGET;
+      LAYOUT_MIN_SEP = DEFAULT_MIN_SEP;
+      SOLVER_SPRING_K = DEFAULT_SPRING_K;
+      SOLVER_REPULSION_K = DEFAULT_REPULSION_K;
+      PER_STEP_ANCHOR_K = DEFAULT_PER_STEP_ANCHOR_K;
+      PER_STEP_ITER_SCALE = DEFAULT_STEP_ITER_SCALE;
+      LAYOUT_BOUNDS_SCALE = DEFAULT_LAYOUT_BOUNDS_SCALE;
+      LEVEL_COLUMNS_SPRING_X_SCALE = DEFAULT_LEVEL_COLUMNS_SPRING_X_SCALE;
+      setSliderValue(tuneEdgeTarget, EDGE_TARGET);
+      setSliderValue(tuneMinSep, LAYOUT_MIN_SEP);
+      setSliderValue(tuneAnchorK, PER_STEP_ANCHOR_K);
+      setSliderValue(tuneStepIter, PER_STEP_ITER_SCALE);
+      setSliderValue(tuneSpringK, SOLVER_SPRING_K);
+      setSliderValue(tuneRepulsionK, SOLVER_REPULSION_K);
+      setSliderValue(tuneColSpringX, LEVEL_COLUMNS_SPRING_X_SCALE);
+      setSliderValue(tuneCanvasScale, LAYOUT_BOUNDS_SCALE);
+      refreshTuningValueLabels();
+      applyLayoutBoundsScale();
+      applyLayoutTuning();
+    }});
+  }}
+}}
+
 function initControls() {{
+  initTuningPanel();
   initBlockIndex();
   if (blockSelect) {{
     const allOption = document.createElement("option");
@@ -3152,6 +3555,22 @@ function resetLayoutCache() {{
   blockTouchedSetCache.clear();
 }}
 
+function unionLayoutKey(blockId, columnsMode = false) {{
+  const blockKey =
+    blockId === null || blockId === undefined ? "all" : String(blockId);
+  return `${{blockKey}}|${{columnsMode ? "columns" : "normal"}}`;
+}}
+
+function unionColumnsSeedEventId(blockId) {{
+  if (blockId === null || blockId === undefined) {{
+    if (allEventOrder.length === 0) return null;
+    return allEventOrder[allEventOrder.length - 1];
+  }}
+  const order = blockEventIds.get(blockId) || [];
+  if (order.length === 0) return null;
+  return order[order.length - 1];
+}}
+
 function normalizeNodeLevel(rawLevel) {{
   return Number.isFinite(rawLevel) ? rawLevel : null;
 }}
@@ -3257,8 +3676,354 @@ function boundaryForce(p) {{
     outY = (LAYOUT_HEIGHT - LAYOUT_PAD) - p.y;
   }}
   return {{
-    x: outX * 0.55,
-    y: outY * 0.55,
+    x: outX * 0.55 + outX * Math.abs(outX) * 0.02,
+    y: outY * 0.55 + outY * Math.abs(outY) * 0.02,
+  }};
+}}
+
+function hardClamp2D(p) {{
+  if (!p) return;
+  if (p.x < LAYOUT_PAD) p.x = LAYOUT_PAD;
+  else if (p.x > LAYOUT_WIDTH - LAYOUT_PAD) p.x = LAYOUT_WIDTH - LAYOUT_PAD;
+  if (p.y < LAYOUT_PAD) p.y = LAYOUT_PAD;
+  else if (p.y > LAYOUT_HEIGHT - LAYOUT_PAD) p.y = LAYOUT_HEIGHT - LAYOUT_PAD;
+}}
+
+function capDisp2D(d, maxMag) {{
+  if (!d) return;
+  const mag = Math.hypot(d.x, d.y);
+  if (mag <= maxMag || mag < 1e-9) return;
+  const s = maxMag / mag;
+  d.x *= s;
+  d.y *= s;
+}}
+
+function capDisp3D(d, maxMag) {{
+  if (!d) return;
+  const mag = Math.hypot(d.x, d.y, d.z || 0);
+  if (mag <= maxMag || mag < 1e-9) return;
+  const s = maxMag / mag;
+  d.x *= s;
+  d.y *= s;
+  d.z = (d.z || 0) * s;
+}}
+
+function smoothstepRange(lo, hi, x) {{
+  if (!Number.isFinite(x)) return 0;
+  if (x <= lo) return 0;
+  if (x >= hi) return 1;
+  const t = (x - lo) / Math.max(1e-9, hi - lo);
+  return t * t * (3 - 2 * t);
+}}
+
+function projectNodeToBounds(node) {{
+  if (!node || !node.bounds) return;
+  const b = node.bounds;
+  if (node.x < b.xMin) node.x = b.xMin;
+  else if (node.x > b.xMax) node.x = b.xMax;
+  if (node.y < b.yMin) node.y = b.yMin;
+  else if (node.y > b.yMax) node.y = b.yMax;
+}}
+
+function optimizeProjectedMomentum(nodes, energyGrad, options = {{}}) {{
+  const n = nodes.length;
+  if (n === 0) return;
+  const iterations = Math.max(1, Math.floor(options.iterations || 40));
+  const lrStart = Number.isFinite(options.lrStart) ? options.lrStart : 0.82;
+  const lrEnd = Number.isFinite(options.lrEnd) ? options.lrEnd : 0.22;
+  const warmupFrac = Number.isFinite(options.warmupFrac)
+    ? Math.max(0, Math.min(0.45, options.warmupFrac))
+    : 0.1;
+  const warmupStartScale = Number.isFinite(options.warmupStartScale)
+    ? Math.max(0.01, Math.min(1, options.warmupStartScale))
+    : 0.18;
+  const betaStart =
+    Number.isFinite(options.betaStart) ? options.betaStart : 0.58;
+  const betaEnd = Number.isFinite(options.betaEnd) ? options.betaEnd : 0.9;
+  const stepCap = Number.isFinite(options.stepCap)
+    ? options.stepCap
+    : MAX_LAYOUT_DELTA_2D;
+  const gradCap = Number.isFinite(options.gradCap) ? options.gradCap : 56;
+  const noiseStart = Number.isFinite(options.noiseStart)
+    ? options.noiseStart
+    : 0.42;
+  const noiseSeed = Number.isFinite(options.seed) ? options.seed : 0;
+  const grad = new Array(n);
+  const velocity = new Array(n);
+  for (let i = 0; i < n; i += 1) {{
+    grad[i] = {{ x: 0, y: 0 }};
+    velocity[i] = {{ x: 0, y: 0 }};
+    projectNodeToBounds(nodes[i]);
+  }}
+  const scratch = {{}};
+
+  for (let it = 0; it < iterations; it += 1) {{
+    const t = it / Math.max(1, iterations - 1);
+    energyGrad(nodes, t, grad, scratch);
+    let lr;
+    if (t <= warmupFrac && warmupFrac > 1e-9) {{
+      const u = t / warmupFrac;
+      lr = lrStart * (warmupStartScale + (1 - warmupStartScale) * u);
+    }} else {{
+      const u =
+        warmupFrac >= 1
+          ? 1
+          : (t - warmupFrac) / Math.max(1e-9, 1 - warmupFrac);
+      const c = 0.5 * (1 + Math.cos(Math.PI * Math.max(0, Math.min(1, u))));
+      lr = lrEnd + (lrStart - lrEnd) * c;
+    }}
+    const beta = betaStart + (betaEnd - betaStart) * t;
+    const noiseScale = noiseStart * (1 - t) * (1 - t);
+
+    for (let i = 0; i < n; i += 1) {{
+      const g = grad[i];
+      const v = velocity[i];
+      const node = nodes[i];
+      if (!Number.isFinite(g.x) || !Number.isFinite(g.y)) {{
+        g.x = 0;
+        g.y = 0;
+      }}
+      capDisp2D(g, gradCap);
+      v.x = beta * v.x - lr * g.x;
+      v.y = beta * v.y - lr * g.y;
+      if (noiseScale > 1e-6) {{
+        const nx = seededUnit((it + 1 + noiseSeed) * 911 + (i + 1) * 131) - 0.5;
+        const ny = seededUnit((it + 1 + noiseSeed) * 577 + (i + 1) * 197) - 0.5;
+        v.x += nx * 2 * noiseScale;
+        v.y += ny * 2 * noiseScale;
+      }}
+      capDisp2D(v, stepCap);
+      node.x += v.x;
+      node.y += v.y;
+      projectNodeToBounds(node);
+      const b = node.bounds;
+      if ((node.x <= b.xMin + 1e-6 && v.x < 0) || (node.x >= b.xMax - 1e-6 && v.x > 0)) {{
+        v.x = 0;
+      }}
+      if ((node.y <= b.yMin + 1e-6 && v.y < 0) || (node.y >= b.yMax - 1e-6 && v.y > 0)) {{
+        v.y = 0;
+      }}
+    }}
+  }}
+}}
+
+function makeSpringRepulsionEnergyGrad(params) {{
+  const edges = Array.isArray(params.edges) ? params.edges : [];
+  const springLen = Number.isFinite(params.springLen) ? params.springLen : EDGE_TARGET;
+  const springK = Number.isFinite(params.springK) ? params.springK : 0.088;
+  const springXScale = Number.isFinite(params.springXScale)
+    ? params.springXScale
+    : 1;
+  const repulsionXScale = Number.isFinite(params.repulsionXScale)
+    ? params.repulsionXScale
+    : 1;
+  const columnTargets = Array.isArray(params.columnTargets)
+    ? params.columnTargets
+    : null;
+  const columnK = Number.isFinite(params.columnK) ? params.columnK : 0;
+  const columnStartT = Number.isFinite(params.columnStartT)
+    ? params.columnStartT
+    : 0;
+  const columnEndT = Number.isFinite(params.columnEndT)
+    ? params.columnEndT
+    : 1;
+  const anchorTargets = Array.isArray(params.anchorTargets)
+    ? params.anchorTargets
+    : null;
+  const anchorK = Number.isFinite(params.anchorK) ? params.anchorK : 0;
+  const anchorXWeight = Number.isFinite(params.anchorXWeight)
+    ? Math.max(0, params.anchorXWeight)
+    : 1;
+  const anchorYWeight = Number.isFinite(params.anchorYWeight)
+    ? Math.max(0, params.anchorYWeight)
+    : 1;
+  const anchorStartT = Number.isFinite(params.anchorStartT)
+    ? params.anchorStartT
+    : 0;
+  const anchorEndT = Number.isFinite(params.anchorEndT)
+    ? params.anchorEndT
+    : 0.45;
+  const repulsionRadius = Number.isFinite(params.repulsionRadius)
+    ? params.repulsionRadius
+    : LAYOUT_MIN_SEP;
+  const repulsionK = Number.isFinite(params.repulsionK) ? params.repulsionK : 0.72;
+  const repulsionStartT = Number.isFinite(params.repulsionStartT)
+    ? params.repulsionStartT
+    : 0.14;
+  const repulsionEndT = Number.isFinite(params.repulsionEndT)
+    ? params.repulsionEndT
+    : 0.82;
+  const sameCellAndForwardOffsets = [
+    [0, 0],
+    [1, 0],
+    [1, 1],
+    [0, 1],
+    [-1, 1],
+  ];
+
+  function gridKey(cx, cy) {{
+    return `${{cx}},${{cy}}`;
+  }}
+
+  return function energyGrad(nodes, t, grad, scratch) {{
+    let energy = 0;
+    for (let i = 0; i < grad.length; i += 1) {{
+      grad[i].x = 0;
+      grad[i].y = 0;
+    }}
+
+    for (let i = 0; i < edges.length; i += 1) {{
+      const edge = edges[i];
+      const a = edge.a;
+      const b = edge.b;
+      const na = nodes[a];
+      const nb = nodes[b];
+      if (!na || !nb) continue;
+      let dx = na.x - nb.x;
+      let dy = na.y - nb.y;
+      let dist = Math.hypot(dx, dy);
+      if (dist < 1e-6) {{
+        const nudge = (seededUnit((a + 7) * (b + 11)) - 0.5) * 0.08;
+        dx = 0.03 + nudge;
+        dy = -0.03 + nudge;
+        dist = Math.hypot(dx, dy);
+      }}
+      const stretch = dist - springLen;
+      const w = Number.isFinite(edge.weight) ? edge.weight : 1;
+      const k = springK * (1 + 0.3 * Math.min(4, Math.max(1, w)) - 0.3);
+      energy += 0.5 * k * stretch * stretch;
+      const coeff = (k * stretch) / Math.max(1e-6, dist);
+      const gx = coeff * dx * springXScale;
+      const gy = coeff * dy;
+      grad[a].x += gx;
+      grad[a].y += gy;
+      grad[b].x -= gx;
+      grad[b].y -= gy;
+    }}
+
+    if (columnTargets && columnK > 0) {{
+      const ramp = smoothstepRange(columnStartT, columnEndT, t);
+      if (ramp > 0) {{
+        const k = columnK * ramp;
+        for (let i = 0; i < nodes.length; i += 1) {{
+          const tx = columnTargets[i];
+          if (!Number.isFinite(tx)) continue;
+          const node = nodes[i];
+          const dx = node.x - tx;
+          energy += 0.5 * k * dx * dx;
+          grad[i].x += k * dx;
+        }}
+      }}
+    }}
+
+    if (anchorTargets && anchorK > 0) {{
+      const ramp = smoothstepRange(anchorStartT, anchorEndT, t);
+      if (ramp > 0) {{
+        const k = anchorK * ramp;
+        for (let i = 0; i < nodes.length; i += 1) {{
+          const target = anchorTargets[i];
+          if (!target) continue;
+          const node = nodes[i];
+          const dx = node.x - target.x;
+          const dy = node.y - target.y;
+          energy += 0.5 * k * (anchorXWeight * dx * dx + anchorYWeight * dy * dy);
+          grad[i].x += k * anchorXWeight * dx;
+          grad[i].y += k * anchorYWeight * dy;
+        }}
+      }}
+    }}
+
+    const repRamp = smoothstepRange(repulsionStartT, repulsionEndT, t);
+    if (repRamp <= 0) return energy;
+    const repK = repulsionK * repRamp;
+    const cellSize = Math.max(8, repulsionRadius);
+    let grid = scratch.grid;
+    if (!(grid instanceof Map)) {{
+      grid = new Map();
+      scratch.grid = grid;
+    }}
+    grid.clear();
+    for (let i = 0; i < nodes.length; i += 1) {{
+      const p = nodes[i];
+      const cx = Math.floor(p.x / cellSize);
+      const cy = Math.floor(p.y / cellSize);
+      const key = gridKey(cx, cy);
+      const bucket = grid.get(key);
+      if (bucket) bucket.push(i);
+      else grid.set(key, [i]);
+    }}
+
+    grid.forEach((bucket, key) => {{
+      const comma = key.indexOf(",");
+      const cx = Number(key.slice(0, comma));
+      const cy = Number(key.slice(comma + 1));
+      for (let offIdx = 0; offIdx < sameCellAndForwardOffsets.length; offIdx += 1) {{
+        const off = sameCellAndForwardOffsets[offIdx];
+        const nx = cx + off[0];
+        const ny = cy + off[1];
+        const other = grid.get(gridKey(nx, ny));
+        if (!other) continue;
+        if (off[0] === 0 && off[1] === 0) {{
+          for (let i0 = 0; i0 < bucket.length; i0 += 1) {{
+            const i = bucket[i0];
+            const pi = nodes[i];
+            for (let j0 = i0 + 1; j0 < bucket.length; j0 += 1) {{
+              const j = bucket[j0];
+              const pj = nodes[j];
+              let dx = pi.x - pj.x;
+              let dy = pi.y - pj.y;
+              let dist = Math.hypot(dx, dy);
+              if (dist < 1e-6) {{
+                const nudge = (seededUnit((i + 13) * (j + 17)) - 0.5) * 0.08;
+                dx = 0.03 + nudge;
+                dy = 0.03 - nudge;
+                dist = Math.hypot(dx, dy);
+              }}
+              if (dist >= repulsionRadius) continue;
+              const overlap = repulsionRadius - dist;
+              energy += 0.5 * repK * overlap * overlap;
+              const coeff = (-repK * overlap) / Math.max(1e-6, dist);
+              const gx = coeff * dx;
+              const gy = coeff * dy;
+              grad[i].x += gx * repulsionXScale;
+              grad[i].y += gy;
+              grad[j].x -= gx * repulsionXScale;
+              grad[j].y -= gy;
+            }}
+          }}
+        }} else {{
+          for (let i0 = 0; i0 < bucket.length; i0 += 1) {{
+            const i = bucket[i0];
+            const pi = nodes[i];
+            for (let j0 = 0; j0 < other.length; j0 += 1) {{
+              const j = other[j0];
+              const pj = nodes[j];
+              let dx = pi.x - pj.x;
+              let dy = pi.y - pj.y;
+              let dist = Math.hypot(dx, dy);
+              if (dist < 1e-6) {{
+                const nudge = (seededUnit((i + 19) * (j + 23)) - 0.5) * 0.08;
+                dx = 0.03 + nudge;
+                dy = -0.03 + nudge;
+                dist = Math.hypot(dx, dy);
+              }}
+              if (dist >= repulsionRadius) continue;
+              const overlap = repulsionRadius - dist;
+              energy += 0.5 * repK * overlap * overlap;
+              const coeff = (-repK * overlap) / Math.max(1e-6, dist);
+              const gx = coeff * dx;
+              const gy = coeff * dy;
+              grad[i].x += gx * repulsionXScale;
+              grad[i].y += gy;
+              grad[j].x -= gx * repulsionXScale;
+              grad[j].y -= gy;
+            }}
+          }}
+        }}
+      }}
+    }});
+
+    return energy;
   }};
 }}
 
@@ -3363,29 +4128,169 @@ function relaxAllNodes(
   springs,
   iterations,
   targetEdge = EDGE_TARGET,
-  levelColumns = null
+  levelColumns = null,
+  options = null
 ) {{
-  let step = 1.3;
-  for (let it = 0; it < iterations; it += 1) {{
-    const disp = new Map();
-    nodeIds.forEach((id) => disp.set(id, {{ x: 0, y: 0 }}));
+  if (nodeIds.length === 0) return;
+  const idToIndex = new Map();
+  const nodes = [];
+  const unionAnchorPositions =
+    options && options.unionAnchorPositions instanceof Map
+      ? options.unionAnchorPositions
+      : null;
+  const columnTargetById =
+    levelColumns && levelColumns.targetById instanceof Map
+      ? levelColumns.targetById
+      : null;
+  const anchorTargets = unionAnchorPositions ? new Array(nodeIds.length) : null;
+  const columnTargets = columnTargetById ? new Array(nodeIds.length) : null;
+  const xMinGlobal = LAYOUT_PAD;
+  const xMaxGlobal = LAYOUT_WIDTH - LAYOUT_PAD;
+  const yMinGlobal = LAYOUT_PAD;
+  const yMaxGlobal = LAYOUT_HEIGHT - LAYOUT_PAD;
+  const targets = levelColumns && levelColumns.targetById
+    ? levelColumns.targetById
+    : null;
+  const halfWidth = levelColumns && Number.isFinite(levelColumns.halfWidth)
+    ? levelColumns.halfWidth
+    : null;
 
-    applySpringForces(disp, positions, springs, targetEdge);
-    applyCollisionForces(disp, positions, nodeIds);
-    applyLevelColumnForces(disp, positions, nodeIds, levelColumns);
-
-    nodeIds.forEach((id) => {{
-      const d = disp.get(id);
-      const p = positions.get(id);
-      const border = boundaryForce(p);
-      d.x += border.x;
-      d.y += border.y;
-      p.x += d.x * step;
-      p.y += d.y * step;
+  nodeIds.forEach((id, idx) => {{
+    let p = positions.get(id);
+    if (!p) {{
+      const spanX = LAYOUT_WIDTH - 2 * LAYOUT_PAD;
+      const spanY = LAYOUT_HEIGHT - 2 * LAYOUT_PAD;
+      p = {{
+        x: LAYOUT_PAD + spanX * seededUnit(id * 17 + 3),
+        y: LAYOUT_PAD + spanY * seededUnit(id * 31 + 7),
+      }};
+      positions.set(id, {{ x: p.x, y: p.y }});
+    }}
+    let xMin = xMinGlobal;
+    let xMax = xMaxGlobal;
+    if (targets && halfWidth !== null) {{
+      const tx = targets.get(id);
+      if (Number.isFinite(tx)) {{
+        xMin = Math.max(xMinGlobal, tx - halfWidth);
+        xMax = Math.min(xMaxGlobal, tx + halfWidth);
+      }}
+    }}
+    if (xMin > xMax) {{
+      const mid = 0.5 * (xMin + xMax);
+      xMin = mid;
+      xMax = mid;
+    }}
+    nodes.push({{
+      x: p.x,
+      y: p.y,
+      bounds: {{ xMin, xMax, yMin: yMinGlobal, yMax: yMaxGlobal }},
+      neighbors: [],
     }});
-    confineToLevelColumns(positions, nodeIds, levelColumns);
-    step *= 0.984;
-  }}
+    if (anchorTargets) {{
+      const anchor = unionAnchorPositions.get(id);
+      anchorTargets[idx] =
+        anchor && Number.isFinite(anchor.x) && Number.isFinite(anchor.y)
+          ? {{ x: anchor.x, y: anchor.y }}
+          : null;
+    }}
+    if (columnTargets) {{
+      const tx = columnTargetById.get(id);
+      columnTargets[idx] = Number.isFinite(tx) ? tx : null;
+    }}
+    idToIndex.set(id, idx);
+  }});
+
+  const localEdges = [];
+  springs.forEach((spring) => {{
+    const a = idToIndex.get(spring.a);
+    const b = idToIndex.get(spring.b);
+    if (!Number.isInteger(a) || !Number.isInteger(b) || a === b) return;
+    nodes[a].neighbors.push(b);
+    nodes[b].neighbors.push(a);
+    localEdges.push({{
+      a,
+      b,
+      weight: Number.isFinite(spring.weight) ? spring.weight : 1,
+    }});
+  }});
+
+  const energyGrad = makeSpringRepulsionEnergyGrad({{
+    edges: localEdges,
+    springLen: targetEdge,
+    springK: SOLVER_SPRING_K,
+    springXScale:
+      options && Number.isFinite(options.springXScale)
+        ? options.springXScale
+        : 1,
+    repulsionXScale:
+      options && Number.isFinite(options.repulsionXScale)
+        ? options.repulsionXScale
+        : 1,
+    columnTargets,
+    columnK:
+      options && Number.isFinite(options.columnK)
+        ? options.columnK
+        : levelColumns && Number.isFinite(levelColumns.pull)
+          ? levelColumns.pull * 1.0
+          : 0,
+    columnStartT:
+      options && Number.isFinite(options.columnStartT)
+        ? options.columnStartT
+        : 0,
+    columnEndT:
+      options && Number.isFinite(options.columnEndT)
+        ? options.columnEndT
+        : 1,
+    anchorTargets,
+    anchorK:
+      options && Number.isFinite(options.anchorK)
+        ? options.anchorK
+        : 0,
+    anchorXWeight:
+      options && Number.isFinite(options.anchorXWeight)
+        ? options.anchorXWeight
+        : 1,
+    anchorYWeight:
+      options && Number.isFinite(options.anchorYWeight)
+        ? options.anchorYWeight
+        : 1,
+    anchorStartT:
+      options && Number.isFinite(options.anchorStartT)
+        ? options.anchorStartT
+        : 0,
+    anchorEndT:
+      options && Number.isFinite(options.anchorEndT)
+        ? options.anchorEndT
+        : 0.45,
+    repulsionRadius: LAYOUT_MIN_SEP,
+    repulsionK: SOLVER_REPULSION_K,
+    repulsionStartT: 0.18,
+    repulsionEndT: 0.86,
+  }});
+  optimizeProjectedMomentum(nodes, energyGrad, {{
+    iterations: 200,
+    lrStart: 0.86,
+    lrEnd: 0.22,
+    warmupFrac: 0.1,
+    warmupStartScale: 0.2,
+    betaStart: 0.56,
+    betaEnd: 0.9,
+    stepCap: MAX_LAYOUT_DELTA_2D,
+    gradCap: 60,
+    noiseStart:
+      options && Number.isFinite(options.noiseStart)
+        ? options.noiseStart
+        : 0,
+    seed: nodeIds.length,
+  }});
+
+  nodeIds.forEach((id, idx) => {{
+    const node = nodes[idx];
+    const p = positions.get(id) || {{ x: node.x, y: node.y }};
+    p.x = node.x;
+    p.y = node.y;
+    positions.set(id, p);
+  }});
 }}
 
 function clonePositionMap3D(positions) {{
@@ -3669,9 +4574,11 @@ function relaxAllNodes3D(
       d.x += border.x;
       d.y += border.y;
       d.z += -(p.z || 0) * (0.08 + 0.45 * zPenalty);
+      capDisp3D(d, MAX_LAYOUT_DELTA_3D);
       p.x += d.x * step;
       p.y += d.y * step;
       p.z = (p.z || 0) + d.z * step;
+      hardClamp2D(p);
       if (p.z > 500) p.z = 500;
       else if (p.z < -500) p.z = -500;
     }});
@@ -3843,45 +4750,78 @@ function annealUnionLayout(initial, nodeIds, springs) {{
   }}
 }}
 
-function computeUnionBaseLayout(blockId) {{
+function computeUnionBaseLayout(blockId, columnsMode = false) {{
   const perfToken = perfStart("computeUnionBaseLayout");
   try {{
-  if (unionBasePositionsByBlock.has(blockId)) return;
+  const key = unionLayoutKey(blockId, columnsMode);
+  if (unionBasePositionsByBlock.has(key)) return;
   const ids = allNodeIdsAcrossTimeline(blockId);
   if (ids.length === 0) {{
-    unionBasePositionsByBlock.set(blockId, new Map());
+    unionBasePositionsByBlock.set(key, new Map());
     return;
+  }}
+  let levelColumns = null;
+  if (columnsMode) {{
+    const seedEventId = unionColumnsSeedEventId(blockId);
+    if (Number.isInteger(seedEventId)) {{
+      const seedItem = events[String(seedEventId)] || null;
+      if (seedItem) {{
+        levelColumns = levelColumnsForItem(seedItem, ids, seedEventId);
+      }}
+    }}
   }}
   const unionEdges = allEdgesEverForLayout(blockId);
   const springs = springsFromEdges(ids, unionEdges);
   const positions = initialGridPositions(ids);
   if (ids.length > 1200) {{
-    unionBasePositionsByBlock.set(blockId, positions);
+    unionBasePositionsByBlock.set(key, positions);
     return;
   }}
   const clusterTarget = Math.max(20, EDGE_TARGET * 0.23);
   const warmup = Math.min(120, 50 + ids.length);
-  relaxAllNodes(positions, ids, springs, warmup, clusterTarget);
+  relaxAllNodes(
+    positions,
+    ids,
+    springs,
+    warmup,
+    clusterTarget,
+    levelColumns,
+    {{ noiseStart: 4.6 }}
+  );
   if (!ANNEAL_UNION_LAYOUT) {{
-    unionBasePositionsByBlock.set(blockId, positions);
+    unionBasePositionsByBlock.set(key, positions);
     return;
   }}
   if (ids.length > 700) {{
-    unionBasePositionsByBlock.set(blockId, positions);
+    unionBasePositionsByBlock.set(key, positions);
     return;
   }}
-  unionBasePositionsByBlock.set(
-    blockId,
-    annealUnionLayout(positions, ids, springs)
-  );
+  const annealed = annealUnionLayout(positions, ids, springs);
+  if (levelColumns) {{
+    relaxAllNodes(
+      annealed,
+      ids,
+      springs,
+      90,
+      EDGE_TARGET,
+      levelColumns,
+      {{
+        springXScale: LEVEL_COLUMNS_SPRING_X_SCALE,
+        repulsionXScale: 0.08,
+        columnK: 0.08,
+      }}
+    );
+  }}
+  unionBasePositionsByBlock.set(key, annealed);
   }} finally {{
     perfEnd(perfToken);
   }}
 }}
 
-function basePositionForNode(id, blockId = null) {{
-  computeUnionBaseLayout(blockId);
-  const positions = unionBasePositionsByBlock.get(blockId) || new Map();
+function basePositionForNode(id, blockId = null, columnsMode = false) {{
+  computeUnionBaseLayout(blockId, columnsMode);
+  const key = unionLayoutKey(blockId, columnsMode);
+  const positions = unionBasePositionsByBlock.get(key) || new Map();
   const existing = positions.get(id);
   if (existing) return existing;
   const spanX = LAYOUT_WIDTH - 2 * LAYOUT_PAD;
@@ -3892,7 +4832,12 @@ function basePositionForNode(id, blockId = null) {{
   }};
 }}
 
-function clonePositionsForIds(previous, nodeIds, blockId = null) {{
+function clonePositionsForIds(
+  previous,
+  nodeIds,
+  blockId = null,
+  columnsMode = false
+) {{
   const next = new Map();
   nodeIds.forEach((id) => {{
     const p = previous && previous.get(id);
@@ -3900,7 +4845,7 @@ function clonePositionsForIds(previous, nodeIds, blockId = null) {{
       next.set(id, {{ x: p.x, y: p.y }});
       return;
     }}
-    const base = basePositionForNode(id, blockId);
+    const base = basePositionForNode(id, blockId, columnsMode);
     next.set(id, {{ x: base.x, y: base.y }});
   }});
   return next;
@@ -3912,10 +4857,12 @@ function placeNewNodeLocally(
   fixedIds,
   springs,
   levelColumns = null,
-  blockId = null
+  blockId = null,
+  springXScale = 1,
+  columnsMode = false
 ) {{
   if (!positions.has(newId)) {{
-    const base = basePositionForNode(newId, blockId);
+    const base = basePositionForNode(newId, blockId, columnsMode);
     positions.set(newId, {{ x: base.x, y: base.y }});
   }}
   const p0 = positions.get(newId);
@@ -3974,7 +4921,7 @@ function placeNewNodeLocally(
       const stretch = dist - EDGE_TARGET;
       const stiffness = 0.07 + 0.018 * Math.min(3, spring.weight);
       const force = stiffness * stretch;
-      d.x += ux * force;
+      d.x += ux * force * springXScale;
       d.y += uy * force;
     }});
 
@@ -4013,8 +4960,10 @@ function placeNewNodeLocally(
       const outside = Math.abs(dx) - halfWidth;
       if (outside > 0) d.x += Math.sign(dx) * outside * 0.3;
     }}
+    capDisp2D(d, MAX_LAYOUT_DELTA_2D);
     p.x += d.x * step;
     p.y += d.y * step;
+    hardClamp2D(p);
     if (Number.isFinite(targetX)) {{
       const halfWidth =
         levelColumns && Number.isFinite(levelColumns.halfWidth)
@@ -4036,13 +4985,22 @@ function ensureLayoutForIndex(index) {{
 
   const item = events[String(eventId)];
   const currBlock = eventBlockId(item, 0);
-  computeUnionBaseLayout(currBlock);
+  const columnsMode = !!levelColumnsEnabled;
+  computeUnionBaseLayout(currBlock, columnsMode);
+  const unionAnchors =
+    unionBasePositionsByBlock.get(unionLayoutKey(currBlock, columnsMode)) ||
+    null;
   const orderedIds = nodeIdsForLayout(item, eventId);
   const layoutEdges = layoutEdgesFor(item, eventId);
   const springs = springsFromEdges(orderedIds, layoutEdges);
   const levelColumns = levelColumnsEnabled
     ? levelColumnsForItem(item, orderedIds, eventId)
     : null;
+  const springXScale = levelColumns ? LEVEL_COLUMNS_SPRING_X_SCALE : 1;
+  const repulsionXScale = levelColumns ? 0.08 : 1;
+  const columnCenterK = levelColumns ? 0.08 : 0;
+  const anchorXWeight = levelColumns ? 0 : 1;
+  const anchorYWeight = 1;
 
   let positions;
   const prevId = clamped > 0 ? eventOrder[clamped - 1] : null;
@@ -4052,21 +5010,45 @@ function ensureLayoutForIndex(index) {{
   const blockChanged = prevId !== null && prevBlock !== currBlock;
 
   if (!prevPositions || blockChanged) {{
+    const initIters = Math.max(
+      6,
+      Math.round((levelColumns ? 62 : 46) * PER_STEP_ITER_SCALE)
+    );
     positions = new Map();
     orderedIds.forEach((id) => {{
-      const base = basePositionForNode(id, currBlock);
+      const base = basePositionForNode(id, currBlock, columnsMode);
       positions.set(id, {{ x: base.x, y: base.y }});
     }});
     relaxAllNodes(
       positions,
       orderedIds,
       springs,
-      levelColumns ? 62 : 46,
+      initIters,
       EDGE_TARGET,
-      levelColumns
+      levelColumns,
+      {{
+        unionAnchorPositions: unionAnchors,
+        springXScale,
+        repulsionXScale,
+        columnK: columnCenterK,
+        anchorK: PER_STEP_ANCHOR_K,
+        anchorXWeight,
+        anchorYWeight,
+        anchorStartT: 0,
+        anchorEndT: 0.5,
+      }}
     );
   }} else {{
-    positions = clonePositionsForIds(prevPositions, orderedIds, currBlock);
+    const stepIters = Math.max(
+      4,
+      Math.round((levelColumns ? 30 : 20) * PER_STEP_ITER_SCALE)
+    );
+    positions = clonePositionsForIds(
+      prevPositions,
+      orderedIds,
+      currBlock,
+      columnsMode
+    );
     const existingIds = orderedIds.filter((id) => prevPositions.has(id));
     const newIds = orderedIds.filter((id) => !prevPositions.has(id));
     newIds.forEach((newId) => {{
@@ -4076,16 +5058,29 @@ function ensureLayoutForIndex(index) {{
         existingIds,
         springs,
         levelColumns,
-        currBlock
+        currBlock,
+        springXScale,
+        columnsMode
       );
     }});
     relaxAllNodes(
       positions,
       orderedIds,
       springs,
-      levelColumns ? 30 : 20,
+      stepIters,
       EDGE_TARGET,
-      levelColumns
+      levelColumns,
+      {{
+        unionAnchorPositions: unionAnchors,
+        springXScale,
+        repulsionXScale,
+        columnK: columnCenterK,
+        anchorK: PER_STEP_ANCHOR_K,
+        anchorXWeight,
+        anchorYWeight,
+        anchorStartT: 0,
+        anchorEndT: 0.5,
+      }}
     );
   }}
   layoutCache.set(eventId, positions);
@@ -4157,8 +5152,8 @@ function drawGraph(eventId, index) {{
 
     const left = columnsData.left;
     const right = columnsData.right;
-    const top = LAYOUT_PAD - 10;
-    const bottom = LAYOUT_HEIGHT - LAYOUT_PAD + 10;
+    const top = LAYOUT_PAD - 1.5 * NODE_RADIUS;
+    const bottom = LAYOUT_HEIGHT - LAYOUT_PAD + 1.5 * NODE_RADIUS;
     const step = columnsData.step || (right - left);
 
     const bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
@@ -4288,9 +5283,11 @@ function drawGraph(eventId, index) {{
 
   function drawEdge(edge, removed) {{
     const src =
-      positions.get(edge.src) || basePositionForNode(edge.src, currentBlock);
+      positions.get(edge.src) ||
+      basePositionForNode(edge.src, currentBlock, levelColumnsEnabled);
     const dst =
-      positions.get(edge.dst) || basePositionForNode(edge.dst, currentBlock);
+      positions.get(edge.dst) ||
+      basePositionForNode(edge.dst, currentBlock, levelColumnsEnabled);
     if (!src || !dst) return;
     const stroke = edgeColor(edge, removed);
     const bend = edgeBends.get(edgeKey(edge)) || 0;
@@ -4421,7 +5418,9 @@ function drawGraph(eventId, index) {{
 
   function drawNodes() {{
     orderedIds.forEach((id) => {{
-    const pos = positions.get(id) || basePositionForNode(id, currentBlock);
+    const pos =
+      positions.get(id) ||
+      basePositionForNode(id, currentBlock, levelColumnsEnabled);
     const node = snapshot[String(id)] || {{
       level: null,
       lower: null,
@@ -4502,6 +5501,24 @@ function drawGraph(eventId, index) {{
     label.setAttribute("font-size", "11");
     label.setAttribute("fill", palette.text);
     label.textContent = varLabel(id, node, eventId);
+    const provenance = nodeCreationProvenance(id, node);
+    const reasonClass = classifyCreationReason(provenance);
+    const reasonGlyph = creationReasonGlyph(reasonClass);
+    const reasonColor = creationReasonColor(reasonClass);
+    const reasonLabel = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "text"
+    );
+    reasonLabel.setAttribute("x", String(pos.x));
+    reasonLabel.setAttribute("y", String(pos.y + NODE_RADIUS - 4));
+    reasonLabel.setAttribute("text-anchor", "middle");
+    reasonLabel.setAttribute("font-size", "8.5");
+    reasonLabel.setAttribute("font-weight", "700");
+    reasonLabel.setAttribute("fill", reasonColor);
+    reasonLabel.setAttribute("stroke", "#fffdf7");
+    reasonLabel.setAttribute("stroke-width", "0.8");
+    reasonLabel.setAttribute("paint-order", "stroke");
+    reasonLabel.textContent = reasonGlyph;
     const levelLabel = document.createElementNS(
       "http://www.w3.org/2000/svg",
       "text"
@@ -4516,7 +5533,7 @@ function drawGraph(eventId, index) {{
         ? "?"
         : formatLevelValue(node.level);
     levelLabel.textContent = `L=${{levelText}}`;
-    group.append(circle, label, levelLabel);
+    group.append(circle, label, reasonLabel, levelLabel);
     graph.appendChild(group);
 
     const popupGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
@@ -4547,7 +5564,15 @@ function drawGraph(eventId, index) {{
     creationText.setAttribute("fill", "#3f3a33");
     creationText.textContent =
       `created: ${{creation && creation.loc ? formatLocationCompact(creation.loc) : "unknown"}}`;
-    popupGroup.append(lowerText, upperText, creationText);
+    const reasonText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    reasonText.setAttribute("x", String(popupX));
+    reasonText.setAttribute("y", String(popupY + 30));
+    reasonText.setAttribute("text-anchor", "start");
+    reasonText.setAttribute("font-size", "8.5");
+    reasonText.setAttribute("fill", reasonColor);
+    reasonText.textContent =
+      `reason: ${{provenance || "unknown"}} (${{reasonGlyph}})`;
+    popupGroup.append(lowerText, upperText, creationText, reasonText);
     graph.appendChild(popupGroup);
     const popupBox = popupGroup.getBBox();
     const popupBg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
@@ -4659,9 +5684,14 @@ if (PERF_ENABLED) {{
 
 def main():
     args = parse_args()
+    default_source_file = (
+        args.default_source_file
+        if args.default_source_file is not None
+        else infer_default_source_file(args.input)
+    )
     events, step_results = load_trace(
         args.input,
-        default_source_file=args.default_source_file,
+        default_source_file=default_source_file,
         drop_backtraces=args.drop_backtraces,
     )
     timeline, order = build_timeline(
@@ -4670,7 +5700,11 @@ def main():
         include_snapshots=not args.no_snapshots,
     )
     base_dir = os.path.dirname(os.path.abspath(args.input))
-    sources = collect_sources(events, base_dir)
+    sources = collect_sources(
+        events,
+        base_dir,
+        default_source_file=default_source_file,
+    )
     max_block = annotate_blocks(timeline, order)
     future_relevant_by_block = compute_future_relevant_nodes_by_block(
         timeline, order, max_block

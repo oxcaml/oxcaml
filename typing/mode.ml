@@ -4363,9 +4363,13 @@ let json_position (pos : Lexing.position) =
     pos.pos_lnum (pos.pos_cnum - pos.pos_bol) pos.pos_cnum
 
 let json_location (loc : Location.t) =
+  let file =
+    if String.equal loc.loc_start.pos_fname "" then !Location.input_name
+    else loc.loc_start.pos_fname
+  in
   Printf.sprintf
     {|{"file":%s,"start":%s,"end":%s}|}
-    (json_string loc.loc_start.pos_fname)
+    (json_string file)
     (json_position loc.loc_start)
     (json_position loc.loc_end)
 
