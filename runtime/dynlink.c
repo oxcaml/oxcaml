@@ -171,17 +171,6 @@ void caml_build_primitive_table(char_os * lib_path,
                                 char_os * libs,
                                 char * req_prims)
 {
-<<<<<<< oxcaml
-  char_os * p;
-  char * q;
-
-||||||| upstream-base
-  char_os * tofree1, * tofree2;
-  char_os * p;
-  char * q;
-
-=======
->>>>>>> upstream-incoming
   /* Initialize the search path for dynamic libraries:
      - directories specified on the command line with the -I option
      - directories specified in the CAML_LD_LIBRARY_PATH
@@ -205,26 +194,7 @@ void caml_build_primitive_table(char_os * lib_path,
   caml_ext_table_init(&caml_prim_table, 0x180);
   caml_ext_table_init(&caml_prim_name_table, 0x180);
   if (req_prims != NULL)
-<<<<<<< oxcaml
-    for (q = req_prims; *q != 0; q += strlen(q) + 1) {
-||||||| upstream-base
-#endif
-  for (q = req_prims; *q != 0; q += strlen(q) + 1) {
-    c_primitive prim = lookup_primitive(q);
-    if (prim == NULL)
-          caml_fatal_error("unknown C primitive `%s'", q);
-    caml_ext_table_add(&caml_prim_table, (void *) prim);
-#ifdef DEBUG
-    caml_ext_table_add(&caml_prim_name_table, caml_stat_strdup(q));
-#endif
-  }
-  /* Clean up */
-  caml_stat_free(tofree1);
-  caml_stat_free(tofree2);
-  caml_ext_table_free(&caml_shared_libs_path, 0);
-=======
     for (char *q = req_prims; *q != 0; q += strlen(q) + 1) {
->>>>>>> upstream-incoming
       c_primitive prim = lookup_primitive(q);
       if (prim == NULL)
             caml_fatal_error("unknown C primitive `%s'", q);
@@ -238,21 +208,8 @@ void caml_build_primitive_table(char_os * lib_path,
 
 void caml_build_primitive_table_builtin(void)
 {
-<<<<<<< oxcaml
-  int i;
-  caml_build_primitive_table(NULL, NULL, NULL);
-  for (i = 0; caml_builtin_cprim[i] != 0; i++) {
-||||||| upstream-base
-  int i;
-  caml_ext_table_init(&caml_prim_table, 0x180);
-#ifdef DEBUG
-  caml_ext_table_init(&caml_prim_name_table, 0x180);
-#endif
-  for (i = 0; caml_builtin_cprim[i] != 0; i++) {
-=======
   caml_build_primitive_table(NULL, NULL, NULL);
   for (int i = 0; caml_builtin_cprim[i] != 0; i++) {
->>>>>>> upstream-incoming
     caml_ext_table_add(&caml_prim_table, (void *) caml_builtin_cprim[i]);
     caml_ext_table_add(&caml_prim_name_table,
                        caml_stat_strdup(caml_names_of_builtin_cprim[i]));
@@ -269,71 +226,6 @@ CAMLprim value caml_dynlink_get_bytecode_sections(value unit)
 {
   CAMLparam1(unit);
   CAMLlocal4(ret, tbl, list, str);
-<<<<<<< oxcaml
-  int i, j;
-  ret = caml_alloc(4, 0);
-
-  if (caml_params->section_table != NULL) {
-    /* cf. Symtable.bytecode_sections */
-    const char* sec_names[] = {"SYMB", "CRCS"};
-    tbl = caml_input_value_from_block(caml_params->section_table,
-                                      caml_params->section_table_size);
-    for (i = 0; i < sizeof(sec_names)/sizeof(sec_names[0]); i++) {
-      for (j = 0; j < Wosize_val(tbl); j++) {
-        value kv = Field(tbl, j);
-        if (!strcmp(sec_names[i], String_val(Field(kv, 0))))
-          Store_field(ret, i, Field(kv, 1));
-      }
-    }
-  } else {
-    struct exec_trailer trail;
-    int fd, err;
-    char *sect;
-    int32_t len;
-
-    fd = open_os(caml_params->exe_name, O_RDONLY | O_BINARY);
-    if (fd < 0)
-      caml_failwith("Dynlink: Failed to re-open bytecode executable");
-
-    err = caml_read_trailer(fd, &trail);
-    if (err != 0)
-      caml_failwith("Dynlink: Failed to re-read bytecode trailer");
-
-    caml_read_section_descriptors(fd, &trail);
-
-    len = caml_seek_optional_section(fd, &trail, "SYMB");
-    sect = caml_stat_alloc(len);
-    if (read(fd, sect, len) != len)
-      caml_failwith("Dynlink: error reading SYMB");
-    Store_field(ret, 0,
-      caml_input_value_from_block(sect, len));
-    caml_stat_free(sect);
-
-    len = caml_seek_optional_section(fd, &trail, "CRCS");
-    if (len > 0) {
-      sect = caml_stat_alloc(len);
-      if (read(fd, sect, len) != len)
-        caml_failwith("Dynlink: error reading CRCS");
-      Store_field(ret, 1,
-        caml_input_value_from_block(sect, len));
-      caml_stat_free(sect);
-    }
-
-    caml_stat_free(trail.section);
-    close(fd);
-  }
-
-  list = Val_emptylist;
-  for (i = caml_prim_name_table.size - 1; i >= 0; i--) {
-    str = caml_copy_string(caml_prim_name_table.contents[i]);
-    list = caml_alloc_2(Tag_cons, str, list);
-  }
-  Store_field(ret, 2, list);
-
-  list = Val_emptylist;
-  for (i = caml_shared_libs_path.size - 1; i >= 0; i--) {
-||||||| upstream-base
-=======
   ret = caml_alloc(4, 0);
 
   if (caml_params->section_table != NULL) {
@@ -395,7 +287,6 @@ CAMLprim value caml_dynlink_get_bytecode_sections(value unit)
 
   list = Val_emptylist;
   for (int i = caml_shared_libs_path.size - 1; i >= 0; i--) {
->>>>>>> upstream-incoming
     str = caml_copy_string_of_os(caml_shared_libs_path.contents[i]);
     list = caml_alloc_2(Tag_cons, str, list);
   }

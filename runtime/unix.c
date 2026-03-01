@@ -27,30 +27,13 @@
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
-<<<<<<< oxcaml
-||||||| upstream-base
-#ifdef HAS_GETTIMEOFDAY
-#include <sys/time.h>
-#endif
-=======
-#include "caml/config.h"
-#ifdef HAS_GETTIMEOFDAY
-#include <sys/time.h>
-#endif
->>>>>>> upstream-incoming
 #include <sys/stat.h>
 #include <fcntl.h>
-<<<<<<< oxcaml
 #include <errno.h>
 #include "caml/config.h"
 #ifdef HAS_GETTIMEOFDAY
 #include <sys/time.h>
 #endif
-||||||| upstream-base
-#include <errno.h>
-#include "caml/config.h"
-=======
->>>>>>> upstream-incoming
 #if defined(SUPPORT_DYNAMIC_LINKING) && !defined(BUILDING_LIBCAMLRUNS)
 #define WITH_DYNAMIC_LINKING
 #ifdef __CYGWIN__

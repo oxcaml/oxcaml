@@ -70,18 +70,11 @@ Caml_inline void restore_stack_parent(caml_domain_state* domain_state,
 {
   CAMLassert(Stack_parent(domain_state->current_stack) == NULL);
   if (Is_block(cont)) {
-<<<<<<< oxcaml
     struct stack_info* parent_stack = Ptr_val(caml_continuation_use(cont));
-||||||| upstream-base
-  Stack_parent(domain_state->current_stack) = parent_stack;
-=======
-    struct stack_info* parent_stack = Ptr_val(Op_val(cont)[0]);
->>>>>>> upstream-incoming
     Stack_parent(domain_state->current_stack) = parent_stack;
   }
 }
 
-<<<<<<< oxcaml
 static value raise_if_exception(value res)
 {
   if (Is_exception_result(res)) {
@@ -95,10 +88,6 @@ static value raise_if_exception(value res)
   return res;
 }
 
-||||||| upstream-base
-
-=======
->>>>>>> upstream-incoming
 #ifndef NATIVE_CODE
 
 /* Bytecode callbacks */
@@ -108,7 +97,8 @@ static value raise_if_exception(value res)
 #include "caml/fix_code.h"
 #include "caml/fiber.h"
 
-static opcode_t callback_code[] = { STOP };
+static opcode_t callback_code[] =
+  { STOP };
 
 void caml_init_callbacks(void)
 {
@@ -424,6 +414,48 @@ CAMLexport value caml_callback2_exn(value closure, value arg1, value arg2)
   return res;
 }
 
+/* Exception-propagating variants of the above */
+CAMLexport value caml_callback3_exn(value closure, value arg1, value arg2,
+                                    value arg3)
+{
+  value res = callback3_global(closure, arg1, arg2, arg3);
+  Caml_state->raising_async_exn = 0;
+  return res;
+}
+
+CAMLexport value caml_callbackN_exn(value closure, int narg, value args[])
+{
+  value res = callbackN_global(closure, narg, args);
+  Caml_state->raising_async_exn = 0;
+  return res;
+}
+
+/* Functions that propagate all exceptions, with any asynchronous exceptions
+   also being propagated asynchronously. */
+
+CAMLexport value caml_callback (value closure, value arg)
+{
+  return raise_if_exception(callback(closure, arg));
+}
+
+CAMLexport value caml_callback2 (value closure, value arg1, value arg2)
+{
+  return raise_if_exception(callback2_global(closure, arg1, arg2));
+}
+
+CAMLexport value caml_callback3 (value closure, value arg1, value arg2,
+                                 value arg3)
+{
+  return raise_if_exception(callback3_global(closure, arg1, arg2, arg3));
+}
+
+CAMLexport value caml_callbackN (value closure, int narg, value args[])
+{
+  return raise_if_exception(callbackN_global(closure, narg, args));
+}
+
+#endif
+
 /* Result-returning variants of the above */
 
 Caml_inline caml_result Result_encoded(value encoded)
@@ -458,78 +490,6 @@ CAMLexport caml_result caml_callback3_res(
   return Result_encoded(caml_callback3_exn(closure, arg1, arg2, arg3));
 }
 
-
-/* Exception-propagating variants of the above */
-CAMLexport value caml_callback3_exn(value closure, value arg1, value arg2,
-                                    value arg3)
-{
-  value res = callback3_global(closure, arg1, arg2, arg3);
-  Caml_state->raising_async_exn = 0;
-  return res;
-}
-
-CAMLexport value caml_callbackN_exn(value closure, int narg, value args[])
-{
-  value res = callbackN_global(closure, narg, args);
-  Caml_state->raising_async_exn = 0;
-  return res;
-}
-
-/* Functions that propagate all exceptions, with any asynchronous exceptions
-   also being propagated asynchronously. */
-
-static value encoded_value_or_raise(value res)
-{
-  if (Is_exception_result(res)) caml_raise(Extract_exception(res));
-  return res;
-}
-
-CAMLexport value caml_callback (value closure, value arg)
-{
-<<<<<<< oxcaml
-  return raise_if_exception(callback(closure, arg));
-||||||| upstream-base
-  return caml_raise_if_exception(caml_callback_exn(closure, arg));
-=======
-  return encoded_value_or_raise(caml_callback_exn(closure, arg));
->>>>>>> upstream-incoming
-}
-
-CAMLexport value caml_callback2 (value closure, value arg1, value arg2)
-{
-<<<<<<< oxcaml
-  return raise_if_exception(callback2_global(closure, arg1, arg2));
-||||||| upstream-base
-  return caml_raise_if_exception(caml_callback2_exn(closure, arg1, arg2));
-=======
-  return encoded_value_or_raise(caml_callback2_exn(closure, arg1, arg2));
->>>>>>> upstream-incoming
-}
-
-CAMLexport value caml_callback3 (value closure, value arg1, value arg2,
-                                 value arg3)
-{
-<<<<<<< oxcaml
-  return raise_if_exception(callback3_global(closure, arg1, arg2, arg3));
-||||||| upstream-base
-  return caml_raise_if_exception(caml_callback3_exn(closure, arg1, arg2, arg3));
-=======
-  return encoded_value_or_raise(caml_callback3_exn(closure, arg1, arg2, arg3));
->>>>>>> upstream-incoming
-}
-
-CAMLexport value caml_callbackN (value closure, int narg, value args[])
-{
-<<<<<<< oxcaml
-  return raise_if_exception(callbackN_global(closure, narg, args));
-||||||| upstream-base
-  return caml_raise_if_exception(caml_callbackN_exn(closure, narg, args));
-=======
-  return encoded_value_or_raise(caml_callbackN_exn(closure, narg, args));
->>>>>>> upstream-incoming
-}
-
-#endif
 
 /* Naming of OCaml values */
 
@@ -571,18 +531,9 @@ CAMLprim value caml_register_named_value(value vname, value val)
     }
   }
   if (!found) {
-<<<<<<< oxcaml
-    struct named_value *nv = (struct named_value *)
-      caml_stat_alloc(sizeof(struct named_value) + namelen);
-||||||| upstream-base
-    nv = (struct named_value *)
-      caml_stat_alloc(sizeof(struct named_value) + namelen);
-    memcpy(nv->name, name, namelen + 1);
-=======
     size_t namelen = strlen(String_val(vname));
     struct named_value * nv =
       caml_stat_alloc(sizeof(struct named_value) + namelen + 1);
->>>>>>> upstream-incoming
     memcpy(nv->name, String_val(vname), namelen + 1);
     nv->val = val;
     nv->next = named_value_table[h];
@@ -623,19 +574,17 @@ CAMLexport void caml_iterate_named_values(caml_named_action f)
 
 CAMLprim value caml_with_async_exns(value body_callback)
 {
-  value res;
-  res = caml_callback_exn(body_callback, Val_unit);
+  caml_result res = Result_encoded(caml_callback_exn(body_callback, Val_unit));
 
   /* raised as a normal exn, even if it was asynchronous */
-  if (Is_exception_result(res)) {
+  if (caml_result_is_exception(res)) {
     /* Drain the queue of pending actions. We may need to do
        this several times if some raise */
     do {
-      res = Extract_exception(res);
-      res = caml_process_pending_actions_with_root_exn(res);
-    } while (Is_exception_result(res));
-    caml_raise(res);
+      res = caml_process_pending_actions_with_root_res(res.data);
+    } while (caml_result_is_exception(res));
+    caml_raise(res.data);
   }
 
-  return res;
+  return res.data;
 }

@@ -466,18 +466,6 @@ CAMLexport void caml_main(char_os **argv)
   /* Determine options */
   caml_parse_ocamlrunparam();
 
-<<<<<<< oxcaml
-#ifdef DEBUG
-  // Silenced in oxcaml to make it easier to run tests that
-  // check program output.
-  // CAML_GC_MESSAGE (ANY, "### OCaml runtime: debug mode ###\n");
-#endif
-||||||| upstream-base
-#ifdef DEBUG
-  caml_gc_message (-1, "### OCaml runtime: debug mode ###\n");
-#endif
-=======
->>>>>>> upstream-incoming
   if (!caml_startup_aux(/* pooling */ caml_params->cleanup_on_exit))
     return;
 
@@ -615,18 +603,6 @@ CAMLexport value caml_startup_code_exn(
   /* Determine options */
   caml_parse_ocamlrunparam();
 
-<<<<<<< oxcaml
-#ifdef DEBUG
-  // Silenced in oxcaml to make it easier to run tests that
-  // check program output.
-  // CAML_GC_MESSAGE (ANY, "### OCaml runtime: debug mode ###\n");
-#endif
-||||||| upstream-base
-#ifdef DEBUG
-  caml_gc_message (-1, "### OCaml runtime: debug mode ###\n");
-#endif
-=======
->>>>>>> upstream-incoming
   if (caml_params->cleanup_on_exit)
     pooling = 1;
   if (!caml_startup_aux(pooling))

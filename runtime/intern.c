@@ -337,14 +337,7 @@ static void readfloats(struct caml_intern_state* s,
 
 CAMLnoret static void intern_stack_overflow(struct caml_intern_state* s)
 {
-<<<<<<< oxcaml
-  CAML_GC_MESSAGE(DEBUG,
-                  "Stack overflow in un-marshaling value\n");
-||||||| upstream-base
-  caml_gc_message (0x04, "Stack overflow in un-marshaling value\n");
-=======
-  CAML_GC_MESSAGE(HEAPSIZE, "Stack overflow in un-marshaling value\n");
->>>>>>> upstream-incoming
+  CAML_GC_MESSAGE(DEBUG, "Stack overflow in un-marshaling value\n");
   intern_cleanup(s);
   caml_raise_out_of_memory();
 }
@@ -445,17 +438,9 @@ static value intern_alloc_obj(struct caml_intern_state* s, caml_domain_state* d,
       intern_cleanup (s);
       caml_raise_out_of_memory();
     }
-<<<<<<< oxcaml
-    d->allocated_words += Whsize_wosize(wosize);
-    d->allocated_words_direct += Whsize_wosize(wosize);
-    Hd_hp(p) = Make_header (wosize, tag, caml_allocation_status());
-||||||| upstream-base
-    Hd_hp(p) = Make_header (wosize, tag, caml_global_heap_state.MARKED);
-=======
     caml_update_major_allocated_words(
       d, Whsize_wosize(wosize), 1 /* direct */);
-    Hd_hp(p) = Make_header (wosize, tag, caml_global_heap_state.MARKED);
->>>>>>> upstream-incoming
+    Hd_hp(p) = Make_header (wosize, tag, caml_allocation_status());
     caml_memprof_sample_block(Val_hp(p), wosize,
                               Whsize_wosize(wosize),
                               CAML_MEMPROF_SRC_MARSHAL);
