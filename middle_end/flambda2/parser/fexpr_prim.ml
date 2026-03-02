@@ -152,32 +152,22 @@ let block_access_kind =
             | Naked_floats _ | Mixed _ -> None)
           value ])
 
-(* Awkwardly using function type to access number of argument *)
-let block_kind : (int -> P.Block_kind.t) param_cons =
+type block_kind =
+  | FNaked_floats
+  | FValues of Tag.Scannable.t
+
+let block_kind : block_kind param_cons =
   D.(
     either
-      ~no_match_handler:
-        P.Block_kind.(
-          fun bak ->
-            match bak 1 with
-            | Mixed _ as bak -> Misc.fatal_errorf "Unsupported %a" print bak
-            | Values _ | Naked_floats -> assert false)
       [ case
-          ~box:(fun _ () -> fun _ -> P.Block_kind.Naked_floats)
-          ~unbox:(fun _ bak ->
-            match (bak 1 : P.Block_kind.t) with
-            | Naked_floats -> Some ()
-            | Values _ | Mixed _ -> None)
+          ~box:(fun _ () -> FNaked_floats)
+          ~unbox:(fun _ bk ->
+            match bk with FNaked_floats -> Some () | FValues _ -> None)
           (flag "floats");
         case
-          ~box:(fun _ tag ->
-            fun n ->
-             P.Block_kind.Values
-               (tag, List.init n (fun _ -> Flambda_kind.With_subkind.any_value)))
-          ~unbox:(fun _ bak ->
-            match (bak 1 : P.Block_kind.t) with
-            | Values (tag, _) -> Some tag
-            | Naked_floats | Mixed _ -> None)
+          ~box:(fun _ tag -> FValues tag)
+          ~unbox:(fun _ bk ->
+            match bk with FValues tag -> Some tag | FNaked_floats -> None)
           (positional scannable_tag) ])
 
 let string_accessor_width =
@@ -809,7 +799,13 @@ let make_block =
     variadic "%block"
       ~params:(param3 mutability block_kind alloc_mode_for_allocation)
       (fun _ (m, k, a) n ->
-        let kind = k n in
+        let kind =
+          match k with
+          | FValues t ->
+            P.Block_kind.Values
+              (t, List.init n (fun _ -> Flambda_kind.With_subkind.any_value))
+          | FNaked_floats -> P.Block_kind.Naked_floats
+        in
         P.Make_block (kind, m, a)))
 
 let make_array =
@@ -917,8 +913,10 @@ module OfFlambda = struct
     | Begin_try_region { ghost = false } -> begin_try_region env ()
     | Begin_region { ghost = true } -> begin_ghost_region env ()
     | Begin_try_region { ghost = true } -> begin_try_ghost_region env ()
-    | Make_block (((Values _ | Naked_floats) as kind), mutability, alloc) ->
-      make_block env (mutability, (fun _ -> kind), alloc)
+    | Make_block (Values (tag, _), mutability, alloc) ->
+      make_block env (mutability, FValues tag, alloc)
+    | Make_block (Naked_floats, mutability, alloc) ->
+      make_block env (mutability, FNaked_floats, alloc)
     | Make_array (kind, mutability, alloc) ->
       make_array env (kind, mutability, alloc)
     | Make_block (Mixed (_, _), _, _) ->

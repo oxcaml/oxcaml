@@ -58,6 +58,7 @@ type const =
   | Naked_float of float
   | Naked_int8 of Numeric_types.Int8.t
   | Naked_int16 of Numeric_types.Int16.t
+    (* CR bclement/keryan: we could consider using Reg_width_const.t directly *)
   | Naked_int32 of int32
   | Naked_int64 of int64
   | Naked_vec128 of Vector_types.Vec128.Bit_pattern.bits
