@@ -314,7 +314,7 @@ spill_one_or_two:
   movq  %rbx, 8(%rsp)
   movq  %rdi, %rbx
   movl  $1, %eax
-  movq  (%rbx), %rdi
+  movq  (%rbx), %rdi\
   call  *%rdi
 .L107:
   movq  (%rsp), %rax
@@ -322,6 +322,107 @@ spill_one_or_two:
   leaq  -1(%rax,%rbx), %rax
   addq  $24, %rsp
   ret
+|}]
+
+
+(* This triggers a rare path where the closure register spill is hoisted
+   out of the loop but also pushed into the loop, and then a spill-unspill
+   pair gets eliminated, resulting in a spill without explicit unspill.
+*)
+let double_loop_no_definition_at_beginning array n list =
+  let rec iter f = function
+    [] -> ()
+    | a::l -> f a; iter f l
+  in
+  for i = 0 to n do
+    let[@inline never] f x = array.(x) <- i in
+    iter f list;
+  done
+[%%expect_asm X86_64{|
+double_loop_no_definition_at_beginning:
+  subq  $72, %rsp
+  movq  64(%r14), %rsi
+  cmpq  $1, %rbx
+  jl    .L147
+  movq  %rsi, 48(%rsp)
+  movq  %rdi, 16(%rsp)
+  movq  %rbx, 8(%rsp)
+  movq  %rax, (%rsp)
+  movl  $1, %esi
+  movq  %rsi, 32(%rsp)
+.L112:
+  movq  32(%rsp), %rsi
+  movq  64(%r14), %rsi
+  movq  %rsi, 40(%rsp)
+  movq  64(%r14), %rsi
+  subq  $40, %rsi
+  movq  %rsi, 64(%r14)
+  cmpq  80(%r14), %rsi
+  jl    .L154
+.L155:
+  addq  72(%r14), %rsi
+  addq  $8, %rsi
+  movq  $5111, -8(%rsi)
+  movq  camlTOP14__f_33_37_code@GOTPCREL(%rip), %rdx
+  movq  %rdx, (%rsi)
+  movabsq $108086391056891911, %rdx
+  movq  %rdx, 8(%rsi)
+  movq  32(%rsp), %rdx
+  movq  %rdx, 16(%rsi)
+  movq  %rax, 24(%rsi)
+  movq  %rsi, 56(%rsp)
+  movq  %rdi, %rsi
+  testb $1, %sil
+  jne   .L133
+.L126:
+  movq  %rsi, 24(%rsp)
+  movq  (%rsi), %rax
+  movq  56(%rsp), %rbx
+  call  camlTOP14__f_33_37_code@PLT
+.L156:
+  movq  32(%rsp), %rax
+  movq  24(%rsp), %rsi
+  movq  8(%rsi), %rsi
+  movq  (%rsp), %rax
+  movq  8(%rsp), %rbx
+  movq  16(%rsp), %rdi
+  testb $1, %sil
+  je    .L126
+.L133:
+  movq  40(%rsp), %rsi
+  movq  %rsi, 64(%r14)
+  movq  32(%rsp), %rsi
+  cmpq  %rbx, %rsi
+  jne   .L136
+  movq  48(%rsp), %rsi
+  jmp   .L147
+.L136:
+  addq  $2, %rsi
+  movq  %rsi, 32(%rsp)
+  jmp   .L112
+.L147:
+  movq  %rsi, 64(%r14)
+  movl  $1, %eax
+  addq  $72, %rsp
+  ret
+
+double_loop_no_definition_at_beginning.f:
+  movq  24(%rbx), %rsi
+  movq  -8(%rsi), %rdi
+  salq  $8, %rdi
+  shrq  $17, %rdi
+  cmpq  %rdi, %rax
+  jae   .L175
+  movq  16(%rbx), %rbx
+  movq  %rbx, -4(%rsi,%rax,4)
+  movl  $1, %eax
+  ret
+.L175:
+  movq  camlTOP14__block715@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
 |}]
 
 

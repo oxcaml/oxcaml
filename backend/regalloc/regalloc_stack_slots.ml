@@ -39,11 +39,6 @@ let[@inline] get_or_create t reg =
     Reg.Tbl.replace t.stack_slots reg res;
     res
 
-let[@inline] get_or_fatal t reg =
-  match Reg.Tbl.find_opt t.stack_slots reg with
-  | None -> fatal "register %a has no associated slot" Printreg.reg reg
-  | Some slot -> slot
-
 let[@inline] use_same_slot_or_fatal t reg ~existing =
   match Reg.Tbl.find_opt t.stack_slots existing with
   | None -> fatal "register %a has no associated slot" Printreg.reg existing

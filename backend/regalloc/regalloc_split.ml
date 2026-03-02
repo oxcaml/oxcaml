@@ -152,7 +152,7 @@ let make_spill : type a. a make_operation =
     | Some stack_reg -> stack_reg
     | None ->
       let slots = State.stack_slots state in
-      let slot : int = Regalloc_stack_slots.get_or_fatal slots old_reg in
+      let slot : int = Regalloc_stack_slots.get_or_create slots old_reg in
       let stack : Reg.t =
         Reg.create_with_typ_and_name ~prefix_if_var:"stack" old_reg
       in
