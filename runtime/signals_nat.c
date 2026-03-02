@@ -103,7 +103,7 @@ void caml_garbage_collection(void)
 
   if (nallocs == 0) {
     /* This is a poll */
-    caml_process_pending_actions();
+    caml_process_pending_actions_flags(CAML_FROM_CAML);
     return;
   }
 
