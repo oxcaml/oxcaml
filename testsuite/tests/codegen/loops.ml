@@ -161,7 +161,8 @@ f.do_work:
 |}]
 
 
-(* CR ttebbi: noop loop could be eliminated *)
+(* CR ttebbi: noop loop could be eliminated
+   https://github.com/oxcaml/oxcaml/issues/4752 *)
 let noop_loop lo hi = for i = lo to hi do () done
 [%%expect_asm X86_64{|
 noop_loop:

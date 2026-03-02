@@ -299,3 +299,42 @@ is_int_branch:
   movl  $1, %eax
   ret
 |}]
+
+
+(* CR ttebbi: https://github.com/oxcaml/oxcaml/issues/2521 *)
+let is_block_branch (x : 'a) f = if not(obj_is_int x) then f()
+[%%expect_asm X86_64{|
+is_block_branch:
+  testb $1, %al
+  je    .L105
+  movl  $1, %eax
+  ret
+.L105:
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+|}]
+
+
+(* CR ttebbi: https://github.com/oxcaml/oxcaml/issues/2929 *)
+let branch_or_tailcall x =
+  let[@inline never] failure _ = failwith "..." in
+  match x with
+  | 0 -> 5
+  | 1 -> 3
+  | 2 -> 7
+  | n -> failure n
+[%%expect_asm X86_64{|
+branch_or_tailcall:
+  cmpq  $5, %rax
+  jbe   .L105
+  movq  camlTOP25__Pmakeblock786@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
+.L105:
+  movq  camlTOP25__switch_block787@GOTPCREL(%rip), %rbx
+  movq  -4(%rbx,%rax,4), %rax
+  ret
+|}]
