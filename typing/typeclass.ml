@@ -1258,9 +1258,11 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
             in
             (id,
              {exp_desc =
-              Texp_ident(path, mknoloc (Longident.Lident (Ident.name id)), vd,
-                         Id_value, aliased_many_use,
-                         Mode.Value.(disallow_right legacy));
+              Texp_ident { path;
+                           lid = mknoloc (Longident.Lident (Ident.name id));
+                           desc = vd; kind = Id_value;
+                           unique_use = aliased_many_use;
+                           mode = Mode.Value.(disallow_right legacy) };
               exp_loc = Location.none; exp_extra = [];
               exp_type = Ctype.instance vd.val_type;
               exp_attributes = []; (* check *)
@@ -1467,9 +1469,11 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
              in
              let expr =
                {exp_desc =
-                Texp_ident(path, mknoloc(Longident.Lident (Ident.name id)),vd,
-                           Id_value, aliased_many_use,
-                           Mode.Value.(disallow_right legacy));
+                Texp_ident { path;
+                             lid = mknoloc (Longident.Lident (Ident.name id));
+                             desc = vd; kind = Id_value;
+                             unique_use = aliased_many_use;
+                             mode = Mode.Value.(disallow_right legacy) };
                 exp_loc = Location.none; exp_extra = [];
                 exp_type = ty;
                 exp_attributes = [];
