@@ -874,7 +874,7 @@ static void custom_finalize_minor (caml_domain_state * domain)
        elt < domain->minor_tables->custom.ptr; elt++) {
     value *v = &elt->block;
     if (Is_block(*v) && Is_young(*v)) {
-      if (!Is_promoted_hd(get_header_val(*v))) { /* value not copied to major heap */
+      if (!Is_promoted_hd(Hd_val(*v))) { /* value not copied to major heap */
         void (*final_fun)(value) = Custom_ops_val(*v)->finalize;
         if (final_fun != NULL) final_fun(*v);
       }

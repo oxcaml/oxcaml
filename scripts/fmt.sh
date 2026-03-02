@@ -33,5 +33,7 @@ exit_code=0
 $opam_exec dune build @fmt --auto-promote || exit_code=1
 # Format owee files explicitly (external/ is vendored so dune skips it)
 $opam_exec ocamlformat -i external/owee/owee_archive.ml external/owee/owee_archive.mli || exit_code=1
-scripts/80ch.sh || exit_code=1
+if [[ ! -v SKIP_80CH ]]; then
+  scripts/80ch.sh || exit_code=1
+fi
 exit $exit_code

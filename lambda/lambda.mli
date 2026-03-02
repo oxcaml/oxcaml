@@ -649,6 +649,8 @@ val generic_value : value_kind
 *)
 val layout_of_extern_repr : extern_repr -> layout
 
+val element_layout_of_array_kind : array_kind -> layout
+
 val extern_repr_involves_unboxed_products : extern_repr -> bool
 
 type structured_constant =
@@ -1355,6 +1357,11 @@ val mod_field:
 val structured_constant_layout : structured_constant -> layout
 
 val mixed_block_element_of_layout : layout -> unit mixed_block_element
+
+(** Returns the element at the given path in a mixed block shape.
+    The path is a list of field indices for navigating into nested products. *)
+val project_from_mixed_block_shape
+  : 'a mixed_block_element array -> path:int list -> 'a mixed_block_element
 
 (** [Pintval] if a type of [value] jkind is GC-ignorable based on its provided
     externality, and [Pgenval] otherwise. *)

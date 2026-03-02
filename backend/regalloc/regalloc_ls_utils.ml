@@ -325,9 +325,9 @@ module ClassIntervals = struct
 end
 
 let log_interval ~kind (interval : Interval.t) =
-  let reg_class = Reg_class.of_machtype interval.reg.typ in
-  log "%s %a (class %a) [%d..%d]" kind Printreg.reg interval.reg Reg_class.print
-    reg_class interval.begin_ interval.end_;
+  let reg_class = Regs.Reg_class.of_machtype interval.reg.typ in
+  log "%s %a (class %a) [%d..%d]" kind Printreg.reg interval.reg
+    Regs.Reg_class.print reg_class interval.begin_ interval.end_;
   let ranges = Buffer.create 128 in
   let first = ref true in
   DLL.iter interval.ranges ~f:(fun { Range.begin_; end_ } ->
