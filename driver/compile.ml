@@ -22,22 +22,15 @@ let with_info =
   Compile_common.with_info ~backend:Byte ~tool_name
 
 let interface ~source_file ~output_prefix =
-<<<<<<< oxcaml
-  with_info ~source_file ~output_prefix ~dump_ext:"cmi"
-    ~compilation_unit:Inferred_from_output_prefix ~kind:Intf
-  @@ fun info ->
+  let unit_info =
+    unit_info_from_cu_or_output_prefix ~source_file Intf ~output_prefix
+      ~compilation_unit:Inferred_from_output_prefix
+  in
+  with_info ~dump_ext:"cmi" unit_info @@ fun info ->
   Compile_common.interface
     ~hook_parse_tree:(fun _ -> ())
     ~hook_typed_tree:(fun _ -> ())
     info
-||||||| upstream-base
-  with_info ~source_file ~output_prefix ~dump_ext:"cmi" @@ fun info ->
-  Compile_common.interface info
-=======
-  let unit_info = Unit_info.make ~source_file Intf output_prefix in
-  with_info ~dump_ext:"cmi" unit_info @@ fun info ->
-  Compile_common.interface info
->>>>>>> upstream-incoming
 
 (** Bytecode compilation backend for .ml files. *)
 
@@ -102,7 +95,6 @@ let emit_bytecode i
             ~main_module_block_format ~arg_descr);
     )
 
-<<<<<<< oxcaml
 type starting_point =
   | Parsing
   | Instantiation of {
@@ -114,35 +106,17 @@ type starting_point =
 let starting_point_of_compiler_pass start_from =
   match (start_from:Clflags.Compiler_pass.t) with
   | Parsing -> Parsing
-||||||| upstream-base
-let implementation ~start_from ~source_file ~output_prefix =
-  let backend info typed =
-    let bytecode = to_bytecode info typed in
-    emit_bytecode info bytecode
-  in
-  with_info ~source_file ~output_prefix ~dump_ext:"cmo" @@ fun info ->
-  match (start_from : Clflags.Compiler_pass.t) with
-  | Parsing -> Compile_common.implementation info ~backend
-=======
-let implementation ~start_from ~source_file ~output_prefix =
-  let backend info typed =
-    let bytecode = to_bytecode info typed in
-    emit_bytecode info bytecode
-  in
-  let unit_info = Unit_info.make ~source_file Impl output_prefix in
-  with_info ~dump_ext:"cmo" unit_info @@ fun info ->
-  match (start_from : Clflags.Compiler_pass.t) with
-  | Parsing -> Compile_common.implementation info ~backend
->>>>>>> upstream-incoming
   | _ -> Misc.fatal_errorf "Cannot start from %s"
            (Clflags.Compiler_pass.to_string start_from)
 
 let implementation_aux ~start_from ~source_file ~output_prefix
     ~keep_symbol_tables:_
     ~(compilation_unit : Compile_common.compilation_unit_or_inferred) =
-  with_info ~source_file ~output_prefix ~dump_ext:"cmo" ~compilation_unit
-    ~kind:Impl
-  @@ fun info ->
+  let unit_info =
+    unit_info_from_cu_or_output_prefix
+      ~source_file Impl ~output_prefix ~compilation_unit
+  in
+  with_info ~dump_ext:"cmo" unit_info @@ fun info ->
   match start_from with
   | Parsing ->
     let backend info typed =
