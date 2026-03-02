@@ -699,9 +699,10 @@ module Array1 : sig
     = "caml_ba_layout"
   (** Return the layout of the given Bigarray. *)
 
-  val change_layout
+  external change_layout
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b, 'c) t -> 'd layout -> ('a, 'b, 'd) t
+      (('a, 'b, 'c) t[@local_opt]) -> 'd layout -> (('a, 'b, 'd) t[@local_opt])
+    = "caml_ba_change_layout"
   (** [Array1.change_layout a layout] returns a Bigarray with the
       specified [layout], sharing the data with [a] (and hence having
       the same dimension as [a]). No copying of elements is involved: the
@@ -712,7 +713,7 @@ module Array1 : sig
 
   val size_in_bytes
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b, 'c) t @ immutable -> int
+      ('a, 'b, 'c) t @ immutable local -> int
   (** [size_in_bytes a] is the number of elements in [a]
     multiplied by [a]'s {!kind_size_in_bytes}.
 
@@ -741,7 +742,7 @@ module Array1 : sig
 
   external sub
     : ('a : any) ('b : any) ('c : any).
-      ('a, 'b, 'c) t -> int -> int -> ('a, 'b, 'c) t
+      (('a, 'b, 'c) t[@local_opt]) -> int -> int -> (('a, 'b, 'c) t[@local_opt])
       = "caml_ba_sub"
   (** Extract a sub-array of the given one-dimensional Bigarray.
      See {!Genarray.sub_left} for more details. *)
