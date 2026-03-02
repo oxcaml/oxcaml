@@ -961,12 +961,38 @@ type lambda =
   | Lsplice of scoped_location * slambda
 
 and slambda =
+  | SLlayout of layout
+  | SLglobal of Compilation_unit.t
+  | SLvar of Slambdaident.t
   | SLmissing
+  | SLrecord of slambda list
+  | SLfield of slambda * int
   | SLhalves of slambda_halves
+  | SLproj_comptime of slambda
+  | SLproj_runtime of slambda
+  | SLtemplate of slambda_function
+  | SLinstantiate of slambda_apply
+  | SLlet of slambda_let
 
 and slambda_halves =
   { sval_comptime: slambda;
     sval_runtime: lambda
+  }
+
+and slambda_function =
+  { sfun_params: Slambdaident.t array;
+    sfun_body: slambda
+  }
+
+and slambda_apply =
+  { sapp_func: slambda;
+    sapp_arguments: slambda array
+  }
+
+and slambda_let =
+  { slet_name: Slambdaident.t;
+    slet_value: slambda;
+    slet_body: slambda
   }
 
 and rec_binding = {
@@ -1694,11 +1720,32 @@ and free_variables_list set exprs =
     set exprs
 
 and free_variables_slambda = function
-  | SLmissing -> Ident.Set.empty
+  | SLlayout _ | SLglobal _ | SLvar _ | SLmissing | SLfield _ -> Ident.Set.empty
+  | SLrecord fields ->
+      List.fold_left
+        (fun set field ->
+          Ident.Set.union (free_variables_slambda field) set)
+        Ident.Set.empty fields
   | SLhalves { sval_comptime; sval_runtime } ->
       Ident.Set.union
         (free_variables_slambda sval_comptime)
         (free_variables sval_runtime)
+  | SLproj_comptime slambda | SLproj_runtime slambda ->
+      free_variables_slambda slambda
+  | SLtemplate _ ->
+      (* Notably we don't recurse into templates as they would only introduce
+         new free variables into their call site. *)
+      Ident.Set.empty
+  | SLinstantiate { sapp_func; sapp_arguments } ->
+      (* Mechanically the result of instantiation could introduce new free
+         variables, however it's an invariant of slambda that it doesn't. *)
+      Array.fold_left
+        (fun set arg -> Ident.Set.union (free_variables_slambda arg) set)
+        (free_variables_slambda sapp_func) sapp_arguments
+  | SLlet { slet_name = _; slet_value; slet_body } ->
+      Ident.Set.union
+        (free_variables_slambda slet_value)
+        (free_variables_slambda slet_body)
 
 (* Check if an action has a "when" guard *)
 let static_label_sequence = Static_label.make_sequence ()
