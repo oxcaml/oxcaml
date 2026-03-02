@@ -409,7 +409,7 @@ CAMLexport int caml_check_pending_actions(void)
   return check_pending_actions(Caml_state);
 }
 
-value caml_do_pending_actions_exn(void)
+value caml_do_pending_actions_flags_exn(int flags)
 {
   /* 1. Non-delayable actions that do not run OCaml code. */
 
@@ -439,8 +439,13 @@ value caml_do_pending_actions_exn(void)
   check_async_exn(exn, "finaliser");
   if (Is_exception_result(exn)) goto exception;
 
-  /* Check for a pending preemption */
-  if (Caml_state->preemption == Val_long(1)) {
+  /* Check for a pending preemption
+
+     This sets up an *uninitialized* 3-word preemption continuation, so we can
+     only do it if pending actions were checked from ocaml (in
+     caml_garbage_collection)
+   */
+  if (flags & CAML_FROM_CAML) {
     caml_domain_setup_preemption();
   }
 
@@ -461,32 +466,53 @@ exception:
   return exn;
 }
 
-value caml_process_pending_actions_with_root_exn(value root)
+value caml_do_pending_actions_exn(void)
+{
+  return caml_do_pending_actions_flags_exn(CAML_FROM_C);
+}
+
+value caml_process_pending_actions_with_root_flags_exn(value root, int flags)
 {
   if (caml_check_pending_actions()) {
     CAMLparam1(root);
-    value exn = caml_do_pending_actions_exn();
+    value exn = caml_do_pending_actions_flags_exn(flags);
     if (Is_exception_result(exn)) CAMLreturn(exn);
     CAMLdrop;
   }
   return root;
 }
 
-CAMLprim value caml_process_pending_actions_with_root(value root)
+value caml_process_pending_actions_with_root_exn(value root)
+{
+  return caml_process_pending_actions_with_root_flags_exn(root, CAML_FROM_C);
+}
+
+value caml_process_pending_actions_with_root_flags(value root, int flags)
 {
   return caml_raise_async_if_exception(
-    caml_process_pending_actions_with_root_exn(root),
+    caml_process_pending_actions_with_root_flags_exn(root, flags),
     "");
 }
+
+CAMLprim value caml_process_pending_actions_with_root(value root)
+{
+  return caml_process_pending_actions_with_root_flags(root, CAML_FROM_C);
+}
+
 
 CAMLexport value caml_process_pending_actions_exn(void)
 {
   return caml_process_pending_actions_with_root_exn(Val_unit);
 }
 
+CAMLexport void caml_process_pending_actions_flags(int flags)
+{
+  caml_process_pending_actions_with_root_flags(Val_unit, flags);
+}
+
 CAMLexport void caml_process_pending_actions(void)
 {
-  caml_process_pending_actions_with_root(Val_unit);
+  caml_process_pending_actions_flags(CAML_FROM_C);
 }
 
 /* OS-independent numbering of signals */

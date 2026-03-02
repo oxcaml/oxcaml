@@ -1827,14 +1827,35 @@ void caml_interrupt_self(void)
  */
 CAMLprim value caml_domain_preempt_self(value unit) {
   CAMLnoalloc;
+  if (Caml_state->preemption != Val_unit) {
+    return Val_unit;
+  }
   domain_root_set(&Caml_state->preemption, Val_long(1));
   caml_interrupt_self();
   return Val_unit;
 }
 
+/* If a preemption is pending, allocate a 3-word continuation for the preemption
+   and store it in Caml_state->preemption
+
+  The resulting preemption will not be fully initialized, so after this function
+  is run care must be taken not to enter the GC before returning from
+  caml_garbage_collection.
+*/
 void caml_domain_setup_preemption(void) {
   CAMLparam0();
-  value cont = caml_alloc_3(Cont_tag, Val_ptr(NULL), Val_ptr(NULL), Val_ptr(NULL));
+  CAMLlocal1(cont);
+  /* Check if there is a pending preemption */
+  if (Caml_state->preemption != Val_long(1)) {
+    CAMLreturn0;
+  }
+  cont = caml_alloc_3(Cont_tag, Val_ptr(NULL), Val_ptr(NULL), Val_ptr(NULL));
+  /* Check if there is still a pending preemption. This might not be true if the
+     caml_alloc_3 also called the GC, which itself called
+  `  caml_domain_setup_preemption`. */
+  if (Caml_state->preemption != Val_long(1)) {
+    CAMLreturn0;
+  }
   domain_root_set(&Caml_state->preemption, cont);
   CAMLreturn0;
 }
