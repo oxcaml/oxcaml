@@ -47,7 +47,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (alias runtest-dwarf)
  (enabled_if (= %{context_name} "main"))
  (deps test_basic_dwarf.output test_basic_dwarf.output.corrected)
- (action (diff test_basic_dwarf.output test_basic_dwarf.output.corrected)))
+ (action
+  (diff test_basic_dwarf.output test_basic_dwarf.output.corrected)))
 
 (executable
  (name test_unboxed_dwarf)
@@ -97,7 +98,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (alias runtest-dwarf)
  (enabled_if (= %{context_name} "main"))
  (deps test_unboxed_dwarf.output test_unboxed_dwarf.output.corrected)
- (action (diff test_unboxed_dwarf.output test_unboxed_dwarf.output.corrected)))
+ (action
+  (diff test_unboxed_dwarf.output test_unboxed_dwarf.output.corrected)))
 
 (executable
  (name test_datatypes_dwarf)
@@ -147,7 +149,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (alias runtest-dwarf)
  (enabled_if (= %{context_name} "main"))
  (deps test_datatypes_dwarf.output test_datatypes_dwarf.output.corrected)
- (action (diff test_datatypes_dwarf.output test_datatypes_dwarf.output.corrected)))
+ (action
+  (diff test_datatypes_dwarf.output test_datatypes_dwarf.output.corrected)))
 
 (executable
  (name test_simd_dwarf)
@@ -197,7 +200,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (alias runtest-dwarf)
  (enabled_if (= %{context_name} "main"))
  (deps test_simd_dwarf.output test_simd_dwarf.output.corrected)
- (action (diff test_simd_dwarf.output test_simd_dwarf.output.corrected)))
+ (action
+  (diff test_simd_dwarf.output test_simd_dwarf.output.corrected)))
 
 (executable
  (name test_simple_functor_dwarf)
@@ -247,7 +251,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (alias runtest-dwarf)
  (enabled_if (= %{context_name} "main"))
  (deps test_simple_functor_dwarf.output test_simple_functor_dwarf.output.corrected)
- (action (diff test_simple_functor_dwarf.output test_simple_functor_dwarf.output.corrected)))
+ (action
+  (diff test_simple_functor_dwarf.output test_simple_functor_dwarf.output.corrected)))
 
 (executable
  (name test_parameters_dwarf)
@@ -297,7 +302,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (alias runtest-dwarf)
  (enabled_if (= %{context_name} "main"))
  (deps test_parameters_dwarf.output test_parameters_dwarf.output.corrected)
- (action (diff test_parameters_dwarf.output test_parameters_dwarf.output.corrected)))
+ (action
+  (diff test_parameters_dwarf.output test_parameters_dwarf.output.corrected)))
 
 (executable
  (name test_callstack_dwarf)
@@ -347,7 +353,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (alias runtest-dwarf)
  (enabled_if (= %{context_name} "main"))
  (deps test_callstack_dwarf.output test_callstack_dwarf.output.corrected)
- (action (diff test_callstack_dwarf.output test_callstack_dwarf.output.corrected)))
+ (action
+  (diff test_callstack_dwarf.output test_callstack_dwarf.output.corrected)))
 
 (executable
  (name test_stepping_dwarf)
@@ -397,7 +404,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (alias runtest-dwarf)
  (enabled_if (= %{context_name} "main"))
  (deps test_stepping_dwarf.output test_stepping_dwarf.output.corrected)
- (action (diff test_stepping_dwarf.output test_stepping_dwarf.output.corrected)))
+ (action
+  (diff test_stepping_dwarf.output test_stepping_dwarf.output.corrected)))
 
 (executable
  (name test_closures_dwarf)
@@ -446,8 +454,9 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 (rule
  (alias runtest-dwarf)
  (enabled_if (= %{context_name} "main"))
- (deps test_closures_dwarf.output test_closures_dwarf.output.corrected)
- (action (diff test_closures_dwarf.output test_closures_dwarf.output.corrected)))
+ (deps test_closures_dwarf.%{env:OXCAML_NAME_MANGLING=flat}.output test_closures_dwarf.output.corrected)
+ (action
+  (diff test_closures_dwarf.%{env:OXCAML_NAME_MANGLING=flat}.output test_closures_dwarf.output.corrected)))
 
 (executable
  (name test_large_data_dwarf)
@@ -497,7 +506,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (alias runtest-dwarf)
  (enabled_if (= %{context_name} "main"))
  (deps test_large_data_dwarf.output test_large_data_dwarf.output.corrected)
- (action (diff test_large_data_dwarf.output test_large_data_dwarf.output.corrected)))
+ (action
+  (diff test_large_data_dwarf.output test_large_data_dwarf.output.corrected)))
 
 (executable
  (name test_tailrec_dwarf)
@@ -547,7 +557,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
  (alias runtest-dwarf)
  (enabled_if (= %{context_name} "main"))
  (deps test_tailrec_dwarf.output test_tailrec_dwarf.output.corrected)
- (action (diff test_tailrec_dwarf.output test_tailrec_dwarf.output.corrected)))
+ (action
+  (diff test_tailrec_dwarf.output test_tailrec_dwarf.output.corrected)))
 
 (executable
  (name test_ocaml_and_c_dwarf)
@@ -596,5 +607,6 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 (rule
  (alias runtest-dwarf)
  (enabled_if (= %{context_name} "main"))
- (deps test_ocaml_and_c_dwarf.output test_ocaml_and_c_dwarf.output.corrected)
- (action (diff test_ocaml_and_c_dwarf.output test_ocaml_and_c_dwarf.output.corrected)))
+ (deps test_ocaml_and_c_dwarf.%{env:OXCAML_NAME_MANGLING=flat}.output test_ocaml_and_c_dwarf.output.corrected)
+ (action
+  (diff test_ocaml_and_c_dwarf.%{env:OXCAML_NAME_MANGLING=flat}.output test_ocaml_and_c_dwarf.output.corrected)))

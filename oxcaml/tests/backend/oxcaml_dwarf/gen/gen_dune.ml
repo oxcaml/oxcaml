@@ -14,12 +14,14 @@ let () =
   in
   let buf = Buffer.create 1000 in
   (* Function to generate rules for executable tests that produce output *)
-  let print_dwarf_test name =
+  let print_dwarf_test ?(mangling_dep = false) name =
     let subst = function
       | "enabled_if" -> enabled_if
       | "enabled_if_with_lldb" -> enabled_if_with_lldb
       | "enabled_if_without_lldb" -> enabled_if_without_lldb
       | "name" -> name
+      | "mangling_extension" ->
+        if mangling_dep then ".%{env:OXCAML_NAME_MANGLING=flat}" else ""
       | "filter" -> "filter_for_function_call_only.sh"
       | _ -> assert false
     in
@@ -67,8 +69,9 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
 (rule
  (alias runtest-dwarf)
  ${enabled_if}
- (deps ${name}.output ${name}.output.corrected)
- (action (diff ${name}.output ${name}.output.corrected)))
+ (deps ${name}${mangling_extension}.output ${name}.output.corrected)
+ (action
+  (diff ${name}${mangling_extension}.output ${name}.output.corrected)))
 |};
     Buffer.output_buffer Out_channel.stdout buf
   in
@@ -81,8 +84,8 @@ Example: export OXCAML_LLDB=/path/to/custom/lldb")
   print_dwarf_test "test_parameters_dwarf";
   print_dwarf_test "test_callstack_dwarf";
   print_dwarf_test "test_stepping_dwarf";
-  print_dwarf_test "test_closures_dwarf";
+  print_dwarf_test ~mangling_dep:true "test_closures_dwarf";
   print_dwarf_test "test_large_data_dwarf";
   print_dwarf_test "test_tailrec_dwarf";
-  print_dwarf_test "test_ocaml_and_c_dwarf";
+  print_dwarf_test ~mangling_dep:true "test_ocaml_and_c_dwarf";
   ()
