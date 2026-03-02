@@ -833,17 +833,16 @@ let rec generalize stage_offset ty =
     (* Normalize the variable to be at [stage_offset = 0] *)
     | Tvar name ->
         update_variable_stage stage_offset ty name.name name.jkind
-    (* Do not update the stage of row variables *)
-    (* CR metaprogramming jbachurski: Never generalising cross-stage
-       row-polymorphic types seems a extreme but probably correct.
-       We should probably have support for quoting/splicing row variables. *)
-    | Tobject _ when stage_offset <> 0 && is_Tvar (proxy ty) ->
-        set_level (proxy ty) generic_level;
-        iter_type_expr (generalize stage_offset) ty;
-        lower_all ty
-    | Tvariant row when stage_offset <> 0 && is_Tvar (row_more row) ->
-        set_level (row_more row) generic_level;
-        iter_type_expr (generalize stage_offset) ty;
+    (* Do not generalize cross-stage row-polymorphic types, as we cannot
+       quote or splice row variables.
+       Weak type variables that arise here are considered cross-stage,
+       so we do not update their stages by recursing. *)
+    (* CR metaprogramming jbachurski: We should fix this, as this is not only
+       incomplete, but also order-dependent. Polymorphic variants seem
+       particularly tricky.
+       This problem is independent from beta-reducing evaluations on
+       open row types. *)
+    | Tobject _ | Tvariant _ when stage_offset <> 0 && is_Tvar (proxy ty) ->
         lower_all ty
     (* recur into abbrev for the speed *)
     | Tconstr (_, _, abbrev) ->
@@ -2234,6 +2233,8 @@ let rec try_reduce_once t =
            so the [Tobject] does not reduce at all.
          - If the object type is closed, its final element is a [Tnil] and
            the entire [Tobject] will reduce just fine. *)
+      (* CR metaprogramming jbachurski: As for [Tvariant], it would be nicer
+         to support open object types here. *)
       Tobject (
         try_reduce_once (new_quote_eval_ty t),
         ref (
@@ -2256,6 +2257,9 @@ let rec try_reduce_once t =
     (* [<[ [ `A of t ... ] | ]> eval] ==> [ [ `A of <[t]> eval | ... ] ] *)
     | Tvariant row ->
       (* Immediately beta-reduce [more] -- only reduces closed variant types *)
+      (* CR metaprogramming jbachurski: We should not need a restriction to
+         closed row types, and allow having [Tquote_eval] on row variables.
+         As is, this is incomplete and order-dependent. Same for [Tobject]. *)
       let more = row_more row |> new_quote_eval_ty |> try_reduce_once in
       Tvariant (copy_row new_quote_eval_ty true row false more)
     (* [<['a. t]> eval] ==> ['b. (<[{$'b/'a} t]> eval)],
