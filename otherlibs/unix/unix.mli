@@ -1178,7 +1178,8 @@ type sigprocmask_command =
   | SIG_BLOCK
   | SIG_UNBLOCK
 
-val sigprocmask : sigprocmask_command -> Sys.signal list @ local -> Sys.signal list
+val sigprocmask :
+  sigprocmask_command -> Sys.signal list @ local -> Sys.signal list
 (** [sigprocmask mode sigs] changes the set of blocked signals.
    If [mode] is [SIG_SETMASK], blocked signals are set to those in
    the list [sigs].

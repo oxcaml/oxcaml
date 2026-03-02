@@ -76,7 +76,7 @@ val cons : ('a : value_or_null). 'a -> 'a list -> 'a list
     @since 4.03 (4.05 in ListLabels)
  *)
 
-val singleton: ('a : value_or_null). 'a -> 'a list
+val singleton : ('a : value_or_null). 'a -> 'a list
 (** [singleton x] returns the one-element list [[x]].
 
     @since 5.4 *)

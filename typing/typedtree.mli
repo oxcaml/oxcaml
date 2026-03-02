@@ -278,8 +278,10 @@ and 'k pattern_desc =
             Invariant: n > 0
          *)
   | Tpat_record_unboxed_product :
-      (Longident.t loc * Data_types.unboxed_label_description * value general_pattern) list *
-        closed_flag ->
+      (Longident.t loc
+       * Data_types.unboxed_label_description
+       * value general_pattern) list
+      * closed_flag ->
       value pattern_desc
         (** #{ l1=P1; ...; ln=Pn }     (flag = Closed)
             #{ l1=P1; ...; ln=Pn; _}   (flag = Open)
@@ -287,7 +289,8 @@ and 'k pattern_desc =
             Invariant: n > 0
          *)
   | Tpat_array :
-      Types.mutability * Jkind.sort * value general_pattern list -> value pattern_desc
+      Types.mutability * Jkind.sort * value general_pattern list ->
+      value pattern_desc
         (** [| P1; ...; Pn |]    (flag = Mutable)
             [: P1; ...; Pn :]    (flag = Immutable) *)
   | Tpat_lazy : value general_pattern -> value pattern_desc
@@ -448,7 +451,9 @@ and expression_desc =
 
             The [Zero_alloc.assume option] records the optional [@zero_alloc
             assume] attribute that may appear on applications. *)
-  | Texp_match of expression * Jkind.sort * computation case list * value case list * partial
+  | Texp_match of
+      expression * Jkind.sort * computation case list * value case list *
+      partial
         (** match E0 with
             | P1 -> E1
             | P2 | exception P3 -> E2
@@ -523,7 +528,9 @@ and expression_desc =
             in which case it does not need allocation.
           *)
   | Texp_record_unboxed_product of {
-      fields : ( Data_types.unboxed_label_description * record_label_definition ) array;
+      fields :
+        ( Data_types.unboxed_label_description
+          * record_label_definition ) array;
       representation : Types.record_unboxed_product_representation;
       extended_expression : (expression * Jkind.sort) option;
     }
@@ -548,8 +555,8 @@ and expression_desc =
         - [texp_field_boxing] provides extra information depending on if the
           projection requires boxing. *)
   | Texp_unboxed_field of
-      expression * Jkind.sort * Longident.t loc * Data_types.unboxed_label_description *
-        unique_use
+      expression * Jkind.sort * Longident.t loc *
+      Data_types.unboxed_label_description * unique_use
   | Texp_setfield of
       expression * Mode.Locality.l * Longident.t loc *
       Data_types.label_description * expression
@@ -721,7 +728,8 @@ and block_access =
   | Baccess_block of mutable_flag * expression
 
 and unboxed_access =
-  | Uaccess_unboxed_field of Longident.t loc * Data_types.unboxed_label_description
+  | Uaccess_unboxed_field of
+      Longident.t loc * Data_types.unboxed_label_description
 
 and comprehension =
   {

@@ -211,7 +211,8 @@ type existential_binding =
 
 type error =
   | Constructor_arity_mismatch of Longident.t * int * int
-  | Label_mismatch of Data_types.record_form_packed * Longident.t * Errortrace.unification_error
+  | Label_mismatch of
+      Data_types.record_form_packed * Longident.t * Errortrace.unification_error
   | Pattern_type_clash :
       Errortrace.unification_error * Parsetree.pattern_desc option
       -> error
@@ -314,7 +315,8 @@ type error =
   | Bind_existential of existential_binding * Ident.t * type_expr
   | Missing_type_constraint
   | Wrong_expected_kind of wrong_kind_sort * wrong_kind_context * type_expr
-  | Wrong_expected_record_boxing of wrong_kind_context * Data_types.record_form_packed * type_expr
+  | Wrong_expected_record_boxing of
+      wrong_kind_context * Data_types.record_form_packed * type_expr
   | Expr_not_a_record_type of Data_types.record_form_packed * type_expr
   | Constructor_labeled_arg
   | Partial_tuple_pattern_bad_type
@@ -322,7 +324,8 @@ type error =
   | Missing_tuple_label of string option * type_expr
   | Repeated_tuple_exp_label of string
   | Repeated_tuple_pat_label of string
-  | Expr_record_type_has_wrong_boxing of Data_types.record_form_packed * type_expr
+  | Expr_record_type_has_wrong_boxing of
+      Data_types.record_form_packed * type_expr
   | Invalid_unboxed_access of
       { prev_el_type : type_expr; ua : Parsetree.unboxed_access }
   | Block_access_record_unboxed

@@ -71,14 +71,15 @@ type 'a gen_label_description =
 
 type label_description = record_representation gen_label_description
 
-type unboxed_label_description = record_unboxed_product_representation gen_label_description
+type unboxed_label_description =
+  record_unboxed_product_representation gen_label_description
 
-(** This type tracks the distinction between legacy records ([{ field }]) and unboxed
-    records ([#{ field }]). Note that [Legacy] includes normal boxed records, as well as
-    inlined and [[@@unboxed]] records.
+(** This type tracks the distinction between legacy records ([{ field }]) and
+    unboxed records ([#{ field }]). Note that [Legacy] includes normal boxed
+    records, as well as inlined and [[@@unboxed]] records.
 
-    As a GADT, it also lets us avoid duplicating functions that handle both record forms,
-    such as [Env.find_label_by_name], which has type
+    As a GADT, it also lets us avoid duplicating functions that handle both
+    record forms, such as [Env.find_label_by_name], which has type
     ['rep record_form -> Longident.t -> Env.t -> 'rep gen_label_description].
 *)
 type _ record_form =
