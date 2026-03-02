@@ -259,8 +259,12 @@ and arg_label = Types.arg_label =
 
 and expression_desc =
     Texp_ident of
-      Path.t * Longident.t loc * Types.value_description * ident_kind *
-        unique_use * Mode.Value.l
+      { path : Path.t;
+        lid : Longident.t loc;
+        desc : Types.value_description;
+        kind : ident_kind;
+        unique_use : unique_use;
+        mode : Mode.Value.l }
   | Texp_constant of constant
   | Texp_let of rec_flag * value_binding list * expression
   | Texp_letmutable of value_binding * expression
@@ -1425,8 +1429,8 @@ let nominal_exp_doc lid t =
   let rec nominal_exp_doc doc exp =
     match exp.exp_desc with
     | _ when exp.exp_attributes <> [] -> None
-    | Texp_ident (_,l,_,_,_,_) ->
-        Some (longident l doc)
+    | Texp_ident { lid; _ } ->
+        Some (longident lid doc)
     | Texp_instvar (_,_,s) ->
         Some (string s.Location.txt doc)
     | Texp_constant _ -> assert false

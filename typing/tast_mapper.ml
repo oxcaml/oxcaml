@@ -517,8 +517,8 @@ let expr sub x =
   in
   let exp_desc =
     match x.exp_desc with
-    | Texp_ident (path, lid, vd, idk, uu, mode) ->
-        Texp_ident (path, map_loc sub lid, vd, idk, uu, mode)
+    | Texp_ident r ->
+        Texp_ident { r with lid = map_loc sub r.lid }
     | Texp_constant _ as d -> d
     | Texp_let (rec_flag, list, exp) ->
         let (rec_flag, list) = sub.value_bindings sub (rec_flag, list) in
