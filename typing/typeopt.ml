@@ -52,7 +52,8 @@ let scrape_ty env ty =
     | _ -> ty
   in
   match get_desc ty with
-  | Tconstr _ ->
+  | Tconstr _
+  | Tquote _ | Tsplice _ | Tquote_eval _ ->
       let ty = Ctype.correct_levels ty in
       let ty' = Ctype.expand_head_opt env ty in
       begin match get_desc ty' with
@@ -194,10 +195,11 @@ let classify ~classify_product env ty sort : _ classification =
              Maybe we should emit a warning. *)
           Any
       end
-  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _  | Tnil
-  | Tvariant _ | Tquote _ ->
+  | Tarrow _ | Ttuple _ | Tpackage _ | Tobject _  | Tnil | Tvariant _ ->
       Addr
-  | Tsplice _ | Tquote_eval _ ->
+  (* Quotes are not representable, but it's safe to say they are [Any].
+     Unreduced splices and evals might stand for anything. *)
+  | Tquote _ | Tsplice _ | Tquote_eval _ ->
       Any
   | Tlink _ | Tsubst _ | Tpoly _ | Tfield _ | Tunboxed_tuple _
   | Tof_kind _ | Trepr _ ->
