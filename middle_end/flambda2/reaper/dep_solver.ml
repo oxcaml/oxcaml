@@ -2946,7 +2946,8 @@ module Rewriter = struct
             in
             match set_of_closures with
             | None ->
-              Format.eprintf "COULD NOT IDENTIFY@.";
+              if Lazy.force debug_types
+              then Format.eprintf "COULD NOT IDENTIFY@.";
               forget_type ()
             | Some set_of_closures ->
               if
