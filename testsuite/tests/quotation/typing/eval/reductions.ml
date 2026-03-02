@@ -96,6 +96,16 @@ let f (x : <[($('a), $('b)) Either.t]> expr)
 val f : <[($('a), $('b)) Either.t]> expr -> ('a eval, 'b eval) Either.t =
   <fun>
 |}]
+(* non-top-level type constructor *)
+(* CR-soon jbachurski: This should never state that [<[t]> eval = t]. *)
+let _ = <[ fun (type t) (x : t) -> $(Quote.Expr.int (eval <[ x ]> : int)) ]>
+[%%expect {|
+Line 1, characters 53-65:
+1 | let _ = <[ fun (type t) (x : t) -> $(Quote.Expr.int (eval <[ x ]> : int)) ]>
+                                                         ^^^^^^^^^^^^
+Error: This expression has type "<[t]> eval" = "t"
+       but an expression was expected of type "int"
+|}]
 
 (* Arrows *)
 let f (x : <[$('a) -> $('b)]> expr) : 'a eval -> 'b eval = eval x
