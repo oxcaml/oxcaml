@@ -307,6 +307,14 @@ let increment_continuation_scope t =
 let bump_current_level_scope t =
   { t with typing_env = TE.bump_current_level_scope t.typing_env }
 
+let enter_stub t =
+  { t with
+    disable_inlining = Disable_inlining Stub;
+    disable_partial_application_stub_generation =
+      Flambda_features.simplify_stubs ()
+      || t.disable_partial_application_stub_generation
+  }
+
 let enter_set_of_closures
     { machine_width;
       round;
