@@ -592,7 +592,7 @@ Lines 1-5, characters 0-3:
 1 | module rec M : sig
 2 |   kind_ k = M.k mod global
 3 | end = struct
-4 |   kind_ k
+4 |   kind_ k = M.k mod global
 5 | end
 Error: The kind "M.k" is cyclic:
          "M.k" = "M.k mod global",
