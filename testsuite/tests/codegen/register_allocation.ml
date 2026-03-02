@@ -314,7 +314,7 @@ spill_one_or_two:
   movq  %rbx, 8(%rsp)
   movq  %rdi, %rbx
   movl  $1, %eax
-  movq  (%rbx), %rdi\
+  movq  (%rbx), %rdi
   call  *%rdi
 .L107:
   movq  (%rsp), %rax
