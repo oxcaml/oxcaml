@@ -40,6 +40,9 @@ let dacc_inside_function context ~outer_dacc ~params ~my_closure ~my_region
     |> DE.set_inlining_history_tracker
          (Inlining_history.Tracker.inside_function absolute_history)
   in
+  let denv =
+    if Code_metadata.stub code_metadata then DE.enter_stub denv else denv
+  in
   let my_closure_duid = Flambda_debug_uid.none in
   let denv =
     match function_slot_opt with

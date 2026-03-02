@@ -193,6 +193,8 @@ val disable_partial_application_stub_generation : t -> bool
 
 val enter_set_of_closures : t -> in_stub:bool -> t
 
+val enter_stub : t -> t
+
 val set_rebuild_terms : t -> t
 
 val are_rebuilding_terms : t -> Are_rebuilding_terms.t
