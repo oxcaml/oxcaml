@@ -26,7 +26,13 @@ module Pat = struct
     let sort = Jkind.Sort.new_var ~level:(Ctype.get_current_level ()) in
     let mode = Mode.Value.newvar () in
     let pat_desc =
-      Tpat_var (Ident.create_local str.Asttypes.txt, str, uid, sort, mode)
+      Tpat_var
+        { id = Ident.create_local str.Asttypes.txt;
+          name = str;
+          uid;
+          sort;
+          mode
+        }
     in
     { pat_desc;
       pat_loc;

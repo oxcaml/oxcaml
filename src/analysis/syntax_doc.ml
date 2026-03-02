@@ -645,11 +645,31 @@ let get_oxcaml_syntax_doc cursor_loc nodes : syntax_info =
     | _ -> get_modality_doc modality)
   (* Jkinds *)
   | Mod_bound { txt = Mode mod_bound; _ } :: _ -> get_mod_bound_doc mod_bound
-  | Jkind_annotation { pjka_desc = Pjk_abbreviation abbrev; _ } :: _ ->
+  | Jkind_annotation { pjka_desc = Pjk_abbreviation (abbrev, modifiers); _ }
+    :: _ -> (
     (* CR-someday: It isn't ideal that this is based on the parsetree, as this will result
        in an incorrect hint in the presence of shadowing. To properly fix, the compiler
        should introduce a typed jkind into the typedtree. Internal ticket 6600. *)
-    get_jkind_abbrev_doc abbrev.txt
+    match
+      Loc_comparison_result.is_inside (compare_cursor_to_loc abbrev.loc)
+    with
+    | true -> get_jkind_abbrev_doc abbrev.txt
+    | false ->
+      List.find_opt modifiers ~f:(fun (modifier : _ Location.loc) ->
+          Loc_comparison_result.is_inside (compare_cursor_to_loc modifier.loc))
+      |> Option.bind ~f:(fun (modifier : _ Location.loc) ->
+             match modifier.txt with
+             | "non_pointer" ->
+               (Some
+                  { name = "Kind Modifier";
+                    description =
+                      "Modifies a value kind abbreviation to indicate that its \
+                       representation is never a pointer.";
+                    documentation = syntax_doc_url Oxcaml "kinds/syntax/";
+                    level = Advanced
+                  }
+                 : syntax_info)
+             | _ -> None))
   | Jkind_annotation { pjka_desc = Pjk_mod _; _ } :: _ ->
     Some
       { name = "`mod` keyword (in a kind)";

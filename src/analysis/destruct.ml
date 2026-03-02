@@ -339,7 +339,7 @@ let rec destructible patt =
   let open Typedtree in
   match patt.pat_desc with
   | Tpat_any | Tpat_var _ -> true
-  | Tpat_alias (p, _, _, _, _, _, _) -> destructible p
+  | Tpat_alias { pattern = p; _ } -> destructible p
   | _ -> false
 
 let is_package ty =
@@ -373,8 +373,8 @@ let rec subst_patt initial ~by patt =
     | Tpat_constant _
     | Tpat_unboxed_bool _
     | Tpat_unboxed_unit -> patt
-    | Tpat_alias (p, x, y, uid, s, m, ty) ->
-      { patt with pat_desc = Tpat_alias (f p, x, y, uid, s, m, ty) }
+    | Tpat_alias ({ pattern = p; _ } as alias) ->
+      { patt with pat_desc = Tpat_alias { alias with pattern = f p } }
     | Tpat_tuple lst ->
       { patt with
         pat_desc = Tpat_tuple (List.map lst ~f:(fun (lbl, p) -> (lbl, f p)))
@@ -416,8 +416,8 @@ let rec rm_sub patt sub =
   | Tpat_constant _
   | Tpat_unboxed_bool _
   | Tpat_unboxed_unit -> patt
-  | Tpat_alias (p, x, y, uid, s, m, ty) ->
-    { patt with pat_desc = Tpat_alias (f p, x, y, uid, s, m, ty) }
+  | Tpat_alias ({ pattern = p; _ } as alias) ->
+    { patt with pat_desc = Tpat_alias { alias with pattern = f p } }
   | Tpat_tuple lst ->
     { patt with
       pat_desc = Tpat_tuple (List.map lst ~f:(fun (lbl, p) -> (lbl, f p)))
@@ -481,8 +481,8 @@ let rec qualify_constructors ~unmangling_tables f pat =
   in
   let pat_desc =
     match pat.pat_desc with
-    | Tpat_alias (p, id, loc, uid, s, m, ty) ->
-      Tpat_alias (qualify_constructors f p, id, loc, uid, s, m, ty)
+    | Tpat_alias ({ pattern = p; _ } as alias) ->
+      Tpat_alias { alias with pattern = qualify_constructors f p }
     | Tpat_tuple ps ->
       Tpat_tuple
         (List.map ps ~f:(fun (lbl, p) -> (lbl, qualify_constructors f p)))
@@ -541,7 +541,7 @@ let find_branch patterns sub =
       | Tpat_any | Tpat_var _ | Tpat_constant _
       | Tpat_variant (_, None, _)
       | Tpat_unboxed_bool _ | Tpat_unboxed_unit -> false
-      | Tpat_alias (p, _, _, _, _, _, _)
+      | Tpat_alias { pattern = p; _ }
       | Tpat_variant (_, Some p, _)
       | Tpat_lazy p -> is_sub_patt p ~sub
       | Tpat_tuple lst ->
@@ -620,12 +620,12 @@ module Conv = struct
       in
       match pat.pat_desc with
       | Tpat_or (pa, pb, _) -> mkpat (Ppat_or (loop pa, loop pb))
-      | Tpat_var (_, ({ txt = "*extension*"; _ } as nm), _, _, _) ->
+      | Tpat_var { name = { txt = "*extension*"; _ } as nm; _ } ->
         (* PR#7330 *)
         mkpat (Ppat_var nm)
       | Tpat_any | Tpat_var _ -> mkpat Ppat_any
       | Tpat_constant c -> mkpat (Ppat_constant (Untypeast.constant c))
-      | Tpat_alias (p, _, _, _, _, _, _) -> loop p
+      | Tpat_alias { pattern = p; _ } -> loop p
       | Tpat_tuple lst ->
         let lst = List.map ~f:(fun (lbl, p) -> (lbl, loop p)) lst in
         mkpat (Ppat_tuple (lst, Closed))

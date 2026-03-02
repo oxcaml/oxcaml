@@ -542,6 +542,7 @@ module MenhirInterpreter : sig
     | N_list_structure_element_ : (Parsetree.structure_item list list) nonterminal
     | N_list_signature_element_ : (Parsetree.signature_item list list) nonterminal
     | N_list_post_item_attribute_ : (Parsetree.attributes) nonterminal
+    | N_list_mkrhs_LIDENT__ : (string Location.loc list) nonterminal
     | N_list_generic_and_type_declaration_type_subst_kind__ : (Parsetree.type_declaration list) nonterminal
     | N_list_generic_and_type_declaration_type_kind__ : (Parsetree.type_declaration list) nonterminal
     | N_list_attribute_ : (Parsetree.attributes) nonterminal

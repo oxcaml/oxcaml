@@ -42,6 +42,7 @@ let nullable (type a) : a MenhirInterpreter.nonterminal -> bool =
   | N_list_structure_element_ -> true
   | N_list_signature_element_ -> true
   | N_list_post_item_attribute_ -> true
+  | N_list_mkrhs_LIDENT__ -> true
   | N_list_generic_and_type_declaration_type_subst_kind__ -> true
   | N_list_generic_and_type_declaration_type_kind__ -> true
   | N_list_attribute_ -> true

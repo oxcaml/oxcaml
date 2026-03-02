@@ -349,6 +349,7 @@ let print_symbol = function
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_list_structure_element_) -> "list_structure_element_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_list_signature_element_) -> "list_signature_element_"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_list_post_item_attribute_) -> "list_post_item_attribute_"
+  | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_list_mkrhs_LIDENT__) -> "list_mkrhs_LIDENT__"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_list_generic_and_type_declaration_type_subst_kind__) -> "list_generic_and_type_declaration_type_subst_kind__"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_list_generic_and_type_declaration_type_kind__) -> "list_generic_and_type_declaration_type_kind__"
   | MenhirInterpreter.X (MenhirInterpreter.N MenhirInterpreter.N_list_attribute_) -> "list_attribute_"
@@ -775,6 +776,7 @@ let print_value (type a) : a MenhirInterpreter.symbol -> a -> string = function
   | MenhirInterpreter.N MenhirInterpreter.N_list_structure_element_ -> (fun _ -> "list_structure_element_")
   | MenhirInterpreter.N MenhirInterpreter.N_list_signature_element_ -> (fun _ -> "list_signature_element_")
   | MenhirInterpreter.N MenhirInterpreter.N_list_post_item_attribute_ -> (fun _ -> "list_post_item_attribute_")
+  | MenhirInterpreter.N MenhirInterpreter.N_list_mkrhs_LIDENT__ -> (fun _ -> "list_mkrhs_LIDENT__")
   | MenhirInterpreter.N MenhirInterpreter.N_list_generic_and_type_declaration_type_subst_kind__ -> (fun _ -> "list_generic_and_type_declaration_type_subst_kind__")
   | MenhirInterpreter.N MenhirInterpreter.N_list_generic_and_type_declaration_type_kind__ -> (fun _ -> "list_generic_and_type_declaration_type_kind__")
   | MenhirInterpreter.N MenhirInterpreter.N_list_attribute_ -> (fun _ -> "list_attribute_")

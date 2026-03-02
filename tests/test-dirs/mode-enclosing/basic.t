@@ -59,7 +59,7 @@ Part 2: Display some interesting modes
   > let f () =
   >   f_nonportable ()
   > EOF
-  4:2-4:15: @ unique
+  4:2-4:15: @ unique static
 
 In this test, the cursor is on a node causing an error
   $ run 4:5 <<EOF

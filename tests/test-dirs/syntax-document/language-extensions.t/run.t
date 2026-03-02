@@ -451,6 +451,7 @@ Convenience function to ensure we haven't made any syntax errors.
   > end
   > let f (x : (_ : value)) = (x : (_ : value))
   > type t : float64 mod everything
+  > type t : value non_pointer
   > EOF
 
   $ syntax_errors kinds.ml
@@ -529,6 +530,16 @@ Convenience function to ensure we haven't made any syntax errors.
   type t : float64 mod everything
                               ^
   Mod-bound
+
+  $ syn_doc_name kinds.ml 8 10
+  type t : value non_pointer
+            ^
+  Kind abbreviation
+
+  $ syn_doc_name kinds.ml 8 16
+  type t : value non_pointer
+                  ^
+  Kind Modifier
 
   $ syn_doc_desc kinds.ml 7 13
   type t : float64 mod everything

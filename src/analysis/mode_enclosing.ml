@@ -60,7 +60,7 @@ let from_node (_env, node) =
   match node with
   | Expression { exp_desc = Texp_ident (_, _, _, _, _, mode); exp_loc; _ } ->
     Some (exp_loc, mode)
-  | Pattern { pat_desc = Tpat_var (_, _, _, _, mode); pat_loc; _ } ->
+  | Pattern { pat_desc = Tpat_var { mode; _ }; pat_loc; _ } ->
     Some (pat_loc, mode)
   | _ -> None
 

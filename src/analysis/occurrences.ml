@@ -120,10 +120,8 @@ let uid_and_loc_of_node env node =
     let md = Env.find_module (Pident ident) env in
     Some (md.md_uid, mb_name.loc)
   | Pattern
-      { pat_desc =
-          Tpat_var (_, name, uid, _, _) | Tpat_alias (_, _, name, uid, _, _, _);
-        _
-      } -> Some (uid, name.loc)
+      { pat_desc = Tpat_var { name; uid; _ } | Tpat_alias { name; uid; _ }; _ }
+    -> Some (uid, name.loc)
   | Type_declaration { typ_type; typ_name; _ } ->
     Some (typ_type.type_uid, typ_name.loc)
   | Label_declaration { ld_uid; ld_name; _ } -> Some (ld_uid, ld_name.loc)

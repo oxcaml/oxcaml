@@ -156,7 +156,7 @@ and jkind_declaration id { jkind_manifest; jkind_attributes; _ } :
       Option.map jkind_manifest ~f:(fun _ : Parsetree.jkind_annotation ->
           (* CR modes: this is terrible. Internal ticket 6599 *)
           { pjka_desc =
-              Pjk_abbreviation { txt = Lident "any"; loc = Location.none };
+              Pjk_abbreviation ({ txt = Lident "any"; loc = Location.none }, []);
             pjka_loc = Location.none
           });
     pjkind_attributes = jkind_attributes;

@@ -21,7 +21,7 @@
                   pattern (test.ml[2,79+6]..test.ml[2,79+13])
                     Tpat_var \"problem/275\"
                     sort value
-                    value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#4[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);imply(unique,uncontended,read_write,static)(modevar#5[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                    value_mode meet_const(local,once,nonportable,unforkable,yielding,stateful)(modevar#4[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);imply_const(unique,uncontended,read_write,static)(modevar#5[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
                   expression (test.ml[2,79+16]..test.ml[2,79+24])
                     Texp_variant \"Problem\"
                     None
@@ -77,7 +77,7 @@
           pattern (type.ml[1,0+4]..type.ml[1,0+5])
             Tpat_var \"f/275\"
             sort value
-            value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#2[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);imply(unique,uncontended,read_write,static)(modevar#3[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+            value_mode meet_const(local,once,nonportable,unforkable,yielding,stateful)(modevar#2[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);imply_const(unique,uncontended,read_write,static)(modevar#3[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
           expression (type.ml[1,0+8]..type.ml[1,0+61])
             extra
               Texp_newtype  t
@@ -102,7 +102,7 @@
                     []
                   Tpat_var \"foo/278\"
                   sort value
-                  value_mode map_comonadic(local_to_regional)(modevar#6[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);imply(unique,uncontended,read_write,static)(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+                  value_mode map_comonadic(local_to_regional)(modevar#6[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);imply_const(unique,uncontended,read_write,static)(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
                 id(modevar#6[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);id(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
                 []
             ]
@@ -215,7 +215,7 @@
                     "kind": "pattern (test.ml[1,0+4]..test.ml[1,0+5])
     Tpat_var \"f/275\"
     sort value
-    value_mode meet(local,once,nonportable,unforkable,yielding,stateful)(modevar#2[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);imply(unique,uncontended,read_write,static)(modevar#3[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+    value_mode meet_const(local,once,nonportable,unforkable,yielding,stateful)(modevar#2[global,many,portable,forkable,unyielding,stateless .. global,once,nonportable,unforkable,yielding,stateful]);imply_const(unique,uncontended,read_write,static)(modevar#3[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
   ",
                     "children": []
                   },
@@ -248,7 +248,7 @@
                         "kind": "pattern (test.ml[1,0+6]..test.ml[1,0+9])
     Tpat_var \"x/277\"
     sort '_representable_layout_1
-    value_mode map_comonadic(local_to_regional)(modevar#6[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);imply(unique,uncontended,read_write,static)(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
+    value_mode map_comonadic(local_to_regional)(modevar#6[global,many,portable,forkable,unyielding,stateless .. local,once,nonportable,unforkable,yielding,stateful]);imply_const(unique,uncontended,read_write,static)(modevar#7[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
   ",
                         "children": []
                       },
