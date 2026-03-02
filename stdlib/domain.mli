@@ -71,10 +71,14 @@ val recommended_domain_count : unit -> int @@ portable
 
     The value returned is at least [1]. *)
 
+val max_domain_count : int
+(** The maximum number of simultaneously running domains. *)
+
 val self_index : unit -> int @@ portable
 (** The index of the current domain. It is an integer unique among
     currently-running domains, in the interval [0; N-1] where N is the
     peak number of domains running simultaneously so far.
+    N is at most [max_domain_count].
 
     The index of a terminated domain may be reused for a new
     domain. Use [(Domain.self () :> int)] instead for an identifier

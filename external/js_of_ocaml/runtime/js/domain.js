@@ -126,6 +126,12 @@ function caml_recommended_domain_count(unit) {
   return 1;
 }
 
+//Provides: caml_recommended_domain_count
+//Version: >= 5
+function caml_max_domain_count(unit) {
+  return 1;
+}
+
 //Provides: caml_ml_domain_index
 //Requires: caml_domain_id
 //Version: >= 5.03
