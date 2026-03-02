@@ -550,16 +550,15 @@ type closed_class_failure = {
 val free_variables: ?env:Env.t -> type_expr -> type_expr list
         (* If env present, then check for incomplete definitions too;
            returns both normal variables and row variables*)
+val free_variables_list: ?env:Env.t -> type_expr list -> type_expr list
+        (* If env present, then check for incomplete definitions too *)
 val free_non_row_variables_of_list: type_expr list -> type_expr list
         (* gets only non-row variables *)
 val free_variable_set_of_list: Env.t -> type_expr list -> Btype.TypeSet.t
         (* post-condition: all elements in the set are Tvars *)
-
 val exists_free_variable : (type_expr -> jkind_lr -> bool) -> type_expr -> bool
         (* Check if there exists a free variable that satisfies the
            given predicate. *)
-val free_variables_list: ?env:Env.t -> type_expr list -> type_expr list
-        (* If env present, then check for incomplete definitions too *)
 val closed_type_expr: ?env:Env.t -> type_expr -> bool
         (* If env present, expand abbreviations to see if expansion
            eliminates the variable *)

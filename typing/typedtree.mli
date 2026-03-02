@@ -442,14 +442,12 @@ and expression_desc =
 
             The resulting typedtree for the application is:
             Texp_apply (Texp_ident "f/1037",
-                        [(Nolabel, Omitted _);
+                        [(Nolabel, Omitted ());
                          (Labelled "y", Arg (Texp_constant Const_int 3))
                         ])
 
             The [Zero_alloc.assume option] records the optional [@zero_alloc
             assume] attribute that may appear on applications. *)
-  (* CR sspies: upstream added a separate [value case list] for effect handler
-     cases. This will need corresponding .ml changes. *)
   | Texp_match of expression * Jkind.sort * computation case list * value case list * partial
         (** match E0 with
             | P1 -> E1
@@ -460,8 +458,6 @@ and expression_desc =
             [Texp_match (E0, sort_of_E0, [(P1, E1); (P2 | exception P3, E2);
                               (exception P4, E3)], [(P4, E4)], _)]
          *)
-  (* CR sspies: upstream added a separate [value case list] for effect handler
-     cases. This will need corresponding .ml changes. *)
   | Texp_unboxed_unit
         (** #() *)
   | Texp_unboxed_bool of bool
@@ -622,17 +618,15 @@ and expression_desc =
   | Texp_antiquotation of expression
   | Texp_eval of core_type * Jkind.sort
 
-and function_curry =
-  | More_args of { partial_mode : Mode.Alloc.l }
-  | Final_arg
-
 and meth =
     Tmeth_name of string
   | Tmeth_val of Ident.t
   | Tmeth_ancestor of Ident.t * Path.t
 
-(* CR sspies: c_cont added from upstream for effect handler continuations.
-   This will need corresponding .ml changes. *)
+and function_curry =
+  | More_args of { partial_mode : Mode.Alloc.l }
+  | Final_arg
+
 and 'k case =
     {
      c_lhs: 'k general_pattern;
@@ -1230,7 +1224,6 @@ and label_declaration =
      ld_id: Ident.t;
      ld_name: string loc;
      ld_uid: Uid.t;
-     (* CR sspies: upstream has atomicity as a separate [ld_atomic] field. *)
      ld_mutable: Types.mutability;
      ld_modalities: modalities;
      ld_type: core_type;
@@ -1466,12 +1459,6 @@ val pat_bound_idents_full:
 (** Splits an or pattern into its value (left) and exception (right) parts. *)
 val split_pattern:
   computation general_pattern -> pattern option * pattern option
-
-(** Returns a format document if the expression reads nicely as the subject of a
-    sentence in a error message. *)
-val nominal_exp_doc :
-  Longident.t Format_doc.printer -> expression
-  -> Format_doc.t option
 
 (** Calculates the syntactic arity of a function based on its parameters and body. *)
 val function_arity : function_param list -> function_body -> int

@@ -209,10 +209,6 @@ type existential_binding =
   | Bind_not_in_scope
   | Bind_non_locally_abstract
 
-(* CR sspies: This error type seems to mix upstream with non-upstream
-   constructors quite a bit. I tried to be careful during conflict resolution,
-   but it would be good to sort them into upstream first then our additions.
-   This should make future merges easier. *)
 type error =
   | Constructor_arity_mismatch of Longident.t * int * int
   | Label_mismatch of Data_types.record_form_packed * Longident.t * Errortrace.unification_error

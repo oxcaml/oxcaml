@@ -18,7 +18,8 @@
 
 (** {1 Physical comparison} *)
 
-external phys_equal : 'a -> 'a -> bool = "%eq"
+external phys_equal :
+  ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%eq"
 (** [phys_equal e1 e2] tests for physical equality of [e1] and [e2].
     On mutable types such as references, arrays, byte sequences, records with
     mutable fields and objects with mutable instance variables,
@@ -30,7 +31,8 @@ external phys_equal : 'a -> 'a -> bool = "%eq"
 
 (** {1 Polymorphic comparison} *)
 
-external equal : 'a -> 'a -> bool = "%equal"
+external equal :
+  ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%equal"
 (** [equal e1 e2] tests for structural equality of [e1] and [e2].
     Mutable structures (e.g. references and arrays) are equal
     if and only if their current contents are structurally equal,
@@ -38,7 +40,9 @@ external equal : 'a -> 'a -> bool = "%equal"
     Equality between functional values raises [Invalid_argument].
     Equality between cyclic data structures may not terminate. *)
 
-external compare : 'a -> 'a -> int = "%compare"
+external compare :
+  ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> int
+  = "%compare"
 (** [compare x y] returns [0] if [x] is equal to [y],
     a negative integer if [x] is less than [y], and a positive integer
     if [x] is greater than [y].  The ordering implemented by [compare]
@@ -58,12 +62,12 @@ external compare : 'a -> 'a -> int = "%compare"
     required by the {!Set.Make} and {!Map.Make} functors, as well as
     the {!List.sort} and {!Array.sort} functions. *)
 
-val min : 'a -> 'a -> 'a
+val min : ('a : value_or_null) . 'a -> 'a -> 'a
 (** Return the smaller of the two arguments.
     The result is unspecified if one of the arguments contains
     the float value {!Stdlib.nan}. *)
 
-val max : 'a -> 'a -> 'a
+val max : ('a : value_or_null) . 'a -> 'a -> 'a
 (** Return the greater of the two arguments.
     The result is unspecified if one of the arguments contains
     the float value {!Stdlib.nan}. *)

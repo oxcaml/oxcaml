@@ -1293,6 +1293,8 @@ val max_arity : unit -> int
       This is unlimited ([max_int]) for bytecode, but limited
       (currently to 126) for native code. *)
 
+val tag_of_lazy_tag : lazy_block_tag -> int
+
 val join_locality_mode : locality_mode -> locality_mode -> locality_mode
 val sub_locality_mode : locality_mode -> locality_mode -> bool
 val eq_locality_mode : locality_mode -> locality_mode -> bool
@@ -1315,8 +1317,6 @@ val primitive_may_allocate : primitive -> locality_mode option
 val locality_mode_of_primitive_description :
   external_call_description -> locality_mode option
   (** Like [primitive_may_allocate], for [external] calls. *)
-
-val tag_of_lazy_tag : lazy_block_tag -> int
 
 (***********************)
 (* For static failures *)

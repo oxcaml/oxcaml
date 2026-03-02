@@ -378,7 +378,7 @@ val cons : ('a : value_or_null). 'a -> 'a t -> 'a t
 
     @since 4.11 *)
 
-val singleton : ('a : value_or_null). 'a -> 'a t
+val singleton: ('a : value_or_null). 'a -> 'a t
 (** [singleton x] returns the one-element sequence containing only [x].
 
     @since 5.4 *)

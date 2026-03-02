@@ -145,11 +145,6 @@ type control =
         parameter.
         Runtime 4 default: 100. Runtime 5 default: 80. *)
 
-    (* CR sspies: upstream changed verbose flags from 3-digit to 4-digit hex
-       (0x001 -> 0x0001) and added two new flags:
-       - 0x0800 GC debugging messages
-       - 0x1000 Address space reservation changes
-       Our runtime 5 flags are different. Review whether they need updating. *)
     verbose : int;
     (** This value controls the GC messages on standard error output.
        It is a sum of some of the following flags, to print messages
@@ -200,10 +195,7 @@ type control =
        (this setting is intended for testing purposes only).
        If [max_overhead >= 1000000], compaction is never triggered.
        On runtime4, if compaction is permanently disabled, it is strongly
-       suggested to set [allocation_policy] to 2. Default: 500.
-
-       This field is currently not available in OCaml 5: the field value is
-       always [0]. *)
+       suggested to set [allocation_policy] to 2. Default: 500. *)
 
     stack_limit : int;
     (** The maximum size of the fiber stacks (in words).

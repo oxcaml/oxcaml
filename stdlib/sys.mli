@@ -269,6 +269,7 @@ external poll_actions : unit -> unit = "%poll"
     GC slices, signal handlers, finalizers, or memprof callbacks.
     @since 5.3 *)
 
+
 (** {1 Signal handling} *)
 
 type signal = int
@@ -293,7 +294,8 @@ type signal_behavior =
    number as an argument. *)
 
 external signal :
-  signal -> signal_behavior -> signal_behavior @@ nonportable = "caml_install_signal_handler"
+  signal -> signal_behavior -> signal_behavior @@ nonportable
+  = "caml_install_signal_handler"
 [@@alert unsafe_multidomain "Use [Sys.Safe.signal]."]
 (** Set the behavior of the system on receipt of a given signal.  The
    first argument is the signal number.  Return the behavior

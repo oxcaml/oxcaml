@@ -40,29 +40,17 @@ type constructor_description =
     cstr_uid: Uid.t;
    }
 
-(* Constructors are the same *)
-val equal_tag :  tag -> tag -> bool
+(* Constructors are the same: they return (structurally)-equal values
+   when applied to equal arguments. *)
+val equal_constr :
+    constructor_description ->  constructor_description -> bool
 
-(* Comparison of tags to store them in sets. *)
-val compare_tag :  tag -> tag -> int
-
-(* Constructors may be the same, given potential rebinding *)
+(* Constructors may be the same, given potential rebinding. *)
 val may_equal_constr :
     constructor_description ->  constructor_description -> bool
 
 (* Type constructor of the constructor's result type. *)
 val cstr_res_type_path : constructor_description -> Path.t
-
-(* Equality *)
-
-val equal_record_representation :
-  record_representation -> record_representation -> bool
-
-val equal_record_unboxed_product_representation :
-  record_unboxed_product_representation -> record_unboxed_product_representation -> bool
-
-val equal_variant_representation :
-  variant_representation -> variant_representation -> bool
 
 type 'a gen_label_description =
   { lbl_name: string;                   (* Short name *)
@@ -104,6 +92,3 @@ val record_form_to_string : _ record_form -> string
 
 (* Type constructor of the label record type. *)
 val lbl_res_type_path : label_description -> Path.t
-
-val mixed_block_element_of_const_sort :
-  Jkind_types.Sort.Const.t -> mixed_block_element
