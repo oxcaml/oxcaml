@@ -444,6 +444,16 @@
           }
         });
       }
+      controls.toRef.addEventListener("blur", () => {
+        window.setTimeout(() => {
+          if (!state.apiAvailable) return;
+          if (!isComparisonMode()) return;
+          if (!controls.refPicker.classList.contains("hidden")) return;
+          const value = String(controls.toRef.value || "").trim();
+          if (value) return;
+          loadSelectedDiffFromApi();
+        }, 0);
+      });
 
       document.addEventListener("mousedown", (event) => {
         if (!controls.refPicker || controls.refPicker.classList.contains("hidden")) return;
