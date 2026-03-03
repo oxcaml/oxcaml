@@ -327,7 +327,7 @@ let load_tlambda ppf ~compilation_unit ~required_globals tlam repr =
     Slambda.eval
       (fun slam ->
         if !Clflags.dump_slambda
-        then fprintf ppf "%a@." Printslambda.slambda slam;
+        then fprintf ppf "%a@." Printlambda.slambda slam;
         slam)
       tlam
   in

@@ -2192,7 +2192,7 @@ module Extended_machtype = struct
     | Ptop -> Misc.fatal_error "No Extended_machtype for layout [Ptop]"
     | Pbottom ->
       Misc.fatal_error "No unique Extended_machtype for layout [Pbottom]"
-    | Psplicevar ident -> Lambda.error (Unevaluated_splice_var ident)
+    | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
     | Punboxed_float Unboxed_float64 -> typ_float
     | Punboxed_float Unboxed_float32 -> typ_float32
     | Punboxed_vector Unboxed_vec128 -> typ_vec128

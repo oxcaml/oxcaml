@@ -786,8 +786,8 @@ let free_methods l =
     | Lprim _ | Lswitch _ | Lstringswitch _ | Lstaticraise _
     | Lifthenelse _ | Lsequence _ | Lwhile _
     | Levent _ | Lifused _ | Lregion _ | Lexclave _ -> ()
-    | Lsplice (loc, _) ->
-      error ~loc:(to_location loc) (Invalid_constructor "Lsplice")
+    | Lsplice _ ->
+      fatal_error_invalid_constructor l
   in free l; !fv
 
 let transl_class ~scopes ids cl_id pub_meths cl vflag =

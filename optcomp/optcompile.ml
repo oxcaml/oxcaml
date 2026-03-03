@@ -95,7 +95,7 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
         program.code
         |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
         |> Slambda.eval
-             (print_if i.ppf_dump Clflags.dump_slambda Printslambda.slambda)
+             (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
         |> fun { Lambda.sval_comptime = _; sval_runtime } ->
         { program with Lambda.code = sval_runtime }
         |> print_if i.ppf_dump Clflags.dump_debug_uid_tables (fun ppf _ ->

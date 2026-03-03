@@ -900,6 +900,7 @@ type lambda =
   (* [Lexclave] closes the newest region opened.
      Note that [Lexclave] nesting is currently unsupported. *)
   | Lexclave of lambda
+  (* [Lsplice] should only exist in slambda. *)
   | Lsplice of scoped_location * slambda
 
 and slambda =
@@ -1190,8 +1191,9 @@ val iter_head_constructor: (lambda -> unit) -> lambda -> unit
     sub expressions of [lam]. It does not recursively traverse the
     expression.
 
-    Callers should note that if calling this before static evaluation and
-    [Simplif.undelay] you will need to handle [Lsplice] and [Ldelayed].
+    Callers should note that you will need to handle stage specific
+    constructors ([Lsplice], etc) depending on what stage you are calling this
+    from.
 *)
 
 val shallow_iter:
@@ -1201,8 +1203,9 @@ val shallow_iter:
 (** Same as [iter_head_constructor], but use a different callback for
     sub-terms which are in tail position or not.
 
-    Callers should note that if calling this before static evaluation and
-    [Simplif.undelay] you will need to handle [Lsplice] and [Ldelayed].
+    Callers should note that you will need to handle stage specific
+    constructors ([Lsplice], etc) depending on what stage you are calling this
+    from.
 *)
 
 val transl_prim: string -> string -> lambda
@@ -1459,7 +1462,8 @@ val static_cast
 
 type error =
   | Slambda_unsupported of string
-  | Unevaluated_splice_var of Ident.t
-  | Invalid_constructor of string
 
 val error : ?loc:Location.t -> error -> 'a
+
+val fatal_error_unevaluated_splice_var : Ident.t -> 'a
+val fatal_error_invalid_constructor : lambda -> 'a

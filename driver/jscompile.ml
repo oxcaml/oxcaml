@@ -46,7 +46,7 @@ let tlambda_to_jsir i tlambda ~as_arg_for =
          program.code
          |> print_if i.ppf_dump Clflags.dump_tlambda Printlambda.lambda
          |> Slambda.eval
-              (print_if i.ppf_dump Clflags.dump_slambda Printslambda.slambda)
+              (print_if i.ppf_dump Clflags.dump_slambda Printlambda.slambda)
          |> fun { Lambda.sval_comptime = _; sval_runtime } ->
          sval_runtime
          |> print_if i.ppf_dump Clflags.dump_rawlambda Printlambda.lambda

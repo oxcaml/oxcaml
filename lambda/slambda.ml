@@ -118,6 +118,10 @@ let eval inspect_slambda template_lam =
        with Found_a_splice ->
          Misc.fatal_error
            "Encountered a splice in the program after slambda eval");
+      (* CR layout poly: We can keep this check in the future if
+         [is_enabled Layout_poly] is replaced with whether template_lam contains
+         any templates. (which is cheap to check if it's combined with
+         fracturing) *)
       if
         (not Language_extension.(is_enabled Layout_poly))
         && not (template_lam == halves.sval_runtime)
