@@ -1219,7 +1219,8 @@ end = struct
   | N : 'c Desc.Var.Head.t
         * 'd Desc.Var.Head.t
         * 'a C.obj
-        * ('a, 'a, (allowed * disallowed)) C.morph
+        * 'b C.obj
+        * ('a, 'b, ('l * 'r)) C.morph
       -> boxedname
 
   module VarTbl = Hashtbl.Make (struct
@@ -1265,6 +1266,17 @@ end = struct
   path *)
   let visible_comonadic_paths_tbl = VarPairTbl.create 17
 
+  (** Tracks all paths from a visible comonadic mode
+  variable to visible monadic mode variable. Since
+  the path goes from a comonadic to a monadic mode,
+  it will have to go through a "monadic to comonadic"
+  morphism. These paths will correspond to a closing
+  over relation between two mode variables
+
+  See description of [visible_monadic_paths_tbl] for
+  a definition of a path *)
+  let visible_closing_over_paths_tbl = VarPairTbl.create 17
+
   (** counter used to generate names for polymorphic mode variables *)
   let modename_counter = ref 0
   let modenames = ref ([] : (boxedname * string) list)
@@ -1285,6 +1297,7 @@ end = struct
     modenames := [];
     VarPairTbl.reset visible_monadic_paths_tbl;
     VarPairTbl.reset visible_comonadic_paths_tbl;
+    VarPairTbl.reset visible_closing_over_paths_tbl;
     VarTbl.reset visible_vars;
     modename_counter := 0
 
@@ -1511,7 +1524,7 @@ end = struct
     fun ~memoized ~visited (K (dst, v)) ->
       find_paths ~memoized ~visited true dst v
 
-  (* [find_path_from_description] constructs all morphisms
+  (** [find_path_from_description] constructs all morphisms
     from one visible mode variable to another, and applies
     an iterator [iter] on them.
     The [find_morph_opt] parameter takes a variable as
@@ -1579,7 +1592,12 @@ end = struct
           Alloc.obj_comonadic Alloc.obj_comonadic
           comonadic
           { f = find_comonadic_morph_opt }
-          (VarPairTbl.add visible_comonadic_paths_tbl)
+          (VarPairTbl.add visible_comonadic_paths_tbl);
+        find_path_from_description ~memoized
+          Alloc.obj_comonadic Alloc.obj_monadic
+          comonadic
+          { f = find_monadic_morph_opt }
+          (VarPairTbl.add visible_closing_over_paths_tbl)
       ) !visible_pairs
 
   type ('a,'b) morphl = ('a, 'b, (allowed * disallowed)) C.morph
@@ -1588,8 +1606,10 @@ end = struct
   type comonadic_morph =
     (Alloc.Comonadic.Const.t, Alloc.Comonadic.Const.t)
       morphl
+  type closing_over_morph =
+    (Alloc.Monadic.Const.t, Alloc.Comonadic.Const.t) morphl
 
-  type edge =
+  type simple_edge =
     { via :
         (monadic_morph, comonadic_morph)
           monadic_comonadic;
@@ -1609,6 +1629,39 @@ end = struct
         the bounds can determine it), we use the
         monadic morphism instead. *)
     }
+
+  type comonadic_edge =
+    { c_via : comonadic_morph;
+        (** The comonadic morphism between two modes
+        when there is no path between their monadic
+        counterparts. This edge represents a partial
+        constraint between two modes. The morphism
+        gives a path from [target] to [src] *)
+      c_name : boxedname;
+        (** The boxed name of [c_via] *)
+    }
+
+  type closing_over_edge =
+    { cls_via : closing_over_morph;
+        (** The right adjoint of the monadic to
+        comonadic path between two modes. This edge
+        represents a constraint on a curry mode
+        when partially applying a function. We take
+        the right adjoint to print the constraint on
+        the curry mode *)
+      cls_name : boxedname
+        (** The boxed name of [cls_via] *)
+    }
+
+  type edge =
+  | Simple of simple_edge
+      (** a constraint between two alloc modes *)
+  | Comonadic of comonadic_edge
+      (** a constraint between the comonadic parts
+      of two alloc modes *)
+  | ClosingOver of closing_over_edge
+      (** a constraint between the monadic part
+      of one mode and the comonadic part of another *)
 
    let dupper_lr : type a. a C.obj -> (a, (allowed * allowed)) Desc.t -> a =
     fun dst descr ->
@@ -1646,6 +1699,19 @@ end = struct
         if C.le dst l r
         then [C.id]
         else [Alloc.meet_const_morph r]
+
+  let construct_closing_over_morphs :
+      (Alloc.Comonadic.Const.t, allowed * allowed) Desc.t
+      -> (Alloc.Monadic.Const.t, allowed * allowed) Desc.t
+      -> closing_over_morph list =
+    fun src_descr target_descr ->
+    match src_descr, target_descr with
+    | Amodevar (Amorphvar (v, f)), Amodevar (Amorphvar (u, g)) ->
+      let vobj = C.src Alloc.obj_comonadic f in
+      let uobj = C.src Alloc.obj_monadic g in
+        VarPairTbl.find_all visible_closing_over_paths_tbl
+        (K (vobj, v), K (uobj, u))
+    | _, _ -> []
 
   let construct_monadic_morphs src_descr target_descr =
     construct_morphs Alloc.obj_monadic src_descr target_descr
@@ -1716,14 +1782,44 @@ end = struct
         { monadic = mon1; comonadic = com1 } ->
       match com0, com1 with
       | Amodevar (Amorphvar (v, _)), Amodevar (Amorphvar (u, _)) ->
-        N (u, v, Alloc.obj_comonadic, com_morph)
+        N (u, v, Alloc.obj_comonadic, Alloc.obj_comonadic, com_morph)
       | _, _ ->
         match mon0, mon1 with
         | Amodevar (Amorphvar (v, _)), Amodevar (Amorphvar (u, _)) ->
-          N (u, v, Alloc.obj_monadic, mon_morph)
+          N (u, v, Alloc.obj_monadic, Alloc.obj_monadic, mon_morph)
         | _, _ -> raise Invalid_edge
                   (* edges are only created when one of the morphism
                   goes from a variable to a variable*)
+
+  let construct_comonadic_name_exn :
+      visible_pair
+      -> comonadic_morph
+      -> visible_pair
+      -> boxedname =
+    fun { comonadic = com0 }
+        com_morph
+        { comonadic = com1 } ->
+      match com0, com1 with
+      | Amodevar (Amorphvar (v, _)), Amodevar (Amorphvar (u, _)) ->
+        N (u, v, Alloc.obj_comonadic, Alloc.obj_comonadic, com_morph)
+      | _, _ -> raise Invalid_edge
+          (* comonadic edges are only created when one of the morphism
+          goes from a variable to a variable*)
+
+  let construct_closing_over_name_exn :
+      visible_pair
+      -> closing_over_morph
+      -> visible_pair
+      -> boxedname =
+    fun { comonadic = com0 }
+        cls_morph
+        { monadic = mon1 } ->
+      match com0, mon1 with
+      | Amodevar (Amorphvar (v, _)), Amodevar (Amorphvar (u, _)) ->
+        N (u, v, Alloc.obj_monadic, Alloc.obj_comonadic, cls_morph)
+      | _, _ -> raise Invalid_edge
+          (* comonadic edges are only created when one of the morphism
+          goes from a variable to a variable*)
 
   let construct_edges_to :
       visible_pair -> edge list =
@@ -1743,8 +1839,26 @@ end = struct
             construct_comonadic_morphs
               comonadic_descr1 comonadic_descr0
           in
-          List.fold_left (fun acc mon_morph ->
-            List.fold_left (fun acc com_morph ->
+          let closing_over_morphs =
+            construct_closing_over_morphs
+              comonadic_descr1 monadic_descr0
+          in
+          let closing_over_morphs =
+            List.map (fun cls_morph ->
+                let cls_name =
+                  construct_closing_over_name_exn
+                    pair0 cls_morph pair1
+                in
+                ClosingOver { cls_via = cls_morph; cls_name }
+              ) closing_over_morphs
+          in
+          List.fold_left (fun acc com_morph ->
+            if mon_morphs = [] then begin
+              let c_name = construct_comonadic_name_exn pair0 com_morph pair1 in
+              let edge = Comonadic { c_via = com_morph; c_name } in
+              edge :: acc
+            end else begin
+              List.fold_left (fun acc mon_morph ->
               let via =
                 { monadic = mon_morph;
                   comonadic = com_morph }
@@ -1752,11 +1866,12 @@ end = struct
               let name =
                 construct_name_exn pair0 via pair1
               in
-              let edge = { via; name } in
+              let edge = Simple { via; name } in
               edge :: acc )
-              acc com_morphs)
-            [] mon_morphs
-        end
+              acc mon_morphs
+            end)
+            closing_over_morphs com_morphs
+          end
       in
       let edges =
         List.map find_edges !visible_pairs
@@ -1781,19 +1896,38 @@ end = struct
             construct_comonadic_morphs
               comonadic_descr1 comonadic_descr0
           in
-          List.fold_left (fun acc mon_morph ->
-            List.fold_left (fun acc com_morph ->
-              let via =
-                { monadic = mon_morph;
-                  comonadic = com_morph }
-              in
-              let name =
-                construct_name_exn pair0 via pair1
-              in
-              let edge = { via; name } in
-              edge :: acc )
-              acc com_morphs)
-            [] mon_morphs
+          let closing_over_morphs =
+            construct_closing_over_morphs
+              comonadic_descr1 monadic_descr0
+          in
+          let closing_over_morphs =
+            List.map (fun cls_morph ->
+                let cls_name =
+                  construct_closing_over_name_exn
+                    pair0 cls_morph pair1
+                in
+                ClosingOver { cls_via = cls_morph; cls_name }
+              ) closing_over_morphs
+          in
+          List.fold_left (fun acc com_morph ->
+            if mon_morphs = [] then begin
+              let c_name = construct_comonadic_name_exn pair0 com_morph pair1 in
+              let edge = Comonadic { c_via = com_morph; c_name } in
+              edge :: acc
+            end else begin
+              List.fold_left (fun acc mon_morph ->
+                let via =
+                  { monadic = mon_morph;
+                    comonadic = com_morph }
+                in
+                let name =
+                  construct_name_exn pair0 via pair1
+                in
+                let edge = Simple { via; name } in
+                edge :: acc )
+              end
+              acc mon_morphs)
+            closing_over_morphs com_morphs
         end
       in
       let edges =
@@ -1802,7 +1936,7 @@ end = struct
       List.flatten edges
 
   let eq_boxedname
-      (N (v, v', dstf, f)) (N (u, u', dstg, g)) =
+      (N (v, v', _, dstf, f)) (N (u, u', _, dstg, g)) =
     match C.equal_obj dstf dstg with
     | Some Refl ->
       Desc.Var.Head.equal v u
@@ -1862,22 +1996,78 @@ end = struct
       hi = Fmt.asprintf "%a"
              Alloc.Const.Option.partial_print upper}
 
-  let print_raw_upper_bound ppf { via; name } =
-    let m = add_named_modevar name in
-    Alloc.pretty_print_monadic_morph
-      (fun ppf s -> Fmt.fprintf ppf "%s" s)
-      m ppf via.monadic
+  type edge_as_lower =
+  | Lower_simple : simple_edge -> edge_as_lower
+  | Lower_comonadic : comonadic_edge -> edge_as_lower
+  | Lower_closing_over_from : closing_over_edge -> edge_as_lower
+  | Lower_closing_over_to : closing_over_edge -> edge_as_lower
 
-  let print_raw_lower_bound ppf { via; name } =
-    let m = add_named_modevar name in
-    Alloc.pretty_print_comonadic_morph
-      (fun ppf s -> Fmt.fprintf ppf "%s" s)
-      m ppf via.comonadic
+  type edge_as_upper =
+  | Upper_simple : simple_edge -> edge_as_upper
+  | Upper_comonadic : comonadic_edge -> edge_as_upper
+
+  let print_raw_upper_bound ppf edge =
+    match edge with
+    | Upper_simple { via; name } ->
+      let m = add_named_modevar name in
+      Alloc.pretty_print_monadic_morph
+        (fun ppf s -> Fmt.fprintf ppf "%s" s)
+        m ppf via.monadic
+    | Upper_comonadic { c_name } ->
+      let m = add_named_modevar c_name in
+      Fmt.fprintf ppf "%s.future" m
+
+  let print_raw_lower_bound ppf edge =
+    match edge with
+    | Lower_simple { via; name } ->
+      let m = add_named_modevar name in
+      Alloc.pretty_print_comonadic_morph
+        (fun ppf s -> Fmt.fprintf ppf "%s" s)
+        m ppf via.comonadic
+    | Lower_comonadic { c_via; c_name } ->
+      let m = add_named_modevar c_name in
+      Alloc.pretty_print_comonadic_morph
+        (fun ppf s -> Fmt.fprintf ppf "%s.future" s)
+        m ppf c_via
+    | Lower_closing_over_to { cls_via; cls_name } ->
+      let m = add_named_modevar cls_name in
+      Alloc.pretty_print_comonadic_morph
+        (fun ppf s -> Fmt.fprintf ppf "%s" s)
+        m ppf cls_via
+    | Lower_closing_over_from { cls_name } ->
+      let m = add_named_modevar cls_name in
+      Fmt.fprintf ppf "%s" m
+
+  let partition_edges_into_bounds :
+      edges_from:edge list ->
+      edges_to:edge list ->
+      edge_as_lower list * edge_as_upper list =
+    fun ~edges_from ~edges_to ->
+    let partition_edges_from
+        : edge -> (edge_as_lower, edge_as_upper) Either.t
+      = function
+      | ClosingOver e -> Either.Left (Lower_closing_over_from e)
+      | Simple e -> Either.Right (Upper_simple e)
+      | Comonadic e -> Right (Upper_comonadic e)
+    in
+    let into_lower_to = function
+      | ClosingOver e -> Lower_closing_over_to e
+      | Simple e -> Lower_simple e
+      | Comonadic e -> Lower_comonadic e
+    in
+    let lower_from, upper =
+      List.partition_map partition_edges_from edges_from
+    in
+    let lower_to = List.map into_lower_to edges_to in
+    (lower_from @ lower_to, upper)
 
   let print_raw_constraints { lo; hi } ppf pair =
     let edges_to = construct_edges_to pair in
     let edges_from = construct_edges_from pair in
-    if edges_to = [] && edges_from = []
+    let edges_lower, edges_upper =
+      partition_edges_into_bounds ~edges_from ~edges_to
+    in
+    if edges_lower = [] && edges_upper = []
        && lo = "" && hi = ""
     then begin
       let name =
@@ -1885,51 +2075,42 @@ end = struct
           { monadic = C.id; comonadic = C.id }
           pair
       in
-      let m = add_named_modevar name in
-      Fmt.fprintf ppf "%s" m
+      Fmt.fprintf ppf "%s" (add_named_modevar name)
     end
     else begin
-      let print_lower_bound ppf () =
-        Fmt.fprintf ppf "%s" lo
+      let pp_sep sep ppf () =
+        Fmt.fprintf ppf "%s" sep
       in
-      let print_upper_bound ppf () =
-        Fmt.fprintf ppf "%s" hi
+      let pp_bounds pp sep extra ppf items =
+        match items, extra with
+        | [], "" -> ()
+        | [], s -> Fmt.fprintf ppf "%s" s
+        | l, "" ->
+          Fmt.pp_print_list
+            ~pp_sep:(pp_sep sep) pp ppf l
+        | l, s ->
+          Fmt.fprintf ppf "%a%s%s"
+            (Fmt.pp_print_list
+               ~pp_sep:(pp_sep sep) pp)
+            l sep s
       in
-      let print_spacing ppf () =
-        if (edges_to <> [] || lo <> "")
-           && (edges_from <> [] || hi <> "")
-        then Fmt.fprintf ppf " "
+      let has_upper =
+        edges_upper <> [] || hi <> ""
       in
-      Fmt.fprintf ppf "[%a%a%a%a%a%a%a%a%a]"
-        (fun ppf () ->
-          if edges_from <> [] || hi <> ""
-          then Fmt.fprintf ppf "< ")
-        ()
-        (Fmt.pp_print_list
-          ~pp_sep:(fun ppf () ->
-            Fmt.fprintf ppf " & ")
-          print_raw_upper_bound)
-        edges_from
-        (fun ppf () ->
-          if edges_from <> [] && hi <> ""
-          then Fmt.fprintf ppf " & ")
-        ()
-        print_upper_bound ()
-        print_spacing ()
-        (fun ppf () ->
-          if edges_to <> [] || lo <> ""
-          then Fmt.fprintf ppf "> ")
-        ()
-        (Fmt.pp_print_list
-          ~pp_sep:(fun ppf () ->
-            Fmt.fprintf ppf " | ")
-          print_raw_lower_bound)
-        edges_to
-        (fun ppf () ->
-          if edges_to <> [] && lo <> ""
-          then Fmt.fprintf ppf " | ")
-        ()
-        print_lower_bound ()
+      let has_lower =
+        edges_lower <> [] || lo <> ""
+      in
+      Fmt.fprintf ppf "[%s%a%s%s%a]"
+        (if has_upper then "< " else "")
+        (pp_bounds print_raw_upper_bound
+           " & " hi)
+        edges_upper
+        (if has_upper && has_lower
+         then " " else "")
+        (if has_lower then "> " else "")
+        (pp_bounds print_raw_lower_bound
+           " | " lo)
+        edges_lower
     end
 
   let find_mode_already_printed pair =
@@ -2276,6 +2457,10 @@ let tree_of_modes : Alloc.lr -> zapped:Alloc.Const.t -> string list =
   fun modes ~zapped ->
     if Alloc.check_level_var modes generic_level &&
       Language_extension.(is_at_least Mode_polymorphism Alpha) then
+      (* [ (Fmt.asprintf "%s\n debug: %a"
+            (Names.name_of_mode modes)
+            (Mode.Alloc.print ~verbose:true ())
+            modes) ] *)
       [ (Fmt.asprintf "%s"
             (Names.name_of_mode modes))]
     else

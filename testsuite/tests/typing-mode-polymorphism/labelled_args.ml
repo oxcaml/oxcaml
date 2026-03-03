@@ -30,7 +30,9 @@ let () =
 
 let fst ~label1 ~label2 = label1
 [%%expect{|
-val fst : label1:'a @ [< 'n] -> (label2:'b @ 'o -> 'a @ [> 'n]) @ 'm = <fun>
+val fst :
+  label1:'a @ [< 'o & 'n.future] ->
+  (label2:'b @ 'p -> 'a @ [> 'm | 'o]) @ [> close('m) | 'n.future] = <fun>
 |}]
 
 let () =
@@ -85,7 +87,9 @@ Error: This value is "local" but is expected to be "global".
 
 let snd ~label1 ~label2 = label2
 [%%expect{|
-val snd : label1:'a @ 'o -> (label2:'b @ [< 'n] -> 'b @ [> 'n]) @ 'm = <fun>
+val snd :
+  label1:'a @ [< 'm.future] ->
+  (label2:'b @ [< 'n] -> 'b @ [> 'n]) @ [> 'm.future] = <fun>
 |}]
 
 let () =
@@ -125,13 +129,16 @@ let () =
 let foo = fun x -> fst ~label1:x
 [%%expect{|
 val foo :
-  'a @ [< 'o & global] -> (label2:'b @ 'p -> 'a @ [< 'n > 'n | 'o]) @ 'm =
+  'a @ [< 'p & 'n.future & global] ->
+  (label2:'b @ [< 'q.future > 'q.future] -> 'a @ [< 'o > 'm | 'o | 'p]) @ [> close('m) | 'n.future] =
   <fun>
 |}]
 
 let foo ?label1 x = x
 [%%expect{|
-val foo : ?label1:'a @ 'o -> ('b @ [< 'n] -> 'b @ [> 'n]) @ 'm = <fun>
+val foo :
+  ?label1:'a @ [< 'm.future] -> ('b @ [< 'n] -> 'b @ [> 'n]) @ [> 'm.future] =
+  <fun>
 |}]
 
 let () =
@@ -154,7 +161,9 @@ Error: This value is "local" but is expected to be "global".
 
 let foo x ?label1 = x
 [%%expect{|
-val foo : 'a @ [< 'n] -> (?label1:'b @ 'o -> 'a @ [> 'n]) @ 'm = <fun>
+val foo :
+  'a @ [< 'o & 'n.future] ->
+  (?label1:'b @ 'p -> 'a @ [> 'm | 'o]) @ [> close('m) | 'n.future] = <fun>
 |}]
 
 let () =

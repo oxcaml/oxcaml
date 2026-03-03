@@ -30,7 +30,9 @@ val use_global : 'a @ [< global] -> unit @ 'm = <fun>
 
 let fst x y = x
 [%%expect{|
-val fst : 'a @ [< 'n] -> ('b @ 'o -> 'a @ [> 'n]) @ 'm = <fun>
+val fst :
+  'a @ [< 'o & 'n.future] ->
+  ('b @ 'p -> 'a @ [> 'm | 'o]) @ [> close('m) | 'n.future] = <fun>
 |}]
 
 (* n-ary functions will impose locality bounds on arguments, since the middle end
@@ -54,8 +56,9 @@ let bar (once_ x) =
   fst x
 [%%expect{|
 val bar :
-  'a @ [< 'n & global > once] ->
-  ('b @ 'o -> 'a @ [< 'm > 'm | 'n | once]) @ [> once] = <fun>
+  'a @ [< 'p & 'n.future & global > once] ->
+  ('b @ [< 'q.future > 'q.future] -> 'a @ [< 'o > 'm | 'o | 'p | once]) @ [> close('m) | 'n.future | once] =
+  <fun>
 |}]
 
 let bar (unique_ x) =
@@ -86,9 +89,11 @@ Error: The value "bar1" is "nonportable"
 let many_arguments x y z s t = y
 [%%expect{|
 val many_arguments :
-  'a @ 'mm3 ->
-  ('b @ [< 'q] ->
-   ('c @ 'mm2 -> ('d @ 'mm1 -> ('e @ 'mm0 -> 'b @ [> 'q]) @ 'p) @ 'o) @ 'n) @ 'm =
+  'a @ [< 'mm7.future & 'mm2.future & 'p.future & 'm.future] ->
+  ('b @ [< 'mm8 & 'mm6.future & 'mm1.future & 'o.future] ->
+   ('c @ [< 'mm5.future & 'mm0.future] ->
+    ('d @ [< 'mm4.future] ->
+     ('e @ 'mm9 -> 'b @ [> 'mm3 | 'q | 'n | 'mm8]) @ [> close('mm3) | 'mm4.future | 'mm5.future | 'mm6.future | 'mm7.future]) @ [> close('q) | 'mm0.future | 'mm1.future | 'mm2.future]) @ [> close('n) | 'o.future | 'p.future]) @ [> 'm.future] =
   <fun>
 |}]
 
@@ -127,7 +132,9 @@ val foo : unit = ()
 
 let fst x = fun y -> x
 [%%expect{|
-val fst : 'a @ [< 'n & global] -> ('b @ 'o -> 'a @ [> 'n]) @ 'm = <fun>
+val fst :
+  'a @ [< 'o & 'n.future & global] ->
+  ('b @ 'p -> 'a @ [> 'm | 'o]) @ [> close('m) | 'n.future] = <fun>
 |}]
 
 (* x is < global as before *)
@@ -237,8 +244,10 @@ Error: The value "bar1" is "nonportable"
 let nest x = fun () -> fun () -> fun () -> x
 [%%expect{|
 val nest :
-  'a @ [< 'p & global] ->
-  (unit @ 'mm1 -> (unit @ 'mm0 -> (unit @ 'q -> 'a @ [> 'p]) @ 'o) @ 'n) @ 'm =
+  'a @ [< 'mm1 & 'mm0.future & 'p.future & 'n.future & global] ->
+  (unit @ 'mm4 ->
+   (unit @ 'mm3 ->
+    (unit @ 'mm2 -> 'a @ [> 'q | 'o | 'm | 'mm1]) @ [> close('q) | 'mm0.future]) @ [> close('o) | 'p.future]) @ [> close('m) | 'n.future] =
   <fun>
 |}]
 

@@ -20,7 +20,9 @@ type 'a myref = { mutable i : 'a }
 let alloc x = { i = x }
 [%%expect{|
 type 'a myref = { mutable i : 'a; }
-val alloc : 'a @ [< global many] -> 'a myref @ [> nonportable] = <fun>
+val alloc :
+  'a @ [< global many > 'm.future] -> 'a myref @ [< 'm.future > nonportable] =
+  <fun>
 |}]
 
 (* CR ageorges: make a test case that checks that the codegen of a store
@@ -31,15 +33,17 @@ val alloc : 'a @ [< global many] -> 'a myref @ [> nonportable] = <fun>
 let store_any x y = x.i <- y
 [%%expect{|
 val store_any :
-  'a myref @ [< uncontended] ->
-  ('a @ [< global many uncontended] -> unit @ 'm) @ [> nonportable] = <fun>
+  'a myref @ [< 'n.future & uncontended] ->
+  ('a @ [< global many uncontended > 'm.future] -> unit @ 'o) @ [< 'm.future > 'n.future | nonportable] =
+  <fun>
 |}]
 
 let store_global (x @ global) y = x.i <- y
 [%%expect{|
 val store_global :
-  'a myref @ [< global uncontended] ->
-  ('a @ [< global many uncontended] -> unit @ 'm) @ [> nonportable] = <fun>
+  'a myref @ [< 'n.future & global uncontended] ->
+  ('a @ [< global many uncontended > 'm.future] -> unit @ 'o) @ [< 'm.future > 'n.future | nonportable] =
+  <fun>
 |}]
 
 let () =
@@ -129,6 +133,6 @@ Error: This value is "once" but is expected to be "many".
 let foo (x @ contended) = alloc x
 [%%expect{|
 val foo :
-  'a @ [< global many > contended] -> 'a myref @ [> nonportable contended] =
-  <fun>
+  'a @ [< global many > 'm.future | contended] ->
+  'a myref @ [< 'm.future > nonportable contended] = <fun>
 |}]
