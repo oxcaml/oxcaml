@@ -86,3 +86,50 @@ select_nativeint:
   cmovne %rbx, %rax
   ret
 |}]
+
+(* CR ttebbi: We should not materialize a boolean. *)
+let repeated_select_shared x y z w  a b =
+  let c = (Int64_u.to_int64 x) < (Int64_u.to_int64 y) in
+  let q = Builtins.select_int64 c z w in
+  let r = Builtins.select_int64 c a b in
+  #(q,r)
+[%%expect_asm X86_64{|
+repeated_select_shared:
+  movq  %rbx, %r8
+  movq  %rcx, %rbx
+  cmpq  %r8, %rax
+  setl  %al
+  movzbq %al, %rax
+  leaq  1(%rax,%rax), %rcx
+  movq  %rsi, %rax
+  cmpq  $1, %rcx
+  cmovne %rdi, %rax
+  cmpq  $1, %rcx
+  cmovne %rdx, %rbx
+  ret
+|}]
+
+(* CR ttebbi: We not materialize the boolean, ideally even share the cmpq. *)
+let repeated_select_repeated x y z w  a b =
+  let q =
+    Builtins.select_int64 ((Int64_u.to_int64 x) < (Int64_u.to_int64 y)) z w
+  in
+  let r =
+    Builtins.select_int64 ((Int64_u.to_int64 x) < (Int64_u.to_int64 y)) a b
+  in
+  #(q,r)
+[%%expect_asm X86_64{|
+repeated_select_repeated:
+  movq  %rbx, %r8
+  movq  %rcx, %rbx
+  cmpq  %r8, %rax
+  setl  %al
+  movzbq %al, %rax
+  leaq  1(%rax,%rax), %rcx
+  movq  %rsi, %rax
+  cmpq  $1, %rcx
+  cmovne %rdi, %rax
+  cmpq  $1, %rcx
+  cmovne %rdx, %rbx
+  ret
+|}]
