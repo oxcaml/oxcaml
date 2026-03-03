@@ -132,7 +132,9 @@ type 'a myref = { mutable i : 'a }
 let alloc x = { i = x }
 [%%expect{|
 type 'a myref = { mutable i : 'a; }
-val alloc : 'a @ [< global many] -> 'a myref @ [> nonportable] = <fun>
+val alloc :
+  'a @ [< global many > 'm.future] -> 'a myref @ [< 'm.future > nonportable] =
+  <fun>
 |}]
 
 (* mutable fields are not polymorphic *)
@@ -209,8 +211,8 @@ Error: This value is "once" but is expected to be "many".
 let foo (x @ contended) = alloc x
 [%%expect{|
 val foo :
-  'a @ [< global many > contended] -> 'a myref @ [> nonportable contended] =
-  <fun>
+  'a @ [< global many > 'm.future | contended] ->
+  'a myref @ [< 'm.future > nonportable contended] = <fun>
 |}]
 
 (* PRODUCTS *)
@@ -218,8 +220,9 @@ val foo :
 let prod x y = (x, y)
 [%%expect{|
 val prod :
-  'a @ [< 'o & global] ->
-  ('b @ [< 'n & global] -> 'a * 'b @ [> 'n | 'o]) @ 'm = <fun>
+  'a @ [< 'p & 'n.future & global] ->
+  ('b @ [< 'o & global] -> 'a * 'b @ [> 'm | 'o | 'p]) @ [> close('m) | 'n.future] =
+  <fun>
 |}]
 
 let dupl x = (x, x)
@@ -240,7 +243,9 @@ val foo : unit = ()
 
 let fst x y = x
 [%%expect{|
-val fst : 'a @ [< 'n] -> ('b @ 'o -> 'a @ [> 'n]) @ 'm = <fun>
+val fst :
+  'a @ [< 'o & 'n.future] ->
+  ('b @ 'p -> 'a @ [> 'm | 'o]) @ [> close('m) | 'n.future] = <fun>
 |}]
 
 (* n-ary functions will impose locality bounds on arguments, since the middle end
@@ -264,8 +269,9 @@ let bar (once_ x) =
   fst x
 [%%expect{|
 val bar :
-  'a @ [< 'n & global > once] ->
-  ('b @ 'o -> 'a @ [< 'm > 'm | 'n | once]) @ [< global > once] = <fun>
+  'a @ [< 'p & 'n.future & global > once] ->
+  ('b @ [< 'q.future > 'q.future] -> 'a @ [< 'o > 'm | 'o | 'p | once]) @ [< global > close('m) | 'n.future | once] =
+  <fun>
 |}]
 
 let bar (unique_ x) =
@@ -296,9 +302,11 @@ Error: The value "bar1" is "nonportable"
 let many_arguments x y z s t = y
 [%%expect{|
 val many_arguments :
-  'a @ 'mm3 ->
-  ('b @ [< 'q] ->
-   ('c @ 'mm2 -> ('d @ 'mm1 -> ('e @ 'mm0 -> 'b @ [> 'q]) @ 'p) @ 'o) @ 'n) @ 'm =
+  'a @ [< 'mm7.future & 'mm2.future & 'p.future & 'm.future] ->
+  ('b @ [< 'mm8 & 'mm6.future & 'mm1.future & 'o.future] ->
+   ('c @ [< 'mm5.future & 'mm0.future] ->
+    ('d @ [< 'mm4.future] ->
+     ('e @ 'mm9 -> 'b @ [> 'mm3 | 'q | 'n | 'mm8]) @ [> close('mm3) | 'mm4.future | 'mm5.future | 'mm6.future | 'mm7.future]) @ [> close('q) | 'mm0.future | 'mm1.future | 'mm2.future]) @ [> close('n) | 'o.future | 'p.future]) @ [> 'm.future] =
   <fun>
 |}]
 
@@ -338,8 +346,9 @@ val foo : unit = ()
 
 let fst x = fun y -> x
 [%%expect{|
-val fst : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [< global] =
-  <fun>
+val fst :
+  'a @ [< 'o & 'n.future & global] ->
+  ('b @ 'p -> 'a @ [> 'm | 'o]) @ [< global > close('m) | 'n.future] = <fun>
 |}]
 
 (* x is < global as before *)
@@ -485,8 +494,8 @@ Error: This value is "nonportable" but is expected to be "portable".
 let apply f = fun x -> f x
 [%%expect{|
 val apply :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global] ->
-  ('a @ [< 'n] -> 'b @ [> 'm]) @ 'o = <fun>
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o.future & global] ->
+  ('a @ [< 'n] -> 'b @ [> 'm]) @ [> 'o.future] = <fun>
 |}]
 
 (* CR ageorges: the following test ought to succeed; might be due to n-ary function *)
@@ -501,8 +510,9 @@ Line 3, characters 6-7:
 Warning 26 [unused-var]: unused variable y.
 
 val foo :
-  'a @ [< global unique] ->
-  ('b @ [< global > aliased] -> unit @ 'm) @ [> once nonportable] = <fun>
+  'a @ [< 'm.future & global unique] ->
+  ('b @ [< global > aliased] -> unit @ 'n) @ [> 'm.future | once nonportable] =
+  <fun>
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
@@ -523,9 +533,9 @@ Error: This value is "nonportable" but is expected to be "portable".
 let compose f g x = f (g x)
 [%%expect{|
 val compose :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ 'mm1 ->
-  (('c @ [> 'p] -> 'a @ [< 'n & global]) @ 'mm0 ->
-   ('c @ [< 'p] -> 'b @ [> 'm]) @ 'q) @ 'o =
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'mm0.future & 'o.future] ->
+  (('c @ [> 'p] -> 'a @ [< 'n & global]) @ [< 'q.future] ->
+   ('c @ [< 'p] -> 'b @ [> 'm]) @ [> 'q.future | 'mm0.future]) @ [> 'o.future] =
   <fun>
 |}]
 
@@ -553,8 +563,8 @@ let foo (x : int @ portable) (y : int @ nonportable) =
   use_portable y
 [%%expect{|
 val foo :
-  int @ [< portable] ->
-  (int @ [> nonportable] -> unit @ 'm) @ [> nonportable] = <fun>
+  int @ [< 'm.future & portable] ->
+  (int @ [> nonportable] -> unit @ 'n) @ [> 'm.future | nonportable] = <fun>
 |}]
 
 (* CHAINING APPLICATIONS *)
@@ -584,7 +594,9 @@ val foo : 'a @ [< global portable] -> unit @ 'm = <fun>
 let close_over x = fun () -> x
 [%%expect{|
 val close_over :
-  'a @ [< 'm & global] -> (unit @ 'n -> 'a @ [> 'm]) @ [< global] = <fun>
+  'a @ [< 'o & 'n.future & global] ->
+  (unit @ 'p -> 'a @ [> 'm | 'o]) @ [< global > close('m) | 'n.future] =
+  <fun>
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
@@ -602,8 +614,10 @@ Error: This value is "nonportable" but is expected to be "portable".
 let close_over x = fun () -> fun () -> x
 [%%expect{|
 val close_over :
-  'a @ [< 'm & global] ->
-  (unit @ 'o -> (unit @ 'n -> 'a @ [> 'm]) @ [< global]) @ [< global] = <fun>
+  'a @ [< 'q & 'p.future & 'n.future & global] ->
+  (unit @ 'mm1 ->
+   (unit @ 'mm0 -> 'a @ [> 'o | 'm | 'q]) @ [< global > close('o) | 'p.future]) @ [< global > close('m) | 'n.future] =
+  <fun>
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
