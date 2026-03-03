@@ -406,7 +406,8 @@ install_for_test: install
 	cp $(boot_build)/ocamltest/ocamltest.native _runtest/ocamltest/ocamltest
 test: install_for_test
 	if [ "$(middle_end)" = "flambda2" ]; then \
-	  for dir in `cd testsuite; ls -1 -d tests/*`; do \
+	  for dir in `cd testsuite; ls -1 -d tests/*/`; do \
+	    dir=$${dir%/}; \
 	    if ! grep -q "^  $$dir " oxcaml/testsuite/flambda2-test-list; then \
 	      echo "  $$dir"; \
 	    fi; \
