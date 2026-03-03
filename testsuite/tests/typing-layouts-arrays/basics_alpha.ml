@@ -229,24 +229,24 @@ let f5 (x : float32# array) v = set x 0 v
 external set : ('a : any mod separable). 'a array -> int -> 'a -> unit
   = "%array_safe_set" [@@layout_poly]
 val f1 :
-  float# array @ [< global uncontended] ->
-  (float# @ [< global many uncontended] -> unit @ [< global]) @ [< global > nonportable] =
+  float# array @ [< 'n.future & global uncontended] ->
+  (float# @ [< global many uncontended > 'm.future] -> unit @ [< global]) @ [< 'm.future & global > 'n.future | nonportable] =
   <fun>
 val f2 :
-  int32# array @ [< global uncontended] ->
-  (int32# @ [< global many uncontended] -> unit @ [< global]) @ [< global > nonportable] =
+  int32# array @ [< 'n.future & global uncontended] ->
+  (int32# @ [< global many uncontended > 'm.future] -> unit @ [< global]) @ [< 'm.future & global > 'n.future | nonportable] =
   <fun>
 val f3 :
-  int64# array @ [< global uncontended] ->
-  (int64# @ [< global many uncontended] -> unit @ [< global]) @ [< global > nonportable] =
+  int64# array @ [< 'n.future & global uncontended] ->
+  (int64# @ [< global many uncontended > 'm.future] -> unit @ [< global]) @ [< 'm.future & global > 'n.future | nonportable] =
   <fun>
 val f4 :
-  nativeint# array @ [< global uncontended] ->
-  (nativeint# @ [< global many uncontended] -> unit @ [< global]) @ [< global > nonportable] =
+  nativeint# array @ [< 'n.future & global uncontended] ->
+  (nativeint# @ [< global many uncontended > 'm.future] -> unit @ [< global]) @ [< 'm.future & global > 'n.future | nonportable] =
   <fun>
 val f5 :
-  float32# array @ [< global uncontended] ->
-  (float32# @ [< global many uncontended] -> unit @ [< global]) @ [< global > nonportable] =
+  float32# array @ [< 'n.future & global uncontended] ->
+  (float32# @ [< global many uncontended > 'm.future] -> unit @ [< global]) @ [< 'm.future & global > 'n.future | nonportable] =
   <fun>
 |}]
 

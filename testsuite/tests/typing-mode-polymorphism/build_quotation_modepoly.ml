@@ -190,15 +190,21 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 
 <[ fun x y -> x ]>;;
 [%%expect {|
-- : <[$('a) @ [< 'm] -> ($('b) @ 'n -> $('a) @ [> 'm]) @ [> local]]> expr =
-<[fun x y -> x]>
+- : <[
+     $('a) @ [< 'o & 'n.future] ->
+     ($('b) @ 'p -> $('a) @ [> 'm | 'o]) @ [> close('m) | 'n.future | local]
+     ]>
+    expr
+= <[fun x y -> x]>
 |}];;
 
 <[ fun f x y -> f ~a:y ~b:x ]>;;
 [%%expect {|
 - : <[
-     (a:$('a) @ [> 'p] -> (b:$('b) @ [> 'o] -> $('c) @ [< 'n & global]) @ 'm) @ 'q ->
-     ($('b) @ [< 'o] -> ($('a) @ [< 'p] -> $('c) @ [> 'n]) @ [> local]) @ [> local]
+     (a:$('a) @ [< 'm.future > 'n | 'mm1] ->
+      (b:$('b) @ [> 'q | 'mm0] -> $('c) @ [< 'p & global]) @ [> 'm.future | monadic_to_comonadic_min('n) | 'o.future]) @ [< 'o.future & 'mm2.future] ->
+     ($('b) @ [< 'mm3.future & 'mm0] ->
+      ($('a) @ [< 'mm1] -> $('c) @ [> 'p]) @ [> 'mm3.future | close('q) | local]) @ [> 'mm2.future | local]
      ]>
     expr
 = <[fun f x y -> f ~a:y ~b:x]>
@@ -207,10 +213,10 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 <[ fun f x y -> f ?a:y ?b:x ]>;;
 [%%expect {|
 - : <[
-     (?a:$('a) @ [> 'p] ->
-      (?b:$('b) @ [> 'o] -> $('c) @ [< 'n & global]) @ 'm) @ 'q ->
-     ($('b) option @ [< 'o] ->
-      ($('a) option @ [< 'p] -> $('c) @ [> 'n]) @ [> local]) @ [> local]
+     (?a:$('a) @ [< 'm.future > 'n | 'mm1] ->
+      (?b:$('b) @ [> 'q | 'mm0] -> $('c) @ [< 'p & global]) @ [> 'm.future | monadic_to_comonadic_min('n) | 'o.future]) @ [< 'o.future & 'mm2.future] ->
+     ($('b) option @ [< 'mm3.future & 'mm0] ->
+      ($('a) option @ [< 'mm1] -> $('c) @ [> 'p]) @ [> 'mm3.future | close('q) | local]) @ [> 'mm2.future | local]
      ]>
     expr
 = <[fun f x y -> f ?a:y ?b:x]>
@@ -289,8 +295,9 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 <[ fun f x d -> match f x with | res -> res | exception e -> d ]>;;
 [%%expect {|
 - : <[
-     ($('a) @ [> 'n] -> $('b) @ [< 'm & global]) @ 'p ->
-     ($('a) @ [< 'n] -> ($('b) @ [< 'o] -> $('b) @ [> 'o | 'm]) @ [> local]) @ [> local]
+     ($('a) @ [> 'n | 'o] -> $('b) @ [< 'm & global]) @ [< 'p.future] ->
+     ($('a) @ [< 'q.future & 'o] ->
+      ($('b) @ [< 'mm0] -> $('b) @ [> 'mm0 | 'm]) @ [> 'q.future | close('n) | local]) @ [> 'p.future | local]
      ]>
     expr
 = <[fun f x d -> match f x with | res -> res | (exception e) -> d]>
@@ -311,8 +318,9 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 <[ fun x d -> match x with | Some y -> y | None -> d ]>;;
 [%%expect {|
 - : <[
-     $('a) option @ [< 'n] ->
-     ($('a) @ [< 'm] -> $('a) @ [> 'm | 'n]) @ [> local]]>
+     $('a) option @ [< 'p & 'n.future] ->
+     ($('a) @ [< 'o] -> $('a) @ [> 'm | 'o | 'p]) @ [> close('m) | 'n.future | local]
+     ]>
     expr
 = <[fun x d -> match x with | Some (y) -> y | None -> d]>
 |}];;
@@ -329,8 +337,8 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 <[ fun (type a) (f : a -> a) (x : a) -> f (f x) ]>;;
 [%%expect {|
 - : <[
-     ($('a) -> $('a)) @ [< many] ->
-     ($('a) @ [< global many uncontended] -> $('a) @ [> aliased nonportable]) @ [> local]
+     ($('a) -> $('a)) @ [< 'm.future & many] ->
+     ($('a) @ [< global many uncontended] -> $('a) @ [> aliased nonportable]) @ [> 'm.future | local]
      ]>
     expr
 = <[fun (type a) (f : a -> a) (x : a) -> f (f x)]>
@@ -339,9 +347,9 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 <[ fun x (type a) (f : a -> a * a) (g : int -> a) -> f (g x) ]>;;
 [%%expect {|
 - : <[
-     int @ 'o ->
-     (($('a) -> $('a) * $('a)) @ 'n ->
-      ((int -> $('a)) @ 'm -> $('a) * $('a) @ [> aliased nonportable]) @ [> local]) @ [> local]
+     int @ [< 'm.future] ->
+     (($('a) -> $('a) * $('a)) @ [< 'n.future] ->
+      ((int -> $('a)) @ 'o -> $('a) * $('a) @ [> aliased nonportable]) @ [> 'n.future | local]) @ [> 'm.future | local]
      ]>
     expr
 = <[fun x (type a) (f : a -> a * a) (g : int -> a) -> f (g x)]>
@@ -350,8 +358,8 @@ val x0 : <[[> `C of int ] as '_weak3]> expr = <[`C 543]>
 <[ fun (f : 'a. 'a -> 'a) -> f f ]>;;
 [%%expect {|
 - : <[
-     ('a. 'a -> 'a) @ [< global many] ->
-     ($('b) -> $('b)) @ [> aliased nonportable]]>
+     ('a. 'a -> 'a) @ [< global many > 'm.future] ->
+     ($('b) -> $('b)) @ [< 'm.future > aliased nonportable]]>
     expr
 = <[fun (f : 'a. 'a -> 'a) -> f f]>
 |}];;
@@ -482,8 +490,11 @@ Here is an example of a case that is not matched:
 
 <[ fun (f: int -> int) (x: int) -> f x ]>;;
 [%%expect {|
-- : <[(int -> int) @ 'o -> (int @ 'n -> int @ 'm) @ [> local]]> expr =
-<[fun (f : int -> int) (x : int) -> f x]>
+- : <[
+     (int -> int) @ [< 'm.future] ->
+     (int @ 'o -> int @ 'n) @ [> 'm.future | local]]>
+    expr
+= <[fun (f : int -> int) (x : int) -> f x]>
 |}];;
 
 <[ let module M = Set.Make(Int) in M.singleton 100 |> M.elements ]>;;
@@ -770,7 +781,9 @@ module Mod : sig type t = int val mk : 'a -> 'a end
 
 <[fun (module M : Hashtbl.S) x -> M.clear (M.create x)]>;;
 [%%expect {|
-- : <[(module Hashtbl.S) @ [< many] -> (int @ 'n -> unit @ 'm) @ [> local]]>
+- : <[
+     (module Hashtbl.S) @ [< 'm.future & many] ->
+     (int @ 'o -> unit @ 'n) @ [> 'm.future | local]]>
     expr
 = <[fun (module M : Stdlib.Hashtbl.S) x -> M.clear (M.create x)]>
 |}];;
@@ -976,10 +989,10 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 <[ fun (f : x:'a -> ?y:'b -> 'c -> unit) x y z -> f ~x ?y:None z ]>
 [%%expect {|
 - : <[
-     (x:$('a) -> ?y:$('b) -> $('c) -> unit) @ [< global many] ->
-     ($('a) @ [< global many uncontended] ->
-      ($('d) @ 'n ->
-       ($('c) @ [< global many uncontended] -> unit @ 'm) @ [> local]) @ [> local nonportable]) @ [> local]
+     (x:$('a) -> ?y:$('b) -> $('c) -> unit) @ [< 'm.future & global many > 'p.future] ->
+     ($('a) @ [< global many uncontended > 'o.future] ->
+      ($('d) @ [< 'q.future] ->
+       ($('c) @ [< global many uncontended > 'n.future] -> unit @ 'mm0) @ [> 'q.future | local]) @ [< 'n.future & 'o.future & 'p.future > local nonportable]) @ [> 'm.future | local]
      ]>
     expr
 = <[fun (f : x:'a -> ?y:'b -> 'c -> unit) x y z -> f ~x:x ?y:None z]>
@@ -1018,7 +1031,13 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
    and bar (x : int) : int = if x > 0 then foo x else 0
    in foo, bar ]>
 [%%expect {|
-- : <[(int @ 'n -> int @ 'm) * (int @ 'p -> int @ 'o)]> expr =
+- : <[
+     (int @ 'n -> int @ [< 'm.future > 'm.future mod many portable]) *
+     (int @ 'p ->
+      int @ [< 'o.future & 'o.future > 'o.future mod many portable | 'o.future mod many portable])
+     ]>
+    expr
+=
 <[
   let rec foo = (fun (x : int) -> (if (x < 0) then (bar x) else 0 : int))
   and bar =
@@ -1029,15 +1048,18 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
 
 <[ fun x -> function None -> 0 | Some x -> x ]>
 [%%expect {|
-- : <[$('a) @ 'n -> (int option @ [< 'm] -> int @ [> 'm]) @ [> local]]> expr
+- : <[
+     $('a) @ [< 'm.future] ->
+     (int option @ [< 'n] -> int @ [> 'n]) @ [> 'm.future | local]]>
+    expr
 = <[fun x -> function | None -> 0 | Some (x__1) -> x__1]>
 |}];;
 
 <[ fun f x -> (f [@inlined]) x [@nontail] ]>
 [%%expect {|
 - : <[
-     ($('a) @ [> 'n] -> $('b) @ [< 'm & global]) @ 'o ->
-     ($('a) @ [< 'n] -> $('b) @ [> 'm]) @ [> local]]>
+     ($('a) @ [> 'n] -> $('b) @ [< 'm & global]) @ [< 'o.future] ->
+     ($('a) @ [< 'n] -> $('b) @ [> 'm]) @ [> 'o.future | local]]>
     expr
 = <[fun f x -> ((f [@inlined]) x [@nontail])]>
 |}];;
@@ -1145,8 +1167,12 @@ Error: Identifier "x" is used at line 1, characters 43-44,
 (* Bug 9: Fun with function cases must have balanced format boxes *)
 <[ fun x -> function | 0 -> x | n -> n + x ]>;;
 [%%expect {|
-- : <[int @ [< 'm] -> (int @ [< many] -> int @ [> 'm]) @ [> local]]> expr =
-<[fun x -> function | 0 -> x | n -> n + x]>
+- : <[
+     int @ [< 'o & 'n.future] ->
+     (int @ [< many] -> int @ [> 'm | 'o]) @ [> close('m) | 'n.future | local]
+     ]>
+    expr
+= <[fun x -> function | 0 -> x | n -> n + x]>
 |}];;
 
 (* Bug 10: Src_pos must not print as "." *)
@@ -1176,7 +1202,11 @@ Error: Identifier "x" is used at line 1, characters 43-44,
 (* Bug 2.2: Match/try in case RHS must be parenthesized *)
 <[ fun x y -> match x with | true -> (match y with | 0 -> "a" | _ -> "b") | false -> "c" ]>;;
 [%%expect {|
-- : <[bool @ 'o -> (int @ 'n -> string @ 'm) @ [> local]]> expr =
+- : <[
+     bool @ [< 'm.future] ->
+     (int @ 'o -> string @ 'n) @ [> 'm.future | local]]>
+    expr
+=
 <[
   fun x y ->
     match x with | true -> (match y with | 0 -> "a" | _ -> "b") | false ->

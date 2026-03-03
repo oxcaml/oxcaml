@@ -136,8 +136,9 @@ val f :
   ((int or_null -> unit) @ 'm -> unit @ [< global]) @ [< global] = <fun>
 |}, Principal{|
 val f :
-  int or_null @ [> local] ->
-  ((int or_null -> unit) @ 'm -> unit @ [< global]) @ [> local] = <fun>
+  int or_null @ [< 'm.future > local] ->
+  ((int or_null -> unit) @ 'n -> unit @ [< global]) @ [> 'm.future | local] =
+  <fun>
 |}]
 
 module M : sig

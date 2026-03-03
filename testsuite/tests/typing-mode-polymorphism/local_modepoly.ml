@@ -399,9 +399,10 @@ let etajoin p (f : ?b:bool -> unit -> int) (local_ g : unit -> int) =
   if p then (f : unit -> int) else g
 [%%expect{|
 val etajoin :
-  bool @ [< global] ->
-  ((?b:bool -> unit -> int) @ [< global] ->
-   ((unit -> int) @ [> local] -> (unit -> int) @ [> local]) @ [< global]) @ [< global] =
+  bool @ [< 'm.future & global] ->
+  ((?b:bool -> unit -> int) @ [< 'p.future & 'n.future & global] ->
+   ((unit -> int) @ [< 'o.future > local] ->
+    (unit -> int) @ [> 'o.future | 'p.future | local]) @ [< global > 'n.future]) @ [< global > 'm.future] =
   <fun>
 |}]
 
@@ -410,15 +411,17 @@ val etajoin :
 let foo ?(local_ x) () = x;;
 [%%expect{|
 val foo :
-  ?x:'a @ [< 'm > local] ->
-  (unit @ 'n -> 'a option @ [> 'm | local]) @ [> local] = <fun>
+  ?x:'a @ [< 'o & 'n.future > local] ->
+  (unit @ 'p -> 'a option @ [> 'm | 'o | local]) @ [> close('m) | 'n.future | local] =
+  <fun>
 |}]
 
 let foo ?(local_ x = "hello") () = x;;
 [%%expect{|
 val foo :
-  ?x:string @ [< 'm > local] ->
-  (unit @ 'n -> string @ [> 'm | local]) @ [> local] = <fun>
+  ?x:string @ [< 'o & 'n.future > local] ->
+  (unit @ 'p -> string @ [> 'm | 'o | local]) @ [> close('m) | 'n.future | local] =
+  <fun>
 |}]
 
 let foo ?(local_ x = local_ "hello") () = x;;
@@ -565,12 +568,12 @@ let use_locally' (local_ f : local_ 'a -> 'a) (x : 'a) =
   res
 [%%expect{|
 val use_locally :
-  ('a @ local -> 'a) @ [< global] ->
-  ('a @ [< many uncontended] -> 'a @ [< global > aliased nonportable]) @ [< global] =
+  ('a @ local -> 'a) @ [< 'm.future & global] ->
+  ('a @ [< many uncontended] -> 'a @ [< global > aliased nonportable]) @ [< global > 'm.future] =
   <fun>
 val use_locally' :
-  ('a @ local -> 'a) @ [> local] ->
-  ('a @ [< many uncontended] -> 'a @ [< global > aliased nonportable]) @ [> local] =
+  ('a @ local -> 'a) @ [< 'm.future > local] ->
+  ('a @ [< many uncontended] -> 'a @ [< global > aliased nonportable]) @ [> 'm.future | local] =
   <fun>
 |}]
 
@@ -1140,8 +1143,8 @@ let foo x =
   res
 [%%expect{|
 val foo :
-  'a @ [< global many shared] -> 'a @ [< global > aliased nonportable] =
-  <fun>
+  'a @ [< global many shared > 'm.future] ->
+  'a @ [< 'm.future & global > aliased nonportable] = <fun>
 |}]
 
 let foo x = exclave_
@@ -1149,8 +1152,9 @@ let foo x = exclave_
   let local_ foo () = r.contents in
   foo ()
 [%%expect{|
-val foo : 'a @ [< global many shared] -> 'a @ [> local aliased nonportable] =
-  <fun>
+val foo :
+  'a @ [< global many shared > 'm.future] ->
+  'a @ [< 'm.future > local aliased nonportable] = <fun>
 |}]
 
 (* Cannot return local values without annotations on all exits *)
@@ -1172,7 +1176,9 @@ let foo x = exclave_
   let r = local_ { contents = x } in
   r
 [%%expect{|
-val foo : 'a @ [< global many] -> 'a ref @ [> local nonportable] = <fun>
+val foo :
+  'a @ [< global many > 'm.future] ->
+  'a ref @ [< 'm.future > local nonportable] = <fun>
 |}]
 
 let foo p x = exclave_
@@ -1181,8 +1187,9 @@ let foo p x = exclave_
   else r
 [%%expect{|
 val foo :
-  bool @ [< global] ->
-  ('a @ [< global many] -> 'a ref @ [> local nonportable]) @ [< global] =
+  bool @ [< 'm.future & global] ->
+  ('a @ [< global many > 'n.future] ->
+   'a ref @ [< 'n.future > local nonportable]) @ [< global > 'm.future] =
   <fun>
 |}]
 
@@ -1193,8 +1200,8 @@ let rec length acc (local_ xl) =
   | x :: xs -> length (acc + 1) xs
 [%%expect{|
 val length :
-  int @ [< global] ->
-  ('a list @ [> local] -> int @ [< 'm & global > 'm]) @ [< global > nonportable] =
+  int @ [< 'm.future & global > 'n] ->
+  ('a list @ [> local] -> int @ [< 'o & global > 'o]) @ [< global > 'm.future | monadic_to_comonadic_min('n) | nonportable] =
   <fun>
 |}]
 
@@ -1323,8 +1330,8 @@ let foo y =
   x.mut
 [%%expect{|
 val foo :
-  'a @ [< global many shared] -> 'a @ [< global > aliased nonportable] =
-  <fun>
+  'a @ [< global many shared > 'm.future] ->
+  'a @ [< 'm.future & global > aliased nonportable] = <fun>
 |}]
 let foo (local_ x) = x.gbl
 [%%expect{|
@@ -1370,8 +1377,8 @@ let foo y =
   mut
 [%%expect{|
 val foo :
-  'a @ [< global many shared] -> 'a @ [< global > aliased nonportable] =
-  <fun>
+  'a @ [< global many shared > 'm.future] ->
+  'a @ [< 'm.future & global > aliased nonportable] = <fun>
 |}]
 let foo (local_ { gbl }) = gbl
 [%%expect{|
@@ -1781,8 +1788,8 @@ let foo (local_ x) y =
 [%%expect{|
 val escape : 'a -> unit = <fun>
 val foo :
-  'a option @ [< many > local] ->
-  ('b option @ [< global many uncontended] -> unit @ [< global]) @ [> local] =
+  'a option @ [< 'm.future & many > local] ->
+  ('b option @ [< global many uncontended] -> unit @ [< global]) @ [> 'm.future | local] =
   <fun>
 |}]
 
@@ -1836,10 +1843,10 @@ let foo p (local_ x) y z =
   escape b;;
 [%%expect{|
 val foo :
-  bool @ [< global] ->
-  ('a @ [> local] ->
-   ('b @ [< global many uncontended] ->
-    ('a * 'b @ [< global many uncontended] -> unit @ [< global]) @ [> local nonportable]) @ [> local]) @ [< global] =
+  bool @ [< 'm.future & global] ->
+  ('a @ [< 'n.future > local] ->
+   ('b @ [< global many uncontended > 'p.future] ->
+    ('a * 'b @ [< global many uncontended > 'o.future] -> unit @ [< global]) @ [< 'o.future & 'p.future > local nonportable]) @ [> 'n.future | local]) @ [< global > 'm.future] =
   <fun>
 |}]
 
@@ -2128,18 +2135,21 @@ let float (local_ x) (local_ y) = exclave_
   (x +. y *. x -. 42.)
 [%%expect{|
 val int32 :
-  int32 @ [< many > local] ->
-  (int32 @ [< many > local] -> int32 @ [> local aliased]) @ [> local] = <fun>
+  int32 @ [< 'm.future & many > local] ->
+  (int32 @ [< many > local] -> int32 @ [> local aliased]) @ [> 'm.future | local] =
+  <fun>
 val int64 :
-  int64 @ [< many > local] ->
-  (int64 @ [< many > local] -> int64 @ [> local aliased]) @ [> local] = <fun>
+  int64 @ [< 'm.future & many > local] ->
+  (int64 @ [< many > local] -> int64 @ [> local aliased]) @ [> 'm.future | local] =
+  <fun>
 val nativeint :
-  nativeint @ [< many > local] ->
-  (nativeint @ [< many > local] -> nativeint @ [> local aliased]) @ [> local] =
+  nativeint @ [< 'm.future & many > local] ->
+  (nativeint @ [< many > local] -> nativeint @ [> local aliased]) @ [> 'm.future | local] =
   <fun>
 val float :
-  float @ [< many > local] ->
-  (float @ [> local] -> float @ [> local aliased]) @ [> local] = <fun>
+  float @ [< 'm.future & many > local] ->
+  (float @ [> local] -> float @ [> local aliased]) @ [> 'm.future | local] =
+  <fun>
 |}]
 
 let etapair (local_ x) = exclave_ (fst x, snd x)
@@ -2166,8 +2176,8 @@ let compare (local_ x) (local_ y) =
   [x = y; x <> y; x < y; x > y; x <= y; x >= y; compare x y = 0; x == y; x != y]
 [%%expect{|
 val compare :
-  'a @ [< many uncontended > local] ->
-  ('a @ [< many uncontended > local] -> bool list @ [< global]) @ [> local nonportable] =
+  'a @ [< many uncontended > 'n.future | local] ->
+  ('a @ [< many uncontended > 'm.future | local] -> bool list @ [< global]) @ [< 'm.future & 'n.future > local nonportable] =
   <fun>
 |}]
 
@@ -2238,8 +2248,9 @@ let foo (local_ x) y =
   | None, None | Some _, Some _ -> assert false
 [%%expect{|
 val foo :
-  'a option @ [< 'n > local] ->
-  ('a option @ [< 'm] -> 'a @ [> 'm | 'n | local]) @ [> local] = <fun>
+  'a option @ [< 'p & 'n.future > local] ->
+  ('a option @ [< 'o] -> 'a @ [> 'm | 'o | 'p | local]) @ [> close('m) | 'n.future | local] =
+  <fun>
 |}]
 
 let foo (local_ x) y =
@@ -2248,8 +2259,9 @@ let foo (local_ x) y =
   | None, None | Some _, Some _ -> assert false
 [%%expect{|
 val foo :
-  'a option @ [< 'n > local] ->
-  ('a option @ [< 'm] -> 'a @ [> 'm | 'n | local]) @ [> local] = <fun>
+  'a option @ [< 'p & 'n.future > local] ->
+  ('a option @ [< 'o] -> 'a @ [> 'm | 'o | 'p | local]) @ [> close('m) | 'n.future | local] =
+  <fun>
 |}]
 
 module M = struct
@@ -2294,8 +2306,8 @@ let f g n =
 let z : (int list -> unit) -> int -> unit = f
 [%%expect{|
 val f :
-  (int list @ [> local] -> unit @ 'm) @ [< global] ->
-  (int @ 'n -> unit @ [< global]) @ [< global] = <fun>
+  (int list @ [> local] -> unit @ 'm) @ [< 'n.future & global] ->
+  (int @ 'o -> unit @ [< global]) @ [< global > 'n.future] = <fun>
 Line 5, characters 44-45:
 5 | let z : (int list -> unit) -> int -> unit = f
                                                 ^
@@ -2941,18 +2953,25 @@ Lines 3-6, characters 6-3:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           val g : 'a @ 'o -> ('b @ 'n -> string @ [> local]) @ 'm
-           val f : 'a @ 'n -> ('b @ 'm -> string @ [> local]) @ [> local]
+           val g :
+             'a @ [< 'm.future] ->
+             ('b @ 'n -> string @ [> local]) @ [> 'm.future]
+           val f :
+             'a @ [< 'm.future] ->
+             ('b @ 'o -> string @ [< 'n.future > 'n.future | local]) @ [> 'm.future | local]
          end
        is not included in
          sig val f : string -> string -> string @ local end
        Values do not match:
-         val f : 'a @ 'n -> ('b @ 'm -> string @ [> local]) @ [> local]
+         val f :
+           'a @ [< 'm.future] ->
+           ('b @ 'o -> string @ [< 'n.future > 'n.future | local]) @ [> 'm.future | local]
        is not included in
          val f : string -> string -> string @ local
        The type
-         "string @ [> aliased] ->
-         (string @ [> aliased] -> string @ [> local]) @ [> local]"
+         "string @ [< 'm.future & 'm.future > aliased] ->
+         (string @ [> aliased] ->
+          string @ [< 'n.future & 'n.future > 'n.future | 'n.future | local]) @ [> 'm.future | 'm.future | local]"
        is not compatible with the type "string -> string -> string @ local"
 |}]
 

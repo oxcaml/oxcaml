@@ -24,8 +24,8 @@ let foo r x = r.i <- x
        (setfield_ptr(maybe-stack) 0 r/290 x/291)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/288))
 val foo :
-  'a myref @ [< global uncontended] ->
-  ('a @ [< global many uncontended] -> unit @ [< global]) @ [< global > nonportable] =
+  'a myref @ [< 'n.future & global uncontended] ->
+  ('a @ [< global many uncontended > 'm.future] -> unit @ [< global]) @ [< 'm.future & global > 'n.future | nonportable] =
   <fun>
 |}]
 
@@ -37,8 +37,8 @@ let foo (r @ local) x = r.i <- x
        (setfield_ptr(maybe-stack) 0 r/293 x/294)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/292))
 val foo :
-  'a myref @ [< uncontended > local] ->
-  ('a @ [< global many uncontended] -> unit @ [< global]) @ [> local nonportable] =
+  'a myref @ [< 'n.future & uncontended > local] ->
+  ('a @ [< global many uncontended > 'm.future] -> unit @ [< global]) @ [< 'm.future > 'n.future | local nonportable] =
   <fun>
 |}]
 
@@ -50,8 +50,8 @@ let foo (r @ global) x = r.i <- x
      (function {nlocal = 0} r/296 x/297 : int (setfield_ptr 0 r/296 x/297)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/295))
 val foo :
-  'a myref @ [< global uncontended] ->
-  ('a @ [< global many uncontended] -> unit @ [< global]) @ [< global > nonportable] =
+  'a myref @ [< 'n.future & global uncontended] ->
+  ('a @ [< global many uncontended > 'm.future] -> unit @ [< global]) @ [< 'm.future & global > 'n.future | nonportable] =
   <fun>
 |}]
 
@@ -136,7 +136,8 @@ let fst x = fun y -> x
      (function {nlocal = 0} x/322? (function {nlocal = 1} y/323[L]? x/322)))
   (apply (field_imm 1 (global Toploop!)) "fst" fst/321))
 val fst :
-  'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [< global > 'm]) @ [< global] =
+  'a @ [< 'o & 'n.future & global] ->
+  ('b @ 'p -> 'a @ [< global > 'm | 'o]) @ [< global > close('m) | 'n.future] =
   <fun>
 |}]
 
@@ -145,7 +146,8 @@ let fst' x y = x
 (let (fst'/324 = (function {nlocal = 1} x/326[L]? y/327[L]? x/326))
   (apply (field_imm 1 (global Toploop!)) "fst'" fst'/324))
 val fst' :
-  'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [< global > 'm]) @ [< global] =
+  'a @ [< 'o & 'n.future & global] ->
+  ('b @ 'p -> 'a @ [< global > 'm | 'o]) @ [< global > close('m) | 'n.future] =
   <fun>
 |}]
 
@@ -159,7 +161,9 @@ let fst_local (x @ local) = exclave_ fun y -> x
        (function[L] {nlocal = 1} y/331[L]? : local x/330)))
   (apply (field_imm 1 (global Toploop!)) "fst_local" fst_local/328))
 val fst_local :
-  'a @ [< 'm > local] -> ('b @ 'n -> 'a @ [> 'm | local]) @ [> local] = <fun>
+  'a @ [< 'o & 'n.future > local] ->
+  ('b @ 'p -> 'a @ [> 'm | 'o | local]) @ [> close('m) | 'n.future | local] =
+  <fun>
 |}]
 
 let foo = fst 42
@@ -168,7 +172,8 @@ let foo = fst 42
   (fst/321 =? (apply (field_imm 0 (global Toploop!)) "fst")
    foo/332 = (apply fst/321 42))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/332))
-val foo : '_weak1 -> int @ [< global > aliased] = <fun>
+val foo : '_weak1 -> int @ [< 'm.future & global > 'm.future | aliased] =
+  <fun>
 |}]
 
 let foo () =
@@ -180,5 +185,8 @@ let foo () =
      (function {nlocal = 1} param/334[L][value<int>] : local
        (apply[L] fst_local/328 42)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/333))
-val foo : unit @ 'n -> ('a @ 'm -> int @ [> local]) @ [> local] = <fun>
+val foo :
+  unit @ 'p ->
+  ('a @ 'o -> int @ [< 'n.future > 'm | 'n.future | local]) @ [> close('m) | local] =
+  <fun>
 |}]

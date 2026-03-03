@@ -28,12 +28,12 @@ val foo : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
 let foo f x = f x
 [%%expect{|
 val foo :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global] ->
-  ('a @ [< 'n] -> 'b @ [< global > 'm]) @ [< global] = <fun>
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o.future & global] ->
+  ('a @ [< 'n] -> 'b @ [< global > 'm]) @ [< global > 'o.future] = <fun>
 |}, Principal{|
 val foo :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< global] ->
-  ('a @ [< 'n] -> 'b @ [< global > 'm]) @ [< global] = <fun>
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o.future & global] ->
+  ('a @ [< 'n] -> 'b @ [< global > 'm]) @ [< global > 'o.future] = <fun>
 |}]
 
 let foo =
@@ -48,8 +48,9 @@ let foo a b = a + b
 [%%expect{|
 val foo : int @ 'n -> (int @ 'm -> int @ [< global]) @ [< global] = <fun>
 |}, Principal{|
-val foo : int @ [< global] -> (int @ 'm -> int @ [< global]) @ [< global] =
-  <fun>
+val foo :
+  int @ [< 'm.future & global] ->
+  (int @ 'n -> int @ [< global]) @ [< global > 'm.future] = <fun>
 |}]
 
 
@@ -88,16 +89,16 @@ type ('a, 'b) mytype = { x : 'a; y : 'b; }
 let foo x y = { x; y }
 [%%expect{|
 val foo :
-  'a @ [< 'n & global] ->
-  ('b @ [< 'm & global] -> ('a, 'b) mytype @ [< global > 'm | 'n]) @ [< global] =
+  'a @ [< 'p & 'n.future & global] ->
+  ('b @ [< 'o & global] -> ('a, 'b) mytype @ [< global > 'm | 'o | 'p]) @ [< global > close('m) | 'n.future] =
   <fun>
 |}]
 
 let foo x = fun y -> { x; y }
 [%%expect{|
 val foo :
-  'a @ [< 'n & global] ->
-  ('b @ [< 'm & global] -> ('a, 'b) mytype @ [< global > 'm | 'n]) @ [< global] =
+  'a @ [< 'p & 'n.future & global] ->
+  ('b @ [< 'o & global] -> ('a, 'b) mytype @ [< global > 'm | 'o | 'p]) @ [< global > close('m) | 'n.future] =
   <fun>
 |}]
 
@@ -120,8 +121,9 @@ type 'a myref = { mutable x : 'a; }
 
 let create a = { x = a }
 [%%expect{|
-val create : 'a @ [< global many] -> 'a myref @ [< global > nonportable] =
-  <fun>
+val create :
+  'a @ [< global many > 'm.future] ->
+  'a myref @ [< 'm.future & global > nonportable] = <fun>
 |}]
 
 let read r = r.x
@@ -134,8 +136,8 @@ val read :
 let store r = fun a -> r.x <- a
 [%%expect{|
 val store :
-  'a myref @ [< global uncontended] ->
-  ('a @ [< global many uncontended] -> unit @ [< global]) @ [< global > nonportable] =
+  'a myref @ [< 'n.future & global uncontended] ->
+  ('a @ [< global many uncontended > 'm.future] -> unit @ [< global]) @ [< 'm.future & global > 'n.future | nonportable] =
   <fun>
 |}]
 
@@ -150,16 +152,16 @@ val dupl : 'a @ [< 'm & global many] -> 'a * 'a @ [< global > 'm | aliased] =
 let prod x y = (x, y)
 [%%expect{|
 val prod :
-  'a @ [< 'n & global] ->
-  ('b @ [< 'm & global] -> 'a * 'b @ [< global > 'm | 'n]) @ [< global] =
+  'a @ [< 'p & 'n.future & global] ->
+  ('b @ [< 'o & global] -> 'a * 'b @ [< global > 'm | 'o | 'p]) @ [< global > close('m) | 'n.future] =
   <fun>
 |}]
 
 let prod_eta x = fun y -> (x, y)
 [%%expect{|
 val prod_eta :
-  'a @ [< 'n & global] ->
-  ('b @ [< 'm & global] -> 'a * 'b @ [< global > 'm | 'n]) @ [< global] =
+  'a @ [< 'p & 'n.future & global] ->
+  ('b @ [< 'o & global] -> 'a * 'b @ [< global > 'm | 'o | 'p]) @ [< global > close('m) | 'n.future] =
   <fun>
 |}]
 
@@ -176,8 +178,8 @@ let foo x = fun y ->
   (x', y')
 [%%expect{|
 val foo :
-  'a @ [< 'n & global many] ->
-  ('b @ [< 'm & global many] -> 'a * 'b @ [< global > 'm | 'n | aliased]) @ [< global > nonportable] =
+  'a @ [< 'p & 'n.future & global many] ->
+  ('b @ [< 'o & global many] -> 'a * 'b @ [< global > 'm | 'o | 'p | aliased]) @ [< global > close('m) | 'n.future | nonportable] =
   <fun>
 |}]
 
@@ -186,29 +188,34 @@ val foo :
 let foo x y = x
 [%%expect{|
 val foo :
-  'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [< global > 'm]) @ [< global] =
+  'a @ [< 'o & 'n.future & global] ->
+  ('b @ 'p -> 'a @ [< global > 'm | 'o]) @ [< global > close('m) | 'n.future] =
   <fun>
 |}]
 
 let foo x y = y
 [%%expect{|
 val foo :
-  'a @ [< global] ->
-  ('b @ [< 'm & global] -> 'b @ [< global > 'm]) @ [< global] = <fun>
+  'a @ [< 'm.future & global] ->
+  ('b @ [< 'n & global] -> 'b @ [< global > 'n]) @ [< global > 'm.future] =
+  <fun>
 |}]
 
 let foo f = fun x -> fun y -> f x y
 [%%expect{|
 val foo :
-  ('a @ [> 'p] -> ('b @ [> 'o] -> 'c @ [< 'n & global]) @ 'm) @ [< global] ->
-  ('a @ [< 'p & global] -> ('b @ [< 'o] -> 'c @ [< global > 'n]) @ [< global]) @ [< global] =
+  ('a @ [< 'm.future > 'mm0 | 'n | 'mm1] ->
+   ('b @ [> 'q] -> 'c @ [< 'p & global]) @ [> 'm.future | monadic_to_comonadic_min('n) | 'o.future]) @ [< 'mm4.future & 'o.future & 'mm2.future & global] ->
+  ('a @ [< 'mm3.future & 'mm1 & global] ->
+   ('b @ [< 'q] -> 'c @ [< global > 'p]) @ [< global > 'mm3.future | close('mm0) | 'mm4.future]) @ [< global > 'mm2.future] =
   <fun>
 |}]
 
 let fst x = fun y -> x
 [%%expect{|
 val fst :
-  'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [< global > 'm]) @ [< global] =
+  'a @ [< 'o & 'n.future & global] ->
+  ('b @ 'p -> 'a @ [< global > 'm | 'o]) @ [< global > close('m) | 'n.future] =
   <fun>
 |}]
 let snd x = fun y -> y
@@ -221,48 +228,50 @@ val snd :
 let foo x y = ref x
 [%%expect{|
 val foo :
-  'a @ [< global many uncontended] ->
-  ('b @ 'm -> 'a ref @ [< global > aliased nonportable]) @ [< global > nonportable] =
+  'a @ [< global many uncontended > 'm.future] ->
+  ('b @ 'n -> 'a ref @ [< global > aliased nonportable]) @ [< 'm.future & global > nonportable] =
   <fun>
 |}]
 
 let foo (x @ aliased) y = ref x
 [%%expect{|
 val foo :
-  'a @ [< global many uncontended > aliased] ->
-  ('b @ 'm -> 'a ref @ [< global > aliased nonportable]) @ [< global > nonportable] =
+  'a @ [< global many uncontended > 'm.future | aliased] ->
+  ('b @ 'n -> 'a ref @ [< global > aliased nonportable]) @ [< 'm.future & global > nonportable] =
   <fun>
 |}]
 
 let foo (x @ contended) y = x
 [%%expect{|
 val foo :
-  'a @ [< 'm & global > contended] ->
-  ('b @ 'n -> 'a @ [< global > 'm | contended]) @ [< global] = <fun>
+  'a @ [< 'o & 'n.future & global > contended] ->
+  ('b @ 'p -> 'a @ [< global > 'm | 'o | contended]) @ [< global > close('m) | 'n.future] =
+  <fun>
 |}]
 
 let foo x y z = 42
 [%%expect{|
 val foo :
-  'a @ [< global] ->
-  ('b @ [< global] -> ('c @ 'm -> int @ [< global]) @ [< global]) @ [< global] =
+  'a @ [< 'm.future & global] ->
+  ('b @ [< 'n.future & global] ->
+   ('c @ 'o -> int @ [< global]) @ [< global > 'n.future]) @ [< global > 'm.future] =
   <fun>
 |}]
 
 let foo x y = (x, y)
 [%%expect{|
 val foo :
-  'a @ [< 'n & global] ->
-  ('b @ [< 'm & global] -> 'a * 'b @ [< global > 'm | 'n]) @ [< global] =
+  'a @ [< 'p & 'n.future & global] ->
+  ('b @ [< 'o & global] -> 'a * 'b @ [< global > 'm | 'o | 'p]) @ [< global > close('m) | 'n.future] =
   <fun>
 |}]
 
 let foo x y z = (y,z)
 [%%expect{|
 val foo :
-  'a @ [< global] ->
-  ('b @ [< 'n & global] ->
-   ('c @ [< 'm & global] -> 'b * 'c @ [< global > 'm | 'n]) @ [< global]) @ [< global] =
+  'a @ [< 'm.future & global] ->
+  ('b @ [< 'q & 'o.future & global] ->
+   ('c @ [< 'p & global] -> 'b * 'c @ [< global > 'n | 'p | 'q]) @ [< global > close('n) | 'o.future]) @ [< global > 'm.future] =
   <fun>
 |}]
 
@@ -300,17 +309,18 @@ val foo : unit -> unit = <fun>
 let foo (unique_ y) (z @ portable) = z
 [%%expect{|
 val foo :
-  'a @ [< global unique] ->
-  ('b @ [< 'm & global portable] -> 'b @ [< global > 'm]) @ [< global] =
+  'a @ [< 'm.future & global unique] ->
+  ('b @ [< 'n & global portable] -> 'b @ [< global > 'n]) @ [< global > 'm.future] =
   <fun>
 |}]
 
 let foo (local_ x) (unique_ y) (z @ portable) = exclave_ (x, y, z)
 [%%expect{|
 val foo :
-  'a @ [< 'o > local] ->
-  ('b @ [< 'n & unique] ->
-   ('c @ [< 'm & portable] -> 'a * 'b * 'c @ [> 'm | 'n | 'o | local]) @ [> local]) @ [> local] =
+  'a @ [< 'mm1 & 'n.future > local] ->
+  ('b @ [< 'mm0 & 'p.future & unique] ->
+   ('c @ [< 'q & portable] ->
+    'a * 'b * 'c @ [> 'o | 'm | 'q | 'mm0 | 'mm1 | local]) @ [> close('o) | 'p.future | local]) @ [> close('m) | 'n.future | local] =
   <fun>
 |}]
 
@@ -322,8 +332,8 @@ let foo (x : intref) (f : intref @ local -> int) = f x
 [%%expect{|
 type intref = { mutable v : int; }
 val foo :
-  intref @ [< global uncontended] ->
-  ((intref @ local -> int) @ 'm -> int @ [< global]) @ [< global > nonportable] =
+  intref @ [< 'm.future & global uncontended] ->
+  ((intref @ local -> int) @ 'n -> int @ [< global]) @ [< global > 'm.future | nonportable] =
   <fun>
 |}]
 
@@ -331,30 +341,30 @@ val foo :
 let foo (f : int -> int) x y = f
 [%%expect{|
 val foo :
-  (int -> int) @ [< 'm mod aliased contended & global] ->
-  ('a @ [< global] ->
-   ('b @ 'n -> (int -> int) @ [< global > 'm]) @ [< global]) @ [< global] =
+  (int -> int) @ [< 'o mod aliased contended & 'm.future & global] ->
+  ('a @ [< 'n.future & global] ->
+   ('b @ 'p -> (int -> int) @ [< global > 'o]) @ [< global > 'n.future]) @ [< global > 'm.future] =
   <fun>
 |}, Principal{|
 val foo :
-  (int -> int) @ [< 'm mod aliased contended & global] ->
-  ('a @ [< global] ->
-   ('b @ 'n -> (int -> int) @ [< global > 'm]) @ [< global]) @ [< global] =
+  (int -> int) @ [< 'p mod aliased contended & 'n.future & global] ->
+  ('a @ [< 'o.future & global] ->
+   ('b @ 'q -> (int -> int) @ [< global > 'm | 'p]) @ [< global > 'o.future]) @ [< global > close('m) mod many portable | 'n.future] =
   <fun>
 |}]
 
 let foo (f : intref @ local -> int) (x : intref) (y : intref) = f x
 [%%expect{|
 val foo :
-  (intref @ local -> int) @ [< global] ->
-  (intref @ [< global uncontended] ->
-   (intref @ 'm -> int @ [< global]) @ [< global > nonportable]) @ [< global] =
+  (intref @ local -> int) @ [< 'm.future & global] ->
+  (intref @ [< 'n.future & global uncontended] ->
+   (intref @ 'o -> int @ [< global]) @ [< global > 'n.future mod many portable | nonportable]) @ [< global > 'm.future] =
   <fun>
 |}, Principal{|
 val foo :
-  (intref @ local -> int) @ [< global] ->
-  (intref @ [< global uncontended] ->
-   (intref @ 'm -> int @ [< global]) @ [< global > nonportable]) @ [< global] =
+  (intref @ local -> int) @ [< 'm.future & global] ->
+  (intref @ [< 'n.future & global uncontended] ->
+   (intref @ 'o -> int @ [< global]) @ [< global > 'n.future | nonportable]) @ [< global > 'm.future] =
   <fun>
 |}]
 
@@ -368,24 +378,27 @@ val map : ('a -> 'b) -> 'a list -> 'b list = <fun>
 let map f l = List.map f l
 [%%expect{|
 val map :
-  ('a @ [> aliased nonportable] -> 'b @ [< global many uncontended]) @ [< global many] ->
+  ('a @ [< 'm.future > aliased nonportable] ->
+   'b @ [< global many uncontended]) @ [< 'n.future & global many > 'o.future | 'm.future] ->
   ('a list @ [< global many uncontended] ->
-   'b list @ [< global > aliased nonportable]) @ [< global] =
+   'b list @ [< 'o.future & global > aliased nonportable]) @ [< global > 'n.future] =
   <fun>
 |}, Principal{|
 val map :
-  ('a @ [> aliased nonportable] -> 'b @ [< global many uncontended]) @ [< global many] ->
+  ('a @ [< 'm.future > aliased nonportable] ->
+   'b @ [< global many uncontended]) @ [< 'n.future & global many > 'o.future | 'm.future] ->
   ('a list @ [< global many uncontended] ->
-   'b list @ [< global > aliased nonportable]) @ [< global] =
+   'b list @ [< 'o.future & global > aliased nonportable]) @ [< global > 'n.future] =
   <fun>
 |}]
 
 let map_eta f = fun l -> List.map f l
 [%%expect{|
 val map_eta :
-  ('a @ [> aliased nonportable] -> 'b @ [< global many uncontended]) @ [< global many] ->
+  ('a @ [< 'm.future > aliased nonportable] ->
+   'b @ [< global many uncontended]) @ [< 'n.future & global many > 'o.future | 'm.future] ->
   ('a list @ [< global many uncontended] ->
-   'b list @ [< global > aliased nonportable]) @ [< global] =
+   'b list @ [< 'o.future & global > aliased nonportable]) @ [< global > 'n.future] =
   <fun>
 |}]
 

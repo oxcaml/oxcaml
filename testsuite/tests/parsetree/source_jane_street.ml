@@ -38,15 +38,18 @@ let f y (type (a : immediate) (b : immediate)) (x : a) = x;;
 [%%expect{|
 val f :
   'b ('a : immediate).
-    'b @ [< global] -> ('a @ 'm -> 'a @ [< global]) @ [< global] =
+    'b @ [< 'm.future & global] ->
+    ('a @ 'n -> 'a @ [< global]) @ [< global > 'm.future] =
   <fun>
 val f :
   'b ('a : immediate).
-    'b @ [< global] -> ('a @ 'm -> 'a @ [< global]) @ [< global] =
+    'b @ [< 'm.future & global] ->
+    ('a @ 'n -> 'a @ [< global]) @ [< global > 'm.future] =
   <fun>
 val f :
   'b ('a : immediate).
-    'b @ [< global] -> ('a @ 'm -> 'a @ [< global]) @ [< global] =
+    'b @ [< 'm.future & global] ->
+    ('a @ 'n -> 'a @ [< global]) @ [< global > 'm.future] =
   <fun>
 |}]
 
@@ -548,21 +551,23 @@ let f ~(x1 @ many)
 
 [%%expect{|
 val f :
-  x1:'b @ [< 'p & global many] ->
-  (x2:string @ [> local] ->
-   (x3:(string -> string) @ [< 'o mod aliased contended > local] ->
-    (x4:('a. 'a -> 'a) @ [< 'n mod aliased contended > local] ->
-     (x9:('a. 'a) @ [> local] ->
-      (x5:'c @ [< 'm > local] ->
-       (x6:bool @ [< many > local] ->
-        (x7:bool @ [< many > local] ->
-         (x8:unit @ [> local] ->
-          (string @ [< global] ->
+  x1:'b @ [< 'mm11 & 'n.future & global many] ->
+  (x2:string @ [< 'p.future > local] ->
+   (x3:(string -> string) @ [< 'mm10 mod aliased contended & 'q.future > local] ->
+    (x4:('a. 'a -> 'a) @ [< 'mm9 mod aliased contended & 'mm0.future > local] ->
+     (x9:('a. 'a) @ [< 'mm1.future > local] ->
+      (x5:'c @ [< 'mm8 & 'mm3.future > local] ->
+       (x6:bool @ [< 'mm4.future & many > local] ->
+        (x7:bool @ [< 'mm5.future & many > local] ->
+         (x8:unit @ [< 'mm6.future > local] ->
+          (string @ [< 'mm7.future & global] ->
            ('d @ [> local] ->
             'b * string * (string -> string) * ('e -> 'e) * 'c * string *
             string * int array * string *
-            (int @ 'mm0 -> (int @ 'q -> int @ [< global]) @ [> local]) *
-            (int @ 'mm2 -> (int @ 'mm1 -> int @ [< global]) @ [> local]) @ [> 'm | 'n | 'o | 'p | local contended]) @ [> local]) @ [> local]) @ [> local]) @ [> local]) @ [> local]) @ [> local]) @ [> local]) @ [> local]) @ [> local]) @ [< global] =
+            (int @ [< 'mm12.future] ->
+             (int @ 'mm13 -> int @ [< global]) @ [> 'mm12.future | local]) *
+            (int @ [< 'mm14.future] ->
+             (int @ 'mm15 -> int @ [< global]) @ [> 'mm14.future | local]) @ [> 'mm2 | 'o | 'm | 'mm8 | 'mm9 | 'mm10 | 'mm11 | local contended]) @ [> 'mm7.future | local]) @ [> 'mm6.future | local]) @ [> 'mm5.future | local]) @ [> 'mm4.future | local]) @ [> close('mm2) | 'mm3.future | local]) @ [> 'mm1.future | local]) @ [> 'mm0.future | local]) @ [> 'q.future | local]) @ [> close('o) mod portable | 'p.future | local]) @ [< global > close('m) | 'n.future] =
   <fun>
 |}]
 
@@ -649,9 +654,10 @@ let f2 (x @ local) (f @ once) : t2 = exclave_ { x; f }
 
 [%%expect{|
 val f2 :
-  float @ [> local] ->
-  ((float @ [> aliased nonportable] -> float @ [< global many uncontended]) @ [> once] ->
-   t2 @ [> local once nonportable]) @ [> local] =
+  float @ [< 'm.future > local] ->
+  ((float @ [> aliased nonportable] ->
+    float @ [< global many uncontended > 'n.future]) @ [< 'o.future > once] ->
+   t2 @ [< 'n.future > 'o.future | local once nonportable]) @ [> 'm.future | local] =
   <fun>
 |}]
 
@@ -851,8 +857,8 @@ let double2 y = apply ~f:(stack_ function x -> x + y) y [@nontail]
 
 [%%expect{|
 val apply :
-  f:('a @ [> 'n] -> 'b @ [< 'm & global]) @ [> local] ->
-  ('a @ [< 'n] -> 'b @ [< global > 'm]) @ [> local] = <fun>
+  f:('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o.future > local] ->
+  ('a @ [< 'n] -> 'b @ [< global > 'm]) @ [> 'o.future | local] = <fun>
 val double1 : int @ [< many] -> int @ [< global] = <fun>
 val double2 : int @ [< many] -> int @ [< global] = <fun>
 |}]
@@ -1017,9 +1023,9 @@ let f ((~(x:int),y) : (x:int * int)) : int = x + y
 
 [%%expect{|
 val foo :
-  'a @ [< global] ->
-  ((unit @ 'n -> 'b @ [< 'm & global]) @ [< global] ->
-   ((unit @ 'p -> 'b @ [< 'o & global]) @ 'q -> 'b @ [< global > 'o | 'm]) @ [< global]) @ [< global] =
+  'a @ [< 'm.future & global] ->
+  ((unit @ 'o -> 'b @ [< 'n & global]) @ [< 'p.future & global] ->
+   ((unit @ 'mm0 -> 'b @ [< 'q & global]) @ 'mm1 -> 'b @ [< global > 'q | 'n]) @ [< global > 'p.future]) @ [< global > 'm.future] =
   <fun>
 val x : int @@ stateless = 1
 val y : int = 2
@@ -1091,30 +1097,37 @@ let test_char s f =
 
 [%%expect{|
 val test_float :
-  string @ [< global many uncontended] ->
-  (Float_u.t @ 'm -> unit @ [< global]) @ [< global > nonportable] = <fun>
+  string @ [< global many uncontended > 'm.future] ->
+  (Float_u.t @ 'n -> unit @ [< global]) @ [< 'm.future & global > nonportable] =
+  <fun>
 val test_int8 :
-  string @ [< global many uncontended] ->
-  (int8# @ 'm -> unit @ [< global]) @ [< global > nonportable] = <fun>
+  string @ [< global many uncontended > 'm.future] ->
+  (int8# @ 'n -> unit @ [< global]) @ [< 'm.future & global > nonportable] =
+  <fun>
 val test_int16 :
-  string @ [< global many uncontended] ->
-  (int16# @ 'm -> unit @ [< global]) @ [< global > nonportable] = <fun>
+  string @ [< global many uncontended > 'm.future] ->
+  (int16# @ 'n -> unit @ [< global]) @ [< 'm.future & global > nonportable] =
+  <fun>
 val test_int32 :
-  string @ [< global many uncontended] ->
-  (Int32_u.t @ 'm -> unit @ [< global]) @ [< global > nonportable] = <fun>
+  string @ [< global many uncontended > 'm.future] ->
+  (Int32_u.t @ 'n -> unit @ [< global]) @ [< 'm.future & global > nonportable] =
+  <fun>
 val test_int64 :
-  string @ [< global many uncontended] ->
-  (Int64_u.t @ 'm -> unit @ [< global]) @ [< global > nonportable] = <fun>
+  string @ [< global many uncontended > 'm.future] ->
+  (Int64_u.t @ 'n -> unit @ [< global]) @ [< 'm.future & global > nonportable] =
+  <fun>
 val test_int :
-  string @ [< global many uncontended] ->
-  (int# @ 'm -> unit @ [< global]) @ [< global > nonportable] = <fun>
+  string @ [< global many uncontended > 'm.future] ->
+  (int# @ 'n -> unit @ [< global]) @ [< 'm.future & global > nonportable] =
+  <fun>
 val test_nativeint :
-  string @ [< global many uncontended] ->
-  (Nativeint_u.t @ 'm -> unit @ [< global]) @ [< global > nonportable] =
+  string @ [< global many uncontended > 'm.future] ->
+  (Nativeint_u.t @ 'n -> unit @ [< global]) @ [< 'm.future & global > nonportable] =
   <fun>
 val test_char :
-  string @ [< global many uncontended] ->
-  (char# @ 'm -> unit @ [< global]) @ [< global > nonportable] = <fun>
+  string @ [< global many uncontended > 'm.future] ->
+  (char# @ 'n -> unit @ [< global]) @ [< 'm.future & global > nonportable] =
+  <fun>
 |}]
 
 (* Expressions *)
@@ -1622,7 +1635,8 @@ let f ~(x : [%call_pos]) () = x;;
 [%%expect{|
 val f :
   x:[%call_pos] ->
-  (unit @ 'n -> lexing_position @ [< global > 'm]) @ [< global] = <fun>
+  (unit @ 'p -> lexing_position @ [< global > 'm | 'o]) @ [< global > close('m) | 'n.future] =
+  <fun>
 |}]
 
 type t = x:[%call_pos] -> int
@@ -1635,8 +1649,9 @@ let f g here = g ~(here : [%call_pos])
 
 [%%expect{|
 val f :
-  (here:[%call_pos] -> 'a @ [< 'm & global]) @ [< global] ->
-  (lexing_position @ [< 'n] -> 'a @ [< global > 'm]) @ [< global] = <fun>
+  (here:[%call_pos] -> 'a @ [< 'm & global]) @ [< 'o.future & global] ->
+  (lexing_position @ [< 'n] -> 'a @ [< global > 'm]) @ [< global > 'o.future] =
+  <fun>
 |}]
 
 (***************)

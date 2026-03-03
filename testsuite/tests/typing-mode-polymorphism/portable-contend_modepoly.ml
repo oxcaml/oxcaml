@@ -373,8 +373,8 @@ let foo (x : int @ nonportable) (y : int @ contended) =
     ()
 [%%expect{|
 val foo :
-  int @ [< global > nonportable] ->
-  (int @ [> contended] -> unit @ [< global]) @ [< global > nonportable] =
+  int @ [< 'm.future & global > nonportable] ->
+  (int @ [> contended] -> unit @ [< global]) @ [< global > 'm.future | nonportable] =
   <fun>
 |}]
 

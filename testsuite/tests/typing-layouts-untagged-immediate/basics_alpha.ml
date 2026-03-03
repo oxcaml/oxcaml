@@ -404,9 +404,9 @@ let f9_3 () = twice f1_3 (make_intu ());;
 val twice :
   ('a : untagged_immediate).
     ('a t_untagged_immediate_id @ [> 'o | 'n] ->
-     'a t_untagged_immediate_id @ [< 'm & 'n & global]) @ [< global many] ->
+     'a t_untagged_immediate_id @ [< 'm & 'n & global]) @ [< 'p.future & global many] ->
     ('a t_untagged_immediate_id @ [< 'o] ->
-     'a t_untagged_immediate_id @ [< global > 'm]) @ [< global] =
+     'a t_untagged_immediate_id @ [< global > 'm]) @ [< global > 'p.future] =
   <fun>
 val f9_1 :
   unit @ 'm -> t_untagged_immediate t_untagged_immediate_id @ [< global] =
@@ -658,18 +658,18 @@ end;;
 [%%expect{|
 type t12_8 = < f : t_untagged_immediate -> t_untagged_immediate >
 val f12_9 :
-  t12_8 @ [< global uncontended] ->
-  (t_untagged_immediate @ [< global many uncontended] ->
-   t_untagged_immediate @ [< global > aliased nonportable]) @ [< global > nonportable] =
+  t12_8 @ [< 'n.future & global uncontended] ->
+  (t_untagged_immediate @ [< global many uncontended > 'm.future] ->
+   t_untagged_immediate @ [< global > aliased nonportable]) @ [< 'm.future & global > 'n.future | nonportable] =
   <fun>
 val f12_10 :
-  < baz : t_untagged_immediate @ [> 'p | aliased] ->
-          (t_untagged_immediate @ [> 'o | aliased] ->
-           (t_untagged_immediate @ [> 'n | aliased] ->
-            t_untagged_immediate @ [< 'm & global]) @ [> nonportable]) @ [> nonportable];
-    .. > @ [< global uncontended] ->
-  (t_untagged_immediate @ [< 'n & 'o & 'p & many] ->
-   t_untagged_immediate @ [< global > 'm]) @ [< global > nonportable] =
+  < baz : t_untagged_immediate @ [< 'n.future > 'o | 'mm3 | aliased] ->
+          (t_untagged_immediate @ [< 'p.future > 'q | 'mm2 | aliased] ->
+           (t_untagged_immediate @ [> 'mm1 | aliased] ->
+            t_untagged_immediate @ [< 'mm0 & global]) @ [> 'p.future | monadic_to_comonadic_min('q) | 'm.future | nonportable]) @ [< 'm.future > 'n.future | monadic_to_comonadic_min('o) | nonportable];
+    .. > @ [< 'mm4.future & global uncontended] ->
+  (t_untagged_immediate @ [< 'mm1 & 'mm2 & 'mm3 & many] ->
+   t_untagged_immediate @ [< global > 'mm0]) @ [< global > 'mm4.future | nonportable] =
   <fun>
 class ['a] c12_11 : object method x : t_untagged_immediate -> 'a end
 class ['a] c12_12 : object method x : 'a -> t_untagged_immediate end

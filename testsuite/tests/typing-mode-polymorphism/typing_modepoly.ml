@@ -353,8 +353,8 @@ Line 1, characters 31-73:
                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: This expression has type
          "<[
-          $(a) * $(b) @ [< global] ->
-          'a * ($(a) * $(b)) @ [> aliased nonportable]]>
+          $(a) * $(b) @ [< 'm.future & global] ->
+          'a * ($(a) * $(b)) @ [> 'm.future | aliased nonportable]]>
          expr"
        This is not a function; it cannot be applied.
 |}];;
@@ -372,8 +372,9 @@ Error: Type variable "'a" is used outside any quotations,
 <[fun (type a) (type b) (x : a) (y : b) -> (x, y)]>;;
 [%%expect {|
 - : <[
-     $('a) @ [< 'n & global] ->
-     ($('b) @ [< 'm & global] -> $('a) * $('b) @ [> 'm | 'n]) @ [> local]]>
+     $('a) @ [< 'p & 'n.future & global] ->
+     ($('b) @ [< 'o & global] -> $('a) * $('b) @ [> 'm | 'o | 'p]) @ [> close('m) | 'n.future | local]
+     ]>
     expr
 = <[fun (type a) (type b) (x : a) (y : b) -> (x, y)]>
 |}];;
@@ -408,8 +409,9 @@ Error: Identifier "t5" is used at line 3, characters 11-14,
 <[fun (x : 'a) (y : 'b) -> (x, y)]>;;
 [%%expect {|
 - : <[
-     $('a) @ [< 'n & global] ->
-     ($('b) @ [< 'm & global] -> $('a) * $('b) @ [> 'm | 'n]) @ [> local]]>
+     $('a) @ [< 'p & 'n.future & global] ->
+     ($('b) @ [< 'o & global] -> $('a) * $('b) @ [> 'm | 'o | 'p]) @ [> close('m) | 'n.future | local]
+     ]>
     expr
 = <[fun (x : 'a) (y : 'b) -> (x, y)]>
 |}];;
@@ -417,8 +419,8 @@ Error: Identifier "t5" is used at line 3, characters 11-14,
 <[fun (f : 'a. 'a -> 'a) (x : 'b) -> f x]>;;
 [%%expect {|
 - : <[
-     ('a. 'a -> 'a) @ 'm ->
-     ($('b) @ [< global many uncontended] -> $('b) @ [> aliased nonportable]) @ [> local]
+     ('a. 'a -> 'a) @ [< 'm.future] ->
+     ($('b) @ [< global many uncontended] -> $('b) @ [> aliased nonportable]) @ [> 'm.future | local]
      ]>
     expr
 = <[fun (f : 'a. 'a -> 'a) (x : 'b) -> f x]>
@@ -427,8 +429,8 @@ Error: Identifier "t5" is used at line 3, characters 11-14,
 <[fun (f : 'a. 'a -> 'a) (x : 'a) -> f x]>;;
 [%%expect {|
 - : <[
-     ('a. 'a -> 'a) @ 'm ->
-     ($('a) @ [< global many uncontended] -> $('a) @ [> aliased nonportable]) @ [> local]
+     ('a. 'a -> 'a) @ [< 'm.future] ->
+     ($('a) @ [< global many uncontended] -> $('a) @ [> aliased nonportable]) @ [> 'm.future | local]
      ]>
     expr
 = <[fun (f : 'a. 'a -> 'a) (x : 'a__1) -> f x]>
@@ -437,8 +439,8 @@ Error: Identifier "t5" is used at line 3, characters 11-14,
 <[fun (x : 'a) (f : 'a. 'a -> 'a) -> f x]>;;
 [%%expect {|
 - : <[
-     $('a) @ [< global many uncontended] ->
-     (('a0. 'a0 -> 'a0) @ 'm -> $('a) @ [> aliased nonportable]) @ [> local nonportable]
+     $('a) @ [< global many uncontended > 'm.future] ->
+     (('a0. 'a0 -> 'a0) @ 'n -> $('a) @ [> aliased nonportable]) @ [< 'm.future > local nonportable]
      ]>
     expr
 = <[fun (x : 'a) (f : 'a__1. 'a__1 -> 'a__1) -> f x]>
@@ -447,9 +449,9 @@ Error: Identifier "t5" is used at line 3, characters 11-14,
 <[fun (f : 'a. 'a -> 'a) (g: 'b 'c. 'b list -> ('b -> 'c) -> 'c list) -> f g]>;;
 [%%expect {|
 - : <[
-     ('a. 'a -> 'a) @ 'm ->
-     (('b 'c. 'b list -> ('b -> 'c) -> 'c list) @ [< global many] ->
-      ($('d) list -> ($('d) -> $('e)) -> $('e) list) @ [> aliased nonportable]) @ [> local]
+     ('a. 'a -> 'a) @ [< 'm.future] ->
+     (('b 'c. 'b list -> ('b -> 'c) -> 'c list) @ [< global many > 'n.future] ->
+      ($('d) list -> ($('d) -> $('e)) -> $('e) list) @ [< 'n.future > aliased nonportable]) @ [> 'm.future | local]
      ]>
     expr
 =
@@ -566,9 +568,9 @@ let app (type a b) (f : <[$a -> $b]> expr) (x : a expr) =
   <[ $f $x ]>
 [%%expect {|
 val app :
-  <[$('a) -> $('b)]> expr @ [< global many uncontended] ->
-  ('a expr @ [< global many uncontended] ->
-   'b expr @ [< global > aliased nonportable]) @ [< global > nonportable] =
+  <[$('a) -> $('b)]> expr @ [< global many uncontended > 'n.future] ->
+  ('a expr @ [< global many uncontended > 'm.future] ->
+   'b expr @ [< global > aliased nonportable]) @ [< 'm.future & 'n.future & global > nonportable] =
   <fun>
 |}]
 

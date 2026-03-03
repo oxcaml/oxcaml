@@ -83,8 +83,9 @@ let f a b = a + b;;
 match f 42 with
 | _ -> ();;
 [%%expect {|
-val f : int @ [< global] -> (int @ 'm -> int @ [< global]) @ [< global] =
-  <fun>
+val f :
+  int @ [< 'm.future & global] ->
+  (int @ 'n -> int @ [< global]) @ [< global > 'm.future] = <fun>
 Line 2, characters 6-10:
 2 | match f 42 with
           ^^^^
@@ -99,8 +100,9 @@ match f 42 with
 | _ -> ()
 | exception _ -> ();;
 [%%expect {|
-val f : int @ [< global] -> (int @ 'm -> int @ [< global]) @ [< global] =
-  <fun>
+val f :
+  int @ [< 'm.future & global] ->
+  (int @ 'n -> int @ [< global]) @ [< global > 'm.future] = <fun>
 Line 2, characters 6-10:
 2 | match f 42 with
           ^^^^
@@ -114,8 +116,9 @@ let f a b = a + b;;
 match f 42 with
 | x -> ignore (x 34);;
 [%%expect {|
-val f : int @ [< global] -> (int @ 'm -> int @ [< global]) @ [< global] =
-  <fun>
+val f :
+  int @ [< 'm.future & global] ->
+  (int @ 'n -> int @ [< global]) @ [< global > 'm.future] = <fun>
 - : unit = ()
 |}]
 
@@ -124,8 +127,9 @@ let f a b = a + b;;
 match (f 42 : _) with
 | _ -> ();;
 [%%expect {|
-val f : int @ [< global] -> (int @ 'm -> int @ [< global]) @ [< global] =
-  <fun>
+val f :
+  int @ [< 'm.future & global] ->
+  (int @ 'n -> int @ [< global]) @ [< global > 'm.future] = <fun>
 - : unit = ()
 |}]
 
@@ -141,8 +145,9 @@ Exception: Stdlib.Exit.
 
 let f a b = a + b;;
 [%%expect {|
-val f : int @ [< global] -> (int @ 'm -> int @ [< global]) @ [< global] =
-  <fun>
+val f :
+  int @ [< 'm.future & global] ->
+  (int @ 'n -> int @ [< global]) @ [< global > 'm.future] = <fun>
 |}]
 let g x = x + 1
 let _ = g (f 1);;
