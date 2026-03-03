@@ -874,7 +874,11 @@ CAMLexport int caml_c_thread_register(void)
   caml_acquire_domain_lock();
 
   /* Create tick thread if not already done */
-  caml_domain_set_tick_interval_usec(Thread_timeout_usec);
+  uintnat prev_tick_interval =
+    Long_val(caml_domain_get_tick_interval_usec(Val_unit));
+  if (prev_tick_interval == 0) {
+    caml_domain_set_tick_interval_usec(Long_val(Thread_timeout_usec));
+  }
   st_retcode err = caml_start_tick_thread();
   if (err != 0) goto out_err;
 
