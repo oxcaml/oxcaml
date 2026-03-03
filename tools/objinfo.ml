@@ -302,7 +302,11 @@ let print_general_infos print_name name crc defines arg_descr mbf
 
 let print_global_table table =
   printf "Globals defined:\n";
-  Symtable.iter_global_map (fun id _ -> print_line (Symtable.Global.name id))
+  Symtable.iter_global_map
+    (fun global _ ->
+       let desc = Format_doc.compat Symtable.Global.description in
+       print_line (Format.asprintf "%a" desc global)
+    )
     table
 
 open Cmx_format
