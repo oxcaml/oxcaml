@@ -730,12 +730,6 @@ CAMLprim value caml_thread_initialize(value unit)
   caml_domain_send_interrupt_hook = caml_thread_domain_send_interrupt_hook;
   caml_atfork_hook = caml_thread_reinitialize;
 
-  /* CR-someday: It would be nice to find a way to recover the original tick
-     interval if it was nonzero before we set it here. But for now, in practice,
-     it never will be, because all schedulers that set the tick interval will do
-     so after systhreads is initialized */
-  caml_domain_set_tick_interval_usec(Thread_timeout_usec);
-
   threads_initialized = true;
 
   return Val_unit;
@@ -832,6 +826,11 @@ CAMLprim value caml_thread_new(value clos)
   /* Create the tick thread if not already done.
      Because of PR#4666, we start the tick thread late, only when we create
      the first additional thread in the current process */
+  /* CR-someday: It would be nice to find a way to recover the original tick
+     interval if it was nonzero before we set it here. But for now, in practice,
+     it never will be, because all schedulers that set the tick interval will do
+     so after systhreads is initialized */
+  caml_domain_set_tick_interval_usec(Thread_timeout_usec);
   st_retcode err = caml_start_tick_thread();
   sync_check_error(err, "Thread.create");
 
@@ -875,6 +874,7 @@ CAMLexport int caml_c_thread_register(void)
   caml_acquire_domain_lock();
 
   /* Create tick thread if not already done */
+  caml_domain_set_tick_interval_usec(Thread_timeout_usec);
   st_retcode err = caml_start_tick_thread();
   if (err != 0) goto out_err;
 
