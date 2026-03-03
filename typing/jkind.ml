@@ -634,12 +634,24 @@ module With_bounds = struct
 end
 
 module Stage = struct
+  let equal (stage : stage) (stage' : stage) =
+    match stage, stage' with
+    | Unknown, Unknown -> true
+    | Known _, Unknown | Unknown, Known _ -> false
+    | Known n, Known n' -> n = n'
+
   let less_or_equal (stage : stage) (stage' : stage) =
     match stage, stage' with
     | _, Unknown -> Sub_result.Less
     | Unknown, Known _ -> Sub_result.Not_le [Stage_disagreement]
     | Known n, Known n' ->
       if n = n' then Sub_result.Equal else Sub_result.Not_le [Stage_disagreement]
+
+  let intersection (stage : stage) (stage' : stage) =
+    match stage, stage' with
+    | Unknown, Unknown -> Some Unknown
+    | Known n, Unknown | Unknown, Known n -> Some (Known n)
+    | Known n, Known n' -> if n = n' then Some (Known n) else None
 
   let quote = function Unknown -> Unknown | Known stage -> Known (stage + 1)
 
@@ -1402,20 +1414,19 @@ module Jkind_desc = struct
         } =
       t2
     in
-    if stage1 <> stage2
-    then false
-    else
-      match base1, base2 with
-      | Layout l1, Layout l2 ->
-        Layout.equate_or_equal ~allow_mutation ~level l1 l2
-        && Mod_bounds.equal mod_bounds1 mod_bounds2
-      | Kconstr p1, Kconstr p2
-        when Path.same p1 p2 && Mod_bounds.equal mod_bounds1 mod_bounds2 ->
-        true
-      | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
-        match expand_pair env t1 t2 with
-        | None -> false
-        | Some (t1, t2) -> equate_or_equal ~allow_mutation ~level env t1 t2)
+    Stage.equal stage1 stage2
+    &&
+    match base1, base2 with
+    | Layout l1, Layout l2 ->
+      Layout.equate_or_equal ~allow_mutation ~level l1 l2
+      && Mod_bounds.equal mod_bounds1 mod_bounds2
+    | Kconstr p1, Kconstr p2
+      when Path.same p1 p2 && Mod_bounds.equal mod_bounds1 mod_bounds2 ->
+      true
+    | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
+      match expand_pair env t1 t2 with
+      | None -> false
+      | Some (t1, t2) -> equate_or_equal ~allow_mutation ~level env t1 t2)
 
   let sub_expanded (type l r) ~level
       ({ base = base1;
@@ -1502,31 +1513,31 @@ module Jkind_desc = struct
          with_bounds = with_bounds2;
          stage = stage2
        } as t2) =
-    if stage1 <> stage2
-    then No_intersection
-    else
-      let stage = stage1 in
-      let make_intersection base =
-        Intersection
-          { base;
-            mod_bounds = Mod_bounds.meet mod_bounds1 mod_bounds2;
-            with_bounds = With_bounds.meet with_bounds1 with_bounds2;
-            stage
-          }
-      in
+    let make_intersection base stage =
+      Intersection
+        { base;
+          mod_bounds = Mod_bounds.meet mod_bounds1 mod_bounds2;
+          with_bounds = With_bounds.meet with_bounds1 with_bounds2;
+          stage
+        }
+    in
+    match Stage.intersection stage1 stage2 with
+    | None -> No_intersection
+    | Some stage -> (
       match base1, base2 with
       | Layout l1, Layout l2 -> (
         match Layout.intersection ~level l1 l2 with
         | None -> No_intersection
-        | Some l -> make_intersection (Layout l))
-      | Kconstr p1, Kconstr p2 when Path.same p1 p2 -> make_intersection base1
+        | Some l -> make_intersection (Layout l) stage)
+      | Kconstr p1, Kconstr p2 when Path.same p1 p2 ->
+        make_intersection base1 stage
       | (Layout (Layout.Any sa), base | base, Layout (Layout.Any sa))
         when Scannable_axes.equal sa Scannable_axes.max ->
-        make_intersection base
+        make_intersection base stage
       | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
         match expand_pair env t1 t2 with
         | None -> Unknown
-        | Some (t1, t2) -> intersection ~level env t1 t2)
+        | Some (t1, t2) -> intersection ~level env t1 t2))
 
   let sub_layout ~level env t1 t2 =
     match Base.expand_until_comparable env t1.base t2.base with

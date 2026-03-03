@@ -1298,18 +1298,18 @@ module Jkind0 = struct
 
       let any =
         { jkind =
-            {(mk_jkind (Any Scannable_axes.max) ~crossing:Mode.Crossing.max
+            mk_jkind (Any Scannable_axes.max) ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.max ~nullability:Maybe_null
-              ~separability:Maybe_separable) with stage = Unknown};
+              ~separability:Maybe_separable;
           name = "any"
         }
 
       let any_mod_everything =
         { jkind =
-            {(mk_jkind (Any Scannable_axes.max)
+            mk_jkind (Any Scannable_axes.max)
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min ~nullability:Maybe_null
-              ~separability:Maybe_separable) with stage = Unknown};
+              ~separability:Maybe_separable;
           name = "any mod everything"
         }
 
@@ -1997,6 +1997,9 @@ module Jkind0 = struct
       { (disallow_right t) with quality = Best }
 
     module Builtin = struct
+      (* [any_dummy_jkind] uses [Jkind_desc.max], which has its [stage]
+         set to [Unknown], but any other [any] jkind will use [Known 0].
+         This happens to be exactly the behaviour we want. *)
       let any_dummy_jkind =
         { jkind = Jkind_desc.max;
           annotation = None;
@@ -2011,8 +2014,8 @@ module Jkind0 = struct
       let any ~(why : Jkind_intf.History.any_creation_reason) =
         match why with
         | Dummy_jkind ->
-          any_dummy_jkind (* share this one common case *) |> allow_left
-          |> allow_right
+          any_dummy_jkind (* share this one common case *)
+          |> allow_left |> allow_right
         | _ ->
           fresh_jkind Jkind_desc.Builtin.any
             ~annotation:(mk_annot "any") ~why:(Any_creation why)
