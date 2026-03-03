@@ -24,4 +24,4 @@ let get_and_incr seq =
 
 let of_int_unsafe i = i
 
-let min i j = if i < j then i else j
+let min = Int.min

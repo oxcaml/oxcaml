@@ -1265,7 +1265,7 @@ let transl_class ~scopes ids cl_id pub_meths cl vflag =
       Static
   and lbody_virt lenvs =
     (* Virtual classes only need to provide the [class_init] and [env]
-      fields. [obj_init] is filled with a dummy [lambda_unit] value. *)
+       fields. [obj_init] is filled with a dummy [lambda_unit] value. *)
     Lprim(Pmakeblock(0, Immutable, All_value, alloc_heap),
           [lambda_unit; Lambda.lfunction
                           ~kind:(Curried {nlocal=0})

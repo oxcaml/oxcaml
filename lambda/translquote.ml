@@ -2716,22 +2716,12 @@ let type_for_annotation ~env ~loc typ =
              cannot be spliced@ within quoted higher-rank function types"
             Location.print_loc_in_lowercase loc
         | Tpackage { pack_path; pack_cstrs } ->
-          (* CR sspies: I have no confidence in this fix. But I imagine we
-             stumble over this also in other places. *)
-          let lid_of_string_list l =
-            match Longident.unflatten l with
-            | Some lid -> lid
-            | None ->
-              fatal_errorf
-                "Translquote [at %a]:@ empty package constraint path"
-                Location.print_loc_in_lowercase loc
-          in
           Ttyp_package
             { tpt_path = pack_path;
               tpt_cstrs =
                 List.map
                   (fun (parts, ty) ->
-                    mkloc (lid_of_string_list parts) loc, go ty)
+                    mkloc (Longident.unflatten parts |> Option.get) loc, go ty)
                   pack_cstrs;
               tpt_type = Mty_ident pack_path;
               tpt_txt = mkloc (Untypeast.lident_of_path pack_path) loc
