@@ -46,3 +46,5 @@ utils/symbol.ml* merlin-exclude
 utils/target_system.ml* merlin-exclude
 utils/targetint.ml* merlin-exclude
 utils/terminfo.ml* merlin-exclude
+utils/compression.ml merlin-exclude
+utils/compression.mli merlin-exclude
