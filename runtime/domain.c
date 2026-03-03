@@ -2045,13 +2045,12 @@ CAMLextern uintnat caml_effective_tick_interval_usec(void) {
     return 0;
   }
 
-  uintnat res = 0;
+  uintnat res = Max_tick_interval_usec;
 
   for (int i = 0; i < caml_params->max_domains; i++) {
     uintnat dom_tick_interval =
       atomic_load_relaxed(&all_domains[i].tick_interval_usec);
     if (dom_tick_interval == 0) { continue; }
-    if (res == 0) { res = dom_tick_interval; }
     else if (dom_tick_interval < res) {
       res = dom_tick_interval;
     }
@@ -2146,17 +2145,30 @@ CAMLprim value caml_enable_tick_thread(value v_enable)
   return Val_unit;
 }
 
+/* Set the requested tick interval for the current domain
+
+   If argument is 0, the current domain no longer wants ticks */
 CAMLprim value caml_domain_set_tick_interval_usec(value v_interval_usec)
 {
   CAMLparam1(v_interval_usec);
-  CAMLnoalloc;
   uintnat interval_usec = Long_val(v_interval_usec);
+  if (interval_usec > Max_tick_interval_usec) {
+    caml_invalid_argument(
+      "domain_set_tick_interval_usec: "
+      "interval cannot be larger than "
+      CAML_EXPAND_STRINGIFY(Max_tick_interval_usec));
+  }
+
+  if (interval_usec == 0 &&
+      atomic_load_relaxed(&domain_self->tick_interval_usec) != 0) {
+    /* If the tick interval is being set from nonzero to zero, that means the
+       domain no longer wants ticks. Set back to the maximum instead, so that
+       the tick thread ticks at the maximum interval */
+    interval_usec = Max_tick_interval_usec;
+  }
   atomic_store_relaxed(&domain_self->tick_interval_usec, interval_usec);
   if (interval_usec != 0) {
     caml_enable_tick_thread(Val_true);
-    /* NOTE: It might be nice to also disable the tick thread if we set back to
-       0, but it's non-trivial to know if nothing else wants ticks; for now, we
-       just let the tick thread keep running in this case (which seems fine). */
   }
   CAMLreturn(Val_unit);
 }
