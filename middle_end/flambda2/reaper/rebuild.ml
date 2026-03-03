@@ -1587,112 +1587,111 @@ let rebuild_let_expr_holed0 (env : env) res ~(bound_pattern : Bound_pattern.t)
 
 let rec default_defining_expr_for_rebuilding_let env res
     (bound_pattern : Bound_pattern.t) (defining_expr : Rev_expr.rev_named) =
-  match defining_expr with
-  | Named defining_expr -> bound_pattern, defining_expr, res
-  | Static_consts group ->
-    let bound_static =
-      match bound_pattern with
-      | Static l -> l
-      | Set_of_closures _ | Singleton _ ->
-        (* Bound pattern is static consts, so can't bind something else *)
-        assert false
-    in
-    let bound_and_group =
-      List.filter_map
-        (fun ((p, e) as arg :
-               Bound_static.Pattern.t * Rev_expr.rev_static_const_or_code) ->
-          match p with
-          | Code code_id ->
-            if is_code_id_used env code_id
-            then Some arg
-            else (
-              (match e with
-              | Code _ -> ()
-              | Deleted_code -> ()
-              | Static_const _ ->
-                (* Pattern is [Code _], so can't bind static const *)
-                assert false);
-              Some (p, Rev_expr.Deleted_code))
-          | Block_like sym -> if is_symbol_used env sym then Some arg else None
-          | Set_of_closures m ->
-            if
-              Function_slot.Lmap.exists
-                (fun _ sym ->
-                  Option.is_some
-                    (DS.get_changed_representation env.uses
-                       (Code_id_or_name.symbol sym)))
-                m
-            then
-              let m =
-                Function_slot.Lmap.of_list
-                  (List.map
-                     (fun (fs, sym) ->
-                       let repr =
-                         Option.get
-                           (DS.get_changed_representation env.uses
-                              (Code_id_or_name.symbol sym))
-                       in
-                       match repr with
-                       | DS.Block_representation _ ->
-                         Misc.fatal_errorf
-                           "Block representation for set of closures %a"
-                           Symbol.print sym
-                       | DS.Closure_representation (_, fs_map, cur_fs) ->
-                         assert (Function_slot.equal fs cur_fs);
-                         Function_slot.Map.find fs fs_map, sym)
-                     (Function_slot.Lmap.bindings m))
-              in
-              Some (Bound_static.Pattern.set_of_closures m, e)
-            else if
-              Function_slot.Lmap.exists (fun _ sym -> is_symbol_used env sym) m
-            then Some arg
-            else None)
-        (List.combine (Bound_static.to_list bound_static) group)
-    in
-    let bound_static, _group = List.split bound_and_group in
-    let res, group_members =
-      List.fold_left_map
-        (fun res pat_and_rev ->
-          let static_const_or_code, res =
-            rebuild_static_const_or_code env res pat_and_rev
-          in
-          res, static_const_or_code)
-        res bound_and_group
-    in
-    let group = Static_const_group.create group_members in
-    ( Bound_pattern.static (Bound_static.create bound_static),
-      Named.create_static_consts group,
-      res )
-  | Set_of_closures set_of_closures ->
-    let bound =
-      match bound_pattern with
-      | Set_of_closures bound_vars ->
-        List.map Name.var (List.map Bound_var.var bound_vars)
-      | Static _ | Singleton _ ->
-        (* Pattern is a set of closures *)
-        assert false
-    in
-    let set_of_closures, res =
-      rewrite_set_of_closures env res ~bound set_of_closures
-    in
-    let is_phantom =
-      Name_mode.is_phantom (Bound_pattern.name_mode bound_pattern)
-    in
-    let res =
-      { res with
-        all_slot_offsets =
-          Slot_offsets.add_set_of_closures res.all_slot_offsets ~is_phantom
-            set_of_closures
-      }
-    in
-    bound_pattern, Named.create_set_of_closures set_of_closures, res
+  match bound_pattern, defining_expr with
+  | Singleton _, Named defining_expr -> bound_pattern, defining_expr, res
+  | Static bound_static, Static_consts group ->
+    default_defining_expr_for_rebuilding_let_static_consts env res bound_static
+      group
+  | Set_of_closures bound_vars, Set_of_closures set_of_closures ->
+    default_defining_expr_for_rebuilding_let_set_of_closures env res bound_vars
+      set_of_closures
+  | ( (Singleton _ | Static _ | Set_of_closures _),
+      (Named _ | Static_consts _ | Set_of_closures _) ) ->
+    Misc.fatal_errorf "Bound pattern %a does not match defining expr"
+      Bound_pattern.print bound_pattern
+
+and default_defining_expr_for_rebuilding_let_static_consts env res bound_static
+    group =
+  let bound_and_group =
+    List.filter_map
+      (fun ((p, e) as arg :
+             Bound_static.Pattern.t * Rev_expr.rev_static_const_or_code) ->
+        match p with
+        | Code code_id ->
+          if is_code_id_used env code_id
+          then Some arg
+          else (
+            (match e with
+            | Code _ -> ()
+            | Deleted_code -> ()
+            | Static_const _ ->
+              (* Pattern is [Code _], so can't bind static const *)
+              assert false);
+            Some (p, Rev_expr.Deleted_code))
+        | Block_like sym -> if is_symbol_used env sym then Some arg else None
+        | Set_of_closures m ->
+          if
+            Function_slot.Lmap.exists
+              (fun _ sym ->
+                Option.is_some
+                  (DS.get_changed_representation env.uses
+                     (Code_id_or_name.symbol sym)))
+              m
+          then
+            let m =
+              Function_slot.Lmap.of_list
+                (List.map
+                   (fun (fs, sym) ->
+                     let repr =
+                       Option.get
+                         (DS.get_changed_representation env.uses
+                            (Code_id_or_name.symbol sym))
+                     in
+                     match repr with
+                     | DS.Block_representation _ ->
+                       Misc.fatal_errorf
+                         "Block representation for set of closures %a"
+                         Symbol.print sym
+                     | DS.Closure_representation (_, fs_map, cur_fs) ->
+                       assert (Function_slot.equal fs cur_fs);
+                       Function_slot.Map.find fs fs_map, sym)
+                   (Function_slot.Lmap.bindings m))
+            in
+            Some (Bound_static.Pattern.set_of_closures m, e)
+          else if
+            Function_slot.Lmap.exists (fun _ sym -> is_symbol_used env sym) m
+          then Some arg
+          else None)
+      (List.combine (Bound_static.to_list bound_static) group)
+  in
+  let bound_static, _group = List.split bound_and_group in
+  let res, group_members =
+    List.fold_left_map
+      (fun res pat_and_rev ->
+        let static_const_or_code, res =
+          rebuild_static_const_or_code env res pat_and_rev
+        in
+        res, static_const_or_code)
+      res bound_and_group
+  in
+  let group = Static_const_group.create group_members in
+  ( Bound_pattern.static (Bound_static.create bound_static),
+    Named.create_static_consts group,
+    res )
+
+and default_defining_expr_for_rebuilding_let_set_of_closures env res bound_vars
+    set_of_closures =
+  let bound = List.map (fun v -> Name.var (Bound_var.var v)) bound_vars in
+  let set_of_closures, res =
+    rewrite_set_of_closures env res ~bound set_of_closures
+  in
+  let is_phantom =
+    Name_mode.is_phantom (Bound_var.name_mode (List.hd bound_vars))
+  in
+  let res =
+    { res with
+      all_slot_offsets =
+        Slot_offsets.add_set_of_closures res.all_slot_offsets ~is_phantom
+          set_of_closures
+    }
+  in
+  ( Bound_pattern.set_of_closures bound_vars,
+    Named.create_set_of_closures set_of_closures,
+    res )
 
 and rebuild_let_expr_holed (env : env) res ~(bound_pattern : Bound_pattern.t)
     ~(defining_expr : Rev_expr.rev_named) ~parent ~hole : RE.t * rebuild_result
     =
-  let bound_pattern, new_defining_expr, res =
-    default_defining_expr_for_rebuilding_let env res bound_pattern defining_expr
-  in
   if
     Bound_pattern.fold_all_bound_vars bound_pattern
       ~f:(fun b v -> b || is_dead_var env (Bound_var.var v))
@@ -1707,6 +1706,10 @@ and rebuild_let_expr_holed (env : env) res ~(bound_pattern : Bound_pattern.t)
         ~free_names:Name_occurrences.empty,
       res )
   else
+    let bound_pattern, new_defining_expr, res =
+      default_defining_expr_for_rebuilding_let env res bound_pattern
+        defining_expr
+    in
     let subexpr, res =
       match (bound_pattern : Bound_pattern.t) with
       | Set_of_closures _ | Static _ ->
