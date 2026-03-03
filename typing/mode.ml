@@ -5814,6 +5814,30 @@ module Value_with (Areality : Areality) = struct
 
   let meet_const_morph a = C.Simple (C.Simple_morph.Meet_const a)
 
+  let pretty_print_monadic_simple_morph : type a d f.
+      (Fmt.formatter -> a -> unit) ->
+      a ->
+      Fmt.formatter ->
+      (d, Monadic.Const.t, f) C.Simple_morph.t ->
+      unit =
+   fun printm m ppf f ->
+    match f with
+    | C.Simple_morph.Id -> Fmt.fprintf ppf "%a" printm m
+    | C.Simple_morph.Meet_const c ->
+      (* only print the interesting parts of the monadic meet; omit max (min due to
+          flipping of Monadic axis) modes *)
+      let c = merge { monadic = c; comonadic = Comonadic.Const.min } in
+      let diff = Const.diff c Const.min in
+      if diff = Const.Option.none
+      then Fmt.fprintf ppf "%a" printm m
+      else Fmt.fprintf ppf "%a mod %a" printm m Const.Option.partial_print diff
+    | C.Simple_morph.Core_imply_const
+        (C.Core_morph.Comonadic_to_monadic_max _, _) ->
+      failwith "not implemented"
+    | _ ->
+      Fmt.fprintf ppf "%a(%a)" (C.Simple_morph.print obj_monadic) f printm m
+  [@@warning "-4"]
+
   let pretty_print_monadic_morph : type a d f.
       (Fmt.formatter -> a -> unit) ->
       a ->
@@ -5822,16 +5846,50 @@ module Value_with (Areality : Areality) = struct
       unit =
    fun printm m ppf f ->
     match f with
-    | C.Simple C.Simple_morph.Id -> Fmt.fprintf ppf "%a" printm m
-    | C.Simple (C.Simple_morph.Meet_const c) ->
-      (* only print the interesting parts of the monadic meet; omit max (min due to
-        flipping of Monadic axis) modes *)
-      let c = merge { monadic = c; comonadic = Comonadic.Const.min } in
-      let diff = Const.diff c Const.min in
-      if diff = Const.Option.none
-      then Fmt.fprintf ppf "%a" printm m
-      else Fmt.fprintf ppf "%a mod %a" printm m Const.Option.partial_print diff
+    | C.Simple f -> pretty_print_monadic_simple_morph printm m ppf f
     | _ -> Fmt.fprintf ppf "%a(%a)" (C.print_morph obj_monadic) f printm m
+  [@@warning "-4"]
+
+  let pretty_print_comonadic_meet : type a.
+      (Fmt.formatter -> a -> unit) ->
+      a ->
+      Fmt.formatter ->
+      Comonadic.Const.t ->
+      unit =
+   fun printm m ppf c ->
+    (* only print the interesting parts of the meet; omit max modes *)
+    let c = merge { monadic = Monadic.Const.max; comonadic = c } in
+    let diff = Const.diff c Const.max in
+    if diff = Const.Option.none
+    then Fmt.fprintf ppf "%a" printm m
+    else Fmt.fprintf ppf "%a mod %a" printm m Const.Option.partial_print diff
+
+  let pretty_print_comonadic_simple_morph : type a d f.
+      (Fmt.formatter -> a -> unit) ->
+      a ->
+      Fmt.formatter ->
+      (d, Comonadic.Const.t, f) C.Simple_morph.t ->
+      unit =
+   fun printm m ppf f ->
+    match f with
+    | C.Simple_morph.Id -> Fmt.fprintf ppf "%a" printm m
+    | C.Simple_morph.Meet_const c -> pretty_print_comonadic_meet printm m ppf c
+    | C.Simple_morph.Meet_const_core (c, C.Core_morph.Monadic_to_comonadic_min)
+      ->
+      (* since the meet is applied to a monadic_to_comonadic_min, we filter out the
+      comonadic only axes *)
+      let c : Comonadic.Const.t =
+        { c with
+          areality = Areality.Const.max;
+          forkable = Forkable.Const.max;
+          yielding = Yielding.Const.max
+        }
+      in
+      pretty_print_comonadic_meet
+        (fun ppf m -> Fmt.fprintf ppf "close(%a)" printm m)
+        m ppf c
+    | _ ->
+      Fmt.fprintf ppf "%a(%a)" (C.Simple_morph.print obj_comonadic) f printm m
   [@@warning "-4"]
 
   let pretty_print_comonadic_morph : type a d f.
@@ -5842,14 +5900,7 @@ module Value_with (Areality : Areality) = struct
       unit =
    fun printm m ppf f ->
     match f with
-    | C.Simple C.Simple_morph.Id -> Fmt.fprintf ppf "%a" printm m
-    | C.Simple (C.Simple_morph.Meet_const c) ->
-      (* only print the interesting parts of the meet; omit max modes *)
-      let c = merge { monadic = Monadic.Const.max; comonadic = c } in
-      let diff = Const.diff c Const.max in
-      if diff = Const.Option.none
-      then Fmt.fprintf ppf "%a" printm m
-      else Fmt.fprintf ppf "%a mod %a" printm m Const.Option.partial_print diff
+    | C.Simple f -> pretty_print_comonadic_simple_morph printm m ppf f
     | _ -> Fmt.fprintf ppf "%a(%a)" (C.print_morph obj_comonadic) f printm m
   [@@warning "-4"]
 

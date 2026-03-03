@@ -140,9 +140,9 @@ let _ = <[ fun (Equal : (<[Inst0.t]>, int NonInst1.t) Type.eq)
                (x : <[Inst0.t]> expr) -> (x : int NonInst1.t expr) ]>
 [%%expect {|
 - : <[
-     (<[Inst0.t]>, int NonInst1.t) Type.eq @ 'n ->
-     (<[Inst0.t]> expr @ [< 'm mod aliased contended] ->
-      int NonInst1.t expr @ [> 'm]) @ [> local]
+     (<[Inst0.t]>, int NonInst1.t) Type.eq @ [< 'm.future] ->
+     (<[Inst0.t]> expr @ [< 'n mod aliased contended] ->
+      int NonInst1.t expr @ [> 'n]) @ [> 'm.future | local]
      ]>
     expr
 =
@@ -157,9 +157,9 @@ let _ = <[ fun (Equal : (int NonInst1.t, <[Inst0.t]>) Type.eq)
                (x : <[Inst0.t]> expr) -> (x : int NonInst1.t expr) ]>
 [%%expect {|
 - : <[
-     (int NonInst1.t, <[Inst0.t]>) Type.eq @ 'n ->
-     (<[Inst0.t]> expr @ [< 'm mod aliased contended] ->
-      int NonInst1.t expr @ [> 'm]) @ [> local]
+     (int NonInst1.t, <[Inst0.t]>) Type.eq @ [< 'm.future] ->
+     (<[Inst0.t]> expr @ [< 'n mod aliased contended] ->
+      int NonInst1.t expr @ [> 'n]) @ [> 'm.future | local]
      ]>
     expr
 =
@@ -177,8 +177,9 @@ let _ = <[ fun (Equal : (Inst0.t, $(int NonInst1.t)) Type.eq)
                (x : Inst0.t) -> (x : $(int NonInst1.t)) ]>
 [%%expect {|
 - : <[
-     (Inst0.t, $(int NonInst1.t)) Type.eq @ 'n ->
-     (Inst0.t @ [< 'm] -> $(int NonInst1.t) @ [> 'm]) @ [> local]]>
+     (Inst0.t, $(int NonInst1.t)) Type.eq @ [< 'm.future] ->
+     (Inst0.t @ [< 'n] -> $(int NonInst1.t) @ [> 'n]) @ [> 'm.future | local]
+     ]>
     expr
 =
 <[
@@ -191,8 +192,9 @@ let _ = <[ fun (Equal : ($(int NonInst1.t), Inst0.t) Type.eq)
                (x : Inst0.t) -> (x : $(int NonInst1.t)) ]>
 [%%expect {|
 - : <[
-     ($(int NonInst1.t), Inst0.t) Type.eq @ 'n ->
-     (Inst0.t @ [< 'm] -> $(int NonInst1.t) @ [> 'm]) @ [> local]]>
+     ($(int NonInst1.t), Inst0.t) Type.eq @ [< 'm.future] ->
+     (Inst0.t @ [< 'n] -> $(int NonInst1.t) @ [> 'n]) @ [> 'm.future | local]
+     ]>
     expr
 =
 <[
@@ -205,9 +207,9 @@ let _ = <[ fun (Equal : (Inst1.t, <[int NonInst0.t]>) Type.eq)
                (x : Inst1.t expr) -> (x : <[int NonInst0.t]> expr) ]>
 [%%expect {|
 - : <[
-     (Inst1.t, <[int NonInst0.t]>) Type.eq @ 'n ->
-     (Inst1.t expr @ [< 'm mod aliased contended] ->
-      <[int NonInst0.t]> expr @ [> 'm]) @ [> local]
+     (Inst1.t, <[int NonInst0.t]>) Type.eq @ [< 'm.future] ->
+     (Inst1.t expr @ [< 'n mod aliased contended] ->
+      <[int NonInst0.t]> expr @ [> 'n]) @ [> 'm.future | local]
      ]>
     expr
 =
@@ -222,9 +224,9 @@ let _ = <[ fun (Equal : (<[int NonInst0.t]>, Inst1.t) Type.eq)
                (x : Inst1.t expr) -> (x : <[int NonInst0.t]> expr) ]>
 [%%expect {|
 - : <[
-     (<[int NonInst0.t]>, Inst1.t) Type.eq @ 'n ->
-     (Inst1.t expr @ [< 'm mod aliased contended] ->
-      <[int NonInst0.t]> expr @ [> 'm]) @ [> local]
+     (<[int NonInst0.t]>, Inst1.t) Type.eq @ [< 'm.future] ->
+     (Inst1.t expr @ [< 'n mod aliased contended] ->
+      <[int NonInst0.t]> expr @ [> 'n]) @ [> 'm.future | local]
      ]>
     expr
 =
@@ -254,9 +256,9 @@ let _ = <[ fun (Equal : (<[Inst0.t]>, <[Inst0.t']>) Type.eq)
                (x : <[Inst0.t]> expr) -> (x : <[Inst0.t']> expr) ]>
 [%%expect {|
 - : <[
-     (<[Inst0.t]>, <[Inst0.t']>) Type.eq @ 'n ->
-     (<[Inst0.t]> expr @ [< 'm mod aliased contended] ->
-      <[Inst0.t']> expr @ [> 'm]) @ [> local]
+     (<[Inst0.t]>, <[Inst0.t']>) Type.eq @ [< 'm.future] ->
+     (<[Inst0.t]> expr @ [< 'n mod aliased contended] ->
+      <[Inst0.t']> expr @ [> 'n]) @ [> 'm.future | local]
      ]>
     expr
 =
@@ -271,9 +273,9 @@ let _ = <[ fun (Equal : ($Inst2.t, <[Inst0.t']>) Type.eq)
                (x : <[Inst0.t']> expr) -> (x : $Inst2.t expr) ]>
 [%%expect {|
 - : <[
-     ($(Inst2.t), <[Inst0.t']>) Type.eq @ 'n ->
-     (<[Inst0.t']> expr @ [< 'm mod aliased contended] ->
-      $(Inst2.t) expr @ [> 'm]) @ [> local]
+     ($(Inst2.t), <[Inst0.t']>) Type.eq @ [< 'm.future] ->
+     (<[Inst0.t']> expr @ [< 'n mod aliased contended] ->
+      $(Inst2.t) expr @ [> 'n]) @ [> 'm.future | local]
      ]>
     expr
 =
@@ -287,9 +289,9 @@ let _ = <[ fun (Equal : (<[Inst0.t']>, $Inst2.t) Type.eq)
                (x : <[Inst0.t']> expr) -> (x : $Inst2.t expr) ]>
 [%%expect {|
 - : <[
-     (<[Inst0.t']>, $(Inst2.t)) Type.eq @ 'n ->
-     (<[Inst0.t']> expr @ [< 'm mod aliased contended] ->
-      $(Inst2.t) expr @ [> 'm]) @ [> local]
+     (<[Inst0.t']>, $(Inst2.t)) Type.eq @ [< 'm.future] ->
+     (<[Inst0.t']> expr @ [< 'n mod aliased contended] ->
+      $(Inst2.t) expr @ [> 'n]) @ [> 'm.future | local]
      ]>
     expr
 =
@@ -308,8 +310,8 @@ let _ = <[ fun (Equal : ($(<[Inst0.t]> NonInst1.t),
                (x : Inst0.t) -> (x : Inst0.t') ]>
 [%%expect {|
 - : <[
-     ($(<[Inst0.t]> NonInst1.t), $(<[Inst0.t']> NonInst1.t)) Type.eq @ 'n ->
-     (Inst0.t @ [< 'm] -> Inst0.t' @ [> 'm]) @ [> local]]>
+     ($(<[Inst0.t]> NonInst1.t), $(<[Inst0.t']> NonInst1.t)) Type.eq @ [< 'm.future] ->
+     (Inst0.t @ [< 'n] -> Inst0.t' @ [> 'n]) @ [> 'm.future | local]]>
     expr
 =
 <[
@@ -325,14 +327,16 @@ let _ = <[ fun (Equal : ($(<[Inst0.t]> NonInst1.t),
 let force_variables_equal_intro_left (x : 'a expr) (y : ('a, _) Type.eq) = ()
 [%%expect {|
 val force_variables_equal_intro_left :
-  'a expr @ [< global] ->
-  (('a, 'b) Type.eq @ 'm -> unit @ [< global]) @ [< global] = <fun>
+  'a expr @ [< 'm.future & global] ->
+  (('a, 'b) Type.eq @ 'n -> unit @ [< global]) @ [< global > 'm.future] =
+  <fun>
 |}]
 let force_variables_equal_intro_right (x : 'a expr) (y : (_, 'a) Type.eq) = ()
 [%%expect {|
 val force_variables_equal_intro_right :
-  'a expr @ [< global] ->
-  (('b, 'a) Type.eq @ 'm -> unit @ [< global]) @ [< global] = <fun>
+  'a expr @ [< 'm.future & global] ->
+  (('b, 'a) Type.eq @ 'n -> unit @ [< global]) @ [< global > 'm.future] =
+  <fun>
 |}]
 
 (* Quotes *)
@@ -343,8 +347,8 @@ let f (type a) (x : <[_]> expr) (eq : (<[_]>, a) Type.eq) =
   match eq with Equal -> x
 [%%expect {|
 val f :
-  'a expr @ [< 'm mod aliased contended & global many] ->
-  (('a, 'a) Type.eq @ 'n -> 'a expr @ [< global > 'm | aliased]) @ [< global] =
+  'a expr @ [< 'o mod aliased contended & 'n.future & global many] ->
+  (('a, 'a) Type.eq @ 'p -> 'a expr @ [< global > 'm | 'o | aliased]) @ [< global > close('m) mod many portable | 'n.future] =
   <fun>
 |}]
 (* <[t]> ~ s  equates s to t when s instantiable -- $0 escapes! *)
@@ -367,8 +371,8 @@ let f (type a) (x : <[_]> expr) (eq : (a, <[_]>) Type.eq) =
   match eq with Equal -> x
 [%%expect {|
 val f :
-  'a expr @ [< 'm mod aliased contended & global many] ->
-  (('a, 'a) Type.eq @ 'n -> 'a expr @ [< global > 'm | aliased]) @ [< global] =
+  'a expr @ [< 'o mod aliased contended & 'n.future & global many] ->
+  (('a, 'a) Type.eq @ 'p -> 'a expr @ [< global > 'm | 'o | aliased]) @ [< global > close('m) mod many portable | 'n.future] =
   <fun>
 |}]
 (* s ~ <[t]>  equates s to t when s instantiable -- $0 escapes! *)
@@ -394,8 +398,9 @@ let force_variables_equal_intro_left' =
 [%%expect {|
 val force_variables_equal_intro_left' :
   <[
-   $('a) expr @ [< global] ->
-   (($('a), $('b)) Type.eq @ 'm -> unit @ [< global]) @ [< global]]>
+   $('a) expr @ [< 'm.future & global] ->
+   (($('a), $('b)) Type.eq @ 'n -> unit @ [< global]) @ [< global > 'm.future]
+   ]>
   expr = <[fun (x : 'a expr) (y : ('a, _) Stdlib.Type.eq) -> ()]>
 |}]
 let force_variables_equal_intro_right' =
@@ -403,8 +408,9 @@ let force_variables_equal_intro_right' =
 [%%expect {|
 val force_variables_equal_intro_right' :
   <[
-   $('a) expr @ [< global] ->
-   (($('b), $('a)) Type.eq @ 'm -> unit @ [< global]) @ [< global]]>
+   $('a) expr @ [< 'm.future & global] ->
+   (($('b), $('a)) Type.eq @ 'n -> unit @ [< global]) @ [< global > 'm.future]
+   ]>
   expr = <[fun (x : 'a expr) (y : (_, 'a) Stdlib.Type.eq) -> ()]>
 |}]
 
@@ -417,8 +423,9 @@ let f = <[
 [%%expect {|
 val f :
   <[
-   $('a) expr @ [< 'm mod aliased contended & global many] ->
-   (($('a), $('a)) Type.eq @ 'n -> $('a) expr @ [< global > 'm | aliased]) @ [< global]
+   $('a) expr @ [< 'o mod aliased contended & 'n.future & global many] ->
+   (($('a), $('a)) Type.eq @ 'p ->
+    $('a) expr @ [< global > 'm | 'o | aliased]) @ [< global > close('m) mod many portable | 'n.future]
    ]>
   expr =
   <[
@@ -452,8 +459,9 @@ let f = <[
 [%%expect {|
 val f :
   <[
-   $('a) expr @ [< 'm mod aliased contended & global many] ->
-   (($('a), $('a)) Type.eq @ 'n -> $('a) expr @ [< global > 'm | aliased]) @ [< global]
+   $('a) expr @ [< 'o mod aliased contended & 'n.future & global many] ->
+   (($('a), $('a)) Type.eq @ 'p ->
+    $('a) expr @ [< global > 'm | 'o | aliased]) @ [< global > close('m) mod many portable | 'n.future]
    ]>
   expr =
   <[

@@ -104,8 +104,9 @@ let f r =
                    (field_imm 0 *match*/317))
                  3)))))))
   (apply (field_imm 1 (global Toploop!)) "f" f/310))
-val f : int option ref @ [< many uncontended] -> int @ [< global > aliased] =
-  <fun>
+val f :
+  int option ref @ [< 'm.future & many uncontended] ->
+  int @ [< global > 'm.future mod global many | aliased] = <fun>
 |}]
 
 

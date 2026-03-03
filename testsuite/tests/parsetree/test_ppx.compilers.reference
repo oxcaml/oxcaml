@@ -1,5 +1,5 @@
-File "source_jane_street.ml", line 174, characters 0-24:
-174 | type t = #(int * float#)
+File "source_jane_street.ml", line 177, characters 0-24:
+177 | type t = #(int * float#)
       ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Multiple definition of the type name "t".
        Names must be unique in a given structure or signature.

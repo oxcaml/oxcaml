@@ -11,7 +11,9 @@ let g : local_ 'a -> int -> _ = fun _ _ -> (fun[@curry] (local_ _) (x : int) -> 
 [%%expect{|
 val g :
   'a @ local ->
-  int -> ('b @ [> local] -> (int @ 'm -> int @ [< global]) @ [> local]) =
+  int ->
+  ('b @ [< 'm.future > local] ->
+   (int @ 'n -> int @ [< global]) @ [> 'm.future | local]) =
   <fun>
 |}]
 let apply1 x = g x
@@ -30,7 +32,8 @@ let apply2 x = g x x
 [%%expect{|
 val apply2 :
   int @ [< many uncontended] ->
-  ('a @ [> local] -> (int @ 'm -> int @ [< global]) @ [> local]) @ [< global > nonportable] =
+  ('a @ [< 'n.future & 'p.future > 'p.future | local] ->
+   (int @ 'o -> int @ [< global]) @ [< 'm.future > 'm.future | 'n.future | local]) @ [< global > nonportable] =
   <fun>
 |}]
 let apply3 x = g x x x
@@ -74,7 +77,9 @@ Line 1, characters 19-30:
                        ^^^^^^^^^^^
 Error: The function "g" has type
          'a @ local ->
-         int -> ('b @ [> local] -> (int -> int @ [< global]) @ [> local])
+         int ->
+         ('b @ [< 'm.future > local] ->
+          (int -> int @ [< global]) @ [> 'm.future | local])
        It is applied to too many arguments
 Line 1, characters 29-30:
 1 | let ill_typed () = g 1 2 3 4 5
@@ -89,10 +94,11 @@ Line 1, characters 29-30:
 let f g = g (local_ (1, 2)) 1 2 3 [@nontail]
 [%%expect{|
 val f :
-  (int * int @ [> local] ->
-   (int @ 'p ->
-    (int @ 'o -> (int @ 'n -> 'a @ [< 'm & global]) @ [> local]) @ [> local]) @ [> local]) @ 'q ->
-  'a @ [< global > 'm] = <fun>
+  (int * int @ [< 'n.future > 'o | local] ->
+   (int @ [< 'mm0.future > 'mm1] ->
+    (int @ [< 'mm2.future > 'mm3] ->
+     (int @ 'mm5 -> 'a @ [< 'mm4 & global]) @ [> 'mm2.future | monadic_to_comonadic_min('mm3) | 'q.future | local]) @ [< 'q.future > 'mm0.future | monadic_to_comonadic_min('mm1) | 'm.future | local]) @ [< 'm.future > 'n.future | monadic_to_comonadic_min('o) | 'p.future | local]) @ [< 'p.future] ->
+  'a @ [< global > 'mm4] = <fun>
 |}]
 
 (*
@@ -158,8 +164,9 @@ let app42_wrapped (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> 
   (f ~a:(local_ ref 1)) 2 ~c:4
 [%%expect{|
 val app42_wrapped :
-  (a:int ref @ local -> (int -> b:int ref @ local -> c:int -> unit)) @ 'm ->
-  (b:int ref @ local -> unit) @ [< global > nonportable] = <fun>
+  (a:int ref @ local -> (int -> b:int ref @ local -> c:int -> unit)) @ 'n ->
+  (b:int ref @ local -> unit) @ [< global > 'm | close('m) | nonportable] =
+  <fun>
 |}]
 let app43 (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) =
   f ~a:(local_ ref 1) 2
@@ -174,35 +181,37 @@ Error: This value is "local"
 let app5 (f : b:local_ int ref -> a:int -> unit) = f ~a:42
 [%%expect{|
 val app5 :
-  (b:int ref @ local -> a:int -> unit) @ [< global many] ->
-  (b:int ref @ local -> unit) @ [< global > nonportable] = <fun>
+  (b:int ref @ local -> a:int -> unit) @ [< 'n.future & global many] ->
+  (b:int ref @ local -> unit) @ [< global > 'm | close('m) | 'n.future | nonportable] =
+  <fun>
 |}]
 let app6 (f : a:local_ int ref -> b:local_ int ref -> c:int -> unit) = f ~c:42
 [%%expect{|
 val app6 :
-  (a:int ref @ local -> b:int ref @ local -> c:int -> unit) @ [< global many] ->
-  (a:int ref @ local -> (b:int ref @ local -> unit) @ [> local nonportable]) @ [< global > nonportable] =
+  (a:int ref @ local -> b:int ref @ local -> c:int -> unit) @ [< 'o.future & global many > 'p.future] ->
+  (a:int ref @ local ->
+   (b:int ref @ local -> unit) @ [< 'p.future > close('m) | local nonportable]) @ [< global > 'm | 'n | close('n) | 'o.future | nonportable] =
   <fun>
 |}]
 
 let app1' (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(ref 42) ()
 [%%expect{|
 val app1' :
-  (a:int -> b:int ref @ local -> unit -> unit) @ [< global many] ->
-  (a:int -> unit) @ [< global > aliased nonportable] = <fun>
+  (a:int -> b:int ref @ local -> unit -> unit) @ [< global many > 'm.future] ->
+  (a:int -> unit) @ [< 'm.future & global > aliased nonportable] = <fun>
 |}]
 let app2' (f : a:int -> b:local_ int ref -> unit -> unit) = f ~b:(ref 42)
 [%%expect{|
 val app2' :
-  (a:int -> b:int ref @ local -> unit -> unit) @ [< global many] ->
-  (a:int -> (unit -> unit) @ local) @ [< global > aliased nonportable] =
+  (a:int -> b:int ref @ local -> unit -> unit) @ [< global many > 'm.future] ->
+  (a:int -> (unit -> unit) @ local) @ [< 'm.future & global > aliased nonportable] =
   <fun>
 |}]
 let app3' (f : a:int -> b:local_ int ref -> unit) = f ~b:(ref 42)
 [%%expect{|
 val app3' :
-  (a:int -> b:int ref @ local -> unit) @ [< global many] ->
-  (a:int -> unit) @ [< global > aliased nonportable] = <fun>
+  (a:int -> b:int ref @ local -> unit) @ [< global many > 'm.future] ->
+  (a:int -> unit) @ [< 'm.future & global > aliased nonportable] = <fun>
 |}]
 let app4' (f : b:local_ int ref -> a:int -> unit) = f ~b:(ref 42)
 [%%expect{|
@@ -230,8 +239,9 @@ let app42'_wrapped (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int ->
   (f ~a:(ref 1)) 2 ~c:4
 [%%expect{|
 val app42'_wrapped :
-  (a:int ref @ local -> (int -> b:int ref @ local -> c:int -> unit)) @ 'm ->
-  (b:int ref @ local -> unit) @ [< global > nonportable] = <fun>
+  (a:int ref @ local -> (int -> b:int ref @ local -> c:int -> unit)) @ 'n ->
+  (b:int ref @ local -> unit) @ [< global > 'm | close('m) | nonportable] =
+  <fun>
 |}]
 let app43' (f : a:local_ int ref -> (int -> b:local_ int ref -> c:int -> unit)) =
   f ~a:(ref 1) 2
@@ -254,8 +264,9 @@ val app43'_wrapped :
 let rapp1 (f : a:int -> unit -> local_ int ref) = f ()
 [%%expect{|
 val rapp1 :
-  (a:int -> unit -> int ref @ local) @ [< global many] ->
-  (a:int -> int ref @ local) @ [< global > nonportable] = <fun>
+  (a:int -> unit -> int ref @ local) @ [< global many > 'm.future] ->
+  (a:int -> int ref @ local) @ [< 'm.future & global > 'n | close('n) | nonportable] =
+  <fun>
 |}]
 let rapp2 (f : a:int -> unit -> local_ int ref) = f ~a:1
 [%%expect{|
@@ -327,9 +338,10 @@ let overapp ~(local_ a) ~b = (); fun ~c ~d -> ()
 let () = overapp ~a:1 ~b:2 ~c:3 ~d:4
 [%%expect{|
 val overapp :
-  a:'a @ [> local] ->
-  (b:'b @ 'n ->
-   (c:'c @ [< global] -> (d:'d @ 'm -> unit @ [< global]) @ [< global]) @ [< global]) @ [> local] =
+  a:'a @ [< 'm.future > local] ->
+  (b:'b @ 'p ->
+   (c:'c @ [< 'n.future & global] ->
+    (d:'d @ 'o -> unit @ [< global]) @ [< global > 'n.future]) @ [< global]) @ [> 'm.future | local] =
   <fun>
 Line 3, characters 9-26:
 3 | let () = overapp ~a:1 ~b:2 ~c:3 ~d:4
@@ -497,18 +509,20 @@ let f g x =
   g (x: _ @ once) x [@nontail]
 [%%expect{|
 val f :
-  ('a @ [> 'o | once aliased] ->
-   ('a @ [> 'n | aliased] -> 'b @ [< 'm & global]) @ [> once]) @ [< global] ->
-  ('a @ [< 'n & 'o & many] -> 'b @ [< global > 'm]) @ [< global] = <fun>
+  ('a @ [< 'm.future > 'n | 'mm0 | once aliased] ->
+   ('a @ [> 'q | aliased] -> 'b @ [< 'p & global]) @ [> 'm.future | monadic_to_comonadic_min('n) | 'o.future | once]) @ [< 'o.future & 'mm1.future & global] ->
+  ('a @ [< 'q & 'mm0 & many] -> 'b @ [< global > 'p]) @ [< global > 'mm1.future] =
+  <fun>
 |}]
 
 let f g x y =
   g (x: _ @ unique) y [@nontail]
 [%%expect{|
 val f :
-  ('a @ [> 'p] -> ('b @ [> 'o] -> 'c @ [< 'n & global]) @ 'm) @ [< global] ->
-  ('a @ [< 'p & global unique] ->
-   ('b @ [< 'o] -> 'c @ [< global > 'n]) @ [< global > once]) @ [< global] =
+  ('a @ [< 'm.future > 'mm0 | 'n | 'mm1] ->
+   ('b @ [> 'q] -> 'c @ [< 'p & global]) @ [> 'm.future | monadic_to_comonadic_min('n) | 'o.future]) @ [< 'o.future & 'mm2.future & global] ->
+  ('a @ [< 'mm3.future & 'mm1 & global unique] ->
+   ('b @ [< 'q] -> 'c @ [< global > 'p]) @ [< global > 'mm3.future | close('mm0) | once]) @ [< global > 'mm2.future] =
   <fun>
 |}]
 
@@ -516,23 +530,25 @@ let f (g @ unique) x =
   g x x [@nontail]
 [%%expect{|
 val f :
-  ('a @ [> 'p | aliased] ->
-   ('a @ [> 'o | aliased] -> 'b @ [< 'n & global]) @ 'm) @ [< global unique] ->
-  ('a @ [< 'o & 'p & many] -> 'b @ [< global > 'n]) @ [< global] = <fun>
+  ('a @ [< 'm.future > 'n | 'mm0 | aliased] ->
+   ('a @ [> 'q | aliased] -> 'b @ [< 'p & global]) @ [> 'm.future | monadic_to_comonadic_min('n) | 'o.future]) @ [< 'o.future & 'mm1.future & global unique] ->
+  ('a @ [< 'q & 'mm0 & many] -> 'b @ [< global > 'p]) @ [< global > 'mm1.future] =
+  <fun>
 |}, Principal{|
 val f :
-  ('a @ [> 'p | aliased] ->
-   ('a @ [> 'o | aliased] -> 'b @ [< 'n & global]) @ 'm) @ [< global unique] ->
-  ('a @ [< 'o & 'p & many] -> 'b @ [< global > 'n]) @ [< global] = <fun>
+  ('a @ [< 'm.future > 'n | 'mm0 | aliased] ->
+   ('a @ [> 'q | aliased] -> 'b @ [< 'p & global]) @ [> 'm.future | monadic_to_comonadic_min('n) | 'o.future]) @ [< 'o.future & 'mm1.future & global unique] ->
+  ('a @ [< 'q & 'mm0 & many] -> 'b @ [< global > 'p]) @ [< global > 'mm1.future] =
+  <fun>
 |}]
 
 let f (g @ once) x =
   g x x [@nontail]
 [%%expect{|
 val f :
-  ('a @ [> 'o | aliased] ->
-   ('a @ [> 'n | aliased] -> 'b @ [< 'm & global]) @ [> once]) @ [< global > once] ->
-  ('a @ [< 'n & 'o & many] -> 'b @ [< global > 'm]) @ [< global > once] =
+  ('a @ [< 'm.future > 'n | 'mm0 | aliased] ->
+   ('a @ [> 'q | aliased] -> 'b @ [< 'p & global]) @ [> 'm.future | monadic_to_comonadic_min('n) | 'o.future | once]) @ [< 'o.future & 'mm1.future & global > once] ->
+  ('a @ [< 'q & 'mm0 & many] -> 'b @ [< global > 'p]) @ [< global > 'mm1.future | once] =
   <fun>
 |}]
 
@@ -541,18 +557,20 @@ let f g x =
   g (x: _ @ nonportable) x [@nontail]
 [%%expect{|
 val f :
-  ('a @ [> 'o | aliased nonportable] ->
-   ('a @ [> 'n | aliased] -> 'b @ [< 'm & global]) @ [> nonportable]) @ [< global] ->
-  ('a @ [< 'n & 'o & many] -> 'b @ [< global > 'm]) @ [< global] = <fun>
+  ('a @ [< 'm.future > 'n | 'mm0 | aliased nonportable] ->
+   ('a @ [> 'q | aliased] -> 'b @ [< 'p & global]) @ [> 'm.future | monadic_to_comonadic_min('n) | 'o.future | nonportable]) @ [< 'o.future & 'mm1.future & global] ->
+  ('a @ [< 'q & 'mm0 & many] -> 'b @ [< global > 'p]) @ [< global > 'mm1.future] =
+  <fun>
 |}]
 
 let f g x y =
   g (x: _ @ uncontended) y [@nontail]
 [%%expect{|
 val f :
-  ('a @ [> 'p] -> ('b @ [> 'o] -> 'c @ [< 'n & global]) @ 'm) @ [< global] ->
-  ('a @ [< 'p & global uncontended] ->
-   ('b @ [< 'o] -> 'c @ [< global > 'n]) @ [< global > nonportable]) @ [< global] =
+  ('a @ [< 'm.future > 'mm0 | 'n | 'mm1] ->
+   ('b @ [> 'q] -> 'c @ [< 'p & global]) @ [> 'm.future | monadic_to_comonadic_min('n) | 'o.future]) @ [< 'o.future & 'mm2.future & global] ->
+  ('a @ [< 'mm3.future & 'mm1 & global uncontended] ->
+   ('b @ [< 'q] -> 'c @ [< global > 'p]) @ [< global > 'mm3.future | close('mm0) | nonportable]) @ [< global > 'mm2.future] =
   <fun>
 |}]
 
@@ -560,18 +578,19 @@ let f (g @ uncontended) x =
   g x x [@nontail]
 [%%expect{|
 val f :
-  ('a @ [> 'p | aliased] ->
-   ('a @ [> 'o | aliased] -> 'b @ [< 'n & global]) @ 'm) @ [< global uncontended] ->
-  ('a @ [< 'o & 'p & many] -> 'b @ [< global > 'n]) @ [< global] = <fun>
+  ('a @ [< 'm.future > 'n | 'mm0 | aliased] ->
+   ('a @ [> 'q | aliased] -> 'b @ [< 'p & global]) @ [> 'm.future | monadic_to_comonadic_min('n) | 'o.future]) @ [< 'o.future & 'mm1.future & global uncontended] ->
+  ('a @ [< 'q & 'mm0 & many] -> 'b @ [< global > 'p]) @ [< global > 'mm1.future] =
+  <fun>
 |}]
 
 let f (g @ nonportable) x =
   g x x [@nontail]
 [%%expect{|
 val f :
-  ('a @ [> 'o | aliased] ->
-   ('a @ [> 'n | aliased] -> 'b @ [< 'm & global]) @ [> nonportable]) @ [< global > nonportable] ->
-  ('a @ [< 'n & 'o & many] -> 'b @ [< global > 'm]) @ [< global > nonportable] =
+  ('a @ [< 'm.future > 'n | 'mm0 | aliased] ->
+   ('a @ [> 'q | aliased] -> 'b @ [< 'p & global]) @ [> 'm.future | monadic_to_comonadic_min('n) | 'o.future | nonportable]) @ [< 'o.future & 'mm1.future & global > nonportable] ->
+  ('a @ [< 'q & 'mm0 & many] -> 'b @ [< global > 'p]) @ [< global > 'mm1.future | nonportable] =
   <fun>
 |}]
 

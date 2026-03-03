@@ -6,10 +6,10 @@
 (* Subtyping is "syntactic" *)
 fun (x : < x : int >) y z -> (y :> 'a), (x :> 'a), (z :> 'a);;
 [%%expect{|
-- : < x : int > @ [< 'o mod aliased & global] ->
-    (< x : int > @ [< 'n & global] ->
-     (< x : int > @ [< 'm & global] ->
-      < x : int > * < x : int > * < x : int > @ [< global > 'm | 'n | 'o mod global many]) @ [> local]) @ [> local]
+- : < x : int > @ [< 'mm1 mod aliased & 'n.future & global] ->
+    (< x : int > @ [< 'mm0 & 'p.future & global] ->
+     (< x : int > @ [< 'q & global] ->
+      < x : int > * < x : int > * < x : int > @ [< global > 'o | 'm | 'q | 'mm0 | 'mm1 mod global many]) @ [> close('o) | 'p.future | local]) @ [> close('m) mod many | 'n.future | local]
 = <fun>
 |}];;
 (* - : (< x : int > as 'a) -> 'a -> 'a * 'a = <fun> *)
@@ -160,7 +160,9 @@ class ['a, 'b] c :
   object
     constraint 'a = int -> 'c
     constraint 'b = 'a * < x : 'b > * 'c * 'd
-    method f : 'a @ [< global] -> ('b @ 'm -> unit @ [< global]) @ [< global]
+    method f :
+      'a @ [< 'm.future & 'm.future & 'm.future & global] ->
+      ('b @ 'n -> unit @ [< global]) @ [< global > 'm.future | 'm.future | 'm.future]
   end
 |}];;
 class ['a, 'b] d () = object
@@ -173,8 +175,8 @@ class ['a, 'b] d :
     constraint 'a = int -> 'd
     constraint 'b = 'a * (< x : 'b > as 'c) * 'd * 'e
     method f :
-      (int -> 'd) @ [< global] ->
-      ((int -> 'd) * 'c * 'd * 'e @ 'm -> unit @ [< global]) @ [< global]
+      (int -> 'd) @ [< 'm.future & 'm.future & 'm.future & global] ->
+      ((int -> 'd) * 'c * 'd * 'e @ 'n -> unit @ [< global]) @ [< global > 'm.future | 'm.future | 'm.future]
   end
 |}];;
 
@@ -274,14 +276,14 @@ type 'a u = 'a
 |}];;
 fun (x : t) (y : 'a u) -> x = y;;
 [%%expect{|
-- : t @ [< global uncontended] ->
-    (t u @ [< global many uncontended] -> bool @ [< global]) @ [> local nonportable]
+- : t @ [< 'm.future & global uncontended] ->
+    (t u @ [< global many uncontended] -> bool @ [< global]) @ [> 'm.future | local nonportable]
 = <fun>
 |}];;
 fun (x : t) (y : 'a u) -> y = x;;
 [%%expect{|
-- : t @ [< global uncontended] ->
-    (t u @ [< global many uncontended] -> bool @ [< global]) @ [> local nonportable]
+- : t @ [< 'm.future & global uncontended] ->
+    (t u @ [< global many uncontended] -> bool @ [< global]) @ [> 'm.future | local nonportable]
 = <fun>
 |}];;
 (* - : t -> t u -> bool = <fun> *)

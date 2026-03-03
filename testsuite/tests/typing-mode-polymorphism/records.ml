@@ -20,23 +20,24 @@ type 'a myref = { mutable i : 'a }
 let alloc x = { i = x }
 [%%expect{|
 type 'a myref = { mutable i : 'a; }
-val alloc : 'a @ [< global many] -> 'a myref @ [< global > nonportable] =
-  <fun>
+val alloc :
+  'a @ [< global many > 'm.future] ->
+  'a myref @ [< 'm.future & global > nonportable] = <fun>
 |}]
 
 let store_local (x @ local) y = x.i <- y
 [%%expect{|
 val store_local :
-  'a myref @ [< corrupted > local] ->
-  ('a @ [< global many uncontended] -> unit @ [< global]) @ [> local corruptible] =
+  'a myref @ [< 'm.future & corrupted > local] ->
+  ('a @ [< global many uncontended] -> unit @ [< global]) @ [> 'm.future | local corruptible] =
   <fun>
 |}]
 
 let store_global (x @ global) y = x.i <- y
 [%%expect{|
 val store_global :
-  'a myref @ [< global corrupted] ->
-  ('a @ [< global many uncontended] -> unit @ [< global]) @ [< global > corruptible] =
+  'a myref @ [< 'm.future & global corrupted] ->
+  ('a @ [< global many uncontended] -> unit @ [< global]) @ [< global > 'm.future | corruptible] =
   <fun>
 |}]
 
@@ -127,6 +128,6 @@ Error: This value is "once" but is expected to be "many".
 let foo (x @ contended) = alloc x
 [%%expect{|
 val foo :
-  'a @ [< global many > contended] ->
-  'a myref @ [< global > nonportable contended] = <fun>
+  'a @ [< global many > 'm.future | contended] ->
+  'a myref @ [< 'm.future & global > nonportable contended] = <fun>
 |}]
