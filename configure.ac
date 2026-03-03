@@ -2706,7 +2706,8 @@ zstd_libs=""
 
 AS_IF([test x"$with_zstd" != "xno"],
   # Try pkg-config first, as it gives the most reliable results
-  [AS_IF([${PKG_CONFIG} libzstd 2>/dev/null],
+  [AC_MSG_ERROR([OxCaml doesn't support compressed marshalling yet])
+    AS_IF([${PKG_CONFIG} libzstd 2>/dev/null],
     # Now check the version
     [AS_IF([${PKG_CONFIG} --atleast-version 1.4 libzstd],
       [zstd_libs=`${PKG_CONFIG} --libs libzstd`

@@ -1504,6 +1504,8 @@ utils/clflags.ml	.ocamlcommon.objs/native/clflags.cmx
 utils/clflags.mli	.ocamlcommon.objs/byte/clflags.cmi
 utils/compilation_unit.ml	.ocamlcommon.objs/native/compilation_unit.cmx
 utils/compilation_unit.mli	.ocamlcommon.objs/byte/compilation_unit.cmi
+utils/compression.ml	.ocamlcommon.objs/native/compression.cmx
+utils/compression.mli	.ocamlcommon.objs/byte/compression.cmi
 utils/config.ml	.ocamlcommon.objs/native/config.cmx
 utils/config.mli	.ocamlcommon.objs/byte/config.cmi
 utils/consistbl.ml	.ocamlcommon.objs/native/consistbl.cmx
