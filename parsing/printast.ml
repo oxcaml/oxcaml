@@ -587,6 +587,9 @@ and jkind_annotation i ppf (jkind : jkind_annotation) =
   | Pjk_product jkinds ->
       line i ppf "Pjk_product\n";
       list i jkind_annotation ppf jkinds
+  | Pjk_quote jkind ->
+      line i ppf "Pjk_quote\n";
+      jkind_annotation (i+1) ppf jkind;
 
 and function_param i ppf { pparam_desc = desc; pparam_loc = loc } =
   match desc with

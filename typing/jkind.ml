@@ -2103,6 +2103,12 @@ module Const = struct
               ~type_expr:type_ base.with_bounds;
           stage = Known 0
         })
+    | Pjk_quote base ->
+      let base =
+        of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
+          context base
+      in
+      Base_and_axes.quote base
     | Pjk_default | Pjk_kind_of _ ->
       raise ~loc:jkind.pjka_loc Unimplemented_syntax
 
@@ -2288,6 +2294,7 @@ let of_type_decl_overapproximate_unknown ~context env
     | Pjk_with _ -> true
     | Pjk_mod (base, _) -> has_with_bounds base
     | Pjk_product jkinds -> List.exists has_with_bounds jkinds
+    | Pjk_quote base -> has_with_bounds base
     | Pjk_abbreviation _ -> false
     | Pjk_default | Pjk_kind_of _ ->
       raise ~loc:jkind.pjka_loc Unimplemented_syntax
