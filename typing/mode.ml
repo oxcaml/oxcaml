@@ -4692,9 +4692,9 @@ module Modality = struct
 
     let le (type a) (ax : a Axis.t) (a : a) (b : a) : bool =
       match ax, a, b with
-      | Monadic ax, Join_with a, Join_with b ->
+      | Monadic ax, Join_const a, Join_const b ->
         Value.Monadic.Const.Per_axis.le ax a b
-      | Comonadic ax, Meet_with a, Meet_with b ->
+      | Comonadic ax, Meet_const a, Meet_const b ->
         Value.Comonadic.Const.Per_axis.le ax a b
 
     let print (type a) (ax : a Axis.t) ppf (t : a) =
