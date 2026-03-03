@@ -17,7 +17,7 @@ type t
 (** The state of the linking check.
     It keeps track of compilation units provided and required so far. *)
 
-type compunit = string
+type compunit = Compilation_unit.t
 
 type filename = string
 
