@@ -320,13 +320,10 @@ lognot:
   ret
 |}]
 
-(* CR ttebbi: Sign-extending the topmost bit is unnecessary. *)
 let shift_left x y = Int64_u.shift_left x (Int64_u.to_int y)
 [%%expect_asm X86_64{|
 shift_left:
   movq  %rbx, %rcx
-  salq  $1, %rcx
-  sarq  $1, %rcx
   salq  %cl, %rax
   ret
 |}]
@@ -335,8 +332,6 @@ let shift_right x y = Int64_u.shift_right x (Int64_u.to_int y)
 [%%expect_asm X86_64{|
 shift_right:
   movq  %rbx, %rcx
-  salq  $1, %rcx
-  sarq  $1, %rcx
   sarq  %cl, %rax
   ret
 |}]
@@ -345,8 +340,6 @@ let shift_right_logical x y = Int64_u.shift_right_logical x (Int64_u.to_int y)
 [%%expect_asm X86_64{|
 shift_right_logical:
   movq  %rbx, %rcx
-  salq  $1, %rcx
-  sarq  $1, %rcx
   shrq  %cl, %rax
   ret
 |}]

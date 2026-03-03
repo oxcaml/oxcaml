@@ -1003,6 +1003,7 @@ let binary_int_shift_primitive _env dbg kind (op : P.int_shift_op) x y =
            bits into the high bits of the register. *)
         C.lsl_int, C.Scalar_type.Integer.nativeint
     in
+    let y = C.ignore_high_bit_int ~ignored_bits:((Arch.size_int * 8) - 6) y in
     C.Scalar_type.Integral.conjugate ~outer:kind ~inner:(Untagged op_kind) ~dbg
       ~f:(fun x ->
         (* [kind] only applies to [x], the [y] argument is always a bare

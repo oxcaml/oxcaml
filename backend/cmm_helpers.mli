@@ -473,6 +473,11 @@ val bigarray_word_kind : Lambda.bigarray_kind -> memory_chunk
     irrelevant *)
 val ignore_low_bit_int : expression -> expression
 
+(** Simplify the given expression knowing the high bits will be irrelevant
+    (e.g., for shift counts). Strips sign/zero extensions recursively through
+    bitwise operations. *)
+val ignore_high_bit_int : ignored_bits:int -> expression -> expression
+
 (** Simplify the given expression knowing that bits other than the low [bits]
     bits will be irrelevant *)
 val low_bits : bits:int -> dbg:Debuginfo.t -> expression -> expression
