@@ -191,8 +191,9 @@ Error: This value is "contended" but is expected to be "uncontended".
 
 let close_over x = fun () -> x
 [%%expect{|
-val close_over : 'a @ [< 'n & global] -> (unit @ 'o -> 'a @ [> 'n]) @ 'm =
-  <fun>
+val close_over :
+  'a @ [< 'o & 'n.future & global] ->
+  (unit @ 'p -> 'a @ [> 'm | 'o]) @ [> close('m) | 'n.future] = <fun>
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
@@ -210,7 +211,9 @@ Error: This value is "nonportable" but is expected to be "portable".
 let close_over x = fun () -> fun () -> x
 [%%expect{|
 val close_over :
-  'a @ [< 'o & global] -> (unit @ 'q -> (unit @ 'p -> 'a @ [> 'o]) @ 'n) @ 'm =
+  'a @ [< 'q & 'p.future & 'n.future & global] ->
+  (unit @ 'mm1 ->
+   (unit @ 'mm0 -> 'a @ [> 'o | 'm | 'q]) @ [> close('o) | 'p.future]) @ [> close('m) | 'n.future] =
   <fun>
 |}]
 
@@ -250,8 +253,8 @@ let foo (x : int @ portable) (y : int @ nonportable) =
   use_portable y
 [%%expect{|
 val foo :
-  int @ [< portable] ->
-  (int @ [> nonportable] -> unit @ 'm) @ [> nonportable] = <fun>
+  int @ [< 'm.future & portable] ->
+  (int @ [> nonportable] -> unit @ 'n) @ [> 'm.future | nonportable] = <fun>
 |}]
 
 (* LOCAL AND MODE POLYMORPHISM *)
