@@ -109,7 +109,7 @@ repeated_select_shared:
   ret
 |}]
 
-(* CR ttebbi: We not materialize the boolean, ideally even share the cmpq. *)
+(* CR ttebbi: We should not materialize the boolean, ideally even share the cmpq. *)
 let repeated_select_repeated x y z w  a b =
   let q =
     Builtins.select_int64 ((Int64_u.to_int64 x) < (Int64_u.to_int64 y)) z w
