@@ -21,8 +21,8 @@ module DAH = Dwarf_attribute_helpers
 module DS = Dwarf_state
 module L = Linear
 
-let for_fundecl ~get_file_id state (fundecl : L.fundecl) ~fun_end_label
-    available_ranges_vars inlined_frame_ranges =
+let for_fundecl ~get_file_id ~value_type_proto_die state (fundecl : L.fundecl)
+    ~fun_end_label available_ranges_vars inlined_frame_ranges =
   let parent = Dwarf_state.compilation_unit_proto_die state in
   let fun_name = fundecl.fun_name in
   let loc = Debuginfo.to_location fundecl.fun_dbg in
@@ -74,17 +74,20 @@ let for_fundecl ~get_file_id state (fundecl : L.fundecl) ~fun_end_label
   let _inlined_frame_proto_dies =
     Profile.record "dwarf_inlined_frames"
       (fun () ->
-        Dwarf_inlined_frames.dwarf state fundecl
+        Dwarf_inlined_frames.dwarf state fundecl ~function_symbol:start_sym
           ~function_proto_die:concrete_instance_proto_die inlined_frame_ranges)
       ~accumulate:true ()
   in
-  if not !Dwarf_flags.restrict_to_upstream_dwarf
-  then
+  (match value_type_proto_die with
+  | None -> ()
+  | Some value_type_proto_die ->
+    assert (not !Dwarf_flags.restrict_to_upstream_dwarf);
     Profile.record "dwarf_variables_and_parameters"
       (fun () ->
-        Dwarf_variables_and_parameters.dwarf state
+        Dwarf_variables_and_parameters.dwarf state ~value_type_proto_die
+          ~function_symbol:start_sym
           ~function_proto_die:concrete_instance_proto_die available_ranges_vars)
-      ~accumulate:true ();
+      ~accumulate:true ());
   (* CR mshinwell: When cross-referencing of DIEs across files is necessary we
      need to be careful about symbol table size. let name = Printf.sprintf
      "__concrete_instance_%s" fun_name in Proto_die.set_name

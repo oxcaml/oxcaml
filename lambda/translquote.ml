@@ -605,6 +605,8 @@ module Identifier : sig
     val global_module :
       Debuginfo.Scoped_location.t -> Global_module.Name.t -> t'
 
+    val toplevel_module : Debuginfo.Scoped_location.t -> string -> t'
+
     val dot : Debuginfo.Scoped_location.t -> t -> string -> t'
 
     val var : Debuginfo.Scoped_location.t -> Var.Module.t -> Loc.t -> t'
@@ -793,6 +795,9 @@ end = struct
       Env.require_global_for_quote
         (Compilation_unit.Name.of_head_of_global_name a1);
       let a1 = Global_module.Name.to_string a1 in
+      apply1 "Identifier.Module" "global_module" loc (string ~loc a1)
+
+    let toplevel_module loc a1 =
       apply1 "Identifier.Module" "global_module" loc (string ~loc a1)
 
     let dot loc a1 a2 =
@@ -2315,7 +2320,10 @@ let rec module_for_path loc = function
       | None -> (
         match Ident.to_global id with
         | Some global -> Identifier.Module.global_module loc global
-        | None -> raise Exit))
+        | None ->
+          (* We must be in a [Toplevel_lock_for_directive] if we are quoting
+             a non-global module. *)
+          Ident.name id |> Identifier.Module.toplevel_module loc))
     |> Identifier.Module.wrap
   | Path.Pdot (p, s) ->
     Identifier.Module.dot loc (module_for_path loc p) s
@@ -2503,11 +2511,11 @@ let is_module pat =
 let rec with_new_idents_pat pat =
   match pat.pat_desc with
   | Tpat_any -> ()
-  | Tpat_var (id, _, _, _, _) ->
+  | Tpat_var { id; _ } ->
     if is_module pat
     then with_new_idents_modules [id]
     else with_new_idents_values [id]
-  | Tpat_alias (pat, id, _, _, _, _, _) ->
+  | Tpat_alias { pattern = pat; id; _ } ->
     with_new_idents_values [id];
     with_new_idents_pat pat
   | Tpat_constant _ -> ()
@@ -2534,11 +2542,11 @@ let rec with_new_idents_pat pat =
 let rec without_idents_pat pat =
   match pat.pat_desc with
   | Tpat_any -> ()
-  | Tpat_var (id, _, _, _, _) ->
+  | Tpat_var { id; _ } ->
     if is_module pat
     then without_idents_modules [id]
     else without_idents_values [id]
-  | Tpat_alias (pat, id, _, _, _, _, _) ->
+  | Tpat_alias { pattern = pat; id; _ } ->
     without_idents_values [id];
     without_idents_pat pat
   | Tpat_constant _ -> ()
@@ -2779,11 +2787,11 @@ and quote_value_pattern ~scopes p =
   let pat_quoted =
     match p.pat_desc with
     | Tpat_any -> if is_module p then Pat.any_module else Pat.any
-    | Tpat_var (id, _, _, _, _) ->
+    | Tpat_var { id; _ } ->
       if is_module p
       then Pat.unpack loc (Var.Module.mk (Lvar id))
       else Pat.var loc (Var.Value.mk (Lvar id))
-    | Tpat_alias (pat, id, _, _, _, _, _) ->
+    | Tpat_alias { pattern = pat; id; _ } ->
       let pat = quote_value_pattern ~scopes pat in
       Pat.alias loc pat (Var.Value.mk (Lvar id))
     | Tpat_constant const ->
@@ -3078,7 +3086,7 @@ let rec case_binding ~scopes ~transl stage case =
     match pat.pat_desc with
     | Tpat_value pat -> (
       match (pat :> value general_pattern).pat_desc with
-      | Tpat_var (id, name, _, _, _) ->
+      | Tpat_var { id; name; _ } ->
         with_new_idents_values [id];
         let exp = quote_expression ~scopes ~transl stage case.c_rhs in
         let res =
@@ -3477,7 +3485,7 @@ and quote_expression_desc ~scopes ~transl stage e =
                     Location.print_loc_in_lowercase loc'
               in
               match vb.vb_pat.pat_desc with
-              | Tpat_var (ident, _, _, _, _) -> (ident, cstr), vb.vb_expr
+              | Tpat_var { id; _ } -> (id, cstr), vb.vb_expr
               | _ ->
                 fatal_errorf
                   "Translquote [at %a]: unexpected pattern in let rec - only a \

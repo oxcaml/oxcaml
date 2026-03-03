@@ -27,7 +27,7 @@ title: Introduction to parallelism, Part 2
 
 # Parallelism Tutorial: Part 2
 
-The [first parallelism tutorial](../01-intro-to-parallelism-part-1) introduced the
+The [first parallelism tutorial](../intro-to-parallelism-part-1) introduced the
 contention and portability mode axes, showcasing their use in fork/join
 parallelism and parallel sequences.  However, it only covered one way to share
 mutable data between `portable` functions:
@@ -42,7 +42,7 @@ can be used parallelize programs that operate on more complex mutable data.
 
 _This tutorial uses the ["expert" capsule
 API](https://github.com/janestreet/basement/blob/master/src/capsule.mli), which
-is explained in more detail [here](../../parallelism/02-capsules).  For a brief
+is explained in more detail [here](../../parallelism/capsules).  For a brief
 overview, read on._
 
 Wrapping mutable state in an `Atomic.t` can be a reasonable approach, but
@@ -364,7 +364,7 @@ Since we want to share the input image across multiple parallel tasks, we'll
 need to provide it in a capsule.  For simplicity, we also make use of
 `Capsule.access`, which lets us _unwrap_ the encapsulated image before passing
 it to `blur_at`.  This pattern is explained in more detail in the [capsules
-page](../../parallelism/02-capsules).
+page](../../parallelism/capsules).
 
 ```ocaml
 let filter ~scheduler ~mutex image =
@@ -470,4 +470,4 @@ abstractions alone.
 
 For example, if we needed to preserve the mutability of our input image, we
 could instead protect its capsule with a reader-writer lock.  The [capsules
-page](../../parallelism/02-capsules) discusses several further interfaces.
+page](../../parallelism/capsules) discusses several further interfaces.

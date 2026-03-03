@@ -188,8 +188,7 @@ type initialize_array_element_width =
       }
   | Sixty_four_or_more
 
-let initialize_array0 env loc ~length array_set_kind width ~(init : L.lambda)
-    creation_expr =
+let initialize_array0 env loc ~length array_set_kind width ~init creation_expr =
   let array = Ident.create_local "array" in
   let array_duid = Lambda.debug_uid_none in
   (* If the element size is 32-bit or less, zero-initialize the last 64-bit
@@ -206,15 +205,17 @@ let initialize_array0 env loc ~length array_set_kind width ~(init : L.lambda)
         L.Lprim
           ( Parraysetu (array_set_kind, Ptagged_int_index),
             (* [Popaque] is used to conceal the out-of-bounds write. *)
-            [Lprim (Popaque L.layout_unit, [Lvar array], loc); length; zero_init],
+            [ Lprim (Popaque L.layout_unit, [Lvar array], loc);
+              Lvar length;
+              zero_init ],
             loc )
       in
       let length_is_greater_than_zero_and_is_not_zero_mod_elements_per_word =
         L.Lprim
           ( Psequand,
-            [ L.icmp ~loc Cgt L.int length (L.tagged_immediate 0);
+            [ L.icmp ~loc Cgt L.int (Lvar length) (L.tagged_immediate 0);
               L.icmp ~loc Cne L.int
-                (L.and_ L.int length
+                (L.and_ L.int (Lvar length)
                    (L.tagged_immediate (elements_per_word - 1))
                    ~loc)
                 (L.tagged_immediate 0) ],
@@ -230,10 +231,11 @@ let initialize_array0 env loc ~length array_set_kind width ~(init : L.lambda)
     let index = Ident.create_local "index" in
     let index_duid = Lambda.debug_uid_none in
     rec_catch_for_for_loop env loc index index_duid (L.tagged_immediate 0)
-      (L.pred L.int length ~loc) Upto
+      (L.pred L.int (Lvar length) ~loc)
+      Upto
       (Lprim
          ( Parraysetu (array_set_kind, Ptagged_int_index),
-           [Lvar array; Lvar index; init],
+           [Lvar array; Lvar index; Lvar init],
            loc ))
   in
   let term =
@@ -298,7 +300,7 @@ let makearray_dynamic_singleton name (mode : L.locality_mode) ~length ~init loc
   in
   L.Lprim
     ( Pccall external_call_desc,
-      ([length] @ match init with None -> [] | Some (_, init) -> [init]),
+      ([L.Lvar length] @ match init with None -> [] | Some (_, init) -> [init]),
       loc )
 
 let makearray_dynamic_singleton_uninitialized name (mode : L.locality_mode)
@@ -330,8 +332,8 @@ let makearray_dynamic_unboxed_product_c_stub ~name (mode : L.locality_mode) =
     ~is_layout_poly:false
 
 let makearray_dynamic_non_scannable_unboxed_product env
-    (lambda_array_kind : L.array_kind) (mode : L.locality_mode) ~length
-    ~(init : L.lambda option) loc =
+    (lambda_array_kind : L.array_kind) (mode : L.locality_mode) ~length ~init
+    loc =
   makearray_dynamic_unboxed_products_only_64_bit ();
   let is_local =
     L.of_bool (match mode with Alloc_heap -> false | Alloc_local -> true)
@@ -362,7 +364,7 @@ let makearray_dynamic_non_scannable_unboxed_product env
     L.(
       Lprim
         ( Pccall external_call_desc,
-          [tagged_immediate num_components; is_local; length],
+          [tagged_immediate num_components; is_local; Lvar length],
           loc ))
   in
   match init with
@@ -410,11 +412,12 @@ let makearray_dynamic_scannable_unboxed_product0
         args_array_duid,
         Lprim
           ( Pmakearray (lambda_array_kind, Immutable, L.alloc_local),
-            [init] (* will be unarized when this term is CPS converted *),
+            [Lvar init] (* will be unarized when this term is CPS converted *),
             loc ),
         Lprim
-          (Pccall external_call_desc, [Lvar args_array; is_local; length], loc)
-      )
+          ( Pccall external_call_desc,
+            [Lvar args_array; is_local; Lvar length],
+            loc ) )
   in
   (* We must not add a region if the C stub is going to return a local value,
      otherwise we will incorrectly close the region on such live value. *)
@@ -424,8 +427,8 @@ let makearray_dynamic_scannable_unboxed_product0
     | Alloc_heap -> L.Lregion (body, array_layout))
 
 let makearray_dynamic_scannable_unboxed_product env
-    (lambda_array_kind : L.array_kind) (mode : L.locality_mode) ~length
-    ~(init : L.lambda) loc =
+    (lambda_array_kind : L.array_kind) (mode : L.locality_mode) ~length ~init
+    loc =
   let must_be_scanned =
     match lambda_array_kind with
     | Pgcignorableproductarray _ -> false
@@ -453,31 +456,10 @@ let makearray_dynamic_scannable_unboxed_product env
     makearray_dynamic_non_scannable_unboxed_product env lambda_array_kind mode
       ~length ~init:(Some init) loc
 
-let makearray_dynamic env (lambda_array_kind : L.array_kind)
-    (mode : L.locality_mode) (has_init : L.has_initializer) args loc :
+let makearray_dynamic0 env (lambda_array_kind : L.array_kind)
+    (mode : L.locality_mode) ~length ~init loc :
     Env.t * primitive_transform_result =
-  (* %makearray_dynamic is analogous to (from stdlib/array.ml):
-   *   external create: int -> 'a -> 'a array = "caml_array_make"
-   * except that it works on any layout, including unboxed products, at both
-   * heap and local modes.
-   * Additionally, if the initializer is omitted, an uninitialized array will
-   * be returned.  Initializers must however be provided when the array kind is
-   * Pgenarray, Paddrarray, Pgcignorableaddrarray, Pintarray, Pfloatarray or
-   * Pgcscannableproductarray; or when a Pgcignorableproductarray involves an
-   * [int].  (See comment below.)
-   *)
   let dbg = Debuginfo.from_location loc in
-  let length, init =
-    match args, has_init with
-    | [length], Uninitialized -> length, None
-    | [length; init], With_initializer -> length, Some init
-    | _, (Uninitialized | With_initializer) ->
-      Misc.fatal_errorf
-        "Pmakearray_dynamic takes the (non-unarized) length and optionally an \
-         initializer (the latter perhaps of unboxed product layout) according \
-         to the setting of [Uninitialized] or [With_initializer]:@ %a"
-        Debuginfo.print_compact dbg
-  in
   let[@inline] must_have_initializer () =
     match init with
     | Some init -> init
@@ -508,7 +490,7 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
     ( env,
       Transformed
         (makearray_dynamic_singleton "" mode ~length
-           ~init:(Some (Same_as_ocaml_repr (Base Value), init))
+           ~init:(Some (Same_as_ocaml_repr (Base Value), L.Lvar init))
            loc) )
   | Punboxedfloatarray Unboxed_float32 ->
     makearray_dynamic_singleton_uninitialized "unboxed_float32" ~length mode loc
@@ -592,6 +574,62 @@ let makearray_dynamic env (lambda_array_kind : L.array_kind)
     in
     makearray_dynamic_non_scannable_unboxed_product env lambda_array_kind mode
       ~length ~init loc
+
+let makearray_dynamic env (lambda_array_kind : L.array_kind)
+    (mode : L.locality_mode) (has_init : L.has_initializer) args loc :
+    Env.t * primitive_transform_result =
+  (* %makearray_dynamic is analogous to (from stdlib/array.ml):
+   *   external create: int -> 'a -> 'a array = "caml_array_make"
+   * except that it works on any layout, including unboxed products, at both
+   * heap and local modes.
+   * Additionally, if the initializer is omitted, an uninitialized array will
+   * be returned.  Initializers must however be provided when the array kind is
+   * Pgenarray, Paddrarray, Pgcignorableaddrarray, Pintarray, Pfloatarray or
+   * Pgcscannableproductarray; or when a Pgcignorableproductarray involves an
+   * [int].  (See comment below.)
+   *)
+  let dbg = Debuginfo.from_location loc in
+  let length_expr, init =
+    match args, has_init with
+    | [length_expr], Uninitialized -> length_expr, None
+    | [length_expr; init], With_initializer -> length_expr, Some init
+    | _, (Uninitialized | With_initializer) ->
+      Misc.fatal_errorf
+        "Pmakearray_dynamic takes the (non-unarized) length and optionally an \
+         initializer (the latter perhaps of unboxed product layout) according \
+         to the setting of [Uninitialized] or [With_initializer]:@ %a"
+        Debuginfo.print_compact dbg
+  in
+  let bind = L.bind_with_layout in
+  let length = Ident.create_local "length" in
+  let length_duid = Lambda.debug_uid_none in
+  let init_binding =
+    match init with
+    | None -> None
+    | Some init_expr ->
+      let init = Ident.create_local "init" in
+      let init_duid = Lambda.debug_uid_none in
+      let element_layout = L.element_layout_of_array_kind lambda_array_kind in
+      Some (init, init_duid, element_layout, init_expr)
+  in
+  let init = Option.map (fun (init, _, _, _) -> init) init_binding in
+  let env, result =
+    makearray_dynamic0 env lambda_array_kind mode ~length ~init loc
+  in
+  let body =
+    match result with
+    | Transformed body -> body
+    | Primitive (prim, args, loc) -> L.Lprim (prim, args, loc)
+  in
+  (* Preserve right-to-left evaluation order. *)
+  let body = bind Strict (length, length_duid, L.layout_int) length_expr body in
+  let body =
+    match init_binding with
+    | Some (init, init_duid, element_layout, init_expr) ->
+      bind Strict (init, init_duid, element_layout) init_expr body
+    | None -> body
+  in
+  env, Transformed body
 
 let wrong_arity_for_arrayblit loc =
   Misc.fatal_errorf

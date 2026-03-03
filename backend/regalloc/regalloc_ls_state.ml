@@ -7,7 +7,7 @@ module DLL = Oxcaml_utils.Doubly_linked_list
 
 type t =
   { interval_dll : Interval.t DLL.t;
-    active : ClassIntervals.t Reg_class.Tbl.t;
+    active : ClassIntervals.t Regs.Reg_class_tbl.t;
     stack_slots : Regalloc_stack_slots.t;
     affinity : Regalloc_affinity.t;
     ls_order_tbl : int InstructionId.Tbl.t
@@ -15,12 +15,12 @@ type t =
 
 let for_fatal t =
   ( DLL.map t.interval_dll ~f:Interval.copy,
-    Reg_class.Tbl.map t.active ~f:ClassIntervals.copy )
+    Regs.Reg_class_tbl.map t.active ~f:ClassIntervals.copy )
 
 let[@inline] make ~stack_slots ~affinity =
   let interval_dll = DLL.make_empty () in
   let active =
-    Reg_class.Tbl.init ~f:(fun _reg_class -> ClassIntervals.make ())
+    Regs.Reg_class_tbl.init ~f:(fun _reg_class -> ClassIntervals.make ())
   in
   let ls_order_tbl = InstructionId.Tbl.create 32 in
   { interval_dll; active; stack_slots; affinity; ls_order_tbl }
@@ -71,19 +71,21 @@ let compare_desc_end (left : Interval.t) (right : Interval.t) =
   | c -> c
 
 let[@inline] update_intervals state map =
-  let active : ClassIntervals.t Reg_class.Tbl.t = state.active in
-  Reg_class.Tbl.iter active ~f:(fun _regclass intervals ->
+  let active : ClassIntervals.t Regs.Reg_class_tbl.t = state.active in
+  Regs.Reg_class_tbl.iter active ~f:(fun _regclass intervals ->
       ClassIntervals.clear intervals);
-  let active' : class_interval_array Reg_class.Tbl.t =
-    Reg_class.Tbl.init ~f:(fun _ -> make_class_interval_array ())
+  let active' : class_interval_array Regs.Reg_class_tbl.t =
+    Regs.Reg_class_tbl.init ~f:(fun _ -> make_class_interval_array ())
   in
   let class_intervals = make_class_interval_array () in
   Reg.Tbl.iter
     (fun reg interval ->
       match reg.loc with
       | Reg _ ->
-        let reg_class = Reg_class.of_machtype reg.typ in
-        add_class_interval_array (Reg_class.Tbl.find active' reg_class) interval
+        let reg_class = Regs.Reg_class.of_machtype reg.typ in
+        add_class_interval_array
+          (Regs.Reg_class_tbl.find active' reg_class)
+          interval
       | Stack _ | Unknown -> add_class_interval_array class_intervals interval)
     map;
   let class_intervals = extract_class_interval_array class_intervals in
@@ -91,12 +93,13 @@ let[@inline] update_intervals state map =
   DLL.clear state.interval_dll;
   DLL.add_array state.interval_dll class_intervals;
   if debug then log_interval_dll ~kind:"regular" state.interval_dll;
-  Reg_class.Tbl.iter active'
+  Regs.Reg_class_tbl.iter active'
     ~f:(fun reg_class (intervals : class_interval_array) ->
       let extracted = extract_class_interval_array intervals in
       Array.sort extracted ~cmp:compare_desc_end;
-      DLL.clear (Reg_class.Tbl.find active reg_class).fixed_dll;
-      DLL.add_array (Reg_class.Tbl.find active reg_class).fixed_dll extracted)
+      DLL.clear (Regs.Reg_class_tbl.find active reg_class).fixed_dll;
+      DLL.add_array (Regs.Reg_class_tbl.find active reg_class).fixed_dll
+        extracted)
 
 let[@inline] iter_intervals state ~f = DLL.iter state.interval_dll ~f
 
@@ -104,10 +107,11 @@ let[@inline] fold_intervals state ~f ~init =
   DLL.fold_left state.interval_dll ~f ~init
 
 let[@inline] release_expired_intervals state ~pos =
-  Reg_class.Tbl.iter state.active ~f:(fun _ x ->
+  Regs.Reg_class_tbl.iter state.active ~f:(fun _ x ->
       ClassIntervals.release_expired_intervals x ~pos)
 
-let[@inline] active state ~reg_class = Reg_class.Tbl.find state.active reg_class
+let[@inline] active state ~reg_class =
+  Regs.Reg_class_tbl.find state.active reg_class
 
 let[@inline] active_classes state = state.active
 
@@ -218,7 +222,7 @@ let[@inline] invariant_intervals state cfg_with_infos =
       (Cfg_with_infos.cfg_with_layout cfg_with_infos)
       ~instruction:check_instr ~terminator:check_instr)
 
-let invariant_field_dll (reg_class : Reg_class.t) (field_name : string)
+let invariant_field_dll (reg_class : Regs.Reg_class.t) (field_name : string)
     (l : Interval.t DLL.t) =
   let rec is prev curr =
     match curr with
@@ -229,7 +233,7 @@ let invariant_field_dll (reg_class : Reg_class.t) (field_name : string)
       then
         fatal
           "Regalloc_ls_state.invariant_field_dll: active.(%a).%s is not sorted"
-          Reg_class.print reg_class field_name
+          Regs.Reg_class.print reg_class field_name
       else is value (DLL.next cell)
   in
   match DLL.hd_cell l with
@@ -239,7 +243,7 @@ let invariant_field_dll (reg_class : Reg_class.t) (field_name : string)
 let[@inline] invariant_active state =
   if debug && Lazy.force invariants
   then
-    Reg_class.Tbl.iter state.active ~f:(fun reg_class intervals ->
+    Regs.Reg_class_tbl.iter state.active ~f:(fun reg_class intervals ->
         invariant_field_dll reg_class "fixed "
           intervals.ClassIntervals.fixed_dll;
         invariant_field_dll reg_class "active "

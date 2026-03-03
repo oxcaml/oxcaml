@@ -8,7 +8,7 @@ title: Block indices
 
 This document describes the language feature and implementation for explicit
 _indices_ into a block. Before reading this document, you may wish to read up
-through the [layouts](../01-intro#layouts) section of the main document.
+through the [layouts](../intro#layouts) section of the main document.
 
 As a quick example:
 ```ocaml
@@ -161,7 +161,7 @@ type c = { mutable b : b; s : string }
 The record `c` presents an interesting problem for block indices: the fields of
 its contained unboxed records `a` and `b` are not actually contiguous at runtime
 when using the native code compiler. This problem is caused by the
-[mixed block representation](../01-intro#the-mixed-block-representation),
+[mixed block representation](../intro#the-mixed-block-representation),
 which mandates that we reorder fields so that values come before unboxed types.
 
 While the layout of `c` has the shape
@@ -224,7 +224,7 @@ Below, we show the different cases to consider. Note that:
    orange), while `o2` and `g2` refer to the offset and gap of the index after
    deepening (blue).
 
-<img src="assets/all_values_or_flats.png" width="600" height="auto" />
-<img src="assets/mixed_to_mixed.png" width="600" height="auto" />
-<img src="assets/mixed_to_all_values.png" width="600" height="auto" />
-<img src="assets/mixed_to_all_flats.png" width="600" height="auto" />
+<img src="/documentation/all_values_or_flats.png" width="600" height="auto" />
+<img src="/documentation/mixed_to_mixed.png" width="600" height="auto" />
+<img src="/documentation/mixed_to_all_values.png" width="600" height="auto" />
+<img src="/documentation/mixed_to_all_flats.png" width="600" height="auto" />

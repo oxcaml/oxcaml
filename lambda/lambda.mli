@@ -649,6 +649,8 @@ val generic_value : value_kind
 *)
 val layout_of_extern_repr : extern_repr -> layout
 
+val element_layout_of_array_kind : array_kind -> layout
+
 val extern_repr_involves_unboxed_products : extern_repr -> bool
 
 type structured_constant =
@@ -901,40 +903,12 @@ type lambda =
   | Lsplice of scoped_location * slambda
 
 and slambda =
-  | SLlayout of layout
-  | SLglobal of Compilation_unit.t
-  | SLvar of Slambdaident.t
   | SLmissing
-  | SLrecord of slambda list
-  | SLfield of slambda * int
   | SLhalves of slambda_halves
-  | SLproj_comptime of slambda
-    (** Project out the compiletime half of a [slambda_halves] *)
-  | SLproj_runtime of slambda
-    (** Project out the runtime half of a [slambda_halves] *)
-  | SLtemplate of slambda_function
-  | SLinstantiate of slambda_apply
-  | SLlet of slambda_let
 
 and slambda_halves =
   { sval_comptime: slambda;
     sval_runtime: lambda
-  }
-
-and slambda_function =
-  { sfun_params: Slambdaident.t array;
-    sfun_body: slambda
-  }
-
-and slambda_apply =
-  { sapp_func: slambda;
-    sapp_arguments: slambda array
-  }
-
-and slambda_let =
-  { slet_name: Slambdaident.t;
-    slet_value: slambda;
-    slet_body: slambda
   }
 
 and rec_binding = {
@@ -1383,6 +1357,11 @@ val mod_field:
 val structured_constant_layout : structured_constant -> layout
 
 val mixed_block_element_of_layout : layout -> 'a mixed_block_element
+
+(** Returns the element at the given path in a mixed block shape.
+    The path is a list of field indices for navigating into nested products. *)
+val project_from_mixed_block_shape
+  : 'a mixed_block_element array -> path:int list -> 'a mixed_block_element
 
 (** [Pintval] if a type of [value] jkind is GC-ignorable based on its provided
     externality, and [Pgenval] otherwise. *)

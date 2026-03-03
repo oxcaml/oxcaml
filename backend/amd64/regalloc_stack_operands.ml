@@ -244,12 +244,12 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
       && Nativeint.compare n (-0x80000000n) >= 0
     then may_use_stack_operand_for_only_result map instr
     else May_still_have_spilled_registers
-  | Op (Intop (Iadd | Isub | Iand | Ior | Ixor)) ->
+  | Op (Intop (Isub | Iand | Ior | Ixor)) ->
     binary_operation map instr Result_can_be_on_stack
   | Op (Intop (Icomp _)) -> binary_operation map instr Result_cannot_be_on_stack
   | Op (Intop_imm (Icomp _, _)) ->
     may_use_stack_operand_for_only_argument map instr ~has_result:true
-  | Op (Intop_imm (Iadd, _)) ->
+  | Op (Intop Iadd) | Op (Intop_imm (Iadd, _)) ->
     (* Conservatively assume it will be turned into a `lea` instruction, and ask
        for everything to be in registers. *)
     May_still_have_spilled_registers
@@ -266,7 +266,7 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
   | Op (Intop (Ipopcnt | Iclz _ | Ictz _))
   | Op (Intop_atomic _)
   | Op
-      ( Move | Spill | Reload
+      ( Move | Spill | Reload | Dummy_use
       | Floatop (_, (Inegf | Iabsf | Icompf _))
       | Const_float _ | Const_float32 _ | Const_vec128 _ | Const_vec256 _
       | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Name_for_debugger _

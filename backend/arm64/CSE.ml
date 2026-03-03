@@ -50,7 +50,7 @@ let class_of_operation (op : Operation.t)
           intr
     in
     Class op_class
-  | Move | Spill | Reload
+  | Move | Spill | Reload | Dummy_use
   | Floatop _
   | Csel _
   | Reinterpret_cast _ | Static_cast _
@@ -68,7 +68,7 @@ let is_cheap_operation (op : Operation.t)
   | Const_int n ->
     Cheap (Nativeint.compare n 65535n <= 0 && Nativeint.compare n 0n >= 0)
   | Specific _
-  | Move | Spill | Reload
+  | Move | Spill | Reload | Dummy_use
   | Floatop _
   | Csel _
   | Reinterpret_cast _ | Static_cast _
