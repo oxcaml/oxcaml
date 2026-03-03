@@ -102,7 +102,8 @@ let check t =
 open Format_doc
 
 let print_reference print_fname ppf {compunit; filename} =
-  fprintf ppf "%a (%a)" Compilation_unit.print_as_inline_code compunit print_fname filename
+  fprintf ppf "%a (%a)"
+    Compilation_unit.print_as_inline_code compunit print_fname filename
 
 let pp_list_comma f =
   pp_print_list ~pp_sep:(fun ppf () -> fprintf ppf ",@ ") f

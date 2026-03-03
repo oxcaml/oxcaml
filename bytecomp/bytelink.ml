@@ -147,9 +147,10 @@ let scan_file ldeps obj_name tolink =
       let required =
         List.fold_right
           (fun compunit reqd ->
+             let name = compunit.cu_name in
             if compunit.cu_force_link
             || !Clflags.link_everything
-            || Linkdeps.required ldeps compunit.cu_name
+            || Linkdeps.required ldeps name
             then begin
               linkdeps_unit ldeps ~filename:obj_name compunit;
               compunit :: reqd
@@ -916,8 +917,7 @@ let report_error_doc ppf = function
                  make inconsistent assumptions over interface %a@]"
         Location.Doc.quoted_filename file1
         Location.Doc.quoted_filename file2
-        Style.inline_code
-        (Format_doc.asprintf "%a" CU.Name.print intf)
+        CU.Name.print_as_inline_code intf
   | Custom_runtime ->
       fprintf ppf "Error while building custom runtime system"
   | File_exists file ->
