@@ -2059,6 +2059,10 @@ CAMLextern uintnat caml_effective_tick_interval_usec(void) {
   return res;
 }
 
+CAMLextern value caml_effective_tick_interval_usec_bytecode(value v_unit) {
+  return Val_long(caml_effective_tick_interval_usec());
+}
+
 static void* caml_tick(void *arg)
 {
   while (!atomic_load_acquire(&tick_thread.stop)) {
