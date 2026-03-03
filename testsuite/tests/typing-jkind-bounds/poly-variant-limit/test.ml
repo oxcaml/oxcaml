@@ -3,7 +3,7 @@
  setup-ocamlc.byte-build-env;
 
  (* Generate a file that defines some large polymorphic variants. *)
- script = "/bin/bash gen_types.sh types.ml";
+ script = "/usr/bin/env bash gen_types.sh types.ml";
  script;
  module = "types.ml";
  ocamlc.byte;
