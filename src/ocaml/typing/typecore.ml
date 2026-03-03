@@ -9401,7 +9401,7 @@ and type_label_exp
   in
   (lid, label, arg)
 
-and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sarg
+and type_argument_ ?explanation ?recarg ~overwrite env (mode : expected_mode) sarg
       ty_expected' ty_expected =
   (* ty_expected' may be generic *)
   let no_labels ty =
@@ -9628,6 +9628,22 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         (mk_expected ?explanation ty_expected') in
       unify_exp env texp ty_expected;
       texp
+
+and type_argument ?explanation ?recarg ~overwrite env mode sarg ty_expected' ty_expected =
+  Msupport.with_saved_types
+    ~warning_attribute:sarg.pexp_attributes ?save_part:None
+      (fun () ->
+        let saved = save_levels () in
+        try
+          type_argument_ ?explanation ?recarg ~overwrite env mode sarg ty_expected'
+            ty_expected
+        with exn ->
+          Msupport.erroneous_type_register ty_expected;
+          raise_error exn;
+          set_levels saved;
+          let loc = sarg.pexp_loc in
+          create_merlin_type_error_node loc env ty_expected
+            ~attributes:(Msupport.recovery_attributes sarg.pexp_attributes))
 
 (* See Note [Type-checking applications] for an overview *)
 and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (lbl, arg) =
