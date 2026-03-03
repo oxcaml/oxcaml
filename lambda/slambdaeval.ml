@@ -111,6 +111,43 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Ltemplate _ | Linstantiate _ -> Lambda.fatal_error_invalid_constructor lam);
   Lambda.iter_head_constructor assert_no_splices lam
 
+module Or_missing = struct
+  type 'a t =
+    | Present of 'a
+    | Missing
+
+  let of_option = function Some a -> Present a | None -> Missing
+
+  let[@inline] map t ~f =
+    match t with
+    | Present a -> Present ((f [@inlined hint]) a)
+    | Missing -> Missing
+
+  let[@inline] bind t ~f =
+    match t with Present a -> (f [@inlined hint]) a | Missing -> Missing
+
+  exception Found_missing
+
+  let all_list list =
+    try
+      let list =
+        List.map
+          (function Present a -> a | Missing -> raise Found_missing)
+          list
+      in
+      Present list
+    with Found_missing -> Missing
+
+  module Syntax = struct
+    let[@inline] ( let* ) t f = bind t ~f
+
+    let[@inline] ( let+ ) t f = map t ~f
+
+    let[@inline] ( |>> ) t f = map t ~f
+  end
+end
+
+open Or_missing.Syntax
 
 module rec Types : sig
   type closure =
@@ -133,9 +170,11 @@ and Env : sig
 
   val empty : t
 
-  val add : t -> Slambdaident.t -> Types.value -> t
+  val add : t -> Slambdaident.t -> Types.value Or_missing.t -> t
 
-  val find : t -> Slambdaident.t -> Types.value option
+  val add_present : t -> Slambdaident.t -> Types.value -> t
+
+  val find : t -> Slambdaident.t -> Types.value Or_missing.t
 end = struct
   module Map = Slambdaident.Map
 
@@ -143,9 +182,14 @@ end = struct
 
   let empty = Map.empty
 
-  let add t id v = Map.add id v t
+  let add t id v =
+    match (v : Types.value Or_missing.t) with
+    | Present v -> Map.add id v t
+    | Missing -> (* Possibly unnecessary but be safe anyway *) Map.remove id t
 
-  let find t id = Map.find_opt id t
+  let add_present t id v = add t id (Present v)
+
+  let find t id = Map.find_opt id t |> Or_missing.of_option
 end
 
 open Types
@@ -197,46 +241,51 @@ let expect (type a) ?reason (vty : a value_type) (v : value) : a =
     let (TP actual_vty) = typeof v in
     expect_err ?reason ~expected:vty ~actual:actual_vty
 
-let rec eval_slam env slam =
+let expect_not_missing (a : 'a Or_missing.t) : 'a =
+  match a with Present a -> a | Missing -> errf "unexpected missing value"
+
+let rec eval_slam env slam : value Or_missing.t =
   match slam with
   | SLhalves { sval_comptime; sval_runtime } ->
     let sval_runtime = eval_lam env sval_runtime in
-    SLVhalves { sval_comptime; sval_runtime }
-  | SLlayout layout -> SLVlayout layout
+    Present (SLVhalves { sval_comptime; sval_runtime })
+  | SLlayout layout -> Present (SLVlayout layout)
   | SLglobal _ -> errf "cross-module eval not implemented"
   | SLvar id -> eval_var env id
   | SLlet { slet_name; slet_value; slet_body } ->
     let value = eval_slam env slet_value in
     let env_body = Env.add env slet_name value in
     eval_slam env_body slet_body
-  | SLmissing -> errf "missing"
+  | SLmissing -> Missing
   | SLrecord slams ->
-    let values = List.map (eval_slam env) slams in
+    let+ values =
+      List.map (eval_slam env) slams |> Or_missing.all_list
+    in
     SLVrecord values
   | SLfield (slam, i) ->
-    let fields = eval_slam env slam |> expect Trecord in
+    let+ fields = eval_slam env slam |>> expect Trecord in
     List.nth fields i
   | SLproj_comptime slam ->
-    let halves = eval_slam env slam |> expect Thalves in
+    let* halves = eval_slam env slam |>> expect Thalves in
     eval_slam env halves.sval_comptime
   | SLproj_runtime slam ->
-    let halves = eval_slam env slam |> expect Thalves in
+    let+ halves = eval_slam env slam |>> expect Thalves in
     SLVlambda halves.sval_runtime
   | SLtemplate { sfun_params; sfun_body } ->
-    SLVclosure { clo_params = sfun_params; clo_body = sfun_body; clo_env = env }
+    Present
+      (SLVclosure
+         { clo_params = sfun_params; clo_body = sfun_body; clo_env = env })
   | SLinstantiate { sapp_func; sapp_args } ->
-    let closure = eval_slam env sapp_func |> expect Tclosure in
-    let args = List.map (eval_slam env) sapp_args in
+    let* closure = eval_slam env sapp_func |>> expect Tclosure in
+    let eval_arg arg = eval_slam env arg |> expect_not_missing in
+    let args = List.map eval_arg sapp_args in
     let { clo_params; clo_body; clo_env } = closure in
     let env_body =
-      List.fold_left2 Env.add clo_env clo_params args
+      List.fold_left2 Env.add_present clo_env clo_params args
     in
     eval_slam env_body clo_body
 
-and eval_var env id =
-  match Env.find env id with
-  | Some v -> v
-  | None -> errf "unbound variable: %a" Slambdaident.print id
+and eval_var env id = Env.find env id
 
 and eval_lam env lam =
   match lam with
@@ -360,7 +409,8 @@ and eval_lam env lam =
     let layout = eval_layout env layout in
     Lregion (lam, layout)
   | Lexclave lam -> Lexclave (eval_lam env lam)
-  | Lsplice (_loc, slam) -> eval_slam env slam |> expect Tlambda
+  | Lsplice (_loc, slam) ->
+    eval_slam env slam |> expect_not_missing |> expect Tlambda
   | Lvar _id | Lmutvar _id -> lam
   | Ltemplate _ | Linstantiate _ -> fatal_error_invalid_constructor lam
 
@@ -393,7 +443,7 @@ and eval_mixed_block_element :
   match element with
   | Splice_variable id ->
     eval_var env (id |> Slambdaident.of_ident)
-    |> expect Tlayout |> mixed_block_element_of_layout
+    |> expect_not_missing |> expect Tlayout |> mixed_block_element_of_layout
   | Product elements ->
     Product (Array.map (eval_mixed_block_element env) elements)
   | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
@@ -403,7 +453,8 @@ and eval_mixed_block_element :
 and eval_layout env layout =
   match layout with
   | Psplicevar id ->
-    eval_var env (id |> Slambdaident.of_ident) |> expect Tlayout
+    eval_var env (id |> Slambdaident.of_ident)
+    |> expect_not_missing |> expect Tlayout
   | Punboxed_product layouts ->
     Punboxed_product (List.map (eval_layout env) layouts)
   | Ptop | Pvalue _ | Punboxed_float _ | Punboxed_or_untagged_integer _
@@ -491,7 +542,8 @@ and eval_prim env prim =
     prim
 
 let do_eval slam =
-  eval_slam Env.empty slam |> expect Thalves ~reason:"toplevel module"
+  eval_slam Env.empty slam |> expect_not_missing
+  |> expect Thalves ~reason:"toplevel module"
 
 let eval slam =
   Profile.record_call "static_eval" (fun () ->
