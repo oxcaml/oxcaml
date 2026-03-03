@@ -1210,16 +1210,16 @@ module Jkind0 = struct
         type l r.
         ('layout, l * r) base_and_axes ->
         ('layout, Allowance.allowed * r) base_and_axes option =
-     fun { base; mod_bounds; with_bounds } ->
+     fun { base; mod_bounds; with_bounds; stage } ->
       match With_bounds.try_allow_l with_bounds with
       | None -> None
       | Some with_bounds ->
-        Some { base; mod_bounds = Obj.magic mod_bounds; with_bounds }
+        Some { base; mod_bounds = Obj.magic mod_bounds; with_bounds; stage }
 
-    let try_allow_r { base; mod_bounds; with_bounds } =
+    let try_allow_r { base; mod_bounds; with_bounds; stage } =
       match With_bounds.try_allow_r with_bounds with
       | Some with_bounds ->
-        Some { base; mod_bounds = Obj.magic mod_bounds; with_bounds }
+        Some { base; mod_bounds = Obj.magic mod_bounds; with_bounds; stage }
       | None -> None
   end
 
@@ -1235,13 +1235,15 @@ module Jkind0 = struct
     let of_path path =
       { base = Kconstr path;
         mod_bounds = Mod_bounds.max;
-        with_bounds = No_with_bounds
+        with_bounds = No_with_bounds;
+        stage = Known 0
       }
 
     let max =
       { base = Layout Jkind_types.Layout.Const.max;
         mod_bounds = Mod_bounds.max;
-        with_bounds = No_with_bounds
+        with_bounds = No_with_bounds;
+        stage = Unknown
       }
 
     (* This function is shallow in the sense that it does not expand abstract
@@ -1291,22 +1293,23 @@ module Jkind0 = struct
         let mod_bounds =
           Mod_bounds.create crossing ~nullability ~separability ~externality
         in
-        { base = Layout layout; mod_bounds; with_bounds = No_with_bounds }
+        { base = Layout layout; mod_bounds;
+          with_bounds = No_with_bounds; stage = Known 0 }
 
       let any =
         { jkind =
-            mk_jkind (Any Scannable_axes.max) ~crossing:Mode.Crossing.max
+            {(mk_jkind (Any Scannable_axes.max) ~crossing:Mode.Crossing.max
               ~externality:Mod_bounds.Externality.max ~nullability:Maybe_null
-              ~separability:Maybe_separable;
+              ~separability:Maybe_separable) with stage = Unknown};
           name = "any"
         }
 
       let any_mod_everything =
         { jkind =
-            mk_jkind (Any Scannable_axes.max)
+            {(mk_jkind (Any Scannable_axes.max)
               ~crossing:cross_all_except_staticity
               ~externality:Mod_bounds.Externality.min ~nullability:Maybe_null
-              ~separability:Maybe_separable;
+              ~separability:Maybe_separable) with stage = Unknown};
           name = "any mod everything"
         }
 
@@ -1352,7 +1355,8 @@ module Jkind0 = struct
                  create crossing ~externality:Externality.max
                    ~nullability:Nullability.Non_null
                    ~separability:Separability.Non_float);
-              with_bounds = No_with_bounds
+              with_bounds = No_with_bounds;
+              stage = Known 0
             };
           name = "immutable_data"
         }
@@ -1371,7 +1375,8 @@ module Jkind0 = struct
                  create crossing ~externality:Externality.max
                    ~nullability:Nullability.Non_null
                    ~separability:Separability.Non_float);
-              with_bounds = No_with_bounds
+              with_bounds = No_with_bounds;
+              stage = Known 0
             };
           name = "exn"
         }
@@ -1390,7 +1395,8 @@ module Jkind0 = struct
                  create crossing ~externality:Externality.max
                    ~nullability:Nullability.Non_null
                    ~separability:Separability.Non_float);
-              with_bounds = No_with_bounds
+              with_bounds = No_with_bounds;
+              stage = Known 0
             };
           name = "sync_data"
         }
@@ -1409,7 +1415,8 @@ module Jkind0 = struct
                  create crossing ~externality:Externality.max
                    ~nullability:Nullability.Non_null
                    ~separability:Separability.Non_float);
-              with_bounds = No_with_bounds
+              with_bounds = No_with_bounds;
+              stage = Known 0
             };
           name = "mutable_data"
         }
@@ -1877,7 +1884,7 @@ module Jkind0 = struct
               bounds)
           tys_modalities No_with_bounds
       in
-      { base; mod_bounds; with_bounds }
+      { base; mod_bounds; with_bounds; stage = Known 0 }
 
     let get_const t =
       Base_and_axes.map_layout_option Jkind_types.Layout.get_const t
@@ -1888,6 +1895,7 @@ module Jkind0 = struct
       type t =
         | Axis_disagreement of Jkind_axis.Axis.packed
         | Layout_disagreement
+        | Stage_disagreement
         | With_bounds_on_left
         | Constrain_ran_out_of_fuel
     end
@@ -2075,7 +2083,8 @@ module Jkind0 = struct
         let desc : _ jkind_desc =
           { base = Layout layout;
             mod_bounds = Mod_bounds.max;
-            with_bounds = No_with_bounds }
+            with_bounds = No_with_bounds;
+            stage = Known 0 }
         in
         fresh_jkind_poly desc ~annotation:None ~why:(Product_creation why)
       (* We do not [mark_best] here because the resulting jkind is used (only)
@@ -2166,7 +2175,8 @@ module Jkind0 = struct
       fresh_jkind
         { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
           mod_bounds;
-          with_bounds = No_with_bounds
+          with_bounds = No_with_bounds;
+          stage = Known 0
         }
         ~annotation:None ~why:(Value_creation why)
 
@@ -2422,7 +2432,8 @@ module Jkind0 = struct
         { base =
             Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
           mod_bounds;
-          with_bounds = No_with_bounds
+          with_bounds = No_with_bounds;
+          stage = Known 0
         }
         ~annotation:None ~why:(Primitive ident)
       |> mark_best
@@ -2436,7 +2447,8 @@ module Jkind0 = struct
       fresh_jkind
         { base = Layout (Any { pointerness = Maybe_pointer });
           mod_bounds;
-          with_bounds = No_with_bounds
+          with_bounds = No_with_bounds;
+          stage = Known 0
         }
         ~annotation:None ~why:(Any_creation Array_type_argument)
 
@@ -2454,7 +2466,8 @@ module Jkind0 = struct
         { base =
             Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
           mod_bounds;
-          with_bounds = No_with_bounds
+          with_bounds = No_with_bounds;
+          stage = Known 0
         }
         ~annotation:None ~why:(Value_creation why)
   end

@@ -409,6 +409,7 @@ module Error = struct
     | Unimplemented_syntax
     | With_on_right : (_ * allowed) History.annotation_context -> t
     | Abstract_kind_in_product
+    | Quoted_kind_in_product
 
   exception User_error of Location.t * t
 end
@@ -632,6 +633,25 @@ module With_bounds = struct
           type_exprs)
 end
 
+module Stage = struct
+  let less_or_equal (stage : stage) (stage' : stage) =
+    match stage, stage' with
+    | _, Unknown -> Sub_result.Less
+    | Unknown, Known _ -> Sub_result.Not_le [Stage_disagreement]
+    | Known n, Known n' ->
+      if n = n' then Sub_result.Equal else Sub_result.Not_le [Stage_disagreement]
+
+  let quote = function Unknown -> Unknown | Known stage -> Known (stage + 1)
+
+  let splice = function
+    | Unknown -> Some Unknown
+    | Known stage -> if stage > 0 then Some (Known (stage - 1)) else None
+
+  let debug_print ppf = function
+    | Unknown -> Format.fprintf ppf "?"
+    | Known n -> Format.fprintf ppf "%d" n
+end
+
 (******************************)
 (* context *)
 
@@ -731,10 +751,12 @@ module Base_and_axes = struct
   let jkind_desc_of_const const =
     { const with base = Base.map_layout ~f:Layout.of_const const.base }
 
-  let debug_print format_layout ppf { base; mod_bounds; with_bounds } =
-    Format.fprintf ppf "{ base = %a;@ mod_bounds = %a;@ with_bounds = %a }"
+  let debug_print format_layout ppf { base; mod_bounds; with_bounds; stage } =
+    Format.fprintf ppf
+      "{ base = %a;@ mod_bounds = %a;@ with_bounds = %a;@ stage = %a }"
       (Base.format format_layout)
       base Mod_bounds.debug_print mod_bounds With_bounds.debug_print with_bounds
+      Stage.debug_print stage
 
   type 'a expand_result =
     | Expanded of 'a
@@ -767,7 +789,11 @@ module Base_and_axes = struct
           Expanded jkind
         else
           Expanded
-            { base = jkind.base; mod_bounds; with_bounds = t.with_bounds })
+            { base = jkind.base;
+              mod_bounds;
+              with_bounds = t.with_bounds;
+              stage = t.stage
+            })
 
   let rec fully_expand_aliases_const env t : _ jkind_const_desc =
     match expand_base_once_const env t with
@@ -1321,6 +1347,13 @@ module Base_and_axes = struct
           t
       in
       normalized_t, ctl.fuel_status
+
+  let quote jkind = { jkind with stage = Stage.quote jkind.stage }
+
+  let splice jkind =
+    match Stage.splice jkind.stage with
+    | Some stage -> Some { jkind with stage }
+    | None -> None
 end
 
 (*********************************)
@@ -1357,42 +1390,57 @@ module Jkind_desc = struct
   let rec equate_or_equal ~allow_mutation ~level env t1 t2 =
     let { base = base1;
           mod_bounds = mod_bounds1;
-          with_bounds = (No_with_bounds : (allowed * allowed) with_bounds)
+          with_bounds = (No_with_bounds : (allowed * allowed) with_bounds);
+          stage = stage1
         } =
       t1
     in
     let { base = base2;
           mod_bounds = mod_bounds2;
-          with_bounds = (No_with_bounds : (allowed * allowed) with_bounds)
+          with_bounds = (No_with_bounds : (allowed * allowed) with_bounds);
+          stage = stage2
         } =
       t2
     in
-    match base1, base2 with
-    | Layout l1, Layout l2 ->
-      Layout.equate_or_equal ~allow_mutation ~level l1 l2
-      && Mod_bounds.equal mod_bounds1 mod_bounds2
-    | Kconstr p1, Kconstr p2
-      when Path.same p1 p2 && Mod_bounds.equal mod_bounds1 mod_bounds2 ->
-      true
-    | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
-      match expand_pair env t1 t2 with
-      | None -> false
-      | Some (t1, t2) -> equate_or_equal ~allow_mutation ~level env t1 t2)
+    if stage1 <> stage2
+    then false
+    else
+      match base1, base2 with
+      | Layout l1, Layout l2 ->
+        Layout.equate_or_equal ~allow_mutation ~level l1 l2
+        && Mod_bounds.equal mod_bounds1 mod_bounds2
+      | Kconstr p1, Kconstr p2
+        when Path.same p1 p2 && Mod_bounds.equal mod_bounds1 mod_bounds2 ->
+        true
+      | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
+        match expand_pair env t1 t2 with
+        | None -> false
+        | Some (t1, t2) -> equate_or_equal ~allow_mutation ~level env t1 t2)
 
   let sub_expanded (type l r) ~level
-      ({ base = base1; mod_bounds = bounds1; with_bounds = with_bounds1 } :
+      ({ base = base1;
+         mod_bounds = bounds1;
+         with_bounds = with_bounds1;
+         stage = stage1
+       } :
         (allowed * r) jkind_desc)
-      ({ base = base2; mod_bounds = bounds2; with_bounds = No_with_bounds } :
+      ({ base = base2;
+         mod_bounds = bounds2;
+         with_bounds = No_with_bounds;
+         stage = stage2
+       } :
         (l * allowed) jkind_desc) =
     (* Rather than carefully expanding only as much as needed, this assumes both
        kinds are fully expanded, and that [sub] is Ignore_best normalized. See
        comment about [axes_max_on_right] in [sub] just below for why we do it
        this way. *)
     let bases = Base.sub_expanded ~level base1 base2 in
+    let stages = Stage.less_or_equal stage1 stage2 in
+    let result = Sub_result.combine bases stages in
     match with_bounds1 with
     | No_with_bounds ->
       let bounds = Mod_bounds.less_or_equal bounds1 bounds2 in
-      Sub_result.combine bases bounds
+      Sub_result.combine result bounds
     | With_bounds _ -> (
       (* Ignore_best normalization guarantees this only happens when the sub's
          base is abstract after expansion. We punt: only succeeding if the rhs
@@ -1407,8 +1455,9 @@ module Jkind_desc = struct
       | Layout (Any sa)
         when Mod_bounds.is_max bounds2
              && Scannable_axes.equal sa Scannable_axes.max ->
-        Sub_result.Less
-      | _ -> Sub_result.combine bases (Sub_result.Not_le [With_bounds_on_left]))
+        Sub_result.combine result Sub_result.Less
+      | _ -> Sub_result.combine result (Sub_result.Not_le [With_bounds_on_left])
+      )
 
   let sub (type l r) ~type_equal:_ ~context ~level env
       ~sub_previously_ran_out_of_fuel (sub : (allowed * r) jkind_desc)
@@ -1443,30 +1492,41 @@ module Jkind_desc = struct
     sub_expanded ~level sub super
 
   let rec intersection ~level env
-      ({ base = base1; mod_bounds = mod_bounds1; with_bounds = with_bounds1 } as
-       t1)
-      ({ base = base2; mod_bounds = mod_bounds2; with_bounds = with_bounds2 } as
-       t2) =
-    let make_intersection base =
-      Intersection
-        { base;
-          mod_bounds = Mod_bounds.meet mod_bounds1 mod_bounds2;
-          with_bounds = With_bounds.meet with_bounds1 with_bounds2
-        }
-    in
-    match base1, base2 with
-    | Layout l1, Layout l2 -> (
-      match Layout.intersection ~level l1 l2 with
-      | None -> No_intersection
-      | Some l -> make_intersection (Layout l))
-    | Kconstr p1, Kconstr p2 when Path.same p1 p2 -> make_intersection base1
-    | (Layout (Layout.Any sa), base | base, Layout (Layout.Any sa))
-      when Scannable_axes.equal sa Scannable_axes.max ->
-      make_intersection base
-    | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
-      match expand_pair env t1 t2 with
-      | None -> Unknown
-      | Some (t1, t2) -> intersection ~level env t1 t2)
+      ({ base = base1;
+         mod_bounds = mod_bounds1;
+         with_bounds = with_bounds1;
+         stage = stage1
+       } as t1)
+      ({ base = base2;
+         mod_bounds = mod_bounds2;
+         with_bounds = with_bounds2;
+         stage = stage2
+       } as t2) =
+    if stage1 <> stage2
+    then No_intersection
+    else
+      let stage = stage1 in
+      let make_intersection base =
+        Intersection
+          { base;
+            mod_bounds = Mod_bounds.meet mod_bounds1 mod_bounds2;
+            with_bounds = With_bounds.meet with_bounds1 with_bounds2;
+            stage
+          }
+      in
+      match base1, base2 with
+      | Layout l1, Layout l2 -> (
+        match Layout.intersection ~level l1 l2 with
+        | None -> No_intersection
+        | Some l -> make_intersection (Layout l))
+      | Kconstr p1, Kconstr p2 when Path.same p1 p2 -> make_intersection base1
+      | (Layout (Layout.Any sa), base | base, Layout (Layout.Any sa))
+        when Scannable_axes.equal sa Scannable_axes.max ->
+        make_intersection base
+      | Layout _, Kconstr _ | Kconstr _, Layout _ | Kconstr _, Kconstr _ -> (
+        match expand_pair env t1 t2 with
+        | None -> Unknown
+        | Some (t1, t2) -> intersection ~level env t1 t2)
 
   let sub_layout ~level env t1 t2 =
     match Base.expand_until_comparable env t1.base t2.base with
@@ -1489,7 +1549,8 @@ module Jkind_desc = struct
           Mod_bounds.max
           |> Mod_bounds.set_nullability nullability_upper_bound
           |> Mod_bounds.set_separability separability_upper_bound;
-        with_bounds = No_with_bounds
+        with_bounds = No_with_bounds;
+        stage = Known 0
       },
       sort )
 
@@ -1500,7 +1561,8 @@ module Jkind_desc = struct
         Mod_bounds.max
         |> Mod_bounds.set_nullability Maybe_null
         |> Mod_bounds.set_separability Maybe_separable;
-      with_bounds = No_with_bounds
+      with_bounds = No_with_bounds;
+      stage = Known 0
     }
 
   let get t = Base_and_axes.map_layout Layout.get t
@@ -1819,7 +1881,8 @@ module Const = struct
                         Mod_bounds.set_separability Separability.Separable
                           (Mod_bounds.set_nullability Nullability.Non_null
                              Mod_bounds.max);
-                      with_bounds = No_with_bounds
+                      with_bounds = No_with_bounds;
+                      stage = jkind.stage
                     };
                   name = Base.to_string Layout.Const.to_string jkind.base
                 }
@@ -1844,7 +1907,8 @@ module Const = struct
                   { jkind =
                       { base = jkind.base;
                         mod_bounds = Mod_bounds.max;
-                        with_bounds = No_with_bounds
+                        with_bounds = No_with_bounds;
+                        stage = jkind.stage
                       };
                     name = layout_str
                   }
@@ -1910,7 +1974,7 @@ module Const = struct
       =
     let folder (type l r) (layouts_acc, mod_bounds_acc, with_bounds_acc)
         (kind : (l * r) t) =
-      let { base; mod_bounds; with_bounds } =
+      let { base; mod_bounds; with_bounds; stage } =
         Base_and_axes.fully_expand_aliases_const env kind
       in
       let layout =
@@ -1919,6 +1983,11 @@ module Const = struct
         match base with
         | Kconstr _ -> raise ~loc Abstract_kind_in_product
         | Layout l -> l
+      in
+      let () =
+        match stage with
+        | Known 0 -> raise ~loc Quoted_kind_in_product
+        | Known _ | Unknown -> ()
       in
       ( layout :: layouts_acc,
         Mod_bounds.join mod_bounds mod_bounds_acc,
@@ -1929,7 +1998,8 @@ module Const = struct
     in
     { base = Layout (Layout.Const.Product (List.rev layouts));
       mod_bounds;
-      with_bounds
+      with_bounds;
+      stage = Known 0
     }
 
   let transl_scannable_axes sa_annots =
@@ -2000,7 +2070,11 @@ module Const = struct
       let mod_bounds =
         Mod_bounds.meet base.mod_bounds (Typemode.transl_mod_bounds modifiers)
       in
-      { base = base.base; mod_bounds; with_bounds = No_with_bounds }
+      { base = base.base;
+        mod_bounds;
+        with_bounds = No_with_bounds;
+        stage = Known 0
+      }
     | Pjk_product ts ->
       let jkinds =
         List.map
@@ -2026,7 +2100,8 @@ module Const = struct
           mod_bounds = base.mod_bounds;
           with_bounds =
             With_bounds.add_modality ~modality ~relevant_for_shallow:`Irrelevant
-              ~type_expr:type_ base.with_bounds
+              ~type_expr:type_ base.with_bounds;
+          stage = Known 0
         })
     | Pjk_default | Pjk_kind_of _ ->
       raise ~loc:jkind.pjka_loc Unimplemented_syntax
@@ -2252,7 +2327,8 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
   fresh_jkind_poly
     { base = jkind.jkind.base;
       mod_bounds = Mod_bounds.min;
-      with_bounds = With_bounds with_bounds_types
+      with_bounds = With_bounds with_bounds_types;
+      stage = Known 0
     }
     ~annotation:None ~why:Abbreviation
 
@@ -2271,7 +2347,8 @@ let for_open_boxed_row =
   fresh_jkind
     { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
       mod_bounds;
-      with_bounds = No_with_bounds
+      with_bounds = No_with_bounds;
+      stage = Known 0
     }
     ~annotation:None ~why:(Value_creation Polymorphic_variant)
 
@@ -2313,7 +2390,8 @@ let for_arrow =
   fresh_jkind
     { base = Layout (Sort (Base Value, { pointerness = Maybe_pointer }));
       mod_bounds = Mod_bounds.for_arrow;
-      with_bounds = No_with_bounds
+      with_bounds = No_with_bounds;
+      stage = Known 0
     }
     ~annotation:None ~why:(Value_creation Arrow)
   |> mark_best
@@ -2339,7 +2417,8 @@ let for_object =
       mod_bounds =
         Mod_bounds.create { comonadic; monadic } ~externality:Externality.max
           ~nullability:Non_null ~separability:Separability.Non_float;
-      with_bounds = No_with_bounds
+      with_bounds = No_with_bounds;
+      stage = Known 0
     }
     ~annotation:None ~why:(Value_creation Object)
 
@@ -2435,7 +2514,8 @@ let get_mod_bounds (type l r) ~context ~skip_axes env (jk : (l * r) jkind) =
        this function is mainly used for mode crossing or optimizations, we don't
        expect this to come up much. *)
     Mod_bounds.max
-  | { base = Kconstr _ | Layout _; with_bounds = No_with_bounds; mod_bounds } ->
+  | { base = Kconstr _ | Layout _; with_bounds = No_with_bounds; mod_bounds; _ }
+    ->
     mod_bounds
   | { base = Layout _; with_bounds = With_bounds _; _ } ->
     Misc.fatal_error
@@ -2593,6 +2673,13 @@ let decompose_product env jk =
          introduce product histories. *)
       Some (List.map mk_jkind layouts)
     | Sort (s, _) -> deal_with_sort (Sort.get s))
+
+let quote jkind = { jkind with jkind = Base_and_axes.quote jkind.jkind }
+
+let splice jkind0 =
+  match Base_and_axes.splice jkind0.jkind with
+  | Some jkind -> Some { jkind0 with jkind }
+  | None -> None
 
 (*********************************)
 (* pretty printing *)
@@ -3084,8 +3171,8 @@ module Violation = struct
               Some (Axis_set.add disagreeing_axes_so_far axis)
             | Axis_disagreement (Pack axis), None ->
               Some (Axis_set.singleton axis)
-            | ( ( Layout_disagreement | Constrain_ran_out_of_fuel
-                | With_bounds_on_left ),
+            | ( ( Layout_disagreement | Stage_disagreement
+                | Constrain_ran_out_of_fuel | With_bounds_on_left ),
                 _ ) ->
               disagreeing_axes_so_far)
           None reasons
@@ -3579,8 +3666,11 @@ let sub_jkind_l ~type_equal ~context ~level ?(allow_any_crossing = false) env
           })
     in
     match sub with
-    | { base = _; mod_bounds = sub_upper_bounds; with_bounds = No_with_bounds }
-      ->
+    | { base = _;
+        mod_bounds = sub_upper_bounds;
+        with_bounds = No_with_bounds;
+        stage = _
+      } ->
       let* () =
         (* MB_MODE : verify that the remaining upper_bounds from sub are <=
            super's bounds *)
@@ -3600,20 +3690,34 @@ let is_obviously_max (t : (_ * allowed) jkind) =
   (* This doesn't do any mutation because mutating a sort variable can't make it
      any, and modal upper bounds are constant. *)
   | { jkind =
-        { base = Layout (Any sa); mod_bounds; with_bounds = No_with_bounds };
+        { base = Layout (Any sa);
+          mod_bounds;
+          with_bounds = No_with_bounds;
+          stage = Unknown
+        };
       _
     } ->
     Scannable_axes.(equal sa max) && Mod_bounds.is_max mod_bounds
-  | { jkind = { base = Layout _ | Kconstr _; mod_bounds = _; with_bounds = _ };
+  | { jkind =
+        { base = Layout _ | Kconstr _;
+          mod_bounds = _;
+          with_bounds = _;
+          stage = _
+        };
       _
     } ->
     false
 
 let mod_bounds_are_obviously_max (type l r) (t : (l * r) jkind) =
   match t with
-  | { jkind = { base = _; mod_bounds; with_bounds = No_with_bounds }; _ } ->
+  | { jkind = { base = _; mod_bounds; with_bounds = No_with_bounds; stage = _ };
+      _
+    } ->
     Mod_bounds.is_max mod_bounds
-  | { jkind = { base = _; mod_bounds = _; with_bounds = With_bounds _ }; _ } ->
+  | { jkind =
+        { base = _; mod_bounds = _; with_bounds = With_bounds _; stage = _ };
+      _
+    } ->
     false
 
 let fully_expand_aliases env ({ jkind; _ } as jk) =
@@ -3886,12 +3990,16 @@ module Debug_printers = struct
       (match q with Best -> "Best" | Not_best -> "Not_best")
 
   module Const = struct
-    let t ppf ({ base; mod_bounds; with_bounds } : _ Const.t) =
+    let t ppf ({ base; mod_bounds; with_bounds; stage } : _ Const.t) =
       fprintf ppf
-        "@[<v 2>{ base = %a@,; mod_bounds = %a@,; with_bounds = %a@, }@]"
+        "@[<v 2>{ base = %a@,\
+         ; mod_bounds = %a@,\
+         ; with_bounds = %a@,\
+         ; stage = %a@,\
+        \ }@]"
         (Base.format Layout.Const.Debug_printers.t)
         base Mod_bounds.debug_print mod_bounds With_bounds.debug_print
-        with_bounds
+        with_bounds Stage.debug_print stage
   end
 end
 
@@ -3938,6 +4046,8 @@ let report_error ~loc : Error.t -> _ = function
       Location.errorf ~loc "'with' syntax is not allowed on a right mode.")
   | Abstract_kind_in_product ->
     Location.errorf ~loc "Abstract kinds are not yet supported in products."
+  | Quoted_kind_in_product ->
+    Location.errorf ~loc "Quoted kinds cannot occur in products."
 
 let () =
   Location.register_error_of_exn (function

@@ -593,6 +593,7 @@ module Jkind0 : sig
       type t =
         | Axis_disagreement of Jkind_axis.Axis.packed
         | Layout_disagreement
+        | Stage_disagreement
         | With_bounds_on_left
         | Constrain_ran_out_of_fuel
     end

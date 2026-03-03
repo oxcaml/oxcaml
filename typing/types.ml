@@ -168,10 +168,13 @@ and 'layout jkind_base =
   | Layout of 'layout
   | Kconstr of Path.t
 
+and stage = Unknown | Known of int
+
 and ('layout, 'd) base_and_axes =
   { base : 'layout jkind_base;
     mod_bounds : mod_bounds;
-    with_bounds : 'd with_bounds
+    with_bounds : 'd with_bounds;
+    stage : stage
   }
   constraint 'd = 'l * 'r
 

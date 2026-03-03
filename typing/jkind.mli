@@ -65,6 +65,7 @@ module Sub_failure_reason : sig
   type t = Jkind0.Violation.Sub_failure_reason.t =
     | Axis_disagreement of Jkind_axis.Axis.packed
     | Layout_disagreement
+    | Stage_disagreement
     | With_bounds_on_left
     | Constrain_ran_out_of_fuel
 end
@@ -624,6 +625,12 @@ val apply_or_null_r : Types.jkind_r -> (Types.jkind_r, unit) result
     in the jkind lattice than they might need to be. *)
 val decompose_product : Env.t -> 'd Types.jkind -> 'd Types.jkind list option
 
+(** Build a quoted jkind. *)
+val quote : 'd Types.jkind -> 'd Types.jkind
+
+(** Build a spliced jkind. Only possible if the argument is not meta-stage. *)
+val splice : 'd Types.jkind -> 'd Types.jkind option
+
 (** Get an annotation (that a user might write) for this [t]. *)
 val get_annotation : 'd Types.jkind -> Parsetree.jkind_annotation option
 
@@ -849,7 +856,9 @@ val map_type_expr :
   (allowed * 'r) Types.jkind
 
 (** Checks to see whether a right-jkind is the maximum jkind. Never does any
-    mutation. Is conservative and does not do any expansion. *)
+    mutation. Is conservative and does not do any expansion. Note there is only
+    a maximum in the jkind lattice at a fixed runtime metaprogramming [stage].
+*)
 val is_obviously_max : ('l * allowed) Types.jkind -> bool
 
 (** Checks to see whether a jkind's mod bounds are max. Never does any mutation.
