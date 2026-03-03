@@ -32,14 +32,15 @@ let get_thread_count () =
   loop ()
 
 let () =
-  let before = get_thread_count () in
-  Printf.printf "Thread count before Thread.create: %d\n" before;
+  Printf.printf "Thread count before Thread.create: %d\n%!"
+    (get_thread_count ());
   let done_ = Atomic.make false in
   let t = Thread.create (fun () ->
     while not (Atomic.get done_) do Thread.yield () done
   ) () in
-  let after = get_thread_count () in
-  Printf.printf "Thread count after Thread.create: > 1? %b\n" (after > 1);
+  Printf.printf "Thread count after Thread.create: > 1? %b\n%!"
+    (get_thread_count () > 1);
   Atomic.set done_ true;
   Thread.join t;
-  print_string "OK\n"
+  Printf.printf "Thread count after Thread.join: > 1? %b\n%!"
+    (get_thread_count () > 1);

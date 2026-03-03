@@ -1,3 +1,3 @@
 Thread count before Thread.create: 1
 Thread count after Thread.create: > 1? true
-OK
+Thread count after Thread.join: > 1? true
