@@ -3,6 +3,7 @@
  hassysthreads;
  not-windows;
  not-bsd;
+ not-macos;
  {
    bytecode;
  }{
