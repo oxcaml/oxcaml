@@ -77,6 +77,7 @@
   binutils
   local_store
   config
+  compression
   build_path_prefix_map
   misc
   format_doc
@@ -220,6 +221,11 @@
 (copy_files ../../utils/local_store.ml)
 
 (copy_files ../../utils/config.ml)
+
+; NOTE: only the .mli is copied; compression.ml is a dynlink-specific stub
+; (see the comment in that file) that avoids the caml_zstd_initialize
+; primitive, so that dynlink.cmxa does not need -lcomprmarsh.
+(copy_files ../../utils/compression.mli)
 
 (copy_files ../../utils/build_path_prefix_map.ml)
 
@@ -690,6 +696,7 @@
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Local_store.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Build_path_prefix_map.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Config.cmo
+  .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Compression.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Format_doc.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Misc.cmo
   .dynlink_compilerlibs.objs/byte/dynlink_compilerlibs__Target_system.cmo
@@ -814,6 +821,7 @@
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Local_store.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Build_path_prefix_map.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Config.cmx
+  .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Compression.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Format_doc.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Misc.cmx
   .dynlink_compilerlibs.objs/native/dynlink_compilerlibs__Target_system.cmx
