@@ -1,13 +1,15 @@
 (* TEST
  readonly_files = "intrinsics.ml";
- flags = " -extension-universe upstream_compatible";
  setup-ocamlopt.opt-build-env;
  all_modules = "intrinsics.ml";
  compile_only = "true";
  ocamlopt.opt;
 
  only-default-codegen;
- flags = " -O3 -extension-universe upstream_compatible -I ocamlopt.opt";
+ flags = " -O3 -I ocamlopt.opt";
+ flags += " -cfg-prologue-shrink-wrap";
+ flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
+ flags += " -regalloc-param AFFINITY:on -regalloc irc";
  expect.opt;
 *)
 
@@ -15,6 +17,7 @@ open Intrinsics
 
 (* Codegen tests for Int64_u operations *)
 
+(* CR ttebbi: This should use the neg instruction. *)
 let neg x = Int64_u.neg x
 [%%expect_asm X86_64{|
 neg:
@@ -361,13 +364,13 @@ to_int:
 let unsigned_to_int x = Int64_u.unsigned_to_int x
 [%%expect_asm X86_64{|
 unsigned_to_int:
-  subq  $8, %rsp
   movq  %rax, %rbx
   cmpq  $0, %rbx
   jl    .L112
   movabsq $4611686018427387903, %rax
   cmpq  %rax, %rbx
   jg    .L109
+  subq  $8, %rsp
   subq  $16, %r15
   cmpq  (%r14), %r15
   jb    .L115
@@ -380,11 +383,9 @@ unsigned_to_int:
   ret
 .L109:
   movl  $1, %eax
-  addq  $8, %rsp
   ret
 .L112:
   movl  $1, %eax
-  addq  $8, %rsp
   ret
 |}]
 
@@ -513,6 +514,8 @@ float_of_bits:
   ret
 |}]
 
+(* CR ttebbi: Double cmp instruction, subtraction should be done on byte
+   registers. *)
 let compare x y = Int64_u.compare x y
 [%%expect_asm X86_64{|
 compare:
@@ -627,5 +630,22 @@ let of_int64 x = Int64_u.of_int64 x
 [%%expect_asm X86_64{|
 of_int64:
   movq  8(%rax), %rax
+  ret
+|}]
+
+let bswap64 x = Int64_u.bswap x
+[%%expect_asm X86_64{|
+bswap64:
+  bswap %rax
+  ret
+|}]
+
+let bytes_get_int64_bswap (buf : bytes) (i : int) =
+  Int64_u.bswap (Bytes.unsafe_get_int64_ne buf i)
+[%%expect_asm X86_64{|
+bytes_get_int64_bswap:
+  sarq  $1, %rbx
+  movq  (%rax,%rbx), %rax
+  bswap %rax
   ret
 |}]

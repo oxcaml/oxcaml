@@ -1,5 +1,8 @@
 (* TEST
  flags += " -O3";
+ flags += " -cfg-prologue-shrink-wrap";
+ flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
+ flags += " -regalloc-param AFFINITY:on -regalloc irc";
  only-default-codegen;
  expect.opt;
 *)
@@ -272,7 +275,7 @@ equal:
 
 (* CR ttebbi: This is very inefficient, should be like `equal`. *)
 let equal_using_compare (x : int) (y : int) =
-  Stdlib.compare x y = 0
+  Int.compare x y = 0
 [%%expect_asm X86_64{|
 equal_using_compare:
   movq  %rax, %rdi

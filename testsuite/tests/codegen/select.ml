@@ -6,13 +6,18 @@
  ocamlopt.opt;
 
  only-default-codegen;
- flags = " -I ocamlopt.opt";
+ flags = " -O3 -I ocamlopt.opt";
+ flags += " -cfg-prologue-shrink-wrap";
+ flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
+ flags += " -regalloc-param AFFINITY:on -regalloc irc";
  expect.opt;
 *)
 
+open Intrinsics
+
 
 (* CR ttebbi: This use of select is the identity on the value representation *)
-let select_identity x = Intrinsics.select x 1 0
+let select_identity x = Builtins.select x 1 0
 [%%expect_asm X86_64{|
 select_identity:
   movq  %rax, %rbx
@@ -26,7 +31,7 @@ select_identity:
 
 (* CR ttebbi: This could use fewer instructions by flipping
    the condition and cmov registers. *)
-let select_cmp (x : int) = Intrinsics.select (x > 10) x 55
+let select_cmp (x : int) = Builtins.select (x > 10) x 55
 [%%expect_asm X86_64{|
 select_cmp:
   movq  %rax, %rbx
@@ -38,8 +43,46 @@ select_cmp:
 
 
 (* CR ttebbi: We could constant-fold this. *)
-let select_constant (x : int) = Intrinsics.select true x 55
+let select_constant (x : int) = Builtins.select true x 55
 [%%expect_asm X86_64{|
 select_constant:
+  ret
+|}]
+
+
+(* CR ttebbi: Unnecessary sign extension. *)
+let select_int32 b (x : int32#) (y : int32#) =
+  Builtins.select_int32 b x y
+[%%expect_asm X86_64{|
+select_int32:
+  cmpq  $1, %rax
+  cmovne %rbx, %rdi
+  movslq %edi, %rax
+  ret
+|}]
+
+
+(* CR ttebbi: Unnecessary moves. *)
+let select_int64 b (x : int64#) (y : int64#) =
+  Builtins.select_int64 b x y
+[%%expect_asm X86_64{|
+select_int64:
+  movq  %rax, %rsi
+  movq  %rdi, %rax
+  cmpq  $1, %rsi
+  cmovne %rbx, %rax
+  ret
+|}]
+
+
+(* CR ttebbi: Unnecessary moves. *)
+let select_nativeint b (x : nativeint#) (y : nativeint#) =
+  Builtins.select_nativeint b x y
+[%%expect_asm X86_64{|
+select_nativeint:
+  movq  %rax, %rsi
+  movq  %rdi, %rax
+  cmpq  $1, %rsi
+  cmovne %rbx, %rax
   ret
 |}]
