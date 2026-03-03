@@ -89,6 +89,8 @@ let const (c : Fexpr.const) : Reg_width_const.t =
   | Naked_immediate i -> Reg_width_const.naked_immediate (i |> immediate)
   | Naked_float f -> Reg_width_const.naked_float (f |> float)
   | Naked_float32 f -> Reg_width_const.naked_float32 (f |> float32)
+  | Naked_int8 i -> Reg_width_const.naked_int8 i
+  | Naked_int16 i -> Reg_width_const.naked_int16 i
   | Naked_int32 i -> Reg_width_const.naked_int32 i
   | Naked_int64 i -> Reg_width_const.naked_int64 i
   | Naked_nativeint i -> Reg_width_const.naked_nativeint (i |> targetint)

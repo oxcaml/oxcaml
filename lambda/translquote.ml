@@ -605,6 +605,8 @@ module Identifier : sig
     val global_module :
       Debuginfo.Scoped_location.t -> Global_module.Name.t -> t'
 
+    val toplevel_module : Debuginfo.Scoped_location.t -> string -> t'
+
     val dot : Debuginfo.Scoped_location.t -> t -> string -> t'
 
     val var : Debuginfo.Scoped_location.t -> Var.Module.t -> Loc.t -> t'
@@ -793,6 +795,9 @@ end = struct
       Env.require_global_for_quote
         (Compilation_unit.Name.of_head_of_global_name a1);
       let a1 = Global_module.Name.to_string a1 in
+      apply1 "Identifier.Module" "global_module" loc (string ~loc a1)
+
+    let toplevel_module loc a1 =
       apply1 "Identifier.Module" "global_module" loc (string ~loc a1)
 
     let dot loc a1 a2 =
@@ -2315,7 +2320,10 @@ let rec module_for_path loc = function
       | None -> (
         match Ident.to_global id with
         | Some global -> Identifier.Module.global_module loc global
-        | None -> raise Exit))
+        | None ->
+          (* We must be in a [Toplevel_lock_for_directive] if we are quoting
+             a non-global module. *)
+          Ident.name id |> Identifier.Module.toplevel_module loc))
     |> Identifier.Module.wrap
   | Path.Pdot (p, s) ->
     Identifier.Module.dot loc (module_for_path loc p) s
@@ -3453,8 +3461,8 @@ and quote_expression_desc ~scopes ~transl stage e =
   List.iter (update_env_with_extra ~loc) e.exp_extra;
   let body =
     match e.exp_desc with
-    | Texp_ident (path, _, _, ident_kind, _, _) ->
-      quote_value_ident_path_as_exp loc env path ident_kind
+    | Texp_ident { path; kind; _ } ->
+      quote_value_ident_path_as_exp loc env path kind
     | Texp_constant const ->
       let const = quote_constant loc const in
       Exp_desc.constant loc const

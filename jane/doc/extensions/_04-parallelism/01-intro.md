@@ -18,4 +18,4 @@ Based on that, the OCaml Language team developed a collection of compiler featur
 
 This is a stub, with more complete documentation to follow. For now, please see
 our parallelism tutorials, beginning with [part
-1](../../tutorials/01-intro-to-parallelism-part-1).
+1](../../tutorials/intro-to-parallelism-part-1).

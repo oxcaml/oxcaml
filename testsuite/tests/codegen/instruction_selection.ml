@@ -6,7 +6,10 @@
  ocamlopt.opt;
 
  only-default-codegen;
- flags = " -O3 -extension-universe upstream_compatible -I ocamlopt.opt";
+ flags = " -O3 -I ocamlopt.opt";
+ flags += " -cfg-prologue-shrink-wrap";
+ flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
+ flags += " -regalloc-param AFFINITY:on -regalloc irc";
  expect.opt;
 *)
 
@@ -122,32 +125,6 @@ branch_and_return:
 |}]
 
 
-(* CR ttebbi: If we change the register representation of 32bit values to be
-    zero-extended, we could emit 32bit instructions saving 1 byte of instruction
-    encoding and remove the sign extensions.
-*)
-let add32 x y = Int32_u.add x y
-[%%expect_asm X86_64{|
-add32:
-  addq  %rbx, %rax
-  movslq %eax, %rax
-  ret
-|}]
-
-let min32 x y = Int32_u.min x y
-[%%expect_asm X86_64{|
-min32:
-  movq  %rax, %rdi
-  movq  %rbx, %rax
-  cmpq  %rax, %rdi
-  jg    .L105
-  movq  %rdi, %rax
-  ret
-.L105:
-  ret
-|}]
-
-
 (* CR ttebbi: `leaq  8(%r15), %rbx` could be merged with
    the subsequent addition. *)
 let two_element_list x = [x; x]
@@ -218,5 +195,107 @@ int32_box_unbox_after_call:
   movslq %eax, %rax
   movslq %eax, %rax
   addq  $8, %rsp
+  ret
+|}]
+
+(* CR ttebbi: "xchg  %ah, %al" is rather slow, a 32bit byte swap followed by a
+   shift would be faster. Also, we zero-extend twice. *)
+let bswap16 x = Int.bswap16 x
+[%%expect_asm X86_64{|
+bswap16:
+  sarq  $1, %rax
+  xchg  %ah, %al
+  movzwq %ax, %rax
+  andl  $65535, %eax
+  leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
+let int63_to_int64 x = reinterpret_tagged_int63_as_unboxed_int64 x
+[%%expect_asm X86_64{|
+int63_to_int64:
+  ret
+|}]
+
+let int64_to_int63 x = reinterpret_unboxed_int64_as_tagged_int63 x
+[%%expect_asm X86_64{|
+int64_to_int63:
+  orq   $1, %rax
+  ret
+|}]
+
+let pause () = cpu_relax ()
+[%%expect_asm X86_64{|
+pause:
+  subq  $8, %rsp
+  pause
+  cmpq  (%r14), %r15
+  jbe   .L105
+.L106:
+  movl  $1, %eax
+  addq  $8, %rsp
+  ret
+|}]
+
+(* Cross-type conversions between unboxed types *)
+
+let int32_to_int64 (x : Int32_u.t) : Int64_u.t =
+  Int64_u.of_int32_u x
+[%%expect_asm X86_64{|
+int32_to_int64:
+  ret
+|}]
+
+let int64_to_int32 (x : Int64_u.t) : Int32_u.t =
+  Int64_u.to_int32_u x
+[%%expect_asm X86_64{|
+int64_to_int32:
+  movslq %eax, %rax
+  ret
+|}]
+
+let int64_to_nativeint (x : Int64_u.t) : Nativeint_u.t =
+  Int64_u.to_nativeint_u x
+[%%expect_asm X86_64{|
+int64_to_nativeint:
+  ret
+|}]
+
+let nativeint_to_int64 (x : Nativeint_u.t) : Int64_u.t =
+  Int64_u.of_nativeint_u x
+[%%expect_asm X86_64{|
+nativeint_to_int64:
+  ret
+|}]
+
+
+(* Optimization barrier *)
+
+let opaque_int (x : int) = opaque x
+[%%expect_asm X86_64{|
+opaque_int:
+  ret
+|}]
+
+(* Tag test for variant discrimination *)
+
+let is_int (x : 'a) = obj_is_int x
+[%%expect_asm X86_64{|
+is_int:
+  andl  $1, %eax
+  leaq  1(%rax,%rax), %rax
+  ret
+|}]
+
+let is_int_branch (x : 'a) f = if obj_is_int x then f()
+[%%expect_asm X86_64{|
+is_int_branch:
+  testb $1, %al
+  je    .L107
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+.L107:
+  movl  $1, %eax
   ret
 |}]

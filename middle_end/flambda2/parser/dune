@@ -3,46 +3,32 @@
 ; @regen alias that regenerates them only if asked for. The Makefile then runs
 ; the alias with --auto-promote.
 
-(alias (name regen))
-
 (rule
- (target flambda_lex.ml.new)
+ (target flambda_lex.ml)
  (deps flambda_lex.mll)
- (alias regen)
  (action
   (chdir %{workspace_root}
    (run ocamllex -q %{deps} -o %{target}))))
 
 (rule
- (alias regen)
- (action
-  (diff flambda_lex.ml flambda_lex.ml.new)))
-
-(rule
- (alias regen)
  (deps flambda_parser_in.ml)
  (targets)
  (action
-  (progn
-   (with-stdin-from
-    %{deps}
-    (with-stdout-to
-     flambda_parser.ml.new
-     (run sed "s/MenhirLib/CamlinternalMenhirLib/g")))
-   (diff flambda_parser.ml flambda_parser.ml.new))))
+  (with-stdin-from
+   %{deps}
+   (with-stdout-to
+    flambda_parser.ml
+    (run sed "s/MenhirLib/CamlinternalMenhirLib/g")))))
 
 (rule
- (alias regen)
  (deps flambda_parser_in.mli)
  (targets)
  (action
-  (progn
-   (with-stdin-from
-    %{deps}
-    (with-stdout-to
-     flambda_parser.mli.new
-     (run sed "s/MenhirLib/CamlinternalMenhirLib/g")))
-   (diff flambda_parser.mli flambda_parser.mli.new))))
+  (with-stdin-from
+   %{deps}
+   (with-stdout-to
+    flambda_parser.mli
+    (run sed "s/MenhirLib/CamlinternalMenhirLib/g")))))
 
 (rule
  (targets flambda_parser_in.ml flambda_parser_in.mli)

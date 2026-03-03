@@ -237,7 +237,7 @@ fundamentals of data-race freedom. The [next tutorial] will build on
 the basics by
 covering more primitive operations that exercise more of the system.
 
-[next tutorial]: ../02-intro-to-parallelism-part-2
+[next tutorial]: ../intro-to-parallelism-part-2
 
 ## A trivial example
 
@@ -1253,7 +1253,7 @@ something more sophisticated like a lock over the whole tree, which grants a
 function `uncontended` access while the lock is held (which is safe because of
 course only one domain can hold the lock). See the [capsule API] for details.
 
-[capsule API]: ../../parallelism/02-capsules
+[capsule API]: ../../parallelism/capsules
 
 The good news is that data-race freedom guarantees that even buggy programs can
 be reasoned about intuitively. See [Why are data races bad?].

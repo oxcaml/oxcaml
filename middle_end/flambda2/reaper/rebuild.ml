@@ -1181,7 +1181,13 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
   match DS.get_unboxed_fields env.uses arg with
   | Some arg -> bind_fields (Unboxed to_bind) (Field.Map.find field arg) hole
   | None -> (
-    assert (Option.is_some (DS.get_changed_representation env.uses arg));
+    if Option.is_none (DS.get_changed_representation env.uses arg)
+    then
+      Misc.fatal_errorf
+        "Loading unboxed from variable %a that is not unboxed nor changed \
+         representation (has_source: %b)@."
+        Code_id_or_name.print arg
+        (DS.has_source env.uses arg);
     let arg = Option.get (DS.get_changed_representation env.uses arg) in
     match arg with
     | Block_representation (arg_fields, _size) ->
