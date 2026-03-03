@@ -1131,7 +1131,7 @@ type ('args, 'row) pattern_matching = {
 type 'a arg = {
   arg : 'a;
   binding_kind : let_kind;
-  mut : mutable_flag;
+  mut : Asttypes.mutable_flag;
   (** We track with a [mutable_flag] whether a mutable read was
       performed to access the corresponding sub-value of the
       scrutinee: an argument is [Mutable] if the path from the root of
@@ -1195,10 +1195,8 @@ type ('args, 'head_pat, 'matrix) pm_or_compiled = {
    it obvious that we thought about how this value should evolve (or not).
 *)
 let compose_mut m1 m2 =
+  let open Asttypes in
   match m1, m2 with
-  (* CR sspies: [Immutable_unique] is new, and this is only a guess *)
-  | Immutable_unique, Immutable | Immutable, Immutable_unique
-  | Immutable_unique, Immutable_unique -> Immutable_unique
   | Immutable, Immutable -> Immutable
   | Mutable, _ | _, Mutable -> Mutable
 
@@ -2705,7 +2703,8 @@ let get_expr_args_array ~scopes kind head { arg; mut; _ } rem =
            [ arg; Lconst (Const_base (Const_int pos)) ],
            loc);
         binding_kind = (if Types.is_mutable am then StrictOpt else Alias);
-        mut = compose_mut mut am_mut;
+        mut =
+          compose_mut mut (if Types.is_mutable am then Mutable else Immutable);
         sort = arg_sort;
         layout = result_layout
       } :: make_args (pos + 1)
@@ -4269,12 +4268,12 @@ and compile_match_simplified ~scopes value_kind repr partial ctx
    general type [partial] of partiality information from the
    specialized type [arg_partial] used to make code-generation
    decisions for a given argument switch. *)
-and compute_arg_partial partial mut =
+and compute_arg_partial partial (mut : Asttypes.mutable_flag) =
   match partial.tempo, mut with
   | Following, Mutable -> Arg { partial with global = Partial }
-  | First, _ | _, (Immutable | Immutable_unique) -> Arg partial
+  | First, _ | _, Immutable -> Arg partial
 
-and mut_of_binding_kind =
+and mut_of_binding_kind : _ -> Asttypes.mutable_flag =
   (* This is somewhat of a hack: we notice that a pattern-matching
      argument is mutable (its value can change if evaluated
      several times) exactly when it is bound as StrictOpt. Alias
@@ -4316,7 +4315,7 @@ and bind_match_arg kind v v_duid arg arg_layout (lam, jumps) =
        by calling [Context.erase_first_col] below.
     *)
     match mut_of_binding_kind kind with
-    | Immutable | Immutable_unique -> jumps
+    | Immutable -> jumps
     | Mutable ->
         Jumps.map Context.erase_first_col jumps in
   (bind_check kind v v_duid arg_layout arg lam,
