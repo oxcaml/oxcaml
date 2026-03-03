@@ -329,7 +329,7 @@ let rewrite_simple (env : env) simple =
         not
           (Option.is_none
              (DS.get_unboxed_fields env.uses (Code_id_or_name.name name)))
-      then simple (* XXX Misc.fatal_errorf "UNBOXED?? %a@." Name.print name; *)
+      then name_poison env name (* XXX Misc.fatal_errorf "UNBOXED?? %a@." Name.print name; *)
       else if is_name_used env name
       then simple
       else name_poison env name)
