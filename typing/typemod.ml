@@ -2984,11 +2984,11 @@ let rec type_module ?alias sttn funct_body anchor env smod =
    we conservatively require all module expressions to be [aliased many]. *)
 and constrain_uniqueness_and_linearity md =
   let linearity_constraint =
-    { Value.Const.max with linearity = Linearity.Const.min }
+    { Value.Const.max with linearity = Linearity.Const.Many }
     |> Value.of_const ~hint_comonadic:Module_must_be_many
   in
   let uniqueness_constraint =
-    { Value.Const.min with uniqueness = Uniqueness.Const.max }
+    { Value.Const.min with uniqueness = Uniqueness.Const.Aliased }
     |> Value.of_const ~hint_monadic:Module_must_be_aliased
   in
   let (mode, locks) = md.mod_mode in
