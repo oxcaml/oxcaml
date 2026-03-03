@@ -1551,29 +1551,39 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
        dbg)
     ~body:hole
 
-let rebuild_let_expr_holed0 (env : env) res ~(bound_pattern : Bound_pattern.t)
-    ~(defining_expr : Rev_expr.rev_named) ~new_defining_expr ~hole :
-    RE.t * rebuild_result =
-  match (bound_pattern : Bound_pattern.t) with
-  | Set_of_closures bvs when bound_vars_will_be_unboxed env bvs ->
+let rebuild_let_expr_holed_set_of_closures env res bvs ~defining_expr
+    ~new_defining_expr ~hole =
+  if bound_vars_will_be_unboxed env bvs
+  then
     ( rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
         ~defining_expr ~hole,
       res )
-  | Singleton bv when bound_vars_will_be_unboxed env [bv] ->
+  else
+    let bound_pattern = Bound_pattern.set_of_closures bvs in
+    if bound_vars_will_have_their_representation_changed env bvs
+    then
+      rebuild_set_of_closures_binding_whose_representation_is_being_changed env
+        res bound_pattern bvs ~orig_defining_expr:defining_expr ~hole
+    else
+      let defining_expr = rebuild_named_default_case env new_defining_expr in
+      RE.create_let bound_pattern defining_expr ~body:hole, res
+
+let rebuild_let_expr_singleton (env : env) res bv
+    ~(defining_expr : Rev_expr.rev_named) ~new_defining_expr ~hole :
+    RE.t * rebuild_result =
+  if bound_vars_will_be_unboxed env [bv]
+  then
     ( rebuild_singleton_binding_which_is_being_unboxed env bv ~defining_expr
         ~hole,
       res )
-  | Singleton bv when bound_vars_will_have_their_representation_changed env [bv]
-    ->
+  else if bound_vars_will_have_their_representation_changed env [bv]
+  then
     ( rebuild_singleton_binding_whose_representation_is_being_changed env
-        bound_pattern bv ~orig_defining_expr:defining_expr ~new_defining_expr
-        ~hole,
+        (Bound_pattern.singleton bv)
+        bv ~orig_defining_expr:defining_expr ~new_defining_expr ~hole,
       res )
-  | Set_of_closures bvs
-    when bound_vars_will_have_their_representation_changed env bvs ->
-    rebuild_set_of_closures_binding_whose_representation_is_being_changed env
-      res bound_pattern bvs ~orig_defining_expr:defining_expr ~hole
-  | Singleton _ | Set_of_closures _ | Static _ -> (
+  else
+    let bound_pattern = Bound_pattern.singleton bv in
     match[@ocaml.warning "-fragile-match"] new_defining_expr with
     | Flambda.Prim
         (Variadic (Make_block (block_kind, mutability, alloc_mode), fields), dbg)
@@ -1583,25 +1593,24 @@ let rebuild_let_expr_holed0 (env : env) res ~(bound_pattern : Bound_pattern.t)
         res )
     | _ ->
       let defining_expr = rebuild_named_default_case env new_defining_expr in
-      RE.create_let bound_pattern defining_expr ~body:hole, res)
+      RE.create_let bound_pattern defining_expr ~body:hole, res
 
-let rec default_defining_expr_for_rebuilding_let env res
-    (bound_pattern : Bound_pattern.t) (defining_expr : Rev_expr.rev_named) =
-  match bound_pattern, defining_expr with
-  | Singleton _, Named defining_expr -> bound_pattern, defining_expr, res
-  | Static bound_static, Static_consts group ->
-    default_defining_expr_for_rebuilding_let_static_consts env res bound_static
-      group
-  | Set_of_closures bound_vars, Set_of_closures set_of_closures ->
-    default_defining_expr_for_rebuilding_let_set_of_closures env res bound_vars
-      set_of_closures
-  | ( (Singleton _ | Static _ | Set_of_closures _),
-      (Named _ | Static_consts _ | Set_of_closures _) ) ->
-    Misc.fatal_errorf "Bound pattern %a does not match defining expr"
-      Bound_pattern.print bound_pattern
+let rebuild_let_expr_holed0 (env : env) res ~(bound_pattern : Bound_pattern.t)
+    ~(defining_expr : Rev_expr.rev_named) ~new_defining_expr ~hole :
+    RE.t * rebuild_result =
+  match (bound_pattern : Bound_pattern.t) with
+  | Set_of_closures bvs ->
+    rebuild_let_expr_holed_set_of_closures env res bvs ~defining_expr
+      ~new_defining_expr ~hole
+  | Singleton bv ->
+    rebuild_let_expr_singleton env res bv ~defining_expr ~new_defining_expr
+      ~hole
+  | Static _ ->
+    let defining_expr = rebuild_named_default_case env new_defining_expr in
+    RE.create_let bound_pattern defining_expr ~body:hole, res
 
-and default_defining_expr_for_rebuilding_let_static_consts env res bound_static
-    group =
+let rec default_defining_expr_for_rebuilding_let_static_consts env res
+    bound_static group =
   let bound_and_group =
     List.filter_map
       (fun ((p, e) as arg :
@@ -1706,30 +1715,39 @@ and rebuild_let_expr_holed (env : env) res ~(bound_pattern : Bound_pattern.t)
         ~free_names:Name_occurrences.empty,
       res )
   else
-    let bound_pattern, new_defining_expr, res =
-      default_defining_expr_for_rebuilding_let env res bound_pattern
-        defining_expr
-    in
     let subexpr, res =
-      match (bound_pattern : Bound_pattern.t) with
-      | Set_of_closures _ | Static _ ->
-        rebuild_let_expr_holed0 env res ~bound_pattern ~defining_expr
-          ~new_defining_expr ~hole
-      | Singleton v ->
+      match bound_pattern, defining_expr with
+      | Singleton v, Named new_defining_expr ->
         let v = Bound_var.var v in
         (* CR ncourant: we should probably properly track regions *)
         let is_begin_region =
-          match defining_expr with
-          | Named (Prim (prim, _)) -> P.is_begin_region prim
-          | Named (Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _)
-          | Set_of_closures _ | Static_consts _ ->
-            false
+          match new_defining_expr with
+          | Prim (prim, _) -> P.is_begin_region prim
+          | Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _ -> false
         in
         if is_begin_region || is_var_used env v
         then
           rebuild_let_expr_holed0 env res ~bound_pattern ~defining_expr
             ~new_defining_expr ~hole
         else hole, res
+      | Static bound_static, Static_consts group ->
+        let bound_pattern, new_defining_expr, res =
+          default_defining_expr_for_rebuilding_let_static_consts env res
+            bound_static group
+        in
+        rebuild_let_expr_holed0 env res ~bound_pattern ~defining_expr
+          ~new_defining_expr ~hole
+      | Set_of_closures bound_vars, Set_of_closures set_of_closures ->
+        let bound_pattern, new_defining_expr, res =
+          default_defining_expr_for_rebuilding_let_set_of_closures env res
+            bound_vars set_of_closures
+        in
+        rebuild_let_expr_holed0 env res ~bound_pattern ~defining_expr
+          ~new_defining_expr ~hole
+      | ( (Singleton _ | Static _ | Set_of_closures _),
+          (Named _ | Static_consts _ | Set_of_closures _) ) ->
+        Misc.fatal_errorf "Bound pattern %a does not match defining expr"
+          Bound_pattern.print bound_pattern
     in
     rebuild_holed env res parent subexpr
 
