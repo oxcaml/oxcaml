@@ -2857,7 +2857,10 @@ let rec package_constraints_sig env loc sg constrs =
         when List.mem_assoc [Ident.name id] constrs ->
           let ty = List.assoc [Ident.name id] constrs in
           let reason =
-            Format_doc.asprintf "package constraint path=%a" Path.print (Pident id)
+            Format_doc.asprintf
+              "package constraint path=%a"
+              Path.print
+              (Pident id)
           in
           Sig_type
             ( id,

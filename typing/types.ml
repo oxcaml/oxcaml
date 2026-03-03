@@ -421,9 +421,15 @@ module Jkind_mod_bounds = struct
           nullability;
           separability } =
     let crossing_s = Format_doc.asprintf "%a" Crossing.print crossing in
-    let externality_s = Format_doc.asprintf "%a" Externality.print externality in
-    let nullability_s = Format_doc.asprintf "%a" Nullability.print nullability in
-    let separability_s = Format_doc.asprintf "%a" Separability.print separability in
+    let externality_s =
+      Format_doc.asprintf "%a" Externality.print externality
+    in
+    let nullability_s =
+      Format_doc.asprintf "%a" Nullability.print nullability
+    in
+    let separability_s =
+      Format_doc.asprintf "%a" Separability.print separability
+    in
     Format.fprintf ppf "@[{ crossing = %s;@ externality = %s;@ \
       nullability = %s;@ separability = %s }@]"
       crossing_s

@@ -219,7 +219,8 @@ let relevant_axes_of_modality
           Mode.Modality.Const.proj axis_for_modality modality
         in
         not
-          (Mode.Modality.Per_axis.is_constant axis_for_modality modality_on_axis)
+          (Mode.Modality.Per_axis.is_constant axis_for_modality
+             modality_on_axis)
       | Nonmodal Externality -> true
       | Nonmodal (Separability | Nullability) -> (
         match relevant_for_shallow with

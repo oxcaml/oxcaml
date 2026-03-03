@@ -635,7 +635,6 @@ module With_bounds = struct
     match t with
     | No_with_bounds -> Seq.empty
     | With_bounds tys -> With_bounds_types.to_seq tys
-
 end
 
 (******************************)

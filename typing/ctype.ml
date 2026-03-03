@@ -2719,7 +2719,10 @@ let constrain_type_jkind ~fixed env ty jkind =
                                     Nonempty_list.to_list sub_failure_reasons)))
         | May_have_intersection sub_failure_reasons ->
            if !Clflags.ikinds_debug
-           then
+           then begin
+             let verbosity =
+               Jkind.Format_verbosity.Expanded_with_all_mod_bounds
+             in
              Format.eprintf
                "@[<v>[ikind-ctype] constrain_type_jkind: may_intersect \
                 reasons=[%s]@,\
@@ -2743,14 +2746,10 @@ let constrain_type_jkind ~fixed env ty jkind =
                           "Constrain_ran_out_of_fuel")
                      (Misc.Nonempty_list.to_list sub_failure_reasons)))
                (Format_doc.compat
-                  (Jkind.format_verbose
-                     ~verbosity:Jkind.Format_verbosity.Expanded_with_all_mod_bounds
-                     env))
+                  (Jkind.format_verbose ~verbosity env))
                ty's_jkind
                (Format_doc.compat
-                  (Jkind.format_verbose
-                     ~verbosity:Jkind.Format_verbosity.Expanded_with_all_mod_bounds
-                     env))
+                  (Jkind.format_verbose ~verbosity env))
                jkind
                Jkind.Mod_bounds.debug_print
                ty's_jkind.jkind.mod_bounds
@@ -2760,6 +2759,7 @@ let constrain_type_jkind ~fixed env ty jkind =
                ty's_jkind.jkind.with_bounds
                Jkind.With_bounds.debug_print
                jkind.jkind.with_bounds;
+           end;
            let sub_failure_reasons = Nonempty_list.to_list sub_failure_reasons in
            let product ~fuel tys =
              let num_components = List.length tys in
