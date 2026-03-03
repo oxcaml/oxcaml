@@ -115,7 +115,9 @@ ref_unsafe_set:
   ret
 |}]
 
-(* CR ttebbi: Stackframe creation is only necessary on the GC-calling path. *)
+(* CR ttebbi: Stackframe creation is only necessary on the GC-calling path.
+   In this case, this would require moving the stackframe creation into the
+   hidden block where the GC is actually called. *)
 let poly_unsafe_get (a : 'a array) (i : int) =
   Array.unsafe_get a i
 [%%expect_asm X86_64{|
