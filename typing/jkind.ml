@@ -634,20 +634,25 @@ module With_bounds = struct
 end
 
 module Stage = struct
-  let equal (stage : stage) (stage' : stage) =
+  let compose stage stage' =
+    match stage, stage' with
+    | Unknown, _ | _, Unknown -> Unknown
+    | Known n, Known n' -> Known (n + n')
+
+  let equal stage stage' =
     match stage, stage' with
     | Unknown, Unknown -> true
     | Known _, Unknown | Unknown, Known _ -> false
     | Known n, Known n' -> n = n'
 
-  let less_or_equal (stage : stage) (stage' : stage) =
+  let less_or_equal stage stage' =
     match stage, stage' with
     | _, Unknown -> Sub_result.Less
     | Unknown, Known _ -> Sub_result.Not_le [Stage_disagreement]
     | Known n, Known n' ->
       if n = n' then Sub_result.Equal else Sub_result.Not_le [Stage_disagreement]
 
-  let intersection (stage : stage) (stage' : stage) =
+  let intersection stage stage' =
     match stage, stage' with
     | Unknown, Unknown -> Some Unknown
     | Known n, Unknown | Unknown, Known n -> Some (Known n)
@@ -809,7 +814,7 @@ module Base_and_axes = struct
             { base = jkind.base;
               mod_bounds;
               with_bounds = t.with_bounds;
-              stage = t.stage
+              stage = Stage.compose t.stage jkind.stage
             })
 
   let rec fully_expand_aliases_const env t : _ jkind_const_desc =
@@ -3643,7 +3648,7 @@ let sub_jkind_l ~type_equal ~context ~level ?(allow_any_crossing = false) env
   let sub_jkind = Base_and_axes.fully_expand_aliases env sub.jkind in
   let super_jkind = Base_and_axes.fully_expand_aliases env super.jkind in
   let* () =
-    (* Validate layouts *)
+    (* Validate layouts and check stages *)
     require_le (Base.sub_expanded ~level sub_jkind.base super_jkind.base)
   in
   match allow_any_crossing with
@@ -3703,6 +3708,7 @@ let sub_jkind_l ~type_equal ~context ~level ?(allow_any_crossing = false) env
           { relevant_axes = Axis_set.diff left_relevant_axes right_relevant_axes
           })
     in
+    (* Stages are already checked by [Base.sub_expanded] at this point *)
     match sub with
     | { base = _;
         mod_bounds = sub_upper_bounds;
