@@ -306,7 +306,6 @@ module Flambda2 = struct
 
     let oclassic = {
       default with
-      fallback_inlining_heuristic = true;
       shorten_symbol_names = true;
     }
 
