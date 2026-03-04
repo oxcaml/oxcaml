@@ -260,7 +260,7 @@ after meet: (Val ([0m[38;5;160;1m=[0m [0m[38;5;70;1m0[0m))
 
 MEET BOTTOM AFTER ALIAS
 
-first type: (Val! (Variant (tagged_imms (Naked_immediate ({ -1 0 1 })))))
+first type: (Val! (Variant (tagged_imms (Naked_immediate { -1 0 1 }))))
 second type: (Val ([0m[38;5;160;1m=[0m [0m[38;5;70;1m3[0m))
 after meet: (Val [0m[38;5;37;1m⊥[0m)
 
