@@ -786,7 +786,7 @@
  (instrumentation
   (backend bisect_ppx))
  (ocamlopt_flags
-  (:standard -runtime-variant nnp))
+  (:standard -runtime-variant nnp_noasan))
  (libraries
   memtrace
   flambda2
