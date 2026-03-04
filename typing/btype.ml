@@ -1173,6 +1173,14 @@ module Jkind0 = struct
     | With_bounds tys -> With_bounds_types.is_empty tys
   end
 
+  module Stage = struct
+    let equal stage stage' =
+      match stage, stage' with
+      | Unknown, Unknown -> true
+      | Known _, Unknown | Unknown, Known _ -> false
+      | Known n, Known n' -> n = n'
+  end
+
   module Base_and_axes = struct
     module Allow_disallow = Allowance.Magic_allow_disallow (struct
       type (_, 'layout, 'd) sided = ('layout, 'd) base_and_axes
@@ -1266,11 +1274,13 @@ module Jkind0 = struct
         match t1.base, t2.base with
         | Kconstr p1, Kconstr p2 ->
           Path.same p1 p2 &&
-          Mod_bounds.equal t1.mod_bounds t2.mod_bounds
+          Mod_bounds.equal t1.mod_bounds t2.mod_bounds &&
+          Stage.equal t1.stage t2.stage
         | Kconstr _, Layout _ | Layout _, Kconstr _ -> false
         | Layout l1, Layout l2 ->
           Jkind_types.Layout.Const.equal l1 l2 &&
-          Mod_bounds.equal t1.mod_bounds t2.mod_bounds
+          Mod_bounds.equal t1.mod_bounds t2.mod_bounds &&
+          Stage.equal t1.stage t2.stage
       )
 
     (* CR layouts: Remove this once we have a better story for printing with

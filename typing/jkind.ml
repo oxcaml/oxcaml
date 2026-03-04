@@ -634,10 +634,20 @@ module With_bounds = struct
 end
 
 module Stage = struct
+  include Jkind0.Stage
+
+  (* [compose x y] nests a jkind at stage [y] inside one stage [x]. *)
   let compose stage stage' =
     match stage, stage' with
     | Unknown, _ | _, Unknown -> Unknown
     | Known n, Known n' -> Known (n + n')
+
+  (* [diff x y] is such that [compose x (diff x y) = y]. *)
+  let diff stage stage' =
+    match stage, stage' with
+    | _, Unknown -> Some Unknown
+    | Unknown, Known _ -> None
+    | Known n, Known n' -> if n <= n' then Some (Known (n' - n)) else None
 
   let equal stage stage' =
     match stage, stage' with
@@ -654,8 +664,7 @@ module Stage = struct
 
   let intersection stage stage' =
     match stage, stage' with
-    | Unknown, Unknown -> Some Unknown
-    | Known n, Unknown | Unknown, Known n -> Some (Known n)
+    | Unknown, stage | stage, Unknown -> Some stage
     | Known n, Known n' -> if n = n' then Some (Known n) else None
 
   let quote = function Unknown -> Unknown | Known stage -> Known (stage + 1)
@@ -664,10 +673,11 @@ module Stage = struct
     | Unknown -> Some Unknown
     | Known stage -> if stage > 0 then Some (Known (stage - 1)) else None
 
-  let rec format_staged stage f ppf =
+  let rec format_quoted stage f ppf =
     match stage with
-    | Unknown | Known 0 -> Fmt.fprintf ppf "%a" f
-    | Known n -> Fmt.fprintf ppf "<[%a]>" (format_staged (Known (n - 1)) f)
+    | Unknown -> Fmt.fprintf ppf "<[%a]>^?" f
+    | Known 0 -> Fmt.fprintf ppf "%a" f
+    | Known n -> Fmt.fprintf ppf "<[%a]>" (format_quoted (Known (n - 1)) f)
 
   let debug_print ppf = function
     | Unknown -> Format.fprintf ppf "?"
@@ -805,6 +815,7 @@ module Base_and_axes = struct
         if
           With_bounds.is_empty t.with_bounds
           && Mod_bounds.equal mod_bounds jkind.mod_bounds
+          && Stage.equal t.stage jkind.stage
         then
           (* If the expanded base is equal to the original jkind, don't allocate
              a new one. *)
@@ -1683,7 +1694,8 @@ module Const = struct
         scannable_axes : string list;
         modal_bounds : string list;
         printable_with_bounds :
-          (Outcometree.out_type * Outcometree.out_modality list) list
+          (Outcometree.out_type * Outcometree.out_modality list) list;
+        stage : stage
       }
 
     (** [diff base actual] returns the axes on which [actual] is strictly
@@ -1801,6 +1813,7 @@ module Const = struct
         | Layout l1, Layout l2 -> Layout.Const.equal_up_to_scannable_axes l1 l2
         | (Kconstr _ | Layout _), _ -> false
       in
+      let stage_diff = Stage.diff base_jkind.stage actual.stage in
       let scannable_axes =
         match actual.base with
         | Layout l ->
@@ -1842,15 +1855,16 @@ module Const = struct
                   (modality_to_ignore_axes axes_ignored_by_modalities) ))
             with_bounds otys
       in
-      match matching_layouts, modal_bounds with
-      | true, Some modal_bounds ->
+      match matching_layouts, stage_diff, modal_bounds with
+      | true, Some stage_diff, Some modal_bounds ->
         Some
           { base = base.name;
             scannable_axes;
             modal_bounds;
-            printable_with_bounds
+            printable_with_bounds;
+            stage = Stage.compose base_jkind.stage stage_diff
           }
-      | false, _ | _, None -> None
+      | false, _, _ | _, None, _ | _, _, None -> None
 
     (** Select the out_jkind_const with the least number of modal bounds to
         print *)
@@ -1885,7 +1899,7 @@ module Const = struct
           |> select_simplest
         | Expanded | Expanded_with_all_mod_bounds -> None
       in
-      let { base; scannable_axes; modal_bounds; printable_with_bounds } =
+      let { base; scannable_axes; modal_bounds; printable_with_bounds; stage } =
         match simplest with
         | Some simplest -> simplest
         | None -> (
@@ -1903,7 +1917,7 @@ module Const = struct
                           (Mod_bounds.set_nullability Nullability.Non_null
                              Mod_bounds.max);
                       with_bounds = No_with_bounds;
-                      stage = jkind.stage
+                      stage = Known 0
                     };
                   name = Base.to_string Layout.Const.to_string jkind.base
                 }
@@ -1929,7 +1943,7 @@ module Const = struct
                       { base = jkind.base;
                         mod_bounds = Mod_bounds.max;
                         with_bounds = No_with_bounds;
-                        stage = jkind.stage
+                        stage = Known 0
                       };
                     name = layout_str
                   }
@@ -1955,7 +1969,7 @@ module Const = struct
       in
       (* Quote the kind if necessary *)
       let base =
-        match jkind.stage with
+        match stage with
         | Unknown -> base
         | Known n ->
           let rec loop acc n =
@@ -2022,8 +2036,8 @@ module Const = struct
       in
       let () =
         match stage with
-        | Known 0 -> raise ~loc Quoted_kind_in_product
-        | Known _ | Unknown -> ()
+        | Known 0 -> ()
+        | Known _ | Unknown -> raise ~loc Quoted_kind_in_product
       in
       ( layout :: layouts_acc,
         Mod_bounds.join mod_bounds mod_bounds_acc,
@@ -2214,23 +2228,26 @@ module Desc = struct
       match desc.base with
       | Layout (Sort (Var n, sa)) ->
         let sort_var_str = Fmt.asprintf "'s%d" (Sort.Var.get_print_number n) in
-        (Fmt.pp_print_list
-           ~pp_sep:(fun f () -> Fmt.fprintf f " ")
-           Fmt.pp_print_string)
+        Stage.format_quoted desc.stage
+          (Fmt.pp_print_list
+             ~pp_sep:(fun f () -> Fmt.fprintf f " ")
+             Fmt.pp_print_string)
           ppf
           (sort_var_str :: Scannable_axes.to_string_list sa)
       (* Analyze a product before calling [get_const]: the machinery in
          [Const.format] works better for atomic layouts, not products. *)
       | Layout (Product lays) ->
         let pp_sep ppf () = Fmt.fprintf ppf "@ & " in
-        Fmt.pp_nested_list ~nested ~pp_element:format_desc ~pp_sep ppf
+        Stage.format_quoted desc.stage
+          (Fmt.pp_nested_list ~nested ~pp_element:format_desc ~pp_sep)
+          ppf
           (List.map (fun layout -> { desc with base = Layout layout }) lays)
       | Layout _ | Kconstr _ -> (
         match get_const desc with
         | Some c -> Const.format ~verbosity env ppf c
         | None -> assert false (* handled above *))
     in
-    Stage.format_staged t.stage (format_desc ~nested:false) ppf t
+    format_desc ~nested:false ppf t
 
   let format ppf t = format_verbose ~verbosity:Not_verbose ppf t
 end

@@ -410,6 +410,10 @@ module Jkind0 : sig
     val is_empty : ('l * 'r) with_bounds -> bool
   end
 
+  module Stage : sig
+    val equal : stage -> stage -> bool
+  end
+
   module Base_and_axes : sig
     include Allowance.Allow_disallow
       with type (_, 'layout, 'd) sided = ('layout, 'd) base_and_axes

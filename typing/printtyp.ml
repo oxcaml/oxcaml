@@ -1405,7 +1405,8 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
     Ojkind_product
       (List.map
          (fun layout ->
-            out_jkind_of_desc env { desc with base = Layout layout })
+            out_jkind_of_desc env
+              { desc with base = Layout layout; stage = Known 0 })
          lays)
     |> quote_out_jkind desc.stage
   | _ -> match Jkind.Desc.get_const desc with
