@@ -41,5 +41,5 @@ module Expr : sig
   val string : string -> <[string]> expr
 end
 
-val print : Format.formatter -> 'a expr -> unit
-val string_of_expr : 'a expr -> string
+val print : ('a : <[value]>). Format.formatter -> 'a expr -> unit
+val string_of_expr : ('a : <[value]>). 'a expr -> string

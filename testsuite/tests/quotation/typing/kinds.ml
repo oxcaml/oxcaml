@@ -71,38 +71,177 @@ type t1 : <[value]> = <[bytes]>
 type t2 : <[<[value]>]> = <[<[bytes]>]>
 [%%expect {|
 type t0 = bytes
-Line 2, characters 0-31:
-2 | type t1 : <[value]> = <[bytes]>
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "<[bytes]>" is value
-         because it's a staged type.
-       But the kind of type "<[bytes]>" must be a subkind of <[value]>
-         because of the definition of t1 at line 2, characters 0-31.
+type t1 = <[bytes]>
+type t2 = <[<[bytes]>]>
 |}]
 type t0 : immediate = int
 type t1 : <[immediate]> = <[int]>
 type t2 : <[<[immediate]>]> = <[<[int]>]>
 [%%expect {|
 type t0 = int
-Line 2, characters 0-33:
-2 | type t1 : <[immediate]> = <[int]>
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "<[int]>" is value
-         because it's a staged type.
-       But the kind of type "<[int]>" must be a subkind of <[immediate]>
-         because of the definition of t1 at line 2, characters 0-33.
+type t1 = <[int]>
+type t2 = <[<[int]>]>
 |}]
 
-(* Unannotated quoted types *)
-type t = <[bytes]>
+(* Abstracting quoted types *)
+module Values : sig
+  type t0 : value
+  type t1 : <[value]>
+  type t2 : <[<[value]>]>
+end = struct
+  type t0 = bytes
+  type t1 = <[bytes]>
+  type t2 = <[<[bytes]>]>
+end
 [%%expect {|
-type t = <[bytes]>
+module Values : sig type t0 type t1 : <[value]> type t2 : <[<[value]>]> end
 |}]
-type t = <[int]>
+module Immediates : sig
+  type t0 : immediate
+  type t1 : <[immediate]>
+  type t2 : <[<[immediate]>]>
+end = struct
+  type t0 = int
+  type t1 = <[int]>
+  type t2 = <[<[int]>]>
+end
 [%%expect {|
-type t = <[int]>
+module Immediates :
+  sig
+    type t0 : immediate
+    type t1 : <[immediate]>
+    type t2 : <[<[immediate]>]>
+  end
 |}]
-type t = <[<[bytes]>]>
+
+(* Stage annotation errors *)
+type t : value = <[bytes]>
 [%%expect {|
-type t = <[<[bytes]>]>
+Line 1, characters 0-26:
+1 | type t : value = <[bytes]>
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "<[bytes]>" is <[mutable_data]>
+         because it is the primitive type bytes.
+       But the kind of type "<[bytes]>" must be a subkind of value
+         because of the definition of t at line 1, characters 0-26.
+|}]
+type t : <[value]> = bytes
+[%%expect {|
+Line 1, characters 0-26:
+1 | type t : <[value]> = bytes
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "bytes" is mutable_data
+         because it is the primitive type bytes.
+       But the kind of type "bytes" must be a subkind of <[value]>
+         because of the definition of t at line 1, characters 0-26.
+|}]
+
+(* Inclusion check errors with quoted kinds *)
+module M : sig
+  type t
+end = struct
+  type t = <[bytes]>
+end
+[%%expect {|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = <[bytes]>
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = <[bytes]> end
+       is not included in
+         sig type t end
+       Type declarations do not match:
+         type t = <[bytes]>
+       is not included in
+         type t
+       The kind of the first is <[mutable_data]>
+         because it is the primitive type bytes.
+       But the kind of the first must be a subkind of value
+         because of the definition of t at line 2, characters 2-8.
+|}]
+module M : sig
+  type t : value
+end = struct
+  type t = <[bytes]>
+end
+[%%expect {|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = <[bytes]>
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = <[bytes]> end
+       is not included in
+         sig type t end
+       Type declarations do not match:
+         type t = <[bytes]>
+       is not included in
+         type t
+       The kind of the first is <[mutable_data]>
+         because it is the primitive type bytes.
+       But the kind of the first must be a subkind of value
+         because of the definition of t at line 2, characters 2-16.
+|}]
+module M : sig
+  type t : <[value]>
+end = struct
+  type t = bytes
+end
+[%%expect {|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = bytes
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = bytes end
+       is not included in
+         sig type t : <[value]> end
+       Type declarations do not match:
+         type t = bytes
+       is not included in
+         type t : <[value]>
+       The kind of the first is mutable_data
+         because it is the primitive type bytes.
+       But the kind of the first must be a subkind of <[value]>
+         because of the definition of t at line 2, characters 2-20.
+|}]
+
+(* Inclusion checks under quotes happen as normal *)
+(* fine: int is immediate *)
+module M : sig
+  type t : <[immediate]>
+end = struct
+  type t = <[int]>
+end
+[%%expect {|
+module M : sig type t : <[immediate]> end
+|}]
+(* error: bytes is not immediate *)
+module M : sig
+  type t : <[immediate]>
+end = struct
+  type t = <[bytes]>
+end
+[%%expect {|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type t = <[bytes]>
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig type t = <[bytes]> end
+       is not included in
+         sig type t : <[immediate]> end
+       Type declarations do not match:
+         type t = <[bytes]>
+       is not included in
+         type t : <[immediate]>
+       The kind of the first is <[mutable_data]>
+         because it is the primitive type bytes.
+       But the kind of the first must be a subkind of <[immediate]>
+         because of the definition of t at line 2, characters 2-24.
 |}]

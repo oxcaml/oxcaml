@@ -2661,9 +2661,19 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
     end
   | Tobject _ -> Jkind.for_object
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
-  | Tquote _ -> Jkind.Builtin.value ~why:Tquote
-  | Tsplice _ -> Jkind.Builtin.value ~why:Tsplice
-  | Tquote_eval _ -> Jkind.Builtin.value ~why:Tquote_eval
+  | Tquote ty ->
+    estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty
+    |> Jkind.quote
+  | Tsplice ty ->
+    let jkind =
+      estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty
+    in
+    begin match Jkind.splice jkind with
+    | Some jkind -> jkind
+    | None -> fatal_error "estimate_type_jkind: Non-quote-kinded splice type"
+    end
+  | Tquote_eval ty ->
+    estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->

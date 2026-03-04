@@ -1179,6 +1179,12 @@ module Jkind0 = struct
       | Unknown, Unknown -> true
       | Known _, Unknown | Unknown, Known _ -> false
       | Known n, Known n' -> n = n'
+
+    let quote = function Unknown -> Unknown | Known stage -> Known (stage + 1)
+
+    let splice = function
+      | Unknown -> Some Unknown
+      | Known stage -> if stage > 0 then Some (Known (stage - 1)) else None
   end
 
   module Base_and_axes = struct
@@ -1229,6 +1235,13 @@ module Jkind0 = struct
       | Some with_bounds ->
         Some { base; mod_bounds = Obj.magic mod_bounds; with_bounds; stage }
       | None -> None
+
+  let quote jkind = { jkind with stage = Stage.quote jkind.stage }
+
+  let splice jkind =
+    match Stage.splice jkind.stage with
+    | Some stage -> Some { jkind with stage }
+    | None -> None
   end
 
   module Const = struct
@@ -2483,6 +2496,13 @@ module Jkind0 = struct
           stage = Known 0
         }
         ~annotation:None ~why:(Value_creation why)
+
+    let quote jkind = { jkind with jkind = Base_and_axes.quote jkind.jkind }
+
+    let splice jkind0 =
+      match Base_and_axes.splice jkind0.jkind with
+      | Some jkind -> Some { jkind0 with jkind }
+      | None -> None
   end
 
   include Jkind

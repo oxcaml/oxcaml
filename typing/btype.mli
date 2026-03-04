@@ -431,7 +431,15 @@ module Jkind0 : sig
 
     val try_allow_r :
       ('layout, 'l * 'r) base_and_axes ->
+
       ('layout, 'l * allowed) base_and_axes option
+
+
+    val quote : ('layout, 'd) base_and_axes ->
+                ('layout, 'd) base_and_axes
+
+    val splice : ('layout, 'd) base_and_axes ->
+                 ('layout, 'd) base_and_axes option
   end
 
   module Const : sig
@@ -719,6 +727,10 @@ module Jkind0 : sig
 
     (** The jkind for [array] type arguments. *)
     val for_array_argument : jkind_lr
+
+    val quote : 'd jkind -> 'd jkind
+
+    val splice : 'd jkind -> 'd jkind option
   end
 
   include module type of Jkind

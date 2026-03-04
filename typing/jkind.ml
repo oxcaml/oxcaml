@@ -667,12 +667,6 @@ module Stage = struct
     | Unknown, stage | stage, Unknown -> Some stage
     | Known n, Known n' -> if n = n' then Some (Known n) else None
 
-  let quote = function Unknown -> Unknown | Known stage -> Known (stage + 1)
-
-  let splice = function
-    | Unknown -> Some Unknown
-    | Known stage -> if stage > 0 then Some (Known (stage - 1)) else None
-
   let rec format_quoted stage f ppf =
     match stage with
     | Unknown -> Fmt.fprintf ppf "<[%a]>^?" f
@@ -1380,13 +1374,6 @@ module Base_and_axes = struct
           t
       in
       normalized_t, ctl.fuel_status
-
-  let quote jkind = { jkind with stage = Stage.quote jkind.stage }
-
-  let splice jkind =
-    match Stage.splice jkind.stage with
-    | Some stage -> Some { jkind with stage }
-    | None -> None
 end
 
 (*********************************)
@@ -2734,13 +2721,6 @@ let decompose_product env jk =
       Some (List.map mk_jkind layouts)
     | Sort (s, _) -> deal_with_sort (Sort.get s))
 
-let quote jkind = { jkind with jkind = Base_and_axes.quote jkind.jkind }
-
-let splice jkind0 =
-  match Base_and_axes.splice jkind0.jkind with
-  | Some jkind -> Some { jkind0 with jkind }
-  | None -> None
-
 (*********************************)
 (* pretty printing *)
 
@@ -2953,6 +2933,9 @@ module Format_history = struct
       fprintf ppf
         "the compiler failed to deduce its exact kind@ due to with-bound \
          checking limitations"
+    | Quoted_expression ->
+      fprintf ppf "it's the type of an expression inside of a quote"
+    | Evaluated_quote -> fprintf ppf "it's the result of evaluating a quote"
 
   let format_immediate_creation_reason ppf :
       History.immediate_creation_reason -> _ = function
@@ -3059,14 +3042,8 @@ module Format_history = struct
     | Debug_printer_argument ->
       format_with_notify_js ppf
         "it's the type of an argument to a debugger printer function"
-    | Quotation_result -> fprintf ppf "it's the result type of a quotation"
-    | Antiquotation_result -> fprintf ppf "it's the result type of splicing"
-    | Evaluation_result ->
-      fprintf ppf "it's the result of evaluating a quotation"
-    | Tquote -> fprintf ppf "it's a staged type"
-    | Tsplice -> fprintf ppf "it's a splice of a staged type"
-    | Tquote_eval ->
-      fprintf ppf "it's the result of evaluating a staged program"
+    | Expression ->
+      format_with_notify_js ppf "it's the type of a quoted expression"
     | Unknown s ->
       fprintf ppf
         "unknown @[(please alert the Jane Street@;\
@@ -3891,6 +3868,8 @@ module Debug_printers = struct
         parent_path
     | Overapproximation_of_with_bounds ->
       fprintf ppf "Overapproximation_of_with_bounds"
+    | Quoted_expression -> fprintf ppf "Quoted_expression"
+    | Evaluated_quote -> fprintf ppf "Evaluated_quote"
 
   let immediate_creation_reason ppf : History.immediate_creation_reason -> _ =
     function
@@ -3955,12 +3934,7 @@ module Debug_printers = struct
     | Class_type_argument -> fprintf ppf "Class_type_argument"
     | Class_term_argument -> fprintf ppf "Class_term_argument"
     | Debug_printer_argument -> fprintf ppf "Debug_printer_argument"
-    | Quotation_result -> fprintf ppf "Quotation_result"
-    | Antiquotation_result -> fprintf ppf "Antiquotation_result"
-    | Evaluation_result -> fprintf ppf "Evaluation_result"
-    | Tquote -> fprintf ppf "Tquote"
-    | Tsplice -> fprintf ppf "Tsplice"
-    | Tquote_eval -> fprintf ppf "Tquote_eval"
+    | Expression -> fprintf ppf "Expression"
     | Unknown s -> fprintf ppf "Unknown %s" s
     | Array_type_kind -> fprintf ppf "Array_type_kind"
 
