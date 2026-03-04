@@ -15,7 +15,7 @@
 
 type closure_entry_point =
   | Unknown_arity_code_pointer
-      (** Entry point used for an [Indirect_known_arity] call. *)
+      (** Entry point used for an [Indirect_unknown_arity] call. *)
   | Known_arity_code_pointer
       (** Entry point used for a [Direct] or [Indirect_known_arity] call. *)
 
