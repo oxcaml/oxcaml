@@ -2109,7 +2109,7 @@ module Const = struct
       { base = base.base;
         mod_bounds;
         with_bounds = No_with_bounds;
-        stage = Known 0
+        stage = base.stage
       }
     | Pjk_product ts ->
       let jkinds =
@@ -2137,7 +2137,7 @@ module Const = struct
           with_bounds =
             With_bounds.add_modality ~modality ~relevant_for_shallow:`Irrelevant
               ~type_expr:type_ base.with_bounds;
-          stage = Known 0
+          stage = base.stage
         })
     | Pjk_quote base ->
       let base =
