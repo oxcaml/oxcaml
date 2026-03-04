@@ -88,6 +88,8 @@ module BitMatrix : S = struct
        before row i) + (position within row i) = [i*n - i*(i-1)/2] + (j-i) *)
     let i = Reg.Stamp.to_int i in
     let j = Reg.Stamp.to_int j in
+    if i >= num_registers || j >= num_registers
+    then fatal "invalid edge: (%d, %d) with num_registers=%d" i j num_registers;
     let bit_offset = (i * num_registers) - ((i * (i - 1)) asr 1) + (j - i) in
     let byte_index = bit_offset lsr 3 in
     let bit_position = bit_offset land 7 in
