@@ -2066,6 +2066,8 @@ void caml_handle_gc_interrupt(void)
 
 value caml_process_tick_exn(void)
 {
+  CAMLparam0();
+  CAMLlocal1(res);
   if (atomic_exchange_explicit(&Caml_state->requested_tick, false,
                                memory_order_acquire)) {
     caml_domain_tick_hook();
@@ -2080,20 +2082,20 @@ value caml_process_tick_exn(void)
     }
 
     if (!any_preemptible) {
-      return Val_unit;
+      CAMLreturn(Val_unit);
     }
 
     while (stack) {
       if (stack->handler->handle_tick != Val_unit) {
-        value res = caml_callback_exn(stack->handler->handle_tick, Val_unit);
+        res = caml_callback_exn(stack->handler->handle_tick, Val_unit);
         if (Is_exception_result(res)) {
-          return res;
+          CAMLreturn(res);
         }
 
         switch (Long_val(res)) {
         case 0: /* Preempt */
-          caml_domain_setup_preemption();
-          return Val_unit;
+          domain_root_set(&Caml_state->preemption, Val_long(1));
+          CAMLreturn(Val_unit);
         case 1: /* Continue */
           break;
         default:
@@ -2109,7 +2111,7 @@ value caml_process_tick_exn(void)
     }
   }
 
-  return Val_unit;
+  CAMLreturn(Val_unit);
 }
 
 CAMLextern void caml_stop_tick_thread(void)

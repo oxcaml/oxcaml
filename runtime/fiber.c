@@ -342,6 +342,7 @@ alloc_size_class_stack_noexc(mlsize_t wosize, int cache_bucket, value hval,
   hand->handle_effect = heff;
   hand->handle_tick = htick;
   hand->parent = NULL;
+  hand->preemptible_child = NULL;
   stack->sp = Stack_high(stack);
   stack->exception_ptr = NULL;
   stack->id = id;

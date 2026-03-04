@@ -1601,13 +1601,20 @@ CFI_STARTPROC
         movq    Stack_handler(%rax), %r11
         movq    %rcx, Handler_parent(%r11)
     /* If this fiber is preemptible, set it as the preemptible_child of the
-       current stack */
+       nearest preemptible ancestor (or the root fiber) */
         cmpq    $1, Handler_tick(%r11)
         je      1f
-    /* CR aspsmith: Iterate up the stack until we find either the root fiber or
-       another preemptible fiber */
-        movq    Stack_handler(%rcx), %r12
-        movq    %rax, Handler_preemptible_child(%r12)
+    /* Walk up the stack to find the nearest preemptible ancestor or root */
+        movq    %rcx, %r12                /* r12 = current stack in walk */
+2:      movq    Stack_handler(%r12), %r13 /* r13 = handler of current stack */
+        cmpq    $1, Handler_tick(%r13)    /* is this stack preemptible? */
+        jne     3f                         /* yes -> found it */
+        movq    Handler_parent(%r13), %r10 /* r10 = parent stack */
+        testq   %r10, %r10                /* parent == NULL? (root fiber) */
+        jz      3f                         /* root -> use this one */
+        movq    %r10, %r12                /* keep walking up */
+        jmp     2b
+3:      movq    %rax, Handler_preemptible_child(%r13)
 1:      movq    %rax, Caml_state(current_stack)
         movq    Stack_sp(%rax), %r11
 #if Stack_padding_word
