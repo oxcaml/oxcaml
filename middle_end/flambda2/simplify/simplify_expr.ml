@@ -25,7 +25,7 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
     Continuation.create ~name:"dummy_toplevel_continuation" ()
   in
   let dacc =
-    DA.with_are_lifting_conts dacc Are_lifting_conts.no_lifting
+    DA.with_are_lifting_conts dacc (Are_lifting_conts.no_lifting At_toplevel)
     |> DA.with_flow_acc
          (Flow.Acc.init_toplevel ~dummy_toplevel_cont
             (Bound_parameters.append params implicit_params))

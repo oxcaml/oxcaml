@@ -65,6 +65,8 @@ val reaper_change_calling_conventions : unit -> bool
 
 val kind_checks : unit -> bool
 
+val match_in_match : unit -> bool
+
 val flat_float_array : unit -> bool
 
 val function_result_types : is_a_functor:bool -> bool
@@ -184,7 +186,7 @@ module Expert : sig
 
   val cont_lifting_budget : unit -> int
 
-  val cont_spec_budget : unit -> int
+  val cont_spec_threshold : unit -> float
 end
 
 val stack_allocation_enabled : unit -> bool
