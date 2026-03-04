@@ -651,8 +651,7 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
     | None -> add_apply acc ~only_if_closure_any_source:false
     | Some callee -> (
       let closure = Acc.simple_to_node acc ~denv callee in
-      Acc.add_accessor_dep acc ~to_:call_widget
-        (Field.code_of_closure Known_arity_code_pointer)
+      Acc.add_accessor_dep acc ~to_:call_widget Field.known_arity_call_witness
         ~base:closure;
       match denv.should_preserve_direct_calls with
       | Yes -> add_apply acc ~only_if_closure_any_source:false
@@ -672,8 +671,7 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
     let closure =
       Acc.simple_to_node acc ~denv (Option.get (Apply.callee apply))
     in
-    Acc.add_accessor_dep acc ~to_:call_widget
-      (Field.code_of_closure Known_arity_code_pointer)
+    Acc.add_accessor_dep acc ~to_:call_widget Field.known_arity_call_witness
       ~base:closure
   | Function { function_call = Indirect_unknown_arity; _ } ->
     let call_widget =
@@ -684,8 +682,7 @@ and traverse_call_kind denv acc apply ~exn_arg ~return_args ~default_acc =
     let closure =
       Acc.simple_to_node acc ~denv (Option.get (Apply.callee apply))
     in
-    Acc.add_accessor_dep acc ~to_:call_widget
-      (Field.code_of_closure Unknown_arity_code_pointer)
+    Acc.add_accessor_dep acc ~to_:call_widget Field.unknown_arity_call_witness
       ~base:closure
   | Method _ | C_call _ | Effect _ -> default_acc acc
 

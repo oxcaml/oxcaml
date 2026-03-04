@@ -402,10 +402,10 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
   let code_is_used bound_name =
     DS.field_used env.uses
       (Code_id_or_name.name bound_name)
-      (Field.code_of_closure Known_arity_code_pointer)
+      Field.known_arity_call_witness
     || DS.field_used env.uses
          (Code_id_or_name.name bound_name)
-         (Field.code_of_closure Unknown_arity_code_pointer)
+         Field.unknown_arity_call_witness
   in
   let new_repr =
     match bound with
@@ -438,7 +438,7 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
           (fun field (uf : _ DS.unboxed_fields) value_slots ->
             match Field.view field with
             | Is_int | Get_tag | Block _ -> assert false
-            | Code_of_closure _ | Apply _ | Code_id_of_call_witness ->
+            | Call_witness _ | Return_of_call _ | Code_id_of_call_witness ->
               assert false
             | Function_slot _ -> assert false
             | Value_slot value_slot -> (
@@ -1279,7 +1279,7 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
             Left
               (Simple.untagged_const_int
                  (Tag.to_targetint_31_63 env.machine_width tag))
-          | Value_slot _ | Function_slot _ | Code_of_closure _ | Apply _
+          | Value_slot _ | Function_slot _ | Call_witness _ | Return_of_call _
           | Code_id_of_call_witness ->
             assert false
         in
@@ -1364,8 +1364,8 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
                   (* CR sspies: Missing debug uid. *)
                 in
                 RE.create_let bp (Named.create_simple arg) ~body:hole
-            | Block _ | Is_int | Get_tag | Function_slot _ | Code_of_closure _
-            | Apply _ | Code_id_of_call_witness ->
+            | Block _ | Is_int | Get_tag | Function_slot _ | Call_witness _
+            | Return_of_call _ | Code_id_of_call_witness ->
               assert false)
           to_bind hole)
     hole bvs
@@ -1446,7 +1446,7 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
                 (rewrite_simple env (Simple.const_one env.machine_width))
                 mp
             | Unboxed _ -> Misc.fatal_errorf "trying to unbox simple")
-          | Value_slot _ | Function_slot _ | Code_of_closure _ | Apply _
+          | Value_slot _ | Function_slot _ | Return_of_call _ | Call_witness _
           | Code_id_of_call_witness ->
             assert false)
         fields Int.Map.empty
