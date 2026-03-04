@@ -853,6 +853,24 @@ type pop_region =
   | Popped_region
   | Same_region
 
+(** The lambda type is shared across multiple phases of compilation, where some
+  constructors are invalid at different stages.
+
+  Compilation looks like: {[
+    typedtree
+    ---transl--> tlambda
+    --fracture-> slambda
+    ----eval---> rawlambda
+    ---simplif-> lambda
+  ]}
+  where [tlambda], [slambda], [rawlambda], and [lambda] are all represented
+  using this type.
+
+  Most constructors are valid at all stages, the constructors that aren't
+  document this. The only other difference is that [layout] can contain
+  variables before eval ([tlambda] and [slambda]) and not after eval
+  ([rawlambda] and [lambda]).
+*)
 type lambda =
     Lvar of Ident.t
   | Lmutvar of Ident.t
@@ -900,7 +918,7 @@ type lambda =
   (* [Lexclave] closes the newest region opened.
      Note that [Lexclave] nesting is currently unsupported. *)
   | Lexclave of lambda
-  (* [Lsplice] should only exist in slambda. *)
+  (* [Lsplice] should only exist in the slambda stage. *)
   | Lsplice of scoped_location * slambda
 
 and slambda =
