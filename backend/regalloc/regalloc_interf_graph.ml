@@ -93,7 +93,11 @@ module BitMatrix : S = struct
     let bit_position = bit_offset land 7 in
     byte_index, bit_position
 
+  let extra_room_factor = 10
+
   let make ~num_registers =
+    (* overallocate a bit to try and avoid reallocation *)
+    let num_registers = num_registers + (num_registers / extra_room_factor) in
     let num_edges = (num_registers * (num_registers + 1)) lsr 1 in
     let num_bytes = (num_edges + 7) lsr 3 in
     { bits = Bytes.make num_bytes '\000'; num_registers }
