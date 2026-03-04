@@ -138,7 +138,7 @@ end = struct
       in
       (* Add destructions before the loop. *)
       let all_loop_predecessors : Label.Set.t =
-        (Cfg.get_block_exn cfg header).predecessors
+        Label.Set.diff (Cfg.get_block_exn cfg header).predecessors loop
       in
       let destructions_at_end : destructions_at_end =
         Label.Set.fold
