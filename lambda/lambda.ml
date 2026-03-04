@@ -1861,42 +1861,42 @@ let transl_module_representation repr =
 
 (* Translate an access path *)
 
-let rec transl_address loc staticity = function
-  | Env.Aunit cu -> Lprim(Pgetglobal (cu, staticity), [], loc)
+let rec transl_address loc = function
+  | Env.Aunit cu -> Lprim(Pgetglobal (cu, Dynamic), [], loc)
   | Env.Alocal id ->
       if Ident.is_predef id
       then Lprim (Pgetpredef id, [], loc)
       else Lvar id
   | Env.Adot(addr, module_repr, pos) ->
       let module_repr = transl_module_representation module_repr in
-      Lprim(mod_field pos module_repr, [transl_address loc staticity addr], loc)
+      Lprim(mod_field pos module_repr, [transl_address loc addr], loc)
 
-let transl_path find loc env path staticity =
+let transl_path find loc env path =
   match find path env with
   | exception Not_found ->
       fatal_error ("Cannot find address for: " ^ (Path.name path))
-  | addr -> transl_address loc staticity addr
+  | addr -> transl_address loc addr
 
 (* Translation of identifiers *)
 
-let transl_module_path loc env path staticity =
-  transl_path Env.find_module_address loc env path staticity
+let transl_module_path loc env path =
+  transl_path Env.find_module_address loc env path
 
-let transl_value_path loc env path staticity =
-  transl_path Env.find_value_address loc env path staticity
+let transl_value_path loc env path =
+  transl_path Env.find_value_address loc env path
 
 let transl_extension_path loc env path =
-  transl_path Env.find_constructor_address loc env path Dynamic
+  transl_path Env.find_constructor_address loc env path
 
 let transl_class_path loc env path =
-  transl_path Env.find_class_address loc env path Dynamic
+  transl_path Env.find_class_address loc env path
 
 let transl_prim mod_name name =
   let pers = Ident.create_persistent mod_name in
   let env = Env.add_persistent_structure pers Env.empty in
   let lid = Longident.Ldot (Longident.Lident mod_name, name) in
   match Env.find_value_by_name_lazy lid env with
-  | path, _ -> transl_value_path Loc_unknown env path Dynamic
+  | path, _ -> transl_value_path Loc_unknown env path
   | exception Not_found ->
       fatal_error ("Primitive " ^ name ^ " not found.")
 

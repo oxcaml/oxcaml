@@ -132,7 +132,7 @@ let rec apply_coercion loc strict restr arg =
         ~poly_sort:pc_poly_sort
         None
   | Tcoerce_alias (env, path, cc) ->
-      let lam = transl_module_path loc env path Dynamic in
+      let lam = transl_module_path loc env path in
       name_lambda strict arg Lambda.layout_module
         (fun _ -> apply_coercion loc Alias cc lam)
 
@@ -614,7 +614,7 @@ and transl_module ~scopes cc rootpath mexp =
   match mexp.mod_desc with
   | Tmod_ident (path,_) ->
       apply_coercion loc Strict cc
-        (transl_module_path loc mexp.mod_env path Dynamic)
+        (transl_module_path loc mexp.mod_env path)
   | Tmod_structure str ->
       let lam, _repr = transl_struct ~scopes loc [] cc rootpath str in
       lam

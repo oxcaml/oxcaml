@@ -88,7 +88,8 @@ let module M = struct
     let a = one
   end
 end in
-M.N.a
+let module K = M
+in K.N.a
 [%%expect{|
 { c = (let
         (one =

@@ -1268,17 +1268,12 @@ val transl_prim: string -> string -> lambda
 
 val free_variables: lambda -> Ident.Set.t
 
-val transl_module_path :
-  scoped_location -> Env.t -> Path.t -> staticity -> lambda
-val transl_value_path :
-  scoped_location -> Env.t -> Path.t -> staticity -> lambda
-val transl_extension_path :
-  scoped_location -> Env.t -> Path.t -> lambda
-val transl_class_path :
-  scoped_location -> Env.t -> Path.t -> lambda
+val transl_module_path: scoped_location -> Env.t -> Path.t -> lambda
+val transl_value_path: scoped_location -> Env.t -> Path.t -> lambda
+val transl_extension_path: scoped_location -> Env.t -> Path.t -> lambda
+val transl_class_path : scoped_location -> Env.t -> Path.t -> lambda
 
-val transl_address :
-  scoped_location -> staticity -> Persistent_env.address -> lambda
+val transl_address : scoped_location -> Persistent_env.address -> lambda
 
 val transl_mixed_product_shape : Types.mixed_product_shape -> mixed_block_shape
 
