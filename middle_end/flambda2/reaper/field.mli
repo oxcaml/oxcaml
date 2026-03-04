@@ -27,10 +27,10 @@ type view = private
   | Block of int * Flambda_kind.t
   | Value_slot of Value_slot.t
   | Function_slot of Function_slot.t
-  | Code_of_closure of closure_entry_point
+  | Call_witness of closure_entry_point
   | Is_int
   | Get_tag
-  | Apply of return_kind
+  | Return_of_call of return_kind
   | Code_id_of_call_witness
 
 type t
@@ -64,9 +64,15 @@ val get_tag : t
     These fields cannot be accessed through primitives and are used internally
     by the reaper to model function calls. *)
 
-val code_of_closure : closure_entry_point -> t
+val known_arity_call_witness : t
 
-val apply : return_kind -> t
+val unknown_arity_call_witness : t
+
+val call_witness : closure_entry_point -> t
+
+val normal_return_of_call : int -> t
+
+val exn_return_of_call : t
 
 val code_id_of_call_witness : t
 

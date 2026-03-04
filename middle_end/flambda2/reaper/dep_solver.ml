@@ -91,7 +91,7 @@
 
    [CR ncourant: move here the explanation about how my_closure is handled.]
 
-   Closures have a special field, [Code_of_closure], which represents what
+   Closures have a special field, [Call_witness], which represents what
    happens when the closure is called. Schematically, if we have a function
    named [f], with a code_id [p], which has a parameter [x] and returns a result
    [r], and that this function flows to a point where there is an application
@@ -122,7 +122,7 @@
  *  ╰──────────╮╭──────────╯ ╰─────────╮╭───────────╯
  *      (co)constructors         (co)accessors
  *)
-(* On the left side of the graph, the construction of the [Code_of_closure]
+(* On the left side of the graph, the construction of the [Call_witness]
    field of the closure (named [wit] in the graph, for compactness) is done. On
    the right side, the access to that field representing the application is
    done. When the function is applied, we need to do three things:
@@ -195,14 +195,14 @@
    Formally, a value allocated at a given point $x$ can be unboxed if, for each
    usage $y$ of $x$ that reads from $x$ for one of the fields [Block],
    [Value_slot], [Function_slot], [Is_int] or [Get_tag], (but not
-   [Code_of_closure] which connects the call witness which is not read at
+   [Call_witness] which connects the call witness which is not read at
    runtime from $x$, nor [Apply] or [Code_id_of_call_witnes] which are only read
    from call witnesses), $y$ has known sources, and the only source of $y$ is
    $x$.
 
    In the case where $x$ has unknown usages, we can assume any field defined in
    $x$ that is not local might be read from it. As such, as soon as $x$ has a
-   non-local field other than [Code_of_closure], the representation of $x$ may
+   non-local field other than [Call_witness], the representation of $x$ may
    not be changed. Besides, if $x$ has a local field $f$ that is read from a
    value with an unknown source, the criterion above fails as well.
 
@@ -1121,7 +1121,7 @@ let get_all_usages :
        [ One.flag follow_known_arity_calls;
          out % [x];
          rev_accessor ~base:x
-           !!(Field.code_of_closure Known_arity_code_pointer)
+           !!Field.known_arity_call_witness
            ~to_:apply_witness;
          sources apply_witness call_witness;
          constructor ~base:call_witness
@@ -1616,7 +1616,7 @@ let datalog_rules =
          ["call_witness"; "codeid"; "set_of_closures"]
        in
        [ rev_constructor ~from:call_witness
-           !!(Field.code_of_closure Unknown_arity_code_pointer)
+           !!Field.unknown_arity_call_witness
            ~base:set_of_closures;
          has_usage call_witness;
          constructor ~base:call_witness
@@ -1644,8 +1644,8 @@ let datalog_rules =
            (fun f ->
              match Field.view f with
              | Block _ | Is_int | Get_tag -> true
-             | Value_slot _ | Function_slot _ | Code_of_closure _ | Apply _
-             | Code_id_of_call_witness ->
+             | Value_slot _ | Function_slot _ | Call_witness _
+             | Return_of_call _ | Code_id_of_call_witness ->
                false)
            field ]
        ==> cannot_change_representation x);
@@ -1667,9 +1667,7 @@ let datalog_rules =
          pass the value slots as extra arguments. Thus, we prevent unboxing of
          closures if their calling convention cannot be changed. *)
       (let$ [x; call_witness; codeid] = ["x"; "call_witness"; "codeid"] in
-       [ constructor ~base:x
-           !!(Field.code_of_closure Known_arity_code_pointer)
-           ~from:call_witness;
+       [ constructor ~base:x !!Field.known_arity_call_witness ~from:call_witness;
          constructor ~base:call_witness
            !!Field.code_id_of_call_witness
            ~from:codeid;
@@ -1685,7 +1683,7 @@ let datalog_rules =
          when1
            (fun f ->
              match[@ocaml.warning "-4"] Field.view f with
-             | Apply _ -> true
+             | Return_of_call _ -> true
              | _ -> false)
            relation;
          constructor ~base:call_witness
@@ -1838,7 +1836,7 @@ let classify_field_map fields =
             | `Empty -> k Value_slot.Map.empty Function_slot.Map.empty
           in
           match Field.view field with
-          | Code_of_closure _ | Apply _ | Code_id_of_call_witness ->
+          | Call_witness _ | Return_of_call _ | Code_id_of_call_witness ->
             `Could_not_classify
           | Value_slot vs ->
             closure_fields (fun ~value_slots ~function_slots ->
@@ -2082,7 +2080,7 @@ module Rewriter = struct
                 !!Field.code_id_of_call_witness
                 ~base:witness;
               rev_constructor ~from:witness
-                !!(Field.code_of_closure Known_arity_code_pointer)
+                !!Field.known_arity_call_witness
                 ~base:closure;
               rev_constructor ~from:closure function_slot ~base:all_closures;
               when1 Field.is_function_slot function_slot ]
@@ -2161,13 +2159,9 @@ module Rewriter = struct
     Function_slot.Map.map
       (fun closure ->
         ( Single_source closure,
-          if
-            field_used db closure
-              (Field.code_of_closure Unknown_arity_code_pointer)
+          if field_used db closure Field.unknown_arity_call_witness
           then Any_call
-          else if
-            field_used db closure
-              (Field.code_of_closure Known_arity_code_pointer)
+          else if field_used db closure Field.known_arity_call_witness
           then Only_called_with_known_arity
           else Never_called ))
       set_of_closures
@@ -2258,25 +2252,19 @@ module Rewriter = struct
            ==> out2 % [fs; fs_usage]);
           (let$ [fs; usage] = ["fs"; "usage"] in
            [ out2 % [fs; usage];
-             field_usages_top usage
-               !!(Field.code_of_closure Known_arity_code_pointer) ]
+             field_usages_top usage !!Field.known_arity_call_witness ]
            ==> known_arity % [fs]);
           (let$ [fs; usage; _v] = ["fs"; "usage"; "_v"] in
            [ out2 % [fs; usage];
-             field_usages usage
-               !!(Field.code_of_closure Known_arity_code_pointer)
-               _v ]
+             field_usages usage !!Field.known_arity_call_witness _v ]
            ==> known_arity % [fs]);
           (let$ [fs; usage] = ["fs"; "usage"] in
            [ out2 % [fs; usage];
-             field_usages_top usage
-               !!(Field.code_of_closure Unknown_arity_code_pointer) ]
+             field_usages_top usage !!Field.unknown_arity_call_witness ]
            ==> unknown_arity % [fs]);
           (let$ [fs; usage; _v] = ["fs"; "usage"; "_v"] in
            [ out2 % [fs; usage];
-             field_usages usage
-               !!(Field.code_of_closure Unknown_arity_code_pointer)
-               _v ]
+             field_usages usage !!Field.unknown_arity_call_witness _v ]
            ==> unknown_arity % [fs]);
           (let$ [fs; code_id; my_closure; usage] =
              ["fs"; "code_id"; "my_closure"; "usage"]
@@ -2375,9 +2363,8 @@ module Rewriter = struct
           | None, None -> assert false
           | Some _, None ->
             None
-            (* This should only happen for fields like [Code_of_closure _],
-               which are ignored when creating unboxed fields. TODO: check
-               this? *)
+            (* This should only happen for fields like [Call_witness _], which
+               are ignored when creating unboxed fields. TODO: check this? *)
           | None, Some _ ->
             (* This should not happen if we only start
                [patterns_for_unboxed_fields] on the same name we started
@@ -3232,8 +3219,9 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
   Field.Map.filter_map
     (fun field field_use ->
       match Field.view field with
-      | Function_slot _ | Code_id_of_call_witness | Apply _ -> assert false
-      | Code_of_closure _ -> None
+      | Function_slot _ | Code_id_of_call_witness | Return_of_call _ ->
+        assert false
+      | Call_witness _ -> None
       | Block _ | Value_slot _ | Is_int | Get_tag -> (
         let field_source = get_single_field_source db unboxed_block field in
         match field_source with
@@ -3489,7 +3477,7 @@ let unknown_code_id_actually_directly_called_query =
     ["closure"], ["known_arity_call_witness"]
   in
   [ rev_accessor ~base:closure
-      !!(Field.code_of_closure Known_arity_code_pointer)
+      !!Field.known_arity_call_witness
       ~to_:known_arity_call_witness;
     any_source known_arity_call_witness ]
 
@@ -3499,7 +3487,7 @@ let code_id_actually_directly_called_query =
        ["closure"], ["apply_widget"; "call_witness"; "codeid"]
      in
      [ rev_accessor ~base:closure
-         !!(Field.code_of_closure Known_arity_code_pointer)
+         !!Field.known_arity_call_witness
          ~to_:apply_widget;
        sources apply_widget call_witness;
        constructor ~base:call_witness
@@ -3598,7 +3586,7 @@ let rec arguments_used_by_call db ep callee_sources grouped_args =
     | Any_source -> List.map (List.map (fun x -> x, Keep)) grouped_args
     | Sources callee_sources -> (
       let witness_sources =
-        get_field_sources db callee_sources (Field.code_of_closure ep)
+        get_field_sources db callee_sources (Field.call_witness ep)
       in
       match witness_sources with
       | Any_source -> List.map (List.map (fun x -> x, Keep)) grouped_args
@@ -3617,7 +3605,8 @@ let rec arguments_used_by_call db ep callee_sources grouped_args =
           | [] -> [] (* Avoid computing sources of result if no more args *)
           | _ :: _ ->
             arguments_used_by_call db ep
-              (get_field_sources db witness_sources (Field.apply (Normal 0)))
+              (get_field_sources db witness_sources
+                 (Field.normal_return_of_call 0))
               grouped_args_rest
         in
         first_arg_group :: grouped_args_rest))
