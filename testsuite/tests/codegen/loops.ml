@@ -7,6 +7,7 @@
 
  only-default-codegen;
  flags = " -O3 -I ocamlopt.opt";
+ flags += " -flambda2-no-simplify-stubs";
  flags += " -cfg-prologue-shrink-wrap";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
@@ -101,7 +102,7 @@ loop_with_non_dominating_load:
 .L108:
   testb $1, %bl
   je    .L112
-  movq  camlStdlib__List__Pmakeblock2305@GOTPCREL(%rip), %rax
+  movq  camlStdlib__List__Pmakeblock2278@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
