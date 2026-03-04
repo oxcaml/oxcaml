@@ -518,14 +518,29 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
   in
   set_of_closures, res
 
-let rewrite_static_const (env : env) (sc : SC.t) =
+let rewrite_static_const (env : env) ~(bound_to : Symbol.t) (sc : SC.t) =
   match sc with
   | Set_of_closures set ->
     Misc.fatal_errorf
       "Set of closures given as input to [rewrite_static_const]:@ %a@."
       Set_of_closures.print set
   | Block (tag, mut, shape, fields) ->
-    SC.block tag mut shape (rewrite_simples_with_debuginfo env fields)
+    (* Note: shape contains only kinds, no subkinds: no need to rewrite. *)
+    let bound_name = Code_id_or_name.symbol bound_to in
+    let fields =
+      List.mapi
+        (fun i field ->
+          let kind = K.Scannable_block_shape.element_kind shape i in
+          let f = Field.block i kind in
+          if DS.field_used env.uses bound_name f
+          then rewrite_simple_with_debuginfo env field
+          else
+            Simple.With_debuginfo.create
+              (poison ~machine_width:env.machine_width kind)
+              (Simple.With_debuginfo.dbg field))
+        fields
+    in
+    SC.block tag mut shape fields
   | Boxed_float f -> SC.boxed_float (rewrite_or_variable Float.zero env f)
   | Boxed_float32 f -> SC.boxed_float32 (rewrite_or_variable Float32.zero env f)
   | Boxed_int32 n -> SC.boxed_int32 (rewrite_or_variable Int32.zero env n)
@@ -2071,8 +2086,13 @@ and rebuild_static_const_or_code env res
     in
     static_const_or_code, res
   | Static_const (Other static_const) ->
+    let bound_to =
+      match bound_to with
+      | Block_like sym -> sym
+      | Set_of_closures _ | Code _ -> Misc.fatal_error "Expected [Block_like]"
+    in
     ( Static_const_or_code.create_static_const
-        (rewrite_static_const env static_const),
+        (rewrite_static_const env ~bound_to static_const),
       res )
 
 type result =
