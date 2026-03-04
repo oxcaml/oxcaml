@@ -520,9 +520,10 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
 
 let rewrite_static_const (env : env) (sc : SC.t) =
   match sc with
-  | Set_of_closures _ ->
-    (* Already rewritten *)
-    sc
+  | Set_of_closures set ->
+    Misc.fatal_errorf
+      "Set of closures given as input to [rewrite_static_const]:@ %a@."
+      Set_of_closures.print set
   | Block (tag, mut, shape, fields) ->
     SC.block tag mut shape (rewrite_simples_with_debuginfo env fields)
   | Boxed_float f -> SC.boxed_float (rewrite_or_variable Float.zero env f)
@@ -577,16 +578,6 @@ let rewrite_static_const (env : env) (sc : SC.t) =
     SC.immutable_vec512_array
       (rewrite_or_variables Vector_types.Vec512.Bit_pattern.zero env fields)
   | Empty_array _ | Mutable_string _ | Immutable_string _ -> sc
-
-let rewrite_static_const_or_code env (sc : Static_const_or_code.t) =
-  match sc with
-  | Code _ -> sc
-  | Deleted_code -> sc
-  | Static_const sc ->
-    Static_const_or_code.create_static_const (rewrite_static_const env sc)
-
-let rewrite_static_const_group env (group : Static_const_group.t) =
-  Static_const_group.map ~f:(rewrite_static_const_or_code env) group
 
 let rebuild_named_default_case env (named : Named.t) =
   let[@local] rewrite_field_access arg field =
@@ -1649,7 +1640,6 @@ let rec rebuild_let_expr_static_consts env res bound_static group ~hole =
       res bound_and_group
   in
   let group = Static_const_group.create group_members in
-  let group = rewrite_static_const_group env group in
   ( RE.create_let
       (Bound_pattern.static (Bound_static.create bound_static))
       (Named.create_static_consts group)
@@ -2078,23 +2068,10 @@ and rebuild_static_const_or_code env res
       |> Static_const_or_code.create_static_const
     in
     static_const_or_code, res
-  | Static_const (Other static_const) -> (
-    match static_const with
-    | Block _ | Boxed_float32 _ | Boxed_float _ | Boxed_int32 _ | Boxed_int64 _
-    | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-    | Immutable_float_block _ | Immutable_float_array _
-    | Immutable_float32_array _ | Immutable_int_array _ | Immutable_int8_array _
-    | Immutable_int16_array _ | Immutable_int32_array _
-    | Immutable_int64_array _ | Immutable_nativeint_array _
-    | Immutable_vec128_array _ | Immutable_vec256_array _
-    | Immutable_vec512_array _ | Immutable_value_array _ | Empty_array _
-    | Mutable_string _ | Immutable_string _ ->
-      Static_const_or_code.create_static_const static_const, res
-    | Set_of_closures _ ->
-      Misc.fatal_errorf
-        "Set_of_closures is not permitted in conjunction with Other in the \
-         Static_const case:@ %a"
-        SC.print static_const)
+  | Static_const (Other static_const) ->
+    ( Static_const_or_code.create_static_const
+        (rewrite_static_const env static_const),
+      res )
 
 type result =
   { body : Expr.t;
