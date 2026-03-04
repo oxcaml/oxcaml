@@ -663,7 +663,10 @@ let rebuild_named_default_case env (named : Named.t) =
   | Prim (prim, dbg) ->
     let prim = P.map_args (rewrite_simple env) prim in
     Named.create_prim prim dbg
-  | Set_of_closures s -> Named.create_set_of_closures s (* Already rewritten *)
+  | Set_of_closures s ->
+    Misc.fatal_errorf
+      "[rebuild_named_default_case] called on set of closures:@ %a@."
+      Set_of_closures.print s
   | Static_consts sc ->
     Named.create_static_consts (rewrite_static_const_group env sc)
   | Rec_info r -> Named.create_rec_info r
@@ -1312,7 +1315,7 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
       Named.print defining_expr
 
 let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
-    ~(defining_expr : Rev_expr.rev_named) ~hole =
+    ~(set_of_closures : Rev_expr.rev_set_of_closures) ~hole =
   assert (
     List.for_all
       (fun bv ->
@@ -1331,15 +1334,7 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
             (DS.get_unboxed_fields env.uses
                (Code_id_or_name.var (Bound_var.var bv)))
         in
-        let value_slots =
-          match[@ocaml.warning "-fragile-match"] defining_expr with
-          | Named (Set_of_closures _set) ->
-            (* Possible ? *)
-            assert false
-            (* Set_of_closures.value_slots set *)
-          | Set_of_closures set -> set.value_slots
-          | _ -> assert false
-        in
+        let value_slots = set_of_closures.value_slots in
         Field.Map.fold
           (fun field (var : _ DS.unboxed_fields) hole ->
             match Field.view field with
@@ -1480,22 +1475,6 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
     let defining_expr = rebuild_named_default_case env defining_expr in
     RE.create_let bp defining_expr ~body:hole
 
-let rebuild_set_of_closures_binding_whose_representation_is_being_changed env
-    res bp bvs ~(orig_defining_expr : Rev_expr.rev_named) ~hole =
-  let bound = List.map (fun bv -> Name.var (Bound_var.var bv)) bvs in
-  let set =
-    match[@ocaml.warning "-fragile-match"] orig_defining_expr with
-    | Named (Set_of_closures _set) ->
-      (* Possible ? *)
-      assert false
-      (* Set_of_closures.value_slots set *)
-    | Set_of_closures set -> set
-    | _ -> assert false
-  in
-  let set_of_closures, res = rewrite_set_of_closures env res ~bound set in
-  ( RE.create_let bp (Named.create_set_of_closures set_of_closures) ~body:hole,
-    res )
-
 let rebuild_make_block_default_case env (bp : Bound_pattern.t)
     ~(block_kind : P.Block_kind.t) ~mutability ~alloc_mode ~fields ~hole dbg =
   let bound_name =
@@ -1548,22 +1527,46 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
        dbg)
     ~body:hole
 
-let rebuild_let_expr_holed_set_of_closures env res bvs ~defining_expr
-    ~new_defining_expr ~hole =
+let rebuild_set_of_closures_binding_whose_representation_is_being_changed env
+    res bp bvs ~set_of_closures ~hole =
+  let bound = List.map (fun bv -> Name.var (Bound_var.var bv)) bvs in
+  let set_of_closures, res =
+    rewrite_set_of_closures env res ~bound set_of_closures
+  in
+  ( RE.create_let bp (Named.create_set_of_closures set_of_closures) ~body:hole,
+    res )
+
+let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures ~hole =
   if bound_vars_will_be_unboxed env bvs
   then
     ( rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
-        ~defining_expr ~hole,
+        ~set_of_closures ~hole,
       res )
   else
     let bound_pattern = Bound_pattern.set_of_closures bvs in
     if bound_vars_will_have_their_representation_changed env bvs
     then
       rebuild_set_of_closures_binding_whose_representation_is_being_changed env
-        res bound_pattern bvs ~orig_defining_expr:defining_expr ~hole
+        res bound_pattern bvs ~set_of_closures ~hole
     else
-      let defining_expr = rebuild_named_default_case env new_defining_expr in
-      RE.create_let bound_pattern defining_expr ~body:hole, res
+      let bound = List.map (fun v -> Name.var (Bound_var.var v)) bvs in
+      let set_of_closures, res =
+        rewrite_set_of_closures env res ~bound set_of_closures
+      in
+      let is_phantom =
+        Name_mode.is_phantom (Bound_var.name_mode (List.hd bvs))
+      in
+      let res =
+        { res with
+          all_slot_offsets =
+            Slot_offsets.add_set_of_closures res.all_slot_offsets ~is_phantom
+              set_of_closures
+        }
+      in
+      ( RE.create_let bound_pattern
+          (Named.create_set_of_closures set_of_closures)
+          ~body:hole,
+        res )
 
 let rebuild_let_expr_singleton (env : env) res bv ~(defining_expr : Named.t)
     ~hole : RE.t * rebuild_result =
@@ -1668,26 +1671,6 @@ let rec default_defining_expr_for_rebuilding_let_static_consts env res
     Named.create_static_consts group,
     res )
 
-and default_defining_expr_for_rebuilding_let_set_of_closures env res bound_vars
-    set_of_closures =
-  let bound = List.map (fun v -> Name.var (Bound_var.var v)) bound_vars in
-  let set_of_closures, res =
-    rewrite_set_of_closures env res ~bound set_of_closures
-  in
-  let is_phantom =
-    Name_mode.is_phantom (Bound_var.name_mode (List.hd bound_vars))
-  in
-  let res =
-    { res with
-      all_slot_offsets =
-        Slot_offsets.add_set_of_closures res.all_slot_offsets ~is_phantom
-          set_of_closures
-    }
-  in
-  ( Bound_pattern.set_of_closures bound_vars,
-    Named.create_set_of_closures set_of_closures,
-    res )
-
 and rebuild_let_expr_holed (env : env) res ~(bound_pattern : Bound_pattern.t)
     ~(defining_expr : Rev_expr.rev_named) ~parent ~hole : RE.t * rebuild_result
     =
@@ -1717,12 +1700,8 @@ and rebuild_let_expr_holed (env : env) res ~(bound_pattern : Bound_pattern.t)
         let defining_expr = rebuild_named_default_case env new_defining_expr in
         RE.create_let bound_pattern defining_expr ~body:hole, res
       | Set_of_closures bound_vars, Set_of_closures set_of_closures ->
-        let _, new_defining_expr, res =
-          default_defining_expr_for_rebuilding_let_set_of_closures env res
-            bound_vars set_of_closures
-        in
-        rebuild_let_expr_holed_set_of_closures env res bound_vars ~defining_expr
-          ~new_defining_expr ~hole
+        rebuild_let_expr_holed_set_of_closures env res bound_vars
+          ~set_of_closures ~hole
       | ( (Singleton _ | Static _ | Set_of_closures _),
           (Named _ | Static_consts _ | Set_of_closures _) ) ->
         Misc.fatal_errorf "Bound pattern %a does not match defining expr"
