@@ -591,7 +591,7 @@ module Expr = struct
       ~at_least_these_closure_types:closure_types_in_set
       ~at_least_these_value_slots:value_slots_in_set alloc_mode =
     Closure
-      { exact = true;
+      { exact = false;
         function_slot;
         function_slots_in_set;
         closure_types_in_set;
