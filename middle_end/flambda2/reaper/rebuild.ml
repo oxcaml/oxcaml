@@ -1533,7 +1533,9 @@ let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures ~hole =
        of the set of closures has changed *)
     let bound = List.map (fun v -> Name.var (Bound_var.var v)) bvs in
     let bound_pattern = Bound_pattern.set_of_closures bvs in
-    let is_phantom = Name_mode.is_phantom (Bound_var.name_mode (List.hd bvs)) in
+    let is_phantom =
+      Name_mode.is_phantom (Bound_pattern.name_mode bound_pattern)
+    in
     let set_of_closures, res =
       rewrite_set_of_closures env res ~bound set_of_closures ~is_phantom
     in
