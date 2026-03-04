@@ -1595,20 +1595,6 @@ let rebuild_let_expr_singleton (env : env) res bv
       let defining_expr = rebuild_named_default_case env new_defining_expr in
       RE.create_let bound_pattern defining_expr ~body:hole, res
 
-let rebuild_let_expr_holed0 (env : env) res ~(bound_pattern : Bound_pattern.t)
-    ~(defining_expr : Rev_expr.rev_named) ~new_defining_expr ~hole :
-    RE.t * rebuild_result =
-  match (bound_pattern : Bound_pattern.t) with
-  | Set_of_closures bvs ->
-    rebuild_let_expr_holed_set_of_closures env res bvs ~defining_expr
-      ~new_defining_expr ~hole
-  | Singleton bv ->
-    rebuild_let_expr_singleton env res bv ~defining_expr ~new_defining_expr
-      ~hole
-  | Static _ ->
-    let defining_expr = rebuild_named_default_case env new_defining_expr in
-    RE.create_let bound_pattern defining_expr ~body:hole, res
-
 let rec default_defining_expr_for_rebuilding_let_static_consts env res
     bound_static group =
   let bound_and_group =
@@ -1717,8 +1703,8 @@ and rebuild_let_expr_holed (env : env) res ~(bound_pattern : Bound_pattern.t)
   else
     let subexpr, res =
       match bound_pattern, defining_expr with
-      | Singleton v, Named new_defining_expr ->
-        let v = Bound_var.var v in
+      | Singleton bv, Named new_defining_expr ->
+        let v = Bound_var.var bv in
         (* CR ncourant: we should probably properly track regions *)
         let is_begin_region =
           match new_defining_expr with
@@ -1727,7 +1713,7 @@ and rebuild_let_expr_holed (env : env) res ~(bound_pattern : Bound_pattern.t)
         in
         if is_begin_region || is_var_used env v
         then
-          rebuild_let_expr_holed0 env res ~bound_pattern ~defining_expr
+          rebuild_let_expr_singleton env res bv ~defining_expr
             ~new_defining_expr ~hole
         else hole, res
       | Static bound_static, Static_consts group ->
@@ -1735,14 +1721,14 @@ and rebuild_let_expr_holed (env : env) res ~(bound_pattern : Bound_pattern.t)
           default_defining_expr_for_rebuilding_let_static_consts env res
             bound_static group
         in
-        rebuild_let_expr_holed0 env res ~bound_pattern ~defining_expr
-          ~new_defining_expr ~hole
+        let defining_expr = rebuild_named_default_case env new_defining_expr in
+        RE.create_let bound_pattern defining_expr ~body:hole, res
       | Set_of_closures bound_vars, Set_of_closures set_of_closures ->
-        let bound_pattern, new_defining_expr, res =
+        let _, new_defining_expr, res =
           default_defining_expr_for_rebuilding_let_set_of_closures env res
             bound_vars set_of_closures
         in
-        rebuild_let_expr_holed0 env res ~bound_pattern ~defining_expr
+        rebuild_let_expr_holed_set_of_closures env res bound_vars ~defining_expr
           ~new_defining_expr ~hole
       | ( (Singleton _ | Static _ | Set_of_closures _),
           (Named _ | Static_consts _ | Set_of_closures _) ) ->
