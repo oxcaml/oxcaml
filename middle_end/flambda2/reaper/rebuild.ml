@@ -1238,82 +1238,78 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
         (Unboxed to_bind) arg hole)
 
 let rebuild_singleton_binding_which_is_being_unboxed env bv
-    ~(defining_expr : Rev_expr.rev_named) ~hole =
+    ~(defining_expr : Named.t) ~hole =
   let to_bind =
     Option.get
       (DS.get_unboxed_fields env.uses (Code_id_or_name.var (Bound_var.var bv)))
   in
   match[@ocaml.warning "-fragile-match"] defining_expr with
-  | Named named -> (
-    match[@ocaml.warning "-fragile-match"] named with
-    | Prim (Variadic (Make_block (kind, _, _), args), _dbg) ->
-      Field.Map.fold
-        (fun field (var : _ DS.unboxed_fields) hole ->
-          let arg : _ Either.t =
-            match Field.view field with
-            | Block (nth, field_kind) ->
-              let arg =
-                if nth < List.length args
-                then
-                  let arg = List.nth args nth in
-                  if K.equal field_kind (get_simple_kind env arg)
-                  then arg
-                  else poison ~machine_width:env.machine_width field_kind
+  | Prim (Variadic (Make_block (kind, _, _), args), _dbg) ->
+    Field.Map.fold
+      (fun field (var : _ DS.unboxed_fields) hole ->
+        let arg : _ Either.t =
+          match Field.view field with
+          | Block (nth, field_kind) ->
+            let arg =
+              if nth < List.length args
+              then
+                let arg = List.nth args nth in
+                if K.equal field_kind (get_simple_kind env arg)
+                then arg
                 else poison ~machine_width:env.machine_width field_kind
-              in
-              if simple_is_unboxable env arg
-              then Right (get_simple_unboxable env arg)
-              else Left arg
-            | Is_int -> Left (Simple.untagged_const_false env.machine_width)
-            | Get_tag ->
-              let tag, _ = P.Block_kind.to_shape kind in
-              Left
-                (Simple.untagged_const_int
-                   (Tag.to_targetint_31_63 env.machine_width tag))
-            | Value_slot _ | Function_slot _ | Code_of_closure _ | Apply _
-            | Code_id_of_call_witness ->
-              assert false
+              else poison ~machine_width:env.machine_width field_kind
+            in
+            if simple_is_unboxable env arg
+            then Right (get_simple_unboxable env arg)
+            else Left arg
+          | Is_int -> Left (Simple.untagged_const_false env.machine_width)
+          | Get_tag ->
+            let tag, _ = P.Block_kind.to_shape kind in
+            Left
+              (Simple.untagged_const_int
+                 (Tag.to_targetint_31_63 env.machine_width tag))
+          | Value_slot _ | Function_slot _ | Code_of_closure _ | Apply _
+          | Code_id_of_call_witness ->
+            assert false
+        in
+        match arg with
+        | Left simple ->
+          let var =
+            match var with
+            | Not_unboxed var -> var
+            | Unboxed _ -> Misc.fatal_errorf "Trying to unbox non-unboxable"
           in
-          match arg with
-          | Left simple ->
-            let var =
-              match var with
-              | Not_unboxed var -> var
-              | Unboxed _ -> Misc.fatal_errorf "Trying to unbox non-unboxable"
-            in
-            let bp =
-              Bound_pattern.singleton
-                (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
-              (* CR sspies: Missing debug uid. *)
-            in
-            RE.create_let bp (Named.create_simple simple) ~body:hole
-          | Right arg_fields -> bind_fields var (Unboxed arg_fields) hole)
-        to_bind hole
-    (* | Prim ( Unary (Opaque_identity { middle_end_only = true; _ }, arg), _dbg
-       ) -> (* XXX TO REMOVE *) bind_fields (DS.Unboxed to_bind) (DS.Unboxed
-       (get_simple_unboxable env arg)) hole *)
-    | Prim (Unary (Block_load { field; kind; _ }, arg), dbg) ->
-      let field =
-        Field.block
-          (Target_ocaml_int.to_int field)
-          (P.Block_access_kind.element_kind_for_load kind)
-      in
-      load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
-        ~hole
-    | Prim
-        (Unary (Project_value_slot { value_slot; project_from = _ }, arg), dbg)
-      ->
-      let field = Field.value_slot value_slot in
-      load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
-        ~hole
-    | Prim (Unary (Project_function_slot _, arg), _) | Simple arg ->
-      bind_fields (Unboxed to_bind)
-        (Unboxed (get_simple_unboxable env arg))
-        hole
-    | named ->
-      Format.printf "BOUM ? %a@." Named.print named;
-      assert false)
-  | _ -> assert false
+          let bp =
+            Bound_pattern.singleton
+              (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
+            (* CR sspies: Missing debug uid. *)
+          in
+          RE.create_let bp (Named.create_simple simple) ~body:hole
+        | Right arg_fields -> bind_fields var (Unboxed arg_fields) hole)
+      to_bind hole
+  (* | Prim ( Unary (Opaque_identity { middle_end_only = true; _ }, arg), _dbg )
+     -> (* XXX TO REMOVE *) bind_fields (DS.Unboxed to_bind) (DS.Unboxed
+     (get_simple_unboxable env arg)) hole *)
+  | Prim (Unary (Block_load { field; kind; _ }, arg), dbg) ->
+    let field =
+      Field.block
+        (Target_ocaml_int.to_int field)
+        (P.Block_access_kind.element_kind_for_load kind)
+    in
+    load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
+      ~hole
+  | Prim (Unary (Project_value_slot { value_slot; project_from = _ }, arg), dbg)
+    ->
+    let field = Field.value_slot value_slot in
+    load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
+      ~hole
+  | Prim (Unary (Project_function_slot _, arg), _) | Simple arg ->
+    bind_fields (Unboxed to_bind) (Unboxed (get_simple_unboxable env arg)) hole
+  | defining_expr ->
+    Misc.fatal_errorf
+      "Unexpected [defining_expr] in \
+       [rebuild_singleton_binding_which_is_being_unboxed]:@ %a@."
+      Named.print defining_expr
 
 let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
     ~(defining_expr : Rev_expr.rev_named) ~hole =
@@ -1372,13 +1368,11 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
     hole bvs
 
 let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
-    ~(orig_defining_expr : Rev_expr.rev_named) ~(new_defining_expr : Named.t)
-    ~hole =
+    ~(defining_expr : Named.t) ~hole =
   (* TODO when this block is stored anywhere else, the subkind is no longer
      correct... we need to fix that somehow *)
-  match[@ocaml.warning "-fragile-match"] orig_defining_expr with
-  | Named
-      (Prim (Unary (Project_function_slot { move_from; move_to }, arg), dbg)) ->
+  match[@ocaml.warning "-fragile-match"] defining_expr with
+  | Prim (Unary (Project_function_slot { move_from; move_to }, arg), dbg) ->
     let fields =
       Option.get
         (DS.get_changed_representation env.uses
@@ -1400,7 +1394,7 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
         dbg
     in
     RE.create_let bp named ~body:hole
-  | Named (Prim (Variadic (Make_block (kind, _mut, alloc_mode), args), dbg)) ->
+  | Prim (Variadic (Make_block (kind, _mut, alloc_mode), args), dbg) ->
     let fields =
       Option.get
         (DS.get_changed_representation env.uses
@@ -1480,7 +1474,10 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
      * then [z] will be marked as having its representation changed, because
      * it is equal to [x].  However we don't need to rewrite the [fst y]
      * primitive, which brings us to this case. *)
-    let defining_expr = rebuild_named_default_case env new_defining_expr in
+    (* CR ncourant: should we check that we are in one of the cases we expect?
+       That would be only the projections so block load, project_value_slot and
+       project_function_slot. *)
+    let defining_expr = rebuild_named_default_case env defining_expr in
     RE.create_let bp defining_expr ~body:hole
 
 let rebuild_set_of_closures_binding_whose_representation_is_being_changed env
@@ -1568,10 +1565,17 @@ let rebuild_let_expr_holed_set_of_closures env res bvs ~defining_expr
       let defining_expr = rebuild_named_default_case env new_defining_expr in
       RE.create_let bound_pattern defining_expr ~body:hole, res
 
-let rebuild_let_expr_singleton (env : env) res bv
-    ~(defining_expr : Rev_expr.rev_named) ~new_defining_expr ~hole :
-    RE.t * rebuild_result =
-  if bound_vars_will_be_unboxed env [bv]
+let rebuild_let_expr_singleton (env : env) res bv ~(defining_expr : Named.t)
+    ~hole : RE.t * rebuild_result =
+  (* CR ncourant: we should probably properly track regions *)
+  let is_begin_region =
+    match defining_expr with
+    | Prim (prim, _) -> P.is_begin_region prim
+    | Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _ -> false
+  in
+  if not (is_begin_region || is_var_used env (Bound_var.var bv))
+  then hole, res
+  else if bound_vars_will_be_unboxed env [bv]
   then
     ( rebuild_singleton_binding_which_is_being_unboxed env bv ~defining_expr
         ~hole,
@@ -1580,11 +1584,11 @@ let rebuild_let_expr_singleton (env : env) res bv
   then
     ( rebuild_singleton_binding_whose_representation_is_being_changed env
         (Bound_pattern.singleton bv)
-        bv ~orig_defining_expr:defining_expr ~new_defining_expr ~hole,
+        bv ~defining_expr ~hole,
       res )
   else
     let bound_pattern = Bound_pattern.singleton bv in
-    match[@ocaml.warning "-fragile-match"] new_defining_expr with
+    match[@ocaml.warning "-fragile-match"] defining_expr with
     | Flambda.Prim
         (Variadic (Make_block (block_kind, mutability, alloc_mode), fields), dbg)
       ->
@@ -1592,7 +1596,7 @@ let rebuild_let_expr_singleton (env : env) res bv
           ~mutability ~alloc_mode ~fields ~hole dbg,
         res )
     | _ ->
-      let defining_expr = rebuild_named_default_case env new_defining_expr in
+      let defining_expr = rebuild_named_default_case env defining_expr in
       RE.create_let bound_pattern defining_expr ~body:hole, res
 
 let rec default_defining_expr_for_rebuilding_let_static_consts env res
@@ -1703,19 +1707,8 @@ and rebuild_let_expr_holed (env : env) res ~(bound_pattern : Bound_pattern.t)
   else
     let subexpr, res =
       match bound_pattern, defining_expr with
-      | Singleton bv, Named new_defining_expr ->
-        let v = Bound_var.var bv in
-        (* CR ncourant: we should probably properly track regions *)
-        let is_begin_region =
-          match new_defining_expr with
-          | Prim (prim, _) -> P.is_begin_region prim
-          | Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _ -> false
-        in
-        if is_begin_region || is_var_used env v
-        then
-          rebuild_let_expr_singleton env res bv ~defining_expr
-            ~new_defining_expr ~hole
-        else hole, res
+      | Singleton bv, Named defining_expr ->
+        rebuild_let_expr_singleton env res bv ~defining_expr ~hole
       | Static bound_static, Static_consts group ->
         let bound_pattern, new_defining_expr, res =
           default_defining_expr_for_rebuilding_let_static_consts env res
