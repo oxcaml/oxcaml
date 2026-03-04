@@ -109,12 +109,11 @@ let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
     if is_valid_shift
     then Some (Nativeint.shift_right left (Nativeint.to_int right))
     else None
-  (* CR xclerc for xclerc: some of the following operations could be
-     supported in the future; care is needed as some may clobber
-     registers beyond [res.(0)] on certain targets (e.g. [Imul] may
-     not always lower to a form writing only to the destination). *)
-  | Imul | Imulh _ | Idiv | Imod | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ->
-    None
+  (* CR xclerc for xclerc: some of the following operations could be supported
+     in the future; care is needed as some may clobber registers beyond
+     [res.(0)] on certain targets (e.g. [Imul] may not always lower to a form
+     writing only to the destination). *)
+  | Imul | Imulh _ | Idiv | Imod | Iclz _ | Ictz _ | Ipopcnt | Icomp _ -> None
 
 (* Iterates over the passed instructions, and updates `known_values` so that it
    contains a map from registers to known values after the instructions have
@@ -187,11 +186,10 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
       | Op
           ( Spill | Reload | Dummy_use | Const_symbol _ | Const_vec128 _
           | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _ | Store _
-          | Int128op _ | Intop_atomic _ | Floatop _
-          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-          | Opaque | Begin_region | End_region | Specific _
-          | Name_for_debugger _ | Dls_get | Poll | Pause | Alloc _ | Tls_get
-          | Domain_index )
+          | Int128op _ | Intop_atomic _ | Floatop _ | Csel _
+          | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
+          | Begin_region | End_region | Specific _ | Name_for_debugger _
+          | Dls_get | Poll | Pause | Alloc _ | Tls_get | Domain_index )
       | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
       | Stack_check _ ->
         Array.iter
