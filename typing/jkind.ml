@@ -2388,7 +2388,7 @@ let for_abbreviation ~type_jkind_purely ~modality ty =
     { base = jkind.jkind.base;
       mod_bounds = Mod_bounds.min;
       with_bounds = With_bounds with_bounds_types;
-      stage = Known 0
+      stage = jkind.jkind.stage
     }
     ~annotation:None ~why:Abbreviation
 
@@ -3665,8 +3665,11 @@ let sub_jkind_l ~type_equal ~context ~level ?(allow_any_crossing = false) env
   let sub_jkind = Base_and_axes.fully_expand_aliases env sub.jkind in
   let super_jkind = Base_and_axes.fully_expand_aliases env super.jkind in
   let* () =
-    (* Validate layouts and check stages *)
+    (* Validate layouts *)
     require_le (Base.sub_expanded ~level sub_jkind.base super_jkind.base)
+  in
+  let* () =
+    require_le (Stage.less_or_equal sub_jkind.stage super_jkind.stage)
   in
   match allow_any_crossing with
   | true -> Ok ()
