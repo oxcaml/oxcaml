@@ -87,6 +87,10 @@ type known_value =
 
 let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
   let open Operation in
+  let is_valid_shift =
+    Nativeint.compare right 0n >= 0
+    && Nativeint.compare right (Nativeint.of_int Nativeint.size) < 0
+  in
   match op with
   | Iadd -> Some (Nativeint.add left right)
   | Isub -> Some (Nativeint.sub left right)
@@ -95,18 +99,15 @@ let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
   | Ior -> Some (Nativeint.logor left right)
   | Ixor -> Some (Nativeint.logxor left right)
   | Ilsl ->
-    if Nativeint.compare right 0n >= 0
-       && Nativeint.compare right (Nativeint.of_int Nativeint.size) < 0
+    if is_valid_shift
     then Some (Nativeint.shift_left left (Nativeint.to_int right))
     else None
   | Ilsr ->
-    if Nativeint.compare right 0n >= 0
-       && Nativeint.compare right (Nativeint.of_int Nativeint.size) < 0
+    if is_valid_shift
     then Some (Nativeint.shift_right_logical left (Nativeint.to_int right))
     else None
   | Iasr ->
-    if Nativeint.compare right 0n >= 0
-       && Nativeint.compare right (Nativeint.of_int Nativeint.size) < 0
+    if is_valid_shift
     then Some (Nativeint.shift_right left (Nativeint.to_int right))
     else None
   | Imulh _ | Idiv | Imod | Iclz _ | Ictz _ | Ipopcnt | Icomp _ -> None
@@ -136,6 +137,20 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
       known_values
   in
   Dll.iter instrs ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+      let apply_int_op op right_opt =
+        let result_opt =
+          match find_opt instr.arg.(0) with
+          | Some (Const_int left) -> (
+            match right_opt with
+            | Some right -> eval_int_op op left right
+            | None -> None)
+          | Some (Const_float32 _ | Const_float _) | None -> None
+        in
+        (match result_opt with
+        | Some result -> replace instr.res.(0) (Const_int result)
+        | None -> remove instr.res.(0));
+        remove_destroyed instr
+      in
       match instr.desc with
       | Op (Const_int c) -> replace instr.res.(0) (Const_int c)
       | Op (Const_float32 c) ->
@@ -154,32 +169,17 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
           replace instr.res.(0) value
         | Some _ | None -> remove instr.res.(0))
       | Op (Intop_imm (op, imm)) ->
-        let result_opt =
-          match find_opt instr.arg.(0) with
-          | Some (Const_int left) ->
-            eval_int_op op left (Nativeint.of_int imm)
-          | Some (Const_float32 _ | Const_float _) | None -> None
-        in
-        (match result_opt with
-        | Some result -> replace instr.res.(0) (Const_int result)
-        | None -> remove instr.res.(0));
-        remove_destroyed instr
+        apply_int_op op (Some (Nativeint.of_int imm))
       | Op (Intop op) ->
-        let result_opt =
+        let right_opt =
           if Operation.is_unary_integer_operation op
           then None
           else
-            match find_opt instr.arg.(0) with
-            | Some (Const_int left) -> (
-              match find_opt instr.arg.(1) with
-              | Some (Const_int right) -> eval_int_op op left right
-              | Some (Const_float32 _ | Const_float _) | None -> None)
+            match find_opt instr.arg.(1) with
+            | Some (Const_int v) -> Some v
             | Some (Const_float32 _ | Const_float _) | None -> None
         in
-        (match result_opt with
-        | Some result -> replace instr.res.(0) (Const_int result)
-        | None -> remove instr.res.(0));
-        remove_destroyed instr
+        apply_int_op op right_opt
       | Op
           ( Spill | Reload | Dummy_use | Const_symbol _ | Const_vec128 _
           | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _ | Store _
