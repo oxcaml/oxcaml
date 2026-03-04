@@ -129,8 +129,8 @@ let eval_float_op op (left : float) (right : float option) : float option =
 (* Iterates over the passed instructions, and updates `known_values` so that it
    contains a map from registers to known values after the instructions have
    been executed. Currently only tracks constant values, moves between
-   registers, basic integer arithmetic, and basic float64 arithmetic over
-   known values. *)
+   registers, basic integer arithmetic, and basic float64 arithmetic over known
+   values. *)
 let collect_known_values (instrs : Cfg.basic_instruction_list) :
     known_value Reg.UsingLocEquality.Tbl.t =
   let known_values = Reg.UsingLocEquality.Tbl.create 17 in
@@ -214,8 +214,8 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
           let right_opt =
             match (op : Operation.float_operation) with
             | Inegf | Iabsf -> None
-            | Iaddf | Isubf | Imulf | Idivf | Icompf _ ->
-              (match find_opt instr.arg.(1) with
+            | Iaddf | Isubf | Imulf | Idivf | Icompf _ -> (
+              match find_opt instr.arg.(1) with
               | Some (Const_float bits) -> Some (Int64.float_of_bits bits)
               | Some (Const_int _ | Const_float32 _) | None -> None)
           in
@@ -227,10 +227,12 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
       | Op
           ( Spill | Reload | Dummy_use | Const_symbol _ | Const_vec128 _
           | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _ | Store _
-          | Int128op _ | Intop_atomic _ | Floatop (Float32, _) | Csel _
-          | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
-          | Begin_region | End_region | Specific _ | Name_for_debugger _
-          | Dls_get | Poll | Pause | Alloc _ | Tls_get | Domain_index )
+          | Int128op _ | Intop_atomic _
+          | Floatop (Float32, _)
+          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
+          | Opaque | Begin_region | End_region | Specific _
+          | Name_for_debugger _ | Dls_get | Poll | Pause | Alloc _ | Tls_get
+          | Domain_index )
       | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
       | Stack_check _ ->
         Array.iter
