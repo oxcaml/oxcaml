@@ -645,6 +645,8 @@ and print_out_jkind_const ppf ojkind =
     | Ojkind_const_product ts ->
       let pp_sep ppf () = fprintf ppf "@ & " in
       pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+    | Ojkind_const_quote t ->
+      fprintf ppf "<[%a]>" (pp_element ~nested:false) t
     | Ojkind_const_with _ -> failwith "XXX unreachable (stripped off earlier)"
     | Ojkind_const_kind_of _ ->
       failwith "XXX unimplemented jkind syntax");
@@ -670,6 +672,8 @@ and print_out_jkind ppf ojkind =
     | Ojkind_product ts ->
       let pp_sep ppf () = fprintf ppf "@ & " in
       pp_nested_list ~nested ~pp_element ~pp_sep ppf ts
+    | Ojkind_quote t ->
+      fprintf ppf "<[%a]>" (pp_element ~nested:false) t
   in
   pp_element ~nested:false ppf ojkind
 

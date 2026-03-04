@@ -1397,6 +1397,7 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
     Ojkind_var ("'_representable_layout_" ^
                 Int.to_string (Jkind.Sort.Var.get_print_number n),
                 Jkind.Scannable_axes.to_string_list sa)
+    |> quote_out_jkind desc.stage
   (* Analyze a product before calling [get_const]: the machinery in
      [Jkind.Const.to_out_jkind_const] works better for atomic layouts, not
      products. *)
@@ -1406,9 +1407,23 @@ let rec out_jkind_of_desc env (desc : 'd Jkind.Desc.t) =
          (fun layout ->
             out_jkind_of_desc env { desc with base = Layout layout })
          lays)
+    |> quote_out_jkind desc.stage
   | _ -> match Jkind.Desc.get_const desc with
+    (* quotes are handled in [to_out_jkind_const] *)
     | Some c -> out_jkind_of_const_jkind env c
     | None -> assert false (* handled above *)
+
+and quote_out_jkind stage out_jkind =
+  match stage with
+  | Unknown -> out_jkind
+  | Known n ->
+    let rec loop acc n =
+      if n > 0
+      then loop (Ojkind_quote acc) (n - 1)
+      else acc
+    in
+    loop out_jkind n
+
 
 (* returns None for [value], according to (C2.1) from
    Note [When to print jkind annotations] *)

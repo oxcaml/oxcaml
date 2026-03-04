@@ -659,6 +659,11 @@ module Stage = struct
     | Unknown -> Some Unknown
     | Known stage -> if stage > 0 then Some (Known (stage - 1)) else None
 
+  let rec format_staged stage f ppf =
+    match stage with
+    | Unknown | Known 0 -> Fmt.fprintf ppf "%a" f
+    | Known n -> Fmt.fprintf ppf "<[%a]>" (format_staged (Known (n - 1)) f)
+
   let debug_print ppf = function
     | Unknown -> Format.fprintf ppf "?"
     | Known n -> Format.fprintf ppf "%d" n
@@ -1936,11 +1941,26 @@ module Const = struct
         then base
         else Outcometree.Ojkind_const_mod (Some base, modal_bounds)
       in
-      (* Finally, add on the [with]-types and their modalities *)
-      List.fold_left
-        (fun jkind (ty, modalities) ->
-          Outcometree.Ojkind_const_with (jkind, ty, modalities))
-        base printable_with_bounds
+      (* Add on the [with]-types and their modalities *)
+      let base =
+        List.fold_left
+          (fun jkind (ty, modalities) ->
+            Outcometree.Ojkind_const_with (jkind, ty, modalities))
+          base printable_with_bounds
+      in
+      (* Quote the kind if necessary *)
+      let base =
+        match jkind.stage with
+        | Unknown -> base
+        | Known n ->
+          let rec loop acc n =
+            if n > 0
+            then loop (Outcometree.Ojkind_const_quote acc) (n - 1)
+            else acc
+          in
+          loop base n
+      in
+      base
   end
 
   let to_out_jkind_const jkind =
@@ -2205,7 +2225,7 @@ module Desc = struct
         | Some c -> Const.format ~verbosity env ppf c
         | None -> assert false (* handled above *))
     in
-    format_desc ppf ~nested:false t
+    Stage.format_staged t.stage (format_desc ~nested:false) ppf t
 
   let format ppf t = format_verbose ~verbosity:Not_verbose ppf t
 end
