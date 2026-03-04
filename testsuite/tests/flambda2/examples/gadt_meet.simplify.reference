@@ -1,0 +1,98 @@
+let code with_y_0 deleted in
+let $camlGadt_meet__const_block18 = Block 0 (0) in
+let $camlGadt_meet__const_block20 = Block 0 ($camlGadt_meet__const_block18)
+in
+let code f_1 deleted in
+let code get_2 deleted in
+let $camlGadt_meet__const_block39 = Block 0 (1) in
+let code test_3 deleted in
+let $camlGadt_meet__immstring59 = "Error" in
+let code foo_4 deleted in
+let code loopify(never) size(10) newer_version_of(with_y_0)
+      with_y_0_1 (b : [ 0 of imm tagged ], y : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of imm tagged ] =
+  let Pfield = %block_load.[`0`] (b) in
+  let int_add = %int_barith.add (Pfield, y) in
+  let Pmakeblock = %block.[`0`] (int_add) in
+  cont k (Pmakeblock)
+in
+let $camlGadt_meet__with_y_5 = closure with_y_0_1 @with_y in
+let code inline(never) loopify(never) size(1) newer_version_of(f_1)
+      f_1_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of [ 0 of imm tagged ] |1 of imm tagged ] =
+  cont k ($camlGadt_meet__const_block20)
+in
+let $camlGadt_meet__f_6 = closure f_1_1 @f in
+let code loopify(never) size(2) newer_version_of(get_2)
+      get_2_1 (t : [ 0 of [ 0 of imm tagged ] |1 of imm tagged ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of imm tagged ] =
+  let Pfield = %block_load.[`0`] (t) in
+  cont k (Pfield)
+in
+let $camlGadt_meet__get_7 = closure get_2_1 @get in
+let code loopify(never) size(44) newer_version_of(test_3)
+      test_3_1 (x)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 | 0 of val ] =
+  apply direct(f_1_1)
+    ($camlGadt_meet__f_6 : _ -> [ 0 of [ 0 of imm tagged ] |1 of imm tagged ]
+     )
+      (0)
+      -> k2 * k1
+    where k2 (op : [ 0 of [ 0 of imm tagged ] |1 of imm tagged ]) =
+      let Pfield = %block_load.[`0`] (op) in
+      (apply direct(with_y_0_1)
+         ($camlGadt_meet__with_y_5 : _ -> [ 0 of imm tagged ])
+           (Pfield, 1)
+           -> k2 * k1
+         where k2 (apply_result : [ 0 of imm tagged ]) =
+           (apply ccall
+              ($`*extern*`.caml_equal : val * val -> val)
+                (apply_result, $camlGadt_meet__const_block39)
+                -> k2 * k1
+              where k2 (Pccall) =
+                ((let untagged = %untag_imm (Pccall) in
+                  switch untagged
+                    | 0 -> k2
+                    | 1 -> k (0))
+                   where k2 =
+                     let Pmakeblock = %block.[`0`] (x, op) in
+                     let Pmakeblock_1 = %block.[`0`] (Pmakeblock) in
+                     cont k (Pmakeblock_1))))
+in
+let $camlGadt_meet__test_8 = closure test_3_1 @test in
+let $camlGadt_meet__Pmakeblock146 =
+  Block 0 ($`*predef*`.caml_exn_Failure, $camlGadt_meet__immstring59)
+in
+let code loopify(never) size(17) newer_version_of(foo_4)
+      foo_4_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of imm tagged * [ 0 of val |1 of imm tagged ] ] =
+  apply direct(test_3_1)
+    ($camlGadt_meet__test_8 : _ -> [ 0 | 0 of val ]) (0) -> k2 * k1
+    where k2 (`*match*` : [ 0 | 0 of val ]) =
+      let prim = %is_int (`*match*`) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k1 pop(reraise k1) ($camlGadt_meet__Pmakeblock146)
+         where k2 =
+           let Pfield = %block_load.[`0`] (`*match*`) in
+           cont k (Pfield))
+in
+let $camlGadt_meet__foo_9 = closure foo_4_1 @foo in
+let $camlGadt_meet =
+  Block 0 ($camlGadt_meet__with_y_5,
+           $camlGadt_meet__f_6,
+           $camlGadt_meet__get_7,
+           $camlGadt_meet__test_8,
+           $camlGadt_meet__foo_9)
+in
+cont done ($camlGadt_meet)

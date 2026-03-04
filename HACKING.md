@@ -106,7 +106,6 @@ install parallel`.
 
 There is also a `make ci` target which does a full build and test run.
 
-Some of our tests are expect tests run using a custom tool called `flexpect`.
 Corrected outputs can be promoted using `make promote`.
 
 See `HACKING.ox.adoc` for documentation on additional test-related

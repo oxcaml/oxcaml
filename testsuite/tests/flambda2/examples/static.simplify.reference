@@ -1,0 +1,50 @@
+let code g_1 deleted in
+let code h_2 deleted in
+let code f_0 deleted in
+let code loopify(never) size(12) newer_version_of(g_1)
+      g_1_1 (b : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let x = %project_value_slot.[`g`].[`x`] (my_closure) in
+  let untagged = %untag_imm (b) in
+  switch untagged
+    | 0 -> k (42)
+    | 1 -> k (x)
+in
+let code loopify(never) size(10) newer_version_of(h_2)
+      h_2_1 (acc : imm tagged, x : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let g = %project_value_slot.[`h`].[`g`] (my_closure) in
+  apply direct(g_1_1) (g : _ -> imm tagged) (0) -> k2 * k1
+    where k2 (apply_result : imm tagged) =
+      let int_add = %int_barith.add (acc, x) in
+      let int_add_1 = %int_barith.add (int_add, apply_result) in
+      cont k (int_add_1)
+in
+let code loopify(never) size(58) newer_version_of(f_0)
+      f_0_1 (x : imm tagged, l : [ 0 | 0 of val * [ 0 | 0 of val * val ] ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let g = closure g_1_1 @g with { x = x } in
+  let h = closure h_2_1 @h with { g = g } in
+  cont self (0, l)
+    where rec self (accu, l_1 : [ 0 | 0 of val * [ 0 | 0 of val * val ] ]) =
+      let prim = %is_int (l_1) in
+      (switch prim
+         | 0 -> k2
+         | 1 -> k (accu)
+         where k2 =
+           let Pfield = %block_load.[`1`] (l_1) in
+           ((let Pfield_1 = %block_load.[`0`] (l_1) in
+             apply direct(h_2_1) inlining_state(depth(10))
+               h (accu, Pfield_1) -> k2 * k1)
+              where k2 (apply_result) =
+                cont self (apply_result, Pfield)))
+in
+let $camlStatic__f_3 = closure f_0_1 @f in
+let $camlStatic = Block 0 ($camlStatic__f_3) in
+cont done ($camlStatic)

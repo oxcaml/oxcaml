@@ -111,8 +111,6 @@ type pass = Oxcaml_flags.Flambda2.Dump.pass =
 
 val dump_fexpr : pass -> dump_target
 
-val dump_flexpect : unit -> dump_target
-
 val dump_slot_offsets : unit -> bool
 
 val dump_flow : unit -> bool

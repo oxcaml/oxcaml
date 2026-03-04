@@ -1,0 +1,28 @@
+let code is_valid_0 deleted in
+let code loopify(never) size(41) newer_version_of(is_valid_0)
+      is_valid_0_1 (i : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let prim = %int_comp.le (0, i) in
+   switch prim
+     | 0 -> k2
+     | 1 -> k3
+     where k3 =
+       let prim_1 = %int_comp.le (i, 55295) in
+       switch prim_1
+         | 0 -> k2
+         | 1 -> k (1))
+    where k2 =
+      let prim = %int_comp.le (57344, i) in
+      (switch prim
+         | 0 -> k (0)
+         | 1 -> k2
+         where k2 =
+           let prim_1 = %int_comp.le (i, 1114111) in
+           let int_lessequal = %tag_imm (prim_1) in
+           cont k (int_lessequal))
+in
+let $camlAndor__is_valid_1 = closure is_valid_0_1 @is_valid in
+let $camlAndor = Block 0 ($camlAndor__is_valid_1) in
+cont done ($camlAndor)

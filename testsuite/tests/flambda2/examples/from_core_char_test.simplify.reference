@@ -1,0 +1,139 @@
+let $camlFrom_core_char_test__string18 = "index out of bounds" in
+let $camlFrom_core_char_test__block20 =
+  Block 0 ($`*predef*`.caml_exn_Invalid_argument,
+           $camlFrom_core_char_test__string18)
+in
+let $camlFrom_core_char_test__immstring26 = "from_core_char_test.ml" in
+let $camlFrom_core_char_test__const_block28 =
+  Block 0 ($camlFrom_core_char_test__immstring26, 24, 56)
+in
+let $camlFrom_core_char_test__Pmakeblock31 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure,
+           $camlFrom_core_char_test__const_block28)
+in
+let code char_of_string_0 deleted in
+let code result_is_error_1 deleted in
+let code result_try_with_2 deleted in
+let $camlFrom_core_char_test__immstring64 = "c" in
+let code test_3 deleted in
+let $camlFrom_core_char_test__const_block87 =
+  Block 0 ($camlFrom_core_char_test__immstring26, 35, 35)
+in
+let $camlFrom_core_char_test__Pmakeblock90 =
+  Block 0 ($`*predef*`.caml_exn_Assert_failure,
+           $camlFrom_core_char_test__const_block87)
+in
+let code top_5 deleted in
+let code inline(always) loopify(never) size(40) newer_version_of(char_of_string_0)
+      char_of_string_0_1 (s : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %string_length (s) in
+  let `*match*` = %tag_imm (prim) in
+  let prim_1 = %int_comp.ne (`*match*`, 1) in
+  switch prim_1
+    | 0 -> k2
+    | 1 -> k1 pop(regular k1) ($camlFrom_core_char_test__Pmakeblock31)
+    where k2 =
+      ((let prim_2 = %num_conv.[`imm`].[`nativeint`] (prim) in
+        let prim_3 = %int_comp.`nativeint`.unsigned.lt (0n, prim_2) in
+        switch prim_3
+          | 0 -> k2
+          | 1 -> k3)
+         where k3 =
+           let prim_2 = %string_load.[`8`] (s, 0i) in
+           let Pstringrefs = %tag_imm (prim_2) in
+           cont k (Pstringrefs)
+         where k2 =
+           cont k1 pop(regular k1) ($camlFrom_core_char_test__block20))
+in
+let $camlFrom_core_char_test__char_of_string_6 =
+  closure char_of_string_0_1 @char_of_string
+in
+let code inline(always) loopify(never) size(5) newer_version_of(result_is_error_1)
+      result_is_error_1_1 (r : [ 0 of val |1 of val ])
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %get_tag (r) in
+  let tagged_scrutinee = %tag_imm (prim) in
+  cont k (tagged_scrutinee)
+in
+let $camlFrom_core_char_test__result_is_error_7 =
+  closure result_is_error_1_1 @result_is_error
+in
+let code inline(always) loopify(never) size(29) newer_version_of(result_try_with_2)
+      result_try_with_2_1 (f : val)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : [ 0 of val |1 of val ] =
+  let try_region = %begin_try_region () in
+  let try_ghost_region = %begin_try_ghost_region () in
+  cont k3 push(k2)
+    where k3 =
+      (apply f (0) -> k3 * k2
+         where k3 (apply_result : val) =
+           let Pmakeblock = %block.[`0`] (apply_result) in
+           cont k pop(k2) (Pmakeblock))
+    where k2 exn (`exn` : val) =
+      let `unit` = %end_try_region (try_region) in
+      let unit_1 = %end_try_ghost_region (try_ghost_region) in
+      let Pmakeblock = %block.[`1`] (`exn`) in
+      cont k (Pmakeblock)
+in
+let $camlFrom_core_char_test__result_try_with_8 =
+  closure result_try_with_2_1 @result_try_with
+in
+let code inline(always) loopify(never) size(20) newer_version_of(test_3)
+      test_3_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  let prim = %string_load.[`8`] ($camlFrom_core_char_test__immstring64, 0i)
+  in
+  let Pstringrefs = %tag_imm (prim) in
+  let prim_1 = %phys_eq (Pstringrefs, 99) in
+  switch prim_1
+    | 0 -> k (0)
+    | 1 -> k2
+    where k2 =
+      let try_region = %begin_try_region () in
+      let try_ghost_region = %begin_try_ghost_region () in
+      let `unit` = %end_try_region (try_region) in
+      let unit_1 = %end_try_ghost_region (try_ghost_region) in
+      cont k (1)
+in
+let $camlFrom_core_char_test__test_9 = closure test_3_1 @test in
+let code loopify(never) size(30) newer_version_of(top_5)
+      top_5_1 (param : imm tagged)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : imm tagged =
+  (let prim = %string_load.[`8`] ($camlFrom_core_char_test__immstring64, 0i)
+   in
+   let Pstringrefs = %tag_imm (prim) in
+   let prim_1 = %phys_eq (Pstringrefs, 99) in
+   switch prim_1
+     | 0 -> k2 (0i)
+     | 1 -> k3
+     where k3 =
+       let try_region = %begin_try_region () in
+       let try_ghost_region = %begin_try_ghost_region () in
+       let `unit` = %end_try_region (try_region) in
+       let unit_1 = %end_try_ghost_region (try_ghost_region) in
+       cont k2 (1i))
+    where k2 (naked_immediate : imm) =
+      switch naked_immediate
+        | 0 -> k1 pop(regular k1) ($camlFrom_core_char_test__Pmakeblock90)
+        | 1 -> k (0)
+in
+let $camlFrom_core_char_test__top_11 = closure top_5_1 @top in
+let $camlFrom_core_char_test =
+  Block 0 ($camlFrom_core_char_test__char_of_string_6,
+           $camlFrom_core_char_test__result_is_error_7,
+           $camlFrom_core_char_test__result_try_with_8,
+           $camlFrom_core_char_test__test_9,
+           $camlFrom_core_char_test__top_11)
+in
+cont done ($camlFrom_core_char_test)

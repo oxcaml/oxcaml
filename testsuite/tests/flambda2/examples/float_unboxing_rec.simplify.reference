@@ -1,0 +1,34 @@
+let code f_0 deleted in
+let code loopify(never) size(42) newer_version_of(f_0)
+      f_0_1 (n : imm tagged, x : float boxed)
+        my_closure _region _ghost_region my_depth
+        -> k * k1
+        : float boxed =
+  (let prim = %int_comp.le (0, n) in
+   switch prim
+     | 0 -> k4
+     | 1 -> k3
+     where k4 =
+       let unboxed_float = %unbox_num.`float` (x) in
+       cont k2 (unboxed_float)
+     where k3 =
+       ((let unboxed_float = %unbox_num.`float` (x) in
+         cont k3 (0, unboxed_float))
+          where rec k3 (i : imm tagged, unboxed_float : float) =
+            let prim_1 = %unbox_num.`float` (x) in
+            let prim_2 = %bfloat_arith.add (unboxed_float, prim_1) in
+            let prim_3 = %int_comp.ne (i, n) in
+            (switch prim_3
+               | 0 -> k2 (prim_2)
+               | 1 -> k4
+               where k4 =
+                 let int_succ = %int_barith.add (i, 1) in
+                 cont k3 (int_succ, prim_2))))
+    where k2 (unboxed_float : float) =
+      let prim = %bfloat_arith.add (unboxed_float, 0x0p+0) in
+      let float_add = %box_num.`float` (prim) in
+      cont k (float_add)
+in
+let $camlFloat_unboxing_rec__f_1 = closure f_0_1 @f in
+let $camlFloat_unboxing_rec = Block 0 ($camlFloat_unboxing_rec__f_1) in
+cont done ($camlFloat_unboxing_rec)
