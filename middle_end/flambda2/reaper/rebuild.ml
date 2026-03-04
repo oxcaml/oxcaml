@@ -390,7 +390,7 @@ let rewrite_simple_with_debuginfo env (simple : Simple.With_debuginfo.t) =
 let rewrite_simples_with_debuginfo env simples =
   List.map (rewrite_simple_with_debuginfo env) simples
 
-let rewrite_set_of_closures env res ~(bound : Name.t list)
+let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
     ({ Rev_expr.function_decls; value_slots; alloc_mode } :
       Rev_expr.rev_set_of_closures) =
   let slot_is_used slot =
@@ -512,7 +512,7 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
   let res =
     { res with
       all_slot_offsets =
-        Slot_offsets.add_set_of_closures res.all_slot_offsets ~is_phantom:false
+        Slot_offsets.add_set_of_closures res.all_slot_offsets ~is_phantom
           set_of_closures
     }
   in
@@ -668,7 +668,9 @@ let rebuild_named_default_case env (named : Named.t) =
       "[rebuild_named_default_case] called on set of closures:@ %a@."
       Set_of_closures.print s
   | Static_consts sc ->
-    Named.create_static_consts (rewrite_static_const_group env sc)
+    Misc.fatal_errorf
+      "[rebuild_named_default_case] called on static consts:@ %a@."
+      Static_const_group.print sc
   | Rec_info r -> Named.create_rec_info r
 
 let rewrite_apply_cont_expr env ac =
@@ -1527,46 +1529,27 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
        dbg)
     ~body:hole
 
-let rebuild_set_of_closures_binding_whose_representation_is_being_changed env
-    res bp bvs ~set_of_closures ~hole =
-  let bound = List.map (fun bv -> Name.var (Bound_var.var bv)) bvs in
-  let set_of_closures, res =
-    rewrite_set_of_closures env res ~bound set_of_closures
-  in
-  ( RE.create_let bp (Named.create_set_of_closures set_of_closures) ~body:hole,
-    res )
-
 let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures ~hole =
   if bound_vars_will_be_unboxed env bvs
   then
     ( rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
         ~set_of_closures ~hole,
       res )
+  else if not (List.exists (fun v -> is_var_used env (Bound_var.var v)) bvs)
+  then hole, res
   else
+    (* [rewrite_set_of_closures] also handles the case where the representation
+       of the set of closures has changed *)
+    let bound = List.map (fun v -> Name.var (Bound_var.var v)) bvs in
     let bound_pattern = Bound_pattern.set_of_closures bvs in
-    if bound_vars_will_have_their_representation_changed env bvs
-    then
-      rebuild_set_of_closures_binding_whose_representation_is_being_changed env
-        res bound_pattern bvs ~set_of_closures ~hole
-    else
-      let bound = List.map (fun v -> Name.var (Bound_var.var v)) bvs in
-      let set_of_closures, res =
-        rewrite_set_of_closures env res ~bound set_of_closures
-      in
-      let is_phantom =
-        Name_mode.is_phantom (Bound_var.name_mode (List.hd bvs))
-      in
-      let res =
-        { res with
-          all_slot_offsets =
-            Slot_offsets.add_set_of_closures res.all_slot_offsets ~is_phantom
-              set_of_closures
-        }
-      in
-      ( RE.create_let bound_pattern
-          (Named.create_set_of_closures set_of_closures)
-          ~body:hole,
-        res )
+    let is_phantom = Name_mode.is_phantom (Bound_var.name_mode (List.hd bvs)) in
+    let set_of_closures, res =
+      rewrite_set_of_closures env res ~bound set_of_closures ~is_phantom
+    in
+    ( RE.create_let bound_pattern
+        (Named.create_set_of_closures set_of_closures)
+        ~body:hole,
+      res )
 
 let rebuild_let_expr_singleton (env : env) res bv ~(defining_expr : Named.t)
     ~hole : RE.t * rebuild_result =
@@ -1602,8 +1585,7 @@ let rebuild_let_expr_singleton (env : env) res bv ~(defining_expr : Named.t)
       let defining_expr = rebuild_named_default_case env defining_expr in
       RE.create_let bound_pattern defining_expr ~body:hole, res
 
-let rec default_defining_expr_for_rebuilding_let_static_consts env res
-    bound_static group =
+let rec rebuild_let_expr_static_consts env res bound_static group ~hole =
   let bound_and_group =
     List.filter_map
       (fun ((p, e) as arg :
@@ -1667,8 +1649,11 @@ let rec default_defining_expr_for_rebuilding_let_static_consts env res
       res bound_and_group
   in
   let group = Static_const_group.create group_members in
-  ( Bound_pattern.static (Bound_static.create bound_static),
-    Named.create_static_consts group,
+  let group = rewrite_static_const_group env group in
+  ( RE.create_let
+      (Bound_pattern.static (Bound_static.create bound_static))
+      (Named.create_static_consts group)
+      ~body:hole,
     res )
 
 and rebuild_let_expr_holed (env : env) res ~(bound_pattern : Bound_pattern.t)
@@ -1693,12 +1678,7 @@ and rebuild_let_expr_holed (env : env) res ~(bound_pattern : Bound_pattern.t)
       | Singleton bv, Named defining_expr ->
         rebuild_let_expr_singleton env res bv ~defining_expr ~hole
       | Static bound_static, Static_consts group ->
-        let bound_pattern, new_defining_expr, res =
-          default_defining_expr_for_rebuilding_let_static_consts env res
-            bound_static group
-        in
-        let defining_expr = rebuild_named_default_case env new_defining_expr in
-        RE.create_let bound_pattern defining_expr ~body:hole, res
+        rebuild_let_expr_static_consts env res bound_static group ~hole
       | Set_of_closures bound_vars, Set_of_closures set_of_closures ->
         rebuild_let_expr_holed_set_of_closures env res bound_vars
           ~set_of_closures ~hole
@@ -2091,6 +2071,7 @@ and rebuild_static_const_or_code env res
     let bound_to = List.map Name.symbol bound_to in
     let set_of_closures, res =
       rewrite_set_of_closures env res ~bound:bound_to set_of_closures
+        ~is_phantom:false
     in
     let static_const_or_code =
       SC.set_of_closures set_of_closures
