@@ -225,6 +225,15 @@ let eval code =
   in
   Warnings.check_fatal () (* TODO: more error handling? *);
   (* TODO: assert program.arg_block_idx is none? *)
+  (* We ignore the comptime bit here because eval'd stuff is dynamic, we could
+     consider packaging the comptime component up in the result if the quoted
+     mode is static, which would let us do something like:
+     [{
+      val eval : <[ 'a @ static ]> expr -> <[ 'a ]> eval with_static_data
+      val inject
+        :  (('a. 'a with_static_data -> <[ 'a @ static ]> expr) -> 'b expr)
+        -> 'b eval
+     }] *)
   let { Lambda.sval_comptime = _; sval_runtime = raw_lambda } =
     Slambda.eval Fun.id tlambda_program.code
   in
