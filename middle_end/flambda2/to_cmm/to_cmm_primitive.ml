@@ -975,7 +975,7 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
     | Xor -> wrap C.xor_int)
 
 let binary_int_shift_primitive _env dbg kind (op : P.int_shift_op) x y =
-  (* See comments on [binary_int_arity_primitive], above, about sign extension
+  (* See comments on [binary_int_arith_primitive], above, about sign extension
      and use of [C.low_bits]. *)
   match[@warning "-fragile-match"] (kind : K.Standard_int.t) with
   | Tagged_immediate -> (
