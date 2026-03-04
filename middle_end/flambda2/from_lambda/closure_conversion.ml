@@ -1809,35 +1809,33 @@ let close_exact_or_unknown_apply acc env
       ~probe ~position
       ~relative_history:(Env.relative_history_from_scoped ~loc env)
   in
-  if Flambda_features.classic_mode ()
+  if not (Flambda_features.classic_mode ())
+  then Expr_with_acc.create_apply acc apply
+  else if !Clflags.jsir
   then
-    if !Clflags.jsir
-    then
+    let apply =
+      Apply.with_inlined_attribute apply
+        (Inlined_attribute.with_use_info (Apply.inlined apply)
+           Jsir_inlining_disabled)
+    in
+    Expr_with_acc.create_apply acc apply
+  else
+    match Inlining.inlinable env apply callee_approx with
+    | Not_inlinable ->
       let apply =
         Apply.with_inlined_attribute apply
           (Inlined_attribute.with_use_info (Apply.inlined apply)
-             Jsir_inlining_disabled)
+             Unused_because_function_unknown)
       in
       Expr_with_acc.create_apply acc apply
-    else
-      match Inlining.inlinable env apply callee_approx with
-      | Not_inlinable ->
-        let apply =
-          Apply.with_inlined_attribute apply
-            (Inlined_attribute.with_use_info (Apply.inlined apply)
-               Unused_because_function_unknown)
-        in
-        Expr_with_acc.create_apply acc apply
-      | Inlinable func_desc ->
-        let acc = Acc.mark_continuation_as_untrackable continuation acc in
-        let acc =
-          Acc.mark_continuation_as_untrackable
-            (Exn_continuation.exn_handler apply_exn_continuation)
-            acc
-        in
-        Inlining.inline acc ~apply ~apply_depth:(Env.current_depth env)
-          ~func_desc
-  else Expr_with_acc.create_apply acc apply
+    | Inlinable func_desc ->
+      let acc = Acc.mark_continuation_as_untrackable continuation acc in
+      let acc =
+        Acc.mark_continuation_as_untrackable
+          (Exn_continuation.exn_handler apply_exn_continuation)
+          acc
+      in
+      Inlining.inline acc ~apply ~apply_depth:(Env.current_depth env) ~func_desc
 
 let close_apply_cont acc env ~dbg cont trap_action args : Expr_with_acc.t =
   let acc, args = find_simples acc env args in
@@ -2765,6 +2763,7 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
   in
   let contains_subfunctions = Acc.seen_a_function acc in
   let cost_metrics = Acc.cost_metrics acc in
+  let free_names_of_body = Acc.free_names acc in
   let inline : Inline_attribute.t =
     (* We make a decision based on [fallback_inlining_heuristic] here to try to
        mimic Closure's behaviour as closely as possible, particularly when there
@@ -2779,9 +2778,12 @@ let close_one_function acc ~code_id ~external_env ~by_function_slot
       contains_subfunctions
       && Flambda_features.Expert.fallback_inlining_heuristic ()
     then Never_inline
+    else if !Clflags.jsir
+            && Name_occurrences.contains_function_or_value_slots
+                 free_names_of_body
+    then Never_inline
     else Inline_attribute.from_lambda (Function_decl.inline decl)
   in
-  let free_names_of_body = Acc.free_names acc in
   let params_and_body =
     Function_params_and_body.create ~return_continuation
       ~exn_continuation:(Exn_continuation.exn_handler exn_continuation)
