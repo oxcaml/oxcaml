@@ -94,7 +94,6 @@ let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
   match op with
   | Iadd -> Some (Nativeint.add left right)
   | Isub -> Some (Nativeint.sub left right)
-  | Imul -> Some (Nativeint.mul left right)
   | Iand -> Some (Nativeint.logand left right)
   | Ior -> Some (Nativeint.logor left right)
   | Ixor -> Some (Nativeint.logxor left right)
@@ -110,7 +109,12 @@ let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
     if is_valid_shift
     then Some (Nativeint.shift_right left (Nativeint.to_int right))
     else None
-  | Imulh _ | Idiv | Imod | Iclz _ | Ictz _ | Ipopcnt | Icomp _ -> None
+  (* CR xclerc for xclerc: some of the following operations could be
+     supported in the future; care is needed as some may clobber
+     registers beyond [res.(0)] on certain targets (e.g. [Imul] may
+     not always lower to a form writing only to the destination). *)
+  | Imul | Imulh _ | Idiv | Imod | Iclz _ | Ictz _ | Ipopcnt | Icomp _ ->
+    None
 
 (* Iterates over the passed instructions, and updates `known_values` so that it
    contains a map from registers to known values after the instructions have
