@@ -521,6 +521,7 @@ jobs:
 
           git add raw-data/
           git commit -m "Add metrics for commit ${COMMIT_HASH}"
+          git pull --rebase
           git push
 
       - name: Upload core dumps
