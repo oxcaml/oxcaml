@@ -305,6 +305,7 @@ let size_float = 8
 let size_vec128 = 16
 let size_vec256 = 32
 let size_vec512 = 64
+let max_relevant_shift_amount_bits = 6
 
 let allow_unaligned_access = true
 

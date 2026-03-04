@@ -130,6 +130,8 @@ val size_vec256 : int
 
 val size_vec512 : int
 
+val max_relevant_shift_amount_bits : int
+
 val allow_unaligned_access : bool
 
 val division_crashes_on_overflow : bool

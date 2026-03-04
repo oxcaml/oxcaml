@@ -693,19 +693,6 @@ let ignore_low_bit_int = function
   | Cop (Cor, [c; Cconst_int (1, _)], _) -> c
   | c -> c
 
-let rec ignore_high_bit_int ~ignored_bits = function
-  | Cop
-      ( (Casr | Clsr),
-        [Cop (Clsl, [inner; Cconst_int (n, _)], _); Cconst_int (n', _)],
-        _ )
-    when n = n' && n <= ignored_bits ->
-    ignore_high_bit_int ~ignored_bits inner
-  | Cop (((Cand | Cor | Cxor) as op), [x; y], dbg) ->
-    let x' = ignore_high_bit_int ~ignored_bits x in
-    let y' = ignore_high_bit_int ~ignored_bits y in
-    Cop (op, [x'; y'], dbg)
-  | c -> c
-
 let ignore_low_bit_int' arg =
   let open P.Default_variables in
   P.run arg
@@ -1009,7 +996,13 @@ let rec low_bits ~bits ~dbg x =
           match get_const_bitmask x with
           | Some (x, bitmask) when does_mask_keep_low_bits bitmask ->
             low_bits ~bits x ~dbg
-          | _ -> x))
+          | _ -> (
+            match x with
+            | Cop (((Cand | Cor | Cxor) as op), [x; y], dbg) ->
+              let x' = low_bits ~bits ~dbg x in
+              let y' = low_bits ~bits ~dbg y in
+              Cop (op, [x'; y'], dbg)
+            | _ -> x)))
       x
 
 let tag_int i dbg =

@@ -350,7 +350,8 @@ let shift_of_logand (a : int64#) =
 [%%expect_asm X86_64{|
 shift_of_logand:
   movq  %rax, %rcx
-  andl  $1, %ecx
+  movl  $1, %eax
+  andq  %rax, %rcx
   movl  $3, %eax
   shrq  %cl, %rax
   orq   $1, %rax
