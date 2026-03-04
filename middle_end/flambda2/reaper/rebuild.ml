@@ -390,7 +390,7 @@ let rewrite_simple_with_debuginfo env (simple : Simple.With_debuginfo.t) =
 let rewrite_simples_with_debuginfo env simples =
   List.map (rewrite_simple_with_debuginfo env) simples
 
-let rewrite_set_of_closures env res ~(bound : Name.t list)
+let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
     ({ Rev_expr.function_decls; value_slots; alloc_mode } :
       Rev_expr.rev_set_of_closures) =
   let slot_is_used slot =
@@ -512,7 +512,7 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
   let res =
     { res with
       all_slot_offsets =
-        Slot_offsets.add_set_of_closures res.all_slot_offsets ~is_phantom:false
+        Slot_offsets.add_set_of_closures res.all_slot_offsets ~is_phantom
           set_of_closures
     }
   in
@@ -520,9 +520,10 @@ let rewrite_set_of_closures env res ~(bound : Name.t list)
 
 let rewrite_static_const (env : env) (sc : SC.t) =
   match sc with
-  | Set_of_closures _ ->
-    (* Already rewritten *)
-    sc
+  | Set_of_closures set ->
+    Misc.fatal_errorf
+      "Set of closures given as input to [rewrite_static_const]:@ %a@."
+      Set_of_closures.print set
   | Block (tag, mut, shape, fields) ->
     SC.block tag mut shape (rewrite_simples_with_debuginfo env fields)
   | Boxed_float f -> SC.boxed_float (rewrite_or_variable Float.zero env f)
@@ -577,16 +578,6 @@ let rewrite_static_const (env : env) (sc : SC.t) =
     SC.immutable_vec512_array
       (rewrite_or_variables Vector_types.Vec512.Bit_pattern.zero env fields)
   | Empty_array _ | Mutable_string _ | Immutable_string _ -> sc
-
-let rewrite_static_const_or_code env (sc : Static_const_or_code.t) =
-  match sc with
-  | Code _ -> sc
-  | Deleted_code -> sc
-  | Static_const sc ->
-    Static_const_or_code.create_static_const (rewrite_static_const env sc)
-
-let rewrite_static_const_group env (group : Static_const_group.t) =
-  Static_const_group.map ~f:(rewrite_static_const_or_code env) group
 
 let rebuild_named_default_case env (named : Named.t) =
   let[@local] rewrite_field_access arg field =
@@ -663,9 +654,14 @@ let rebuild_named_default_case env (named : Named.t) =
   | Prim (prim, dbg) ->
     let prim = P.map_args (rewrite_simple env) prim in
     Named.create_prim prim dbg
-  | Set_of_closures s -> Named.create_set_of_closures s (* Already rewritten *)
+  | Set_of_closures s ->
+    Misc.fatal_errorf
+      "[rebuild_named_default_case] called on set of closures:@ %a@."
+      Set_of_closures.print s
   | Static_consts sc ->
-    Named.create_static_consts (rewrite_static_const_group env sc)
+    Misc.fatal_errorf
+      "[rebuild_named_default_case] called on static consts:@ %a@."
+      Static_const_group.print sc
   | Rec_info r -> Named.create_rec_info r
 
 let rewrite_apply_cont_expr env ac =
@@ -1238,85 +1234,81 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
         (Unboxed to_bind) arg hole)
 
 let rebuild_singleton_binding_which_is_being_unboxed env bv
-    ~(defining_expr : Rev_expr.rev_named) ~hole =
+    ~(defining_expr : Named.t) ~hole =
   let to_bind =
     Option.get
       (DS.get_unboxed_fields env.uses (Code_id_or_name.var (Bound_var.var bv)))
   in
   match[@ocaml.warning "-fragile-match"] defining_expr with
-  | Named named -> (
-    match[@ocaml.warning "-fragile-match"] named with
-    | Prim (Variadic (Make_block (kind, _, _), args), _dbg) ->
-      Field.Map.fold
-        (fun field (var : _ DS.unboxed_fields) hole ->
-          let arg : _ Either.t =
-            match Field.view field with
-            | Block (nth, field_kind) ->
-              let arg =
-                if nth < List.length args
-                then
-                  let arg = List.nth args nth in
-                  if K.equal field_kind (get_simple_kind env arg)
-                  then arg
-                  else poison ~machine_width:env.machine_width field_kind
+  | Prim (Variadic (Make_block (kind, _, _), args), _dbg) ->
+    Field.Map.fold
+      (fun field (var : _ DS.unboxed_fields) hole ->
+        let arg : _ Either.t =
+          match Field.view field with
+          | Block (nth, field_kind) ->
+            let arg =
+              if nth < List.length args
+              then
+                let arg = List.nth args nth in
+                if K.equal field_kind (get_simple_kind env arg)
+                then arg
                 else poison ~machine_width:env.machine_width field_kind
-              in
-              if simple_is_unboxable env arg
-              then Right (get_simple_unboxable env arg)
-              else Left arg
-            | Is_int -> Left (Simple.untagged_const_false env.machine_width)
-            | Get_tag ->
-              let tag, _ = P.Block_kind.to_shape kind in
-              Left
-                (Simple.untagged_const_int
-                   (Tag.to_targetint_31_63 env.machine_width tag))
-            | Value_slot _ | Function_slot _ | Code_of_closure _ | Apply _
-            | Code_id_of_call_witness ->
-              assert false
+              else poison ~machine_width:env.machine_width field_kind
+            in
+            if simple_is_unboxable env arg
+            then Right (get_simple_unboxable env arg)
+            else Left arg
+          | Is_int -> Left (Simple.untagged_const_false env.machine_width)
+          | Get_tag ->
+            let tag, _ = P.Block_kind.to_shape kind in
+            Left
+              (Simple.untagged_const_int
+                 (Tag.to_targetint_31_63 env.machine_width tag))
+          | Value_slot _ | Function_slot _ | Code_of_closure _ | Apply _
+          | Code_id_of_call_witness ->
+            assert false
+        in
+        match arg with
+        | Left simple ->
+          let var =
+            match var with
+            | Not_unboxed var -> var
+            | Unboxed _ -> Misc.fatal_errorf "Trying to unbox non-unboxable"
           in
-          match arg with
-          | Left simple ->
-            let var =
-              match var with
-              | Not_unboxed var -> var
-              | Unboxed _ -> Misc.fatal_errorf "Trying to unbox non-unboxable"
-            in
-            let bp =
-              Bound_pattern.singleton
-                (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
-              (* CR sspies: Missing debug uid. *)
-            in
-            RE.create_let bp (Named.create_simple simple) ~body:hole
-          | Right arg_fields -> bind_fields var (Unboxed arg_fields) hole)
-        to_bind hole
-    (* | Prim ( Unary (Opaque_identity { middle_end_only = true; _ }, arg), _dbg
-       ) -> (* XXX TO REMOVE *) bind_fields (DS.Unboxed to_bind) (DS.Unboxed
-       (get_simple_unboxable env arg)) hole *)
-    | Prim (Unary (Block_load { field; kind; _ }, arg), dbg) ->
-      let field =
-        Field.block
-          (Target_ocaml_int.to_int field)
-          (P.Block_access_kind.element_kind_for_load kind)
-      in
-      load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
-        ~hole
-    | Prim
-        (Unary (Project_value_slot { value_slot; project_from = _ }, arg), dbg)
-      ->
-      let field = Field.value_slot value_slot in
-      load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
-        ~hole
-    | Prim (Unary (Project_function_slot _, arg), _) | Simple arg ->
-      bind_fields (Unboxed to_bind)
-        (Unboxed (get_simple_unboxable env arg))
-        hole
-    | named ->
-      Format.printf "BOUM ? %a@." Named.print named;
-      assert false)
-  | _ -> assert false
+          let bp =
+            Bound_pattern.singleton
+              (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
+            (* CR sspies: Missing debug uid. *)
+          in
+          RE.create_let bp (Named.create_simple simple) ~body:hole
+        | Right arg_fields -> bind_fields var (Unboxed arg_fields) hole)
+      to_bind hole
+  (* | Prim ( Unary (Opaque_identity { middle_end_only = true; _ }, arg), _dbg )
+     -> (* XXX TO REMOVE *) bind_fields (DS.Unboxed to_bind) (DS.Unboxed
+     (get_simple_unboxable env arg)) hole *)
+  | Prim (Unary (Block_load { field; kind; _ }, arg), dbg) ->
+    let field =
+      Field.block
+        (Target_ocaml_int.to_int field)
+        (P.Block_access_kind.element_kind_for_load kind)
+    in
+    load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
+      ~hole
+  | Prim (Unary (Project_value_slot { value_slot; project_from = _ }, arg), dbg)
+    ->
+    let field = Field.value_slot value_slot in
+    load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
+      ~hole
+  | Prim (Unary (Project_function_slot _, arg), _) | Simple arg ->
+    bind_fields (Unboxed to_bind) (Unboxed (get_simple_unboxable env arg)) hole
+  | defining_expr ->
+    Misc.fatal_errorf
+      "Unexpected [defining_expr] in \
+       [rebuild_singleton_binding_which_is_being_unboxed]:@ %a@."
+      Named.print defining_expr
 
 let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
-    ~(defining_expr : Rev_expr.rev_named) ~hole =
+    ~(set_of_closures : Rev_expr.rev_set_of_closures) ~hole =
   assert (
     List.for_all
       (fun bv ->
@@ -1335,15 +1327,7 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
             (DS.get_unboxed_fields env.uses
                (Code_id_or_name.var (Bound_var.var bv)))
         in
-        let value_slots =
-          match[@ocaml.warning "-fragile-match"] defining_expr with
-          | Named (Set_of_closures _set) ->
-            (* Possible ? *)
-            assert false
-            (* Set_of_closures.value_slots set *)
-          | Set_of_closures set -> set.value_slots
-          | _ -> assert false
-        in
+        let value_slots = set_of_closures.value_slots in
         Field.Map.fold
           (fun field (var : _ DS.unboxed_fields) hole ->
             match Field.view field with
@@ -1372,13 +1356,11 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
     hole bvs
 
 let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
-    ~(orig_defining_expr : Rev_expr.rev_named) ~(new_defining_expr : Named.t)
-    ~hole =
+    ~(defining_expr : Named.t) ~hole =
   (* TODO when this block is stored anywhere else, the subkind is no longer
      correct... we need to fix that somehow *)
-  match[@ocaml.warning "-fragile-match"] orig_defining_expr with
-  | Named
-      (Prim (Unary (Project_function_slot { move_from; move_to }, arg), dbg)) ->
+  match[@ocaml.warning "-fragile-match"] defining_expr with
+  | Prim (Unary (Project_function_slot { move_from; move_to }, arg), dbg) ->
     let fields =
       Option.get
         (DS.get_changed_representation env.uses
@@ -1400,7 +1382,7 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
         dbg
     in
     RE.create_let bp named ~body:hole
-  | Named (Prim (Variadic (Make_block (kind, _mut, alloc_mode), args), dbg)) ->
+  | Prim (Variadic (Make_block (kind, _mut, alloc_mode), args), dbg) ->
     let fields =
       Option.get
         (DS.get_changed_representation env.uses
@@ -1480,24 +1462,11 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
      * then [z] will be marked as having its representation changed, because
      * it is equal to [x].  However we don't need to rewrite the [fst y]
      * primitive, which brings us to this case. *)
-    let defining_expr = rebuild_named_default_case env new_defining_expr in
+    (* CR ncourant: should we check that we are in one of the cases we expect?
+       That would be only the projections so block load, project_value_slot and
+       project_function_slot. *)
+    let defining_expr = rebuild_named_default_case env defining_expr in
     RE.create_let bp defining_expr ~body:hole
-
-let rebuild_set_of_closures_binding_whose_representation_is_being_changed env
-    res bp bvs ~(orig_defining_expr : Rev_expr.rev_named) ~hole =
-  let bound = List.map (fun bv -> Name.var (Bound_var.var bv)) bvs in
-  let set =
-    match[@ocaml.warning "-fragile-match"] orig_defining_expr with
-    | Named (Set_of_closures _set) ->
-      (* Possible ? *)
-      assert false
-      (* Set_of_closures.value_slots set *)
-    | Set_of_closures set -> set
-    | _ -> assert false
-  in
-  let set_of_closures, res = rewrite_set_of_closures env res ~bound set in
-  ( RE.create_let bp (Named.create_set_of_closures set_of_closures) ~body:hole,
-    res )
 
 let rebuild_make_block_default_case env (bp : Bound_pattern.t)
     ~(block_kind : P.Block_kind.t) ~mutability ~alloc_mode ~fields ~hole dbg =
@@ -1551,30 +1520,54 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
        dbg)
     ~body:hole
 
-let rebuild_let_expr_holed0 (env : env) res ~(bound_pattern : Bound_pattern.t)
-    ~(defining_expr : Rev_expr.rev_named) ~new_defining_expr ~hole :
-    RE.t * rebuild_result =
-  match (bound_pattern : Bound_pattern.t) with
-  | Set_of_closures bvs when bound_vars_will_be_unboxed env bvs ->
+let rebuild_let_expr_holed_set_of_closures env res bvs ~set_of_closures ~hole =
+  if bound_vars_will_be_unboxed env bvs
+  then
     ( rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
-        ~defining_expr ~hole,
+        ~set_of_closures ~hole,
       res )
-  | Singleton bv when bound_vars_will_be_unboxed env [bv] ->
+  else if not (List.exists (fun v -> is_var_used env (Bound_var.var v)) bvs)
+  then hole, res
+  else
+    (* [rewrite_set_of_closures] also handles the case where the representation
+       of the set of closures has changed *)
+    let bound = List.map (fun v -> Name.var (Bound_var.var v)) bvs in
+    let bound_pattern = Bound_pattern.set_of_closures bvs in
+    let is_phantom =
+      Name_mode.is_phantom (Bound_pattern.name_mode bound_pattern)
+    in
+    let set_of_closures, res =
+      rewrite_set_of_closures env res ~bound set_of_closures ~is_phantom
+    in
+    ( RE.create_let bound_pattern
+        (Named.create_set_of_closures set_of_closures)
+        ~body:hole,
+      res )
+
+let rebuild_let_expr_singleton (env : env) res bv ~(defining_expr : Named.t)
+    ~hole : RE.t * rebuild_result =
+  (* CR ncourant: we should probably properly track regions *)
+  let is_begin_region =
+    match defining_expr with
+    | Prim (prim, _) -> P.is_begin_region prim
+    | Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _ -> false
+  in
+  if not (is_begin_region || is_var_used env (Bound_var.var bv))
+  then hole, res
+  else if bound_vars_will_be_unboxed env [bv]
+  then
     ( rebuild_singleton_binding_which_is_being_unboxed env bv ~defining_expr
         ~hole,
       res )
-  | Singleton bv when bound_vars_will_have_their_representation_changed env [bv]
-    ->
+  else if bound_vars_will_have_their_representation_changed env [bv]
+  then
     ( rebuild_singleton_binding_whose_representation_is_being_changed env
-        bound_pattern bv ~orig_defining_expr:defining_expr ~new_defining_expr
-        ~hole,
+        (Bound_pattern.singleton bv)
+        bv ~defining_expr ~hole,
       res )
-  | Set_of_closures bvs
-    when bound_vars_will_have_their_representation_changed env bvs ->
-    rebuild_set_of_closures_binding_whose_representation_is_being_changed env
-      res bound_pattern bvs ~orig_defining_expr:defining_expr ~hole
-  | Singleton _ | Set_of_closures _ | Static _ -> (
-    match[@ocaml.warning "-fragile-match"] new_defining_expr with
+  else
+    let bound_pattern = Bound_pattern.singleton bv in
+    match[@ocaml.warning "-fragile-match"] defining_expr with
     | Flambda.Prim
         (Variadic (Make_block (block_kind, mutability, alloc_mode), fields), dbg)
       ->
@@ -1582,117 +1575,82 @@ let rebuild_let_expr_holed0 (env : env) res ~(bound_pattern : Bound_pattern.t)
           ~mutability ~alloc_mode ~fields ~hole dbg,
         res )
     | _ ->
-      let defining_expr = rebuild_named_default_case env new_defining_expr in
-      RE.create_let bound_pattern defining_expr ~body:hole, res)
+      let defining_expr = rebuild_named_default_case env defining_expr in
+      RE.create_let bound_pattern defining_expr ~body:hole, res
 
-let rec default_defining_expr_for_rebuilding_let env res
-    (bound_pattern : Bound_pattern.t) (defining_expr : Rev_expr.rev_named) =
-  match defining_expr with
-  | Named defining_expr -> bound_pattern, defining_expr, res
-  | Static_consts group ->
-    let bound_static =
-      match bound_pattern with
-      | Static l -> l
-      | Set_of_closures _ | Singleton _ ->
-        (* Bound pattern is static consts, so can't bind something else *)
-        assert false
-    in
-    let bound_and_group =
-      List.filter_map
-        (fun ((p, e) as arg :
-               Bound_static.Pattern.t * Rev_expr.rev_static_const_or_code) ->
-          match p with
-          | Code code_id ->
-            if is_code_id_used env code_id
-            then Some arg
-            else (
-              (match e with
-              | Code _ -> ()
-              | Deleted_code -> ()
-              | Static_const _ ->
-                (* Pattern is [Code _], so can't bind static const *)
-                assert false);
-              Some (p, Rev_expr.Deleted_code))
-          | Block_like sym -> if is_symbol_used env sym then Some arg else None
-          | Set_of_closures m ->
-            if
-              Function_slot.Lmap.exists
-                (fun _ sym ->
-                  Option.is_some
-                    (DS.get_changed_representation env.uses
-                       (Code_id_or_name.symbol sym)))
-                m
-            then
-              let m =
-                Function_slot.Lmap.of_list
-                  (List.map
-                     (fun (fs, sym) ->
-                       let repr =
-                         Option.get
-                           (DS.get_changed_representation env.uses
-                              (Code_id_or_name.symbol sym))
-                       in
-                       match repr with
-                       | DS.Block_representation _ ->
-                         Misc.fatal_errorf
-                           "Block representation for set of closures %a"
-                           Symbol.print sym
-                       | DS.Closure_representation (_, fs_map, cur_fs) ->
-                         assert (Function_slot.equal fs cur_fs);
-                         Function_slot.Map.find fs fs_map, sym)
-                     (Function_slot.Lmap.bindings m))
-              in
-              Some (Bound_static.Pattern.set_of_closures m, e)
-            else if
-              Function_slot.Lmap.exists (fun _ sym -> is_symbol_used env sym) m
-            then Some arg
-            else None)
-        (List.combine (Bound_static.to_list bound_static) group)
-    in
-    let bound_static, _group = List.split bound_and_group in
-    let res, group_members =
-      List.fold_left_map
-        (fun res pat_and_rev ->
-          let static_const_or_code, res =
-            rebuild_static_const_or_code env res pat_and_rev
-          in
-          res, static_const_or_code)
-        res bound_and_group
-    in
-    let group = Static_const_group.create group_members in
-    ( Bound_pattern.static (Bound_static.create bound_static),
-      Named.create_static_consts group,
-      res )
-  | Set_of_closures set_of_closures ->
-    let bound =
-      match bound_pattern with
-      | Set_of_closures bound_vars ->
-        List.map Name.var (List.map Bound_var.var bound_vars)
-      | Static _ | Singleton _ ->
-        (* Pattern is a set of closures *)
-        assert false
-    in
-    let set_of_closures, res =
-      rewrite_set_of_closures env res ~bound set_of_closures
-    in
-    let is_phantom =
-      Name_mode.is_phantom (Bound_pattern.name_mode bound_pattern)
-    in
-    let res =
-      { res with
-        all_slot_offsets =
-          Slot_offsets.add_set_of_closures res.all_slot_offsets ~is_phantom
-            set_of_closures
-      }
-    in
-    bound_pattern, Named.create_set_of_closures set_of_closures, res
+let rec rebuild_let_expr_static_consts env res bound_static group ~hole =
+  let bound_and_group =
+    List.filter_map
+      (fun ((p, e) as arg :
+             Bound_static.Pattern.t * Rev_expr.rev_static_const_or_code) ->
+        match p with
+        | Code code_id ->
+          if is_code_id_used env code_id
+          then Some arg
+          else (
+            (match e with
+            | Code _ -> ()
+            | Deleted_code -> ()
+            | Static_const _ ->
+              (* Pattern is [Code _], so can't bind static const *)
+              assert false);
+            Some (p, Rev_expr.Deleted_code))
+        | Block_like sym -> if is_symbol_used env sym then Some arg else None
+        | Set_of_closures m ->
+          if
+            Function_slot.Lmap.exists
+              (fun _ sym ->
+                Option.is_some
+                  (DS.get_changed_representation env.uses
+                     (Code_id_or_name.symbol sym)))
+              m
+          then
+            let m =
+              Function_slot.Lmap.of_list
+                (List.map
+                   (fun (fs, sym) ->
+                     let repr =
+                       Option.get
+                         (DS.get_changed_representation env.uses
+                            (Code_id_or_name.symbol sym))
+                     in
+                     match repr with
+                     | DS.Block_representation _ ->
+                       Misc.fatal_errorf
+                         "Block representation for set of closures %a"
+                         Symbol.print sym
+                     | DS.Closure_representation (_, fs_map, cur_fs) ->
+                       assert (Function_slot.equal fs cur_fs);
+                       Function_slot.Map.find fs fs_map, sym)
+                   (Function_slot.Lmap.bindings m))
+            in
+            Some (Bound_static.Pattern.set_of_closures m, e)
+          else if
+            Function_slot.Lmap.exists (fun _ sym -> is_symbol_used env sym) m
+          then Some arg
+          else None)
+      (List.combine (Bound_static.to_list bound_static) group)
+  in
+  let bound_static, _group = List.split bound_and_group in
+  let res, group_members =
+    List.fold_left_map
+      (fun res pat_and_rev ->
+        let static_const_or_code, res =
+          rebuild_static_const_or_code env res pat_and_rev
+        in
+        res, static_const_or_code)
+      res bound_and_group
+  in
+  let group = Static_const_group.create group_members in
+  ( RE.create_let
+      (Bound_pattern.static (Bound_static.create bound_static))
+      (Named.create_static_consts group)
+      ~body:hole,
+    res )
 
 and rebuild_let_expr_holed (env : env) res ~(bound_pattern : Bound_pattern.t)
     ~(defining_expr : Rev_expr.rev_named) ~parent ~hole : RE.t * rebuild_result
     =
-  let bound_pattern, new_defining_expr, res =
-    default_defining_expr_for_rebuilding_let env res bound_pattern defining_expr
-  in
   if
     Bound_pattern.fold_all_bound_vars bound_pattern
       ~f:(fun b v -> b || is_dead_var env (Bound_var.var v))
@@ -1708,25 +1666,18 @@ and rebuild_let_expr_holed (env : env) res ~(bound_pattern : Bound_pattern.t)
       res )
   else
     let subexpr, res =
-      match (bound_pattern : Bound_pattern.t) with
-      | Set_of_closures _ | Static _ ->
-        rebuild_let_expr_holed0 env res ~bound_pattern ~defining_expr
-          ~new_defining_expr ~hole
-      | Singleton v ->
-        let v = Bound_var.var v in
-        (* CR ncourant: we should probably properly track regions *)
-        let is_begin_region =
-          match defining_expr with
-          | Named (Prim (prim, _)) -> P.is_begin_region prim
-          | Named (Simple _ | Set_of_closures _ | Static_consts _ | Rec_info _)
-          | Set_of_closures _ | Static_consts _ ->
-            false
-        in
-        if is_begin_region || is_var_used env v
-        then
-          rebuild_let_expr_holed0 env res ~bound_pattern ~defining_expr
-            ~new_defining_expr ~hole
-        else hole, res
+      match bound_pattern, defining_expr with
+      | Singleton bv, Named defining_expr ->
+        rebuild_let_expr_singleton env res bv ~defining_expr ~hole
+      | Static bound_static, Static_consts group ->
+        rebuild_let_expr_static_consts env res bound_static group ~hole
+      | Set_of_closures bound_vars, Set_of_closures set_of_closures ->
+        rebuild_let_expr_holed_set_of_closures env res bound_vars
+          ~set_of_closures ~hole
+      | ( (Singleton _ | Static _ | Set_of_closures _),
+          (Named _ | Static_consts _ | Set_of_closures _) ) ->
+        Misc.fatal_errorf "Bound pattern %a does not match defining expr"
+          Bound_pattern.print bound_pattern
     in
     rebuild_holed env res parent subexpr
 
@@ -2112,29 +2063,17 @@ and rebuild_static_const_or_code env res
     let bound_to = List.map Name.symbol bound_to in
     let set_of_closures, res =
       rewrite_set_of_closures env res ~bound:bound_to set_of_closures
+        ~is_phantom:false
     in
     let static_const_or_code =
       SC.set_of_closures set_of_closures
       |> Static_const_or_code.create_static_const
     in
     static_const_or_code, res
-  | Static_const (Other static_const) -> (
-    match static_const with
-    | Block _ | Boxed_float32 _ | Boxed_float _ | Boxed_int32 _ | Boxed_int64 _
-    | Boxed_nativeint _ | Boxed_vec128 _ | Boxed_vec256 _ | Boxed_vec512 _
-    | Immutable_float_block _ | Immutable_float_array _
-    | Immutable_float32_array _ | Immutable_int_array _ | Immutable_int8_array _
-    | Immutable_int16_array _ | Immutable_int32_array _
-    | Immutable_int64_array _ | Immutable_nativeint_array _
-    | Immutable_vec128_array _ | Immutable_vec256_array _
-    | Immutable_vec512_array _ | Immutable_value_array _ | Empty_array _
-    | Mutable_string _ | Immutable_string _ ->
-      Static_const_or_code.create_static_const static_const, res
-    | Set_of_closures _ ->
-      Misc.fatal_errorf
-        "Set_of_closures is not permitted in conjunction with Other in the \
-         Static_const case:@ %a"
-        SC.print static_const)
+  | Static_const (Other static_const) ->
+    ( Static_const_or_code.create_static_const
+        (rewrite_static_const env static_const),
+      res )
 
 type result =
   { body : Expr.t;
