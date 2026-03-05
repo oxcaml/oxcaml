@@ -1717,6 +1717,18 @@ let datalog_rules =
          (Known_arity_code_pointer, _) -> false) [relation] ] ==> cannot_unbox0
          allocation_id); *)
       (* CR ncourant: I'm not sure this is useful? *)
+      (* CR-someday ncourant: allowing a symbol to be unboxed is difficult, due
+         to symbols being always values; thus we prevent it. *)
+      (let$ [x; _source] = ["x"; "_source"] in
+       [ sources x _source;
+         when1
+           (fun x ->
+             Code_id_or_name.pattern_match x
+               ~symbol:(fun _ -> true)
+               ~var:(fun _ -> false)
+               ~code_id:(fun _ -> false))
+           x ]
+       ==> cannot_unbox0 x);
       (* An allocation that is stored in another can only be unboxed if either
          the representation of the other allocation can be changed, of it the
          field it is stored in is never read, as in that case a poison value
@@ -1731,18 +1743,6 @@ let datalog_rules =
          when1 Field.is_real_field relation;
          cannot_unbox0 to_ ]
        ==> cannot_unbox0 allocation_id);
-      (* CR-someday ncourant: allowing a symbol to be unboxed is difficult, due
-         to symbols being always values; thus we prevent it. *)
-      (let$ [x; _source] = ["x"; "_source"] in
-       [ sources x _source;
-         when1
-           (fun x ->
-             Code_id_or_name.pattern_match x
-               ~symbol:(fun _ -> true)
-               ~var:(fun _ -> false)
-               ~code_id:(fun _ -> false))
-           x ]
-       ==> cannot_unbox0 x);
       (* As previously: if any closure of a set of closures cannot be unboxed,
          then every closure in the set cannot be unboxed. *)
       (let$ [x] = ["x"] in
