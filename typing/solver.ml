@@ -769,8 +769,8 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
       disallow_left (disallow_right mv0) == disallow_left (disallow_right mv1))
     ||
     match C.equal_morph dst f0 f1 with
-    | Not_equal -> false
-    | Equal -> v0 == v1
+    | None -> false
+    | Some Misc.Refl -> v0 == v1
 
   let submode_mvmv (type a) ~log (pp : H.Pinpoint.t) (dst : a C.obj)
       (Amorphvar (v, f, f_hint) as mv) (Amorphvar (u, g, g_hint) as mu) =

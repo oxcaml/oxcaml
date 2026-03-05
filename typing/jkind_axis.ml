@@ -306,15 +306,15 @@ module Per_axis = struct
       | Nullability -> Nullability.print
       | Separability -> Separability.print
 
-    let equal_obj : type a b. a t -> b t -> (a, b) Solver_intf.equality =
+    let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
      fun a b ->
       match a, b with
-      | Externality, Externality -> Equal
-      | Nullability, Nullability -> Equal
-      | Separability, Separability -> Equal
-      | _ -> Not_equal
+      | Externality, Externality -> Some Misc.Refl
+      | Nullability, Nullability -> Some Misc.Refl
+      | Separability, Separability -> Some Misc.Refl
+      | _ -> None
 
-    let compare_obj : type a b. a t -> b t -> (a, b) Solver_intf.comparison =
+    let compare_obj : type a b. a t -> b t -> (a, b) Misc.comparison =
      fun a b ->
       match a, b with
       | Externality, Externality -> Equal
@@ -362,14 +362,14 @@ module Per_axis = struct
     | Modal ax -> Mode.Crossing.Per_axis.print ax
     | Nonmodal ax -> Nonmodal.print ax
 
-  let equal_obj : type a b. a t -> b t -> (a, b) Solver_intf.equality =
+  let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
    fun a b ->
     match a, b with
     | Modal ax0, Modal ax1 -> Mode.Crossing.Per_axis.equal_obj ax0 ax1
     | Nonmodal ax0, Nonmodal ax1 -> Nonmodal.equal_obj ax0 ax1
-    | _ -> Not_equal
+    | _ -> None
 
-  let compare_obj : type a b. a t -> b t -> (a, b) Solver_intf.comparison =
+  let compare_obj : type a b. a t -> b t -> (a, b) Misc.comparison =
    fun a b ->
     match a, b with
     | Modal ax0, Modal ax1 -> Mode.Crossing.Per_axis.compare_obj ax0 ax1

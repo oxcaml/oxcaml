@@ -16,20 +16,13 @@
 open Allowance
 module Fmt = Format_doc
 
-type ('a, 'b) equality =
-  | Not_equal : ('a, 'b) equality
-  | Equal : ('a, 'a) equality
-
-type ('a, 'b) comparison =
-  | Less_than : ('a, 'b) comparison
-  | Equal : ('a, 'a) comparison
-  | Greater_than : ('a, 'b) comparison
-
 module type Equal = sig
   type ('a, 'b, 'd) t constraint 'd = 'l * 'r
 
   val equal :
-    ('a0, 'b, 'l0 * 'r0) t -> ('a1, 'b, 'l1 * 'r1) t -> ('a0, 'a1) equality
+    ('a0, 'b, 'l0 * 'r0) t ->
+    ('a1, 'b, 'l1 * 'r1) t ->
+    ('a0, 'a1) Misc.eq option
 end
 
 (** A collection of lattices, indexed by [obj]; *)
@@ -54,9 +47,9 @@ module type Lattices = sig
 
   val print : 'a obj -> Fmt.formatter -> 'a elt -> unit
 
-  val equal_obj : 'a obj -> 'b obj -> ('a, 'b) equality
+  val equal_obj : 'a obj -> 'b obj -> ('a, 'b) Misc.eq option
 
-  val compare_obj : 'a obj -> 'b obj -> ('a, 'b) comparison
+  val compare_obj : 'a obj -> 'b obj -> ('a, 'b) Misc.comparison
 
   val print_obj : Fmt.formatter -> 'a obj -> unit
 end
@@ -164,7 +157,7 @@ module type Lattices_mono = sig
     'b obj ->
     ('a0, 'b, 'l0 * 'r0) morph ->
     ('a1, 'b, 'l1 * 'r1) morph ->
-    ('a0, 'a1) equality
+    ('a0, 'a1) Misc.eq option
 
   (** Compares two morphisms. Should be compatible with [equal_morph]. Used for
       deduplication only; it is fine (but not recommended) to return a nonzero
@@ -173,7 +166,7 @@ module type Lattices_mono = sig
     'b obj ->
     ('a0, 'b, 'd0) morph ->
     ('a1, 'b, 'd1) morph ->
-    ('a0, 'a1) comparison
+    ('a0, 'a1) Misc.comparison
 
   (** Print morphism *)
   val print_morph : 'b obj -> Fmt.formatter -> ('a, 'b, 'd) morph -> unit

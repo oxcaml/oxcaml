@@ -1911,6 +1911,12 @@ end
 (* Fancy types *)
 
 type (_, _) eq = Refl : ('a, 'a) eq
+
+type ('a, 'b) comparison =
+  | Less_than : ('a, 'b) comparison
+  | Equal : ('a, 'a) comparison
+  | Greater_than : ('a, 'b) comparison
+
 (*********************************************)
 (* Fancy modules *)
 
