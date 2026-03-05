@@ -112,6 +112,9 @@ val ar: string
 val interface_suffix: string ref
 (** Suffix for interface file names *)
 
+val caml_symbol_prefix: string
+(** Prefix used for mangling symbol names *)
+
 val exec_magic_number: string
 (** Magic number for bytecode executable files *)
 

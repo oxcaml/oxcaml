@@ -15,15 +15,28 @@
 (*                                                                        *)
 (**************************************************************************)
 
-open! Dynlink_compilerlibs
+open Dynlink_support
+
+module Symtable = Dynlink_symtable
+module Config = Dynlink_config
+open Cmo_format
 
 module DC = Dynlink_common
 module DT = Dynlink_types
 
-let convert_cmi_import import =
-  let name = Import_info.name import |> Compilation_unit.Name.to_string in
-  let crc = Import_info.crc import in
+let convert_cmi_import (name, info) =
+  let name = Compilation_unit.Name.to_string name in
+  let crc = Option.map snd info in
   name, crc
+
+module Compression = struct (* Borrowed from utils/compression.ml *)
+  (* CR-soon dallsopp: Implement compressed marshalling *)
+  (* external zstd_initialize: unit -> bool = "caml_zstd_initialize" *)
+  let zstd_initialize () = false
+  let input_value = Stdlib.input_value
+end
+
+let _compression_supported = Compression.zstd_initialize ()
 
 module Bytecode = struct
   type filename = string
@@ -40,28 +53,22 @@ module Bytecode = struct
     let implementation_imports (t : t) =
       let required_from_unit =
         t.cu_required_compunits
-        |> List.map Compilation_unit.to_global_ident_for_bytecode
+        |> List.map Compilation_unit.full_path_as_string
       in
       let required =
         required_from_unit
-        @ List.map Compilation_unit.to_global_ident_for_bytecode
+        @ List.map Compilation_unit.full_path_as_string
             (Symtable.required_compunits t.cu_reloc)
       in
       let required =
         List.filter
-          (fun id ->
-             not (Ident.is_predef id)
-             && not (String.contains (Ident.name id) '.'))
+          (fun id -> not (String.contains id '.'))
           required
       in
-      List.map
-        (fun id -> Ident.name id, None)
-        required
+      List.map (fun id -> id, None) required
 
     let defined_symbols (t : t) =
-      List.map (fun cu ->
-          Compilation_unit.to_global_ident_for_bytecode cu
-          |> Ident.name)
+      List.map Compilation_unit.full_path_as_string
         (Symtable.initialized_compunits t.cu_reloc)
 
     let unsafe_module (t : t) = t.cu_primitives <> []
@@ -72,15 +79,12 @@ module Bytecode = struct
   let default_crcs = ref [| |]
   let default_global_map = ref Symtable.empty_global_map
 
-  external get_bytecode_sections : unit -> Symtable.bytecode_sections =
-    "caml_dynlink_get_bytecode_sections"
-
   let init () =
     if !Sys.interactive then begin (* PR#6802 *)
       invalid_arg "The dynlink.cma library cannot be used \
         inside the OCaml toplevel"
     end;
-    default_crcs := Symtable.init_toplevel ~get_bytecode_sections;
+    default_crcs := Symtable.init_toplevel ();
     default_global_map := Symtable.current_state ()
 
   let is_native = false
@@ -93,26 +97,42 @@ module Bytecode = struct
     Compilation_unit.create Compilation_unit.Prefix.empty modname
 
   let fold_initial_units ~init ~f =
-    Array.fold_left (fun acc import ->
-        let modname = Import_info.name import in
-        let crc = Import_info.crc import in
-        let cu = assume_no_prefix modname in
-        let defined =
-          Symtable.is_defined_in_global_map !default_global_map
-            (Glob_compunit cu)
-        in
-        let implementation =
-          if defined then Some (None, DT.Loaded)
-          else None
-        in
-        let compunit = modname |> Compilation_unit.Name.to_string in
-        let defined_symbols =
-          if defined then [compunit]
-          else []
-        in
-        f acc ~compunit ~interface:crc ~implementation ~defined_symbols)
-      init
-      !default_crcs
+    let acc =
+      Array.fold_left (fun acc (modname, info) ->
+          let crc = Option.map snd info in
+          let cu = assume_no_prefix modname in
+          let defined =
+            Symtable.is_defined_in_global_map !default_global_map
+              (Glob_compunit cu)
+          in
+          let implementation =
+            if defined then Some (None, DT.Loaded)
+            else None
+          in
+          let compunit = modname |> Compilation_unit.Name.to_string in
+          let defined_symbols =
+            if defined then [compunit]
+            else []
+          in
+          f acc ~compunit ~interface:crc ~implementation ~defined_symbols)
+        init
+        !default_crcs
+    in
+    (* Bytecode doesn't track the CRCs of implementations, which means that
+       while the symbols of parameterized modules will appear in the initial
+       units list, the symbols for the instantiations will not. Pick these up by
+       iterating over the global map. *)
+    Symtable.fold_global_map
+      (fun global _slot acc ->
+        match global with
+        | Glob_compunit cu when Compilation_unit.is_instance cu ->
+          let compunit = Compilation_unit.full_path_as_string cu in
+          f acc ~compunit ~interface:None
+            ~implementation:(Some (None, DT.Loaded))
+            ~defined_symbols:[compunit]
+        | Glob_compunit _ | Glob_predef _ -> acc)
+      !default_global_map
+      acc
 
   let run_shared_startup _ = ()
 
@@ -128,6 +148,13 @@ module Bytecode = struct
     match In_channel.really_input_bigarray ic ar st n with
       | None -> raise End_of_file
       | Some () -> ()
+
+  type instruct_debug_event
+  external reify_bytecode :
+    (char, Bigarray.int8_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t ->
+    instruct_debug_event list array -> string option ->
+    Obj.t * (unit -> Obj.t)
+    = "caml_reify_bytecode"
 
   let run lock (ic, file_name, file_digest) ~unit_header ~priv =
     let clos = with_lock lock (fun () ->
@@ -147,7 +174,7 @@ module Bytecode = struct
           let new_error : DT.linking_error =
             match error with
             | Symtable.Undefined_global global ->
-              let desc = Format_doc.compat Symtable.Global.description in
+              let desc = Symtable.Global.description in
               Undefined_global (Format.asprintf "%a" desc global)
             | Symtable.Unavailable_primitive s -> Unavailable_primitive s
             | Symtable.Uninitialized_global global ->
@@ -169,14 +196,11 @@ module Bytecode = struct
           else begin
             seek_in ic compunit.cu_debug;
             [|
-              (* CR ocaml 5 compressed-marshal:
-              (Compression.input_value ic : Instruct.debug_event list)
-              *)
-              (Marshal.from_channel ic : Instruct.debug_event list)
+              (Compression.input_value ic : instruct_debug_event list)
             |]
           end in
         if priv then Symtable.hide_additions old_state;
-        let _, clos = Meta.reify_bytecode code events (Some digest) in
+        let _, clos = reify_bytecode code events (Some digest) in
         clos
       )
     in
@@ -211,9 +235,8 @@ module Bytecode = struct
       if buffer = Config.cma_magic_number then begin
         let toc_pos = input_binary_int ic in  (* Go to table of contents *)
         seek_in ic toc_pos;
-        let lib = (input_value ic : Cmo_format.library) in
-        Dll.open_dlls Dll.For_execution
-          (List.map Dll.extract_dll_name lib.lib_dllibs);
+        let lib = (input_value ic : library) in
+        Symtable.open_dlls lib.lib_dllibs;
         handle, lib.lib_units
       end else begin
         raise (DT.Error (Not_a_bytecode_file file_name))
