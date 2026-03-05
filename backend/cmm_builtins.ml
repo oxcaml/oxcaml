@@ -1263,12 +1263,21 @@ let builtin_even_if_not_annotated = function
     true
   | _ -> false
 
+(* These builtins are C calls that are lowered to Cmm operations that are
+   guaranteed to produce sign-extended 32-bit results. This means the caller can
+   skip redundant sign extensions.
+
+   If a builtin uses [if_operation_supported] and could fall back to an actual C
+   call on some architectures, this function must return [false] when the
+   operation is not supported, since C calling conventions do not guarantee
+   sign-extended small integer return values. *)
 let builtin_sign_extends = function
   | "caml_native_pointer_load_signed_int32"
   | "caml_native_pointer_load_unboxed_int32"
   | "caml_ext_pointer_load_signed_int32" | "caml_ext_pointer_load_unboxed_int32"
-  | "caml_int32_shift_right_by_int32_unboxed" | "caml_csel_int32_unboxed" ->
+  | "caml_int32_shift_right_by_int32_unboxed" ->
     true
+  | "caml_csel_int32_unboxed" -> Proc.operation_supported (Ccsel typ_int)
   | _ -> false
 
 let extcall ~dbg ~returns ~alloc ~is_c_builtin ~effects ~coeffects ~ty_args name
