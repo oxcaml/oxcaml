@@ -202,7 +202,10 @@ and traverse_let denv acc let_expr : rev_expr =
       let bound_static =
         match bound_pattern with
         | Static b -> b
-        | Singleton _ | Set_of_closures _ -> assert false
+        | Singleton _ | Set_of_closures _ ->
+          Misc.fatal_errorf
+            "Expected [Static] bound pattern for [Static_consts], got %a"
+            Bound_pattern.print bound_pattern
       in
       let rev_group =
         Static_const_group.match_against_bound_static group bound_static
@@ -326,7 +329,11 @@ and traverse_set_of_closures denv acc ~(bound_pattern : Bound_pattern.t)
     let bound_vars =
       match bound_pattern with
       | Set_of_closures set -> set
-      | Static _ | Singleton _ -> assert false
+      | Static _ | Singleton _ ->
+        Misc.fatal_errorf
+          "Expected [Set_of_closures] bound pattern in \
+           [traverse_set_of_closures], got %a"
+          Bound_pattern.print bound_pattern
     in
     let funs =
       Function_declarations.funs_in_order
@@ -345,7 +352,10 @@ and traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
   let bound_static =
     match bound_pattern with
     | Static b -> b
-    | Singleton _ | Set_of_closures _ -> assert false
+    | Singleton _ | Set_of_closures _ ->
+      Misc.fatal_errorf
+        "Expected [Static] bound pattern in [traverse_static_consts], got %a"
+        Bound_pattern.print bound_pattern
   in
   Static_const_group.match_against_bound_static group bound_static ~init:()
     ~code:(fun () -> prepare_code acc)
@@ -368,7 +378,10 @@ and traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
         | Block (_, _, shape, _) ->
           Flambda_kind.Scannable_block_shape.element_kind shape i
         | Immutable_value_array _ -> Flambda_kind.value
-        | _ -> assert false
+        | _ ->
+          Misc.fatal_errorf
+            "Unexpected static const %a in [block_field_kind] for symbol %a"
+            Static_const.print static_const Symbol.print symbol
       in
       match[@ocaml.warning "-4"] static_const with
       | Block (_, _, _, fields) | Immutable_value_array fields ->
@@ -390,7 +403,11 @@ and traverse_static_consts denv acc ~(bound_pattern : Bound_pattern.t) group =
           ~base:(Code_id_or_name.name name)
           Field.get_tag
           ~from:(Code_id_or_name.name denv.all_constants)
-      | Set_of_closures _ -> assert false
+      | Set_of_closures _ ->
+        Misc.fatal_errorf
+          "Unexpected [Set_of_closures] in block_like static const traversal \
+           for symbol %a"
+          Symbol.print symbol
       | _ ->
         Acc.add_alias acc
           ~to_:(Code_id_or_name.name name)
@@ -545,7 +562,10 @@ and traverse_apply denv acc apply : rev_expr =
       Continuation.Map.find (Exn_continuation.exn_handler exn) denv.conts
     in
     match exn_params with
-    | [] -> assert false
+    | [] ->
+      Misc.fatal_errorf
+        "Empty exception continuation parameters in [traverse_apply] for %a"
+        Apply.print apply
     | exn_param :: extra_params ->
       List.iter2
         (fun param (arg, _kind) ->
