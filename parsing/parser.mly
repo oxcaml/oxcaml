@@ -3087,10 +3087,6 @@ comprehension_clause:
 block_access:
   | DOT mkrhs(label_longident)
     { Baccess_field $2 }
-  | DOT _p=LPAREN seq_expr RPAREN
-    { raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p)))) }
-  | DOTOP _p=LPAREN seq_expr RPAREN
-    { raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p)))) }
   | DOT ident _p=LPAREN i=seq_expr RPAREN
     {
       match $2 with
@@ -3099,8 +3095,6 @@ block_access:
       | _ ->
         raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p))))
     }
-  | DOTOP ident _p=LPAREN seq_expr RPAREN
-    { raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p)))) }
   | DOT ident _p=LPAREN seq_expr _e=error
     { indexop_unclosed_error $loc(_p) Paren $loc(_e) }
 ;
