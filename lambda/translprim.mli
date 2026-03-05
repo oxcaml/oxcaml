@@ -71,6 +71,7 @@ type error =
   | Invalid_floatarray_glb
   | Invalid_array_kind_for_uninitialized_makearray_dynamic
   | Invalid_stack_primitive of invalid_stack_primitive
+  | Unable_to_specialize_array_idx_primitive of Types.type_expr
 
 exception Error of Location.t * error
 

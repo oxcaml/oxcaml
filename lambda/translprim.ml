@@ -37,6 +37,7 @@ type error =
   | Invalid_floatarray_glb
   | Invalid_array_kind_for_uninitialized_makearray_dynamic
   | Invalid_stack_primitive of invalid_stack_primitive
+  | Unable_to_specialize_array_idx_primitive of Types.type_expr
 
 exception Error of Location.t * error
 
@@ -1157,18 +1158,47 @@ let lookup_primitive loc ~poly_mode ~poly_sort pos p =
       Primitive(Preinterpret_tagged_int63_as_unboxed_int64, 1)
     | "%reinterpret_unboxed_int64_as_tagged_int63" ->
       Primitive(Preinterpret_unboxed_int64_as_tagged_int63, 1)
-    | "%unsafe_get_idx_imm" ->
+    | "%get_idx_imm" ->
       (* This primitive requires the indexed data to be truly immutable,
          which the compiler will rely upon when performing optimizations *)
       Primitive(Pget_idx (layout, Immutable), 2)
-    | "%unsafe_get_idx" ->
+    | "%get_idx" ->
       (* Whenever it's safe to use the "_imm" counterpart to this primitive
          (just above), it's also safe to use this one. Marking the primitive as
          [Mutable] just restricts the optimizations that can be performed. *)
       Primitive(Pget_idx (layout, Mutable), 2)
-    | "%unsafe_set_idx" ->
+    | "%set_idx" ->
       let layout = List.nth (get_arg_layouts ()) 2 in
       Primitive(Pset_idx (layout, get_first_arg_mode ()), 3)
+    | "%unsafe_array_idx" ->
+      Primitive(Pmake_idx_array
+        (gen_array_kind, Ptagged_int_index,
+         Value generic_value, []), 1)
+    | "%unsafe_array_idx_indexed_by_int8#" ->
+      Primitive(Pmake_idx_array
+        (gen_array_kind,
+         Punboxed_or_untagged_integer_index Untagged_int8,
+         Value generic_value, []), 1)
+    | "%unsafe_array_idx_indexed_by_int16#" ->
+      Primitive(Pmake_idx_array
+        (gen_array_kind,
+         Punboxed_or_untagged_integer_index Untagged_int16,
+         Value generic_value, []), 1)
+    | "%unsafe_array_idx_indexed_by_int32#" ->
+      Primitive(Pmake_idx_array
+        (gen_array_kind,
+         Punboxed_or_untagged_integer_index Unboxed_int32,
+         Value generic_value, []), 1)
+    | "%unsafe_array_idx_indexed_by_int64#" ->
+      Primitive(Pmake_idx_array
+        (gen_array_kind,
+         Punboxed_or_untagged_integer_index Unboxed_int64,
+         Value generic_value, []), 1)
+    | "%unsafe_array_idx_indexed_by_nativeint#" ->
+      Primitive(Pmake_idx_array
+        (gen_array_kind,
+         Punboxed_or_untagged_integer_index Unboxed_nativeint,
+         Value generic_value, []), 1)
     | "%unsafe_get_ptr_imm" ->
       (* This primitive requires the pointed-to data to be truly immutable,
          which the compiler will rely upon when performing optimizations *)
@@ -1842,6 +1872,30 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
   | Primitive (Pset_ptr (_, m), arity), (_ :: p2 :: _) ->
     let l = layout_of_ty_for_idx_set env loc p2 in
     Some (Primitive (Pset_ptr (l, m), arity))
+  | Primitive (Pmake_idx_array (_, ik, mbe, path), arity), _ ->
+    let loc = to_location loc in
+    let err () =
+      raise (Error (loc,
+        Unable_to_specialize_array_idx_primitive rest_ty))
+    in
+    let array_ty =
+      match Types.get_desc (Ctype.expand_head env rest_ty) with
+      | Tconstr (p, array_ty :: _, _)
+        when Path.same p Predef.path_idx_mut
+          || Path.same p Predef.path_idx_imm ->
+        array_ty
+      | _ -> err ()
+    in
+    (match Types.get_desc (Ctype.expand_head env array_ty) with
+     | Tconstr (p, _, _)
+       when Path.same p Predef.path_array
+         || Path.same p Predef.path_iarray -> ()
+     | _ -> err ());
+    let ak =
+      Typeopt.array_type_kind ~elt_sort:None ~elt_ty:None
+        env loc array_ty
+    in
+    Some (Primitive (Pmake_idx_array (ak, ik, mbe, path), arity))
   | _ -> None
 
 let caml_equal =
@@ -2587,6 +2641,10 @@ let report_error_doc ppf = function
         "This primitive always allocates on heap@ \
         (maybe it should be declared with %a or %a?)"
         Style.inline_code "[@local_opt]" Style.inline_code "@ local"
+  | Unable_to_specialize_array_idx_primitive _ty ->
+      fprintf ppf
+        "@[Unable to determine the array kind for array index \
+         primitive.@]"
 
 let () =
   Location.register_error_of_exn

@@ -4606,14 +4606,6 @@ let rec is_nonexpansive exp =
   | Texp_idx (ba, _uas) ->
       let block_access = function
         | Baccess_field _ -> true
-        | Baccess_array
-            { mut = _
-            ; index_kind = _
-            ; index
-            ; base_ty = _
-            ; elt_ty = _
-            ; elt_sort = _ } ->
-          is_nonexpansive index
         | Baccess_block (_, idx) -> is_nonexpansive idx
       in
       (* All unboxed accesses are nonexpansive, but we include the below match
@@ -5686,11 +5678,6 @@ let generalize_structure_type_block_access_result
   generalize_structure el_ty;
   match ba with
   | Baccess_field _ -> ()
-  | Baccess_array
-      { mut = _; index; index_kind = _; base_ty; elt_ty; elt_sort = _ } ->
-    generalize_structure base_ty;
-    generalize_structure elt_ty;
-    generalize_structure_exp index
   | Baccess_block (_, idx) ->
     generalize_structure_exp idx
 
@@ -6870,11 +6857,11 @@ and type_expect_
     let mut =
       match ba with
       | Baccess_field (_, { lbl_mut = Immutable; _ })
-      | Baccess_array { mut = Immutable; _ } | Baccess_block (Immutable, _) ->
+      | Baccess_block (Immutable, _) ->
         false
       | Baccess_field
           (_, { lbl_mut = Mutable { mode = _; atomic = Nonatomic }; _ })
-      | Baccess_array { mut = Mutable; _ } | Baccess_block (Mutable, _) ->
+      | Baccess_block (Mutable, _) ->
         true
       | Baccess_field
           (_, { lbl_mut = Mutable { mode = _; atomic = Atomic }; _ }) ->
@@ -7901,34 +7888,6 @@ and type_block_access env expected_base_ty principal
     in
     let modality = label.lbl_modalities in
     { ba; base_ty = ty_res; el_ty = ty_arg; flat_float; modality }
-  | Baccess_array (mut, index_kind, index) ->
-    let elt_jkind, elt_sort =
-      Jkind.of_new_non_float_sort_var ~why:Idx_element
-        ~level:(Ctype.get_current_level ())
-    in
-    let elt_ty = newvar elt_jkind in
-    let base_ty =
-      match mut with
-      | Immutable -> Predef.type_iarray elt_ty
-      | Mutable -> Predef.type_array elt_ty
-    in
-    let index_type_expected =
-      match index_kind with
-      | Index_int -> Predef.type_int
-      | Index_unboxed_int64 -> Predef.type_unboxed_int64
-      | Index_unboxed_int32 -> Predef.type_unboxed_int32
-      | Index_unboxed_int16 -> Predef.type_unboxed_int16
-      | Index_unboxed_int8 -> Predef.type_unboxed_int8
-      | Index_unboxed_nativeint -> Predef.type_unboxed_nativeint
-    in
-    let index =
-      type_expect env mode_legacy index (mk_expected index_type_expected) in
-    let ba =
-      Baccess_array { mut; index_kind; index; base_ty; elt_ty; elt_sort }
-    in
-    let mut = match mut with Immutable -> false | Mutable -> true in
-    let modality = Typemode.idx_expected_modalities ~mut in
-    { ba; base_ty; el_ty = elt_ty; flat_float = false; modality }
   | Baccess_block (mut, idx) ->
     let base_ty = newvar (Jkind.Builtin.value ~why:Idx_base) in
     let el_ty =

@@ -204,7 +204,6 @@ let iter_on_occurrences
   let iter_block_access exp_env = function
     | Baccess_field (lid, label_desc) ->
       add_label ~namespace:Label exp_env lid label_desc
-    | Baccess_array _ -> ()
     | Baccess_block _ -> ()
   in
   let iter_unboxed_access exp_env = function
