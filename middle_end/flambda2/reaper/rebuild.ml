@@ -162,7 +162,10 @@ let simple_is_unboxable env simple =
 
 let get_simple_unboxable env simple =
   Simple.pattern_match
-    ~const:(fun _ -> assert false)
+    ~const:(fun const ->
+      Misc.fatal_errorf
+        "Expected unboxable name in [get_simple_unboxable], got constant %a"
+        Reg_width_const.print const)
     ~name:(fun name ~coercion:_ ->
       Option.get (DS.get_unboxed_fields env.uses (Code_id_or_name.name name)))
     simple
@@ -177,7 +180,11 @@ let simple_changed_repr env simple =
 
 let get_simple_changed_repr env simple =
   Simple.pattern_match
-    ~const:(fun _ -> assert false)
+    ~const:(fun const ->
+      Misc.fatal_errorf
+        "Expected name with changed representation in \
+         [get_simple_changed_repr], got constant %a"
+        Reg_width_const.print const)
     ~name:(fun name ~coercion:_ ->
       Option.get
         (DS.get_changed_representation env.uses (Code_id_or_name.name name)))
@@ -289,7 +296,13 @@ let function_params_and_body_free_names fpb =
         ~free_names_of_body
       ->
       let f =
-        match free_names_of_body with Unknown -> assert false | Known f -> f
+        match free_names_of_body with
+        | Unknown ->
+          Misc.fatal_errorf
+            "Expected [Known] free names in \
+             [function_params_and_body_free_names] for %a"
+            Continuation.print return_continuation
+        | Known f -> f
       in
       let f =
         Name_occurrences.remove_continuation f ~continuation:return_continuation
@@ -428,7 +441,14 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
     | Some repr ->
       let fields, function_slots =
         match repr with
-        | Block_representation _ -> assert false
+        | Block_representation _ ->
+          Misc.fatal_errorf
+            "Expected closure representation for set of closures bound to \
+             [%a], got block representation"
+            (Format.pp_print_list
+               ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
+               Name.print)
+            bound
         | Closure_representation (fields, function_slots, _) ->
           fields, Some function_slots
       in
@@ -437,10 +457,33 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
         Field.Map.fold
           (fun field (uf : _ DS.unboxed_fields) value_slots ->
             match Field.view field with
-            | Is_int | Get_tag | Block _ -> assert false
+            | Is_int | Get_tag | Block _ ->
+              Misc.fatal_errorf
+                "Unexpected field kind %a in closure representation rewrite \
+                 for set of closures bound to [%a]"
+                Field.print field
+                (Format.pp_print_list
+                   ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
+                   Name.print)
+                bound
             | Call_witness _ | Return_of_call _ | Code_id_of_call_witness ->
-              assert false
-            | Function_slot _ -> assert false
+              Misc.fatal_errorf
+                "Unexpected field kind %a in closure representation rewrite \
+                 for set of closures bound to [%a]"
+                Field.print field
+                (Format.pp_print_list
+                   ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
+                   Name.print)
+                bound
+            | Function_slot _ ->
+              Misc.fatal_errorf
+                "Unexpected function slot field %a in value slot iteration for \
+                 set of closures bound to [%a]"
+                Field.print field
+                (Format.pp_print_list
+                   ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
+                   Name.print)
+                bound
             | Value_slot value_slot -> (
               let arg = Value_slot.Map.find value_slot existing_value_slots in
               if simple_is_unboxable env arg
@@ -1138,7 +1181,11 @@ let rebuild_apply env apply =
       in
       let params_decisions =
         match Code_id.Map.find_opt code_id env.function_params_to_keep with
-        | None -> assert false
+        | None ->
+          Misc.fatal_errorf
+            "No parameter decisions found for code id %a in direct apply \
+             rewrite of@ %a"
+            Code_id.print code_id Apply.print apply
         | Some p -> p
       in
       let params_decisions =
@@ -1152,7 +1199,11 @@ let rebuild_apply env apply =
       let args = List.map2 (get_args_with_kinds env) params_decisions args in
       let args =
         match args with
-        | [] -> assert false
+        | [] ->
+          Misc.fatal_errorf
+            "Empty argument groups in direct apply rewrite for code id %a in@ \
+             %a"
+            Code_id.print code_id Apply.print apply
         | first :: rest -> (args_from_unboxed_callee @ first) :: rest
       in
       let args_arity =
@@ -1281,7 +1332,9 @@ let rebuild_singleton_binding_which_is_being_unboxed env bv
                  (Tag.to_targetint_31_63 env.machine_width tag))
           | Value_slot _ | Function_slot _ | Call_witness _ | Return_of_call _
           | Code_id_of_call_witness ->
-            assert false
+            Misc.fatal_errorf
+              "Unexpected field kind %a when unboxing block binding for %a"
+              Field.print field Bound_var.print bv
         in
         match arg with
         | Left simple ->
@@ -1366,7 +1419,10 @@ let rebuild_set_of_closures_binding_which_is_being_unboxed env bvs
                 RE.create_let bp (Named.create_simple arg) ~body:hole
             | Block _ | Is_int | Get_tag | Function_slot _ | Call_witness _
             | Return_of_call _ | Code_id_of_call_witness ->
-              assert false)
+              Misc.fatal_errorf
+                "Unexpected field kind %a when unboxing set of closures \
+                 binding for %a"
+                Field.print field Bound_var.print bv)
           to_bind hole)
     hole bvs
 
@@ -1383,7 +1439,11 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
     in
     let fss =
       match fields with
-      | Block_representation _ -> assert false
+      | Block_representation _ ->
+        Misc.fatal_errorf
+          "Expected closure representation for Project_function_slot on %a, \
+           got block representation"
+          Bound_var.print bv
       | Closure_representation (_, fss, _) -> fss
     in
     let named =
@@ -1406,7 +1466,11 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
     let fields, size =
       match fields with
       | Block_representation (fields, size) -> fields, size
-      | Closure_representation _ -> assert false
+      | Closure_representation _ ->
+        Misc.fatal_errorf
+          "Expected block representation for Make_block on %a, got closure \
+           representation"
+          Bound_var.print bv
     in
     let mp =
       Field.Map.fold
@@ -1448,7 +1512,10 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
             | Unboxed _ -> Misc.fatal_errorf "trying to unbox simple")
           | Value_slot _ | Function_slot _ | Return_of_call _ | Call_witness _
           | Code_id_of_call_witness ->
-            assert false)
+            Misc.fatal_errorf
+              "Unexpected field kind %a when rebuilding Make_block for %a \
+               whose representation is being changed"
+              Field.print f Bound_var.print bv)
         fields Int.Map.empty
     in
     let args =
@@ -1488,7 +1555,11 @@ let rebuild_make_block_default_case env (bp : Bound_pattern.t)
   let bound_name =
     match bp with
     | Singleton v -> Name.var (Bound_var.var v)
-    | Set_of_closures _ | Static _ -> assert false
+    | Set_of_closures _ | Static _ ->
+      Misc.fatal_errorf
+        "Expected singleton bound pattern in \
+         [rebuild_make_block_default_case], got %a"
+        Bound_pattern.print bp
   in
   let _tag, block_shape = P.Block_kind.to_shape block_kind in
   let block_kind =
@@ -1607,8 +1678,9 @@ let rec rebuild_let_expr_static_consts env res bound_static group ~hole =
             | Code _ -> ()
             | Deleted_code -> ()
             | Static_const _ ->
-              (* Pattern is [Code _], so can't bind static const *)
-              assert false);
+              Misc.fatal_errorf
+                "Pattern is [Code %a] but binding is a [Static_const]"
+                Code_id.print code_id);
             Some (p, Rev_expr.Deleted_code))
         | Block_like sym -> if is_symbol_used env sym then Some arg else None
         | Set_of_closures m ->
@@ -1858,7 +1930,11 @@ and rebuild_function_params_and_body (env : env) res code_metadata
   let code_id = Code_metadata.code_id code_metadata in
   let updating_calling_convention, params_vars, results_vars =
     match Code_id.Map.find_opt code_id env.code_deps with
-    | None -> assert false
+    | None ->
+      Misc.fatal_errorf
+        "No code dependencies found for code id %a in \
+         [rebuild_function_params_and_body]"
+        Code_id.print code_id
     | Some code_dep ->
       let cannot_change_calling_convention =
         DS.cannot_change_calling_convention env.uses code_id
@@ -2005,7 +2081,11 @@ and rebuild_function_params_and_body (env : env) res code_metadata
     in
     let params =
       match params with
-      | [] -> assert false
+      | [] ->
+        Misc.fatal_errorf
+          "Empty parameter groups when changing calling convention for code id \
+           %a"
+          Code_id.print code_id
       | first :: rest -> (params_from_closure @ first) :: rest
     in
     let params_arity =

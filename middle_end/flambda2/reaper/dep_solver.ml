@@ -1205,7 +1205,10 @@ let get_fields : Datalog.database -> usages -> field_usage Field.Map.t =
      Field.Map.merge
        (fun k x y ->
          match x, y with
-         | None, None -> assert false
+         | None, None ->
+           Misc.fatal_errorf
+             "Field %a appeared in neither output in [get_fields_usage]"
+             Field.print k
          | Some _, Some _ ->
            Misc.fatal_errorf "Got two results for field %a" Field.print k
          | Some (), None -> Some Used_as_top
@@ -1265,7 +1268,11 @@ let get_fields_usage_of_constructors :
      Field.Map.merge
        (fun k x y ->
          match x, y with
-         | None, None -> assert false
+         | None, None ->
+           Misc.fatal_errorf
+             "Field %a appeared in neither output in \
+              [get_fields_usage_of_constructors]"
+             Field.print k
          | Some _, Some _ ->
            Misc.fatal_errorf "Got two results for field %a" Field.print k
          | Some (), None -> Some Used_as_top
@@ -2326,7 +2333,16 @@ module Rewriter = struct
             code_ids_of_function_slots )
       in
       match usages with
-      | No_source | No_usages -> assert false
+      | No_source ->
+        Misc.fatal_errorf
+          "Unexpected [No_source] usages in [uses_for_set_of_closures] for \
+           function slot %a"
+          Function_slot.print current_function_slot
+      | No_usages ->
+        Misc.fatal_errorf
+          "Unexpected [No_usages] usages in [uses_for_set_of_closures] for \
+           function slot %a"
+          Function_slot.print current_function_slot
       | Many_sources_any_usage -> any ()
       | Many_sources_usages s ->
         Fixit.run stmt db s current_function_slot any code_ids_of_function_slots
@@ -2360,7 +2376,11 @@ module Rewriter = struct
       Field.Map.merge
         (fun field field_use unboxed_field ->
           match field_use, unboxed_field with
-          | None, None -> assert false
+          | None, None ->
+            Misc.fatal_errorf
+              "Field %a appeared in neither [fields] nor [unboxed_fields] in \
+               [patterns_for_unboxed_fields]"
+              Field.print field
           | Some _, None ->
             None
             (* This should only happen for fields like [Call_witness _], which
@@ -2489,7 +2509,12 @@ module Rewriter = struct
         else Many_sources_usages usages
     in
     match t with
-    | No_source | No_usages -> assert false
+    | No_source ->
+      Misc.fatal_errorf "Unexpected [No_source] in [follow_field] for field %a"
+        Field.print field
+    | No_usages ->
+      Misc.fatal_errorf "Unexpected [No_usages] in [follow_field] for field %a"
+        Field.print field
     | Many_sources_any_usage -> Many_sources_any_usage
     | Many_sources_usages usages -> for_usages usages
     | Single_source source -> (
@@ -3228,7 +3253,8 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
     (fun field field_use ->
       match Field.view field with
       | Function_slot _ | Code_id_of_call_witness | Return_of_call _ ->
-        assert false
+        Misc.fatal_errorf "Unexpected field kind %a in [mk_unboxed_fields]"
+          Field.print field
       | Call_witness _ -> None
       | Block _ | Value_slot _ | Is_int | Get_tag -> (
         let field_source = get_single_field_source db unboxed_block field in
@@ -3254,7 +3280,11 @@ let rec mk_unboxed_fields ~has_to_be_unboxed ~mk db unboxed_block fields
             then
               let new_unboxed_block =
                 match field_source with
-                | No_source -> assert false
+                | No_source ->
+                  Misc.fatal_errorf
+                    "Unexpected [No_source] for field %a in \
+                     [mk_unboxed_fields] when creating nested unboxed fields"
+                    Field.print field
                 | Many ->
                   Misc.fatal_errorf
                     "[mk_unboxed_fields]: unboxed fields, but [Many] sources"
