@@ -1917,6 +1917,11 @@ type ('a, 'b) comparison =
   | Equal : ('a, 'a) comparison
   | Greater_than : ('a, 'b) comparison
 
+let comparison_result : type a b. (a, b) comparison -> int = function
+  | Less_than -> -1
+  | Equal -> 0
+  | Greater_than -> 1
+
 (*********************************************)
 (* Fancy modules *)
 
