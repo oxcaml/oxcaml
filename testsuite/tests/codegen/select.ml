@@ -50,14 +50,15 @@ select_constant:
 |}]
 
 
-(* CR ttebbi: Unnecessary sign extension. *)
+(* CR ttebbi: Unnecessary moves. *)
 let select_int32 b (x : int32#) (y : int32#) =
   Builtins.select_int32 b x y
 [%%expect_asm X86_64{|
 select_int32:
-  cmpq  $1, %rax
-  cmovne %rbx, %rdi
-  movslq %edi, %rax
+  movq  %rax, %rsi
+  movq  %rdi, %rax
+  cmpq  $1, %rsi
+  cmovne %rbx, %rax
   ret
 |}]
 

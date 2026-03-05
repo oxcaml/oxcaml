@@ -110,19 +110,34 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
        2. All of the [machtype_component]s are singleton arrays. *)
     Array.map (fun machtype -> [| machtype |]) return_ty
   in
+  let builtins_sign_extends =
+    is_c_builtin
+    &&
+    match callee with
+    | "caml_native_pointer_load_signed_int32"
+    | "caml_native_pointer_load_unboxed_int32"
+    | "caml_ext_pointer_load_signed_int32"
+    | "caml_ext_pointer_load_unboxed_int32"
+    | "caml_int32_shift_right_by_int32_unboxed" | "caml_csel_int32_unboxed" ->
+      true
+    | _ -> false
+  in
   (* Returned small integer values need to be sign-extended because it's not
      clear whether C code that returns a small integer returns one that is sign
      extended or not. There is no need to wrap other return arities. *)
   let maybe_sign_extend kind dbg cmm =
-    match Flambda_kind.With_subkind.kind kind with
-    | Naked_number Naked_int8 -> C.sign_extend ~bits:8 ~dbg cmm
-    | Naked_number Naked_int16 -> C.sign_extend ~bits:16 ~dbg cmm
-    | Naked_number Naked_int32 -> C.sign_extend ~bits:32 ~dbg cmm
-    | Naked_number
-        ( Naked_float | Naked_immediate | Naked_int64 | Naked_nativeint
-        | Naked_vec128 | Naked_vec256 | Naked_vec512 | Naked_float32 )
-    | Value | Rec_info | Region ->
-      cmm
+    if builtins_sign_extends
+    then cmm
+    else
+      match Flambda_kind.With_subkind.kind kind with
+      | Naked_number Naked_int8 -> C.sign_extend ~bits:8 ~dbg cmm
+      | Naked_number Naked_int16 -> C.sign_extend ~bits:16 ~dbg cmm
+      | Naked_number Naked_int32 -> C.sign_extend ~bits:32 ~dbg cmm
+      | Naked_number
+          ( Naked_float | Naked_immediate | Naked_int64 | Naked_nativeint
+          | Naked_vec128 | Naked_vec256 | Naked_vec512 | Naked_float32 )
+      | Value | Rec_info | Region ->
+        cmm
   in
   let ty_args =
     List.map C.exttype_of_kind

@@ -317,13 +317,11 @@ ptr_store_int64:
 
 (* Native pointer load/store - int32 *)
 
-(* CR ttebbi: Double sign extension: movslq from memory, then movslq again. *)
 let ptr_load_int32 (p : nativeint#) =
   Builtins.native_pointer_load_int32 p
 [%%expect_asm X86_64{|
 ptr_load_int32:
   movslq (%rax), %rax
-  movslq %eax, %rax
   ret
 |}]
 
@@ -673,7 +671,6 @@ let ext_load_int32 (p : Builtins.ext_pointer) =
 [%%expect_asm X86_64{|
 ext_load_int32:
   movslq -1(%rax), %rax
-  movslq %eax, %rax
   ret
 |}]
 
