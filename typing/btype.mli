@@ -714,6 +714,12 @@ module Jkind0 : sig
 
     (** The jkind for [array] type arguments. *)
     val for_array_argument : jkind_lr
+
+    (** Build a quoted jkind. *)
+    val quote : 'd Types.jkind -> 'd Types.jkind
+
+    (** Build a spliced jkind. Only possible if the argument is not meta-stage. *)
+    val splice : 'd Types.jkind -> 'd Types.jkind option
   end
 
   include module type of Jkind

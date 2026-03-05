@@ -2457,6 +2457,10 @@ module Jkind0 = struct
           with_bounds = No_with_bounds
         }
         ~annotation:None ~why:(Value_creation why)
+
+    let quote jk = jk
+
+    let splice jk = Some jk
   end
 
   include Jkind

@@ -517,6 +517,12 @@ val for_abbreviation :
 (** The jkind for array elements, creating a new sort variable. *)
 val for_array_element_sort : level:int -> Types.jkind_lr * sort
 
+(** Build a quoted jkind. *)
+val quote : 'd Types.jkind -> 'd Types.jkind
+
+(** Build a spliced jkind. Only possible if the argument is not meta-stage. *)
+val splice : 'd Types.jkind -> 'd Types.jkind option
+
 (******************************)
 (* elimination and defaulting *)
 
