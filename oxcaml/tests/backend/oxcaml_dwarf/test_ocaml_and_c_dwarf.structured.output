@@ -27,14 +27,14 @@
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_hash_exn(count=#21L : value, limit=#201L : value, seed=#1L : value, obj=<PTR> : value)
   * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_hash_exn(count=#21L : value, limit=#201L : value, seed=#1L : value, obj=<PTR> : value)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_c_call + N
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`camlStdlib__Hashtbl__add_XXX_XXX_code
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Stdlib__Hashtbl.add
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Test_ocaml_and_c_dwarf.f_hash(param="key" : ocaml_value, param=42 : ocaml_value)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`camlTest_ocaml_and_c_dwarf__entry
 === Testing OCaml/C boundary - polymorphic compare ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_compare(v1=<PTR> : value, v2=<PTR> : value)
   * frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_compare(v1=<PTR> : value, v2=<PTR> : value)
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_c_call + N
-    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`camlStdlib__Hashtbl__find_XXX_XXX_code
+    frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`Stdlib__Hashtbl.find
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`camlTest_ocaml_and_c_dwarf__entry
 === Testing OCaml/C boundary - marshal output ===
     frame #N: <ADDRESS> test_ocaml_and_c_dwarf.exe`caml_output_value_to_buffer(buf=<PTR> : value, ofs=#1L : value, len=#129L : value, v=<PTR> : value, flags=#1L : value)
