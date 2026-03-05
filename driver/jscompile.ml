@@ -136,8 +136,8 @@ let implementation_aux ~start_from ~source_file ~output_prefix
     ~keep_symbol_tables:_
     ~(compilation_unit : Compile_common.compilation_unit_or_inferred) =
   let unit_info =
-    unit_info_from_cu_or_output_prefix
-      ~source_file Impl ~output_prefix ~compilation_unit
+    unit_info_from_cu_or_output_prefix ~source_file Impl ~output_prefix
+      ~compilation_unit
   in
   with_info ~dump_ext:"cmo" unit_info @@ fun info ->
   match start_from with
