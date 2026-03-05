@@ -368,12 +368,7 @@ module Inlining = struct
       assert false
     | Some (Closure_approximation { code; _ }) ->
       let metadata = Code_or_metadata.code_metadata code in
-      let fun_params_length =
-        Code_metadata.params_arity metadata |> Flambda_arity.num_params
-      in
-      if
-        (not (Code_or_metadata.code_present code))
-        || fun_params_length > List.length (Apply_expr.args apply)
+      if not (Code_or_metadata.code_present code)
       then (
         Inlining_report.record_decision_at_call_site_for_known_function ~tracker
           ~apply ~pass:After_closure_conversion ~unrolling_depth:None
@@ -381,6 +376,21 @@ module Inlining = struct
           ~are_rebuilding_terms Definition_says_not_to_inline;
         Not_inlinable)
       else
+        (* These calculations are all in terms of non-unarized parameters. *)
+        let params_length_from_code_metadata =
+          Code_metadata.params_arity metadata |> Flambda_arity.num_params
+        in
+        let params_length_from_args =
+          Flambda_arity.num_params (Apply_expr.args_arity apply)
+        in
+        if params_length_from_code_metadata <> params_length_from_args
+        then
+          Misc.fatal_errorf
+            "Closure_conversion: inlinable function has %d (complex) params \
+             but application has %d (complex) args, despite earlier \
+             determination this was an exact application:@ %a"
+            params_length_from_code_metadata params_length_from_args
+            Apply_expr.print apply;
         let code = Code_or_metadata.get_code code in
         let inlined_call = Apply_expr.inlined apply in
         let decision, res =
