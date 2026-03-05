@@ -2169,7 +2169,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
   in
   let str = add_barrier_to_let_kind ubr Alias in
   if cstr.cstr_inlined <> None then
-    { arg; binding_kind = Alias; mut; sort; layout } :: rem
+    { arg; binding_kind; mut; sort; layout } :: rem
   else
     match cstr.cstr_repr with
     | Variant_boxed _ ->
@@ -3659,6 +3659,7 @@ let combine_extension_constructor value_kind loc arg pat_env pat_barrier partial
 
 let combine_regular_constructor value_kind loc arg cstr partial
     ctx def (descr_lambda_list, total1, pats) =
+  (* Regular concrete type *)
   let ncases = List.length descr_lambda_list
   and nconstrs = cstr.cstr_consts + cstr.cstr_nonconsts in
   let sig_complete = ncases = nconstrs in
@@ -4778,6 +4779,8 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
 
 (* Easy case since variables are available *)
 let for_tupled_function ~scopes ~return_layout loc paraml pats_act_list partial =
+  (* The arguments of a tupled function are always values since they must be
+     tuple elements *)
   let args = List.map (fun id ->
     root_arg (Lvar id) Strict Jkind.Sort.Const.for_tuple_element layout_tuple_element
   ) paraml in
