@@ -95,23 +95,11 @@ let handle_extension ext =
 
 let rec add_type bv ty =
   match ty.ptyp_desc with
-<<<<<<< oxcaml
     Ptyp_any jkind
   | Ptyp_var (_, jkind) -> Option.iter (add_jkind bv) jkind
   | Ptyp_arrow(_, t1, t2, _, _) -> add_type bv t1; add_type bv t2
-  | Ptyp_tuple tl -> add_type_labeled_tuple bv tl
-  | Ptyp_unboxed_tuple tl -> add_type_labeled_tuple bv tl
-||||||| upstream-base
-    Ptyp_any -> ()
-  | Ptyp_var _ -> ()
-  | Ptyp_arrow(_, t1, t2) -> add_type bv t1; add_type bv t2
-  | Ptyp_tuple tl -> List.iter (add_type bv) tl
-=======
-    Ptyp_any -> ()
-  | Ptyp_var _ -> ()
-  | Ptyp_arrow(_, t1, t2) -> add_type bv t1; add_type bv t2
   | Ptyp_tuple tl -> List.iter (fun (_, t) -> add_type bv t) tl
->>>>>>> upstream-incoming
+  | Ptyp_unboxed_tuple tl -> List.iter (fun (_, t) -> add_type bv t) tl
   | Ptyp_constr(c, tl) -> add bv c; List.iter (add_type bv) tl
   | Ptyp_object (fl, _) ->
       List.iter
@@ -141,22 +129,9 @@ let rec add_type bv ty =
   | Ptyp_repr(_, t) -> add_type bv t
   | Ptyp_extension e -> handle_extension e
 
-<<<<<<< oxcaml
-and add_type_labeled_tuple bv tl =
-  List.iter (fun (_, ty) -> add_type bv ty) tl
-
-and add_package_type bv (lid, l) =
-  add bv lid;
-  List.iter (add_type bv) (List.map (fun (_, e) -> e) l)
-||||||| upstream-base
-and add_package_type bv (lid, l) =
-  add bv lid;
-  List.iter (add_type bv) (List.map (fun (_, e) -> e) l)
-=======
 and add_package_type bv ptyp =
   add bv ptyp.ppt_path;
   List.iter (fun (_, ty) -> add_type bv ty) ptyp.ppt_cstrs
->>>>>>> upstream-incoming
 
 (* CR layouts: Remember to add this when jkinds can have module
    prefixes. *)
@@ -229,16 +204,10 @@ let rec add_pattern bv pat =
   | Ppat_alias(p, _) -> add_pattern bv p
   | Ppat_interval _
   | Ppat_constant _ -> ()
-<<<<<<< oxcaml
   | Ppat_unboxed_unit -> ()
   | Ppat_unboxed_bool _ -> ()
-  | Ppat_tuple (pl, _) -> add_pattern_labeled_tuple bv pl
-  | Ppat_unboxed_tuple (pl, _)-> add_pattern_labeled_tuple bv pl
-||||||| upstream-base
-  | Ppat_tuple pl -> List.iter (add_pattern bv) pl
-=======
   | Ppat_tuple (pl, _) -> List.iter (fun (_, p) -> add_pattern bv p) pl
->>>>>>> upstream-incoming
+  | Ppat_unboxed_tuple (pl, _) -> List.iter (fun (_, p) -> add_pattern bv p) pl
   | Ppat_construct(c, opt) ->
       add bv c;
       add_opt
@@ -262,9 +231,6 @@ let rec add_pattern bv pat =
   | Ppat_exception p -> add_pattern bv p
   | Ppat_extension e -> handle_extension e
 
-and add_pattern_labeled_tuple bv labeled_pl =
-  List.iter (fun (_, p) -> add_pattern bv p) labeled_pl
-
 let add_pattern bv pat =
   pattern_bv := bv;
   add_pattern bv pat;
@@ -284,16 +250,10 @@ let rec add_expr bv exp =
       add_expr bv e; List.iter (fun (_,e) -> add_expr bv e) el
   | Pexp_match(e, pel) -> add_expr bv e; add_cases bv pel
   | Pexp_try(e, pel) -> add_expr bv e; add_cases bv pel
-<<<<<<< oxcaml
   | Pexp_unboxed_unit -> ()
   | Pexp_unboxed_bool _ -> ()
-  | Pexp_tuple el -> add_labeled_tuple_expr bv el
-  | Pexp_unboxed_tuple el -> add_labeled_tuple_expr bv el
-||||||| upstream-base
-  | Pexp_tuple el -> List.iter (add_expr bv) el
-=======
   | Pexp_tuple el -> List.iter (fun (_, e) -> add_expr bv e) el
->>>>>>> upstream-incoming
+  | Pexp_unboxed_tuple el -> List.iter (fun (_, e) -> add_expr bv e) el
   | Pexp_construct(c, opte) -> add bv c; add_opt add_expr bv opte
   | Pexp_variant(_, opte) -> add_opt add_expr bv opte
   | Pexp_record(lblel, opte)
@@ -337,19 +297,11 @@ let rec add_expr bv exp =
   | Pexp_poly (e, t) -> add_expr bv e; add_opt add_type bv t
   | Pexp_object { pcstr_self = pat; pcstr_fields = fieldl } ->
       let bv = add_pattern bv pat in List.iter (add_class_field bv) fieldl
-<<<<<<< oxcaml
   | Pexp_newtype (_, jkind, e) ->
       Option.iter (add_jkind bv) jkind;
       add_expr bv e
-  | Pexp_pack m -> add_module_expr bv m
-||||||| upstream-base
-  | Pexp_newtype (_, e) -> add_expr bv e
-  | Pexp_pack m -> add_module_expr bv m
-=======
-  | Pexp_newtype (_, e) -> add_expr bv e
   | Pexp_pack (m, opty) ->
       add_module_expr bv m; add_opt add_package_type bv opty
->>>>>>> upstream-incoming
   | Pexp_open (o, e) ->
       let bv = open_declaration bv o in
       add_expr bv e
@@ -406,8 +358,6 @@ and add_comprehension_iterator bv = function
     add_expr bv stop
   | Pcomp_in expr ->
     add_expr bv expr
-
-and add_labeled_tuple_expr bv el = List.iter (add_expr bv) (List.map snd el)
 
 and add_block_access bv = function
   | Baccess_field fld -> add bv fld
@@ -692,7 +642,7 @@ and add_structure_binding bv item_list =
 (* When we merge [include functor] upstream this can get re-inlined *)
 and add_include_declaration (bv, m) incl =
   let Node (s, m') as n = add_module_binding bv incl.pincl_mod in
-  if !Clflags.transparent_modules then
+  if !Clflags.no_alias_deps then
     add_names s
   else
     (* If we are not in the delayed dependency mode, we need to
@@ -751,29 +701,7 @@ and add_struct_item (bv, m) item : _ String.Map.t * _ String.Map.t =
   | Pstr_class_type cdtl ->
       List.iter (add_class_type_declaration bv) cdtl; (bv, m)
   | Pstr_include incl ->
-<<<<<<< oxcaml
       add_include_declaration (bv, m) incl
-||||||| upstream-base
-      let Node (s, m') as n = add_module_binding bv incl.pincl_mod in
-      if !Clflags.transparent_modules then
-        add_names s
-      else
-        (* If we are not in the delayed dependency mode, we need to
-           collect all delayed dependencies imported by the include statement *)
-        add_names (collect_free n);
-      let add = String.Map.fold String.Map.add m' in
-      (add bv, add m)
-=======
-      let Node (s, m') as n = add_module_binding bv incl.pincl_mod in
-      if !Clflags.no_alias_deps then
-        add_names s
-      else
-        (* If we are not in the delayed dependency mode, we need to
-           collect all delayed dependencies imported by the include statement *)
-        add_names (collect_free n);
-      let add = String.Map.fold String.Map.add m' in
-      (add bv, add m)
->>>>>>> upstream-incoming
   | Pstr_attribute _ -> (bv, m)
   | Pstr_extension (e, _) ->
       handle_extension e;
