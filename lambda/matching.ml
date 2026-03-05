@@ -4905,27 +4905,18 @@ let do_for_multiple_match ~scopes ~return_layout loc idl mode pat_act_list parti
     in
     let next, nexts = split_and_precompile_half_simplified pm1_half in
     let size = List.length idl in
-    let (idl_with_layouts, args) =
-      List.map (fun (id, sort, layout) ->
-          (id, Lambda.debug_uid_none, layout),
-          root_arg (Lvar id) Alias sort layout
-          (* CR sspies: Can we get a better [debug_uid] here? *)
-        )
+    let args =
+      List.map
+        (fun (id, sort, layout) -> root_arg (Lvar id) Alias sort layout)
         idl
-      |> List.split
     in
     let flat_next = flatten_precompiled size args next
     and flat_nexts =
       List.map (fun (e, pm) -> (e, flatten_precompiled size args pm)) nexts
     in
-    let lam, total =
-      comp_match_handlers return_layout
-        (compile_flattened ~scopes return_layout repr) partial
-        (Context.start size) flat_next flat_nexts
-    in
-    List.fold_right2 (bind_with_layout Strict)
-      idl_with_layouts param_lambda lam,
-    total
+    comp_match_handlers return_layout
+      (compile_flattened ~scopes return_layout repr) partial
+      (Context.start size) flat_next flat_nexts
   )
 
 (* PR#4828: Believe it or not, the 'paraml' argument below
@@ -4946,11 +4937,11 @@ let bind_opt (v, v_duid, _, layout, eo) k =
 
 let for_multiple_match ~scopes ~return_layout loc paraml mode pat_act_list partial =
   let v_paraml = List.map param_to_var paraml in
-  let idl =
+  let vl =
     List.map (fun (v, _, sort, layout, _) -> (v, sort, layout)) v_paraml
   in
   List.fold_right bind_opt v_paraml
-    (do_for_multiple_match ~scopes ~return_layout loc idl mode pat_act_list
+    (do_for_multiple_match ~scopes ~return_layout loc vl mode pat_act_list
        partial)
 
 let for_optional_arg_default
