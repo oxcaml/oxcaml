@@ -164,9 +164,8 @@ let get_simple_unboxable env simple =
   Simple.pattern_match
     ~const:(fun const ->
       Misc.fatal_errorf
-        "Expected unboxable name in [get_simple_unboxable], got constant %a \
-         (simple: %a)"
-        Reg_width_const.print const Simple.print simple)
+        "Expected unboxable name in [get_simple_unboxable], got constant %a"
+        Reg_width_const.print const)
     ~name:(fun name ~coercion:_ ->
       Option.get (DS.get_unboxed_fields env.uses (Code_id_or_name.name name)))
     simple
@@ -184,8 +183,8 @@ let get_simple_changed_repr env simple =
     ~const:(fun const ->
       Misc.fatal_errorf
         "Expected name with changed representation in \
-         [get_simple_changed_repr], got constant %a (simple: %a)"
-        Reg_width_const.print const Simple.print simple)
+         [get_simple_changed_repr], got constant %a"
+        Reg_width_const.print const)
     ~name:(fun name ~coercion:_ ->
       Option.get
         (DS.get_changed_representation env.uses (Code_id_or_name.name name)))
@@ -446,7 +445,9 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
           Misc.fatal_errorf
             "Expected closure representation for set of closures bound to \
              [%a], got block representation"
-            (Format.pp_print_list ~pp_sep:Format.pp_print_space Name.print)
+            (Format.pp_print_list
+               ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
+               Name.print)
             bound
         | Closure_representation (fields, function_slots, _) ->
           fields, Some function_slots
@@ -461,21 +462,27 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
                 "Unexpected field kind %a in closure representation rewrite \
                  for set of closures bound to [%a]"
                 Field.print field
-                (Format.pp_print_list ~pp_sep:Format.pp_print_space Name.print)
+                (Format.pp_print_list
+                   ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
+                   Name.print)
                 bound
             | Call_witness _ | Return_of_call _ | Code_id_of_call_witness ->
               Misc.fatal_errorf
                 "Unexpected field kind %a in closure representation rewrite \
                  for set of closures bound to [%a]"
                 Field.print field
-                (Format.pp_print_list ~pp_sep:Format.pp_print_space Name.print)
+                (Format.pp_print_list
+                   ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
+                   Name.print)
                 bound
             | Function_slot _ ->
               Misc.fatal_errorf
                 "Unexpected function slot field %a in value slot iteration for \
                  set of closures bound to [%a]"
                 Field.print field
-                (Format.pp_print_list ~pp_sep:Format.pp_print_space Name.print)
+                (Format.pp_print_list
+                   ~pp_sep:(fun ppf () -> Format.fprintf ppf ";@ ")
+                   Name.print)
                 bound
             | Value_slot value_slot -> (
               let arg = Value_slot.Map.find value_slot existing_value_slots in
