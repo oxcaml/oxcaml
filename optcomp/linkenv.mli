@@ -84,10 +84,10 @@ val check_consistency :
   t -> unit:unit_link_info -> Import_info.t array -> Import_info.t array -> unit
 
 (* CR sspies: Upstream PR #12084 removed [Missing_implementations] and
-   [Multiple_definition] from [Asmlink.error], replacing them with
-   [Link_error of Linkdeps.error]. Once we backport that change, these two
-   constructors should move from here into [Linkdeps.error] and
-   [asmlink.ml] should use [Link_error] accordingly. *)
+   [Multiple_definition] from [Asmlink.error], replacing them with [Link_error
+   of Linkdeps.error]. Once we backport that change, these two constructors
+   should move from here into [Linkdeps.error] and [asmlink.ml] should use
+   [Link_error] accordingly. *)
 type error =
   | File_not_found of filepath
   | Not_an_object_file of filepath
