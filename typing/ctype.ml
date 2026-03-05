@@ -276,12 +276,12 @@ let none = newty (Ttuple [])                (* Clearly ill-formed type *)
 let rec update_variable_stage stage_offset ty name jkind =
   if stage_offset = 0 then ()
   else if stage_offset < 0 then begin
-    let v = newvar2 ?name (get_level ty) jkind in
+    let v = newvar2 ?name (get_level ty) (Jkind.splice jkind |> Option.get) in
     let ty' = newty2 ~level:(get_level ty) (Tquote v) in
     link_type ty ty';
     update_variable_stage (stage_offset + 1) v name jkind
   end else begin
-    let v = newvar2 ?name (get_level ty) jkind in
+    let v = newvar2 ?name (get_level ty) (Jkind.quote jkind) in
     let ty' = newty2 ~level:(get_level ty) (Tsplice v) in
     link_type ty ty';
     update_variable_stage (stage_offset - 1) v name jkind
