@@ -88,6 +88,8 @@ type unrepresentable_constructor =
   | Unrepresentable_argument of int
   | Unrepresentable_argument_field of string
 
+(* Update the representation of a constructor whose representation at
+   declaration time was [None] because it has an argument of kind [any]. *)
 val update_constructor_representation:
     Env.t -> Types.constructor_arguments -> (_ * _) jkind list ->
     loc:Location.t -> is_extension_constructor:bool ->
@@ -96,10 +98,11 @@ val update_constructor_representation:
 type unrepresentable_record =
   | Unrepresentable_field of string
 
+(* Update the representation of a record whose representation at declaration
+   time was [None] because it has a field of kind [any]. *)
 val update_record_representation:
     Env.t -> Location.t -> 'rep Types.record_form ->
     (Types.label_declaration * Types.type_expr) list ->
-    'rep option ->
     (Jkind.Sort.Const.t list * 'rep, unrepresentable_record) Result.t
 
 val mixed_block_element :

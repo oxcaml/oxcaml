@@ -47,3 +47,31 @@ let print_array a =
 let () =
   print_array (fst b);
   print_array (fst c);
+
+module Poly_record : sig
+  type 'a t = { f : 'a }
+
+  val make : 'a -> 'a t
+  val f : 'a t -> 'a
+end = struct
+  type 'a t = { f : 'a }
+
+  let[@inline never] make f =
+    (* [f] has unknown type so this can't be a flat float block *)
+    { f }
+  let[@inline never] f t =
+    (* Similarly, this can't access [t] as a flat float block *)
+    t.f
+end
+
+let f =
+  let open Poly_record in
+  (* Make sure it's not possible to create a [Poly_record.t] as a flat float
+     block or to access one as if it's a flat float block *)
+  let t = { f = 1. } in
+  print_float (f t); (* crash if [t] is flat *)
+  print_newline ();
+
+  let t = make 2. in
+  print_float t.f; (* crash if we think [t] is flat *)
+  print_newline ();

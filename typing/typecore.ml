@@ -1688,7 +1688,7 @@ let update_labels (type rep) env labels (form : rep record_form) ~loc
         in
         match
           Typedecl.update_record_representation env loc form
-            (lbls_and_ty_args |> Array.to_list) None
+            (lbls_and_ty_args |> Array.to_list)
         with
         | Ok (sorts, rep) ->
             let sorts = sorts |> Array.of_list in
@@ -6259,28 +6259,31 @@ and type_expect_
         lbl_all, lbl_repres
       in
       let representation =
-        let labels_with_updated_types =
-          Array.map2
-            (fun ld (arg, _jkind, _sort, _def) ->
-               Types.label_declaration_of_label_description ld, arg)
-            label_descriptions label_definitions
-          |> Array.to_list
-        in
-        begin match
-          (* XXX This is redundantly going to get the sort and jkind for each
-             label all over again. Possibly we're doing things in the wrong
-             order. *)
-          Typedecl.update_record_representation env
-            sexp.pexp_loc record_form labels_with_updated_types representation
-        with
-        | Ok (_, rep) -> rep
-        | Error _ ->
-            (* This should be impossible since we already ran everything
-               through [jkind_and_sort_for_label_definition] *)
-            Misc.fatal_errorf
-              "No representation for record whose fields have sorts: %a"
-                (Format_doc.compat Printtyp.type_expr) ty_expected
-        end
+        match representation with
+        | Some rep -> rep
+        | None ->
+            let labels_with_updated_types =
+              Array.map2
+                (fun ld (arg, _jkind, _sort, _def) ->
+                   Types.label_declaration_of_label_description ld, arg)
+                label_descriptions label_definitions
+              |> Array.to_list
+            in
+            begin match
+              (* XXX This is redundantly going to get the sort and jkind for each
+                 label all over again. Possibly we're doing things in the wrong
+                 order. *)
+              Typedecl.update_record_representation env
+                sexp.pexp_loc record_form labels_with_updated_types
+            with
+            | Ok (_, rep) -> rep
+            | Error _ ->
+                (* This should be impossible since we already ran everything
+                   through [jkind_and_sort_for_label_definition] *)
+                Misc.fatal_errorf
+                  "No representation for record whose fields have sorts: %a"
+                    (Format_doc.compat Printtyp.type_expr) ty_expected
+            end
       in
       let fields =
         Array.map2 (fun descr (_arg, _jkind, sort, def) -> descr, sort, def)
