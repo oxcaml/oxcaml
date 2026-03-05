@@ -17,6 +17,9 @@
 open! Flambda.Import
 open! Simplify_import
 
+let closure_invalid_debug =
+  Option.is_some (Sys.getenv_opt "FLAMBDA2_CLOSURE_INVALID_DEBUG")
+
 let fail_if_probe apply =
   match Apply.probe apply with
   | None -> ()
@@ -836,8 +839,8 @@ let arity_mismatch ~(params_arity : [`Complex] Flambda_arity.t)
 let simplify_direct_function_call ~simplify_expr dacc apply
     ~callee's_code_id_from_type ~callee's_code_ids_from_call_kind
     ~callee's_function_slot ~coming_from_indirect ~result_arity ~result_types
-    ~recursive ~must_be_detupled ~closure_alloc_mode_from_type function_decl
-    ~down_to_up =
+    ~recursive ~must_be_detupled ~closure_alloc_mode_from_type ~callee_ty
+    function_decl ~down_to_up =
   (match Apply.probe apply, Apply.inlined apply with
   | None, _ | Some _, Never_inlined -> ()
   | Some _, (Hint_inlined | Unroll _ | Default_inlined | Always_inlined _) ->
@@ -858,6 +861,21 @@ let simplify_direct_function_call ~simplify_expr dacc apply
   in
   match callee's_code_ids with
   | Bottom ->
+    if closure_invalid_debug
+    then (
+      let typing_env = DA.typing_env dacc in
+      Format.eprintf
+        "@[<v>Closure_type_was_invalid \
+         (code age relation meet):@ \
+         callee type: %a@ \
+         code ids from call kind: %a@ \
+         code id from type: %a@ \
+         typing env:@ %a@]@."
+        T.print callee_ty
+        (Or_unknown.print Code_id.Set.print)
+        callee's_code_ids_from_call_kind
+        Code_id.print callee's_code_id_from_type
+        TE.print typing_env);
     replace_apply_by_invalid dacc ~down_to_up (Closure_type_was_invalid apply)
   | Ok callee's_code_ids ->
     let callee's_code_id =
@@ -1143,10 +1161,19 @@ let simplify_function_call ~simplify_expr dacc apply ~callee_ty
         ~result_arity:(Code_metadata.result_arity callee's_code_metadata)
         ~result_types:(Code_metadata.result_types callee's_code_metadata)
         ~recursive:(Code_metadata.recursive callee's_code_metadata)
-        ~must_be_detupled ~closure_alloc_mode_from_type func_decl_type
-        ~down_to_up
+        ~must_be_detupled ~closure_alloc_mode_from_type ~callee_ty
+        func_decl_type ~down_to_up
     | Need_meet -> type_unavailable ()
     | Invalid ->
+      if closure_invalid_debug
+      then
+        Format.eprintf
+          "@[<v>Closure_type_was_invalid \
+           (meet_single_closures_entry):@ \
+           callee type: %a@ \
+           typing env:@ %a@]@."
+          T.print callee_ty
+          TE.print (DE.typing_env denv);
       let rebuild uacc ~after_rebuild =
         let uacc = UA.notify_removed ~operation:Removed_operations.call uacc in
         EB.rebuild_invalid uacc (Closure_type_was_invalid apply) ~after_rebuild
@@ -1328,6 +1355,18 @@ let simplify_c_call ~simplify_expr dacc apply ~callee_ty ~arg_types ~down_to_up
     down_to_up dacc
       ~rebuild:(rebuild_non_ocaml_function_call apply ~use_id ~exn_cont_use_id)
   | Invalid ->
+    if closure_invalid_debug
+    then
+      Format.eprintf
+        "@[<v>Closure_type_was_invalid \
+         (simplify_extcall):@ \
+         callee type: %a@ \
+         arg types: %a@ \
+         typing env:@ %a@]@."
+        T.print callee_ty
+        (Format.pp_print_list ~pp_sep:Format.pp_print_space T.print)
+        arg_types
+        TE.print (DA.typing_env dacc);
     replace_apply_by_invalid dacc ~down_to_up (Closure_type_was_invalid apply)
 
 let simplify_effect_op dacc apply (op : Call_kind.Effect.t) ~down_to_up =
