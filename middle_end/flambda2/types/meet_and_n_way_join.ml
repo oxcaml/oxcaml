@@ -415,6 +415,10 @@ let meet_code_id (env : ME.t) (code_id1 : Code_id.t) (code_id2 : Code_id.t) :
         code_id1 code_id2
     with
     | Bottom -> Bottom (New_result ())
+    | Unknown ->
+      (* CR bclement: We are kind of lying here -- using either input is
+         correct, but might lose different information. *)
+      Ok (Both_inputs, env)
     | Ok code_id ->
       if Code_id.equal code_id code_id1
       then Ok (Left_input, env)

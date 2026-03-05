@@ -28,7 +28,9 @@ let get_older_version_of t code_id = Code_id.Map.find_opt code_id t
 
 let add t ~newer ~older = Code_id.Map.add newer older t
 
-let rec all_ids_up_to_root0 t ~resolver id all_ids_so_far =
+exception Missing_cmx_file
+
+let rec all_ids_up_to_root0_exn t ~resolver id all_ids_so_far =
   if Code_id.Set.mem id all_ids_so_far
   then all_ids_so_far
   else
@@ -43,25 +45,30 @@ let rec all_ids_up_to_root0 t ~resolver id all_ids_so_far =
         | exception _ ->
           Misc.fatal_errorf "Exception in resolver@ Backtrace is: %s"
             (Printexc.raw_backtrace_to_string (Printexc.get_raw_backtrace ()))
-        | None -> all_ids_so_far
+        | None -> raise Missing_cmx_file
         | Some t -> (
           (* Inlining the base case, so that we do not recursively loop in case
              of a code_id that is not bound in the map *)
           match Code_id.Map.find id t with
           | exception Not_found -> all_ids_so_far
-          | older -> all_ids_up_to_root0 t ~resolver older all_ids_so_far))
-    | older -> all_ids_up_to_root0 t ~resolver older all_ids_so_far
+          | older -> all_ids_up_to_root0_exn t ~resolver older all_ids_so_far))
+    | older -> all_ids_up_to_root0_exn t ~resolver older all_ids_so_far
 
-let all_ids_up_to_root t ~resolver id =
-  all_ids_up_to_root0 t ~resolver id Code_id.Set.empty
+let all_ids_up_to_root_exn t ~resolver id =
+  all_ids_up_to_root0_exn t ~resolver id Code_id.Set.empty
 
 let meet_set t ~resolver ids1 ids2 : _ Or_bottom.t =
   if Code_id.Set.equal ids1 ids2
   then Ok ids1
   else
     let should_keep_id other_ids id =
-      let ids_to_root = all_ids_up_to_root t ~resolver id in
-      not (Code_id.Set.disjoint ids_to_root other_ids)
+      match all_ids_up_to_root_exn t ~resolver id with
+      | exception Missing_cmx_file ->
+        (* CR bclement: we likely could do something more precise here rather
+           than keeping all ids for which the code age relation involves a
+           missing cmx. *)
+        true
+      | ids_to_root -> not (Code_id.Set.disjoint ids_to_root other_ids)
     in
     let ids =
       Code_id.Set.union
@@ -70,22 +77,45 @@ let meet_set t ~resolver ids1 ids2 : _ Or_bottom.t =
     in
     if Code_id.Set.is_empty ids then Bottom else Ok ids
 
-let _num_ids_up_to_root t ~resolver id =
-  Code_id.Set.cardinal (all_ids_up_to_root t ~resolver id)
+type is_ancestor_of =
+  | Definitely_not_ancestor
+  | Definitely_ancestor
+  | Maybe_ancestor
 
-let meet t ~resolver id1 id2 : _ Or_bottom.t =
+let is_ancestor_of t ~resolver ~descendant ancestor =
+  match all_ids_up_to_root_exn t ~resolver descendant with
+  | exception Missing_cmx_file ->
+    (* CR bclement: in some situations, we might be able to determine that
+       [ancestor] is definitely an ancestor of [descendant] if the missing cmx
+       file is a dependency of the file that defines [ancestor]. *)
+    Maybe_ancestor
+  | all_ancestors_of_child ->
+    if Code_id.Set.mem ancestor all_ancestors_of_child
+    then Definitely_ancestor
+    else Definitely_not_ancestor
+
+let meet t ~resolver id1 id2 : _ Or_unknown_or_bottom.t =
   (* Whichever of [id1] and [id2] is newer (or the same as the other one), in
      the case where they are comparable; otherwise bottom. *)
   if Code_id.equal id1 id2
   then Ok id1
   else
-    let id1_to_root = all_ids_up_to_root t ~resolver id1 in
-    let id2_to_root = all_ids_up_to_root t ~resolver id2 in
-    if Code_id.Set.mem id1 id2_to_root
-    then Ok id2
-    else if Code_id.Set.mem id2 id1_to_root
-    then Ok id1
-    else Bottom
+    match
+      ( is_ancestor_of t ~resolver ~descendant:id2 id1,
+        is_ancestor_of t ~resolver ~descendant:id1 id2 )
+    with
+    | Definitely_ancestor, _ ->
+      (* id1 is an ancestor of id2 -> id2 is more precise *)
+      Ok id2
+    | _, Definitely_ancestor ->
+      (* id2 is an ancestor of id1 -> id1 is more precise *)
+      Ok id1
+    | Definitely_not_ancestor, Definitely_not_ancestor ->
+      (* id1 and id2 are definitely not related *)
+      Bottom
+    | Maybe_ancestor, _ | _, Maybe_ancestor ->
+      (* can't determine whether id1 and id2 are related *)
+      Unknown
 
 let union t1 t2 = Code_id.Map.disjoint_union ~eq:Code_id.equal t1 t2
 
