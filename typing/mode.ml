@@ -1260,6 +1260,8 @@ module Lattices_mono = struct
       | Staticity -> { t with staticity = r }
   end
 
+  type neither = disallowed * disallowed
+
   type ('a, 'b, 'd) locality_morph =
     (* Following is a chain of adjunctions (this can be extended one
        further, but we never need the missing operation) *)
@@ -2403,7 +2405,7 @@ module Lattices_mono = struct
   type ('a, 'b, 'd) locality_composition =
     | Id : ('a, 'a, 'd) locality_composition
     | Morph : ('a, 'b, 'd) locality_morph -> ('a, 'b, 'd) locality_composition
-    | Disallowed : ('a, 'b, disallowed * disallowed) locality_composition
+    | Disallowed : ('a, 'b, neither) locality_composition
 
   let compose_locality : type a b c d.
       (b, c, d) locality_morph ->
@@ -4892,8 +4894,6 @@ module Comonadic_with (Areality : Areality) = struct
 
   let meet_const_with ax c m = meet_const (C.max_with Obj.obj ax c) m
 
-  let imply_const_with ax c m = imply_const (C.max_with Obj.obj ax c) m
-
   let zap_to_legacy m : Const.t =
     let areality = proj Areality m |> Areality.zap_to_legacy in
     let linearity = proj Linearity m |> Linearity.zap_to_legacy in
@@ -5036,8 +5036,6 @@ module Monadic = struct
   (* The monadic fragment is inverted. *)
 
   let join_const_with ax c m = join_const (C.min_with Obj.obj ax c) m
-
-  let subtract_const_with ax c m = subtract_const (C.min_with Obj.obj ax c) m
 
   let min_with ax m =
     S.apply ~hint:Skip Obj.obj (And_max_with (ax, Id)) (S.disallow_left m)
@@ -5615,16 +5613,6 @@ module Value_with (Areality : Areality) = struct
     let comonadic = Comonadic.meet_const_with ax c comonadic in
     { comonadic; monadic }
 
-  let imply_const_with ax c { monadic; comonadic } =
-    let monadic = Monadic.disallow_left monadic in
-    let comonadic = Comonadic.imply_const_with ax c comonadic in
-    { monadic; comonadic }
-
-  let subtract_const_with ax c { monadic; comonadic } =
-    let monadic = Monadic.subtract_const_with ax c monadic in
-    let comonadic = Comonadic.disallow_right comonadic in
-    { comonadic; monadic }
-
   let join l =
     let como, mo =
       List.fold_left
@@ -5668,16 +5656,6 @@ module Value_with (Areality : Areality) = struct
   let join_const c { comonadic; monadic } =
     let monadic = Monadic.join_const c monadic in
     let comonadic = Comonadic.disallow_left comonadic in
-    { monadic; comonadic }
-
-  let imply_const c { comonadic; monadic } =
-    let monadic = Monadic.disallow_left monadic in
-    let comonadic = Comonadic.imply_const c comonadic in
-    { monadic; comonadic }
-
-  let subtract_const c { comonadic; monadic } =
-    let monadic = Monadic.subtract_const c monadic in
-    let comonadic = Comonadic.disallow_right comonadic in
     { monadic; comonadic }
 
   let zap_to_ceil { comonadic; monadic } =
