@@ -23,48 +23,37 @@ end = struct
   type 'a t  = int -> int
   type 'a t' = int -> int
 end
-(* CR quoted-kinds jbachurski: Annotate these with quoted kinds *)
 module Inst1 : sig
-  type t
-  type t'
+  type t  : <[value]>
+  type t' : <[value]>
 end = struct
   type t  = <[int -> int]>
   type t' = <[int -> int]>
 end
 module NonInst1 : sig
-  type 'a t
-  type 'a t'
+  type 'a t  : <[value]>
+  type 'a t' : <[value]>
 end = struct
   type 'a t  = <[int -> int]>
   type 'a t' = <[int -> int]>
 end
 module Inst2 : sig
-  type t
+  type t : <[<[value]>]>
 end = struct
-  type t = <[int -> int]>
+  type t = <[<[int -> int]>]>
 end
 module NonInst2 : sig
-  type 'a t
+  type 'a t : <[<[value]>]>
 end = struct
-  type 'a t = <[int -> int]>
+  type 'a t = <[<[int -> int]>]>
 end
-(* We wrap some constructs in [A.t] so that they are checked
-   in [mcomp], but not [unify]. *)
-(* CR quoted-kinds jbachurski: We might need extra versions of A
-   with 'a quoted-kinded. *)
-module A = struct
-  type _ t  = |
-  type _ t' = |
-end
-
 [%%expect {|
 module Inst0 : sig type t type t' end
 module NonInst0 : sig type 'a t type 'a t' end
-module Inst1 : sig type t type t' end
-module NonInst1 : sig type 'a t type 'a t' end
-module Inst2 : sig type t end
-module NonInst2 : sig type 'a t end
-module A : sig type _ t = | type _ t' = | end
+module Inst1 : sig type t : <[value]> type t' : <[value]> end
+module NonInst1 : sig type 'a t : <[value]> type 'a t' : <[value]> end
+module Inst2 : sig type t : <[<[value]>]> end
+module NonInst2 : sig type 'a t : <[<[value]>]> end
 |}]
 #mark_toplevel_in_quotations
 
@@ -81,17 +70,41 @@ module A : sig type _ t = | type _ t' = | end
 (* <['a]> ~ unit *)
 let _ : <['a]> -> <['a]> = fun (() as x) -> x
 [%%expect {|
-- : unit -> unit = <fun>
+Line 11, characters 27-45:
+11 | let _ : <['a]> -> <['a]> = fun (() as x) -> x
+                                ^^^^^^^^^^^^^^^^^^
+Error: Function arguments and returns must be representable.
+       The layout of <['a]> is any
+         because it's assigned a dummy kind that should have been overwritten.
+                 Please notify the Jane Street compilers group if you see this output.
+       But the layout of <['a]> must be representable
+         because we must know concretely how to pass a function argument.
 |}]
 (* <[<['a]>]> ~ unit *)
 let _ : <[<['a]>]> -> <[<['a]>]> = fun (() as x) -> x
 [%%expect {|
-- : unit -> unit = <fun>
+Line 1, characters 35-53:
+1 | let _ : <[<['a]>]> -> <[<['a]>]> = fun (() as x) -> x
+                                       ^^^^^^^^^^^^^^^^^^
+Error: Function arguments and returns must be representable.
+       The layout of <[<['a]>]> is any
+         because it's assigned a dummy kind that should have been overwritten.
+                 Please notify the Jane Street compilers group if you see this output.
+       But the layout of <[<['a]>]> must be representable
+         because we must know concretely how to pass a function argument.
 |}]
 (* <[<[<['a]>]>]> ~ unit *)
 let _ : <[<[<['a]>]>]> -> <[<[<['a]>]>]> = fun (() as x) -> x
 [%%expect {|
-- : unit -> unit = <fun>
+Line 1, characters 43-61:
+1 | let _ : <[<[<['a]>]>]> -> <[<[<['a]>]>]> = fun (() as x) -> x
+                                               ^^^^^^^^^^^^^^^^^^
+Error: Function arguments and returns must be representable.
+       The layout of <[<[<['a]>]>]> is any
+         because it's assigned a dummy kind that should have been overwritten.
+                 Please notify the Jane Street compilers group if you see this output.
+       But the layout of <[<[<['a]>]>]> must be representable
+         because we must know concretely how to pass a function argument.
 |}]
 
 (* In tests with spliced variables, the variable ['a] always occurs at stage 0,
@@ -101,19 +114,43 @@ let _ : <[<[<['a]>]>]> -> <[<[<['a]>]>]> = fun (() as x) -> x
 let _ : <[ $('a) -> $('a) ]> expr  =
   <[fun (() as x) -> x]>
 [%%expect {|
-- : <[unit -> unit]> expr = <[fun () as x -> x]>
+Line 2, characters 4-22:
+2 |   <[fun (() as x) -> x]>
+        ^^^^^^^^^^^^^^^^^^
+Error: Function arguments and returns must be representable.
+       The layout of $('a) is any
+         because it's assigned a dummy kind that should have been overwritten.
+                 Please notify the Jane Street compilers group if you see this output.
+       But the layout of $('a) must be representable
+         because we must know concretely how to pass a function argument.
 |}]
 (* $($('a)) ~ unit *)
 let _ : <[ <[ $($('a)) -> $($('a)) ]> expr ]> expr =
   <[<[fun (() as x) -> x]>]>
 [%%expect {|
-- : <[<[unit -> unit]> expr]> expr = <[<[fun () as x -> x]>]>
+Line 2, characters 6-24:
+2 |   <[<[fun (() as x) -> x]>]>
+          ^^^^^^^^^^^^^^^^^^
+Error: Function arguments and returns must be representable.
+       The layout of $($('a)) is any
+         because it's assigned a dummy kind that should have been overwritten.
+                 Please notify the Jane Street compilers group if you see this output.
+       But the layout of $($('a)) must be representable
+         because we must know concretely how to pass a function argument.
 |}]
 (* $($($('a))) ~ unit *)
 let _ : <[ <[ <[ $($($('a))) -> $($($('a))) ]> expr ]> expr ]> expr =
   <[<[<[fun (() as x) -> x]>]>]>
 [%%expect {|
-- : <[<[<[unit -> unit]> expr]> expr]> expr = <[<[<[fun () as x -> x]>]>]>
+Line 2, characters 8-26:
+2 |   <[<[<[fun (() as x) -> x]>]>]>
+            ^^^^^^^^^^^^^^^^^^
+Error: Function arguments and returns must be representable.
+       The layout of $($($('a))) is any
+         because it's assigned a dummy kind that should have been overwritten.
+                 Please notify the Jane Street compilers group if you see this output.
+       But the layout of $($($('a))) must be representable
+         because we must know concretely how to pass a function argument.
 |}]
 
 
@@ -153,25 +190,29 @@ let _ = <[ fun (Equal : (int NonInst0.t, $Inst1.t) Type.eq)
 let _ = <[ fun (Equal : (<[Inst0.t]>, int NonInst1.t) Type.eq)
                (x : Inst0.t) -> (x : $(int NonInst1.t)) ]>
 [%%expect {|
-- : <[(<[Inst0.t]>, int NonInst1.t) Type.eq -> Inst0.t -> $(int NonInst1.t)]>
-    expr
-=
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    (<[Inst0.t]>, (int) NonInst1.t) Stdlib.Type.eq) (x : Inst0.t) -> (x : _)
-]>
+Line 1, characters 25-36:
+1 | let _ = <[ fun (Equal : (<[Inst0.t]>, int NonInst1.t) Type.eq)
+                             ^^^^^^^^^^^
+Error: This type "<[Inst0.t]>" should be an instance of type
+         "('a : value_or_null)"
+       The kind of <[Inst0.t]> is <[value]>
+         because of the definition of t at line 2, characters 2-8.
+       But the kind of <[Inst0.t]> must be a subkind of value_or_null
+         because the 1st type argument of Type.eq has this kind.
 |}]
 (* t ~ <[s]>  when s instantiable *)
 let _ = <[ fun (Equal : (int NonInst1.t, <[Inst0.t]>) Type.eq)
                (x : Inst0.t) -> (x : $(int NonInst1.t)) ]>
 [%%expect {|
-- : <[(int NonInst1.t, <[Inst0.t]>) Type.eq -> Inst0.t -> $(int NonInst1.t)]>
-    expr
-=
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    ((int) NonInst1.t, <[Inst0.t]>) Stdlib.Type.eq) (x : Inst0.t) -> (x : _)
-]>
+Line 1, characters 25-39:
+1 | let _ = <[ fun (Equal : (int NonInst1.t, <[Inst0.t]>) Type.eq)
+                             ^^^^^^^^^^^^^^
+Error: This type "int NonInst1.t" should be an instance of type
+         "('a : value_or_null)"
+       The kind of int NonInst1.t is <[value]>
+         because of the definition of t at line 23, characters 2-24.
+       But the kind of int NonInst1.t must be a subkind of value_or_null
+         because the 1st type argument of Type.eq has this kind.
 |}]
 
 (* Both sides instantiable and quotes/splices *)
@@ -192,44 +233,43 @@ let _ = <[ fun (Equal : ($Inst1.t, $Inst1.t') Type.eq)
 let _ = <[ fun (Equal : (<[Inst0.t]>, <[Inst0.t']>) Type.eq)
                (x : <[Inst0.t]> expr) -> (x : <[Inst0.t']> expr) ]>
 [%%expect {|
-- : <[
-     (<[Inst0.t]>, <[Inst0.t']>) Type.eq ->
-     <[Inst0.t]> expr -> <[Inst0.t']> expr]>
-    expr
-=
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    (<[Inst0.t]>, <[Inst0.t']>) Stdlib.Type.eq) (x : <[Inst0.t]> expr) -> (x
-    : <[Inst0.t']> expr)
-]>
+Line 1, characters 25-36:
+1 | let _ = <[ fun (Equal : (<[Inst0.t]>, <[Inst0.t']>) Type.eq)
+                             ^^^^^^^^^^^
+Error: This type "<[Inst0.t]>" should be an instance of type
+         "('a : value_or_null)"
+       The kind of <[Inst0.t]> is <[value]>
+         because of the definition of t at line 2, characters 2-8.
+       But the kind of <[Inst0.t]> must be a subkind of value_or_null
+         because the 1st type argument of Type.eq has this kind.
 |}]
 (* $t ~ <[s]>  and t, s instantiable *)
 let _ = <[ fun (Equal : ($Inst2.t, <[Inst0.t']>) Type.eq)
                (x : <[Inst0.t']> expr) -> (x : $Inst2.t expr) ]>
 [%%expect {|
-- : <[
-     ($(Inst2.t), <[Inst0.t']>) Type.eq ->
-     <[Inst0.t']> expr -> $(Inst2.t) expr]>
-    expr
-=
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (_, <[Inst0.t']>)
-    Stdlib.Type.eq) (x : <[Inst0.t']> expr) -> (x : _ expr)
-]>
+Line 1, characters 25-33:
+1 | let _ = <[ fun (Equal : ($Inst2.t, <[Inst0.t']>) Type.eq)
+                             ^^^^^^^^
+Error: This type "$(Inst2.t)" should be an instance of type
+         "('a : value_or_null)"
+       The kind of $(Inst2.t) is <[value]>
+         because of the definition of t at line 30, characters 2-24.
+       But the kind of $(Inst2.t) must be a subkind of value_or_null
+         because the 1st type argument of Type.eq has this kind.
 |}]
 (* <[t]> ~ $s  and t, s instantiable *)
 let _ = <[ fun (Equal : (<[Inst0.t']>, $Inst2.t) Type.eq)
                (x : <[Inst0.t']> expr) -> (x : $Inst2.t expr) ]>
 [%%expect {|
-- : <[
-     (<[Inst0.t']>, $(Inst2.t)) Type.eq ->
-     <[Inst0.t']> expr -> $(Inst2.t) expr]>
-    expr
-=
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (<[Inst0.t']>, _)
-    Stdlib.Type.eq) (x : <[Inst0.t']> expr) -> (x : _ expr)
-]>
+Line 1, characters 25-37:
+1 | let _ = <[ fun (Equal : (<[Inst0.t']>, $Inst2.t) Type.eq)
+                             ^^^^^^^^^^^^
+Error: This type "<[Inst0.t']>" should be an instance of type
+         "('a : value_or_null)"
+       The kind of <[Inst0.t']> is <[value]>
+         because of the definition of t' at line 3, characters 2-9.
+       But the kind of <[Inst0.t']> must be a subkind of value_or_null
+         because the 1st type argument of Type.eq has this kind.
 |}]
 
 
@@ -255,41 +295,60 @@ let f (type a) (x : <[_]> expr) (eq : (<[_]>, a) Type.eq) =
   force_variables_equal_intro_left x eq;
   match eq with Equal -> x
 [%%expect {|
-val f : 'a expr -> ('a, 'a) Type.eq -> 'a expr = <fun>
+Line 1, characters 39-44:
+1 | let f (type a) (x : <[_]> expr) (eq : (<[_]>, a) Type.eq) =
+                                           ^^^^^
+Error: This type "<['a]>" should be an instance of type "('b : value_or_null)"
+       The layout of <['a]> is any
+         because there's a _ in the type.
+                 Please notify the Jane Street compilers group if you see this output.
+       But the layout of <['a]> must be a sublayout of value
+         because the 1st type argument of Type.eq has this layout.
 |}]
 (* <[t]> ~ s  equates s to t when s instantiable -- $0 escapes! *)
 let f (type a) (x : <[_]> expr) (eq : (<[_ NonInst0.t]>, a) Type.eq) =
   force_variables_equal_intro_left x eq;
   match eq with Equal -> x
 [%%expect {|
-Line 3, characters 16-21:
-3 |   match eq with Equal -> x
-                    ^^^^^
-Error: This pattern matches values of type
-         "(<[$($0) NonInst0.t]>, <[$($0) NonInst0.t]>) Type.eq"
-       but a pattern was expected which matches values of type
-         "(<[$($0) NonInst0.t]>, a) Type.eq"
-       The type constructor "$0" would escape its scope
+Line 1, characters 39-55:
+1 | let f (type a) (x : <[_]> expr) (eq : (<[_ NonInst0.t]>, a) Type.eq) =
+                                           ^^^^^^^^^^^^^^^^
+Error: This type "<['a NonInst0.t]>" should be an instance of type
+         "('b : value_or_null)"
+       The kind of <['a NonInst0.t]> is <[value]>
+         because of the definition of t at line 9, characters 2-11.
+       But the kind of <['a NonInst0.t]> must be a subkind of value_or_null
+         because the 1st type argument of Type.eq has this kind.
 |}]
 (* s ~ <[t]>  links t to s when t flexible and s instantiable *)
 let f (type a) (x : <[_]> expr) (eq : (a, <[_]>) Type.eq) =
   force_variables_equal_intro_right x eq;
   match eq with Equal -> x
 [%%expect {|
-val f : 'a expr -> ('a, 'a) Type.eq -> 'a expr = <fun>
+Line 1, characters 42-47:
+1 | let f (type a) (x : <[_]> expr) (eq : (a, <[_]>) Type.eq) =
+                                              ^^^^^
+Error: This type "<['a]>" should be an instance of type "('b : value_or_null)"
+       The layout of <['a]> is any
+         because there's a _ in the type.
+                 Please notify the Jane Street compilers group if you see this output.
+       But the layout of <['a]> must be a sublayout of value
+         because the 2nd type argument of Type.eq has this layout.
 |}]
 (* s ~ <[t]>  equates s to t when s instantiable -- $0 escapes! *)
 let f (type a) (x : <[_]> expr) (eq : (a, <[_ NonInst0.t]>) Type.eq) =
   force_variables_equal_intro_right x eq;
   match eq with Equal -> x
 [%%expect {|
-Line 3, characters 16-21:
-3 |   match eq with Equal -> x
-                    ^^^^^
-Error: This pattern matches values of type "(a, a) Type.eq"
-       but a pattern was expected which matches values of type
-         "(a, <[$($0) NonInst0.t]>) Type.eq"
-       The type constructor "$0" would escape its scope
+Line 1, characters 42-58:
+1 | let f (type a) (x : <[_]> expr) (eq : (a, <[_ NonInst0.t]>) Type.eq) =
+                                              ^^^^^^^^^^^^^^^^
+Error: This type "<['a NonInst0.t]>" should be an instance of type
+         "('b : value_or_null)"
+       The kind of <['a NonInst0.t]> is <[value]>
+         because of the definition of t at line 9, characters 2-11.
+       But the kind of <['a NonInst0.t]> must be a subkind of value_or_null
+         because the 2nd type argument of Type.eq has this kind.
 |}]
 
 (* Splices *)
@@ -300,14 +359,16 @@ let force_variables_equal_intro_left' =
   <[ fun (x : 'a expr) (y : ('a, _) Type.eq) -> () ]>
 [%%expect {|
 val force_variables_equal_intro_left' :
-  <[$('a) expr -> ($('a), $('b)) Type.eq -> unit]> expr =
+  ('a : <[value_or_null]>) ('b : <[value_or_null]>).
+    <[$('a) expr -> ($('a), $('b)) Type.eq -> unit]> expr =
   <[fun (x : 'a expr) (y : ('a, _) Stdlib.Type.eq) -> ()]>
 |}]
 let force_variables_equal_intro_right' =
   <[ fun (x : 'a expr) (y : (_, 'a) Type.eq) -> () ]>
 [%%expect {|
 val force_variables_equal_intro_right' :
-  <[$('a) expr -> ($('b), $('a)) Type.eq -> unit]> expr =
+  ('a : <[value_or_null]>) ('b : <[value_or_null]>).
+    <[$('a) expr -> ($('b), $('a)) Type.eq -> unit]> expr =
   <[fun (x : 'a expr) (y : (_, 'a) Stdlib.Type.eq) -> ()]>
 |}]
 
@@ -318,12 +379,15 @@ let f = <[
       match eq with Equal -> x
   ]>
 [%%expect {|
-val f : <[$('a) expr -> ($('a), $('a)) Type.eq -> $('a) expr]> expr =
-  <[
-    fun (type a) (x : _ expr) (eq : (_, a) Stdlib.Type.eq) ->
-      (fun (x__1 : 'a expr) (y : ('a, _) Stdlib.Type.eq) -> ()) x eq;
-      match eq with | (Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) -> x
-  ]>
+Line 2, characters 40-44:
+2 |     fun (type a) (x : $(_) expr) (eq : ($(_), a) Type.eq) ->
+                                            ^^^^
+Error: This type "$('a)" should be an instance of type "('b : value_or_null)"
+       The layout of $('a) is any
+         because there's a _ in the type.
+                 Please notify the Jane Street compilers group if you see this output.
+       But the layout of $('a) must be a sublayout of value
+         because the 1st type argument of Type.eq has this layout.
 |}]
 (* $t ~ s  equates s to t when s instantiable -- $0 escapes! *)
 let f = <[
@@ -332,14 +396,8 @@ let f = <[
       match eq with Equal -> x
   ]>
 [%%expect {|
-Line 4, characters 20-25:
-4 |       match eq with Equal -> x
-                        ^^^^^
-Error: This pattern matches values of type
-         "($(<[$0]> NonInst1.t), $(<[$0]> NonInst1.t)) Type.eq"
-       but a pattern was expected which matches values of type
-         "($(<[$0]> NonInst1.t), a) Type.eq"
-       The type constructor "$0" would escape its scope
+Uncaught exception: Invalid_argument("option is None")
+
 |}]
 (* s ~ $t  links t to s when t flexible and s instantiable *)
 let f = <[
@@ -348,12 +406,15 @@ let f = <[
       match eq with Equal -> x
   ]>
 [%%expect {|
-val f : <[$('a) expr -> ($('a), $('a)) Type.eq -> $('a) expr]> expr =
-  <[
-    fun (type a) (x : _ expr) (eq : (a, _) Stdlib.Type.eq) ->
-      (fun (x__1 : 'a expr) (y : (_, 'a) Stdlib.Type.eq) -> ()) x eq;
-      match eq with | (Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) -> x
-  ]>
+Line 2, characters 43-47:
+2 |     fun (type a) (x : $(_) expr) (eq : (a, $(_)) Type.eq) ->
+                                               ^^^^
+Error: This type "$('a)" should be an instance of type "('b : value_or_null)"
+       The layout of $('a) is any
+         because there's a _ in the type.
+                 Please notify the Jane Street compilers group if you see this output.
+       But the layout of $('a) must be a sublayout of value
+         because the 2nd type argument of Type.eq has this layout.
 |}]
 (* s ~ $t  equates s to t when s instantiable -- $0 escapes! *)
 let f = <[
@@ -362,11 +423,6 @@ let f = <[
       match eq with Equal -> x
   ]>
 [%%expect {|
-Line 4, characters 20-25:
-4 |       match eq with Equal -> x
-                        ^^^^^
-Error: This pattern matches values of type "(a, a) Type.eq"
-       but a pattern was expected which matches values of type
-         "(a, $(<[$0]> NonInst1.t)) Type.eq"
-       The type constructor "$0" would escape its scope
+Uncaught exception: Invalid_argument("option is None")
+
 |}]

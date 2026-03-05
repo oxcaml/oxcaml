@@ -177,12 +177,16 @@ type 'a s2 = <[$('a) -> int]> expr
 
 type ('a, 'b) s3 = <[$'a -> $'b -> $'a * $'b]> expr;;
 [%%expect {|
-type ('a, 'b) s3 = <[$('a) -> $('b) -> $('a) * $('b)]> expr
+>> Fatal error: estimate_type_jkind: Non-quote-kinded splice type
+Uncaught exception: Misc.Fatal_error
+
 |}];;
 
 type ('a, 'b, 'c) s4 = <[$'a list -> $'b option -> $'c]> expr;;
 [%%expect {|
-type ('a, 'b, 'c) s4 = <[$('a) list -> $('b) option -> $('c)]> expr
+>> Fatal error: estimate_type_jkind: Non-quote-kinded splice type
+Uncaught exception: Misc.Fatal_error
+
 |}];;
 
 type ('a, 'b) s5 = <[$'a -> [`A of 'b]]> expr;;
@@ -267,7 +271,17 @@ Error: Splices ($) are not allowed in the initial stage,
 
 let foo1 (x: 'a) = <[fun (y : $'a) -> 1]>;;
 [%%expect {|
-val foo1 : 'a -> <[$('a) -> int]> expr = <fun>
+Line 1, characters 25-34:
+1 | let foo1 (x: 'a) = <[fun (y : $'a) -> 1]>;;
+                             ^^^^^^^^^
+Error: This pattern matches values of type "$('a)"
+       but a pattern was expected which matches values of type
+         "('b : '_representable_layout_1)"
+       The layout of $('a) is any
+         because it's assigned a dummy kind that should have been overwritten.
+                 Please notify the Jane Street compilers group if you see this output.
+       But the layout of $('a) must be representable
+         because we must know concretely how to pass a function argument.
 |}];;
 
 let foo2 (x: 'a) = <[fun (y : 'a) -> 1]>;;
@@ -292,12 +306,17 @@ Error: Type variable "'a" is used inside 2 layers of quotation (<[ ... ]>),
 
 let foo4 (x: <['a]> expr) = <[fun (y : 'b) -> ($x, y)]>;;
 [%%expect {|
-val foo4 : 'a expr -> <[$('b) -> $('a) * $('b)]> expr = <fun>
+val foo4 :
+  ('a : <[value_or_null]>) ('b : <[value_or_null]>).
+    'a expr -> <[$('b) -> $('a) * $('b)]> expr =
+  <fun>
 |}];;
 
 let foo5 (x: <['a]> expr) = <[fun (y : 'a) -> ($x, y)]>;;
 [%%expect {|
-val foo5 : 'a expr -> <[$('a) -> $('a) * $('a)]> expr = <fun>
+val foo5 :
+  ('a : <[value_or_null]>). 'a expr -> <[$('a) -> $('a) * $('a)]> expr =
+  <fun>
 |}];;
 
 let foo6 (type a) (type b) x = <[fun (y : a) -> y]>;;
@@ -312,30 +331,23 @@ Error: Identifier "a" is used at line 1, characters 42-43,
 
 let foo7 (type a) (type b) x = <[fun (y : $a) -> y]>;;
 [%%expect {|
-val foo7 : 'b -> <[$('a) -> $('a)]> expr = <fun>
+>> Fatal error: estimate_type_jkind: Non-quote-kinded splice type
+Uncaught exception: Misc.Fatal_error
+
 |}];;
 
 let foo7' = (fun (type a) (type b) x -> <[fun (y : $a) -> y]>) 42;;
 [%%expect {|
-Line 1:
-Error: Values do not match:
-         val foo7' : <[$('_a) -> $('_a)]> expr
-       is not included in
-         val foo7' : <[$('_a) -> $('_a)]> expr
-       The type "<[$('_a) -> $('_a)]> expr" is not compatible with the type
-         "<[$('_a) -> $('_a)]> expr"
-       Type "$('_a) -> $('_a)" is not compatible with type "$('_a) -> $('_a)"
-       Type "'_a" is not compatible with type "'_a"
-       The type variable "'a" occurs inside "'a"
+>> Fatal error: estimate_type_jkind: Non-quote-kinded splice type
+Uncaught exception: Misc.Fatal_error
+
 |}];;
 
 let foo8 (type a) (type b) x = <[fun ((p, q) : $a * $b) -> ($x, (p, q))]> <["foo"]>;;
 [%%expect {|
-Line 1, characters 31-73:
-1 | let foo8 (type a) (type b) x = <[fun ((p, q) : $a * $b) -> ($x, (p, q))]> <["foo"]>;;
-                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "<[$(a) * $(b) -> 'a * ($(a) * $(b))]> expr"
-       This is not a function; it cannot be applied.
+>> Fatal error: estimate_type_jkind: Non-quote-kinded splice type
+Uncaught exception: Misc.Fatal_error
+
 |}];;
 
 (<[fun (y : 'a) -> 1]>, fun (x : 'a) -> ())
@@ -419,11 +431,17 @@ Error: Identifier "t5" is used at line 3, characters 11-14,
 
 let bar (f : <[int -> int]>) = f 42;;
 [%%expect {|
-Line 1, characters 31-32:
+Line 1, characters 8-28:
 1 | let bar (f : <[int -> int]>) = f 42;;
-                                   ^
-Error: This expression has type "<[int -> int]>"
-       This is not a function; it cannot be applied.
+            ^^^^^^^^^^^^^^^^^^^^
+Error: This pattern matches values of type "<[int -> int]>"
+       but a pattern was expected which matches values of type
+         "('a : value_or_null)"
+       The kind of <[int -> int]> is
+           <[value mod aliased immutable non_float]>
+         because it's a function type.
+       But the kind of <[int -> int]> must be a subkind of value_or_null
+         because we must know concretely how to pass a function argument.
 |}];;
 
 (* The mk_pair examples exist to test whether unification behaves well when
@@ -431,79 +449,153 @@ Error: This expression has type "<[int -> int]>"
 
 let mk_pair x = <[$x, $x]>;;
 [%%expect {|
-val mk_pair : 'a expr -> <[$('a) * $('a)]> expr = <fun>
+val mk_pair : ('a : <[value_or_null]>). 'a expr -> <[$('a) * $('a)]> expr =
+  <fun>
 |}];;
 
 mk_pair <[123]>;;
 [%%expect {|
-- : <[int * int]> expr = <[(123, 123)]>
+Line 1, characters 8-15:
+1 | mk_pair <[123]>;;
+            ^^^^^^^
+Error: This expression has type "<['a]> expr"
+       but an expression was expected of type "'b expr"
+       Type "<['a]>" is not compatible with type "'b"
+       The layout of <['a]> is any
+         because it's the type of an expression inside of a quote.
+       But the layout of <['a]> must be a sublayout of value
+         because of the definition of mk_pair at line 1, characters 12-26.
 |}];;
 
 mk_pair <[[]]>;;
 [%%expect {|
-- : <[$('a) list * $('a) list]> expr = <[([], [])]>
+Line 1, characters 8-14:
+1 | mk_pair <[[]]>;;
+            ^^^^^^
+Error: This expression has type "<['a]> expr"
+       but an expression was expected of type "'b expr"
+       Type "<['a]>" is not compatible with type "'b"
+       The layout of <['a]> is any
+         because it's the type of an expression inside of a quote.
+       But the layout of <['a]> must be a sublayout of value
+         because of the definition of mk_pair at line 1, characters 12-26.
 |}];;
 
 mk_pair <[None]>;;
 [%%expect {|
-- : <[$('a) option * $('a) option]> expr = <[(None, None)]>
+Line 1, characters 8-16:
+1 | mk_pair <[None]>;;
+            ^^^^^^^^
+Error: This expression has type "<['a]> expr"
+       but an expression was expected of type "'b expr"
+       Type "<['a]>" is not compatible with type "'b"
+       The layout of <['a]> is any
+         because it's the type of an expression inside of a quote.
+       But the layout of <['a]> must be a sublayout of value
+         because of the definition of mk_pair at line 1, characters 12-26.
 |}];;
 
 mk_pair <[Some 123]>;;
 [%%expect {|
-- : <[int option * int option]> expr = <[((Some 123), (Some 123))]>
+Line 1, characters 8-20:
+1 | mk_pair <[Some 123]>;;
+            ^^^^^^^^^^^^
+Error: This expression has type "<['a]> expr"
+       but an expression was expected of type "'b expr"
+       Type "<['a]>" is not compatible with type "'b"
+       The layout of <['a]> is any
+         because it's the type of an expression inside of a quote.
+       But the layout of <['a]> must be a sublayout of value
+         because of the definition of mk_pair at line 1, characters 12-26.
 |}];;
 
 mk_pair <[fun () -> 42]>;;
 [%%expect {|
-- : <[(unit -> int) * (unit -> int)]> expr =
-<[((fun () -> 42), (fun () -> 42))]>
+Line 1, characters 8-24:
+1 | mk_pair <[fun () -> 42]>;;
+            ^^^^^^^^^^^^^^^^
+Error: This expression has type "<['a]> expr"
+       but an expression was expected of type "'b expr"
+       Type "<['a]>" is not compatible with type "'b"
+       The layout of <['a]> is any
+         because it's the type of an expression inside of a quote.
+       But the layout of <['a]> must be a sublayout of value
+         because of the definition of mk_pair at line 1, characters 12-26.
 |}];;
 
 mk_pair <[fun x -> x]>;;
 [%%expect {|
-- : <[('_weak1 -> '_weak1) * ('_weak1 -> '_weak1)]> expr =
-<[((fun x -> x), (fun x -> x))]>
+Line 1, characters 8-22:
+1 | mk_pair <[fun x -> x]>;;
+            ^^^^^^^^^^^^^^
+Error: This expression has type "<['a]> expr"
+       but an expression was expected of type "'b expr"
+       Type "<['a]>" is not compatible with type "'b"
+       The layout of <['a]> is any
+         because it's the type of an expression inside of a quote.
+       But the layout of <['a]> must be a sublayout of value
+         because of the definition of mk_pair at line 1, characters 12-26.
 |}];;
 
 (* Type algebra checks. *)
 
 fun (x: 'a) -> (x: <[<[<[$($($'a))]>]>]>);;
 [%%expect {|
-- : 'a -> 'a = <fun>
+>> Fatal error: estimate_type_jkind: Non-quote-kinded splice type
+Uncaught exception: Misc.Fatal_error
+
 |}];;
 
 fun (x: <[<[<[$($($'a))]>]>]>) -> (x: 'a);;
 [%%expect {|
-- : 'a -> 'a = <fun>
+Line 1, characters 4-30:
+1 | fun (x: <[<[<[$($($'a))]>]>]>) -> (x: 'a);;
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This pattern matches values of type "'a" = "('a : any)"
+       but a pattern was expected which matches values of type
+         "('b : '_representable_layout_2)"
+       The layout of 'a is any
+         because it's a fresh unification variable.
+                 Please notify the Jane Street compilers group if you see this output.
+       But the layout of 'a must be representable
+         because we must know concretely how to pass a function argument.
 |}];;
 
 fun (x: <[<[<[$($'a)]>]>]>) -> (x: 'a);;
 [%%expect {|
-Line 1, characters 35-37:
+Line 1, characters 4-27:
 1 | fun (x: <[<[<[$($'a)]>]>]>) -> (x: 'a);;
-                                       ^^
-Error: Type variable "'a" is used outside any quotations,
-       it already occurs inside a quotation (<[ ... ]>).
-       Hint: Consider using "<['a]>".
+        ^^^^^^^^^^^^^^^^^^^^^^^
+Error: This pattern matches values of type "<['a]>"
+       but a pattern was expected which matches values of type
+         "('b : '_representable_layout_3)"
+       The layout of <['a]> is any
+         because it's a fresh unification variable.
+                 Please notify the Jane Street compilers group if you see this output.
+       But the layout of <['a]> must be representable
+         because we must know concretely how to pass a function argument.
 |}];;
 
 (* Eta expansion of quotes/splices *)
 
 let eta (type a) (x : a expr) : a expr = <[ $x ]>
 [%%expect {|
-val eta : 'a expr -> 'a expr = <fun>
+>> Fatal error: estimate_type_jkind: Non-quote-kinded splice type
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 let eta1 (type a) = <[ fun (x : $a expr) : $a expr -> <[ $x ]> ]>
 [%%expect {|
-val eta1 : <[$('a) expr -> $('a) expr]> expr =
-  <[fun (x : _ expr) -> (<[$x]> : _ expr)]>
+>> Fatal error: estimate_type_jkind: Non-quote-kinded splice type
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 let eta1' = <[ fun (type a) (x : a) : a -> $(<[ x ]>) ]>
 [%%expect {|
-val eta1' : <[$('a) -> $('a)]> expr = <[fun (type a) (x : a) -> (x : a)]>
+val eta1' : ('a : <[value]>). <[$('a) -> $('a)]> expr =
+  <[fun (type a) (x : a) -> (x : a)]>
 |}]
 
 (* Applicative *)
@@ -511,13 +603,17 @@ val eta1' : <[$('a) -> $('a)]> expr = <[fun (type a) (x : a) -> (x : a)]>
 let app (type a b) (f : <[$a -> $b]> expr) (x : a expr) =
   <[ $f $x ]>
 [%%expect {|
-val app : <[$('a) -> $('b)]> expr -> 'a expr -> 'b expr = <fun>
+>> Fatal error: estimate_type_jkind: Non-quote-kinded splice type
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 let both (type a b) (p : a expr * b expr) : <[$a * $b]> expr =
   let (x, y) = p in <[ $x, $y ]>
 [%%expect {|
-val both : 'a expr * 'b expr -> <[$('a) * $('b)]> expr = <fun>
+>> Fatal error: estimate_type_jkind: Non-quote-kinded splice type
+Uncaught exception: Misc.Fatal_error
+
 |}]
 
 (* Type equality *)

@@ -11,10 +11,10 @@
 open (struct
   let eval = Obj.magic
 end : sig
-  val eval : 'a expr -> 'a eval
+  val eval : ('a : <[value]>). 'a expr -> 'a eval
 end)
 [%%expect {|
-val eval : 'a expr -> 'a eval = <fun>
+val eval : ('a : <[value]>). 'a expr -> 'a eval = <fun>
 |}]
 
 (* The [eval] argument is annotated at introduction, and its result is typed *)
@@ -52,9 +52,25 @@ val f : <[int list]> expr -> int list = <fun>
 (* The type is inferrable inside the quotation *)
 let e () : int = eval <[ 42 ]>
 [%%expect {|
-val e : unit -> int = <fun>
+Line 1, characters 22-30:
+1 | let e () : int = eval <[ 42 ]>
+                          ^^^^^^^^
+Error: This expression has type "<['a]> expr"
+       but an expression was expected of type "'b expr"
+       The layout of <['a]> is any
+         because it's the type of an expression inside of a quote.
+       But the layout of <['a]> must be a sublayout of value
+         because of the definition of eval at line 4, characters 2-49.
 |}]
 let e () : int list = eval <[ [1; 2; 3] ]>
 [%%expect {|
-val e : unit -> int list = <fun>
+Line 1, characters 27-42:
+1 | let e () : int list = eval <[ [1; 2; 3] ]>
+                               ^^^^^^^^^^^^^^^
+Error: This expression has type "<['a]> expr"
+       but an expression was expected of type "'b expr"
+       The layout of <['a]> is any
+         because it's the type of an expression inside of a quote.
+       But the layout of <['a]> must be a sublayout of value
+         because of the definition of eval at line 4, characters 2-49.
 |}]

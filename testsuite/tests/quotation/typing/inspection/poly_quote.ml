@@ -19,9 +19,13 @@ let (f : <[
     f () (fun x -> <[Int.to_string $x]>))]>
 
 [%%expect {|
->> Fatal error: Translquote [at line 5, characters 8-9]:
-Explicitly quantified type variables cannot be spliced
-within quoted higher-rank function types
-Uncaught exception: Misc.Fatal_error
-
+Line 6, characters 19-29:
+6 |     f () (fun x -> <[$x + 1]>),
+                       ^^^^^^^^^^
+Error: This expression has type "<['a]> expr"
+       but an expression was expected of type "'b expr"
+       The layout of <['a]> is any
+         because it's the type of an expression inside of a quote.
+       But the layout of <['a]> must be a sublayout of value
+         because it is or unifies with an unannotated universal variable.
 |}]
