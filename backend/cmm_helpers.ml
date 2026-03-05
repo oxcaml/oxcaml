@@ -4261,6 +4261,15 @@ let make_symbol ?compilation_unit name =
     | None -> Compilation_unit.get_current_exn ()
     | Some compilation_unit -> compilation_unit
   in
+  (* CR sspies: [make_symbol] always uses flat name mangling. Structured
+     mangling can currently only be enabled for functions with a code id. It
+     could, in principle, also be used for other symbols such as module entry
+     points, frame tables, etc. If desired, structured mangling for these can be
+     enabled here BUT this requires additional changes, since other parts of the
+     compiler currently hardcode the symbol names (e.g., frame tables).
+     [make_symbol] is called, for example, for [code_begin], [code_end],
+     [data_begin], [data_end], [entry], [frametable], [gc_roots], and
+     [jump_tables]. *)
   Symbol.for_name compilation_unit name
   |> Symbol.linkage_name |> Linkage_name.to_string
 
