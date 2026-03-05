@@ -1413,6 +1413,22 @@ let no_afl_instrument = Actions.make
     "AFL instrumentation disabled"
     "AFL instrumentation enabled")
 
+let flat_name_mangling = Actions.make
+  ~name:"flat-name-mangling"
+  ~description:"Passes if the flat name-mangling scheme is enabled"
+  ~does_something:false
+  (Actions_helpers.predicate (Ocamltest_config.name_mangling = "flat")
+    "Flat name-mangling scheme enabled"
+    "Structured name-mangling scheme enabled")
+
+let structured_name_mangling = Actions.make
+  ~name:"structured-name-mangling"
+  ~description:"Passes if the structured name-mangling scheme is enabled"
+  ~does_something:false
+  (Actions_helpers.predicate (Ocamltest_config.name_mangling = "structured")
+    "Structured name-mangling scheme enabled"
+    "Flat name-mangling scheme enabled")
+
 let stack_allocation = Actions.make
   ~name:"stack-allocation"
   ~description:"Passes if stack allocation is enabled"
@@ -1706,6 +1722,8 @@ let init () =
     windows_unicode;
     afl_instrument;
     no_afl_instrument;
+    flat_name_mangling;
+    structured_name_mangling;
     stack_allocation;
     no_stack_allocation;
     poll_insertion;

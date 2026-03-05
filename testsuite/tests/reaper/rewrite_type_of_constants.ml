@@ -1,6 +1,7 @@
 (* TEST
  flambda2;
  setup-ocamlopt.byte-build-env;
+ flat-name-mangling;
  {
    module = "rewrite_type_of_constants.mli";
    ocamlopt.byte;
