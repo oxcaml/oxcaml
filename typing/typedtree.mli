@@ -445,7 +445,7 @@ and expression_desc =
 
             The resulting typedtree for the application is:
             Texp_apply (Texp_ident "f/1037",
-                        [(Nolabel, Omitted ());
+                        [(Nolabel, Omitted _);
                          (Labelled "y", Arg (Texp_constant Const_int 3))
                         ])
 

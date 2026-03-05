@@ -27,12 +27,6 @@ val strings_of_paths: namespace -> Path.t list -> string list
 (** Print a list of paths, using the same naming context to
     avoid name collisions *)
 
-val raw_row_desc : Format.formatter -> row_desc -> unit
-val raw_type_expr: Format.formatter -> type_expr -> unit
-val raw_field : Format.formatter -> row_field -> unit
-
-val rewrite_double_underscore_longidents: Env.t -> Longident.t -> Longident.t
-
 (** [printed_signature sourcefile ppf sg] print the signature [sg] of
         [sourcefile] with potential warnings for name collisions *)
 val printed_signature: string -> Format.formatter -> signature -> unit

@@ -141,6 +141,12 @@ val prepared_extension_constructor:
     Ident.t -> extension_constructor printer
 
 
+val raw_row_desc : Format.formatter -> row_desc -> unit
+val raw_type_expr: Format.formatter -> type_expr -> unit
+val raw_field : Format.formatter -> row_field -> unit
+
+val rewrite_double_underscore_longidents: Env.t -> Longident.t -> Longident.t
+
 (** {1 Declarations }*)
 
 val tree_of_type_declaration:
