@@ -743,12 +743,7 @@ module Jkind0 : sig
   include module type of Jkind
 end
 
-(* CR sspies: upstream removed [print_raw] and [cstr_type_path] but oxcaml
-   still uses them. *)
+(* CR sspies: upstream removed [print_raw] but oxcaml still uses it. *)
 
 (**** Forward declarations ****)
 val print_raw: (Format.formatter -> type_expr -> unit) ref
-
-(**** Type information getter ****)
-
-val cstr_type_path : Data_types.constructor_description -> Path.t
