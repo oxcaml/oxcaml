@@ -1,4 +1,29 @@
-module SL = Slambda
+(******************************************************************************
+ *                                  OxCaml                                    *
+ * -------------------------------------------------------------------------- *
+ *                               MIT License                                  *
+ *                                                                            *
+ * Copyright (c) 2025 Jane Street Group LLC                                   *
+ * opensource-contacts@janestreet.com                                         *
+ *                                                                            *
+ * Permission is hereby granted, free of charge, to any person obtaining a    *
+ * copy of this software and associated documentation files (the "Software"), *
+ * to deal in the Software without restriction, including without limitation  *
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,   *
+ * and/or sell copies of the Software, and to permit persons to whom the      *
+ * Software is furnished to do so, subject to the following conditions:       *
+ *                                                                            *
+ * The above copyright notice and this permission notice shall be included    *
+ * in all copies or substantial portions of the Software.                     *
+ *                                                                            *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR *
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,   *
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL    *
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER *
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING    *
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER        *
+ * DEALINGS IN THE SOFTWARE.                                                  *
+ ******************************************************************************)
 
 (* Helpers for asserting that slambda is trivial. *)
 
@@ -61,10 +86,7 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Lfunction func -> assert_function_contains_no_splices func
   | Llet (_, layout, _, _, _, _) -> assert_layout_contains_no_splices layout
   | Lmutlet (layout, _, _, _, _) -> assert_layout_contains_no_splices layout
-  | Lletrec (bindings, _) ->
-    List.iter
-      (fun { Lambda.def; _ } -> assert_function_contains_no_splices def)
-      bindings
+  | Lletrec (_, _) -> ()
   | Lprim (prim, _, _) -> assert_primitive_contains_no_splices prim
   | Lswitch (_, _, _, layout) -> assert_layout_contains_no_splices layout
   | Lstringswitch (_, _, _, _, layout) ->
@@ -86,58 +108,16 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Lsplice _ -> raise Found_a_splice);
   Lambda.iter_head_constructor assert_no_splices lam
 
-(* Check that slambda is trivial (a quote and contains no splices) *)
-let assert_slambda_is_trivial slam =
-  match slam with
-  | SL.Quote lam -> (
-    try assert_no_splices lam
-    with Found_a_splice ->
-      Misc.fatal_error
-        "Slambda contains splices but layout_poly extension is disabled")
+let do_eval slam =
+  match (slam : Lambda.slambda) with
+  | SLhalves halves -> halves
+  | _ -> Misc.fatal_error "slambda eval not yet implemented"
 
-(* Introduce dependencies on modules referenced only by "external". *)
-
-let scan_used_globals lam =
-  let globals = ref Compilation_unit.Set.empty in
-  let rec scan (lam : Lambda.lambda) =
-    Lambda.iter_head_constructor scan lam;
-    match lam with
-    | Lprim (Pgetglobal cu, _, _) ->
-      globals := Compilation_unit.Set.add cu !globals
-    | _ -> ()
-  in
-  scan lam;
-  !globals
-
-let required_globals ~flambda body =
-  let globals = scan_used_globals body in
-  let add_global comp_unit req =
-    if (not flambda) && Compilation_unit.Set.mem comp_unit globals
-    then req
-    else Compilation_unit.Set.add comp_unit req
-  in
-  let required =
-    List.fold_left
-      (fun acc cu -> add_global cu acc)
-      (if flambda then globals else Compilation_unit.Set.empty)
-      (Translprim.get_units_with_used_primitives ())
-  in
-  let required =
-    List.fold_right add_global (Env.get_required_globals ()) required
-  in
-  Env.reset_required_globals ();
-  Translprim.clear_used_primitives ();
-  required
-
-let do_eval ({ Slambda.code = slam } as p) =
-  if not Language_extension.(is_enabled Layout_poly)
-  then assert_slambda_is_trivial slam;
-  let (SL.Quote lam) = slam in
-  { Lambda.compilation_unit = p.compilation_unit;
-    main_module_block_format = p.main_module_block_format;
-    arg_block_idx = p.arg_block_idx;
-    required_globals = required_globals ~flambda:true lam;
-    code = lam
-  }
-
-let eval p = Profile.(record static_eval) do_eval p
+let eval slam =
+  Profile.record_call "static_eval" (fun () ->
+      let halves = do_eval slam in
+      (try assert_no_splices halves.sval_runtime
+       with Found_a_splice ->
+         Misc.fatal_error
+           "Encountered a splice in the program after slambda eval");
+      halves)

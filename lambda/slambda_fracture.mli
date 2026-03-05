@@ -27,4 +27,12 @@
 
 open Lambda
 
-val eval : slambda -> slambda_halves
+(** "Fractures" tlambda (the result of transl) into slambda.
+
+    This process conceptually splits ~all constructs into their compile-time and
+    runtime halves and composes them so that the resulting slambda will evaluate
+    to an [slambda_halves] where the [sval_comptime] is the compile-time
+    representation of whatever the initial tlambda evalutaes to and the
+    [sval_runtime] half is lambda that evaluates to the runtime representation
+    of it. *)
+val fracture : lambda -> slambda

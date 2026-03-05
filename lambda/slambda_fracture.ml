@@ -27,4 +27,8 @@
 
 open Lambda
 
-val eval : slambda -> slambda_halves
+let fracture_lam lam =
+  SLhalves { sval_comptime = SLmissing; sval_runtime = lam }
+
+(** This is the only externally accessible entry point to this module. *)
+let fracture lam = Profile.record "slambda_fracture" fracture_lam lam

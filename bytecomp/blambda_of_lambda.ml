@@ -230,7 +230,7 @@ let copy_unboxed_product shape ~path expr =
     | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
     | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
       expr
-    | Splice_variable _ -> Misc.splices_should_not_exist_after_eval ()
+    | Splice_variable var -> Lambda.fatal_error_unevaluated_splice_var var
   in
   copy_element (Lambda.project_from_mixed_block_shape shape ~path) expr
 
@@ -248,7 +248,7 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     { id; def = comp_fun def }
   in
   match (exp : Lambda.lambda) with
-  | Lsplice _ -> Misc.splices_should_not_exist_after_eval ()
+  | Lsplice _ -> Lambda.fatal_error_invalid_constructor exp
   | Lvar id | Lmutvar id -> Var id
   | Lconst cst -> Const cst
   | Lapply { ap_func; ap_args; ap_region_close } ->
