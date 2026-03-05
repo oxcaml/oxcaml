@@ -110,11 +110,22 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
        2. All of the [machtype_component]s are singleton arrays. *)
     Array.map (fun machtype -> [| machtype |]) return_ty
   in
+  let ty_args =
+    List.map C.exttype_of_kind
+      (Flambda_arity.unarize (Apply.args_arity apply)
+      |> List.map K.With_subkind.kind)
+  in
+  let effects = To_cmm_effects.transl_c_call_effects effects in
+  let coeffects = To_cmm_effects.transl_c_call_coeffects coeffects in
+  let { extcall; builtin_sign_extends } : Cmm_builtins.t =
+    C.extcall ~dbg ~alloc:needs_caml_c_call ~is_c_builtin ~effects ~coeffects
+      ~returns ~ty_args callee return_ty args
+  in
   (* Returned small integer values need to be sign-extended because it's not
      clear whether C code that returns a small integer returns one that is sign
      extended or not. There is no need to wrap other return arities. *)
   let maybe_sign_extend kind dbg cmm =
-    if is_c_builtin && Cmm_builtins.builtin_sign_extends callee
+    if builtin_sign_extends
     then cmm
     else
       match Flambda_kind.With_subkind.kind kind with
@@ -126,17 +137,6 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
           | Naked_vec128 | Naked_vec256 | Naked_vec512 | Naked_float32 )
       | Value | Rec_info | Region ->
         cmm
-  in
-  let ty_args =
-    List.map C.exttype_of_kind
-      (Flambda_arity.unarize (Apply.args_arity apply)
-      |> List.map K.With_subkind.kind)
-  in
-  let effects = To_cmm_effects.transl_c_call_effects effects in
-  let coeffects = To_cmm_effects.transl_c_call_coeffects coeffects in
-  let extcall =
-    C.extcall ~dbg ~alloc:needs_caml_c_call ~is_c_builtin ~effects ~coeffects
-      ~returns ~ty_args callee return_ty args
   in
   let wrap return_values =
     let kinds = Flambda_arity.unarized_components return_arity in

@@ -17,6 +17,8 @@
 
 open Cmm
 
+type t = {extcall: expression; builtin_sign_extends: bool }
+
 (** Create a C function call. *)
 val extcall :
   dbg:Debuginfo.t ->
@@ -29,6 +31,4 @@ val extcall :
   string ->
   machtype ->
   expression list ->
-  expression
-
-val builtin_sign_extends : string -> bool
+  t
