@@ -23,16 +23,40 @@ type instruction_size =
 module type S = sig
   type distance = int
 
+  (** Instructions produced during branch relaxation (e.g. far branches,
+      inverted conditional branches).  The sizes of these instructions must
+      not depend on any mutable sizing environment. *)
+  type relaxed_instruction
+
   val offset_pc_at_branch : distance
 
   val instr_size : Linear.instruction -> instruction_size
 
+  (** Compute the size of a relaxed instruction.  The [Linear.instruction]
+      must have its [desc] already set to the result of
+      [relaxed_instruction_desc].  The returned size must not depend on
+      any mutable sizing environment state. *)
+  val relaxed_instruction_size
+     : relaxed_instruction
+    -> Linear.instruction
+    -> instruction_size
+
+  val relaxed_instruction_desc
+     : relaxed_instruction
+    -> Linear.instruction_desc
+
+  val relax_poll : unit -> relaxed_instruction
+
   val relax_allocation
      : num_bytes:int
     -> dbginfo:Cmm.alloc_dbginfo
-    -> Linear.instruction_desc
+    -> relaxed_instruction
 
-  val relax_poll
-     : unit
-    -> Linear.instruction_desc
+  val relax_condbranch
+     : Linear.instruction_desc
+    -> relaxed_instruction
+
+  val relax_branch
+     : Linear.instruction_desc
+    -> relaxed_instruction
 end

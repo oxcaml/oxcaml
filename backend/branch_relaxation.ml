@@ -93,8 +93,10 @@ module Make (T : Branch_relaxation_intf.S) = struct
       match lbl with
       | None -> next
       | Some l ->
+        let desc = Lcondbranch (Iinttest_imm (Ceq, n), l) in
+        let ri = T.relax_condbranch desc in
         instr_cons
-          (Lcondbranch (Iinttest_imm (Ceq, n), l))
+          (T.relaxed_instruction_desc ri)
           arg [||] next ~available_before:Reg_availability_set.Unreachable
           ~available_across:Reg_availability_set.Unreachable
     in
@@ -124,15 +126,17 @@ module Make (T : Branch_relaxation_intf.S) = struct
         else
           match instr.desc with
           | Lop Poll ->
-            instr.desc <- T.relax_poll ();
-            let new_size = T.instr_size instr in
+            let ri = T.relax_poll () in
+            instr.desc <- T.relaxed_instruction_desc ri;
+            let new_size = T.relaxed_instruction_size ri instr in
             let did_fix, rest_sizes =
               fixup true (pc + new_size.size) instr.next rest
             in
             did_fix, new_size :: rest_sizes
           | Lop (Alloc { bytes = num_bytes; dbginfo; _ }) ->
-            instr.desc <- T.relax_allocation ~num_bytes ~dbginfo;
-            let new_size = T.instr_size instr in
+            let ri = T.relax_allocation ~num_bytes ~dbginfo in
+            instr.desc <- T.relaxed_instruction_desc ri;
+            let new_size = T.relaxed_instruction_size ri instr in
             let did_fix, rest_sizes =
               fixup true (pc + new_size.size) instr.next rest
             in
@@ -140,18 +144,27 @@ module Make (T : Branch_relaxation_intf.S) = struct
           | Lcondbranch (test, lbl) ->
             let lbl2 = Cmm.new_label () in
             let llabel = Llabel { label = lbl2; section_name = None } in
+            let ri_branch = T.relax_branch (Lbranch lbl) in
             let branch_instr =
-              instr_cons (Lbranch lbl) [||] [||]
+              instr_cons
+                (T.relaxed_instruction_desc ri_branch)
+                [||] [||]
                 (instr_cons llabel [||] [||] instr.next
                    ~available_before:Reg_availability_set.Unreachable
                    ~available_across:Reg_availability_set.Unreachable)
                 ~available_before:Reg_availability_set.Unreachable
                 ~available_across:Reg_availability_set.Unreachable
             in
-            instr.desc <- Lcondbranch (Operation.invert_test test, lbl2);
+            let inverted_desc =
+              Lcondbranch (Operation.invert_test test, lbl2)
+            in
+            let ri_inverted = T.relax_condbranch inverted_desc in
+            instr.desc <- T.relaxed_instruction_desc ri_inverted;
             instr.next <- branch_instr;
-            let inverted_size = T.instr_size instr in
-            let branch_size = T.instr_size branch_instr in
+            let inverted_size = T.relaxed_instruction_size ri_inverted instr in
+            let branch_size =
+              T.relaxed_instruction_size ri_branch branch_instr
+            in
             let label_size : Branch_relaxation_intf.instruction_size =
               { size = 0; max_displacement = None }
             in
@@ -172,7 +185,10 @@ module Make (T : Branch_relaxation_intf.S) = struct
             let rec measure_expanded i sizes =
               if i == original_next
               then sizes
-              else measure_expanded i.next (T.instr_size i :: sizes)
+              else
+                let ri = T.relax_condbranch i.desc in
+                let s = T.relaxed_instruction_size ri i in
+                measure_expanded i.next (s :: sizes)
             in
             let new_sizes = List.rev (measure_expanded instr []) @ rest in
             fixup true pc instr new_sizes

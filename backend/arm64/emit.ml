@@ -1863,6 +1863,22 @@ let out_of_line_code_block_sizes env =
   | None -> []
   | Some _ -> [measure_instruction_count (fun () -> emit_stack_realloc env)]
 
+type relaxed_instruction =
+  | Far_poll
+  | Far_alloc of
+      { num_bytes : int;
+        dbginfo : Cmm.alloc_dbginfo
+      }
+  | Condbranch of Operation.test * Cmm.label
+  | Branch of Cmm.label
+
+let relaxed_instruction_desc = function
+  | Far_poll -> Linear.Lop (Specific Ifar_poll)
+  | Far_alloc { num_bytes; dbginfo } ->
+    Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo }))
+  | Condbranch (test, lbl) -> Lcondbranch (test, lbl)
+  | Branch lbl -> Lbranch lbl
+
 let branch_relax env body =
   (* Record copy so the sizing pass can mutate its own mutable fields
      (stack_offset, call_gc_sites, etc.) without affecting [env], which is used
@@ -1873,6 +1889,8 @@ let branch_relax env body =
   let module BR = Branch_relaxation.Make (struct
     type distance = int
 
+    type nonrec relaxed_instruction = relaxed_instruction
+
     let offset_pc_at_branch = 0
 
     let instr_size instr =
@@ -1881,10 +1899,39 @@ let branch_relax env body =
         max_displacement = m.min_max_displacement
       }
 
-    let relax_poll () = Lop (Specific Ifar_poll)
+    let relaxed_instruction_size _ri instr =
+      let saved_stack_offset = sizing_env.stack_offset in
+      let saved_call_gc_sites = sizing_env.call_gc_sites in
+      let saved_local_realloc_sites = sizing_env.local_realloc_sites in
+      let saved_stack_realloc = sizing_env.stack_realloc in
+      let saved_float32_literals = sizing_env.float32_literals in
+      let saved_float_literals = sizing_env.float_literals in
+      let saved_vec128_literals = sizing_env.vec128_literals in
+      let m = measure_emit_instr sizing_env instr in
+      sizing_env.stack_offset <- saved_stack_offset;
+      sizing_env.call_gc_sites <- saved_call_gc_sites;
+      sizing_env.local_realloc_sites <- saved_local_realloc_sites;
+      sizing_env.stack_realloc <- saved_stack_realloc;
+      sizing_env.float32_literals <- saved_float32_literals;
+      sizing_env.float_literals <- saved_float_literals;
+      sizing_env.vec128_literals <- saved_vec128_literals;
+      { Branch_relaxation_intf.size = m.count;
+        max_displacement = m.min_max_displacement
+      }
 
-    let relax_allocation ~num_bytes ~dbginfo =
-      Lop (Specific (Ifar_alloc { bytes = num_bytes; dbginfo }))
+    let relaxed_instruction_desc = relaxed_instruction_desc
+
+    let relax_poll () = Far_poll
+
+    let relax_allocation ~num_bytes ~dbginfo = Far_alloc { num_bytes; dbginfo }
+
+    let[@warning "-4"] relax_condbranch = function
+      | Linear.Lcondbranch (test, lbl) -> Condbranch (test, lbl)
+      | _ -> Misc.fatal_error "relax_condbranch: not a Lcondbranch"
+
+    let[@warning "-4"] relax_branch = function
+      | Linear.Lbranch lbl -> Branch lbl
+      | _ -> Misc.fatal_error "relax_branch: not a Lbranch"
   end) in
   BR.relax body ~initial_sizes ~out_of_line_code_block_sizes;
   List.length sizing_env.call_gc_sites
