@@ -274,8 +274,6 @@
 
 (copy_files ../../parsing/parser_types.ml)
 
-(copy_files ../../parsing/parser.ml)
-
 (copy_files ../../parsing/printast.ml)
 
 (copy_files ../../parsing/pprintast.ml)
@@ -488,8 +486,6 @@
 
 (copy_files ../../typing/jkind.mli)
 
-(copy_files ../../typing/jkind_intf.mli)
-
 (copy_files ../../typing/jkind_types.mli)
 
 (copy_files ../../typing/jkind_axis.mli)
@@ -549,8 +545,6 @@
 (copy_files ../../typing/signature_with_global_bindings.mli)
 
 (copy_files ../../typing/datarepr.mli)
-
-(copy_files ../../typing/unit_info.mli)
 
 (copy_files ../../typing/typedtree.mli)
 
