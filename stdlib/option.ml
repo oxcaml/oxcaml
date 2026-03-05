@@ -18,7 +18,7 @@ open! Stdlib
 
 [@@@ocaml.flambda_o3]
 
-type ('a : value_or_null) t = 'a option = None | Some of 'a
+type ('a : any) t = 'a option = None | Some of 'a
 
 let none = None
 let some v = Some v
@@ -29,8 +29,8 @@ let join = function Some o -> o | None -> None
 let map f o = match o with None -> None | Some v -> Some (f v)
 let fold ~none ~some = function Some v -> some v | None -> none
 let iter f = function Some v -> f v | None -> ()
-let is_none = function None -> true | Some _ -> false
-let is_some = function None -> false | Some _ -> true
+let is_none = function None -> true | _ -> false
+let is_some = function None -> false | _ -> true
 
 let equal eq o0 o1 = match o0, o1 with
 | Some v0, Some v1 -> eq v0 v1

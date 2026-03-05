@@ -16,7 +16,8 @@ let ( and* ) a b =
 
 [%%expect{|
 val portable_use : 'a @ portable -> unit = <fun>
-val ( let* ) : 'a option -> ('a -> 'b option) -> 'b option = <fun>
+val ( let* ) : 'a ('b : any). 'a option -> ('a -> 'b option) -> 'b option =
+  <fun>
 val ( and* ) : 'a option -> 'b option -> ('a * 'b) option = <fun>
 |}]
 

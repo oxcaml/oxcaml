@@ -1730,10 +1730,6 @@ let bad p =
 Line 3, characters 43-44:
 3 |   | T (type (a : float64)) (x : a) -> Some x
                                                ^
-Error: This expression has type "a" but an expression was expected of type
-         "('a : value_or_null)"
-       The layout of a is float64
-         because of the annotation on the existential variable a.
-       But the layout of a must be a sublayout of value
-         because the type argument of option has layout value_or_null.
+Error: This expression has type "a" but an expression was expected of type "'a"
+       The type constructor "a" would escape its scope
 |}]
