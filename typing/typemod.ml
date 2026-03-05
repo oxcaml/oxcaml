@@ -123,16 +123,11 @@ let register_module_allocation () =
   in
   fst (Value.newvar_below upper_bound)
 
-let register_closure_allocation (mode : Value.r option) : Alloc.lr * Value.lr =
-  let common_upper_bound =
+let register_closure_allocation () : Alloc.lr * Value.lr =
+  let upper_bound =
     Alloc.of_const
       ~hint_comonadic:Module_allocated_on_heap
       { Alloc.Const.max with areality = Global }
-  in
-  let upper_bound =
-    match mode with
-    | None -> common_upper_bound
-    | Some m -> Alloc.meet [common_upper_bound; value_to_alloc_r2g m]
   in
   let alloc_mode, _ = Alloc.newvar_below upper_bound in
   let closed_over_mode = alloc_as_value ~hint:Skip alloc_mode in
@@ -2996,8 +2991,7 @@ and  type_module_maybe_hold_locks ?(alias=false) ~hold_locks sttn funct_body
     (fun () -> type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       smod)
 
-and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
-  ?expected_mode smod =
+and type_module_aux ~alias ~hold_locks sttn funct_body anchor env smod =
   (* If the module is an identifier, there might be locks between the
   declaration site and the use site.
   - If [hold_locks] is [true], the locks are held and stored in [mod_mode].
@@ -3032,7 +3026,7 @@ and type_module_aux ~alias ~hold_locks sttn funct_body anchor env
       md, shape
   | Pmod_functor(arg_opt, sbody) ->
       let alloc_mode, closed_over_mode =
-        register_closure_allocation expected_mode
+        register_closure_allocation ()
       in
       let newenv =
         Env.add_closure_lock
