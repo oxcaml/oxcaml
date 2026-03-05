@@ -553,16 +553,6 @@ let mode_morph f expected_mode =
   let tuple_modes = None in
   {expected_mode with mode; tuple_modes}
 
-(** Takes the mode of a container, a child's relation to it, and an optional
-    modality, returns the mode of the child. *)
-let apply_left_is_contained_by is_contained_by
-  ?(modalities = Modality.Const.id) mode =
-  Modality.Const.apply_left ~is_contained_by modalities mode
-
-let apply_right_is_contained_by is_contained_by
-  ?(modalities = Modality.Const.id) mode =
-  Modality.Const.apply_right ~is_contained_by modalities mode
-
 (** Similiar to [apply_is_contained_by] but for [expected_mode]. *)
 let mode_is_contained_by is_contained_by ?modalities expected_mode =
   as_single_mode expected_mode

@@ -716,21 +716,11 @@ module type S = sig
 
     val join_const : Monadic.Const.t -> ('l * 'r) t -> (disallowed * 'r) t
 
-    val imply_const : Comonadic.Const.t -> ('l * 'r) t -> (disallowed * 'r) t
-
-    val subtract_const : Monadic.Const.t -> ('l * 'r) t -> ('l * disallowed) t
-
     val meet_const_with :
       'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * disallowed) t
 
     val join_const_with :
       'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> (disallowed * 'r) t
-
-    val imply_const_with :
-      'a Comonadic.Axis.t -> 'a -> ('l * 'r) t -> (disallowed * 'r) t
-
-    val subtract_const_with :
-      'a Monadic.Axis.t -> 'a -> ('l * 'r) t -> ('l * disallowed) t
 
     (** [max_with ax elt] returns [max] but with the axis [ax] set to [elt]. *)
     val max_with_comonadic :

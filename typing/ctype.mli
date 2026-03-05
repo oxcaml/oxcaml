@@ -843,8 +843,8 @@ val check_constructor_crossing_destruction :
     modality, returns the mode of the child. *)
 val apply_left_is_contained_by : Mode.Hint.is_contained_by
   -> ?modalities:Mode.Modality.Const.t
-  -> (allowed * 'r) Mode.Value.t -> (allowed * disallowed) Mode.Value.t
+  -> (allowed * 'r) Mode.Value.t -> Mode.Value.l
 
 val apply_right_is_contained_by : Mode.Hint.is_contained_by
   -> ?modalities:Mode.Modality.Const.t
-  -> ('l * allowed) Mode.Value.t -> (disallowed * allowed) Mode.Value.t
+  -> ('l * allowed) Mode.Value.t -> Mode.Value.r
