@@ -30,3 +30,5 @@ val extcall :
   machtype ->
   expression list ->
   expression
+
+val builtin_sign_extends : string -> bool

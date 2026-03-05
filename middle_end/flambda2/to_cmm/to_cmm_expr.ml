@@ -110,23 +110,11 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
        2. All of the [machtype_component]s are singleton arrays. *)
     Array.map (fun machtype -> [| machtype |]) return_ty
   in
-  let builtins_sign_extends =
-    is_c_builtin
-    &&
-    match callee with
-    | "caml_native_pointer_load_signed_int32"
-    | "caml_native_pointer_load_unboxed_int32"
-    | "caml_ext_pointer_load_signed_int32"
-    | "caml_ext_pointer_load_unboxed_int32"
-    | "caml_int32_shift_right_by_int32_unboxed" | "caml_csel_int32_unboxed" ->
-      true
-    | _ -> false
-  in
   (* Returned small integer values need to be sign-extended because it's not
      clear whether C code that returns a small integer returns one that is sign
      extended or not. There is no need to wrap other return arities. *)
   let maybe_sign_extend kind dbg cmm =
-    if builtins_sign_extends
+    if is_c_builtin && Cmm_builtins.builtin_sign_extends callee
     then cmm
     else
       match Flambda_kind.With_subkind.kind kind with

@@ -1263,6 +1263,14 @@ let builtin_even_if_not_annotated = function
     true
   | _ -> false
 
+let builtin_sign_extends = function
+  | "caml_native_pointer_load_signed_int32"
+  | "caml_native_pointer_load_unboxed_int32"
+  | "caml_ext_pointer_load_signed_int32" | "caml_ext_pointer_load_unboxed_int32"
+  | "caml_int32_shift_right_by_int32_unboxed" | "caml_csel_int32_unboxed" ->
+    true
+  | _ -> false
+
 let extcall ~dbg ~returns ~alloc ~is_c_builtin ~effects ~coeffects ~ty_args name
     typ_res args =
   if not returns
