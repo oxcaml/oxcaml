@@ -1375,6 +1375,7 @@ and jkind_annotation_desc =
   | Pjk_with of jkind_annotation * core_type * modalities
   | Pjk_kind_of of core_type
   | Pjk_product of jkind_annotation list
+  | Pjk_quote of jkind_annotation
 
 and jkind_annotation =
   { pjka_loc : Location.t

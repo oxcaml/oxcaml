@@ -2028,6 +2028,10 @@ module Const = struct
             With_bounds.add_modality ~modality ~relevant_for_shallow:`Irrelevant
               ~type_expr:type_ base.with_bounds
         })
+    | Pjk_quote jkind ->
+      (* CR jbachurski: quote this *)
+      of_user_written_annotation_unchecked_level ~use_abstract_jkinds env
+        context jkind
     | Pjk_default | Pjk_kind_of _ ->
       raise ~loc:jkind.pjka_loc Unimplemented_syntax
 
@@ -2214,6 +2218,7 @@ let of_type_decl_overapproximate_unknown ~context env
     | Pjk_mod (base, _) -> has_with_bounds base
     | Pjk_product jkinds -> List.exists has_with_bounds jkinds
     | Pjk_abbreviation _ -> false
+    | Pjk_quote jkind -> has_with_bounds jkind
     | Pjk_default | Pjk_kind_of _ ->
       raise ~loc:jkind.pjka_loc Unimplemented_syntax
   in

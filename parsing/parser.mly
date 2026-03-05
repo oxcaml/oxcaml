@@ -4094,6 +4094,9 @@ jkind_desc:
   | reverse_product_jkind %prec below_AMPERSAND {
       Pjk_product (List.rev $1)
     }
+  | LESSLBRACKET jkind_annotation RBRACKETGREATER {
+      Pjk_quote $2
+    }
   | LPAREN jkind_desc RPAREN {
       $2
     }
