@@ -38,6 +38,7 @@ type error =
   | Invalid_array_kind_for_uninitialized_makearray_dynamic
   | Invalid_stack_primitive of invalid_stack_primitive
   | Unable_to_specialize_array_idx_primitive of Types.type_expr
+  | Element_would_be_reordered_in_record
 
 exception Error of Location.t * error
 
@@ -1872,18 +1873,18 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
   | Primitive (Pset_ptr (_, m), arity), (_ :: p2 :: _) ->
     let l = layout_of_ty_for_idx_set env loc p2 in
     Some (Primitive (Pset_ptr (l, m), arity))
-  | Primitive (Pmake_idx_array (_, ik, mbe, path), arity), _ ->
+  | Primitive (Pmake_idx_array (_, ik, _mbe, path), arity), _ ->
     let loc = to_location loc in
     let err () =
       raise (Error (loc,
         Unable_to_specialize_array_idx_primitive rest_ty))
     in
-    let array_ty =
+    let array_ty, elt_ty =
       match Types.get_desc (Ctype.expand_head env rest_ty) with
-      | Tconstr (p, array_ty :: _, _)
+      | Tconstr (p, [array_ty; elt_ty], _)
         when Path.same p Predef.path_idx_mut
           || Path.same p Predef.path_idx_imm ->
-        array_ty
+        array_ty, elt_ty
       | _ -> err ()
     in
     (match Types.get_desc (Ctype.expand_head env array_ty) with
@@ -1895,6 +1896,11 @@ let specialize_primitive env loc ty ~has_constant_constructor prim =
       Typeopt.array_type_kind ~elt_sort:None ~elt_ty:None
         env loc array_ty
     in
+    let jkind = Ctype.type_jkind env elt_ty in
+    let mbe = Typedecl.mixed_block_element env elt_ty jkind in
+    let mbe = transl_mixed_block_element env loc elt_ty mbe in
+    if Lambda.will_be_reordered mbe then
+      raise (Error (loc, Element_would_be_reordered_in_record));
     Some (Primitive (Pmake_idx_array (ak, ik, mbe, path), arity))
   | _ -> None
 
@@ -2645,6 +2651,10 @@ let report_error_doc ppf = function
       fprintf ppf
         "@[Unable to determine the array kind for array index \
          primitive.@]"
+  | Element_would_be_reordered_in_record ->
+      fprintf ppf
+        "Block indices into arrays whose element layout contains a@ \
+         non-value before a value are not yet supported."
 
 let () =
   Location.register_error_of_exn

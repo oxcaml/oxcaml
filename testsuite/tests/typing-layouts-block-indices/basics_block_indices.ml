@@ -442,11 +442,15 @@ Error: This block index cannot be created because it refers to values
 (* CR layouts v8: these should be allowed once we reorder array elements *)
 
 type r = #{ a : int64#; b : int }
-let bad_idx () =
-  (.idx_mut(Idx_mut.unsafe_create_into_array 0).#a)
+let bad_idx () : (_, r) idx_mut =
+  Idx_mut.unsafe_create_into_array 0
 [%%expect{|
 type r = #{ a : int64#; b : int; }
-val bad_idx : unit -> (r array, int64#) idx_mut = <fun>
+Line 3, characters 2-36:
+3 |   Idx_mut.unsafe_create_into_array 0
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Block indices into arrays whose element layout contains a
+       non-value before a value are not yet supported.
 |}]
 
 type r = { ii : #( int * int64#) ; i : int }
@@ -454,7 +458,11 @@ let bad_idx () =
   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#ii)
 [%%expect{|
 type r = { ii : #(int * int64#); i : int; }
-val bad_idx : unit -> (r# array, #(int * int64#)) idx_mut = <fun>
+Line 3, characters 12-46:
+3 |   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#ii)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Block indices into arrays whose element layout contains a
+       non-value before a value are not yet supported.
 |}]
 
 (* Note that this does work, though, as no reordering is needed *)
@@ -669,6 +677,141 @@ let ok () = (.mut.#mut_not_global.#item)
 val ok : unit -> ('a box# mut_not_global# box_mut, 'a) idx_mut = <fun>
 |}]
 
+(******************************************************)
+(* Cannot take an index to float/non-separable arrays *)
+
+(* CR layouts v8: could this error message more clearly point out the problem,
+   that the element type is not [mod non_float]? *)
+let bad () : (float array, _) idx_mut =
+  Idx_mut.unsafe_create_into_array 0
+[%%expect{|
+Line 2, characters 2-36:
+2 |   Idx_mut.unsafe_create_into_array 0
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "('a array, 'a) idx_mut"
+       but an expression was expected of type "(float array, 'b) idx_mut"
+       The kind of float is
+           value mod forkable unyielding many stateless immutable
+         because it is the primitive type float.
+       But the kind of float must be a subkind of value_or_null mod non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}]
+
+type non_sep = float or_null
+let bad () : (_ array, non_sep) idx_mut =
+  Idx_mut.unsafe_create_into_array 0
+[%%expect{|
+type non_sep = float or_null
+Line 3, characters 2-36:
+3 |   Idx_mut.unsafe_create_into_array 0
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "('a array, 'a) idx_mut"
+       but an expression was expected of type "('a array, non_sep) idx_mut"
+       Type "'a" is not compatible with type "non_sep" = "float or_null"
+       The kind of non_sep is value_or_null mod everything with float
+         because it is the primitive type or_null.
+       But the kind of non_sep must be a subkind of
+           value_or_null mod non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}]
+
+type abstract
+let bad () : (abstract array, _) idx_mut =
+  Idx_mut.unsafe_create_into_array 0
+[%%expect{|
+type abstract
+Line 3, characters 2-36:
+3 |   Idx_mut.unsafe_create_into_array 0
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "('a array, 'a) idx_mut"
+       but an expression was expected of type "(abstract array, 'b) idx_mut"
+       The kind of abstract is value
+         because of the definition of abstract at line 1, characters 0-13.
+       But the kind of abstract must be a subkind of
+           value_or_null mod non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}]
+
+let bad () : (float iarray, _) idx_imm = Idx_imm.unsafe_create_into_iarray 0
+[%%expect{|
+Line 1, characters 41-76:
+1 | let bad () : (float iarray, _) idx_imm = Idx_imm.unsafe_create_into_iarray 0
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "('a iarray, 'a) idx_imm"
+       but an expression was expected of type "(float iarray, 'b) idx_imm"
+       The kind of float is
+           value mod forkable unyielding many stateless immutable
+         because it is the primitive type float.
+       But the kind of float must be a subkind of value_or_null mod non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}]
+
+(* CR layouts v8: this is similarly sad *)
+let bad (x : float array) =
+  let y = Idx_mut.unsafe_create_into_array 42 in
+  Idx_mut.get x y
+[%%expect{|
+Line 3, characters 16-17:
+3 |   Idx_mut.get x y
+                    ^
+Error: This expression has type "('a array, 'a) idx_mut"
+       but an expression was expected of type "(float array, 'b) idx_mut"
+       The kind of float is
+           value mod forkable unyielding many stateless immutable
+         because it is the primitive type float.
+       But the kind of float must be a subkind of value_or_null mod non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}]
+
+type non_sep = float or_null
+let bad () : (_ iarray, non_sep) idx_imm =
+  Idx_imm.unsafe_create_into_iarray 0
+[%%expect{|
+type non_sep = float or_null
+Line 3, characters 2-37:
+3 |   Idx_imm.unsafe_create_into_iarray 0
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "('a iarray, 'a) idx_imm"
+       but an expression was expected of type "('a iarray, non_sep) idx_imm"
+       Type "'a" is not compatible with type "non_sep" = "float or_null"
+       The kind of non_sep is value_or_null mod everything with float
+         because it is the primitive type or_null.
+       But the kind of non_sep must be a subkind of
+           value_or_null mod non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}]
+
+type abstract
+let bad () : (abstract iarray, _) idx_imm =
+  Idx_imm.unsafe_create_into_iarray 0
+[%%expect{|
+type abstract
+Line 3, characters 2-37:
+3 |   Idx_imm.unsafe_create_into_iarray 0
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "('a iarray, 'a) idx_imm"
+       but an expression was expected of type "(abstract iarray, 'b) idx_imm"
+       The kind of abstract is value
+         because of the definition of abstract at line 1, characters 0-13.
+       But the kind of abstract must be a subkind of
+           value_or_null mod non_float
+         because it's the layout polymorphic type in an external declaration
+         ([@layout_poly] forces all variables of layout 'any' to be
+         representable at call sites).
+|}]
+
 (*******************)
 (* Private records *)
 
@@ -786,4 +929,52 @@ Line 6, characters 54-55:
 Warning 18 [not-principal]: this type-based unboxed record field disambiguation is not principal.
 
 val f : bool -> (u t# array, int) idx_mut = <fun>
+|}]
+
+(************************)
+(* Unable to specialize *)
+
+type ('a, 'b : any) not_an_idx : bits64
+type ('a : any mod separable) not_an_array
+[%%expect{|
+type ('a, 'b : any) not_an_idx : bits64
+type ('a : any mod separable) not_an_array
+|}]
+
+external bad
+  : ('a : any mod separable). int -> ('a not_an_array, 'a) idx_mut
+  = "%unsafe_array_idx"
+[@@layout_poly]
+let use_bad () = bad 0
+[%%expect{|
+external bad : ('a : any mod separable). int -> ('a not_an_array, 'a) idx_mut
+  = "%unsafe_array_idx" [@@layout_poly]
+Line 5, characters 17-22:
+5 | let use_bad () = bad 0
+                     ^^^^^
+Error: Unable to determine the array kind for array index primitive.
+|}]
+
+external bad
+  : ('a : any mod separable). int -> ('a array, 'a) not_an_idx
+  = "%unsafe_array_idx"
+[@@layout_poly]
+let use_bad () = bad 0
+[%%expect{|
+external bad : ('a : any mod separable). int -> ('a array, 'a) not_an_idx
+  = "%unsafe_array_idx" [@@layout_poly]
+Line 5, characters 17-22:
+5 | let use_bad () = bad 0
+                     ^^^^^
+Error: Unable to determine the array kind for array index primitive.
+|}]
+
+external bad : int -> (_, _) idx_mut = "%unsafe_array_idx"
+let use_bad () = bad 0
+[%%expect{|
+external bad : int -> ('a, 'b) idx_mut = "%unsafe_array_idx"
+Line 2, characters 17-22:
+2 | let use_bad () = bad 0
+                     ^^^^^
+Error: Unable to determine the array kind for array index primitive.
 |}]

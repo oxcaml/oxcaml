@@ -38,7 +38,6 @@ type error =
   | Unboxed_product_in_array_comprehension
   | Unboxed_product_in_let_mutable
   | Block_index_gap_overflow_possible
-  | Element_would_be_reordered_in_record
 
 exception Error of Location.t * error
 
@@ -2730,10 +2729,6 @@ let report_error_doc ppf = function
          and non-values that are separated by 2^%d or more bytes in their@ \
          block, or could be deepened to such an index."
         (64 - Mixed_product_bytes.block_index_offset_bits)
-  | Element_would_be_reordered_in_record ->
-      fprintf ppf
-        "Block indices into arrays whose element layout contains a@ \
-         non-value before a value are not yet supported."
 let () =
   Location.register_error_of_exn
     (function
