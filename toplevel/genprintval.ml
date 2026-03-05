@@ -580,7 +580,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                               in
                               match
                                 Typedecl.update_record_representation env
-                                  Location.none Legacy lds_and_types None
+                                  Location.none Legacy lds_and_types
                               with
                               | Ok (_sorts, rep) -> rep
                               | Error _ ->

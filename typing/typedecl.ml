@@ -2178,7 +2178,7 @@ let update_record_kind (type rep) env loc (form : rep record_form)
     Misc.fatal_error
       "Typedecl.update_record_kind: unexpected record representation"
 
-let update_record_representation env loc form lbls_and_types rep =
+let update_record_representation env loc form lbls_and_types =
   let sorts, rep, _jkind =
     let warn =
       (* Only warn during initial typechecking rather than when updating at
@@ -2191,7 +2191,7 @@ let update_record_representation env loc form lbls_and_types rep =
        layout/mode polymorphism introducing concerns about principality of
        inferred layouts/modes. *)
     let snap = Btype.snapshot () in
-    let ans = update_record_kind env loc form lbls_and_types rep ~warn in
+    let ans = update_record_kind env loc form lbls_and_types None ~warn in
     Btype.backtrack snap;
     ans
   in
