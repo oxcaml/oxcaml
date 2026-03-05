@@ -1724,6 +1724,18 @@ let datalog_rules =
          (Known_arity_code_pointer, _) -> false) [relation] ] ==> cannot_unbox0
          allocation_id); *)
       (* CR ncourant: I'm not sure this is useful? *)
+      (* CR-someday ncourant: allowing a symbol to be unboxed is difficult, due
+         to symbols being always values; thus we prevent it. *)
+      (let$ [x; _source] = ["x"; "_source"] in
+       [ sources x _source;
+         when1
+           (fun x ->
+             Code_id_or_name.pattern_match x
+               ~symbol:(fun _ -> true)
+               ~var:(fun _ -> false)
+               ~code_id:(fun _ -> false))
+           x ]
+       ==> cannot_unbox0 x);
       (* An allocation that is stored in another can only be unboxed if either
          the representation of the other allocation can be changed, of it the
          field it is stored in is never read, as in that case a poison value
@@ -1738,18 +1750,6 @@ let datalog_rules =
          when1 Field.is_real_field relation;
          cannot_unbox0 to_ ]
        ==> cannot_unbox0 allocation_id);
-      (* CR-someday ncourant: allowing a symbol to be unboxed is difficult, due
-         to symbols being always values; thus we prevent it. *)
-      (let$ [x; _source] = ["x"; "_source"] in
-       [ sources x _source;
-         when1
-           (fun x ->
-             Code_id_or_name.pattern_match x
-               ~symbol:(fun _ -> true)
-               ~var:(fun _ -> false)
-               ~code_id:(fun _ -> false))
-           x ]
-       ==> cannot_unbox0 x);
       (* As previously: if any closure of a set of closures cannot be unboxed,
          then every closure in the set cannot be unboxed. *)
       (let$ [x] = ["x"] in
@@ -2633,6 +2633,10 @@ module Rewriter = struct
           uses_for_set_of_closures db usages current_function_slot
             code_id_of_function_slots
         in
+        let[@local] bottom () =
+          Rule.rewrite Pattern.any
+            (Expr.bottom (Flambda2_types.kind flambda_type))
+        in
         let[@local] change_representation_of_closures fields closure_source
             value_slots_reprs function_slots_reprs =
           let patterns = ref [] in
@@ -2717,17 +2721,12 @@ module Rewriter = struct
         let[@local] no_representation_change function_slot value_slots_metadata
             function_slots_metadata_and_uses =
           let all_patterns = ref [] in
-          let all_value_slots_in_set =
+          match
             Value_slot.Map.filter_map
               (fun value_slot metadata ->
                 match metadata with
                 | No_usages -> None
-                | No_source ->
-                  Misc.fatal_errorf
-                    "Unexpected [No_source] for value slot %a of function slot \
-                     %a in [no_representation_change]"
-                    Value_slot.print value_slot Function_slot.print
-                    function_slot
+                | No_source -> raise Exit
                 | Single_source _ | Many_sources_any_usage
                 | Many_sources_usages _ ->
                   let v = Var.create () in
@@ -2737,66 +2736,70 @@ module Rewriter = struct
                        :: !all_patterns;
                   Some (Expr.var v))
               value_slots_metadata
-          in
-          let all_closure_types_in_set =
-            Function_slot.Map.mapi
-              (fun function_slot (metadata, _uses) ->
-                let v = Var.create () in
-                all_patterns
-                  := Pattern.function_slot function_slot
-                       (Pattern.var v (result, metadata))
-                     :: !all_patterns;
-                Expr.var v)
-              function_slots_metadata_and_uses
-          in
-          let all_function_slots_in_set =
-            Function_slot.Map.mapi
-              (fun function_slot (_, uses) ->
-                match uses with
-                | Never_called -> Or_unknown.Unknown
-                | Only_called_with_known_arity | Any_call ->
+          with
+          | exception Exit ->
+            (* CR ncourant: should this check be in [uses_for_set_of_closures]
+               instead? *)
+            bottom ()
+          | all_value_slots_in_set ->
+            let all_closure_types_in_set =
+              Function_slot.Map.mapi
+                (fun function_slot (metadata, _uses) ->
                   let v = Var.create () in
                   all_patterns
-                    := Pattern.rec_info function_slot
-                         (Pattern.var v (result, Many_sources_any_usage))
+                    := Pattern.function_slot function_slot
+                         (Pattern.var v (result, metadata))
                        :: !all_patterns;
-                  let function_type =
-                    Flambda2_types.Closures_entry.find_function_type
-                      closures_entry function_slot
-                  in
-                  Or_unknown.map function_type ~f:(fun function_type ->
-                      Expr.Function_type.create
-                        (Function_type.code_id function_type)
-                        ~rec_info:(Expr.var v)))
-              function_slots_metadata_and_uses
-          in
-          let known_sources =
-            Function_slot.Map.for_all
-              (fun _ (use, _) ->
-                match use with
-                | Single_source _ -> true
-                | No_source | No_usages | Many_sources_usages _
-                | Many_sources_any_usage ->
-                  false)
-              function_slots_metadata_and_uses
-          in
-          let expr =
-            if known_sources
-            then
-              Expr.exactly_this_closure function_slot ~all_function_slots_in_set
-                ~all_closure_types_in_set ~all_value_slots_in_set alloc_mode
-            else
-              Expr.at_least_this_closure function_slot
-                ~at_least_these_function_slots:all_function_slots_in_set
-                ~at_least_these_closure_types:all_closure_types_in_set
-                ~at_least_these_value_slots:all_value_slots_in_set alloc_mode
-          in
-          Rule.rewrite (Pattern.closure !all_patterns) expr
+                  Expr.var v)
+                function_slots_metadata_and_uses
+            in
+            let all_function_slots_in_set =
+              Function_slot.Map.mapi
+                (fun function_slot (_, uses) ->
+                  match uses with
+                  | Never_called -> Or_unknown.Unknown
+                  | Only_called_with_known_arity | Any_call ->
+                    let v = Var.create () in
+                    all_patterns
+                      := Pattern.rec_info function_slot
+                           (Pattern.var v (result, Many_sources_any_usage))
+                         :: !all_patterns;
+                    let function_type =
+                      Flambda2_types.Closures_entry.find_function_type
+                        closures_entry function_slot
+                    in
+                    Or_unknown.map function_type ~f:(fun function_type ->
+                        Expr.Function_type.create
+                          (Function_type.code_id function_type)
+                          ~rec_info:(Expr.var v)))
+                function_slots_metadata_and_uses
+            in
+            let known_sources =
+              Function_slot.Map.for_all
+                (fun _ (use, _) ->
+                  match use with
+                  | Single_source _ -> true
+                  | No_source | No_usages | Many_sources_usages _
+                  | Many_sources_any_usage ->
+                    false)
+                function_slots_metadata_and_uses
+            in
+            let expr =
+              if known_sources
+              then
+                Expr.exactly_this_closure function_slot
+                  ~all_function_slots_in_set ~all_closure_types_in_set
+                  ~all_value_slots_in_set alloc_mode
+              else
+                Expr.at_least_this_closure function_slot
+                  ~at_least_these_function_slots:all_function_slots_in_set
+                  ~at_least_these_closure_types:all_closure_types_in_set
+                  ~at_least_these_value_slots:all_value_slots_in_set alloc_mode
+            in
+            Rule.rewrite (Pattern.closure !all_patterns) expr
         in
         match usages_for_value_slots with
-        | Dead_code ->
-          Rule.rewrite Pattern.any
-            (Expr.bottom (Flambda2_types.kind flambda_type))
+        | Dead_code -> bottom ()
         | From_set_of_closures set_of_closures ->
           if
             Function_slot.Map.exists
