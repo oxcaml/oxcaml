@@ -323,6 +323,9 @@ val method_type : label -> class_signature -> type_expr
    @raises [Assert_failure] if the class has no such method. *)
 val instance_variable_type : label -> class_signature -> type_expr
 
+(**** Forward declarations ****)
+val print_raw: (Format.formatter -> type_expr -> unit) ref
+
 (* These modules exists here to resolve a dependency cycle: [Subst], [Predef],
    [Datarepr], and [Env] must not depend on [Jkind].  The portions intended for
    use outside of those modules are re-exported as [Jkind.With_bounds] and
@@ -742,13 +745,3 @@ module Jkind0 : sig
 
   include module type of Jkind
 end
-
-(* CR sspies: upstream removed [print_raw] and [cstr_type_path] but oxcaml
-   still uses them. *)
-
-(**** Forward declarations ****)
-val print_raw: (Format.formatter -> type_expr -> unit) ref
-
-(**** Type information getter ****)
-
-val cstr_type_path : Data_types.constructor_description -> Path.t

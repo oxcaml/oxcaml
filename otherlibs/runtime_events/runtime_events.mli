@@ -138,12 +138,6 @@ Live blocks of a Domain's major heap large allocations.
 (**
 Reallocation of the table of dependent memory from minor heap.
 @since 5.4 *)
-| EV_C_MAJOR_ALLOCATED_WORDS
-(**
-Allocations to the major heap of this Domain in words, since the last major
-slice.
-@since 5.3
-*)
 | EV_C_MAJOR_SLICE_ALLOC_DEPENDENT_WORDS
 (**
 Words of off-heap allocation by this domain since the last major slice
@@ -156,11 +150,6 @@ New GC work incurred by this domain since the last major slice
 (**
 Total pending GC work (for all domains) at start of slice
 @since 5.4 *)
-| EV_C_MAJOR_SLICE_BUDGET
-(**
-The budget in 'work' that a domain has to do during the major slice.
-@since 5.3
-*)
 | EV_C_MAJOR_SLICE_WORK_DONE
 (**
 Total work done by this domain in a slice.
@@ -169,6 +158,12 @@ Total work done by this domain in a slice.
 (**
 Major heap size in words of a Domain.
 @since 5.3 *)
+| EV_C_MAJOR_ALLOCATED_WORDS
+(**
+Allocations to the major heap of this Domain in words, since the last major
+slice.
+@since 5.3
+*)
 | EV_C_MAJOR_ALLOCATED_WORK
 (**
 The amount of major GC 'work' needing to be done as a result of allocations to
@@ -206,6 +201,11 @@ began.
 (**
 The target amount of global 'work' that should be done by all domains at the
 end of the major slice (see EV_C_MAJOR_SLICE_COUNTER).
+@since 5.3
+*)
+| EV_C_MAJOR_SLICE_BUDGET
+(**
+The budget in 'work' that a domain has to do during the major slice.
 @since 5.3
 *)
 

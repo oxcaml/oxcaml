@@ -152,6 +152,7 @@ type error =
   | Invalid_type_subst_rhs
   | Non_packable_local_modtype_subst of Path.t
   | With_cannot_remove_packed_modtype of Path.t * module_type
+  | Cannot_alias of Path.t
   | Strengthening_mismatch of Longident.t * Includemod.explanation
   | Cannot_pack_parameter
   | Compiling_as_parameterised_parameter
@@ -165,7 +166,6 @@ type error =
       old_source_file: Misc.filepath;
     }
   | Duplicate_parameter_name of Global_module.Parameter_name.t
-  | Cannot_alias of Path.t
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error

@@ -216,11 +216,11 @@ val check_modtype_equiv:
 val signatures: Env.t -> mark:bool -> modes:modes ->
   signature -> signature -> module_coercion
 
-(** Check an implementation against an interface *)
-val check_implementation: Env.t -> modes:modes -> signature -> signature -> unit
-
 val include_functor_signatures : Env.t -> mark:bool ->
   signature -> signature -> modes:modes -> (Ident.t * module_coercion) list
+
+(** Check an implementation against an interface *)
+val check_implementation: Env.t -> modes:modes -> signature -> signature -> unit
 
 val compunit:
       Env.t -> mark:bool -> string -> signature ->

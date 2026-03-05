@@ -171,12 +171,14 @@ val min : ('a : value_or_null) . 'a -> 'a -> 'a
 val max : ('a : value_or_null) . 'a -> 'a -> 'a
 (** Alias of {!Repr.max}. *)
 
-external ( == ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%eq"
+external ( == ) :
+  ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%eq"
 (** Alias of {!Repr.phys_equal}.
     Left-associative operator,  see {!Ocaml_operators} for more information.
 *)
 
-external ( != ) : ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%noteq"
+external ( != ) :
+  ('a : value_or_null) . ('a[@local_opt]) -> ('a[@local_opt]) -> bool = "%noteq"
 (** Negation of {!Repr.phys_equal}.
     Left-associative operator,  see {!Ocaml_operators} for more information.
 *)

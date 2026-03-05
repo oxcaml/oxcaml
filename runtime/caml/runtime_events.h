@@ -154,6 +154,8 @@ typedef enum {
     EV_C_MAJOR_HEAP_LARGE_BLOCKS,
     /* CR sspies: EV_C_MAJOR_SLICE_ALLOC_WORDS has been renamed to
        EV_C_MAJOR_ALLOCATED_WORDS to match upstream. */
+    /* CR sspies: EV_C_MAJOR_SLICE_BUDGET and EV_C_MAJOR_ALLOCATED_WORDS
+       have been moved in the variant to match upstream. */
 <<<<<<< oxcaml
     EV_C_REQUEST_MINOR_REALLOC_DEPENDENT_TABLE,
     EV_C_MAJOR_SLICE_ALLOC_WORDS,

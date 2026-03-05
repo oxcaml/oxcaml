@@ -202,7 +202,4 @@ type error =
 
 exception Error of Location.t * error
 
-(* CR sspies: upstream changed [report_error] to return [Location.report]. I
-   kept our doc version for now, but this should potentially be revisited. *)
 val report_error: loc:Location.t -> error -> Location.report
-val report_error_doc: error Format_doc.printer

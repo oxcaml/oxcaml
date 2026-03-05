@@ -278,8 +278,10 @@ and 'k pattern_desc =
             Invariant: n > 0
          *)
   | Tpat_record_unboxed_product :
-      (Longident.t loc * Data_types.unboxed_label_description * value general_pattern) list *
-        closed_flag ->
+      (Longident.t loc
+       * Data_types.unboxed_label_description
+       * value general_pattern) list
+      * closed_flag ->
       value pattern_desc
         (** #{ l1=P1; ...; ln=Pn }     (flag = Closed)
             #{ l1=P1; ...; ln=Pn; _}   (flag = Open)
@@ -287,7 +289,8 @@ and 'k pattern_desc =
             Invariant: n > 0
          *)
   | Tpat_array :
-      Types.mutability * Jkind.sort * value general_pattern list -> value pattern_desc
+      Types.mutability * Jkind.sort * value general_pattern list ->
+      value pattern_desc
         (** [| P1; ...; Pn |]    (flag = Mutable)
             [: P1; ...; Pn :]    (flag = Immutable) *)
   | Tpat_lazy : value general_pattern -> value pattern_desc
@@ -448,9 +451,9 @@ and expression_desc =
 
             The [Zero_alloc.assume option] records the optional [@zero_alloc
             assume] attribute that may appear on applications. *)
-  (* CR sspies: upstream added a separate [value case list] for effect handler
-     cases. This will need corresponding .ml changes. *)
-  | Texp_match of expression * Jkind.sort * computation case list * value case list * partial
+  | Texp_match of
+      expression * Jkind.sort * computation case list * value case list *
+      partial
         (** match E0 with
             | P1 -> E1
             | P2 | exception P3 -> E2
@@ -460,8 +463,6 @@ and expression_desc =
             [Texp_match (E0, sort_of_E0, [(P1, E1); (P2 | exception P3, E2);
                               (exception P4, E3)], [(P4, E4)], _)]
          *)
-  (* CR sspies: upstream added a separate [value case list] for effect handler
-     cases. This will need corresponding .ml changes. *)
   | Texp_unboxed_unit
         (** #() *)
   | Texp_unboxed_bool of bool
@@ -527,7 +528,9 @@ and expression_desc =
             in which case it does not need allocation.
           *)
   | Texp_record_unboxed_product of {
-      fields : ( Data_types.unboxed_label_description * record_label_definition ) array;
+      fields :
+        ( Data_types.unboxed_label_description
+          * record_label_definition ) array;
       representation : Types.record_unboxed_product_representation;
       extended_expression : (expression * Jkind.sort) option;
     }
@@ -552,8 +555,8 @@ and expression_desc =
         - [texp_field_boxing] provides extra information depending on if the
           projection requires boxing. *)
   | Texp_unboxed_field of
-      expression * Jkind.sort * Longident.t loc * Data_types.unboxed_label_description *
-        unique_use
+      expression * Jkind.sort * Longident.t loc *
+      Data_types.unboxed_label_description * unique_use
   | Texp_setfield of
       expression * Mode.Locality.l * Longident.t loc *
       Data_types.label_description * expression
@@ -622,17 +625,15 @@ and expression_desc =
   | Texp_antiquotation of expression
   | Texp_eval of core_type * Jkind.sort
 
-and function_curry =
-  | More_args of { partial_mode : Mode.Alloc.l }
-  | Final_arg
-
 and meth =
     Tmeth_name of string
   | Tmeth_val of Ident.t
   | Tmeth_ancestor of Ident.t * Path.t
 
-(* CR sspies: c_cont added from upstream for effect handler continuations.
-   This will need corresponding .ml changes. *)
+and function_curry =
+  | More_args of { partial_mode : Mode.Alloc.l }
+  | Final_arg
+
 and 'k case =
     {
      c_lhs: 'k general_pattern;
@@ -727,7 +728,8 @@ and block_access =
   | Baccess_block of mutable_flag * expression
 
 and unboxed_access =
-  | Uaccess_unboxed_field of Longident.t loc * Data_types.unboxed_label_description
+  | Uaccess_unboxed_field of
+      Longident.t loc * Data_types.unboxed_label_description
 
 and comprehension =
   {
@@ -1230,7 +1232,6 @@ and label_declaration =
      ld_id: Ident.t;
      ld_name: string loc;
      ld_uid: Uid.t;
-     (* CR sspies: upstream has atomicity as a separate [ld_atomic] field. *)
      ld_mutable: Types.mutability;
      ld_modalities: modalities;
      ld_type: core_type;
@@ -1466,12 +1467,6 @@ val pat_bound_idents_full:
 (** Splits an or pattern into its value (left) and exception (right) parts. *)
 val split_pattern:
   computation general_pattern -> pattern option * pattern option
-
-(** Returns a format document if the expression reads nicely as the subject of a
-    sentence in a error message. *)
-val nominal_exp_doc :
-  Longident.t Format_doc.printer -> expression
-  -> Format_doc.t option
 
 (** Calculates the syntactic arity of a function based on its parameters and body. *)
 val function_arity : function_param list -> function_body -> int

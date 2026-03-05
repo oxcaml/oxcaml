@@ -75,16 +75,14 @@ val is_right : ('a : value_or_null) ('b : value_or_null)
   . ('a, 'b) t -> bool
 (** [is_right (Left v)] is [false], [is_right (Right v)] is [true]. *)
 
-val get_left : ('a : value_or_null) ('b : value_or_null)
-  . ('a, 'b) t -> 'a
+val get_left : ('a : value_or_null) ('b : value_or_null) . ('a, 'b) t -> 'a
 (** [get_left e] is [v] if [e] is [Left v] and raise otherwise.
 
     @raise Invalid_argument if [e] is [Right _].
 
     @since 5.4 *)
 
-val get_right : ('a : value_or_null) ('b : value_or_null)
-  . ('a, 'b) t -> 'b
+val get_right : ('a : value_or_null) ('b : value_or_null) . ('a, 'b) t -> 'b
 (** [get_right e] is [v] if [e] is [Right v] and raise otherwise.
 
     @raise Invalid_argument if [e] is [Left _].
