@@ -73,12 +73,7 @@ let load_lambda ppf tlam =
     (* CR layout poly: If this toplevel value is static we should keep the
        comptime part in a separate table so we can use it in later expressions.
     *)
-    Slambda.eval
-      (fun slam ->
-        if !Clflags.dump_slambda
-        then fprintf ppf "%a@." Printlambda.slambda slam;
-        slam)
-      tlam
+    Slambda.eval (print_if ppf Clflags.dump_slambda Printlambda.slambda) tlam
   in
   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda rawlam;
   let lam = Simplif.simplify_lambda_for_bytecode rawlam in
