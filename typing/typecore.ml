@@ -2732,23 +2732,47 @@ module Constructor = NameChoice (struct
   let in_env _ = true
 end)
 
-let representation_for_tuple_constructor env constr ty_args ~loc ~jkinds
-      ~containing_type =
+type unrepresentable_arg =
+  Unrepresentable_arg of Warnings.loc * type_expr * Jkind.Violation.t
+
+let representation_for_tuple_constructor env constr ty_args ~loc ~types
+      ~containing_type ~why : _ Result.t =
   match constr.cstr_shape with
-  | Some shape -> shape
+  | Some shape ->
+      begin match
+        Misc.Stdlib.List.map_option
+          (fun arg -> arg.ca_sort |> Option.map Jkind.Sort.of_const)
+          constr.cstr_args
+      with
+      | Some sorts -> Ok (shape, sorts)
+      | None -> Misc.fatal_error "representable constructor missing a sort"
+      end
   | None ->
       begin match
-        Typedecl.update_constructor_representation env (Cstr_tuple ty_args)
-          jkinds ~loc ~is_extension_constructor:false
-      with
-      | Ok shape -> shape
-      | Error (Unrepresentable_argument i) ->
-          raise (Error (loc, env,
-                        Indeterminate_constructor_layout(
-                          containing_type, constr.cstr_name, i)))
-      | Error (Unrepresentable_argument_field _) ->
-          (* Should be impossible because we passed [Cstr_tuple] *)
-          Misc.fatal_error "Unrepresentable_argument_field with Cstr_tuple"
+        Misc.Stdlib.List.mapi_result
+          (fun _ (ty, loc) ->
+             type_jkind_and_sort env ty ~why ~fixed:false
+             |> Result.map_error
+                  (fun err -> Unrepresentable_arg (loc, ty, err)))
+          types
+        with
+        | Ok jkinds_and_sorts ->
+            let jkinds, sorts = List.split jkinds_and_sorts in
+            begin match
+              Typedecl.update_constructor_representation env
+                (Cstr_tuple ty_args) jkinds ~loc ~is_extension_constructor:false
+            with
+            | Ok shape -> Ok (shape, sorts)
+            | Error (Unrepresentable_argument i) ->
+                (* XXX Impossible? *)
+                raise (Error (loc, env,
+                              Indeterminate_constructor_layout(
+                                containing_type, constr.cstr_name, i)))
+            | Error (Unrepresentable_argument_field _) ->
+                (* Should be impossible because we passed [Cstr_tuple] *)
+                Misc.fatal_error "Unrepresentable_argument_field with Cstr_tuple"
+            end
+        | Error err -> Error err
       end
 
 (* Typing of patterns *)
@@ -3364,7 +3388,7 @@ and type_pat_aux
         { containing = Constructor (constr.cstr_name, Modality);
           container = (loc, Pattern) }
       in
-      let jkinds, ctor_args =
+      let ctor_args =
         List.map2
           (fun p (arg : Types.constructor_argument) ->
              let alloc_mode =
@@ -3375,32 +3399,26 @@ and type_pat_aux
               Mode.Value.join [ alloc_mode; constructor_mode ]
              in
              let alloc_mode = simple_pat_mode alloc_mode in
-             let pat =
-               let sort =
-                 match arg.ca_sort with
-                 | Some sort -> Jkind.Sort.of_const sort
-                 | None -> Jkind.Sort.new_var ~level:(get_current_level ())
-               in
-               type_pat ~alloc_mode tps Value p arg.ca_type sort
+             let sort =
+               match arg.ca_sort with
+               | Some sort -> Jkind.Sort.of_const sort
+               | None -> Jkind.Sort.new_var ~level:(get_current_level ())
              in
-             let jkind, sort =
-               match
-                 type_jkind_and_sort !!penv pat.pat_type
-                   ~why:Constructor_arg_projection ~fixed:false
-               with
-               | Ok (jkind, sort) -> jkind, sort
-               | Error err -> raise (Error (p.ppat_loc, !!penv,
-                                            Constructor_arg_projection_not_rep(
-                                              pat.pat_type, err)))
-             in
-             jkind, (sort, pat))
+             type_pat ~alloc_mode tps Value p arg.ca_type sort)
           sargs args
-        |> List.split
       in
-      let repr =
-        representation_for_tuple_constructor !!penv constr args ~loc ~jkinds
-          ~containing_type:expected_ty
+      let repr, sorts =
+        let types = List.map (fun arg -> arg.pat_type, arg.pat_loc) ctor_args in
+        match
+          representation_for_tuple_constructor !!penv constr args ~loc ~types
+            ~containing_type:expected_ty ~why:Constructor_arg_projection
+        with
+        | Ok (repr, sorts) -> repr, sorts
+        | Error (Unrepresentable_arg (loc, ty, err)) ->
+            raise (Error (loc, !!penv,
+                          Constructor_arg_projection_not_rep(ty, err)))
       in
+      let ctor_args = List.combine sorts ctor_args in
       rvp { pat_desc =
               Tpat_construct(lid, constr, repr, ctor_args, existential_ctyp);
             pat_loc = loc;
@@ -9894,7 +9912,7 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
          ty_args)
       overwrite
   in
-  let jkinds, args =
+  let args =
     Misc.Stdlib.List.map3
       (fun e ({Types.ca_type=ty; ca_modalities=modalities; _},t0) overwrite ->
          let is_contained_by : Mode.Hint.is_contained_by =
@@ -9904,20 +9922,8 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
          let argument_mode =
           mode_is_contained_by is_contained_by ~modalities argument_mode
          in
-         let arg = type_argument ~recarg ~overwrite env argument_mode e ty t0 in
-         let jkind, sort =
-           match
-             type_jkind_and_sort env arg.exp_type ~fixed:false
-               ~why:Constructor_arg_assignment
-           with
-           | Ok sort -> sort
-           | Error err ->
-               raise (Error (loc, env,
-                             Constructor_arg_value_not_rep(arg.exp_type, err)))
-         in
-         jkind, (sort, arg))
+         type_argument ~recarg ~overwrite env argument_mode e ty t0)
       sargs (List.combine ty_args ty_args0) overwrites
-    |> List.split
   in
   if constr.cstr_private = Private then
     begin match constr.cstr_repr with
@@ -9928,10 +9934,17 @@ and type_construct ~overwrite env (expected_mode : expected_mode) loc lid sarg
     | Variant_with_null -> assert false
       (* [Variant_with_null] can't be made private due to [or_null_reexport]. *)
     end;
-  let shape =
-    representation_for_tuple_constructor env constr ty_args ~loc ~jkinds
-      ~containing_type:ty_res
+  let shape, sorts =
+    let types = List.map (fun arg -> arg.exp_type, arg.exp_loc) args in
+    match
+      representation_for_tuple_constructor env constr ty_args ~loc ~types
+        ~containing_type:ty_res ~why:Constructor_arg_assignment
+    with
+    | Ok (shape, sorts) -> shape, sorts
+    | Error (Unrepresentable_arg (loc, ty, err)) ->
+        raise (Error (loc, env, Constructor_arg_value_not_rep(ty, err)))
   in
+  let args = List.combine sorts args in
   (* NOTE: shouldn't we call "re" on this final expression? -- AF *)
   { texp with
     exp_desc = Texp_construct(lid, constr, shape, args, alloc_mode) }
