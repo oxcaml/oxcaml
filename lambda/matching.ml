@@ -2172,7 +2172,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
         layout;
       }
   in
-  let str = add_barrier_to_let_kind ubr Alias in
+  let binding_kind = add_barrier_to_let_kind ubr Alias in
   if cstr.cstr_inlined <> None then
     { arg; binding_kind; mut; sort; layout } :: rem
   else
@@ -2180,7 +2180,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
     | Variant_boxed _ ->
       List.mapi
       (fun i { ca_sort } ->
-         make_field_access str ca_sort ~field:i ~pos:i)
+         make_field_access binding_kind ca_sort ~field:i ~pos:i)
       cstr.cstr_args
         @ rem
     | Variant_unboxed | Variant_with_null ->
@@ -2188,13 +2188,13 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
         rem (* [Null] constructor case. *)
       else
         (* CR sspies: I have low confidence on mutability here. *)
-        { arg; binding_kind = str; mut; sort; layout } :: rem
+        { arg; binding_kind; mut; sort; layout } :: rem
         (* the unboxed variant constructor, or the [This] constructor
            for [Variant_with_null]. *)
     | Variant_extensible ->
         List.mapi
           (fun i { ca_sort } ->
-             make_field_access str ca_sort ~field:i ~pos:(i+1))
+             make_field_access binding_kind ca_sort ~field:i ~pos:(i+1))
           cstr.cstr_args
         @ rem
 
@@ -2218,10 +2218,10 @@ let get_expr_args_variant_nonconst ~scopes head { arg; mut; _ } rem =
   let loc = head_loc ~scopes head in
   let ubr = Translmode.transl_unique_barrier (head.pat_unique_barrier) in
   let field_prim = nonconstant_variant_field ubr 1 in
-  let str = add_barrier_to_let_kind ubr Alias in
-    binding_kind = str;
+  let binding_kind = add_barrier_to_let_kind ubr Alias in
   {
     arg = Lprim (field_prim, [ arg ], loc);
+    binding_kind;
     mut = compose_mut mut Immutable;
     sort = Jkind.Sort.Const.for_variant_arg;
     layout = layout_variant_arg;
@@ -2459,14 +2459,14 @@ let get_expr_args_tuple ~scopes head { arg; mut; _ } rem =
   let arity = Patterns.Head.arity head in
   let ubr = Translmode.transl_unique_barrier (head.pat_unique_barrier) in
   let sem = add_barrier_to_read ubr Reads_agree in
-  let str = add_barrier_to_let_kind ubr Alias in
+  let binding_kind = add_barrier_to_let_kind ubr Alias in
   let rec make_args pos =
     if pos >= arity then
       rem
     else
       {
         arg = Lprim (Pfield (pos, Pointer, sem), [ arg ], loc);
-        binding_kind = str;
+        binding_kind;
         mut = compose_mut mut Immutable;
         sort = Jkind.Sort.Const.for_tuple_element;
         layout = layout_tuple_element;
@@ -3647,8 +3647,8 @@ let combine_extension_constructor value_kind loc arg pat_env pat_barrier partial
           in
           let ubr = Translmode.transl_unique_barrier pat_barrier in
           let sem = add_barrier_to_read ubr Reads_agree in
-          let str = add_barrier_to_let_kind ubr Alias in
-          Llet (str, Lambda.layout_block, tag, tag_duid,
+          let binding_kind = add_barrier_to_let_kind ubr Alias in
+          Llet (binding_kind, Lambda.layout_block, tag, tag_duid,
                 Lprim (Pfield (0, Pointer, sem), [ arg ], loc),
                 tests)
     in
@@ -3794,9 +3794,9 @@ let call_switcher_variant_constr value_kind loc fail arg pat_barrier int_lambda_
   let v = Ident.create_local "variant" in
   let v_duid = Lambda.debug_uid_none in
   let ubr = Translmode.transl_unique_barrier pat_barrier in
-  let str = add_barrier_to_let_kind ubr Alias in
+  let binding_kind = add_barrier_to_let_kind ubr Alias in
   Llet
-    ( str,
+    ( binding_kind,
       Lambda.layout_int,
       v,
       v_duid,
