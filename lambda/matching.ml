@@ -1140,8 +1140,8 @@ type 'a arg = {
       the same position in different branches of the pattern
       matching -- outside the scope of the strict binding generated
       for the mutable read -- may observe a different value. *)
-  sort: Jkind.Sort.Const.t;
-  layout: layout;
+  sort : Jkind.Sort.Const.t;
+  layout : layout;
 }
 
 type args = lambda arg list
@@ -2141,7 +2141,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
       let shape = transl_mixed_product_shape shape in
       let e, layout = lambda_void_of_el shape.(pos) in
       (* CR sspies: I have low confidence on mutability here. *)
-      { arg = e; binding_kind; mut = compose_mut mut Immutable; sort; layout }
+      { arg = e; binding_kind; mut = compose_mut mut Immutable; sort; layout; }
   in
   let make_field_access binding_kind sort ~field:_ ~pos =
     if cstr.cstr_constant then
@@ -2164,8 +2164,13 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
       in
       let layout = Typeopt.layout_of_sort head.pat_loc sort in
       (* CR sspies: I have low confidence on mutability here. *)
-      { arg = Lprim (prim, [ arg ], loc); mut = compose_mut mut Immutable;
-        binding_kind; sort; layout }
+      {
+        arg = Lprim (prim, [ arg ], loc);
+        binding_kind;
+        mut = compose_mut mut Immutable;
+        sort;
+        layout;
+      }
   in
   let str = add_barrier_to_let_kind ubr Alias in
   if cstr.cstr_inlined <> None then
@@ -2209,18 +2214,18 @@ let nonconstant_variant_field ubr index =
   let sem = add_barrier_to_read ubr Reads_agree in
   Lambda.Pfield(index, Pointer, sem)
 
-let get_expr_args_variant_nonconst ~scopes head { arg; mut; _ }
-      rem =
+let get_expr_args_variant_nonconst ~scopes head { arg; mut; _ } rem =
   let loc = head_loc ~scopes head in
   let ubr = Translmode.transl_unique_barrier (head.pat_unique_barrier) in
   let field_prim = nonconstant_variant_field ubr 1 in
   let str = add_barrier_to_let_kind ubr Alias in
-  { arg = Lprim (field_prim, [ arg ], loc);
     binding_kind = str;
+  {
+    arg = Lprim (field_prim, [ arg ], loc);
     mut = compose_mut mut Immutable;
     sort = Jkind.Sort.Const.for_variant_arg;
-    layout = layout_variant_arg }
-  :: rem
+    layout = layout_variant_arg;
+  } :: rem
 
 let divide_variant ~scopes row ctx { cases = cl; args; default = def } =
   let rec divide = function
@@ -2425,7 +2430,7 @@ let get_expr_args_lazy ~scopes head { arg; mut; _ } rem =
     (* A lazy pattern is considered immutable, forcing its argument
        always returns the same value. *)
     sort = Jkind.Sort.Const.for_lazy_body;
-    layout = layout_lazy_contents
+    layout = layout_lazy_contents;
   } :: rem
 
 let divide_lazy ~scopes head ctx pm =
@@ -2464,12 +2469,12 @@ let get_expr_args_tuple ~scopes head { arg; mut; _ } rem =
         binding_kind = str;
         mut = compose_mut mut Immutable;
         sort = Jkind.Sort.Const.for_tuple_element;
-        layout = layout_tuple_element
+        layout = layout_tuple_element;
       } :: make_args (pos + 1)
   in
   make_args 0
 
-let get_expr_args_unboxed_tuple ~scopes shape head { arg; mut; _} rem =
+let get_expr_args_unboxed_tuple ~scopes shape head { arg; mut; _ } rem =
   let loc = head_loc ~scopes head in
   let shape =
     List.map (fun (_, sort) ->
@@ -2487,9 +2492,8 @@ let get_expr_args_unboxed_tuple ~scopes shape head { arg; mut; _} rem =
       binding_kind = Alias;
       mut = compose_mut mut Immutable; (* CR sspies: This or immutable? *)
       sort;
-      layout
-    })
-    shape
+      layout;
+    }) shape
   @ rem
 
 let divide_tuple ~scopes head ctx pm =
@@ -2598,13 +2602,13 @@ let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
         binding_kind;
         mut = compose_mut mut
           (if Types.is_mutable lbl.lbl_mut then Mutable else Immutable);
-        sort; layout
+        sort;
+        layout;
       } :: make_args (pos + 1)
   in
   make_args 0
 
-let get_expr_args_record_unboxed_product ~scopes head
-      { arg; mut; _} rem =
+let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
   let loc = head_loc ~scopes head in
   let all_labels =
     let open Patterns.Head in
@@ -2706,7 +2710,7 @@ let get_expr_args_array ~scopes kind head { arg; mut; _ } rem =
         mut =
           compose_mut mut (if Types.is_mutable am then Mutable else Immutable);
         sort = arg_sort;
-        layout = result_layout
+        layout = result_layout;
       } :: make_args (pos + 1)
   in
   make_args 0
@@ -3720,7 +3724,8 @@ let combine_regular_constructor value_kind loc arg cstr partial
                (typically the constant cases are dense, so
                call_switcher will generate a Lswitch, still one
                instruction.) *)
-            call_switcher value_kind loc fail_opt arg ~low:0 ~high:(n - 1) consts
+            call_switcher value_kind loc fail_opt arg
+              ~low:0 ~high:(n - 1) consts
         | n, _, _, _, None -> (
             let act0 =
               (* = Some act when all non-const constructors match to act *)
@@ -3751,7 +3756,8 @@ let combine_regular_constructor value_kind loc arg cstr partial
                    *)
                 Lifthenelse
                   ( Lprim (Pisint { variant_only = true }, [ arg ], loc),
-                    call_switcher value_kind loc fail_opt arg ~low:0 ~high:(n - 1) consts,
+                    call_switcher value_kind loc fail_opt arg
+                      ~low:0 ~high:(n - 1) consts,
                     act, value_kind )
             | None ->
                 (* In the general case, emit a switch. *)
@@ -4165,7 +4171,6 @@ and compile_match_simplified ~scopes value_kind repr partial ctx
   let first_match, rem = split_and_precompile_simplified m in
   combine_handlers value_kind ~scopes repr partial ctx first_match rem
 
-
 (* Note on [compute_arg_partial].
 
    Partiality information is provided by the
@@ -4544,14 +4549,16 @@ let root_arg arg binding_kind sort layout =
      immutable. *)
   { arg; binding_kind; mut = Immutable; sort; layout }
 
-let compile_matching ~scopes ~arg_sort ~arg_layout ~return_layout loc ~failer repr arg pat_act_list partial =
+let compile_matching ~scopes ~arg_sort ~arg_layout ~return_layout loc ~failer
+      repr arg pat_act_list partial =
   let args = [ root_arg arg Strict arg_sort arg_layout ] in
   let rows = map_on_rows (fun pat -> (pat, [])) pat_act_list in
   let handler =
     toplevel_handler ~scopes ~return_layout loc ~failer partial args rows
   in
   handler (fun partial pm ->
-    compile_match_nonempty ~scopes return_layout repr partial (Context.start 1) pm
+    compile_match_nonempty
+      ~scopes return_layout repr partial (Context.start 1) pm
   )
 
 let for_function ~scopes ~arg_sort ~arg_layout ~return_layout loc repr param
@@ -4584,8 +4591,8 @@ let simple_for_let ~scopes ~arg_sort ~return_layout loc param pat body =
   let arg_layout =
     Typeopt.layout pat.pat_env pat.pat_loc arg_sort pat.pat_type
   in
-  compile_matching ~scopes ~arg_sort ~arg_layout ~return_layout loc ~failer:Raise_match_failure
-    None param [ (pat, body) ] Partial
+  compile_matching ~scopes ~arg_sort ~arg_layout ~return_layout loc
+    ~failer:Raise_match_failure None param [ (pat, body) ] Partial
 
 (* Optimize binding of immediate tuples
 
@@ -4870,8 +4877,8 @@ let compile_flattened ~scopes value_kind repr partial ctx pmh =
         (compile_match ~scopes value_kind repr partial)
         lam total ctx hs
 
-let do_for_multiple_match ~scopes  ~return_layout loc idl mode pat_act_list partial =
-    (* CR layouts v5: This function is called in cases where the scrutinee of a
+let do_for_multiple_match ~scopes ~return_layout loc idl mode pat_act_list partial =
+  (* CR layouts v5: This function is called in cases where the scrutinee of a
      match is a literal tuple (e.g., [match e1, e2, e3 with ...]).  The
      typechecker treats the scrutinee here like any other tuple, so it's fine to
      assume the whole thing and the elements have sort value.  That will change
