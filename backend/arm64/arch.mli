@@ -86,7 +86,7 @@ val size_vec512 : int
 val allow_unaligned_access : bool
 
 (* Whether Ocaml provides shift operations where the shift amount is interpreted
-   module bitwidth. *)
+   modulo bitwidth. *)
 
 val ocaml_shifts_are_wrapping : bool
 
