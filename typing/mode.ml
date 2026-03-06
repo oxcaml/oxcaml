@@ -3287,10 +3287,7 @@ module Comonadic_with (Areality : Areality) = struct
         P Yielding;
         P Statefulness ]
       |> List.sort (fun (P ax1) (P ax2) ->
-          match compare ax1 ax2 with
-          | Less_than -> -1
-          | Equal -> 0
-          | Greater_than -> 1)
+          Misc.comparison_result (compare ax1 ax2))
   end
 
   let proj_obj ax = (C.proj_obj [@inlined hint]) ax Obj.obj
@@ -3434,10 +3431,7 @@ module Monadic = struct
     let all =
       [P Uniqueness; P Contention; P Visibility; P Staticity]
       |> List.sort (fun (P ax1) (P ax2) ->
-          match compare ax1 ax2 with
-          | Less_than -> -1
-          | Equal -> 0
-          | Greater_than -> 1)
+          Misc.comparison_result (compare ax1 ax2))
   end
 
   let proj_obj ax = (C.proj_obj [@inlined hint]) ax Obj.obj
@@ -3598,10 +3592,7 @@ module Value_with (Areality : Areality) = struct
           (fun (Comonadic.Axis.P ax) -> P (Comonadic ax))
           Comonadic.Axis.all
       |> List.sort (fun (P ax1) (P ax2) ->
-          match compare ax1 ax2 with
-          | Less_than -> -1
-          | Equal -> 0
-          | Greater_than -> 1)
+          Misc.comparison_result (compare ax1 ax2))
   end
 
   let proj_obj : type a. a Axis.t -> a C.obj = function

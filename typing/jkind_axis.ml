@@ -309,9 +309,9 @@ module Per_axis = struct
     let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
      fun a b ->
       match a, b with
-      | Externality, Externality -> Some Misc.Refl
-      | Nullability, Nullability -> Some Misc.Refl
-      | Separability, Separability -> Some Misc.Refl
+      | Externality, Externality -> Some Refl
+      | Nullability, Nullability -> Some Refl
+      | Separability, Separability -> Some Refl
       | _ -> None
 
     let compare_obj : type a b. a t -> b t -> (a, b) Misc.comparison =

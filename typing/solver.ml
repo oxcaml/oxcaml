@@ -250,11 +250,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
         match C.compare_obj obj1 obj2 with
         | Less_than -> 1
         | Greater_than -> -1
-        | Equal -> (
-          match C.compare_morph obj1 m1 m2 with
-          | Less_than -> 1
-          | Greater_than -> -1
-          | Equal -> 0)
+        | Equal -> Misc.comparison_result (C.compare_morph obj1 m1 m2)
   end)
 
   (** Map the function to the list, and returns the first [Error] found; Returns
@@ -770,7 +766,7 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
     ||
     match C.equal_morph dst f0 f1 with
     | None -> false
-    | Some Misc.Refl -> v0 == v1
+    | Some Refl -> v0 == v1
 
   let submode_mvmv (type a) ~log (pp : H.Pinpoint.t) (dst : a C.obj)
       (Amorphvar (v, f, f_hint) as mv) (Amorphvar (u, g, g_hint) as mu) =
