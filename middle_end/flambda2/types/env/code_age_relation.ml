@@ -28,40 +28,47 @@ let get_older_version_of t code_id = Code_id.Map.find_opt code_id t
 
 let add t ~newer ~older = Code_id.Map.add newer older t
 
-let rec all_ids_up_to_root0 t ~resolver id all_ids_so_far =
-  if Code_id.Set.mem id all_ids_so_far
-  then all_ids_so_far
+let rec has_older_version_in t ~resolver id candidates : _ Or_unknown.t =
+  if Code_id.Set.mem id candidates
+  then Known true
   else
-    let all_ids_so_far = Code_id.Set.add id all_ids_so_far in
     match Code_id.Map.find id t with
     | exception Not_found -> (
       let comp_unit = Code_id.get_compilation_unit id in
       if Compilation_unit.equal comp_unit (Compilation_unit.get_current_exn ())
-      then all_ids_so_far
+      then Known false
       else
         match resolver comp_unit with
         | exception _ ->
           Misc.fatal_errorf "Exception in resolver@ Backtrace is: %s"
             (Printexc.raw_backtrace_to_string (Printexc.get_raw_backtrace ()))
-        | None -> all_ids_so_far
+        | None -> Unknown
         | Some t -> (
           (* Inlining the base case, so that we do not recursively loop in case
              of a code_id that is not bound in the map *)
           match Code_id.Map.find id t with
-          | exception Not_found -> all_ids_so_far
-          | older -> all_ids_up_to_root0 t ~resolver older all_ids_so_far))
-    | older -> all_ids_up_to_root0 t ~resolver older all_ids_so_far
-
-let all_ids_up_to_root t ~resolver id =
-  all_ids_up_to_root0 t ~resolver id Code_id.Set.empty
+          | exception Not_found -> Known false
+          | older -> has_older_version_in t ~resolver older candidates))
+    | older -> has_older_version_in t ~resolver older candidates
 
 let meet_set t ~resolver ids1 ids2 : _ Or_bottom.t =
   if Code_id.Set.equal ids1 ids2
   then Ok ids1
   else
+    (* We are trying to keep a reasonably precise set of the code ids that can
+       actually be called, in order to avoid de-optimizing to a single direct
+       call.
+
+       The typical case is that we could meet { A, A1, A2 } with { A3, A4 }
+       where A1, A2, A3, A4 are newer versions of A, in which case we want the
+       output to be { A3, A4 } (from the second set, only newer versions of A3
+       and A4 are possible, which excludes newer versions of A1 and A2).
+
+       Returning { A } would be correct, but imprecise. *)
     let should_keep_id other_ids id =
-      let ids_to_root = all_ids_up_to_root t ~resolver id in
-      not (Code_id.Set.disjoint ids_to_root other_ids)
+      match has_older_version_in t ~resolver id other_ids with
+      | Known has_older_version_in_other_ids -> has_older_version_in_other_ids
+      | Unknown -> true
     in
     let ids =
       Code_id.Set.union
@@ -70,22 +77,28 @@ let meet_set t ~resolver ids1 ids2 : _ Or_bottom.t =
     in
     if Code_id.Set.is_empty ids then Bottom else Ok ids
 
-let _num_ids_up_to_root t ~resolver id =
-  Code_id.Set.cardinal (all_ids_up_to_root t ~resolver id)
-
-let meet t ~resolver id1 id2 : _ Or_bottom.t =
+let meet t ~resolver id1 id2 : _ Or_unknown_or_bottom.t =
   (* Whichever of [id1] and [id2] is newer (or the same as the other one), in
      the case where they are comparable; otherwise bottom. *)
   if Code_id.equal id1 id2
   then Ok id1
   else
-    let id1_to_root = all_ids_up_to_root t ~resolver id1 in
-    let id2_to_root = all_ids_up_to_root t ~resolver id2 in
-    if Code_id.Set.mem id1 id2_to_root
-    then Ok id2
-    else if Code_id.Set.mem id2 id1_to_root
-    then Ok id1
-    else Bottom
+    match
+      ( has_older_version_in t ~resolver id2 (Code_id.Set.singleton id1),
+        has_older_version_in t ~resolver id1 (Code_id.Set.singleton id2) )
+    with
+    | Known true, _ ->
+      (* id1 is an older version of id2 -> id2 is more precise *)
+      Ok id2
+    | _, Known true ->
+      (* id2 is an older version of id1 -> id1 is more precise *)
+      Ok id1
+    | Known false, Known false ->
+      (* id1 and id2 are definitely not related *)
+      Bottom
+    | Unknown, _ | _, Unknown ->
+      (* can't determine whether id1 and id2 are related *)
+      Unknown
 
 let union t1 t2 = Code_id.Map.disjoint_union ~eq:Code_id.equal t1 t2
 

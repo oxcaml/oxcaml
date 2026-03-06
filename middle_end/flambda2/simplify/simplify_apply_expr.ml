@@ -880,7 +880,10 @@ let simplify_direct_function_call ~simplify_expr dacc apply
   | Ok callee's_code_ids ->
     let callee's_code_id =
       (* XXX: go to indirect_known_arity if there are multiple code ids even
-         with the types. *)
+         with the types.
+
+         bclement: We need to be careful not to prevent inlining by doing
+         this. *)
       match Code_id.Set.get_singleton callee's_code_ids with
       | Some callee's_code_id -> callee's_code_id
       | None -> callee's_code_id_from_type
