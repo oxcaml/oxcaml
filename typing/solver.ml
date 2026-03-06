@@ -2078,5 +2078,110 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
             submode_mvmv H.Pinpoint.unknown obj ~log:None mu mv |> Result.get_ok)
           mvs;
         allow_left (Amodevar mu), true
+
+  (** Exposed description of mode variables, used for printing generic mode
+      variables *)
+  module Desc = struct
+    module Var = struct
+      type 'a t = 'a var
+
+      type ('b, 'd) t_with_morph =
+        | Amorphvar : 'a t * ('a, 'b, 'd) C.morph -> ('b, 'd) t_with_morph
+
+      module Head = struct
+        type 'a t =
+          { desc_id : int;
+            desc_upper : 'a;
+            desc_lower : 'a;
+            desc_vlower : ('a, left_only) t_with_morph list;
+            desc_level : int
+          }
+
+        let equal v1 v2 = v1.desc_id = v2.desc_id
+
+        let hash v = Hashtbl.hash v.desc_id
+      end
+
+      let force : 'a C.obj -> 'a var -> 'a Head.t =
+       fun obj v ->
+        let desc_id = v.id in
+        let desc_lower =
+          get_floor obj
+            (Amodevar (Amorphvar (v, C.id, Comp_hint.Morph_hint.Id)))
+        in
+        let desc_upper =
+          get_ceil obj (Amodevar (Amorphvar (v, C.id, Comp_hint.Morph_hint.Id)))
+        in
+        (* let desc_lower = v.lower in
+          let desc_upper = v.upper in *)
+        let desc_vlower =
+          let f (Amorphvar (a, f, _) : _ morphvar) = Amorphvar (a, f) in
+          let vlower = VarMap.map f v.vlower in
+          var_map_to_list vlower
+        in
+        let desc_level = v.level in
+        { desc_id; desc_lower; desc_upper; desc_vlower; desc_level }
+    end
+
+    type ('b, 'd) morphvar =
+      | Amorphvar : 'a Var.Head.t * ('a, 'b, 'd) C.morph -> ('b, 'd) morphvar
+
+    type ('a, 'd) t =
+      | Amode : 'a -> ('a, 'l * 'r) t
+      | Amodevar : ('a, 'd) morphvar -> ('a, 'd) t
+      | Amodejoin :
+          'a * ('a, 'l * disallowed) morphvar list
+          -> ('a, 'l * disallowed) t
+      | Amodemeet :
+          'a * ('a, disallowed * 'r) morphvar list
+          -> ('a, disallowed * 'r) t
+
+    let print_var : type a. a C.obj -> Fmt.formatter -> a Var.Head.t -> unit =
+     fun obj ppf { desc_id; desc_upper; desc_lower; desc_level } ->
+      Fmt.fprintf ppf "%x<%d>[%a--%a]" desc_id desc_level (C.print obj)
+        desc_lower (C.print obj) desc_upper
+
+    let print_morphvar : type a l r.
+        a C.obj -> Fmt.formatter -> (a, l * r) morphvar -> unit =
+     fun dst ppf mv ->
+      let (Amorphvar (v, f)) = mv in
+      let src = C.src dst f in
+      Fmt.fprintf ppf "%a(%a)" (C.print_morph dst) f (print_var src) v
+
+    let print : type a l r. a C.obj -> Fmt.formatter -> (a, l * r) t -> unit =
+     fun obj ppf m ->
+      match m with
+      | Amode a -> C.print obj ppf a
+      | Amodevar mv -> print_morphvar obj ppf mv
+      | Amodejoin (a, mvs) ->
+        Fmt.fprintf ppf "join(%a,%a)" (C.print obj) a
+          (Fmt.pp_print_list
+             ~pp_sep:(fun ppf () -> Fmt.fprintf ppf ",")
+             (print_morphvar obj))
+          mvs
+      | Amodemeet (a, mvs) ->
+        Fmt.fprintf ppf "meet(%a,%a)" (C.print obj) a
+          (Fmt.pp_print_list
+             ~pp_sep:(fun ppf () -> Fmt.fprintf ppf ",")
+             (print_morphvar obj))
+          mvs
+  end
+
+  let desc_morphvar : type a l r.
+      a C.obj -> (a, l * r) morphvar -> (a, l * r) Desc.morphvar =
+   fun dst (Amorphvar (v, f, _)) ->
+    let src = C.src dst f in
+    let v = Desc.Var.force src v in
+    Desc.Amorphvar (v, f)
+
+  let desc : type a l r. a C.obj -> (a, l * r) mode -> (a, l * r) Desc.t =
+   fun dst m ->
+    match m with
+    | Amode (a, _, _) -> Desc.Amode a
+    | Amodevar mv -> Desc.Amodevar (desc_morphvar dst mv)
+    | Amodejoin (a, _, mvs) ->
+      Desc.Amodejoin (a, var_map_to_list (VarMap.map (desc_morphvar dst) mvs))
+    | Amodemeet (a, _, mvs) ->
+      Desc.Amodemeet (a, var_map_to_list (VarMap.map (desc_morphvar dst) mvs))
 end
 [@@inline always]
