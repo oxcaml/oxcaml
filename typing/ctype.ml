@@ -1415,6 +1415,7 @@ let new_local_type ?(loc = Location.none) ?manifest_and_scope origin jkind =
     type_arity = 0;
     type_kind = Type_abstract origin;
     type_jkind = Jkind.disallow_right jkind;
+    type_ikind = Types.ikinds_todo "new_local_type";
     type_private = Public;
     type_manifest = manifest;
     type_variance = [];
@@ -2415,7 +2416,53 @@ let mk_is_abstract env p =
   -> false
 
 let mk_jkind_context env jkind_of_type =
-  { Jkind.jkind_of_type; is_abstract = mk_is_abstract env }
+  let lookup_type p =
+    match Env.find_type p env with
+    | decl -> Some decl
+    | exception Not_found -> None
+  in
+  let debug_print_env ppf =
+    (* Print a bounded snapshot of types in the environment *)
+    let max_items = 120 in
+    let count = ref 0 in
+    let items = ref [] in
+    let add_item name path (decl : Types.type_declaration) acc =
+      if !count < max_items then begin
+        incr count;
+        items := (name, path, decl) :: !items
+      end;
+      acc
+    in
+    ignore (Env.fold_types add_item None env ());
+    let pp_kind ppf (decl : Types.type_declaration) =
+      match decl.type_kind, decl.type_manifest with
+      | Types.Type_abstract _, None -> Format.fprintf ppf "abstract"
+      | Types.Type_abstract _, Some _ -> Format.fprintf ppf "abbrev"
+      | Types.Type_variant _, _ -> Format.fprintf ppf "variant"
+      | Types.Type_record _, _ -> Format.fprintf ppf "record"
+      | Types.Type_record_unboxed_product _, _ ->
+        Format.fprintf ppf "record(unboxed)"
+      | Types.Type_open, _ -> Format.fprintf ppf "open"
+    in
+    let pp_item ppf (name, path, decl) =
+      Format.fprintf ppf "- %s (%a): %a"
+        name (Format_doc.compat Path.print) path pp_kind decl
+    in
+    let items = List.rev !items in
+    Format.fprintf ppf
+      "@[<v2>Environment types (showing %d/%d):@,%a@]@."
+      (List.length items)
+      !count
+      (Format.pp_print_list
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,")
+         pp_item)
+      items
+  in
+  { Jkind.jkind_of_type;
+    is_abstract = mk_is_abstract env;
+    lookup_type;
+    debug_print_env;
+  }
 
 (* We parameterize [estimate_type_jkind] by a function
    [expand_component] because some callers want expansion of types and others
@@ -2634,10 +2681,29 @@ let constrain_type_jkind ~fixed env ty jkind =
       loop ~fuel ~expanded:false t ty's_jkind jkind
 
     | _ ->
-       match
-         Jkind.sub_or_intersect ~type_equal ~context ~level:!current_level env
+       if !Clflags.ikinds_debug
+       then
+         Format.eprintf
+           "@[<v>[ikind-ctype] constrain_type_jkind: sub_or_intersect call@,\
+            [ikind-ctype]   lhs(ty_jkind)=%a@,\
+            [ikind-ctype]   rhs(bound)=%a@]@."
+           (Format_doc.compat (Jkind.format env))
+           ty's_jkind
+           (Format_doc.compat (Jkind.format env))
+           jkind;
+       let sub_result =
+         Ikind.sub_or_intersect ~type_equal ~context ~level:!current_level env
            ty's_jkind jkind
-       with
+       in
+       if !Clflags.ikinds_debug
+       then
+         Format.eprintf
+           "[ikind-ctype] constrain_type_jkind: sub_or_intersect=%s@."
+           (match sub_result with
+            | Sub -> "Sub"
+            | Disjoint _ -> "Disjoint"
+            | May_have_intersection _ -> "May_have_intersection");
+       match sub_result with
        | Sub -> Ok ()
        | Disjoint sub_failure_reasons ->
           (* Reporting that [ty's_jkind] must be a subjkind of [jkind] is not
@@ -2651,7 +2717,49 @@ let constrain_type_jkind ~fixed env ty jkind =
           Error (Jkind.Violation.of_ ~context env
                    (Not_a_subjkind (ty's_jkind, jkind,
                                     Nonempty_list.to_list sub_failure_reasons)))
-       | May_have_intersection sub_failure_reasons ->
+        | May_have_intersection sub_failure_reasons ->
+           if !Clflags.ikinds_debug
+           then begin
+             let verbosity =
+               Jkind.Format_verbosity.Expanded_with_all_mod_bounds
+             in
+             Format.eprintf
+               "@[<v>[ikind-ctype] constrain_type_jkind: may_intersect \
+                reasons=[%s]@,\
+                [ikind-ctype]   lhs(verbose)=%a@,\
+                [ikind-ctype]   rhs(verbose)=%a@,\
+                [ikind-ctype]   lhs.mod_bounds=%a@,\
+                [ikind-ctype]   rhs.mod_bounds=%a@,\
+                [ikind-ctype]   lhs.with_bounds=%a@,\
+                [ikind-ctype]   rhs.with_bounds=%a@]@."
+               (String.concat ", "
+                  (List.map
+                     (fun (reason : Jkind.Sub_failure_reason.t) ->
+                        match reason with
+                        | Axis_disagreement (Jkind_axis.Axis.Pack axis) ->
+                          "Axis_disagreement("
+                          ^ Jkind_axis.Axis.name axis
+                          ^ ")"
+                        | Layout_disagreement -> "Layout_disagreement"
+                        | With_bounds_on_left -> "With_bounds_on_left"
+                        | Constrain_ran_out_of_fuel ->
+                          "Constrain_ran_out_of_fuel")
+                     (Misc.Nonempty_list.to_list sub_failure_reasons)))
+               (Format_doc.compat
+                  (Jkind.format_verbose ~verbosity env))
+               ty's_jkind
+               (Format_doc.compat
+                  (Jkind.format_verbose ~verbosity env))
+               jkind
+               Jkind.Mod_bounds.debug_print
+               ty's_jkind.jkind.mod_bounds
+               Jkind.Mod_bounds.debug_print
+               jkind.jkind.mod_bounds
+               Jkind.With_bounds.debug_print
+               ty's_jkind.jkind.with_bounds
+               Jkind.With_bounds.debug_print
+               jkind.jkind.with_bounds;
+           end;
            let sub_failure_reasons = Nonempty_list.to_list sub_failure_reasons in
            let product ~fuel tys =
              let num_components = List.length tys in
@@ -5360,7 +5468,7 @@ let zap_modalities_to_floor_if_at_least level =
 
 let crossing_of_jkind env jkind =
   let context = mk_jkind_context_check_principal env in
-  Jkind.get_mode_crossing ~context env jkind
+  Ikind.crossing_of_jkind ~context env jkind
 
 let crossing_of_ty env ?modalities ty =
   let crossing =
@@ -7454,6 +7562,7 @@ let rec nondep_type_decl env mid is_covariant decl =
       type_arity = decl.type_arity;
       type_kind = tk;
       type_jkind = jkind;
+      type_ikind = Types.ikinds_todo "nondep_type_decl";
       type_manifest = tm;
       type_private = priv;
       type_variance = decl.type_variance;
@@ -7705,8 +7814,10 @@ let check_decl_jkind env decl jkind =
     | _ -> decl.type_jkind
   in
   match
-    Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level env
-      decl_jkind jkind
+    Ikind.sub_jkind_l
+      ~origin:
+        (Format.asprintf "ctype:decl %a" Location.print_loc decl.type_loc)
+      ~type_equal ~context ~level:!current_level env decl_jkind jkind
   with
   | Ok () -> Ok ()
   | Error _ as err ->
@@ -7715,8 +7826,11 @@ let check_decl_jkind env decl jkind =
     | Some ty ->
       let ty_jkind = type_jkind env ty in
       match
-        Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level env
-          ty_jkind jkind
+        Ikind.sub_jkind_l
+          ~origin:
+            (Format.asprintf "ctype:manifest %a"
+               Location.print_loc decl.type_loc)
+          ~type_equal ~context ~level:!current_level env ty_jkind jkind
       with
       | Ok () -> Ok ()
       | Error _ as err -> err
@@ -7728,12 +7842,15 @@ let constrain_decl_jkind env decl jkind =
   (* This case is sad, because it can't refine type variables. Hence
      the need for reimplementation. Hopefully no one hits this for
      a while. *)
-  | None -> check_decl_jkind env decl jkind
+  | None ->
+    check_decl_jkind env decl jkind
   | Some jkind ->
     let type_equal = type_equal env in
     let context = mk_jkind_context_always_principal env in
     match
-      Jkind.sub_or_error ~type_equal ~context ~level:!current_level env
+      (* Use Ikind when enabled so axis constraints are checked; it falls
+         back to [Jkind.sub_or_error] when ikinds are disabled. *)
+      Ikind.sub_or_error ~type_equal ~context ~level:!current_level env
         decl.type_jkind jkind
     with
     | Ok () as ok -> ok

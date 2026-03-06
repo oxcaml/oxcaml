@@ -83,6 +83,61 @@ val mutable_mode : ('l * 'r) Mode.Value.Comonadic.t -> ('l * 'r) Mode.Value.t
     Note on mutability: TBD.
  *)
 
+(** The mod-bounds of a jkind *)
+module Jkind_mod_bounds : sig
+  module Crossing = Mode.Crossing
+  module Externality = Jkind_axis.Externality
+  module Nullability = Jkind_axis.Nullability
+  module Separability = Jkind_axis.Separability
+
+  type t
+
+  val create :
+    Crossing.t->
+    externality:Externality.t ->
+    nullability:Nullability.t ->
+    separability:Separability.t ->
+    t
+
+  val crossing : t -> Crossing.t
+  val externality : t -> Externality.t
+  val nullability : t -> Nullability.t
+  val separability : t -> Separability.t
+
+  val set_crossing : Crossing.t -> t -> t
+  val set_externality : Externality.t -> t -> t
+  val set_nullability : Nullability.t -> t -> t
+  val set_separability : Separability.t -> t -> t
+
+  (** [set_max_in_set bounds axes] sets all the axes in [axes] to their [max]
+      within [bounds]. *)
+  val set_max_in_set : t -> Jkind_axis.Axis_set.t -> t
+
+  (** [set_min_in_set bounds axes] sets all the axes in [axes] to their [min]
+      within [bounds]. *)
+  val set_min_in_set : t -> Jkind_axis.Axis_set.t -> t
+
+  (** [is_max_within_set bounds axes] returns whether all the axes in [axes]
+      are [max] within [bounds]. *)
+  val is_max_within_set : t -> Jkind_axis.Axis_set.t -> bool
+  val is_max : t -> bool
+
+  val areality_const : t -> Mode.Regionality.Const.t
+  val linearity_const : t -> Mode.Linearity.Const.t
+  val uniqueness_const : t -> Mode.Uniqueness.Const.t
+  val portability_const : t -> Mode.Portability.Const.t
+  val contention_const : t -> Mode.Contention.Const.t
+  val forkable_const : t -> Mode.Forkable.Const.t
+  val yielding_const : t -> Mode.Yielding.Const.t
+  val statefulness_const : t -> Mode.Statefulness.Const.t
+  val visibility_const : t -> Mode.Visibility.Const.t
+  val staticity_const : t -> Mode.Staticity.Const.t
+  val to_axis_lattice : t -> Axis_lattice.t
+  val of_axis_lattice : Axis_lattice.t -> t
+
+  val debug_print : Format.formatter -> t -> unit
+end
+
 (** Information tracked about an individual type within the with-bounds for a jkind *)
 module With_bounds_type_info : sig
   (** The axes that the with-bound applies to *)
@@ -91,11 +146,68 @@ module With_bounds_type_info : sig
   val join : t -> t -> t
 end
 
+(** Types shared by ikind algorithms. *)
+module Rigid_name : sig
+  type unknown_id
+
+  type t =
+    | Atom of
+        { constr : Path.t;
+          arg_index : int
+          (** [arg_index] = 0 refers to the base contribution, and subsequent
+              indices refer to the coefficients of the i-th argument. This
+              is a positional index, not a type-variable id. *)
+        }
+    | KAtom of Path.t
+        (** A jkind-atom path. Unlike [Atom], this refers to a jkind alias
+            path and should be interpreted through jkind lookup in an
+            environment when possible. *)
+    | Param of int
+        (** [Param id] only occurs in formulas for type constructors. Refers to
+            a type-parameter of the constructor, where [id] is the
+            [Types.get_id] of the type variable representing the parameter. *)
+    | Unknown of unknown_id
+        (** An unknown quantity with a given id. Used to model not-best in
+            ikinds. This is used when we couldn't compute a precise ikind,
+            e.g. for a polymorphic variant with conjunctive type --
+            `Constr of (a & b & ...) *)
+
+  (** Ordering on rigid names used in the LDD to order the nodes. *)
+  val compare : t -> t -> int
+
+  val to_string : t -> string
+
+  val atomic : Path.t -> int -> t
+
+  val katom : Path.t -> t
+
+  val param : int -> t
+
+  val unknown : Shape.Uid.t -> t
+
+end
+
+module Ldd : Ldd_intf.S with module Name = Rigid_name
+
 type type_expr
 type row_desc
 type row_field
 type field_kind
 type commutable
+
+type constructor_ikind =
+  { base : Ldd.node;
+    coeffs : Ldd.node array;
+    (** Invariant: [coeffs] are in subtract-normal form, i.e.
+    [coeffs.(i)] is disjoint from [base]. *)
+  }
+
+
+type constructor_ikind_entry =
+  | Constructor_ikind of constructor_ikind
+  | No_constructor_ikind of string
+
+type type_ikind = constructor_ikind_entry
 
 and type_desc =
   | Tvar of { name : string option; jkind : jkind_lr }
@@ -381,6 +493,17 @@ and jkind_declaration =
     jkind_loc : Location.t
   }
 
+val ikinds_todo : string -> type_ikind
+
+module Ikind_substitution : sig
+  type lookup_result =
+    | Lookup_identity
+    | Lookup_path of Path.t
+    | Lookup_type_fun of type_expr list * type_expr
+
+  val substitute_decl_ikind_with_lookup :
+    (lookup:(Path.t -> lookup_result) -> type_ikind -> type_ikind) ref
+end
 (* A map from [type_expr] to [With_bounds_type_info.t], specifically defined with a
    (best-effort) semantic comparison function on types to be used in the with-bounds of a
    jkind.
@@ -769,6 +892,10 @@ type type_declaration =
        the jkind stored here might be a subjkind of the jkind that would
        be computed from the decl kind. This happens in
        Ctype.add_jkind_equation. *)
+
+    type_ikind: constructor_ikind_entry;
+    (* Cached constructor ikind polynomial (opaque) populated when jkinds are
+       normalized under [-ikinds]; carries a reason when absent. *)
 
     type_private: private_flag;
     type_manifest: type_expr option;

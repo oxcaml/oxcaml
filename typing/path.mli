@@ -66,6 +66,7 @@ val is_unboxed_version : t -> bool
 
 val same: t -> t -> bool
 val compare: t -> t -> int
+val hash: t -> int
 val compare_extra: extra_ty -> extra_ty -> int
 val find_free_opt: Ident.t list -> t -> Ident.t option
 val exists_free: Ident.t list -> t -> bool
@@ -86,3 +87,4 @@ val is_constructor_typath: t -> bool
 
 module Map : Map.S with type key = t
 module Set : Set.S with type elt = t
+module Tbl : Hashtbl.S with type key = t

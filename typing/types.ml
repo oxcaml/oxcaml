@@ -18,6 +18,79 @@
 open Allowance
 open Asttypes
 
+module Rigid_name = struct
+  type unknown_id = Shape.Uid.t
+
+  type t =
+    | Atom of
+        { constr : Path.t;
+          arg_index : int
+        }
+    | KAtom of Path.t
+    | Param of int
+    | Unknown of unknown_id
+
+  let compare a b =
+    if a == b
+    then 0
+    else
+      match a, b with
+      | Atom a1, Atom a2 ->
+        let h = Path.compare a1.constr a2.constr in
+        if h != 0 then h else Int.compare a1.arg_index a2.arg_index
+      | KAtom p1, KAtom p2 -> Path.compare p1 p2
+      | Param x, Param y -> Int.compare x y
+      | Atom _, _ -> -1
+      | _, Atom _ -> 1
+      | KAtom _, _ -> -1
+      | _, KAtom _ -> 1
+      | Unknown x, Unknown y -> Shape.Uid.compare x y
+      | Unknown _, _ -> 1
+      | _, Unknown _ -> -1
+
+  let to_string = function
+    | Atom { constr; arg_index } ->
+      let constr_s = Format_doc.asprintf "%a" Path.print constr in
+      Printf.sprintf "%s.%d" constr_s arg_index
+    | KAtom path ->
+      let path_s = Format_doc.asprintf "%a" Path.print path in
+      Printf.sprintf "katom[%s]" path_s
+    | Param i -> Printf.sprintf "param[%d]" i
+    | Unknown id ->
+      Format.asprintf "unknown[%a]" Shape.Uid.print id
+
+  let atomic constr arg_index = Atom { constr; arg_index }
+
+  let katom path = KAtom path
+
+  let param i = Param i
+
+  let unknown uid = Unknown uid
+end
+
+module Ldd = struct
+  module Name = Rigid_name
+
+  include (Ldd.Make (Rigid_name) :
+             Ldd_intf.S with module Name := Rigid_name)
+end
+
+type constructor_ikind =
+  { base : Ldd.node;
+    coeffs : Ldd.node array;
+  }
+
+type constructor_ikind_entry =
+  | Constructor_ikind of constructor_ikind
+  | No_constructor_ikind of string
+
+type type_ikind = constructor_ikind_entry
+
+let ikinds_todo (message : string) : type_ikind =
+  if !Clflags.ikinds_debug then
+    Format.eprintf "[ikinds-todo] %s@." message;
+  No_constructor_ikind message
+
 type atomic =
   | Nonatomic
   | Atomic
@@ -53,6 +126,317 @@ type mod_bounds =
     nullability: Jkind_axis.Nullability.t;
     separability: Jkind_axis.Separability.t;
   }
+
+module Jkind_mod_bounds = struct
+  module Crossing = Mode.Crossing
+  module Externality = Jkind_axis.Externality
+  module Nullability = Jkind_axis.Nullability
+  module Separability = Jkind_axis.Separability
+
+  type t = mod_bounds
+
+  let crossing t = t.crossing
+
+  let[@inline] modal ax t = t |> crossing |> (Crossing.proj [@inlined hint]) ax
+  let areality = Crossing.Axis.Comonadic Areality
+  let linearity = Crossing.Axis.Comonadic Linearity
+  let uniqueness = Crossing.Axis.Monadic Uniqueness
+  let portability = Crossing.Axis.Comonadic Portability
+  let contention = Crossing.Axis.Monadic Contention
+  let forkable = Crossing.Axis.Comonadic Forkable
+  let yielding = Crossing.Axis.Comonadic Yielding
+  let statefulness = Crossing.Axis.Comonadic Statefulness
+  let visibility = Crossing.Axis.Monadic Visibility
+  let staticity = Crossing.Axis.Monadic Staticity
+  let[@inline] externality t = t.externality
+  let[@inline] nullability t = t.nullability
+  let[@inline] separability t = t.separability
+
+  let[@inline] create
+      crossing
+      ~externality
+      ~nullability
+      ~separability =
+    {
+      crossing;
+      externality;
+      nullability;
+      separability;
+    }
+
+  let[@inline] set_crossing crossing t = { t with crossing }
+  let[@inline] set_externality externality t = { t with externality }
+  let[@inline] set_nullability nullability t = { t with nullability }
+  let[@inline] set_separability separability t = { t with separability }
+
+  let[@inline] set_max_in_set t max_axes =
+    let open Jkind_axis.Axis_set in
+    let[@inline] modal ax =
+      if mem max_axes (Modal ax)
+      then (Crossing.Per_axis.max [@inlined hint]) ax
+      else modal ax t
+    in
+    (* a little optimization *)
+    if is_empty max_axes then t else
+    let regionality = modal areality in
+    let linearity = modal linearity in
+    let uniqueness = modal uniqueness in
+    let portability = modal portability in
+    let contention = modal contention in
+    let forkable = modal forkable in
+    let yielding = modal yielding in
+    let statefulness = modal statefulness in
+    let visibility = modal visibility in
+    let staticity = modal staticity in
+    let externality =
+      if mem max_axes (Nonmodal Externality)
+      then Externality.max
+      else t.externality
+    in
+    let nullability =
+      if mem max_axes (Nonmodal Nullability)
+      then Nullability.max
+      else t.nullability
+    in
+    let separability =
+      if mem max_axes (Nonmodal Separability)
+      then Separability.max
+      else t.separability
+    in
+    let monadic =
+      Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
+    in
+    let comonadic =
+      Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
+        ~forkable ~statefulness
+    in
+    let crossing : Mode.Crossing.t = { monadic; comonadic } in
+    {
+      crossing;
+      externality;
+      nullability;
+      separability;
+    }
+
+  let[@inline] set_min_in_set t min_axes =
+    let open Jkind_axis.Axis_set in
+    let modal ax =
+      if mem min_axes (Modal ax)
+      then (Crossing.Per_axis.min [@inlined hint]) ax
+      else modal ax t
+    in
+    (* a little optimization *)
+    if is_empty min_axes then t else
+    let regionality = modal areality in
+    let linearity = modal linearity in
+    let uniqueness = modal uniqueness in
+    let portability = modal portability in
+    let contention = modal contention in
+    let forkable = modal forkable in
+    let yielding = modal yielding in
+    let statefulness = modal statefulness in
+    let visibility = modal visibility in
+    let staticity = modal staticity in
+    let externality =
+      if mem min_axes (Nonmodal Externality)
+      then Externality.min
+      else t.externality
+    in
+    let nullability =
+      if mem min_axes (Nonmodal Nullability)
+      then Nullability.min
+      else t.nullability
+    in
+    let separability =
+      if mem min_axes (Nonmodal Separability)
+      then Separability.min
+      else t.separability
+    in
+    let monadic =
+      Crossing.Monadic.create ~uniqueness ~contention ~visibility ~staticity
+    in
+    let comonadic =
+      Crossing.Comonadic.create ~regionality ~linearity ~portability ~yielding
+        ~forkable ~statefulness
+    in
+    let crossing : Mode.Crossing.t = { monadic; comonadic } in
+    {
+      crossing;
+      externality;
+      nullability;
+      separability;
+    }
+
+  let[@inline] is_max_within_set t axes =
+    let open Jkind_axis.Axis_set in
+    let modal ax =
+      not (mem axes (Modal ax)) ||
+      Crossing.Per_axis.((le [@inlined hint]) ax ((max [@inlined hint]) ax)
+        (modal ax t))
+    in
+    modal areality &&
+    modal linearity &&
+    modal uniqueness &&
+    modal portability &&
+    modal contention &&
+    modal forkable &&
+    modal yielding &&
+    modal statefulness &&
+    modal visibility &&
+    modal staticity &&
+    (not (mem axes (Nonmodal Externality)) ||
+     Externality.(le max (externality t))) &&
+    (not (mem axes (Nonmodal Nullability)) ||
+     Nullability.(le max (nullability t))) &&
+    (not (mem axes (Nonmodal Separability)) ||
+     Separability.(le max (separability t)))
+
+  let extract_monadic axis t =
+    let (Crossing.Monadic.Atom.Modality
+           (Mode.Modality.Monadic.Atom.Join_const value)) = modal axis t
+    in
+    value
+
+  let extract_comonadic axis t =
+    let (Crossing.Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const value)) = modal axis t
+    in
+    value
+
+  let areality_const t = extract_comonadic areality t
+
+  let linearity_const t = extract_comonadic linearity t
+
+  let uniqueness_const t = extract_monadic uniqueness t
+
+  let portability_const t = extract_comonadic portability t
+
+  let contention_const t = extract_monadic contention t
+
+  let forkable_const t = extract_comonadic forkable t
+
+  let yielding_const t = extract_comonadic yielding t
+
+  let statefulness_const t = extract_comonadic statefulness t
+
+  let visibility_const t = extract_monadic visibility t
+
+  let staticity_const t = extract_monadic staticity t
+
+  let crossing_of_constants ~areality ~linearity ~uniqueness ~portability
+      ~contention ~forkable ~yielding ~statefulness ~visibility ~staticity :
+      Crossing.t =
+    let open Crossing in
+    let monadic =
+      Monadic.create
+        ~uniqueness:
+          (Monadic.Atom.Modality
+             (Mode.Modality.Monadic.Atom.Join_const uniqueness))
+        ~contention:
+          (Monadic.Atom.Modality
+             (Mode.Modality.Monadic.Atom.Join_const contention))
+        ~visibility:
+          (Monadic.Atom.Modality
+             (Mode.Modality.Monadic.Atom.Join_const visibility))
+        ~staticity:
+          (Monadic.Atom.Modality
+             (Mode.Modality.Monadic.Atom.Join_const staticity))
+    in
+    let comonadic =
+      Comonadic.create
+        ~regionality:
+          (Comonadic.Atom.Modality
+             (Mode.Modality.Comonadic.Atom.Meet_const areality))
+        ~linearity:
+          (Comonadic.Atom.Modality
+             (Mode.Modality.Comonadic.Atom.Meet_const linearity))
+        ~portability:
+          (Comonadic.Atom.Modality
+             (Mode.Modality.Comonadic.Atom.Meet_const portability))
+        ~forkable:
+          (Comonadic.Atom.Modality
+             (Mode.Modality.Comonadic.Atom.Meet_const forkable))
+        ~yielding:
+          (Comonadic.Atom.Modality
+             (Mode.Modality.Comonadic.Atom.Meet_const yielding))
+        ~statefulness:
+          (Comonadic.Atom.Modality
+             (Mode.Modality.Comonadic.Atom.Meet_const statefulness))
+    in
+    { monadic; comonadic }
+
+  let to_axis_lattice (t : t) : Axis_lattice.t =
+    let boxed : Axis_lattice.boxed =
+      { areality = areality_const t;
+        linearity = linearity_const t;
+        uniqueness = uniqueness_const t;
+        portability = portability_const t;
+        contention = contention_const t;
+        forkable = forkable_const t;
+        yielding = yielding_const t;
+        statefulness = statefulness_const t;
+        visibility = visibility_const t;
+        staticity = staticity_const t;
+        externality = externality t;
+        nullability = nullability t;
+        separability = separability t
+      }
+    in
+    Axis_lattice.of_boxed boxed
+
+  let of_axis_lattice (x : Axis_lattice.t) : t =
+    let ({ areality;
+           linearity;
+           uniqueness;
+           portability;
+           contention;
+           forkable;
+           yielding;
+           statefulness;
+           visibility;
+           staticity;
+           externality;
+           nullability;
+           separability
+         } :
+          Axis_lattice.boxed) =
+      Axis_lattice.to_boxed x
+    in
+    let crossing =
+      crossing_of_constants ~areality ~linearity ~uniqueness ~portability
+        ~contention ~forkable ~yielding ~statefulness ~visibility ~staticity
+    in
+    create crossing ~externality ~nullability ~separability
+
+  let max =
+    { crossing = Mode.Crossing.max;
+      externality = Externality.max;
+      nullability = Nullability.max;
+      separability = Separability.max }
+
+  let[@inline] is_max m = m = max
+  let debug_print ppf
+        { crossing;
+          externality;
+          nullability;
+          separability } =
+    let crossing_s = Format_doc.asprintf "%a" Crossing.print crossing in
+    let externality_s =
+      Format_doc.asprintf "%a" Externality.print externality
+    in
+    let nullability_s =
+      Format_doc.asprintf "%a" Nullability.print nullability
+    in
+    let separability_s =
+      Format_doc.asprintf "%a" Separability.print separability
+    in
+    Format.fprintf ppf "@[{ crossing = %s;@ externality = %s;@ \
+      nullability = %s;@ separability = %s }@]"
+      crossing_s
+      externality_s
+      nullability_s
+      separability_s
+end
 
 module With_bounds_type_info = struct
   type t = {relevant_axes : Jkind_axis.Axis_set.t } [@@unboxed]
@@ -213,6 +597,16 @@ and jkind_declaration =
     jkind_loc : Location.t
   }
 
+module Ikind_substitution = struct
+  type lookup_result =
+    | Lookup_identity
+    | Lookup_path of Path.t
+    | Lookup_type_fun of type_expr list * type_expr
+
+  let substitute_decl_ikind_with_lookup :
+      (lookup:(Path.t -> lookup_result) -> type_ikind -> type_ikind) ref =
+    ref (fun ~lookup:_ ikind_entry -> ikind_entry)
+end
 module TransientTypeOps = struct
   type t = type_expr
   let compare t1 t2 = t1.id - t2.id
@@ -364,6 +758,7 @@ type type_declaration =
     type_arity: int;
     type_kind: type_decl_kind;
     type_jkind: jkind_l;
+    type_ikind: constructor_ikind_entry;
     type_private: private_flag;
     type_manifest: type_expr option;
     type_variance: Variance.t list;

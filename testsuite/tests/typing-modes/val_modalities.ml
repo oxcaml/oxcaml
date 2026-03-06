@@ -150,6 +150,7 @@ module Module_type_of_error = struct
     let x = fun x -> ignore !y; x
   end
 end
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect{|
 Lines 8-12, characters 33-5:
  8 | .................................struct
@@ -239,6 +240,7 @@ end
 issue. See
 https://github.com/oxcaml/oxcaml/pull/3922#discussion_r2059000469
 *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect{|
 module Module_type_nested :
   sig
@@ -308,6 +310,7 @@ module Inclusion_fail = struct
     end
 end
 (* For this to type check, M has to be at [contended] *)
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect{|
 module Inclusion_fail :
   sig module M : sig val x : string ref end @@ contended end @@ stateless
@@ -320,6 +323,7 @@ module Inclusion_fail = struct
       let x @ contended = ref "hello"
   end
 end
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect{|
 Lines 4-6, characters 22-5:
 4 | ......................struct
@@ -406,6 +410,7 @@ module Inclusion_match = struct
     end
     let () = uncontended_use M.x
 end
+(* CR layouts v2.8: fix principal case. Internal ticket 5111 *)
 [%%expect{|
 module Inclusion_match : sig module M : sig val x : int ref end end @@
   stateless

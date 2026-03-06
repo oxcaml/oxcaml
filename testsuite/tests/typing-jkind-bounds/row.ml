@@ -277,7 +277,6 @@ Error: The kind of type "[ `C | `D of 'a * unit -> 'a ] as 'a" is
 |}]
 
 type trec_succeeds : value mod immutable = [ `C | `D of 'a * unit -> 'a ] as 'a
-
 [%%expect{|
 type trec_succeeds = [ `C | `D of 'a * unit -> 'a ] as 'a
 |}]
@@ -303,7 +302,6 @@ Error: The kind of type "[ `X of
 
 type trec_rec_succeeds : value mod immutable =
   [ `X of 'b | `Y of [ `Z of ('a -> 'b) | `W of 'a | `Loop of 'b ] as 'b ] as 'a
-
 [%%expect{|
 type trec_rec_succeeds =
     [ `X of [ `Loop of 'b | `W of 'a | `Z of 'a -> 'b ] as 'b | `Y of 'b ]
@@ -413,11 +411,60 @@ Error: The kind of type "t2" is immutable_data
          because of the annotation on the declaration of the type t2.
 |}]
 
-module M2 : S with type t = [ `A of string | `B of int ] = struct
+type t2 : immediate with string = M1.t
+[%%expect{|
+Line 1, characters 0-38:
+1 | type t2 : immediate with string = M1.t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "M1.t" is value mod non_float
+         because it's a polymorphic variant type.
+       But the kind of type "M1.t" must be a subkind of immutable_data
+         because of the definition of t2 at line 1, characters 0-38.
+|}]
+
+type t2 : value mod portable = M1.t
+[%%expect{|
+Line 1, characters 0-35:
+1 | type t2 : value mod portable = M1.t
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "M1.t" is value mod non_float
+         because it's a polymorphic variant type.
+       But the kind of type "M1.t" must be a subkind of value mod portable
+         because of the definition of t2 at line 1, characters 0-35.
+|}]
+
+module type S = sig
+  type t = private [< `A of string | `B ]
+end
+module M1b : S = struct
+  type t = [ `B ]
+end
+[%%expect{|
+module type S = sig type t = private [< `A of string | `B ] end
+module M1b : S
+|}]
+
+(* This should not be accepted. *)
+type t2 : immediate with M1b.t = C of string
+[%%expect{|
+Line 1, characters 0-44:
+1 | type t2 : immediate with M1b.t = C of string
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The kind of type "t2" is immutable_data
+         because it's a boxed variant type.
+       But the kind of type "t2" must be a subkind of immediate with M1b.t
+         because of the annotation on the declaration of the type t2.
+|}]
+
+module type S2 = sig
+  type t = private [< `A of string | `B of int ]
+end
+module M2 : S2 with type t = [ `A of string | `B of int ] = struct
   type t = [ `A of string | `B of int ]
 end
 type t3 : immediate with M2.t = C of string (* should be accepted *)
 [%%expect{|
+module type S2 = sig type t = private [< `A of string | `B of int ] end
 module M2 : sig type t = [ `A of string | `B of int ] end
 type t3 = C of string
 |}]
