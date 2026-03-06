@@ -1,0 +1,52 @@
+diff --git a/.depend b/.depend
+index b043fcbe510c..dac89504fef8 100644
+--- a/.depend
++++ b/.depend
+@@ -3009,6 +3009,7 @@ asmcomp/emit.cmi : \
+     asmcomp/linear.cmi \
+     asmcomp/cmm.cmi
+ asmcomp/emitaux.cmo : \
++    parsing/location.cmi \
+     utils/format_doc.cmi \
+     asmcomp/emitenv.cmi \
+     lambda/debuginfo.cmi \
+@@ -3019,6 +3020,7 @@ asmcomp/emitaux.cmo : \
+     asmcomp/arch.cmi \
+     asmcomp/emitaux.cmi
+ asmcomp/emitaux.cmx : \
++    parsing/location.cmx \
+     utils/format_doc.cmx \
+     asmcomp/emitenv.cmi \
+     lambda/debuginfo.cmx \
+diff --git a/Changes b/Changes
+index 7c129feacfaa..09bfade40984 100644
+--- a/Changes
++++ b/Changes
+@@ -239,6 +239,9 @@ _______________
+   since #11288 and broke ocamlbrowser.
+   (David Allsopp, report by Jacques Garrigue, review by ??)
+ 
++- #13251: Register printer for errors in Emitaux
++  (Vincent Laviron, review by Miod Vallat and Florian Angeletti)
++
+ ### Internal/compiler-libs changes:
+ 
+ - #11129, #11148: enforce that ppxs do not produce `parsetree`s with
+diff --git a/asmcomp/emitaux.ml b/asmcomp/emitaux.ml
+index 582b9bb1b8d7..69131632b63d 100644
+--- a/asmcomp/emitaux.ml
++++ b/asmcomp/emitaux.ml
+@@ -461,6 +461,13 @@ let report_error ppf = function
+   | Stack_frame_too_large n ->
+       Format_doc.fprintf ppf "stack frame too large (%d bytes)" n
+ 
++let () =
++  Location.register_error_of_exn
++    (function
++      | Error err -> Some (Location.error_of_printer_file report_error err)
++      | _ -> None
++    )
++
+ let mk_env f : Emitenv.per_function_env =
+   {
+     f;

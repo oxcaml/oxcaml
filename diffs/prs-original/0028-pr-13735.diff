@@ -1,0 +1,1100 @@
+diff --git a/Changes b/Changes
+index 4bd4296d44a4..81869fb00cea 100644
+--- a/Changes
++++ b/Changes
+@@ -115,6 +115,10 @@ Working version
+ - #13758: Propagate more value kinds in Flambda to allow more unboxing
+   (Vincent Laviron, review by Pierre Chambart)
+ 
++- #13735: Follow the behaviour of the C compiler to decide whether to emit the
++  `.size` and `.type` directives and the `.note.GNU-stack` section
++  (Samuel Hym, review by Miod Vallat, Antonin Décimo and Gabriel Scherer)
++
+ ### Standard library:
+ 
+ - #13731: Add Either.retract
+diff --git a/aclocal.m4 b/aclocal.m4
+index 7aadcaee8d2d..eee0a7778680 100644
+--- a/aclocal.m4
++++ b/aclocal.m4
+@@ -527,6 +527,78 @@ AC_DEFUN([OCAML_CC_SUPPORTS_ATOMIC], [
+   OCAML_CC_RESTORE_VARIABLES
+ ])
+ 
++# Detects whether the C compiler generates an explicit .note.GNU-stack section
++# to mark the stack as non-executable, so that we can follow suit
++AC_DEFUN([OCAML_WITH_NONEXECSTACK_NOTE],
++  [AC_REQUIRE([AC_PROG_FGREP])dnl
++  AC_CACHE_CHECK([if $CC generates a .note.GNU-stack section],
++    [ocaml_cv_prog_cc_nonexecstack_note],
++    [OCAML_CC_SAVE_VARIABLES
++
++    # We write the assembly into the .$ac_objext file as AC_COMPILE_IFELSE
++    # assumes an error if such a file doesn't exist after compiling
++    CFLAGS="$CFLAGS -S -o conftest.$ac_objext"
++
++    ocaml_cv_prog_cc_nonexecstack_note=no
++    AC_COMPILE_IFELSE([AC_LANG_SOURCE],
++      [AS_IF([$FGREP .note.GNU-stack conftest.$ac_objext >/dev/null],
++        [ocaml_cv_prog_cc_nonexecstack_note=yes])])
++    OCAML_CC_RESTORE_VARIABLES])
++
++  AS_IF([test "x$ocaml_cv_prog_cc_nonexecstack_note" = xyes],
++    [with_nonexecstack_note=true
++    AC_DEFINE([WITH_NONEXECSTACK_NOTE], [1])],
++    [with_nonexecstack_note=false])
++])
++
++AC_DEFUN([OCAML_ASM_SIZE_TYPE_DIRECTIVES],
++  [AC_REQUIRE([AC_PROG_GREP])dnl
++  AC_CACHE_CHECK([if $CC generates .size and .type asm directives],
++    [ocaml_cv_prog_cc_asm_size_type_directives],
++    [OCAML_CC_SAVE_VARIABLES
++
++    # We write the assembly into the .$ac_objext file as AC_COMPILE_IFELSE
++    # assumes an error if such a file doesn't exist after compiling
++    CFLAGS="$CFLAGS -S -o conftest.$ac_objext"
++
++    ocaml_cv_prog_cc_asm_size_type_directives=no
++    AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
++int feat_detect_obj;
++int feat_detect_func(void) {
++  return 42;
++}
++    ]])],
++      [asm_type_obj_directive=no
++      asm_type_func_directive=no
++      asm_size_func_directive=no
++      # We do not look for a .size directive for the object as it is not
++      # generated in that simple case for instance by the compiler
++      # powerpc64le-linux-gnu-gcc 14.2 which emits instead an .lcomm directive
++      AS_IF([$GREP '\.type.*feat_detect_obj' conftest.$ac_objext >/dev/null],
++        [asm_type_obj_directive=yes])
++      AS_IF([$GREP '\.type.*feat_detect_func' conftest.$ac_objext >/dev/null],
++        [asm_type_func_directive=yes])
++      AS_IF([$GREP '\.size.*feat_detect_func' conftest.$ac_objext >/dev/null],
++        [asm_size_func_directive=yes])
++      AS_CASE([m4_join([,],[$asm_type_obj_directive],[$asm_type_func_directive],
++          [$asm_size_func_directive])],
++        [yes,yes,yes],
++          [ocaml_cv_prog_cc_asm_size_type_directives=yes],
++        [no,no,no],
++          [ocaml_cv_prog_cc_asm_size_type_directives=no],
++        [ocaml_cv_prog_cc_asm_size_type_directives=unconclusive])])
++    OCAML_CC_RESTORE_VARIABLES])
++
++  AS_CASE([$ocaml_cv_prog_cc_asm_size_type_directives],
++    [yes],
++      [asm_size_type_directives=true
++      AC_DEFINE([ASM_SIZE_TYPE_DIRECTIVES], [1])],
++    [no],
++      [asm_size_type_directives=false],
++    [AC_MSG_WARN([found inconsistent results for .size and .type directives])
++    asm_size_type_directives=false])
++])
++
+ AC_DEFUN([OCAML_CC_SUPPORTS_LABELS_AS_VALUES], [
+   AC_CACHE_CHECK([whether $CC supports the labels as values extension],
+     [ocaml_cv_prog_cc_labels_as_values],
+diff --git a/asmcomp/amd64/emit.mlp b/asmcomp/amd64/emit.mlp
+index 9900da5ee089..2e69e3493464 100644
+--- a/asmcomp/amd64/emit.mlp
++++ b/asmcomp/amd64/emit.mlp
+@@ -943,14 +943,12 @@ let fundecl fundecl =
+     end;
+   end;
+   cfi_endproc ();
+-  begin match system with
+-  | S_gnu | S_linux ->
++  if Config.asm_size_type_directives then begin
+       D.type_ (emit_symbol fundecl.fun_name) "@function";
+       D.size (emit_symbol fundecl.fun_name)
+         (ConstSub (
+             ConstThis,
+             ConstLabel (emit_symbol fundecl.fun_name)))
+-  | _ -> ()
+   end
+ 
+ (* Emission of data *)
+@@ -1080,12 +1078,13 @@ let end_assembly() =
+       efa_string = (fun s -> D.bytes (s ^ "\000"))
+     };
+ 
+-  if system = S_linux || system = S_freebsd || system = S_netbsd || system = S_openbsd then begin
++  if Config.asm_size_type_directives then begin
+     let frametable = emit_symbol (Compilenv.make_symbol (Some "frametable")) in
++    D.type_ frametable "@object";
+     D.size frametable (ConstSub (ConstThis, ConstLabel frametable))
+   end;
+ 
+-  if system = S_linux || system = S_freebsd then
++  if Config.with_nonexecstack_note then
+     (* Mark stack as non-executable, PR#4564 *)
+     D.section [".note.GNU-stack"] (Some "") [ "%progbits" ];
+ 
+diff --git a/asmcomp/arm64/emit.mlp b/asmcomp/arm64/emit.mlp
+index 533204b0d97d..d91543daf7ed 100644
+--- a/asmcomp/arm64/emit.mlp
++++ b/asmcomp/arm64/emit.mlp
+@@ -45,23 +45,11 @@ let label_prefix =
+ let emit_label lbl =
+   emit_string label_prefix; emit_int lbl
+ 
+-(* Symbols *)
+-
+-let emit_symbol s =
+-  if macosx then emit_string "_";
+-  Emitaux.emit_symbol s
+-
+ (* Object types *)
+ 
+-let emit_symbol_type emit_lbl_or_sym lbl_or_sym ty =
+-  if not macosx then begin
+-    `	.type	{emit_lbl_or_sym lbl_or_sym}, %{emit_string ty}\n`
+-  end
+-
+-
+-let emit_symbol_size sym =
+-  if not macosx then begin
+-    `	.size	{emit_symbol sym}, .-{emit_symbol sym}\n`
++let emit_label_type lbl ty =
++  if Config.asm_size_type_directives then begin
++    `	.type	{emit_label lbl}, {emit_string ty}\n`
+   end
+ 
+ (* Output a pseudo-register *)
+@@ -1132,7 +1120,7 @@ let fundecl fundecl =
+   emit_named_text_section fundecl.fun_name;
+   `	.align	3\n`;
+   `	.globl	{emit_symbol fundecl.fun_name}\n`;
+-  emit_symbol_type emit_symbol fundecl.fun_name "function";
++  emit_type_directive fundecl.fun_name "%function";
+   (* Dynamic stack checking *)
+   let stack_threshold_size = Config.stack_threshold * 8 in (* bytes *)
+   let max_frame_size = frame_size env + fundecl.fun_extra_stack_used in
+@@ -1183,8 +1171,8 @@ let fundecl fundecl =
+   assert (List.length env.bound_error_sites = num_check_bound);
+ 
+   cfi_endproc();
+-  emit_symbol_type emit_symbol fundecl.fun_name "function";
+-  emit_symbol_size fundecl.fun_name;
++  emit_type_directive fundecl.fun_name "%function";
++  emit_size_directive fundecl.fun_name;
+   emit_literals env
+ 
+ (* Emission of data *)
+@@ -1257,10 +1245,10 @@ let end_assembly () =
+   `{emit_symbol lbl}:\n`;
+   emit_frames
+     { efa_code_label = (fun lbl ->
+-                       emit_symbol_type emit_label lbl "function";
++                       emit_label_type lbl "%function";
+                        `	.quad	{emit_label lbl}\n`);
+       efa_data_label = (fun lbl ->
+-                       emit_symbol_type emit_label lbl "object";
++                       emit_label_type lbl "%object";
+                        `	.quad	{emit_label lbl}\n`);
+       efa_8 = (fun n -> `	.byte	{emit_int n}\n`);
+       efa_16 = (fun n -> `	.short	{emit_int n}\n`);
+@@ -1271,11 +1259,6 @@ let end_assembly () =
+                            `	.long	{emit_label lbl} - . + {emit_int32 ofs}\n`);
+       efa_def_label = (fun lbl -> `{emit_label lbl}:\n`);
+       efa_string = (fun s -> emit_string_directive "	.asciz	" s) };
+-  emit_symbol_type emit_symbol lbl "object";
+-  emit_symbol_size lbl;
+-  begin match Config.system with
+-  | "linux" ->
+-      (* Mark stack as non-executable *)
+-      `	.section	.note.GNU-stack,\"\",%progbits\n`
+-  | _ -> ()
+-  end
++  emit_type_directive lbl "%object";
++  emit_size_directive lbl;
++  emit_nonexecstack_note ()
+diff --git a/asmcomp/emitaux.ml b/asmcomp/emitaux.ml
+index 61ec3d940f44..055c2636d529 100644
+--- a/asmcomp/emitaux.ml
++++ b/asmcomp/emitaux.ml
+@@ -35,7 +35,10 @@ let emit_printf fmt =
+ 
+ let emit_int32 n = emit_printf "0x%lx" n
+ 
++let macosx = Config.system = "macosx"
++
+ let emit_symbol s =
++  if macosx then output_char !output_channel '_';
+   for i = 0 to String.length s - 1 do
+     let c = s.[i] in
+     match c with
+@@ -111,6 +114,29 @@ let emit_float64_split_directive directive x =
+ let emit_float32_directive directive x =
+   emit_printf "\t%s\t0x%lx\n" directive x
+ 
++let emit_size_directive symbol =
++  if Config.asm_size_type_directives then begin
++    emit_string "\t.size\t";
++    emit_symbol symbol;
++    emit_string ", . - ";
++    emit_symbol symbol;
++    emit_char '\n'
++  end
++
++let emit_type_directive symbol ty =
++  if Config.asm_size_type_directives then begin
++    emit_string "\t.type\t";
++    emit_symbol symbol;
++    emit_string ", ";
++    emit_string ty;
++    emit_char '\n'
++  end
++
++let emit_nonexecstack_note () =
++  if Config.with_nonexecstack_note then begin
++    emit_string "\t.section .note.GNU-stack,\"\",%progbits\n"
++  end
++
+ (* Record live pointers at call points *)
+ 
+ type frame_debuginfo =
+diff --git a/asmcomp/emitaux.mli b/asmcomp/emitaux.mli
+index d174fa92d40a..37f1b18fd4db 100644
+--- a/asmcomp/emitaux.mli
++++ b/asmcomp/emitaux.mli
+@@ -30,6 +30,19 @@ val emit_float64_directive: string -> int64 -> unit
+ val emit_float64_split_directive: string -> int64 -> unit
+ val emit_float32_directive: string -> int32 -> unit
+ 
++val emit_size_directive: string -> unit
++(** [emit_size_directive symbol]
++    Emit a [.size] assembler directive for the given [symbol] when it is
++    supported by the assembler *)
++
++val emit_type_directive: string -> string -> unit
++(** [emit_type_directive symbol typ]
++    Emit a [.type] assembler directive that [symbol] has type [typ] when it is
++    supported by the assembler *)
++
++val emit_nonexecstack_note : unit -> unit
++(** Emit a [.note.GNU-stack] section when it is supported by the linker *)
++
+ val reset : unit -> unit
+ val reset_debug_info: unit -> unit
+ val emit_debug_info: Debuginfo.t -> unit
+diff --git a/asmcomp/power/emit.mlp b/asmcomp/power/emit.mlp
+index f9303ea65d37..f91c87d12101 100644
+--- a/asmcomp/power/emit.mlp
++++ b/asmcomp/power/emit.mlp
+@@ -1018,7 +1018,7 @@ let fundecl fundecl =
+   end;
+   (* Function entry point *)
+   `	.globl	{emit_symbol fundecl.fun_name}\n`;
+-  `	.type	{emit_symbol fundecl.fun_name}, @function\n`;
++  emit_type_directive fundecl.fun_name "@function";
+   `{emit_symbol fundecl.fun_name}:\n`;
+   `0:	addis	2, 12, (.TOC. - 0b)@ha\n`;
+   `	addi	2, 2, (.TOC. - 0b)@l\n`;
+@@ -1054,7 +1054,7 @@ let fundecl fundecl =
+   (* Emit the glue code to handle bound errors *)
+   emit_call_bound_errors env;
+   cfi_endproc();
+-  `	.size	{emit_symbol fundecl.fun_name}, . - {emit_symbol fundecl.fun_name}\n`;
++  emit_size_directive fundecl.fun_name;
+   (* Emit the numeric literals *)
+   if env.float_literals <> [] then begin
+     emit_string rodata_space;
+@@ -1082,7 +1082,7 @@ let fundecl fundecl =
+ 
+ let declare_global_data s =
+   `	.globl	{emit_symbol s}\n`;
+-  `	.type	{emit_symbol s}, @object\n`
++  emit_type_directive s "@object"
+ 
+ let emit_item = function
+     Cglobal_symbol s ->
+@@ -1166,8 +1166,9 @@ let end_assembly() =
+       efa_def_label = (fun l -> `{emit_label l}:\n`);
+       efa_string = (fun s -> emit_bytes_directive "	.byte	" (s ^ "\000"))
+      };
++  emit_size_directive lbl;
+   (* Emit the TOC entries *)
+   emit_string toc_space;
+   emit_toctable();
+   Hashtbl.clear tocref_entries;
+-  `	.section .note.GNU-stack,\"\",%progbits\n`
++  emit_nonexecstack_note ()
+diff --git a/asmcomp/riscv/emit.mlp b/asmcomp/riscv/emit.mlp
+index 2fbc47793a51..c0b1d31765b4 100644
+--- a/asmcomp/riscv/emit.mlp
++++ b/asmcomp/riscv/emit.mlp
+@@ -619,7 +619,7 @@ let rec emit_all env = function
+ let fundecl fundecl =
+   let env = mk_env fundecl in
+   `	.globl	{emit_symbol fundecl.fun_name}\n`;
+-  `	.type	{emit_symbol fundecl.fun_name}, @function\n`;
++  emit_type_directive fundecl.fun_name "@function";
+   emit_named_text_section fundecl.fun_name;
+   `	.align	2\n`;
+   `{emit_symbol fundecl.fun_name}:\n`;
+@@ -666,7 +666,7 @@ let fundecl fundecl =
+   end;
+ 
+   cfi_endproc();
+-  `	.size	{emit_symbol fundecl.fun_name}, .-{emit_symbol fundecl.fun_name}\n`;
++  emit_size_directive fundecl.fun_name;
+   (* Emit the float literals *)
+   if env.float_literals <> [] then begin
+     `	{emit_string rodata_space}\n`;
+@@ -682,7 +682,7 @@ let fundecl fundecl =
+ 
+ let declare_global_data s =
+   `	.globl	{emit_symbol s}\n`;
+-  `	.type	{emit_symbol s}, @object\n`
++  emit_type_directive s "@object"
+ 
+ let emit_item = function
+   | Cglobal_symbol s ->
+@@ -759,4 +759,6 @@ let end_assembly() =
+                            `	.long	({emit_label lbl} - .) + {emit_int32 ofs}\n`);
+       efa_def_label = (fun l -> `{emit_label l}:\n`);
+       efa_string = (fun s -> emit_bytes_directive "	.byte	" (s ^ "\000"))
+-     }
++     };
++  emit_size_directive lbl;
++  emit_nonexecstack_note ()
+diff --git a/asmcomp/s390x/emit.mlp b/asmcomp/s390x/emit.mlp
+index 045bbf9f5d71..62246eaa8026 100644
+--- a/asmcomp/s390x/emit.mlp
++++ b/asmcomp/s390x/emit.mlp
+@@ -718,7 +718,7 @@ let fundecl fundecl =
+   let env = mk_env fundecl in
+   `	.globl	{emit_symbol fundecl.fun_name}\n`;
+   emit_debug_info fundecl.fun_dbg;
+-  `	.type	{emit_symbol fundecl.fun_name}, @function\n`;
++  emit_type_directive fundecl.fun_name "@function";
+   emit_named_text_section fundecl.fun_name;
+   `	.align	8\n`;
+   `{emit_symbol fundecl.fun_name}:\n`;
+@@ -763,6 +763,7 @@ let fundecl fundecl =
+   end;
+ 
+   cfi_endproc ();
++  emit_size_directive fundecl.fun_name;
+   (* Emit the numeric literals *)
+   if env.float_literals <> [] || env.int_literals <> [] then begin
+     emit_string rodata_space;
+@@ -782,7 +783,7 @@ let fundecl fundecl =
+ 
+ let declare_global_data s =
+   `	.globl	{emit_symbol s}\n`;
+-  `	.type	{emit_symbol s}, @object\n`
++  emit_type_directive s "@object"
+ 
+ let emit_item = function
+     Cglobal_symbol s ->
+@@ -865,5 +866,5 @@ let end_assembly() =
+       efa_def_label = (fun l -> `{emit_label l}:\n`);
+       efa_string = (fun s -> emit_bytes_directive "	.byte	" (s ^ "\000"))
+      };
+-   (* Mark stack as non-executable *)
+-   `	.section .note.GNU-stack,\"\",%progbits\n`
++  emit_size_directive lbl;
++  emit_nonexecstack_note ()
+diff --git a/configure b/configure
+index ded0f421bf7b..9115e6e4e585 100755
+--- a/configure
++++ b/configure
+@@ -826,6 +826,7 @@ mkdll_exp
+ mkdll
+ rpath
+ sharedlib_cflags
++asm_size_type_directives
+ asm_cfi_supported
+ AS
+ endianness
+@@ -878,6 +879,7 @@ flexdll_dir
+ bootstrapping_flexdll
+ flexdll_source_dir
+ zstd_libs
++with_nonexecstack_note
+ native_ldflags
+ cclibs
+ oc_dll_ldflags
+@@ -3503,6 +3505,7 @@ LINEAR_MAGIC_NUMBER=Caml1999L035
+ 
+ 
+ 
++
+ 
+ 
+  # TODO: rename this variable
+@@ -3553,6 +3556,7 @@ LINEAR_MAGIC_NUMBER=Caml1999L035
+ 
+ 
+ 
++
+ 
+ 
+ ## Generated files
+@@ -14294,6 +14298,156 @@ CC=$lt_save_CC
+ CFLAGS="$saved_CFLAGS"
+ target_os=$old_host_os
+ 
++  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking if $CC generates a .note.GNU-stack section" >&5
++printf %s "checking if $CC generates a .note.GNU-stack section... " >&6; }
++if test ${ocaml_cv_prog_cc_nonexecstack_note+y}
++then :
++  printf %s "(cached) " >&6
++else $as_nop
++
++  saved_CC="$CC"
++  saved_CFLAGS="$CFLAGS"
++  saved_CPPFLAGS="$CPPFLAGS"
++  saved_LIBS="$LIBS"
++  saved_ac_ext="$ac_ext"
++  saved_ac_compile="$ac_compile"
++  # Move the content of confdefs.h to another file so it does not
++  # get included
++  mv confdefs.h confdefs.h.bak
++  touch confdefs.h
++
++
++    # We write the assembly into the .$ac_objext file as AC_COMPILE_IFELSE
++    # assumes an error if such a file doesn't exist after compiling
++    CFLAGS="$CFLAGS -S -o conftest.$ac_objext"
++
++    ocaml_cv_prog_cc_nonexecstack_note=no
++    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
++/* end confdefs.h.  */
++
++_ACEOF
++if ac_fn_c_try_compile "$LINENO"
++then :
++  if $FGREP .note.GNU-stack conftest.$ac_objext >/dev/null
++then :
++  ocaml_cv_prog_cc_nonexecstack_note=yes
++fi
++fi
++rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
++
++  # Restore the content of confdefs.h
++  mv confdefs.h.bak confdefs.h
++  ac_compile="$saved_ac_compile"
++  ac_ext="$saved_ac_ext"
++  CPPFLAGS="$saved_CPPFLAGS"
++  CFLAGS="$saved_CFLAGS"
++  CC="$saved_CC"
++  LIBS="$saved_LIBS"
++
++fi
++{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ocaml_cv_prog_cc_nonexecstack_note" >&5
++printf "%s\n" "$ocaml_cv_prog_cc_nonexecstack_note" >&6; }
++
++  if test "x$ocaml_cv_prog_cc_nonexecstack_note" = xyes
++then :
++  with_nonexecstack_note=true
++    printf "%s\n" "#define WITH_NONEXECSTACK_NOTE 1" >>confdefs.h
++
++else $as_nop
++  with_nonexecstack_note=false
++fi
++
++  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking if $CC generates .size and .type asm directives" >&5
++printf %s "checking if $CC generates .size and .type asm directives... " >&6; }
++if test ${ocaml_cv_prog_cc_asm_size_type_directives+y}
++then :
++  printf %s "(cached) " >&6
++else $as_nop
++
++  saved_CC="$CC"
++  saved_CFLAGS="$CFLAGS"
++  saved_CPPFLAGS="$CPPFLAGS"
++  saved_LIBS="$LIBS"
++  saved_ac_ext="$ac_ext"
++  saved_ac_compile="$ac_compile"
++  # Move the content of confdefs.h to another file so it does not
++  # get included
++  mv confdefs.h confdefs.h.bak
++  touch confdefs.h
++
++
++    # We write the assembly into the .$ac_objext file as AC_COMPILE_IFELSE
++    # assumes an error if such a file doesn't exist after compiling
++    CFLAGS="$CFLAGS -S -o conftest.$ac_objext"
++
++    ocaml_cv_prog_cc_asm_size_type_directives=no
++    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
++/* end confdefs.h.  */
++
++int feat_detect_obj;
++int feat_detect_func(void) {
++  return 42;
++}
++
++_ACEOF
++if ac_fn_c_try_compile "$LINENO"
++then :
++  asm_type_obj_directive=no
++      asm_type_func_directive=no
++      asm_size_func_directive=no
++      # We do not look for a .size directive for the object as it is not
++      # generated in that simple case for instance by the compiler
++      # powerpc64le-linux-gnu-gcc 14.2 which emits instead an .lcomm directive
++      if $GREP '\.type.*feat_detect_obj' conftest.$ac_objext >/dev/null
++then :
++  asm_type_obj_directive=yes
++fi
++      if $GREP '\.type.*feat_detect_func' conftest.$ac_objext >/dev/null
++then :
++  asm_type_func_directive=yes
++fi
++      if $GREP '\.size.*feat_detect_func' conftest.$ac_objext >/dev/null
++then :
++  asm_size_func_directive=yes
++fi
++      case $asm_type_obj_directive,$asm_type_func_directive,$asm_size_func_directive in #(
++  yes,yes,yes) :
++    ocaml_cv_prog_cc_asm_size_type_directives=yes ;; #(
++  no,no,no) :
++    ocaml_cv_prog_cc_asm_size_type_directives=no ;; #(
++  *) :
++    ocaml_cv_prog_cc_asm_size_type_directives=unconclusive ;;
++esac
++fi
++rm -f core conftest.err conftest.$ac_objext conftest.beam conftest.$ac_ext
++
++  # Restore the content of confdefs.h
++  mv confdefs.h.bak confdefs.h
++  ac_compile="$saved_ac_compile"
++  ac_ext="$saved_ac_ext"
++  CPPFLAGS="$saved_CPPFLAGS"
++  CFLAGS="$saved_CFLAGS"
++  CC="$saved_CC"
++  LIBS="$saved_LIBS"
++
++fi
++{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ocaml_cv_prog_cc_asm_size_type_directives" >&5
++printf "%s\n" "$ocaml_cv_prog_cc_asm_size_type_directives" >&6; }
++
++  case $ocaml_cv_prog_cc_asm_size_type_directives in #(
++  yes) :
++    asm_size_type_directives=true
++      printf "%s\n" "#define ASM_SIZE_TYPE_DIRECTIVES 1" >>confdefs.h
++ ;; #(
++  no) :
++    asm_size_type_directives=false ;; #(
++  *) :
++    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: found inconsistent results for .size and .type directives" >&5
++printf "%s\n" "$as_me: WARNING: found inconsistent results for .size and .type directives" >&2;}
++    asm_size_type_directives=false ;;
++esac
++
++
+ case $host in #(
+   sparc-sun-solaris*) :
+     DEP_CC="false" ;; #(
+diff --git a/configure.ac b/configure.ac
+index 1ab2160ced23..2c2baa2d0d82 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -179,6 +179,7 @@ AC_SUBST([oc_ldflags])
+ AC_SUBST([oc_dll_ldflags])
+ AC_SUBST([cclibs])
+ AC_SUBST([native_ldflags])
++AC_SUBST([with_nonexecstack_note])
+ AC_SUBST([zstd_libs])
+ AC_SUBST([bytecode_cflags])
+ AC_SUBST([bytecode_cppflags])
+@@ -233,6 +234,7 @@ AC_SUBST([ASPP])
+ AC_SUBST([endianness])
+ AC_SUBST([AS])
+ AC_SUBST([asm_cfi_supported])
++AC_SUBST([asm_size_type_directives])
+ AC_SUBST([sharedlib_cflags])
+ AC_SUBST([rpath])
+ AC_SUBST([mkdll])
+@@ -681,6 +683,9 @@ popdef([host_cpu])dnl
+ popdef([host_alias])dnl
+ popdef([host])dnl
+ 
++OCAML_WITH_NONEXECSTACK_NOTE
++OCAML_ASM_SIZE_TYPE_DIRECTIVES
++
+ AS_CASE([$host],
+   [sparc-sun-solaris*],
+     [DEP_CC="false"],
+diff --git a/runtime/amd64.S b/runtime/amd64.S
+index 800dc16966b8..5c36868a7c6a 100644
+--- a/runtime/amd64.S
++++ b/runtime/amd64.S
+@@ -19,6 +19,7 @@
+ /* PIC mode support based on contribution by Paul Stravers (see PR#4795) */
+ 
+ #include "caml/m.h"
++#include "caml/asm.h"
+ 
+ #if defined(SYS_macosx)
+ 
+@@ -68,7 +69,7 @@ G(name):
+ #define FUNCTION(name) \
+         TEXT_SECTION(G(name)); \
+         .globl G(name); \
+-        .type G(name),@function; \
++        TYPE_DIRECTIVE(G(name),@function); \
+         .align FUNCTION_ALIGN; \
+ G(name):
+ 
+@@ -79,18 +80,11 @@ G(name):
+         .align EIGHT_ALIGN; \
+ G(name):
+ 
+-#if defined(SYS_linux) || defined(SYS_gnu)
+ #define END_FUNCTION(name) \
+-        .size G(name), . - G(name)
++        SIZE_DIRECTIVE(G(name))
+ #define END_OBJECT(name) \
+-        .type G(name), @object; \
+-        .size G(name), . - G(name)
+-#else
+-#define END_FUNCTION(name)
+-#define END_OBJECT(name)
+-#endif
+-
+-#include "../runtime/caml/asm.h"
++        TYPE_DIRECTIVE(G(name),@object) \
++        SIZE_DIRECTIVE(G(name))
+ 
+ #ifdef WITH_FRAME_POINTERS
+ #define FRAME_POINTER_SIZE   8
+@@ -1377,7 +1371,4 @@ G(caml_negf_mask):
+ G(caml_absf_mask):
+         .quad   0x7FFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF
+ 
+-#if defined(SYS_linux) || defined(SYS_freebsd)
+-    /* Mark stack as non-executable, PR#4564 */
+-        .section .note.GNU-stack,"",%progbits
+-#endif
++        NONEXECSTACK_NOTE
+diff --git a/runtime/arm64.S b/runtime/arm64.S
+index 09326ee7072a..2082ae4fd824 100644
+--- a/runtime/arm64.S
++++ b/runtime/arm64.S
+@@ -19,6 +19,7 @@
+ /* Must be preprocessed by cpp */
+ 
+ #include "caml/m.h"
++#include "caml/asm.h"
+ 
+ /* Special registers */
+ 
+@@ -138,23 +139,21 @@ G(\name):
+         TEXT_SECTION(name); \
+         .align  2; \
+         .globl  G(name); \
+-        .type   G(name), %function; \
++        TYPE_DIRECTIVE(G(name),%function) \
+ G(name):
+ #define END_FUNCTION(name) \
+-        .size   G(name), .-G(name)
++        SIZE_DIRECTIVE(G(name))
+ 
+ #define OBJECT(name) \
+         .data; \
+         .align  3; \
+         .globl  G(name); \
+-        .type   G(name), %object; \
++        TYPE_DIRECTIVE(G(name),%object) \
+ G(name):
+ #define END_OBJECT(name) \
+-        .size   G(name), .-G(name)
++        SIZE_DIRECTIVE(G(name))
+ #endif
+ 
+-#include "../runtime/caml/asm.h"
+-
+ /* Function prologue and epilogue */
+ 
+ .macro ENTER_FUNCTION
+@@ -1291,7 +1290,4 @@ OBJECT(caml_system$frametable)
+         .align 3
+         END_OBJECT(caml_system$frametable)
+ 
+-#if !defined(SYS_macosx)
+-/* Mark stack as non-executable */
+-        .section .note.GNU-stack,"",%progbits
+-#endif
++        NONEXECSTACK_NOTE
+diff --git a/runtime/caml/asm.h b/runtime/caml/asm.h
+index b3c9b2b230a0..77372ea11ed7 100644
+--- a/runtime/caml/asm.h
++++ b/runtime/caml/asm.h
+@@ -45,6 +45,26 @@
+ #define CFI_STARTPROC
+ #endif
+ 
++/* .size and .type directives, with explicit end-of-directive semi-colons */
++
++#ifdef ASM_SIZE_TYPE_DIRECTIVES
++#define SIZE_DIRECTIVE(name) \
++        .size name, . - name;
++#define TYPE_DIRECTIVE(name,ty) \
++        .type name, ty;
++#else
++#define SIZE_DIRECTIVE(name)
++#define TYPE_DIRECTIVE(name,ty)
++#endif
++
++/* Non-executable stack note */
++
++#ifdef WITH_NONEXECSTACK_NOTE
++#define NONEXECSTACK_NOTE       .section .note.GNU-stack,"",%progbits
++#else
++#define NONEXECSTACK_NOTE
++#endif
++
+ /******************************************************************************/
+ /* DWARF */
+ /******************************************************************************/
+diff --git a/runtime/caml/m.h.in b/runtime/caml/m.h.in
+index 3e9ef4b0b99a..d771d26083b6 100644
+--- a/runtime/caml/m.h.in
++++ b/runtime/caml/m.h.in
+@@ -64,6 +64,11 @@
+ 
+ #undef ASM_CFI_SUPPORTED
+ 
++#undef ASM_SIZE_TYPE_DIRECTIVES
++
++/* Define ASM_SIZE_TYPE_DIRECTIVES when the ".size" and ".type" assembler
++   directives can be used */
++
+ #undef WITH_FRAME_POINTERS
+ 
+ #define NO_NAKED_POINTERS 1
+@@ -81,3 +86,8 @@
+ #undef SUPPORTS_TREE_VECTORIZE
+ 
+ #undef USE_MMAP_MAP_STACK
++
++#undef WITH_NONEXECSTACK_NOTE
++
++/* Define WITH_NONEXECSTACK_NOTE when an explicit ".note.GNU-stack" section
++   is to be added to indicate the stack should not be executable */
+diff --git a/runtime/power.S b/runtime/power.S
+index 0e1c01595791..88ebe2945162 100644
+--- a/runtime/power.S
++++ b/runtime/power.S
+@@ -14,6 +14,7 @@
+ /**************************************************************************/
+ 
+ #include "caml/m.h"
++#include "caml/asm.h"
+ 
+         .abiversion 2
+ 
+@@ -88,7 +89,7 @@ caml_hot$code_end:
+ .macro FUNCTION name
+         TEXT_SECTION \name
+         .globl \name
+-        .type \name, @function
++        TYPE_DIRECTIVE(\name,@function)
+ \name:
+ 0:      addis   2, 12, .TOC.- 0b@ha
+         addi    2, 2,  .TOC.- 0b@l
+@@ -96,17 +97,17 @@ caml_hot$code_end:
+ .endm
+ 
+ .macro ENDFUNCTION name
+-        .size \name, . - \name
++        SIZE_DIRECTIVE(\name)
+ .endm
+ 
+ .macro OBJECT name
+         .globl \name
+-        .type \name, @object
++        TYPE_DIRECTIVE(\name,@object)
+ \name:
+ .endm
+ 
+ .macro ENDOBJECT name
+-        .size \name, . - \name
++        SIZE_DIRECTIVE(\name)
+ .endm
+ 
+ /* Function prologue and epilogue */
+@@ -1223,5 +1224,4 @@ TOCENTRY(caml_array_bound_error_asm)
+ TOCENTRYLABEL(fiber_exn_handler)
+ TOCENTRYLABEL(trap_handler)
+ 
+-/* Mark stack as non-executable */
+-        .section .note.GNU-stack,"",%progbits
++        NONEXECSTACK_NOTE
+diff --git a/runtime/riscv.S b/runtime/riscv.S
+index 9b16e6548cfe..099a48a96435 100644
+--- a/runtime/riscv.S
++++ b/runtime/riscv.S
+@@ -17,6 +17,7 @@
+ /* Must be preprocessed by cpp */
+ 
+ #include "caml/m.h"
++#include "caml/asm.h"
+ 
+ #define DOMAIN_STATE_PTR s11
+ #define TRAP_PTR s1
+@@ -79,13 +80,13 @@ caml_hot$code_end:
+         TEXT_SECTION(name); \
+         .align 2; \
+         .globl name; \
+-        .type  name, @function; \
++        TYPE_DIRECTIVE(name,@function) \
+ name:; \
+         CFI_STARTPROC
+ 
+ #define END_FUNCTION(name) \
+         CFI_ENDPROC; \
+-        .size name, .-name
++        SIZE_DIRECTIVE(name)
+ 
+ #if defined(__PIC__)
+         .option pic
+@@ -99,12 +100,10 @@ name:; \
+         .data; \
+         .align  3; \
+         .globl  name; \
+-        .type   name, @object; \
++        TYPE_DIRECTIVE(name,@object) \
+ name:
+ #define END_OBJECT(name) \
+-        .size   name, .-name
+-
+-#include "../runtime/caml/asm.h"
++        SIZE_DIRECTIVE(name)
+ 
+ /* Function prologue and epilogue */
+ 
+@@ -1258,5 +1257,5 @@ OBJECT(caml_system$frametable)
+         .short  0                 /* no roots */
+         .align  3
+ END_OBJECT(caml_system$frametable)
+-/* Mark stack as non-executable */
+-        .section .note.GNU-stack,"",%progbits
++
++        NONEXECSTACK_NOTE
+diff --git a/runtime/s390x.S b/runtime/s390x.S
+index 70bb87afedcb..7ae504992cda 100644
+--- a/runtime/s390x.S
++++ b/runtime/s390x.S
+@@ -16,6 +16,7 @@
+ /**************************************************************************/
+ 
+ #include "caml/m.h"
++#include "caml/asm.h"
+ 
+ /* Special registers */
+ 
+@@ -59,18 +60,20 @@ caml_hot$code_end:
+ #define FUNCTION(name) \
+         TEXT_SECTION(name); \
+         .globl name; \
+-        .type name,@function; \
++        TYPE_DIRECTIVE(name,@function) \
+         name:
+ 
+-#define ENDFUNCTION(name)
++#define ENDFUNCTION(name) \
++        SIZE_DIRECTIVE(name)
+ 
+ #define OBJECT(name) \
+         .align 8; \
+         .globl name; \
+-        .type name, @object; \
++        TYPE_DIRECTIVE(name,@object) \
+         name:
+ 
+-#define ENDOBJECT(name)
++#define ENDOBJECT(name) \
++        SIZE_DIRECTIVE(name)
+ 
+ /* Stack space to be reserved by the caller of a C function */
+ #define RESERVED_STACK          160
+@@ -138,8 +141,6 @@ caml_hot$code_end:
+ #define DW_REG_r12                12
+ #define DW_REG_r15                15
+ 
+-#include "../runtime/caml/asm.h"
+-
+ /******************************************************************************/
+ /* Access to the current domain state block. */
+ /******************************************************************************/
+@@ -1217,5 +1218,4 @@ OBJECT(caml_system$frametable)
+         .align  8
+ ENDOBJECT(caml_system$frametable)
+ 
+-/* Mark stack as non-executable */
+-        .section .note.GNU-stack,"",%progbits
++        NONEXECSTACK_NOTE
+diff --git a/testsuite/tools/asmgen_arm.S b/testsuite/tools/asmgen_arm.S
+index da6d9ee74f63..49d734c51388 100644
+--- a/testsuite/tools/asmgen_arm.S
++++ b/testsuite/tools/asmgen_arm.S
+@@ -13,6 +13,9 @@
+ /*                                                                        */
+ /**************************************************************************/
+ 
++#include "caml/m.h"
++#include "caml/asm.h"
++
+         .text
+ 
+         .global call_gen_code
+@@ -38,5 +41,4 @@ caml_c_call:
+     @ function to call is in r10
+         bx      r10
+ 
+-/* Mark stack as non-executable */
+-        .section .note.GNU-stack,"",%progbits
++        NONEXECSTACK_NOTE
+diff --git a/testsuite/tools/asmgen_arm64.S b/testsuite/tools/asmgen_arm64.S
+index 6a06f8d7e2a3..d43144cf59ca 100644
+--- a/testsuite/tools/asmgen_arm64.S
++++ b/testsuite/tools/asmgen_arm64.S
+@@ -13,6 +13,9 @@
+ /*                                                                        */
+ /**************************************************************************/
+ 
++#include "caml/m.h"
++#include "caml/asm.h"
++
+ #if defined(SYS_macosx)
+ #define G(sym) _##sym
+ #else
+@@ -60,7 +63,4 @@ G(call_gen_code):
+ G(caml_c_call):
+         br      x15
+ 
+-#if !defined(SYS_macosx)
+-/* Mark stack as non-executable */
+-        .section .note.GNU-stack,"",%progbits
+-#endif
++        NONEXECSTACK_NOTE
+diff --git a/testsuite/tools/asmgen_power.S b/testsuite/tools/asmgen_power.S
+index b3323484172f..754afefa6b69 100644
+--- a/testsuite/tools/asmgen_power.S
++++ b/testsuite/tools/asmgen_power.S
+@@ -10,6 +10,9 @@
+ /*                                                                   */
+ /*********************************************************************/
+ 
++#include "caml/m.h"
++#include "caml/asm.h"
++
+ #define RESERVED_STACK 32
+ #define LR_SAVE_AREA 16
+ 
+@@ -131,5 +134,4 @@ FUNCTION(caml_c_call)
+         mr      12, 28
+         bctr
+ 
+-/* Mark stack as non-executable */
+-        .section .note.GNU-stack,"",%progbits
++        NONEXECSTACK_NOTE
+diff --git a/testsuite/tools/asmgen_s390x.S b/testsuite/tools/asmgen_s390x.S
+index 99eeca2704e3..14c014c76eb0 100644
+--- a/testsuite/tools/asmgen_s390x.S
++++ b/testsuite/tools/asmgen_s390x.S
+@@ -1,3 +1,6 @@
++#include "caml/m.h"
++#include "caml/asm.h"
++
+ #define ALIGN 8
+ 
+ #define CALL_GEN_CODE call_gen_code
+@@ -63,5 +66,4 @@ CAML_ABSF_MASK:
+ 
+         .comm   young_limit, 8
+ 
+-/* Mark stack as non-executable */
+-        .section .note.GNU-stack,"",%progbits
++        NONEXECSTACK_NOTE
+diff --git a/utils/config.common.ml.in b/utils/config.common.ml.in
+index c5a9b5f1c7ed..0f956d2fbc5f 100644
+--- a/utils/config.common.ml.in
++++ b/utils/config.common.ml.in
+@@ -100,7 +100,9 @@ let configuration_variables () =
+   p "system" system;
+   p "asm" asm;
+   p_bool "asm_cfi_supported" asm_cfi_supported;
++  p_bool "asm_size_type_directives" asm_size_type_directives;
+   p_bool "with_frame_pointers" with_frame_pointers;
++  p_bool "with_nonexecstack_note" with_nonexecstack_note;
+   p "ext_exe" ext_exe;
+   p "ext_obj" ext_obj;
+   p "ext_asm" ext_asm;
+diff --git a/utils/config.fixed.ml b/utils/config.fixed.ml
+index 4665cce8931b..a334b1d76f5d 100644
+--- a/utils/config.fixed.ml
++++ b/utils/config.fixed.ml
+@@ -37,6 +37,7 @@ let native_c_compiler = c_compiler
+ let native_c_libraries = ""
+ let compression_c_libraries = ""
+ let native_ldflags = ""
++let with_nonexecstack_note = false
+ let native_pack_linker = boot_cannot_call "the linker"
+ let default_rpath = ""
+ let mksharedlibrpath = ""
+@@ -65,6 +66,7 @@ let target_os_type =
+   "The boot compiler should not be using Config.target_os_type"
+ let asm = boot_cannot_call "the assembler"
+ let asm_cfi_supported = false
++let asm_size_type_directives = false
+ let with_frame_pointers = false
+ let reserved_header_bits = 0
+ let ext_exe = ".ex_The boot compiler should not be using Config.ext_exe"
+diff --git a/utils/config.generated.ml.in b/utils/config.generated.ml.in
+index 148d812f7dad..c0a3b5376004 100644
+--- a/utils/config.generated.ml.in
++++ b/utils/config.generated.ml.in
+@@ -46,6 +46,7 @@ let native_c_compiler =
+ let native_c_libraries = {@QS@|@cclibs@|@QS@}
+ let compression_c_libraries = {@QS@|@zstd_libs@|@QS@}
+ let native_ldflags = {@QS@|@native_ldflags@|@QS@}
++let with_nonexecstack_note = @with_nonexecstack_note@
+ let native_pack_linker = {@QS@|@PACKLD@|@QS@}
+ let default_rpath = {@QS@|@rpath@|@QS@}
+ let mksharedlibrpath = {@QS@|@mksharedlibrpath@|@QS@}
+@@ -78,6 +79,7 @@ let target_os_type = {@QS@|@target_os_type@|@QS@}
+ 
+ let asm = {@QS@|@AS@|@QS@}
+ let asm_cfi_supported = @asm_cfi_supported@
++let asm_size_type_directives = @asm_size_type_directives@
+ let with_frame_pointers = @frame_pointers@
+ let reserved_header_bits = @reserved_header_bits@
+ 
+diff --git a/utils/config.mli b/utils/config.mli
+index 0375f71efbe3..3e61d6e66b2a 100644
+--- a/utils/config.mli
++++ b/utils/config.mli
+@@ -74,6 +74,12 @@ val compression_c_libraries: string
+ val native_ldflags : string
+ (* Flags to pass to the system linker *)
+ 
++val with_nonexecstack_note : bool
++(** Whether an explicit ".note.GNU-stack" section is to be added to indicate
++    the stack should not be executable
++
++    @since 5.4 *)
++
+ val native_pack_linker: string
+ (** The linker to use for packaging (ocamlopt -pack) and for partial
+     links (ocamlopt -output-obj). *)
+@@ -182,6 +188,11 @@ val asm: string
+ val asm_cfi_supported: bool
+ (** Whether assembler understands CFI directives *)
+ 
++val asm_size_type_directives: bool
++(** Whether the [.size] and [.type] assembler directives can be used
++
++    @since 5.4 *)
++
+ val with_frame_pointers : bool
+ (** Whether assembler should maintain frame pointers *)
+ 
