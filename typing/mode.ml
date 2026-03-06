@@ -1839,11 +1839,10 @@ module Lattices_mono = struct
         | Linearity -> Axis Linearity
         | Statefulness -> Axis Statefulness
         | Portability -> Axis Portability)
-      | Max_with m_ax, ax | Min_with m_ax, ax -> begin
+      | Max_with m_ax, ax | Min_with m_ax, ax -> (
         match Axis.equal m_ax ax with
         | None -> NoneResponsible
-        | Some Refl -> SourceIsSingle
-      end
+        | Some Refl -> SourceIsSingle)
       | Monadic_to_comonadic_min, ax -> handle_monadic_to_comonadic ax
       | Monadic_to_comonadic_max, ax -> handle_monadic_to_comonadic ax
       | Comonadic_to_monadic_min _, ax -> handle_comonadic_to_monadic ax
