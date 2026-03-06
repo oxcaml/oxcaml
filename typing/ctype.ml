@@ -277,13 +277,11 @@ let rec update_variable_stage stage_offset ty name jkind =
   if stage_offset = 0 then ()
   else if stage_offset < 0 then begin
     let v = newvar2 ?name (get_level ty) jkind in
-    let ty' = newty2 ~level:(get_level ty) (Tquote v) in
-    link_type ty ty';
+    link_type ty (new_quote_ty v);
     update_variable_stage (stage_offset + 1) v name jkind
   end else begin
     let v = newvar2 ?name (get_level ty) jkind in
-    let ty' = newty2 ~level:(get_level ty) (Tsplice v) in
-    link_type ty ty';
+    link_type ty (new_splice_ty v);
     update_variable_stage (stage_offset - 1) v name jkind
   end
 
@@ -2166,14 +2164,11 @@ let rec try_expand_once env ty =
   match get_desc ty with
     Tconstr _ -> expand_abbrev env ty
   | Tsplice t ->
-      let t = try_expand_once env t in
-      new_splice_ty t
+      try_expand_once env t |> new_splice_ty
   | Tquote t ->
-      let t = try_expand_once env t in
-      new_quote_ty t
+      try_expand_once env t |> new_quote_ty
   | Tquote_eval t ->
-      let t = try_expand_once env t in
-      new_quote_eval_ty t
+      try_expand_once env t |> new_quote_eval_ty
   | _ -> raise Cannot_expand
 
 (* This one only raises Cannot_expand *)
@@ -2315,7 +2310,7 @@ let rec try_reduce_once t =
     (* reduce in subterm *)
     | Tsplice _
     | Tquote_eval _ ->
-      new_splice_ty (try_reduce_once t)
+      try_reduce_once t |> new_splice_ty
     | _ -> raise Cannot_expand
     end
   | Tquote t -> begin
@@ -2326,7 +2321,7 @@ let rec try_reduce_once t =
     (* reduce in subterm *)
     | Tquote _
     | Tquote_eval _ ->
-      new_quote_ty (try_reduce_once t)
+      try_reduce_once t |> new_quote_ty
     | _ -> raise Cannot_expand
     end
   | _ -> raise Cannot_expand
@@ -2428,14 +2423,11 @@ let rec try_expand_once_opt env ty =
   match get_desc ty with
     Tconstr _ -> expand_abbrev_opt env ty
   | Tsplice t ->
-      let t = try_expand_once_opt env t in
-      newty2 ~level:(get_level t) (Tsplice t)
+      try_expand_once_opt env t |> new_splice_ty
   | Tquote t ->
-      let t = try_expand_once_opt env t in
-      newty2 ~level:(get_level t) (Tquote t)
+      try_expand_once_opt env t |> new_quote_ty
   | Tquote_eval t ->
-      let t = try_expand_once_opt env t in
-      newty2 ~level:(get_level t) (Tquote_eval t)
+      try_expand_once_opt env t |> new_quote_eval_ty
   | _ -> raise Cannot_expand
 
 let try_expand_safe_opt env ty =
