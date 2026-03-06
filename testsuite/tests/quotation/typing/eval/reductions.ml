@@ -508,9 +508,10 @@ Line 1, characters 60-61:
 Error: This expression has type "<[<[int]> eval]> eval" = "int"
        but an expression was expected of type "<[<[int]>]> eval eval"
 |}]
-let f (x : <[<[int]> eval]> eval) = x
+(* This one should definitely succeed *)
+let f (x : <[<[int]> eval]> eval) : int = x
 [%%expect {|
-val f : <[<[int]> eval]> eval -> <[<[int]> eval]> eval = <fun>
+val f : <[<[int]> eval]> eval -> int = <fun>
 |}]
 
 (* quote-kinded types should not reduce *)
