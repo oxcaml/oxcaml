@@ -31,7 +31,7 @@ val for_trywith:
         lambda -> (pattern * lambda) list ->
         lambda
 val for_handler:
-        scopes:scopes -> Location.t ->
+        scopes:scopes -> return_layout:layout -> Location.t ->
         lambda -> lambda -> lambda -> (pattern * lambda) list ->
         lambda
 val for_let:

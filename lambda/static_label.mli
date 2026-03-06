@@ -60,3 +60,7 @@ val get_and_incr : sequence -> t
     This function should only be used when interfacing with legacy code
     that provides raw integers. *)
 val of_int_unsafe : int -> t
+
+(** Labels are totally ordered by [compare], and min retrieves the smaller of
+    the two arguments. *)
+val min : t -> t -> t

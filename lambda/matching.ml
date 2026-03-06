@@ -222,17 +222,9 @@ end = struct
     | Tpat_any
     | Tpat_var _ ->
         p
-<<<<<<< oxcaml
     | Tpat_alias (q, id, s, uid, sort, mode, ty) ->
         { p with pat_desc =
             Tpat_alias (simpl_under_orpat q, id, s, uid, sort, mode, ty) }
-||||||| upstream-base
-    | Tpat_alias (q, id, s) ->
-        { p with pat_desc = Tpat_alias (simpl_under_orpat q, id, s) }
-=======
-    | Tpat_alias (q, id, s, uid, ty) ->
-        { p with pat_desc = Tpat_alias (simpl_under_orpat q, id, s, uid, ty) }
->>>>>>> upstream-incoming
     | Tpat_or (p1, p2, o) ->
         let p1, p2 = (simpl_under_orpat p1, simpl_under_orpat p2) in
         if le_pat p1 p2 then
@@ -258,18 +250,9 @@ end = struct
       in
       match p.pat_desc with
       | `Any -> stop p `Any
-<<<<<<< oxcaml
       | `Var (id, s, uid, sort, mode) ->
         continue p (`Alias (Patterns.omega, id, s, uid, sort, mode, p.pat_type))
       | `Alias (p, id, _, duid, sort, _, _) ->
-||||||| upstream-base
-      | `Var (id, s) -> continue p (`Alias (Patterns.omega, id, s))
-      | `Alias (p, id, _) ->
-=======
-      | `Var (id, s, uid) ->
-          continue p (`Alias (Patterns.omega, id, s, uid, p.pat_type))
-      | `Alias (p, id, _, _, _) ->
->>>>>>> upstream-incoming
           aux
             ( (General.view p, patl),
               bind_alias p id duid ~arg
@@ -325,7 +308,6 @@ end = struct
       match p.pat_desc with
       | `Any -> `Any
       | `Constant cst -> `Constant cst
-<<<<<<< oxcaml
       | `Unboxed_unit -> `Unboxed_unit
       | `Unboxed_bool b -> `Unboxed_bool b
       | `Tuple ps ->
@@ -333,12 +315,6 @@ end = struct
       | `Unboxed_tuple ps ->
           `Unboxed_tuple
             (List.map (fun (label, p, sort) -> label, alpha_pat env p, sort) ps)
-||||||| upstream-base
-      | `Tuple ps -> `Tuple (List.map (alpha_pat env) ps)
-=======
-      | `Tuple ps ->
-          `Tuple (List.map (fun (label, p) -> label, alpha_pat env p) ps)
->>>>>>> upstream-incoming
       | `Construct (cstr, cst_descr, args) ->
           `Construct (cstr, cst_descr, List.map (alpha_pat env) args)
       | `Variant (cstr, argo, row_desc) ->
@@ -346,16 +322,10 @@ end = struct
       | `Record (fields, closed) ->
           let alpha_field env (lid, l, p) = (lid, l, alpha_pat env p) in
           `Record (List.map (alpha_field env) fields, closed)
-<<<<<<< oxcaml
       | `Record_unboxed_product (fields, closed) ->
           let alpha_field env (lid, l, p) = (lid, l, alpha_pat env p) in
           `Record_unboxed_product (List.map (alpha_field env) fields, closed)
       | `Array (am, arg_sort, ps) -> `Array (am, arg_sort, List.map (alpha_pat env) ps)
-||||||| upstream-base
-      | `Array ps -> `Array (List.map (alpha_pat env) ps)
-=======
-      | `Array (am, ps) -> `Array (am, List.map (alpha_pat env) ps)
->>>>>>> upstream-incoming
       | `Lazy p -> `Lazy (alpha_pat env p)
     in
     { p with pat_desc }
@@ -392,25 +362,11 @@ end = struct
       match p.pat_desc with
       | `Or (p1, p2, _) ->
           split_explode p1 aliases (split_explode p2 aliases rem)
-<<<<<<< oxcaml
       | `Alias (p, id, _, _, _, _, _) -> split_explode p (id :: aliases) rem
       | `Var (id, str, uid, sort, mode) ->
-||||||| upstream-base
-      | `Alias (p, id, _) -> split_explode p (id :: aliases) rem
-      | `Var (id, str) ->
-=======
-      | `Alias (p, id, _, _, _) -> split_explode p (id :: aliases) rem
-      | `Var (id, str, uid) ->
->>>>>>> upstream-incoming
           explode
             { p with pat_desc =
-<<<<<<< oxcaml
                 `Alias (Patterns.omega, id, str, uid, sort, mode, p.pat_type) }
-||||||| upstream-base
-            { p with pat_desc = `Alias (Patterns.omega, id, str) }
-=======
-                       `Alias (Patterns.omega, id, str, uid, p.pat_type) }
->>>>>>> upstream-incoming
             aliases rem
       | #view as view ->
           (* We are doing two things here:
@@ -518,42 +474,12 @@ let matcher discr (p : Simple.pattern) rem =
       (* NB: may_equal_constr considers (potential) constructor rebinding;
           Types.may_equal_constr does check that the arities are the same,
           preserving row-size coherence. *)
-<<<<<<< oxcaml
-      yesif (Types.may_equal_constr cstr cstr')
-||||||| upstream-base
-      yesif (Types.may_equal_constr cstr cstr')
-  | Construct _, (Constant _ | Variant _ | Lazy | Array _ | Record _ | Tuple _)
-    ->
-      no ()
-=======
       yesif (Data_types.may_equal_constr cstr cstr')
-  | Construct _, (Constant _ | Variant _ | Lazy | Array _ | Record _ | Tuple _)
-    ->
-      no ()
->>>>>>> upstream-incoming
   | Variant { tag; has_arg }, Variant { tag = tag'; has_arg = has_arg' } ->
       yesif (tag = tag' && has_arg = has_arg')
-<<<<<<< oxcaml
   | Array (am1, _, n1), Array (am2, _, n2) -> yesif (am1 = am2 && n1 = n2)
   | Unboxed_unit, Unboxed_unit -> yes ()
   | Unboxed_bool b1, Unboxed_bool b2 -> yesif (Bool.equal b1 b2)
-||||||| upstream-base
-  | Variant _, (Constant _ | Construct _ | Lazy | Array _ | Record _ | Tuple _)
-    ->
-      no ()
-  | Array n1, Array n2 -> yesif (n1 = n2)
-  | Array _, (Constant _ | Construct _ | Variant _ | Lazy | Record _ | Tuple _)
-    ->
-      no ()
-=======
-  | Variant _, (Constant _ | Construct _ | Lazy | Array _ | Record _ | Tuple _)
-    ->
-      no ()
-  | Array (am1, n1), Array (am2, n2) -> yesif (am1 = am2 && n1 = n2)
-  | Array _, (Constant _ | Construct _ | Variant _ | Lazy | Record _ | Tuple _)
-    ->
-      no ()
->>>>>>> upstream-incoming
   | Tuple n1, Tuple n2 -> yesif (n1 = n2)
   | Unboxed_tuple l1, Unboxed_tuple l2 ->
     yesif (List.for_all2 (fun (lbl1, _) (lbl2, _) -> lbl1 = lbl2) l1 l2)
@@ -697,13 +623,7 @@ end = struct
           match p.pat_desc with
           | `Or (p1, p2, _) ->
               filter_rec ((left, p1, right) :: (left, p2, right) :: rem)
-<<<<<<< oxcaml
           | `Alias (p, _, _, _, _, _, _) -> filter_rec ((left, p, right) :: rem)
-||||||| upstream-base
-          | `Alias (p, _, _) -> filter_rec ((left, p, right) :: rem)
-=======
-          | `Alias (p, _, _, _, _) -> filter_rec ((left, p, right) :: rem)
->>>>>>> upstream-incoming
           | `Var _ -> filter_rec ((left, Patterns.omega, right) :: rem)
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
@@ -753,13 +673,7 @@ let rec flatten_pat_line size p k =
   | Tpat_tuple args -> (List.map snd args) :: k
   | Tpat_or (p1, p2, _) ->
       flatten_pat_line size p1 (flatten_pat_line size p2 k)
-<<<<<<< oxcaml
   | Tpat_alias (p, _, _, _, _, _, _) ->
-||||||| upstream-base
-  | Tpat_alias (p, _, _) ->
-=======
-  | Tpat_alias (p, _, _, _, _) ->
->>>>>>> upstream-incoming
       (* Note: we are only called from flatten_matrix,
          which is itself only ever used in places
          where variables do not matter (default environments,
@@ -806,19 +720,9 @@ let flatten_matrix size pss =
 module Default_environment : sig
   type t
 
-<<<<<<< oxcaml
-  val is_empty : t -> bool
-
   val pop : t -> ((Static_label.t * matrix) * t) option
-||||||| upstream-base
-  val is_empty : t -> bool
 
-  val pop : t -> ((int * matrix) * t) option
-=======
-  val pop : t -> ((int * matrix) * t) option
->>>>>>> upstream-incoming
-
-  val empty : final_exit:int -> t
+  val empty : final_exit:Static_label.t -> t
 
   val raise_final_exit : t -> lambda
 
@@ -836,16 +740,10 @@ module Default_environment : sig
 
   val pp_section : Format.formatter -> t -> unit
 end = struct
-<<<<<<< oxcaml
-  type t = (Static_label.t * matrix) list
-||||||| upstream-base
-  type t = (int * matrix) list
-=======
   type t = {
-    env: (int * matrix) list;
-    final_exit: int;
+    env: (Static_label.t * matrix) list;
+    final_exit: Static_label.t;
   }
->>>>>>> upstream-incoming
   (** All matrices in the list should have the same arity -- their rows should
       have the same number of columns -- as it should match the arity of the
       current scrutiny vector. *)
@@ -867,13 +765,7 @@ end = struct
       | (p, ps) :: rem -> (
           let p = General.view p in
           match p.pat_desc with
-<<<<<<< oxcaml
           | `Alias (p, _, _, _, _, _, _) -> filter_rec ((p, ps) :: rem)
-||||||| upstream-base
-          | `Alias (p, _, _) -> filter_rec ((p, ps) :: rem)
-=======
-          | `Alias (p, _, _, _, _) -> filter_rec ((p, ps) :: rem)
->>>>>>> upstream-incoming
           | `Var _ -> filter_rec ((Patterns.omega, ps) :: rem)
           | `Or (p1, p2, _) -> filter_rec_or p1 p2 ps rem
           | #Simple.view as view -> (
@@ -1063,40 +955,12 @@ module Jumps : sig
 
   val pp_section : Format.formatter -> t -> unit
 end = struct
-<<<<<<< oxcaml
-  type t = (Static_label.t * Context.t) list
-||||||| upstream-base
-  type t = (int * Context.t) list
-=======
   type t = {
-    env : (int * Context.t) list;
+    env : (Static_label.t * Context.t) list;
     partial : partial;
   }
->>>>>>> upstream-incoming
 
-<<<<<<< oxcaml
-  let pp ppf (env : t) =
-    if env = [] then Format.fprintf ppf "empty" else
-    Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf (i, ctx) ->
-      Format.fprintf ppf
-        "jump for %a@,\
-         %a"
-        Static_label.format i
-        Context.pp ctx
-    ) ppf env
-||||||| upstream-base
-  let pp ppf (env : t) =
-    if env = [] then Format.fprintf ppf "empty" else
-    Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf (i, ctx) ->
-      Format.fprintf ppf
-        "jump for %d@,\
-         %a"
-        i
-        Context.pp ctx
-    ) ppf env
-=======
   let partial { partial = p; _ } = p
->>>>>>> upstream-incoming
 
   let pp ppf ({ env; partial } : t) =
     Format.fprintf ppf "@[<v 2>JUMPS:%t@]"
@@ -1108,9 +972,9 @@ end = struct
            Format.fprintf ppf " (%a)@," pp_partial partial;
            Format.pp_print_list ~pp_sep:Format.pp_print_cut (fun ppf (i, ctx) ->
              Format.fprintf ppf
-               "jump for %d@,\
+               "jump for %a@,\
                 %a"
-               i
+               Static_label.format i
                Context.pp ctx
            ) ppf env
          end)
@@ -1121,22 +985,10 @@ end = struct
   let extract i jumps =
     let rec extract i = function
     | [] -> (Context.empty, [])
-<<<<<<< oxcaml
-    | ((j, pss) as x) :: rem as all ->
-        if Static_label.equal i j then
-          (pss, rem)
-        else if Static_label.compare j i < 0 then
-||||||| upstream-base
-    | ((j, pss) as x) :: rem as all ->
-        if i = j then
-          (pss, rem)
-        else if j < i then
-=======
     | ((j, ctx) as x) :: rem as all ->
-        if i = j then
+        if Static_label.equal i j then
           (ctx, rem)
-        else if j < i then
->>>>>>> upstream-incoming
+        else if Static_label.compare j i < 0 then
           (Context.empty, all)
         else
           let r, rem = extract i rem in
@@ -1171,31 +1023,6 @@ end = struct
     else
       { jumps with env = add jumps.env }
 
-<<<<<<< oxcaml
-  let rec union (env1 : t) env2 =
-    match (env1, env2) with
-    | [], _ -> env2
-    | _, [] -> env1
-    | ((i1, pss1) as x1) :: rem1, ((i2, pss2) as x2) :: rem2 ->
-        if Static_label.equal i1 i2 then
-          (i1, Context.union pss1 pss2) :: union rem1 rem2
-        else if Static_label.compare i1 i2 > 0 then
-          x1 :: union rem1 env2
-        else
-          x2 :: union env1 rem2
-||||||| upstream-base
-  let rec union (env1 : t) env2 =
-    match (env1, env2) with
-    | [], _ -> env2
-    | _, [] -> env1
-    | ((i1, pss1) as x1) :: rem1, ((i2, pss2) as x2) :: rem2 ->
-        if i1 = i2 then
-          (i1, Context.union pss1 pss2) :: union rem1 rem2
-        else if i1 > i2 then
-          x1 :: union rem1 env2
-        else
-          x2 :: union env1 rem2
-=======
   let singleton i ctx =
     (* Total: a singleton only jumps to exit [i],
        not to the final exit. *)
@@ -1207,9 +1034,9 @@ end = struct
       | [], _ -> env2
       | _, [] -> env1
       | ((i1, pss1) as x1) :: rem1, ((i2, pss2) as x2) :: rem2 ->
-          if i1 = i2 then
+          if Static_label.equal i1 i2 then
             (i1, Context.union pss1 pss2) :: union rem1 rem2
-          else if i1 > i2 then
+          else if Static_label.compare i1 i2 > 0 then
             x1 :: union rem1 env2
           else
             x2 :: union env1 rem2
@@ -1221,7 +1048,6 @@ end = struct
         | Partial, _ | _, Partial -> Partial
       );
     }
->>>>>>> upstream-incoming
 
   let rec merge = function
     | env1 :: env2 :: rem -> union env1 env2 :: merge rem
@@ -1298,30 +1124,14 @@ let pp_partiality ppf {current; global; tempo} =
 
 type ('args, 'row) pattern_matching = {
   mutable cases : 'row list;
-<<<<<<< oxcaml
-  args : (lambda * let_kind * Jkind.Sort.Const.t * layout) list;
-      (** args are not just Ident.t in at least the following cases:
-        - when matching the arguments of a constructor,
-          direct field projections are used (make_field_args)
-        - with lazy patterns args can be of the form [Lazy.force ...]
-          (inline_lazy_force). *)
-||||||| upstream-base
-  args : (lambda * let_kind) list;
-      (** args are not just Ident.t in at least the following cases:
-        - when matching the arguments of a constructor,
-          direct field projections are used (make_field_args)
-        - with lazy patterns args can be of the form [Lazy.force ...]
-          (inline_lazy_force). *)
-=======
   args : 'args;
->>>>>>> upstream-incoming
   default : Default_environment.t
 }
 
 type 'a arg = {
   arg : 'a;
   binding_kind : let_kind;
-  mut : mutable_flag;
+  mut : Asttypes.mutable_flag;
   (** We track with a [mutable_flag] whether a mutable read was
       performed to access the corresponding sub-value of the
       scrutinee: an argument is [Mutable] if the path from the root of
@@ -1330,6 +1140,8 @@ type 'a arg = {
       the same position in different branches of the pattern
       matching -- outside the scope of the strict binding generated
       for the mutable read -- may observe a different value. *)
+  sort : Jkind.Sort.Const.t;
+  layout : layout;
 }
 
 type args = lambda arg list
@@ -1360,19 +1172,9 @@ let arg_of_pure = function
 
 type handler = {
   provenance : matrix;
-<<<<<<< oxcaml
   exit : Static_label.t;
   vars : (Ident.t * Lambda.debug_uid * Lambda.layout) list;
-  pm : initial_clause pattern_matching
-||||||| upstream-base
-  exit : int;
-  vars : (Ident.t * Lambda.value_kind) list;
-  pm : initial_clause pattern_matching
-=======
-  exit : int;
-  vars : (Ident.t * Lambda.value_kind) list;
   pm : (args, initial_clause) pattern_matching
->>>>>>> upstream-incoming
 }
 
 type ('args, 'head_pat, 'matrix) pm_or_compiled = {
@@ -1393,6 +1195,7 @@ type ('args, 'head_pat, 'matrix) pm_or_compiled = {
    it obvious that we thought about how this value should evolve (or not).
 *)
 let compose_mut m1 m2 =
+  let open Asttypes in
   match m1, m2 with
   | Immutable, Immutable -> Immutable
   | Mutable, _ | _, Mutable -> Mutable
@@ -1637,14 +1440,8 @@ let can_group discr pat =
   | Constant (Const_unboxed_int64 _), Constant (Const_unboxed_int64 _)
   | Constant (Const_unboxed_nativeint _), Constant (Const_unboxed_nativeint _)->
       true
-<<<<<<< oxcaml
-  | Construct { cstr_tag = Extension _ as discr_tag }, Construct pat_cstr
-||||||| upstream-base
-  | Construct { cstr_tag = Cstr_extension _ as discr_tag }, Construct pat_cstr
-=======
-  | Construct { cstr_tag = Cstr_extension (p1, _) },
-    Construct { cstr_tag = Cstr_extension (p2, _) }
->>>>>>> upstream-incoming
+  | Construct { cstr_tag = Extension p1 },
+    Construct { cstr_tag = Extension p2 }
     ->
       (* Extension constructors with distinct names may be equal thanks to
          constructor rebinding. So we need to produce a specialized
@@ -1688,13 +1485,7 @@ let rec omega_like p =
   | Tpat_any
   | Tpat_var _ ->
       true
-<<<<<<< oxcaml
   | Tpat_alias (p, _, _, _, _, _, _) -> omega_like p
-||||||| upstream-base
-  | Tpat_alias (p, _, _) -> omega_like p
-=======
-  | Tpat_alias (p, _, _, _, _) -> omega_like p
->>>>>>> upstream-incoming
   | Tpat_or (p1, p2, _) -> omega_like p1 || omega_like p2
   | _ -> false
 
@@ -1839,13 +1630,7 @@ let as_matrix cases =
 
 *)
 
-<<<<<<< oxcaml
-let rec split_or ~arg ~arg_sort (cls : Half_simple.clause list) args def =
-||||||| upstream-base
-let rec split_or ~arg (cls : Half_simple.clause list) args def =
-=======
 let rec split_or (cls : Half_simple.clause list) args def =
->>>>>>> upstream-incoming
   let rec do_split (rev_before : Simple.clause list) rev_ors rev_no = function
     | [] ->
         cons_next (List.rev rev_before) (List.rev rev_ors) (List.rev rev_no)
@@ -1876,13 +1661,7 @@ let rec split_or (cls : Half_simple.clause list) args def =
     in
     match yesor with
     | [] -> split_no_or yes args def nexts
-<<<<<<< oxcaml
-    | _ -> precompile_or ~arg ~arg_sort yes yesor args def nexts
-||||||| upstream-base
-    | _ -> precompile_or ~arg yes yesor args def nexts
-=======
     | _ -> precompile_or yes yesor args def nexts
->>>>>>> upstream-incoming
   in
   do_split [] [] [] cls
 
@@ -1957,18 +1736,8 @@ and precompile_var args cls def k =
      precompile the rest, add a PmVar to all precompiled submatrices.
 
      If the rest doesn't generate any split, abort and do_not_precompile. *)
-<<<<<<< oxcaml
-  match args with
-  | [] -> assert false
-  | _ :: ((Lvar v, _, arg_sort, _) as arg) :: rargs -> (
-||||||| upstream-base
-  match args with
-  | [] -> assert false
-  | _ :: ((Lvar v, _) as arg) :: rargs -> (
-=======
   match args.rest with
   | { arg = Lvar v; _ } as first :: rargs -> (
->>>>>>> upstream-incoming
       (* We will use the name of the head column of the submatrix
          we compile, and this is the *second* column of our argument. *)
       match cls with
@@ -1989,13 +1758,7 @@ and precompile_var args cls def k =
               cls
           and var_def = Default_environment.pop_column def in
           let { me = first; matrix }, nexts =
-<<<<<<< oxcaml
-            split_or ~arg:(Lvar v) ~arg_sort var_cls var_args var_def
-||||||| upstream-base
-            split_or ~arg:(Lvar v) var_cls var_args var_def
-=======
             split_or var_cls var_args var_def
->>>>>>> upstream-incoming
           in
           (* Compute top information *)
           match nexts with
@@ -2046,13 +1809,7 @@ and do_not_precompile args cls def k =
     },
     k )
 
-<<<<<<< oxcaml
-and precompile_or ~arg ~arg_sort (cls : Simple.clause list) ors args def k =
-||||||| upstream-base
-and precompile_or ~arg (cls : Simple.clause list) ors args def k =
-=======
 and precompile_or (cls : Simple.clause list) ors args def k =
->>>>>>> upstream-incoming
   (* Example: if [cls] is a single-row matrix
 
        s11        p12 .. p1n -> act1
@@ -2116,19 +1873,9 @@ and precompile_or (cls : Simple.clause list) ors args def k =
               (* variables bound in the or-pattern
                  that are used in the orpm actions *)
               Typedtree.pat_bound_idents_full orp
-<<<<<<< oxcaml
               |> List.filter (fun (id, _, _, _, _) -> Ident.Set.mem id pm_fv)
               |> List.map (fun (id, _, ty, uid, id_sort) ->
                   (id, uid, Typeopt.layout orp.pat_env orp.pat_loc id_sort ty))
-||||||| upstream-base
-              |> List.filter (fun (id, _, _) -> Ident.Set.mem id pm_fv)
-              |> List.map (fun (id, _, ty) ->
-                     (id, Typeopt.value_kind orp.pat_env ty))
-=======
-              |> List.filter (fun (id, _, _, _) -> Ident.Set.mem id pm_fv)
-              |> List.map (fun (id, _, ty, _) ->
-                     (id, Typeopt.value_kind orp.pat_env ty))
->>>>>>> upstream-incoming
             in
             let or_num = next_raise_count () in
             let new_patl = Patterns.omega_list patl in
@@ -2136,14 +1883,9 @@ and precompile_or (cls : Simple.clause list) ors args def k =
               Lstaticraise (or_num, List.map (fun v -> Lvar v) vars)
             in
             let new_cases =
-<<<<<<< oxcaml
-              Simple.explode_or_pat ~arg ~arg_sort p
-||||||| upstream-base
-              Simple.explode_or_pat ~arg p
-=======
               let arg = arg_of_pure args.first.arg in
-              Simple.explode_or_pat ~arg p
->>>>>>> upstream-incoming
+              let arg_sort = args.first.sort in
+              Simple.explode_or_pat ~arg ~arg_sort p
                 ~mk_action:mk_new_action
                 ~patbound_action_vars:
                  (List.map (fun (id, duid, _) -> id, duid) patbound_action_vars)
@@ -2221,18 +1963,8 @@ let split_and_precompile_simplified pm =
   dbg_split_and_precompile pm next nexts;
   (next, nexts)
 
-<<<<<<< oxcaml
-let split_and_precompile_half_simplified ~arg ~arg_sort pm =
-  let { me = next }, nexts =
-    split_or ~arg ~arg_sort pm.cases pm.args pm.default
-  in
-||||||| upstream-base
-let split_and_precompile_half_simplified ~arg pm =
-  let { me = next }, nexts = split_or ~arg pm.cases pm.args pm.default in
-=======
 let split_and_precompile_half_simplified pm =
   let { me = next }, nexts = split_or pm.cases pm.args pm.default in
->>>>>>> upstream-incoming
   dbg_split_and_precompile pm next nexts;
   (next, nexts)
 
@@ -2261,13 +1993,7 @@ let make_line_matching get_expr_args head def { first; rest } =
   }
 
 type 'a division = {
-<<<<<<< oxcaml
-  args : (lambda * let_kind * Jkind.Sort.Const.t * layout) list;
-||||||| upstream-base
-  args : (lambda * let_kind) list;
-=======
   args : split_args;
->>>>>>> upstream-incoming
   cells : ('a * cell) list
 }
 
@@ -2375,20 +2101,13 @@ let get_pat_args_constr p rem =
     args @ rem
   | _ -> assert false
 
-<<<<<<< oxcaml
-let get_expr_args_constr ~scopes head (arg, _mut, sort, layout) rem =
-||||||| upstream-base
-let get_expr_args_constr ~scopes head (arg, _mut) rem =
-=======
-let get_expr_args_constr ~scopes head { arg; mut; _ } rem =
->>>>>>> upstream-incoming
+let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
   let cstr =
     match head.pat_desc with
     | Patterns.Head.Construct cstr -> cstr
     | _ -> fatal_error "Matching.get_expr_args_constr"
   in
   let loc = head_loc ~scopes head in
-<<<<<<< oxcaml
   let ubr = Translmode.transl_unique_barrier (head.pat_unique_barrier) in
   let sem = add_barrier_to_read ubr Reads_agree in
   let make_void_access binding_kind sort pos =
@@ -2413,26 +2132,6 @@ let get_expr_args_constr ~scopes head { arg; mut; _ } rem =
       | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate
       | Splice_variable _ ->
         fatal_error "Matching.get_exr_args_constr: non-void layout"
-||||||| upstream-base
-  let make_field_accesses binding_kind first_pos last_pos argl =
-    let rec make_args pos =
-      if pos > last_pos then
-        argl
-      else
-        (Lprim (Pfield (pos, Pointer, Immutable), [ arg ], loc),
-               binding_kind) :: make_args (pos + 1)
-=======
-  let make_field_accesses binding_kind first_pos last_pos argl =
-    let rec make_args pos =
-      if pos > last_pos then
-        argl
-      else
-        {
-          arg = Lprim (Pfield (pos, Pointer, Immutable), [ arg ], loc);
-          mut = compose_mut mut Immutable;
-          binding_kind;
-        } :: make_args (pos + 1)
->>>>>>> upstream-incoming
     in
     match cstr.cstr_shape with
     | Constructor_uniform_value ->
@@ -2441,7 +2140,8 @@ let get_expr_args_constr ~scopes head { arg; mut; _ } rem =
     | Constructor_mixed shape ->
       let shape = transl_mixed_product_shape shape in
       let e, layout = lambda_void_of_el shape.(pos) in
-      (e, binding_kind, sort, layout)
+      (* CR sspies: I have low confidence on mutability here. *)
+      { arg = e; binding_kind; mut = compose_mut mut Immutable; sort; layout; }
   in
   let make_field_access binding_kind sort ~field:_ ~pos =
     if cstr.cstr_constant then
@@ -2463,59 +2163,45 @@ let get_expr_args_constr ~scopes head { arg; mut; _ } rem =
             Pmixedfield ([pos], shape, sem)
       in
       let layout = Typeopt.layout_of_sort head.pat_loc sort in
-      (Lprim (prim, [ arg ], loc), binding_kind, sort, layout)
+      (* CR sspies: I have low confidence on mutability here. *)
+      {
+        arg = Lprim (prim, [ arg ], loc);
+        binding_kind;
+        mut = compose_mut mut Immutable;
+        sort;
+        layout;
+      }
   in
-  let str = add_barrier_to_let_kind ubr Alias in
+  let binding_kind = add_barrier_to_let_kind ubr Alias in
   if cstr.cstr_inlined <> None then
-<<<<<<< oxcaml
-    (arg, str, sort, layout) :: rem
-||||||| upstream-base
-    (arg, Alias) :: rem
-=======
-    { arg; binding_kind = Alias; mut } :: rem
->>>>>>> upstream-incoming
+    { arg; binding_kind; mut; sort; layout } :: rem
   else
-<<<<<<< oxcaml
     match cstr.cstr_repr with
     | Variant_boxed _ ->
       List.mapi
       (fun i { ca_sort } ->
-         make_field_access str ca_sort ~field:i ~pos:i)
+         make_field_access binding_kind ca_sort ~field:i ~pos:i)
       cstr.cstr_args
         @ rem
     | Variant_unboxed | Variant_with_null ->
       if cstr.cstr_constant then
         rem (* [Null] constructor case. *)
       else
-        (arg, str, sort, layout) :: rem
+        (* CR sspies: I have low confidence on mutability here. *)
+        { arg; binding_kind; mut; sort; layout } :: rem
         (* the unboxed variant constructor, or the [This] constructor
            for [Variant_with_null]. *)
     | Variant_extensible ->
         List.mapi
           (fun i { ca_sort } ->
-             make_field_access str ca_sort ~field:i ~pos:(i+1))
+             make_field_access binding_kind ca_sort ~field:i ~pos:(i+1))
           cstr.cstr_args
         @ rem
-||||||| upstream-base
-    match cstr.cstr_tag with
-    | Cstr_constant _
-    | Cstr_block _ ->
-        make_field_accesses Alias 0 (cstr.cstr_arity - 1) rem
-    | Cstr_unboxed -> (arg, Alias) :: rem
-    | Cstr_extension _ -> make_field_accesses Alias 1 cstr.cstr_arity rem
-=======
-    match cstr.cstr_tag with
-    | Cstr_constant _
-    | Cstr_block _ ->
-        make_field_accesses Alias 0 (cstr.cstr_arity - 1) rem
-    | Cstr_unboxed -> { arg; binding_kind = Alias; mut } :: rem
-    | Cstr_extension _ -> make_field_accesses Alias 1 cstr.cstr_arity rem
->>>>>>> upstream-incoming
 
 let divide_constructor ~scopes ctx pm =
   divide
     (get_expr_args_constr ~scopes)
-    Data_types.equal_constr
+    Data_types.may_equal_constr
     get_key_constr
     get_pat_args_constr
     ctx pm
@@ -2524,35 +2210,22 @@ let divide_constructor ~scopes ctx pm =
 
 let get_expr_args_variant_constant = drop_expr_arg
 
-<<<<<<< oxcaml
 let nonconstant_variant_field ubr index =
   let sem = add_barrier_to_read ubr Reads_agree in
   Lambda.Pfield(index, Pointer, sem)
 
-let get_expr_args_variant_nonconst ~scopes head (arg, _mut, _sort, _layout)
-      rem =
-||||||| upstream-base
-let get_expr_args_variant_nonconst ~scopes head (arg, _mut) rem =
-=======
 let get_expr_args_variant_nonconst ~scopes head { arg; mut; _ } rem =
->>>>>>> upstream-incoming
   let loc = head_loc ~scopes head in
-<<<<<<< oxcaml
   let ubr = Translmode.transl_unique_barrier (head.pat_unique_barrier) in
   let field_prim = nonconstant_variant_field ubr 1 in
-  let str = add_barrier_to_let_kind ubr Alias in
-  (Lprim (field_prim, [ arg ], loc), str, Jkind.Sort.Const.for_variant_arg,
-   layout_variant_arg)
-  :: rem
-||||||| upstream-base
-  (Lprim (Pfield (1, Pointer, Immutable), [ arg ], loc), Alias) :: rem
-=======
+  let binding_kind = add_barrier_to_let_kind ubr Alias in
   {
-    arg = Lprim (Pfield (1, Pointer, Immutable), [ arg ], loc);
-    binding_kind = Alias;
+    arg = Lprim (field_prim, [ arg ], loc);
+    binding_kind;
     mut = compose_mut mut Immutable;
+    sort = Jkind.Sort.Const.for_variant_arg;
+    layout = layout_variant_arg;
   } :: rem
->>>>>>> upstream-incoming
 
 let divide_variant ~scopes row ctx { cases = cl; args; default = def } =
   let rec divide = function
@@ -2617,43 +2290,8 @@ let get_pat_args_lazy p rem =
 let prim_obj_tag =
   Lambda.simple_prim_on_values ~name:"caml_obj_tag" ~arity:1 ~alloc:false
 
-<<<<<<< oxcaml
-let get_mod_field modname field =
-  lazy
-    (let mod_ident = Ident.create_persistent modname in
-     let env =
-       Env.add_persistent_structure mod_ident
-         (Lazy.force Env.initial)
-     in
-     let _, _, env = Env.open_pers_signature modname env in
-     match Env.find_value_by_name_lazy (Longident.Lident field) env with
-     | exception Not_found ->
-         fatal_errorf "Primitive %s.%s not found." modname field
-     | path, _ ->
-         (* Loc_unknown is appropriate here: this references a compiler-internal
-            primitive with no corresponding user source location. *)
-         transl_value_path Scoped_location.Loc_unknown env path
-    )
-||||||| upstream-base
-let get_mod_field modname field =
-  lazy
-    (let mod_ident = Ident.create_persistent modname in
-     let env =
-       Env.add_persistent_structure mod_ident Env.initial
-     in
-     match Env.open_pers_signature modname env with
-     | Error `Not_found ->
-         fatal_errorf "Module %s unavailable." modname
-     | Ok env -> (
-         match Env.find_value_by_name (Longident.Lident field) env with
-         | exception Not_found ->
-             fatal_errorf "Primitive %s.%s not found." modname field
-         | path, _ -> transl_value_path Loc_unknown env path
-       ))
-=======
 let code_force_lazy_block =
   lazy (transl_prim "CamlinternalLazy" "force_lazy_block")
->>>>>>> upstream-incoming
 
 let code_force_lazy =
   lazy (transl_prim "CamlinternalLazy" "force_gen")
@@ -2766,28 +2404,12 @@ let inline_lazy_force arg pos loc =
         ap_loc = loc;
         ap_func = Lazy.force code_force_lazy;
         ap_args = [ Lconst (Const_base (Const_int 0)); arg ];
-<<<<<<< oxcaml
         ap_result_layout = Lambda.layout_lazy_contents;
         ap_region_close = pos;
         ap_mode = alloc_heap;
-        (* nroberts: To make sure this wasn't inlined:
-             - Upstream changed [code_force_lazy] to a non-inlineable
-               function when compiling with AFL support.
-             - We just changed this to Never_inlined.
-
-           If these two approaches are solving the same problem, we should
-           just converge to one.
-        *)
         ap_inlined = Never_inlined;
         ap_specialised = Default_specialise;
         ap_probe=None;
-||||||| upstream-base
-        ap_inlined = Default_inline;
-        ap_specialised = Default_specialise
-=======
-        ap_inlined = Never_inline;
-        ap_specialised = Default_specialise
->>>>>>> upstream-incoming
       }
   else if !Clflags.native_code && not (Clflags.is_flambda2 ()) then
     (* CR vlaviron: Find a way for Flambda 2 to avoid both the call to
@@ -2799,28 +2421,17 @@ let inline_lazy_force arg pos loc =
          tables (~ 250 elts); conditionals are better *)
     inline_lazy_force_cond arg pos loc
 
-<<<<<<< oxcaml
-let get_expr_args_lazy ~scopes head (arg, _mut, _sort, _layout) rem =
-||||||| upstream-base
-let get_expr_args_lazy ~scopes head (arg, _mut) rem =
-=======
 let get_expr_args_lazy ~scopes head { arg; mut; _ } rem =
->>>>>>> upstream-incoming
   let loc = head_loc ~scopes head in
-<<<<<<< oxcaml
-  (inline_lazy_force arg Rc_normal loc, Strict, Jkind.Sort.Const.for_lazy_body,
-   layout_lazy_contents) :: rem
-||||||| upstream-base
-  (inline_lazy_force arg loc, Strict) :: rem
-=======
   {
-    arg = inline_lazy_force arg loc;
+    arg = inline_lazy_force arg Rc_normal loc;
     binding_kind = Strict;
     mut = compose_mut mut Immutable;
     (* A lazy pattern is considered immutable, forcing its argument
        always returns the same value. *)
+    sort = Jkind.Sort.Const.for_lazy_body;
+    layout = layout_lazy_contents;
   } :: rem
->>>>>>> upstream-incoming
 
 let divide_lazy ~scopes head ctx pm =
   divide_line (Context.specialize head)
@@ -2836,7 +2447,6 @@ let get_pat_args_tuple arity p rem =
   | { pat_desc = Tpat_tuple args } -> (List.map snd args) @ rem
   | _ -> assert false
 
-<<<<<<< oxcaml
 let get_pat_args_unboxed_tuple arity p rem =
   match p with
   | { pat_desc = Tpat_any } -> Patterns.omegas arity @ rem
@@ -2844,40 +2454,27 @@ let get_pat_args_unboxed_tuple arity p rem =
     (List.map (fun (_, p, _) -> p) args) @ rem
   | _ -> assert false
 
-let get_expr_args_tuple ~scopes head (arg, _mut, _sort, _layout) rem =
-||||||| upstream-base
-let get_expr_args_tuple ~scopes head (arg, _mut) rem =
-=======
 let get_expr_args_tuple ~scopes head { arg; mut; _ } rem =
->>>>>>> upstream-incoming
   let loc = head_loc ~scopes head in
   let arity = Patterns.Head.arity head in
   let ubr = Translmode.transl_unique_barrier (head.pat_unique_barrier) in
   let sem = add_barrier_to_read ubr Reads_agree in
-  let str = add_barrier_to_let_kind ubr Alias in
+  let binding_kind = add_barrier_to_let_kind ubr Alias in
   let rec make_args pos =
     if pos >= arity then
       rem
     else
-<<<<<<< oxcaml
-      (Lprim (Pfield (pos, Pointer, sem), [ arg ], loc), str,
-       Jkind.Sort.Const.for_tuple_element, layout_tuple_element)
-        :: make_args (pos + 1)
-||||||| upstream-base
-      (Lprim (Pfield (pos, Pointer, Immutable), [ arg ], loc),
-             Alias) :: make_args (pos + 1)
-=======
       {
-        arg = Lprim (Pfield (pos, Pointer, Immutable), [ arg ], loc);
-        binding_kind = Alias;
+        arg = Lprim (Pfield (pos, Pointer, sem), [ arg ], loc);
+        binding_kind;
         mut = compose_mut mut Immutable;
+        sort = Jkind.Sort.Const.for_tuple_element;
+        layout = layout_tuple_element;
       } :: make_args (pos + 1)
->>>>>>> upstream-incoming
   in
   make_args 0
 
-let get_expr_args_unboxed_tuple ~scopes shape head (arg, _mut, _sort, _layout)
-      rem =
+let get_expr_args_unboxed_tuple ~scopes shape head { arg; mut; _ } rem =
   let loc = head_loc ~scopes head in
   let shape =
     List.map (fun (_, sort) ->
@@ -2890,9 +2487,13 @@ let get_expr_args_unboxed_tuple ~scopes shape head (arg, _mut, _sort, _layout)
   in
   let layouts = List.map (fun (_, layout) -> layout) shape in
   List.mapi (fun pos (sort, layout) ->
-    (Lprim (Punboxed_product_field (pos, layouts), [ arg ], loc), Alias,
-     sort, layout))
-    shape
+    {
+      arg = Lprim (Punboxed_product_field (pos, layouts), [ arg ], loc);
+      binding_kind = Alias;
+      mut = compose_mut mut Immutable; (* CR sspies: This or immutable? *)
+      sort;
+      layout;
+    }) shape
   @ rem
 
 let divide_tuple ~scopes head ctx pm =
@@ -2925,7 +2526,6 @@ let get_pat_args_record num_fields p rem =
       record_matching_line num_fields lbl_pat_list @ rem
   | _ -> assert false
 
-<<<<<<< oxcaml
 let get_pat_args_record_unboxed_product num_fields p rem =
   match p with
   | { pat_desc = Tpat_any } -> record_matching_line num_fields [] @ rem
@@ -2933,12 +2533,7 @@ let get_pat_args_record_unboxed_product num_fields p rem =
       record_matching_line num_fields lbl_pat_list @ rem
   | _ -> assert false
 
-let get_expr_args_record ~scopes head (arg, _mut, sort, layout) rem =
-||||||| upstream-base
-let get_expr_args_record ~scopes head (arg, _mut) rem =
-=======
-let get_expr_args_record ~scopes head { arg; mut; _ } rem =
->>>>>>> upstream-incoming
+let get_expr_args_record ~scopes head { arg; mut; sort; layout; _ } rem =
   let loc = head_loc ~scopes head in
   let all_labels =
     let open Patterns.Head in
@@ -2998,14 +2593,22 @@ let get_expr_args_record ~scopes head { arg; mut; _ } rem =
             lbl.lbl_sort, lbl_layout
         | Record_inlined (_, _, Variant_with_null) -> assert false
       in
-      let str = if Types.is_mutable lbl.lbl_mut then StrictOpt else Alias in
-      let str = add_barrier_to_let_kind ubr str in
-      (access, str, sort, layout) :: make_args (pos + 1)
+      let binding_kind =
+        if Types.is_mutable lbl.lbl_mut then StrictOpt else Alias
+      in
+      let binding_kind = add_barrier_to_let_kind ubr binding_kind in
+      {
+        arg = access;
+        binding_kind;
+        mut = compose_mut mut
+          (if Types.is_mutable lbl.lbl_mut then Mutable else Immutable);
+        sort;
+        layout;
+      } :: make_args (pos + 1)
   in
   make_args 0
 
-let get_expr_args_record_unboxed_product ~scopes head
-      (arg, _mut, _sort, _layout) rem =
+let get_expr_args_record_unboxed_product ~scopes head { arg; mut; _ } rem =
   let loc = head_loc ~scopes head in
   let all_labels =
     let open Patterns.Head in
@@ -3032,38 +2635,22 @@ let get_expr_args_record_unboxed_product ~scopes head
       else
         Lprim (Punboxed_product_field (pos, lbl_layouts), [ arg ], loc)
       in
-<<<<<<< oxcaml
-      let str =
+      let binding_kind, mut =
         if Types.is_mutable lbl.lbl_mut then
           fatal_error
             ("Matching.get_expr_args_record_unboxed_product: "
              ^ "unboxed record labels are never mutable")
         else
-          Alias
-||||||| upstream-base
-      let str =
-        match lbl.lbl_mut with
-        | Immutable -> Alias
-        | Mutable -> StrictOpt
-=======
-      let binding_kind =
-        match lbl.lbl_mut with
-        | Immutable -> Alias
-        | Mutable -> StrictOpt
->>>>>>> upstream-incoming
+          Alias, compose_mut mut Immutable
       in
-<<<<<<< oxcaml
       let layout = Typeopt.layout_of_sort lbl.lbl_loc lbl.lbl_sort in
-      (access, str, lbl.lbl_sort, layout) :: make_args (pos + 1)
-||||||| upstream-base
-      (access, str) :: make_args (pos + 1)
-=======
       {
         arg = access;
         binding_kind;
-        mut = compose_mut mut lbl.lbl_mut;
+        mut;
+        sort = lbl.lbl_sort;
+        layout
       } :: make_args (pos + 1)
->>>>>>> upstream-incoming
   in
   make_args 0
 
@@ -3089,45 +2676,19 @@ let divide_record_unboxed_product all_labels ~scopes head ctx pm =
 (* Matching against an array pattern *)
 
 let get_key_array = function
-<<<<<<< oxcaml
   | { pat_desc = Tpat_array (_, _, patl) } -> List.length patl
-||||||| upstream-base
-  | { pat_desc = Tpat_array patl } -> List.length patl
-=======
-  | { pat_desc = Tpat_array (_, patl) } -> List.length patl
->>>>>>> upstream-incoming
   | _ -> assert false
 
 let get_pat_args_array p rem =
   match p with
-<<<<<<< oxcaml
   | { pat_desc = Tpat_array (_, _, patl) } -> patl @ rem
-||||||| upstream-base
-  | { pat_desc = Tpat_array patl } -> patl @ rem
-=======
-  | { pat_desc = Tpat_array (_, patl) } -> patl @ rem
->>>>>>> upstream-incoming
   | _ -> assert false
 
-<<<<<<< oxcaml
-let get_expr_args_array ~scopes kind head (arg, _mut, _sort, _layout) rem =
+let get_expr_args_array ~scopes kind head { arg; mut; _ } rem =
   let am, arg_sort, len =
-||||||| upstream-base
-let get_expr_args_array ~scopes kind head (arg, _mut) rem =
-  let len =
-=======
-let get_expr_args_array ~scopes kind head { arg; mut } rem =
-  let am, len =
->>>>>>> upstream-incoming
     let open Patterns.Head in
     match head.pat_desc with
-<<<<<<< oxcaml
     | Array (am, arg_sort, len) -> am, arg_sort, len
-||||||| upstream-base
-    | Array len -> len
-=======
-    | Array (am, len) -> am, len
->>>>>>> upstream-incoming
     | _ -> assert false
   in
   let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
@@ -3136,40 +2697,21 @@ let get_expr_args_array ~scopes kind head { arg; mut } rem =
     if pos >= len then
       rem
     else
-<<<<<<< oxcaml
       (* TODO: The resulting float should be allocated to at the mode of the
          array pattern, once that's available *)
       let ref_kind = Lambda.(array_ref_kind alloc_heap kind) in
       let result_layout = array_ref_kind_result_layout ref_kind in
-      let mut = if Types.is_mutable am then Mutable else Immutable in
-      ( Lprim
-          (Parrayrefu (ref_kind, Ptagged_int_index, mut),
+      let am_mut = if Types.is_mutable am then Mutable else Immutable in
+      { arg = Lprim
+          (Parrayrefu (ref_kind, Ptagged_int_index, am_mut),
            [ arg; Lconst (Const_base (Const_int pos)) ],
-           loc),
-        (if Types.is_mutable am then StrictOpt else Alias),
-        arg_sort,
-        result_layout)
-      :: make_args (pos + 1)
-||||||| upstream-base
-      ( Lprim
-          (Parrayrefu kind, [ arg; Lconst (Const_base (Const_int pos)) ], loc),
-        StrictOpt )
-      :: make_args (pos + 1)
-=======
-      let arg =
-        Lprim
-          (Parrayrefu kind,
-           [ arg; Lconst (Const_base (Const_int pos)) ], loc)
-      in
-      {
-        arg;
-        binding_kind =
-          (match am with
-          | Mutable   -> StrictOpt
-          | Immutable -> Alias);
-        mut = compose_mut mut am;
+           loc);
+        binding_kind = (if Types.is_mutable am then StrictOpt else Alias);
+        mut =
+          compose_mut mut (if Types.is_mutable am then Mutable else Immutable);
+        sort = arg_sort;
+        layout = result_layout;
       } :: make_args (pos + 1)
->>>>>>> upstream-incoming
   in
   make_args 0
 
@@ -3544,40 +3086,21 @@ let reintroduce_fail sw =
       in
       List.iter seen sw.sw_consts;
       List.iter seen sw.sw_blocks;
-<<<<<<< oxcaml
-      let i_max = ref None and max = ref (-1) in
-      Static_label.Tbl.iter
-||||||| upstream-base
-      let i_max = ref (-1) and max = ref (-1) in
-      Hashtbl.iter
-=======
       let c_max = ref (-1) in
-      let i_max = ref max_int in
-      Hashtbl.iter
->>>>>>> upstream-incoming
+      let i_max = ref None in
+      Static_label.Tbl.iter
         (fun i c ->
-<<<<<<< oxcaml
-          if c > !max then (
-            i_max := Some i;
-            max := c
-||||||| upstream-base
-          if c > !max then (
-            i_max := i;
-            max := c
-=======
           if c > !c_max then (
-            i_max := i;
+            i_max := Some i;
             c_max := c
           ) else if c = !c_max then (
            (* Pick the miminal [i] which has maximal [c], and not just
               the first [i], as the Hashtbl iteration order is not
               deterministic: see #14088. *)
-            i_max := min i !i_max;
->>>>>>> upstream-incoming
+            i_max := Some (Static_label.min i (Option.value ~default:i !i_max));
           ))
         t;
-<<<<<<< oxcaml
-      if !max >= 3 then
+      if !c_max >= 3 then
         match !i_max with
         | Some default ->
             let remove =
@@ -3592,35 +3115,6 @@ let reintroduce_fail sw =
               sw_failaction = Some (make_exit default)
             }
         | None -> sw
-||||||| upstream-base
-      if !max >= 3 then
-        let default = !i_max in
-        let remove =
-          List.filter (fun (_, lam) ->
-              match as_simple_exit lam with
-              | Some j -> j <> default
-              | None -> true)
-        in
-        { sw with
-          sw_consts = remove sw.sw_consts;
-          sw_blocks = remove sw.sw_blocks;
-          sw_failaction = Some (make_exit default)
-        }
-=======
-      if !c_max >= 3 then
-        let default = !i_max in
-        let remove =
-          List.filter (fun (_, lam) ->
-              match as_simple_exit lam with
-              | Some j -> j <> default
-              | None -> true)
-        in
-        { sw with
-          sw_consts = remove sw.sw_consts;
-          sw_blocks = remove sw.sw_blocks;
-          sw_failaction = Some (make_exit default)
-        }
->>>>>>> upstream-incoming
       else
         sw
   | Some _ -> sw
@@ -3749,19 +3243,9 @@ let as_interval fail ?(low = min_int) ?(high = max_int) l =
     | None -> as_interval_nofail l
     | Some act -> as_interval_canfail act ~low ~high l )
 
-<<<<<<< oxcaml
-let call_switcher kind loc fail arg low high int_lambda_list =
-  let edges, (cases, actions) = as_interval fail low high int_lambda_list in
-  Switcher.zyva loc kind edges arg cases actions
-||||||| upstream-base
-let call_switcher loc fail arg low high int_lambda_list =
-  let edges, (cases, actions) = as_interval fail low high int_lambda_list in
-  Switcher.zyva loc edges arg cases actions
-=======
-let call_switcher loc fail arg ?low ?high int_lambda_list =
+let call_switcher kind loc fail arg ?low ?high int_lambda_list =
   let edges, (cases, actions) = as_interval fail ?low ?high int_lambda_list in
-  Switcher.zyva loc edges arg cases actions
->>>>>>> upstream-incoming
+  Switcher.zyva loc kind edges arg cases actions
 
 let rec list_as_pat = function
   | [] -> fatal_error "Matching.list_as_pat"
@@ -3817,113 +3301,6 @@ let mk_failaction_neg arg_partial ctx def =
       | None -> (None, Jumps.empty Total)
       | Some (lam, jumps) -> (Some lam, jumps)
 
-<<<<<<< oxcaml
-(* In line with the article and simpler than before *)
-let mk_failaction_pos partial seen ctx defs =
-  let rec scan_def env to_test defs =
-    match (to_test, Default_environment.pop defs) with
-    | [], _
-    | _, None ->
-        List.fold_left
-          (fun (klist, jumps) (i, pats) ->
-            let action = Lstaticraise (i, []) in
-            let klist =
-              List.fold_right
-                (fun pat r -> (get_key_constr pat, action) :: r)
-                pats klist
-            and jumps =
-              Jumps.add i (Context.lub (list_as_pat pats) ctx) jumps
-            in
-            (klist, jumps))
-          ([], Jumps.empty) env
-    | _, Some ((idef, pss), rem) -> (
-        let now, later =
-          List.partition (fun (_p, p_ctx) -> Context.matches p_ctx pss) to_test
-        in
-        match now with
-        | [] -> scan_def env to_test rem
-        | _ -> scan_def ((idef, List.map fst now) :: env) later rem
-      )
-  in
-  let fail_pats = complete_pats_constrs seen in
-  if List.length fail_pats < !Clflags.match_context_rows then (
-    let fail, jmps =
-      scan_def []
-        (List.map (fun pat -> (pat, Context.lub pat ctx)) fail_pats)
-        defs
-    in
-    debugf
-      "@,@[<v 2>COMBINE (mk_failaction_pos %a)@,\
-           %a@,\
-           @[<v 2>FAIL PATTERNS:@,\
-             %a@]@,\
-           @[<v 2>POSITIVE JUMPS:@,\
-             %a@]\
-           @]"
-      pp_partial partial
-      Default_environment.pp defs
-      (Format.pp_print_list ~pp_sep:Format.pp_print_cut
-         Printpat.Compat.pretty_pat) fail_pats
-      Jumps.pp jmps
-    ;
-    (None, fail, jmps)
-  ) else (
-    (* Too many non-matched constructors -> reduced information *)
-    let fail, jumps = mk_failaction_neg partial ctx defs in
-||||||| upstream-base
-(* In line with the article and simpler than before *)
-let mk_failaction_pos partial seen ctx defs =
-  let rec scan_def env to_test defs =
-    match (to_test, Default_environment.pop defs) with
-    | [], _
-    | _, None ->
-        List.fold_left
-          (fun (klist, jumps) (i, pats) ->
-            let action = Lstaticraise (i, []) in
-            let klist =
-              List.fold_right
-                (fun pat r -> (get_key_constr pat, action) :: r)
-                pats klist
-            and jumps =
-              Jumps.add i (Context.lub (list_as_pat pats) ctx) jumps
-            in
-            (klist, jumps))
-          ([], Jumps.empty) env
-    | _, Some ((idef, pss), rem) -> (
-        let now, later =
-          List.partition (fun (_p, p_ctx) -> Context.matches p_ctx pss) to_test
-        in
-        match now with
-        | [] -> scan_def env to_test rem
-        | _ -> scan_def ((idef, List.map fst now) :: env) later rem
-      )
-  in
-  let fail_pats = complete_pats_constrs seen in
-  if List.length fail_pats < !Clflags.match_context_rows then (
-    let fail, jmps =
-      scan_def []
-        (List.map (fun pat -> (pat, Context.lub pat ctx)) fail_pats)
-        defs
-    in
-    debugf
-      "@,@[<v 2>COMBINE (mk_failaction_pos %a)@,\
-           %a@,\
-           @[<v 2>FAIL PATTERNS:@,\
-             %a@]@,\
-           @[<v 2>POSITIVE JUMPS:@,\
-             %a@]\
-           @]"
-      pp_partial partial
-      Default_environment.pp defs
-      (Format.pp_print_list ~pp_sep:Format.pp_print_cut
-         Printpat.pretty_pat) fail_pats
-      Jumps.pp jmps
-    ;
-    (None, fail, jmps)
-  ) else (
-    (* Too many non-matched constructors -> reduced information *)
-    let fail, jumps = mk_failaction_neg partial ctx defs in
-=======
 (* In [mk_failaction_pos partial seen ctx defs],
    - [partial] indicates whether the current switch
      is exhaustive
@@ -3962,7 +3339,6 @@ let mk_failaction_pos arg_partial seen ctx defs =
   if List.length input_fail_pats >= !Clflags.match_context_rows then (
     (* Too many non-matched constructors -> reduced information. *)
     let fail, jumps = mk_failaction_neg arg_partial ctx defs in
->>>>>>> upstream-incoming
     debugf
       "@,@[<v 2>COMBINE (mk_failaction_pos)@,\
            %a@,\
@@ -4080,8 +3456,7 @@ let combine_constant value_kind loc arg cst partial ctx def
               | _ -> assert false)
             const_lambda_list
         in
-<<<<<<< oxcaml
-        call_switcher value_kind loc fail arg min_int max_int int_lambda_list
+        call_switcher value_kind loc fail arg int_lambda_list
     | Const_int8 _ ->
         let int_lambda_list =
           List.map
@@ -4092,7 +3467,7 @@ let combine_constant value_kind loc arg cst partial ctx def
         in
         let max_excl = 1 lsl 7 in
         call_switcher value_kind loc fail arg
-          (-max_excl) (max_excl - 1) int_lambda_list
+          ~low:(-max_excl) ~high:(max_excl - 1) int_lambda_list
     | Const_int16 _ ->
         let int_lambda_list =
           List.map
@@ -4103,12 +3478,7 @@ let combine_constant value_kind loc arg cst partial ctx def
         in
         let max_excl = 1 lsl 15 in
         call_switcher value_kind loc fail arg
-          (-max_excl) (max_excl - 1) int_lambda_list
-||||||| upstream-base
-        call_switcher loc fail arg min_int max_int int_lambda_list
-=======
-        call_switcher loc fail arg int_lambda_list
->>>>>>> upstream-incoming
+          ~low:(-max_excl) ~high:(max_excl - 1) int_lambda_list
     | Const_char _ ->
         let int_lambda_list =
           List.map
@@ -4117,13 +3487,7 @@ let combine_constant value_kind loc arg cst partial ctx def
               | _ -> assert false)
             const_lambda_list
         in
-<<<<<<< oxcaml
-        call_switcher value_kind loc fail arg 0 255 int_lambda_list
-||||||| upstream-base
-        call_switcher loc fail arg 0 255 int_lambda_list
-=======
-        call_switcher loc fail arg ~low:0 ~high:255 int_lambda_list
->>>>>>> upstream-incoming
+        call_switcher value_kind loc fail arg ~low:0 ~high:255 int_lambda_list
     | Const_string _ ->
         (* Note as the bytecode compiler may resort to dichotomic search,
    the clauses of stringswitch  are sorted with duplicates removed.
@@ -4249,21 +3613,14 @@ let transl_match_on_option value_kind arg loc ~if_some ~if_none =
   else
     Lifthenelse(arg, if_some, if_none, value_kind)
 
-<<<<<<< oxcaml
 let transl_match_on_or_null value_kind arg loc ~if_null ~if_this =
   Lifthenelse (Lprim (Pisnull, [ arg ], loc), if_null, if_this, value_kind)
 
-let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx def
-||||||| upstream-base
-let combine_constructor loc arg pat_env cstr partial ctx def
-=======
-let combine_extension_constructor loc arg pat_env partial ctx def
+let combine_extension_constructor value_kind loc arg pat_env pat_barrier partial ctx def
     (descr_lambda_list, total1, _pats) =
-  let tag_lambda (cstr, act) = (cstr.cstr_tag, act) in
   let fail, local_jumps = mk_failaction_neg partial ctx def in
   let lambda1 =
-    let consts, nonconsts =
-      split_extension_cases (List.map tag_lambda descr_lambda_list) in
+    let consts, nonconsts = split_extension_cases descr_lambda_list in
     let default, consts, nonconsts =
       match fail with
       | None -> (
@@ -4279,33 +3636,33 @@ let combine_extension_constructor loc arg pat_env partial ctx def
       | [] -> default
       | _ ->
           let tag = Ident.create_local "tag" in
+          let tag_duid = Lambda.debug_uid_none in
           let tests =
             List.fold_right
               (fun (path, act) rem ->
                 let ext = transl_extension_path loc pat_env path in
                 Lifthenelse
-                  (Lprim (Pintcomp Ceq, [ Lvar tag; ext ], loc), act, rem))
+                  (phys_equal ~loc (Lvar tag) ext, act, rem, value_kind))
               nonconsts default
           in
-          Llet (Alias, Pgenval, tag,
-                Lprim (Pfield (0, Pointer, Immutable), [ arg ], loc), tests)
+          let ubr = Translmode.transl_unique_barrier pat_barrier in
+          let sem = add_barrier_to_read ubr Reads_agree in
+          let binding_kind = add_barrier_to_let_kind ubr Alias in
+          Llet (binding_kind, Lambda.layout_block, tag, tag_duid,
+                Lprim (Pfield (0, Pointer, sem), [ arg ], loc),
+                tests)
     in
     List.fold_right
       (fun (path, act) rem ->
         let ext = transl_extension_path loc pat_env path in
-        Lifthenelse (Lprim (Pintcomp Ceq, [ arg; ext ], loc), act, rem))
+        Lifthenelse (phys_equal ~loc arg ext, act, rem,
+                      value_kind))
       consts nonconst_lambda
   in
   (lambda1, Jumps.union local_jumps total1)
 
-let combine_regular_constructor loc arg cstr partial ctx def
->>>>>>> upstream-incoming
-    (descr_lambda_list, total1, pats) =
-<<<<<<< oxcaml
-||||||| upstream-base
-  let tag_lambda (cstr, act) = (cstr.cstr_tag, act) in
-=======
-  let tag_lambda (cstr, act) = (cstr.cstr_tag, act) in
+let combine_regular_constructor value_kind loc arg cstr partial
+    ctx def (descr_lambda_list, total1, pats) =
   (* Regular concrete type *)
   let ncases = List.length descr_lambda_list
   and nconstrs = cstr.cstr_consts + cstr.cstr_nonconsts in
@@ -4320,8 +3677,7 @@ let combine_regular_constructor loc arg cstr partial ctx def
       mk_failaction_pos partial constrs ctx def
   in
   let descr_lambda_list = fails @ descr_lambda_list in
-  let consts, nonconsts =
-    split_cases (List.map tag_lambda descr_lambda_list) in
+  let consts, nonconsts, null = split_cases descr_lambda_list in
   (* Our duty below is to generate code, for matching on a list of
      constructor+action cases, that is good for both bytecode and
      native-code compilation. (Optimizations that only work well
@@ -4351,19 +3707,26 @@ let combine_regular_constructor loc arg cstr partial ctx def
         act
     | _ -> (
         match
-          (cstr.cstr_consts, cstr.cstr_nonconsts, consts, nonconsts)
+          (cstr.cstr_consts, cstr.cstr_nonconsts, consts, nonconsts, null)
         with
-        | 1, 1, [ (0, act1) ], [ (0, act2) ] ->
-            (* This case is very frequent, it corresponds to
-               options and lists. *)
-            transl_match_on_option arg loc ~if_none:act1 ~if_some:act2
-        | n, 0, _, [] ->
+        | 1, 1, [ (0, act1) ], [ (0, act2) ], None
+          when not (Clflags.is_flambda2 ()) ->
+            transl_match_on_option value_kind arg loc
+              ~if_none:act1 ~if_some:act2
+        | 1, 1, [], [(_, act2)], Some act1 ->
+            (* The [Variant_with_null] case. *)
+            transl_match_on_or_null value_kind arg loc
+              ~if_null:act1 ~if_this:act2
+        | _, _, _, _, Some _ ->
+            Misc.fatal_error "Matching.combine_constructor: Unexpected Null case"
+        | n, 0, _, [], None ->
             (* The matched type defines constant constructors only.
                (typically the constant cases are dense, so
                call_switcher will generate a Lswitch, still one
                instruction.) *)
-            call_switcher loc fail_opt arg ~low:0 ~high:(n - 1) consts
-        | n, _, _, _ -> (
+            call_switcher value_kind loc fail_opt arg
+              ~low:0 ~high:(n - 1) consts
+        | n, _, _, _, None -> (
             let act0 =
               (* = Some act when all non-const constructors match to act *)
               match (fail_opt, nonconsts) with
@@ -4392,10 +3755,10 @@ let combine_regular_constructor loc arg cstr partial ctx def
                    (The type of tokens has more than 120 constructors.)
                    *)
                 Lifthenelse
-                  ( Lprim (Pisint, [ arg ], loc),
-                    call_switcher loc fail_opt arg
+                  ( Lprim (Pisint { variant_only = true }, [ arg ], loc),
+                    call_switcher value_kind loc fail_opt arg
                       ~low:0 ~high:(n - 1) consts,
-                    act )
+                    act, value_kind )
             | None ->
                 (* In the general case, emit a switch. *)
                 let sw =
@@ -4406,376 +3769,39 @@ let combine_regular_constructor loc arg cstr partial ctx def
                     sw_failaction = fail_opt
                   }
                 in
-                let hs, sw = share_actions_sw sw in
+                let hs, sw = share_actions_sw value_kind sw in
                 let sw = reintroduce_fail sw in
-                hs (Lswitch (arg, sw, loc))
-          )
-      )
+                hs (Lswitch (arg, sw, loc, value_kind))))
   in
   (lambda1, Jumps.union local_jumps total1)
 
-let combine_constructor loc arg pat_env cstr partial ctx def actions =
->>>>>>> upstream-incoming
+let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx def actions =
   match cstr.cstr_tag with
-<<<<<<< oxcaml
   | Extension _ ->
-      (* Special cases for extensions *)
-      let fail, local_jumps = mk_failaction_neg partial ctx def in
-      let lambda1 =
-        let consts, nonconsts = split_extension_cases descr_lambda_list in
-        let default, consts, nonconsts =
-          match fail with
-          | None -> (
-              match (consts, nonconsts) with
-              | _, (_, act) :: rem -> (act, consts, rem)
-              | (_, act) :: rem, _ -> (act, rem, nonconsts)
-              | _ -> assert false
-            )
-          | Some fail -> (fail, consts, nonconsts)
-        in
-        let nonconst_lambda =
-          match nonconsts with
-          | [] -> default
-          | _ ->
-              let tag = Ident.create_local "tag" in
-              let tag_duid = Lambda.debug_uid_none in
-              let tests =
-                List.fold_right
-                  (fun (path, act) rem ->
-                    let ext = transl_extension_path loc pat_env path in
-                    Lifthenelse
-                      (phys_equal ~loc (Lvar tag) ext, act, rem, value_kind))
-                  nonconsts default
-              in
-              let ubr = Translmode.transl_unique_barrier pat_barrier in
-              let sem = add_barrier_to_read ubr Reads_agree in
-              let str = add_barrier_to_let_kind ubr Alias in
-              Llet (str, Lambda.layout_block, tag, tag_duid,
-                    Lprim (Pfield (0, Pointer, sem), [ arg ], loc),
-                    tests)
-        in
-        List.fold_right
-          (fun (path, act) rem ->
-            let ext = transl_extension_path loc pat_env path in
-            Lifthenelse (phys_equal ~loc arg ext, act, rem,
-                         value_kind))
-          consts nonconst_lambda
-      in
-      (lambda1, Jumps.union local_jumps total1)
-||||||| upstream-base
-  | Cstr_extension _ ->
-      (* Special cases for extensions *)
-      let fail, local_jumps = mk_failaction_neg partial ctx def in
-      let lambda1 =
-        let consts, nonconsts =
-          split_extension_cases (List.map tag_lambda descr_lambda_list) in
-        let default, consts, nonconsts =
-          match fail with
-          | None -> (
-              match (consts, nonconsts) with
-              | _, (_, act) :: rem -> (act, consts, rem)
-              | (_, act) :: rem, _ -> (act, rem, nonconsts)
-              | _ -> assert false
-            )
-          | Some fail -> (fail, consts, nonconsts)
-        in
-        let nonconst_lambda =
-          match nonconsts with
-          | [] -> default
-          | _ ->
-              let tag = Ident.create_local "tag" in
-              let tests =
-                List.fold_right
-                  (fun (path, act) rem ->
-                    let ext = transl_extension_path loc pat_env path in
-                    Lifthenelse
-                      (Lprim (Pintcomp Ceq, [ Lvar tag; ext ], loc), act, rem))
-                  nonconsts default
-              in
-              Llet (Alias, Pgenval, tag,
-                    Lprim (Pfield (0, Pointer, Immutable), [ arg ], loc), tests)
-        in
-        List.fold_right
-          (fun (path, act) rem ->
-            let ext = transl_extension_path loc pat_env path in
-            Lifthenelse (Lprim (Pintcomp Ceq, [ arg; ext ], loc), act, rem))
-          consts nonconst_lambda
-      in
-      (lambda1, Jumps.union local_jumps total1)
-=======
-  | Cstr_extension _ ->
-    combine_extension_constructor loc arg pat_env partial ctx def actions
->>>>>>> upstream-incoming
+    combine_extension_constructor value_kind loc arg pat_env pat_barrier partial ctx def actions
   | _ ->
-<<<<<<< oxcaml
-      (* Regular concrete type *)
-      let ncases = List.length descr_lambda_list
-      and nconstrs = cstr.cstr_consts + cstr.cstr_nonconsts in
-      let sig_complete = ncases = nconstrs in
-      let fail_opt, fails, local_jumps =
-        if sig_complete then
-          (None, [], Jumps.empty)
-        else
-          let constrs =
-            List.map2 (fun (constr, _act) p -> { p with pat_desc = constr })
-              descr_lambda_list pats in
-          mk_failaction_pos partial constrs ctx def
-      in
-      let descr_lambda_list = fails @ descr_lambda_list in
-      let consts, nonconsts, null = split_cases descr_lambda_list in
-      (* Our duty below is to generate code, for matching on a list of
-         constructor+action cases, that is good for both bytecode and
-         native-code compilation. (Optimizations that only work well
-         for one backend should be done in the backend.)
+    combine_regular_constructor value_kind loc arg cstr partial ctx def actions
 
-         The [Lswitch] construct is generally an excellent choice, as
-         it generates a single instruction in bytecode, and can be
-         turned into efficient, simpler control-flow constructs in
-         native-code. (The lambda/switch.ml module is precisely
-         responsible for efficiently compiling switches to simpler
-         tests.)
-
-         Some additional optimizations make sense here when they let
-         us generate better code, including in bytecode: the generated
-         code should still fit in one bytecode instruction or less.
-
-         [Lswitch] has the downside of always needing a byte per
-         constructor in the generated bytecode, even when many actions
-         are shared. For types with a lot of constructors, calling the
-         switcher directly can result in more compact code. This is
-         a reason to deviate from the one-instruction policy.
-      *)
-      let lambda1 =
-        match (fail_opt, same_actions descr_lambda_list) with
-        | None, Some act ->
-            (* Identical actions, no failure: 0 control-flow instructions. *)
-            act
-        | _ -> (
-            match
-              (cstr.cstr_consts, cstr.cstr_nonconsts, consts, nonconsts, null)
-            with
-            | 1, 1, [ (0, act1) ], [ (0, act2) ], None
-              when not (Clflags.is_flambda2 ()) ->
-                transl_match_on_option value_kind arg loc
-                  ~if_none:act1 ~if_some:act2
-            | 1, 1, [], [(_, act2)], Some act1 ->
-                (* The [Variant_with_null] case. *)
-                transl_match_on_or_null value_kind arg loc
-                  ~if_null:act1 ~if_this:act2
-            | _, _, _, _, Some _ ->
-                Misc.fatal_error "Matching.combine_constructor: Unexpected Null case"
-            | n, 0, _, [], None ->
-                (* The matched type defines constant constructors only.
-                   (typically the constant cases are dense, so
-                   call_switcher will generate a Lswitch, still one
-                   instruction.) *)
-                call_switcher value_kind loc fail_opt arg 0 (n - 1) consts
-            | n, _, _, _, None -> (
-                let act0 =
-                  (* = Some act when all non-const constructors match to act *)
-                  match (fail_opt, nonconsts) with
-                  | Some a, [] -> Some a
-                  | Some _, _ ->
-                      if List.length nonconsts = cstr.cstr_nonconsts then
-                        same_actions nonconsts
-                      else
-                        None
-                  | None, _ -> same_actions nonconsts
-                in
-                match act0 with
-                | Some act ->
-                    (* This case deviates from our policy, by typically
-                       generating three bytecode instructions.
-
-                       It can save a lot of bytecode space when matching
-                       on a type with many non-constant constructors,
-                       all sent to the same action. This pattern occurs
-                       several times in the compiler codebase
-                       (for example), due to code fragments such as the
-                       following:
-
-                           match token with SEMISEMI -> true | _ -> false
-
-                       (The type of tokens has more than 120 constructors.)
-                    *)
-                    Lifthenelse
-                      ( Lprim (Pisint { variant_only = true }, [ arg ], loc),
-                        call_switcher value_kind loc fail_opt arg 0 (n - 1) consts,
-                        act, value_kind )
-                | None ->
-                    (* In the general case, emit a switch. *)
-                    let sw =
-                      { sw_numconsts = cstr.cstr_consts;
-                        sw_consts = consts;
-                        sw_numblocks = cstr.cstr_nonconsts;
-                        sw_blocks = nonconsts;
-                        sw_failaction = fail_opt
-                      }
-                    in
-                    let hs, sw = share_actions_sw value_kind sw in
-                    let sw = reintroduce_fail sw in
-                    hs (Lswitch (arg, sw, loc, value_kind))))
-      in
-      (lambda1, Jumps.union local_jumps total1)
-||||||| upstream-base
-      (* Regular concrete type *)
-      let ncases = List.length descr_lambda_list
-      and nconstrs = cstr.cstr_consts + cstr.cstr_nonconsts in
-      let sig_complete = ncases = nconstrs in
-      let fail_opt, fails, local_jumps =
-        if sig_complete then
-          (None, [], Jumps.empty)
-        else
-          let constrs =
-            List.map2 (fun (constr, _act) p -> { p with pat_desc = constr })
-              descr_lambda_list pats in
-          mk_failaction_pos partial constrs ctx def
-      in
-      let descr_lambda_list = fails @ descr_lambda_list in
-      let consts, nonconsts =
-        split_cases (List.map tag_lambda descr_lambda_list) in
-      (* Our duty below is to generate code, for matching on a list of
-         constructor+action cases, that is good for both bytecode and
-         native-code compilation. (Optimizations that only work well
-         for one backend should be done in the backend.)
-
-         The [Lswitch] construct is generally an excellent choice, as
-         it generates a single instruction in bytecode, and can be
-         turned into efficient, simpler control-flow constructs in
-         native-code. (The lambda/switch.ml module is precisely
-         responsible for efficiently compiling switches to simpler
-         tests.)
-
-         Some additional optimizations make sense here when they let
-         us generate better code, including in bytecode: the generated
-         code should still fit in one bytecode instruction or less.
-
-         [Lswitch] has the downside of always needing a byte per
-         constructor in the generated bytecode, even when many actions
-         are shared. For types with a lot of constructors, calling the
-         switcher directly can result in more compact code. This is
-         a reason to deviate from the one-instruction policy.
-      *)
-      let lambda1 =
-        match (fail_opt, same_actions descr_lambda_list) with
-        | None, Some act ->
-            (* Identical actions, no failure: 0 control-flow instructions. *)
-            act
-        | _ -> (
-            match
-              (cstr.cstr_consts, cstr.cstr_nonconsts, consts, nonconsts)
-            with
-            | 1, 1, [ (0, act1) ], [ (0, act2) ] ->
-                (* This case is very frequent, it corresponds to
-                   options and lists. *)
-                transl_match_on_option arg loc ~if_none:act1 ~if_some:act2
-            | n, 0, _, [] ->
-                (* The matched type defines constant constructors only.
-                   (typically the constant cases are dense, so
-                   call_switcher will generate a Lswitch, still one
-                   instruction.) *)
-                call_switcher loc fail_opt arg 0 (n - 1) consts
-            | n, _, _, _ -> (
-                let act0 =
-                  (* = Some act when all non-const constructors match to act *)
-                  match (fail_opt, nonconsts) with
-                  | Some a, [] -> Some a
-                  | Some _, _ ->
-                      if List.length nonconsts = cstr.cstr_nonconsts then
-                        same_actions nonconsts
-                      else
-                        None
-                  | None, _ -> same_actions nonconsts
-                in
-                match act0 with
-                | Some act ->
-                    (* This case deviates from our policy, by typically
-                       generating three bytecode instructions.
-
-                       It can save a lot of bytecode space when matching
-                       on a type with many non-constant constructors,
-                       all sent to the same action. This pattern occurs
-                       several times in the compiler codebase
-                       (for example), due to code fragments such as the
-                       following:
-
-                           match token with SEMISEMI -> true | _ -> false
-
-                       (The type of tokens has more than 120 constructors.)
-                       *)
-                    Lifthenelse
-                      ( Lprim (Pisint, [ arg ], loc),
-                        call_switcher loc fail_opt arg 0 (n - 1) consts,
-                        act )
-                | None ->
-                    (* In the general case, emit a switch. *)
-                    let sw =
-                      { sw_numconsts = cstr.cstr_consts;
-                        sw_consts = consts;
-                        sw_numblocks = cstr.cstr_nonconsts;
-                        sw_blocks = nonconsts;
-                        sw_failaction = fail_opt
-                      }
-                    in
-                    let hs, sw = share_actions_sw sw in
-                    let sw = reintroduce_fail sw in
-                    hs (Lswitch (arg, sw, loc))
-              )
-          )
-      in
-      (lambda1, Jumps.union local_jumps total1)
-=======
-    combine_regular_constructor loc arg cstr partial ctx def actions
->>>>>>> upstream-incoming
-
-<<<<<<< oxcaml
 let make_test_sequence_variant_constant
       value_kind loc fail arg int_lambda_list =
-  let _, (cases, actions) =
-    as_interval fail min_int max_int int_lambda_list
-  in
-  Switcher.test_sequence loc value_kind arg cases actions
-||||||| upstream-base
-let make_test_sequence_variant_constant fail arg int_lambda_list =
-  let _, (cases, actions) = as_interval fail min_int max_int int_lambda_list in
-  Switcher.test_sequence arg cases actions
-=======
-let make_test_sequence_variant_constant fail arg int_lambda_list =
   let _, (cases, actions) = as_interval fail int_lambda_list in
-  Switcher.test_sequence arg cases actions
->>>>>>> upstream-incoming
+  Switcher.test_sequence loc value_kind arg cases actions
 
-<<<<<<< oxcaml
 let call_switcher_variant_constant kind loc fail arg int_lambda_list =
-  call_switcher kind loc fail arg min_int max_int int_lambda_list
-||||||| upstream-base
-let call_switcher_variant_constant loc fail arg int_lambda_list =
-  call_switcher loc fail arg min_int max_int int_lambda_list
-=======
-let call_switcher_variant_constant loc fail arg int_lambda_list =
-  call_switcher loc fail arg int_lambda_list
->>>>>>> upstream-incoming
+  call_switcher kind loc fail arg int_lambda_list
 
 let call_switcher_variant_constr value_kind loc fail arg pat_barrier int_lambda_list =
   let v = Ident.create_local "variant" in
   let v_duid = Lambda.debug_uid_none in
   let ubr = Translmode.transl_unique_barrier pat_barrier in
-  let str = add_barrier_to_let_kind ubr Alias in
+  let binding_kind = add_barrier_to_let_kind ubr Alias in
   Llet
-    ( str,
+    ( binding_kind,
       Lambda.layout_int,
       v,
-<<<<<<< oxcaml
       v_duid,
       Lprim (nonconstant_variant_field ubr 0, [ arg ], loc),
-      call_switcher value_kind loc fail (Lvar v) min_int max_int int_lambda_list )
-||||||| upstream-base
-      Lprim (Pfield (0, Pointer, Immutable), [ arg ], loc),
-      call_switcher loc fail (Lvar v) min_int max_int int_lambda_list )
-=======
-      Lprim (Pfield (0, Pointer, Immutable), [ arg ], loc),
-      call_switcher loc fail (Lvar v) int_lambda_list )
->>>>>>> upstream-incoming
+      call_switcher value_kind loc fail (Lvar v) int_lambda_list )
 
 let combine_variant value_kind loc row arg pat_barrier partial ctx def
     (tag_lambda_list, total1, _pats)
@@ -4855,13 +3881,7 @@ let combine_array value_kind loc arg kind partial ctx def (len_lambda_list, tota
     let newvar = Ident.create_local "len" in
     let newvar_duid = Lambda.debug_uid_none in
     let switch =
-<<<<<<< oxcaml
-      call_switcher value_kind loc fail (Lvar newvar) 0 max_int len_lambda_list
-||||||| upstream-base
-      call_switcher loc fail (Lvar newvar) 0 max_int len_lambda_list
-=======
-      call_switcher loc fail (Lvar newvar) ~low:0 len_lambda_list
->>>>>>> upstream-incoming
+      call_switcher value_kind loc fail (Lvar newvar) ~low:0 len_lambda_list
     in
     bind_with_layout Alias (newvar, newvar_duid, Lambda.layout_int)
       (Lprim (Parraylength kind, [ arg ], loc)) switch
@@ -5022,35 +4042,11 @@ let rec lower_bind v v_duid arg_layout arg lam =
         Llet (Alias, k, vv, vv_duid, lv, lower_bind v v_duid arg_layout arg l)
   | _ -> bind_with_layout Alias (v, v_duid, arg_layout) arg lam
 
-<<<<<<< oxcaml
-let bind_check str v v_duid arg_layout arg lam =
-  match (str, arg) with
-  | _, Lvar _ -> bind_with_layout str (v, v_duid, arg_layout) arg lam
-  | Alias, _ -> lower_bind v v_duid arg_layout arg lam
-  | _, _ -> bind_with_layout str (v, v_duid, arg_layout) arg lam
-
-let comp_exit ctx m =
-  match Default_environment.pop m.default with
-  | Some ((i, _), _) -> (Lstaticraise (i, []), Jumps.singleton i ctx)
-  | None -> fatal_error "Matching.comp_exit"
-||||||| upstream-base
-let bind_check str v arg lam =
-  match (str, arg) with
-  | _, Lvar _ -> bind str v arg lam
-  | Alias, _ -> lower_bind v arg lam
-  | _, _ -> bind str v arg lam
-
-let comp_exit ctx m =
-  match Default_environment.pop m.default with
-  | Some ((i, _), _) -> (Lstaticraise (i, []), Jumps.singleton i ctx)
-  | None -> fatal_error "Matching.comp_exit"
-=======
-let bind_check kind v arg lam =
+let bind_check kind v v_duid arg_layout arg lam =
   match (kind, arg) with
-  | _, Lvar _ -> bind kind v arg lam
-  | Alias, _ -> lower_bind v arg lam
-  | _, _ -> bind kind v arg lam
->>>>>>> upstream-incoming
+  | _, Lvar _ -> bind_with_layout kind (v, v_duid, arg_layout) arg lam
+  | Alias, _ -> lower_bind v v_duid arg_layout arg lam
+  | _, _ -> bind_with_layout kind (v, v_duid, arg_layout) arg lam
 
 let rec comp_match_handlers layout comp_fun partial ctx first_match next_matches =
   match next_matches with
@@ -5107,36 +4103,16 @@ let rec comp_match_handlers layout comp_fun partial ctx first_match next_matches
 let rec name_pattern default = function
   | ((pat, _), _) :: rem -> (
       match pat.pat_desc with
-<<<<<<< oxcaml
       | Tpat_var (id, _, uid, _, _) -> id, uid
       | Tpat_alias (_, id, _, uid, _, _, _) -> id, uid
-||||||| upstream-base
-      | Tpat_var (id, _) -> id
-      | Tpat_alias (_, id, _) -> id
-=======
-      | Tpat_var (id, _, _) -> id
-      | Tpat_alias (_, id, _, _, _) -> id
->>>>>>> upstream-incoming
       | _ -> name_pattern default rem
     )
   | _ -> Ident.create_local default, Lambda.debug_uid_none
 
 let arg_to_var arg cls =
   match arg with
-<<<<<<< oxcaml
-  | Lvar v -> (v, Lambda.debug_uid_none, arg)
-  | _ ->
-      let v, v_duid = name_pattern "*match*" cls in
-      (v, v_duid, Lvar v)
-||||||| upstream-base
-  | Lvar v -> (v, arg)
-  | _ ->
-      let v = name_pattern "*match*" cls in
-      (v, Lvar v)
-=======
-  | Lvar v -> v
+  | Lvar v -> (v, Lambda.debug_uid_none)
   | _ -> name_pattern "*match*" cls
->>>>>>> upstream-incoming
 
 (*
   The main compilation function.
@@ -5149,16 +4125,8 @@ let arg_to_var arg cls =
    Output: a lambda term, a jump summary {..., exit number -> context, ... }
 *)
 
-<<<<<<< oxcaml
 let rec compile_match ~scopes value_kind repr partial ctx
-    (m : initial_clause pattern_matching) =
-||||||| upstream-base
-let rec compile_match ~scopes repr partial ctx
-    (m : initial_clause pattern_matching) =
-=======
-let rec compile_match ~scopes repr partial ctx
     (m : (args, initial_clause) pattern_matching) : lambda * Jumps.t =
->>>>>>> upstream-incoming
   match m.cases with
   | ([], action) :: rem ->
       let res =
@@ -5178,107 +4146,31 @@ let rec compile_match ~scopes repr partial ctx
       compile_match_nonempty ~scopes value_kind repr partial ctx
         { m with cases = map_on_rows Non_empty_row.of_initial nonempty_cases }
 
-<<<<<<< oxcaml
 and compile_match_nonempty ~scopes value_kind repr partial ctx
-    (m : Typedtree.pattern Non_empty_row.t clause pattern_matching)=
-||||||| upstream-base
-and compile_match_nonempty ~scopes repr partial ctx
-    (m : Typedtree.pattern Non_empty_row.t clause pattern_matching) =
-=======
-and compile_match_nonempty ~scopes repr partial ctx
-    (m : (args, Typedtree.pattern Non_empty_row.t clause) pattern_matching) =
->>>>>>> upstream-incoming
+    (m : (args, Typedtree.pattern Non_empty_row.t clause) pattern_matching)=
   match m with
-<<<<<<< oxcaml
-  | { cases = []; args = [] } -> comp_exit ctx m
-  | { args = (arg, str, arg_sort, layout) :: argl } ->
-      let v, v_duid, newarg = arg_to_var arg m.cases in
-      let args = (newarg, Alias, arg_sort, layout) :: argl in
-      let cases =
-        List.map (half_simplify_nonempty ~arg:newarg)
-          m.cases
-      in
-      let m = { m with args; cases } in
-      let first_match, rem =
-        split_and_precompile_half_simplified ~arg:newarg ~arg_sort m
-      in
-      combine_handlers ~scopes value_kind repr partial ctx
-                       (v, v_duid, str, layout, arg) first_match rem
-||||||| upstream-base
-  | { cases = []; args = [] } -> comp_exit ctx m
-  | { args = (arg, str) :: argl } ->
-      let v, newarg = arg_to_var arg m.cases in
-      let args = (newarg, Alias) :: argl in
-      let cases = List.map (half_simplify_nonempty ~arg:newarg) m.cases in
-      let m = { m with args; cases } in
-      let first_match, rem =
-        split_and_precompile_half_simplified ~arg:newarg m in
-      combine_handlers ~scopes repr partial ctx (v, str, arg) first_match rem
-=======
   | { cases = []; args = [] } ->
       begin match comp_exit partial ctx m.default with
       | None -> fatal_error "Matching: impossible empty matrix in a Total match"
       | Some exit -> exit
       end
-  | { args = { arg; binding_kind; _ } as first :: rest } ->
-      let v = arg_to_var arg m.cases in
-      bind_match_arg binding_kind v arg (
+  | { args = { arg; binding_kind; layout; _ } as first :: rest } ->
+      let v, v_duid = arg_to_var arg m.cases in
+      bind_match_arg binding_kind v v_duid arg layout (
         let args = { first = { first with arg = Var v }; rest } in
         let cases = List.map (half_simplify_nonempty ~arg:(Lvar v)) m.cases in
         let m = { m with args; cases } in
         let first_match, rem =
           split_and_precompile_half_simplified m in
-        combine_handlers ~scopes repr partial ctx first_match rem
+        combine_handlers ~scopes value_kind repr partial ctx first_match rem
       )
->>>>>>> upstream-incoming
   | _ -> assert false
 
-<<<<<<< oxcaml
-and compile_match_simplified ~scopes value_kind  repr partial ctx
-    (m : Simple.clause pattern_matching) =
-  match m with
-  | { cases = []; args = [] } -> comp_exit ctx m
-  | { args = ((Lvar v as arg), str, sort, layout) :: argl } ->
-      let v_duid = Lambda.debug_uid_none in
-      (* CR sspies: Can we get a better [debug_uid] here? *)
-      let args = (arg, Alias, sort, layout) :: argl in
-      let m = { m with args } in
-      let first_match, rem = split_and_precompile_simplified m in
-      combine_handlers value_kind ~scopes repr partial ctx
-        (v, v_duid, str, layout, arg) first_match rem
-  | _ -> assert false
-||||||| upstream-base
-and compile_match_simplified ~scopes repr partial ctx
-    (m : Simple.clause pattern_matching) =
-  match m with
-  | { cases = []; args = [] } -> comp_exit ctx m
-  | { args = ((Lvar v as arg), str) :: argl } ->
-      let args = (arg, Alias) :: argl in
-      let m = { m with args } in
-      let first_match, rem = split_and_precompile_simplified m in
-      combine_handlers ~scopes repr partial ctx (v, str, arg) first_match rem
-  | _ -> assert false
-=======
-and compile_match_simplified ~scopes repr partial ctx
+and compile_match_simplified ~scopes value_kind repr partial ctx
     (m : (split_args, Simple.clause) pattern_matching) =
   let first_match, rem = split_and_precompile_simplified m in
-  combine_handlers ~scopes repr partial ctx first_match rem
->>>>>>> upstream-incoming
+  combine_handlers value_kind ~scopes repr partial ctx first_match rem
 
-<<<<<<< oxcaml
-and combine_handlers ~scopes value_kind repr partial ctx
-    (v, v_duid, str, arg_layout, arg) first_match rem =
-  let lam, total =
-    comp_match_handlers value_kind
-      (( if dbg then
-         do_compile_matching_pr ~scopes value_kind
-||||||| upstream-base
-and combine_handlers ~scopes repr partial ctx (v, str, arg) first_match rem =
-  let lam, total =
-    comp_match_handlers
-      (( if dbg then
-         do_compile_matching_pr ~scopes
-=======
 (* Note on [compute_arg_partial].
 
    Partiality information is provided by the
@@ -5382,12 +4274,12 @@ and combine_handlers ~scopes repr partial ctx (v, str, arg) first_match rem =
    general type [partial] of partiality information from the
    specialized type [arg_partial] used to make code-generation
    decisions for a given argument switch. *)
-and compute_arg_partial partial mut =
+and compute_arg_partial partial (mut : Asttypes.mutable_flag) =
   match partial.tempo, mut with
   | Following, Mutable -> Arg { partial with global = Partial }
   | First, _ | _, Immutable -> Arg partial
 
-and mut_of_binding_kind =
+and mut_of_binding_kind : _ -> Asttypes.mutable_flag =
   (* This is somewhat of a hack: we notice that a pattern-matching
      argument is mutable (its value can change if evaluated
      several times) exactly when it is bound as StrictOpt. Alias
@@ -5401,7 +4293,7 @@ and mut_of_binding_kind =
   | Strict | Alias -> Immutable
   | StrictOpt -> Mutable
 
-and bind_match_arg kind v arg (lam, jumps) =
+and bind_match_arg kind v v_duid arg arg_layout (lam, jumps) =
   let jumps =
     (* If the Lambda expression [arg] to access the first argument is
        a mutable field read, then its binding and evaluation may be
@@ -5432,35 +4324,18 @@ and bind_match_arg kind v arg (lam, jumps) =
     | Immutable -> jumps
     | Mutable ->
         Jumps.map Context.erase_first_col jumps in
-  (bind_check kind v arg lam,
+  (bind_check kind v v_duid arg_layout arg lam,
    jumps)
 
-and combine_handlers ~scopes repr partial ctx first_match rem =
-  comp_match_handlers
+and combine_handlers ~scopes value_kind repr partial ctx first_match rem =
+  comp_match_handlers value_kind
     (( if dbg () then
-         do_compile_matching_pr ~scopes
->>>>>>> upstream-incoming
+         do_compile_matching_pr ~scopes value_kind
        else
-<<<<<<< oxcaml
          do_compile_matching ~scopes value_kind
-       )
-         repr)
-      partial ctx first_match rem
-  in
-  (bind_check str v v_duid arg_layout arg lam, total)
-||||||| upstream-base
-         do_compile_matching ~scopes
-       )
-         repr)
-      partial ctx first_match rem
-  in
-  (bind_check str v arg lam, total)
-=======
-         do_compile_matching ~scopes
      )
        repr)
     partial ctx first_match rem
->>>>>>> upstream-incoming
 
 (* verbose version of do_compile_matching, for debug *)
 and do_compile_matching_pr ~scopes value_kind repr partial ctx x =
@@ -5486,33 +4361,6 @@ and do_compile_matching_pr ~scopes value_kind repr partial ctx x =
 and do_compile_matching ~scopes value_kind repr partial ctx pmh =
   match pmh with
   | Pm pm -> (
-<<<<<<< oxcaml
-      let arg =
-        match pm.args with
-        | (first_arg, _, _, _) :: _ -> first_arg
-        | _ ->
-            (* We arrive in do_compile_matching from:
-               - compile_matching
-               - recursive call on PmVars
-               The first one explicitly checks that [args] is nonempty, the
-               second one is only generated when the inner pm first looks at
-               a variable (i.e. there is something to look at).
-            *)
-            assert false
-||||||| upstream-base
-      let arg =
-        match pm.args with
-        | (first_arg, _) :: _ -> first_arg
-        | _ ->
-            (* We arrive in do_compile_matching from:
-               - compile_matching
-               - recursive call on PmVars
-               The first one explicitly checks that [args] is nonempty, the
-               second one is only generated when the inner pm first looks at
-               a variable (i.e. there is something to look at).
-            *)
-            assert false
-=======
       let first = pm.args.first in
       let arg = arg_of_pure first.arg in
       let arg_partial =
@@ -5527,172 +4375,73 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
            conservatively consider the switch Partial (this is the
            role of [compute_arg_partial]), but this should not
            pessimize the compilation of other columns. *)
->>>>>>> upstream-incoming
       in
       let ph = what_is_cases pm.cases in
       let pomega = Patterns.Head.to_omega_pattern ph in
       let ploc = head_loc ~scopes ph in
       let compile_no_test divide combine =
-        compile_no_test ~scopes divide combine repr partial ctx pm
+        compile_no_test ~scopes value_kind divide combine repr partial ctx pm
       in
       let compile_test divide combine =
         compile_test
-          (compile_match ~scopes repr partial)
+          (compile_match ~scopes value_kind repr partial)
           arg_partial divide combine ctx pm
       in
       let open Patterns.Head in
       match ph.pat_desc with
       | Any ->
-<<<<<<< oxcaml
-          compile_no_test ~scopes value_kind
-||||||| upstream-base
-          compile_no_test ~scopes
-=======
           compile_no_test
->>>>>>> upstream-incoming
             divide_var
-<<<<<<< oxcaml
-            Context.rshift repr partial ctx pm
+            Context.rshift
       | Unboxed_unit ->
-          compile_no_test ~scopes value_kind
+          compile_no_test
             divide_var
-            Context.rshift repr partial ctx pm
+            Context.rshift
       | Unboxed_bool _ ->
           compile_test
-            (compile_match ~scopes value_kind repr partial)
-            partial divide_unboxed_bool
-            (combine_unboxed_bool value_kind ploc arg partial)
-            ctx pm
-||||||| upstream-base
-            Context.rshift repr partial ctx pm
-=======
-            Context.rshift
->>>>>>> upstream-incoming
+            divide_unboxed_bool
+            (combine_unboxed_bool value_kind ploc arg arg_partial)
       | Tuple _ ->
-<<<<<<< oxcaml
-          compile_no_test ~scopes value_kind
-||||||| upstream-base
-          compile_no_test ~scopes
-=======
           compile_no_test
->>>>>>> upstream-incoming
             (divide_tuple ~scopes ph)
-<<<<<<< oxcaml
-            Context.combine repr partial ctx pm
-      | Unboxed_tuple shape ->
-          compile_no_test ~scopes value_kind
-            (divide_unboxed_tuple ~scopes ph shape)
-            Context.combine repr partial ctx pm
-      | Record [] | Record_unboxed_product [] -> assert false
-||||||| upstream-base
-            Context.combine repr partial ctx pm
-      | Record [] -> assert false
-=======
             Context.combine
-      | Record [] -> assert false
->>>>>>> upstream-incoming
-      | Record (lbl :: _) ->
-<<<<<<< oxcaml
-          compile_no_test ~scopes value_kind
-||||||| upstream-base
-          compile_no_test ~scopes
-=======
+      | Unboxed_tuple shape ->
           compile_no_test
->>>>>>> upstream-incoming
+            (divide_unboxed_tuple ~scopes ph shape)
+            Context.combine
+      | Record [] | Record_unboxed_product [] -> assert false
+      | Record (lbl :: _) ->
+          compile_no_test
             (divide_record ~scopes lbl.lbl_all ph)
-<<<<<<< oxcaml
-            Context.combine repr partial ctx pm
+            Context.combine
       | Record_unboxed_product (lbl :: _) ->
-          compile_no_test ~scopes value_kind
+          compile_no_test
             (divide_record_unboxed_product ~scopes lbl.lbl_all ph)
-            Context.combine repr partial ctx pm
+            Context.combine
       | Constant (Const_float32 _ | Const_unboxed_float32 _) ->
           Parmatch.raise_matched_float32 ()
-||||||| upstream-base
-            Context.combine repr partial ctx pm
-=======
-            Context.combine
->>>>>>> upstream-incoming
       | Constant cst ->
           compile_test
-<<<<<<< oxcaml
-            (compile_match ~scopes value_kind repr partial)
-            partial divide_constant
-            (combine_constant value_kind ploc arg cst partial)
-            ctx pm
-||||||| upstream-base
-            (compile_match ~scopes repr partial)
-            partial divide_constant
-            (combine_constant ploc arg cst partial)
-            ctx pm
-=======
             divide_constant
-            (combine_constant ploc arg cst arg_partial)
->>>>>>> upstream-incoming
+            (combine_constant value_kind ploc arg cst arg_partial)
       | Construct cstr ->
           compile_test
-<<<<<<< oxcaml
-            (compile_match ~scopes value_kind repr partial)
-            partial (divide_constructor ~scopes)
-            (combine_constructor value_kind ploc arg ph.pat_env ph.pat_unique_barrier cstr partial)
-            ctx pm
+            (divide_constructor ~scopes)
+            (combine_constructor value_kind ploc arg ph.pat_env ph.pat_unique_barrier cstr arg_partial)
       | Array (_, elt_sort, _) ->
           let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
           let kind = Typeopt.array_pattern_kind pomega elt_sort in
-||||||| upstream-base
-            (compile_match ~scopes repr partial)
-            partial (divide_constructor ~scopes)
-            (combine_constructor ploc arg ph.pat_env cstr partial)
-            ctx pm
-      | Array _ ->
-          let kind = Typeopt.array_pattern_kind pomega in
-=======
-            (divide_constructor ~scopes)
-            (combine_constructor ploc arg ph.pat_env cstr arg_partial)
-      | Array _ ->
-          let kind = Typeopt.array_pattern_kind pomega in
->>>>>>> upstream-incoming
           compile_test
-<<<<<<< oxcaml
-            (compile_match ~scopes value_kind repr partial)
-            partial (divide_array ~scopes kind)
-            (combine_array value_kind ploc arg kind partial)
-            ctx pm
-||||||| upstream-base
-            (compile_match ~scopes repr partial)
-            partial (divide_array ~scopes kind)
-            (combine_array ploc arg kind partial)
-            ctx pm
-=======
             (divide_array ~scopes kind)
-            (combine_array ploc arg kind arg_partial)
->>>>>>> upstream-incoming
+            (combine_array value_kind ploc arg kind arg_partial)
       | Lazy ->
-<<<<<<< oxcaml
-          compile_no_test ~scopes value_kind
-||||||| upstream-base
-          compile_no_test ~scopes
-=======
           compile_no_test
->>>>>>> upstream-incoming
             (divide_lazy ~scopes ph)
             Context.combine
       | Variant { cstr_row = row } ->
           compile_test
-<<<<<<< oxcaml
-            (compile_match ~scopes value_kind repr partial)
-            partial (divide_variant ~scopes !row)
-            (combine_variant value_kind ploc !row arg ph.pat_unique_barrier partial)
-            ctx pm
-||||||| upstream-base
-            (compile_match ~scopes repr partial)
-            partial (divide_variant ~scopes !row)
-            (combine_variant ploc !row arg partial)
-            ctx pm
-=======
             (divide_variant ~scopes !row)
-            (combine_variant ploc !row arg arg_partial)
->>>>>>> upstream-incoming
+            (combine_variant value_kind ploc !row arg ph.pat_unique_barrier arg_partial)
     )
   | PmVar { inside = pmh } ->
       let lam, total =
@@ -5713,187 +4462,6 @@ and compile_no_test ~scopes value_kind divide up_ctx repr partial ctx to_match =
 
 (* The entry points *)
 
-<<<<<<< oxcaml
-(*
-   If there is a guard in a matching or a lazy pattern,
-   then set exhaustiveness info to Partial.
-   (because of side effects, assume the worst).
-
-   Notice that exhaustiveness information is trusted by the compiler,
-   that is, a match flagged as Total should not fail at runtime.
-   More specifically, for instance if match y with x::_ -> x is flagged
-   total (as it happens during JoCaml compilation) then y cannot be []
-   at runtime. As a consequence, the static Total exhaustiveness information
-   have to be downgraded to Partial, in the dubious cases where guards
-   or lazy pattern execute arbitrary code that may perform side effects
-   and change the subject values.
-LM:
-   Lazy pattern was PR#5992, initial patch by lpw25.
-   I have  generalized the patch, so as to also find mutable fields.
-*)
-
-let is_lazy_pat p =
-  match p.pat_desc with
-  | Tpat_lazy _ -> true
-  | Tpat_alias _
-  | Tpat_variant _
-  | Tpat_record _
-  | Tpat_record_unboxed_product _
-  | Tpat_unboxed_unit
-  | Tpat_unboxed_bool _
-  | Tpat_tuple _
-  | Tpat_unboxed_tuple _
-  | Tpat_construct _
-  | Tpat_array _
-  | Tpat_or _
-  | Tpat_constant _
-  | Tpat_var _
-  | Tpat_any ->
-      false
-
-let has_lazy p = Typedtree.exists_pattern is_lazy_pat p
-
-let is_record_with_mutable_field p =
-  let fields_have_mutable_type lps =
-    List.exists (fun (_, lbl, _) -> Types.is_mutable lbl.lbl_mut) lps
-  in
-  match p.pat_desc with
-  | Tpat_record (lps, _) -> fields_have_mutable_type lps
-  | Tpat_record_unboxed_product (lps, _) -> fields_have_mutable_type lps
-  | Tpat_alias _
-  | Tpat_variant _
-  | Tpat_lazy _
-  | Tpat_unboxed_unit
-  | Tpat_unboxed_bool _
-  | Tpat_tuple _
-  | Tpat_unboxed_tuple _
-  | Tpat_construct _
-  | Tpat_array _
-  | Tpat_or _
-  | Tpat_constant _
-  | Tpat_var _
-  | Tpat_any ->
-      false
-
-let has_mutable p = Typedtree.exists_pattern is_record_with_mutable_field p
-
-(* Downgrade Total when
-   1. Matching accesses some mutable fields;
-   2. And there are  guards or lazy patterns.
-*)
-
-let check_partial has_mutable has_lazy pat_act_list = function
-  | Partial -> Partial
-  | Total ->
-      if
-        pat_act_list = []
-        || (* allow empty case list *)
-           List.exists
-             (fun (pats, lam) ->
-               has_mutable pats && (is_guarded lam || has_lazy pats))
-             pat_act_list
-      then
-        Partial
-      else
-        Total
-
-let check_partial_list pats_act_list =
-  check_partial (List.exists has_mutable) (List.exists has_lazy) pats_act_list
-
-let check_partial pat_act_list =
-  check_partial has_mutable has_lazy pat_act_list
-
-(* have toplevel handler when appropriate *)
-
-||||||| upstream-base
-(*
-   If there is a guard in a matching or a lazy pattern,
-   then set exhaustiveness info to Partial.
-   (because of side effects, assume the worst).
-
-   Notice that exhaustiveness information is trusted by the compiler,
-   that is, a match flagged as Total should not fail at runtime.
-   More specifically, for instance if match y with x::_ -> x is flagged
-   total (as it happens during JoCaml compilation) then y cannot be []
-   at runtime. As a consequence, the static Total exhaustiveness information
-   have to be downgraded to Partial, in the dubious cases where guards
-   or lazy pattern execute arbitrary code that may perform side effects
-   and change the subject values.
-LM:
-   Lazy pattern was PR#5992, initial patch by lpw25.
-   I have  generalized the patch, so as to also find mutable fields.
-*)
-
-let is_lazy_pat p =
-  match p.pat_desc with
-  | Tpat_lazy _ -> true
-  | Tpat_alias _
-  | Tpat_variant _
-  | Tpat_record _
-  | Tpat_tuple _
-  | Tpat_construct _
-  | Tpat_array _
-  | Tpat_or _
-  | Tpat_constant _
-  | Tpat_var _
-  | Tpat_any ->
-      false
-
-let has_lazy p = Typedtree.exists_pattern is_lazy_pat p
-
-let is_record_with_mutable_field p =
-  match p.pat_desc with
-  | Tpat_record (lps, _) ->
-      List.exists
-        (fun (_, lbl, _) ->
-          match lbl.Types.lbl_mut with
-          | Mutable -> true
-          | Immutable -> false)
-        lps
-  | Tpat_alias _
-  | Tpat_variant _
-  | Tpat_lazy _
-  | Tpat_tuple _
-  | Tpat_construct _
-  | Tpat_array _
-  | Tpat_or _
-  | Tpat_constant _
-  | Tpat_var _
-  | Tpat_any ->
-      false
-
-let has_mutable p = Typedtree.exists_pattern is_record_with_mutable_field p
-
-(* Downgrade Total when
-   1. Matching accesses some mutable fields;
-   2. And there are  guards or lazy patterns.
-*)
-
-let check_partial has_mutable has_lazy pat_act_list = function
-  | Partial -> Partial
-  | Total ->
-      if
-        pat_act_list = []
-        || (* allow empty case list *)
-           List.exists
-             (fun (pats, lam) ->
-               has_mutable pats && (is_guarded lam || has_lazy pats))
-             pat_act_list
-      then
-        Partial
-      else
-        Total
-
-let check_partial_list pats_act_list =
-  check_partial (List.exists has_mutable) (List.exists has_lazy) pats_act_list
-
-let check_partial pat_act_list =
-  check_partial has_mutable has_lazy pat_act_list
-
-(* have toplevel handler when appropriate *)
-
-=======
->>>>>>> upstream-incoming
 type failer_kind =
   | Raise_match_failure
   | Reraise_noloc of lambda
@@ -5933,74 +4501,14 @@ let failure_handler ~scopes loc ~failer () =
         ],
         sloc )
 
-<<<<<<< oxcaml
-let check_total ~scopes value_kind loc ~failer total lambda i =
-  if Jumps.is_empty total then
-    lambda
-  else
-    Lstaticcatch (lambda, (i, []),
-                  failure_handler ~scopes loc ~failer (),
-                  Same_region, value_kind)
-
 let toplevel_handler ~scopes ~return_layout loc ~failer partial args cases
     compile_fun =
-||||||| upstream-base
-let check_total ~scopes loc ~failer total lambda i =
-  if Jumps.is_empty total then
-    lambda
-  else
-    Lstaticcatch (lambda, (i, []),
-                  failure_handler ~scopes loc ~failer ())
-
-let toplevel_handler ~scopes loc ~failer partial args cases compile_fun =
-=======
-let toplevel_handler ~scopes loc ~failer partial args cases compile_fun =
->>>>>>> upstream-incoming
   let compile_fun partial pm =
     debugf "@[<v>MATCHING@,";
     let result = compile_fun partial pm in
     debugf "@]@.";
     result
   in
-<<<<<<< oxcaml
-  match partial with
-  | Total when not !Clflags.safer_matching ->
-      let default = Default_environment.empty in
-      let pm = { args; cases; default } in
-      let (lam, total) = compile_fun Total pm in
-      assert (Jumps.is_empty total);
-      lam
-  | Partial | Total (* when !Clflags.safer_matching *) ->
-      let raise_num = next_raise_count () in
-      let default =
-        Default_environment.cons [ Patterns.omega_list args ] raise_num
-          Default_environment.empty in
-      let pm = { args; cases; default } in
-      begin match compile_fun Partial pm with
-      | exception Unused -> assert false
-      | (lam, total) ->
-          check_total ~scopes return_layout loc ~failer total lam raise_num
-      end
-||||||| upstream-base
-  match partial with
-  | Total when not !Clflags.safer_matching ->
-      let default = Default_environment.empty in
-      let pm = { args; cases; default } in
-      let (lam, total) = compile_fun Total pm in
-      assert (Jumps.is_empty total);
-      lam
-  | Partial | Total (* when !Clflags.safer_matching *) ->
-      let raise_num = next_raise_count () in
-      let default =
-        Default_environment.cons [ Patterns.omega_list args ] raise_num
-          Default_environment.empty in
-      let pm = { args; cases; default } in
-      begin match compile_fun Partial pm with
-      | exception Unused -> assert false
-      | (lam, total) ->
-          check_total ~scopes loc ~failer total lam raise_num
-      end
-=======
   let final_exit = next_raise_count () in
   let default = Default_environment.empty ~final_exit in
   let pm = { args; cases; default } in
@@ -6030,46 +4538,28 @@ let toplevel_handler ~scopes loc ~failer partial args cases compile_fun =
             Location.prerr_warning loc warning
         end;
         Lstaticcatch (lam, (final_exit, []),
-                      failure_handler ~scopes loc ~failer ())
+                      failure_handler ~scopes loc ~failer (),
+                      Same_region, return_layout)
   end
 
-let root_arg arg binding_kind =
+let root_arg arg binding_kind sort layout =
   (* The mutability information denotes the mutability of a *position*
      inside the value, which indicates whether looking inside the
      value of the scrutinee is a pure operation. At the root we are
      immutable. *)
-  { arg; binding_kind; mut = Immutable }
->>>>>>> upstream-incoming
+  { arg; binding_kind; mut = Immutable; sort; layout }
 
-<<<<<<< oxcaml
-let compile_matching ~scopes ~arg_sort ~arg_layout ~return_layout loc ~failer repr arg
-      pat_act_list partial =
-  let partial = check_partial pat_act_list partial in
-  let args = [ (arg, Strict, arg_sort, arg_layout) ] in
-||||||| upstream-base
-let compile_matching ~scopes loc ~failer repr arg pat_act_list partial =
-  let partial = check_partial pat_act_list partial in
-  let args = [ (arg, Strict) ] in
-=======
-let compile_matching ~scopes loc ~failer repr arg pat_act_list partial =
-  let args = [ root_arg arg Strict ] in
->>>>>>> upstream-incoming
+let compile_matching ~scopes ~arg_sort ~arg_layout ~return_layout loc ~failer
+      repr arg pat_act_list partial =
+  let args = [ root_arg arg Strict arg_sort arg_layout ] in
   let rows = map_on_rows (fun pat -> (pat, [])) pat_act_list in
-<<<<<<< oxcaml
-  toplevel_handler ~scopes ~return_layout loc ~failer partial args rows
-    (fun partial pm -> compile_match_nonempty ~scopes return_layout repr
-                         partial (Context.start 1) pm)
-||||||| upstream-base
-  toplevel_handler ~scopes loc ~failer partial args rows (fun partial pm ->
-    compile_match_nonempty ~scopes repr partial (Context.start 1) pm)
-=======
   let handler =
-    toplevel_handler ~scopes loc ~failer partial args rows
+    toplevel_handler ~scopes ~return_layout loc ~failer partial args rows
   in
   handler (fun partial pm ->
-    compile_match_nonempty ~scopes repr partial (Context.start 1) pm
+    compile_match_nonempty
+      ~scopes return_layout repr partial (Context.start 1) pm
   )
->>>>>>> upstream-incoming
 
 let for_function ~scopes ~arg_sort ~arg_layout ~return_layout loc repr param
       pat_act_list partial =
@@ -6089,27 +4579,20 @@ let for_trywith ~scopes ~return_layout loc param pat_act_list =
     ~arg_layout:layout_block ~return_layout loc ~failer:(Reraise_noloc param)
     None param pat_act_list Partial
 
-<<<<<<< oxcaml
+let for_handler ~scopes ~return_layout loc param cont cont_tail pat_act_list =
+  (* CR sspies: Hardcoding arg_sort and arg_layout like for_trywith.
+     Revisit whether this choice is actually correct. *)
+  compile_matching ~scopes ~arg_sort:Jkind.Sort.Const.for_predef_value
+    ~arg_layout:layout_block ~return_layout loc
+    ~failer:(Reperform_noloc [param; cont; cont_tail])
+    None param pat_act_list Partial
+
 let simple_for_let ~scopes ~arg_sort ~return_layout loc param pat body =
   let arg_layout =
     Typeopt.layout pat.pat_env pat.pat_loc arg_sort pat.pat_type
   in
   compile_matching ~scopes ~arg_sort ~arg_layout ~return_layout loc
     ~failer:Raise_match_failure None param [ (pat, body) ] Partial
-||||||| upstream-base
-let simple_for_let ~scopes loc param pat body =
-  compile_matching ~scopes loc ~failer:Raise_match_failure
-    None param [ (pat, body) ] Partial
-=======
-let for_handler ~scopes loc param cont cont_tail pat_act_list =
-  compile_matching ~scopes loc
-    ~failer:(Reperform_noloc [param; cont; cont_tail])
-    None param pat_act_list Partial
-
-let simple_for_let ~scopes loc param pat body =
-  compile_matching ~scopes loc ~failer:Raise_match_failure
-    None param [ (pat, body) ] Partial
->>>>>>> upstream-incoming
 
 (* Optimize binding of immediate tuples
 
@@ -6221,26 +4704,14 @@ let assign_pat ~scopes body_layout opt nraise catch_ids loc pat pat_sort lam =
     | Tpat_tuple patl, Lprim (Pmakeblock _, lams, _) ->
         opt := true;
         List.fold_left2
-<<<<<<< oxcaml
           (fun acc (_, pat) lam ->
              collect Jkind.Sort.Const.for_tuple_element acc pat lam)
-||||||| upstream-base
-        List.fold_left2 collect acc patl lams
-=======
-          (fun acc (_, pat) lam -> collect acc pat lam)
->>>>>>> upstream-incoming
           acc patl lams
     | Tpat_tuple patl, Lconst (Const_block (_, scl)) ->
         opt := true;
-<<<<<<< oxcaml
         let collect_const acc (_, pat) sc =
           collect Jkind.Sort.Const.for_tuple_element acc pat (Lconst sc)
         in
-||||||| upstream-base
-        let collect_const acc pat sc = collect acc pat (Lconst sc) in
-=======
-        let collect_const acc (_, pat) sc = collect acc pat (Lconst sc) in
->>>>>>> upstream-incoming
         List.fold_left2 collect_const acc patl scl
     | _ ->
         (* pattern idents will be bound in staticcatch (let body), so we
@@ -6275,14 +4746,8 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       (* This eliminates a useless variable (and stack slot in bytecode)
          for "let _ = ...". See #6865. *)
       Lsequence (param, body)
-<<<<<<< oxcaml
   | Tpat_var (id, _, duid, _, _)
   | Tpat_alias ({ pat_desc = Tpat_any }, id, _, duid, _, _, _) ->
-||||||| upstream-base
-  | Tpat_var (id, _) | Tpat_alias ({ pat_desc = Tpat_any }, id, _) ->
-=======
-  | Tpat_var (id, _, _) | Tpat_alias ({ pat_desc = Tpat_any }, id, _, _, _) ->
->>>>>>> upstream-incoming
       (* Fast path, and keep track of simple bindings to unboxable numbers.
 
          Note: the (Tpat_alias (Tpat_any, id)) case needs to be
@@ -6301,23 +4766,11 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
       let catch_ids = pat_bound_idents_full pat in
       let ids_with_kinds =
         List.map
-<<<<<<< oxcaml
           (fun (id, _, typ, uid, sort) ->
              (id, uid, Typeopt.layout pat.pat_env pat.pat_loc sort typ))
-||||||| upstream-base
-          (fun (id, _, typ) -> (id, Typeopt.value_kind pat.pat_env typ))
-=======
-          (fun (id, _, typ, _) -> (id, Typeopt.value_kind pat.pat_env typ))
->>>>>>> upstream-incoming
           catch_ids
       in
-<<<<<<< oxcaml
       let ids = List.map (fun (id, _, _, _, _) -> id) catch_ids in
-||||||| upstream-base
-      let ids = List.map (fun (id, _, _) -> id) catch_ids in
-=======
-      let ids = List.map (fun (id, _, _, _) -> id) catch_ids in
->>>>>>> upstream-incoming
       let bind =
         map_return (assign_pat ~scopes return_layout opt nraise ids loc pat
                       arg_sort)
@@ -6332,24 +4785,12 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
 (* Handling of tupled functions and matchings *)
 
 (* Easy case since variables are available *)
-<<<<<<< oxcaml
 let for_tupled_function ~scopes ~return_layout loc paraml pats_act_list partial =
-  let partial = check_partial_list pats_act_list partial in
   (* The arguments of a tupled function are always values since they must be
      tuple elements *)
-  let args =
-    List.map (fun id -> (Lvar id, Strict, Jkind.Sort.Const.for_tuple_element,
-                         layout_tuple_element))
-      paraml
-  in
-||||||| upstream-base
-let for_tupled_function ~scopes loc paraml pats_act_list partial =
-  let partial = check_partial_list pats_act_list partial in
-  let args = List.map (fun id -> (Lvar id, Strict)) paraml in
-=======
-let for_tupled_function ~scopes loc paraml pats_act_list partial =
-  let args = List.map (fun id -> root_arg (Lvar id) Strict) paraml in
->>>>>>> upstream-incoming
+  let args = List.map (fun id ->
+    root_arg (Lvar id) Strict Jkind.Sort.Const.for_tuple_element layout_tuple_element
+  ) paraml in
   let handler =
     toplevel_handler ~scopes ~return_layout loc ~failer:Raise_match_failure
       partial args pats_act_list in
@@ -6436,104 +4877,46 @@ let compile_flattened ~scopes value_kind repr partial ctx pmh =
         (compile_match ~scopes value_kind repr partial)
         lam total ctx hs
 
-<<<<<<< oxcaml
-let do_for_multiple_match ~scopes ~return_layout loc paraml mode pat_act_list partial =
+let do_for_multiple_match ~scopes ~return_layout loc idl mode pat_act_list partial =
   (* CR layouts v5: This function is called in cases where the scrutinee of a
      match is a literal tuple (e.g., [match e1, e2, e3 with ...]).  The
      typechecker treats the scrutinee here like any other tuple, so it's fine to
      assume the whole thing and the elements have sort value.  That will change
      when we allow non-values in structures. *)
-||||||| upstream-base
-let do_for_multiple_match ~scopes loc paraml pat_act_list partial =
-=======
-let do_for_multiple_match ~scopes loc idl pat_act_list partial =
->>>>>>> upstream-incoming
   let repr = None in
-  let param_lambda = List.map (fun (l, _, _) -> l) paraml in
+  let param_lambda = List.map (fun (id, _, _) -> Lvar id) idl in
   let arg =
     let sloc = Scoped_location.of_location ~scopes loc in
-<<<<<<< oxcaml
     Lprim (Pmakeblock (0, Immutable, All_value, mode), param_lambda, sloc)
   in
-  let arg_sort = Jkind.Sort.Const.for_tuple in
-||||||| upstream-base
-    Lprim (Pmakeblock (0, Immutable, None), paraml, sloc) in
-=======
-    let args = List.map (fun id -> Lvar id) idl in
-    Lprim (Pmakeblock (0, Immutable, None), args, sloc) in
-  let input_args = { first = root_arg (Tuple arg) Strict; rest = [] } in
->>>>>>> upstream-incoming
+  let input_args =
+    { first = root_arg (Tuple arg) Strict
+        Jkind.Sort.Const.for_tuple layout_block;
+      rest = [] }
+  in
   let handler =
     let rows = map_on_rows (fun p -> (p, [])) pat_act_list in
-<<<<<<< oxcaml
     toplevel_handler ~scopes ~return_layout loc ~failer:Raise_match_failure
-      partial [ (arg, Strict, Jkind.Sort.Const.for_tuple, layout_block) ] rows in
-||||||| upstream-base
-    toplevel_handler ~scopes loc ~failer:Raise_match_failure
-      partial [ (arg, Strict) ] rows in
-=======
-    toplevel_handler ~scopes loc ~failer:Raise_match_failure
       partial input_args rows in
->>>>>>> upstream-incoming
   handler (fun partial pm1 ->
     let pm1_half =
       { pm1 with
         cases = List.map (half_simplify_nonempty ~arg) pm1.cases }
-<<<<<<< oxcaml
     in
-    let next, nexts = split_and_precompile_half_simplified ~arg ~arg_sort pm1_half in
-    let size = List.length paraml in
-    let (idl_with_layouts, args) =
-      List.map (function
-        | Lvar id as lid, sort, layout ->
-          (id, Lambda.debug_uid_none, layout), (lid, Alias, sort, layout)
-        (* CR sspies: Can we get a better [debug_uid] here? *)
-        | _, sort, layout ->
-          let id = Ident.create_local "*match*" in
-          let id_uid = Lambda.debug_uid_none in
-          (id, id_uid, layout), (Lvar id, Alias, sort, layout))
-        paraml
-      |> List.split
-||||||| upstream-base
-      { pm1 with cases = List.map (half_simplify_nonempty ~arg) pm1.cases }
-=======
->>>>>>> upstream-incoming
-    in
-<<<<<<< oxcaml
-||||||| upstream-base
-    let next, nexts = split_and_precompile_half_simplified ~arg pm1_half in
-    let size = List.length paraml
-    and idl = List.map (function
-      | Lvar id -> id
-      | _ -> Ident.create_local "*match*") paraml in
-    let args = List.map (fun id -> (Lvar id, Alias)) idl in
-=======
     let next, nexts = split_and_precompile_half_simplified pm1_half in
     let size = List.length idl in
-    let args = List.map (fun id -> root_arg (Lvar id) Alias) idl in
->>>>>>> upstream-incoming
+    let args =
+      List.map
+        (fun (id, sort, layout) -> root_arg (Lvar id) Alias sort layout)
+        idl
+    in
     let flat_next = flatten_precompiled size args next
     and flat_nexts =
       List.map (fun (e, pm) -> (e, flatten_precompiled size args pm)) nexts
     in
-<<<<<<< oxcaml
-    let lam, total =
-      comp_match_handlers return_layout
-        (compile_flattened ~scopes return_layout repr) partial
-        (Context.start size) flat_next flat_nexts
-    in
-    List.fold_right2 (bind_with_layout Strict) idl_with_layouts param_lambda lam,
-    total
-||||||| upstream-base
-    let lam, total =
-      comp_match_handlers (compile_flattened ~scopes repr) partial
-        (Context.start size) flat_next flat_nexts
-    in
-    List.fold_right2 (bind Strict) idl paraml lam, total
-=======
-    comp_match_handlers (compile_flattened ~scopes repr) partial
+    comp_match_handlers return_layout
+      (compile_flattened ~scopes return_layout repr) partial
       (Context.start size) flat_next flat_nexts
->>>>>>> upstream-incoming
   )
 
 (* PR#4828: Believe it or not, the 'paraml' argument below
@@ -6554,24 +4937,12 @@ let bind_opt (v, v_duid, _, layout, eo) k =
 
 let for_multiple_match ~scopes ~return_layout loc paraml mode pat_act_list partial =
   let v_paraml = List.map param_to_var paraml in
-<<<<<<< oxcaml
-  let paraml =
-    List.map (fun (v, _, sort, layout, _) -> (Lvar v, sort, layout)) v_paraml
+  let vl =
+    List.map (fun (v, _, sort, layout, _) -> (v, sort, layout)) v_paraml
   in
-||||||| upstream-base
-  let paraml = List.map (fun (v, _) -> Lvar v) v_paraml in
-=======
-  let vl = List.map fst v_paraml in
->>>>>>> upstream-incoming
   List.fold_right bind_opt v_paraml
-<<<<<<< oxcaml
-    (do_for_multiple_match ~scopes ~return_layout loc paraml mode pat_act_list
+    (do_for_multiple_match ~scopes ~return_layout loc vl mode pat_act_list
        partial)
-||||||| upstream-base
-    (do_for_multiple_match ~scopes loc paraml pat_act_list partial)
-=======
-    (do_for_multiple_match ~scopes loc vl pat_act_list partial)
->>>>>>> upstream-incoming
 
 let for_optional_arg_default
     ~scopes loc pat ~param ~default_arg ~default_arg_sort ~return_layout body
