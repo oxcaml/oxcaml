@@ -428,7 +428,7 @@ let add_cold_attribute expr loc attributes =
             (Warnings.Duplicated_attribute "cold");
       (* ppx_cold rewrites `[@cold]` to `[@inline never][@specialise never]
          [@local never]` so we do the equivalent here. *)
-      begin match attr.inline with 
+      begin match attr.inline with
       | Always_inline
       | Never_inline
       | Available_inline

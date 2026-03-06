@@ -1248,6 +1248,7 @@ let rec struct_const ppf = function
         List.iter (fun f -> fprintf ppf "@ %s" f) fl in
       fprintf ppf "@[<1>[|@[%s%a@]|]@]" f1 floats fl
   | Const_null -> fprintf ppf "<null>"
+  | Const_layout l -> layout ppf l
 
 and struct_consts ppf (hd, tl) =
   let sconsts ppf scl =
@@ -1262,10 +1263,16 @@ let rec lam ppf = function
       fprintf ppf "*%a" Ident.print id
   | Lconst cst ->
       struct_const ppf cst
-  | Lapply ap ->
+  | Lapply ap | Linstantiate ap as l->
       let lams ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
-      let form = apply_kind "apply" ap.ap_region_close ap.ap_mode in
+      let name =
+        match l with
+        | Lapply _ -> "apply"
+        | Linstantiate _ -> "instantiate"
+        | _ -> assert false
+      in
+      let form = apply_kind name ap.ap_region_close ap.ap_mode in
       fprintf ppf "@[<2>(%s@ %a%a%a%a%a%a)@]" form
         lam ap.ap_func lams ap.ap_args
         apply_tailcall_attribute ap.ap_tailcall
@@ -1274,6 +1281,8 @@ let rec lam ppf = function
         apply_probe ap.ap_probe
   | Lfunction lfun ->
       lfunction ppf lfun
+  | Ltemplate (lfun, _) ->
+      function_like "template" ppf lfun
   | Llet _ | Lmutlet _ as expr ->
       let let_kind = begin function
         | Llet(str,_,_,_,_,_) ->
@@ -1435,7 +1444,7 @@ let rec lam ppf = function
       fprintf ppf "$(%a)" slam slambda
 
 and slam ppf = function
-  | SLlayout layout -> fprintf ppf "⟪%a⟫" layout_annotation layout
+  | SLlayout l -> fprintf ppf "⟪%a⟫" layout l
   | SLglobal cu ->
     fprintf ppf "(global %a)" (Format_doc.compat Compilation_unit.print) cu
   | SLvar id -> Slambdaident.print ppf id
@@ -1471,9 +1480,9 @@ and slambda_function ppf { sfun_params; sfun_body } =
   in
   fprintf ppf "@[<2>@[<2>%t->@]@ %a@]" print_params slam sfun_body
 
-and slambda_apply ppf { sapp_func; sapp_arguments } =
+and slambda_apply ppf { sapp_func; sapp_args } =
   let print_args ppf =
-    Array.iter (fun arg -> fprintf ppf "@ %a" slam arg) sapp_arguments
+    Array.iter (fun arg -> fprintf ppf "@ %a" slam arg) sapp_args
   in
   fprintf ppf "@[<2>%a%t@]" slam sapp_func print_args
 
@@ -1483,7 +1492,7 @@ and sequence ppf = function
   | l ->
       lam ppf l
 
-and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
+and function_like name ppf {kind; params; return; body; attr; ret_mode; mode} =
   let pr_params ppf params =
     match kind with
     | Curried {nlocal} ->
@@ -1510,10 +1519,12 @@ and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
           )
           params;
         fprintf ppf ")" in
-  fprintf ppf "@[<2>(function%s%a@ %a%a%a)@]"
+  fprintf ppf "@[<2>(%s%s%a@ %a%a%a)@]"
+    name
     (locality_kind mode) pr_params params
     function_attribute attr return_kind (ret_mode, return) lam body
 
+and lfunction ppf lfun = function_like "function" ppf lfun
 
 let structured_constant = struct_const
 

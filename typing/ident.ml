@@ -29,6 +29,8 @@ type t =
          predefined identifiers is always unique. *)
   | Global_with_args of global
       (* must have non-empty [args] *)
+  | Sort_var of int
+      (* Massive hack but useful for now *)
 and global = Global_module.Name.t = private
   { head: string; args: Global_module.Name.argument list }
 
@@ -57,6 +59,9 @@ let create_global glob =
   | { head; args = [] } -> Global head
   | _ -> Global_with_args glob
 
+let create_sort_var var =
+  Sort_var var
+
 let create_local_binding_for_global glob =
   create_local (Global_module.Name.to_string glob)
 
@@ -71,6 +76,7 @@ let name = function
   | Global name
   | Predef { name; _ } -> name
   | Global_with_args g -> global_name g
+  | Sort_var id -> Format.asprintf "layout!%i" id
 
 let rename = function
   | Local { name; stamp = _ }
@@ -93,6 +99,7 @@ let unique_name = function
          "_<some number>", and that their name is unique. *)
       name
   | Global_with_args g -> global_name g
+  | Sort_var id -> Format.asprintf "layout!%i" id
 
 let unique_toplevel_name = function
   | Local { name; stamp }
@@ -100,6 +107,7 @@ let unique_toplevel_name = function
   | Global name
   | Predef { name; _ } -> name
   | Global_with_args g -> global_name g
+  | Sort_var id -> Format.asprintf "layout!%i" id
 
 let equal i1 i2 =
   match i1, i2 with
@@ -133,7 +141,7 @@ let stamp = function
 
 let scope = function
   | Scoped { scope; _ } -> scope
-  | Local _ -> highest_scope
+  | Local _ | Sort_var _ -> highest_scope
   | Global _ | Predef _ | Global_with_args _ -> lowest_scope
 
 let reinit_level = ref (-1)
@@ -150,7 +158,8 @@ let is_global = function
 
 let is_global_or_predef = function
   | Local _
-  | Scoped _ -> false
+  | Scoped _
+  | Sort_var _ -> false
   | Global _
   | Predef _
   | Global_with_args _ -> true
@@ -184,6 +193,7 @@ let print ~with_scope ppf =
         (if with_scope then asprintf "[%i]" scope else "")
   | Global_with_args g ->
       fprintf ppf "%a!" Global_module.Name.print g
+  | Sort_var id -> fprintf ppf "layout!%i" id
 
 let print_with_scope ppf id = print ~with_scope:true ppf id
 
@@ -418,6 +428,9 @@ let compare x y =
   | Global_with_args _, _ -> 1
   | _, Global_with_args _ -> (-1)
   | Predef { stamp = s1; _ }, Predef { stamp = s2; _ } -> compare s1 s2
+  | Predef _, _ -> 1
+  | _, Predef _ -> (-1)
+  | Sort_var x, Sort_var y -> compare x y
 
 let output oc id = output_string oc (unique_name id)
 let hash i = (Char.code (name i).[0]) lxor (stamp i)

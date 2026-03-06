@@ -252,7 +252,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
           | Const_unboxed_int32 _ | Const_unboxed_int64 _
           | Const_unboxed_nativeint _ )
       | Const_block _ | Const_mixed_block _ | Const_float_array _
-      | Const_immstring _ | Const_float_block _ | Const_null ->
+      | Const_immstring _ | Const_float_block _ | Const_null | Const_layout _ ->
         Misc.fatal_errorf
           "In constant mixed block, a field of kind\n\
           \       Float_boxed contained the  constant %a"
@@ -299,6 +299,7 @@ let rec declare_const acc dbg (const : Lambda.structured_constant) =
     in
     register_const acc dbg const "const_mixed_block"
   | Const_null -> acc, reg_width RWC.const_null, "null"
+  | Const_layout _ -> Misc.fatal_error "I'm just hoping this can't happen"
 
 let close_const acc const =
   (* For this code path, the debuginfo is discarded (see just below). *)

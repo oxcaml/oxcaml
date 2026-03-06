@@ -173,12 +173,12 @@ let rec eval_slam env slam : value Or_missing.t =
     Present
       (SLVclosure
          { clo_params = sfun_params; clo_body = sfun_body; clo_env = env })
-  | SLinstantiate { sapp_func; sapp_arguments } ->
+  | SLinstantiate { sapp_func; sapp_args } ->
     let closure =
       eval_slam env sapp_func |> expect_not_missing |> expect Tclosure
     in
     let eval_arg arg = eval_slam env arg |> expect_not_missing in
-    let args = Array.map eval_arg sapp_arguments in
+    let args = Array.map eval_arg sapp_args in
     let { clo_params; clo_body; clo_env } = closure in
     let env_body =
       Misc.Stdlib.Array.fold_left2 Env.add_present clo_env clo_params args
@@ -578,7 +578,8 @@ let rec assert_no_splices (lam : Lambda.lambda) =
   | Levent _ | Lifused _ -> ()
   | Lregion (_, layout) -> assert_layout_contains_no_splices layout
   | Lexclave _ -> ()
-  | Lsplice _ -> raise Found_a_splice);
+  | Lsplice _ -> raise Found_a_splice
+  | Ltemplate _ | Linstantiate _ -> Lambda.fatal_error_invalid_constructor lam);
   Lambda.iter_head_constructor assert_no_splices lam
 
 let do_eval slam =

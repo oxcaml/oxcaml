@@ -1192,7 +1192,8 @@ let rec cps acc env ccenv (lam : L.lambda) (k : cps_continuation)
                                [Lstaticraise] jump to this handler if needed. *)
                             apply_cont_with_extra_args acc env ccenv ~dbg k None
                               (get_unarized_vars wrap_return env)))))))
-  | Lsplice _ -> Lambda.fatal_error_invalid_constructor lam
+  | Lsplice _ | Ltemplate _ | Linstantiate _ ->
+    Lambda.fatal_error_invalid_constructor lam
 
 and cps_non_tail_simple :
     Acc.t ->
@@ -1689,7 +1690,8 @@ and cps_switch acc env ccenv (switch : L.lambda_switch) ~condition_dbg
           let consts_rev = (arm, cont, dbg, None, []) :: consts_rev in
           let wrappers = (cont, action) :: wrappers in
           consts_rev, wrappers
-        | Lsplice _ -> Lambda.fatal_error_invalid_constructor action)
+        | Lsplice _ | Ltemplate _ | Linstantiate _ ->
+          Lambda.fatal_error_invalid_constructor action)
       ([], wrappers) cases
   in
   cps_non_tail_var "scrutinee" acc env ccenv scrutinee
