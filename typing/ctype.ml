@@ -2298,8 +2298,8 @@ let rec try_reduce_once t =
         ==> [module S with type typ = <[t]> eval] *)
     | Tpackage (p, fl) ->
       Tpackage (p, List.map (fun (n, t) -> n, new_quote_eval_ty t) fl)
-    (* [<[ (of_kind k) ]> eval] ==> [of_kind k]] *)
-    | Tof_kind _ -> get_desc t
+    (* It is safe not to expand [Tof_kind], and we do not need to currently *)
+    | Tof_kind _ -> raise Cannot_expand
     | Tlink _ | Tsubst _ -> assert false
     end |> newty2 ~level:(get_level t)
   | Tsplice t -> begin
