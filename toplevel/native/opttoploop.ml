@@ -847,3 +847,31 @@ let run_script ppf name args =
     else name
   in
   use_silently ppf explicit_name
+
+
+let preload_objects = ref []
+
+let prepare ppf ?input () =
+  let dir =
+    (* CR sspies: Not sure we want to depend on the toploop like this. *)
+    Option.map (fun inp -> Filename.dirname (Toploop.filename_of_input inp)) input in
+  Topcommon.set_paths ?dir ();
+  begin try
+    initialize_toplevel_env ()
+  with Env.Error _ | Typetexp.Error _ as exn ->
+    Location.report_exception ppf exn; raise (Compenv.Exit_with_status 2)
+  end;
+  try
+    let res =
+      let objects =
+        List.rev (!preload_objects @ !Compenv.first_objfiles)
+      in
+      List.for_all (Opttopdirs.load_file ppf) objects
+    in
+    run_hooks Startup;
+    res
+  with x ->
+    try Location.report_exception ppf x; false
+    with x ->
+      Format.fprintf ppf "Uncaught exception: %s\n" (Printexc.to_string x);
+      false
