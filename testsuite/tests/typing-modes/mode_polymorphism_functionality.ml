@@ -270,7 +270,7 @@ let bar (once_ x) =
 [%%expect{|
 val bar :
   'a @ [< 'p & 'n.future & global > once] ->
-  ('b @ [< 'q.future > 'q.future] -> 'a @ [< 'o > 'm | 'o | 'p | once]) @ [< global > close('m) | 'n.future | once] =
+  ('b @ [< 'q.future > 'q.future] -> 'a @ [< 'o > 'm | 'o | 'p | once]) @ [> close('m) | 'n.future | once] =
   <fun>
 |}]
 
@@ -348,7 +348,7 @@ let fst x = fun y -> x
 [%%expect{|
 val fst :
   'a @ [< 'o & 'n.future & global] ->
-  ('b @ 'p -> 'a @ [> 'm | 'o]) @ [< global > close('m) | 'n.future] = <fun>
+  ('b @ 'p -> 'a @ [> 'm | 'o]) @ [> close('m) | 'n.future] = <fun>
 |}]
 
 (* x is < global as before *)
@@ -595,8 +595,7 @@ let close_over x = fun () -> x
 [%%expect{|
 val close_over :
   'a @ [< 'o & 'n.future & global] ->
-  (unit @ 'p -> 'a @ [> 'm | 'o]) @ [< global > close('m) | 'n.future] =
-  <fun>
+  (unit @ 'p -> 'a @ [> 'm | 'o]) @ [> close('m) | 'n.future] = <fun>
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
@@ -616,7 +615,7 @@ let close_over x = fun () -> fun () -> x
 val close_over :
   'a @ [< 'q & 'p.future & 'n.future & global] ->
   (unit @ 'mm1 ->
-   (unit @ 'mm0 -> 'a @ [> 'o | 'm | 'q]) @ [< global > close('o) | 'p.future]) @ [< global > close('m) | 'n.future] =
+   (unit @ 'mm0 -> 'a @ [> 'o | 'm | 'q]) @ [> close('o) | 'p.future]) @ [> close('m) | 'n.future] =
   <fun>
 |}]
 

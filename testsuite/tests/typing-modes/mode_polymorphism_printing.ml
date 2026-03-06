@@ -94,7 +94,7 @@ let foo x = fun y -> { x; y }
 [%%expect{|
 val foo :
   'a @ [< 'p & 'n.future & global] ->
-  ('b @ [< 'o & global] -> ('a, 'b) mytype @ [> 'm | 'o | 'p]) @ [< global > close('m) | 'n.future] =
+  ('b @ [< 'o & global] -> ('a, 'b) mytype @ [> 'm | 'o | 'p]) @ [> close('m) | 'n.future] =
   <fun>
 |}]
 
@@ -155,7 +155,7 @@ let prod_eta x = fun y -> (x, y)
 [%%expect{|
 val prod_eta :
   'a @ [< 'p & 'n.future & global] ->
-  ('b @ [< 'o & global] -> 'a * 'b @ [> 'm | 'o | 'p]) @ [< global > close('m) | 'n.future] =
+  ('b @ [< 'o & global] -> 'a * 'b @ [> 'm | 'o | 'p]) @ [> close('m) | 'n.future] =
   <fun>
 |}]
 
@@ -173,7 +173,7 @@ let foo x = fun y ->
 [%%expect{|
 val foo :
   'a @ [< 'p & 'n.future & global many] ->
-  ('b @ [< 'o & global many] -> 'a * 'b @ [> 'm | 'o | 'p | aliased]) @ [< global > close('m) | 'n.future | nonportable] =
+  ('b @ [< 'o & global many] -> 'a * 'b @ [> 'm | 'o | 'p | aliased]) @ [> close('m) | 'n.future | nonportable] =
   <fun>
 |}]
 
@@ -206,7 +206,7 @@ let fst x = fun y -> x
 [%%expect{|
 val fst :
   'a @ [< 'o & 'n.future & global] ->
-  ('b @ 'p -> 'a @ [> 'm | 'o]) @ [< global > close('m) | 'n.future] = <fun>
+  ('b @ 'p -> 'a @ [> 'm | 'o]) @ [> close('m) | 'n.future] = <fun>
 |}]
 let snd x = fun y -> y
 [%%expect{|
