@@ -4,10 +4,12 @@
  flambda2;
  {
    ocamlopt_flags = "-Oclassic";
+   compiler_directory_suffix = ".Oclassic";
    setup-ocamlopt.byte-build-env;
    ocamlopt.opt;
  }{
    ocamlopt_flags = "-O3";
+   compiler_directory_suffix = ".O3";
    setup-ocamlopt.byte-build-env;
    ocamlopt.opt;
  }
