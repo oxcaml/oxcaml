@@ -514,11 +514,46 @@ module Bytes = struct
     @@ portable = "%caml_bytes_get64u#_indexed_by_int64#"
     [@@warning "-187"]
 
+  external unsafe_set_int64_ne_indexed_by_int64 :
+    (bytes[@local_opt]) -> int64# -> int64# -> unit
+    @@ portable = "%caml_bytes_set64u#_indexed_by_int64#"
+    [@@warning "-187"]
+
+  external unsafe_get_int8_indexed_by_int64 :
+    (bytes[@local_opt]) -> int64# -> int
+    @@ portable = "%caml_bytes_geti8u_indexed_by_int64#"
+    [@@warning "-187"]
+
+  external unsafe_set_int8_indexed_by_int64 :
+    (bytes[@local_opt]) -> int64# -> int -> unit
+    @@ portable = "%caml_bytes_set8u_indexed_by_int64#"
+    [@@warning "-187"]
+
+  external unsafe_get_int32_ne_indexed_by_int64 :
+    (bytes[@local_opt]) -> int64# -> int32#
+    @@ portable = "%caml_bytes_get32u#_indexed_by_int64#"
+    [@@warning "-187"]
+
+  external unsafe_set_int32_ne_indexed_by_int64 :
+    (bytes[@local_opt]) -> int64# -> int32# -> unit
+    @@ portable = "%caml_bytes_set32u#_indexed_by_int64#"
+    [@@warning "-187"]
+
   external unsafe_get_float32_ne : (bytes[@local_opt]) -> int -> float32#
     @@ portable = "%caml_bytes_getf32u#" [@@warning "-187"]
 
   external unsafe_set_float32_ne : (bytes[@local_opt]) -> int -> float32# -> unit
     @@ portable = "%caml_bytes_setf32u#" [@@warning "-187"]
+
+  external unsafe_get_float32_ne_indexed_by_int64 :
+    (bytes[@local_opt]) -> int64# -> float32#
+    @@ portable = "%caml_bytes_getf32u#_indexed_by_int64#"
+    [@@warning "-187"]
+
+  external unsafe_set_float32_ne_indexed_by_int64 :
+    (bytes[@local_opt]) -> int64# -> float32# -> unit
+    @@ portable = "%caml_bytes_setf32u#_indexed_by_int64#"
+    [@@warning "-187"]
 
   external length : (bytes[@local_opt]) -> int @@ portable = "%bytes_length"
 end
@@ -532,6 +567,26 @@ module String = struct
 
   external unsafe_get_float32_ne : (string[@local_opt]) -> int -> float32#
     @@ portable = "%caml_string_getf32u#" [@@warning "-187"]
+
+  external unsafe_get_int8_indexed_by_int64 :
+    (string[@local_opt]) -> int64# -> int
+    @@ portable = "%caml_string_geti8u_indexed_by_int64#"
+    [@@warning "-187"]
+
+  external unsafe_get_int32_ne_indexed_by_int64 :
+    (string[@local_opt]) -> int64# -> int32#
+    @@ portable = "%caml_string_get32u#_indexed_by_int64#"
+    [@@warning "-187"]
+
+  external unsafe_get_int64_ne_indexed_by_int64 :
+    (string[@local_opt]) -> int64# -> int64#
+    @@ portable = "%caml_string_get64u#_indexed_by_int64#"
+    [@@warning "-187"]
+
+  external unsafe_get_float32_ne_indexed_by_int64 :
+    (string[@local_opt]) -> int64# -> float32#
+    @@ portable = "%caml_string_getf32u#_indexed_by_int64#"
+    [@@warning "-187"]
 
   external length : (string[@local_opt]) -> int @@ portable = "%string_length"
 end
