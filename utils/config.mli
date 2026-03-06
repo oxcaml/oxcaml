@@ -209,6 +209,14 @@ val with_address_sanitizer : bool
 val with_cpp_mangling : bool
 (** Whether symbol names should be following the cpp mangling convention *)
 
+type name_mangling_scheme =
+  | Flat
+
+exception Invalid_name_mangling_scheme of string
+
+val name_mangling_scheme : name_mangling_scheme
+(** The name mangling scheme to use *)
+
 val ext_obj: string
 (** Extension for object files, e.g. [.o] under Unix. *)
 
