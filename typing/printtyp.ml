@@ -720,6 +720,8 @@ and raw_type_desc ppf = function
       fprintf ppf "@[Tquote@ %a@]" raw_type t
   | Tsplice t ->
       fprintf ppf "@[Tsplice@ %a@]" raw_type t
+  | Tquote_eval t ->
+      fprintf ppf "@[Tquote_eval@ %a@]" raw_type t
   | Tfield (f, k, t1, t2) ->
       fprintf ppf "@[<hov1>Tfield(@,%s,@,%s,@,%a,@;<0 -1>%a)@]" f
         (string_of_field_kind k)
@@ -752,7 +754,7 @@ and raw_type_desc ppf = function
       fprintf ppf "@[<hov1>Tpackage(@,%a,@,%a)@]" path p
         raw_lid_type_list fl
   | Tof_kind jkind ->
-    fprintf ppf "(type@ :@ %a)" (Jkind.format !printing_env) jkind
+    fprintf ppf "Tof_kind@ %a" (Jkind.format !printing_env) jkind
 and raw_row_fixed ppf = function
 | None -> fprintf ppf "None"
 | Some Types.Fixed_private -> fprintf ppf "Some Fixed_private"
@@ -1543,6 +1545,7 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_ret (Orm_any (tree_of_modes mode), tree)
     | Other _ -> tree
   in
+  let ty = Ctype.reduce_head ty in
   let px = proxy ty in
   if List.memq px !printed_aliases && not (List.memq px !delayed) then
    let non_gen = is_non_gen mode (Transient_expr.type_expr px) in
@@ -1625,6 +1628,13 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_quote (tree_of_typexp mode alloc_mode ty)
     | Tsplice ty ->
         Otyp_splice (tree_of_typexp mode alloc_mode ty)
+    | Tquote_eval ty ->
+        (* We use [Predef]'s [eval] as the syntax, so we need to quote [ty]. *)
+        let ty = newgenty (Tquote ty) in
+        let p', s = best_type_path Predef.path_eval in
+        let tyl = apply_subst s [ty] in
+        Internal_names.add p';
+        Otyp_constr (tree_of_path (Some Type) p', tree_of_typlist mode tyl)
     | Tnil | Tfield _ ->
         tree_of_typobject mode ty None
     | Tsubst _ ->

@@ -76,6 +76,8 @@ val new_quote_ty: type_expr -> type_expr
         (* Quote a type expression *)
 val new_splice_ty: type_expr -> type_expr
         (* Splice a type expression *)
+val new_quote_eval_ty: type_expr -> type_expr
+        (* Quote-eval a type expression *)
 
 (**** Types ****)
 
