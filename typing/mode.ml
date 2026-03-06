@@ -5238,65 +5238,62 @@ type ('mo, 'como) monadic_comonadic =
   }
 
 module Zap_scope = struct
-  module ModeIdMap = Map.Make (Int)
+  module ModeIdMap = Hashtbl.Make (Int)
+
+  type job = unit -> unit
+
+  type job_list = job list
 
   type zap_scope =
-    { mutable zap_to_floor_map : (unit -> unit) ModeIdMap.t;
-      mutable zap_to_ceil_map : (unit -> unit) ModeIdMap.t;
-      mutable zap_to_legacy_map : (unit -> unit) ModeIdMap.t
+    { zap_to_floor_map : job_list ModeIdMap.t;
+      zap_to_ceil_map : job_list ModeIdMap.t;
+      zap_to_legacy_map : job ModeIdMap.t
     }
 
   let create () =
-    { zap_to_floor_map = ModeIdMap.empty;
-      zap_to_ceil_map = ModeIdMap.empty;
-      zap_to_legacy_map = ModeIdMap.empty
+    { zap_to_floor_map = ModeIdMap.create 17;
+      zap_to_ceil_map = ModeIdMap.create 17;
+      zap_to_legacy_map = ModeIdMap.create 17
     }
 
+  let add_job_to_map map i job =
+    match ModeIdMap.find_opt map i with
+    | Some jobs -> ModeIdMap.replace map i (job :: jobs)
+    | None -> ModeIdMap.add map i [job]
+
   let add_zap_to_floor_to_zap_scope i zap_to_floor zap_to_legacy zs =
-    if ModeIdMap.mem i zs.zap_to_legacy_map
+    if ModeIdMap.mem zs.zap_to_legacy_map i
     then ()
     else begin
-      if ModeIdMap.mem i zs.zap_to_ceil_map
+      if ModeIdMap.mem zs.zap_to_ceil_map i
       then begin
-        let zap_to_ceil_map = ModeIdMap.remove i zs.zap_to_ceil_map in
-        let zap_to_legacy_map =
-          ModeIdMap.add i zap_to_legacy zs.zap_to_legacy_map
-        in
-        zs.zap_to_ceil_map <- zap_to_ceil_map;
-        zs.zap_to_legacy_map <- zap_to_legacy_map
+        ModeIdMap.remove zs.zap_to_ceil_map i;
+        ModeIdMap.add zs.zap_to_legacy_map i zap_to_legacy
       end
-      else begin
-        let zap_to_floor_map =
-          ModeIdMap.add i zap_to_floor zs.zap_to_floor_map
-        in
-        zs.zap_to_floor_map <- zap_to_floor_map
-      end
+      else add_job_to_map zs.zap_to_floor_map i zap_to_floor
     end
 
   let add_zap_to_ceil_to_zap_scope i zap_to_ceil zap_to_legacy zs =
-    if ModeIdMap.mem i zs.zap_to_legacy_map
+    if ModeIdMap.mem zs.zap_to_legacy_map i
     then ()
     else begin
-      if ModeIdMap.mem i zs.zap_to_floor_map
+      if ModeIdMap.mem zs.zap_to_floor_map i
       then begin
-        let zap_to_floor_map = ModeIdMap.remove i zs.zap_to_floor_map in
-        let zap_to_legacy_map =
-          ModeIdMap.add i zap_to_legacy zs.zap_to_legacy_map
-        in
-        zs.zap_to_floor_map <- zap_to_floor_map;
-        zs.zap_to_legacy_map <- zap_to_legacy_map
+        ModeIdMap.remove zs.zap_to_floor_map i;
+        ModeIdMap.add zs.zap_to_legacy_map i zap_to_legacy
       end
-      else begin
-        let zap_to_ceil_map = ModeIdMap.add i zap_to_ceil zs.zap_to_ceil_map in
-        zs.zap_to_ceil_map <- zap_to_ceil_map
-      end
+      else add_job_to_map zs.zap_to_ceil_map i zap_to_ceil
     end
 
   let resolve_zap_scope { zap_to_floor_map; zap_to_ceil_map; zap_to_legacy_map }
       =
     ModeIdMap.iter (fun _ f -> f ()) zap_to_legacy_map;
-    ModeIdMap.iter (fun _ f -> f ()) zap_to_floor_map;
-    ModeIdMap.iter (fun _ f -> f ()) zap_to_ceil_map
+    ModeIdMap.iter
+      (fun _ jobs -> List.iter (fun f -> f ()) jobs)
+      zap_to_floor_map;
+    ModeIdMap.iter
+      (fun _ jobs -> List.iter (fun f -> f ()) jobs)
+      zap_to_ceil_map
 end
 
 module Value_with (Areality : Areality) = struct
