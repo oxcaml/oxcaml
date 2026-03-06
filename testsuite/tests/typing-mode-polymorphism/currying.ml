@@ -182,10 +182,7 @@ let bar (x @ unique) =
 Line 4, characters 13-19:
 4 |   use_unique (f ());
                  ^^^^^^
-Error: This value is "aliased"
-         because it is used inside the function at line 1, characters 12-22
-         which is expected to be "many".
-       However, the highlighted expression is expected to be "unique".
+Error: This value is "aliased" but is expected to be "unique".
 |}]
 
 (* returned value matches input portability *)
@@ -216,10 +213,7 @@ let var (x @ uncontended) =
 Line 3, characters 18-19:
 3 |   use_uncontended x
                       ^
-Error: This value is "immutable"
-         because it is used inside the function at line 1, characters 12-22
-         which is expected to be "stateless".
-       However, the highlighted expression is expected to be "read_write".
+Error: This value is "immutable" but is expected to be "read_write".
 |}]
 let var (x @ contended) =
   let x = fst x () in

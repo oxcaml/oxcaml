@@ -71,7 +71,8 @@ Error: This value is "nonportable" but is expected to be "portable".
 (* higher-order application should propagate mode constraints *)
 let apply f = fun x -> f x
 [%%expect{|
-val apply : ('a -> 'b) @ stateless -> 'a @ stateless -> 'b @ immutable =
+val apply :
+  ('a -> 'b @ stateless) @ stateless -> 'a @ stateless -> 'b @ immutable =
   <fun>
 |}]
 
@@ -105,7 +106,7 @@ Error: This value is "nonportable" but is expected to be "portable".
 let compose f g x = f (g x)
 [%%expect{|
 val compose :
-  ('a -> 'b) @ stateless immutable ->
+  ('a -> 'b @ stateless) @ stateless immutable ->
   ('c @ immutable -> 'a @ stateless) @ stateless immutable ->
   'c @ stateless -> 'b @ immutable = <fun>
 |}]
