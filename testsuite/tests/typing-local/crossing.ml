@@ -504,3 +504,16 @@ let foo (local_ x : int) =
 [%%expect{|
 val foo : int @ local -> (int -> int) ref = <fun>
 |}]
+
+(* Functional record update allows mode-crossing on kept fields *)
+type r = { foo: int ref; bar: int; mutable baz: int; qux : int ref @@ global }
+let f (orig @ local) = { orig with foo = ref 42; baz = 42 }
+[%%expect{|
+type r = {
+  foo : int ref;
+  bar : int;
+  mutable baz : int;
+  qux : int ref @@ global;
+}
+val f : r @ local -> r = <fun>
+|}]
