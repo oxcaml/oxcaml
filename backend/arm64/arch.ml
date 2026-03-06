@@ -100,6 +100,11 @@ let size_vec512 = 64
 
 let allow_unaligned_access = true
 
+(* Whether Ocaml provides shift operations where the shift amount is interpreted
+   module bitwidth. *)
+
+let ocaml_shifts_are_wrapping = true
+
 (* Behavior of division *)
 
 let division_crashes_on_overflow = false
