@@ -28,8 +28,8 @@ let get_older_version_of t code_id = Code_id.Map.find_opt code_id t
 
 let add t ~newer ~older = Code_id.Map.add newer older t
 
-let rec has_older_version_in t ~resolver id ancestors : _ Or_unknown.t =
-  if Code_id.Set.mem id ancestors
+let rec has_older_version_in t ~resolver id candidates : _ Or_unknown.t =
+  if Code_id.Set.mem id candidates
   then Known true
   else
     match Code_id.Map.find id t with
@@ -48,8 +48,8 @@ let rec has_older_version_in t ~resolver id ancestors : _ Or_unknown.t =
              of a code_id that is not bound in the map *)
           match Code_id.Map.find id t with
           | exception Not_found -> Known false
-          | older -> has_older_version_in t ~resolver older ancestors))
-    | older -> has_older_version_in t ~resolver older ancestors
+          | older -> has_older_version_in t ~resolver older candidates))
+    | older -> has_older_version_in t ~resolver older candidates
 
 let meet_set t ~resolver ids1 ids2 : _ Or_bottom.t =
   if Code_id.Set.equal ids1 ids2
