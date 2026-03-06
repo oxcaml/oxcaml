@@ -998,10 +998,14 @@ let rec low_bits ~bits ~dbg x =
             low_bits ~bits x ~dbg
           | _ -> (
             match x with
-            | Cop (((Cand | Cor | Cxor) as op), [x; y], dbg) ->
-              let x' = low_bits ~bits ~dbg x in
-              let y' = low_bits ~bits ~dbg y in
-              Cop (op, [x'; y'], dbg)
+            | Cop (((Cand | Cor | Cxor) as op), [x1; x2], dbg) ->
+              let x1 = low_bits ~bits ~dbg x1 in
+              let x2 = low_bits ~bits ~dbg x2 in
+              (match op with
+              | Cand -> and_int x1 x2 dbg
+              | Cor -> or_int x1 x2 dbg
+              | Cxor -> xor_int x1 x2 dbg
+              | _ ->  Misc.fatal_error "impossible")
             | _ -> x)))
       x
 
