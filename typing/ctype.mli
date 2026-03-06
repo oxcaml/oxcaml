@@ -339,8 +339,15 @@ val deep_occur_list: type_expr -> type_expr list -> bool
            a list of types. *)
 val deep_occur: type_expr -> type_expr -> bool
         (* Check whether a type occurs structurally within another. *)
-val moregeneral: Env.t -> bool -> type_expr -> type_expr -> unit
-        (* Check if the first type scheme is more general than the second. *)
+val moregeneral: Env.t -> bool ->
+  Jkind_types.Sort.var list -> Jkind_types.Sort.var list ->
+  type_expr -> type_expr -> Jkind_types.Sort.t option list
+        (* Check if the first type scheme is more general than the second.
+           The two [Sort.var list] arguments are the layout-polymorphic sort
+           variables of the pattern and subject respectively.
+           Returns, for each pattern sort variable (in order), the sort it was
+           constrained to during the check, or [None] if unconstrained. Sorts
+           in the result may contain subject sort variables. *)
 val is_moregeneral: Env.t -> bool -> type_expr -> type_expr -> bool
 val all_distinct_vars: Env.t -> type_expr list -> bool
         (* Check those types are all distinct type variables *)

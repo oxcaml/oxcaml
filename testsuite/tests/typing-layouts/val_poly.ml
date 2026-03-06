@@ -8,48 +8,77 @@ module type S = sig
   val foo : layout_ x y. ('a : x) ('b : y). 'a -> 'b
 end
 [%%expect{|
-module type S = sig val foo : layout_ x y. ('a : x) ('b : y). 'a -> 'b end
+module type S = sig val foo : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end
 |}]
 
-(* unused layout variables are not omitted *)
+(* The following is error, because the module type goes through inclusion check
+against itself, and unconstrained layout variables caused coercion, which is not
+supported yet. *)
+(* CR-soon zqian: once coercion is supported, the following should be allowed,
+with omitted layout variables preserved. *)
 module type S = sig
   val foo : layout_ x. ('a : value) ('b : value). 'a -> 'b
 end
 [%%expect{|
-Line 2, characters 20-21:
-2 |   val foo : layout_ x. ('a : value) ('b : value). 'a -> 'b
-                        ^
-Warning 191 [unused-kind-declaration]: unused kind x.
-
-module type S = sig val foo : layout_ x. 'a -> 'b end
+Line 1:
+Error: Module type declarations do not match:
+         module type S = sig val foo : layout_ l. 'a -> 'b end
+       does not match
+         module type S = sig val foo : layout_ l. 'a -> 'b end
+       At position "module type S = <here>"
+       Module types do not match:
+         sig val foo : layout_ l. 'a -> 'b end
+       is not equal to
+         sig val foo : layout_ l. 'a -> 'b end
+       At position "module type S = <here>"
+       Values do not match:
+         val foo : layout_ l. 'a -> 'b
+       is not included in
+         val foo : layout_ l. 'a -> 'b
+       The layout parameter at position 1 in the LHS
+       is instantiated with an unconstrained layout variable,
+       which is not supported yet.
 |}]
 
-(* shadowing of variable names is allowed; the printing back is smart enough tho *)
+(* Name shadowing caused unused variables. Same issue as above. *)
+(* CR-soon zqian: the test should pass with all variables preserved, once we support coercion. *)
 module type S = sig
   val bar : layout_ x x. ('a : x) ('b : x). 'a -> 'b
   val baz : layout_ x x x. ('a : x) ('b : x). 'a -> 'b
 end
 [%%expect{|
-Line 2, characters 20-21:
-2 |   val bar : layout_ x x. ('a : x) ('b : x). 'a -> 'b
-                        ^
-Warning 191 [unused-kind-declaration]: unused kind x.
-
-Line 3, characters 20-21:
-3 |   val baz : layout_ x x x. ('a : x) ('b : x). 'a -> 'b
-                        ^
-Warning 191 [unused-kind-declaration]: unused kind x.
-
-Line 3, characters 22-23:
-3 |   val baz : layout_ x x x. ('a : x) ('b : x). 'a -> 'b
-                          ^
-Warning 191 [unused-kind-declaration]: unused kind x.
-
-module type S =
-  sig
-    val bar : layout_ x x0. ('a : x0) ('b : x0). 'a -> 'b
-    val baz : layout_ x x0 x1. ('a : x1) ('b : x1). 'a -> 'b
-  end
+Line 1:
+Error: Module type declarations do not match:
+         module type S =
+           sig
+             val bar : layout_ l l0. ('a : l0) ('b : l0). 'a -> 'b
+             val baz : layout_ l l0 l1. ('a : l1) ('b : l1). 'a -> 'b
+           end
+       does not match
+         module type S =
+           sig
+             val bar : layout_ l l0. ('a : l0) ('b : l0). 'a -> 'b
+             val baz : layout_ l l0 l1. ('a : l1) ('b : l1). 'a -> 'b
+           end
+       At position "module type S = <here>"
+       Module types do not match:
+         sig
+           val bar : layout_ l l0. ('a : l0) ('b : l0). 'a -> 'b
+           val baz : layout_ l l0 l1. ('a : l1) ('b : l1). 'a -> 'b
+         end
+       is not equal to
+         sig
+           val bar : layout_ l l0. ('a : l0) ('b : l0). 'a -> 'b
+           val baz : layout_ l l0 l1. ('a : l1) ('b : l1). 'a -> 'b
+         end
+       At position "module type S = <here>"
+       Values do not match:
+         val bar : layout_ l l0. ('a : l0) ('b : l0). 'a -> 'b
+       is not included in
+         val bar : layout_ l l0. ('a : l0) ('b : l0). 'a -> 'b
+       The layout parameter at position 1 in the LHS
+       is instantiated with an unconstrained layout variable,
+       which is not supported yet.
 |}]
 
 (* the layout variables are rigid and cannot be constrained *)
@@ -82,14 +111,15 @@ Line 5, characters 6-7:
           ^
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : layout_ x y. ('a : x). 'a -> 'a end
+         sig val f : layout_ l l0. ('a : l). 'a -> 'a end
        is not included in
-         sig val f : layout_ x. ('a : x). 'a -> 'a end
+         sig val f : layout_ l. ('a : l). 'a -> 'a end
        Values do not match:
-         val f : layout_ x y. ('a : x). 'a -> 'a
+         val f : layout_ l l0. ('a : l). 'a -> 'a
        is not included in
-         val f : layout_ x. ('a : x). 'a -> 'a
-       The number of locally abstract layouts differs.
+         val f : layout_ l. ('a : l). 'a -> 'a
+       The LHS has 1 more layout parameter that is not used,
+       which is not supported yet.
 |}]
 
 (* implementation has fewer variables than the interface *)
@@ -104,14 +134,15 @@ Line 5, characters 6-7:
           ^
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : layout_ x. ('a : x). 'a -> 'a end
+         sig val f : layout_ l. ('a : l). 'a -> 'a end
        is not included in
-         sig val f : layout_ x y. ('a : x). 'a -> 'a end
+         sig val f : layout_ l l0. ('a : l). 'a -> 'a end
        Values do not match:
-         val f : layout_ x. ('a : x). 'a -> 'a
+         val f : layout_ l. ('a : l). 'a -> 'a
        is not included in
-         val f : layout_ x y. ('a : x). 'a -> 'a
-       The number of locally abstract layouts differs.
+         val f : layout_ l l0. ('a : l). 'a -> 'a
+       The RHS has 1 more layout parameter that is not used,
+       which is not supported yet.
 |}]
 
 (* same arity, but used different variable *)
@@ -126,21 +157,18 @@ Line 5, characters 6-7:
           ^
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : layout_ x y. ('a : x). 'a -> 'a end
+         sig val f : layout_ l l0. ('a : l). 'a -> 'a end
        is not included in
-         sig val f : layout_ x y. ('b : y). 'b -> 'b end
+         sig val f : layout_ l l0. ('b : l0). 'b -> 'b end
        Values do not match:
-         val f : layout_ x y. ('a : x). 'a -> 'a
+         val f : layout_ l l0. ('a : l). 'a -> 'a
        is not included in
-         val f : layout_ x y. ('b : y). 'b -> 'b
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The layout of 'a is y
-         because of the definition of f at line 4, characters 2-41.
-       But the layout of 'a must be a sublayout of x
-         because of the definition of f at line 2, characters 2-41.
+         val f : layout_ l l0. ('b : l0). 'b -> 'b
+       The layout parameter at position 1 in the LHS
+       corresponds to the parameter at position 2 in the RHS,
+       which is not supported yet.
 |}]
 
-(* CR-someday zqian: the error message is confusing. *)
 module F2 (M : sig
   val f : layout_ x y. ('a : x). 'a -> 'a
 end) : sig
@@ -152,18 +180,16 @@ Line 5, characters 6-7:
           ^
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : layout_ x y. ('a : x). 'a -> 'a end
+         sig val f : layout_ l l0. ('a : l). 'a -> 'a end
        is not included in
-         sig val f : layout_ y x. ('b : x). 'b -> 'b end
+         sig val f : layout_ l l0. ('b : l0). 'b -> 'b end
        Values do not match:
-         val f : layout_ x y. ('a : x). 'a -> 'a
+         val f : layout_ l l0. ('a : l). 'a -> 'a
        is not included in
-         val f : layout_ y x. ('b : x). 'b -> 'b
-       The type "'a -> 'a" is not compatible with the type "'b -> 'b"
-       The layout of 'a is x
-         because of the definition of f at line 4, characters 2-41.
-       But the layout of 'a must be a sublayout of x
-         because of the definition of f at line 2, characters 2-41.
+         val f : layout_ l l0. ('b : l0). 'b -> 'b
+       The layout parameter at position 1 in the LHS
+       corresponds to the parameter at position 2 in the RHS,
+       which is not supported yet.
 |}]
 
 (* some alpha renaming *)
@@ -174,8 +200,8 @@ end) : sig
 end = M
 [%%expect{|
 module F1 :
-  functor (M : sig val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b end) ->
-    sig val f : layout_ p q. ('a : p) ('b : q). 'a -> 'b end
+  functor (M : sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end) ->
+    sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end
 |}]
 
 (* layout-poly is not included in non-poly functions, even tho the former can be instantiate to the latter. *)
@@ -190,36 +216,63 @@ Line 5, characters 6-7:
           ^
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : layout_ x. ('a : x). 'a -> 'a end
+         sig val f : layout_ l. ('a : l). 'a -> 'a end
        is not included in
          sig val f : 'a -> 'a end
        Values do not match:
-         val f : layout_ x. ('a : x). 'a -> 'a
+         val f : layout_ l. ('a : l). 'a -> 'a
        is not included in
          val f : 'a -> 'a
-       The number of locally abstract layouts differs.
+       The LHS has 1 more layout parameter that is not used,
+       which is not supported yet.
 |}]
 
 (* Ordering: both use first var on both sides - same position, should succeed *)
+(* CR-soon zqian: same issue; should pass with coercion. *)
 module FO1 (M : sig
   val f : layout_ x y. ('a : x) ('b : x). 'a -> 'b
 end) : sig
   val f : layout_ p q. ('a : p) ('b : p). 'a -> 'b
 end = M
 [%%expect{|
-Line 2, characters 20-21:
-2 |   val f : layout_ x y. ('a : x) ('b : x). 'a -> 'b
-                        ^
-Warning 191 [unused-kind-declaration]: unused kind y.
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : layout_ l l0. ('a : l) ('b : l). 'a -> 'b end
+       is not included in
+         sig val f : layout_ l l0. ('a : l) ('b : l). 'a -> 'b end
+       Values do not match:
+         val f : layout_ l l0. ('a : l) ('b : l). 'a -> 'b
+       is not included in
+         val f : layout_ l l0. ('a : l) ('b : l). 'a -> 'b
+       The layout parameter at position 2 in the LHS
+       is instantiated with an unconstrained layout variable,
+       which is not supported yet.
+|}]
 
-Line 4, characters 20-21:
-4 |   val f : layout_ p q. ('a : p) ('b : p). 'a -> 'b
-                        ^
-Warning 191 [unused-kind-declaration]: unused kind q.
-
-module FO1 :
-  functor (M : sig val f : layout_ x y. ('a : x) ('b : x). 'a -> 'b end) ->
-    sig val f : layout_ p q. ('a : p) ('b : p). 'a -> 'b end
+module F (M : sig
+  val f : layout_ x. ('a : x) ('b : x). 'a -> 'b
+end) : sig
+  val f : layout_ x. 'a -> 'b
+end = M
+[%%expect{|
+Line 5, characters 6-7:
+5 | end = M
+          ^
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : layout_ l. ('a : l) ('b : l). 'a -> 'b end
+       is not included in
+         sig val f : layout_ l. 'a -> 'b end
+       Values do not match:
+         val f : layout_ l. ('a : l) ('b : l). 'a -> 'b
+       is not included in
+         val f : layout_ l. 'a -> 'b
+       The layout parameter at position 1 in the LHS
+       is instantiated with layout "value",
+       which is not supported yet.
 |}]
 
 (* Ordering: sort var in the same order, type var in different order, accepted. *)
@@ -230,8 +283,8 @@ end) : sig
 end = M
 [%%expect{|
 module FO3 :
-  functor (M : sig val f : layout_ p q. ('a : p) ('b : q). 'a -> 'b end) ->
-    sig val f : layout_ p' q'. ('a : p') ('b : q'). 'a -> 'b end
+  functor (M : sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end) ->
+    sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end
 |}]
 
 (* Ordering: sorts swapped between sides - should fail *)
@@ -246,18 +299,16 @@ Line 5, characters 6-7:
           ^
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b end
+         sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end
        is not included in
-         sig val f : layout_ p q. ('a : q) ('b : p). 'a -> 'b end
+         sig val f : layout_ l l0. ('a : l0) ('b : l). 'a -> 'b end
        Values do not match:
-         val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b
+         val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b
        is not included in
-         val f : layout_ p q. ('a : q) ('b : p). 'a -> 'b
-       The type "'a -> 'b" is not compatible with the type "'c -> 'd"
-       The layout of 'a is q
-         because of the definition of f at line 4, characters 2-50.
-       But the layout of 'a must be a sublayout of x
-         because of the definition of f at line 2, characters 2-50.
+         val f : layout_ l l0. ('a : l0) ('b : l). 'a -> 'b
+       The layout parameter at position 1 in the LHS
+       corresponds to the parameter at position 2 in the RHS,
+       which is not supported yet.
 |}]
 
 (* layout_ in a general type annotation is not yet supported *)
@@ -303,7 +354,7 @@ module type T = sig
 end
 [%%expect{|
 module type T =
-  sig val bar : layout_ x. ('a : x mod contended) ('b : x). 'a -> 'b end
+  sig val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b end
 |}]
 
 module F (M : sig
@@ -315,12 +366,12 @@ end = M
 module F :
   functor
     (M : sig
-           val bar : layout_ x. ('a : x mod contended) ('b : x). 'a -> 'b
+           val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b
          end)
     ->
     sig
       val bar :
-        layout_ x. ('a : x mod contended) ('b : x mod contended). 'a -> 'b
+        layout_ l. ('a : l mod contended) ('b : l mod contended). 'a -> 'b
     end
 |}]
 
@@ -339,18 +390,18 @@ Line 5, characters 6-7:
 Error: Signature mismatch:
        Modules do not match:
          sig
-           val bar : layout_ x. ('a : x mod contended) ('b : x). 'a -> 'b
+           val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b
          end
        is not included in
-         sig val bar : layout_ x. ('a : x) ('b : x). 'a -> 'b end
+         sig val bar : layout_ l. ('a : l) ('b : l). 'a -> 'b end
        Values do not match:
-         val bar : layout_ x. ('a : x mod contended) ('b : x). 'a -> 'b
+         val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b
        is not included in
-         val bar : layout_ x. ('a : x) ('b : x). 'a -> 'b
+         val bar : layout_ l. ('a : l) ('b : l). 'a -> 'b
        The type "'a -> 'b" is not compatible with the type "'c -> 'd"
-       The layout of 'a is x
+       The kind of 'a is 's1
          because of the definition of bar at line 4, characters 2-50.
-       But the layout of 'a must be a sublayout of x
+       But the kind of 'a must be representable
          because of the definition of bar at line 2, characters 2-64.
 |}]
 
@@ -362,8 +413,8 @@ end) : sig
 end = M
 [%%expect{|
 module F :
-  functor (M : sig val bar : layout_ x. ('a : x) ('b : x). 'a -> 'b end) ->
-    sig val bar : layout_ x. ('a : x mod contended) ('b : x). 'a -> 'b end
+  functor (M : sig val bar : layout_ l. ('a : l) ('b : l). 'a -> 'b end) ->
+    sig val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b end
 |}]
 
 module F (M : sig
@@ -379,22 +430,22 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            val bar :
-             layout_ x.
-               ('a : x mod contended) ('b : x mod contended). 'a -> 'b
+             layout_ l.
+               ('a : l mod contended) ('b : l mod contended). 'a -> 'b
          end
        is not included in
          sig
-           val bar : layout_ x. ('a : x mod contended) ('b : x). 'a -> 'b
+           val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b
          end
        Values do not match:
          val bar :
-           layout_ x. ('a : x mod contended) ('b : x mod contended). 'a -> 'b
+           layout_ l. ('a : l mod contended) ('b : l mod contended). 'a -> 'b
        is not included in
-         val bar : layout_ x. ('a : x mod contended) ('b : x). 'a -> 'b
+         val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b
        The type "'a -> 'b" is not compatible with the type "'a -> 'c"
-       The layout of 'a is x
+       The kind of 'a is 's2
          because of the definition of bar at line 4, characters 2-64.
-       But the layout of 'a must be a sublayout of x
+       But the kind of 'a must be representable
          because of the definition of bar at line 2, characters 2-78.
 |}]
 
@@ -407,11 +458,11 @@ end = M
 module F :
   functor
     (M : sig
-           val bar : layout_ x. ('a : x mod contended) ('b : x). 'a -> 'b
+           val bar : layout_ l. ('a : l mod contended) ('b : l). 'a -> 'b
          end)
     ->
     sig
       val bar :
-        layout_ x. ('a : x mod contended) ('b : x mod contended). 'a -> 'b
+        layout_ l. ('a : l mod contended) ('b : l mod contended). 'a -> 'b
     end
 |}]

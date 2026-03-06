@@ -477,6 +477,7 @@ module Repr_check = struct
     | Product _ -> true
     | Base _ -> false
     | Univar _ -> Misc.fatal_error "sort_is_product: univar"
+    | Genvar _ -> Misc.fatal_error "sort_is_product: genvar"
 
   let valid_c_stub_arg = function
     | Same_as_ocaml_repr s ->
@@ -494,6 +495,8 @@ module Repr_check = struct
     | Same_as_ocaml_repr (Product _) -> false
     | Same_as_ocaml_repr (Univar _) ->
       Misc.fatal_error "valid_c_stub_return: univar"
+    | Same_as_ocaml_repr (Genvar _) ->
+      Misc.fatal_error "valid_c_stub_return: genvar"
 
   let check checks prim =
     let reprs = args_res_reprs prim in

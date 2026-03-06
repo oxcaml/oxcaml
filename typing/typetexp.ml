@@ -413,7 +413,7 @@ end = struct
 
   let make_repr_univars vars_with_stage =
     let sort_vars = List.map (fun (var, _stage) ->
-      Jkind_types.Sort.new_univar ~name:var.txt ()
+      Jkind_types.Sort.{ name = Some var.txt }
     ) vars_with_stage in
     let poly_univars = List.map2 (fun (var, stage) svar ->
       let name = var.txt in
@@ -1642,19 +1642,19 @@ let transl_type_scheme_lmono env styp =
 let transl_type_scheme_lpoly env attrs loc vars inner_type =
   (* Use [with_local_level] just for scoping *)
   with_local_level begin fun () ->
-    let env', ident_univar_pairs =
+    let env', ident_var_pairs =
       List.fold_left (fun (env, pairs) var ->
         let name = var.txt in
         let decl = new_local_jkind ~loc:var.loc () in
         let scope = create_scope () in
         let id, env' = Env.enter_jkind ~scope name decl env in
-        let univar = Jkind_types.Sort.new_univar ~name () in
-        (env', (id, univar) :: pairs))
+        let v = Jkind_types.Sort.new_genvar () in
+        (env', (id, v) :: pairs))
       (env, []) vars
     in
     let cty = transl_type_scheme_lmono env' inner_type in
     let ty = cty.ctyp_type in
-    (* Replace references to the ident with Univar *)
+    (* Replace references to the ident with a Var at generic_level *)
     let seen = Hashtbl.create 8 in
     let rec replace t =
       if Hashtbl.mem seen (get_id t) then ()
@@ -1665,16 +1665,16 @@ let transl_type_scheme_lpoly env attrs loc vars inner_type =
           let desc = jkind.jkind in
           (match desc.base with
           | Kconstr (Pident id) ->
-            let uv_opt =
+            let v_opt =
               List.find_map
-                (fun (id', uv) ->
-                  if Ident.same id id' then Some uv else None)
-                ident_univar_pairs
+                (fun (id', v) ->
+                  if Ident.same id id' then Some v else None)
+                ident_var_pairs
             in
-            (match uv_opt with
-            | Some uv ->
+            (match v_opt with
+            | Some v ->
               let base : Jkind_types.Sort.t Jkind_types.Layout.t jkind_base
-                = Layout (Sort (Univar uv, {pointerness = Maybe_pointer})) in
+                = Layout (Sort (Var v, {pointerness = Maybe_pointer})) in
               let desc = {desc with base} in
               let jkind = {jkind with jkind = desc} in
               Types.set_var_jkind t jkind
@@ -1692,7 +1692,7 @@ let transl_type_scheme_lpoly env attrs loc vars inner_type =
         ctyp_loc = loc;
         ctyp_attributes = attrs }
     in
-    ident_univar_pairs |> List.map snd |> List.rev, ctyp
+    ident_var_pairs |> List.map snd |> List.rev, ctyp
   end
 
 let transl_type_scheme env styp =
@@ -1820,7 +1820,7 @@ let report_error_doc env ppf =
           dprintf "But it was inferred to have %t"
             (fun ppf -> let desc = Jkind.get inferred_jkind in
               match desc.base with
-              | Layout (Sort (Var _, sa)) ->
+              | Layout (Sort (Var _, sa)) | Layout (Sort (Genvar _, sa)) ->
                 fprintf ppf "%a representable kind"
                   (pp_print_list ~pp_sep:(fun f () -> fprintf f " ")
                     pp_print_string)

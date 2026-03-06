@@ -1765,6 +1765,7 @@ module Element_repr = struct
       | Product l ->
         Unboxed_element (Product (Array.of_list (List.map sort_to_t l)))
       | Univar _ -> Misc.fatal_error "sort_to_t: unexpected univar"
+      | Genvar _ -> Misc.fatal_error "sort_to_t: unexpected genvar"
       in
       sort_to_t sort
 
@@ -2593,6 +2594,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
       | Base _ -> false
       | Product l -> List.exists has_any l
       | Univar _ -> Misc.fatal_error "Unboxed_recursion: univar"
+      | Genvar _ -> Misc.fatal_error "Unboxed_recursion: genvar"
     in
     if has_any layout then tyl else []
   in
@@ -3517,6 +3519,7 @@ let native_repr_of_type env kind ty sort_or_poly =
       | Sort (Base Value) -> true
       | Sort (Base _ | Product _) -> false
       | Sort (Univar _) -> Misc.fatal_error "typedecl: Univar in native repr"
+      | Sort (Genvar _) -> Misc.fatal_error "typedecl: Genvar in native repr"
     in
     if is_immediate && is_non_nullable && is_value
     then Some (Unboxed_or_untagged_integer Untagged_int)
@@ -3644,6 +3647,8 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
     Same_as_ocaml_repr base
   | Native_repr_attr_absent, Sort (Univar _) ->
     Misc.fatal_error "typedecl: Univar in concrete type"
+  | Native_repr_attr_absent, Sort (Genvar _) ->
+    Misc.fatal_error "typedecl: Genvar in concrete type"
   | Native_repr_attr_absent, (Sort (Base sort as c)) ->
     (if Language_extension.erasable_extensions_only ()
     then
@@ -3678,6 +3683,8 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
     end
   | Native_repr_attr_present Unboxed, Sort (Univar _) ->
     Misc.fatal_error "typedecl: Univar in concrete type"
+  | Native_repr_attr_present Unboxed, Sort (Genvar _) ->
+    Misc.fatal_error "typedecl: Genvar in concrete type"
   | Native_repr_attr_present Unboxed, (Sort (Product _ | Base Void)) ->
     raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unboxed))
   | Native_repr_attr_present Unboxed, (Sort (Base sort as c)) ->

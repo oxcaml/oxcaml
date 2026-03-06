@@ -738,7 +738,7 @@ and raw_type_desc ppf = function
         raw_type_list tl
   | Trepr (t, sort_vars) ->
       let print_sort_univar ppf uv =
-        fprintf ppf "%s" (Jkind_types.Sort.to_string_univar uv)
+        fprintf ppf "%s" (Option.value uv.Jkind_types.Sort.name ~default:"_")
       in
       fprintf ppf "@[<hov1>Trepr(@,%a,@,[@[%a@]])@]"
         raw_type t
@@ -2385,9 +2385,9 @@ let tree_of_value_description id decl =
   in
   let qsvs, qtvs =
     (* Important: process the fvs *after* the type; tree_of_type_scheme
-       resets the naming context. Both must be inside print_with_univars
-       so that sort univar names are registered when jkinds are printed. *)
-    Jkind_types.Sort.print_with_univars decl.val_lpoly (fun names ->
+       resets the naming context. Both must be inside print_with_genvars
+       so that sort poly var names are registered when jkinds are printed. *)
+    Jkind_types.Sort.print_with_genvars decl.val_lpoly (fun names ->
       names, extract_qtvs [decl.val_type])
   in
   let apparent_arity =
