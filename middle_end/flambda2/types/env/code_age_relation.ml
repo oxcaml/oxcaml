@@ -28,47 +28,47 @@ let get_older_version_of t code_id = Code_id.Map.find_opt code_id t
 
 let add t ~newer ~older = Code_id.Map.add newer older t
 
-exception Missing_cmx_file
-
-let rec all_ids_up_to_root0_exn t ~resolver id all_ids_so_far =
-  if Code_id.Set.mem id all_ids_so_far
-  then all_ids_so_far
+let rec has_older_version_in t ~resolver id ancestors : _ Or_unknown.t =
+  if Code_id.Set.mem id ancestors
+  then Known true
   else
-    let all_ids_so_far = Code_id.Set.add id all_ids_so_far in
     match Code_id.Map.find id t with
     | exception Not_found -> (
       let comp_unit = Code_id.get_compilation_unit id in
       if Compilation_unit.equal comp_unit (Compilation_unit.get_current_exn ())
-      then all_ids_so_far
+      then Known false
       else
         match resolver comp_unit with
         | exception _ ->
           Misc.fatal_errorf "Exception in resolver@ Backtrace is: %s"
             (Printexc.raw_backtrace_to_string (Printexc.get_raw_backtrace ()))
-        | None -> raise Missing_cmx_file
+        | None -> Unknown
         | Some t -> (
           (* Inlining the base case, so that we do not recursively loop in case
              of a code_id that is not bound in the map *)
           match Code_id.Map.find id t with
-          | exception Not_found -> all_ids_so_far
-          | older -> all_ids_up_to_root0_exn t ~resolver older all_ids_so_far))
-    | older -> all_ids_up_to_root0_exn t ~resolver older all_ids_so_far
-
-let all_ids_up_to_root_exn t ~resolver id =
-  all_ids_up_to_root0_exn t ~resolver id Code_id.Set.empty
+          | exception Not_found -> Known false
+          | older -> has_older_version_in t ~resolver older ancestors))
+    | older -> has_older_version_in t ~resolver older ancestors
 
 let meet_set t ~resolver ids1 ids2 : _ Or_bottom.t =
   if Code_id.Set.equal ids1 ids2
   then Ok ids1
   else
+    (* We are trying to keep a reasonably precise set of the code ids that can
+       actually be called, in order to avoid de-optimizing to a single direct
+       call.
+
+       The typical case is that we could meet { A, A1, A2 } with { A3, A4 }
+       where A1, A2, A3, A4 are newer versions of A, in which case we want the
+       output to be { A3, A4 } (from the second set, only newer versions of A3
+       and A4 are possible, which excludes newer versions of A1 and A2).
+
+       Returning { A } would be correct, but imprecise. *)
     let should_keep_id other_ids id =
-      match all_ids_up_to_root_exn t ~resolver id with
-      | exception Missing_cmx_file ->
-        (* CR bclement: we likely could do something more precise here rather
-           than keeping all ids for which the code age relation involves a
-           missing cmx. *)
-        true
-      | ids_to_root -> not (Code_id.Set.disjoint ids_to_root other_ids)
+      match has_older_version_in t ~resolver id other_ids with
+      | Known has_older_version_in_other_ids -> has_older_version_in_other_ids
+      | Unknown -> true
     in
     let ids =
       Code_id.Set.union
@@ -77,23 +77,6 @@ let meet_set t ~resolver ids1 ids2 : _ Or_bottom.t =
     in
     if Code_id.Set.is_empty ids then Bottom else Ok ids
 
-type is_ancestor_of =
-  | Definitely_not_ancestor
-  | Definitely_ancestor
-  | Maybe_ancestor
-
-let is_ancestor_of t ~resolver ~descendant ancestor =
-  match all_ids_up_to_root_exn t ~resolver descendant with
-  | exception Missing_cmx_file ->
-    (* CR bclement: in some situations, we might be able to determine that
-       [ancestor] is definitely an ancestor of [descendant] if the missing cmx
-       file is a dependency of the file that defines [ancestor]. *)
-    Maybe_ancestor
-  | all_ancestors_of_child ->
-    if Code_id.Set.mem ancestor all_ancestors_of_child
-    then Definitely_ancestor
-    else Definitely_not_ancestor
-
 let meet t ~resolver id1 id2 : _ Or_unknown_or_bottom.t =
   (* Whichever of [id1] and [id2] is newer (or the same as the other one), in
      the case where they are comparable; otherwise bottom. *)
@@ -101,19 +84,19 @@ let meet t ~resolver id1 id2 : _ Or_unknown_or_bottom.t =
   then Ok id1
   else
     match
-      ( is_ancestor_of t ~resolver ~descendant:id2 id1,
-        is_ancestor_of t ~resolver ~descendant:id1 id2 )
+      ( has_older_version_in t ~resolver id2 (Code_id.Set.singleton id1),
+        has_older_version_in t ~resolver id1 (Code_id.Set.singleton id2) )
     with
-    | Definitely_ancestor, _ ->
-      (* id1 is an ancestor of id2 -> id2 is more precise *)
+    | Known true, _ ->
+      (* id1 is an older version of id2 -> id2 is more precise *)
       Ok id2
-    | _, Definitely_ancestor ->
-      (* id2 is an ancestor of id1 -> id1 is more precise *)
+    | _, Known true ->
+      (* id2 is an older version of id1 -> id1 is more precise *)
       Ok id1
-    | Definitely_not_ancestor, Definitely_not_ancestor ->
+    | Known false, Known false ->
       (* id1 and id2 are definitely not related *)
       Bottom
-    | Maybe_ancestor, _ | _, Maybe_ancestor ->
+    | Unknown, _ | _, Unknown ->
       (* can't determine whether id1 and id2 are related *)
       Unknown
 
