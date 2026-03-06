@@ -1172,7 +1172,24 @@ let pseudoregs_for_instr (simd : Simd.instr) arg_regs res_regs =
     arg_regs.(0) <- res_regs.(0)
   | Res rr ->
     Array.iteri (fun i ({ loc; _ } : Simd.arg) -> maybe_pin res_regs i loc) rr);
-  arg_regs, res_regs
+  (* For destroyed args (e.g. the mask operand of AVX2 gather instructions),
+     add fresh registers to [res_regs] and tie the corresponding [arg_regs]
+     entries to them.  This tells the register allocator that these arg
+     registers are written by the instruction, so their previous values
+     cannot be reused afterward. *)
+  if Array.length simd.destroyed > 0
+  then begin
+    let extra_res =
+      Array.map
+        (fun idx ->
+          let reg = Reg.create arg_regs.(idx).Reg.typ in
+          arg_regs.(idx) <- reg;
+          reg)
+        simd.destroyed
+    in
+    arg_regs, Array.append res_regs extra_res
+  end
+  else arg_regs, res_regs
 
 let pseudoregs_for_operation (simd : Simd.operation) arg res =
   let arg_regs = Array.copy arg in
