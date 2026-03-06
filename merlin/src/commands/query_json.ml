@@ -1,0 +1,631 @@
+(* {{{ COPYING *(
+
+     This file is part of Merlin, an helper for ocaml editors
+
+     Copyright (C) 2013 - 2015  Frédéric Bour  <frederic.bour(_)lakaban.net>
+                                Thomas Refis  <refis.thomas(_)gmail.com>
+                                Simon Castellan  <simon.castellan(_)iuwt.fr>
+
+     Permission is hereby granted, free of charge, to any person obtaining a
+     copy of this software and associated documentation files (the "Software"),
+     to deal in the Software without restriction, including without limitation the
+     rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+     sell copies of the Software, and to permit persons to whom the Software is
+     furnished to do so, subject to the following conditions:
+
+     The above copyright notice and this permission notice shall be included in
+     all copies or substantial portions of the Software.
+
+     The Software is provided "as is", without warranty of any kind, express or
+     implied, including but not limited to the warranties of merchantability,
+     fitness for a particular purpose and noninfringement. In no event shall
+     the authors or copyright holders be liable for any claim, damages or other
+     liability, whether in an action of contract, tort or otherwise, arising
+     from, out of or in connection with the software or the use or other dealings
+     in the Software.
+
+   )* }}} *)
+
+open Std
+open Query_protocol
+
+let dump (type a) : a t -> json =
+  let mk command args = `Assoc (("command", `String command) :: args) in
+  let mk_position = function
+    | `Start -> `String "start"
+    | `End -> `String "end"
+    | `Offset n -> `Assoc [ ("offset", `Int n) ]
+    | `Logical (line, col) ->
+      `Assoc [ ("line", `Int line); ("column", `Int col) ]
+  in
+  let mk_verbosity (verbosity : Mconfig.Verbosity.t) =
+    match verbosity with
+    | Lvl n -> `Int n
+    | Smart -> `String "smart"
+  in
+  let kinds_to_json kind =
+    `List
+      (List.map
+         ~f:(function
+           | `Constructor -> `String "constructor"
+           | `Keywords -> `String "keywords"
+           | `Labels -> `String "label"
+           | `Modules -> `String "module"
+           | `Modules_type -> `String "module-type"
+           | `Types -> `String "type"
+           | `Values -> `String "value"
+           | `Variants -> `String "variant")
+         kind)
+  in
+  function
+  | Type_expr (expr, pos) ->
+    mk "type-expression"
+      [ ("expression", `String expr); ("position", mk_position pos) ]
+  | Stack_or_heap_enclosing (pos, lsp_compat, index) ->
+    mk "stack-or-heap-enclosing"
+      [ ( "index",
+          match index with
+          | None -> `String "all"
+          | Some n -> `Int n );
+        ("lsp-compat", `Bool lsp_compat);
+        ("position", mk_position pos)
+      ]
+  | Type_enclosing (opt_cursor, pos, index) ->
+    mk "type-enclosing"
+      [ ( "cursor",
+          match opt_cursor with
+          | None -> `Null
+          | Some (text, offset) ->
+            `Assoc [ ("text", `String text); ("offset", `Int offset) ] );
+        ( "index",
+          match index with
+          | None -> `String "all"
+          | Some n -> `Int n );
+        ("position", mk_position pos)
+      ]
+  | Kind_enclosing { position; index; override_verbosity } ->
+    mk "kind-enclosing"
+      ([ ( "index",
+           match index with
+           | None -> `String "all"
+           | Some n -> `Int n );
+         ("position", mk_position position)
+       ]
+      @ (Option.map override_verbosity ~f:(fun v ->
+             ("override-verbosity", mk_verbosity v))
+        |> Option.to_list))
+  | Mode_enclosing { position; override_verbosity } ->
+    mk "mode-enclosing"
+      ([ ("position", mk_position position) ]
+      @ (Option.map override_verbosity ~f:(fun v ->
+             ("override-verbosity", mk_verbosity v))
+        |> Option.to_list))
+  | Locate_type pos -> mk "locate-type" [ ("position", mk_position pos) ]
+  | Locate_types pos -> mk "locate-types" [ ("position", mk_position pos) ]
+  | Enclosing pos -> mk "enclosing" [ ("position", mk_position pos) ]
+  | Complete_prefix (prefix, pos, kind, doc, typ) ->
+    mk "complete-prefix"
+      [ ("prefix", `String prefix);
+        ("position", mk_position pos);
+        ("with-doc", `Bool doc);
+        ("with-types", `Bool typ);
+        ("kind", kinds_to_json kind)
+      ]
+  | Expand_prefix (prefix, pos, kind, typ) ->
+    mk "expand-prefix"
+      [ ("prefix", `String prefix);
+        ("position", mk_position pos);
+        ("with-types", `Bool typ);
+        ("kind", kinds_to_json kind)
+      ]
+  | Document (identifier, pos) ->
+    mk "document"
+      [ ( "identifier",
+          match identifier with
+          | None -> `Null
+          | Some ident -> `String ident );
+        ("position", mk_position pos)
+      ]
+  | Syntax_document pos ->
+    mk "syntax-document" [ ("position", mk_position pos) ]
+  | Expand_ppx pos -> mk "ppx-expand" [ ("position", mk_position pos) ]
+  | Locate (prefix, look_for, pos, context) ->
+    mk "locate"
+      [ ( "prefix",
+          match prefix with
+          | None -> `Null
+          | Some prefix -> `String prefix );
+        ( "look-for",
+          match look_for with
+          | `ML -> `String "implementation"
+          | `MLI -> `String "interface" );
+        ("position", mk_position pos);
+        ( "context",
+          match context with
+          | Some context ->
+            `String (Query_protocol.Locate_context.to_string context)
+          | None -> `Null )
+      ]
+  | Jump (target, pos) ->
+    mk "jump" [ ("target", `String target); ("position", mk_position pos) ]
+  | Phrase (target, pos) ->
+    mk "phrase"
+      [ ( "target",
+          `String
+            (match target with
+            | `Next -> "next"
+            | `Prev -> "prev") );
+        ("position", mk_position pos)
+      ]
+  | Case_analysis (pos_start, pos_end) ->
+    mk "case-analysis"
+      [ ("start", mk_position pos_start); ("end", mk_position pos_end) ]
+  | Holes -> mk "holes" []
+  | Construct (pos, with_values, depth) ->
+    let depth = Option.value ~default:1 depth in
+    mk "construct"
+      [ ("position", mk_position pos);
+        ( "with_values",
+          match with_values with
+          | Some `None | None -> `String "none"
+          | Some `Local -> `String "local" );
+        ("depth", `Int depth)
+      ]
+  | Inlay_hints (start, stop, hint_let_binding, hint_pattern_var, ghost) ->
+    mk "inlay-hints"
+      [ ("start", mk_position start);
+        ("stop", mk_position stop);
+        ("hint-let-binding", `Bool hint_let_binding);
+        ("hint-pattern-variable", `Bool hint_pattern_var);
+        ("avoid-ghost-location", `Bool ghost)
+      ]
+  | Outline { include_types } ->
+    mk "outline" [ ("include-types", `Bool include_types) ]
+  | Errors { lexing; parsing; typing } ->
+    let args =
+      if lexing && parsing && typing then []
+      else
+        [ ("lexing", `Bool lexing);
+          ("parsing", `Bool parsing);
+          ("typing", `Bool typing)
+        ]
+    in
+    mk "errors" args
+  | Shape pos -> mk "shape" [ ("position", mk_position pos) ]
+  | Dump args -> mk "dump" [ ("args", `List args) ]
+  | Path_of_source paths ->
+    mk "path-of-source" [ ("paths", `List (List.map ~f:Json.string paths)) ]
+  | List_modules exts ->
+    mk "list-modules" [ ("extensions", `List (List.map ~f:Json.string exts)) ]
+  | Findlib_list -> mk "findlib-list" []
+  | Extension_list status ->
+    mk "extension-list"
+      [ ( "filter",
+          match status with
+          | `All -> `String "all"
+          | `Enabled -> `String "enabled"
+          | `Disabled -> `String "disabled" )
+      ]
+  | Path_list var ->
+    mk "path-list"
+      [ ( "variable",
+          match var with
+          | `Build -> `String "build"
+          | `Source -> `String "source" )
+      ]
+  | Polarity_search (query, pos) ->
+    mk "polarity-search"
+      [ ("query", `String query); ("position", mk_position pos) ]
+  | Type_search (query, pos, limit, with_doc) ->
+    mk "type-search"
+      [ ("query", `String query);
+        ("position", mk_position pos);
+        ("limit", `Int limit);
+        ("with-doc", `Bool with_doc)
+      ]
+  | Occurrences (`Ident_at pos, scope) ->
+    mk "occurrences"
+      [ ("kind", `String "identifiers");
+        ("position", mk_position pos);
+        ( "scope",
+          match scope with
+          | `Buffer -> `String "local"
+          | `Project -> `String "project"
+          | `Renaming -> `String "renaming" )
+      ]
+  | Refactor_open (action, pos) ->
+    mk "refactor-open"
+      [ ( "action",
+          `String
+            (match action with
+            | `Qualify -> "qualify"
+            | `Unqualify -> "unqualify") );
+        ("position", mk_position pos)
+      ]
+  | Signature_help { position; _ } ->
+    mk "signature-help" [ ("position", mk_position position) ]
+  | Version -> mk "version" []
+
+let string_of_completion_kind = function
+  | `Value -> "Value"
+  | `Variant -> "Variant"
+  | `Constructor -> "Constructor"
+  | `Label -> "Label"
+  | `Module -> "Module"
+  | `Modtype -> "Signature"
+  | `Type -> "Type"
+  | `Method -> "Method"
+  | `MethodCall -> "#"
+  | `Exn -> "Exn"
+  | `Class -> "Class"
+  | `Keyword -> "Keyword"
+
+let with_location ?(with_file = false) ?(skip_none = false) loc assoc =
+  let with_file l =
+    if not with_file then l
+    else ("file", `String loc.Location.loc_start.pos_fname) :: l
+  in
+  if skip_none && loc = Location.none then `Assoc assoc
+  else
+    `Assoc
+      (with_file
+      @@ ("start", Lexing.json_of_position loc.Location.loc_start)
+         :: ("end", Lexing.json_of_position loc.Location.loc_end)
+         :: assoc)
+
+let json_of_stack_or_heap (loc, desc) =
+  with_location loc
+    [ ( "stack_or_heap",
+        match desc with
+        | `String _ as str -> str
+        | `Index n -> `Int n )
+    ]
+
+let json_of_mode (loc, mode) = with_location loc [ ("mode", `String mode) ]
+
+let json_of_type_loc (loc, desc, tail) =
+  with_location loc
+    [ ( "type",
+        match desc with
+        | `String _ as str -> str
+        | `Index n -> `Int n );
+      ( "tail",
+        `String
+          (match tail with
+          | `No -> "no"
+          | `Tail_position -> "position"
+          | `Tail_call -> "call") )
+    ]
+
+let json_of_kind_enclosing_res (loc, desc) =
+  with_location loc
+    [ ( "kind",
+        match desc with
+        | `Kind k -> `String k
+        | `Index n -> `Int n )
+    ]
+
+let json_of_error (error : Location.error) =
+  let of_sub loc sub =
+    let msg =
+      Location.print_sub_msg Format.str_formatter sub;
+      String.trim (Format.flush_str_formatter ())
+    in
+    with_location ~skip_none:true loc [ ("message", `String msg) ]
+  in
+  let loc = Location.loc_of_report error in
+  let msg = Format.asprintf "@[%a@]" Location.print_main error |> String.trim in
+  let typ =
+    match error.source with
+    | Location.Lexer -> "lexer"
+    | Location.Parser -> "parser"
+    | Location.Typer -> "typer"
+    | Location.Warning ->
+      if String.is_prefixed ~by:"Error" msg then "typer"
+        (* Handle warn-error (since 4.08) *)
+      else "warning"
+    | Location.Unknown -> "unknown"
+    | Location.Env -> "env"
+    | Location.Config -> "config"
+  in
+  let content =
+    [ ("type", `String typ);
+      ("sub", `List (List.map ~f:(of_sub loc) error.sub));
+      ("valid", `Bool true);
+      ("message", `String msg)
+    ]
+  in
+  with_location ~skip_none:true loc content
+
+let json_of_completion
+    { Compl.name; kind; desc; info; deprecated; ppx_template_generated } =
+  `Assoc
+    ([ ("name", `String name);
+       ("kind", `String (string_of_completion_kind kind));
+       ("desc", `String desc);
+       ("info", `String info);
+       ("deprecated", `Bool deprecated)
+     ]
+    @
+    if ppx_template_generated then [ ("ppx_template_generated", `Bool true) ]
+    else [])
+
+let json_of_completions { Compl.entries; context } =
+  `Assoc
+    [ ("entries", `List (List.map ~f:json_of_completion entries));
+      ( "context",
+        match context with
+        | `Unknown -> `Null
+        | `Application { Compl.argument_type; labels } ->
+          let label (name, ty) =
+            `Assoc [ ("name", `String name); ("type", `String ty) ]
+          in
+          let a =
+            `Assoc
+              [ ("argument_type", `String argument_type);
+                ("labels", `List (List.map ~f:label labels))
+              ]
+          in
+          `List [ `String "application"; a ] )
+    ]
+
+let rec json_of_outline outline =
+  let json_of_item
+      { outline_name;
+        outline_kind;
+        outline_type;
+        location;
+        children;
+        deprecated
+      } =
+    with_location location
+      [ ("name", `String outline_name);
+        ("kind", `String (string_of_completion_kind outline_kind));
+        ( "type",
+          match outline_type with
+          | None -> `Null
+          | Some typ -> `String typ );
+        ("children", `List (json_of_outline children));
+        ("deprecated", `Bool deprecated)
+      ]
+  in
+  List.map ~f:json_of_item outline
+
+let rec json_of_shape { shape_loc; shape_sub } =
+  with_location shape_loc
+    [ ("children", `List (List.map ~f:json_of_shape shape_sub)) ]
+
+let json_of_locate resp =
+  match resp with
+  | `At_origin -> `String "Already at definition point"
+  | `Builtin s ->
+    `String
+      (sprintf
+         "%S is a builtin, and it is therefore impossible to jump to its \
+          definition"
+         s)
+  | `Invalid_context -> `String "Not a valid identifier"
+  | `Not_found (id, None) -> `String ("didn't manage to find " ^ id)
+  | `Not_found (i, Some f) ->
+    `String (sprintf "%s was supposed to be in %s but could not be found" i f)
+  | `Not_in_env str -> `String (Printf.sprintf "Not in environment '%s'" str)
+  | `File_not_found msg -> `String msg
+  | `Found (None, pos) -> `Assoc [ ("pos", Lexing.json_of_position pos) ]
+  | `Found (Some file, pos) ->
+    `Assoc [ ("file", `String file); ("pos", Lexing.json_of_position pos) ]
+
+let json_of_locate_types (resp : Locate_types_result.t) =
+  (* This function serializes to json differently than json_of_locate to make it easier
+     to deserialize. *)
+  let json_of_position
+      ({ pos_fname; pos_lnum; pos_bol; pos_cnum } : Lexing.position) =
+    `Assoc
+      [ ("pos_fname", `String pos_fname);
+        ("pos_lnum", `Int pos_lnum);
+        ("pos_bol", `Int pos_bol);
+        ("pos_cnum", `Int pos_cnum)
+      ]
+  in
+  let json_of_option opt ~f =
+    match opt with
+    | None -> `Null
+    | Some x -> f x
+  in
+  let json_of_locate_result result =
+    let variant_name, payload =
+      match result with
+      | `Found (file, pos) ->
+        let file = json_of_option file ~f:(fun file -> `String file) in
+        ("Found", [ file; json_of_position pos ])
+      | `File_not_found msg -> ("File_not_found", [ `String msg ])
+      | `Builtin id -> ("Builtin", [ `String id ])
+      | `Not_found (id, file) ->
+        let file = json_of_option file ~f:(fun file -> `String file) in
+        ("Not_found", [ `String id; file ])
+      | `Not_in_env id -> ("Not_in_env", [ `String id ])
+    in
+    `List (`String variant_name :: payload)
+  in
+  let json_of_node_data : Locate_types_result.Tree.node_data -> _ = function
+    | Arrow -> `List [ `String "Arrow" ]
+    | Tuple -> `List [ `String "Tuple" ]
+    | Unboxed_tuple -> `List [ `String "Unboxed_tuple" ]
+    | Object -> `List [ `String "Object" ]
+    | Poly_variant -> `List [ `String "Poly_variant" ]
+    | Type_ref { type_; result } ->
+      `List
+        [ `String "Type_ref";
+          `Assoc
+            [ ("type", `String type_);
+              ("result", json_of_locate_result result)
+            ]
+        ]
+    | Other type_ -> `List [ `String "Other"; `String type_ ]
+  in
+  let rec json_of_type_tree { Locate_types_result.Tree.data; children } =
+    `Assoc
+      [ ("data", json_of_node_data data);
+        ("children", `List (List.map ~f:json_of_type_tree children))
+      ]
+  in
+  match resp with
+  | Success tree -> json_of_type_tree tree
+  | Invalid_context -> `String "Invalid context"
+
+let json_of_inlay_hints hints =
+  let json_of_hint (position, label) =
+    `Assoc
+      [ ("pos", Lexing.json_of_position position); ("label", `String label) ]
+  in
+  `List (List.map ~f:json_of_hint hints)
+
+let json_of_signature_help resp =
+  let param { label_start; label_end } =
+    `Assoc [ ("label", `List [ `Int label_start; `Int label_end ]) ]
+  in
+  match resp with
+  | None -> `Assoc []
+  | Some { label; parameters; active_param; active_signature } ->
+    let signature =
+      `Assoc
+        [ ("label", `String label);
+          ("parameters", `List (List.map ~f:param parameters))
+        ]
+    in
+    `Assoc
+      [ ("signatures", `List [ signature ]);
+        ("activeParameter", `Int active_param);
+        ("activeSignature", `Int active_signature)
+      ]
+
+let json_of_search_result list =
+  let list =
+    List.map
+      ~f:(fun { name; typ; loc; cost; doc; constructible } ->
+        with_location ~with_file:true loc
+          [ ("name", `String name);
+            ("type", `String typ);
+            ("cost", `Int cost);
+            ( "doc",
+              match doc with
+              | Some x -> `String x
+              | None -> `Null );
+            ("constructible", `String constructible)
+          ])
+      list
+  in
+  `List list
+
+let json_of_response (type a) (query : a t) (response : a) : json =
+  match (query, response) with
+  | Type_expr _, str -> `String str
+  | Stack_or_heap_enclosing _, results ->
+    `List (List.map ~f:json_of_stack_or_heap results)
+  | Mode_enclosing _, results -> `List (List.map ~f:json_of_mode results)
+  | Type_enclosing _, results -> `List (List.map ~f:json_of_type_loc results)
+  | Kind_enclosing _, results ->
+    `List (List.map ~f:json_of_kind_enclosing_res results)
+  | Enclosing _, results ->
+    `List (List.map ~f:(fun loc -> with_location loc []) results)
+  | Complete_prefix _, compl -> json_of_completions compl
+  | Expand_prefix _, compl -> json_of_completions compl
+  | Polarity_search _, compl -> json_of_completions compl
+  | Type_search _, result -> json_of_search_result result
+  | Refactor_open _, locations ->
+    `List
+      (List.map locations ~f:(fun (name, loc) ->
+           with_location loc [ ("content", `String name) ]))
+  | Document _, resp -> begin
+    match resp with
+    | `No_documentation -> `String "No documentation available"
+    | `Invalid_context -> `String "Not a valid identifier"
+    | `Builtin s ->
+      `String (sprintf "%S is a builtin, no documentation is available" s)
+    | `Not_found (id, None) -> `String ("didn't manage to find " ^ id)
+    | `Not_found (i, Some f) ->
+      `String (sprintf "%s was supposed to be in %s but could not be found" i f)
+    | `Not_in_env str -> `String (Printf.sprintf "Not in environment '%s'" str)
+    | `File_not_found msg -> `String msg
+    | `Found doc -> `String doc
+  end
+  | Syntax_document _, resp -> (
+    match resp with
+    | `Found { name; description; documentation; level } ->
+      `Assoc
+        [ ("name", `String name);
+          ("description", `String description);
+          ("url", Json.option (fun s -> `String s) documentation);
+          ( "level",
+            `String
+              (match level with
+              | Simple -> "simple"
+              | Advanced -> "advanced") )
+        ]
+    | `No_documentation -> `String "No documentation found")
+  | Expand_ppx _, resp ->
+    let str =
+      match resp with
+      | `Found ppx_info ->
+        `Assoc
+          [ ("code", `String ppx_info.code);
+            ( "deriver",
+              `Assoc
+                [ ("start", Lexing.json_of_position ppx_info.attr_start);
+                  ("end", Lexing.json_of_position ppx_info.attr_end)
+                ] )
+          ]
+      | `No_ppx ->
+        `String "No PPX deriver/extension node found on this position"
+    in
+    str
+  | Locate_type _, resp -> json_of_locate resp
+  | Locate_types _, resp -> json_of_locate_types resp
+  | Locate _, resp -> json_of_locate resp
+  | Jump _, resp -> begin
+    match resp with
+    | `Error str -> `String str
+    | `Found pos -> `Assoc [ ("pos", Lexing.json_of_position pos) ]
+  end
+  | Phrase _, pos -> `Assoc [ ("pos", Lexing.json_of_position pos) ]
+  | Case_analysis _, ({ Location.loc_start; loc_end; _ }, str) ->
+    let assoc =
+      `Assoc
+        [ ("start", Lexing.json_of_position loc_start);
+          ("end", Lexing.json_of_position loc_end)
+        ]
+    in
+    `List [ assoc; `String str ]
+  | Holes, locations ->
+    `List
+      (List.map locations ~f:(fun (loc, typ) ->
+           with_location loc [ ("type", `String typ) ]))
+  | Construct _, ({ Location.loc_start; loc_end; _ }, strs) ->
+    let assoc =
+      `Assoc
+        [ ("start", Lexing.json_of_position loc_start);
+          ("end", Lexing.json_of_position loc_end)
+        ]
+    in
+    `List [ assoc; `List (List.map ~f:Json.string strs) ]
+  | Outline _, outlines -> `List (json_of_outline outlines)
+  | Shape _, shapes -> `List (List.map ~f:json_of_shape shapes)
+  | Inlay_hints _, result -> json_of_inlay_hints result
+  | Errors _, errors -> `List (List.map ~f:json_of_error errors)
+  | Dump _, json -> json
+  | Path_of_source _, str -> `String str
+  | List_modules _, strs -> `List (List.map ~f:Json.string strs)
+  | Findlib_list, strs -> `List (List.map ~f:Json.string strs)
+  | Extension_list _, strs -> `List (List.map ~f:Json.string strs)
+  | Path_list _, strs -> `List (List.map ~f:Json.string strs)
+  | Occurrences (_, scope), (occurrences, _project) ->
+    let with_file = scope = `Project || scope = `Renaming in
+    `List
+      (List.map occurrences ~f:(fun occurrence ->
+           with_location ~with_file occurrence.loc
+             [ ("stale", Json.bool occurrence.is_stale) ]))
+  | Signature_help _, s -> json_of_signature_help s
+  | Version, (version, magic_numbers) ->
+    `Assoc
+      [ ("version", `String version);
+        ("magicNumbers", Config.Magic_numbers.to_json magic_numbers)
+      ]

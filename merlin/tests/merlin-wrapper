@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+export PATH=$(dirname dot-merlin-reader):$PATH
+
+# If no dune-project of .merlin file are present in the test we write a default
+# `.merlin` file to force the use of dot-merlin-reader
+if [ ! -f dune-project ]; then
+  touch .merlin
+fi
+
+if [ -z "$MERLIN_TEST_OCAML_PATH" ]; then
+  echo >&2 "You must set the MERLIN_TEST_OCAML_PATH environment variable in your shell to run merlin tests."
+  echo >&2 "It should be set to the directory where your flambda-backend build artifacts are installed."
+  exit 1
+fi
+
+MERLIN_TEST_OCAMLLIB_PATH="$MERLIN_TEST_OCAML_PATH/lib/ocaml"
+
+if [ ! -d "$MERLIN_TEST_OCAMLLIB_PATH" ]; then
+    echo >&2 "Error: Directory $MERLIN_TEST_OCAMLLIB_PATH does not exist."
+    echo >&2 "Check that you've set MERLIN_TEST_OCAML_PATH correctly."
+    exit 1
+fi
+
+ocamlmerlin "$@" -ocamllib-path "$MERLIN_TEST_OCAMLLIB_PATH" \
+    | jq 'del(.timing)' \
+    | jq 'del(.heap_mbytes)' \
+    | jq 'del(.cache)' \
+    | jq 'del(.query_num)' \
+    | sed -e 's:"[^"]*lib/ocaml:"lib/ocaml:g' \
+    | sed -e 's:\\n:\n:g'

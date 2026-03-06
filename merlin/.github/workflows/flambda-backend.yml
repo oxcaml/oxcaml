@@ -1,0 +1,118 @@
+name: Run Tests
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+# Overall approach to running the tests:
+#  - Install OCaml 5.2, as this is the version of dependencies our merlin expects.
+#  - Build flambda-backend (which requires installing OCaml 4.14).
+#  - Build merlin using OCaml 5.2, and then run the tests while pointing merlin at
+#    flambda-backend's stdlib and ocamlc.
+#
+# The second step only needs to be run when we update the flambda-backend version,
+# so we cache it. We use [upstream/ocaml_flambda/base-rev.txt] as the cache key,
+# given that it is updated when and only when we import new changes from
+# flambda-backend into merlin-jst.
+
+jobs:
+  build:
+    # The type of runner that the job will run on
+    name: built with flambda-backend, ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            flambda-backend-config: --enable-middle-end=flambda2 --disable-naked-pointers
+            name: flambda2
+            ocaml-compiler: 5.2.x
+
+    env:
+      MERLIN_TESTS: all
+
+    steps:
+    - name: Checkout the merlin-jst repo
+      uses: actions/checkout@master
+      with:
+        path: 'merlin-jst'
+
+    - name: Set up OCaml ${{ matrix.ocaml-compiler }}
+      uses: ocaml/setup-ocaml@v3
+      with:
+        # Version of the OCaml compiler to initialise
+        ocaml-compiler: ${{ matrix.ocaml-compiler }}
+
+    - name: Cache flambda-backend build
+      uses: actions/cache@v3
+      id: cache
+      with:
+        path: ${{ github.workspace }}/flambda-backend/_install
+        key: cache-flambda-backend-${{ matrix.name }}-${{ hashFiles('merlin-jst/upstream/ocaml_flambda/base-rev.txt') }}
+
+    - name: Clone the flambda-backend repo
+      uses: actions/checkout@master
+      if: steps.cache.outputs.cache-hit != 'true'
+      with:
+        repository: 'ocaml-flambda/flambda-backend'
+        path: 'flambda-backend'
+
+    - name: Check out the flambda-backend repo to the specified hash
+      if: steps.cache.outputs.cache-hit != 'true'
+      working-directory: flambda-backend
+      run: |
+        REV=$(cat $GITHUB_WORKSPACE/merlin-jst/upstream/ocaml_flambda/base-rev.txt)
+        git fetch origin "$REV"
+        git checkout "$REV"
+
+    - name: Install dependencies for flambda-backend
+      if: steps.cache.outputs.cache-hit != 'true'
+      working-directory: flambda-backend
+      run: |
+        opam switch create 5.4.0 --yes
+        opam switch link 5.4.0 --yes
+        opam install --yes dune.3.20.2 menhir.20231231
+
+    - name: Configure, build, and install flambda-backend
+      if: steps.cache.outputs.cache-hit != 'true'
+      working-directory: flambda-backend
+      run: |
+        eval $(opam env)
+        autoconf
+        ./configure \
+          --prefix=$GITHUB_WORKSPACE/flambda-backend/_install \
+          --with-dune=$(which dune) \
+          ${{ matrix.flambda-backend-config }}
+        make install
+
+    - name: Install dependencies
+      working-directory: merlin-jst
+      run: |
+        opam depext conf-jq --yes # opam depext bug
+        opam pin menhirLib 20231231 --no-action
+        opam install --yes ppx_string ppx_compare ocamlformat.0.26.2
+        opam install . --deps-only --with-test --yes
+
+    - name: Check formatting
+      working-directory: merlin-jst
+      run: |
+        opam exec -- dune build @fmt
+
+    - name: Build and test in release mode (linux)
+      working-directory: merlin-jst
+      run: |
+        export MERLIN_TEST_OCAML_PATH=$GITHUB_WORKSPACE/flambda-backend/_install
+        opam exec -- dune build
+        opam exec -- dune runtest -p merlin-lib,dot-merlin-reader,merlin,ocaml-index
+        if ! git diff --quiet ; then
+          echo "The following files were modified by dune:" >&2
+          git diff --name-only >&2
+          echo "" >&2
+          echo "Hint: If this check fails, the likely culprit is
+        that you compiled with the wrong menhir version. Cross-check your opam switch's
+        menhir version with the one in merlin-lib.opam" >&2
+          exit 1
+        fi
