@@ -1291,7 +1291,7 @@ struct
                 TE.add_definition base_env bound_name (TG.kind ty')
               in
               let new_types = Name.Map.add (Name.var var') ty' new_types in
-              Var.Map.add var (var', ty') sbs, base_env, new_types, acc))
+              Var.Map.add var var' sbs, base_env, new_types, acc))
         live_vars
         (Var.Map.empty, base_env, Name.Map.empty, empty)
     in
@@ -1327,20 +1327,20 @@ struct
     in
     let subst var =
       match Var.Map.find_opt var sbs with
-      | Some (v, ty) ->
-        Name.var v, ET.to_type (Expand_head.expand_head final_env ty)
+      | Some v ->
+        Name.var v, TE.find final_env (Name.var v) (Some (Variable.kind v))
       | None -> Misc.fatal_error "Not defined [subst]"
     in
     let to_keep =
       Var.Map.fold
-        (fun _ (var, _) acc -> Variable.Set.add var acc)
+        (fun _ var acc -> Variable.Set.add var acc)
         sbs Variable.Set.empty
     in
     let teev =
       Expand_head.make_suitable_for_environment final_env
         (All_variables_except to_keep) (List.map subst bind_to)
     in
-    Var.Map.map fst sbs, teev
+    sbs, teev
 
   let rewrite env symbol_abstraction =
     (* CR vlaviron for bclement: This should share more code with
