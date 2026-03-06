@@ -202,6 +202,8 @@ module T = struct
         of_kind ~loc ~attrs (sub.jkind_annotation sub jkind)
     | Ptyp_repr (lvars, t) ->
         repr ~loc ~attrs (List.map (map_loc sub) lvars) (sub.typ sub t)
+    | Ptyp_newlayout (lvars, t) ->
+        newlayout ~loc ~attrs (List.map (map_loc sub) lvars) (sub.typ sub t)
     | Ptyp_extension x -> extension ~loc ~attrs (sub.extension sub x)
 
   let map_type_declaration sub

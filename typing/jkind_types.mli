@@ -107,6 +107,7 @@ module Sort : sig
   module Flat : sig
     type t =
       | Var of Var.id
+      | Genvar of var
       | Univar of univar
       | Base of base
   end
@@ -135,6 +136,7 @@ module Layout : sig
       | Base of Sort.base * Scannable_axes.t
       | Product of t list
       | Univar of Sort.univar
+      | Genvar of Sort.var
 
     module Static : sig
       val of_base : Sort.base -> Scannable_axes.t -> t

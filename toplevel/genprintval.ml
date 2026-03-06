@@ -288,6 +288,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         Print_as "<abstr>"
       | Product _ -> Print_as "<unboxed product>"
       | Univar _ -> Print_as "<univar>"
+      | Genvar _ -> Print_as "<genvar>"
 
     let outval_of_value max_steps max_depth check_depth env obj ty =
 

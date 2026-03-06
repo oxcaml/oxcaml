@@ -1798,3 +1798,10 @@ Line 2, characters 0-39:
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The "let poly_" annotation is not yet implemented.
 |}]
+
+module type S = sig
+  val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b
+end
+[%%expect{|
+module type S = sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end
+|}]
