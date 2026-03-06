@@ -497,7 +497,6 @@ module E = struct
 
   let map_block_access sub = function
     | Baccess_field lid -> Baccess_field (map_loc sub lid)
-    | Baccess_array (mut, ik, e) -> Baccess_array (mut, ik, sub.expr sub e)
     | Baccess_block (mut, e) -> Baccess_block (mut, sub.expr sub e)
 
   let map_unboxed_access sub = function

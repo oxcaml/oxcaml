@@ -20,7 +20,7 @@ type void : void
 external unsafe_set_void
   : ('a : value).
   'a or_null @ local -> ('a, void) idx_mut -> void -> unit
-  = "%unsafe_set_idx"
+  = "%set_idx"
 
 let[@inline] unsafe_set_void (type a) (idx : (a, void) idx_mut) v =
   unsafe_set_void Null idx v

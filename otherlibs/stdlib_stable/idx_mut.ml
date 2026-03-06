@@ -16,14 +16,44 @@
 
 type ('a, 'b : any) t : bits64 mod everything = ('a, 'b) idx_mut
 
-external unsafe_get
+external get
   : 'a ('b : any).
   ('a[@local_opt]) -> ('a, 'b) idx_mut -> ('b[@local_opt])
-  = "%unsafe_get_idx"
+  = "%get_idx"
 [@@layout_poly]
 
-external unsafe_set
+external set
   : 'a ('b : any).
   ('a[@local_opt]) -> ('a, 'b) idx_mut -> 'b -> unit
-  = "%unsafe_set_idx"
+  = "%set_idx"
+[@@layout_poly]
+
+external unsafe_create_into_array
+  : ('a : any mod non_float). int -> ('a array, 'a) idx_mut
+  = "%unsafe_array_idx"
+[@@layout_poly]
+
+external unsafe_create_into_array_indexed_by_int8
+  : ('a : any mod non_float). int8# -> ('a array, 'a) idx_mut
+  = "%unsafe_array_idx_indexed_by_int8#"
+[@@layout_poly]
+
+external unsafe_create_into_array_indexed_by_int16
+  : ('a : any mod non_float). int16# -> ('a array, 'a) idx_mut
+  = "%unsafe_array_idx_indexed_by_int16#"
+[@@layout_poly]
+
+external unsafe_create_into_array_indexed_by_int32
+  : ('a : any mod non_float). int32# -> ('a array, 'a) idx_mut
+  = "%unsafe_array_idx_indexed_by_int32#"
+[@@layout_poly]
+
+external unsafe_create_into_array_indexed_by_int64
+  : ('a : any mod non_float). int64# -> ('a array, 'a) idx_mut
+  = "%unsafe_array_idx_indexed_by_int64#"
+[@@layout_poly]
+
+external unsafe_create_into_array_indexed_by_nativeint
+  : ('a : any mod non_float). nativeint# -> ('a array, 'a) idx_mut
+  = "%unsafe_array_idx_indexed_by_nativeint#"
 [@@layout_poly]

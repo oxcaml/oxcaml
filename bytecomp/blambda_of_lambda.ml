@@ -548,8 +548,8 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
         let element_size = Prim (Lsrint, [word_size; tagged_immediate 3]) in
         Sequence (comp_expr arg, element_size)
       | [] | _ :: _ :: _ -> wrong_arity ~expected:1)
-    | Pget_idx _ -> binary (Ccall "caml_unsafe_get_idx_bytecode")
-    | Pset_idx _ -> ternary (Ccall "caml_unsafe_set_idx_bytecode")
+    | Pget_idx _ -> binary (Ccall "caml_get_idx_bytecode")
+    | Pset_idx _ -> ternary (Ccall "caml_set_idx_bytecode")
     | Pmake_idx_field pos ->
       Const (Const_block (0, [Const_base (Const_int pos)]))
     | Pmake_idx_mixed_field (_, pos, path) ->
