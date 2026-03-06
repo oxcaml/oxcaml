@@ -62,6 +62,12 @@ static void st_thread_join(st_thread_id thr)
   /* best effort: ignore errors */
 }
 
+static void st_thread_cancel(st_thread_id thr)
+{
+  pthread_cancel(thr);
+  /* best effort: ignore errors */
+}
+
 /* The master lock.  This is a mutex that is held most of the time,
    so we implement it in a slightly convoluted way to avoid
    all risks of busy-waiting.  Also, we count the number of waiting
