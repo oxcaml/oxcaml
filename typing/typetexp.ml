@@ -105,6 +105,7 @@ type error =
   | Mismatched_jkind_annotation of
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
   | Must_provide_zero_alloc_arity
+  | Invalid_payload_arg_zero_alloc
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -892,9 +893,9 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           begin
             let open Builtin_attributes in
             match zero_alloc with
-            | (Check {arity; _} | Assume {arity; _}) when arity = -1 ->
-              raise (Error (arg.ptyp_loc, env, Must_provide_zero_alloc_arity))
-            | Default_zero_alloc | Ignore_assert_all | Check _ | Assume _ -> ()
+            | Assume _ ->
+              raise (Error (loc, env, Invalid_payload_arg_zero_alloc))
+            | Default_zero_alloc | Ignore_assert_all | Check _ -> ()
           end;
           let zero_alloc = Zero_alloc.create_const zero_alloc in
           let ret_cty = loop acc_mode rest in
@@ -1886,6 +1887,10 @@ let report_error_doc env ppf =
   | Must_provide_zero_alloc_arity ->
     fprintf ppf
       "Zero-alloc annotations on function arguments must specify arity."
+  | Invalid_payload_arg_zero_alloc ->
+    fprintf ppf
+      "Invalid zero-alloc payload for a higher-order function argument."
+
 
 let () =
   Location.register_error_of_exn

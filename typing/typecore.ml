@@ -301,7 +301,7 @@ type error =
   | Wrong_arg_zero_alloc of Zero_alloc.error
   | Unsupported_arg_zero_alloc
   | Must_provide_zero_alloc_arity
-
+  | Invalid_payload_arg_zero_alloc
 
 let not_principal fmt =
   Format_doc.Doc.kmsg (fun x -> Warnings.Not_principal x) fmt
@@ -4323,9 +4323,11 @@ let collect_unknown_apply_args env funct ty_fun mode_fun rev_args sargs ret_tvar
               in
               let zero_alloc =
                 match zero_alloc with
-                | (Check { arity; _ } | Assume { arity; _ }) when arity = 0 ->
+                | Assume _ ->
+                  raise (Error (sarg.pexp_loc, env, Invalid_payload_arg_zero_alloc))
+                | Check { arity; _ } when arity = 0 ->
                   raise (Error (sarg.pexp_loc, env, Must_provide_zero_alloc_arity))
-                | Default_zero_alloc | Ignore_assert_all | Check _ | Assume _ ->
+                | Default_zero_alloc | Ignore_assert_all | Check _ ->
                   Zero_alloc.create_const zero_alloc
               in
               let ty_arg = newmono ~zero_alloc ty_arg_mono in
@@ -5849,7 +5851,7 @@ let add_typed_zero_alloc_attribute expr attributes =
     let default_arity = function_arity fn.params fn.body in
     let za =
       get_zero_alloc_attribute ~in_signature:false ~default_arity attributes
-        ~on_application:false ~on_function_argument:true
+        ~on_application:false ~on_function_argument:false
     in
     begin match za with
     | Default_zero_alloc -> expr
@@ -8400,9 +8402,11 @@ and type_function
       in
       begin
         match zero_alloc with
-        | (Check { arity; _ } | Assume { arity; _ }) when arity = 0 ->
+        | Assume _ ->
+          raise (Error (pparam_loc, env, Invalid_payload_arg_zero_alloc))
+        | Check { arity; _ } when arity = 0 ->
           raise (Error (pparam_loc, env, Must_provide_zero_alloc_arity))
-        | Default_zero_alloc | Ignore_assert_all | Check _ | Assume _ -> ()
+        | Default_zero_alloc | Ignore_assert_all | Check _ -> ()
       end;
       let zero_alloc = Zero_alloc.create_const zero_alloc in
       let env,
@@ -12460,6 +12464,9 @@ let report_error ~loc env =
   | Must_provide_zero_alloc_arity ->
       Location.errorf ~loc
         "Zero-alloc annotations on function arguments must specify arity."
+  | Invalid_payload_arg_zero_alloc ->
+      Location.errorf ~loc
+        "Invalid zero-alloc payload for a higher-order function argument."
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env
