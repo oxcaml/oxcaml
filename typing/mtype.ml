@@ -895,6 +895,8 @@ let lower_nongen nglev mty =
     | _ ->
         super.it_do_type_expr it ty
   in
-  let it = {super with it_do_type_expr} in
+  let it_mode_expr m = Mode.Alloc.update_level nglev m in
+  let it_modality m = Mode.Modality.update_level nglev m in
+  let it = {super with it_do_type_expr; it_mode_expr; it_modality} in
   it.it_module_type it mty
   end

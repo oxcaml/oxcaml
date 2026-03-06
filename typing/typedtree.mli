@@ -125,7 +125,7 @@ val submode_with_constant_l_err :
   -> alloc_mode_r
   -> unit
 
-val zap_alloc_r_to_ceil : alloc_mode_r -> Mode.Locality.Const.t
+val zap_alloc_r_to_ceil_exn : alloc_mode_r -> Mode.Locality.Const.t
 
 val print_alloc_mode_r : Format.formatter -> alloc_mode_r -> unit
 
@@ -149,7 +149,7 @@ val submode_with_constant_r_err :
   -> Mode.Locality.Const.t
   -> unit
 
-val zap_alloc_l_to_floor : alloc_mode_l -> Mode.Locality.Const.t
+val zap_alloc_l_to_floor_exn : alloc_mode_l -> Mode.Locality.Const.t
 
 val print_alloc_mode_l : Format.formatter -> alloc_mode_l -> unit
 

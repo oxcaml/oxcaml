@@ -109,7 +109,7 @@ end
 
 (**** Type level management ****)
 
-let generic_level = Ident.highest_scope
+let generic_level = Mode.Alloc.generic_level
 let lowest_level = Ident.lowest_scope
 
 (**** Some type creators ****)
@@ -283,11 +283,13 @@ let iter_row f row =
   fold_row (fun () v -> f v) () row
 
 
-let fold_type_expr f init ty =
+let fold_type_expr f fm init ty =
   match get_desc ty with
     Tvar _              -> init
-  | Tarrow (_, ty1, ty2, _) ->
-      let result = f init ty1 in
+  | Tarrow ((_, m1, m2), ty1, ty2, _) ->
+      let result = fm init m1 in
+      let result = fm result m2 in
+      let result = f result ty1 in
       f result ty2
   | Ttuple l            -> List.fold_left f init (List.map snd l)
   | Tunboxed_tuple l    -> List.fold_left f init (List.map snd l)
@@ -317,8 +319,8 @@ let fold_type_expr f init ty =
     List.fold_left (fun result (_n, ty) -> f result ty) init fl
   | Tof_kind _ -> init
 
-let iter_type_expr f ty =
-  fold_type_expr (fun () v -> f v) () ty
+let iter_type_expr f fm ty =
+  fold_type_expr (fun () v -> f v) (fun () v -> fm v) () ty
 
 let rec iter_abbrev f = function
     Mnil                   -> ()
@@ -355,10 +357,11 @@ let iter_type_expr_kind f = function
                   (**********************************)
 
 let rec mark_type mark ty =
-  if try_mark_node mark ty then iter_type_expr (mark_type mark) ty
+  if try_mark_node mark ty then
+    iter_type_expr (mark_type mark) (Fun.const ()) ty
 
 let mark_type_params mark ty =
-  iter_type_expr (mark_type mark) ty
+  iter_type_expr (mark_type mark) (Fun.const ()) ty
 
                   (**********************************)
                   (*  (Object-oriented) iterator    *)
@@ -382,6 +385,8 @@ type 'a type_iterators =
     it_type_kind: 'a type_iterators -> type_decl_kind -> unit;
     it_do_type_expr: 'a type_iterators -> 'a;
     it_type_expr: 'a type_iterators -> type_expr -> unit;
+    it_mode_expr: Mode.Alloc.lr -> unit;
+    it_modality: Mode.Modality.t -> unit;
     it_path: Path.t -> unit; }
 
 type type_iterators_full = (type_expr -> unit) type_iterators
@@ -401,7 +406,7 @@ let type_iterators_without_type_expr =
     | Sig_jkind (_ , _jkd, _)       -> ()
     (* currently jkind declarations have nothing interesting to iterate over *)
   and it_value_description it vd =
-    it.it_type_expr it vd.val_type
+    it.it_type_expr it vd.val_type;
   and it_type_declaration it td =
     List.iter (it.it_type_expr it) td.type_params;
     Option.iter (it.it_type_expr it) td.type_manifest;
@@ -454,18 +459,21 @@ let type_iterators_without_type_expr =
   and it_type_kind it kind =
     iter_type_expr_kind (it.it_type_expr it) kind
   and it_path _p = ()
+  and it_mode_expr _m = ()
+  and it_modality _m = ()
   in
   { it_path; it_type_expr = (fun _ _ -> ()); it_do_type_expr = (fun _ _ -> ());
     it_type_kind; it_class_type; it_functor_param; it_module_type;
     it_signature; it_class_type_declaration; it_class_declaration;
     it_modtype_declaration; it_module_declaration; it_extension_constructor;
-    it_type_declaration; it_value_description; it_signature_item; }
+    it_type_declaration; it_value_description;
+    it_signature_item; it_mode_expr; it_modality }
 
 let type_iterators mark =
   let it_type_expr it ty =
     if try_mark_node mark ty then it.it_do_type_expr it ty
   and it_do_type_expr it ty =
-    iter_type_expr (it.it_type_expr it) ty;
+    iter_type_expr (it.it_type_expr it) (it.it_mode_expr) ty;
     match get_desc ty with
       Tconstr (p, _, _)
     | Tobject (_, {contents=Some (p, _)})
@@ -504,10 +512,11 @@ let copy_row f fixed row keep more =
 
 let copy_commu c = if is_commu_ok c then commu_ok else commu_var ()
 
-let rec copy_type_desc ?(keep_names=false) f = function
+let rec copy_type_desc ?(keep_names=false) f fm = function
     Tvar { jkind; _ } as tv ->
      if keep_names then tv else Tvar { name=None; jkind }
-  | Tarrow (p, ty1, ty2, c)-> Tarrow (p, f ty1, f ty2, copy_commu c)
+  | Tarrow ((p, m1, m2), ty1, ty2, c)->
+    Tarrow ((p, fm m1, fm m2), f ty1, f ty2, copy_commu c)
   | Ttuple l            -> Ttuple (List.map (fun (label, t) -> label, f t) l)
   | Tunboxed_tuple l    ->
     Tunboxed_tuple (List.map (fun (label, t) -> label, f t) l)
@@ -522,7 +531,7 @@ let rec copy_type_desc ?(keep_names=false) f = function
       Tfield (p, field_kind_internal_repr k, f ty1, f ty2)
       (* the kind is kept shared, with indirections removed for performance *)
   | Tnil                -> Tnil
-  | Tlink ty            -> copy_type_desc f (get_desc ty)
+  | Tlink ty            -> copy_type_desc f fm (get_desc ty)
   | Tsubst _            -> assert false
   | Tunivar _ as ty     -> ty (* always keep the name *)
   | Tpoly (ty, tyl)     ->
@@ -539,11 +548,21 @@ module For_copy : sig
 
   val redirect_desc: copy_scope -> type_expr -> type_desc -> unit
 
+  val mode_instantiate :
+    copy_scope -> current_level:int ->
+    Mode.Alloc.lr -> Mode.Alloc.lr
+
+  val mode_copy_generic :
+    copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+
+  val mode_duplicate: copy_scope -> Mode.Alloc.lr -> Mode.Alloc.lr
+
   val with_scope: (copy_scope -> 'a) -> 'a
 end = struct
   type copy_scope = {
     mutable saved_desc : (transient_expr * type_desc) list;
     (* Save association of generic nodes with their description. *)
+    saved_mode_changes : Mode.copy_scope;
   }
 
   let redirect_desc copy_scope ty desc =
@@ -551,13 +570,26 @@ end = struct
     copy_scope.saved_desc <- (ty, ty.desc) :: copy_scope.saved_desc;
     Transient_expr.set_desc ty desc
 
+  let mode_instantiate copy_scope ~current_level m =
+    let copy_scope = copy_scope.saved_mode_changes in
+    Mode.Alloc.instantiate ~copy_scope ~current_level m
+
+  let mode_copy_generic copy_scope m =
+    let copy_scope = copy_scope.saved_mode_changes in
+    Mode.Alloc.copy_generic ~copy_scope m
+
+  let mode_duplicate copy_scope m =
+    let copy_scope = copy_scope.saved_mode_changes in
+    Mode.Alloc.duplicate ~copy_scope m
+
   (* Restore type descriptions. *)
   let cleanup { saved_desc; _ } =
     List.iter (fun (ty, desc) -> Transient_expr.set_desc ty desc) saved_desc
 
   let with_scope f =
-    let scope = { saved_desc = [] } in
-    Fun.protect ~finally:(fun () -> cleanup scope) (fun () -> f scope)
+    Mode.with_copy_scope (fun ms ->
+      let scope = { saved_desc = []; saved_mode_changes = ms } in
+      Fun.protect ~finally:(fun () -> cleanup scope) (fun () -> f scope))
 
 end
 

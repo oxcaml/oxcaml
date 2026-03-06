@@ -83,7 +83,7 @@ module Unique_barrier = struct
 
   let enable barrier = match !barrier with
     | Not_computed ->
-      barrier := Enabled (Uniqueness.newvar ())
+      barrier := Enabled (Uniqueness.newvar 0)
     | _ -> Misc.fatal_error "Unique barrier was enabled twice"
 
   (* Due to or-patterns a barrier may have several upper bounds. *)
@@ -95,7 +95,7 @@ module Unique_barrier = struct
   let resolve barrier =
     match !barrier with
     | Enabled uniq ->
-      let zapped = Uniqueness.zap_to_ceil uniq in
+      let zapped = Uniqueness.zap_to_ceil_exn uniq in
       barrier := Resolved zapped;
       zapped
     | Resolved barrier -> barrier
@@ -140,8 +140,8 @@ let submode_with_constant_l_exn
 let submode_with_constant_l_err ?hint pp c alloc_mode =
   Mode.Locality.submode_err pp (Mode.Locality.of_const ?hint c) alloc_mode
 
-let zap_alloc_r_to_ceil (alloc_mode : alloc_mode_r) =
-  Mode.Locality.zap_to_ceil alloc_mode
+let zap_alloc_r_to_ceil_exn (alloc_mode : alloc_mode_r) =
+  Mode.Locality.zap_to_ceil_exn alloc_mode
 
 let print_alloc_mode_r ppf alloc_mode =
   let open Format in
@@ -162,8 +162,8 @@ let submode_with_constant_r_exn
 let submode_with_constant_r_err ?hint pp alloc_mode c =
   Mode.Locality.submode_err pp alloc_mode (Mode.Locality.of_const ?hint c)
 
-let zap_alloc_l_to_floor (alloc_mode : alloc_mode_l) =
-  Mode.Locality.zap_to_floor alloc_mode
+let zap_alloc_l_to_floor_exn (alloc_mode : alloc_mode_l) =
+  Mode.Locality.zap_to_floor_exn alloc_mode
 
 let print_alloc_mode_l ppf alloc_mode =
   let open Format in

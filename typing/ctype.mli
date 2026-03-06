@@ -228,7 +228,8 @@ val instance_label:
         _ gen_label_description -> type_expr list * type_expr * type_expr
         (* Same, for a label *)
 val prim_mode :
-        (Mode.allowed * 'r) Mode.Locality.t option -> (Primitive.mode * Primitive.native_repr)
+        (Mode.allowed * 'r) Mode.Locality.t option ->
+        (Primitive.mode * Primitive.native_repr) -> level:int
         -> (Mode.allowed * 'r) Mode.Locality.t
 val instance_prim:
         Env.t ->
@@ -240,7 +241,13 @@ val instance_prim:
 (** Given (a @ m1 -> b -> c) @ m0, where [m0] and [m1] are modes expressed by
     user-syntax, [curry_mode m0 m1] gives the mode we implicitly interpret b->c
     to have. *)
-val curry_mode : Alloc.Const.t -> Alloc.Const.t -> Alloc.Const.t
+val curry_mode_const : Alloc.Const.t -> Alloc.Const.t -> Alloc.Const.t
+
+(** Applies the same logic as [curry_mode_const] over
+    the comonadic mode for [m0] and the lr mode [m1] *)
+val curry_mode :
+  (allowed * 'r) Alloc.Comonadic.t -> Alloc.lr ->
+  Alloc.Comonadic.l
 
 val apply:
         ?use_current_level:bool ->
@@ -524,7 +531,8 @@ val nondep_jkind_declaration:
 val is_contractive: Env.t -> Path.t -> bool
 val normalize_type: type_expr -> unit
 
-val remove_mode_and_jkind_variables: type_expr -> unit
+val remove_mode_and_jkind_variables:
+  zap_scope:Alloc.zap_scope -> type_expr -> unit
         (* Ensure mode and jkind variables are fully determined *)
 
 val nongen_vars_in_schema: Env.t -> type_expr -> Btype.TypeSet.t option
@@ -558,10 +566,14 @@ val closed_type_expr: ?env:Env.t -> type_expr -> bool
         (* If env present, expand abbreviations to see if expansion
            eliminates the variable *)
 
-val closed_type_decl: type_declaration -> type_expr option
-val closed_extension_constructor: extension_constructor -> type_expr option
+val closed_type_decl:
+  zap_scope:Alloc.zap_scope ->
+  type_declaration -> type_expr option
+val closed_extension_constructor:
+  zap_scope:Alloc.zap_scope ->
+  extension_constructor -> type_expr option
 val closed_class:
-        type_expr list -> class_signature ->
+        zap_scope:Alloc.zap_scope -> type_expr list -> class_signature ->
         closed_class_failure option
         (* Check whether all type variables are bound *)
 

@@ -121,7 +121,9 @@ module type Common = sig
 
   val legacy : lr
 
-  val newvar : unit -> ('l * 'r) t
+  val generic_level : int
+
+  val newvar : int -> ('l * 'r) t
 
   (* How to submode
 
@@ -163,6 +165,12 @@ module type Common = sig
   val submode_err :
     Mode_hint.pinpoint -> (allowed * 'r) t -> ('l * allowed) t -> unit
 
+  val update_level : int -> ('l * 'r) t -> unit
+
+  val generalize : current_level:int -> ('l * 'r) t -> unit
+
+  val generalize_structure : current_level:int -> ('l * 'r) t -> unit
+
   val equate : lr -> lr -> (unit, equate_error) result
 
   (** Similiar to [submode], but crashes the compiler if errors. Use this
@@ -176,15 +184,45 @@ module type Common = sig
 
   val meet : ('l * allowed) t list -> right_only t
 
-  val newvar_above : (allowed * 'r) t -> ('l * 'r_) t * bool
+  val newvar_above : int -> (allowed * 'r) t -> ('l * 'r_) t * bool
 
-  val newvar_below : ('l * allowed) t -> ('l_ * 'r) t * bool
+  val newvar_below : int -> ('l * allowed) t -> ('l_ * 'r) t * bool
+
+  val newvar_above_if_nonzero : (allowed * 'r) t -> (allowed * 'r) t
+
+  val newvar_below_if_nonzero : ('l * allowed) t -> ('l * allowed) t
 
   val print : ?verbose:bool -> unit -> Fmt.formatter -> ('l * 'r) t -> unit
 
-  val zap_to_ceil : ('l * allowed) t -> Const.t
+  (** If a mode is a variable, returns true iff it has the given level *)
+  val check_level : ('l * 'r) t -> int -> bool
 
-  val zap_to_floor : (allowed * 'r) t -> Const.t
+  (** Returns true iff the mode is a variable at the given level *)
+  val check_level_var : ('l * 'r) t -> int -> bool
+
+  (** zaps all variables to ceil (including generic variables): use with caution
+  *)
+  val zap_to_ceil_force : ('l * allowed) t -> Const.t
+
+  (** zaps all variables to floor (including generic variables): use with
+      caution *)
+  val zap_to_floor_force : (allowed * 'r) t -> Const.t
+
+  (** zaps non-generic variables to ceil, raises a [Cannot_zap_generic] excetion
+      if variable is generic *)
+  val zap_to_ceil_exn : ('l * allowed) t -> Const.t
+
+  (** zaps non-generic variables to floor, raises a [Cannot_zap_generic]
+      excetion if variable is generic *)
+  val zap_to_floor_exn : (allowed * 'r) t -> Const.t
+
+  (** zaps non-generic variables to ceil, returns [None] if variable is generic.
+  *)
+  val zap_to_ceil : ('l * allowed) t -> Const.t option
+
+  (** zaps non-generic variables to floor, returns [None] if variable is
+      generic. *)
+  val zap_to_floor : (allowed * 'r) t -> Const.t option
 end
 
 module type Common_axis = sig
@@ -272,6 +310,10 @@ module type S = sig
   val undo_changes : changes -> unit
 
   val set_append_changes : (changes ref -> unit) -> unit
+
+  type copy_scope
+
+  val with_copy_scope : (copy_scope -> 'a) -> 'a
 
   type nonrec allowed = allowed
 
@@ -637,6 +679,8 @@ module type S = sig
         val proj : 'a Axis.t -> t -> 'a option
 
         val set : 'a Axis.t -> 'a option -> t -> t
+
+        val partial_print : Fmt.formatter -> t -> unit
       end
 
       val is_max : 'a Axis.t -> 'a -> bool
@@ -676,6 +720,11 @@ module type S = sig
     type simple_error = Error : 'a Axis.t * 'a simple_axerror -> simple_error
 
     type 'd t = ('d Monadic.t, 'd Comonadic.t) monadic_comonadic
+
+    (** Scope containing pending zap jobs *)
+    type zap_scope
+
+    val with_zap_scope : (zap_scope:zap_scope -> 'a) -> 'a
 
     include
       Common
@@ -735,7 +784,21 @@ module type S = sig
     val min_with_monadic :
       'a Monadic.Axis.t -> ('a, 'l * 'r) mode -> ('r * disallowed) t
 
-    val zap_to_legacy : lr -> Const.t
+    val add_mode_to_zap_scope : (allowed * allowed) t -> zap_scope -> unit
+
+    val zap_to_legacy_exn : lr -> Const.t
+
+    val zap_to_legacy : lr -> Const.t option
+
+    val zap_to_legacy_force : lr -> Const.t
+
+    val zap_to_ceil_exn : ('l * allowed) t -> Const.t
+
+    val zap_to_floor_exn : (allowed * 'r) t -> Const.t
+
+    val zap_to_ceil_force : ('l * allowed) t -> Const.t
+
+    val zap_to_floor_force : (allowed * 'r) t -> Const.t
 
     val comonadic_to_monadic_min :
       ?hint:('r * disallowed) neg Hint.morph ->
@@ -757,6 +820,23 @@ module type S = sig
     (** Returns the lower bound needed for [B -> C] in relation to [A -> B -> C]
     *)
     val partial_apply : (allowed * 'r) t -> l
+
+    (** Copies a mode variable and its submodes from generic level to the
+        current level *)
+    val instantiate :
+      copy_scope:copy_scope -> current_level:int -> ('l * 'r) t -> ('l * 'r) t
+
+    (** Copies a mode variable and its submodes from generic level to max int *)
+    val copy_generic : copy_scope:copy_scope -> ('l * 'r) t -> ('l * 'r) t
+
+    (** Fully duplicates a mode and its submodes to max int *)
+    val duplicate : copy_scope:copy_scope -> ('l * 'r) t -> ('l * 'r) t
+
+    module Guts : sig
+      (** Returns [Some c] if the given mode has been constrained to constant
+          [c]. see notes on [get_floor] in [solver_intf.mli] for cautions. *)
+      val check_const : (allowed * allowed) t -> Const.t option
+    end
   end
 
   (** The most general mode. Used in most type checking, including in value
@@ -951,6 +1031,9 @@ module type S = sig
         is the axis on which the modalities disagree. [left] is the projection
         of [t0] on [ax], and [right] is the projection of [t1] on [ax]. *)
     val sub : t -> t -> (unit, error) Result.t
+
+    (** [update_level n t] updates the level of mode variables in [t] to [n] *)
+    val update_level : int -> t -> unit
 
     (** [equate t0 t1] checks that [t0 = t1]. Definition: [t0 = t1] iff
         [t0 <= t1] and [t1 <= t0]. *)
