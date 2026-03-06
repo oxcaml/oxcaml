@@ -1,0 +1,7 @@
+(rule (copy# ../platform/platform_misc.c platform_misc.c))
+
+(library
+ (name merlin_utils)
+ (public_name merlin-lib.utils)
+ (libraries str unix)
+ (foreign_stubs (language c) (names platform_misc)))

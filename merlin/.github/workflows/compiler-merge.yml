@@ -1,0 +1,37 @@
+name: Compiler merge checklist
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'upstream/ocaml_flambda/base-rev.txt'
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Create PR Comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPO=${{ github.repository }}
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          COMMENT="## Compiler Merge Checklist
+
+          This PR seems to merge changes from Flambda. Please be sure to follow the below steps:
+
+          - [ ] Update the magic numbers
+          - [ ] Update list of compiler flags to ignore
+          - [ ] Make Merlin know about new relevant compiler flags
+
+          If this PR is not merging changes from Flambda, feel free to ignore this comment"
+
+           # Check if comment already exists
+          if ! gh pr view $PR_NUMBER --json comments -q '.comments[].body' --repo $REPO | grep -q "Compiler Merge Checklist"; then
+            gh pr comment $PR_NUMBER --body "$COMMENT" --repo $REPO
+            echo "Comment added successfully."
+          else
+            echo "Comment already exists. Skipping."
+          fi
