@@ -2450,14 +2450,16 @@ let tree_of_modes_const (modes : Mode.Alloc.Const.t) =
 let tree_of_modes : Alloc.lr -> zapped:Alloc.Const.t -> string list =
   fun modes ~zapped ->
     if Alloc.check_level_var modes generic_level &&
-      Language_extension.(is_at_least Mode_polymorphism Alpha) then
-      (* [ (Fmt.asprintf "%s\n debug: %a"
-            (Names.name_of_mode modes)
-            (Mode.Alloc.print ~verbose:true ())
-            modes) ] *)
-      [ (Fmt.asprintf "%s"
+      Language_extension.(is_at_least Mode_polymorphism Alpha) then begin
+        if !Clflags.debug_ocaml then
+          [ (Fmt.asprintf "%s\n debug: %a"
+                (Names.name_of_mode modes)
+                (Mode.Alloc.print ~verbose:true ())
+                modes) ]
+        else
+          [ (Fmt.asprintf "%s"
             (Names.name_of_mode modes))]
-    else
+    end else
       tree_of_modes_const zapped
 
 (** The modal context on a type when printing it. This is to reproduce the mode
