@@ -449,7 +449,7 @@ type r = #{ a : int64#; b : int; }
 Line 3, characters 2-36:
 3 |   Idx_mut.unsafe_create_into_array 0
       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Block indices into arrays whose element layout contains a
+Error: Block indices into arrays of unboxed products containing a
        non-value before a value are not yet supported.
 |}]
 
@@ -461,7 +461,7 @@ type r = { ii : #(int * int64#); i : int; }
 Line 3, characters 12-46:
 3 |   (.idx_mut(Idx_mut.unsafe_create_into_array 0).#ii)
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Block indices into arrays whose element layout contains a
+Error: Block indices into arrays of unboxed products containing a
        non-value before a value are not yet supported.
 |}]
 
@@ -952,7 +952,9 @@ external bad : ('a : any mod separable). int -> ('a not_an_array, 'a) idx_mut
 Line 5, characters 17-22:
 5 | let use_bad () = bad 0
                      ^^^^^
-Error: Unable to determine the array kind for array index primitive.
+Error: Unable to determine the array kind for array index primitive: the
+       result type should be equal to a "(_, _) idx_mut" or "(_, _) idx_imm"
+       whose first parameter is equal to "_ array" or "_ iarray".
 |}]
 
 external bad
@@ -966,7 +968,9 @@ external bad : ('a : any mod separable). int -> ('a array, 'a) not_an_idx
 Line 5, characters 17-22:
 5 | let use_bad () = bad 0
                      ^^^^^
-Error: Unable to determine the array kind for array index primitive.
+Error: Unable to determine the array kind for array index primitive: the
+       result type should be equal to a "(_, _) idx_mut" or "(_, _) idx_imm"
+       whose first parameter is equal to "_ array" or "_ iarray".
 |}]
 
 external bad : int -> (_, _) idx_mut = "%unsafe_array_idx"
@@ -976,5 +980,28 @@ external bad : int -> ('a, 'b) idx_mut = "%unsafe_array_idx"
 Line 2, characters 17-22:
 2 | let use_bad () = bad 0
                      ^^^^^
-Error: Unable to determine the array kind for array index primitive.
+Error: Unable to determine the array kind for array index primitive: the
+       result type should be equal to a "(_, _) idx_mut" or "(_, _) idx_imm"
+       whose first parameter is equal to "_ array" or "_ iarray".
+|}]
+
+(*************************)
+(* Specialize to aliases *)
+
+type ('a, 'b : any) an_idx : bits64 = ('a, 'b) idx_imm
+type ('a : any mod separable) an_array = 'a iarray
+
+external ok
+  : ('a : any mod separable). int -> ('a an_array, 'a) an_idx
+  = "%unsafe_array_idx"
+[@@layout_poly]
+let use_ok () = ok 0
+[%%expect{|
+type ('a, 'b : any) an_idx = ('a, 'b) idx_imm
+type ('a : any mod separable) an_array = 'a iarray
+external ok : ('a : any mod separable). int -> ('a an_array, 'a) an_idx
+  = "%unsafe_array_idx" [@@layout_poly]
+val use_ok :
+  ('a : value_or_null mod separable). unit -> ('a an_array, 'a) an_idx =
+  <fun>
 |}]

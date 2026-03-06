@@ -2649,11 +2649,14 @@ let report_error_doc ppf = function
         Style.inline_code "[@local_opt]" Style.inline_code "@ local"
   | Unable_to_specialize_array_idx_primitive _ty ->
       fprintf ppf
-        "@[Unable to determine the array kind for array index \
-         primitive.@]"
+        "@[Unable to determine the array kind for array index primitive: \
+         the@ result type should be equal to a %a or %a@ \
+         whose first parameter is equal to %a or %a.@]"
+        Style.inline_code "(_, _) idx_mut" Style.inline_code "(_, _) idx_imm"
+        Style.inline_code "_ array" Style.inline_code "_ iarray"
   | Element_would_be_reordered_in_record ->
       fprintf ppf
-        "Block indices into arrays whose element layout contains a@ \
+        "Block indices into arrays of unboxed products containing a@ \
          non-value before a value are not yet supported."
 
 let () =
