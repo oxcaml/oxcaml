@@ -48,15 +48,6 @@ module NonInst2 : sig
 end = struct
   type 'a t = <[int -> int]>
 end
-(* We wrap some constructs in [A.t] so that they are checked
-   in [mcomp], but not [unify]. *)
-(* CR quoted-kinds jbachurski: We might need extra versions of A
-   with 'a quoted-kinded. *)
-module A = struct
-  type _ t  = |
-  type _ t' = |
-end
-
 [%%expect {|
 module Inst0 : sig type t type t' end
 module NonInst0 : sig type 'a t type 'a t' end
@@ -64,7 +55,6 @@ module Inst1 : sig type t type t' end
 module NonInst1 : sig type 'a t type 'a t' end
 module Inst2 : sig type t end
 module NonInst2 : sig type 'a t end
-module A : sig type _ t = | type _ t' = | end
 |}]
 #mark_toplevel_in_quotations
 
