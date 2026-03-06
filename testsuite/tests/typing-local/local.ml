@@ -2585,11 +2585,7 @@ Line 2, characters 8-9:
             ^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is contained (via constructor "GFoo") in the value at line 2, characters 2-17
-         which is expected to be "global" because it is an allocation
-         which is expected to be "local" to the parent region or "global"
-         because it is a function return value.
-         Hint: Use exclave_ to return a local value.
+         because it is contained (via constructor "GFoo") (with some modality) in the value at line 2, characters 2-17.
 |}]
 
 let f =
