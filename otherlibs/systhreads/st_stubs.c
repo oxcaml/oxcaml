@@ -752,6 +752,7 @@ static void stop_tick_thread(void)
 {
   if (Tick_thread_running){
     atomic_store_release(&Tick_thread_stop, 1);
+    st_thread_cancel(Tick_thread_id);
     st_thread_join(Tick_thread_id);
     atomic_store_release(&Tick_thread_stop, 0);
     Tick_thread_running = 0;
