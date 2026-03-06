@@ -1165,18 +1165,23 @@ let pseudoregs_for_instr (simd : Simd.instr) arg_regs res_regs =
   Array.iteri
     (fun i ({ loc; _ } : Simd.arg) -> maybe_pin arg_regs i loc)
     simd.args;
-  (match simd.res with
-  | Res_none -> ()
+  match simd.res with
+  | Res_none -> arg_regs, res_regs
   | Arg rr ->
+    let res_regs = ref res_regs in
     Array.iteri
       (fun r a ->
         let a = Simd.unarized_reg_index simd.args a in
         assert (not (Reg.is_preassigned arg_regs.(a)));
-        arg_regs.(a) <- res_regs.(r))
-      rr
+        (* We do not require binding additional args as results *)
+        if r < Array.length !res_regs
+        then arg_regs.(a) <- !res_regs.(r)
+        else res_regs := Array.append !res_regs [| arg_regs.(a) |])
+      rr;
+    arg_regs, !res_regs
   | Res rr ->
-    Array.iteri (fun i ({ loc; _ } : Simd.arg) -> maybe_pin res_regs i loc) rr);
-  arg_regs, res_regs
+    Array.iteri (fun i ({ loc; _ } : Simd.arg) -> maybe_pin res_regs i loc) rr;
+    arg_regs, res_regs
 
 let pseudoregs_for_operation (simd : Simd.operation) arg res =
   let arg_regs = Array.copy arg in

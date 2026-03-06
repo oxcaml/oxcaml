@@ -148,80 +148,60 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
       (* Extcalls of arity 0 are allowed (these never return). *)
       return_values
     | [kind] -> maybe_sign_extend kind dbg return_values
-    | kinds ->
-      if
-        (* Builtins need not follow the C calling convention. *)
-        not is_c_builtin
-      then (
-        (* CR xclerc: we only support pairs as unboxed return values. *)
-        (match List.length kinds with
-        | 2 -> ()
-        | 4 -> (
-          match Target_system.architecture () with
-          | AArch64 -> ()
-          | X86_64 ->
-            Misc.fatal_errorf
-              "C functions are currently limited to a single return value or a \
-               pair of return values"
-          | IA32 | ARM | POWER | Z | Riscv ->
-            Misc.fatal_error "Only x86-64 and arm64 are supported")
-        | _ ->
-          Misc.fatal_error
-            "C functions are currently limited to a single return value or a \
-             pair of return values");
-        (* CR mshinwell: we also currently only support 64 bit integer and float
-           values (in addition to things of kind [Value] which count as 64-bit
-           integers for this purpose), since on (at least) x86-64 the calling
-           convention differs for smaller widths. *)
-        List.iter
-          (fun kind ->
-            match Flambda_kind.With_subkind.kind kind with
-            | Value
-            | Naked_number
-                (Naked_immediate | Naked_int64 | Naked_nativeint | Naked_float)
-              ->
-              ()
-            | Naked_number (Naked_float32 | Naked_vec128) -> (
-              match Target_system.architecture () with
-              | AArch64 -> ()
-              | X86_64 ->
-                Misc.fatal_errorf
-                  "Cannot compile unboxed product return from external C call \
-                   with a component of kind %a"
-                  Flambda_kind.With_subkind.print kind
-              | IA32 | ARM | POWER | Z | Riscv ->
-                Misc.fatal_error "Only x86-64 and arm64 are supported")
-            | Naked_number
-                ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_vec256
-                | Naked_vec512 )
-            | Region | Rec_info ->
+    | [_; _] as kinds ->
+      (* CR xclerc: we currently support only pairs as unboxed return values. *)
+      (* CR mshinwell: we also currently only support 64 bit integer and float
+         values (in addition to things of kind [Value] which count as 64-bit
+         integers for this purpose), since on (at least) x86-64 the calling
+         convention differs for smaller widths. *)
+      List.iter
+        (fun kind ->
+          match Flambda_kind.With_subkind.kind kind with
+          | Value
+          | Naked_number
+              (Naked_immediate | Naked_int64 | Naked_nativeint | Naked_float) ->
+            ()
+          | Naked_number (Naked_float32 | Naked_vec128) -> (
+            match Target_system.architecture () with
+            | AArch64 -> ()
+            | X86_64 ->
               Misc.fatal_errorf
                 "Cannot compile unboxed product return from external C call \
                  with a component of kind %a"
-                Flambda_kind.With_subkind.print kind)
-          kinds;
-        (* CR mshinwell: Digest page 35 of this doc:
-
-           https://github.com/ARM-software/abi-aa/releases/download/2024Q3/aapcs64.pdf
-
-           and figure out what happens for mixed int/float struct returns (it
-           looks like the floats may be returned in int regs)
-
-           jvanburen: that seems to be what clang does:
-           https://godbolt.org/z/snzEoME9h *)
-        match Target_system.architecture () with
-        | X86_64 -> ()
-        | AArch64 ->
-          let kinds = Flambda_kind.With_subkind.Set.of_list kinds in
-          if Flambda_kind.With_subkind.Set.cardinal kinds <> 1
-          then
+                Flambda_kind.With_subkind.print kind
+            | IA32 | ARM | POWER | Z | Riscv ->
+              Misc.fatal_error "Only x86-64 and arm64 are supported")
+          | Naked_number
+              ( Naked_int8 | Naked_int16 | Naked_int32 | Naked_vec256
+              | Naked_vec512 )
+          | Region | Rec_info ->
             Misc.fatal_errorf
-              "Cannot compile unboxed product return from external C call on \
-               arm64 unless the components of the product are of the same \
-               kind:@ %a"
-              Apply.print apply
-        | IA32 | ARM | POWER | Z | Riscv ->
-          Misc.fatal_error "Only x86-64 and arm64 are supported");
+              "Cannot compile unboxed product return from external C call with \
+               a component of kind %a"
+              Flambda_kind.With_subkind.print kind)
+        kinds;
+      (* CR mshinwell: Digest page 35 of this doc:
+
+         https://github.com/ARM-software/abi-aa/releases/download/2024Q3/aapcs64.pdf
+
+         and figure out what happens for mixed int/float struct returns (it
+         looks like the floats may be returned in int regs)
+
+         jvanburen: that seems to be what clang does:
+         https://godbolt.org/z/snzEoME9h *)
+      (match Target_system.architecture () with
+      | X86_64 -> ()
+      | AArch64 ->
+        let kinds = Flambda_kind.With_subkind.Set.of_list kinds in
+        if Flambda_kind.With_subkind.Set.cardinal kinds <> 1
+        then
+          Misc.fatal_errorf
+            "Cannot compile unboxed product return from external C call on \
+             arm64 unless the components of the product are of the same kind:@ \
+             %a"
+            Apply.print apply
+      | IA32 | ARM | POWER | Z | Riscv ->
+        Misc.fatal_error "Only x86-64 and arm64 are supported");
       let get_unarized_return_value exp n =
         C.tuple_field exp ~component_tys n dbg
       in
@@ -231,6 +211,10 @@ let translate_external_call env res ~free_vars apply ~callee_simple ~args
              maybe_sign_extend kind dbg
                (get_unarized_return_value return_values i))
            kinds)
+    | _ ->
+      Misc.fatal_errorf
+        "C functions are currently limited to a single return value or a pair \
+         of return values"
   in
   let extcall_ident = Ident.create_local "extcall" in
   let extcall_var = Backend_var.With_provenance.create extcall_ident in
