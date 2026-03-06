@@ -974,8 +974,13 @@ let binary_int_arith_primitive _env dbg (kind : K.Standard_int.t)
     | Or -> wrap C.or_int
     | Xor -> wrap C.xor_int)
 
+let relevant_bits_for_shift_amount =
+  if Arch.ocaml_shifts_are_wrapping
+  then Misc.log2 (Arch.size_int * 8)
+  else Arch.size_int * 8
+
 let binary_int_shift_primitive _env dbg kind (op : P.int_shift_op) x y =
-  (* See comments on [binary_int_arity_primitive], above, about sign extension
+  (* See comments on [binary_int_arith_primitive], above, about sign extension
      and use of [C.low_bits]. *)
   match[@warning "-fragile-match"] (kind : K.Standard_int.t) with
   | Tagged_immediate -> (
@@ -1003,6 +1008,7 @@ let binary_int_shift_primitive _env dbg kind (op : P.int_shift_op) x y =
            bits into the high bits of the register. *)
         C.lsl_int, C.Scalar_type.Integer.nativeint
     in
+    let y = C.low_bits ~bits:relevant_bits_for_shift_amount y ~dbg in
     C.Scalar_type.Integral.conjugate ~outer:kind ~inner:(Untagged op_kind) ~dbg
       ~f:(fun x ->
         (* [kind] only applies to [x], the [y] argument is always a bare

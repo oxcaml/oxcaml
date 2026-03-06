@@ -69,20 +69,18 @@ logxor:
 
 (* CR ttebbi: We could use sarx / sarxl to save the move and relax register
    constraints. *)
-let shift_left x y = Nativeint_u.shift_left x y
+let shift_left x y = Nativeint_u.shift_left x (Nativeint_u.to_int y)
 [%%expect_asm X86_64{|
 shift_left:
   movq  %rbx, %rcx
-  sarq  $1, %rcx
   salq  %cl, %rax
   ret
 |}]
 
-let shift_right x y = Nativeint_u.shift_right x y
+let shift_right x y = Nativeint_u.shift_right x (Nativeint_u.to_int y)
 [%%expect_asm X86_64{|
 shift_right:
   movq  %rbx, %rcx
-  sarq  $1, %rcx
   sarq  %cl, %rax
   ret
 |}]

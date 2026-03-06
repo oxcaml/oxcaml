@@ -341,9 +341,7 @@ branch_or_tailcall:
 |}]
 
 
-(* CR ttebbi: We push the int64->int63 transformation into the logand operands,
-   producing even more shifts. We don't need any, since shifts ignore high
-   bits. *)
+(* CR ttebbi: The final bitwise or is unnecessary. *)
 let shift_of_logand (a : int64#) =
   let b = Int64_u.logand a #1L in
   let c = Int64_u.shift_right_logical #3L (Int64_u.to_int b) in
@@ -353,10 +351,6 @@ let shift_of_logand (a : int64#) =
 shift_of_logand:
   movq  %rax, %rcx
   movl  $1, %eax
-  salq  $1, %rax
-  sarq  $1, %rax
-  salq  $1, %rcx
-  sarq  $1, %rcx
   andq  %rax, %rcx
   movl  $3, %eax
   shrq  %cl, %rax
