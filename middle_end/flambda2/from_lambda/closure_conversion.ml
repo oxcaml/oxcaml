@@ -375,6 +375,15 @@ module Inlining = struct
           ~callee:(Inlining_history.Absolute.empty compilation_unit)
           ~are_rebuilding_terms Definition_says_not_to_inline;
         Not_inlinable)
+      else if Code_metadata.is_tupled metadata
+      then (
+        (* Tupled functions have detupled params in the code metadata but the
+           apply has a single tuple argument; don't try to inline here. *)
+        Inlining_report.record_decision_at_call_site_for_known_function ~tracker
+          ~apply ~pass:After_closure_conversion ~unrolling_depth:None
+          ~callee:(Inlining_history.Absolute.empty compilation_unit)
+          ~are_rebuilding_terms Definition_says_not_to_inline;
+        Not_inlinable)
       else
         (* These calculations are all in terms of non-unarized parameters. *)
         let params_length_from_code_metadata =
