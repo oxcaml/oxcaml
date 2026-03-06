@@ -8791,6 +8791,33 @@ let rec normalize_type_rec mark ty =
 let normalize_type ty =
   with_type_mark (fun mark -> normalize_type_rec mark ty)
 
+let arrow_spine env ty =
+  let rec arrow_spine_rec ~mark labels ty_fun =
+    let ty = expand_head env ty_fun in
+    if try_mark_node mark ty
+    then (
+      match get_desc ty with
+      | Tarrow ((label, _, _), ty_arg, ty_ret, _commu) ->
+        arrow_spine_rec ~mark ((label, ty_arg) :: labels) ty_ret
+      | _ -> List.rev labels, `Return ty)
+    else List.rev labels, `Cycle
+  in
+  let snap = snapshot () in
+  let result =
+    with_type_mark (fun mark ->
+        wrap_trace_gadt_instances env (arrow_spine_rec ~mark []) ty)
+  in
+  backtrack snap;
+  result
+
+let arrow_labels env ty =
+  let label_tys, ret_ty_or_cycle = arrow_spine env ty in
+  let is_ret_tvar =
+    match ret_ty_or_cycle with
+    | `Cycle -> false
+    | `Return ty -> is_Tvar ty
+  in
+  List.map fst label_tys, ~is_ret_tvar
 
                               (*************************)
                               (*  Remove dependencies  *)

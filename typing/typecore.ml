@@ -4426,26 +4426,6 @@ let is_prim ~name funct =
       prim_name = name
   | _ -> false
 
-(* List labels in a function type, and whether return type is a variable *)
-let rec list_labels_aux env visited ls ty_fun =
-  let ty = expand_head env ty_fun in
-  if TypeSet.mem ty visited then
-    List.rev ls, false
-  else match get_desc ty with
-    | Tarrow ((l,_,_), _, ty_res, _) ->
-        list_labels_aux env (TypeSet.add ty visited) (l::ls) ty_res
-    | _ ->
-        List.rev ls, is_Tvar ty
-
-let list_labels env ty =
-  let snap = Btype.snapshot () in
-  let result =
-    wrap_trace_gadt_instances env (list_labels_aux env TypeSet.empty []) ty
-  in
-  Btype.backtrack snap;
-  result
-
-
 (* Collecting arguments for function applications. *)
 
 (* See also Note [Type-checking applications] *)
@@ -4828,8 +4808,8 @@ let collect_unknown_apply_args env funct ty_fun0 mode_fun rev_args sargs
     || !Clflags.classic && arg = Nolabel && not (is_omittable param)
   in
   let has_label l ty_fun =
-    let ls, tvar = list_labels env ty_fun in
-    tvar || List.mem l ls
+    let ls, ~is_ret_tvar = arrow_labels env ty_fun in
+    is_ret_tvar || List.mem l ls
   in
   let rec loop ty_fun mode_fun rev_args sargs =
     match sargs with
@@ -9342,18 +9322,58 @@ and type_function
          type for each parameter that's added. Now that functions are n-ary,
          there might be an opportunity to improve this.
       *)
-      let not_nolabel_function ty =
-        (* [list_labels] does expansion and is potentially expensive; only
-           call this when necessary. *)
-        let ls, tvar = list_labels env ty in
-        List.for_all (( <> ) Nolabel) ls && not tvar
+      let only_labels_function_ret_tvar ty =
+        (* [arrow_spine] does expansion and is potentially expensive;
+           only call this when necessary. *)
+        let label_tys, ret_ty_or_cycle = arrow_spine env ty in
+        let is_spine_only_labels =
+          List.for_all (fun (label, _ty) -> label <> Nolabel) label_tys
+        in
+        if is_spine_only_labels
+        then (
+          match ret_ty_or_cycle with
+          | `Cycle -> Some `Not_tvar
+          | `Return ty ->
+              if is_Tvar ty
+              then Some (`Tvar ty)
+              else Some `Not_tvar )
+        else None
       in
-      if is_optional typed_arg_label && not_nolabel_function ty_ret then
-        Location.prerr_warning pat.pat_loc
+      (* An optional argument [?x] is only erasable if the function's return
+         type eventually becomes an unlabelled arrow type ['a -> 'b].
+
+         If the return type [ty_ret] is not yet fully known, the check must be
+         delayed to avoid reporting false negatives. For instance, with
+         -rectypes in 5.4.0:
+         {[
+         # let rec f (type a) ?x = f;;
+         val f : ?x:'b -> 'a as 'a = <fun>
+         ]}
+      *)
+      let raise_unerasable_optional_argument () =
+        Location.prerr_warning
+          pat.pat_loc
           Warnings.Unerasable_optional_argument
-      else if is_position typed_arg_label && not_nolabel_function ty_ret then
-        Location.prerr_warning pat.pat_loc
-          Warnings.Unerasable_position_argument;
+      in
+      if is_optional typed_arg_label
+      then (
+        match only_labels_function_ret_tvar ty_ret with
+        | Some (`Tvar ret_tvar) ->
+          (* We don't necessarily know [ty] is a function with only labelled
+             args since unification may change this. So we add
+             a delayed check. *)
+          add_delayed_check (fun () ->
+              if Option.is_some (only_labels_function_ret_tvar ret_tvar)
+              then raise_unerasable_optional_argument ())
+        | Some `Not_tvar -> raise_unerasable_optional_argument ()
+        | None -> ())
+      else if is_position typed_arg_label
+      then (
+        match only_labels_function_ret_tvar ty_ret with
+        | Some `Not_tvar ->
+          Location.prerr_warning pat.pat_loc
+            Warnings.Unerasable_position_argument
+        | Some (`Tvar _) | None -> ());
       let pat =
         if really_poly
         then { pat with
@@ -10076,8 +10096,8 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
       ty_expected' ty_expected =
   (* ty_expected' may be generic *)
   let no_labels ty =
-    let ls, tvar = list_labels env ty in
-    not tvar && List.for_all ((=) Nolabel) ls
+    let ls, ~is_ret_tvar = arrow_labels env ty in
+    not is_ret_tvar && List.for_all ((=) Nolabel) ls
   in
   let inferred = is_inferred sarg in
   let rec loosen_arrow_modes ty' ty =
@@ -10435,8 +10455,8 @@ and type_application env app_loc expected_mode position_and_mode
       let ignore_labels =
         !Clflags.classic ||
         begin
-          let ls, tvar = list_labels env funct.exp_type in
-          not tvar &&
+          let ls, ~is_ret_tvar = arrow_labels env funct.exp_type in
+          not is_ret_tvar &&
           let labels = List.filter (fun l -> not (is_omittable l)) ls in
           List.length labels = List.length sargs &&
           List.for_all (fun (l,_) -> l = Parsetree.Nolabel) sargs &&

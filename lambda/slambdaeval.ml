@@ -122,7 +122,7 @@ let typeof = function
   | SLVrecord _ -> TP Trecord
   | SLVclosure _ -> TP Tclosure
 
-let expect_err ?reason ~expected ~actual =
+let expect_err ?reason ~expected actual =
   let pp_reason ppf () =
     match reason with
     | Some reason -> Format.fprintf ppf " (%s)" reason
@@ -141,7 +141,7 @@ let expect (type a) ?reason (vty : a value_type) (v : value) : a =
   | Tclosure, SLVclosure closure -> closure
   | _, _ ->
     let (TP actual_vty) = typeof v in
-    expect_err ?reason ~expected:vty ~actual:actual_vty
+    expect_err ?reason ~expected:vty actual_vty
 
 let expect_not_missing (a : 'a Or_missing.t) : 'a =
   match a with Present a -> a | Missing -> errf "unexpected missing value"
