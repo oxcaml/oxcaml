@@ -959,6 +959,8 @@ type lambda =
   | Lregion of lambda * layout
   | Lexclave of lambda
   | Lsplice of scoped_location * slambda
+  | Ltemplate of lfunction * layout Ident.Map.t
+  | Linstantiate of lambda_apply
 
 and slambda =
   | SLlayout of layout
@@ -980,13 +982,13 @@ and slambda_halves =
   }
 
 and slambda_function =
-  { sfun_params: Slambdaident.t array;
+  { sfun_params: Slambdaident.t list;
     sfun_body: slambda
   }
 
 and slambda_apply =
   { sapp_func: slambda;
-    sapp_arguments: slambda array
+    sapp_args: slambda list
   }
 
 and slambda_let =
@@ -1065,8 +1067,10 @@ let rec try_to_find_location lam =
   match lam with
   | Lprim (_, _, loc)
   | Lfunction { loc; _ }
+  | Ltemplate ({ loc; _ }, _)
   | Lletrec ({ def = { loc; _ }; _ } :: _, _)
   | Lapply { ap_loc = loc; _ }
+  | Linstantiate { ap_loc = loc; _ }
   | Lfor { for_loc = loc; _ }
   | Lswitch (_, _, loc, _)
   | Lstringswitch (_, _, _, loc, _)
@@ -1128,6 +1132,8 @@ let fatal_error_invalid_constructor lambda =
     | Lregion _ -> "Lregion"
     | Lexclave _ -> "Lexclave"
     | Lsplice _ -> "Lsplice"
+    | Ltemplate _ -> "Ltemplate"
+    | Linstantiate _ -> "Linstantiate"
   in
   Misc.fatal_errorf "Lambda constructor %s is not valid at this stage: %a"
     name Location.print_loc loc
@@ -1471,7 +1477,7 @@ let make_key e =
         (* Mutable constants are not shared *)
         raise Not_simple
     | Lconst _ -> e
-    | Lapply ap ->
+    | Lapply ap | Linstantiate ap ->
         Lapply {ap with ap_func = tr_rec env ap.ap_func;
                         ap_args = tr_recs env ap.ap_args;
                         ap_loc = Loc_unknown}
@@ -1516,7 +1522,7 @@ let make_key e =
     | Lifused (id,e) -> Lifused (id,tr_rec env e)
     | Lregion (e,layout) -> Lregion (tr_rec env e,layout)
     | Lexclave e -> Lexclave (tr_rec env e)
-    | Lletrec _|Lfunction _
+    | Lletrec _|Lfunction _ | Ltemplate _
     | Lfor _ | Lwhile _
 (* Beware: (PR#6412) the event argument to Levent
    may include cyclic structure of type Type.typexpr *)
@@ -1625,6 +1631,10 @@ let shallow_iter ~tail ~non_tail:f = function
       f e
   | Lexclave e ->
       tail e
+  | Ltemplate ({body},_) ->
+      f body
+  | Linstantiate { ap_func; ap_args } ->
+      f ap_func; List.iter f ap_args
 
 let iter_head_constructor f l =
   shallow_iter ~tail:f ~non_tail:f l
@@ -1714,6 +1724,9 @@ let rec free_variables = function
   | Lexclave e ->
       free_variables e
   | Lsplice (_, slambda) -> free_variables_slambda slambda
+  | Ltemplate (_, free_vars) -> Ident.Map.keys free_vars
+  | Linstantiate{ap_func = fn; ap_args = args} ->
+      free_variables_list (free_variables fn) args
 
 and free_variables_list set exprs =
   List.fold_left (fun set expr -> Ident.Set.union (free_variables expr) set)
@@ -1736,12 +1749,12 @@ and free_variables_slambda = function
       (* Notably we don't recurse into templates as they would only introduce
          new free variables into their call site. *)
       Ident.Set.empty
-  | SLinstantiate { sapp_func; sapp_arguments } ->
+  | SLinstantiate { sapp_func; sapp_args } ->
       (* Mechanically the result of instantiation could introduce new free
          variables, however it's an invariant of slambda that it doesn't. *)
-      Array.fold_left
+      List.fold_left
         (fun set arg -> Ident.Set.union (free_variables_slambda arg) set)
-        (free_variables_slambda sapp_func) sapp_arguments
+        (free_variables_slambda sapp_func) sapp_args
   | SLlet { slet_name = _; slet_value; slet_body } ->
       Ident.Set.union
         (free_variables_slambda slet_value)
@@ -1988,8 +2001,13 @@ let build_substs update_env ?(freshen_bound_variables = false) s =
     | Lapply ap ->
         Lapply{ap with ap_func = subst s l ap.ap_func;
                       ap_args = subst_list s l ap.ap_args}
+    | Linstantiate ap ->
+        Linstantiate { ap with ap_func = subst s l ap.ap_func;
+                              ap_args = subst_list s l ap.ap_args }
     | Lfunction lf ->
         Lfunction (subst_lfun s l lf)
+    | Ltemplate (_lf, _free_vars) ->
+        Misc.fatal_error "I've got no idea what to do here"
     | Llet(str, k, id, duid, arg, body) ->
         let id, duid, l' = bind id duid l in
         Llet(str, k, id, duid, subst s l arg, subst s l' body)
@@ -2139,8 +2157,25 @@ let shallow_map ~tail ~non_tail:f = function
         ap_specialised;
         ap_probe;
       }
+  | Linstantiate { ap_func; ap_args; ap_result_layout; ap_region_close; ap_mode;
+                   ap_loc; ap_tailcall; ap_inlined; ap_specialised; ap_probe }
+      ->
+      Linstantiate {
+        ap_func = f ap_func;
+        ap_args = List.map f ap_args;
+        ap_result_layout;
+        ap_region_close;
+        ap_mode;
+        ap_loc;
+        ap_tailcall;
+        ap_inlined;
+        ap_specialised;
+        ap_probe;
+      }
   | Lfunction lfun ->
       Lfunction (map_lfunction f lfun)
+  | Ltemplate (lfun, vars) ->
+      Ltemplate (map_lfunction f lfun, vars)
   | Llet (str, layout, v, v_duid, e1, e2) ->
       Llet (str, layout, v, v_duid, f e1, tail e2)
   | Lmutlet (layout, v, v_duid, e1, e2) ->
@@ -2814,7 +2849,7 @@ let layout_of_module_field repr pos =
     layout_of_mixed_block_element shape.(pos)
 
 let rec mixed_block_element_of_layout (layout : layout) :
-    unit mixed_block_element =
+    'a mixed_block_element =
   match layout with
   | Punboxed_product layouts ->
     Product (List.map mixed_block_element_of_layout layouts |> Array.of_list)
@@ -3173,10 +3208,12 @@ let may_allocate_in_region lam =
   and loop = function
     | Lvar _ | Lmutvar _ | Lconst _ -> ()
 
-    | Lfunction {mode=Alloc_heap} -> ()
-    | Lfunction {mode=Alloc_local} -> raise Exit
+    | Lfunction {mode=Alloc_heap} | Ltemplate ({mode=Alloc_heap}, _) -> ()
+    | Lfunction {mode=Alloc_local} | Ltemplate ({mode=Alloc_local}, _) ->
+      raise Exit
 
     | Lapply {ap_mode=Alloc_local}
+    | Linstantiate {ap_mode=Alloc_local}
     | Lsend (_,_,_,_,_,Alloc_local,_,_) -> raise Exit
 
     | Lprim (prim, args, _) ->
@@ -3196,8 +3233,8 @@ let may_allocate_in_region lam =
     | Lwhile {wh_cond; wh_body} -> loop wh_cond; loop wh_body
     | Lsplice _ -> fatal_error_invalid_constructor lam
     | Lfor {for_from; for_to; for_body} -> loop for_from; loop for_to; loop for_body
-    | ( Lapply _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _ | Lstringswitch _
-      | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
+    | ( Lapply _  | Linstantiate _ | Llet _ | Lmutlet _ | Lletrec _ | Lswitch _
+      | Lstringswitch _ | Lstaticraise _ | Lstaticcatch _ | Ltrywith _
       | Lifthenelse _ | Lsequence _ | Lassign _ | Lsend _
       | Levent _ | Lifused _) as lam ->
        iter_head_constructor loop lam
