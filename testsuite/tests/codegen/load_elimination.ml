@@ -1,6 +1,7 @@
 (* TEST
  only-default-codegen;
  flags = " -O3";
+ flags += " -flambda2-simplify-stubs";
  flags += " -cfg-prologue-shrink-wrap";
  flags += " -regalloc-param SPLIT_AROUND_LOOPS:on";
  flags += " -regalloc-param AFFINITY:on -regalloc irc";
@@ -12,7 +13,7 @@ let immutable_load l = (List.hd l) + (List.hd l)
 immutable_load:
   testb $1, %al
   je    .L105
-  movq  camlStdlib__List__Pmakeblock2305@GOTPCREL(%rip), %rax
+  movq  camlStdlib__List__Pmakeblock2278@GOTPCREL(%rip), %rax
   movq  48(%r14), %rsp
   popq  48(%r14)
   popq  %r11
