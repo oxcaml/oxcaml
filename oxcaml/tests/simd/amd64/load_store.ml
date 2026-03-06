@@ -306,36 +306,15 @@ end
 
 module AVX2 = struct
 
-  external vec128_gather32_index32 : scale:int64# -> onto:(int32x4[@unboxed]) -> addr -> idx:(int32x4[@unboxed]) -> mask:(int32x4[@unboxed]) -> #(int32x4# * int32x4#) = "" "caml_avx2_vec128_gather32_index32"
+  external vec128_gather32_index32 : scale:int64# -> onto:(int32x4[@unboxed]) -> addr -> idx:(int32x4[@unboxed]) -> mask:(int32x4[@unboxed]) -> (int32x4[@unboxed]) = "" "caml_avx2_vec128_gather32_index32"
   [@@noalloc] [@@builtin]
-  external vec256_gather32_index32 : scale:int64# -> onto:(int32x8[@unboxed]) -> addr -> idx:(int32x8[@unboxed]) -> mask:(int32x8[@unboxed]) -> #(int32x8# * int32x8#) = "" "caml_avx2_vec256_gather32_index32"
-  [@@noalloc] [@@builtin]
-
-  external vec128_gather32_index64 : scale:int64# -> onto:(int32x4[@unboxed]) -> addr -> idx:(int64x2[@unboxed]) -> mask:(int32x4[@unboxed]) -> #(int32x4# * int32x4#) = "" "caml_avx2_vec128_gather32_index64"
-  [@@noalloc] [@@builtin]
-  external vec256_gather32_index64 : scale:int64# -> onto:(int32x4[@unboxed]) -> addr -> idx:(int64x4[@unboxed]) -> mask:(int32x4[@unboxed]) -> #(int32x4# * int32x4#) = "" "caml_avx2_vec256_gather32_index64"
+  external vec256_gather32_index32 : scale:int64# -> onto:(int32x8[@unboxed]) -> addr -> idx:(int32x8[@unboxed]) -> mask:(int32x8[@unboxed]) -> (int32x8[@unboxed]) = "" "caml_avx2_vec256_gather32_index32"
   [@@noalloc] [@@builtin]
 
-  external box_int64x4 : int64x4# -> int64x4 = "%box_vec256"
-  external box_int32x8 : int32x8# -> int32x8 = "%box_vec256"
-  external box_int64x2 : int64x2# -> int64x2 = "%box_vec128"
-  external box_int32x4 : int32x4# -> int32x4 = "%box_vec128"
-
-  let[@inline] vec128_gather32_index32 ~scale ~onto addr ~idx ~mask =
-    let #(res, _) = vec128_gather32_index32 ~scale ~onto addr ~idx ~mask in
-    box_int32x4 res
-
-  let[@inline] vec256_gather32_index32 ~scale ~onto addr ~idx ~mask =
-    let #(res, _) = vec256_gather32_index32 ~scale ~onto addr ~idx ~mask in
-    box_int32x8 res
-
-  let[@inline] vec128_gather32_index64 ~scale ~onto addr ~idx ~mask =
-    let #(res, _) = vec128_gather32_index64 ~scale ~onto addr ~idx ~mask in
-    box_int32x4 res
-
-  let[@inline] vec256_gather32_index64 ~scale ~onto addr ~idx ~mask =
-    let #(res, _) = vec256_gather32_index64 ~scale ~onto addr ~idx ~mask in
-    box_int32x4 res
+  external vec128_gather32_index64 : scale:int64# -> onto:(int32x4[@unboxed]) -> addr -> idx:(int64x2[@unboxed]) -> mask:(int32x4[@unboxed]) -> (int32x4[@unboxed]) = "" "caml_avx2_vec128_gather32_index64"
+  [@@noalloc] [@@builtin]
+  external vec256_gather32_index64 : scale:int64# -> onto:(int32x4[@unboxed]) -> addr -> idx:(int64x4[@unboxed]) -> mask:(int32x4[@unboxed]) -> (int32x4[@unboxed]) = "" "caml_avx2_vec256_gather32_index64"
+  [@@noalloc] [@@builtin]
 
   let () =
     let mem = aligned_alloc ~align:#32n ~size:#32n in
@@ -396,31 +375,15 @@ module AVX2 = struct
         ~mask:(Int32s.to_int32x4 (-1l) (-1l) (-1l) 0l) in
     eq_int32x4 ~result:x ~expect:(Int32s.to_int32x4 8l 6l 4l 12l)
 
-  external vec128_gather64_index32 : scale:int64# -> onto:(int64x2[@unboxed]) -> addr -> idx:(int32x4[@unboxed]) -> mask:(int64x2[@unboxed]) -> #(int64x2# * int64x2#) = "" "caml_avx2_vec128_gather64_index32"
+  external vec128_gather64_index32 : scale:int64# -> onto:(int64x2[@unboxed]) -> addr -> idx:(int32x4[@unboxed]) -> mask:(int64x2[@unboxed]) -> (int64x2[@unboxed]) = "" "caml_avx2_vec128_gather64_index32"
   [@@noalloc] [@@builtin]
-  external vec256_gather64_index32 : scale:int64# -> onto:(int64x4[@unboxed]) -> addr -> idx:(int32x4[@unboxed]) -> mask:(int64x4[@unboxed]) -> #(int64x4# * int64x4#) = "" "caml_avx2_vec256_gather64_index32"
-  [@@noalloc] [@@builtin]
-
-  external vec128_gather64_index64 : scale:int64# -> onto:(int64x2[@unboxed]) -> addr -> idx:(int64x2[@unboxed]) -> mask:(int64x2[@unboxed]) -> #(int64x2# * int64x2#) = "" "caml_avx2_vec128_gather64_index64"
-  [@@noalloc] [@@builtin]
-  external vec256_gather64_index64 : scale:int64# -> onto:(int64x4[@unboxed]) -> addr -> idx:(int64x4[@unboxed]) -> mask:(int64x4[@unboxed]) -> #(int64x4# * int64x4#) = "" "caml_avx2_vec256_gather64_index64"
+  external vec256_gather64_index32 : scale:int64# -> onto:(int64x4[@unboxed]) -> addr -> idx:(int32x4[@unboxed]) -> mask:(int64x4[@unboxed]) -> (int64x4[@unboxed]) = "" "caml_avx2_vec256_gather64_index32"
   [@@noalloc] [@@builtin]
 
-  let[@inline] vec128_gather64_index32 ~scale ~onto addr ~idx ~mask =
-    let #(res, _) = vec128_gather64_index32 ~scale ~onto addr ~idx ~mask in
-    box_int64x2 res
-
-  let[@inline] vec256_gather64_index32 ~scale ~onto addr ~idx ~mask =
-    let #(res, _) = vec256_gather64_index32 ~scale ~onto addr ~idx ~mask in
-    box_int64x4 res
-
-  let[@inline] vec128_gather64_index64 ~scale ~onto addr ~idx ~mask =
-    let #(res, _) = vec128_gather64_index64 ~scale ~onto addr ~idx ~mask in
-    box_int64x2 res
-
-  let[@inline] vec256_gather64_index64 ~scale ~onto addr ~idx ~mask =
-    let #(res, _) = vec256_gather64_index64 ~scale ~onto addr ~idx ~mask in
-    box_int64x4 res
+  external vec128_gather64_index64 : scale:int64# -> onto:(int64x2[@unboxed]) -> addr -> idx:(int64x2[@unboxed]) -> mask:(int64x2[@unboxed]) -> (int64x2[@unboxed]) = "" "caml_avx2_vec128_gather64_index64"
+  [@@noalloc] [@@builtin]
+  external vec256_gather64_index64 : scale:int64# -> onto:(int64x4[@unboxed]) -> addr -> idx:(int64x4[@unboxed]) -> mask:(int64x4[@unboxed]) -> (int64x4[@unboxed]) = "" "caml_avx2_vec256_gather64_index64"
+  [@@noalloc] [@@builtin]
 
   let () =
     let mem = aligned_alloc ~align:#32n ~size:#32n in
