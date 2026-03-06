@@ -3940,7 +3940,8 @@ let transl_value_decl env loc ~modal ~why valdecl =
         count_arrows 0 ty
       in
       let zero_alloc =
-        Builtin_attributes.get_zero_alloc_attribute ~in_signature:true
+        Builtin_attributes.get_zero_alloc_attribute
+          ~in_signature:true
           ~on_application:false
           ~on_function_argument:false
           ~default_arity

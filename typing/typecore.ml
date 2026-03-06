@@ -5868,27 +5868,15 @@ let add_typed_zero_alloc_attribute expr attributes =
     end
   | _ -> expr
 
-let add_parsed_zero_alloc_attribute
-      ~default_arity
-      ({ pvb_pat = pat; pvb_attributes = attributes; _ } as vb)
-  =
+let add_parsed_zero_alloc_attribute ~default_arity vb =
   let zero_alloc =
-    match pat.ppat_desc with
-    | Ppat_any | Ppat_var _ ->
-      Builtin_attributes.get_zero_alloc_attribute
-        ~in_signature:false
-        ~on_application:false
-        ~on_function_argument:false
-        ~default_arity
-        attributes
-      |> Zero_alloc.create_const
-    | Ppat_alias _ | Ppat_constant _ | Ppat_interval _ | Ppat_tuple _
-    | Ppat_unboxed_tuple _ | Ppat_construct _ | Ppat_variant _
-    | Ppat_record _ | Ppat_record_unboxed_product _ | Ppat_array _
-    | Ppat_or _ | Ppat_constraint _ | Ppat_type _ | Ppat_lazy _
-    | Ppat_unpack _ | Ppat_exception _ | Ppat_extension _
-    | Ppat_open _ | Ppat_unboxed_unit | Ppat_unboxed_bool _ ->
-      Zero_alloc.default
+    Builtin_attributes.get_zero_alloc_attribute
+      ~in_signature:false
+      ~on_application:false
+      ~on_function_argument:false
+      ~default_arity
+      vb.pvb_attributes
+    |> Zero_alloc.create_const
   in
   vb, zero_alloc
 
@@ -7214,7 +7202,7 @@ and type_expect_
               loc, [])
         | Tvar _ ->
             let ty' = newvar (Jkind.Builtin.value ~why:Object_field) in
-            let za = Zero_alloc.create_var loc 1 in
+            let za = Zero_alloc.default in
             unify env (instance typ) (newty(Tpoly(ty',[], za)));
             (* if not !Clflags.nolabels then
                Location.prerr_warning loc (Warnings.Unknown_method met); *)
@@ -9235,7 +9223,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         let desc =
           { val_type = ty; val_kind = Val_reg sort;
             val_attributes = [];
-            val_zero_alloc = Zero_alloc.default; (* ZERO_ALLOC *)
+            val_zero_alloc = Zero_alloc.default;
             val_modalities = Modality.undefined;
             val_loc = Location.none;
             val_uid = Uid.mk ~current_unit:(Env.get_unit_name ());
@@ -10550,9 +10538,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
       (fun (s, ((_,p,_), (e, _))) (pvb, _) ->
         (* We check for [zero_alloc] attributes written on the [let] and move
            them to the function. *)
-        let e =
-          add_typed_zero_alloc_attribute e pvb.pvb_attributes
-        in
+        let e = add_typed_zero_alloc_attribute e pvb.pvb_attributes in
         (* vb_rec_kind will be computed later for recursive bindings *)
         {vb_pat=p; vb_expr=e; vb_sort = s; vb_attributes=pvb.pvb_attributes;
          vb_loc=pvb.pvb_loc; vb_rec_kind = Dynamic;

@@ -245,11 +245,3 @@ let equal za1 za2 =
   with
   | Error (Arity_mismatch _ as e) -> Result.Error e
   | Error _ -> Result.Error Incompatible
-
-
-let prepare_zero_alloc ~in_signature ~on_application ~on_function_argument ~default_arity ~loc l =
-  let open Builtin_attributes in
-  match get_zero_alloc_attribute ~in_signature ~on_application
-          ~on_function_argument ~default_arity l with
-  | Default_zero_alloc -> create_var loc default_arity
-  | (Ignore_assert_all | Check _ | Assume _) as za -> create_const za

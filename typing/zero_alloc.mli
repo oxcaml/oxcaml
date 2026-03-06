@@ -45,11 +45,6 @@ val create_var : Location.t -> int -> t
    [const] and has no effect. *)
 val get : t -> const
 
-(* Get zero alloc information from attributes, create a variable if no annotation. *)
-val prepare_zero_alloc :
-  in_signature:bool -> on_application:bool-> on_function_argument:bool -> default_arity:int ->
-  loc:Location.t -> Parsetree.attributes -> t
-
 (* For types.ml's backtracking mechanism. *)
 type change
 val set_change_log : (change -> unit) -> unit
