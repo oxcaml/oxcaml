@@ -88,8 +88,8 @@ let coalesce_temp_spills_and_reloads (block : Cfg.basic_block)
     | Reloadretaddr | Prologue | Epilogue | Pushtrap _ | Poptrap _
     | Stack_check _
     | Op
-        ( Move | Opaque | Begin_region | End_region | Dls_get | Tls_get
-        | Domain_index | Poll | Pause | Const_int _ | Const_float32 _
+        ( Move | Dummy_use | Opaque | Begin_region | End_region | Dls_get
+        | Tls_get | Domain_index | Poll | Pause | Const_int _ | Const_float32 _
         | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
         | Const_vec512 _ | Stackoffset _ | Load _
         | Store (_, _, _)
@@ -303,7 +303,7 @@ let rewrite_gen : type s.
           then
             (* insert block *)
             (* CR-soon xclerc for xclerc: now that we preprocess critical nodes,
-               no insertion should occur here. *)
+               no block insertion should occur here. *)
             let (_ : Cfg.basic_block list) =
               Cfg_with_layout.insert_block
                 (Cfg_with_infos.cfg_with_layout cfg_with_infos)
@@ -467,6 +467,61 @@ let prelude :
     else cfg_infos, Regalloc_stack_slots.make ()
   in
   cfg_infos, stack_slots, Regalloc_affinity.compute cfg_with_infos
+
+let make_dummy_use :
+    Cfg.t -> copy:_ Cfg.instruction -> reg:Reg.t -> Cfg.basic Cfg.instruction =
+ fun cfg ~copy ~reg ->
+  Cfg.make_instruction_from_copy copy ~desc:(Cfg.Op Dummy_use)
+    ~id:(InstructionId.get_and_incr cfg.next_instruction_id)
+    ~arg:[| reg |] ~res:[||] ()
+
+let insert_dummy_uses : Cfg_with_infos.t -> cfg_infos -> unit =
+ fun cfg_with_infos cfg_infos ->
+  let set_but_unused_regs = Reg.Set.diff cfg_infos.res cfg_infos.arg in
+  if not (Reg.Set.is_empty set_but_unused_regs)
+  then begin
+    let cfg = Cfg_with_infos.cfg cfg_with_infos in
+    let block_insertion = ref false in
+    Cfg.iter_blocks cfg ~f:(fun _label block ->
+        (* process body *)
+        DLL.iter_cell block.body ~f:(fun cell ->
+            let (instr : Cfg.basic Cfg.instruction) = DLL.value cell in
+            Reg.Set.iter
+              (fun set_but_unused_reg ->
+                if occurs_array instr.res set_but_unused_reg
+                then
+                  let dummy_use =
+                    make_dummy_use cfg ~copy:instr ~reg:set_but_unused_reg
+                  in
+                  DLL.insert_after cell dummy_use)
+              set_but_unused_regs);
+        (* process terminator *)
+        let term = block.terminator in
+        Reg.Set.iter
+          (fun set_but_unused_reg ->
+            if occurs_array term.res set_but_unused_reg
+            then begin
+              let dummy_use =
+                make_dummy_use cfg ~copy:term ~reg:set_but_unused_reg
+              in
+              let new_instrs = DLL.make_single dummy_use in
+              (* CR-soon xclerc for xclerc: now that we preprocess critical
+                 nodes, no block insertion should occur here. *)
+              let (_ : Cfg.basic_block list) =
+                Cfg_with_layout.insert_block
+                  (Cfg_with_infos.cfg_with_layout cfg_with_infos)
+                  new_instrs ~after:block ~before:None
+                  ~next_instruction_id:(fun () ->
+                    InstructionId.get_and_incr cfg.next_instruction_id)
+              in
+              block_insertion := true
+            end)
+          set_but_unused_regs);
+    (* invalidate liveness / structural info as needed *)
+    Cfg_with_infos.invalidate_liveness cfg_with_infos;
+    if !block_insertion
+    then Cfg_with_infos.invalidate_dominators_and_loop_infos cfg_with_infos
+  end
 
 let postlude : type s.
     (module State with type t = s) ->

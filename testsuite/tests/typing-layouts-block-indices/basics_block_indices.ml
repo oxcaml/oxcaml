@@ -322,7 +322,7 @@ let coerce_mut_bad (idx : (_, [ `A ]) idx_mut) =
 Line 2, characters 3-6:
 2 |   (idx :> (_, [ `A | `B ]) idx_mut)
        ^^^
-Error: This expression cannot be coerced to type ""('a, [ `A | `B ]) idx_mut"";
+Error: This expression cannot be coerced to type ""('b, [ `A | `B ]) idx_mut"";
        it has type "('a, [ `A ]) idx_mut" but is here used with type
          "('a, [ `A | `B ]) idx_mut"
        The first variant type does not allow tag(s) "`B"

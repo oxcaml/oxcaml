@@ -204,6 +204,36 @@ let static_cast ~src ~dst x =
        modulo 2^8 or 2^16. *)
     sign_extend dst x
 
+(** [copy_unboxed_product shape ~path expr] generates Blambda code that creates
+    a fresh deep copy of [expr] if the field at [path] in [shape] is an unboxed
+    product. For non-product elements, returns [expr] unchanged. For products,
+    allocates a fresh block and recursively copies each field.
+
+    This is needed because in bytecode, unboxed products are represented as
+    boxed blocks. Without copying, reading or writing an unboxed product from/to
+    a mutable field would alias the original, causing mutations via set_idx to
+    affect both. *)
+let copy_unboxed_product shape ~path expr =
+  let rec copy_element (elt : _ Lambda.mixed_block_element) expr =
+    match elt with
+    | Product elements ->
+      (* Bind expr to a variable so it's only evaluated once *)
+      let id = Ident.create_local "copy_src" in
+      let copied_fields =
+        Array.to_list
+          (Array.mapi
+             (fun i field_elt ->
+               copy_element field_elt (Prim (Getfield i, [Var id])))
+             elements)
+      in
+      Let { id; arg = expr; body = Prim (Makeblock { tag = 0 }, copied_fields) }
+    | Value _ | Float_boxed _ | Float64 | Float32 | Bits8 | Bits16 | Bits32
+    | Bits64 | Vec128 | Vec256 | Vec512 | Word | Untagged_immediate ->
+      expr
+    | Splice_variable _ -> Misc.splices_should_not_exist_after_eval ()
+  in
+  copy_element (Lambda.project_from_mixed_block_shape shape ~path) expr
+
 let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
   let comp_fun ({ params; body; loc = _ } as lfunction : Lambda.lfunction) :
       Blambda.bfunction =
@@ -574,50 +604,35 @@ let rec comp_expr (exp : Lambda.lambda) : Blambda.blambda =
     | Pfloatfield (n, _, _) | Pufloatfield (n, _) ->
       pseudo_event (unary (Getfloatfield n))
     | Psetfloatfield (n, _) | Psetufloatfield (n, _) -> binary (Setfloatfield n)
-    | Pmixedfield ([], _, _) -> assert false
-    | Pmixedfield ([n], _, _) ->
-      (* CR layouts: This will need reworking if we ever want bytecode
-         to unbox fields that are written with unboxed types in the source
-         language. *)
-      (* Note, non-value mixed fields are always boxed in bytecode; they
-         aren't stored flat like they are in native code.
-      *)
-      unary (Getfield n)
-    | Pmixedfield (hd :: tl, _, _) ->
-      (* `Pmixedfield ([idx0, idx1, ..., idxn], [block])` is compiled to
-         `Getfield (idxn, [... Getfield (idx1, [Getfield (idx0, [block])])])` *)
-      List.fold_left
-        (fun expr idx -> Blambda.Prim (Getfield idx, [expr]))
-        (unary (Getfield hd)) tl
-    | Psetmixedfield ([], _, _) -> assert false
-    | Psetmixedfield ([n], _, _) ->
-      (* See the comment in the [Pmixedfield] case. *)
-      binary (Setfield n)
-    | Psetmixedfield (path, _, _) -> (
-      (* `Psetmixedfield ([idx0, idx1, ..., idxn], [block; value])` is compiled
-         to
-         `Setfield (idxn, [... Getfield (idx1, [Getfield (idx0, [block])]);
-           value])`
-         given the match case above, we know the path should have at least two
-         elements. *)
-      match args with
-      | [] | [_] | _ :: _ :: _ :: _ -> wrong_arity ~expected:2
-      | [block; value] -> (
+    | Pmixedfield ([], _, _) | Psetmixedfield ([], _, _) -> assert false
+    | Pmixedfield (path, shape, _sem) ->
+      (* Non-value mixed fields are always boxed in bytecode; they aren't
+         stored flat like they are in native code. *)
+      let read_expr =
+        List.fold_left
+          (fun expr idx -> Prim (Getfield idx, [expr]))
+          (unary (Getfield (List.hd path)))
+          (List.tl path)
+      in
+      copy_unboxed_product shape ~path read_expr
+    | Psetmixedfield (path, shape, _init) ->
+      let block, value =
+        match args with
+        | [block; value] -> comp_expr block, comp_expr value
+        | _ -> wrong_arity ~expected:2
+      in
+      let value_expr = copy_unboxed_product shape ~path value in
+      let parent_path, last_idx =
         match List.rev path with
-        | [] -> Misc.fatal_error "comp_expr: path must be non-empty"
-        | last :: rest -> (
-          match List.rev rest with
-          | [] ->
-            Misc.fatal_error
-              "comp_expr: path is expected to have at least two elements"
-          | hd :: tl ->
-            let block =
-              List.fold_left
-                (fun expr idx -> Blambda.Prim (Getfield idx, [expr]))
-                (Blambda.Prim (Getfield hd, [comp_expr block]))
-                tl
-            in
-            Blambda.Prim (Setfield last, [block; comp_expr value]))))
+        | last :: rest -> List.rev rest, last
+        | [] -> assert false
+      in
+      let target_block =
+        List.fold_left
+          (fun expr idx -> Prim (Getfield idx, [expr]))
+          block parent_path
+      in
+      Prim (Setfield last_idx, [target_block; value_expr])
     | Pduprecord _ -> unary (Ccall "caml_obj_dup")
     | Pccall p -> n_ary (Ccall p.prim_name) ~arity:p.prim_arity
     | Pperform -> context_switch Perform ~arity:1

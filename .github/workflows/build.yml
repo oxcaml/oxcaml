@@ -169,8 +169,15 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             cc: clang
 
+          # CR sspies: The DWARF tests unconditionally pass -function-sections
+          # in their dune rules, which requires --enable-function-sections at
+          # configure time. The tests should be made parametric over function
+          # sections so they can run with or without it.
+          # CR sspies: We should enable --enable-oxcaml-dwarf-on-compiler in
+          # at least one CI build to test that the compiler itself can be built
+          # with DWARF enabled under function sections.
           - name: runtime5 dwarf-tests (x86_64-linux)
-            config: --enable-runtime5
+            config: --enable-runtime5 --enable-function-sections
             os: warp-ubuntu-latest-x64-8x
             dwarf_tests_only: true
             oxcaml_llvm_tag: oxcaml-lldb-16.0.6-minus1
@@ -433,9 +440,16 @@ jobs:
         if: matrix.check_arch == true
         run: make check_all_arches
 
-      - name: Build debug target
+      - name: Build and test ocamldebug
         if: matrix.build_debug == true
-        run: make debug
+        run: |
+          if [[ -n "${{matrix.install_path}}" ]]; then
+            install_path="${{matrix.install_path}}"
+          else
+            install_path="_install"
+          fi
+          make debug || exit 1
+          $install_path/bin/ocamldebug $install_path/bin/ocamlc <<< ""
 
       - name: Run register allocation on artifacts
         if: matrix.run_regalloc_tool == true

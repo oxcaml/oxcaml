@@ -11,6 +11,7 @@ let operation ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf res =
   | Move -> regs ppf arg
   | Spill -> fprintf ppf "%a (spill)" regs arg
   | Reload -> fprintf ppf "%a (reload)" regs arg
+  | Dummy_use -> fprintf ppf "dummy use %a" regs arg
   | Const_int n -> fprintf ppf "%s" (Nativeint.to_string n)
   | Const_float32 f -> fprintf ppf "%Fs" (Int32.float_of_bits f)
   | Const_float f -> fprintf ppf "%F" (Int64.float_of_bits f)
