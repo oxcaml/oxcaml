@@ -29,6 +29,12 @@ val reset : unit -> unit
 
 val reset_debug_info : unit -> unit
 
+type debug_info_snapshot
+
+val save_debug_info : unit -> debug_info_snapshot
+
+val restore_debug_info : debug_info_snapshot -> unit
+
 val emit_debug_info_gen :
   ?discriminator:int ->
   Debuginfo.t ->
@@ -51,6 +57,12 @@ val record_frame_descr :
   frame_debuginfo ->
   (* Location, if any *)
   unit
+
+type frame_descr_snapshot
+
+val save_frame_descriptors : unit -> frame_descr_snapshot
+
+val restore_frame_descriptors : frame_descr_snapshot -> unit
 
 type emit_frame_actions =
   { efa_code_label : Label.t -> unit;

@@ -189,6 +189,9 @@ let get_addend (kind : Kind.t) : int =
    depend on the helpers. These are pure bit-manipulation functions with no
    state dependencies. *)
 
+(* CR mshinwell: we need to make sure everything (except the _NC relocs) has
+   bounds checks *)
+
 let int64_of_int32_unsigned (x : int32) : int64 =
   Int64.logand (Int64.of_int32 x) 0xFFFFFFFFL
 
@@ -234,6 +237,10 @@ let patch_ldr_imm12 (insn : int32) (offset12 : int64) ~(scale : int) : int64 =
   let insn = logand insn (lognot 0x003ffc00l) in
   let insn = logor insn (shift_left (of_int combined_scaled) 10) in
   int64_of_int32_unsigned insn
+
+(* CR mshinwell: see the comment on the max_displacement function in ast.ml. I'm
+   a bit concerned we may end up with overflow when calculating relocs for B and
+   BL, and instead will need to create and insert trampolines. *)
 
 let patch_branch26 (insn : int32) (offset : int64) : int64 =
   let imm26 = Int64.to_int offset / 4 in
