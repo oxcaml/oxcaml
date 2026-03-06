@@ -1167,9 +1167,13 @@ let pseudoregs_for_instr (simd : Simd.instr) arg_regs res_regs =
     simd.args;
   (match simd.res with
   | Res_none -> ()
-  | First_arg ->
-    assert (not (Reg.is_preassigned arg_regs.(0)));
-    arg_regs.(0) <- res_regs.(0)
+  | Arg rr ->
+    Array.iteri
+      (fun r a ->
+        let a = Simd.unarized_reg_index simd.args a in
+        assert (not (Reg.is_preassigned arg_regs.(a)));
+        arg_regs.(a) <- res_regs.(r))
+      rr
   | Res rr ->
     Array.iteri (fun i ({ loc; _ } : Simd.arg) -> maybe_pin res_regs i loc) rr);
   arg_regs, res_regs

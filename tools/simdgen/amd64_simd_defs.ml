@@ -80,7 +80,7 @@ type arg =
 
 type res =
   | Res_none (* No result *)
-  | First_arg (* Result is returned in the first argument operand. *)
+  | Arg of int array (* Results are modified argument operand(s). *)
   | Res of arg array (* Separate operand(s) for result. *)
 
 type legacy_prefix =
@@ -186,6 +186,12 @@ let temp_is_reg = function
   | R8 | R16 | R32 | R64 | MM | XMM | YMM -> true
   | M8 | M16 | M32 | M64 | M128 | M256 | VM32X | VM32Y | VM64X | VM64Y -> false
 
+let temp_is_vm = function
+  | VM32X | VM32Y | VM64X | VM64Y -> true
+  | R8 | R16 | R32 | R64 | MM | XMM | YMM | M8 | M16 | M32 | M64 | M128 | M256
+    ->
+    false
+
 let loc_allows_reg = function
   | Pin _ -> true
   | Temp temps -> Array.exists temp_is_reg temps
@@ -195,6 +201,17 @@ let loc_allows_mem = function
   | Temp temps -> Array.exists (fun temp -> not (temp_is_reg temp)) temps
 
 let loc_is_pinned = function Pin reg -> Some reg | Temp _ -> None
+
+let loc_reg_count = function
+  | Temp ts when Array.exists temp_is_vm ts -> 2
+  | Temp _ | Pin _ -> 1
+
+let unarized_reg_index args i =
+  let idx = ref 0 in
+  for i = 0 to i - 1 do
+    idx := !idx + loc_reg_count args.(i).loc
+  done;
+  !idx
 
 let arg_is_implicit ({ enc; _ } : arg) =
   match enc with Implicit -> true | Immediate | RM_r | RM_rm | Vex_v -> false
