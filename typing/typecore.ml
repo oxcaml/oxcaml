@@ -5877,7 +5877,7 @@ and type_expect_
                 exp, mode
               end ~post:(fun (exp, _) -> generalize_structure_exp exp)
             in
-            Some (exp, mode)
+            Some (exp, Mode.Value.disallow_right mode)
       in
       let ty_record, expected_type =
         let extract_record loc ty other_form_error not_a_record_error =
@@ -6042,6 +6042,7 @@ and type_expect_
                 apply_is_contained_by is_contained_by
                   ~modalities:lbl.lbl_modalities mode
               in
+              let mode = cross_left env lbl.lbl_arg mode in
               check_construct_mutability ~loc:record_loc ~env lbl.lbl_mut
                 ~ty:lbl.lbl_arg ~modalities:lbl.lbl_modalities record_mode;
               let is_contained_by : Mode.Hint.is_contained_by =
