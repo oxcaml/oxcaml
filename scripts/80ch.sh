@@ -62,9 +62,11 @@ do
     # Don't check external directory.
     # Don't check generated simd instruction defs.
     # Don't check debug_printers, which needs to have single-line let-bindings.
+    # Don't check Merlin, which uses separate formatting rules.
     testsuite/tests/* | \
     oxcaml/tests/* | \
     external/* | \
+    merlin/* | \
     middle_end/flambda2/parser/flambda_parser.ml | \
     middle_end/flambda2/parser/flambda_lex.ml | \
     tools/simdgen/amd64_simd_instrs.ml | \
