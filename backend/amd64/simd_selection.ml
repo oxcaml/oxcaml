@@ -1173,10 +1173,12 @@ let pseudoregs_for_instr (simd : Simd.instr) arg_regs res_regs =
       (fun r a ->
         let a = Simd.unarized_reg_index simd.args a in
         assert (not (Reg.is_preassigned arg_regs.(a)));
-        (* We do not require binding additional args as results *)
-        if r < Array.length !res_regs
-        then arg_regs.(a) <- !res_regs.(r)
-        else res_regs := Array.append !res_regs [| arg_regs.(a) |])
+        (* We don't require binding overwritten args as results *)
+        (if r = Array.length !res_regs
+         then
+           let fresh = Reg.create arg_regs.(a).Reg.typ in
+           res_regs := Array.append !res_regs [| fresh |]);
+        arg_regs.(a) <- !res_regs.(r))
       rr;
     arg_regs, !res_regs
   | Res rr ->
