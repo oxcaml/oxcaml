@@ -574,7 +574,7 @@ module type Wrapped = sig
     { val_type: type_expr wrapped;                (* Type of the value *)
       val_modalities : Mode.Modality.t;     (* Modalities on the value *)
       val_kind: value_kind;
-      val_lpoly: Jkind_types.Sort.univar list;
+      val_lpoly: Jkind_types.Sort.var list;
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;
@@ -941,6 +941,7 @@ let rec mixed_block_element_of_const_sort (sort : Jkind_types.Sort.Const.t) =
     Product (Array.map mixed_block_element_of_const_sort (Array.of_list sorts))
   | Base Void -> Void
   | Univar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Univar"
+  | Genvar _ -> Misc.fatal_error "mixed_block_element_of_const_sort: Genvar"
 
 let find_unboxed_type decl =
   match decl.type_kind with

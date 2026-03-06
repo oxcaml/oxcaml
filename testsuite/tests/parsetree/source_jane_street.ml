@@ -1754,5 +1754,5 @@ module type S = sig
   val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b
 end
 [%%expect{|
-module type S = sig val f : layout_ x y. ('a : x) ('b : y). 'a -> 'b end
+module type S = sig val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b end
 |}]

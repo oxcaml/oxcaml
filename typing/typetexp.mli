@@ -131,7 +131,7 @@ val transl_simple_type_delayed
            function that binds the type variable. *)
 val transl_type_scheme:
         Env.t -> Parsetree.core_type ->
-        Jkind_types.Sort.univar list * Typedtree.core_type
+        Jkind_types.Sort.var list * Typedtree.core_type
 val transl_type_param:
   Env.t -> Path.t -> jkind_lr -> Parsetree.core_type -> Typedtree.core_type
 (* the Path.t above is of the type/class whose param we are processing;
