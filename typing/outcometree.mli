@@ -105,6 +105,7 @@ type out_jkind_const =
   | Ojkind_const_with of out_jkind_const * out_type * out_modality list
   | Ojkind_const_kind_of of out_type
   | Ojkind_const_product of out_jkind_const list
+  | Ojkind_const_quote of out_jkind_const
 
 and out_jkind =
   | Ojkind_const of out_jkind_const

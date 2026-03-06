@@ -273,15 +273,22 @@ let none = newty (Ttuple [])                (* Clearly ill-formed type *)
 
 (**** Control variable stage in inference *)
 
+let splice_exn jkind =
+  begin match Jkind.splice jkind with
+  | Some jkind -> jkind
+  | None -> fatal_error "Non-quote-kinded splice type"
+  end
+
+
 let rec update_variable_stage stage_offset ty name jkind =
   if stage_offset = 0 then ()
   else if stage_offset < 0 then begin
-    let v = newvar2 ?name (get_level ty) jkind in
+    let v = newvar2 ?name (get_level ty) (splice_exn jkind) in
     let ty' = newty2 ~level:(get_level ty) (Tquote v) in
     link_type ty ty';
     update_variable_stage (stage_offset + 1) v name jkind
   end else begin
-    let v = newvar2 ?name (get_level ty) jkind in
+    let v = newvar2 ?name (get_level ty) (Jkind.quote jkind) in
     let ty' = newty2 ~level:(get_level ty) (Tsplice v) in
     link_type ty ty';
     update_variable_stage (stage_offset - 1) v name jkind
@@ -2661,9 +2668,14 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
     end
   | Tobject _ -> Jkind.for_object
   | Tfield _ -> Jkind.Builtin.value ~why:Tfield
-  | Tquote _ -> Jkind.Builtin.value ~why:Tquote
-  | Tsplice _ -> Jkind.Builtin.value ~why:Tsplice
-  | Tquote_eval _ -> Jkind.Builtin.value ~why:Tquote_eval
+  | Tquote ty ->
+    estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty
+    |> Jkind.quote
+  | Tsplice ty ->
+    estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty
+    |> splice_exn
+  | Tquote_eval ty ->
+    estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty
   | Tnil -> Jkind.Builtin.value ~why:Tnil
   | Tlink _ | Tsubst _ -> assert false
   | Tvariant row ->

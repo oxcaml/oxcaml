@@ -28,47 +28,55 @@ end = struct
   type 'a t  = int -> int
   type 'a t' = int -> int
 end
-(* CR quoted-kinds jbachurski: Annotate these with quoted kinds *)
 module Inst1 : sig
-  type t
-  type t'
+  type t  : <[value]>
+  type t' : <[value]>
 end = struct
   type t  = <[int -> int]>
   type t' = <[int -> int]>
 end
 module NonInst1 : sig
-  type 'a t
-  type 'a t'
+  type 'a t  : <[value]>
+  type 'a t' : <[value]>
 end = struct
   type 'a t  = <[int -> int]>
   type 'a t' = <[int -> int]>
 end
 module Inst2 : sig
-  type t
+  type t : <[<[value]>]>
 end = struct
-  type t = <[int -> int]>
+  type t = <[<[int -> int]>]>
 end
 module NonInst2 : sig
-  type 'a t
+  type 'a t : <[<[value]>]>
 end = struct
-  type 'a t = <[int -> int]>
+  type 'a t = <[<[int -> int]>]>
 end
 (* We wrap some constructs in [A.t] so that they are checked
    in [mcomp], but not [unify]. *)
-(* CR quoted-kinds jbachurski: We might need extra versions of A
-   with 'a quoted-kinded. *)
-module A = struct
-  type _ t  = |
-  type _ t' = |
+module A0 = struct
+  type (_ : value) t  = |
+  type (_ : value) t' = |
+end
+module A1 = struct
+  type (_ : <[value]>) t  = |
+  type (_ : <[value]>) t' = |
+end
+module A2 = struct
+  type (_ : <[<[value]>]>) t  = |
+  type (_ : <[<[value]>]>) t' = |
 end
 [%%expect {|
 module Inst0 : sig type t type t' end
 module NonInst0 : sig type 'a t type 'a t' end
-module Inst1 : sig type t type t' end
-module NonInst1 : sig type 'a t type 'a t' end
-module Inst2 : sig type t end
-module NonInst2 : sig type 'a t end
-module A : sig type _ t = | type _ t' = | end
+module Inst1 : sig type t : <[value]> type t' : <[value]> end
+module NonInst1 : sig type 'a t : <[value]> type 'a t' : <[value]> end
+module Inst2 : sig type t : <[<[value]>]> end
+module NonInst2 : sig type 'a t : <[<[value]>]> end
+module A0 : sig type _ t = | type _ t' = | end
+module A1 : sig type (_ : <[value]>) t = | type (_ : <[value]>) t' = | end
+module A2 :
+  sig type (_ : <[<[value]>]>) t = | type (_ : <[<[value]>]>) t' = | end
 |}]
 #mark_toplevel_in_quotations
 
@@ -197,84 +205,89 @@ let _ = <[ fun (Equal : (<[int NonInst0.t]>, $(int NonInst2.t)) Type.eq) -> () ]
     (<[(int) NonInst0.t]>, _) Stdlib.Type.eq) -> ()
 ]>
 |}]
-let _ = <[ fun (Equal : ($(int NonInst1.t) A.t, $(int NonInst1.t') A.t') Type.eq) -> () ]>
+let _ = <[ fun (Equal : ($(int NonInst1.t) A0.t,
+                         $(int NonInst1.t') A0.t') Type.eq) -> () ]>
 [%%expect{|
-- : <[($(int NonInst1.t) A.t, $(int NonInst1.t') A.t') Type.eq -> unit]> expr
+- : <[($(int NonInst1.t) A0.t, $(int NonInst1.t') A0.t') Type.eq -> unit]>
+    expr
 =
 <[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (_ A.t, _ A.t')
+  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (_ A0.t, _ A0.t')
     Stdlib.Type.eq) -> ()
 ]>
 |}]
-let _ = <[ fun (Equal : (<[int NonInst0.t]> A.t, <[int NonInst0.t']> A.t') Type.eq) -> () ]>
+let _ = <[ fun (Equal : (<[int NonInst0.t ]> A1.t,
+                         <[int NonInst0.t']> A1.t') Type.eq) -> () ]>
 [%%expect{|
-- : <[(<[int NonInst0.t]> A.t, <[int NonInst0.t']> A.t') Type.eq -> unit]>
+- : <[(<[int NonInst0.t]> A1.t, <[int NonInst0.t']> A1.t') Type.eq -> unit]>
     expr
 =
 <[
   fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    (<[(int) NonInst0.t]> A.t, <[(int) NonInst0.t']> A.t') Stdlib.Type.eq) ->
-    ()
+    (<[(int) NonInst0.t]> A1.t, <[(int) NonInst0.t']> A1.t') Stdlib.Type.eq)
+    -> ()
 ]>
 |}]
 
 (* Rigid: just comparing types with quotes *)
 
-let _ = <[ fun (Equal : (<[int]> A.t, <[int]> A.t') Type.eq) -> () ]>
+let _ = <[ fun (Equal : (<[int]> A1.t, <[int]> A1.t') Type.eq) -> () ]>
 [%%expect{|
-- : <[(<[int]> A.t, <[int]> A.t') Type.eq -> unit]> expr =
+- : <[(<[int]> A1.t, <[int]> A1.t') Type.eq -> unit]> expr =
 <[
   fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    (<[int]> A.t, <[int]> A.t') Stdlib.Type.eq) -> ()
+    (<[int]> A1.t, <[int]> A1.t') Stdlib.Type.eq) -> ()
 ]>
 |}]
-let _ = <[ fun (Equal : (<[<[int]>]> A.t, <[<[int]>]> A.t') Type.eq) -> () ]>
+let _ = <[ fun (Equal : (<[<[int]>]> A2.t, <[<[int]>]> A2.t') Type.eq) -> () ]>
 [%%expect{|
-- : <[(<[<[int]>]> A.t, <[<[int]>]> A.t') Type.eq -> unit]> expr =
+- : <[(<[<[int]>]> A2.t, <[<[int]>]> A2.t') Type.eq -> unit]> expr =
 <[
   fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    (<[<[int]>]> A.t, <[<[int]>]> A.t') Stdlib.Type.eq) -> ()
+    (<[<[int]>]> A2.t, <[<[int]>]> A2.t') Stdlib.Type.eq) -> ()
 ]>
 |}]
 (* Sanity check that these error with non-aliasable types *)
-let _ = <[ fun (Equal : (int A.t, <[int]> A.t') Type.eq) -> () ]>
+let _ = <[ fun (Equal : (int A0.t, <[int]> A1.t') Type.eq) -> () ]>
 [%%expect{|
 Line 1, characters 16-21:
-1 | let _ = <[ fun (Equal : (int A.t, <[int]> A.t') Type.eq) -> () ]>
+1 | let _ = <[ fun (Equal : (int A0.t, <[int]> A1.t') Type.eq) -> () ]>
                     ^^^^^
-Error: This pattern matches values of type "(int A.t, int A.t) Type.eq"
+Error: This pattern matches values of type "(int A0.t, int A0.t) Type.eq"
        but a pattern was expected which matches values of type
-         "(int A.t, <[int]> A.t') Type.eq"
-       Type "int A.t" is not compatible with type "<[int]> A.t'"
+         "(int A0.t, <[int]> A1.t') Type.eq"
+       Type "int A0.t" is not compatible with type "<[int]> A1.t'"
 |}]
-let _ = <[ fun (Equal : (<[int]> A.t, int A.t') Type.eq) -> () ]>
+let _ = <[ fun (Equal : (<[int]> A1.t, int A0.t') Type.eq) -> () ]>
 [%%expect{|
 Line 1, characters 16-21:
-1 | let _ = <[ fun (Equal : (<[int]> A.t, int A.t') Type.eq) -> () ]>
-                    ^^^^^
-Error: This pattern matches values of type "(<[int]> A.t, <[int]> A.t) Type.eq"
-       but a pattern was expected which matches values of type
-         "(<[int]> A.t, int A.t') Type.eq"
-       Type "<[int]> A.t" is not compatible with type "int A.t'"
-|}]
-let _ = <[ fun (Equal : (<[<[int]>]> A.t, <[int]> A.t') Type.eq) -> () ]>
-[%%expect{|
-Line 1, characters 16-21:
-1 | let _ = <[ fun (Equal : (<[<[int]>]> A.t, <[int]> A.t') Type.eq) -> () ]>
+1 | let _ = <[ fun (Equal : (<[int]> A1.t, int A0.t') Type.eq) -> () ]>
                     ^^^^^
 Error: This pattern matches values of type
-         "(<[<[int]>]> A.t, <[<[int]>]> A.t) Type.eq"
+         "(<[int]> A1.t, <[int]> A1.t) Type.eq"
        but a pattern was expected which matches values of type
-         "(<[<[int]>]> A.t, <[int]> A.t') Type.eq"
-       Type "<[<[int]>]> A.t" is not compatible with type "<[int]> A.t'"
+         "(<[int]> A1.t, int A0.t') Type.eq"
+       Type "<[int]> A1.t" is not compatible with type "int A0.t'"
 |}]
-let _ = <[ fun (Equal : (<[int]> A.t, <[<[int]>]> A.t') Type.eq) -> () ]>
+let _ = <[ fun (Equal : (<[<[int]>]> A2.t, <[int]> A1.t') Type.eq) -> () ]>
 [%%expect{|
 Line 1, characters 16-21:
-1 | let _ = <[ fun (Equal : (<[int]> A.t, <[<[int]>]> A.t') Type.eq) -> () ]>
+1 | let _ = <[ fun (Equal : (<[<[int]>]> A2.t, <[int]> A1.t') Type.eq) -> () ]>
                     ^^^^^
-Error: This pattern matches values of type "(<[int]> A.t, <[int]> A.t) Type.eq"
+Error: This pattern matches values of type
+         "(<[<[int]>]> A2.t, <[<[int]>]> A2.t) Type.eq"
        but a pattern was expected which matches values of type
-         "(<[int]> A.t, <[<[int]>]> A.t') Type.eq"
-       Type "<[int]> A.t" is not compatible with type "<[<[int]>]> A.t'"
+         "(<[<[int]>]> A2.t, <[int]> A1.t') Type.eq"
+       Type "<[<[int]>]> A2.t" is not compatible with type "<[int]> A1.t'"
+|}]
+let _ = <[ fun (Equal : (<[int]> A1.t, <[<[int]>]> A2.t') Type.eq) -> () ]>
+[%%expect{|
+Line 1, characters 16-21:
+1 | let _ = <[ fun (Equal : (<[int]> A1.t, <[<[int]>]> A2.t') Type.eq) -> () ]>
+                    ^^^^^
+Error: This pattern matches values of type
+         "(<[int]> A1.t, <[int]> A1.t) Type.eq"
+       but a pattern was expected which matches values of type
+         "(<[int]> A1.t, <[<[int]>]> A2.t') Type.eq"
+       Type "<[int]> A1.t" is not compatible with type "<[<[int]>]> A2.t'"
 |}]

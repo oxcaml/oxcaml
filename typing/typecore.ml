@@ -7802,13 +7802,11 @@ and type_expect_
         raise (Typetexp.Error (loc, env,
                                Unsupported_extension Runtime_metaprogramming));
       submode ~loc ~env ~reason:Other Value.legacy expected_mode;
-      let jkind = Jkind.Builtin.value ~why:Quotation_result in
       let new_env = Env.enter_quotation env in
-      let ty = newgenvar jkind in
-      let quoted_ty = newgenty (Tquote ty) in
-      let to_unify = Predef.type_code quoted_ty in
+      let ty = newgenvar (Jkind.Builtin.any ~why:Quoted_expression) in
+      let expr_ty = Predef.type_code (newgenty (Tquote ty)) in
       with_explanation (fun () ->
-        unify_exp_types loc env to_unify (generic_instance ty_expected));
+        unify_exp_types loc env expr_ty (generic_instance ty_expected));
       let arg = type_expect new_env mode_legacy exp (mk_expected ty) in
       re {
         exp_desc = Texp_quotation arg;

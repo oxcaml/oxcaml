@@ -709,6 +709,7 @@ module Layout = struct
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
     | Any of Scannable_axes.t
+    | Quote of 'sort t
 
   module Const = struct
     type t =
@@ -716,6 +717,7 @@ module Layout = struct
       | Base of Sort.base * Scannable_axes.t
       | Product of t list
       | Univar of Sort.univar
+      | Quote of t
 
     let max = Any Scannable_axes.max
 
@@ -726,7 +728,8 @@ module Layout = struct
       | Any sa1, Any sa2 -> Scannable_axes.equal sa1 sa2
       | Product cs1, Product cs2 -> List.equal equal cs1 cs2
       | Univar uv1, Univar uv2 -> Sort.equal_univar_univar uv1 uv2
-      | (Base _ | Any _ | Product _ | Univar _), _ -> false
+      | Quote c1, Quote c2 -> equal c1 c2
+      | (Base _ | Any _ | Product _ | Univar _ | Quote _), _ -> false
 
     let rec get_sort : t -> Sort.Const.t option = function
       | Any _ -> None
@@ -736,6 +739,7 @@ module Layout = struct
           (fun x -> Sort.Const.Product x)
           (Misc.Stdlib.List.map_option get_sort ts)
       | Univar uv -> Some (Sort.Const.Univar uv)
+      | Quote _ -> None
 
     module Static = struct
       let value_non_pointer =
@@ -821,6 +825,7 @@ module Layout = struct
     | Base (b, sa) -> Sort (Sort.of_base b, sa)
     | Product cs -> Product (List.map of_const cs)
     | Univar uv -> Sort (Sort.Univar uv, Scannable_axes.max)
+    | Quote c -> Quote (of_const c)
 
   let product = function
     | [] -> Misc.fatal_error "Layout.product: empty product"
@@ -834,6 +839,7 @@ module Layout = struct
       Option.map
         (fun x -> Const.Product x)
         (Misc.Stdlib.List.map_option (get_const of_sort) layouts)
+    | Quote l -> Option.map (fun c -> Const.Quote c) (get_const of_sort l)
 
   let get_flat_const t = get_const Const.of_flat_sort t
 

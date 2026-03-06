@@ -2059,6 +2059,7 @@ module Const = struct
         List.fold_left
           (fun m l -> Language_extension.Maturity.max m (scan_layout l))
           Language_extension.Stable layouts
+      | Quote l, _ -> scan_layout l
       | Base (Void, _), _ -> Stable
     in
     match jkind.base with
@@ -2598,6 +2599,10 @@ let decompose_product env jk =
          introduce product histories. *)
       Some (List.map mk_jkind layouts)
     | Sort (s, _) -> deal_with_sort (Sort.get s))
+
+let quote jk = jk
+
+let splice jk = Some jk
 
 (*********************************)
 (* pretty printing *)

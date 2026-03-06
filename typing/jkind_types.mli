@@ -128,6 +128,7 @@ module Layout : sig
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
     | Any of Scannable_axes.t
+    | Quote of 'sort t
 
   module Const : sig
     type t =
@@ -135,6 +136,7 @@ module Layout : sig
       | Base of Sort.base * Scannable_axes.t
       | Product of t list
       | Univar of Sort.univar
+      | Quote of t
 
     module Static : sig
       val of_base : Sort.base -> Scannable_axes.t -> t

@@ -448,18 +448,16 @@ Uncaught exception: Stack overflow
 
 (* Test that quote-kinded (and quote-kind-parameterised) type constructors
    do not beta-reduce under quote-eval. *)
-(* CR quoted-kinds jbachurski: For now, these tests indicate incompleteness lurking
-   in the system that will be fixed by quoted kinds. *)
+(* CR quoted-kinds jbachurski: For now, these tests indicate incompleteness
+   lurking in the system that will be fixed by quoted kinds. *)
 
-(* CR quoted-kinds jbachurski: Annotate [t : <[value]>]. *)
 module QuoteKinded : sig
-  type t
+  type t : <[value]>
 end = struct
   type t = <[int]>
 end
-(* CR quoted-kinds jbachurski: Annotate ['a : <[value]>]. *)
 module QuoteKindedParam : sig
-  type 'a t
+  type ('a : <[value]>) t
 end = struct
   type 'a t = 'a expr
 end

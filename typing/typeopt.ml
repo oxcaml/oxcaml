@@ -434,6 +434,7 @@ let value_kind_of_value_jkind env jkind =
   | Some ( Any _
          | Product _
          | Univar _
+         | Quote _
          | Base ( ( Void | Untagged_immediate | Float64 | Float32 | Word
                   | Bits8 | Bits16 | Bits32 | Bits64 | Vec128 | Vec256
                   | Vec512 ),

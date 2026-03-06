@@ -14,7 +14,7 @@ end : sig
   val eval : 'a expr -> 'a eval
 end)
 [%%expect {|
-val eval : 'a expr -> 'a eval = <fun>
+val eval : ('a : <[value]>). 'a expr -> 'a eval = <fun>
 |}]
 
 (* The [eval] argument is annotated at introduction, and its result is typed *)

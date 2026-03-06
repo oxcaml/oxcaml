@@ -2592,6 +2592,7 @@ let check_unboxed_recursion ~abs_env env loc path0 ty0 to_check =
       | Any _ -> true
       | Base _ -> false
       | Product l -> List.exists has_any l
+      | Quote c -> has_any c
       | Univar _ -> Misc.fatal_error "Unboxed_recursion: univar"
     in
     if has_any layout then tyl else []

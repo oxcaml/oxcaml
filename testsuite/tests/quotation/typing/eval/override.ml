@@ -15,8 +15,8 @@ val f : <[int]> eval -> int = <fun>
 
 (* Define another type named [eval] *)
 let f_predef (x : 'a eval) = x
-type 'a predef_eval = 'a eval
-type 'a eval
+type ('a : <[any]>) predef_eval = 'a eval
+type ('a : <[any]>) eval
 let f_override (x : 'a eval) = x
 [%%expect {|
 val f_predef : 'a eval -> 'a eval = <fun>

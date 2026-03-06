@@ -101,6 +101,7 @@ module Layout : sig
     | Sort of 'sort * Scannable_axes.t
     | Product of 'sort t list
     | Any of Scannable_axes.t
+    | Quote of 'sort t
 
   module Const : sig
     type t = Jkind_types.Layout.Const.t
