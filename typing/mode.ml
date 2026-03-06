@@ -2088,12 +2088,12 @@ module Report = struct
         match Location.is_none loc, definite with
         | true, _ -> print_desc ~definite:false ~capitalize ppf
         | false, true ->
-          Fmt.fprintf ppf "%t at %a"
+          Fmt.fprintf ppf "%t at@;<1 2>%a"
             (print_desc ~definite ~capitalize)
             (Location.Doc.loc ~capitalize_first:false)
             loc
         | false, false ->
-          Fmt.fprintf ppf "%t (at %a)"
+          Fmt.fprintf ppf "%t at@;<1 2>%a"
             (print_desc ~definite ~capitalize)
             (Location.Doc.loc ~capitalize_first:false)
             loc)
@@ -2121,7 +2121,7 @@ module Report = struct
 
   let print_region : capitalize:_ -> region -> _ =
    fun ~capitalize (loc, desc) ->
-    Fmt.dprintf "%t at %a"
+    Fmt.dprintf "%t at@;<1 2>%a"
       (print_region_desc desc ~definite:true ~capitalize)
       (Location.Doc.loc ~capitalize_first:false)
       loc
@@ -2192,23 +2192,31 @@ module Report = struct
    fun { txt; loc } ->
     match txt with
     | Unknown ->
-      Fmt.dprintf "is allocated at %a containing data"
+      Fmt.dprintf "is allocated at@;<1 2>%a@ containing data"
         (Location.Doc.loc ~capitalize_first:false)
         loc
+    (* Allocation_l appears when the hint chain traces backwards through an
+       allocation (via left_adjoint of Allocation_r). This requires extracting
+       a component from the allocated value. For Optional_argument and
+       Function_coercion, the allocated values (Some wrappers and closures)
+       are opaque to users, so this path is not known to be reachable.
+       For Float_projection, the contents are unboxed floats which cross
+       all modes, so the submode check on the contents never fails. *)
     | Optional_argument ->
       Fmt.dprintf
-        "is an optional argument wrapper (and thus allocated) of the value at \
-         %a"
+        "is an optional argument wrapper (and thus allocated) of the value at@;\
+         <1 2>%a"
         (Location.Doc.loc ~capitalize_first:false)
         loc
     | Function_coercion ->
       Fmt.dprintf
-        "is a partial application of the function at %a on omittable parameters"
+        "is a partial application of the function at@;\
+         <1 2>%a@ on omittable parameters"
         (Location.Doc.loc ~capitalize_first:false)
         loc
     | Float_projection ->
       Fmt.dprintf
-        "is projected (at %a) from a float record (and thus allocated)"
+        "is projected at@;<1 2>%a@ from a float record (and thus allocated)"
         (Location.Doc.loc ~capitalize_first:false)
         loc
 
@@ -2216,6 +2224,10 @@ module Report = struct
    fun { txt; _ } ->
     match txt with
     | Unknown -> Fmt.dprintf "is an allocation"
+    (* The Optional_argument hint is attached by register_allocation in
+       type_option_some, but in practice the hint chain is lost during mode
+       constraint solving: the error appears without the allocation hint.
+       See testsuite/tests/typing-modes/hint.ml for an attempt. *)
     | Optional_argument ->
       Fmt.dprintf
         "is to be put in an optional argument wrapper (and thus an allocation)"
@@ -2223,6 +2235,9 @@ module Report = struct
       Fmt.dprintf
         "is to omit some parameters by partial application (and thus an \
          allocation)"
+    (* Float_projection: the contents of the boxing are unboxed floats which
+       cross all modes, so the submode check on the contents never fails and
+       this hint never appears in an error. *)
     | Float_projection ->
       Fmt.dprintf "is a float-record projection (and thus an allocation)"
 
@@ -2279,25 +2294,27 @@ module Report = struct
     let pr =
       match containing with
       | Tuple ->
-        Fmt.dprintf "is an element of the tuple at %a"
+        Fmt.dprintf "is an element of the tuple at@;<1 2>%a"
           (Location.Doc.loc ~capitalize_first:false)
           container
       | Record (s, moda) ->
-        Fmt.dprintf "is the field %a%a of the record at %a"
+        Fmt.dprintf "is the field %a%a of the record at@;<1 2>%a"
           Misc.Style.inline_code s maybe_modality moda
           (Location.Doc.loc ~capitalize_first:false)
           container
       | Array moda ->
-        Fmt.dprintf "is an element%a of the array at %a" maybe_modality moda
+        Fmt.dprintf "is an element%a of the array at@;<1 2>%a" maybe_modality
+          moda
           (Location.Doc.loc ~capitalize_first:false)
           container
       | Constructor (s, moda) ->
-        Fmt.dprintf "is contained (via constructor %a)%a in the value at %a"
+        Fmt.dprintf
+          "is contained (via constructor %a)%a in the value at@;<1 2>%a"
           Misc.Style.inline_code s maybe_modality moda
           (Location.Doc.loc ~capitalize_first:false)
           container
       | Structure (x, moda) ->
-        Fmt.dprintf "is %t%a in the structure at %a"
+        Fmt.dprintf "is %t%a in the structure at@;<1 2>%a"
           (print_structure_item ~capitalize:false x)
           maybe_modality moda
           (Location.Doc.loc ~capitalize_first:false)
@@ -2429,9 +2446,10 @@ module Report = struct
         match print_morph ~fixpoint pp morph_hint with
         | None -> Some Mode
         | Some (t, pp) ->
-          Fmt.fprintf ppf "@ because it %t" t;
+          Fmt.fprintf ppf "@ @[<v 0>@[<v 0>because it %t@]" t;
           if is_known_pinpoint pp
           then ignore (print_ahint ~sub:true side pp src ppf ahint);
+          Fmt.fprintf ppf "@]";
           Some Mode_with_hint)
     | Const Unknown ->
       print_mode_with_side ~sub side obj ppf a;
@@ -2444,7 +2462,7 @@ module Report = struct
            inside a responsible morphism";
       None
     | Const c ->
-      Fmt.fprintf ppf "%a@ because %a"
+      Fmt.fprintf ppf "%a@ @[<v 0>because %a@]"
         (print_mode_with_side ~sub side obj)
         a (print_const pp) c;
       Some Mode_with_hint

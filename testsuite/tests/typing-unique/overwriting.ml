@@ -83,7 +83,8 @@ Line 2, characters 31-32:
                                    ^
 Error: This value is "local"
        but is expected to be "global"
-         because it is the field "x" of the record at line 2, characters 29-34
+         because it is the field "x" of the record at
+           line 2, characters 29-34
          which is expected to be "global".
 |}]
 
@@ -95,7 +96,8 @@ Line 2, characters 22-23:
                           ^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is the field "x" of the record at line 2, characters 20-25
+         because it is the field "x" of the record at
+           line 2, characters 20-25
          which is expected to be "global".
 |}]
 
@@ -107,7 +109,8 @@ Line 2, characters 31-32:
                                    ^
 Error: This value is "local"
        but is expected to be "global"
-         because it is the field "x" of the record at line 2, characters 29-34
+         because it is the field "x" of the record at
+           line 2, characters 29-34
          which is expected to be "global".
 |}]
 
@@ -119,7 +122,8 @@ Line 2, characters 22-23:
                           ^
 Error: This value is "local" to the parent region
        but is expected to be "global"
-         because it is the field "x" of the record at line 2, characters 20-25
+         because it is the field "x" of the record at
+           line 2, characters 20-25
          which is expected to be "global".
 |}]
 
@@ -359,7 +363,8 @@ Line 4, characters 39-47:
                                            ^^^^^^^^
 Error: This value is "once"
        but is expected to be "many"
-         because it is the field "b" of the record at line 4, characters 23-49
+         because it is the field "b" of the record at
+           line 4, characters 23-49
          which is expected to be "many".
 |}]
 
@@ -371,10 +376,12 @@ Line 3, characters 39-40:
 3 |     overwrite_ mr with { a = None; b = _ }
                                            ^
 Error: This value is "once"
-         because it is the field "b" of the record at line 3, characters 15-17
+         because it is the field "b" of the record at
+           line 3, characters 15-17
          which is "once".
        However, the highlighted expression is expected to be "many"
-         because it is the field "b" of the record at line 3, characters 23-42
+         because it is the field "b" of the record at
+           line 3, characters 23-42
          which is expected to be "many".
 |}]
 
@@ -387,10 +394,12 @@ Line 3, characters 15-17:
 3 |     overwrite_ mr with { a = None }
                    ^^
 Error: This value is "once"
-         because it is the field "b" of the record at line 3, characters 15-17
+         because it is the field "b" of the record at
+           line 3, characters 15-17
          which is "once".
        However, the highlighted expression is expected to be "many"
-         because it is the field "b" of the record at line 3, characters 23-35
+         because it is the field "b" of the record at
+           line 3, characters 23-35
          which is expected to be "many".
 |}]
 
@@ -417,7 +426,8 @@ Line 4, characters 39-54:
                                            ^^^^^^^^^^^^^^^
 Error: This value is "nonportable"
        but is expected to be "portable"
-         because it is the field "b" of the record at line 4, characters 23-56
+         because it is the field "b" of the record at
+           line 4, characters 23-56
          which is expected to be "portable".
 |}]
 
@@ -432,9 +442,11 @@ Line 5, characters 34-49:
                                       ^^^^^^^^^^^^^^^
 Error: This value is "nonportable"
        but is expected to be "portable"
-         because it is contained (via constructor "Some") in the value at line 5, characters 29-49
+         because it is contained (via constructor "Some") in the value at
+           line 5, characters 29-49
          which is expected to be "portable"
-         because it is the field "a" of the record at line 5, characters 23-69
+         because it is the field "a" of the record at
+           line 5, characters 23-69
          which is expected to be "portable".
 |}]
 
@@ -854,7 +866,8 @@ Line 2, characters 10-13:
 2 |   unique_ r.m
               ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with some modality) of the record at line 2, characters 10-11.
+         because it is the field "m" (with some modality) of the record at
+           line 2, characters 10-11.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -868,7 +881,8 @@ Line 4, characters 15-18:
 4 |     overwrite_ r.m with OptionA s
                    ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with some modality) of the record at line 4, characters 15-16.
+         because it is the field "m" (with some modality) of the record at
+           line 4, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -883,7 +897,8 @@ Line 5, characters 15-18:
 5 |     overwrite_ r.m with OptionA s
                    ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with some modality) of the record at line 5, characters 15-16.
+         because it is the field "m" (with some modality) of the record at
+           line 5, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -898,7 +913,8 @@ Line 5, characters 15-18:
 5 |     overwrite_ r.m with OptionA s
                    ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with some modality) of the record at line 5, characters 15-16.
+         because it is the field "m" (with some modality) of the record at
+           line 5, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -913,9 +929,11 @@ Line 5, characters 15-20:
 5 |     overwrite_ r.m.x with OptionA s
                    ^^^^^
 Error: This value is "aliased"
-         because it is the field "x" of the record at line 5, characters 15-18
+         because it is the field "x" of the record at
+           line 5, characters 15-18
          which is "aliased"
-         because it is the field "m" (with some modality) of the record at line 5, characters 15-16.
+         because it is the field "m" (with some modality) of the record at
+           line 5, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -929,7 +947,8 @@ Line 4, characters 35-38:
 4 |     (r.m <- OptionB s), overwrite_ r.m with OptionA s
                                        ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with some modality) of the record at line 4, characters 35-36.
+         because it is the field "m" (with some modality) of the record at
+           line 4, characters 35-36.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -943,9 +962,11 @@ Line 4, characters 43-48:
 4 |     (r.m <- { x = OptionB s }), overwrite_ r.m.x with OptionA s
                                                ^^^^^
 Error: This value is "aliased"
-         because it is the field "x" of the record at line 4, characters 43-46
+         because it is the field "x" of the record at
+           line 4, characters 43-46
          which is "aliased"
-         because it is the field "m" (with some modality) of the record at line 4, characters 43-44.
+         because it is the field "m" (with some modality) of the record at
+           line 4, characters 43-44.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -960,7 +981,8 @@ Line 5, characters 28-31:
 5 |             else overwrite_ r.m with OptionA s
                                 ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with some modality) of the record at line 5, characters 28-29.
+         because it is the field "m" (with some modality) of the record at
+           line 5, characters 28-29.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -975,9 +997,11 @@ Line 5, characters 20-25:
 5 |     else overwrite_ r.m.x with OptionA s
                         ^^^^^
 Error: This value is "aliased"
-         because it is the field "x" of the record at line 5, characters 20-23
+         because it is the field "x" of the record at
+           line 5, characters 20-23
          which is "aliased"
-         because it is the field "m" (with some modality) of the record at line 5, characters 20-21.
+         because it is the field "m" (with some modality) of the record at
+           line 5, characters 20-21.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -992,7 +1016,8 @@ Line 5, characters 15-18:
 5 |     overwrite_ r.m with OptionA s
                    ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with some modality) of the record at line 5, characters 15-16.
+         because it is the field "m" (with some modality) of the record at
+           line 5, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -1007,9 +1032,11 @@ Line 5, characters 15-20:
 5 |     overwrite_ r.m.x with OptionA s
                    ^^^^^
 Error: This value is "aliased"
-         because it is the field "x" of the record at line 5, characters 15-18
+         because it is the field "x" of the record at
+           line 5, characters 15-18
          which is "aliased"
-         because it is the field "m" (with some modality) of the record at line 5, characters 15-16.
+         because it is the field "m" (with some modality) of the record at
+           line 5, characters 15-16.
        However, the highlighted expression is expected to be "unique".
 |}]
 
@@ -1029,7 +1056,8 @@ Line 7, characters 17-20:
 7 |       overwrite_ r.m with OptionB s
                      ^^^
 Error: This value is "aliased"
-         because it is the field "m" (with some modality) of the record at line 7, characters 17-18.
+         because it is the field "m" (with some modality) of the record at
+           line 7, characters 17-18.
        However, the highlighted expression is expected to be "unique".
 |}]
 

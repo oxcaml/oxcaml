@@ -40,7 +40,8 @@ Lines 1-3, characters 30-3:
 2 |     let g = M.f
 3 | end
 Error: The module is "nonportable"
-         because it contains the value "g" defined as the expression at line 2, characters 8-9
+         because it contains the value "g" defined as the expression at
+           line 2, characters 8-9
          which is "nonportable".
        However, the module highlighted is expected to be "portable".
 |}]
@@ -197,7 +198,8 @@ Error: Modules do not match: sig val f : unit -> unit end @ nonportable
      is not included in
        val f : unit -> unit (* in a structure at portable *)
      The left-hand side is "nonportable"
-       because it contains a usage (of the value "r" at line 2, characters 40-41)
+       because it contains a usage (of the value "r" at
+         line 2, characters 40-41)
        which is expected to be "uncontended".
      However, the right-hand side is "portable".
 |}]
@@ -294,7 +296,8 @@ Error: Signature mismatch in included functor's parameter:
        is not included in
          val f : unit -> unit (* in a structure at portable *)
        The left-hand side is "nonportable"
-         because it contains a usage (of the value "r" at line 2, characters 40-41)
+         because it contains a usage (of the value "r" at
+           line 2, characters 40-41)
          which is expected to be "uncontended".
        However, the right-hand side is "portable".
 |}]
@@ -707,7 +710,8 @@ Line 2, characters 21-22:
                          ^
 Error: The value "x" is "stateful"
        but is expected to be "stateless"
-         because it is used inside the function at line 2, characters 2-28
+         because it is used inside the function at
+           line 2, characters 2-28
          which is expected to be "stateless".
 |}]
 
@@ -719,7 +723,8 @@ Line 2, characters 10-41:
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Error: Signature mismatch:
        Got "stateful"
-         because it closes over the module "M1" at line 2, characters 35-37
+         because it closes over the module "M1" at
+           line 2, characters 35-37
          which is "stateful".
        However, expected "stateless".
 |}]
@@ -967,10 +972,12 @@ Line 1, characters 55-56:
 1 | module F (M : S @ local) : S @ global = struct include M end
                                                            ^
 Error: The value "f" in the structure is "local"
-         because it is the value "f" in the structure at line 1, characters 55-56
+         because it is the value "f" in the structure at
+           line 1, characters 55-56
          which is "local".
        However, the value "f" in the structure highlighted is expected to be "global"
-         because it is the value "f" in the structure at line 1, characters 47-56
+         because it is the value "f" in the structure at
+           line 1, characters 47-56
          which is expected to be "global"
          because modules always need to be allocated on the heap.
 |}]
@@ -1008,7 +1015,8 @@ Error: Signature mismatch:
        is not included in
          val f : unit -> unit (* in a structure at portable *)
        The left-hand side is "nonportable"
-         because it is the value "f" in the structure at line 3, characters 40-44
+         because it is the value "f" in the structure at
+           line 3, characters 40-44
          which is "nonportable".
        However, the right-hand side is "portable".
 |}]

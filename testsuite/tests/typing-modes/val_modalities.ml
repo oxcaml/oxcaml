@@ -84,7 +84,8 @@ Line 2, characters 15-16:
                    ^
 Error: The expression is "local"
        but is expected to be "global"
-         because it is the value "x" in the structure at line 2, characters 4-26
+         because it is the value "x" in the structure at
+           line 2, characters 4-26
          which is expected to be "global"
          because modules always need to be allocated on the heap.
 |}]
@@ -98,7 +99,8 @@ Lines 1-3, characters 18-3:
 2 |     let (foo @ once) () = ()
 3 | end
 Error: The module is "once"
-         because it contains the value "foo" defined as the expression at line 2, characters 9-12
+         because it contains the value "foo" defined as the expression at
+           line 2, characters 9-12
          which is "once".
        However, the module highlighted is expected to be "many".
 |}]
@@ -175,7 +177,8 @@ Error: Signature mismatch:
        is not included in
          val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
        The left-hand side is "stateful"
-         because it contains a usage (of the value "y" at line 11, characters 29-30)
+         because it contains a usage (of the value "y" at
+           line 11, characters 29-30)
          which is expected to be "read_write".
        However, the right-hand side is "stateless".
 |}, Principal{|
@@ -199,7 +202,8 @@ Error: Signature mismatch:
        is not included in
          val x : 'a -> 'a @@ stateless (* in a structure at stateful *)
        The left-hand side is "stateful"
-         because it contains a usage (of the value "y" at line 11, characters 29-30)
+         because it contains a usage (of the value "y" at
+           line 11, characters 29-30)
          which is expected to be "read_write".
        However, the right-hand side is "stateless".
 |}]
@@ -451,7 +455,8 @@ Line 7, characters 20-23:
 7 |     uncontended_use M.r
                         ^^^
 Error: This value is "contended"
-         because it is used inside the function at lines 5-7, characters 23-23
+         because it is used inside the function at
+           lines 5-7, characters 23-23
          which is expected to be "portable".
        However, the highlighted expression is expected to be "uncontended".
 |}]
@@ -470,7 +475,8 @@ Line 6, characters 12-15:
                 ^^^
 Error: The value "M.x" is "nonportable"
        but is expected to be "portable"
-         because it is used inside the function at lines 5-7, characters 23-6
+         because it is used inside the function at
+           lines 5-7, characters 23-6
          which is expected to be "portable".
 |}]
 
@@ -1058,7 +1064,8 @@ Line 3, characters 12-13:
                 ^
 Error: The value "f" is "nonportable"
        but is expected to be "portable"
-         because it is used inside the function at lines 1-4, characters 21-6
+         because it is used inside the function at
+           lines 1-4, characters 21-6
          which is expected to be "portable".
 |}]
 
@@ -1084,7 +1091,8 @@ Line 4, characters 12-13:
                 ^
 Error: The value "f" is "nonportable"
        but is expected to be "portable"
-         because it is used inside the function at lines 3-5, characters 23-6
+         because it is used inside the function at
+           lines 3-5, characters 23-6
          which is expected to be "portable".
 |}]
 
@@ -1223,7 +1231,8 @@ Line 2, characters 18-19:
                       ^
 Error: The value "M.baz" is "nonportable"
        but is expected to be "portable"
-         because it is used inside the function at lines 1-3, characters 21-3
+         because it is used inside the function at
+           lines 1-3, characters 21-3
          which is expected to be "portable".
 |}]
 
@@ -1241,7 +1250,8 @@ Line 4, characters 12-13:
                 ^
 Error: The module "M" is "local"
        but is expected to be "global"
-         because it is used inside the function at lines 3-4, characters 21-22
+         because it is used inside the function at
+           lines 3-4, characters 21-22
          which is expected to be "global".
 |}]
 
@@ -1259,7 +1269,8 @@ Line 4, characters 12-13:
                 ^
 Error: The module "M" is "local"
        but is expected to be "global"
-         because it is used inside the function at lines 3-4, characters 21-22
+         because it is used inside the function at
+           lines 3-4, characters 21-22
          which is expected to be "global".
 |}]
 
@@ -1319,7 +1330,8 @@ Line 3, characters 18-34:
                       ^^^^^^^^^^^^^^^^
 Error: The module "M_Func_portable'" is "nonportable"
        but is expected to be "portable"
-         because it is used inside the function at lines 2-4, characters 21-3
+         because it is used inside the function at
+           lines 2-4, characters 21-3
          which is expected to be "portable".
 |}]
 
@@ -1337,7 +1349,8 @@ Line 4, characters 20-36:
                         ^^^^^^^^^^^^^^^^
 Error: The module "M_Func_portable'" is "local"
        but is expected to be "global"
-         because it is used inside the function at lines 3-5, characters 21-5
+         because it is used inside the function at
+           lines 3-5, characters 21-5
          which is expected to be "global".
 |}]
 
@@ -1351,7 +1364,8 @@ Line 2, characters 18-20:
                       ^^
 Error: The value "M'.M.baz" is "nonportable"
        but is expected to be "portable"
-         because it is used inside the function at lines 1-3, characters 21-3
+         because it is used inside the function at
+           lines 1-3, characters 21-3
          which is expected to be "portable".
 |}]
 
@@ -1379,7 +1393,8 @@ Line 4, characters 18-19:
                       ^
 Error: The module "F" is "nonportable"
        but is expected to be "portable"
-         because it is used inside the function at lines 3-5, characters 21-3
+         because it is used inside the function at
+           lines 3-5, characters 21-3
          which is expected to be "portable".
 |}]
 
@@ -1407,10 +1422,13 @@ Line 2, characters 18-19:
 2 |   let k = (module M : Class) in
                       ^
 Error: The class "M.cla" is "nonportable"
-         because it contains the class "cla" defined as the class at line 38, characters 2-24
-         which is "nonportable" because classes are always at the legacy modes.
+         because it contains the class "cla" defined as the class at
+           line 38, characters 2-24
+         which is "nonportable"
+         because classes are always at the legacy modes.
        However, the class "M.cla" highlighted is expected to be "portable"
-         because it is used inside the function at lines 1-3, characters 21-3
+         because it is used inside the function at
+           lines 1-3, characters 21-3
          which is expected to be "portable".
 |}]
 
@@ -1432,7 +1450,8 @@ Line 2, characters 25-26:
                              ^
 Error: The value "m" is "nonportable"
        but is expected to be "portable"
-         because it is used inside the function at lines 1-3, characters 21-6
+         because it is used inside the function at
+           lines 1-3, characters 21-6
          which is expected to be "portable".
 |}]
 
@@ -1554,8 +1573,10 @@ Lines 1-3, characters 22-3:
 2 |   class foo = object end
 3 | end
 Error: The module is "nonportable"
-         because it contains the class "foo" defined as the class at line 2, characters 2-24
-         which is "nonportable" because classes are always at the legacy modes.
+         because it contains the class "foo" defined as the class at
+           line 2, characters 2-24
+         which is "nonportable"
+         because classes are always at the legacy modes.
        However, the module highlighted is expected to be "portable".
 |}]
 
@@ -1573,8 +1594,10 @@ Error: Signature mismatch:
          sig class foo : object  end end @ portable
        Class declarations foo do not match:
        First is "nonportable"
-         because it contains the class "foo" defined as the class at line 1, characters 32-54
-         which is "nonportable" because classes are always at the legacy modes.
+         because it contains the class "foo" defined as the class at
+           line 1, characters 32-54
+         which is "nonportable"
+         because classes are always at the legacy modes.
        However, second is "portable".
 |}]
 
