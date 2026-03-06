@@ -288,7 +288,7 @@ module Type_shape = struct
                information about the type. *)
           | Ttuple exprs -> Shape.tuple (of_expr_list (List.map snd exprs))
           | Tvar { name = _; jkind } -> unknown_shape_from_jkind jkind
-          | Tpoly (type_expr, _type_vars) ->
+          | Tpoly (type_expr, _type_vars, _zero_alloc) ->
             (* CR sspies: At the moment, we simply ignore the polymorphic
                variables.
                This code used to only work for [_type_vars = []]. Consider
@@ -317,7 +317,7 @@ module Type_shape = struct
                 | Tobject (_, _)
                 | Tfield (_, _, _, _)
                 | Tvariant _ | Tunivar _
-                | Tpoly (_, _)
+                | Tpoly (_, _, _)
                 | Trepr (_, _)
                 | Tpackage (_, _)
                 | Tquote _ | Tsplice _ | Tof_kind _ ->

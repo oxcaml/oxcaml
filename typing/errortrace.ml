@@ -113,6 +113,7 @@ type ('a, 'variety) elt =
   | Unequal_var_jkinds :
       type_expr * jkind_lr * type_expr * jkind_lr -> ('a, _) elt
   | Unequal_tof_kind_jkinds : jkind_lr * jkind_lr -> ('a, _) elt
+  | Incompatible_zero_alloc : Zero_alloc.t * Zero_alloc.t -> ('a, 'varity) elt
 
 type ('a, 'variety) t = ('a, 'variety) elt list
 
@@ -130,6 +131,7 @@ let map_elt (type variety) f : ('a, variety) elt -> ('b, variety) elt = function
   | Bad_jkind_sort _ as x -> x
   | Unequal_var_jkinds _ as x -> x
   | Unequal_tof_kind_jkinds _ as x -> x
+  | Incompatible_zero_alloc (_, _) as x -> x
 
 let map f t = List.map (map_elt f) t
 

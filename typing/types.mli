@@ -182,7 +182,7 @@ and type_desc =
   (** Occurrence of a type variable introduced by a
       forall quantifier / [Tpoly]. *)
 
-  | Tpoly of type_expr * type_expr list
+  | Tpoly of type_expr * type_expr list * Zero_alloc.t
   (** [Tpoly (ty,tyl)] ==> ['a1... 'an. ty],
       where 'a1 ... 'an are names given to types in tyl
       and occurrences of those types in ty. *)

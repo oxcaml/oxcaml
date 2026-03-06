@@ -1006,7 +1006,7 @@ module Base_and_axes = struct
             ({ tuple_fuel; seen_constrs; seen_row_vars; fuel_status = _ } as t)
             ty =
           match Types.get_desc ty with
-          | Tpoly (ty, _) | Trepr (ty, _) -> check ~relevant_axes t ty
+          | Tpoly (ty, _, _) | Trepr (ty, _) -> check ~relevant_axes t ty
           | Ttuple _ ->
             if tuple_fuel > 0
             then

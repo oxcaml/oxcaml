@@ -389,6 +389,22 @@ let print_arg_label_and_out_type ppf (lbl : arg_label) ty ~print_type =
   | Position l -> fprintf ppf "%a:[%%call_pos]" print_lident l
   | Optional l -> fprintf ppf "?%a:%a" print_lident l print_type ty
 
+let pp_arg_zero_alloc ppf (zero_alloc : Zero_alloc.const) =
+  let print_check ppf ({strict; opt; arity; _} : Zero_alloc.check) =
+    if strict then fprintf ppf " strict";
+    if opt then fprintf ppf " opt";
+    fprintf ppf " arity %d" arity;
+  in
+  let print_assume ppf ({strict; arity; _} : Zero_alloc.assume) =
+    if strict then fprintf ppf " strict";
+    fprintf ppf " arity %d" arity;
+  in
+  match zero_alloc with
+  | Default_zero_alloc -> ()
+  | Ignore_assert_all -> fprintf ppf "@ [@zero_alloc ignore]"
+  | Check check -> fprintf ppf "@ [@zero_alloc%a]" print_check check
+  | Assume assume -> fprintf ppf "@ [@zero_alloc assume%a]" print_assume assume
+
 exception Cannot_cancel
 
 let rec cancel_quote_splice ty =
@@ -442,7 +458,7 @@ and print_out_type_mode ~arg mode ppf ty =
 
 and print_out_type_1 ppf =
   function
-  | Otyp_arrow (lab, am, ty1, ty2) ->
+  | Otyp_arrow (lab, _zero_alloc, am, ty1, ty2) ->
       pp_open_box ppf 0;
       print_arg_label_and_out_type ppf lab ty1 ~print_type:(print_out_arg am);
       pp_print_string ppf " ->";
@@ -507,12 +523,18 @@ and print_out_type_3 ppf =
          else if tags = None then "> " else "? ")
         print_fields row_fields
         print_present tags
-  | Otyp_alias _ | Otyp_poly _ | Otyp_repr _ | Otyp_arrow _ | Otyp_tuple _
-    as ty ->
+  | Otyp_alias _ | Otyp_poly _ | Otyp_repr _ | Otyp_tuple _ as ty ->
       pp_open_box ppf 1;
       pp_print_char ppf '(';
       print_out_type_0 ppf ty;
       pp_print_char ppf ')';
+      pp_close_box ppf ()
+  | Otyp_arrow (_, zero_alloc, _, _, _) as ty ->
+      pp_open_box ppf 1;
+      pp_print_char ppf '(';
+      print_out_type_0 ppf ty;
+      pp_print_char ppf ')';
+      pp_arg_zero_alloc ppf zero_alloc;
       pp_close_box ppf ()
   | Otyp_unboxed_tuple tyl ->
       pp_open_box ppf 1;

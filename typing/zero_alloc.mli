@@ -52,11 +52,17 @@ val undo_change : change -> unit
 
 (* These are the errors that may be raised by [sub_exn] below. *)
 type error
+val error_is_arity_mismatch : error -> bool
 val print_error : Format_doc.formatter -> error -> unit
 
 (* [sub t1 t2] checks whether the zero_alloc check t1 is stronger than the
    zero_alloc check t2. It returns [Ok ()] if so, and [Error e] if not.  If [t1]
    is a variable, it may be set to make the relation hold. *)
 val sub : t -> t -> (unit, error) Result.t
+
+(* [equal t1 t2] checks whether the zero_alloc checks t1 and t2 are the same.
+   It returns [Ok ()] if so, and [Error e] if not.  The values [t1] and [t2] are
+   expected to be either constants or the same variable. *)
+val equal : t -> t -> (unit, error) Result.t
 
 val debug_printer : Format.formatter -> t -> unit

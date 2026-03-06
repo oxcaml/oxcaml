@@ -267,7 +267,7 @@ let newobj fields      = newty (Tobject (fields, ref None))
 
 let newconstr path tyl = newty (Tconstr (path, tyl, ref Mnil))
 
-let newmono ty = newty (Tpoly(ty, []))
+let newmono ~zero_alloc ty = newty (Tpoly(ty, [], zero_alloc))
 
 let none = newty (Ttuple [])                (* Clearly ill-formed type *)
 
@@ -875,7 +875,7 @@ let rec generalize_spine ty =
       set_level ty generic_level;
       generalize_spine ty1;
       generalize_spine ty2;
-  | Tpoly (ty', _) ->
+  | Tpoly (ty', _, _) ->
       set_level ty generic_level;
       generalize_spine ty'
   | Ttuple tyl ->
@@ -1191,7 +1191,7 @@ let compute_univars ty =
   let node_univars = TypeHash.create 17 in
   let rec add_univar univ inv =
     match get_desc inv.inv_type with
-      Tpoly (_ty, tl) when List.memq (get_id univ) (List.map get_id tl) -> ()
+      Tpoly (_ty, tl, _) when List.memq (get_id univ) (List.map get_id tl) -> ()
     | _ ->
         try
           let univs = TypeHash.find node_univars inv.inv_type in
@@ -1730,7 +1730,7 @@ let instance_label ~fixed lbl =
   For_copy.with_scope (fun copy_scope ->
     let vars, ty_arg =
       match get_desc lbl.lbl_arg with
-        Tpoly (ty, tl) ->
+        Tpoly (ty, tl, _) ->
           instance_poly' copy_scope ~keep_names:false ~copy_var:None ~fixed
             tl ty
       | _ ->
@@ -2214,7 +2214,7 @@ let rec extract_concrete_typedecl env ty =
                 | May_have_typedecl -> May_have_typedecl
           end
       end
-  | Tpoly(ty, _) -> extract_concrete_typedecl env ty
+  | Tpoly(ty, _, _) -> extract_concrete_typedecl env ty
   | Trepr _ -> Has_no_typedecl
   | Tquote ty -> extract_concrete_typedecl env ty
   | Tsplice ty -> extract_concrete_typedecl env ty
@@ -2340,7 +2340,7 @@ let unbox_once env ty =
         end
       end
     end
-  | Tpoly (ty, univars) ->
+  | Tpoly (ty, univars, _) ->
     Stepped
       { ty = instance_poly_for_jkind univars ty
       ; modality = Mode.Modality.Const.id
@@ -2359,7 +2359,7 @@ let contained_without_boxing env ty =
     end
   | Tunboxed_tuple labeled_tys ->
     List.map snd labeled_tys
-  | Tpoly (ty, _) -> [ty]
+  | Tpoly (ty, _, _) -> [ty]
   | Trepr (_, _) ->  Misc.fatal_error "Ctype.contained_without_boxing: repr"
   | Tvar _ | Tarrow _ | Ttuple _ | Tobject _ | Tfield _ | Tnil | Tlink _
   | Tsubst _ | Tvariant _ | Tunivar _ | Tpackage _ | Tof_kind _
@@ -2490,7 +2490,7 @@ let rec estimate_type_jkind ~expand_component ~ignore_mod_bounds env ty =
   | Tvariant row ->
      Jkind.for_boxed_row row
   | Tunivar { jkind } -> Jkind.disallow_right jkind
-  | Tpoly (ty, univars) ->
+  | Tpoly (ty, univars, _) ->
     (* The jkind of [ty] might mention the variables bound in this [Tpoly]
        node, and so just returning it here would be wrong. Instead, we need
        to eliminate these variables. We do this by replacing them with
@@ -2623,7 +2623,7 @@ let constrain_type_jkind ~fixed env ty jkind =
 
     (* Handle the [Tpoly] case out here so [Tvar]s wrapped in [Tpoly]s can get
        the treatment above. *)
-    | Tpoly (t, _) ->
+    | Tpoly (t, _, _) ->
       (* [t] probably contains variables that will escapes their scope here. But
          comparing these variables in jkinds is fine, and they can't escape from
          this function (except harmlessly in error messages), so we don't do
@@ -2836,7 +2836,7 @@ let constrain_type_jkind_exn env texn ty jkind =
 *)
 let rec intersect_type_jkind ~reason ~level env ty1 jkind2 =
   match get_desc ty1 with
-  | Tpoly (ty, _) -> intersect_type_jkind ~reason ~level env ty jkind2
+  | Tpoly (ty, _, _) -> intersect_type_jkind ~reason ~level env ty jkind2
   | _ ->
     (* [intersect_type_jkind] is called rarely, so we don't bother with trying
        to avoid this call as in [constrain_type_jkind] *)
@@ -3150,7 +3150,7 @@ let occur_univar ?(inj_only=false) env ty =
         Tunivar _ ->
           if not (TypeSet.mem ty bound) then
             raise_escape_exn (Univ ty)
-      | Tpoly (ty, tyl) ->
+      | Tpoly (ty, tyl, _) ->
           let bound = List.fold_right TypeSet.add tyl bound in
           occur_rec bound  ty
       | Trepr (ty, _sort_vars) ->
@@ -3214,7 +3214,7 @@ let univars_escape env univar_pairs vl ty =
   let rec occur t =
     if try_mark_node mark t then begin
       match get_desc t with
-        Tpoly (t, tl) ->
+        Tpoly (t, tl, _) ->
           if List.exists (fun t -> TypeSet.mem t family) tl then ()
           else occur t
       | Tunivar _ -> if TypeSet.mem t family then raise_escape_exn (Univ t)
@@ -3244,9 +3244,9 @@ let enter_poly env univar_pairs t1 tl1 t2 tl2 f =
       TypeSet.empty old_univars
   in
   if List.exists (fun t -> TypeSet.mem t known_univars) tl1 then
-     univars_escape env old_univars tl1 (newty(Tpoly(t2,tl2)));
+     univars_escape env old_univars tl1 (newty(Tpoly(t2,tl2,Zero_alloc.ignore_assert_all)));
   if List.exists (fun t -> TypeSet.mem t known_univars) tl2 then
-    univars_escape env old_univars tl2 (newty(Tpoly(t1,tl1)));
+    univars_escape env old_univars tl2 (newty(Tpoly(t1,tl1,Zero_alloc.ignore_assert_all)));
   let cl1 = List.map (fun t -> t, ref None) tl1
   and cl2 = List.map (fun t -> t, ref None) tl2 in
   univar_pairs := (cl1,cl2) :: (cl2,cl1) :: old_univars;
@@ -3277,7 +3277,8 @@ let polyfy env ty vars =
   For_copy.with_scope (fun copy_scope ->
     let vars' = List.filter_map (subst_univar copy_scope) vars in
     let ty = copy copy_scope ty in
-    let ty = newty2 ~level:(get_level ty) (Tpoly(ty, vars')) in
+    let za = Zero_alloc.ignore_assert_all in
+    let ty = newty2 ~level:(get_level ty) (Tpoly(ty, vars', za)) in
     let complete = List.length vars = List.length vars' in
     ty, complete
   )
@@ -3490,6 +3491,11 @@ let equivalent_with_nolabels l1 l2 =
   | (Nolabel | Labelled _), (Nolabel | Labelled _) -> true
   | _ -> false)
 
+let verify_zero_alloc_equal context za1 za2 =
+  match Zero_alloc.equal za1 za2 with
+  | Ok () -> ()
+  | Error _ -> raise_for context (Incompatible_zero_alloc (za1, za2))
+
 (* the [tk] means we're comparing a type against a jkind; axes do
    not matter, so a jkind extracted from a type_declaration does
    not need to be substed *)
@@ -3565,12 +3571,14 @@ let rec mcomp type_pairs env t1 t2 =
             mcomp_fields type_pairs env t1' t2'
         | (Tnil, Tnil, _, _) ->
             ()
-        | (Tpoly (t1, []), Tpoly (t2, []), _, _) ->
-            mcomp type_pairs env t1 t2
-        | (Tpoly (t1, tl1), Tpoly (t2, tl2), _, _) ->
+        | (Tpoly (t1'', [], za1), Tpoly (t2'', [], za2), _, _) ->
+            verify_zero_alloc_equal Unify za1 za2;
+            mcomp type_pairs env t1'' t2''
+        | (Tpoly (t1'', tl1, za1), Tpoly (t2'', tl2, za2), _, _) ->
+            verify_zero_alloc_equal Unify za1 za2;
             (try
                enter_poly env univar_pairs
-                 t1 tl1 t2 tl2 (mcomp type_pairs env)
+                 t1'' tl1 t2'' tl2 (mcomp type_pairs env)
              with Escape _ -> raise Incompatible)
         | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2), _, _) ->
             (* For layout-polymorphic types, establish correspondence between
@@ -4327,10 +4335,12 @@ and unify3 uenv t1 t1' t2 t2' =
           end
       | (Tnil, Tnil) ->
           ()
-      | (Tpoly (t1, []), Tpoly (t2, [])) ->
-          unify uenv t1 t2
-      | (Tpoly (t1, tl1), Tpoly (t2, tl2)) ->
-          enter_poly_for Unify (get_env uenv) univar_pairs t1 tl1 t2 tl2
+      | (Tpoly (t1'', [], za1), Tpoly (t2'', [], za2)) ->
+          verify_zero_alloc_equal Unify za1 za2;
+          unify uenv t1'' t2''
+      | (Tpoly (t1'', tl1, za1), Tpoly (t2'', tl2, za2)) ->
+          verify_zero_alloc_equal Unify za1 za2;
+          enter_poly_for Unify (get_env uenv) univar_pairs t1'' tl1 t2'' tl2
             (unify uenv)
       | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2)) ->
           (* For layout-polymorphic types, establish correspondence between
@@ -4792,7 +4802,7 @@ type filtered_arrow =
     ret_mode : Mode.Alloc.lr
   }
 
-let filter_arrow env t l ~force_tpoly =
+let filter_arrow env t l ~force_tpoly ~zero_alloc =
   let function_type level =
     let k_arg = Jkind.Builtin.any ~why:Inside_of_Tarrow in
     let k_res = Jkind.Builtin.any ~why:Inside_of_Tarrow in
@@ -4814,7 +4824,7 @@ let filter_arrow env t l ~force_tpoly =
           else
             newvar2 level k_arg
         in
-        newty2 ~level (Tpoly(t1, []))
+        newty2 ~level (Tpoly(t1, [], zero_alloc))
       end
     in
     let ty_ret = newvar2 level k_res in
@@ -4864,14 +4874,15 @@ exception Filter_mono_failed
 
 let filter_mono ty =
   match get_desc ty with
-  | Tpoly(ty, []) -> ty
+  | Tpoly(ty, [], _) -> ty
   | Tpoly _ -> raise Filter_mono_failed
   | _ -> assert false
 
 exception Filter_arrow_mono_failed
 
 let filter_arrow_mono env t l =
-  match filter_arrow env t l ~force_tpoly:true with
+  let zero_alloc = Zero_alloc.default in
+  match filter_arrow env t l ~force_tpoly:true ~zero_alloc with
   | exception Filter_arrow_failed _ -> raise Filter_arrow_mono_failed
   | {ty_arg; _} as farr ->
       match filter_mono ty_arg with
@@ -5504,10 +5515,12 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
                 t1' t2'
           | (Tnil, Tnil) ->
               ()
-          | (Tpoly (t1, []), Tpoly (t2, [])) ->
-              moregen inst_nongen variance type_pairs env t1 t2
-          | (Tpoly (t1, tl1), Tpoly (t2, tl2)) ->
-              enter_poly_for Moregen env univar_pairs t1 tl1 t2 tl2
+          | (Tpoly (t1'', [], za1), Tpoly (t2'', [], za2)) ->
+              verify_zero_alloc_equal Moregen za1 za2;
+              moregen inst_nongen variance type_pairs env t1'' t2''
+          | (Tpoly (t1'', tl1, za1), Tpoly (t2'', tl2, za2)) ->
+              verify_zero_alloc_equal Moregen za1 za2;
+              enter_poly_for Moregen env univar_pairs t1'' tl1 t2'' tl2
                 (moregen inst_nongen variance type_pairs env)
           | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2)) ->
               (* For layout-polymorphic types, establish correspondence
@@ -5978,10 +5991,12 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
                 t1' t2'
           | (Tnil, Tnil) ->
               ()
-          | (Tpoly (t1, []), Tpoly (t2, [])) ->
-              eqtype rename type_pairs subst env t1 t2 ~do_jkind_check
-          | (Tpoly (t1, tl1), Tpoly (t2, tl2)) ->
-              enter_poly_for Equality env univar_pairs t1 tl1 t2 tl2
+          | (Tpoly (t1'', [], za1), Tpoly (t2'', [], za2)) ->
+              verify_zero_alloc_equal Equality za1 za2;
+              eqtype rename type_pairs subst env t1'' t2'' ~do_jkind_check
+          | (Tpoly (t1'', tl1, za1), Tpoly (t2'', tl2, za2)) ->
+              verify_zero_alloc_equal Equality za1 za2;
+              enter_poly_for Equality env univar_pairs t1'' tl1 t2'' tl2
                 (eqtype rename type_pairs subst env ~do_jkind_check)
           | (Trepr (t1, sort_vars1), Trepr (t2, sort_vars2)) ->
               (* For layout-polymorphic types, establish correspondence
@@ -6719,9 +6734,9 @@ let rec build_subtype env (visited : transient_expr list)
       end
   | Tsubst _ | Tlink _ ->
       assert false
-  | Tpoly(t1, tl) ->
+  | Tpoly(t1, tl, za) ->
       let (t1', c) = build_subtype env visited loops posi level t1 in
-      if c > Unchanged then (newty (Tpoly(t1', tl)), c)
+      if c > Unchanged then (newty (Tpoly(t1', tl, za)), c)
       else (t, Unchanged)
   | Trepr(t1, tl) ->
       let (t1', c) = build_subtype env visited loops posi level t1 in
@@ -6867,12 +6882,15 @@ let rec subtype_rec env trace t1 t2 cstrs =
         with Exit ->
           (trace, t1, t2, !univar_pairs)::cstrs
         end
-    | (Tpoly (u1, []), Tpoly (u2, [])) ->
+    | (Tpoly (u1, [], za1), Tpoly (u2, [], za2)) ->
+        verify_zero_alloc_equal Unify za1 za2;
         subtype_rec env trace u1 u2 cstrs
-    | (Tpoly (u1, tl1), Tpoly (u2, [])) ->
+    | (Tpoly (u1, tl1, za1), Tpoly (u2, [], za2)) ->
+        verify_zero_alloc_equal Unify za1 za2;
         let u1' = instance_poly tl1 u1 in
         subtype_rec env trace u1' u2 cstrs
-    | (Tpoly (u1, tl1), Tpoly (u2,tl2)) ->
+    | (Tpoly (u1, tl1, za1), Tpoly (u2, tl2, za2)) ->
+        verify_zero_alloc_equal Unify za1 za2;
         begin try
           enter_poly env univar_pairs u1 tl1 u2 tl2
             (fun t1 t2 -> subtype_rec env trace t1 t2 cstrs)

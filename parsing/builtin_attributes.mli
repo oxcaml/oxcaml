@@ -319,8 +319,8 @@ val is_zero_alloc_check_enabled : opt:bool -> bool
    "arity n" field is allowed, and whether we track this attribute for
    warning 199. *)
 val get_zero_alloc_attribute :
-  in_signature:bool -> on_application:bool-> default_arity:int -> Parsetree.attributes ->
-  zero_alloc_attribute
+  in_signature:bool -> on_application:bool-> on_function_argument:bool ->
+  default_arity:int -> Parsetree.attributes -> zero_alloc_attribute
 
 (* This returns the [zero_alloc_assume] if the input is an assume.  Otherwise,
    it returns None. If the input attribute is [Check], this issues a warning. *)

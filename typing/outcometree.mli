@@ -83,6 +83,8 @@ type arg_label =
   | Optional of string
   | Position of string
 
+type arg_zero_alloc = Zero_alloc.const
+
 type out_mode = string
 
 type out_arg_mode = out_mode list
@@ -126,7 +128,7 @@ and out_type =
   | Otyp_abstract
   | Otyp_open
   | Otyp_alias of {non_gen:bool; aliased:out_type; alias:string}
-  | Otyp_arrow of arg_label * out_arg_mode * out_type * out_type
+  | Otyp_arrow of arg_label * arg_zero_alloc * out_arg_mode * out_type * out_type
   (** INVARIANT: the [out_type] for the return must be [Otyp_ret]. *)
   | Otyp_class of out_ident * out_type list
   | Otyp_constr of out_ident * out_type list

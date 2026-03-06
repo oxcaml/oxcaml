@@ -104,6 +104,8 @@ type error =
        usage_stage : Env.stage}
   | Mismatched_jkind_annotation of
     { name : string; explicit_jkind : jkind_lr; implicit_jkind : jkind_lr }
+  | Must_provide_zero_alloc_arity
+  | Invalid_payload_arg_zero_alloc
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
@@ -880,17 +882,33 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
             | _ :: _ ->
               { mode_modes = acc_mode; mode_desc = [] }
           in
+          let zero_alloc =
+            Builtin_attributes.get_zero_alloc_attribute
+              ~in_signature:false
+              ~on_application:false
+              ~on_function_argument:true
+              ~default_arity:(-1)
+              arg.ptyp_attributes
+          in
+          begin
+            let open Builtin_attributes in
+            match zero_alloc with
+            | Assume _ ->
+              raise (Error (loc, env, Invalid_payload_arg_zero_alloc))
+            | Default_zero_alloc | Ignore_assert_all | Check _ -> ()
+          end;
+          let zero_alloc = Zero_alloc.create_const zero_alloc in
           let ret_cty = loop acc_mode rest in
           let arg_ty = arg_cty.ctyp_type in
           let arg_ty =
-            if Btype.is_Tpoly arg_ty then arg_ty else newmono arg_ty
+            if Btype.is_Tpoly arg_ty then arg_ty else newmono ~zero_alloc arg_ty
           in
           let arg_ty =
             if not (Btype.is_optional l) then arg_ty
             else begin
               if not (Btype.tpoly_is_mono arg_ty) then
                 raise (Error (arg.ptyp_loc, env, Polymorphic_optional_param));
-              newmono
+              newmono ~zero_alloc
                 (newconstr Predef.path_option [Btype.tpoly_get_mono arg_ty])
             end
           in
@@ -1152,16 +1170,41 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let ty = newty (Tvariant (make_row more)) in
       ctyp (Ttyp_variant (tfields, closed, present)) ty
   | Ptyp_poly(vars, st) ->
+      let zero_alloc =
+        Builtin_attributes.get_zero_alloc_attribute
+          ~in_signature:false
+          ~on_application:false
+          ~on_function_argument:false
+          ~default_arity:(-1)
+          styp.ptyp_attributes
+      in
+      begin
+        let open Builtin_attributes in
+        match zero_alloc with
+        | (Check {arity; _} | Assume {arity; _}) when arity = -1 ->
+          raise (Error (loc, env, Polymorphic_optional_param))
+        | Default_zero_alloc | Ignore_assert_all | Check _ | Assume _ -> ()
+      end;
+      let zero_alloc = Zero_alloc.create_const zero_alloc in
       let desc, typ =
-        transl_type_poly env ~policy ~row_context mode styp.ptyp_loc
+        transl_type_poly env ~policy ~row_context ~zero_alloc mode styp.ptyp_loc
           vars st
       in
       ctyp desc typ
   | Ptyp_repr(vars, st) ->
       Language_extension.assert_enabled ~loc Layout_poly
         Language_extension.Alpha;
+      let zero_alloc =
+        Zero_alloc.create_const
+          (Builtin_attributes.get_zero_alloc_attribute
+             ~in_signature:false
+             ~on_application:false
+             ~on_function_argument:false
+             ~default_arity:1
+             styp.ptyp_attributes)
+      in
       let desc, typ =
-        transl_type_repr env ~policy ~row_context mode styp.ptyp_loc
+        transl_type_repr env ~policy ~row_context ~zero_alloc mode styp.ptyp_loc
           vars st
       in
       ctyp desc typ
@@ -1265,7 +1308,7 @@ and transl_type_var env ~policy ~row_context attrs loc name jkind_annot_opt =
   in
   Ttyp_var (Some name, jkind_annot), ty
 
-and transl_type_poly env ~policy ~row_context mode loc vars st =
+and transl_type_poly env ~policy ~row_context ~zero_alloc mode loc vars st =
   let typed_vars, new_univars, cty =
     with_local_level begin fun () ->
       let vars = List.map (fun (n, v) -> (n, v, Env.stage env)) vars in
@@ -1281,11 +1324,11 @@ and transl_type_poly env ~policy ~row_context mode loc vars st =
   let ty = cty.ctyp_type in
   let ty_list = TyVarEnv.check_poly_univars env loc new_univars in
   let ty_list = List.filter (fun v -> deep_occur v ty) ty_list in
-  let ty' = Btype.newgenty (Tpoly(ty, ty_list)) in
+  let ty' = Btype.newgenty (Tpoly(ty, ty_list, zero_alloc)) in
   unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)) ty';
   Ttyp_poly (typed_vars, cty), ty'
 
-and transl_type_repr env ~policy ~row_context mode loc vars st =
+and transl_type_repr env ~policy ~row_context ~zero_alloc mode loc vars st =
   let sort_vars, new_univars, cty =
     with_local_level begin fun () ->
       let vars_with_stage = List.map (fun var -> var, Env.stage env) vars in
@@ -1300,7 +1343,7 @@ and transl_type_repr env ~policy ~row_context mode loc vars st =
   let ty = cty.ctyp_type in
   let ty_list = TyVarEnv.check_poly_univars env loc new_univars in
   let ty_list = List.filter (fun v -> deep_occur v ty) ty_list in
-  let ty_poly = Btype.newgenty (Tpoly(ty, ty_list)) in
+  let ty_poly = Btype.newgenty (Tpoly(ty, ty_list, zero_alloc)) in
   let ty' = Btype.newgenty (Trepr(ty_poly, sort_vars)) in
   unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)) ty';
   Ttyp_repr (List.map (fun v -> v.txt) vars, cty), ty'
@@ -1563,7 +1606,7 @@ let transl_simple_type_univars env styp =
   end in
   make_fixed_univars typ.ctyp_type;
     { typ with ctyp_type =
-        instance (Btype.newgenty (Tpoly (typ.ctyp_type, univs))) }
+        instance (Btype.newgenty (Tpoly (typ.ctyp_type, univs, Zero_alloc.default))) }
 
 let transl_simple_type_delayed env mode styp =
   TyVarEnv.reset_locals ();
@@ -1841,6 +1884,13 @@ let report_error_doc env ppf =
       Env.print_stage usage_stage
       Env.print_stage intro_stage
       Env.print_with_quote_promote (name, intro_stage, usage_stage)
+  | Must_provide_zero_alloc_arity ->
+    fprintf ppf
+      "Zero-alloc annotations on function arguments must specify arity."
+  | Invalid_payload_arg_zero_alloc ->
+    fprintf ppf
+      "Invalid zero-alloc payload for a higher-order function argument."
+
 
 let () =
   Location.register_error_of_exn

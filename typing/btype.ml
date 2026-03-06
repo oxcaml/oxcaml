@@ -308,7 +308,7 @@ let fold_type_expr f init ty =
   | Tlink _
   | Tsubst _            -> assert false
   | Tunivar _           -> init
-  | Tpoly (ty, tyl)     ->
+  | Tpoly (ty, tyl, _)     ->
     let result = f init ty in
     List.fold_left f result tyl
   | Trepr (ty, _sort_vars) ->
@@ -525,9 +525,9 @@ let rec copy_type_desc ?(keep_names=false) f = function
   | Tlink ty            -> copy_type_desc f (get_desc ty)
   | Tsubst _            -> assert false
   | Tunivar _ as ty     -> ty (* always keep the name *)
-  | Tpoly (ty, tyl)     ->
+  | Tpoly (ty, tyl, za) ->
       let tyl = List.map f tyl in
-      Tpoly (f ty, tyl)
+      Tpoly (f ty, tyl, za)
   | Trepr (ty, sort_vars) ->
       Trepr (f ty, sort_vars)
   | Tpackage (p, fl)  -> Tpackage (p, List.map (fun (n, ty) -> (n, f ty)) fl)
@@ -794,18 +794,18 @@ let instance_variable_type label sign =
 
 let tpoly_is_mono ty =
   match get_desc ty with
-  | Tpoly(_, []) -> true
-  | Tpoly(_, _ :: _) -> false
+  | Tpoly(_, [], _) -> true
+  | Tpoly(_, _ :: _, _) -> false
   | _ -> assert false
 
 let tpoly_get_poly ty =
   match get_desc ty with
-  | Tpoly(ty, vars) -> (ty, vars)
+  | Tpoly(ty, vars, za) -> (ty, vars, za)
   | _ -> assert false
 
 let tpoly_get_mono ty =
   match get_desc ty with
-  | Tpoly(ty, []) -> ty
+  | Tpoly(ty, [], _) -> ty
   | _ -> assert false
 
                   (**********)
