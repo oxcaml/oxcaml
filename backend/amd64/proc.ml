@@ -525,7 +525,7 @@ let destroyed_by_simd_instr (instr : Simd.instr) =
   | Vzeroall -> all_simd_regs
   | _ ->
     match instr.res with
-    | Res_none | First_arg -> [||]
+    | Res_none | Arg _ -> [||]
     | Res rr ->
       Array.fold_left (fun acc ({loc; _} : Simd.arg) ->
         match Simd.loc_is_pinned loc with

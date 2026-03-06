@@ -723,7 +723,7 @@ let emit_simd b (instr : Amd64_simd_instrs.instr) args =
   in
   let enc i =
     match instr.res with
-    | Res_none | First_arg -> instr.args.(i).enc
+    | Res_none | Arg _ -> instr.args.(i).enc
     | Res rr ->
       let rr = Array.fold_right
         (fun ({enc; _} : Amd64_simd_defs.arg) acc ->
