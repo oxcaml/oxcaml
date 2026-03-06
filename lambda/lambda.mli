@@ -920,6 +920,10 @@ type lambda =
   | Lexclave of lambda
   (* [Lsplice] should only exist in the slambda stage. *)
   | Lsplice of scoped_location * slambda
+  (* [Ltemplate] should only exist in the tlambda stage. *)
+  | Ltemplate of lfunction * layout Ident.Map.t
+  (* [Linstantiate] should only exist in the tlambda stage. *)
+  | Linstantiate of lambda_apply
 
 and slambda =
   | SLlayout of layout
@@ -943,13 +947,13 @@ and slambda_halves =
   }
 
 and slambda_function =
-  { sfun_params: Slambdaident.t array;
+  { sfun_params: Slambdaident.t list;
     sfun_body: slambda
   }
 
 and slambda_apply =
   { sapp_func: slambda;
-    sapp_arguments: slambda array
+    sapp_args: slambda list
   }
 
 and slambda_let =
@@ -1405,7 +1409,7 @@ val mod_field:
 
 val structured_constant_layout : structured_constant -> layout
 
-val mixed_block_element_of_layout : layout -> unit mixed_block_element
+val mixed_block_element_of_layout : layout -> 'a mixed_block_element
 
 (** Returns the element at the given path in a mixed block shape.
     The path is a list of field indices for navigating into nested products. *)
