@@ -667,6 +667,7 @@ type structured_constant =
   | Const_immstring of string
   | Const_float_block of string list
   | Const_null
+  | Const_layout of layout
 
 type tailcall_attribute =
   | Tailcall_expectation of bool
@@ -926,6 +927,10 @@ type lambda =
   | Lexclave of lambda
   (* [Lsplice] should only exist in the slambda stage. *)
   | Lsplice of scoped_location * slambda
+  (* [Ltemplate] should only exist in the tlambda stage. *)
+  | Ltemplate of lfunction * layout Ident.Map.t
+  (* [Linstantiate] should only exist in the tlambda stage. *)
+  | Linstantiate of lambda_apply
 
 and slambda =
   | SLlayout of layout
@@ -953,7 +958,7 @@ and slambda_function =
 
 and slambda_apply =
   { sapp_func: slambda;
-    sapp_arguments: slambda array
+    sapp_args: slambda array
   }
 
 and slambda_let =
