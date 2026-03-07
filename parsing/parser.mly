@@ -199,19 +199,22 @@ let ghpat_with_modes ~loc ~pat ~cty ~modes =
 let mkexp_constraint ~loc ~exp ~cty ~modes =
   match exp.pexp_desc with
   | Pexp_constraint (exp', cty', modes') ->
-     begin match cty, cty' with
-     | cty, None | None, cty ->
+     begin match cty with
+     | None ->
         { exp with
-          pexp_desc = Pexp_constraint (exp', cty, modes @ modes');
+          pexp_desc = Pexp_constraint (exp', cty', modes @ modes');
           pexp_loc = make_loc loc
         }
-     | _ ->
+     | Some cty ->
         mkexp ~loc (Pexp_constraint (exp, cty, modes))
      end
   | _ ->
      begin match cty, modes with
      | None, [] -> exp
-     | cty, modes -> mkexp ~loc (Pexp_constraint (exp, cty, modes))
+     | None, modes ->
+        let cty = ghtyp ~loc (Ptyp_any None) in
+        mkexp ~loc (Pexp_constraint (exp, cty, modes))
+     | Some cty, modes -> mkexp ~loc (Pexp_constraint (exp, cty, modes))
      end
 
 let ghexp_constraint ~loc ~exp ~cty ~modes =
@@ -2995,7 +2998,7 @@ simple_expr:
   | LPAREN MODULE ext_attributes module_expr RPAREN
       { Pexp_pack $4, $3 }
   | LPAREN MODULE ext_attributes module_expr COLON package_type RPAREN
-      { Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $4), Some $6, []), $3 }
+      { Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $4), $6, []), $3 }
   | LPAREN MODULE ext_attributes module_expr COLON error
       { unclosed "(" $loc($1) ")" $loc($6) }
   | OBJECT ext_attributes class_structure END
@@ -3186,7 +3189,7 @@ block_access:
     package_type RPAREN
       { let modexp =
           mkexp_attrs ~loc:($startpos($3), $endpos)
-            (Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $6), Some $8, [])) $5 in
+            (Pexp_constraint (ghexp ~loc:$sloc (Pexp_pack $6), $8, [])) $5 in
         Pexp_open(od, modexp) }
   | mod_longident DOT
     LPAREN MODULE ext_attributes module_expr COLON error

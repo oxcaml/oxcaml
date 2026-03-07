@@ -804,7 +804,7 @@ let transl_label_from_expr (label : Parsetree.arg_label)
     (expr : Parsetree.expression) =
   match expr with
   | {pexp_desc = Pexp_constraint (inner_expr, ty, []); _} ->
-      let label = transl_label label ty in
+      let label = transl_label label (Some ty) in
       let expr = if Btype.is_position label then inner_expr else expr in
       label, expr
   | _ -> transl_label label None, expr

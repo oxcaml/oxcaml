@@ -50,9 +50,9 @@ let texp_letmodule () =
   in
   ()
 [%%expect{|
-Line 4, characters 12-21:
+Line 4, characters 20-21:
 4 |     let y = unique_ x
-                ^^^^^^^^^
+                        ^
 Error: This value is aliased but used as unique.
 Hint: This value comes from outside the current module or class.
 |}]
@@ -82,9 +82,9 @@ let texp_open () =
   let open (struct let y = unique_ x end) in
   ()
 [%%expect{|
-Line 3, characters 27-36:
+Line 3, characters 35-36:
 3 |   let open (struct let y = unique_ x end) in
-                               ^^^^^^^^^
+                                       ^
 Error: This value is aliased but used as unique.
 Hint: This value comes from outside the current module or class.
 |}]
@@ -113,9 +113,9 @@ let texp_pack () =
   ()
 [%%expect{|
 module type bar = sig val y : string end
-Line 5, characters 33-42:
+Line 5, characters 41-42:
 5 |   let z = (module struct let y = unique_ x end : bar) in
-                                     ^^^^^^^^^
+                                             ^
 Error: This value is aliased but used as unique.
 Hint: This value comes from outside the current module or class.
 |}]

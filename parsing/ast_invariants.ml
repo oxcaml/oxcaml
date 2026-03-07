@@ -154,7 +154,6 @@ let iterator =
         | Pcomp_array_comprehension (_, {pcomp_clauses = []}) )
       ->
         empty_comprehension loc
-    | Pexp_constraint (_, ty, mode) -> check_empty_constraint ~loc ty mode
     | _ -> ()
   in
   let extension_constructor self ec =
