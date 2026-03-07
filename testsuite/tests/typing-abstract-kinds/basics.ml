@@ -1412,3 +1412,281 @@ end
 [%%expect{|
 module M : sig kind_ k type ('a : k) t end
 |}]
+
+(*********************************************************)
+(* Test: Hidden recursive-module cycles through abstraction *)
+
+(* This cycle is hidden by an abstract recursive signature. *)
+module rec Hidden_a : sig
+  kind_ ka = Hidden_b.kb
+end = struct
+  kind_ ka = Hidden_b.kb
+end
+and Hidden_b : sig
+  kind_ kb
+end = struct
+  kind_ kb = Hidden_a.ka
+end
+[%%expect{|
+module rec Hidden_a : sig kind_ ka = Hidden_b.kb end
+and Hidden_b : sig kind_ kb end
+|}]
+
+(* This cycle is rejected when both aliases carry the same bound. *)
+module rec Hidden_bounds_a : sig
+  kind_ ka = Hidden_bounds_b.kb mod global
+end = struct
+  kind_ ka = Hidden_bounds_b.kb mod global
+end
+and Hidden_bounds_b : sig
+  kind_ kb = Hidden_bounds_a.ka mod global
+end = struct
+  kind_ kb = Hidden_bounds_a.ka mod global
+end
+[%%expect{|
+Lines 1-5, characters 0-3:
+1 | module rec Hidden_bounds_a : sig
+2 |   kind_ ka = Hidden_bounds_b.kb mod global
+3 | end = struct
+4 |   kind_ ka = Hidden_bounds_b.kb mod global
+5 | end
+Error: The kind "Hidden_bounds_a.ka" is cyclic:
+         "Hidden_bounds_a.ka" = "Hidden_bounds_b.kb mod global",
+         "Hidden_bounds_b.kb mod global" contains "Hidden_bounds_b.kb",
+         "Hidden_bounds_b.kb" = "Hidden_bounds_a.ka mod global",
+         "Hidden_bounds_a.ka mod global" contains "Hidden_bounds_a.ka"
+|}]
+
+module rec Hidden_nested : sig
+  module A : sig
+    kind_ k
+  end
+  kind_ k = A.k
+end = struct
+  module A = struct
+    kind_ k = Hidden_nested.k
+  end
+  kind_ k = A.k
+end
+[%%expect{|
+module rec Hidden_nested : sig module A : sig kind_ k end kind_ k = A.k end
+|}]
+
+(* This self alias is hidden by an abstract recursive signature. *)
+module rec Hidden_self : sig
+  kind_ k
+end = struct
+  kind_ k = Hidden_self.k
+end
+[%%expect{|
+module rec Hidden_self : sig kind_ k end
+|}]
+
+module rec Hidden_local_mty_a : sig
+  module type T = sig
+    kind_ k
+  end
+  module X : T
+  kind_ ka = X.k
+end = struct
+  module type T = sig
+    kind_ k
+  end
+  module X = struct
+    kind_ k = Hidden_local_mty_b.kb
+  end
+  kind_ ka = X.k
+end
+and Hidden_local_mty_b : sig
+  kind_ kb = Hidden_local_mty_a.ka
+end = struct
+  kind_ kb = Hidden_local_mty_a.ka
+end
+[%%expect{|
+module rec Hidden_local_mty_a :
+  sig module type T = sig kind_ k end module X : T kind_ ka = X.k end
+and Hidden_local_mty_b : sig kind_ kb = Hidden_local_mty_a.ka end
+|}]
+
+(* This cycle is rejected when the local module type exposes the alias. *)
+module rec Visible_local_mty_a : sig
+  module type T = sig
+    kind_ k = Visible_local_mty_b.kb
+  end
+  module X : T
+  kind_ ka = X.k
+end = struct
+  module type T = sig
+    kind_ k = Visible_local_mty_b.kb
+  end
+  module X = struct
+    kind_ k = Visible_local_mty_b.kb
+  end
+  kind_ ka = X.k
+end
+and Visible_local_mty_b : sig
+  kind_ kb = Visible_local_mty_a.ka
+end = struct
+  kind_ kb = Visible_local_mty_a.ka
+end
+[%%expect{|
+Lines 1-15, characters 0-3:
+ 1 | module rec Visible_local_mty_a : sig
+ 2 |   module type T = sig
+ 3 |     kind_ k = Visible_local_mty_b.kb
+ 4 |   end
+ 5 |   module X : T
+...
+12 |     kind_ k = Visible_local_mty_b.kb
+13 |   end
+14 |   kind_ ka = X.k
+15 | end
+Error: The kind "Visible_local_mty_a.X.k" is cyclic:
+         "Visible_local_mty_a.X.k" = "Visible_local_mty_b.kb",
+         "Visible_local_mty_b.kb" = "Visible_local_mty_a.ka",
+         "Visible_local_mty_a.ka" = "Visible_local_mty_a.X.k"
+|}]
+
+(************************************************************)
+(* Test: Asymmetric GADT refinement of abstract-kind equalities *)
+(* Upshot: GADT pattern matching refines the kinds of abstract types,
+   but it does currently *not* refine the kind variables. 
+   Doing so in the future would be safe, but we would have to be 
+   very careful in combination with the above hidden recursive cycles:
+   if GADT matching refined kind variables, we could expose the 
+   hidden cycles, and the typechecker could then go into an infinite
+   loop if it is not carefully rewritten to handle cycles.
+   This is probably doable (after all, it works for rectypes),
+   but not worth the effort right now. *)
+
+(* Set up two abstract kinds with equal concrete definitions. *)
+type ('a : any, 'b : any) branch_eq = Refl : ('x : any). ('x, 'x) branch_eq
+module type Branch_empty = sig end
+
+module Branch_kinds : sig
+  kind_ k1
+  kind_ k2
+  type t1 : k1
+  type t2 : k2
+  val eq12 : (t1, t2) branch_eq
+end = struct
+  kind_ k1 = float64
+  kind_ k2 = float64
+  type t1 = float#
+  type t2 = float#
+  let eq12 = Refl
+end
+[%%expect{|
+type ('a : any, 'b : any) branch_eq = Refl : ('x : any). ('x, 'x) branch_eq
+module type Branch_empty = sig end
+module Branch_kinds :
+  sig
+    kind_ k1
+    kind_ k2
+    type t1 : k1
+    type t2 : k2
+    val eq12 : (t1, t2) branch_eq
+  end
+|}]
+
+type ('a : Branch_kinds.k1) branch_needs_k1
+type ('a : Branch_kinds.k2) branch_needs_k2
+[%%expect{|
+type ('a : Branch_kinds.k1) branch_needs_k1
+type ('a : Branch_kinds.k2) branch_needs_k2
+|}]
+
+(* Without a match, t2 does not satisfy k1. *)
+let _ =
+  (module struct
+    type bad = Branch_kinds.t2 branch_needs_k1
+  end : Branch_empty)
+[%%expect{|
+Line 3, characters 15-30:
+3 |     type bad = Branch_kinds.t2 branch_needs_k1
+                   ^^^^^^^^^^^^^^^
+Error: This type "Branch_kinds.t2" should be an instance of type
+         "('a : Branch_kinds.k1)"
+       The kind of Branch_kinds.t2 is Branch_kinds.k2
+         because of the definition of t2 at line 8, characters 2-14.
+       But the kind of Branch_kinds.t2 must be a subkind of Branch_kinds.k1
+         because of the definition of branch_needs_k1 at line 1, characters 0-43.
+|}]
+
+(* Inside the match, t2 satisfies k1 but t1 still does not satisfy k2. *)
+let _ =
+  match Branch_kinds.eq12 with
+  | Refl ->
+    (module struct
+      type now_ok_1 = Branch_kinds.t2 branch_needs_k1
+      type now_ok_2 = Branch_kinds.t2 branch_needs_k2
+      type still_bad = Branch_kinds.t1 branch_needs_k2
+    end : Branch_empty)
+[%%expect{|
+Line 7, characters 23-38:
+7 |       type still_bad = Branch_kinds.t1 branch_needs_k2
+                           ^^^^^^^^^^^^^^^
+Error: This type "Branch_kinds.t1" should be an instance of type
+         "('a : Branch_kinds.k2)"
+       The kind of Branch_kinds.t1 is Branch_kinds.k1
+         because of the definition of t1 at line 7, characters 2-14.
+       But the kind of Branch_kinds.t1 must be a subkind of Branch_kinds.k2
+         because of the definition of branch_needs_k2 at line 2, characters 0-43.
+|}]
+
+module Branch_kinds_extra : sig
+  kind_ k1
+  kind_ k2
+  type t1 : k1
+  type t1' : k1
+  type t2 : k2
+  type t2' : k2
+  val eq12 : (t1, t2) branch_eq
+end = struct
+  kind_ k1 = float64
+  kind_ k2 = float64
+  type t1 = float#
+  type t1' = float#
+  type t2 = float#
+  type t2' = float#
+  let eq12 = Refl
+end
+[%%expect{|
+module Branch_kinds_extra :
+  sig
+    kind_ k1
+    kind_ k2
+    type t1 : k1
+    type t1' : k1
+    type t2 : k2
+    type t2' : k2
+    val eq12 : (t1, t2) branch_eq
+  end
+|}]
+
+(* Add more types at the same abstract kinds. *)
+type ('a : Branch_kinds_extra.k1) branch_needs_k1_extra
+[%%expect{|
+type ('a : Branch_kinds_extra.k1) branch_needs_k1_extra
+|}]
+
+(* The refinement does *not* apply to a different type at k2. *)
+let _ =
+  match Branch_kinds_extra.eq12 with
+  | Refl ->
+    (module struct
+      type test_t2 = Branch_kinds_extra.t2 branch_needs_k1_extra
+      type test_t2' = Branch_kinds_extra.t2' branch_needs_k1_extra
+    end : Branch_empty)
+[%%expect{|
+Line 6, characters 22-44:
+6 |       type test_t2' = Branch_kinds_extra.t2' branch_needs_k1_extra
+                          ^^^^^^^^^^^^^^^^^^^^^^
+Error: This type "Branch_kinds_extra.t2'" should be an instance of type
+         "('a : Branch_kinds_extra.k1)"
+       The kind of Branch_kinds_extra.t2' is Branch_kinds_extra.k2
+         because of the definition of t2' at line 7, characters 2-15.
+       But the kind of Branch_kinds_extra.t2' must be a subkind of
+           Branch_kinds_extra.k1
+         because of the definition of branch_needs_k1_extra at line 1, characters 0-55.
+|}]
