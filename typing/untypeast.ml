@@ -433,13 +433,17 @@ let exp_extra sub (extra, loc, attrs) sexp =
                      Option.map (sub.typ sub) cty1,
                      sub.typ sub cty2)
     | Texp_constraint (cty) ->
-        Pexp_constraint (sexp, Some (sub.typ sub cty), [])
+        Pexp_constraint (sexp, sub.typ sub cty, [])
     | Texp_poly cto -> Pexp_poly (sexp, Option.map (sub.typ sub) cto)
     | Texp_newtype (_, label_loc, jkind, _) ->
         Pexp_newtype (label_loc, jkind, sexp)
     | Texp_stack -> Pexp_stack sexp
     | Texp_mode modes ->
-        Pexp_constraint (sexp, None, Typemode.untransl_mode modes)
+        let modes = Typemode.untransl_mode modes in
+        (match sexp.pexp_desc with
+         | Pexp_constraint (sexp, typ, modes') ->
+             Pexp_constraint (sexp, typ, modes @ modes')
+         | _ -> Pexp_constraint (sexp, Typ.any None, modes))
     | Texp_inspected_type _ ->
         (* Type inspections are unnecessary in a Parsetree,
            as type inference reproduces them *)

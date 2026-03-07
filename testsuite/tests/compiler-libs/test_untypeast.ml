@@ -90,7 +90,7 @@ let foo : ('a : value) . 'a -> 'a = fun x -> x in foo
 run {| let foo : type a . a -> a = fun x -> x in foo |}
 
 [%%expect{|
-let foo : ('a : value) . 'a -> 'a = fun (type a) -> ( (fun x -> x : a -> a)) in
+let foo : ('a : value) . 'a -> 'a = fun (type a) -> (fun x -> x : a -> a) in
 foo
 - : unit = ()
 |}];;
@@ -100,7 +100,7 @@ foo
 run {| let foo : ('a -> 'a) @ portable = fun x -> x in foo |}
 
 [%%expect{|
-let (foo : 'a -> 'a) = ((fun x -> x : 'a -> 'a) : _ @ portable) in foo
+let (foo : 'a -> 'a) = (fun x -> x : ('a -> 'a) @ portable) in foo
 - : unit = ()
 |}];;
 
@@ -127,6 +127,6 @@ let module M = struct type t = {
 run {| let foo : 'a -> 'a = fun x -> x in foo |}
 
 [%%expect{|
-let (foo : 'a -> 'a) = ( (fun x -> x : 'a -> 'a)) in foo
+let (foo : 'a -> 'a) = (fun x -> x : 'a -> 'a) in foo
 - : unit = ()
 |}];;
