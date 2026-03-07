@@ -62,7 +62,6 @@ type error =
   | Signature_parameter_expected of module_type
   | Signature_result_expected of module_type
   | Recursive_include_functor
-  | Recursive_jkind_declaration
   | With_no_component of Longident.t
   | With_mismatch of Longident.t * Includemod.explanation
   | With_makes_applicative_functor_ill_typed of
@@ -407,15 +406,23 @@ let type_module_type_of_fwd :
 (* Additional validity checks on type definitions arising from
    recursive modules *)
 
-let check_recmod_typedecls env decls =
+let check_recmod_decls env decls =
   let recmod_ids = List.map fst decls in
   List.iter
     (fun (id, md) ->
+      let (~types, ~jkinds) =
+        Mtype.type_and_jkind_paths env (Pident id) md.Types.md_type
+      in
       List.iter
         (fun path ->
           Typedecl.check_recmod_typedecl env md.Types.md_loc recmod_ids
                                          path (Env.find_type path env))
-        (Mtype.type_paths env (Pident id) md.Types.md_type))
+        types;
+      List.iter
+        (fun path ->
+          Typedecl.check_recmod_jkind_decl env md.Types.md_loc recmod_ids
+                                           path (Env.find_jkind path env))
+        jkinds)
     decls
 
 (* Merge one "with" constraint in a signature *)
@@ -616,7 +623,7 @@ let check_well_formed_module env loc context mty =
       | Sig_module (id, _, mty, Trec_first, _) :: rem ->
           let (id_mty_l, rem) = extract_next_modules rem in
           begin try
-            check_recmod_typedecls (Lazy.force env) ((id, mty) :: id_mty_l)
+            check_recmod_decls (Lazy.force env) ((id, mty) :: id_mty_l)
           with Typedecl.Error (_, err) ->
             raise (Error (loc, Lazy.force env,
                           Badly_formed_signature(context, err)))
@@ -1540,8 +1547,12 @@ and approx_sig_items env ssg=
           ) decls [rem]
           |> List.flatten
       | Psig_jkind sdecl ->
-          (* CR layouts: support this - internal ticket 5793 *)
-          raise (Error(sdecl.pjkind_loc, env, Recursive_jkind_declaration))
+          let jkind_decl = Typedecl.approx_jkind_decl sdecl in
+          let scope = Ctype.create_scope () in
+          let (id, newenv) =
+            Env.enter_jkind ~scope sdecl.pjkind_name.txt jkind_decl env
+          in
+          Sig_jkind(id, jkind_decl, Exported) :: approx_sig_items newenv srem
       | _ ->
           approx_sig_items env srem
 
@@ -2572,7 +2583,7 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
       (fun () -> transition env0 init)
   in
   let env1 = make_env dcl1 in
-  check_recmod_typedecls env1 (map_mtys dcl1);
+  check_recmod_decls env1 (map_mtys dcl1);
   let dcl2 = transition env1 dcl1 in
 (*
   List.iter
@@ -2581,7 +2592,7 @@ and transl_recmodule_modtypes env ~sig_modalities sdecls =
     dcl2;
 *)
   let env2 = make_env dcl2 in
-  check_recmod_typedecls env2 (map_mtys dcl2);
+  check_recmod_decls env2 (map_mtys dcl2);
   let dcl2 =
     List.map2 (fun (pmd, _) (id_shape, id_loc, md, mmode, md_modalities, mty) ->
       let tmd =
@@ -4648,10 +4659,6 @@ let report_error ~loc _env = function
   | Recursive_include_functor ->
       Location.errorf ~loc
         "@[Including a functor is not supported in recursive module signatures @]"
-  | Recursive_jkind_declaration ->
-      Location.errorf ~loc
-        "@[Kind declarations are not yet supported in recursive module \
-         signatures@]"
   | With_no_component lid ->
       Location.errorf ~loc
         "@[The signature constrained by %a has no component named %a@]"

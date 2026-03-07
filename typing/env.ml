@@ -2970,6 +2970,12 @@ let enter_modtype ~scope name mtd env =
   let env = store_modtype id (Subst.Lazy.of_modtype_decl mtd) shape env in
   (id, env)
 
+let enter_jkind ~scope name decl env =
+  let id = Ident.create_scoped ~scope name in
+  let shape = Shape.leaf decl.jkind_uid in
+  let env = store_jkind ~check:false id decl shape env in
+  (id, env)
+
 let enter_class ~scope name desc env =
   let id = Ident.create_scoped ~scope name in
   let addr = class_declaration_address env id desc in
