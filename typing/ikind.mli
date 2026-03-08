@@ -13,10 +13,12 @@
 (**************************************************************************)
 
 val type_declaration_ikind_gated :
-  context:Jkind.jkind_context -> path:Path.t -> Types.type_ikind
+  env:Env.t option ->
+  path:Path.t ->
+  Types.type_ikind
 
 val type_declaration_ikind_of_jkind :
-  context:Jkind.jkind_context ->
+  env:Env.t option ->
   params:Types.type_expr list ->
   Types.jkind_l ->
   Types.type_ikind

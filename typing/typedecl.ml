@@ -1566,10 +1566,9 @@ let narrow_to_manifest_jkind env loc path decl =
                  (Format_doc.compat Path.print) path;
              raise (Error (loc, Jkind_mismatch_of_type (env, ty, v))))
     end;
-    let context =
-      Ctype.mk_jkind_context env (fun ty -> Some (Ctype.type_jkind env ty))
+    let type_ikind =
+      Ikind.type_declaration_ikind_gated ~env:(Some env) ~path
     in
-    let type_ikind = Ikind.type_declaration_ikind_gated ~context ~path in
     { decl with type_jkind = manifest_jkind; type_ikind }
 
 (* Check that the type expression (if present) is compatible with the kind.
@@ -2907,8 +2906,7 @@ let normalize_decl_jkinds env decls =
       { decl with
         type_jkind = normalized_jkind;
         type_ikind =
-          Ikind.type_declaration_ikind_gated
-            ~context:normalization_context ~path;
+          Ikind.type_declaration_ikind_gated ~env:(Some env) ~path;
         type_unboxed_version
       }
     in
@@ -2963,7 +2961,7 @@ let normalize_decl_jkinds env decls =
           in
           let type_ikind =
             Ikind.type_declaration_ikind_of_jkind
-              ~context:normalization_context
+              ~env:(Some env)
               ~params:decl.type_params
               type_jkind
           in

@@ -78,23 +78,15 @@ module Solver = struct
         }
     | Poly of Ldd.node * Ldd.node array
 
-  (* The environment supplies constructor lookup so callers can use
-     alternative environments (e.g., identity environments when inlining
-     type functions). *)
-  and env =
-    { lookup : Path.t -> constr_decl;
-      jkind_env : Env.t option
-    }
-
   and ctx =
-    { env : env;
+    { env : Env.t option;
       mode : mode;
       ty_to_kind : Ldd.node TyTbl.t;
       constr_to_coeffs : (Ldd.node * Ldd.node array) ConstrTbl.t
     }
 
   (** Start a new solver context. *)
-  let create_ctx ~(mode : mode) (env : env) : ctx =
+  let create_ctx ~(mode : mode) ~(env : Env.t option) : ctx =
     { env;
       mode;
       ty_to_kind = TyTbl.create 0;
@@ -132,14 +124,36 @@ module Solver = struct
   (* CR jujacobs: we could optimize the join with masks you see below
      using a combined [Ldd.join_with_mask left mask right] operation. *)
 
+  let identity_constr_decl ~(arity : int) (path : Path.t) : constr_decl =
+    let open Ldd in
+    let base = node_of_var (rigid (Name.atomic path 0)) in
+    let coeffs =
+      Array.init arity (fun i -> node_of_var (rigid (Name.atomic path (i + 1))))
+    in
+    Poly (base, coeffs)
+
+  let lookup_from_env :
+      (Env.t -> Path.t -> constr_decl) ref =
+    ref
+      (fun _env _path ->
+        failwith "ikind: lookup_from_env not initialized")
+
+  let set_lookup_from_env f = lookup_from_env := f
+
+  let lookup_constr (ctx : ctx) ~(min_arity : int) (path : Path.t) :
+      constr_decl =
+    match ctx.env with
+    | Some env -> !lookup_from_env env path
+    | None -> identity_constr_decl ~arity:min_arity path
+
   (** Fetch or compute the polynomial for constructor [c]. *)
-  let rec constr_kind (ctx : ctx) (path : Path.t)
+  let rec constr_kind (ctx : ctx) ~(min_arity : int) (path : Path.t)
       : Ldd.node * Ldd.node array =
     (* Return placeholder nodes stored in [constr_to_coeffs] for recursion. *)
     match ConstrTbl.find_opt ctx.constr_to_coeffs path with
     | Some base_and_coeffs -> base_and_coeffs
     | None -> (
-      match ctx.env.lookup path with
+      match lookup_constr ctx ~min_arity path with
       | Poly (base, coeffs) ->
         (* Install placeholder nodes before rehydrating cached
            polynomials.  This breaks recursion cycles between
@@ -158,7 +172,7 @@ module Solver = struct
           match name with
           | Param _ | Unknown _ -> rigid_name ctx name
           | KAtom kpath -> (
-            match ctx.env.jkind_env with
+            match ctx.env with
             | None -> rigid_name ctx name
             | Some env -> (
               match Env.find_jkind kpath env with
@@ -170,7 +184,9 @@ module Solver = struct
             if Path.same other_path path
             then rigid_name ctx name
             else
-              let base_poly, coeffs_poly = constr_kind ctx other_path in
+              let base_poly, coeffs_poly =
+                constr_kind ctx ~min_arity:arg_index other_path
+              in
               if arg_index = 0
               then base_poly
               else if arg_index - 1 < Array.length coeffs_poly
@@ -249,7 +265,9 @@ module Solver = struct
   (* Apply a constructor polynomial to argument kinds. *)
   and constr (ctx : ctx) (path : Path.t) (arg_kinds : Ldd.node list)
       : Ldd.node =
-    let base, coeffs = constr_kind ctx path in
+    let base, coeffs =
+      constr_kind ctx ~min_arity:(List.length arg_kinds) path
+    in
     let rec loop acc remaining i =
       if i = Array.length coeffs
       then acc
@@ -266,7 +284,7 @@ module Solver = struct
       type a l r. ctx -> (a, l * r) Types.base_and_axes -> Ldd.node =
    fun ctx jkind_desc ->
     let expand =
-      match ctx.env.jkind_env with
+      match ctx.env with
       | None ->
         let expand :
             type b. (b, l * r) Types.base_and_axes ->
@@ -455,7 +473,7 @@ module Solver = struct
      [Types.constructor_ikind]. *)
   let constr_kind_poly (ctx : ctx) (c : Path.t)
       : Ldd.node * Ldd.node array =
-    let base, coeffs = constr_kind ctx c in
+    let base, coeffs = constr_kind ctx ~min_arity:0 c in
     Ldd.solve_pending ();
     base, coeffs
 
@@ -678,11 +696,11 @@ let make_gadt_payload_projector
 
 (* Lookup function supplied to the solver.
    We prefer a stored ikind (when present) and otherwise recompute from the
-   type declaration in [context]. *)
-let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
+   type declaration in [env]. *)
+let lookup_of_env ~(env : Env.t) (path : Path.t) :
     Solver.constr_decl =
-  match context.lookup_type path with
-  | None ->
+  match Env.find_type path env with
+  | exception Not_found ->
     (* Format.eprintf "ERROR: unknown constructor %a@." Path.print path; *)
     (* WE CANNOT ACTUALLY GIVE AN ERROR HERE! *)
     (* Explanation: build systems sometimes heuristically do not
@@ -694,7 +712,7 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
     let unknown = Ldd.Name.unknown (fresh_unknown_uid ()) in
     let kind : Solver.ckind = fun _ctx -> Ldd.node_of_var (Ldd.rigid unknown) in
     Solver.Ty { args = []; kind; abstract = true }
-  | Some type_decl ->
+  | type_decl ->
     (* Here we can switch to using the cached ikind or not. *)
     let fallback () =
       (* When we have no stored ikind, we go to this fallback and compute. *)
@@ -881,27 +899,24 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
         (Format_doc.compat Path.print) path ikind_msg);
     ikind
 
-(* Package the above into a full evaluation context. *)
-let make_ctx ~(mode : Solver.mode) ~(env : Env.t option)
-    ~(context : Jkind.jkind_context) :
-    Solver.ctx =
-  Solver.create_ctx ~mode
-    { lookup = lookup_of_context ~context;
-      jkind_env = env
-    }
+let () = Solver.set_lookup_from_env (fun env path -> lookup_of_env ~env path)
 
-let normalize ~(context : Jkind.jkind_context) (jkind : Types.jkind_l) :
-    Ldd.node =
-  let ctx = make_ctx ~mode:Solver.Normal ~env:None ~context in
+(* Package the above into a full evaluation context. *)
+let make_ctx ~(mode : Solver.mode) ~(env : Env.t option) : Solver.ctx =
+  Solver.create_ctx ~mode ~env
+
+let normalize ~(env : Env.t option) (jkind : Types.jkind_l) : Ldd.node =
+  let ctx = make_ctx ~mode:Solver.Normal ~env in
   Solver.normalize (Solver.ckind_of_jkind ctx jkind)
 
-let type_declaration_ikind ~(context : Jkind.jkind_context) ~(path : Path.t) :
+let type_declaration_ikind ~(env : Env.t option)
+    ~(path : Path.t) :
     Types.constructor_ikind =
-  let ctx = make_ctx ~mode:Solver.Normal ~env:None ~context in
+  let ctx = make_ctx ~mode:Solver.Normal ~env in
   let base, coeffs = Solver.constr_kind_poly ctx path in
   constructor_ikind ~base ~coeffs
 
-let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
+let type_declaration_ikind_gated ~(env : Env.t option)
     ~(path : Path.t) : Types.type_ikind =
   (* This function gets called separately for each
     type definition of a mutually recursive group. This is
@@ -911,13 +926,16 @@ let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
     between calls to this function from the same mutually recursive
     group. *)
   with_ikinds_enabled (fun () ->
-    let ikind = type_declaration_ikind ~context ~path in
+    let ikind = type_declaration_ikind ~env ~path in
     (if !Clflags.ikinds_debug
     then
       let stored_jkind =
-        match context.lookup_type path with
+        match env with
         | None -> "?"
-        | Some _decl -> "<stored-jkind>"
+        | Some env -> (
+          match Env.find_type path env with
+          | exception Not_found -> "?"
+          | _decl -> "<stored-jkind>")
       in
       Format.eprintf "[ikind] %a: stored=%s, base=%s, coeffs=[%s]@."
         (Format_doc.compat Path.print) path stored_jkind
@@ -925,11 +943,11 @@ let type_declaration_ikind_gated ~(context : Jkind.jkind_context)
         (pp_coeffs ikind.coeffs));
     ikind)
 
-let type_declaration_ikind_of_jkind ~(context : Jkind.jkind_context)
+let type_declaration_ikind_of_jkind ~(env : Env.t option)
     ~(params : Types.type_expr list) (type_jkind : Types.jkind_l) :
     Types.type_ikind =
   with_ikinds_enabled (fun () ->
-    let poly = normalize ~context type_jkind in
+    let poly = normalize ~env type_jkind in
     let rigid_vars =
       List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
     in
@@ -945,32 +963,18 @@ let type_declaration_ikind_of_jkind ~(context : Jkind.jkind_context)
         (pp_coeffs payload.coeffs);
     payload)
 
-let predef_ikind_context =
-  let unreachable _ =
-    failwith
-      "[predef_ikind_context] We unexpectedly hit a type when computing \
-       ikinds for predef types"
-  in
-  {
-    Jkind.jkind_of_type = unreachable;
-    is_abstract = unreachable;
-    lookup_type = unreachable;
-    debug_print_env = unreachable;
-  }
-
 let predef_ikind_of_jkind ~params type_jkind =
-  type_declaration_ikind_of_jkind
-    ~context:predef_ikind_context ~params type_jkind
+  type_declaration_ikind_of_jkind ~env:None ~params type_jkind
 
 let () = Predef.set_ikind_of_jkind predef_ikind_of_jkind
 
 (* Compute polynomials for a subcheck:
    - compute [super] in Normal mode
    - only round up [sub] if [super] is constant *)
-let compute_subcheck_polys ~(context : Jkind.jkind_context) env
+let compute_subcheck_polys ~context:_ env
     (sub : ('l1 * 'r1) Types.jkind) (super : ('l2 * 'r2) Types.jkind) :
     Ldd.node * Ldd.node =
-  let ctx = make_ctx ~mode:Solver.Normal ~env:(Some env) ~context in
+  let ctx = make_ctx ~mode:Solver.Normal ~env:(Some env) in
   let super_poly = Solver.ckind_of_jkind ctx super in
   let super_is_constant =
     Ldd.solve_pending ();
@@ -1051,7 +1055,7 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
   if not (enable_crossing && !Clflags.ikinds)
   then Jkind.get_mode_crossing ~context env jkind
   else
-    let ctx = make_ctx ~mode:Solver.Round_up ~env:(Some env) ~context in
+    let ctx = make_ctx ~mode:Solver.Round_up ~env:(Some env) in
     let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
     let mb = Jkind.Mod_bounds.of_axis_lattice lat in
     Jkind.Mod_bounds.to_mode_crossing mb
@@ -1149,68 +1153,12 @@ let sub_or_error ?origin:_origin
 (** Substitute constructor ikinds according to [lookup] without requiring
     Env. *)
 
-(* Collect, for each constructor path, the maximum arity at which it occurs in
-   the given type/jkind.  This drives how many coefficients the identity
-   environment must provide. *)
-let rec max_arity_in_jkind (acc : int Path.Map.t) (jkind : _ Types.jkind) =
-  Jkind.With_bounds.to_seq jkind.jkind.with_bounds
-  |> Seq.fold_left (fun acc (ty, _) -> max_arity_in_type acc ty) acc
-
-and max_arity_in_type (acc : int Path.Map.t) (ty : Types.type_expr) =
-  match Types.get_desc ty with
-  | Tvar { jkind; _ } | Tunivar { jkind; _ } -> max_arity_in_jkind acc jkind
-  | Tconstr (path, args, _) ->
-    let n = List.length args in
-    let prev = match Path.Map.find_opt path acc with None -> 0 | Some m -> m in
-    let acc = if n > prev then Path.Map.add path n acc else acc in
-    List.fold_left max_arity_in_type acc args
-  | Ttuple elts | Tunboxed_tuple elts ->
-    List.fold_left (fun a (_, t) -> max_arity_in_type a t) acc elts
-  | Tarrow (_, t1, t2, _) -> max_arity_in_type (max_arity_in_type acc t1) t2
-  | Tpoly (t, ts) ->
-    List.fold_left max_arity_in_type (max_arity_in_type acc t) ts
-  | Trepr (t, _sort_vars) -> max_arity_in_type acc t
-  | Tobject (t, name) -> (
-    let acc = max_arity_in_type acc t in
-    match !name with
-    | None -> acc
-    | Some (_, tl) -> List.fold_left max_arity_in_type acc tl)
-  | Tfield (_, _, t1, t2) -> max_arity_in_type (max_arity_in_type acc t1) t2
-  | Tvariant row ->
-    let acc = Btype.fold_row max_arity_in_type acc row in
-    max_arity_in_type acc (Types.row_more row)
-  | Tpackage (_, fields) ->
-    List.fold_left (fun acc (_n, t) -> max_arity_in_type acc t) acc fields
-  | Tquote t | Tsplice t -> max_arity_in_type acc t
-  | Tlink t -> max_arity_in_type acc t
-  | Tsubst (t, row_opt) -> (
-    let acc = max_arity_in_type acc t in
-    match row_opt with None -> acc | Some row -> max_arity_in_type acc row)
-  | Tof_kind jkind -> max_arity_in_jkind acc jkind
-  | Tnil -> acc
-
-let identity_lookup_from_arity_map (arity : int Path.Map.t) (path : Path.t) :
-    Solver.constr_decl =
-  let open Ldd in
-  let n = match Path.Map.find_opt path arity with None -> 0 | Some m -> m in
-  (* Identity polynomial: base and coeffs are just fresh rigid atoms. *)
-  let base = node_of_var (rigid (Name.atomic path 0)) in
-  let coeffs =
-    Array.init n (fun i -> node_of_var (rigid (Name.atomic path (i + 1))))
-  in
-  Solver.Poly (base, coeffs)
-
 let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
     ~(body : Types.type_expr) : Ldd.node * Ldd.node array =
   (* Approximate type-function substitution by evaluating in an identity
      environment, i.e. every constructor contributes an independent rigid
      atom. *)
-  let arity = max_arity_in_type Path.Map.empty body in
-  let lookup path = identity_lookup_from_arity_map arity path in
-  let ctx =
-    Solver.create_ctx ~mode:Solver.Normal
-      { lookup; jkind_env = None }
-  in
+  let ctx = Solver.create_ctx ~mode:Solver.Normal ~env:None in
   let poly = Solver.normalize (Solver.kind ctx body) in
   let rigid_vars =
     List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
