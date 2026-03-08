@@ -123,6 +123,10 @@ end
 module Mod_bounds : sig
   type t = Types.mod_bounds
 
+  val to_axis_lattice : t -> Axis_lattice.t
+
+  val of_axis_lattice : Axis_lattice.t -> t
+
   val to_mode_crossing : t -> Mode.Crossing.t
 
   val debug_print : Format.formatter -> t -> unit

@@ -351,7 +351,8 @@ let list_argument_jkind = Jkind.Builtin.value_or_null ~why:(
 
 let ikind_of_jkind_ref :
     (params:type_expr list -> jkind_l -> type_ikind) ref =
-  ref (fun ~params:_ _jkind -> Types.ikinds_todo "predef")
+  ref (fun ~params:_ _jkind ->
+    failwith "Predef.ikind_of_jkind called before initialization")
 
 let set_ikind_of_jkind f = ikind_of_jkind_ref := f
 

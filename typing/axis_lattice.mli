@@ -45,7 +45,7 @@ val mask_shallow : t
 val mask_of_modality :
   relevant_for_shallow:[`Relevant | `Irrelevant] -> Mode.Modality.Const.t -> t
 
-(** [Jkind_mod_bounds.t] is morally the same type as this.
+(** [Types.mod_bounds] is morally the same type as this.
    However, its encoding of Crossing.t is different and more complex
    than record below. *)
 type boxed = {

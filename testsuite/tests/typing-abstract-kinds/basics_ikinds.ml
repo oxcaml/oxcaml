@@ -1121,8 +1121,6 @@ type t2 : k2
 type ('a : k1) require_k1
 |}]
 
-(* This could be allowed because [t1]'s kind is [k1] so the with bound doesn't
-   actually affect anything, but currently we're conservative. *)
 type a : k1 with t1
 type b = a require_k1
 [%%expect{|

@@ -106,7 +106,6 @@ end = struct
   include Make_nonportable (A)
 end
 
-(* CR layouts v2.8: ikinds regression vs non-ikinds. *)
 [%%expect{|
 type 'witness wrap = { dummy : 'witness; }
 module Make_nonportable :

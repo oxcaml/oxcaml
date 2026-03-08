@@ -265,20 +265,26 @@ module Solver = struct
   and ckind_of_jkind_desc :
       type a l r. ctx -> (a, l * r) Types.base_and_axes -> Ldd.node =
    fun ctx jkind_desc ->
-    let mod_bounds, with_bounds, unresolved_base =
-      let rec expand :
-          type b. (b, l * r) Types.base_and_axes ->
-          Types.mod_bounds * (l * r) Types.with_bounds * Path.t option =
-       fun jkind_desc ->
-        match ctx.env.jkind_env with
-        | None ->
+    let expand =
+      match ctx.env.jkind_env with
+      | None ->
+        let expand :
+            type b. (b, l * r) Types.base_and_axes ->
+            Types.mod_bounds * (l * r) Types.with_bounds * Path.t option =
+         fun jkind_desc ->
           let unresolved_base =
             match jkind_desc.base with
             | Types.Layout _ -> None
             | Types.Kconstr path -> Some path
           in
           jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
-        | Some env -> (
+        in
+        expand
+      | Some env ->
+        let rec expand :
+            type b. (b, l * r) Types.base_and_axes ->
+            Types.mod_bounds * (l * r) Types.with_bounds * Path.t option =
+         fun jkind_desc ->
           match Jkind.Const.expand_once env jkind_desc with
           | Some jkind_const -> expand jkind_const
           | None ->
@@ -287,19 +293,13 @@ module Solver = struct
               | Types.Layout _ -> None
               | Types.Kconstr path -> Some path
             in
-            jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base)
-      in
-      expand jkind_desc
+            jkind_desc.mod_bounds, jkind_desc.with_bounds, unresolved_base
+        in
+        expand
     in
-    (* Base is the modality bounds stored on this jkind. *)
-    let mod_bounds =
-      Types.Jkind_mod_bounds.create mod_bounds.crossing
-        ~externality:mod_bounds.externality
-        ~nullability:mod_bounds.nullability
-        ~separability:mod_bounds.separability
-    in
+    let mod_bounds, with_bounds, unresolved_base = expand jkind_desc in
     let base_mod_bounds =
-      Ldd.const (Types.Jkind_mod_bounds.to_axis_lattice mod_bounds)
+      Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds)
     in
     let base =
       match unresolved_base with
@@ -548,51 +548,51 @@ let type_id_set (tys : Types.type_expr list) =
     tys;
   ids
 
-(* Gather unique local vars from [tys], skipping declaration parameters. *)
+(* Gather constructor-local vars from [tys], skipping declaration params. *)
 let collect_type_vars_excluding ~(excluded_ids : ('a, unit) Hashtbl.t)
-    (tys : Types.type_expr list) : Types.type_expr list =
-  let seen = Hashtbl.create 16 in
-  let vars = ref [] in
-  let rec collect ty =
-    match Types.get_desc ty with
-    | Types.Tvar _ | Types.Tunivar _ ->
-      let id = Types.get_id ty in
-      if
-        not (Hashtbl.mem excluded_ids id)
-        && not (Hashtbl.mem seen id)
-      then (
-        Hashtbl.replace seen id ();
-        vars := ty :: !vars)
-    | _ -> Btype.iter_type_expr collect ty
-  in
-  List.iter collect tys;
-  List.rev !vars
+    (tys : Types.type_expr list) : (int, Types.type_expr) Hashtbl.t =
+  let vars = Hashtbl.create 16 in
+  Types.with_type_mark (fun mark ->
+    let super = Btype.type_iterators mark in
+    let it =
+      { super with
+        it_type_expr =
+          (fun self ty ->
+            match Types.get_desc ty with
+            | Types.Tvar _ | Types.Tunivar _ ->
+              let id = Types.get_id ty in
+              if not (Hashtbl.mem excluded_ids id)
+              then Hashtbl.replace vars id ty
+            | _ -> super.it_type_expr self ty)
+      }
+    in
+    List.iter (it.it_type_expr it) tys);
+  vars
 
 (* Use each local variable's declared jkind as its fallback bound. *)
-let local_var_bounds (ctx : Solver.ctx) (local_vars : Types.type_expr list) =
-  let bounds = Hashtbl.create (List.length local_vars) in
-  List.iter
-    (fun ty ->
+let local_var_bounds (ctx : Solver.ctx)
+    (local_vars : (int, Types.type_expr) Hashtbl.t) =
+  let bounds = Hashtbl.create (Hashtbl.length local_vars) in
+  Hashtbl.iter
+    (fun id ty ->
       let bound =
         match Types.get_desc ty with
         | Types.Tvar { jkind; _ } | Types.Tunivar { jkind; _ } ->
           Solver.ckind_of_jkind ctx jkind
         | _ -> Ldd.const Axis_lattice.top
       in
-      Hashtbl.replace bounds (Types.get_id ty) bound)
+      Hashtbl.replace bounds id bound)
     local_vars;
   bounds
 
 (* For a plain-variable result argument, map it directly to [lhs_kind]. *)
-let add_plain_var_projection ~(local_var_ids : ('a, unit) Hashtbl.t)
+let add_plain_var_projection ~(local_vars : ('a, Types.type_expr) Hashtbl.t)
     ~(local_subst : ('a, Ldd.node) Hashtbl.t) ~(lhs_kind : Ldd.node)
     (res_arg : Types.type_expr) : unit =
   match Types.get_desc res_arg with
   | Types.Tvar _ | Types.Tunivar _ ->
     let id = Types.get_id res_arg in
-    if
-      Hashtbl.mem local_var_ids id
-      && not (Hashtbl.mem local_subst id)
+    if Hashtbl.mem local_vars id && not (Hashtbl.mem local_subst id)
     then Hashtbl.add local_subst id lhs_kind
   | _ -> ()
 
@@ -632,24 +632,21 @@ let make_gadt_payload_projector
             ~excluded_ids:decl_param_ids
             (payload_tys @ res_args)
         in
-        if local_vars = []
+        if Hashtbl.length local_vars = 0
         then fallback
         else
-          let local_var_ids = type_id_set local_vars in
           let local_var_bounds = local_var_bounds ctx local_vars in
           (* Step 2: build a partial substitution local_var -> projected kind
              from the constructor result arguments. Earlier mappings win. *)
-          let local_subst = Hashtbl.create (List.length local_vars) in
-          if List.length res_args = List.length decl_params
-          then
-            List.iter2
-              (fun decl_param res_arg ->
-                add_plain_var_projection
-                  ~local_var_ids
-                  ~local_subst
-                  ~lhs_kind:(Solver.kind ctx decl_param)
-                  res_arg)
-              decl_params res_args;
+          let local_subst = Hashtbl.create (Hashtbl.length local_vars) in
+          List.iter2
+            (fun decl_param res_arg ->
+              add_plain_var_projection
+                ~local_vars
+                ~local_subst
+                ~lhs_kind:(Solver.kind ctx decl_param)
+                res_arg)
+            decl_params res_args;
           (* Step 3: apply the substitution to payload kinds:
              - mapped locals use their projected kinds
              - unmapped locals fall back to their declared bounds
@@ -662,7 +659,7 @@ let make_gadt_payload_projector
               match Hashtbl.find_opt local_subst id with
               | Some projected -> projected
               | None ->
-                if Hashtbl.mem local_var_ids id
+                if Hashtbl.mem local_vars id
                 then
                   (match Hashtbl.find_opt local_var_bounds id with
                   | Some bound -> bound
@@ -674,7 +671,10 @@ let make_gadt_payload_projector
           fun ty ->
             let raw_kind = Solver.kind ctx ty in
             Ldd.map_rigid map_name raw_kind
-      | _ -> fallback)
+      | _ ->
+        failwith
+          "ikind: expected GADT constructor result to be a type \
+           constructor")
 
 (* Lookup function supplied to the solver.
    We prefer a stored ikind (when present) and otherwise recompute from the
@@ -811,17 +811,8 @@ let lookup_of_context ~(context : Jkind.jkind_context) (path : Path.t) :
               else Axis_lattice.immutable_data
             in
             let payload_kind_of_constructor =
-              if
-                List.exists
-                  (fun (c : Types.constructor_declaration) ->
-                    Option.is_some c.cd_res)
-                  cstrs
-              then
-                make_gadt_payload_projector
-                  ~decl_params:type_decl.type_params ctx
-              else
-                fun (_c : Types.constructor_declaration) ty ->
-                  Solver.kind ctx ty
+              make_gadt_payload_projector
+                ~decl_params:type_decl.type_params ctx
             in
             let constructor_contrib (c : Types.constructor_declaration) =
               let payload_kind = payload_kind_of_constructor c in
@@ -1062,8 +1053,8 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
   else
     let ctx = make_ctx ~mode:Solver.Round_up ~env:(Some env) ~context in
     let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
-    let mb = Types.Jkind_mod_bounds.of_axis_lattice lat in
-    Types.Jkind_mod_bounds.crossing mb
+    let mb = Jkind.Mod_bounds.of_axis_lattice lat in
+    Jkind.Mod_bounds.to_mode_crossing mb
 
 type sub_or_intersect = Jkind.sub_or_intersect
 
@@ -1146,12 +1137,10 @@ let sub_or_error ?origin:_origin
   if not (enable_sub_or_error && !Clflags.ikinds)
   then Jkind.sub_or_error ~type_equal ~context ~level env t1 t2
   else
-    let ctx = make_ctx ~mode:Solver.Normal ~env:(Some env) ~context in
-    match
-      Ldd.leq_with_reason
-        (Solver.ckind_of_jkind ctx t1)
-        (Solver.ckind_of_jkind ctx t2)
-    with
+    let sub_poly, super_poly =
+      compute_subcheck_polys ~context env t1 t2
+    in
+    match Ldd.leq_with_reason sub_poly super_poly with
     | [] -> Ok ()
     | _ ->
       (* Delegate to Jkind for detailed error reporting. *)
@@ -1264,7 +1253,8 @@ let substitute_decl_ikind_with_lookup
         | Lookup_path alias_path ->
           Ldd.node_of_var (Ldd.rigid (Ldd.Name.katom alias_path))
         | Lookup_type_fun (_params, _body) ->
-          Ldd.node_of_var (Ldd.rigid name))
+          failwith
+            "ikind: unexpected type function while rewriting k-atoms")
       | Atom { constr = path; arg_index } -> (
         match lookup path with
         | Lookup_identity -> Ldd.node_of_var (Ldd.rigid name)

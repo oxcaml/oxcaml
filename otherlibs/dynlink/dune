@@ -149,7 +149,6 @@
   persistent_env
   env
   jkind
-  ;; IKINDS
   ikind
   errortrace
   ctype

@@ -747,17 +747,17 @@ let rec type_declaration' copy_scope s decl =
          inlined type functions), avoiding Env. *)
       let lookup (path : Path.t) : Types.Ikind_substitution.lookup_result =
         match Path.Map.find_opt path s.types with
-        | Some (Path p) -> Types.Ikind_substitution.Lookup_path p
+        | Some (Path p) -> Lookup_path p
         | Some (Type_function { params; body }) ->
           let body = apply_type_function params params body in
-          Types.Ikind_substitution.Lookup_type_fun (params, body)
+          Lookup_type_fun (params, body)
         | None -> (
           (* Mirror [type_path]: even without an explicit replacement, rename
              via module path rewriting if the path changes. *)
           let path' = type_path s path in
           if Path.same path path'
-          then Types.Ikind_substitution.Lookup_identity
-          else Types.Ikind_substitution.Lookup_path path')
+          then Lookup_identity
+          else Lookup_path path')
       in
       !Types.Ikind_substitution.substitute_decl_ikind_with_lookup
         ~lookup decl.type_ikind

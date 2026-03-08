@@ -385,10 +385,6 @@ module M : sig
 end = struct
   type t = P : ('a : immediate). 'a abstract -> t
 end
-(* CR layouts v2.8: This might be safe to accept, but it's tricky and unlikely to be
-   especially useful. Revisit later. It will require descending into arguments of non-best
-   Tconstrs, checking to see if corresponding arguments are in a sub-kind relationship --
-   but only if at least the argument on the right is best. Subtle. *)
 [%%expect{|
 module M : sig type t : immutable_data with (type : value) abstract end
 |}]
