@@ -108,21 +108,6 @@ type t = ..
 type t += K : ('a : float64). 'a ignore -> t
 |}]
 
-(* CR layouts v2.8: re-enable this. Internal ticket 5118. *)
-(*
-module M : sig
-  kind_abbrev_ k = immediate
-end = struct
-  kind_abbrev_ k = immediate
-end
-
-[%%expect{|
->> Fatal error: kind_abbrev not supported!
-Uncaught exception: Misc.Fatal_error
-
-|}]
-*)
-
 type t1 : any
 type t2 : any mod separable
 type t3 : value_or_null
@@ -1312,8 +1297,8 @@ Error: This value is "local" because it is borrowed.
        However, the highlighted expression is expected to be "global".
 |}]
 
-(***************)
-(* Modal kinds *)
+(*************************************)
+(* Modal kinds and kind declarations *)
 
 (* supported *)
 type 'a list : immutable_data with 'a
@@ -1361,21 +1346,30 @@ module M :
   end @@ stateless
 |}]
 
+module type S = sig kind_ k end
+module type S1 = S with kind_ k = value mod portable
+module type S2 = S with kind_ k := value mod global
+[%%expect{|
+module type S = sig kind_ k end
+module type S1 = sig kind_ k = value mod portable end
+module type S2 = sig end
+|}]
+
 (* not yet supported *)
 module _ : sig
-  type 'a gel : kind_of_ 'a mod global
+  type 'a gel : (kind_of_ 'a) mod global
   type 'a t : _
 end = struct
-  type 'a gel : kind_of_ 'a mod global
+  type 'a gel : (kind_of_ 'a) mod global
   type 'a t : _
 end
 
 (* CR layouts: Expect this output to change once `kind_of_` is   supported.
    Internal ticket 2912. *)
 [%%expect{|
-Line 5, characters 16-27:
-5 |   type 'a gel : kind_of_ 'a mod global
-                    ^^^^^^^^^^^
+Line 5, characters 16-29:
+5 |   type 'a gel : (kind_of_ 'a) mod global
+                    ^^^^^^^^^^^^^
 Error: Unimplemented kind syntax
 |}]
 
