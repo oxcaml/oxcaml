@@ -54,6 +54,8 @@ module type S = sig
   (** Solving interface. *)
   val solve_lfp : var -> node -> unit
 
+  val inline_solved_vars : node -> node
+
   val enqueue_gfp : var -> node -> unit
 
   val solve_pending : unit -> unit

@@ -233,39 +233,28 @@ module Make (V : Ordered) = struct
     else node_raw v lo (canonicalize ~hi ~lo)
 
   (* --------- boolean algebra over nodes --------- *)
-  let rec join (a : node) (b : node) =
+  let rec join' (a : node) (b : node) =
     (* Variable-order merge: [order] decides which side can be descended.
        This is similar to merge on sorted lists as we go down one path of
        the tree, but unlike merge on lists, we traverse all paths down the
        tree.
     *)
-    if a == b
-    then a
-    else if is_leaf a
+    let a_block = Unsafe.node_block a in
+    let b_block = Unsafe.node_block b in
+    let order = compare_var a_block.v b_block.v in
+    if order = 0
     then
-      let leaf_val = Unsafe.leaf_value a in
-      join_with_leaf leaf_val b
-    else if is_leaf b
+      node_raw a_block.v (join a_block.lo b_block.lo)
+        (join
+           (canonicalize ~hi:a_block.hi ~lo:b_block.lo)
+           (canonicalize ~hi:b_block.hi ~lo:a_block.lo))
+    else if order < 0
     then
-      let leaf_val = Unsafe.leaf_value b in
-      join_with_leaf leaf_val a
+      node_raw a_block.v (join a_block.lo b)
+        (canonicalize ~hi:a_block.hi ~lo:b)
     else
-      let a_block = Unsafe.node_block a in
-      let b_block = Unsafe.node_block b in
-      let order = compare_var a_block.v b_block.v in
-      if order = 0
-      then
-        node_raw a_block.v (join a_block.lo b_block.lo)
-          (join
-             (canonicalize ~hi:a_block.hi ~lo:b_block.lo)
-             (canonicalize ~hi:b_block.hi ~lo:a_block.lo))
-      else if order < 0
-      then
-        node_raw a_block.v (join a_block.lo b)
-          (canonicalize ~hi:a_block.hi ~lo:b)
-      else
-        node_raw b_block.v (join a b_block.lo)
-          (canonicalize ~hi:b_block.hi ~lo:a)
+      node_raw b_block.v (join a b_block.lo)
+        (canonicalize ~hi:b_block.hi ~lo:a)
 
   and join_with_leaf (leaf_value : Axis_lattice.t) (node : node) =
     let rec aux (leaf_value : Axis_lattice.t) (node : node) =
@@ -288,29 +277,23 @@ module Make (V : Ordered) = struct
     then node
     else aux leaf_value node
 
-  let rec meet (a : node) (b : node) =
+  and meet' (a : node) (b : node) =
     (* Variable-order merge: [order] decides which side can be descended. *)
-    if a == b
-    then a
-    else if is_leaf a
-    then meet_with_leaf a b
-    else if is_leaf b
-    then meet_with_leaf b a
+    let a_block = Unsafe.node_block a in
+    let b_block = Unsafe.node_block b in
+    let order = compare_var a_block.v b_block.v in
+    if order = 0
+    then
+      let lo = meet a_block.lo b_block.lo in
+      let hi =
+        meet (join a_block.hi a_block.lo) (join b_block.hi b_block.lo)
+      in
+      node a_block.v ~lo ~hi
+    else if order < 0
+    then
+      node a_block.v ~lo:(meet a_block.lo b) ~hi:(meet a_block.hi b)
     else
-      let a_block = Unsafe.node_block a in
-      let b_block = Unsafe.node_block b in
-      let order = compare_var a_block.v b_block.v in
-      if order = 0
-      then
-        let lo = meet a_block.lo b_block.lo in
-        let hi = meet (join a_block.hi a_block.lo)
-                   (join b_block.hi b_block.lo) in
-        node a_block.v ~lo ~hi
-      else if order < 0
-      then
-        node a_block.v ~lo:(meet a_block.lo b) ~hi:(meet a_block.hi b)
-      else
-        node b_block.v ~lo:(meet a b_block.lo) ~hi:(meet a b_block.hi)
+      node b_block.v ~lo:(meet a b_block.lo) ~hi:(meet a b_block.hi)
 
   and meet_with_leaf (leaf_node : node) (other : node) =
     let rec aux (leaf_value : Axis_lattice.t) (other : node) =
@@ -330,6 +313,36 @@ module Make (V : Ordered) = struct
     else if Axis_lattice.equal leaf_value Axis_lattice.bot
     then bot
     else aux leaf_value other
+
+  and[@inline] join (a : node) (b : node) =
+    if a == b
+    then a
+    else if is_leaf a
+    then
+      let leaf_val = Unsafe.leaf_value a in
+      if is_leaf b
+      then leaf (Axis_lattice.join leaf_val (Unsafe.leaf_value b))
+      else join_with_leaf leaf_val b
+    else if is_leaf b
+    then
+      let leaf_val = Unsafe.leaf_value b in
+      join_with_leaf leaf_val a
+    else
+      join' a b
+
+  and[@inline] meet (a : node) (b : node) =
+    if a == b
+    then a
+    else if is_leaf a
+    then
+      let leaf_val = Unsafe.leaf_value a in
+      if is_leaf b
+      then leaf (Axis_lattice.meet leaf_val (Unsafe.leaf_value b))
+      else meet_with_leaf a b
+    else if is_leaf b
+    then meet_with_leaf b a
+    else
+      meet' a b
 
   (* --------- public constructors --------- *)
   let[@inline] const (c : Axis_lattice.t) = leaf c
@@ -387,9 +400,7 @@ module Make (V : Ordered) = struct
         then node0
         else node block.v ~lo:lo' ~hi:hi'
 
-  (* --------- inline solved vars --------- *)
-  (** Inline solved variables by replacing them with their solutions. *)
-  let rec inline_solved_vars (node : node) : node =
+  and inline_solved_vars (node : node) : node =
     (* Do not descend under rigid vars. *)
     if is_leaf node
     then node

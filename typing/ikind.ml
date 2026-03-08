@@ -85,13 +85,42 @@ module Solver = struct
       constr_to_coeffs : (Ldd.node * Ldd.node array) ConstrTbl.t
     }
 
-  (** Start a new solver context. *)
-  let create_ctx ~(mode : mode) ~(env : Env.t option) : ctx =
-    { env;
-      mode;
-      ty_to_kind = TyTbl.create 0;
-      constr_to_coeffs = ConstrTbl.create 0
+  type ctx_tables =
+    { ty_to_kind : Ldd.node TyTbl.t;
+      constr_to_coeffs : (Ldd.node * Ldd.node array) ConstrTbl.t
     }
+
+  let ctx_tables_pool : ctx_tables list ref = ref []
+
+  let acquire_ctx_tables () =
+    match !ctx_tables_pool with
+    | tables :: rest ->
+      ctx_tables_pool := rest;
+      tables
+    | [] ->
+      { ty_to_kind = TyTbl.create 0;
+        constr_to_coeffs = ConstrTbl.create 0
+      }
+
+  let release_ctx (ctx : ctx) =
+    TyTbl.clear ctx.ty_to_kind;
+    ConstrTbl.clear ctx.constr_to_coeffs;
+    ctx_tables_pool :=
+      { ty_to_kind = ctx.ty_to_kind;
+        constr_to_coeffs = ctx.constr_to_coeffs
+      }
+      :: !ctx_tables_pool
+
+  let with_ctx ~(mode : mode) ~(env : Env.t option) f =
+    let tables = acquire_ctx_tables () in
+    let ctx =
+      { env;
+        mode;
+        ty_to_kind = tables.ty_to_kind;
+        constr_to_coeffs = tables.constr_to_coeffs
+      }
+    in
+    Fun.protect ~finally:(fun () -> release_ctx ctx) (fun () -> f ctx)
 
   let reset_for_mode (ctx : ctx) ~(mode : mode) : ctx = { ctx with mode }
 
@@ -115,11 +144,6 @@ module Solver = struct
   let is_principal_type (ty : Types.type_expr) : bool =
     (not !Clflags.principal)
     || Types.get_level ty = Btype.generic_level
-
-  (* Guards against accidental infinite recursion when traversing types. *)
-  let kind_of_depth = ref 0
-
-  let kind_of_counter = ref 0
 
   (* CR jujacobs: we could optimize the join with masks you see below
      using a combined [Ldd.join_with_mask left mask right] operation. *)
@@ -198,7 +222,12 @@ module Solver = struct
         let coeffs_rhs = Array.map rehydrate coeffs in
         Ldd.solve_lfp base_var base_rhs;
         Array.iter2 (fun v rhs -> Ldd.solve_lfp v rhs) coeff_vars coeffs_rhs;
-        base_poly, coeffs_poly
+        let res =
+          Ldd.inline_solved_vars base_poly,
+          Array.map Ldd.inline_solved_vars coeffs_poly
+        in
+        ConstrTbl.replace ctx.constr_to_coeffs path res;
+        res
       | Ty { args = params; kind = body; abstract } ->
         let base_var = Ldd.new_var () in
         let coeff_vars =
@@ -262,22 +291,21 @@ module Solver = struct
             coeff_vars coeffs_rhs);
         base_poly, coeffs_poly)
 
-  (* Apply a constructor polynomial to argument kinds. *)
-  and constr (ctx : ctx) (path : Path.t) (arg_kinds : Ldd.node list)
+  (* Apply a constructor polynomial to argument types. *)
+  and constr (ctx : ctx) (path : Path.t) (args : Types.type_expr list)
       : Ldd.node =
-    let base, coeffs =
-      constr_kind ctx ~min_arity:(List.length arg_kinds) path
-    in
+    let base, coeffs = constr_kind ctx ~min_arity:(List.length args) path in
     let rec loop acc remaining i =
       if i = Array.length coeffs
       then acc
       else
         match remaining with
-        | arg_kind :: rest ->
+        | arg :: rest ->
+          let arg_kind = kind ctx arg in
           loop (Ldd.join acc (Ldd.meet arg_kind coeffs.(i))) rest (i + 1)
         | [] -> failwith "Missing arg"
     in
-    loop base arg_kinds 0
+    loop base args 0
 
   (* Converting surface jkinds to solver ckinds. *)
   and ckind_of_jkind_desc :
@@ -341,6 +369,43 @@ module Solver = struct
       type l r. ctx -> (l * r) Types.jkind -> Ldd.node =
    fun ctx jkind -> ckind_of_jkind_desc ctx jkind.jkind
 
+  and mod_bounds_floor_of_jkind_desc :
+      type a l r. ctx -> (a, l * r) Types.base_and_axes -> Ldd.node option =
+   fun ctx jkind_desc ->
+    let mod_bounds, unresolved_base =
+      let rec expand :
+          type b. (b, l * r) Types.base_and_axes ->
+          Types.mod_bounds * Path.t option =
+       fun jkind_desc ->
+        match ctx.env with
+        | None ->
+          let unresolved_base =
+            match jkind_desc.base with
+            | Types.Layout _ -> None
+            | Types.Kconstr path -> Some path
+          in
+          jkind_desc.mod_bounds, unresolved_base
+        | Some env -> (
+          match Jkind.Const.expand_once env jkind_desc with
+          | Some jkind_const -> expand jkind_const
+          | None ->
+            let unresolved_base =
+              match jkind_desc.base with
+              | Types.Layout _ -> None
+              | Types.Kconstr path -> Some path
+            in
+            jkind_desc.mod_bounds, unresolved_base)
+      in
+      expand jkind_desc
+    in
+    match unresolved_base with
+    | Some _ -> None
+    | None -> Some (Ldd.const (Jkind.Mod_bounds.to_axis_lattice mod_bounds))
+
+  and mod_bounds_floor_of_jkind :
+      type l r. ctx -> (l * r) Types.jkind -> Ldd.node option =
+   fun ctx jkind -> mod_bounds_floor_of_jkind_desc ctx jkind.jkind
+
   (** Compute the kind for [t]. *)
   and kind (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
     if not (is_principal_type ty) then Ldd.const Axis_lattice.top else
@@ -355,11 +420,13 @@ module Solver = struct
         TyTbl.add ctx.ty_to_kind ty placeholder;
         let kind_rhs = kind_uncached ctx ty in
         Ldd.solve_lfp var kind_rhs;
-        placeholder)
-      else
+        let kind_inlined = Ldd.inline_solved_vars placeholder in
+        TyTbl.replace ctx.ty_to_kind ty kind_inlined;
+        kind_inlined)
+      else (
         let kind_rhs = kind_uncached ctx ty in
         TyTbl.add ctx.ty_to_kind ty kind_rhs;
-        kind_rhs
+        kind_rhs)
 
   (* Worker for [kind]; does not memoize.
      Only call from [kind] so caching and LFP handling apply. *)
@@ -367,12 +434,6 @@ module Solver = struct
     (* Compute the ikind polynomial for an arbitrary [type_expr]. This is the
        semantic counterpart of [Jkind.jkind_of_type], but expressed in LDD
        form. *)
-    incr kind_of_depth;
-    if !kind_of_depth > 500 then failwith "kind_of_depth too deep" else ();
-    incr kind_of_counter;
-    if !kind_of_counter > 100000000
-    then failwith "kind_of_counter too big"
-    else ();
     let kind_poly =
       (* [ty] is expected to be representative: no links/substs/fields/nil. *)
       match Types.get_desc ty with
@@ -381,8 +442,7 @@ module Solver = struct
         (* Keep a rigid param, but cap it by its annotated jkind. *)
         Ldd.meet (rigid ctx ty) (ckind_of_jkind ctx jkind)
       | Types.Tconstr (path, args, _abbrev_memo) ->
-        let arg_kinds = List.map (fun t -> kind ctx t) args in
-        constr ctx path arg_kinds
+        constr ctx path args
       | Types.Ttuple elts ->
         (* Boxed tuples: immutable_data base + per-element contributions
            under id modality. *)
@@ -458,7 +518,6 @@ module Solver = struct
         in
         Ldd.meet (Ldd.const Axis_lattice.nonfloat_value) unknown
     in
-    decr kind_of_depth;
     kind_poly
 
   (* Evaluate a ckind in [ctx] and flush pending GFP constraints. *)
@@ -902,19 +961,19 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
 let () = Solver.set_lookup_from_env (fun env path -> lookup_of_env ~env path)
 
 (* Package the above into a full evaluation context. *)
-let make_ctx ~(mode : Solver.mode) ~(env : Env.t option) : Solver.ctx =
-  Solver.create_ctx ~mode ~env
+let with_ctx ~(mode : Solver.mode) ~(env : Env.t option) f =
+  Solver.with_ctx ~mode ~env f
 
 let normalize ~(env : Env.t option) (jkind : Types.jkind_l) : Ldd.node =
-  let ctx = make_ctx ~mode:Solver.Normal ~env in
-  Solver.normalize (Solver.ckind_of_jkind ctx jkind)
+  with_ctx ~mode:Solver.Normal ~env (fun ctx ->
+      Solver.normalize (Solver.ckind_of_jkind ctx jkind))
 
 let type_declaration_ikind ~(env : Env.t option)
     ~(path : Path.t) :
     Types.constructor_ikind =
-  let ctx = make_ctx ~mode:Solver.Normal ~env in
-  let base, coeffs = Solver.constr_kind_poly ctx path in
-  constructor_ikind ~base ~coeffs
+  with_ctx ~mode:Solver.Normal ~env (fun ctx ->
+      let base, coeffs = Solver.constr_kind_poly ctx path in
+      constructor_ikind ~base ~coeffs)
 
 let type_declaration_ikind_gated ~(env : Env.t option)
     ~(path : Path.t) : Types.type_ikind =
@@ -968,25 +1027,70 @@ let predef_ikind_of_jkind ~params type_jkind =
 
 let () = Predef.set_ikind_of_jkind predef_ikind_of_jkind
 
+type subcheck_fast_path =
+  | No_fast_path
+  | Rhs_top_fast_path
+  | Lhs_mod_bounds_floor_fast_path
+
+type subcheck_polys =
+  { lhs_for_leq : Ldd.node;
+    rhs_for_leq : Ldd.node;
+    fast_path : subcheck_fast_path
+  }
+
 (* Compute polynomials for a subcheck:
    - compute [super] in Normal mode
-   - only round up [sub] if [super] is constant *)
+   - fast path: if [super] is constant top, no need to compute [sub]
+   - otherwise, only round up [sub] if [super] is constant *)
 let compute_subcheck_polys ~context:_ env
     (sub : ('l1 * 'r1) Types.jkind) (super : ('l2 * 'r2) Types.jkind) :
-    Ldd.node * Ldd.node =
-  let ctx = make_ctx ~mode:Solver.Normal ~env:(Some env) in
-  let super_poly = Solver.ckind_of_jkind ctx super in
-  let super_is_constant =
-    Ldd.solve_pending ();
-    Ldd.is_const super_poly
-  in
-  let sub_ctx =
-    if super_is_constant
-    then Solver.reset_for_mode ctx ~mode:Solver.Round_up
-    else ctx
-  in
-  let sub_poly = Solver.ckind_of_jkind sub_ctx sub in
-  sub_poly, super_poly
+    subcheck_polys =
+  with_ctx ~mode:Solver.Normal ~env:(Some env) (fun ctx ->
+      let super_poly = Solver.ckind_of_jkind ctx super in
+      let super_is_constant =
+        Ldd.solve_pending ();
+        Ldd.is_const super_poly
+      in
+      if super_is_constant
+         && Axis_lattice.equal (Ldd.round_up super_poly) Axis_lattice.top
+      then
+        { lhs_for_leq = Ldd.bot;
+          rhs_for_leq = super_poly;
+          fast_path = Rhs_top_fast_path
+        }
+      else
+        let floor_fast_path =
+          if super_is_constant
+          then
+            match Solver.mod_bounds_floor_of_jkind ctx sub with
+            | None -> None
+            | Some lhs_floor ->
+              let lhs_floor_or_super = Ldd.join lhs_floor super_poly in
+              if
+                Axis_lattice.equal
+                  (Ldd.round_up lhs_floor_or_super)
+                  Axis_lattice.top
+              then Some lhs_floor
+              else None
+          else None
+        in
+        match floor_fast_path with
+        | Some lhs_floor ->
+          { lhs_for_leq = lhs_floor;
+            rhs_for_leq = super_poly;
+            fast_path = Lhs_mod_bounds_floor_fast_path
+          }
+        | None ->
+          let sub_ctx =
+            if super_is_constant
+            then Solver.reset_for_mode ctx ~mode:Solver.Round_up
+            else ctx
+          in
+          let sub_poly = Solver.ckind_of_jkind sub_ctx sub in
+          { lhs_for_leq = sub_poly;
+            rhs_for_leq = super_poly;
+            fast_path = No_fast_path
+          })
 
 let sub_jkind_l ?allow_any_crossing ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
@@ -1018,19 +1122,26 @@ let sub_jkind_l ?allow_any_crossing ?origin
           origin_suffix);
       Ok ())
     else
-      let sub_poly, super_poly =
-        compute_subcheck_polys ~context env sub super
-      in
+      let subcheck = compute_subcheck_polys ~context env sub super in
+      let sub_poly = subcheck.lhs_for_leq in
+      let super_poly = subcheck.rhs_for_leq in
       let violating_axes = Ldd.leq_with_reason sub_poly super_poly in
       (if !Clflags.ikinds_debug
       then
         let origin_suffix = origin_suffix_of origin in
+        let fast_path =
+          match subcheck.fast_path with
+          | No_fast_path -> "none"
+          | Rhs_top_fast_path -> "rhs_top"
+          | Lhs_mod_bounds_floor_fast_path -> "lhs_mod_bounds_floor"
+        in
         Format.eprintf
-          "[ikind-subjkind] call%s allow_any=false@;\
+          "[ikind-subjkind] call%s allow_any=false fast_path=%s@;\
            @;\
            sub_poly=%s@;\
            super_poly=%s@."
           origin_suffix
+          fast_path
           (Ldd.pp sub_poly)
           (Ldd.pp super_poly));
       match violating_axes with
@@ -1055,10 +1166,19 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
   if not (enable_crossing && !Clflags.ikinds)
   then Jkind.get_mode_crossing ~context env jkind
   else
-    let ctx = make_ctx ~mode:Solver.Round_up ~env:(Some env) in
-    let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
-    let mb = Jkind.Mod_bounds.of_axis_lattice lat in
-    Jkind.Mod_bounds.to_mode_crossing mb
+    let with_bounds_is_empty =
+      match Jkind.With_bounds.to_seq jkind.jkind.with_bounds () with
+      | Seq.Nil -> true
+      | Seq.Cons _ -> false
+    in
+    match jkind.jkind.base with
+    | Types.Layout _ when with_bounds_is_empty ->
+      Jkind.get_mode_crossing ~context env jkind
+    | _ ->
+      with_ctx ~mode:Solver.Round_up ~env:(Some env) (fun ctx ->
+          let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
+          let mb = Jkind.Mod_bounds.of_axis_lattice lat in
+          Jkind.Mod_bounds.to_mode_crossing mb)
 
 type sub_or_intersect = Jkind.sub_or_intersect
 
@@ -1073,7 +1193,9 @@ let sub_or_intersect ?origin
       let sub_poly, super_poly =
         match polys with
         | Some polys -> polys
-        | None -> compute_subcheck_polys ~context env t1 t2
+        | None ->
+          let subcheck = compute_subcheck_polys ~context env t1 t2 in
+          subcheck.lhs_for_leq, subcheck.rhs_for_leq
       in
       let origin_suffix = origin_suffix_of origin in
       Format.eprintf
@@ -1107,9 +1229,9 @@ let sub_or_intersect ?origin
          debug_polys ~outcome:"Sub" ();
          Jkind.Sub)
     | Ok () ->
-      let sub_poly, super_poly =
-        compute_subcheck_polys ~context env t1 t2
-      in
+      let subcheck = compute_subcheck_polys ~context env t1 t2 in
+      let sub_poly = subcheck.lhs_for_leq in
+      let super_poly = subcheck.rhs_for_leq in
       match Ldd.leq_with_reason sub_poly super_poly with
       | [] ->
         debug_polys ~polys:(sub_poly, super_poly) ~outcome:"Sub" ();
@@ -1141,14 +1263,16 @@ let sub_or_error ?origin:_origin
   if not (enable_sub_or_error && !Clflags.ikinds)
   then Jkind.sub_or_error ~type_equal ~context ~level env t1 t2
   else
-    let sub_poly, super_poly =
-      compute_subcheck_polys ~context env t1 t2
-    in
-    match Ldd.leq_with_reason sub_poly super_poly with
-    | [] -> Ok ()
-    | _ ->
-      (* Delegate to Jkind for detailed error reporting. *)
-      Jkind.sub_or_error ~type_equal ~context ~level env t1 t2
+    with_ctx ~mode:Solver.Normal ~env:(Some env) (fun ctx ->
+        match
+          Ldd.leq_with_reason
+            (Solver.ckind_of_jkind ctx t1)
+            (Solver.ckind_of_jkind ctx t2)
+        with
+        | [] -> Ok ()
+        | _ ->
+          (* Delegate to Jkind for detailed error reporting. *)
+          Jkind.sub_or_error ~type_equal ~context ~level env t1 t2)
 
 (** Substitute constructor ikinds according to [lookup] without requiring
     Env. *)
@@ -1158,15 +1282,15 @@ let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
   (* Approximate type-function substitution by evaluating in an identity
      environment, i.e. every constructor contributes an independent rigid
      atom. *)
-  let ctx = Solver.create_ctx ~mode:Solver.Normal ~env:None in
-  let poly = Solver.normalize (Solver.kind ctx body) in
-  let rigid_vars =
-    List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
-  in
-  let base, coeffs =
-    Ldd.decompose_into_linear_terms ~universe:rigid_vars poly
-  in
-  base, Array.of_list coeffs
+  with_ctx ~mode:Solver.Normal ~env:None (fun ctx ->
+      let poly = Solver.normalize (Solver.kind ctx body) in
+      let rigid_vars =
+        List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
+      in
+      let base, coeffs =
+        Ldd.decompose_into_linear_terms ~universe:rigid_vars poly
+      in
+      base, Array.of_list coeffs)
 
 module Lookup_result = struct
   type t =
