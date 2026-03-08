@@ -1294,14 +1294,15 @@ let substitute_decl_ikind_with_lookup
     Types.Constructor_ikind payload
 
 let () =
-  Types.Ikind_substitution.substitute_decl_ikind_with_lookup :=
+  Subst.Ikind_substitution.substitute_decl_ikind_with_lookup :=
     (fun ~lookup ikind_entry ->
       let lookup path =
         match lookup path with
-        | Types.Ikind_substitution.Lookup_identity ->
+        | Subst.Ikind_substitution.Lookup_identity ->
           Lookup_result.Lookup_identity
-        | Types.Ikind_substitution.Lookup_path p -> Lookup_result.Lookup_path p
-        | Types.Ikind_substitution.Lookup_type_fun (params, body) ->
+        | Subst.Ikind_substitution.Lookup_path p ->
+          Lookup_result.Lookup_path p
+        | Subst.Ikind_substitution.Lookup_type_fun (params, body) ->
           Lookup_result.Lookup_type_fun (params, body)
       in
       substitute_decl_ikind_with_lookup ~lookup ikind_entry)
