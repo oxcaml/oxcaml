@@ -4483,6 +4483,35 @@ let transl_jkind_decl env pjkind =
   Builtin_attributes.warning_scope pjkind.pjkind_attributes
     (fun () -> transl_jkind_decl env pjkind)
 
+let transl_jkind_constraint id env orig_decl new_decl =
+  (* This can be much simpler than [transl_with_constraint] because the
+     considerations that require us to re-check the declaration in the inner
+     environment (e.g., [constraint]s) do not occur for lr-jkinds. *)
+  Env.mark_jkind_used orig_decl.jkind_uid;
+  let jkind_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) in
+  let context = Jkind.History.Jkind_declaration (Pident id) in
+  let jka =
+    match new_decl.pjkind_manifest with
+    | None -> Misc.fatal_error "Typedecl.transl_jkind_constraint : no manifest"
+    | Some jka -> jka
+  in
+  let jkind_manifest = Some (Jkind.Const.of_annotation env ~context jka) in
+  let jkind_jkind =
+    { jkind_manifest;
+      jkind_attributes = new_decl.pjkind_attributes;
+      jkind_uid;
+      jkind_loc = new_decl.pjkind_loc }
+  in
+  let decl =
+    { jkind_id = id;
+      jkind_name = new_decl.pjkind_name;
+      jkind_jkind;
+      jkind_attributes = new_decl.pjkind_attributes;
+      jkind_annotation = Some jka;
+      jkind_loc = new_decl.pjkind_loc }
+  in
+  decl
+
 (**** Error report ****)
 
 open Format_doc

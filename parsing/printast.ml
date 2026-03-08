@@ -1016,6 +1016,9 @@ and with_constraint i ppf x =
       line i ppf "Pwith_module %a = %a\n"
         fmt_longident_loc lid1
         fmt_longident_loc lid2;
+  | Pwith_jkind (lid, jd) ->
+      line i ppf "Pwith_jkind %a\n" fmt_longident_loc lid;
+      jkind_declaration (i+1) ppf jd;
   | Pwith_modsubst (lid1, lid2) ->
       line i ppf "Pwith_modsubst %a = %a\n"
         fmt_longident_loc lid1
@@ -1028,6 +1031,9 @@ and with_constraint i ppf x =
      line i ppf "Pwith_modtypesubst %a\n"
         fmt_longident_loc lid1;
       module_type (i+1) ppf mty
+  | Pwith_jkindsubst (lid, jd) ->
+      line i ppf "Pwith_jkindsubst %a\n" fmt_longident_loc lid;
+      jkind_declaration (i+1) ppf jd;
 
 and module_expr i ppf x =
   line i ppf "module_expr %a\n" fmt_location x.pmod_loc;

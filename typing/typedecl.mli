@@ -65,6 +65,10 @@ val transl_jkind_decl:
   Env.t -> Parsetree.jkind_declaration ->
   Ident.t * Env.t * Typedtree.jkind_declaration
 
+val transl_jkind_constraint:
+  Ident.t -> Env.t -> Types.jkind_declaration -> Parsetree.jkind_declaration ->
+  Typedtree.jkind_declaration
+
 val abstract_type_decl:
   injective:bool ->
   jkind:jkind_l ->

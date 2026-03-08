@@ -18,12 +18,12 @@ type ('a, 'b) either : immutable_data with 'a * 'b
 type ('a, 'b) either : immutable_data with 'a with 'b
 |}]
 
-type 'a gel : kind_of_ 'a mod global
+type 'a gel : (kind_of_ 'a) mod global
 
 [%%expect{|
-Line 1, characters 14-25:
-1 | type 'a gel : kind_of_ 'a mod global
-                  ^^^^^^^^^^^
+Line 1, characters 14-27:
+1 | type 'a gel : (kind_of_ 'a) mod global
+                  ^^^^^^^^^^^^^
 Error: Unimplemented kind syntax
 |}]
 
@@ -67,7 +67,7 @@ kind_ mutable_data = mutable_data
 module type S = sig
   type 'a list : immutable_data with 'a
   type ('a, 'b) either : immutable_data with 'a * 'b
-  type 'a gel : kind_of_ 'a mod global
+  type 'a gel : (kind_of_ 'a) mod global
   type 'a t : _
   kind_ immediate = value mod global aliased many sync contended
   kind_ immutable_data = value mod sync contended many
@@ -76,9 +76,9 @@ module type S = sig
 end
 
 [%%expect{|
-Line 4, characters 16-27:
-4 |   type 'a gel : kind_of_ 'a mod global
-                    ^^^^^^^^^^^
+Line 4, characters 16-29:
+4 |   type 'a gel : (kind_of_ 'a) mod global
+                    ^^^^^^^^^^^^^
 Error: Unimplemented kind syntax
 |}]
 
