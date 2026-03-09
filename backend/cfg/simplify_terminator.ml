@@ -115,8 +115,7 @@ let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
   | Imul | Imulh _ | Idiv | Imod | Iclz _ | Ictz _ | Ipopcnt | Icomp _ -> None
 
 let eval_float_op op (left : float) (right : float option) : float option =
-  let open Operation in
-  match op with
+  match (op : Operation.float_operation) with
   | Iaddf -> Option.map (Float.add left) right
   | Isubf -> Option.map (Float.sub left) right
   | Imulf -> Option.map (Float.mul left) right
