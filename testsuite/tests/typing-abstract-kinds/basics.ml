@@ -677,8 +677,8 @@ type q = t2 t1'
 |}]
 
 
-(***************************)
-(* Test: Nondep error case *)
+(****************************)
+(* Test: Nondep error cases *)
 
 (* We can't always round up jkinds with abstract bases, so we may need to error
    because of a type that can't be erased in the with bounds. *)
@@ -698,6 +698,65 @@ Error: This functor has type
        "functor (X : sig type t end) -> sig kind_ k type t : k with X.t end"
        The parameter cannot be eliminated in the result type.
        Please bind the argument to a module identifier.
+|}]
+
+(* Appears in signature (similar to tests in [generalized-open/gpr1506.ml]) *)
+include struct
+  open struct
+    kind_ k
+    type t : k
+  end
+  type s = t
+end
+[%%expect{|
+Lines 2-5, characters 2-5:
+2 | ..open struct
+3 |     kind_ k
+4 |     type t : k
+5 |   end
+Error: The jkind "k" introduced by this open appears in the signature.
+Line 6, characters 2-12:
+6 |   type s = t
+      ^^^^^^^^^^
+  The type "s" has no valid type if "k" is hidden.
+|}]
+
+include struct
+  open struct
+    kind_ k
+  end
+  kind_ k' = k
+end
+[%%expect{|
+Lines 2-4, characters 2-5:
+2 | ..open struct
+3 |     kind_ k
+4 |   end
+Error: The jkind "k" introduced by this open appears in the signature.
+Line 5, characters 2-14:
+5 |   kind_ k' = k
+      ^^^^^^^^^^^^
+  The jkind "k'" has no valid type if "k" is hidden.
+|}]
+
+(* Illegal shadowing (similar to first test in [typing-sigsubst/sigsubst.ml]) *)
+module type S1 = sig
+  kind_ k
+  type t1 : k
+end
+module type S2 = sig
+  kind_ k
+  type t2 : k
+end
+module type Combined = sig
+  include S1
+  include S2
+end
+[%%expect{|
+module type S1 = sig kind_ k type t1 : k end
+module type S2 = sig kind_ k type t2 : k end
+Uncaught exception: Typemod.Error(_, _, _)
+
 |}]
 
 
