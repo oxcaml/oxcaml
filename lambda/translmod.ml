@@ -337,6 +337,9 @@ let init_shape id modl =
                 let unsafe = Unsafe {reason=Unsafe_non_value_arg; loc; subid} in
                 raise (Initialization_failure unsafe)
             end
+          | Tfunctor(_,_,_,_) ->
+              (* Module-dependent functions take a module (a value). *)
+              const_int 0 (* camlinternalMod.Function *)
           | Tconstr(p, _, _) when Path.same p Predef.path_lazy_t ->
               const_int 1 (* camlinternalMod.Lazy *)
           | _ ->
