@@ -3348,6 +3348,17 @@ let fixpoint (graph : Global_flow_graph.graph) =
   then Format.eprintf "%a@." Datalog.Schedule.print_stats stats;
   if Flambda_features.debug_reaper "db"
   then Format.eprintf "%a@." Datalog.print db;
+  let name_of_node =
+    if Flambda_features.debug_reaper "stamps"
+    then
+      fun node ->
+        Flambda_colours.without_colours ~f:(fun () ->
+            Format.asprintf "%a" Code_id_or_name.print node)
+    else
+      fun node ->
+        Code_id_or_name.pattern_match node ~code_id:Code_id.name
+          ~symbol:Symbol.linkage_name_as_string ~var:Variable.name
+  in
   let has_to_be_unboxed code_or_name = has_to_be_unboxed [code_or_name] db in
   let unboxed =
     Datalog.Cursor.fold query_to_unbox db ~init:Code_id_or_name.Map.empty
@@ -3355,9 +3366,9 @@ let fixpoint (graph : Global_flow_graph.graph) =
         (* CR-someday ncourant: produce ghost makeblocks/set of closures for
            debugging *)
         let new_name =
-          Flambda_colours.without_colours ~f:(fun () ->
-              Format.asprintf "%a_into_%a" Code_id_or_name.print code_or_name
-                Code_id_or_name.print to_patch)
+          Format.asprintf "%s_into_%s"
+            (name_of_node code_or_name)
+            (name_of_node to_patch)
         in
         let fields =
           mk_unboxed_fields ~has_to_be_unboxed
