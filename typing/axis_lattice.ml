@@ -554,7 +554,8 @@ let object_legacy : t =
         : Mode.Value.Comonadic.Const.t) =
     Mode.Value.Comonadic.Const.legacy
   in
-  const_of_levels ~linearity ~areality ~uniqueness:Mode.Uniqueness.Const.Unique
+  const_of_levels ~linearity ~areality
+    ~uniqueness:Mode.Uniqueness.Const.Aliased
     ~portability ~contention:Mode.Contention.Const.Uncontended ~forkable
     ~yielding ~statefulness ~visibility:Mode.Visibility.Const.Read_write
     ~staticity:Mode.Staticity.Static ~externality:Jkind_axis.Externality.max

@@ -883,9 +883,12 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
           let kind : Solver.ckind =
            fun (ctx : Solver.ctx) ->
             let base_lat0 =
-              if all_args_void
-              then Axis_lattice.immediate
-              else Axis_lattice.immutable_data
+              match rep with
+              | Types.Variant_unboxed -> Axis_lattice.immediate
+              | _ ->
+                if all_args_void
+                then Axis_lattice.immediate
+                else Axis_lattice.immutable_data
             in
             let payload_kind_of_constructor =
               make_gadt_payload_projector
