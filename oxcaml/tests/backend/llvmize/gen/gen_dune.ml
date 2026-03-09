@@ -191,9 +191,11 @@ let print_rule ~extra_subst ~buf rule_template =
         "-llvm-backend -llvm-path ${OXCAML_CLANG} -keep-llvmir \
          -dno-asm-comments -disable-poll-insertion"
       | "common_flags" ->
-        "-g -O3 -opaque -S -dump-into-file -dcmm -dcfg -dlinear"
+        "-g -O3 -flambda2-no-simplify-stubs -opaque -S -dump-into-file -dcmm \
+         -dcfg -dlinear"
       | "stop_after_llvm_flags" ->
-        "-g -O3 -opaque -dump-into-file -dcmm -dcfg -stop-after llvmize"
+        "-g -O3 -flambda2-no-simplify-stubs -opaque -dump-into-file -dcmm \
+         -dcfg -stop-after llvmize"
       | "c_flags" -> "-c -g -O3 -I %{project_root}/runtime"
       | _ -> assert false)
   in
