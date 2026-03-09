@@ -86,12 +86,11 @@ type known_value =
   | Const_float of int64
 
 let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
-  let open Operation in
   let is_valid_shift =
     Nativeint.compare right 0n >= 0
     && Nativeint.compare right (Nativeint.of_int Nativeint.size) < 0
   in
-  match op with
+  match (op : Operation.integer_operation) with
   | Iadd -> Some (Nativeint.add left right)
   | Isub -> Some (Nativeint.sub left right)
   | Iand -> Some (Nativeint.logand left right)
