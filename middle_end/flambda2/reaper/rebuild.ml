@@ -733,7 +733,7 @@ let rebuild_named_default_case env (named : Named.t) =
     in
     let arg_repr = get_simple_changed_repr env arg in
     match arg_repr with
-    | Block_representation (arg_fields, _size) ->
+    | Block_representation { fields = arg_fields; size = _ } ->
       get_field arg_fields ~f:(fun (field, kind) ->
           Named.create_prim
             (P.Unary
@@ -1419,7 +1419,7 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
         (DS.has_source env.uses arg);
     let arg = Option.get (DS.get_changed_representation env.uses arg) in
     match arg with
-    | Block_representation (arg_fields, _size) -> (
+    | Block_representation { fields = arg_fields; size = _ } -> (
       match Field.Map.find field arg_fields with
       | exception Not_found ->
         Misc.fatal_errorf "@[<v>%a@;<1 2>%a@ %a@;<1 2>%a@ %a@]@."
@@ -1644,7 +1644,7 @@ let rebuild_singleton_binding_whose_representation_is_being_changed env bp bv
     in
     let fields, size =
       match fields with
-      | Block_representation (fields, size) -> fields, size
+      | Block_representation { fields; size } -> fields, size
       | Closure_representation _ ->
         Misc.fatal_errorf
           "Expected block representation for Make_block on %a, got closure \

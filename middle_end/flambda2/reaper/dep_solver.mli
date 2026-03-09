@@ -39,8 +39,11 @@ type unboxed = Variable.t unboxed_fields Field.Map.t
 
 type changed_representation =
   | Block_representation of
-      (int * Flambda_primitive.Block_access_kind.t) unboxed_fields Field.Map.t
-      * int
+      { fields :
+          (int * Flambda_primitive.Block_access_kind.t) unboxed_fields
+          Field.Map.t;
+        size : int
+      }
   | Closure_representation of
       Value_slot.t unboxed_fields Field.Map.t
       * Function_slot.t Function_slot.Map.t

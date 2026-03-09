@@ -256,6 +256,8 @@ let rec pp_unboxed_elt pp_unboxed ppf = function
 
 let print_unboxed_fields = pp_unboxed_elt
 
+(* CR bclement: This is *the* canonical order to iterate on an unboxed field
+   map. It should never be iterated over in any other way. *)
 let rec fold_unboxed_with_kind (f : Flambda_kind.t -> 'a -> 'b -> 'b)
     (fields : 'a unboxed_fields Field.Map.t) acc =
   Field.Map.fold
@@ -280,15 +282,20 @@ type changed_representation =
      the value_kinds to account for changed representations before enabling
      this *)
   | Block_representation of
-      (int * Flambda_primitive.Block_access_kind.t) unboxed_fields Field.Map.t
-      * int
+      { fields :
+          (int (* index of original field, 0 ≤ · < size *)
+          * Flambda_primitive.Block_access_kind.t)
+          unboxed_fields
+          Field.Map.t;
+        size : int
+      }
   | Closure_representation of
       Value_slot.t unboxed_fields Field.Map.t
       * Function_slot.t Function_slot.Map.t (* old -> new *)
       * Function_slot.t (* OLD current function slot *)
 
 let pp_changed_representation ff = function
-  | Block_representation (fields, size) ->
+  | Block_representation { fields; size } ->
     Format.fprintf ff "(fields %a) (size %d)"
       (Field.Map.print
          (pp_unboxed_elt (fun ff (field, _) -> Format.pp_print_int ff field)))
@@ -3088,7 +3095,9 @@ let fixpoint (graph : Global_flow_graph.graph) =
             mk_unboxed_fields ~has_to_be_unboxed ~mk db code_id_or_name
               (get_fields db uses) ""
           in
-          add_to_s (Block_representation (repr, !r + 1)) code_id_or_name
+          add_to_s
+            (Block_representation { fields = repr; size = !r + 1 })
+            code_id_or_name
         | Set_of_closures l ->
           let mk kind name =
             Value_slot.create
