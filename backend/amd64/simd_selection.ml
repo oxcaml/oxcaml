@@ -1176,7 +1176,7 @@ let pseudoregs_for_instr (simd : Simd.instr) arg_regs res_regs =
         (* CR-someday mslater: we should require binding all overwritten args *)
         (if r = Array.length !res_regs
          then
-           let fresh = Reg.create arg_regs.(a).Reg.typ in
+           let fresh = Reg.create_with_typ arg_regs.(a) in
            res_regs := Array.append !res_regs [| fresh |]);
         arg_regs.(a) <- !res_regs.(r))
       rr;

@@ -206,9 +206,9 @@ let loc_reg_count = function
   | Temp ts when Array.exists temp_is_vm ts -> 2
   | Temp _ | Pin _ -> 1
 
-let unarized_reg_index args i =
+let unarized_reg_index args arg_idx =
   let idx = ref 0 in
-  for i = 0 to i - 1 do
+  for i = 0 to arg_idx - 1 do
     idx := !idx + loc_reg_count args.(i).loc
   done;
   !idx
