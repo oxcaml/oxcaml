@@ -29,6 +29,9 @@ let reset_constructor_ikind_on_substitution = false
 
 module Ldd = Types.Ldd
 
+let instance_poly_for_jkind' =
+  ref (fun _univars _ty -> Misc.fatal_error "instance_poly_for_jkind")
+
 let fresh_unknown_uid () : Types.Uid.t =
   let current_unit =
     Some
@@ -407,8 +410,11 @@ module Solver = struct
    fun ctx jkind -> mod_bounds_floor_of_jkind_desc ctx jkind.jkind
 
   (** Compute the kind for [t]. *)
-  and kind (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
-    if not (is_principal_type ty) then Ldd.const Axis_lattice.top else
+  and kind ?(check_principality = true) (ctx : ctx) (ty : Types.type_expr)
+      : Ldd.node =
+    if check_principality && not (is_principal_type ty)
+    then Ldd.const Axis_lattice.top
+    else
     (* Memoize only potentially cyclic types; LFPs handle recursion. *)
     match TyTbl.find_opt ctx.ty_to_kind ty with
     | Some kind_poly -> kind_poly
@@ -471,10 +477,11 @@ module Solver = struct
       | Types.Tlink _ -> failwith "Tlink shouldn't appear in kind"
       | Types.Tsubst _ -> failwith "Tsubst shouldn't appear in kind"
       | Types.Trepr (ty, _sort_vars) -> kind ctx ty
-      | Types.Tpoly (ty, _) ->
+      | Types.Tpoly (ty, univars) ->
         (* CR ikinds: this is sound but not fully precise.
           Internal ticket 5746. *)
-        kind ctx ty
+        kind ~check_principality:false
+          ctx (!instance_poly_for_jkind' univars ty)
       | Types.Tof_kind jkind -> ckind_of_jkind ctx jkind
       | Types.Tobject _ -> Ldd.const Axis_lattice.object_legacy
       | Types.Tfield _ ->

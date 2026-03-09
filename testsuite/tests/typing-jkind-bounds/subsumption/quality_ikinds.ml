@@ -498,13 +498,7 @@ end = struct
   type t
 end
 [%%expect {|
-Line 3, characters 2-37:
-3 |   type t : value mod contended with a
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value
-         because of the annotation on the declaration of the type t.
-       But the kind of type "t" must be a subkind of value
-         because of the annotation on the declaration of the type t.
+module M : sig type a = { foo : 'a. 'a; } type t end
 |}]
 
 module M : sig
@@ -515,13 +509,7 @@ end = struct
   type t
 end
 [%%expect {|
-Line 3, characters 2-37:
-3 |   type t : value mod contended with a
-      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The kind of type "t" is value
-         because of the annotation on the declaration of the type t.
-       But the kind of type "t" must be a subkind of value
-         because of the annotation on the declaration of the type t.
+module M : sig type a = { foo : 'a. 'a; } [@@unboxed] type t end
 |}]
 
 module type S = sig

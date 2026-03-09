@@ -44,6 +44,9 @@ val round_up_type : Env.t -> Types.type_expr -> Axis_lattice.t
 
 val crossing_of_type : Env.t -> Types.type_expr -> Mode.Crossing.t
 
+val instance_poly_for_jkind' :
+  (Types.type_expr list -> Types.type_expr -> Types.type_expr) ref
+
 type sub_or_intersect = Jkind.sub_or_intersect
 
 val sub_or_intersect :

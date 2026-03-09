@@ -24,6 +24,9 @@ open Mode
 open Local_store
 module Int = Misc.Stdlib.Int
 
+let debug_ikind_crossing_mismatch =
+  Sys.getenv_opt "OXCAML_IKIND_CROSSING_MISMATCH" <> None
+
 (*
    Type manipulation after type inference
    ======================================
@@ -1726,6 +1729,8 @@ let instance_poly_for_jkind univars sch =
     in
     ty
   )
+
+let () = Ikind.instance_poly_for_jkind' := instance_poly_for_jkind
 
 let instance_label ~fixed lbl =
   For_copy.with_scope (fun copy_scope ->
@@ -5475,11 +5480,30 @@ let crossing_of_ty env ?modalities ty =
   let crossing =
     if not principal
     then Crossing.max
-    else if !Clflags.ikinds
-    then Ikind.crossing_of_type env ty
     else
-      let jkind = type_jkind_purely env ty in
-      crossing_of_jkind env jkind
+      let jkind_crossing () =
+        let jkind = type_jkind_purely env ty in
+        crossing_of_jkind env jkind
+      in
+      if !Clflags.ikinds
+      then (
+        let ikind_crossing = Ikind.crossing_of_type env ty in
+        if debug_ikind_crossing_mismatch then (
+          let old_jkind_crossing = jkind_crossing () in
+          if not (Crossing.equal ikind_crossing old_jkind_crossing)
+          then
+            Format.eprintf
+              "@[<v>[ikind-crossing-mismatch]@ \
+               type=%a@ \
+               ikind=%a@ \
+               jkind=%a@]@."
+              !Btype.print_raw ty
+              (Format_doc.compat Crossing.print) ikind_crossing
+              (Format_doc.compat Crossing.print) old_jkind_crossing
+        );
+        ikind_crossing)
+      else
+        jkind_crossing ()
   in
   match modalities with
   | None -> crossing
