@@ -159,8 +159,8 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
       ~keep_symbol_tables
       ~(compilation_unit : Compile_common.compilation_unit_or_inferred) =
     let unit_info =
-      unit_info_from_cu_or_output_prefix
-        ~source_file Impl ~output_prefix ~compilation_unit
+      unit_info_from_cu_or_output_prefix ~source_file Impl ~output_prefix
+        ~compilation_unit
     in
     with_info ~dump_ext:Backend.ext_flambda_obj unit_info @@ fun info ->
     if !Oxcaml_flags.internal_assembler
