@@ -483,7 +483,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
       let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
       transl_match ~scopes ~arg_sort ~return_sort:sort e arg pat_expr_list
         partial
-  | Texp_match(arg, _arg_sort, pat_expr_list, eff_pat_expr_list, partial) ->
+  | Texp_match(arg, arg_sort, pat_expr_list, eff_pat_expr_list, partial) ->
+      let arg_sort = Jkind.Sort.default_for_transl_and_get arg_sort in
   (* need to separate the values from exceptions for transl_handler *)
       let split_case (val_cases, exn_cases as acc)
             ({ c_lhs; c_rhs } as case) =
@@ -503,8 +504,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         let x, y = List.fold_left split_case ([], []) pat_expr_list in
         List.rev x, List.rev y
       in
-      transl_handler ~scopes e arg (Some (pat_expr_list, partial))
-        exn_pat_expr_list eff_pat_expr_list
+      transl_handler ~scopes ~return_sort:sort ~body_sort:arg_sort e arg
+        (Some (pat_expr_list, partial)) exn_pat_expr_list eff_pat_expr_list
   | Texp_try(body, pat_expr_list, []) ->
       let id, id_duid = Typecore.name_cases "exn" pat_expr_list in
       let return_layout = layout_exp sort e in
@@ -513,7 +514,8 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
                  (transl_cases_try ~scopes sort pat_expr_list),
                return_layout)
   | Texp_try(body, exn_pat_expr_list, eff_pat_expr_list) ->
-    transl_handler ~scopes e body None exn_pat_expr_list eff_pat_expr_list
+      transl_handler ~scopes ~return_sort:sort ~body_sort:sort e body
+        None exn_pat_expr_list eff_pat_expr_list
   | Texp_unboxed_unit ->
       Lprim(Punbox_unit, [lambda_unit], of_location ~scopes e.exp_loc)
   | Texp_unboxed_bool b ->
@@ -2630,21 +2632,30 @@ and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
    This compiles to [Pwith_stack(val_fun, exn_fun, eff_fun, body_fun, arg)]
    which runs [body_fun arg] on a new fiber. The handler functions are:
    - [val_fun]:  called when [body] returns normally; receives the
-                 scrutinee's return value
+                 body's return value
    - [exn_fun]:  called when [body] raises; receives the exception
    - [eff_fun]:  called when [body] performs an effect; receives the effect,
                  a continuation [k], and a tail continuation [ktail]
-   - [body_fun]: computes the scrutinee
+   - [body_fun]: computes the body
    - [arg]:      the argument to [body_fun]
 
    We always wrap the body as [body_fun = fun _ -> body] and [arg = 0].
 
    Effect handlers require all types to have layout [value]. *)
-and transl_handler ~scopes e body val_caselist exn_caselist eff_caselist =
-  let body_sort = Jkind.Sort.Const.for_predef_value in
-  let body_layout = Lambda.layout_block in
-  let return_sort = Jkind.Sort.Const.for_predef_value in
-  let return_layout = Lambda.layout_block in
+and transl_handler ~scopes ~return_sort ~body_sort e body
+                   val_caselist exn_caselist eff_caselist =
+  if not (Jkind.Sort.Const.equal body_sort (Base Value)) then
+    Misc.fatal_errorf_doc "Matching with effect handlers is only supported for \
+                           scrutinees of kind [value], received %a at %a"
+                           Jkind.Sort.Const.format return_sort
+                           (Location.Doc.loc ~capitalize_first:false) e.exp_loc;
+  if not (Jkind.Sort.Const.equal return_sort (Base Value)) then
+    Misc.fatal_errorf_doc "Matching with effect handlers is only supported for \
+                           resulting types of kind [value], received %a at %a"
+                           Jkind.Sort.Const.format return_sort
+                           (Location.Doc.loc ~capitalize_first:false) e.exp_loc;
+  let return_layout = layout_exp return_sort e in
+  let body_layout = layout_exp body_sort body in
   let mk_param name debug_uid layout =
     { name; debug_uid; layout;
       attributes = Lambda.default_param_attribute;
@@ -2655,17 +2666,16 @@ and transl_handler ~scopes e body val_caselist exn_caselist eff_caselist =
     | None ->
         let param = Ident.create_local "param" in
         lfunction ~kind:(Curried {nlocal=0})
-          ~params:[mk_param param Lambda.debug_uid_none body_layout]
-          ~return:return_layout ~body:(Lvar param)
-          ~attr:default_function_attribute ~loc:Loc_unknown
-          ~mode:alloc_heap ~ret_mode:alloc_heap
+         ~params:[mk_param param Lambda.debug_uid_none body_layout]
+         ~return:return_layout ~body:(Lvar param)
+         ~attr:default_function_attribute ~loc:Loc_unknown
+         ~mode:alloc_heap ~ret_mode:alloc_heap
     | Some (val_caselist, partial) ->
         let val_cases = transl_cases ~scopes return_sort val_caselist in
         let param, param_duid = Typecore.name_cases "param" val_caselist in
         let body =
           Matching.for_function ~scopes
-            ~arg_sort:body_sort
-            ~arg_layout:body_layout ~return_layout:return_layout
+            ~arg_sort:body_sort ~arg_layout:body_layout ~return_layout
             e.exp_loc None (Lvar param) val_cases partial
         in
         lfunction ~kind:(Curried {nlocal=0})
@@ -2677,12 +2687,11 @@ and transl_handler ~scopes e body val_caselist exn_caselist eff_caselist =
     let exn_cases = transl_cases ~scopes return_sort exn_caselist in
     let param, param_duid = Typecore.name_cases "exn" exn_caselist in
     let body =
-      Matching.for_trywith ~scopes ~return_layout:return_layout e.exp_loc
+      Matching.for_trywith ~scopes ~return_layout e.exp_loc
         (Lvar param) exn_cases
     in
     lfunction ~kind:(Curried {nlocal=0})
-      ~params:[mk_param param param_duid Lambda.layout_exception]
-      ~return:return_layout
+      ~params:[mk_param param param_duid layout_exception] ~return:return_layout
       ~attr:default_function_attribute ~loc:Loc_unknown ~body
       ~mode:alloc_heap ~ret_mode:alloc_heap
   in
@@ -2692,15 +2701,15 @@ and transl_handler ~scopes e body val_caselist exn_caselist eff_caselist =
     let cont_tail = Ident.create_local "ktail" in
     let eff_cases = transl_cases ~scopes ~cont return_sort eff_caselist in
     let body =
-      Matching.for_handler ~scopes ~return_layout:return_layout e.exp_loc
-        (Lvar param) (Lvar cont) (Lvar cont_tail) eff_cases
+      Matching.for_handler ~scopes ~return_layout e.exp_loc (Lvar param)
+        (Lvar cont) (Lvar cont_tail) eff_cases
     in
     lfunction ~kind:(Curried {nlocal=0})
       ~params:[mk_param param param_duid Lambda.layout_block;
                mk_param cont Lambda.debug_uid_none Lambda.layout_function;
                mk_param cont_tail Lambda.debug_uid_none Lambda.layout_function]
-      ~return:return_layout ~attr:default_function_attribute
-      ~loc:Loc_unknown ~body ~mode:alloc_heap ~ret_mode:alloc_heap
+      ~return:return_layout ~attr:default_function_attribute ~loc:Loc_unknown
+      ~body ~mode:alloc_heap ~ret_mode:alloc_heap
   in
   (* Upstream decomposes [body] into [f x] when it is an application, avoiding
      the thunk. We always use the thunk path because we cannot verify that the
