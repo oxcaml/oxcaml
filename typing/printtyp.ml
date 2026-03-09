@@ -162,7 +162,7 @@ module Namespace = struct
     | Jkind -> 7
      (* we do not handle those component *)
 
-  let size = 1 + id Unboxed_label
+  let size = 1 + id Jkind
 
 
   let pp ppf x =

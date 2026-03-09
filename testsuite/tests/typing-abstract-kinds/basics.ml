@@ -755,8 +755,18 @@ end
 [%%expect{|
 module type S1 = sig kind_ k type t1 : k end
 module type S2 = sig kind_ k type t2 : k end
-Uncaught exception: Typemod.Error(_, _, _)
-
+Line 11, characters 2-12:
+11 |   include S2
+       ^^^^^^^^^^
+Error: Illegal shadowing of included jkind "k/2" by "k/1".
+Line 10, characters 2-12:
+10 |   include S1
+       ^^^^^^^^^^
+  Jkind "k/2" came from this include.
+Line 3, characters 2-13:
+3 |   type t1 : k
+      ^^^^^^^^^^^
+  The type "t1" has no valid type if "k/2" is shadowed.
 |}]
 
 
