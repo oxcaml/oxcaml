@@ -92,6 +92,10 @@ let reaper_unbox () =
   !Oxcaml_flags.Flambda2.reaper_unbox
   |> with_default ~f:(fun d -> d.reaper_unbox)
 
+let reaper_max_unbox_size () =
+  !Oxcaml_flags.Flambda2.reaper_max_unbox_size
+  |> with_default ~f:(fun d -> d.reaper_max_unbox_size)
+
 let reaper_change_calling_conventions () =
   !Oxcaml_flags.Flambda2.reaper_change_calling_conventions
   |> with_default ~f:(fun d -> d.reaper_change_calling_conventions)

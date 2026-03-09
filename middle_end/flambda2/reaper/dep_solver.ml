@@ -1215,8 +1215,11 @@ let get_fields : Datalog.database -> usages -> field_usage Field.Map.t =
          | None, Some m -> Some (Used_as_vars m))
        out1 out2)
 
-let field_of_constructor_is_used =
-  rel2 "field_of_constructor_is_used" Cols.[n; f]
+let field_of_constructor_is_used_tbl =
+  Datalog.create_relation ~name:"field_of_constructor_is_used" Cols.[n; f]
+
+let field_of_constructor_is_used constr field =
+  field_of_constructor_is_used_tbl % [constr; field]
 
 let field_of_constructor_is_used_top =
   rel2 "field_of_constructor_is_used_top" Cols.[n; f]
@@ -1358,7 +1361,9 @@ let cannot_change_representation1 = rel1 "cannot_change_representation1" Cols.[n
 
 let cannot_change_representation = rel1 "cannot_change_representation" Cols.[n]
 
-let cannot_unbox0 = rel1 "cannot_unbox0" Cols.[n]
+let cannot_unbox0_tbl = Datalog.create_relation ~name:"cannot_unbox0" Cols.[n]
+
+let cannot_unbox0 x = cannot_unbox0_tbl % [x]
 
 let cannot_unbox = rel1 "cannot_unbox" Cols.[n]
 
@@ -1373,7 +1378,7 @@ let dominated_by_allocation_point =
 
 let allocation_point_dominator = rel2 "allocation_point_dominator" Cols.[n; n]
 
-let datalog_rules =
+let field_of_constructor_is_used_rules =
   saturate_in_order
     [ (let$ [base; relation; from] = ["base"; "relation"; "from"] in
        [ constructor ~base relation ~from;
@@ -1452,7 +1457,7 @@ let datalog_rules =
          any_usage v ]
        ==> and_
              [ field_of_constructor_is_used base relation;
-               field_of_constructor_is_used_top base relation ]);
+               field_of_constructor_is_used_top base relation ])
       (* CR ncourant: this marks any [Apply] field as
          [field_of_constructor_is_used], as long as the function is called.
          Shouldn't that be gated behind a [cannot_change_calling_convetion]? *)
@@ -1464,7 +1469,11 @@ let datalog_rules =
       (* CR ncourant: should this be reenabled? I think this is no longer
          necessary because we remove unused arguments of continuations,
          including return continuations. *)
-      (* If any usage is possible, do not change the representation. Note that
+    ]
+
+let datalog_rules =
+  saturate_in_order
+    [ (* If any usage is possible, do not change the representation. Note that
          this rule will change in the future, when local value slots are
          properly tracked: a closure will only local value slots that has
          any_use will still be able to have its representation changed. *)
@@ -3337,6 +3346,32 @@ let fixpoint (graph : Global_flow_graph.graph) =
       datalog
   in
   let db = Datalog.Schedule.run ~stats datalog_schedule datalog in
+  let db =
+    List.fold_left
+      (fun db rule -> Datalog.Schedule.run ~stats rule db)
+      db field_of_constructor_is_used_rules
+  in
+  (* We need to do this after [field_of_constructor_is_used] is computed, so
+     that we prevent unboxing based on the number of fields actually used. *)
+  let db =
+    let max_unbox_size = Flambda_features.reaper_max_unbox_size () in
+    Datalog.set_table cannot_unbox0_tbl
+      (Code_id_or_name.Map.filter_map
+         (fun _block fields ->
+           let num_used_fields =
+             Field.Map.fold
+               (fun field () acc ->
+                 if
+                   Field.is_real_field field
+                   && not (Field.is_function_slot field)
+                 then acc + 1
+                 else acc)
+               fields 0
+           in
+           if num_used_fields > max_unbox_size then Some () else None)
+         (Datalog.get_table field_of_constructor_is_used_tbl db))
+      db
+  in
   let db =
     List.fold_left
       (fun db rule -> Datalog.Schedule.run ~stats rule db)
