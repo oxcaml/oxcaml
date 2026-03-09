@@ -109,8 +109,6 @@ module Layout : sig
 
     val of_sort_const : Sort.Const.t -> Scannable_axes.t -> t
 
-    val of_sort_const_option : Sort.Const.t option -> Scannable_axes.t -> t
-
     val to_string : t -> string
   end
 

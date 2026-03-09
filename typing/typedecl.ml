@@ -1956,25 +1956,26 @@ let update_record_kind (type rep) env loc (form : rep record_form)
     let types = List.map snd lbls in
     let sorts, jkinds = update_label_sorts env loc types ~form in
     let jkind =
-      let lbls_with_sorts =
-        List.map2 (fun (lbl, ty) sort -> (lbl, ty, sort)) lbls sorts
-      in
       match form with
-      | Legacy -> Jkind.for_boxed_record_with_updates lbls_with_sorts
+      | Legacy ->
+          let lbls_with_sorts =
+            List.map2 (fun (lbl, ty) sort -> (lbl, ty, sort)) lbls sorts
+          in
+          Jkind.for_boxed_record_with_updates lbls_with_sorts
       | Unboxed_product ->
         let lbls_with_layouts =
-          List.map
-            (fun (lbl, ty, sort) ->
-               let sa =
-                 (* XXX ??? *)
-                 Jkind_types.Scannable_axes.max
-               in
+          List.map2
+            (fun (lbl, ty) jkind ->
                let layout =
-                 Jkind.Layout.Const.of_sort_const_option sort sa
-                 |> Jkind_types.Layout.of_const
+                 match Jkind.extract_layout env jkind with
+                 | Ok layout -> layout
+                 | Error _ ->
+                     (* XXX This means we couldn't expand the jkind. Safe to
+                        swallow this? *)
+                     Jkind.Layout.Any Jkind_types.Scannable_axes.max
                in
                lbl, ty, layout)
-            lbls_with_sorts
+            lbls jkinds
         in
         Jkind.for_unboxed_record_with_updates lbls_with_layouts
     in

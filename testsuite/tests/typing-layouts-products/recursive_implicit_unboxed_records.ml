@@ -418,7 +418,9 @@ Line 12, characters 17-18:
                       ^
 Error: The unboxed record field "a" belongs to the type "t#" = "M.t#"
        but is mixed here with fields of type
-         "('a : '_representable_layout_1 & '_representable_layout_2)"
+         "('a :
+          ('_representable_layout_1 & '_representable_layout_2)
+          & ('_representable_layout_3 & '_representable_layout_4))"
        The layout of t# is any & any
          because it is an unboxed record.
        But the layout of t# must be representable

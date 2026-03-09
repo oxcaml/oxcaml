@@ -125,11 +125,6 @@ module Layout = struct
         Product (List.map (fun s -> of_sort_const s sa) consts)
       | Univar uv -> Univar uv
 
-    let of_sort_const_option s sa =
-      match s with
-      | Some sort_const -> of_sort_const sort_const sa
-      | None -> Any sa
-
     (* if so, scannable axis annotations should not trigger a warning *)
     let is_value_or_any = function
       | Any _ | Base (Value, _) -> true
