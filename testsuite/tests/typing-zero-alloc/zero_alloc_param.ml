@@ -1,6 +1,6 @@
 (* TEST
    flags = "-w +198";
-   expect;
+   expect.opt;
 *)
 
 (* This tests the typing behavior of `[@zero_alloc]` attributes on function arguments.

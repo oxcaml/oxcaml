@@ -984,7 +984,9 @@ and class_field_second_pass cl_num sign met_env field =
         (fun () ->
            let zero_alloc = Zero_alloc.default in
            let unit_type = Ctype.instance Predef.type_unit in
-           let self_param_type = Ctype.newmono ~zero_alloc sign.Types.csig_self in
+           let self_param_type =
+             Ctype.newmono ~zero_alloc sign.Types.csig_self
+           in
            let arrow_desc = Nolabel, Mode.Alloc.legacy, Mode.Alloc.legacy in
            let meth_type =
              Typecore.mk_expected (Ctype.newty

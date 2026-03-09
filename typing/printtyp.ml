@@ -1535,7 +1535,8 @@ type typvariant_repr = {
   tags : string list option
 }
 
-let rec tree_of_modal_typexp ?(zero_alloc=Zero_alloc.Default_zero_alloc) mode modal ty =
+let rec tree_of_modal_typexp ?(zero_alloc=Zero_alloc.Default_zero_alloc)
+          mode modal ty =
   let not_arrow tree =
     match modal with
     | Arrow_return {mode; _} ->
@@ -1646,7 +1647,9 @@ let rec tree_of_modal_typexp ?(zero_alloc=Zero_alloc.Default_zero_alloc) mode mo
            printed once when used as proxy *)
         List.iter add_delayed tyl;
         let tl = tree_of_qtvs tyl in
-        let tr = Otyp_poly (tl, tree_of_typexp ~zero_alloc mode alloc_mode ty) in
+        let tr =
+          Otyp_poly (tl, tree_of_typexp ~zero_alloc mode alloc_mode ty)
+        in
         (* Forget names when we leave scope *)
         Names.remove_names tyl;
         delayed := old_delayed; tr
@@ -1727,7 +1730,8 @@ let rec tree_of_modal_typexp ?(zero_alloc=Zero_alloc.Default_zero_alloc) mode mo
         Otyp_ret (rm, ty)
     | Other m -> pr_typ m
 
-and tree_of_typexp ?(zero_alloc=Zero_alloc.Default_zero_alloc) mode alloc_mode ty =
+and tree_of_typexp ?(zero_alloc=Zero_alloc.Default_zero_alloc)
+      mode alloc_mode ty =
   tree_of_modal_typexp mode (Other alloc_mode) ~zero_alloc ty
 
 (* qtvs = quantified type variables *)

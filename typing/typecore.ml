@@ -2136,7 +2136,8 @@ let type_comprehension_for_range_iterator_index ~loc ~env ~param tps =
        because it can't have been referenced later so we don't need to track it
        for duplicates or anything else. *)
     ~any:Fun.id
-    ~var:(fun ~name ~pv_mode ~pv_type ~pv_loc ~pv_as_var ~pv_attributes ~pv_zero_alloc ->
+    ~var:(fun ~name ~pv_mode ~pv_type ~pv_loc ~pv_as_var ~pv_attributes
+           ~pv_zero_alloc ->
           enter_variable
             ~is_as_variable:pv_as_var
             ~kind:(Val_reg Jkind.Sort.(of_const Const.for_loop_index))
@@ -2861,7 +2862,8 @@ and type_pat_aux
   = fun tps category ~no_existentials ~alloc_mode ~mutable_flag ~penv
         ~zero_alloc sp expected_ty sort ->
   let type_pat tps category ?(alloc_mode=alloc_mode) ?(penv=penv) ~zero_alloc =
-    type_pat tps category ~no_existentials ~alloc_mode ~mutable_flag ~penv ~zero_alloc
+    type_pat tps category ~no_existentials ~alloc_mode ~mutable_flag ~penv
+      ~zero_alloc
   in
   let loc = sp.ppat_loc in
   let solve_expected (x : pattern) : pattern =

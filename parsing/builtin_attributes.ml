@@ -984,7 +984,8 @@ let parse_zero_alloc_payload ~loc ~arity ~custom_error_message
     | None -> warn ();  Default_zero_alloc
     | Some ca -> ca arity loc custom_error_message
 
-let parse_zero_alloc_attribute ~in_signature ~on_application ~on_function_argument ~default_arity attr =
+let parse_zero_alloc_attribute ~in_signature ~on_application
+      ~on_function_argument ~default_arity attr =
   match attr with
   | None -> Default_zero_alloc
   | Some {Parsetree.attr_name = {txt; loc}; attr_payload = payload} ->
