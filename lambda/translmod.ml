@@ -83,7 +83,7 @@ let field_path path field =
     None -> None
   | Some p ->
     Some(Longident.Ldot(Location.mknoloc p,
-                        Location.mknoloc (Ident.name field)))
+         Location.mknoloc (Ident.name field)))
 
 (* Compile type extensions *)
 
@@ -320,9 +320,6 @@ let init_shape id modl =
               (* CR layouts: We should allow any representable layout here. It
                  will require reworking [camlinternalMod.init_mod]. *)
               let jkind = Jkind.Builtin.value_or_null ~why:Recmod_fun_arg in
-              (* CR sspies: Ctype.correct_levels was removed upstream.
-                 Verify this is safe without level correction. *)
-              let ty_arg = ty_arg in
               match Ctype.check_type_jkind env ty_arg jkind with
               | Ok _ -> const_int 0 (* camlinternalMod.Function *)
               | Error _ ->
@@ -659,7 +656,7 @@ and transl_apply ~scopes ~loc ~cc mod_env funct translated_arg =
        ap_probe=None;})
 
 and transl_struct ~scopes loc fields cc rootpath
-      {str_final_env; str_items; _} : lambda * _ =
+      {str_final_env; str_items; _} =
   transl_structure ~scopes loc fields cc rootpath str_final_env str_items
 
 (* The function  transl_structure is called by  the bytecode compiler.
@@ -720,8 +717,8 @@ and transl_structure ~scopes loc
               List.filter (fun (id,_,_) -> not (Ident.Set.mem id ids))
                 id_pos_list
             in
-            wrap_id_pos_list loc id_pos_list get_field get_layout lam,
-              output_repr
+            ( wrap_id_pos_list loc id_pos_list get_field get_layout lam,
+              output_repr )
         | _ ->
             fatal_error "Translmod.transl_structure"
       in
@@ -792,7 +789,8 @@ and transl_structure ~scopes loc
                transl_extension_constructor ~scopes
                                             item.str_env
                                             path
-                                            ext.tyexn_constructor, body), repr
+                                            ext.tyexn_constructor, body),
+          repr
       | Tstr_module ({mb_presence=Mp_present} as mb) ->
           let id = mb.mb_id in
           let field =
@@ -816,14 +814,15 @@ and transl_structure ~scopes loc
             transl_structure ~scopes loc (cons_opt field fields)
               cc rootpath final_env rem
           in
-          (begin match id with
+          begin match id with
           | None ->
               Lsequence (Lprim(Pignore, [module_body],
-                               of_location ~scopes mb.mb_name.loc), body)
+                               of_location ~scopes mb.mb_name.loc), body),
+              repr
           | Some id ->
               Llet(pure_module mb.mb_expr, Lambda.layout_module, id,
-              id_duid, module_body, body)
-          end), repr
+              id_duid, module_body, body), repr
+          end
       | Tstr_module ({mb_presence=Mp_absent}) ->
           transl_structure ~scopes loc fields cc rootpath final_env rem
       | Tstr_recmodule bindings ->
@@ -883,9 +882,12 @@ and transl_structure ~scopes loc
                 Llet(Alias, lambda_layout, id, id_duid,
                      Lprim(mod_field pos incl_repr,
                            [Lvar mid],
-                           of_location ~scopes incl.incl_loc), body), repr
+                           of_location ~scopes incl.incl_loc), body),
+                repr
           in
-          let body, repr = rebind_idents 0 fields ids_with_sorts in
+          let body, repr =
+            rebind_idents 0 fields ids_with_sorts
+          in
           let loc = of_location ~scopes incl.incl_loc in
           let let_kind, modl =
             match incl.incl_kind with
@@ -898,7 +900,8 @@ and transl_structure ~scopes loc
                 Strict, transl_include_functor ~generative:true modl
                           input_coercion scopes loc ~input_repr
           in
-          Llet(let_kind, Lambda.layout_module, mid, mid_duid, modl, body), repr
+          Llet(let_kind, Lambda.layout_module, mid, mid_duid, modl, body),
+          repr
 
       | Tstr_open od ->
           let pure = pure_module od.open_expr in
@@ -932,9 +935,12 @@ and transl_structure ~scopes loc
                   (* CR sspies: Can we find a better [debug_uid] here? *)
                   Llet(Alias, lambda_layout, id, id_duid,
                       Lprim(mod_field pos open_repr, [Lvar mid],
-                            of_location ~scopes od.open_loc), body), repr
+                            of_location ~scopes od.open_loc), body),
+                  repr
               in
-              let body, repr = rebind_idents 0 fields ids_with_sorts in
+              let body, repr =
+                rebind_idents 0 fields ids_with_sorts
+              in
               Llet(pure, Lambda.layout_module, mid, mid_duid,
                    transl_module ~scopes Tcoerce_none None od.open_expr, body),
               repr
@@ -1072,20 +1078,13 @@ let transl_implementation compilation_unit impl ~loc =
   primitive_declarations := [];
   Translprim.clear_used_primitives ();
   let scopes = enter_compilation_unit ~scopes:empty_scopes compilation_unit in
-  let result_ref = ref None in
-  let body =
+  let body, (repr, arg_block_idx) =
     Translobj.transl_label_init (fun () ->
       let body, repr, arg_block_idx =
-        transl_implementation_module ~loc ~scopes compilation_unit impl
+        transl_implementation_module ~loc ~scopes compilation_unit
+          impl
       in
-      result_ref := Some (repr, arg_block_idx);
-      body)
-  in
-  let repr, arg_block_idx =
-    match !result_ref with
-    | Some r -> r
-    | None -> fatal_error "Translmod.transl_implementation: \
-                           repr and arg_block_idx missing."
+      body, (repr, arg_block_idx))
   in
   let body, main_module_block_format =
     match has_parameters () with
@@ -1188,7 +1187,7 @@ let toploop_setvalue id lam =
 
 let toploop_setvalue_id id = toploop_setvalue id (Lvar id)
 
-let close_toplevel_term lam =
+let close_toplevel_term (lam, ()) =
   Ident.Set.fold (fun id l -> Llet(Strict, Lambda.layout_any_value, id,
                                   Lambda.debug_uid_none,
                                   toploop_getvalue id, l))
@@ -1322,7 +1321,10 @@ let transl_toplevel_item ~scopes item =
 
 let transl_toplevel_item_and_close ~scopes itm =
   close_toplevel_term
-    (transl_label_init (fun () -> transl_toplevel_item ~scopes itm))
+    (transl_label_init
+       (fun () ->
+          let expr = transl_toplevel_item ~scopes itm
+          in expr, ()))
 
 let transl_toplevel_definition str =
   reset_labels ();

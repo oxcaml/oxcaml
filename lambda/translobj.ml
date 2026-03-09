@@ -88,7 +88,7 @@ let prim_makearray =
 
 (* Also use it for required globals *)
 let transl_label_init_general f =
-  let expr = f () in
+  let expr, repr = f () in
   let expr =
     Hashtbl.fold
       (fun c id expr ->
@@ -110,7 +110,7 @@ let transl_label_init_general f =
   in
   Env.reset_required_globals ();*)
   reset_labels ();
-  expr
+  expr, repr
 
 let transl_label_init_flambda f =
   assert(Config.flambda || Config.flambda2);
@@ -120,7 +120,7 @@ let transl_label_init_flambda f =
   (* Calling f (usually Translmod.transl_struct) requires the
      method_cache variable to be initialised to be able to generate
      method accesses. *)
-  let expr = f () in
+  let expr, repr = f () in
   let expr =
     if !method_count = 0 then expr
     else
@@ -131,7 +131,7 @@ let transl_label_init_flambda f =
                Loc_unknown),
         expr)
   in
-  transl_label_init_general (fun () -> expr)
+  transl_label_init_general (fun () -> expr, repr)
 
 let transl_label_init f =
   if !Clflags.native_code || Clflags.is_flambda2 () then

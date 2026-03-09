@@ -908,18 +908,18 @@ let compile_indirect newval =
   }
 
 let compile_alloc size =
-  let alloc prim size =
+  let alloc prim const_args =
     Lprim (Pccall prim,
-           [Lconst (Lambda.const_int size)],
+           List.map Lambda.tagged_immediate const_args,
            no_loc)
   in
   (* if you add new allocation primitives below,
      you should update {!find_size_of_alloc_prim} as well. *)
   match size with
   | Regular_block size ->
-      alloc alloc_prim size
+      alloc alloc_prim [size]
   | Float_record size ->
-      alloc alloc_float_record_prim size
+      alloc alloc_float_record_prim [size]
   | Lazy_block ->
       Lprim(Pccall alloc_lazy_prim,
             [Lambda.lambda_unit],
@@ -933,9 +933,7 @@ let compile_alloc size =
       let value_prefix_len = Mixed_block_shape.value_prefix_len shape in
       let flat_suffix_len = Mixed_block_shape.flat_suffix_len shape in
       let size = value_prefix_len + flat_suffix_len in
-      Lprim (Pccall alloc_mixed_record_prim,
-                 List.map Lambda.tagged_immediate [size; value_prefix_len],
-                 no_loc)
+      alloc alloc_mixed_record_prim [size; value_prefix_len]
 
 let compile_update size dummy newval =
   let prim, newval =
@@ -1041,7 +1039,7 @@ let compile_letrec input_bindings body =
   in
   let body_with_patches =
     List.fold_left (fun body (id, _, size, lam) ->
-        Lsequence (compile_update size (Lvar id) lam, body)
+        Lsequence(compile_update size (Lvar id) lam, body)
     ) body (all_bindings_rev.static)
   in
   let body_with_functions =

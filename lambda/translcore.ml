@@ -1110,12 +1110,6 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
          transl_exp ~scopes Jkind.Sort.Const.for_lazy_body e
       | `Float_that_cannot_be_shortcut
       | `Identifier `Forward_value ->
-         (* CR-someday mshinwell: Consider adding a new primitive
-            that expresses the construction of forward_tag blocks.
-            We need to use [Popaque] here to prevent unsound
-            optimisation in Flambda, but the concept of a mutable
-            block doesn't really match what is going on here.  This
-            value may subsequently turn into an immediate... *)
          Lprim(Pmakelazyblock Forward_tag,
                 [transl_exp ~scopes Jkind.Sort.Const.for_lazy_body e],
                 of_location ~scopes e.exp_loc)
@@ -1223,7 +1217,6 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
         with
         | {val_type; _} -> begin
             match
-              (* CR sspies: Removed [correct_levels] during the 5.4 merge. Is that right? *)
               Ctype.check_type_jkind e.exp_env val_type
               (* CR layouts v3: here we allow [value_or_null] because this check
                  happens too late for the typecheker to infer [non_null]. Test that
@@ -2648,10 +2641,10 @@ and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
 
    Effect handlers require all types to have layout [value]. *)
 and transl_handler ~scopes e body val_caselist exn_caselist eff_caselist =
-  let scrutinee_sort = Jkind.Sort.Const.for_predef_value in
-  let scrutinee_layout = Lambda.layout_block in
-  let result_sort = Jkind.Sort.Const.for_predef_value in
-  let result_layout = Lambda.layout_block in
+  let body_sort = Jkind.Sort.Const.for_predef_value in
+  let body_layout = Lambda.layout_block in
+  let return_sort = Jkind.Sort.Const.for_predef_value in
+  let return_layout = Lambda.layout_block in
   let mk_param name debug_uid layout =
     { name; debug_uid; layout;
       attributes = Lambda.default_param_attribute;
@@ -2662,34 +2655,34 @@ and transl_handler ~scopes e body val_caselist exn_caselist eff_caselist =
     | None ->
         let param = Ident.create_local "param" in
         lfunction ~kind:(Curried {nlocal=0})
-          ~params:[mk_param param Lambda.debug_uid_none scrutinee_layout]
-          ~return:result_layout ~body:(Lvar param)
+          ~params:[mk_param param Lambda.debug_uid_none body_layout]
+          ~return:return_layout ~body:(Lvar param)
           ~attr:default_function_attribute ~loc:Loc_unknown
           ~mode:alloc_heap ~ret_mode:alloc_heap
     | Some (val_caselist, partial) ->
-        let val_cases = transl_cases ~scopes result_sort val_caselist in
+        let val_cases = transl_cases ~scopes return_sort val_caselist in
         let param, param_duid = Typecore.name_cases "param" val_caselist in
         let body =
           Matching.for_function ~scopes
-            ~arg_sort:scrutinee_sort
-            ~arg_layout:scrutinee_layout ~return_layout:result_layout
+            ~arg_sort:body_sort
+            ~arg_layout:body_layout ~return_layout:return_layout
             e.exp_loc None (Lvar param) val_cases partial
         in
         lfunction ~kind:(Curried {nlocal=0})
-          ~params:[mk_param param param_duid scrutinee_layout]
-          ~return:result_layout ~attr:default_function_attribute
+          ~params:[mk_param param param_duid body_layout]
+          ~return:return_layout ~attr:default_function_attribute
           ~loc:Loc_unknown ~body ~mode:alloc_heap ~ret_mode:alloc_heap
   in
   let exn_fun =
-    let exn_cases = transl_cases ~scopes result_sort exn_caselist in
+    let exn_cases = transl_cases ~scopes return_sort exn_caselist in
     let param, param_duid = Typecore.name_cases "exn" exn_caselist in
     let body =
-      Matching.for_trywith ~scopes ~return_layout:result_layout e.exp_loc
+      Matching.for_trywith ~scopes ~return_layout:return_layout e.exp_loc
         (Lvar param) exn_cases
     in
     lfunction ~kind:(Curried {nlocal=0})
       ~params:[mk_param param param_duid Lambda.layout_exception]
-      ~return:result_layout
+      ~return:return_layout
       ~attr:default_function_attribute ~loc:Loc_unknown ~body
       ~mode:alloc_heap ~ret_mode:alloc_heap
   in
@@ -2697,27 +2690,27 @@ and transl_handler ~scopes e body val_caselist exn_caselist eff_caselist =
     let param, param_duid = Typecore.name_cases "eff" eff_caselist in
     let cont = Ident.create_local "k" in
     let cont_tail = Ident.create_local "ktail" in
-    let eff_cases = transl_cases ~scopes ~cont result_sort eff_caselist in
+    let eff_cases = transl_cases ~scopes ~cont return_sort eff_caselist in
     let body =
-      Matching.for_handler ~scopes ~return_layout:result_layout e.exp_loc
+      Matching.for_handler ~scopes ~return_layout:return_layout e.exp_loc
         (Lvar param) (Lvar cont) (Lvar cont_tail) eff_cases
     in
     lfunction ~kind:(Curried {nlocal=0})
       ~params:[mk_param param param_duid Lambda.layout_block;
                mk_param cont Lambda.debug_uid_none Lambda.layout_function;
                mk_param cont_tail Lambda.debug_uid_none Lambda.layout_function]
-      ~return:result_layout ~attr:default_function_attribute
+      ~return:return_layout ~attr:default_function_attribute
       ~loc:Loc_unknown ~body ~mode:alloc_heap ~ret_mode:alloc_heap
   in
   (* Upstream decomposes [body] into [f x] when it is an application, avoiding
      the thunk. We always use the thunk path because we cannot verify that the
      arg has layout [value] from [Lapply]. *)
   let (body_fun, arg) =
-    let body = transl_exp ~scopes scrutinee_sort body in
+    let body = transl_exp ~scopes body_sort body in
     let param = Ident.create_local "param" in
     (lfunction ~kind:(Curried {nlocal=0})
        ~params:[mk_param param Lambda.debug_uid_none Lambda.layout_int]
-       ~return:scrutinee_layout
+       ~return:body_layout
        ~attr:default_function_attribute ~loc:Loc_unknown
        ~body ~mode:alloc_heap ~ret_mode:alloc_heap,
      Lconst(Const_base(Const_int 0)))

@@ -919,13 +919,6 @@ let rec choice ctx t =
     | Punbox_vector _ | Pbox_vector (_, _)
     | Pjoin_vec256 | Psplit_vec256
 
-    (* Lazy blocks should never contain a recursive call directly:
-       either it's a closure (Lazy_tag), or a variable (Forward_tag).
-       The case 'let foo = recursive_call in lazy foo' could be translated to
-       use tmc in the cases where 'foo' might be of type lazy or float, but
-       given the fragility of such a transformation we choose not to. *)
-    | Pmakelazyblock _
-
     (* we don't handle array indices as destinations yet *)
     | (Pmakearray _ | Pduparray _ | Pmakearray_dynamic _)
 
@@ -946,6 +939,13 @@ let rec choice ctx t =
     | Pobj_dup
     | Pobj_magic _
     | Pprobe_is_enabled _
+
+    (* Lazy blocks should never contain a recursive call directly:
+       either it's a closure (Lazy_tag), or a variable (Forward_tag).
+       The case 'let foo = recursive_call in lazy foo' could be translated to
+       use tmc in the cases where 'foo' might be of type lazy or float, but
+       given the fragility of such a transformation we choose not to. *)
+    | Pmakelazyblock _
 
     (* more common cases... *)
     | Pbigarrayref _ | Pbigarrayset _
