@@ -76,13 +76,15 @@ let rec parse_args mnemonic acc encs args imm res =
     if !imm <> Imm_none then failwith mnemonic;
     imm := i
   in
-  let set_res_fst () =
-    if not (!res = Res_none) then raise Unsupported;
-    res := First_arg
+  let set_res_arg () =
+    match !res with
+    | Res _ -> raise Unsupported
+    | Res_none -> res := Arg [| List.length acc |]
+    | Arg rr -> res := Arg (Array.append rr [| List.length acc |])
   in
   let set_res loc enc =
     match !res with
-    | First_arg -> raise Unsupported
+    | Arg _ -> raise Unsupported
     | Res_none -> res := Res [| { loc; enc } |]
     | Res rr -> res := Res (Array.append rr [| { loc; enc } |])
   in
@@ -171,8 +173,8 @@ let rec parse_args mnemonic acc encs args imm res =
     | None -> parse_args mnemonic acc encs args imm res
     | Some loc -> (
       match String.trim rw with
-      | "(r, w)" ->
-        set_res_fst ();
+      | "(r,w)" | "(r, w)" ->
+        set_res_arg ();
         parse_args mnemonic ({ loc; enc } :: acc) encs args imm res
       | "(w)" ->
         set_res loc enc;
@@ -333,7 +335,7 @@ let binding instr =
     in
     let res =
       match instr.res with
-      | Res_none | First_arg -> ""
+      | Res_none | Arg _ -> ""
       | Res rr ->
         Array.fold_left (fun acc { loc; _ } -> acc ^ mangle_loc loc ^ "_") "" rr
     in
@@ -409,9 +411,12 @@ let print_one bind instr =
       args
     |> Array.to_list |> String.concat ";"
   in
+  let print_idxs idxs =
+    Array.map Int.to_string idxs |> Array.to_list |> String.concat ";"
+  in
   let print_res : res -> string = function
     | Res_none -> "Res_none"
-    | First_arg -> "First_arg"
+    | Arg rr -> sprintf "Arg [|%s|]" (print_idxs rr)
     | Res rr -> sprintf "Res [|%s|]" (print_args rr)
   in
   let print_legacy_prefix : legacy_prefix -> string = function
