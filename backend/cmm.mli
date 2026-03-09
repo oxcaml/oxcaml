@@ -385,7 +385,11 @@ type alloc_dbginfo_item =
     alloc_dbg : Debuginfo.t
   }
 
+val equal_alloc_dbginfo_item : alloc_dbginfo_item -> alloc_dbginfo_item -> bool
+
 type alloc_dbginfo = alloc_dbginfo_item list
+
+val equal_alloc_dbginfo : alloc_dbginfo -> alloc_dbginfo -> bool
 
 type is_global =
   | Global

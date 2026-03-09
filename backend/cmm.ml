@@ -481,16 +481,33 @@ type alloc_dbginfo_item =
     alloc_dbg : Debuginfo.t
   }
 
+let equal_alloc_dbginfo_item left right =
+  Int.equal left.alloc_words right.alloc_words
+  && equal_alloc_block_kind left.alloc_block_kind right.alloc_block_kind
+  && Debuginfo.compare left.alloc_dbg right.alloc_dbg = 0
+
 type alloc_dbginfo = alloc_dbginfo_item list
+
+let equal_alloc_dbginfo left right =
+  List.equal equal_alloc_dbginfo_item left right
 
 type is_global =
   | Global
   | Local
 
+let equal_is_global g g' =
+  match g, g' with
+  | Local, Local | Global, Global -> true
+  | Local, Global | Global, Local -> false
+
 type symbol =
   { sym_name : string;
     sym_global : is_global
   }
+
+let equal_symbol left right =
+  String.equal left.sym_name right.sym_name
+  && equal_is_global left.sym_global right.sym_global
 
 type operation =
   | Capply of
@@ -575,15 +592,6 @@ type operation =
   | Cdomain_index
   | Cpoll
   | Cpause
-
-let equal_is_global g g' =
-  match g, g' with
-  | Local, Local | Global, Global -> true
-  | Local, Global | Global, Local -> false
-
-let equal_symbol left right =
-  String.equal left.sym_name right.sym_name
-  && equal_is_global left.sym_global right.sym_global
 
 type vec128_bits =
   { word0 : int64; (* Least significant *)
@@ -881,8 +889,7 @@ let equal_machtype_component
   rank_machtype_component left = rank_machtype_component right
 
 let equal_machtype left right =
-  Int.equal (Array.length left) (Array.length right)
-  && Array.for_all2 equal_machtype_component left right
+  Misc.Stdlib.Array.equal equal_machtype_component left right
 
 let equal_exttype
     (( XInt | XInt8 | XInt16 | XInt32 | XInt64 | XFloat32 | XFloat | XVec128

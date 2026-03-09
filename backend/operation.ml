@@ -477,15 +477,6 @@ let dump ppf op =
   | Alloc { bytes; dbginfo = _; mode = Local } ->
     Format.fprintf ppf "alloc_local %i" bytes
 
-let equal_alloc_dbginfo_item left right =
-  Int.equal left.Cmm.alloc_words right.Cmm.alloc_words
-  && Cmm.equal_alloc_block_kind left.Cmm.alloc_block_kind
-       right.Cmm.alloc_block_kind
-  && Debuginfo.compare left.Cmm.alloc_dbg right.Cmm.alloc_dbg = 0
-
-let equal_alloc_dbginfo left right =
-  List.equal equal_alloc_dbginfo_item left right
-
 let equal_test left right =
   match left, right with
   | Itruetest, Itruetest
@@ -595,7 +586,7 @@ let equal left right =
   | ( Alloc { bytes = left_bytes; dbginfo = left_dbg; mode = left_mode },
       Alloc { bytes = right_bytes; dbginfo = right_dbg; mode = right_mode } ) ->
     Int.equal left_bytes right_bytes
-    && equal_alloc_dbginfo left_dbg right_dbg
+    && Cmm.equal_alloc_dbginfo left_dbg right_dbg
     && Cmm.Alloc_mode.equal left_mode right_mode
   | ( ( Move | Spill | Reload | Dummy_use | Const_int _ | Const_float32 _
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
