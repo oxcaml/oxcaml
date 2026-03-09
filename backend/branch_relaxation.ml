@@ -82,6 +82,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
           | Intop_imm (_, _)
           | Intop_atomic _
           | Floatop (_, _)
+          | Compare _
           | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
           | Name_for_debugger _ )
       | Lprologue | Lepilogue_open | Lepilogue_close | Lend | Lreloadretaddr
@@ -160,6 +161,7 @@ module Make (T : Branch_relaxation_intf.S) = struct
               | Intop_imm (_, _)
               | Intop_atomic _
               | Floatop (_, _)
+              | Compare _
               | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
               | Name_for_debugger _ | Specific _ ) ->
             (* Any other instruction has already been rejected in

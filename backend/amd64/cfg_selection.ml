@@ -211,6 +211,7 @@ let pseudoregs_for_operation op arg res =
     let arg = Array.copy arg in
     arg.(len - 1) <- res.(0);
     arg, res
+  | Compare _ -> raise Use_default_exn
   (* Other instructions are regular *)
   | Intop_atomic { op = Add | Sub | Land | Lor | Lxor; _ }
   | Intop (Ipopcnt | Iclz _ | Ictz _ | Icomp _ | Iadd)

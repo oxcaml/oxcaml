@@ -52,14 +52,11 @@ bswap:
 let compare x y = Int32_u.compare x y
 [%%expect_asm X86_64{|
 compare:
-  movq  %rax, %rdi
-  cmpq  %rbx, %rdi
+  cmpq  %rbx, %rax
+  setg  %cl
   setl  %al
-  movzbq %al, %rsi
-  cmpq  %rbx, %rdi
-  setg  %al
-  movzbq %al, %rax
-  subq  %rsi, %rax
+  subb  %al, %cl
+  movsbq %cl, %rax
   leaq  1(%rax,%rax), %rax
   ret
 |}]

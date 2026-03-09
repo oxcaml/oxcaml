@@ -180,6 +180,7 @@ type t =
   | Domain_index
   | Poll
   | Pause
+  | Compare of { signed : bool }
   | Alloc of
       { bytes : int;
         dbginfo : Cmm.alloc_dbginfo;

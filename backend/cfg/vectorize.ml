@@ -287,6 +287,7 @@ end = struct
       Operation.equal_int128_operation intop1 intop2
     | Intop_imm (intop1, _), Intop_imm (intop2, _) ->
       Operation.equal_integer_operation intop1 intop2
+    | Compare { signed = s1 }, Compare { signed = s2 } -> Bool.equal s1 s2
     | Floatop (width1, floatop1), Floatop (width2, floatop2) ->
       Operation.equal_float_width width1 width2
       && Operation.equal_float_operation floatop1 floatop2
@@ -325,7 +326,8 @@ end = struct
     | Tls_get, _
     | Domain_index, _
     | Poll, _
-    | Alloc _, _ ->
+    | Alloc _, _
+    | Compare _, _ ->
       false
 
   let have_isomorphic_op instruction1 instruction2 =
@@ -822,7 +824,7 @@ end = struct
                   | Floatop (_, _)
                   | Csel _ | Reinterpret_cast _ | Static_cast _
                   | Probe_is_enabled _ | Specific _ | Name_for_debugger _
-                  | Alloc _ ->
+                  | Alloc _ | Compare _ ->
                     None))
               | _ -> None
             in
@@ -1070,7 +1072,8 @@ end = struct
           | Move | Reinterpret_cast _ | Static_cast _ | Const_int _
           | Const_float32 _ | Const_float _ | Const_symbol _ | Const_vec128 _
           | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Intop _
-          | Int128op _ | Intop_imm _ | Floatop _ | Csel _ | Alloc _ ->
+          | Int128op _ | Intop_imm _ | Floatop _ | Compare _ | Csel _
+          | Alloc _ ->
             None)
 
       let create (instruction : Instruction.t) reaching_definitions : t option =
@@ -2324,7 +2327,7 @@ end = struct
         | Reload | Dummy_use | Const_int _ | Const_float32 _ | Const_float _
         | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
         | Stackoffset _ | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
-        | Floatop _ | Csel _ | Probe_is_enabled _ | Opaque | Pause
+        | Floatop _ | Compare _ | Csel _ | Probe_is_enabled _ | Opaque | Pause
         | Begin_region | End_region | Name_for_debugger _ | Dls_get | Tls_get
         | Domain_index | Poll ->
           None)

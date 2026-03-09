@@ -321,6 +321,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Int128op _ -> Op_pure
     | Intop_imm (_, _) -> Op_pure
     | Intop_atomic _ -> Op_store true
+    | Compare _ -> Op_pure
     | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _ -> Op_pure
     | Specific _ -> Op_other
     | Name_for_debugger _ -> Op_other
@@ -340,8 +341,9 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
     | Stackoffset _ | Load _ | Store _ | Alloc _ | Poll | Pause | Intop _
     | Int128op _
     | Intop_imm (_, _)
-    | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _ | Reinterpret_cast _
-    | Specific _ | Name_for_debugger _ | Probe_is_enabled _ | Begin_region
+    | Intop_atomic _ | Compare _ | Floatop _ | Csel _ | Static_cast _
+    | Reinterpret_cast _ | Specific _ | Name_for_debugger _ | Probe_is_enabled _
+    | Begin_region
     | End_region | Dls_get | Tls_get | Domain_index ->
       false
 
@@ -389,7 +391,7 @@ module Cse_generic (Target : Cfg_cse_target_intf.S) = struct
          | Store (_, _, _)
          | Intop _ | Int128op _
          | Intop_imm (_, _)
-         | Intop_atomic _
+         | Intop_atomic _ | Compare _
          | Floatop (_, _)
          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
          | Specific _ | Name_for_debugger _ ) as op) -> (

@@ -1135,6 +1135,7 @@ module BR = Branch_relaxation.Make (struct
       | _ -> 1 + num_instructions_for_intconst (Nativeint.of_int num_bytes))
     | Lop (Csel _) -> 4
     | Lop (Begin_region | End_region) -> 1
+    | Lop (Compare _) -> 4
     | Lop (Intop (Icomp _)) -> 2
     | Lop (Floatop (Float64, Icompf _)) -> 2
     | Lop (Floatop (Float32, Icompf _)) -> 2
@@ -1779,6 +1780,15 @@ let emit_instr i =
     emit_addimm (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) n
   | Lop (Intop_imm (Isub, n)) ->
     emit_subimm (H.reg_x i.res.(0)) (H.reg_x i.arg.(0)) n
+  | Lop (Compare { signed }) ->
+    A.ins_cmp_reg (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1))
+      O.optional_none;
+    A.ins_cset reg_x_tmp1
+      (cond_for_comparison (if signed then Cgt else Cugt));
+    A.ins_cset (H.reg_x i.res.(0))
+      (cond_for_comparison (if signed then Clt else Cult));
+    A.ins4 SUB_shifted_register (H.reg_x i.res.(0)) reg_x_tmp1
+      (H.reg_x i.res.(0)) O.optional_none
   | Lop (Intop (Icomp cmp)) ->
     A.ins_cmp_reg (H.reg_x i.arg.(0)) (H.reg_x i.arg.(1)) O.optional_none;
     A.ins_cset (H.reg_x i.res.(0)) (cond_for_comparison cmp)

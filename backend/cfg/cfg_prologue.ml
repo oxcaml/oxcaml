@@ -96,7 +96,7 @@ module Instruction_requirements = struct
           ( Move | Spill | Reload | Dummy_use | Const_int _ | Const_float32 _
           | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
           | Const_vec512 _ | Load _ | Store _ | Intop _ | Int128op _
-          | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _
+          | Intop_imm _ | Intop_atomic _ | Floatop _ | Compare _ | Csel _
           | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
           | Begin_region | End_region | Specific _ | Name_for_debugger _
           | Dls_get | Tls_get | Domain_index | Pause )

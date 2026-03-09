@@ -329,6 +329,7 @@ type t =
   | Domain_index
   | Poll
   | Pause
+  | Compare of { signed : bool }
   | Alloc of
       { bytes : int;
         dbginfo : Cmm.alloc_dbginfo;
@@ -376,6 +377,7 @@ let is_pure = function
   | Domain_index -> true
   | Poll -> false
   | Pause -> false
+  | Compare _ -> true
   | Alloc _ -> false
 
 (* The next 2 functions are copied almost as is from asmcomp/printmach.ml
@@ -472,6 +474,9 @@ let dump ppf op =
   | Domain_index -> Format.fprintf ppf "domain_index"
   | Poll -> Format.fprintf ppf "poll"
   | Pause -> Format.fprintf ppf "pause"
+  | Compare { signed } ->
+    Format.fprintf ppf "compare_%s"
+      (if signed then "signed" else "unsigned")
   | Alloc { bytes; dbginfo = _; mode = Heap } ->
     Format.fprintf ppf "alloc %i" bytes
   | Alloc { bytes; dbginfo = _; mode = Local } ->

@@ -155,7 +155,8 @@ let is_move_basic : Cfg.basic -> bool =
     | Domain_index -> false
     | Poll -> false
     | Pause -> false
-    | Alloc _ -> false)
+    | Alloc _ -> false
+    | Compare _ -> false)
   | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue | Stack_check _
     ->
     false

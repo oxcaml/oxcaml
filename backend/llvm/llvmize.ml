@@ -1301,6 +1301,8 @@ let basic_op t (i : Cfg.basic Cfg.instruction) (op : Operation.t) =
     let domain_id_ptr = load_domainstate_addr t Domain_id in
     let domain_id = emit_ins t (I.load ~ptr:domain_id_ptr ~typ:T.i64) in
     store_into_reg t i.res.(0) domain_id
+  | Compare _ ->
+    Misc.fatal_error "Llvmize: Compare operation not supported"
   | Poll -> () (* CR yusumez: insert poll call *)
   | Stackoffset _ -> () (* Handled separately via [statepoint_id_attr] *)
   | Spill | Reload | Dummy_use ->

@@ -278,6 +278,7 @@ let check_basic_arity t label (instr : Cfg.basic Cfg.instruction) =
       in
       check ~expected_args ~expected_res
     | Intop_imm _ -> check ~expected_args:[1] ~expected_res:[1]
+    | Compare _ -> check ~expected_args:[2] ~expected_res:[1; 2]
     | Intop_atomic { op; addr; _ } ->
       let addr_args = Arch.num_args_addressing addr in
       let data_args =
@@ -473,8 +474,8 @@ let check_stack_offset t label (block : Cfg.basic_block) =
             ( Move | Spill | Reload | Dummy_use | Const_int _ | Const_float _
             | Const_float32 _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
             | Const_vec512 _ | Load _ | Store _ | Intop _ | Int128op _
-            | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Static_cast _
-            | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
+            | Intop_imm _ | Intop_atomic _ | Floatop _ | Compare _ | Csel _
+            | Static_cast _ | Reinterpret_cast _ | Probe_is_enabled _ | Opaque | Begin_region
             | End_region | Specific _ | Name_for_debugger _ | Dls_get | Tls_get
             | Domain_index | Poll | Pause | Alloc _ )
         | Reloadretaddr | Prologue | Epilogue | Stack_check _ ->

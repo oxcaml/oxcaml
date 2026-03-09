@@ -491,6 +491,7 @@ let destroyed_at_raise = all_phys_regs
 let destroyed_at_reloadretaddr = [| |]
 
 let destroyed_rax = [| rax |] (* CR-someday vkarvonen: Use [iarray] *)
+let destroyed_rax_rcx = [| rax; rcx |]
 let destroyed_rax_rdx = [| rax; rdx |]
 let destroyed_rbp = [| rbp |]
 let destroyed_r10 = [| r10 |]
@@ -530,6 +531,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
     destroyed_at_large_memory_op
   | Op(Intop(Imulh _ | Icomp _) | Intop_imm((Icomp _), _)) ->
     destroyed_rax
+  | Op (Compare _) -> destroyed_rax_rcx
   | Op (Specific (Irdtsc | Irdpmc)) ->
     destroyed_rax_rdx
   | Op Poll -> destroyed_at_alloc_or_poll
@@ -705,7 +707,7 @@ let operation_supported = function
   | Ccsel _
   | Cbswap _
   | Cclz _ | Cctz _
-  | Ccmpi _ | Caddv | Cadda
+  | Ccompare _ | Ccmpi _ | Caddv | Cadda
   | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
   | Ccmpf _
   | Craise _

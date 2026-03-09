@@ -58,6 +58,7 @@ let class_of_operation (op : Operation.t)
   | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
   | Stackoffset _ | Load _ | Store _ | Alloc _
   | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
+  | Compare _
   | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
   | Begin_region | End_region | Poll | Dls_get | Tls_get | Domain_index
     -> Use_default
@@ -76,6 +77,7 @@ let is_cheap_operation (op : Operation.t)
   | Const_symbol _ | Const_vec128 _ | Const_vec256 _ | Const_vec512 _
   | Stackoffset _ | Load _ | Store _ | Alloc _
   | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _
+  | Compare _
   | Name_for_debugger _ | Probe_is_enabled _ | Opaque | Pause
   | Begin_region | End_region | Poll | Dls_get | Tls_get | Domain_index
     -> Cheap false

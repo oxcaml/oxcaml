@@ -570,6 +570,7 @@ type operation =
         size : atomic_bitwidth
       }
   | Ccmpi of integer_comparison
+  | Ccompare of { signed : bool }
   | Caddv
   | Cadda
   | Cnegf of float_width
@@ -768,8 +769,8 @@ let iter_shallow_tail f = function
         | Cload _
         | Cstore (_, _)
         | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz _ | Cctz _ | Cprefetch _
-        | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _
-        | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
+        | Catomic _ | Ccmpi _ | Ccompare _ | Cnegf _ | Cabsf _ | Caddf _
+        | Csubf _ | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
         | Ccmpf (_, _)
         | Cprobe _ | Cprobe_is_enabled _
         | Ctuple_field (_, _) ),
@@ -802,8 +803,8 @@ let map_shallow_tail f = function
           | Capply _ | Cextcall _ | Cload _
           | Cstore (_, _)
           | Cmulhi _ | Cbswap _ | Ccsel _ | Cclz _ | Cctz _ | Cprefetch _
-          | Catomic _ | Ccmpi _ | Cnegf _ | Cabsf _ | Caddf _ | Csubf _
-          | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
+          | Catomic _ | Ccmpi _ | Ccompare _ | Cnegf _ | Cabsf _ | Caddf _
+          | Csubf _ | Cmulf _ | Cdivf _ | Creinterpret_cast _ | Cstatic_cast _
           | Ccmpf (_, _)
           | Cprobe _ | Cprobe_is_enabled _
           | Ctuple_field (_, _) ),
