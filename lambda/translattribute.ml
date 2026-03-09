@@ -65,6 +65,9 @@ let is_opaque_attribute =
 let is_unboxable_attribute =
   [ "unboxable", Return ]
 
+let is_lpoly_inst_attribute =
+  [ "lpoly_inst", Return ]
+
 let find_attribute p attributes =
   let inline_attribute = select_attributes p attributes in
   let attr =
@@ -220,6 +223,31 @@ let parse_opaque_attribute attr =
         ~empty:true
         []
         payload
+
+let parse_lpoly_inst_attribute {Parsetree.attr_name = {txt; loc}; attr_payload = payload} =
+  let exception Invalid in
+  try
+    let tys = match payload with
+      | PTyp ({ ptyp_desc = Ptyp_any _ } as ty) -> [None, ty]
+      | PTyp { ptyp_desc = Ptyp_tuple tys } -> tys
+      | _  -> raise Invalid
+    in
+    Some (List.map
+      (fun (_, { Parsetree.ptyp_desc = ty; ptyp_loc; _ }) ->
+        match ty with
+        | Ptyp_any (Some jkind_annot) ->
+          let env = Lazy.force Env.initial in
+          let jkind = Jkind.of_annotation ~context:(Type_wildcard ptyp_loc) env jkind_annot in
+          let sort = Jkind.sort_of_jkind env (Jkind.disallow_right jkind) in
+          let const_sort = Jkind.Sort.default_for_transl_and_get sort in
+          Typeopt.layout_of_sort ptyp_loc const_sort
+        | _ -> raise Invalid)
+      tys)
+  with
+  | Invalid ->
+    Location.prerr_warning loc
+      (Warnings.Attribute_payload (txt, "It must be a tuple of _ with layouts"));
+    None
 
 let get_inline_attribute l =
   let attr = find_attribute is_inline_attribute l in
@@ -428,7 +456,7 @@ let add_cold_attribute expr loc attributes =
             (Warnings.Duplicated_attribute "cold");
       (* ppx_cold rewrites `[@cold]` to `[@inline never][@specialise never]
          [@local never]` so we do the equivalent here. *)
-      begin match attr.inline with 
+      begin match attr.inline with
       | Always_inline
       | Never_inline
       | Available_inline
@@ -634,3 +662,12 @@ let transl_param_attributes pat =
     Option.is_some (find_attribute is_unboxable_attribute attrs)
   in
   { unbox_param }
+
+let get_lpoly_inst_attribute attrs =
+  match find_attribute is_lpoly_inst_attribute attrs with
+  | None -> None
+  | Some attr when (not Language_extension.(is_enabled Layout_poly)) ->
+      Location.prerr_warning attr.attr_loc
+        (Warnings.Attribute_payload (Location.get_txt attr.attr_name, "Is only allowed if the layout_poly extension is enabled"));
+      None
+  | Some attr -> parse_lpoly_inst_attribute attr

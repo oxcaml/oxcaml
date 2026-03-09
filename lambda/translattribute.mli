@@ -68,3 +68,7 @@ val add_function_attributes
 val transl_param_attributes
   : Typedtree.pattern
   -> Lambda.parameter_attribute
+
+val get_lpoly_inst_attribute
+  : Parsetree.attributes
+  -> Lambda.layout list option

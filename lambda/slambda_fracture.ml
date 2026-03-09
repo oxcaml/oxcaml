@@ -37,8 +37,9 @@ open Lambda
 
 (** Fracture a lambda constant, currently no constants have a compile time part
     so does nothing. *)
-let fracture_const lambda _const =
-  SLhalves { sval_comptime = SLmissing; sval_runtime = lambda }
+let fracture_const lambda = function
+  | Const_layout layout -> SLhalves { sval_comptime = SLlayout layout; sval_runtime = lambda }
+  | _ -> SLhalves { sval_comptime = SLmissing; sval_runtime = lambda }
 
 let rec fracture_lam lambda : slambda =
   match lambda with

@@ -386,8 +386,23 @@ and transl_exp1 ~scopes ~in_new_scope sort e =
 and transl_exp0 ~in_new_scope ~scopes sort e =
   match e.exp_desc with
   | Texp_ident { path; desc; kind; _ } ->
-      transl_ident (of_location ~scopes e.exp_loc)
-        e.exp_env e.exp_type path desc kind
+      let ident = transl_ident (of_location ~scopes e.exp_loc)
+        e.exp_env e.exp_type path desc kind in
+      (match Translattribute.get_lpoly_inst_attribute e.exp_attributes with
+      | Some args ->
+          Linstantiate {
+            ap_func = ident;
+            ap_args = List.map (fun l -> Lconst (Const_layout l)) args;
+            ap_result_layout = Lambda.layout_function;
+            ap_region_close = Rc_normal;
+            ap_mode = alloc_heap;
+            ap_loc = (of_location ~scopes e.exp_loc);
+            ap_tailcall = Default_tailcall;
+            ap_inlined = Default_inlined;
+            ap_specialised = Default_specialise;
+            ap_probe = None;
+          }
+      | None -> ident)
   | Texp_constant cst -> Lconst (Const_base cst)
   | Texp_let(rec_flag, pat_expr_list, body) ->
       let return_layout = layout_exp sort body in
