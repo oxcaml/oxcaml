@@ -14,16 +14,16 @@
 
 [@@@ocaml.flambda_o3]
 
-type ('a, 'b : any) t : bits64 mod everything = ('a, 'b) idx_mut
+type ('a : value_or_null, 'b : any) t : bits64 mod everything = ('a, 'b) idx_mut
 
 external get
-  : 'a ('b : any).
+  : ('a : value_or_null) ('b : any).
   ('a[@local_opt]) -> ('a, 'b) idx_mut -> ('b[@local_opt])
   = "%get_idx"
 [@@layout_poly]
 
 external set
-  : 'a ('b : any).
+  : ('a : value_or_null) ('b : any).
   ('a[@local_opt]) -> ('a, 'b) idx_mut -> 'b -> unit
   = "%set_idx"
 [@@layout_poly]

@@ -15,11 +15,11 @@
 (** Mutable indices into blocks. *)
 
 (** An alias for the type of mutable indices into blocks. *)
-type ('a, 'b : any) t : bits64 mod everything = ('a, 'b) idx_mut
+type ('a : value_or_null, 'b : any) t : bits64 mod everything = ('a, 'b) idx_mut
 
 (** [get a i] uses the index [i] to access [a]. *)
 external get
-  : 'a ('b : any).
+  : ('a : value_or_null) ('b : any).
   ('a[@local_opt]) -> ('a, 'b) idx_mut -> ('b[@local_opt])
   = "%get_idx"
 [@@layout_poly]
@@ -30,7 +30,7 @@ external get
     array elements or mutable record fields) can only be created to elements
     with the [global] modality. *)
 external set
-  : 'a ('b : any).
+  : ('a : value_or_null) ('b : any).
   ('a[@local_opt]) -> ('a, 'b) idx_mut -> 'b -> unit
   = "%set_idx"
 [@@layout_poly]
