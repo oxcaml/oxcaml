@@ -32,6 +32,9 @@
    - and [accessor], which means that a given field of a variable can flow to
    another variable.
 
+   CR bclement: what does "unknown sources" / "unknown usages" mean precisely?
+   Anything outside this file? Anything, including things in this file?
+
    Some nodes are also labelled as having unknown sources (for variables outside
    the compilation unit, for instance), or unknown usages (for arguments to
    functions outside the compilation unit, for instance).
@@ -354,6 +357,9 @@ let any_usage = any_usage
     For local fields, this relation is not used. *)
 let field_usages_top = rel2 "field_usages_top" Cols.[n; f]
 
+let nontop_field_usages x f y =
+  `Only_if ([~~(field_usages_top x f)], field_usages x f y)
+
 (** [sources x y] y is a source of x, and there is an actual source for y.
 
     For performance reasons, we don't want to represent [sources x y] when x is
@@ -467,248 +473,418 @@ let has_usage = rel1 "has_usage" Cols.[n]
    x y] for some [y]. *)
 let has_source = rel1 "has_source" Cols.[n]
 
-let datalog_schedule =
+module Datalog_schedule = struct
   (* Group rules by priority. Rules with (let$) are executed first, then the
      rules with (let$$) are executed. *)
-  let with_priority p x f = p, ( let$ ) x f in
-  let ( let$ ) x f = with_priority 0 x f in
-  let ( let$$ ) x f = with_priority 1 x f in
+  let with_priority p x f = p, ( let$ ) x f
+
+  let ( let$ ) x f = with_priority 0 x f
+
+  let ( let$$ ) x f = with_priority 1 x f
+
   let make_schedule l =
     Schedule.fixpoint
       (List.init 2 (fun i ->
            Schedule.saturate
              (List.filter_map (fun (p, r) -> if i = p then Some r else None) l)))
-  in
-  [ (* Reverse relations, because datalog does not implement a more efficient
+
+  let reverse_rules =
+    (* Reverse relations, because datalog does not implement a more efficient
        representation yet. Datalog iterates on the first key of a relation
        first, those reversed relations allows to select a different key. Of
        these, only [alias] has both priorities, because it is the only of those
        relations that is extended after graph construction. *)
-    (let$ [to_; from] = ["to_"; "from"] in
-     [alias ~to_ ~from] ==> rev_alias ~from ~to_);
-    (let$$ [to_; from] = ["to_"; "from"] in
-     [alias ~to_ ~from] ==> rev_alias ~from ~to_);
-    (let$ [to_; from] = ["to_"; "from"] in
-     [use ~to_ ~from] ==> rev_use ~from ~to_);
-    (let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-     [accessor ~to_ relation ~base] ==> rev_accessor ~base relation ~to_);
-    (let$ [base; relation; from] = ["base"; "relation"; "from"] in
-     [constructor ~base relation ~from] ==> rev_constructor ~from relation ~base);
-    (let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-     [coaccessor ~to_ relation ~base] ==> rev_coaccessor ~base relation ~to_);
-    (let$ [base; relation; from] = ["base"; "relation"; "from"] in
-     [coconstructor ~base relation ~from]
-     ==> rev_coconstructor ~from relation ~base);
-    (* The [propagate] relation is part of the input of the solver, with the
-       intended meaning of this rule, that is, an alias if [is_used] is used. *)
-    (let$ [if_used; to_; from] = ["if_used"; "to_"; "from"] in
-     [any_usage if_used; propagate ~if_used ~to_ ~from] ==> alias ~to_ ~from);
-    (* Likewise, [alias_if_any_source] means an alias if [is_any_source] has any
-       source. *)
-    (let$ [if_any_source; to_; from] = ["if_any_source"; "to_"; "from"] in
-     [any_source if_any_source; alias_if_any_source ~if_any_source ~to_ ~from]
-     ==> alias ~to_ ~from);
-    (* has_usage/has_source *)
-    (let$ [x] = ["x"] in
-     [zero_alloc_source x] ==> any_source x);
-    (let$ [x] = ["x"] in
-     [any_usage x] ==> has_usage x);
-    (let$$ [x; y] = ["x"; "y"] in
-     [usages x y] ==> has_usage x);
-    (let$ [x] = ["x"] in
-     [any_source x] ==> has_source x);
-    (let$$ [x; y] = ["x"; "y"] in
-     [sources x y] ==> has_source x);
-    (* usages rules:
+    [ (let$ [to_; from] = ["to_"; "from"] in
+       [alias ~to_ ~from] ==> rev_alias ~from ~to_);
+      (let$$ [to_; from] = ["to_"; "from"] in
+       [alias ~to_ ~from] ==> rev_alias ~from ~to_);
+      (let$ [to_; from] = ["to_"; "from"] in
+       [use ~to_ ~from] ==> rev_use ~from ~to_);
+      (let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+       [accessor ~to_ relation ~base] ==> rev_accessor ~base relation ~to_);
+      (let$ [base; relation; from] = ["base"; "relation"; "from"] in
+       [constructor ~base relation ~from]
+       ==> rev_constructor ~from relation ~base);
+      (let$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+       [coaccessor ~to_ relation ~base] ==> rev_coaccessor ~base relation ~to_);
+      (let$ [base; relation; from] = ["base"; "relation"; "from"] in
+       [coconstructor ~base relation ~from]
+       ==> rev_coconstructor ~from relation ~base) ]
 
-       By convention the [base] name applies to something that represents a
-       block value (something on which an accessor or a constructor applies)
+  let alias_rules =
+    [ (* The [propagate] relation is part of the input of the solver, with the
+         intended meaning of this rule, that is, an alias if [is_used] is
+         used. *)
+      (let$ [if_used; to_; from] = ["if_used"; "to_"; "from"] in
+       [any_usage if_used; propagate ~if_used ~to_ ~from] ==> alias ~to_ ~from);
+      (* Likewise, [alias_if_any_source] means an alias if [is_any_source] has
+         any source. *)
+      (let$ [if_any_source; to_; from] = ["if_any_source"; "to_"; "from"] in
+       [any_source if_any_source; alias_if_any_source ~if_any_source ~to_ ~from]
+       ==> alias ~to_ ~from);
+      (* Constructor: if [base = { field = from; _ }], and there is a precise
+         usage [base_use] of base with [to_ = base_use.field], there is an alias
+         [to_ = from].
 
-       usage_accessor and usage_coaccessor are the relation initialisation: they
-       define what we mean by 'actually using' something. usage_alias
-       propagatess usage to aliases.
+         Note that this rule is written in a slightly convoluted way (using
+         `field_usages` instead of `accessors`) so that the alias is only
+         introduced when the field is actually used.
 
-       An 'actual use' comes from either a top (any_usage predicate) or through
-       an accessor (or coaccessor) on an used variable
+         CR bclement: I'm not entirely sure why the above is useful.
 
-       All those rules are constrained not to apply when any_usage is valid.
-       (see [usages] definition comment) *)
-    (let$ [to_; from] = ["to_"; "from"] in
-     [alias ~to_ ~from; any_usage to_] ==> any_usage from);
-    (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-     [accessor ~to_ relation ~base; has_usage to_] ==> nontop_usages base base);
-    (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-     [has_source to_; coaccessor ~to_ relation ~base]
-     ==> nontop_usages base base);
-    (let$$ [to_; from; usage] = ["to_"; "from"; "usage"] in
-     [nontop_usages to_ usage; alias ~to_ ~from] ==> nontop_usages from usage);
-    (* accessor-usage *)
-    (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-     [ ~~(any_usage base);
-       any_usage to_;
-       accessor ~to_ relation ~base;
-       unless1 Field.is_local relation ]
-     ==> field_usages_top base relation);
-    (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-     [ ~~(any_usage base);
-       any_usage to_;
-       accessor ~to_ relation ~base;
-       when1 Field.is_local relation ]
-     ==> field_usages base relation to_);
-    (let$$ [to_; relation; base; _var] = ["to_"; "relation"; "base"; "_var"] in
-     [ ~~(any_usage base);
-       nontop_usages to_ _var;
-       ~~(field_usages_top base relation);
-       accessor ~to_ relation ~base ]
-     ==> field_usages base relation to_);
-    (* coaccessor-usages *)
-    (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
-     [~~(any_usage base); has_source to_; coaccessor ~to_ relation ~base]
-     ==> cofield_usages base relation to_);
-    (* constructor-usages *)
-    (let$$ [base; base_use; relation; from; to_] =
-       ["base"; "base_use"; "relation"; "from"; "to_"]
-     in
-     [ ~~(any_usage from);
-       ~~(field_usages_top base_use relation);
-       constructor ~base relation ~from;
-       nontop_usages base base_use;
-       field_usages base_use relation to_ ]
-     ==> alias ~to_ ~from);
-    (let$$ [base; base_use; relation; from; to_] =
-       ["base"; "base_use"; "relation"; "from"; "to_"]
-     in
-     [ when1 Field.is_local relation;
-       constructor ~base relation ~from;
-       usages base base_use;
-       field_usages base_use relation to_ ]
-     ==> alias ~to_ ~from);
-    (let$ [base; base_use; relation; from] =
-       ["base"; "base_use"; "relation"; "from"]
-     in
-     [ constructor ~base relation ~from;
-       nontop_usages base base_use;
-       field_usages_top base_use relation ]
-     ==> any_usage from);
-    (let$ [base; relation; from] = ["base"; "relation"; "from"] in
-     [ any_usage base;
-       constructor ~base relation ~from;
-       unless1 Field.is_local relation ]
-     ==> any_usage from);
-    (let$ [base; relation; from] = ["base"; "relation"; "from"] in
-     [ any_usage base;
-       constructor ~base relation ~from;
-       when1 Field.is_local relation ]
-     ==> escaping_field relation from);
-    (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
-     [any_source base; rev_coaccessor ~base relation ~to_] ==> any_usage to_);
-    (* sources: see explanation on usage *)
-    (let$ [from; to_] = ["from"; "to_"] in
-     [rev_alias ~from ~to_; zero_alloc_source from] ==> zero_alloc_source to_);
-    (let$ [from; to_] = ["from"; "to_"] in
-     [rev_alias ~from ~to_; any_source from] ==> any_source to_);
-    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
-     [has_source from; rev_constructor ~from relation ~base]
-     ==> nontop_sources base base);
-    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
-     [has_usage from; rev_coconstructor ~from relation ~base]
-     ==> nontop_sources base base);
-    (let$$ [from; to_; source] = ["from"; "to_"; "source"] in
-     [nontop_sources from source; rev_alias ~from ~to_]
-     ==> nontop_sources to_ source);
-    (* constructor-sources *)
-    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
-     [ ~~(any_source base);
-       any_source from;
-       rev_constructor ~from relation ~base;
-       unless1 Field.is_local relation ]
-     ==> field_sources_top base relation);
-    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
-     [ ~~(any_source base);
-       any_source from;
-       rev_constructor ~from relation ~base;
-       when1 Field.is_local relation ]
-     ==> field_sources base relation from);
-    (let$$ [from; relation; base; _var] =
-       ["from"; "relation"; "base"; "_var"]
-     in
-     [ ~~(any_source base);
-       ~~(field_sources_top base relation);
-       rev_constructor ~from relation ~base;
-       nontop_sources from _var ]
-     ==> field_sources base relation from);
-    (* coaccessor-sources *)
-    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
-     [ ~~(any_source base);
-       has_usage from;
-       rev_coconstructor ~from relation ~base ]
-     ==> cofield_sources base relation from);
-    (* coconstructor-uses *)
-    (let$$ [base; base_use; relation; from; to_] =
-       ["base"; "base_use"; "relation"; "from"; "to_"]
-     in
-     [ coconstructor ~base relation ~from;
-       nontop_usages base base_use;
-       cofield_usages base_use relation to_ ]
-     ==> alias ~to_:from ~from:to_);
-    (let$ [base; relation; from] = ["base"; "relation"; "from"] in
-     [any_usage base; coconstructor ~base relation ~from] ==> any_source from);
-    (* accessor-sources *)
-    (let$$ [base; base_source; relation; to_; from] =
-       ["base"; "base_source"; "relation"; "to_"; "from"]
-     in
-     [ ~~(any_source to_);
-       ~~(field_sources_top base_source relation);
-       rev_accessor ~base relation ~to_;
-       nontop_sources base base_source;
-       field_sources base_source relation from ]
-     ==> alias ~to_ ~from);
-    (let$$ [base; base_source; relation; to_; from] =
-       ["base"; "base_source"; "relation"; "to_"; "from"]
-     in
-     [ when1 Field.is_local relation;
-       rev_accessor ~base relation ~to_;
-       sources base base_source;
-       field_sources base_source relation from ]
-     ==> alias ~to_ ~from);
-    (let$ [base; base_source; relation; to_] =
-       ["base"; "base_source"; "relation"; "to_"]
-     in
-     [ rev_accessor ~base relation ~to_;
-       nontop_sources base base_source;
-       field_sources_top base_source relation ]
-     ==> any_source to_);
-    (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
-     [zero_alloc_source base; rev_accessor ~base relation ~to_]
-     ==> zero_alloc_source to_);
-    (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
-     [ any_source base;
-       rev_accessor ~base relation ~to_;
-       unless1 Field.is_local relation ]
-     ==> any_source to_);
-    (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
-     [ any_source base;
-       rev_accessor ~base relation ~to_;
-       when1 Field.is_local relation ]
-     ==> reading_field relation to_);
-    (let$ [relation; from; to_] = ["relation"; "from"; "to_"] in
-     [escaping_field relation from; reading_field relation to_]
-     ==> alias ~to_ ~from);
-    (let$$ [base; base_source; relation; to_; from] =
-       ["base"; "base_source"; "relation"; "to_"; "from"]
-     in
-     [ rev_coaccessor ~base relation ~to_;
-       nontop_sources base base_source;
-       cofield_sources base_source relation from ]
-     ==> alias ~to_:from ~from:to_);
-    (* use *)
-    (let$ [to_; from] = ["to_"; "from"] in
-     [has_usage to_; use ~to_ ~from] ==> any_usage from);
-    (let$ [from; to_] = ["from"; "to_"] in
-     [has_source from; rev_use ~from ~to_] ==> any_source to_);
-    (let$ [from; to_] = ["from"; "to_"] in
-     [zero_alloc_source from; rev_use ~from ~to_] ==> zero_alloc_source to_) ]
-  |> make_schedule
+         We use two variants of this rule for local and non-local fields; see
+         the comment at the top of this file.
+
+         This rule has a mutual dependency with the `usages` rules: there is no
+         case for constructors in the `usages` rules; instead, we rely on the
+         aliases inserted by this rule. *)
+      (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+       [ ~~(any_usage base);
+         any_usage to_;
+         accessor ~to_ relation ~base;
+         when1 Field.is_local relation ]
+       ==> field_usages base relation to_);
+      (let$$ [to_; relation; base; _var] =
+         ["to_"; "relation"; "base"; "_var"]
+       in
+       [~~(any_usage base); nontop_usages to_ _var; accessor ~to_ relation ~base]
+       ==> nontop_field_usages base relation to_);
+      (let$$ [base; base_use; relation; from; to_] =
+         ["base"; "base_use"; "relation"; "from"; "to_"]
+       in
+       [ ~~(any_usage from);
+         constructor ~base relation ~from;
+         nontop_usages base base_use;
+         nontop_field_usages base_use relation to_ ]
+       ==> alias ~to_ ~from);
+      (let$$ [base; base_use; relation; from; to_] =
+         ["base"; "base_use"; "relation"; "from"; "to_"]
+       in
+       [ when1 Field.is_local relation;
+         constructor ~base relation ~from;
+         usages base base_use;
+         field_usages base_use relation to_ ]
+       ==> alias ~to_ ~from);
+      (* Accessor: if [to_ = base.field] and there is a precise source
+         [base_source] for [base] with [base_source = { field = from; _ }],
+         there is an alias between [to_] and [from].
+
+         This is similar to the rules for constructors above, except that we are
+         only deducing the alias when there is a source. We again have an
+         additional rule for local fields. *)
+      (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+       [ ~~(any_source base);
+         any_source from;
+         rev_constructor ~from relation ~base;
+         when1 Field.is_local relation ]
+       ==> field_sources base relation from);
+      (let$$ [from; relation; base; _var] =
+         ["from"; "relation"; "base"; "_var"]
+       in
+       [ ~~(any_source base);
+         ~~(field_sources_top base relation);
+         rev_constructor ~from relation ~base;
+         nontop_sources from _var ]
+       ==> field_sources base relation from);
+      (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+       [ ~~(any_source base);
+         has_usage from;
+         rev_coconstructor ~from relation ~base ]
+       ==> cofield_sources base relation from);
+      (let$$ [base; base_source; relation; to_; from] =
+         ["base"; "base_source"; "relation"; "to_"; "from"]
+       in
+       [ ~~(any_source to_);
+         ~~(field_sources_top base_source relation);
+         rev_accessor ~base relation ~to_;
+         nontop_sources base base_source;
+         field_sources base_source relation from ]
+       ==> alias ~to_ ~from);
+      (let$$ [base; base_source; relation; to_; from] =
+         ["base"; "base_source"; "relation"; "to_"; "from"]
+       in
+       [ when1 Field.is_local relation;
+         rev_accessor ~base relation ~to_;
+         sources base base_source;
+         field_sources base_source relation from ]
+       ==> alias ~to_ ~from);
+      (* Coconstructor *)
+      (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+       [~~(any_usage base); has_source to_; coaccessor ~to_ relation ~base]
+       ==> cofield_usages base relation to_);
+      (let$$ [base; base_use; relation; from; to_] =
+         ["base"; "base_use"; "relation"; "from"; "to_"]
+       in
+       [ coconstructor ~base relation ~from;
+         nontop_usages base base_use;
+         cofield_usages base_use relation to_ ]
+       ==> alias ~to_:from ~from:to_);
+      (* Coaccessor *)
+      (let$$ [base; base_source; relation; to_; from] =
+         ["base"; "base_source"; "relation"; "to_"; "from"]
+       in
+       [ rev_coaccessor ~base relation ~to_;
+         nontop_sources base base_source;
+         cofield_sources base_source relation from ]
+       ==> alias ~to_:from ~from:to_);
+      (* Local fields *)
+      (let$ [relation; from; to_] = ["relation"; "from"; "to_"] in
+       [escaping_field relation from; reading_field relation to_]
+       ==> alias ~to_ ~from) ]
+
+  let has_usage_rules =
+    [ (let$ [x] = ["x"] in
+       [any_usage x] ==> has_usage x);
+      (let$$ [x; y] = ["x"; "y"] in
+       [usages x y] ==> has_usage x) ]
+
+  let has_source_rules =
+    [ (let$ [x] = ["x"] in
+       [any_source x] ==> has_source x);
+      (let$$ [x; y] = ["x"; "y"] in
+       [sources x y] ==> has_source x) ]
+
+  let any_usage_rules =
+    (* The [any_usage] predicate holds when a variable "escapes", i.e. when its
+       value can go into locations that are not tracked by the reaper.
+
+       The base cases for escaping are defined in [traverse.ml] according to the
+       semantics of the flambda2 IR. The following rules take care of
+       propagating the escape.
+
+       The propagation of [any_usage] through location aliases is done
+       backwards: if a location [to_] escapes and is computed from another
+       location [from], then location [from] also escapes.
+
+       The relation [any_usage] records the escaping variables, while the
+       auxiliary relation [field_usages_top] records the escaping field
+       (non-variable) locations.
+
+       # Local fields
+
+       The exception to the above concerns local fields: these define locations
+       that we can track more precisely, even when they would normally escape,
+       since we know (by definition) that no code outside of the current module
+       is able to access them. As such, they are excluded from the following
+       rules -- instead, see the [local_rules] which deal with this case. *)
+    [ (* By definition of the [use] input relation *)
+      (let$ [to_; from] = ["to_"; "from"] in
+       [has_usage to_; use ~to_ ~from] ==> any_usage from);
+      (* ---------------------------------------------------------------------*)
+      (*                             Propagation rules                        *)
+      (* ---------------------------------------------------------------------*)
+
+      (* Alias: if [to_ = from] then [from] escapes when [to_] escapes. *)
+      (let$ [to_; from] = ["to_"; "from"] in
+       [alias ~to_ ~from; any_usage to_] ==> any_usage from);
+      (* Accessor: if [to_ = base.field] then [base.field] escapes when [to_]
+         escapes.
+
+         There are two exceptions:
+
+         - If [base] itself escapes, we don't mark [base.relation] as escaping
+         because we already consider all of its fields as escaping (see below).
+
+         - If [relation] is a local field, it does not escape either; instead,
+         it is tracked separately (see [escaping_field]). *)
+      (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+       [ accessor ~to_ relation ~base;
+         any_usage to_;
+         ~~(any_usage base);
+         unless1 Field.is_local relation ]
+       ==> field_usages_top base relation);
+      (* Constructor: the following two rules encode the fact that if [base = {
+         field = from; _ }], then [from] escapes when [base.field] escapes.
+
+         We need two rules because we don't propagate [field_usages_top]
+         backwards: it only holds for the variable that was explicitly accessed
+         (see above rule), and so we must explicitly look for a use through
+         [nontop_usages].
+
+         Moreover, the first rule only deals with cases where the field is
+         explicitly used (in a way that can be seen by the reaper); the second
+         rule encodes the fact that if an allocation escapes, then all of its
+         (nonlocal) fields also escape, even when there are no explicit uses of
+         the field visible to the reaper. *)
+      (let$ [base; base_use; relation; from] =
+         ["base"; "base_use"; "relation"; "from"]
+       in
+       [ constructor ~base relation ~from;
+         nontop_usages base base_use;
+         field_usages_top base_use relation ]
+       ==> any_usage from);
+      (let$ [base; relation; from] = ["base"; "relation"; "from"] in
+       [ any_usage base;
+         constructor ~base relation ~from;
+         unless1 Field.is_local relation ]
+       ==> any_usage from);
+      (* Coaccessor: if [base.param = from], then [from] escapes when [base] is
+         arbitrary.
+
+         If [base] is not arbitrary, we can track all of its sources, which
+         means we can track precisely the variables that [from] flows into
+         through coconstructors. *)
+      (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
+       [any_source base; rev_coaccessor ~base relation ~to_] ==> any_usage to_)
+      (* Coconstructor: if [to_ = base.param], then [base.param] escapes when
+         [to_] escapes.
+
+         There is no explicit rule for this case: instead, we build an alias
+         between [to_] and the values that flow into [base.param] through a
+         [coconstructor] relation (see the [alias_rules]). *) ]
+
+  let any_source_rules =
+    (* The propagation rules are similar to the ones for [any_usage], except
+       that the propagation happens forwards rather than backwards. *)
+    [ (* By definition of the [use] input relation *)
+      (let$ [from; to_] = ["from"; "to_"] in
+       [has_source from; rev_use ~from ~to_] ==> any_source to_);
+      (* ---------------------------------------------------------------------*)
+      (*                             Propagation rules                        *)
+      (* ---------------------------------------------------------------------*)
+
+      (* Alias: if [to_ = from] and [from], then [to_] is arbitrary when [from]
+         is is arbitrary. *)
+      (let$ [from; to_] = ["from"; "to_"] in
+       [rev_alias ~from ~to_; any_source from] ==> any_source to_);
+      (* Accessor: the following two rules encode the fact that if [to_ =
+         base.field], then [to_] is arbitrary when [base.field] is arbitrary.
+
+         We need two rules because we don't propagate [field_sources_top]
+         forward: it only holds for allocations (see above rules), and so we
+         must explicitly look for a source through [nontop_sources].
+
+         Moreover, the first rule only deals with cases where the field is
+         explicitly constructed (in a way that can be seen by the reaper); the
+         second rule encodes the fact that if a variable is arbitrary, then all
+         its fields are also arbitrary. *)
+      (let$ [base; base_source; relation; to_] =
+         ["base"; "base_source"; "relation"; "to_"]
+       in
+       [ rev_accessor ~base relation ~to_;
+         nontop_sources base base_source;
+         field_sources_top base_source relation ]
+       ==> any_source to_);
+      (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
+       [ any_source base;
+         rev_accessor ~base relation ~to_;
+         unless1 Field.is_local relation ]
+       ==> any_source to_);
+      (* Constructor: if [base = { field = from; _ }], then [base.field] is
+         arbitrary [from] is arbitrary.
+
+         There are two exceptions:
+
+         - If [base] itself is arbitrary, we don't mark [base.field] as
+         arbitrary because we already consider all of its fields to be arbitrary
+         (see below).
+
+         - If [field] is a local field, it does not become arbitrary either;
+         instead, it is tracked separately (see [reading_field]). *)
+      (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+       [ rev_constructor ~from relation ~base;
+         any_source from;
+         ~~(any_source base);
+         unless1 Field.is_local relation ]
+       ==> field_sources_top base relation);
+      (* Coaccessor: if [base.param = from], then [base.param] is arbitrary when
+         [from] is arbitrary.
+
+         There is no explicit rule for this case: instead, we build an alias
+         between [from] and the values that [base.param] flows into through a
+         [coaccessor] relation (see the [alias_rules]). *)
+
+      (* Coconstructor: if [to_ = base.arg], then [to_] is arbitrary when [base]
+         escapes.
+
+         If [base] does not escape, we can track all of its uses, which means we
+         can track precisely the variables that flow into it through
+         coaccessors. *)
+      (let$ [base; relation; from] = ["base"; "relation"; "from"] in
+       [any_usage base; coconstructor ~base relation ~from] ==> any_source from);
+      (* Zero-alloc *)
+      (let$ [x] = ["x"] in
+       [zero_alloc_source x] ==> any_source x) ]
+
+  let usages_rules =
+    (* Note: Recall that the [usages] relation is propagated backwards.
+
+       Note that all the [nontop_usages] are automatically guarded by the
+       [any_usage] relation: we stop tracking precise usage of a variable that
+       is already escaping. *)
+    [ (* If [to_ = from], any usage of [to_] is an usage of [from]. *)
+      (let$$ [to_; from; usage] = ["to_"; "from"; "usage"] in
+       [alias ~to_ ~from; nontop_usages to_ usage] ==> nontop_usages from usage);
+      (* If [to_ = base.field], [base] is used (as [base]) if [to_] is used in
+         any way. *)
+      (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+       [accessor ~to_ relation ~base; has_usage to_] ==> nontop_usages base base);
+      (* If [base = { field = from; _ }], [from] is used if [base.field] is
+         used.
+
+         There is no explicit rule for this; instead, aliases are added between
+         [from] and all the uses of [field] (see [alias_rules]). *)
+
+      (* If [base.param = from], [base] is used (as [base]) if [to_] has a
+         source. *)
+      (let$$ [to_; relation; base] = ["to_"; "relation"; "base"] in
+       [coaccessor ~to_ relation ~base; has_source to_]
+       ==> nontop_usages base base)
+      (* If [to_ = base.param], then any usage of [to_] is an usage of
+         [base.param].
+
+         There is no explicit rule for this: instead, aliases are added between
+         [to_] and all the coaccessors to [base.param] (see [alias_rules]). *)
+    ]
+
+  let sources_rules =
+    [ (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+       [has_source from; rev_constructor ~from relation ~base]
+       ==> nontop_sources base base);
+      (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+       [has_usage from; rev_coconstructor ~from relation ~base]
+       ==> nontop_sources base base);
+      (let$$ [from; to_; source] = ["from"; "to_"; "source"] in
+       [nontop_sources from source; rev_alias ~from ~to_]
+       ==> nontop_sources to_ source) ]
+
+  let local_rules =
+    [ (let$ [base; relation; from] = ["base"; "relation"; "from"] in
+       [ any_usage base;
+         constructor ~base relation ~from;
+         when1 Field.is_local relation ]
+       ==> escaping_field relation from);
+      (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
+       [ any_source base;
+         rev_accessor ~base relation ~to_;
+         when1 Field.is_local relation ]
+       ==> reading_field relation to_) ]
+
+  let zero_alloc_rules =
+    [ (let$ [from; to_] = ["from"; "to_"] in
+       [rev_alias ~from ~to_; zero_alloc_source from] ==> zero_alloc_source to_);
+      (let$ [from; to_] = ["from"; "to_"] in
+       [zero_alloc_source from; rev_use ~from ~to_] ==> zero_alloc_source to_);
+      (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
+       [zero_alloc_source base; rev_accessor ~base relation ~to_]
+       ==> zero_alloc_source to_) ]
+
+  let schedule =
+    List.concat
+      [ reverse_rules;
+        alias_rules;
+        has_usage_rules;
+        has_source_rules;
+        any_usage_rules;
+        any_source_rules;
+        usages_rules;
+        sources_rules;
+        local_rules;
+        zero_alloc_rules ]
+    |> make_schedule
+end
+
+let datalog_schedule = Datalog_schedule.schedule
 
 type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
 
@@ -3238,7 +3414,7 @@ type sources =
   | Any_source
   | Sources of unit Code_id_or_name.Map.t
 
-let get_direct_sources :
+let get_exact_sources :
     Datalog.database -> unit Code_id_or_name.Map.t -> sources =
   let open! Fixit in
   run
@@ -3296,7 +3472,7 @@ let cofield_has_use :
 
 let rec arguments_used_by_call db ep callee_sources grouped_args =
   match grouped_args with
-  | [] -> []
+  | [] -> [] (* Avoid computing sources of witness if no args *)
   | first_arg_group :: grouped_args_rest -> (
     match callee_sources with
     | Any_source -> List.map (List.map (fun x -> x, Keep)) grouped_args
@@ -3330,10 +3506,10 @@ let rec arguments_used_by_call db ep callee_sources grouped_args =
 let arguments_used_by_known_arity_call result callee args =
   List.flatten
     (arguments_used_by_call result.db Field.Known_arity_code_pointer
-       (get_direct_sources result.db (Code_id_or_name.Map.singleton callee ()))
+       (get_exact_sources result.db (Code_id_or_name.Map.singleton callee ()))
        [args])
 
 let arguments_used_by_unknown_arity_call result callee args =
   arguments_used_by_call result.db Field.Unknown_arity_code_pointer
-    (get_direct_sources result.db (Code_id_or_name.Map.singleton callee ()))
+    (get_exact_sources result.db (Code_id_or_name.Map.singleton callee ()))
     args
