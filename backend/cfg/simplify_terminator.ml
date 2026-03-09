@@ -166,10 +166,12 @@ let collect_known_values (cfg : Cfg.t) (block : Cfg.basic_block) :
       known_values
   in
   let infer_known_values_from_predecessor () =
-    (* When there is only on predecessor, we can sometimes infer the value of a
+    (* When there is only one predecessor, we can sometimes infer the value of a
        temporary from the predecessor's terminator. For instance, if the
        terminator is a truth test and we are in the "ifnot" block, then we can
        infer the tested temporary is equal to zero at the start of the block. *)
+    (* CR-someday xclerc for xclerc: that could be extended to multiple
+    predecessors, if all lead to the same inference. *)
     begin match Label.Set.cardinal block.predecessors with
     | 1 ->
       let predecessor_block =
