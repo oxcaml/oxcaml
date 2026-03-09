@@ -165,6 +165,7 @@ module Flambda2 = struct
     let reaper_preserve_direct_calls : reaper_preserve_direct_calls = Auto
     let reaper_local_fields = false
     let reaper_unbox = true
+    let reaper_max_unbox_size = 10
     let reaper_change_calling_conventions = true
     let unicode = true
     let kind_checks = false
@@ -183,6 +184,7 @@ module Flambda2 = struct
     reaper_preserve_direct_calls : reaper_preserve_direct_calls;
     reaper_local_fields : bool;
     reaper_unbox : bool;
+    reaper_max_unbox_size : int;
     reaper_change_calling_conventions : bool;
     unicode : bool;
     kind_checks : bool;
@@ -201,6 +203,7 @@ module Flambda2 = struct
     reaper_preserve_direct_calls = Default.reaper_preserve_direct_calls;
     reaper_local_fields = Default.reaper_local_fields;
     reaper_unbox = Default.reaper_unbox;
+    reaper_max_unbox_size = Default.reaper_max_unbox_size;
     reaper_change_calling_conventions =
       Default.reaper_change_calling_conventions;
     unicode = Default.unicode;
@@ -242,6 +245,7 @@ module Flambda2 = struct
   let reaper_preserve_direct_calls = ref Default
   let reaper_local_fields = ref Default
   let reaper_unbox = ref Default
+  let reaper_max_unbox_size = ref Default
   let reaper_change_calling_conventions = ref Default
 
   module Dump = struct

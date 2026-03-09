@@ -142,6 +142,7 @@ module Flambda2 : sig
     val reaper_preserve_direct_calls : reaper_preserve_direct_calls
     val reaper_local_fields : bool
     val reaper_unbox : bool
+    val reaper_max_unbox_size : int
     val reaper_change_calling_conventions : bool
     val unicode : bool
     val kind_checks : bool
@@ -163,6 +164,7 @@ module Flambda2 : sig
     reaper_preserve_direct_calls : reaper_preserve_direct_calls;
     reaper_local_fields : bool;
     reaper_unbox : bool;
+    reaper_max_unbox_size : int;
     reaper_change_calling_conventions : bool;
     unicode : bool;
     kind_checks : bool;
@@ -183,6 +185,7 @@ module Flambda2 : sig
   val reaper_preserve_direct_calls : reaper_preserve_direct_calls or_default ref
   val reaper_local_fields : bool or_default ref
   val reaper_unbox : bool or_default ref
+  val reaper_max_unbox_size : int or_default ref
   val reaper_change_calling_conventions : bool or_default ref
   val unicode : bool or_default ref
   val kind_checks : bool or_default ref
@@ -190,7 +193,7 @@ module Flambda2 : sig
   module Dump : sig
     type target = Nowhere | Main_dump_stream | File of Misc.filepath
     type pass = Last_pass | This_pass of string
-    
+
     val rawfexpr : target ref
     val fexpr : target ref
     val fexpr_after : pass ref
