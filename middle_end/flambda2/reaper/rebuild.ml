@@ -40,10 +40,15 @@ module P = Flambda_primitive
 module RE = Rebuilt_expr
 module SC = Static_const
 
-type param_decision =
+type unboxing_decision =
+  | Delete  (** [Delete] means that the variable should be deleted. *)
   | Keep of Variable.t * KS.t
-  | Delete
-  | Unbox of Variable.t DS.unboxed_fields Field.Map.t
+      (** [Keep (v, k)] means that the variable should be kept with name [v] and
+          kind [k]. *)
+  | Unbox of DS.unboxed
+      (** [Unbox fields] means that the variable should be replaced with the
+          provided unboxed variables. This includes "deep" unboxing such as
+          replacing `[((x, _), _)]` with `x`. *)
 
 type my_closure_param_decision =
   | Keep_my_closure
@@ -75,14 +80,15 @@ type env =
     code_deps : Traverse_acc.code_dep Code_id.Map.t;
     get_code_metadata : Code_id.t -> Code_metadata.t;
     (* TODO change names *)
-    cont_params_to_keep : param_decision list Continuation.Map.t;
-    should_keep_param : Continuation.t -> Variable.t -> KS.t -> param_decision;
+    cont_params_to_keep : unboxing_decision list Continuation.Map.t;
+    should_keep_param :
+      Continuation.t -> Variable.t -> KS.t -> unboxing_decision;
     (* TODO same here *)
     my_closure_decisions : my_closure_param_decision Code_id.Map.t;
-    function_params_to_keep : param_decision list Code_id.Map.t;
+    function_params_to_keep : unboxing_decision list Code_id.Map.t;
     should_keep_function_param :
-      Code_id.t -> Variable.t -> KS.t -> param_decision;
-    function_return_decision : param_decision list Code_id.Map.t;
+      Code_id.t -> Variable.t -> KS.t -> unboxing_decision;
+    function_return_decision : unboxing_decision list Code_id.Map.t;
     kinds : K.t Name.Map.t;
     should_preserve_direct_calls : should_preserve_direct_calls;
     old_typing_env : Typing_env.t option;
