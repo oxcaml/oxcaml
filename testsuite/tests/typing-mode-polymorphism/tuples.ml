@@ -20,18 +20,16 @@ val use_global : 'a @ [< global] -> unit @ 'm = <fun>
 let prod x y = (x, y)
 [%%expect{|
 val prod :
-  'a @ [< 'p & 'n.future & global] ->
-  ('b @ [< 'o & global] -> 'a * 'b @ [> 'm | 'o | 'p]) @ [> close('m) | 'n.future] =
-  <fun>
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] -> 'a * 'b @ [> 'n | 'm]) @ [> close('m)] = <fun>
 |}]
 
 (* With exclave_ the tuple is local *)
 let prod_local x y = exclave_ (x, y)
 [%%expect{|
 val prod_local :
-  'a @ [< 'p & 'n.future] ->
-  ('b @ [< 'o] -> 'a * 'b @ [> 'm | 'o | 'p | local]) @ [> close('m) | 'n.future] =
-  <fun>
+  'a @ [< 'm] ->
+  ('b @ [< 'n] -> 'a * 'b @ [> 'n | 'm | local]) @ [> close('m)] = <fun>
 |}]
 
 (* [prod] is polymorphic on the other axes *)
@@ -41,9 +39,8 @@ let foo (x @ portable) (y @ portable) =
   use_portable a
 [%%expect{|
 val foo :
-  'a @ [< 'm.future & global portable] ->
-  ('b @ [< global portable] -> unit @ 'n) @ [> 'm.future | nonportable] =
-  <fun>
+  'a @ [< 'm @@ past & global portable] ->
+  ('b @ [< global portable] -> unit @ 'n) @ [> 'm | nonportable] = <fun>
 |}]
 
 (* But the returned tuple will be the meet of its arguments *)
@@ -132,9 +129,8 @@ let foo (x @ portable) (y @ portable) =
   use_portable p
 [%%expect{|
 val foo :
-  'a @ [< 'm.future & global portable] ->
-  ('b @ [< global portable] -> unit @ 'n) @ [> 'm.future | nonportable] =
-  <fun>
+  'a @ [< 'm @@ past & global portable] ->
+  ('b @ [< global portable] -> unit @ 'n) @ [> 'm | nonportable] = <fun>
 |}]
 
 let foo (x @ local) (y @ local) =

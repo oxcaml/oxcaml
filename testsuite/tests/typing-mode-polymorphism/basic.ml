@@ -122,15 +122,15 @@ let which = function
   | false -> f
   | true -> g
 [%%expect{|
-val f : string @ [< 'm mod contended] -> string @ [> 'm mod many portable] =
+val f : string @ [< 'm . contended] -> string @ [> 'm @@ many portable] =
   <fun>
 val g :
-  string @ [< 'm mod contended > local] ->
-  string @ [> 'm mod many portable | local] = <fun>
+  string @ [< 'm . contended > local] ->
+  string @ [> 'm @@ many portable | local] = <fun>
 val which :
   bool @ 'p ->
-  (string @ [< 'n mod contended & 'n mod contended & 'o > 'o | local] ->
-   string @ [< 'm > 'm | 'n mod many portable | 'n mod many portable | local]) @ [> aliased nonportable] =
+  (string @ [< 'n . contended & 'n . contended & 'o > 'o | local] ->
+   string @ [< 'm > 'm | 'n @@ many portable | 'n @@ many portable | local]) @ [> aliased nonportable] =
   <fun>
 |}]
 
@@ -192,8 +192,7 @@ Error: This value is "contended" but is expected to be "uncontended".
 let close_over x = fun () -> x
 [%%expect{|
 val close_over :
-  'a @ [< 'o & 'n.future & global] ->
-  (unit @ 'p -> 'a @ [> 'm | 'o]) @ [> close('m) | 'n.future] = <fun>
+  'a @ [< 'm & global] -> (unit @ 'n -> 'a @ [> 'm]) @ [> close('m)] = <fun>
 |}]
 
 let foo (x @ portable) (y @ nonportable) =
@@ -211,9 +210,8 @@ Error: This value is "nonportable" but is expected to be "portable".
 let close_over x = fun () -> fun () -> x
 [%%expect{|
 val close_over :
-  'a @ [< 'q & 'p.future & 'n.future & global] ->
-  (unit @ 'mm1 ->
-   (unit @ 'mm0 -> 'a @ [> 'o | 'm | 'q]) @ [> close('o) | 'p.future]) @ [> close('m) | 'n.future] =
+  'a @ [< 'm & global] ->
+  (unit @ 'o -> (unit @ 'n -> 'a @ [> 'm]) @ [> close('m)]) @ [> close('m)] =
   <fun>
 |}]
 
@@ -253,8 +251,8 @@ let foo (x : int @ portable) (y : int @ nonportable) =
   use_portable y
 [%%expect{|
 val foo :
-  int @ [< 'm.future & portable] ->
-  (int @ [> nonportable] -> unit @ 'n) @ [> 'm.future | nonportable] = <fun>
+  int @ [< 'm @@ past & portable] ->
+  (int @ [> nonportable] -> unit @ 'n) @ [> 'm | nonportable] = <fun>
 |}]
 
 (* LOCAL AND MODE POLYMORPHISM *)

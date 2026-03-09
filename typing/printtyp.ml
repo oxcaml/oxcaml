@@ -1641,16 +1641,37 @@ end = struct
         (** The boxed name of [c_via] *)
     }
 
+  (** [closing_over_edge] describes a specific pattern
+  that may arise between an argument, a return and a
+  curry-mode.
+
+  Consider the following function (the K-combinator)
+  let k x y = x
+
+  The mode of the argument [x] describes a lower bound on
+  the inner return. But when [k] is partially applied, this
+  mode also describes an upper bound on the closure [k x].
+
+  We want to print such a pattern as follows:
+
+  [k : x @ [< 'm] -> (y @ 'n -> x @ [> 'm]) @ [> close('m)]]
+
+  Where [close('m)] denotes a relation to the comonadic
+  parts of the argument, and the monadic part of the return *)
+
+  (** A [closing_over_edge] describes a relationship between
+  three visible mode variables: [src], [target] and [curry]*)
   type closing_over_edge =
-    { cls_via : closing_over_morph;
-        (** The right adjoint of the monadic to
-        comonadic path between two modes. This edge
-        represents a constraint on a curry mode
-        when partially applying a function. We take
-        the right adjoint to print the constraint on
-        the curry mode *)
-      cls_name : boxedname
-        (** The boxed name of [cls_via] *)
+    { cls_target : closing_over_morph;
+        (** A path from [curry] to monadic
+        part of [target] *)
+      cls_src : comonadic_morph;
+        (** A path from [curry] to comonadic
+        part of [src] *)
+      cls_edge : simple_edge
+        (** the edge from [src] to [target].
+        The name of a [closing_over_edge]
+        corresponds to the name of [cls_edge]. *)
     }
 
   type edge =
@@ -1770,7 +1791,6 @@ end = struct
       in
       compare_dec && check_signature
 
-
   exception Invalid_edge
   let construct_name_exn :
       visible_pair
@@ -1806,128 +1826,120 @@ end = struct
           (* comonadic edges are only created when one of the morphism
           goes from a variable to a variable*)
 
-  let construct_closing_over_name_exn :
-      visible_pair
-      -> closing_over_morph
-      -> visible_pair
-      -> boxedname =
-    fun { comonadic = com0 }
-        cls_morph
-        { monadic = mon1 } ->
-      match com0, mon1 with
-      | Amodevar (Amorphvar (v, _)), Amodevar (Amorphvar (u, _)) ->
-        N (u, v, Alloc.obj_monadic, Alloc.obj_comonadic, cls_morph)
-      | _, _ -> raise Invalid_edge
-          (* comonadic edges are only created when one of the morphism
-          goes from a variable to a variable*)
+  let construct_simple_between =
+    fun pair0 pair1 ->
+      let mon_morphs =
+        construct_monadic_morphs
+          pair0.monadic pair1.monadic
+      in
+      let com_morphs =
+        construct_comonadic_morphs
+          pair1.comonadic pair0.comonadic
+      in
+      let edges =
+        List.fold_left (fun acc com_morph ->
+          List.fold_left (fun acc mon_morph ->
+          let via =
+            { monadic = mon_morph;
+              comonadic = com_morph }
+          in
+          let name =
+            construct_name_exn pair0 via pair1
+          in
+          let edge = { via; name } in
+          edge :: acc )
+          acc mon_morphs)
+        [] com_morphs
+      in
+      edges
+
+  let check_closing_over_candidate pair0 pair1 =
+    List.exists
+      (fun pair2 ->
+        let closing_over_morphs =
+          construct_closing_over_morphs
+            pair1.comonadic pair2.monadic
+        in
+        let edges = construct_simple_between pair0 pair2 in
+        edges <> [] && closing_over_morphs <> []
+      ) !visible_pairs
+
+  let construct_comonadic_between =
+    fun pair0 pair1 ->
+      let mon_morphs =
+        construct_monadic_morphs
+          pair0.monadic pair1.monadic
+      in
+      let com_morphs =
+        construct_comonadic_morphs
+          pair1.comonadic pair0.comonadic
+      in
+      if not (check_closing_over_candidate pair0 pair1) && mon_morphs = [] then
+        List.map (fun com_morph ->
+          let c_name = construct_comonadic_name_exn pair0 com_morph pair1 in
+          Comonadic { c_via = com_morph; c_name }) com_morphs
+      else []
+
+  let construct_closing_over_to =
+    fun pair1 ->
+      List.fold_left (fun acc pair0 ->
+        List.fold_left (fun acc pair2 ->
+            let com_morphs =
+              construct_comonadic_morphs
+                pair1.comonadic pair0.comonadic
+            in
+            let closing_over_morphs =
+              construct_closing_over_morphs
+                pair1.comonadic pair2.monadic
+            in
+            let simple_edges =
+              construct_simple_between pair0 pair2
+            in
+            List.fold_left (fun acc edge ->
+              List.fold_left (fun acc cls_morph ->
+                List.fold_left (fun acc com_morph ->
+                  ClosingOver {
+                    cls_target = cls_morph;
+                    cls_src = com_morph;
+                    cls_edge = edge
+                  } :: acc
+                ) acc com_morphs
+              ) acc closing_over_morphs
+            ) acc simple_edges
+          )
+        acc !visible_pairs)
+      [] !visible_pairs
 
   let construct_edges_to :
       visible_pair -> edge list =
-    fun ({ monadic = monadic_descr1;
-           comonadic = comonadic_descr1 } as pair1) ->
-      let find_edges
-          ({ monadic = monadic_descr0;
-             comonadic = comonadic_descr0 } as pair0) =
+    fun pair1 ->
+      let find_edges pair0 =
         if not (construct_edge_condition pair0 pair1)
         then []
         else begin
-          let mon_morphs =
-            construct_monadic_morphs
-              monadic_descr0 monadic_descr1
-          in
-          let com_morphs =
-            construct_comonadic_morphs
-              comonadic_descr1 comonadic_descr0
-          in
-          let closing_over_morphs =
-            construct_closing_over_morphs
-              comonadic_descr1 monadic_descr0
-          in
-          let closing_over_morphs =
-            List.map (fun cls_morph ->
-                let cls_name =
-                  construct_closing_over_name_exn
-                    pair0 cls_morph pair1
-                in
-                ClosingOver { cls_via = cls_morph; cls_name }
-              ) closing_over_morphs
-          in
-          List.fold_left (fun acc com_morph ->
-            if mon_morphs = [] then begin
-              let c_name = construct_comonadic_name_exn pair0 com_morph pair1 in
-              let edge = Comonadic { c_via = com_morph; c_name } in
-              edge :: acc
-            end else begin
-              List.fold_left (fun acc mon_morph ->
-              let via =
-                { monadic = mon_morph;
-                  comonadic = com_morph }
-              in
-              let name =
-                construct_name_exn pair0 via pair1
-              in
-              let edge = Simple { via; name } in
-              edge :: acc )
-              acc mon_morphs
-            end)
-            closing_over_morphs com_morphs
-          end
+          let edges = construct_simple_between pair0 pair1 in
+          let com_morphs = construct_comonadic_between pair0 pair1 in
+          let edges = List.map (fun edge -> Simple edge) edges in
+          edges @ com_morphs
+        end
       in
       let edges =
         List.map find_edges !visible_pairs
       in
-      List.flatten edges
+      let close_over = construct_closing_over_to pair1 in
+      close_over @ List.flatten edges
 
   let construct_edges_from :
       visible_pair -> edge list =
-    fun ({ monadic = monadic_descr0;
-           comonadic = comonadic_descr0 } as pair0) ->
-      let find_edges
-          ({ monadic = monadic_descr1;
-             comonadic = comonadic_descr1 } as pair1) =
+    fun pair0 ->
+      let find_edges pair1 =
         if not (construct_edge_condition pair0 pair1)
         then []
         else begin
-          let mon_morphs =
-            construct_monadic_morphs
-              monadic_descr0 monadic_descr1
-          in
-          let com_morphs =
-            construct_comonadic_morphs
-              comonadic_descr1 comonadic_descr0
-          in
-          let closing_over_morphs =
-            construct_closing_over_morphs
-              comonadic_descr1 monadic_descr0
-          in
-          let closing_over_morphs =
-            List.map (fun cls_morph ->
-                let cls_name =
-                  construct_closing_over_name_exn
-                    pair0 cls_morph pair1
-                in
-                ClosingOver { cls_via = cls_morph; cls_name }
-              ) closing_over_morphs
-          in
-          List.fold_left (fun acc com_morph ->
-            if mon_morphs = [] then begin
-              let c_name = construct_comonadic_name_exn pair0 com_morph pair1 in
-              let edge = Comonadic { c_via = com_morph; c_name } in
-              edge :: acc
-            end else begin
-              List.fold_left (fun acc mon_morph ->
-                let via =
-                  { monadic = mon_morph;
-                    comonadic = com_morph }
-                in
-                let name =
-                  construct_name_exn pair0 via pair1
-                in
-                let edge = Simple { via; name } in
-                edge :: acc )
-              end
-              acc mon_morphs)
-            closing_over_morphs com_morphs
+          let edges = construct_simple_between pair0 pair1 in
+          let com_morphs = construct_comonadic_between pair0 pair1 in
+          let edges = List.map (fun edge -> Simple edge) edges in
+          edges @ com_morphs
         end
       in
       let edges =
@@ -1999,7 +2011,6 @@ end = struct
   type edge_as_lower =
   | Lower_simple : simple_edge -> edge_as_lower
   | Lower_comonadic : comonadic_edge -> edge_as_lower
-  | Lower_closing_over_from : closing_over_edge -> edge_as_lower
   | Lower_closing_over_to : closing_over_edge -> edge_as_lower
 
   type edge_as_upper =
@@ -2015,7 +2026,7 @@ end = struct
         m ppf via.monadic
     | Upper_comonadic { c_name } ->
       let m = add_named_modevar c_name in
-      Fmt.fprintf ppf "%s.future" m
+      Fmt.fprintf ppf "%s @@@@ past" m
 
   let print_raw_lower_bound ppf edge =
     match edge with
@@ -2027,39 +2038,35 @@ end = struct
     | Lower_comonadic { c_via; c_name } ->
       let m = add_named_modevar c_name in
       Alloc.pretty_print_comonadic_morph
-        (fun ppf s -> Fmt.fprintf ppf "%s.future" s)
-        m ppf c_via
-    | Lower_closing_over_to { cls_via; cls_name } ->
-      let m = add_named_modevar cls_name in
-      Alloc.pretty_print_comonadic_morph
         (fun ppf s -> Fmt.fprintf ppf "%s" s)
-        m ppf cls_via
-    | Lower_closing_over_from { cls_name } ->
-      let m = add_named_modevar cls_name in
-      Fmt.fprintf ppf "%s" m
+        m ppf c_via
+    | Lower_closing_over_to { cls_target; cls_src; cls_edge } ->
+      let m = add_named_modevar cls_edge.name in
+      Alloc.pretty_print_comonadic_morph
+        (fun ppf cls ->
+          Alloc.pretty_print_comonadic_morph
+            (fun ppf s -> Fmt.fprintf ppf "%s" s)
+            m ppf cls)
+        cls_target ppf cls_src
 
   let partition_edges_into_bounds :
       edges_from:edge list ->
       edges_to:edge list ->
       edge_as_lower list * edge_as_upper list =
     fun ~edges_from ~edges_to ->
-    let partition_edges_from
-        : edge -> (edge_as_lower, edge_as_upper) Either.t
-      = function
-      | ClosingOver e -> Either.Left (Lower_closing_over_from e)
-      | Simple e -> Either.Right (Upper_simple e)
-      | Comonadic e -> Right (Upper_comonadic e)
+    let into_lower_from = function
+      | ClosingOver _ -> assert false
+      | Simple e -> Upper_simple e
+      | Comonadic e -> Upper_comonadic e
     in
     let into_lower_to = function
       | ClosingOver e -> Lower_closing_over_to e
       | Simple e -> Lower_simple e
       | Comonadic e -> Lower_comonadic e
     in
-    let lower_from, upper =
-      List.partition_map partition_edges_from edges_from
-    in
-    let lower_to = List.map into_lower_to edges_to in
-    (lower_from @ lower_to, upper)
+    let upper = List.map into_lower_from edges_from in
+    let lower = List.map into_lower_to edges_to in
+    lower, upper
 
   let print_raw_constraints { lo; hi } ppf pair =
     let edges_to = construct_edges_to pair in
