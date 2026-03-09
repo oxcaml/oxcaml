@@ -5471,9 +5471,12 @@ let crossing_of_jkind env jkind =
   Ikind.crossing_of_jkind ~context env jkind
 
 let crossing_of_ty env ?modalities ty =
+  let principal = is_principal ty in
   let crossing =
-    if not (is_principal ty)
-      then Crossing.max
+    if not principal
+    then Crossing.max
+    else if !Clflags.ikinds
+    then Ikind.crossing_of_type env ty
     else
       let jkind = type_jkind_purely env ty in
       crossing_of_jkind env jkind

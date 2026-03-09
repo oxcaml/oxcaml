@@ -1180,8 +1180,15 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
     | _ ->
       with_ctx ~mode:Solver.Round_up ~env:(Some env) (fun ctx ->
           let lat = Solver.round_up (Solver.ckind_of_jkind ctx jkind) in
-          let mb = Jkind.Mod_bounds.of_axis_lattice lat in
-          Jkind.Mod_bounds.to_mode_crossing mb)
+          Axis_lattice.to_mode_crossing lat)
+
+let round_up_type env (ty : Types.type_expr) : Axis_lattice.t =
+  with_ctx ~mode:Solver.Round_up ~env:(Some env) (fun ctx ->
+      Solver.round_up (Solver.kind ctx ty))
+
+let crossing_of_type env (ty : Types.type_expr) : Mode.Crossing.t =
+  let lat = round_up_type env ty in
+  Axis_lattice.to_mode_crossing lat
 
 type sub_or_intersect = Jkind.sub_or_intersect
 

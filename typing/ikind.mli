@@ -40,6 +40,10 @@ val crossing_of_jkind :
   ('l * 'r) Types.jkind ->
   Mode.Crossing.t
 
+val round_up_type : Env.t -> Types.type_expr -> Axis_lattice.t
+
+val crossing_of_type : Env.t -> Types.type_expr -> Mode.Crossing.t
+
 type sub_or_intersect = Jkind.sub_or_intersect
 
 val sub_or_intersect :

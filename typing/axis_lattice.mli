@@ -68,6 +68,8 @@ val of_boxed : boxed -> t
 
 val to_boxed : t -> boxed
 
+val to_mode_crossing : t -> Mode.Crossing.t
+
 (** Canonical lattice constants used by ikinds. *)
 val nonfloat_value : t
 

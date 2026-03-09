@@ -441,6 +441,57 @@ let to_boxed (x : t) : boxed =
     separability = separability_of_level lv.(12)
   }
 
+let to_mode_crossing (x : t) : Mode.Crossing.t =
+  let open Levels in
+  let open Mode.Crossing in
+  let monadic =
+    Monadic.create
+      ~uniqueness:
+        (Monadic.Atom.Modality
+           (Mode.Modality.Monadic.Atom.Join_const
+              (uniqueness_of_level_monadic (get_axis x ~axis:1))))
+      ~contention:
+        (Monadic.Atom.Modality
+           (Mode.Modality.Monadic.Atom.Join_const
+              (contention_of_level_monadic (get_axis x ~axis:3))))
+      ~visibility:
+        (Monadic.Atom.Modality
+           (Mode.Modality.Monadic.Atom.Join_const
+              (visibility_of_level_monadic (get_axis x ~axis:8))))
+      ~staticity:
+        (Monadic.Atom.Modality
+           (Mode.Modality.Monadic.Atom.Join_const
+              (staticity_of_level_monadic (get_axis x ~axis:9))))
+  in
+  let comonadic =
+    Comonadic.create
+      ~regionality:
+        (Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const
+              (areality_of_level (get_axis x ~axis:0))))
+      ~linearity:
+        (Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const
+              (linearity_of_level (get_axis x ~axis:2))))
+      ~portability:
+        (Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const
+              (portability_of_level (get_axis x ~axis:4))))
+      ~forkable:
+        (Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const
+              (forkable_of_level (get_axis x ~axis:5))))
+      ~yielding:
+        (Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const
+              (yielding_of_level (get_axis x ~axis:6))))
+      ~statefulness:
+        (Comonadic.Atom.Modality
+           (Mode.Modality.Comonadic.Atom.Meet_const
+              (statefulness_of_level (get_axis x ~axis:7))))
+  in
+  { monadic; comonadic }
+
 let const_of_levels ~areality ~linearity ~uniqueness ~portability ~contention
     ~forkable ~yielding ~statefulness ~visibility ~staticity ~externality
     ~nullability ~separability =
