@@ -1757,9 +1757,6 @@ let transl_extension_path loc env path =
 let transl_class_path loc env path =
   transl_path Env.find_class_address loc env path
 
-(* CR sspies: Upstream uses [Env.open_pers_signature] returning a [result],
-   but in OxCaml it raises [Not_found] instead. Also, OxCaml uses
-   [find_value_by_name_lazy] and [Lazy.force Env.initial]. *)
 let transl_prim modname field =
   let mod_ident = Ident.create_persistent modname in
   let env = Env.add_persistent_structure mod_ident (Lazy.force Env.initial) in

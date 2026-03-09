@@ -2140,7 +2140,6 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
     | Constructor_mixed shape ->
       let shape = transl_mixed_product_shape shape in
       let e, layout = lambda_void_of_el shape.(pos) in
-      (* CR sspies: I have low confidence on mutability here. *)
       { arg = e; binding_kind; mut = compose_mut mut Immutable; sort; layout; }
   in
   let make_field_access binding_kind sort ~field:_ ~pos =
@@ -2163,7 +2162,6 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
             Pmixedfield ([pos], shape, sem)
       in
       let layout = Typeopt.layout_of_sort head.pat_loc sort in
-      (* CR sspies: I have low confidence on mutability here. *)
       {
         arg = Lprim (prim, [ arg ], loc);
         binding_kind;
@@ -2187,7 +2185,6 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
       if cstr.cstr_constant then
         rem (* [Null] constructor case. *)
       else
-        (* CR sspies: I have low confidence on mutability here. *)
         { arg; binding_kind; mut; sort; layout } :: rem
         (* the unboxed variant constructor, or the [This] constructor
            for [Variant_with_null]. *)
@@ -2490,7 +2487,7 @@ let get_expr_args_unboxed_tuple ~scopes shape head { arg; mut; _ } rem =
     {
       arg = Lprim (Punboxed_product_field (pos, layouts), [ arg ], loc);
       binding_kind = Alias;
-      mut = compose_mut mut Immutable; (* CR sspies: This or immutable? *)
+      mut = compose_mut mut Immutable;
       sort;
       layout;
     }) shape
