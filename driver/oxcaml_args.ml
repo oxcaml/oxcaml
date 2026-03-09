@@ -638,6 +638,14 @@ let mk_no_reaper_unbox f =
     Printf.sprintf " Disable unboxing in the reaper%s (Flambda2 only)"
       (format_not_default Flambda2.Default.reaper_unbox) )
 
+let mk_reaper_max_unbox_size f =
+  ( "-reaper-max-unbox-size",
+    Arg.Int f,
+    Printf.sprintf
+      " Maximum number of fields unboxed by the reaper for a single block \
+       (default %d) (Flambda2 only)"
+      Flambda2.Default.reaper_max_unbox_size )
+
 let mk_reaper_change_calling_conventions f =
   ( "-reaper-change-calling-conventions",
     Arg.Unit f,
@@ -1249,6 +1257,7 @@ module type Oxcaml_options = sig
   val no_reaper_local_fields : unit -> unit
   val reaper_unbox : unit -> unit
   val no_reaper_unbox : unit -> unit
+  val reaper_max_unbox_size : int -> unit
   val reaper_change_calling_conventions : unit -> unit
   val no_reaper_change_calling_conventions : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit
@@ -1422,6 +1431,7 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_reaper_local_fields F.no_reaper_local_fields;
       mk_reaper_unbox F.reaper_unbox;
       mk_no_reaper_unbox F.no_reaper_unbox;
+      mk_reaper_max_unbox_size F.reaper_max_unbox_size;
       mk_reaper_change_calling_conventions F.reaper_change_calling_conventions;
       mk_no_reaper_change_calling_conventions
         F.no_reaper_change_calling_conventions;
@@ -1733,6 +1743,9 @@ module Oxcaml_options_impl = struct
   let no_reaper_local_fields = clear Flambda2.reaper_local_fields
   let reaper_unbox = set Flambda2.reaper_unbox
   let no_reaper_unbox = clear Flambda2.reaper_unbox
+
+  let reaper_max_unbox_size size =
+    Flambda2.reaper_max_unbox_size := Oxcaml_flags.Set size
 
   let reaper_change_calling_conventions =
     set Flambda2.reaper_change_calling_conventions
