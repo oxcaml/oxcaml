@@ -106,8 +106,8 @@ let _ = fun a b ->
 [%%expect{|
 (function {nlocal = 2} a/295[value<int>] b/296? : int 0)
 (function {nlocal = 2} a/295[value<int>] b/296? : int 0)
-- : bool @ [< 'm.future & global] ->
-    ('a @ [< global] -> unit @ [< global]) @ [> 'm.future | local]
+- : bool @ [< 'm @@ past & global] ->
+    ('a @ [< global] -> unit @ [< global]) @ [> 'm | local]
 = <fun>
 |}];;
 
@@ -134,9 +134,8 @@ let _ = fun a b -> match a, b with
     p/301))
 (function {nlocal = 2} a/299[value<int>] b/300?
   : (consts ()) (non_consts ([0: value<int>, ?])) (makeblock 0 a/299 b/300))
-- : bool @ [< 'p & 'n.future & global many] ->
-    ('a @ [< 'o & global many] ->
-     bool * 'a @ [< global > 'm | 'o | 'p | aliased]) @ [> close('m) | 'n.future | local]
+- : bool @ [< 'm & global many] ->
+    ('a @ [< 'n & global many] -> bool * 'a @ [< global > 'n | 'm | aliased]) @ [> close('m) | local]
 = <fun>
 |}]
 
@@ -153,8 +152,8 @@ let _ = fun a b -> match a, b with
     p/305))
 (function {nlocal = 2} a/303[value<int>] b/304?
   : (consts ()) (non_consts ([0: value<int>, ?])) (makeblock 0 a/303 b/304))
-- : bool @ [< 'p & 'n.future & global] ->
-    ('a @ [< 'o & global] -> bool * 'a @ [< global > 'm | 'o | 'p]) @ [> close('m) | 'n.future | local]
+- : bool @ [< 'm & global] ->
+    ('a @ [< 'n & global] -> bool * 'a @ [< global > 'n | 'm]) @ [> close('m) | local]
 = <fun>
 |}];;
 
@@ -181,9 +180,9 @@ let _ = fun a b -> match a, b with
   (makeblock 0 (value<int>,value<
                             (consts ()) (non_consts ([0: value<int>, ?]))>)
     a/309 (makeblock 0 a/309 b/310)))
-- : bool @ [< 'p & 'n.future & global many] ->
-    ('a @ [< 'o & global many] ->
-     bool * (bool * 'a) @ [< global > 'm | 'o | 'p | aliased]) @ [> close('m) | 'n.future | local]
+- : bool @ [< 'm & global many] ->
+    ('a @ [< 'n & global many] ->
+     bool * (bool * 'a) @ [< global > 'n | 'm | aliased]) @ [> close('m) | local]
 = <fun>
 |}]
 
@@ -210,9 +209,9 @@ let _ = fun a b -> match a, b with
   (makeblock 0 (value<int>,value<
                             (consts ()) (non_consts ([0: value<int>, ?]))>)
     a/315 (makeblock 0 a/315 b/316)))
-- : bool @ [< 'p & 'n.future & global many] ->
-    ('a @ [< 'o & global many] ->
-     bool * (bool * 'a) @ [< global > 'm | 'o | 'p | aliased]) @ [> close('m) | 'n.future | local]
+- : bool @ [< 'm & global many] ->
+    ('a @ [< 'n & global many] ->
+     bool * (bool * 'a) @ [< global > 'n | 'm | aliased]) @ [> close('m) | local]
 = <fun>
 |}]
 
@@ -257,9 +256,9 @@ let _ = fun a b -> match a, b with
                               (consts ())
                                (non_consts ([0: value<int>, value<int>]))>)
       b/326 (makeblock 0 a/325 b/326))))
-- : bool @ [< 'p & 'n.future & global many] ->
-    (bool @ [< 'o & global many] ->
-     bool * (bool * bool) @ [< global > 'm | 'o | 'p | aliased]) @ [> close('m) | 'n.future | local]
+- : bool @ [< 'm & global many] ->
+    (bool @ [< 'n & global many] ->
+     bool * (bool * bool) @ [< global > 'n | 'm | aliased]) @ [> close('m) | local]
 = <fun>
 |}]
 
@@ -312,9 +311,9 @@ let _ = fun a b -> match a, b with
                               (consts ())
                                (non_consts ([0: value<int>, value<int>]))>)
       x/333 p/334)))
-- : bool @ [< 'p & 'n.future & global many] ->
-    (bool @ [< 'o & global many] ->
-     bool * (bool * bool) @ [< global > 'm | 'o | 'p | aliased]) @ [> close('m) | 'n.future | local]
+- : bool @ [< 'm & global many] ->
+    (bool @ [< 'n & global many] ->
+     bool * (bool * bool) @ [< global > 'n | 'm | aliased]) @ [> close('m) | local]
 = <fun>
 |}]
 
@@ -364,9 +363,9 @@ let _ = fun a b -> match a, b with
                               (consts ())
                                (non_consts ([0: value<int>, value<int>]))>)
       a/341 (makeblock 0 a/341 b/342))))
-- : bool @ [< 'p & 'n.future & global many] ->
-    (bool @ [< 'o & global many] ->
-     bool * (bool * bool) @ [< global > 'm | 'o | 'p | aliased]) @ [> close('m) | 'n.future | local]
+- : bool @ [< 'm & global many] ->
+    (bool @ [< 'n & global many] ->
+     bool * (bool * bool) @ [< global > 'n | 'm | aliased]) @ [> close('m) | local]
 = <fun>
 |}]
 
@@ -393,9 +392,9 @@ let _ = fun a b -> match a, b with
   (makeblock 0 (value<int>,value<
                             (consts ()) (non_consts ([0: value<int>, ?]))>)
     a/347 (makeblock 0 a/347 b/348)))
-- : bool @ [< 'p & 'n.future & global many] ->
-    ('a @ [< 'o & global many] ->
-     bool * (bool * 'a) @ [< global > 'm | 'o | 'p | aliased]) @ [> close('m) | 'n.future | local]
+- : bool @ [< 'm & global many] ->
+    ('a @ [< 'n & global many] ->
+     bool * (bool * 'a) @ [< global > 'n | 'm | aliased]) @ [> close('m) | local]
 = <fun>
 |}]
 
@@ -438,9 +437,9 @@ let _ =fun a b -> match a, b with
      (non_consts ([0: value<int>, value<(consts (0)) (non_consts ([0: *]))>]))
   (catch (if a/360 (if b/361 (field_imm 0 b/361) (exit 12)) (exit 12))
    with (12) (makeblock 0 a/360 b/361)))
-- : bool @ [< 'p & 'n.future & global many] ->
-    (bool tuplist @ [< 'o & global many] ->
-     bool * bool tuplist @ [< global > 'm | 'o | 'p | aliased]) @ [> close('m) | 'n.future | local]
+- : bool @ [< 'm & global many] ->
+    (bool tuplist @ [< 'n & global many] ->
+     bool * bool tuplist @ [< global > 'n | 'm | aliased]) @ [> close('m) | local]
 = <fun>
 |}]
 
@@ -489,8 +488,8 @@ let _ = fun a b -> match a, b with
                     (non_consts ([0: value<int>,
                                   value<(consts (0)) (non_consts ([0: *]))>]))>])
     p/366))
-- : bool @ [< 'p & 'n.future & global many] ->
-    (bool tuplist @ [< 'o & global many] ->
-     bool * bool tuplist @ [< global > 'm | 'o | 'p | aliased]) @ [> close('m) | 'n.future | local]
+- : bool @ [< 'm & global many] ->
+    (bool tuplist @ [< 'n & global many] ->
+     bool * bool tuplist @ [< global > 'n | 'm | aliased]) @ [> close('m) | local]
 = <fun>
 |}]

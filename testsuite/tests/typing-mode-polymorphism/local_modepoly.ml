@@ -33,7 +33,7 @@ let (!) = fun (local_ r) -> r.contents
 [%%expect{|
 val ( ! ) :
   'a ref @ [< 'm & shared > local] ->
-  'a @ [< global > 'm mod global many | aliased] = <fun>
+  'a @ [< global > 'm @@ global many | aliased] = <fun>
 |}]
 
 (* Local lets *)
@@ -378,7 +378,7 @@ Error: This value is "local"
 let no_eta (local_ f : unit -> int) = (f : unit -> int)
 [%%expect{|
 val no_eta :
-  (unit -> int) @ [< 'm mod aliased contended > local] ->
+  (unit -> int) @ [< 'm . aliased contended > local] ->
   (unit -> int) @ [> 'm | local] = <fun>
 |}]
 
@@ -399,10 +399,10 @@ let etajoin p (f : ?b:bool -> unit -> int) (local_ g : unit -> int) =
   if p then (f : unit -> int) else g
 [%%expect{|
 val etajoin :
-  bool @ [< 'm.future & global] ->
-  ((?b:bool -> unit -> int) @ [< 'p.future & 'n.future & global] ->
-   ((unit -> int) @ [< 'o.future > local] ->
-    (unit -> int) @ [> 'o.future | 'p.future | local]) @ [< global > 'n.future]) @ [< global > 'm.future] =
+  bool @ [< 'm @@ past & global] ->
+  ((?b:bool -> unit -> int) @ [< 'p @@ past & 'n @@ past & global] ->
+   ((unit -> int) @ [< 'o @@ past > local] ->
+    (unit -> int) @ [> 'o | 'p | local]) @ [< global > 'n]) @ [< global > 'm] =
   <fun>
 |}]
 
@@ -411,17 +411,15 @@ val etajoin :
 let foo ?(local_ x) () = x;;
 [%%expect{|
 val foo :
-  ?x:'a @ [< 'o & 'n.future > local] ->
-  (unit @ 'p -> 'a option @ [> 'm | 'o | local]) @ [> close('m) | 'n.future | local] =
-  <fun>
+  ?x:'a @ [< 'm > local] ->
+  (unit @ 'n -> 'a option @ [> 'm | local]) @ [> close('m) | local] = <fun>
 |}]
 
 let foo ?(local_ x = "hello") () = x;;
 [%%expect{|
 val foo :
-  ?x:string @ [< 'o & 'n.future > local] ->
-  (unit @ 'p -> string @ [> 'm | 'o | local]) @ [> close('m) | 'n.future | local] =
-  <fun>
+  ?x:string @ [< 'm > local] ->
+  (unit @ 'n -> string @ [> 'm | local]) @ [> close('m) | local] = <fun>
 |}]
 
 let foo ?(local_ x = local_ "hello") () = x;;
@@ -568,12 +566,12 @@ let use_locally' (local_ f : local_ 'a -> 'a) (x : 'a) =
   res
 [%%expect{|
 val use_locally :
-  ('a @ local -> 'a) @ [< 'm.future & global] ->
-  ('a @ [< many uncontended] -> 'a @ [< global > aliased nonportable]) @ [< global > 'm.future] =
+  ('a @ local -> 'a) @ [< 'm @@ past & global] ->
+  ('a @ [< many uncontended] -> 'a @ [< global > aliased nonportable]) @ [< global > 'm] =
   <fun>
 val use_locally' :
-  ('a @ local -> 'a) @ [< 'm.future > local] ->
-  ('a @ [< many uncontended] -> 'a @ [< global > aliased nonportable]) @ [> 'm.future | local] =
+  ('a @ local -> 'a) @ [< 'm @@ past > local] ->
+  ('a @ [< many uncontended] -> 'a @ [< global > aliased nonportable]) @ [> 'm | local] =
   <fun>
 |}]
 
@@ -677,7 +675,7 @@ let use_locally (f : local_ 'a -> local_ 'a) : local_ 'a -> local_ 'a = f
 [%%expect{|
 val use_locally :
   ('a : any).
-    ('a @ local -> 'a @ local) @ [< 'm mod aliased contended & global] ->
+    ('a @ local -> 'a @ local) @ [< 'm . aliased contended & global] ->
     ('a @ local -> 'a @ local) @ [< global > 'm] =
   <fun>
 |}]
@@ -1143,8 +1141,8 @@ let foo x =
   res
 [%%expect{|
 val foo :
-  'a @ [< global many shared > 'm.future] ->
-  'a @ [< 'm.future & global > aliased nonportable] = <fun>
+  'a @ [< global many shared > 'm] ->
+  'a @ [< 'm @@ past & global > aliased nonportable] = <fun>
 |}]
 
 let foo x = exclave_
@@ -1153,8 +1151,8 @@ let foo x = exclave_
   foo ()
 [%%expect{|
 val foo :
-  'a @ [< global many shared > 'm.future] ->
-  'a @ [< 'm.future > local aliased nonportable] = <fun>
+  'a @ [< global many shared > 'm] ->
+  'a @ [< 'm @@ past > local aliased nonportable] = <fun>
 |}]
 
 (* Cannot return local values without annotations on all exits *)
@@ -1177,8 +1175,8 @@ let foo x = exclave_
   r
 [%%expect{|
 val foo :
-  'a @ [< global many > 'm.future] ->
-  'a ref @ [< 'm.future > local nonportable] = <fun>
+  'a @ [< global many > 'm] -> 'a ref @ [< 'm @@ past > local nonportable] =
+  <fun>
 |}]
 
 let foo p x = exclave_
@@ -1187,9 +1185,8 @@ let foo p x = exclave_
   else r
 [%%expect{|
 val foo :
-  bool @ [< 'm.future & global] ->
-  ('a @ [< global many > 'n.future] ->
-   'a ref @ [< 'n.future > local nonportable]) @ [< global > 'm.future] =
+  bool @ [< 'm @@ past & global] ->
+  ('a @ [< global many > 'n] -> 'a ref @ [< 'n @@ past > local nonportable]) @ [< global > 'm] =
   <fun>
 |}]
 
@@ -1200,8 +1197,8 @@ let rec length acc (local_ xl) =
   | x :: xs -> length (acc + 1) xs
 [%%expect{|
 val length :
-  int @ [< 'm.future & global > 'n] ->
-  ('a list @ [> local] -> int @ [< 'o & global > 'o]) @ [< global > 'm.future | monadic_to_comonadic_min('n) | nonportable] =
+  int @ [< 'm @@ past & global] ->
+  ('a list @ [> local] -> int @ [< 'n & global > 'n]) @ [< global > 'm | nonportable] =
   <fun>
 |}]
 
@@ -1323,20 +1320,19 @@ let foo (local_ x) = x.mut
 [%%expect{|
 val foo :
   'a mut @ [< 'm & shared > local] ->
-  'a @ [< global > 'm mod global many | aliased] = <fun>
+  'a @ [< global > 'm @@ global many | aliased] = <fun>
 |}]
 let foo y =
   let x = local_ { mut = y } in
   x.mut
 [%%expect{|
 val foo :
-  'a @ [< global many shared > 'm.future] ->
-  'a @ [< 'm.future & global > aliased nonportable] = <fun>
+  'a @ [< global many shared > 'm] ->
+  'a @ [< 'm @@ past & global > aliased nonportable] = <fun>
 |}]
 let foo (local_ x) = x.gbl
 [%%expect{|
-val foo :
-  'a gbl @ [< 'm > local] -> 'a @ [< global > 'm mod global | aliased] =
+val foo : 'a gbl @ [< 'm > local] -> 'a @ [< global > 'm @@ global | aliased] =
   <fun>
 |}]
 let foo y =
@@ -1344,8 +1340,8 @@ let foo y =
   x.gbl
 [%%expect{|
 val foo :
-  'a @ [< 'm mod aliased & global] ->
-  'a @ [< global > 'm mod global | aliased] = <fun>
+  'a @ [< 'm . aliased & global] -> 'a @ [< global > 'm @@ global | aliased] =
+  <fun>
 |}]
 
 let foo (local_ { imm }) = imm
@@ -1370,20 +1366,19 @@ let foo (local_ { mut }) = mut
 [%%expect{|
 val foo :
   'a mut @ [< 'm & shared > local] ->
-  'a @ [< global > 'm mod global many | aliased] = <fun>
+  'a @ [< global > 'm @@ global many | aliased] = <fun>
 |}]
 let foo y =
   let { mut } = local_ { mut = y } in
   mut
 [%%expect{|
 val foo :
-  'a @ [< global many shared > 'm.future] ->
-  'a @ [< 'm.future & global > aliased nonportable] = <fun>
+  'a @ [< global many shared > 'm] ->
+  'a @ [< 'm @@ past & global > aliased nonportable] = <fun>
 |}]
 let foo (local_ { gbl }) = gbl
 [%%expect{|
-val foo :
-  'a gbl @ [< 'm > local] -> 'a @ [< global > 'm mod global | aliased] =
+val foo : 'a gbl @ [< 'm > local] -> 'a @ [< global > 'm @@ global | aliased] =
   <fun>
 |}]
 let foo y =
@@ -1391,8 +1386,8 @@ let foo y =
   gbl
 [%%expect{|
 val foo :
-  'a @ [< 'm mod aliased & global] ->
-  'a @ [< global > 'm mod global | aliased] = <fun>
+  'a @ [< 'm . aliased & global] -> 'a @ [< global > 'm @@ global | aliased] =
+  <fun>
 |}]
 
 let foo (local_ imm) =
@@ -1478,7 +1473,7 @@ Error: This value is "local"
 let foo (local_ x) = x.#mut
 [%%expect{|
 val foo :
-  'a mut# @ [< 'm > local] -> 'a @ [< global > 'm mod global many | aliased] =
+  'a mut# @ [< 'm > local] -> 'a @ [< global > 'm @@ global many | aliased] =
   <fun>
 |}]
 let foo y =
@@ -1486,13 +1481,13 @@ let foo y =
   x.#mut
 [%%expect{|
 val foo :
-  'a @ [< 'm mod aliased & global many] ->
-  'a @ [< global > 'm mod global many | aliased] = <fun>
+  'a @ [< 'm . aliased & global many] ->
+  'a @ [< global > 'm @@ global many | aliased] = <fun>
 |}]
 let foo (local_ x) = x.#gbl
 [%%expect{|
 val foo :
-  'a gbl# @ [< 'm > local] -> 'a @ [< global > 'm mod global | aliased] =
+  'a gbl# @ [< 'm > local] -> 'a @ [< global > 'm @@ global | aliased] =
   <fun>
 |}]
 let foo y =
@@ -1500,8 +1495,8 @@ let foo y =
   x.#gbl
 [%%expect{|
 val foo :
-  'a @ [< 'm mod aliased & global] ->
-  'a @ [< global > 'm mod global | aliased] = <fun>
+  'a @ [< 'm . aliased & global] -> 'a @ [< global > 'm @@ global | aliased] =
+  <fun>
 |}]
 
 let foo (local_ #{ imm }) = imm
@@ -1525,7 +1520,7 @@ Error: This value is "local"
 let foo (local_ #{ mut }) = mut
 [%%expect{|
 val foo :
-  'a mut# @ [< 'm > local] -> 'a @ [< global > 'm mod global many | aliased] =
+  'a mut# @ [< 'm > local] -> 'a @ [< global > 'm @@ global many | aliased] =
   <fun>
 |}]
 let foo y =
@@ -1533,13 +1528,13 @@ let foo y =
   mut
 [%%expect{|
 val foo :
-  'a @ [< 'm mod aliased & global many] ->
-  'a @ [< global > 'm mod global many | aliased] = <fun>
+  'a @ [< 'm . aliased & global many] ->
+  'a @ [< global > 'm @@ global many | aliased] = <fun>
 |}]
 let foo (local_ #{ gbl }) = gbl
 [%%expect{|
 val foo :
-  'a gbl# @ [< 'm > local] -> 'a @ [< global > 'm mod global | aliased] =
+  'a gbl# @ [< 'm > local] -> 'a @ [< global > 'm @@ global | aliased] =
   <fun>
 |}]
 let foo y =
@@ -1547,8 +1542,8 @@ let foo y =
   gbl
 [%%expect{|
 val foo :
-  'a @ [< 'm mod aliased & global] ->
-  'a @ [< global > 'm mod global | aliased] = <fun>
+  'a @ [< 'm . aliased & global] -> 'a @ [< global > 'm @@ global | aliased] =
+  <fun>
 |}]
 
 let foo (local_ imm) =
@@ -1620,8 +1615,7 @@ type 'a gbl = #{ gbl : 'a @@ global; }
 
 let foo (local_ x) = x.#gbl
 [%%expect{|
-val foo :
-  'a gbl @ [< 'm > local] -> 'a @ [< global > 'm mod global | aliased] =
+val foo : 'a gbl @ [< 'm > local] -> 'a @ [< global > 'm @@ global | aliased] =
   <fun>
 |}]
 let foo y =
@@ -1629,13 +1623,12 @@ let foo y =
   x.#gbl
 [%%expect{|
 val foo :
-  'a @ [< 'm mod aliased & global] ->
-  'a @ [< global > 'm mod global | aliased] = <fun>
+  'a @ [< 'm . aliased & global] -> 'a @ [< global > 'm @@ global | aliased] =
+  <fun>
 |}]
 let foo (local_ #{ gbl }) = gbl
 [%%expect{|
-val foo :
-  'a gbl @ [< 'm > local] -> 'a @ [< global > 'm mod global | aliased] =
+val foo : 'a gbl @ [< 'm > local] -> 'a @ [< global > 'm @@ global | aliased] =
   <fun>
 |}]
 let foo y =
@@ -1643,8 +1636,8 @@ let foo y =
   gbl
 [%%expect{|
 val foo :
-  'a @ [< 'm mod aliased & global] ->
-  'a @ [< global > 'm mod global | aliased] = <fun>
+  'a @ [< 'm . aliased & global] -> 'a @ [< global > 'm @@ global | aliased] =
+  <fun>
 |}]
 let foo (local_ gbl) =
   let _ = #{ gbl } in
@@ -1788,8 +1781,8 @@ let foo (local_ x) y =
 [%%expect{|
 val escape : 'a -> unit = <fun>
 val foo :
-  'a option @ [< 'm.future & many > local] ->
-  ('b option @ [< global many uncontended] -> unit @ [< global]) @ [> 'm.future | local] =
+  'a option @ [< 'm @@ past & many > local] ->
+  ('b option @ [< global many uncontended] -> unit @ [< global]) @ [> 'm | local] =
   <fun>
 |}]
 
@@ -1843,10 +1836,10 @@ let foo p (local_ x) y z =
   escape b;;
 [%%expect{|
 val foo :
-  bool @ [< 'm.future & global] ->
-  ('a @ [< 'n.future > local] ->
-   ('b @ [< global many uncontended > 'p.future] ->
-    ('a * 'b @ [< global many uncontended > 'o.future] -> unit @ [< global]) @ [< 'o.future & 'p.future > local nonportable]) @ [> 'n.future | local]) @ [< global > 'm.future] =
+  bool @ [< 'm @@ past & global] ->
+  ('a @ [< 'n @@ past > local] ->
+   ('b @ [< global many uncontended > 'p] ->
+    ('a * 'b @ [< global many uncontended > 'o] -> unit @ [< global]) @ [< 'o @@ past & 'p @@ past > local nonportable]) @ [> 'n | local]) @ [< global > 'm] =
   <fun>
 |}]
 
@@ -2135,21 +2128,20 @@ let float (local_ x) (local_ y) = exclave_
   (x +. y *. x -. 42.)
 [%%expect{|
 val int32 :
-  int32 @ [< 'm.future & many > local] ->
-  (int32 @ [< many > local] -> int32 @ [> local aliased]) @ [> 'm.future | local] =
+  int32 @ [< 'm @@ past & many > local] ->
+  (int32 @ [< many > local] -> int32 @ [> local aliased]) @ [> 'm | local] =
   <fun>
 val int64 :
-  int64 @ [< 'm.future & many > local] ->
-  (int64 @ [< many > local] -> int64 @ [> local aliased]) @ [> 'm.future | local] =
+  int64 @ [< 'm @@ past & many > local] ->
+  (int64 @ [< many > local] -> int64 @ [> local aliased]) @ [> 'm | local] =
   <fun>
 val nativeint :
-  nativeint @ [< 'm.future & many > local] ->
-  (nativeint @ [< many > local] -> nativeint @ [> local aliased]) @ [> 'm.future | local] =
+  nativeint @ [< 'm @@ past & many > local] ->
+  (nativeint @ [< many > local] -> nativeint @ [> local aliased]) @ [> 'm | local] =
   <fun>
 val float :
-  float @ [< 'm.future & many > local] ->
-  (float @ [> local] -> float @ [> local aliased]) @ [> 'm.future | local] =
-  <fun>
+  float @ [< 'm @@ past & many > local] ->
+  (float @ [> local] -> float @ [> local aliased]) @ [> 'm | local] = <fun>
 |}]
 
 let etapair (local_ x) = exclave_ (fst x, snd x)
@@ -2176,8 +2168,8 @@ let compare (local_ x) (local_ y) =
   [x = y; x <> y; x < y; x > y; x <= y; x >= y; compare x y = 0; x == y; x != y]
 [%%expect{|
 val compare :
-  'a @ [< many uncontended > 'n.future | local] ->
-  ('a @ [< many uncontended > 'm.future | local] -> bool list @ [< global]) @ [< 'm.future & 'n.future > local nonportable] =
+  'a @ [< many uncontended > 'n | local] ->
+  ('a @ [< many uncontended > 'm | local] -> bool list @ [< global]) @ [< 'm @@ past & 'n @@ past > local nonportable] =
   <fun>
 |}]
 
@@ -2248,8 +2240,8 @@ let foo (local_ x) y =
   | None, None | Some _, Some _ -> assert false
 [%%expect{|
 val foo :
-  'a option @ [< 'p & 'n.future > local] ->
-  ('a option @ [< 'o] -> 'a @ [> 'm | 'o | 'p | local]) @ [> close('m) | 'n.future | local] =
+  'a option @ [< 'm > local] ->
+  ('a option @ [< 'n] -> 'a @ [> 'n | 'm | local]) @ [> close('m) | local] =
   <fun>
 |}]
 
@@ -2259,8 +2251,8 @@ let foo (local_ x) y =
   | None, None | Some _, Some _ -> assert false
 [%%expect{|
 val foo :
-  'a option @ [< 'p & 'n.future > local] ->
-  ('a option @ [< 'o] -> 'a @ [> 'm | 'o | 'p | local]) @ [> close('m) | 'n.future | local] =
+  'a option @ [< 'm > local] ->
+  ('a option @ [< 'n] -> 'a @ [> 'n | 'm | local]) @ [> close('m) | local] =
   <fun>
 |}]
 
@@ -2306,8 +2298,8 @@ let f g n =
 let z : (int list -> unit) -> int -> unit = f
 [%%expect{|
 val f :
-  (int list @ [> local] -> unit @ 'm) @ [< 'n.future & global] ->
-  (int @ 'o -> unit @ [< global]) @ [< global > 'n.future] = <fun>
+  (int list @ [> local] -> unit @ 'm) @ [< 'n @@ past & global] ->
+  (int @ 'o -> unit @ [< global]) @ [< global > 'n] = <fun>
 Line 5, characters 44-45:
 5 | let z : (int list -> unit) -> int -> unit = f
                                                 ^
@@ -2342,14 +2334,14 @@ let foo f = (f : local_ string -> float :> string -> float)
 [%%expect{|
 val foo :
   (string @ [> local aliased nonportable] ->
-   float @ [< global many uncontended]) @ [< 'm mod aliased contended & global] ->
+   float @ [< global many uncontended]) @ [< 'm . aliased contended & global] ->
   (string -> float) @ [< global > 'm] = <fun>
 |}]
 
 let foo f = (f : string -> float :> string -> local_ float)
 [%%expect{|
 val foo :
-  (string @ [> aliased nonportable] -> float @ [< global many uncontended]) @ [< 'm mod aliased contended & global] ->
+  (string @ [> aliased nonportable] -> float @ [< global many uncontended]) @ [< 'm . aliased contended & global] ->
   (string -> float @ local) @ [< global > 'm] = <fun>
 |}]
 
@@ -2954,24 +2946,23 @@ Error: Signature mismatch:
        Modules do not match:
          sig
            val g :
-             'a @ [< 'm.future] ->
-             ('b @ 'n -> string @ [> local]) @ [> 'm.future]
+             'a @ [< 'm @@ past] -> ('b @ 'n -> string @ [> local]) @ [> 'm]
            val f :
-             'a @ [< 'm.future] ->
-             ('b @ 'o -> string @ [< 'n.future > 'n.future | local]) @ [> 'm.future | local]
+             'a @ [< 'm @@ past] ->
+             ('b @ 'o -> string @ [< 'n @@ past > 'n | local]) @ [> 'm | local]
          end
        is not included in
          sig val f : string -> string -> string @ local end
        Values do not match:
          val f :
-           'a @ [< 'm.future] ->
-           ('b @ 'o -> string @ [< 'n.future > 'n.future | local]) @ [> 'm.future | local]
+           'a @ [< 'm @@ past] ->
+           ('b @ 'o -> string @ [< 'n @@ past > 'n | local]) @ [> 'm | local]
        is not included in
          val f : string -> string -> string @ local
        The type
-         "string @ [< 'm.future & 'm.future > aliased] ->
+         "string @ [< 'm @@ past & 'm @@ past > aliased] ->
          (string @ [> aliased] ->
-          string @ [< 'n.future & 'n.future > 'n.future | 'n.future | local]) @ [> 'm.future | 'm.future | local]"
+          string @ [< 'n @@ past & 'n @@ past > 'n | 'n | local]) @ [> 'm | 'm | local]"
        is not compatible with the type "string -> string -> string @ local"
 |}]
 

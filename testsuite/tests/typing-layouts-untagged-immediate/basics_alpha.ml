@@ -404,9 +404,9 @@ let f9_3 () = twice f1_3 (make_intu ());;
 val twice :
   ('a : untagged_immediate).
     ('a t_untagged_immediate_id @ [> 'o | 'n] ->
-     'a t_untagged_immediate_id @ [< 'm & 'n & global]) @ [< 'p.future & global many] ->
+     'a t_untagged_immediate_id @ [< 'm & 'n & global]) @ [< 'p @@ past & global many] ->
     ('a t_untagged_immediate_id @ [< 'o] ->
-     'a t_untagged_immediate_id @ [< global > 'm]) @ [< global > 'p.future] =
+     'a t_untagged_immediate_id @ [< global > 'm]) @ [< global > 'p] =
   <fun>
 val f9_1 :
   unit @ 'm -> t_untagged_immediate t_untagged_immediate_id @ [< global] =
@@ -658,18 +658,18 @@ end;;
 [%%expect{|
 type t12_8 = < f : t_untagged_immediate -> t_untagged_immediate >
 val f12_9 :
-  t12_8 @ [< 'n.future & global uncontended] ->
-  (t_untagged_immediate @ [< global many uncontended > 'm.future] ->
-   t_untagged_immediate @ [< global > aliased nonportable]) @ [< 'm.future & global > 'n.future | nonportable] =
+  t12_8 @ [< 'n @@ past & global uncontended] ->
+  (t_untagged_immediate @ [< global many uncontended > 'm] ->
+   t_untagged_immediate @ [< global > aliased nonportable]) @ [< 'm @@ past & global > 'n | nonportable] =
   <fun>
 val f12_10 :
-  < baz : t_untagged_immediate @ [< 'n.future > 'o | 'mm3 | aliased] ->
-          (t_untagged_immediate @ [< 'p.future > 'q | 'mm2 | aliased] ->
-           (t_untagged_immediate @ [> 'mm1 | aliased] ->
-            t_untagged_immediate @ [< 'mm0 & global]) @ [> 'p.future | monadic_to_comonadic_min('q) | 'm.future | nonportable]) @ [< 'm.future > 'n.future | monadic_to_comonadic_min('o) | nonportable];
-    .. > @ [< 'mm4.future & global uncontended] ->
-  (t_untagged_immediate @ [< 'mm1 & 'mm2 & 'mm3 & many] ->
-   t_untagged_immediate @ [< global > 'mm0]) @ [< global > 'mm4.future | nonportable] =
+  < baz : t_untagged_immediate @ [< 'n @@ past > 'mm1 | aliased] ->
+          (t_untagged_immediate @ [< 'o @@ past > 'mm0 | aliased] ->
+           (t_untagged_immediate @ [> 'q | aliased] ->
+            t_untagged_immediate @ [< 'p & global]) @ [> 'o | 'm | nonportable]) @ [< 'm @@ past > 'n | nonportable];
+    .. > @ [< 'mm2 @@ past & global uncontended] ->
+  (t_untagged_immediate @ [< 'q & 'mm0 & 'mm1 & many] ->
+   t_untagged_immediate @ [< global > 'p]) @ [< global > 'mm2 | nonportable] =
   <fun>
 class ['a] c12_11 : object method x : t_untagged_immediate -> 'a end
 class ['a] c12_12 : object method x : 'a -> t_untagged_immediate end

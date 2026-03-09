@@ -21,23 +21,22 @@ val local_aliased_use : 'a @ [> local] -> unit @ [< global] = <fun>
 let unique_aliased_use (local_ unique_ x) (local_ y) = ()
 [%%expect{|
 val unique_aliased_use :
-  'a @ [< 'm.future & unique > local] ->
-  ('b @ [> local] -> unit @ [< global]) @ [> 'm.future | local] = <fun>
+  'a @ [< 'm @@ past & unique > local] ->
+  ('b @ [> local] -> unit @ [< global]) @ [> 'm | local] = <fun>
 |}]
 
 let aliased_unique_use (local_ x) (local_ unique_ y) = ()
 [%%expect{|
 val aliased_unique_use :
-  'a @ [< 'm.future > local] ->
-  ('b @ [< unique > local] -> unit @ [< global]) @ [> 'm.future | local] =
-  <fun>
+  'a @ [< 'm @@ past > local] ->
+  ('b @ [< unique > local] -> unit @ [< global]) @ [> 'm | local] = <fun>
 |}]
 
 let aliased_aliased_use (local_ x) (local_ y) = ()
 [%%expect{|
 val aliased_aliased_use :
-  'a @ [< 'm.future > local] ->
-  ('b @ [> local] -> unit @ [< global]) @ [> 'm.future | local] = <fun>
+  'a @ [< 'm @@ past > local] ->
+  ('b @ [> local] -> unit @ [< global]) @ [> 'm | local] = <fun>
 |}]
 
 let local_returning (local_ x) = [%exclave] x
@@ -734,8 +733,8 @@ let foo () =
   ()
 [%%expect{|
 val aliased_local_and_legacy_use :
-  'a @ [< 'm.future > local aliased] ->
-  (unit @ 'n -> unit @ [< global]) @ [> 'm.future | local] = <fun>
+  'a @ [< 'm @@ past > local aliased] ->
+  (unit @ 'n -> unit @ [< global]) @ [> 'm | local] = <fun>
 Line 4, characters 10-50:
 4 |   let f = aliased_local_and_legacy_use (borrow_ x) in
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

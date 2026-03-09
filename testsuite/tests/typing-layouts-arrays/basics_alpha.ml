@@ -229,24 +229,24 @@ let f5 (x : float32# array) v = set x 0 v
 external set : ('a : any mod separable). 'a array -> int -> 'a -> unit
   = "%array_safe_set" [@@layout_poly]
 val f1 :
-  float# array @ [< 'n.future & global uncontended] ->
-  (float# @ [< global many uncontended > 'm.future] -> unit @ [< global]) @ [< 'm.future & global > 'n.future | nonportable] =
+  float# array @ [< 'n @@ past & global uncontended] ->
+  (float# @ [< global many uncontended > 'm] -> unit @ [< global]) @ [< 'm @@ past & global > 'n | nonportable] =
   <fun>
 val f2 :
-  int32# array @ [< 'n.future & global uncontended] ->
-  (int32# @ [< global many uncontended > 'm.future] -> unit @ [< global]) @ [< 'm.future & global > 'n.future | nonportable] =
+  int32# array @ [< 'n @@ past & global uncontended] ->
+  (int32# @ [< global many uncontended > 'm] -> unit @ [< global]) @ [< 'm @@ past & global > 'n | nonportable] =
   <fun>
 val f3 :
-  int64# array @ [< 'n.future & global uncontended] ->
-  (int64# @ [< global many uncontended > 'm.future] -> unit @ [< global]) @ [< 'm.future & global > 'n.future | nonportable] =
+  int64# array @ [< 'n @@ past & global uncontended] ->
+  (int64# @ [< global many uncontended > 'm] -> unit @ [< global]) @ [< 'm @@ past & global > 'n | nonportable] =
   <fun>
 val f4 :
-  nativeint# array @ [< 'n.future & global uncontended] ->
-  (nativeint# @ [< global many uncontended > 'm.future] -> unit @ [< global]) @ [< 'm.future & global > 'n.future | nonportable] =
+  nativeint# array @ [< 'n @@ past & global uncontended] ->
+  (nativeint# @ [< global many uncontended > 'm] -> unit @ [< global]) @ [< 'm @@ past & global > 'n | nonportable] =
   <fun>
 val f5 :
-  float32# array @ [< 'n.future & global uncontended] ->
-  (float32# @ [< global many uncontended > 'm.future] -> unit @ [< global]) @ [< 'm.future & global > 'n.future | nonportable] =
+  float32# array @ [< 'n @@ past & global uncontended] ->
+  (float32# @ [< global many uncontended > 'm] -> unit @ [< global]) @ [< 'm @@ past & global > 'n | nonportable] =
   <fun>
 |}]
 

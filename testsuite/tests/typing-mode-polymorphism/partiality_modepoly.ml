@@ -105,8 +105,8 @@ let f r =
                  3)))))))
   (apply (field_imm 1 (global Toploop!)) "f" f/310))
 val f :
-  int option ref @ [< 'm.future & many uncontended] ->
-  int @ [< global > 'm.future mod global many | aliased] = <fun>
+  int option ref @ [< 'm @@ past & many uncontended] ->
+  int @ [< global > 'm @@ global many | aliased] = <fun>
 |}]
 
 

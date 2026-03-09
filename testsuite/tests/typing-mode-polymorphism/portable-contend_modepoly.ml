@@ -81,7 +81,7 @@ let foo (r @ contended) = r.b
 [%%expect{|
 val foo :
   r @ [< 'm & global > contended] ->
-  bytes @ [< global > 'm mod many portable | contended] = <fun>
+  bytes @ [< global > 'm @@ many portable | contended] = <fun>
 |}]
 
 (* reading immutable field from shared record is fine *)
@@ -89,7 +89,7 @@ let foo (r @ shared) = r.b
 [%%expect{|
 val foo :
   r @ [< 'm & global shared > shared] ->
-  bytes @ [< global > 'm mod many portable | shared] = <fun>
+  bytes @ [< global > 'm @@ many portable | shared] = <fun>
 |}]
 
 let foo (r @ shared) = {r with a = best_bytes ()}
@@ -373,8 +373,8 @@ let foo (x : int @ nonportable) (y : int @ contended) =
     ()
 [%%expect{|
 val foo :
-  int @ [< 'm.future & global > nonportable] ->
-  (int @ [> contended] -> unit @ [< global]) @ [< global > 'm.future | nonportable] =
+  int @ [< 'm @@ past & global > nonportable] ->
+  (int @ [> contended] -> unit @ [< global]) @ [< global > 'm | nonportable] =
   <fun>
 |}]
 

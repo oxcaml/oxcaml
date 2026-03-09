@@ -38,18 +38,18 @@ let f y (type (a : immediate) (b : immediate)) (x : a) = x;;
 [%%expect{|
 val f :
   'b ('a : immediate).
-    'b @ [< 'm.future & global] ->
-    ('a @ 'n -> 'a @ [< global]) @ [< global > 'm.future] =
+    'b @ [< 'm @@ past & global] ->
+    ('a @ 'n -> 'a @ [< global]) @ [< global > 'm] =
   <fun>
 val f :
   'b ('a : immediate).
-    'b @ [< 'm.future & global] ->
-    ('a @ 'n -> 'a @ [< global]) @ [< global > 'm.future] =
+    'b @ [< 'm @@ past & global] ->
+    ('a @ 'n -> 'a @ [< global]) @ [< global > 'm] =
   <fun>
 val f :
   'b ('a : immediate).
-    'b @ [< 'm.future & global] ->
-    ('a @ 'n -> 'a @ [< global]) @ [< global > 'm.future] =
+    'b @ [< 'm @@ past & global] ->
+    ('a @ 'n -> 'a @ [< global]) @ [< global > 'm] =
   <fun>
 |}]
 
@@ -197,7 +197,7 @@ let f xs = match xs with
 [%%expect{|
 type t = #(int * float#)
 val f :
-  #('a * float#) @ [< 'm & 'm mod aliased contended & global] ->
+  #('a * float#) @ [< 'm & 'm . aliased contended & global] ->
   #('a * float#) @ [< global > 'm | 'm] = <fun>
 |}]
 
@@ -551,23 +551,23 @@ let f ~(x1 @ many)
 
 [%%expect{|
 val f :
-  x1:'b @ [< 'mm11 & 'n.future & global many] ->
-  (x2:string @ [< 'p.future > local] ->
-   (x3:(string -> string) @ [< 'mm10 mod aliased contended & 'q.future > local] ->
-    (x4:('a. 'a -> 'a) @ [< 'mm9 mod aliased contended & 'mm0.future > local] ->
-     (x9:('a. 'a) @ [< 'mm1.future > local] ->
-      (x5:'c @ [< 'mm8 & 'mm3.future > local] ->
-       (x6:bool @ [< 'mm4.future & many > local] ->
-        (x7:bool @ [< 'mm5.future & many > local] ->
-         (x8:unit @ [< 'mm6.future > local] ->
-          (string @ [< 'mm7.future & global] ->
+  x1:'b @ [< 'm & global many] ->
+  (x2:string @ [< 'n @@ past > local] ->
+   (x3:(string -> string) @ [< 'mm6 . aliased contended & 'o @@ past > local] ->
+    (x4:('a. 'a -> 'a) @ [< 'mm5 . aliased contended & 'p @@ past > local] ->
+     (x9:('a. 'a) @ [< 'q @@ past > local] ->
+      (x5:'c @ [< 'mm0 > local] ->
+       (x6:bool @ [< 'mm1 @@ past & many > local] ->
+        (x7:bool @ [< 'mm2 @@ past & many > local] ->
+         (x8:unit @ [< 'mm3 @@ past > local] ->
+          (string @ [< 'mm4 @@ past & global] ->
            ('d @ [> local] ->
             'b * string * (string -> string) * ('e -> 'e) * 'c * string *
             string * int array * string *
-            (int @ [< 'mm12.future] ->
-             (int @ 'mm13 -> int @ [< global]) @ [> 'mm12.future | local]) *
-            (int @ [< 'mm14.future] ->
-             (int @ 'mm15 -> int @ [< global]) @ [> 'mm14.future | local]) @ [> 'mm2 | 'o | 'm | 'mm8 | 'mm9 | 'mm10 | 'mm11 | local contended]) @ [> 'mm7.future | local]) @ [> 'mm6.future | local]) @ [> 'mm5.future | local]) @ [> 'mm4.future | local]) @ [> close('mm2) | 'mm3.future | local]) @ [> 'mm1.future | local]) @ [> 'mm0.future | local]) @ [> 'q.future | local]) @ [> close('o) mod portable | 'p.future | local]) @ [< global > close('m) | 'n.future] =
+            (int @ [< 'mm7 @@ past] ->
+             (int @ 'mm8 -> int @ [< global]) @ [> 'mm7 | local]) *
+            (int @ [< 'mm9 @@ past] ->
+             (int @ 'mm10 -> int @ [< global]) @ [> 'mm9 | local]) @ [> 'mm0 | 'mm5 | 'mm6 | 'm | local contended]) @ [> 'mm4 | local]) @ [> 'mm3 | local]) @ [> 'mm2 | local]) @ [> 'mm1 | local]) @ [> close('mm0) | local]) @ [> 'q | local]) @ [> 'p | local]) @ [> 'o | local]) @ [> 'n | local]) @ [< global > close('m)] =
   <fun>
 |}]
 
@@ -654,10 +654,10 @@ let f2 (x @ local) (f @ once) : t2 = exclave_ { x; f }
 
 [%%expect{|
 val f2 :
-  float @ [< 'm.future > local] ->
+  float @ [< 'm @@ past > local] ->
   ((float @ [> aliased nonportable] ->
-    float @ [< global many uncontended > 'n.future]) @ [< 'o.future > once] ->
-   t2 @ [< 'n.future > 'o.future | local once nonportable]) @ [> 'm.future | local] =
+    float @ [< global many uncontended > 'n]) @ [< 'o @@ past > once] ->
+   t2 @ [< 'n @@ past > 'o | local once nonportable]) @ [> 'm | local] =
   <fun>
 |}]
 
@@ -857,8 +857,8 @@ let double2 y = apply ~f:(stack_ function x -> x + y) y [@nontail]
 
 [%%expect{|
 val apply :
-  f:('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o.future > local] ->
-  ('a @ [< 'n] -> 'b @ [< global > 'm]) @ [> 'o.future | local] = <fun>
+  f:('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past > local] ->
+  ('a @ [< 'n] -> 'b @ [< global > 'm]) @ [> 'o | local] = <fun>
 val double1 : int @ [< many] -> int @ [< global] = <fun>
 val double2 : int @ [< many] -> int @ [< global] = <fun>
 |}]
@@ -1023,9 +1023,9 @@ let f ((~(x:int),y) : (x:int * int)) : int = x + y
 
 [%%expect{|
 val foo :
-  'a @ [< 'm.future & global] ->
-  ((unit @ 'o -> 'b @ [< 'n & global]) @ [< 'p.future & global] ->
-   ((unit @ 'mm0 -> 'b @ [< 'q & global]) @ 'mm1 -> 'b @ [< global > 'q | 'n]) @ [< global > 'p.future]) @ [< global > 'm.future] =
+  'a @ [< 'm @@ past & global] ->
+  ((unit @ 'o -> 'b @ [< 'n & global]) @ [< 'p @@ past & global] ->
+   ((unit @ 'mm0 -> 'b @ [< 'q & global]) @ 'mm1 -> 'b @ [< global > 'q | 'n]) @ [< global > 'p]) @ [< global > 'm] =
   <fun>
 val x : int @@ stateless = 1
 val y : int = 2
@@ -1097,36 +1097,36 @@ let test_char s f =
 
 [%%expect{|
 val test_float :
-  string @ [< global many uncontended > 'm.future] ->
-  (Float_u.t @ 'n -> unit @ [< global]) @ [< 'm.future & global > nonportable] =
+  string @ [< global many uncontended > 'm] ->
+  (Float_u.t @ 'n -> unit @ [< global]) @ [< 'm @@ past & global > nonportable] =
   <fun>
 val test_int8 :
-  string @ [< global many uncontended > 'm.future] ->
-  (int8# @ 'n -> unit @ [< global]) @ [< 'm.future & global > nonportable] =
+  string @ [< global many uncontended > 'm] ->
+  (int8# @ 'n -> unit @ [< global]) @ [< 'm @@ past & global > nonportable] =
   <fun>
 val test_int16 :
-  string @ [< global many uncontended > 'm.future] ->
-  (int16# @ 'n -> unit @ [< global]) @ [< 'm.future & global > nonportable] =
+  string @ [< global many uncontended > 'm] ->
+  (int16# @ 'n -> unit @ [< global]) @ [< 'm @@ past & global > nonportable] =
   <fun>
 val test_int32 :
-  string @ [< global many uncontended > 'm.future] ->
-  (Int32_u.t @ 'n -> unit @ [< global]) @ [< 'm.future & global > nonportable] =
+  string @ [< global many uncontended > 'm] ->
+  (Int32_u.t @ 'n -> unit @ [< global]) @ [< 'm @@ past & global > nonportable] =
   <fun>
 val test_int64 :
-  string @ [< global many uncontended > 'm.future] ->
-  (Int64_u.t @ 'n -> unit @ [< global]) @ [< 'm.future & global > nonportable] =
+  string @ [< global many uncontended > 'm] ->
+  (Int64_u.t @ 'n -> unit @ [< global]) @ [< 'm @@ past & global > nonportable] =
   <fun>
 val test_int :
-  string @ [< global many uncontended > 'm.future] ->
-  (int# @ 'n -> unit @ [< global]) @ [< 'm.future & global > nonportable] =
+  string @ [< global many uncontended > 'm] ->
+  (int# @ 'n -> unit @ [< global]) @ [< 'm @@ past & global > nonportable] =
   <fun>
 val test_nativeint :
-  string @ [< global many uncontended > 'm.future] ->
-  (Nativeint_u.t @ 'n -> unit @ [< global]) @ [< 'm.future & global > nonportable] =
+  string @ [< global many uncontended > 'm] ->
+  (Nativeint_u.t @ 'n -> unit @ [< global]) @ [< 'm @@ past & global > nonportable] =
   <fun>
 val test_char :
-  string @ [< global many uncontended > 'm.future] ->
-  (char# @ 'n -> unit @ [< global]) @ [< 'm.future & global > nonportable] =
+  string @ [< global many uncontended > 'm] ->
+  (char# @ 'n -> unit @ [< global]) @ [< 'm @@ past & global > nonportable] =
   <fun>
 |}]
 
@@ -1635,7 +1635,7 @@ let f ~(x : [%call_pos]) () = x;;
 [%%expect{|
 val f :
   x:[%call_pos] ->
-  (unit @ 'p -> lexing_position @ [< global > 'm | 'o]) @ [< global > close('m) | 'n.future] =
+  (unit @ 'n -> lexing_position @ [< global > 'm]) @ [< global > close('m)] =
   <fun>
 |}]
 
@@ -1649,8 +1649,8 @@ let f g here = g ~(here : [%call_pos])
 
 [%%expect{|
 val f :
-  (here:[%call_pos] -> 'a @ [< 'm & global]) @ [< 'o.future & global] ->
-  (lexing_position @ [< 'n] -> 'a @ [< global > 'm]) @ [< global > 'o.future] =
+  (here:[%call_pos] -> 'a @ [< 'm & global]) @ [< 'o @@ past & global] ->
+  (lexing_position @ [< 'n] -> 'a @ [< global > 'm]) @ [< global > 'o] =
   <fun>
 |}]
 

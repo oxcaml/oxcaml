@@ -471,23 +471,23 @@ type ('k, 'v) tree =
     }
   | Leaf
 val fold :
-  ('a @ [< 'n.future > 'o | 'mm7 mod many | aliased] ->
-   ('b @ [< 'q.future > 'mm0 | 'mm6 mod many | aliased] ->
-    ('c @ [> 'mm3 | 'mm4 | 'mm5 | 'mm2] -> 'c @ [< 'mm1 & 'mm2 & global]) @ [> 'q.future | monadic_to_comonadic_min('mm0) | 'm.future]) @ [< 'm.future > 'n.future | monadic_to_comonadic_min('o) | 'p.future]) @ [< 'p.future & 'mm9.future & 'mm10.future & 'mm21 & global many > 'mm11 | 'mm21 | aliased] ->
-  ('c @ [< 'mm18 & 'mm13.future & 'mm14.future & 'mm20 & 'mm5 & global > 'mm15 | 'mm16 | 'mm20 | 'mm1] ->
-   (('a, 'b) tree @ [< 'mm19 & 'mm6 & 'mm7 > 'mm19 mod many] ->
-    'c @ [< 'mm17 & 'mm4 & global > 'mm12 | 'mm17 | 'mm18]) @ [< global > close('mm12) | 'mm13.future | 'mm14.future | monadic_to_comonadic_min('mm15) | close('mm16) | close('mm3) | 'mm8.future | nonportable]) @ [< 'mm8.future & global > 'mm9.future | 'mm10.future | monadic_to_comonadic_min('mm11) | nonportable] =
+  ('a @ [< 'n @@ past > 'mm4 @@ many | aliased] ->
+   ('b @ [< 'p @@ past > 'mm3 @@ many | aliased] ->
+    ('c @ [> 'mm1 | 'mm2 | 'mm0] -> 'c @ [< 'q & 'mm0 & global]) @ [> 'p | 'm]) @ [< 'm @@ past > 'n | 'o]) @ [< 'o @@ past & 'mm6 & global many > 'mm6 | aliased] ->
+  ('c @ [< 'mm8 & 'mm7 & 'mm2 & global > 'mm7 | 'q] ->
+   (('a, 'b) tree @ [< 'mm10 & 'mm3 & 'mm4 > 'mm10 @@ many] ->
+    'c @ [< 'mm9 & 'mm1 & global > 'mm9 | 'mm8]) @ [< global > close('mm2) | close('mm2) | close('mm7) | close('mm7) | monadic_to_comonadic_min('mm7) | monadic_to_comonadic_min('mm7) | close('mm8) | close('mm8) | 'mm5 | nonportable]) @ [< 'mm5 @@ past & global > monadic_to_comonadic_min('mm6) | monadic_to_comonadic_min('mm6) | nonportable] =
   <fun>
 val work :
-  insert:(int @ [< 'n.future > 'o | aliased] ->
-          (bool @ [< 'q.future > 'mm0] ->
-           ('a @ [> 'mm3 | 'mm2] -> 'a @ [< 'mm1 & 'mm2 & global]) @ [> 'q.future | monadic_to_comonadic_min('mm0) | 'm.future]) @ [< 'm.future > 'n.future | monadic_to_comonadic_min('o) | 'p.future]) @ [< 'p.future & 'mm4.future & global many] ->
-  (fold:(('b @ [< 'mm5.future & global] ->
-          (bool @ [< 'mm6.future & global] ->
-           (int @ [< 'mm7 & global] -> int @ [< global > 'mm7]) @ [< global > 'mm6.future]) @ [< global > 'mm5.future]) @ [< 'mm9.future > 'mm10] ->
-         (int @ [< 'mm12.future > 'mm13] ->
-          ('a @ [> 'mm15 | 'mm1] -> 'c @ [< 'mm14 & global]) @ [> 'mm12.future | monadic_to_comonadic_min('mm13) | 'mm8.future]) @ [< 'mm8.future > 'mm9.future | monadic_to_comonadic_min('mm10) | 'mm11.future]) @ [< 'mm11.future & 'mm16.future & global] ->
-   (empty:'a @ [< 'mm15 & 'mm3 & global] -> 'c @ [< global > 'mm14]) @ [< global > 'mm16.future]) @ [< global > 'mm4.future] =
+  insert:(int @ [< 'n @@ past > aliased] ->
+          (bool @ [< 'p @@ past] ->
+           ('a @ [> 'mm1 | 'mm0] -> 'a @ [< 'q & 'mm0 & global]) @ [> 'p | 'm]) @ [< 'm @@ past > 'n | 'o]) @ [< 'o @@ past & 'mm2 @@ past & global many] ->
+  (fold:(('b @ [< 'mm3 @@ past & global] ->
+          (bool @ [< 'mm4 @@ past & global] ->
+           (int @ [< 'mm5 & global] -> int @ [< global > 'mm5]) @ [< global > 'mm4]) @ [< global > 'mm3]) @ [< 'mm7 @@ past] ->
+         (int @ [< 'mm9 @@ past] ->
+          ('a @ [> 'mm11 | 'q] -> 'c @ [< 'mm10 & global]) @ [> 'mm9 | 'mm6]) @ [< 'mm6 @@ past > 'mm7 | 'mm8]) @ [< 'mm8 @@ past & 'mm12 @@ past & global] ->
+   (empty:'a @ [< 'mm11 & 'mm1 & global] -> 'c @ [< global > 'mm10]) @ [< global > 'mm12]) @ [< global > 'mm2] =
   <fun>
 Line 85, characters 16-71:
 85 |                 balance_right (Node { t with right = ins k v t.right }) [@nontail]
