@@ -23,8 +23,8 @@ foo ((); g);;
 [%%expect{|
 val foo : (unit -> unit) @ 'm -> unit @ [< global] = <fun>
 val g :
-  ?x:'a @ [< 'm.future & global] ->
-  (unit @ 'n -> unit @ [< global]) @ [< global > 'm.future] = <fun>
+  ?x:'a @ [< 'm @@ past & global] ->
+  (unit @ 'n -> unit @ [< global]) @ [< global > 'm] = <fun>
 - : unit = ()
 |}];;
 
@@ -93,9 +93,9 @@ Error: This function is applied to arguments
 let f g = ignore (g : ?x:int -> unit -> int); g ~x:3 () ;;
 [%%expect{|
 val f :
-  (?x:int @ [< 'mm0.future & 'mm1.future & global many > 'p.future | 'mm0.future | aliased nonportable] ->
-   (unit @ [< 'p.future & 'q.future > aliased nonportable] ->
-    int @ [< global many uncontended > 'm.future]) @ [< 'm.future & 'n.future & 'o.future & global many uncontended > 'n.future | nonportable]) @ [< global many > 'q.future | 'o.future | 'mm1.future] ->
+  (?x:int @ [< 'mm0 @@ past & 'mm1 @@ past & global many > 'p | 'mm0 | aliased nonportable] ->
+   (unit @ [< 'p @@ past & 'q @@ past > aliased nonportable] ->
+    int @ [< global many uncontended > 'm]) @ [< 'm @@ past & 'n @@ past & 'o @@ past & global many uncontended > 'n | nonportable]) @ [< global many > 'q | 'o | 'mm1] ->
   int @ [< global] = <fun>
 |}, Principal{|
 Line 1, characters 51-52:
@@ -104,18 +104,18 @@ Line 1, characters 51-52:
 Warning 18 [not-principal]: using an optional argument here is not principal.
 
 val f :
-  (?x:int @ [< 'mm1.future & 'mm2.future & global many > 'q.future | 'mm1.future | aliased nonportable] ->
-   (unit @ [< 'q.future & 'mm0.future > aliased nonportable] ->
-    int @ [< 'p & global many uncontended > 'm.future]) @ [< 'm.future & 'n.future & 'o.future & global many uncontended > 'n.future | nonportable]) @ [< global many > 'mm0.future | 'o.future | 'mm2.future] ->
+  (?x:int @ [< 'mm1 @@ past & 'mm2 @@ past & global many > 'q | 'mm1 | aliased nonportable] ->
+   (unit @ [< 'q @@ past & 'mm0 @@ past > aliased nonportable] ->
+    int @ [< 'p & global many uncontended > 'm]) @ [< 'm @@ past & 'n @@ past & 'o @@ past & global many uncontended > 'n | nonportable]) @ [< global many > 'mm0 | 'o | 'mm2] ->
   int @ [< global > 'p] = <fun>
 |}];;
 
 let f g = ignore (g : ?x:int -> unit -> int); g ();;
 [%%expect{|
 val f :
-  (?x:int @ [< 'mm0.future & 'mm1.future & global many > 'p.future | 'mm0.future | aliased nonportable] ->
-   (unit @ [< 'p.future & 'q.future > aliased nonportable] ->
-    int @ [< global many uncontended > 'm.future]) @ [< 'm.future & 'n.future & 'o.future & global many uncontended > 'n.future | nonportable]) @ [< global many > 'q.future | 'o.future | 'mm1.future] ->
+  (?x:int @ [< 'mm0 @@ past & 'mm1 @@ past & global many > 'p | 'mm0 | aliased nonportable] ->
+   (unit @ [< 'p @@ past & 'q @@ past > aliased nonportable] ->
+    int @ [< global many uncontended > 'm]) @ [< 'm @@ past & 'n @@ past & 'o @@ past & global many uncontended > 'n | nonportable]) @ [< global many > 'q | 'o | 'mm1] ->
   int @ [< global] = <fun>
 |}, Principal{|
 Line 1, characters 46-47:
@@ -124,20 +124,19 @@ Line 1, characters 46-47:
 Warning 19 [non-principal-labels]: eliminated omittable argument without principality.
 
 val f :
-  (?x:int @ [< 'mm1.future & 'mm2.future & global many > 'q.future | 'mm1.future | aliased nonportable] ->
-   (unit @ [< 'q.future & 'mm0.future > aliased nonportable] ->
-    int @ [< 'p & global many uncontended > 'm.future]) @ [< 'm.future & 'n.future & 'o.future & global many uncontended > 'n.future | nonportable]) @ [< global many > 'mm0.future | 'o.future | 'mm2.future] ->
+  (?x:int @ [< 'mm1 @@ past & 'mm2 @@ past & global many > 'q | 'mm1 | aliased nonportable] ->
+   (unit @ [< 'q @@ past & 'mm0 @@ past > aliased nonportable] ->
+    int @ [< 'p & global many uncontended > 'm]) @ [< 'm @@ past & 'n @@ past & 'o @@ past & global many uncontended > 'n | nonportable]) @ [< global many > 'mm0 | 'o | 'mm2] ->
   int @ [< global > 'p] = <fun>
 |}];;
 
 let f g = ignore (g : x:int -> unit -> int); g ();;
 [%%expect{|
 val f :
-  (x:int @ [< 'mm2.future & 'mm3.future & global many > 'q.future | 'mm2.future | aliased nonportable]as 'mm4 ->
-   (unit @ [< 'q.future & 'mm0.future > 'mm1 | aliased nonportable] ->
-    int @ [< global many uncontended > 'm.future]as 'p) @ [< 'm.future & 'n.future & 'o.future & global many uncontended > 'n.future | nonportable]) @ [< 'mm6.future & global many > 'mm0.future | 'o.future | 'mm3.future] ->
-  (x:int @ 'mm4 -> int @ 'p) @ [< global > 'mm5 | close('mm1) | close('mm5) | 'mm6.future] =
-  <fun>
+  (x:int @ [< 'mm1 @@ past & 'mm2 @@ past & global many > 'q | 'mm1 | aliased nonportable]as 'mm3 ->
+   (unit @ [< 'q @@ past & 'mm0 @@ past > aliased nonportable] ->
+    int @ [< global many uncontended > 'm]as 'p) @ [< 'm @@ past & 'n @@ past & 'o @@ past & global many uncontended > 'n | nonportable]) @ [< 'mm4 @@ past & global many > 'mm0 | 'o | 'mm2] ->
+  (x:int @ 'mm3 -> int @ 'p) @ [< global > 'mm4] = <fun>
 |}, Principal{|
 Line 1, characters 45-46:
 1 | let f g = ignore (g : x:int -> unit -> int); g ();;
@@ -145,11 +144,10 @@ Line 1, characters 45-46:
 Warning 19 [non-principal-labels]: commuted an argument without principality.
 
 val f :
-  (x:int @ [< 'mm2.future & 'mm3.future & global many > 'q.future | 'mm2.future | aliased nonportable]as 'mm4 ->
-   (unit @ [< 'q.future & 'mm0.future > 'mm1 | aliased nonportable] ->
-    int @ [< global many uncontended > 'm.future]as 'p) @ [< 'm.future & 'n.future & 'o.future & global many uncontended > 'n.future | nonportable]) @ [< 'mm6.future & global many > 'mm0.future | 'o.future | 'mm3.future] ->
-  (x:int @ 'mm4 -> int @ 'p) @ [< global > 'mm5 | close('mm1) | close('mm5) | 'mm6.future] =
-  <fun>
+  (x:int @ [< 'mm1 @@ past & 'mm2 @@ past & global many > 'q | 'mm1 | aliased nonportable]as 'mm3 ->
+   (unit @ [< 'q @@ past & 'mm0 @@ past > aliased nonportable] ->
+    int @ [< global many uncontended > 'm]as 'p) @ [< 'm @@ past & 'n @@ past & 'o @@ past & global many uncontended > 'n | nonportable]) @ [< 'mm4 @@ past & global many > 'mm0 | 'o | 'mm2] ->
+  (x:int @ 'mm3 -> int @ 'p) @ [< global > 'mm4] = <fun>
 |}];;
 
 (* 9859: inferred function types may appear in the right hand side of :> *)
@@ -163,15 +161,15 @@ end
 class setup :
   object
     method with_ :
-      (int @ 'n -> unit @ [< 'm.future & global]) @ 'o ->
-      unit @ [< global > 'm.future mod many portable]
+      (int @ 'n -> unit @ [< 'm @@ past & global]) @ 'o ->
+      unit @ [< global > 'm @@ many portable]
   end
 class virtual fail :
   object
     method trigger : setup
     method virtual with_ :
-      (int @ 'n -> unit @ [< 'm.future & global]) @ 'o ->
-      unit @ [< global > 'm.future mod many portable]
+      (int @ 'n -> unit @ [< 'm @@ past & global]) @ 'o ->
+      unit @ [< global > 'm @@ many portable]
   end
 |}]
 
@@ -184,8 +182,7 @@ let g = ( (fun _ -> f) :> 'a -> E.t)
 module type T = sig type t end
 val type_of : 'x @ 'm -> (module T with type t = 'x) @ [< global] = <fun>
 val f :
-  (x:int @ [< 'm.future > 'n] ->
-   (y:int @ 'q -> int @ 'p) @ [> 'm.future | monadic_to_comonadic_min('n) | 'o.future]) @ [< 'o.future] ->
+  (x:int @ [< 'm @@ past] -> (y:int @ 'p -> int @ 'o) @ [> 'm | 'n]) @ [< 'n @@ past] ->
   int @ [< global] = <fun>
 Line 4, characters 11-26:
 4 | module E = (val type_of f)

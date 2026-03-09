@@ -5830,10 +5830,7 @@ module Value_with (Areality : Areality) = struct
       let diff = Const.diff c Const.min in
       if diff = Const.Option.none
       then Fmt.fprintf ppf "%a" printm m
-      else Fmt.fprintf ppf "%a mod %a" printm m Const.Option.partial_print diff
-    | C.Simple_morph.Core_imply_const
-        (C.Core_morph.Comonadic_to_monadic_max _, _) ->
-      failwith "not implemented"
+      else Fmt.fprintf ppf "%a . %a" printm m Const.Option.partial_print diff
     | _ ->
       Fmt.fprintf ppf "%a(%a)" (C.Simple_morph.print obj_monadic) f printm m
   [@@warning "-4"]
@@ -5862,7 +5859,7 @@ module Value_with (Areality : Areality) = struct
     let diff = Const.diff c Const.max in
     if diff = Const.Option.none
     then Fmt.fprintf ppf "%a" printm m
-    else Fmt.fprintf ppf "%a mod %a" printm m Const.Option.partial_print diff
+    else Fmt.fprintf ppf "%a @@@@ %a" printm m Const.Option.partial_print diff
 
   let pretty_print_comonadic_simple_morph : type a d f.
       (Fmt.formatter -> a -> unit) ->

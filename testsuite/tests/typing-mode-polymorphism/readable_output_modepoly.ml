@@ -56,8 +56,8 @@ let[@tail_mod_cons] rec map f = function
           (setfield_ptr(heap-init)_computed dst offset 0))))
   (apply (field_imm 1 (global Toploop!)) "map" map))
 val map :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o.future & 'p.future & 'mm2 & global many > 'q | 'mm2 | aliased] ->
-  ('a list @ [< 'mm1 & 'n > 'mm1] -> 'b list @ [< 'mm0 & global > 'mm0 | 'm]) @ [< global > 'o.future | 'p.future | monadic_to_comonadic_min('q) | nonportable] =
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o & global many > 'o | aliased] ->
+  ('a list @ [< 'q & 'n > 'q] -> 'b list @ [< 'p & global > 'p | 'm]) @ [< global > monadic_to_comonadic_min('o) | monadic_to_comonadic_min('o) | nonportable] =
   <fun>
 |}]
 
@@ -118,9 +118,8 @@ let[@tail_mod_cons] rec rec_map f = function
           (setfield_ptr(heap-init)_computed dst offset 0))))
   (apply (field_imm 1 (global Toploop!)) "rec_map" rec_map))
 val rec_map :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o.future & 'p.future & 'mm2 & global many > 'q | 'mm2 | aliased] ->
-  ('a rec_list @ [< 'mm1 & 'n > 'mm1] ->
-   'b rec_list @ [< 'mm0 & global > 'mm0 | 'm]) @ [< global > 'o.future | 'p.future | monadic_to_comonadic_min('q) | nonportable] =
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o & global many > 'o | aliased] ->
+  ('a rec_list @ [< 'q & 'n > 'q] -> 'b rec_list @ [< 'p & global > 'p | 'm]) @ [< global > monadic_to_comonadic_min('o) | monadic_to_comonadic_min('o) | nonportable] =
   <fun>
 |}]
 
@@ -293,9 +292,8 @@ let[@tail_mod_cons] rec effects f = function
           (setfield_ptr(heap-init)_computed dst offset 0))))
   (apply (field_imm 1 (global Toploop!)) "effects" effects))
 val effects :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o.future & 'p.future & 'mm2 & global many > 'q | 'mm2 | aliased] ->
-  (('a * 'a) list @ [< 'mm1 & 'n > 'mm1] ->
-   'b list @ [< 'mm0 & global > 'mm0 | 'm]) @ [< global > 'o.future | 'p.future | monadic_to_comonadic_min('q) | nonportable] =
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o & global many > 'o | aliased] ->
+  (('a * 'a) list @ [< 'q & 'n > 'q] -> 'b list @ [< 'p & global > 'p | 'm]) @ [< global > monadic_to_comonadic_min('o) | monadic_to_comonadic_min('o) | nonportable] =
   <fun>
 |}]
 
@@ -374,8 +372,8 @@ let[@tail_mod_cons] rec map_stutter f xs =
               (setfield_ptr(heap-init)_computed block 1 0))))))
   (apply (field_imm 1 (global Toploop!)) "map_stutter" map_stutter))
 val map_stutter :
-  ('a option @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o.future & 'p.future & 'mm2 & global many > 'q | 'mm2 | aliased] ->
-  ('a list @ [< 'mm1 & 'n > 'mm1] -> 'b list @ [< 'mm0 & global > 'mm0 | 'm]) @ [< global > 'o.future | 'p.future | monadic_to_comonadic_min('q) | nonportable] =
+  ('a option @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o & global many > 'o | aliased] ->
+  ('a list @ [< 'q & 'n > 'q] -> 'b list @ [< 'p & global > 'p | 'm]) @ [< global > monadic_to_comonadic_min('o) | monadic_to_comonadic_min('o) | nonportable] =
   <fun>
 |}]
 
@@ -455,8 +453,8 @@ type 'a stream = { hd : 'a; tl : unit -> 'a stream; }
                 (%int_sub n 1) tailcall))))))
   (apply (field_imm 1 (global Toploop!)) "smap_stutter" smap_stutter))
 val smap_stutter :
-  ('a option @ [> 'n | aliased nonportable] -> 'b @ [< 'm & global]) @ [< 'p.future & 'q.future & 'mm4 & global many > 'mm0 | 'mm4 | aliased] ->
-  ('a stream @ [< 'mm1.future & 'mm2.future & 'n & global > aliased nonportable] ->
-   (int @ [< many uncontended] -> 'b list @ [< 'mm3 & global > 'mm3 | 'm]) @ [< global > 'mm1.future | 'mm2.future | 'o.future | nonportable]) @ [< 'o.future & global > 'p.future | 'q.future | monadic_to_comonadic_min('mm0) | nonportable] =
+  ('a option @ [> 'n | aliased nonportable] -> 'b @ [< 'm & global]) @ [< 'p & global many > 'p | aliased] ->
+  ('a stream @ [< 'q @@ past & 'mm0 @@ past & 'n & global > aliased nonportable] ->
+   (int @ [< many uncontended] -> 'b list @ [< 'mm1 & global > 'mm1 | 'm]) @ [< global > 'q | 'mm0 | 'o | nonportable]) @ [< 'o @@ past & global > monadic_to_comonadic_min('p) | monadic_to_comonadic_min('p) | nonportable] =
   <fun>
 |}]

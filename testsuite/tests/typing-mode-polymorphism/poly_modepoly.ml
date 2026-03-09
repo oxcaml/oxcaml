@@ -19,8 +19,8 @@ let f l = { fold = List.fold_left l };;
 type 'a t = { t : 'a; }
 type 'a fold = { fold : 'b. f:('b -> 'a -> 'b) -> init:'b -> 'b; }
 val f :
-  'a list @ [< 'n.future & global many uncontended > 'm.future] ->
-  'a fold @ [< 'm.future & global > 'n.future | nonportable] = <fun>
+  'a list @ [< 'n @@ past & global many uncontended > 'm] ->
+  'a fold @ [< 'm @@ past & global > 'n | nonportable] = <fun>
 - : int = 6
 |}];;
 
@@ -470,8 +470,8 @@ val cp : color_point = <obj>
 val c : circle = <obj>
 val d : float = 11.
 val f :
-  < m : 'a. 'a -> 'a > @ [< 'm mod aliased] ->
-  < m : 'b. 'b -> 'b > @ [< global > 'm mod global many] = <fun>
+  < m : 'a. 'a -> 'a > @ [< 'm . aliased] ->
+  < m : 'b. 'b -> 'b > @ [< global > 'm @@ global many] = <fun>
 Line 9, characters 41-42:
 9 | let f (x : < m : 'a. 'a -> 'a list >) = (x : < m : 'b. 'b -> 'c >)
                                              ^
@@ -805,8 +805,8 @@ val count :
   'a #olist @ [< uncontended] -> int @ [< global > aliased nonportable] =
   <fun>
 val append :
-  'a #olist @ [< 'm.future & global uncontended] ->
-  (('a #olist as 'b) @ [< uncontended] -> 'b) @ [< global > 'm.future | nonportable] =
+  'a #olist @ [< 'm @@ past & global uncontended] ->
+  (('a #olist as 'b) @ [< uncontended] -> 'b) @ [< global > 'm | nonportable] =
   <fun>
 |}];;
 
@@ -875,20 +875,18 @@ let f (x: <m:'a.<p: 'a * 'b> as 'b>) (y : 'b) = ();;
 let f (x: <m:'a. 'a * (<p:int*'b> as 'b)>) (y : 'b) = ();;
 [%%expect {|
 val f :
-  < m : 'a. < p : 'a * 'c > as 'c > @ [< 'm.future] ->
-  ('b @ 'n -> unit @ [< global]) @ [< global > 'm.future mod global many] =
-  <fun>
+  < m : 'a. < p : 'a * 'c > as 'c > @ [< 'm @@ past] ->
+  ('b @ 'n -> unit @ [< global]) @ [< global > 'm @@ global many] = <fun>
 val f :
-  < m : 'a. 'a * (< p : int * 'b > as 'b) > @ [< 'm.future] ->
-  ('b @ 'n -> unit @ [< global]) @ [< global > 'm.future mod global many] =
-  <fun>
+  < m : 'a. 'a * (< p : int * 'b > as 'b) > @ [< 'm @@ past] ->
+  ('b @ 'n -> unit @ [< global]) @ [< global > 'm @@ global many] = <fun>
 |}, Principal{|
 val f :
-  < m : 'a. < p : 'a * 'c > as 'c > @ [< 'm.future & global] ->
-  ('b @ 'n -> unit @ [< global]) @ [< global > 'm.future] = <fun>
+  < m : 'a. < p : 'a * 'c > as 'c > @ [< 'm @@ past & global] ->
+  ('b @ 'n -> unit @ [< global]) @ [< global > 'm] = <fun>
 val f :
-  < m : 'a. 'a * (< p : int * 'b > as 'b) > @ [< 'm.future & global] ->
-  ((< p : int * 'c > as 'c) @ 'n -> unit @ [< global]) @ [< global > 'm.future] =
+  < m : 'a. 'a * (< p : int * 'b > as 'b) > @ [< 'm @@ past & global] ->
+  ((< p : int * 'c > as 'c) @ 'n -> unit @ [< global]) @ [< global > 'm] =
   <fun>
 |}];;
 
@@ -1058,14 +1056,14 @@ fun (x : 'a t as 'a) -> (x : 'b t);;
 type u = 'a t as 'a;;
 [%%expect {|
 type 'a t = < a : 'a >
-- : ('a t as 'a) @ [< 'm mod aliased & global] ->
-    'a t @ [< global > 'm mod global many]
+- : ('a t as 'a) @ [< 'm . aliased & global] ->
+    'a t @ [< global > 'm @@ global many]
 = <fun>
 type u = 'a t as 'a
 |}, Principal{|
 type 'a t = < a : 'a >
-- : ('a t as 'a) @ [< 'm mod aliased & global] ->
-    ('b t as 'b) t @ [< global > 'm mod global many]
+- : ('a t as 'a) @ [< 'm . aliased & global] ->
+    ('b t as 'b) t @ [< global > 'm @@ global many]
 = <fun>
 type u = 'a t as 'a
 |}];;
@@ -1263,8 +1261,8 @@ let f x y =
   x = y;;
 [%%expect {|
 val f :
-  (< m : 'a. 'a -> (< m : 'a. 'a -> 'c * <  > > as 'c) * < .. >; .. > as 'b) @ [< global many uncontended > 'n.future] ->
-  ('b @ [< global many uncontended > 'm.future] -> bool @ [< global]) @ [< 'm.future & 'n.future & global > nonportable] =
+  (< m : 'a. 'a -> (< m : 'a. 'a -> 'c * <  > > as 'c) * < .. >; .. > as 'b) @ [< global many uncontended > 'n] ->
+  ('b @ [< global many uncontended > 'm] -> bool @ [< global]) @ [< 'm @@ past & 'n @@ past & global > nonportable] =
   <fun>
 |}];;
 
@@ -1327,14 +1325,14 @@ let f x = if true then [| (x : < m : 'a. 'a -> 'a >) |] else [|x|];;
 fun x -> (f x).(0)#m;; (* Warning 18 *)
 [%%expect {|
 val f :
-  < m : 'a. 'a -> 'a > @ [< 'm mod aliased] ->
-  < m : 'a. 'a -> 'a > @ [< global > 'm mod global many] = <fun>
+  < m : 'a. 'a -> 'a > @ [< 'm . aliased] ->
+  < m : 'a. 'a -> 'a > @ [< global > 'm @@ global many] = <fun>
 - : < m : 'a. 'a -> 'a > @ [< global uncontended] ->
     ('b -> 'b) @ [< global > aliased nonportable]
 = <fun>
 val f :
-  < m : 'a. 'a -> 'a > * 'b @ [< 'm mod aliased] ->
-  < m : 'a. 'a -> 'a > @ [< global > 'm mod global many] = <fun>
+  < m : 'a. 'a -> 'a > * 'b @ [< 'm . aliased] ->
+  < m : 'a. 'a -> 'a > @ [< global > 'm @@ global many] = <fun>
 - : < m : 'a. 'a -> 'a > @ [< global many uncontended] ->
     ('b -> 'b) @ [< global > aliased nonportable]
 = <fun>
@@ -1346,8 +1344,8 @@ val f :
 = <fun>
 |}, Principal{|
 val f :
-  < m : 'a. 'a -> 'a > @ [< 'm & 'm mod aliased & 'n & 'n mod aliased & global] ->
-  < m : 'a. 'a -> 'a > @ [< global > 'm | 'm | 'n mod global many | 'n mod global many] =
+  < m : 'a. 'a -> 'a > @ [< 'm & 'm . aliased & 'n & 'n . aliased & global] ->
+  < m : 'a. 'a -> 'a > @ [< global > 'm | 'm | 'n @@ global many | 'n @@ global many] =
   <fun>
 Line 2, characters 9-16:
 2 | fun x -> (f x)#m;; (* Warning 18 *)
@@ -1358,8 +1356,8 @@ Warning 18 [not-principal]: this use of a polymorphic method is not principal.
     ('b -> 'b) @ [< global > aliased nonportable]
 = <fun>
 val f :
-  < m : 'a. 'a -> 'a > * 'b @ [< 'm & 'm mod aliased & 'n & 'n mod aliased & global] ->
-  < m : 'a. 'a -> 'a > @ [< global > 'm | 'm | 'n mod global many | 'n mod global many] =
+  < m : 'a. 'a -> 'a > * 'b @ [< 'm & 'm . aliased & 'n & 'n . aliased & global] ->
+  < m : 'a. 'a -> 'a > @ [< global > 'm | 'm | 'n @@ global many | 'n @@ global many] =
   <fun>
 Line 4, characters 9-20:
 4 | fun x -> (f (x,x))#m;; (* Warning 18 *)
@@ -1370,8 +1368,8 @@ Warning 18 [not-principal]: this use of a polymorphic method is not principal.
     ('b -> 'b) @ [< global > aliased nonportable]
 = <fun>
 val f :
-  < m : 'a. 'a -> 'a > @ [< global many > 'm.future] ->
-  < m : 'a. 'a -> 'a > array @ [< 'm.future & global > nonportable] = <fun>
+  < m : 'a. 'a -> 'a > @ [< global many > 'm] ->
+  < m : 'a. 'a -> 'a > array @ [< 'm @@ past & global > nonportable] = <fun>
 Line 6, characters 9-20:
 6 | fun x -> (f x).(0)#m;; (* Warning 18 *)
              ^^^^^^^^^^^
@@ -1527,8 +1525,8 @@ and transf_alist : 'a. _ -> ('a*t) list -> ('a*t) list = fun f -> function
 ;;
 [%%expect {|
 val transf :
-  (int @ 'n -> t @ [< 'm & global]) @ [< 'p.future & global many uncontended > 'o.future | aliased nonportable] ->
-  (t @ [< global > aliased] -> t @ [< global > 'm | aliased]) @ [< 'o.future & global > 'p.future | nonportable] =
+  (int @ 'n -> t @ [< 'm & global]) @ [< 'p @@ past & global many uncontended > 'o | aliased nonportable] ->
+  (t @ [< global > aliased] -> t @ [< global > 'm | aliased]) @ [< 'o @@ past & global > 'p | nonportable] =
   <fun>
 val transf_alist :
   (int @ 'm -> t @ [< global]) -> ('a * t) list -> ('a * t) list = <fun>
@@ -1674,8 +1672,8 @@ let f (n : < m : 'a 'r. [< `Foo of 'a & int | `Bar] as 'r >) =
   (n : < m : 'b 'r. [< `Foo of 'b & int | `Bar] as 'r >)
 [%%expect{|
 val f :
-  < m : 'a 'c. [< `Bar | `Foo of 'a & int ] as 'c > @ [< 'm mod aliased] ->
-  < m : 'b 'd. [< `Bar | `Foo of 'b & int ] as 'd > @ [< global > 'm mod global many] =
+  < m : 'a 'c. [< `Bar | `Foo of 'a & int ] as 'c > @ [< 'm . aliased] ->
+  < m : 'b 'd. [< `Bar | `Foo of 'b & int ] as 'd > @ [< global > 'm @@ global many] =
   <fun>
 |}]
 (* fail? *)
@@ -1697,8 +1695,8 @@ let f (n : < m : 'a. [< `Foo of 'a & int | `Bar] >) =
   (n : < m : 'b. [< `Foo of 'b & int | `Bar] >)
 [%%expect{|
 val f :
-  < m : 'c 'a. [< `Bar | `Foo of 'a & int ] as 'c > @ [< 'm mod aliased] ->
-  < m : 'd 'b. [< `Bar | `Foo of 'b & int ] as 'd > @ [< global > 'm mod global many] =
+  < m : 'c 'a. [< `Bar | `Foo of 'a & int ] as 'c > @ [< 'm . aliased] ->
+  < m : 'd 'b. [< `Bar | `Foo of 'b & int ] as 'd > @ [< global > 'm @@ global many] =
   <fun>
 |}]
 
@@ -1736,15 +1734,15 @@ type 'a t = V1 of 'a
 type ('c, 't) pvariant = [ `V of 'c * 't t ]
 class ['c] clss : object method mthod : 'c -> 't t -> ('c, 't) pvariant end
 val f2 :
-  'a @ [< 'm.future & global] ->
-  ('b @ [< 'n.future & global] ->
-   ('c t @ [< 'o & global] -> 'c t @ [< global > 'o]) @ [< global > 'n.future]) @ [< global > 'm.future] =
+  'a @ [< 'm @@ past & global] ->
+  ('b @ [< 'n @@ past & global] ->
+   ('c t @ [< 'o & global] -> 'c t @ [< global > 'o]) @ [< global > 'n]) @ [< global > 'm] =
   <fun>
 val f1 :
   < mthod : 't. 'a -> 't t -> [< `V of 'a * 't t ]; .. > @ [< global many uncontended] ->
-  ('a @ [< global many uncontended > 'p.future | 'n.future] ->
-   ('b t @ [< 'q & global many uncontended > 'o.future | 'm.future] ->
-    'b t @ [< global > 'q | aliased]) @ [< 'o.future & 'p.future & global > nonportable]) @ [< 'm.future & 'n.future & global > nonportable] =
+  ('a @ [< global many uncontended > 'p | 'n] ->
+   ('b t @ [< 'q & global many uncontended > 'o | 'm] ->
+    'b t @ [< global > 'q | aliased]) @ [< 'o @@ past & 'p @@ past & global > nonportable]) @ [< 'm @@ past & 'n @@ past & global > nonportable] =
   <fun>
 |}]
 
@@ -1780,8 +1778,8 @@ let c (f : u -> u) =
 type u
 type 'a t = u
 val c :
-  (u -> u) @ [< global many > 'm.future] ->
-  < apply : 'a. u -> u > @ [< 'm.future & global > aliased nonportable] =
+  (u -> u) @ [< global many > 'm] ->
+  < apply : 'a. u -> u > @ [< 'm @@ past & global > aliased nonportable] =
   <fun>
 |}]
 
@@ -1793,11 +1791,11 @@ type t = { x : 'a. ([< `Foo of int & float ] as 'a) -> unit };;
 let f t = { x = t.x };;
 [%%expect{|
 val f :
-  < m : 'a. ([< `Foo of int & float ] as 'a) -> unit > @ [< 'm mod aliased] ->
-  < m : 'b. ([< `Foo of int & float ] as 'b) -> unit > @ [< global > 'm mod global many] =
+  < m : 'a. ([< `Foo of int & float ] as 'a) -> unit > @ [< 'm . aliased] ->
+  < m : 'b. ([< `Foo of int & float ] as 'b) -> unit > @ [< global > 'm @@ global many] =
   <fun>
 type t = { x : 'a. ([< `Foo of int & float ] as 'a) -> unit; }
-val f : t @ [< 'm mod aliased contended & global] -> t @ [< global > 'm] =
+val f : t @ [< 'm . aliased contended & global] -> t @ [< global > 'm] =
   <fun>
 |}]
 
@@ -1900,9 +1898,9 @@ Error: Illegal open object type
 let g = fun (y : ('a * 'b)) x -> (x : < <m: 'a> ; <m: 'b> >)
 [%%expect{|
 val g :
-  'a * 'a @ [< 'm.future & global] ->
-  (< m : 'a > @ [< 'n mod aliased] ->
-   < m : 'a > @ [< global > 'n mod global many]) @ [< global > 'm.future] =
+  'a * 'a @ [< 'm @@ past & global] ->
+  (< m : 'a > @ [< 'n . aliased] ->
+   < m : 'a > @ [< global > 'n @@ global many]) @ [< global > 'm] =
   <fun>
 |}]
 
@@ -1973,17 +1971,17 @@ class d = object (self) inherit c method n' = self#m () end;;
 class c :
   object
     method m :
-      ?x:int @ [< 'mm1 & 'mm1 & 'mm1 & 'mm1 & 'p.future & 'q.future & 'p.future & 'q.future & global many uncontended > 'mm0 | 'mm0 | 'n.future] ->
-      (unit @ 'mm2 ->
-       int @ [< global many uncontended > 'o | 'o | 'm.future | 'mm1 | 'mm1 | 'mm1 | 'mm1]) @ [< 'm.future & 'n.future & global > close('o) | close('o) | 'p.future | 'q.future | 'p.future | 'q.future | monadic_to_comonadic_min('mm0) | monadic_to_comonadic_min('mm0) | nonportable]
+      ?x:int @ [< 'o & 'o & 'o & 'o & global many uncontended > 'n] ->
+      (unit @ 'p ->
+       int @ [< global many uncontended > 'm | 'o | 'o | 'o | 'o]) @ [< 'm @@ past & 'n @@ past & global > close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | nonportable]
     method n : int
   end
 class d :
   object
     method m :
-      ?x:int @ [< 'mm1 & 'mm1 & 'mm1 & 'mm1 & 'mm1 & 'mm1 & 'mm1 & 'mm1 & 'mm1 & 'p.future & 'q.future & 'p.future & 'q.future & 'p.future & 'q.future & global many uncontended > 'mm0 | 'mm0 | 'mm0 | 'mm0 | 'mm0 | 'mm0 | 'n.future] ->
-      (unit @ 'mm2 ->
-       int @ [< global many uncontended > 'o | 'o | 'o | 'm.future | 'mm1 | 'mm1 | 'mm1 | 'mm1 | 'mm1 | 'mm1 | 'mm1 | 'mm1 | 'mm1]) @ [< 'm.future & 'n.future & global > close('o) | close('o) | close('o) | 'p.future | 'q.future | 'p.future | 'q.future | 'p.future | 'q.future | monadic_to_comonadic_min('mm0) | monadic_to_comonadic_min('mm0) | monadic_to_comonadic_min('mm0) | monadic_to_comonadic_min('mm0) | monadic_to_comonadic_min('mm0) | monadic_to_comonadic_min('mm0) | nonportable]
+      ?x:int @ [< 'o & 'o & 'o & 'o & 'o & 'o & 'o & 'o & 'o & global many uncontended > 'n] ->
+      (unit @ 'p ->
+       int @ [< global many uncontended > 'm | 'o | 'o | 'o | 'o | 'o | 'o | 'o | 'o | 'o]) @ [< 'm @@ past & 'n @@ past & global > close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | nonportable]
     method n : int
     method n' : int
   end

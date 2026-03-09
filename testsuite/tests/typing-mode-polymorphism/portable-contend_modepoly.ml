@@ -88,7 +88,7 @@ let foo (r @ contended) = r.b
 [%%expect{|
 val foo :
   r @ [< 'm & global > contended] ->
-  bytes @ [< global > 'm mod many portable | contended] = <fun>
+  bytes @ [< global > 'm @@ many portable | contended] = <fun>
 |}]
 
 (* reading immutable field from corrupted record is fine *)
@@ -96,7 +96,7 @@ let foo (r @ corrupted) = r.b
 [%%expect{|
 val foo :
   r @ [< 'm & global corrupted > corrupted] ->
-  bytes @ [< global > 'm mod many portable | corrupted] = <fun>
+  bytes @ [< global > 'm @@ many portable | corrupted] = <fun>
 |}]
 
 (* reading immutable field from shared record is fine *)
@@ -104,7 +104,7 @@ let foo (r @ shared) = r.b
 [%%expect{|
 val foo :
   r @ [< 'm & global shared > shared] ->
-  bytes @ [< global > 'm mod many portable | shared] = <fun>
+  bytes @ [< global > 'm @@ many portable | shared] = <fun>
 |}]
 
 let foo (r @ shared) = {r with a = best_bytes ()}
@@ -543,8 +543,8 @@ let foo (x : int @ nonportable) (y : int @ contended) =
     ()
 [%%expect{|
 val foo :
-  int @ [< 'm.future & global > nonportable] ->
-  (int @ [> contended] -> unit @ [< global]) @ [< global > 'm.future | nonportable] =
+  int @ [< 'm @@ past & global > nonportable] ->
+  (int @ [> contended] -> unit @ [< global]) @ [< global > 'm | nonportable] =
   <fun>
 |}]
 
@@ -640,7 +640,7 @@ let foo (r @ corrupted) = r.b
 [%%expect{|
 val foo :
   r @ [< 'm & global corrupted > corrupted] ->
-  bytes @ [< global > 'm mod many portable | corrupted] = <fun>
+  bytes @ [< global > 'm @@ many portable | corrupted] = <fun>
 |}]
 
 (* TESTING corruptible mode *)
@@ -768,7 +768,7 @@ let f (x @ uncontended) = { shared = x }
 
 [%%expect{|
 val f :
-  'a @ [< 'm mod shared & global uncontended] -> 'a shared @ [< global > 'm] =
+  'a @ [< 'm . shared & global uncontended] -> 'a shared @ [< global > 'm] =
   <fun>
 |}]
 
@@ -776,7 +776,7 @@ let f (x @ shared) = { shared = x }
 
 [%%expect{|
 val f :
-  'a @ [< 'm mod shared & global shared > shared] ->
+  'a @ [< 'm . shared & global shared > shared] ->
   'a shared @ [< global > 'm] = <fun>
 |}]
 
@@ -784,7 +784,7 @@ let f (x @ corrupted) = { shared = x }
 
 [%%expect{|
 val f :
-  'a @ [< 'm mod shared & global corrupted > corrupted] ->
+  'a @ [< 'm . shared & global corrupted > corrupted] ->
   'a shared @ [< global > 'm | corrupted] = <fun>
 |}]
 
@@ -792,7 +792,7 @@ let f (x @ contended) = { shared = x }
 
 [%%expect{|
 val f :
-  'a @ [< 'm mod shared & global > contended] ->
+  'a @ [< 'm . shared & global > contended] ->
   'a shared @ [< global > 'm | corrupted] = <fun>
 |}]
 
@@ -800,7 +800,7 @@ let f (x @ uncontended) = { corrupted = x }
 
 [%%expect{|
 val f :
-  'a @ [< 'm mod corrupted & global uncontended] ->
+  'a @ [< 'm . corrupted & global uncontended] ->
   'a corrupted @ [< global > 'm] = <fun>
 |}]
 
@@ -808,7 +808,7 @@ let f (x @ shared) = { corrupted = x }
 
 [%%expect{|
 val f :
-  'a @ [< 'm mod corrupted & global shared > shared] ->
+  'a @ [< 'm . corrupted & global shared > shared] ->
   'a corrupted @ [< global > 'm | shared] = <fun>
 |}]
 
@@ -816,7 +816,7 @@ let f (x @ corrupted) = { corrupted = x }
 
 [%%expect{|
 val f :
-  'a @ [< 'm mod corrupted & global corrupted > corrupted] ->
+  'a @ [< 'm . corrupted & global corrupted > corrupted] ->
   'a corrupted @ [< global > 'm] = <fun>
 |}]
 
@@ -824,7 +824,7 @@ let f (x @ contended) = { corrupted = x }
 
 [%%expect{|
 val f :
-  'a @ [< 'm mod corrupted & global > contended] ->
+  'a @ [< 'm . corrupted & global > contended] ->
   'a corrupted @ [< global > 'm | shared] = <fun>
 |}]
 
@@ -832,7 +832,7 @@ let f (x @ uncontended) = { contended = x }
 
 [%%expect{|
 val f :
-  'a @ [< 'm mod contended & global uncontended] ->
+  'a @ [< 'm . contended & global uncontended] ->
   'a contended @ [< global > 'm] = <fun>
 |}]
 
@@ -840,7 +840,7 @@ let f (x @ shared) = { contended = x }
 
 [%%expect{|
 val f :
-  'a @ [< 'm mod contended & global shared > shared] ->
+  'a @ [< 'm . contended & global shared > shared] ->
   'a contended @ [< global > 'm] = <fun>
 |}]
 
@@ -848,7 +848,7 @@ let f (x @ corrupted) = { contended = x }
 
 [%%expect{|
 val f :
-  'a @ [< 'm mod contended & global corrupted > corrupted] ->
+  'a @ [< 'm . contended & global corrupted > corrupted] ->
   'a contended @ [< global > 'm] = <fun>
 |}]
 
@@ -856,7 +856,7 @@ let f (x @ contended) = { contended = x }
 
 [%%expect{|
 val f :
-  'a @ [< 'm mod contended & global > contended] ->
+  'a @ [< 'm . contended & global > contended] ->
   'a contended @ [< global > 'm] = <fun>
 |}]
 
@@ -1198,7 +1198,7 @@ let f { shareable = x } = (x : @ nonportable)
 [%%expect{|
 val f :
   'a shareable @ [< 'm & global] ->
-  'a @ [< global > 'm mod shareable | nonportable] = <fun>
+  'a @ [< global > 'm @@ shareable | nonportable] = <fun>
 |}]
 
 let f { shareable = x } = (x : @ shareable)
@@ -1206,7 +1206,7 @@ let f { shareable = x } = (x : @ shareable)
 [%%expect{|
 val f :
   'a shareable @ [< 'm & global] ->
-  'a @ [< global > 'm mod shareable | shareable] = <fun>
+  'a @ [< global > 'm @@ shareable | shareable] = <fun>
 |}]
 
 let f { shareable = x } = (x : @ corruptible)
@@ -1214,7 +1214,7 @@ let f { shareable = x } = (x : @ corruptible)
 [%%expect{|
 val f :
   'a shareable @ [< 'm & global corruptible] ->
-  'a @ [< global > 'm mod shareable | corruptible] = <fun>
+  'a @ [< global > 'm @@ shareable | corruptible] = <fun>
 |}]
 
 let f { shareable = x } = (x : @ portable)
@@ -1222,7 +1222,7 @@ let f { shareable = x } = (x : @ portable)
 [%%expect{|
 val f :
   'a shareable @ [< 'm & global corruptible] ->
-  'a @ [< global > 'm mod shareable] = <fun>
+  'a @ [< global > 'm @@ shareable] = <fun>
 |}]
 
 let f { corruptible = x } = (x : @ nonportable)
@@ -1230,7 +1230,7 @@ let f { corruptible = x } = (x : @ nonportable)
 [%%expect{|
 val f :
   'a corruptible @ [< 'm & global] ->
-  'a @ [< global > 'm mod corruptible | nonportable] = <fun>
+  'a @ [< global > 'm @@ corruptible | nonportable] = <fun>
 |}]
 
 let f { corruptible = x } = (x : @ shareable)
@@ -1238,7 +1238,7 @@ let f { corruptible = x } = (x : @ shareable)
 [%%expect{|
 val f :
   'a corruptible @ [< 'm & global shareable] ->
-  'a @ [< global > 'm mod corruptible | shareable] = <fun>
+  'a @ [< global > 'm @@ corruptible | shareable] = <fun>
 |}]
 
 let f { corruptible = x } = (x : @ corruptible)
@@ -1246,7 +1246,7 @@ let f { corruptible = x } = (x : @ corruptible)
 [%%expect{|
 val f :
   'a corruptible @ [< 'm & global] ->
-  'a @ [< global > 'm mod corruptible | corruptible] = <fun>
+  'a @ [< global > 'm @@ corruptible | corruptible] = <fun>
 |}]
 
 let f { corruptible = x } = (x : @ portable)
@@ -1254,7 +1254,7 @@ let f { corruptible = x } = (x : @ portable)
 [%%expect{|
 val f :
   'a corruptible @ [< 'm & global shareable] ->
-  'a @ [< global > 'm mod corruptible] = <fun>
+  'a @ [< global > 'm @@ corruptible] = <fun>
 |}]
 
 let f { portable = x } = (x : @ nonportable)
@@ -1262,7 +1262,7 @@ let f { portable = x } = (x : @ nonportable)
 [%%expect{|
 val f :
   'a portable @ [< 'm & global] ->
-  'a @ [< global > 'm mod portable | nonportable] = <fun>
+  'a @ [< global > 'm @@ portable | nonportable] = <fun>
 |}]
 
 let f { portable = x } = (x : @ shareable)
@@ -1270,7 +1270,7 @@ let f { portable = x } = (x : @ shareable)
 [%%expect{|
 val f :
   'a portable @ [< 'm & global] ->
-  'a @ [< global > 'm mod portable | shareable] = <fun>
+  'a @ [< global > 'm @@ portable | shareable] = <fun>
 |}]
 
 let f { portable = x } = (x : @ corruptible)
@@ -1278,13 +1278,13 @@ let f { portable = x } = (x : @ corruptible)
 [%%expect{|
 val f :
   'a portable @ [< 'm & global] ->
-  'a @ [< global > 'm mod portable | corruptible] = <fun>
+  'a @ [< global > 'm @@ portable | corruptible] = <fun>
 |}]
 
 let f { portable = x } = (x : @ portable)
 
 [%%expect{|
-val f : 'a portable @ [< 'm & global] -> 'a @ [< global > 'm mod portable] =
+val f : 'a portable @ [< 'm & global] -> 'a @ [< global > 'm @@ portable] =
   <fun>
 |}]
 
@@ -1457,7 +1457,7 @@ let f ({ shareable } @ nonportable) = (shareable : @ shareable)
 [%%expect{|
 val f :
   'a shareable @ [< 'm & global > nonportable] ->
-  'a @ [< global > 'm mod shareable | shareable] = <fun>
+  'a @ [< global > 'm @@ shareable | shareable] = <fun>
 |}]
 
 let f ({ shareable } @ shareable) = (shareable : @ shareable)
@@ -1465,7 +1465,7 @@ let f ({ shareable } @ shareable) = (shareable : @ shareable)
 [%%expect{|
 val f :
   'a shareable @ [< 'm & global shareable > shareable] ->
-  'a @ [< global > 'm mod shareable | shareable] = <fun>
+  'a @ [< global > 'm @@ shareable | shareable] = <fun>
 |}]
 
 let f ({ shareable } @ corruptible) = (shareable : @ portable)
@@ -1473,7 +1473,7 @@ let f ({ shareable } @ corruptible) = (shareable : @ portable)
 [%%expect{|
 val f :
   'a shareable @ [< 'm & global corruptible > corruptible] ->
-  'a @ [< global > 'm mod shareable] = <fun>
+  'a @ [< global > 'm @@ shareable] = <fun>
 |}]
 
 let f ({ shareable } @ portable) = (shareable : @ portable)
@@ -1481,7 +1481,7 @@ let f ({ shareable } @ portable) = (shareable : @ portable)
 [%%expect{|
 val f :
   'a shareable @ [< 'm & global portable] ->
-  'a @ [< global > 'm mod shareable] = <fun>
+  'a @ [< global > 'm @@ shareable] = <fun>
 |}]
 
 let f ({ corruptible } @ nonportable) = (corruptible : @ corruptible)
@@ -1489,7 +1489,7 @@ let f ({ corruptible } @ nonportable) = (corruptible : @ corruptible)
 [%%expect{|
 val f :
   'a corruptible @ [< 'm & global > nonportable] ->
-  'a @ [< global > 'm mod corruptible | corruptible] = <fun>
+  'a @ [< global > 'm @@ corruptible | corruptible] = <fun>
 |}]
 
 let f ({ corruptible } @ shareable) = (corruptible : @ portable)
@@ -1497,7 +1497,7 @@ let f ({ corruptible } @ shareable) = (corruptible : @ portable)
 [%%expect{|
 val f :
   'a corruptible @ [< 'm & global shareable > shareable] ->
-  'a @ [< global > 'm mod corruptible] = <fun>
+  'a @ [< global > 'm @@ corruptible] = <fun>
 |}]
 
 let f ({ corruptible } @ corruptible) = (corruptible : @ corruptible)
@@ -1505,7 +1505,7 @@ let f ({ corruptible } @ corruptible) = (corruptible : @ corruptible)
 [%%expect{|
 val f :
   'a corruptible @ [< 'm & global corruptible > corruptible] ->
-  'a @ [< global > 'm mod corruptible | corruptible] = <fun>
+  'a @ [< global > 'm @@ corruptible | corruptible] = <fun>
 |}]
 
 let f ({ corruptible } @ portable) = (corruptible : @ portable)
@@ -1513,7 +1513,7 @@ let f ({ corruptible } @ portable) = (corruptible : @ portable)
 [%%expect{|
 val f :
   'a corruptible @ [< 'm & global portable] ->
-  'a @ [< global > 'm mod corruptible] = <fun>
+  'a @ [< global > 'm @@ corruptible] = <fun>
 |}]
 
 let f ({ portable } @ nonportable) = (portable : @ portable)
@@ -1521,7 +1521,7 @@ let f ({ portable } @ nonportable) = (portable : @ portable)
 [%%expect{|
 val f :
   'a portable @ [< 'm & global > nonportable] ->
-  'a @ [< global > 'm mod portable] = <fun>
+  'a @ [< global > 'm @@ portable] = <fun>
 |}]
 
 let f ({ portable } @ shareable) = (portable : @ portable)
@@ -1529,7 +1529,7 @@ let f ({ portable } @ shareable) = (portable : @ portable)
 [%%expect{|
 val f :
   'a portable @ [< 'm & global shareable > shareable] ->
-  'a @ [< global > 'm mod portable] = <fun>
+  'a @ [< global > 'm @@ portable] = <fun>
 |}]
 
 let f ({ portable } @ corruptible) = (portable : @ portable)
@@ -1537,14 +1537,14 @@ let f ({ portable } @ corruptible) = (portable : @ portable)
 [%%expect{|
 val f :
   'a portable @ [< 'm & global corruptible > corruptible] ->
-  'a @ [< global > 'm mod portable] = <fun>
+  'a @ [< global > 'm @@ portable] = <fun>
 |}]
 
 let f ({ portable } @ portable) = (portable : @ portable)
 
 [%%expect{|
 val f :
-  'a portable @ [< 'm & global portable] -> 'a @ [< global > 'm mod portable] =
+  'a portable @ [< 'm & global portable] -> 'a @ [< global > 'm @@ portable] =
   <fun>
 |}]
 

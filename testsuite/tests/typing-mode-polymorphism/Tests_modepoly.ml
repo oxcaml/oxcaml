@@ -6,10 +6,10 @@
 (* Subtyping is "syntactic" *)
 fun (x : < x : int >) y z -> (y :> 'a), (x :> 'a), (z :> 'a);;
 [%%expect{|
-- : < x : int > @ [< 'mm1 mod aliased & 'n.future & global] ->
-    (< x : int > @ [< 'mm0 & 'p.future & global] ->
-     (< x : int > @ [< 'q & global] ->
-      < x : int > * < x : int > * < x : int > @ [< global > 'o | 'm | 'q | 'mm0 | 'mm1 mod global many]) @ [> close('o) | 'p.future | local]) @ [> close('m) mod many | 'n.future | local]
+- : < x : int > @ [< 'm . aliased & global] ->
+    (< x : int > @ [< 'n & global] ->
+     (< x : int > @ [< 'o & global] ->
+      < x : int > * < x : int > * < x : int > @ [< global > 'o | 'n | 'm @@ global many]) @ [> close('n) | local]) @ [> close('m) @@ many | local]
 = <fun>
 |}];;
 (* - : (< x : int > as 'a) -> 'a -> 'a * 'a = <fun> *)
@@ -161,8 +161,8 @@ class ['a, 'b] c :
     constraint 'a = int -> 'c
     constraint 'b = 'a * < x : 'b > * 'c * 'd
     method f :
-      'a @ [< 'm.future & 'm.future & 'm.future & global] ->
-      ('b @ 'n -> unit @ [< global]) @ [< global > 'm.future | 'm.future | 'm.future]
+      'a @ [< 'm @@ past & 'm @@ past & 'm @@ past & global] ->
+      ('b @ 'n -> unit @ [< global]) @ [< global > 'm | 'm | 'm]
   end
 |}];;
 class ['a, 'b] d () = object
@@ -175,8 +175,8 @@ class ['a, 'b] d :
     constraint 'a = int -> 'd
     constraint 'b = 'a * (< x : 'b > as 'c) * 'd * 'e
     method f :
-      (int -> 'd) @ [< 'm.future & 'm.future & 'm.future & global] ->
-      ((int -> 'd) * 'c * 'd * 'e @ 'n -> unit @ [< global]) @ [< global > 'm.future | 'm.future | 'm.future]
+      (int -> 'd) @ [< 'm @@ past & 'm @@ past & 'm @@ past & global] ->
+      ((int -> 'd) * 'c * 'd * 'e @ 'n -> unit @ [< global]) @ [< global > 'm | 'm | 'm]
   end
 |}];;
 
@@ -276,14 +276,14 @@ type 'a u = 'a
 |}];;
 fun (x : t) (y : 'a u) -> x = y;;
 [%%expect{|
-- : t @ [< 'm.future & global uncontended] ->
-    (t u @ [< global many uncontended] -> bool @ [< global]) @ [> 'm.future | local nonportable]
+- : t @ [< 'm @@ past & global uncontended] ->
+    (t u @ [< global many uncontended] -> bool @ [< global]) @ [> 'm | local nonportable]
 = <fun>
 |}];;
 fun (x : t) (y : 'a u) -> y = x;;
 [%%expect{|
-- : t @ [< 'm.future & global uncontended] ->
-    (t u @ [< global many uncontended] -> bool @ [< global]) @ [> 'm.future | local nonportable]
+- : t @ [< 'm @@ past & global uncontended] ->
+    (t u @ [< global many uncontended] -> bool @ [< global]) @ [> 'm | local nonportable]
 = <fun>
 |}];;
 (* - : t -> t u -> bool = <fun> *)
@@ -721,15 +721,15 @@ Lines 1-3, characters 12-3:
 3 | end......
 Error: Signature mismatch:
        Modules do not match:
-         sig val f : (#c as 'a) @ [< 'm mod aliased] -> 'a end
+         sig val f : (#c as 'a) @ [< 'm . aliased] -> 'a end
        is not included in
          sig val f : #c -> #c end
        Values do not match:
-         val f : (#c as 'a) @ [< 'm mod aliased] -> 'a
+         val f : (#c as 'a) @ [< 'm . aliased] -> 'a
        is not included in
          val f : #c -> #c
        The type
-         "(#c as 'a) @ [< 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased & 'm mod aliased] ->
+         "(#c as 'a) @ [< 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased & 'm . aliased] ->
          'a"
        is not compatible with the type "#c -> #c"
        Type "#c as 'a" = "< m : 'a; .. >" is not compatible with type
@@ -770,14 +770,13 @@ Error: Type "int -> bool" is not a subtype of "int -> int"
 |}];;
 fun x -> (x : < > :> < .. >);;
 [%%expect{|
-- : <  > @ [< 'm mod aliased & global] ->
-    <  > @ [< global > 'm mod global many]
+- : <  > @ [< 'm . aliased & global] -> <  > @ [< global > 'm @@ global many]
 = <fun>
 |}];;
 fun x -> (x : < .. > :> < >);;
 [%%expect{|
-- : < .. > @ [< 'm mod aliased & global] ->
-    <  > @ [< global > 'm mod global many]
+- : < .. > @ [< 'm . aliased & global] ->
+    <  > @ [< global > 'm @@ global many]
 = <fun>
 |}];;
 

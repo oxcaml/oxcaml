@@ -241,9 +241,9 @@ module type S = sig type t end
 module type F = functor (M : S) -> sig type t = M.t end
 module type S' = sig type _ t_aux type t val eq : (t, unit t_aux) eq end
 val cast_functor_argument_under_equality :
-  (module S' with type t = 't) @ [< 'm.future & global many] ->
+  (module S' with type t = 't) @ [< 'm @@ past & global many] ->
   ((module F) @ [< many] ->
-   (module S with type t = 't) @ [< global > aliased]) @ [< global > 'm.future] =
+   (module S with type t = 't) @ [< global > aliased]) @ [< global > 'm] =
   <fun>
 |}]
 
@@ -275,9 +275,9 @@ module type F =
   functor (M : S) -> sig module type S = sig type t = M.t end end
 module type S' = sig type _ t_aux type t val eq : (t, unit t_aux) eq end
 val cast_functor_argument_signature_under_equality :
-  (module S' with type t = 't) @ [< 'm.future & global many] ->
+  (module S' with type t = 't) @ [< 'm @@ past & global many] ->
   ((module F) @ [< many] ->
-   (module S with type t = 't) @ [< global > aliased]) @ [< global > 'm.future] =
+   (module S with type t = 't) @ [< global > aliased]) @ [< global > 'm] =
   <fun>
 |}]
 
@@ -290,9 +290,9 @@ let cast_double_functor_argument_signature_under_equality (type t)
   (module (O : F(M).S) : F(M).S)
 [%%expect {|
 val cast_double_functor_argument_signature_under_equality :
-  (module S' with type t = 't) @ [< 'm.future & global many] ->
+  (module S' with type t = 't) @ [< 'm @@ past & global many] ->
   ((module F) @ [< many] ->
-   (module S with type t = 't) @ [< global > aliased]) @ [< global > 'm.future] =
+   (module S with type t = 't) @ [< global > aliased]) @ [< global > 'm] =
   <fun>
 |}]
 
