@@ -3094,7 +3094,7 @@ let reintroduce_fail sw =
            (* Pick the miminal [i] which has maximal [c], and not just
               the first [i], as the Hashtbl iteration order is not
               deterministic: see #14088. *)
-            i_max := Some (Static_label.min i (Option.value ~default:i !i_max));
+            i_max := Some (Static_label.min i (Option.get !i_max));
           ))
         t;
       if !c_max >= 3 then
