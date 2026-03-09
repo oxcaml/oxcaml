@@ -5527,6 +5527,10 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
   try
     match (get_desc t1, get_desc t2) with
       (Tvar { jkind }, _) when may_instantiate inst_nongen t1 ->
+        let t2 =
+          try try_quote_splice_cancel t2
+          with Cannot_expand -> t2
+        in
         moregen_occur env (get_level t1) t2;
         update_scope_for Moregen (get_scope t1) t2;
         occur_for Moregen (Expression {env; in_subst = false}) t1 t2;

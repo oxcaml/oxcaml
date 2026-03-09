@@ -317,17 +317,7 @@ val foo7 : 'b -> <[$('a) -> $('a)]> expr = <fun>
 
 let foo7' = (fun (type a) (type b) x -> <[fun (y : $a) -> y]>) 42;;
 [%%expect {|
-Line 1:
-Error: Values do not match:
-         val foo7' : <[$('_a) -> $('_a)]> expr
-       is not included in
-         val foo7' : <[$('_a) -> $('_a)]> expr
-       The type "<[$('_a) -> $('_a)]> expr" is not compatible with the type
-         "<[$('_a) -> $('_a)]> expr"
-       Type "$('_a) -> $('_a)" is not compatible with type
-         "$('_a) -> $('_a)" = "$('_a) -> $('_a)"
-       Type "'_a" is not compatible with type "'_a" = "'_a"
-       The type variable "'a" occurs inside "'a"
+val foo7' : <[$('_a) -> $('_a)]> expr = <[fun (y : _) -> y]>
 |}];;
 
 let foo7'' () = (fun (type a) (type b) x -> <[fun (y : $a) -> y]>) 42;;
