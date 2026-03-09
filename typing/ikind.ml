@@ -148,6 +148,9 @@ module Solver = struct
     (not !Clflags.principal)
     || Types.get_level ty = Btype.generic_level
 
+  let disable_tpoly_principality_hack =
+    Sys.getenv_opt "OXCAML_DISABLE_TPOLY_PRINCIPALITY_HACK" <> None
+
   (* CR jujacobs: we could optimize the join with masks you see below
      using a combined [Ldd.join_with_mask left mask right] operation. *)
 
@@ -480,8 +483,10 @@ module Solver = struct
       | Types.Tpoly (ty, univars) ->
         (* CR ikinds: this is sound but not fully precise.
           Internal ticket 5746. *)
-        kind ~check_principality:false
-          ctx (!instance_poly_for_jkind' univars ty)
+        let ty = !instance_poly_for_jkind' univars ty in
+        if disable_tpoly_principality_hack
+        then kind ctx ty
+        else kind ~check_principality:false ctx ty
       | Types.Tof_kind jkind -> ckind_of_jkind ctx jkind
       | Types.Tobject _ -> Ldd.const Axis_lattice.object_legacy
       | Types.Tfield _ ->
@@ -624,17 +629,9 @@ let validate_immutable_unboxed_label (lbl : Types.label_declaration) =
     failwith
       "ikind: mutable fields in unboxed records are not supported"
 
-(* Build an id-set for quick membership checks on type expressions. *)
-let type_id_set (tys : Types.type_expr list) =
-  let ids = Hashtbl.create (List.length tys) in
-  List.iter
-    (fun ty -> Hashtbl.replace ids (Types.get_id ty) ())
-    tys;
-  ids
-
-(* Gather constructor-local vars from [tys], skipping declaration params. *)
-let collect_type_vars_excluding ~(excluded_ids : ('a, unit) Hashtbl.t)
-    (tys : Types.type_expr list) : (int, Types.type_expr) Hashtbl.t =
+(* Gather constructor-local vars from [tys]. *)
+let collect_type_vars (tys : Types.type_expr list) :
+    (int, Types.type_expr) Hashtbl.t =
   let vars = Hashtbl.create 16 in
   Types.with_type_mark (fun mark ->
     let super = Btype.type_iterators mark in
@@ -645,8 +642,7 @@ let collect_type_vars_excluding ~(excluded_ids : ('a, unit) Hashtbl.t)
             match Types.get_desc ty with
             | Types.Tvar _ | Types.Tunivar _ ->
               let id = Types.get_id ty in
-              if not (Hashtbl.mem excluded_ids id)
-              then Hashtbl.replace vars id ty
+              Hashtbl.replace vars id ty
             | _ -> super.it_type_expr self ty)
       }
     in
@@ -701,7 +697,6 @@ let make_gadt_payload_projector
      - type ('a, 'b) same = C : 'x -> ('x, 'x) same
        First hit wins: ['x] is mapped from the first result arg to kind('a);
        the second occurrence does not overwrite it. *)
-  let decl_param_ids = type_id_set decl_params in
   let fallback ty = Solver.kind ctx ty in
   fun (c : Types.constructor_declaration) ->
     match c.cd_res with
@@ -710,12 +705,10 @@ let make_gadt_payload_projector
       match Types.get_desc res with
       | Types.Tconstr (_, res_args, _) ->
         let payload_tys = Types.tys_of_constr_args c.cd_args in
-        (* Step 1: collect constructor-local vars seen in payload/result. *)
-        let local_vars =
-          collect_type_vars_excluding
-            ~excluded_ids:decl_param_ids
-            (payload_tys @ res_args)
-        in
+        (* Step 1: collect constructor-local vars seen in payload/result.
+           GADT constructor vars are in their own scope, distinct from the
+           type declaration parameters. *)
+        let local_vars = collect_type_vars (payload_tys @ res_args) in
         if Hashtbl.length local_vars = 0
         then fallback
         else
