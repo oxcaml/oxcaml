@@ -30,9 +30,7 @@ val use_global : 'a @ [< global] -> unit @ 'm = <fun>
 
 let fst x y = x
 [%%expect{|
-val fst :
-  'a @ [< 'o & 'n.future] ->
-  ('b @ 'p -> 'a @ [> 'm | 'o]) @ [> close('m) | 'n.future] = <fun>
+val fst : 'a @ [< 'm] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] = <fun>
 |}]
 
 (* n-ary functions will impose locality bounds on arguments, since the middle end
@@ -56,8 +54,8 @@ let bar (once_ x) =
   fst x
 [%%expect{|
 val bar :
-  'a @ [< 'p & 'n.future & global > once] ->
-  ('b @ [< 'q.future > 'q.future] -> 'a @ [< 'o > 'm | 'o | 'p | once]) @ [> close('m) | 'n.future | once] =
+  'a @ [< 'm & global > once] ->
+  ('b @ [< 'o @@ past > 'o] -> 'a @ [< 'n > 'n | 'm | once]) @ [> close('m) | once] =
   <fun>
 |}]
 
@@ -89,11 +87,11 @@ Error: The value "bar1" is "nonportable"
 let many_arguments x y z s t = y
 [%%expect{|
 val many_arguments :
-  'a @ [< 'mm7.future & 'mm2.future & 'p.future & 'm.future] ->
-  ('b @ [< 'mm8 & 'mm6.future & 'mm1.future & 'o.future] ->
-   ('c @ [< 'mm5.future & 'mm0.future] ->
-    ('d @ [< 'mm4.future] ->
-     ('e @ 'mm9 -> 'b @ [> 'mm3 | 'q | 'n | 'mm8]) @ [> close('mm3) | 'mm4.future | 'mm5.future | 'mm6.future | 'mm7.future]) @ [> close('q) | 'mm0.future | 'mm1.future | 'mm2.future]) @ [> close('n) | 'o.future | 'p.future]) @ [> 'm.future] =
+  'a @ [< 'mm2 @@ past & 'q @@ past & 'o @@ past & 'm @@ past] ->
+  ('b @ [< 'n] ->
+   ('c @ [< 'mm1 @@ past & 'p @@ past] ->
+    ('d @ [< 'mm0 @@ past] ->
+     ('e @ 'mm3 -> 'b @ [> 'n]) @ [> close('n) | 'mm0 | 'mm1 | 'mm2]) @ [> close('n) | 'p | 'q]) @ [> close('n) | 'o]) @ [> 'm] =
   <fun>
 |}]
 
@@ -132,9 +130,8 @@ val foo : unit = ()
 
 let fst x = fun y -> x
 [%%expect{|
-val fst :
-  'a @ [< 'o & 'n.future & global] ->
-  ('b @ 'p -> 'a @ [> 'm | 'o]) @ [> close('m) | 'n.future] = <fun>
+val fst : 'a @ [< 'm & global] -> ('b @ 'n -> 'a @ [> 'm]) @ [> close('m)] =
+  <fun>
 |}]
 
 (* x is < global as before *)
@@ -244,10 +241,9 @@ Error: The value "bar1" is "nonportable"
 let nest x = fun () -> fun () -> fun () -> x
 [%%expect{|
 val nest :
-  'a @ [< 'mm1 & 'mm0.future & 'p.future & 'n.future & global] ->
-  (unit @ 'mm4 ->
-   (unit @ 'mm3 ->
-    (unit @ 'mm2 -> 'a @ [> 'q | 'o | 'm | 'mm1]) @ [> close('q) | 'mm0.future]) @ [> close('o) | 'p.future]) @ [> close('m) | 'n.future] =
+  'a @ [< 'm & global] ->
+  (unit @ 'p ->
+   (unit @ 'o -> (unit @ 'n -> 'a @ [> 'm]) @ [> close('m)]) @ [> close('m)]) @ [> close('m)] =
   <fun>
 |}]
 

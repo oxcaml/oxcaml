@@ -66,8 +66,8 @@ Error: This value is "nonportable" but is expected to be "portable".
 let apply f = fun x -> f x
 [%%expect{|
 val apply :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o.future & global] ->
-  ('a @ [< 'n] -> 'b @ [> 'm]) @ [> 'o.future] = <fun>
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global] ->
+  ('a @ [< 'n] -> 'b @ [> 'm]) @ [> 'o] = <fun>
 |}]
 
 let foo (x @ unique) (y @ aliased) =
@@ -100,9 +100,9 @@ Error: This value is "nonportable" but is expected to be "portable".
 let compose f g x = f (g x)
 [%%expect{|
 val compose :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'mm0.future & 'o.future] ->
-  (('c @ [> 'p] -> 'a @ [< 'n & global]) @ [< 'q.future] ->
-   ('c @ [< 'p] -> 'b @ [> 'm]) @ [> 'q.future | 'mm0.future]) @ [> 'o.future] =
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'mm0 @@ past & 'o @@ past] ->
+  (('c @ [> 'p] -> 'a @ [< 'n & global]) @ [< 'q @@ past] ->
+   ('c @ [< 'p] -> 'b @ [> 'm]) @ [> 'q | 'mm0]) @ [> 'o] =
   <fun>
 |}]
 
@@ -147,9 +147,9 @@ let rec recursive x n =
   if n <= 0 then x else recursive x (n - 1)
 [%%expect{|
 val recursive :
-  'a @ [< 'mm5 & 'q.future & 'mm0.future & 'mm7 & 'mm7 & global > 'mm1 | 'mm2 | 'mm7 | 'mm7] ->
-  (int @ [< 'mm6 & many uncontended > 'mm6] ->
-   'a @ [< 'mm3 & 'mm3 & 'mm4 & 'mm4 & global > 'p | 'mm3 | 'mm3 | 'mm4 | 'mm4 | 'mm5]) @ [< 'm.future & 'n.future & 'o.future > close('p) | 'm.future | 'n.future mod many portable | 'o.future | 'q.future | 'mm0.future | monadic_to_comonadic_min('mm1) | close('mm2) | nonportable] =
+  'a @ [< 'q & 'p & 'p & global > 'p | 'p] ->
+  (int @ [< 'mm2 & many uncontended > 'mm2] ->
+   'a @ [< 'mm0 & 'mm0 & 'mm1 & 'mm1 & global > 'mm0 | 'mm0 | 'mm1 | 'mm1 | 'q]) @ [< 'm @@ past & 'n @@ past & 'o @@ past > close('p) | close('p) | monadic_to_comonadic_min('p) | monadic_to_comonadic_min('p) | close('p) | close('p) | monadic_to_comonadic_min('p) | monadic_to_comonadic_min('p) | close('q) | close('q) | 'm | 'n @@ many portable | 'o | nonportable] =
   <fun>
 |}]
 
@@ -165,9 +165,9 @@ val foo : 'a @ [< global portable] -> unit @ 'm = <fun>
 let recursive' = recursive
 [%%expect{|
 val recursive' :
-  'a @ [< 'mm4 & 'mm4 & 'mm4 & global portable > 'q | 'q | 'mm0 | 'mm4 | 'mm4 | 'mm4] ->
-  (int @ [< 'mm3 & many uncontended > 'mm3] ->
-   'a @ [< 'mm1 & 'mm1 & 'mm1 & 'mm1 & 'mm1 & 'mm1 & 'mm2 & 'mm2 & 'mm2 & global portable > 'p | 'p | 'p | 'p | 'mm1 | 'mm1 | 'mm1 | 'mm1 | 'mm1 | 'mm1 | 'mm2 | 'mm2 | 'mm2]) @ [< 'm.future & 'n.future & 'm.future & 'n.future & 'o.future > close('p) | close('p) | close('p) | close('p) | 'm.future | 'n.future mod many portable | 'm.future | 'n.future mod many portable | 'o.future | close('q) | close('q) | monadic_to_comonadic_min('mm0) | nonportable] =
+  'a @ [< 'mm1 & 'mm1 & 'mm1 & global portable > 'mm1 | 'mm1 | 'mm1] ->
+  (int @ [< 'mm0 & many uncontended > 'mm0] ->
+   'a @ [< 'p & 'p & 'p & 'p & 'p & 'p & 'q & 'q & 'q & global portable > 'p | 'p | 'p | 'p | 'p | 'p | 'q | 'q | 'q]) @ [< 'm @@ past & 'n @@ past & 'o @@ past & 'n @@ past & 'o @@ past > 'm | 'n @@ many portable | 'o | 'n @@ many portable | 'o | nonportable] =
   <fun>
 |}]
 
@@ -186,9 +186,9 @@ let rec map f = function
   | x :: xs -> f x :: map f xs
 [%%expect{|
 val map :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'mm0.future & 'mm1.future & 'mm6 & 'mm6 mod aliased contended & 'mm6 & many > 'mm2 | 'mm6 | 'mm6 | 'mm6 | aliased] ->
-  ('a list @ [< 'mm5 & 'mm5 & 'n > 'mm5 | 'mm5] ->
-   'b list @ [< 'mm3 & 'mm3 & 'mm4 & 'mm4 & global > 'mm3 | 'mm3 | 'mm4 | 'mm4 | 'm]) @ [< 'o.future & 'p.future & 'q.future > 'o.future | 'p.future mod many portable | 'q.future | 'mm0.future | 'mm1.future | monadic_to_comonadic_min('mm2) | nonportable] =
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'mm0 & 'mm0 . aliased contended & 'mm0 & many > 'mm0 | 'mm0 | 'mm0 | aliased] ->
+  ('a list @ [< 'mm3 & 'mm3 & 'n > 'mm3 | 'mm3] ->
+   'b list @ [< 'mm1 & 'mm1 & 'mm2 & 'mm2 & global > 'mm1 | 'mm1 | 'mm2 | 'mm2 | 'm]) @ [< 'o @@ past & 'p @@ past & 'q @@ past > monadic_to_comonadic_min('mm0) | monadic_to_comonadic_min('mm0) | monadic_to_comonadic_min('mm0) | monadic_to_comonadic_min('mm0) | monadic_to_comonadic_min('mm0) | monadic_to_comonadic_min('mm0) | 'o | 'p @@ many portable | 'q | nonportable] =
   <fun>
 |}]
 
