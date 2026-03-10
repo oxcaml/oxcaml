@@ -1114,26 +1114,6 @@ include Wrapped with type 'a wrapped = 'a
 
 val item_visibility : signature_item -> visibility
 
-(* Constructors are the same *)
-val equal_tag :  tag -> tag -> bool
-
-(* Comparison of tags to store them in sets. *)
-val compare_tag :  tag -> tag -> int
-
-(* Equality *)
-
-val equal_record_representation :
-  record_representation -> record_representation -> bool
-
-val equal_record_unboxed_product_representation :
-  record_unboxed_product_representation -> record_unboxed_product_representation -> bool
-
-val equal_variant_representation :
-  variant_representation -> variant_representation -> bool
-
-val mixed_block_element_of_const_sort :
-  Jkind_types.Sort.Const.t -> mixed_block_element
-
 (** Extracts the list of "value" identifiers bound by a signature.
     "Value" identifiers are identifiers for signature components that
     correspond to a run-time value: values, extensions, modules, classes.
@@ -1146,10 +1126,6 @@ val bound_value_identifiers_and_sorts :
 
 val signature_item_id : signature_item -> Ident.t
 
-val equal_mixed_block_element :
-  mixed_block_element -> mixed_block_element -> bool
-val compare_mixed_block_element :
-  mixed_block_element -> mixed_block_element -> int
 val mixed_block_element_to_string : mixed_block_element -> string
 val mixed_block_element_to_lowercase_string : mixed_block_element -> string
 

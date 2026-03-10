@@ -472,7 +472,7 @@ let matcher discr (p : Simple.pattern) rem =
   | Constant cst, Constant cst' -> yesif (const_compare cst cst' = 0)
   | Construct cstr, Construct cstr' ->
       (* NB: may_equal_constr considers (potential) constructor rebinding;
-          Types.may_equal_constr does check that the arities are the same,
+          Data_types.may_equal_constr does check that the arities are the same,
           preserving row-size coherence. *)
       yesif (Data_types.may_equal_constr cstr cstr')
   | Variant { tag; has_arg }, Variant { tag = tag'; has_arg = has_arg' } ->

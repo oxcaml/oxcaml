@@ -162,7 +162,6 @@ let is_predef = function
   | Predef _ -> true
   | _ -> false
 
-<<<<<<< oxcaml
 let is_instance = function
   | Global_with_args _ -> true
   | _ -> false
@@ -171,8 +170,7 @@ let to_global = function
   | Global head -> Some (Global_module.Name.create_no_args head)
   | Global_with_args g -> Some g
   | _ -> None
-||||||| upstream-base
-=======
+
 let canonical_stamps = s_table Hashtbl.create 0
 let next_canonical_stamp = s_table Hashtbl.create 0
 
@@ -200,38 +198,10 @@ let pp_stamped ppf (name, stamp) =
     in
     fprintf ppf "%s/%i" name stamp
   end
->>>>>>> upstream-incoming
 
 let print ~with_scope ppf =
   let open Format_doc in
   function
-<<<<<<< oxcaml
-  | Global name -> fprintf ppf "%s!" name
-  | Predef { name; stamp = n } ->
-      fprintf ppf "%s%s!" name
-        (if !Clflags.unique_ids then asprintf "/%i" n else "")
-  | Local { name; stamp = n } ->
-      fprintf ppf "%s%s" name
-        (if !Clflags.unique_ids then asprintf "/%i" n else "")
-  | Scoped { name; stamp = n; scope } ->
-      fprintf ppf "%s%s%s" name
-        (if !Clflags.unique_ids then asprintf "/%i" n else "")
-        (if with_scope then asprintf "[%i]" scope else "")
-  | Global_with_args g ->
-      fprintf ppf "%a!" Global_module.Name.print g
-||||||| upstream-base
-  | Global name -> fprintf ppf "%s!" name
-  | Predef { name; stamp = n } ->
-      fprintf ppf "%s%s!" name
-        (if !Clflags.unique_ids then sprintf "/%i" n else "")
-  | Local { name; stamp = n } ->
-      fprintf ppf "%s%s" name
-        (if !Clflags.unique_ids then sprintf "/%i" n else "")
-  | Scoped { name; stamp = n; scope } ->
-      fprintf ppf "%s%s%s" name
-        (if !Clflags.unique_ids then sprintf "/%i" n else "")
-        (if with_scope then sprintf "[%i]" scope else "")
-=======
   | Global name ->
       fprintf ppf "%s!" name
   | Predef { name; stamp } ->
@@ -244,24 +214,19 @@ let print ~with_scope ppf =
       fprintf ppf "%a%s"
         pp_stamped (name, stamp)
         (if with_scope then asprintf "[%i]" scope else "")
->>>>>>> upstream-incoming
+  | Global_with_args g ->
+      fprintf ppf "%a!" Global_module.Name.print g
 
 let print_with_scope ppf id = print ~with_scope:true ppf id
 
 let doc_print ppf id = print ~with_scope:false ppf id
 let print ppf id = Format_doc.compat doc_print ppf id
-<<<<<<< oxcaml
 
 let to_global_exn id =
   match to_global id with
   | Some global -> global
   | None -> Misc.fatal_errorf "Not global: %a" print id
 
-||||||| upstream-base
-let print ppf id = print ~with_scope:false ppf id
-
-=======
->>>>>>> upstream-incoming
 (* For the documentation of ['a Ident.tbl], see ident.mli.
 
    The implementation is a copy-paste specialization of

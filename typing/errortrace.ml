@@ -109,7 +109,7 @@ type ('a, 'variety) elt =
   | Variant : 'variety variant -> ('a, 'variety) elt
   | Obj : 'variety obj -> ('a, 'variety) elt
   | Escape : 'a escape -> ('a, _) elt
-  | Function_label_mismatch of Asttypes.arg_label diff
+  | Function_label_mismatch of Types.arg_label diff
   | Tuple_label_mismatch of string option diff
   | Incompatible_fields : { name:string; diff: type_expr diff } -> ('a, _) elt
       (* Could move [Incompatible_fields] into [obj] *)
@@ -133,19 +133,11 @@ let map_elt (type variety) f : ('a, variety) elt -> ('b, variety) elt = function
       Escape { kind = Equation (f x); context }
   | Escape {kind = (Univ _ | Self | Constructor _ | Module_type _ | Constraint);
             _}
-<<<<<<< oxcaml
-  | Variant _ | Obj _ | Incompatible_fields _ | Rec_occur (_, _) as x -> x
-  | Bad_jkind _ as x -> x
-  | Bad_jkind_sort _ as x -> x
-  | Unequal_var_jkinds _ as x -> x
-  | Unequal_tof_kind_jkinds _ as x -> x
-||||||| upstream-base
-  | Variant _ | Obj _ | Incompatible_fields _ | Rec_occur (_, _) as x -> x
-=======
   | Variant _ | Obj _ | Function_label_mismatch _ | Tuple_label_mismatch _
   | Incompatible_fields _
   | Rec_occur (_, _) | First_class_module _  as x -> x
->>>>>>> upstream-incoming
+  | Bad_jkind _ | Bad_jkind_sort _
+  | Unequal_var_jkinds _ | Unequal_tof_kind_jkinds _ as x -> x
 
 let map f t = List.map (map_elt f) t
 

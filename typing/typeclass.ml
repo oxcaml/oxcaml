@@ -18,12 +18,7 @@ open Asttypes
 open Path
 open Types
 open Typetexp
-<<<<<<< oxcaml
 open Mode
-||||||| upstream-base
-open Format
-=======
->>>>>>> upstream-incoming
 
 
 type 'a class_info = {
@@ -529,14 +524,8 @@ let add_instance_var_met loc label id sign cl_num attrs met_env =
     { val_type = ty; val_modalities = Modality.undefined; val_kind = kind;
       val_attributes = attrs;
       Types.val_loc = loc;
-<<<<<<< oxcaml
       val_zero_alloc = Zero_alloc.default;
-      val_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) }
-||||||| upstream-base
-      val_uid = Uid.mk ~current_unit:(Env.get_unit_name ()) }
-=======
       val_uid = Uid.mk ~current_unit:(Env.get_current_unit ()) }
->>>>>>> upstream-incoming
   in
   Env.add_value ~mode:Mode.Value.legacy id desc met_env
 
@@ -695,21 +684,9 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
       with_attrs
         (fun () ->
            let cty =
-<<<<<<< oxcaml
-             Ctype.with_local_level_if_principal
+             Ctype.with_local_level_generalize_structure_if_principal
                (fun () -> Typetexp.transl_simple_type ~new_var_jkind:Any val_env
                             ~closed:false Alloc.Const.legacy styp)
-               ~post:(fun cty -> Ctype.generalize_structure cty.ctyp_type)
-||||||| upstream-base
-             Ctype.with_local_level_if_principal
-               (fun () -> Typetexp.transl_simple_type val_env
-                            ~closed:false styp)
-               ~post:(fun cty -> Ctype.generalize_structure cty.ctyp_type)
-=======
-             Ctype.with_local_level_generalize_structure_if_principal
-               (fun () -> Typetexp.transl_simple_type val_env
-                            ~closed:false styp)
->>>>>>> upstream-incoming
            in
            begin
              match
@@ -755,18 +732,8 @@ let rec class_field_first_pass self_loc cl_num sign self_scope acc cf =
                            No_overriding ("instance variable", label.txt)))
            end;
            let definition =
-<<<<<<< oxcaml
-             Ctype.with_local_level_if_principal
-               ~post:Typecore.generalize_structure_exp
-               (fun () -> Typecore.type_exp val_env sdefinition)
-||||||| upstream-base
-             Ctype.with_local_level_if_principal
-               ~post:Typecore.generalize_structure_exp
-               (fun () -> type_exp val_env sdefinition)
-=======
              Ctype.with_local_level_generalize_structure_if_principal
-               (fun () -> type_exp val_env sdefinition)
->>>>>>> upstream-incoming
+               (fun () -> Typecore.type_exp val_env sdefinition)
            in
            begin
              match
@@ -1141,15 +1108,9 @@ and class_structure cl_num virt self_scope final val_env met_env loc
   in
   let met_env =
     List.fold_right
-<<<<<<< oxcaml
-      (fun {Typecore.pv_id; pv_type; pv_loc; pv_as_var; pv_attributes} met_env ->
-||||||| upstream-base
-      (fun {pv_id; pv_type; pv_loc; pv_as_var; pv_attributes} met_env ->
-=======
-      (fun {pv_id; pv_type; pv_loc; pv_kind; pv_attributes} met_env ->
->>>>>>> upstream-incoming
+      (fun {Typecore.pv_id; pv_type; pv_loc; pv_kind; pv_attributes} met_env ->
          add_self_met pv_loc pv_id sign self_var_kind vars
-           cl_num (pv_kind=As_var) pv_type pv_attributes met_env)
+           cl_num (pv_kind=Typecore.As_var) pv_type pv_attributes met_env)
       self_pat_vars met_env
   in
   let fields =
@@ -1262,14 +1223,8 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
       in
       let param_name = "*opt*" ^ param_suffix in
       let smatch =
-<<<<<<< oxcaml
-        Exp.match_ ~loc (Exp.ident ~loc (mknoloc (Longident.Lident param_name)))
-||||||| upstream-base
-        Exp.match_ ~loc (Exp.ident ~loc (mknoloc (Longident.Lident "*opt*")))
-=======
         Exp.match_ ~loc
-          (Exp.ident ~loc (mknoloc (Longident.Lident "*opt*")))
->>>>>>> upstream-incoming
+          (Exp.ident ~loc (mknoloc (Longident.Lident param_name)))
           scases
       in
       let sfun =
@@ -1300,16 +1255,9 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
             in
             (id,
              {exp_desc =
-<<<<<<< oxcaml
               Texp_ident(path, mknoloc (Longident.Lident (Ident.name id)), vd,
                          Id_value, aliased_many_use,
                          Mode.Value.(disallow_right legacy));
-||||||| upstream-base
-              Texp_ident(path, mknoloc (Longident.Lident (Ident.name id)), vd);
-=======
-              Texp_ident(path, mknoloc
-                (Longident.Lident (Ident.name id)), vd);
->>>>>>> upstream-incoming
               exp_loc = Location.none; exp_extra = [];
               exp_type = Ctype.instance vd.val_type;
               exp_attributes = []; (* check *)
@@ -1375,7 +1323,7 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
           Location.prerr_warning
             cl.cl_loc
             (Warnings.Labels_omitted
-               (List.map Asttypes.string_of_label
+               (List.map Printtyp.string_of_label
                          (List.filter ((<>) Nolabel) labels)));
           true
         end
@@ -1399,7 +1347,6 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
               )
             in
             let eliminate_optional_arg () =
-<<<<<<< oxcaml
               Arg (Typecore.type_option_none val_env ty0 Location.none,
                    (* CR layouts v5: Change the sort when options can hold
                       non-values. *)
@@ -1409,11 +1356,6 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
             let eliminate_position_arg () =
               let arg = Typecore.src_pos (Location.ghostify scl.pcl_loc) [] val_env in
               Arg (arg, Jkind.Sort.value)
-||||||| upstream-base
-              Some (option_none val_env ty0 Location.none)
-=======
-              Arg (option_none val_env ty0 Location.none)
->>>>>>> upstream-incoming
             in
             let remaining_sargs, arg =
               if ignore_labels then begin
@@ -1436,7 +1378,6 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
               end else
                 match Btype.extract_label name sargs with
                 | Some (l', sarg, _, remaining_sargs) ->
-<<<<<<< oxcaml
                     if not optional && Btype.is_optional l' then (
                       let label = Printtyp.string_of_label l in
                       if Btype.is_position l then
@@ -1448,24 +1389,12 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                       else
                         Location.prerr_warning sarg.pexp_loc
                           (Warnings.Nonoptional_label label));
-||||||| upstream-base
-                    if not optional && Btype.is_optional l' then
-                      Location.prerr_warning sarg.pexp_loc
-                        (Warnings.Nonoptional_label
-                           (Printtyp.string_of_label l));
-=======
-                    if not optional && Btype.is_optional l' then
-                      Location.prerr_warning sarg.pexp_loc
-                        (Warnings.Nonoptional_label
-                           (Asttypes.string_of_label l));
->>>>>>> upstream-incoming
                     remaining_sargs, use_arg sarg l'
                 | None ->
                     let is_erased () = List.mem_assoc Nolabel sargs in
                     sargs,
                     if Btype.is_optional l && is_erased () then
                       eliminate_optional_arg ()
-<<<<<<< oxcaml
                     else if Btype.is_position l && is_erased () then
                       eliminate_position_arg ()
                     else begin
@@ -1481,17 +1410,6 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
             let omitted =
               match arg with
               | Omitted _ -> (l,ty0) :: omitted
-||||||| upstream-base
-                    else
-                      None
-=======
-                    else
-                      Omitted ()
-            in
-            let omitted =
-              match arg with
-              | Omitted () -> (l,ty0) :: omitted
->>>>>>> upstream-incoming
               | Arg _ -> omitted
             in
             type_args ((l,arg)::args) omitted ty_fun ty_fun0 remaining_sargs
@@ -1524,7 +1442,6 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
         Typecore.type_let In_class_def val_env Immutable rec_flag sdefs in
       let (vals, met_env) =
         List.fold_right
-<<<<<<< oxcaml
           (fun (id, modes_and_sorts, _) (vals, met_env) ->
              List.iter
                (fun (loc, mode, sort) ->
@@ -1535,11 +1452,6 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                                  Non_value_let_binding (Ident.name id, sort)))
                )
                modes_and_sorts;
-||||||| upstream-base
-          (fun (id, _id_loc, _typ) (vals, met_env) ->
-=======
-          (fun (id, _id_loc, _typ, _uid) (vals, met_env) ->
->>>>>>> upstream-incoming
              let path = Pident id in
              (* do not mark the value as used *)
              let vd = Env.find_value path val_env
@@ -1551,16 +1463,9 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
              in
              let expr =
                {exp_desc =
-<<<<<<< oxcaml
                 Texp_ident(path, mknoloc(Longident.Lident (Ident.name id)),vd,
                            Id_value, aliased_many_use,
                            Mode.Value.(disallow_right legacy));
-||||||| upstream-base
-                Texp_ident(path, mknoloc(Longident.Lident (Ident.name id)),vd);
-=======
-                Texp_ident(path, mknoloc(
-                  Longident.Lident (Ident.name id)),vd);
->>>>>>> upstream-incoming
                 exp_loc = Location.none; exp_extra = [];
                 exp_type = ty;
                 exp_attributes = [];
@@ -2007,19 +1912,11 @@ let final_decl env define_class
   | Some reason ->
       let printer =
         if define_class
-<<<<<<< oxcaml
-        then Format_doc.doc_printf "%a" (Printtyp.class_declaration id) clty
-        else Format_doc.doc_printf "%a" (Printtyp.cltype_declaration id) cltydef
-||||||| upstream-base
-        then function ppf -> Printtyp.class_declaration id ppf clty
-        else function ppf -> Printtyp.cltype_declaration id ppf cltydef
-=======
         then
           Format_doc.doc_printf "%a" (Printtyp.Doc.class_declaration id) clty
         else
           Format_doc.doc_printf "%a"
             (Printtyp.Doc.cltype_declaration id) cltydef
->>>>>>> upstream-incoming
       in
       raise(Error(cl.pci_loc, env, Unbound_type_var(printer, reason)))
   end;
@@ -2284,12 +2181,7 @@ module Style=Misc.Style
 module Printtyp = Printtyp.Doc
 
 let out_type ppf t = Style.as_inline_code !Oprint.out_type ppf t
-<<<<<<< oxcaml
-||||||| upstream-base
-let report_error env ppf =
-=======
 let quoted_type ppf t = Style.as_inline_code Printtyp.type_expr ppf t
->>>>>>> upstream-incoming
 
 let report_error_doc env ppf =
   let pp_args ppf args =
@@ -2302,31 +2194,13 @@ let report_error_doc env ppf =
   | Unconsistent_constraint err ->
       let msg = Format_doc.Doc.msg in
       fprintf ppf "@[<v>The class constraints are not consistent.@ ";
-<<<<<<< oxcaml
-      Printtyp.report_unification_error ppf env err
-||||||| upstream-base
-      Printtyp.report_unification_error ppf env err
-        (fun ppf -> fprintf ppf "Type")
-        (fun ppf -> fprintf ppf "is not compatible with type");
-=======
       Errortrace_report.unification ppf env err
->>>>>>> upstream-incoming
         (msg "Type")
         (msg "is not compatible with type");
       fprintf ppf "@]"
   | Field_type_mismatch (k, m, err) ->
       let msg  = Format_doc.doc_printf in
-<<<<<<< oxcaml
-      Printtyp.report_unification_error ppf env err
-||||||| upstream-base
-      Printtyp.report_unification_error ppf env err
-        (function ppf ->
-           fprintf ppf "The %s %a@ has type" k Style.inline_code m)
-        (function ppf ->
-           fprintf ppf "but is expected to have type")
-=======
       Errortrace_report.unification ppf env err
->>>>>>> upstream-incoming
         (msg "The %s %a@ has type" k Style.inline_code m)
         (msg "but is expected to have type")
   | Unexpected_field (ty, lab) ->
@@ -2366,33 +2240,12 @@ let report_error_doc env ppf =
       Out_type.prepare_for_printing [abbrev; actual; expected];
       fprintf ppf "@[The abbreviation@ %a@ expands to type@ %a@ \
        but is used with type@ %a@]"
-<<<<<<< oxcaml
-        out_type (Printtyp.tree_of_typexp Type abbrev)
-        out_type (Printtyp.tree_of_typexp Type actual)
-        out_type (Printtyp.tree_of_typexp Type expected)
-||||||| upstream-base
-        (Style.as_inline_code !Oprint.out_type)
-        (Printtyp.tree_of_typexp Type abbrev)
-        (Style.as_inline_code !Oprint.out_type)
-        (Printtyp.tree_of_typexp Type actual)
-        (Style.as_inline_code !Oprint.out_type)
-        (Printtyp.tree_of_typexp Type expected)
-=======
         out_type (Out_type.tree_of_typexp Type abbrev)
         out_type (Out_type.tree_of_typexp Type actual)
         out_type (Out_type.tree_of_typexp Type expected)
->>>>>>> upstream-incoming
   | Constructor_type_mismatch (c, err) ->
       let msg = Format_doc.doc_printf in
-<<<<<<< oxcaml
-      Printtyp.report_unification_error ppf env err
-||||||| upstream-base
-      Printtyp.report_unification_error ppf env err
-        (function ppf ->
-           fprintf ppf "The expression %a has type"
-=======
       Errortrace_report.unification ppf env err
->>>>>>> upstream-incoming
         (msg "The expression %a has type"
              Style.inline_code ("new " ^ c)
         )
@@ -2423,17 +2276,7 @@ let report_error_doc env ppf =
         (Style.as_inline_code Printtyp.longident) lid expected provided
   | Parameter_mismatch err ->
       let msg = Format_doc.Doc.msg in
-<<<<<<< oxcaml
-      Printtyp.report_unification_error ppf env err
-||||||| upstream-base
-      Printtyp.report_unification_error ppf env err
-        (function ppf ->
-           fprintf ppf "The type parameter")
-        (function ppf ->
-           fprintf ppf "does not meet its constraint: it should be")
-=======
       Errortrace_report.unification ppf env err
->>>>>>> upstream-incoming
         (msg  "The type parameter")
         (msg "does not meet its constraint: it should be")
   | Bad_parameters (id, params, cstrs) ->
@@ -2466,30 +2309,13 @@ let report_error_doc env ppf =
           | Type_variable -> ty0
           | Row_variable -> Btype.newgenty(Tobject(ty0, ref None))
         in
-<<<<<<< oxcaml
-        Printtyp.add_type_to_preparation meth_ty;
-        Printtyp.add_type_to_preparation ty1;
-||||||| upstream-base
-        Printtyp.add_type_to_preparation meth_ty;
-        Printtyp.add_type_to_preparation ty1;
-        let pp_type ppf ty = Style.as_inline_code !Oprint.out_type ppf ty in
-=======
         Out_type.add_type_to_preparation meth_ty;
         Out_type.add_type_to_preparation ty1;
->>>>>>> upstream-incoming
         fprintf ppf
           "The method %a@ has type@;<1 2>%a@ where@ %a@ is unbound"
           Style.inline_code meth
-<<<<<<< oxcaml
-          out_type (Printtyp.tree_of_typexp Type meth_ty)
-          out_type (Printtyp.tree_of_typexp Type ty0)
-||||||| upstream-base
-          pp_type (Printtyp.tree_of_typexp Type meth_ty)
-          pp_type (Printtyp.tree_of_typexp Type ty0)
-=======
           out_type (Out_type.tree_of_typexp Type meth_ty)
           out_type (Out_type.tree_of_typexp Type ty0)
->>>>>>> upstream-incoming
       in
       fprintf ppf
         "@[<v>@[Some type variables are unbound in this type:@;<1 2>%a@]@ \
@@ -2519,31 +2345,13 @@ let report_error_doc env ppf =
         "@[The type of this class,@ %a,@ \
            contains non-collapsible conjunctive types in constraints.@ %t@]"
         (Style.as_inline_code @@ Printtyp.class_declaration id) clty
-<<<<<<< oxcaml
-        (fun ppf -> Printtyp.report_unification_error ppf env err
-||||||| upstream-base
-        (fun ppf -> Printtyp.report_unification_error ppf env err
-            (fun ppf -> fprintf ppf "Type")
-            (fun ppf -> fprintf ppf "is not compatible with type")
-=======
         (fun ppf -> Errortrace_report.unification ppf env err
->>>>>>> upstream-incoming
             (msg "Type")
             (msg "is not compatible with type")
         )
   | Self_clash err ->
       let msg = Format_doc.Doc.msg in
-<<<<<<< oxcaml
-      Printtyp.report_unification_error ppf env err
-||||||| upstream-base
-      Printtyp.report_unification_error ppf env err
-        (function ppf ->
-           fprintf ppf "This object is expected to have type")
-        (function ppf ->
-           fprintf ppf "but actually has type")
-=======
       Errortrace_report.unification ppf env err
->>>>>>> upstream-incoming
         (msg "This object is expected to have type")
         (msg "but actually has type")
   | Mutability_mismatch (_lab, mut) ->
