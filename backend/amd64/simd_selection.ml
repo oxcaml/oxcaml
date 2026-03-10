@@ -1203,7 +1203,20 @@ let pseudoregs_for_operation (simd : Simd.operation) arg res =
   pseudoregs_for_instr sse_or_avx arg_regs res_regs
 
 let pseudoregs_for_mem_operation (op : Simd.Mem.operation) arg res =
-  match op with Load op | Store op -> pseudoregs_for_operation op arg res
+  match op with
+  | Load op | Store op ->
+    let arg, res = pseudoregs_for_operation op arg res in
+    (* Gather instructions require all XMM/YMM operands (onto, index, mask) to
+       be in distinct registers. The [Arg _] case above already ties [onto] and
+       [mask] to distinct results. Creating a fresh register for [index] forces
+       a move to be generated, which interferes with [onto] and [mask]. *)
+    (match[@warning "-4"] (Simd.Pseudo_instr.instr op.instr).id with
+    | Vpgatherdd_X_M32X_X | Vpgatherdd_Y_M32Y_Y | Vpgatherdq_X_M32X_X
+    | Vpgatherdq_Y_M32X_Y | Vpgatherqd_X_M64X_X | Vpgatherqd_X_M64Y_X
+    | Vpgatherqq_X_M64X_X | Vpgatherqq_Y_M64Y_Y ->
+      arg.(2) <- Reg.create_with_typ arg.(2)
+    | _ -> ());
+    arg, res
 
 (* Error report *)
 
