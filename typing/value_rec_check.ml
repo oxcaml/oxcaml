@@ -1531,7 +1531,7 @@ and pattern : type k . k general_pattern -> Env.t -> mode = fun pat env ->
 and is_destructuring_pattern : type k . k general_pattern -> bool =
   fun pat -> match pat.pat_desc with
     | Tpat_any -> false
-    | Tpat_var _ -> false
+    | Tpat_var _ | Tpat_fun_layout _ -> false
     | Tpat_alias { pattern = pat; _ } -> is_destructuring_pattern pat
     | Tpat_constant _ -> true
     | Tpat_unboxed_unit -> true

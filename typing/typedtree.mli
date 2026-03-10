@@ -215,7 +215,6 @@ and 'k pattern_desc =
       uid: Uid.t;
       sort: Jkind_types.Sort.t;
       mode: Mode.Value.l;
-      lpoly: Types.Val_lpoly.t;
     } -> value pattern_desc
         (** x *)
   | Tpat_alias : {
@@ -226,9 +225,20 @@ and 'k pattern_desc =
       sort: Jkind_types.Sort.t;
       mode: Mode.Value.l;
       type_expr: Types.type_expr;
-      lpoly: Types.Val_lpoly.t;
     } -> value pattern_desc
         (** P as a *)
+  | Tpat_fun_layout : {
+      id: Ident.t;
+      name: string loc;
+      uid: Uid.t;
+      sort: Jkind_types.Sort.t;
+      mode: Mode.Value.l;
+      lpoly: Types.Val_lpoly.t;
+    } -> value pattern_desc
+        (** x with layout polymorphism, used in let poly_ bindings. The
+            [Val_lpoly.t] may end up determined with an empty list of sort
+            vars if no layout poly is actually inferred (in which case a
+            [Useless_poly] warning is emitted). *)
   | Tpat_constant : constant -> value pattern_desc
         (** 1, 'a', "true", 1.0, 1l, 1L, 1n *)
   | Tpat_unboxed_unit : value pattern_desc

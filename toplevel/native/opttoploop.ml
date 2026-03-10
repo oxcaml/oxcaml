@@ -414,8 +414,7 @@ let name_expression ~loc ~attrs sort exp =
   let pat =
     { pat_desc =
         Tpat_var { id; name = mknoloc name; uid = vd.val_uid; sort;
-                   mode = Mode.Value.disallow_right Mode.Value.legacy;
-                   lpoly = Val_lpoly.determined [] };
+                   mode = Mode.Value.disallow_right Mode.Value.legacy };
       pat_loc = loc;
       pat_extra = [];
       pat_type = exp.exp_type;

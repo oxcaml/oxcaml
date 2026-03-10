@@ -321,13 +321,7 @@ type tpat_var_identifier = Jkind.Sort.t * Value.l
 let mkTpat_var ?id:(sort, mode = dummy_value_sort, dummy_value_mode)
     (ident, name) =
   Tpat_var
-    { id = ident;
-      name;
-      uid = Uid.internal_not_actually_unique;
-      sort;
-      mode;
-      lpoly = Val_lpoly.determined []
-    }
+    { id = ident; name; uid = Uid.internal_not_actually_unique; sort; mode }
 
 type tpat_alias_identifier = Jkind.Sort.t * Value.l * Types.type_expr
 
@@ -339,8 +333,7 @@ let mkTpat_alias ~id:(sort, mode, ty) (p, ident, name) =
       uid = Uid.internal_not_actually_unique;
       sort;
       mode;
-      type_expr = ty;
-      lpoly = Val_lpoly.determined []
+      type_expr = ty
     }
 
 type tpat_array_identifier = mutability * Jkind.sort

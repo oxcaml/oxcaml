@@ -153,8 +153,9 @@ Line 2, characters 12-13:
 2 |   let poly_ f = 42
                 ^
 Warning 217: This "let poly_" binding generalizes no layout variables. Consider using a regular "let" instead.
+>> Fatal error: Matching: layout-poly patterns not yet supported (0 sort var(s))
+Uncaught exception: Misc.Fatal_error
 
-module M : sig val f : int end
 |}]
 
 (* layout-polymorphic id is not included in regular id,
@@ -331,8 +332,8 @@ Line 4, characters 16-17:
 4 |   let rec poly_ f x = x
                     ^
 Warning 217: This "let poly_" binding generalizes no layout variables. Consider using a regular "let" instead.
+Uncaught exception: File "lambda/translcore.ml", line 2037, characters 19-25: Assertion failed
 
-module M : sig val f : 'a -> 'a end
 |}]
 
 (* CR-someday zqian: [rec poly_] should work with explicit user annotations. *)

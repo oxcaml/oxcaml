@@ -1659,7 +1659,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
           ty, mode
       end
   | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
-  | Tpat_any | Tpat_var _
+  | Tpat_any | Tpat_var _ | Tpat_fun_layout _
   | Tpat_array _ | Tpat_lazy _ ->
       p.pat_type, mode
 
@@ -3082,13 +3082,19 @@ and type_pat_aux
       let id, uid =
         enter_variable ~lpoly tps loc name mode ~kind ty sp.ppat_attributes sort
       in
-      rvp {
-        pat_desc = Tpat_var { id; name; uid; sort; mode = alloc_mode; lpoly };
+      let var_pat = {
+        pat_desc = Tpat_var { id; name; uid; sort; mode = alloc_mode };
         pat_loc = loc; pat_extra=[];
         pat_type = ty;
         pat_attributes = sp.ppat_attributes;
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
+      in
+      if (penv : Pattern_env.t).is_lpoly
+      then rvp { var_pat with
+                 pat_desc = Tpat_fun_layout { id; name; uid; sort;
+                                             mode = alloc_mode; lpoly } }
+      else rvp var_pat
   | Ppat_unpack name ->
       let t = instance expected_ty in
       begin match name.txt with
@@ -3114,8 +3120,7 @@ and type_pat_aux
           rvp {
             pat_desc =
               Tpat_var
-                { id; name = v; uid; sort;
-                  mode = alloc_mode.mode; lpoly = Val_lpoly.determined [] };
+                { id; name = v; uid; sort; mode = alloc_mode.mode };
             pat_loc = sp.ppat_loc;
             pat_extra=[Tpat_unpack, loc, sp.ppat_attributes];
             pat_type = t;
@@ -3137,14 +3142,16 @@ and type_pat_aux
           ~kind:(Val_reg sort) tps name.loc name mode
           ty_var sp.ppat_attributes sort
       in
-      rvp { pat_desc = Tpat_alias { pattern = q; id; name; uid;
-                                    sort; mode; type_expr = ty_var;
-                                    lpoly };
-            pat_loc = loc; pat_extra=[];
-            pat_type = q.pat_type;
-            pat_attributes = sp.ppat_attributes;
-            pat_env = !!penv;
-            pat_unique_barrier = Unique_barrier.not_computed () }
+      let alias_pat = {
+        pat_desc = Tpat_alias { pattern = q; id; name; uid;
+                                sort; mode; type_expr = ty_var };
+        pat_loc = loc; pat_extra=[];
+        pat_type = q.pat_type;
+        pat_attributes = sp.ppat_attributes;
+        pat_env = !!penv;
+        pat_unique_barrier = Unique_barrier.not_computed () }
+      in
+      rvp alias_pat
   | Ppat_unboxed_unit ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       rvp @@ solve_expected {
@@ -3860,7 +3867,7 @@ let rec check_counter_example_pat
         (fun fields -> mkp k (Tpat_record_unboxed_product (fields, closed)))
   in
   match tp.pat_desc with
-    Tpat_any | Tpat_var _ ->
+    Tpat_any | Tpat_var _ | Tpat_fun_layout _ ->
       let k' () = mkp k tp.pat_desc in
       if info.explosion_fuel <= 0 then k' () else
       let decrease n = {info with explosion_fuel = info.explosion_fuel - n} in
@@ -9150,8 +9157,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         let uu = unique_use ~loc:sarg.pexp_loc ~env mode mode in
         {pat_desc = Tpat_var { id; name = mknoloc name;
                                uid = desc.val_uid; sort;
-                               mode = Value.disallow_right mode;
-                               lpoly = Val_lpoly.determined [] };
+                               mode = Value.disallow_right mode };
          pat_type = ty;
          pat_extra=[];
          pat_attributes = [];
@@ -10468,7 +10474,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   if is_recursive then
     List.iter
       (fun {vb_pat=pat} -> match pat.pat_desc with
-           Tpat_var _ -> ()
+           Tpat_var _ | Tpat_fun_layout _ -> ()
          | _ -> raise(Error(pat.pat_loc, env, Illegal_letrec_pat)))
       l;
   List.iter (fun vb ->
