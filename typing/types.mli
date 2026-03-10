@@ -1087,7 +1087,10 @@ module type Wrapped = sig
       have been applied and we have the real mode of the value. The original
       modalities shouldn't be looked again and is replaced by [undefined]. *)
       val_kind: value_kind;
-      val_lpoly: Val_lpoly.t; (** see [Val_lpoly] *)
+      val_lpoly: Val_lpoly.t;
+      (** Guaranteed [determined] for all values visible outside [type_let].
+          May be [to_generalize] during intermediate stages of typing a
+          [let poly_] binding. See [Val_lpoly]. *)
       val_loc: Location.t;
       val_zero_alloc: Zero_alloc.t;
       val_attributes: Parsetree.attributes;

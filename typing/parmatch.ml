@@ -64,8 +64,7 @@ let extra_pat =
     (Tpat_var { id = Ident.create_local "+"; name = mknoloc "+";
       uid = Uid.internal_not_actually_unique;
       sort = Jkind.Sort.(of_const Const.for_boxed_variant);
-      mode = Mode.Value.disallow_right Mode.Value.max;
-      lpoly = Val_lpoly.determined [] })
+      mode = Mode.Value.disallow_right Mode.Value.max })
     Ctype.none Env.empty
 
 
@@ -685,7 +684,8 @@ let do_set_args ~erase_mutable q r = match q with
     rest
 | {pat_desc=Tpat_constant _|Tpat_any|Tpat_unboxed_unit|Tpat_unboxed_bool _} ->
     q::r (* case any is used in matching.ml *)
-| {pat_desc = (Tpat_var _ | Tpat_alias _ | Tpat_or _); _} ->
+| {pat_desc =
+     (Tpat_var _ | Tpat_fun_layout _ | Tpat_alias _ | Tpat_or _); _} ->
     fatal_error "Parmatch.set_args"
 
 let set_args q r = do_set_args ~erase_mutable:false q r
@@ -1111,8 +1111,7 @@ let build_other ext env =
                        name = {txt="*extension*"; loc = d.pat_loc};
                        uid = Uid.internal_not_actually_unique;
                        sort = Jkind.Sort.(of_const Const.for_constructor);
-                       mode = Mode.Value.disallow_right Mode.Value.max;
-                       lpoly = Val_lpoly.determined [] })
+                       mode = Mode.Value.disallow_right Mode.Value.max })
             Ctype.none Env.empty
       | Construct _ ->
           begin match ext with
@@ -1289,6 +1288,7 @@ let build_other ext env =
 let rec has_instance p = match p.pat_desc with
   | Tpat_variant (l,_,r) when is_absent l r -> false
   | Tpat_any | Tpat_var _ | Tpat_constant _ | Tpat_unboxed_unit
+  | Tpat_fun_layout _
   | Tpat_unboxed_bool _ | Tpat_variant (_,None,_) -> true
   | Tpat_alias { pattern = p; _ } | Tpat_variant (_,Some p,_) -> has_instance p
   | Tpat_or (p1,p2,_) -> has_instance p1 || has_instance p2
@@ -2211,6 +2211,7 @@ let rec collect_paths_from_pat r p = match p.pat_desc with
       (if extendable_path path then add_path path r else r)
       ps
 | Tpat_any|Tpat_var _|Tpat_constant _|Tpat_unboxed_unit|Tpat_unboxed_bool _
+| Tpat_fun_layout _
 | Tpat_variant (_,None,_) -> r
 | Tpat_tuple ps ->
     List.fold_left (fun r (_, p) -> collect_paths_from_pat r p) r ps
@@ -2351,7 +2352,7 @@ let inactive ~partial pat =
         | Tpat_lazy _ | Tpat_array (Mutable _, _, _) ->
           false
         | Tpat_any | Tpat_var _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
-        | Tpat_variant (_, None, _)
+        | Tpat_variant (_, None, _) | Tpat_fun_layout _
         -> true
         | Tpat_constant c -> begin
             match c with
@@ -2500,9 +2501,9 @@ type amb_row = { row : pattern list ; varsets : Ident.Set.t list; }
 let simplify_head_amb_pat head_bound_variables varsets ~add_column p ps k =
   let rec simpl head_bound_variables varsets p ps k =
     match (Patterns.General.view p).pat_desc with
-    | `Alias (p,x,_,_,_,_,_,_) ->
+    | `Alias (p,x,_,_,_,_,_) ->
       simpl (Ident.Set.add x head_bound_variables) varsets p ps k
-    | `Var (x, _, _, _, _, _) ->
+    | `Var (x, _, _, _, _) | `Fun_layout (x, _, _, _, _, _) ->
       simpl (Ident.Set.add x head_bound_variables) varsets Patterns.omega ps k
     | `Or (p1,p2,_) ->
       simpl head_bound_variables varsets p1 ps

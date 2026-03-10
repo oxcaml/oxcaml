@@ -261,6 +261,17 @@ module type Sort = sig
       [f], {!to_string_genvar} will return the assigned name for each var. *)
   val print_with_genvars : var list -> (string list -> 'a) -> 'a
 
+  (** [generalize_with f] runs [f] with sort generalization enabled (for let
+      poly_ support). Returns the result of [f] and the list of generic sort
+      variables created during [f]. *)
+  val generalize_with : (unit -> 'a) -> 'a * var list
+
+  (** Generalize sort variables when in sort generalization context. Sets the
+      level of sort variables to Ident.highest_scope and accumulates them. This
+      should be called from Ctype.generalize. Only has an effect when called
+      within {!generalize_with}. *)
+  val generalize : current_level:int -> t -> unit
+
   module Debug_printers : sig
     val base : Format.formatter -> base -> unit
 
