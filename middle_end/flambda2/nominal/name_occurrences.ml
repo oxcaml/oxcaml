@@ -757,8 +757,6 @@ let equal t1 t2 =
     ~for_value_slots:For_value_slots.equal ~for_code_ids:For_code_ids.equal t1
     t2
 
-let is_empty t = equal t empty
-
 let no_variables t =
   For_names.for_all t.names ~f:(fun var -> not (Name.is_var var))
 
@@ -792,7 +790,15 @@ let inter_domain_is_non_empty t1 t2 =
     ~for_value_slots:For_value_slots.inter_domain_is_non_empty
     ~for_code_ids:For_code_ids.inter_domain_is_non_empty t1 t2
 
-let union_list ts = List.fold_left union empty ts
+let union_list ts =
+  List.fold_left
+    (fun acc t ->
+      if is_empty acc
+      then t
+      else if is_empty t
+      then acc
+      else union acc t)
+    empty ts
 
 let function_slots_in_normal_projections t =
   For_function_slots.fold_with_mode t.function_slots_in_projections
