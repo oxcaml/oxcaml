@@ -60,13 +60,6 @@ let mk_binannot_occurrences f =
     features such as project-wide occurrences. This flag has\n\
     no effect in the absence of '-bin-annot'."
 
-let mk_binannot_occurrences f =
-  "-bin-annot-occurrences", Arg.Unit f,
-  " Store every occurrence of a bound name in the .cmt file.\n\
-    This information can be used by external tools to provide\n\
-    features such as project-wide occurrences. This flag has\n\
-    no effect in the absence of '-bin-annot'."
-
 let mk_c f =
   "-c", Arg.Unit f, " Compile only (do not link)"
 
@@ -969,19 +962,9 @@ let mk_dcse f =
 let mk_dlinear f =
   "-dlinear", Arg.Unit f, " (undocumented)"
 
-<<<<<<< oxcaml
-||||||| upstream-base
-let mk_dinterval f =
-  "-dinterval", Arg.Unit f, " (undocumented)"
-
-=======
-let mk_dinterval f =
-  "-dinterval", Arg.Unit f, " (undocumented)"
-
 let mk_dparsetree_loc_ghost_invariants f =
   "-dparsetree-loc-ghost-invariants", Arg.Unit f, " (undocumented)"
 
->>>>>>> upstream-incoming
 let mk_dstartup f =
   "-dstartup", Arg.Unit f, " (undocumented)"
 
@@ -1189,12 +1172,8 @@ module type Core_options = sig
   val _dparsetree_loc_ghost_invariants : unit -> unit
   val _dtypedtree : unit -> unit
   val _dshape : unit -> unit
-<<<<<<< oxcaml
   val _dslambda : unit -> unit
-||||||| upstream-base
-=======
   val _dmatchcomp : unit -> unit
->>>>>>> upstream-incoming
   val _drawlambda : unit -> unit
   val _dlambda : unit -> unit
   val _dblambda : unit -> unit
@@ -1208,12 +1187,8 @@ module type Compiler_options = sig
   val _as_argument_for : string -> unit
   val _as_parameter : unit -> unit
   val _binannot : unit -> unit
-<<<<<<< oxcaml
   val _binannot_cms : unit -> unit
   val _shape_format : string -> unit
-||||||| upstream-base
-=======
->>>>>>> upstream-incoming
   val _binannot_occurrences : unit -> unit
   val _c : unit -> unit
   val _cc : string -> unit
@@ -1461,11 +1436,7 @@ struct
     mk_as_argument_for F._as_argument_for;
     mk_as_parameter F._as_parameter;
     mk_binannot F._binannot;
-<<<<<<< oxcaml
     mk_binannot_cms F._binannot_cms;
-||||||| upstream-base
-=======
->>>>>>> upstream-incoming
     mk_binannot_occurrences F._binannot_occurrences;
     mk_c F._c;
     mk_cc F._cc;
@@ -1691,12 +1662,8 @@ struct
     mk_dparsetree_loc_ghost_invariants F._dparsetree_loc_ghost_invariants;
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
-<<<<<<< oxcaml
     mk_dslambda F._dslambda;
-||||||| upstream-base
-=======
     mk_dmatchcomp F._dmatchcomp;
->>>>>>> upstream-incoming
     mk_drawlambda F._drawlambda;
     mk_dlambda F._dlambda;
     mk_dblambda F._dblambda;
@@ -1725,11 +1692,7 @@ struct
     mk_as_argument_for F._as_argument_for;
     mk_as_parameter F._as_parameter;
     mk_binannot F._binannot;
-<<<<<<< oxcaml
     mk_binannot_cms F._binannot_cms;
-||||||| upstream-base
-=======
->>>>>>> upstream-incoming
     mk_binannot_occurrences F._binannot_occurrences;
     mk_inline_branch_factor F._inline_branch_factor;
     mk_c F._c;
@@ -1875,12 +1838,8 @@ struct
     mk_dparsetree_loc_ghost_invariants F._dparsetree_loc_ghost_invariants;
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
-<<<<<<< oxcaml
     mk_dslambda F._dslambda;
-||||||| upstream-base
-=======
     mk_dmatchcomp F._dmatchcomp;
->>>>>>> upstream-incoming
     mk_drawlambda F._drawlambda;
     mk_dlambda F._dlambda;
     mk_dblambda F._dblambda;
@@ -2032,12 +1991,8 @@ module Make_opttop_options (F : Opttop_options) = struct
     mk_dparsetree_loc_ghost_invariants F._dparsetree_loc_ghost_invariants;
     mk_dtypedtree F._dtypedtree;
     mk_dshape F._dshape;
-<<<<<<< oxcaml
     mk_dslambda F._dslambda;
-||||||| upstream-base
-=======
     mk_dmatchcomp F._dmatchcomp;
->>>>>>> upstream-incoming
     mk_drawlambda F._drawlambda;
     mk_dlambda F._dlambda;
     mk_dblambda F._dblambda;
@@ -2347,14 +2302,8 @@ module Default = struct
     let _i_variance = set print_variance
     let _labels = clear classic
     let _no_absname = clear Clflags.absname
-<<<<<<< oxcaml
     let _no_locs = clear Clflags.locs
-    let _no_alias_deps = set transparent_modules
-||||||| upstream-base
-    let _no_alias_deps = set transparent_modules
-=======
     let _no_alias_deps = set no_alias_deps
->>>>>>> upstream-incoming
     let _no_app_funct = clear applicative_functors
     let _directory d = Clflags.directory := Some d
     let _no_principal = clear principal
@@ -2410,12 +2359,8 @@ module Default = struct
     let _dblambda = set dump_blambda
     let _dletreclambda = set dump_letreclambda
     let _dparsetree = set dump_parsetree
-<<<<<<< oxcaml
     let _dslambda = set dump_slambda
-||||||| upstream-base
-=======
     let _dparsetree_loc_ghost_invariants = set parsetree_ghost_loc_invariant
->>>>>>> upstream-incoming
     let _drawlambda = set dump_rawlambda
     let _dsource = set dump_source
     let _dtypedtree = set dump_typedtree
@@ -2536,16 +2481,12 @@ module Default = struct
     let _as_argument_for s = as_argument_for := Some s
     let _as_parameter = set as_parameter
     let _binannot = set binary_annotations
-<<<<<<< oxcaml
     let _binannot_cms = set binary_annotations_cms
     let _shape_format s =
       match s with
       | "old-merlin" -> shape_format := Old_merlin
       | "debugging-shapes" -> shape_format := Debugging_shapes
       | _ -> ()
-||||||| upstream-base
-=======
->>>>>>> upstream-incoming
     let _binannot_occurrences = set store_occurrences
     let _c = set compile_only
     let _cc s = c_compiler := (Some s)

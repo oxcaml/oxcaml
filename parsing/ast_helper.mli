@@ -74,7 +74,8 @@ module Typ :
       -> core_type
     val arrow: ?loc:loc -> ?attrs:attrs -> arg_label -> core_type -> core_type ->
       mode with_loc list -> mode with_loc list -> core_type
-    val tuple: ?loc:loc -> ?attrs:attrs -> (string option * core_type) list -> core_type
+    val tuple: ?loc:loc -> ?attrs:attrs -> (string option * core_type) list
+               -> core_type
     val unboxed_tuple: ?loc:loc -> ?attrs:attrs
                        -> (string option * core_type) list -> core_type
     val constr: ?loc:loc -> ?attrs:attrs -> lid -> core_type list -> core_type

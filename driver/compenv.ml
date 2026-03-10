@@ -205,7 +205,6 @@ let set_compiler_pass ppf ~name v flag ~filter =
           "Please specify at most one %s <pass>." name
       end
 
-<<<<<<< oxcaml
 let decode_flambda_invariants ppf v ~name =
   match v with
   | "0" -> Some No_checks
@@ -220,8 +219,7 @@ let set_flambda_invariants ppf ~name v flag =
   match decode_flambda_invariants ppf v ~name with
   | None -> ()
   | Some checks -> flag := checks
-||||||| upstream-base
-=======
+
 let handle_dump_option ppf v =
   let module D = Clflags.Dump_option in
   let value, key =
@@ -246,7 +244,6 @@ let handle_dump_option ppf v =
         "dump=%s: %s." key msg
   | Ok () ->
       D.flag option := value
->>>>>>> upstream-incoming
 
 (* 'can-discard=' specifies which arguments can be discarded without warning
    because they are not understood by some versions of OCaml. *)

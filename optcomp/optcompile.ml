@@ -69,9 +69,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
     Compile_common.with_info ~backend:(Opt Backend.backend) ~tool_name ~dump_ext
 
   let interface ~source_file ~output_prefix =
-    with_info ~source_file ~output_prefix ~dump_ext:"cmi"
-      ~compilation_unit:Inferred_from_output_prefix ~kind:Intf
-    @@ fun info ->
+    let unit_info =
+      unit_info_from_cu_or_output_prefix ~source_file Intf ~output_prefix
+        ~compilation_unit:Inferred_from_output_prefix
+    in
+    with_info ~dump_ext:"cmi" unit_info @@ fun info ->
     Compile_common.interface
       ~hook_parse_tree:(Compiler_hooks.execute Compiler_hooks.Parse_tree_intf)
       ~hook_typed_tree:(Compiler_hooks.execute Compiler_hooks.Typed_tree_intf)
@@ -156,9 +158,11 @@ module Make (Backend : Optcomp_intf.Backend) : S = struct
   let implementation_aux ~start_from ~source_file ~output_prefix
       ~keep_symbol_tables
       ~(compilation_unit : Compile_common.compilation_unit_or_inferred) =
-    with_info ~source_file ~output_prefix ~dump_ext:Backend.ext_flambda_obj
-      ~compilation_unit ~kind:Impl
-    @@ fun info ->
+    let unit_info =
+      unit_info_from_cu_or_output_prefix ~source_file Impl ~output_prefix
+        ~compilation_unit
+    in
+    with_info ~dump_ext:Backend.ext_flambda_obj unit_info @@ fun info ->
     if !Oxcaml_flags.internal_assembler
     then Emitaux.binary_backend_available := true;
     Compilenv.reset info.target;

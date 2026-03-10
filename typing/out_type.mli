@@ -97,10 +97,6 @@ val tree_of_typexp: type_or_scheme -> type_expr -> out_type
 (** [tree_of_typexp] generate the [outcometree] for a prepared type
     expression.*)
 
-(* CR sspies: oxcaml re-exposes [tree_of_type_scheme] which upstream removed.
-   Implementation is in printtyp.ml. *)
-val tree_of_type_scheme: type_expr -> out_type
-
 val prepared_type_scheme: type_expr printer
 val prepared_type_expr: type_expr printer
 (** The printers [prepared_type_expr] and [prepared_type_scheme] should only be
@@ -145,6 +141,12 @@ val prepared_extension_constructor:
     Ident.t -> extension_constructor printer
 
 
+val raw_row_desc : Format.formatter -> row_desc -> unit
+val raw_type_expr: Format.formatter -> type_expr -> unit
+val raw_field : Format.formatter -> row_field -> unit
+
+val rewrite_double_underscore_longidents: Env.t -> Longident.t -> Longident.t
+
 (** {1 Declarations }*)
 
 val tree_of_type_declaration:
@@ -168,8 +170,8 @@ val tree_of_cltype_declaration:
 (* CR sspies: oxcaml changed [tree_of_module] to take [module_declaration]
    instead of [module_type]. Implementation is in printtyp.ml. *)
 val tree_of_module:
-    Ident.t -> ?ellipsis:bool -> module_declaration -> rec_status
-    -> out_sig_item
+    Ident.t -> ?ellipsis:bool -> module_declaration -> rec_status ->
+    out_sig_item
 (* CR sspies: oxcaml adds [?abbrev] to [tree_of_modtype].
    Implementation is in printtyp.ml. *)
 val tree_of_modtype: ?abbrev:bool -> module_type -> out_module_type
@@ -177,6 +179,24 @@ val tree_of_signature: Types.signature -> out_sig_item list
 
 val tree_of_class_type: type_or_scheme -> class_type -> out_class_type
 val prepare_class_type: class_type -> unit
+
+val expand_module_type: (Env.t -> module_type -> module_type) ref
+(* Forward declaration to be filled in Mtype. We want to be able to print types
+   in Mtype for debugging purposes and hence don't want to depend on Mtype
+   here. *)
+
+(** {1 For [Translquote] *)
+type typobject_repr = { fields : (string * type_expr) list; open_row : bool }
+type typvariant_repr = {
+  fields : (string * bool * type_expr list) list;
+  name : (Path.t * type_expr list) option;
+  closed : bool;
+  present : (string * row_field) list;
+  all_present : bool;
+  tags : string list option
+}
+val tree_of_typobject_repr : type_expr -> typobject_repr
+val tree_of_typvariant_repr : row_desc -> typvariant_repr
 
 (** {1 Toplevel printing}  *)
 val print_items: (Env.t -> signature_item -> 'a option) ->
@@ -209,10 +229,6 @@ module Ident_names: sig
       [f] *)
   val with_fuzzy: Ident.t -> (unit -> 'a) -> 'a
 
-  (* CR sspies: oxcaml-specific addition. This was originally
-     [Printtyp.Naming_context.reset] (see printtyp.ml). Upstream's
-     [Ident_names] does not include [reset]; the top-level [Out_type.reset]
-     resets everything including ident names. *)
   val reset: unit -> unit
 end
 

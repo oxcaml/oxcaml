@@ -902,8 +902,6 @@ and constructor_representation =
 and label_declaration =
   {
     ld_id: Ident.t;
-    (* CR sspies: upstream has atomicity as a separate [ld_atomic] field
-       rather than folded into [mutability]. *)
     ld_mutable: mutability;
     ld_modalities: Mode.Modality.Const.t;
     ld_type: type_expr;
@@ -1115,6 +1113,26 @@ end
 include Wrapped with type 'a wrapped = 'a
 
 val item_visibility : signature_item -> visibility
+
+(* Constructors are the same *)
+val equal_tag :  tag -> tag -> bool
+
+(* Comparison of tags to store them in sets. *)
+val compare_tag :  tag -> tag -> int
+
+(* Equality *)
+
+val equal_record_representation :
+  record_representation -> record_representation -> bool
+
+val equal_record_unboxed_product_representation :
+  record_unboxed_product_representation -> record_unboxed_product_representation -> bool
+
+val equal_variant_representation :
+  variant_representation -> variant_representation -> bool
+
+val mixed_block_element_of_const_sort :
+  Jkind_types.Sort.Const.t -> mixed_block_element
 
 (** Extracts the list of "value" identifiers bound by a signature.
     "Value" identifiers are identifiers for signature components that

@@ -182,33 +182,25 @@ let set_input_lexbuf ic =
   Location.input_lexbuf := Some lexbuf;
   lexbuf
 
-<<<<<<< oxcaml
+let check_loc_ghost (type a) (kind : a ast_kind) (ast : a) ~inputfile =
+if !Clflags.parsetree_ghost_loc_invariant then
+  let meth : (Ast_iterator.iterator -> Ast_iterator.iterator -> a -> unit) =
+    match kind with
+    | Structure -> (fun i -> i.structure)
+    | Signature -> (fun i -> i.signature)
+  in
+  let source_contents =
+    In_channel.with_open_bin inputfile In_channel.input_all
+  in
+  Ast_invariants.check_loc_ghost meth ast ~source_contents
+
 type 'a ast_result = { ast : 'a; source_file : string }
 
-let file_aux ~tool_name ~source_file inputfile (type a) parse_fun invariant_fun
-             (kind : a ast_kind) : a ast_result =
+(* CR-someday upstream: s/sourcefile/source_file (but merge conflict noise is a
+   nuisance at the moment) *)
+let file_aux ~tool_name ~sourcefile:source_file inputfile (type a) parse_fun
+             invariant_fun (kind : a ast_kind) : a ast_result =
   let { ast; source_file } =
-||||||| upstream-base
-let file_aux ~tool_name ~sourcefile inputfile (type a) parse_fun invariant_fun
-             (kind : a ast_kind) : a =
-  let ast =
-=======
-let check_loc_ghost (type a) (kind : a ast_kind) (ast : a) ~inputfile =
-  if !Clflags.parsetree_ghost_loc_invariant then
-    let meth : (Ast_iterator.iterator -> Ast_iterator.iterator -> a -> unit) =
-      match kind with
-      | Structure -> (fun i -> i.structure)
-      | Signature -> (fun i -> i.signature)
-    in
-    let source_contents =
-      In_channel.with_open_bin inputfile In_channel.input_all
-    in
-    Ast_invariants.check_loc_ghost meth ast ~source_contents
-
-let file_aux ~tool_name ~sourcefile inputfile (type a) parse_fun invariant_fun
-             (kind : a ast_kind) : a =
-  let ast =
->>>>>>> upstream-incoming
     let ast_magic = magic_of_kind kind in
     let (ic, is_ast_file) = open_and_check_magic inputfile ast_magic in
     let close_ic () = close_in ic in
@@ -251,7 +243,7 @@ let file ~tool_name inputfile parse_fun ast_kind =
   let { ast; source_file = _ } =
     file_aux
       ~tool_name
-      ~source_file:inputfile
+      ~sourcefile:inputfile
       inputfile
       parse_fun
       ignore
@@ -276,29 +268,19 @@ let () =
 
 let report_error = Format_doc.compat report_error_doc
 
-<<<<<<< oxcaml
-let parse_file ~tool_name invariant_fun parse kind source_file =
-  Location.input_name := source_file;
-  let inputfile = preprocess source_file in
-||||||| upstream-base
 let parse_file ~tool_name invariant_fun parse kind sourcefile =
   Location.input_name := sourcefile;
   let inputfile = preprocess sourcefile in
-=======
-let parse_file ~tool_name invariant_fun parse kind sourcefile =
-  Location.input_name := sourcefile;
-  let inputfile = preprocess sourcefile in
->>>>>>> upstream-incoming
   Misc.try_finally
     (fun () ->
        Profile.record_call "parsing" @@ fun () ->
-       file_aux ~tool_name ~source_file inputfile parse invariant_fun kind)
+       file_aux ~tool_name ~sourcefile inputfile parse invariant_fun kind)
     ~always:(fun () -> remove_preprocessed inputfile)
 
-let parse_implementation ~tool_name source_file =
+let parse_implementation ~tool_name sourcefile =
   parse_file ~tool_name Ast_invariants.structure
-      (parse Structure) Structure source_file
+      (parse Structure) Structure sourcefile
 
-let parse_interface ~tool_name source_file =
+let parse_interface ~tool_name sourcefile =
   parse_file ~tool_name Ast_invariants.signature
-    (parse Signature) Signature source_file
+    (parse Signature) Signature sourcefile

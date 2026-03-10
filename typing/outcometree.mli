@@ -67,16 +67,6 @@ type out_value =
 
 type out_modality = string
 
-type out_atomicity =
-  | Atomic
-  | Nonatomic
-
-type out_mutability =
-  | Om_immutable
-  | Om_mutable of string option * out_atomicity
-
-
-
 (** This definition avoids a cyclic dependency between Outcometree and Types. *)
 type arg_label =
   | Nolabel
@@ -134,8 +124,6 @@ and out_type =
   | Otyp_object of { fields: (string * out_type) list; open_row:bool}
   | Otyp_record of out_label list
   | Otyp_record_unboxed_product of out_label list
-  (* INVARIANT: [out_mutability] is included for uniformity with [Otyp_record],
-     but it is always [Omm_immutable] *)
   | Otyp_stuff of string
   | Otyp_sum of out_constructor list
   | Otyp_tuple of (string option * out_type) list
@@ -157,7 +145,8 @@ and out_type =
 
 and out_label = {
   olab_name: string;
-  olab_mut: out_mutability;
+  olab_mut: Asttypes.mutable_flag;
+  olab_atomic: Asttypes.atomic_flag;
   olab_type: out_type;
   olab_modalities: out_modality list;
 }
