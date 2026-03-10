@@ -2219,6 +2219,10 @@ let try_expand_safe env ty =
    * Reduce a quoted-eval through a concrete (top-level) type constructor.
    * Cancel a quote-splice pair. *)
 let rec try_reduce_once env t =
+  let path_must_be_toplevel path =
+    if not (Env.path_is_toplevel_in_quotations env path) then
+      raise Cannot_expand
+  in
   let try_reduce_once t = try_reduce_once env t in
   let try_reduce_poly t = if is_Tpoly t then try_reduce_once t else t in
   match get_desc t with
@@ -2238,9 +2242,8 @@ let rec try_reduce_once env t =
     | Tunboxed_tuple tl ->
       Tunboxed_tuple (List.map (fun (l, t) -> (l, new_quote_eval_ty t)) tl)
     (* [<[(t1, t2) typ]> eval]  ==>  [(<[t1]> eval, <[t2]> eval) typ] *)
-    (* CR metaprogramming jbachurski: Path [p] might only be available inside
-       the quote. Thus, we should check if it is top-level here. *)
     | Tconstr (p, tl, a) ->
+      path_must_be_toplevel p;
       Tconstr (p, List.map new_quote_eval_ty tl, a)
     (* [<[ < .. > ]> eval]  ==>  [< <[..]> eval >] *)
     | Tobject (t, ct) ->
@@ -2258,8 +2261,9 @@ let rec try_reduce_once env t =
         try_reduce_once (new_quote_eval_ty t),
         ref (
           Option.map
-            (* CR metaprogramming jbachurski: Only reduce top-level [p]. *)
-            (fun (p, tl) -> p, List.map new_quote_eval_ty tl)
+            (fun (p, tl) ->
+              path_must_be_toplevel p;
+              p, List.map new_quote_eval_ty tl)
             !ct))
     (* [<[ < a: t, .. > ]> eval] ==> [<a : <[t]> eval, <[..]> eval >] *)
     | Tfield (s, k, t_method, t_rest) ->
@@ -2309,7 +2313,7 @@ let rec try_reduce_once env t =
     (*     [<[ module S with type typ = t ]> eval]
         ==> [module S with type typ = <[t]> eval] *)
     | Tpackage (p, fl) ->
-      (* CR metaprogramming jbachurski: Only reduce if [p] is top-level. *)
+      path_must_be_toplevel p;
       Tpackage (p, List.map (fun (n, t) -> n, new_quote_eval_ty t) fl)
     (* It is safe not to expand [Tof_kind], and we do not need to currently *)
     | Tof_kind _ -> raise Cannot_expand
