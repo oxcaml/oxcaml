@@ -593,11 +593,9 @@ let untransl_mod_bounds ?(verbose = false) (bounds : Jkind.Mod_bounds.t) :
       ( { Location.txt = Parsetree.Mode s; loc = Location.none },
         only_when_verbose )
     in
-    [ mk_annot Externality.max Externality.print (externality bounds) ]
+    [mk_annot Externality.max Externality.print (externality bounds)]
     |> List.partition_map (fun (annot, only_when_verbose) ->
-        match only_when_verbose with
-        | false -> Left annot
-        | true -> Right annot)
+        match only_when_verbose with false -> Left annot | true -> Right annot)
   in
   let verbose_annots =
     match verbose with

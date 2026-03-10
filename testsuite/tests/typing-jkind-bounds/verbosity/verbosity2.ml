@@ -32,7 +32,7 @@ type t
 type t : immediate
 [%%expect {|
 type t
-  : immediate
+  : value non_pointer
       mod global
           many
           stateless
