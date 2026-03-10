@@ -13,35 +13,43 @@ open (struct
 end : sig
   val eval : 'a expr -> 'a eval
 end)
+type nonrec 'a eval' = 'a eval
 [%%expect {|
 val eval : 'a expr -> 'a eval = <fun>
+type nonrec 'a eval' = 'a eval
 |}]
+#mark_toplevel_in_quotations
 
 (* The [eval] argument is annotated at introduction, and its result is typed *)
 let f (e : <[int list]> expr) : int list = eval e
 [%%expect {|
 val f : <[int list]> expr -> int list = <fun>
 |}]
+(* The [eval] is preserved in printing if under a non-[Predef] annotation *)
+let f (e : <[int list]> expr) : <[int list]> eval' = eval e
+[%%expect {|
+val f : <[int list]> expr -> <[int list]> eval' = <fun>
+|}]
 
 (* The [eval] argument is annotated at introduction *)
 let f (e : <[int list]> expr) = eval e
 [%%expect {|
-val f : <[int list]> expr -> <[int list]> eval = <fun>
+val f : <[int list]> expr -> int list = <fun>
 |}]
 (* The [eval] argument is annotated at call-site *)
 let f e = eval (e : <[int list]> expr)
 [%%expect {|
-val f : <[int list]> expr -> <[int list]> eval = <fun>
+val f : <[int list]> expr -> int list = <fun>
 |}]
 (* The [eval] function type's parameter is annotated *)
 let f e = (eval : <[int list]> expr -> _) e
 [%%expect {|
-val f : <[int list]> expr -> <[int list]> eval = <fun>
+val f : <[int list]> expr -> int list = <fun>
 |}]
 (* The [eval] function type's parameter and (unreduced) result are annotated *)
-let f e = (eval : <[int list]> expr -> <[int list]> eval) e
+let f e = (eval : <[int list]> expr -> <[int list]> eval') e
 [%%expect {|
-val f : <[int list]> expr -> <[int list]> eval = <fun>
+val f : <[int list]> expr -> <[int list]> eval' = <fun>
 |}]
 (* The [eval] function type's parameter and (reduced) result are annotated *)
 let f e = (eval : <[int list]> expr -> int list) e

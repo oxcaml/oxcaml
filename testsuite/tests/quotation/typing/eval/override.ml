@@ -8,9 +8,9 @@
 (* Test that having another [eval]-named type in scope is sane. *)
 
 (* Predefined [eval] reduces as expected *)
-let f (x : <[int]> eval) : int = x
+let x : <[int]> eval = 42
 [%%expect {|
-val f : <[int]> eval -> int = <fun>
+val x : int = 42
 |}]
 
 (* Define another type named [eval] *)

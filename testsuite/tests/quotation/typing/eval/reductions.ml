@@ -13,12 +13,12 @@
 
 let f (x : <[int]> eval) : int = x
 [%%expect {|
-val f : <[int]> eval -> int = <fun>
+val f : int -> int = <fun>
 |}]
 
 let f (x : <[string]> eval) : string = x
 [%%expect {|
-val f : <[string]> eval -> string = <fun>
+val f : string -> string = <fun>
 |}]
 
 let f (x : <[int]> eval) : string = x
@@ -79,7 +79,7 @@ val f : ('a : any). 'a expr -> 'a eval = <fun>
 |}]
 let f (x : <[int]> expr) = eval x
 [%%expect {|
-val f : <[int]> expr -> <[int]> eval = <fun>
+val f : <[int]> expr -> int = <fun>
 |}]
 
 
@@ -249,8 +249,7 @@ val f :
 let f (x : <[('a. 'a -> 'a) -> int]> expr)
     : ('a. <[ $('a) -> $('a) ]> eval) -> int = eval x
 [%%expect {|
-val f :
-  <[('a. 'a -> 'a) -> int]> expr -> ('a. <[$('a) -> $('a)]> eval) -> int =
+val f : <[('a. 'a -> 'a) -> int]> expr -> ('a. 'a eval -> 'a eval) -> int =
   <fun>
 |}]
 (* fully re-staged *)
@@ -267,7 +266,7 @@ let f (x : <[('a. 'a -> $('b) -> 'a) -> $('b)]> expr)
 val f :
   ('b : any).
     <[('a. 'a -> $('b) -> 'a) -> $('b)]> expr ->
-    ('a. <[$('a) -> $('b) -> $('a)]> eval) -> 'b eval =
+    ('a. 'a eval -> 'b eval -> 'a eval) -> 'b eval =
   <fun>
 |}]
 (* nested quantifiers *)
@@ -362,7 +361,7 @@ val f : <[<[$($('a)) expr]> expr]> expr -> <[<[$($('a)) eval]> eval]> eval =
 let f (x : <[int]> expr) : <[int]> eval =
   eval0 x
 [%%expect {|
-val f : <[int]> expr -> <[int]> eval = <fun>
+val f : <[int]> expr -> int = <fun>
 |}]
 let f (x : <[ <[int]> expr ]> expr) : int =
   eval0 <[$eval1 $x]>
@@ -475,11 +474,11 @@ module QuoteKindedParam : sig type 'a t end
 (* [expr] should not reduce, as it has a quote-kinded parameter *)
 let f (x : <[$('a) expr]> eval) : 'a eval expr = x
 [%%expect {|
-val f : <[$('a) expr]> eval -> 'a eval expr = <fun>
+val f : 'a eval expr -> 'a eval expr = <fun>
 |}]
 let f (x : <[<[int]> expr]> eval) : <[<[int]>]> eval expr = x
 [%%expect {|
-val f : <[<[int]> expr]> eval -> <[<[int]>]> eval expr = <fun>
+val f : <[<[int]>]> eval expr -> <[<[int]>]> eval expr = <fun>
 |}]
 
 (* [eval] should not reduce, as it has a quote-kinded parameter *)
@@ -511,26 +510,25 @@ Error: This expression has type "<[<[int]> eval]> eval" = "int"
 (* This one should definitely succeed *)
 let f (x : <[<[int]> eval]> eval) : int = x
 [%%expect {|
-val f : <[<[int]> eval]> eval -> int = <fun>
+val f : int -> int = <fun>
 |}]
 
 (* quote-kinded types should not reduce *)
 let f (x : <[QuoteKinded.t]> eval expr) : QuoteKinded.t expr = x
 [%%expect {|
-val f : <[QuoteKinded.t]> eval expr -> QuoteKinded.t expr = <fun>
+val f : QuoteKinded.t expr -> QuoteKinded.t expr = <fun>
 |}]
 
 (* quote-kind-parameterised types should not reduce *)
 let f (x : <[$('a) QuoteKindedParam.t]> eval expr) : 'a eval QuoteKindedParam.t expr = x
 [%%expect {|
-val f :
-  <[$('a) QuoteKindedParam.t]> eval expr -> 'a eval QuoteKindedParam.t expr =
+val f : 'a eval QuoteKindedParam.t expr -> 'a eval QuoteKindedParam.t expr =
   <fun>
 |}]
 let f (x : <[<[int]> QuoteKindedParam.t]> eval expr)
          : <[<[int]>]> eval QuoteKindedParam.t expr = x
 [%%expect {|
 val f :
-  <[<[int]> QuoteKindedParam.t]> eval expr ->
+  <[<[int]>]> eval QuoteKindedParam.t expr ->
   <[<[int]>]> eval QuoteKindedParam.t expr = <fun>
 |}]

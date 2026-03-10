@@ -2732,7 +2732,6 @@ let type_for_annotation ~env ~loc typ =
     match get_desc ty with Tvar _ | Tunivar _ -> false | _ -> true
   in
   let rec go aliased ty =
-    let ty = Ctype.reduce_head ty in
     let ctyp_desc =
       if aliasable ty && List.memq ty aliased
       then Ttyp_var (None, (Jkind.Builtin.any ~why:Wildcard).annotation)

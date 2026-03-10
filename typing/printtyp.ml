@@ -1384,6 +1384,10 @@ let add_type_to_preparation = prepare_type
 (* Disabled in classic mode when printing an unification error *)
 let print_labels = ref true
 
+(* Whether to expand [eval] in types for reductions before printing.
+   Disabled when printing errors, as they usually contain an expansion trace. *)
+let print_reduced_evals = ref true
+
 let out_jkind_of_const_jkind env jkind =
   Ojkind_const (Jkind.Const.to_out_jkind_const env jkind)
 
@@ -1543,7 +1547,7 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_ret (Orm_any (tree_of_modes mode), tree)
     | Other _ -> tree
   in
-  let ty = Ctype.reduce_head ty in
+  let ty = Ctype.reduce_head ~expand_eval:!print_reduced_evals ty in
   let px = proxy ty in
   if List.memq px !printed_aliases && not (List.memq px !delayed) then
    let non_gen = is_non_gen mode (Transient_expr.type_expr px) in
@@ -3046,7 +3050,9 @@ let trees_of_type_expansion'
     let t' = if proxy t == proxy t' then unalias t' else t' in
     (* beware order matter due to side effect,
        e.g. when printing object types *)
+    print_reduced_evals := false; (* preserve unreduced eval in types *)
     let first = tree_of_typexp' t in
+    print_reduced_evals := true;
     let second = tree_of_typexp' t' in
     if first = second then Same first
     else Diff(first,second)
@@ -3507,6 +3513,7 @@ let error trace_format mode subst env tr txt1 ppf txt2 ty_expect_explanation =
       print_labels := true
     with exn ->
       print_labels := true;
+      print_reduced_evals := true;
       raise exn
 
 let report_error trace_format ppf mode env tr

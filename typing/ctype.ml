@@ -2157,19 +2157,21 @@ let safe_abbrev env ty =
       cleanup_abbrev ();
       false
 
-(* Expand the head of a type once.
-   Raise Cannot_expand if the type cannot be expanded.
-   May raise Escape, if a recursion was hidden in the type. *)
-let rec try_expand_once env ty =
+let rec try_expand_once_gen expand_abbrev env ty =
   match get_desc ty with
     Tconstr _ -> expand_abbrev env ty
   | Tsplice t ->
-      try_expand_once env t |> new_splice_ty
+      try_expand_once_gen expand_abbrev env t |> new_splice_ty
   | Tquote t ->
-      try_expand_once env t |> new_quote_ty
+      try_expand_once_gen expand_abbrev env t |> new_quote_ty
   | Tquote_eval t ->
-      try_expand_once env t |> new_quote_eval_ty
+      try_expand_once_gen expand_abbrev env t |> new_quote_eval_ty
   | _ -> raise Cannot_expand
+
+(* Expand the head of a type once.
+   Raise Cannot_expand if the type cannot be expanded.
+   May raise Escape, if a recursion was hidden in the type. *)
+let try_expand_once = try_expand_once_gen expand_abbrev
 
 (* This one only raises Cannot_expand *)
 let try_expand_safe env ty =
@@ -2332,13 +2334,19 @@ let rec try_reduce ty =
   try try_reduce ty'
   with Cannot_expand -> ty'
 
-let reduce_head ty =
-  try try_reduce ty
-  with Cannot_expand -> ty
+(* [Predef]'s [eval] is special -- we want to always expand it in [reduce_head],
+   so we special-case its abbreviation expansion there. *)
+let expand_eval_abbrev () ty =
+  match get_desc ty with
+  | Tconstr (path, [ty], _) when Path.same path Predef.path_eval ->
+    new_quote_eval_ty (new_splice_ty ty)
+  | _ -> raise Cannot_expand
+
+let try_expand_eval_once = try_expand_once_gen expand_eval_abbrev
 
 (* Fully expand the head of a type. *)
-let try_expand_head
-    (try_once : Env.t -> type_expr -> type_expr) env ty =
+let try_expand_head (type env)
+    (try_once : env -> type_expr -> type_expr) (env : env) ty =
   let rec loop try_once env ty =
     let ty' = try_once env ty in
     try loop try_once env ty'
@@ -2348,6 +2356,15 @@ let try_expand_head
   in
   try loop try_once env ty
   with Cannot_expand -> try_reduce ty
+
+let reduce_head ~expand_eval ty =
+  let try_once =
+    if expand_eval
+    then try_expand_eval_once
+    else (fun () _ -> raise Cannot_expand)
+  in
+  try try_expand_head try_once () ty
+  with Cannot_expand -> ty
 
 (* Unsafe full expansion, may raise [Unify [Escape _]]. *)
 let expand_head_unif env ty =
@@ -2419,16 +2436,7 @@ let safe_abbrev_opt env ty =
     Btype.backtrack snap;
     false
 
-let rec try_expand_once_opt env ty =
-  match get_desc ty with
-    Tconstr _ -> expand_abbrev_opt env ty
-  | Tsplice t ->
-      try_expand_once_opt env t |> new_splice_ty
-  | Tquote t ->
-      try_expand_once_opt env t |> new_quote_ty
-  | Tquote_eval t ->
-      try_expand_once_opt env t |> new_quote_eval_ty
-  | _ -> raise Cannot_expand
+let try_expand_once_opt = try_expand_once_gen expand_abbrev_opt
 
 let try_expand_safe_opt env ty =
   let snap = Btype.snapshot () in
@@ -5705,6 +5713,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           TypePairs.add pairs (t1', t2');
           match (get_desc t1', get_desc t2') with
             (Tvar { jkind }, _) when may_instantiate inst_nongen t1' ->
+              let t2 = reduce_head ~expand_eval:false t2 in
               moregen_occur env (get_level t1') t2;
               update_scope_for Moregen (get_scope t1') t2;
               (* use [check], not [constrain], here because [constrain] would be like
