@@ -1280,16 +1280,14 @@ let sub_or_error ?origin:_origin
   if not (enable_sub_or_error && !Clflags.ikinds)
   then Jkind.sub_or_error ~type_equal ~context ~level env t1 t2
   else
-    with_ctx ~mode:Solver.Normal ~env:(Some env) (fun ctx ->
-        match
-          Ldd.leq_with_reason
-            (Solver.ckind_of_jkind ctx t1)
-            (Solver.ckind_of_jkind ctx t2)
-        with
-        | [] -> Ok ()
-        | _ ->
-          (* Delegate to Jkind for detailed error reporting. *)
-          Jkind.sub_or_error ~type_equal ~context ~level env t1 t2)
+    let { lhs_for_leq = sub_poly; rhs_for_leq = super_poly; _ } =
+      compute_subcheck_polys ~context env t1 t2
+    in
+    match Ldd.leq_with_reason sub_poly super_poly with
+    | [] -> Ok ()
+    | _ ->
+      (* Delegate to Jkind for detailed error reporting. *)
+      Jkind.sub_or_error ~type_equal ~context ~level env t1 t2
 
 (** Substitute constructor ikinds according to [lookup] without requiring
     Env. *)
