@@ -97,13 +97,12 @@ val f : <[($('a), $('b)) Either.t]> expr -> ('a eval, 'b eval) Either.t =
   <fun>
 |}]
 (* non-top-level type constructor -- locally abstract type *)
-(* CR metaprogramming jbachurski: This should not state [<[t]> eval = t]. *)
 let _ = <[ fun (type t) (x : t) -> $(eval <[ x ]>) ]>
 [%%expect {|
 Line 1, characters 36-50:
 1 | let _ = <[ fun (type t) (x : t) -> $(eval <[ x ]>) ]>
                                         ^^^^^^^^^^^^^^
-Error: This expression has type "<[t]> eval" = "t"
+Error: This expression has type "<[t]> eval"
        but an expression was expected of type "<['a]> expr"
 |}]
 
@@ -322,8 +321,6 @@ module S () = struct
   end
 end
 #mark_toplevel_in_quotations
-(* CR metaprogramming jbachurski: This should not state that
-   [<[(module Z.T)]> eval = (module Z.T)]. *)
 let _ = <[
   (* It is illegal to write [S()] in a type, so we have an intermediate [Z]. *)
   let module Z = S () in
@@ -331,14 +328,12 @@ let _ = <[
   fun (type t) (module M : Z.T) -> $(eval <[ (module M : Z.T) ]>) ]>
 [%%expect {|
 module S : functor () -> sig module type T = sig type s end end
-Line 13, characters 36-65:
-13 |   fun (type t) (module M : Z.T) -> $(eval <[ (module M : Z.T) ]>) ]>
+Line 11, characters 36-65:
+11 |   fun (type t) (module M : Z.T) -> $(eval <[ (module M : Z.T) ]>) ]>
                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "<[(module Z.T)]> eval" = "(module Z.T)"
+Error: This expression has type "<[(module Z.T)]> eval"
        but an expression was expected of type "<['a]> expr"
 |}]
-(* CR metaprogramming jbachurski: As above, but also the package constraint
-   should say [s = <[t]> eval] and not [s = t]. *)
 let _ = <[
   let module Z = S () in
   fun (type t) (module M : Z.T with type s = t) ->
@@ -347,8 +342,7 @@ let _ = <[
 Line 4, characters 6-51:
 4 |      $(eval <[ (module M : Z.T with type s = t) ]>) ]>
           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type
-         "<[(module Z.T with type s = t)]> eval" = "(module Z.T with type s = t)"
+Error: This expression has type "<[(module Z.T with type s = t)]> eval"
        but an expression was expected of type "<['a]> expr"
 |}]
 
