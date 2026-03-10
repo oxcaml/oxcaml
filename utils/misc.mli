@@ -32,10 +32,6 @@ val fatal_errorf: ('a, Format.formatter, unit, 'b) format4 -> 'a
 val fatal_errorf_doc: ('a, Format_doc.formatter, unit, 'b) format4 -> 'a
   (** Like [fatal_errorf] but using [Format_doc]. *)
 
-val splices_should_not_exist_after_eval : unit -> _
-  (** Raise a [Fatal_error] explaining that a slambda splice shouldn't exist in
-      lambda code after slambda eval has happened. *)
-
 exception Fatal_error
 
 (** {1 Exceptions and finalization} *)
@@ -1114,6 +1110,14 @@ end
 
 (** Propositional equality *)
 type (_, _) eq = Refl : ('a, 'a) eq
+
+(** Propositional comparison *)
+type ('a, 'b) comparison =
+  | Less_than : ('a, 'b) comparison
+  | Equal : ('a, 'a) comparison
+  | Greater_than : ('a, 'b) comparison
+
+val comparison_result : ('a, 'b) comparison -> int
 
 (** Utilities for module-level programming *)
 module type T = sig

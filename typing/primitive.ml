@@ -859,24 +859,54 @@ let prim_has_valid_reprs ~loc prim =
     | "%peek" | "%poke" ->
       (* Arities and layouts of these primitives are checked in [Translprim] *)
       fun _ -> Success
-    | "%unsafe_get_idx" ->
+    | "%get_idx" ->
       check [
         is (Same_as_ocaml_repr C.value);
         is (Same_as_ocaml_repr C.bits64);
         any
       ]
-    | "%unsafe_get_idx_imm" ->
+    | "%get_idx_imm" ->
       check [
         is (Same_as_ocaml_repr C.value);
         is (Same_as_ocaml_repr C.bits64);
         any
       ]
-    | "%unsafe_set_idx" ->
+    | "%set_idx" ->
       check [
         is (Same_as_ocaml_repr C.value);
         is (Same_as_ocaml_repr C.bits64);
         any;
         is (Same_as_ocaml_repr C.value);
+      ]
+    | "%unsafe_array_idx" ->
+      check [
+        is (Same_as_ocaml_repr C.value);
+        is (Same_as_ocaml_repr C.bits64);
+      ]
+    | "%unsafe_array_idx_indexed_by_int8#" ->
+      check [
+        is (Same_as_ocaml_repr C.bits8);
+        is (Same_as_ocaml_repr C.bits64);
+      ]
+    | "%unsafe_array_idx_indexed_by_int16#" ->
+      check [
+        is (Same_as_ocaml_repr C.bits16);
+        is (Same_as_ocaml_repr C.bits64);
+      ]
+    | "%unsafe_array_idx_indexed_by_int32#" ->
+      check [
+        is (Same_as_ocaml_repr C.bits32);
+        is (Same_as_ocaml_repr C.bits64);
+      ]
+    | "%unsafe_array_idx_indexed_by_int64#" ->
+      check [
+        is (Same_as_ocaml_repr C.bits64);
+        is (Same_as_ocaml_repr C.bits64);
+      ]
+    | "%unsafe_array_idx_indexed_by_nativeint#" ->
+      check [
+        is (Same_as_ocaml_repr C.word);
+        is (Same_as_ocaml_repr C.bits64);
       ]
     | "%unsafe_get_ptr" ->
       check [

@@ -2,14 +2,13 @@
 layout: documentation-page
 collectionName: Kinds
 title: Syntax
-slug: syntax
 ---
 
 # Syntax for kind annotations
 
 [overview]: ../intro
 [manual]: https://ocaml.org/manual/language.html
-[unboxed types]: ../../unboxed-types/01-intro
+[unboxed types]: ../../unboxed-types/intro
 [nullability]: ../non-modal#nullability
 [externality]: ../non-modal#externality
 

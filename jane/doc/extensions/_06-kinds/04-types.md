@@ -2,7 +2,6 @@
 layout: documentation-page
 collectionName: Kinds
 title: Kinds of types
-slug: types
 ---
 
 # Kinds of types

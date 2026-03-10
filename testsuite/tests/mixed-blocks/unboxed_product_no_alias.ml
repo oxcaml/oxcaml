@@ -13,7 +13,7 @@
    deep-copied when read or written, causing mutations via set_idx to be visible
    through previously-read values or to affect the source of a write. *)
 
-external set_idx : 'a -> ('a, 'b) idx_mut -> 'b -> unit = "%unsafe_set_idx"
+external set_idx : 'a -> ('a, 'b) idx_mut -> 'b -> unit = "%set_idx"
 
 (* Simple case: unboxed record with two fields *)
 type r = #{ i : int; j : unit }

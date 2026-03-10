@@ -470,7 +470,9 @@ and type_with_label ctxt f (label, c, mode) =
 
 and jkind_annotation ?(nested = false) ctxt f k = match k.pjka_desc with
   | Pjk_default -> pp f "_"
-  | Pjk_abbreviation s -> longident_loc f s
+  | Pjk_abbreviation (s, sa) ->
+    longident_loc f s;
+    List.iter (fun a -> pp f " %s" a.Location.txt) sa
   | Pjk_mod (t, modes) ->
     begin match modes with
     | [] -> Misc.fatal_error "malformed jkind annotation"
@@ -2295,21 +2297,6 @@ and directive_argument f x =
 and block_access ctxt f = function
   | Baccess_field li ->
     pp f ".%a" longident_loc li
-  | Baccess_array (mut, index_kind, index) ->
-    let dotop =
-      match mut with
-      | Mutable -> "."
-      | Immutable -> ".:"
-    in
-    let suffix = match index_kind with
-      | Index_int -> ""
-      | Index_unboxed_int64 -> "L"
-      | Index_unboxed_int32 -> "l"
-      | Index_unboxed_int16 -> "S"
-      | Index_unboxed_int8 -> "s"
-      | Index_unboxed_nativeint -> "n"
-    in
-    pp f "%s%s(%a)" dotop suffix (expression ctxt) index
   | Baccess_block (mut, index) ->
     let s =
       match mut with

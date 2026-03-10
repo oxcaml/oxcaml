@@ -170,6 +170,52 @@ module Separability = struct
     | Maybe_separable -> Fmt.fprintf ppf "maybe_separable"
 end
 
+module Pointerness = struct
+  type t =
+    | Non_pointer
+    | Maybe_pointer
+
+  let max = Maybe_pointer
+
+  let min = Non_pointer
+
+  let equal p1 p2 =
+    match p1, p2 with
+    | Non_pointer, Non_pointer -> true
+    | Maybe_pointer, Maybe_pointer -> true
+    | (Non_pointer | Maybe_pointer), _ -> false
+
+  let less_or_equal p1 p2 : Misc.Le_result.t =
+    match p1, p2 with
+    | Non_pointer, Non_pointer -> Equal
+    | Non_pointer, Maybe_pointer -> Less
+    | Maybe_pointer, Non_pointer -> Not_le
+    | Maybe_pointer, Maybe_pointer -> Equal
+
+  let le p1 p2 = Misc.Le_result.is_le (less_or_equal p1 p2)
+
+  let meet p1 p2 =
+    match p1, p2 with
+    | Non_pointer, (Non_pointer | Maybe_pointer) | Maybe_pointer, Non_pointer ->
+      Non_pointer
+    | Maybe_pointer, Maybe_pointer -> Maybe_pointer
+
+  let join p1 p2 =
+    match p1, p2 with
+    | Maybe_pointer, (Maybe_pointer | Non_pointer) | Non_pointer, Maybe_pointer
+      ->
+      Maybe_pointer
+    | Non_pointer, Non_pointer -> Non_pointer
+
+  let to_string = function
+    | Non_pointer -> "non_pointer"
+    | Maybe_pointer -> "maybe_pointer"
+
+  let print ppf t = Fmt.fprintf ppf "%s" (to_string t)
+
+  let is_max p = equal p max
+end
+
 module Axis = struct
   module Nonmodal = struct
     type 'a t =
@@ -234,6 +280,13 @@ module Per_axis = struct
       | Nullability -> Nullability.le a b
       | Separability -> Separability.le a b
 
+    let equal : type a. a t -> a -> a -> bool =
+     fun ax a b ->
+      match ax with
+      | Externality -> Externality.equal a b
+      | Nullability -> Nullability.equal a b
+      | Separability -> Separability.equal a b
+
     let meet : type a. a t -> a -> a -> a =
      fun ax a b ->
       match ax with
@@ -253,13 +306,24 @@ module Per_axis = struct
       | Nullability -> Nullability.print
       | Separability -> Separability.print
 
-    let eq_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
+    let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
      fun a b ->
       match a, b with
       | Externality, Externality -> Some Refl
       | Nullability, Nullability -> Some Refl
       | Separability, Separability -> Some Refl
       | _ -> None
+
+    let compare_obj : type a b. a t -> b t -> (a, b) Misc.comparison =
+     fun a b ->
+      match a, b with
+      | Externality, Externality -> Equal
+      | Externality, _ -> Less_than
+      | _, Externality -> Greater_than
+      | Nullability, Nullability -> Equal
+      | Nullability, _ -> Less_than
+      | _, Nullability -> Greater_than
+      | Separability, Separability -> Equal
   end
 
   let min : type a. a t -> a = function[@inline available]
@@ -275,6 +339,12 @@ module Per_axis = struct
     match ax with
     | Modal ax -> (Mode.Crossing.Per_axis.le [@inlined hint]) ax a b
     | Nonmodal ax -> (Nonmodal.le [@inlined hint]) ax a b
+
+  let equal : type a. a t -> a -> a -> bool =
+   fun[@inline available] ax a b ->
+    match ax with
+    | Modal ax -> (Mode.Crossing.Per_axis.equal [@inlined hint]) ax a b
+    | Nonmodal ax -> (Nonmodal.equal [@inlined hint]) ax a b
 
   let meet : type a. a t -> a -> a -> a =
    fun[@inline available] ax a b ->
@@ -292,12 +362,20 @@ module Per_axis = struct
     | Modal ax -> Mode.Crossing.Per_axis.print ax
     | Nonmodal ax -> Nonmodal.print ax
 
-  let eq_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
+  let equal_obj : type a b. a t -> b t -> (a, b) Misc.eq option =
    fun a b ->
     match a, b with
-    | Modal ax0, Modal ax1 -> Mode.Crossing.Per_axis.eq_obj ax0 ax1
-    | Nonmodal ax0, Nonmodal ax1 -> Nonmodal.eq_obj ax0 ax1
+    | Modal ax0, Modal ax1 -> Mode.Crossing.Per_axis.equal_obj ax0 ax1
+    | Nonmodal ax0, Nonmodal ax1 -> Nonmodal.equal_obj ax0 ax1
     | _ -> None
+
+  let compare_obj : type a b. a t -> b t -> (a, b) Misc.comparison =
+   fun a b ->
+    match a, b with
+    | Modal ax0, Modal ax1 -> Mode.Crossing.Per_axis.compare_obj ax0 ax1
+    | Modal _, _ -> Less_than
+    | _, Modal _ -> Greater_than
+    | Nonmodal ax0, Nonmodal ax1 -> Nonmodal.compare_obj ax0 ax1
 
   let print_obj : type a. Fmt.formatter -> a t -> unit =
    fun ppf ax -> Fmt.pp_print_string ppf (name ax)

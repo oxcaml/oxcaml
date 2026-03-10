@@ -141,7 +141,7 @@ and add_package_type bv (lid, l) =
 and add_jkind bv (jkind : jkind_annotation) =
   match jkind.pjka_desc with
   | Pjk_default -> ()
-  | Pjk_abbreviation l -> add bv l
+  | Pjk_abbreviation (l, _sa) -> add bv l
   | Pjk_mod (jkind, (_ : modes)) -> add_jkind bv jkind
   | Pjk_with (jkind, typ, (_ : modalities)) ->
       add_jkind bv jkind;
@@ -371,8 +371,6 @@ and add_labeled_tuple_expr bv el = List.iter (add_expr bv) (List.map snd el)
 
 and add_block_access bv = function
   | Baccess_field fld -> add bv fld
-  | Baccess_array (_, _, index) ->
-    add_expr bv index
   | Baccess_block (_, idx) ->
     add_expr bv idx
 

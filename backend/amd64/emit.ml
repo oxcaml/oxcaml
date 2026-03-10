@@ -749,10 +749,10 @@ let emit_stack_check ~size_in_bytes ~save_registers ~save_simd =
   let threshold_offset =
     (Domainstate.stack_ctx_words * 8) + Stack_check.stack_threshold_size
   in
-  if save_registers then I.push r10;
+  if save_registers then push r10;
   I.lea (mem64 NONE (-(size_in_bytes + threshold_offset)) (Scalar RSP)) r10;
   I.cmp (domain_field Domainstate.Domain_current_stack) r10;
-  if save_registers then I.pop r10;
+  if save_registers then pop r10;
   I.jb (emit_asm_label_arg overflow);
   D.define_label ret;
   stack_realloc
@@ -1708,9 +1708,13 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
   let res_used =
     match simd.res with
     | Res_none -> 0
-    | First_arg ->
-      assert (Reg.same_loc instr.arg.(0) instr.res.(0));
-      1
+    | Arg rr ->
+      Array.iteri
+        (fun r a ->
+          let a = Simd.unarized_reg_index simd.args a in
+          assert (Reg.same_loc instr.arg.(a) instr.res.(r)))
+        rr;
+      Array.length rr
     | Res rr ->
       Array.iteri
         (fun i ({ loc; _ } : Simd.arg) -> assert_loc loc instr.res.(i))
@@ -1791,7 +1795,7 @@ let emit_simd_instr ?mode (simd : Simd.instr) imm instr =
   in
   let args =
     match simd.res with
-    | Res_none | First_arg -> args
+    | Res_none | Arg _ -> args
     | Res rr ->
       Array.fold_left
         (fun (idx, acc) ({ loc; enc } : Simd.arg) ->
@@ -1880,7 +1884,7 @@ let prologue_stack_offset () =
   frame_size () - 8 - if fp then 8 else 0
 
 (* Emit an instruction *)
-let emit_instr ~first ~fallthrough i =
+let emit_instr ~first ~last ~fallthrough i =
   let open Simd_instrs in
   emit_debug_info_linear i;
   match i.desc with
@@ -1906,10 +1910,14 @@ let emit_instr ~first ~fallthrough i =
     then (
       I.add (int n) rsp;
       D.cfi_adjust_cfa_offset ~bytes:(-n));
-    if fp then I.pop rbp
+    if fp
+    then (
+      I.pop rbp;
+      D.cfi_adjust_cfa_offset ~bytes:(-8))
   | Lepilogue_close ->
     (* reset CFA back cause function body may continue *)
     let n = prologue_stack_offset () in
+    let n = if fp then n + 8 else n in
     if n <> 0 then D.cfi_adjust_cfa_offset ~bytes:n
   | Lop (Move | Spill | Reload) -> move i.arg.(0) i.res.(0)
   | Lop Dummy_use -> ()
@@ -2528,16 +2536,20 @@ let emit_instr ~first ~fallthrough i =
     D.cfi_adjust_cfa_offset ~bytes:(-8);
     stack_offset := !stack_offset - 16
   | Lraise k -> (
+    let call_raise sym =
+      emit_call (Cmm.global_symbol sym);
+      record_frame Reg.Set.empty (Dbg_raise i.dbg);
+      (* Add a nop if this is the last instruction of this function, so that the
+         return address (used in backtraces) lies in the right function. *)
+      if last then I.nop ()
+    in
     match k with
     | Lambda.Raise_regular ->
       I.mov (int 0) (domain_field Domainstate.Domain_backtrace_pos);
-      emit_call (Cmm.global_symbol "caml_raise_exn");
-      record_frame Reg.Set.empty (Dbg_raise i.dbg)
+      call_raise "caml_raise_exn"
     | Lambda.Raise_reraise ->
-      emit_call
-        (Cmm.global_symbol
-           (if Config.runtime5 then "caml_reraise_exn" else "caml_raise_exn"));
-      record_frame Reg.Set.empty (Dbg_raise i.dbg)
+      call_raise
+        (if Config.runtime5 then "caml_reraise_exn" else "caml_raise_exn")
     | Lambda.Raise_notrace ->
       I.mov (domain_field Domainstate.Domain_exn_handler) rsp;
       I.pop (domain_field Domainstate.Domain_exn_handler);
@@ -2548,24 +2560,22 @@ let emit_instr ~first ~fallthrough i =
       ~save_registers:(not first)
       ~save_simd:(must_save_simd_regs i.live)
 
-let emit_instr ~first ~fallthrough i =
-  try emit_instr ~first ~fallthrough i with
+let emit_instr ~first ~last ~fallthrough i =
+  try emit_instr ~first ~last ~fallthrough i with
   | I.Extension_disabled _ as exn -> raise exn
   | exn ->
     Format.eprintf "Exception whilst emitting instruction:@ %a\n"
       Printlinear.instr i;
     raise exn
 
+let[@warning "-fragile-match"] is_Lend = function Lend -> true | _ -> false
+
 let rec emit_all ~first ~fallthrough i =
-  match i.desc with
-  | Lend -> ()
-  | Lprologue | Lepilogue_open | Lepilogue_close | Lreloadretaddr | Lreturn
-  | Lentertrap | Lpoptrap _ | Lop _ | Lcall_op _ | Llabel _ | Lbranch _
-  | Lcondbranch (_, _)
-  | Lcondbranch3 (_, _, _)
-  | Lswitch _ | Ladjust_stack_offset _ | Lpushtrap _ | Lraise _ | Lstackcheck _
-    ->
-    (try emit_instr ~first ~fallthrough i with
+  if is_Lend i.desc
+  then ()
+  else
+    let last = is_Lend i.next.desc in
+    (try emit_instr ~first ~last ~fallthrough i with
     | I.Extension_disabled _ as exn -> raise exn
     | exn ->
       Format.eprintf "Exception whilst emitting instruction:@ %a\n"
