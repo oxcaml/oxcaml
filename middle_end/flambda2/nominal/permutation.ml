@@ -76,7 +76,7 @@ module Make (N : Container_types.S) = struct
 
   (* CR-someday lmaurer: Define [N.Map.left_union] so we don't have this Some
      silliness. *)
-  let left_union map1 map2 = N.Map.union (fun _k l _r -> Some l) map1 map2
+  let left_union map1 map2 = N.Map.union_left_biased map1 map2
 
   let compose ~second ~first =
     (* Find the triples [n1, n2, n3] where [first n1 = n2] and [second n2 =
