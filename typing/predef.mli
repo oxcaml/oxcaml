@@ -23,6 +23,9 @@ type abstract_type_constr = [
   | `String
   | `Bytes
   | `Float
+  | `Float32
+  | `Int8
+  | `Int16
   | `Continuation
   | `Array
   | `Nativeint
@@ -33,6 +36,31 @@ type abstract_type_constr = [
   | `Floatarray
   | `Iarray
   | `Atomic_loc
+  | `Lexing_position
+  | `Code
+  | `Idx_imm
+  | `Idx_mut
+  | `Int8x16
+  | `Int16x8
+  | `Int32x4
+  | `Int64x2
+  | `Float16x8
+  | `Float32x4
+  | `Float64x2
+  | `Int8x32
+  | `Int16x16
+  | `Int32x8
+  | `Int64x4
+  | `Float16x16
+  | `Float32x8
+  | `Float64x4
+  | `Int8x64
+  | `Int16x32
+  | `Int32x16
+  | `Int64x8
+  | `Float16x32
+  | `Float32x16
+  | `Float64x8
 ]
 type data_type_constr = [
   | `Bool
@@ -41,6 +69,7 @@ type data_type_constr = [
   | `Eff
   | `List
   | `Option
+  | `Or_null
 ]
 type type_constr = [
   | abstract_type_constr

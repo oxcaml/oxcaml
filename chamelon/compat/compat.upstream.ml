@@ -27,6 +27,7 @@
 
 open Typedtree
 open Types
+open Data_types
 
 let mkTvar name = Tvar name
 
@@ -263,10 +264,11 @@ let option_of_arg_or_omitted arg =
 let mk_constructor_description cstr_name =
   { cstr_name;
     cstr_res = newty2 ~level:0 (mkTvar (Some "a"));
+    cstr_shape = Constructor_uniform_value;
     cstr_existentials = [];
     cstr_args = [];
     cstr_arity = 0;
-    cstr_tag = Cstr_constant 0;
+    cstr_tag = Ordinary { src_index = 0; runtime_tag = 0 };
     cstr_consts = 0;
     cstr_nonconsts = 0;
     cstr_generalized = false;
@@ -274,7 +276,9 @@ let mk_constructor_description cstr_name =
     cstr_loc = Location.none;
     cstr_attributes = [];
     cstr_inlined = None;
-    cstr_uid = Uid.internal_not_actually_unique
+    cstr_uid = Uid.internal_not_actually_unique;
+    cstr_repr = Variant_boxed [||];
+    cstr_constant = true
   }
 
 type value_binding_identifier = unit

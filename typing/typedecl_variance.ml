@@ -74,13 +74,8 @@ let compute_variance env visited vari ty =
         compute_same ty2
     | Ttuple tl ->
         List.iter (fun (_,t) -> compute_same t) tl
-<<<<<<< oxcaml
     | Tunboxed_tuple tl ->
         List.iter (fun (_,t) -> compute_same t) tl
-||||||| upstream-base
-        List.iter compute_same tl
-=======
->>>>>>> upstream-incoming
     | Tconstr (path, tl, _) ->
         let open Variance in
         if tl = [] then () else begin
@@ -117,16 +112,8 @@ let compute_variance env visited vari ty =
         compute_same (row_more row)
     | Tpoly (ty, _) | Trepr (ty, _) ->
         compute_same ty
-<<<<<<< oxcaml
     | Tvar _ | Tnil | Tlink _ | Tunivar _ | Tof_kind _ -> ()
-    | Tpackage (_, fl) ->
-||||||| upstream-base
-    | Tvar _ | Tnil | Tlink _ | Tunivar _ -> ()
-    | Tpackage (_, fl) ->
-=======
-    | Tvar _ | Tnil | Tlink _ | Tunivar _ -> ()
     | Tpackage pack ->
->>>>>>> upstream-incoming
         let v = Variance.(compose vari full) in
         List.iter (fun (_, ty) -> compute_variance_rec v ty) pack.pack_cstrs
   in
@@ -204,15 +191,7 @@ let compute_variance_type env ~check (required, loc) decl tyl =
                                                         (c,n,i)))))
       params required;
     (* Check propagation from constrained parameters *)
-<<<<<<< oxcaml
-    let args = Btype.newgenty (Ttuple (List.map (fun t -> None, t) params)) in
-    let fvl = Ctype.free_variables args in
-||||||| upstream-base
-    let args = Btype.newgenty (Ttuple params) in
-    let fvl = Ctype.free_variables args in
-=======
     let fvl = Ctype.free_variables_list params in
->>>>>>> upstream-incoming
     let fvl =
       List.filter (fun v -> not (List.exists (eq_type v) params)) fvl in
     (* If there are no extra variables there is nothing to do *)
@@ -366,7 +345,9 @@ let compute_variance_decl env ~check decl (required, _ as rloc) =
       (fun (c, n, i) -> make (not n) (not c) (not abstract || i))
       required
   | { type_kind = _; type_manifest = Some _ }
-  | { type_kind = Type_record _ | Type_variant _; type_manifest = _ } ->
+  | { type_kind = Type_record _ | Type_variant _
+                | Type_record_unboxed_product _;
+      type_manifest = _ } ->
     let mn =
       match decl.type_manifest with
         None -> []

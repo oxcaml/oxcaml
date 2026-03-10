@@ -18,7 +18,7 @@ open Format
     invocation of ocaml. Example:
 
     {[
-       Debug.print "The type is %a" Printtyp.raw_type_expr ty
+       Debug.print "The type is %a" Rawprinttyp.type_expr ty
     ]}
 *)
 val print : ('a, formatter, unit) format -> 'a

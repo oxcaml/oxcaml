@@ -516,21 +516,12 @@ let matcher discr (p : Simple.pattern) rem =
   | Constant cst, Constant cst' -> yesif (const_compare cst cst' = 0)
   | Construct cstr, Construct cstr' ->
       (* NB: may_equal_constr considers (potential) constructor rebinding;
-          Types.may_equal_constr does check that the arities are the same,
+          Data_types.may_equal_constr does check that the arities are the same,
           preserving row-size coherence. *)
-<<<<<<< oxcaml
-      yesif (Types.may_equal_constr cstr cstr')
-||||||| upstream-base
-      yesif (Types.may_equal_constr cstr cstr')
-  | Construct _, (Constant _ | Variant _ | Lazy | Array _ | Record _ | Tuple _)
-    ->
-      no ()
-=======
       yesif (Data_types.may_equal_constr cstr cstr')
   | Construct _, (Constant _ | Variant _ | Lazy | Array _ | Record _ | Tuple _)
     ->
       no ()
->>>>>>> upstream-incoming
   | Variant { tag; has_arg }, Variant { tag = tag'; has_arg = has_arg' } ->
       yesif (tag = tag' && has_arg = has_arg')
 <<<<<<< oxcaml

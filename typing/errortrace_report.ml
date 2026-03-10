@@ -161,6 +161,9 @@ let pp_path ppf p =
 let explain_fixed_row pos expl = match expl with
   | Types.Fixed_private ->
     doc_printf "The %a variant type is private" Errortrace.print_pos pos
+  | Types.Fixed_existential ->
+    doc_printf "The %a variant type is existential in a with-bound"
+      Errortrace.print_pos pos
   | Types.Univar x ->
     Variable_names.reserve x;
     doc_printf "The %a variant type is bound to the universal type variable %a"
@@ -193,7 +196,8 @@ let explain_variant (type variety) : variety Errortrace.variant -> _ = function
     )
   | Errortrace.Fixed_row (pos,
                           k,
-                          (Univar _ | Reified _ | Fixed_private as e)) ->
+                          (Univar _ | Reified _ | Fixed_private
+                          | Fixed_existential as e)) ->
       Some (
         doc_printf "@,@[%a,@ %a@]" pp_doc (explain_fixed_row pos e)
           pp_doc (explain_fixed_row_case k)
@@ -272,27 +276,29 @@ let explain_incompatible_fields name (diff: Types.type_expr Errortrace.diff) =
 
 
 let explain_label_mismatch ~missing_label_msg  {Errortrace.got;expected} =
-  let quoted_label ppf l = Style.inline_code ppf (Asttypes.string_of_label l) in
+  let quoted_label ppf l =
+    Style.inline_code ppf (Printtyp.string_of_label l) in
   match got, expected with
-  | Asttypes.Nolabel, Asttypes.(Labelled _ | Optional _ )  ->
+  | Types.Nolabel, Types.(Labelled _ | Optional _ | Position _)  ->
       doc_printf "@,@[A label@ %a@ was expected@]"
         quoted_label expected
-  | Asttypes.(Labelled _|Optional _), Asttypes.Nolabel  ->
+  | Types.(Labelled _|Optional _|Position _), Types.Nolabel  ->
       doc_printf missing_label_msg
         quoted_label got
- | Asttypes.Labelled g, Asttypes.Optional e when g = e ->
+  | Types.Labelled g, Types.Optional e when g = e ->
       doc_printf
         "@,@[The label@ %a@ was expected to be optional@]"
         quoted_label got
-  | Asttypes.Optional g, Asttypes.Labelled e when g = e ->
+  | Types.Optional g, Types.Labelled e when g = e ->
       doc_printf
         "@,@[The label@ %a@ was expected to not be optional@]"
         quoted_label got
-  | Asttypes.(Labelled _ | Optional _), Asttypes.(Labelled _ | Optional _) ->
+  | Types.(Labelled _ | Optional _ | Position _),
+    Types.(Labelled _ | Optional _ | Position _) ->
       doc_printf "@,@[Labels %a@ and@ %a do not match@]"
         quoted_label got
         quoted_label expected
-  | Asttypes.Nolabel, Asttypes.Nolabel ->
+  | Types.Nolabel, Types.Nolabel ->
       (* Two empty labels cannot be mismatched*)
       assert false
 
@@ -334,8 +340,8 @@ let explanation (type variety) intro prev env
     Some(explain_label_mismatch ~missing_label_msg diff)
   | Errortrace.Tuple_label_mismatch diff ->
     let ast_label = function
-      | None -> Asttypes.Nolabel
-      | Some x -> Asttypes.Labelled x
+      | None -> Types.Nolabel
+      | Some x -> Types.Labelled x
     in
     let diff = Errortrace.map_diff ast_label diff in
     let missing_label_msg =
@@ -369,6 +375,38 @@ let explanation (type variety) intro prev env
              {[ The type int occurs inside int list -> 'a |}
         *)
     end
+  | Errortrace.Bad_jkind (ty, violation) ->
+    Some (
+      doc_printf "@,@[%a@]"
+        (Jkind.Violation.report_with_offender
+           ~offender:(fun ppf ->
+             Style.as_inline_code type_expr_with_reserved_names ppf ty)
+           ~level:(Ctype.get_current_level ()))
+        violation)
+  | Errortrace.Bad_jkind_sort (ty, violation) ->
+    Some (
+      doc_printf "@,@[%a@]"
+        (Jkind.Violation.report_with_offender_sort
+           ~offender:(fun ppf ->
+             Style.as_inline_code type_expr_with_reserved_names ppf ty)
+           ~level:(Ctype.get_current_level ()))
+        violation)
+  | Errortrace.Unequal_var_jkinds (ty1, jkind1, ty2, jkind2) ->
+    Variable_names.reserve ty1;
+    Variable_names.reserve ty2;
+    Some (
+      doc_printf
+        "@,@[The type variable %a has kind %a,@ but the type variable %a \
+         has kind %a@]"
+        (Style.as_inline_code type_expr_with_reserved_names) ty1
+        Jkind.format jkind1
+        (Style.as_inline_code type_expr_with_reserved_names) ty2
+        Jkind.format jkind2)
+  | Errortrace.Unequal_tof_kind_jkinds (jkind1, jkind2) ->
+    Some (
+      doc_printf "@,@[Kinds %a and %a are incompatible@]"
+        Jkind.format jkind1
+        Jkind.format jkind2)
 
 let mismatch intro env trace =
   Errortrace.explain trace (fun ~prev h -> explanation intro prev env h)

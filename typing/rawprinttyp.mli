@@ -18,3 +18,5 @@
     compiler itself. *)
 
 val type_expr: Format.formatter -> Types.type_expr -> unit
+val row_desc: Format.formatter -> Types.row_desc -> unit
+val field: Format.formatter -> Types.row_field -> unit
