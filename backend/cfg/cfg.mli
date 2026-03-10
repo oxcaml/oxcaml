@@ -262,6 +262,15 @@ val make_empty_block : ?label:Label.t -> terminator instruction -> basic_block
 *)
 val basic_block_contains_calls : basic_block -> bool
 
+val equal_func_call_operation :
+  func_call_operation -> func_call_operation -> bool
+
+val equal_external_call_operation :
+  external_call_operation -> external_call_operation -> bool
+
+val equal_prim_call_operation :
+  prim_call_operation -> prim_call_operation -> bool
+
 val equal_basic : basic -> basic -> bool
 
 val equal_terminator : terminator -> terminator -> bool
