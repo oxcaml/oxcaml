@@ -1371,12 +1371,12 @@ let dominated_by_allocation_point =
 
 let allocation_point_dominator = rel2 "allocation_point_dominator" Cols.[n; n]
 
+let real_field f =
+  match Field.view f with
+  | Code_of_closure _ | Apply _ | Code_id_of_call_witness -> false
+  | Is_int | Get_tag | Block _ | Value_slot _ | Function_slot _ -> true
+
 let field_of_constructor_is_used_rules =
-  let real_field f =
-    match Field.view f with
-    | Code_of_closure _ | Apply _ | Code_id_of_call_witness -> false
-    | Is_int | Get_tag | Block _ | Value_slot _ | Function_slot _ -> true
-  in
   saturate_in_order
     [ (let$ [base; relation; from] = ["base"; "relation"; "from"] in
        [ constructor ~base relation ~from;
@@ -3352,7 +3352,7 @@ let fixpoint (graph : Global_flow_graph.graph) =
              Field.Map.fold
                (fun field () acc ->
                  if
-                   Field.is_real_field field
+                   real_field field
                    && not (Field.is_function_slot field)
                  then acc + 1
                  else acc)
