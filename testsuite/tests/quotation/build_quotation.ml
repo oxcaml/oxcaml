@@ -444,6 +444,32 @@ Here is an example of a case that is not matched:
 ]>
 |}];;
 
+(* Non-top-level functor *)
+module Make = Set.Make;;
+<[ let module M = Make(Int) in M.singleton 100 |> M.elements ]>;;
+[%%expect {|
+module Make = Set.Make
+Line 2, characters 18-22:
+2 | <[ let module M = Make(Int) in M.singleton 100 |> M.elements ]>;;
+                      ^^^^
+Error: Identifier "Make" is used at line 2, characters 18-22,
+       inside a quotation (<[ ... ]>);
+       it is introduced at file "_none_", line 1, outside any quotations.
+|}];;
+
+(* Non-top-level functor argument *)
+module Int' = Int;;
+<[ let module M = Set.Make(Int') in M.singleton 100 |> M.elements ]>;;
+[%%expect {|
+module Int' = Int
+Line 2, characters 27-31:
+2 | <[ let module M = Set.Make(Int') in M.singleton 100 |> M.elements ]>;;
+                               ^^^^
+Error: Identifier "Int'" is used at line 2, characters 27-31,
+       inside a quotation (<[ ... ]>);
+       it is introduced at file "_none_", line 1, outside any quotations.
+|}];;
+
 <[ ref 42 ]>;;
 [%%expect {|
 - : <[int ref]> expr = <[Stdlib.ref 42]>
