@@ -98,7 +98,7 @@ val caml_apply_inline_fast_path : bool ref
 type function_result_types = Never | Functors_only | All_functions
 type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto
 type join_algorithm = Binary | N_way | Checked
-type opt_level = Oclassic | O2 | O3
+type opt_level = Oclassic | O2 | O3 | O4
 type 'a or_default = Set of 'a | Default
 
 val dump_inlining_paths : bool ref

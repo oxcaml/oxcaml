@@ -195,7 +195,7 @@ module Inlining = struct
     match opt_level with
     | Oclassic -> I.oclassic_arguments
     | O2 -> I.o2_arguments
-    | O3 -> I.o3_arguments
+    | O3 | O4 -> I.o3_arguments
 
   let max_depth round_or_default =
     let depth =
