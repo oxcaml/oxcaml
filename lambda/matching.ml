@@ -4428,7 +4428,8 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
       | Construct cstr ->
           compile_test
             (divide_constructor ~scopes)
-            (combine_constructor value_kind ploc arg ph.pat_env ph.pat_unique_barrier cstr arg_partial)
+            (combine_constructor value_kind ploc arg ph.pat_env
+               ph.pat_unique_barrier cstr arg_partial)
       | Array (_, elt_sort, _) ->
           let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
           let kind = Typeopt.array_pattern_kind pomega elt_sort in
@@ -4442,7 +4443,8 @@ and do_compile_matching ~scopes value_kind repr partial ctx pmh =
       | Variant { cstr_row = row } ->
           compile_test
             (divide_variant ~scopes !row)
-            (combine_variant value_kind ploc !row arg ph.pat_unique_barrier arg_partial)
+            (combine_variant value_kind ploc !row arg
+               ph.pat_unique_barrier arg_partial)
     )
   | PmVar { inside = pmh } ->
       let lam, total =
@@ -4879,7 +4881,8 @@ let compile_flattened ~scopes value_kind repr partial ctx pmh =
         (compile_match ~scopes value_kind repr partial)
         lam total ctx hs
 
-let do_for_multiple_match ~scopes ~return_layout loc idl mode pat_act_list partial =
+let do_for_multiple_match ~scopes ~return_layout loc idl mode
+    pat_act_list partial =
   (* CR layouts v5: This function is called in cases where the scrutinee of a
      match is a literal tuple (e.g., [match e1, e2, e3 with ...]).  The
      typechecker treats the scrutinee here like any other tuple, so it's fine to

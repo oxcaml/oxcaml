@@ -617,8 +617,10 @@ let rec build_class_init ~scopes cla cstr super inh_init cl_init msubst top cl =
               (* Load the [class_init] field of the class,
                  and apply it to our current table and the class' environment.
                  This gets us the object initialiser. *)
-                 mkappl(Lprim(class_field 1, [path_lam], Loc_unknown), (Lvar cla ::
-                        if top then [Lprim(class_field 2, [path_lam], Loc_unknown)]
+                 mkappl(Lprim(class_field 1, [path_lam], Loc_unknown),
+                        (Lvar cla ::
+                        if top then
+                          [Lprim(class_field 2, [path_lam], Loc_unknown)]
                         else []), layout_t),
               (* The methods and variables for this class are fully registered
                  in the table. If we are in an inheritance context, we can now
