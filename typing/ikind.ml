@@ -162,18 +162,18 @@ module Solver = struct
     in
     Poly (base, coeffs)
 
-  let lookup_from_env :
+  let lookup_of_env :
       (Env.t -> Path.t -> constr_decl) ref =
     ref
       (fun _env _path ->
-        failwith "ikind: lookup_from_env not initialized")
+        failwith "ikind: lookup_of_env not initialized")
 
-  let set_lookup_from_env f = lookup_from_env := f
+  let set_lookup_of_env f = lookup_of_env := f
 
   let lookup_constr (ctx : ctx) ~(min_arity : int) (path : Path.t) :
       constr_decl =
     match ctx.env with
-    | Some env -> !lookup_from_env env path
+    | Some env -> !lookup_of_env env path
     | None -> identity_constr_decl ~arity:min_arity path
 
   (** Fetch or compute the polynomial for constructor [c]. *)
@@ -961,7 +961,7 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
         (Format_doc.compat Path.print) path ikind_msg);
     ikind
 
-let () = Solver.set_lookup_from_env (fun env path -> lookup_of_env ~env path)
+let () = Solver.set_lookup_of_env (fun env path -> lookup_of_env ~env path)
 
 (* Package the above into a full evaluation context. *)
 let with_ctx ~(mode : Solver.mode) ~(env : Env.t option) f =
