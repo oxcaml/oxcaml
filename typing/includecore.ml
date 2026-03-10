@@ -215,7 +215,7 @@ let value_descriptions ~loc env name
   let val_lpoly2 = Val_lpoly.get_exn vd2.val_lpoly in
   match vd1.val_kind with
   | Val_prim p1 -> begin
-     assert (List.is_empty (Val_lpoly.get_exn vd1.val_lpoly));
+     assert (List.is_empty val_lpoly1);
      match vd2.val_kind with
      | Val_prim p2 -> begin
          let locality = [ Mode.Locality.global; Mode.Locality.local ] in
