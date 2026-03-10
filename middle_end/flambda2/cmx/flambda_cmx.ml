@@ -82,16 +82,16 @@ let all_predefined_exception_symbols () =
   Predef.all_predef_exns |> List.map symbol_for_global |> Symbol.Set.of_list
 
 let predefined_exception_typing_env () =
-  let unit_info = Env.get_unit_name () in
+  let unit_info = Env.get_current_unit () in
   let predef_unit_info =
     Unit_info.make_dummy ~input_name:"<predefined exceptions>"
       Compilation_unit.predef_exn
   in
-  Env.set_unit_name (Some predef_unit_info);
+  Env.set_current_unit (Some predef_unit_info);
   let typing_env =
     TE.Serializable.predefined_exceptions (all_predefined_exception_symbols ())
   in
-  Env.set_unit_name unit_info;
+  Env.set_current_unit unit_info;
   typing_env
 
 let create_loader ~get_module_info =

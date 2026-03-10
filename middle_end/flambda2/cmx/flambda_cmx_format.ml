@@ -217,7 +217,7 @@ let print0 ~sections ~print_typing_env ~print_code ~print_offsets ppf t =
   let unit_info =
     Unit_info.make_dummy ~input_name:"<none>" t.original_compilation_unit
   in
-  Env.set_unit_name (Some unit_info);
+  Env.set_current_unit (Some unit_info);
   let typing_env, code = import_typing_env_and_code0 ~sections t in
   if print_typing_env
   then
