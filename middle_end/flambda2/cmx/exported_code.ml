@@ -52,7 +52,16 @@ let add_code ~keep_code code_map t =
 let mark_as_imported t =
   Code_id.Map.map_sharing Code_or_metadata.remember_only_metadata t
 
-let merge t1 t2 = Code_id.Map.union Code_or_metadata.merge t1 t2
+let merge t1 t2 =
+  Code_id.Map.union_total
+    (fun code_id t1 t2 ->
+      match Code_or_metadata.merge code_id t1 t2 with
+      | Some t -> t
+      | None ->
+        Misc.fatal_errorf
+          "Unexpected deletion while merging exported code for %a"
+          Code_id.print code_id)
+    t1 t2
 
 let mem code_id t = Code_id.Map.mem code_id t
 

@@ -1423,11 +1423,11 @@ and meet_row_like :
   let add_extra_variables_and_extract_extension scoped_env =
     let level = ME.cut scoped_env ~cut_after:common_scope in
     extra_variables
-      := Variable.Map.union
+      := Variable.Map.union_total_shared
            (fun var k1 k2 ->
              if not (K.equal k1 k2)
              then Misc.fatal_errorf "Different kinds for %a" Variable.print var;
-             Some k1)
+             k1)
            !extra_variables
            (TEL.defined_variables_with_kinds level);
     TEE.from_map (TEL.equations level)
