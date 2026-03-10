@@ -1074,48 +1074,6 @@ module Jkind0 = struct
 
     let staticity_const t = extract_monadic staticity t
 
-    let crossing_of_constants ~areality ~linearity ~uniqueness ~portability
-        ~contention ~forkable ~yielding ~statefulness ~visibility ~staticity :
-        Crossing.t =
-      let open Crossing in
-      let monadic =
-        Monadic.create
-          ~uniqueness:
-            (Monadic.Atom.Modality
-               (Mode.Modality.Monadic.Atom.Join_const uniqueness))
-          ~contention:
-            (Monadic.Atom.Modality
-               (Mode.Modality.Monadic.Atom.Join_const contention))
-          ~visibility:
-            (Monadic.Atom.Modality
-               (Mode.Modality.Monadic.Atom.Join_const visibility))
-          ~staticity:
-            (Monadic.Atom.Modality
-               (Mode.Modality.Monadic.Atom.Join_const staticity))
-      in
-      let comonadic =
-        Comonadic.create
-          ~regionality:
-            (Comonadic.Atom.Modality
-               (Mode.Modality.Comonadic.Atom.Meet_const areality))
-          ~linearity:
-            (Comonadic.Atom.Modality
-               (Mode.Modality.Comonadic.Atom.Meet_const linearity))
-          ~portability:
-            (Comonadic.Atom.Modality
-               (Mode.Modality.Comonadic.Atom.Meet_const portability))
-          ~forkable:
-            (Comonadic.Atom.Modality
-               (Mode.Modality.Comonadic.Atom.Meet_const forkable))
-          ~yielding:
-            (Comonadic.Atom.Modality
-               (Mode.Modality.Comonadic.Atom.Meet_const yielding))
-          ~statefulness:
-            (Comonadic.Atom.Modality
-               (Mode.Modality.Comonadic.Atom.Meet_const statefulness))
-      in
-      { monadic; comonadic }
-
     let to_axis_lattice (t : t) : Axis_lattice.t =
       let boxed : Axis_lattice.boxed =
         { areality = areality_const t;
@@ -1136,28 +1094,14 @@ module Jkind0 = struct
       Axis_lattice.of_boxed boxed
 
     let of_axis_lattice (x : Axis_lattice.t) : t =
-      let ({ areality;
-             linearity;
-             uniqueness;
-             portability;
-             contention;
-             forkable;
-             yielding;
-             statefulness;
-             visibility;
-             staticity;
-             externality;
+      let ({ externality;
              nullability;
              separability
            } :
-            Axis_lattice.boxed) =
+           Axis_lattice.boxed) =
         Axis_lattice.to_boxed x
       in
-      let crossing =
-        crossing_of_constants ~areality ~linearity ~uniqueness ~portability
-          ~contention ~forkable ~yielding ~statefulness ~visibility
-          ~staticity
-      in
+      let crossing = Axis_lattice.to_mode_crossing x in
       create crossing ~externality ~nullability ~separability
 
     (* Returns the set of axes that is relevant under a given modality. For
