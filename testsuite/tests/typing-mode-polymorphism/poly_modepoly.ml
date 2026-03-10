@@ -1344,8 +1344,8 @@ val f :
 = <fun>
 |}, Principal{|
 val f :
-  < m : 'a. 'a -> 'a > @ [< 'm & 'm . aliased & 'n & 'n . aliased & global] ->
-  < m : 'a. 'a -> 'a > @ [< global > 'm | 'm | 'n @@ global many | 'n @@ global many] =
+  < m : 'a. 'a -> 'a > @ [< 'm . aliased & 'm & 'n . aliased & 'n & global] ->
+  < m : 'a. 'a -> 'a > @ [< global > 'm @@ global many | 'm @@ global many | 'n | 'n] =
   <fun>
 Line 2, characters 9-16:
 2 | fun x -> (f x)#m;; (* Warning 18 *)
@@ -1356,8 +1356,8 @@ Warning 18 [not-principal]: this use of a polymorphic method is not principal.
     ('b -> 'b) @ [< global > aliased nonportable]
 = <fun>
 val f :
-  < m : 'a. 'a -> 'a > * 'b @ [< 'm & 'm . aliased & 'n & 'n . aliased & global] ->
-  < m : 'a. 'a -> 'a > @ [< global > 'm | 'm | 'n @@ global many | 'n @@ global many] =
+  < m : 'a. 'a -> 'a > * 'b @ [< 'm . aliased & 'm & 'n . aliased & 'n & global] ->
+  < m : 'a. 'a -> 'a > @ [< global > 'm @@ global many | 'm @@ global many | 'n | 'n] =
   <fun>
 Line 4, characters 9-20:
 4 | fun x -> (f (x,x))#m;; (* Warning 18 *)
@@ -1617,15 +1617,11 @@ val using_match :
 match (fun x -> x), fun x -> x with x, y -> x, y;;
 match fun x -> x with x -> x, x;;
 [%%expect {|
-- : ('a @ [< 'n & 'n & 'n & global] ->
-     'a @ [< 'm & 'm & 'm & 'm & global > 'm | 'm | 'm | 'm | 'n | 'n | 'n]) *
-    ('b @ [< 'p & 'p & 'p & global] ->
-     'b @ [< 'o & 'o & 'o & 'o & global > 'o | 'o | 'o | 'o | 'p | 'p | 'p])
+- : ('a @ [< 'm & global] -> 'a @ [< global > 'm]) *
+    ('b @ [< 'n & global] -> 'b @ [< global > 'n])
 = (<fun>, <fun>)
-- : ('a @ [< 'n & 'n & global] ->
-     'a @ [< 'm & 'm & 'm & 'm & global > 'm | 'm | 'm | 'm | 'n | 'n]) *
-    ('b @ [< 'p & 'p & global] ->
-     'b @ [< 'o & 'o & 'o & 'o & global > 'o | 'o | 'o | 'o | 'p | 'p])
+- : ('a @ [< 'm & global] -> 'a @ [< global > 'm]) *
+    ('b @ [< 'n & global] -> 'b @ [< global > 'n])
 = (<fun>, <fun>)
 |}];;
 
@@ -1973,7 +1969,7 @@ class c :
     method m :
       ?x:int @ [< 'o & 'o & 'o & 'o & global many uncontended > 'n] ->
       (unit @ 'p ->
-       int @ [< global many uncontended > 'm | 'o | 'o | 'o | 'o]) @ [< 'm @@ past & 'n @@ past & global > close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | nonportable]
+       int @ [< global many uncontended > 'm | 'o | 'o | 'o | 'o]) @ [< 'm @@ past & 'n @@ past & global > close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | nonportable]
     method n : int
   end
 class d :
@@ -1981,7 +1977,7 @@ class d :
     method m :
       ?x:int @ [< 'o & 'o & 'o & 'o & 'o & 'o & 'o & 'o & 'o & global many uncontended > 'n] ->
       (unit @ 'p ->
-       int @ [< global many uncontended > 'm | 'o | 'o | 'o | 'o | 'o | 'o | 'o | 'o | 'o]) @ [< 'm @@ past & 'n @@ past & global > close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | nonportable]
+       int @ [< global many uncontended > 'm | 'o | 'o | 'o | 'o | 'o | 'o | 'o | 'o | 'o]) @ [< 'm @@ past & 'n @@ past & global > close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | close('o) | nonportable]
     method n : int
     method n' : int
   end

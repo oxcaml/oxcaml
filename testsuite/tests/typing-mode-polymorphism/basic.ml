@@ -132,9 +132,9 @@ val g :
   string @ [< 'm . contended & global portable] ->
   string @ [< global > 'm @@ many portable] = <fun>
 val which :
-  bool @ 'p ->
-  (string @ [< 'n . contended & 'n . contended & 'o & global portable > 'o] ->
-   string @ [< 'm & global > 'm | 'n @@ many portable | 'n @@ many portable]) @ [> aliased nonportable] =
+  bool @ 'n ->
+  (string @ [< 'm . contended & global portable] ->
+   string @ [< global > 'm @@ many portable]) @ [> aliased nonportable] =
   <fun>
 |}]
 

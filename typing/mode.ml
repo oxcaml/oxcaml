@@ -1739,6 +1739,10 @@ module Lattices_mono = struct
    fun dst f1 f2 ->
     match f1, f2 with
     | Id, Id -> Some Refl
+    | Id, Meet_const c -> if equal dst (max dst) c then Some Refl else None
+    | Meet_const c, Id -> if equal dst (max dst) c then Some Refl else None
+    | Id, Imply_const c -> if equal dst (max dst) c then Some Refl else None
+    | Imply_const c, Id -> if equal dst (max dst) c then Some Refl else None
     | Core m1, Core m2 -> equal_core_morph m1 m2
     | Meet_const c1, Meet_const c2 ->
       if equal dst c1 c2 then Some Refl else None
@@ -5818,6 +5822,7 @@ module Value_with (Areality : Areality) = struct
     match f with
     | C.Id -> Fmt.fprintf ppf "%a" printm m
     | C.Meet_const c -> pretty_print_comonadic_meet printm m ppf c
+    | C.Core C.Monadic_to_comonadic_min -> Fmt.fprintf ppf "close(%a)" printm m
     | C.Core_and_meet_const (c, C.Monadic_to_comonadic_min) ->
       (* since the meet is applied to a monadic_to_comonadic_min, we filter out the
       comonadic only axes *)

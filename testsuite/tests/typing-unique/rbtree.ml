@@ -473,10 +473,9 @@ type ('k, 'v) tree =
 val fold :
   ('a @ [< 'n @@ past > 'mm4 @@ many | aliased] ->
    ('b @ [< 'p @@ past > 'mm3 @@ many | aliased] ->
-    ('c @ [> 'mm1 | 'mm2 | 'mm0] -> 'c @ [< 'q & 'mm0 & global]) @ [> 'p | 'm]) @ [< 'm @@ past > 'n | 'o]) @ [< 'o @@ past & 'mm6 & global many > 'mm6 | aliased] ->
-  ('c @ [< 'mm8 & 'mm7 & 'mm2 & global > 'mm7 | 'q] ->
-   (('a, 'b) tree @ [< 'mm10 & 'mm3 & 'mm4 > 'mm10 @@ many] ->
-    'c @ [< 'mm9 & 'mm1 & global > 'mm9 | 'mm8]) @ [< global > close('mm2) | close('mm2) | close('mm7) | close('mm7) | monadic_to_comonadic_min('mm7) | monadic_to_comonadic_min('mm7) | close('mm8) | close('mm8) | 'mm5 | nonportable]) @ [< 'mm5 @@ past & global > monadic_to_comonadic_min('mm6) | monadic_to_comonadic_min('mm6) | nonportable] =
+    ('c @ [> 'mm1 | 'mm2 | 'mm0] -> 'c @ [< 'q & 'mm0 & global]) @ [> 'p | 'm]) @ [< 'm @@ past > 'n | 'o]) @ [< 'o @@ past & 'mm6 @@ past & global many > aliased] ->
+  ('c @ [< 'mm7 & 'mm2 & global > 'q] ->
+   (('a, 'b) tree @ [< 'mm3 & 'mm4] -> 'c @ [< 'mm1 & global > 'mm7]) @ [< global > close('mm2) | close('mm7) | 'mm5 | nonportable]) @ [< 'mm5 @@ past & global > 'mm6 | nonportable] =
   <fun>
 val work :
   insert:(int @ [< 'n @@ past > aliased] ->

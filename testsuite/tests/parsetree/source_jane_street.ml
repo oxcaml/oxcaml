@@ -197,7 +197,7 @@ let f xs = match xs with
 [%%expect{|
 type t = #(int * float#)
 val f :
-  #('a * float#) @ [< 'm & 'm . aliased contended & global] ->
+  #('a * float#) @ [< 'm . aliased contended & 'm & global] ->
   #('a * float#) @ [< global > 'm | 'm] = <fun>
 |}]
 

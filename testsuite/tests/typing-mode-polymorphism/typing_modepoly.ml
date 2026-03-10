@@ -333,16 +333,15 @@ val foo7 :
 
 let foo7' = (fun (type a) (type b) x -> <[fun (y : $a) -> y]>) 42;;
 [%%expect {|
-val foo7' :
-  <[$('_a) -> $('_a) @ [< 'm & global > 'm | aliased nonportable]]> expr =
+val foo7' : <[$('_a) -> $('_a) @ [< global > aliased nonportable]]> expr =
   <[fun (y : _) -> y]>
 |}];;
 
 let foo7'' () = (fun (type a) (type b) x -> <[fun (y : $a) -> y]>) 42;;
 [%%expect {|
 val foo7'' :
-  unit @ 'o ->
-  <[$('a) @ [< 'n & global] -> $('a) @ [< 'm & global > 'm | 'n]]> expr @ [< global > aliased nonportable] =
+  unit @ 'n ->
+  <[$('a) @ [< 'm & global] -> $('a) @ [< global > 'm]]> expr @ [< global > aliased nonportable] =
   <fun>
 |}];;
 

@@ -1029,13 +1029,7 @@ let x = <[<[42]>]> in <[ <[ $($x) ]> ]>;;
    and bar (x : int) : int = if x > 0 then foo x else 0
    in foo, bar ]>
 [%%expect {|
-- : <[
-     (int @ 'n -> int @ [< 'm @@ past > 'm @@ many portable]) *
-     (int @ 'p ->
-      int @ [< 'o @@ past & 'o @@ past > 'o @@ many portable | 'o @@ many portable])
-     ]>
-    expr
-=
+- : <[(int @ 'n -> int @ 'm) * (int @ 'p -> int @ 'o)]> expr =
 <[
   let rec foo = (fun (x : int) -> (if (x < 0) then (bar x) else 0 : int))
   and bar =

@@ -102,9 +102,7 @@ let () =
 
 let foo = fst ~label2:()
 [%%expect{|
-val foo :
-  label1:'a @ [< 'n & 'n & global] -> 'a @ [< 'm & global > 'm | 'n | 'n] =
-  <fun>
+val foo : label1:'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
 |}]
 
 (* partially applying a labelled function yield
@@ -132,8 +130,7 @@ let foo = fun x -> fst ~label1:x
 [%%expect{|
 val foo :
   'a @ [< 'm & global] ->
-  (label2:'b @ 'o -> 'a @ [< 'n @@ past & global > 'n | 'm]) @ [< global > close('m)] =
-  <fun>
+  (label2:'b @ 'n -> 'a @ [< global > 'm]) @ [< global > close('m)] = <fun>
 |}]
 
 let foo ?label1 x = x

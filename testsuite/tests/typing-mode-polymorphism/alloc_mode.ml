@@ -169,7 +169,7 @@ let foo = fst 42
   (fst/321 =? (apply (field_imm 0 (global Toploop!)) "fst")
    foo/332 = (apply fst/321 42))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/332))
-val foo : '_weak1 -> int @ [< 'm @@ past & global > 'm | aliased] = <fun>
+val foo : '_weak1 -> int @ [< global > aliased] = <fun>
 |}]
 
 let foo () =
@@ -181,7 +181,5 @@ let foo () =
      (function {nlocal = 1} param/334[L][value<int>] : local
        (apply[L] fst_local/328 42)))
   (apply (field_imm 1 (global Toploop!)) "foo" foo/333))
-val foo :
-  unit @ 'o -> ('a @ 'n -> int @ [< 'm @@ past > 'm | local]) @ [> local] =
-  <fun>
+val foo : unit @ 'n -> ('a @ 'm -> int @ [> local]) @ [> local] = <fun>
 |}]

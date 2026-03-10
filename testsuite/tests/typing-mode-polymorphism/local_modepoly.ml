@@ -1198,7 +1198,7 @@ let rec length acc (local_ xl) =
 [%%expect{|
 val length :
   int @ [< 'm @@ past & global] ->
-  ('a list @ [> local] -> int @ [< 'n & global > 'n]) @ [< global > 'm | nonportable] =
+  ('a list @ [> local] -> int @ [< global]) @ [< global > 'm | nonportable] =
   <fun>
 |}]
 
@@ -2949,20 +2949,19 @@ Error: Signature mismatch:
              'a @ [< 'm @@ past] -> ('b @ 'n -> string @ [> local]) @ [> 'm]
            val f :
              'a @ [< 'm @@ past] ->
-             ('b @ 'o -> string @ [< 'n @@ past > 'n | local]) @ [> 'm | local]
+             ('b @ 'n -> string @ [> local]) @ [> 'm | local]
          end
        is not included in
          sig val f : string -> string -> string @ local end
        Values do not match:
          val f :
            'a @ [< 'm @@ past] ->
-           ('b @ 'o -> string @ [< 'n @@ past > 'n | local]) @ [> 'm | local]
+           ('b @ 'n -> string @ [> local]) @ [> 'm | local]
        is not included in
          val f : string -> string -> string @ local
        The type
          "string @ [< 'm @@ past & 'm @@ past > aliased] ->
-         (string @ [> aliased] ->
-          string @ [< 'n @@ past & 'n @@ past > 'n | 'n | local]) @ [> 'm | 'm | local]"
+         (string @ [> aliased] -> string @ [> local]) @ [> 'm | 'm | local]"
        is not compatible with the type "string -> string -> string @ local"
 |}]
 

@@ -1418,8 +1418,7 @@ class foo =
   end
 let _ = (new foo)#f true
 [%%expect {|
-class foo :
-  object method f : bool @ [< 'n > 'n] -> bool @ [< 'm & global > 'm] end
+class foo : object method f : bool @ 'm -> bool @ [< global] end
 - : bool = true
 |}];;
 

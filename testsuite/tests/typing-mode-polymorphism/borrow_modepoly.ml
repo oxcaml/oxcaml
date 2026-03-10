@@ -749,8 +749,7 @@ let rec foo x =
   let _ = foo (borrow_ x) in
   ()
 [%%expect{|
-val foo : 'a @ [< 'm & many > 'm | local aliased] -> unit @ [< global] =
-  <fun>
+val foo : 'a @ [< many > local aliased] -> unit @ [< global] = <fun>
 |}]
 
 (* id function cannot leak *)
