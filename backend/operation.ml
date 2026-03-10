@@ -587,6 +587,8 @@ let equal left right =
     && Arch.equal_addressing_mode left_addr right_addr
   | Floatop (left_w, left_op), Floatop (right_w, right_op) ->
     equal_float_width left_w right_w && equal_float_operation left_op right_op
+  | Compare { signed = left }, Compare { signed = right } ->
+    Bool.equal left right
   | Csel left_test, Csel right_test -> equal_test left_test right_test
   | Reinterpret_cast left_c, Reinterpret_cast right_c ->
     Cmm.equal_reinterpret_cast left_c right_c
@@ -626,7 +628,8 @@ let equal left right =
   | ( ( Move | Spill | Reload | Dummy_use | Const_int _ | Const_float32 _
       | Const_float _ | Const_symbol _ | Const_vec128 _ | Const_vec256 _
       | Const_vec512 _ | Stackoffset _ | Load _ | Store _ | Intop _ | Int128op _
-      | Intop_imm _ | Intop_atomic _ | Floatop _ | Csel _ | Reinterpret_cast _
+      | Intop_imm _ | Intop_atomic _ | Floatop _ | Compare _ | Csel _
+      | Reinterpret_cast _
       | Static_cast _ | Probe_is_enabled _ | Opaque | Begin_region | End_region
       | Specific _ | Name_for_debugger _ | Dls_get | Tls_get | Domain_index
       | Poll | Pause | Alloc _ ),
