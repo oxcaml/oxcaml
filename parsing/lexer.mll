@@ -48,7 +48,7 @@ let all_keywords =
   let v1_6 = Some (1,6) in
   let v4_2 = Some (4,2) in
   let always = None in
-  let oxcaml = Some (9, 0) in
+  let oxcaml = None in
   [
     "and", AND, always;
     "as", AS, always;
