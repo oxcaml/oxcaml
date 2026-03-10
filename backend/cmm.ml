@@ -513,8 +513,7 @@ type symbol =
     sym_global : is_global
   }
 
-let equal_symbol
-    { sym_name = left_sym_name; sym_global = left_sym_global }
+let equal_symbol { sym_name = left_sym_name; sym_global = left_sym_global }
     { sym_name = right_sym_name; sym_global = right_sym_global } =
   String.equal left_sym_name right_sym_name
   && equal_is_global left_sym_global right_sym_global

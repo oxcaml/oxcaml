@@ -806,8 +806,7 @@ let equal_basic left right =
       _ ) ->
     false
 
-let equal_bool_test
-    ({ ifso = left_ifso; ifnot = left_ifnot } : bool_test)
+let equal_bool_test ({ ifso = left_ifso; ifnot = left_ifnot } : bool_test)
     ({ ifso = right_ifso; ifnot = right_ifnot } : bool_test) =
   Label.equal left_ifso right_ifso && Label.equal left_ifnot right_ifnot
 
@@ -817,13 +816,15 @@ let equal_int_test
        gt = left_gt;
        is_signed = left_is_signed;
        imm = left_imm
-     } : int_test)
+     } :
+      int_test)
     ({ lt = right_lt;
        eq = right_eq;
        gt = right_gt;
        is_signed = right_is_signed;
        imm = right_imm
-     } : int_test) =
+     } :
+      int_test) =
   Label.equal left_lt right_lt
   && Label.equal left_eq right_eq
   && Label.equal left_gt right_gt
@@ -836,13 +837,15 @@ let equal_float_test
        eq = left_eq;
        gt = left_gt;
        uo = left_uo
-     } : float_test)
+     } :
+      float_test)
     ({ width = right_width;
        lt = right_lt;
        eq = right_eq;
        gt = right_gt;
        uo = right_uo
-     } : float_test) =
+     } :
+      float_test) =
   Cmm.equal_float_width left_width right_width
   && Label.equal left_lt right_lt
   && Label.equal left_eq right_eq
