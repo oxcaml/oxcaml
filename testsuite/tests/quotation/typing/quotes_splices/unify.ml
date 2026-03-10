@@ -111,34 +111,30 @@ let _ : <[ <[ <[ $($($('a))) -> $($($('a))) ]> expr ]> expr ]> expr =
 
 (* One side instantiable and under quotes/splices *)
 
-(* $t ~ s  when t instantiable *)
+(* Spliced types are not instantiable: the following should fail. *)
+(* $t ~/~ s  when t instantiable *)
 let _ = <[ fun (Equal : ($Inst1.t, int NonInst0.t) Type.eq)
                (x : Inst1.t expr) -> (x : <[int NonInst0.t]> expr) ]>
 [%%expect {|
-- : <[
-     ($(Inst1.t), int NonInst0.t) Type.eq ->
-     Inst1.t expr -> <[int NonInst0.t]> expr]>
-    expr
-=
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (_, (int) NonInst0.t)
-    Stdlib.Type.eq) (x : (Inst1.t) expr) -> (x : <[(int) NonInst0.t]> expr)
-]>
+Line 8, characters 38-39:
+8 |                (x : Inst1.t expr) -> (x : <[int NonInst0.t]> expr) ]>
+                                          ^
+Error: This expression has type "Inst1.t expr"
+       but an expression was expected of type "<[int NonInst0.t]> expr"
+       Type "Inst1.t" is not compatible with type "<[int NonInst0.t]>"
 |}]
 (* t ~ $s  when s instantiable *)
 let _ = <[ fun (Equal : (int NonInst0.t, $Inst1.t) Type.eq)
                (x : Inst1.t expr) -> (x : <[int NonInst0.t]> expr) ]>
 [%%expect {|
-- : <[
-     (int NonInst0.t, $(Inst1.t)) Type.eq ->
-     Inst1.t expr -> <[int NonInst0.t]> expr]>
-    expr
-=
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : ((int) NonInst0.t, _)
-    Stdlib.Type.eq) (x : (Inst1.t) expr) -> (x : <[(int) NonInst0.t]> expr)
-]>
+Line 2, characters 38-39:
+2 |                (x : Inst1.t expr) -> (x : <[int NonInst0.t]> expr) ]>
+                                          ^
+Error: This expression has type "Inst1.t expr"
+       but an expression was expected of type "<[int NonInst0.t]> expr"
+       Type "Inst1.t" is not compatible with type "<[int NonInst0.t]>"
 |}]
+(* Quoted types are instantiable: the following should succeed. *)
 (* <[t]> ~ s  when t instantiable *)
 let _ = <[ fun (Equal : (<[Inst0.t]>, int NonInst1.t) Type.eq)
                (x : Inst0.t) -> (x : $(int NonInst1.t)) ]>

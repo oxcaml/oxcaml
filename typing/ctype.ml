@@ -4306,14 +4306,12 @@ let complete_type_list ?(allow_absent=false) env fl1 lv2 mty2 fl2 =
   | res -> res
   | exception Exit -> raise Not_found
 
-(* Checks if a type is an instantiable type under some quotes.
-   Note that types under splices are not instantiable, as they are erased. *)
+(* Checks if a type is an instantiable type under some quotes *)
 let rec is_instantiable_ty env ty =
   match get_desc ty with
   | Tconstr (path, [], _) ->
       is_instantiable env ~for_jkind_eqn:false path
   | Tquote ty' -> is_instantiable_ty (incr_stage env) ty'
-  | Tsplice ty' -> is_instantiable_ty (decr_stage env) ty'
   | _ -> false
 
 (* Checks if a type is equatable under some quotes or splices *)
@@ -4330,7 +4328,6 @@ let rec instantiable_scope ty =
   match get_desc ty with
   | Tconstr (path, [], _) -> Path.scope path
   | Tquote ty' -> instantiable_scope ty'
-  | Tsplice ty' -> instantiable_scope ty'
   | _ -> -1
 
 (* raise Not_found rather than Unify if the module types are incompatible *)
@@ -4655,25 +4652,13 @@ and unify3 uenv t1 t1' t2 t2' =
           record_equation uenv t1' t2';
           add_gadt_equation uenv path t1'
       (* Ordering of scopes is asymmetric to ensure we consistently
-         move quotes/splices to the same side *)
-      | (Tsplice s1, _)
-        when is_instantiable_ty (get_env uenv) s1
-          && instantiable_scope s1 > instantiable_scope t2'
-          && can_generate_equations uenv ->
-          unify_with_decr_stage uenv
-            (fun uenv -> unify uenv s1 (new_quote_ty t2'))
+         move quotes to the same side *)
       | (Tquote s1, _)
         when is_instantiable_ty (get_env uenv) s1
           && instantiable_scope s1 > instantiable_scope t2'
           && can_generate_equations uenv ->
           unify_with_incr_stage uenv
             (fun uenv -> unify uenv s1 (new_splice_ty t2'))
-      | (_, Tsplice s2)
-        when is_instantiable_ty (get_env uenv) s2
-          && instantiable_scope s2 >= instantiable_scope t1'
-          && can_generate_equations uenv ->
-          unify_with_decr_stage uenv
-            (fun uenv -> unify uenv (new_quote_ty t1') s2)
       | (_, Tquote s2)
         when is_instantiable_ty (get_env uenv) s2
           && instantiable_scope s2 >= instantiable_scope t1'

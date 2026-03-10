@@ -606,16 +606,19 @@ let _ =
    -- should always fail.
    [S_proof > S_min], [S_proof > T_proof = T_subj]. *)
 
-(* CR metaprogramming jbachurski: Tests succeed until splices are rigid. *)
 (* CR quoted-kinds jbachurski: Annotate [t : <[value]>]. *)
-
 (* 1 ~~> 0  @  0 <=> 0 *)
 let _ = fun (type t) (x : t expr) -> <[
     (fun (Equal : ($t, int) Type.eq) ->
       $x + 1)
     |> $sorry1 ]>
 [%%expect{|
-- : 't expr -> <[int]> expr = <fun>
+Line 3, characters 7-8:
+3 |       $x + 1)
+           ^
+Error: This expression has type "t expr" but an expression was expected of type
+         "<[int]> expr"
+       Type "t" is not compatible with type "<[int]>"
 |}]
 (* 2 ~~> 1  @  1 <=> 1 *)
 let _ = <[ fun (type t) (x : t expr) -> <[
@@ -623,12 +626,12 @@ let _ = <[ fun (type t) (x : t expr) -> <[
       $x + 1)
     |> $sorry1 ]> ]>
 [%%expect{|
-Line 4, characters 8-14:
-4 |     |> $sorry1 ]> ]>
-            ^^^^^^
-Error: Identifier "sorry1" is used at line 4, characters 8-14,
-       inside a quotation (<[ ... ]>);
-       it is introduced at line 2, characters 4-10, outside any quotations.
+Line 3, characters 7-8:
+3 |       $x + 1)
+           ^
+Error: This expression has type "t expr" but an expression was expected of type
+         "<[int]> expr"
+       Type "t" is not compatible with type "<[int]>"
 |}]
 
 (* Evidence travels to the wrong stage in the past -- should always fail:
@@ -914,16 +917,17 @@ let magic_with_time_travel_and_past_types (type a b) (x : a) : b =
 [%%expect {|
 val magic_with_time_travel_and_past_types : 'a -> 'b = <fun>
 |}]
+
 (* Splices are not instantiable *)
 let foo (type a) (c : a expr) = <[
   fun (x : $a) (Equal : ($a, int) Type.eq) ->
     $c + 42 ]>
 let bad = foo <["abc"]>
 [%%expect {|
-val foo : 'a expr -> <[$('a) -> ($('a), int) Type.eq -> int]> expr = <fun>
-val bad : <[string -> (string, int) Type.eq -> int]> expr =
-  <[
-    fun (x : _) ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (_, int)
-      Stdlib.Type.eq) -> "abc" + 42
-  ]>
+Line 3, characters 5-6:
+3 |     $c + 42 ]>
+         ^
+Error: This expression has type "a expr" but an expression was expected of type
+         "<[int]> expr"
+       Type "a" is not compatible with type "<[int]>"
 |}]
