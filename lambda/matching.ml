@@ -2198,7 +2198,7 @@ let get_expr_args_constr ~scopes head { arg; mut; sort; layout; _ } rem =
 let divide_constructor ~scopes ctx pm =
   divide
     (get_expr_args_constr ~scopes)
-    Data_types.may_equal_constr
+    Data_types.equal_constr
     get_key_constr
     get_pat_args_constr
     ctx pm
