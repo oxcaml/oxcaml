@@ -201,6 +201,12 @@ jobs:
             build_ocamlparam: '_,reaper=1'
             ocamlparam: '_,reaper=1'
 
+          - name: runtime5 reaper with local value slots
+            config: --enable-runtime5
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: '_,reaper=1,reaper-local-fields=1'
+            ocamlparam: '_,reaper=1,reaper-local-fields=1'
+
     env:
       J: "8"
       run_testsuite: "true"
