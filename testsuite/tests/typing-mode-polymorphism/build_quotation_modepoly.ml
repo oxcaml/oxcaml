@@ -1138,13 +1138,7 @@ let x = <[<[42]>]> in <[ fun () -> <[ $($x) ]> ]>;;
    and bar (x : int) : int = if x > 0 then foo x else 0
    in foo, bar ]>
 [%%expect {|
-- : <[
-     (int @ 'n -> int @ [< 'm @@ past > 'm @@ many portable]) *
-     (int @ 'p ->
-      int @ [< 'o @@ past & 'o @@ past > 'o @@ many portable | 'o @@ many portable])
-     ]>
-    expr
-=
+- : <[(int @ 'n -> int @ 'm) * (int @ 'p -> int @ 'o)]> expr =
 <[
   let rec foo = (fun (x : int) -> (if (x < 0) then (bar x) else 0 : int))
   and bar =
@@ -1487,9 +1481,7 @@ Error: Annotating types with kinds
 
 <[ let rec f (x @ local unique) @ local unique = x in f ]>
 [%%expect {|
-- : <[
-     $('a) @ [< 'm & 'n & unique > 'n | local] ->
-     $('a) @ [< unique > 'm | local]]>
+- : <[$('a) @ [< 'm & unique > local] -> $('a) @ [< unique > 'm | local]]>
     expr
 = <[let rec f = (fun (x : _ @ local unique) -> (x : _ @ local unique)) in f]>
 |}];;

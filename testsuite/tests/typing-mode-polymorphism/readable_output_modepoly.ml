@@ -56,8 +56,8 @@ let[@tail_mod_cons] rec map f = function
           (setfield_ptr(heap-init)_computed dst offset 0))))
   (apply (field_imm 1 (global Toploop!)) "map" map))
 val map :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o & global many > 'o | aliased] ->
-  ('a list @ [< 'q & 'n > 'q] -> 'b list @ [< 'p & global > 'p | 'm]) @ [< global > monadic_to_comonadic_min('o) | monadic_to_comonadic_min('o) | nonportable] =
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global many > aliased] ->
+  ('a list @ [< 'n] -> 'b list @ [< global > 'm]) @ [< global > 'o | nonportable] =
   <fun>
 |}]
 
@@ -118,8 +118,8 @@ let[@tail_mod_cons] rec rec_map f = function
           (setfield_ptr(heap-init)_computed dst offset 0))))
   (apply (field_imm 1 (global Toploop!)) "rec_map" rec_map))
 val rec_map :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o & global many > 'o | aliased] ->
-  ('a rec_list @ [< 'q & 'n > 'q] -> 'b rec_list @ [< 'p & global > 'p | 'm]) @ [< global > monadic_to_comonadic_min('o) | monadic_to_comonadic_min('o) | nonportable] =
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global many > aliased] ->
+  ('a rec_list @ [< 'n] -> 'b rec_list @ [< global > 'm]) @ [< global > 'o | nonportable] =
   <fun>
 |}]
 
@@ -215,8 +215,8 @@ let[@tail_mod_cons] rec trip = function
           (setfield_ptr(heap-init)_computed dst offset 0))))
   (apply (field_imm 1 (global Toploop!)) "trip" trip))
 val trip :
-  'a list @ [< 'n & 'o & global many > 'o] ->
-  ('a * int) list @ [< 'm & global > 'm | 'n | aliased] = <fun>
+  'a list @ [< 'm & global many] ->
+  ('a * int) list @ [< global > 'm | aliased] = <fun>
 |}]
 
 (* check nested-constructors whose arguments
@@ -292,8 +292,8 @@ let[@tail_mod_cons] rec effects f = function
           (setfield_ptr(heap-init)_computed dst offset 0))))
   (apply (field_imm 1 (global Toploop!)) "effects" effects))
 val effects :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o & global many > 'o | aliased] ->
-  (('a * 'a) list @ [< 'q & 'n > 'q] -> 'b list @ [< 'p & global > 'p | 'm]) @ [< global > monadic_to_comonadic_min('o) | monadic_to_comonadic_min('o) | nonportable] =
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global many > aliased] ->
+  (('a * 'a) list @ [< 'n] -> 'b list @ [< global > 'm]) @ [< global > 'o | nonportable] =
   <fun>
 |}]
 
@@ -372,8 +372,8 @@ let[@tail_mod_cons] rec map_stutter f xs =
               (setfield_ptr(heap-init)_computed block 1 0))))))
   (apply (field_imm 1 (global Toploop!)) "map_stutter" map_stutter))
 val map_stutter :
-  ('a option @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o & global many > 'o | aliased] ->
-  ('a list @ [< 'q & 'n > 'q] -> 'b list @ [< 'p & global > 'p | 'm]) @ [< global > monadic_to_comonadic_min('o) | monadic_to_comonadic_min('o) | nonportable] =
+  ('a option @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global many > aliased] ->
+  ('a list @ [< 'n] -> 'b list @ [< global > 'm]) @ [< global > 'o | nonportable] =
   <fun>
 |}]
 
@@ -453,8 +453,8 @@ type 'a stream = { hd : 'a; tl : unit -> 'a stream; }
                 (%int_sub n 1) tailcall))))))
   (apply (field_imm 1 (global Toploop!)) "smap_stutter" smap_stutter))
 val smap_stutter :
-  ('a option @ [> 'n | aliased nonportable] -> 'b @ [< 'm & global]) @ [< 'p & global many > 'p | aliased] ->
-  ('a stream @ [< 'q @@ past & 'mm0 @@ past & 'n & global > aliased nonportable] ->
-   (int @ [< many uncontended] -> 'b list @ [< 'mm1 & global > 'mm1 | 'm]) @ [< global > 'q | 'mm0 | 'o | nonportable]) @ [< 'o @@ past & global > monadic_to_comonadic_min('p) | monadic_to_comonadic_min('p) | nonportable] =
+  ('a option @ [> 'n | aliased nonportable] -> 'b @ [< 'm & global]) @ [< 'p @@ past & global many > aliased] ->
+  ('a stream @ [< 'q @@ past & 'n & global > aliased nonportable] ->
+   (int @ [< many uncontended] -> 'b list @ [< global > 'm]) @ [< global > 'q | 'o | nonportable]) @ [< 'o @@ past & global > 'p | nonportable] =
   <fun>
 |}]

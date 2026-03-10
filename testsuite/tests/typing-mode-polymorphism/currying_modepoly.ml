@@ -32,8 +32,8 @@ let apply2 x = g x x
 [%%expect{|
 val apply2 :
   int @ [< many uncontended] ->
-  ('a @ [< 'n @@ past & 'p @@ past > 'p | local] ->
-   (int @ 'o -> int @ [< global]) @ [< 'm @@ past > 'm | 'n | local]) @ [< global > nonportable] =
+  ('a @ [< 'm @@ past > local] ->
+   (int @ 'n -> int @ [< global]) @ [> 'm | local]) @ [< global > nonportable] =
   <fun>
 |}]
 let apply3 x = g x x x

@@ -516,3 +516,162 @@ Error: Signature mismatch:
          t @ [< global > 'm | 'm | 'm | 'm | nonportable]"
        is not compatible with the type "t -> t @ portable"
 |}]
+
+(* variant types *)
+
+type 'a option' = None' | Some' of 'a
+
+let wrap x = Some' x
+[%%expect{|
+type 'a option' = None' | Some' of 'a
+val wrap : 'a @ [< 'm & global] -> 'a option' @ [< global > 'm] = <fun>
+|}]
+
+let unwrap_or default = function
+  | None' -> default
+  | Some' x -> x
+[%%expect{|
+val unwrap_or :
+  'a @ [< 'm & global] ->
+  ('a option' @ [< 'n] -> 'a @ [> 'n | 'm]) @ [< global > close('m)] = <fun>
+|}]
+
+type ('a, 'b) either = Left of 'a | Right of 'b
+
+let map_left f = function
+  | Left x -> Left (f x)
+  | Right y -> Right y
+[%%expect{|
+type ('a, 'b) either = Left of 'a | Right of 'b
+val map_left :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global] ->
+  (('a, 'c) either @ [< 'p & 'n & global] -> ('b, 'c) either @ [> 'p | 'm]) @ [< global > 'o] =
+  <fun>
+|}]
+
+(* recursive functions *)
+
+let rec length = function
+  | [] -> 0
+  | _ :: tl -> 1 + length tl
+[%%expect{|
+val length : 'a list @ 'n -> int @ 'm = <fun>
+|}]
+
+let rec map f = function
+  | [] -> []
+  | x :: xs -> f x :: map f xs
+[%%expect{|
+val map :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global many > aliased] ->
+  ('a list @ [< 'n] -> 'b list @ [< global > 'm]) @ [< global > 'o | nonportable] =
+  <fun>
+|}]
+
+(* if/then/else *)
+
+let choose b x y = if b then x else y
+[%%expect{|
+val choose :
+  bool @ [< 'm @@ past & global] ->
+  ('a @ [< 'n & global] ->
+   ('a @ [< 'o & global] -> 'a @ [< global > 'o | 'n]) @ [< global > close('n)]) @ [< global > 'm] =
+  <fun>
+|}]
+
+(* nested closures *)
+
+let nest x = fun () -> fun () -> fun () -> x
+[%%expect{|
+val nest :
+  'a @ [< 'm & global] ->
+  (unit @ 'p ->
+   (unit @ 'o -> (unit @ 'n -> 'a @ [< global > 'm]) @ [< global > close('m)]) @ [< global > close('m)]) @ [< global > close('m)] =
+  <fun>
+|}]
+
+(* sequencing: using x then returning it *)
+
+let use_and_return x = ignore x; x
+[%%expect{|
+val use_and_return :
+  'a @ [< 'm & global many uncontended] -> 'a @ [< global > 'm | aliased] =
+  <fun>
+|}]
+
+(* multiple distinct mode variables *)
+
+let swap (a, b) = (b, a)
+[%%expect{|
+val swap : 'a * 'b @ [< 'm & global] -> 'b * 'a @ [< global > 'm] = <fun>
+|}]
+
+let both_id x y = (x, y)
+[%%expect{|
+val both_id :
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] -> 'a * 'b @ [< global > 'n | 'm]) @ [< global > close('m)] =
+  <fun>
+|}]
+
+(* let bindings preserving modes *)
+
+let let_chain x =
+  let a = x in
+  let b = a in
+  let c = b in
+  c
+[%%expect{|
+val let_chain : 'a @ [< 'm & global] -> 'a @ [< global > 'm] = <fun>
+|}]
+
+(* mode polymorphism with option type *)
+
+let map_option f = function
+  | None -> None
+  | Some x -> Some (f x)
+[%%expect{|
+val map_option :
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & global] ->
+  ('a option @ [< 'n] -> 'b option @ [> 'm]) @ [< global > 'o] = <fun>
+|}]
+
+(* Currying over three arguments *)
+
+let triple x y z = (x, y, z)
+[%%expect{|
+val triple :
+  'a @ [< 'm & global] ->
+  ('b @ [< 'n & global] ->
+   ('c @ [< 'o & global] -> 'a * 'b * 'c @ [< global > 'o | 'n | 'm]) @ [< global > close('n)]) @ [< global > close('m)] =
+  <fun>
+|}]
+
+let flip f (x, y) = f (y, x)
+[%%expect{|
+val flip :
+  ('a * 'b @ [> 'n] -> 'c @ [< 'm & global]) @ [< 'o @@ past & global] ->
+  ('b * 'a @ [< 'n & global] -> 'c @ [< global > 'm]) @ [< global > 'o] =
+  <fun>
+|}]
+
+let flip f x y = f y x
+[%%expect{|
+val flip :
+  ('a @ [< 'm @@ past > 'q] ->
+   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> 'm | 'n]) @ [< 'n @@ past & 'mm0 @@ past & global] ->
+  ('b @ [< 'p & global] ->
+   ('a @ [< 'q] -> 'c @ [< global > 'o]) @ [< global > close('p)]) @ [< global > 'mm0] =
+  <fun>
+|}]
+
+
+let flip f = fun x -> fun y -> f y x
+[%%expect{|
+val flip :
+  ('a @ [< 'm @@ past > 'q] ->
+   ('b @ [> 'p] -> 'c @ [< 'o & global]) @ [> 'm | 'n]) @ [< 'mm1 @@ past & 'n @@ past & 'mm0 @@ past & global] ->
+  ('b @ [< 'p & global] ->
+   ('a @ [< 'q] -> 'c @ [< global > 'o]) @ [< global > close('p) | 'mm1]) @ [< global > 'mm0] =
+  <fun>
+|}]
