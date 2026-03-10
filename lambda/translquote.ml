@@ -2419,9 +2419,7 @@ let quote_value_ident_path_as_exp loc env path ident_kind =
   Exp_desc.ident loc (quote_value_ident_path loc env path ident_kind)
 
 let type_path env ty =
-  let desc =
-    Types.get_desc (Ctype.expand_head_opt env ty)
-  in
+  let desc = Types.get_desc (Ctype.expand_head_opt env ty) in
   match desc with Tconstr (p, _, _) -> Some p | _ -> None
 
 let quote_record_field env loc (lbl_desc : _ Data_types.gen_label_description) =
@@ -2483,7 +2481,7 @@ let quote_constructor env loc (constr : Data_types.constructor_description) =
 
 let rec quote_modtype_path_of_lid loc = function
   | Lident id -> Modtype_path.name loc id |> Modtype_path.wrap
-  | Ldot ({txt = p; _}, {txt = s; _}) ->
+  | Ldot ({ txt = p; _ }, { txt = s; _ }) ->
     Modtype_path.dot loc (quote_modtype_path_of_lid loc p) s
     |> Modtype_path.wrap
   | _ ->

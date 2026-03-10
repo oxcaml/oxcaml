@@ -3613,8 +3613,8 @@ let transl_match_on_option value_kind arg loc ~if_some ~if_none =
 let transl_match_on_or_null value_kind arg loc ~if_null ~if_this =
   Lifthenelse (Lprim (Pisnull, [ arg ], loc), if_null, if_this, value_kind)
 
-let combine_extension_constructor value_kind loc arg pat_env pat_barrier partial ctx def
-    (descr_lambda_list, total1, _pats) =
+let combine_extension_constructor value_kind loc arg pat_env pat_barrier partial
+    ctx def (descr_lambda_list, total1, _pats) =
   let fail, local_jumps = mk_failaction_neg partial ctx def in
   let lambda1 =
     let consts, nonconsts = split_extension_cases descr_lambda_list in
