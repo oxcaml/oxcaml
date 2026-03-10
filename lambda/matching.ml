@@ -4144,7 +4144,7 @@ let rec compile_match ~scopes value_kind repr partial ctx
         { m with cases = map_on_rows Non_empty_row.of_initial nonempty_cases }
 
 and compile_match_nonempty ~scopes value_kind repr partial ctx
-    (m : (args, Typedtree.pattern Non_empty_row.t clause) pattern_matching)=
+    (m : (args, Typedtree.pattern Non_empty_row.t clause) pattern_matching) =
   match m with
   | { cases = []; args = [] } ->
       begin match comp_exit partial ctx m.default with
