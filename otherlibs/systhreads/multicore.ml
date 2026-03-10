@@ -96,11 +96,11 @@ module Await_atomic_bitset = struct
     ;;
 end
 
-type 'a spawn_result =
+type ('a : value_or_null) spawn_result =
   | Spawned
   | Failed of 'a * exn @@ aliased many * Printexc.raw_backtrace @@ aliased many
 
-type 'a request_inner : value mod contended portable  =
+type ('a : value_or_null) request_inner : value mod contended portable  =
   { action : 'a @ contended once portable unique -> unit @@ portable
   ; argument : 'a @@ contended portable
   ; mutable result : 'a spawn_result @@ contended portable
@@ -112,7 +112,7 @@ type 'a request_inner : value mod contended portable  =
    (* The mutable fields are synchronized via [mutex] and [condition]. *)]
 
 type request : value mod contended portable =
-    Request : 'a request_inner -> request
+    Request : ('a : value_or_null). 'a request_inner -> request
 [@@unboxed]
 
 type t : value mod contended portable =
@@ -210,7 +210,9 @@ let () =
 ;;
 
 external magic_unique__contended_portable
-  : 'a @ contended portable -> 'a @ contended portable unique @@ portable
+  :  ('a : value_or_null).
+     'a @ contended portable
+  -> 'a @ contended portable unique @@ portable
   = "%identity"
 
 (** Run some function on a new thread. *)
@@ -297,7 +299,8 @@ let spawn_on ~domain:i f a =
        pass a function through a data structure such that it is statically known
        to be used only once without having to use a mutable box to do so. *)
     external magic_many__contended_portable
-      :  'a @ contended once portable
+      :  ('a : value_or_null).
+         'a @ contended once portable
       -> 'a @ contended many portable
       @@ portable
       = "%identity"

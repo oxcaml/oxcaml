@@ -48,7 +48,7 @@ type ('a : value_or_null) spawn_result =
     @raise Sys_error in case the system fails to create a new thread. *)
 val spawn_on
   :  ('a : value_or_null).
-      domain:int
+     domain:int
   -> ('a @ contended once portable unique -> unit) @ once portable unyielding
   -> 'a @ contended once portable unique
   -> 'a spawn_result @ contended once portable unique
