@@ -528,12 +528,12 @@ module E = struct
     }
 
   let map_block_access sub = function
-    | Baccess_field lid -> Baccess_field (map_loc sub lid)
+    | Baccess_field lid -> Baccess_field (map_loc_lid sub lid)
     | Baccess_array (mut, ik, e) -> Baccess_array (mut, ik, sub.expr sub e)
     | Baccess_block (mut, e) -> Baccess_block (mut, sub.expr sub e)
 
   let map_unboxed_access sub = function
-    | Uaccess_unboxed_field lid -> Uaccess_unboxed_field (map_loc sub lid)
+    | Uaccess_unboxed_field lid -> Uaccess_unboxed_field (map_loc_lid sub lid)
 
   let map_iterator sub = function
     | Pcomp_range { start; stop; direction } ->
@@ -599,12 +599,12 @@ module E = struct
           (map_opt (sub.expr sub) eo)
     | Pexp_record_unboxed_product (l, eo) ->
         record_unboxed_product ~loc ~attrs
-          (List.map (map_tuple (map_loc sub) (sub.expr sub)) l)
+          (List.map (map_tuple (map_loc_lid sub) (sub.expr sub)) l)
           (map_opt (sub.expr sub) eo)
     | Pexp_field (e, lid) ->
         field ~loc ~attrs (sub.expr sub e) (map_loc_lid sub lid)
     | Pexp_unboxed_field (e, lid) ->
-        unboxed_field ~loc ~attrs (sub.expr sub e) (map_loc sub lid)
+        unboxed_field ~loc ~attrs (sub.expr sub e) (map_loc_lid sub lid)
     | Pexp_setfield (e1, lid, e2) ->
         setfield ~loc ~attrs (sub.expr sub e1) (map_loc_lid sub lid)
           (sub.expr sub e2)

@@ -478,12 +478,12 @@ module E = struct
         sub.attributes sub attrs
 
   let iter_block_access sub = function
-    | Baccess_field lid -> iter_loc sub lid
+    | Baccess_field lid -> iter_loc_lid sub lid
     | Baccess_array (_, _, index) -> sub.expr sub index
     | Baccess_block (_, idx) -> sub.expr sub idx
 
   let iter_unboxed_access sub = function
-    | Uaccess_unboxed_field lid -> iter_loc sub lid
+    | Uaccess_unboxed_field lid -> iter_loc_lid sub lid
 
   let iter sub {pexp_loc = loc; pexp_desc = desc; pexp_attributes = attrs} =
     sub.location sub loc;

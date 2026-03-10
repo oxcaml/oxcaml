@@ -897,9 +897,10 @@ and simple_pattern ctxt (f:Format.formatter) (x:pattern) : unit =
         record_pattern ctxt f ~unboxed:true l closed
     | Ppat_unboxed_unit -> pp f "#()"
     | Ppat_unboxed_bool b -> pp f "#%a" bool b
-    | Ppat_tuple (l, closed) -> tuple_pattern ctxt f l closed
-    | Ppat_unboxed_tuple (l, closed) ->
-        labeled_tuple_pattern ctxt f ~unboxed:true l closed
+    | Ppat_tuple (l, c) ->
+        tuple_pattern ctxt f ~unboxed:false l c
+    | Ppat_unboxed_tuple (l, c) ->
+        tuple_pattern ctxt f ~unboxed:true l c
     | Ppat_constant (c) -> pp f "%a" constant c
     | Ppat_interval (c1, c2) -> pp f "%a..%a" constant c1 constant c2
     | Ppat_variant (l,None) ->  pp f "`%a" ident_of_name l
@@ -1291,7 +1292,7 @@ and expression2 ctxt f x =
     | Pexp_field (e, li) ->
         pp f "@[<hov2>%a.%a@]" (simple_expr ctxt) e value_longident_loc li
     | Pexp_unboxed_field (e, li) ->
-        pp f "@[<hov2>%a.#%a@]" (simple_expr ctxt) e longident_loc li
+        pp f "@[<hov2>%a.#%a@]" (simple_expr ctxt) e value_longident_loc li
     | Pexp_send (e, s) ->
         pp f "@[<hov2>%a#%a@]" (simple_expr ctxt) e ident_of_name s.txt
 
@@ -2375,8 +2376,7 @@ and label_x_expression_param ctxt f (l,e) =
 
 and tuple_expr_component ctxt f (l,e) =
   let simple_name = match e with
-    | {pexp_desc=Pexp_ident {txt=Lident l;_};
-       pexp_attributes=[]} -> Some l
+   | {pexp_desc=Pexp_ident {txt=Lident l;_}; pexp_attributes=[]} -> Some l
     | _ -> None
   in match (simple_name, l) with
   (* Labeled component can be represented with pun *)
@@ -2384,7 +2384,7 @@ and tuple_expr_component ctxt f (l,e) =
   (* Labeled component general case *)
   | _, Some lbl -> pp f "~%s:%a" lbl (simple_expr ctxt) e
   (* Unlabeled component *)
-  | _, None  -> expression2 ctxt f e (* level 2*)
+  | _, None  -> expression2 ctxt f e
 
 and directive_argument f x =
   match x.pdira_desc with
@@ -2591,7 +2591,7 @@ let top_phrase f x =
   pp f ";;";
   pp_print_newline f ()
 
-let longident = print_with_maximal_extensions longident
+let longident = print_with_maximal_extensions value_longident
 let core_type = print_reset_with_maximal_extensions core_type
 let pattern = print_reset_with_maximal_extensions pattern
 let signature = print_reset_with_maximal_extensions signature

@@ -59,9 +59,8 @@ let fmt_char_option f = function
 
 let fmt_bool f x =
   match x with
-  | false -> fprintf f "false";
-  | true -> fprintf f "true";
-;;
+  | false -> fprintf f "false"
+  | true -> fprintf f "true"
 let fmt_mutable_flag f x =
   match x with
   | Immutable -> fprintf f "Immutable"
@@ -289,7 +288,7 @@ and pattern i ppf x =
   | Ppat_unboxed_bool b -> line i ppf "Ppat_unboxed_bool %a\n" fmt_bool b;
   | Ppat_tuple (l, c) ->
       line i ppf "Ppat_tuple\n %a\n" fmt_closed_flag c;
-      list i (labeled_tuple_element pattern) ppf l
+      list i (labeled_tuple_element pattern) ppf l;
   | Ppat_unboxed_tuple (l, c) ->
       line i ppf "Ppat_unboxed_tuple %a\n" fmt_closed_flag c;
       list i (labeled_tuple_element pattern) ppf l
