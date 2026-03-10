@@ -405,12 +405,24 @@ install_for_test: install
 	mkdir _runtest/ocamltest
 	cp $(boot_build)/ocamltest/ocamltest.native _runtest/ocamltest/ocamltest
 test: install_for_test
+	# For flambda2, build the list of test directories that are not already
+	# listed in [oxcaml/testsuite/flambda2-test-list].
+	#
+	# Step 1: change to [testsuite] so the loop can refer to [tests/*].
+	# Step 2: iterate over every entry under [tests] and skip non-directories,
+	# such as [tests/Makefile].
+	# Step 3: write only the remaining directories that are not already in the
+	# flambda2 test list.
 	if [ "$(middle_end)" = "flambda2" ]; then \
-	  for dir in `cd testsuite; ls -1 -d tests/*`; do \
-	    if ! grep -q "^  $$dir " oxcaml/testsuite/flambda2-test-list; then \
-	      echo "  $$dir"; \
+	  cd testsuite || exit 1; \
+	  for path in tests/*; do \
+	    if [ ! -d "$$path" ]; then \
+	      continue; \
 	    fi; \
-	  done > _runtest/flambda2-test-list; \
+	    if ! grep -q "^  $$path " ../oxcaml/testsuite/flambda2-test-list; then \
+	      echo "  $$path"; \
+	    fi; \
+	  done > ../_runtest/flambda2-test-list; \
 	fi
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
