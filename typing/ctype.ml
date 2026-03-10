@@ -2218,7 +2218,8 @@ let try_expand_safe env ty =
 (* Perform one of the following head-position beta reductions via rewrites:
    * Reduce a quoted-eval through a concrete (top-level) type constructor.
    * Cancel a quote-splice pair. *)
-let rec try_reduce_once t =
+let rec try_reduce_once env t =
+  let try_reduce_once t = try_reduce_once env t in
   let try_reduce_poly t = if is_Tpoly t then try_reduce_once t else t in
   match get_desc t with
   | Tquote_eval t -> begin
@@ -2339,14 +2340,14 @@ let rec try_reduce_once t =
   | _ -> raise Cannot_expand
 
 (* Perform head-position reductions exhaustively til the normal form. *)
-let rec try_reduce ty =
-  let ty' = try_reduce_once ty in
-  try try_reduce ty'
+let rec try_reduce env ty =
+  let ty' = try_reduce_once env ty in
+  try try_reduce env ty'
   with Cannot_expand -> ty'
 
 (* [Predef]'s [eval] is special -- we want to always expand it in [reduce_head],
    so we special-case its abbreviation expansion there. *)
-let expand_eval_abbrev () ty =
+let expand_eval_abbrev _env ty =
   match get_desc ty with
   | Tconstr (path, [ty], _) when Path.same path Predef.path_eval ->
     new_quote_eval_ty (new_splice_ty ty)
@@ -2355,25 +2356,25 @@ let expand_eval_abbrev () ty =
 let try_expand_eval_once = try_expand_once_gen expand_eval_abbrev
 
 (* Fully expand the head of a type. *)
-let try_expand_head (type env)
-    (try_once : env -> type_expr -> type_expr) (env : env) ty =
+let try_expand_head
+    (try_once : Env.t -> type_expr -> type_expr) (env : Env.t) ty =
   let rec loop try_once env ty =
     let ty' = try_once env ty in
     try loop try_once env ty'
     with Cannot_expand ->
-      try try_reduce ty'
+      try try_reduce env ty'
       with Cannot_expand -> ty'
   in
   try loop try_once env ty
-  with Cannot_expand -> try_reduce ty
+  with Cannot_expand -> try_reduce env ty
 
-let reduce_head ~expand_eval ty =
+let reduce_head ~expand_eval env ty =
   let try_once =
     if expand_eval
     then try_expand_eval_once
-    else (fun () _ -> raise Cannot_expand)
+    else (fun _env _ty -> raise Cannot_expand)
   in
-  try try_expand_head try_once () ty
+  try try_expand_head try_once env ty
   with Cannot_expand -> ty
 
 (* Unsafe full expansion, may raise [Unify [Escape _]]. *)
@@ -5723,7 +5724,7 @@ let rec moregen inst_nongen variance type_pairs env t1 t2 =
           TypePairs.add pairs (t1', t2');
           match (get_desc t1', get_desc t2') with
             (Tvar { jkind }, _) when may_instantiate inst_nongen t1' ->
-              let t2 = reduce_head ~expand_eval:false t2 in
+              let t2 = reduce_head ~expand_eval:false env t2 in
               moregen_occur env (get_level t1') t2;
               update_scope_for Moregen (get_scope t1') t2;
               (* use [check], not [constrain], here because [constrain] would be like

@@ -1547,7 +1547,9 @@ let rec tree_of_modal_typexp mode modal ty =
         Otyp_ret (Orm_any (tree_of_modes mode), tree)
     | Other _ -> tree
   in
-  let ty = Ctype.reduce_head ~expand_eval:!print_reduced_evals ty in
+  let ty =
+    Ctype.reduce_head ~expand_eval:!print_reduced_evals !printing_env ty
+  in
   let px = proxy ty in
   if List.memq px !printed_aliases && not (List.memq px !delayed) then
    let non_gen = is_non_gen mode (Transient_expr.type_expr px) in
