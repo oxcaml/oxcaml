@@ -688,6 +688,16 @@ module Jkind0 : sig
     val for_non_float : why:Jkind_intf.History.value_creation_reason -> 'd jkind
 
     val for_boxed_record : label_declaration list -> jkind_l
+    (* Shared type-level implementation of Steps B1-B4 from
+       Note [With-bounds for GADTs].  Callers choose the projection target via
+       [projected_params]: declaration parameters for boxed GADTs, or the
+       already-instantiated head arguments for unboxed GADTs. *)
+    val gadt_payload_subst :
+      projected_params:Types.type_expr list ->
+      res_args:Types.type_expr list ->
+      payload_tys:Types.type_expr list ->
+      free_vars:(Types.type_expr list -> TypeSet.t) ->
+      (Types.type_expr * Types.type_expr) list
     val for_boxed_variant :
       loc:Location.t ->
       decl_params:Types.type_expr list ->
