@@ -30,6 +30,8 @@ module Location : sig
 
   val print : Cmm.machtype_component -> Format.formatter -> t -> unit
 
+  val compare : t -> t -> int
+
   val equal : t -> t -> bool
 
   module Set : Set.S with type elt = t
@@ -107,6 +109,24 @@ end = struct
       | Outgoing { index } -> Reg.Outgoing (word_index_to_byte_offset index)
       | Domainstate { index } ->
         Reg.Domainstate (word_index_to_byte_offset index)
+
+    let compare (t1 : t) (t2 : t) : int =
+      match t1, t2 with
+      | ( Local { index = i1; stack_class = c1 },
+          Local { index = i2; stack_class = c2 } ) ->
+        let c = Int.compare i1 i2 in
+        if c <> 0 then c
+        else Int.compare (Stack_class.hash c1) (Stack_class.hash c2)
+      | Incoming { index = i1 }, Incoming { index = i2 } -> Int.compare i1 i2
+      | Outgoing { index = i1 }, Outgoing { index = i2 } -> Int.compare i1 i2
+      | Domainstate { index = i1 }, Domainstate { index = i2 } ->
+        Int.compare i1 i2
+      | Local _, (Incoming _ | Outgoing _ | Domainstate _) -> -1
+      | (Incoming _ | Outgoing _ | Domainstate _), Local _ -> 1
+      | Incoming _, (Outgoing _ | Domainstate _) -> -1
+      | (Outgoing _ | Domainstate _), Incoming _ -> 1
+      | Outgoing _, Domainstate _ -> -1
+      | Domainstate _, Outgoing _ -> 1
   end
 
   type t =
@@ -137,8 +157,11 @@ end = struct
     Printreg.loc ~unknown:(fun _ -> assert false) ppf (to_loc_lossy t) typ
 
   let compare (t1 : t) (t2 : t) : int =
-    (* CR-someday azewierzejew: Implement proper comparison. *)
-    Stdlib.compare t1 t2
+    match t1, t2 with
+    | Reg r1, Reg r2 -> Regs.Phys_reg.compare r1 r2
+    | Stack s1, Stack s2 -> Stack.compare s1 s2
+    | Reg _, Stack _ -> -1
+    | Stack _, Reg _ -> 1
 
   let equal (t1 : t) (t2 : t) : bool = compare t1 t2 = 0
 
@@ -185,8 +208,12 @@ end = struct
     | Named _ -> Reg.Unknown
 
   let compare (t1 : t) (t2 : t) =
-    (* CR-someday azewierzejew: Implement proper comparison. *)
-    Stdlib.compare t1 t2
+    match t1, t2 with
+    | Preassigned { location = l1 }, Preassigned { location = l2 } ->
+      Location.compare l1 l2
+    | Named { stamp = s1 }, Named { stamp = s2 } -> Reg.Stamp.compare s1 s2
+    | Preassigned _, Named _ -> -1
+    | Named _, Preassigned _ -> 1
 end
 
 module Register : sig
