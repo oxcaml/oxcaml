@@ -174,6 +174,12 @@ let create_scope () =
 
 let wrap_end_def f = Misc.try_finally f ~always:end_def
 
+let mark_toplevel_in_quotations env =
+  let scope = !current_level in
+  (* Create a new scope to make sure we only capture what came before *)
+  let _ = create_scope () in
+  Env.mark_toplevel_in_quotations ~scope env
+
 let with_local_level ?post f =
   begin_def ();
   let result = wrap_end_def f in
