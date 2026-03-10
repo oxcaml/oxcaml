@@ -1129,15 +1129,18 @@ let sub_jkind_l ?allow_any_crossing ?origin
           origin_suffix);
       Ok ())
     else
-      let subcheck = compute_subcheck_polys ~context env sub super in
-      let sub_poly = subcheck.lhs_for_leq in
-      let super_poly = subcheck.rhs_for_leq in
+      let { lhs_for_leq = sub_poly;
+            rhs_for_leq = super_poly;
+            fast_path
+          } =
+        compute_subcheck_polys ~context env sub super
+      in
       let violating_axes = Ldd.leq_with_reason sub_poly super_poly in
       (if !Clflags.ikinds_debug
       then
         let origin_suffix = origin_suffix_of origin in
         let fast_path =
-          match subcheck.fast_path with
+          match fast_path with
           | No_fast_path -> "none"
           | Rhs_top_fast_path -> "rhs_top"
           | Lhs_mod_bounds_floor_fast_path -> "lhs_mod_bounds_floor"
