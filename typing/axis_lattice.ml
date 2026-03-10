@@ -170,8 +170,6 @@ let non_bot_axes (v : t) : int list =
   in
   loop 0 []
 
-let of_levels ~(levels : int array) : t = encode ~levels
-
 let pp (v : t) : string =
   let lv = decode v |> Array.to_list |> List.map string_of_int in
   "[" ^ String.concat "," lv ^ "]"
@@ -409,6 +407,45 @@ let nullability (x : t) : Jkind_axis.Nullability.t =
 let separability (x : t) : Jkind_axis.Separability.t =
   Levels.separability_of_level (get_axis x ~axis:12)
 
+let set_areality (a : Mode.Regionality.Const.t) (x : t) : t =
+  set_axis x ~axis:0 ~level:(Levels.level_of_areality a)
+
+let set_uniqueness (u : Mode.Uniqueness.Const.t) (x : t) : t =
+  set_axis x ~axis:1 ~level:(Levels.level_of_uniqueness_monadic u)
+
+let set_linearity (l : Mode.Linearity.Const.t) (x : t) : t =
+  set_axis x ~axis:2 ~level:(Levels.level_of_linearity l)
+
+let set_contention (c : Mode.Contention.Const.t) (x : t) : t =
+  set_axis x ~axis:3 ~level:(Levels.level_of_contention_monadic c)
+
+let set_portability (p : Mode.Portability.Const.t) (x : t) : t =
+  set_axis x ~axis:4 ~level:(Levels.level_of_portability p)
+
+let set_forkable (f : Mode.Forkable.Const.t) (x : t) : t =
+  set_axis x ~axis:5 ~level:(Levels.level_of_forkable f)
+
+let set_yielding (y : Mode.Yielding.Const.t) (x : t) : t =
+  set_axis x ~axis:6 ~level:(Levels.level_of_yielding y)
+
+let set_statefulness (s : Mode.Statefulness.Const.t) (x : t) : t =
+  set_axis x ~axis:7 ~level:(Levels.level_of_statefulness s)
+
+let set_visibility (v : Mode.Visibility.Const.t) (x : t) : t =
+  set_axis x ~axis:8 ~level:(Levels.level_of_visibility_monadic v)
+
+let set_staticity (s : Mode.Staticity.const) (x : t) : t =
+  set_axis x ~axis:9 ~level:(Levels.level_of_staticity_monadic s)
+
+let set_externality (e : Jkind_axis.Externality.t) (x : t) : t =
+  set_axis x ~axis:10 ~level:(Levels.level_of_externality e)
+
+let set_nullability (n : Jkind_axis.Nullability.t) (x : t) : t =
+  set_axis x ~axis:11 ~level:(Levels.level_of_nullability n)
+
+let set_separability (s : Jkind_axis.Separability.t) (x : t) : t =
+  set_axis x ~axis:12 ~level:(Levels.level_of_separability s)
+
 type boxed = {
   areality : Mode.Regionality.Const.t;
   linearity : Mode.Linearity.Const.t;
@@ -441,24 +478,20 @@ let of_boxed
        separability
      } :
       boxed) : t =
-  let open Levels in
-  let levels =
-    [| level_of_areality areality;
-       level_of_uniqueness_monadic uniqueness;
-       level_of_linearity linearity;
-       level_of_contention_monadic contention;
-       level_of_portability portability;
-       level_of_forkable forkable;
-       level_of_yielding yielding;
-       level_of_statefulness statefulness;
-       level_of_visibility_monadic visibility;
-       level_of_staticity_monadic staticity;
-       level_of_externality externality;
-       level_of_nullability nullability;
-       level_of_separability separability
-    |]
-  in
-  of_levels ~levels
+  bot
+  |> set_areality areality
+  |> set_uniqueness uniqueness
+  |> set_linearity linearity
+  |> set_contention contention
+  |> set_portability portability
+  |> set_forkable forkable
+  |> set_yielding yielding
+  |> set_statefulness statefulness
+  |> set_visibility visibility
+  |> set_staticity staticity
+  |> set_externality externality
+  |> set_nullability nullability
+  |> set_separability separability
 
 let to_boxed (x : t) : boxed =
   { areality = areality x;
@@ -529,23 +562,20 @@ let to_mode_crossing (x : t) : Mode.Crossing.t =
 let const_of_levels ~areality ~linearity ~uniqueness ~portability ~contention
     ~forkable ~yielding ~statefulness ~visibility ~staticity ~externality
     ~nullability ~separability =
-  let open Levels in
-  encode
-    ~levels:
-      [| level_of_areality areality;
-         level_of_uniqueness_monadic uniqueness;
-         level_of_linearity linearity;
-         level_of_contention_monadic contention;
-         level_of_portability portability;
-         level_of_forkable forkable;
-         level_of_yielding yielding;
-         level_of_statefulness statefulness;
-         level_of_visibility_monadic visibility;
-         level_of_staticity_monadic staticity;
-         level_of_externality externality;
-         level_of_nullability nullability;
-         level_of_separability separability
-      |]
+  bot
+  |> set_areality areality
+  |> set_uniqueness uniqueness
+  |> set_linearity linearity
+  |> set_contention contention
+  |> set_portability portability
+  |> set_forkable forkable
+  |> set_yielding yielding
+  |> set_statefulness statefulness
+  |> set_visibility visibility
+  |> set_staticity staticity
+  |> set_externality externality
+  |> set_nullability nullability
+  |> set_separability separability
 
 (* Canonical lattice constants used by ikinds. *)
 let nonfloat_value : t =
