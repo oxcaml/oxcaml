@@ -115,7 +115,8 @@ end = struct
       | ( Local { index = i1; stack_class = c1 },
           Local { index = i2; stack_class = c2 } ) ->
         let c = Int.compare i1 i2 in
-        if c <> 0 then c
+        if c <> 0
+        then c
         else Int.compare (Stack_class.hash c1) (Stack_class.hash c2)
       | Incoming { index = i1 }, Incoming { index = i2 } -> Int.compare i1 i2
       | Outgoing { index = i1 }, Outgoing { index = i2 } -> Int.compare i1 i2
