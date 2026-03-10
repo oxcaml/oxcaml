@@ -3598,7 +3598,7 @@ let rec mcomp type_pairs env t1 t2 =
         | (_, Tquote s2, _, _)  when target2 ->
           mcomp type_pairs env (new_splice_ty t1') s2
         | (_, Tsplice s2, _, _) when target2 ->
-          mcomp type_pairs env (new_splice_ty t1') s2
+          mcomp type_pairs env (new_quote_ty t1') s2
         (* Flexible cases *)
         (* - If [flexible1], then [t1'] is now a [Tvar].
            - If [flexible2], then [t2'] is now a [Tvar]. *)
