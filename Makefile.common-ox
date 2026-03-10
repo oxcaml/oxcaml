@@ -146,13 +146,13 @@ minimize-stdlib: boot-minimizer boot-compiler
 # and implement [runtest-upstream-boot] for testing when the final compiler
 # itself is miscompiled.
 runtest: compiler
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) runtest $(ws_main)
+	RUNTIME_DIR=$(RUNTIME_DIR) OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) runtest $(ws_main)
 
 runtest-llvmize: compiler
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build @runtest-llvmize $(ws_main)
+	RUNTIME_DIR=$(RUNTIME_DIR) OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-llvmize $(ws_main)
 
 runtest-dwarf: compiler
-	RUNTIME_DIR=$(RUNTIME_DIR) $(dune) build @runtest-dwarf $(ws_main)
+	RUNTIME_DIR=$(RUNTIME_DIR) OXCAML_NAME_MANGLING=$(NAME_MANGLING_SCHEME) $(dune) build @runtest-dwarf $(ws_main)
 
 # This Makefile supports old versions that don't have $(file), so we're using
 # environment var trickery to get a multiline string into a file
@@ -405,24 +405,12 @@ install_for_test: install
 	mkdir _runtest/ocamltest
 	cp $(boot_build)/ocamltest/ocamltest.native _runtest/ocamltest/ocamltest
 test: install_for_test
-	# For flambda2, build the list of test directories that are not already
-	# listed in [oxcaml/testsuite/flambda2-test-list].
-	#
-	# Step 1: change to [testsuite] so the loop can refer to [tests/*].
-	# Step 2: iterate over every entry under [tests] and skip non-directories,
-	# such as [tests/Makefile].
-	# Step 3: write only the remaining directories that are not already in the
-	# flambda2 test list.
 	if [ "$(middle_end)" = "flambda2" ]; then \
-	  cd testsuite || exit 1; \
-	  for path in tests/*; do \
-	    if [ ! -d "$$path" ]; then \
-	      continue; \
+	  for dir in `cd testsuite; ls -1 -d tests/*`; do \
+	    if ! grep -q "^  $$dir " oxcaml/testsuite/flambda2-test-list; then \
+	      echo "  $$dir"; \
 	    fi; \
-	    if ! grep -q "^  $$path " ../oxcaml/testsuite/flambda2-test-list; then \
-	      echo "  $$path"; \
-	    fi; \
-	  done > ../_runtest/flambda2-test-list; \
+	  done > _runtest/flambda2-test-list; \
 	fi
 	(export OCAMLSRCDIR=$$(pwd)/_runtest; \
 	 export CAML_LD_LIBRARY_PATH=$$(pwd)/_runtest/lib/ocaml/stublibs; \
