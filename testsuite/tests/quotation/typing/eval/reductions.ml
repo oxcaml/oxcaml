@@ -96,15 +96,15 @@ let f (x : <[($('a), $('b)) Either.t]> expr)
 val f : <[($('a), $('b)) Either.t]> expr -> ('a eval, 'b eval) Either.t =
   <fun>
 |}]
-(* non-top-level type constructor *)
-(* CR-soon jbachurski: This should never state that [<[t]> eval = t]. *)
-let _ = <[ fun (type t) (x : t) -> $(Quote.Expr.int (eval <[ x ]> : int)) ]>
+(* non-top-level type constructor -- locally abstract type *)
+(* CR metaprogramming jbachurski: This should not state [<[t]> eval = t]. *)
+let _ = <[ fun (type t) (x : t) -> $(eval <[ x ]>) ]>
 [%%expect {|
-Line 1, characters 53-65:
-1 | let _ = <[ fun (type t) (x : t) -> $(Quote.Expr.int (eval <[ x ]> : int)) ]>
-                                                         ^^^^^^^^^^^^
+Line 1, characters 36-50:
+1 | let _ = <[ fun (type t) (x : t) -> $(eval <[ x ]>) ]>
+                                        ^^^^^^^^^^^^^^
 Error: This expression has type "<[t]> eval" = "t"
-       but an expression was expected of type "int"
+       but an expression was expected of type "<['a]> expr"
 |}]
 
 (* Arrows *)
@@ -315,7 +315,42 @@ val f :
   <[(module Map.OrderedType with type t = $('a)) -> unit]> expr ->
   (module Map.OrderedType with type t = 'a eval) -> unit = <fun>
 |}]
-
+(* non-top-level package type -- generative functor *)
+module S () = struct
+  module type T = sig
+    type s
+  end
+end
+#mark_toplevel_in_quotations
+(* CR metaprogramming jbachurski: This should not state that
+   [<[(module Z.T)]> eval = (module Z.T)]. *)
+let _ = <[
+  (* It is illegal to write [S()] in a type, so we have an intermediate [Z]. *)
+  let module Z = S () in
+  (* for some reason the error message is less informative without [type t] *)
+  fun (type t) (module M : Z.T) -> $(eval <[ (module M : Z.T) ]>) ]>
+[%%expect {|
+module S : functor () -> sig module type T = sig type s end end
+Line 13, characters 36-65:
+13 |   fun (type t) (module M : Z.T) -> $(eval <[ (module M : Z.T) ]>) ]>
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type "<[(module Z.T)]> eval" = "(module Z.T)"
+       but an expression was expected of type "<['a]> expr"
+|}]
+(* CR metaprogramming jbachurski: As above, but also the package constraint
+   should say [s = <[t]> eval] and not [s = t]. *)
+let _ = <[
+  let module Z = S () in
+  fun (type t) (module M : Z.T with type s = t) ->
+     $(eval <[ (module M : Z.T with type s = t) ]>) ]>
+[%%expect {|
+Line 4, characters 6-51:
+4 |      $(eval <[ (module M : Z.T with type s = t) ]>) ]>
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This expression has type
+         "<[(module Z.T with type s = t)]> eval" = "(module Z.T with type s = t)"
+       but an expression was expected of type "<['a]> expr"
+|}]
 
 (** Composing evals **)
 
