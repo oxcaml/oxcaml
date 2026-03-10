@@ -778,3 +778,69 @@ Error: The kind of type "t" is immutable_data with (type : value) t/2
        Note: I gave up trying to find the simplest kind for the first,
        as it is very large or deeply recursive.
 |}]
+
+(*********************************************************)
+(* Unboxed GADT aliases should stay in declaration-parameter space. *)
+
+type ('a, 'b) unboxed_alias_t : immediate with 'a @@ contended portable
+[%%expect {|
+type ('a, 'b) unboxed_alias_t : immediate with 'a @@ portable contended
+|}]
+
+type 'a unboxed_alias_x =
+  X : ('a, 'b) unboxed_alias_t -> 'a unboxed_alias_x
+[@@unboxed]
+[%%expect {|
+type 'a unboxed_alias_x = X : ('a, 'b) unboxed_alias_t -> 'a unboxed_alias_x [@@unboxed]
+|}]
+
+type 'a unboxed_alias_y
+  : immediate with 'a @@ contended portable = 'a unboxed_alias_x
+[%%expect {|
+Lines 1-2, characters 0-64:
+1 | type 'a unboxed_alias_y
+2 |   : immediate with 'a @@ contended portable = 'a unboxed_alias_x
+Error: The kind of type "'a unboxed_alias_x" is
+           immediate with 'a @@ portable contended
+         because of the definition of unboxed_alias_t at line 1, characters 0-71.
+       But the kind of type "'a unboxed_alias_x" must be a subkind of
+           immediate with 'a @@ portable contended
+         because of the definition of unboxed_alias_y at lines 1-2, characters 0-64.
+
+       The first mode-crosses less than the second along:
+         locality: mod global with 'a ≰ mod global with 'a
+         uniqueness: mod aliased with 'a ≰ mod aliased with 'a
+         linearity: mod many with 'a ≰ mod many with 'a
+         forkable: mod forkable with 'a ≰ mod forkable with 'a
+         yielding: mod unyielding with 'a ≰ mod unyielding with 'a
+         statefulness: mod stateless with 'a ≰ mod stateless with 'a
+         visibility: mod immutable with 'a ≰ mod immutable with 'a
+         externality: mod external_ with 'a ≰ mod external_ with 'a
+|}]
+
+type 'a unboxed_alias_z
+  : immutable_data with 'a @@ contended portable =
+  'a unboxed_alias_x list
+[%%expect {|
+Lines 1-3, characters 0-25:
+1 | type 'a unboxed_alias_z
+2 |   : immutable_data with 'a @@ contended portable =
+3 |   'a unboxed_alias_x list
+Error: The kind of type "'a unboxed_alias_x list" is
+           immutable_data with 'a unboxed_alias_x
+         because it's a boxed variant type.
+       But the kind of type "'a unboxed_alias_x list" must be a subkind of
+           immutable_data with 'a @@ portable contended
+         because of the definition of unboxed_alias_z at lines 1-3, characters 0-25.
+
+       The first mode-crosses less than the second along:
+         linearity: mod many with 'a unboxed_alias_x ≰ mod many with 'a
+         forkable: mod forkable with 'a unboxed_alias_x ≰
+           mod forkable with 'a
+         yielding: mod unyielding with 'a unboxed_alias_x ≰
+           mod unyielding with 'a
+         statefulness: mod stateless with 'a unboxed_alias_x ≰
+           mod stateless with 'a
+         visibility: mod immutable with 'a unboxed_alias_x ≰
+           mod immutable with 'a
+|}]
