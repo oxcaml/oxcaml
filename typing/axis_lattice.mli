@@ -45,6 +45,48 @@ val mask_shallow : t
 val mask_of_modality :
   relevant_for_shallow:[`Relevant | `Irrelevant] -> Mode.Modality.Const.t -> t
 
+val create :
+  areality:Mode.Regionality.Const.t ->
+  linearity:Mode.Linearity.Const.t ->
+  uniqueness:Mode.Uniqueness.Const.t ->
+  portability:Mode.Portability.Const.t ->
+  contention:Mode.Contention.Const.t ->
+  forkable:Mode.Forkable.Const.t ->
+  yielding:Mode.Yielding.Const.t ->
+  statefulness:Mode.Statefulness.Const.t ->
+  visibility:Mode.Visibility.Const.t ->
+  staticity:Mode.Staticity.const ->
+  externality:Jkind_axis.Externality.t ->
+  nullability:Jkind_axis.Nullability.t ->
+  separability:Jkind_axis.Separability.t ->
+  t
+
+val areality : t -> Mode.Regionality.Const.t
+
+val linearity : t -> Mode.Linearity.Const.t
+
+val uniqueness : t -> Mode.Uniqueness.Const.t
+
+val portability : t -> Mode.Portability.Const.t
+
+val contention : t -> Mode.Contention.Const.t
+
+val forkable : t -> Mode.Forkable.Const.t
+
+val yielding : t -> Mode.Yielding.Const.t
+
+val statefulness : t -> Mode.Statefulness.Const.t
+
+val visibility : t -> Mode.Visibility.Const.t
+
+val staticity : t -> Mode.Staticity.const
+
+val externality : t -> Jkind_axis.Externality.t
+
+val nullability : t -> Jkind_axis.Nullability.t
+
+val separability : t -> Jkind_axis.Separability.t
+
 (** [Types.mod_bounds] is morally the same type as this.
    However, its encoding of Crossing.t is different and more complex
    than record below. *)

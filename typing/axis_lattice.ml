@@ -559,7 +559,7 @@ let to_mode_crossing (x : t) : Mode.Crossing.t =
   in
   { monadic; comonadic }
 
-let const_of_levels ~areality ~linearity ~uniqueness ~portability ~contention
+let create ~areality ~linearity ~uniqueness ~portability ~contention
     ~forkable ~yielding ~statefulness ~visibility ~staticity ~externality
     ~nullability ~separability =
   bot
@@ -579,7 +579,7 @@ let const_of_levels ~areality ~linearity ~uniqueness ~portability ~contention
 
 (* Canonical lattice constants used by ikinds. *)
 let nonfloat_value : t =
-  const_of_levels ~areality:Mode.Regionality.Const.max
+  create ~areality:Mode.Regionality.Const.max
     ~linearity:Mode.Linearity.Const.max ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability:Mode.Portability.Const.max
     ~contention:Mode.Contention.Const.Uncontended
@@ -591,7 +591,7 @@ let nonfloat_value : t =
     ~separability:Jkind_axis.Separability.Non_float
 
 let immutable_data : t =
-  const_of_levels ~areality:Mode.Regionality.Const.max
+  create ~areality:Mode.Regionality.Const.max
     ~linearity:Mode.Linearity.Const.min ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability:Mode.Portability.Const.min
     ~contention:Mode.Contention.Const.Contended
@@ -603,7 +603,7 @@ let immutable_data : t =
     ~separability:Jkind_axis.Separability.Non_float
 
 let mutable_data : t =
-  const_of_levels ~areality:Mode.Regionality.Const.max
+  create ~areality:Mode.Regionality.Const.max
     ~linearity:Mode.Linearity.Const.min ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability:Mode.Portability.Const.min
     ~contention:Mode.Contention.Const.Uncontended
@@ -615,7 +615,7 @@ let mutable_data : t =
     ~separability:Jkind_axis.Separability.Non_float
 
 let sync_data : t =
-  const_of_levels ~areality:Mode.Regionality.Const.max
+  create ~areality:Mode.Regionality.Const.max
     ~linearity:Mode.Linearity.Const.min ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability:Mode.Portability.Const.min
     ~contention:Mode.Contention.Const.Contended
@@ -627,7 +627,7 @@ let sync_data : t =
     ~separability:Jkind_axis.Separability.Non_float
 
 let value : t =
-  const_of_levels ~areality:Mode.Regionality.Const.max
+  create ~areality:Mode.Regionality.Const.max
     ~linearity:Mode.Linearity.Const.max ~uniqueness:Mode.Uniqueness.Const.Unique
     ~portability:Mode.Portability.Const.max
     ~contention:Mode.Contention.Const.Uncontended
@@ -639,7 +639,7 @@ let value : t =
     ~separability:Jkind_axis.Separability.Separable
 
 let arrow : t =
-  const_of_levels ~areality:Mode.Regionality.Const.max
+  create ~areality:Mode.Regionality.Const.max
     ~linearity:Mode.Linearity.Const.max
     ~uniqueness:Mode.Uniqueness.Const.Aliased
     ~portability:Mode.Portability.Const.max
@@ -652,7 +652,7 @@ let arrow : t =
     ~separability:Jkind_axis.Separability.Non_float
 
 let immediate : t =
-  const_of_levels ~areality:Mode.Regionality.Const.min
+  create ~areality:Mode.Regionality.Const.min
     ~linearity:Mode.Linearity.Const.min
     ~uniqueness:Mode.Uniqueness.Const.Aliased
     ~portability:Mode.Portability.Const.min
@@ -669,7 +669,7 @@ let object_legacy : t =
         : Mode.Value.Comonadic.Const.t) =
     Mode.Value.Comonadic.Const.legacy
   in
-  const_of_levels ~linearity ~areality
+  create ~linearity ~areality
     ~uniqueness:Mode.Uniqueness.Const.Aliased
     ~portability ~contention:Mode.Contention.Const.Uncontended ~forkable
     ~yielding ~statefulness ~visibility:Mode.Visibility.Const.Read_write

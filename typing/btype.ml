@@ -1075,34 +1075,19 @@ module Jkind0 = struct
     let staticity_const t = extract_monadic staticity t
 
     let to_axis_lattice (t : t) : Axis_lattice.t =
-      let boxed : Axis_lattice.boxed =
-        { areality = areality_const t;
-          linearity = linearity_const t;
-          uniqueness = uniqueness_const t;
-          portability = portability_const t;
-          contention = contention_const t;
-          forkable = forkable_const t;
-          yielding = yielding_const t;
-          statefulness = statefulness_const t;
-          visibility = visibility_const t;
-          staticity = staticity_const t;
-          externality = externality t;
-          nullability = nullability t;
-          separability = separability t
-        }
-      in
-      Axis_lattice.of_boxed boxed
+      Axis_lattice.create ~areality:(areality_const t)
+        ~linearity:(linearity_const t) ~uniqueness:(uniqueness_const t)
+        ~portability:(portability_const t) ~contention:(contention_const t)
+        ~forkable:(forkable_const t) ~yielding:(yielding_const t)
+        ~statefulness:(statefulness_const t) ~visibility:(visibility_const t)
+        ~staticity:(staticity_const t) ~externality:(externality t)
+        ~nullability:(nullability t) ~separability:(separability t)
 
     let of_axis_lattice (x : Axis_lattice.t) : t =
-      let ({ externality;
-             nullability;
-             separability
-           } :
-           Axis_lattice.boxed) =
-        Axis_lattice.to_boxed x
-      in
       let crossing = Axis_lattice.to_mode_crossing x in
-      create crossing ~externality ~nullability ~separability
+      create crossing ~externality:(Axis_lattice.externality x)
+        ~nullability:(Axis_lattice.nullability x)
+        ~separability:(Axis_lattice.separability x)
 
     (* Returns the set of axes that is relevant under a given modality. For
        example, under the [global] modality, the areality axis is *not*
