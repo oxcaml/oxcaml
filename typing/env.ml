@@ -148,7 +148,6 @@ type module_unbound_reason =
 type stage_lock =
   | Quotation_lock
   | Splice_lock
-  | Toplevel_lock_for_directive
 
 type lock =
   | Const_closure_lock of bool * Mode.Hint.pinpoint *
@@ -658,6 +657,7 @@ type t = {
   implicit_jkinds: jkind_lr loc String.Map.t;
   flags: int;
   stage: stage;
+  toplevel_scope: int
 }
 
 and module_components =
@@ -961,6 +961,7 @@ let empty = {
   functor_args = Ident.empty;
   jkinds = IdTbl.empty;
   stage = 0;
+  toplevel_scope = Ident.lowest_scope
  }
 
 let in_signature b env =
@@ -3036,8 +3037,8 @@ let enter_splice ~loc env =
     raise (Error (Toplevel_splice loc));
   add_stage_lock Splice_lock {env with stage = env.stage - 1}
 
-let mark_toplevel_in_quotations env =
-  add_stage_lock Toplevel_lock_for_directive env
+let mark_toplevel_in_quotations ~scope env =
+  { env with toplevel_scope = scope }
 
 let check_no_open_quotations loc env context =
   if env.stage = 0
@@ -3051,8 +3052,7 @@ let stage_locks_offset locks =
     (fun lock rel_stage ->
        match lock with
        | Quotation_lock -> rel_stage + 1
-       | Splice_lock -> rel_stage - 1
-       | Toplevel_lock_for_directive -> 0)
+       | Splice_lock -> rel_stage - 1)
     locks 0
 
 (* Insertion of all components of a signature *)
@@ -3385,13 +3385,11 @@ let may_lookup_error report_errors loc env err =
   if report_errors then lookup_error loc env err
   else raise Not_found
 
-let rec path_head_is_global_or_predef = function
-    Pident id -> Ident.is_global_or_predef id
-  | Pdot(p, _) | Pextra_ty (p, _) -> path_head_is_global_or_predef p
-  | Papply _ -> false
+let path_is_toplevel_in_quotations env path =
+  Path.scope path <= env.toplevel_scope
 
-let does_not_cross_quotation path locks =
-  if path_head_is_global_or_predef path
+let does_not_cross_quotation env path locks =
+  if path_is_toplevel_in_quotations env path
   then Ok ()
   else
     (match stage_locks_offset locks with
@@ -3400,14 +3398,14 @@ let does_not_cross_quotation path locks =
 
 let check_cross_quotation ~errors ~loc_use ~loc_def env path lid
       locks =
-  match does_not_cross_quotation path locks with
+  match does_not_cross_quotation env path locks with
   | Ok () -> ()
   | Error n ->
     may_lookup_error errors loc_use env
       (Incompatible_stage (lid, loc_use, env.stage, loc_def, env.stage - n))
 
-let assert_does_not_cross_quotation ~loc_use ~loc_def path locks =
-  match does_not_cross_quotation path locks with
+let assert_does_not_cross_quotation ~loc_use ~loc_def env path locks =
+  match does_not_cross_quotation env path locks with
   | Ok () -> ()
   | Error _ ->
       Misc.fatal_errorf_doc
@@ -3785,7 +3783,7 @@ let lookup_all_ident_labels (type rep) ~(record_form : rep record_form) ~errors
   let lbls_filtered =
     List.filter_map
       (fun (path, lbl, (locks, use_fn)) ->
-         does_not_cross_quotation path locks
+         does_not_cross_quotation env path locks
          |> Result.map (fun () -> (path, lbl, use_fn))
          |> Result.to_option)
       lbls
@@ -3818,7 +3816,7 @@ let lookup_all_ident_constructors ~errors ~use ~loc usage s env =
     List.filter_map
       (fun (path, cda, (locks, use_fn)) ->
          let stage_locks, locks = partition_locks locks in
-         does_not_cross_quotation path stage_locks
+         does_not_cross_quotation env path stage_locks
          |> Result.map (fun () -> (path, cda, (locks, use_fn)))
          |> Result.to_option)
       cstrs
@@ -4283,7 +4281,7 @@ let lookup_module_instance_path ~errors ~use ~loc ~load name env =
       path, mda.mda_declaration.md_loc
   in
   let stage_locks, locks = partition_locks locks in
-  assert_does_not_cross_quotation ~loc_use:loc ~loc_def path stage_locks;
+  assert_does_not_cross_quotation env ~loc_use:loc ~loc_def path stage_locks;
   path, locks
 
 let lookup_value_lazy ~errors ~use ~loc lid env =
