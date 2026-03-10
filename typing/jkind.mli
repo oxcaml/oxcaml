@@ -551,7 +551,7 @@ val default_to_value : 'd Types.jkind -> unit
    when we have a choice. *)
 
 (** Generalize the sorts in a jkind when in sort generalization context. Only
-    has an effect when called within {!Sort.with_generalize}. *)
+    has an effect when called within {!Sort.generalize_with}. *)
 val generalize : current_level:int -> 'd Types.jkind -> unit
 
 (** Returns the sort corresponding to the jkind. Call only on representable
