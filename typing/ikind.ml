@@ -1044,6 +1044,7 @@ type subcheck_polys =
 (* Compute polynomials for a subcheck:
    - compute [super] in Normal mode
    - fast path: if [super] is constant top, no need to compute [sub]
+   - otherwise, if [super] is constant, try the lhs mod-bounds floor fast path
    - otherwise, only round up [sub] if [super] is constant *)
 let compute_subcheck_polys ~context:_ env
     (sub : ('l1 * 'r1) Types.jkind) (super : ('l2 * 'r2) Types.jkind) :
