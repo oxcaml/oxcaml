@@ -384,8 +384,10 @@ Line 3, characters 2-5:
 3 |   r.x
       ^^^
 Error: This value is "local"
-         because it is the field "x" of the record at line 3, characters 2-3
-         which is "local" because it is "stack_"-allocated.
+         because it is the field "x" of the record at
+           line 3, characters 2-3
+         which is "local"
+         because it is "stack_"-allocated.
        However, the highlighted expression is expected to be "local" to the parent region or "global"
          because it is a function return value.
          Hint: Use exclave_ to return a local value.
