@@ -399,10 +399,9 @@ let rewrite :
     State.t ->
     Cfg_with_infos.t ->
     spilled_nodes:Reg.t list ->
-    reset:bool ->
     block_temporaries:bool ->
     bool =
- fun state cfg_with_infos ~spilled_nodes ~reset ~block_temporaries ->
+ fun state cfg_with_infos ~spilled_nodes ~block_temporaries ->
   let new_inst_temporaries, new_block_temporaries, block_inserted =
     Regalloc_rewrite.rewrite_gen
       (module State)
@@ -414,15 +413,10 @@ let rewrite :
   match new_inst_temporaries, new_block_temporaries with
   | [], [] -> false
   | _ ->
-    (Cfg_with_infos.invalidate_liveness cfg_with_infos;
-     State.add_inst_temporaries_list state new_inst_temporaries;
-     State.add_block_temporaries_list state new_block_temporaries;
-     match reset with
-     | true -> State.reset state ~new_inst_temporaries ~new_block_temporaries
-     | false ->
-       State.clear_spilled_nodes state;
-       State.add_initial_list state new_block_temporaries;
-       State.add_initial_list state new_inst_temporaries);
+    Cfg_with_infos.invalidate_liveness cfg_with_infos;
+    State.add_inst_temporaries_list state new_inst_temporaries;
+    State.add_block_temporaries_list state new_block_temporaries;
+    State.reset state ~new_inst_temporaries ~new_block_temporaries;
     true
 
 (* CR xclerc for xclerc: could probably be lower; the compiler distribution
@@ -517,8 +511,7 @@ let rec main : round:int -> State.t -> Cfg_with_infos.t -> unit =
       List.iter spilled_nodes ~f:(fun reg ->
           log "/!\\ register %a needs to be spilled" Printreg.reg reg);
     match
-      rewrite state cfg_with_infos ~spilled_nodes ~reset:true
-        ~block_temporaries:(round = 1)
+      rewrite state cfg_with_infos ~spilled_nodes ~block_temporaries:(round = 1)
     with
     | false -> if debug then log "(end of main)"
     | true ->

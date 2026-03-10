@@ -38,7 +38,6 @@ type error =
   | Unboxed_product_in_array_comprehension
   | Unboxed_product_in_let_mutable
   | Block_index_gap_overflow_possible
-  | Element_would_be_reordered_in_record
 
 exception Error of Location.t * error
 
@@ -2423,41 +2422,6 @@ and transl_idx ~scopes loc env ba uas =
       Lprim (Pmake_idx_mixed_field (shape, lbl.lbl_pos, uas_path), [],
              (of_location ~scopes loc))
     end
-  | Baccess_array { mut = _; index_kind; index; base_ty; elt_ty; elt_sort } ->
-    let index_sort, index_kind = match index_kind with
-      | Index_int ->
-        Jkind.Sort.Const.value, Ptagged_int_index
-      | Index_unboxed_int64 ->
-        Jkind.Sort.Const.bits64,
-        Punboxed_or_untagged_integer_index Unboxed_int64
-      | Index_unboxed_int32 ->
-        Jkind.Sort.Const.bits32,
-        Punboxed_or_untagged_integer_index Unboxed_int32
-      | Index_unboxed_int16 ->
-        Jkind.Sort.Const.bits16,
-        Punboxed_or_untagged_integer_index Untagged_int16
-      | Index_unboxed_int8 ->
-        Jkind.Sort.Const.bits8,
-        Punboxed_or_untagged_integer_index Untagged_int8
-      | Index_unboxed_nativeint ->
-        Jkind.Sort.Const.word,
-        Punboxed_or_untagged_integer_index Unboxed_nativeint
-    in
-    let index = transl_exp ~scopes index_sort index in
-    let elt_sort = Jkind.Sort.default_for_transl_and_get elt_sort in
-    let array_kind =
-      array_type_kind ~elt_ty:(Some elt_ty) ~elt_sort:(Some elt_sort) env loc
-        base_ty
-    in
-    let elt_layout = layout env loc elt_sort elt_ty in
-    let mbe = mixed_block_element_of_layout elt_layout in
-    (* CR layouts v8: remove this restriction once we stable sort (within) array
-       elements to place values before non-values, which will likely be done to
-       support striped arrays *)
-    if will_be_reordered mbe then
-      raise (Error (loc, Element_would_be_reordered_in_record));
-    Lprim (Pmake_idx_array (array_kind, index_kind, mbe, uas_path), [index],
-           (of_location ~scopes loc))
   end
 
 and transl_match ~scopes ~arg_sort ~return_sort e arg pat_expr_list partial =
@@ -2765,10 +2729,6 @@ let report_error_doc ppf = function
          and non-values that are separated by 2^%d or more bytes in their@ \
          block, or could be deepened to such an index."
         (64 - Mixed_product_bytes.block_index_offset_bits)
-  | Element_would_be_reordered_in_record ->
-      fprintf ppf
-        "Block indices into arrays whose element layout contains a@ \
-         non-value before a value are not yet supported."
 let () =
   Location.register_error_of_exn
     (function

@@ -13,16 +13,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let unit_with_body (unit : Flambda_unit.t) (body : Flambda.Expr.t) =
-  Flambda_unit.create
-    ~return_continuation:(Flambda_unit.return_continuation unit)
-    ~exn_continuation:(Flambda_unit.exn_continuation unit)
-    ~toplevel_my_region:(Flambda_unit.toplevel_my_region unit)
-    ~toplevel_my_ghost_region:(Flambda_unit.toplevel_my_ghost_region unit)
-    ~body
-    ~module_symbol:(Flambda_unit.module_symbol unit)
-    ~used_value_slots:(Flambda_unit.used_value_slots unit)
-
 let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
     (unit : Flambda_unit.t) =
   let debug_print = Flambda_features.dump_reaper () in
@@ -72,4 +62,8 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
          ~unit_symbol:(Flambda_unit.module_symbol unit))
       final_typing_env
   in
-  unit_with_body unit body, free_names, all_code, slot_offsets, final_typing_env
+  ( Flambda_unit.with_body unit body,
+    free_names,
+    all_code,
+    slot_offsets,
+    final_typing_env )

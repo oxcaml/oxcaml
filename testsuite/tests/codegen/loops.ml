@@ -62,21 +62,21 @@ for_loop_layout:
   cmpq  $1, %rax
   jl    .L119
   subq  $24, %rsp
-  movl  $1, %edi
-.L108:
-  movq  %rdi, 16(%rsp)
   movq  %rbx, 8(%rsp)
   movq  %rax, (%rsp)
+  movl  $1, %eax
+.L108:
+  movq  %rax, 16(%rsp)
   movl  $1, %eax
   movq  (%rbx), %rdi
   call  *%rdi
 .L123:
-  movq  (%rsp), %rax
+  movq  (%rsp), %rdi
   movq  8(%rsp), %rbx
-  movq  16(%rsp), %rdi
-  cmpq  %rax, %rdi
+  movq  16(%rsp), %rax
+  cmpq  %rdi, %rax
   je    .L115
-  addq  $2, %rdi
+  addq  $2, %rax
   jmp   .L108
 .L115:
   movl  $1, %eax
@@ -161,7 +161,8 @@ f.do_work:
 |}]
 
 
-(* CR ttebbi: noop loop could be eliminated *)
+(* CR ttebbi: noop loop could be eliminated
+   https://github.com/oxcaml/oxcaml/issues/4752 *)
 let noop_loop lo hi = for i = lo to hi do () done
 [%%expect_asm X86_64{|
 noop_loop:

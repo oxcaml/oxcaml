@@ -191,6 +191,7 @@ module Runtime_4 = struct
   let self () = 0
   let is_main_domain () = true
   let recommended_domain_count () = 1
+  let max_domain_count = 1
   let self_index () = 0
 end
 
@@ -219,6 +220,8 @@ module Runtime_5 = struct
       = "caml_ml_domain_id" [@@noalloc]
     external get_recommended_domain_count: unit -> int @@ portable
       = "caml_recommended_domain_count" [@@noalloc]
+    external get_max_domain_count : unit -> int @@ portable
+      = "caml_max_domain_count" [@@noalloc]
   end
 
   type id = Raw.t
@@ -452,6 +455,7 @@ module Runtime_5 = struct
     | Error ex -> raise ex
 
   let recommended_domain_count = Raw.get_recommended_domain_count
+  let max_domain_count = Raw.get_max_domain_count ()
 end
 
 module type S = sig
@@ -478,6 +482,7 @@ module type S = sig
   val self : unit -> id @@ portable
   val is_main_domain : unit -> bool @@ portable
   val recommended_domain_count : unit -> int @@ portable
+  val max_domain_count : int
   val self_index : unit -> int @@ portable
   val before_first_spawn : (unit -> unit) -> unit @@ nonportable
   val at_exit : (unit -> unit) @ portable -> unit @@ portable

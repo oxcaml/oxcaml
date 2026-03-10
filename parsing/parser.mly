@@ -3087,35 +3087,11 @@ comprehension_clause:
 block_access:
   | DOT mkrhs(label_longident)
     { Baccess_field $2 }
-  | DOT _p=LPAREN i=seq_expr RPAREN
-    { Baccess_array (Mutable, Index_int, i) }
-  | DOTOP _p=LPAREN i=seq_expr RPAREN
-    {
-      match $1 with
-      | ":" -> Baccess_array (Immutable, Index_int, i)
-      | _ -> raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p))))
-    }
   | DOT ident _p=LPAREN i=seq_expr RPAREN
     {
       match $2 with
-      | "L" -> Baccess_array (Mutable, Index_unboxed_int64, i)
-      | "l" -> Baccess_array (Mutable, Index_unboxed_int32, i)
-      | "S" -> Baccess_array (Mutable, Index_unboxed_int16, i)
-      | "s" -> Baccess_array (Mutable, Index_unboxed_int8, i)
-      | "n" -> Baccess_array (Mutable, Index_unboxed_nativeint, i)
       | "idx_imm" -> Baccess_block (Immutable, i)
       | "idx_mut" -> Baccess_block (Mutable, i)
-      | _ ->
-        raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p))))
-    }
-  | DOTOP ident _p=LPAREN i=seq_expr RPAREN
-    {
-      match $1, $2 with
-      | ":", "L" -> Baccess_array (Immutable, Index_unboxed_int64, i)
-      | ":", "l" -> Baccess_array (Immutable, Index_unboxed_int32, i)
-      | ":", "S" -> Baccess_array (Immutable, Index_unboxed_int16, i)
-      | ":", "s" -> Baccess_array (Immutable, Index_unboxed_int8, i)
-      | ":", "n" -> Baccess_array (Immutable, Index_unboxed_nativeint, i)
       | _ ->
         raise Syntaxerr.(Error(Block_access_bad_paren(make_loc $loc(_p))))
     }

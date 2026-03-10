@@ -996,7 +996,17 @@ let rec low_bits ~bits ~dbg x =
           match get_const_bitmask x with
           | Some (x, bitmask) when does_mask_keep_low_bits bitmask ->
             low_bits ~bits x ~dbg
-          | _ -> x))
+          | _ -> (
+            match x with
+            | Cop (((Cand | Cor | Cxor) as op), [x1; x2], dbg) -> (
+              let x1 = low_bits ~bits ~dbg x1 in
+              let x2 = low_bits ~bits ~dbg x2 in
+              match op with
+              | Cand -> and_int x1 x2 dbg
+              | Cor -> or_int x1 x2 dbg
+              | Cxor -> xor_int x1 x2 dbg
+              | _ -> Misc.fatal_error "impossible")
+            | _ -> x)))
       x
 
 let tag_int i dbg =
@@ -2192,7 +2202,7 @@ module Extended_machtype = struct
     | Ptop -> Misc.fatal_error "No Extended_machtype for layout [Ptop]"
     | Pbottom ->
       Misc.fatal_error "No unique Extended_machtype for layout [Pbottom]"
-    | Psplicevar _ -> Misc.splices_should_not_exist_after_eval ()
+    | Psplicevar ident -> Lambda.fatal_error_unevaluated_splice_var ident
     | Punboxed_float Unboxed_float64 -> typ_float
     | Punboxed_float Unboxed_float32 -> typ_float32
     | Punboxed_vector Unboxed_vec128 -> typ_vec128

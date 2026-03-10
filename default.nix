@@ -29,6 +29,7 @@ let
     [
       "--cache-file=/dev/null"
       "--with-objcopy=${pkgs.llvm}/bin/llvm-objcopy"
+      "--enable-assembler-suitable-for-dissector=${pkgs.llvm}/bin/llvm-mc"
       (mkFlag addressSanitizer "address-sanitizer")
       (mkFlag dev "dev")
       (mkFlag flambdaInvariants "flambda-invariants")
@@ -205,7 +206,8 @@ stdenv.mkDerivation {
   OXCAML_CLANG = if oxcamlClang then "${clang}/bin/clang" else null;
 
   enableParallelBuilding = true;
-  separateDebugInfo = !dev;
+  separateDebugInfo = false;
+  dontStrip = true;
 
   # Disable _multioutConfig hook which adds --libdir=$out/lib into
   # configureFlags when separateDebugInfo is enabled, breaking OCaml's configure

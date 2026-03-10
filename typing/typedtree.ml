@@ -382,14 +382,6 @@ and meth =
 
 and block_access =
   | Baccess_field of Longident.t loc * Types.label_description
-  | Baccess_array of {
-      mut: mutable_flag;
-      index_kind: index_kind;
-      index: expression;
-      base_ty: Types.type_expr;
-      elt_ty: Types.type_expr;
-      elt_sort: Jkind.Sort.t
-    }
   | Baccess_block of mutable_flag * expression
 
 and unboxed_access =

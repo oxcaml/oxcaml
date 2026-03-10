@@ -163,6 +163,7 @@ val dump_source : bool ref
 val dump_parsetree : bool ref
 val dump_typedtree : bool ref
 val dump_shape : bool ref
+val dump_tlambda : bool ref
 val dump_slambda : bool ref
 val dump_rawlambda : bool ref
 val dump_lambda : bool ref
@@ -292,6 +293,7 @@ module Opt_flag_handler : sig
     set_oclassic : unit -> unit;
     set_o2 : unit -> unit;
     set_o3 : unit -> unit;
+    set_o4 : unit -> unit;
   }
 
   val default : t
@@ -302,6 +304,7 @@ end
 val set_oclassic : unit -> unit
 val set_o2 : unit -> unit
 val set_o3 : unit -> unit
+val set_o4 : unit -> unit
 
 module Compiler_ir : sig
   type t = Linear | Cfg | Llvmir

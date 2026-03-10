@@ -2329,3 +2329,8 @@ CAMLprim value caml_recommended_domain_count(value unused)
 
   return (Val_long(n));
 }
+
+CAMLprim value caml_max_domain_count(value unused)
+{
+  return Val_long(caml_params->max_domains);
+}

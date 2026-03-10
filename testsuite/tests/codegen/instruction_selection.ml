@@ -217,6 +217,7 @@ int63_to_int64:
   ret
 |}]
 
+(* CR ttebbi: There should be a way to reinterpret as int without tagging. *)
 let int64_to_int63 x = reinterpret_unboxed_int64_as_tagged_int63 x
 [%%expect_asm X86_64{|
 int64_to_int63:
@@ -297,5 +298,73 @@ is_int_branch:
   jmp   *%rdi
 .L107:
   movl  $1, %eax
+  ret
+|}]
+
+
+(* CR ttebbi: https://github.com/oxcaml/oxcaml/issues/2521 *)
+let is_block_branch (x : 'a) f = if not(obj_is_int x) then f()
+[%%expect_asm X86_64{|
+is_block_branch:
+  testb $1, %al
+  je    .L105
+  movl  $1, %eax
+  ret
+.L105:
+  movl  $1, %eax
+  movq  (%rbx), %rdi
+  jmp   *%rdi
+|}]
+
+
+(* CR ttebbi: https://github.com/oxcaml/oxcaml/issues/2929 *)
+let branch_or_tailcall x =
+  let[@inline never] failure _ = failwith "..." in
+  match x with
+  | 0 -> 5
+  | 1 -> 3
+  | 2 -> 7
+  | n -> failure n
+[%%expect_asm X86_64{|
+branch_or_tailcall:
+  cmpq  $5, %rax
+  jbe   .L105
+  movq  camlTOP25__Pmakeblock786@GOTPCREL(%rip), %rax
+  movq  48(%r14), %rsp
+  popq  48(%r14)
+  popq  %r11
+  jmp   *%r11
+.L105:
+  movq  camlTOP25__switch_block787@GOTPCREL(%rip), %rbx
+  movq  -4(%rbx,%rax,4), %rax
+  ret
+|}]
+
+
+(* CR ttebbi: The final bitwise or is unnecessary. *)
+let shift_of_logand (a : int64#) =
+  let b = Int64_u.logand a #1L in
+  let c = Int64_u.shift_right_logical #3L (Int64_u.to_int b) in
+  reinterpret_unboxed_int64_as_tagged_int63 c
+;;
+[%%expect_asm X86_64{|
+shift_of_logand:
+  movq  %rax, %rcx
+  movl  $1, %eax
+  andq  %rax, %rcx
+  movl  $3, %eax
+  shrq  %cl, %rax
+  orq   $1, %rax
+  ret
+|}]
+
+
+(* CR ttebbi: We could use lea as a shorter encoding alternative to encode
+  small constants. *)
+let small_constants () = #(#0L, #5L)
+[%%expect_asm X86_64{|
+small_constants:
+  movl  $5, %ebx
+  xorl  %eax, %eax
   ret
 |}]

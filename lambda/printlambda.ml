@@ -1425,8 +1425,14 @@ let rec lam ppf = function
       fprintf ppf "@[<2>(region@ %a)@]" lam expr
   | Lexclave expr ->
       fprintf ppf "@[<2>(exclave@ %a)@]" lam expr
-  | Lsplice { splice_loc = _;  slambda } ->
-      fprintf ppf "$(%a)" (Printslambda0.slambda0 lam) slambda
+  | Lsplice (_, slambda) ->
+      fprintf ppf "$(%a)" slam slambda
+
+and slam ppf = function
+  | SLmissing -> fprintf ppf "(missing)"
+  | SLhalves { sval_comptime; sval_runtime } ->
+    fprintf ppf "@[<hv 2>{ c = %a;@ r = ⟪ %a ⟫ }@]"
+      slam sval_comptime lam sval_runtime
 
 and sequence ppf = function
   | Lsequence(l1, l2) ->
@@ -1469,5 +1475,6 @@ and lfunction ppf {kind; params; return; body; attr; ret_mode; mode} =
 let structured_constant = struct_const
 
 let lambda = lam
+let slambda = slam
 
 let program ppf { code } = lambda ppf code

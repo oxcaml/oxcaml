@@ -87,6 +87,7 @@ module type Core_options = sig
   val _dparsetree : unit -> unit
   val _dtypedtree : unit -> unit
   val _dshape : unit -> unit
+  val _dtlambda : unit -> unit
   val _dslambda : unit -> unit
   val _drawlambda : unit -> unit
   val _dlambda : unit -> unit
@@ -230,6 +231,7 @@ module type Optcommon_options = sig
   val _no_unbox_specialised_args : unit -> unit
   val _o2 : unit -> unit
   val _o3 : unit -> unit
+  val _o4 : unit -> unit
   val _insn_sched : unit -> unit
   val _no_insn_sched : unit -> unit
   val _linscan : unit -> unit
@@ -319,6 +321,7 @@ module type Jscomp_options = sig
   val _classic_inlining : unit -> unit
   val _o2 : unit -> unit
   val _o3 : unit -> unit
+  val _o4 : unit -> unit
 end
 
 module type Ocamldoc_options = sig
