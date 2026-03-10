@@ -1659,7 +1659,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
           ty, mode
       end
   | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
-  | Tpat_any | Tpat_var _
+  | Tpat_any | Tpat_var _ | Tpat_fun_layout _
   | Tpat_array _ | Tpat_lazy _ ->
       p.pat_type, mode
 
@@ -3082,8 +3082,13 @@ and type_pat_aux
       let id, uid =
         enter_variable ~lpoly tps loc name mode ~kind ty sp.ppat_attributes sort
       in
+      let pat_desc =
+        if (penv : Pattern_env.t).is_lpoly
+        then Tpat_fun_layout { id; name; uid; sort; mode = alloc_mode; lpoly }
+        else Tpat_var { id; name; uid; sort; mode = alloc_mode }
+      in
       rvp {
-        pat_desc = Tpat_var { id; name; uid; sort; mode = alloc_mode; lpoly };
+        pat_desc;
         pat_loc = loc; pat_extra=[];
         pat_type = ty;
         pat_attributes = sp.ppat_attributes;
@@ -3112,10 +3117,8 @@ and type_pat_aux
               ~kind:(Val_reg sort) sp.ppat_attributes sort
           in
           rvp {
-            pat_desc =
-              Tpat_var
-                { id; name = v; uid; sort;
-                  mode = alloc_mode.mode; lpoly = Val_lpoly.determined [] };
+            pat_desc = Tpat_var { id; name = v; uid; sort;
+                                  mode = alloc_mode.mode };
             pat_loc = sp.ppat_loc;
             pat_extra=[Tpat_unpack, loc, sp.ppat_attributes];
             pat_type = t;
@@ -3127,19 +3130,13 @@ and type_pat_aux
       let q = type_pat tps Value sq expected_ty sort in
       let ty_var, mode = solve_Ppat_alias ~mode:alloc_mode.mode !!penv q in
       let mode = cross_left !!penv expected_ty mode in
-      let lpoly =
-        if (penv : Pattern_env.t).is_lpoly
-        then Val_lpoly.to_generalize ~loc
-        else Val_lpoly.determined []
-      in
       let id, uid =
-        enter_variable ~is_as_variable:true ~lpoly
+        enter_variable ~is_as_variable:true
           ~kind:(Val_reg sort) tps name.loc name mode
           ty_var sp.ppat_attributes sort
       in
       rvp { pat_desc = Tpat_alias { pattern = q; id; name; uid;
-                                    sort; mode; type_expr = ty_var;
-                                    lpoly };
+                                    sort; mode; type_expr = ty_var };
             pat_loc = loc; pat_extra=[];
             pat_type = q.pat_type;
             pat_attributes = sp.ppat_attributes;
@@ -3860,7 +3857,7 @@ let rec check_counter_example_pat
         (fun fields -> mkp k (Tpat_record_unboxed_product (fields, closed)))
   in
   match tp.pat_desc with
-    Tpat_any | Tpat_var _ ->
+    Tpat_any | Tpat_var _ | Tpat_fun_layout _ ->
       let k' () = mkp k tp.pat_desc in
       if info.explosion_fuel <= 0 then k' () else
       let decrease n = {info with explosion_fuel = info.explosion_fuel - n} in
@@ -9132,8 +9129,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         let uu = unique_use ~loc:sarg.pexp_loc ~env mode mode in
         {pat_desc = Tpat_var { id; name = mknoloc name;
                                uid = desc.val_uid; sort;
-                               mode = Value.disallow_right mode;
-                               lpoly = Val_lpoly.determined [] };
+                               mode = Value.disallow_right mode };
          pat_type = ty;
          pat_extra=[];
          pat_attributes = [];
@@ -10389,7 +10385,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
             ~on_determined:(fun () -> generalize ty)
             ~on_to_generalize:(fun loc ->
               let _, univars =
-                Jkind_types.Sort.with_generalize (fun () -> generalize ty)
+                Jkind_types.Sort.generalize_with (fun () -> generalize ty)
               in
               if List.is_empty univars then
                 Location.prerr_warning loc Warnings.Useless_poly;
@@ -10452,7 +10448,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   if is_recursive then
     List.iter
       (fun {vb_pat=pat} -> match pat.pat_desc with
-           Tpat_var _ -> ()
+           Tpat_var _ | Tpat_fun_layout _ -> ()
          | _ -> raise(Error(pat.pat_loc, env, Illegal_letrec_pat)))
       l;
   List.iter (fun vb ->

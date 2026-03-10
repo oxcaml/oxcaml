@@ -688,7 +688,7 @@ module Sort = struct
 
   (* Wrapper to run a function in sort generalization context. Returns the
      result of [f] and the vars generalized during [f]. *)
-  let with_generalize f =
+  let generalize_with f =
     let vars_ref = ref [] in
     let old_context = !in_sort_generalization_context in
     in_sort_generalization_context := Some vars_ref;
