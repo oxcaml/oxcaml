@@ -1721,7 +1721,16 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
         rr;
       Array.length rr
   in
-  assert (res_used = Array.length instr.res)
+  assert (res_used = Array.length instr.res);
+  (* Gathers require that all args are distinct registers. *)
+  match[@warning "-4"] simd.id with
+  | Vpgatherdd_X_M32X_X | Vpgatherdd_Y_M32Y_Y | Vpgatherdq_X_M32X_X
+  | Vpgatherdq_Y_M32X_Y | Vpgatherqd_X_M64X_X | Vpgatherqd_X_M64Y_X
+  | Vpgatherqq_X_M64X_X | Vpgatherqq_Y_M64Y_Y ->
+    let module Set = Reg.UsingLocEquality.Set in
+    let set = Array.fold_right Set.add instr.arg Set.empty in
+    assert (Set.cardinal set = Array.length instr.arg)
+  | _ -> ()
 
 let to_arg_with_width loc instr i =
   match Simd.loc_register_width loc with
