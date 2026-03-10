@@ -806,22 +806,48 @@ let equal_basic left right =
       _ ) ->
     false
 
-let equal_bool_test (left : bool_test) (right : bool_test) =
-  Label.equal left.ifso right.ifso && Label.equal left.ifnot right.ifnot
+let equal_bool_test
+    ({ ifso = left_ifso; ifnot = left_ifnot } : bool_test)
+    ({ ifso = right_ifso; ifnot = right_ifnot } : bool_test) =
+  Label.equal left_ifso right_ifso && Label.equal left_ifnot right_ifnot
 
-let equal_int_test (left : int_test) (right : int_test) =
-  Label.equal left.lt right.lt
-  && Label.equal left.eq right.eq
-  && Label.equal left.gt right.gt
-  && Scalar.Signedness.equal left.is_signed right.is_signed
-  && Option.equal Int.equal left.imm right.imm
+let equal_int_test
+    ({ lt = left_lt;
+       eq = left_eq;
+       gt = left_gt;
+       is_signed = left_is_signed;
+       imm = left_imm
+     } : int_test)
+    ({ lt = right_lt;
+       eq = right_eq;
+       gt = right_gt;
+       is_signed = right_is_signed;
+       imm = right_imm
+     } : int_test) =
+  Label.equal left_lt right_lt
+  && Label.equal left_eq right_eq
+  && Label.equal left_gt right_gt
+  && Scalar.Signedness.equal left_is_signed right_is_signed
+  && Option.equal Int.equal left_imm right_imm
 
-let equal_float_test (left : float_test) (right : float_test) =
-  Cmm.equal_float_width left.width right.width
-  && Label.equal left.lt right.lt
-  && Label.equal left.eq right.eq
-  && Label.equal left.gt right.gt
-  && Label.equal left.uo right.uo
+let equal_float_test
+    ({ width = left_width;
+       lt = left_lt;
+       eq = left_eq;
+       gt = left_gt;
+       uo = left_uo
+     } : float_test)
+    ({ width = right_width;
+       lt = right_lt;
+       eq = right_eq;
+       gt = right_gt;
+       uo = right_uo
+     } : float_test) =
+  Cmm.equal_float_width left_width right_width
+  && Label.equal left_lt right_lt
+  && Label.equal left_eq right_eq
+  && Label.equal left_gt right_gt
+  && Label.equal left_uo right_uo
 
 let equal_func_call_operation left right =
   match left, right with
@@ -830,14 +856,30 @@ let equal_func_call_operation left right =
   | Direct left_sym, Direct right_sym -> Cmm.equal_symbol left_sym right_sym
   | (Indirect _ | Direct _), _ -> false
 
-let equal_external_call_operation left right =
-  String.equal left.func_symbol right.func_symbol
-  && Bool.equal left.alloc right.alloc
-  && Cmm.equal_effects left.effects right.effects
-  && Cmm.equal_machtype left.ty_res right.ty_res
-  && List.equal Cmm.equal_exttype left.ty_args right.ty_args
-  && Int.equal left.stack_ofs right.stack_ofs
-  && Cmm.equal_stack_align left.stack_align right.stack_align
+let equal_external_call_operation
+    { func_symbol = left_func_symbol;
+      alloc = left_alloc;
+      effects = left_effects;
+      ty_res = left_ty_res;
+      ty_args = left_ty_args;
+      stack_ofs = left_stack_ofs;
+      stack_align = left_stack_align
+    }
+    { func_symbol = right_func_symbol;
+      alloc = right_alloc;
+      effects = right_effects;
+      ty_res = right_ty_res;
+      ty_args = right_ty_args;
+      stack_ofs = right_stack_ofs;
+      stack_align = right_stack_align
+    } =
+  String.equal left_func_symbol right_func_symbol
+  && Bool.equal left_alloc right_alloc
+  && Cmm.equal_effects left_effects right_effects
+  && Cmm.equal_machtype left_ty_res right_ty_res
+  && List.equal Cmm.equal_exttype left_ty_args right_ty_args
+  && Int.equal left_stack_ofs right_stack_ofs
+  && Cmm.equal_stack_align left_stack_align right_stack_align
 
 let equal_prim_call_operation left right =
   match left, right with
@@ -858,8 +900,10 @@ let equal_prim_call_operation left right =
     && Bool.equal left_enabled right_enabled
   | (External _ | Probe _), _ -> false
 
-let equal_with_label_after equal_op left right =
-  equal_op left.op right.op && Label.equal left.label_after right.label_after
+let equal_with_label_after equal_op
+    { op = left_op; label_after = left_label_after }
+    { op = right_op; label_after = right_label_after } =
+  equal_op left_op right_op && Label.equal left_label_after right_label_after
 
 let equal_terminator left right =
   match left, right with

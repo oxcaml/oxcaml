@@ -481,10 +481,18 @@ type alloc_dbginfo_item =
     alloc_dbg : Debuginfo.t
   }
 
-let equal_alloc_dbginfo_item left right =
-  Int.equal left.alloc_words right.alloc_words
-  && equal_alloc_block_kind left.alloc_block_kind right.alloc_block_kind
-  && Debuginfo.compare left.alloc_dbg right.alloc_dbg = 0
+let equal_alloc_dbginfo_item
+    { alloc_words = left_alloc_words;
+      alloc_block_kind = left_alloc_block_kind;
+      alloc_dbg = left_alloc_dbg
+    }
+    { alloc_words = right_alloc_words;
+      alloc_block_kind = right_alloc_block_kind;
+      alloc_dbg = right_alloc_dbg
+    } =
+  Int.equal left_alloc_words right_alloc_words
+  && equal_alloc_block_kind left_alloc_block_kind right_alloc_block_kind
+  && Debuginfo.compare left_alloc_dbg right_alloc_dbg = 0
 
 type alloc_dbginfo = alloc_dbginfo_item list
 
@@ -505,9 +513,11 @@ type symbol =
     sym_global : is_global
   }
 
-let equal_symbol left right =
-  String.equal left.sym_name right.sym_name
-  && equal_is_global left.sym_global right.sym_global
+let equal_symbol
+    { sym_name = left_sym_name; sym_global = left_sym_global }
+    { sym_name = right_sym_name; sym_global = right_sym_global } =
+  String.equal left_sym_name right_sym_name
+  && equal_is_global left_sym_global right_sym_global
 
 type operation =
   | Capply of

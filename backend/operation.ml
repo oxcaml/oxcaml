@@ -503,23 +503,53 @@ let equal left right =
   | Const_float32 left_f, Const_float32 right_f -> Int32.equal left_f right_f
   | Const_float left_f, Const_float right_f -> Int64.equal left_f right_f
   | Const_symbol left_s, Const_symbol right_s -> Cmm.equal_symbol left_s right_s
-  | Const_vec128 left_v, Const_vec128 right_v ->
-    Int64.equal left_v.Cmm.word0 right_v.Cmm.word0
-    && Int64.equal left_v.Cmm.word1 right_v.Cmm.word1
-  | Const_vec256 left_v, Const_vec256 right_v ->
-    Int64.equal left_v.Cmm.word0 right_v.Cmm.word0
-    && Int64.equal left_v.Cmm.word1 right_v.Cmm.word1
-    && Int64.equal left_v.Cmm.word2 right_v.Cmm.word2
-    && Int64.equal left_v.Cmm.word3 right_v.Cmm.word3
-  | Const_vec512 left_v, Const_vec512 right_v ->
-    Int64.equal left_v.Cmm.word0 right_v.Cmm.word0
-    && Int64.equal left_v.Cmm.word1 right_v.Cmm.word1
-    && Int64.equal left_v.Cmm.word2 right_v.Cmm.word2
-    && Int64.equal left_v.Cmm.word3 right_v.Cmm.word3
-    && Int64.equal left_v.Cmm.word4 right_v.Cmm.word4
-    && Int64.equal left_v.Cmm.word5 right_v.Cmm.word5
-    && Int64.equal left_v.Cmm.word6 right_v.Cmm.word6
-    && Int64.equal left_v.Cmm.word7 right_v.Cmm.word7
+  | ( Const_vec128 { Cmm.word0 = left_w0; word1 = left_w1 },
+      Const_vec128 { Cmm.word0 = right_w0; word1 = right_w1 } ) ->
+    Int64.equal left_w0 right_w0 && Int64.equal left_w1 right_w1
+  | ( Const_vec256
+        { Cmm.word0 = left_w0;
+          word1 = left_w1;
+          word2 = left_w2;
+          word3 = left_w3
+        },
+      Const_vec256
+        { Cmm.word0 = right_w0;
+          word1 = right_w1;
+          word2 = right_w2;
+          word3 = right_w3
+        } ) ->
+    Int64.equal left_w0 right_w0
+    && Int64.equal left_w1 right_w1
+    && Int64.equal left_w2 right_w2
+    && Int64.equal left_w3 right_w3
+  | ( Const_vec512
+        { Cmm.word0 = left_w0;
+          word1 = left_w1;
+          word2 = left_w2;
+          word3 = left_w3;
+          word4 = left_w4;
+          word5 = left_w5;
+          word6 = left_w6;
+          word7 = left_w7
+        },
+      Const_vec512
+        { Cmm.word0 = right_w0;
+          word1 = right_w1;
+          word2 = right_w2;
+          word3 = right_w3;
+          word4 = right_w4;
+          word5 = right_w5;
+          word6 = right_w6;
+          word7 = right_w7
+        } ) ->
+    Int64.equal left_w0 right_w0
+    && Int64.equal left_w1 right_w1
+    && Int64.equal left_w2 right_w2
+    && Int64.equal left_w3 right_w3
+    && Int64.equal left_w4 right_w4
+    && Int64.equal left_w5 right_w5
+    && Int64.equal left_w6 right_w6
+    && Int64.equal left_w7 right_w7
   | Stackoffset left_n, Stackoffset right_n -> Int.equal left_n right_n
   | ( Load
         { memory_chunk = left_chunk;
