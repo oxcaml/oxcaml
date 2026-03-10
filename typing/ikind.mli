@@ -69,20 +69,8 @@ val sub_or_error :
   ('l2 * Allowance.allowed) Types.jkind ->
   (unit, Jkind.Violation.t) result
 
-
-module Lookup_result : sig
-  (** Substitution description for a constructor path.
-    - [Lookup_identity] leaves the path unchanged.
-    - [Lookup_path q] renames to [q].
-    - [Lookup_type_fun (params, body)] represents an inlined type function. *)
-  type t =
-    | Lookup_identity
-    | Lookup_path of Path.t
-    | Lookup_type_fun of Types.type_expr list * Types.type_expr
-end
-
 (** Apply a [lookup_result] substitution to a constructor ikind. *)
 val substitute_decl_ikind_with_lookup :
-  lookup:(Path.t -> Lookup_result.t) ->
+  lookup:(Path.t -> Subst.Ikind_substitution.lookup_result) ->
   Types.type_ikind ->
   Types.type_ikind

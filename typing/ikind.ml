@@ -1302,15 +1302,8 @@ let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
       in
       base, Array.of_list coeffs)
 
-module Lookup_result = struct
-  type t =
-    | Lookup_identity
-    | Lookup_path of Path.t
-    | Lookup_type_fun of Types.type_expr list * Types.type_expr
-end
-
 let substitute_decl_ikind_with_lookup
-    ~(lookup : Path.t -> Lookup_result.t)
+    ~(lookup : Path.t -> Subst.Ikind_substitution.lookup_result)
     (ikind_entry : Types.type_ikind) : Types.type_ikind =
   (* Inline type functions in an identity environment (no Env). *)
   match ikind_entry with
@@ -1331,18 +1324,20 @@ let substitute_decl_ikind_with_lookup
       | Unknown _ -> Ldd.node_of_var (Ldd.rigid name)
       | KAtom path -> (
         match lookup path with
-        | Lookup_identity -> Ldd.node_of_var (Ldd.rigid name)
-        | Lookup_path alias_path ->
+        | Subst.Ikind_substitution.Lookup_identity ->
+          Ldd.node_of_var (Ldd.rigid name)
+        | Subst.Ikind_substitution.Lookup_path alias_path ->
           Ldd.node_of_var (Ldd.rigid (Ldd.Name.katom alias_path))
-        | Lookup_type_fun (_params, _body) ->
+        | Subst.Ikind_substitution.Lookup_type_fun (_params, _body) ->
           failwith
             "ikind: unexpected type function while rewriting k-atoms")
       | Atom { constr = path; arg_index } -> (
         match lookup path with
-        | Lookup_identity -> Ldd.node_of_var (Ldd.rigid name)
-        | Lookup_path alias_path ->
+        | Subst.Ikind_substitution.Lookup_identity ->
+          Ldd.node_of_var (Ldd.rigid name)
+        | Subst.Ikind_substitution.Lookup_path alias_path ->
           Ldd.node_of_var (Ldd.rigid (Ldd.Name.atomic alias_path arg_index))
-        | Lookup_type_fun (params, body) ->
+        | Subst.Ikind_substitution.Lookup_type_fun (params, body) ->
           (* Inline a type function by evaluating it in an identity
              environment.  The [expanding] set prevents infinite
              unfolding of recursive type functions. *)
@@ -1377,14 +1372,4 @@ let substitute_decl_ikind_with_lookup
 
 let () =
   Subst.Ikind_substitution.substitute_decl_ikind_with_lookup :=
-    (fun ~lookup ikind_entry ->
-      let lookup path =
-        match lookup path with
-        | Subst.Ikind_substitution.Lookup_identity ->
-          Lookup_result.Lookup_identity
-        | Subst.Ikind_substitution.Lookup_path p ->
-          Lookup_result.Lookup_path p
-        | Subst.Ikind_substitution.Lookup_type_fun (params, body) ->
-          Lookup_result.Lookup_type_fun (params, body)
-      in
-      substitute_decl_ikind_with_lookup ~lookup ikind_entry)
+    substitute_decl_ikind_with_lookup
