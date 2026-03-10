@@ -388,11 +388,11 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
   | Texp_ident { path; desc; kind; _ } ->
       let ident = transl_ident (of_location ~scopes e.exp_loc)
         e.exp_env e.exp_type path desc kind in
-      (match Translattribute.get_lpoly_inst_attribute e.exp_attributes with
-      | Some args ->
-          Linstantiate {
-            ap_func = ident;
-            ap_args = List.map (fun l -> Lconst (Const_layout l)) args;
+      ident
+  | Texp_apply_layout (func, args) ->
+      Linstantiate {
+            ap_func = (transl_exp ~scopes Jkind.Sort.Const.for_function func);
+            ap_args = List.map (fun l -> Lvar (Ident.create_sort_var (Jkind_types.Sort.Var.get_id l :> int))) args;
             ap_result_layout = Lambda.layout_function;
             ap_region_close = Rc_normal;
             ap_mode = alloc_heap;
@@ -402,7 +402,6 @@ and transl_exp0 ~in_new_scope ~scopes sort e =
             ap_specialised = Default_specialise;
             ap_probe = None;
           }
-      | None -> ident)
   | Texp_constant cst -> Lconst (Const_base cst)
   | Texp_let(rec_flag, pat_expr_list, body) ->
       let return_layout = layout_exp sort body in

@@ -213,6 +213,9 @@ module type Sort = sig
       this will default to [void] instead. *)
   val default_for_transl_and_get : t -> Const.t
 
+  (** Like [default_to_value_and_get] but operates directly on a [var]. *)
+  val var_default_to_value_and_get : var -> Const.t
+
   (** To record changes to sorts, for use with [Types.snapshot] and
       [Types.backtrack]. *)
   type change
