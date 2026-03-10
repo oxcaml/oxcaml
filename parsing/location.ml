@@ -348,6 +348,7 @@ module Doc = struct
         Fmt.fprintf ppf "%s %a-%a"
           (capitalize "lines") linenum startline linenum endline
     end;
+
     if chars_valid ~startchar ~endchar then (
       comma ();
       Fmt.fprintf ppf "%s %a-%a"
@@ -1001,6 +1002,7 @@ let aligned_error_hint
           let main, hint = Misc.align_error_hint ~main ~hint in
           mkerror loc (mknoloc hint :: sub) footnote main
   ) fmt
+
 let error ?(loc = none) ?(sub = []) ?(footnote=Fun.const None) msg_str =
   mkerror loc sub footnote Fmt.Doc.(string msg_str empty)
 

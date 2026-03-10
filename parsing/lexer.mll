@@ -48,7 +48,7 @@ let all_keywords =
   let v1_6 = Some (1,6) in
   let v4_2 = Some (4,2) in
   let always = None in
-  let oxcaml = Some (5,4) in
+  let oxcaml = Some (9, 0) in
   [
     "and", AND, always;
     "as", AS, always;
@@ -84,7 +84,7 @@ let all_keywords =
     "local_", LOCAL, oxcaml;
     "match", MATCH, always;
     "method", METHOD, v1_0;
-    "mod", MOD, oxcaml;
+    "mod", MOD, always;
     "module", MODULE, always;
     "mutable", MUTABLE, always;
     "new", NEW, v1_0;

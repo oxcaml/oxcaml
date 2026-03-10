@@ -67,9 +67,13 @@ let strict_modname_from_source source_file =
 let lax_modname_from_source source_file =
   source_file |> stem |> modulize
 
-let compilation_unit_from_source ~for_pack_prefix source_file =
+let compilation_unit_from_source ~strict ~for_pack_prefix source_file =
+  let modname_from_source =
+    if strict then strict_modname_from_source
+    else lax_modname_from_source
+  in
   let modname =
-    strict_modname_from_source source_file |> Compilation_unit.Name.of_string
+    modname_from_source source_file |> Compilation_unit.Name.of_string
   in
   Compilation_unit.create for_pack_prefix modname
 
@@ -83,7 +87,9 @@ let check_unit_name file =
       (Warnings.Bad_module_name name)
 
 let make ?(check_modname=true) ~source_file ~for_pack_prefix kind prefix =
-  let modname = compilation_unit_from_source ~for_pack_prefix prefix in
+  let modname =
+    compilation_unit_from_source ~strict:true ~for_pack_prefix prefix
+  in
   let p =
     {
       modname;
@@ -129,7 +135,9 @@ module Artifact = struct
   let prefix x = Filename.remove_extension (filename x)
 
   let from_filename ~for_pack_prefix filename =
-    let modname = compilation_unit_from_source ~for_pack_prefix filename in
+    let modname =
+      compilation_unit_from_source ~strict:false ~for_pack_prefix filename
+    in
     { modname;
       filename;
       original_source_file = None;
@@ -178,10 +186,6 @@ let artifact f ~extension = mk_artifact extension f
 let companion_obj f = companion_artifact Config.ext_obj f
 let companion_cmt f = companion_artifact ".cmt" f
 let companion_cms f = companion_artifact ".cms" f
-
-let companion_cmi f =
-  let prefix = Misc.chop_extensions f.Artifact.filename in
-  { f with Artifact.filename = prefix ^ ".cmi"}
 
 let companion_cmi f =
   let prefix = Misc.chop_extensions f.Artifact.filename in

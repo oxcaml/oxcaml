@@ -115,7 +115,8 @@ let fmt_constant i f x =
   | Pconst_integer (j,m) -> line i f "PConst_int (%s,%a)\n" j fmt_char_option m
   | Pconst_unboxed_integer (j,m) -> line i f "PConst_unboxed_int (%s,%c)\n" j m
   | Pconst_char c -> line i f "PConst_char %02x\n" (Char.code c)
-  | Pconst_untagged_char c -> line i f "PConst_untagged_char %02x\n" (Char.code c)
+  | Pconst_untagged_char c ->
+      line i f "PConst_untagged_char %02x\n" (Char.code c)
   | Pconst_string (s, strloc, None) ->
       line i f "PConst_string(%S,%a,None)\n" s fmt_location strloc
   | Pconst_string (s, strloc, Some delim) ->
@@ -257,6 +258,7 @@ and typevar i ppf (s, jkind) =
 
 and reprvar i ppf s =
   line i ppf "reprvar: %s\n" s.txt
+
 and package_type i ppf ptyp =
   let i = i + 1 in
   line i ppf "package_type %a\n" fmt_longident_loc ptyp.ppt_path;

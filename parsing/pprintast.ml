@@ -236,7 +236,6 @@ let ident_of_name ppf i =
   Format_doc.compat (Doc_internal.ident_of_name ~kind:Other) ppf i
 
 let constr ppf l = Format_doc.compat Doc_internal.constr ppf l
-let longident = value_longident
 
 let is_curry_attr attr =
   attr.attr_name.txt = Builtin_attributes.curry_attr_name
@@ -363,7 +362,6 @@ let paren: 'a . ?first:space_formatter -> ?last:space_formatter ->
 
 let with_loc pr ppf x = pr ppf x.txt
 let value_longident_loc = with_loc value_longident
-let longident_loc f x = pp f "%a" longident x.txt
 
 let constant_desc f = function
   | Pconst_char i ->
@@ -859,12 +857,13 @@ and tuple_pattern_component ctxt (f:Format.formatter) (label, x) : unit =
   (* Unlabeled component *)
   | None, _ -> pattern1 ctxt f x
 
-and tuple_pattern ctxt f l closed =
+and tuple_pattern ctxt f ~unboxed l closed =
   let closed_flag ppf = function
   | Closed -> ()
   | Open -> pp ppf ",@;.."
   in
-  pp f "@[<1>(%a%a)@]"
+  pp f "@[<1>%s(%a%a)@]"
+    (if unboxed then "#" else "")
     (list ~sep:",@;" (tuple_pattern_component ctxt)) l
     closed_flag closed
 
@@ -941,16 +940,6 @@ and record_pattern ctxt f ~unboxed l closed =
       pp f "@[<2>%s{@;%a@;}@]" hash (list longident_x_pattern ~sep:";@;") l
   | Open ->
       pp f "@[<2>%s{@;%a;_}@]" hash (list longident_x_pattern ~sep:";@;") l
-
-and labeled_tuple_pattern ctxt f ~unboxed l closed =
-  let closed_flag ppf = function
-  | Closed -> ()
-  | Open -> pp ppf ",@;.."
-  in
-  pp f "@[<1>%s(%a%a)@]"
-    (if unboxed then "#" else "")
-    (list ~sep:",@;" (tuple_pattern_component ctxt)) l
-    closed_flag closed
 
 (** for special treatment of modes in labeled expressions *)
 and pattern2 ctxt f p =
@@ -1648,7 +1637,7 @@ and module_type ctxt f x =
     | Pmty_strengthen (mty, mod_id) ->
         pp f "@[<hov2>%a@ with@ %a@]"
           (module_type1 ctxt) mty
-          longident_loc mod_id
+          (with_loc type_longident) mod_id
 
     | _ -> module_type1 ctxt f x
 and with_constraint ctxt f = function
@@ -1881,7 +1870,7 @@ and pp_print_params_then_equals ctxt f x =
 
 and poly_type ctxt core_type f (vars, typ) =
   pp f "type@;%a.@;%a"
-    (list ~sep:"@;" (tyvar_loc_jkind pp_print_string)) vars
+    (list ~sep:"@;" (tyvar_loc_jkind ident_of_name)) vars
     (core_type ctxt) typ
 
 and poly_type_with_optional_modes ctxt f (vars, typ, modes) =
@@ -2380,7 +2369,8 @@ and tuple_expr_component ctxt f (l,e) =
     | _ -> None
   in match (simple_name, l) with
   (* Labeled component can be represented with pun *)
-  | Some simple_name, Some lbl when String.equal simple_name lbl -> pp f "~%s" lbl
+  | Some simple_name, Some lbl when String.equal simple_name lbl ->
+    pp f "~%s" lbl
   (* Labeled component general case *)
   | _, Some lbl -> pp f "~%s:%a" lbl (simple_expr ctxt) e
   (* Unlabeled component *)
@@ -2396,7 +2386,7 @@ and directive_argument f x =
 
 and block_access ctxt f = function
   | Baccess_field li ->
-    pp f ".%a" longident_loc li
+    pp f ".%a" value_longident_loc li
   | Baccess_array (mut, index_kind, index) ->
     let dotop =
       match mut with
@@ -2422,7 +2412,7 @@ and block_access ctxt f = function
 
 and unboxed_access f = function
   | Uaccess_unboxed_field li ->
-    pp f ".#%a" longident_loc li
+    pp f ".#%a" value_longident_loc li
 
 and comprehension_expr ctxt f cexp =
   let punct, comp = match cexp with

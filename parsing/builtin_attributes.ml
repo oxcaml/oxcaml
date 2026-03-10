@@ -32,14 +32,6 @@ let mark_used t = Attribute_table.remove unused_attrs t
 *)
 let attr_order a1 a2 = Location.compare a1.loc a2.loc
 
-let compiler_stops_before_attributes_consumed () =
-  let stops_before_lambda =
-    match !Clflags.stop_after with
-    | None -> false
-    | Some pass -> Clflags.Compiler_pass.(compare pass Lambda) < 0
-  in
-  stops_before_lambda || !Clflags.print_types
-
 let unchecked_zero_alloc_attributes = Attribute_table.create 1
 let mark_zero_alloc_attribute_checked txt loc =
   Attribute_table.remove unchecked_zero_alloc_attributes { txt; loc }
@@ -526,6 +518,7 @@ let explicit_arity attrs = has_attribute "explicit_arity" attrs
 let has_unboxed attrs = has_attribute "unboxed" attrs
 
 let has_boxed attrs = has_attribute "boxed" attrs
+let has_atomic attrs = has_attribute "atomic" attrs
 
 let has_unsafe_allow_any_mode_crossing attrs =
   has_attribute "unsafe_allow_any_mode_crossing" attrs
@@ -1190,4 +1183,3 @@ let get_eval_payload payload =
   | PTyp typ -> Ok typ
   | _ -> Error ()
 
-let has_atomic attrs = has_attribute "atomic" attrs
