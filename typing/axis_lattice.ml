@@ -446,69 +446,6 @@ let set_nullability (n : Jkind_axis.Nullability.t) (x : t) : t =
 let set_separability (s : Jkind_axis.Separability.t) (x : t) : t =
   set_axis x ~axis:12 ~level:(Levels.level_of_separability s)
 
-type boxed = {
-  areality : Mode.Regionality.Const.t;
-  linearity : Mode.Linearity.Const.t;
-  uniqueness : Mode.Uniqueness.Const.t;
-  portability : Mode.Portability.Const.t;
-  contention : Mode.Contention.Const.t;
-  forkable : Mode.Forkable.Const.t;
-  yielding : Mode.Yielding.Const.t;
-  statefulness : Mode.Statefulness.Const.t;
-  visibility : Mode.Visibility.Const.t;
-  staticity : Mode.Staticity.const;
-  externality : Jkind_axis.Externality.t;
-  nullability : Jkind_axis.Nullability.t;
-  separability : Jkind_axis.Separability.t;
-}
-
-let of_boxed
-    ({ areality;
-       linearity;
-       uniqueness;
-       portability;
-       contention;
-       forkable;
-       yielding;
-       statefulness;
-       visibility;
-       staticity;
-       externality;
-       nullability;
-       separability
-     } :
-      boxed) : t =
-  bot
-  |> set_areality areality
-  |> set_uniqueness uniqueness
-  |> set_linearity linearity
-  |> set_contention contention
-  |> set_portability portability
-  |> set_forkable forkable
-  |> set_yielding yielding
-  |> set_statefulness statefulness
-  |> set_visibility visibility
-  |> set_staticity staticity
-  |> set_externality externality
-  |> set_nullability nullability
-  |> set_separability separability
-
-let to_boxed (x : t) : boxed =
-  { areality = areality x;
-    uniqueness = uniqueness x;
-    linearity = linearity x;
-    contention = contention x;
-    portability = portability x;
-    forkable = forkable x;
-    yielding = yielding x;
-    statefulness = statefulness x;
-    visibility = visibility x;
-    staticity = staticity x;
-    externality = externality x;
-    nullability = nullability x;
-    separability = separability x
-  }
-
 let to_mode_crossing (x : t) : Mode.Crossing.t =
   let open Mode.Crossing in
   let monadic =

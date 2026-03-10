@@ -87,29 +87,6 @@ val nullability : t -> Jkind_axis.Nullability.t
 
 val separability : t -> Jkind_axis.Separability.t
 
-(** [Types.mod_bounds] is morally the same type as this.
-   However, its encoding of Crossing.t is different and more complex
-   than record below. *)
-type boxed = {
-  areality : Mode.Regionality.Const.t;
-  linearity : Mode.Linearity.Const.t;
-  uniqueness : Mode.Uniqueness.Const.t;
-  portability : Mode.Portability.Const.t;
-  contention : Mode.Contention.Const.t;
-  forkable : Mode.Forkable.Const.t;
-  yielding : Mode.Yielding.Const.t;
-  statefulness : Mode.Statefulness.Const.t;
-  visibility : Mode.Visibility.Const.t;
-  staticity : Mode.Staticity.const;
-  externality : Jkind_axis.Externality.t;
-  nullability : Jkind_axis.Nullability.t;
-  separability : Jkind_axis.Separability.t;
-}
-
-val of_boxed : boxed -> t
-
-val to_boxed : t -> boxed
-
 val to_mode_crossing : t -> Mode.Crossing.t
 
 (** Canonical lattice constants used by ikinds. *)
