@@ -1069,6 +1069,9 @@ let compute_subcheck_polys ~context:_ env
             match Solver.mod_bounds_floor_of_jkind ctx sub with
             | None -> None
             | Some lhs_floor ->
+              (* [super_poly] is not top here; [Rhs_top_fast_path] handled
+                 that case already. We still need the join because [lhs_floor]
+                 and [super_poly] can contribute different axes toward top. *)
               let lhs_floor_or_super = Ldd.join lhs_floor super_poly in
               if
                 Axis_lattice.equal
