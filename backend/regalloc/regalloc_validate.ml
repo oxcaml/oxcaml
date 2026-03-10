@@ -500,15 +500,13 @@ end = struct
            allocation): %a."
           InstructionId.format id InstructionId.format old_successor_id
           InstructionId.format successor_id;
-      (* CR-someday azewierzejew: Avoid using polymrphic compare. *)
       (match instr.desc, old_instr.desc with
       | Op (Name_for_debugger _), Op (Name_for_debugger _) ->
         (* IRC uses `Reg.interf` to represent the adjacency lists for the
            interference graph, which can lead to cycles. *)
         ()
       | _ ->
-        (* CR-soon xclerc for xclerc: avoid polymorphic equality. *)
-        if Stdlib.compare instr.desc old_instr.desc <> 0
+        if not (Cfg.equal_basic instr.desc old_instr.desc)
         then
           Regalloc_utils.fatal "The desc of instruction with id %a changed"
             InstructionId.format id);
@@ -579,29 +577,22 @@ end = struct
     | Switch labels1, Switch labels2 ->
       Array.iter2 (fun l1 l2 -> compare_label l1 l2) labels1 labels2
     | Return, Return -> ()
-    | Raise rk1, Raise rk2
-    (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
-      when Stdlib.compare rk1 rk2 = 0 ->
-      ()
+    | Raise rk1, Raise rk2 when Lambda.equal_raise_kind rk1 rk2 -> ()
     | Tailcall_self { destination = l1 }, Tailcall_self { destination = l2 } ->
       compare_label l1 l2
     | Tailcall_func call1, Tailcall_func call2
-    (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
-      when Stdlib.compare call1 call2 = 0 ->
+      when Cfg.equal_func_call_operation call1 call2 ->
       ()
     | Call_no_return call1, Call_no_return call2
-    (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
-      when Stdlib.compare call1 call2 = 0 ->
+      when Cfg.equal_external_call_operation call1 call2 ->
       ()
     | ( Call { op = call1; label_after = l1 },
         Call { op = call2; label_after = l2 } )
-    (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
-      when Stdlib.compare call1 call2 = 0 ->
+      when Cfg.equal_func_call_operation call1 call2 ->
       compare_label l1 l2
     | ( Prim { op = prim1; label_after = l1 },
         Prim { op = prim2; label_after = l2 } )
-    (* CR-someday azewierzejew: Avoid using polymorphic comparison. *)
-      when Stdlib.compare prim1 prim2 = 0 ->
+      when Cfg.equal_prim_call_operation prim1 prim2 ->
       compare_label l1 l2
     | ( Invalid { message = m1; label_after = None; _ },
         Invalid { message = m2; label_after = None; _ } )
