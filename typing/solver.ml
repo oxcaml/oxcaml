@@ -2178,6 +2178,24 @@ module Solver_mono (H : Hint) (C : Lattices_mono) = struct
           'a * ('a, disallowed * 'r) morphvar list
           -> ('a, disallowed * 'r) t
 
+    let equal_morphvar : type a l r.
+        a C.obj -> (a, l * r) morphvar -> (a, l * r) morphvar -> bool =
+     fun obj (Amorphvar (v1, m1)) (Amorphvar (v2, m2)) ->
+      match C.equal_morph obj m1 m2 with
+      | None -> false
+      | Some Refl -> Var.Head.equal v1 v2
+
+    let equal : type a l r. a C.obj -> (a, l * r) t -> (a, l * r) t -> bool =
+     fun obj m1 m2 ->
+      match m1, m2 with
+      | Amode a1, Amode a2 -> C.equal obj a1 a2
+      | Amodevar mv1, Amodevar mv2 -> equal_morphvar obj mv1 mv2
+      | Amodejoin (a1, mv1), Amodejoin (a2, mv2) ->
+        C.equal obj a1 a2 && List.for_all2 (equal_morphvar obj) mv1 mv2
+      | Amodemeet (a1, mv1), Amodejoin (a2, mv2) ->
+        C.equal obj a1 a2 && List.for_all2 (equal_morphvar obj) mv1 mv2
+      | _, _ -> false
+
     let print_var : type a. a C.obj -> Fmt.formatter -> a Var.Head.t -> unit =
      fun obj ppf { desc_id; desc_upper; desc_lower; desc_level } ->
       Fmt.fprintf ppf "%x<%d>[%a--%a]" desc_id desc_level (C.print obj)

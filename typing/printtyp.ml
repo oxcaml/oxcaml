@@ -1356,30 +1356,14 @@ end = struct
   let zap_non_generic_modes ty =
     zap_non_generic_modes Alloc.Const.legacy ty
 
-  (* Physical equality of two description *)
-  let eq_description_lr :
-    type a. a C.obj
-         -> (a, (allowed * allowed)) Alloc.Desc.t
-         -> (a, (allowed * allowed)) Alloc.Desc.t
-         -> bool =
-    fun dst left right ->
-    match left, right with
-    | Amode left, Amode right -> C.le dst left right && C.le dst right left
-    | Amodevar (Amorphvar (v, f)), Amodevar (Amorphvar (u, g)) ->
-      Desc.Var.Head.equal v u &&
-      (match C.equal_morph dst f g with
-      | Some Refl -> true
-      | None -> false)
-    | _, _ -> false
-
   let eq_pair :
       visible_pair
       -> visible_pair
       -> bool =
     fun { monadic = mon0; comonadic = com0 }
         { monadic = mon1; comonadic = com1 } ->
-    eq_description_lr Alloc.obj_monadic mon0 mon1
-    && eq_description_lr Alloc.obj_comonadic com0 com1
+    Desc.equal Alloc.obj_monadic mon0 mon1
+    && Desc.equal Alloc.obj_comonadic com0 com1
 
   (* The following preprocessing step registers all the
     modes pointed to by a type. Recall that a [Alloc.lr]
@@ -1473,6 +1457,18 @@ end = struct
     fun obj v ->
       VarTbl.mem visible_vars (K (obj, v))
 
+  let remove_duplicate_paths : boxedpath list -> boxedpath list =
+    fun paths ->
+      let sort (P (fdst, v, f)) (P (gdst, u, g)) =
+        match C.equal_obj fdst gdst with
+        | None -> 1
+        | Some Refl ->
+          match C.equal_morph fdst f g with
+          | None -> 1
+          | Some Refl -> Int.compare v.desc_id u.desc_id
+      in
+      List.sort_uniq sort paths
+
   (* Find all direct paths (via vlowers) from some
     variable [v] to all other reachable visible variables
     at generic level. *)
@@ -1513,6 +1509,7 @@ end = struct
             in
             (* TODO: we might want to remove duplicates here *)
             let paths = List.flatten paths in
+            let paths = remove_duplicate_paths paths in
             VarTbl.add memoized (K (dst,v)) paths;
             paths
           end
@@ -1772,13 +1769,14 @@ end = struct
      [compare com0 com1] can't be decided via bounds
   2) Either [mon0] and [mon1] are both variables,
      or [com0] and [com1] are both variables
+  3) [(mon0, com0)] and [(mon1, com1)] are not equal
   *)
   let construct_edge_condition :
       visible_pair
       -> visible_pair
       -> bool =
-    fun { monadic = mon0; comonadic = com0 }
-        { monadic = mon1; comonadic = com1 } ->
+    fun ({ monadic = mon0; comonadic = com0 } as pair0)
+        ({ monadic = mon1; comonadic = com1 } as pair1) ->
       let compare_dec =
         not (descr_compare_dec
                Alloc.obj_monadic mon0 mon1)
@@ -1789,7 +1787,8 @@ end = struct
         (descr_is_var mon0 && descr_is_var mon1)
         || (descr_is_var com0 && descr_is_var com1)
       in
-      compare_dec && check_signature
+      let pairs_ne = not (eq_pair pair0 pair1) in
+      compare_dec && check_signature && pairs_ne
 
   exception Invalid_edge
   let construct_name_exn :
@@ -1828,6 +1827,7 @@ end = struct
 
   let construct_simple_between =
     fun pair0 pair1 ->
+
       let mon_morphs =
         construct_monadic_morphs
           pair0.monadic pair1.monadic
@@ -1860,7 +1860,10 @@ end = struct
           construct_closing_over_morphs
             pair1.comonadic pair2.monadic
         in
-        let edges = construct_simple_between pair0 pair2 in
+        let edges =
+          if construct_edge_condition pair0 pair2
+          then construct_simple_between pair0 pair2
+          else [] in
         edges <> [] && closing_over_morphs <> []
       ) !visible_pairs
 
@@ -1893,7 +1896,9 @@ end = struct
                 pair1.comonadic pair2.monadic
             in
             let simple_edges =
-              construct_simple_between pair0 pair2
+              if (construct_edge_condition pair0 pair2)
+              then construct_simple_between pair0 pair2
+              else []
             in
             List.fold_left (fun acc edge ->
               List.fold_left (fun acc cls_morph ->

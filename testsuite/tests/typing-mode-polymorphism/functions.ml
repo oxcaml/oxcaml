@@ -147,8 +147,8 @@ let rec recursive x n =
   if n <= 0 then x else recursive x (n - 1)
 [%%expect{|
 val recursive :
-  'a @ [< 'n & 'm & global > 'm] ->
-  (int @ [< many uncontended] -> 'a @ [< 'o & global > 'o | 'n]) @ [> close('m) | close('m) | monadic_to_comonadic_min('m) | monadic_to_comonadic_min('m) | close('n) | close('n) | nonportable] =
+  'a @ [< 'm & global] ->
+  (int @ [< many uncontended] -> 'a @ [< global > 'm]) @ [> close('m) | nonportable] =
   <fun>
 |}]
 
@@ -162,8 +162,8 @@ val foo : 'a @ [< global portable] -> unit @ 'm = <fun>
 let recursive' = recursive
 [%%expect{|
 val recursive' :
-  'a @ [< 'n & 'm & global > 'm] ->
-  (int @ [< many uncontended] -> 'a @ [< 'o & global > 'o | 'n]) @ [> close('m) | close('m) | monadic_to_comonadic_min('m) | monadic_to_comonadic_min('m) | close('n) | close('n) | nonportable] =
+  'a @ [< 'm & global] ->
+  (int @ [< many uncontended] -> 'a @ [< global > 'm]) @ [> close('m) | nonportable] =
   <fun>
 |}]
 
@@ -182,8 +182,8 @@ let rec map f = function
   | x :: xs -> f x :: map f xs
 [%%expect{|
 val map :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o & many > 'o | aliased] ->
-  ('a list @ [< 'q & 'n > 'q] -> 'b list @ [< 'p & global > 'p | 'm]) @ [> monadic_to_comonadic_min('o) | monadic_to_comonadic_min('o) | nonportable] =
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & many > aliased] ->
+  ('a list @ [< 'n] -> 'b list @ [< global > 'm]) @ [> 'o | nonportable] =
   <fun>
 |}]
 

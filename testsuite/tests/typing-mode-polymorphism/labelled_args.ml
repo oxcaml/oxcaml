@@ -101,7 +101,7 @@ let () =
 
 let foo = fst ~label2:()
 [%%expect{|
-val foo : label1:'a @ [< 'n & 'n] -> 'a @ [< 'm > 'm | 'n | 'n] = <fun>
+val foo : label1:'a @ [< 'm] -> 'a @ [> 'm] = <fun>
 |}]
 
 (* partially applying a labelled function yield

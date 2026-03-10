@@ -807,6 +807,8 @@ module type S = sig
             'a * ('a, disallowed * 'r) morphvar list
             -> ('a, disallowed * 'r) t
 
+      val equal : 'a C.obj -> ('a, 'l * 'r) t -> ('a, 'l * 'r) t -> bool
+
       val print : 'a C.obj -> Fmt.formatter -> ('a, 'l * 'r) t -> unit
     end
 
