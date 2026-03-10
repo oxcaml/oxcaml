@@ -147,9 +147,8 @@ let rec recursive x n =
   if n <= 0 then x else recursive x (n - 1)
 [%%expect{|
 val recursive :
-  'a @ [< 'q & 'p & 'p & global > 'p | 'p] ->
-  (int @ [< 'mm2 & many uncontended > 'mm2] ->
-   'a @ [< 'mm0 & 'mm0 & 'mm1 & 'mm1 & global > 'mm0 | 'mm0 | 'mm1 | 'mm1 | 'q]) @ [< 'm @@ past & 'n @@ past & 'o @@ past > close('p) | close('p) | monadic_to_comonadic_min('p) | monadic_to_comonadic_min('p) | close('p) | close('p) | monadic_to_comonadic_min('p) | monadic_to_comonadic_min('p) | close('q) | close('q) | 'm | 'n @@ many portable | 'o | nonportable] =
+  'a @ [< 'm & global] ->
+  (int @ [< many uncontended] -> 'a @ [< global > 'm]) @ [> close('m) | nonportable] =
   <fun>
 |}]
 
@@ -165,9 +164,8 @@ val foo : 'a @ [< global portable] -> unit @ 'm = <fun>
 let recursive' = recursive
 [%%expect{|
 val recursive' :
-  'a @ [< 'mm1 & 'mm1 & 'mm1 & global portable > 'mm1 | 'mm1 | 'mm1] ->
-  (int @ [< 'mm0 & many uncontended > 'mm0] ->
-   'a @ [< 'p & 'p & 'p & 'p & 'p & 'p & 'q & 'q & 'q & global portable > 'p | 'p | 'p | 'p | 'p | 'p | 'q | 'q | 'q]) @ [< 'm @@ past & 'n @@ past & 'o @@ past & 'n @@ past & 'o @@ past > 'm | 'n @@ many portable | 'o | 'n @@ many portable | 'o | nonportable] =
+  'a @ [< global portable] ->
+  (int @ [< many uncontended] -> 'a @ [< global portable]) @ [> nonportable] =
   <fun>
 |}]
 
@@ -186,9 +184,8 @@ let rec map f = function
   | x :: xs -> f x :: map f xs
 [%%expect{|
 val map :
-  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'mm0 & 'mm0 . aliased contended & 'mm0 & many > 'mm0 | 'mm0 | 'mm0 | aliased] ->
-  ('a list @ [< 'mm3 & 'mm3 & 'n > 'mm3 | 'mm3] ->
-   'b list @ [< 'mm1 & 'mm1 & 'mm2 & 'mm2 & global > 'mm1 | 'mm1 | 'mm2 | 'mm2 | 'm]) @ [< 'o @@ past & 'p @@ past & 'q @@ past > monadic_to_comonadic_min('mm0) | monadic_to_comonadic_min('mm0) | monadic_to_comonadic_min('mm0) | monadic_to_comonadic_min('mm0) | monadic_to_comonadic_min('mm0) | monadic_to_comonadic_min('mm0) | 'o | 'p @@ many portable | 'q | nonportable] =
+  ('a @ [> 'n] -> 'b @ [< 'm & global]) @ [< 'o @@ past & many > aliased] ->
+  ('a list @ [< 'n] -> 'b list @ [< global > 'm]) @ [> 'o | nonportable] =
   <fun>
 |}]
 

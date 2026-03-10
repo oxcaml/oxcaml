@@ -55,8 +55,7 @@ let bar (once_ x) =
 [%%expect{|
 val bar :
   'a @ [< 'm & global > once] ->
-  ('b @ [< 'o @@ past > 'o] -> 'a @ [< 'n > 'n | 'm | once]) @ [> close('m) | once] =
-  <fun>
+  ('b @ 'n -> 'a @ [> 'm | once]) @ [> close('m) | once] = <fun>
 |}]
 
 let bar (unique_ x) =

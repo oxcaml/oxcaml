@@ -514,6 +514,8 @@ module type Solver_mono = sig
           'a * ('a, disallowed * 'r) morphvar list
           -> ('a, disallowed * 'r) t
 
+    val equal : 'a obj -> ('a, 'l * 'r) t -> ('a, 'l * 'r) t -> bool
+
     val print : 'a obj -> Fmt.formatter -> ('a, 'l * 'r) t -> unit
   end
 
