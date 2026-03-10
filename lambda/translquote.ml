@@ -49,7 +49,7 @@ let use modname field =
      let lid =
        match unflatten (String.split_on_char '.' modname) with
        | None -> Lident field
-       | Some lid -> Ldot (lid, field)
+       | Some lid -> Ldot (Location.mknoloc lid, Location.mknoloc field)
      in
      match Env.find_value_by_name_lazy lid env with
      | p, _ -> transl_value_path Loc_unknown env p
@@ -2419,12 +2419,10 @@ let quote_value_ident_path_as_exp loc env path ident_kind =
   Exp_desc.ident loc (quote_value_ident_path loc env path ident_kind)
 
 let type_path env ty =
-  let desc =
-    Types.get_desc (Ctype.expand_head_opt env (Ctype.correct_levels ty))
-  in
+  let desc = Types.get_desc (Ctype.expand_head_opt env ty) in
   match desc with Tconstr (p, _, _) -> Some p | _ -> None
 
-let quote_record_field env loc lbl_desc =
+let quote_record_field env loc (lbl_desc : _ Data_types.gen_label_description) =
   match type_path env lbl_desc.lbl_res with
   | None ->
     fatal_errorf "Translquote [at %a]: no global path for record field"
@@ -2439,7 +2437,7 @@ let quote_record_field env loc lbl_desc =
     fatal_errorf "Translquote [at %a]: unsupported constructor type detected."
       Location.print_loc (to_location loc)
 
-let quote_constructor env loc constr =
+let quote_constructor env loc (constr : Data_types.constructor_description) =
   let exception Non_builtin of string in
   (try
      Identifier.Constructor.wrap
@@ -2483,7 +2481,7 @@ let quote_constructor env loc constr =
 
 let rec quote_modtype_path_of_lid loc = function
   | Lident id -> Modtype_path.name loc id |> Modtype_path.wrap
-  | Ldot (p, s) ->
+  | Ldot ({ txt = p; _ }, { txt = s; _ }) ->
     Modtype_path.dot loc (quote_modtype_path_of_lid loc p) s
     |> Modtype_path.wrap
   | _ ->
@@ -2680,8 +2678,8 @@ let type_for_annotation ~env ~loc typ =
           Ttyp_constr
             (p, mkloc (Untypeast.lident_of_path p) loc, List.map go tyl)
         | Tobject (fields, _) ->
-          let Printtyp.{ fields; open_row } =
-            Printtyp.tree_of_typobject_repr fields
+          let Out_type.{ fields; open_row } =
+            Out_type.tree_of_typobject_repr fields
           in
           let fields =
             List.map
@@ -2694,10 +2692,10 @@ let type_for_annotation ~env ~loc typ =
           in
           Ttyp_object (fields, if open_row then Open else Closed)
         | Tvariant row ->
-          let Printtyp.
+          let Out_type.
                 { fields; name = _; closed; present = _; all_present = _; tags }
               =
-            Printtyp.tree_of_typvariant_repr row
+            Out_type.tree_of_typvariant_repr row
           in
           let fields =
             List.map
@@ -2715,15 +2713,16 @@ let type_for_annotation ~env ~loc typ =
             "Translquote [at %a]:@ Explicitly quantified type variables@ \
              cannot be spliced@ within quoted higher-rank function types"
             Location.print_loc_in_lowercase loc
-        | Tpackage (pack_path, pack_fields) ->
+        | Tpackage { pack_path; pack_cstrs } ->
           Ttyp_package
-            { pack_path;
-              pack_fields =
+            { tpt_path = pack_path;
+              tpt_cstrs =
                 List.map
-                  (fun (lident, ty) -> mkloc lident loc, go ty)
-                  pack_fields;
-              pack_type = Mty_ident pack_path;
-              pack_txt = mkloc (Untypeast.lident_of_path pack_path) loc
+                  (fun (parts, ty) ->
+                    mkloc (Longident.unflatten parts |> Option.get) loc, go ty)
+                  pack_cstrs;
+              tpt_type = Mty_ident pack_path;
+              tpt_txt = mkloc (Untypeast.lident_of_path pack_path) loc
             }
         | Tlink _ | Tsubst _ | Tfield _ | Tnil ->
           fatal_errorf
@@ -2999,8 +2998,8 @@ and quote_core_type ~scopes ty =
     without_idents_poly names;
     Type.poly loc (quote_loc loc) names_lam body |> Type.wrap
   | Ttyp_package package ->
-    let { pack_path; pack_fields; pack_type = _; pack_txt = _ } = package in
-    let mod_type = module_type_for_path loc pack_path
+    let { tpt_path; tpt_cstrs; tpt_type = _; tpt_txt = _ } = package in
+    let mod_type = module_type_for_path loc tpt_path
     and with_types =
       List.map
         (fun (lid, ty) ->
@@ -3008,7 +3007,7 @@ and quote_core_type ~scopes ty =
               (of_location ~scopes Asttypes.(lid.loc))
               lid.txt,
             quote_core_type ~scopes ty ))
-        pack_fields
+        tpt_cstrs
     in
     Type.package loc mod_type with_types |> Type.wrap
   | Ttyp_quote ty -> Type.quote loc (quote_core_type ~scopes ty) |> Type.wrap
@@ -3559,11 +3558,11 @@ and quote_expression_desc ~scopes ~transl stage e =
           args
       in
       Exp_desc.apply loc fn args
-    | Texp_match (exp, _, cases, _) ->
+    | Texp_match (exp, _, cases, _, _) ->
       let exp = quote_expression ~scopes ~transl stage exp in
       let cases = List.map (quote_case ~scopes ~transl stage loc) cases in
       Exp_desc.match_ loc exp cases
-    | Texp_try (exp, cases) ->
+    | Texp_try (exp, cases, _) ->
       let exp = quote_expression ~transl ~scopes stage exp
       and cases =
         List.map (quote_value_pattern_case ~scopes ~transl stage loc) cases
