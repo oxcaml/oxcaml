@@ -83,6 +83,7 @@ module Solver = struct
 
   and ctx =
     { env : Env.t option;
+      lookup_of_env : Env.t -> Path.t -> constr_decl;
       mode : mode;
       ty_to_kind : Ldd.node TyTbl.t;
       constr_to_coeffs : (Ldd.node * Ldd.node array) ConstrTbl.t
@@ -114,10 +115,12 @@ module Solver = struct
       }
       :: !ctx_tables_pool
 
-  let with_ctx ~(mode : mode) ~(env : Env.t option) f =
+  let with_ctx ~(mode : mode) ~(env : Env.t option)
+      ~(lookup_of_env : Env.t -> Path.t -> constr_decl) f =
     let tables = acquire_ctx_tables () in
     let ctx =
       { env;
+        lookup_of_env;
         mode;
         ty_to_kind = tables.ty_to_kind;
         constr_to_coeffs = tables.constr_to_coeffs
@@ -162,18 +165,10 @@ module Solver = struct
     in
     Poly (base, coeffs)
 
-  let lookup_of_env :
-      (Env.t -> Path.t -> constr_decl) ref =
-    ref
-      (fun _env _path ->
-        failwith "ikind: lookup_of_env not initialized")
-
-  let set_lookup_of_env f = lookup_of_env := f
-
   let lookup_constr (ctx : ctx) ~(min_arity : int) (path : Path.t) :
       constr_decl =
     match ctx.env with
-    | Some env -> !lookup_of_env env path
+    | Some env -> ctx.lookup_of_env env path
     | None -> identity_constr_decl ~arity:min_arity path
 
   (** Fetch or compute the polynomial for constructor [c]. *)
@@ -961,11 +956,11 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
         (Format_doc.compat Path.print) path ikind_msg);
     ikind
 
-let () = Solver.set_lookup_of_env (fun env path -> lookup_of_env ~env path)
-
 (* Package the above into a full evaluation context. *)
 let with_ctx ~(mode : Solver.mode) ~(env : Env.t option) f =
-  Solver.with_ctx ~mode ~env f
+  Solver.with_ctx ~mode ~env
+    ~lookup_of_env:(fun env path -> lookup_of_env ~env path)
+    f
 
 let normalize ~(env : Env.t option) (jkind : Types.jkind_l) : Ldd.node =
   with_ctx ~mode:Solver.Normal ~env (fun ctx ->
