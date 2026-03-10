@@ -172,8 +172,6 @@ let non_bot_axes (v : t) : int list =
 
 let of_levels ~(levels : int array) : t = encode ~levels
 
-let to_levels (v : t) : int array = decode v
-
 let pp (v : t) : string =
   let lv = decode v |> Array.to_list |> List.map string_of_int in
   "[" ^ String.concat "," lv ^ "]"
@@ -372,6 +370,45 @@ module Levels = struct
     | _ -> invalid_arg "Axis_lattice.separability_of_level"
 end
 
+let areality (x : t) : Mode.Regionality.Const.t =
+  Levels.areality_of_level (get_axis x ~axis:0)
+
+let uniqueness (x : t) : Mode.Uniqueness.Const.t =
+  Levels.uniqueness_of_level_monadic (get_axis x ~axis:1)
+
+let linearity (x : t) : Mode.Linearity.Const.t =
+  Levels.linearity_of_level (get_axis x ~axis:2)
+
+let contention (x : t) : Mode.Contention.Const.t =
+  Levels.contention_of_level_monadic (get_axis x ~axis:3)
+
+let portability (x : t) : Mode.Portability.Const.t =
+  Levels.portability_of_level (get_axis x ~axis:4)
+
+let forkable (x : t) : Mode.Forkable.Const.t =
+  Levels.forkable_of_level (get_axis x ~axis:5)
+
+let yielding (x : t) : Mode.Yielding.Const.t =
+  Levels.yielding_of_level (get_axis x ~axis:6)
+
+let statefulness (x : t) : Mode.Statefulness.Const.t =
+  Levels.statefulness_of_level (get_axis x ~axis:7)
+
+let visibility (x : t) : Mode.Visibility.Const.t =
+  Levels.visibility_of_level_monadic (get_axis x ~axis:8)
+
+let staticity (x : t) : Mode.Staticity.const =
+  Levels.staticity_of_level_monadic (get_axis x ~axis:9)
+
+let externality (x : t) : Jkind_axis.Externality.t =
+  Levels.externality_of_level (get_axis x ~axis:10)
+
+let nullability (x : t) : Jkind_axis.Nullability.t =
+  Levels.nullability_of_level (get_axis x ~axis:11)
+
+let separability (x : t) : Jkind_axis.Separability.t =
+  Levels.separability_of_level (get_axis x ~axis:12)
+
 type boxed = {
   areality : Mode.Regionality.Const.t;
   linearity : Mode.Linearity.Const.t;
@@ -424,71 +461,68 @@ let of_boxed
   of_levels ~levels
 
 let to_boxed (x : t) : boxed =
-  let open Levels in
-  let lv = to_levels x in
-  { areality = areality_of_level lv.(0);
-    uniqueness = uniqueness_of_level_monadic lv.(1);
-    linearity = linearity_of_level lv.(2);
-    contention = contention_of_level_monadic lv.(3);
-    portability = portability_of_level lv.(4);
-    forkable = forkable_of_level lv.(5);
-    yielding = yielding_of_level lv.(6);
-    statefulness = statefulness_of_level lv.(7);
-    visibility = visibility_of_level_monadic lv.(8);
-    staticity = staticity_of_level_monadic lv.(9);
-    externality = externality_of_level lv.(10);
-    nullability = nullability_of_level lv.(11);
-    separability = separability_of_level lv.(12)
+  { areality = areality x;
+    uniqueness = uniqueness x;
+    linearity = linearity x;
+    contention = contention x;
+    portability = portability x;
+    forkable = forkable x;
+    yielding = yielding x;
+    statefulness = statefulness x;
+    visibility = visibility x;
+    staticity = staticity x;
+    externality = externality x;
+    nullability = nullability x;
+    separability = separability x
   }
 
 let to_mode_crossing (x : t) : Mode.Crossing.t =
-  let open Levels in
   let open Mode.Crossing in
   let monadic =
     Monadic.create
       ~uniqueness:
         (Monadic.Atom.Modality
            (Mode.Modality.Monadic.Atom.Join_const
-              (uniqueness_of_level_monadic (get_axis x ~axis:1))))
+              (uniqueness x)))
       ~contention:
         (Monadic.Atom.Modality
            (Mode.Modality.Monadic.Atom.Join_const
-              (contention_of_level_monadic (get_axis x ~axis:3))))
+              (contention x)))
       ~visibility:
         (Monadic.Atom.Modality
            (Mode.Modality.Monadic.Atom.Join_const
-              (visibility_of_level_monadic (get_axis x ~axis:8))))
+              (visibility x)))
       ~staticity:
         (Monadic.Atom.Modality
            (Mode.Modality.Monadic.Atom.Join_const
-              (staticity_of_level_monadic (get_axis x ~axis:9))))
+              (staticity x)))
   in
   let comonadic =
     Comonadic.create
       ~regionality:
         (Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const
-              (areality_of_level (get_axis x ~axis:0))))
+              (areality x)))
       ~linearity:
         (Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const
-              (linearity_of_level (get_axis x ~axis:2))))
+              (linearity x)))
       ~portability:
         (Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const
-              (portability_of_level (get_axis x ~axis:4))))
+              (portability x)))
       ~forkable:
         (Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const
-              (forkable_of_level (get_axis x ~axis:5))))
+              (forkable x)))
       ~yielding:
         (Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const
-              (yielding_of_level (get_axis x ~axis:6))))
+              (yielding x)))
       ~statefulness:
         (Comonadic.Atom.Modality
            (Mode.Modality.Comonadic.Atom.Meet_const
-              (statefulness_of_level (get_axis x ~axis:7))))
+              (statefulness x)))
   in
   { monadic; comonadic }
 
