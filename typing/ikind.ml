@@ -1176,13 +1176,13 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
   if not (enable_crossing && !Clflags.ikinds)
   then Jkind.get_mode_crossing ~context env jkind
   else
-    let with_bounds_is_empty =
-      match Jkind.With_bounds.to_seq jkind.jkind.with_bounds () with
-      | Seq.Nil -> true
-      | Seq.Cons _ -> false
+    let with_bounds_is_empty :
+        type l r. (l * r) Types.with_bounds -> bool = function
+      | No_with_bounds -> true
+      | With_bounds _ -> false
     in
     match jkind.jkind.base with
-    | Types.Layout _ when with_bounds_is_empty ->
+    | Types.Layout _ when with_bounds_is_empty jkind.jkind.with_bounds ->
       Jkind.get_mode_crossing ~context env jkind
     | _ ->
       with_ctx ~mode:Solver.Round_up ~env:(Some env) (fun ctx ->
