@@ -1441,3 +1441,28 @@ Error: Values do not match:
          "[> M.v ]" = "[> `A of M.a ]"
        Types for tag "`A" are incompatible
 |}]
+
+(* https://github.com/ocaml/ocaml/issues/14622: warning 16 must traverse
+   module-dependent functions (from typing-warnings/warning16.ml, which
+   runs without the modular_explicits extension). *)
+module type Show = sig
+  type t
+
+  val show : t -> string
+end
+
+type 'a show_t =
+  | A :
+    { x : string option
+      ; show : 'a -> string
+      }
+    -> 'a show_t
+
+let test (type a) ?x (module M : Show with type t = a) =
+  A { x; show = M.show }
+[%%expect{|
+module type Show = sig type t val show : t -> string end
+type 'a show_t = A : { x : string option; show : 'a -> string; } -> 'a show_t
+val test : ?x:string -> (module M : Show with type t = 'a) -> M.t show_t =
+  <fun>
+|}]
