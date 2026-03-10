@@ -1407,7 +1407,8 @@ and transl_guard ~scopes guard rhs_sort rhs =
 and transl_cont cont c_cont body =
   match cont, c_cont with
   | Some id1, Some id2 ->
-      Llet(Alias, Lambda.layout_function, id2, Lambda.debug_uid_none, Lvar id1, body)
+      Llet(Alias, Lambda.layout_function, id2,
+        Lambda.debug_uid_none, Lvar id1, body)
   | None, None
   | Some _, None -> body
   | None, Some _ -> assert false

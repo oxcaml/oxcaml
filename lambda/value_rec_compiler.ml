@@ -46,23 +46,29 @@ open Lambda
 (** Allocation and backpatching primitives *)
 
 let alloc_prim =
-  Lambda.simple_prim_on_values ~name:"caml_alloc_dummy" ~arity:1 ~alloc:true
+  Lambda.simple_prim_on_values
+    ~name:"caml_alloc_dummy" ~arity:1 ~alloc:true
 
 let alloc_float_record_prim =
-  Lambda.simple_prim_on_values ~name:"caml_alloc_dummy_float" ~arity:1 ~alloc:true
+  Lambda.simple_prim_on_values
+    ~name:"caml_alloc_dummy_float" ~arity:1 ~alloc:true
 
 let alloc_lazy_prim =
-  Lambda.simple_prim_on_values ~name:"caml_alloc_dummy_lazy" ~arity:1 ~alloc:true
+  Lambda.simple_prim_on_values
+    ~name:"caml_alloc_dummy_lazy" ~arity:1 ~alloc:true
 
 let alloc_mixed_record_prim =
-  Lambda.simple_prim_on_values ~name:"caml_alloc_dummy_mixed" ~arity:2 ~alloc:true
+  Lambda.simple_prim_on_values
+    ~name:"caml_alloc_dummy_mixed" ~arity:2 ~alloc:true
 
 let update_prim =
   (* Note: [alloc] could be false, but it probably doesn't matter *)
-  Lambda.simple_prim_on_values ~name:"caml_update_dummy" ~arity:2 ~alloc:true
+  Lambda.simple_prim_on_values
+    ~name:"caml_update_dummy" ~arity:2 ~alloc:true
 
 let update_lazy_prim =
-  Lambda.simple_prim_on_values ~name:"caml_update_dummy_lazy" ~arity:2 ~alloc:true
+  Lambda.simple_prim_on_values
+    ~name:"caml_update_dummy_lazy" ~arity:2 ~alloc:true
 
 
 (** {1. Sizing} *)

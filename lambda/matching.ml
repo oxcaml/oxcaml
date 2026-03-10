@@ -3715,7 +3715,9 @@ let combine_regular_constructor value_kind loc arg cstr partial
             transl_match_on_or_null value_kind arg loc
               ~if_null:act1 ~if_this:act2
         | _, _, _, _, Some _ ->
-            Misc.fatal_error "Matching.combine_constructor: Unexpected Null case"
+            Misc.fatal_error
+              "Matching.combine_regular_constructor: \
+               Unexpected Null case"
         | n, 0, _, [], None ->
             (* The matched type defines constant constructors only.
                (typically the constant cases are dense, so
@@ -3772,10 +3774,12 @@ let combine_regular_constructor value_kind loc arg cstr partial
   in
   (lambda1, Jumps.union local_jumps total1)
 
-let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx def actions =
+let combine_constructor value_kind loc arg pat_env pat_barrier cstr partial ctx
+  def actions =
   match cstr.cstr_tag with
   | Extension _ ->
-    combine_extension_constructor value_kind loc arg pat_env pat_barrier partial ctx def actions
+    combine_extension_constructor value_kind loc arg pat_env pat_barrier partial
+      ctx def actions
   | _ ->
     combine_regular_constructor value_kind loc arg cstr partial ctx def actions
 
@@ -4786,7 +4790,8 @@ let for_tupled_function ~scopes ~return_layout loc paraml pats_act_list partial 
   (* The arguments of a tupled function are always values since they must be
      tuple elements *)
   let args = List.map (fun id ->
-    root_arg (Lvar id) Strict Jkind.Sort.Const.for_tuple_element layout_tuple_element
+    root_arg (Lvar id) Strict Jkind.Sort.Const.for_tuple_element
+      layout_tuple_element
   ) paraml in
   let handler =
     toplevel_handler ~scopes ~return_layout loc ~failer:Raise_match_failure
