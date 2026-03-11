@@ -638,6 +638,61 @@ let three_preemptible_middle_finishes () =
   print_endline "OK"
 ;;
 
+external set_interval_usec
+  : int -> unit
+  = "caml_domain_set_tick_interval_usec"
+[@@noalloc]
+
+let stale_preemptible_child_after_inner_finishes () =
+  print_endline
+    "# Stale preemptible_child after inner preemptible finishes";
+  (* Set a very fast tick interval so ticks fire frequently *)
+  set_interval_usec 1;
+  let spurious_preemption = ref false in
+  let inner_preempted = ref false in
+  (try
+     try_with_preemptible
+       ~on_tick:(fun () -> Continue)
+       (fun () ->
+          (* Inner preemptible fiber: gets preempted then finishes *)
+          try_with_preemptible
+            ~on_tick:(fun () -> Preempt)
+            (fun () -> busy_wait_for inner_preempted)
+            ()
+            { effc = (fun (type a) (eff : a Effect.t) ->
+                match eff with
+                | Preemption ->
+                  Some (fun (k : (a, _) continuation) ->
+                    inner_preempted := true;
+                    continue k ())
+                | _ -> None)
+            };
+          (* Inner has finished. Its stack is freed, but the outer's
+             preemptible_child still points to it. Do allocations to
+             trigger GC (collecting the stale handle_tick closure)
+             and tick processing (following the stale pointer). *)
+          Gc.full_major ();
+          for _ = 1 to 10_000_000 do
+            ignore (Sys.opaque_identity (ref 42))
+          done)
+       ()
+       { effc = (fun (type a) (eff : a Effect.t) ->
+           match eff with
+           | Preemption ->
+             Some (fun (k : (a, _) continuation) ->
+               spurious_preemption := true;
+               continue k ())
+           | _ -> None)
+       }
+   with exn ->
+     Printf.printf "Unexpected exception: %s\n" (Printexc.to_string exn));
+  set_interval_usec 0;
+  assert !inner_preempted;
+  if !spurious_preemption
+  then print_endline "FAIL: spurious preemption from stale preemptible_child"
+  else print_endline "OK"
+;;
+
 let multiple_layers_outer_preempts () =
   print_endline
     "# Multiple non-preemptible layers, outer preempts";
@@ -690,5 +745,6 @@ let () =
   inner_preemptible_finishes_then_outer_ticks ();
   inner_preemptible_finishes_sibling_ticks ();
   three_preemptible_middle_finishes ();
+  stale_preemptible_child_after_inner_finishes ();
   multiple_layers_outer_preempts ()
 ;;

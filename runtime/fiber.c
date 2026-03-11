@@ -679,6 +679,7 @@ void caml_scan_stack(
     f(fdata, Stack_handle_value(stack), &Stack_handle_value(stack));
     f(fdata, Stack_handle_exception(stack), &Stack_handle_exception(stack));
     f(fdata, Stack_handle_effect(stack), &Stack_handle_effect(stack));
+    f(fdata, Stack_handle_tick(stack), &Stack_handle_tick(stack));
 
     scan_local_allocations(f, fdata, locals, stack->local_sp);
 
@@ -837,6 +838,8 @@ void caml_scan_stack(
       f(fdata, Stack_handle_exception(stack), &Stack_handle_exception(stack));
     if (is_scannable(fflags, Stack_handle_effect(stack)))
       f(fdata, Stack_handle_effect(stack), &Stack_handle_effect(stack));
+    if (is_scannable(fflags, Stack_handle_tick(stack)))
+      f(fdata, Stack_handle_tick(stack), &Stack_handle_tick(stack));
 
     stack = Stack_parent(stack);
   }
