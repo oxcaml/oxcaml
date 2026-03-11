@@ -49,9 +49,9 @@ Line 1, characters 31-32:
 
 let dup (unique_ x) = (x, (unique_ x), x)
 [%%expect{|
-Line 1, characters 35-36:
+Line 1, characters 26-37:
 1 | let dup (unique_ x) = (x, (unique_ x), x)
-                                       ^
+                              ^^^^^^^^^^^
 Error: This value is used here as unique, but it is also being used at:
 Line 1, characters 23-24:
 1 | let dup (unique_ x) = (x, (unique_ x), x)
@@ -66,9 +66,9 @@ Line 1, characters 36-37:
 1 | let dup (unique_ x) = ((unique_ x), x)
                                         ^
 Error: This value is used here, but it is also being used as unique at:
-Line 1, characters 32-33:
+Line 1, characters 23-34:
 1 | let dup (unique_ x) = ((unique_ x), x)
-                                    ^
+                           ^^^^^^^^^^^
 
 |}]
 

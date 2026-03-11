@@ -496,16 +496,16 @@ Error: This value is "local" but is expected to be "global".
 module type T = sig val x : int option end
 let first_class_module () =
   let thing = local_ Some 1 in
-  let _m : (module T) @ local = (module struct let x = thing end) in
+  let _m : (module T) = local_ (module struct let x = thing end) in
   ()
 [%%expect{|
 module type T = sig val x : int option end
-Line 4, characters 51-52:
-4 |   let _m : (module T) @ local = (module struct let x = thing end) in
-                                                       ^
+Line 4, characters 50-51:
+4 |   let _m : (module T) = local_ (module struct let x = thing end) in
+                                                      ^
 Error: The expression is "local"
        but is expected to be "global"
-         because it is the value "x" in the structure at line 4, characters 47-60
+         because it is the value "x" in the structure at line 4, characters 46-59
          which is expected to be "global"
          because modules always need to be allocated on the heap.
 |}]
@@ -2895,7 +2895,7 @@ val f : unit -> (int -> (int -> int)) @ local = <fun>
 
 (* Type annotations on a [local_] binding are interpreted in a local context,
  * so [int -> int -> int] is secretly [int -> local_ (int -> int)]. Contrast
- * with the below type errors where `local_` is omitted on the binding.
+ * with the below type error where `local_` is omitted on the binding.
  *)
 let foo () =
   let local_ _bar1 : int -> int -> int = local_ (fun x y -> x + y) in
@@ -2909,20 +2909,9 @@ let foo () =
   let _bar : int -> int -> int = local_ (fun x y -> x + y) in
   ()
 [%%expect{|
-Line 2, characters 33-58:
+Line 2, characters 40-58:
 2 |   let _bar : int -> int -> int = local_ (fun x y -> x + y) in
-                                     ^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: This expression has type "int -> (int -> int) @ local"
-       but an expression was expected of type "int -> int -> int"
-|}];;
-
-let foo () =
-  let _bar z : int -> int -> int = exclave_ (fun x y -> x + y + z) in
-  ()
-[%%expect{|
-Line 2, characters 44-66:
-2 |   let _bar z : int -> int -> int = exclave_ (fun x y -> x + y + z) in
-                                                ^^^^^^^^^^^^^^^^^^^^^^
+                                            ^^^^^^^^^^^^^^^^^^
 Error: This function or one of its parameters escape their region
        when it is partially applied.
 |}];;
@@ -2976,17 +2965,13 @@ let () = foo_f (fun M_constructor -> ())
 [%%expect{|
 |}]
 
-(* [local_ M_constructor] expands to [M_constructor : _ @ local], which breaks
-   type-directed ambiguation. If we had a way to constrain just the mode without also
-   constraining the type, these would work.
-
 let () = foo (local_ M_constructor)
 [%%expect{|
 |}]
 
 let () = foo_f (local_ (fun M_constructor -> ()))
 [%%expect{|
-|}] *)
+|}]
 
 let _ret () : M.t -> unit = (fun M_constructor -> ())
 [%%expect{|

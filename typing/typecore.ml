@@ -5364,6 +5364,13 @@ let is_exclave_extension_node = function
   | "extension.exclave" | "ocaml.exclave" | "exclave" -> true
   | _ -> false
 
+(* CR modes: This makes [e : _] and [e : _ @ m] behave differently. Modes should
+   behave more like type constraints. *)
+let only_constrains_modes ty modes =
+  match ty.ptyp_desc, modes with
+  | Ptyp_any None, _ :: _ -> true
+  | _ -> false
+
 (* If [is_inferred e] is true, [e] will be typechecked without using
    the "expected type" provided by the context. *)
 
@@ -5373,9 +5380,11 @@ let rec is_inferred sexp =
       ({ pexp_desc = Pexp_extension({ txt }, PStr []) },
         [Nolabel, sbody]) when is_exclave_extension_node txt ->
       is_inferred sbody
-  | Pexp_ident _ | Pexp_apply _ | Pexp_field _ | Pexp_constraint _
-  | Pexp_coerce _ | Pexp_send _ | Pexp_new _ -> true
-  | Pexp_sequence (_, e) | Pexp_open (_, e) -> is_inferred e
+  | Pexp_ident _ | Pexp_apply _ | Pexp_field _ | Pexp_coerce _ | Pexp_send _
+  | Pexp_new _ -> true
+  | Pexp_constraint (_, t, m) when not (only_constrains_modes t m) -> true
+  | Pexp_sequence (_, e) | Pexp_open (_, e) | Pexp_constraint (e, _, _) ->
+      is_inferred e
   | Pexp_ifthenelse (_, e1, Some e2) -> is_inferred e1 && is_inferred e2
   | _ -> false
 
@@ -7025,6 +7034,15 @@ and type_expect_
         exp_type = instance Predef.type_unit;
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
+  | Pexp_constraint (sarg, sty, modes) when only_constrains_modes sty modes ->
+      let modes = Typemode.transl_mode_annots modes in
+      let expected_mode =
+        type_expect_mode ~loc ~env ~modes:modes.mode_modes expected_mode
+      in
+      let exp = type_expect env expected_mode sarg (mk_expected ty_expected ?explanation) in
+      { exp with exp_loc = loc
+      ; exp_extra = (Texp_mode modes, loc, []) :: exp.exp_extra
+      }
   | Pexp_constraint (sarg, sty, modes) ->
       let modes = Typemode.transl_mode_annots modes in
       let (ty, extra_cty) =

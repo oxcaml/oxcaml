@@ -31,9 +31,9 @@ let f () =
   let g = stack_ ((42, 42) : _ @ global ) in
   ()
 [%%expect{|
-Line 2, characters 18-26:
+Line 2, characters 17-41:
 2 |   let g = stack_ ((42, 42) : _ @ global ) in
-                      ^^^^^^^^
+                     ^^^^^^^^^^^^^^^^^^^^^^^^
 Error: The allocation is "local" because it is "stack_"-allocated.
        However, the allocation highlighted is expected to be "global".
 |}]
