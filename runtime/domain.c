@@ -2074,12 +2074,17 @@ value caml_process_tick_exn(void)
 
     bool any_preemptible = false;
     struct stack_info *stack = caml_state->current_stack;
+    struct stack_info *innermost_preemptible = NULL;
     while (stack->handler->parent) {
       if (stack->handler->handle_tick != Val_unit) {
         any_preemptible = true;
+        stack->handler->preemptible_child = innermost_preemptible;
+        innermost_preemptible = stack;
       }
       stack = stack->handler->parent;
     }
+    /* stack is now the root; fix up its preemptible_child */
+    stack->handler->preemptible_child = innermost_preemptible;
 
     if (!any_preemptible) {
       CAMLreturn(Val_unit);

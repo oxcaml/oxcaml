@@ -24,5 +24,7 @@ OK
 OK
 # Three preemptible fibers, middle finishes, inner ticks
 OK
+# Stale preemptible_child after inner preemptible finishes
+OK
 # Multiple non-preemptible layers, outer preempts
 OK
