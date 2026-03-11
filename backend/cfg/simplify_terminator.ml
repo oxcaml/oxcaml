@@ -114,10 +114,21 @@ let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
      writing only to the destination). *)
   | Imul | Imulh _ | Idiv | Imod | Iclz _ | Ictz _ | Ipopcnt | Icomp _ -> None
 
+let eval_float_op op (left : float) (right : float option) : float option =
+  match (op : Operation.float_operation) with
+  | Iaddf -> Option.map (Float.add left) right
+  | Isubf -> Option.map (Float.sub left) right
+  | Imulf -> Option.map (Float.mul left) right
+  | Idivf -> Option.map (Float.div left) right
+  | Inegf -> Some (Float.neg left)
+  | Iabsf -> Some (Float.abs left)
+  | Icompf _ -> None
+
 (* Iterates over the passed instructions, and updates `known_values` so that it
    contains a map from registers to known values after the instructions have
    been executed. Currently only tracks constant values, moves between
-   registers, and basic integer arithmetic over known values. *)
+   registers, basic integer arithmetic, and basic float64 arithmetic over known
+   values. *)
 let collect_known_values (instrs : Cfg.basic_instruction_list) :
     known_value Reg.UsingLocEquality.Tbl.t =
   let known_values = Reg.UsingLocEquality.Tbl.create 17 in
@@ -153,6 +164,19 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
         | None -> remove instr.res.(0));
         remove_destroyed instr
       in
+      let apply_float_op op right_opt =
+        let result_opt =
+          match find_opt instr.arg.(0) with
+          | Some (Const_float left_bits) ->
+            let left = Int64.float_of_bits left_bits in
+            Option.map Int64.bits_of_float (eval_float_op op left right_opt)
+          | Some (Const_int _ | Const_float32 _) | None -> None
+        in
+        (match result_opt with
+        | Some bits -> replace instr.res.(0) (Const_float bits)
+        | None -> remove instr.res.(0));
+        remove_destroyed instr
+      in
       match instr.desc with
       | Op (Const_int c) -> replace instr.res.(0) (Const_int c)
       | Op (Const_float32 c) ->
@@ -182,13 +206,31 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
             | Some (Const_float32 _ | Const_float _) | None -> None
         in
         apply_int_op op right_opt
+      | Op (Floatop (Float64, op)) ->
+        if !Oxcaml_flags.cfg_value_propagation_float
+        then
+          let right_opt =
+            match (op : Operation.float_operation) with
+            | Inegf | Iabsf -> None
+            | Iaddf | Isubf | Imulf | Idivf | Icompf _ -> (
+              match find_opt instr.arg.(1) with
+              | Some (Const_float bits) -> Some (Int64.float_of_bits bits)
+              | Some (Const_int _ | Const_float32 _) | None -> None)
+          in
+          apply_float_op op right_opt
+        else begin
+          Array.iter remove instr.res;
+          remove_destroyed instr
+        end
       | Op
           ( Spill | Reload | Dummy_use | Const_symbol _ | Const_vec128 _
           | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _ | Store _
-          | Int128op _ | Intop_atomic _ | Floatop _ | Csel _
-          | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
-          | Begin_region | End_region | Specific _ | Name_for_debugger _
-          | Dls_get | Poll | Pause | Alloc _ | Tls_get | Domain_index )
+          | Int128op _ | Intop_atomic _
+          | Floatop (Float32, _)
+          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
+          | Opaque | Begin_region | End_region | Specific _
+          | Name_for_debugger _ | Dls_get | Poll | Pause | Alloc _ | Tls_get
+          | Domain_index )
       | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
       | Stack_check _ ->
         Array.iter
