@@ -71,21 +71,14 @@ let parse in_ =
   in
   csv []
 
-let rec parse_args mnemonic acc encs args imm res destroyed =
+let rec parse_args mnemonic acc encs args imm res =
   let set_imm i =
     if !imm <> Imm_none then failwith mnemonic;
     imm := i
   in
   let set_res_fst () =
-    match !res with
-    | Res_none -> res := First_arg
-    | First_arg ->
-      (* A second (r, w) operand after the first: the later operand is
-         destroyed (read and written by the hardware) but is not a result.
-         Record its index in [destroyed]. *)
-      let idx = List.length acc in
-      destroyed := idx :: !destroyed
-    | Res _ -> raise Unsupported
+    if not (!res = Res_none) then raise Unsupported;
+    res := First_arg
   in
   let set_res loc enc =
     match !res with
@@ -95,7 +88,7 @@ let rec parse_args mnemonic acc encs args imm res destroyed =
   in
   match args, encs with
   | [], _ -> List.rev acc
-  | "" :: args, encs -> parse_args mnemonic acc encs args imm res destroyed
+  | "" :: args, encs -> parse_args mnemonic acc encs args imm res
   | arg :: args, enc :: encs -> (
     let loc : loc option =
       match String.trim arg with
@@ -175,27 +168,23 @@ let rec parse_args mnemonic acc encs args imm res destroyed =
       | enc -> fail mnemonic enc
     in
     match loc with
-    | None -> parse_args mnemonic acc encs args imm res destroyed
+    | None -> parse_args mnemonic acc encs args imm res
     | Some loc -> (
       match String.trim rw with
-      | "(r, w)" | "(r,w)" ->
+      | "(r, w)" ->
         set_res_fst ();
-        parse_args mnemonic ({ loc; enc } :: acc) encs args imm res destroyed
+        parse_args mnemonic ({ loc; enc } :: acc) encs args imm res
       | "(w)" ->
         set_res loc enc;
-        parse_args mnemonic acc encs args imm res destroyed
-      | _ ->
-        parse_args mnemonic ({ loc; enc } :: acc) encs args imm res destroyed))
+        parse_args mnemonic acc encs args imm res
+      | _ -> parse_args mnemonic ({ loc; enc } :: acc) encs args imm res))
   | _ -> failwith mnemonic
 
 let parse_args mnemonic enc args =
   let imm = ref Imm_none in
   let res = ref Res_none in
-  let destroyed = ref [] in
-  let args = parse_args mnemonic [] enc args imm res destroyed in
-  let args = Array.of_list args in
-  let destroyed = Array.of_list (List.rev !destroyed) in
-  args, !imm, !res, destroyed
+  let args = parse_args mnemonic [] enc args imm res in
+  Array.of_list args, !imm, !res
 
 let parse_enc mnemonic enc ~operand_size_override =
   let enc = String.uppercase_ascii enc in
@@ -477,10 +466,6 @@ let print_one bind instr =
   let res = print_res instr.res in
   let imm = print_imm instr.imm in
   let enc = print_enc instr.enc in
-  let destroyed =
-    Array.map Int.to_string instr.destroyed
-    |> Array.to_list |> String.concat ";"
-  in
   printf
     {|
 let %s = {
@@ -488,12 +473,11 @@ let %s = {
   ; ext = [|%s|]
   ; args = [|%s|]
   ; res = %s
-  ; destroyed = [|%s|]
   ; imm = %s
   ; mnemonic = "%s"
   ; enc = %s
 }|}
-    bind constructor ext args res destroyed imm instr.mnemonic enc
+    bind constructor ext args res imm instr.mnemonic enc
 
 let print_all () =
   let module Map = Map.Make (String) in
@@ -549,15 +533,14 @@ let amd64 () =
           | Some ext ->
             let mnemonic, args = first_word mnemonic in
             let mnemonic = String.lowercase_ascii mnemonic in
-            let args, imm, res, destroyed =
+            let args, imm, res =
               String.split_on_char ',' args |> parse_args mnemonic encs
             in
             let enc =
               parse_enc mnemonic enc
                 ~operand_size_override:(Array.exists arg_has_int16 args)
             in
-            Some { id = Dummy; ext; args; res; destroyed; imm;
-                   mnemonic; enc }
+            Some { id = Dummy; ext; args; res; imm; mnemonic; enc }
           | None -> None
         with Unsupported -> None)
       | _ -> None)

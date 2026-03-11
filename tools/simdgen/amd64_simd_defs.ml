@@ -141,11 +141,6 @@ type 'id instr =
     ext : ext array; (* Multiple extensions may be required. *)
     args : arg array;
     res : res;
-    (* Indices into [args] of operands that are destroyed (read and written)
-       by the instruction but whose output values are not results.
-       For example, the mask operand of AVX2 gather instructions is zeroed
-       out by the hardware. *)
-    destroyed : int array;
     imm : imm;
     mnemonic : string;
     enc : enc

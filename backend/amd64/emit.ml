@@ -1685,10 +1685,7 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
         rr;
       Array.length rr
   in
-  (* [destroyed] args add extra entries to [instr.res] so the register
-     allocator knows those arg registers are clobbered. *)
-  let num_destroyed = Array.length simd.destroyed in
-  assert (res_used + num_destroyed = Array.length instr.res)
+  assert (res_used = Array.length instr.res)
 
 let to_arg_with_width loc instr i =
   match Simd.loc_register_width loc with
