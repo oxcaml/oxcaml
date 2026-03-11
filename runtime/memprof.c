@@ -400,8 +400,11 @@ typedef struct memprof_orphan_table_s memprof_orphan_table_s,
 #define CONFIG_NONE Val_unit
 
 #define Status(config)          Int_val(Field(config, CONFIG_FIELD_STATUS))
-#define Sampling(config)        ((config != CONFIG_NONE) && \
-                                 (Status(config) == CONFIG_STATUS_SAMPLING))
+
+static bool Sampling(value config)
+{
+  return (config != CONFIG_NONE) && (Status(config) == CONFIG_STATUS_SAMPLING);
+}
 
 /* The 'status' field is the only one we ever update. */
 
