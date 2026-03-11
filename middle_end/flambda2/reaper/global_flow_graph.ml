@@ -33,6 +33,7 @@ type graph =
     mutable alias_if_any_source : NNN.t;
     mutable any_usage : N.t;
     mutable any_source : N.t;
+    mutable magic_source : N.t;
     mutable code_id_my_closure : NN.t
   }
 
@@ -87,6 +88,8 @@ let any_usage = N.create ~name:"any_usage"
 
 let any_source = N.create ~name:"any_source"
 
+let magic_source = N.create ~name:"magic_source"
+
 let code_id_my_closure = NN.create ~name:"code_id_my_closure"
 
 let to_datalog graph =
@@ -100,6 +103,7 @@ let to_datalog graph =
   @@ Datalog.set_table alias_if_any_source graph.alias_if_any_source
   @@ Datalog.set_table any_usage graph.any_usage
   @@ Datalog.set_table any_source graph.any_source
+  @@ Datalog.set_table magic_source graph.magic_source
   @@ Datalog.set_table code_id_my_closure graph.code_id_my_closure
   @@ Datalog.empty
 
@@ -139,6 +143,8 @@ module Relations = struct
 
   let any_source var = Datalog.atom any_source [var]
 
+  let magic_source var = Datalog.atom magic_source [var]
+
   let code_id_my_closure ~code_id ~my_closure =
     Datalog.atom code_id_my_closure [code_id; my_closure]
 end
@@ -154,6 +160,7 @@ let create () =
     alias_if_any_source = NNN.empty;
     any_usage = N.empty;
     any_source = N.empty;
+    magic_source = N.empty;
     code_id_my_closure = NN.empty
   }
 
@@ -198,6 +205,9 @@ let add_any_usage t (var : Code_id_or_name.t) =
 
 let add_any_source t (var : Code_id_or_name.t) =
   t.any_source <- N.add_or_replace [var] () t.any_source
+
+let add_magic_source t var =
+  t.magic_source <- N.add_or_replace [var] () t.magic_source
 
 let add_code_id_my_closure t code_id my_closure =
   t.code_id_my_closure

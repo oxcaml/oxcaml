@@ -164,6 +164,8 @@ let add_alias_if_any_source_dep t ~if_any_source ~to_ ~from =
 
 let add_any_source t x = Graph.add_any_source t.deps x
 
+let add_magic_source t x = Graph.add_magic_source t.deps x
+
 let add_any_usage t x = Graph.add_any_usage t.deps x
 
 let add_code_id_my_closure t code_id my_closure =

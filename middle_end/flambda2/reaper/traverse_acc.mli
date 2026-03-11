@@ -122,6 +122,8 @@ val add_any_usage : t -> Code_id_or_name.t -> unit
 
 val add_any_source : t -> Code_id_or_name.t -> unit
 
+val add_magic_source : t -> Code_id_or_name.t -> unit
+
 val add_code_id_my_closure : t -> Code_id.t -> Variable.t -> unit
 
 (* *)
