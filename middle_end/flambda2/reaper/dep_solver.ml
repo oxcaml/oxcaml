@@ -452,8 +452,6 @@ let field_sources = rel3 "field_sources" Cols.[n; f; n]
 let field_sources_top = rel2 "field_sources_top" Cols.[n; f]
 (* CR pchambart: is there a reason why this is called top an not any source ? *)
 
-let field_magic_sources = rel2 "field_magic_sources" Cols.[n; f]
-
 let cofield_sources = rel3 "cofield_sources" Cols.[n; cf; n]
 
 let cofield_usages = rel3 "cofield_usages" Cols.[n; cf; n]
@@ -686,12 +684,6 @@ let datalog_schedule =
     (* constructor-sources *)
     (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
      [ ~~(any_source base);
-       magic_source from;
-       rev_constructor ~from relation ~base;
-       unless1 Field.is_local relation ]
-     ==> field_magic_sources base relation);
-    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
-     [ ~~(any_source base);
        any_source from;
        rev_constructor ~from relation ~base;
        unless1 Field.is_local relation ]
@@ -744,13 +736,6 @@ let datalog_schedule =
        sources base base_source;
        field_sources base_source relation from ]
      ==> alias ~to_ ~from);
-    (let$ [base; base_source; relation; to_] =
-       ["base"; "base_source"; "relation"; "to_"]
-     in
-     [ rev_accessor ~base relation ~to_;
-       nontop_sources base base_source;
-       field_magic_sources base_source relation ]
-     ==> magic_source to_);
     (let$ [base; base_source; relation; to_] =
        ["base"; "base_source"; "relation"; "to_"]
      in
