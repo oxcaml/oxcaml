@@ -845,10 +845,6 @@ static bool entries_transfer(entries_t from, entries_t to)
   if (from->size == 0)
     return true;
 
-  (void)validated_config(from); /* For side-effect, so we can check ... */
-  (void)validated_config(to);   /* ... that the configs are equal. */
-  CAMLassert(from->config == to->config);
-
   if (!entries_ensure(to, from->size))
     return false;
 
@@ -1752,6 +1748,40 @@ static value run_callback_exn(memprof_thread_t thread,
   thread->running_index = i;
   e->runner = thread;
 
+  if (cb_index == CB_ALLOC) {
+    /* CB_ALLOC callbacks expect a Gc.Memprof.allocation.
+       It's allocated here, inside the thread->running_table protection. */
+    value callstack = Val_unit;
+    CAMLparam3(cb, param, callstack);
+
+    callstack = e->user_data;
+    if (Is_long(callstack)) {
+      /* Callstack stashed on C heap, so copy it to OCaml heap */
+      callstack_stash_t stash = Ptr_val(callstack);
+      callstack = caml_alloc(stash->frames, 0);
+      /* es, i, e may have moved at the caml_alloc */
+      es = thread->running_table;
+      i = thread->running_index;
+      e = &es->t[i];
+      for (size_t i = 0; i < stash->frames; ++i) {
+        Field(callstack, i) = Val_backtrace_slot(stash->stack[i]);
+      }
+      caml_stat_free(stash);
+    }
+
+    param = caml_alloc_small(4, 0);
+    /* es, i, e may have moved at the caml_alloc_small */
+    es = thread->running_table;
+    i = thread->running_index;
+    e = &es->t[i];
+    Field(param, 0) = Val_long(e->samples);
+    Field(param, 1) = Val_long(e->wosize);
+    Field(param, 2) = Val_long(e->source);
+    Field(param, 3) = callstack;
+
+    CAMLdrop;
+  }
+
   e->callback = cb_index;
   e->callbacks |= CB_MASK(cb_index);
   e->user_data = Val_unit;      /* Release root. */
@@ -1805,40 +1835,6 @@ static value run_callback_exn(memprof_thread_t thread,
   return res;
 }
 
-/* Run the allocation callback for a given entry of an entries array.
- * Returns Val_unit or an exception result. */
-
-static value run_alloc_callback_exn(memprof_thread_t thread,
-                                    entries_t es, size_t i)
-{
-  entry_t e = &es->t[i];
-  CAMLassert(e->deallocated || e->offset || Is_block(e->block));
-
-  value sample_info = caml_alloc_small(4, 0);
-  Field(sample_info, 0) = Val_long(e->samples);
-  Field(sample_info, 1) = Val_long(e->wosize);
-  Field(sample_info, 2) = Val_long(e->source);
-  Field(sample_info, 3) = e->user_data;
-
-  if (Is_long(e->user_data)) {
-    /* Callstack stashed on C heap, so copy it to OCaml heap */
-    CAMLparam1(sample_info);
-    CAMLlocal1(callstack);
-    callstack_stash_t stash = Ptr_val(e->user_data);
-    callstack = caml_alloc(stash->frames, 0);
-    for (size_t i = 0; i < stash->frames; ++i) {
-      Field(callstack, i) = Val_backtrace_slot(stash->stack[i]);
-    }
-    caml_stat_free(stash);
-    Store_field(sample_info, 3, callstack);
-    CAMLdrop;
-  }
-
-  value callback =
-    e->alloc_young ? Alloc_minor(es->config) : Alloc_major(es->config);
-  return run_callback_exn(thread, es, i, callback, sample_info, CB_ALLOC);
-}
-
 /* Run any pending callbacks from entries table `es` in thread
  * `thread`. Returns either (a) when a callback raises an exception,
  * or (b) when all pending callbacks have been run. */
@@ -1864,7 +1860,8 @@ static value entries_run_callbacks_exn(memprof_thread_t thread,
     } else if (!(e->callbacks & CB_MASK(CB_ALLOC))) {
       /* allocation callback hasn't been run */
       if (Status(config) == CONFIG_STATUS_SAMPLING) {
-        res = run_alloc_callback_exn(thread, es, i);
+        value cb = e->alloc_young ? Alloc_minor(config) : Alloc_major(config);
+        res = run_callback_exn(thread, es, i, cb, Val_unit, CB_ALLOC);
         if (Is_exception_result(res)) break;
       } else {
         /* sampling stopped, e.g. by a previous callback; drop this entry */
@@ -2032,15 +2029,20 @@ void caml_memprof_sample_young(uintnat wosize, int from_caml,
   CAMLassert(domain);
   memprof_thread_t thread = domain->current;
   CAMLassert(thread);
+  CAMLassert(!thread->suspended);
   entries_t entries = &thread->entries;
   uintnat whsize = Whsize_wosize(wosize);
   value res = Val_unit;
   CAMLlocal1(config);
-  config = entries->config;
+  config = validated_config(entries);
 
-  /* When a domain is not sampling, the memprof trigger is not
-   * set, so we should not come into this function. */
-  CAMLassert(sampling(domain));
+  if (!(Sampling(config) && !Min_lambda(config))) {
+    /* We're not in fact sampling. We shouldn't usually get here, but
+       can if sampling has just been stopped by another domain. */
+    caml_memprof_set_trigger(Caml_state);
+    caml_reset_young_limit(Caml_state);
+    CAMLreturn0;
+  }
 
   if (!from_caml) {
     /* Not coming from Caml, so this isn't a comballoc. We know we're
@@ -2099,6 +2101,7 @@ void caml_memprof_sample_young(uintnat wosize, int from_caml,
     }
 
     if (samples) {
+      /* May clear domain->entries.config */
       value callstack = capture_callstack_GC(domain, sub_alloc);
       size_t entry =
         new_entry(entries, (value)alloc_ofs, callstack,
@@ -2106,6 +2109,12 @@ void caml_memprof_sample_young(uintnat wosize, int from_caml,
                   true, true);
       if (entry != Invalid_index) {
         ++ new_entries;
+      }
+
+      if (domain->entries.config == CONFIG_NONE) {
+        /* Some other domain stopped this config */
+        alloc_ofs = trigger_ofs = 0;
+        break;
       }
     }
   } while (sub_alloc);
@@ -2127,7 +2136,7 @@ void caml_memprof_sample_young(uintnat wosize, int from_caml,
    * orphaned, deleting all offset entries. In this case,
    * thread->config will have changed. We will have run the allocation
    * callbacks up to the one which stopped the old profile. */
-  bool restarted = (config != entries->config);
+  bool restarted = (config != entries->config && entries->config != CONFIG_NONE);
 
   /* A callback may have raised an exception. In this case, we are
    * going to cancel this whole combined allocation and should delete
