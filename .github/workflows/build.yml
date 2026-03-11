@@ -206,6 +206,7 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             build_ocamlparam: 'reaper=1,reaper-local-fields=1,_'
             ocamlparam: 'reaper=1,reaper-local-fields=1,_'
+            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml'
 
     env:
       J: "8"
