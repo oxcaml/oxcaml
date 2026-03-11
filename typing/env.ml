@@ -2981,6 +2981,11 @@ let enter_cltype ~scope name desc env =
   let env = store_cltype id desc (Shape.leaf desc.clty_uid) env in
   (id, env)
 
+let enter_jkind ~scope name decl env =
+  let id = Ident.create_scoped ~scope name in
+  let env = add_jkind ~check:true id decl env in
+  (id, env)
+
 let enter_module ~scope ?arg s presence mty ?mode env =
   enter_module_declaration ~scope ?arg s presence (md mty) ?mode env
 

@@ -227,6 +227,18 @@ and 'k pattern_desc =
       type_expr: Types.type_expr;
     } -> value pattern_desc
         (** P as a *)
+  | Tpat_fun_layout : {
+      id: Ident.t;
+      name: string loc;
+      uid: Uid.t;
+      sort: Jkind_types.Sort.t;
+      mode: Mode.Value.l;
+      lpoly: Types.Val_lpoly.t;
+    } -> value pattern_desc
+        (** x with layout polymorphism, used in let poly_ bindings. The
+            [Val_lpoly.t] may end up determined with an empty list of sort
+            vars if no layout poly is actually inferred (in which case a
+            [Useless_poly] warning is emitted). *)
   | Tpat_constant : constant -> value pattern_desc
         (** 1, 'a', "true", 1.0, 1l, 1L, 1n *)
   | Tpat_unboxed_unit : value pattern_desc
@@ -1144,6 +1156,7 @@ and core_type_desc =
   | Ttyp_quote of core_type
   | Ttyp_splice of core_type
   | Ttyp_repr of string list * core_type
+  | Ttyp_newlayout of string loc list * core_type
   | Ttyp_of_kind of Parsetree.jkind_annotation
   | Ttyp_call_pos
       (** [Ttyp_call_pos] represents the type of the value of a Position

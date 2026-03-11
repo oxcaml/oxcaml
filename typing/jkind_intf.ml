@@ -54,6 +54,7 @@ module type Sort = sig
       | Base of base
       | Product of t list
       | Univar of univar
+      | Genvar of var
 
     val equal : t -> t -> bool
 
@@ -217,6 +218,40 @@ module type Sort = sig
   type change
 
   val undo_change : change -> unit
+
+  (** Create a fresh polymorphic sort variable (level = [Ident.highest_scope]).
+  *)
+  val new_genvar : unit -> var
+
+  (** Returns [true] iff the variable was created by {!new_genvar}. *)
+  val is_genvar : var -> bool
+
+  (** [sub_with vars f] calls [f] and returns, for each var in [vars], the sort
+      it was equated to during [f] (or [None] if it was not equated), together
+      with the result of [f]. *)
+  val sub_with : var list -> (unit -> 'a) -> t option list * 'a
+
+  (** [instance_with ~level vars f] creates a fresh sort var at [level] for each
+      var in [vars], calls [f] with {!instance} configured to replace each var
+      with its fresh copy, and returns the fresh vars together with the result
+      of [f]. Raises if any var in [vars] is not a generic variable (see
+      {!is_genvar}). *)
+  val instance_with : level:int -> var list -> (unit -> 'a) -> var list * 'a
+
+  (** Apply instantiation to every [Var] node in a sort. Generic variables (see
+      {!is_genvar}) are replaced by fresh vars registered via {!instance_with};
+      non-generic variables are left unchanged. Must be called within the
+      dynamic extent of {!instance_with}. *)
+  val instance : t -> t
+
+  (** Returns a human-readable name for a generic variable. Must be called
+      within the dynamic extent of {!print_with_genvars}. *)
+  val to_string_genvar : var -> string
+
+  (** [print_with_genvars vars f] assigns a fresh name to each var in [vars],
+      calls [f] with those names, and returns the result. Within the call to
+      [f], {!to_string_genvar} will return the assigned name for each var. *)
+  val print_with_genvars : var list -> (string list -> 'a) -> 'a
 
   module Debug_printers : sig
     val base : Format.formatter -> base -> unit

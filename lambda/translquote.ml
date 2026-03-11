@@ -2538,6 +2538,7 @@ let rec with_new_idents_pat pat =
   | Tpat_record_unboxed_product (lbl_pats, _) ->
     List.iter (fun (_, _, pat) -> with_new_idents_pat pat) lbl_pats
   | Tpat_lazy pat -> with_new_idents_pat pat
+  | Tpat_fun_layout { id; _ } -> with_new_idents_values [id]
 
 let rec without_idents_pat pat =
   match pat.pat_desc with
@@ -2569,6 +2570,7 @@ let rec without_idents_pat pat =
   | Tpat_record_unboxed_product (lbl_pats, _) ->
     List.iter (fun (_, _, pat) -> without_idents_pat pat) lbl_pats
   | Tpat_lazy pat -> without_idents_pat pat
+  | Tpat_fun_layout { id; _ } -> without_idents_values [id]
 
 let with_new_param fp =
   let pat_of_param =
@@ -2783,101 +2785,110 @@ and quote_pat_extra ~env ~scopes loc pat_lam extra =
     |> Pat.wrap
 
 and quote_value_pattern ~scopes p =
-  let env = p.pat_env and loc = of_location ~scopes p.pat_loc in
-  let pat_quoted =
-    match p.pat_desc with
-    | Tpat_any -> if is_module p then Pat.any_module else Pat.any
-    | Tpat_var { id; _ } ->
-      if is_module p
-      then Pat.unpack loc (Var.Module.mk (Lvar id))
-      else Pat.var loc (Var.Value.mk (Lvar id))
-    | Tpat_alias { pattern = pat; id; _ } ->
-      let pat = quote_value_pattern ~scopes pat in
-      Pat.alias loc pat (Var.Value.mk (Lvar id))
-    | Tpat_constant const ->
-      let const = quote_constant loc const in
-      Pat.constant loc const
-    | Tpat_unboxed_unit -> Pat.unboxed_unit
-    | Tpat_unboxed_bool b -> Pat.unboxed_bool loc b
-    | Tpat_tuple pats ->
-      let pats =
-        List.map
-          (fun (lbl, p) -> quote_nonopt loc lbl, quote_value_pattern ~scopes p)
-          pats
-      in
-      Pat.tuple loc pats
-    | Tpat_construct (lid, constr, args, _) ->
-      let constr = quote_constructor env (of_location ~scopes lid.loc) constr in
-      let args =
-        match args with
-        | [] -> None
-        | _ :: _ ->
-          let args = List.map (quote_value_pattern ~scopes) args in
-          let with_labels =
-            List.map
-              (fun a -> Label.Nonoptional.no_label |> Label.Nonoptional.wrap, a)
-              args
-          in
-          Some (Pat.tuple loc with_labels |> Pat.wrap)
-      in
-      Pat.construct loc constr args
-    | Tpat_variant (variant, argo, _) ->
-      let argo = Option.map (quote_value_pattern ~scopes) argo in
-      Pat.variant loc (Variant.of_string loc variant |> Variant.wrap) argo
-    | Tpat_record (lbl_pats, closed) ->
-      let lbl_pats =
-        List.map
-          (fun (lid, lbl_desc, pat) ->
-            let lid_loc = Asttypes.(lid.loc) in
-            let lbl =
-              quote_record_field env (of_location ~scopes lid_loc) lbl_desc
+  match p.pat_desc with
+  | _ ->
+    let env = p.pat_env and loc = of_location ~scopes p.pat_loc in
+    let pat_quoted =
+      match p.pat_desc with
+      | Tpat_fun_layout { id; _ } ->
+        (* Layout polymorphism annotations have no parsetree representation. *)
+        Pat.var loc (Var.Value.mk (Lvar id))
+      | Tpat_any -> if is_module p then Pat.any_module else Pat.any
+      | Tpat_var { id; _ } ->
+        if is_module p
+        then Pat.unpack loc (Var.Module.mk (Lvar id))
+        else Pat.var loc (Var.Value.mk (Lvar id))
+      | Tpat_alias { pattern = pat; id; _ } ->
+        let pat = quote_value_pattern ~scopes pat in
+        Pat.alias loc pat (Var.Value.mk (Lvar id))
+      | Tpat_constant const ->
+        let const = quote_constant loc const in
+        Pat.constant loc const
+      | Tpat_unboxed_unit -> Pat.unboxed_unit
+      | Tpat_unboxed_bool b -> Pat.unboxed_bool loc b
+      | Tpat_tuple pats ->
+        let pats =
+          List.map
+            (fun (lbl, p) ->
+              quote_nonopt loc lbl, quote_value_pattern ~scopes p)
+            pats
+        in
+        Pat.tuple loc pats
+      | Tpat_construct (lid, constr, args, _) ->
+        let constr =
+          quote_constructor env (of_location ~scopes lid.loc) constr
+        in
+        let args =
+          match args with
+          | [] -> None
+          | _ :: _ ->
+            let args = List.map (quote_value_pattern ~scopes) args in
+            let with_labels =
+              List.map
+                (fun a ->
+                  Label.Nonoptional.no_label |> Label.Nonoptional.wrap, a)
+                args
             in
-            let pat = quote_value_pattern ~scopes pat in
-            lbl, pat)
-          lbl_pats
-      in
-      let closed =
-        match closed with Asttypes.Closed -> true | Asttypes.Open -> false
-      in
-      Pat.record loc lbl_pats closed
-    | Tpat_array (_, _, pats) ->
-      let pats = List.map (quote_value_pattern ~scopes) pats in
-      Pat.array loc pats
-    | Tpat_or (pat1, pat2, _) ->
-      let pat1 = quote_value_pattern ~scopes pat1 in
-      let pat2 = quote_value_pattern ~scopes pat2 in
-      Pat.or_ loc pat1 pat2
-    | Tpat_unboxed_tuple pats ->
-      let pats =
-        List.map
-          (fun (lbl, p, _) ->
-            quote_nonopt loc lbl, quote_value_pattern ~scopes p)
-          pats
-      in
-      Pat.unboxed_tuple loc pats
-    | Tpat_record_unboxed_product (lbl_pats, closed) ->
-      let lbl_pats =
-        List.map
-          (fun (lid, lbl_desc, pat) ->
-            let lid_loc = Asttypes.(lid.loc) in
-            let lbl =
-              quote_record_field env (of_location ~scopes lid_loc) lbl_desc
-            in
-            let pat = quote_value_pattern ~scopes pat in
-            lbl, pat)
-          lbl_pats
-      in
-      let closed =
-        match closed with Asttypes.Closed -> true | Asttypes.Open -> false
-      in
-      Pat.unboxed_record loc lbl_pats closed
-    | Tpat_lazy pat ->
-      let pat = quote_value_pattern ~scopes pat in
-      Pat.lazy_ loc pat
-  in
-  List.fold_right
-    (fun extra p -> quote_pat_extra ~env ~scopes loc p extra)
-    p.pat_extra (Pat.wrap pat_quoted)
+            Some (Pat.tuple loc with_labels |> Pat.wrap)
+        in
+        Pat.construct loc constr args
+      | Tpat_variant (variant, argo, _) ->
+        let argo = Option.map (quote_value_pattern ~scopes) argo in
+        Pat.variant loc (Variant.of_string loc variant |> Variant.wrap) argo
+      | Tpat_record (lbl_pats, closed) ->
+        let lbl_pats =
+          List.map
+            (fun (lid, lbl_desc, pat) ->
+              let lid_loc = Asttypes.(lid.loc) in
+              let lbl =
+                quote_record_field env (of_location ~scopes lid_loc) lbl_desc
+              in
+              let pat = quote_value_pattern ~scopes pat in
+              lbl, pat)
+            lbl_pats
+        in
+        let closed =
+          match closed with Asttypes.Closed -> true | Asttypes.Open -> false
+        in
+        Pat.record loc lbl_pats closed
+      | Tpat_array (_, _, pats) ->
+        let pats = List.map (quote_value_pattern ~scopes) pats in
+        Pat.array loc pats
+      | Tpat_or (pat1, pat2, _) ->
+        let pat1 = quote_value_pattern ~scopes pat1 in
+        let pat2 = quote_value_pattern ~scopes pat2 in
+        Pat.or_ loc pat1 pat2
+      | Tpat_unboxed_tuple pats ->
+        let pats =
+          List.map
+            (fun (lbl, p, _) ->
+              quote_nonopt loc lbl, quote_value_pattern ~scopes p)
+            pats
+        in
+        Pat.unboxed_tuple loc pats
+      | Tpat_record_unboxed_product (lbl_pats, closed) ->
+        let lbl_pats =
+          List.map
+            (fun (lid, lbl_desc, pat) ->
+              let lid_loc = Asttypes.(lid.loc) in
+              let lbl =
+                quote_record_field env (of_location ~scopes lid_loc) lbl_desc
+              in
+              let pat = quote_value_pattern ~scopes pat in
+              lbl, pat)
+            lbl_pats
+        in
+        let closed =
+          match closed with Asttypes.Closed -> true | Asttypes.Open -> false
+        in
+        Pat.unboxed_record loc lbl_pats closed
+      | Tpat_lazy pat ->
+        let pat = quote_value_pattern ~scopes pat in
+        Pat.lazy_ loc pat
+    in
+    List.fold_right
+      (fun extra p -> quote_pat_extra ~env ~scopes loc p extra)
+      p.pat_extra (Pat.wrap pat_quoted)
 
 and quote_core_type ~scopes ty =
   let loc = of_location ~scopes ty.ctyp_loc in
@@ -3022,6 +3033,8 @@ and quote_core_type ~scopes ty =
   | Ttyp_quote ty -> Type.quote loc (quote_core_type ~scopes ty) |> Type.wrap
   | Ttyp_splice _ -> Type.var loc None |> Type.wrap
   | Ttyp_repr _ -> fatal_error "Translquote: Ttyp_repr not implemented."
+  | Ttyp_newlayout _ ->
+    fatal_error "Translquote: Ttyp_newlayout not implemented."
   | Ttyp_open _ ->
     fatal_errorf "Translquote [at %a]: Ttyp_open not implemented."
       Location.print_loc (to_location loc)

@@ -184,6 +184,9 @@ let arg_label i ppf = function
   | Labelled s -> line i ppf "Labelled \"%s\"\n" s
   | Position s -> line i ppf "Position \"%s\"\n" s
 
+let layout_var ppf {txt; _} =
+  fprintf ppf " %s" txt
+
 let typevar_no_jkind ~print_quote ppf v =
   let pptv =
     if print_quote
@@ -407,6 +410,10 @@ let rec core_type i ppf x =
       line i ppf "Ttyp_repr%a\n"
         (fun ppf -> List.iter (typevar_no_jkind ~print_quote:true ppf)) lv;
       core_type i ppf ct
+  | Ttyp_newlayout (lv, ct) ->
+      line i ppf "Ttyp_newlayout%a\n"
+        (fun ppf -> List.iter (layout_var ppf)) lv;
+      core_type i ppf ct
   | Ttyp_of_kind jkind ->
       line i ppf "Ttyp_of_kind %a\n" (jkind_annotation i) jkind;
   | Ttyp_call_pos -> line i ppf "Ttyp_call_pos\n";
@@ -517,6 +524,10 @@ and pattern : type k . _ -> _ -> k general_pattern -> unit = fun i ppf x ->
       line i ppf "Tpat_or\n";
       pattern i ppf p1;
       pattern i ppf p2;
+  | Tpat_fun_layout { id = s; sort; mode = m; _ } ->
+      line i ppf "Tpat_fun_layout \"%a\"\n" fmt_ident s;
+      line i ppf "sort %a\n" fmt_sort sort;
+      value_mode i ppf m
 
 and labeled_pattern : type k . _ -> _ -> string option * k general_pattern -> unit =
   fun i ppf (label, x) ->

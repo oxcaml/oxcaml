@@ -46,6 +46,7 @@ module Sort : sig
   include
     Jkind_intf.Sort
       with type t = Jkind_types.Sort.t
+       and type var = Jkind_types.Sort.var
        and type univar = Jkind_types.Sort.univar
        and type base = Jkind_types.Sort.base
        and type Const.t = Jkind_types.Sort.Const.t
@@ -54,6 +55,7 @@ module Sort : sig
     (** A flat sort is returned from [get]. *)
     type t =
       | Var of Var.id (* [Var.id] is for debugging / printing only *)
+      | Genvar of var (* generic sort variable, level = Ident.highest_scope *)
       | Univar of univar
       | Base of base
   end
@@ -372,6 +374,9 @@ val of_new_sort_var :
 val of_new_sort :
   why:History.concrete_creation_reason -> level:int -> 'd Types.jkind
 
+(** Apply {!Sort.instance} to every sort variable in a jkind. *)
+val instance : 'd Types.jkind -> 'd Types.jkind
+
 (** Same as [of_new_sort_var], but the jkind is lowered to [Non_null] to mirror
     "legacy" OCaml values. Defaulting the sort variable produces exactly
     [value]. *)
@@ -546,6 +551,10 @@ val default_to_value : 'd Types.jkind -> unit
 (* CR layouts v5: When we have proper support for void, we'll want to change
    these three functions to default to void - it's the most efficient thing
    when we have a choice. *)
+
+(** Generalize the sorts in a jkind when in sort generalization context. Only
+    has an effect when called within {!Sort.with_generalize}. *)
+val generalize : current_level:int -> 'd Types.jkind -> unit
 
 (** Returns the sort corresponding to the jkind. Call only on representable
     jkinds - raises on Any. *)

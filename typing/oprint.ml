@@ -412,9 +412,15 @@ let rec print_out_type_0 ppf =
       (ty_var ~non_gen) alias
   | Otyp_poly ([], ty) ->
       print_out_type_0 ppf ty  (* no "." if there are no vars *)
+  | Otyp_newlayout ([], ty) ->
+      print_out_type_0 ppf ty  (* no "." if there are no vars *)
   | Otyp_poly (sl, ty) ->
       fprintf ppf "@[<hov 2>%a.@ %a@]"
         pr_var_jkinds sl
+        print_out_type_0 ty
+  | Otyp_newlayout (sl, ty) ->
+      fprintf ppf "@[<hov 2>layout_ %a.@ %a@]"
+        pr_sort_univars sl
         print_out_type_0 ty
   | Otyp_repr ([], ty) ->
       print_out_type_0 ppf ty  (* no "." if there are no vars *)
@@ -508,6 +514,7 @@ and print_out_type_3 ppf =
         print_fields row_fields
         print_present tags
   | Otyp_alias _ | Otyp_poly _ | Otyp_repr _ | Otyp_arrow _ | Otyp_tuple _
+  | Otyp_newlayout _
     as ty ->
       pp_open_box ppf 1;
       pp_print_char ppf '(';
@@ -711,6 +718,11 @@ and pr_var_jkind ppf (v, l) = match l with
                     print_out_jkind lay
 and pr_var_jkinds jks =
   print_list pr_var_jkind (fun ppf -> fprintf ppf "@ ") jks
+
+and pr_sort_univar = pp_print_string
+
+and pr_sort_univars univars =
+  print_list pr_sort_univar (fun ppf -> fprintf ppf "@ ") univars
 
 and pr_var_repr ppf v =
   fprintf ppf "(repr_@ %a)" pr_var v

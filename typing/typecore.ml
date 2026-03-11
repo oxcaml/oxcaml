@@ -253,6 +253,7 @@ type error =
   | Illegal_letrec_pat
   | Illegal_letrec_expr
   | Illegal_mutable_pat
+  | Mixed_poly_nonpoly_bindings
   | Illegal_class_expr
   | Letop_type_clash of string * Errortrace.unification_error
   | Andop_type_clash of string * Errortrace.unification_error
@@ -298,6 +299,7 @@ type error =
   | Unexpected_hole
   | Eval_format
   | Let_poly_not_yet_implemented
+  | Layout_poly_inst_not_yet_supported
 
 
 let not_principal fmt =
@@ -1278,6 +1280,7 @@ type pattern_variable =
     pv_as_var: bool;
     pv_attributes: attributes;
     pv_sort: Jkind_types.Sort.t;
+    pv_lpoly: Val_lpoly.t;
   }
 
 type module_variable =
@@ -1371,18 +1374,19 @@ let iter_pattern_variables_type f : pattern_variable list -> unit =
   List.iter (fun {pv_type; _} -> f pv_type)
 
 let iter_pattern_variables_type_mut ~f_immut ~f_mut pvs =
-  List.iter (fun {pv_type; pv_kind; _ } ->
+  List.iter (fun {pv_type; pv_kind; pv_lpoly; _} ->
     match pv_kind with
     | Val_mut _ -> f_mut pv_type
-    | _ -> f_immut pv_type) pvs
+    | _ -> f_immut pv_lpoly pv_type) pvs
 
 let add_pattern_variables ?check ?check_as env pv =
   List.fold_right
     (fun {pv_id; pv_mode; pv_kind; pv_type; pv_loc; pv_as_var;
-          pv_attributes; pv_uid} env ->
+          pv_attributes; pv_uid; pv_lpoly} env ->
        let check = if pv_as_var then check_as else check in
        Env.add_value ?check ~mode:pv_mode pv_id
-         {val_type = pv_type; val_kind = pv_kind; Types.val_loc = pv_loc;
+         {val_type = pv_type; val_kind = pv_kind; val_lpoly = pv_lpoly;
+          Types.val_loc = pv_loc;
           val_attributes = pv_attributes; val_modalities = Modality.undefined;
           val_zero_alloc = Zero_alloc.default;
           val_uid = pv_uid
@@ -1431,6 +1435,7 @@ let add_module_variables env module_variables =
   ) env module_variables_as_list
 
 let enter_variable ?(is_module=false) ?(is_as_variable=false) tps loc name mode
+    ?(lpoly=Val_lpoly.determined [])
     ~kind ty attrs sort =
   if List.exists (fun {pv_id; _} -> Ident.name pv_id = name.txt)
       tps.tps_pattern_variables
@@ -1470,7 +1475,8 @@ let enter_variable ?(is_module=false) ?(is_as_variable=false) tps loc name mode
      pv_as_var = is_as_variable;
      pv_attributes = attrs;
      pv_uid;
-     pv_sort = sort} :: tps.tps_pattern_variables;
+     pv_sort = sort;
+     pv_lpoly = lpoly} :: tps.tps_pattern_variables;
   id, pv_uid
 
 let sort_pattern_variables vs =
@@ -1653,7 +1659,7 @@ and build_as_type_aux (env : Env.t) p ~mode =
           ty, mode
       end
   | Tpat_constant _ | Tpat_unboxed_unit | Tpat_unboxed_bool _
-  | Tpat_any | Tpat_var _
+  | Tpat_any | Tpat_var _ | Tpat_fun_layout _
   | Tpat_array _ | Tpat_lazy _ ->
       p.pat_type, mode
 
@@ -2110,7 +2116,8 @@ let type_for_loop_index ~loc ~env ~param =
                 pv_kind = Val_reg Jkind.Sort.(of_const Const.for_loop_index);
                 pv_type; pv_loc; pv_as_var;
                 pv_attributes;
-                pv_sort = Jkind.Sort.(of_const Const.for_loop_index)
+                pv_sort = Jkind.Sort.(of_const Const.for_loop_index);
+                pv_lpoly = Val_lpoly.determined [];
                 }
             in
             (pv_id, pv_uid), add_pattern_variables ~check ~check_as:check env [pv])
@@ -3067,16 +3074,27 @@ and type_pat_aux
             let kind = Val_mut (m0, sort) in
             mode, kind
       in
-      let id, uid =
-        enter_variable tps loc name mode ~kind ty sp.ppat_attributes sort
+      let lpoly =
+        if (penv : Pattern_env.t).is_lpoly
+        then Val_lpoly.to_generalize ~loc
+        else Val_lpoly.determined []
       in
-      rvp {
+      let id, uid =
+        enter_variable ~lpoly tps loc name mode ~kind ty sp.ppat_attributes sort
+      in
+      let var_pat = {
         pat_desc = Tpat_var { id; name; uid; sort; mode = alloc_mode };
         pat_loc = loc; pat_extra=[];
         pat_type = ty;
         pat_attributes = sp.ppat_attributes;
         pat_env = !!penv;
         pat_unique_barrier = Unique_barrier.not_computed () }
+      in
+      if (penv : Pattern_env.t).is_lpoly
+      then rvp { var_pat with
+                 pat_desc = Tpat_fun_layout { id; name; uid; sort;
+                                             mode = alloc_mode; lpoly } }
+      else rvp var_pat
   | Ppat_unpack name ->
       let t = instance expected_ty in
       begin match name.txt with
@@ -3100,8 +3118,9 @@ and type_pat_aux
               ~kind:(Val_reg sort) sp.ppat_attributes sort
           in
           rvp {
-            pat_desc = Tpat_var { id; name = v; uid; sort;
-                                  mode = alloc_mode.mode };
+            pat_desc =
+              Tpat_var
+                { id; name = v; uid; sort; mode = alloc_mode.mode };
             pat_loc = sp.ppat_loc;
             pat_extra=[Tpat_unpack, loc, sp.ppat_attributes];
             pat_type = t;
@@ -3113,18 +3132,26 @@ and type_pat_aux
       let q = type_pat tps Value sq expected_ty sort in
       let ty_var, mode = solve_Ppat_alias ~mode:alloc_mode.mode !!penv q in
       let mode = cross_left !!penv expected_ty mode in
+      let lpoly =
+        if (penv : Pattern_env.t).is_lpoly
+        then Val_lpoly.to_generalize ~loc
+        else Val_lpoly.determined []
+      in
       let id, uid =
-        enter_variable ~is_as_variable:true
+        enter_variable ~is_as_variable:true ~lpoly
           ~kind:(Val_reg sort) tps name.loc name mode
           ty_var sp.ppat_attributes sort
       in
-      rvp { pat_desc = Tpat_alias { pattern = q; id; name; uid;
-                                    sort; mode; type_expr = ty_var };
-            pat_loc = loc; pat_extra=[];
-            pat_type = q.pat_type;
-            pat_attributes = sp.ppat_attributes;
-            pat_env = !!penv;
-            pat_unique_barrier = Unique_barrier.not_computed () }
+      let alias_pat = {
+        pat_desc = Tpat_alias { pattern = q; id; name; uid;
+                                sort; mode; type_expr = ty_var };
+        pat_loc = loc; pat_extra=[];
+        pat_type = q.pat_type;
+        pat_attributes = sp.ppat_attributes;
+        pat_env = !!penv;
+        pat_unique_barrier = Unique_barrier.not_computed () }
+      in
+      rvp alias_pat
   | Ppat_unboxed_unit ->
       Language_extension.assert_enabled ~loc Layouts Language_extension.Stable;
       rvp @@ solve_expected {
@@ -3496,12 +3523,12 @@ let type_pattern
 
 let type_pattern_list
     category no_existentials env mutable_flag spatl expected_tys expected_sorts
-    allow_modules
+    allow_modules ~is_lpoly
   =
   let tps = create_type_pat_state allow_modules in
   let equations_scope = get_current_level () in
   let new_penv = Pattern_env.make env
-      ~equations_scope ~allow_recursive_equations:false in
+      ~is_lpoly ~equations_scope ~allow_recursive_equations:false in
   let type_pat (attrs, pat_mode, exp_mode, pat) ty sort =
     Builtin_attributes.warning_scope ~ppwarning:false attrs
       (fun () ->
@@ -3558,6 +3585,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
           Env.add_value ~mode:Mode.Value.legacy pv_id
             { val_type = pv_type
             ; val_kind = Val_reg pv_sort
+            ; val_lpoly = Val_lpoly.determined []
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
             ; val_modalities = Modality.undefined
@@ -3570,6 +3598,7 @@ let type_class_arg_pattern cl_num val_env met_env l spat =
           Env.add_value ~mode:Mode.Value.legacy id' ~check
             { val_type = pv_type
             ; val_kind = Val_ivar (Immutable, cl_num)
+            ; val_lpoly = Val_lpoly.determined []
             ; val_attributes = pv_attributes
             ; val_zero_alloc = Zero_alloc.default
             ; val_modalities = Modality.undefined
@@ -3838,7 +3867,7 @@ let rec check_counter_example_pat
         (fun fields -> mkp k (Tpat_record_unboxed_product (fields, closed)))
   in
   match tp.pat_desc with
-    Tpat_any | Tpat_var _ ->
+    Tpat_any | Tpat_var _ | Tpat_fun_layout _ ->
       let k' () = mkp k tp.pat_desc in
       if info.explosion_fuel <= 0 then k' () else
       let decrease n = {info with explosion_fuel = info.explosion_fuel - n} in
@@ -5714,13 +5743,7 @@ let vb_exp_constraint {pvb_expr=expr; pvb_pat=pat; pvb_constraint=ct; pvb_modes=
       List.fold_right mk_newtype locally_abstract_univars expr
 
 let vb_pat_constraint
-      ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; pvb_is_poly;
-        pvb_loc; _ } as vb) =
-  if pvb_is_poly then begin
-    Language_extension.assert_enabled ~loc:pvb_loc Layout_poly
-      Language_extension.Alpha;
-    raise (Error (pvb_loc, Env.empty, Let_poly_not_yet_implemented))
-  end;
+      ({pvb_pat=pat; pvb_expr = exp; pvb_modes = modes; _ } as vb) =
   let spat =
     let open Ast_helper in
     let loc =
@@ -6239,7 +6262,8 @@ and type_expect_
         exp_attributes = sexp.pexp_attributes;
         exp_env = env }
   | Pexp_let(Immutable, Nonrecursive,
-             [{pvb_pat=spat; pvb_attributes=[]; _ } as vb], sbody)
+        [{pvb_pat=spat; pvb_attributes=[]; pvb_is_poly=false; _ } as vb],
+        sbody )
     when turn_let_into_match spat ->
       (* TODO: allow non-empty attributes? *)
       let sval = vb_exp_constraint vb in
@@ -8086,6 +8110,8 @@ and type_ident env ?(recarg=Rejected) lid =
 
   Therefore, we need to cross modes upon look-up. Ideally that should be done in
   [Env], but that is difficult due to cyclic dependency between jkind and env. *)
+  if not @@ List.is_empty (Val_lpoly.get_exn desc.val_lpoly) then
+    raise (Error (lid.loc, env, Layout_poly_inst_not_yet_supported));
   let mode = cross_left env desc.val_type mode in
   (* There can be locks between the definition and a use of a value. For
   example, if a function closes over a value, there will be Closure_lock between
@@ -9081,6 +9107,7 @@ and type_argument ?explanation ?recarg ~overwrite env (mode : expected_mode) sar
         let id = Ident.create_local name in
         let desc =
           { val_type = ty; val_kind = Val_reg sort;
+            val_lpoly = Val_lpoly.determined [];
             val_attributes = [];
             val_zero_alloc = Zero_alloc.default;
             val_modalities = Modality.undefined;
@@ -10152,6 +10179,20 @@ and type_function_cases_expect
 
 and type_let ?check ?check_strict ?(force_toplevel = false)
     existential_context env mutable_flag rec_flag spat_sexp_list allow_modules =
+  (* Check that all bindings are either all poly or all non-poly *)
+  let is_lpoly =
+    match spat_sexp_list with
+    | [] -> false
+    | first :: rest ->
+      if first.pvb_is_poly then
+        Language_extension.assert_enabled ~loc:first.pvb_loc
+          Layout_poly Language_extension.Alpha;
+      List.iter (fun binding ->
+        if binding.pvb_is_poly <> first.pvb_is_poly then
+          raise (Error(binding.pvb_loc, env, Mixed_poly_nonpoly_bindings))
+      ) rest;
+      first.pvb_is_poly
+  in
   let rec sexp_is_fun sexp =
     match sexp.pexp_desc with
     | Pexp_function _ -> true
@@ -10194,7 +10235,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
           let (pat_list, _new_env, _force, pvs, _mvs as res) =
             with_local_level_if is_recursive (fun () ->
               type_pattern_list Value existential_context env mutable_flag spatl
-                nvs sorts allow_modules
+                nvs sorts allow_modules ~is_lpoly
             ) ~post:(fun (_, _, _, pvs, _) ->
                        iter_pattern_variables_type generalize pvs)
           in
@@ -10213,6 +10254,17 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
                 let bound_expr = vb_exp_constraint binding in
                 type_approx env bound_expr pat.pat_type)
               pat_list spat_sexp_list;
+          (* CR-someday zqian: if recursive, unify [pv_lpoly] with user
+             annotations of layout poly. *)
+          (* If recursive, values don't enjoy layout polymorphism, unless
+             specified in its types (incorperated above). *)
+          if is_recursive then
+            List.iter (fun { pv_lpoly; _ } ->
+              Val_lpoly.generalize
+                ~on_to_generalize:(fun loc ->
+                  Location.prerr_warning loc Warnings.Useless_poly; [])
+                pv_lpoly
+            ) pvs;
           (* If recursive, all pattern variables must have layout value. This
              could be relaxed in some cases, like let recs that aren't actually
              recusive. But, if making that change, delete [Lambda.layout_letrec]
@@ -10318,7 +10370,17 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
           if maybe_expansive exp then lower_contravariant env pat.pat_type)
         mode_pat_typ_list exp_list;
       iter_pattern_variables_type_mut
-        ~f_immut:generalize
+        ~f_immut:(fun pv_lpoly ty ->
+          Val_lpoly.generalize
+            ~on_determined:(fun () -> generalize ty)
+            ~on_to_generalize:(fun loc ->
+              let _, univars =
+                Jkind_types.Sort.with_generalize (fun () -> generalize ty)
+              in
+              if List.is_empty univars then
+                Location.prerr_warning loc Warnings.Useless_poly;
+              univars)
+            pv_lpoly)
         ~f_mut:(unify_var env (newvar (Jkind.Builtin.any ~why:Dummy_jkind)))
         pvs;
       (* update pattern variable jkind reasons *)
@@ -10376,7 +10438,7 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   if is_recursive then
     List.iter
       (fun {vb_pat=pat} -> match pat.pat_desc with
-           Tpat_var _ -> ()
+           Tpat_var _ | Tpat_fun_layout _ -> ()
          | _ -> raise(Error(pat.pat_loc, env, Illegal_letrec_pat)))
       l;
   List.iter (fun vb ->
@@ -11949,6 +12011,11 @@ let report_error ~loc env =
       Location.errorf ~loc
         "Only variables are allowed as the left-hand side of %a"
         Style.inline_code "let mutable"
+  | Mixed_poly_nonpoly_bindings ->
+      Location.errorf ~loc
+        "All bindings in a %a must be either all %a or all non-%a"
+        Style.inline_code "let"
+        Style.inline_code "poly_" Style.inline_code "poly_"
   | Illegal_letrec_expr ->
       Location.errorf ~loc
         "This kind of expression is not allowed as right-hand side of %a"
@@ -12268,6 +12335,9 @@ let report_error ~loc env =
       Location.errorf ~loc
         "The %a annotation is not yet implemented."
         Style.inline_code "let poly_"
+  | Layout_poly_inst_not_yet_supported ->
+      Location.errorf ~loc
+        "Instantiation of layout-polymorphic values is not yet supported."
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

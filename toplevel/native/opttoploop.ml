@@ -405,7 +405,8 @@ let name_expression ~loc ~attrs sort exp =
       val_attributes = attrs;
       val_zero_alloc = Zero_alloc.default;
       val_modalities = Mode.Modality.(Const.id |> of_const);
-      val_uid = Uid.internal_not_actually_unique; }
+      val_uid = Uid.internal_not_actually_unique;
+      val_lpoly = Val_lpoly.determined []; }
   in
   let sg = [Sig_value(id, vd, Exported)] in
   let pat =

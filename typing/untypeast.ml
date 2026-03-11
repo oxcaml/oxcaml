@@ -420,6 +420,8 @@ let pattern : type k . _ -> k T.general_pattern -> _ = fun sub pat ->
     | Tpat_exception p -> Ppat_exception (sub.pat sub p)
     | Tpat_value p -> (sub.pat sub (p :> pattern)).ppat_desc
     | Tpat_or (p1, p2, _) -> Ppat_or (sub.pat sub p1, sub.pat sub p2)
+    | Tpat_fun_layout { id; name; _ } ->
+        Ppat_var { name with txt = Ident.name id }
   in
   Pat.mk ~loc ~attrs desc
 
@@ -1099,6 +1101,8 @@ let core_type sub ct =
     | Ttyp_repr (list, ct) ->
         let bound_vars = List.map (fun v -> mkloc v loc) list in
         Ptyp_repr (bound_vars, sub.typ sub ct)
+    | Ttyp_newlayout (list, ct) ->
+        Ptyp_newlayout (list, sub.typ sub ct)
     | Ttyp_of_kind jkind -> Ptyp_of_kind jkind
     | Ttyp_call_pos ->
         Ptyp_extension call_pos_extension

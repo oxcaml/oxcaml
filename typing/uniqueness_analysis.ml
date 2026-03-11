@@ -2085,6 +2085,7 @@ and pattern_match_barrier pat paths : UF.t =
   | Tpat_record_unboxed_product _ ->
     (* unboxed records are not allocations *)
     no_memory_access ()
+  | Tpat_fun_layout _ -> no_memory_access ()
 
 and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
   let uf_read = pattern_match_barrier pat paths in
@@ -2095,7 +2096,8 @@ and pattern_match_single pat paths : Ienv.Extension.t * UF.t =
       let ext1, uf1 = pattern_match_single pat1 paths in
       Ienv.Extension.disjunct ext0 ext1, UF.choose uf0 uf1
     | Tpat_any -> Ienv.Extension.empty, UF.unused
-    | Tpat_var { id; _ } -> Ienv.Extension.singleton id paths, UF.unused
+    | Tpat_var { id; _ } | Tpat_fun_layout { id; _ } ->
+      Ienv.Extension.singleton id paths, UF.unused
     | Tpat_alias { pattern = pat'; id; _ } ->
       let ext0 = Ienv.Extension.singleton id paths in
       let ext1, uf = pattern_match_single pat' paths in

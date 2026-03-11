@@ -179,6 +179,11 @@ let map_on_rows f = List.map (map_on_row f)
 
 module Non_empty_row = Patterns.Non_empty_row
 
+let fatal_var_lpoly lpoly =
+  let n = List.length (Types.Val_lpoly.get_exn lpoly) in
+  Misc.fatal_errorf
+    "Matching: layout-poly patterns not yet supported (%d sort var(s))" n
+
 module General = struct
   include Patterns.General
 
@@ -253,6 +258,7 @@ end = struct
       | `Any -> stop p `Any
       | `Var (id, s, uid, sort, mode) ->
         continue p (`Alias (Patterns.omega, id, s, uid, sort, mode, p.pat_type))
+      | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
       | `Alias (p, id, _, duid, sort, _, _) ->
           aux
             ( (General.view p, patl),
@@ -369,6 +375,7 @@ end = struct
             { p with pat_desc =
                 `Alias (Patterns.omega, id, str, uid, sort, mode, p.pat_type) }
             aliases rem
+      | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
       | #view as view ->
           (* We are doing two things here:
              - we freshen the variables of the pattern, to
@@ -616,8 +623,10 @@ end = struct
           match p.pat_desc with
           | `Or (p1, p2, _) ->
               filter_rec ((left, p1, right) :: (left, p2, right) :: rem)
-          | `Alias (p, _, _, _, _, _, _) -> filter_rec ((left, p, right) :: rem)
+          | `Alias (p, _, _, _, _, _, _) ->
+              filter_rec ((left, p, right) :: rem)
           | `Var _ -> filter_rec ((left, Patterns.omega, right) :: rem)
+          | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
               match matcher head p right with
@@ -746,6 +755,7 @@ end = struct
           match p.pat_desc with
           | `Alias (p, _, _, _, _, _, _) -> filter_rec ((p, ps) :: rem)
           | `Var _ -> filter_rec ((Patterns.omega, ps) :: rem)
+          | `Fun_layout (_, _, _, _, _, lpoly) -> fatal_var_lpoly lpoly
           | `Or (p1, p2, _) -> filter_rec_or p1 p2 ps rem
           | #Simple.view as view -> (
               let p = { p with pat_desc = view } in
@@ -4066,7 +4076,8 @@ let is_lazy_pat p =
   | Tpat_or _
   | Tpat_constant _
   | Tpat_var _
-  | Tpat_any ->
+  | Tpat_any
+  | Tpat_fun_layout _ ->
       false
 
 let has_lazy p = Typedtree.exists_pattern is_lazy_pat p
@@ -4090,7 +4101,8 @@ let is_record_with_mutable_field p =
   | Tpat_or _
   | Tpat_constant _
   | Tpat_var _
-  | Tpat_any ->
+  | Tpat_any
+  | Tpat_fun_layout _ ->
       false
 
 let has_mutable p = Typedtree.exists_pattern is_record_with_mutable_field p

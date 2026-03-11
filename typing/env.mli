@@ -512,6 +512,7 @@ val enter_modtype:
 val enter_class: scope:int -> string -> class_declaration -> t -> Ident.t * t
 val enter_cltype:
   scope:int -> string -> class_type_declaration -> t -> Ident.t * t
+val enter_jkind: scope:int -> string -> jkind_declaration -> t -> Ident.t * t
 
 (* Same as [add_signature] but refreshes (new stamp) and rescopes bound idents
    in the process. *)

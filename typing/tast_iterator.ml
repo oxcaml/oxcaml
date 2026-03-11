@@ -308,6 +308,7 @@ let pat
   | Tpat_or (p1, p2, _) ->
       sub.pat sub p1;
       sub.pat sub p2
+  | Tpat_fun_layout { name = s; _ } -> iter_loc sub s
 
 let extra sub = function
   | Texp_constraint (cty) -> sub.typ sub cty
@@ -747,6 +748,7 @@ let typ sub {ctyp_loc; ctyp_desc; ctyp_env; ctyp_attributes; _} =
   | Ttyp_quote t -> sub.typ sub t
   | Ttyp_splice t -> sub.typ sub t
   | Ttyp_repr (_, ct) -> sub.typ sub ct
+  | Ttyp_newlayout (_, ct) -> sub.typ sub ct
   | Ttyp_of_kind jkind -> sub.jkind_annotation sub jkind
   | Ttyp_call_pos -> ()
 
