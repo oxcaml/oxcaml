@@ -61,6 +61,8 @@ val reaper_local_fields : unit -> bool
 
 val reaper_unbox : unit -> bool
 
+val reaper_max_unbox_size : unit -> int
+
 val reaper_change_calling_conventions : unit -> bool
 
 val kind_checks : unit -> bool

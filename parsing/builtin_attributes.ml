@@ -99,6 +99,7 @@ let builtin_attrs =
   ; "nolabels"
   ; "flambda_oclassic"
   ; "flambda_o3"
+  ; "flambda_o4"
   ; "afl_inst_ratio"
   ; "local_opt"
   ; "curry"; "extension.curry"
@@ -581,6 +582,11 @@ let flambda_o3_attribute attr =
     ~name:"flambda_o3"
     ~f:(fun () -> if Config.flambda || Config.flambda2 then Clflags.set_o3 ())
 
+let flambda_o4_attribute attr =
+  clflags_attribute_without_payload' attr
+    ~name:"flambda_o4"
+    ~f:(fun () -> if Config.flambda || Config.flambda2 then Clflags.set_o4 ())
+
 let llvm_backend_attribute attr =
   clflags_attribute_without_payload' attr
     ~name:"llvm_backend"
@@ -661,6 +667,7 @@ let parse_standard_implementation_attributes attr =
   inline_attribute attr;
   afl_inst_ratio_attribute attr;
   flambda_o3_attribute attr;
+  flambda_o4_attribute attr;
   flambda_oclassic_attribute attr;
   zero_alloc_attribute ~in_signature:false attr;
   unsafe_allow_any_mode_crossing_attribute attr;
