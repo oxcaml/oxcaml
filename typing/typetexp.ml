@@ -868,6 +868,10 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
       let rec loop acc_mode args =
         match args with
         | (l, arg_mode, arg) :: rest ->
+          let rec syntactic_arity = function
+            | Ptyp_arrow (_, _, t, _, _) -> 1 + syntactic_arity t.ptyp_desc
+            | _ -> 0
+          in
           check_arg_type arg;
           let l = transl_label l (Some arg) in
           let arg_cty =
@@ -883,21 +887,29 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
               { mode_modes = acc_mode; mode_desc = [] }
           in
           let zero_alloc =
-            Builtin_attributes.get_zero_alloc_attribute
-              ~in_signature:false
-              ~on_application:false
-              ~on_function_argument:true
-              ~default_arity:(-1)
-              arg.ptyp_attributes
+            match Types.get_desc arg_cty.ctyp_type with
+            | Tpoly (_, _, zero_alloc) -> zero_alloc
+            | _ -> begin
+                match arg_cty.ctyp_desc with
+                | Ttyp_arrow _ ->
+                  let default_arity = syntactic_arity arg.ptyp_desc in
+                  Builtin_attributes.get_zero_alloc_attribute
+                    ~in_signature:false
+                    ~on_application:false
+                    ~on_function_argument:true
+                    ~default_arity
+                    arg_cty.ctyp_attributes
+                  |> Zero_alloc.create_const
+                | _ -> Zero_alloc.default
+              end
           in
           begin
             let open Builtin_attributes in
-            match zero_alloc with
+            match Zero_alloc.get zero_alloc with
             | Assume _ ->
               raise (Error (loc, env, Invalid_payload_arg_zero_alloc))
             | Default_zero_alloc | Ignore_assert_all | Check _ -> ()
           end;
-          let zero_alloc = Zero_alloc.create_const zero_alloc in
           let ret_cty = loop acc_mode rest in
           let arg_ty = arg_cty.ctyp_type in
           let arg_ty =
@@ -1175,14 +1187,14 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
           ~in_signature:false
           ~on_application:false
           ~on_function_argument:false
-          ~default_arity:(-1)
+          ~default_arity:0
           styp.ptyp_attributes
       in
       begin
         let open Builtin_attributes in
         match zero_alloc with
-        | (Check {arity; _} | Assume {arity; _}) when arity = -1 ->
-          raise (Error (loc, env, Polymorphic_optional_param))
+        | (Check {arity; _} | Assume {arity; _}) when arity = 0 ->
+          raise (Error (loc, env, Must_provide_zero_alloc_arity))
         | Default_zero_alloc | Ignore_assert_all | Check _ | Assume _ -> ()
       end;
       let zero_alloc = Zero_alloc.create_const zero_alloc in
@@ -1194,15 +1206,7 @@ and transl_type_aux env ~row_context ~aliased ~policy mode styp =
   | Ptyp_repr(vars, st) ->
       Language_extension.assert_enabled ~loc Layout_poly
         Language_extension.Alpha;
-      let zero_alloc =
-        Zero_alloc.create_const
-          (Builtin_attributes.get_zero_alloc_attribute
-             ~in_signature:false
-             ~on_application:false
-             ~on_function_argument:false
-             ~default_arity:1
-             styp.ptyp_attributes)
-      in
+      let zero_alloc = Zero_alloc.default in
       let desc, typ =
         transl_type_repr env ~policy ~row_context ~zero_alloc mode styp.ptyp_loc
           vars st

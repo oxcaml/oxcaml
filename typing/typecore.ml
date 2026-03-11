@@ -4922,7 +4922,6 @@ let type_approx_fun_one_param
   =
   let mode_annots, has_poly, zero_alloc =
     match spato with
-    (* CR zero-alloc aivaskovic: is default appropriate? *)
     | None -> None, false, Zero_alloc.default
     | Some spat ->
         let mode_annots = mode_annots_from_pat spat in
@@ -5835,7 +5834,7 @@ let pat_modes ~force_toplevel rec_mode_var (attrs, zero_alloc, spat) =
   in
   attrs, zero_alloc, pat_mode, exp_mode, spat
 
-let add_typed_zero_alloc_attribute expr attributes =
+let add_typed_zero_alloc_attribute expr zero_alloc_attribute =
   let open Builtin_attributes in
   let to_string : zero_alloc_attribute -> string = function
     | Check { strict; loc = _} ->
@@ -5850,37 +5849,36 @@ let add_typed_zero_alloc_attribute expr attributes =
   in
   match expr.exp_desc with
   | Texp_function fn ->
-    let default_arity = function_arity fn.params fn.body in
-    let za =
-      get_zero_alloc_attribute ~in_signature:false ~default_arity attributes
-        ~on_application:false ~on_function_argument:false
-    in
-    begin match za with
+    begin match zero_alloc_attribute with
     | Default_zero_alloc -> expr
     | Ignore_assert_all | Check _ | Assume _ ->
       begin match Zero_alloc.get fn.zero_alloc with
       | Default_zero_alloc -> ()
       | Ignore_assert_all | Assume _ | Check _ ->
         Location.prerr_warning expr.exp_loc
-          (Warnings.Duplicated_attribute (to_string za));
+          (Warnings.Duplicated_attribute (to_string zero_alloc_attribute));
       end;
       (* Here, we may be throwing away a zero_alloc variable. There's no need
          to set it, because it can't have gotten anywhere else yet. *)
-      let zero_alloc = Zero_alloc.create_const za in
+      let zero_alloc = Zero_alloc.create_const zero_alloc_attribute in
       let exp_desc = Texp_function { fn with zero_alloc } in
       { expr with exp_desc }
     end
   | _ -> expr
 
 let add_parsed_zero_alloc_attribute ~default_arity vb =
-  let zero_alloc =
+  let attr =
     Builtin_attributes.get_zero_alloc_attribute
       ~in_signature:false
       ~on_application:false
       ~on_function_argument:false
       ~default_arity
       vb.pvb_attributes
-    |> Zero_alloc.create_const
+  in
+  let zero_alloc =
+    match attr with
+    | Default_zero_alloc -> Zero_alloc.create_var vb.pvb_loc default_arity
+    | Check _ | Assume _ | Ignore_assert_all -> Zero_alloc.create_const attr
   in
   vb, zero_alloc
 
@@ -6587,14 +6585,6 @@ and type_expect_
       let mode_ret = Alloc.disallow_right mode_ret in
       let ap_mode = Alloc.proj_comonadic Areality mode_ret in
       let mode_ret = cross_left env ty_ret (alloc_as_value mode_ret) in
-      let zero_alloc =
-        Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
-          ~on_application:true
-          ~on_function_argument:false
-          ~default_arity:(List.length args)
-          sfunct.pexp_attributes
-        |> Builtin_attributes.zero_alloc_attribute_only_assume_allowed
-      in
       let funct =
         match List.exists (fun (_, _, sch) -> Option.is_some sch) args with
         | true ->
@@ -6603,6 +6593,29 @@ and type_expect_
           { funct with
             exp_extra = (Texp_inspected_type ti, loc, []) :: funct.exp_extra }
         | false -> funct
+      in
+      let extract_zero_alloc_attr () =
+        Builtin_attributes.get_zero_alloc_attribute ~in_signature:false
+          ~on_application:true
+          ~on_function_argument:false
+          ~default_arity:(List.length args)
+          sfunct.pexp_attributes
+      in
+      let zero_alloc =
+        begin
+          match funct.exp_desc with
+          | Texp_ident { desc; _ } ->
+            begin
+              match Zero_alloc.get desc.val_zero_alloc with
+              | Check {strict; arity; loc; _} ->
+                Assume {strict; arity; loc;
+                        never_returns_normally = false;
+                        never_raises = false}
+              | _ -> extract_zero_alloc_attr ()
+            end
+          | _ -> extract_zero_alloc_attr ()
+        end
+        |> Builtin_attributes.zero_alloc_attribute_only_assume_allowed
       in
       let args = List.map (fun (lbl, arg, _) -> (lbl, arg)) args in
       let exp = rue {
@@ -8467,7 +8480,7 @@ and type_function
       in
       let (pat, params, body, ret_info, newtypes, contains_gadt, curry), partial =
         (* Check everything else in the scope of the parameter. *)
-        map_half_typed_cases Value env expected_pat_mode
+        map_half_typed_cases ~zero_alloc Value env expected_pat_mode
           ty_arg_internal sort_arg_internal ty_ret pat.ppat_loc
           ~check_if_total:true
           (* We don't make use of [case_data] here so we pass unit. *)
@@ -9875,6 +9888,7 @@ and type_statement ?explanation ?(position=RNontail) env sexp =
 and map_half_typed_cases
   : type k ret case_data.
     ?additional_checks_for_split_cases:((_ * ret) list -> unit)
+    -> ?zero_alloc:Zero_alloc.t
     -> k pattern_category -> _ -> _ -> _ -> _ -> _ -> _
     -> (untyped_case * case_data) list
     -> type_body:(
@@ -9887,7 +9901,7 @@ and map_half_typed_cases
         -> ret)
     -> check_if_total:bool (* if false, assume Partial right away *)
     -> ret list * partial
-  = fun ?additional_checks_for_split_cases
+  = fun ?additional_checks_for_split_cases ?zero_alloc
     category env pat_mode
     ty_arg sort_arg ty_res loc caselist ~type_body ~check_if_total ->
   (* ty_arg is _fully_ generalized *)
@@ -9946,9 +9960,12 @@ and map_half_typed_cases
                   (fun () -> instance ?partial:take_partial_instance ty_arg)
               in
               let zero_alloc =
-                if is_Tpoly ty_arg
-                then thd3 (tpoly_get_poly ty_arg)
-                else Zero_alloc.default
+                match zero_alloc with
+                | Some za -> za
+                | None ->
+                  if is_Tpoly ty_arg
+                  then thd3 (tpoly_get_poly ty_arg)
+                  else Zero_alloc.default
               in
               let (pat, ext_env, force, pvs, mvs) =
                 type_pattern category ~lev ~alloc_mode:pat_mode env pattern
@@ -10321,7 +10338,9 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   in
   let rec arity_of_fun sexp =
     match sexp.pexp_desc with
-    | Pexp_function (params, _, _) -> List.length params
+    | Pexp_function (params, _, body) ->
+      ((match body with | Pfunction_body _ -> 0 | Pfunction_cases _ -> 1) +
+       List.length params)
     | Pexp_constraint (e, _, _)
     | Pexp_newtype (_, _, e) -> arity_of_fun e
     (* function is only ever invoked if sexp_is_fun is true *)
@@ -10541,10 +10560,10 @@ and type_let ?check ?check_strict ?(force_toplevel = false)
   let l = List.combine sorts l in
   let l =
     List.map2
-      (fun (s, ((_,p,_), (e, _))) (pvb, _) ->
+      (fun (s, ((_,p,_), (e, _))) (pvb, zero_alloc) ->
         (* We check for [zero_alloc] attributes written on the [let] and move
            them to the function. *)
-        let e = add_typed_zero_alloc_attribute e pvb.pvb_attributes in
+        let e = add_typed_zero_alloc_attribute e (Zero_alloc.get zero_alloc) in
         (* vb_rec_kind will be computed later for recursive bindings *)
         {vb_pat=p; vb_expr=e; vb_sort = s; vb_attributes=pvb.pvb_attributes;
          vb_loc=pvb.pvb_loc; vb_rec_kind = Dynamic;
@@ -11129,7 +11148,7 @@ and type_comprehension_clause ~loc ~comprehension_type ~container_type env
         List.map
           (type_comprehension_binding
              ~loc ~comprehension_type ~container_type ~env tps)
-          bindings
+         bindings
       in
       let env =
         let check s = Warnings.Unused_var { name = s; mutated = false } in
