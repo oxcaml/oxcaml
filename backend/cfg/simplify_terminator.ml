@@ -85,10 +85,39 @@ type known_value =
   | Const_float32 of int32
   | Const_float of int64
 
+let eval_int_op op (left : nativeint) (right : nativeint) : nativeint option =
+  let is_valid_shift =
+    Nativeint.compare right 0n >= 0
+    && Nativeint.compare right (Nativeint.of_int Nativeint.size) < 0
+  in
+  match (op : Operation.integer_operation) with
+  | Iadd -> Some (Nativeint.add left right)
+  | Isub -> Some (Nativeint.sub left right)
+  | Iand -> Some (Nativeint.logand left right)
+  | Ior -> Some (Nativeint.logor left right)
+  | Ixor -> Some (Nativeint.logxor left right)
+  | Ilsl ->
+    if is_valid_shift
+    then Some (Nativeint.shift_left left (Nativeint.to_int right))
+    else None
+  | Ilsr ->
+    if is_valid_shift
+    then Some (Nativeint.shift_right_logical left (Nativeint.to_int right))
+    else None
+  | Iasr ->
+    if is_valid_shift
+    then Some (Nativeint.shift_right left (Nativeint.to_int right))
+    else None
+  (* CR xclerc for xclerc: some of the following operations could be supported
+     in the future; care is needed as some may clobber registers beyond
+     [res.(0)] on certain targets (e.g. [Imul] may not always lower to a form
+     writing only to the destination). *)
+  | Imul | Imulh _ | Idiv | Imod | Iclz _ | Ictz _ | Ipopcnt | Icomp _ -> None
+
 (* Iterates over the passed instructions, and updates `known_values` so that it
    contains a map from registers to known values after the instructions have
-   been executed. Currently only tracks constant values and moves between
-   registers. *)
+   been executed. Currently only tracks constant values, moves between
+   registers, and basic integer arithmetic over known values. *)
 let collect_known_values (instrs : Cfg.basic_instruction_list) :
     known_value Reg.UsingLocEquality.Tbl.t =
   let known_values = Reg.UsingLocEquality.Tbl.create 17 in
@@ -99,7 +128,31 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
   in
   let find_opt reg = Reg.UsingLocEquality.Tbl.find_opt known_values reg in
   let remove reg = Reg.UsingLocEquality.Tbl.remove known_values reg in
+  let remove_destroyed (instr : Cfg.basic Cfg.instruction) =
+    let destroyed_regs = Proc.destroyed_at_basic instr.desc in
+    Reg.UsingLocEquality.Tbl.filter_map_inplace
+      (fun reg known_value ->
+        let is_destroyed =
+          Array.exists (fun r -> Reg.same_loc r reg) destroyed_regs
+        in
+        if is_destroyed then None else Some known_value)
+      known_values
+  in
   Dll.iter instrs ~f:(fun (instr : Cfg.basic Cfg.instruction) ->
+      let apply_int_op op right_opt =
+        let result_opt =
+          match find_opt instr.arg.(0) with
+          | Some (Const_int left) -> (
+            match right_opt with
+            | Some right -> eval_int_op op left right
+            | None -> None)
+          | Some (Const_float32 _ | Const_float _) | None -> None
+        in
+        (match result_opt with
+        | Some result -> replace instr.res.(0) (Const_int result)
+        | None -> remove instr.res.(0));
+        remove_destroyed instr
+      in
       match instr.desc with
       | Op (Const_int c) -> replace instr.res.(0) (Const_int c)
       | Op (Const_float32 c) ->
@@ -117,27 +170,31 @@ let collect_known_values (instrs : Cfg.basic_instruction_list) :
           ->
           replace instr.res.(0) value
         | Some _ | None -> remove instr.res.(0))
+      | Op (Intop_imm (op, imm)) ->
+        apply_int_op op (Some (Nativeint.of_int imm))
+      | Op (Intop op) ->
+        let right_opt =
+          if Operation.is_unary_integer_operation op
+          then None
+          else
+            match find_opt instr.arg.(1) with
+            | Some (Const_int v) -> Some v
+            | Some (Const_float32 _ | Const_float _) | None -> None
+        in
+        apply_int_op op right_opt
       | Op
           ( Spill | Reload | Dummy_use | Const_symbol _ | Const_vec128 _
           | Const_vec256 _ | Const_vec512 _ | Stackoffset _ | Load _ | Store _
-          | Intop _ | Int128op _ | Intop_imm _ | Intop_atomic _ | Floatop _
-          | Csel _ | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _
-          | Opaque | Begin_region | End_region | Specific _
-          | Name_for_debugger _ | Dls_get | Poll | Pause | Alloc _ | Tls_get
-          | Domain_index )
+          | Int128op _ | Intop_atomic _ | Floatop _ | Csel _
+          | Reinterpret_cast _ | Static_cast _ | Probe_is_enabled _ | Opaque
+          | Begin_region | End_region | Specific _ | Name_for_debugger _
+          | Dls_get | Poll | Pause | Alloc _ | Tls_get | Domain_index )
       | Reloadretaddr | Pushtrap _ | Poptrap _ | Prologue | Epilogue
       | Stack_check _ ->
         Array.iter
           (fun reg -> Reg.UsingLocEquality.Tbl.remove known_values reg)
           instr.res;
-        let destroyed_regs = Proc.destroyed_at_basic instr.desc in
-        Reg.UsingLocEquality.Tbl.filter_map_inplace
-          (fun reg known_value ->
-            let is_destroyed =
-              Array.exists (fun r -> Reg.same_loc r reg) destroyed_regs
-            in
-            if is_destroyed then None else Some known_value)
-          known_values);
+        remove_destroyed instr);
   known_values
 
 (* Compute the destination of a terminator, using [known_values] to determine
