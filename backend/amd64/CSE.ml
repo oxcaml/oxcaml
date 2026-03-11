@@ -53,6 +53,7 @@ let class_of_operation (op : Operation.t)
     end
   | Move | Spill | Reload | Dummy_use
   | Floatop _
+  | Compare _
   | Csel _
   | Reinterpret_cast _ | Static_cast _
   | Const_int _ | Const_float32 _ | Const_float _

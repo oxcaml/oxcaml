@@ -246,7 +246,8 @@ let basic (map : spilled_map) (instr : Cfg.basic Cfg.instruction) =
     else May_still_have_spilled_registers
   | Op (Intop (Isub | Iand | Ior | Ixor)) ->
     binary_operation map instr Result_can_be_on_stack
-  | Op (Intop (Icomp _)) -> binary_operation map instr Result_cannot_be_on_stack
+  | Op (Intop (Icomp _)) | Op (Compare _) ->
+    binary_operation map instr Result_cannot_be_on_stack
   | Op (Intop_imm (Icomp _, _)) ->
     may_use_stack_operand_for_only_argument map instr ~has_result:true
   | Op (Intop Iadd) | Op (Intop_imm (Iadd, _)) ->

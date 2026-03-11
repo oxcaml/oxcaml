@@ -293,6 +293,8 @@ let operation d = function
   | Cctz { arg_is_non_zero } -> Printf.sprintf "ctz %B" arg_is_non_zero
   | Cpopcnt -> "popcnt"
   | Ccmpi c -> integer_comparison c
+  | Ccompare { signed } ->
+    if signed then "compare_signed" else "compare_unsigned"
   | Caddv -> "+v"
   | Cadda -> "+a"
   | Cnegf Float64 -> "~f"

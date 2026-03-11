@@ -266,18 +266,14 @@ shift_right_logical:
 |}]
 
 
-(* CR ttebbi: There is no need to repeat cmpq. *)
 let compare (x : int) (y : int) = compare x y
 [%%expect_asm X86_64{|
 compare:
-  movq  %rax, %rdi
-  cmpq  %rbx, %rdi
-  setl  %al
-  movzbq %al, %rsi
-  cmpq  %rbx, %rdi
+  cmpq  %rbx, %rax
   setg  %al
-  movzbq %al, %rax
-  subq  %rsi, %rax
+  setl  %bl
+  subl  %ebx, %eax
+  movsbq %al, %rax
   leaq  1(%rax,%rax), %rax
   ret
 |}]
@@ -299,14 +295,11 @@ let equal_using_compare (x : int) (y : int) =
   Int.compare x y = 0
 [%%expect_asm X86_64{|
 equal_using_compare:
-  movq  %rax, %rdi
-  cmpq  %rbx, %rdi
-  setl  %al
-  movzbq %al, %rsi
-  cmpq  %rbx, %rdi
+  cmpq  %rbx, %rax
   setg  %al
-  movzbq %al, %rax
-  subq  %rsi, %rax
+  setl  %bl
+  subl  %ebx, %eax
+  movsbq %al, %rax
   leaq  1(%rax,%rax), %rax
   cmpq  $1, %rax
   sete  %al

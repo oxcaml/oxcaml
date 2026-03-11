@@ -2193,6 +2193,12 @@ let emit_instr ~first ~last ~fallthrough i =
          :: !call_gc_sites;
     D.define_label lbl_after_poll
   | Lop Pause -> I.pause ()
+  | Lop (Compare { signed }) ->
+    I.cmp (arg i 1) (arg i 0);
+    I.set (if signed then G else A) (res8 i 0);
+    I.set (if signed then L else B) (res8 i 1);
+    I.sub (res32 i 1) (res32 i 0);
+    I.movsx (res8 i 0) (res i 0)
   | Lop (Intop (Icomp cmp)) ->
     I.cmp (arg i 1) (arg i 0);
     I.set (cond cmp) al;

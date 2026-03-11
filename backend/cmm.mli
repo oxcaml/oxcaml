@@ -474,6 +474,7 @@ type operation =
         size : atomic_bitwidth
       }
   | Ccmpi of integer_comparison
+  | Ccompare of { signed : bool }
   | Caddv (* pointer addition that produces a [Val] (well-formed Caml value) *)
   | Cadda (* pointer addition that produces a [Addr] (derived heap pointer) *)
   | Cnegf of float_width

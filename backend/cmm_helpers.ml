@@ -1053,18 +1053,10 @@ let mk_not dbg cmm =
     Cop (Cxor, [Cconst_int (2, dbg); c], dbg)
 
 let mk_compare_ints_untagged dbg a1 a2 =
-  bind "int_cmp" a2 (fun a2 ->
-      bind "int_cmp" a1 (fun a1 ->
-          let op1 = Cop (Ccmpi Cgt, [a1; a2], dbg) in
-          let op2 = Cop (Ccmpi Clt, [a1; a2], dbg) in
-          sub_int op1 op2 dbg))
+  Cop (Ccompare { signed = true }, [a1; a2], dbg)
 
 let mk_unsigned_compare_ints_untagged dbg a1 a2 =
-  bind "uint_cmp" a2 (fun a2 ->
-      bind "uint_cmp" a1 (fun a1 ->
-          let op1 = Cop (Ccmpi Cugt, [a1; a2], dbg) in
-          let op2 = Cop (Ccmpi Cult, [a1; a2], dbg) in
-          sub_int op1 op2 dbg))
+  Cop (Ccompare { signed = false }, [a1; a2], dbg)
 
 let mk_compare_ints dbg a1 a2 =
   match a1, a2 with

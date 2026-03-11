@@ -127,6 +127,8 @@ let operation ?(print_reg = Printreg.reg) (op : Operation.t) arg ppf res =
   | Tls_get -> fprintf ppf "tls_get"
   | Domain_index -> fprintf ppf "domain_index"
   | Poll -> fprintf ppf "poll call"
+  | Compare { signed } ->
+    fprintf ppf "compare_%s" (if signed then "signed" else "unsigned")
   | Pause -> fprintf ppf "pause"
   | Probe_is_enabled { name; enabled_at_init } ->
     fprintf ppf "probe_is_enabled \"%s\"%s" name

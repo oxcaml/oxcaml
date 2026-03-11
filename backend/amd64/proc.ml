@@ -530,6 +530,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
     destroyed_at_large_memory_op
   | Op(Intop(Imulh _ | Icomp _) | Intop_imm((Icomp _), _)) ->
     destroyed_rax
+  | Op (Compare _) -> [| |]
   | Op (Specific (Irdtsc | Irdpmc)) ->
     destroyed_rax_rdx
   | Op Poll -> destroyed_at_alloc_or_poll
@@ -705,7 +706,7 @@ let operation_supported = function
   | Ccsel _
   | Cbswap _
   | Cclz _ | Cctz _
-  | Ccmpi _ | Caddv | Cadda
+  | Ccompare _ | Ccmpi _ | Caddv | Cadda
   | Cnegf _ | Cabsf _ | Caddf _ | Csubf _ | Cmulf _ | Cdivf _ | Cpackf32
   | Ccmpf _
   | Craise _
