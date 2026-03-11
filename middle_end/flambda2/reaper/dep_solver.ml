@@ -452,6 +452,8 @@ let field_sources = rel3 "field_sources" Cols.[n; f; n]
 let field_sources_top = rel2 "field_sources_top" Cols.[n; f]
 (* CR pchambart: is there a reason why this is called top an not any source ? *)
 
+let field_magic_sources = rel2 "field_magic_sources" Cols.[n; f]
+
 let cofield_sources = rel3 "cofield_sources" Cols.[n; cf; n]
 
 let cofield_usages = rel3 "cofield_usages" Cols.[n; cf; n]
@@ -575,6 +577,8 @@ let datalog_schedule =
      ==> alias ~to_ ~from);
     (* has_usage/has_source *)
     (let$ [x] = ["x"] in
+     [magic_source x] ==> any_source x);
+    (let$ [x] = ["x"] in
      [any_usage x] ==> has_usage x);
     (let$$ [x; y] = ["x"; "y"] in
      [usages x y] ==> has_usage x);
@@ -667,6 +671,8 @@ let datalog_schedule =
      [any_source base; rev_coaccessor ~base relation ~to_] ==> any_usage to_);
     (* sources: see explanation on usage *)
     (let$ [from; to_] = ["from"; "to_"] in
+     [rev_alias ~from ~to_; magic_source from] ==> magic_source to_);
+    (let$ [from; to_] = ["from"; "to_"] in
      [rev_alias ~from ~to_; any_source from] ==> any_source to_);
     (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
      [has_source from; rev_constructor ~from relation ~base]
@@ -678,6 +684,12 @@ let datalog_schedule =
      [nontop_sources from source; rev_alias ~from ~to_]
      ==> nontop_sources to_ source);
     (* constructor-sources *)
+    (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
+     [ ~~(any_source base);
+       magic_source from;
+       rev_constructor ~from relation ~base;
+       unless1 Field.is_local relation ]
+     ==> field_magic_sources base relation);
     (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
      [ ~~(any_source base);
        any_source from;
@@ -737,8 +749,17 @@ let datalog_schedule =
      in
      [ rev_accessor ~base relation ~to_;
        nontop_sources base base_source;
+       field_magic_sources base_source relation ]
+     ==> magic_source to_);
+    (let$ [base; base_source; relation; to_] =
+       ["base"; "base_source"; "relation"; "to_"]
+     in
+     [ rev_accessor ~base relation ~to_;
+       nontop_sources base base_source;
        field_sources_top base_source relation ]
      ==> any_source to_);
+    (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
+     [magic_source base; rev_accessor ~base relation ~to_] ==> magic_source to_);
     (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
      [ any_source base;
        rev_accessor ~base relation ~to_;
@@ -763,7 +784,9 @@ let datalog_schedule =
     (let$ [to_; from] = ["to_"; "from"] in
      [has_usage to_; use ~to_ ~from] ==> any_usage from);
     (let$ [from; to_] = ["from"; "to_"] in
-     [has_source from; rev_use ~from ~to_] ==> any_source to_) ]
+     [has_source from; rev_use ~from ~to_] ==> any_source to_);
+    (let$ [from; to_] = ["from"; "to_"] in
+     [magic_source from; rev_use ~from ~to_] ==> magic_source to_) ]
   |> make_schedule
 
 module Fixit : sig

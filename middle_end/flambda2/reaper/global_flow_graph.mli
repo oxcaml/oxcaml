@@ -67,6 +67,8 @@ module Relations : sig
 
   val any_source : Code_id_or_name.t term -> _ atom
 
+  val magic_source : Code_id_or_name.t term -> _ atom
+
   (* An entry (code_id, v) in this relation means that [v] is the "my_closure"
      variable of the code associated to [code_id]. *)
   val code_id_my_closure :
@@ -109,6 +111,8 @@ val add_alias_if_any_source_dep :
 val add_any_usage : graph -> Code_id_or_name.t -> unit
 
 val add_any_source : graph -> Code_id_or_name.t -> unit
+
+val add_magic_source : graph -> Code_id_or_name.t -> unit
 
 val add_code_id_my_closure : graph -> Code_id.t -> Variable.t -> unit
 
