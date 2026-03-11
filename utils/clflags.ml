@@ -654,6 +654,7 @@ module Opt_flag_handler = struct
     set_oclassic : unit -> unit;
     set_o2 : unit -> unit;
     set_o3 : unit -> unit;
+    set_o4 : unit -> unit;
   }
 
   let default =
@@ -675,7 +676,8 @@ module Opt_flag_handler = struct
       use_inlining_arguments_set ~round:1 o2_arguments;
       use_inlining_arguments_set ~round:0 o1_arguments
     in
-    { set_oclassic; set_o2; set_o3 }
+    let set_o4 () = set_o3 () in
+    { set_oclassic; set_o2; set_o3; set_o4 }
 
   let current = ref default
 
@@ -685,6 +687,7 @@ end
 let set_oclassic () = (!Opt_flag_handler.current).set_oclassic ()
 let set_o2 () = (!Opt_flag_handler.current).set_o2 ()
 let set_o3 () = (!Opt_flag_handler.current).set_o3 ()
+let set_o4 () = (!Opt_flag_handler.current).set_o4 ()
 
 (* This is used by the -stop-after option. *)
 module Compiler_pass = struct

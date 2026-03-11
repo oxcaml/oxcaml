@@ -127,6 +127,7 @@ module type Oxcaml_options = sig
   val no_reaper_local_fields : unit -> unit
   val reaper_unbox : unit -> unit
   val no_reaper_unbox : unit -> unit
+  val reaper_max_unbox_size : int -> unit
   val reaper_change_calling_conventions : unit -> unit
   val no_reaper_change_calling_conventions : unit -> unit
   val flambda2_expert_fallback_inlining_heuristic : unit -> unit

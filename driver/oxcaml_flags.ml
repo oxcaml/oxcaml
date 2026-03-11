@@ -114,7 +114,7 @@ let caml_apply_inline_fast_path = ref false  (* -caml-apply-inline-fast-path *)
 type function_result_types = Never | Functors_only | All_functions
 type join_algorithm = Binary | N_way | Checked
 type reaper_preserve_direct_calls = Never | Always | Zero_alloc | Auto
-type opt_level = Oclassic | O2 | O3
+type opt_level = Oclassic | O2 | O3 | O4
 type 'a or_default = Set of 'a | Default
 
 
@@ -132,12 +132,13 @@ let gc_timings = ref false
 
 let symbol_visibility_protected = ref false (* -symbol-visibility-protected*)
 
-let flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3 =
+let flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3 ~o4 =
   match opt_level with
   | Default -> default
   | Set Oclassic -> oclassic
   | Set O2 -> o2
   | Set O3 -> o3
+  | Set O4 -> o4
 
   (* -llvm-backend is at [Clflags.llvm_backend] *)
 
@@ -166,6 +167,7 @@ module Flambda2 = struct
     let reaper_preserve_direct_calls : reaper_preserve_direct_calls = Auto
     let reaper_local_fields = false
     let reaper_unbox = true
+    let reaper_max_unbox_size = 10
     let reaper_change_calling_conventions = true
     let unicode = true
     let kind_checks = false
@@ -184,6 +186,7 @@ module Flambda2 = struct
     reaper_preserve_direct_calls : reaper_preserve_direct_calls;
     reaper_local_fields : bool;
     reaper_unbox : bool;
+    reaper_max_unbox_size : int;
     reaper_change_calling_conventions : bool;
     unicode : bool;
     kind_checks : bool;
@@ -202,6 +205,7 @@ module Flambda2 = struct
     reaper_preserve_direct_calls = Default.reaper_preserve_direct_calls;
     reaper_local_fields = Default.reaper_local_fields;
     reaper_unbox = Default.reaper_unbox;
+    reaper_max_unbox_size = Default.reaper_max_unbox_size;
     reaper_change_calling_conventions =
       Default.reaper_change_calling_conventions;
     unicode = Default.unicode;
@@ -227,7 +231,13 @@ module Flambda2 = struct
     function_result_types = Functors_only
   }
 
-  let default_for_opt_level opt_level = flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3
+  let o4 = {
+    o3 with
+    enable_reaper = true
+  }
+
+  let default_for_opt_level opt_level =
+    flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3 ~o4
 
   let classic_mode = ref Default
   let join_points = ref Default
@@ -243,6 +253,7 @@ module Flambda2 = struct
   let reaper_preserve_direct_calls = ref Default
   let reaper_local_fields = ref Default
   let reaper_unbox = ref Default
+  let reaper_max_unbox_size = ref Default
   let reaper_change_calling_conventions = ref Default
 
   module Dump = struct
@@ -318,8 +329,10 @@ module Flambda2 = struct
 
     let o3 = default
 
+    let o4 = default
+
     let default_for_opt_level opt_level =
-      flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3
+      flags_by_opt_level ~opt_level ~default ~oclassic ~o2 ~o3 ~o4
 
     let fallback_inlining_heuristic = ref Default
     let inline_effects_in_cmm = ref Default
@@ -490,8 +503,16 @@ let set_o3 () =
     Clflags.Opt_flag_handler.default.set_o3 ();
   end
 
+let set_o4 () =
+  if Clflags.is_flambda2 () then begin
+    Flambda2.Inlining.use_inlining_arguments_set Flambda2.Inlining.o3_arguments;
+    opt_level := Set O4
+  end else begin
+    Clflags.Opt_flag_handler.default.set_o3 ();
+  end
+
 let opt_flag_handler : Clflags.Opt_flag_handler.t =
-  { set_oclassic; set_o2; set_o3 }
+  { set_oclassic; set_o2; set_o3; set_o4 }
 
 let use_cached_generic_functions = ref false
 let cached_generic_functions_path =

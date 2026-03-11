@@ -637,7 +637,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
            ~type_expr:param)
   |> add_type2 ident_idx_imm
        ~param1_jkind:(
-         Jkind.Builtin.value ~why:(Type_argument {
+         Jkind.Builtin.value_or_null ~why:(Type_argument {
            parent_path = Path.Pident ident_idx_imm;
            position = 1;
            arity = 2;
@@ -655,7 +655,7 @@ let build_initial_env add_type add_extension add_jkind empty_env =
        ~type_separability:[Separability.Ind; Separability.Ind]
   |> add_type2 ident_idx_mut
        ~param1_jkind:(
-         Jkind.Builtin.value ~why:(Type_argument {
+         Jkind.Builtin.value_or_null ~why:(Type_argument {
            parent_path = Path.Pident ident_idx_mut;
            position = 1;
            arity = 2;
