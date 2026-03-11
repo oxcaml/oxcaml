@@ -429,21 +429,14 @@ Error: This expression has type "int" but an expression was expected of type
 
 (* expressions *)
 let g () = exclave_ local_
-  let f = (() : _ @ unique once) in
-  let f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
-  local_ (() : _ @ unique once);;
+  let _f = (() : _ @ unique once) in
+  let _f = (() : @ unique once) in
+  let _f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
+  let _f x y @ local unique = exclave_ local_ (x + y : @ once unique) in
+  local_ (() : _ @ unique once);
+  local_ (() : @ unique once);;
 
 [%%expect{|
-Line 2, characters 6-7:
-2 |   let f = (() : _ @ unique once) in
-          ^
-Warning 26 [unused-var]: unused variable f.
-
-Line 3, characters 6-7:
-3 |   let f x y @ local unique = exclave_ local_ (x + y : _ @ once unique) in
-          ^
-Warning 26 [unused-var]: unused variable f.
-
 val g : unit -> unit @ local once = <fun>
 |}]
 

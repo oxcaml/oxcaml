@@ -1,0 +1,62 @@
+source_jane_street.ml:  FAIL, REPARSED AST IS DIFFERENT (test.ml 123:2)
+--- /tmp/ocamlparse9a9ef7.txt	2026-03-11 20:15:03.581212296 -0400
++++ /tmp/ocamlparsea90c3a.txt	2026-03-11 20:15:03.729212375 -0400
+@@ -3937,6 +3937,8 @@
+                               expression (_none_[0,0+-1]..[0,0+-1]) ghost
+                                 Pexp_construct "()" (_none_[0,0+-1]..[0,0+-1]) ghost
+                                 None
++                              core_type (_none_[0,0+-1]..[0,0+-1]) ghost
++                                Ptyp_any
+                               mode "unique" (_none_[0,0+-1]..[0,0+-1]) ghost
+                               mode "once" (_none_[0,0+-1]..[0,0+-1]) ghost
+                         ]
+@@ -4043,6 +4045,8 @@
+                                                   expression (_none_[0,0+-1]..[0,0+-1]) ghost
+                                                     Pexp_ident "y" (_none_[0,0+-1]..[0,0+-1]) ghost
+                                               ]
++                                            core_type (_none_[0,0+-1]..[0,0+-1]) ghost
++                                              Ptyp_any
+                                             mode "local" (_none_[0,0+-1]..[0,0+-1]) ghost
+                                             mode "once" (_none_[0,0+-1]..[0,0+-1]) ghost
+                                             mode "unique" (_none_[0,0+-1]..[0,0+-1]) ghost
+@@ -4066,6 +4070,8 @@
+                                   expression (_none_[0,0+-1]..[0,0+-1]) ghost
+                                     Pexp_construct "()" (_none_[0,0+-1]..[0,0+-1]) ghost
+                                     None
++                                  core_type (_none_[0,0+-1]..[0,0+-1]) ghost
++                                    Ptyp_any
+                                   mode "local" (_none_[0,0+-1]..[0,0+-1]) ghost
+                                   mode "unique" (_none_[0,0+-1]..[0,0+-1]) ghost
+                                   mode "once" (_none_[0,0+-1]..[0,0+-1]) ghost
+=====================================================
+source_jane_street.ml:  FAIL, REPARSED AST IS DIFFERENT (test.ml 131:2)
+--- /tmp/ocamlparse4fad5a.txt	2026-03-11 20:15:03.968212503 -0400
++++ /tmp/ocamlparsed1775c.txt	2026-03-11 20:15:04.115212581 -0400
+@@ -3937,6 +3937,8 @@
+                               expression (_none_[0,0+-1]..[0,0+-1]) ghost
+                                 Pexp_construct "()" (_none_[0,0+-1]..[0,0+-1]) ghost
+                                 None
++                              core_type (_none_[0,0+-1]..[0,0+-1]) ghost
++                                Ptyp_any
+                               mode "unique" (_none_[0,0+-1]..[0,0+-1]) ghost
+                               mode "once" (_none_[0,0+-1]..[0,0+-1]) ghost
+                         ]
+@@ -4043,6 +4045,8 @@
+                                                   expression (_none_[0,0+-1]..[0,0+-1]) ghost
+                                                     Pexp_ident "y" (_none_[0,0+-1]..[0,0+-1]) ghost
+                                               ]
++                                            core_type (_none_[0,0+-1]..[0,0+-1]) ghost
++                                              Ptyp_any
+                                             mode "local" (_none_[0,0+-1]..[0,0+-1]) ghost
+                                             mode "once" (_none_[0,0+-1]..[0,0+-1]) ghost
+                                             mode "unique" (_none_[0,0+-1]..[0,0+-1]) ghost
+@@ -4066,6 +4070,8 @@
+                                   expression (_none_[0,0+-1]..[0,0+-1]) ghost
+                                     Pexp_construct "()" (_none_[0,0+-1]..[0,0+-1]) ghost
+                                     None
++                                  core_type (_none_[0,0+-1]..[0,0+-1]) ghost
++                                    Ptyp_any
+                                   mode "local" (_none_[0,0+-1]..[0,0+-1]) ghost
+                                   mode "unique" (_none_[0,0+-1]..[0,0+-1]) ghost
+                                   mode "once" (_none_[0,0+-1]..[0,0+-1]) ghost
+=====================================================
