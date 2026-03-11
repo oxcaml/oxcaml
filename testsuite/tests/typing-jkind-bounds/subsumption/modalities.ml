@@ -470,3 +470,113 @@ Error: This value is "contended"
          which is expected to be "portable".
        However, the highlighted expression is expected to be "uncontended".
 |}]
+
+(* Non-modal axis: external_ in with-bounds *)
+
+(* [value mod portable external_ with 'a @@ external_]
+  always crosses externality, but crosses [portable] with ['a] *)
+
+module Crosses_portable_with_a : sig
+  type 'a t : value mod portable with 'a
+end = struct
+  type 'a t : value mod portable external_ with 'a @@ external_
+end
+[%%expect{|
+module Crosses_portable_with_a :
+  sig type 'a t : value mod portable with 'a end
+|}]
+
+module Doesn't_always_cross_portable : sig
+  type 'a t : value mod portable
+end = struct
+  type 'a t : value mod portable external_ with 'a @@ external_
+end
+[%%expect{|
+Lines 3-5, characters 6-3:
+3 | ......struct
+4 |   type 'a t : value mod portable external_ with 'a @@ external_
+5 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig
+           type 'a t : value mod portable external_ with 'a @@ external_
+         end
+       is not included in
+         sig type 'a t : value mod portable end
+       Type declarations do not match:
+         type 'a t : value mod portable external_ with 'a @@ external_
+       is not included in
+         type 'a t : value mod portable
+       The kind of the first is
+           value mod portable external_ with 'a @@ external_
+         because of the definition of t at line 4, characters 2-63.
+       But the kind of the first must be a subkind of value mod portable
+         because of the definition of t at line 2, characters 2-32.
+
+       The first mode-crosses less than the second along:
+         portability: mod portable with 'a ≰ mod portable
+|}]
+
+module Always_crosses_external : sig
+  type 'a t : value mod external_
+end = struct
+  type 'a t : value mod portable external_ with 'a @@ external_
+end
+[%%expect{|
+module Always_crosses_external : sig type 'a t : value mod external_ end
+|}]
+
+(* with bound is ignored for external when it's with _ @@ external_ *)
+module Check1 : sig
+  type 'a t : value mod external_
+end = struct
+  type 'a t : value mod external_ with 'a @@ external_
+end
+[%%expect{|
+module Check1 : sig type 'a t : value mod external_ end
+|}]
+
+module Check2 : sig
+  type 'a t : value mod external_ with 'a @@ external_
+end = struct
+  type 'a t : value mod external_
+end
+[%%expect{|
+module Check2 : sig type 'a t : value mod external_ end
+|}]
+
+(* [@@ internal] does nothing **)
+module Check1 : sig
+  type 'a t : value mod external_ with 'a
+end = struct
+  type 'a t : value mod external_ with 'a @@ internal
+end
+[%%expect{|
+module Check1 : sig type 'a t : value mod external_ with 'a end
+|}]
+
+module Check2 : sig
+  type 'a t : value mod external_ with 'a @@ internal
+end = struct
+  type 'a t : value mod external_ with 'a
+end
+[%%expect{|
+module Check2 : sig type 'a t : value mod external_ with 'a end
+|}]
+
+(* Non-modal axes other than externality are not supported in with-bounds *)
+type 'a t : value with 'a @@ non_null
+[%%expect{|
+Line 1, characters 29-37:
+1 | type 'a t : value with 'a @@ non_null
+                                 ^^^^^^^^
+Error: Unrecognized modality non_null.
+|}]
+
+type 'a t : value with 'a @@ separable
+[%%expect{|
+Line 1, characters 29-38:
+1 | type 'a t : value with 'a @@ separable
+                                 ^^^^^^^^^
+Error: Unrecognized modality separable.
+|}]

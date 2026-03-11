@@ -1681,20 +1681,18 @@ module Const = struct
       | Some base_sa, Some actual_sa ->
         Scannable_axes.to_string_list_diff ~base:base_sa actual_sa
 
-    let modality_to_ignore_axes axes_to_ignore =
-      (* The modality is constant along axes to ignore and id along others *)
+    let modalities_of_ignored_axes axes_to_ignore =
       List.fold_left
-        (fun acc (Axis.Pack axis) ->
+        (fun (modal_modality, nonmodal_axes) (Axis.Pack axis) ->
           match axis with
           | Modal axis -> (
             match axis, Crossing.Per_axis.min axis with
-            | Monadic ax, Modality t -> Modality.Const.set (Monadic ax) t acc
+            | Monadic ax, Modality t ->
+              Modality.Const.set (Monadic ax) t modal_modality, nonmodal_axes
             | Comonadic ax, Modality t ->
-              Modality.Const.set (Comonadic ax) t acc)
-          | Nonmodal _ ->
-            (* TODO: don't know how to print *)
-            acc)
-        Modality.Const.id
+              Modality.Const.set (Comonadic ax) t modal_modality, nonmodal_axes)
+          | Nonmodal _ -> modal_modality, Axis.Pack axis :: nonmodal_axes)
+        (Modality.Const.id, [])
         (Axis_set.to_list axes_to_ignore)
 
     (** Write [actual] in terms of [base] *)
@@ -1753,9 +1751,19 @@ module Const = struct
                 With_bounds.Type_info.axes_ignored_by_modalities
                   ~mod_bounds:actual.mod_bounds ~type_info
               in
-              ( out_type,
-                !outcometree_of_modalities Types.Immutable
-                  (modality_to_ignore_axes axes_ignored_by_modalities) ))
+              let modal_modality, nonmodal_axes =
+                modalities_of_ignored_axes axes_ignored_by_modalities
+              in
+              let modal =
+                !outcometree_of_modalities Types.Immutable modal_modality
+              in
+              let nonmodal =
+                List.map
+                  (fun (Axis.Pack axis) ->
+                    Fmt.asprintf "%a" (Per_axis.print axis) (Per_axis.min axis))
+                  nonmodal_axes
+              in
+              out_type, modal @ nonmodal)
             with_bounds otys
       in
       match matching_layouts, modal_bounds with
@@ -2017,15 +2025,26 @@ module Const = struct
       | Right_jkind c -> raise ~loc:type_.ptyp_loc (With_on_right c)
       | Left_jkind (transl_type, _) ->
         let type_ = transl_type type_ in
-        let modality =
-          (Typemode.transl_modalities ~maturity:Stable Immutable modalities)
-            .moda_modalities
+        let modality, externality =
+          Typemode.transl_with_bound_modifiers modalities
+        in
+        let relevant_axes =
+          let axes =
+            Mod_bounds.relevant_axes_of_modality
+              ~relevant_for_shallow:`Irrelevant ~modality
+          in
+          match externality with
+          | None -> axes
+          | Some ext ->
+            let is_top =
+              Per_axis.(
+                le (Nonmodal Externality) (max (Nonmodal Externality)) ext)
+            in
+            if is_top then axes else Axis_set.remove axes (Nonmodal Externality)
         in
         { base = base.base;
           mod_bounds = base.mod_bounds;
-          with_bounds =
-            With_bounds.add_modality ~modality ~relevant_for_shallow:`Irrelevant
-              ~type_expr:type_ base.with_bounds
+          with_bounds = With_bounds.add type_ { relevant_axes } base.with_bounds
         })
     | Pjk_default | Pjk_kind_of _ ->
       raise ~loc:jkind.pjka_loc Unimplemented_syntax
