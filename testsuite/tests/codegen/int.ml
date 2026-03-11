@@ -270,10 +270,10 @@ let compare (x : int) (y : int) = compare x y
 [%%expect_asm X86_64{|
 compare:
   cmpq  %rbx, %rax
-  setg  %cl
-  setl  %al
-  subb  %al, %cl
-  movsbq %cl, %rax
+  setg  %al
+  setl  %bl
+  subl  %ebx, %eax
+  movsbq %al, %rax
   leaq  1(%rax,%rax), %rax
   ret
 |}]
@@ -296,10 +296,10 @@ let equal_using_compare (x : int) (y : int) =
 [%%expect_asm X86_64{|
 equal_using_compare:
   cmpq  %rbx, %rax
-  setg  %cl
-  setl  %al
-  subb  %al, %cl
-  movsbq %cl, %rax
+  setg  %al
+  setl  %bl
+  subl  %ebx, %eax
+  movsbq %al, %rax
   leaq  1(%rax,%rax), %rax
   cmpq  $1, %rax
   sete  %al

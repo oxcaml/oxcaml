@@ -517,10 +517,10 @@ let compare x y = Int64_u.compare x y
 [%%expect_asm X86_64{|
 compare:
   cmpq  %rbx, %rax
-  setg  %cl
-  setl  %al
-  subb  %al, %cl
-  movsbq %cl, %rax
+  setg  %al
+  setl  %bl
+  subl  %ebx, %eax
+  movsbq %al, %rax
   leaq  1(%rax,%rax), %rax
   ret
 |}]
@@ -533,10 +533,10 @@ unsigned_compare:
   movabsq $-9223372036854775808, %rdi
   subq  %rdi, %rax
   cmpq  %rbx, %rax
-  setg  %cl
-  setl  %al
-  subb  %al, %cl
-  movsbq %cl, %rax
+  setg  %al
+  setl  %bl
+  subl  %ebx, %eax
+  movsbq %al, %rax
   leaq  1(%rax,%rax), %rax
   ret
 |}]
@@ -556,10 +556,10 @@ let equal_using_compare x y = Int64_u.compare x y = 0
 [%%expect_asm X86_64{|
 equal_using_compare:
   cmpq  %rbx, %rax
-  setg  %cl
-  setl  %al
-  subb  %al, %cl
-  movsbq %cl, %rax
+  setg  %al
+  setl  %bl
+  subl  %ebx, %eax
+  movsbq %al, %rax
   leaq  1(%rax,%rax), %rax
   cmpq  $1, %rax
   sete  %al

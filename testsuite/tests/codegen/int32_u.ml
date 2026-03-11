@@ -53,10 +53,10 @@ let compare x y = Int32_u.compare x y
 [%%expect_asm X86_64{|
 compare:
   cmpq  %rbx, %rax
-  setg  %cl
-  setl  %al
-  subb  %al, %cl
-  movsbq %cl, %rax
+  setg  %al
+  setl  %bl
+  subl  %ebx, %eax
+  movsbq %al, %rax
   leaq  1(%rax,%rax), %rax
   ret
 |}]
