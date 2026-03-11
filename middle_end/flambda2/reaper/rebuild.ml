@@ -80,12 +80,14 @@ type env =
     function_return_decision : param_decision list Code_id.Map.t;
     kinds : K.t Name.Map.t;
     should_preserve_direct_calls : should_preserve_direct_calls;
-    old_typing_env : Typing_env.t option
+    old_typing_env : Typing_env.t option;
+    inside_code_definition : bool
   }
 
 type rebuild_result =
   { all_slot_offsets : Slot_offsets.t;
-    all_code : Code.t Code_id.Map.t
+    all_code : Code.t Code_id.Map.t;
+    code_ids_to_remember : Code_id.Set.t
   }
 
 let freshen_decisions = function
@@ -546,6 +548,18 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
       (Function_slot.Lmap.bindings
          (Function_declarations.funs_in_order function_decls))
   in
+  let code_ids_to_remember =
+    if env.inside_code_definition
+    then
+      List.fold_left
+        (fun code_ids_to_remember (_, decl) ->
+          match decl with
+          | Deleted _ -> code_ids_to_remember
+          | Code_id { code_id; _ } ->
+            Code_id.Set.add code_id code_ids_to_remember)
+        res.code_ids_to_remember function_decls
+    else res.code_ids_to_remember
+  in
   let function_decls =
     Function_declarations.create (Function_slot.Lmap.of_list function_decls)
   in
@@ -556,7 +570,8 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
     { res with
       all_slot_offsets =
         Slot_offsets.add_set_of_closures res.all_slot_offsets ~is_phantom
-          set_of_closures
+          set_of_closures;
+      code_ids_to_remember
     }
   in
   set_of_closures, res
@@ -1916,6 +1931,7 @@ and rebuild_function_params_and_body (env : env) res code_metadata
       in
       { env with should_preserve_direct_calls }
   in
+  let env = { env with inside_code_definition = true } in
   let { Rev_expr.return_continuation;
         exn_continuation;
         params;
@@ -2179,6 +2195,7 @@ type result =
   { body : Expr.t;
     free_names : Name_occurrences.t;
     all_code : Code.t Code_id.Map.t;
+    code_ids_to_remember : Code_id.Set.t;
     slot_offsets : Slot_offsets.t
   }
 
@@ -2300,18 +2317,23 @@ let rebuild ~machine_width ~(code_deps : Traverse_acc.code_dep Code_id.Map.t)
       function_return_decision;
       kinds;
       should_preserve_direct_calls;
-      old_typing_env = final_typing_env
+      old_typing_env = final_typing_env;
+      inside_code_definition = false
     }
   in
   let res =
-    { all_slot_offsets = Slot_offsets.empty; all_code = Code_id.Map.empty }
+    { all_slot_offsets = Slot_offsets.empty;
+      all_code = Code_id.Map.empty;
+      code_ids_to_remember = Code_id.Set.empty
+    }
   in
-  let rebuilt_expr, { all_slot_offsets; all_code } =
+  let rebuilt_expr, { all_slot_offsets; all_code; code_ids_to_remember } =
     Profile.record_call ~accumulate:true "up" (fun () ->
         rebuild_expr env res holed)
   in
   { body = rebuilt_expr.expr;
     free_names = rebuilt_expr.free_names;
     all_code;
+    code_ids_to_remember;
     slot_offsets = all_slot_offsets
   }
