@@ -186,6 +186,16 @@ let mk_no_cfg_value_propagation_float f =
     Arg.Unit f,
     " Do not propagate float value to simplify CFG" )
 
+let mk_cfg_value_propagation_flow f =
+  ( "-cfg-value-propagation-flow",
+    Arg.Unit f,
+    " Propagate values across block to simplify CFG" )
+
+let mk_no_cfg_value_propagation_flow f =
+  ( "-no-cfg-value-propagation-flow",
+    Arg.Unit f,
+    " Do not propagate values across block to simplify CFG" )
+
 let mk_reorder_blocks_random f =
   ( "-reorder-blocks-random",
     Arg.Int f,
@@ -1189,6 +1199,8 @@ module type Oxcaml_options = sig
   val no_cfg_value_propagation : unit -> unit
   val cfg_value_propagation_float : unit -> unit
   val no_cfg_value_propagation_float : unit -> unit
+  val cfg_value_propagation_flow : unit -> unit
+  val no_cfg_value_propagation_flow : unit -> unit
   val reorder_blocks_random : int -> unit
   val basic_block_sections : unit -> unit
   val module_entry_functions_section : unit -> unit
@@ -1355,6 +1367,8 @@ module Make_oxcaml_options (F : Oxcaml_options) = struct
       mk_no_cfg_value_propagation F.no_cfg_value_propagation;
       mk_cfg_value_propagation_float F.cfg_value_propagation_float;
       mk_no_cfg_value_propagation_float F.no_cfg_value_propagation_float;
+      mk_cfg_value_propagation_flow F.cfg_value_propagation_flow;
+      mk_no_cfg_value_propagation_flow F.no_cfg_value_propagation_flow;
       mk_reorder_blocks_random F.reorder_blocks_random;
       mk_basic_block_sections F.basic_block_sections;
       mk_module_entry_functions_section F.module_entry_functions_section;
@@ -1568,6 +1582,11 @@ module Oxcaml_options_impl = struct
 
   let no_cfg_value_propagation_float =
     clear' Oxcaml_flags.cfg_value_propagation_float
+
+  let cfg_value_propagation_flow = set' Oxcaml_flags.cfg_value_propagation_flow
+
+  let no_cfg_value_propagation_flow =
+    clear' Oxcaml_flags.cfg_value_propagation_flow
 
   let reorder_blocks_random seed =
     Oxcaml_flags.reorder_blocks_random := Some seed
@@ -2089,6 +2108,8 @@ module Extra_params = struct
     | "cfg-value-propagation" -> set' Oxcaml_flags.cfg_value_propagation
     | "cfg-value-propagation-float" ->
         set' Oxcaml_flags.cfg_value_propagation_float
+    | "cfg-value-propagation-flow" ->
+        set' Oxcaml_flags.cfg_value_propagation_flow
     | "dump-inlining-paths" -> set' Oxcaml_flags.dump_inlining_paths
     | "davail" -> set' Oxcaml_flags.davail
     | "dranges" -> set' Oxcaml_flags.dranges
