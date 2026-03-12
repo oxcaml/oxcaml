@@ -551,6 +551,16 @@ let rewrite_set_of_closures env res ~(bound : Name.t list) ~is_phantom
   let code_ids_to_remember =
     if env.inside_code_definition
     then
+      (* If a closure is defined inside a code definition (let's call it C) it is possible,
+          for other compilation units to need the code of the functions.
+          If the C code is inlined in this other compilation unit, the functions
+          of the closure can be simplified again. Hence it has to be exported
+          (remembered).
+          
+          This is an over-approximation: If the current code C cannot be inlined
+          or re-simplified in another compilation unit, this closure can't be
+          resimplified there. Yet the current criterion will still export the code
+          from this closure *)
       List.fold_left
         (fun code_ids_to_remember (_, decl) ->
           match decl with
