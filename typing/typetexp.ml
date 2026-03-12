@@ -1914,7 +1914,7 @@ let report_error_doc env ppf =
       Env.print_with_quote_promote (name, intro_stage, usage_stage)
   | Lpoly_unsupported ->
       fprintf ppf
-        "@[Sort polymorphism is not supported in this context@]"
+        "@[Layout polymorphism is not supported in this context@]"
 
 let () =
   Location.register_error_of_exn

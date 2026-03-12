@@ -317,7 +317,7 @@ let _ = (fun (x : layout_ a. ('t : a). 't) -> x)
 Line 1, characters 18-41:
 1 | let _ = (fun (x : layout_ a. ('t : a). 't) -> x)
                       ^^^^^^^^^^^^^^^^^^^^^^^
-Error: Sort polymorphism is not supported in this context
+Error: Layout polymorphism is not supported in this context
 |}]
 
 let f : layout_ a. ('t : a). 't -> 't = fun x -> x
@@ -325,7 +325,7 @@ let f : layout_ a. ('t : a). 't -> 't = fun x -> x
 Line 1, characters 8-37:
 1 | let f : layout_ a. ('t : a). 't -> 't = fun x -> x
             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Sort polymorphism is not supported in this context
+Error: Layout polymorphism is not supported in this context
 |}]
 
 (* layout_ in a record field type is not yet supported *)
@@ -334,7 +334,7 @@ type t = { id : layout_ k. ('a : k). 'a -> 'a }
 Line 1, characters 16-45:
 1 | type t = { id : layout_ k. ('a : k). 'a -> 'a }
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Sort polymorphism is not supported in this context
+Error: Layout polymorphism is not supported in this context
 |}]
 
 module F (M : sig val f : layout_ x. ('a : x). 'a -> 'a end) = struct
