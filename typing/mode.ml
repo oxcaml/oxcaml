@@ -359,7 +359,7 @@ module Lattices = struct
 
     let max = L.max
 
-    let le a b = a <= b && (l_to_int a <> 0b01 || l_to_int b <> 0b10)
+    let le a b = a <= b && l_to_int a lxor 0b01 lor (l_to_int b lxor 0b10) <> 0
 
     let equal a b = a = b
 
