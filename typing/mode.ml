@@ -385,6 +385,8 @@ module Lattices = struct
     open struct
       external l_to_int : L.t -> int = "%identity"
 
+      external l_of_int : int -> L.t = "%identity"
+
       external pord_of_int : int -> pord = "%identity"
 
       let () =
@@ -418,17 +420,9 @@ module Lattices = struct
       | Equal -> true
       | Less | Greater | Incomparable -> false
 
-    let join a b =
-      match cmp a b with
-      | Greater -> a
-      | Less | Equal -> b
-      | Incomparable -> L.max
+    let join a b = l_of_int (l_to_int a lor l_to_int b)
 
-    let meet a b =
-      match cmp a b with
-      | Less -> a
-      | Equal | Greater -> b
-      | Incomparable -> L.min
+    let meet a b = l_of_int (l_to_int a land l_to_int b)
 
     (* A partial lattice has a co-heyting structure.
        Prove the [subtract] below is the left adjoint of [join].
