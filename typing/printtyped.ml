@@ -295,9 +295,9 @@ let alloc_modes_opt i ppf ms =
   in
   modes ~pr:print_alloc_modes_opt i ppf ms
 
-let alloc_modes_var i ppf ms =
+let alloc_modes_l_var i ppf ms =
   let print_alloc_modes_var i ppf m =
-    line i ppf "%a\n" (Format_doc.compat (Mode.Alloc.print ())) m
+    line i ppf "%a\n" (Typedtree.print_alloc_mode_l) m
   in
   modes ~pr:print_alloc_modes_var i ppf ms
 
@@ -571,7 +571,7 @@ and function_body i ppf (body : function_body) =
       line i ppf "Tfunction_cases%a %a\n"
         fmt_partiality fc_partial
         fmt_location fc_loc;
-      alloc_mode_raw i ppf fc_arg_mode;
+      alloc_mode_l_raw i ppf fc_arg_mode;
       line i ppf "%a\n" fmt_sort fc_arg_sort;
       attributes (i+1) ppf fc_attributes;
       List.iter (fun e -> expression_extra (i+1) ppf e []) fc_exp_extra;
@@ -612,13 +612,19 @@ and expression_extra i ppf x attrs =
       attributes i ppf attrs;
       type_inspection (i+1) ppf ti
 
-and alloc_mode_raw: type l r. _ -> _ -> (l * r) Mode.Alloc.t -> _
+and alloc_mode_r_raw: _ -> _ -> alloc_mode_r -> _
+  = fun i ppf m -> line i ppf "alloc_mode %a\n" (Typedtree.print_alloc_mode_r) m
+
+and alloc_mode_l_raw: _ -> _ -> alloc_mode_l -> _
+  = fun i ppf m -> line i ppf "alloc_mode %a\n" (Typedtree.print_alloc_mode_l) m
+
+and _mode_raw: type l r. _ -> _ -> (l * r) Mode.Alloc.t -> _
   = fun i ppf m ->
     line i ppf "alloc_mode %a\n" (Format_doc.compat (Mode.Alloc.print ())) m
 
-and alloc_mode i ppf (m : alloc_mode) = alloc_mode_raw i ppf m
+and alloc_mode_r i ppf (m : alloc_mode_r) = alloc_mode_r_raw i ppf m
 
-and alloc_mode_option i ppf m = Option.iter (alloc_mode i ppf) m
+and alloc_mode_option i ppf m = Option.iter (alloc_mode_r i ppf) m
 
 and locality_mode i ppf m =
   line i ppf "locality_mode %a\n"
@@ -632,7 +638,7 @@ and alloc_const_option_mode i ppf m =
     (Format_doc.compat Mode.Alloc.Const.Option.print) m
 
 and expression_alloc_mode i ppf (expr, am) =
-  alloc_mode i ppf am;
+  alloc_mode_r i ppf am;
   expression i ppf expr
 
 and expression i ppf x =
@@ -660,8 +666,8 @@ and expression i ppf x =
       expression i ppf e
   | Texp_function { params; body; alloc_mode = am; ret_mode } ->
       line i ppf "Texp_function\n";
-      alloc_mode i ppf am;
-      alloc_modes_var i ppf ret_mode;
+      alloc_mode_r i ppf am;
+      alloc_modes_l_var i ppf ret_mode;
       list i function_param ppf params;
       function_body i ppf body;
   | Texp_apply (e, l, m, am, za) ->
@@ -689,7 +695,7 @@ and expression i ppf x =
   | Texp_unboxed_bool b -> line i ppf "Texp_unboxed_bool %a\n" fmt_bool b;
   | Texp_tuple (l, am) ->
       line i ppf "Texp_tuple\n";
-      alloc_mode i ppf am;
+      alloc_mode_r i ppf am;
       list i labeled_expression ppf l;
   | Texp_unboxed_tuple l ->
       line i ppf "Texp_unboxed_tuple\n";
@@ -738,7 +744,7 @@ and expression i ppf x =
   | Texp_array (amut, sort, l, amode) ->
       line i ppf "Texp_array %a\n" fmt_mutable_mode_flag amut;
       line i ppf "%a\n" fmt_sort sort;
-      alloc_mode i ppf amode;
+      alloc_mode_r i ppf amode;
       list i expression ppf l;
   | Texp_idx (ba, uas) ->
       line i ppf "Texp_idx\n";
@@ -749,7 +755,7 @@ and expression i ppf x =
       expression i ppf e;
       line i ppf "%a\n" fmt_sort sort;
       longident i ppf li;
-      alloc_mode i ppf amode
+      alloc_mode_r i ppf amode
   | Texp_list_comprehension comp ->
       line i ppf "Texp_list_comprehension\n";
       comprehension i ppf comp
@@ -885,7 +891,7 @@ and function_param i ppf x =
       line i ppf "%a\n" fmt_sort sort;
       pattern (i+1) ppf pat;
       expression (i+1) ppf expr);
-  alloc_modes_var (i+1) ppf x.fp_mode
+  alloc_modes_l_var (i+1) ppf x.fp_mode
 
 and type_parameter i ppf (x, _variance) = core_type i ppf x
 
