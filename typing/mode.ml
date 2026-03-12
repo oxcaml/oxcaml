@@ -617,15 +617,16 @@ module Lattices = struct
       let max = Stateful
 
       (* CR nmatschke: The compiler could generate better code here, but we
-         could also consider precomputing a table indexed by [a lor b]. *)
+         could also consider precomputing a table indexed by [(a lsl 2) lor b].
+      *)
       let cmp a b =
         let open struct
           external to_int : t -> int = "%identity"
         end in
         let a = to_int a and b = to_int b in
-        if a land b = 0 && a <> 0 && b <> 0
-        then Incomparable
-        else if a < b then Less else if a > b then Greater else Equal
+        if a = b then Equal
+        else if a land b = 0 && a <> 0 && b <> 0 then Incomparable
+        else if a < b then Less else Greater
     end)
 
     let legacy = Stateful
@@ -652,15 +653,16 @@ module Lattices = struct
       let max = Immutable
 
       (* CR nmatschke: The compiler could generate better code here, but we
-         could also consider precomputing a table indexed by [a lor b]. *)
+         could also consider precomputing a table indexed by [(a lsl 2) lor b].
+      *)
       let cmp a b =
         let open struct
           external to_int : t -> int = "%identity"
         end in
         let a = to_int a and b = to_int b in
-        if a land b = 0 && a <> 0 && b <> 0
-        then Incomparable
-        else if a < b then Less else if a > b then Greater else Equal
+        if a = b then Equal
+        else if a land b = 0 && a <> 0 && b <> 0 then Incomparable
+        else if a < b then Less else Greater
     end)
 
     let legacy = Read_write
