@@ -425,6 +425,9 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
       cfg_with_infos ++ register_allocator fd_cmm
       ++ cfg_with_infos_profile ~accumulate:true "cfg_validate_description"
            (Regalloc_validate.run cfg_description))
+  ++ (fun cfg_with_infos ->
+  Callee_regs_collector.cfg cfg_with_infos;
+  cfg_with_infos)
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue" Cfg_prologue.run
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue_validate"
        Cfg_prologue.validate

@@ -194,6 +194,12 @@ end) : S = struct
       (fun info ->
         Zero_alloc_info.merge info.ui_zero_alloc_info ~into:ui_zero_alloc_info)
       units;
+    let ui_callee_regs_info = Callee_regs_info.create () in
+    List.iter
+      (fun info ->
+        Callee_regs_info.merge info.ui_callee_regs_info
+          ~into:ui_callee_regs_info)
+      units;
     let modname = Compilation_unit.name ui.ui_unit in
     let format : Lambda.main_module_block_format =
       (* Open modules not supported with packs, so always just a record *)
@@ -224,6 +230,7 @@ end) : S = struct
         ui_force_link = List.exists (fun info -> info.ui_force_link) units;
         ui_export_info;
         ui_zero_alloc_info;
+        ui_callee_regs_info;
         ui_external_symbols =
           union (List.map (fun info -> info.ui_external_symbols) units)
       }

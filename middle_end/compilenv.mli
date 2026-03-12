@@ -57,6 +57,13 @@ val cached_zero_alloc_info : Zero_alloc_info.t
 val cache_zero_alloc_info : Zero_alloc_info.t -> unit
         (* [cache_zero_alloc_info c] adds [c] to [cached_zero_alloc_info] *)
 
+val cached_callee_regs_info : Callee_regs_info.t
+        (* Return cached information about registers clobbered by leaf
+           functions (from other compilation units). *)
+
+val cache_callee_regs_info : Callee_regs_info.t -> unit
+        (* [cache_callee_regs_info c] adds [c] to [cached_callee_regs_info] *)
+
 val new_const_symbol : unit -> string
 
 val read_unit_info: string -> unit_infos * Digest.t

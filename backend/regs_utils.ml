@@ -23,6 +23,10 @@ module type T = sig
     include Identifiable.S with type t := t
 
     val reg_class : t -> Reg_class.t
+
+    (** A stable integer index for the register, unique within all registers
+        across all classes (i.e. a flat global index). *)
+    val to_int : t -> int
   end
 
   val index_in_class : Phys_reg.t -> int

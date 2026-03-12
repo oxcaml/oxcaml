@@ -367,7 +367,23 @@ let print_cmx_infos (uir, sections, crc) =
   print_generic_fns uir.uir_generic_fns;
   printf "Force link: %s\n" (if uir.uir_force_link then "YES" else "no");
   if not (!no_code || !no_approx) then begin
-    Zero_alloc_info.Raw.print uir.uir_zero_alloc_info
+    Zero_alloc_info.Raw.print uir.uir_zero_alloc_info;
+    let class_name class_idx =
+      match List.nth_opt Regs.Reg_class.all class_idx with
+      | None -> Printf.sprintf "class_%d" class_idx
+      | Some cls -> Format.asprintf "%a" Regs.Reg_class.print cls
+    in
+    let reg_name ~class_idx ~bit_idx =
+      match List.nth_opt Regs.Reg_class.all class_idx with
+      | None -> Printf.sprintf "reg_%d_%d" class_idx bit_idx
+      | Some cls ->
+        let regs = Regs.registers cls in
+        if bit_idx < Array.length regs
+        then Format.asprintf "%a" Regs.Phys_reg.print regs.(bit_idx)
+        else Printf.sprintf "reg_%d_%d" class_idx bit_idx
+    in
+    Callee_regs_info.Raw.print_with_names ~class_name ~reg_name
+      uir.uir_callee_regs_info
   end
 
 let print_cmxa_infos (lib : Cmx_format.library_infos) =
