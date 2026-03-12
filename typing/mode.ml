@@ -326,11 +326,11 @@ module Lattices = struct
   end
   [@@inline]
 
-  (* Any changes to this type must consider the implementation of [pord_tbl]. *) 
+  (* Any changes to this type must consider the implementation of [pord_tbl]. *)
   type pord =
-    | Less         (* 0b00 *)
-    | Equal        (* 0b01 *)
-    | Greater      (* 0b10 *)
+    | Less (* 0b00 *)
+    | Equal (* 0b01 *)
+    | Greater (* 0b10 *)
     | Incomparable (* 0b11 *)
 
   (* A lookup table precomputing the result of [cmp] for partial lattices with
@@ -384,6 +384,7 @@ module Lattices = struct
   module Partial (L : Partial) = struct
     open struct
       external l_to_int : L.t -> int = "%identity"
+
       external pord_of_int : int -> pord = "%identity"
 
       let () =
@@ -400,7 +401,7 @@ module Lattices = struct
 
       let cmp a b =
         pord_of_int
-          ((pord_tbl lsr (((l_to_int a lsl 2) lor l_to_int b) * 2)) land 0b11)
+          ((pord_tbl lsr ((l_to_int a lsl 2) lor l_to_int b * 2)) land 0b11)
     end
 
     let min = L.min
@@ -648,12 +649,12 @@ module Lattices = struct
   end
 
   module Statefulness = struct
-    (* Any changes to this type must consider the implementation of [cmp]. *) 
+    (* Any changes to this type must consider the implementation of [cmp]. *)
     type t =
-      | Stateless  (* 0b00 *)
+      | Stateless (* 0b00 *)
       | Observable (* 0b01 *)
-      | Reading    (* 0b10 *)
-      | Stateful   (* 0b11 *)
+      | Reading (* 0b10 *)
+      | Stateful (* 0b11 *)
 
     include Partial (struct
       type nonrec t = t
@@ -677,12 +678,12 @@ module Lattices = struct
   end
 
   module Visibility = struct
-    (* Any changes to this type must consider the implementation of [cmp]. *) 
+    (* Any changes to this type must consider the implementation of [cmp]. *)
     type t =
       | Read_write (* 0b00 *)
-      | Read       (* 0b01 *)
-      | Write      (* 0b10 *)
-      | Immutable  (* 0b11 *)
+      | Read (* 0b01 *)
+      | Write (* 0b10 *)
+      | Immutable (* 0b11 *)
 
     include Partial (struct
       type nonrec t = t
@@ -3269,9 +3270,9 @@ module Portability = struct
   (* CR dkalinichenko: ideally, [reading] should zap to [shareable]. *)
   let zap_to_legacy ~statefulness =
     match statefulness with
-    | Statefulness.Const.Stateful
-    | Statefulness.Const.Reading
-    | Statefulness.Const.Observable -> zap_to_ceil
+    | Statefulness.Const.Stateful | Statefulness.Const.Reading
+    | Statefulness.Const.Observable ->
+      zap_to_ceil
     | Statefulness.Const.Stateless -> zap_to_floor
 end
 
@@ -3311,9 +3312,9 @@ module Contention = struct
   (* CR dkalinichenko: ideally, [read] should zap to [shared]. *)
   let zap_to_legacy ~visibility =
     match visibility with
-    | Visibility.Const.Read_write
-    | Visibility.Const.Read
-    | Visibility.Const.Write -> zap_to_floor
+    | Visibility.Const.Read_write | Visibility.Const.Read
+    | Visibility.Const.Write ->
+      zap_to_floor
     | Visibility.Const.Immutable -> zap_to_ceil
 end
 
