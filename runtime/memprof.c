@@ -2093,10 +2093,13 @@ void caml_memprof_sample_young(uintnat wosize, int from_caml,
         ++ new_entries;
       }
 
-      if (domain->entries.config == CONFIG_NONE) {
-        /* Some other domain stopped this config */
-        alloc_ofs = trigger_ofs = 0;
-        break;
+      if (entries->config != config) {
+          /* The config has changed (possibly discarded); keep sampling? */
+          config = entries->config;
+          if (!sampling(config)) {
+              alloc_ofs = trigger_ofs = 0;
+              break;
+          }
       }
     }
   } while (sub_alloc);
