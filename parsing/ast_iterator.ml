@@ -161,6 +161,7 @@ module T = struct
     | Ptyp_of_kind jkind ->
         sub.jkind_annotation sub jkind
     | Ptyp_repr (_, t) -> sub.typ sub t
+    | Ptyp_newlayout (_, t) -> sub.typ sub t
     | Ptyp_extension x -> sub.extension sub x
 
   let iter_type_declaration sub

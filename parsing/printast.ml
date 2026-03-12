@@ -240,6 +240,10 @@ let rec core_type i ppf x =
       line i ppf "Ptyp_repr\n";
       list i reprvar ppf lvars;
       core_type i ppf ct
+  | Ptyp_newlayout (lvars, ct) ->
+      line i ppf "Ptyp_newlayout\n";
+      list i string_loc ppf lvars;
+      core_type i ppf ct
   | Ptyp_extension (s, arg) ->
       line i ppf "Ptyp_extension \"%s\"\n" s.txt;
       payload i ppf arg
