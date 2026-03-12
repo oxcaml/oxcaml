@@ -13,7 +13,20 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let unit_with_body (unit : Flambda_unit.t) (body : Flambda.Expr.t) =
+let unit_with_body (unit : Flambda_unit.t) (body : Flambda.Expr.t) ~free_names_of_body =
+  let toplevel_my_region = Flambda_unit.toplevel_my_region unit in
+  let toplevel_my_ghost_region = Flambda_unit.toplevel_my_ghost_region unit in
+  Name_occurrences.fold_names free_names_of_body ~init:() ~f:(fun () name ->
+      Name.pattern_match name
+        ~var:(fun var ->
+          if not (Variable.equal var toplevel_my_region
+                 || Variable.equal var toplevel_my_ghost_region)
+          then
+            Misc.fatal_errorf
+              "Variable %a not expected to be free in whole-compilation-unit \
+               term after rebuild in the reaper:@ free names:@ %a@ body:@ %a"
+              Variable.print var Name_occurrences.print free_names_of_body Flambda.Expr.print body)
+        ~symbol:(fun _symbol -> ()));
   Flambda_unit.create
     ~return_continuation:(Flambda_unit.return_continuation unit)
     ~exn_continuation:(Flambda_unit.exn_continuation unit)
@@ -72,4 +85,4 @@ let run ~machine_width ~cmx_loader ~all_code ~final_typing_env
          ~unit_symbol:(Flambda_unit.module_symbol unit))
       final_typing_env
   in
-  unit_with_body unit body, free_names, all_code, slot_offsets, final_typing_env
+  unit_with_body unit body ~free_names_of_body:free_names, free_names, all_code, slot_offsets, final_typing_env
