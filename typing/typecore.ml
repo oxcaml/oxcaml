@@ -7036,6 +7036,28 @@ and type_expect_
       { exp with exp_loc = loc
       ; exp_extra = (Texp_mode modes, loc, []) :: exp.exp_extra
       }
+  | Pexp_constraint (sarg, Some sty, []) ->
+      let (ty, extra_cty) = type_constraint env sty Mode.Alloc.Const.legacy in
+      let ty' = instance ty in
+      let error_message_attr_opt =
+        Builtin_attributes.error_message_attr sexp.pexp_attributes in
+      let explanation = Option.map (fun msg -> Error_message_attr msg)
+                          error_message_attr_opt in
+      let arg =
+        type_argument ~overwrite ?explanation env expected_mode sarg ty
+          (instance ty)
+      in
+      rue {
+        exp_desc = arg.exp_desc;
+        exp_loc = arg.exp_loc;
+        exp_type = ty';
+        exp_attributes = arg.exp_attributes;
+        exp_env = env;
+        exp_extra =
+          (Texp_constraint extra_cty,
+           loc,
+           sexp.pexp_attributes) :: arg.exp_extra;
+      }
   | Pexp_constraint (sarg, Some sty, modes) ->
       let modes = Typemode.transl_mode_annots modes in
       let (ty, extra_cty) =
