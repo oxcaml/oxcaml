@@ -198,15 +198,17 @@ module Pattern_env : sig
       (* scope for local type declarations *)
       allow_recursive_equations : bool;
       (* true iff checking counter examples *)
-      mutable env_alloc_mode : Mode.Alloc.r option;
+      mutable env_alloc_mode : Typedtree.alloc_mode_r option;
       (** [Some m] if the pattern is under [let poly_], where [m] is the
          allocation mode of the captured environment *)
     }
-  val make: ?env_alloc_mode:Mode.Alloc.r -> Env.t -> equations_scope:int
+  val make:
+    ?env_alloc_mode:Typedtree.alloc_mode_r
+    -> Env.t -> equations_scope:int
     -> allow_recursive_equations:bool -> t
   val copy: ?equations_scope:int -> t -> t
   val set_env: t -> Env.t -> unit
-  val set_env_alloc_mode : t -> Mode.Alloc.r option -> unit
+  val set_env_alloc_mode : t -> Typedtree.alloc_mode_r option -> unit
 end
 
 type existential_treatment =

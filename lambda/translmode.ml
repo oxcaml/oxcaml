@@ -22,20 +22,13 @@ let transl_locality_mode = function
 let transl_locality_mode_l locality =
   Locality.zap_to_floor locality |> transl_locality_mode
 
-let transl_locality_mode_r locality =
-  (* r mode are for allocations; [optimise_allocations] should have pushed it
-     to ceil and determined; here we push it again just to get the constant. *)
-  Locality.zap_to_ceil locality |> transl_locality_mode
+let transl_alloc_mode_l (mode : Typedtree.alloc_mode_l) =
+  Typedtree.zap_alloc_l_to_floor mode |> transl_locality_mode
 
-let transl_alloc_mode_l mode =
-  (* we only take the locality axis *)
-  Alloc.proj_comonadic Areality mode |> transl_locality_mode_l
-
-let transl_alloc_mode_r mode =
-  (* we only take the locality axis *)
-  Alloc.proj_comonadic Areality mode |> transl_locality_mode_r
-
-let transl_alloc_mode (mode : Typedtree.alloc_mode) = transl_alloc_mode_r mode
+let transl_alloc_mode_r (mode : Typedtree.alloc_mode_r) =
+  (* alloc modes are for allocations; [optimise_allocations] should have pushed it
+   to ceil and determined; here we push it again just to get the constant. *)
+  Typedtree.zap_alloc_r_to_ceil mode |> transl_locality_mode
 
 let transl_modify_mode locality =
   match Locality.zap_to_floor locality with
