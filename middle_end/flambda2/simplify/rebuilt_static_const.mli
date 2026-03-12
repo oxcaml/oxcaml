@@ -137,6 +137,8 @@ val free_names : t -> Name_occurrences.t
 
 val is_block : t -> bool
 
+val is_block_of_interest : t -> bool
+
 val is_set_of_closures : t -> bool
 
 val is_code : t -> bool

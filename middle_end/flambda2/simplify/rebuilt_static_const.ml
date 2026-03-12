@@ -35,6 +35,13 @@ let is_block t =
   | Block_not_rebuilt _ -> true
   | Set_of_closures_not_rebuilt _ | Code_not_rebuilt _ -> false
 
+let is_block_of_interest t =
+  match[@warning "-4"] t with
+  | Normal { const = Static_const const; _ } -> Static_const.is_of_interest const
+  | Normal _
+  | Block_not_rebuilt _ 
+  | Set_of_closures_not_rebuilt _ | Code_not_rebuilt _ -> false
+
 let is_set_of_closures t =
   match t with
   | Normal { const; _ } -> Static_const_or_code.is_set_of_closures const

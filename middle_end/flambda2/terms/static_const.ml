@@ -54,6 +54,25 @@ type t =
   | Mutable_string of { initial_value : string }
   | Immutable_string of string
 
+let interesting = [
+  "test_arb_dead.ml:8,4--575;strategy.ml:334,8--15;w_handoff.ml:1327,10--24;w_handoff.ml:538,4--105;w_handoff_intf.ml:99,6--20;option.ml:52,36--48;sexp_conv.ml:154,25--33";
+  "strategy.ml:334,8--15;w_handoff.ml:1327,10--24;w_handoff.ml:538,4--105;w_handoff_intf.ml:99,6--20;option.ml:52,36--48;sexp_conv.ml:154,25--33";
+  "w_handoff.ml:1327,10--24;w_handoff.ml:538,4--105;w_handoff_intf.ml:99,6--20;option.ml:52,36--48;sexp_conv.ml:154,25--33";
+  "w_handoff.ml:538,4--105;w_handoff_intf.ml:99,6--20;option.ml:52,36--48;sexp_conv.ml:154,25--33";
+]
+
+let is_of_interest t =
+  match[@warning "-4"] t with
+  | Block (tag, _, _, [simple])
+    when Tag.Scannable.equal tag Tag.Scannable.zero
+    && Simple.is_var (Simple.With_debuginfo.simple simple) ->
+    let dbg =
+      Format.asprintf "%a" Debuginfo.print_compact
+        (Simple.With_debuginfo.dbg simple)
+    in
+    List.exists (String.equal dbg) interesting
+  | _ -> false
+
 let set_of_closures set = Set_of_closures set
 
 let block tag mutability shape fields = Block (tag, mutability, shape, fields)

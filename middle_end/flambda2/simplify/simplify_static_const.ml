@@ -84,6 +84,9 @@ let simplify_static_const_of_kind_value dacc (static_const : Static_const.t)
         let denv = DE.define_symbol denv result_sym K.value in
         DE.add_equation_on_symbol denv result_sym typ)
   in
+  if Static_const.is_of_interest static_const then
+    Format.eprintf "Interesting constant:@ %a@ dacc:%a\n%!"
+      Static_const.print static_const DA.print dacc;
   match static_const with
   | Block (tag, is_mutable, shape, fields) ->
     let fields_with_tys =
