@@ -35,7 +35,7 @@ Error: Module type declarations do not match:
          val foo : layout_ l. 'a -> 'b
        is not included in
          val foo : layout_ l. 'a -> 'b
-       The layout parameter at position 1 in the LHS
+       The layout parameter at position 1 in the left-hand side
        is instantiated with an unconstrained layout variable,
        which is not supported yet.
 |}]
@@ -76,7 +76,7 @@ Error: Module type declarations do not match:
          val bar : layout_ l l0. ('a : l0) ('b : l0). 'a -> 'b
        is not included in
          val bar : layout_ l l0. ('a : l0) ('b : l0). 'a -> 'b
-       The layout parameter at position 1 in the LHS
+       The layout parameter at position 1 in the left-hand side
        is instantiated with an unconstrained layout variable,
        which is not supported yet.
 |}]
@@ -118,7 +118,7 @@ Error: Signature mismatch:
          val f : layout_ l l0. ('a : l). 'a -> 'a
        is not included in
          val f : layout_ l. ('a : l). 'a -> 'a
-       The LHS has 1 more layout parameter that is not used,
+       the left-hand side has 1 more layout parameter that is not used,
        which is not supported yet.
 |}]
 
@@ -141,7 +141,7 @@ Error: Signature mismatch:
          val f : layout_ l. ('a : l). 'a -> 'a
        is not included in
          val f : layout_ l l0. ('a : l). 'a -> 'a
-       The RHS has 1 more layout parameter that is not used,
+       the right-hand side has 1 more layout parameter that is not used,
        which is not supported yet.
 |}]
 
@@ -164,8 +164,8 @@ Error: Signature mismatch:
          val f : layout_ l l0. ('a : l). 'a -> 'a
        is not included in
          val f : layout_ l l0. ('b : l0). 'b -> 'b
-       The layout parameter at position 1 in the LHS
-       corresponds to the parameter at position 2 in the RHS,
+       The layout parameter at position 1 in the left-hand side
+       corresponds to the parameter at position 2 in the right-hand side,
        which is not supported yet.
 |}]
 
@@ -187,8 +187,8 @@ Error: Signature mismatch:
          val f : layout_ l l0. ('a : l). 'a -> 'a
        is not included in
          val f : layout_ l l0. ('b : l0). 'b -> 'b
-       The layout parameter at position 1 in the LHS
-       corresponds to the parameter at position 2 in the RHS,
+       The layout parameter at position 1 in the left-hand side
+       corresponds to the parameter at position 2 in the right-hand side,
        which is not supported yet.
 |}]
 
@@ -223,7 +223,7 @@ Error: Signature mismatch:
          val f : layout_ l. ('a : l). 'a -> 'a
        is not included in
          val f : 'a -> 'a
-       The LHS has 1 more layout parameter that is not used,
+       the left-hand side has 1 more layout parameter that is not used,
        which is not supported yet.
 |}]
 
@@ -247,7 +247,7 @@ Error: Signature mismatch:
          val f : layout_ l l0. ('a : l) ('b : l). 'a -> 'b
        is not included in
          val f : layout_ l l0. ('a : l) ('b : l). 'a -> 'b
-       The layout parameter at position 2 in the LHS
+       The layout parameter at position 2 in the left-hand side
        is instantiated with an unconstrained layout variable,
        which is not supported yet.
 |}]
@@ -270,7 +270,7 @@ Error: Signature mismatch:
          val f : layout_ l. ('a : l) ('b : l). 'a -> 'b
        is not included in
          val f : layout_ l. 'a -> 'b
-       The layout parameter at position 1 in the LHS
+       The layout parameter at position 1 in the left-hand side
        is instantiated with layout "value",
        which is not supported yet.
 |}]
@@ -306,8 +306,8 @@ Error: Signature mismatch:
          val f : layout_ l l0. ('a : l) ('b : l0). 'a -> 'b
        is not included in
          val f : layout_ l l0. ('a : l0) ('b : l). 'a -> 'b
-       The layout parameter at position 1 in the LHS
-       corresponds to the parameter at position 2 in the RHS,
+       The layout parameter at position 1 in the left-hand side
+       corresponds to the parameter at position 2 in the right-hand side,
        which is not supported yet.
 |}]
 

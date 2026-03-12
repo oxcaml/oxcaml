@@ -34,16 +34,16 @@ type primitive_mismatch =
 
 type layout_poly_coercion =
   | Extra_lhs of { extra: int }
-  (** The LHS has [extra] more layout parameters than the RHS. *)
+  (** [first] has [extra] more layout parameters than [second]. *)
   | Extra_rhs of { extra: int }
-  (** The RHS has [extra] more layout parameters than the LHS. *)
+  (** [second] has [extra] more layout parameters than [first]. *)
   | Instantiate_lhs_to_rhs of { index_lhs: int; index_rhs: int }
-  (** The sort poly var at position [index_lhs] in the LHS is instantiated with
-      the sort poly var at position [index_rhs] in the RHS (not position
+  (** The sort poly var at position [index_lhs] in [first] is instantiated with
+      the sort poly var at position [index_rhs] in [second] (not position
       [index_lhs] as expected). *)
   | Instantiate_lhs of { index_lhs: int; arg: Jkind_types.Sort.t option }
-  (** The sort poly var at position [index_lhs] in the LHS is instantiated with
-      [arg], which is not any sort poly var of the RHS. *)
+  (** The sort poly var at position [index_lhs] in [first] is instantiated with
+      [arg], which is not any sort poly var of [second]. *)
 
 type value_mismatch =
   | Primitive_mismatch of primitive_mismatch

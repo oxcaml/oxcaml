@@ -474,22 +474,22 @@ let report_value_mismatch first second env ppf err =
       let expected = second ^ " is" in
       report_mode_sub_error got expected ppf e
   | Layout_poly_coercion (Extra_lhs { extra }) ->
-      pr "The LHS has %d more layout parameter%s that %s not used,@ \
+      pr "%s has %d more layout parameter%s that %s not used,@ \
           which is not supported yet."
-        extra
+        first extra
         (if extra = 1 then "" else "s")
         (if extra = 1 then "is" else "are")
   | Layout_poly_coercion (Extra_rhs { extra }) ->
-      pr "The RHS has %d more layout parameter%s that %s not used,@ \
+      pr "%s has %d more layout parameter%s that %s not used,@ \
           which is not supported yet."
-        extra
+        second extra
         (if extra = 1 then "" else "s")
         (if extra = 1 then "is" else "are")
   | Layout_poly_coercion (Instantiate_lhs_to_rhs { index_lhs; index_rhs }) ->
-      pr "The layout parameter at position %d in the LHS@ \
-          corresponds to the parameter at position %d in the RHS,@ \
+      pr "The layout parameter at position %d in %s@ \
+          corresponds to the parameter at position %d in %s,@ \
           which is not supported yet."
-        index_lhs index_rhs
+        index_lhs first index_rhs second
   | Layout_poly_coercion (Instantiate_lhs { index_lhs; arg }) ->
       let format_got ppf = match arg with
         | None -> Fmt.fprintf ppf "an unconstrained layout variable"
@@ -497,9 +497,9 @@ let report_value_mismatch first second env ppf err =
           Fmt.fprintf ppf "layout %a"
             (Style.as_inline_code Jkind_types.Sort.format) s
       in
-      pr "The layout parameter at position %d in the LHS@ \
+      pr "The layout parameter at position %d in %s@ \
           is instantiated with %t,@ \
-          which is not supported yet." index_lhs format_got
+          which is not supported yet." index_lhs first format_got
 
 let report_type_inequality env ppf err =
   let msg = Fmt.Doc.msg in
