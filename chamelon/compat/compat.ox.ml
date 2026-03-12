@@ -35,7 +35,12 @@ let dummy_value_mode = Value.disallow_right Value.legacy
 
 let dummy_scannable_sort = Jkind.Sort.scannable
 
-let dummy_alloc_mode = Alloc.disallow_left Alloc.legacy
+let dummy_alloc_mode_r = Locality.disallow_left Locality.legacy
+
+let dummy_alloc_mode_l = Locality.disallow_right Locality.legacy
+
+let dummy_return_mode =
+  create_return_mode (Locality.disallow_right Locality.legacy)
 
 let dummy_ctor_repres = Constructor_uniform_value
 
@@ -61,14 +66,14 @@ type nonrec apply_arg = apply_arg
 
 type texp_apply_identifier =
   apply_position
-  * Locality.l
+  * return_mode
   * Yielding.l
   * Builtin_attributes.zero_alloc_assume option
 
 let mkTexp_apply
     ?id:(pos, mode, yielding, za =
         ( Default,
-          Locality.disallow_right Locality.legacy,
+          dummy_return_mode,
           Yielding.disallow_right Yielding.yielding,
           None )) (exp, args) =
   let args =
@@ -76,27 +81,28 @@ let mkTexp_apply
   in
   Texp_apply (exp, args, pos, mode, yielding, za)
 
-type texp_tuple_identifier = string option list * alloc_mode
+type texp_tuple_identifier = string option list * alloc_mode_r
 
 let mkTexp_tuple ?id exps =
   let labels, alloc =
     match id with
-    | None -> List.map (fun _ -> None) exps, dummy_alloc_mode
+    | None -> List.map (fun _ -> None) exps, dummy_alloc_mode_r
     | Some id -> id
   in
   let exps = List.combine labels exps in
   Texp_tuple (exps, alloc)
 
-type texp_construct_identifier = alloc_mode option * constructor_representation
+type texp_construct_identifier =
+  alloc_mode_r option * constructor_representation
 
 type texp_construct_arg_identifier = Jkind.Sort.t
 
 let mkTexp_construct
-    ?id:(mode, repres = Some dummy_alloc_mode, dummy_ctor_repres)
+    ?id:(mode, repres = Some dummy_alloc_mode_r, dummy_ctor_repres)
     (name, desc, args) =
   Texp_construct (name, desc, repres, args, mode)
 
-type texp_record_identifier = Types.record_representation * alloc_mode option
+type texp_record_identifier = Types.record_representation * alloc_mode_r option
 
 type texp_record_field_identifier = Jkind.Sort.t
 
@@ -108,7 +114,7 @@ let mkTexp_record ~id:(representation, alloc_mode) (fields, extended_expression)
 
 type texp_function_param_identifier =
   { param_sort : Jkind.Sort.t;
-    param_mode : Alloc.l;
+    param_mode : alloc_mode_l;
     param_curry : function_curry;
     param_newtypes :
       (Ident.t
@@ -128,7 +134,7 @@ type texp_function_param =
   }
 
 type texp_function_cases_identifier =
-  { last_arg_mode : Alloc.l;
+  { last_arg_mode : alloc_mode_l;
     last_arg_sort : Jkind.Sort.t;
     last_arg_exp_extra : exp_extra list;
     last_arg_attributes : attributes;
@@ -151,14 +157,14 @@ type texp_function =
   }
 
 type texp_function_identifier =
-  { alloc_mode : alloc_mode;
+  { alloc_mode : alloc_mode_r;
     ret_sort : Jkind.sort;
-    ret_mode : Alloc.l;
+    ret_mode : return_mode;
     zero_alloc : Zero_alloc.t
   }
 
 let texp_function_cases_identifier_defaults =
-  { last_arg_mode = Alloc.disallow_right Alloc.legacy;
+  { last_arg_mode = dummy_alloc_mode_l;
     last_arg_sort = Jkind.Sort.scannable;
     last_arg_exp_extra = [];
     last_arg_attributes = [];
@@ -168,15 +174,15 @@ let texp_function_cases_identifier_defaults =
 
 let texp_function_param_identifier_defaults =
   { param_sort = Jkind.Sort.scannable;
-    param_mode = Alloc.disallow_right Alloc.legacy;
-    param_curry = More_args { partial_mode = Alloc.disallow_right Alloc.legacy };
+    param_mode = dummy_alloc_mode_l;
+    param_curry = More_args { partial_mode = dummy_alloc_mode_l };
     param_newtypes = []
   }
 
 let texp_function_defaults =
-  { alloc_mode = dummy_alloc_mode;
+  { alloc_mode = dummy_alloc_mode_r;
     ret_sort = Jkind.Sort.scannable;
-    ret_mode = Alloc.disallow_right Alloc.legacy;
+    ret_mode = dummy_return_mode;
     zero_alloc = Zero_alloc.default
   }
 

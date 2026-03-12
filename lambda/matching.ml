@@ -4830,7 +4830,7 @@ let for_let ~scopes ~arg_sort ~return_layout loc param mutable_flag pat body =
     let kind_params =
       List.map Slambdaident.of_sort_var (Lpoly.get_exn lpoly)
     in
-    let env_alloc_mode = Translmode.transl_alloc_mode env_alloc_mode in
+    let env_alloc_mode = Translmode.transl_alloc_mode_r env_alloc_mode in
     let free_vars =
       Lambda.free_variables param
       |> Ident.Set.to_list
