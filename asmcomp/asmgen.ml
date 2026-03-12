@@ -425,9 +425,6 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
       cfg_with_infos ++ register_allocator fd_cmm
       ++ cfg_with_infos_profile ~accumulate:true "cfg_validate_description"
            (Regalloc_validate.run cfg_description))
-  ++ (fun cfg_with_infos ->
-  Callee_regs_collector.cfg cfg_with_infos;
-  cfg_with_infos)
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue" Cfg_prologue.run
   ++ cfg_with_infos_profile ~accumulate:true "cfg_prologue_validate"
        Cfg_prologue.validate
@@ -461,6 +458,9 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
     (Cfg_with_layout.cfg cfg_with_layout).allowed_to_be_irreducible <- true;
     cfg_with_layout_profile ~accumulate:true "cfg_simplify"
       Regalloc_utils.simplify_cfg cfg_with_layout)
+  ++ (fun cfg_with_layout ->
+  Callee_regs_collector.cfg cfg_with_layout;
+  cfg_with_layout)
   ++ cfg_with_layout_profile ~accumulate:true "save_cfg" save_cfg
   ++ cfg_with_layout_profile ~accumulate:true "cfg_reorder_blocks"
        (reorder_blocks_random ppf_dump)
