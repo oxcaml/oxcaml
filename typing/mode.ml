@@ -337,45 +337,6 @@ module Lattices = struct
   end
   [@@inline]
 
-  (* Any changes to this type must consider the implementation of [pord_tbl]. *)
-  type pord =
-    | Less (* 0b00 *)
-    | Equal (* 0b01 *)
-    | Greater (* 0b10 *)
-    | Incomparable (* 0b11 *)
-
-  (* A lookup table precomputing the result of [cmp] for partial lattices with
-     elements defined as {[
-       type t =
-         | Min
-         | Fst
-         | Snd
-         | Max
-     ]} of the form {v
-         Max
-         / \
-       Snd Fst
-         \ /
-         Min
-     v}. This specifically applies to [Visibility] and [Statefulness].
-
-     Computed via {[
-       let tbl = ref 0 in
-       for i = 0b0000 to 0b1111 do
-         let a = (i lsr 2) land 0b11 and b = i land 0b11 in
-         let pord =
-           if a = b then 0b01
-           else if a land b = 0 && a <> 0 && b <> 0 then 0b11
-           else if a < b then 0b00 else 0b10
-         in
-         tbl := !tbl lor (pord lsl (i * 2))
-       done;
-       !tbl
-     ]} *)
-  (* CR nmatschke: This is probably the best code we can generate for [cmp], but
-     maybe it obfuscates the underlying comparison enough to harm e.g. [le]? *)
-  let pord_tbl = 0b01_10_10_10_00_01_11_10_00_11_01_10_00_00_00_01
-
   module type Partial = sig
     (** A lattice is a partial order, if for any [a] [b], either:
         - [a <= b] or [b <= a]
@@ -398,38 +359,20 @@ module Lattices = struct
 
       external l_of_int : int -> L.t = "%identity"
 
-      external pord_of_int : int -> pord = "%identity"
-
       let () =
         assert (l_to_int L.min = 0b00);
         assert (l_to_int L.fst = 0b01);
         assert (l_to_int L.snd = 0b10);
         assert (l_to_int L.max = 0b11)
-
-      let () =
-        assert (pord_of_int 0b00 = Less);
-        assert (pord_of_int 0b01 = Equal);
-        assert (pord_of_int 0b10 = Greater);
-        assert (pord_of_int 0b11 = Incomparable)
-
-      let cmp a b =
-        pord_of_int
-          ((pord_tbl lsr ((l_to_int a lsl 2) lor l_to_int b * 2)) land 0b11)
     end
 
     let min = L.min
 
     let max = L.max
 
-    let le a b =
-      match cmp a b with
-      | Less | Equal -> true
-      | Greater | Incomparable -> false
+    let le a b = a <= b && (l_to_int a <> 0b01 || l_to_int b <> 0b10)
 
-    let equal a b =
-      match cmp a b with
-      | Equal -> true
-      | Less | Greater | Incomparable -> false
+    let equal a b = a = b
 
     let join a b = l_of_int (l_to_int a lor l_to_int b)
 
@@ -654,7 +597,7 @@ module Lattices = struct
   end
 
   module Statefulness = struct
-    (* Any changes to this type must consider the implementation of [cmp]. *)
+    (* Changes to this type must consider the implementation of [Partial]. *)
     type t =
       | Stateless (* 0b00 *)
       | Observable (* 0b01 *)
@@ -683,7 +626,7 @@ module Lattices = struct
   end
 
   module Visibility = struct
-    (* Any changes to this type must consider the implementation of [cmp]. *)
+    (* Changes to this type must consider the implementation of [Partial]. *)
     type t =
       | Read_write (* 0b00 *)
       | Read (* 0b01 *)
