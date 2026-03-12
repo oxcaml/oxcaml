@@ -15,8 +15,8 @@ let add_reg value (reg : Reg.t) =
 
 let add_regs value regs = Array.iter (add_reg value) regs
 
-let cfg (cfg_with_infos : Cfg_with_infos.t) =
-  let cfg = Cfg_with_infos.cfg cfg_with_infos in
+let cfg (cfg_with_layout : Cfg_with_layout.t) =
+  let cfg = Cfg_with_layout.cfg cfg_with_layout in
   (* CR xclerc: we use [fun_contains_calls] as a proxy for "leaf function",
      but we should perhaps reconsider this choice, e.g. by directly checking
      for the absence of [Call]/[Tailcall_func] terminators in the CFG. *)
