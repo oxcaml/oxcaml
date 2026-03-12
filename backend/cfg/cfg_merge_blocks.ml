@@ -15,7 +15,7 @@ end = struct
   let operation : Operation.t -> int =
    fun op ->
     let repr = Obj.repr op in
-    if Obj.is_int repr then -(Obj.magic repr : int) else Obj.tag repr
+    if Obj.is_int repr then -(Obj.obj repr : int) else Obj.tag repr
 
   let basic : Cfg.basic -> int = function
     | Op op -> operation op
@@ -29,7 +29,7 @@ end = struct
 
   let terminator term =
     let repr = Obj.repr term in
-    if Obj.is_int repr then -(Obj.magic repr : int) else Obj.tag repr
+    if Obj.is_int repr then -(Obj.obj repr : int) else Obj.tag repr
 
   let rec basic_instruction_cell :
       Cfg.basic Cfg.instruction DLL.cell option -> fuel:int -> acc:int -> int =
