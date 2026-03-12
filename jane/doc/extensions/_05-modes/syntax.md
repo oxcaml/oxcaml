@@ -20,8 +20,8 @@ portability ::= `portable` | `shareable` | `nonportable`
 contention ::= `uncontended` | `shared` | `contended`
 yield ::= `unyielding` | `yielding`
 fork ::= `forkable` | `unforkable`
-statefulness ::= `stateless` | `reading` | `stateful`
-visibility ::= `read_write` | `read` | `immutable`
+statefulness ::= `stateless` | `observable` | `reading | `stateful`
+visibility ::= `read_write` | `read` | `write` | `immutable`
 
 modes ::= mode
       |  mode modes
