@@ -648,38 +648,51 @@ let rebuild_named_default_case env (named : Named.t) =
     in
     Named.create_simple (Simple.var var)
   in
-  let[@local] rewrite_field_access_chg_repr arg field dbg =
+  let[@local] rewrite_field_access_chg_repr ?(mut : Mutability.t = Immutable)
+      arg field dbg =
+    let[@inline] get_field ~f (arg_fields : _ DS.unboxed_fields Field.Map.t) =
+      match Field.Map.find field arg_fields with
+      | Unboxed _ -> Misc.fatal_errorf "Trying to bind non-unboxed to unboxed"
+      | Not_unboxed r -> f r
+      | exception Not_found ->
+        (match mut with
+        | Immutable | Immutable_unique ->
+          Misc.fatal_errorf
+            "In [rewrite_field_access_chg_repr], an immutable field load for \
+             field %a did not appear in the fields. This case should have been \
+             excluded by the no_source check previously.@.Block is: \
+             %a@.Expected fields are: %a@."
+            Field.print field Simple.print arg Field.Set.print
+            (Field.Map.keys arg_fields)
+        | Mutable -> Named.create_prim (P.Nullary (Invalid (Field.kind field))))
+          dbg
+    in
     let arg_repr = get_simple_changed_repr env arg in
     match arg_repr with
-    | Block_representation (arg_fields, _size) -> (
-      let f = Field.Map.find field arg_fields in
-      match f with
-      | Unboxed _ -> Misc.fatal_errorf "Trying to bind non-unboxed to unboxed"
-      | Not_unboxed (field, kind) ->
-        Named.create_prim
-          (P.Unary
-             ( Block_load
-                 { field = Target_ocaml_int.of_int env.machine_width field;
-                   kind;
-                   mut = Immutable
-                 },
-               arg ))
-          dbg)
+    | Block_representation (arg_fields, _size) ->
+      get_field arg_fields ~f:(fun (field, kind) ->
+          Named.create_prim
+            (P.Unary
+               ( Block_load
+                   { field = Target_ocaml_int.of_int env.machine_width field;
+                     kind;
+                     mut = Immutable
+                   },
+                 arg ))
+            dbg)
     | Closure_representation (arg_fields, function_slots, current_function_slot)
-      -> (
-      let f = Field.Map.find field arg_fields in
-      match f with
-      | Unboxed _ -> Misc.fatal_errorf "Trying to bind non-unboxed to unboxed"
-      | Not_unboxed value_slot ->
-        Named.create_prim
-          (P.Unary
-             ( Project_value_slot
-                 { value_slot;
-                   project_from =
-                     Function_slot.Map.find current_function_slot function_slots
-                 },
-               arg ))
-          dbg)
+      ->
+      get_field arg_fields ~f:(fun value_slot ->
+          Named.create_prim
+            (P.Unary
+               ( Project_value_slot
+                   { value_slot;
+                     project_from =
+                       Function_slot.Map.find current_function_slot
+                         function_slots
+                   },
+                 arg ))
+            dbg)
   in
   match[@ocaml.warning "-fragile-match"] named with
   | Simple simple -> Named.create_simple (rewrite_simple env simple)
@@ -696,11 +709,11 @@ let rebuild_named_default_case env (named : Named.t) =
     rewrite_field_access arg Field.is_int
   | Prim (Unary (Get_tag, arg), _dbg) when simple_is_unboxable env arg ->
     rewrite_field_access arg Field.get_tag
-  | Prim (Unary (Block_load { kind; field; _ }, arg), dbg)
+  | Prim (Unary (Block_load { kind; field; mut; _ }, arg), dbg)
     when simple_changed_repr env arg ->
     let kind = P.Block_access_kind.element_kind_for_load kind in
     let field = Field.block (Target_ocaml_int.to_int field) kind in
-    rewrite_field_access_chg_repr arg field dbg
+    rewrite_field_access_chg_repr ~mut arg field dbg
   | Prim (Unary (Project_value_slot { value_slot; _ }, arg), dbg)
     when simple_changed_repr env arg ->
     rewrite_field_access_chg_repr arg (Field.value_slot value_slot) dbg
