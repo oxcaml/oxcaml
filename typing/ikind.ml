@@ -25,6 +25,8 @@ let enable_sub_or_intersect = true
 
 let enable_sub_or_error = false
 
+let enable_fast_sub = Sys.getenv_opt "OXCAML_ENABLE_FAST_SUB" <> None
+
 let reset_constructor_ikind_on_substitution = false
 
 module Ldd = Types.Ldd
@@ -273,7 +275,7 @@ module Solver = struct
       else
         match remaining with
         | arg :: rest ->
-          let arg_kind = kind ctx arg in
+          let arg_kind = kind ~use_tables:true ctx arg in
           loop (Ldd.join acc (Ldd.meet arg_kind coeffs.(i))) rest (i + 1)
         | [] -> failwith "Missing arg"
     in
@@ -332,8 +334,8 @@ module Solver = struct
     |> Seq.fold_left
          (fun acc (ty, bound_info) ->
            let axes = bound_info.Types.With_bounds_type_info.relevant_axes in
-           let mask = Axis_lattice.of_axis_set axes in
-           let ty_kind = kind ctx ty in
+           let mask = Axis_lattice.of_axis_set' axes in
+           let ty_kind = kind ~use_tables:true ctx ty in
            Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
          base
 
@@ -379,16 +381,17 @@ module Solver = struct
    fun ctx jkind -> mod_bounds_floor_of_jkind_desc ctx jkind.jkind
 
   (** Compute the kind for [t]. *)
-  and kind ?(check_principality = true) (ctx : ctx) (ty : Types.type_expr)
-      : Ldd.node =
+  and kind ?(check_principality = true) ~use_tables
+      (ctx : ctx) (ty : Types.type_expr) : Ldd.node =
     if check_principality && not (is_principal_type ty)
     then Ldd.const Axis_lattice.top
     else
-    (* Memoize only potentially cyclic types; LFPs handle recursion. *)
     match TyTbl.find_opt ctx.ty_to_kind ty with
     | Some kind_poly -> kind_poly
     | None ->
-      if type_may_be_circular ty
+      if not use_tables
+      then kind_uncached ctx ty
+      else if type_may_be_circular ty
       then (
         let var = Ldd.new_var () in
         let placeholder = Ldd.node_of_var var in
@@ -426,7 +429,7 @@ module Solver = struct
         Ldd.sum elts
           ~base
           ~f:(fun (_lbl, t) ->
-            Ldd.meet mask (kind ctx t))
+            Ldd.meet mask (kind ~use_tables:true ctx t))
       | Types.Tunboxed_tuple elts ->
         (* Unboxed tuples: per-element contributions; shallow axes relevant
            only for arity = 1. *)
@@ -439,20 +442,21 @@ module Solver = struct
         Ldd.sum elts
           ~base:Ldd.bot
           ~f:(fun (_lbl, t) ->
-            Ldd.meet mask (kind ctx t))
+            Ldd.meet mask (kind ~use_tables:true ctx t))
       | Types.Tarrow (_lbl, _t1, _t2, _commu) ->
         (* Arrows use the dedicated per-axis bounds (no with-bounds). *)
         Ldd.const Axis_lattice.arrow
       | Types.Tlink _ -> failwith "Tlink shouldn't appear in kind"
       | Types.Tsubst _ -> failwith "Tsubst shouldn't appear in kind"
-      | Types.Trepr (ty, _sort_vars) -> kind ctx ty
+      | Types.Trepr (ty, _sort_vars) -> kind ~use_tables:true ctx ty
       | Types.Tpoly (ty, univars) ->
         (* CR ikinds: this is sound but not fully precise.
           Internal ticket 5746. *)
         let ty = !instance_poly_for_jkind' univars ty in
         if disable_tpoly_principality_hack
-        then kind ctx ty
-        else kind ~check_principality:false ctx ty
+        then kind ~use_tables:true ctx ty
+        else
+          kind ~check_principality:false ~use_tables:true ctx ty
       | Types.Tof_kind jkind -> ckind_of_jkind ctx jkind
       | Types.Tobject _ -> Ldd.const Axis_lattice.object_legacy
       | Types.Tfield _ ->
@@ -473,7 +477,7 @@ module Solver = struct
             let mask = Ldd.const Axis_lattice.mask_shallow in
             Btype.fold_row
               (fun acc ty ->
-                let ty_kind = kind ctx ty in
+                let ty_kind = kind ~use_tables:true ctx ty in
                 let contribution = Ldd.meet mask ty_kind in
                 Ldd.join acc contribution)
               base row
@@ -663,7 +667,7 @@ let make_gadt_payload_projector
      - type ('a, 'b) same = C : 'x -> ('x, 'x) same
        First hit wins: ['x] is mapped from the first result arg to kind('a);
        the second occurrence does not overwrite it. *)
-  let fallback ty = Solver.kind ctx ty in
+  let fallback ty = Solver.kind ~use_tables:true ctx ty in
   fun (c : Types.constructor_declaration) ->
     match c.cd_res with
     | None -> fallback
@@ -687,7 +691,7 @@ let make_gadt_payload_projector
               add_plain_var_projection
                 ~local_vars
                 ~local_subst
-                ~lhs_kind:(Solver.kind ctx decl_param)
+                ~lhs_kind:(Solver.kind ~use_tables:true ctx decl_param)
                 res_arg)
             decl_params res_args;
           (* Step 3: apply the substitution to payload kinds:
@@ -712,7 +716,7 @@ let make_gadt_payload_projector
               Solver.node_of_name ctx name
           in
           fun ty ->
-            let raw_kind = Solver.kind ctx ty in
+            let raw_kind = Solver.kind ~use_tables:true ctx ty in
             Ldd.map_rigid map_name raw_kind
       | _ ->
         failwith
@@ -745,7 +749,9 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
       | Some body_ty ->
         (* Concrete: compute kind of body. *)
         let args = type_decl.type_params in
-        let kind : Solver.ckind = fun ctx -> Solver.kind ctx body_ty in
+        let kind : Solver.ckind =
+         fun ctx -> Solver.kind ~use_tables:true ctx body_ty
+        in
         Solver.Ty { args; kind; abstract = false }
       | None -> (
         (* No manifest: may still be "concrete" (record/variant/...).
@@ -796,10 +802,11 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
             sum_record_label_contributions
               ~base:immutable_base
               ~relevant_for_shallow
-              ~payload_kind:(fun ty -> Solver.kind ctx ty)
+              ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
               ~validate_label:no_validation lbls
           in
-          Solver.Ty { args = type_decl.type_params; kind; abstract = false }
+          Solver.Ty
+            { args = type_decl.type_params; kind; abstract = false }
         | Types.Type_record_unboxed_product (lbls, _rep, _umc_opt) ->
           (* Unboxed products: shallow axes relevant only for arity = 1. *)
           let kind : Solver.ckind =
@@ -811,10 +818,11 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
             sum_record_label_contributions
               ~base
               ~relevant_for_shallow
-              ~payload_kind:(fun ty -> Solver.kind ctx ty)
+              ~payload_kind:(fun ty -> Solver.kind ~use_tables:true ctx ty)
               ~validate_label:validate_immutable_unboxed_label lbls
           in
-          Solver.Ty { args = type_decl.type_params; kind; abstract = false }
+          Solver.Ty
+            { args = type_decl.type_params; kind; abstract = false }
         | Types.Type_variant (_cstrs, Types.Variant_with_null, _umc_opt) ->
           (* [Variant_with_null] (i.e. [or_null]) has semantics that are not
              captured by its constructors: nullability/separability and
@@ -885,7 +893,8 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
               ~base:(Ldd.const base_lat0)
               ~f:constructor_contrib
           in
-          Solver.Ty { args = type_decl.type_params; kind; abstract = false }
+          Solver.Ty
+            { args = type_decl.type_params; kind; abstract = false }
         | Types.Type_open ->
           (* Use the stored jkind here in case it is `exn`,
              which is special. *)
@@ -908,7 +917,8 @@ let lookup_of_env ~(env : Env.t) (path : Path.t) :
       | Types.No_constructor_ikind reason ->
         if !Clflags.ikinds_debug then Format.eprintf "[ikind-miss] %s@." reason;
         fallback ()
-      | Types.Constructor_ikind _ -> fallback ()
+      | Types.Constructor_ikind _ ->
+        fallback ()
     in
     (if !Clflags.ikinds_debug
     then
@@ -1006,20 +1016,8 @@ type subcheck_polys =
     fast_path : subcheck_fast_path
   }
 
-(* Compute polynomials for a subcheck:
-   - compute [super] in Normal mode
-   - fast path: if [super] is constant top, no need to compute [sub]
-   - otherwise, if [super] is constant, try the lhs mod-bounds floor fast path
-   - otherwise, only round up [sub] if [super] is constant *)
-let compute_subcheck_polys ~context:_ env
-    (sub : ('l1 * 'r1) Types.jkind) (super : ('l2 * 'r2) Types.jkind) :
-    subcheck_polys =
-  let ctx = create_ctx ~mode:Solver.Normal ~env:(Some env) in
-  let super_poly = Solver.ckind_of_jkind ctx super in
-  let super_is_constant =
-    Ldd.solve_pending ();
-    Ldd.is_const super_poly
-  in
+let finish_subcheck_polys ~ctx ~super_is_constant
+    ~(sub : ('l1 * 'r1) Types.jkind) (super_poly : Ldd.node) : subcheck_polys =
   if super_is_constant
      && Axis_lattice.equal (Ldd.round_up super_poly) Axis_lattice.top
   then
@@ -1034,9 +1032,6 @@ let compute_subcheck_polys ~context:_ env
         match Solver.mod_bounds_floor_of_jkind ctx sub with
         | None -> None
         | Some lhs_floor ->
-          (* [super_poly] is not top here; [Rhs_top_fast_path] handled
-             that case already. We still need the join because [lhs_floor]
-             and [super_poly] can contribute different axes toward top. *)
           let lhs_floor_or_super = Ldd.join lhs_floor super_poly in
           if
             Axis_lattice.equal
@@ -1064,6 +1059,22 @@ let compute_subcheck_polys ~context:_ env
         fast_path = No_fast_path
       }
 
+(* Compute polynomials for a subcheck:
+   - compute [super] in Normal mode
+   - fast path: if [super] is constant top, no need to compute [sub]
+   - otherwise, if [super] is constant, try the lhs mod-bounds floor fast path
+   - otherwise, only round up [sub] if [super] is constant *)
+let compute_subcheck_polys ~context:_ env
+    (sub : ('l1 * 'r1) Types.jkind) (super : ('l2 * 'r2) Types.jkind) :
+    subcheck_polys =
+  let ctx = create_ctx ~mode:Solver.Normal ~env:(Some env) in
+  let super_poly = Solver.ckind_of_jkind ctx super in
+  let super_is_constant =
+    Ldd.solve_pending ();
+    Ldd.is_const super_poly
+  in
+  finish_subcheck_polys ~ctx ~super_is_constant ~sub super_poly
+
 let sub_jkind_l ?allow_any_crossing ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
     ~(context : Jkind.jkind_context) ~level env (sub : Types.jkind_l)
@@ -1071,8 +1082,8 @@ let sub_jkind_l ?allow_any_crossing ?origin
   let open Misc.Stdlib.Monad.Result.Syntax in
   if not (enable_sub_jkind_l && !Clflags.ikinds)
   then
-    Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context ~level env sub
-      super
+    Jkind.sub_jkind_l ?allow_any_crossing ~type_equal ~context ~level env
+      sub super
   else
     (* Check layouts first; if that fails, print both sides with full
        info and return the error. *)
@@ -1156,13 +1167,107 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
 
 let round_up_type env (ty : Types.type_expr) : Axis_lattice.t =
   let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
-  Solver.round_up (Solver.kind ctx ty)
+  Solver.round_up (Solver.kind ~use_tables:true ctx ty)
 
 let crossing_of_type env (ty : Types.type_expr) : Mode.Crossing.t =
   let lat = round_up_type env ty in
   Axis_lattice.to_mode_crossing lat
 
 type sub_or_intersect = Jkind.sub_or_intersect
+
+let with_bounds_is_empty :
+    type l r. (l * r) Types.with_bounds -> bool = function
+  | Types.No_with_bounds -> true
+  | Types.With_bounds _ -> false
+
+let sort_is_value sort =
+  match Jkind_types.Sort.get sort with
+  | Base Value -> true
+  | Base _ | Var _ | Univar _ | Product _ -> false
+
+let fast_sub_of_value_sub :
+    type r.
+    Axis_lattice.t ->
+    (Allowance.allowed * r) Types.jkind ->
+    bool =
+ fun super_lat (sub : (Allowance.allowed * r) Types.jkind) ->
+  if Axis_lattice.equal super_lat Axis_lattice.top
+  then true
+  else if not (with_bounds_is_empty sub.jkind.with_bounds)
+  then false
+  else
+    let sub_lat =
+      Jkind.Mod_bounds.to_axis_lattice sub.jkind.mod_bounds
+    in
+    Axis_lattice.leq sub_lat super_lat
+
+let fast_sub_of_any_super :
+    type r.
+    Types.mod_bounds ->
+    (Allowance.allowed * r) Types.jkind ->
+    bool =
+ fun mod_bounds sub ->
+  match sub.jkind.base with
+  | Types.Layout
+      (Jkind_types.Layout.Sort
+         (sub_sort, { pointerness = _ })) ->
+    if not (sort_is_value sub_sort)
+    then false
+    else
+      fast_sub_of_value_sub
+        (Jkind.Mod_bounds.to_axis_lattice mod_bounds)
+        sub
+  | Types.Layout _ | Types.Kconstr _ -> false
+
+let fast_sub_of_sort_super :
+    type r.
+    Jkind_types.Sort.t ->
+    Types.mod_bounds ->
+    (Allowance.allowed * r) Types.jkind ->
+    bool =
+ fun super_sort mod_bounds sub ->
+  match sub.jkind.base with
+  | Types.Layout
+      (Jkind_types.Layout.Sort
+         (sub_sort, { pointerness = _ })) ->
+    if not (Jkind_types.Sort.equate sub_sort super_sort)
+    then false
+    else if not (sort_is_value sub_sort)
+    then false
+    else
+      fast_sub_of_value_sub
+        (Jkind.Mod_bounds.to_axis_lattice mod_bounds)
+        sub
+  | Types.Layout _ | Types.Kconstr _ -> false
+
+let fast_sub :
+    type r1 l2.
+    context:Jkind.jkind_context ->
+    level:int ->
+    Env.t ->
+    (Allowance.allowed * r1) Types.jkind ->
+    (l2 * Allowance.allowed) Types.jkind ->
+    bool =
+ fun ~context:_ ~level:_ _env
+    (sub : (Allowance.allowed * r1) Types.jkind)
+    (super : (l2 * Allowance.allowed) Types.jkind) ->
+  match super.jkind with
+  | { base =
+        Types.Layout
+          (Jkind_types.Layout.Sort
+             ( super_sort,
+               { pointerness = Jkind_axis.Pointerness.Maybe_pointer } ));
+      mod_bounds;
+      with_bounds = Types.No_with_bounds
+    } -> fast_sub_of_sort_super super_sort mod_bounds sub
+  | { base =
+        Types.Layout
+          (Jkind_types.Layout.Any
+             { pointerness = Jkind_axis.Pointerness.Maybe_pointer });
+      mod_bounds;
+      with_bounds = Types.No_with_bounds
+    } -> fast_sub_of_any_super mod_bounds sub
+  | _ -> false
 
 let sub_or_intersect ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
@@ -1190,9 +1295,7 @@ let sub_or_intersect ?origin
         (Ldd.pp sub_poly)
         (Ldd.pp super_poly))
   in
-  if not (enable_sub_or_intersect && !Clflags.ikinds)
-  then Jkind.sub_or_intersect ~type_equal ~context ~level env t1 t2
-  else
+  let generic_sub_or_intersect () =
     (* Old behavior adapted to abstract kinds:
        1) gate on env-aware layout subchecking
        2) if layouts are compatible, decide based on ikind polynomials *)
@@ -1200,7 +1303,9 @@ let sub_or_intersect ?origin
     | Error _ ->
       (* Keep Jkind as the source of Disjoint vs May_have_intersection
          classification when layouts fail. *)
-      (match Jkind.sub_or_intersect ~type_equal ~context ~level env t1 t2 with
+      (match
+         Jkind.sub_or_intersect ~type_equal ~context ~level env t1 t2
+       with
        | Jkind.Disjoint _ as disjoint ->
          debug_polys ~outcome:"Disjoint" ();
          disjoint
@@ -1235,6 +1340,19 @@ let sub_or_intersect ?origin
           | hd :: tl -> hd :: tl
         in
         Jkind.May_have_intersection reasons
+  in
+  if not (enable_sub_or_intersect && !Clflags.ikinds)
+  then Jkind.sub_or_intersect ~type_equal ~context ~level env t1 t2
+  else if enable_fast_sub && fast_sub ~context ~level env t1 t2
+  then (
+    if !Clflags.ikinds_debug
+    then (
+      let origin_suffix = origin_suffix_of origin in
+      Format.eprintf
+        "[ikind-sub-or-intersect] outcome=Sub%s fast_sub=true@."
+        origin_suffix);
+    Jkind.Sub)
+  else generic_sub_or_intersect ()
 
 let sub_or_error ?origin:_origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
@@ -1263,7 +1381,7 @@ let poly_of_type_function_in_identity_env ~(params : Types.type_expr list)
      environment, i.e. every constructor contributes an independent rigid
      atom. *)
   let ctx = create_ctx ~mode:Solver.Normal ~env:None in
-  let poly = Solver.normalize (Solver.kind ctx body) in
+  let poly = Solver.normalize (Solver.kind ~use_tables:true ctx body) in
   let rigid_vars =
     List.map (fun ty -> Ldd.rigid (Ldd.Name.param (Types.get_id ty))) params
   in

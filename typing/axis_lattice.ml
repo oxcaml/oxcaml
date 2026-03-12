@@ -200,6 +200,19 @@ let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
     Axis.all;
   encode ~levels
 
+let of_axis_set' (set : Jkind_axis.Axis_set.t) : t =
+  let set : int = Obj.magic set in
+  let lo =
+    (set land 0x001)
+    lor ((set land 0x00E) lsl 1)
+    lor ((set land 0x010) lsl 2)
+    lor ((set land 0x0E0) lsl 3)
+    lor ((set land 0x100) lsl 4)
+    lor ((set land 0x600) lsl 5)
+    lor ((set land 0x1800) lsl 6)
+  in
+  lo lor ((lo land 0x49451) lsl 1)
+
 (* IK-only: compute relevant axes of a constant modality, mirroring
    Jkind.relevant_axes_of_modality. *)
 let relevant_axes_of_modality
@@ -229,7 +242,7 @@ let mask_shallow : t = co_sub top (join axis_mask.(11) axis_mask.(12))
 (* Directly produce an axis-lattice mask from a constant modality. *)
 let mask_of_modality ~(relevant_for_shallow : [`Relevant | `Irrelevant])
     (modality : Mode.Modality.Const.t) : t =
-  relevant_axes_of_modality ~relevant_for_shallow modality |> of_axis_set
+  relevant_axes_of_modality ~relevant_for_shallow modality |> of_axis_set'
 
 (* Helpers to translate between axis enumerations and packed levels. *)
 module Levels = struct

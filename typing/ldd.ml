@@ -627,9 +627,8 @@ module Make (V : Ordered) = struct
     Axis_lattice.non_bot_axes witness
     |> List.map Axis_lattice.axis_number_to_axis_packed
 
-  let map_rigid (f : V.t -> node) (node : node) : node =
-    let rec aux (node : node) : node =
-      if is_leaf node
+  let rec map_rigid_rec (f : V.t -> node) (node : node) : node =
+    if is_leaf node
       then node
       else
         let block = Unsafe.node_block node in
@@ -638,13 +637,17 @@ module Make (V : Ordered) = struct
         let hi = block.hi in
         match var.state with
         | Rigid name ->
-          let lo' = aux lo in
-          let hi' = aux hi in
-          let replacement = f name in
-          join lo' (meet hi' replacement)
+          let replacement = inline_solved_vars (f name) in
+          if is_leaf replacement then
+            let self' = join lo (meet hi replacement) in
+            map_rigid_rec f self'
+          else
+            let lo' = map_rigid_rec f lo in
+            let hi' = map_rigid_rec f hi in
+            join lo' (meet hi' replacement)
         | Unsolved ->
-          let lo' = aux lo in
-          let hi' = aux hi in
+          let lo' = map_rigid_rec f lo in
+          let hi' = map_rigid_rec f hi in
           if lo' == lo && hi' == hi
           then node
           else
@@ -656,8 +659,9 @@ module Make (V : Ordered) = struct
         | Solved _ ->
           invalid_arg
             "map_rigid: solved vars should not appear after inline_solved_vars"
-    in
-    aux (inline_solved_vars node)
+
+  let map_rigid (f : V.t -> node) (node : node) : node =
+    map_rigid_rec f (inline_solved_vars node)
 
   (* --------- structural debug printer --------- *)
   let pp_debug (node : node) : string =

@@ -14,6 +14,8 @@ By default this runs in non-principal mode. Use --principal to add
 -principal to all compiler invocations.
 
 Options:
+  --ocamlc              Use _install/bin/ocamlc.opt
+  --ocamlopt            Use _install/bin/ocamlopt.opt (default)
   --principal           Benchmark with -principal
   --non-principal       Benchmark without -principal (default)
   --module NAME         Benchmark only NAME; may be repeated
@@ -31,11 +33,22 @@ runs=5
 warmup=1
 principal=false
 modules=()
-compiler="$repo_root/_install/bin/ocamlc.opt"
+compiler="$repo_root/_install/bin/ocamlopt.opt"
+compiler_kind="ocamlopt"
 output_dir=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --ocamlc)
+      compiler="$repo_root/_install/bin/ocamlc.opt"
+      compiler_kind="ocamlc"
+      shift
+      ;;
+    --ocamlopt)
+      compiler="$repo_root/_install/bin/ocamlopt.opt"
+      compiler_kind="ocamlopt"
+      shift
+      ;;
     --principal)
       principal=true
       shift
@@ -62,6 +75,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --compiler)
       compiler="$2"
+      case "$(basename "$compiler")" in
+        ocamlopt|ocamlopt.opt)
+          compiler_kind="ocamlopt"
+          ;;
+        *)
+          compiler_kind="ocamlc"
+          ;;
+      esac
       shift 2
       ;;
     --help)
@@ -98,6 +119,7 @@ fi
 
 main="$repo_root/_build/main"
 common="$repo_root/_build/main/.ocamlcommon.objs/byte"
+common_native="$repo_root/_build/main/.ocamlcommon.objs/native"
 stdlib="$repo_root/_install/lib/ocaml"
 
 if [ ! -x "$compiler" ]; then
@@ -114,23 +136,36 @@ else
 fi
 
 if [ -z "$output_dir" ]; then
-  output_dir="$repo_root/_bench_ikinds_${principal_suffix}_$(date +%Y%m%d_%H%M%S)"
+  output_dir="$repo_root/_bench_ikinds_${compiler_kind}_${principal_suffix}_$(date +%Y%m%d_%H%M%S)"
 fi
 
 mkdir -p "$output_dir"
 
+if [ "$compiler_kind" = "ocamlopt" ]; then
+  artifact_ext="cmx"
+  include_flags="-I '$main' -I '$common' -I '$common_native' -I '$stdlib'"
+else
+  artifact_ext="cmo"
+  include_flags="-I '$main' -I '$common' -I '$stdlib'"
+fi
+
 for mod in "${modules[@]}"; do
   tmp="$output_dir/tmp_$mod"
   mkdir -p "$tmp"
+  if [ "$compiler_kind" = "ocamlopt" ]; then
+    cleanup_exts="'$tmp/$mod.cmx' '$tmp/$mod.o' '$tmp/$mod.cmi' '$tmp/$mod.cmt' '$tmp/$mod.cmti' '$tmp/$mod.annot'"
+  else
+    cleanup_exts="'$tmp/$mod.cmo' '$tmp/$mod.cmi' '$tmp/$mod.cmt' '$tmp/$mod.cmti' '$tmp/$mod.annot'"
+  fi
   hyperfine \
     --warmup "$warmup" \
     --runs "$runs" \
     --export-json "$output_dir/$mod.json" \
-    --prepare "rm -f '$tmp/$mod.cmo' '$tmp/$mod.cmi' '$tmp/$mod.cmt' '$tmp/$mod.cmti' '$tmp/$mod.annot'" \
+    --prepare "rm -f $cleanup_exts" \
     --command-name off \
-    "'$compiler' $principal_flag -c -o '$tmp/$mod.cmo' -I '$main' -I '$common' -I '$stdlib' '$main/$mod.ml'" \
+    "'$compiler' $principal_flag -c -o '$tmp/$mod.$artifact_ext' $include_flags '$main/$mod.ml'" \
     --command-name on \
-    "'$compiler' $principal_flag -ikinds -c -o '$tmp/$mod.cmo' -I '$main' -I '$common' -I '$stdlib' '$main/$mod.ml'"
+    "'$compiler' $principal_flag -ikinds -c -o '$tmp/$mod.$artifact_ext' $include_flags '$main/$mod.ml'"
 done
 
 printf '%s\n' "$output_dir"
