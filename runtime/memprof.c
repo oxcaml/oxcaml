@@ -397,7 +397,7 @@ typedef struct memprof_orphan_table_s memprof_orphan_table_s,
 
 #define Status(config)          Int_val(Field(config, CONFIG_FIELD_STATUS))
 
-static bool Sampling(value config)
+static bool sampling(value config)
 {
   return (config != CONFIG_NONE) && (Status(config) == CONFIG_STATUS_SAMPLING);
 }
@@ -1929,13 +1929,13 @@ value caml_memprof_run_callbacks_exn(void)
 
 /* Is the current thread currently sampling? */
 
-Caml_inline bool sampling(memprof_domain_t domain)
+Caml_inline bool domain_sampling(memprof_domain_t domain)
 {
   memprof_thread_t thread = domain->current;
 
   if (thread && !thread->suspended) {
     value config = thread_config(thread);
-    return Sampling(config) && !Min_lambda(config);
+    return sampling(config) && !Min_lambda(config);
   }
   return false;
 }
@@ -1971,7 +1971,7 @@ void caml_memprof_set_trigger(caml_domain_state *state)
   memprof_domain_t domain = state->memprof;
   CAMLassert(domain);
   value *trigger = state->young_start;
-  if (sampling(domain)) {
+  if (domain_sampling(domain)) {
     uintnat geom = rand_geom(domain);
     if (state->young_ptr - state->young_start > geom) {
       trigger = state->young_ptr - (geom - 1);
@@ -1993,7 +1993,7 @@ void caml_memprof_sample_block(value block,
   memprof_domain_t domain = Caml_state->memprof;
   CAMLassert(domain);
   CAMLassert(sampled_words >= allocated_words);
-  if (sampling(domain)) {
+  if (domain_sampling(domain)) {
     maybe_track_block(domain, block, rand_binom(domain, sampled_words),
                       allocated_words, source);
   }
@@ -2018,7 +2018,7 @@ void caml_memprof_sample_young(uintnat wosize, int from_caml,
   CAMLlocal1(config);
   config = validated_config(entries);
 
-  if (!(Sampling(config) && !Min_lambda(config))) {
+  if (!(sampling(config) && !Min_lambda(config))) {
     /* We're not in fact sampling. We shouldn't usually get here, but
        can if sampling has just been stopped by another domain. */
     caml_memprof_set_trigger(Caml_state);
@@ -2252,7 +2252,7 @@ CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
   CAMLassert(domain);
   CAMLassert(domain->current);
 
-  if (Sampling(thread_config(domain->current))) {
+  if (sampling(thread_config(domain->current))) {
     caml_failwith("Gc.Memprof.start: already started.");
   }
 
@@ -2306,7 +2306,7 @@ CAMLprim value caml_memprof_participate(value config)
   memprof_domain_t domain = Caml_state->memprof;
   CAMLassert(domain);
 
-  if (Sampling(thread_config(domain->current))) {
+  if (sampling(thread_config(domain->current))) {
     caml_failwith("Gc.Memprof.participate: already profiling.");
   }
 
