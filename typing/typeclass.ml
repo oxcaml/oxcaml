@@ -1407,9 +1407,9 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                     else if Btype.is_position l && is_erased () then
                       eliminate_position_arg ()
                     else begin
-                      let mode_closure = Mode.Alloc.disallow_left Mode.Alloc.legacy in
-                      let mode_arg = Mode.Alloc.disallow_right Mode.Alloc.legacy in
-                      let mode_ret = Mode.Alloc.disallow_right Mode.Alloc.legacy in
+                      let mode_closure = Typedtree.alloc_mode_r_legacy in
+                      let mode_arg = Typedtree.alloc_mode_l_legacy in
+                      let mode_ret = Typedtree.alloc_mode_l_legacy in
                       let sort_arg = Jkind.Sort.value in
                       let sort_ret = Jkind.Sort.value in
                       Omitted { mode_closure; mode_arg; mode_ret; sort_arg;
