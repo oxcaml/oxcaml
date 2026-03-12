@@ -1407,9 +1407,15 @@ and class_expr_aux cl_num val_env met_env virt self_scope scl =
                     else if Btype.is_position l && is_erased () then
                       eliminate_position_arg ()
                     else begin
-                      let mode_closure = Mode.Alloc.disallow_left Mode.Alloc.legacy in
-                      let mode_arg = Mode.Alloc.disallow_right Mode.Alloc.legacy in
-                      let mode_ret = Mode.Alloc.disallow_right Mode.Alloc.legacy in
+                      let mode_closure =
+                        Mode.Locality.disallow_left Mode.Locality.legacy
+                      in
+                      let mode_arg =
+                        Mode.Locality.disallow_right Mode.Locality.legacy
+                      in
+                      let mode_ret =
+                        Mode.Locality.disallow_right Mode.Locality.legacy
+                      in
                       let sort_arg = Jkind.Sort.scannable in
                       let sort_ret = Jkind.Sort.scannable in
                       Omitted { mode_closure; mode_arg; mode_ret; sort_arg;

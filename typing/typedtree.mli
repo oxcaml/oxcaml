@@ -109,7 +109,9 @@ type unique_use = Mode.Uniqueness.r * Mode.Linearity.l
 
 val print_unique_use : Format.formatter -> unique_use -> unit
 
-type alloc_mode = Mode.Alloc.r
+type alloc_mode_r = Mode.Locality.r
+
+type alloc_mode_l = Mode.Locality.l
 
 (* CR-someday liam923: We'd like to split this into an arrow_modes and
    value_modes type. *)
@@ -124,7 +126,7 @@ type modalities = Typemode.modalities =
   }
 
 type texp_field_boxing =
-  | Boxing of alloc_mode * unique_use
+  | Boxing of alloc_mode_r * unique_use
   (** Projection requires boxing. [unique_use] describes the usage of the
       unboxed field as argument to boxing. *)
   | Non_boxing of unique_use
@@ -251,7 +253,7 @@ and 'k pattern_desc =
       the allocation mode of the captured environment. [pending] during
       type-checking; guaranteed [determined] of (potentially empty) generic sort
       variables after [type_let] returns. *)
-      env_alloc_mode: alloc_mode;
+      env_alloc_mode: alloc_mode_r;
       (** The allocation mode of the environment captured by the layout
       function.
 
@@ -482,11 +484,11 @@ and expression_desc =
   | Texp_function of
       { params : function_param list;
         body : function_body;
-        ret_mode : Mode.Alloc.l modes;
+        ret_mode : alloc_mode_l modes;
         (* Mode where the function allocates, ie local for a function of
            type 'a -> local_ 'b, and heap for a function of type 'a -> 'b *)
         ret_sort : Jkind.sort;
-        alloc_mode : alloc_mode;
+        alloc_mode : alloc_mode_r;
         (* Mode at which the closure is allocated *)
         zero_alloc : Zero_alloc.t;
         (* zero-alloc attributes *)
@@ -502,7 +504,7 @@ and expression_desc =
       *)
   | Texp_apply of
       expression * (arg_label * apply_arg) list * apply_position *
-        Mode.Locality.l * Zero_alloc.assume option
+        alloc_mode_l * Zero_alloc.assume option
         (** E0 ~l1:E1 ... ~ln:En
 
             The expression can be Omitted if the expression is abstracted over
@@ -535,7 +537,7 @@ and expression_desc =
         (** #() *)
   | Texp_unboxed_bool of bool
         (** #false, #true *)
-  | Texp_tuple of (string option * expression) list * alloc_mode
+  | Texp_tuple of (string option * expression) list * alloc_mode_r
         (** [Texp_tuple(el)] represents
             - [(E1, ..., En)]
                 when [el] is [(None, E1);...;(None, En)],
@@ -556,7 +558,7 @@ and expression_desc =
   | Texp_construct of
       Longident.t loc * Types.constructor_description *
       Types.constructor_representation * (Jkind.sort * expression) list *
-      alloc_mode option
+      alloc_mode_r option
         (** C                []
             C E              [E]
             C (E1, ..., En)  [E1;...;En]
@@ -565,7 +567,7 @@ and expression_desc =
             or [None] if the constructor is [Cstr_unboxed] or [Cstr_constant],
             in which case it does not need allocation.
          *)
-  | Texp_variant of label * (expression * alloc_mode) option
+  | Texp_variant of label * (expression * alloc_mode_r) option
         (** [alloc_mode] is the allocation mode of the variant,
             or [None] if the variant has no argument,
             in which case it does not need allocation.
@@ -576,7 +578,7 @@ and expression_desc =
           array;
       representation : Types.record_representation;
       extended_expression : (expression * Jkind.sort * Unique_barrier.t) option;
-      alloc_mode : alloc_mode option
+      alloc_mode : alloc_mode_r option
     }
         (** { l1=P1; ...; ln=Pn }           (extended_expression = None)
             { E0 with l1=P1; ...; ln=Pn }   (extended_expression = Some E0)
@@ -611,7 +613,7 @@ and expression_desc =
           *)
   | Texp_atomic_loc of
       expression * Jkind.sort * Longident.t loc * Types.label_description *
-      alloc_mode
+      alloc_mode_r
   | Texp_field of {
       record : expression;
       record_sort : Jkind.sort;
@@ -644,7 +646,8 @@ and expression_desc =
       newval : expression;
     }
     (** [alloc_mode] translates to the [modify_mode] of the record *)
-  | Texp_array of Types.mutability * Jkind.Sort.t * expression list * alloc_mode
+  | Texp_array of
+      Types.mutability * Jkind.Sort.t * expression list * alloc_mode_r
   | Texp_idx of block_access * unboxed_access list
   | Texp_list_comprehension of comprehension
   (* CR layouts-scannable: The sort here is no longer used. Instead, a layout is
@@ -712,7 +715,7 @@ and expression_desc =
   | Texp_antiquotation of expression
 
 and function_curry =
-  | More_args of { partial_mode : Mode.Alloc.l }
+  | More_args of { partial_mode : alloc_mode_l }
   | Final_arg
 
 and function_param =
@@ -731,7 +734,7 @@ and function_param =
     *)
     fp_kind: function_param_kind;
     fp_sort: Jkind.sort;
-    fp_mode: Mode.Alloc.l modes;
+    fp_mode: alloc_mode_l modes;
     fp_curry: function_curry;
     fp_newtypes: (Ident.t * string loc *
                   Parsetree.jkind_annotation option * Uid.t) list;
@@ -772,7 +775,7 @@ and function_cases =
     (** [fc_env] contains entries from all parameters except
         for the last one being matched by the cases.
     *)
-    fc_arg_mode: Mode.Alloc.l;
+    fc_arg_mode: alloc_mode_l;
     fc_arg_sort: Jkind.sort;
     fc_ret_type : Types.type_expr;
     fc_partial: partial;
@@ -869,9 +872,9 @@ and ('a, 'b) arg_or_omitted =
   | Omitted of 'b (* an argument not passed due to partial application *)
 
 and omitted_parameter =
-  { mode_closure : Mode.Alloc.r;
-    mode_arg : Mode.Alloc.l;
-    mode_ret : Mode.Alloc.l;
+  { mode_closure : alloc_mode_r;
+    mode_arg : alloc_mode_l;
+    mode_ret : alloc_mode_l;
     sort_arg : Jkind.sort;
     sort_ret : Jkind.sort }
 
