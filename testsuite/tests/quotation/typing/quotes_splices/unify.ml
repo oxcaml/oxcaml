@@ -162,17 +162,17 @@ let _ = <[ fun (Equal : (int NonInst1.t, <[Inst0.t]>) Type.eq)
 
 (* Both sides instantiable and quotes/splices *)
 
-(* $t ~ $s  and t, s instantiable *)
-let _ = <[ fun (Equal : ($Inst1.t, $Inst1.t') Type.eq)
-               (x : Inst1.t expr) -> (x : Inst1.t' expr) ]>
+(* $t ~/~ $s  and t, s instantiable *)
+let _ = <[ fun (Equal : ($Inst1.t, $Inst1.t') Type.eq) ->
+        $( (fun (x : Inst1.t expr) -> (x : Inst1.t' expr))
+           |> ignore; <[()]>) ]>
 [%%expect {|
-- : <[($(Inst1.t), $(Inst1.t')) Type.eq -> Inst1.t expr -> Inst1.t' expr]>
-    expr
-=
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (_, _) Stdlib.Type.eq)
-    (x : (Inst1.t) expr) -> (x : (Inst1.t') expr)
-]>
+Line 2, characters 39-40:
+2 |         $( (fun (x : Inst1.t expr) -> (x : Inst1.t' expr))
+                                           ^
+Error: This expression has type "Inst1.t expr"
+       but an expression was expected of type "Inst1.t' expr"
+       Type "Inst1.t" is not compatible with type "Inst1.t'"
 |}]
 (* <[t]> ~ <[s]>  and t, s instantiable *)
 let _ = <[ fun (Equal : (<[Inst0.t]>, <[Inst0.t']>) Type.eq)

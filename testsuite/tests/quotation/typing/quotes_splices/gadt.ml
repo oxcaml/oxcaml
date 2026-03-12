@@ -915,7 +915,10 @@ let magic_with_time_travel_and_past_types (type a b) (x : a) : b =
      $(result := Some x; <[()]>) ]> |> ignore;
   !result |> Option.get
 [%%expect {|
-val magic_with_time_travel_and_past_types : 'a -> 'b = <fun>
+Line 4, characters 22-23:
+4 |      $(result := Some x; <[()]>) ]> |> ignore;
+                          ^
+Error: This expression has type "a" but an expression was expected of type "b"
 |}]
 
 (* Splices are not instantiable *)

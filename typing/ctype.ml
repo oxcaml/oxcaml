@@ -332,7 +332,8 @@ type unification_environment =
       { penv : Pattern_env.t;
         equations_generation : equations_generation;
         assume_injective : bool;
-        unify_eq_set : TypePairs.t; }
+        unify_eq_set : TypePairs.t;
+        under_splice : bool }
     (* GADT constraint unification mode:
        only used for type indices of GADT constructors
        during pattern matching.
@@ -379,7 +380,8 @@ let in_subst_mode = function
 
 let can_generate_equations = function
   | Expression _ | Pattern { equations_generation = Forbidden } -> false
-  | Pattern { equations_generation = Allowed _ } -> true
+  | Pattern { equations_generation = Allowed _; under_splice } ->
+    not under_splice
 
 (* Can only be called when generate_equations is true.  Tracks equations only to
    improve error messages. *)
@@ -483,7 +485,7 @@ let unify_with_decr_stage uenv f =
     f (Expression { e with env = decr_stage e.env })
   | Pattern p ->
     Pattern_env.set_env p.penv (decr_stage p.penv.env);
-    let x = f (Pattern p) in
+    let x = f (Pattern { p with under_splice = true }) in
     Pattern_env.set_env p.penv (incr_stage p.penv.env);
     x
 
@@ -5068,7 +5070,8 @@ let unify_gadt (penv : Pattern_env.t) ty1 ty2 =
       { penv;
         equations_generation;
         assume_injective = true;
-        unify_eq_set = TypePairs.create 11; }
+        unify_eq_set = TypePairs.create 11;
+        under_splice = false; }
   in
   unify uenv ty1 ty2;
   equated_types
