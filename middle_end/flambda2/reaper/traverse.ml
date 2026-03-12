@@ -99,7 +99,7 @@ let prepare_code acc (code_id : Code_id.t) (code : Code.t) =
     List.iter
       (fun var -> Acc.add_any_usage acc (Code_id_or_name.var var))
       ((my_closure :: params) @ (exn :: return));
-    Acc.add_magic_source acc (Code_id_or_name.var my_closure);
+    Acc.add_zero_alloc_source acc (Code_id_or_name.var my_closure);
     List.iter
       (fun param ->
         let param = Code_id_or_name.var param in
