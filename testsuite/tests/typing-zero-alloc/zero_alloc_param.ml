@@ -15,14 +15,14 @@
 
 type t = int -> int;;
 module type S_with_t_in_arg = sig
-  val f : (t [@zero_alloc arity 1]) -> int
+  val f : (t [@zero_alloc arity 1]) -> int [@@zero_alloc]
 end;;
 module type S_with_t_not_arg = sig
   val f : t [@zero_alloc arity 1]
 end;;
 [%%expect {|
 type t = int -> int
-module type S_with_t_in_arg = sig val f : t -> int end
+module type S_with_t_in_arg = sig val f : t -> int [@@zero_alloc] end
 module type S_with_t_not_arg = sig val f : t end
 |}];;
 
@@ -50,7 +50,7 @@ let _ =
 
 let _ =
   let f x = x in
-  g f;; (* should fail in the frontend *)
+  g f;; (* should succeed *)
 [%%expect {|
 - : int = 42
 |}];;
@@ -64,10 +64,66 @@ val f : (int -> int) [@zero_alloc arity 1] -> int [@@zero_alloc] = <fun>
 let[@zero_alloc] f : ((int -> int -> int) [@zero_alloc]) -> int =
   fun (g [@zero_alloc arity 1]) -> g 42 123;; (* should fail *)
 [%%expect {|
-val f : (int -> int -> int) [@zero_alloc arity 2] -> int [@@zero_alloc] =
+Line 2, characters 6-31:
+2 |   fun (g [@zero_alloc arity 1]) -> g 42 123;; (* should fail *)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "zero_alloc" attribute on this function parameter conflicts with the one on its type.
+       zero_alloc arity mismatch:
+       When using "zero_alloc" in a signature or function parameter, the
+       syntactic arity of the implementation must match the function type in
+       the interface. Here the former is 1 and the latter is 2.
+|}];;
+
+(* checks with strict *)
+
+let[@zero_alloc] f : ((int -> int) [@zero_alloc strict]) -> int =
+  fun (g [@zero_alloc strict arity 1]) -> g 42;; (* should succeed *)
+[%%expect {|
+val f : (int -> int) [@zero_alloc strict arity 1] -> int [@@zero_alloc] =
   <fun>
 |}];;
 
+let[@zero_alloc] f : ((int -> int) [@zero_alloc strict]) -> int =
+  fun (g [@zero_alloc arity 1]) -> g 42;; (* should fail *)
+[%%expect {|
+Line 2, characters 6-31:
+2 |   fun (g [@zero_alloc arity 1]) -> g 42;; (* should fail *)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "zero_alloc" attribute on this function parameter conflicts with the one on its type.
+       There is a mismatch between the two "zero_alloc" assumptions.
+|}];;
+
+let[@zero_alloc] f : ((int -> int) [@zero_alloc]) -> int =
+  fun (g [@zero_alloc strict arity 1]) -> g 42;; (* should succeed *)
+[%%expect {|
+val f : (int -> int) [@zero_alloc arity 1] -> int [@@zero_alloc] = <fun>
+|}];;
+
+(* checks with opt *)
+
+let[@zero_alloc] f : ((int -> int) [@zero_alloc opt]) -> int =
+  fun (g [@zero_alloc opt arity 1]) -> g 42;; (* should succeed *)
+[%%expect {|
+val f : (int -> int) [@zero_alloc opt arity 1] -> int [@@zero_alloc] = <fun>
+|}];;
+
+let[@zero_alloc] f : ((int -> int) [@zero_alloc opt]) -> int =
+  fun (g [@zero_alloc arity 1]) -> g 42;; (* should succeed *)
+[%%expect {|
+val f : (int -> int) [@zero_alloc opt arity 1] -> int [@@zero_alloc] = <fun>
+|}];;
+
+let[@zero_alloc] f : ((int -> int) [@zero_alloc]) -> int =
+  fun (g [@zero_alloc opt arity 1]) -> g 42;; (* should fail *)
+[%%expect {|
+Line 2, characters 6-35:
+2 |   fun (g [@zero_alloc opt arity 1]) -> g 42;; (* should fail *)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "zero_alloc" attribute on this function parameter conflicts with the one on its type.
+       There is a mismatch between the two "zero_alloc" assumptions.
+|}];;
+
+(* partial application *)
 let _ =
   let[@zero_alloc] f x y = x + y in
   let f' = f 123 in
@@ -81,6 +137,7 @@ Error: Function argument zero alloc assumption violated.
 |}];;
 
 (* CR aivaskovic: needs fixing *)
+(* partial application with specified zero_alloc *)
 let _ =
   let[@zero_alloc] f x y = x + y in
   let[@zero_alloc] f' = f 123 in
@@ -115,7 +172,7 @@ let _ = g (fun[@zero_alloc] x -> (x, 123));; (* should fail in the backend *)
 Line 1, characters 16-26:
 1 | let _ = g (fun[@zero_alloc] x -> (x, 123));; (* should fail in the backend *)
                     ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP18._$.(fun) (camlTOP18__fn[:1,10--42]_16_17_code).
+Error: Annotation check for zero_alloc failed on function TOP24._$.(fun) (camlTOP24__fn[:1,10--42]_22_23_code).
 Line 1, characters 33-41:
 1 | let _ = g (fun[@zero_alloc] x -> (x, 123));; (* should fail in the backend *)
                                      ^^^^^^^^
@@ -143,7 +200,7 @@ let _ = g (fun x -> [x]);; (* should fail in the backend *)
 Line 1, characters 10-24:
 1 | let _ = g (fun x -> [x]);; (* should fail in the backend *)
               ^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP22._$.(fun) (camlTOP22__fn[:1,10--24]_24_25_code).
+Error: Annotation check for zero_alloc failed on function TOP28._$.(fun) (camlTOP28__fn[:1,10--24]_30_31_code).
 Line 1, characters 20-23:
 1 | let _ = g (fun x -> [x]);; (* should fail in the backend *)
                         ^^^
@@ -339,5 +396,31 @@ let w2 : ('a. (('a -> int) [@zero_alloc])) -> int =
 val w2 : ('a. 'a -> int) -> int = <fun>
 |}];;
 
-
-(* CR aivaskovic: add tests with strict and other various details *)
+(* Does zero-alloc information propagate across aliases?
+   Strictly speaking, this has nothing to do with zero-alloc on
+   function parameters, but it is related to where values in the
+   environment get their zero-alloc information from. *)
+module M : sig
+  val[@zero_alloc] g : int -> int
+end = struct
+  let[@zero_alloc] f x = x + 1
+  let g = f
+end
+[%%expect {|
+Lines 3-6, characters 6-3:
+3 | ......struct
+4 |   let[@zero_alloc] f x = x + 1
+5 |   let g = f
+6 | end
+Error: Signature mismatch:
+       Modules do not match:
+         sig val f : int -> int [@@zero_alloc] val g : int -> int end
+       is not included in
+         sig val g : int -> int [@@zero_alloc] end
+       Values do not match:
+         val g : int -> int
+       is not included in
+         val g : int -> int [@@zero_alloc]
+       The former provides a weaker "zero_alloc" guarantee than the latter.
+       Hint: Add a "zero_alloc" attribute to the implementation.
+|}];;

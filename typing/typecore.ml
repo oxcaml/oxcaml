@@ -302,6 +302,7 @@ type error =
   | Unsupported_arg_zero_alloc
   | Must_provide_zero_alloc_arity
   | Invalid_payload_arg_zero_alloc
+  | Incompatible_param_zero_alloc of Zero_alloc.error
 
 let not_principal fmt =
   Format_doc.Doc.kmsg (fun x -> Warnings.Not_principal x) fmt
@@ -5866,8 +5867,25 @@ let add_typed_zero_alloc_attribute expr zero_alloc_attribute =
     end
   | _ -> expr
 
+let check_arg_compatible ~loc ~zero_alloc_expected env zero_alloc =
+  match Zero_alloc.equal zero_alloc zero_alloc_expected with
+  | Ok () -> ()
+  | Error e ->
+    if Zero_alloc.error_is_arity_mismatch e
+    then () (* reported elsewhere *)
+    else raise (Error (loc, env, Wrong_arg_zero_alloc e))
+
+(* let get_attr_from_type ~default_arity ~on_function_argument core_type =
+ *   Builtin_attributes.get_zero_alloc_attribute
+ *     ~in_signature:false
+ *     ~on_application:false
+ *     ~on_function_argument
+ *     ~default_arity
+ *     core_type.ptyp_attributes
+ *   |> Zero_alloc.create_const *)
+
 let add_parsed_zero_alloc_attribute ~default_arity vb =
-  let attr =
+  let val_attr =
     Builtin_attributes.get_zero_alloc_attribute
       ~in_signature:false
       ~on_application:false
@@ -5876,29 +5894,22 @@ let add_parsed_zero_alloc_attribute ~default_arity vb =
       vb.pvb_attributes
   in
   let zero_alloc =
-    match attr with
+    match val_attr with
     | Default_zero_alloc -> Zero_alloc.create_var vb.pvb_loc default_arity
-    | Check _ | Assume _ | Ignore_assert_all -> Zero_alloc.create_const attr
+    | Check _ | Assume _ | Ignore_assert_all -> Zero_alloc.create_const val_attr
   in
   vb, zero_alloc
 
 let check_zero_alloc env exp ~zero_alloc_expected =
-  let check_arg_compatible zero_alloc =
-    match Zero_alloc.equal zero_alloc zero_alloc_expected with
-    | Ok () -> ()
-    | Error e ->
-      if Zero_alloc.error_is_arity_mismatch e
-      then () (* reported elsewhere *)
-      else raise (Error (exp.exp_loc, env, Wrong_arg_zero_alloc e))
-  in
+  let loc = exp.exp_loc in
   match exp.exp_desc with
-  | Texp_function { zero_alloc; _ } -> check_arg_compatible zero_alloc
-  | Texp_ident { desc = {val_zero_alloc; _}; _ } ->
-    check_arg_compatible val_zero_alloc
+  | Texp_function { zero_alloc; _ }
+  | Texp_ident { desc = {val_zero_alloc = zero_alloc; _}; _ } ->
+    check_arg_compatible ~loc ~zero_alloc_expected env zero_alloc
   | _ ->
     match Zero_alloc.equal Zero_alloc.default zero_alloc_expected with
     | Ok () -> ()
-    | Error _ -> raise (Error (exp.exp_loc, env, Unsupported_arg_zero_alloc))
+    | Error _ -> raise (Error (loc, env, Unsupported_arg_zero_alloc))
 
 let rec type_exp ?recarg ?(overwrite=No_overwrite) env expected_mode sexp =
   (* We now delegate everything to type_expect *)
@@ -8436,6 +8447,17 @@ and type_function
           ~mode_annots:mode_annots.mode_modes
           ~ret_mode_annots:ret_mode_annots.mode_modes
       in
+      (* Check that the zero_alloc attribute on the pattern is compatible
+         with the one on the parameter type (from a type annotation). *)
+      begin match get_desc ty_arg with
+      | Tpoly (_, _, type_za) ->
+        begin match Zero_alloc.equal zero_alloc type_za with
+        | Ok () -> ()
+        | Error e ->
+          raise (Error (pparam_loc, env, Incompatible_param_zero_alloc e))
+        end
+      | _ -> ()
+      end;
       (* [ty_arg_internal] is the type of the parameter viewed internally
          to the function. This is different than [ty_arg_mono] exactly for
          optional arguments with defaults, where the external [ty_arg_mono]
@@ -9423,7 +9445,7 @@ and type_apply_arg env ~app_loc ~funct ~index ~position_and_mode ~partial_app (l
           {arg with exp_type = instance arg.exp_type}, sch, zero_alloc
         end
       in
-      let _ = Env.summary env in begin
+      begin
         match Zero_alloc.get zero_alloc with
         | Zero_alloc.Check _ ->
           check_zero_alloc env arg ~zero_alloc_expected:zero_alloc
@@ -12488,6 +12510,11 @@ let report_error ~loc env =
   | Invalid_payload_arg_zero_alloc ->
       Location.errorf ~loc
         "Invalid zero-alloc payload for a higher-order function argument."
+  | Incompatible_param_zero_alloc err ->
+      Location.errorf ~loc
+        "@[The \"zero_alloc\" attribute on this function parameter conflicts \
+         with the one on its type.@]@ %a"
+        Zero_alloc.print_error err
 
 let report_error ~loc env err =
   Printtyp.wrap_printing_env ~error:true env

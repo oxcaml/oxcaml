@@ -348,6 +348,7 @@ type error =
   | Unsupported_arg_zero_alloc
   | Must_provide_zero_alloc_arity
   | Invalid_payload_arg_zero_alloc
+  | Incompatible_param_zero_alloc of Zero_alloc.error
 
 exception Error of Location.t * Env.t * error
 exception Error_forward of Location.error
