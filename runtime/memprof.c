@@ -331,12 +331,12 @@
  * Some callbacks are run at allocation time, for allocations from
  * Caml (see under "Sampling" above). Other allocation callbacks, and
  * all post-allocation callbacks, are run during
- * `caml_memprof_run_callbacks_exn()`, which is called by the
+ * `caml_memprof_do_pending_exn()`, which is called by the
  * runtime's general pending-action mechanism at poll points.
  *
  * We set the domain's action-pending flag when we notice we have
  * pending callbacks. Caml drops into the runtime at a poll point, and
- * calls `caml_memprof_run_callbacks_exn()`, whenever the
+ * calls `caml_memprof_do_pending_exn()`, whenever the
  * action-pending flag is set, whether or not memprof set it. So
  * memprof maintains its own per-domain `pending` flag, to avoid
  * suspending/unsuspending sampling, and checking all the entries
@@ -631,6 +631,9 @@ static caml_plat_mutex orphans_lock = CAML_PLAT_MUTEX_INITIALIZER;
 
 /* Flag indicating non-NULL orphans. Only modified when holding orphans_lock. */
 static atomic_uintnat orphans_present;
+
+/* The config passed to caml_memprof_participate_globally. (A root) */
+static _Atomic value requested_global_config = CONFIG_NONE;
 
 /**** Initializing and clearing entries tables ****/
 
@@ -1274,6 +1277,19 @@ static void thread_destroy(memprof_thread_t thread)
   caml_stat_free(thread);
 }
 
+/* Set config of the domain and all its threads */
+static void set_config(memprof_domain_t domain, value config)
+{
+  CAMLassert(domain->entries.size == 0);
+  domain->entries.config = config;
+  memprof_thread_t thread = domain->threads;
+  while (thread) {
+    CAMLassert(thread->entries.size == 0);
+    thread->entries.config = config;
+    thread = thread->next;
+  }
+}
+
 /**** Create and destroy domain state structures ****/
 
 /* Destroy a domain state structure. In the usual case, this will
@@ -1334,6 +1350,18 @@ static memprof_domain_t domain_create(caml_domain_state *caml_state)
 
 /**** Interface with domain action-pending flag ****/
 
+static bool has_pending_external_interrupt(memprof_domain_t domain)
+{
+  value requested_config = atomic_load_acquire(&requested_global_config);
+  return (requested_config != CONFIG_NONE &&
+          (domain == NULL || domain->entries.config != requested_config));
+}
+
+bool caml_memprof_pending_external_interrupt(caml_domain_state* caml_state)
+{
+  return has_pending_external_interrupt(caml_state->memprof);
+}
+
 /* If a domain has some callbacks pending, and isn't currently
  * suspended, set the action pending flag. */
 
@@ -1343,7 +1371,8 @@ static void set_action_pending_as_needed(memprof_domain_t domain)
   if (domain->current->suspended) return;
   domain->pending = (domain->entries.active < domain->entries.size ||
                      domain->current->entries.size > 0 ||
-                     domain->orphans_pending);
+                     domain->orphans_pending ||
+                     has_pending_external_interrupt(domain));
   if (domain->pending) {
     caml_set_action_pending(domain->caml_state);
   }
@@ -1478,6 +1507,15 @@ void caml_memprof_scan_roots(scanning_action f,
 {
   memprof_domain_t domain = state->memprof;
   CAMLassert(domain);
+
+  value requested_config = requested_global_config;
+  if (requested_config != CONFIG_NONE) {
+    value updated = requested_config;
+    f(fdata, requested_config, &updated);
+    if (updated != requested_config)
+      atomic_compare_exchange_strong(&requested_global_config,
+                                     &requested_config, updated);
+  }
 
   /* Adopt all global orphans into this domain. */
   orphans_adopt(domain);
@@ -1871,14 +1909,31 @@ static value entries_run_callbacks_exn(memprof_thread_t thread,
  * change the various indexes into an entries table while iterating
  * over it, whereas domain_apply_actions assumes that can't happen. */
 
-value caml_memprof_run_callbacks_exn(void)
+value caml_memprof_do_pending_exn(void)
 {
   memprof_domain_t domain = Caml_state->memprof;
   CAMLassert(domain);
   memprof_thread_t thread = domain->current;
   CAMLassert(thread);
   value res = Val_unit;
-  if (thread->suspended || !domain->pending) return res;
+  if (thread->suspended) return res;
+  value requested_config = atomic_load_acquire(&requested_global_config);
+  if (requested_config != CONFIG_NONE && thread->entries.config != requested_config) {
+    if (!Sampling(requested_config)) {
+      atomic_compare_exchange_strong(&requested_global_config, &requested_config, CONFIG_NONE);
+    } else {
+      if (Sampling(thread->entries.config))
+        Set_status(thread->entries.config, CONFIG_STATUS_STOPPED);
+
+      if (!orphans_create(domain))
+        caml_fatal_error("caml_memprof_do_pending_exn: out of memory");
+
+      set_config(domain, requested_config);
+      rand_init(domain);
+      domain->pending = 1;
+    }
+  }
+  if (!domain->pending) return res;
 
   orphans_adopt(domain);
   update_suspended(domain, true);
@@ -2207,19 +2262,6 @@ CAMLexport void caml_memprof_enter_thread(memprof_thread_t thread)
 
 /**** Interface to OCaml ****/
 
-/* Set config of the domain and all its threads */
-static void set_config(memprof_domain_t domain, value config)
-{
-  CAMLassert(domain->entries.size == 0);
-  domain->entries.config = config;
-  memprof_thread_t thread = domain->threads;
-  while (thread) {
-    CAMLassert(thread->entries.size == 0);
-    thread->entries.config = config;
-    thread = thread->next;
-  }
-}
-
 CAMLprim value caml_memprof_start(value lv, value szv, value tracker)
 {
   CAMLparam3(lv, szv, tracker);
@@ -2319,6 +2361,22 @@ CAMLprim value caml_memprof_participate(value config)
   set_action_pending_as_needed(domain);
 
   CAMLreturn(Val_unit);
+}
+
+CAMLprim value caml_memprof_participate_globally(value config)
+{
+  CAMLparam1(config);
+  switch (Status(config)) {
+  case CONFIG_STATUS_DISCARDED:
+    caml_failwith("Gc.Memprof.participate_globally: profile already discarded.");
+  case CONFIG_STATUS_STOPPED:
+    caml_failwith("Gc.Memprof.participate_globally: profile already stopped.");
+  case CONFIG_STATUS_SAMPLING:
+    break;
+  }
+  atomic_store(&requested_global_config, config);
+  caml_interrupt_all_signal_safe();
+  CAMLreturn (Val_unit);
 }
 
 CAMLprim value caml_memprof_stop(value unit)

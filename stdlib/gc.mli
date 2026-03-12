@@ -729,6 +729,12 @@ module (Memprof @@ nonportable) :
         any profile, or if the specified profile has been stopped or
         discarded. *)
 
+    val participate_globally : t -> unit
+    (** Cause all running domains to participate in the specified profile.
+        Raises an exception if the specified profile has been stopped or
+        discarded. If other domains are currently sampling with other profiles,
+        those profiles are stopped (but not discarded). *)
+
     (** Submodule containing non-backwards-compatible functions which enforce thread
         safety via modes. *)
     module Safe : sig

@@ -1095,6 +1095,11 @@ CAMLprim value caml_memprof_participate(value profile)
   caml_failwith("Gc.Memprof.participate: not implemented in runtime4");
 }
 
+CAMLprim value caml_memprof_participate_globally(value profile)
+{
+  caml_failwith("Gc.Memprof.participate_globally: not implemented in runtime4");
+}
+
 CAMLprim value caml_memprof_discard(value profile)
 {
   caml_failwith("Gc.Memprof.discard: not implemented in runtime4");

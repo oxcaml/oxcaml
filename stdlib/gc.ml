@@ -208,6 +208,9 @@ module Memprof =
 
     external participate : t -> unit @@ portable = "caml_memprof_participate"
 
+    external participate_globally : t -> unit @@ portable =
+      "caml_memprof_participate_globally"
+
     external stop : unit -> unit @@ portable = "caml_memprof_stop"
 
     external discard : t -> unit @@ portable = "caml_memprof_discard"
