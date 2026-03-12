@@ -132,13 +132,6 @@ let rec expression event env = function
         Ttuple ty_list ->
           if n < 1 || n > List.length ty_list
           then raise(Error(Tuple_index(ty, List.length ty_list, n)))
-<<<<<<< oxcaml
-          (* CR labeled tuples: handle labels in debugger (also see "E_field"
-             case) *)
-||||||| upstream-base
-          else (Debugcom.Remote_value.field v (n-1), List.nth ty_list (n-1))
-=======
->>>>>>> upstream-incoming
           else (Debugcom.Remote_value.field v (n-1),
                 snd (List.nth ty_list (n-1)))
       | Tconstr(path, [ty_arg], _) when Path.same path Predef.path_array ->

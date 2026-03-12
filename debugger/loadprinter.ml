@@ -90,88 +90,15 @@ let eval_value_path env path =
 
 (* Install, remove a printer (as in toplevel/topdirs) *)
 
-<<<<<<< oxcaml
-let match_printer_type desc make_printer_type =
-  Ctype.with_local_level ~post:Ctype.generalize begin fun () ->
-    let ty_arg = Ctype.newvar (Jkind.Builtin.value ~why:Debug_printer_argument) in
-    Ctype.unify (Lazy.force Env.initial)
-      (make_printer_type ty_arg)
-      (Ctype.instance desc.val_type);
-    ty_arg
-  end
-
-let find_printer_type lid =
-  match Env.find_value_by_name lid Env.empty with
-  | (path, desc) -> begin
-      match match_printer_type desc Topprinters.printer_type_new with
-      | ty_arg -> (ty_arg, path, false)
-      | exception Ctype.Unify _ -> begin
-          match match_printer_type desc Topprinters.printer_type_old with
-          | ty_arg -> (ty_arg, path, true)
-          | exception Ctype.Unify _ -> raise(Error(Wrong_type lid))
-        end
-    end
-  | exception Not_found ->
-      raise(Error(Unbound_identifier lid))
-
-let install_printer ppf lid =
-  let (ty_arg, path, is_old_style) = find_printer_type lid in
-  let v =
-    try
-      eval_value_path Env.empty path
-    with Symtable.Error(Symtable.Undefined_global global) ->
-      let s = Symtable.Global.name global in
-      raise(Error(Unavailable_module(s, lid))) in
-  let print_function =
-    if is_old_style then
-      (fun _formatter repr -> Obj.obj v (Obj.obj repr))
-    else
-      (fun formatter repr -> Obj.obj v formatter (Obj.obj repr)) in
-  Printval.install_printer path ty_arg ppf print_function
-||||||| upstream-base
-let match_printer_type desc make_printer_type =
-  Ctype.with_local_level ~post:Ctype.generalize begin fun () ->
-    let ty_arg = Ctype.newvar() in
-    Ctype.unify Env.empty
-      (make_printer_type ty_arg)
-      (Ctype.instance desc.val_type);
-    ty_arg
-  end
-
-let find_printer_type lid =
-  match Env.find_value_by_name lid Env.empty with
-  | (path, desc) -> begin
-      match match_printer_type desc Topprinters.printer_type_new with
-      | ty_arg -> (ty_arg, path, false)
-      | exception Ctype.Unify _ -> begin
-          match match_printer_type desc Topprinters.printer_type_old with
-          | ty_arg -> (ty_arg, path, true)
-          | exception Ctype.Unify _ -> raise(Error(Wrong_type lid))
-        end
-    end
-  | exception Not_found ->
-      raise(Error(Unbound_identifier lid))
-
-let install_printer ppf lid =
-  let (ty_arg, path, is_old_style) = find_printer_type lid in
-  let v =
-    try
-      eval_value_path Env.empty path
-    with Symtable.Error(Symtable.Undefined_global global) ->
-      let s = Symtable.Global.name global in
-      raise(Error(Unavailable_module(s, lid))) in
-  let print_function =
-    if is_old_style then
-      (fun _formatter repr -> Obj.obj v (Obj.obj repr))
-    else
-      (fun formatter repr -> Obj.obj v formatter (Obj.obj repr)) in
-  Printval.install_printer path ty_arg ppf print_function
-=======
 (* Very close to Topdirs.install_printer_by_kind
    except that we do fetch the (remote) values
    {b and fallback if it fails} *)
  let install_printer lid =
-  match Topprinters.find_printer Env.empty lid with
+  let env = Lazy.force Env.initial in
+  (* CR sspies: The semantics is now subtly different here, since [env] is used
+     in more places than it was before the 5.4 merge. I suspect this is fine.
+     Planning to delete this comment during review *)
+  match Topprinters.find_printer env lid with
   | Error error -> raise (Error (error :> error))
   | Ok (path, kind) ->
       let v =
@@ -197,7 +124,6 @@ let install_printer ppf lid =
           Printval.install_printer path ty_arg print_function
       | Topprinters.Generic _ ->
           raise (Error (`Wrong_type lid))
->>>>>>> upstream-incoming
 
 let remove_printer lid =
   match Topprinters.find_printer Env.empty lid with
@@ -213,12 +139,7 @@ let remove_printer lid =
 open Format
 module Style = Misc.Style
 let quoted_longident =
-<<<<<<< oxcaml
-  Format_doc.compat @@ Style.as_inline_code Printtyp.longident
-||||||| upstream-base
-=======
   Format_doc.compat @@ Style.as_inline_code Printtyp.Doc.longident
->>>>>>> upstream-incoming
 
 let report_error ppf = function
   | `Load_failure e ->
@@ -227,42 +148,14 @@ let report_error ppf = function
   | `Unbound_identifier lid ->
       fprintf ppf "@[Unbound identifier %a@]@."
         quoted_longident lid
-<<<<<<< oxcaml
-  | Unavailable_module(md, lid) ->
-||||||| upstream-base
-      (Style.as_inline_code Printtyp.longident) lid
-  | Unavailable_module(md, lid) ->
-=======
   | `Unavailable_module(md, lid) ->
->>>>>>> upstream-incoming
       fprintf ppf
         "@[The debugger does not contain the code for@ %a.@ \
          Please load an implementation of %s first.@]@."
         quoted_longident lid md
-<<<<<<< oxcaml
-  | Wrong_type lid ->
-||||||| upstream-base
-           Please load an implementation of %s first.@]@."
-        (Style.as_inline_code Printtyp.longident) lid md
-  | Wrong_type lid ->
-=======
   | `Wrong_type lid ->
->>>>>>> upstream-incoming
       fprintf ppf "@[%a has the wrong type for a printing function.@]@."
         quoted_longident lid
-<<<<<<< oxcaml
-  | No_active_printer lid ->
-||||||| upstream-base
-      (Style.as_inline_code Printtyp.longident) lid
-  | No_active_printer lid ->
-=======
   | `No_active_printer path ->
->>>>>>> upstream-incoming
       fprintf ppf "@[%a is not currently active as a printing function.@]@."
-<<<<<<< oxcaml
-        quoted_longident lid
-||||||| upstream-base
-      (Style.as_inline_code Printtyp.longident) lid
-=======
         Printtyp.path path
->>>>>>> upstream-incoming

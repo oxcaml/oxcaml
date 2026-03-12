@@ -65,7 +65,9 @@ let match_simple_printer_type env ty ~is_old_style =
   in
   match
     Ctype.with_local_level_generalize begin fun () ->
-      let ty_arg = Ctype.newvar() in
+      let ty_arg =
+        Ctype.newvar (Jkind.Builtin.value ~why:Debug_printer_argument)
+      in
       Ctype.unify env
         (make_printer_type ty_arg)
         (Ctype.instance ty);
