@@ -2648,6 +2648,9 @@ module Report = struct
     | `Expected, Visibility_op, Read ->
       Fmt.fprintf ppf "%a or %a" mode_printer C.Visibility.Read mode_printer
         C.Visibility.Read_write
+    | `Expected, Visibility_op, Write ->
+      Fmt.fprintf ppf "%a or %a" mode_printer C.Visibility.Write mode_printer
+        C.Visibility.Read_write
     | `Expected, Regionality, Regional ->
       Fmt.fprintf ppf "%a to the parent region or %a" mode_printer
         C.Regionality.Local mode_printer C.Regionality.Global

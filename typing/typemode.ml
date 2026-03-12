@@ -231,9 +231,9 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
   | Monadic Visibility, Join_const a ->
     let b : Contention.Const.t =
       match a with
-      | Immutable | Write -> Contended
+      | Immutable -> Contended
       | Read -> Shared
-      | Read_write -> Uncontended
+      | Read_write | Write -> Uncontended
     in
     [Atom (Monadic Contention, Join_const b)]
   | Comonadic Statefulness, Meet_const a ->
@@ -384,10 +384,9 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
   let contention =
     match annots.contention, annots.visibility with
     | (Some _ as c), _ | c, None -> c
-    | None, Some Visibility.Const.(Immutable | Write) ->
-      Some Contention.Const.Contended
+    | None, Some Visibility.Const.Immutable -> Some Contention.Const.Contended
     | None, Some Visibility.Const.Read -> Some Contention.Const.Shared
-    | None, Some Visibility.Const.Read_write ->
+    | None, Some Visibility.Const.(Read_write | Write) ->
       Some Contention.Const.Uncontended
   in
   (* Likewise for [portability]. *)
