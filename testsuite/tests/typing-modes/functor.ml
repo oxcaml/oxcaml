@@ -196,10 +196,10 @@ Error: Modules do not match: sig val f : unit -> unit end @ nonportable
        val f : unit -> unit (* in a structure at nonportable *)
      is not included in
        val f : unit -> unit (* in a structure at portable *)
-     The left-hand side is "nonportable"
+     The first is "nonportable"
        because it contains a usage (of the value "r" at line 2, characters 40-41)
        which is expected to be "uncontended".
-     However, the right-hand side is "portable".
+     However, the second is "portable".
 |}]
 
 (* testing generative functor *)
@@ -231,8 +231,8 @@ Error: Signature mismatch in included functor's parameter:
          val f : unit -> unit (* in a structure at nonportable *)
        is not included in
          val f : unit -> unit (* in a structure at portable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 module type U = sig
@@ -258,8 +258,8 @@ Error: Signature mismatch in included functor's parameter:
          val f : unit -> unit (* in a structure at nonportable *)
        is not included in
          val f : unit -> unit (* in a structure at portable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 (* CR-soon zqian: the following should be allowed *)
@@ -274,8 +274,8 @@ Error: Signature mismatch in included functor's parameter:
          val f : unit -> unit (* in a structure at nonportable *)
        is not included in
          val f : unit -> unit (* in a structure at portable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 
@@ -293,10 +293,10 @@ Error: Signature mismatch in included functor's parameter:
          val f : unit -> unit (* in a structure at nonportable *)
        is not included in
          val f : unit -> unit (* in a structure at portable *)
-       The left-hand side is "nonportable"
+       The first is "nonportable"
          because it contains a usage (of the value "r" at line 2, characters 40-41)
          which is expected to be "uncontended".
-       However, the right-hand side is "portable".
+       However, the second is "portable".
 |}]
 
 module M = struct
@@ -780,8 +780,8 @@ Error: Signature mismatch:
          val f : unit -> unit (* in a structure at nonportable *)
        is not included in
          val f : unit -> unit (* in a structure at portable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 module F (M : Portable_Nonportable) = (M : Portable_Portable)
@@ -812,8 +812,8 @@ Error: Signature mismatch:
          val g : unit -> unit (* in a structure at nonportable *)
        is not included in
          val g : unit -> unit (* in a structure at portable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 module F (M : Portable_Portable) = (M : Portable_Nonportable)
@@ -840,8 +840,8 @@ Error: Signature mismatch:
          val f : unit -> unit (* in a structure at nonportable *)
        is not included in
          val f : unit -> unit (* in a structure at shareable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "shareable".
+       The first is "nonportable"
+       but the second is "shareable".
 |}]
 
 module F (M : S -> S) = (M : S @ shareable -> S)
@@ -872,8 +872,8 @@ Error: Signature mismatch:
          val f : unit -> unit (* in a structure at nonportable *)
        is not included in
          val f : unit -> unit (* in a structure at shareable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "shareable".
+       The first is "nonportable"
+       but the second is "shareable".
 |}]
 
 module type T = sig val t : int * int ref end
@@ -1007,10 +1007,10 @@ Error: Signature mismatch:
          val f : unit -> unit (* in a structure at nonportable *)
        is not included in
          val f : unit -> unit (* in a structure at portable *)
-       The left-hand side is "nonportable"
+       The first is "nonportable"
          because it is the value "f" in the structure at line 3, characters 40-44
          which is "nonportable".
-       However, the right-hand side is "portable".
+       However, the second is "portable".
 |}]
 
 module F(G : S @ portable-> S) = struct
@@ -1027,8 +1027,8 @@ Error: Modules do not match: sig val f : unit -> unit end @ nonportable
        val f : unit -> unit (* in a structure at nonportable *)
      is not included in
        val f : unit -> unit (* in a structure at portable *)
-     The left-hand side is "nonportable"
-     but the right-hand side is "portable".
+     The first is "nonportable"
+     but the second is "portable".
 |}]
 
 module F(G : S -> S) = struct
@@ -1072,8 +1072,8 @@ Error: Signature mismatch:
          val f : unit -> unit (* in a structure at nonportable *)
        is not included in
          val f : unit -> unit (* in a structure at portable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 module F (M : (S -> S @ portable) -> S) = (M : (S -> S) -> S)
@@ -1095,8 +1095,8 @@ Error: Signature mismatch:
          val f : unit -> unit (* in a structure at nonportable *)
        is not included in
          val f : unit -> unit (* in a structure at portable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 module F (M : (S -> S) -> S) = (M : (S -> S @ portable) -> S)
