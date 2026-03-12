@@ -163,7 +163,7 @@ let simplify_named0 dacc (bound_pattern : Bound_pattern.t) (named : Named.t)
               && Name_mode.is_normal (Bound_var.name_mode bound_var)
             in
             let defining_expr, dacc =
-              Reification.try_to_reify dacc dbg simplified_named
+              Reification.try_to_reify dacc dbg named simplified_named
                 ~bound_to:bound_var ~kind_of_bound_to:(P.result_kind' prim)
                 ~allow_lifting
             in

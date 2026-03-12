@@ -63,6 +63,11 @@ let simplify_toplevel_common dacc simplify ~params ~implicit_params
             ~return_continuation ~exn_continuation
             ~machine_width:(DE.machine_width (DA.denv dacc))
         in
+        (match Sys.getenv "FLOW" with exception Not_found -> ()
+         | _ ->
+           Format.eprintf "Dataflow for %s:@ %a\n%!"
+             print_name Flow_types.Flow_result.print flow_result
+        );
         let uenv =
           UE.add_function_return_or_exn_continuation
             (UE.create

@@ -16,7 +16,7 @@
 
 open! Simplify_import
 
-let create_static_const dacc dbg (to_lift : T.to_lift) : RSC.t =
+let create_static_const dacc dbg (to_lift : T.to_lift) original_named : RSC.t =
   let[@inline always] convert_fields fields =
     ListLabels.map fields ~f:(fun field ->
         Simple.pattern_match' field
@@ -42,8 +42,11 @@ let create_static_const dacc dbg (to_lift : T.to_lift) : RSC.t =
     in
     let rsc = RSC.create_block art tag mut shape ~fields in 
     if RSC.is_block_of_interest rsc then
-      Format.eprintf "Interesting constant in Reification:@ %a@ dacc:%a\n%!"
-        RSC.print rsc DA.print dacc;
+      Format.eprintf
+        "Interesting constant in Reification:@ %a@ original Named.t was:@ %a@ dacc:%a\n%!"
+        RSC.print rsc
+        Named.print original_named
+        DA.print dacc;
     rsc
   | Boxed_float32 f -> RSC.create_boxed_float32 art (Const f)
   | Boxed_float f -> RSC.create_boxed_float art (Const f)
@@ -151,7 +154,7 @@ let lift dacc ty ~bound_to static_const : _ Or_invalid.t * DA.t =
   let machine_width = DE.machine_width (DA.denv dacc) in
   Ok (Simplified_named.create ~machine_width term), dacc
 
-let try_to_reify dacc dbg (term : Simplified_named.t) ~bound_to
+let try_to_reify dacc dbg original_named (term : Simplified_named.t) ~bound_to
     ~kind_of_bound_to ~allow_lifting : _ Or_invalid.t * DA.t =
   let occ_kind = Bound_var.name_mode bound_to in
   let bound_to = Bound_var.var bound_to in
@@ -172,7 +175,7 @@ let try_to_reify dacc dbg (term : Simplified_named.t) ~bound_to
   | Lift to_lift ->
     if Name_mode.is_normal occ_kind && allow_lifting
     then
-      let static_const = create_static_const dacc dbg to_lift in
+      let static_const = create_static_const dacc dbg to_lift original_named in
       lift dacc ty ~bound_to static_const
     else Ok term, dacc
   | Simple simple when Simple.equal simple (Simple.var bound_to) ->
