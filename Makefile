@@ -72,6 +72,10 @@ DISTCLEAN_FILES = \
   utils/config.common.ml \
   utils/config.generated.ml \
   compilerlibs/META \
+  otherlibs/dynlink/dynlink_cmo_format.mli \
+  otherlibs/dynlink/dynlink_cmxs_format.mli \
+  otherlibs/dynlink/dynlink_config.ml \
+  otherlibs/dynlink/dynlink_platform_intf.mli \
   otherlibs/unix/unix.ml \
   stdlib/META \
   stdlib/runtime.info \
@@ -84,8 +88,8 @@ DISTCLEAN_FILES = \
   runtime4/caml/exec.h \
   runtime4/caml/m.h \
   runtime4/caml/s.h \
-  runtime4/caml/version.h
-# CR sspies: We might need to add dynlink files here. Revisit after the dynlink changes have been backported.
+  runtime4/caml/version.h \
+  $(wildcard otherlibs/*/META)
 
 ifdef dune
   CLEAN_DUNE_BIN := $(dune)
