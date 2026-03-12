@@ -4602,6 +4602,15 @@ let package_units initial_env objfiles target_cmi modulename =
 
 open Printtyp
 
+(* A heuristic used in nondep errors: the input describes a declaration
+   that has made invalid, and this says what about it is now invalid. *)
+let invalid_part_of_user_kind : Sig_component_kind.t -> string  = function
+  | Type -> "kind"
+  | Jkind -> "definition"
+  | ( Value | Constructor | Label | Unboxed_label | Module | Module_type
+    | Extension_constructor | Class | Class_type ) ->
+    "type"
+
 let report_error ~loc _env = function
     Cannot_apply mty ->
       Location.errorf ~loc
@@ -4812,11 +4821,13 @@ let report_error ~loc _env = function
           (String.capitalize_ascii shadowed_item_kind)
           Style.inline_code shadowed
       in
+      let invalid_part = invalid_part_of_user_kind user_kind in
       let user_msg =
         Location.msg ~loc:user_loc
-        "@[The %s %a has no valid type@ if %a is shadowed.@]"
+        "@[The %s %a has no valid %s@ if %a is shadowed.@]"
         (Sig_component_kind.to_string user_kind)
          Style.inline_code (Ident.name user_id)
+         invalid_part
          Style.inline_code shadowed
       in
       Location.errorf ~loc ~sub:[shadowed_msg; user_msg]
@@ -4828,11 +4839,13 @@ let report_error ~loc _env = function
       { opened_item_kind; opened_item_id; user_id; user_kind; user_loc } ->
       let opened_item_kind= Sig_component_kind.to_string opened_item_kind in
       let opened_id = Ident.name opened_item_id in
+      let invalid_part = invalid_part_of_user_kind user_kind in
       let user_msg =
         Location.msg ~loc:user_loc
-          "@[The %s %a has no valid type@ if %a is hidden.@]"
+          "@[The %s %a has no valid %s@ if %a is hidden.@]"
           (Sig_component_kind.to_string user_kind)
           Style.inline_code (Ident.name user_id)
+          invalid_part
           Style.inline_code opened_id
       in
       Location.errorf ~loc ~sub:[user_msg]

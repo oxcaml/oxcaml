@@ -677,8 +677,8 @@ type q = t2 t1'
 |}]
 
 
-(***************************)
-(* Test: Nondep error case *)
+(****************************)
+(* Test: Nondep error cases *)
 
 (* We can't always round up jkinds with abstract bases, so we may need to error
    because of a type that can't be erased in the with bounds. *)
@@ -698,6 +698,75 @@ Error: This functor has type
        "functor (X : sig type t end) -> sig kind_ k type t : k with X.t end"
        The parameter cannot be eliminated in the result type.
        Please bind the argument to a module identifier.
+|}]
+
+(* Appears in signature (similar to tests in [generalized-open/gpr1506.ml]) *)
+include struct
+  open struct
+    kind_ k
+    type t : k
+  end
+  type s = t
+end
+[%%expect{|
+Lines 2-5, characters 2-5:
+2 | ..open struct
+3 |     kind_ k
+4 |     type t : k
+5 |   end
+Error: The kind "k" introduced by this open appears in the signature.
+Line 6, characters 2-12:
+6 |   type s = t
+      ^^^^^^^^^^
+  The type "s" has no valid kind if "k" is hidden.
+|}]
+
+include struct
+  open struct
+    kind_ k
+  end
+  kind_ k' = k
+end
+[%%expect{|
+Lines 2-4, characters 2-5:
+2 | ..open struct
+3 |     kind_ k
+4 |   end
+Error: The kind "k" introduced by this open appears in the signature.
+Line 5, characters 2-14:
+5 |   kind_ k' = k
+      ^^^^^^^^^^^^
+  The kind "k'" has no valid definition if "k" is hidden.
+|}]
+
+(* Illegal shadowing (similar to first test in [typing-sigsubst/sigsubst.ml]) *)
+module type S1 = sig
+  kind_ k
+  type t1 : k
+end
+module type S2 = sig
+  kind_ k
+  type t2 : k
+end
+module type Combined = sig
+  include S1
+  include S2
+end
+[%%expect{|
+module type S1 = sig kind_ k type t1 : k end
+module type S2 = sig kind_ k type t2 : k end
+Line 11, characters 2-12:
+11 |   include S2
+       ^^^^^^^^^^
+Error: Illegal shadowing of included kind "k/2" by "k/1".
+Line 10, characters 2-12:
+10 |   include S1
+       ^^^^^^^^^^
+  Kind "k/2" came from this include.
+Line 3, characters 2-13:
+3 |   type t1 : k
+      ^^^^^^^^^^^
+  The type "t1" has no valid kind if "k/2" is shadowed.
 |}]
 
 
@@ -827,7 +896,7 @@ end
 Line 3, characters 2-9:
 3 |   kind_ k
       ^^^^^^^
-Error: Multiple definition of the jkind name "k".
+Error: Multiple definition of the kind name "k".
        Names must be unique in a given structure or signature.
 |}]
 
@@ -840,7 +909,7 @@ end
 Line 3, characters 2-9:
 3 |   kind_ k
       ^^^^^^^
-Error: Multiple definition of the jkind name "k".
+Error: Multiple definition of the kind name "k".
        Names must be unique in a given structure or signature.
 |}]
 
@@ -856,7 +925,7 @@ module M : sig kind_ k end
 Line 4, characters 2-11:
 4 |   include M
       ^^^^^^^^^
-Error: Multiple definition of the jkind name "k".
+Error: Multiple definition of the kind name "k".
        Names must be unique in a given structure or signature.
 |}]
 
@@ -871,7 +940,7 @@ module type S = sig kind_ k end
 Line 4, characters 2-11:
 4 |   include S
       ^^^^^^^^^
-Error: Multiple definition of the jkind name "k".
+Error: Multiple definition of the kind name "k".
        Names must be unique in a given structure or signature.
 |}]
 
@@ -889,7 +958,7 @@ module F : functor (X : sig kind_ k end) -> sig kind_ k = X.k end
 Line 6, characters 2-19:
 6 |   include functor F
       ^^^^^^^^^^^^^^^^^
-Error: Multiple definition of the jkind name "k".
+Error: Multiple definition of the kind name "k".
        Names must be unique in a given structure or signature.
 |}]
 
