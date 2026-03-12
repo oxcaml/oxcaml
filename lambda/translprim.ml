@@ -201,6 +201,10 @@ let extern_repr_of_native_repr:
   | Unboxed_float f, _ -> Unboxed_float f
   | Unboxed_or_untagged_integer i, _ -> Unboxed_or_untagged_integer i
   | Unboxed_vector i, _ -> Unboxed_vector i
+  | Unpacked_product sort, _ ->
+    (* This relies on the fact that the OxCaml calling convention for unboxed
+       products is the same as if each component were a separate argument. *)
+    Same_as_ocaml_repr sort
 
 let sort_of_native_repr ~poly_sort repr =
   match extern_repr_of_native_repr ~poly_sort repr with

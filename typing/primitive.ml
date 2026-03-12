@@ -41,6 +41,7 @@ type native_repr =
   | Unboxed_float of boxed_float
   | Unboxed_vector of boxed_vector
   | Unboxed_or_untagged_integer of unboxed_or_untagged_integer
+  | Unpacked_product of Jkind_types.Sort.Const.t
 
 type effects = No_effects | Only_generative_effects | Arbitrary_effects
 type coeffects = No_coeffects | Has_coeffects
@@ -85,7 +86,8 @@ let check_ocaml_value = function
   | _, Repr_poly -> Bad_layout
   | _, Unboxed_float _
   | _, Unboxed_vector _
-  | _, Unboxed_or_untagged_integer _ -> Bad_attribute
+  | _, Unboxed_or_untagged_integer _
+  | _, Unpacked_product _ -> Bad_attribute
 
 let is_builtin_prim_name name = String.length name > 0 && name.[0] = '%'
 
@@ -239,6 +241,7 @@ let rec add_native_repr_attributes ty attrs =
 
 let oattr_unboxed = { oattr_name = "unboxed" }
 let oattr_untagged = { oattr_name = "untagged" }
+let oattr_unpacked = { oattr_name = "unpacked" }
 let oattr_noalloc = { oattr_name = "noalloc" }
 let oattr_builtin = { oattr_name = "builtin" }
 let oattr_no_effects = { oattr_name = "no_effects" }
@@ -260,6 +263,7 @@ let print p osig_val_decl =
   let needs_unboxed_attribute = function
     | _, Same_as_ocaml_repr (Base Value)
     | _, Repr_poly
+    | _, Unpacked_product _
     | _, Unboxed_or_untagged_integer (Untagged_int | Untagged_int8
                                     | Untagged_int16) -> false
     | _, Unboxed_float _
@@ -286,6 +290,7 @@ let print p osig_val_decl =
     | _, Unboxed_vector _
     | _, Unboxed_or_untagged_integer (Unboxed_int64 | Unboxed_int32
                                     | Unboxed_nativeint)
+    | _, Unpacked_product _
     | _, Repr_poly -> false
   in
   let all_unboxed = for_all needs_unboxed_attribute in
@@ -331,6 +336,7 @@ let print p osig_val_decl =
      | Unboxed_or_untagged_integer (Untagged_int | Untagged_int8
                                    | Untagged_int16) ->
        if all_untagged then [] else [oattr_untagged]
+     | Unpacked_product _ -> [oattr_unpacked]
      | Same_as_ocaml_repr _->
        if all_unboxed || not (needs_unboxed_attribute (m, repr))
        then []
@@ -409,29 +415,36 @@ let equal_native_repr nr1 nr2 =
   match nr1, nr2 with
   | Repr_poly, Repr_poly -> true
   | Repr_poly, (Unboxed_float _ | Unboxed_or_untagged_integer _
-               | Unboxed_vector _ | Same_as_ocaml_repr _)
+               | Unboxed_vector _ | Same_as_ocaml_repr _
+               | Unpacked_product _)
   | (Unboxed_float _ | Unboxed_or_untagged_integer _
-    | Unboxed_vector _ | Same_as_ocaml_repr _), Repr_poly
+    | Unboxed_vector _ | Same_as_ocaml_repr _
+    | Unpacked_product _), Repr_poly
     -> false
   | Same_as_ocaml_repr s1, Same_as_ocaml_repr s2 ->
     Jkind_types.Sort.Const.equal s1 s2
   | Same_as_ocaml_repr _,
     (Unboxed_float _ | Unboxed_or_untagged_integer _ |
-     Unboxed_vector _) -> false
+     Unboxed_vector _ | Unpacked_product _) -> false
   | Unboxed_float f1, Unboxed_float f2 -> equal_boxed_float f1 f2
   | Unboxed_float _,
     (Same_as_ocaml_repr _ | Unboxed_or_untagged_integer _ |
-     Unboxed_vector _) -> false
+     Unboxed_vector _ | Unpacked_product _) -> false
   | Unboxed_vector vi1, Unboxed_vector vi2 ->
     equal_unboxed_vector_size (unboxed_vector vi1) (unboxed_vector vi2)
   | Unboxed_vector _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
-     Unboxed_or_untagged_integer _) -> false
+     Unboxed_or_untagged_integer _ | Unpacked_product _) -> false
   | Unboxed_or_untagged_integer bi1, Unboxed_or_untagged_integer bi2 ->
     equal_unboxed_or_untagged_integer bi1 bi2
   | Unboxed_or_untagged_integer _,
     (Same_as_ocaml_repr _ | Unboxed_float _ |
-     Unboxed_vector _) -> false
+     Unboxed_vector _ | Unpacked_product _) -> false
+  | Unpacked_product s1, Unpacked_product s2 ->
+    Jkind_types.Sort.Const.equal s1 s2
+  | Unpacked_product _,
+    (Same_as_ocaml_repr _ | Unboxed_float _ |
+     Unboxed_vector _ | Unboxed_or_untagged_integer _) -> false
 
 let equal_effects ef1 ef2 =
   match ef1, ef2 with
@@ -471,7 +484,7 @@ module Repr_check = struct
   let value_or_unboxed_or_untagged = function
     | Same_as_ocaml_repr (Base Value)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _ -> true
-    | Same_as_ocaml_repr _ | Repr_poly -> false
+    | Same_as_ocaml_repr _ | Repr_poly | Unpacked_product _ -> false
 
   let sort_is_product : Jkind_types.Sort.Const.t -> bool = function
     | Product _ -> true
@@ -483,12 +496,13 @@ module Repr_check = struct
     | Same_as_ocaml_repr s ->
       not (sort_is_product s)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
-    | Repr_poly -> true
+    | Unpacked_product _ | Repr_poly -> true
 
   let valid_c_stub_return = function
     | Same_as_ocaml_repr (Base _)
     | Unboxed_float _ | Unboxed_or_untagged_integer _ | Unboxed_vector _
     | Repr_poly -> true
+    | Unpacked_product _ -> false
     | Same_as_ocaml_repr (Product [s1; s2]) ->
       not (sort_is_product s1) &&
       not (sort_is_product s2)

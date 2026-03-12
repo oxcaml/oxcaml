@@ -24,7 +24,7 @@ open Typetexp
 
 module String = Misc.Stdlib.String
 
-type native_repr_kind = Unboxed | Untagged
+type native_repr_kind = Unboxed | Untagged | Unpacked
 
 type jkind_sort_loc =
   | Cstr_tuple of { unboxed : bool }
@@ -3531,14 +3531,17 @@ let get_native_repr_attribute attrs ~global_repr =
   match
     Attr_helper.get_no_payload_attribute "unboxed"  attrs,
     Attr_helper.get_no_payload_attribute "untagged" attrs,
+    Attr_helper.get_no_payload_attribute "unpacked" attrs,
     global_repr
   with
-  | None, None, None -> Native_repr_attr_absent
-  | None, None, Some repr -> Native_repr_attr_present repr
-  | Some _, None, None -> Native_repr_attr_present Unboxed
-  | None, Some _, None -> Native_repr_attr_present Untagged
-  | Some { Location.loc }, _, _
-  | _, Some { Location.loc }, _ ->
+  | None, None, None, None -> Native_repr_attr_absent
+  | None, None, None, Some repr -> Native_repr_attr_present repr
+  | Some _, None, None, None -> Native_repr_attr_present Unboxed
+  | None, Some _, None, None -> Native_repr_attr_present Untagged
+  | None, None, Some _, None -> Native_repr_attr_present Unpacked
+  | Some { Location.loc }, _, _, _
+  | _, Some { Location.loc }, _, _
+  | _, _, Some { Location.loc }, _ ->
     raise (Error (loc, Multiple_native_repr_attributes))
 
 let is_upstream_compatible_non_value_unbox env ty =
@@ -3725,7 +3728,8 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
          (Warnings.Incompatible_with_upstream
             (Warnings.Non_value_sort sort)));
     Same_as_ocaml_repr c
-  | Native_repr_attr_present kind, (Poly | Sort (Base Value))
+  | Native_repr_attr_present ((Unboxed | Untagged) as kind),
+    (Poly | Sort (Base Value))
   | Native_repr_attr_present (Untagged as kind), Sort _ ->
     begin match native_repr_of_type env kind ty sort_or_poly with
     | None ->
@@ -3766,6 +3770,12 @@ let make_native_repr env core_type ty ~global_repr ~is_layout_poly ~why =
         (Warnings.Incompatible_with_upstream
               (Warnings.Non_value_sort layout)));
     Same_as_ocaml_repr c
+  | Native_repr_attr_present Unpacked, Sort (Product _ as sort) ->
+    Unpacked_product sort
+  | Native_repr_attr_present Unpacked, (Sort (Base _) | Poly) ->
+    raise (Error (core_type.ptyp_loc, Cannot_unbox_or_untag_type Unpacked))
+  | Native_repr_attr_present Unpacked, Sort (Univar _ | Genvar _) ->
+    Misc.fatal_error "typedecl: Univar/Genvar in concrete type"
 
 let prim_const_mode m =
   match Mode.Locality.Guts.check_const m with
@@ -4879,9 +4889,10 @@ let report_error_doc ppf = function
   | Val_in_structure ->
       fprintf ppf "Value declarations are only allowed in signatures"
   | Multiple_native_repr_attributes ->
-      fprintf ppf "Too many %a/%a attributes"
+      fprintf ppf "Too many %a/%a/%a attributes"
         Style.inline_code "[@@unboxed]"
         Style.inline_code "[@@untagged]"
+        Style.inline_code "[@@unpacked]"
   | Cannot_unbox_or_untag_type Unboxed ->
       fprintf ppf "@[Don't know how to unbox this type.@ \
                    Only %a, %a, %a, %a, vector primitives, and@ \
@@ -4896,13 +4907,20 @@ let report_error_doc ppf = function
         Style.inline_code "int8"
         Style.inline_code "int16"
         Style.inline_code "int"
+  | Cannot_unbox_or_untag_type Unpacked ->
+      fprintf ppf "@[Don't know how to unpack this type.@ \
+                   Only types with product layouts can be marked %a.@]"
+        Style.inline_code "unpacked"
   | Deep_unbox_or_untag_attribute kind ->
       fprintf ppf
         "@[The attribute %a should be attached to@ \
          a direct argument or result of the primitive,@ \
          it should not occur deeply into its type.@]"
         Style.inline_code
-        (match kind with Unboxed -> "@unboxed" | Untagged -> "@untagged")
+        (match kind with
+         | Unboxed -> "@unboxed"
+         | Untagged -> "@untagged"
+         | Unpacked -> "@unpacked")
   | Jkind_mismatch_of_path (env, dpath, v) ->
     (* the type is always printed just above, so print out just the head of the
        path instead of something like [t/3] *)

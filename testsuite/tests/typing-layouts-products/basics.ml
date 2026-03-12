@@ -1421,6 +1421,67 @@ Error: Types in an external must have a representable layout.
          because it's the type of the result of an external declaration.
 |}]
 
+(* Test 9b: @unpacked on product args *)
+
+(* @unpacked allows product types as arguments to C stubs *)
+external ext_unpack_tuple :
+  (#(int * bool) [@unpacked]) -> int = "foo" "bar"
+[%%expect{|
+external ext_unpack_tuple : (#(int * bool) [@unpacked]) -> int = "foo" "bar"
+|}]
+
+external ext_unpack_product :
+  (t_product [@unpacked]) -> int = "foo" "bar"
+[%%expect{|
+external ext_unpack_product : (t_product [@unpacked]) -> int = "foo" "bar"
+|}]
+
+external ext_unpack_product_3 :
+  (t_product_3 [@unpacked]) -> int = "foo" "bar"
+[%%expect{|
+external ext_unpack_product_3 : (t_product_3 [@unpacked]) -> int = "foo"
+  "bar"
+|}]
+
+(* @unpacked with unboxed record *)
+external ext_unpack_record :
+  (ext_record_arg_record [@unpacked]) -> int = "foo" "bar"
+[%%expect{|
+external ext_unpack_record : (ext_record_arg_record [@unpacked]) -> int
+  = "foo" "bar"
+|}]
+
+(* @unpacked on a non-product type should error *)
+external ext_unpack_int : (int [@unpacked]) -> int = "foo" "bar"
+[%%expect{|
+Line 1, characters 27-30:
+1 | external ext_unpack_int : (int [@unpacked]) -> int = "foo" "bar"
+                               ^^^
+Error: Don't know how to unpack this type.
+       Only types with product layouts can be marked "unpacked".
+|}]
+
+(* @unpacked on return should error *)
+external ext_unpack_return :
+  int -> (#(int * bool) [@unpacked]) = "foo" "bar"
+[%%expect{|
+Line 2, characters 2-36:
+2 |   int -> (#(int * bool) [@unpacked]) = "foo" "bar"
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The primitive [foo] is used in an invalid declaration.
+       The declaration contains argument/return types with the wrong layout.
+|}]
+
+(* @unpacked combined with @unboxed should error *)
+external ext_unpack_unboxed :
+  (#(int * bool) [@unpacked] [@unboxed]) -> int = "foo" "bar"
+[%%expect{|
+Line 2, characters 31-38:
+2 |   (#(int * bool) [@unpacked] [@unboxed]) -> int = "foo" "bar"
+                                   ^^^^^^^
+Error: Too many "[@@unboxed]"/"[@@untagged]"/"[@@unpacked]" attributes
+|}]
+
 (***********************************)
 (* Test 10: not allowed in let recs *)
 
