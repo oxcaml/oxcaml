@@ -88,128 +88,17 @@ let report_error loc e bt =
   print_exn loc e bt;
   "=> error in test script"
 
-<<<<<<< oxcaml
-type result_summary = No_failure | Some_failure | All_skipped
-let join_result summary result =
-  let open Result in
-  match result.status, summary with
-  | Fail, _
-  | (Pass | Skip | Predicate _), Some_failure -> Some_failure
-  | (Skip | Predicate false), All_skipped -> All_skipped
-  | Pass, All_skipped -> No_failure
-  | Predicate true, All_skipped -> No_failure
-  | (Pass | Skip | Predicate _), No_failure -> No_failure
-||||||| upstream-base
-type result_summary = No_failure | Some_failure | All_skipped
-let join_result summary result =
-  let open Result in
-  match result.status, summary with
-  | Fail, _
-  | _, Some_failure -> Some_failure
-  | Skip, All_skipped -> All_skipped
-  | _ -> No_failure
-=======
-type summary = Result.status = Pass | Skip | Fail
->>>>>>> upstream-incoming
+type summary = Pass | Skip | Fail
 
-<<<<<<< oxcaml
-let join_summaries sa sb =
-  match sa, sb with
-  | Some_failure, (No_failure | Some_failure | All_skipped)
-  | (No_failure | All_skipped), Some_failure -> Some_failure
-  | All_skipped, All_skipped -> All_skipped
-  | No_failure, (No_failure | All_skipped)
-  | All_skipped, No_failure -> No_failure
-||||||| upstream-base
-let join_summaries sa sb =
-  match sa, sb with
-  | Some_failure, _
-  | _, Some_failure -> Some_failure
-  | All_skipped, All_skipped -> All_skipped
-  | _ -> No_failure
-=======
+(* CR sspies: I'm not entirely convinced this is right, but I think we should
+   try.  *)
+let summary_of_status : Result.status -> summary = function
+  | Pass | Predicate true -> Pass
+  | Skip | Predicate false -> Skip
+  | Fail -> Fail
+
 (* The sequential join passes if both tests pass.
->>>>>>> upstream-incoming
 
-<<<<<<< oxcaml
-let rec run_test_tree log common_prefix behavior env summ ast
-      ~must_do_something =
-  match ast with
-  | Ast (Environment_statement s :: stmts, subs) ->
-    begin match interpret_environment_statement env s with
-    | env ->
-      run_test_tree log common_prefix behavior env summ (Ast (stmts, subs))
-        ~must_do_something
-    | exception e ->
-      let line = s.loc.Location.loc_start.Lexing.pos_lnum in
-      Printf.printf "%s line %d %!" common_prefix line;
-      Printf.printf "%s\n%!" (report_error s.loc e);
-      Some_failure
-    end
-  | Ast (Test (_, name, mods) :: stmts, subs) ->
-    let skip_all =
-      match behavior with
-      | Skip_all -> true
-      | Run -> false
-    in
-    let locstr =
-      if name.loc = Location.none then
-        "default"
-      else
-        Printf.sprintf "line %d" name.loc.Location.loc_start.Lexing.pos_lnum
-    in
-    if not skip_all then
-      Printf.printf "%s %s (%s) %!" common_prefix locstr name.node;
-    let test = lookup_test name in
-    let must_do_something =
-      must_do_something && not (Tests.does_something test)
-    in
-    let (msg, children_behavior, newenv, result) =
-      match behavior with
-      | Skip_all -> ("", Skip_all, env, Result.skip)
-      | Run ->
-        begin try
-          let testenv = List.fold_left apply_modifiers env mods in
-          let (result, newenv) = Tests.run log testenv test in
-          let msg = Result.string_of_result result in
-          let sub_behavior = if Result.is_pass result then Run else Skip_all in
-          (msg, sub_behavior, newenv, result)
-        with e ->
-          (report_error name.loc e, Skip_all, env, Result.fail)
-||||||| upstream-base
-let rec run_test_tree log common_prefix behavior env summ ast =
-  match ast with
-  | Ast (Environment_statement s :: stmts, subs) ->
-    begin match interpret_environment_statement env s with
-    | env ->
-      run_test_tree log common_prefix behavior env summ (Ast (stmts, subs))
-    | exception e ->
-      let line = s.loc.Location.loc_start.Lexing.pos_lnum in
-      Printf.printf "%s line %d %!" common_prefix line;
-      Printf.printf "%s\n%!" (report_error s.loc e);
-      Some_failure
-    end
-  | Ast (Test (_, name, mods) :: stmts, subs) ->
-    let locstr =
-      if name.loc = Location.none then
-        "default"
-      else
-        Printf.sprintf "line %d" name.loc.Location.loc_start.Lexing.pos_lnum
-    in
-    Printf.printf "%s %s (%s) %!" common_prefix locstr name.node;
-    let (msg, children_behavior, newenv, result) =
-      match behavior with
-      | Skip_all -> ("=> n/a", Skip_all, env, Result.skip)
-      | Run ->
-        begin try
-          let testenv = List.fold_left apply_modifiers env mods in
-          let test = lookup_test name in
-          let (result, newenv) = Tests.run log testenv test in
-          let msg = Result.string_of_result result in
-          let sub_behavior = if Result.is_pass result then Run else Skip_all in
-          (msg, sub_behavior, newenv, result)
-        with e -> (report_error name.loc e, Skip_all, env, Result.fail)
-=======
    This implies that a linear sequence of actions, a path along the
    test tree, is considered successful if all actions passed. *)
 let join_sequential r1 r2 =
@@ -235,10 +124,10 @@ let string_of_summary = function
   | Skip -> "skipped"
 
 let run_test_tree log add_msg behavior env summ ast =
-  let run_statement (behavior, env, summ) = function
+  let run_statement (behavior, env, summ, must_do_something) = function
     | Environment_statement s ->
       begin match interpret_environment_statement env s with
-      | env -> Ok (behavior, env, summ)
+      | env -> Ok (behavior, env, summ, must_do_something)
       | exception e ->
         let bt = Printexc.get_backtrace () in
         let line = s.loc.Location.loc_start.Lexing.pos_lnum in
@@ -246,19 +135,24 @@ let run_test_tree log add_msg behavior env summ ast =
         Error Fail
       end
     | Test (_, name, mods) ->
+      let skip_all =
+        match behavior with
+        | Skip_all -> true
+        | Run -> false
+      in
       let locstr =
         if name.loc = Location.none then
           "default"
         else
           Printf.sprintf "line %d" name.loc.Location.loc_start.Lexing.pos_lnum
       in
+      let test = lookup_test name in
       let (msg, behavior, env, result) =
         match behavior with
-        | Skip_all -> ("=> n/a", Skip_all, env, Result.skip)
+        | Skip_all -> ("", Skip_all, env, Result.skip)
         | Run ->
           begin try
             let testenv = List.fold_left apply_modifiers env mods in
-            let test = lookup_test name in
             let (result, newenv) = Tests.run log testenv test in
             let msg = Result.string_of_result result in
             let sub_behavior =
@@ -269,64 +163,43 @@ let run_test_tree log add_msg behavior env summ ast =
             (report_error name.loc e bt, Skip_all, env, Result.fail)
           end
       in
-      Printf.ksprintf add_msg "%s (%s) %s" locstr name.node msg;
-      let summ = join_sequential summ result.status in
-      Ok (behavior, env, summ)
+      if not skip_all then
+        Printf.ksprintf add_msg "%s (%s) %s" locstr name.node msg;
+      let summ = join_sequential summ (summary_of_status result.status) in
+      let must_do_something =
+        must_do_something && not (Tests.does_something test)
+      in
+      Ok (behavior, env, summ, must_do_something)
   in
-  let rec run_tree behavior env summ (Ast (stmts, subs)) =
-    match List.fold_left_result run_statement (behavior, env, summ) stmts with
+  let rec run_tree behavior env summ (Ast (stmts, subs)) ~must_do_something =
+    match
+      List.fold_left_result run_statement
+        (behavior, env, summ, must_do_something) stmts
+    with
     | Error e -> e
-    | Ok (behavior, env, summ) ->
+    | Ok (behavior, env, summ, must_do_something) ->
         (* If [subs] is empty, there are no further test actions to
            perform: we are at the end of a test path and can report
            our current summary. Otherwise we continue with each
            branch, and parallel-join the result summaries. *)
         begin match subs with
-        | [] -> summ
+        | [] ->
+          if not must_do_something then summ
+          else (
+            match summ with
+            | Pass ->
+              add_msg "does the test tree do something? => failed";
+              Fail
+            | Skip | Fail -> summ
+          )
         | _ ->
+        (* CR mshinwell/xclerc: maybe sequences of actions that "do something"
+           and then have further actions that do not "do something" should be
+           flagged *)
             List.fold_left join_parallel Skip
-              (List.map (run_tree behavior env summ) subs)
->>>>>>> upstream-incoming
+              (List.map (run_tree behavior env summ ~must_do_something) subs)
         end
-<<<<<<< oxcaml
-    in
-    if not skip_all then Printf.printf "%s\n%!" msg;
-    let newsumm = join_result summ result in
-    let newast = Ast (stmts, subs) in
-    run_test_tree log common_prefix children_behavior newenv newsumm newast
-      ~must_do_something
-  | Ast ([], []) ->
-    if not must_do_something then summ
-    else (
-      match summ with
-      | No_failure ->
-        Printf.printf "%s: does the test tree do something? => failed\n%!"
-          common_prefix;
-        Some_failure
-      | All_skipped | Some_failure -> summ
-    )
-  | Ast ([], subs) ->
-    (* CR mshinwell/xclerc: maybe sequences of actions that "do something" and
-       then have further actions that do not "do something" should be
-       flagged *)
-    List.fold_left join_summaries summ
-      (List.map (run_test_tree log common_prefix behavior env All_skipped
-        ~must_do_something) subs)
-
-let run_test_tree log common_prefix behavior env summ ast =
-  run_test_tree log common_prefix behavior env summ ast ~must_do_something:true
-||||||| upstream-base
-    in
-    Printf.printf "%s\n%!" msg;
-    let newsumm = join_result summ result in
-    let newast = Ast (stmts, subs) in
-    run_test_tree log common_prefix children_behavior newenv newsumm newast
-  | Ast ([], subs) ->
-    List.fold_left join_summaries summ
-      (List.map (run_test_tree log common_prefix behavior env All_skipped) subs)
-=======
-  in run_tree behavior env summ ast
->>>>>>> upstream-incoming
+  in run_tree behavior env summ ast ~must_do_something:true
 
 let get_test_source_directory test_dirname =
   if (Filename.is_relative test_dirname) then
