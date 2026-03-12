@@ -404,6 +404,7 @@ module Lattices = struct
        and omitted. *)
     let imply c b = if le c b then L.max else b
   end
+  [@@inline]
 
   (* Make the type of [Locality] and [Regionality] below distinguishable,
      so that we can be sure [Comonadic_with] is applied correctly. *)
