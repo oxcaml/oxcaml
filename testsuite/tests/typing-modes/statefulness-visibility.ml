@@ -24,7 +24,7 @@ Line 1, characters 35-36:
 1 | let foo (x @ read uncontended) a = x.a <- a
                                        ^
 Error: This value is "read"
-       but is expected to be "read_write"
+       but is expected to be "write" or "read_write"
          because its mutable field "a" is being written.
 |}]
 
@@ -34,7 +34,7 @@ Line 1, characters 40-41:
 1 | let foo (x @ immutable uncontended) a = x.a <- a
                                             ^
 Error: This value is "immutable"
-       but is expected to be "read_write"
+       but is expected to be "write" or "read_write"
          because its mutable field "a" is being written.
 |}]
 
@@ -83,7 +83,7 @@ Line 1, characters 33-34:
 1 | let foo (x @ read contended) a = x.a <- a
                                      ^
 Error: This value is "read"
-       but is expected to be "read_write"
+       but is expected to be "write" or "read_write"
          because its mutable field "a" is being written.
 |}]
 
@@ -93,7 +93,7 @@ Line 1, characters 33-34:
 1 | let foo (x @ contended read) a = x.a <- a
                                      ^
 Error: This value is "read"
-       but is expected to be "read_write"
+       but is expected to be "write" or "read_write"
          because its mutable field "a" is being written.
 |}]
 
@@ -103,7 +103,7 @@ Line 1, characters 30-31:
 1 | let foo (x @ read shared) a = x.a <- a
                                   ^
 Error: This value is "read"
-       but is expected to be "read_write"
+       but is expected to be "write" or "read_write"
          because its mutable field "a" is being written.
 |}]
 
@@ -747,7 +747,7 @@ Line 1, characters 42-43:
 Error: This value is "immutable"
          because it is used inside the lazy expression at line 1, characters 36-58
          which is expected to be "stateless".
-       However, the highlighted expression is expected to be "read_write"
+       However, the highlighted expression is expected to be "write" or "read_write"
          because its mutable field "contents" is being written.
 |}]
 
@@ -761,7 +761,7 @@ Line 1, characters 40-41:
 Error: This value is "read"
          because it is used inside the lazy expression at line 1, characters 34-56
          which is expected to be "reading".
-       However, the highlighted expression is expected to be "read_write"
+       However, the highlighted expression is expected to be "write" or "read_write"
          because its mutable field "contents" is being written.
 |}]
 
@@ -832,7 +832,7 @@ Line 4, characters 4-5:
 4 |     x.contents <- 42;
         ^
 Error: This value is "immutable"
-       but is expected to be "read_write"
+       but is expected to be "write" or "read_write"
          because its mutable field "contents" is being written.
 |}]
 
@@ -854,6 +854,6 @@ Line 5, characters 4-5:
 5 |     y.contents <- 24
         ^
 Error: This value is "read"
-       but is expected to be "read_write"
+       but is expected to be "write" or "read_write"
          because its mutable field "contents" is being written.
 |}]

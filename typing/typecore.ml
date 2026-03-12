@@ -1152,7 +1152,7 @@ let mode_project_mutable mut_name =
 let mode_mutate_mutable mut_name =
   let mode =
     { Value.Const.max with
-      visibility = Read_write;
+      visibility = Write;
       contention = Uncontended }
     |> Value.of_const ~hint_monadic:(Mutable_write mut_name)
   in
