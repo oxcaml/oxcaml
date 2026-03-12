@@ -303,26 +303,6 @@ module Lattices = struct
     val max : t
   end
 
-  type pord =
-    | Less
-    | Equal
-    | Greater
-    | Incomparable
-
-  module type Partial = sig
-    (** A lattice is a partial order, if for any [a] [b], either:
-        - [a <= b] or [b <= a]
-        - [a] and [b] are incomparable. *)
-
-    type t
-
-    val cmp : t -> t -> pord
-
-    val min : t
-
-    val max : t
-  end
-
   module Total (L : Total) = struct
     let min = L.min
 
@@ -357,29 +337,105 @@ module Lattices = struct
   end
   [@@inline]
 
+  (* Any changes to this type must consider the implementation of [pord_tbl]. *) 
+  type pord =
+    | Less         (* 0b00 *)
+    | Equal        (* 0b01 *)
+    | Greater      (* 0b10 *)
+    | Incomparable (* 0b11 *)
+
+  (* A lookup table precomputing the result of [cmp] for partial lattices with
+     elements defined as {[
+       type t =
+         | Min
+         | Fst
+         | Snd
+         | Max
+     ]} of the form {v
+         Max
+         / \
+       Snd Fst
+         \ /
+         Min
+     v}. This specifically applies to [Visibility] and [Statefulness].
+
+     Computed via {[
+       let tbl = ref 0 in
+       for i = 0b0000 to 0b1111 do
+         let a = (i lsr 2) land 0b11 and b = i land 0b11 in
+         let pord =
+           if a = b then 0b01
+           else if a land b = 0 && a <> 0 && b <> 0 then 0b11
+           else if a < b then 0b00 else 0b10
+         in
+         tbl := !tbl lor (pord lsl (i * 2))
+       done;
+       !tbl
+     ]} *)
+  (* CR nmatschke: This is probably the best code we can generate for [cmp], but
+     maybe it obfuscates the underlying comparison enough to harm e.g. [le]? *)
+  let pord_tbl = 0b01_10_10_10_00_01_11_10_00_11_01_10_00_00_00_01
+
+  module type Partial = sig
+    (** A lattice is a partial order, if for any [a] [b], either:
+        - [a <= b] or [b <= a]
+        - [a] and [b] are incomparable. *)
+
+    type t [@@immediate]
+
+    val min : t
+
+    val fst : t
+
+    val snd : t
+
+    val max : t
+  end
+
   module Partial (L : Partial) = struct
+    open struct
+      external l_to_int : L.t -> int = "%identity"
+      external pord_of_int : int -> pord = "%identity"
+
+      let () =
+        assert (l_to_int L.min = 0b00);
+        assert (l_to_int L.fst = 0b01);
+        assert (l_to_int L.snd = 0b10);
+        assert (l_to_int L.max = 0b11)
+
+      let () =
+        assert (pord_of_int 0b00 = Less);
+        assert (pord_of_int 0b01 = Equal);
+        assert (pord_of_int 0b10 = Greater);
+        assert (pord_of_int 0b11 = Incomparable)
+
+      let cmp a b =
+        pord_of_int
+          ((pord_tbl lsr (((l_to_int a lsl 2) lor l_to_int b) * 2)) land 0b11)
+    end
+
     let min = L.min
 
     let max = L.max
 
     let le a b =
-      match L.cmp a b with
+      match cmp a b with
       | Less | Equal -> true
       | Greater | Incomparable -> false
 
     let equal a b =
-      match L.cmp a b with
+      match cmp a b with
       | Equal -> true
       | Less | Greater | Incomparable -> false
 
     let join a b =
-      match L.cmp a b with
+      match cmp a b with
       | Greater -> a
       | Less | Equal -> b
       | Incomparable -> L.max
 
     let meet a b =
-      match L.cmp a b with
+      match cmp a b with
       | Less -> a
       | Equal | Greater -> b
       | Incomparable -> L.min
@@ -603,30 +659,23 @@ module Lattices = struct
   end
 
   module Statefulness = struct
+    (* Any changes to this type must consider the implementation of [cmp]. *) 
     type t =
-      | Stateless
-      | Observable
-      | Reading
-      | Stateful
+      | Stateless  (* 0b00 *)
+      | Observable (* 0b01 *)
+      | Reading    (* 0b10 *)
+      | Stateful   (* 0b11 *)
 
     include Partial (struct
       type nonrec t = t
 
       let min = Stateless
 
-      let max = Stateful
+      let fst = Observable
 
-      (* CR nmatschke: The compiler could generate better code here, but we
-         could also consider precomputing a table indexed by [(a lsl 2) lor b].
-      *)
-      let cmp a b =
-        let open struct
-          external to_int : t -> int = "%identity"
-        end in
-        let a = to_int a and b = to_int b in
-        if a = b then Equal
-        else if a land b = 0 && a <> 0 && b <> 0 then Incomparable
-        else if a < b then Less else Greater
+      let snd = Reading
+
+      let max = Stateful
     end)
 
     let legacy = Stateful
@@ -639,30 +688,23 @@ module Lattices = struct
   end
 
   module Visibility = struct
+    (* Any changes to this type must consider the implementation of [cmp]. *) 
     type t =
-      | Read_write
-      | Read
-      | Write
-      | Immutable
+      | Read_write (* 0b00 *)
+      | Read       (* 0b01 *)
+      | Write      (* 0b10 *)
+      | Immutable  (* 0b11 *)
 
     include Partial (struct
       type nonrec t = t
 
       let min = Read_write
 
-      let max = Immutable
+      let fst = Read
 
-      (* CR nmatschke: The compiler could generate better code here, but we
-         could also consider precomputing a table indexed by [(a lsl 2) lor b].
-      *)
-      let cmp a b =
-        let open struct
-          external to_int : t -> int = "%identity"
-        end in
-        let a = to_int a and b = to_int b in
-        if a = b then Equal
-        else if a land b = 0 && a <> 0 && b <> 0 then Incomparable
-        else if a < b then Less else Greater
+      let snd = Write
+
+      let max = Immutable
     end)
 
     let legacy = Read_write
