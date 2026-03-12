@@ -558,8 +558,9 @@ Error: Signature mismatch:
        is not included in
          val f : int -> int -> int [@@zero_alloc]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the syntactic arity of
-       the implementation must match the function type in the interface.
+       When using "zero_alloc" in a signature or function parameter, the
+       syntactic arity of the implementation must match the function type in
+       the interface.
        Here the former is 1 and the latter is 2.
 |}]
 
@@ -607,8 +608,9 @@ Error: Signature mismatch:
        is not included in
          val f : t_two_args [@@zero_alloc arity 2]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the syntactic arity of
-       the implementation must match the function type in the interface.
+       When using "zero_alloc" in a signature or function parameter, the
+       syntactic arity of the implementation must match the function type in
+       the interface.
        Here the former is 1 and the latter is 2.
 |}]
 
@@ -636,8 +638,9 @@ Error: Signature mismatch:
        is not included in
          val f : t_two_args [@@zero_alloc arity 1]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the syntactic arity of
-       the implementation must match the function type in the interface.
+       When using "zero_alloc" in a signature or function parameter, the
+       syntactic arity of the implementation must match the function type in
+       the interface.
        Here the former is 2 and the latter is 1.
 |}]
 
@@ -693,8 +696,9 @@ Error: Signature mismatch:
        is not included in
          val f : int -> t [@@zero_alloc]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the syntactic arity of
-       the implementation must match the function type in the interface.
+       When using "zero_alloc" in a signature or function parameter, the
+       syntactic arity of the implementation must match the function type in
+       the interface.
        Here the former is 2 and the latter is 1.
 |}]
 
@@ -737,8 +741,9 @@ Error: Signature mismatch:
        is not included in
          val f : int -> int -> int -> int * int [@@zero_alloc arity 2]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the syntactic arity of
-       the implementation must match the function type in the interface.
+       When using "zero_alloc" in a signature or function parameter, the
+       syntactic arity of the implementation must match the function type in
+       the interface.
        Here the former is 3 and the latter is 2.
 |}]
 
@@ -1084,8 +1089,9 @@ Error: Signature mismatch:
        is not included in
          val f : int -> t [@@zero_alloc]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the syntactic arity of
-       the implementation must match the function type in the interface.
+       When using "zero_alloc" in a signature or function parameter, the
+       syntactic arity of the implementation must match the function type in
+       the interface.
        Here the former is 2 and the latter is 1.
 |}]
 
@@ -1111,8 +1117,9 @@ Error: Signature mismatch:
        is not included in
          val f : int -> int -> int [@@zero_alloc]
        zero_alloc arity mismatch:
-       When using "zero_alloc" in a signature, the syntactic arity of
-       the implementation must match the function type in the interface.
+       When using "zero_alloc" in a signature or function parameter, the
+       syntactic arity of the implementation must match the function type in
+       the interface.
        Here the former is 1 and the latter is 2.
 |}]
 

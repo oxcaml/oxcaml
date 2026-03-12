@@ -55,6 +55,19 @@ let _ =
 - : int = 42
 |}];;
 
+let[@zero_alloc] f : ((int -> int) [@zero_alloc]) -> int =
+  fun (g [@zero_alloc arity 1]) -> g 42;; (* should succeed *)
+[%%expect {|
+val f : (int -> int) [@zero_alloc arity 1] -> int [@@zero_alloc] = <fun>
+|}];;
+
+let[@zero_alloc] f : ((int -> int -> int) [@zero_alloc]) -> int =
+  fun (g [@zero_alloc arity 1]) -> g 42 123;; (* should fail *)
+[%%expect {|
+val f : (int -> int -> int) [@zero_alloc arity 2] -> int [@@zero_alloc] =
+  <fun>
+|}];;
+
 let _ =
   let[@zero_alloc] f x y = x + y in
   let f' = f 123 in
@@ -64,7 +77,7 @@ Line 4, characters 4-6:
 4 |   g f';; (* should fail; f' zero_alloc information is not available *)
         ^^
 Error: Function argument zero alloc assumption violated.
-       There is a mismatch between the two "zero_alloc" guarantees.
+       There is a mismatch between the two "zero_alloc" assumptions.
 |}];;
 
 (* CR aivaskovic: needs fixing *)
@@ -77,7 +90,7 @@ Line 4, characters 4-6:
 4 |   g f';; (* should succeed *)
         ^^
 Error: Function argument zero alloc assumption violated.
-       There is a mismatch between the two "zero_alloc" guarantees.
+       There is a mismatch between the two "zero_alloc" assumptions.
 |}];;
 
 let _ = g (fun[@zero_alloc] x -> 42);; (* should succeed *)
@@ -102,7 +115,7 @@ let _ = g (fun[@zero_alloc] x -> (x, 123));; (* should fail in the backend *)
 Line 1, characters 16-26:
 1 | let _ = g (fun[@zero_alloc] x -> (x, 123));; (* should fail in the backend *)
                     ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP16._$.(fun) (camlTOP16__fn[:1,10--42]_12_13_code).
+Error: Annotation check for zero_alloc failed on function TOP18._$.(fun) (camlTOP18__fn[:1,10--42]_16_17_code).
 Line 1, characters 33-41:
 1 | let _ = g (fun[@zero_alloc] x -> (x, 123));; (* should fail in the backend *)
                                      ^^^^^^^^
@@ -130,7 +143,7 @@ let _ = g (fun x -> [x]);; (* should fail in the backend *)
 Line 1, characters 10-24:
 1 | let _ = g (fun x -> [x]);; (* should fail in the backend *)
               ^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP20._$.(fun) (camlTOP20__fn[:1,10--24]_20_21_code).
+Error: Annotation check for zero_alloc failed on function TOP22._$.(fun) (camlTOP22__fn[:1,10--24]_24_25_code).
 Line 1, characters 20-23:
 1 | let _ = g (fun x -> [x]);; (* should fail in the backend *)
                         ^^^
@@ -146,7 +159,7 @@ Line 4, characters 4-7:
 4 |   g id';; (* should succeed *)
         ^^^
 Error: Function argument zero alloc assumption violated.
-       There is a mismatch between the two "zero_alloc" guarantees.
+       There is a mismatch between the two "zero_alloc" assumptions.
 |}];;
 
 let _ =
@@ -158,7 +171,7 @@ Line 4, characters 4-7:
 4 |   g id';; (* should succeed *)
         ^^^
 Error: Function argument zero alloc assumption violated.
-       There is a mismatch between the two "zero_alloc" guarantees.
+       There is a mismatch between the two "zero_alloc" assumptions.
 |}];;
 
 let _ =
@@ -170,7 +183,7 @@ Line 4, characters 4-7:
 4 |   g id';; (* should succeed *)
         ^^^
 Error: Function argument zero alloc assumption violated.
-       There is a mismatch between the two "zero_alloc" guarantees.
+       There is a mismatch between the two "zero_alloc" assumptions.
 |}];;
 
 (** Frontend analysis fails when the arguments is neither an identifier nor a
@@ -318,5 +331,13 @@ Error: Signature mismatch:
          "(int -> int -> 'b) [@zero_alloc arity 2] -> 'b"
        Zero-alloc attributes should match.
 |}];;
+
+(* Interaction between the two meanings of Tpoly. *)
+let w2 : ('a. (('a -> int) [@zero_alloc])) -> int =
+  fun (f [@zero_alloc arity 1]) -> f 123;;
+[%%expect {|
+val w2 : ('a. 'a -> int) -> int = <fun>
+|}];;
+
 
 (* CR aivaskovic: add tests with strict and other various details *)

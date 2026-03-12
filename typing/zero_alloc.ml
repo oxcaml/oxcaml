@@ -102,11 +102,12 @@ let print_error ppf error =
     if missing_entirely then
       pr "@ Hint: Add a \"zero_alloc\" attribute to the implementation."
   | Incompatible ->
-    pr "There is a mismatch between the two \"zero_alloc\" guarantees."
+    pr "There is a mismatch between the two \"zero_alloc\" assumptions."
   | Arity_mismatch (n1, n2) ->
     pr "zero_alloc arity mismatch:@ \
-        When using \"zero_alloc\" in a signature, the syntactic arity of@ \
-        the implementation must match the function type in the interface.@ \
+        When using \"zero_alloc\" in a signature or function parameter, the@ \
+        syntactic arity of the implementation must match the function type in@ \
+        the interface.@ \
         Here the former is %d and the latter is %d."
       n1 n2
 
