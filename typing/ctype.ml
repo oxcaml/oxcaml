@@ -4213,7 +4213,9 @@ let add_jkind_equation ~reason uenv destination jkind1 =
                let refined_decl =
                  { decl with type_jkind = Jkind.disallow_right jkind }
                in
-               set_env uenv (Env.add_local_constraint p refined_decl env)
+               set_env uenv
+                 (Env.add_local_constraint ~stage:(Env.stage env) p
+                    refined_decl env)
             | _ -> ()
           with
             Not_found -> ()
@@ -4258,7 +4260,8 @@ let add_gadt_equation uenv source destination =
         type_origin
         jkind
     in
-    set_env uenv (Env.add_local_constraint source decl env);
+    set_env uenv
+      (Env.add_local_constraint ~stage:(Env.stage env) source decl env);
     cleanup_abbrev ()
   end
 
