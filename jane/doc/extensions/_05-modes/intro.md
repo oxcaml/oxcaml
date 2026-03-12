@@ -272,15 +272,16 @@ when they are yielding.
 |----------------|
 | immutable      |
 | `|`            |
-| read           |
+| read | write   |
 | `|`            |
 | **read_write** |
 {: .table}
 
 Visibility is a past axis that controls access to mutable portions of values.
 It's similar to contention: the typechecker forbids accessing mutable fields of values
-with *immutable* visiblity, and forbids writing to mutable fields of values
-with *read* visibility. Unlike for contention, even thread-safe access is disallowed.
+with *immutable* visiblity, forbids writing to mutable fields of values
+with *read* visibility, and forbids reading from mutable fields of values with *write*
+visibility. Unlike for contention, even thread-safe access is disallowed.
 
 Visibility is irrelevant for types that are deeply immutable. Values of such
 types *mode cross* on the visibility axis; they may be used as read_write even
@@ -288,21 +289,22 @@ when they are immutable.
 
 ## Future modes: Statefulness
 
-|--------------|
-| **stateful** |
-| `|`          |
-| reading      |
-| `|`          |
-| stateless    |
+|------------------------|
+| **stateful**           |
+| `|`                    |
+| observable | reading   |
+| `|`                    |
+| stateless              |
 {: .table}
 
 Statefulness is a future axis that tracks whether a function reads or writes to some
 mutable state that it closes over (in other words, state that is not explicitly passed to it in an argument).
 
-*Stateless* functions may not either read or write such state, and *reading*
-functions can only read it. *Stateful* functions have no restrictions.
-Stateless closures capture all values at visibility *immutable*,
-while reading closures capture all values at visibility *read*.
+*Stateless* functions may not either read or write such state, *reading* functions can
+only read it, and *observable* functions can only write it. *Stateful* functions have no
+restrictions. Stateless closures capture all values at visibility *immutable*, while
+reading closures capture all values at visibility *read*, and observable closures
+capture all values at visibility *write*.
 
 Statefulness is irrelevant for types that do not contain functions, and values of such
 types *mode cross* on the statefulness axis; they may be used as stateless
