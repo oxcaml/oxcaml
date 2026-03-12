@@ -35,7 +35,10 @@ module Make (V : Ordered) = struct
       lo : node;
       hi : node;
       down0 : Axis_lattice.t
-      (** Cached lattice value of the lo->lo->..->lo leaf. *)
+      (** Cached lattice value of the lo->lo->..->lo leaf. *);
+      up0 : Axis_lattice.t
+      (** Cached upper bound on [round_up]. After inlining solved vars this is
+          exact. *)
     }
 
   and var =
@@ -75,13 +78,22 @@ module Make (V : Ordered) = struct
 
     let[@inline] node_down0 (node : node) : Axis_lattice.t =
       (node_block node).down0
+
+    let[@inline] node_up0 (node : node) : Axis_lattice.t = (node_block node).up0
   end
 
   let[@inline] make_node (v : var) (lo : node) (hi : node) : node =
     let down0 =
       if is_leaf lo then Unsafe.leaf_value lo else Unsafe.node_down0 lo
     in
-    Obj.repr ({ v; lo; hi; down0 } : node_block)
+    let up0_lo =
+      if is_leaf lo then Unsafe.leaf_value lo else Unsafe.node_up0 lo
+    in
+    let up0_hi =
+      if is_leaf hi then Unsafe.leaf_value hi else Unsafe.node_up0 hi
+    in
+    let up0 = Axis_lattice.join up0_lo up0_hi in
+    Obj.repr ({ v; lo; hi; down0; up0 } : node_block)
 
   let[@inline] leaf (c : Axis_lattice.t) : node = Obj.repr c
 
@@ -95,6 +107,9 @@ module Make (V : Ordered) = struct
     if is_leaf node
     then Unsafe.leaf_value node
     else Unsafe.node_down0 node
+
+  let[@inline] up0 (node : node) : Axis_lattice.t =
+    if is_leaf node then Unsafe.leaf_value node else Unsafe.node_up0 node
 
   (* Construct a node; must be in canonical form: hi = hi - lo. *)
   let node_raw (v : var) (lo : node) (hi : node) : node =
@@ -224,6 +239,8 @@ module Make (V : Ordered) = struct
     let leaf_val = Unsafe.leaf_value lo in
     if Axis_lattice.equal leaf_val Axis_lattice.bot
     then hi
+    else if Axis_lattice.leq (up0 hi) leaf_val
+    then bot
     else aux ~hi leaf_val
 
   (** Build a canonical node; ensures [hi] is disjoint from [lo]. *)
@@ -275,6 +292,8 @@ module Make (V : Ordered) = struct
     else if (* Fast path: [down0] summarizes the lo-chain in order. *)
             Axis_lattice.leq leaf_value (down0 node)
     then node
+    else if Axis_lattice.leq (up0 node) leaf_value
+    then leaf leaf_value
     else aux leaf_value node
 
   and meet' (a : node) (b : node) =
@@ -312,6 +331,8 @@ module Make (V : Ordered) = struct
     then other
     else if Axis_lattice.equal leaf_value Axis_lattice.bot
     then bot
+    else if Axis_lattice.leq (up0 other) leaf_value
+    then other
     else aux leaf_value other
 
   and[@inline] join (a : node) (b : node) =
@@ -521,19 +542,10 @@ module Make (V : Ordered) = struct
     let base, linears = go universe (inline_solved_vars n) [] in
     base, List.rev linears
 
-  let rec round_up' (node : node) =
-    if is_leaf node
-    then Unsafe.leaf_value node
-    else
-      let block = Unsafe.node_block node in
-      let lo = round_up' block.lo in
-      let hi = round_up' block.hi in
-      Axis_lattice.join lo hi
-
   let round_up (node : node) =
     solve_pending ();
     let node = inline_solved_vars node in
-    round_up' node
+    up0 node
 
   let is_const (node : node) : bool =
     let node = inline_solved_vars node in
@@ -623,7 +635,7 @@ module Make (V : Ordered) = struct
       Jkind_axis.Axis.packed list =
     solve_pending ();
     let diff = sub_subsets a b in
-    let witness = round_up' diff in
+    let witness = up0 diff in
     Axis_lattice.non_bot_axes witness
     |> List.map Axis_lattice.axis_number_to_axis_packed
 
@@ -712,8 +724,10 @@ module Make (V : Ordered) = struct
         else
           let block = Unsafe.node_block node in
           Buffer.add_string b
-            (Printf.sprintf "%sNode#%d %s down0=%s lo=#%d hi=#%d\n" indent id
+            (Printf.sprintf
+               "%sNode#%d %s down0=%s up0=%s lo=#%d hi=#%d\n" indent id
                (pp_var_info block.v) (pp_coeff block.down0)
+               (pp_coeff block.up0)
                (get_id block.lo) (get_id block.hi));
           let indent' = indent ^ "  " in
           go indent' block.lo;
