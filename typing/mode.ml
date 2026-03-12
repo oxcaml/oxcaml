@@ -292,6 +292,26 @@ module Lattices = struct
     val max : t
   end
 
+  type pord =
+    | Less
+    | Equal
+    | Greater
+    | Incomparable
+
+  module type Partial = sig
+    (** A lattice is a partial order, if for any [a] [b], either:
+        - [a <= b] or [b <= a]
+        - [a] and [b] are incomparable. *)
+
+    type t
+
+    val cmp : t -> t -> pord
+
+    val min : t
+
+    val max : t
+  end
+
   module Total (L : Total) = struct
     let min = L.min
 
@@ -325,6 +345,54 @@ module Lattices = struct
     let imply c b = if le c b then L.max else b
   end
   [@@inline]
+
+  module Partial (L : Partial) = struct
+    let min = L.min
+
+    let max = L.max
+
+    let le a b =
+      match L.cmp a b with
+      | Less | Equal -> true
+      | Greater | Incomparable -> false
+
+    let equal a b =
+      match L.cmp a b with
+      | Equal -> true
+      | Less | Greater | Incomparable -> false
+
+    let join a b =
+      match L.cmp a b with
+      | Greater -> a
+      | Less | Equal -> b
+      | Incomparable -> L.max
+
+    let meet a b =
+      match L.cmp a b with
+      | Less -> a
+      | Equal | Greater -> b
+      | Incomparable -> L.min
+
+    (* A partial lattice has a co-heyting structure.
+       Prove the [subtract] below is the left adjoint of [join].
+        - If [subtract a c <= b], by the definition of [subtract] below,
+          that could mean one of two things:
+          - Took the branch [a <= c], and [min <= b]. In this case, we have [a <= c <= join c b].
+          - Took the other branch, and [a <= b]. In this case, we have [a <= b <= join c b].
+
+        - In the other direction: Given [a <= join c b], compare [c] and [b]:
+          - if [c <= b], then [a <= join c b = b], and:
+            - either [a <= c], then [subtract a c = min <= b]
+            - or the other branch, then [subtract a c = a <= b]
+          - if [b <= c], then [a <= join c b = c], then [subtract a c = min <= b]
+          - if [b <> c], then [a <= join c b = max], then [subtract a c = min <= max]
+    *)
+    let subtract a c = if le a c then L.min else a
+
+    (* A partial lattice has a heyting structure. The proof for [imply] is dual
+       and omitted. *)
+    let imply c b = if le c b then L.max else b
+  end
 
   (* Make the type of [Locality] and [Regionality] below distinguishable,
      so that we can be sure [Comonadic_with] is applied correctly. *)
@@ -525,23 +593,34 @@ module Lattices = struct
   module Statefulness = struct
     type t =
       | Stateless
+      | Observable
       | Reading
       | Stateful
 
-    include Total (struct
+    include Partial (struct
       type nonrec t = t
 
       let min = Stateless
 
       let max = Stateful
 
-      let ord = function Stateless -> 0 | Reading -> 1 | Stateful -> 2
+      (* CR nmatschke: The compiler could generate better code here, but we
+         could also consider precomputing a table indexed by [a lor b]. *)
+      let cmp a b =
+        let open struct
+          external to_int : t -> int = "%identity"
+        end in
+        let a = to_int a and b = to_int b in
+        if a land b = 0 && a <> 0 && b <> 0
+        then Incomparable
+        else if a < b then Less else if a > b then Greater else Equal
     end)
 
     let legacy = Stateful
 
     let print ppf = function
       | Stateless -> Fmt.fprintf ppf "stateless"
+      | Observable -> Fmt.fprintf ppf "observable"
       | Reading -> Fmt.fprintf ppf "reading"
       | Stateful -> Fmt.fprintf ppf "stateful"
   end
@@ -550,16 +629,26 @@ module Lattices = struct
     type t =
       | Read_write
       | Read
+      | Write
       | Immutable
 
-    include Total (struct
+    include Partial (struct
       type nonrec t = t
 
       let min = Read_write
 
       let max = Immutable
 
-      let ord = function Read_write -> 0 | Read -> 1 | Immutable -> 2
+      (* CR nmatschke: The compiler could generate better code here, but we
+         could also consider precomputing a table indexed by [a lor b]. *)
+      let cmp a b =
+        let open struct
+          external to_int : t -> int = "%identity"
+        end in
+        let a = to_int a and b = to_int b in
+        if a land b = 0 && a <> 0 && b <> 0
+        then Incomparable
+        else if a < b then Less else if a > b then Greater else Equal
     end)
 
     let legacy = Read_write
@@ -567,6 +656,7 @@ module Lattices = struct
     let print ppf = function
       | Immutable -> Fmt.fprintf ppf "immutable"
       | Read -> Fmt.fprintf ppf "read"
+      | Write -> Fmt.fprintf ppf "write"
       | Read_write -> Fmt.fprintf ppf "read_write"
   end
 
@@ -1662,12 +1752,14 @@ module Lattices_mono = struct
 
   let statefulness_to_visibility = function
     | Statefulness.Stateless -> Visibility.Immutable
+    | Statefulness.Observable -> Visibility.Write
     | Statefulness.Reading -> Visibility.Read
     | Statefulness.Stateful -> Visibility.Read_write
 
   let visibility_to_statefulness = function
     | Visibility.Immutable -> Statefulness.Stateless
     | Visibility.Read -> Statefulness.Reading
+    | Visibility.Write -> Statefulness.Observable
     | Visibility.Read_write -> Statefulness.Stateful
 
   let min_with dst ax a = Axis.set ax a (min dst)
@@ -3080,6 +3172,8 @@ module Statefulness = struct
 
   let reading = of_const Reading
 
+  let observable = of_const Observable
+
   let stateful = of_const Stateful
 
   let legacy = of_const Const.legacy
@@ -3101,6 +3195,8 @@ module Visibility = struct
   let immutable = of_const Immutable
 
   let read = of_const Read
+
+  let write = of_const Write
 
   let read_write = of_const Read_write
 
@@ -3125,7 +3221,9 @@ module Portability = struct
   (* CR dkalinichenko: ideally, [reading] should zap to [shareable]. *)
   let zap_to_legacy ~statefulness =
     match statefulness with
-    | Statefulness.Const.Stateful | Statefulness.Const.Reading -> zap_to_ceil
+    | Statefulness.Const.Stateful
+    | Statefulness.Const.Reading
+    | Statefulness.Const.Observable -> zap_to_ceil
     | Statefulness.Const.Stateless -> zap_to_floor
 end
 
@@ -3165,7 +3263,9 @@ module Contention = struct
   (* CR dkalinichenko: ideally, [read] should zap to [shared]. *)
   let zap_to_legacy ~visibility =
     match visibility with
-    | Visibility.Const.Read_write | Visibility.Const.Read -> zap_to_floor
+    | Visibility.Const.Read_write
+    | Visibility.Const.Read
+    | Visibility.Const.Write -> zap_to_floor
     | Visibility.Const.Immutable -> zap_to_ceil
 end
 

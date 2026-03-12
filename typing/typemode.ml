@@ -88,9 +88,11 @@ module Mode_axis_pair = struct
     | "unyielding" -> comonadic Yielding Unyielding
     | "stateless" -> comonadic Statefulness Stateless
     | "reading" -> comonadic Statefulness Reading
+    | "observable" -> comonadic Statefulness Observable
     | "stateful" -> comonadic Statefulness Stateful
     | "immutable" -> monadic Visibility Immutable
     | "read" -> monadic Visibility Read
+    | "write" -> monadic Visibility Write
     | "read_write" -> monadic Visibility Read_write
     | "static" -> monadic Staticity Static
     | "dynamic" -> monadic Staticity Dynamic
@@ -229,7 +231,7 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
   | Monadic Visibility, Join_const a ->
     let b : Contention.Const.t =
       match a with
-      | Immutable -> Contended
+      | Immutable | Write -> Contended
       | Read -> Shared
       | Read_write -> Uncontended
     in
@@ -239,7 +241,7 @@ let implied_modalities (Atom (ax, a) : Modality.atom) : Modality.atom list =
       match a with
       | Stateless -> Portable
       | Reading -> Shareable
-      | Stateful -> Nonportable
+      | Stateful | Observable -> Nonportable
     in
     [Atom (Comonadic Portability, Meet_const b)]
   | _ -> []
@@ -382,7 +384,8 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
   let contention =
     match annots.contention, annots.visibility with
     | (Some _ as c), _ | c, None -> c
-    | None, Some Visibility.Const.Immutable -> Some Contention.Const.Contended
+    | None, Some Visibility.Const.(Immutable | Write) ->
+      Some Contention.Const.Contended
     | None, Some Visibility.Const.Read -> Some Contention.Const.Shared
     | None, Some Visibility.Const.Read_write ->
       Some Contention.Const.Uncontended
@@ -393,7 +396,7 @@ let default_mode_annots (annots : Alloc.Const.Option.t) =
     | (Some _ as p), _ | p, None -> p
     | None, Some Statefulness.Const.Stateless -> Some Portability.Const.Portable
     | None, Some Statefulness.Const.Reading -> Some Portability.Const.Shareable
-    | None, Some Statefulness.Const.Stateful ->
+    | None, Some Statefulness.Const.(Stateful | Observable) ->
       Some Portability.Const.Nonportable
   in
   { annots with forkable; yielding; contention; portability }
