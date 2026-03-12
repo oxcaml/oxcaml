@@ -1729,6 +1729,24 @@ static value capture_callstack_GC(memprof_domain_t domain, int alloc_idx)
   return res;
 }
 
+/* Normalise any callstack value, stashed or not, into an unstashed
+ * one on the Caml heap. */
+
+static value unstash_callstack(value callstack)
+{
+  CAMLparam1(callstack);
+  if (Is_long(callstack)) {
+    /* Callstack stashed on C heap, so copy it to OCaml heap */
+    callstack_stash_t stash = Ptr_val(callstack);
+    callstack = caml_alloc(stash->frames, 0);
+    for (size_t i = 0; i < stash->frames; ++i) {
+      Field(callstack, i) = Val_backtrace_slot(stash->stack[i]);
+    }
+    caml_stat_free(stash);
+  }
+  CAMLreturn(callstack);
+}
+
 /**** Running callbacks ****/
 
 /* Runs a single callback, in thread `thread`, for entry number `i` in
@@ -1754,26 +1772,12 @@ static value run_callback_exn(memprof_thread_t thread,
   if (cb_index == CB_ALLOC) {
     /* CB_ALLOC callbacks expect a Gc.Memprof.allocation.
        It's allocated here, inside the thread->running_table protection. */
-    value callstack = Val_unit;
-    CAMLparam3(cb, param, callstack);
+    CAMLparam2(cb, param);
+    CAMLlocal1(callstack);
 
-    callstack = e->user_data;
-    if (Is_long(callstack)) {
-      /* Callstack stashed on C heap, so copy it to OCaml heap */
-      callstack_stash_t stash = Ptr_val(callstack);
-      callstack = caml_alloc(stash->frames, 0);
-      /* es, i, e may have moved at the caml_alloc */
-      es = thread->running_table;
-      i = thread->running_index;
-      e = &es->t[i];
-      for (size_t i = 0; i < stash->frames; ++i) {
-        Field(callstack, i) = Val_backtrace_slot(stash->stack[i]);
-      }
-      caml_stat_free(stash);
-    }
-
+    callstack = unstash_callstack(e->user_data);
     param = caml_alloc_small(4, 0);
-    /* es, i, e may have moved at the caml_alloc_small */
+    /* es, i, e may have moved in unstash_callstack or caml_alloc_small */
     es = thread->running_table;
     i = thread->running_index;
     e = &es->t[i];
