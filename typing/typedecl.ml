@@ -39,10 +39,13 @@ type jkind_sort_loc =
    from a type declaration, by expansion of definitions or by the
    subterm relation (a type expression is syntactically contained
    in another). *)
-type reaching_type_path = reaching_type_step list
-and reaching_type_step =
-  | Expands_to of type_expr * type_expr
-  | Contains of type_expr * type_expr
+type ('a, 'b) reaching_path = ('a, 'b) reaching_path_step list
+and ('a, 'b) reaching_path_step =
+  | Expands_to of 'a * 'b
+  | Contains of 'b * 'a
+
+type reaching_type_path = (type_expr, type_expr) reaching_path
+type reaching_kind_path = (Path.t, Types.jkind_const_desc_lr) reaching_path
 
 module Mixed_product_kind = struct
   type t =
@@ -150,6 +153,7 @@ type error =
   | Atomic_field_in_mixed_block
   | Non_value_atomic_field
   | Layout_poly_unsupported
+  | Recursive_jkind_definition of Path.t * Env.t * reaching_kind_path
 
 open Typedtree
 
@@ -2588,6 +2592,53 @@ let check_well_founded_decl  ~abs_env env loc path decl to_check =
     it.it_type_declaration it (Ctype.generic_instance_declaration decl)
   end
 
+let check_well_founded_jkind_decl env loc recmod_ids path decl =
+  (* This function is simpler than the type version because there is not
+     currently any relevant branching in jkinds (e.g., we don't have product
+     kinds) so it can just linearly traverse the kind definitions. In the future
+     this function will need to be more like the type version to deal with more
+     complex jkinds. *)
+  match decl.Types.jkind_manifest with
+  | None -> ()
+  | Some { base = Layout _; _ } -> ()
+  | Some ({ base = Kconstr kpath; mod_bounds = _; with_bounds = No_with_bounds }
+          as manifest) ->
+    if not (Path.exists_free recmod_ids kpath) then ()
+    else
+      let steps_of kind_path (manifest : Types.jkind_const_desc_lr) =
+        let expand = Expands_to (kind_path, manifest) in
+        (* We check to see if we'd print any mod bounds, in which case we want
+           to use the "a contains b" language rather than "a = b". In the
+           future, we'll have more ways for [Contains] to show up (e.g., product
+           kinds). *)
+        match Typemode.untransl_mod_bounds manifest.mod_bounds with
+        | [] -> [expand]
+        | _ :: _ ->
+          (match manifest.base with
+           | Kconstr base_path -> [Contains (manifest, base_path); expand]
+           | Layout _ -> assert false)
+      in
+      let rec follow current acc visited =
+        if Path.same current path then
+          Some (List.rev acc)
+        else if List.exists (Path.same current) visited then
+          (* This case may also be a cycle, but for a different path that will
+             be separately checked. *)
+          None
+        else
+          match (Env.find_jkind current env).jkind_manifest with
+          | Some ({ base = Kconstr next; mod_bounds = _;
+                    with_bounds = No_with_bounds } as m) ->
+            follow next ((steps_of current m) @ acc) (current :: visited)
+          | Some { base = Layout _; _ } | None -> None
+          | exception Not_found -> None
+      in
+      match follow kpath (steps_of path manifest) [path] with
+      | Some reaching_path ->
+        raise
+          (Error (loc, Recursive_jkind_definition (path, env, reaching_path)))
+      | None -> ()
+
 (* We only allow recursion in unboxed product types to occur through boxes,
    otherwise the type is uninhabitable and usually also infinite-size.
    See [typing-layouts-unboxed-records/recursive.ml].
@@ -4451,6 +4502,12 @@ let approx_type_decl env sdecl_list =
        (id, abstract_type_decl ~injective ~jkind ~params))
     sdecl_list
 
+let approx_jkind_decl sdecl : Types.jkind_declaration =
+  { jkind_manifest = None;
+    jkind_attributes = sdecl.pjkind_attributes;
+    jkind_uid = Uid.internal_not_actually_unique;
+    jkind_loc = sdecl.pjkind_loc }
+
 (* Check the well-formedness conditions on type abbreviations defined
    within recursive modules. *)
 
@@ -4472,6 +4529,9 @@ let check_recmod_typedecl env loc recmod_ids path decl =
      with the intention of fixing the jkind soundness issue once the other soundness issue
      is resolved. *)
   check_kind_coherence env loc path decl
+
+let check_recmod_jkind_decl env loc recmod_ids path decl =
+  check_well_founded_jkind_decl env loc recmod_ids path decl
 
 let transl_jkind_decl env
       { pjkind_name; pjkind_manifest; pjkind_attributes; pjkind_loc=loc } =
@@ -4552,12 +4612,30 @@ let explain_unbound_single ppf tv ty =
   | _ -> trivial ty
 
 module Reaching_path = struct
-  type t = reaching_type_path
+  module Fmt = Format_doc
 
-  (* Simplify a reaching path before showing it in error messages. *)
+  let pp ~pp_root ~pp_body ppf reaching_path =
+    let pp_step ppf = function
+      | Expands_to (root, body) ->
+        Fmt.fprintf ppf "%a = %a"
+          (Style.as_inline_code pp_root) root
+          (Style.as_inline_code pp_body) body
+      | Contains (body, root) ->
+        Fmt.fprintf ppf "%a contains %a"
+          (Style.as_inline_code pp_body) body
+          (Style.as_inline_code pp_root) root
+    in
+    Fmt.(pp_print_list ~pp_sep:comma) pp_step ppf reaching_path
+
+  let pp_colon ~pp_root ~pp_body ppf path =
+    Fmt.fprintf ppf ":@;<1 2>@[<v>%a@]" (pp ~pp_root ~pp_body) path
+
+  (* Type-specific operations *)
+
+  (* Simplify a reaching type path before showing it in error messages. *)
   let simplify path =
     let is_tconstr ty = match get_desc ty with Tconstr _ -> true | _ -> false in
-    let rec simplify : t -> t = function
+    let rec simplify : reaching_type_path -> reaching_type_path = function
       | Contains (ty1, _ty2) :: Contains (ty2', ty3) :: rest
         when not (is_tconstr ty2') ->
           (* If t1 contains t2 and t2 contains t3, then t1 contains t3
@@ -4579,23 +4657,36 @@ module Reaching_path = struct
           List.iter Printtyp.add_type_to_preparation [ty1; ty2]
     ) path
 
-  module Fmt = Format_doc
+  let pp_type_colon =
+    pp_colon
+      ~pp_root:Printtyp.prepared_type_expr
+      ~pp_body:Printtyp.prepared_type_expr
 
-  let pp ppf reaching_path =
-    let pp_step ppf = function
-      | Expands_to (ty, body) ->
-          Fmt.fprintf ppf "%a = %a"
-            (Style.as_inline_code Printtyp.prepared_type_expr) ty
-            (Style.as_inline_code Printtyp.prepared_type_expr) body
-      | Contains (outer, inner) ->
-          Fmt.fprintf ppf "%a contains %a"
-            (Style.as_inline_code Printtyp.prepared_type_expr) outer
-            (Style.as_inline_code Printtyp.prepared_type_expr) inner
+  (* Kind-specific operations *)
+
+  (* Format a jkind manifest without expanding Kconstr paths, to avoid infinite
+     loops on the very cycles we're reporting. *)
+  let pp_kind_manifest ppf
+        ({ base; mod_bounds; with_bounds = No_with_bounds}
+         : jkind_const_desc_lr ) =
+    let pp_base ppf = function
+      | Types.Layout l -> Fmt.fprintf ppf "%s" (Jkind.Layout.Const.to_string l)
+      | Kconstr p -> Printtyp.path ppf p
     in
-    Fmt.(pp_print_list ~pp_sep:comma) pp_step ppf reaching_path
+    let mod_strings =
+      Typemode.untransl_mod_bounds mod_bounds
+      |> List.map (fun { Location.txt = Parsetree.Mode s; _ } -> s)
+    in
+    match mod_strings with
+    | [] -> pp_base ppf base
+    | _ ->
+      Fmt.fprintf ppf "%a mod %a" pp_base base
+        (Fmt.pp_print_list
+           ~pp_sep:(fun ppf () -> Fmt.fprintf ppf " ")
+           Fmt.pp_print_string)
+        mod_strings
 
-  let pp_colon ppf path =
-    Fmt.fprintf ppf ":@;<1 2>@[<v>%a@]" pp path
+  let pp_kind_colon = pp_colon ~pp_root:Printtyp.path ~pp_body:pp_kind_manifest
 end
 
 let report_jkind_mismatch_due_to_bad_inference ppf env ty violation loc =
@@ -4640,7 +4731,7 @@ let report_error_doc ppf = function
       Reaching_path.add_to_preparation reaching_path;
       fprintf ppf "@[<v>The type abbreviation %a is cyclic%a@]"
         Style.inline_code s
-        Reaching_path.pp_colon reaching_path
+        Reaching_path.pp_type_colon reaching_path
   | Cycle_in_def (s, env, reaching_path) ->
       let reaching_path = Reaching_path.simplify reaching_path in
       Printtyp.wrap_printing_env ~error:true env @@ fun () ->
@@ -4648,7 +4739,7 @@ let report_error_doc ppf = function
       Reaching_path.add_to_preparation reaching_path;
       fprintf ppf "@[<v>The definition of %a contains a cycle%a@]"
         Style.inline_code s
-        Reaching_path.pp_colon reaching_path
+        Reaching_path.pp_type_colon reaching_path
   | Unboxed_recursion (s, env, reaching_path) ->
       let reaching_path = Reaching_path.simplify reaching_path in
       Printtyp.wrap_printing_env ~error:true env @@ fun () ->
@@ -4656,7 +4747,7 @@ let report_error_doc ppf = function
       Reaching_path.add_to_preparation reaching_path;
       fprintf ppf "@[<v>The definition of %a is recursive without boxing%a@]"
         Style.inline_code s
-        Reaching_path.pp_colon reaching_path
+        Reaching_path.pp_type_colon reaching_path
   | Definition_mismatch (ty, _env, None) ->
       fprintf ppf "@[<v>@[<hov>%s@ %s@;<1 2>%a@]@]"
         "This variant or record definition" "does not match that of type"
@@ -4707,7 +4798,7 @@ let report_error_doc ppf = function
            let is_expansion = function Expands_to _ -> true | _ -> false in
            if List.exists is_expansion reaching_path then
              fprintf pp "@ after the following expansion(s)%a@ "
-             Reaching_path.pp_colon reaching_path
+             Reaching_path.pp_type_colon reaching_path
            else fprintf pp ".@ ")
   | Inconsistent_constraint (env, err) ->
       let msg = Format_doc.Doc.msg in
@@ -5114,6 +5205,11 @@ let report_error_doc ppf = function
   | Layout_poly_unsupported ->
     fprintf ppf
       "@[Layout polymorphism is unsupported in this context.@]"
+  | Recursive_jkind_definition (path, env, reaching_path) ->
+    Printtyp.wrap_printing_env ~error:true env @@ fun () ->
+    fprintf ppf "@[<v>The kind %a is cyclic%a@]"
+      (Style.as_inline_code Printtyp.path) path
+      Reaching_path.pp_kind_colon reaching_path
 
 
 let () =

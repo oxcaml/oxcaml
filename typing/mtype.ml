@@ -650,28 +650,36 @@ and enrich_item env p = function
                  priv)
   | item -> item
 
-let rec type_paths env p mty =
+let rec type_and_jkind_paths env p mty =
   match scrape env mty with
-    Mty_ident _ -> []
-  | Mty_alias _ -> []
-  | Mty_signature sg -> type_paths_sig env p sg
-  | Mty_functor _ -> []
-  | Mty_strengthen _ -> []
+  | Mty_ident _ | Mty_alias _ | Mty_functor _ | Mty_strengthen _ ->
+    ~types:[], ~jkinds:[]
+  | Mty_signature sg -> type_and_jkind_paths_sig env p sg
 
-and type_paths_sig env p sg =
+and type_and_jkind_paths_sig env p sg =
   match sg with
-    [] -> []
+  | [] -> ~types:[], ~jkinds:[]
   | Sig_type(id, _decl, _, _) :: rem ->
-      Pdot(p, Ident.name id) :: type_paths_sig env p rem
+    let ~types, ~jkinds = type_and_jkind_paths_sig env p rem in
+    ~types:(Pdot(p, Ident.name id) :: types), ~jkinds
+  | Sig_jkind(id, _decl, _) :: rem ->
+    let ~types, ~jkinds = type_and_jkind_paths_sig env p rem in
+    ~types, ~jkinds:(Pdot(p, Ident.name id) :: jkinds)
   | Sig_module(id, pres, md, _, _) :: rem ->
-      type_paths env (Pdot(p, Ident.name id)) md.md_type @
-      type_paths_sig (Env.add_module_declaration ~check:false id pres md env)
-        p rem
+    let ~types:nested_types, ~jkinds:nested_jkinds =
+      type_and_jkind_paths env (Pdot(p, Ident.name id)) md.md_type
+    in
+    let env =
+      Env.add_module_declaration ~check:false id pres md env
+    in
+    let ~types:rem_types, ~jkinds:rem_jkinds =
+      type_and_jkind_paths_sig env p rem
+    in
+    ~types:(nested_types @ rem_types), ~jkinds:(nested_jkinds @ rem_jkinds)
   | Sig_modtype(id, decl, _) :: rem ->
-      type_paths_sig (Env.add_modtype id decl env) p rem
-  | ( Sig_value _ | Sig_typext _ | Sig_class _ | Sig_class_type _
-    | Sig_jkind _ ) :: rem ->
-    type_paths_sig env p rem
+    type_and_jkind_paths_sig (Env.add_modtype id decl env) p rem
+  | (Sig_value _ | Sig_typext _ | Sig_class _ | Sig_class_type _) :: rem ->
+    type_and_jkind_paths_sig env p rem
 
 let rec no_code_needed_mod env pres mty =
   match pres with
