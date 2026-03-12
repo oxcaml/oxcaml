@@ -1169,17 +1169,22 @@ let pseudoregs_for_instr (simd : Simd.instr) arg_regs res_regs =
   | Res_none -> arg_regs, res_regs
   | Arg rr ->
     let res_regs = ref res_regs in
-    Array.iteri
+    Array.fold_left
       (fun r a ->
+        let len = Simd.loc_reg_count simd.args.(a).loc in
         let a = Simd.unarized_reg_index simd.args a in
-        assert (not (Reg.is_preassigned arg_regs.(a)));
         (* CR-someday mslater: we should require binding all overwritten args *)
         (if r = Array.length !res_regs
          then
-           let fresh = Reg.create_with_typ arg_regs.(a) in
-           res_regs := Array.append !res_regs [| fresh |]);
-        arg_regs.(a) <- !res_regs.(r))
-      rr;
+           let fresh = Reg.createv_with_typs (Array.sub arg_regs a len) in
+           res_regs := Array.append !res_regs fresh);
+        for idx = 0 to len - 1 do
+          assert (not (Reg.is_preassigned arg_regs.(a + idx)));
+          arg_regs.(a + idx) <- !res_regs.(r + idx)
+        done;
+        r + len)
+      0 rr
+    |> ignore;
     arg_regs, !res_regs
   | Res rr ->
     Array.iteri (fun i ({ loc; _ } : Simd.arg) -> maybe_pin res_regs i loc) rr;
@@ -1203,20 +1208,7 @@ let pseudoregs_for_operation (simd : Simd.operation) arg res =
   pseudoregs_for_instr sse_or_avx arg_regs res_regs
 
 let pseudoregs_for_mem_operation (op : Simd.Mem.operation) arg res =
-  match op with
-  | Load op | Store op ->
-    let arg, res = pseudoregs_for_operation op arg res in
-    (* Gather instructions require all XMM/YMM operands (onto, index, mask) to
-       be in distinct registers. The [Arg _] case above already ties [onto] and
-       [mask] to distinct results. Creating a fresh register for [index] forces
-       a move to be generated, which interferes with [onto] and [mask]. *)
-    (match[@warning "-4"] (Simd.Pseudo_instr.instr op.instr).id with
-    | Vpgatherdd_X_M32X_X | Vpgatherdd_Y_M32Y_Y | Vpgatherdq_X_M32X_X
-    | Vpgatherdq_Y_M32X_Y | Vpgatherqd_X_M64X_X | Vpgatherqd_X_M64Y_X
-    | Vpgatherqq_X_M64X_X | Vpgatherqq_Y_M64Y_Y ->
-      arg.(2) <- Reg.create_with_typ arg.(2)
-    | _ -> ());
-    arg, res
+  match op with Load op | Store op -> pseudoregs_for_operation op arg res
 
 (* Error report *)
 

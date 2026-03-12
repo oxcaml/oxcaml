@@ -1709,12 +1709,15 @@ let check_simd_instr ?mode (simd : Simd.instr) imm instr =
     match simd.res with
     | Res_none -> 0
     | Arg rr ->
-      Array.iteri
+      Array.fold_left
         (fun r a ->
+          let len = Simd.loc_reg_count simd.args.(a).loc in
           let a = Simd.unarized_reg_index simd.args a in
-          assert (Reg.same_loc instr.arg.(a) instr.res.(r)))
-        rr;
-      Array.length rr
+          for idx = 0 to len - 1 do
+            assert (Reg.same_loc instr.arg.(a + idx) instr.res.(r + idx))
+          done;
+          r + len)
+        0 rr
     | Res rr ->
       Array.iteri
         (fun i ({ loc; _ } : Simd.arg) -> assert_loc loc instr.res.(i))
