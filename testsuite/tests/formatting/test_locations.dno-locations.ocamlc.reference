@@ -90,15 +90,18 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
         pattern 
           Tpat_var "fib"
           sort value
-          value_mode global,many,portable,forkable,unyielding,stateful;meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#3<0>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static]))
+          value_mode global,many,portable,forkable,unyielding,stateful;meet(unique,uncontended,read_write,static,imply(unique,uncontended,read_write,static)(modevar#3<0>[aliased,uncontended,read_write,dynamic .. unique,uncontended,read_write,static]))
         expression 
           Texp_function
-          alloc_mode global,many,portable,forkable,unyielding,stateful;id(modevar#9<4>[aliased,contended,immutable,dynamic .. unique,uncontended,read_write,static])
-          global,many,nonportable,forkable,unyielding,stateful;aliased,uncontended,read_write,dynamic
+          alloc_mode alloc_mode global
+
+          alloc_mode global
+
           []
           []
           Tfunction_cases 
-          alloc_mode global,many,nonportable,forkable,unyielding,stateful;aliased,uncontended,read_write,dynamic
+          alloc_mode alloc_mode global
+
           value
             [
               <case>
@@ -118,7 +121,8 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                 expression 
                   Texp_apply
                   apply_mode Tail
-                  locality_mode global
+                  alloc_mode alloc_mode global
+
                   expression 
                     Texp_ident "Stdlib!.+"
                   [
@@ -127,7 +131,8 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                       expression 
                         Texp_apply
                         apply_mode Default
-                        locality_mode global
+                        alloc_mode alloc_mode global
+
                         expression 
                           Texp_ident "fib"
                         [
@@ -136,7 +141,8 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                             expression 
                               Texp_apply
                               apply_mode Default
-                              locality_mode global
+                              alloc_mode alloc_mode global
+
                               expression 
                                 Texp_ident "Stdlib!.-"
                               [
@@ -155,7 +161,8 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                       expression 
                         Texp_apply
                         apply_mode Default
-                        locality_mode global
+                        alloc_mode alloc_mode global
+
                         expression 
                           Texp_ident "fib"
                         [
@@ -164,7 +171,8 @@ let rec fib = function | 0 | 1 -> 1 | n -> (fib (n - 1)) + (fib (n - 2))
                             expression 
                               Texp_apply
                               apply_mode Default
-                              locality_mode global
+                              alloc_mode alloc_mode global
+
                               expression 
                                 Texp_ident "Stdlib!.-"
                               [

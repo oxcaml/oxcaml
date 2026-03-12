@@ -35,7 +35,9 @@ let dummy_value_mode = Value.disallow_right Value.legacy
 
 let dummy_value_sort = Jkind.Sort.value
 
-let dummy_alloc_mode = Alloc.disallow_left Alloc.legacy
+let dummy_alloc_mode_r = alloc_mode_r_legacy
+
+let dummy_alloc_mode_l = alloc_mode_l_legacy
 
 let mkTvar name = Tvar { name; jkind = dummy_jkind }
 
@@ -53,35 +55,34 @@ let mkTexp_ident ?id:(kind, unique_use = Id_value, aliased_many_use)
 type nonrec apply_arg = apply_arg
 
 type texp_apply_identifier =
-  apply_position * Locality.l * Builtin_attributes.zero_alloc_assume option
+  apply_position * alloc_mode_l * Builtin_attributes.zero_alloc_assume option
 
-let mkTexp_apply
-    ?id:(pos, mode, za = Default, Locality.disallow_right Locality.legacy, None)
+let mkTexp_apply ?id:(pos, mode, za = Default, alloc_mode_l_legacy, None)
     (exp, args) =
   let args =
     List.map (fun (label, x) -> Typetexp.transl_label label None, x) args
   in
   Texp_apply (exp, args, pos, mode, za)
 
-type texp_tuple_identifier = string option list * alloc_mode
+type texp_tuple_identifier = string option list * alloc_mode_r
 
 let mkTexp_tuple ?id exps =
   let labels, alloc =
     match id with
-    | None -> List.map (fun _ -> None) exps, dummy_alloc_mode
+    | None -> List.map (fun _ -> None) exps, dummy_alloc_mode_r
     | Some id -> id
   in
   let exps = List.combine labels exps in
   Texp_tuple (exps, alloc)
 
-type texp_construct_identifier = alloc_mode option
+type texp_construct_identifier = alloc_mode_r option
 
-let mkTexp_construct ?id:(mode = Some dummy_alloc_mode) (name, desc, args) =
+let mkTexp_construct ?id:(mode = Some dummy_alloc_mode_r) (name, desc, args) =
   Texp_construct (name, desc, args, mode)
 
 type texp_function_param_identifier =
   { param_sort : Jkind.Sort.t;
-    param_mode : Alloc.l;
+    param_mode : alloc_mode_l;
     param_curry : function_curry;
     param_newtypes :
       (Ident.t
@@ -101,7 +102,7 @@ type texp_function_param =
   }
 
 type texp_function_cases_identifier =
-  { last_arg_mode : Alloc.l;
+  { last_arg_mode : alloc_mode_l;
     last_arg_sort : Jkind.Sort.t;
     last_arg_exp_extra : exp_extra list;
     last_arg_attributes : attributes;
@@ -124,14 +125,14 @@ type texp_function =
   }
 
 type texp_function_identifier =
-  { alloc_mode : alloc_mode;
+  { alloc_mode : alloc_mode_r;
     ret_sort : Jkind.sort;
-    ret_mode : Alloc.l;
+    ret_mode : alloc_mode_l;
     zero_alloc : Zero_alloc.t
   }
 
 let texp_function_cases_identifier_defaults =
-  { last_arg_mode = Alloc.disallow_right Alloc.legacy;
+  { last_arg_mode = dummy_alloc_mode_l;
     last_arg_sort = Jkind.Sort.value;
     last_arg_exp_extra = [];
     last_arg_attributes = [];
@@ -141,15 +142,15 @@ let texp_function_cases_identifier_defaults =
 
 let texp_function_param_identifier_defaults =
   { param_sort = Jkind.Sort.value;
-    param_mode = Alloc.disallow_right Alloc.legacy;
-    param_curry = More_args { partial_mode = Alloc.disallow_right Alloc.legacy };
+    param_mode = dummy_alloc_mode_l;
+    param_curry = More_args { partial_mode = dummy_alloc_mode_l };
     param_newtypes = []
   }
 
 let texp_function_defaults =
-  { alloc_mode = dummy_alloc_mode;
+  { alloc_mode = dummy_alloc_mode_r;
     ret_sort = Jkind.Sort.value;
-    ret_mode = Alloc.disallow_right Alloc.legacy;
+    ret_mode = dummy_alloc_mode_l;
     zero_alloc = Zero_alloc.default
   }
 
