@@ -62,8 +62,8 @@ Error: Signature mismatch:
          val g : unit -> unit (* in a structure at nonportable *)
        is not included in
          val g : unit -> unit (* in a structure at portable *)
-       The left-hand side is "nonportable"
-       but the right-hand side is "portable".
+       The first is "nonportable"
+       but the second is "portable".
 |}]
 
 module F : S -> T = functor (M : S) -> struct
@@ -897,8 +897,8 @@ Error: Signature mismatch:
          val t : int * int ref (* in a structure at immutable *)
        is not included in
          val t : int * int ref (* in a structure at read_write *)
-       The left-hand side is "immutable"
-       but the right-hand side is "read_write".
+       The first is "immutable"
+       but the second is "read_write".
 |}]
 
 module F (M : T @ immutable -> S) = (M : T -> S)
@@ -929,8 +929,8 @@ Error: Signature mismatch:
          val t : int * int ref (* in a structure at immutable *)
        is not included in
          val t : int * int ref (* in a structure at read_write *)
-       The left-hand side is "immutable"
-       but the right-hand side is "read_write".
+       The first is "immutable"
+       but the second is "read_write".
 |}]
 
 (* refering to [F(M).t] is allowed even if [M] is weaker than what [F] wants *)
