@@ -176,4 +176,10 @@ let inline dacc ~apply ~unroll_to ~was_inline_always function_decl =
               ~apply_exn_continuation ~apply_return_continuation
               ~result_arity:(Code.result_arity code) ~make_inlined_body
         in
+        (match Sys.getenv "INLINING" with exception Not_found -> ()
+         | _ ->
+           Format.eprintf "Inlining code ID %a, inlined body:@ %a\n%!"
+             Code_id.print (FT.code_id function_decl)
+             Expr.print expr
+        );
         DA.with_denv dacc denv, expr)
