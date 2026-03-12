@@ -130,19 +130,7 @@ let require_escaping str =
   | '0' .. '9' -> true
   | _ -> not (String.for_all is_out_char str)
 
-let rec encode buf str =
-  if not (require_escaping str)
-  then Printf.bprintf buf "%d%s" (String.length str) str
-  else
-    let raw = Buffer.create (String.length str)
-    and escaped = Buffer.create (2 * String.length str)
-    and ins_pos = ref 0 in
-    encode_split_parts str raw escaped ins_pos 0 Raw;
-    Printf.bprintf buf "u%d%a_%a"
-      (Buffer.length escaped + Buffer.length raw + 1)
-      Buffer.add_buffer escaped Buffer.add_buffer raw
-
-and encode_split_parts str raw escaped ins_pos i = function
+let rec encode_split_parts str raw escaped ins_pos i = function
   | _ when i >= String.length str -> ()
   | Raw ->
     if is_out_char str.[i]
@@ -163,6 +151,18 @@ and encode_split_parts str raw escaped ins_pos i = function
     else (
       hex escaped str.[i];
       encode_split_parts str raw escaped ins_pos (i + 1) Esc)
+
+let encode buf str =
+  if not (require_escaping str)
+  then Printf.bprintf buf "%d%s" (String.length str) str
+  else
+    let raw = Buffer.create (String.length str)
+    and escaped = Buffer.create (2 * String.length str)
+    and ins_pos = ref 0 in
+    encode_split_parts str raw escaped ins_pos 0 Raw;
+    Printf.bprintf buf "u%d%a_%a"
+      (Buffer.length escaped + Buffer.length raw + 1)
+      Buffer.add_buffer escaped Buffer.add_buffer raw
 
 (** {1 Path mangling} *)
 

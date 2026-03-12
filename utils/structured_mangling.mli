@@ -67,6 +67,11 @@ type path_item =
   | Partial_function of int * int * string option
       (** A partial application at (line, col, file) *)
 
+(* CR sspies: Support for lazy expressions (they do not appear in the mangling
+   path at all) and object methods (they appear as regular functions) is still
+   missing; adding a construct for lazy expressions would allow us to make sure
+   there is always a mangling path item for every [Debuginfo] scope *)
+
 (** A mangling path is a list of path items representing the full lexical
     context of an identifier. *)
 type path = path_item list
