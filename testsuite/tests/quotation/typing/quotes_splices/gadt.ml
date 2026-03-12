@@ -285,108 +285,125 @@ let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq)
 (* Evidence stays in the same *wrong* stage -- should always fail:
    [S_proof = S_min] and [T_proof =/= T_subj] *)
 
-(* CR metaprogramming jbachurski: Tests succeed until constraints are staged. *)
-
 (* 0 ~~> 0  @  1 <=> 0 *)
 let _ = fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq)
             (x : M.t) -> x + 1
 [%%expect{|
-- : (<[M.t]> expr, <[int]> expr) Type.eq -> M.t -> int = <fun>
+Line 2, characters 25-26:
+2 |             (x : M.t) -> x + 1
+                             ^
+Error: This expression has type "M.t" but an expression was expected of type
+         "int"
 |}]
 
 (* 1 ~~> 2 ~~> 1  @  1 <=> 0 *)
 let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) (x : M.t) ->
     <[ $(Quote.Expr.int (x + 1)) * 2 ]> ]>
 [%%expect {|
-- : <[(<[M.t]> expr, <[int]> expr) Type.eq -> M.t -> <[int]> expr]> expr =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq) (x : M.t) ->
-    <[($(Stdlib.Quote.Expr.int (x + 1))) * 2]>
-]>
+Line 2, characters 25-26:
+2 |     <[ $(Quote.Expr.int (x + 1)) * 2 ]> ]>
+                             ^
+Error: This expression has type "M.t" but an expression was expected of type
+         "int"
 |}]
 (* 1 ~~> 2 ~~> 1  @  0 <=> 1 *)
 let _ = <[ fun (Equal : (M.t, int) Type.eq) (x : <[M.t]> expr) ->
     <[ $x + 1 ]> ]>
 [%%expect {|
-- : <[(M.t, int) Type.eq -> <[M.t]> expr -> <[int]> expr]> expr =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (M.t, int)
-    Stdlib.Type.eq) (x : <[M.t]> expr) -> <[($x) + 1]>
-]>
+Line 2, characters 8-9:
+2 |     <[ $x + 1 ]> ]>
+            ^
+Error: This expression has type "<[M.t]> expr"
+       but an expression was expected of type "<[int]> expr"
+       Type "M.t" = "int" is not compatible with type "int"
 |}]
 
 (* 0 ~~> 0  @  1 <=> 0 *)
 let _ = fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq)
             (x : M.t) -> x + 1
 [%%expect {|
-- : (<[M.t]> expr, <[int]> expr) Type.eq -> M.t -> int = <fun>
+Line 2, characters 25-26:
+2 |             (x : M.t) -> x + 1
+                             ^
+Error: This expression has type "M.t" but an expression was expected of type
+         "int"
 |}]
 (* 0 ~~> 0  @  1 <=> 2 *)
 let _ = fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq)
             (x : <[<[M.t]> expr]> expr) -> <[<[$($x) + 1]>]>
 [%%expect {|
-- : (<[M.t]> expr, <[int]> expr) Type.eq ->
-    <[<[M.t]> expr]> expr -> <[<[int]> expr]> expr
-= <fun>
+Line 2, characters 50-51:
+2 |             (x : <[<[M.t]> expr]> expr) -> <[<[$($x) + 1]>]>
+                                                      ^
+Error: This expression has type "<[<[M.t]> expr]> expr"
+       but an expression was expected of type "<[<[int]> expr]> expr"
+       Type "<[M.t]>" = "<[int]>" is not compatible with type "<[int]>"
+       Type "M.t" is not compatible with type "int"
 |}]
 (* 1 ~~> 1  @  1 <=> 2 *)
 let _ = <[ fun (Equal : (M.t, int) Type.eq)
                (x : <[M.t]> expr) -> <[$x + 1]> ]>
 [%%expect {|
-- : <[(M.t, int) Type.eq -> <[M.t]> expr -> <[int]> expr]> expr =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (M.t, int)
-    Stdlib.Type.eq) (x : <[M.t]> expr) -> <[($x) + 1]>
-]>
+Line 2, characters 40-41:
+2 |                (x : <[M.t]> expr) -> <[$x + 1]> ]>
+                                            ^
+Error: This expression has type "<[M.t]> expr"
+       but an expression was expected of type "<[int]> expr"
+       Type "M.t" = "int" is not compatible with type "int"
 |}]
 (* 0 ~~> 0  @  2 <=> 0 *)
 let _ = fun (Equal : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq)
             (x : M.t) -> x + 1
 [%%expect {|
-- : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq -> M.t -> int =
-<fun>
+Line 2, characters 25-26:
+2 |             (x : M.t) -> x + 1
+                             ^
+Error: This expression has type "M.t" but an expression was expected of type
+         "int"
 |}]
 (* 0 ~~> 0  @  2 <=> 1 *)
 let _ = fun (Equal : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq)
             (x : <[M.t]> expr) -> <[$x + 1]>
 [%%expect {|
-- : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq ->
-    <[M.t]> expr -> <[int]> expr
-= <fun>
+Line 2, characters 37-38:
+2 |             (x : <[M.t]> expr) -> <[$x + 1]>
+                                         ^
+Error: This expression has type "<[M.t]> expr"
+       but an expression was expected of type "<[int]> expr"
+       Type "M.t" is not compatible with type "int"
 |}]
 (* 0 ~~> 0  @  2 <=> 3 *)
 let _ = fun (Equal : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq)
             (x : <[<[<[M.t]> expr]> expr]> expr) -> <[<[<[$($($x)) + 1]>]>]>
 [%%expect {|
-- : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq ->
-    <[<[<[M.t]> expr]> expr]> expr -> <[<[<[int]> expr]> expr]> expr
-= <fun>
+Line 2, characters 63-64:
+2 |             (x : <[<[<[M.t]> expr]> expr]> expr) -> <[<[<[$($($x)) + 1]>]>]>
+                                                                   ^
+Error: This expression has type "<[<[<[M.t]> expr]> expr]> expr"
+       but an expression was expected of type "<[<[<[int]> expr]> expr]> expr"
+       Type "M.t" is not compatible with type "int"
 |}]
 (* 1 ~~> 1  @  2 <=> 1 *)
 let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq)
                (x : M.t) -> x + 1 ]>
 [%%expect {|
-- : <[(<[M.t]> expr, <[int]> expr) Type.eq -> M.t -> int]> expr =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq) (x : M.t) -> x + 1
-]>
+Line 2, characters 28-29:
+2 |                (x : M.t) -> x + 1 ]>
+                                ^
+Error: This expression has type "M.t" but an expression was expected of type
+         "int"
 |}]
 (* 1 ~~> 1  @  2 <=> 3 *)
 let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq)
                (x : <[<[M.t]> expr]> expr) -> <[<[$($x) + 1]>]> ]>
 [%%expect {|
-- : <[
-     (<[M.t]> expr, <[int]> expr) Type.eq ->
-     <[<[M.t]> expr]> expr -> <[<[int]> expr]> expr]>
-    expr
-=
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq) (x : <[<[M.t]> expr]> expr)
-    -> <[<[($($x)) + 1]>]>
-]>
+Line 2, characters 53-54:
+2 |                (x : <[<[M.t]> expr]> expr) -> <[<[$($x) + 1]>]> ]>
+                                                         ^
+Error: This expression has type "<[<[M.t]> expr]> expr"
+       but an expression was expected of type "<[<[int]> expr]> expr"
+       Type "<[M.t]>" = "<[int]>" is not compatible with type "<[int]>"
+       Type "M.t" is not compatible with type "int"
 |}]
 
 (* Evidence travels to the right stage in the future -- should always succeed:
@@ -470,93 +487,101 @@ let _ = <[ <[
 (* Evidence travels to the wrong stage in the future -- should always fail:
    [S_proof < S_min] and [T_proof =/= T_subj] *)
 
-(* CR metaprogramming jbachurski: Tests succeed until constraints are staged. *)
-
 (* 0 ~~> 1  @  1 <=> 2 *)
 let _ = fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
      <[ fun (x : <[M.t]> expr) -> <[$x + 1]> ]>
 [%%expect {|
-- : (<[M.t]> expr, <[int]> expr) Type.eq ->
-    <[<[M.t]> expr -> <[int]> expr]> expr
-= <fun>
+Line 2, characters 37-38:
+2 |      <[ fun (x : <[M.t]> expr) -> <[$x + 1]> ]>
+                                         ^
+Error: This expression has type "<[M.t]> expr"
+       but an expression was expected of type "<[int]> expr"
+       Type "M.t" = "int" is not compatible with type "int"
 |}]
 (* 0 ~~> 2  @  1 <=> 2 *)
 let _ = fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
   <[ <[ fun (x : M.t) -> x + 1 ]> ]>
 [%%expect {|
-- : (<[M.t]> expr, <[int]> expr) Type.eq -> <[<[M.t -> int]> expr]> expr =
-<fun>
+Line 2, characters 25-26:
+2 |   <[ <[ fun (x : M.t) -> x + 1 ]> ]>
+                             ^
+Error: This expression has type "M.t" but an expression was expected of type
+         "int"
 |}]
 (* 1 ~~> 2  @  1 <=> 2 *)
 let _ = <[ fun (Equal : (M.t, int) Type.eq) ->
         <[ fun (x : M.t) -> x + 1 ]> ]>
 [%%expect {|
-- : <[(M.t, int) Type.eq -> <[M.t -> int]> expr]> expr =
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (M.t, int)
-    Stdlib.Type.eq) -> <[fun (x : M.t) -> x + 1]>
-]>
+Line 2, characters 28-29:
+2 |         <[ fun (x : M.t) -> x + 1 ]> ]>
+                                ^
+Error: This expression has type "M.t" but an expression was expected of type
+         "int"
 |}]
 (* 0 ~~> 1  @  2 <=> 1 *)
 let _ = fun (Equal : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq) ->
      <[ fun (x : M.t) -> x + 1 ]>
 [%%expect {|
-- : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq ->
-    <[M.t -> int]> expr
-= <fun>
+Line 2, characters 25-26:
+2 |      <[ fun (x : M.t) -> x + 1 ]>
+                             ^
+Error: This expression has type "M.t" but an expression was expected of type
+         "int"
 |}]
 (* 0 ~~> 1  @  2 <=> 3 *)
 let _ = fun (Equal : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq) ->
      <[ fun (x : <[<[M.t]> expr]> expr) -> <[<[$($x) + 1]>]> ]>
 [%%expect {|
-- : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq ->
-    <[<[<[M.t]> expr]> expr -> <[<[int]> expr]> expr]> expr
-= <fun>
+Line 2, characters 50-51:
+2 |      <[ fun (x : <[<[M.t]> expr]> expr) -> <[<[$($x) + 1]>]> ]>
+                                                      ^
+Error: This expression has type "<[<[M.t]> expr]> expr"
+       but an expression was expected of type "<[<[int]> expr]> expr"
+       Type "<[M.t]>" = "<[int]>" is not compatible with type "<[int]>"
+       Type "M.t" is not compatible with type "int"
 |}]
 (* 0 ~~> 2  @  2 <=> 3 *)
 let _ = fun (Equal : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq) ->
   <[ <[ fun (x : <[M.t]> expr) -> <[$x + 1]> ]> ]>
 [%%expect {|
-- : (<[<[M.t]> expr]> expr, <[<[int]> expr]> expr) Type.eq ->
-    <[<[<[M.t]> expr -> <[int]> expr]> expr]> expr
-= <fun>
+Line 2, characters 37-38:
+2 |   <[ <[ fun (x : <[M.t]> expr) -> <[$x + 1]> ]> ]>
+                                         ^
+Error: This expression has type "<[M.t]> expr"
+       but an expression was expected of type "<[int]> expr"
+       Type "M.t" = "int" is not compatible with type "int"
 |}]
 (* 0 ~~> 3  @  2 <=> 3 *)
 let _ = fun (Equal : (<[<[<[M.t]> expr]> expr]> expr,
                       <[<[<[int]> expr]> expr]> expr) Type.eq) ->
   <[ <[ fun (x : M.t) -> x + 1 ]> ]>
 [%%expect {|
-- : (<[<[<[M.t]> expr]> expr]> expr, <[<[<[int]> expr]> expr]> expr) Type.eq ->
-    <[<[M.t -> int]> expr]> expr
-= <fun>
+Line 3, characters 25-26:
+3 |   <[ <[ fun (x : M.t) -> x + 1 ]> ]>
+                             ^
+Error: This expression has type "M.t" but an expression was expected of type
+         "int"
 |}]
 (* 1 ~~> 2  @  2 <=> 3 *)
 let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
         <[ fun (x : <[M.t]> expr) -> <[$x + 1]> ]> ]>
 [%%expect {|
-- : <[
-     (<[M.t]> expr, <[int]> expr) Type.eq ->
-     <[<[M.t]> expr -> <[int]> expr]> expr]>
-    expr
-=
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq) ->
-    <[fun (x : <[M.t]> expr) -> <[($x) + 1]>]>
-]>
+Line 2, characters 40-41:
+2 |         <[ fun (x : <[M.t]> expr) -> <[$x + 1]> ]> ]>
+                                            ^
+Error: This expression has type "<[M.t]> expr"
+       but an expression was expected of type "<[int]> expr"
+       Type "M.t" = "int" is not compatible with type "int"
 |}]
 (* 1 ~~> 3  @  2 <=> 3 *)
 let _ = <[ fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
      <[ <[ fun (x : M.t) -> x + 1 ]> ]> ]>
 [%%expect {|
-- : <[(<[M.t]> expr, <[int]> expr) Type.eq -> <[<[M.t -> int]> expr]> expr]>
-    expr
-=
-<[
-  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
-    (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq) ->
-    <[<[fun (x : M.t) -> x + 1]>]>
-]>
+Line 2, characters 28-29:
+2 |      <[ <[ fun (x : M.t) -> x + 1 ]> ]> ]>
+                                ^
+Error: This expression has type "M.t" but an expression was expected of type
+         "int"
 |}]
 
 (* 0 ~~> 1  @  0 <=> 1 *)
@@ -566,7 +591,11 @@ let _ = <[
       <[x + 1]>)
     |> sorry0) ]>
 [%%expect{|
-- : <[M.t -> int]> expr = <[fun (x : M.t) -> x + 1]>
+Line 4, characters 8-9:
+4 |       <[x + 1]>)
+            ^
+Error: This expression has type "M.t" but an expression was expected of type
+         "int"
 |}]
 
 (* Evidence travels to the right stage in the past -- should always fail:
@@ -641,15 +670,16 @@ Error: This expression has type "t expr" but an expression was expected of type
    [S_proof > S_min], [T_proof =/= T_subj] *)
 (* This is also time travel, but should fail due to the mis-staged equation. *)
 
-(* CR metaprogramming jbachurski: Tests succeed until time travel is banned
-   or constraints are staged. *)
-
 (* 1 ~~> 0  @  1 <=> 0 *)
 let _ = fun (x : M.t) ->
      <[ fun (Equal : (M.t, int) Type.eq) ->
         $(Quote.Expr.int x) + 1 ]>
 [%%expect{|
-- : M.t -> <[(M.t, int) Type.eq -> int]> expr = <fun>
+Line 3, characters 25-26:
+3 |         $(Quote.Expr.int x) + 1 ]>
+                             ^
+Error: This expression has type "M.t" but an expression was expected of type
+         "int"
 |}]
 
 (* 2 ~~> 0  @  2 <=> 1 *)
@@ -657,7 +687,12 @@ let _ = fun (x : <[M.t]> expr) ->
   <[ <[ fun (Equal : (M.t, int) Type.eq) ->
         $(Quote.Expr.int $x) + 1 ]> ]>
 [%%expect{|
-- : <[M.t]> expr -> <[<[(M.t, int) Type.eq -> int]> expr]> expr = <fun>
+Line 3, characters 26-27:
+3 |         $(Quote.Expr.int $x) + 1 ]> ]>
+                              ^
+Error: This expression has type "<[M.t]> expr"
+       but an expression was expected of type "<[int]> expr"
+       Type "M.t" is not compatible with type "int"
 |}]
 
 (* 2 ~~> 1  @  2 <=> 1 *)
@@ -666,20 +701,14 @@ let _ =
      <[ fun (Equal : (M.t, int) Type.eq) ->
         $(Quote.Expr.int x) + 1 ]> ]>
 [%%expect{|
-- : <[M.t -> <[(M.t, int) Type.eq -> int]> expr]> expr =
-<[
-  fun (x : M.t) ->
-    <[
-      fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (M.t, int)
-        Stdlib.Type.eq) -> ($(Stdlib.Quote.Expr.int x)) + 1
-      ]>
-]>
+Line 4, characters 25-26:
+4 |         $(Quote.Expr.int x) + 1 ]> ]>
+                             ^
+Error: This expression has type "M.t" but an expression was expected of type
+         "int"
 |}]
 
 (* Repeated equations at different stages *)
-
-(* CR metaprogramming jbachurski: Tests (might) have wrong outputs until
-   constraints are staged. *)
 
 (* Both proofs at stage 0 *)
 (* succeeds, because we instantiate stage 1 *)
@@ -687,60 +716,42 @@ let _ = fun (Equal : (M.t, string) Type.eq) ->
         fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
         fun (x : <[M.t]> expr) -> <[ $x + 0 ]>
 [%%expect {|
-Line 2, characters 13-18:
-2 |         fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
-                 ^^^^^
-Error: This pattern matches values of type
-         "(<[M.t]> expr, <[M.t]> expr) Type.eq"
-       but a pattern was expected which matches values of type
-         "(<[M.t]> expr, <[int]> expr) Type.eq"
-       Type "<[M.t]>" = "<[string]>" is not compatible with type "<[int]>"
-       Type "string" is not compatible with type "int"
+- : (M.t, string) Type.eq ->
+    (<[M.t]> expr, <[int]> expr) Type.eq -> <[M.t]> expr -> <[int]> expr
+= <fun>
 |}]
 (* succeeds, because we instantiate stage 0 *)
 let _ = fun (Equal : (M.t, string) Type.eq) ->
         fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
         fun (x : M.t) -> x ^ ""
 [%%expect {|
-Line 2, characters 13-18:
-2 |         fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
-                 ^^^^^
-Error: This pattern matches values of type
-         "(<[M.t]> expr, <[M.t]> expr) Type.eq"
-       but a pattern was expected which matches values of type
-         "(<[M.t]> expr, <[int]> expr) Type.eq"
-       Type "<[M.t]>" = "<[string]>" is not compatible with type "<[int]>"
-       Type "string" is not compatible with type "int"
+- : (M.t, string) Type.eq ->
+    (<[M.t]> expr, <[int]> expr) Type.eq -> M.t -> string
+= <fun>
 |}]
 (* fails, because we only instantiate stage 1 *)
 let _ = fun (Equal : (M.t, string) Type.eq) ->
         fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
         fun (x : <[M.t]> expr) -> <[ $x ^ "" ]>
 [%%expect {|
-Line 2, characters 13-18:
-2 |         fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
-                 ^^^^^
-Error: This pattern matches values of type
-         "(<[M.t]> expr, <[M.t]> expr) Type.eq"
-       but a pattern was expected which matches values of type
-         "(<[M.t]> expr, <[int]> expr) Type.eq"
-       Type "<[M.t]>" = "<[string]>" is not compatible with type "<[int]>"
-       Type "string" is not compatible with type "int"
+Line 3, characters 38-39:
+3 |         fun (x : <[M.t]> expr) -> <[ $x ^ "" ]>
+                                          ^
+Error: This expression has type "<[M.t]> expr"
+       but an expression was expected of type "<[string]> expr"
+       Type "<[M.t]>" = "<[int]>" is not compatible with type "<[string]>"
+       Type "int" is not compatible with type "string"
 |}]
 (* fails, because we only instantiate stage 0 *)
 let _ = fun (Equal : (M.t, string) Type.eq) ->
         fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
         fun (x : M.t) -> x + 0
 [%%expect {|
-Line 2, characters 13-18:
-2 |         fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
-                 ^^^^^
-Error: This pattern matches values of type
-         "(<[M.t]> expr, <[M.t]> expr) Type.eq"
-       but a pattern was expected which matches values of type
-         "(<[M.t]> expr, <[int]> expr) Type.eq"
-       Type "<[M.t]>" = "<[string]>" is not compatible with type "<[int]>"
-       Type "string" is not compatible with type "int"
+Line 3, characters 25-26:
+3 |         fun (x : M.t) -> x + 0
+                             ^
+Error: This expression has type "M.t" = "string"
+       but an expression was expected of type "int"
 |}]
 
 (* Both proofs at different stages *)
@@ -749,52 +760,41 @@ let _ = fun (Equal : (M.t, string) Type.eq) ->
      <[ fun (Equal : (M.t, int) Type.eq) ->
         fun (x : M.t) -> x + 0 ]>
 [%%expect {|
-Line 2, characters 13-18:
-2 |      <[ fun (Equal : (M.t, int) Type.eq) ->
-                 ^^^^^
-Error: This pattern matches values of type "(M.t, M.t) Type.eq"
-       but a pattern was expected which matches values of type
-         "(M.t, int) Type.eq"
-       Type "M.t" = "string" is not compatible with type "int"
+- : (M.t, string) Type.eq -> <[(M.t, int) Type.eq -> M.t -> int]> expr =
+<fun>
 |}]
 (* fails, because we instantiate stage 0, which travels time *)
 let _ = fun (Equal : (M.t, string) Type.eq) ->
         fun (x : <[M.t]> expr) ->
      <[ fun (Equal : (M.t, int) Type.eq) -> $x + 0 ]>
 [%%expect {|
-Line 3, characters 13-18:
-3 |      <[ fun (Equal : (M.t, int) Type.eq) -> $x + 0 ]>
-                 ^^^^^
-Error: This pattern matches values of type "(M.t, M.t) Type.eq"
-       but a pattern was expected which matches values of type
-         "(M.t, int) Type.eq"
-       Type "M.t" = "string" is not compatible with type "int"
+- : (M.t, string) Type.eq ->
+    <[M.t]> expr -> <[(M.t, int) Type.eq -> int]> expr
+= <fun>
 |}]
 (* fails, because we only instantiate stage 1 *)
 let _ = fun (Equal : (M.t, string) Type.eq) ->
      <[ fun (Equal : (M.t, int) Type.eq) ->
         fun (x : M.t) -> x ^ "" ]>
 [%%expect {|
-Line 2, characters 13-18:
-2 |      <[ fun (Equal : (M.t, int) Type.eq) ->
-                 ^^^^^
-Error: This pattern matches values of type "(M.t, M.t) Type.eq"
-       but a pattern was expected which matches values of type
-         "(M.t, int) Type.eq"
-       Type "M.t" = "string" is not compatible with type "int"
+Line 3, characters 25-26:
+3 |         fun (x : M.t) -> x ^ "" ]>
+                             ^
+Error: This expression has type "M.t" = "int"
+       but an expression was expected of type "string"
 |}]
 (* fails, because we only instantiate stage 0 *)
 let _ = fun (Equal : (M.t, string) Type.eq) ->
         fun (x : <[M.t]> expr) -> <[
         fun (Equal : (M.t, int) Type.eq) -> $x ^ "" ]>
 [%%expect {|
-Line 3, characters 13-18:
+Line 3, characters 45-46:
 3 |         fun (Equal : (M.t, int) Type.eq) -> $x ^ "" ]>
-                 ^^^^^
-Error: This pattern matches values of type "(M.t, M.t) Type.eq"
-       but a pattern was expected which matches values of type
-         "(M.t, int) Type.eq"
-       Type "M.t" = "string" is not compatible with type "int"
+                                                 ^
+Error: This expression has type "<[M.t]> expr"
+       but an expression was expected of type "<[string]> expr"
+       Type "<[M.t]>" = "<[int]>" is not compatible with type "<[string]>"
+       Type "int" is not compatible with type "string"
 |}]
 
 (* Conflicting proofs -- fails *)
@@ -818,15 +818,18 @@ let _ = <[
         fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
         fun (x : <[M.t]> expr) -> <[ $x + 0 ]> ]>
 [%%expect {|
-Line 3, characters 13-18:
-3 |         fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
-                 ^^^^^
-Error: This pattern matches values of type
-         "(<[M.t]> expr, <[M.t]> expr) Type.eq"
-       but a pattern was expected which matches values of type
-         "(<[M.t]> expr, <[int]> expr) Type.eq"
-       Type "<[M.t]>" = "<[string]>" is not compatible with type "<[int]>"
-       Type "string" is not compatible with type "int"
+- : <[
+     (M.t, string) Type.eq ->
+     (<[M.t]> expr, <[int]> expr) Type.eq -> <[M.t]> expr -> <[int]> expr]>
+    expr
+=
+<[
+  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (M.t, string)
+    Stdlib.Type.eq) ->
+    fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+      (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq) ->
+      fun (x : <[M.t]> expr) -> <[($x) + 0]>
+]>
 |}]
 (* succeeds, because we instantiate stage 1 *)
 let _ =
@@ -834,15 +837,17 @@ let _ =
         fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
         fun (x : M.t) -> x ^ "" ]>
 [%%expect {|
-Line 3, characters 13-18:
-3 |         fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
-                 ^^^^^
-Error: This pattern matches values of type
-         "(<[M.t]> expr, <[M.t]> expr) Type.eq"
-       but a pattern was expected which matches values of type
-         "(<[M.t]> expr, <[int]> expr) Type.eq"
-       Type "<[M.t]>" = "<[string]>" is not compatible with type "<[int]>"
-       Type "string" is not compatible with type "int"
+- : <[
+     (M.t, string) Type.eq ->
+     (<[M.t]> expr, <[int]> expr) Type.eq -> M.t -> string]>
+    expr
+=
+<[
+  fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) : (M.t, string)
+    Stdlib.Type.eq) ->
+    fun ((Stdlib__Type.Equal : (_, _) Stdlib.Type.eq) :
+      (<[M.t]> expr, <[int]> expr) Stdlib.Type.eq) -> fun (x : M.t) -> x ^ ""
+]>
 |}]
 (* fails, because we only instantiate stage 2 *)
 let _ =
@@ -850,15 +855,13 @@ let _ =
         fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
         fun (x : <[M.t]> expr) -> <[ $x ^ "" ]> ]>
 [%%expect {|
-Line 3, characters 13-18:
-3 |         fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
-                 ^^^^^
-Error: This pattern matches values of type
-         "(<[M.t]> expr, <[M.t]> expr) Type.eq"
-       but a pattern was expected which matches values of type
-         "(<[M.t]> expr, <[int]> expr) Type.eq"
-       Type "<[M.t]>" = "<[string]>" is not compatible with type "<[int]>"
-       Type "string" is not compatible with type "int"
+Line 4, characters 38-39:
+4 |         fun (x : <[M.t]> expr) -> <[ $x ^ "" ]> ]>
+                                          ^
+Error: This expression has type "<[M.t]> expr"
+       but an expression was expected of type "<[string]> expr"
+       Type "<[M.t]>" = "<[int]>" is not compatible with type "<[string]>"
+       Type "int" is not compatible with type "string"
 |}]
 (* fails, because we only instantiate stage 1 *)
 let _ =
@@ -866,15 +869,11 @@ let _ =
         fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
         fun (x : M.t) -> x + 0 ]>
 [%%expect {|
-Line 3, characters 13-18:
-3 |         fun (Equal : (<[M.t]> expr, <[int]> expr) Type.eq) ->
-                 ^^^^^
-Error: This pattern matches values of type
-         "(<[M.t]> expr, <[M.t]> expr) Type.eq"
-       but a pattern was expected which matches values of type
-         "(<[M.t]> expr, <[int]> expr) Type.eq"
-       Type "<[M.t]>" = "<[string]>" is not compatible with type "<[int]>"
-       Type "string" is not compatible with type "int"
+Line 4, characters 25-26:
+4 |         fun (x : M.t) -> x + 0 ]>
+                             ^
+Error: This expression has type "M.t" = "string"
+       but an expression was expected of type "int"
 |}]
 
 
