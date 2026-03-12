@@ -51,6 +51,11 @@ let cached_zero_alloc_info = Zero_alloc_info.create ()
 
 let cache_zero_alloc_info c = Zero_alloc_info.merge c ~into:cached_zero_alloc_info
 
+let cached_callee_regs_info = Callee_regs_info.create ()
+
+let cache_callee_regs_info c =
+  Callee_regs_info.merge c ~into:cached_callee_regs_info
+
 let current_unit =
   { ui_unit = CU.dummy;
     ui_defines = [];
@@ -64,6 +69,7 @@ let current_unit =
     ui_force_link = false;
     ui_requires_metaprogramming = false;
     ui_zero_alloc_info = Zero_alloc_info.create ();
+    ui_callee_regs_info = Callee_regs_info.create ();
     ui_export_info = None;
     ui_external_symbols = [];
   }
@@ -72,6 +78,7 @@ let reset unit_info =
   let compilation_unit = Unit_info.modname unit_info in
   Infos_table.clear global_infos_table;
   Zero_alloc_info.reset cached_zero_alloc_info;
+  Callee_regs_info.reset cached_callee_regs_info;
   Env.set_current_unit unit_info;
   current_unit.ui_unit <- compilation_unit;
   current_unit.ui_defines <- [compilation_unit];
@@ -87,6 +94,7 @@ let reset unit_info =
   current_unit.ui_requires_metaprogramming <-
     !Clflags.requires_metaprogramming;
   Zero_alloc_info.reset current_unit.ui_zero_alloc_info;
+  Callee_regs_info.reset current_unit.ui_callee_regs_info;
   Hashtbl.clear exported_constants;
   current_unit.ui_export_info <- None;
   current_unit.ui_external_symbols <- []
@@ -130,6 +138,7 @@ let read_unit_info filename =
       ui_generic_fns = uir.uir_generic_fns;
       ui_export_info = export_info;
       ui_zero_alloc_info = Zero_alloc_info.of_raw uir.uir_zero_alloc_info;
+      ui_callee_regs_info = Callee_regs_info.of_raw uir.uir_callee_regs_info;
       ui_force_link = uir.uir_force_link;
       ui_requires_metaprogramming = uir.uir_requires_metaprogramming;
       ui_external_symbols = uir.uir_external_symbols |> Array.to_list;
@@ -193,6 +202,7 @@ let get_unit_export_info comp_unit =
             if not (CU.equal ui.ui_unit comp_unit) then
               raise(Error(Illegal_renaming(comp_unit, ui.ui_unit, filename)));
             cache_zero_alloc_info ui.ui_zero_alloc_info;
+            cache_callee_regs_info ui.ui_callee_regs_info;
             (Some ui, Some crc)
           with Not_found ->
             let warn =
@@ -218,6 +228,7 @@ let get_global_export_info comp_unit =
 
 let cache_unit_info ui =
   cache_zero_alloc_info ui.ui_zero_alloc_info;
+  cache_callee_regs_info ui.ui_callee_regs_info;
   Infos_table.add global_infos_table
     (ui.ui_unit |> CU.to_global_name_without_prefix) (Some ui)
 
@@ -292,6 +303,7 @@ let write_unit_info info filename =
     uir_generic_fns = info.ui_generic_fns;
     uir_export_info = raw_export_info;
     uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;
+    uir_callee_regs_info = Callee_regs_info.to_raw info.ui_callee_regs_info;
     uir_force_link = info.ui_force_link;
     uir_requires_metaprogramming = info.ui_requires_metaprogramming;
     uir_section_toc = toc;

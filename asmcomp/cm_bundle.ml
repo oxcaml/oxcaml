@@ -94,6 +94,8 @@ let cmx_bundle ~quoted_cmx =
           uir_generic_fns = info.ui_generic_fns;
           uir_export_info = raw_export_info;
           uir_zero_alloc_info = Zero_alloc_info.to_raw info.ui_zero_alloc_info;
+          uir_callee_regs_info =
+            Callee_regs_info.to_raw info.ui_callee_regs_info;
           uir_force_link = info.ui_force_link;
           uir_requires_metaprogramming = info.ui_requires_metaprogramming;
           uir_section_toc = toc;
