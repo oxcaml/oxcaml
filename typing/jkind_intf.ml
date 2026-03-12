@@ -55,6 +55,11 @@ module type Sort = sig
       | Product of t list
       | Univar of univar
       | Genvar of var
+          (** A layout variable bound by a surrounding [val_lpoly]. It's a
+              "fake" constant that will be instantiated to real layout constant
+              by slambda. The [var] is used only for physical identity; its
+              contents are not consumed and its level must be
+              [Ident.highest_scope]. *)
 
     val equal : t -> t -> bool
 
