@@ -161,8 +161,8 @@ module type Map = sig
   val union_total : (key -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
 
   (** [union_total_shared f m1 m2] is a version of [union_total f m1 m2] that
-      also exploits sharing of [m1] and [m2] to avoid calling [f] when
-      possible, assuming that [f k x x = x] for all keys [k] and values [x]. *)
+      also exploits sharing of [m1] and [m2] to avoid calling [f] when possible,
+      assuming that [f k x x = x] for all keys [k] and values [x]. *)
   val union_total_shared : (key -> 'a -> 'a -> 'a) -> 'a t -> 'a t -> 'a t
 
   val union_left_biased : 'a t -> 'a t -> 'a t

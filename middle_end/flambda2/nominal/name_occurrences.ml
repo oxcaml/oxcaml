@@ -747,8 +747,8 @@ let union t1 t2 =
     binary_op ~for_names:For_names.union
       ~for_continuations:For_continuations.union
       ~for_function_slots:For_function_slots.union
-      ~for_value_slots:For_value_slots.union ~for_code_ids:For_code_ids.union
-      t1 t2
+      ~for_value_slots:For_value_slots.union ~for_code_ids:For_code_ids.union t1
+      t2
 
 let equal t1 t2 =
   binary_conjunction ~for_names:For_names.equal
@@ -793,11 +793,7 @@ let inter_domain_is_non_empty t1 t2 =
 let union_list ts =
   List.fold_left
     (fun acc t ->
-      if is_empty acc
-      then t
-      else if is_empty t
-      then acc
-      else union acc t)
+      if is_empty acc then t else if is_empty t then acc else union acc t)
     empty ts
 
 let function_slots_in_normal_projections t =
