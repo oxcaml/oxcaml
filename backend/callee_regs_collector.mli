@@ -5,9 +5,14 @@
 [@@@ocaml.warning "+a-40-41-42"]
 
 (** [cfg cfg_with_layout] computes the set of registers clobbered by the
-    function described by [cfg_with_layout] — if it is a leaf function
-    (i.e. [fun_contains_calls = false]) — and records the result in
-    [Compilenv].
+    function described by [cfg_with_layout] — if it is a leaf function —
+    and records the result in [Compilenv].
+
+    A leaf function is one that contains no [Call] or [Tailcall_func]
+    terminators (i.e. it never transfers control to another OCaml function).
+    Functions that allocate, poll, make external C calls, or contain probes
+    are still considered leaf functions; their register effects are captured
+    via [Proc.destroyed_at_basic] and [Proc.destroyed_at_terminator].
 
     Clobbered registers include registers appearing in the [res] arrays of
     all instructions, as well as registers implicitly destroyed by

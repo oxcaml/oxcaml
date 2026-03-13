@@ -15,12 +15,26 @@ let add_reg value (reg : Reg.t) =
 
 let add_regs value regs = Array.iter (add_reg value) regs
 
+exception Has_ocaml_call
+
+(* A "leaf function" for our purposes is one that contains no [Call] or
+   [Tailcall_func] terminators — i.e. it never transfers control to another
+   OCaml function. Allocations, polls, external C calls, and probes are all
+   fine: their register effects are captured by [Proc.destroyed_at_basic] /
+   [Proc.destroyed_at_terminator]. *)
+let is_leaf_function (cfg : Cfg.t) =
+  match
+    Cfg.iter_blocks cfg ~f:(fun _label block ->
+      (match[@ocaml.warning "-4"] block.Cfg.terminator.desc with
+      | Cfg.Call _ | Cfg.Tailcall_func _ -> raise Has_ocaml_call
+      | _ -> ()))
+  with
+  | () -> true
+  | exception Has_ocaml_call -> false
+
 let cfg (cfg_with_layout : Cfg_with_layout.t) =
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
-  (* CR xclerc: we use [fun_contains_calls] as a proxy for "leaf function",
-     but we should perhaps reconsider this choice, e.g. by directly checking
-     for the absence of [Call]/[Tailcall_func] terminators in the CFG. *)
-  if not cfg.Cfg.fun_contains_calls
+  if is_leaf_function cfg
   then begin
     let num_classes = List.length Regs.Reg_class.all in
     let value = Array.make num_classes 0 in
