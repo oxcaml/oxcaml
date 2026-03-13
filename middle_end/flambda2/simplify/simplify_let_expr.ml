@@ -196,7 +196,20 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
               | Rec_info _ -> true
               | Simple _ | Prim _ | Set_of_closures _ | Static_consts _ -> false
             in
-            let has_uses = Name_mode.Or_absent.is_present greatest_name_mode in
+            let required_by_lifted_constants =
+              (not (Name_mode.Or_absent.is_present greatest_name_mode))
+              && at_unit_toplevel
+              && not no_constants_to_place
+              && Bound_pattern.exists_all_bound_vars bound_vars
+                   ~f:(fun bound_var ->
+                     Name.Set.mem
+                       (Name.var (VB.var bound_var))
+                       (UA.required_names uacc))
+            in
+            let has_uses =
+              Name_mode.Or_absent.is_present greatest_name_mode
+              || required_by_lifted_constants
+            in
             let can_phantomise =
               (not is_depth)
               && Bound_pattern.exists_all_bound_vars bound_vars
@@ -250,9 +263,12 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                  the information forward. mshinwell: this might be done now in
                  Simplify_named, check. *)
               let name_mode =
-                match greatest_name_mode with
-                | Absent -> Name_mode.phantom
-                | Present name_mode -> name_mode
+                if required_by_lifted_constants
+                then Name_mode.normal
+                else
+                  match greatest_name_mode with
+                  | Absent -> Name_mode.phantom
+                  | Present name_mode -> name_mode
               in
               assert (Name_mode.can_be_in_terms name_mode);
               let bound_vars =
