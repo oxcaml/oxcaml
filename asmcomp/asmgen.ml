@@ -295,13 +295,106 @@ let cfg_block_counters (block : Cfg.basic_block) =
   |> Profile.Counters.set "block" 1
   |> Profile.Counters.set "move" moves
 
+(* Estimate the reduction in register saves at a direct call to [callee_name],
+   computed from pre-allocation liveness.
+
+   For each register class c: R_c = available registers in class c K_c =
+   available registers in class c actually clobbered by the callee L_c = values
+   of class c live across this call (from pre-allocation liveness)
+
+   With the current calling convention, an optimizing allocator must save all
+   L_c live values (it must assume any register in the class might be
+   clobbered). With an improved convention using the callee's actual clobber
+   set, it can keep up to (R_c - K_c) values in safe (non-clobbered) registers,
+   and must only spill max(0, L_c - (R_c - K_c)) values.
+
+   Savings per class = L_c - max(0, L_c - (R_c - K_c)) = min(L_c, R_c - K_c).
+   Total savings = sum over all classes of min(L_c, max(0, R_c - K_c)). *)
+let callee_regs_savings_at_call (liveness : Cfg_with_infos.liveness)
+    (term : Cfg.terminator Cfg.instruction) callee_name =
+  let current_unit_info =
+    (Compilenv.current_unit_infos ()).ui_callee_regs_info
+  in
+  let callee_info =
+    match Callee_regs_info.get_value current_unit_info callee_name with
+    | Some _ as v -> v
+    | None ->
+      Callee_regs_info.get_value Compilenv.cached_callee_regs_info callee_name
+  in
+  match callee_info with
+  | None -> 0, 0
+  | Some callee_clobbers ->
+    let live_across =
+      match InstructionId.Tbl.find_opt liveness term.id with
+      | None -> Reg.Set.empty
+      | Some { Cfg_liveness.across; _ } -> across
+    in
+    let num_classes = List.length Regs.Reg_class.all in
+    let live_counts = Array.make num_classes 0 in
+    (* Only count virtual (unassigned) registers; pinned physical registers are
+       not subject to the allocator's placement choices. *)
+    Reg.Set.iter
+      (fun (reg : Reg.t) ->
+        match reg.loc with
+        | Reg.Unknown ->
+          let cls = Regs.Reg_class.of_machtype reg.typ in
+          let cls_idx = Regs.Reg_class.hash cls in
+          live_counts.(cls_idx) <- live_counts.(cls_idx) + 1
+        | Reg.Reg _ | Reg.Stack _ -> ())
+      live_across;
+    let savings =
+      List.fold_left
+        (fun acc cls ->
+          let cls_idx = Regs.Reg_class.hash cls in
+          let available = Regs.available_registers cls in
+          let k_c =
+            Array.fold_left
+              (fun n phys_reg ->
+                let bit = Regs.index_in_class phys_reg in
+                if callee_clobbers.(cls_idx) land (1 lsl bit) <> 0
+                then n + 1
+                else n)
+              0 available
+          in
+          let r_c = Array.length available in
+          let l_c = live_counts.(cls_idx) in
+          acc + Int.min l_c (Int.max 0 (r_c - k_c)))
+        0 Regs.Reg_class.all
+    in
+    let live = Array.fold_left ( + ) 0 live_counts in
+    savings, live
+
+let count_callee_regs_savings (cfg_with_infos : Cfg_with_infos.t) =
+  let cfg = Cfg_with_infos.cfg cfg_with_infos in
+  let liveness = Cfg_with_infos.liveness cfg_with_infos in
+  Cfg.fold_blocks cfg ~init:(0, 0)
+    ~f:(fun _label block (acc_savings, acc_live) ->
+      match block.Cfg.terminator.desc with
+      | Call { op = Direct sym; _ } ->
+        let savings, live =
+          callee_regs_savings_at_call liveness block.Cfg.terminator sym.sym_name
+        in
+        acc_savings + savings, acc_live + live
+      | _ -> acc_savings, acc_live)
+
+(* Hold the savings and live-set estimates for the function currently being
+   compiled. Set just before the register allocator (while [Cfg_with_infos.t] is
+   in scope and pre-allocation liveness is available), then read back by
+   [whole_cfg_counters] for every subsequent profiled pass. *)
+let callee_regs_savings_estimate = ref 0
+
+let callee_regs_live_estimate = ref 0
+
 (** Returns all CFG counters that require the whole CFG to produce a count. *)
 let whole_cfg_counters (cfg : Cfg.t) =
   let stack_slots =
     Stack_class.Tbl.fold cfg.fun_num_stack_slots ~init:0
       ~f:(fun _stack_class num acc -> num + acc)
   in
-  Profile.Counters.create () |> Profile.Counters.set "stack_slot" stack_slots
+  Profile.Counters.create ()
+  |> Profile.Counters.set "stack_slot" stack_slots
+  |> Profile.Counters.set "callee_regs_savings" !callee_regs_savings_estimate
+  |> Profile.Counters.set "callee_regs_live" !callee_regs_live_estimate
 
 let cfg_profile to_cfg =
   let total_counters = ref (Profile.Counters.create ()) in
@@ -416,6 +509,11 @@ let compile_cfg ppf_dump ~funcnames fd_cmm cfg_with_layout =
   ++ Compiler_hooks.execute_and_pipe Compiler_hooks.Cfg_cse
   ++ Cfg_with_infos.make
   ++ cfg_with_infos_profile ~accumulate:true "cfg_deadcode" Cfg_deadcode.run
+  ++ (fun (cfg_with_infos : Cfg_with_infos.t) ->
+  let savings, live = count_callee_regs_savings cfg_with_infos in
+  callee_regs_savings_estimate := savings;
+  callee_regs_live_estimate := live;
+  cfg_with_infos)
   ++ save_cfg_before_regalloc
   ++ Profile.record ~accumulate:true "regalloc" (fun cfg_with_infos ->
       let cfg_description =
