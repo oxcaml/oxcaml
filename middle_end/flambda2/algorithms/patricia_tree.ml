@@ -142,75 +142,70 @@ module Set = struct
           if t1' == t1 then t else branch pbit t0 t1'
       else t
 
-  let rec union_impl t0 t1 =
-    if t0 == t1
-    then t0
-    else
-      match t0, t1 with
-      | Empty, _ -> t1
-      | _, Empty -> t0
-      | Leaf i0, Leaf i1 -> if i0 = i1 then t0 else join i0 t0 i1 t1
-      | Leaf i, Branch (pbit, t10, t11) ->
-        let bit = pbit_bit pbit in
-        if match_pbit_with_bit i pbit bit
+  let rec union t0 t1 =
+    match t0, t1 with
+    | Empty, _ -> t1
+    | _, Empty -> t0
+    | Leaf i0, Leaf i1 -> if i0 = i1 then t0 else join i0 t0 i1 t1
+    | Leaf i, Branch (pbit, t10, t11) ->
+      let bit = pbit_bit pbit in
+      if match_pbit_with_bit i pbit bit
+      then
+        if zero_bit i bit
         then
-          if zero_bit i bit
-          then
-            let t10' = union_impl t0 t10 in
-            if t10' == t10 then t1 else branch_non_empty pbit t10' t11
-          else
-            let t11' = union_impl t0 t11 in
-            if t11' == t11 then t1 else branch_non_empty pbit t10 t11'
-        else join i t0 pbit t1
-      | Branch (pbit, t00, t01), Leaf i ->
-        let bit = pbit_bit pbit in
-        if match_pbit_with_bit i pbit bit
+          let t10' = union t0 t10 in
+          if t10' == t10 then t1 else branch_non_empty pbit t10' t11
+        else
+          let t11' = union t0 t11 in
+          if t11' == t11 then t1 else branch_non_empty pbit t10 t11'
+      else join i t0 pbit t1
+    | Branch (pbit, t00, t01), Leaf i ->
+      let bit = pbit_bit pbit in
+      if match_pbit_with_bit i pbit bit
+      then
+        if zero_bit i bit
         then
-          if zero_bit i bit
-          then
-            let t00' = union_impl t00 t1 in
-            if t00' == t00 then t0 else branch_non_empty pbit t00' t01
-          else
-            let t01' = union_impl t01 t1 in
-            if t01' == t01 then t0 else branch_non_empty pbit t00 t01'
-        else join pbit t0 i t1
-      | Branch (pbit0, t00, t01), Branch (pbit1, t10, t11) ->
-        let bit0 = pbit_bit pbit0 in
-        let bit1 = pbit_bit pbit1 in
-        if pbit0 = pbit1
+          let t00' = union t00 t1 in
+          if t00' == t00 then t0 else branch_non_empty pbit t00' t01
+        else
+          let t01' = union t01 t1 in
+          if t01' == t01 then t0 else branch_non_empty pbit t00 t01'
+      else join pbit t0 i t1
+    | Branch (pbit0, t00, t01), Branch (pbit1, t10, t11) ->
+      let bit0 = pbit_bit pbit0 in
+      let bit1 = pbit_bit pbit1 in
+      if pbit0 = pbit1
+      then
+        let t00' = union t00 t10 in
+        let t01' = union t01 t11 in
+        if t00' == t00 && t01' == t01
+        then t0
+        else if t00' == t10 && t01' == t11
+        then t1
+        else branch_non_empty pbit0 t00' t01'
+      else if includes_pbit pbit0 pbit1
+      then
+        if zero_bit pbit1 bit0
         then
-          let t00' = union_impl t00 t10 in
-          let t01' = union_impl t01 t11 in
-          if t00' == t00 && t01' == t01
-          then t0
-          else if t00' == t10 && t01' == t11
-          then t1
-          else branch_non_empty pbit0 t00' t01'
-        else if includes_pbit pbit0 pbit1
+          let t00' = union t00 t1 in
+          if t00' == t00 then t0 else branch_non_empty pbit0 t00' t01
+        else
+          let t01' = union t01 t1 in
+          if t01' == t01 then t0 else branch_non_empty pbit0 t00 t01'
+      else if includes_pbit pbit1 pbit0
+      then
+        if zero_bit pbit0 bit1
         then
-          if zero_bit pbit1 bit0
-          then
-            let t00' = union_impl t00 t1 in
-            if t00' == t00 then t0 else branch_non_empty pbit0 t00' t01
-          else
-            let t01' = union_impl t01 t1 in
-            if t01' == t01 then t0 else branch_non_empty pbit0 t00 t01'
-        else if includes_pbit pbit1 pbit0
-        then
-          if zero_bit pbit0 bit1
-          then
-            let t10' = union_impl t0 t10 in
-            if t10' == t10 then t1 else branch_non_empty pbit1 t10' t11
-          else
-            let t11' = union_impl t0 t11 in
-            if t11' == t11 then t1 else branch_non_empty pbit1 t10 t11'
-        else join pbit0 t0 pbit1 t1
+          let t10' = union t0 t10 in
+          if t10' == t10 then t1 else branch_non_empty pbit1 t10' t11
+        else
+          let t11' = union t0 t11 in
+          if t11' == t11 then t1 else branch_non_empty pbit1 t10 t11'
+      else join pbit0 t0 pbit1 t1
 
-  let[@inline never] union t0 t1 = union_impl t0 t1
+  let union_sharing = union
 
-  let[@inline never] union_sharing t0 t1 = union_impl t0 t1
-
-  let[@inline never] union_shared t0 t1 = union_impl t0 t1
+  let union_shared = union
 
   let rec subset t0 t1 =
     if t0 == t1
@@ -824,7 +819,7 @@ module Map = struct
         else branch pbit1 (merge_right f t10) (merge f t0 t11)
       else join pbit0 (merge_left f t0) pbit1 (merge_right f t1)
 
-  let rec union_total_impl f t0 t1 =
+  let rec union_total f t0 t1 =
     match t0, t1 with
     | Empty, _ -> t1
     | _, Empty -> t0
@@ -840,10 +835,10 @@ module Map = struct
       then
         if zero_bit i bit
         then
-          let t10' = union_total_impl f t0 t10 in
+          let t10' = union_total f t0 t10 in
           if t10' == t10 then t1 else branch_non_empty pbit t10' t11
         else
-          let t11' = union_total_impl f t0 t11 in
+          let t11' = union_total f t0 t11 in
           if t11' == t11 then t1 else branch_non_empty pbit t10 t11'
       else join i t0 pbit t1
     | Branch (pbit, t00, t01), Leaf (i, _) ->
@@ -852,10 +847,10 @@ module Map = struct
       then
         if zero_bit i bit
         then
-          let t00' = union_total_impl f t00 t1 in
+          let t00' = union_total f t00 t1 in
           if t00' == t00 then t0 else branch_non_empty pbit t00' t01
         else
-          let t01' = union_total_impl f t01 t1 in
+          let t01' = union_total f t01 t1 in
           if t01' == t01 then t0 else branch_non_empty pbit t00 t01'
       else join pbit t0 i t1
     | Branch (pbit0, t00, t01), Branch (pbit1, t10, t11) ->
@@ -863,8 +858,8 @@ module Map = struct
       let bit1 = pbit_bit pbit1 in
       if pbit0 = pbit1
       then
-        let t00' = union_total_impl f t00 t10 in
-        let t01' = union_total_impl f t01 t11 in
+        let t00' = union_total f t00 t10 in
+        let t01' = union_total f t01 t11 in
         if t00' == t00 && t01' == t01
         then t0
         else if t00' == t10 && t01' == t11
@@ -878,33 +873,31 @@ module Map = struct
         then
           if zero_bit pbit1 bit0
           then
-            let t00' = union_total_impl f t00 t1 in
+            let t00' = union_total f t00 t1 in
             if t00' == t00 then t0 else branch_non_empty pbit0 t00' t01
           else
-            let t01' = union_total_impl f t01 t1 in
+            let t01' = union_total f t01 t1 in
             if t01' == t01 then t0 else branch_non_empty pbit0 t00 t01'
         else if higher bit1 bit0 && match_pbit_with_bit pbit0 pbit1 bit1
         then
           if zero_bit pbit0 bit1
           then
-            let t10' = union_total_impl f t0 t10 in
+            let t10' = union_total f t0 t10 in
             if t10' == t10 then t1 else branch_non_empty pbit1 t10' t11
           else
-            let t11' = union_total_impl f t0 t11 in
+            let t11' = union_total f t0 t11 in
             if t11' == t11 then t1 else branch_non_empty pbit1 t10 t11'
         else join pbit0 t0 pbit1 t1
 
-  let[@inline never] union_total f t0 t1 = union_total_impl f t0 t1
-
-  let[@inline never] union_total_shared f t0 t1 = union_total_impl f t0 t1
+  let union_total_shared = union_total
 
   let[@inline always] union_left_biased t0 t1 =
-    union_total_impl (fun _ left _right -> left) t0 t1
+    union_total (fun _ left _right -> left) t0 t1
 
   let[@inline always] union_right_biased t0 t1 =
-    union_total_impl (fun _ _left right -> right) t0 t1
+    union_total (fun _ _left right -> right) t0 t1
 
-  let rec union_impl f t0 t1 =
+  let rec union f t0 t1 =
     match t0, t1 with
     | Empty, _ -> t1
     | _, Empty -> t0
@@ -921,10 +914,10 @@ module Map = struct
       then
         if zero_bit i bit
         then
-          let t10' = union_impl f t0 t10 in
+          let t10' = union f t0 t10 in
           if t10' == t10 then t1 else branch pbit t10' t11
         else
-          let t11' = union_impl f t0 t11 in
+          let t11' = union f t0 t11 in
           if t11' == t11 then t1 else branch pbit t10 t11'
       else join i t0 pbit t1
     | Branch (pbit, t00, t01), Leaf (i, _) ->
@@ -933,10 +926,10 @@ module Map = struct
       then
         if zero_bit i bit
         then
-          let t00' = union_impl f t00 t1 in
+          let t00' = union f t00 t1 in
           if t00' == t00 then t0 else branch pbit t00' t01
         else
-          let t01' = union_impl f t01 t1 in
+          let t01' = union f t01 t1 in
           if t01' == t01 then t0 else branch pbit t00 t01'
       else join pbit t0 i t1
     | Branch (pbit0, t00, t01), Branch (pbit1, t10, t11) ->
@@ -944,8 +937,8 @@ module Map = struct
       let bit1 = pbit_bit pbit1 in
       if pbit0 = pbit1
       then
-        let t00' = union_impl f t00 t10 in
-        let t01' = union_impl f t01 t11 in
+        let t00' = union f t00 t10 in
+        let t01' = union f t01 t11 in
         if t00' == t00 && t01' == t01
         then t0
         else if t00' == t10 && t01' == t11
@@ -959,28 +952,25 @@ module Map = struct
         then
           if zero_bit pbit1 bit0
           then
-            let t00' = union_impl f t00 t1 in
+            let t00' = union f t00 t1 in
             if t00' == t00 then t0 else branch pbit0 t00' t01
           else
-            let t01' = union_impl f t01 t1 in
+            let t01' = union f t01 t1 in
             if t01' == t01 then t0 else branch pbit0 t00 t01'
         else if higher bit1 bit0 && match_pbit_with_bit pbit0 pbit1 bit1
         then
           if zero_bit pbit0 bit1
           then
-            let t10' = union_impl f t0 t10 in
+            let t10' = union f t0 t10 in
             if t10' == t10 then t1 else branch pbit1 t10' t11
           else
-            let t11' = union_impl f t0 t11 in
+            let t11' = union f t0 t11 in
             if t11' == t11 then t1 else branch pbit1 t10 t11'
         else join pbit0 t0 pbit1 t1
 
-  let[@inline never] union f t0 t1 = union_impl f t0 t1
+  let union_sharing = union
 
-  let[@inline never] union_sharing f t0 t1 = union_impl f t0 t1
-
-  let[@inline never] union_shared f t0 t1 =
-    if t0 == t1 then t0 else union_impl f t0 t1
+  let union_shared = union
 
   let rec update_many_right f t1 =
     match t1 with
@@ -1528,7 +1518,7 @@ module Map = struct
         Misc.fatal_errorf
           "Patricia_tree.disjoint_union: key %a is in intersection" print key
       in
-      union_impl
+      union
         (fun key datum1 datum2 ->
           match eq with
           | None -> fail key
