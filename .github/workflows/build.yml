@@ -211,6 +211,14 @@ jobs:
             ocamlparam: 'reaper=1,reaper-local-fields=1,_'
             disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml'
 
+          # Same as for the reaper, some tests rely on being able to enable or disable
+          # lifting and specialization
+          - name: runtime5 match-in-match
+            config: --enable-runtime5
+            os: wrap-ubuntu-latest-x64-8x
+            build_ocamlparam: '_,flambda2-expert-cont-lifting-budget=1000,flambda2-expert-cont-spec-budget=100,_'
+            ocamlparam: 'flambda2-expert-cont-lifting-budget=1000,flambda2-expert-cont-spec-budget=100,_'
+
     env:
       J: "8"
       run_testsuite: "true"
