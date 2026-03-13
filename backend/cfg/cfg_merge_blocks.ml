@@ -22,37 +22,36 @@ end = struct
     | Move -> 0
     | Spill -> 1
     | Reload -> 2
-    | Dummy_use -> 3
-    | Opaque -> 4
-    | Begin_region -> 5
-    | End_region -> 6
-    | Dls_get -> 7
-    | Tls_get -> 8
-    | Domain_index -> 9
-    | Poll -> 10
-    | Pause -> 11
-    | Const_int _ -> 12
-    | Const_float32 _ -> 13
-    | Const_float _ -> 14
-    | Const_symbol _ -> 15
-    | Const_vec128 _ -> 16
-    | Const_vec256 _ -> 17
-    | Const_vec512 _ -> 18
-    | Stackoffset _ -> 19
-    | Load _ -> 20
-    | Store _ -> 21
-    | Intop _ -> 22
-    | Int128op _ -> 23
-    | Intop_imm _ -> 24
-    | Intop_atomic _ -> 25
-    | Floatop _ -> 26
-    | Csel _ -> 27
-    | Reinterpret_cast _ -> 28
-    | Static_cast _ -> 29
-    | Probe_is_enabled _ -> 30
-    | Specific _ -> 31
-    | Name_for_debugger _ -> 32
-    | Alloc _ -> 33
+    | Opaque -> 3
+    | Begin_region -> 4
+    | End_region -> 5
+    | Dls_get -> 6
+    | Tls_get -> 7
+    | Domain_index -> 8
+    | Poll -> 9
+    | Pause -> 10
+    | Const_int _ -> 11
+    | Const_float32 _ -> 12
+    | Const_float _ -> 13
+    | Const_symbol _ -> 14
+    | Const_vec128 _ -> 15
+    | Const_vec256 _ -> 16
+    | Const_vec512 _ -> 17
+    | Stackoffset _ -> 18
+    | Load _ -> 19
+    | Store _ -> 20
+    | Intop _ -> 21
+    | Int128op _ -> 22
+    | Intop_imm _ -> 23
+    | Intop_atomic _ -> 24
+    | Floatop _ -> 25
+    | Csel _ -> 26
+    | Reinterpret_cast _ -> 27
+    | Static_cast _ -> 28
+    | Probe_is_enabled _ -> 29
+    | Specific _ -> 30
+    | Name_for_debugger _ -> 31
+    | Alloc _ -> 32
 
   let basic : Cfg.basic -> int = function
     | Op op -> operation op
