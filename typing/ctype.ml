@@ -2486,11 +2486,23 @@ let unbox_once env ty =
       in
       begin match find_unboxed_type decl with
       | Some (ty2, modality) ->
-        (* We need to ensure that existential variables do not escape their
-           scope. To do so, we substitute them with [Tof_kind]s. *)
-        let existentials =
+        let extra_substs =
           match Env.find_type_descrs p env with
-          | Type_variant ([{ cstr_existentials }], _, _) -> cstr_existentials
+          | Type_variant ([ ({ cstr_generalized = true } as cstr) ], _, _) ->
+            (* Unboxed GADT wrappers need the same B1-B4 projection as boxed
+               GADTs, but projected onto the instantiated head arguments of the
+               wrapper type rather than the declaration parameters. *)
+            let res_args =
+              match get_desc cstr.Types.cstr_res with
+              | Tconstr (_, res_args, _) -> res_args
+              | _ -> Misc.fatal_error "Ctype.unbox_once: cstr_res"
+            in
+            Btype.Jkind0.gadt_payload_subst
+              ~projected_params:args
+              ~res_args
+              ~payload_tys:[ty2]
+              ~get_free_vars:(free_variable_set_of_list env)
+          | Type_variant ([{ cstr_generalized = false }], _, _) -> []
           | Type_variant (_not_one, _, _) ->
             Misc.fatal_error "Ctype.unbox_once: not just one constructor"
           | Type_abstract _ | Type_record _
@@ -2498,16 +2510,6 @@ let unbox_once env ty =
           | exception Not_found ->
             (* but we found it earlier! *)
             Misc.fatal_error "Ctype.unbox_once: expected to find [p] in [env]"
-        in
-        let extra_substs =
-          List.map
-            (fun ty ->
-              match get_desc ty with
-              | Tvar { name = _; jkind } -> ty, newgenty (Tof_kind jkind)
-              | _ ->
-                Misc.fatal_error
-                  "Ctype.unbox_once: existential is not a variable")
-            existentials
         in
         Stepped { ty = apply ty2 ~extra_substs; modality }
       | None -> begin match decl.type_kind with
