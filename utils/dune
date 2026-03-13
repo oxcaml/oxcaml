@@ -30,7 +30,7 @@
   (:tbl
    ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/domain_state.tbl)
   (glob_files
-   ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/{config,m,s}.h))
+   ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/{config,m,s,compatibility}.h))
  (action
   (with-stdout-to
    %{targets}
@@ -46,7 +46,7 @@
   (:tbl
    ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/domain_state.tbl)
   (glob_files
-   ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/{config,m,s}.h))
+   ../%{env:RUNTIME_DIR=runtime-dir-env-var-not-set}/caml/{config,m,s,compatibility}.h))
  (action
   (with-stdout-to
    %{targets}
