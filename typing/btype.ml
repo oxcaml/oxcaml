@@ -2280,7 +2280,8 @@ module Jkind0 = struct
   *)
   (* Shared type-level implementation of Steps B1-B4 from
      Note [With-bounds for GADTs]. *)
-  let gadt_payload_subst ~projected_params ~res_args ~payload_tys ~free_vars =
+  let gadt_payload_subst
+      ~projected_params ~res_args ~payload_tys ~get_free_vars =
     (* STEP B1 from Note [With-bounds for GADTs]: *)
     let domain, range, seen =
       List.fold_left2
@@ -2306,7 +2307,7 @@ module Jkind0 = struct
         res_args projected_params
     in
     (* STEP B2 from Note [With-bounds for GADTs]: *)
-    let orphaned_type_var_set = TypeSet.diff (free_vars payload_tys) seen in
+    let orphaned_type_var_set = TypeSet.diff (get_free_vars payload_tys) seen in
     let orphaned_type_var_list = TypeSet.elements orphaned_type_var_set in
     (* STEP B3 from Note [With-bounds for GADTs]: *)
     let mk_type_of_kind ty =
@@ -2324,7 +2325,7 @@ module Jkind0 = struct
       (orphaned_type_var_list @ domain)
       (type_of_kind_list @ range)
 
-  let for_boxed_variant ~loc ~decl_params ~type_apply ~free_vars cstrs =
+  let for_boxed_variant ~loc ~decl_params ~type_apply ~get_free_vars cstrs =
     let base =
       let all_args_void =
         List.for_all
@@ -2395,7 +2396,7 @@ module Jkind0 = struct
               ~projected_params:decl_params
               ~res_args
               ~payload_tys:cstr_arg_tys
-              ~free_vars
+              ~get_free_vars
           in
           let domain, range = List.split extra_substs in
           let cstr_arg_tys =

@@ -696,7 +696,7 @@ module Jkind0 : sig
       projected_params:Types.type_expr list ->
       res_args:Types.type_expr list ->
       payload_tys:Types.type_expr list ->
-      free_vars:(Types.type_expr list -> TypeSet.t) ->
+      get_free_vars:(Types.type_expr list -> TypeSet.t) ->
       (Types.type_expr * Types.type_expr) list
     val for_boxed_variant :
       loc:Location.t ->
@@ -706,7 +706,7 @@ module Jkind0 : sig
         Types.type_expr ->
         Types.type_expr list ->
         Types.type_expr) ->
-      free_vars:(Types.type_expr list -> TypeSet.t) ->
+      get_free_vars:(Types.type_expr list -> TypeSet.t) ->
       Types.constructor_declaration list ->
       Types.jkind_l
 

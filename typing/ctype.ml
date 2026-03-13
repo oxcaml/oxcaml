@@ -2306,7 +2306,7 @@ let unbox_once env ty =
               ~projected_params:args
               ~res_args
               ~payload_tys:[ty2]
-              ~free_vars:(free_variable_set_of_list env)
+              ~get_free_vars:(free_variable_set_of_list env)
 | Type_variant ([{ cstr_generalized = false }], _, _) -> []
           | Type_variant (_not_one, _, _) ->
             Misc.fatal_error "Ctype.unbox_once: not just one constructor"
