@@ -1383,7 +1383,7 @@ $(SAK): $(RUNTIME_DIR)/sak.$(O)
 $(RUNTIME_DIR)/sak.$(O): $(RUNTIME_DIR)/sak.c $(RUNTIME_DIR)/caml/misc.h $(RUNTIME_DIR)/caml/config.h
 	$(V_CC)$(SAK_CC) -c $(SAK_CFLAGS) $(OUTPUTOBJ)$@ $<
 
-C_LITERAL = $(shell $(SAK) encode-C-literal '$(1)')
+C_LITERAL = $(shell $(SAK) $(ENCODE_C_LITERAL) '$(1)')
 
 $(RUNTIME_DIR)/build_config.h: $(ROOTDIR)/Makefile.config $(SAK)
 	$(V_GEN)echo '/* This file is generated from $(ROOTDIR)/Makefile.config */' > $@ && \
