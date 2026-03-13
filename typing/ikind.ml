@@ -1165,7 +1165,7 @@ let crossing_of_jkind ~(context : Jkind.jkind_context)
 
 let round_up_type env (ty : Types.type_expr) : Axis_lattice.t =
   let ctx = create_ctx ~mode:Solver.Round_up ~env:(Some env) in
-  Solver.round_up (Solver.kind ~use_tables:true ctx ty)
+  Solver.round_up (Solver.kind ~use_tables:false ctx ty)
 
 let crossing_of_type env (ty : Types.type_expr) : Mode.Crossing.t =
   let lat = round_up_type env ty in
