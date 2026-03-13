@@ -362,6 +362,12 @@ let get_equations_scope = function
   | Expression _ -> invalid_arg "Ctype.get_equations_scope"
   | Pattern r -> r.penv.equations_scope
 
+let get_initial_stage = function
+  | Expression _ | Pattern { equations_generation = Forbidden } ->
+    invalid_arg "Ctype.get_initial_stage"
+  | Pattern { equations_generation = Allowed { pattern_stage }; _ } ->
+    pattern_stage
+
 let order_type_pair t1 t2 =
   if get_id t1 <= get_id t2 then (t1, t2) else (t2, t1)
 
@@ -4266,8 +4272,8 @@ let add_jkind_equation ~reason uenv destination jkind1 =
                  { decl with type_jkind = Jkind.disallow_right jkind }
                in
                set_env uenv
-                 (Env.add_local_constraint ~stage:(Env.stage env) p
-                    refined_decl env)
+                 (Env.add_local_constraint ~since_stage:(get_initial_stage uenv)
+                    ~stage:(Env.stage env) p refined_decl env)
             | _ -> ()
           with
             Not_found -> ()
@@ -4313,7 +4319,8 @@ let add_gadt_equation uenv source destination =
         jkind
     in
     set_env uenv
-      (Env.add_local_constraint ~stage:(Env.stage env) source decl env);
+      (Env.add_local_constraint ~since_stage:(get_initial_stage uenv)
+         ~stage:(Env.stage env) source decl env);
     cleanup_abbrev ()
   end
 
