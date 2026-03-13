@@ -195,11 +195,21 @@ jobs:
             os: warp-ubuntu-latest-x64-8x
             cc: musl-gcc
 
+          # Here and below, we put 'reaper=1,_' instead of '_,reaper=1', as
+          # some tests rely on explicitely controlling whether the reaper is
+          # enabled.
           - name: runtime5 reaper
             config: --enable-runtime5
             os: warp-ubuntu-latest-x64-8x
-            build_ocamlparam: '_,reaper=1'
-            ocamlparam: '_,reaper=1'
+            build_ocamlparam: 'reaper=1,_'
+            ocamlparam: 'reaper=1,_'
+
+          - name: runtime5 reaper with local value slots
+            config: --enable-runtime5
+            os: warp-ubuntu-latest-x64-8x
+            build_ocamlparam: 'reaper=1,reaper-local-fields=1,_'
+            ocamlparam: 'reaper=1,reaper-local-fields=1,_'
+            disable_testcases: 'testsuite/tests/tool-ocamlobjinfo/question.ml'
 
     env:
       J: "8"
