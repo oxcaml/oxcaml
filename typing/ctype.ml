@@ -2812,7 +2812,7 @@ let constrain_type_jkind ~fixed env ty jkind =
         *)
        let jkind_inter =
          Jkind.intersection_or_error ~type_equal ~context
-           ~reason:Tyvar_refinement_intersection env ~level:!current_level
+           ~reason:Tyvar_refinement_intersection env
            ty's_jkind jkind
        in
        Result.map (set_var_jkind ty) jkind_inter
@@ -2831,7 +2831,7 @@ let constrain_type_jkind ~fixed env ty jkind =
 
     | _ ->
        match
-         Jkind.sub_or_intersect ~type_equal ~context ~level:!current_level env
+         Jkind.sub_or_intersect ~type_equal ~context env
            ty's_jkind jkind
        with
        | Sub -> Ok ()
@@ -3030,9 +3030,9 @@ let constrain_type_jkind_exn env texn ty jkind =
    in some cases where its not (this will happen when pattern matching on a
    "false" GADT pattern), but not to say the intersection is empty if it isn't.
 *)
-let rec intersect_type_jkind ~reason ~level env ty1 jkind2 =
+let rec intersect_type_jkind ~reason env ty1 jkind2 =
   match get_desc ty1 with
-  | Tpoly (ty, _) -> intersect_type_jkind ~reason ~level env ty jkind2
+  | Tpoly (ty, _) -> intersect_type_jkind ~reason env ty jkind2
   | _ ->
     (* [intersect_type_jkind] is called rarely, so we don't bother with trying
        to avoid this call as in [constrain_type_jkind] *)
@@ -3048,7 +3048,7 @@ let rec intersect_type_jkind ~reason ~level env ty1 jkind2 =
        it. Internal ticket 5112. *)
     match jkind1, jkind2 with
     | Some jkind1, Some jkind2 ->
-      Jkind.intersection ~type_equal ~context ~reason ~level env jkind1 jkind2
+      Jkind.intersection ~type_equal ~context ~reason env jkind1 jkind2
     | _, _ -> Jkind.Unknown
 
 (* See comment on [jkind_unification_mode] *)
@@ -3293,7 +3293,7 @@ let local_non_recursive_abbrev uenv p ty =
    They carry redundant information but are added to save two calls to
    [get_desc] which are usually performed already at the call site. *)
 let unify_univar env t1 t2 jkind1 jkind2 pairs =
-  if not (Jkind.equal ~level:!current_level env jkind1 jkind2) then
+  if not (Jkind.equal env jkind1 jkind2) then
     raise Cannot_unify_universal_variables;
   let rec inner t1 t2 = function
     (cl1, cl2) :: rem ->
@@ -3707,8 +3707,8 @@ let equivalent_with_nolabels l1 l2 =
 (* the [tk] means we're comparing a type against a jkind; axes do
    not matter, so a jkind extracted from a type_declaration does
    not need to be substed *)
-let may_have_jkind_intersection_tk ~level env ty jkind =
-  Jkind.may_have_intersection ~level env (type_jkind env ty) jkind
+let may_have_jkind_intersection_tk env ty jkind =
+  Jkind.may_have_intersection env (type_jkind env ty) jkind
 
 (* [mcomp] tests if two types are "compatible" -- i.e., if they could ever
    unify.  (This is distinct from [eqtype], which checks if two types *are*
@@ -3725,7 +3725,7 @@ let may_have_jkind_intersection_tk ~level env ty jkind =
 
 let rec mcomp type_pairs env t1 t2 =
   let check_jkinds ty jkind =
-    if not (may_have_jkind_intersection_tk ~level:!current_level env ty
+    if not (may_have_jkind_intersection_tk env ty
               (Jkind.disallow_right jkind))
     then raise Incompatible
   in
@@ -3783,7 +3783,7 @@ let rec mcomp type_pairs env t1 t2 =
             begin try
               let decl = Env.find_type p env in
               if not (is_aliasable p decl &&
-                      may_have_jkind_intersection_tk ~level:!current_level env
+                      may_have_jkind_intersection_tk env
                         other decl.type_jkind)
               then raise Incompatible
             with Not_found -> ()
@@ -3923,7 +3923,7 @@ and mcomp_type_decl type_pairs env p1 p2 tl1 tl2 =
     let decl = Env.find_type p1 env in
     let decl' = Env.find_type p2 env in
     let check_jkinds () =
-      if not (Jkind.may_have_intersection ~level:!current_level env
+      if not (Jkind.may_have_intersection env
                 decl.type_jkind decl'.type_jkind)
       then raise Incompatible
     in
@@ -4061,7 +4061,7 @@ let add_jkind_equation ~reason uenv destination jkind1 =
      refine the type since we don't know the intersection. *)
   let env = get_env uenv in
   match
-    intersect_type_jkind ~reason ~level:!current_level env destination jkind1
+    intersect_type_jkind ~reason env destination jkind1
   with
   | Jkind.No_intersection err -> raise_for Unify (Bad_jkind (destination,err))
   | Jkind.Unknown -> ()
@@ -4076,7 +4076,7 @@ let add_jkind_equation ~reason uenv destination jkind1 =
                ticket 5112. *)
             match Jkind.try_allow_r jkind, Jkind.try_allow_r decl.type_jkind with
             | Some jkind, Some decl_jkind when
-                   not (Jkind.equal ~level:!current_level env jkind
+                   not (Jkind.equal env jkind
                           decl_jkind) ->
                let refined_decl =
                  { decl with type_jkind = Jkind.disallow_right jkind }
@@ -6130,7 +6130,7 @@ let all_distinct_vars_with_original_jkinds env vars =
          tys := TypeSet.add ty !tys;
          match get_desc ty with
          | Tvar { jkind = inferred_jkind } ->
-           if Jkind.equate ~level:!current_level env inferred_jkind
+           if Jkind.equate env inferred_jkind
                 original_jkind
            then All_good
            else Jkind_mismatch { original_jkind; inferred_jkind; ty }
@@ -6187,7 +6187,7 @@ let eqtype_subst env type_pairs subst t1 k1 t2 k2 ~do_jkind_check =
       !subst
   then ()
   else begin
-    if do_jkind_check && not (Jkind.equal ~level:!current_level env k1 k2)
+    if do_jkind_check && not (Jkind.equal env k1 k2)
       then raise_for Equality (Unequal_var_jkinds (t1, k1, t2, k2));
     subst := (t1, t2) :: !subst;
     TypePairs.add type_pairs (t1, t2)
@@ -6218,7 +6218,7 @@ let rec eqtype rename type_pairs subst env ~do_jkind_check t1 t2 =
     | (Tconstr (p1, [], _), Tconstr (p2, [], _)) when Path.same p1 p2 ->
         ()
     | (Tof_kind k1, Tof_kind k2) ->
-      if not (Jkind.equal ~level:!current_level env k1 k2)
+      if not (Jkind.equal env k1 k2)
       then raise_for Equality (Unequal_tof_kind_jkinds (k1, k2))
     | _ ->
         let t1' = expand_head_rigid env t1 in
@@ -8001,7 +8001,7 @@ let check_decl_jkind env decl jkind =
     | _ -> decl.type_jkind
   in
   match
-    Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level env
+    Jkind.sub_jkind_l ~type_equal ~context env
       decl_jkind jkind
   with
   | Ok () -> Ok ()
@@ -8011,7 +8011,7 @@ let check_decl_jkind env decl jkind =
     | Some ty ->
       let ty_jkind = type_jkind env ty in
       match
-        Jkind.sub_jkind_l ~type_equal ~context ~level:!current_level env
+        Jkind.sub_jkind_l ~type_equal ~context env
           ty_jkind jkind
       with
       | Ok () -> Ok ()
@@ -8029,7 +8029,7 @@ let constrain_decl_jkind env decl jkind =
     let type_equal = type_equal env in
     let context = mk_jkind_context_always_principal env in
     match
-      Jkind.sub_or_error ~type_equal ~context ~level:!current_level env
+      Jkind.sub_or_error ~type_equal ~context env
         decl.type_jkind jkind
     with
     | Ok () as ok -> ok
