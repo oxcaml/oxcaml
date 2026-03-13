@@ -1084,7 +1084,7 @@ and str_formatter = formatter_of_buffer stdbuf
 (* Initialise domain local state *)
 
 (* CR-soon mslater: switch to TLS to remove thread unsafety *)
-module DLS = struct 
+module DLS = struct
   let new_key = Domain.Safe.DLS.new_key
   let get = Obj.magic_portable Domain.DLS.get
   let set = Obj.magic_portable Domain.DLS.set
@@ -1168,8 +1168,8 @@ let make_synchronized_formatter_safe output flush =
     in
     make_formatter output' flush')
 
-let make_synchronized_formatter_unsafe output flush = 
-  make_synchronized_formatter_safe 
+let make_synchronized_formatter_unsafe output flush =
+  make_synchronized_formatter_safe
     (Obj.magic_portable output)
     (Obj.magic_portable flush)
 
@@ -1245,60 +1245,8 @@ let formatter_of_symbolic_output_buffer sob =
 
 *)
 
-<<<<<<< oxcaml
 let[@inline] apply1 f v = f (DLS.get std_formatter_key) v
 let[@inline] apply2 f v w = f (DLS.get std_formatter_key) v w
-||||||| upstream-base
-let open_hbox v = pp_open_hbox (DLS.get std_formatter_key) v
-and open_vbox v = pp_open_vbox (DLS.get std_formatter_key) v
-and open_hvbox v = pp_open_hvbox (DLS.get std_formatter_key) v
-and open_hovbox v = pp_open_hovbox (DLS.get std_formatter_key) v
-and open_box v = pp_open_box (DLS.get std_formatter_key) v
-and close_box v = pp_close_box (DLS.get std_formatter_key) v
-and open_stag v = pp_open_stag (DLS.get std_formatter_key) v
-and close_stag v = pp_close_stag (DLS.get std_formatter_key) v
-and print_as v w = pp_print_as (DLS.get std_formatter_key) v w
-and print_string v = pp_print_string (DLS.get std_formatter_key) v
-and print_bytes v = pp_print_bytes (DLS.get std_formatter_key) v
-and print_int v = pp_print_int (DLS.get std_formatter_key) v
-and print_float v = pp_print_float (DLS.get std_formatter_key) v
-and print_char v = pp_print_char (DLS.get std_formatter_key) v
-and print_bool v = pp_print_bool (DLS.get std_formatter_key) v
-and print_break v w = pp_print_break (DLS.get std_formatter_key) v w
-and print_cut v = pp_print_cut (DLS.get std_formatter_key) v
-and print_space v = pp_print_space (DLS.get std_formatter_key) v
-and force_newline v = pp_force_newline (DLS.get std_formatter_key) v
-and print_flush v = pp_print_flush (DLS.get std_formatter_key) v
-and print_newline v = pp_print_newline (DLS.get std_formatter_key) v
-and print_if_newline v = pp_print_if_newline (DLS.get std_formatter_key) v
-=======
-let open_hbox v = pp_open_hbox (DLS.get std_formatter_key) v
-and open_vbox v = pp_open_vbox (DLS.get std_formatter_key) v
-and open_hvbox v = pp_open_hvbox (DLS.get std_formatter_key) v
-and open_hovbox v = pp_open_hovbox (DLS.get std_formatter_key) v
-and open_box v = pp_open_box (DLS.get std_formatter_key) v
-and close_box v = pp_close_box (DLS.get std_formatter_key) v
-and open_stag v = pp_open_stag (DLS.get std_formatter_key) v
-and close_stag v = pp_close_stag (DLS.get std_formatter_key) v
-and print_as v w = pp_print_as (DLS.get std_formatter_key) v w
-and print_string v = pp_print_string (DLS.get std_formatter_key) v
-and print_substring ~pos ~len v =
-  pp_print_substring  ~pos ~len (DLS.get std_formatter_key) v
-and print_substring_as ~pos ~len as_len v =
-  pp_print_substring_as ~pos ~len (DLS.get std_formatter_key) as_len v
-and print_bytes v = pp_print_bytes (DLS.get std_formatter_key) v
-and print_int v = pp_print_int (DLS.get std_formatter_key) v
-and print_float v = pp_print_float (DLS.get std_formatter_key) v
-and print_char v = pp_print_char (DLS.get std_formatter_key) v
-and print_bool v = pp_print_bool (DLS.get std_formatter_key) v
-and print_break v w = pp_print_break (DLS.get std_formatter_key) v w
-and print_cut v = pp_print_cut (DLS.get std_formatter_key) v
-and print_space v = pp_print_space (DLS.get std_formatter_key) v
-and force_newline v = pp_force_newline (DLS.get std_formatter_key) v
-and print_flush v = pp_print_flush (DLS.get std_formatter_key) v
-and print_newline v = pp_print_newline (DLS.get std_formatter_key) v
-and print_if_newline v = pp_print_if_newline (DLS.get std_formatter_key) v
->>>>>>> upstream-incoming
 
 let open_hbox = apply1 pp_open_hbox
 and open_vbox = apply1 pp_open_vbox
@@ -1402,13 +1350,7 @@ let pp_print_text ppf s =
   let left = ref 0 in
   let right = ref 0 in
   let flush () =
-<<<<<<< oxcaml
     pp_print_substring ppf s ~pos:!left ~len:(!right - !left);
-||||||| upstream-base
-    pp_print_string ppf (String.sub s !left (!right - !left));
-=======
-    pp_print_substring ~pos:!left ~len:(!right - !left) ppf s;
->>>>>>> upstream-incoming
     incr right; left := !right;
   in
   while (!right <> len) do

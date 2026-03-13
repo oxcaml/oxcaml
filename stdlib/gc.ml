@@ -124,18 +124,9 @@ let rec call_alarm arec =
 
 let delete_alarm a = Atomic.set a false
 
-<<<<<<< oxcaml
 (* We use [@inline never] to ensure [arec] is never statically allocated
    (which would prevent installation of the finaliser). *)
 let [@inline never] create_alarm f =
-||||||| upstream-base
-let create_alarm f =
-  let arec = { active = Atomic.make true; f = f } in
-  Domain.at_exit (fun () -> delete_alarm arec.active);
-=======
-(* never inline, to prevent [arec] from being allocated statically *)
-let[@inline never] create_alarm f =
->>>>>>> upstream-incoming
   let alarm = Atomic.make true in
   Domain.at_exit (fun () -> delete_alarm alarm);
   let arec = { active = alarm; f = f } in
@@ -229,15 +220,11 @@ module Memprof =
     external discard : t -> unit @@ portable = "caml_memprof_discard"
   end
 
-<<<<<<< oxcaml
 module Tweak = struct
   external set : string -> int -> unit = "caml_gc_tweak_set"
   external get : string -> int = "caml_gc_tweak_get"
   external list_active : unit -> (string * int) list = "caml_gc_tweak_list_active"
 end
-||||||| upstream-base
-=======
-
 
 type suspended_collection_work = int
 (* Note: we do not currently expose this type outside the module,
@@ -255,9 +242,8 @@ type suspended_collection_work = int
    type.
 *)
 
-external ramp_up : (unit -> 'a) -> 'a * suspended_collection_work
+external ramp_up : (unit -> 'a) -> 'a * suspended_collection_work @@ portable
   = "caml_ml_gc_ramp_up"
 
-external ramp_down : suspended_collection_work -> unit
+external ramp_down : suspended_collection_work -> unit @@ portable
   = "caml_ml_gc_ramp_down"
->>>>>>> upstream-incoming

@@ -555,30 +555,10 @@ let pop_last (Pack a) =
   (* We know [length <= capacity a]. *)
   if length = 0 then raise Not_found;
   let last = length - 1 in
-  (* We know [length > 0] so [last >= 0]. *)
-<<<<<<< oxcaml
-  match Array.unsafe_get arr last with
-  | Empty ->
-      Error.missing_element ~i:last ~length
-  | Elem s ->
-      Array.unsafe_set arr last Empty;
-      a.length <- last;
-      s.v
-||||||| upstream-base
-  match Array.unsafe_get arr last with
-  (* At this point we know that [last] is a valid index in [arr]. *)
-  | Empty ->
-      Error.missing_element ~i:last ~length
-  | Elem s ->
-      Array.unsafe_set arr last Empty;
-      a.length <- last;
-      s.v
-=======
   let v = unsafe_get arr ~dummy ~i:last ~length in
   Array.unsafe_set arr last (Dummy.of_dummy dummy);
   a.length <- last;
   v
->>>>>>> upstream-incoming
 
 let pop_last_opt a =
   match pop_last a with
