@@ -359,6 +359,8 @@ module Lattices = struct
 
       external l_of_int : int -> L.t = "%identity"
 
+      let mask = 0b11
+
       let () =
         assert (l_to_int L.min = 0b00);
         assert (l_to_int L.fst = 0b01);
@@ -370,33 +372,27 @@ module Lattices = struct
 
     let max = L.max
 
-    let le a b = a <= b && l_to_int a lxor 0b01 lor (l_to_int b lxor 0b10) <> 0
-
     let equal a b = a = b
 
     let join a b = l_of_int (l_to_int a lor l_to_int b)
 
     let meet a b = l_of_int (l_to_int a land l_to_int b)
 
-    (* A partial lattice has a co-heyting structure.
-       Prove the [subtract] below is the left adjoint of [join].
-        - If [subtract a c <= b], by the definition of [subtract] below,
-          that could mean one of two things:
-          - Took the branch [a <= c], and [min <= b]. In this case, we have [a <= c <= join c b].
-          - Took the other branch, and [a <= b]. In this case, we have [a <= b <= join c b].
+    let le a b = meet a b = a
 
-        - In the other direction: Given [a <= join c b], compare [c] and [b]:
-          - if [c <= b], then [a <= join c b = b], and:
-            - either [a <= c], then [subtract a c = min <= b]
-            - or the other branch, then [subtract a c = a <= b]
-          - if [b <= c], then [a <= join c b = c], then [subtract a c = min <= b]
-          - if [b <> c], then [a <= join c b = max], then [subtract a c = min <= max]
-    *)
-    let subtract a c = if le a c then L.min else a
+    (* We can treat [read] and [write] as independent axes.
+       0b0 land (lnot 0b0) = 0b0 (min = min => min)
+       0b0 land (lnot 0b1) = 0b0 (min < max => min)
+       0b1 land (lnot 0b0) = 0b1 (max > min => max)
+       0b1 land (lnot 0b1) = 0b0 (max = max => min) *)
+    let subtract a c = l_of_int (l_to_int a land lnot (l_to_int c) land mask)
 
-    (* A partial lattice has a heyting structure. The proof for [imply] is dual
-       and omitted. *)
-    let imply c b = if le c b then L.max else b
+    (* We can treat [read] and [write] as independent axes.
+       (lnot 0b0) lor 0b0 = 0b1 (min = min => max)
+       (lnot 0b0) lor 0b1 = 0b1 (min < max => max)
+       (lnot 0b1) lor 0b0 = 0b0 (max > min => min)
+       (lnot 0b1) lor 0b1 = 0b1 (max = max => max) *)
+    let imply c b = l_of_int (lnot (l_to_int c) lor l_to_int b land mask)
   end
   [@@inline]
 
