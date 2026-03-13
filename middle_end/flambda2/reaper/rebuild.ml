@@ -257,6 +257,13 @@ let is_dead_var env v =
   | Value | Naked_number _ ->
     not (DS.has_source env.uses (Code_id_or_name.var v))
 
+let simple_is_dead env simple =
+  Simple.pattern_match' simple
+    ~var:(fun v ~coercion:_ -> is_dead_var env v)
+    ~symbol:(fun sym ~coercion:_ ->
+      not (DS.has_source env.uses (Code_id_or_name.symbol sym)))
+    ~const:(fun _ -> false)
+
 type change_calling_convention =
   | Not_changing_calling_convention
   | Changing_calling_convention of Code_id.t
@@ -1074,26 +1081,25 @@ let decide_whether_apply_needs_calling_convention_change env apply =
       else Changing_calling_convention code_id, call_kind)
 
 let rebuild_apply env apply =
-  let callee_is_dead_variable =
+  let callee_is_dead =
     match Apply.callee apply with
     | None -> false
-    | Some c ->
-      Simple.pattern_match c
-        ~const:(fun _ -> false)
-        ~name:(fun name ~coercion:_ ->
-          not (DS.has_source env.uses (Code_id_or_name.name name)))
+    | Some c -> simple_is_dead env c
   in
-  if callee_is_dead_variable
+  if callee_is_dead || List.exists (simple_is_dead env) (Apply.args apply)
   then
-    (* This is to avoid having to consider the case where the callee is dead in
-       the rest of rebuilding the apply. This invalid should be eliminated
-       higher anyway, at the moment the callee is bound. *)
+    (* This is to avoid having to consider the case where the callee or one of
+       its arguments is dead in the rest of rebuilding the apply. This invalid
+       should be eliminated higher anyway, at the moment the dead
+       callee/argument is bound. *)
     RE.from_expr
       ~expr:
         (Expr.create_invalid
            (Message
-              (Format.asprintf "Callee %a has no source" Simple.print
-                 (Option.get (Apply.callee apply)))))
+              (Format.asprintf
+                 "[This invalid should not appear in the output code] Callee \
+                  or one of the args has no source for apply %a"
+                 Apply.print apply)))
       ~free_names:Name_occurrences.empty
   else
     (* CR ncourant: we never rewrite alloc_mode. This is currently ok because we
