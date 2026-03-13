@@ -17,3 +17,5 @@
 (* The variables are listed in alphabetical order *)
 
 val debugger_script : Variables.t
+
+val init : unit -> unit

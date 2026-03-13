@@ -395,6 +395,8 @@ let () =
   Ocaml_modifiers.init ();
   Ocaml_tests.init ();
   Ocaml_variables.init ();
+  Debugger_actions.init ();
+  Debugger_variables.init ();
   Strace.init ();
   init_tests_to_skip()
 
