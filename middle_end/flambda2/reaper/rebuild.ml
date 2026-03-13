@@ -136,8 +136,13 @@ let rec fold2_unboxed_subset (f : 'a -> 'b -> 'c -> 'c)
   | Unboxed fields1, Unboxed fields2 ->
     Field.Map.fold
       (fun field f1 acc ->
-        let f2 = Field.Map.find field fields2 in
-        fold2_unboxed_subset f f1 f2 acc)
+        match Field.Map.find field fields2 with
+        | exception Not_found ->
+          Misc.fatal_errorf "@[<v 2>@[%a@]:@ @[%a@]@]@." Format.pp_print_text
+            "Expected a subset of unboxed fields, but the following field is \
+             not in the superset"
+            Field.print field
+        | f2 -> fold2_unboxed_subset f f1 f2 acc)
       fields1 acc
 
 let rec fold2_unboxed_subset_with_kind (f : K.t -> 'a -> 'b -> 'c -> 'c)
@@ -145,13 +150,19 @@ let rec fold2_unboxed_subset_with_kind (f : K.t -> 'a -> 'b -> 'c -> 'c)
     (fields2 : 'b DS.unboxed_fields Field.Map.t) acc =
   Field.Map.fold
     (fun field f1 acc ->
-      let f2 = Field.Map.find field fields2 in
-      match (f1, f2 : _ DS.unboxed_fields * _ DS.unboxed_fields) with
-      | Not_unboxed x1, Not_unboxed x2 -> f (Field.kind field) x1 x2 acc
-      | Not_unboxed _, Unboxed _ | Unboxed _, Not_unboxed _ ->
-        Misc.fatal_errorf "[fold2_unboxed_subset]"
-      | Unboxed fields1, Unboxed fields2 ->
-        fold2_unboxed_subset_with_kind f fields1 fields2 acc)
+      match Field.Map.find field fields2 with
+      | exception Not_found ->
+        Misc.fatal_errorf "@[<v 2>@[%a@]:@ @[%a@]@]@." Format.pp_print_text
+          "Expected a subset of unboxed fields, but the following field is not \
+           in the superset"
+          Field.print field
+      | f2 -> (
+        match (f1, f2 : _ DS.unboxed_fields * _ DS.unboxed_fields) with
+        | Not_unboxed x1, Not_unboxed x2 -> f (Field.kind field) x1 x2 acc
+        | Not_unboxed _, Unboxed _ | Unboxed _, Not_unboxed _ ->
+          Misc.fatal_errorf "[fold2_unboxed_subset]"
+        | Unboxed fields1, Unboxed fields2 ->
+          fold2_unboxed_subset_with_kind f fields1 fields2 acc))
     fields1 acc
 
 let simple_is_unboxable env simple =
@@ -675,15 +686,17 @@ let rewrite_static_const (env : env) ~(bound_to : Symbol.t) (sc : SC.t) =
   | Empty_array _ | Mutable_string _ | Immutable_string _ -> sc
 
 let rebuild_named_default_case env (named : Named.t) =
-  let[@local] rewrite_field_access arg field =
-    let arg = get_simple_unboxable env arg in
-    let var = Field.Map.find field arg in
-    let var =
-      match var with
-      | Not_unboxed var -> var
-      | Unboxed _ -> Misc.fatal_errorf "Trying to bind non-unboxed to unboxed"
-    in
-    Named.create_simple (Simple.var var)
+  let[@local] rewrite_field_access base field =
+    let arg = get_simple_unboxable env base in
+    match Field.Map.find field arg with
+    | Not_unboxed var -> Named.create_simple (Simple.var var)
+    | Unboxed _ -> Misc.fatal_errorf "Trying to bind non-unboxed to unboxed"
+    | exception Not_found ->
+      Misc.fatal_errorf
+        "@[<v>@[%a@]@;<1 2>@[%a@]@ @[%a@]@;<1 2>@[%a@]@ @[%a@]@]@."
+        Format.pp_print_text "Trying to rewrite access to field:" Field.print
+        field Format.pp_print_text "from variable" Simple.print base
+        Format.pp_print_text "but it was not tracked."
   in
   let[@local] rewrite_field_access_chg_repr ?(mut : Mutability.t = Immutable)
       arg field dbg =
@@ -1358,7 +1371,14 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
   in
   let arg = Code_id_or_name.name arg in
   match DS.get_unboxed_fields env.uses arg with
-  | Some arg -> bind_fields (Unboxed to_bind) (Field.Map.find field arg) hole
+  | Some arg -> (
+    match Field.Map.find field arg with
+    | exception Not_found ->
+      Misc.fatal_errorf "@[<v>%a@;<1 2>%a@ %a@;<1 2>%a@ %a@]@."
+        Format.pp_print_text "Loading unboxed field:" Field.print field
+        Format.pp_print_text "from unboxed variable:" Simple.print oarg
+        Format.pp_print_text "but it was not tracked."
+    | f -> bind_fields (Unboxed to_bind) f hole)
   | None -> (
     if Option.is_none (DS.get_changed_representation env.uses arg)
     then
@@ -1369,52 +1389,64 @@ let load_field_from_value_which_is_being_unboxed env ~to_bind field arg dbg
         (DS.has_source env.uses arg);
     let arg = Option.get (DS.get_changed_representation env.uses arg) in
     match arg with
-    | Block_representation (arg_fields, _size) ->
-      let arg = Field.Map.find field arg_fields in
-      fold2_unboxed_subset
-        (fun var (field, kind) hole ->
-          let bp =
-            Bound_pattern.singleton
-              (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
-            (* CR sspies: Missing debug uid. *)
-          in
-          let named =
-            Named.create_prim
-              (P.Unary
-                 ( Block_load
-                     { field = Target_ocaml_int.of_int env.machine_width field;
-                       kind;
-                       mut = Immutable
-                     },
-                   oarg ))
-              dbg
-          in
-          RE.create_let bp named ~body:hole)
-        (Unboxed to_bind) arg hole
+    | Block_representation (arg_fields, _size) -> (
+      match Field.Map.find field arg_fields with
+      | exception Not_found ->
+        Misc.fatal_errorf "@[<v>%a@;<1 2>%a@ %a@;<1 2>%a@ %a@]@."
+          Format.pp_print_text "Loading unboxed field:" Field.print field
+          Format.pp_print_text "from block with changed representation:"
+          Simple.print oarg Format.pp_print_text "but it was not tracked."
+      | arg ->
+        fold2_unboxed_subset
+          (fun var (field, kind) hole ->
+            let bp =
+              Bound_pattern.singleton
+                (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
+              (* CR sspies: Missing debug uid. *)
+            in
+            let named =
+              Named.create_prim
+                (P.Unary
+                   ( Block_load
+                       { field = Target_ocaml_int.of_int env.machine_width field;
+                         kind;
+                         mut = Immutable
+                       },
+                     oarg ))
+                dbg
+            in
+            RE.create_let bp named ~body:hole)
+          (Unboxed to_bind) arg hole)
     | Closure_representation (arg_fields, function_slots, current_function_slot)
-      ->
-      let arg = Field.Map.find field arg_fields in
-      fold2_unboxed_subset
-        (fun var value_slot hole ->
-          let bp =
-            Bound_pattern.singleton
-              (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
-            (* CR sspies: Missing debug uid. *)
-          in
-          let named =
-            Named.create_prim
-              (P.Unary
-                 ( Project_value_slot
-                     { value_slot;
-                       project_from =
-                         Function_slot.Map.find current_function_slot
-                           function_slots
-                     },
-                   oarg ))
-              dbg
-          in
-          RE.create_let bp named ~body:hole)
-        (Unboxed to_bind) arg hole)
+      -> (
+      match Field.Map.find field arg_fields with
+      | exception Not_found ->
+        Misc.fatal_errorf "@[<v>%a@;<1 2>%a@ %a@;<1 2>%a@ %a@]@."
+          Format.pp_print_text "Loading unboxed field:" Field.print field
+          Format.pp_print_text "from closure with changed representation:"
+          Simple.print oarg Format.pp_print_text "but it was not tracked."
+      | arg ->
+        fold2_unboxed_subset
+          (fun var value_slot hole ->
+            let bp =
+              Bound_pattern.singleton
+                (Bound_var.create var Flambda_debug_uid.none Name_mode.normal)
+              (* CR sspies: Missing debug uid. *)
+            in
+            let named =
+              Named.create_prim
+                (P.Unary
+                   ( Project_value_slot
+                       { value_slot;
+                         project_from =
+                           Function_slot.Map.find current_function_slot
+                             function_slots
+                       },
+                     oarg ))
+                dbg
+            in
+            RE.create_let bp named ~body:hole)
+          (Unboxed to_bind) arg hole))
 
 let rebuild_singleton_binding_which_is_being_unboxed env bv
     ~(defining_expr : Named.t) ~hole =
