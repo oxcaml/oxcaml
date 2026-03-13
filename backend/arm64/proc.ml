@@ -322,8 +322,7 @@ let destroyed_at_basic (basic : Cfg_intf.S.basic) =
               |Ilsr|Iasr|Imulh _|Iclz _|Ictz _|Icomp _))
   | Op (Int128op (Iadd128 | Isub128 | Imul64 _))
   | Op (Specific _
-        | Move | Spill | Reload | Dummy_use
-        | Floatop _
+        | Move | Spill | Reload | Floatop _
         | Csel _
         | Const_int _
         | Const_float32 _ | Const_float _
