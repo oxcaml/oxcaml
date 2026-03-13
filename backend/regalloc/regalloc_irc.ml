@@ -48,6 +48,14 @@ let build : State.t -> Cfg_with_infos.t -> unit =
           if move_src == Reg.dummy || not (Reg.same reg1 move_src)
           then Array.iter def ~f:(fun reg2 -> State.add_edge state reg1 reg2))
         live.across;
+      (* Add interference edges between all pairs of results, since they are all
+         defined simultaneously and must be in different registers. *)
+      for i = 0 to Array.length def - 2 do
+        for j = i + 1 to Array.length def - 1 do
+          State.add_edge state def.(i) def.(j)
+        done
+      done
+    end;
     if Array.length destroyed > 0
     then
       Reg.Set.iter
