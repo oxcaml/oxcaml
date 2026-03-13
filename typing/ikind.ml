@@ -1022,8 +1022,20 @@ type subcheck_polys =
     fast_path : subcheck_fast_path
   }
 
-let finish_subcheck_polys ~ctx ~super_is_constant
-    ~(sub : ('l1 * 'r1) Types.jkind) (super_poly : Ldd.node) : subcheck_polys =
+(* Compute polynomials for a subcheck:
+   - compute [super] in Normal mode
+   - fast path: if [super] is constant top, no need to compute [sub]
+   - otherwise, if [super] is constant, try the lhs mod-bounds floor fast path
+   - otherwise, only round up [sub] if [super] is constant *)
+let compute_subcheck_polys ~context:_ env
+    (sub : ('l1 * 'r1) Types.jkind) (super : ('l2 * 'r2) Types.jkind) :
+    subcheck_polys =
+  let ctx = create_ctx ~mode:Solver.Normal ~env:(Some env) in
+  let super_poly = Solver.ckind_of_jkind ctx super in
+  let super_is_constant =
+    Ldd.solve_pending ();
+    Ldd.is_const super_poly
+  in
   if super_is_constant
      && Axis_lattice.equal (Ldd.round_up super_poly) Axis_lattice.top
   then
@@ -1064,22 +1076,6 @@ let finish_subcheck_polys ~ctx ~super_is_constant
         rhs_for_leq = super_poly;
         fast_path = No_fast_path
       }
-
-(* Compute polynomials for a subcheck:
-   - compute [super] in Normal mode
-   - fast path: if [super] is constant top, no need to compute [sub]
-   - otherwise, if [super] is constant, try the lhs mod-bounds floor fast path
-   - otherwise, only round up [sub] if [super] is constant *)
-let compute_subcheck_polys ~context:_ env
-    (sub : ('l1 * 'r1) Types.jkind) (super : ('l2 * 'r2) Types.jkind) :
-    subcheck_polys =
-  let ctx = create_ctx ~mode:Solver.Normal ~env:(Some env) in
-  let super_poly = Solver.ckind_of_jkind ctx super in
-  let super_is_constant =
-    Ldd.solve_pending ();
-    Ldd.is_const super_poly
-  in
-  finish_subcheck_polys ~ctx ~super_is_constant ~sub super_poly
 
 let sub_jkind_l ?allow_any_crossing ?origin
     ~(type_equal : Types.type_expr -> Types.type_expr -> bool)
