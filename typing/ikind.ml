@@ -91,14 +91,22 @@ module Solver = struct
       constr_to_coeffs : (Ldd.node * Ldd.node array) ConstrTbl.t
     }
 
+  let global_ty_to_kind : Ldd.node TyTbl.t = TyTbl.create 1
+
+  let global_constr_to_coeffs :
+      (Ldd.node * Ldd.node array) ConstrTbl.t =
+    ConstrTbl.create 1
+
   let create_ctx ~(mode : mode) ~(env : Env.t option)
       ~(lookup_of_env : Env.t -> Path.t -> constr_decl) =
+    TyTbl.clear global_ty_to_kind;
+    ConstrTbl.clear global_constr_to_coeffs;
     {
       env;
       lookup_of_env;
       mode;
-      ty_to_kind = TyTbl.create 1;
-      constr_to_coeffs = ConstrTbl.create 1
+      ty_to_kind = global_ty_to_kind;
+      constr_to_coeffs = global_constr_to_coeffs
     }
 
   let reset_for_mode (ctx : ctx) ~(mode : mode) : ctx = { ctx with mode }
