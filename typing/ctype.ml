@@ -2426,47 +2426,9 @@ let mk_jkind_context env jkind_of_type =
     | decl -> Some decl
     | exception Not_found -> None
   in
-  let debug_print_env ppf =
-    (* Print a bounded snapshot of types in the environment *)
-    let max_items = 120 in
-    let count = ref 0 in
-    let items = ref [] in
-    let add_item name path (decl : Types.type_declaration) acc =
-      if !count < max_items then begin
-        incr count;
-        items := (name, path, decl) :: !items
-      end;
-      acc
-    in
-    ignore (Env.fold_types add_item None env ());
-    let pp_kind ppf (decl : Types.type_declaration) =
-      match decl.type_kind, decl.type_manifest with
-      | Types.Type_abstract _, None -> Format.fprintf ppf "abstract"
-      | Types.Type_abstract _, Some _ -> Format.fprintf ppf "abbrev"
-      | Types.Type_variant _, _ -> Format.fprintf ppf "variant"
-      | Types.Type_record _, _ -> Format.fprintf ppf "record"
-      | Types.Type_record_unboxed_product _, _ ->
-        Format.fprintf ppf "record(unboxed)"
-      | Types.Type_open, _ -> Format.fprintf ppf "open"
-    in
-    let pp_item ppf (name, path, decl) =
-      Format.fprintf ppf "- %s (%a): %a"
-        name (Format_doc.compat Path.print) path pp_kind decl
-    in
-    let items = List.rev !items in
-    Format.fprintf ppf
-      "@[<v2>Environment types (showing %d/%d):@,%a@]@."
-      (List.length items)
-      !count
-      (Format.pp_print_list
-         ~pp_sep:(fun ppf () -> Format.fprintf ppf "@,")
-         pp_item)
-      items
-  in
   { Jkind.jkind_of_type;
     is_abstract = mk_is_abstract env;
     lookup_type;
-    debug_print_env;
   }
 
 (* We parameterize [estimate_type_jkind] by a function

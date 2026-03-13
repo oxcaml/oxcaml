@@ -207,7 +207,6 @@ type jkind_context =
     lookup_type : Path.t -> Types.type_declaration option;
         (* Lookup a type in the environment. Returns the full
            [Types.type_declaration] if found, or [None] otherwise. *)
-    debug_print_env : Format.formatter -> unit
   }
 
 (******************************)
