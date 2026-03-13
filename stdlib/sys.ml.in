@@ -208,9 +208,9 @@ let signal_to_string s =
   else if s < sigwinch then invalid_arg "Sys.signal_to_string"
   else "SIG(" ^ string_of_int s ^ ")"
 
-external rev_convert_signal_number: int -> int =
+external rev_convert_signal_number: int -> int @@ portable =
   "caml_sys_rev_convert_signal_number"
-external convert_signal_number: int -> int =
+external convert_signal_number: int -> int @@ portable =
   "caml_sys_convert_signal_number"
 
 let signal_of_int i =

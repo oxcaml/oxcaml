@@ -62,7 +62,7 @@ let equal : int -> int -> bool = ( = )
 let compare : int -> int -> int = Stdlib.compare
 
 external seeded_hash_param :
-  int -> int -> int -> 'a -> int = "caml_hash" [@@noalloc]
+  int -> int -> int -> 'a -> int @@ portable = "caml_hash" [@@noalloc]
 let seeded_hash seed x = seeded_hash_param 10 100 seed x
 let hash x = seeded_hash_param 10 100 0 x
 

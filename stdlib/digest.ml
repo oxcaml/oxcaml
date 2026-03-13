@@ -84,7 +84,7 @@ module BLAKE2 (X: sig val hash_length : int end) : sig @@ portable include S end
   external final: state -> int -> t @@ portable = "caml_blake2_final"
   external unsafe_string: int -> string -> string -> int -> int -> t @@ portable
                         = "caml_blake2_string"
-  external unsafe_bytes: int -> string -> bytes -> int -> int -> t
+  external unsafe_bytes: int -> string -> bytes -> int -> int -> t @@ portable
                         = "caml_blake2_bytes"
 
   let create () = create_gen hash_length ""
