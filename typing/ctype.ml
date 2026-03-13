@@ -2293,7 +2293,7 @@ let unbox_once env ty =
       | Some (ty2, modality) ->
         let extra_substs =
           match Env.find_type_descrs p env with
-          | Type_variant ([cstr], _, _) when cstr.cstr_generalized ->
+| Type_variant ([ ({ cstr_generalized = true } as cstr) ], _, _) when cstr.cstr_generalized ->
             (* Unboxed GADT wrappers need the same B1-B4 projection as boxed
                GADTs, but projected onto the instantiated head arguments of the
                wrapper type rather than the declaration parameters. *)
