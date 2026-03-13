@@ -41,12 +41,15 @@ let create_static_const dacc dbg (to_lift : T.to_lift) original_named : RSC.t =
       if is_unique then Immutable_unique else Immutable
     in
     let rsc = RSC.create_block art tag mut shape ~fields in 
+    ignore original_named;
+    (*
     if RSC.is_block_of_interest rsc then
       Format.eprintf
         "Interesting constant in Reification:@ %a@ original Named.t was:@ %a@ dacc:%a\n%!"
         RSC.print rsc
         Named.print original_named
-        DA.print dacc;
+       DA.print dacc;
+       *)
     rsc
   | Boxed_float32 f -> RSC.create_boxed_float32 art (Const f)
   | Boxed_float f -> RSC.create_boxed_float art (Const f)
