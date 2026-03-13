@@ -56,6 +56,29 @@ let check_values label update values =
         base_samples)
     values
 
+let all_axis_sets =
+  List.fold_right
+    (fun (Jkind_axis.Axis.Pack axis) sets ->
+      List.concat_map
+        (fun set -> [set; Jkind_axis.Axis_set.add set axis])
+        sets)
+    Jkind_axis.Axis.all
+    [Jkind_axis.Axis_set.empty]
+
+let check_of_axis_set' () =
+  List.iter
+    (fun set ->
+      let expected = of_axis_set set in
+      let actual = of_axis_set' set in
+      if expected <> actual
+      then
+        failwith
+          (Format.asprintf
+             "axis set conversion mismatch for %a: expected %s, got %s"
+             Jkind_axis.Axis_set.print set (to_string expected)
+             (to_string actual)))
+    all_axis_sets
+
 let () =
   check_values "areality"
     (fun sample areality -> { sample with areality })
@@ -109,4 +132,5 @@ let () =
     (fun sample separability -> { sample with separability })
     [ Jkind_axis.Separability.Non_float;
       Jkind_axis.Separability.Separable;
-      Jkind_axis.Separability.Maybe_separable ]
+      Jkind_axis.Separability.Maybe_separable ];
+  check_of_axis_set' ()
