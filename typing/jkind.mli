@@ -204,7 +204,7 @@ type jkind_context =
   { jkind_of_type : Types.type_expr -> Types.jkind_l option;
     is_abstract : Path.t -> bool;
         (* Check if a type path refers to an abstract type *)
-    lookup_type : Path.t -> Types.type_declaration option;
+    lookup_type : Path.t -> Types.type_declaration option
         (* Lookup a type in the environment. Returns the full
            [Types.type_declaration] if found, or [None] otherwise. *)
   }
