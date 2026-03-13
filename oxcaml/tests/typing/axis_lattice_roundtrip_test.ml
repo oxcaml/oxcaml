@@ -59,9 +59,7 @@ let check_values label update values =
 let all_axis_sets =
   List.fold_right
     (fun (Jkind_axis.Axis.Pack axis) sets ->
-      List.concat_map
-        (fun set -> [set; Jkind_axis.Axis_set.add set axis])
-        sets)
+      List.concat_map (fun set -> [set; Jkind_axis.Axis_set.add set axis]) sets)
     Jkind_axis.Axis.all
     [Jkind_axis.Axis_set.empty]
 
