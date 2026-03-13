@@ -235,7 +235,8 @@ module Flambda2 = struct
 
   let o4 = {
     o3 with
-    enable_reaper = true
+    enable_reaper = true;
+    reaper_local_fields = true;
   }
 
   let default_for_opt_level opt_level =
