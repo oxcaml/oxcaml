@@ -124,9 +124,6 @@ module Solver = struct
     (not !Clflags.principal)
     || Types.get_level ty = Btype.generic_level
 
-  let disable_tpoly_principality_hack =
-    Sys.getenv_opt "OXCAML_DISABLE_TPOLY_PRINCIPALITY_HACK" <> None
-
   (* CR jujacobs: we could optimize the join with masks you see below
      using a combined [Ldd.join_with_mask left mask right] operation. *)
 
@@ -453,10 +450,11 @@ module Solver = struct
         (* CR ikinds: this is sound but not fully precise.
           Internal ticket 5746. *)
         let ty = !instance_poly_for_jkind' univars ty in
-        if disable_tpoly_principality_hack
-        then kind ~use_tables:true ctx ty
-        else
-          kind ~check_principality:false ~use_tables:true ctx ty
+        (* We intentionally skip the principality check here. Enforcing it
+           breaks the stdlib build, and the old env-var escape hatch never had
+           a viable setting in practice. Track removing this workaround as part
+           of internal ticket 5746. *)
+        kind ~check_principality:false ~use_tables:true ctx ty
       | Types.Tof_kind jkind -> ckind_of_jkind ctx jkind
       | Types.Tobject _ -> Ldd.const Axis_lattice.object_legacy
       | Types.Tfield _ ->
