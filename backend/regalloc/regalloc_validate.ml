@@ -340,7 +340,7 @@ module Description : sig
 
   (** Will return [Some _] for the instructions that existed in the CFG before
       allocation and [None] otherwise. Currently, only instructions that
-      register allocation can add are [Spill], [Reload], and [Dummy_use]. *)
+      register allocation can add are [Spill] and [Reload]. *)
   val find_basic : t -> basic instruction -> basic Instruction.t option
 
   (** Will return [Some _] for the terminators that existed in CFG before
@@ -376,7 +376,7 @@ end = struct
   let reg_fun_args t = t.reg_fun_args
 
   let is_regalloc_specific_basic (desc : Cfg.basic) =
-    match desc with Op (Reload | Spill | Dummy_use) -> true | _ -> false
+    match desc with Op (Reload | Spill) -> true | _ -> false
 
   let add_instr_id ~seen_ids ~context id =
     if Hashtbl.mem seen_ids id
@@ -1212,7 +1212,6 @@ module Transfer (Desc_val : Description_value) :
       match instr.desc with
       | Op (Spill | Reload | Move) ->
         Result.ok @@ rename_location t ~loc_instr:instr
-      | Op Dummy_use -> Result.ok t
       | _ -> assert false)
     | Some instr_before -> (
       match instr.desc with

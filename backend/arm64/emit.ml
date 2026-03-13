@@ -1372,7 +1372,6 @@ let emit_instr env i =
   | Lop (Reinterpret_cast cast) -> emit_reinterpret_cast env cast i
   | Lop (Static_cast cast) -> emit_static_cast cast i
   | Lop (Move | Spill | Reload) -> move env i.arg.(0) i.res.(0)
-  | Lop Dummy_use -> ()
   | Lop (Specific Imove32) -> (
     let src = i.arg.(0) and dst = i.res.(0) in
     if not (Reg.same_loc src dst)

@@ -283,7 +283,7 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
  fun cfg_with_infos ->
   if debug then reset_indentation ();
   let cfg_with_layout = Cfg_with_infos.cfg_with_layout cfg_with_infos in
-  let cfg_infos, stack_slots, affinity =
+  let (_ : cfg_infos), stack_slots, affinity =
     Regalloc_rewrite.prelude
       (module Utils)
       ~on_fatal_callback:(fun () ->
@@ -302,7 +302,6 @@ let run : Cfg_with_infos.t -> Cfg_with_infos.t =
         save_cfg "ls" cfg_with_layout)
       cfg_with_infos
   in
-  Regalloc_rewrite.insert_dummy_uses cfg_with_infos cfg_infos;
   let state = State.make ~stack_slots ~affinity in
   main ~round:1 state cfg_with_infos;
   Regalloc_rewrite.postlude
