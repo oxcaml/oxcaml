@@ -213,6 +213,32 @@ let rebuild_let simplify_named_result removed_operations ~rewrite_id
                    being generated. *)
                 not (has_uses || (generate_phantom_lets && can_phantomise))
             in
+            (match Sys.getenv "VAR_X" with exception Not_found -> ()
+             | _ ->
+              let bv =
+                match[@warning "-4"] bound_vars with
+                | Singleton bound_var -> Some bound_var
+                | _ -> None
+              in
+              (match bv with None -> ()
+               | Some bv ->
+                 let name = Bound_var.var bv |> Variable.name in
+                 if String.equal name "x" then
+                   Format.eprintf "Decision for binding of %a: has_uses %b \
+                                   can_phantomise %b will_delete_binding %b, \
+                                   declared_name_mode %a, greatest_name_mode %a, \
+                                   defining expr %a,@ free names of body@ %a@ \
+                                   body@ %a@ uacc:@ %a\n%!"
+                     Bound_var.print bv
+                     has_uses can_phantomise will_delete_binding
+                     Name_mode.print declared_name_mode
+                     Name_mode.Or_absent.print greatest_name_mode
+                     Named.print defining_expr
+                     Name_occurrences.print free_names_of_body
+                     (RE.print (UA.are_rebuilding_terms uacc)) body
+                     UA.print uacc
+              )
+            );
             if will_delete_binding
             then Expr_builder.Delete_binding { original_defining_expr }
             else
