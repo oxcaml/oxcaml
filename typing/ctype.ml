@@ -2293,8 +2293,7 @@ let unbox_once env ty =
       | Some (ty2, modality) ->
         let extra_substs =
           match Env.find_type_descrs p env with
-| Type_variant ([ ({ cstr_generalized = true } as cstr) ], _, _)
-  when cstr.cstr_generalized ->
+          | Type_variant ([ ({ cstr_generalized = true } as cstr) ], _, _) ->
             (* Unboxed GADT wrappers need the same B1-B4 projection as boxed
                GADTs, but projected onto the instantiated head arguments of the
                wrapper type rather than the declaration parameters. *)
@@ -2308,7 +2307,7 @@ let unbox_once env ty =
               ~res_args
               ~payload_tys:[ty2]
               ~get_free_vars:(free_variable_set_of_list env)
-| Type_variant ([{ cstr_generalized = false }], _, _) -> []
+          | Type_variant ([{ cstr_generalized = false }], _, _) -> []
           | Type_variant (_not_one, _, _) ->
             Misc.fatal_error "Ctype.unbox_once: not just one constructor"
           | Type_abstract _ | Type_record _
