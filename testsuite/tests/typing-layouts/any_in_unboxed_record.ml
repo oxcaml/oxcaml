@@ -148,3 +148,14 @@ let test_nested_direct =
 [%%expect{|
 val test_nested_direct : int64 = 4L
 |}]
+
+(* Basic test of singleton case *)
+
+type ('a : any) singleton = { singleton : 'a }
+
+let test_singleton () = #{ singleton = 1 }
+
+[%%expect {|
+type ('a : any) singleton = { singleton : 'a; }
+val test_singleton : unit -> int singleton# = <fun>
+|}]
