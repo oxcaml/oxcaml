@@ -1895,7 +1895,6 @@ let report_error_doc env ppf =
     fprintf ppf
       "Invalid zero-alloc payload for a higher-order function argument."
 
-
 let () =
   Location.register_error_of_exn
     (function

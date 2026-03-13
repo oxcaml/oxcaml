@@ -574,7 +574,9 @@ Error: Function argument zero alloc assumption violated.
 |}];;
 
 (** Dealing with inference: what happens when there are multiple competing
-    zero_alloc constraints? *)
+    zero_alloc constraints?
+    The tests should fail. *)
+(* CR-soon aivaskovic: improve error messages here *)
 
 let g1 (f [@zero_alloc arity 1]) = f 500;;
 let g2 (f [@zero_alloc strict arity 1]) = f 99;;
@@ -591,7 +593,11 @@ let _ =
   let _ = g2 f in
   f;;
 [%%expect {|
-- : int -> int = <fun>
+Line 4, characters 13-14:
+4 |   let _ = g2 f in
+                 ^
+Error: Function argument zero alloc assumption violated.
+       There is a mismatch between the two "zero_alloc" assumptions.
 |}];;
 
 let _ =
@@ -601,7 +607,11 @@ let _ =
   let _ = g3 f in
   f;;
 [%%expect {|
-- : int -> int = <fun>
+Line 4, characters 13-14:
+4 |   let _ = g2 f in
+                 ^
+Error: Function argument zero alloc assumption violated.
+       There is a mismatch between the two "zero_alloc" assumptions.
 |}];;
 
 let _ =
@@ -610,7 +620,11 @@ let _ =
   let _ = g1 f in
   f;;
 [%%expect {|
-- : int -> int = <fun>
+Line 4, characters 13-14:
+4 |   let _ = g1 f in
+                 ^
+Error: Function argument zero alloc assumption violated.
+       There is a mismatch between the two "zero_alloc" assumptions.
 |}];;
 
 let f_inferred x = x + 123;;
@@ -620,6 +634,9 @@ let _ = g3 f_inferred;;
 [%%expect {|
 val f_inferred : int -> int = <fun>
 - : int = 623
-- : int = 222
-- : int = 234
+Line 3, characters 11-21:
+3 | let _ = g2 f_inferred;;
+               ^^^^^^^^^^
+Error: Function argument zero alloc assumption violated.
+       There is a mismatch between the two "zero_alloc" assumptions.
 |}];;

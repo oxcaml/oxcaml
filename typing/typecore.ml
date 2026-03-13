@@ -304,6 +304,7 @@ type error =
   | Invalid_payload_arg_zero_alloc
   | Incompatible_param_zero_alloc of Zero_alloc.error
 
+
 let not_principal fmt =
   Format_doc.Doc.kmsg (fun x -> Warnings.Not_principal x) fmt
 
@@ -1322,9 +1323,6 @@ type module_variables =
 
 type type_pat_state =
   { mutable tps_pattern_variables: pattern_variable list;
-    (* We need to keep track of zero alloc information for each pattern variable
-       for the sake of detecting zero alloc constaint violations in the
-       frontend. *)
     mutable tps_pattern_force: (unit -> unit) list;
     mutable tps_module_variables: module_variables;
     (* Mutation will not change the constructor of [tps_module_variables], just

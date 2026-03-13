@@ -250,33 +250,14 @@ let set_var v c =
   | { desc = None; _ }, Assume { strict; } ->
     !log_change (None, v);
     v.desc <- Some { strict; opt = true; custom_error_msg = None }
-  | { desc = (Some { strict = strict1; opt = opt1; custom_error_msg = msg1; } as desc); _ },
-    Check { strict = strict2; opt = opt2; custom_error_msg = msg2 } ->
-    let strict = strict1 || strict2 in
-    let opt = opt1 && opt2 in
-    let custom_error_msg, msg_changed =
-      match msg1, msg2 with
-      | None, None -> msg1, false;
-      | None, Some _ -> msg2, true;
-      | Some _, None -> msg1, false;
-      | Some m1, Some m2 ->
-        let b = String.equal m1 m2 in
-        let msg =
-          if b then msg1 else Some (String.concat "\n" [m1; m2])
-        in
-        msg, not b
-    in
-    if strict <> strict1 || opt <> opt1 || msg_changed then begin
-      !log_change (desc, v);
-      v.desc <- Some { strict; opt; custom_error_msg; }
-    end
-  | { desc = (Some { strict = strict1; opt; custom_error_msg } as desc); _ },
-    Assume { strict = strict2 } ->
-    let strict = strict1 || strict2 in
-    if strict <> strict1 then begin
-      !log_change (desc, v);
-      v.desc <- Some { strict; opt; custom_error_msg; }
-    end
+  | { desc = (Some { strict = strict1; opt = opt1; custom_error_msg = msg1; });
+      _ },
+    Check { strict = strict2; opt = opt2; custom_error_msg = msg2 }
+    when strict1 <> strict2 || opt1 <> opt2 || msg1 <> msg2 ->
+    raise (Error Incompatible)
+  | { desc = Some { strict = strict1 }; _ }, Assume { strict = strict2 }
+    when strict1 <> strict2 ->
+    raise (Error Incompatible)
   | _, _ -> ()
 
 let eq_exn za1 za2 =
