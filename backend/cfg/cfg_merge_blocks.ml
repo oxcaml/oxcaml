@@ -10,12 +10,49 @@ module List = ListLabels
 module Quick_hash : sig
   val basic_block : Cfg.basic_block -> int
 end = struct
+  (* note: we are hashing a number of mutable elements; this is fine here
+     because we know mutations only happen when the hash value is no longer
+     useful. We implement the hashing functions here, and do not export them
+     because they are probably low-quality, not for general use. *)
   let[@inline] hash_combine h1 h2 = (h1 * 65599) + h2
 
   let operation : Operation.t -> int =
    fun op ->
-    let repr = Obj.repr op in
-    if Obj.is_int repr then -(Obj.obj repr : int) else Obj.tag repr
+    match op with
+    | Move -> 0
+    | Spill -> 1
+    | Reload -> 2
+    | Dummy_use -> 3
+    | Opaque -> 4
+    | Begin_region -> 5
+    | End_region -> 6
+    | Dls_get -> 7
+    | Tls_get -> 8
+    | Domain_index -> 9
+    | Poll -> 10
+    | Pause -> 11
+    | Const_int _ -> 12
+    | Const_float32 _ -> 13
+    | Const_float _ -> 14
+    | Const_symbol _ -> 15
+    | Const_vec128 _ -> 16
+    | Const_vec256 _ -> 17
+    | Const_vec512 _ -> 18
+    | Stackoffset _ -> 19
+    | Load _ -> 20
+    | Store _ -> 21
+    | Intop _ -> 22
+    | Int128op _ -> 23
+    | Intop_imm _ -> 24
+    | Intop_atomic _ -> 25
+    | Floatop _ -> 26
+    | Csel _ -> 27
+    | Reinterpret_cast _ -> 28
+    | Static_cast _ -> 29
+    | Probe_is_enabled _ -> 30
+    | Specific _ -> 31
+    | Name_for_debugger _ -> 32
+    | Alloc _ -> 33
 
   let basic : Cfg.basic -> int = function
     | Op op -> operation op
@@ -27,9 +64,24 @@ end = struct
     | Stack_check { max_frame_size_bytes } ->
       hash_combine 6 max_frame_size_bytes
 
-  let terminator term =
-    let repr = Obj.repr term in
-    if Obj.is_int repr then -(Obj.obj repr : int) else Obj.tag repr
+  let terminator : Cfg.terminator -> int =
+   fun term ->
+    match term with
+    | Never -> 0
+    | Return -> 1
+    | Always _ -> 2
+    | Parity_test _ -> 3
+    | Truth_test _ -> 4
+    | Float_test _ -> 5
+    | Int_test _ -> 6
+    | Switch _ -> 7
+    | Raise _ -> 8
+    | Tailcall_self _ -> 9
+    | Tailcall_func _ -> 10
+    | Call_no_return _ -> 11
+    | Invalid _ -> 12
+    | Call _ -> 13
+    | Prim _ -> 14
 
   let rec basic_instruction_cell :
       Cfg.basic Cfg.instruction DLL.cell option -> fuel:int -> acc:int -> int =
@@ -51,9 +103,31 @@ end = struct
 
   let basic_block : Cfg.basic_block -> int =
    fun block ->
-    let body_hash = basic_instruction_list block.body in
-    let term_hash = terminator block.terminator.desc in
-    hash_combine body_hash term_hash
+    match block with
+    | { start = _;
+        body;
+        terminator =
+          { desc = terminator_desc;
+            id = _;
+            arg = _;
+            res = _;
+            dbg = _;
+            fdo = _;
+            live = _;
+            stack_offset = _;
+            available_before = _;
+            available_across = _
+          };
+        predecessors = _;
+        stack_offset = _;
+        exn = _;
+        can_raise = _;
+        is_trap_handler = _;
+        cold = _
+      } ->
+      let body_hash = basic_instruction_list body in
+      let term_hash = terminator terminator_desc in
+      hash_combine body_hash term_hash
 end
 
 module Equivalent : sig
@@ -107,7 +181,9 @@ end = struct
       Cfg.basic_block ->
       bool =
    fun ~equal_reg left right ->
-    (* CR xclerc for xclerc: consider using other fields *)
+    (* CR xclerc for xclerc: consider using other fields; we currently only
+       compare fields that can affect the semantics (that excludes coldness,
+       which may have a perforamnce impact though). *)
     match left, right with
     | ( { start = _;
           body = left_body;
@@ -145,6 +221,7 @@ let run :
     equal_reg:(Reg.t -> Reg.t -> bool) -> Cfg_with_layout.t -> Cfg_with_layout.t
     =
  fun ~equal_reg cfg_with_layout ->
+  (* CR-someday polytypic for xclerc: we could merge steps 1 and 2. *)
   let cfg = Cfg_with_layout.cfg cfg_with_layout in
   (* step 1: put blocks in buckets according to their hash values *)
   let buckets : Cfg.basic_block list Int.Tbl.t =
@@ -181,7 +258,11 @@ let run :
                     Equivalent.basic_block ~equal_reg block b)
               with
               | None -> block :: seen
-              | Some repr ->
+              | Some (repr : Cfg.basic_block) ->
+                (* CR-someday xclerc for xclerc: double check whether it is
+                   actually a good idea to merge blocks that disagree on
+                   coldness, and if so what the resulting coldness should be. *)
+                repr.cold <- repr.cold && block.cold;
                 Label.Tbl.replace rewrites block.start repr.Cfg.start;
                 seen)
       in
