@@ -149,14 +149,6 @@ let set_axis (v : t) ~axis:i ~level:lev : t =
   let hi = (lev lsr 1) land has_hi.(i) in
   cleared lor (lo lsl off) lor (hi lsl (off + 1))
 
-let encode ~levels : t =
-  let _, v =
-    Array.fold_left
-      (fun (i, acc) lev -> i + 1, set_axis acc ~axis:i ~level:lev)
-      (0, 0) levels
-  in
-  v
-
 let decode (v : t) : int array =
   Array.init num_axes (fun i -> get_axis v ~axis:i)
 
@@ -191,16 +183,6 @@ let co_sub (a : t) (b : t) : t =
 
 (* Build a mask from a set of relevant axes. *)
 let of_axis_set (set : Jkind_axis.Axis_set.t) : t =
-  let levels = Array.make num_axes 0 in
-  let open Jkind_axis in
-  (* Iterate in axis_index order. *)
-  List.iteri
-    (fun i (Axis.Pack ax) ->
-      if Axis_set.mem set ax then levels.(i) <- axis_sizes.(i) - 1)
-    Axis.all;
-  encode ~levels
-
-let of_axis_set' (set : Jkind_axis.Axis_set.t) : t =
   let set : int = Obj.magic set in
   let lo =
     (set land 0x001)
@@ -242,7 +224,7 @@ let mask_shallow : t = co_sub top (join axis_mask.(11) axis_mask.(12))
 (* Directly produce an axis-lattice mask from a constant modality. *)
 let mask_of_modality ~(relevant_for_shallow : [`Relevant | `Irrelevant])
     (modality : Mode.Modality.Const.t) : t =
-  relevant_axes_of_modality ~relevant_for_shallow modality |> of_axis_set'
+  relevant_axes_of_modality ~relevant_for_shallow modality |> of_axis_set
 
 (* Helpers to translate between axis enumerations and packed levels. *)
 module Levels = struct

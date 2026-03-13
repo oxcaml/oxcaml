@@ -63,11 +63,58 @@ let all_axis_sets =
     Jkind_axis.Axis.all
     [Jkind_axis.Axis_set.empty]
 
-let check_of_axis_set' () =
+let mask_of_axis : type a. a Jkind_axis.Axis.t -> t =
+ fun axis ->
+  let open Jkind_axis.Axis in
+  let open Mode.Axis in
+  let open Mode.Crossing.Axis in
+  let sample = sample_of_lattice bot in
+  match axis with
+  | Modal (Comonadic Areality) ->
+    lattice_of_sample { sample with areality = Mode.Regionality.Const.Local }
+  | Modal (Monadic Uniqueness) ->
+    lattice_of_sample { sample with uniqueness = Mode.Uniqueness.Const.Unique }
+  | Modal (Comonadic Linearity) ->
+    lattice_of_sample { sample with linearity = Mode.Linearity.Const.Once }
+  | Modal (Monadic Contention) ->
+    lattice_of_sample
+      { sample with contention = Mode.Contention.Const.Uncontended }
+  | Modal (Comonadic Portability) ->
+    lattice_of_sample
+      { sample with portability = Mode.Portability.Const.Nonportable }
+  | Modal (Comonadic Forkable) ->
+    lattice_of_sample { sample with forkable = Mode.Forkable.Const.Unforkable }
+  | Modal (Comonadic Yielding) ->
+    lattice_of_sample { sample with yielding = Mode.Yielding.Const.Yielding }
+  | Modal (Comonadic Statefulness) ->
+    lattice_of_sample
+      { sample with statefulness = Mode.Statefulness.Const.Stateful }
+  | Modal (Monadic Visibility) ->
+    lattice_of_sample
+      { sample with visibility = Mode.Visibility.Const.Read_write }
+  | Modal (Monadic Staticity) ->
+    lattice_of_sample { sample with staticity = Mode.Staticity.Static }
+  | Nonmodal Externality ->
+    lattice_of_sample
+      { sample with externality = Jkind_axis.Externality.Internal }
+  | Nonmodal Nullability ->
+    lattice_of_sample
+      { sample with nullability = Jkind_axis.Nullability.Maybe_null }
+  | Nonmodal Separability ->
+    lattice_of_sample
+      { sample with separability = Jkind_axis.Separability.Maybe_separable }
+
+let of_axis_set' (set : Jkind_axis.Axis_set.t) : t =
+  Jkind_axis.Axis_set.to_seq set
+  |> Seq.fold_left
+       (fun acc (Jkind_axis.Axis.Pack axis) -> join acc (mask_of_axis axis))
+       bot
+
+let check_of_axis_set () =
   List.iter
     (fun set ->
-      let expected = of_axis_set set in
-      let actual = of_axis_set' set in
+      let expected = of_axis_set' set in
+      let actual = of_axis_set set in
       if expected <> actual
       then
         failwith
@@ -131,4 +178,4 @@ let () =
     [ Jkind_axis.Separability.Non_float;
       Jkind_axis.Separability.Separable;
       Jkind_axis.Separability.Maybe_separable ];
-  check_of_axis_set' ()
+  check_of_axis_set ()

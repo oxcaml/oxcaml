@@ -337,7 +337,7 @@ module Solver = struct
     |> Seq.fold_left
          (fun acc (ty, bound_info) ->
            let axes = bound_info.Types.With_bounds_type_info.relevant_axes in
-           let mask = Axis_lattice.of_axis_set' axes in
+           let mask = Axis_lattice.of_axis_set axes in
            let ty_kind = kind ~use_tables:true ctx ty in
            Ldd.join acc (Ldd.meet (Ldd.const mask) ty_kind))
          base
