@@ -224,9 +224,9 @@ let sub_exn za1 za2 =
        event).
     *)
     if not (za1 == za2) then
-      Misc.fatal_error "zero_alloc: variable constraint"
+      Misc.fatal_error "zero_alloc sub: variable constraint"
   | _, Const (Assume _) ->
-    Misc.fatal_error "zero_alloc: invalid constraint"
+    Misc.fatal_error "zero_alloc sub: invalid constraint"
   | _, (Const (Default_zero_alloc | Ignore_assert_all)) -> ()
   | Var v, Const c -> sub_var_const_exn v c
   | Const c1, Const c2 -> sub_const_const_exn c1 c2
@@ -238,10 +238,64 @@ let sub za1 za2 =
   with
   | Error e -> Result.Error e
 
+let set_var v c =
+  match v, c with
+  | { arity = arity1; _ },
+    (Check { arity = arity2; _ } | Assume { arity = arity2; _ })
+    when arity1 <> arity2 ->
+    raise (Error (Arity_mismatch (arity1, arity2)))
+  | { desc = None; _ }, Check { strict; opt; custom_error_msg; } ->
+    !log_change (None, v);
+    v.desc <- Some { strict; opt; custom_error_msg }
+  | { desc = None; _ }, Assume { strict; } ->
+    !log_change (None, v);
+    v.desc <- Some { strict; opt = true; custom_error_msg = None }
+  | { desc = (Some { strict = strict1; opt = opt1; custom_error_msg = msg1; } as desc); _ },
+    Check { strict = strict2; opt = opt2; custom_error_msg = msg2 } ->
+    let strict = strict1 || strict2 in
+    let opt = opt1 && opt2 in
+    let custom_error_msg, msg_changed =
+      match msg1, msg2 with
+      | None, None -> msg1, false;
+      | None, Some _ -> msg2, true;
+      | Some _, None -> msg1, false;
+      | Some m1, Some m2 ->
+        let b = String.equal m1 m2 in
+        let msg =
+          if b then msg1 else Some (String.concat "\n" [m1; m2])
+        in
+        msg, not b
+    in
+    if strict <> strict1 || opt <> opt1 || msg_changed then begin
+      !log_change (desc, v);
+      v.desc <- Some { strict; opt; custom_error_msg; }
+    end
+  | { desc = (Some { strict = strict1; opt; custom_error_msg } as desc); _ },
+    Assume { strict = strict2 } ->
+    let strict = strict1 || strict2 in
+    if strict <> strict1 then begin
+      !log_change (desc, v);
+      v.desc <- Some { strict; opt; custom_error_msg; }
+    end
+  | _, _ -> ()
+
+let eq_exn za1 za2 =
+  match za1, za2 with
+  | Var _, Var _ ->
+    if not (za1 == za2) then
+      Misc.fatal_error "zero_alloc equal: variable constraint"
+  | _, Const (Assume _)
+  | Const (Assume _), _ ->
+    Misc.fatal_error "zero_alloc equal: invalid constraint"
+  | Var v, Const c
+  | Const c, Var v -> set_var v c
+  | Const c1, Const c2 ->
+    sub_const_const_exn c1 c2;
+    sub_const_const_exn c2 c1
+
 let equal za1 za2 =
   try
-    sub_exn za1 za2;
-    sub_exn za2 za2;
+    eq_exn za1 za2;
     Ok ()
   with
   | Error (Arity_mismatch _ as e) -> Result.Error e

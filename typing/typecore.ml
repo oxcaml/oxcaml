@@ -1439,7 +1439,7 @@ let add_module_variables env module_variables =
   ) env module_variables_as_list
 
 let enter_variable ?(is_module=false) ?(is_as_variable=false) tps loc name mode
-      ~kind ty attrs zero_alloc sort =
+    ~kind ty attrs zero_alloc sort =
   if List.exists (fun {pv_id; _} -> Ident.name pv_id = name.txt)
       tps.tps_pattern_variables
   then raise(Error(loc, Env.empty, Multiply_bound_variable name.txt));
@@ -1979,8 +1979,7 @@ let solve_Ppat_constraint tps loc env mode sty expected_ty =
   unify_pat_types loc env ty (instance expected_ty);
   let expected_ty' =
     match get_desc expected_ty' with
-    | Tpoly (expected_ty', tl, za) ->
-        ignore za;
+    | Tpoly (expected_ty', tl, _za) ->
         instance_poly ~keep_names:true tl expected_ty'
     | _ -> expected_ty'
   in
@@ -5874,15 +5873,6 @@ let check_arg_compatible ~loc ~zero_alloc_expected env zero_alloc =
     if Zero_alloc.error_is_arity_mismatch e
     then () (* reported elsewhere *)
     else raise (Error (loc, env, Wrong_arg_zero_alloc e))
-
-(* let get_attr_from_type ~default_arity ~on_function_argument core_type =
- *   Builtin_attributes.get_zero_alloc_attribute
- *     ~in_signature:false
- *     ~on_application:false
- *     ~on_function_argument
- *     ~default_arity
- *     core_type.ptyp_attributes
- *   |> Zero_alloc.create_const *)
 
 let add_parsed_zero_alloc_attribute ~default_arity vb =
   let val_attr =
@@ -12501,7 +12491,7 @@ let report_error ~loc env =
         Zero_alloc.print_error err
   | Unsupported_arg_zero_alloc ->
       Location.errorf ~loc
-        "@[This function application expects an argument that does not \
+        "@[This function application expects an argument that does not@ \
          allocate.@ \
          Argument must be an identifier or a function binding.@]"
   | Must_provide_zero_alloc_arity ->
@@ -12512,7 +12502,7 @@ let report_error ~loc env =
         "Invalid zero-alloc payload for a higher-order function argument."
   | Incompatible_param_zero_alloc err ->
       Location.errorf ~loc
-        "@[The \"zero_alloc\" attribute on this function parameter conflicts \
+        "@[The \"zero_alloc\" attribute on this function parameter conflicts@ \
          with the one on its type.@]@ %a"
         Zero_alloc.print_error err
 

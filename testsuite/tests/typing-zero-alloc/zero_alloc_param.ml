@@ -111,8 +111,8 @@ let[@zero_alloc] f : ((int -> int -> int) [@zero_alloc]) -> int =
 Line 2, characters 6-31:
 2 |   fun (g [@zero_alloc arity 1]) -> g 42 123;; (* should fail *)
           ^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "zero_alloc" attribute on this function parameter conflicts with the one on its type.
-       zero_alloc arity mismatch:
+Error: The "zero_alloc" attribute on this function parameter conflicts
+       with the one on its type. zero_alloc arity mismatch:
        When using "zero_alloc" in a signature or function parameter, the
        syntactic arity of the implementation must match the function type in
        the interface. Here the former is 1 and the latter is 2.
@@ -133,14 +133,20 @@ let[@zero_alloc] f : ((int -> int) [@zero_alloc strict]) -> int =
 Line 2, characters 6-31:
 2 |   fun (g [@zero_alloc arity 1]) -> g 42;; (* should fail *)
           ^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "zero_alloc" attribute on this function parameter conflicts with the one on its type.
+Error: The "zero_alloc" attribute on this function parameter conflicts
+       with the one on its type.
        There is a mismatch between the two "zero_alloc" assumptions.
 |}];;
 
 let[@zero_alloc] f : ((int -> int) [@zero_alloc]) -> int =
-  fun (g [@zero_alloc strict arity 1]) -> g 42;; (* should succeed *)
+  fun (g [@zero_alloc strict arity 1]) -> g 42;; (* should fail *)
 [%%expect {|
-val f : ((int -> int) [@zero_alloc arity 1]) -> int [@@zero_alloc] = <fun>
+Line 2, characters 6-38:
+2 |   fun (g [@zero_alloc strict arity 1]) -> g 42;; (* should fail *)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "zero_alloc" attribute on this function parameter conflicts
+       with the one on its type.
+       There is a mismatch between the two "zero_alloc" assumptions.
 |}];;
 
 let[@zero_alloc] test_f : ((int -> int) [@zero_alloc strict]) -> int =
@@ -171,10 +177,14 @@ val f : ((int -> int) [@zero_alloc opt arity 1]) -> int [@@zero_alloc] =
 |}];;
 
 let[@zero_alloc] f : ((int -> int) [@zero_alloc opt]) -> int =
-  fun (g [@zero_alloc arity 1]) -> g 42;; (* should succeed *)
+  fun (g [@zero_alloc arity 1]) -> g 42;; (* should fail *)
 [%%expect {|
-val f : ((int -> int) [@zero_alloc opt arity 1]) -> int [@@zero_alloc] =
-  <fun>
+Line 2, characters 6-31:
+2 |   fun (g [@zero_alloc arity 1]) -> g 42;; (* should fail *)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "zero_alloc" attribute on this function parameter conflicts
+       with the one on its type.
+       There is a mismatch between the two "zero_alloc" assumptions.
 |}];;
 
 let[@zero_alloc] f : ((int -> int) [@zero_alloc]) -> int =
@@ -183,18 +193,29 @@ let[@zero_alloc] f : ((int -> int) [@zero_alloc]) -> int =
 Line 2, characters 6-35:
 2 |   fun (g [@zero_alloc opt arity 1]) -> g 42;; (* should fail *)
           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: The "zero_alloc" attribute on this function parameter conflicts with the one on its type.
+Error: The "zero_alloc" attribute on this function parameter conflicts
+       with the one on its type.
        There is a mismatch between the two "zero_alloc" assumptions.
 |}];;
 
 (* assume not supported on function parameters *)
 let[@zero_alloc] f : ((int -> int) [@zero_alloc assume]) -> int =
   fun (g [@zero_alloc assume arity 1]) -> g 42;; (* should fail *)
-[%expect {||}];;
+[%%expect {|
+Line 1, characters 21-63:
+1 | let[@zero_alloc] f : ((int -> int) [@zero_alloc assume]) -> int =
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Invalid zero-alloc payload for a higher-order function argument.
+|}];;
 
 let[@zero_alloc] f : ((int -> int) [@zero_alloc assume]) -> int =
   fun (g [@zero_alloc arity 1]) -> g 42;; (* should fail *)
-[%expect {||}];;
+[%%expect {|
+Line 1, characters 21-63:
+1 | let[@zero_alloc] f : ((int -> int) [@zero_alloc assume]) -> int =
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: Invalid zero-alloc payload for a higher-order function argument.
+|}];;
 
 (* partial application *)
 let _ =
@@ -202,10 +223,11 @@ let _ =
   let f' = f 123 in
   g f';; (* should fail; f' zero_alloc information is not available *)
 [%%expect {|
-Line 1, characters 21-63:
-1 | let[@zero_alloc] f : ((int -> int) [@zero_alloc assume]) -> int =
-                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Error: Invalid zero-alloc payload for a higher-order function argument.
+Line 4, characters 4-6:
+4 |   g f';; (* should fail; f' zero_alloc information is not available *)
+        ^^
+Error: Function argument zero alloc assumption violated.
+       There is a mismatch between the two "zero_alloc" assumptions.
 |}];;
 
 (* partial application with specified zero_alloc *)
@@ -231,7 +253,7 @@ let _ = g (fun[@zero_alloc] x -> (x, 123));; (* should fail in the backend *)
 Line 1, characters 16-26:
 1 | let _ = g (fun[@zero_alloc] x -> (x, 123));; (* should fail in the backend *)
                     ^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP32._$.(fun) (camlTOP32__fn[:1,10--42]_30_31_code).
+Error: Annotation check for zero_alloc failed on function TOP34._$.(fun) (camlTOP34__fn[:1,10--42]_26_27_code).
 Line 1, characters 33-41:
 1 | let _ = g (fun[@zero_alloc] x -> (x, 123));; (* should fail in the backend *)
                                      ^^^^^^^^
@@ -259,7 +281,7 @@ let _ = g (fun x -> [x]);; (* should fail in the backend *)
 Line 1, characters 10-24:
 1 | let _ = g (fun x -> [x]);; (* should fail in the backend *)
               ^^^^^^^^^^^^^^
-Error: Annotation check for zero_alloc failed on function TOP36._$.(fun) (camlTOP36__fn[:1,10--24]_38_39_code).
+Error: Annotation check for zero_alloc failed on function TOP38._$.(fun) (camlTOP38__fn[:1,10--24]_34_35_code).
 Line 1, characters 20-23:
 1 | let _ = g (fun x -> [x]);; (* should fail in the backend *)
                         ^^^
@@ -471,7 +493,12 @@ Error: Signature mismatch:
 let w2 : ('a. (('a -> int) [@zero_alloc])) -> int =
   fun (f [@zero_alloc arity 1]) -> f 123;;
 [%%expect {|
-val w2 : ('a. 'a -> int) -> int = <fun>
+Line 2, characters 6-31:
+2 |   fun (f [@zero_alloc arity 1]) -> f 123;;
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: The "zero_alloc" attribute on this function parameter conflicts
+       with the one on its type.
+       There is a mismatch between the two "zero_alloc" assumptions.
 |}];;
 
 (* Does zero-alloc information propagate across aliases?
@@ -572,6 +599,15 @@ let _ =
   let _ = g1 f in
   let _ = g2 f in
   let _ = g3 f in
+  f;;
+[%%expect {|
+- : int -> int = <fun>
+|}];;
+
+let _ =
+  let f x = x + 123 in
+  let _ = g2 f in
+  let _ = g1 f in
   f;;
 [%%expect {|
 - : int -> int = <fun>
