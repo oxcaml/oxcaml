@@ -131,9 +131,6 @@ type t =
   | Move
   | Spill
   | Reload
-  | Dummy_use
-    (* Use by register allocators to ensure temporaries written but not read are
-       live *)
   | Const_int of nativeint (* CR-someday xclerc: change to `Targetint.t` *)
   | Const_float32 of int32
   | Const_float of int64
