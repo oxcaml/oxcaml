@@ -295,6 +295,7 @@ type constructor_mismatch =
   | Kind of position
   | Explicit_return_type of position
   | Modality of int * Modality.equate_error
+  | Fixed_representation of position
 
 type extension_constructor_mismatch =
   | Constructor_privacy
@@ -315,7 +316,9 @@ type private_object_mismatch =
   | Types of Errortrace.equality_error
 
 type variant_change =
-  (Types.constructor_declaration as 'l, 'l, constructor_mismatch)
+  (Types.constructor_declaration * Types.constructor_representation option
+     as 'cd,
+   'cd, constructor_mismatch)
     Diffing_with_keys.change
 
 type unsafe_mode_crossing_mismatch =
@@ -557,16 +560,24 @@ let report_constructor_mismatch first second decl env ppf err =
       pr "Modality mismatch at argument position %i:@ %a"
         (i + 1) (report_modality_equate_error first second) err
         (* argument position is one-based; more intuitive *)
+  | Fixed_representation ord ->
+      pr "%s has a fixed representation and %s doesn't."
+        (String.capitalize_ascii (choose ord first second))
+        (choose_other ord first second);
+      pr "@ @[<2>Hint: Is there a type that has layout any in %s@ \
+          but not in %s?@]"
+        (choose_other ord first second)
+        (choose ord first second)
 
 let pp_variant_diff first second prefix decl env ppf (x : variant_change) =
   match x with
-  | Delete cd ->
+  | Delete { delete = { cd_id }, _ } ->
       Fmt.fprintf ppf  "%aAn extra constructor, %a, is provided in %s %s."
-        prefix x Style.inline_code (Ident.name cd.delete.cd_id) first decl
-  | Insert cd ->
+        prefix x Style.inline_code (Ident.name cd_id) first decl
+  | Insert { insert = { cd_id }, _ } ->
       Fmt.fprintf ppf "%aA constructor, %a, is missing in %s %s."
-        prefix x Style.inline_code (Ident.name cd.insert.cd_id) first decl
-  | Change Type {got; expected; reason} ->
+        prefix x Style.inline_code (Ident.name cd_id) first decl
+  | Change Type {got = got, _; expected = expected, _; reason} ->
     Printtyp.wrap_printing_env ~error:true env (fun () ->
       Fmt.fprintf ppf
         "@[<hv>%aConstructors do not match:@;<1 2>\
@@ -1013,7 +1024,32 @@ module Variant_diffing = struct
     | Types.Cstr_record _, _ -> Some (Kind First : constructor_mismatch)
     | _, Types.Cstr_record _ -> Some (Kind Second : constructor_mismatch)
 
-  let compare_constructors ~loc env params1 params2 res1 res2 args1 args2 =
+  let compare_constructor_shapes
+        ~loc:_ _env
+        (shape1 : constructor_representation option)
+        (shape2 : constructor_representation option)
+      : constructor_mismatch option =
+    match shape1, shape2 with
+    | None, None -> None
+    | Some _, None -> Some (Fixed_representation First)
+    | None, Some _ -> Some (Fixed_representation Second)
+    | Some _, Some _ ->
+        (* Currently the only way for the representations to be different but
+           the types the same is for the layout information to be different
+           between the two sides, which is only possible if the layout is
+           [any] on one side or the other. So if neither representation is
+           [None] then we must be okay. *)
+        None
+
+  let compare_constructors ~loc env params1 params2 res1 res2 args1 args2
+        shape1 shape2 =
+    let compare_args_and_shapes params1 params2 =
+      match
+        compare_constructor_arguments ~loc env params1 params2 args1 args2
+      with
+      | None -> compare_constructor_shapes ~loc env shape1 shape2
+      | Some err -> Some err
+    in
     match res1, res2 with
     | Some r1, Some r2 ->
         (* Allow renaming here: variables in GADT-syntax constructors are
@@ -1023,19 +1059,16 @@ module Variant_diffing = struct
               (* Pass the result types in this call to
                  [compare_constructor_arguments], so that the call to [Ctype.equal]
                  can see the entire scope of the variables *)
-        | () -> compare_constructor_arguments ~loc env [r1] [r2] args1 args2
-        end
+        | () -> compare_args_and_shapes [r1] [r2]
+      end
     | Some _, None -> Some (Explicit_return_type First)
     | None, Some _ -> Some (Explicit_return_type Second)
-    | None, None ->
-        compare_constructor_arguments ~loc env params1 params2 args1 args2
+    | None, None -> compare_args_and_shapes params1 params2
 
-  let equal ~loc env params1 params2
-      (cstrs1 : Types.constructor_declaration list)
-      (cstrs2 : Types.constructor_declaration list) =
+  let equal ~loc env params1 params2 cstrs1 cstrs2 =
     List.length cstrs1 = List.length cstrs2 &&
-    List.for_all2 (fun (cd1:Types.constructor_declaration)
-                    (cd2:Types.constructor_declaration) ->
+    List.for_all2 (fun ((cd1:Types.constructor_declaration), shape1)
+                    ((cd2:Types.constructor_declaration), shape2) ->
         Ident.name cd1.cd_id = Ident.name cd2.cd_id
         &&
         begin
@@ -1047,13 +1080,14 @@ module Variant_diffing = struct
             (Ident.name cd1.cd_id)
           ;
         match compare_constructors ~loc env params1 params2
-                cd1.cd_res cd2.cd_res cd1.cd_args cd2.cd_args with
+                cd1.cd_res cd2.cd_res cd1.cd_args cd2.cd_args shape1 shape2 with
         | Some _ -> false
         | None -> true
       end) cstrs1 cstrs2
 
   module Defs = struct
-    type left = Types.constructor_declaration
+    type left =
+      Types.constructor_declaration * constructor_representation option
     type right = left
     type diff = constructor_mismatch
     type state = type_expr list * type_expr list
@@ -1072,13 +1106,13 @@ module Variant_diffing = struct
 
 
   let test loc env (params1,params2)
-      ({pos; data=cd1}: D.left)
-      ({data=cd2; _}: D.right) =
+      ({pos; data=cd1, shape1}: D.left)
+      ({data=cd2, shape2; _}: D.right) =
     let name1, name2 = Ident.name cd1.cd_id, Ident.name cd2.cd_id in
     if  name1 <> name2 then
       let types_match =
         match compare_constructors ~loc env params1 params2
-                cd1.cd_res cd2.cd_res cd1.cd_args cd2.cd_args with
+                cd1.cd_res cd2.cd_res cd1.cd_args cd2.cd_args shape1 shape2 with
         | Some _ -> false
         | None -> true
       in
@@ -1086,13 +1120,14 @@ module Variant_diffing = struct
         (Diffing_with_keys.Name {types_match; pos; got=name1; expected=name2})
     else
       match compare_constructors ~loc env params1 params2
-              cd1.cd_res cd2.cd_res cd1.cd_args cd2.cd_args with
+              cd1.cd_res cd2.cd_res cd1.cd_args cd2.cd_args shape1 shape2 with
       | Some reason ->
-          Error (Diffing_with_keys.Type {pos; got=cd1; expected=cd2; reason})
+          Error (Diffing_with_keys.Type
+                   {pos; got=cd1, shape1; expected=cd2, shape2; reason})
       | None -> Ok ()
 
   let diffing loc env params1 params2 cstrs_1 cstrs_2 =
-    let key (x:Defs.left) = Ident.name x.cd_id in
+    let key ((x, _):Defs.left) = Ident.name x.cd_id in
     let module Compute = D.Simple(struct
         let key_left = key
         let key_right = key
@@ -1112,7 +1147,22 @@ module Variant_diffing = struct
   let compare_with_representation ~loc env params1 params2
       cstrs1 cstrs2 rep1 rep2
     =
-    let err = compare ~loc env params1 params2 cstrs1 cstrs2 in
+    let shapes1, shapes2 =
+      match rep1, rep2 with
+      | Variant_boxed cstr_shapes1, Variant_boxed cstr_shapes2 ->
+          Array.map (Option.map fst) cstr_shapes1 |> Array.to_list,
+          Array.map (Option.map fst) cstr_shapes2 |> Array.to_list
+      | _, _ ->
+          (* The match is doomed, but let [compare] go through first since that
+             catches more basic errors *)
+          List.map (fun _ -> None) cstrs1,
+          List.map (fun _ -> None) cstrs2
+    in
+    let cstrs_and_shapes1 = List.combine cstrs1 shapes1 in
+    let cstrs_and_shapes2 = List.combine cstrs2 shapes2 in
+    let err =
+      compare ~loc env params1 params2 cstrs_and_shapes1 cstrs_and_shapes2
+    in
     let attrs_of_only cstrs =
       match cstrs with
       | [cstr] -> cstr.Types.cd_attributes
@@ -1595,6 +1645,7 @@ let extension_constructors ~loc env ~mark id ext1 ext2 =
         ext1.ext_type_params ext2.ext_type_params
         ext1.ext_ret_type ext2.ext_ret_type
         ext1.ext_args ext2.ext_args
+        (Some ext1.ext_shape) (Some ext2.ext_shape)
     in
     match r with
     | Some r -> Some (Constructor_mismatch (id, ext1, ext2, r))
