@@ -410,11 +410,8 @@ module Sort = struct
     | Some t ->
       if is_genvar
       then begin
-        (* CR-soon zqian: unquantified genvar are nonsense and we should fatal
-           error. *)
-        match List.assq_opt v !sub_map with
-        | Some r -> r := Some t
-        | None -> ()
+        let r = List.assq v !sub_map in
+        r := Some t
       end;
       t_iter ~f:(fun u -> update_level u v) t
 
@@ -629,13 +626,7 @@ module Sort = struct
 
   let rec instance_var v =
     match v.contents with
-    | None when is_genvar v ->
-      (* CR-soon zqian: unquantified genvar are nonsense and we should fatal_error. *)
-      begin match List.assq_opt v !instance_map with
-      | Some v' -> Var v'
-      | None -> Var v
-      end
-    | None -> Var v
+    | None -> if is_genvar v then Var (List.assq v !instance_map) else Var v
     | Some t -> instance t
 
   and instance : t -> t = function
