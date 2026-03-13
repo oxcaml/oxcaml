@@ -503,6 +503,8 @@ let datalog_schedule =
      ==> alias ~to_ ~from);
     (* has_usage/has_source *)
     (let$ [x] = ["x"] in
+     [zero_alloc_source x] ==> any_source x);
+    (let$ [x] = ["x"] in
      [any_usage x] ==> has_usage x);
     (let$$ [x; y] = ["x"; "y"] in
      [usages x y] ==> has_usage x);
@@ -595,6 +597,8 @@ let datalog_schedule =
      [any_source base; rev_coaccessor ~base relation ~to_] ==> any_usage to_);
     (* sources: see explanation on usage *)
     (let$ [from; to_] = ["from"; "to_"] in
+     [rev_alias ~from ~to_; zero_alloc_source from] ==> zero_alloc_source to_);
+    (let$ [from; to_] = ["from"; "to_"] in
      [rev_alias ~from ~to_; any_source from] ==> any_source to_);
     (let$$ [from; relation; base] = ["from"; "relation"; "base"] in
      [has_source from; rev_constructor ~from relation ~base]
@@ -668,6 +672,9 @@ let datalog_schedule =
        field_sources_top base_source relation ]
      ==> any_source to_);
     (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
+     [zero_alloc_source base; rev_accessor ~base relation ~to_]
+     ==> zero_alloc_source to_);
+    (let$ [base; relation; to_] = ["base"; "relation"; "to_"] in
      [ any_source base;
        rev_accessor ~base relation ~to_;
        unless1 Field.is_local relation ]
@@ -691,7 +698,9 @@ let datalog_schedule =
     (let$ [to_; from] = ["to_"; "from"] in
      [has_usage to_; use ~to_ ~from] ==> any_usage from);
     (let$ [from; to_] = ["from"; "to_"] in
-     [has_source from; rev_use ~from ~to_] ==> any_source to_) ]
+     [has_source from; rev_use ~from ~to_] ==> any_source to_);
+    (let$ [from; to_] = ["from"; "to_"] in
+     [zero_alloc_source from; rev_use ~from ~to_] ==> zero_alloc_source to_) ]
   |> make_schedule
 
 type usages = Usages of unit Code_id_or_name.Map.t [@@unboxed]
