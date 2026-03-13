@@ -2307,18 +2307,7 @@ let unbox_once env ty =
               ~res_args
               ~payload_tys:[ty2]
               ~free_vars:(free_variable_set_of_list env)
-          | Type_variant ([{ cstr_existentials }], _, _) ->
-            (* Non-GADT unboxed wrappers only need the old existential-to-
-               [Tof_kind] substitution; there is no result-type projection to
-               perform. *)
-            List.map
-              (fun ty ->
-                match get_desc ty with
-                | Tvar { name = _; jkind } -> ty, newgenty (Tof_kind jkind)
-                | _ ->
-                  Misc.fatal_error
-                    "Ctype.unbox_once: existential is not a variable")
-              cstr_existentials
+| Type_variant ([{ cstr_generalized = false }], _, _) -> []
           | Type_variant (_not_one, _, _) ->
             Misc.fatal_error "Ctype.unbox_once: not just one constructor"
           | Type_abstract _ | Type_record _
