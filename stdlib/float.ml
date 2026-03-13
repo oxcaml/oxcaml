@@ -252,7 +252,7 @@ module Array = struct
 
   let copy a =
     let l = length a in
-    if l = 0 then empty
+    if l = 0 then Obj.magic_uncontended empty
     else unsafe_sub a 0 l
 
   let append a1 a2 =
