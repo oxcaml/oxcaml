@@ -1987,8 +1987,7 @@ let prepare_nested_join ~meet_type ~joined_envs ~bindings extensions =
           Bindings_in_target_env.definition_of_local_variables_in_one_joined_env
             bindings index
         in
-        Name.Map.union_left_biased
-          previous_equations
+        Name.Map.union_left_biased previous_equations
           (Name.var_map
              (defining_equations_of_existential_vars
                : Type_in_one_joined_env.t Variable_in_target_env.Map.t
